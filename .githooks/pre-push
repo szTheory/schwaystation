@@ -1,0 +1,4 @@
+#!/bin/sh
+# Scans every local-branch commit that no remote has yet, so the first push
+# covers the whole history and later pushes cover only what is new.
+exec "$(git rev-parse --show-toplevel)/scripts/hygiene.sh" --history --branches --not --remotes

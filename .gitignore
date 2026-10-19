@@ -1,0 +1,51 @@
+# Disc, executable, BIOS, memory-card and save images never enter this
+# repository. Licensed test fixtures are the one exception: they live under
+# tests/fixtures/, each is listed in tests/fixtures/manifest.txt, and
+# scripts/hygiene.sh rejects any image not listed.
+*.bin
+*.cue
+*.iso
+*.img
+*.chd
+*.pbp
+*.ecm
+*.mcr
+*.mcd
+*.gme
+*.exe
+*.psexe
+*.psx
+*.sbi
+*.m3u
+*.ccd
+*.sub
+*.mds
+*.mdf
+*.sav
+*.state
+!/tests/fixtures/**
+/discs/
+/bios/
+/private/
+
+# Local configuration and secrets (12-factor: local values live in .env.local)
+.env
+.env.*
+!.env.example
+
+# Build output
+/build/
+/out/
+/CMakeUserPresets.json
+compile_commands.json
+
+# GSD and agent state that is local to one machine
+/.planning/state.json
+/.planning/milestone.lock
+/.planning/research/.cache/
+/.gsd/
+/.claude/worktrees/
+/.claude/settings.local.json
+
+# OS noise
+.DS_Store

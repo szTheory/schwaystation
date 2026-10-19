@@ -1,0 +1,21 @@
+* text=auto eol=lf
+# Fixture bytes are hashed in tests/fixtures/manifest.txt; git must never rewrite them.
+/tests/fixtures/** -text
+*.bin binary
+*.cue binary
+*.iso binary
+*.img binary
+*.chd binary
+*.pbp binary
+*.ecm binary
+*.mcr binary
+*.mcd binary
+*.gme binary
+*.exe binary
+*.psexe binary
+*.psx binary
+*.sbi binary
+*.ccd binary
+*.sub binary
+*.mds binary
+*.mdf binary

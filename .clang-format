@@ -1,0 +1,8 @@
+# Formatting for C sources, checked with clang-format 21.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Linux
+AllowShortFunctionsOnASingleLine: None
+PointerAlignment: Right
+SortIncludes: Never
