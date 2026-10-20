@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: executing
-stopped_at: Completed 01-08-PLAN.md
-last_updated: "2026-10-20T04:04:39.177Z"
+stopped_at: Completed 01-09-PLAN.md
+last_updated: "2026-10-20T15:38:54.465Z"
 last_activity: 2026-10-19
 last_activity_desc: Phase 01 execution started
-state_head: eaa68cf56371d65633d93955a4300fef21857607
+state_head: 58792b90cb72d02869e802a9fde67863fb9960d4
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 15
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 ## Current Position
 
 Phase: 01 (A test frame in RetroArch) — EXECUTING
-Plan: 9 of 15
+Plan: 10 of 15
 Status: Ready to execute
 Last activity: 2026-10-19 — Phase 01 execution started
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P06 | 8 min | 3 tasks | 10 files |
 | Phase 01 P07 | 6min | 3 tasks | 9 files |
 | Phase 01 P08 | 6 min | 2 tasks | 6 files |
+| Phase 01 P09 | 11h30m wall (checkpoint interruption) | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,7 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-07: perf_compare.cmake reads its mode only from SCHWAYSTATION_PERF_MODE; an unset mode is an input error
 - [Phase 01]: 01-07: budgets.cmake resolves ROOT with file(REAL_PATH) so a relative ROOT still globs docs/*.md
 - [Phase 01]: embed.subdirectory accepts exactly the library and its three object libraries, and fails on any install rule in the embedded tree
+- [Phase 01]: 01-09: --bench shares the --frames limit 1..1000000; the revision is read by git rev-parse at configure into a runner-only generated header and build.revision_matches_head compares it with HEAD
 
 ### Pending Todos
 
@@ -120,6 +122,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T04:04:39.156Z
-Stopped at: Completed 01-08-PLAN.md
+Last session: 2026-10-20T15:38:54.449Z
+Stopped at: Completed 01-09-PLAN.md
 Resume file: None
