@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-10-20T03:40:25.759Z"
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-10-20T03:50:25.121Z"
 last_activity: 2026-10-19
 last_activity_desc: Phase 01 execution started
-state_head: 56fefeea421f0e6f8bbd61ed8dde20f092d38df2
+state_head: b61c57dc296f8b8cba4c26944c43c4c2f5d323f3
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 15
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 ## Current Position
 
 Phase: 01 (A test frame in RetroArch) — EXECUTING
-Plan: 6 of 15
+Plan: 7 of 15
 Status: Ready to execute
 Last activity: 2026-10-19 — Phase 01 execution started
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 9 min | 3 tasks | 8 files |
 | Phase 01 P04 | 6min | 3 tasks | 11 files |
 | Phase 01 P05 | 8min | 3 tasks | 14 files |
+| Phase 01 P06 | 8 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,9 @@ Recent decisions affecting current work:
 - [Phase 01]: Darwin abi.undefined allows memset_pattern16 (Apple clang lowers the test card's repeating fill to it); Windows allows __ImageBase for MSVC switch tables
 - [Phase 01]: core.no_host_clock is the whole host-clock proof: the PS1 has no RTC, so no injected-RTC form
 - [Phase 01]: abi.header.c17/cxx17 and abi.api_v1 are compile/run checks without self-tests; the five gates with negative controls are abi.symbols, abi.globals, abi.undefined, abi.api_version and core.no_host_clock
+- [Phase 01]: line_budget.cmake counts newline bytes only, as wc -l does, so its total equals the wc -l the gate ceilings use
+- [Phase 01]: policy.publish_set.self_test fails both a 17-archive and a 19-archive set, covering both sides of exactly 18
+- [Phase 01]: ci.* hygiene tests carry label hygiene only; policy.* tests carry hygiene and policy
 
 ### Pending Todos
 
@@ -111,6 +115,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T03:40:25.733Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-10-20T03:50:25.099Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
