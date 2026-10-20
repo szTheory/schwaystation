@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: executing
-stopped_at: Completed 01-10-PLAN.md
-last_updated: "2026-10-20T15:50:51.960Z"
+stopped_at: Completed 01-11-PLAN.md
+last_updated: "2026-10-20T15:56:39.664Z"
 last_activity: 2026-10-19
 last_activity_desc: Phase 01 execution started
-state_head: c84e837a13839d552c9a8b92e6fb35eacb5aabc7
+state_head: e521dfe11291b7214e5c0e35b8e8ee75d44e9a6e
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 15
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 ## Current Position
 
 Phase: 01 (A test frame in RetroArch) — EXECUTING
-Plan: 11 of 15
+Plan: 12 of 15
 Status: Ready to execute
 Last activity: 2026-10-19 — Phase 01 execution started
 
@@ -68,6 +68,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P08 | 6 min | 2 tasks | 6 files |
 | Phase 01 P09 | 11h30m wall (checkpoint interruption) | 3 tasks | 16 files |
 | Phase 01 P10 | 12min | 2 tasks | 7 files |
+| Phase 01 P11 | 4min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-09: --bench shares the --frames limit 1..1000000; the revision is read by git rev-parse at configure into a runner-only generated header and build.revision_matches_head compares it with HEAD
 - [Phase 01]: libretro adapter recreates the instance on a region option change (profile locks after the first frame) and sends SET_SYSTEM_AV_INFO only on a changed update
 - [Phase 01]: libretro .info claims core_options true (tested in-process); savestate stays false although retro_serialize is wired and tested
+- [Phase 01]: 01-11: the README install line keeps the seed form (curl zip and SHA256SUMS, shasum -c --ignore-missing, tar -xf cores info), so a damaged download installs nothing
+- [Phase 01]: 01-11: release.floor is not ported; only the two archive-contents tests carry the release label
 
 ### Pending Todos
 
@@ -125,6 +128,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T15:50:51.942Z
-Stopped at: Completed 01-10-PLAN.md
+Last session: 2026-10-20T15:56:39.646Z
+Stopped at: Completed 01-11-PLAN.md
 Resume file: None
