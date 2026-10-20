@@ -1,1 +1,2 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+runner.hash	portable,runner

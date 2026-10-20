@@ -10,7 +10,6 @@
 #
 # Findings name the rule and the file, never the matched text, so the output is
 # safe to paste anywhere. Exit status is 1 if anything was found.
-# Adapted from the owner's cogmaster project (MIT).
 set -eu
 
 # The C locale for every command: under a UTF-8 locale grep -I treats bytes that
