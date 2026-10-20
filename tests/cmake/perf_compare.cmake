@@ -1,27 +1,21 @@
-# SCHWAYSTATION_PERF_MODE=<gate|report> cmake -DFIXTURE=<name> -DHEAD=<n> -DBASE1=<n> -DBASE2=<n>
-#   -DALLOW=<allow file> -DTODAY=<YYYY-MM-DD> [-DNO_BASE=true] -P perf_compare.cmake
-# Fault prevented: a pull request making the core slower unnoticed. HEAD is the
-# Cachegrind Ir per frame of the merge commit, (Ir at 360 frames - Ir at 60) / 300,
-# BASE1 and BASE2 two measurements of its first parent. Prints
-#   perf <fixture> head=<n> base=<n|none> delta_bp=<n|none> verdict=<PASS|FAIL|UNSTABLE|NO_BASE>
-# The limit is +100 basis points, exactly +1.00 % passing; a dated allow line raises
-# it for one fixture. Only gate mode fails a verdict; an input error always fails.
+# SCHWAYSTATION_PERF_MODE=<gate|report> cmake -DFIXTURE=<name> -DHEAD=<n> -DBASE1=<n>
+#   -DBASE2=<n> -DALLOW=<file> -DTODAY=<YYYY-MM-DD> [-DNO_BASE=true] -P perf_compare.cmake
+# Fault prevented: a pull request slowing the core unnoticed. HEAD is Cachegrind Ir per
+# frame, (Ir at 360 frames - Ir at 60) / 300; BASE1 and BASE2 measure the first parent.
+# Fails above +1.00 % (or a dated allow line's cap) only in gate mode; bad input always.
 cmake_minimum_required(VERSION 3.25)
 function(perf_error reason)
   message(FATAL_ERROR "perf: error ${reason}")
 endfunction()
-
 # Days since 1970-01-01 of a YYYY-MM-DD date (the civil-from-days inverse).
 function(perf_days out date)
   if(NOT date MATCHES "^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])$")
     perf_error("date '${date}' is not YYYY-MM-DD")
   endif()
   set(y ${CMAKE_MATCH_1})
-  set(m ${CMAKE_MATCH_2})
-  set(d ${CMAKE_MATCH_3})
-  # A leading zero would read as octal.
-  string(REGEX REPLACE "^0" "" m "${m}")
-  string(REGEX REPLACE "^0" "" d "${d}")
+  # A leading 1 keeps a leading zero from reading as octal.
+  math(EXPR m "1${CMAKE_MATCH_2} - 100")
+  math(EXPR d "1${CMAKE_MATCH_3} - 100")
   if(m LESS 1 OR m GREATER 12 OR d LESS 1 OR d GREATER 31)
     perf_error("date '${date}' is out of range")
   endif()
@@ -37,14 +31,11 @@ function(perf_days out date)
   math(EXPR days "${era} * 146097 + ${yoe} * 365 + ${yoe} / 4 - ${yoe} / 100 + ${doy} - 719468")
   set(${out} ${days} PARENT_SCOPE)
 endfunction()
-
-# A measurement is a decimal integer without a leading zero; 0 is none either.
 function(perf_number name)
   if(NOT "${${name}}" MATCHES "^[1-9][0-9]*$")
     perf_error("${name} '${${name}}' is not a measurement")
   endif()
 endfunction()
-
 set(mode "$ENV{SCHWAYSTATION_PERF_MODE}")
 if(NOT FIXTURE MATCHES "^[A-Za-z0-9_.-]+$")
   perf_error("FIXTURE '${FIXTURE}' is not a fixture name")
@@ -53,11 +44,9 @@ if(NOT mode MATCHES "^(gate|report)$")
   perf_error("SCHWAYSTATION_PERF_MODE '${mode}' is not gate or report")
 endif()
 perf_number(HEAD)
-if(NO_BASE STREQUAL "true")
-  if(NOT "${BASE1}${BASE2}" STREQUAL "")
-    perf_error("NO_BASE is true but a base was measured")
-  endif()
-else()
+if(NO_BASE STREQUAL "true" AND NOT "${BASE1}${BASE2}" STREQUAL "")
+  perf_error("NO_BASE is true but a base was measured")
+elseif(NOT NO_BASE STREQUAL "true")
   perf_number(BASE1)
   perf_number(BASE2)
 endif()
@@ -65,7 +54,6 @@ if(NOT EXISTS "${ALLOW}")
   perf_error("allow file '${ALLOW}' does not exist")
 endif()
 perf_days(today "${TODAY}")
-
 # Allow lines: <fixture> <max % x 100> <expiry YYYY-MM-DD> <reason>. The reason is
 # never printed, so list syntax in it is replaced before the text is split.
 set(limit 100)
@@ -90,7 +78,6 @@ foreach(line IN LISTS lines)
     set(limit ${cap})
   endif()
 endforeach()
-
 if(NO_BASE STREQUAL "true")
   set(verdict NO_BASE)
   set(line "perf ${FIXTURE} head=${HEAD} base=none delta_bp=none verdict=NO_BASE")
