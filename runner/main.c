@@ -1,6 +1,7 @@
 /* schwaystation-run: the headless runner.
  *
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
  *   schwaystation-run --help | --version
  *
  * Runs N frames (1 <= N <= 1,000,000) of one instance with no BIOS and no
@@ -19,14 +20,22 @@
  * PNG, each pixel converted by the shared XRGB8888 converter with the X byte
  * dropped. A file that cannot be written in full is removed.
  *
+ * --bench N runs N frames as --frames N does, times each schway_run_frame
+ * with the runner's monotonic clock and prints the report described in
+ * bench.h. The core reads no clock. docs/runner.md describes all of this for
+ * users.
+ *
  * Exit statuses are listed in exit_status.h and printed by --help.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "bench.h"
+#include "clock.h"
 #include "exit_status.h"
 #include "png.h"
+#include "rss.h"
 #include "schwaystation.h"
 #include "sha256.h"
 #include "xrgb8888.h"
@@ -49,9 +58,11 @@ static void run_free(void *user, void *ptr, size_t size)
 
 static const char synopsis[] =
     "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
     "  --frames N         run N frames (1 <= N <= 1000000)\n"
+    "  --bench N          run N frames and report the time per frame\n"
     "  --hash             print the SHA-256 of the last frame\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --help             print this text and the exit statuses\n"
@@ -129,6 +140,7 @@ static int parse_png(const char *text, uint32_t *frame, const char **path)
 
 typedef struct options {
     uint32_t frames;
+    int bench; /* --bench N rather than --frames N */
     int hash;
     uint32_t png_frame; /* 0 when no --png was given */
     const char *png_path;
@@ -154,12 +166,13 @@ static int parse_options(int argc, char **argv, options *o)
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
         const char *value = i + 1 < argc ? argv[i + 1] : NULL;
-        if (strcmp(arg, "--frames") == 0) {
+        if (strcmp(arg, "--frames") == 0 || strcmp(arg, "--bench") == 0) {
             if (o->frames != 0u) {
-                return usage("give --frames once");
+                return usage("give --frames or --bench once");
             }
-            if (!parse_frames(value, &o->frames)) {
-                return usage("--frames needs a whole number from 1 to 1000000");
+            o->bench = strcmp(arg, "--bench") == 0;
+            if (!parse_frames(value, &o->frames) || schway__bench_bytes(o->frames) == 0u) {
+                return usage("--frames and --bench need a whole number from 1 to 1000000");
             }
             i++;
         } else if (strcmp(arg, "--hash") == 0) {
@@ -190,7 +203,7 @@ static int parse_options(int argc, char **argv, options *o)
         }
     }
     if (o->frames == 0u) {
-        return usage("--frames N is required");
+        return usage("--frames N or --bench N is required");
     }
     if (o->png_frame > o->frames) {
         return usage("--png N must not exceed --frames");
@@ -305,9 +318,18 @@ static int write_png(const schway *inst, const char *path)
     return status;
 }
 
-/* Runs the frames. Returns the exit status. */
+/* Runs the frames. The bench samples take 4 bytes per frame, so they are
+   on the heap. Returns the exit status. */
 static int run(const options *opt)
 {
+    uint32_t *samples = NULL;
+    if (opt->bench) {
+        samples = (uint32_t *)malloc(schway__bench_bytes(opt->frames));
+        if (samples == NULL) {
+            fprintf(stderr, "schwaystation-run: out of memory\n");
+            return SCHWAY__EXIT_FAILURE;
+        }
+    }
     schway_config cfg;
     memset(&cfg, 0, sizeof cfg);
     cfg.size = (uint32_t)sizeof cfg;
@@ -318,6 +340,7 @@ static int run(const options *opt)
     if (st != SCHWAY_STATUS_OK) {
         fprintf(stderr, "schwaystation-run: schway_create failed: %s\n",
                 schway_status_string(st));
+        free(samples);
         return SCHWAY__EXIT_FAILURE;
     }
     int status = SCHWAY__EXIT_OK;
@@ -333,8 +356,15 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
         }
     }
+    /* Only schway_run_frame is timed, not hashing or writing files. */
+    uint32_t ran = 0;
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
+        uint64_t start_ns = opt->bench ? schway__clock_ns() : 0u;
         st = schway_run_frame(inst, NULL);
+        if (opt->bench) {
+            samples[ran] = schway__bench_us(schway__clock_ns() - start_ns);
+        }
+        ran = n;
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: schway_run_frame failed: %s\n",
                     schway_status_string(st));
@@ -345,9 +375,16 @@ static int run(const options *opt)
         }
     }
     if (status == SCHWAY__EXIT_OK && opt->hash) {
-        status = print_hash(inst, opt->frames);
+        status = print_hash(inst, ran);
+    }
+    if (status == SCHWAY__EXIT_OK && opt->bench) {
+        char report[512];
+        size_t len =
+            schway__bench_format(report, sizeof report, samples, ran, schway__rss_max_kib());
+        (void)fwrite(report, 1u, len, stdout);
     }
     schway_destroy(inst);
+    free(samples);
     return status;
 }
 
