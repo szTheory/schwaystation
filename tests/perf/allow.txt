@@ -1,0 +1,6 @@
+# Reviewed exceptions to the instructions-per-frame gate, one line each:
+#   <fixture> <max % x 100> <expiry YYYY-MM-DD> <reason>
+# Example: "testcard 250 2026-12-01 the new mixer runs every scanline" lets the
+# test card slow down by up to 2.50 % until 1 December. A line applies from the
+# day it is checked through its expiry, which must be at most 60 days away. It
+# is reviewed in the pull request that needs it and removed after that merges.
