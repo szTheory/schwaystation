@@ -14,7 +14,59 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   endfunction()
 
-  if(CASE STREQUAL "png_file")
+  # Runs the runner with ARGN through expect_fail.cmake, which passes only
+  # for exit 2 and a usage message.
+  function(refuse)
+    set(CMD ${EMULATOR} ${RUN} ${ARGN})
+    set(CODE 2)
+    set(REGEX "usage")
+    include(${CMAKE_CURRENT_LIST_DIR}/../cmake/expect_fail.cmake)
+  endfunction()
+
+  if(CASE STREQUAL "no_args")
+    refuse()
+  elseif(CASE STREQUAL "unknown")
+    # An option this release does not have, and --help or --version with
+    # anything else.
+    refuse(--frames 1 --bios)
+    refuse(--frames 1 --disc x.cue)
+    refuse(--frames 1 --help)
+    refuse(--version --frames 1)
+  elseif(CASE STREQUAL "positional")
+    # This release loads no disc, so a file name is a usage error.
+    refuse(--frames 1 game.cue)
+    refuse(game.cue)
+  elseif(CASE STREQUAL "frame_range")
+    refuse(--frames 0)
+    refuse(--frames 1000001)
+    refuse(--frames 4294967296)
+    refuse(--frames -1)
+    refuse(--frames 1x)
+    refuse(--frames)
+    refuse(--hash --frames)
+    refuse(--frames 1 --frames 1)
+  elseif(CASE STREQUAL "png_syntax")
+    # Each malformed or out-of-range --png is refused, whichever order the
+    # options come in, and writes nothing.
+    file(REMOVE "${OUT}")
+    refuse(--frames 5 --png)
+    refuse(--frames 5 --png "${OUT}")
+    refuse(--frames 5 --png "5:")
+    refuse(--frames 5 --png ":${OUT}")
+    refuse(--frames 5 --png "0:${OUT}")
+    refuse(--frames 5 --png "x:${OUT}")
+    refuse(--frames 5 --png "6:${OUT}")
+    refuse(--png "6:${OUT}" --frames 5)
+    refuse(--frames 5 --png "5:${OUT}" --png "5:${OUT}")
+    if(EXISTS "${OUT}")
+      message(FATAL_ERROR "a refused --png wrote ${OUT}")
+    endif()
+  elseif(CASE STREQUAL "region")
+    refuse(--frames 1 --region)
+    refuse(--frames 1 --region secam)
+    refuse(--frames 1 --region NTSC-U)
+    refuse(--frames 1 --region auto)
+  elseif(CASE STREQUAL "png_file")
     # The decode check runs first, so the pinned digest is only ever
     # compared for a file whose IHDR and every pixel are already known good.
     file(REMOVE "${OUT}")
@@ -130,3 +182,14 @@ schway_add_test(NAME runner.png_file
     -DDECODE=$<TARGET_FILE:schwaystation-test-runner> -DEXPECTED=${SCHWAYSTATION_TESTCARD_PNG_SHA256}
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: a command line that runs something it should refuse, so a
+# CI step hashes a frame nobody asked for: no arguments, an option this
+# release lacks, a file name, a frame count out of range or missing, a
+# malformed or out-of-range --png, or an unknown region.
+foreach(case no_args unknown positional frame_range png_syntax region)
+  schway_add_test(NAME runner.usage.${case}
+    COMMAND ${runner_check} -DCASE=${case} -DOUT=${PROJECT_BINARY_DIR}/tests/refused.png
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS portable runner TIMEOUT 30)
+endforeach()
