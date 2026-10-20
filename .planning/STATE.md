@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: executing
-stopped_at: Completed 01-11-PLAN.md
-last_updated: "2026-10-20T15:56:39.664Z"
+stopped_at: Completed 01-12-PLAN.md
+last_updated: "2026-10-20T16:05:24.039Z"
 last_activity: 2026-10-19
 last_activity_desc: Phase 01 execution started
-state_head: e521dfe11291b7214e5c0e35b8e8ee75d44e9a6e
+state_head: 3e97b7bb285b0efe3e86646b3227f0332ff13aaa
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 15
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 ## Current Position
 
 Phase: 01 (A test frame in RetroArch) — EXECUTING
-Plan: 12 of 15
+Plan: 13 of 15
 Status: Ready to execute
 Last activity: 2026-10-19 — Phase 01 execution started
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P09 | 11h30m wall (checkpoint interruption) | 3 tasks | 16 files |
 | Phase 01 P10 | 12min | 2 tasks | 7 files |
 | Phase 01 P11 | 4min | 2 tasks | 6 files |
+| Phase 01 P12 | 6min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,10 @@ Recent decisions affecting current work:
 - [Phase 01]: libretro .info claims core_options true (tested in-process); savestate stays false although retro_serialize is wired and tested
 - [Phase 01]: 01-11: the README install line keeps the seed form (curl zip and SHA256SUMS, shasum -c --ignore-missing, tar -xf cores info), so a damaged download installs nothing
 - [Phase 01]: 01-11: release.floor is not ported; only the two archive-contents tests carry the release label
+- [Phase 01]: 01-12: the tests/retroarch files carry no PS1 value; FRAMES=5, --frames 5 --png 5:runner.png and the 320x240 regex live in ci.yml, so the e2e code stays 293 lines
+- [Phase 01]: 01-12: every ci.yml timeout keeps the seed bound marked provisional with no run ID until plan 01-15 measures them
+- [Phase 01]: 01-12: CI required omits the rehearsal and cleanup clauses until plan 01-13 adds those jobs
+- [Phase 01]: 01-12: tests/cmake/workflows.cmake MODE=timeouts|pins replaces the seed's two workflow scans
 
 ### Pending Todos
 
@@ -128,6 +133,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T15:56:39.646Z
-Stopped at: Completed 01-11-PLAN.md
+Last session: 2026-10-20T16:05:24.013Z
+Stopped at: Completed 01-12-PLAN.md
 Resume file: None

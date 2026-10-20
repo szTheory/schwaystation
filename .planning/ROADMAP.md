@@ -42,7 +42,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The pull request's rehearsal produces exactly 18 version-free archives, each with `LICENSE` and `THIRD-PARTY-NOTICES.md`, plus `SHA256SUMS` and verified attestations, then deletes itself. Merging publishes the same set with no manual step.
   5. Each ABI, hygiene and policy gate (`abi.*`, `hygiene.*`, `policy.*`, `ci.title`, `build.revision_matches_head`) fails its negative control with its named message. `--bench` reports the frame-time percentiles, and the Cachegrind Ir/frame measurement runs on every pull request. The core makes zero allocations after load and never reads a host clock.
 
-**Plans**: 11/15 plans executed in 8 waves
+**Plans**: 12/15 plans executed in 8 waves
 
 Plans:
 **Wave 1**
@@ -65,7 +65,7 @@ Plans:
 - [x] 01-11-PLAN.md — Packaging, release.archive_contents and the README install line (wave 4)
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 01-12-PLAN.md — ci.yml lanes, RetroArch e2e compare and the workflow gates (wave 5)
+- [x] 01-12-PLAN.md — ci.yml lanes, RetroArch e2e compare and the workflow gates (wave 5)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 01-13-PLAN.md — Rehearsal and cleanup, release-please, release and nightly workflows, maintainer guide (wave 6)
@@ -164,7 +164,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. A test frame in RetroArch | 11/15 | In Progress | - |
+| 1. A test frame in RetroArch | 12/15 | In Progress | - |
 | 2. The CPU matches the public vectors | 0/TBD | Not started | - |
 | 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
