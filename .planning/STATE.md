@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: executing
-stopped_at: Completed 01-06-PLAN.md
-last_updated: "2026-10-20T03:50:25.121Z"
+stopped_at: Completed 01-07-PLAN.md
+last_updated: "2026-10-20T03:58:27.909Z"
 last_activity: 2026-10-19
 last_activity_desc: Phase 01 execution started
-state_head: b61c57dc296f8b8cba4c26944c43c4c2f5d323f3
+state_head: 0ea639a06e94845b0dcf1daafa3ba6f72e00298b
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 15
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 ## Current Position
 
 Phase: 01 (A test frame in RetroArch) — EXECUTING
-Plan: 7 of 15
+Plan: 8 of 15
 Status: Ready to execute
 Last activity: 2026-10-19 — Phase 01 execution started
 
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P04 | 6min | 3 tasks | 11 files |
 | Phase 01 P05 | 8min | 3 tasks | 14 files |
 | Phase 01 P06 | 8 min | 3 tasks | 10 files |
+| Phase 01 P07 | 6min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Recent decisions affecting current work:
 - [Phase 01]: line_budget.cmake counts newline bytes only, as wc -l does, so its total equals the wc -l the gate ceilings use
 - [Phase 01]: policy.publish_set.self_test fails both a 17-archive and a 19-archive set, covering both sides of exactly 18
 - [Phase 01]: ci.* hygiene tests carry label hygiene only; policy.* tests carry hygiene and policy
+- [Phase 01]: 01-07: perf_compare.cmake reads its mode only from SCHWAYSTATION_PERF_MODE; an unset mode is an input error
+- [Phase 01]: 01-07: budgets.cmake resolves ROOT with file(REAL_PATH) so a relative ROOT still globs docs/*.md
 
 ### Pending Todos
 
@@ -115,6 +118,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T03:50:25.099Z
-Stopped at: Completed 01-06-PLAN.md
+Last session: 2026-10-20T03:58:27.893Z
+Stopped at: Completed 01-07-PLAN.md
 Resume file: None
