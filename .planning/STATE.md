@@ -143,6 +143,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 | 2026-10-19 | /gsd-plan-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-execute-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-20 | /gsd-execute-phase 1 (continued) | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
+| 2026-10-20 | /gsd-code-review 1 | Codex, inline standard review | GPT-6 (session; exact model ID not exposed) |
 
 ## Session Continuity
 
