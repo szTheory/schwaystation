@@ -1,0 +1,17 @@
+# Every pinned download, one row each: name version url sha256.
+# scripts/fetch-pin.sh NAME DEST downloads a row and verifies its SHA-256 before use.
+#
+# Bump policy: take an LTS patch release when it fixes a security advisory, and move
+# to the next LTS before this one's end of life. Each bump is one `ci:` pull request
+# whose digest comes from the release API (the asset's `digest` field). Packages
+# installed with apt stay unpinned: they are signed, and drift fails loudly as a
+# build failure or a hash change.
+
+# wasmtime 48 LTS: runs the wasm32 lane's tests.
+wasmtime-x86_64-linux 48.0.7 https://github.com/bytecodealliance/wasmtime/releases/download/v48.0.7/wasmtime-v48.0.7-x86_64-linux.tar.xz 2192e2b5b911dc42321b9eac2b7f1f0b0d03356058c1e2b2c2b892625bdd0f45
+wasmtime-aarch64-linux 48.0.7 https://github.com/bytecodealliance/wasmtime/releases/download/v48.0.7/wasmtime-v48.0.7-aarch64-linux.tar.xz cc07a1107b53e7f3caee171249e3718a244b90ddc206eec417b3033360db8f63
+wasmtime-aarch64-macos 48.0.7 https://github.com/bytecodealliance/wasmtime/releases/download/v48.0.7/wasmtime-v48.0.7-aarch64-macos.tar.xz 7eee840798c071e9eff501fe456cf031353556fd28d05d21aa3ace866643a941
+
+# RetroArch 1.22.2 Metal (universal) from the libretro buildbot: the hosted
+# retroarch job runs the built core in it.
+retroarch-dmg 1.22.2 https://buildbot.libretro.com/stable/1.22.2/apple/osx/universal/RetroArch_Metal.dmg 81b79121ba26d539064ae13b4d0419a120c3d165afbe656cf5f5412b15fdb434
