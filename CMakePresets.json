@@ -236,7 +236,9 @@
       "steps": [
         { "type": "configure", "name": "ci" },
         { "type": "build", "name": "ci" },
-        { "type": "test", "name": "ci" }
+        { "type": "test", "name": "ci" },
+        { "type": "package", "name": "ci" },
+        { "type": "test", "name": "ci-release" }
       ]
     },
     {
@@ -244,7 +246,9 @@
       "steps": [
         { "type": "configure", "name": "ci-msvc" },
         { "type": "build", "name": "ci-msvc" },
-        { "type": "test", "name": "ci-msvc" }
+        { "type": "test", "name": "ci-msvc" },
+        { "type": "package", "name": "ci-msvc" },
+        { "type": "test", "name": "ci-msvc-release" }
       ]
     },
     {
