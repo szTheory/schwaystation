@@ -52,3 +52,66 @@ foreach(case IN ITEMS "abi.symbols;symbols;symbol;outside[^:]*namespace:.*abi_sy
       -P ${abi_scripts}/expect_fail.cmake
     LABELS abi TIMEOUT 30)
 endforeach()
+
+# Every header name is in a versioned API test, so a declaration added after
+# a release needs tests/api/v2.c and with it SCHWAY_API_VERSION 2. The self
+# test reads a copy of the header with one extra function and no bump, and
+# expects that function named.
+schway_add_test(NAME abi.api_version
+  COMMAND ${CMAKE_COMMAND} -DHEADER=${PROJECT_SOURCE_DIR}/include/schwaystation.h
+    -DAPI_DIR=${PROJECT_SOURCE_DIR}/tests/api -P ${abi_scripts}/api_version.cmake
+  LABELS abi TIMEOUT 10)
+file(READ ${PROJECT_SOURCE_DIR}/include/schwaystation.h abi_header)
+string(REPLACE "void schway_destroy(schway *inst);"
+  "void schway_destroy(schway *inst);\nschway_status schway_added(schway *inst);"
+  abi_header "${abi_header}")
+if(NOT abi_header MATCHES "schway_added")
+  message(FATAL_ERROR "abi.api_version.self_test: the schway_destroy declaration moved")
+endif()
+file(WRITE ${PROJECT_BINARY_DIR}/tests/abi/added_function.h "${abi_header}")
+set(abi_cmd ${CMAKE_COMMAND} -DHEADER=${PROJECT_BINARY_DIR}/tests/abi/added_function.h
+  -DAPI_DIR=${PROJECT_SOURCE_DIR}/tests/api -P ${abi_scripts}/api_version.cmake)
+string(REPLACE ";" "$<SEMICOLON>" abi_cmd "${abi_cmd}")
+schway_add_test(NAME abi.api_version.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${abi_cmd}" -DCODE=1
+    "-DREGEX=in no tests/api/vK[.]c[^:]*1:.*schway_added" -P ${abi_scripts}/expect_fail.cmake
+  LABELS abi TIMEOUT 10)
+
+# The frozen API v1 program: every function, field and constant of version 1.
+add_executable(schwaystation-test-api-v1 ${PROJECT_SOURCE_DIR}/tests/api/v1.c)
+target_link_libraries(schwaystation-test-api-v1 PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-api-v1 PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-api-v1)
+schway_add_test(NAME abi.api_v1 COMMAND schwaystation-test-api-v1
+  LABELS abi portable TIMEOUT 10)
+
+# The public header compiles alone as C17 and as C++17 with warnings fatal.
+# Fault prevented: a header that only the core's own build, with its own
+# flags and language, can compile. C++ is enabled here only; an embedding
+# project never meets it. The targets are built only by these tests, which
+# share the build tree and so take turns.
+enable_language(CXX)
+add_library(schwaystation_header_c17 OBJECT EXCLUDE_FROM_ALL
+  ${PROJECT_SOURCE_DIR}/tests/header/header.c)
+add_library(schwaystation_header_cxx17 OBJECT EXCLUDE_FROM_ALL
+  ${PROJECT_SOURCE_DIR}/tests/header/header.cpp)
+set_target_properties(schwaystation_header_cxx17 PROPERTIES
+  CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+schway_warnings(schwaystation_header_c17)
+foreach(abi_target IN ITEMS schwaystation_header_c17 schwaystation_header_cxx17)
+  target_include_directories(${abi_target} PRIVATE
+    ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/generated)
+  target_compile_options(${abi_target} PRIVATE
+    $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Werror>
+    $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic -Werror>
+    $<$<COMPILE_LANG_AND_ID:C,MSVC>:/W4 /WX /TC>
+    $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/W4 /WX /TP>)
+endforeach()
+foreach(abi_lang IN ITEMS c17 cxx17)
+  schway_add_test(NAME abi.header.${abi_lang}
+    COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR}
+      --target schwaystation_header_${abi_lang} --config $<CONFIG>
+    LABELS abi TIMEOUT 120)
+  set_tests_properties(abi.header.${abi_lang} PROPERTIES RESOURCE_LOCK build_tree)
+endforeach()
