@@ -1,20 +1,12 @@
 #!/bin/sh
-# Decides whether a change needs CI's heavy jobs and whether it touches the
-# release's inputs. Reads the changed paths on standard input, one per line,
-# with both the old and the new name of a rename, and takes the pull
-# request's changed-file count as its argument.
-# Fault prevented: a code change skipping CI as "planning only", and a change
-# to the release pipeline merging without a release rehearsal. Prints
-# heavy=false only when there is at least one path, every path is under
-# .planning/ and the count is at most 3000; anything else prints heavy=true.
-# Prints release_inputs=true when a path is release.yml, ci.yml,
-# scripts/publish.sh, release-please-config.json or cmake/packaging.cmake, and
-# also for empty or unreadable input, a missing count or one over 3000: a
-# change that cannot be seen rehearses. The files API lists at most 3000
-# files, in path order, so .planning/ paths alone can fill it. It reads all of
-# its input, so the writer never sees a closed pipe. Paths are compared as
-# bytes.
+#   scripts/classify-changes.sh COUNT < paths   (changed paths, both names of a rename)
+# Fault prevented: a code change skipping CI as "planning only", or a release
+# pipeline change merging unrehearsed. heavy=false only for a non-empty list
+# wholly under .planning/ and COUNT at most 3000 (the most the files API lists);
+# release_inputs=true for a release input and for any list that cannot be
+# trusted. Reads all input, so the writer never meets a closed pipe.
 set -u
+# Paths are compared as bytes.
 LC_ALL=C
 export LC_ALL
 paths=0
