@@ -1,0 +1,46 @@
+# RetroArch configuration for the hosted retroarch job. run_retroarch.cmake
+# writes it with @RA_DIR@ replaced and starts RetroArch with --config on it,
+# so no other retroarch.cfg is read. Key names are those of RetroArch
+# 1.22.2's retroarch.cfg template; RetroArch ignores a key it does not know.
+
+# Never write this file back, never go fullscreen.
+config_save_on_exit = "false"
+video_fullscreen = "false"
+
+# The screenshot is the core's own frame at the size the core reports: no
+# scaling, shader, aspect correction or on-screen text from the GPU path.
+video_gpu_screenshot = "false"
+video_font_enable = "false"
+notification_show_autoconfig = "false"
+notification_show_remap_load = "false"
+notification_show_config_override_load = "false"
+
+# No sound device, and keep running when the window is not focused (the
+# default pauses it and the launch would time out).
+audio_driver = "null"
+audio_enable = "false"
+pause_nonactive = "false"
+
+# No start screen or menu at launch. RGUI draws without asset files.
+menu_driver = "rgui"
+rgui_show_start_screen = "false"
+history_list_enable = "false"
+content_runtime_log = "false"
+log_to_file = "false"
+
+# Every directory RetroArch reads or writes is inside the run directory.
+assets_directory = "@RA_DIR@/assets"
+cache_directory = "@RA_DIR@/cache"
+core_options_path = "@RA_DIR@/retroarch-core-options.cfg"
+libretro_directory = "@RA_DIR@/cores"
+libretro_info_path = "@RA_DIR@/info"
+playlist_directory = "@RA_DIR@/playlists"
+savefile_directory = "@RA_DIR@/saves"
+savestate_directory = "@RA_DIR@/states"
+screenshot_directory = "@RA_DIR@/shots"
+system_directory = "@RA_DIR@/system"
+log_dir = "@RA_DIR@/logs"
+
+# The macOS app unpacks its bundled assets into the user's RetroArch
+# directory on every launch unless this is off (measured with 1.22.2).
+bundle_assets_extract_enable = "false"

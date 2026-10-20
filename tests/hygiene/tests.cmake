@@ -330,3 +330,23 @@ echo "policy.publish_signer: a release tag verifies as release.yml, a rehearsal 
 schway_add_test(NAME policy.publish_signer
   COMMAND ${SCHWAYSTATION_SH} -c "${hygiene_signer_check}" sh ${CMAKE_SOURCE_DIR}/scripts/publish.sh ${hygiene_signer}
   LABELS hygiene policy TIMEOUT 30)
+
+# Fault prevented: real-host test code growing without bound. Every line
+# under tests/retroarch counts, at most 300; the self test counts a fixture
+# directory holding one 301-line file.
+schway_add_test(NAME policy.e2e_budget
+  COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR} -DPATTERNS=tests/retroarch/* -DLIMIT=300
+    -P ${hygiene_scripts}/line_budget.cmake
+  LABELS hygiene policy TIMEOUT 30)
+set(hygiene_e2e ${CMAKE_BINARY_DIR}/hygiene/e2e_budget_fixture)
+file(REMOVE_RECURSE ${hygiene_e2e})
+string(REPEAT "line\n" 301 hygiene_lines)
+file(CONFIGURE OUTPUT ${hygiene_e2e}/sample.cmake CONTENT "${hygiene_lines}" NEWLINE_STYLE UNIX)
+set(hygiene_cmd ${CMAKE_COMMAND} -DROOT=${hygiene_e2e} -DPATTERNS=* -DLIMIT=300
+  -P ${hygiene_scripts}/line_budget.cmake)
+string(REPLACE ";" "$<SEMICOLON>" hygiene_cmd "${hygiene_cmd}")
+schway_add_test(NAME policy.e2e_budget.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${hygiene_cmd}" -DCODE=1
+    "-DREGEX=line_budget: 301 lines in .* exceeds the limit of 300"
+    -P ${hygiene_scripts}/expect_fail.cmake
+  LABELS hygiene policy TIMEOUT 30)

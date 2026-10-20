@@ -9,6 +9,8 @@ hygiene.no_float	hygiene
 hygiene.no_float.self_test	hygiene
 hygiene.tree	hygiene
 hygiene.tree.self_test	hygiene
+policy.e2e_budget	hygiene,policy
+policy.e2e_budget.self_test	hygiene,policy
 policy.gate_budget	hygiene,policy
 policy.gate_budget.self_test	hygiene,policy
 policy.publish_ref	hygiene,policy
