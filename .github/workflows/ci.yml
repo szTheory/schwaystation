@@ -28,6 +28,9 @@ permissions:
 # runs arm it; arming is one ci: pull request setting this to "gate".
 env:
   SCHWAYSTATION_PERF_MODE: report
+  # A published and deleted tag name can never be reused under immutable
+  # releases, so every rehearsal attempt gets its own.
+  REHEARSAL_TAG: rehearsal-${{ github.run_id }}-${{ github.run_attempt }}
 
 # Only a pull request's runs supersede each other, so every main commit keeps
 # a result. The workflow name is part of the group because a call from
@@ -470,15 +473,131 @@ jobs:
           grep '^perf ' perf.txt >> "$GITHUB_STEP_SUMMARY" || true
           exit "$rc"
 
+  # Every publish step of a release, rehearsed with the release App's token on
+  # a same-repository pull request that changes a release input, against a
+  # prerelease that is never latest: the 18 archives the build legs made from
+  # the merge commit, SHA256SUMS, attestations that verify and a tampered copy
+  # that does not, then the published release downloaded and checked. Direct
+  # runs only (a nested call passes ref). A fork's pull request has no secrets
+  # and skips it. docs/maintaining.md describes the rehearsal.
+  rehearsal:
+    needs: [changes, build]
+    if: >-
+      github.event_name == 'pull_request' && !inputs.ref &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.changes.outputs.release_inputs == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 13  # provisional
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    outputs:
+      id: ${{ steps.draft.outputs.id }}
+    env:
+      # The merge commit the build legs checked out and recorded.
+      EXPECTED_SHA: ${{ github.sha }}
+      # The ref a pull_request run attests from, so a rehearsal's attestation
+      # never passes for a release's; its signer is this file, not release.yml.
+      SOURCE_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+      SIGNER_WORKFLOW: ci.yml
+    steps:
+      - name: The release App is configured
+        env:
+          CLIENT_ID: ${{ vars.SCHWAYSTATION_APP_CLIENT_ID }}
+          HAS_KEY: ${{ secrets.SCHWAYSTATION_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ -z "$CLIENT_ID" ] || [ "$HAS_KEY" != true ]; then
+            echo "rehearsal: the release App is not configured: set SCHWAYSTATION_APP_CLIENT_ID and SCHWAYSTATION_APP_PRIVATE_KEY (docs/maintaining.md)"
+            exit 1
+          fi
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SCHWAYSTATION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SCHWAYSTATION_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: archives-*
+          path: artifacts
+      # The zips side by side in dist, each leg's commit.txt under dist/legs/N.
+      - name: The archives and each leg's commit
+        run: |
+          mkdir -p dist
+          n=0
+          for leg in artifacts/archives-*/; do
+            n=$((n + 1))
+            mkdir -p "dist/legs/$n"
+            mv "${leg}commit.txt" "dist/legs/$n/"
+            mv "$leg"schwaystation-*.zip dist/
+          done
+      - run: sh scripts/publish.sh prepare dist
+      - id: draft
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          id=$(sh scripts/publish.sh rehearsal-create "$REHEARSAL_TAG")
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+      - env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ID: ${{ steps.draft.outputs.id }}
+        run: sh scripts/publish.sh upload "$REHEARSAL_TAG" "$ID" dist
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+      - env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: sh scripts/publish.sh attested dist
+      # By ID, as gh release edit --draft=false --prerelease --latest=false
+      # would, but without looking the draft up by its tag.
+      - name: Publish as a prerelease that is never latest
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ID: ${{ steps.draft.outputs.id }}
+        run: gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$ID" -F draft=false -F prerelease=true -f make_latest=false
+      - env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: sh scripts/publish.sh verify "$REHEARSAL_TAG" dist
+
+  # Last, whatever the rehearsal did: its release and its tag go. A run
+  # cancelled by a newer push can leave one uniquely named prerelease.
+  cleanup:
+    needs: rehearsal
+    if: always() && needs.rehearsal.result != 'skipped'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5  # 5-minute floor (API), provisional
+    permissions:
+      contents: write
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SCHWAYSTATION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SCHWAYSTATION_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ID: ${{ needs.rehearsal.outputs.id }}
+        run: sh scripts/publish.sh rehearsal-delete "$REHEARSAL_TAG" ${ID:+"$ID"}
+
   # The one required check. GitHub reports a skipped job as success and skips
   # a job whose dependency failed, so this always runs and requires every
   # result to be success, except: a heavy job skipped when changes said
-  # heavy=false; title and perf skipped outside pull requests; and perf
-  # skipped in a nested call that passes ref (release.yml's).
+  # heavy=false; title, perf, rehearsal and cleanup skipped outside pull
+  # requests; perf, rehearsal and cleanup skipped in a nested call that
+  # passes ref (release.yml's); and rehearsal and cleanup skipped when no
+  # release input changed.
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, hygiene, title, build, asan, nofp, be32, hash-equality, retroarch, perf]
+    needs: [changes, hygiene, title, build, asan, nofp, be32, hash-equality, retroarch, perf, rehearsal, cleanup]
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor, provisional
     steps:
@@ -488,9 +607,12 @@ jobs:
           EVENT: ${{ github.event_name }}
           HEAVY: ${{ needs.changes.outputs.heavy }}
           CALLED: ${{ inputs.ref && 'true' || 'false' }}
+          RELEASE_INPUTS: ${{ needs.changes.outputs.release_inputs }}
         run: |
-          echo "$NEEDS" | jq -e --arg event "$EVENT" --arg heavy "$HEAVY" --arg called "$CALLED" 'to_entries | all(
+          echo "$NEEDS" | jq -e --arg event "$EVENT" --arg heavy "$HEAVY" --arg called "$CALLED" --arg release_inputs "$RELEASE_INPUTS" 'to_entries | all(
             .value.result == "success"
             or (.key == "title" and .value.result == "skipped" and $event != "pull_request")
             or (.key == "perf" and .value.result == "skipped" and ($event != "pull_request" or $called == "true"))
+            or ((.key | IN("rehearsal", "cleanup")) and .value.result == "skipped"
+              and ($release_inputs != "true" or $event != "pull_request" or $called == "true"))
             or ($heavy == "false" and .value.result == "skipped" and (.key | IN("changes", "hygiene", "title") | not)))'
