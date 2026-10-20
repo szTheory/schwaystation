@@ -25,6 +25,12 @@
 #define SCHWAY__PAL_FRAME_NUM UINT64_C(482961862656)
 #define SCHWAY__PAL_FRAME_DEN UINT64_C(709379)
 
+/* Serializable counter limits: ticks are capped at 2^62 (ARCHITECTURE
+   section 1), and a frame takes at least 566,203 cycles. Loading and
+   advancing use the same inclusive bounds. */
+#define SCHWAY__STATE_TICKS_MAX (UINT64_C(1) << 62)
+#define SCHWAY__STATE_FRAME_MAX (SCHWAY__STATE_TICKS_MAX / UINT64_C(566203))
+
 /* The SPU makes one stereo pair every 768 CPU cycles (ARCHITECTURE
    section 1), so a frame holds 737 or 738 pairs (NTSC), 886 or 887 (PAL). */
 #define SCHWAY__CYCLES_PER_PAIR 768u

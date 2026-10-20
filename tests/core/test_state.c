@@ -388,6 +388,89 @@ static void test_record_sweep(void)
     schway_destroy(src);
 }
 
+/* Accepted counter boundaries must either advance to another loadable state
+   or refuse the frame without changing even the unsaved audio and output. */
+static void test_run_bounds(void)
+{
+    static const uint32_t regions[] = {
+        SCHWAY_REGION_NTSC_J, SCHWAY_REGION_NTSC_U, SCHWAY_REGION_PAL
+    };
+    for (size_t k = 0; k < sizeof regions / sizeof regions[0]; k++) {
+        schway *inst = make(regions[k]);
+        schway *snapshot = malloc(sizeof *snapshot);
+        CHECK(snapshot != NULL);
+        if (snapshot == NULL) {
+            exit(1);
+        }
+        size_t n = save(inst, good);
+        size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
+        CHECK(nf <= MAX_FIELDS);
+        uint32_t frame_at = 0u, ticks_at = 0u, acc_at = 0u;
+        uint64_t frame_max = 0u, ticks_max = 0u;
+        for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
+            if (strcmp(fields[i].name, "instance.frame") == 0) {
+                frame_at = fields[i].offset;
+                frame_max = fields[i].max;
+            } else if (strcmp(fields[i].name, "instance.ticks") == 0) {
+                ticks_at = fields[i].offset;
+                ticks_max = fields[i].max;
+            } else if (strcmp(fields[i].name, "instance.tick_acc") == 0) {
+                acc_at = fields[i].offset;
+            }
+        }
+        CHECK(frame_at != 0u && ticks_at != 0u && acc_at != 0u);
+        if (frame_at == 0u || ticks_at == 0u || acc_at == 0u) {
+            exit(1);
+        }
+        uint64_t den = schway__instance_frame_den(regions[k]);
+        for (uint32_t carry = 0; carry < 2u; carry++) {
+            uint64_t acc = carry ? den - 1u : 0u;
+            uint64_t step = (acc + schway__instance_frame_num(regions[k])) / den;
+            const uint64_t frames[] = {frame_max, frame_max - 1u, 0u, 0u, 0u, 0u, 0u};
+            const uint64_t ticks[] = {
+                0u, 0u, ticks_max, ticks_max - 1u,
+                ticks_max - step, ticks_max - step + 1u, ticks_max - step - 1u
+            };
+            const int advances[] = {0, 1, 0, 0, 1, 0, 1};
+            for (size_t j = 0; j < sizeof frames / sizeof frames[0]; j++) {
+                memcpy(bad, good, n);
+                put_le(bad + frame_at, frames[j], 8u);
+                put_le(bad + ticks_at, ticks[j], 8u);
+                put_le(bad + acc_at, acc, 8u);
+                reseal(bad, n);
+                CHECK_EQ_U64(schway_load_state(inst, bad, n), SCHWAY_STATUS_OK);
+                memcpy(snapshot, inst, sizeof *snapshot);
+                schway_run_result out, untouched;
+                memset(&out, 0xA5, sizeof out);
+                out.size = (uint32_t)sizeof out;
+                memcpy(&untouched, &out, sizeof out);
+                schway_status st = schway_run_frame(inst, &out);
+                if (advances[j]) {
+                    CHECK_EQ_U64(st, SCHWAY_STATUS_OK);
+                    CHECK_EQ_U64(out.stop, SCHWAY_STOP_FRAME);
+                    CHECK_EQ_U64(out.frame, frames[j] + 1u);
+                    CHECK_EQ_U64(out.ticks, ticks[j] + step);
+                    CHECK_EQ_U64(save(inst, before), n);
+                    CHECK_EQ_U64(schway_load_state(inst, before, n), SCHWAY_STATUS_OK);
+                    CHECK_EQ_U64(save(inst, after), n);
+                    CHECK(memcmp(before, after, n) == 0);
+                    /* Each successful boundary advance exhausts one counter. */
+                    memcpy(snapshot, inst, sizeof *snapshot);
+                    memcpy(&out, &untouched, sizeof out);
+                    st = schway_run_frame(inst, &out);
+                }
+                CHECK_EQ_U64(st, SCHWAY_STATUS_ERR_STATE_FIELD);
+                CHECK(memcmp(snapshot, inst, sizeof *snapshot) == 0);
+                CHECK(memcmp(&untouched, &out, sizeof out) == 0);
+                CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_ERR_STATE_FIELD);
+                CHECK(memcmp(snapshot, inst, sizeof *snapshot) == 0);
+            }
+        }
+        free(snapshot);
+        schway_destroy(inst);
+    }
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
@@ -395,6 +478,7 @@ static const struct {
     {"state.record_sweep", test_record_sweep},
     {"state.rejects", test_rejects},
     {"state.round_trip", test_round_trip},
+    {"state.run_bounds", test_run_bounds},
     {"state.stable_bytes", test_stable_bytes},
     {"state.visit", test_visit},
 };

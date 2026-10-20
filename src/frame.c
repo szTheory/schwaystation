@@ -43,10 +43,17 @@ schway_status schway_run_frame(schway *inst, schway_run_result *out)
     /* The frame is num / den cycles; the remainder carries to the next
        frame so cumulative ticks stay exact (ARCHITECTURE section 1). */
     uint64_t den = schway__instance_frame_den(inst->region);
+    uint64_t acc = inst->tick_acc + schway__instance_frame_num(inst->region);
+    uint64_t step = acc / den;
+    /* Refuse before changing any state or output if the next frame would
+       exceed the save format's bounds (ARCHITECTURE section 5). */
+    if (inst->frame >= SCHWAY__STATE_FRAME_MAX ||
+        inst->ticks > SCHWAY__STATE_TICKS_MAX - step) {
+        return SCHWAY_STATUS_ERR_STATE_FIELD;
+    }
     uint64_t before = inst->ticks;
-    inst->tick_acc += schway__instance_frame_num(inst->region);
-    inst->ticks += inst->tick_acc / den;
-    inst->tick_acc %= den;
+    inst->ticks += step;
+    inst->tick_acc = acc % den;
     /* One pair per 768-cycle boundary crossed during the frame. */
     audio_push_silence(inst, (uint32_t)(inst->ticks / SCHWAY__CYCLES_PER_PAIR -
                                         before / SCHWAY__CYCLES_PER_PAIR));

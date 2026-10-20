@@ -17,11 +17,6 @@
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
 
-/* A loaded state's ticks are capped at 2^62, far from 2^64 wrapping
-   (ARCHITECTURE section 1); a frame is at least 566,203 cycles. */
-#define STATE_TICKS_MAX (UINT64_C(1) << 62)
-#define STATE_FRAME_MAX (STATE_TICKS_MAX / UINT64_C(566203))
-
 /* PNG-style magic: a high-bit byte, "PSX", CR LF, DOS end of file, LF. A
    text-mode transfer that strips the high bit or rewrites line ends breaks
    it. */
@@ -55,10 +50,10 @@ static void header_io(struct schway__state_io *io, uint32_t total)
 static void body_io(struct schway__state_io *io, schway *inst)
 {
     uint64_t den = schway__instance_frame_den(inst->region);
-    (void)schway__state_u64(io, name_frame, &inst->frame, 0u, STATE_FRAME_MAX);
+    (void)schway__state_u64(io, name_frame, &inst->frame, 0u, SCHWAY__STATE_FRAME_MAX);
     /* A state loads only into an instance of the same region. */
     (void)schway__state_u32(io, name_region, &inst->region, inst->region, inst->region);
-    (void)schway__state_u64(io, name_ticks, &inst->ticks, 0u, STATE_TICKS_MAX);
+    (void)schway__state_u64(io, name_ticks, &inst->ticks, 0u, SCHWAY__STATE_TICKS_MAX);
     (void)schway__state_u64(io, name_tick_acc, &inst->tick_acc, 0u, den - 1u);
     schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
                             0u, UINT16_MAX);

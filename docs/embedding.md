@@ -110,6 +110,9 @@ schway_destroy(inst); /* NULL is fine */
   `SCHWAY_STATUS_ERR_PROFILE_LOCKED`, even after a reset. To change region, destroy and create again.
 - `schway_run_frame` runs one frame and returns. The optional `schway_run_result` gets the stop reason
   (`SCHWAY_STOP_FRAME`), the frame number since power-on and the CPU cycles run since power-on.
+  If the next frame would exceed the save format's inclusive limits (2^62 ticks or
+  floor(2^62 / 566,203) frames), it returns `SCHWAY_STATUS_ERR_STATE_FIELD` without changing the instance
+  or result. Save the current state or use a power reset to restart the counters.
 - `schway_reset(inst, SCHWAY_RESET_POWER)` returns to frame 0 with the same region; other kinds return
   `SCHWAY_STATUS_ERR_ARGUMENT`.
 - `schway_get_info` gives the display size, the frame rate as a fraction (53,693,175 / 897,619 for NTSC,

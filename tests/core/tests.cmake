@@ -38,7 +38,7 @@ set_target_properties(schwaystation-test-state PROPERTIES
 schway_warnings(schwaystation-test-state)
 
 foreach(case IN ITEMS state.round_trip state.stable_bytes state.rejects state.visit
-    state.record_sweep)
+    state.record_sweep state.run_bounds)
   schway_add_test(NAME core.${case}
     COMMAND schwaystation-test-state ${case}
     LABELS core portable TIMEOUT 10)
