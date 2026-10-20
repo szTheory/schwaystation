@@ -350,3 +350,43 @@ schway_add_test(NAME policy.e2e_budget.self_test
     "-DREGEX=line_budget: 301 lines in .* exceeds the limit of 300"
     -P ${hygiene_scripts}/expect_fail.cmake
   LABELS hygiene policy TIMEOUT 30)
+
+# Fault prevented: a job timeout guessed rather than measured. Every
+# timeout-minutes line names a run ID or says provisional. The self test
+# scans a fixture with two good lines and two bad ones.
+schway_add_test(NAME hygiene.timeout_comments
+  COMMAND ${CMAKE_COMMAND} -DMODE=timeouts -DDIR=${CMAKE_SOURCE_DIR}/.github/workflows
+    -P ${hygiene_scripts}/workflows.cmake
+  LABELS hygiene TIMEOUT 30)
+set(hygiene_timeouts ${CMAKE_BINARY_DIR}/hygiene/timeouts_fixture)
+file(REMOVE_RECURSE ${hygiene_timeouts})
+string(REPEAT "1" 11 hygiene_run)
+file(WRITE ${hygiene_timeouts}/sample.yml "jobs:\n  a:\n    timeout-minutes: 5  # provisional\n"
+  "  b:\n    timeout-minutes: 30\n  c:\n    timeout-minutes: 8  # 2 x 3 min, run ${hygiene_run}\n"
+  "  d:\n    timeout-minutes: 15  # a guess\n")
+set(hygiene_cmd ${CMAKE_COMMAND} -DMODE=timeouts -DDIR=${hygiene_timeouts} -P ${hygiene_scripts}/workflows.cmake)
+string(REPLACE ";" "$<SEMICOLON>" hygiene_cmd "${hygiene_cmd}")
+schway_add_test(NAME hygiene.timeout_comments.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${hygiene_cmd}" -DCODE=1
+    "-DREGEX=sample.yml: timeout-minutes: 30.*sample.yml: timeout-minutes: 15 .*a guess.*timeout_comments: 2 timeout-minutes: lines without a run ID or provisional"
+    -P ${hygiene_scripts}/expect_fail.cmake
+  LABELS hygiene TIMEOUT 30)
+
+# Fault prevented: an action referenced by a tag that can be moved under the
+# release. The self test scans a fixture that uses a tag.
+schway_add_test(NAME policy.action_pins
+  COMMAND ${CMAKE_COMMAND} -DMODE=pins -DDIR=${CMAKE_SOURCE_DIR}/.github/workflows
+    -P ${hygiene_scripts}/workflows.cmake
+  LABELS hygiene policy TIMEOUT 30)
+set(hygiene_actions ${CMAKE_BINARY_DIR}/hygiene/action_pins_fixture)
+file(REMOVE_RECURSE ${hygiene_actions})
+string(REPEAT "0" 40 hygiene_sha)
+file(WRITE ${hygiene_actions}/sample.yml "steps:\n  - uses: ./.github/actions/local\n"
+  "  - uses: actions/checkout@${hygiene_sha} # v7.0.1\n  - uses: actions/checkout@v4\n")
+set(hygiene_cmd ${CMAKE_COMMAND} -DMODE=pins -DDIR=${hygiene_actions} -P ${hygiene_scripts}/workflows.cmake)
+string(REPLACE ";" "$<SEMICOLON>" hygiene_cmd "${hygiene_cmd}")
+schway_add_test(NAME policy.action_pins.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${hygiene_cmd}" -DCODE=1
+    "-DREGEX=action_pins: sample.yml: uses: actions/checkout@v4.*action_pins: 1 uses: lines not pinned"
+    -P ${hygiene_scripts}/expect_fail.cmake
+  LABELS hygiene policy TIMEOUT 30)

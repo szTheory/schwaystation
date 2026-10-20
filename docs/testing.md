@@ -31,7 +31,7 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `dev` | A Debug build passes, for day-to-day work. | `ci` | all but `release` |
 | `ci` | The workflow above. Every Linux and macOS leg runs it. | `ci` | all but `release` |
 | `ci-msvc` | The same with MSVC and the static C runtime. | `ci` | all but `release` |
-| `hygiene` | The repository is clean: tree scan, BIOS and executable bytes, the integer-only text scan, titles, the publish script and the gate-line budget. | `hygiene` | `hygiene` |
+| `hygiene` | The repository is clean: tree scan, BIOS and executable bytes, the integer-only text scan, titles, the publish script, the workflow's timeouts and action pins, and the gate-line and end-to-end budgets. | `hygiene` | `hygiene` |
 | `asan` | No memory or undefined-behaviour fault, with clang-21's AddressSanitizer and UndefinedBehaviorSanitizer; any finding stops the test. | `ci` | all but `abi` and `release`, whose binary-shape checks the instrumentation changes |
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
@@ -177,4 +177,37 @@ base, a missing measurement and an unset mode.
 
 ## CI jobs
 
-<!-- The CI workflow's jobs, the roll-up check and how to reproduce a red job are described here when the workflow lands. -->
+`.github/workflows/ci.yml` runs on every pull request, every push to `main`, by hand, and when `release.yml` calls
+it with a commit. Each job runs the same workflow preset a contributor runs, then the JUnit check above.
+
+| Job | What it runs | Required |
+|---|---|---|
+| `changes` | Lists the pull request's files. `heavy=false` only when every path is under `.planning/`; then the build jobs skip. | yes |
+| `hygiene` | The `hygiene` preset and its JUnit check. | yes |
+| `title` | `scripts/check-title.sh` on the pull request's live title and body (pull requests only). | yes |
+| `build` | The `ci` preset on `ubuntu-26.04`, `ubuntu-26.04-arm`, `macos-15` and `macos-15-intel`, `ci-msvc` on `windows-2025` and `windows-11-arm`. Both JUnit checks (all but `release`, then `release`), the README install line and its flipped-byte control on macOS arm64, then uploads `archives-<os>-<arch>` (the three zips and `commit.txt`) and `hashes-<os>-<arch>`. | yes |
+| `asan` | The `asan` preset; JUnit check without `abi` and `release`. | yes |
+| `nofp` | The `nofp` preset on both Linux legs. | yes |
+| `be32` | The `be32` preset (`portable` tests) and uploads `hashes-be32`. | yes |
+| `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=7`: the six build legs' and `be32`'s `hashes.txt` must be byte-identical. | yes |
+| `wasm32` | The `wasm32` preset with the pinned wasmtime, uploads `hashes-wasm32`, and prints to the job summary whether its `hashes.txt` equals Linux x64's. | no, report-only |
+| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, `320x240, every pixel equal`, and the flipped-pixel control must fail naming `7,3`. | yes |
+| `perf` | Cachegrind instructions per frame at head and at the merge base, then `perf_compare.cmake` in report mode (pull requests and manual runs). | yes |
+| `CI required` | The one check the ruleset requires. It passes only when every job above but `wasm32` succeeded or was skipped as allowed: build jobs when `heavy=false`, `title` and `perf` outside pull requests, and `perf` in a call from `release.yml`. | the check |
+
+`wasm32` stays outside `CI required` and outside the hash comparison until a separate `ci:` pull request after the
+first release moves it in. Every timeout in the file is marked `provisional` until this repository's own runs
+measure it; `hygiene.timeout_comments` fails a `timeout-minutes` line that names neither a run nor `provisional`,
+and `policy.action_pins` fails a `uses:` line that is not a full 40-hex commit with a `# v` comment.
+
+**Downloads.** `pins.txt` lists every download CI makes (wasmtime and the RetroArch DMG) with its SHA-256;
+`scripts/fetch-pin.sh NAME DEST` refuses a file whose digest differs.
+
+**A red retroarch job.** The job prints RetroArch's verbose log and uploads `retroarch-frames`, holding `shot.png`
+(RetroArch's screenshot) and `runner.png` (the runner's frame). The step output names the first differing pixel.
+Download the artifact with `gh run download <run id> -n retroarch-frames` and open both images. A size difference
+means the core reported another geometry; a whole-image difference with the same layout usually means RetroArch's
+frame and the runner's frame are not the same frame, which the test card's frame counter shows.
+
+**Reproducing a red job.** Run the job's preset locally (`cmake --workflow --preset <name>`) and the same JUnit
+check. Lanes this host cannot run are listed above under "Lanes that need tools only CI has".
