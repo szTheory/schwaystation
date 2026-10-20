@@ -42,12 +42,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The pull request's rehearsal produces exactly 18 version-free archives, each with `LICENSE` and `THIRD-PARTY-NOTICES.md`, plus `SHA256SUMS` and verified attestations, then deletes itself. Merging publishes the same set with no manual step.
   5. Each ABI, hygiene and policy gate (`abi.*`, `hygiene.*`, `policy.*`, `ci.title`, `build.revision_matches_head`) fails its negative control with its named message. `--bench` reports the frame-time percentiles, and the Cachegrind Ir/frame measurement runs on every pull request. The core makes zero allocations after load and never reads a host clock.
 
-**Plans**: 1/15 plans executed in 8 waves
+**Plans**: 2/15 plans executed in 8 waves
 
 Plans:
 **Wave 1**
 - [x] 01-01-PLAN.md — CMake skeleton, presets, per-directory inventories, complete header, thin core and the `--frames 60 --hash` tracer (wave 1)
-- [ ] 01-02-PLAN.md — Vendored libretro.h and notices, PROVENANCE pins to cogmaster v0.1.0, README, publish.sh re-sync, setup script removed (wave 1)
+- [x] 01-02-PLAN.md — Vendored libretro.h and notices, PROVENANCE pins to cogmaster v0.1.0, README, publish.sh re-sync, setup script removed (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-03-PLAN.md — Core and state tests: card, tuple, audio accumulator, API contracts, zero allocations, visitor round trip; embedding guide (wave 2)
@@ -164,7 +164,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. A test frame in RetroArch | 1/15 | In Progress | - |
+| 1. A test frame in RetroArch | 2/15 | In Progress | - |
 | 2. The CPU matches the public vectors | 0/TBD | Not started | - |
 | 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
