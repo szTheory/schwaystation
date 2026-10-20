@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-10-20T03:20:36.858Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-10-20T03:28:33.141Z"
 last_activity: 2026-10-19
 last_activity_desc: Phase 01 execution started
-state_head: d1d84e127ee506c7d74e252155a672f55ce883a6
+state_head: 86e3479d6a02bc76c0725a4fe8bdbdabcb3fd72d
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 15
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 ## Current Position
 
 Phase: 01 (A test frame in RetroArch) — EXECUTING
-Plan: 4 of 15
+Plan: 5 of 15
 Status: Ready to execute
 Last activity: 2026-10-19 — Phase 01 execution started
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P01 | 13 min | 3 tasks | 55 files |
 | Phase 01 P02 | 3min | 3 tasks | 7 files |
 | Phase 01 P03 | 9 min | 3 tasks | 8 files |
+| Phase 01 P04 | 6min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase 01]: PROVENANCE PV.11 keeps the old cogmaster pin as a historical citation; seed pins moved to v0.1.0 f09ac97096ac
 - [Phase 01]: The state header size is SCHWAY__STATE_HEADER_SIZE in src/state.h, shared by state.c and the state tests
 - [Phase 01]: Plan 01-01's core passed every 01-03 contract case unchanged; mutants of src/ are caught by the core and state cases
+- [Phase 01]: hashes.txt holds five LF lines, region first (ntsc-u frame 5, ntsc-u frame 60, ntsc-j frame 60, pal frame 60, ntsc-u png 5); the hex is field 5
+- [Phase 01]: The runner takes one --png N:FILE; an unwritable path exits 1 and plan 01-09 owns its test; the PNG digest is pinned only after the pixel-by-pixel decode passed
 
 ### Pending Todos
 
@@ -104,6 +107,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T03:20:36.839Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-10-20T03:28:26.567Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None

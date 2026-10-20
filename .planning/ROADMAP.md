@@ -42,7 +42,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The pull request's rehearsal produces exactly 18 version-free archives, each with `LICENSE` and `THIRD-PARTY-NOTICES.md`, plus `SHA256SUMS` and verified attestations, then deletes itself. Merging publishes the same set with no manual step.
   5. Each ABI, hygiene and policy gate (`abi.*`, `hygiene.*`, `policy.*`, `ci.title`, `build.revision_matches_head`) fails its negative control with its named message. `--bench` reports the frame-time percentiles, and the Cachegrind Ir/frame measurement runs on every pull request. The core makes zero allocations after load and never reads a host clock.
 
-**Plans**: 3/15 plans executed in 8 waves
+**Plans**: 4/15 plans executed in 8 waves
 
 Plans:
 **Wave 1**
@@ -51,7 +51,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 01-03-PLAN.md — Core and state tests: card, tuple, audio accumulator, API contracts, zero allocations, visitor round trip; embedding guide (wave 2)
-- [ ] 01-04-PLAN.md — Runner hashes per region and frame, hashes.txt, PNG reference, converter known answers, usage refusals (wave 2)
+- [x] 01-04-PLAN.md — Runner hashes per region and frame, hashes.txt, PNG reference, converter known answers, usage refusals (wave 2)
 - [ ] 01-05-PLAN.md — ABI gates (symbols, globals, imports, host clock), header C17/C++17, tests/api/v1.c, nofp fixture (wave 2)
 - [ ] 01-06-PLAN.md — Hygiene gates: tree scan, gate budget, BIOS bytes, float scan, title, classify, publish tests; script trims (wave 2)
 - [ ] 01-07-PLAN.md — Ir/frame comparison and its gate cases, docs budgets, no-skip policy, testing guide (wave 2)
@@ -164,7 +164,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. A test frame in RetroArch | 3/15 | In Progress | - |
+| 1. A test frame in RetroArch | 4/15 | In Progress | - |
 | 2. The CPU matches the public vectors | 0/TBD | Not started | - |
 | 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
