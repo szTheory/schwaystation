@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: executing
-stopped_at: Completed 01-13-PLAN.md
-last_updated: "2026-10-20T16:12:43.579Z"
+stopped_at: Completed 01-14-PLAN.md
+last_updated: "2026-10-20T16:32:17.765Z"
 last_activity: 2026-10-19
 last_activity_desc: Phase 01 execution started
-state_head: 98be8f89b5eb62defb847b85d28ea83e0ee8fc88
+state_head: e669f21032f7b46db6e41295e8ffca7a3caa2054
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 ## Current Position
 
 Phase: 01 (A test frame in RetroArch) — EXECUTING
-Plan: 14 of 15
+Plan: 15 of 15
 Status: Ready to execute
 Last activity: 2026-10-19 — Phase 01 execution started
 
@@ -71,6 +71,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P11 | 4min | 2 tasks | 6 files |
 | Phase 01 P12 | 6min | 3 tasks | 11 files |
 | Phase 01 P13 | 5min | 3 tasks | 6 files |
+| Phase 01 P14 | 17min | 3 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-13: the one-off actionlint command also ignores the concurrency queue key, which actionlint 1.7.12 does not know; the seed release.yml ran with queue: max
 - [Phase 01]: 01-13: the rehearsal not-configured message points to docs/maintaining.md, which cites the removed App script as git show 61a5bb7^:scripts/setup-release-app.sh
 - [Phase 01]: 01-13: docs/testing.md CI jobs table does not list rehearsal and cleanup yet; the next plan that edits docs/testing.md adds the row
+- [Phase 01]: 01-14: the first hosted CI run (39455724329) was green on every job; no hosted fix, no RetroArch frame pin
+- [Phase 01]: 01-14: perf on the probe reports NO_BASE (Ir/frame 1620415) because main has no perf preset
 
 ### Pending Todos
 
@@ -137,6 +140,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T16:12:43.550Z
-Stopped at: Completed 01-13-PLAN.md
+Last session: 2026-10-20T16:32:17.744Z
+Stopped at: Completed 01-14-PLAN.md
 Resume file: None
