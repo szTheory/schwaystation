@@ -2,11 +2,14 @@
 #
 # Fault prevented: an install tree, package file or header that only works
 # inside this build, so a program built against a release archive fails to
-# configure, compile or link.
+# configure, compile or link, from C or from C++, or an embedding build that
+# drags in the runner, the libretro core, the tests or an install rule.
 #
 # install.stage installs the library component into <build>/stage. The
 # consumer tests build tests/consumer against it with find_package, each in
-# its own build directory, and run it. Each consumer gets this build's
+# its own build directory, and run it: the C program on the static C runtime
+# and on the DLL runtime (MSVC only; other compilers ignore the variable, so
+# every lane registers both), and the C++ program. Each consumer gets this build's
 # compilers, build type and flags, each as one argument so an empty value
 # survives. The install_staged fixture keeps parallel CTest from running a
 # consumer before the stage.
@@ -32,7 +35,9 @@ set(install_build_options
 
 # name, build directory, C runtime, program, expected output
 set(install_consumers
-  "install.consumer|consumer|MultiThreaded$<$<CONFIG:Debug>:Debug>|consumer|consumer: api 1, one frame 320x240")
+  "install.consumer|consumer|MultiThreaded$<$<CONFIG:Debug>:Debug>|consumer|consumer: api 1, one frame 320x240"
+  "install.consumer.dll_crt|consumer_dll_crt|MultiThreaded$<$<CONFIG:Debug>:Debug>DLL|consumer|consumer: api 1, one frame 320x240"
+  "install.consumer.cxx|consumer_cxx|MultiThreaded$<$<CONFIG:Debug>:Debug>|consumer_cxx|consumer_cxx: api 1")
 foreach(install_row IN LISTS install_consumers)
   string(REPLACE "|" ";" install_row "${install_row}")
   list(GET install_row 0 install_name)
@@ -53,3 +58,16 @@ foreach(install_row IN LISTS install_consumers)
     LABELS install TIMEOUT 120 PASS_REGEX "${install_expect}")
   set_tests_properties(${install_name} PROPERTIES FIXTURES_REQUIRED install_staged)
 endforeach()
+
+# A C project embeds the source tree with add_subdirectory, gets only the
+# library and its alias, and runs the consumer's frame with it.
+schway_add_test(NAME embed.subdirectory
+  COMMAND ${CMAKE_CTEST_COMMAND} --build-and-test
+    ${CMAKE_CURRENT_LIST_DIR}/../embed ${PROJECT_BINARY_DIR}/embed
+    --build-generator ${CMAKE_GENERATOR}
+    ${install_config}
+    --build-options
+      -DSCHWAYSTATION_SOURCE_DIR=${PROJECT_SOURCE_DIR}
+      ${install_build_options}
+    --test-command embed
+  LABELS install TIMEOUT 120 PASS_REGEX "consumer: api 1, one frame 320x240")

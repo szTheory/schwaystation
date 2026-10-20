@@ -1,3 +1,6 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+embed.subdirectory	install
 install.consumer	install
+install.consumer.cxx	install
+install.consumer.dll_crt	install
 install.stage	install
