@@ -1,0 +1,9 @@
+prefix=${pcfiledir}/../..
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: schwaystation
+Description: Sony PlayStation emulator core
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lschwaystation
+Cflags: -I${includedir}
