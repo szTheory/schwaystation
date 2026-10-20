@@ -4,6 +4,8 @@
 # other extensions.
 add_executable(schwaystation-run
   main.c
+  png.c
+  crc32.c
   sha256.c)
 set_target_properties(schwaystation-run PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})

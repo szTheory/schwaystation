@@ -1,6 +1,6 @@
 /* schwaystation-run: the headless runner.
  *
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
  *   schwaystation-run --help | --version
  *
  * Runs N frames (1 <= N <= 1,000,000) of one instance with no BIOS and no
@@ -15,6 +15,10 @@
  * little-endian u16, with no padding (ARCHITECTURE section 7), so it does not
  * depend on the host's byte order.
  *
+ * --png N:FILE writes frame N (1 <= N <= --frames) to FILE as an 8-bit RGB
+ * PNG, each pixel converted by the shared XRGB8888 converter with the X byte
+ * dropped. A file that cannot be written in full is removed.
+ *
  * Exit statuses are listed in exit_status.h and printed by --help.
  */
 #include <stdio.h>
@@ -22,8 +26,10 @@
 #include <string.h>
 
 #include "exit_status.h"
+#include "png.h"
 #include "schwaystation.h"
 #include "sha256.h"
+#include "xrgb8888.h"
 
 #define FRAMES_MAX 1000000u
 
@@ -42,11 +48,12 @@ static void run_free(void *user, void *ptr, size_t size)
 }
 
 static const char synopsis[] =
-    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash]\n"
+    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
     "  --frames N         run N frames (1 <= N <= 1000000)\n"
     "  --hash             print the SHA-256 of the last frame\n"
+    "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
 
@@ -101,9 +108,30 @@ static int parse_frames(const char *text, uint32_t *out)
     return 1;
 }
 
+/* Parses "N:FILE" with N a frame count as parse_frames reads it and FILE
+   not empty. Returns 0 on any other text. */
+static int parse_png(const char *text, uint32_t *frame, const char **path)
+{
+    const char *colon = text != NULL ? strchr(text, ':') : NULL;
+    char number[8];
+    size_t len = colon != NULL ? (size_t)(colon - text) : 0u;
+    if (colon == NULL || len == 0u || len >= sizeof number || colon[1] == '\0') {
+        return 0;
+    }
+    memcpy(number, text, len);
+    number[len] = '\0';
+    if (!parse_frames(number, frame)) {
+        return 0;
+    }
+    *path = colon + 1;
+    return 1;
+}
+
 typedef struct options {
     uint32_t frames;
     int hash;
+    uint32_t png_frame; /* 0 when no --png was given */
+    const char *png_path;
     uint32_t region;
     int printed; /* --help or --version ran; nothing else to do */
 } options;
@@ -136,6 +164,14 @@ static int parse_options(int argc, char **argv, options *o)
             i++;
         } else if (strcmp(arg, "--hash") == 0) {
             o->hash = 1;
+        } else if (strcmp(arg, "--png") == 0) {
+            if (o->png_frame != 0u) {
+                return usage("give --png once");
+            }
+            if (!parse_png(value, &o->png_frame, &o->png_path)) {
+                return usage("--png needs N:FILE with N from 1 to 1000000");
+            }
+            i++;
         } else if (strcmp(arg, "--region") == 0) {
             if (value != NULL && strcmp(value, "ntsc-u") == 0) {
                 o->region = SCHWAY_REGION_NTSC_U;
@@ -155,6 +191,9 @@ static int parse_options(int argc, char **argv, options *o)
     }
     if (o->frames == 0u) {
         return usage("--frames N is required");
+    }
+    if (o->png_frame > o->frames) {
+        return usage("--png N must not exceed --frames");
     }
     return SCHWAY__EXIT_OK;
 }
@@ -212,6 +251,60 @@ static int print_hash(const schway *inst, uint32_t frames)
     return SCHWAY__EXIT_OK;
 }
 
+/* Writes the frame just run to path as a PNG. The file is built in memory
+   and written with one fwrite; a file that cannot be written in full is
+   removed. Returns the exit status. */
+static int write_png(const schway *inst, const char *path)
+{
+    schway_video v;
+    memset(&v, 0, sizeof v);
+    v.size = (uint32_t)sizeof v;
+    schway_status st = schway_get_video(inst, &v);
+    if (st != SCHWAY_STATUS_OK) {
+        fprintf(stderr, "schwaystation-run: schway_get_video failed: %s\n",
+                schway_status_string(st));
+        return SCHWAY__EXIT_FAILURE;
+    }
+    size_t size = schway__png_size(v.width, v.height);
+    if (v.bpp != 16u || v.width > 1024u || v.height > 512u || size == 0u) {
+        fprintf(stderr, "schwaystation-run: unexpected video format\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+    size_t count = (size_t)v.width * v.height;
+    uint32_t *xrgb = (uint32_t *)malloc(count * sizeof *xrgb);
+    uint8_t *rgb = (uint8_t *)malloc(count * 3u);
+    uint8_t *file = (uint8_t *)malloc(size);
+    int status = SCHWAY__EXIT_OK;
+    if (xrgb == NULL || rgb == NULL || file == NULL) {
+        fprintf(stderr, "schwaystation-run: out of memory\n");
+        status = SCHWAY__EXIT_FAILURE;
+    } else {
+        schway_host_xrgb8888_frame(&v, xrgb, v.width);
+        for (size_t i = 0; i < count; i++) {
+            rgb[3u * i] = (uint8_t)(xrgb[i] >> 16);
+            rgb[3u * i + 1u] = (uint8_t)(xrgb[i] >> 8);
+            rgb[3u * i + 2u] = (uint8_t)xrgb[i];
+        }
+        size_t n = schway__png_write(file, size, rgb, v.width, v.height);
+        FILE *f = n != 0u ? fopen(path, "wb") : NULL;
+        int ok = f != NULL && fwrite(file, 1, n, f) == n;
+        if (f != NULL && fclose(f) != 0) {
+            ok = 0;
+        }
+        if (!ok) {
+            fprintf(stderr, "schwaystation-run: cannot write %s\n", path);
+            if (f != NULL) {
+                (void)remove(path);
+            }
+            status = SCHWAY__EXIT_FAILURE;
+        }
+    }
+    free(xrgb);
+    free(rgb);
+    free(file);
+    return status;
+}
+
 /* Runs the frames. Returns the exit status. */
 static int run(const options *opt)
 {
@@ -246,6 +339,9 @@ static int run(const options *opt)
             fprintf(stderr, "schwaystation-run: schway_run_frame failed: %s\n",
                     schway_status_string(st));
             status = SCHWAY__EXIT_FAILURE;
+        }
+        if (status == SCHWAY__EXIT_OK && n == opt->png_frame) {
+            status = write_png(inst, opt->png_path);
         }
     }
     if (status == SCHWAY__EXIT_OK && opt->hash) {

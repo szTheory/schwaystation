@@ -12,9 +12,14 @@ set(SCHWAYSTATION_TESTCARD_SHA256_FRAME5 c3409c280e768d81ce09c5de0eb2d7e09e8d589
 # Frame 60 with --region ntsc-j and --region pal: the region word differs.
 set(SCHWAYSTATION_TESTCARD_SHA256_NTSC_J 547d307f7d4bba16894f82c604a7329620bbbea9407e5d8e5008750f10680d91)
 set(SCHWAYSTATION_TESTCARD_SHA256_PAL 8b8f3d0ac086930610a927ec7510738b0d8773c09deef0de0a2f107b2e8f589a)
+# SHA-256 of the file schwaystation-run --frames 5 --png 5:FILE writes, the
+# reference the RetroArch screenshot is compared with. Pinned only after
+# runner.png_file decoded every pixel of it back to the card.
+set(SCHWAYSTATION_TESTCARD_PNG_SHA256 62ddd3f20a21a7bd48b21d0b7bb843e239236d1668af312f1259f03b33491ea1)
 
 foreach(pin SCHWAYSTATION_TESTCARD_SHA256 SCHWAYSTATION_TESTCARD_SHA256_FRAME5
-    SCHWAYSTATION_TESTCARD_SHA256_NTSC_J SCHWAYSTATION_TESTCARD_SHA256_PAL)
+    SCHWAYSTATION_TESTCARD_SHA256_NTSC_J SCHWAYSTATION_TESTCARD_SHA256_PAL
+    SCHWAYSTATION_TESTCARD_PNG_SHA256)
   string(LENGTH "${${pin}}" pin_length)
   if(NOT ${pin} MATCHES "^[0-9a-f]+$" OR NOT pin_length EQUAL 64)
     message(FATAL_ERROR "testcard_pins: ${pin} must be 64 lowercase hex digits")

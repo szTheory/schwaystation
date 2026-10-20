@@ -3,7 +3,8 @@
 #   cmake -DMODE=compare -DFILES=<list> -DCOUNT=<n> -P hashes.cmake
 if(MODE STREQUAL "write")
   # Fault prevented: a lane's output silently not compared. Writes
-  # <OUT>/hashes.txt, the file CI collects from every lane, in a fixed order.
+  # <OUT>/hashes.txt, the file CI collects from every lane, in a fixed order:
+  # four frame hashes, then the frame 5 PNG's digest.
   set(lines "")
   foreach(case "ntsc-u;5" "ntsc-u;60" "ntsc-j;60" "pal;60")
     list(GET case 0 region)
@@ -17,6 +18,14 @@ if(MODE STREQUAL "write")
     endif()
     string(APPEND lines "${region} ${out}")
   endforeach()
+  # The reference PNG is deterministic too, so its digest is compared as well.
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --frames 5 --png "5:${OUT}/hashes-card.png"
+    OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "schwaystation-run --frames 5 --png: exit ${rc}\n${out}${err}")
+  endif()
+  file(SHA256 "${OUT}/hashes-card.png" png)
+  string(APPEND lines "ntsc-u png 5 sha256 ${png}\n")
   # Unix newlines on every host: file(WRITE) writes CRLF on Windows.
   file(CONFIGURE OUTPUT "${OUT}/hashes.txt" NEWLINE_STYLE UNIX CONTENT "${lines}")
 elseif(MODE STREQUAL "compare")
