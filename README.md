@@ -15,9 +15,23 @@ controllers, and each one is published automatically.
   tests.
 - **The libretro core** (`schwaystation_libretro`): loads in RetroArch or another libretro frontend.
 
-## Install in RetroArch
+## Install in RetroArch (macOS, Apple Silicon)
 
-The one-line install for macOS on Apple Silicon is added with the first release.
+Paste this line into Terminal. It downloads the core and the release's checksum list, checks the core against
+it, and only then puts the core and its information file into RetroArch's folders:
+
+```sh
+mkdir -p ~/Library/Application\ Support/RetroArch && cd "$(mktemp -d)" && curl -fsSL -O https://github.com/szTheory/schwaystation/releases/latest/download/schwaystation-libretro-macos-arm64.zip -O https://github.com/szTheory/schwaystation/releases/latest/download/SHA256SUMS && shasum -a 256 -c --ignore-missing SHA256SUMS && tar -xf schwaystation-libretro-macos-arm64.zip -C ~/Library/Application\ Support/RetroArch cores info
+```
+
+If the download was damaged or changed, `shasum` reports `FAILED` and nothing is installed. RetroArch 1.22.2 (the
+Metal build) then lists **Sony - PlayStation (schwaystation)** under Load Core; after an update, delete
+`~/Library/Application Support/RetroArch/info/core_info.cache` so RetroArch rereads the core's information.
+
+On other systems, download `schwaystation-libretro-<os>-<arch>.zip` from the
+[latest release](https://github.com/szTheory/schwaystation/releases/latest) (`<os>` is `linux`, `macos` or
+`windows`; `<arch>` is `x64` or `arm64`), check it against `SHA256SUMS` from the same release, and copy its
+`cores` and `info` folders into the folders RetroArch lists under Settings → Directory → Cores and Core Info.
 
 ## Quick start: runner
 

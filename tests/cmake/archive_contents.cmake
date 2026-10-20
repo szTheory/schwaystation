@@ -10,7 +10,6 @@ endforeach()
 if(NOT DEFINED COMPONENTS)
   set(COMPONENTS library runner libretro)
 endif()
-
 set(notices LICENSE THIRD-PARTY-NOTICES.md)
 set(lib lib/libschwaystation.a)
 set(exe bin/schwaystation-run)
@@ -29,7 +28,6 @@ set(want_library ${notices} include/schwaystation.h include/schwaystation_versio
   ${cmake_dir}/schwaystationTargets-release.cmake)
 set(want_runner ${notices} ${exe})
 set(want_libretro ${notices} ${core} info/schwaystation_libretro.info)
-
 set(expected "")
 foreach(component IN LISTS COMPONENTS)
   list(APPEND expected "${DIR}/schwaystation-${component}-${SUFFIX}.zip")
@@ -40,7 +38,6 @@ list(SORT found)
 if(NOT found STREQUAL expected)
   message(FATAL_ERROR "archive_contents: zips in ${DIR} are\n  ${found}\nexpected\n  ${expected}")
 endif()
-
 foreach(component IN LISTS COMPONENTS)
   set(name schwaystation-${component}-${SUFFIX}.zip)
   set(out "${BINARY_DIR}/release/extract/${component}")
