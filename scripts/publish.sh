@@ -11,6 +11,9 @@
 # accepts a pull request's attestation. prepare reads EXPECTED_SHA; the rest
 # call gh with GH_TOKEN and GITHUB_REPOSITORY, and attested and verify accept
 # only attestations made on SOURCE_REF, which for a release is refs/heads/main.
+# verify also requires the downloads to be signed by release.yml; only a
+# rehearsal-* tag may name another workflow file in SIGNER_WORKFLOW (ci.yml,
+# where the rehearsal runs), so a release never accepts a rehearsal's signer.
 set -eu
 
 fail() {
@@ -92,12 +95,15 @@ attested() {
   done
 }
 
-# Only an attestation made on main is release provenance: a pull request's
-# rehearsal signs with the same workflow file, but from its own ref.
+# Only an attestation made on main by release.yml is release provenance: a
+# pull request's rehearsal signs from its own ref, with ci.yml.
 verify() {
   case $1 in
-    rehearsal-*) ;;
-    *) [ "$SOURCE_REF" = refs/heads/main ] || fail "$1 verifies only from refs/heads/main, not $SOURCE_REF" ;;
+    rehearsal-*) signer=${SIGNER_WORKFLOW:-release.yml} ;;
+    *)
+      signer=release.yml
+      [ "$SOURCE_REF" = refs/heads/main ] || fail "$1 verifies only from refs/heads/main, not $SOURCE_REF"
+      ;;
   esac
   attested "$2"
   draft=$(gh release view "$1" --repo "$REPO" --json isDraft --jq .isDraft)
@@ -121,8 +127,8 @@ verify() {
   (cd "$tmp/download" && sha256 $(names)) | cmp -s - "$2/SHA256SUMS" || fail "a downloaded zip differs"
   for n in $(names); do
     gh attestation verify "$tmp/download/$n" --repo "$REPO" \
-      --signer-workflow "$REPO/.github/workflows/release.yml" --source-ref "$SOURCE_REF" > /dev/null ||
-      fail "downloaded $n does not verify from $SOURCE_REF"
+      --signer-workflow "$REPO/.github/workflows/$signer" --source-ref "$SOURCE_REF" > /dev/null ||
+      fail "downloaded $n does not verify as $signer from $SOURCE_REF"
   done
   echo "publish: $1 published with 19 assets; every download matches SHA256SUMS and verifies"
 }

@@ -91,7 +91,7 @@ EOF
 $LABELS
 EOF
 
-  # The release App's client ID and key, set by scripts/setup-release-app.sh.
+  # The release App's client ID and key, set by the owner as docs/maintaining.md describes.
   # Without them the release pull request never gets CI and nothing publishes.
   names() { gh "$@" --repo "$repo" --json name -q '.[].name' 2>/dev/null || echo unreadable; }
   have=$(names variable list | grep -cx SCHWAYSTATION_APP_CLIENT_ID || true)
