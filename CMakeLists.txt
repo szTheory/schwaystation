@@ -19,6 +19,12 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 option(SCHWAYSTATION_BUILD_RUNNER "Build the schwaystation-run command" ${PROJECT_IS_TOP_LEVEL})
 option(SCHWAYSTATION_BUILD_TESTS "Register the tests" ${PROJECT_IS_TOP_LEVEL})
+# WASI has no dynamic loading, so no frontend can load a libretro core there.
+set(libretro_default ${PROJECT_IS_TOP_LEVEL})
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  set(libretro_default OFF)
+endif()
+option(SCHWAYSTATION_BUILD_LIBRETRO "Build the schwaystation_libretro core" ${libretro_default})
 
 # The nofp lane proves the core integer-only by machine code, not text: GCC's
 # -mgeneral-regs-only rejects any floating-point type in every core target
@@ -120,7 +126,7 @@ endif()
 # Host helpers shared by the runner and the libretro core. They are outside
 # the core's determinism boundary: nothing here is hashed. Built
 # position-independent and hidden, as the libretro module links them.
-if(SCHWAYSTATION_BUILD_RUNNER)
+if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
   add_library(schwaystation-host STATIC host/xrgb8888.c)
   target_include_directories(schwaystation-host
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/host
@@ -129,7 +135,12 @@ if(SCHWAYSTATION_BUILD_RUNNER)
     C_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON)
   schway_warnings(schwaystation-host)
+endif()
+if(SCHWAYSTATION_BUILD_RUNNER)
   add_subdirectory(runner)
+endif()
+if(SCHWAYSTATION_BUILD_LIBRETRO)
+  add_subdirectory(libretro)
 endif()
 
 # Release archives, one per install component.
