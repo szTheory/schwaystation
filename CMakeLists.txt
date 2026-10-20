@@ -20,6 +20,15 @@ set(CMAKE_C_EXTENSIONS OFF)
 option(SCHWAYSTATION_BUILD_RUNNER "Build the schwaystation-run command" ${PROJECT_IS_TOP_LEVEL})
 option(SCHWAYSTATION_BUILD_TESTS "Register the tests" ${PROJECT_IS_TOP_LEVEL})
 
+# The nofp lane proves the core integer-only by machine code, not text: GCC's
+# -mgeneral-regs-only rejects any floating-point type in every core target
+# (schway_core_options) and in the fixtures that copy its options. It
+# registers only the abi and nofp tests.
+option(SCHWAYSTATION_NOFP "Build the core with general registers only; register only the abi and nofp tests" OFF)
+if(SCHWAYSTATION_NOFP AND NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  message(FATAL_ERROR "nofp: -mgeneral-regs-only needs GCC, not ${CMAKE_C_COMPILER_ID}")
+endif()
+
 # The warning set, applied only when this is the top-level project so an
 # embedder's older or console compiler never meets an unknown flag. Presets
 # make warnings fatal through CMAKE_COMPILE_WARNING_AS_ERROR.
@@ -47,6 +56,9 @@ function(schway_core_options target)
   target_compile_options(${target} PRIVATE
     $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-fno-stack-protector -U_FORTIFY_SOURCE -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.>
     $<$<C_COMPILER_ID:MSVC>:/GS- /Zl>)
+  if(SCHWAYSTATION_NOFP)
+    target_compile_options(${target} PRIVATE -mgeneral-regs-only)
+  endif()
   target_include_directories(${target} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${PROJECT_BINARY_DIR}/generated)
@@ -123,4 +135,43 @@ endif()
 # Release archives, one per install component.
 if(PROJECT_IS_TOP_LEVEL)
   include(cmake/packaging.cmake)
+endif()
+
+# The hygiene lane registers only the repository checks and finds its own
+# tools, so no one sets PATH. A missing tool fails configure naming it; no
+# test skips itself.
+option(SCHWAYSTATION_HYGIENE "Register only the hygiene tests" OFF)
+if(SCHWAYSTATION_HYGIENE)
+  find_program(SCHWAYSTATION_JQ jq REQUIRED)
+  find_program(SCHWAYSTATION_SH sh REQUIRED)
+  find_package(Git REQUIRED)
+endif()
+
+# Tests. SCHWAYSTATION_TIMEOUT_SCALE multiplies every test's timeout on slow
+# lanes; SCHWAYSTATION_INVENTORY names the tests/inventory/<name>.txt
+# directory selection the registered tests must equal.
+set(SCHWAYSTATION_TIMEOUT_SCALE 1 CACHE STRING "Multiplier for every test timeout")
+set(inventory ci)
+if(SCHWAYSTATION_HYGIENE)
+  set(inventory hygiene)
+elseif(SCHWAYSTATION_NOFP)
+  set(inventory nofp)
+endif()
+set(SCHWAYSTATION_INVENTORY ${inventory} CACHE STRING "Test inventory selection under tests/inventory")
+# Fault prevented: every wasm32 test failing on a missing runtime, with a
+# message that does not say where the runtime comes from.
+if(SCHWAYSTATION_BUILD_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  list(GET CMAKE_CROSSCOMPILING_EMULATOR 0 emulator)
+  if(NOT EXISTS "${emulator}")
+    message(FATAL_ERROR "wasm32: the test runtime '${emulator}' is missing; fetch it with\n"
+      "  scripts/fetch-pin.sh wasmtime-<arch>-linux build/pins/wasmtime")
+  endif()
+endif()
+if(SCHWAYSTATION_BUILD_TESTS)
+  if(NOT SCHWAYSTATION_BUILD_RUNNER)
+    message(FATAL_ERROR "SCHWAYSTATION_BUILD_TESTS needs SCHWAYSTATION_BUILD_RUNNER: the tests run schwaystation-run")
+  endif()
+  enable_testing()
+  include(cmake/SchwaystationTests.cmake)
+  include(tests/tests.cmake)
 endif()

@@ -1,0 +1,298 @@
+{
+  "version": 11,
+  "cmakeMinimumRequired": { "major": 4, "minor": 3, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "dev",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "ci",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13"
+      }
+    },
+    {
+      "name": "ci-msvc",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+      }
+    },
+    {
+      "name": "hygiene",
+      "inherits": "base",
+      "$comment": "Registers only the repository checks. CMakeLists.txt finds jq, git and sh; a missing tool fails configure naming it.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_OSX_SYSROOT": "macosx",
+        "SCHWAYSTATION_HYGIENE": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+        "CMAKE_C_COMPILER": "clang-21",
+        "CMAKE_CXX_COMPILER": "clang++-21",
+        "CMAKE_C_FLAGS": "-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "SCHWAYSTATION_TIMEOUT_SCALE": "3",
+        "SCHWAYSTATION_INVENTORY": "ci"
+      }
+    },
+    {
+      "name": "nofp",
+      "inherits": "base",
+      "$comment": "GCC, version 15 on the hosted image: -mgeneral-regs-only is a GCC option. Registers only the abi and nofp tests.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "SCHWAYSTATION_NOFP": "ON"
+      }
+    },
+    {
+      "name": "be32",
+      "inherits": "base",
+      "$comment": "SCHWAYSTATION_TIMEOUT_SCALE 8: under qemu-ppc the seed's 43 shared tests took 6.7 times as long in total as on the Linux x64 leg (its runs 39336389305 and 39335167905), and the slowest up to 7.3 times.",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/ppc-linux-gnu.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+        "SCHWAYSTATION_TIMEOUT_SCALE": "8",
+        "SCHWAYSTATION_INVENTORY": "ci"
+      }
+    },
+    {
+      "name": "wasm32",
+      "inherits": "base",
+      "$comment": "One preopen covers the source and build trees, since binaryDir is under sourceDir. SCHWAYSTATION_TIMEOUT_SCALE 5: under wasmtime the seed's 40 shared tests took 4.3 times as long as on the Linux x64 leg in total (its run 39336389305).",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/wasm32-wasi.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+        "SCHWAYSTATION_BUILD_LIBRETRO": "OFF",
+        "SCHWAYSTATION_TIMEOUT_SCALE": "5",
+        "SCHWAYSTATION_INVENTORY": "wasm32",
+        "CMAKE_CROSSCOMPILING_EMULATOR": "${sourceDir}/build/pins/wasmtime/wasmtime;run;--dir=${sourceDir}::${sourceDir}"
+      }
+    },
+    {
+      "name": "perf",
+      "inherits": "base",
+      "$comment": "The performance build: the runner only, built with the host compiler.",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "ci", "configurePreset": "ci" },
+    { "name": "ci-msvc", "configurePreset": "ci-msvc" },
+    { "name": "hygiene", "configurePreset": "hygiene" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "nofp", "configurePreset": "nofp" },
+    { "name": "be32", "configurePreset": "be32" },
+    { "name": "wasm32", "configurePreset": "wasm32" },
+    { "name": "perf", "configurePreset": "perf", "targets": ["schwaystation-run"] }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "filter": { "exclude": { "label": "^release$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "filter": { "exclude": { "label": "^release$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "ci-msvc",
+      "configurePreset": "ci-msvc",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "filter": { "exclude": { "label": "^release$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "ci-release",
+      "configurePreset": "ci",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/ci/junit-release.xml"
+      },
+      "filter": { "include": { "label": "^release$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "ci-msvc-release",
+      "configurePreset": "ci-msvc",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/ci-msvc/junit-release.xml"
+      },
+      "filter": { "include": { "label": "^release$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "hygiene",
+      "configurePreset": "hygiene",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "filter": { "include": { "label": "^hygiene$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "filter": { "exclude": { "label": "^(abi|release)$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "nofp",
+      "configurePreset": "nofp",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "filter": { "include": { "label": "^abi$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "be32",
+      "configurePreset": "be32",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "filter": { "include": { "label": "^portable$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "wasm32",
+      "configurePreset": "wasm32",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "filter": { "include": { "label": "^portable$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    }
+  ],
+  "packagePresets": [
+    { "name": "ci", "configurePreset": "ci", "generators": ["ZIP"] },
+    { "name": "ci-msvc", "configurePreset": "ci-msvc", "generators": ["ZIP"] }
+  ],
+  "workflowPresets": [
+    {
+      "name": "dev",
+      "steps": [
+        { "type": "configure", "name": "dev" },
+        { "type": "build", "name": "dev" },
+        { "type": "test", "name": "dev" }
+      ]
+    },
+    {
+      "name": "ci",
+      "steps": [
+        { "type": "configure", "name": "ci" },
+        { "type": "build", "name": "ci" },
+        { "type": "test", "name": "ci" }
+      ]
+    },
+    {
+      "name": "ci-msvc",
+      "steps": [
+        { "type": "configure", "name": "ci-msvc" },
+        { "type": "build", "name": "ci-msvc" },
+        { "type": "test", "name": "ci-msvc" }
+      ]
+    },
+    {
+      "name": "hygiene",
+      "steps": [
+        { "type": "configure", "name": "hygiene" },
+        { "type": "build", "name": "hygiene" },
+        { "type": "test", "name": "hygiene" }
+      ]
+    },
+    {
+      "name": "asan",
+      "steps": [
+        { "type": "configure", "name": "asan" },
+        { "type": "build", "name": "asan" },
+        { "type": "test", "name": "asan" }
+      ]
+    },
+    {
+      "name": "nofp",
+      "steps": [
+        { "type": "configure", "name": "nofp" },
+        { "type": "build", "name": "nofp" },
+        { "type": "test", "name": "nofp" }
+      ]
+    },
+    {
+      "name": "be32",
+      "steps": [
+        { "type": "configure", "name": "be32" },
+        { "type": "build", "name": "be32" },
+        { "type": "test", "name": "be32" }
+      ]
+    },
+    {
+      "name": "wasm32",
+      "steps": [
+        { "type": "configure", "name": "wasm32" },
+        { "type": "build", "name": "wasm32" },
+        { "type": "test", "name": "wasm32" }
+      ]
+    },
+    {
+      "name": "perf",
+      "steps": [
+        { "type": "configure", "name": "perf" },
+        { "type": "build", "name": "perf" }
+      ]
+    }
+  ]
+}
