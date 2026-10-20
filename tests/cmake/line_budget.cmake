@@ -1,0 +1,25 @@
+# cmake -DROOT=<dir> -DLIMIT=<n> "-DPATTERNS=<glob>;<glob>" -P line_budget.cmake
+# Fault prevented: gate or end-to-end test code growing past its line budget,
+# or a renamed directory passing as zero lines. Counts newline-terminated
+# lines, as wc -l does, over the files each glob matches under ROOT.
+cmake_minimum_required(VERSION 3.25)
+if(NOT IS_DIRECTORY "${ROOT}" OR NOT LIMIT MATCHES "^[0-9]+$" OR "${PATTERNS}" STREQUAL "")
+  message(FATAL_ERROR "line_budget: -DROOT=<dir>, -DLIMIT=<n> and -DPATTERNS=<globs> are required")
+endif()
+set(total 0)
+foreach(pattern IN LISTS PATTERNS)
+  file(GLOB files LIST_DIRECTORIES false "${ROOT}/${pattern}")
+  if(NOT files)
+    message(FATAL_ERROR "line_budget: ${pattern} matches no file under ${ROOT}")
+  endif()
+  foreach(file IN LISTS files)
+    file(READ "${file}" text)
+    string(REGEX REPLACE "[^\n]+" "" newlines "${text}")
+    string(LENGTH "${newlines}" n)
+    math(EXPR total "${total} + ${n}")
+  endforeach()
+endforeach()
+if(total GREATER LIMIT)
+  message(FATAL_ERROR "line_budget: ${total} lines in ${PATTERNS} exceeds the limit of ${LIMIT}")
+endif()
+message(STATUS "line_budget: ${total} lines in ${PATTERNS}, limit ${LIMIT}")
