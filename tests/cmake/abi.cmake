@@ -1,9 +1,14 @@
-# cmake -DMODE=symbols -DLIB=<archive> -DNM=<nm> -DSYSTEM=<system>/<processor>
-#       [-DHEADER=<schwaystation.h>] -P abi.cmake
+# cmake -DMODE=<symbols|globals|undefined|clock> -DLIB=<archive> -DNM=<nm>
+#       -DSYSTEM=<system>/<processor> [-DHEADER=<schwaystation.h>] -P abi.cmake
 # Fault prevented, by mode:
 #   symbols    a defined external name that is neither a schway_ function the
 #              header declares nor an internal schway__ name, or a declared
 #              function that nothing defines.
+#   globals    mutable state outside the instance: a writable data symbol
+#              (nm types B b D d C).
+#   undefined  the core calling libc, libm or a floating-point helper: every
+#              unresolved name is a C memory function or a helper below.
+#   clock      the core reading a host clock, which breaks determinism.
 cmake_minimum_required(VERSION 3.25)
 foreach(var MODE LIB NM SYSTEM)
   if("${${var}}" STREQUAL "")
@@ -13,6 +18,32 @@ endforeach()
 if(NOT EXISTS "${LIB}" OR IS_DIRECTORY "${LIB}")
   message(FATAL_ERROR "abi: library ${LIB} does not exist")
 endif()
+
+# Compiler helpers per system, "system regex:names". The core builds with
+# -fno-stack-protector -U_FORTIFY_SOURCE, so no __stack_chk_* or __*_chk name.
+set(helpers
+  # Apple clang lowers a zeroing memset to bzero and a repeating 16-byte
+  # store loop to memset_pattern16 (nm -u on the core, -O3).
+  "^Darwin/:bzero __bzero memset_pattern16"
+  # x86-64 ELF position-independent code names the linker-defined GOT symbol
+  # (System V x86-64 psABI, section 3.5).
+  "^Linux/(x86_64|amd64|AMD64)$:_GLOBAL_OFFSET_TABLE_"
+  # 32-bit PowerPC has no 64-bit divide or shift; GCC calls the libgcc
+  # integer routines (GCC internals manual, "Integer library routines").
+  "^Linux/(ppc|powerpc)$:__udivdi3 __umoddi3 __ashldi3 __lshrdi3"
+  # MSVC addresses switch tables from the linker-defined image base (PE
+  # format, "__ImageBase"); x64's auto-vectorizer reads the CPU level.
+  "^Windows/:__ImageBase"
+  "^Windows/(AMD64|x86_64)$:__isa_available")
+set(allowed memcpy memmove memset memcmp)
+foreach(row IN LISTS helpers)
+  string(REGEX MATCH "^([^:]*):(.*)$" unused "${row}")
+  set(names "${CMAKE_MATCH_2}")
+  if(SYSTEM MATCHES "${CMAKE_MATCH_1}")
+    separate_arguments(names UNIX_COMMAND "${names}")
+    list(APPEND allowed ${names})
+  endif()
+endforeach()
 
 # Names a compiler gives its own constants, "system regex:name regex", left
 # out of the globals and symbols checks. MSVC puts each string literal in a
@@ -37,10 +68,6 @@ if(NOT rc EQUAL 0)
   message(FATAL_ERROR "abi: ${NM} -P ${LIB} failed (${rc}): ${err}")
 endif()
 string(REPLACE "\n" ";" lines "${text}")
-set(undefined "")
-set(defined "")
-set(writable "")
-set(external "")
 foreach(line IN LISTS lines)
   if(NOT line MATCHES "^([^ ]+) ([A-Za-z])( |$)")
     continue()
@@ -67,7 +94,19 @@ foreach(line IN LISTS lines)
 endforeach()
 
 set(bad "")
-if(MODE STREQUAL "symbols")
+if(MODE STREQUAL "undefined")
+  list(REMOVE_ITEM undefined ${defined} ${allowed})
+  set(bad ${undefined})
+  set(what "unexpected undefined symbol")
+elseif(MODE STREQUAL "globals")
+  set(bad ${writable})
+  set(what "writable data symbol")
+elseif(MODE STREQUAL "clock")
+  # Optional import prefix and leading underscore; MSVC's time is _time64.
+  set(bad ${undefined})
+  list(FILTER bad INCLUDE REGEX "^(__imp_)?_?(time(32|64)?|clock|clock_gettime|gettimeofday|timespec_get|mach_absolute_time|mach_continuous_time|QueryPerformanceCounter|GetTickCount64|GetSystemTimeAsFileTime)$")
+  set(what "host clock read")
+elseif(MODE STREQUAL "symbols")
   file(READ "${HEADER}" header)
   string(REGEX MATCHALL "schway_[a-z0-9_]*\\(" declared "${header}")
   string(REPLACE "(" "" declared "${declared}")

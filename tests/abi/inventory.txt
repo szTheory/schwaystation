@@ -1,3 +1,9 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+abi.globals	abi
+abi.globals.self_test	abi
 abi.symbols	abi
 abi.symbols.self_test	abi
+abi.undefined	abi
+abi.undefined.self_test	abi
+core.no_host_clock	abi
+core.no_host_clock.self_test	abi

@@ -13,7 +13,7 @@ set(abi_args -DNM=${abi_nm} "-DSYSTEM=${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCES
   -DHEADER=${PROJECT_SOURCE_DIR}/include/schwaystation.h)
 
 get_target_property(abi_options schwaystation_instance COMPILE_OPTIONS)
-foreach(fixture IN ITEMS symbol)
+foreach(fixture IN ITEMS clock global libc symbol)
   add_library(schwaystation-abi-${fixture} STATIC ${CMAKE_CURRENT_LIST_DIR}/${fixture}_fixture.c)
   target_compile_options(schwaystation-abi-${fixture} PRIVATE ${abi_options})
   set_target_properties(schwaystation-abi-${fixture} PROPERTIES
@@ -22,8 +22,13 @@ foreach(fixture IN ITEMS symbol)
     ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests/abi)
 endforeach()
 
-foreach(mode IN ITEMS symbols)
-  schway_add_test(NAME abi.${mode}
+# The PS1 has no real-time clock, so the core needs no injected time; the
+# clock check proves it reads none of the host's.
+foreach(case IN ITEMS "abi.symbols;symbols" "abi.globals;globals" "abi.undefined;undefined"
+                      "core.no_host_clock;clock")
+  list(GET case 0 name)
+  list(GET case 1 mode)
+  schway_add_test(NAME ${name}
     COMMAND ${CMAKE_COMMAND} -DMODE=${mode} -DLIB=$<TARGET_FILE:schwaystation> ${abi_args}
       -P ${abi_scripts}/abi.cmake
     LABELS abi TIMEOUT 30)
@@ -31,7 +36,10 @@ endforeach()
 
 # CMake wraps a long message at a column that depends on the build path, so
 # each regex allows a line break anywhere in the finding's title.
-foreach(case IN ITEMS "abi.symbols;symbols;symbol;outside[^:]*namespace:.*abi_symbol_fixture")
+foreach(case IN ITEMS "abi.symbols;symbols;symbol;outside[^:]*namespace:.*abi_symbol_fixture"
+                      "abi.globals;globals;global;writable[^:]*symbol:.*counter"
+                      "abi.undefined;undefined;libc;unexpected[^:]*symbol:.*abort"
+                      "core.no_host_clock;clock;clock;host[^:]*clock[^:]*read:.*time")
   list(GET case 0 name)
   list(GET case 1 mode)
   list(GET case 2 fixture)
