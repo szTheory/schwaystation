@@ -11,6 +11,11 @@ core.no_alloc_after_load	perf,portable
 core.profile.locked	core,portable
 core.profile.rejected	core,portable
 core.reset.power	core,portable
+core.state.record_sweep	core,portable
+core.state.rejects	core,portable
+core.state.round_trip	core,portable
+core.state.stable_bytes	core,portable
+core.state.visit	core,portable
 core.testcard.counter	core,portable
 core.testcard.frames_differ	core,portable
 core.testcard.full_redraw	core,portable

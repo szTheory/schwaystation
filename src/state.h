@@ -17,6 +17,10 @@
 
 #include "internal.h"
 
+/* The header ahead of the body: magic (8 bytes), state format, total size
+   and body CRC-32 (u32 each). The body CRC covers every byte after it. */
+#define SCHWAY__STATE_HEADER_SIZE 20u
+
 /* One field as RECORD reports it: offset from the start of the state, width
    of one value in bytes, number of values, and the inclusive range VALIDATE
    accepts for each. */

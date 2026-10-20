@@ -26,3 +26,20 @@ foreach(case IN ITEMS testcard.pixels testcard.counter testcard.frames_differ te
     COMMAND schwaystation-test-core ${case}
     LABELS core portable TIMEOUT 10)
 endforeach()
+
+# Save states and the field visitor. Fault prevented: a state that does not
+# round-trip byte for byte, a corruption applied before it is refused, or a
+# visitor that misses a field a save writes.
+add_executable(schwaystation-test-state ${CMAKE_CURRENT_LIST_DIR}/test_state.c)
+target_include_directories(schwaystation-test-state PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-state PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-state PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-state)
+
+foreach(case IN ITEMS state.round_trip state.stable_bytes state.rejects state.visit
+    state.record_sweep)
+  schway_add_test(NAME core.${case}
+    COMMAND schwaystation-test-state ${case}
+    LABELS core portable TIMEOUT 10)
+endforeach()

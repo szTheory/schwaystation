@@ -13,7 +13,6 @@
 
 #include "state.h"
 
-#define STATE_HEADER_SIZE 20u
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
@@ -90,7 +89,8 @@ static uint32_t get_u32(const uint8_t *b)
 
 static uint32_t body_crc(const uint8_t *b, size_t size)
 {
-    return schway__crc32_update(0u, b + STATE_HEADER_SIZE, size - STATE_HEADER_SIZE);
+    return schway__crc32_update(0u, b + SCHWAY__STATE_HEADER_SIZE,
+                                size - SCHWAY__STATE_HEADER_SIZE);
 }
 
 size_t schway_state_size(const schway *inst)
@@ -123,7 +123,7 @@ size_t schway__state_record(const schway *inst, struct schway__state_field *out,
 void schway__state_seal(void *buf, size_t size)
 {
     uint8_t *b = (uint8_t *)buf;
-    if (b == NULL || size < STATE_HEADER_SIZE) {
+    if (b == NULL || size < SCHWAY__STATE_HEADER_SIZE) {
         return;
     }
     uint32_t crc = body_crc(b, size);
@@ -159,7 +159,7 @@ schway_status schway_load_state(schway *inst, const void *buf, size_t size)
     if (size < sizeof state_magic || memcmp(b, state_magic, sizeof state_magic) != 0) {
         return SCHWAY_STATUS_ERR_STATE_MAGIC;
     }
-    if (size < STATE_HEADER_SIZE) {
+    if (size < SCHWAY__STATE_HEADER_SIZE) {
         return SCHWAY_STATUS_ERR_STATE_FIELD;
     }
     if (get_u32(b + H_FORMAT) != SCHWAY__STATE_FORMAT) {
