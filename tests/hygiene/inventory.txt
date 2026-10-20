@@ -1,3 +1,17 @@
+# Repository hygiene: tree scan, integer-only text scan, BIOS bytes, titles, scripts, workflows and gate budgets.
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+ci.classify	hygiene
+ci.title	hygiene
+ci.title.self_test	hygiene
+hygiene.no_bios_bytes	hygiene
+hygiene.no_bios_bytes.self_test	hygiene
+hygiene.no_float	hygiene
+hygiene.no_float.self_test	hygiene
+hygiene.tree	hygiene
+hygiene.tree.self_test	hygiene
 policy.gate_budget	hygiene,policy
 policy.gate_budget.self_test	hygiene,policy
+policy.publish_ref	hygiene,policy
+policy.publish_set	hygiene,policy
+policy.publish_set.self_test	hygiene,policy
+policy.publish_signer	hygiene,policy

@@ -1,0 +1,36 @@
+pass|ci: probe the phase workflows|
+pass|feat: show a test card in RetroArch|
+pass|fix(runner): exit 2 on a missing file|
+pass|feat!: drop the old entry point|
+pass|perf(gpu): draw a line in one pass|
+pass|chore(deps): bump actions/checkout|
+pass|ci(release): pin the app token action|
+pass|docs: say how to install|First line.\nSecond line names skip ci without brackets.
+fail|feat(02-03): x|
+fail|feat(02-03): add x|
+fail|docs(01-15): complete the plan|
+fail|Phase 1: Name|
+fail|Phase 1: a test frame in RetroArch|
+fail|fix(ci): x|
+fail|feat(release): x|
+fail|perf(build): x|
+fail|fix(test): x|
+fail|feat(docs): x|
+fail|feat: Show a test card|
+fail|feature: x|
+fail|feat:x|
+fail|Feat: x|
+fail|ci: probe [skip ci]|
+fail|ci: probe|First line.\n[skip ci]
+fail|ci: probe|[ci skip]
+fail|ci: probe|[no ci]
+fail|ci: probe|[skip actions]
+fail|ci: probe|[actions skip]
+fail|ci: probe|Body.\n\nskip-checks:true
+fail|ci: probe|Body.\n\nskip-checks: true
+fail|ci: probe|[SKIP CI]
+pass|ci: probe the phase branch|
+fail|feat(ci): x|
+fail|feat: éclair|
+fail|Phase 1: A test frame in RetroArch|
+fail|ci: probe the phase branch|Body.\n\n[skip ci]
