@@ -42,7 +42,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The pull request's rehearsal produces exactly 18 version-free archives, each with `LICENSE` and `THIRD-PARTY-NOTICES.md`, plus `SHA256SUMS` and verified attestations, then deletes itself. Merging publishes the same set with no manual step.
   5. Each ABI, hygiene and policy gate (`abi.*`, `hygiene.*`, `policy.*`, `ci.title`, `build.revision_matches_head`) fails its negative control with its named message. `--bench` reports the frame-time percentiles, and the Cachegrind Ir/frame measurement runs on every pull request. The core makes zero allocations after load and never reads a host clock.
 
-**Plans**: 14/15 plans executed in 8 waves
+**Plans**: 15/15 plans executed in 8 waves
 
 Plans:
 **Wave 1**
@@ -74,7 +74,7 @@ Plans:
 - [x] 01-14-PLAN.md — Hosted run driven green on a probe pull request; nightly dispatched; job costs measured (wave 7)
 
 **Wave 8** *(blocked on Wave 7 completion)*
-- [ ] 01-15-PLAN.md — Measured timeouts, bound todos, gate-budget re-pin handed to ship, owner-applied ruleset (wave 8)
+- [x] 01-15-PLAN.md — Measured timeouts, bound todos, gate-budget re-pin handed to ship, owner-applied ruleset (wave 8)
 
 **Cross-cutting constraints:**
 - The cruft grep exits 1 (D-27)
@@ -164,7 +164,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. A test frame in RetroArch | 14/15 | In Progress | - |
+| 1. A test frame in RetroArch | 15/15 | In Progress | - |
 | 2. The CPU matches the public vectors | 0/TBD | Not started | - |
 | 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |

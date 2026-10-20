@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
-status: executing
-stopped_at: Completed 01-14-PLAN.md
-last_updated: "2026-10-20T16:32:17.765Z"
+status: verifying
+stopped_at: Completed 01-15-PLAN.md
+last_updated: "2026-10-20T17:22:57.052Z"
 last_activity: 2026-10-19
 last_activity_desc: Phase 01 execution started
-state_head: e669f21032f7b46db6e41295e8ffca7a3caa2054
+state_head: c078b3127f0128460b56070ce1f5f24559d18f85
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 15
-  completed_plans: 14
+  completed_plans: 15
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-19)
 
 Phase: 01 (A test frame in RetroArch) — EXECUTING
 Plan: 15 of 15
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-19 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -72,6 +72,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P12 | 6min | 3 tasks | 11 files |
 | Phase 01 P13 | 5min | 3 tasks | 6 files |
 | Phase 01 P14 | 17min | 3 tasks | 0 files |
+| Phase 01 P15 | 50min | 3 tasks | 27 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,10 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-13: docs/testing.md CI jobs table does not list rehearsal and cleanup yet; the next plan that edits docs/testing.md adds the row
 - [Phase 01]: 01-14: the first hosted CI run (39455724329) was green on every job; no hosted fix, no RetroArch frame pin
 - [Phase 01]: 01-14: perf on the probe reports NO_BASE (Ir/frame 1620415) because main has no perf preset
+- [Phase 01]: 01-15: be32 (36 s) and wasm32 (22 s) stay per-PR lanes; libgcc and wasmtime-count questions wait for the GTE in phase 3
+- [Phase 01]: 01-15: workflow.test_gate_timeout is 4 s, twice the measured 1.62 s fresh local ci workflow
+- [Phase 01]: 01-15: policy.gate_budget re-pinned from 1500 to the measured gate-line total (1392 at d8a0ab4) at phase 1 ship, after code review
+- [Phase 01]: 01-15: the one-off windows-x64 install.consumer.dll_crt failure is a test bug to triage (todo 022), not a gate
 
 ### Pending Todos
 
@@ -137,9 +142,10 @@ Items acknowledged and deferred at milestone close, most recent first:
 | 2026-10-19 | /gsd-discuss-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-plan-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-execute-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
+| 2026-10-20 | /gsd-execute-phase 1 (continued) | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 
 ## Session Continuity
 
-Last session: 2026-10-20T16:32:17.744Z
-Stopped at: Completed 01-14-PLAN.md
+Last session: 2026-10-20T17:22:57.028Z
+Stopped at: Completed 01-15-PLAN.md
 Resume file: None

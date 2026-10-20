@@ -15,11 +15,11 @@ commercial disc or the owner's hardware; those run only in the local `library` p
 
 ### A test frame in RetroArch
 
-- [ ] **FRAME-01**: `cmake --workflow --preset ci` (`ci-msvc` on Windows) configures, builds, tests and packages the library, `schwaystation-run` and the libretro core on every platform, with the exact test inventory in `tests/inventory/ci.txt` executed once each and no skipped test.
+- [x] **FRAME-01**: `cmake --workflow --preset ci` (`ci-msvc` on Windows) configures, builds, tests and packages the library, `schwaystation-run` and the libretro core on every platform, with the exact test inventory in `tests/inventory/ci.txt` executed once each and no skipped test.
 - [x] **FRAME-02**: `schwaystation-run --frames 60 --hash` with no BIOS and no disc prints a frame hash of the built-in test card (320 × 240, 15-bit, with the 13-word metadata tuple) that is byte-identical on every platform, including the `be32` lane under qemu-ppc; the `wasm32` lane under wasmtime prints the same hash and is report-only until the phase-1 `ci:` tail promotes it (DEC.99), while `be32` gates from day one; `hash-equality` compares the eight `hashes.txt` files.
 - [x] **FRAME-03**: A CTest (`libretro.host`) loads the libretro core in an in-process host, runs 60 frames with no content, and compares the delivered XRGB8888 frame with the runner's conversion byte for byte; `retro_get_system_av_info` reports fps 53,693,175/897,619 (NTSC) or 53,203,425/1,069,484 (PAL) as rationals, sample rate 44,100, base geometry 320 × 240 and aspect 4/3.
 - [x] **FRAME-04**: `nm`-based CTests prove the core exports only `schway_*` symbols (`abi.symbols`), has no mutable globals (`abi.globals`), imports only `memcpy`, `memmove`, `memset` and `memcmp` plus the per-OS allowlist (`abi.undefined`), links no floating point (`hygiene.no_float`, the `nofp` preset with `-mgeneral-regs-only`), and that `include/schwaystation.h` compiles as C17 and C++17; the header stays under 40 KB and the README under 16 KB (`docs.budgets`).
-- [ ] **FRAME-05**: `scripts/hygiene.sh --tree`, the title check (`ci.title`), the timeout-comment check (`hygiene.timeout_comments`), the SHA-pin check, `hygiene.no_bios_bytes` (signatures compared as hex) and the no-self-skip policy (`policy.no_skip`) run in CI, each with a negative control (`<name>.self_test` through `expect_fail.cmake`) that fails with its named message; `policy.gate_budget` holds policy and hygiene code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githooks/*`) at or under 1,500 lines in phase 1, re-pinned to the measured value at ship; `build.revision_matches_head` fails when the embedded revision differs from HEAD.
+- [x] **FRAME-05**: `scripts/hygiene.sh --tree`, the title check (`ci.title`), the timeout-comment check (`hygiene.timeout_comments`), the SHA-pin check, `hygiene.no_bios_bytes` (signatures compared as hex) and the no-self-skip policy (`policy.no_skip`) run in CI, each with a negative control (`<name>.self_test` through `expect_fail.cmake`) that fails with its named message; `policy.gate_budget` holds policy and hygiene code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githooks/*`) at or under 1,500 lines in phase 1, re-pinned to the measured value at ship; `build.revision_matches_head` fails when the embedded revision differs from HEAD.
 - [x] **FRAME-06**: The pull request's prerelease rehearsal (job `rehearsal` inside `CI required`, on release-input changes) runs every publish step with the App token against `rehearsal-<run_id>-<run_attempt>` and produces exactly 18 version-free archives `schwaystation-{library,runner,libretro}-{linux,macos,windows}-{x64,arm64}.zip`, `SHA256SUMS` and verified attestations, then deletes itself; `release.archive_contents` shows `LICENSE` and `THIRD-PARTY-NOTICES.md` in each archive; release-please (`simple`, `version.txt`, draft by ID) is configured so that merging publishes the same set with no manual step (the real publish is confirmed at ship).
 - [x] **FRAME-07**: The README install line, run in CI against the built macOS arm64 libretro archive (and against `releases/latest/download/` once a release exists), verifies the checksum and installs `cores/schwaystation_libretro.dylib` and `info/schwaystation_libretro.info` where RetroArch 1.22.2 (Metal, DMG pinned by SHA-256) finds them; a hosted macOS job runs RetroArch with the core and no content for `--max-frames=5` and compares its screenshot with `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, with a one-byte negative control; `policy.e2e_budget` holds the e2e code at or under 300 lines.
 - [x] **FRAME-08**: An installed-package C consumer (`install.consumer`), a C++ header consumer and an `add_subdirectory` embed with tests, runner and libretro off (`embed.subdirectory`) build in CI on every platform; `tests/api/v1.c` touches every public name.
@@ -110,11 +110,11 @@ Later milestones. Each has a seed in `.planning/seeds/` that says when it comes 
 
 | Requirement | Phase | Status |
 |---|---|---|
-| FRAME-01 | Phase 1 | Pending |
+| FRAME-01 | Phase 1 | Complete |
 | FRAME-02 | Phase 1 | Complete |
 | FRAME-03 | Phase 1 | Complete |
 | FRAME-04 | Phase 1 | Complete |
-| FRAME-05 | Phase 1 | Pending |
+| FRAME-05 | Phase 1 | Complete |
 | FRAME-06 | Phase 1 | Complete |
 | FRAME-07 | Phase 1 | Complete |
 | FRAME-08 | Phase 1 | Complete |
