@@ -1,7 +1,10 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+build.revision_matches_head	runner
+build.revision_matches_head.self_test	runner
 runner.bench.bytes	bench,portable,runner
 runner.bench.format	bench,portable,runner
 runner.bench.percentile	bench,portable,runner
+runner.exit.failure	portable,runner
 runner.hash	portable,runner
 runner.hash.frame5	portable,runner
 runner.hash.ntsc_j	portable,runner
@@ -11,10 +14,12 @@ runner.hashes_compare.count.self_test	runner
 runner.hashes_file	portable,runner
 runner.png	portable,runner
 runner.png_file	portable,runner
+runner.stop	portable,runner
 runner.usage.frame_range	portable,runner
 runner.usage.no_args	portable,runner
 runner.usage.png_syntax	portable,runner
 runner.usage.positional	portable,runner
 runner.usage.region	portable,runner
 runner.usage.unknown	portable,runner
+runner.version	portable,runner
 runner.xrgb8888	portable,runner

@@ -22,8 +22,14 @@
  *
  * --bench N runs N frames as --frames N does, times each schway_run_frame
  * with the runner's monotonic clock and prints the report described in
- * bench.h. The core reads no clock. docs/runner.md describes all of this for
- * users.
+ * bench.h. The core reads no clock.
+ *
+ * SIGINT or SIGTERM ends the run after the frame in progress: what was asked
+ * is printed for the frames that ran, and the status is 0.
+ *
+ * --version prints the library's version and the Git revision the build was
+ * configured from, or "unknown" when it was configured outside a Git
+ * checkout. docs/runner.md describes all of this for users.
  *
  * Exit statuses are listed in exit_status.h and printed by --help.
  */
@@ -35,10 +41,19 @@
 #include "clock.h"
 #include "exit_status.h"
 #include "png.h"
+#include "revision.h"
 #include "rss.h"
 #include "schwaystation.h"
 #include "sha256.h"
+#include "stop.h"
 #include "xrgb8888.h"
+
+/* The tests build a second runner with SCHWAY_RUN_RAISE_AT=N, which raises
+   SIGTERM from inside frame N, to show the stop is clean. The installed
+   runner has no such hook. */
+#ifdef SCHWAY_RUN_RAISE_AT
+#include <signal.h>
+#endif
 
 #define FRAMES_MAX 1000000u
 
@@ -84,15 +99,17 @@ static void help(void)
     }
 }
 
-/* The library's version, which is the release's version. */
+/* The library's version, which is the release's version, and the revision
+   the build was configured from. */
 static void version(void)
 {
     schway_versions v;
     memset(&v, 0, sizeof v);
     v.size = (uint32_t)sizeof v;
     (void)schway_get_versions(&v);
-    printf("schwaystation-run %lu.%lu.%lu\n", (unsigned long)v.library_major,
-           (unsigned long)v.library_minor, (unsigned long)v.library_patch);
+    printf("schwaystation-run %lu.%lu.%lu %s\n", (unsigned long)v.library_major,
+           (unsigned long)v.library_minor, (unsigned long)v.library_patch,
+           SCHWAY__RUNNER_REVISION);
 }
 
 /* Parses text as a decimal number from 1 to FRAMES_MAX. Returns 0 on any
@@ -364,6 +381,11 @@ static int run(const options *opt)
         if (opt->bench) {
             samples[ran] = schway__bench_us(schway__clock_ns() - start_ns);
         }
+#ifdef SCHWAY_RUN_RAISE_AT
+        if (n == SCHWAY_RUN_RAISE_AT) {
+            (void)raise(SIGTERM);
+        }
+#endif
         ran = n;
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: schway_run_frame failed: %s\n",
@@ -372,6 +394,11 @@ static int run(const options *opt)
         }
         if (status == SCHWAY__EXIT_OK && n == opt->png_frame) {
             status = write_png(inst, opt->png_path);
+        }
+        /* A stop request ends the run only between whole frames, after the
+           frame's outputs are written. */
+        if (schway__stop_requested()) {
+            break;
         }
     }
     if (status == SCHWAY__EXIT_OK && opt->hash) {
@@ -394,6 +421,7 @@ int main(int argc, char **argv)
     memset(&opt, 0, sizeof opt);
     int status = parse_options(argc, argv, &opt);
     if (status == SCHWAY__EXIT_OK && !opt.printed) {
+        schway__stop_install();
         status = run(&opt);
     }
     if (fflush(stdout) != 0) {

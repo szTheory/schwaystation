@@ -13,8 +13,8 @@ typedef struct schway__exit_status {
 } schway__exit_status;
 
 static const schway__exit_status schway__exit_statuses[] = {
-    {SCHWAY__EXIT_OK, "done", "every frame ran"},
-    {SCHWAY__EXIT_FAILURE, "failure", "memory ran out or the core failed"},
+    {SCHWAY__EXIT_OK, "done", "every frame ran, or SIGINT or SIGTERM ended the run after a whole frame"},
+    {SCHWAY__EXIT_FAILURE, "failure", "a file could not be written, memory ran out or the core failed"},
     {SCHWAY__EXIT_USAGE, "usage", "the command line is invalid, so nothing ran"},
 };
 

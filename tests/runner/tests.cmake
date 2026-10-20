@@ -62,6 +62,13 @@ if(CMAKE_SCRIPT_MODE_FILE)
     refuse(--bench 1000001)
     refuse(--bench 1073741824)
     refuse(--bench 4294967295)
+  elseif(CASE STREQUAL "stop")
+    # The flag, then a runner built to raise SIGTERM inside frame 5: the run
+    # ends after that frame, still prints what was asked, and exits 0.
+    unit(stop)
+    set(RUN ${HOOKED})
+    expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash)
+    expect_exit(0 "^frames 5\n.*max_rss_kib [0-9]+\n$" --bench 60)
   elseif(CASE STREQUAL "no_args")
     refuse()
   elseif(CASE STREQUAL "unknown")
@@ -233,13 +240,25 @@ foreach(case no_args unknown positional frame_range png_syntax region)
     LABELS portable runner TIMEOUT 30)
 endforeach()
 
-# The bench statistics, tested directly.
+# The bench statistics and the stop flag, tested directly, and a runner built
+# with a hook that raises SIGTERM from inside frame 5.
 add_executable(schwaystation-test-bench
   ${CMAKE_CURRENT_LIST_DIR}/test_runner.c
-  ${PROJECT_SOURCE_DIR}/runner/bench.c)
+  ${PROJECT_SOURCE_DIR}/runner/bench.c
+  ${PROJECT_SOURCE_DIR}/runner/stop.c)
 set_target_properties(schwaystation-test-bench PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-bench)
+
+add_executable(schwaystation-test-run-stop ${SCHWAYSTATION_RUNNER_SOURCES})
+target_include_directories(schwaystation-test-run-stop PRIVATE ${SCHWAYSTATION_RUNNER_INCLUDE})
+target_link_libraries(schwaystation-test-run-stop PRIVATE schwaystation::schwaystation
+  schwaystation-host)
+target_compile_definitions(schwaystation-test-run-stop PRIVATE _POSIX_C_SOURCE=200809L
+  SCHWAY_RUN_RAISE_AT=5)
+set_target_properties(schwaystation-test-run-stop PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-run-stop)
 
 set(bench_check ${runner_check} -DUNIT=$<TARGET_FILE:schwaystation-test-bench>)
 
@@ -260,3 +279,42 @@ schway_add_test(NAME runner.bench.format
 schway_add_test(NAME runner.bench.bytes
   COMMAND ${bench_check} -DCASE=bench_bytes -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS bench portable runner TIMEOUT 30)
+
+# Fault prevented: SIGINT or SIGTERM killing the run mid-frame or losing the
+# output already asked for, so an interrupted CI job reports nothing.
+schway_add_test(NAME runner.stop
+  COMMAND ${bench_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
+    -DEXPECTED=${SCHWAYSTATION_TESTCARD_SHA256_FRAME5} -DCASE=stop -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: a runner that exits 0 after failing to write a file, or
+# calls a failure a usage error.
+set(runner_failure_cmd ${runner_cmd} --frames 1 --png "1:${PROJECT_BINARY_DIR}/tests/missing/x.png")
+string(REPLACE ";" "$<SEMICOLON>" runner_failure_cmd "${runner_failure_cmd}")
+schway_add_test(NAME runner.exit.failure
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${runner_failure_cmd}" -DCODE=1 "-DREGEX=cannot write"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: --version printing something a script cannot parse.
+schway_add_test(NAME runner.version
+  COMMAND ${runner_cmd} --version
+  PASS_REGEX "schwaystation-run [0-9]+[.][0-9]+[.][0-9]+ ([0-9a-f]+|unknown)"
+  LABELS portable runner TIMEOUT 10)
+
+# Fault prevented: testing a stale configure after a commit, so the results
+# describe a tree other than HEAD. The self-test forces a mismatch.
+set(runner_revision ${runner_check} -DSOURCE=${PROJECT_SOURCE_DIR}
+  -P ${PROJECT_SOURCE_DIR}/tests/cmake/revision.cmake)
+schway_add_test(NAME build.revision_matches_head
+  COMMAND ${runner_revision}
+  LABELS runner TIMEOUT 30)
+set(runner_revision_cmd ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
+  -DREVISION=0000000000000000000000000000000000000000 -DSOURCE=${PROJECT_SOURCE_DIR}
+  -P ${PROJECT_SOURCE_DIR}/tests/cmake/revision.cmake)
+string(REPLACE ";" "$<SEMICOLON>" runner_revision_cmd "${runner_revision_cmd}")
+schway_add_test(NAME build.revision_matches_head.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${runner_revision_cmd}" -DCODE=1
+    "-DREGEX=configured at[^/]*0000000000000000000000000000000000000000[^/]*HEAD[^/]*is[^/]*[0-9a-f]"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS runner TIMEOUT 30)

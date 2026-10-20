@@ -1,9 +1,11 @@
-/* The runner's bench statistics, one case per argv[1]: percentile, bytes
-   or format. */
+/* The runner's bench statistics and stop flag, one case per argv[1]:
+   percentile, bytes, format or stop. */
+#include <signal.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "../../runner/bench.h"
+#include "../../runner/stop.h"
 #include "../check.h"
 
 static const uint32_t all_ppm[] = {500000u, 900000u, 990000u, 999000u, 999900u, 999990u, 1000000u};
@@ -115,10 +117,20 @@ static void format(void)
     CHECK_EQ_U64(schway__bench_format(buf, 20u, us, 4u, 123u), 0u);
 }
 
+/* A fresh process has no stop request; SIGINT records one. */
+static void stop(void)
+{
+    CHECK_EQ_U64(schway__stop_requested(), 0u);
+    schway__stop_install();
+    CHECK_EQ_U64(schway__stop_requested(), 0u);
+    CHECK_EQ_U64(raise(SIGINT), 0u);
+    CHECK_EQ_U64(schway__stop_requested(), 1u);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-bench percentile|bytes|format\n");
+        fprintf(stderr, "usage: schwaystation-test-bench percentile|bytes|format|stop\n");
         return 2;
     }
     if (strcmp(argv[1], "percentile") == 0) {
@@ -127,6 +139,8 @@ int main(int argc, char **argv)
         bytes();
     } else if (strcmp(argv[1], "format") == 0) {
         format();
+    } else if (strcmp(argv[1], "stop") == 0) {
+        stop();
     } else {
         fprintf(stderr, "unknown case %s\n", argv[1]);
         return 2;
