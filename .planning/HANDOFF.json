@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-10-20T18:02:54.051Z",
+  "phase": "01",
+  "phase_name": "A test frame in RetroArch",
+  "phase_dir": ".planning/phases/01-a-test-frame-in-retroarch",
+  "plan": 15,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Phase 1 standard code review", "status": "done", "commit": "a6051cf"},
+    {"id": 2, "name": "Fix CR-01 with regression and documentation", "status": "done", "commit": "b7c658a"},
+    {"id": 3, "name": "Record fix report and disposition", "status": "done", "commit": "7ebbbcb"}
+  ],
+  "remaining_tasks": [
+    {"id": 4, "name": "$gsd-verify-work 1 in a fresh session", "status": "not_started"},
+    {"id": 5, "name": "Ship phase 1 after verification in a later session", "status": "not_started"}
+  ],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Share the load and run counter bounds; refuse before mutation using ERR_STATE_FIELD", "rationale": "Every successful frame must remain serializable and reloadable", "phase": "01"},
+    {"decision": "Keep WR-01 as a tooling seed", "rationale": "AGENTS rule 7 and the source review exclude test-helper findings from immediate core fixes", "phase": "01"}
+  ],
+  "uncommitted_files": [" M .planning/STATE.md", " M .planning/config.json"],
+  "uncommitted_files_measured_at": "2026-10-20T18:02:54.051Z",
+  "uncommitted_files_note": "Measured before handoff writes. These existing edits select Codex balanced models and AGENTS.md; preserve them. Pause artifacts and only the pause-owned STATE changes are committed separately.",
+  "next_action": "Resume with $gsd-resume-work; the next substantive step is $gsd-verify-work 1, then stop under AGENTS rule 9.",
+  "context_notes": "All 15 phase plans have summaries. Review fix passed 78 regular CI tests, 2 archive tests and 21 hygiene tests. Branch phase/01-a-test-frame-in-retroarch was four commits ahead of origin before pause; no push or PR this session. No active services, external jobs or new hosted run. Read the companion .continue-here.md for evidence and constraints."
+}
