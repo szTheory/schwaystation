@@ -37,7 +37,7 @@ jobs:
   bench:
     name: bench (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 3  # provisional
+    timeout-minutes: 3  # 2 x 66 s (bench macos-15), slowest of 3 runs, run 39457445780, provisional
     strategy:
       fail-fast: false
       matrix:
@@ -70,7 +70,7 @@ jobs:
   # has no resident set size, so its max_rss_kib line reads 0.
   bench-wasm32:
     runs-on: ubuntu-26.04
-    timeout-minutes: 3  # provisional
+    timeout-minutes: 5  # 2 x 126 s (bench-wasm32), slowest of 2 runs, run 39455724030, provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -104,7 +104,7 @@ jobs:
     needs: [bench, bench-wasm32]
     if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # provisional, 0 samples (skipped on pull requests)
+    timeout-minutes: 5  # 5-minute floor (roll-up); 2 x 8 s (report), slowest of 2 runs, run 39457820699, provisional
     permissions:
       issues: write
     steps:

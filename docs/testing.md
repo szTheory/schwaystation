@@ -196,9 +196,11 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `CI required` | The one check the ruleset requires. It passes only when every job above but `wasm32` succeeded or was skipped as allowed: build jobs when `heavy=false`, `title` and `perf` outside pull requests, and `perf` in a call from `release.yml`. | the check |
 
 `wasm32` stays outside `CI required` and outside the hash comparison until a separate `ci:` pull request after the
-first release moves it in. Every timeout in the file is marked `provisional` until this repository's own runs
-measure it; `hygiene.timeout_comments` fails a `timeout-minutes` line that names neither a run nor `provisional`,
-and `policy.action_pins` fails a `uses:` line that is not a full 40-hex commit with a `# v` comment.
+first release moves it in. Every timeout in the file is twice the slowest successful duration measured in this
+repository's own runs (5 minutes at least for network-bound and roll-up jobs), names that run, and stays marked
+`provisional` while fewer than 10 samples exist; `hygiene.timeout_comments` fails a `timeout-minutes` line that
+names neither a run nor `provisional`, and `policy.action_pins` fails a `uses:` line that is not a full 40-hex
+commit with a `# v` comment.
 
 **Downloads.** `pins.txt` lists every download CI makes (wasmtime and the RetroArch DMG) with its SHA-256;
 `scripts/fetch-pin.sh NAME DEST` refuses a file whose digest differs.

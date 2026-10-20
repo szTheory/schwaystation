@@ -50,7 +50,7 @@ jobs:
   # release_inputs=true when a path the release pipeline reads changed.
   changes:
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor, provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 17 s (changes), slowest of 1 run, run 39455724329, provisional
     permissions:
       contents: read
       pull-requests: read
@@ -81,7 +81,7 @@ jobs:
   # The image has git and jq; configure finds them.
   hygiene:
     runs-on: ubuntu-26.04
-    timeout-minutes: 1  # provisional
+    timeout-minutes: 1  # 2 x 17 s (hygiene), slowest of 1 run, run 39455724329, provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -96,7 +96,7 @@ jobs:
   title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor, provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 7 s (title), slowest of 1 run, run 39455724329, provisional
     permissions:
       contents: read
       pull-requests: read
@@ -119,7 +119,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: build (${{ matrix.os }}-${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 3  # provisional
+    timeout-minutes: 3  # 2 x 63 s (build windows-arm64), slowest of 1 run, run 39455724329, provisional
     strategy:
       fail-fast: false
       matrix:
@@ -183,7 +183,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt), provisional
+    timeout-minutes: 5  # 5-minute floor (apt); 2 x 21 s (asan), slowest of 1 run, run 39455724329, provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -204,7 +204,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: nofp (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 1  # provisional
+    timeout-minutes: 1  # 2 x 16 s (nofp ubuntu-26.04-arm), slowest of 1 run, run 39455724329, provisional
     strategy:
       fail-fast: false
       matrix:
@@ -224,7 +224,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt), provisional
+    timeout-minutes: 5  # 5-minute floor (apt); 2 x 36 s (be32), slowest of 1 run, run 39455724329, provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -249,7 +249,7 @@ jobs:
     needs: [changes, build, be32]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor, provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 5 s (hash-equality), slowest of 1 run, run 39455724329, provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -271,7 +271,7 @@ jobs:
     needs: [changes, build]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt), provisional
+    timeout-minutes: 5  # 5-minute floor (apt); 2 x 22 s (wasm32), slowest of 1 run, run 39455724329, provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -317,7 +317,7 @@ jobs:
     needs: [changes, build]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: macos-15
-    timeout-minutes: 5  # 5-minute floor, provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 23 s (retroarch), slowest of 1 run, run 39455724329, provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -384,7 +384,7 @@ jobs:
     needs: changes
     if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt), provisional
+    timeout-minutes: 5  # 5-minute floor (apt); 2 x 22 s (perf), slowest of 1 run, run 39455724329, provisional
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
@@ -487,7 +487,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.changes.outputs.release_inputs == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 13  # provisional
+    timeout-minutes: 11  # 2 x 328 s (rehearsal), slowest of 1 run, run 39455724329, provisional
     permissions:
       contents: write
       id-token: write
@@ -569,7 +569,7 @@ jobs:
     needs: rehearsal
     if: always() && needs.rehearsal.result != 'skipped'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (API), provisional
+    timeout-minutes: 5  # 5-minute floor (API); 2 x 9 s (cleanup), slowest of 1 run, run 39455724329, provisional
     permissions:
       contents: write
     steps:
@@ -599,7 +599,7 @@ jobs:
     if: always()
     needs: [changes, hygiene, title, build, asan, nofp, be32, hash-equality, retroarch, perf, rehearsal, cleanup]
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor, provisional
+    timeout-minutes: 5  # 5-minute floor (roll-up); 2 x 4 s (CI required), slowest of 1 run, run 39455724329, provisional
     steps:
       - name: Every job succeeded or was skipped as allowed
         env:
