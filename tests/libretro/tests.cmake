@@ -12,9 +12,16 @@ set_target_properties(schwaystation-test-libretro-host PROPERTIES
 schway_warnings(schwaystation-test-libretro-host)
 add_dependencies(schwaystation-test-libretro-host schwaystation_libretro)
 
-# Fault prevented: the core RetroArch loads shows a frame, rate or geometry
-# other than the library's, or needs content to start.
-schway_add_test(NAME libretro.host
-  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
-    $<TARGET_FILE:schwaystation_libretro>
-  LABELS libretro portable TIMEOUT 60)
+# Fault prevented: the core RetroArch loads shows a frame, rate, geometry or
+# audio length other than the library's, needs content to start, loses its
+# region option, or resets or restores a state other than the library does.
+# ntsc-u answers core options version 2 and takes batch audio; pal answers no
+# options version and takes audio pair by pair.
+foreach(case IN ITEMS "libretro.host;ntsc-u" "libretro.host.pal;pal")
+  list(GET case 0 name)
+  list(GET case 1 mode)
+  schway_add_test(NAME ${name}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+      $<TARGET_FILE:schwaystation_libretro> ${mode}
+    LABELS libretro portable TIMEOUT 60)
+endforeach()

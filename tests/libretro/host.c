@@ -1,14 +1,20 @@
 /* Loads the built libretro module at run time and calls it in the order a
  * frontend such as RetroArch does.
  *
- *   schwaystation-test-libretro-host <module>
+ *   schwaystation-test-libretro-host <module> ntsc-u|pal
  *
  * The host runs a reference instance of the library beside the module, frame
  * for frame, and converts its video with the same schway_host_xrgb8888_frame
  * the runner's --png uses, so equal bytes mean the delivered frame equals the
  * runner's conversion. Pixels are compared as the module wrote them, so a
- * swapped channel or byte order fails here. "Lnnn" is a line of the vendored
- * libretro.h. */
+ * swapped channel or byte order fails here. Each frame's audio must equal the
+ * pairs the reference instance drains for that frame.
+ *
+ * ntsc-u: the host reports core options version 2, answers the region option
+ * with ntsc-u and registers the batch audio callback. pal: the host has no
+ * core options version, so the module must fall back to SET_VARIABLES; it
+ * answers pal and registers only the single-sample callback. "Lnnn" is a
+ * line of the vendored libretro.h. */
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -30,7 +36,9 @@
 
 #define MAX_W 640u
 #define MAX_H 576u
+#define MAX_PAIRS 1024u
 #define FRAMES 60u
+#define SAVE_AT 30u
 #define POISON 0xA5u
 
 /* a == b as doubles, printed with every digit. */
@@ -159,12 +167,60 @@ static void resolve_all(void)
 
 /* ---- frontend callbacks: record what the core does ---- */
 
+static int pal; /* the mode: 0 ntsc-u, 1 pal */
 static int no_game_calls, no_game_value;
 static int pixel_format_calls;
 static enum retro_pixel_format pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
+static unsigned options_v2_calls, variables_calls, get_variable_calls;
+static const char *option_value; /* what GET_VARIABLE answers */
+static bool option_updated;      /* what GET_VARIABLE_UPDATE answers, once */
+static unsigned av_info_calls;
+static struct retro_system_av_info av_info_sent;
 static unsigned video_calls, video_bad;
 static unsigned frame_w, frame_h;
 static uint32_t frame[MAX_W * MAX_H];
+static int16_t got_audio[MAX_PAIRS * 2u];
+static size_t got_pairs;
+
+/* got must equal want; prints both. */
+static void check_string(const char *what, const char *got, const char *want)
+{
+    if (got == NULL || strcmp(got, want) != 0) {
+        fprintf(stderr, "%s: got \"%s\", expected \"%s\"\n", what, got != NULL ? got : "(null)",
+                want);
+        check_failures++;
+    }
+}
+
+/* The version 2 definitions (L7747) must hold exactly the region option,
+   default first, with its three values. */
+static void check_options_v2(const struct retro_core_options_v2 *o)
+{
+    const struct retro_core_option_v2_definition *d = o != NULL ? o->definitions : NULL;
+    CHECK(d != NULL);
+    if (d == NULL) {
+        return;
+    }
+    check_string("option key", d[0].key, "schwaystation_region");
+    check_string("option default", d[0].default_value, "ntsc-u");
+    check_string("option value 0", d[0].values[0].value, "ntsc-u");
+    check_string("option value 1", d[0].values[1].value, "ntsc-j");
+    check_string("option value 2", d[0].values[2].value, "pal");
+    CHECK(d[0].values[3].value == NULL);
+    CHECK(d[1].key == NULL);
+}
+
+/* The version 0 variables (L7483) carry the same option, default first. */
+static void check_variables(const struct retro_variable *v)
+{
+    CHECK(v != NULL);
+    if (v == NULL) {
+        return;
+    }
+    check_string("variable key", v[0].key, "schwaystation_region");
+    check_string("variable value", v[0].value, "Region; ntsc-u|ntsc-j|pal");
+    CHECK(v[1].key == NULL);
+}
 
 static bool RETRO_CALLCONV env(unsigned cmd, void *data)
 {
@@ -176,6 +232,37 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
     case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
         pixel_format_calls++;
         pixel_format = *(const enum retro_pixel_format *)data;
+        return true;
+    case RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION:
+        if (pal) {
+            return false;
+        }
+        *(unsigned *)data = 2u;
+        return true;
+    case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2:
+        options_v2_calls++;
+        check_options_v2((const struct retro_core_options_v2 *)data);
+        return true;
+    case RETRO_ENVIRONMENT_SET_VARIABLES:
+        variables_calls++;
+        check_variables((const struct retro_variable *)data);
+        return true;
+    case RETRO_ENVIRONMENT_GET_VARIABLE: {
+        struct retro_variable *var = (struct retro_variable *)data;
+        get_variable_calls++;
+        if (var == NULL || var->key == NULL || strcmp(var->key, "schwaystation_region") != 0) {
+            return false;
+        }
+        var->value = option_value;
+        return true;
+    }
+    case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
+        *(bool *)data = option_updated;
+        option_updated = false;
+        return true;
+    case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
+        av_info_calls++;
+        memcpy(&av_info_sent, data, sizeof av_info_sent);
         return true;
     default:
         return false;
@@ -203,15 +290,23 @@ static void RETRO_CALLCONV video(const void *data, unsigned width, unsigned heig
     }
 }
 
+/* Both audio callbacks append to one buffer per frame; pairs past its end
+   are counted and not kept. */
 static void RETRO_CALLCONV sample(int16_t left, int16_t right)
 {
-    (void)left;
-    (void)right;
+    if (got_pairs < MAX_PAIRS) {
+        got_audio[2u * got_pairs] = left;
+        got_audio[2u * got_pairs + 1u] = right;
+    }
+    got_pairs++;
 }
 
 static size_t RETRO_CALLCONV batch(const int16_t *data, size_t frames)
 {
-    (void)data;
+    size_t i;
+    for (i = 0; i < frames; i++) {
+        sample(data[2u * i], data[2u * i + 1u]);
+    }
     return frames;
 }
 
@@ -226,16 +321,6 @@ static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned ind
     (void)index;
     (void)id;
     return 0;
-}
-
-/* got must equal want; prints both. */
-static void check_string(const char *what, const char *got, const char *want)
-{
-    if (got == NULL || strcmp(got, want) != 0) {
-        fprintf(stderr, "%s: got \"%s\", expected \"%s\"\n", what, got != NULL ? got : "(null)",
-                want);
-        check_failures++;
-    }
 }
 
 /* ---- the reference instance ---- */
@@ -329,7 +414,32 @@ static void run_one(void)
 {
     memset(frame, POISON, sizeof frame);
     frame_w = frame_h = 0u;
+    got_pairs = 0u;
     p_run();
+}
+
+/* One frame of the module and of the reference instance: the frame must be
+   the reference's conversion, and the audio exactly the pairs the reference
+   drains for that frame, lo or lo + 1 of them. */
+static void step(schway *ref, const char *what, unsigned lo)
+{
+    static int16_t ref_audio[MAX_PAIRS * 2u];
+    schway_audio io;
+    CHECK_EQ_U64(schway_run_frame(ref, NULL), SCHWAY_STATUS_OK);
+    memset(&io, 0, sizeof io);
+    io.size = (uint32_t)sizeof io;
+    io.samples = ref_audio;
+    io.capacity = MAX_PAIRS;
+    CHECK_EQ_U64(schway_get_audio(ref, &io), SCHWAY_STATUS_OK);
+    run_one();
+    ref_convert(ref);
+    check_frame(what);
+    if (got_pairs != io.written || (got_pairs != lo && got_pairs != lo + 1u) ||
+        memcmp(got_audio, ref_audio, (size_t)io.written * 2u * sizeof ref_audio[0]) != 0) {
+        fprintf(stderr, "%s: %lu audio pairs, reference %lu, expected %u or %u\n", what,
+                (unsigned long)got_pairs, (unsigned long)io.written, lo, lo + 1u);
+        check_failures++;
+    }
 }
 
 /* Sets the frontend callbacks, as a frontend does after retro_init. */
@@ -337,24 +447,58 @@ static void set_callbacks(void)
 {
     p_set_video_refresh(video);
     p_set_audio_sample(sample);
-    p_set_audio_sample_batch(batch);
+    p_set_audio_sample_batch(pal ? NULL : batch);
     p_set_input_poll(on_poll);
     p_set_input_state(input);
+}
+
+/* The AV info a region must report. The rates are compared with exact
+   equality: the adapter must divide the core's own rationals, not round a
+   constant. */
+static void check_av(const struct retro_system_av_info *av, uint32_t region)
+{
+    CHECK_EQ_U64(av->geometry.base_width, 320u);
+    CHECK_EQ_U64(av->geometry.base_height, 240u);
+    CHECK_EQ_U64(av->geometry.max_width, 640u);
+    CHECK_EQ_DBL(av->geometry.aspect_ratio, 4.0f / 3.0f);
+    CHECK_EQ_DBL(av->timing.sample_rate, 44100.0);
+    if (region == SCHWAY_REGION_PAL) {
+        CHECK_EQ_U64(av->geometry.max_height, 576u);
+        CHECK_EQ_DBL(av->timing.fps, 53203425.0 / 1069484.0);
+    } else {
+        CHECK_EQ_U64(av->geometry.max_height, 480u);
+        CHECK_EQ_DBL(av->timing.fps, 53693175.0 / 897619.0);
+    }
 }
 
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
     struct retro_system_av_info av;
+    struct retro_game_info game;
+    static const unsigned char one_byte[1] = {0};
+    static uint32_t frame60[MAX_W * MAX_H];
     char version[32];
     schway_versions v;
     schway *ref;
-    unsigned run;
+    unsigned char *state, *ref_state;
+    size_t size;
+    unsigned run, lo, other_lo;
+    uint32_t region, other;
 
-    if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-libretro-host <module>\n");
+    if (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0)) {
+        fprintf(stderr, "usage: schwaystation-test-libretro-host <module> ntsc-u|pal\n");
         return 2;
     }
+    pal = strcmp(argv[2], "pal") == 0;
+    option_value = argv[2];
+    region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
+    /* The region a changed option switches to, and both regions' pairs per
+       frame: 33,868,800 x 44,100 / (768 x 44,100) per second over the frame
+       rate (HOSTS-AND-INTEGRATION section 1, AV fields). */
+    other = pal ? SCHWAY_REGION_NTSC_J : SCHWAY_REGION_PAL;
+    lo = pal ? 886u : 737u;
+    other_lo = pal ? 737u : 886u;
     if (!module_open(argv[1])) {
         fprintf(stderr, "cannot load %s\n", argv[1]);
         return 1;
@@ -373,10 +517,13 @@ int main(int argc, char **argv)
     snprintf(version, sizeof version, "%u.%u.%u", (unsigned)v.library_major,
              (unsigned)v.library_minor, (unsigned)v.library_patch);
 
+    /* No-game support and the options are declared before retro_init. */
     CHECK_EQ_U64(p_api_version(), RETRO_API_VERSION);
     p_set_environment(env);
     CHECK_EQ_U64(no_game_calls, 1);
     CHECK_EQ_U64(no_game_value, 1);
+    CHECK_EQ_U64(options_v2_calls, pal ? 0u : 1u);
+    CHECK_EQ_U64(variables_calls, pal ? 1u : 0u);
     p_init();
 
     memset(&sys, 0, sizeof sys);
@@ -388,23 +535,26 @@ int main(int argc, char **argv)
     CHECK_EQ_U64(sys.block_extract, 1);
     set_callbacks();
 
-    /* No content: the pixel format is set before load returns (L870). */
+    /* Content is refused; only the test card runs in this release. */
+    memset(&game, 0, sizeof game);
+    game.path = "game.cue";
+    game.data = one_byte;
+    game.size = sizeof one_byte;
+    CHECK_EQ_U64(p_load_game(&game), 0);
+    CHECK_EQ_U64(p_load_game_special(0, &game, 1), 0);
+    CHECK_EQ_U64(pixel_format_calls, 0);
+    CHECK_EQ_U64(p_serialize_size(), 0);
+
+    /* No content: the pixel format is set before load returns (L870), and
+       the region option is read. */
     CHECK_EQ_U64(p_load_game(NULL), 1);
     CHECK_EQ_U64(pixel_format_calls, 1);
     CHECK_EQ_U64(pixel_format, RETRO_PIXEL_FORMAT_XRGB8888);
-    CHECK_EQ_U64(p_get_region(), RETRO_REGION_NTSC);
-
-    /* The rates are compared with exact equality: the adapter must divide
-       the core's own rationals, not round a constant. */
+    CHECK(get_variable_calls >= 1u);
+    CHECK_EQ_U64(p_get_region(), pal ? RETRO_REGION_PAL : RETRO_REGION_NTSC);
     memset(&av, 0, sizeof av);
     p_get_system_av_info(&av);
-    CHECK_EQ_U64(av.geometry.base_width, 320u);
-    CHECK_EQ_U64(av.geometry.base_height, 240u);
-    CHECK_EQ_U64(av.geometry.max_width, 640u);
-    CHECK_EQ_U64(av.geometry.max_height, 480u);
-    CHECK_EQ_DBL(av.geometry.aspect_ratio, 4.0f / 3.0f);
-    CHECK_EQ_DBL(av.timing.fps, 53693175.0 / 897619.0);
-    CHECK_EQ_DBL(av.timing.sample_rate, 44100.0);
+    check_av(&av, region);
 
     /* No memory regions in this release. */
     CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 0);
@@ -414,24 +564,110 @@ int main(int argc, char **argv)
     p_cheat_reset();
     p_cheat_set(0, true, "");
 
-    /* 60 frames, one video call each, each poisoned first; the 60th equals
-       the reference instance's 60th frame. */
-    ref = ref_create(SCHWAY_REGION_NTSC_U);
+    ref = ref_create(region);
     CHECK(ref != NULL);
     if (ref == NULL) {
         module_close();
         return 1;
     }
+
+    /* 60 frames, one video call each, each poisoned first and each equal to
+       the reference's frame and audio. A state is saved at frame 30. */
+    size = 0u;
+    state = ref_state = NULL;
     for (run = 1; run <= FRAMES; run++) {
-        CHECK_EQ_U64(schway_run_frame(ref, NULL), SCHWAY_STATUS_OK);
-        run_one();
+        step(ref, "frame", lo);
+        if (run == SAVE_AT) {
+            size = p_serialize_size();
+            CHECK(size > 0u);
+            CHECK_EQ_U64(size, schway_state_size(ref));
+            state = (unsigned char *)malloc(size);
+            ref_state = (unsigned char *)malloc(size);
+            CHECK(state != NULL && ref_state != NULL);
+            if (state == NULL || ref_state == NULL) {
+                free(state);
+                free(ref_state);
+                schway_destroy(ref);
+                module_close();
+                return 1;
+            }
+            CHECK_EQ_U64(p_serialize(state, size - 1u), 0);
+            CHECK_EQ_U64(p_serialize(state, size), 1);
+            CHECK_EQ_U64(schway_save_state(ref, ref_state, size), SCHWAY_STATUS_OK);
+            CHECK(memcmp(state, ref_state, size) == 0);
+        }
     }
     CHECK_EQ_U64(video_calls, FRAMES);
     CHECK_EQ_U64(video_bad, 0);
-    ref_convert(ref);
-    check_frame("frame 60");
+    memcpy(frame60, frame, sizeof frame60);
 
+    /* Unserialize to frame 30 and run to 60 again: the same frames and audio,
+       and the same 60th frame. A damaged state is refused. */
+    if (state != NULL && ref_state != NULL) {
+        state[size - 1u] ^= 0xFFu;
+        CHECK_EQ_U64(p_unserialize(state, size), 0);
+        state[size - 1u] ^= 0xFFu;
+        CHECK_EQ_U64(p_unserialize(state, size), 1);
+        CHECK_EQ_U64(schway_load_state(ref, ref_state, size), SCHWAY_STATUS_OK);
+        for (run = SAVE_AT + 1u; run <= FRAMES; run++) {
+            step(ref, "replayed frame", lo);
+        }
+        CHECK(memcmp(frame, frame60, sizeof frame60) == 0);
+    }
+    free(state);
+    free(ref_state);
+
+    /* A power cycle, on both. */
+    p_reset();
+    CHECK_EQ_U64(schway_reset(ref, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    step(ref, "frame after reset", lo);
+
+    /* An update that leaves the region alone keeps the instance. */
+    option_updated = true;
+    step(ref, "frame after an unchanged option", lo);
+    CHECK_EQ_U64(av_info_calls, 0);
+
+    /* A new region recreates the instance from power-on and sends the new
+       AV info once. */
     schway_destroy(ref);
+    ref = ref_create(other);
+    CHECK(ref != NULL);
+    if (ref == NULL) {
+        module_close();
+        return 1;
+    }
+    option_value = other == SCHWAY_REGION_PAL ? "pal" : "ntsc-j";
+    option_updated = true;
+    step(ref, "frame after a region change", other_lo);
+    CHECK_EQ_U64(av_info_calls, 1);
+    check_av(&av_info_sent, other);
+    CHECK_EQ_U64(p_get_region(), other == SCHWAY_REGION_PAL ? RETRO_REGION_PAL : RETRO_REGION_NTSC);
+    memset(&av, 0, sizeof av);
+    p_get_system_av_info(&av);
+    check_av(&av, other);
+    schway_destroy(ref);
+
+    /* Unload, deinit and start again with the mode's region: no state
+       survives, so the first frame is the reference's first. */
+    p_unload_game();
+    CHECK_EQ_U64(p_serialize_size(), 0);
+    p_deinit();
+    no_game_calls = 0;
+    pixel_format_calls = 0;
+    option_value = argv[2];
+    p_set_environment(env);
+    p_init();
+    set_callbacks();
+    CHECK_EQ_U64(no_game_calls, 1);
+    CHECK_EQ_U64(p_load_game(NULL), 1);
+    CHECK_EQ_U64(pixel_format_calls, 1);
+    ref = ref_create(region);
+    CHECK(ref != NULL);
+    if (ref != NULL) {
+        step(ref, "first frame after deinit", lo);
+        schway_destroy(ref);
+    }
+
     p_unload_game();
     p_deinit();
     module_close();
