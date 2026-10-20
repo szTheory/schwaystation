@@ -169,13 +169,14 @@ documentation, changelogs, issue trackers, release notes and released binaries; 
   (CONFORMANCE 3.3).
 
 ## 8. Vendored files
-Vendored files are never edited. The CTest `libretro.vendored` checks each SHA-256 in this table, and each notice
-lives in `THIRD-PARTY-NOTICES.md`. The table is filled in v1.0 phase 1 with `libretro/libretro.h` and in v2.0
-with libchdr and its three dependencies; `rc_hash_disc.c` joins when the probe CTest lands.
+Vendored files are never edited. Each file's SHA-256 is recorded in this table when it is vendored, and each
+notice lives in `THIRD-PARTY-NOTICES.md`. The CTest `libretro.vendored` that re-checks these digests is deferred, a todo bound to the next phase that vendors a file.
+The table is filled in v1.0 phase 1 with `libretro/libretro.h` and in v2.0 with libchdr and its three
+dependencies; `rc_hash_disc.c` joins when the probe CTest lands.
 
 | File | Upstream | Upstream path | Commit | Licence | SHA-256 |
 |---|---|---|---|---|---|
-| `libretro/libretro.h` | https://github.com/libretro/libretro-common | `include/libretro.h` | `a3194c18ba65` (40-hex recorded at vendoring) | MIT | recorded at vendoring (phase 1) |
+| `libretro/libretro.h` | https://github.com/libretro/libretro-common | `include/libretro.h` | `a3194c18ba65ef89734e1898a2f61403c255d368` | MIT | `036ddffc995ad116c3081ca0a7515d09c2a116f3483e4f5012fe0c29a885da76` |
 | `third_party/libchdr/**` (v2.0, `SCHWAYSTATION_CHD`) | https://github.com/rtissera/libchdr | whole tree minus tests | `47d794151b2b` | BSD-3-Clause; deps public domain, MIT, BSD-3 | recorded at vendoring |
 | `tests/probe/rc_hash_disc.c` | https://github.com/RetroAchievements/rcheevos | `src/hash/rc_hash_disc.c` | `dfdc64ea035c` | MIT | recorded at vendoring |
 
