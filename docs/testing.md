@@ -163,9 +163,9 @@ perf testcard head=<n> base=<n> delta_bp=<n> verdict=PASS
 than that or more than the allow file permits; `UNSTABLE` the two base measurements differ; `NO_BASE` the base has
 no `perf` preset. An empty or non-numeric measurement is an input error, never a pass.
 
-**Report mode.** `SCHWAYSTATION_PERF_MODE` is `report` or `gate`. In `report` the script prints the verdict and
-exits 0 whatever it is; in `gate`, `FAIL`, `UNSTABLE` and `NO_BASE` exit 1. The job runs in report mode until a
-separate `ci:` pull request arms it.
+**Gate mode.** CI sets `SCHWAYSTATION_PERF_MODE` to `gate`: `FAIL`, `UNSTABLE` and `NO_BASE` exit 1. The script
+also accepts `report`, which prints the verdict and exits 0; bad input always fails. Two manual control runs
+measuring the released commit three times each showed zero spread before the gate was armed.
 
 **Exceptions.** A pull request that must be slower adds a line to `tests/perf/allow.txt`:
 `<fixture> <max % × 100> <expiry YYYY-MM-DD> <reason>`. It raises that fixture's limit through its expiry, at most
@@ -189,15 +189,16 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `asan` | The `asan` preset; JUnit check without `abi` and `release`. | yes |
 | `nofp` | The `nofp` preset on both Linux legs. | yes |
 | `be32` | The `be32` preset (`portable` tests) and uploads `hashes-be32`. | yes |
-| `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=7`: the six build legs' and `be32`'s `hashes.txt` must be byte-identical. | yes |
-| `wasm32` | The `wasm32` preset with the pinned wasmtime, uploads `hashes-wasm32`, and prints to the job summary whether its `hashes.txt` equals Linux x64's. | no, report-only |
+| `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt` must be byte-identical. | yes |
+| `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
 | `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, `320x240, every pixel equal`, and the flipped-pixel control must fail naming `7,3`. | yes |
-| `perf` | Cachegrind instructions per frame at head and at the merge base, then `perf_compare.cmake` in report mode (pull requests and manual runs). | yes |
-| `CI required` | The one check the ruleset requires. It passes only when every job above but `wasm32` succeeded or was skipped as allowed: build jobs when `heavy=false`, `title` and `perf` outside pull requests, and `perf` in a call from `release.yml`. | the check |
+| `perf` | Cachegrind instructions per frame at head and at the merge base, then `perf_compare.cmake` in gate mode on pull requests. Manual runs measure one commit three times and report its spread. | yes |
+| `rehearsal`, `cleanup` | Rehearse publication on same-repository pull requests that change release inputs, then delete the rehearsal release and tag. See [maintaining.md](maintaining.md). | yes, when applicable |
+| `CI required` | The one check the ruleset requires. It passes only when every job above succeeded or was skipped as allowed: heavy jobs when `heavy=false`, `title` and `perf` outside pull requests, `perf` in a call from `release.yml`, and rehearsal jobs when publication is not applicable. | the check |
 
-`wasm32` stays outside `CI required` and outside the hash comparison until a separate `ci:` pull request after the
-first release moves it in. Every timeout in the file is twice the slowest successful duration measured in this
-repository's own runs (5 minutes at least for network-bound and roll-up jobs), names that run, and stays marked
+`wasm32` became required after a successful run on `main`. Timeouts are twice the slowest successful duration
+measured in this repository's own runs (5 minutes at least for network-bound and roll-up jobs); the shared build
+timeout also covers an observed Windows ARM64 overrun. Each names its evidence run and stays marked
 `provisional` while fewer than 10 samples exist; `hygiene.timeout_comments` fails a `timeout-minutes` line that
 names neither a run nor `provisional`, and `policy.action_pins` fails a `uses:` line that is not a full 40-hex
 commit with a `# v` comment.

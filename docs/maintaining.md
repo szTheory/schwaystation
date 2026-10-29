@@ -167,7 +167,7 @@ night closes it. To see the issue written, run it by hand on any branch with `fo
 
 ## After the first release
 
-Two `ci:` pull requests follow the first release, one step on their own before the next phase starts:
+One `ci:` pull request completes the first release's CI tail before the next phase starts:
 
 - **Arm the instructions-per-frame gate.** Run `ci.yml` by hand twice (`gh workflow run ci.yml --ref main`); each
   `perf` job measures one commit three times and prints `spread=`. When both runs print `spread=0`, set
@@ -175,6 +175,12 @@ Two `ci:` pull requests follow the first release, one step on their own before t
   accepted rise is a dated line in `tests/perf/allow.txt`.
 - **Promote wasm32.** Once `wasm32` has a green record on `main`, add it to `CI required`'s needs and its
   `hashes.txt` to `hash-equality`'s comparison, which then counts eight files.
+
+Both changes are active. The controls on the v0.1.0 commit are
+[40939706087](https://github.com/szTheory/schwaystation/actions/runs/40939706087) and
+[40939709809](https://github.com/szTheory/schwaystation/actions/runs/40939709809); each measures the same commit
+three times with zero spread. wasm32's successful `main` run is
+[40935782754](https://github.com/szTheory/schwaystation/actions/runs/40935782754).
 
 ## Pinned downloads
 
