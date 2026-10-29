@@ -5,10 +5,10 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: verified
-stopped_at: Phase 01 verified; next command is /gsd-ship 1
+stopped_at: Phase 01 ship PR 4; after release verification, the separate CI tail is next
 last_updated: "2026-10-29T18:27:16.672Z"
 last_activity: 2026-10-29
-last_activity_desc: Phase 01 verification passed; ship and release pending
+last_activity_desc: Phase 01 ship PR 4 opened; automatic merge and release tracked in the PR
 state_head: 13b91f66e9154b46e72478fcbb3d73385615e5d1
 progress:
   total_phases: 6
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 ## Current Position
 
-Phase: 01 (A test frame in RetroArch) — VERIFIED, READY TO SHIP
+Phase: 01 (A test frame in RetroArch) — SHIP PR #4
 Plan: 15 of 15
-Status: Verification passed; ship phase 1 before the separate CI tail and phase 2 discussion
-Last activity: 2026-10-29 — 117 UAT entries passed; canonical verification passed
+Status: Verified; ship PR #4 tracks automatic merge and release before the separate CI tail
+Last activity: 2026-10-29 — Phase 01 shipped as PR #4; publication evidence is tracked in its body
 
 Progress: [██░░░░░░░░] 17%
 
@@ -163,5 +163,11 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-10-29
-Stopped at: Phase 01 verified; next command is /gsd-ship 1
+Stopped at: Phase 01 ship PR #4; separate phase-1 CI tail next after publication checks
 Resume file: None
+
+Ship PR: https://github.com/szTheory/schwaystation/pull/4
+
+Next command after the ship report confirms publication:
+`$gsd-quick "Complete the phase-1 CI tail on phase/01-ci-tail"`.
+The CI tail is a separate session; phase 2 discussion follows it.

@@ -21,7 +21,7 @@ audio hashes identical on six platforms plus the `be32` and `wasm32` lanes.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: A test frame in RetroArch** - The library, runner and libretro core ship automatically, and a built-in test card hashes identically on eight lanes (verified 2026-10-29; ship pending)
+- [x] **Phase 1: A test frame in RetroArch** - The library, runner and libretro core ship automatically, and a built-in test card hashes identically on eight lanes (verified 2026-10-29; ship PR #4)
 - [ ] **Phase 2: The CPU matches the public vectors** - The R3000A, COP0, bus, memory control, I-cache and interrupts pass the vectors; PS-EXEs run under the own stub kernel
 - [ ] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests
 - [ ] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch
@@ -45,7 +45,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 15/15 plans complete in 8 waves
 
 **Verification**: Passed 2026-10-29; 117 UAT entries, no open gaps. Next step:
-`$gsd-ship 1`. Confirm the real release there, then run the separate numbered
+Ship PR [#4](https://github.com/szTheory/schwaystation/pull/4) tracks the real release. Then run the separate numbered
 phase-1 CI tail before `$gsd-discuss-phase 2`.
 
 Plans:
@@ -168,7 +168,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. A test frame in RetroArch | 15/15 | Verified; ship pending | 2026-10-29 |
+| 1. A test frame in RetroArch | 15/15 | Ship PR #4 | 2026-10-29 |
 | 2. The CPU matches the public vectors | 0/TBD | Not started | - |
 | 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
