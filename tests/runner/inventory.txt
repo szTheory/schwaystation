@@ -11,6 +11,7 @@ runner.hash.ntsc_j	portable,runner
 runner.hash.pal	portable,runner
 runner.hashes_compare.byte.self_test	runner
 runner.hashes_compare.count.self_test	runner
+runner.hashes_compare.eight	runner
 runner.hashes_file	portable,runner
 runner.png	portable,runner
 runner.png_file	portable,runner

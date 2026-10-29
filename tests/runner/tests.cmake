@@ -171,19 +171,31 @@ schway_add_test(NAME runner.hashes_file
   LABELS portable runner TIMEOUT 60)
 
 # Fault prevented: a comparison that passes lanes which differ, or a lane
-# that silently drops out. Two files one hex digit apart must fail, and two
-# files where three are required must fail.
+# that silently drops out. All eight files must match, a missing eighth must
+# fail, and a different eighth must fail even when the first seven match.
 set(runner_fixture ${PROJECT_BINARY_DIR}/tests/hashes)
-file(WRITE ${runner_fixture}/a.txt "frame 60 sha256 00\n")
+set(runner_files "")
+foreach(lane linux-x64 linux-arm64 macos-x64 macos-arm64 windows-x64 windows-arm64 be32 wasm32)
+  file(WRITE ${runner_fixture}/${lane}.txt "frame 60 sha256 00\n")
+  list(APPEND runner_files ${runner_fixture}/${lane}.txt)
+endforeach()
+string(REPLACE ";" "$<SEMICOLON>" runner_compare_files "${runner_files}")
+schway_add_test(NAME runner.hashes_compare.eight
+  COMMAND ${CMAKE_COMMAND} "-DFILES=${runner_compare_files}" -DCOUNT=8 -DMODE=compare -P ${runner_hashes}
+  LABELS runner TIMEOUT 10)
+list(POP_BACK runner_files)
 file(WRITE ${runner_fixture}/b.txt "frame 60 sha256 01\n")
 # CMake wraps long messages, so the regexes allow a break between words.
-foreach(case IN ITEMS "count;3;a;expected 3 files,[^/]*got 2" "byte;2;b;b.txt[^/]*differs")
+foreach(case IN ITEMS "count;;expected 8 files,[^/]*got 7" "byte;b.txt;b.txt[^/]*differs")
   list(GET case 0 name)
-  list(GET case 1 count)
-  list(GET case 2 second)
-  list(GET case 3 regex)
-  set(cmd ${CMAKE_COMMAND} "-DFILES=${runner_fixture}/a.txt\;${runner_fixture}/${second}.txt"
-    -DCOUNT=${count} -DMODE=compare -P ${runner_hashes})
+  list(GET case 1 eighth)
+  list(GET case 2 regex)
+  set(files ${runner_files})
+  if(eighth)
+    list(APPEND files ${runner_fixture}/${eighth})
+  endif()
+  string(REPLACE ";" "\\;" files "${files}")
+  set(cmd ${CMAKE_COMMAND} "-DFILES=${files}" -DCOUNT=8 -DMODE=compare -P ${runner_hashes})
   string(REPLACE ";" "$<SEMICOLON>" cmd "${cmd}")
   schway_add_test(NAME runner.hashes_compare.${name}.self_test
     COMMAND ${CMAKE_COMMAND} "-DCMD=${cmd}" -DCODE=1 "-DREGEX=${regex}"
