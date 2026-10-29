@@ -5,11 +5,11 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
 status: verified
-stopped_at: Phase 01 ship PR 4; after release verification, the separate CI tail is next
-last_updated: "2026-10-29T18:27:16.672Z"
+stopped_at: Phase 01 CI tail verified; PR 6 tracks final squash merge and main CI; next is phase 2 discussion
+last_updated: "2026-10-29T19:36:51Z"
 last_activity: 2026-10-29
-last_activity_desc: Phase 01 ship PR 4 opened; automatic merge and release tracked in the PR
-state_head: 13b91f66e9154b46e72478fcbb3d73385615e5d1
+last_activity_desc: Completed quick task 261029-ldd; phase-1 CI tail verified in hosted run 40940434499
+state_head: 37a029b99bcfbafe5b88529fcdea9ff27c325622
 progress:
   total_phases: 6
   completed_phases: 1
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 01 — A test frame in RetroArch
+**Current focus:** Phase 01 — separate CI tail after v0.1.0
 
 ## Current Position
 
-Phase: 01 (A test frame in RetroArch) — SHIP PR #4
+Phase: 01 (A test frame in RetroArch) — CI TAIL
 Plan: 15 of 15
-Status: Verified; ship PR #4 tracks automatic merge and release before the separate CI tail
-Last activity: 2026-10-29 — Phase 01 shipped as PR #4; publication evidence is tracked in its body
+Status: CI tail complete and verified; PR #6 tracks final automatic merge and main CI
+Last activity: 2026-10-29 — Completed quick task 261029-ldd: phase-1 CI tail; hosted run 40940434499 green
 
 Progress: [██░░░░░░░░] 17%
 
@@ -120,17 +120,26 @@ Recent decisions affecting current work:
 - [Phase 01]: Verification: run 40929433476 passes on reviewed revision 384ee9d, with six build legs, all eight hashes equal, and exact RetroArch frame-5 equality. Attempt 1's Windows ARM64 job timeout recovered on a targeted rerun; todo 024 carries the timing sample to the CI tail.
 - [Phase 01]: Verification: 117 UAT entries pass, 5/5 pre-merge truths verified; no owner verification remains. Real publication and latest-download installation are confirmed at ship.
 
+- [Phase 01 CI tail]: Two controls on v0.1.0 each measured 1620424 Ir/frame three times with zero spread (runs 40939706087 and 40939709809); performance now gates above +1.00 percent, wasm32 is required, and hash-equality compares eight files. Implementation run 40940434499 is green.
+
 ### Pending Todos
 
-23 pending tooling/seed todos live in `.planning/todos/pending/`. Ship owns the
+22 pending tooling/seed todos live in `.planning/todos/pending/`. Ship owns the
 gate-budget ratchet (018, completed at ship); the next test-helper caller in phase 2 plan 1 owns
-WR-01 (023); the separate phase-1 CI tail owns the Windows ARM64 timeout sample
-(024). Existing todos retain their bound plans and seed dispositions.
+WR-01 (023). The CI tail completed the Windows ARM64 timeout sample (024),
+using the observed 198 s overrun and 10 successful ARM64 samples. Existing todos
+retain their bound plans and seed dispositions.
 
 ### Blockers/Concerns
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261029-ldd | Complete the phase-1 CI tail on phase/01-ci-tail | 2026-10-29 | 37a029b | [261029-ldd-complete-the-phase-1-ci-tail](./quick/261029-ldd-complete-the-phase-1-ci-tail/) |
 
 ## Deferred Items
 
@@ -159,15 +168,16 @@ come from `AGENTS.md`.
 | 2026-10-20 | /gsd-pause-work | Codex, handoff before phase verification | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-29 | /gsd-ship 1 | Codex, OpenGSD 1.19.0; inline shipping and hosted CI | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-29 | /gsd-verify-work 1 | Codex, OpenGSD 1.19.0; inline verification and hosted CI | GPT-6 (session; exact model ID not exposed) |
+| 2026-10-29 | /gsd-quick phase-1 CI tail | Codex, OpenGSD 1.19.0; inline quick fallback | GPT-6 (session; exact model ID not exposed) |
 
 ## Session Continuity
 
 Last session: 2026-10-29
-Stopped at: Phase 01 ship PR #4; separate phase-1 CI tail next after publication checks
+Stopped at: Phase-1 CI tail verified; PR #6 tracks final squash merge and main CI
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
+CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next command after the ship report confirms publication:
-`$gsd-quick "Complete the phase-1 CI tail on phase/01-ci-tail"`.
-The CI tail is a separate session; phase 2 discussion follows it.
+Next command: `$gsd-discuss-phase 2` (after PR #6 merges green).
+Stop after this quick step; do not start phase 2 in this session.

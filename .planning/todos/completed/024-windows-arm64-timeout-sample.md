@@ -1,6 +1,6 @@
 ---
 title: "Include the Windows ARM64 timeout sample in the phase-1 CI tail"
-status: pending
+status: complete
 priority: P2
 source: "phase 01 verification, run 40929433476"
 created: 2026-10-29
@@ -29,3 +29,10 @@ do not loosen assertions or skip tests.
 
 Read-only reproduction: `gh api repos/szTheory/schwaystation/check-runs/123643713395/annotations`
 (exit 0; run URL above).
+
+## Resolution
+
+Completed by quick task 261029-ldd. The shared build timeout is seven minutes:
+twice the observed 198-second overrun, rounded up. The successful rerun took
+53 seconds; the slowest of 10 successful ARM64 jobs across the 14 available CI
+runs took 94 seconds (run 39459524424). No assertion or test was weakened.
