@@ -1,0 +1,4 @@
+# Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+docs.budgets	policy
+policy.no_skip	policy
+policy.no_skip.self_test	policy

@@ -1,0 +1,48 @@
+# cmake -DMODE=timeouts|pins -DDIR=<workflows directory> -P workflows.cmake
+# timeouts: every timeout-minutes line carries a comment naming the run it was
+#   measured from ("run" and nine or more digits) or the word provisional.
+#   Fault prevented: a job timeout guessed rather than measured.
+# pins: every uses: line names a local ./path, or owner/repo[/path] at a full
+#   40-hex commit followed by a "# v..." comment naming the release it is.
+#   Fault prevented: an action referenced by a tag that can be moved under a release.
+cmake_minimum_required(VERSION 3.25)
+if(MODE STREQUAL "timeouts")
+  set(name timeout_comments)
+  set(key timeout-minutes)
+  set(want "without a run ID or provisional")
+elseif(MODE STREQUAL "pins")
+  set(name action_pins)
+  set(key uses)
+  set(want "not pinned to a commit with a # v comment")
+endif()
+if(NOT DEFINED name OR "${DIR}" STREQUAL "")
+  message(FATAL_ERROR "workflows: -DMODE=timeouts|pins and -DDIR=<dir> are required")
+endif()
+file(GLOB files "${DIR}/*.yml" "${DIR}/*.yaml")
+set(bad "")
+set(seen 0)
+string(REPEAT "[0-9]" 9 id)
+string(REPEAT "[0-9a-f]" 40 sha)
+foreach(file IN LISTS files)
+  get_filename_component(base "${file}" NAME)
+  file(STRINGS "${file}" lines REGEX "^[ \t-]*${key}:")
+  foreach(line IN LISTS lines)
+    math(EXPR seen "${seen} + 1")
+    string(REGEX REPLACE "^[ \t-]*" "" line "${line}")
+    if(MODE STREQUAL "timeouts" AND NOT line MATCHES "^timeout-minutes:[^#]*#.*(provisional|runs? ${id})")
+      list(APPEND bad "${name}: ${base}: ${line}")
+    elseif(MODE STREQUAL "pins" AND NOT line MATCHES "^uses: \\./"
+           AND NOT line MATCHES "^uses: [A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@${sha} +# v[0-9]")
+      list(APPEND bad "${name}: ${base}: ${line}")
+    endif()
+  endforeach()
+endforeach()
+list(LENGTH bad count)
+if(count GREATER 0)
+  list(JOIN bad "\n" bad)
+  message(FATAL_ERROR "${bad}\n${name}: ${count} ${key}: lines ${want}")
+endif()
+if(seen EQUAL 0)
+  message(FATAL_ERROR "${name}: no ${key}: line under ${DIR}")
+endif()
+message(STATUS "${name}: ${seen} ${key}: lines, none ${want}")

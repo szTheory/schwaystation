@@ -208,7 +208,7 @@ ENGINEERING, HI = HOSTS-AND-INTEGRATION, PV = PROVENANCE.md, AP = ASSET_POLICY.m
 | LibCrypt semantics: SBI carries no CRC, so every listed sector is treated as bad-Q; whether GetlocP's previous-good answer satisfies every protected title | SCM 2.7, 7 | the PAL LibCrypt titles in the ledger (MediEvil, CTR, Dino Crisis, Legacy of Kain) | v2.0 |
 | Whether the PCSX-Redux AppImage runs under Xvfb on the ubuntu-26.04 runner, and which build id to pin | CF 3.1, 8 | first nightly oracle run, report-only | P6 nightly |
 | Which console, loader and capture path the owner has for hardware sessions | CF 4 | asked at P3 at the earliest, only with a reason | P4 or later |
-| `be32` and `wasm32` per-PR cost on PS1 fixtures; whether ppc32 GCC emits a libgcc call for the GTE's 64-bit multiply; whether wasmtime's instruction count is stable enough for a ceiling | ENG 9, 14, open questions | measured in P1; allowlist row added if needed | P1 |
+| `be32` and `wasm32` per-PR cost on PS1 fixtures; whether ppc32 GCC emits a libgcc call for the GTE's 64-bit multiply; whether wasmtime's instruction count is stable enough for a ceiling | ENG 9, 14, open questions | measured in P1: on the test card `be32` takes 36 s and `wasm32` 22 s per pull request on ubuntu-26.04 (run 39455724329, one sample each), so both stay per-PR; the libgcc and wasmtime-count questions wait for the GTE in P3; allowlist row added if needed | P1 |
 | Whether `vars` resolve in Dependabot-triggered runs and whether an App merge of a workflow-file PR needs `workflows: write` | ENG 5, 7 | the first Dependabot PR after the App exists | P1 tail |
 | Whether GSD 1.18.0 still re-routes a stale `gaps_found` (XFER-053, XFER-098) | LESSONS | checked at the first `gaps_found` | first occurrence |
 

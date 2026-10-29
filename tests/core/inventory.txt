@@ -1,0 +1,25 @@
+# Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+core.api.error_changes_nothing	core,portable
+core.api.size_tags	core,portable
+core.api.statuses	core,portable
+core.audio.pairs	core,portable
+core.audio.ring	core,portable
+core.create.allocator	core,portable
+core.info	core,portable
+core.instances.independent	core,portable
+core.no_alloc_after_load	perf,portable
+core.profile.locked	core,portable
+core.profile.rejected	core,portable
+core.reset.power	core,portable
+core.state.record_sweep	core,portable
+core.state.rejects	core,portable
+core.state.round_trip	core,portable
+core.state.run_bounds	core,portable
+core.state.stable_bytes	core,portable
+core.state.visit	core,portable
+core.testcard.counter	core,portable
+core.testcard.frames_differ	core,portable
+core.testcard.full_redraw	core,portable
+core.testcard.pixels	core,portable
+core.video.pitch	core,portable
+core.video.tuple	core,portable

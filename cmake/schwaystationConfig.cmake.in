@@ -1,0 +1,6 @@
+# CMake package for schwaystation: the static library as schwaystation::schwaystation.
+# Every path is relative to this file, so the installed tree can move.
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/schwaystationTargets.cmake")
+check_required_components(schwaystation)

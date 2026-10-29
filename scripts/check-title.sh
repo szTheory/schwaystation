@@ -1,12 +1,9 @@
 #!/bin/sh
-# Checks a pull request's title (argument 1) and body (standard input), which
-# become the squash commit on main. Fault prevented: a title that cuts the
-# wrong release or none (a plan-number scope, a "Phase N: Name" title, a
-# capitalised subject, or pipeline work typed feat, fix or perf), and a skip
+#   scripts/check-title.sh TITLE < body   (the squash commit on main)
+# Fault prevented: a title that cuts the wrong release or none, or a CI skip
 # token in the title or body, which would start no CI run on main.
 set -u
-# Bytes, not characters: a subject starting with a non-ASCII letter is not
-# lower case.
+# Bytes, not characters: a subject starting with a non-ASCII letter is not lower case.
 LC_ALL=C
 export LC_ALL
 title=${1-}

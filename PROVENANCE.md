@@ -58,7 +58,7 @@ requires. `[PV.NN]` IDs resolve in section 10.
 | rtissera/libchdr `47d794151b2b` (master; v0.3.0 is `93d8c239ff0d`) [PV.07] | `LICENSE.txt`: BSD-3-Clause, Romain Tisserand | `deps/`: lzma-26.02 (public domain), miniz-3.1.2 (MIT in its header, (unverified) at the pin), zstd-1.5.7 (BSD-3 upstream, vendored copy (unverified)) | BSD-3: vendored unmodified behind `SCHWAYSTATION_CHD` (v2.0) with all four notices |
 | RetroAchievements/rcheevos `dfdc64ea035c` (v12.5.0 is the latest tag) [PV.09] | `LICENSE`: MIT | `src/hash/rc_hash_disc.c`, `src/runtime/rc_consoleinfo.c`, `include/rc_consoles.h` | MIT: `rc_hash_disc.c` vendored into a CTest that checks `--probe`'s MD5; the memory map and hash rule as facts |
 | libretro/libretro-common `a3194c18ba65` [PV.10] | per-file: `include/libretro.h` header licenses it MIT, "The RetroArch team" | the header itself | MIT: `libretro.h` vendored unmodified (section 8) |
-| szTheory/cogmaster `abd950941e93`; szTheory/muhtari `d698364b180d` (v0.2.0) [PV.12] | MIT; every commit by the owner's account or its release bot | `PROVENANCE.md`, `THIRD-PARTY-NOTICES.md`, git authors | all of it except their third-party files (`libretro.h`, vectors, the a7800 palette) and their consoles' facts; muhtari's local checkout SHA `ecbe7f52aa37` is not public and is never a pin |
+| szTheory/cogmaster `f09ac97096ac` (v0.1.0, its released phase 1); szTheory/muhtari `d698364b180d` (v0.2.0) [PV.12] | MIT; every commit by the owner's account or its release bot | `PROVENANCE.md`, `THIRD-PARTY-NOTICES.md`, git authors | all of it except their third-party files (`libretro.h`, vectors, the a7800 palette) and their consoles' facts; muhtari's local checkout SHA `ecbe7f52aa37` is not public and is never a pin |
 | Kingcom/armips `62adab4ef30d` [PV.13] | `LICENSE.txt`: MIT 2009 to 2020 | tarball SHA-256 `f7a65102febb4811a336a06e6d93c7e84cc86548182d54e1b1b4e2bffe562f56`; submodules `ext/filesystem` `3f1c185ab414`, `ext/tinyformat` `6175527d738c` | as a tool: its output is ours; `.psx` instruction set, `hi()`/`lo()`, `.sym` |
 | Lameguy64/mkpsxiso v2.30: tag object `b6f9a25c8a96`, commit `54fb1644ed87` [PV.14] | `LICENSE.md`: GPL-2.0; bundles tinyxml2, miniaudio, FLAC | tag tarball SHA-256 `b44778180d239a586c13762322a1f4b9692c787db8772790ddd2fa255a75d9e0`; release zips pinned in PSXDEV-EXTRACTS 4 | as a tool only, run in CI, never vendored; the GPL covers the tool, the image is ours; the `<license file>` feature is never used |
 | Lameguy64/PSn00bSDK `5d9aa2d3dfc7`, release v0.24 [PV.15] | `LICENSE.md`: core MPL-2.0; mkpsxiso GPL-2+; the bundled `mipsel-none-elf` GCC 12.3.0 is GPL-3 with the runtime exception | `doc/toolchain.md`, `LICENSE.md` | headers and facts; GCC as a tool for OpenBIOS and the nugget tests only; `libpsn00b` is never linked into an own fixture |
@@ -77,7 +77,10 @@ Two findings corrected the owner's brief: Avocado (`d7fcf9060ac7`) and Rustation
 their pins, not MIT, and the simias psx-guide has no licence file; all three are in section 6. One pin was
 re-resolved: mkpsxiso's `b6f9a25c8a96` is the annotated v2.30 tag object, whose commit is `54fb1644ed87`. One
 pin was replaced: muhtari's `ecbe7f52aa37` exists only in a local checkout, so the seed pin is the v0.2.0 release
-commit `d698364b180d` (XFER-057). Re-check at every pin bump: a licence is true at a commit, not at a repository.
+commit `d698364b180d` (XFER-057). One pin was bumped on 2026-10-20: cogmaster moved from `abd950941e93` to its
+v0.1.0 release commit `f09ac97096acda99888270e4c1e4dc96e12ffdfe`, which carries the workflows, end-to-end test
+and release configuration the older pin predates; `gh api repos/szTheory/cogmaster/commits/f09ac97096acda99888270e4c1e4dc96e12ffdfe` answered
+200 that day (exit 0). Re-check at every pin bump: a licence is true at a commit, not at a repository.
 
 ## 4. Strangler-fig seeds
 A seed is the only route by which another project's expression reaches `src/`, `runner/`, `libretro/` or
@@ -87,7 +90,7 @@ VRAM, audio and state hashes must match on all eight lanes. The notice leaves in
 
 | Module | Seed @ pin | Licence | Must change | Attribution | Replace when | Parity corpus |
 |---|---|---|---|---|---|---|
-| Runner, libretro adapter, state visitor, CRC/SHA/PNG helpers, tests scaffolding, CI, hygiene, repo settings, publish | cogmaster @`abd950941e93` (which carries muhtari @`d698364b180d` and nesturbator) | MIT, same owner | names (`schway_`), the test card, PS1 frame sizes and rates, exit-status table, fixture manifest path | commit-body line (section 5a) | n/a (own code) | its own hash pins |
+| Runner, libretro adapter, state visitor, CRC/SHA/PNG helpers, tests scaffolding, CI, hygiene, repo settings, publish | cogmaster @`f09ac97096ac` (v0.1.0, which carries muhtari @`d698364b180d` and nesturbator) | MIT, same owner | renames `cogmaster` to `schwaystation`, `COGMASTER_` to `SCHWAYSTATION_`, public `cogmaster_` to `schway_`, internal `cogmaster__` to `schway__<module>_`, `CogmasterTests.cmake` to `SchwaystationTests.cmake` and `cogmaster_add_test` to `schway_add_test`; the test card, PS1 frame sizes and rates, exit-status table, fixture manifest path | commit-body line (section 5a) | n/a (own code) | its own hash pins |
 | R3000A CPU, COP0, bus, DMA, timers, interrupts | none: own code from the IDT R3000 manual, psx-spx and the r3000 vectors; ares `ps1/cpu`, `dma`, `timer`, `interrupt` and MAME `cpu/psx/{psx,dma,irq,rcnt}.cpp` are read for structure and cross-checks | | | lifting any table turns it into a seed row | | r3000 vectors every cycle; `exc_matrix`; nugget cpu, cop0, timers |
 | GTE | own code from psx-spx formulas; the UNR table is generated from the documented formula and asserted against the printed 257 bytes; ares `interpreter-gte.cpp` and MAME `gte.cpp` read for flag placement | | | a copied flag or saturation helper becomes a seed row | | ps1-tests 1150 cases; amidog nightly |
 | GPU rasteriser and display | own code from psx-spx and the ps1-tests images; ares `ps1/gpu` (top-left bias, dither and blend code) and MAME `video/psx.cpp` read; the derived cost column of GPU 4.4 is a fact table with its citation | | | an edge-function or stepper routine ported from ares becomes a seed row with notice | | ps1-tests GPU `vram.png` set; `gpu_motion` |
@@ -121,11 +124,12 @@ never ship (OpenBIOS, nugget tests, ps1-tests executables) are listed with their
 reproducible, even though running them creates no distribution obligation.
 
 **(c) Release archives.** From the first release, the library, runner and libretro zips each hold `LICENSE` and
-`THIRD-PARTY-NOTICES.md` at the root. `release.notices` (CMake `-P`) checks it in `cmake --workflow --preset ci`
-and before attestation; its self-test builds a zip without them and must fail, naming the missing file.
-`policy.notices` checks every SPDX expression is `MIT` or `MIT AND` one of the section 1 licences, that each
-derived file has a notices section, and that the libretro `.info` `license` field names the same licences
-(`MIT` in v1.0; `MIT AND BSD-3-Clause` once CHD is built in).
+`THIRD-PARTY-NOTICES.md` at the root. In phase 1 the check is `release.archive_contents` (CMake `-P`), run by
+`cmake --workflow --preset ci` and on every leg; it fails when a zip lacks either file. `release.notices` (a
+self-tested notices check run before attestation) and `policy.notices` (every SPDX expression is `MIT` or `MIT
+AND` one of the section 1 licences, each derived file has a notices section, and the libretro `.info` `license`
+field names the same licences: `MIT` in v1.0, `MIT AND BSD-3-Clause` once CHD is built in) are deferred todos,
+each bound to the next phase that adds a derived file or a second notices section.
 
 ## 6. Never opened, and why
 "Unknown" counts as excluded until the upstream adds a notice. Facts about these projects come only from their
@@ -169,13 +173,14 @@ documentation, changelogs, issue trackers, release notes and released binaries; 
   (CONFORMANCE 3.3).
 
 ## 8. Vendored files
-Vendored files are never edited. The CTest `libretro.vendored` checks each SHA-256 in this table, and each notice
-lives in `THIRD-PARTY-NOTICES.md`. The table is filled in v1.0 phase 1 with `libretro/libretro.h` and in v2.0
-with libchdr and its three dependencies; `rc_hash_disc.c` joins when the probe CTest lands.
+Vendored files are never edited. Each file's SHA-256 is recorded in this table when it is vendored, and each
+notice lives in `THIRD-PARTY-NOTICES.md`. The CTest `libretro.vendored` that re-checks these digests is deferred, a todo bound to the next phase that vendors a file.
+The table is filled in v1.0 phase 1 with `libretro/libretro.h` and in v2.0 with libchdr and its three
+dependencies; `rc_hash_disc.c` joins when the probe CTest lands.
 
 | File | Upstream | Upstream path | Commit | Licence | SHA-256 |
 |---|---|---|---|---|---|
-| `libretro/libretro.h` | https://github.com/libretro/libretro-common | `include/libretro.h` | `a3194c18ba65` (40-hex recorded at vendoring) | MIT | recorded at vendoring (phase 1) |
+| `libretro/libretro.h` | https://github.com/libretro/libretro-common | `include/libretro.h` | `a3194c18ba65ef89734e1898a2f61403c255d368` | MIT | `036ddffc995ad116c3081ca0a7515d09c2a116f3483e4f5012fe0c29a885da76` |
 | `third_party/libchdr/**` (v2.0, `SCHWAYSTATION_CHD`) | https://github.com/rtissera/libchdr | whole tree minus tests | `47d794151b2b` | BSD-3-Clause; deps public domain, MIT, BSD-3 | recorded at vendoring |
 | `tests/probe/rc_hash_disc.c` | https://github.com/RetroAchievements/rcheevos | `src/hash/rc_hash_disc.c` | `dfdc64ea035c` | MIT | recorded at vendoring |
 
@@ -197,7 +202,7 @@ claim; the asset policy handles that side by keeping firmware and game bytes out
 | PV.09 | T1 | github.com/RetroAchievements/rcheevos `LICENSE` (MIT), `src/hash/rc_hash_disc.c`, `src/runtime/rc_consoleinfo.c` | `dfdc64ea035c`; v12.5.0 | hash rule, memory map |
 | PV.10 | T1 | github.com/libretro/libretro-common `include/libretro.h` header (MIT) | `a3194c18ba65` | vendored header |
 | PV.11 | T1 | nesturbator `.planning/preparation/DECISIONS.md` DEC.04 (relicensing precedent); cogmaster `PROVENANCE.md` PV.09 | `8ae2c6e32e7f`; `abd950941e93` | AI-assistance rule |
-| PV.12 | T1 | github.com/szTheory/cogmaster `PROVENANCE.md`, `THIRD-PARTY-NOTICES.md`, git authors; github.com/szTheory/muhtari releases (v0.2.0 at `d698364b180d`), `PROVENANCE.md`; GitHub commits API: `ecbe7f52aa37` returned 422 (tested) | `abd950941e93`; `d698364b180d` | same-owner seeds; public-pin rule |
+| PV.12 | T1 | github.com/szTheory/cogmaster `PROVENANCE.md`, `THIRD-PARTY-NOTICES.md`, git authors; github.com/szTheory/muhtari releases (v0.2.0 at `d698364b180d`), `PROVENANCE.md`; GitHub commits API: `ecbe7f52aa37` returned 422 (tested) | `f09ac97096ac`; `d698364b180d` | same-owner seeds; public-pin rule |
 | PV.13 | T1 | github.com/Kingcom/armips `LICENSE.txt`, `contents/ext`; commit tarball hashed in PSXDEV-EXTRACTS 4 | `62adab4ef30d` | assembler licence and pin |
 | PV.14 | T1 | github.com/Lameguy64/mkpsxiso `LICENSE.md`, `git/ref/tags/v2.30` (tag object `b6f9a25c8a96` → commit `54fb1644ed87`, tested) | v2.30 | tool licence and pin |
 | PV.15 | T1 | github.com/Lameguy64/PSn00bSDK `LICENSE.md`, `doc/toolchain.md`, release v0.24 | `5d9aa2d3dfc7` | MPL core, GPL tools |

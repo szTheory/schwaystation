@@ -1,0 +1,8 @@
+# Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+perf.gate.allowed	perf
+perf.gate.identical	perf
+perf.gate.missing	perf
+perf.gate.no_base	perf
+perf.gate.plus_1_00	perf
+perf.gate.plus_1_01	perf
+perf.gate.unstable	perf

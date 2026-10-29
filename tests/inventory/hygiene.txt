@@ -1,0 +1,2 @@
+# Directories whose inventory.txt this preset registers, one per line; label subsets come from check_junit.cmake's LABELS and EXCLUDE.
+hygiene

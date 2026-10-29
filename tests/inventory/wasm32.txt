@@ -1,0 +1,9 @@
+# Directories whose inventory.txt this preset registers, one per line; label subsets come from check_junit.cmake's LABELS and EXCLUDE.
+# No libretro: WASI has no dynamic loading.
+abi
+core
+install
+perf
+policy
+release
+runner

@@ -1,0 +1,170 @@
+# Releases. On a push to main, release-please opens or updates the release
+# pull request, which the release App's token sets to merge itself; that merge
+# creates a draft release, CI runs on its commit, and publish attests,
+# verifies and publishes it as latest. Every publish step here is rehearsed on
+# the pull request that changes it, by ci.yml's rehearsal job.
+# docs/maintaining.md describes the release path.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Release runs wait for each other and are never cancelled: by default a
+# newly queued run cancels the pending one, even without cancel-in-progress.
+concurrency:
+  group: release-${{ github.ref }}
+  queue: max
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # The App token, not GITHUB_TOKEN: a pull request opened with GITHUB_TOKEN
+  # starts no workflow, so the release pull request would never get its
+  # required check.
+  release-please:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10  # provisional, 0 samples (runs on main only)
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha }}
+      id: ${{ steps.release.outputs.id }}
+    steps:
+      - name: The release App is configured
+        env:
+          CLIENT_ID: ${{ vars.SCHWAYSTATION_APP_CLIENT_ID }}
+          HAS_KEY: ${{ secrets.SCHWAYSTATION_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ -z "$CLIENT_ID" ] || [ "$HAS_KEY" != true ]; then
+            echo "release: the release App is not configured: set SCHWAYSTATION_APP_CLIENT_ID and SCHWAYSTATION_APP_PRIVATE_KEY (docs/maintaining.md)"
+            exit 1
+          fi
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SCHWAYSTATION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SCHWAYSTATION_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app.outputs.token }}
+      # The pipeline's own merge: GitHub merges the release pull request as
+      # the App once CI required passes on it.
+      - name: Merge the release pull request when CI required passes
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR: ${{ steps.release.outputs.pr }}
+        run: gh pr merge --auto --squash "$(printf '%s' "$PR" | jq -r .number)" --repo "$GITHUB_REPOSITORY"
+
+  # CI on the release's commit, release-please's sha output, never
+  # github.sha: a later push's run can create the release while its own
+  # commit is newer. GitHub refuses to start a called workflow whose jobs ask
+  # for more than this job grants, skipped jobs included, so these are the
+  # union of every permissions block in ci.yml (the rehearsal's among them):
+  # widen them whenever a ci.yml job asks for more.
+  release-ci:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.release-please.outputs.sha }}
+    permissions:
+      contents: write
+      pull-requests: read
+      id-token: write
+      attestations: write
+
+  # The rehearsal's steps on release-please's draft, found by its ID because
+  # a draft cannot be looked up by its tag. Safe to re-run: uploads replace
+  # the draft's assets, and once the release is published a re-run only
+  # verifies it.
+  publish:
+    needs: [release-please, release-ci]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15  # provisional, 0 samples (runs on main only)
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      EXPECTED_SHA: ${{ needs.release-please.outputs.sha }}
+      SOURCE_REF: refs/heads/main
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+      ID: ${{ needs.release-please.outputs.id }}
+    steps:
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SCHWAYSTATION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SCHWAYSTATION_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.release-please.outputs.sha }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: archives-*
+          path: artifacts
+      # The zips side by side in dist, each leg's commit.txt under dist/legs/N.
+      - name: The archives and each leg's commit
+        run: |
+          mkdir -p dist
+          n=0
+          for leg in artifacts/archives-*/; do
+            n=$((n + 1))
+            mkdir -p "dist/legs/$n"
+            mv "${leg}commit.txt" "dist/legs/$n/"
+            mv "$leg"schwaystation-*.zip dist/
+          done
+      - run: sh scripts/publish.sh prepare dist
+      - id: state
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: echo "draft=$(gh api "repos/$GITHUB_REPOSITORY/releases/$ID" --jq .draft)" | tee -a "$GITHUB_OUTPUT"
+      - if: steps.state.outputs.draft == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: sh scripts/publish.sh upload "$TAG" "$ID" dist
+      - if: steps.state.outputs.draft == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+      - if: steps.state.outputs.draft == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: sh scripts/publish.sh attested dist
+      # By ID, as gh release edit --draft=false --latest would.
+      - name: Publish as latest
+        if: steps.state.outputs.draft == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$ID" -F draft=false -f make_latest=true
+      - env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: sh scripts/publish.sh verify "$TAG" dist
+
+  # The README's install line, verbatim, against the latest release.
+  install-line-latest:
+    needs: [release-please, publish]
+    runs-on: macos-15
+    timeout-minutes: 10  # provisional, 0 samples (runs on main only)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.release-please.outputs.sha }}
+      - run: >-
+          cmake -DREADME=README.md
+          -DBASE_URL=https://github.com/szTheory/schwaystation/releases/latest/download/
+          -P tests/cmake/install_line.cmake

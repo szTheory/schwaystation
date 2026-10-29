@@ -1,0 +1,137 @@
+# Nightly bench: 300,000 headless frames of the test card per platform, as
+# trend data, never a gate (docs/testing.md, "Performance"). The runner
+# reports its own frame-time percentiles and max_rss_kib. Reports go to job
+# summaries and artifacts, never to commits. A failed night opens or updates
+# the one open issue labelled nightly; a good night closes it.
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      force_failure:
+        description: "Fail the run on purpose, to show the nightly issue being written"
+        type: boolean
+        default: false
+  # A change to the bench or this file runs the bench jobs on its pull
+  # request; the report job writes no issue for pull requests.
+  pull_request:
+    paths:
+      - .github/workflows/nightly.yml
+      - runner/bench.c
+      - runner/bench.h
+      - runner/clock.c
+      - runner/clock.h
+      - runner/rss.c
+      - runner/rss.h
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  bench:
+    name: bench (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 3  # 2 x 66 s (bench macos-15), slowest of 3 runs, run 39457445780, provisional
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-26.04, ubuntu-26.04-arm, macos-15]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: cmake --workflow --preset perf
+      # A report without the percentiles or the RSS line fails the job.
+      - name: Bench 300,000 frames
+        env:
+          LABEL: ${{ matrix.runner }}
+        run: |
+          mkdir -p report
+          build/perf/schwaystation-run --bench 300000 > report/bench.txt
+          for key in p50_us p99.999_us max_us max_rss_kib; do
+            grep -q "^$key [0-9]" report/bench.txt || { echo "bench: no $key line"; cat report/bench.txt; exit 1; }
+          done
+          { cat report/bench.txt; echo "runner $LABEL"; } > report/report.txt
+          cat report/report.txt
+          { echo "### bench $LABEL"; echo '```'; cat report/report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-${{ matrix.runner }}
+          path: report/report.txt
+          if-no-files-found: error
+
+  # The same bench under the pinned wasmtime, for the browser target. WASI
+  # has no resident set size, so its max_rss_kib line reads 0.
+  bench-wasm32:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5  # 2 x 126 s (bench-wasm32), slowest of 2 runs, run 39455724030, provisional
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: WASI sysroot and runtime
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends wasi-libc libclang-rt-21-dev-wasm32
+          scripts/fetch-pin.sh wasmtime-x86_64-linux build/pins/wasmtime
+      - name: Build the runner
+        run: cmake --preset wasm32 && cmake --build --preset wasm32 --target schwaystation-run
+      - name: Bench 300,000 frames
+        run: |
+          mkdir -p report
+          build/pins/wasmtime/wasmtime run build/wasm32/schwaystation-run --bench 300000 > report/bench.txt
+          { cat report/bench.txt; echo "runner wasm32-wasmtime"; } > report/report.txt
+          cat report/report.txt
+          { echo "### bench wasm32-wasmtime"; echo '```'; cat report/report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-wasm32
+          path: report/report.txt
+          if-no-files-found: error
+      # After the upload, so a forced failure still leaves the night's data.
+      - name: Forced failure
+        if: inputs.force_failure
+        run: exit 1
+
+  # Decides from the jobs' results, never from a piped exit status: the
+  # default shell has no pipefail.
+  report:
+    needs: [bench, bench-wasm32]
+    if: always() && github.event_name != 'pull_request'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5  # 5-minute floor (roll-up); 2 x 8 s (report), slowest of 2 runs, run 39457820699, provisional
+    permissions:
+      issues: write
+    steps:
+      - name: Rolling nightly issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEEDS: ${{ toJSON(needs) }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          results=$(jq -r 'to_entries | map("\(.key): \(.value.result)") | join(", ")' <<< "$NEEDS")
+          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --label nightly --state open \
+            --json number --jq '.[0].number // empty')
+          if jq -e 'all(.[]; .result == "success")' <<< "$NEEDS" > /dev/null; then
+            echo "nightly: success ($results)"
+            if [ -n "$issue" ]; then
+              gh issue close "$issue" --repo "$GITHUB_REPOSITORY" --comment "Passed ($EVENT) at $SHA: $url"
+            fi
+            exit 0
+          fi
+          echo "nightly: failure ($results)"
+          body="Failed ($EVENT) at $SHA: $url
+
+          Jobs: $results"
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "Nightly failed" --label nightly --body "$body"
+          fi

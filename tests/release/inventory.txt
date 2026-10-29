@@ -1,0 +1,3 @@
+# Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+release.archive_contents	release
+release.archive_contents.self_test	release
