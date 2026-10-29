@@ -3,10 +3,10 @@ set(hygiene_scripts ${CMAKE_CURRENT_LIST_DIR}/../cmake)
 
 # Fault prevented: repository-check code growing past its budget. Every line
 # of the shell scripts, the CMake check scripts and the hooks counts, at most
-# 1500; the self test counts a 10-line fixture against a limit of 9.
+# 1392; the self test counts a 10-line fixture against a limit of 9.
 schway_add_test(NAME policy.gate_budget
   COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}
-    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=1500
+    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=1392
     -P ${hygiene_scripts}/line_budget.cmake
   LABELS hygiene policy TIMEOUT 30)
 set(hygiene_budget ${CMAKE_BINARY_DIR}/hygiene/line_budget_fixture)

@@ -122,8 +122,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-24 pending tooling/seed todos live in `.planning/todos/pending/`. Ship owns the
-gate-budget ratchet (018); the next test-helper caller in phase 2 plan 1 owns
+23 pending tooling/seed todos live in `.planning/todos/pending/`. Ship owns the
+gate-budget ratchet (018, completed at ship); the next test-helper caller in phase 2 plan 1 owns
 WR-01 (023); the separate phase-1 CI tail owns the Windows ARM64 timeout sample
 (024). Existing todos retain their bound plans and seed dispositions.
 
@@ -142,6 +142,12 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Runtime Log
 
+Going forward, use Codex with the adaptive OpenGSD profile until the owner switches
+runtime again. Heavy / Opus-tier work uses `gpt-6.1-sol` at `high` effort;
+standard / Sonnet-tier and light / Haiku-tier work use `gpt-6-luna` at `xhigh`
+effort. Resolve both model and effort for each agent dispatch. Project instructions
+come from `AGENTS.md`.
+
 | Date | Step | Runtime | Model |
 |------|------|---------|-------|
 | 2026-10-19 | /gsd-discuss-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
@@ -151,6 +157,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 | 2026-10-20 | /gsd-code-review 1 | Codex, inline standard review | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-20 | /gsd-code-review 1 --fix | Codex, inline fix of CR-01; WR-01 remains a tooling seed | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-20 | /gsd-pause-work | Codex, handoff before phase verification | GPT-6 (session; exact model ID not exposed) |
+| 2026-10-29 | /gsd-ship 1 | Codex, OpenGSD 1.19.0; inline shipping and hosted CI | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-29 | /gsd-verify-work 1 | Codex, OpenGSD 1.19.0; inline verification and hosted CI | GPT-6 (session; exact model ID not exposed) |
 
 ## Session Continuity

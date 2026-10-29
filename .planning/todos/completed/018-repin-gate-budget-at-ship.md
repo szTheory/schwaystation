@@ -1,6 +1,6 @@
 ---
 title: "Re-pin policy.gate_budget to the measured gate-line total at phase 1 ship"
-status: pending
+status: completed
 priority: P2
 source: "phase 01, plan 01-15"
 created: 2026-10-20
@@ -22,3 +22,9 @@ Lower `policy.gate_budget`'s limit from 1,500 to the measured total of `wc -l sc
 - At `/gsd-ship` for phase 1, `wc -l scripts/*.sh tests/cmake/*.cmake .githooks/*` is re-run from the repository root and its total is the new `LIMIT`.
 - `ctest --preset hygiene -R '^policy\.gate_budget'` passes with the new limit, and the self test still fails its 10-line fixture against 9.
 - The command and its exit status are recorded in the ship notes.
+
+## Completion
+
+Completed 2026-10-29 at phase 1 ship. Measured 1,392 lines and set the ceiling
+to 1,392 in the test and REQUIREMENTS.md. Commands and exit statuses are in
+`.planning/phases/01-a-test-frame-in-retroarch/01-SHIP.md`.

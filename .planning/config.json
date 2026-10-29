@@ -1,5 +1,13 @@
 {
-  "model_profile": "inherit",
+  "runtime": "codex",
+  "model_profile": "adaptive",
+  "model_profile_overrides": {
+    "codex": {
+      "opus": "gpt-6.1-sol",
+      "sonnet": "gpt-6-luna",
+      "haiku": "gpt-6-luna"
+    }
+  },
   "commit_docs": true,
   "parallelization": false,
   "search_gitignored": false,
@@ -71,18 +79,25 @@
   "project_code": null,
   "phase_naming": "sequential",
   "agent_skills": {},
-  "claude_md_path": "./.claude/CLAUDE.md",
+  "claude_md_path": "./AGENTS.md",
   "plan_review": {
     "source_grounding": true,
     "source_grounding_authority": "grep"
   },
   "mode": "interactive",
   "granularity": "coarse",
-  "resolve_model_ids": "omit",
+  "resolve_model_ids": true,
   "intel": {
     "enabled": false
   },
   "graphify": {
     "enabled": false
+  },
+  "effort": {
+    "routing_tier_defaults": {
+      "light": "xhigh",
+      "standard": "xhigh",
+      "heavy": "high"
+    }
   }
 }
