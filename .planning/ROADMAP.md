@@ -21,7 +21,7 @@ audio hashes identical on six platforms plus the `be32` and `wasm32` lanes.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: A test frame in RetroArch** - The library, runner and libretro core ship automatically, and a built-in test card hashes identically on eight lanes
+- [x] **Phase 1: A test frame in RetroArch** - The library, runner and libretro core ship automatically, and a built-in test card hashes identically on eight lanes (verified 2026-10-29; ship pending)
 - [ ] **Phase 2: The CPU matches the public vectors** - The R3000A, COP0, bus, memory control, I-cache and interrupts pass the vectors; PS-EXEs run under the own stub kernel
 - [ ] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests
 - [ ] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch
@@ -42,7 +42,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The pull request's rehearsal produces exactly 18 version-free archives, each with `LICENSE` and `THIRD-PARTY-NOTICES.md`, plus `SHA256SUMS` and verified attestations, then deletes itself. Merging publishes the same set with no manual step.
   5. Each ABI, hygiene and policy gate (`abi.*`, `hygiene.*`, `policy.*`, `ci.title`, `build.revision_matches_head`) fails its negative control with its named message. `--bench` reports the frame-time percentiles, and the Cachegrind Ir/frame measurement runs on every pull request. The core makes zero allocations after load and never reads a host clock.
 
-**Plans**: 15/15 plans executed in 8 waves
+**Plans**: 15/15 plans complete in 8 waves
+
+**Verification**: Passed 2026-10-29; 117 UAT entries, no open gaps. Next step:
+`$gsd-ship 1`. Confirm the real release there, then run the separate numbered
+phase-1 CI tail before `$gsd-discuss-phase 2`.
 
 Plans:
 **Wave 1**
@@ -164,7 +168,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. A test frame in RetroArch | 15/15 | In Progress | - |
+| 1. A test frame in RetroArch | 15/15 | Verified; ship pending | 2026-10-29 |
 | 2. The CPU matches the public vectors | 0/TBD | Not started | - |
 | 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |

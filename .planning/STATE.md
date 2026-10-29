@@ -4,42 +4,42 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 01
 current_phase_name: A test frame in RetroArch
-status: paused
-stopped_at: Phase 01 review fix complete; paused before verification
-last_updated: "2026-10-20T18:02:54.051Z"
-last_activity: 2026-10-20
-last_activity_desc: Review fix complete; handoff saved before phase verification
-state_head: 7ebbbcb
+status: verified
+stopped_at: Phase 01 verified; next command is /gsd-ship 1
+last_updated: "2026-10-29T18:27:16.672Z"
+last_activity: 2026-10-29
+last_activity_desc: Phase 01 verification passed; ship and release pending
+state_head: 13b91f66e9154b46e72478fcbb3d73385615e5d1
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 15
   completed_plans: 15
-  percent: 0
+  percent: 17
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-19)
+See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
 **Current focus:** Phase 01 — A test frame in RetroArch
 
 ## Current Position
 
-Phase: 01 (A test frame in RetroArch) — PAUSED BEFORE VERIFICATION
+Phase: 01 (A test frame in RetroArch) — VERIFIED, READY TO SHIP
 Plan: 15 of 15
-Status: Execution and review fix complete; phase verification pending
-Last activity: 2026-10-20 — Paused after CR-01 fix; WR-01 remains a tooling seed
+Status: Verification passed; ship phase 1 before the separate CI tail and phase 2 discussion
+Last activity: 2026-10-29 — 117 UAT entries passed; canonical verification passed
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 17%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
+- Total plans completed: 15
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -47,7 +47,7 @@ Progress: [░░░░░░░░░░] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 1 | 15 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -117,10 +117,15 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-15: workflow.test_gate_timeout is 4 s, twice the measured 1.62 s fresh local ci workflow
 - [Phase 01]: 01-15: policy.gate_budget re-pinned from 1500 to the measured gate-line total (1392 at d8a0ab4) at phase 1 ship, after code review
 - [Phase 01]: 01-15: the one-off windows-x64 install.consumer.dll_crt failure is a test bug to triage (todo 022), not a gate
+- [Phase 01]: Verification: run 40929433476 passes on reviewed revision 384ee9d, with six build legs, all eight hashes equal, and exact RetroArch frame-5 equality. Attempt 1's Windows ARM64 job timeout recovered on a targeted rerun; todo 024 carries the timing sample to the CI tail.
+- [Phase 01]: Verification: 117 UAT entries pass, 5/5 pre-merge truths verified; no owner verification remains. Real publication and latest-download installation are confirmed at ship.
 
 ### Pending Todos
 
-None yet.
+24 pending tooling/seed todos live in `.planning/todos/pending/`. Ship owns the
+gate-budget ratchet (018); the next test-helper caller in phase 2 plan 1 owns
+WR-01 (023); the separate phase-1 CI tail owns the Windows ARM64 timeout sample
+(024). Existing todos retain their bound plans and seed dispositions.
 
 ### Blockers/Concerns
 
@@ -146,9 +151,10 @@ Items acknowledged and deferred at milestone close, most recent first:
 | 2026-10-20 | /gsd-code-review 1 | Codex, inline standard review | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-20 | /gsd-code-review 1 --fix | Codex, inline fix of CR-01; WR-01 remains a tooling seed | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-20 | /gsd-pause-work | Codex, handoff before phase verification | GPT-6 (session; exact model ID not exposed) |
+| 2026-10-29 | /gsd-verify-work 1 | Codex, OpenGSD 1.19.0; inline verification and hosted CI | GPT-6 (session; exact model ID not exposed) |
 
 ## Session Continuity
 
-Last session: 2026-10-20T18:02:54.051Z
-Stopped at: Phase 01 review fix complete; next substantive step is /gsd-verify-work 1
-Resume file: .planning/phases/01-a-test-frame-in-retroarch/.continue-here.md
+Last session: 2026-10-29
+Stopped at: Phase 01 verified; next command is /gsd-ship 1
+Resume file: None

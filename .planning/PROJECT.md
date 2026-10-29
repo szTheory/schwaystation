@@ -20,11 +20,11 @@ library that any host can embed.
 
 ### Validated
 
-(None yet; the first phase validates the delivery path.)
+- ✓ Phase 1: the embeddable library, runner and libretro core produce a moving built-in test card with equal hashes on all eight lanes; real RetroArch frame delivery, checked installation, package consumers and the complete release rehearsal pass. Verification: 2026-10-29, run 40929433476; production publication is confirmed at ship.
 
 ### Active
 
-- [ ] Release automation from the first phase: library, runner and libretro core built, tested, attested and published on every platform by merging a pull request; one install line puts the core into RetroArch on a Mac; a built-in test frame is hashed on eight lanes with no BIOS and no disc.
+- [ ] Ship the verified phase-1 delivery path: merge its pull request and confirm the automatic release and latest-download install, then complete the separate CI tail before phase 2.
 - [ ] The R3000A matches the public vectors before any game runs, with COP0 exceptions, bus decode, memory control, the I-cache and interrupt registers, PS-EXE loading under the own stub kernel with armips-built fixtures, the probe and the first-fault trace.
 - [ ] The GTE matches the hardware-captured cases, and the seven DMA channels and three root counters pass register-level tests and their fixture records.
 - [ ] PlayStation games play in RetroArch: the GPU rasteriser and display modes, DualShock and digital pads with rumble, memory cards, self-authored fixtures that prove play, OpenBIOS booting to its shell, and a compatibility ledger that only ratchets up, with a local `library` preset for the user's own dumps, proven in CI against a fixture in a temporary directory.
@@ -111,4 +111,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-10-19 during preparation*
+*Last updated: 2026-10-29 after phase-1 verification; ship pending*
