@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-11-09T18:56:51.431Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-11-09T19:01:15.890Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 02 execution started
-state_head: a8cd1f34780b7959181a040dbe41c52014dccfe4
+state_head: 97265dbadae43f92726098b40cff9bfd1cf87029
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 18
+  completed_plans: 19
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 4 of 27
+Plan: 5 of 27
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 02 execution started
 
@@ -76,6 +76,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P01 | 2 min | 2 tasks | 15 files |
 | Phase 02 P02 | 4 min | 3 tasks | 16 files |
 | Phase 02 P03 | 6 min | 3 tasks | 8 files |
+| Phase 02 P04 | 5 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,7 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-02: schway__irq_raise takes an interrupt number 0-10; I_STAT and I_MASK are bounded to bits 0-10 in the state; the profile flags survive a power reset
 - [Phase 02]: PASS_REGEX tests run through expect_fail.cmake with CODE 0; the self test nests through a configure-time driver script
 - [Phase 02]: docs.budgets globs docs/*/*.md in the same file(GLOB) as docs/*.md, so policy.gate_budget stays at 1392 lines against the 1520 limit
+- [Phase 02]: 02-04: sst-sample.bin is a u16 count, then per slice a 16-byte name, a u32 length and the upstream slice with its count patched to 100 (2,395,390 bytes); records carry no opcode block after the cycles
 
 ### Pending Todos
 
@@ -182,8 +184,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T18:56:51.377Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-11-09T19:01:15.835Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
