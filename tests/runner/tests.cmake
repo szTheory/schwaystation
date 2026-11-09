@@ -95,6 +95,14 @@ if(CMAKE_SCRIPT_MODE_FILE)
     refuse(--exe a.exe --stop-on)
     refuse(--exe a.exe --stop-on exit)
     refuse(--exe a.exe --stop-on mailbox --stop-on mailbox)
+    # --trace takes first-fault, once, and needs --exe; --no-stop-on-fault needs --exe.
+    refuse(--trace first-fault)
+    refuse(--frames 1 --trace first-fault)
+    refuse(--exe a.exe --trace)
+    refuse(--exe a.exe --trace cpu)
+    refuse(--exe a.exe --trace first-fault --trace first-fault)
+    refuse(--no-stop-on-fault)
+    refuse(--frames 1 --no-stop-on-fault)
   elseif(CASE STREQUAL "exe_missing")
     # A file that is not there, or is not a PS-EXE, exits 1 naming the file
     # and the reason; no frame runs.
