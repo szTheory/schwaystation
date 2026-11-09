@@ -32,6 +32,7 @@ core.testcard.full_redraw	core,portable
 core.testcard.pixels	core,portable
 core.trace.exec_records	core,portable
 core.trace.index_past_end	core,portable
+core.trace.irq	core,portable
 core.trace.last_is_fault	core,portable
 core.trace.short_run	core,portable
 core.trace.wrap	core,portable

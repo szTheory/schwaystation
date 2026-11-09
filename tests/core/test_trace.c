@@ -404,6 +404,53 @@ static void case_index_past_end(void)
     schway_destroy(inst);
 }
 
+/* Opens the vertical-blank interrupt (I_MASK bit 0, SR.IM2 and IEc) and spins. */
+static const uint32_t program_irq[] = {
+    0x3C08BF80u, /* lui   t0, BF80h */
+    0x34090001u, /* ori   t1, zero, 1 */
+    0xAD091074u, /* sw    t1, 1074h(t0): I_MASK */
+    0x340B0401u, /* ori   t3, zero, 401h */
+    0x408B6000u, /* mtc0  t3, sr */
+    0x08004005u, /* j     80010014h */
+    0x00000000u, /* nop */
+};
+
+static void case_irq(void)
+{
+    schway *inst = make();
+    load(inst, program_irq, 7u);
+    schway_run_result res = run(inst, 100000u, SCHWAY_RUN_TRACE);
+    while (res.stop != SCHWAY_STOP_FRAME) {
+        res = run(inst, 100000u, SCHWAY_RUN_TRACE);
+    }
+    CHECK_EQ_U64(res.frame, 1u);
+    /* The frame's end raised the interrupt; the next run takes it two
+       retirements later, so its record leads the vector's own instructions. */
+    (void)run(inst, 300u, SCHWAY_RUN_TRACE);
+    uint32_t n = held(inst);
+    uint32_t at = n;
+    for (uint32_t i = 0u; i < n && at == n; i++) {
+        if (get(inst, i).event == SCHWAY_TRACE_IRQ) {
+            at = i;
+        }
+    }
+    CHECK(at < n);
+    if (at < n) {
+        schway_trace t = get(inst, at);
+        uint64_t start1 = UINT64_C(405350378496) / UINT64_C(715909);
+        CHECK(t.pc == TEXT + 20u || t.pc == TEXT + 24u);
+        CHECK_EQ_U64(t.frame, 1u);
+        CHECK(t.cycle >= start1);
+        CHECK_EQ_U64(t.device, SCHWAY_DEVICE_NONE);
+        CHECK((t.value & 0x400u) != 0u); /* CAUSE shows the hardware line */
+        CHECK(at + 1u < n);
+        t = get(inst, at + 1u);
+        CHECK_EQ_U64(t.event, SCHWAY_TRACE_EXEC);
+        CHECK_EQ_HEX(t.pc, 0x80000080u);
+    }
+    schway_destroy(inst);
+}
+
 static void visit_name(void *user, const char *name, const void *data, uint32_t count,
                        uint32_t width)
 {
@@ -527,6 +574,8 @@ int main(int argc, char **argv)
         case_short_run();
     } else if (strcmp(argv[1], "last_is_fault") == 0) {
         case_last_is_fault();
+    } else if (strcmp(argv[1], "irq") == 0) {
+        case_irq();
     } else if (strcmp(argv[1], "index_past_end") == 0) {
         case_index_past_end();
     } else if (strcmp(argv[1], "hash_equal") == 0) {

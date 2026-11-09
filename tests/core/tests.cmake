@@ -94,7 +94,7 @@ set_target_properties(schwaystation-test-trace PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-trace)
 
-foreach(case IN ITEMS exec_records wrap short_run last_is_fault index_past_end)
+foreach(case IN ITEMS exec_records wrap short_run last_is_fault index_past_end irq)
   schway_add_test(NAME core.trace.${case}
     COMMAND schwaystation-test-trace ${case}
     LABELS core portable TIMEOUT 10)
