@@ -38,9 +38,13 @@ enum schway__dev {
 #define SCHWAY__RAM_SIZE 0x200000u
 #define SCHWAY__SCRATCH_SIZE 0x400u
 
-/* Memory control: the registers at 1F801000h-1F801020h (eight) and RAM_SIZE
-   at 1F801060h (PSX-SYSTEM section 3). */
+/* Memory control: the nine registers at 1F801000h-1F801020h and RAM_SIZE at
+   1F801060h (PSX-SYSTEM section 3). */
 #define SCHWAY__MEMCTL_REGS 9u
+
+/* RAM_SIZE after a power reset: a 2 MiB RAM in an 8 MiB bank, mirrored four
+   times, as the BIOS sets it (PSX-SYSTEM section 3). */
+#define SCHWAY__RAM_SIZE_POWER_ON 0x0B88u
 
 struct schway__bus {
     uint8_t ram[SCHWAY__RAM_SIZE];
@@ -72,15 +76,26 @@ void schway__irq_reset(schway *inst);
 /* The bus and irq fields of the state walk (state.h). */
 void schway__bus_state_io(struct schway__state_io *io, schway *inst);
 
-/* One access to physical address paddr of width 1, 2 or 4 bytes, assembled
+/* The segment of a virtual address: the top three bits, with 0-3 all KUSEG
+   and 6-7 both KSEG2 (PSX-SYSTEM section 2, Segments). KUSEG, KSEG0 and KSEG1
+   map to the physical address addr & 1FFFFFFFh. */
+enum { SCHWAY__SEG_KUSEG = 0, SCHWAY__SEG_KSEG0 = 4, SCHWAY__SEG_KSEG1 = 5, SCHWAY__SEG_KSEG2 = 6 };
+
+static inline uint32_t schway__bus_segment(uint32_t addr)
+{
+    uint32_t top = addr >> 29;
+    return top < 4u ? (uint32_t)SCHWAY__SEG_KUSEG : (top > 6u ? 6u : top);
+}
+
+/* One access to virtual address addr of width 1, 2 or 4 bytes, assembled
    little-endian. Returns 0 when done, with the cost in CPU cycles added to
    *cycles, and non-zero for a bus error, with *value left 0. */
-int schway__bus_read(schway *inst, uint32_t paddr, uint32_t width, uint32_t *value,
+int schway__bus_read(schway *inst, uint32_t addr, uint32_t width, uint32_t *value,
                      uint32_t *cycles);
-int schway__bus_write(schway *inst, uint32_t paddr, uint32_t width, uint32_t value,
+int schway__bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t value,
                       uint32_t *cycles);
-/* An instruction fetch of the word at paddr. */
-int schway__bus_fetch(schway *inst, uint32_t paddr, uint32_t *word, uint32_t *cycles);
+/* An instruction fetch of the word at addr. */
+int schway__bus_fetch(schway *inst, uint32_t addr, uint32_t *word, uint32_t *cycles);
 
 /* Sets interrupt bit number bit (0-10) in I_STAT; other numbers are ignored.
    The line is nonzero while an enabled bit is set. */

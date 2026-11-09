@@ -533,7 +533,8 @@ static void test_cpu_fields(void)
     CHECK_EQ_U64(inst->bus.ram[0x1234], 0u);
     CHECK_EQ_U64(inst->irq.stat | inst->irq.mask, 0u);
 
-    /* Guest RAM is little-endian; the first byte past 2 MiB is a bus error. */
+    /* Guest RAM is little-endian; the first byte past the 8 MiB window the power-on RAM_SIZE
+       selects is a bus error. */
     uint32_t cycles = 0u, word = 0u;
     CHECK_EQ_U64(schway__bus_write(inst, 0x1234u, 4u, 0xA1B2C3D4u, &cycles), 0u);
     CHECK_EQ_HEX(inst->bus.ram[0x1234], 0xD4u);
@@ -543,9 +544,12 @@ static void test_cpu_fields(void)
     CHECK_EQ_U64(schway__bus_fetch(inst, 0x1234u, &word, &cycles), 0u);
     CHECK_EQ_HEX(word, 0xA1B2C3D4u);
     CHECK_EQ_U64(schway__bus_write(inst, 0x1FFFFFu, 1u, 0x5Au, &cycles), 0u);
-    CHECK(schway__bus_read(inst, 0x1FFFFEu, 4u, &word, &cycles) != 0);
-    CHECK(schway__bus_read(inst, 0x200000u, 1u, &word, &cycles) != 0);
+    CHECK(schway__bus_read(inst, 0x7FFFFEu, 4u, &word, &cycles) != 0);
+    CHECK(schway__bus_read(inst, 0x800000u, 1u, &word, &cycles) != 0);
     CHECK_EQ_U64(word, 0u);
+    /* A bus error keeps the first fault; clear it so the latch below is the first. */
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_UNMAPPED_READ);
+    memset(&inst->fault, 0, sizeof inst->fault);
     inst->bus.scratch[0x3FF] = 0x77u;
     inst->bus.memctl[8] = 0x0B88u;
     inst->bus.unbuilt_n[SCHWAY__DEV_GPU] = 3u;

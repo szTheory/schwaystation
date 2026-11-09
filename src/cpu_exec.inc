@@ -2,15 +2,6 @@
    so the one-instruction entry and the run loop run the same code. The CPU is
    a MIPS I R3000A (PSX-SYSTEM section 2). Integer only. */
 
-/* Virtual to physical: the three top bits pick the segment, KSEG0 and KSEG1
-   drop them, and KUSEG and KSEG2 pass the address on (PSX-SYSTEM section 2,
-   Segments; section 3, C4). */
-static inline uint32_t cpu_physical(uint32_t vaddr)
-{
-    uint32_t seg = vaddr >> 29;
-    return (seg == 4u || seg == 5u) ? (vaddr & 0x1FFFFFFFu) : vaddr;
-}
-
 /* One access of the replay bus. The access is recorded, and a read or fetch
    returns the value the expected list holds at the same position (zero past
    its end, which the caller's comparison reports as a missing cycle). */
@@ -34,15 +25,16 @@ static uint32_t cpu_log_access(struct schway__cpu_log *log, uint32_t kind, uint3
 }
 
 /* The access front-ends. With a log attached they replay it; without, they
-   reach the bus with the physical address and add its charge to *cycles. A
-   bus error reads as zero. */
+   reach the bus with the virtual address, whose segment the bus decodes
+   (PSX-SYSTEM section 2, Segments; section 3, C4), and add its charge to
+   *cycles. A bus error reads as zero. */
 static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles)
 {
     uint32_t word = 0u;
     if (inst->cpu.log != NULL) {
         return cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_FETCH, 4u, vaddr, 0u);
     }
-    (void)schway__bus_fetch(inst, cpu_physical(vaddr), &word, cycles);
+    (void)schway__bus_fetch(inst, vaddr, &word, cycles);
     return word;
 }
 
@@ -52,7 +44,7 @@ static inline uint32_t cpu_read(schway *inst, uint32_t vaddr, uint32_t size, uin
     if (inst->cpu.log != NULL) {
         return cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_READ, size, vaddr, 0u);
     }
-    (void)schway__bus_read(inst, cpu_physical(vaddr), size, &value, cycles);
+    (void)schway__bus_read(inst, vaddr, size, &value, cycles);
     return value;
 }
 
@@ -63,7 +55,7 @@ static inline void cpu_write(schway *inst, uint32_t vaddr, uint32_t size, uint32
         (void)cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_WRITE, size, vaddr, value);
         return;
     }
-    (void)schway__bus_write(inst, cpu_physical(vaddr), size, value, cycles);
+    (void)schway__bus_write(inst, vaddr, size, value, cycles);
 }
 
 /* Writes general register n. A write to register 0 is discarded. A load
