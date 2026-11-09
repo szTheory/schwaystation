@@ -34,6 +34,11 @@ static void put32(unsigned char *p, uint32_t v)
 int main(void)
 {
     CHECK(SCHWAY_API_VERSION >= 2);
+    CHECK_EQ_U64(SCHWAY_STOP_FRAME, 1);
+    CHECK_EQ_U64(SCHWAY_STOP_BUDGET, 2);
+    CHECK_EQ_U64(SCHWAY_STOP_HOOK, 4);
+    CHECK_EQ_U64(SCHWAY_STOP_FAULT, 5);
+    CHECK_EQ_U64(SCHWAY_RUN_STOP_ON_FAULT, 1);
     CHECK_EQ_U64(SCHWAY_STATUS_ERR_EXE_INVALID, 11);
     CHECK_EQ_U64(SCHWAY_STATUS_ERR_EXE_RANGE, 12);
     CHECK_EQ_U64(SCHWAY_PROFILE_DEBUG_PORT, 1);
@@ -134,6 +139,34 @@ int main(void)
     CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
     put32(exe + 0x18, 0x80010000u);
     CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_ERR_ARGUMENT);
+
+    /* A budgeted run stops at its cycle limit, with the two result fields
+       added after the first release. */
+    schway_run_result res;
+    memset(&res, 0, sizeof res);
+    res.size = (uint32_t)sizeof res;
+    CHECK(sizeof res >= 32u);
+    CHECK_EQ_U64(schway_run_frame(inst, &res), SCHWAY_STATUS_OK);
+    uint64_t ticks = res.ticks;
+    schway_budget budget;
+    memset(&budget, 0, sizeof budget);
+    budget.size = (uint32_t)sizeof budget;
+    budget.flags = SCHWAY_RUN_STOP_ON_FAULT;
+    budget.max_cycles = 1000u;
+    CHECK_EQ_U64(schway_run(inst, &budget, &res), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(res.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(res.ticks, ticks + 1000u);
+    CHECK_EQ_U64(res.frame, 2u);
+    CHECK_EQ_U64(res.exit_code, 0u);
+    CHECK_EQ_U64(res.fault_present, 0u);
+    CHECK_EQ_U64(schway_run(inst, &budget, NULL), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_run(NULL, &budget, &res), SCHWAY_STATUS_ERR_ARGUMENT);
+    CHECK_EQ_U64(schway_run(inst, NULL, &res), SCHWAY_STATUS_ERR_ARGUMENT);
+    budget.flags = 2u;
+    CHECK_EQ_U64(schway_run(inst, &budget, &res), SCHWAY_STATUS_ERR_ARGUMENT);
+    budget.flags = 0u;
+    budget.size = 8u;
+    CHECK_EQ_U64(schway_run(inst, &budget, &res), SCHWAY_STATUS_ERR_STRUCT_SIZE);
     schway_destroy(inst);
     CHECK_DONE();
 }

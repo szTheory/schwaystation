@@ -33,6 +33,11 @@ typedef uint32_t schway_status;
 #define SCHWAY_REGION_PAL 3u
 
 #define SCHWAY_STOP_FRAME 1u
+#define SCHWAY_STOP_BUDGET 2u
+#define SCHWAY_STOP_HOOK 4u
+#define SCHWAY_STOP_FAULT 5u
+
+#define SCHWAY_RUN_STOP_ON_FAULT 1u
 
 #define SCHWAY_RESET_POWER 1u
 
@@ -97,7 +102,15 @@ typedef struct schway_run_result {
     uint32_t stop; /* SCHWAY_STOP_* */
     uint64_t frame;
     uint64_t ticks;
+    uint32_t exit_code;
+    uint32_t fault_present; /* 1 once a fault is latched */
 } schway_run_result;
+
+typedef struct schway_budget {
+    uint32_t size;
+    uint32_t flags; /* SCHWAY_RUN_* bits */
+    uint64_t max_cycles;
+} schway_budget;
 
 typedef struct schway_video {
     uint32_t size;
@@ -129,6 +142,7 @@ void schway_destroy(schway *inst); /* NULL-safe */
 schway_status schway_set_profile(schway *inst, const schway_profile *profile);
 schway_status schway_reset(schway *inst, uint32_t kind); /* SCHWAY_RESET_* */
 schway_status schway_run_frame(schway *inst, schway_run_result *out); /* out may be NULL */
+schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_result *out);
 schway_status schway_get_info(const schway *inst, schway_info *out);
 schway_status schway_get_video(const schway *inst, schway_video *out);
 schway_status schway_get_audio(schway *inst, schway_audio *io);

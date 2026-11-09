@@ -12,6 +12,7 @@ core.no_alloc_after_load	perf,portable
 core.profile.locked	core,portable
 core.profile.rejected	core,portable
 core.reset.power	core,portable
+core.run.budget_resume	core,portable
 core.state.cpu_fields	core,portable
 core.state.record_sweep	core,portable
 core.state.rejects	core,portable

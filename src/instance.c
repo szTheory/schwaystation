@@ -84,6 +84,8 @@ static void power_on(schway *inst)
     inst->frame = 0u;
     inst->ticks = 0u;
     inst->tick_acc = 0u;
+    inst->frame_end = schway__instance_frame_num(inst->region) /
+                      schway__instance_frame_den(inst->region);
     struct schway__display *d = &inst->display;
     memset(d, 0, sizeof *d);
     d->x1 = 0x260u;
@@ -188,6 +190,12 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     }
     inst->region = profile->region;
     inst->profile_flags = flags;
+    /* The first frame is the region's; nothing has run before the first
+       frame locks the profile. */
+    if (inst->ticks == 0u) {
+        inst->frame_end = schway__instance_frame_num(inst->region) /
+                          schway__instance_frame_den(inst->region);
+    }
     return SCHWAY_STATUS_OK;
 }
 

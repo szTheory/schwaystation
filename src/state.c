@@ -4,7 +4,7 @@
      header  magic (8 bytes), state format (u32), total size (u32), body
              CRC-32 (u32)
      body    instance.frame, instance.region, instance.ticks,
-             instance.tick_acc, gpu.vram, cpu and cop0
+             instance.tick_acc, instance.frame_end, gpu.vram, cpu and cop0
              registers, instance.profile_flags, instance.exe_loaded, the bus
              (RAM, scratchpad, memory control, unbuilt-device counters), irq
              and the first-fault record
@@ -30,6 +30,7 @@ static const char name_frame[] = "instance.frame";
 static const char name_region[] = "instance.region";
 static const char name_ticks[] = "instance.ticks";
 static const char name_tick_acc[] = "instance.tick_acc";
+static const char name_frame_end[] = "instance.frame_end";
 static const char name_vram[] = "gpu.vram";
 static const char name_profile_flags[] = "instance.profile_flags";
 static const char name_exe_loaded[] = "instance.exe_loaded";
@@ -86,8 +87,15 @@ static void body_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u64(io, name_frame, &inst->frame, 0u, SCHWAY__STATE_FRAME_MAX);
     /* A state loads only into an instance of the same region. */
     (void)schway__state_u32(io, name_region, &inst->region, inst->region, inst->region);
-    (void)schway__state_u64(io, name_ticks, &inst->ticks, 0u, SCHWAY__STATE_TICKS_MAX);
+    uint64_t ticks = schway__state_u64(io, name_ticks, &inst->ticks, 0u, SCHWAY__STATE_TICKS_MAX);
     (void)schway__state_u64(io, name_tick_acc, &inst->tick_acc, 0u, den - 1u);
+    /* The frame ends at or after the tick the state is at, and within one
+       frame of it, so a run from a loaded state is bounded. */
+    uint64_t frame_end =
+        schway__state_u64(io, name_frame_end, &inst->frame_end, 0u,
+                          SCHWAY__STATE_TICKS_MAX + schway__instance_frame_max(inst->region));
+    schway__state_check(io, ticks <= frame_end &&
+                                frame_end - ticks <= schway__instance_frame_max(inst->region));
     schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
                             0u, UINT16_MAX);
     schway__cpu_state_io(io, inst);

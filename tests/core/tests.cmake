@@ -64,3 +64,20 @@ schway_warnings(schwaystation-test-bus-unbuilt)
 schway_add_test(NAME core.bus_unbuilt
   COMMAND schwaystation-test-bus-unbuilt
   LABELS bus portable TIMEOUT 10)
+
+# The bounded run and the split property. Fault prevented: a run that overshoots
+# its cycle budget or the frame boundary, a stop and a resume that leave a
+# different state than one run, or a frame end a hostile state can push a run
+# past.
+add_executable(schwaystation-test-run ${CMAKE_CURRENT_LIST_DIR}/test_run.c)
+target_include_directories(schwaystation-test-run PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-run PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-run PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-run)
+
+foreach(case IN ITEMS budget_resume)
+  schway_add_test(NAME core.run.${case}
+    COMMAND schwaystation-test-run ${case}
+    LABELS core portable TIMEOUT 10)
+endforeach()

@@ -94,7 +94,8 @@ struct schway {
     uint32_t profile_locked;    /* 1 after the first run_frame */
     uint64_t frame;             /* frames run since power-on */
     uint64_t ticks;             /* CPU cycles run since power-on */
-    uint64_t tick_acc;          /* the frame accumulator's remainder, < den */
+    uint64_t tick_acc;          /* the frame accumulator's remainder at the frame's start, < den */
+    uint64_t frame_end;         /* the tick the current frame ends on, >= ticks */
     struct schway__display display;
     uint32_t audio_head;    /* oldest queued pair */
     uint32_t audio_count;   /* pairs queued */
@@ -122,6 +123,13 @@ static inline uint64_t schway__instance_frame_num(uint32_t region)
 static inline uint64_t schway__instance_frame_den(uint32_t region)
 {
     return region == SCHWAY_REGION_PAL ? SCHWAY__PAL_FRAME_DEN : SCHWAY__NTSC_FRAME_DEN;
+}
+
+/* The most cycles one frame takes: the frame's cycles rounded up. */
+static inline uint64_t schway__instance_frame_max(uint32_t region)
+{
+    uint64_t den = schway__instance_frame_den(region);
+    return (schway__instance_frame_num(region) + den - 1u) / den;
 }
 
 /* The public layouts, pinned on every target. P is the pointer size. */
@@ -185,7 +193,14 @@ _Static_assert(offsetof(schway_run_result, size) == 0, "run_result.size");
 _Static_assert(offsetof(schway_run_result, stop) == 4, "run_result.stop");
 _Static_assert(offsetof(schway_run_result, frame) == 8, "run_result.frame");
 _Static_assert(offsetof(schway_run_result, ticks) == 16, "run_result.ticks");
-_Static_assert(sizeof(schway_run_result) == 24, "run_result size");
+_Static_assert(offsetof(schway_run_result, exit_code) == 24, "run_result.exit_code");
+_Static_assert(offsetof(schway_run_result, fault_present) == 28, "run_result.fault_present");
+_Static_assert(sizeof(schway_run_result) == 32, "run_result size");
+
+_Static_assert(offsetof(schway_budget, size) == 0, "budget.size");
+_Static_assert(offsetof(schway_budget, flags) == 4, "budget.flags");
+_Static_assert(offsetof(schway_budget, max_cycles) == 8, "budget.max_cycles");
+_Static_assert(sizeof(schway_budget) == 16, "budget size");
 
 _Static_assert(offsetof(schway_video, size) == 0, "video.size");
 _Static_assert(offsetof(schway_video, reserved0) == 4, "video.reserved0");
@@ -226,7 +241,8 @@ _Static_assert(sizeof(schway_audio) == 16 + 2 * SCHWAY__P, "audio size");
 #define SCHWAY__VERSIONS_SIZE_FIRST 32u
 #define SCHWAY__PROFILE_SIZE_FIRST 8u /* a literal: appended fields leave it alone */
 #define SCHWAY__INFO_SIZE_FIRST 36u
-#define SCHWAY__RUN_RESULT_SIZE_FIRST 24u
+#define SCHWAY__RUN_RESULT_SIZE_FIRST 24u /* a literal: appended fields leave it alone */
+#define SCHWAY__BUDGET_SIZE_FIRST 16u
 #define SCHWAY__VIDEO_SIZE_FIRST ((uint32_t)(80 + 2 * SCHWAY__P))
 #define SCHWAY__AUDIO_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__EXE_INFO_SIZE_FIRST 56u
@@ -234,7 +250,9 @@ _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
 _Static_assert(SCHWAY__INFO_SIZE_FIRST == sizeof(schway_info), "info first size");
-_Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == sizeof(schway_run_result), "run_result first size");
+_Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == offsetof(schway_run_result, exit_code),
+               "run_result first size");
+_Static_assert(SCHWAY__BUDGET_SIZE_FIRST == sizeof(schway_budget), "budget first size");
 _Static_assert(SCHWAY__VIDEO_SIZE_FIRST == sizeof(schway_video), "video first size");
 _Static_assert(SCHWAY__AUDIO_SIZE_FIRST == sizeof(schway_audio), "audio first size");
 _Static_assert(SCHWAY__EXE_INFO_SIZE_FIRST == sizeof(schway_exe_info), "exe_info first size");
