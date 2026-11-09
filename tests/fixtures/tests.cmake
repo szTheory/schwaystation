@@ -105,6 +105,8 @@ function(schway__fixture name source)
 endfunction()
 
 schway__fixture(hello.exe hello.asm)
+schway__fixture(exc_default.exe exc_default.asm)
+schway__fixture(exc_handler.exe exc_default.asm -definelabel USE_HANDLER 1)
 schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
@@ -166,4 +168,43 @@ schway_add_test(NAME fixtures.stub_drift
 # the records the stub set up.
 schway_add_test(NAME fixtures.hello.boot
   COMMAND schwaystation-test-boot hello ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a default exception handler that records the wrong
+# registers, or does not hand the exception to the handler an image registered.
+schway_add_test(NAME fixtures.boot.default_handler
+  COMMAND schwaystation-test-boot default_handler ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.registered_handler
+  COMMAND schwaystation-test-boot registered_handler ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a runaway past the stub's image that slides on as no-operations.
+schway_add_test(NAME fixtures.boot.past_stub
+  COMMAND schwaystation-test-boot past_stub
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: an exit that is lost, repeated or reported without its code.
+schway_add_test(NAME fixtures.boot.exit_port
+  COMMAND schwaystation-test-boot exit_port
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a stop on a first fault that comes late or never, and a
+# double fault the host is never told about.
+schway_add_test(NAME fixtures.boot.stop_on_fault
+  COMMAND schwaystation-test-boot stop_on_fault
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.double_fault
+  COMMAND schwaystation-test-boot double_fault
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a run that never returns for a looping or hostile guest.
+schway_add_test(NAME fixtures.boot.bounded
+  COMMAND schwaystation-test-boot bounded
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a run that carries overshoot in the state, or whose stop
+# points differ with how the cycles are split.
+schway_add_test(NAME fixtures.boot.split_with_exe
+  COMMAND schwaystation-test-boot split_with_exe ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
