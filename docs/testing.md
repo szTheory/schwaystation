@@ -36,6 +36,7 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
 | `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
+| `nightly` | All 55,000 public single-step vectors pass at their pin, and the committed sample is their first records. | `nightly` | `vectors.r3000.full` |
 | `perf` | A Release build for the instructions-per-frame job. Configure and build only. | `ci` | none |
 
 `SCHWAYSTATION_TIMEOUT_SCALE` multiplies every test timeout: 3 for `asan`, 8 for `be32` and 5 for `wasm32`.
@@ -54,12 +55,22 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 On Ubuntu these come from the distribution's packages. Where a host lacks them, CI's run of that lane is the
 evidence; the workflow is the same command.
 
+### The full vectors
+
+The `nightly` lane needs the 55 upstream vector files, which are never committed, cached or uploaded. `pins.txt`
+names each by its git blob SHA-1 (`r3000-<NAME>` rows). Fetch a file with
+`gh api repos/SingleStepTests/r3000/git/blobs/<sha> -H 'Accept: application/vnd.github.raw'` into
+`build/sst/<NAME>.json.bin` and check it with `git hash-object`; configure fails naming any file
+`SCHWAYSTATION_SST_DIR` lacks, so the lane never skips. The harness's `--upstream DIR --prefix-of SAMPLE` reads
+them and fails unless the first records of each equal the committed sample. The `vectors-full` job in
+`nightly.yml` does this on a schedule; it reports through the nightly issue and is not part of `CI required`.
+
 ## The inventories
 
 The tests a lane registers are listed in two levels of plain text:
 
-- `tests/inventory/<preset>.txt` selects directories, one per line (`ci.txt`, `hygiene.txt`, `nofp.txt`,
-  `wasm32.txt`); lines starting with `#` are comments.
+- `tests/inventory/<preset>.txt` selects directories, one per line (`ci.txt`, `hygiene.txt`, `nightly.txt`,
+  `nofp.txt`, `wasm32.txt`); lines starting with `#` are comments.
 - `tests/<dir>/inventory.txt` lists that directory's tests, one `name<TAB>labels` line each, labels sorted and
   comma-separated, lines sorted in byte order.
 

@@ -100,6 +100,18 @@
       }
     },
     {
+      "name": "nightly",
+      "inherits": "base",
+      "$comment": "The full public vectors: registers only tests/nightly, and configure fails unless SCHWAYSTATION_SST_DIR holds the pinned files (pins.txt, r3000- rows).",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+        "SCHWAYSTATION_INVENTORY": "nightly",
+        "SCHWAYSTATION_FIXTURES": "OFF",
+        "SCHWAYSTATION_SST_DIR": "${sourceDir}/build/sst"
+      }
+    },
+    {
       "name": "perf",
       "inherits": "base",
       "$comment": "The performance build: the runner only, built with the host compiler. Registers no tests, so it never builds armips.",
@@ -115,6 +127,7 @@
     { "name": "nofp", "configurePreset": "nofp" },
     { "name": "be32", "configurePreset": "be32" },
     { "name": "wasm32", "configurePreset": "wasm32" },
+    { "name": "nightly", "configurePreset": "nightly", "targets": ["schwaystation-test-vectors"] },
     { "name": "perf", "configurePreset": "perf", "targets": ["schwaystation-run"] }
   ],
   "testPresets": [
@@ -217,6 +230,15 @@
       },
       "filter": { "include": { "label": "^portable$" } },
       "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "nightly",
+      "configurePreset": "nightly",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
+      },
+      "execution": { "noTestsAction": "error", "jobs": "" }
     }
   ],
   "packagePresets": [
@@ -290,6 +312,14 @@
         { "type": "configure", "name": "wasm32" },
         { "type": "build", "name": "wasm32" },
         { "type": "test", "name": "wasm32" }
+      ]
+    },
+    {
+      "name": "nightly",
+      "steps": [
+        { "type": "configure", "name": "nightly" },
+        { "type": "build", "name": "nightly" },
+        { "type": "test", "name": "nightly" }
       ]
     },
     {
