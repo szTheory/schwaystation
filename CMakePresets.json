@@ -62,6 +62,26 @@
       }
     },
     {
+      "name": "fuzz",
+      "inherits": "base",
+      "$comment": "The loader fuzz target under clang-21 with ASan and UBSan, on the asan inventory without fixtures. Only schwaystation-fuzz-exe links libFuzzer; every other object takes the coverage instrumentation of fuzzer-no-link. It has no test step: the nightly job runs the binary.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
+        "CMAKE_C_COMPILER": "clang-21",
+        "CMAKE_CXX_COMPILER": "clang++-21",
+        "CMAKE_C_FLAGS": "-O1 -g -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-O1 -g -fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "SCHWAYSTATION_TIMEOUT_SCALE": "3",
+        "SCHWAYSTATION_INVENTORY": "asan",
+        "SCHWAYSTATION_FIXTURES": "OFF",
+        "SCHWAYSTATION_FUZZ": "ON"
+      }
+    },
+    {
       "name": "nofp",
       "inherits": "base",
       "$comment": "GCC, version 15 on the hosted image: -mgeneral-regs-only is a GCC option. Registers only the abi and nofp tests.",
@@ -124,6 +144,7 @@
     { "name": "ci-msvc", "configurePreset": "ci-msvc" },
     { "name": "hygiene", "configurePreset": "hygiene" },
     { "name": "asan", "configurePreset": "asan" },
+    { "name": "fuzz", "configurePreset": "fuzz", "targets": ["schwaystation-fuzz-exe", "schwaystation-fuzz-exe-replay"] },
     { "name": "nofp", "configurePreset": "nofp" },
     { "name": "be32", "configurePreset": "be32" },
     { "name": "wasm32", "configurePreset": "wasm32" },
@@ -288,6 +309,13 @@
         { "type": "configure", "name": "asan" },
         { "type": "build", "name": "asan" },
         { "type": "test", "name": "asan" }
+      ]
+    },
+    {
+      "name": "fuzz",
+      "steps": [
+        { "type": "configure", "name": "fuzz" },
+        { "type": "build", "name": "fuzz" }
       ]
     },
     {
