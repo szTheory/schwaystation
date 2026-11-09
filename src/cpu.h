@@ -31,6 +31,20 @@ enum {
     SCHWAY__COP0_PRID = 15
 };
 
+/* Exception codes of CAUSE bits 2-6 (PSX-SYSTEM section 2, ExcCodes). */
+enum {
+    SCHWAY__EXC_INT = 0x00,
+    SCHWAY__EXC_ADEL = 0x04,
+    SCHWAY__EXC_ADES = 0x05,
+    SCHWAY__EXC_IBE = 0x06,
+    SCHWAY__EXC_DBE = 0x07,
+    SCHWAY__EXC_SYS = 0x08,
+    SCHWAY__EXC_BP = 0x09,
+    SCHWAY__EXC_RI = 0x0A,
+    SCHWAY__EXC_CPU = 0x0B,
+    SCHWAY__EXC_OVF = 0x0C
+};
+
 /* COP0 registers, indexed by register number. */
 struct schway__cop0 {
     uint32_t r[32];
@@ -82,6 +96,17 @@ struct schway__cpu {
 /* Power-on values (ARCHITECTURE section 7). */
 void schway__cpu_reset(schway *inst);
 void schway__cop0_reset(schway *inst);
+
+/* The one exception entry (PSX-SYSTEM section 2, EPC and the SR, CAUSE and
+   Vectors rows). code is the ExcCode, epc the address to return to (the
+   branch itself for a delay-slot instruction), in_delay the BD bit and taken
+   the BT bit. target is written to TAR when in_delay is set; badvaddr is
+   written to BadVaddr when has_badvaddr is set; ce goes to CAUSE bits 28-29.
+   The KU/IE stack is pushed, pending delay-slot state is discarded and the
+   program counter moves to the vector. */
+void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t in_delay,
+                            uint32_t taken, uint32_t target, uint32_t badvaddr,
+                            uint32_t has_badvaddr, uint32_t ce);
 
 /* The cpu and cop0 fields of the state walk (state.h). */
 void schway__cpu_state_io(struct schway__state_io *io, schway *inst);

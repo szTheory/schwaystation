@@ -84,6 +84,23 @@ static uint32_t cpu_slt(uint32_t a, uint32_t b)
     return (a ^ 0x80000000u) < (b ^ 0x80000000u) ? 1u : 0u;
 }
 
+/* Takes an exception for the instruction at pc. A delay-slot instruction
+   returns to the branch before it, and its TAR is where the branch goes, or
+   the instruction after the slot when it was not taken (PSX-SYSTEM section 2,
+   EPC and Branch delay). Returns 1 so the caller can note that the program
+   counter now holds the vector. */
+static uint32_t cpu_exception(schway *inst, uint32_t pc, uint32_t code, uint32_t ce,
+                              uint32_t has_badvaddr, uint32_t badvaddr)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t slot = c->branch_slot;
+    uint32_t take = c->branch_take;
+    uint32_t target = take != 0u ? c->branch_target : pc + 4u;
+    schway__cop0_exception(inst, code, slot != 0u ? pc - 4u : pc, slot, take, target, badvaddr,
+                           has_badvaddr, ce);
+    return 1u;
+}
+
 /* Executes the instruction at pc and returns the cycles it took: one to
    issue, plus what the bus charged. The program counter moves to pc + 4, or
    to the pending branch target when the instruction is its delay slot; the
@@ -103,6 +120,7 @@ static uint32_t cpu_step(schway *inst)
     uint32_t rt = c->r[rt_n];
     uint32_t imm = op & 0xFFFFu;
     uint32_t simm = (imm ^ 0x8000u) - 0x8000u;
+    uint32_t trapped = 0u;
 
     switch (op >> 26) {
     case 0x00u: /* SPECIAL */
@@ -124,6 +142,9 @@ static uint32_t cpu_step(schway *inst)
             break;
         case 0x07u: /* SRAV */
             cpu_set(c, rd_n, cpu_sra(rt, rs & 31u));
+            break;
+        case 0x0Cu: /* SYSCALL */
+            trapped = cpu_exception(inst, pc, SCHWAY__EXC_SYS, 0u, 0u, 0u);
             break;
         case 0x21u: /* ADDU */
             cpu_set(c, rd_n, rs + rt);
@@ -183,7 +204,8 @@ static uint32_t cpu_step(schway *inst)
     }
 
     /* The load issued by the previous instruction lands, and this
-       instruction issues none. Nothing decoded here starts a branch. */
+       instruction issues none. Nothing decoded here starts a branch. An
+       exception has already moved the program counter to the vector. */
     if (c->load_reg != SCHWAY__CPU_NO_LOAD) {
         if (c->load_reg != 0u) {
             c->r[c->load_reg] = c->load_value;
@@ -194,6 +216,8 @@ static uint32_t cpu_step(schway *inst)
     c->branch_slot = 0u;
     c->branch_take = 0u;
     c->branch_target = 0u;
-    c->pc = next;
+    if (trapped == 0u) {
+        c->pc = next;
+    }
     return cycles;
 }

@@ -14,12 +14,14 @@ set(vectors_sample ${vectors_dir}/sst-sample.bin)
 set(vectors_scratch ${PROJECT_BINARY_DIR}/tests)
 # The ALU, shift, logic, set and LUI files, 100 cases each.
 set(vectors_alu ADDIU,ADDU,AND,ANDI,LUI,NOR,OR,ORI,SLL,SLLV,SLT,SLTI,SLTIU,SLTU,SRA,SRAV,SRL,SRLV,SUBU,XOR,XORI)
+# The exception entry's files, added one by one as the executor decodes them.
+set(vectors_exc SYSCALL)
 
 # Fault prevented: an instruction whose result, bus cycles or delay latches
 # differ from the public vectors. The count is the zero-case guard: a run that
 # replayed fewer cases than expected fails.
 schway_add_test(NAME vectors.r3000.sample
-  COMMAND schwaystation-test-vectors ${vectors_sample} --only ${vectors_alu} --expect 2100
+  COMMAND schwaystation-test-vectors ${vectors_sample} --only ${vectors_alu},${vectors_exc} --expect 2200
     --allow ${vectors_dir}/allow.txt
   LABELS portable vectors TIMEOUT 60)
 
