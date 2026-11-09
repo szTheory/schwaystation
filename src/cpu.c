@@ -13,6 +13,9 @@ static const char name_load_value[] = "cpu.load_value";
 static const char name_branch_slot[] = "cpu.branch_slot";
 static const char name_branch_take[] = "cpu.branch_take";
 static const char name_branch_target[] = "cpu.branch_target";
+static const char name_exc_epc[] = "cpu.exc_epc";
+static const char name_exc_code[] = "cpu.exc_code";
+static const char name_exc_repeat[] = "cpu.exc_repeat";
 
 /* General registers, HI and LO are 0 and the program counter is the BIOS
    entry: the machine starts at BFC00000h (ARCHITECTURE section 7,
@@ -29,6 +32,9 @@ void schway__cpu_reset(schway *inst)
     c->branch_slot = 0u;
     c->branch_take = 0u;
     c->branch_target = 0u;
+    c->exc_epc = 0u;
+    c->exc_code = 0u;
+    c->exc_repeat = 0u;
     c->log = NULL;
     schway__cop0_reset(inst);
 }
@@ -46,6 +52,9 @@ void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u32(io, name_branch_slot, &c->branch_slot, 0u, 1u);
     (void)schway__state_u32(io, name_branch_take, &c->branch_take, 0u, 1u);
     (void)schway__state_u32(io, name_branch_target, &c->branch_target, 0u, UINT32_MAX);
+    (void)schway__state_u32(io, name_exc_epc, &c->exc_epc, 0u, UINT32_MAX);
+    (void)schway__state_u32(io, name_exc_code, &c->exc_code, 0u, 31u);
+    (void)schway__state_u32(io, name_exc_repeat, &c->exc_repeat, 0u, UINT32_MAX);
 }
 
 #include "cpu_exec.inc"

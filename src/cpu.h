@@ -45,6 +45,19 @@ enum {
     SCHWAY__EXC_OVF = 0x0C
 };
 
+/* SR bits the executor reads (PSX-SYSTEM section 2, SR bits): KUc, the
+   current mode (1 is user), BEV and the coprocessor usable bits CU0 to CU3. */
+#define SCHWAY__SR_KUC 0x00000002u
+#define SCHWAY__SR_BEV 0x00400000u
+#define SCHWAY__SR_CU0 0x10000000u
+#define SCHWAY__SR_CU1 0x20000000u
+#define SCHWAY__SR_CU2 0x40000000u
+#define SCHWAY__SR_CU3 0x80000000u
+
+/* The same ExcCode taken this many times in a row at one EPC is an exception
+   loop, a first fault (ARCHITECTURE section 6). */
+#define SCHWAY__EXC_LOOP_LIMIT 1000u
+
 /* COP0 registers, indexed by register number. */
 struct schway__cop0 {
     uint32_t r[32];
@@ -90,6 +103,7 @@ struct schway__cpu {
     struct schway__cop0 cop0;
     uint32_t load_reg, load_value;
     uint32_t branch_slot, branch_take, branch_target;
+    uint32_t exc_epc, exc_code, exc_repeat;
     struct schway__cpu_log *log;
 };
 
@@ -107,6 +121,14 @@ void schway__cop0_reset(schway *inst);
 void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t in_delay,
                             uint32_t taken, uint32_t target, uint32_t badvaddr,
                             uint32_t has_badvaddr, uint32_t ce);
+
+/* MFC0 and MTC0 on COP0 register rd. Each returns 1, or 0 when rd is one of
+   the numbers that raise a reserved instruction exception (0-2, 4 and 10).
+   MFC0 stores the value read; the caller issues it through the load delay.
+   RFE pops the KU/IE stack (PSX-SYSTEM section 2, COP0 registers). */
+uint32_t schway__cop0_mfc0(schway *inst, uint32_t rd, uint32_t *value);
+uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value);
+void schway__cop0_rfe(schway *inst);
 
 /* The cpu and cop0 fields of the state walk (state.h). */
 void schway__cpu_state_io(struct schway__state_io *io, schway *inst);
