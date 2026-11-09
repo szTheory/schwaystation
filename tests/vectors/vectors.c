@@ -250,6 +250,52 @@ static uint32_t parse_container(size_t n)
     return count;
 }
 
+/* The next space-separated word of *p, cut off with a NUL, or NULL at the end
+   of the line. */
+static char *next_word(char **p)
+{
+    char *w = *p;
+    while (*w == ' ' || *w == '\t' || *w == '\r') {
+        w++;
+    }
+    if (*w == '\0') {
+        return NULL;
+    }
+    char *e = w;
+    while (*e != '\0' && *e != ' ' && *e != '\t' && *e != '\r') {
+        e++;
+    }
+    if (*e != '\0') {
+        *e++ = '\0';
+    }
+    *p = e;
+    return w;
+}
+
+/* One allow line: a date, a file name, a case and an https URL, nothing else. */
+static int parse_allow_line(char *line, struct allowed *out)
+{
+    char *date = next_word(&line);
+    char *file = next_word(&line);
+    char *hex = next_word(&line);
+    char *url = next_word(&line);
+    if (url == NULL || next_word(&line) != NULL || strlen(date) != 10u ||
+        strlen(file) > SLICE_NAME_BYTES || strlen(hex) >= sizeof out->hex ||
+        strncmp(url, "https://", 8u) != 0) {
+        return 0;
+    }
+    for (uint32_t i = 0; i < 10u; i++) {
+        int digit = date[i] >= '0' && date[i] <= '9';
+        if (i == 4u || i == 7u ? date[i] != '-' : !digit) {
+            return 0;
+        }
+    }
+    memcpy(out->file, file, strlen(file) + 1u);
+    memcpy(out->hex, hex, strlen(hex) + 1u);
+    out->used = 0;
+    return 1;
+}
+
 /* The dated lines of allow.txt: YYYY-MM-DD <file> <case-hex> <issue URL>. */
 static void load_allow(const char *name)
 {
@@ -265,26 +311,17 @@ static void load_allow(const char *name)
         while (*eol != '\0' && *eol != '\n') {
             eol++;
         }
-        char next_is_end = *eol == '\0';
+        int last = *eol == '\0';
         *eol = '\0';
         if (line[0] != '#' && line[0] != '\0') {
-            char date[16], file[SLICE_NAME_BYTES + 1u], hex[16], url[128], extra[2];
-            int got = sscanf(line, "%10s %16s %15s %127s %1s", date, file, hex, url, extra);
-            int ok = got == 4 && strlen(date) == 10u && url[0] == 'h' && url[1] == 't' &&
-                     url[2] == 't' && url[3] == 'p' && url[4] == 's' && url[5] == ':';
-            for (uint32_t i = 0; ok && i < 10u; i++) {
-                ok = (i == 4u || i == 7u) ? date[i] == '-' : (date[i] >= '0' && date[i] <= '9');
-            }
-            if (!ok || allow_n == MAX_LISTED) {
-                fprintf(stderr, "vectors: %s: bad line: %s\n", name, line);
+            if (allow_n == MAX_LISTED || !parse_allow_line(line, &allow[allow_n])) {
+                fprintf(stderr, "vectors: %s: bad line\n", name);
                 free(text);
                 finish(1);
             }
-            memcpy(allow[allow_n].file, file, sizeof file);
-            memcpy(allow[allow_n].hex, hex, sizeof hex);
             allow_n++;
         }
-        line = next_is_end ? eol : eol + 1;
+        line = last ? eol : eol + 1;
     }
     free(text);
 }
