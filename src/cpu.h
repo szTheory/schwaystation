@@ -46,8 +46,10 @@ enum {
 };
 
 /* SR bits the executor reads (PSX-SYSTEM section 2, SR bits): KUc, the
-   current mode (1 is user), BEV and the coprocessor usable bits CU0 to CU3. */
+   current mode (1 is user), Isc, which isolates the cache, BEV and the
+   coprocessor usable bits CU0 to CU3. */
 #define SCHWAY__SR_KUC 0x00000002u
+#define SCHWAY__SR_ISC 0x00010000u
 #define SCHWAY__SR_BEV 0x00400000u
 #define SCHWAY__SR_CU0 0x10000000u
 #define SCHWAY__SR_CU1 0x20000000u
@@ -97,6 +99,13 @@ struct schway__cpu_log {
    valid bit per word (PSX-SYSTEM section 2, I-cache). */
 #define SCHWAY__ICACHE_LINES 256u
 
+/* The write queue holds 4 stores; a fifth waits for one to leave. Each queued
+   store is charged this many cycles when it leaves, an estimate: no published
+   figure gives the drain rate (PSX-SYSTEM section 2, Cache isolation, write
+   queue). */
+#define SCHWAY__WQ_DEPTH 4u
+#define SCHWAY__WQ_DRAIN_CYCLES 4u
+
 /* The CPU: 32 general registers (r[0] is the zero register), HI and LO, the
    program counter, COP0 and the two delay latches. The next program counter
    is not stored: it is branch_target while a taken branch is pending and
@@ -109,7 +118,9 @@ struct schway__cpu_log {
    running multiply or divide has produced HI and LO, 0 when none is running.
    The 64-bit fields come first so the layout does not depend on the
    target's alignment of them. icache_tag, icache_word and icache_valid are
-   the instruction cache. The log pointer is not state. */
+   the instruction cache and wq_count the stores still in the write queue; the
+   queue is a count, because every store reaches the bus at once and only the
+   cost of waiting is modelled. The log pointer is not state. */
 struct schway__cpu {
     uint64_t muldiv_ready;
     uint64_t cycle;
@@ -120,6 +131,7 @@ struct schway__cpu {
     uint32_t load_reg, load_value;
     uint32_t branch_slot, branch_take, branch_target;
     uint32_t exc_epc, exc_code, exc_repeat;
+    uint32_t wq_count;
     uint32_t icache_tag[SCHWAY__ICACHE_LINES];
     uint32_t icache_word[SCHWAY__ICACHE_LINES][4];
     uint8_t icache_valid[SCHWAY__ICACHE_LINES];

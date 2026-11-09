@@ -24,12 +24,38 @@ static uint32_t cpu_log_access(struct schway__cpu_log *log, uint32_t kind, uint3
     return value;
 }
 
+/* A KSEG1 access, data or instruction, waits for the write queue to empty
+   first, so uncached memory and devices see the stores in order: each store
+   still queued is charged its drain, and an empty queue adds nothing (PSX-SYSTEM
+   section 2, Cache isolation, write queue). */
+static void cpu_wq_drain(struct schway__cpu *c, uint32_t *cycles)
+{
+    *cycles += c->wq_count * SCHWAY__WQ_DRAIN_CYCLES;
+    c->wq_count = 0u;
+}
+
+/* A store that reached the bus joins the write queue, unless it went to the
+   scratchpad, which is not behind the queue. A fifth store waits for the oldest
+   to leave, which costs one drain, and the queue stays full. The data is
+   already on the bus, so only the wait is modelled. */
+static void cpu_wq_push(struct schway__cpu *c, uint32_t addr, uint32_t *cycles)
+{
+    if ((addr & 0x1FFFFC00u) == 0x1F800000u) {
+        return;
+    }
+    if (c->wq_count >= SCHWAY__WQ_DEPTH) {
+        *cycles += SCHWAY__WQ_DRAIN_CYCLES;
+    } else {
+        c->wq_count++;
+    }
+}
+
 /* The instruction fetch front-end. With a log attached it replays it, with no
-   cache. Without one, a fetch in KUSEG or KSEG0 goes through the instruction
-   cache, except in the BIOS window, which is never cached; any other fetch
-   reaches the bus. The bus decodes the segment of the virtual address
-   (PSX-SYSTEM section 2, Segments and I-cache; section 3, C4), and its charge
-   adds to *cycles. A bus error reads as zero. */
+   cache and no queue. Without one, a fetch in KUSEG or KSEG0 goes through the
+   instruction cache, except in the BIOS window, which is never cached; a fetch
+   in KSEG1 drains the write queue and reaches the bus. The bus decodes the
+   segment of the virtual address (PSX-SYSTEM section 2, Segments and I-cache;
+   section 3, C4), and its charge adds to *cycles. A bus error reads as zero. */
 static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles)
 {
     uint32_t word = 0u;
@@ -41,6 +67,9 @@ static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles)
         ((vaddr & 0x1FFFFFFFu) >> 19) != 0x3F8u) {
         (void)schway__cpu_icache_fetch(inst, vaddr, &word, cycles);
         return word;
+    }
+    if (seg == (uint32_t)SCHWAY__SEG_KSEG1) {
+        cpu_wq_drain(&inst->cpu, cycles);
     }
     (void)schway__bus_fetch(inst, vaddr, &word, cycles);
     return word;
@@ -148,20 +177,69 @@ static uint32_t cpu_data_check(schway *inst, uint32_t pc, uint32_t op, uint32_t 
     return 0u;
 }
 
+/* With SR.Isc set, a data access in KUSEG, KSEG0 or KSEG1 goes to the
+   instruction cache and never reaches the bus; KSEG2, the cache-control word,
+   still does. The line is the one address bits 11:4 name, the word bits 3:2
+   (PSX-SYSTEM section 2, Cache isolation, write queue; D-29). A load returns
+   that word's bytes whether or not the tag matches. A store writes the tag, the
+   physical address bits 31:12 of the datum, and sets the four valid bits to the
+   datum's low four bits when cache-control TAG (bit 2) and IS1 (bit 11) are both
+   set, and otherwise writes the bytes it covers into the word; that is how the
+   BIOS' FlushCache empties the cache. The bits of rt above the access width go
+   out too, as in any store, which is why a tag store reads the whole datum. */
+static uint32_t cpu_isolated(const schway *inst, uint32_t addr)
+{
+    return (inst->cpu.cop0.r[SCHWAY__COP0_SR] & SCHWAY__SR_ISC) != 0u &&
+                   schway__bus_segment(addr) != (uint32_t)SCHWAY__SEG_KSEG2
+               ? 1u
+               : 0u;
+}
+
+static uint32_t cpu_isolated_read(schway *inst, uint32_t addr, uint32_t size)
+{
+    uint32_t w = inst->cpu.icache_word[(addr >> 4) & 0xFFu][(addr >> 2) & 3u];
+    w >>= 8u * (addr & 3u);
+    return size == 4u ? w : w & ((1u << (8u * size)) - 1u);
+}
+
+static void cpu_isolated_write(schway *inst, uint32_t addr, uint32_t size, uint32_t value)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t line = (addr >> 4) & 0xFFu;
+    uint32_t ctrl = inst->bus.cache_ctrl;
+    if ((ctrl & 0x4u) != 0u && (ctrl & 0x800u) != 0u) {
+        c->icache_tag[line] = value >> 12;
+        c->icache_valid[line] = (uint8_t)(value & 0xFu);
+    } else {
+        uint32_t shift = 8u * (addr & 3u);
+        uint32_t mask = (size == 4u ? 0xFFFFFFFFu : (1u << (8u * size)) - 1u) << shift;
+        uint32_t *w = &c->icache_word[line][(addr >> 2) & 3u];
+        *w = (*w & ~mask) | ((value << shift) & mask);
+    }
+}
+
 /* One access on the bus with the address already checked: the virtual
    address goes to the bus, which decodes the segment (KSEG2 gets the full
-   address), and its charge adds to *cycles. A bus error is DBE and carries no
-   BadVaddr; the bus has already latched it as the first fault (PSX-SYSTEM
-   section 2, Address and bus errors). Returns 1 when it took the exception.
-   A read yields the low size bytes of the datum. */
+   address), and its charge adds to *cycles. A KSEG1 read drains the write queue
+   first. A bus error is DBE and carries no BadVaddr; the bus has already
+   latched it as the first fault (PSX-SYSTEM section 2, Address and bus errors).
+   Returns 1 when it took the exception. A read yields the low size bytes of the
+   datum. */
 static uint32_t cpu_bus_read(schway *inst, uint32_t pc, uint32_t addr, uint32_t size,
                              uint32_t *value, uint32_t *cycles)
 {
     uint32_t v = 0u;
     if (inst->cpu.log != NULL) {
         v = cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_READ, size, addr, 0u);
-    } else if (schway__bus_read(inst, addr, size, &v, cycles) != 0u) {
-        return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
+    } else if (cpu_isolated(inst, addr) != 0u) {
+        v = cpu_isolated_read(inst, addr, size);
+    } else {
+        if (schway__bus_segment(addr) == (uint32_t)SCHWAY__SEG_KSEG1) {
+            cpu_wq_drain(&inst->cpu, cycles);
+        }
+        if (schway__bus_read(inst, addr, size, &v, cycles) != 0u) {
+            return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
+        }
     }
     *value = size == 4u ? v : v & ((1u << (8u * size)) - 1u);
     return 0u;
@@ -181,13 +259,24 @@ static void cpu_load_issue(struct schway__cpu *c, uint32_t n, uint32_t v, uint32
     *load_value = v;
 }
 
+/* The store counterpart: replayed with a log, sent to the cache when isolated,
+   otherwise drained first when it is in KSEG1, written to the bus and then
+   queued. */
 static uint32_t cpu_bus_write(schway *inst, uint32_t pc, uint32_t addr, uint32_t size,
                               uint32_t value, uint32_t *cycles)
 {
     if (inst->cpu.log != NULL) {
         (void)cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_WRITE, size, addr, value);
-    } else if (schway__bus_write(inst, addr, size, value, cycles) != 0u) {
-        return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
+    } else if (cpu_isolated(inst, addr) != 0u) {
+        cpu_isolated_write(inst, addr, size, value);
+    } else {
+        if (schway__bus_segment(addr) == (uint32_t)SCHWAY__SEG_KSEG1) {
+            cpu_wq_drain(&inst->cpu, cycles);
+        }
+        if (schway__bus_write(inst, addr, size, value, cycles) != 0u) {
+            return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
+        }
+        cpu_wq_push(&inst->cpu, addr, cycles);
     }
     return 0u;
 }

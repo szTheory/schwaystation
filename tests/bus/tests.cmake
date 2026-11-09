@@ -80,3 +80,42 @@ schway_warnings(schwaystation-test-cache)
 schway_add_test(NAME bus.icache_fill
   COMMAND schwaystation-test-cache icache_fill
   LABELS bus portable TIMEOUT 10)
+
+# Fault prevented: a tag hit on an invalid word that does not refill, a fill that stops
+# short of the line's end for IBLKSZ, a store that clears a valid bit, or a bus error
+# in a later word that leaves a fault the CPU never asked for.
+schway_add_test(NAME bus.icache_valid_bits
+  COMMAND schwaystation-test-cache icache_valid_bits
+  LABELS bus portable TIMEOUT 10)
+
+# Fault prevented: an isolated access that reaches the bus, a load that depends on the
+# tag, a tag store that ignores TAG or IS1, a cache-control write that isolation
+# swallows, or a FlushCache sequence that leaves a line valid.
+schway_add_test(NAME bus.icache_isolation
+  COMMAND schwaystation-test-cache icache_isolation
+  LABELS bus portable TIMEOUT 10)
+
+# Fault prevented: a write queue deeper or shallower than four, a fifth store that
+# does not wait, a scratchpad or failed store that joins the queue, or a replayed
+# store that does.
+schway_add_test(NAME bus.write_queue_depth
+  COMMAND schwaystation-test-cache write_queue_depth
+  LABELS bus portable TIMEOUT 10)
+
+# Fault prevented: a KSEG1 read, write or fetch that leaves stores queued, a cached
+# read that drains them, a drain charged to an empty queue, or stores that land out of
+# order.
+schway_add_test(NAME bus.write_queue_drain
+  COMMAND schwaystation-test-cache write_queue_drain
+  LABELS bus portable TIMEOUT 10)
+
+# Fault prevented: an exception that drops, reorders or drains the queued stores.
+schway_add_test(NAME bus.write_queue_exception
+  COMMAND schwaystation-test-cache write_queue_exception
+  LABELS bus portable TIMEOUT 10)
+
+# Fault prevented: a saved state that loses the queue count or the cache, or a load
+# that restores them differently from the way they were saved.
+schway_add_test(NAME bus.write_queue_state
+  COMMAND schwaystation-test-cache write_queue_state
+  LABELS bus portable TIMEOUT 10)

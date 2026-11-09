@@ -2,6 +2,8 @@
 bus.bios_window	bus,portable
 bus.exp_regions	bus,portable
 bus.icache_fill	bus,portable
+bus.icache_isolation	bus,portable
+bus.icache_valid_bits	bus,portable
 bus.irq_cause_bit	bus,portable
 bus.irq_edge	bus,portable
 bus.irq_line	bus,portable
@@ -9,3 +11,7 @@ bus.kseg2	bus,portable
 bus.memctl_costs	bus,portable
 bus.ram_mirrors	bus,portable
 bus.scratchpad	bus,portable
+bus.write_queue_depth	bus,portable
+bus.write_queue_drain	bus,portable
+bus.write_queue_exception	bus,portable
+bus.write_queue_state	bus,portable
