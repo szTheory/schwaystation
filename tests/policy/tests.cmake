@@ -41,3 +41,27 @@ schway_add_test(NAME policy.pass_regex_status.self_test
 schway_add_test(NAME docs.budgets
   COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -P ${policy_scripts}/budgets.cmake
   LABELS policy TIMEOUT 10)
+
+# Fault prevented: a public name hosts cannot find in the embedding guide, or a
+# guide naming a removed name. The self test checks a copy of the header with one
+# more function and expects that function named as undocumented.
+schway_add_test(NAME docs.api_names
+  COMMAND ${CMAKE_COMMAND} -DHEADER=${PROJECT_SOURCE_DIR}/include/schwaystation.h
+    -DDOC=${PROJECT_SOURCE_DIR}/docs/embedding.md -P ${policy_scripts}/api_names.cmake
+  LABELS policy portable TIMEOUT 10)
+file(READ ${PROJECT_SOURCE_DIR}/include/schwaystation.h policy_header)
+string(REPLACE "void schway_destroy(schway *inst);"
+  "void schway_destroy(schway *inst);\nschway_status schway_not_documented(void);"
+  policy_header "${policy_header}")
+if(NOT policy_header MATCHES "schway_not_documented")
+  message(FATAL_ERROR "docs.api_names.self_test: the schway_destroy declaration moved")
+endif()
+file(WRITE ${PROJECT_BINARY_DIR}/policy/undocumented_name.h "${policy_header}")
+set(policy_cmd ${CMAKE_COMMAND} -DHEADER=${PROJECT_BINARY_DIR}/policy/undocumented_name.h
+  -DDOC=${PROJECT_SOURCE_DIR}/docs/embedding.md -P ${policy_scripts}/api_names.cmake)
+string(REPLACE ";" "$<SEMICOLON>" policy_cmd "${policy_cmd}")
+schway_add_test(NAME docs.api_names.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${policy_cmd}" -DCODE=1
+    "-DREGEX=api_names:.*undocumented.*schway_not_documented"
+    -P ${policy_scripts}/expect_fail.cmake
+  LABELS policy portable TIMEOUT 10)
