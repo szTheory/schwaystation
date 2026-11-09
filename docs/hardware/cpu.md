@@ -9,7 +9,8 @@ and behaves the same on every platform. Facts come from the psx-spx CPU Specific
 This page covers what is implemented so far: the registers, the decode fields, the arithmetic, logic, shift,
 set-on-less-than and load-upper-immediate class, the trapping adds, branches and jumps, loads and stores, multiply and
 divide, COP2 before the GTE, the two delay latches and the vector tests. COP0 and the exception entry are on their own
-page, [cop0.md](cop0.md). The caches are added to this page as they land.
+page, [cop0.md](cop0.md). The instruction cache and the write queue are on the bus page, [bus.md](bus.md); the part of the
+fetch that touches them is described here.
 
 ## Registers
 
@@ -94,6 +95,22 @@ the address after the delay slot. The latch is always set by a branch, taken or 
 A target that is not a multiple of 4 is an address error when it is fetched (PSX-SYSTEM section 2, Branch delay; the
 exception rules are in [cop0.md](cop0.md)).
 
+## Instruction fetch
+
+Each instruction is fetched at the program counter before it is decoded. A program counter that is not a multiple of 4 is
+an address error on the fetch (see Branches and jumps). Otherwise the fetch goes one of three ways, by segment
+(PSX-SYSTEM section 2, Segments and I-cache):
+
+- In KUSEG or KSEG0 it goes through the instruction cache, a hit costing nothing beyond the instruction's own cycle and
+  a miss filling the line from the missed word to its end.
+- In the BIOS window, in any segment, it bypasses the cache and goes to the bus.
+- In KSEG1 it first drains the write queue and then goes to the bus; KSEG2 is not executable and the bus refuses it.
+
+A bus error on a fetch reads as the word 0, a no-operation, and the bus records the first fault. The scratchpad is data
+only, so a fetch from it is that same bus error. With a replay log attached, as in the vector tests, the fetch is the next
+recorded cycle and no cache or queue is used. The cache's rules, the isolation that SR.Isc turns on and the queue are in
+[bus.md](bus.md).
+
 ## Loads and stores
 
 Every load and store goes through the data access front-end before it reaches the bus, in this order:
@@ -104,8 +121,11 @@ Every load and store goes through the data access front-end before it reaches th
    `LWL`, `LWR`, `SWL` and `SWR` never fault on alignment.
 2. **Segment.** In user mode (SR.KUc = 1) only KUSEG, the addresses below `80000000h`, may be touched; any other
    address raises the same address error. A handler may take it, so it records no first fault.
-3. **The bus.** The virtual address goes to the bus, which decodes the segment and maps it (KSEG2 gets the full
-   address, because only the cache-control word answers there). The bus charges its wait cycles to the instruction. A
+3. **The bus.** With SR.Isc set, a KUSEG, KSEG0 or KSEG1 access goes to the instruction cache instead and never reaches
+   the bus (see [bus.md](bus.md)). Otherwise a KSEG1 access first drains the write queue, and then the virtual address
+   goes to the bus, which decodes the segment and maps it (KSEG2 gets the full
+   address, because only the cache-control word answers there). The bus charges its wait cycles to the instruction, and
+   a store that landed joins the write queue. A
    bus error, an address no device answers, raises DBE (07h); it sets no BadVaddr, and the bus records the first
    fault (PSX-SYSTEM section 2, Address and bus errors and Segments).
 

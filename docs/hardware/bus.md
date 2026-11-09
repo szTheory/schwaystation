@@ -5,8 +5,9 @@ the address, what the access costs and whether it is an error. The interrupt reg
 it in `src/irq.c`. Everything is integer arithmetic and behaves the same on every platform. Facts come from the psx-spx
 Memory Map and Memory Control pages and from sections 2, 3 and 6 of `.planning/preparation/PSX-SYSTEM.md`, which also
 names the sources they were checked against; the cost model is in section 2 of `.planning/preparation/ARCHITECTURE.md`.
-This page covers decode, memory control and costs, devices not built yet, gaps, the debug ports and the interrupt
-registers. The instruction cache and the write queue are added when they land.
+This page covers decode, memory control and costs, devices not built yet, gaps, the debug ports, the instruction cache,
+the write queue and the interrupt registers. The cache and the queue sit between the CPU and the bus, in
+`src/cpu.c` and `src/cpu_exec.inc`, and the bus itself knows nothing of them.
 
 ## Segments and the physical map
 
@@ -14,7 +15,8 @@ The CPU hands the bus the virtual address. The top three bits pick the segment (
 are KUSEG, 4 is KSEG0, 5 is KSEG1 and 6 and 7 are KSEG2. KUSEG, KSEG0 and KSEG1 all map to the physical address
 `addr & 1FFFFFFFh`, so a KUSEG address above 512 MiB lands on the same device as the one below it. KSEG2 answers only
 `FFFE0130h`, the cache-control word, by word reads and writes; every other KSEG2 address is a bus error. The bus keeps
-the word in `cache_ctrl` and gives it no further meaning yet.
+the word in `cache_ctrl`. The CPU reads two of its bits, TAG (bit 2) and IS1 (bit 11), for cache isolation, below; no
+other bit has a meaning here.
 
 | Physical range | Answers |
 |---|---|
@@ -139,6 +141,70 @@ naming it, because nothing is plugged in; a write is dropped and costs the port'
 Both ports act only while the profile's debug-port flag is set, and only for a byte write; a wider write, or any
 access with the flag clear, answers and does nothing. A read returns 0. A retail profile leaves the flag clear. The
 TTY ring holds 4 KiB, and a byte that does not fit is dropped and counted.
+
+## Instruction cache
+
+The I-cache is 4 KiB, direct mapped: 256 lines of 4 words (PSX-SYSTEM section 2, I-cache; psx-spx Memory Map). Address
+bits 11:4 pick the line and bits 3:2 the word. A line holds a tag, the physical address bits 31:12, and one valid bit
+per word. `src/cpu.c` keeps the tags, the words and the valid bits in the CPU state, so a saved state restores them and
+a power reset empties them: every line starts invalid.
+
+- **Which fetches use it.** A fetch in KUSEG or KSEG0 does, except in the BIOS window (`1FC00000h`-`1FC7FFFFh`), which is
+  never cached. A fetch in KSEG1 bypasses it and neither reads nor changes a line. Only fetches are cached; a load
+  never fills a line. Cache control's enable bits are not modelled, so the cache is always on.
+- **A hit** returns the word held and costs nothing beyond the instruction's own cycle.
+- **A miss** is a fetch whose tag differs from the line's, or whose word is not valid. The line is filled from the missed
+  word to its last word. On another tag the line is taken over and only the filled words are valid; on the same tag the
+  words already valid stay valid. The psx-spx page says a tag hit on an invalid word refills the whole line; the model
+  refills from the missed word on, which gives the same words for the next fetch of a straight-line run.
+  IBLKSZ (bits 8 and 9 of cache control) is ignored: psx-spx says IBLKSZ = 0 cuts a fill to two words, and the model
+  always fills to the line's end.
+- **Fill cost.** The missed word costs what the bus charges for it, a RAM read being 5 cycles, and each further word one
+  more cycle, the burst rate of RAM (4 cycles plus one per word; ARCHITECTURE section 2, Costs). That is an
+  approximation for any other device.
+- **Stores never invalidate.** A store to RAM leaves the line as it is, so code that rewrites itself runs the old words
+  until the line is refilled; a program flushes the cache first (PSX-SYSTEM section 2).
+- **A bus error** on the missed word leaves the line as it was and is the first fault. A bus error on a word after it
+  ends the fill there, leaves those words invalid and records no fault, because the CPU never asked for them.
+- **The vector tests** replay each instruction against a recorded bus with no cache and no queue; see
+  [cpu.md](cpu.md).
+
+**Isolation.** While SR.Isc (bit 16) is set, a load or store in KUSEG, KSEG0 or KSEG1 goes to the cache and never reaches
+the bus, whichever segment it names; the cache-control word in KSEG2 still does, so the BIOS can restore it. The line is
+the one address bits 11:4 name and the word bits 3:2 (PSX-SYSTEM section 2, Cache isolation, write queue).
+
+- A load returns the bytes it covers of that word, whether or not the tag matches.
+- A store writes the bytes it covers into the word, unless cache control has both TAG (bit 2) and IS1 (bit 11) set. Then it
+  writes the line's tag, the datum's bits 31:12, and sets the four valid bits to the datum's low four bits. The BIOS'
+  FlushCache does exactly this: it sets cache control to `0804h`, isolates the cache, stores 0 to each of the 256 lines
+  and restores SR and cache control, which leaves every line invalid. `bus.icache_isolation` runs that sequence.
+- The sources add that, with TAG clear, an isolated access reaches the scratchpad instead. The model does not do that:
+  every isolated access goes to the instruction-cache arrays.
+
+## Write queue
+
+The CPU can hold 4 stores in flight, and a fifth waits until one has gone (PSX-SYSTEM section 2, Cache isolation, write
+queue; psx-spx Memory Map). The model keeps a count of them, `wq_count`, 0 to 4, in the CPU state. Every store reaches the
+bus at once and lands in order, so the queue never changes what a store does, only what it costs.
+
+- A store that reaches the bus joins the queue. A store to the scratchpad does not: it is not behind the queue.
+- With 4 queued, the next store waits for the oldest to leave, which costs one drain, and the queue stays at 4.
+- Any access in KSEG1, a load, a store or a fetch, first drains the whole queue, so uncached memory and devices see the
+  stores before it. Each store still queued costs one drain, and an empty queue costs nothing. A cached read leaves the
+  queue alone.
+- An exception does not touch it, and neither does the instruction after. The queue empties only through the rules
+  above, never by time passing.
+- The vector tests bypass it: with a replay log attached each store's bus cycle is emitted at its issue point, in the
+  upstream order, and the count does not change.
+
+A drain costs 4 cycles. That figure is an estimate: no source gives the drain rate, and ares charges a RAM write 1 cycle
+with an unbounded queue (PSX-SYSTEM section 3, C4). Stall timing is therefore documented and not pinned: the tests assert
+the depth, the order and the drain, and that a wait costs more than none, never the cycles of a wait. Retiring a queued
+store as time passes is not modelled, so a long run of stores to cached RAM pays for the wait on each store after the
+fourth until a KSEG1 access drains it; a measurement against hardware would settle a better rule.
+
+`bus.write_queue_depth`, `bus.write_queue_drain`, `bus.write_queue_exception` and `bus.write_queue_state` pin these
+rules, and `bus.icache_fill`, `bus.icache_valid_bits` and `bus.icache_isolation` the cache.
 
 ## Interrupt registers
 
