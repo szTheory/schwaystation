@@ -9,13 +9,17 @@ void schway__irq_reset(schway *inst)
 
 /* CAUSE bit 10 is the live level: the CPU sees it as the line, at the write or
    raise that changes it and with no delay (PSX-SYSTEM section 6).
-   CAUSE bits 8-9 are software latches and stay as they are. */
+   CAUSE bits 8-9 are software latches and stay as they are. When the change
+   makes the CPU's interrupt line true the retirement stamp is armed, so the
+   interrupt is taken two retirements later (PSX-SYSTEM section 6). */
 #define CAUSE_IP2 (UINT32_C(1) << 10)
 
 static void irq_sync(schway *inst)
 {
     uint32_t *cause = &inst->cpu.cop0.r[SCHWAY__COP0_CAUSE];
+    uint32_t was = schway__cop0_irq_pending(inst);
     *cause = (*cause & ~CAUSE_IP2) | (schway__irq_line(inst) != 0u ? CAUSE_IP2 : 0u);
+    schway__cop0_irq_edge(inst, was, SCHWAY__IRQ_LATENCY_EDGE);
 }
 
 /* Interrupt sources 0-10 each latch one I_STAT bit, on the 0 to 1 edge of

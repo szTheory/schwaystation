@@ -115,16 +115,74 @@ static void cpu_branch_set(struct cpu_branch *b, uint32_t take, uint32_t target)
     b->target = target;
 }
 
+/* Takes the interrupt before the instruction at pc, ExcCode 0. The load issued
+   by the instruction before lands first, so the handler sees it (PSX-SYSTEM
+   section 2, Load delay). Interrupts return to EPC + 0: the instruction at pc,
+   or the branch before it when pc is a delay slot, which the entry records as
+   BD with TAR the branch's destination (PSX-SYSTEM section 2, EPC). The entry
+   calls the one hook for the GTE with the word at EPC, read without charge and
+   without a first fault; with a replay log attached there is no memory to read
+   and the word is 0. The stores in the write queue stay queued: the first KSEG1
+   access after the entry drains them. */
+static void cpu_irq_enter(schway *inst, uint32_t pc)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t slot = c->branch_slot;
+    uint32_t take = c->branch_take;
+    uint32_t epc = slot != 0u ? pc - 4u : pc;
+    uint32_t target = take != 0u ? c->branch_target : pc + 4u;
+    uint32_t word = 0u;
+    if (c->load_reg != SCHWAY__CPU_NO_LOAD) {
+        if (c->load_reg != 0u) {
+            c->r[c->load_reg] = c->load_value;
+        }
+        c->load_reg = SCHWAY__CPU_NO_LOAD;
+        c->load_value = 0u;
+    }
+    if (c->log == NULL) {
+        struct schway__fault held = inst->fault;
+        uint32_t sink = 0u;
+        (void)schway__bus_fetch(inst, epc & ~3u, &word, &sink);
+        inst->fault = held;
+    }
+    schway__cop0_exception(inst, SCHWAY__EXC_INT, epc, slot, take, target, 0u, 0u, 0u);
+    (void)schway__cop0_irq_entry_cop2(inst, word);
+}
+
+/* Whether an exception of this code, raised by the instruction at pc, ranks
+   below an interrupt that is due on the same instruction. The order is data
+   AdEL, AdES and DBE, overflow, interrupt, then SYSCALL, BREAK, RI and CpU,
+   then the fetch's AdEL and IBE (PSX-SYSTEM section 2, Priority). A data AdEL
+   has an aligned pc; the fetch's has an odd one. */
+static uint32_t cpu_below_interrupt(uint32_t code, uint32_t pc)
+{
+    return code == (uint32_t)SCHWAY__EXC_SYS || code == (uint32_t)SCHWAY__EXC_BP ||
+                   code == (uint32_t)SCHWAY__EXC_RI || code == (uint32_t)SCHWAY__EXC_CPU ||
+                   code == (uint32_t)SCHWAY__EXC_IBE ||
+                   (code == (uint32_t)SCHWAY__EXC_ADEL && (pc & 3u) != 0u)
+               ? 1u
+               : 0u;
+}
+
 /* Takes an exception for the instruction at pc. A delay-slot instruction
    returns to the branch before it, and its TAR is where the branch goes, or
    the instruction after the slot when it was not taken (PSX-SYSTEM section 2,
    EPC and Branch delay). Returns 1 so the caller can note that the program
-   counter now holds the vector. */
+   counter now holds the vector. An interrupt that is due on this very
+   instruction wins over the exceptions that rank below it: it is taken at pc and
+   the instruction runs again after the return. The ones that rank above it
+   (data address errors, bus errors on data, overflow) are taken, and the
+   interrupt waits for the return from exception. */
 static uint32_t cpu_exception(schway *inst, uint32_t pc, uint32_t code, uint32_t ce,
                               uint32_t has_badvaddr, uint32_t badvaddr)
 {
     struct schway__cpu *c = &inst->cpu;
     uint32_t slot = c->branch_slot;
+    if (c->irq_stamp == 1u && schway__cop0_irq_pending(inst) != 0u &&
+        cpu_below_interrupt(code, pc) != 0u) {
+        cpu_irq_enter(inst, pc);
+        return 1u;
+    }
     uint32_t take = c->branch_take;
     uint32_t target = take != 0u ? c->branch_target : pc + 4u;
     schway__cop0_exception(inst, code, slot != 0u ? pc - 4u : pc, slot, take, target, badvaddr,
@@ -813,6 +871,15 @@ static uint32_t cpu_step(schway *inst)
         c->pc = next;
     }
     c->cycle += cycles;
+    /* The retirement stamp: this instruction retired, so one retirement of the
+       latency is counted, and at the last one the interrupt is taken if the line
+       is still true. It is taken before the next instruction runs. */
+    if (c->irq_stamp != 0u) {
+        c->irq_stamp--;
+        if (c->irq_stamp == 0u && schway__cop0_irq_pending(inst) != 0u) {
+            cpu_irq_enter(inst, c->pc);
+        }
+    }
     return cycles;
 }
 

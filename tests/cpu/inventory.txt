@@ -16,3 +16,4 @@ cpu.cop0.rfe	cpu,portable
 cpu.cop0.sr_mask	cpu,portable
 cpu.cop2_prephase.cu2_clear	cpu,portable
 cpu.cop2_prephase.cu2_set	cpu,portable
+cpu.exception.irq_latency_device	cpu,portable

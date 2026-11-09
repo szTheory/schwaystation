@@ -138,7 +138,10 @@ struct schway__cpu_log {
    target's alignment of them. icache_tag, icache_word and icache_valid are
    the instruction cache and wq_count the stores still in the write queue; the
    queue is a count, because every store reaches the bus at once and only the
-   cost of waiting is modelled. block_end and the log pointer are not state:
+   cost of waiting is modelled. irq_stamp is the interrupt's retirement stamp:
+   0 while none is armed, otherwise the retirements still to count before it is
+   taken (see the Interrupts section of docs/hardware/cop0.md). block_end and
+   the log pointer are not state:
    block_end holds the SCHWAY__BLOCK_* reasons of the block in progress. */
 struct schway__cpu {
     uint64_t muldiv_ready;
@@ -151,6 +154,7 @@ struct schway__cpu {
     uint32_t branch_slot, branch_take, branch_target;
     uint32_t exc_epc, exc_code, exc_repeat;
     uint32_t wq_count;
+    uint32_t irq_stamp;
     uint32_t icache_tag[SCHWAY__ICACHE_LINES];
     uint32_t icache_word[SCHWAY__ICACHE_LINES][4];
     uint8_t icache_valid[SCHWAY__ICACHE_LINES];
@@ -172,6 +176,29 @@ void schway__cop0_reset(schway *inst);
 void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t in_delay,
                             uint32_t taken, uint32_t target, uint32_t badvaddr,
                             uint32_t has_badvaddr, uint32_t ce);
+
+/* The interrupt line the CPU takes: any of CAUSE bits 8-15 whose SR bit 8-15
+   mask is set, with SR.IEc set (PSX-SYSTEM section 2, SR bits and CAUSE bits;
+   section 6). Returns 1 or 0. It reads the registers and arms nothing. */
+uint32_t schway__cop0_irq_pending(const schway *inst);
+
+/* Retirements from the change to the entry, counting the instruction that
+   made the change when the CPU made it: a device edge, an I_MASK write or an
+   SR write is taken after two, a CAUSE write or an RFE after one. An inference
+   from the published behaviour, unmeasured on silicon (PSX-SYSTEM section 6). */
+#define SCHWAY__IRQ_LATENCY_EDGE 2u
+#define SCHWAY__IRQ_LATENCY_NEXT 1u
+
+/* Called after a write that may change what schway__cop0_irq_pending reports;
+   was is its value before the write. A false-to-true change arms the retirement
+   stamp with latency, and a true-to-false one disarms it; nothing else does. */
+void schway__cop0_irq_edge(schway *inst, uint32_t was, uint32_t latency);
+
+/* The interrupt entry's one hook for the GTE: word is the instruction at the
+   EPC the entry just stored. Returns 1 when it is a COP2 command word and does
+   nothing else; the GTE plan executes the command there (PSX-SYSTEM section 2,
+   GTE in a delay slot of an interrupt). */
+uint32_t schway__cop0_irq_entry_cop2(schway *inst, uint32_t word);
 
 /* MFC0 and MTC0 on COP0 register rd. Each returns 1, or 0 when rd is one of
    the numbers that raise a reserved instruction exception (0-2, 4 and 10).

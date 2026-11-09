@@ -47,6 +47,8 @@ void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t 
     c->branch_slot = 0u;
     c->branch_take = 0u;
     c->branch_target = 0u;
+    /* The entry clears IEc, so nothing is pending: the stamp is dropped. */
+    c->irq_stamp = 0u;
     c->block_end |= SCHWAY__BLOCK_EVENT;
     c->pc = (sr & SCHWAY__SR_BEV) != 0u ? SCHWAY__VECTOR_BEV : SCHWAY__VECTOR_RAM;
 
@@ -71,6 +73,42 @@ void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t 
             inst->fault.note = c->exc_repeat;
         }
     }
+}
+
+/* The interrupt line the CPU takes: a CAUSE bit in 8-15 (the two software
+   bits and the hardware line at bit 10) whose SR mask bit is set, with IEc set
+   (PSX-SYSTEM section 2, SR bits; section 6). */
+uint32_t schway__cop0_irq_pending(const schway *inst)
+{
+    const uint32_t *r = inst->cpu.cop0.r;
+    return (r[SCHWAY__COP0_SR] & 1u) != 0u &&
+                   (r[SCHWAY__COP0_CAUSE] & r[SCHWAY__COP0_SR] & 0xFF00u) != 0u
+               ? 1u
+               : 0u;
+}
+
+/* The stamp is set on the false-to-true change of the line and nowhere else,
+   so a read of CAUSE or SR never arms an interrupt. A change to false takes the
+   interrupt back (PSX-SYSTEM section 6). */
+void schway__cop0_irq_edge(schway *inst, uint32_t was, uint32_t latency)
+{
+    if (schway__cop0_irq_pending(inst) == 0u) {
+        inst->cpu.irq_stamp = 0u;
+    } else if (was == 0u) {
+        inst->cpu.irq_stamp = latency;
+    }
+}
+
+/* The interrupt entry's hook for the GTE. On the console an interrupt taken
+   while the next instruction is a GTE command lets that command execute, and it
+   executes again after the return, because EPC names it (PSX-SYSTEM section 2,
+   GTE in a delay slot of an interrupt). The GTE does not exist yet, so the hook
+   only reports the command word; the plan that builds the GTE executes the
+   command here, once, before the handler's first instruction. */
+uint32_t schway__cop0_irq_entry_cop2(schway *inst, uint32_t word)
+{
+    (void)inst;
+    return (word >> 25) == 0x25u ? 1u : 0u;
 }
 
 /* SR writes keep the bits the CPU has: the coprocessor-usable bits, BEV, the
@@ -105,6 +143,7 @@ uint32_t schway__cop0_mfc0(schway *inst, uint32_t rd, uint32_t *value)
 uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value)
 {
     uint32_t *r = inst->cpu.cop0.r;
+    uint32_t was = schway__cop0_irq_pending(inst);
     if (cop0_missing(rd) != 0u) {
         return 0u;
     }
@@ -121,9 +160,11 @@ uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value)
         break;
     case SCHWAY__COP0_SR:
         r[rd] = value & SR_WRITABLE;
+        schway__cop0_irq_edge(inst, was, SCHWAY__IRQ_LATENCY_EDGE);
         break;
     case SCHWAY__COP0_CAUSE:
         r[rd] = (r[rd] & ~CAUSE_SOFTWARE) | (value & CAUSE_SOFTWARE);
+        schway__cop0_irq_edge(inst, was, SCHWAY__IRQ_LATENCY_NEXT);
         break;
     default:
         break;
@@ -137,6 +178,10 @@ uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value)
 void schway__cop0_rfe(schway *inst)
 {
     uint32_t *r = inst->cpu.cop0.r;
+    uint32_t was = schway__cop0_irq_pending(inst);
     inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
     r[SCHWAY__COP0_SR] = (r[SCHWAY__COP0_SR] & ~0xFu) | ((r[SCHWAY__COP0_SR] >> 2) & 0xFu);
+    /* The restored IEc is looked at at once: a line that was held off by the
+       handler's mode is taken after this instruction (PSX-SYSTEM section 6). */
+    schway__cop0_irq_edge(inst, was, SCHWAY__IRQ_LATENCY_NEXT);
 }

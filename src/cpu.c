@@ -19,6 +19,7 @@ static const char name_exc_repeat[] = "cpu.exc_repeat";
 static const char name_muldiv_ready[] = "cpu.muldiv_ready";
 static const char name_cycle[] = "cpu.cycle";
 static const char name_wq_count[] = "cpu.wq_count";
+static const char name_irq_stamp[] = "cpu.irq_stamp";
 static const char name_icache_tag[] = "cpu.icache_tag";
 static const char name_icache_word[] = "cpu.icache_word";
 static const char name_icache_valid[] = "cpu.icache_valid";
@@ -47,6 +48,7 @@ void schway__cpu_reset(schway *inst)
        writes them, and are zero so the state is the same on every run
        (PSX-SYSTEM section 9, CPU, I-cache). */
     c->wq_count = 0u;
+    c->irq_stamp = 0u;
     c->block_end = 0u;
     memset(c->icache_tag, 0, sizeof c->icache_tag);
     memset(c->icache_word, 0, sizeof c->icache_word);
@@ -74,6 +76,7 @@ void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u64(io, name_muldiv_ready, &c->muldiv_ready, 0u, UINT64_MAX);
     (void)schway__state_u64(io, name_cycle, &c->cycle, 0u, UINT64_MAX);
     (void)schway__state_u32(io, name_wq_count, &c->wq_count, 0u, SCHWAY__WQ_DEPTH);
+    (void)schway__state_u32(io, name_irq_stamp, &c->irq_stamp, 0u, SCHWAY__IRQ_LATENCY_EDGE);
     schway__state_u32_array(io, name_icache_tag, c->icache_tag, SCHWAY__ICACHE_LINES, 0u,
                             0xFFFFFu);
     schway__state_u32_array(io, name_icache_word, &c->icache_word[0][0], 4u * SCHWAY__ICACHE_LINES,

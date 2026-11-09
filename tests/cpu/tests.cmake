@@ -103,3 +103,16 @@ schway_add_test(NAME cpu.cop2_prephase.cu2_clear
 schway_add_test(NAME cpu.cop2_prephase.cu2_set
   COMMAND schwaystation-test-cop2 cu2_set
   LABELS cpu portable TIMEOUT 10)
+
+# Exceptions and interrupts: one executable runs the case named on its command line.
+add_executable(schwaystation-test-exception ${CMAKE_CURRENT_LIST_DIR}/exception_tests.c)
+target_include_directories(schwaystation-test-exception PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-exception PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-exception PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-exception)
+
+# Fault prevented: an interrupt that is never taken, one taken at the edge with no latency, or one that returns past an instruction.
+schway_add_test(NAME cpu.exception.irq_latency_device
+  COMMAND schwaystation-test-exception irq_latency_device
+  LABELS cpu portable TIMEOUT 10)
