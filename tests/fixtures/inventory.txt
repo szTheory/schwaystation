@@ -13,3 +13,4 @@ fixtures.hello.header	fixtures,portable
 fixtures.probe.hello	fixtures,portable
 fixtures.stub.window	fixtures,portable
 fixtures.stub_drift	fixtures,portable
+fixtures.tty.hello	fixtures,portable

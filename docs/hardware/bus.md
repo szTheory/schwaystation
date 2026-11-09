@@ -58,7 +58,7 @@ it and ends outside it is a bus error naming the scratchpad. It costs no extra c
 ## The BIOS window
 
 The window reads its image byte by byte, little-endian. With no image from the host, power-on maps the core's own stub
-kernel (524 bytes at `BFC00000h`); a mapped image survives a power reset. An access that ends past the image is a bus
+kernel (620 bytes at `BFC00000h`); a mapped image survives a power reset. An access that ends past the image is a bus
 error naming the BIOS, so a runaway never slides through padding. The window is 512 KiB, with no mirror above it. A
 write to the ROM is dropped and is not an error. Reads cost what the BIOS delay register says, below.
 

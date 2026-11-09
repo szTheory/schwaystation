@@ -238,7 +238,7 @@ a non-zero upper half in a value or address, a non-zero `r0`, and a branch flag 
 
 ## The stub kernel and kernel RAM
 
-With no BIOS from the host the core maps its own stub kernel, 524 bytes of MIPS at `BFC00000h` (see [bus.md](bus.md)),
+With no BIOS from the host the core maps its own stub kernel, 620 bytes of MIPS at `BFC00000h` (see [bus.md](bus.md)),
 and the CPU starts there. The stub is written for this project, holds no Sony byte and provides no kernel service
 beyond what is listed here. It uses only the addresses below, all in the low 64 KiB of RAM except the ROM, and the
 table keeps them disjoint:
@@ -246,7 +246,7 @@ table keeps them disjoint:
 | Address | Holds |
 |---|---|
 | `80000080h`-`8000008Fh` | the general vector with SR.BEV clear: four words that load the handler's ROM address into `k0` and jump to it |
-| `800000A0h`, `800000B0h`, `800000C0h` | the entries of the A, B and C kernel calls; the stub does not write them |
+| `800000A0h`, `800000B0h`, `800000C0h` | the entries of the A, B and C kernel calls, four words each, written by the reset code |
 | `BFC00180h` | the general vector while SR.BEV is set: a jump to the same handler |
 | ROM after `BFC00180h` | the handler body, which uses only `k0` and `k1` |
 | `80000200h`-`8000020Fh` | the launch block: `pc0`, `gp0`, `s_addr`, `s_size`, written by `schway_load_exe` |
@@ -259,6 +259,12 @@ table keeps them disjoint:
 it jumps to `pc0`. The scratchpad is never touched. Between the reset code and `BFC00180h` every byte is `FFh`, an
 opcode that raises an exception, so a runaway that falls out of the reset code is recorded and never slides through
 no-operations.
+
+**Kernel calls.** The A and B entries jump to routines in ROM that implement one function, putchar: a call to `A0h`
+with `t1` = `3Ch`, or to `B0h` with `t1` = `3Dh`, stores the low byte of `a0` to the debug port at `1F802080h` and
+returns. Any other function number returns at once, and so does `C0h`. The routines use only `k0` and `k1`, so every
+other register survives the call. With the profile's debug-port flag clear the store is ignored, and the byte goes
+nowhere.
 
 **The default handler.** An exception writes Cause, EPC, BadVaddr and SR to the exception record. If the mailbox magic is
 there, the handler sets the mailbox word at `08h` to `000000FFh` (status FFh) and jumps to the address in the word at

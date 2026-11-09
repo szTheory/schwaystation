@@ -1,3 +1,3 @@
 # Committed binary fixtures: path<TAB>source<TAB>pin<TAB>licence<TAB>sha256<TAB>notice. scripts/hygiene.sh admits a binary only if listed here.
 tests/vectors/r3000/sst-sample.bin	SingleStepTests/r3000 v1, first 100 cases of each file	51e227447d0b	MIT	d6ef9a9ce978c487d2065c60c7312959a8bb6ddbd67b19c8465d1e28557d5ffc	THIRD-PARTY-NOTICES.md
-src/stub_kernel.c	tests/fixtures/src/stub/stub.asm	-	MIT	4a1ab9be5566468662e9c83b43686ebc1a179276b12b31e1f7b59687884cca53	-
+src/stub_kernel.c	tests/fixtures/src/stub/stub.asm	-	MIT	d8f54416f2475cff7ad329177c8bb7a22d44f8718fb96d9e7ee8d0ce9231c589	-

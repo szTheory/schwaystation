@@ -170,6 +170,12 @@ schway_add_test(NAME fixtures.hello.boot
   COMMAND schwaystation-test-boot hello ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
 
+# Fault prevented: a TTY byte that is lost, reordered or reaches the host by
+# only one of its two sources, the debug port and the kernel's putchar.
+schway_add_test(NAME fixtures.tty.hello
+  COMMAND schwaystation-test-boot tty_hello ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 30)
+
 # Fault prevented: a default exception handler that records the wrong
 # registers, or does not hand the exception to the handler an image registered.
 schway_add_test(NAME fixtures.boot.default_handler

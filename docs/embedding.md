@@ -52,7 +52,7 @@ cfg.size = (uint32_t)sizeof cfg;
 
 The size tag lets a program built against one header run with a library built from another.
 
-**Input structs** (`schway_config`, `schway_profile`, `schway_budget`, `schway_audio`):
+**Input structs** (`schway_config`, `schway_profile`, `schway_budget`, `schway_audio`, `schway_tty`):
 
 - A size below the struct's first released size returns `SCHWAY_STATUS_ERR_STRUCT_SIZE`.
 - A larger size from a newer header is accepted only if every byte past the library's struct is zero; a field
@@ -282,6 +282,22 @@ Each frame queues one stereo pair for every 768 CPU cycles it ran: 737 or 738 pa
 at 44,100 pairs per second. The queue holds 3,548 pairs, four of the longest frames; pairs that do not fit are
 dropped, and `dropped` reports how many since the last drain. Drain every frame. A drain with `capacity` 0 writes
 nothing and leaves the pairs queued; `samples` may be `NULL` only then. This release's audio is silent.
+
+## TTY
+
+`schway_get_tty` drains the bytes the guest wrote to the TTY. Set `size`, point `bytes` at room for `capacity` bytes and
+call it; `written` bytes come back in the order the guest wrote them. The guest writes through the debug port or the
+putchar kernel call, and both need `SCHWAY_PROFILE_DEBUG_PORT`.
+
+```c
+uint8_t text[256];
+schway_tty tty;
+memset(&tty, 0, sizeof tty);
+tty.size = (uint32_t)sizeof tty;
+tty.bytes = text;
+tty.capacity = sizeof text;
+schway_get_tty(inst, &tty); /* tty.written bytes */
+```
 
 ## Save states
 

@@ -7,12 +7,16 @@
 ; I_STAT, put one jump at the general exception vector 80000080h, clear SR.BEV, read the launch
 ; block the loader wrote, set gp and sp and jump to pc0. Until BEV is clear an exception lands
 ; at BFC00180h, which holds a jump to the same handler body.
+; The kernel call entries at 800000A0h, 800000B0h and 800000C0h are three four-word slots the reset
+; code fills: A and B jump to ROM routines that, for the putchar function (t1 = 3Ch through A0h,
+; 3Dh through B0h), store the byte in a0 to the debug port at 1F802080h and return, and C returns at
+; once. Every other function number returns at once with nothing written.
 ; The scratchpad is never touched and no device that is not built is written.
 ;
 ; Kernel RAM, all below 10000h:
 ;   80000000h-8000007Fh  unused vectors (not written)
 ;   80000080h-8000008Fh  the general-vector jump, four words
-;   800000A0h, 800000B0h, 800000C0h  the kernel call entries (not written here)
+;   800000A0h, 800000B0h, 800000C0h  the kernel call entries, four words each
 ;   80000200h-8000020Fh  launch block: pc0, gp0, s_addr, s_size (written by the loader)
 ;   80000210h-8000021Fh  exception record: Cause, EPC, BadVaddr, SR
 ; The mailbox is the first 256 bytes of a loaded image at 80010000h: magic "SWMB" at 0, status at 8,
@@ -25,6 +29,8 @@
 .definelabel LAUNCH, 0x80000200          ; pc0, gp0, s_addr, s_size
 .definelabel EXC_REC, 0x80000210         ; Cause, EPC, BadVaddr, SR
 .definelabel VECTOR, 0x80000080          ; the general exception vector with BEV clear
+.definelabel ENTRIES, 0x800000A0         ; the A, B and C kernel call entries, 16 bytes each
+.definelabel DEBUG_PORT, 0x2080          ; 1F802080h seen from BF800000h: a byte written here is a TTY byte
 .definelabel MAILBOX, 0x80010000
 .definelabel MB_MAGIC_HI, 0x424D         ; "SWMB" read as a little-endian word is 424D5753h
 .definelabel MB_MAGIC_LO, 0x5753
@@ -71,6 +77,17 @@ reset:
   sw t3, 4(t1)
   sw t4, 8(t1)
   sw t5, 12(t1)
+
+  ; The kernel call entries: copy the three four-word slots below to 800000A0h-800000CFh.
+  li t0, entry_slots
+  li t1, ENTRIES
+  addiu t2, t0, 48
+copy_entries:
+  lw t3, 0(t0)
+  addiu t0, t0, 4                        ; fills the load delay slot
+  sw t3, 0(t1)
+  bne t0, t2, copy_entries
+  addiu t1, t1, 4                        ; delay slot
 
   ; With the vector in RAM, exceptions go there: clear BEV.
   mfc0 t0, sr
@@ -137,10 +154,43 @@ spin:
   j spin
   nop
 
+; The putchar routines the A and B entries jump to. They use only k0 and k1, so every register the
+; caller holds survives. A call with another function number returns at once.
+call_a:
+  addiu k1, zero, 0x3C                   ; A(3Ch) putchar
+  bne t1, k1, call_return
+  lui k1, 0xBF80                         ; delay slot: the I/O region in KSEG1
+  sb a0, DEBUG_PORT(k1)
+call_return:
+  jr ra
+  nop
+call_b:
+  addiu k1, zero, 0x3D                   ; B(3Dh) putchar
+  bne t1, k1, call_return
+  lui k1, 0xBF80
+  sb a0, DEBUG_PORT(k1)
+  jr ra
+  nop
+
 ; What the reset code copies to the vector: a jump to the handler body in ROM.
 vector_jump:
   lui k0, handler >> 16
   ori k0, k0, handler & 0xFFFF
   jr k0
+  nop
+
+; What the reset code copies to 800000A0h: A and B jump to their ROM routines, C returns at once.
+entry_slots:
+  lui k0, call_a >> 16
+  ori k0, k0, call_a & 0xFFFF
+  jr k0
+  nop
+  lui k0, call_b >> 16
+  ori k0, k0, call_b & 0xFFFF
+  jr k0
+  nop
+  jr ra
+  nop
+  nop
   nop
 .close

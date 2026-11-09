@@ -272,6 +272,52 @@ static void hello_boot(const char *dir)
     free(exe);
 }
 
+/* Drains the TTY into buf (capacity cap) and returns the bytes written;
+   *dropped is what the drain reported lost. */
+static uint32_t drain_tty(schway *inst, uint8_t *buf, uint32_t cap, uint32_t *dropped)
+{
+    schway_tty t;
+    memset(&t, 0, sizeof t);
+    t.size = (uint32_t)sizeof t;
+    t.bytes = buf;
+    t.capacity = cap;
+    CHECK_EQ_U64(schway_get_tty(inst, &t), SCHWAY_STATUS_OK);
+    if (dropped != NULL) {
+        *dropped = t.dropped;
+    }
+    return t.written;
+}
+
+/* hello.exe with the debug-port flag set prints a line through the port at
+   1F802080h and then a line through the kernel's putchar, A(3Ch): the stub's
+   own routine stores the byte to the port. The host drains both lines in that
+   order, and a second drain finds nothing.
+   Fault prevented: a TTY byte that is lost, reordered or reaches the ring by
+   only one of its two sources. */
+static void tty_hello(const char *dir)
+{
+    size_t n = 0u;
+    uint8_t *exe = read_file(dir, "hello.exe", &n);
+    schway *inst = make_debug();
+    load(inst, exe, n);
+    for (int f = 0; f < 3 && mailbox(inst)[MB_STATUS] != 0u; f++) {
+        schway_run_result r = run_frame(inst);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    }
+    check_sealed(inst, 2u);
+    static const char want[] = "hello port\nhello putchar\n";
+    uint8_t got[64];
+    uint32_t dropped = 99u;
+    uint32_t w = drain_tty(inst, got, sizeof got, &dropped);
+    CHECK_EQ_U64(w, sizeof want - 1u);
+    CHECK(w == sizeof want - 1u && memcmp(got, want, w) == 0);
+    CHECK_EQ_U64(dropped, 0u);
+    CHECK_EQ_U64(drain_tty(inst, got, sizeof got, &dropped), 0u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    schway_destroy(inst);
+    free(exe);
+}
+
 /* The exception record the stub's handler writes at 80000210h: Cause, EPC,
    BadVaddr and SR. */
 static void check_exc_record(const schway *inst, uint32_t cause, uint32_t epc)
@@ -633,6 +679,8 @@ int main(int argc, char **argv)
         stub_drift(argv[2]);
     } else if (strcmp(c, "hello") == 0 && argc == 3) {
         hello_boot(argv[2]);
+    } else if (strcmp(c, "tty_hello") == 0 && argc == 3) {
+        tty_hello(argv[2]);
     } else if (strcmp(c, "default_handler") == 0 && argc == 3) {
         default_handler(argv[2]);
     } else if (strcmp(c, "registered_handler") == 0 && argc == 3) {

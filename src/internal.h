@@ -248,6 +248,14 @@ _Static_assert(offsetof(schway_audio, written) == 12 + SCHWAY__P, "audio.written
 _Static_assert(offsetof(schway_audio, dropped) == 16 + SCHWAY__P, "audio.dropped");
 _Static_assert(sizeof(schway_audio) == 16 + 2 * SCHWAY__P, "audio size");
 
+_Static_assert(offsetof(schway_tty, size) == 0, "tty.size");
+_Static_assert(offsetof(schway_tty, reserved0) == 4, "tty.reserved0");
+_Static_assert(offsetof(schway_tty, bytes) == 8, "tty.bytes");
+_Static_assert(offsetof(schway_tty, capacity) == 8 + SCHWAY__P, "tty.capacity");
+_Static_assert(offsetof(schway_tty, written) == 12 + SCHWAY__P, "tty.written");
+_Static_assert(offsetof(schway_tty, dropped) == 16 + SCHWAY__P, "tty.dropped");
+_Static_assert(sizeof(schway_tty) == 16 + 2 * SCHWAY__P, "tty size");
+
 /* The size of each struct as first released. A caller's size tag below it
    is refused; each is pinned to the layout above, so appending a field later
    cannot move it. */
@@ -261,6 +269,7 @@ _Static_assert(sizeof(schway_audio) == 16 + 2 * SCHWAY__P, "audio size");
 #define SCHWAY__AUDIO_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__EXE_INFO_SIZE_FIRST 56u
 #define SCHWAY__FAULT_SIZE_FIRST 56u
+#define SCHWAY__TTY_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first size");
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
@@ -272,6 +281,7 @@ _Static_assert(SCHWAY__VIDEO_SIZE_FIRST == sizeof(schway_video), "video first si
 _Static_assert(SCHWAY__AUDIO_SIZE_FIRST == sizeof(schway_audio), "audio first size");
 _Static_assert(SCHWAY__EXE_INFO_SIZE_FIRST == sizeof(schway_exe_info), "exe_info first size");
 _Static_assert(SCHWAY__FAULT_SIZE_FIRST == sizeof(schway_fault), "fault first size");
+_Static_assert(SCHWAY__TTY_SIZE_FIRST == sizeof(schway_tty), "tty first size");
 
 /* The public fault kinds and devices are the internal ones, number for number. */
 _Static_assert(SCHWAY_FAULT_NONE == SCHWAY__FAULT_NONE, "fault none");

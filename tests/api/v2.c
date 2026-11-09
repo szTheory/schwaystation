@@ -227,6 +227,29 @@ int main(void)
     CHECK_EQ_U64(fault.device | fault.width | fault.frame | fault.ticks, 0u);
     CHECK_EQ_U64(fault.line | fault.dot | fault.pc | fault.opcode | fault.addr | fault.note, 0u);
     CHECK_EQ_U64(schway_get_fault(NULL, &fault), SCHWAY_STATUS_ERR_ARGUMENT);
+
+    /* The TTY drain assigns every field and takes the bytes the guest wrote
+       to the debug port; none was written here, so it reports nothing. */
+    uint8_t tty_buf[16];
+    schway_tty tty;
+    memset(&tty, 0xA5, sizeof tty);
+    tty.size = (uint32_t)sizeof tty;
+    tty.reserved0 = 0u;
+    tty.bytes = tty_buf;
+    tty.capacity = (uint32_t)sizeof tty_buf;
+    tty.written = 1u;
+    tty.dropped = 1u;
+    CHECK_EQ_U64(schway_get_tty(inst, &tty), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(tty.written, 0u);
+    CHECK_EQ_U64(tty.dropped, 0u);
+    tty.bytes = NULL;
+    CHECK_EQ_U64(schway_get_tty(inst, &tty), SCHWAY_STATUS_ERR_ARGUMENT);
+    tty.capacity = 0u;
+    CHECK_EQ_U64(schway_get_tty(inst, &tty), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_get_tty(NULL, &tty), SCHWAY_STATUS_ERR_ARGUMENT);
+    CHECK_EQ_U64(schway_get_tty(inst, NULL), SCHWAY_STATUS_ERR_ARGUMENT);
+    tty.size = 8u;
+    CHECK_EQ_U64(schway_get_tty(inst, &tty), SCHWAY_STATUS_ERR_STRUCT_SIZE);
     schway_destroy(inst);
     CHECK_DONE();
 }

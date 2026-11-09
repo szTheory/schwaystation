@@ -137,6 +137,32 @@ void schway__tty_push(schway *inst, uint8_t byte)
     t->count++;
 }
 
+schway_status schway_get_tty(schway *inst, schway_tty *io)
+{
+    if (inst == NULL || io == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_status st =
+        schway__instance_check_size(io, SCHWAY__TTY_SIZE_FIRST, (uint32_t)sizeof *io);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    if (io->bytes == NULL && io->capacity != 0u) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    struct schway__tty *t = &inst->tty;
+    uint32_t n = io->capacity < t->count ? io->capacity : t->count;
+    for (uint32_t i = 0; i < n; i++) {
+        io->bytes[i] = t->buf[(t->head + i) % SCHWAY__TTY_SIZE];
+    }
+    t->head = (t->head + n) % SCHWAY__TTY_SIZE;
+    t->count -= n;
+    io->written = n;
+    io->dropped = t->dropped;
+    t->dropped = 0u;
+    return SCHWAY_STATUS_OK;
+}
+
 /* The power-on display: GP1(06h) X1 = 260h, X2 = C60h and GP1(07h)
    Y1 = 10h, Y2 = 100h, 320-dot mode (divider 8), 240 lines, progressive,
    15-bit, display enabled (psx-spx, GPU Display Control Commands). */
