@@ -1,5 +1,6 @@
-/* The stub kernel in the core: schwaystation-test-boot <case> [dir]. White-box:
-   the test sees src/, so it can read the committed image array and the bus. */
+/* The stub kernel and the PS-EXE boot path in the core: schwaystation-test-boot
+   <case> [dir], dir holding the assembled fixtures. White-box: the test sees
+   src/, so it can read the committed image array, RAM and the fault record. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,6 +115,105 @@ static void stub_drift(const char *dir)
     }
 }
 
+/* One little-endian word. */
+static uint32_t le32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+/* The bytes of dir/name; the caller frees them. A file that cannot be read
+   is a failure and ends the test. */
+static uint8_t *read_file(const char *dir, const char *name, size_t *n)
+{
+    char path[1024];
+    int len = snprintf(path, sizeof path, "%s/%s", dir, name);
+    CHECK(len > 0 && (size_t)len < sizeof path);
+    FILE *f = fopen(path, "rb");
+    if (f == NULL) {
+        fprintf(stderr, "%s: cannot open\n", path);
+        exit(1);
+    }
+    size_t cap = 1u << 16;
+    uint8_t *buf = (uint8_t *)malloc(cap);
+    if (buf == NULL) {
+        exit(1);
+    }
+    *n = fread(buf, 1u, cap, f);
+    CHECK(*n > 0u && *n < cap);
+    fclose(f);
+    return buf;
+}
+
+/* The mailbox: the 256 bytes at RAM 10000h, which a fixture places at its
+   load address 80010000h. */
+#define MB_STATUS 8u
+#define MB_COUNT 10u
+#define MB_RECORDS 16u
+static const uint8_t *mailbox(const schway *inst)
+{
+    return inst->bus.ram + 0x10000u;
+}
+
+/* The mailbox is sealed: the magic, and the CRC-32 of bytes 10h to FFh equal
+   to the word at 04h. The core's CRC-32 is not the fixture's bitwise routine,
+   so the two agree only if both are right. */
+static void check_sealed(const schway *inst, uint32_t count)
+{
+    const uint8_t *mb = mailbox(inst);
+    CHECK(memcmp(mb, "SWMB", 4u) == 0);
+    CHECK_EQ_HEX(mb[MB_STATUS], 0u);
+    CHECK_EQ_U64(mb[9], 1u);
+    CHECK_EQ_U64(mb[MB_COUNT], count);
+    CHECK_EQ_HEX(le32(mb + 4u), schway__crc32_update(0u, mb + MB_RECORDS, 0x100u - MB_RECORDS));
+}
+
+/* The value of record n, 1 first, after its id and valid flag are checked. */
+static uint32_t record(const schway *inst, uint32_t n)
+{
+    const uint8_t *r = mailbox(inst) + MB_RECORDS + 8u * (n - 1u);
+    CHECK_EQ_U64((uint32_t)r[0] | ((uint32_t)r[1] << 8), n);
+    CHECK_EQ_U64((uint32_t)r[2] | ((uint32_t)r[3] << 8), 1u);
+    return le32(r + 4u);
+}
+
+static schway_run_result run_frame(schway *inst)
+{
+    schway_run_result r;
+    memset(&r, 0, sizeof r);
+    r.size = (uint32_t)sizeof r;
+    CHECK_EQ_U64(schway_run_frame(inst, &r), SCHWAY_STATUS_OK);
+    return r;
+}
+
+static void load(schway *inst, const uint8_t *exe, size_t n)
+{
+    CHECK_EQ_U64(schway_load_exe(inst, exe, n), SCHWAY_STATUS_OK);
+}
+
+/* hello.exe runs from reset through the stub to its own end: the mailbox is
+   sealed with status 00h, and its two records are what the stub set up, gp
+   from the header's gp0 and sp from its s_addr + s_size. Both come from the
+   file's own header here, so a stub that ignores pc0, gp0 or s_addr fails.
+   Fault prevented: an image that never starts, or starts with the wrong
+   global pointer or stack. */
+static void hello_boot(const char *dir)
+{
+    size_t n = 0u;
+    uint8_t *exe = read_file(dir, "hello.exe", &n);
+    schway *inst = make();
+    load(inst, exe, n);
+    for (int f = 0; f < 3 && mailbox(inst)[MB_STATUS] != 0u; f++) {
+        schway_run_result r = run_frame(inst);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    }
+    check_sealed(inst, 2u);
+    CHECK_EQ_HEX(record(inst, 1u), le32(exe + 0x14));
+    CHECK_EQ_HEX(record(inst, 2u), le32(exe + 0x30) + le32(exe + 0x34));
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    schway_destroy(inst);
+    free(exe);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -125,6 +225,8 @@ int main(int argc, char **argv)
         stub_window();
     } else if (strcmp(c, "stub_drift") == 0 && argc == 3) {
         stub_drift(argv[2]);
+    } else if (strcmp(c, "hello") == 0 && argc == 3) {
+        hello_boot(argv[2]);
     } else {
         fprintf(stderr, "schwaystation-test-boot: unknown case %s\n", c);
         return 2;

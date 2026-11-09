@@ -47,6 +47,7 @@ void schway__cpu_reset(schway *inst)
        writes them, and are zero so the state is the same on every run
        (PSX-SYSTEM section 9, CPU, I-cache). */
     c->wq_count = 0u;
+    c->block_end = 0u;
     memset(c->icache_tag, 0, sizeof c->icache_tag);
     memset(c->icache_word, 0, sizeof c->icache_word);
     memset(c->icache_valid, 0, sizeof c->icache_valid);
@@ -131,6 +132,33 @@ uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, 
 }
 
 #include "cpu_exec.inc"
+
+uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
+{
+    uint64_t room = inst->frame_end - inst->ticks;
+    uint64_t limit = cycles < room ? cycles : room;
+    uint64_t ran = 0u;
+    uint32_t stop = SCHWAY_STOP_BUDGET;
+    while (ran < limit) {
+        ran += cpu_block(inst, limit - ran);
+        if ((inst->cpu.block_end & SCHWAY__BLOCK_DOUBLE_FAULT) != 0u) {
+            stop = SCHWAY_STOP_FAULT;
+            break;
+        }
+        if (inst->exit_pending != 0u) {
+            /* The report consumes the write; exit_code stays for the host. */
+            inst->exit_pending = 0u;
+            stop = SCHWAY_STOP_HOOK;
+            break;
+        }
+        if ((flags & SCHWAY_RUN_STOP_ON_FAULT) != 0u && inst->fault.kind != SCHWAY__FAULT_NONE) {
+            stop = SCHWAY_STOP_FAULT;
+            break;
+        }
+    }
+    inst->cpu.block_end = 0u;
+    return stop;
+}
 
 void schway__cpu_step_one(schway *inst, struct schway__cpu_log *log)
 {

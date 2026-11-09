@@ -18,11 +18,6 @@ void schway__cop0_reset(schway *inst)
     r[SCHWAY__COP0_BDAM] = 0xFFFFFFFFu;
 }
 
-/* The general exception vector: BFC00180h while SR.BEV (bit 22) is set and
-   80000080h otherwise (PSX-SYSTEM section 2, Vectors). */
-#define VECTOR_BEV 0xBFC00180u
-#define VECTOR_RAM 0x80000080u
-
 /* CAUSE bits the entry owns: ExcCode (2-6), CE (28-29), BT (30), BD (31). IP
    bits 8-15 are left as they are (PSX-SYSTEM section 2, CAUSE bits). */
 #define CAUSE_ENTRY_BITS 0xF000007Cu
@@ -52,7 +47,8 @@ void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t 
     c->branch_slot = 0u;
     c->branch_take = 0u;
     c->branch_target = 0u;
-    c->pc = (sr & SCHWAY__SR_BEV) != 0u ? VECTOR_BEV : VECTOR_RAM;
+    c->block_end |= SCHWAY__BLOCK_EVENT;
+    c->pc = (sr & SCHWAY__SR_BEV) != 0u ? SCHWAY__VECTOR_BEV : SCHWAY__VECTOR_RAM;
 
     /* The same EPC and ExcCode taken SCHWAY__EXC_LOOP_LIMIT times in a row
        is a loop the guest cannot leave. An interrupt (ExcCode 0) is neither
@@ -112,6 +108,9 @@ uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value)
     if (cop0_missing(rd) != 0u) {
         return 0u;
     }
+    /* A COP0 write ends the block: it may change what the next instruction
+       sees, SR and CAUSE above all. */
+    inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
     switch (rd) {
     case SCHWAY__COP0_BPC:
     case SCHWAY__COP0_BDA:
@@ -138,5 +137,6 @@ uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value)
 void schway__cop0_rfe(schway *inst)
 {
     uint32_t *r = inst->cpu.cop0.r;
+    inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
     r[SCHWAY__COP0_SR] = (r[SCHWAY__COP0_SR] & ~0xFu) | ((r[SCHWAY__COP0_SR] >> 2) & 0xFu);
 }

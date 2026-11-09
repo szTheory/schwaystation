@@ -171,7 +171,8 @@ int main(void)
     CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_ERR_ARGUMENT);
 
     /* A budgeted run stops at its cycle limit, with the two result fields
-       added after the first release. */
+       added after the first release. The program is running, so it stops at
+       the first instruction boundary at or after the limit. */
     schway_run_result res;
     memset(&res, 0, sizeof res);
     res.size = (uint32_t)sizeof res;
@@ -185,7 +186,7 @@ int main(void)
     budget.max_cycles = 1000u;
     CHECK_EQ_U64(schway_run(inst, &budget, &res), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(res.stop, SCHWAY_STOP_BUDGET);
-    CHECK_EQ_U64(res.ticks, ticks + 1000u);
+    CHECK(res.ticks >= ticks + 1000u && res.ticks < ticks + 1000u + 64u);
     CHECK_EQ_U64(res.frame, 2u);
     CHECK_EQ_U64(res.exit_code, 0u);
     CHECK_EQ_U64(res.fault_present, 0u);

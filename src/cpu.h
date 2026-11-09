@@ -60,6 +60,24 @@ enum {
    loop, a first fault (ARCHITECTURE section 6). */
 #define SCHWAY__EXC_LOOP_LIMIT 1000u
 
+/* The general exception vector: BFC00180h while SR.BEV is set and 80000080h
+   otherwise (PSX-SYSTEM section 2, Vectors). */
+#define SCHWAY__VECTOR_BEV 0xBFC00180u
+#define SCHWAY__VECTOR_RAM 0x80000080u
+
+/* Why the block in progress ends after the instruction that just ran. A write
+   the run loop must see before more instructions run (an exception entry, RFE,
+   MTC0, a write to I_STAT or I_MASK) sets EVENT; an instruction fetch that
+   failed at an exception vector sets DOUBLE_FAULT. */
+#define SCHWAY__BLOCK_EVENT 1u
+#define SCHWAY__BLOCK_DOUBLE_FAULT 2u
+
+/* The most instructions in one block, and a bound on the cycles one
+   instruction takes (a fetch that fills a line, a data access, a write queue
+   drain and a multiply wait together stay well under it). */
+#define SCHWAY__BLOCK_MAX_INSNS 128u
+#define SCHWAY__INSN_CYCLES_MAX 1024u
+
 /* COP0 registers, indexed by register number. */
 struct schway__cop0 {
     uint32_t r[32];
@@ -120,7 +138,8 @@ struct schway__cpu_log {
    target's alignment of them. icache_tag, icache_word and icache_valid are
    the instruction cache and wq_count the stores still in the write queue; the
    queue is a count, because every store reaches the bus at once and only the
-   cost of waiting is modelled. The log pointer is not state. */
+   cost of waiting is modelled. block_end and the log pointer are not state:
+   block_end holds the SCHWAY__BLOCK_* reasons of the block in progress. */
 struct schway__cpu {
     uint64_t muldiv_ready;
     uint64_t cycle;
@@ -135,6 +154,7 @@ struct schway__cpu {
     uint32_t icache_tag[SCHWAY__ICACHE_LINES];
     uint32_t icache_word[SCHWAY__ICACHE_LINES][4];
     uint8_t icache_valid[SCHWAY__ICACHE_LINES];
+    uint32_t block_end;
     struct schway__cpu_log *log;
 };
 
@@ -171,6 +191,19 @@ uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, 
 
 /* The cpu and cop0 fields of the state walk (state.h). */
 void schway__cpu_state_io(struct schway__state_io *io, schway *inst);
+
+/* Runs the CPU for the program loaded as a PS-EXE: blocks of instructions
+   until the cycle limit or the current frame's end is reached, at an
+   instruction boundary. cycles is the limit, flags the SCHWAY_RUN_* bits of
+   the budget. The cycles it ran are the advance of inst->ticks, which moves at
+   every block end; a stop carries no overshoot, so an instruction that
+   crosses the limit or the frame end completes and ticks sit after it.
+   Returns SCHWAY_STOP_BUDGET when the limit or the frame end was reached,
+   SCHWAY_STOP_HOOK when the guest wrote the exit port (inst->exit_code keeps
+   the byte) and SCHWAY_STOP_FAULT at the first fault latched during the run
+   when SCHWAY_RUN_STOP_ON_FAULT is set, or at once for a double fault, an
+   instruction fetch that failed at an exception vector. */
+uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags);
 
 /* Runs one instruction through the executor the run loop uses. With a log,
    fetches and reads take their values from log->expect and every access is

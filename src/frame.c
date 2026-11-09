@@ -35,22 +35,41 @@ static void audio_push_silence(schway *inst, uint32_t n)
    crossed. Reaching frame_end completes the frame: the frame count rises, the
    profile locks, the card is redrawn and the next frame's end is fixed from
    the accumulator's remainder, so the cumulative ticks stay exact
-   (ARCHITECTURE sections 1 and 7). With no instruction run between, a stop
-   at any cycle leaves the state a later stop would pass through, so N cycles
-   then M equal N + M. Refuses, with nothing changed, an advance that would
-   leave the save format's inclusive bounds (ARCHITECTURE section 5). Returns
-   OK, with *done set when the frame completed. */
-static schway_status advance(schway *inst, uint64_t limit, int *done)
+   (ARCHITECTURE sections 1 and 7). With no PS-EXE loaded no instruction runs,
+   so a stop at any cycle leaves the state a later stop would pass through and
+   N cycles then M equal N + M. With one loaded the CPU runs instead and stops
+   at the first instruction boundary at or after the limit or the frame's end,
+   so the advance can pass either by the rest of one instruction, and N cycles
+   then M equal N + M only where N is a boundary of the one-shot run; a frame
+   end passed inside an instruction completes at that instruction's end, and
+   the vertical sync that ends the frame raises I_STAT bit 0 first (psx-spx,
+   Interrupts). Refuses, with nothing changed, an advance that would leave the
+   save format's inclusive bounds (ARCHITECTURE section 5), with the longest
+   instruction's cycles as margin when the CPU runs. Returns OK, with *done set
+   when the frame completed and *stop the CPU's stop reason. */
+static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *done,
+                             uint32_t *stop)
 {
     uint64_t room = inst->frame_end - inst->ticks;
     uint64_t cycles = limit < room ? limit : room;
-    *done = cycles == room;
-    if (inst->ticks + cycles > SCHWAY__STATE_TICKS_MAX ||
-        (*done && inst->frame >= SCHWAY__STATE_FRAME_MAX)) {
-        return SCHWAY_STATUS_ERR_STATE_FIELD;
-    }
     uint64_t before = inst->ticks;
-    inst->ticks += cycles;
+    *stop = SCHWAY_STOP_BUDGET;
+    if (inst->exe_loaded != 0u) {
+        if (inst->ticks + cycles + SCHWAY__INSN_CYCLES_MAX > SCHWAY__STATE_TICKS_MAX ||
+            inst->frame >= SCHWAY__STATE_FRAME_MAX) {
+            return SCHWAY_STATUS_ERR_STATE_FIELD;
+        }
+        inst->profile_locked = 1u;
+        *stop = schway__cpu_run(inst, cycles, flags);
+        *done = inst->ticks >= inst->frame_end;
+    } else {
+        *done = cycles == room;
+        if (inst->ticks + cycles > SCHWAY__STATE_TICKS_MAX ||
+            (*done && inst->frame >= SCHWAY__STATE_FRAME_MAX)) {
+            return SCHWAY_STATUS_ERR_STATE_FIELD;
+        }
+        inst->ticks += cycles;
+    }
     /* One pair per 768-cycle boundary crossed. */
     audio_push_silence(inst, (uint32_t)(inst->ticks / SCHWAY__CYCLES_PER_PAIR -
                                         before / SCHWAY__CYCLES_PER_PAIR));
@@ -58,6 +77,9 @@ static schway_status advance(schway *inst, uint64_t limit, int *done)
     if (*done) {
         uint64_t num = schway__instance_frame_num(inst->region);
         uint64_t den = schway__instance_frame_den(inst->region);
+        if (inst->exe_loaded != 0u) {
+            schway__irq_raise(inst, 0u);
+        }
         inst->frame++;
         inst->tick_acc = (inst->tick_acc + num) % den;
         inst->frame_end += (inst->tick_acc + num) / den;
@@ -74,9 +96,19 @@ static void write_result(const schway *inst, schway_run_result *out, uint32_t st
     r.stop = stop;
     r.frame = inst->frame;
     r.ticks = inst->ticks;
-    r.exit_code = 0u;
+    r.exit_code = stop == SCHWAY_STOP_HOOK ? inst->exit_code : 0u;
     r.fault_present = inst->fault.kind != SCHWAY__FAULT_NONE;
     schway__instance_write_out(out, &r, (uint32_t)sizeof r);
+}
+
+/* The result's stop reason: a hook or a fault the CPU stopped on, else the
+   frame's end, else the budget. */
+static uint32_t stop_reason(uint32_t cpu_stop, int done)
+{
+    if (cpu_stop == SCHWAY_STOP_HOOK || cpu_stop == SCHWAY_STOP_FAULT) {
+        return cpu_stop;
+    }
+    return done ? SCHWAY_STOP_FRAME : SCHWAY_STOP_BUDGET;
 }
 
 schway_status schway_run_frame(schway *inst, schway_run_result *out)
@@ -91,12 +123,13 @@ schway_status schway_run_frame(schway *inst, schway_run_result *out)
         }
     }
     int done;
-    schway_status st = advance(inst, UINT64_MAX, &done);
+    uint32_t cpu_stop;
+    schway_status st = advance(inst, UINT64_MAX, 0u, &done, &cpu_stop);
     if (st != SCHWAY_STATUS_OK) {
         return st;
     }
     if (out != NULL) {
-        write_result(inst, out, SCHWAY_STOP_FRAME);
+        write_result(inst, out, stop_reason(cpu_stop, done));
     }
     return SCHWAY_STATUS_OK;
 }
@@ -128,11 +161,12 @@ schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_r
         stop = SCHWAY_STOP_FAULT;
     } else if (budget->max_cycles != 0u) {
         int done;
-        st = advance(inst, budget->max_cycles, &done);
+        uint32_t cpu_stop;
+        st = advance(inst, budget->max_cycles, budget->flags, &done, &cpu_stop);
         if (st != SCHWAY_STATUS_OK) {
             return st;
         }
-        stop = done ? SCHWAY_STOP_FRAME : SCHWAY_STOP_BUDGET;
+        stop = stop_reason(cpu_stop, done);
     }
     if (out != NULL) {
         write_result(inst, out, stop);

@@ -28,14 +28,18 @@ void schway__irq_raise(schway *inst, uint32_t bit)
     }
 }
 
+/* A write to I_STAT or I_MASK ends the block, so a line it raises is seen
+   before another instruction runs. */
 void schway__irq_write_stat(schway *inst, uint32_t lane, uint32_t mask)
 {
+    inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
     inst->irq.stat &= (lane | ~mask) & SCHWAY__IRQ_BITS;
     irq_sync(inst);
 }
 
 void schway__irq_write_mask(schway *inst, uint32_t lane, uint32_t mask)
 {
+    inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
     inst->irq.mask = ((inst->irq.mask & ~mask) | (lane & mask)) & SCHWAY__IRQ_BITS;
     irq_sync(inst);
 }

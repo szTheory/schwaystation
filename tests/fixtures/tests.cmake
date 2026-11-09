@@ -98,6 +98,7 @@ function(schway__fixture name source)
     COMMAND ${SCHWAYSTATION_ARMIPS} -strequ IMAGE ${out} ${ARGN} ${source}
     WORKING_DIRECTORY ${schway__fixture_src}
     DEPENDS schwaystation-armips ${schway__fixture_src}/${source} ${schway__fixture_src}/header.inc
+      ${schway__fixture_src}/mailbox.inc
     COMMENT "armips ${source}"
     VERBATIM)
   set_property(GLOBAL APPEND PROPERTY SCHWAY__FIXTURE_OUTPUTS ${out})
@@ -159,3 +160,10 @@ schway_add_test(NAME fixtures.stub.window
 schway_add_test(NAME fixtures.stub_drift
   COMMAND schwaystation-test-boot stub_drift ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 10)
+
+# Fault prevented: an image that never starts, or starts with the wrong global
+# pointer or stack: hello.exe boots through the stub and seals its mailbox with
+# the records the stub set up.
+schway_add_test(NAME fixtures.hello.boot
+  COMMAND schwaystation-test-boot hello ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 30)

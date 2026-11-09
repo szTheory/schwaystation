@@ -55,8 +55,9 @@ static void cpu_wq_push(struct schway__cpu *c, uint32_t addr, uint32_t *cycles)
    instruction cache, except in the BIOS window, which is never cached; a fetch
    in KSEG1 drains the write queue and reaches the bus. The bus decodes the
    segment of the virtual address (PSX-SYSTEM section 2, Segments and I-cache;
-   section 3, C4), and its charge adds to *cycles. A bus error reads as zero. */
-static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles)
+   section 3, C4), and its charge adds to *cycles. A bus error sets *err and the
+   word reads as zero; the bus has already latched it as the first fault. */
+static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles, uint32_t *err)
 {
     uint32_t word = 0u;
     uint32_t seg = schway__bus_segment(vaddr);
@@ -65,13 +66,13 @@ static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles)
     }
     if ((seg == (uint32_t)SCHWAY__SEG_KUSEG || seg == (uint32_t)SCHWAY__SEG_KSEG0) &&
         ((vaddr & 0x1FFFFFFFu) >> 19) != 0x3F8u) {
-        (void)schway__cpu_icache_fetch(inst, vaddr, &word, cycles);
+        *err = schway__cpu_icache_fetch(inst, vaddr, &word, cycles);
         return word;
     }
     if (seg == (uint32_t)SCHWAY__SEG_KSEG1) {
         cpu_wq_drain(&inst->cpu, cycles);
     }
-    (void)schway__bus_fetch(inst, vaddr, &word, cycles);
+    *err = schway__bus_fetch(inst, vaddr, &word, cycles) != 0 ? 1u : 0u;
     return word;
 }
 
@@ -511,7 +512,8 @@ static uint32_t cpu_step(schway *inst)
     uint32_t cycles = 1u;
     uint32_t pc = c->pc;
     uint32_t misaligned = (pc & 3u) != 0u ? 1u : 0u;
-    uint32_t op = misaligned != 0u ? 0u : cpu_fetch(inst, pc, &cycles);
+    uint32_t fetch_err = 0u;
+    uint32_t op = misaligned != 0u ? 0u : cpu_fetch(inst, pc, &cycles, &fetch_err);
     uint32_t next = c->branch_take != 0u ? c->branch_target : pc + 4u;
     uint32_t rs_n = (op >> 21) & 31u;
     uint32_t rt_n = (op >> 16) & 31u;
@@ -539,6 +541,14 @@ static uint32_t cpu_step(schway *inst)
         schway__fault_latch(inst, SCHWAY__FAULT_MISALIGNED_FETCH, SCHWAY__DEV_NONE, 4u, pc, 0u,
                             pc);
         trapped = cpu_exception(inst, pc, SCHWAY__EXC_ADEL, 0u, 1u, pc);
+    } else if (fetch_err != 0u) {
+        /* A bus error on the fetch is IBE with no BadVaddr (PSX-SYSTEM section
+           2, Address and bus errors). At an exception vector it cannot be
+           recovered: the handler would fault again, so the run loop stops. */
+        trapped = cpu_exception(inst, pc, SCHWAY__EXC_IBE, 0u, 0u, 0u);
+        if (pc == SCHWAY__VECTOR_BEV || pc == SCHWAY__VECTOR_RAM) {
+            c->block_end |= SCHWAY__BLOCK_DOUBLE_FAULT;
+        }
     } else if (is_cop2 != 0u) {
         trapped = cpu_cop2(inst, pc, op, next, &cycles, &load_reg, &load_value, &br);
     } else {
@@ -804,4 +814,34 @@ static uint32_t cpu_step(schway *inst)
     }
     c->cycle += cycles;
     return cycles;
+}
+
+/* Runs instructions until the block ends and returns the cycles they took. A
+   block ends after a branch's delay slot, after any instruction that set
+   block_end (an exception entry, which covers SYSCALL and BREAK, RFE, a COP0
+   write, a write to I_STAT or I_MASK, a double fault), when the next
+   instruction lies in another 4 KiB page, after 128 instructions, after the
+   exit port was written, after an instruction that latched a first fault, and
+   at the first instruction boundary at or after limit cycles. The cycles are
+   added to inst->ticks once, at the end, so what the instructions did not
+   change, the state of the other devices, is as of the block's start
+   (PSX-SYSTEM section 6; a fault latched in the block carries the ticks of its
+   start). */
+static uint64_t cpu_block(schway *inst, uint64_t limit)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t page = c->pc >> 12;
+    uint32_t fault = inst->fault.kind;
+    uint64_t ran = 0u;
+    c->block_end = 0u;
+    for (uint32_t n = 0u; n < SCHWAY__BLOCK_MAX_INSNS; n++) {
+        uint32_t slot = c->branch_slot;
+        ran += cpu_step(inst);
+        if (slot != 0u || c->block_end != 0u || ran >= limit || (c->pc >> 12) != page ||
+            inst->exit_pending != 0u || inst->fault.kind != fault) {
+            break;
+        }
+    }
+    inst->ticks += ran;
+    return ran;
 }
