@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-20-PLAN.md
-last_updated: "2026-11-09T22:45:32.390Z"
+stopped_at: Completed 02-21-PLAN.md
+last_updated: "2026-11-09T22:59:06.909Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-20 (the runner loads a PS-EXE with --exe, prints its text with --tty and ends on the exit port with status 0 or 6; fixtures.hello.tty, fixtures.exit_port, runner.usage.exe and runner.exe.missing pass in the ci workflow, 212 of 212)
-state_head: 3adfe4bb756b6abb79f3ac13b1cc9ccd0bb2a506
+last_activity_desc: Completed 02-21 (the executor compiled twice, a 4,096-record trace ring outside the state, schway_get_trace and SCHWAY_RUN_TRACE; core.trace.* and core.trace_hash_equal pass in the ci workflow, 219 of 219)
+state_head: 6230ed1fa4145f3cc2d04f26fe66e954806226a1
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 36
+  completed_plans: 37
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 21 of 27
+Plan: 22 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-20: --exe, --tty and the exit port in the runner, status 6, the runner page (02-20-SUMMARY.md); 02-22 stays halted at its push, which is open
+Last activity: 2026-11-09 — Completed 02-21: the dual-compiled executor, the trace ring and schway_get_trace (02-21-SUMMARY.md); 02-22 stays halted at its push, which is open
 
 Progress: [██░░░░░░░░] 17%
 
@@ -93,6 +93,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P18 | 3 min | 3 tasks | 15 files |
 | Phase 02 P19 | 20 min | 3 tasks | 13 files |
 | Phase 02 P20 | 7 min | 3 tasks | 10 files |
+| Phase 02 P21 | 15 min | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -182,6 +183,9 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-19: the interrupt entry calls schway__cop0_irq_entry_cop2 with the word at EPC, read without charge or first fault; it only reports a COP2 command and the GTE plan executes it — The double execution belongs to phase 3 with the GTE; the hook is this plan's whole deliverable for that bug
 - [Phase 02]: 02-20: the exit port acts only with the debug-port flag, so a fixture that reports through it runs with --tty; without --tty the write is ignored and the run goes the full frame count
 - [Phase 02]: 02-20: --exe shares the probe's file reader and refusal line; a line over 4096 bytes is printed in pieces; reaching the 600-frame cap with the program still running exits 0 until plan 02-23 lands the hang report
+- [Phase 02]: the trace ring is a member of struct schway (131,096 bytes: 4,096 32-byte records plus bookkeeping), outside the state and every hash, and is cleared only by a power reset so a per-frame runner keeps one rolling tail
+- [Phase 02]: schway_trace is 64 bytes with no reserved field; a record packs event, width, device and a 16-bit note into one word and keeps the frame's low 32 bits, widened by schway_get_trace
+- [Phase 02]: line and dot of a trace record are derived at read time from the cycles since its frame began at 11 to 7 GPU clocks over 3,413 (NTSC) or 3,406 (PAL) clocks per line until the GPU keeps a beam
 
 ### Pending Todos
 
@@ -236,8 +240,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T22:45:32.261Z
-Stopped at: Completed 02-20-PLAN.md
+Last session: 2026-11-09T22:59:06.756Z
+Stopped at: Completed 02-21-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
