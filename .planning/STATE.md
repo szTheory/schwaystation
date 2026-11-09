@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-24-PLAN.md
-last_updated: "2026-11-09T23:14:09.889Z"
+stopped_at: Completed 02-25-PLAN.md
+last_updated: "2026-11-09T23:22:44.104Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-24 (--trace first-fault, the fault line and its 4,096-record tail, exit 7, the unbuilt line and nine fault-class fixtures; the ci workflow passes 239 of 239 and the hygiene workflow passes)
-state_head: 00b235edee7842d10806821f35194079e5062c60
+last_activity_desc: Completed 02-25 (exc_matrix fixture with 30 mailbox records judged by 30 doc rows in tests/diag/expected.csv, the mailbox judge, and the runner naming a fault it ran past under --no-stop-on-fault; the ci workflow passes 240 of 240 and the hygiene workflow passes)
+state_head: d3f5ea8a7f8358fab8a1dbba26d86d199a500a5f
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 39
+  completed_plans: 40
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 25 of 27
+Plan: 26 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-24: the runner's --trace first-fault, fault line, exit 7, unbuilt line and one fixture per fault class (02-24-SUMMARY.md); 02-22 stays halted at its push, which is open
+Last activity: 2026-11-09 — Completed 02-25: the exc_matrix fixture, its 30 doc rows and the mailbox judge (02-25-SUMMARY.md); 02-22 stays halted at its push, which is open
 
 Progress: [██░░░░░░░░] 17%
 
@@ -96,6 +96,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P21 | 15 min | 3 tasks | 15 files |
 | Phase 02 P23 | 6 min | 3 tasks | 14 files |
 | Phase 02 P24 | 12min | 3 tasks | 13 files |
+| Phase 02 P25 | 25min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -190,6 +191,7 @@ Recent decisions affecting current work:
 - [Phase 02]: line and dot of a trace record are derived at read time from the cycles since its frame began at 11 to 7 GPU clocks over 3,413 (NTSC) or 3,406 (PAL) clocks per line until the GPU keeps a beam
 - [Phase 02]: 02-23: --stop-on mailbox reads the fixture mailbox through schway_peek once per frame; done with a matching CRC-32 exits 0, a fault status or a CRC mismatch exits 6, and no verdict by the frame cap prints hang frames=N pc=0x... and exits 8, only under --stop-on, so a plain --exe run at its cap still exits 0 — A fault status skips the CRC check because the stub kernel writes FFh over the status word without rewriting the CRC; the exit-table check compares --help with docs/runner.md both ways and the gate total is 1494 lines against 1520 (plan 02-26 decides any deferral)
 - [Phase 02]: 02-24: an --exe run goes through schway_run per frame with stop-on-fault on by default and exit 7; the unbuilt line's n is the last device's count, printed once at the end of any --exe run; --trace and --no-stop-on-fault need --exe
+- [Phase 02]: 02-25: the mailbox judge pairs a fixture's CSV rows with its records by order (row n is record id n) and lives in the fixtures script case; under --no-stop-on-fault the runner prints the first fault the program made at the end of the run and keeps the run's status — ExcCode persists until the next exception, so the masked-line and CAUSE-after-I_STAT doc rows read 1Ch, not 0; those two rows and the interrupt EPC (MTC0 plus 8) pin models, not measurements, and change only through tests/diag/allow.txt
 
 ### Pending Todos
 
@@ -244,8 +246,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T23:14:09.790Z
-Stopped at: Completed 02-24-PLAN.md
+Last session: 2026-11-09T23:22:44.020Z
+Stopped at: Completed 02-25-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
