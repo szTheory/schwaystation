@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-10-PLAN.md
-last_updated: "2026-11-09T20:40:44.005Z"
+stopped_at: Completed 02-11-PLAN.md
+last_updated: "2026-11-09T20:52:09.356Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 02 execution started
-state_head: 254b715c34a7c5d36b198b56c40754ca2dff2a9a
+state_head: c99ef9965cd9b4cbdcc2458272177444563e62dc
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 25
+  completed_plans: 26
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 11 of 27
+Plan: 12 of 27
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 02 execution started
 
@@ -83,6 +83,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P08 | 25 min | 2 tasks | 16 files |
 | Phase 02 P09 | 36 min | 3 tasks | 6 files |
 | Phase 02 P10 | 13 min | 3 tasks | 11 files |
+| Phase 02 P11 | 10 min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,9 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-10: Exception entry: schway__cop0_exception is the one entry; cpu_step takes a trapped flag so the program counter stays at the vector, and writes the branch record and the issued load once at the end
 - [Phase 02]: 02-10: Layout assertion: offsetof(exc_repeat) == 296 pins the cpu state part, since the log pointer after a 300-byte state aligns differently on 32 and 64 bit
 - [Phase 02]: 02-10: COP0 behaviour not covered by vectors: MTC0 ignores TAR, BadVaddr, EPC and PRID; MFC0 into r0 is a discarded pending load; COP0 in user mode with CU0 clear is CpU with CE 0 and no first fault; BCondZ links only for rt 10h and 11h
+- [Phase 02]: 02-11: schway_run never crosses a frame boundary, and a budget ending exactly on it reports FRAME; max_cycles 0 changes nothing
+- [Phase 02]: 02-11: instance.frame_end joins the state, validated as ticks <= frame_end <= ticks + the region's longest frame, so a run from a hostile state stays bounded
+- [Phase 02]: 02-11: gate total after docs.api_names is 1457 lines against the 1520 limit; todo 008 is closed, plan 02-27 moves the file
 
 ### Pending Todos
 
@@ -203,8 +207,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T20:40:43.909Z
-Stopped at: Completed 02-10-PLAN.md
+Last session: 2026-11-09T20:52:09.205Z
+Stopped at: Completed 02-11-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
