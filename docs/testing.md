@@ -76,12 +76,22 @@ the same file.
 | `portable` | Tests that hold on every platform, including the frame hashes; the emulated lanes run these. |
 | `abi` | The public header compiled alone as C17 and C++17, the API test, and the library's symbols. |
 | `runner` | `schwaystation-run` options, output, exit statuses and the PNG writer. |
+| `cpu` | The R3000A core: instruction behaviour, exceptions, delay slots and the first-fault trace. |
+| `bus` | The address map: physical decode, RAM mirrors, memory control, the I-cache, the scratchpad and the interrupt registers. |
+| `vectors` | The committed sample of public single-step vectors, run case by case against the core. |
+| `fuzz` | The executable loader's committed fuzz seeds, replayed on every leg; the time-boxed campaign runs nightly and only reports. |
+| `exe` | Loading a PS-X EXE under the stub kernel and `--probe`, including the rejected headers. |
+| `fixtures` | The fixture toolchain: pinned downloads, the committed stub kernel's source and the manifest rows. |
 | `libretro` | The libretro core in an in-process host and its `.info` file. |
 | `install` | The library installed and found by an outside project. |
 | `perf` | Allocation-free frames and the instructions-per-frame gate's own logic. |
 | `policy` | Rules about the repository, the documents and the tests themselves. |
 | `release` | The packaged archives, run after the package step. |
 | `hygiene` | The hygiene lane's checks. |
+
+The directories `cpu`, `bus`, `vectors`, `fuzz`, `exe` and `fixtures` each hold an `inventory.txt` and carry the
+label of the same name. `tests/diag/` is a data directory, with no tests of its own: it holds the judged fixture rows
+and their dated changes.
 
 ### The JUnit check
 
@@ -107,7 +117,8 @@ regular expression or disables a test, so no test is ever conditional.
    ```
 
    `NAME`, `COMMAND`, `LABELS` and `TIMEOUT` are required; `PASS_REGEX` makes the test pass only when its output
-   matches, and `COST` orders long tests first. A comment above it names the fault the test prevents.
+   matches and its command exits 0 (the helper runs it through `expect_fail.cmake` with `CODE` 0, because CTest's own
+   pass pattern would override a non-zero exit), and `COST` orders long tests first. A comment above it names the fault the test prevents.
 2. Add `runner.example<TAB>runner` to `tests/<dir>/inventory.txt` at its sorted place.
 3. Run `cmake --workflow --preset ci`. If configure fails, its message names the difference between what was
    registered and what the inventories list.
@@ -137,7 +148,7 @@ written into the build tree when CMake configures, so no tracked file holds them
 ## Budgets
 
 **Documents.** `docs.budgets` keeps `README.md` under 16,384 bytes, `include/schwaystation.h` under 40,960 bytes and
-each `docs/*.md` page under 61,440 bytes, each strictly below its limit, and names every file at or over it with
+each `docs/*.md` and `docs/*/*.md` page under 61,440 bytes, each strictly below its limit, and names every file at or over it with
 its size. Run it by hand with `cmake -DROOT=. -P tests/cmake/budgets.cmake`.
 
 **Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` (hygiene lane) counts
@@ -193,7 +204,8 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
 | `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, `320x240, every pixel equal`, and the flipped-pixel control must fail naming `7,3`. | yes |
 | `perf` | Cachegrind instructions per frame at head and at the merge base, then `perf_compare.cmake` in gate mode on pull requests. Manual runs measure one commit three times and report its spread. | yes |
-| `rehearsal`, `cleanup` | Rehearse publication on same-repository pull requests that change release inputs, then delete the rehearsal release and tag. See [maintaining.md](maintaining.md). | yes, when applicable |
+| `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
+| `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `CI required` | The one check the ruleset requires. It passes only when every job above succeeded or was skipped as allowed: heavy jobs when `heavy=false`, `title` and `perf` outside pull requests, `perf` in a call from `release.yml`, and rehearsal jobs when publication is not applicable. | the check |
 
 `wasm32` became required after a successful run on `main`. Timeouts are twice the slowest successful duration
