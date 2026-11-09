@@ -9,6 +9,7 @@ fixtures.boot.registered_handler	fixtures,portable
 fixtures.boot.split_with_exe	fixtures,portable
 fixtures.boot.stop_on_fault	fixtures,portable
 fixtures.exit_port	fixtures,portable
+fixtures.gap_write	fixtures,portable
 fixtures.hang	fixtures,portable
 fixtures.hello.boot	fixtures,portable
 fixtures.hello.criterion4	fixtures,portable
@@ -20,8 +21,17 @@ fixtures.mailbox_fault	fixtures,portable
 fixtures.probe.hello	fixtures,portable
 fixtures.stub.window	fixtures,portable
 fixtures.stub_drift	fixtures,portable
+fixtures.trace.cop_unusable	fixtures,portable
 fixtures.trace.criterion5	fixtures,portable
+fixtures.trace.exception_loop	fixtures,portable
+fixtures.trace.misaligned_fetch	fixtures,portable
+fixtures.trace.misaligned_read	fixtures,portable
+fixtures.trace.misaligned_write	fixtures,portable
+fixtures.trace.reserved_instruction	fixtures,portable
+fixtures.trace.unmapped_fetch	fixtures,portable
 fixtures.trace.unmapped_read	fixtures,portable
+fixtures.trace.unmapped_write	fixtures,portable
 fixtures.tty.flag_off	fixtures,portable
 fixtures.tty.hello	fixtures,portable
 fixtures.tty.ring	fixtures,portable
+fixtures.unbuilt_footer	fixtures,portable

@@ -19,6 +19,7 @@ runner.hashes_file	portable,runner
 runner.png	portable,runner
 runner.png_file	portable,runner
 runner.stop	portable,runner
+runner.trace.golden	portable,runner
 runner.usage.exe	portable,runner
 runner.usage.frame_range	portable,runner
 runner.usage.no_args	portable,runner

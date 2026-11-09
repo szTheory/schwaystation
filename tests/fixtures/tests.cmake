@@ -178,7 +178,10 @@ schway__fixture(exit_port_fail.exe exit_port.asm -equ CODE 0x2A)
 schway__fixture(hang.exe hang.asm)
 schway__fixture(mailbox_fault.exe mailbox_fail.asm -equ MODE 0)
 schway__fixture(mailbox_crc.exe mailbox_fail.asm -equ MODE 1)
-set(schway__fault_kinds unmapped_read)
+schway__fixture(unbuilt.exe unbuilt.asm -equ MODE 0)
+schway__fixture(gap_write.exe unbuilt.asm -equ MODE 1)
+set(schway__fault_kinds unmapped_read unmapped_write unmapped_fetch misaligned_read misaligned_write
+  misaligned_fetch reserved_instruction cop_unusable exception_loop)
 set(schway__fault_index 1)
 foreach(kind IN LISTS schway__fault_kinds)
   schway__fixture(fault_${kind}.exe fault.asm -equ KIND ${schway__fault_index})
@@ -275,6 +278,15 @@ endforeach()
 # line and exit 7 (the default cap is 600 frames).
 expect_runner(fixtures.trace.criterion5 7 "(^|\n)fault frame="
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/fault_unmapped_read.exe --trace first-fault)
+
+# Fault prevented: accesses to devices that are not built yet that leave no sign of a program stuck on
+# one, and a write to a gap that is dropped without a fault. GPU and DMA writes end with exit 0 and an
+# unbuilt line; a write to 1F801030h is a first fault.
+expect_runner(fixtures.unbuilt_footer 0
+  "(^|\n)unbuilt dev=(gpu|dma) n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
+  --exe ${SCHWAYSTATION_FIXTURES_DIR}/unbuilt.exe --stop-on mailbox --frames 30)
+expect_runner(fixtures.gap_write 7 "(^|\n)fault frame=[0-9]+ [^\n]* kind=unmapped_write(\n|$)"
+  --exe ${SCHWAYSTATION_FIXTURES_DIR}/gap_write.exe --frames 30)
 
 # Fault prevented: a tampered or wrongly pinned assembler accepted. The
 # digest check runs on a local file:// URL with an all-zero digest and must

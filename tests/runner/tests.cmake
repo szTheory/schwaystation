@@ -343,6 +343,21 @@ schway_add_test(NAME runner.exe.missing
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
+# The trace record formatter, tested directly: it links the formatter alone, with no instance.
+add_executable(schwaystation-test-trace-format
+  ${CMAKE_CURRENT_LIST_DIR}/test_trace.c
+  ${PROJECT_SOURCE_DIR}/runner/trace.c)
+target_link_libraries(schwaystation-test-trace-format PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-trace-format PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-trace-format)
+
+# Fault prevented: a trace line whose fields, order, hex width or event and device names drift from
+# what docs/runner.md says, so a script that reads the tail misparses it. One golden line per event.
+schway_add_test(NAME runner.trace.golden
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-trace-format>
+  LABELS portable runner TIMEOUT 10)
+
 # Fault prevented: a documented exit status that differs from what the runner returns. --help's
 # table and docs/runner.md's must match line for line, in either direction; the self test checks a
 # copy of the page without the hang row, which must fail naming that row.
