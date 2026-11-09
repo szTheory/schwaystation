@@ -64,6 +64,109 @@ t_syscall:
   syscall
 r_syscall:
 
+  ; SYSCALL in the delay slot of a taken branch.
+  arm t_syscall_bd, r_syscall_bd, 0
+t_syscall_bd:
+  b r_syscall_bd
+  .word 0x0000000C                      ; SYSCALL, which armips will not place in a delay slot
+r_syscall_bd:
+
+  ; BREAK, then BREAK in a delay slot.
+  arm t_break, r_break, 0
+t_break:
+  break
+r_break:
+  arm t_break_bd, r_break_bd, 0
+t_break_bd:
+  b r_break_bd
+  .word 0x0000000D                      ; BREAK, likewise
+r_break_bd:
+
+  ; AdEL on a misaligned LH and LW, AdES on a misaligned SW. 80000001h, 80000002h and 80000003h are RAM,
+  ; so only the alignment is wrong; the exception comes before any access.
+  arm t_lh, r_lh, 1
+  li t2, 0x80000001
+t_lh:
+  lh t0, 0(t2)
+r_lh:
+  arm t_lw, r_lw, 1
+  li t2, 0x80000002
+t_lw:
+  lw t0, 0(t2)
+r_lw:
+  arm t_sw, r_sw, 1
+  li t2, 0x80000003
+t_sw:
+  sw zero, 0(t2)
+r_sw:
+
+  ; Overflow: 7FFFFFFFh plus 1 in ADD.
+  arm t_add, r_add, 0
+  li t0, 0x7FFFFFFF
+  li t1, 1
+t_add:
+  add t2, t0, t1
+r_add:
+
+  ; A reserved instruction: opcode 3Fh.
+  arm t_reserved, r_reserved, 0
+t_reserved:
+  .word 0xFFFFFFFF
+r_reserved:
+
+  ; Coprocessor 1 is unusable: MFC1 with SR.CU1 clear.
+  arm t_cop1, r_cop1, 0
+t_cop1:
+  .word 0x44080000
+r_cop1:
+
+  ; A data bus error: a word read from the first expansion region, 1F000000h.
+  arm t_dbe, r_dbe, 0
+  li t2, 0xBF000000
+t_dbe:
+  lw t0, 0(t2)
+r_dbe:
+
+  ; The vertical blank with I_MASK bit 0 set and SR masking it: CAUSE shows the line, no handler runs.
+  li t1, I_STAT
+  li t3, I_MASK
+  li t0, 1
+  sw t0, 0(t3)
+wait_vblank_1:
+  lw t0, 0(t1)
+  nop
+  andi t0, t0, 1
+  beq t0, zero, wait_vblank_1
+  nop
+  mfc0 t2, cause
+  nop
+  rec t2
+  rec s5
+
+  ; CAUSE in the instruction right after an I_STAT write. The KSEG1 read first empties the write queue.
+  lw t0, 0(t1)
+  nop
+  sw zero, 0(t1)
+  mfc0 t2, cause
+  nop
+  rec t2
+
+  ; The next blank, then SR unmasks it: the handler runs two instructions after the MTC0.
+wait_vblank_2:
+  lw t0, 0(t1)
+  nop
+  andi t0, t0, 1
+  beq t0, zero, wait_vblank_2
+  nop
+  arm t_unmask, r_unmask, 0
+  li t0, 0x0401                         ; IM bit 10 and IEc
+t_unmask:
+  mtc0 t0, sr
+  nop
+r_unmask:
+  nop
+  mtc0 zero, sr
+
   ; The records are done: count them and seal the mailbox.
   li t0, MB_BASE
   andi t1, s6, 0xFFFF

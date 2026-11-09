@@ -155,8 +155,9 @@ after an exit port failure, `--hash` and `--bench` print nothing after status 6,
 ## Diagnostics
 
 An `--exe` run stops at the first fault the program makes, which is a bus access, instruction fetch or instruction the
-core cannot carry on from, and exits with status 7. `--no-stop-on-fault` runs on instead. The runner prints one line,
-after the program's text:
+core cannot carry on from, and exits with status 7. `--no-stop-on-fault` runs on instead and keeps the status the
+run would have had. The runner prints one line, after the program's text, for the first fault the program made,
+also when it ran on:
 
 ```text
 fault frame=0 line=0 dot=0 pc=0x80010128 op=0x00000000 addr=0xbf801030 width=4 dev=unmapped kind=unmapped_read

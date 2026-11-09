@@ -364,7 +364,7 @@ expect_runner(fixtures.mailbox_crc 6 "mailbox crc mismatch"
 schway_add_test(NAME fixtures.exc_matrix
   COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=exc_matrix
     -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/exc_matrix.exe -DFRAMES=30 -DFLAGS=--no-stop-on-fault
-    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DFAULT_KIND=misaligned_read -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
     -DALLOW=${PROJECT_SOURCE_DIR}/tests/diag/allow.txt
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}

@@ -44,7 +44,8 @@
  *
  * An --exe run stops at the program's first fault (--no-stop-on-fault turns that off): it prints
  * "fault frame=<N> line=<L> dot=<D> pc=0x<pc> op=0x<op> addr=0x<addr> width=<W> dev=<device>
- * kind=<kind>" and is status 7. --trace first-fault also prints the last 4,096 trace records, oldest
+ * kind=<kind>" and is status 7; with --no-stop-on-fault the run goes on, prints that line at the end
+ * if the program made a fault, and keeps its own status. --trace first-fault also prints the last 4,096 trace records, oldest
  * first, as twelve tab-separated fields (trace.h), after a fault line or a hang line. An --exe run that
  * ends with a non-zero count of accesses to devices that are not built prints one
  * "unbuilt dev=<device> n=<count> last_pc=0x<pc>" line.
@@ -535,14 +536,14 @@ static void print_unbuilt(const schway *inst)
            (unsigned long)v.n[v.last_dev], (unsigned long)v.last_pc);
 }
 
-/* The first-fault line, from the core's fault record. */
-static void print_fault(const schway *inst)
+/* The first-fault line, from the core's fault record: 1 when there was a fault to print. */
+static int print_fault(const schway *inst)
 {
     schway_fault f;
     memset(&f, 0, sizeof f);
     f.size = (uint32_t)sizeof f;
-    if (schway_get_fault(inst, &f) != SCHWAY_STATUS_OK) {
-        return;
+    if (schway_get_fault(inst, &f) != SCHWAY_STATUS_OK || f.kind == SCHWAY_FAULT_NONE) {
+        return 0;
     }
     printf("fault frame=%llu line=%lu dot=%lu pc=0x%08lx op=0x%08lx addr=0x%08lx width=%lu dev=%s "
            "kind=%s\n",
@@ -550,6 +551,7 @@ static void print_fault(const schway *inst)
            (unsigned long)f.pc, (unsigned long)f.opcode, (unsigned long)f.addr,
            (unsigned long)f.width, schway__trace_device_name(f.device),
            schway__trace_kind_name(f.kind));
+    return 1;
 }
 
 /* The trace ring, oldest record first, one twelve-field line each. */
@@ -711,11 +713,9 @@ static int run(const options *opt)
     if (tty.len != 0u) {
         tty_emit(&tty);
     }
-    if (faulted) {
-        print_fault(inst);
-        if (opt->trace) {
-            print_tail(inst);
-        }
+    /* A run that went on past its first fault (--no-stop-on-fault) still names it. */
+    if ((faulted || opt->keep_going) && print_fault(inst) && opt->trace) {
+        print_tail(inst);
     }
     if (status == SCHWAY__EXIT_OK && exit_code != 0u) {
         printf("exit code=0x%02lx\n", (unsigned long)exit_code);
