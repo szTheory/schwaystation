@@ -13,7 +13,7 @@ This release loads no BIOS and no disc. Without `--exe` every run shows the buil
 ```text
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--hash]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox] [--hash]
 schwaystation-run --probe FILE
 schwaystation-run --help | --version
 ```
@@ -26,6 +26,7 @@ schwaystation-run --help | --version
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
 | `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
 | `--tty` | Print the program's text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe`. |
+| `--stop-on mailbox` | End the run when the program's [mailbox](#mailbox) reports done or fault; a run that reaches the frame cap with neither is a [hang](#mailbox). Needs `--exe`. Give it once. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print what the PS-EXE file is, as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
@@ -35,7 +36,7 @@ schwaystation-run --help | --version
 
 Options may come in any order, except `--probe`, which takes no other option. Anything else on the command line is
 a usage error and nothing runs; that includes a file name that does not follow `--exe` or `--probe`, `--exe` twice
-or with `--probe`, `--tty` without `--exe`, and any option this release does not have.
+or with `--probe`, `--tty` or `--stop-on` without `--exe`, `--stop-on` with anything but `mailbox`, and any option this release does not have.
 
 ## Examples
 
@@ -45,6 +46,7 @@ schwaystation-run --bench 600
 schwaystation-run --frames 60 --png 60:card.png
 schwaystation-run --region pal --frames 50 --hash
 schwaystation-run --exe game.exe --tty
+schwaystation-run --exe game.exe --tty --stop-on mailbox
 schwaystation-run --exe game.exe --frames 300 --hash
 schwaystation-run --probe game.exe
 schwaystation-run --help
@@ -62,7 +64,8 @@ schwaystation-run 0.0.0 0123456789abcdef0123456789abcdef01234567
 
 `--exe FILE` reads the file, checks it with the core's PS-EXE validator and loads it, then runs frames as `--frames`
 does. The stub kernel the core maps in place of a BIOS starts the program. Without `--frames` or `--bench` the run is
-600 frames; a program that is still running at the end of the last frame is not an error, and the status is 0.
+600 frames; a program that is still running at the end of the last frame is not an error, and the status is 0, unless
+[`--stop-on mailbox`](#mailbox) was given.
 
 A file that is missing, unreadable, empty or not a valid PS-EXE exits 1 with one line on standard error and runs
 nothing, in the form `--probe` uses:
@@ -102,6 +105,45 @@ exit code=0x2a
 
 The text written before the exit is printed first. `--hash`, `--png` and `--bench` print nothing after an exit
 with status 6. Without `--tty` the port is not decoded and the write has no effect.
+
+## Mailbox
+
+A test program reports its result in a 256-byte mailbox at RAM address 10000h, which is where an image loaded at
+80010000h starts. The layout, in bytes:
+
+| Offset | Content |
+|---|---|
+| 00h | the magic `SWMB` |
+| 04h | CRC-32 (IEEE) of bytes 10h to FFh, little-endian |
+| 08h | status: 80h running, 81h waiting for input, 00h done, FFh fault |
+| 09h | protocol version, 1 |
+| 0Ah | record count, at most 30 |
+| 10h + 8n | record n: id (16 bits), flags (16 bits), value (32 bits), little-endian |
+
+With `--stop-on mailbox` the runner reads the mailbox after every frame, and after a program's exit port report, through
+the core's `schway_peek`; the core has no mailbox of its own. Until the magic is there and the status is 00h or
+FFh the run goes on. A status of 00h or FFh ends it, and the runner prints one line, then one line per record:
+
+```text
+mailbox SWMB status=00 records=2
+mailbox 0001=80018000
+mailbox 0002=80200000
+```
+
+Each record line is the id, four lowercase hex digits, then the value, eight. Status 00h exits 0 when the CRC-32 matches
+the bytes it covers. A CRC that does not match prints `mailbox crc mismatch` alone and exits 6. Status FFh, which a
+program sets itself and the stub kernel sets when the program takes an exception, prints the same lines and exits 6;
+its CRC is not checked, as the kernel does not rewrite it.
+
+A run that reaches the frame cap, `--frames N` or the 600-frame default, with no such status is a hang. The runner
+prints the frame count and the program counter, and exits 8:
+
+```text
+hang frames=600 pc=0x80010100
+```
+
+A program that ends the run through the [exit port](#exit-port) first, or a SIGINT or SIGTERM, is not a hang. As
+after an exit port failure, `--hash` and `--bench` print nothing after status 6 or 8.
 
 ## Frame hash
 
