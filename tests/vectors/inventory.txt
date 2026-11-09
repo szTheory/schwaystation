@@ -1,2 +1,12 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+vectors.r3000.allow.self_test	portable,vectors
+vectors.r3000.allow_stale.self_test	portable,vectors
+vectors.r3000.empty.self_test	portable,vectors
+vectors.r3000.flip.branch_target.self_test	portable,vectors
+vectors.r3000.flip.cause.self_test	portable,vectors
+vectors.r3000.flip.epc.self_test	portable,vectors
+vectors.r3000.flip.load_value.self_test	portable,vectors
+vectors.r3000.flip.r5.self_test	portable,vectors
+vectors.r3000.flip.tar.self_test	portable,vectors
 vectors.r3000.sample	portable,vectors
+vectors.r3000.truncated.self_test	portable,vectors

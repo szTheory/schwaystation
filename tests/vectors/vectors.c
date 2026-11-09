@@ -208,9 +208,6 @@ static uint32_t parse_container(size_t n)
     if (count == 0u) {
         die("no slices");
     }
-    if ((n - 2u) / (SLICE_NAME_BYTES + 4u) < count) {
-        die("short file: fewer bytes than slice headers");
-    }
     slices = calloc(count, sizeof slices[0]);
     if (slices == NULL) {
         die("out of memory");
