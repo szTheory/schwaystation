@@ -11,7 +11,9 @@
 
 # schway_add_test(NAME n COMMAND cmd... LABELS l... TIMEOUT seconds [COST c] [PASS_REGEX re])
 # TIMEOUT is multiplied by SCHWAYSTATION_TIMEOUT_SCALE, which slow lanes raise.
-# PASS_REGEX makes the test pass only when its output matches.
+# PASS_REGEX makes the test pass only when its output matches and its command
+# exits 0: the command runs through tests/cmake/expect_fail.cmake with CODE 0,
+# because CTest's own pass-regex property would override a non-zero exit.
 function(schway_add_test)
   cmake_parse_arguments(PARSE_ARGV 0 T "" "NAME;TIMEOUT;COST;PASS_REGEX" "COMMAND;LABELS")
   if(NOT T_NAME OR NOT T_COMMAND OR NOT T_LABELS OR NOT T_TIMEOUT)
@@ -21,11 +23,16 @@ function(schway_add_test)
     set(T_COST 1)
   endif()
   math(EXPR timeout "${T_TIMEOUT} * ${SCHWAYSTATION_TIMEOUT_SCALE}")
-  add_test(NAME ${T_NAME} COMMAND ${T_COMMAND})
-  set_tests_properties(${T_NAME} PROPERTIES LABELS "${T_LABELS}" TIMEOUT ${timeout} COST ${T_COST})
   if(DEFINED T_PASS_REGEX)
-    set_tests_properties(${T_NAME} PROPERTIES PASS_REGULAR_EXPRESSION "${T_PASS_REGEX}")
+    set(command "${T_COMMAND}")
+    string(REPLACE ";" "$<SEMICOLON>" command "${command}")
+    add_test(NAME ${T_NAME}
+      COMMAND ${CMAKE_COMMAND} "-DCMD=${command}" -DCODE=0 "-DREGEX=${T_PASS_REGEX}"
+        -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake)
+  else()
+    add_test(NAME ${T_NAME} COMMAND ${T_COMMAND})
   endif()
+  set_tests_properties(${T_NAME} PROPERTIES LABELS "${T_LABELS}" TIMEOUT ${timeout} COST ${T_COST})
 endfunction()
 
 include(${PROJECT_SOURCE_DIR}/tests/cmake/inventory.cmake)
