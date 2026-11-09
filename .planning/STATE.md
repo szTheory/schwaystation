@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-11-PLAN.md
-last_updated: "2026-11-09T20:52:09.356Z"
+stopped_at: Completed 02-12-PLAN.md
+last_updated: "2026-11-09T21:07:15.804Z"
 last_activity: 2026-11-09
-last_activity_desc: Phase 02 execution started
-state_head: c99ef9965cd9b4cbdcc2458272177444563e62dc
+last_activity_desc: Completed 02-12 (loads, stores, mul/div, COP2 pre-phase; 5,500 vector cases pass)
+state_head: 4df168be4b54d00092ae35ea55a769b8b536da16
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 26
+  completed_plans: 27
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 12 of 27
+Plan: 13 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Phase 02 execution started
+Last activity: 2026-11-09 — Completed 02-12: loads, stores, mul/div and COP2 before the GTE; all 5,500 vector cases pass
 
 Progress: [██░░░░░░░░] 17%
 
@@ -84,6 +84,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P09 | 36 min | 3 tasks | 6 files |
 | Phase 02 P10 | 13 min | 3 tasks | 11 files |
 | Phase 02 P11 | 10 min | 3 tasks | 14 files |
+| Phase 02 P12 | 14 min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,11 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-11: schway_run never crosses a frame boundary, and a budget ending exactly on it reports FRAME; max_cycles 0 changes nothing
 - [Phase 02]: 02-11: instance.frame_end joins the state, validated as ticks <= frame_end <= ticks + the region's longest frame, so a run from a hostile state stays bounded
 - [Phase 02]: 02-11: gate total after docs.api_names is 1457 lines against the 1520 limit; todo 008 is closed, plan 02-27 moves the file
+- [Phase 02]: Rule (a) of the vector harness asserts the exception for a misaligned access and compares every other final field with CAUSE CE masked; the upstream interpreter copies opcode bits 27-26 into CE
+- [Phase 02]: LWL and LWR read the aligned word once, SWL and SWR write the covered bytes as aligned chunks, and rule (b) coalesces upstream chunks to the covered byte set; no bus-hook field was needed
+- [Phase 02]: A multiply or divide issued at counter t is ready at t plus 6, 9, 13 or 36; an early MFHI/MFLO waits to the stamp, capped at 36 cycles; MTHI/MTLO clear the stamp
+- [Phase 02]: A user-mode access outside KUSEG raises AdEL or AdES and records no first fault; a misaligned access records misaligned_read or misaligned_write
+- [Phase 02]: LWC1, SWC1, LWC3 and SWC3 follow the COP1/COP3 CpU rule; LWC0 and SWC0 stay reserved-instruction exceptions
 
 ### Pending Todos
 
@@ -207,8 +213,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T20:52:09.205Z
-Stopped at: Completed 02-11-PLAN.md
+Last session: 2026-11-09T21:07:15.704Z
+Stopped at: Completed 02-12-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
