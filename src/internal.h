@@ -319,9 +319,9 @@ schway_status schway__instance_check_out_size(const void *s, uint32_t first);
 void schway__instance_write_out(void *out, const void *full, uint32_t ours);
 
 _Static_assert(sizeof(struct schway__cop0) == 128, "cop0 size");
-/* The state part of the cpu ends with exc_repeat at 296; the non-state log
+/* The state part of the cpu ends with exc_repeat at 312; the non-state log
    pointer that follows is aligned differently on 32-bit and 64-bit targets. */
-_Static_assert(offsetof(struct schway__cpu, exc_repeat) == 296, "cpu state size");
+_Static_assert(offsetof(struct schway__cpu, exc_repeat) == 312, "cpu state size");
 _Static_assert(sizeof(struct schway__irq) == 8, "irq size");
 _Static_assert(SCHWAY__DEV_COUNT == 18, "device count");
 _Static_assert(offsetof(struct schway__fault, frame) == 16, "fault.frame");

@@ -1,6 +1,6 @@
 /* Replays the SingleStepTests r3000 vectors through schway__cpu_step_one:
      schwaystation-test-vectors FILE --expect N [--only NAME,...] [--allow FILE]
-                                [--flip-expected FIELD]
+                                [--flip-expected FIELD[@FILE]]
    FILE holds the committed sample: a u16 slice count, then per slice a 16-byte
    NUL-padded name, a u32 byte length and the upstream bytes (a u32 case count,
    then the cases), all little-endian. A case is a 51-byte Pascal name, a u32
@@ -91,7 +91,7 @@ static void die(const char *what)
 static void usage(void)
 {
     fprintf(stderr, "usage: schwaystation-test-vectors FILE --expect N [--only NAME,...] "
-                    "[--allow FILE] [--flip-expected FIELD]\n");
+                    "[--allow FILE] [--flip-expected FIELD[@FILE]]\n");
     finish(2);
 }
 
@@ -449,21 +449,39 @@ static void compare_final(struct run *r, const struct schway__cpu *cpu, uint32_t
     check(r, "load_value", w->load_value, cpu->load_value);
 }
 
+/* The effective address of a load or store case: the base register plus the
+   sign-extended immediate. */
+static uint32_t effective_address(const struct vcase *c)
+{
+    return c->initial.r[(c->opcode >> 21) & 31u] + (((c->opcode & 0xFFFFu) ^ 0x8000u) - 0x8000u);
+}
+
 /* Rule (a). Whether the case is a half-word or word access at an address that
-   is not a multiple of its size; the effective address is the base register
-   plus the sign-extended immediate. Sets *store for a store. */
+   is not a multiple of its size. Sets *store for a store. */
 static int misaligned_access(const struct vcase *c, uint32_t *store, uint32_t *ea)
 {
-    uint32_t size = 0u;
+    uint32_t size;
     *store = 0u;
     switch (c->opcode >> 26) {
+    case 0x21u: /* LH */
+    case 0x25u: /* LHU */
+        size = 2u;
+        break;
     case 0x23u: /* LW */
         size = 4u;
+        break;
+    case 0x29u: /* SH */
+        size = 2u;
+        *store = 1u;
+        break;
+    case 0x2Bu: /* SW */
+        size = 4u;
+        *store = 1u;
         break;
     default:
         return 0;
     }
-    *ea = c->initial.r[(c->opcode >> 21) & 31u] + (((c->opcode & 0xFFFFu) ^ 0x8000u) - 0x8000u);
+    *ea = effective_address(c);
     return (*ea & (size - 1u)) != 0u;
 }
 
@@ -480,6 +498,55 @@ static void rule_misaligned(struct run *r, const struct schway__cpu *cpu,
     check(r, "exception bus (fetch only)", 1u, fetch_only ? 1u : 0u);
     check(r, "exception badvaddr", ea, cpu->cop0.r[SCHWAY__COP0_BADVADDR]);
     compare_final(r, cpu, CAUSE_CE);
+}
+
+/* Rule (b). Whether the case is LWL, LWR, SWL or SWR. Sets *store for a store,
+   *left for LWL and SWL, and *ea. */
+static int unaligned_form(const struct vcase *c, uint32_t *store, uint32_t *left, uint32_t *ea)
+{
+    uint32_t op = c->opcode >> 26;
+    if (op != 0x22u && op != 0x26u && op != 0x2Au && op != 0x2Eu) {
+        return 0;
+    }
+    *store = op >= 0x2Au ? 1u : 0u;
+    *left = op == 0x22u || op == 0x2Au ? 1u : 0u;
+    *ea = effective_address(c);
+    return 1;
+}
+
+/* Rule (b): coalesces cycles 1 and on, which upstream records as chunks of 1,
+   2 and 4 bytes, into one cycle that covers the bytes they touch. Its size
+   field holds the mask of covered lanes of the aligned word, its address the
+   word and its value the covered bytes in place. Returns 0 when the chunks are
+   not all one kind inside one word. */
+static int coalesce(struct schway__cpu_cycle *cyc, uint32_t *n)
+{
+    uint32_t kind = 0u, base = 0u, mask = 0u, data = 0u;
+    if (*n < 2u) {
+        return 0;
+    }
+    for (uint32_t j = 1u; j < *n; j++) {
+        if (j == 1u) {
+            kind = cyc[j].kind;
+            base = cyc[j].addr & ~3u;
+        } else if (cyc[j].kind != kind) {
+            return 0;
+        }
+        for (uint32_t i = 0; i < cyc[j].size; i++) {
+            uint32_t at = cyc[j].addr + i;
+            if ((at & ~3u) != base) {
+                return 0;
+            }
+            mask |= 1u << (at & 3u);
+            data |= ((cyc[j].value >> (8u * i)) & 0xFFu) << (8u * (at & 3u));
+        }
+    }
+    cyc[1].kind = kind;
+    cyc[1].size = mask;
+    cyc[1].addr = base;
+    cyc[1].value = data;
+    *n = 2u;
+    return 1;
 }
 
 /* Inverts one bit of the first case's expected final FIELD, so a negative
@@ -532,7 +599,9 @@ static void make_instance(void)
 
 /* Replays the cases of one selected slice, adding to *ran every case run,
    to *failures the failing ones and to *absorbed those an allow line covers. */
-static unsigned long rule_a_cases;
+static unsigned long rule_a_cases, rule_b_cases;
+static const char *flip_file;
+static int flipped;
 
 static void run_slice(struct slice *s, const char *flip_field, unsigned long *ran,
                       unsigned long *failures, unsigned long *absorbed, unsigned *printed)
@@ -543,11 +612,29 @@ static void run_slice(struct slice *s, const char *flip_field, unsigned long *ra
         struct vcase c;
         struct schway__cpu_log log;
         parse_case(&p, end, &c);
-        if (*ran == 0u && flip_field != NULL) {
+        if (!flipped && flip_field != NULL && (flip_file == NULL || strcmp(flip_file, s->name) == 0)) {
             (void)flip(&c.final, flip_field);
+            flipped = 1;
         }
         struct allowed *a = find_allow(s, &c);
         struct run r = {s, &c, 0u, a == NULL && *printed < PRINT_CASES};
+
+        uint32_t store = 0u, left = 0u, ea = 0u;
+        int rule_a = misaligned_access(&c, &store, &ea);
+        int rule_b = !rule_a && unaligned_form(&c, &store, &left, &ea);
+        if (rule_b) {
+            /* The covered set must be the one the instruction names; a load
+               reads the whole aligned word, replayed from the covered bytes. */
+            uint32_t off = ea & 3u;
+            uint32_t want = left != 0u ? (2u << off) - 1u : (0xFu << off) & 0xFu;
+            rule_b_cases++;
+            if (!coalesce(c.cycle, &c.ncycles) || c.cycle[1].size != want) {
+                cycle_mismatch(&r, 1u, "covered bytes", want, c.cycle[1].size);
+            }
+            if (!store) {
+                c.cycle[1].size = 4u;
+            }
+        }
 
         schway__cpu_reset(inst);
         load_state(&inst->cpu, &c.initial);
@@ -555,11 +642,13 @@ static void run_slice(struct slice *s, const char *flip_field, unsigned long *ra
         log.expect = c.cycle;
         log.expect_n = c.ncycles;
         schway__cpu_step_one(inst, &log);
-        uint32_t store = 0u, ea = 0u;
-        if (misaligned_access(&c, &store, &ea)) {
+        if (rule_a) {
             rule_a_cases++;
             rule_misaligned(&r, &inst->cpu, &log, store, ea);
         } else {
+            if (rule_b && store && log.overflow == 0u) {
+                (void)coalesce(log.got, &log.got_n);
+            }
             compare_cycles(&r, &log);
             compare_final(&r, &inst->cpu, 0u);
         }
@@ -601,6 +690,11 @@ int main(int argc, char **argv)
             allow_path = argv[++i];
         } else if (strcmp(a, "--flip-expected") == 0 && has_value) {
             flip_field = argv[++i];
+            char *at = strchr(flip_field, '@');
+            if (at != NULL) {
+                *at = '\0';
+                flip_file = at + 1;
+            }
         } else if (a[0] != '-' && path == NULL) {
             path = a;
         } else {
@@ -668,7 +762,8 @@ int main(int argc, char **argv)
         }
     }
     printf("vectors: %lu cases, %lu failures\n", ran, failures);
-    printf("vectors: rule (a) handled %lu cases\n", rule_a_cases);
+    printf("vectors: rule (a) handled %lu cases, rule (b) handled %lu cases\n", rule_a_cases,
+           rule_b_cases);
     if (absorbed != 0u) {
         printf("vectors: %lu cases failed and are allowed\n", absorbed);
     }

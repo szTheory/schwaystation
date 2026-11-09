@@ -173,20 +173,174 @@ static void cpu_load_issue(struct schway__cpu *c, uint32_t n, uint32_t v, uint32
     *load_value = v;
 }
 
-/* LW: the word at rs + the sign-extended immediate, into rt through the load
-   delay. A load that faults leaves rt untouched. Returns 1 when it trapped. */
-static uint32_t cpu_load_word(schway *inst, uint32_t pc, uint32_t op, uint32_t *cycles,
-                              uint32_t *load_reg, uint32_t *load_value)
+static uint32_t cpu_bus_write(schway *inst, uint32_t pc, uint32_t addr, uint32_t size,
+                              uint32_t value, uint32_t *cycles)
+{
+    if (inst->cpu.log != NULL) {
+        (void)cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_WRITE, size, addr, value);
+    } else if (schway__bus_write(inst, addr, size, value, cycles) != 0u) {
+        return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
+    }
+    return 0u;
+}
+
+/* The effective address of a load or store: the base register plus the
+   sign-extended immediate. */
+static uint32_t cpu_address(const struct schway__cpu *c, uint32_t op)
+{
+    return c->r[(op >> 21) & 31u] + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u);
+}
+
+/* LB, LBU, LH, LHU and LW: size bytes at the effective address into rt
+   through the load delay, sign-extended when sign is set. A load that faults
+   leaves rt untouched. Returns 1 when it trapped. */
+static uint32_t cpu_load_int(schway *inst, uint32_t pc, uint32_t op, uint32_t size,
+                             uint32_t sign, uint32_t *cycles, uint32_t *load_reg,
+                             uint32_t *load_value)
 {
     struct schway__cpu *c = &inst->cpu;
-    uint32_t addr = c->r[(op >> 21) & 31u] + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u);
+    uint32_t addr = cpu_address(c, op);
     uint32_t v = 0u;
-    if (cpu_data_check(inst, pc, op, addr, 4u, 0u) != 0u ||
-        cpu_bus_read(inst, pc, addr, 4u, &v, cycles) != 0u) {
+    if (cpu_data_check(inst, pc, op, addr, size, 0u) != 0u ||
+        cpu_bus_read(inst, pc, addr, size, &v, cycles) != 0u) {
         return 1u;
+    }
+    if (sign != 0u && size < 4u) {
+        uint32_t top = 1u << (8u * size - 1u);
+        v = (v ^ top) - top;
     }
     cpu_load_issue(c, (op >> 16) & 31u, v, load_reg, load_value);
     return 0u;
+}
+
+/* LWL and LWR: one read of the aligned word that holds the address, whose
+   bytes from the address toward the high end (LWL) or the low end (LWR) of
+   the register replace the same bytes of rt and leave the others. The merge
+   starts from the value a load issued by the previous instruction is about to
+   write, so a pair on one register needs no delay between them (PSX-SYSTEM
+   section 2, Stores, LWL/LWR). Neither faults on alignment. */
+static uint32_t cpu_load_part(schway *inst, uint32_t pc, uint32_t op, uint32_t left,
+                              uint32_t *cycles, uint32_t *load_reg, uint32_t *load_value)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t addr = cpu_address(c, op);
+    uint32_t rt_n = (op >> 16) & 31u;
+    uint32_t off = addr & 3u;
+    uint32_t w = 0u;
+    uint32_t cur, v;
+    if (cpu_data_check(inst, pc, op, addr, 1u, 0u) != 0u ||
+        cpu_bus_read(inst, pc, addr & ~3u, 4u, &w, cycles) != 0u) {
+        return 1u;
+    }
+    cur = c->load_reg == rt_n ? c->load_value : c->r[rt_n];
+    v = left != 0u ? (cur & (0x00FFFFFFu >> (8u * off))) | (w << (24u - 8u * off))
+                   : (cur & (0xFFFFFF00u << (24u - 8u * off))) | (w >> (8u * off));
+    cpu_load_issue(c, rt_n, v, load_reg, load_value);
+    return 0u;
+}
+
+/* SB, SH and SW: the low size bytes of rt at the effective address. All 32
+   bits of rt go on the bus whatever the width (PSX-SYSTEM section 2, Stores).
+   Returns 1 when it trapped. */
+static uint32_t cpu_store_int(schway *inst, uint32_t pc, uint32_t op, uint32_t size,
+                              uint32_t *cycles)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t addr = cpu_address(c, op);
+    if (cpu_data_check(inst, pc, op, addr, size, 1u) != 0u) {
+        return 1u;
+    }
+    return cpu_bus_write(inst, pc, addr, size, c->r[(op >> 16) & 31u], cycles);
+}
+
+/* SWL and SWR: the bytes of the aligned word from its low end up to the
+   address (SWL) or from the address to its high end (SWR) take the matching
+   bytes of rt, and the others stay. They go out as the largest aligned
+   chunks of 4, 2 or 1 bytes, lowest first. Neither faults on alignment. */
+static uint32_t cpu_store_part(schway *inst, uint32_t pc, uint32_t op, uint32_t left,
+                               uint32_t *cycles)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t addr = cpu_address(c, op);
+    uint32_t rt = c->r[(op >> 16) & 31u];
+    uint32_t off = addr & 3u;
+    uint32_t lo = left != 0u ? 0u : off;
+    uint32_t hi = left != 0u ? off : 3u;
+    if (cpu_data_check(inst, pc, op, addr, 1u, 1u) != 0u) {
+        return 1u;
+    }
+    while (lo <= hi) {
+        uint32_t len = hi - lo + 1u;
+        uint32_t size = (lo & 3u) == 0u && len >= 4u ? 4u : ((lo & 1u) == 0u && len >= 2u ? 2u : 1u);
+        uint32_t byte = left != 0u ? 3u - off + lo : lo - off; /* the byte of rt that lands at lo */
+        if (cpu_bus_write(inst, pc, (addr & ~3u) + lo, size, rt >> (8u * byte), cycles) != 0u) {
+            return 1u;
+        }
+        lo += size;
+    }
+    return 0u;
+}
+
+/* The cycles an early read of HI or LO waits: until the running multiply or
+   divide is done, and never more than the longest one takes, whatever a loaded
+   state says. The read issues at the cycle counter plus what the instruction
+   spent before its own issue cycle (PSX-SYSTEM section 2, MULTU/MULT). */
+static uint32_t cpu_muldiv_wait(const struct schway__cpu *c, uint32_t cycles)
+{
+    uint64_t at = c->cycle + (cycles - 1u);
+    uint64_t wait = c->muldiv_ready > at ? c->muldiv_ready - at : 0u;
+    return wait > SCHWAY__MULDIV_MAX ? SCHWAY__MULDIV_MAX : (uint32_t)wait;
+}
+
+/* Starts a multiply or divide that takes n cycles from the issue; one that is
+   still running is replaced and the new one's time is all that counts. */
+static void cpu_muldiv_start(struct schway__cpu *c, uint32_t cycles, uint32_t n)
+{
+    c->muldiv_ready = c->cycle + (cycles - 1u) + n;
+}
+
+/* MULT and MULTU: the 64-bit product into HI:LO, in 6, 9 or 13 cycles by how
+   many bits the first operand needs. MULT classifies rs with its sign mirrored
+   (rs XOR its sign bit spread over the word), MULTU on rs as it is. The
+   product is built from magnitudes so no signed conversion is involved. */
+static void cpu_mult(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t sign,
+                     uint32_t cycles)
+{
+    uint32_t neg_rs = sign != 0u && (rs & 0x80000000u) != 0u ? 1u : 0u;
+    uint32_t neg_rt = sign != 0u && (rt & 0x80000000u) != 0u ? 1u : 0u;
+    uint32_t m = neg_rs != 0u ? ~rs : rs;
+    uint64_t p = (uint64_t)(neg_rs != 0u ? 0u - rs : rs) * (neg_rt != 0u ? 0u - rt : rt);
+    if (neg_rs != neg_rt) {
+        p = 0u - p;
+    }
+    c->lo = (uint32_t)p;
+    c->hi = (uint32_t)(p >> 32);
+    cpu_muldiv_start(c, cycles, m < 0x800u ? 6u : (m < 0x100000u ? 9u : 13u));
+}
+
+/* DIV and DIVU, 36 cycles, no trap. A zero divisor gives LO = -1 (or +1 for
+   DIV of a negative rs) and HI = rs; DIV of -80000000h by -1 gives LO =
+   80000000h and HI = 0 (PSX-SYSTEM section 2, DIV/DIVU). */
+static void cpu_div(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t sign,
+                    uint32_t cycles)
+{
+    uint32_t neg_rs = sign != 0u && (rs & 0x80000000u) != 0u ? 1u : 0u;
+    uint32_t neg_rt = sign != 0u && (rt & 0x80000000u) != 0u ? 1u : 0u;
+    if (rt == 0u) {
+        c->lo = neg_rs != 0u ? 1u : 0xFFFFFFFFu;
+        c->hi = rs;
+    } else if (sign != 0u && rs == 0x80000000u && rt == 0xFFFFFFFFu) {
+        c->lo = 0x80000000u;
+        c->hi = 0u;
+    } else {
+        uint32_t a = neg_rs != 0u ? 0u - rs : rs;
+        uint32_t b = neg_rt != 0u ? 0u - rt : rt;
+        uint32_t q = a / b;
+        uint32_t r = a % b;
+        c->lo = neg_rs != neg_rt ? 0u - q : q;
+        c->hi = neg_rs != 0u ? 0u - r : r;
+    }
+    cpu_muldiv_start(c, cycles, SCHWAY__MULDIV_MAX);
 }
 
 /* Signed overflow of a + b = sum, and of a - b = diff, on unsigned words
@@ -265,6 +419,34 @@ static uint32_t cpu_step(schway *inst)
             case 0x09u: /* JALR */
                 cpu_branch_set(&br, 1u, rs);
                 cpu_set(c, rd_n, next + 4u);
+                break;
+            case 0x10u: /* MFHI */
+                cycles += cpu_muldiv_wait(c, cycles);
+                cpu_set(c, rd_n, c->hi);
+                break;
+            case 0x11u: /* MTHI */
+                c->hi = rs;
+                c->muldiv_ready = 0u;
+                break;
+            case 0x12u: /* MFLO */
+                cycles += cpu_muldiv_wait(c, cycles);
+                cpu_set(c, rd_n, c->lo);
+                break;
+            case 0x13u: /* MTLO */
+                c->lo = rs;
+                c->muldiv_ready = 0u;
+                break;
+            case 0x18u: /* MULT */
+                cpu_mult(c, rs, rt, 1u, cycles);
+                break;
+            case 0x19u: /* MULTU */
+                cpu_mult(c, rs, rt, 0u, cycles);
+                break;
+            case 0x1Au: /* DIV */
+                cpu_div(c, rs, rt, 1u, cycles);
+                break;
+            case 0x1Bu: /* DIVU */
+                cpu_div(c, rs, rt, 0u, cycles);
                 break;
             case 0x0Cu: /* SYSCALL */
                 trapped = cpu_exception(inst, pc, SCHWAY__EXC_SYS, 0u, 0u, 0u);
@@ -376,20 +558,48 @@ static uint32_t cpu_step(schway *inst)
         case 0x0Fu: /* LUI */
             cpu_set(c, rt_n, imm << 16);
             break;
+        case 0x20u: /* LB */
+            trapped = cpu_load_int(inst, pc, op, 1u, 1u, &cycles, &load_reg, &load_value);
+            break;
+        case 0x21u: /* LH */
+            trapped = cpu_load_int(inst, pc, op, 2u, 1u, &cycles, &load_reg, &load_value);
+            break;
+        case 0x22u: /* LWL */
+            trapped = cpu_load_part(inst, pc, op, 1u, &cycles, &load_reg, &load_value);
+            break;
         case 0x23u: /* LW */
-            trapped = cpu_load_word(inst, pc, op, &cycles, &load_reg, &load_value);
+            trapped = cpu_load_int(inst, pc, op, 4u, 0u, &cycles, &load_reg, &load_value);
+            break;
+        case 0x24u: /* LBU */
+            trapped = cpu_load_int(inst, pc, op, 1u, 0u, &cycles, &load_reg, &load_value);
+            break;
+        case 0x25u: /* LHU */
+            trapped = cpu_load_int(inst, pc, op, 2u, 0u, &cycles, &load_reg, &load_value);
+            break;
+        case 0x26u: /* LWR */
+            trapped = cpu_load_part(inst, pc, op, 0u, &cycles, &load_reg, &load_value);
+            break;
+        case 0x28u: /* SB */
+            trapped = cpu_store_int(inst, pc, op, 1u, &cycles);
+            break;
+        case 0x29u: /* SH */
+            trapped = cpu_store_int(inst, pc, op, 2u, &cycles);
+            break;
+        case 0x2Au: /* SWL */
+            trapped = cpu_store_part(inst, pc, op, 1u, &cycles);
+            break;
+        case 0x2Bu: /* SW */
+            trapped = cpu_store_int(inst, pc, op, 4u, &cycles);
+            break;
+        case 0x2Eu: /* SWR */
+            trapped = cpu_store_part(inst, pc, op, 0u, &cycles);
             break;
         case 0x10u: /* COP0 */
             if ((sr & SCHWAY__SR_KUC) != 0u && (sr & SCHWAY__SR_CU0) == 0u) {
                 trapped = cpu_unusable(inst, pc, op, 0u);
             } else if (rs_n == 0u) { /* MFC0: one delay slot, as a load */
                 if (schway__cop0_mfc0(inst, rd_n, &value) != 0u) {
-                    if (c->load_reg == rt_n) {
-                        c->load_reg = SCHWAY__CPU_NO_LOAD;
-                        c->load_value = 0u;
-                    }
-                    load_reg = rt_n;
-                    load_value = value;
+                    cpu_load_issue(c, rt_n, value, &load_reg, &load_value);
                 } else {
                     trapped = cpu_reserved(inst, pc, op);
                 }
@@ -438,5 +648,6 @@ static uint32_t cpu_step(schway *inst)
     if (trapped == 0u) {
         c->pc = next;
     }
+    c->cycle += cycles;
     return cycles;
 }

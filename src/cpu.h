@@ -88,6 +88,10 @@ struct schway__cpu_log {
     uint32_t overflow;
 };
 
+/* The longest a multiply or divide takes: DIV and DIVU (PSX-SYSTEM section
+   2, MULTU/MULT and DIV/DIVU). A read of HI or LO never waits longer. */
+#define SCHWAY__MULDIV_MAX 36u
+
 /* The CPU: 32 general registers (r[0] is the zero register), HI and LO, the
    program counter, COP0 and the two delay latches. The next program counter
    is not stored: it is branch_target while a taken branch is pending and
@@ -95,8 +99,14 @@ struct schway__cpu_log {
    previous instruction, which lands when the current one ends; branch_slot
    says the instruction at pc is a branch delay slot, branch_take that its
    branch is taken and branch_target where it goes (PSX-SYSTEM section 2,
-   Load delay and Branch delay). The log pointer is not state. */
+   Load delay and Branch delay). cycle counts the cycles the CPU has spent
+   on instructions, and muldiv_ready is the value of cycle at which the
+   running multiply or divide has produced HI and LO, 0 when none is running.
+   The 64-bit fields come first so the layout does not depend on the
+   target's alignment of them. The log pointer is not state. */
 struct schway__cpu {
+    uint64_t muldiv_ready;
+    uint64_t cycle;
     uint32_t r[32];
     uint32_t hi, lo;
     uint32_t pc;
