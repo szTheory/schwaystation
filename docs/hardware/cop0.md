@@ -187,6 +187,30 @@ What the entry does, on top of the steps under Entry:
   delay slot of an interrupt). The GTE does not exist yet, so the hook only reports whether the word is a GTE command and
   executes nothing; the plan that builds the GTE executes it there.
 
+## Exception matrix fixture
+
+`exc_matrix.exe` runs under the stub kernel with its own handler copied over the stub's at `80000080h`; it records
+CAUSE and EPC minus the trigger's address for each case, and BadVaddr for the address errors. It judges nothing: the
+rows of `tests/diag/expected.csv` do, each a `doc` row that cites the document the value comes from (see
+[Testing](../testing.md#judged-fixtures)). The 30 records, in order:
+
+| Cases | Records |
+|---|---|
+| `SYSCALL`, then `SYSCALL` in the delay slot of a taken branch | CAUSE, EPC |
+| `BREAK`, then `BREAK` in a delay slot | CAUSE, EPC |
+| a misaligned `LH`, `LW` (AdEL) and `SW` (AdES) | CAUSE, EPC, BadVaddr |
+| `ADD` overflowing, a reserved instruction, `COP1` with `CU1` clear, a read of expansion region 1 (DBE) | CAUSE, EPC |
+| the vertical blank with I_MASK bit 0 set and SR masking it | CAUSE as read, the handler entries so far |
+| the CAUSE value read in the instruction right after an I_STAT write | CAUSE |
+| the same line after `MTC0` to SR unmasks it | CAUSE and EPC in the handler |
+
+In a delay slot EPC is the address of the branch and CAUSE has BD and BT set. ExcCode keeps the code of the last
+exception while a line is merely pending, so the masked row reads 07h from the bus error before it. The CAUSE-after-I_STAT
+row pins a model rather than a measurement: the write commits inside its own instruction, so CAUSE bit 10 is already
+clear in the next one. The console may show the old value there; no run on one has settled it, and a measured value
+would change the row through `tests/diag/allow.txt`. With `--no-stop-on-fault` the run goes on past the rows that
+are first faults, and the runner still names the first, a misaligned read.
+
 ## Tests
 
 `ctest -L cpu` runs the `cpu.cop0.*` cases, which place words in RAM, run them one instruction at a time and compare the

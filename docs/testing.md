@@ -112,7 +112,7 @@ the same file.
 | `vectors` | The committed sample of public single-step vectors, run case by case against the core. |
 | `fuzz` | The executable loader's committed fuzz seeds, replayed on every leg; the time-boxed campaign runs nightly and only reports. |
 | `exe` | Loading a PS-X EXE under the stub kernel and `--probe`, including the rejected headers. |
-| `fixtures` | The fixture toolchain: pinned downloads, the committed stub kernel's source and the manifest rows. |
+| `fixtures` | The fixture toolchain: pinned downloads, the committed stub kernel's source, the manifest rows and the fixtures that run to a sealed mailbox. |
 | `libretro` | The libretro core in an in-process host and its `.info` file. |
 | `install` | The library installed and found by an outside project. |
 | `perf` | Allocation-free frames and the instructions-per-frame gate's own logic. |
@@ -136,6 +136,32 @@ cmake -DJUNIT=build/ci/junit.xml -DINVENTORY=tests/inventory/ci.txt -DEXCLUDE=re
 It fails unless every selected inventory test whose labels match `LABELS` and not `EXCLUDE` appears exactly once,
 ran, and did not fail, error or skip. `policy.no_skip` fails when any test file sets a skip return code, a skip
 regular expression or disables a test, so no test is ever conditional.
+
+## Judged fixtures
+
+A fixture measures and never judges itself. It writes its results as records into the mailbox at the start of its
+image and seals it; `tests/diag/expected.csv` holds the verdicts. A test such as `fixtures.exc_matrix` runs
+`schwaystation-run --exe FIXTURE --stop-on mailbox --frames F`, so the mailbox is read at frame F, and the runner prints
+one `mailbox ID=VALUE` line per record (see [the runner page](runner.md#mailbox)). The test then reads the
+fixture's rows.
+
+| Column | Meaning |
+|---|---|
+| `fixture` | the fixture's name, `exc_matrix` for `exc_matrix.exe` |
+| `test` | the record's name |
+| `profile` | the machine profile the row holds for, `*` for any |
+| `expected` | eight hex digits, or `lo..hi` for a range |
+| `source` | `doc` when a document gives the value, `hw` when a run on a console did |
+| `citation` | the document or the hardware run behind the value, with no comma |
+
+The nth row of a fixture judges the record with id n, so the order of the rows is the order of the records. A line
+that starts with `#` is a comment. The test fails on a record outside its row, a row with no record, a record with no
+row, a runner that does not exit 0, and a row whose source is not `doc` or `hw`. A row is `hw` only when a hardware
+result exists to cite.
+
+A value may change only through `tests/diag/allow.txt`: a dated line `YYYY-MM-DD fixture row value evidence` that names
+the row, the new value as hex and the evidence for it. The test accepts that value for that row. A line that
+applies to no record, because the row does not exist or the record has another value, is an error.
 
 ## Adding a test
 
