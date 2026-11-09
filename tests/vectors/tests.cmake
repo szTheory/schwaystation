@@ -36,19 +36,16 @@ endfunction()
 # avoid the words the controls look for in the output.
 file(MAKE_DIRECTORY ${vectors_scratch})
 file(WRITE ${vectors_scratch}/vectors_none.bin "")
-string(REGEX REPLACE "^([^/])" "/\\1" vectors_url "${vectors_sample}")
+# A drive-letter path gets the slash a file URL needs. Not string(REGEX
+# REPLACE "^(.)": CMake restarts "^" after each match, so "D:/a" became "/D/:/a".
+set(vectors_url "${vectors_sample}")
+if(NOT vectors_url MATCHES "^/")
+  string(PREPEND vectors_url "/")
+endif()
 file(DOWNLOAD file://${vectors_url} ${vectors_scratch}/vectors_cut.bin RANGE_END 999
   STATUS vectors_status)
 list(GET vectors_status 0 vectors_code)
 if(NOT vectors_code EQUAL 0)
-  file(SIZE ${vectors_sample} vectors_diag_size)
-  message(STATUS "vectors diag: sample=${vectors_sample} exists=${vectors_diag_size} url=file://${vectors_url}")
-  foreach(v IN ITEMS "file:///${vectors_sample}" "file://localhost/${vectors_sample}" "file://${vectors_sample}")
-    file(DOWNLOAD "${v}" ${vectors_scratch}/vectors_diag.bin RANGE_END 999 STATUS vs)
-    message(STATUS "vectors diag: ${v} -> ${vs}")
-    file(DOWNLOAD "${v}" ${vectors_scratch}/vectors_diag.bin STATUS vs)
-    message(STATUS "vectors diag: ${v} whole file -> ${vs}")
-  endforeach()
   message(FATAL_ERROR "vectors: copying the first 1000 bytes of the sample failed: ${vectors_status}")
 endif()
 
