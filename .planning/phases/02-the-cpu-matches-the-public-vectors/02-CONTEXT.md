@@ -285,6 +285,26 @@ disagreed, the resolution is recorded below with its reason (D-30 to D-35). Noth
   inside the tarball, and with std::filesystem on neither needs a second fetch. Fix CONFORMANCE section 2 and PX.50
   in the PR that adds `cmake/Armips.cmake`.
 
+### Plan-time amendments (2026-11-09, recorded while planning)
+- **D-33 amended:** `fuzz.regress.exe` is an ordinary gating CTest on every leg, because AGENTS rule 14 says no test is
+  non-gating and D-47 already says it runs on every leg with no skip. Only the nightly `fuzz` campaign (a time-boxed
+  libFuzzer job) is report-only. CPU-05's "report-only until a tune-up promotes them" is read that way; plan 03 edits
+  CPU-05's wording to match. SEED-007 promotes the nightly campaign, not the regress replay.
+- **D-37 layout note:** `schway_budget` is laid out `{size u32, flags u32, max_cycles u64}` (first-size 16), not the
+  order D-37 lists, because it has no padding on any lane. Field names, widths and meaning are unchanged.
+- **D-22 amended (measured against upstream ADDU, 1,000 of 1,000 cases):** the initial state of every vector case also
+  carries non-zero EPC, TAR and CAUSE, and the final comparison reads them, so the harness loads EPC, TAR and CAUSE
+  together with the registers, HI, LO, PC and both delay latches before the single step. A state record is 172 bytes
+  with 4-byte tail fields (not the 166 of CONFORMANCE 1.1). The plan names the next-PC model the harness uses.
+- **D-47 amended:** `vectors-full` is a nightly job outside the `CI required` aggregate, so it reports without
+  blocking a merge; it has no run counter (rule 8 forbids lifetime counters) and promotion is a hand edit. The `exe`
+  label and the `tests/diag/` directory (the `exc_matrix` rows) are part of the inventory set. Every deterministic
+  test, `vectors.r3000.full` included, carries `portable`.
+- **D-06 vs D-43 reconciled:** cross lanes (`be32`, `wasm32`) run the committed stub array, and D-43 still builds armips
+  on them to assemble the fixtures; the two are consistent, D-06's "need no armips" means the stub array does not.
+- **Rule 8 reading for hosted waits:** no plan caps hosted fix-and-watch attempts by a count; each further attempt
+  names the new evidence it acts on, and the session is bounded by time and tokens.
+
 ### Claude's Discretion
 - The container layout of the 55 slices in `sst-sample.bin` (D-19); the launch-block address (D-08); record sizes of
   the fault and trace structs; the order of plans and waves (rule 14: plan 1 lands the CMake skeleton and the

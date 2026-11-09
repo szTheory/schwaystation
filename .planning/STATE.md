@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 01
-current_phase_name: A test frame in RetroArch
-status: verified
-stopped_at: Phase 01 CI tail verified; PR 6 tracks final squash merge and main CI; next is phase 2 discussion
-last_updated: "2026-10-29T19:36:51Z"
-last_activity: 2026-10-29
-last_activity_desc: Completed quick task 261029-ldd; phase-1 CI tail verified in hosted run 40940434499
-state_head: 37a029b99bcfbafe5b88529fcdea9ff27c325622
+current_phase: 02
+current_phase_name: The CPU matches the public vectors
+status: ready_to_execute
+stopped_at: Phase 2 planned (27 plans, 13 waves); next is /gsd-execute-phase 2
+last_updated: "2026-11-09T18:39:40.529Z"
+last_activity: 2026-11-09
+last_activity_desc: Planned phase 2 (27 plans in 13 waves; research skipped, context carries the research)
+state_head: d920febdb5e7482e9e1c08293fb62a97fcd9e44e
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 15
+  total_plans: 42
   completed_plans: 15
   percent: 17
 ---
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 01 — separate CI tail after v0.1.0
+**Current focus:** Phase 02 — the CPU matches the public vectors
 
 ## Current Position
 
-Phase: 01 (A test frame in RetroArch) — CI TAIL
-Plan: 15 of 15
-Status: CI tail complete and verified; PR #6 tracks final automatic merge and main CI
-Last activity: 2026-10-29 — Completed quick task 261029-ldd: phase-1 CI tail; hosted run 40940434499 green
+Phase: 02 (The CPU matches the public vectors) — READY TO EXECUTE
+Plan: 0 of 27
+Status: Planned; plans 02-01 to 02-27 in 13 waves, checker passes closed out by hand (see Runtime Log)
+Last activity: 2026-11-09 — Planned phase 2
 
 Progress: [██░░░░░░░░] 17%
 
@@ -170,15 +170,16 @@ come from `AGENTS.md`.
 | 2026-10-29 | /gsd-verify-work 1 | Codex, OpenGSD 1.19.0; inline verification and hosted CI | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-29 | /gsd-quick phase-1 CI tail | Codex, OpenGSD 1.19.0; inline quick fallback | GPT-6 (session; exact model ID not exposed) |
 | 2026-11-09 | /gsd-discuss-phase 2 | Claude Code, OpenGSD; seven advisor agents fanned out | claude-sonnet-5-5 |
+| 2026-11-09 | /gsd-plan-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, planner claude-opus-5-5 (4 rounds), checker claude-haiku-5-5 (4 passes); research skipped | claude-sonnet-5-5 |
 
 ## Session Continuity
 
 Last session: 2026-11-09
-Stopped at: Phase 2 context gathered (02-CONTEXT.md); next is /gsd-plan-phase 2
-Resume file: .planning/phases/02-the-cpu-matches-the-public-vectors/02-CONTEXT.md
+Stopped at: Phase 2 planned (27 plans, 13 waves); next is /gsd-execute-phase 2
+Resume file: .planning/phases/02-the-cpu-matches-the-public-vectors/02-01-PLAN.md
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next command: `/gsd-plan-phase 2`
-Stop after the discuss step; do not plan in this session.
+Next command: `/gsd-execute-phase 2`
+Stop after the plan step; do not execute in this session.
