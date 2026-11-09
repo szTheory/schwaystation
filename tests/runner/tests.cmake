@@ -165,9 +165,14 @@ schway_add_test(NAME runner.hash.pal
 # compares byte for byte.
 string(REPLACE ";" "$<SEMICOLON>" runner_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
 set(runner_hashes ${PROJECT_SOURCE_DIR}/tests/cmake/hashes.cmake)
+set(runner_fixtures_arg "")
+if(SCHWAYSTATION_FIXTURES)
+  set(runner_fixtures_arg -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures)
+endif()
 schway_add_test(NAME runner.hashes_file
   COMMAND ${CMAKE_COMMAND} -DMODE=write -DRUN=$<TARGET_FILE:schwaystation-run>
-    "-DEMULATOR=${runner_emulator}" -DOUT=${PROJECT_BINARY_DIR} -P ${runner_hashes}
+    "-DEMULATOR=${runner_emulator}" ${runner_fixtures_arg} -DOUT=${PROJECT_BINARY_DIR}
+    -P ${runner_hashes}
   LABELS portable runner TIMEOUT 60)
 
 # Fault prevented: a comparison that passes lanes which differ, or a lane
