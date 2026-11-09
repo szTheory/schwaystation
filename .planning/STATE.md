@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-21-PLAN.md
-last_updated: "2026-11-09T22:59:06.909Z"
+stopped_at: Completed 02-23-PLAN.md
+last_updated: "2026-11-09T23:06:38.008Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-21 (the executor compiled twice, a 4,096-record trace ring outside the state, schway_get_trace and SCHWAY_RUN_TRACE; core.trace.* and core.trace_hash_equal pass in the ci workflow, 219 of 219)
-state_head: 6230ed1fa4145f3cc2d04f26fe66e954806226a1
+last_activity_desc: Completed 02-23 (--stop-on mailbox, the hang report and exit 8, the exit-table check and the hello frame hash in hashes.txt; the ci workflow passes 226 of 226 and the hygiene workflow 21 of 21)
+state_head: e0d1ab19e21068922bc5c014bc9fa61d2afd41a5
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 37
+  completed_plans: 38
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 22 of 27
+Plan: 24 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-21: the dual-compiled executor, the trace ring and schway_get_trace (02-21-SUMMARY.md); 02-22 stays halted at its push, which is open
+Last activity: 2026-11-09 — Completed 02-23: the runner's --stop-on mailbox, hang and exit-table check, and the hello frame hash (02-23-SUMMARY.md); 02-22 stays halted at its push, which is open
 
 Progress: [██░░░░░░░░] 17%
 
@@ -94,6 +94,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P19 | 20 min | 3 tasks | 13 files |
 | Phase 02 P20 | 7 min | 3 tasks | 10 files |
 | Phase 02 P21 | 15 min | 3 tasks | 15 files |
+| Phase 02 P23 | 6 min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -186,6 +187,7 @@ Recent decisions affecting current work:
 - [Phase 02]: the trace ring is a member of struct schway (131,096 bytes: 4,096 32-byte records plus bookkeeping), outside the state and every hash, and is cleared only by a power reset so a per-frame runner keeps one rolling tail
 - [Phase 02]: schway_trace is 64 bytes with no reserved field; a record packs event, width, device and a 16-bit note into one word and keeps the frame's low 32 bits, widened by schway_get_trace
 - [Phase 02]: line and dot of a trace record are derived at read time from the cycles since its frame began at 11 to 7 GPU clocks over 3,413 (NTSC) or 3,406 (PAL) clocks per line until the GPU keeps a beam
+- [Phase 02]: 02-23: --stop-on mailbox reads the fixture mailbox through schway_peek once per frame; done with a matching CRC-32 exits 0, a fault status or a CRC mismatch exits 6, and no verdict by the frame cap prints hang frames=N pc=0x... and exits 8, only under --stop-on, so a plain --exe run at its cap still exits 0 — A fault status skips the CRC check because the stub kernel writes FFh over the status word without rewriting the CRC; the exit-table check compares --help with docs/runner.md both ways and the gate total is 1494 lines against 1520 (plan 02-26 decides any deferral)
 
 ### Pending Todos
 
@@ -240,8 +242,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T22:59:06.756Z
-Stopped at: Completed 02-21-PLAN.md
+Last session: 2026-11-09T23:06:37.869Z
+Stopped at: Completed 02-23-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
