@@ -53,6 +53,25 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "--tty report lacks the line ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "mailbox" OR CASE STREQUAL "criterion4")
+    # hello.exe seals its mailbox, so --stop-on mailbox ends the run with exit 0: its text, the
+    # mailbox line and its two records (gp and sp), printed in that order. The criterion4 case gives
+    # no --frames, which is the 600-frame default cap.
+    set(args --exe "${FILE}" --tty --stop-on mailbox)
+    if(CASE STREQUAL "mailbox")
+      list(APPEND args --frames 30)
+    endif()
+    execute_process(COMMAND ${EMULATOR} ${RUN} ${args} RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "schwaystation-run ${args}: exit ${rc}\n${out}")
+    endif()
+    foreach(line IN ITEMS "tty hello port" "mailbox SWMB status=00 records=2"
+        "mailbox 0001=80018000" "mailbox 0002=80200000")
+      if(NOT out MATCHES "(^|\n)${line}\n")
+        message(FATAL_ERROR "schwaystation-run ${args} printed no line ${line}:\n${out}")
+      endif()
+    endforeach()
   elseif(CASE STREQUAL "exit_port")
     # The runner's outcome for the exit port byte: 00h exits 0 and prints no report; 2Ah exits 6 and
     # prints the line that names it. The port needs the debug-port flag, so --tty is given.
@@ -163,6 +182,17 @@ schway_add_test(NAME fixtures.hello.tty
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a runner that never reads the fixture's mailbox, or reads it wrongly: the sealed
+# mailbox of hello.exe ends the run with exit 0 and prints its records. The second test is the
+# command the project's success criterion for this protocol names, with the default frame cap.
+foreach(case mailbox criterion4)
+  schway_add_test(NAME fixtures.hello.${case}
+    COMMAND ${CMAKE_COMMAND} -DCASE=${case} -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/hello.exe
+      -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS fixtures portable TIMEOUT 30)
+endforeach()
 
 # Fault prevented: an exit byte that is lost or reported as another value, or a
 # zero that fails the run. Byte 00h exits 0 with no report; 2Ah exits 6 and

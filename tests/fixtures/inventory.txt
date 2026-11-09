@@ -10,7 +10,9 @@ fixtures.boot.split_with_exe	fixtures,portable
 fixtures.boot.stop_on_fault	fixtures,portable
 fixtures.exit_port	fixtures,portable
 fixtures.hello.boot	fixtures,portable
+fixtures.hello.criterion4	fixtures,portable
 fixtures.hello.header	fixtures,portable
+fixtures.hello.mailbox	fixtures,portable
 fixtures.hello.tty	fixtures,portable
 fixtures.probe.hello	fixtures,portable
 fixtures.stub.window	fixtures,portable

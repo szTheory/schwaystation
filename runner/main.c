@@ -2,7 +2,8 @@
  *
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--hash]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
+ *                     [--stop-on mailbox] [--hash]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
@@ -36,6 +37,11 @@
  * With --tty a guest can end the run through the exit port: byte 00h is
  * status 0, any other byte prints "exit code=0x<hh>" and is status 6.
  *
+ * --stop-on mailbox reads the fixture mailbox after every frame (mailbox.h)
+ * and ends the run when it reports done (status 0) or fault (status 6); a run
+ * that reaches the frame cap with neither prints "hang frames=<N> pc=0x<pc>"
+ * and is status 8.
+ *
  * SIGINT or SIGTERM ends the run after the frame in progress: what was asked
  * is printed for the frames that ran, and the status is 0.
  *
@@ -52,6 +58,7 @@
 #include "bench.h"
 #include "clock.h"
 #include "exit_status.h"
+#include "mailbox.h"
 #include "png.h"
 #include "probe.h"
 #include "revision.h"
@@ -89,7 +96,8 @@ static void run_free(void *user, void *ptr, size_t size)
 static const char synopsis[] =
     "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]\n"
-    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--hash]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
+    "                         [--stop-on mailbox] [--hash]\n"
     "       schwaystation-run --probe FILE\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
@@ -99,6 +107,7 @@ static const char synopsis[] =
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
     "  --tty              print the program's text as tty lines; needs --exe\n"
+    "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe\n"
     "  --probe FILE       print what a PS-EXE file is; runs nothing\n"
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
@@ -184,6 +193,7 @@ typedef struct options {
     const char *probe; /* --probe FILE, else NULL */
     const char *exe;   /* --exe FILE, else NULL */
     int tty;           /* --tty: debug-port flag and the tty lines */
+    int stop_mailbox;  /* --stop-on mailbox */
     uint32_t region;
     int printed; /* --help or --version ran; nothing else to do */
 } options;
@@ -247,6 +257,15 @@ static int parse_options(int argc, char **argv, options *o)
             i++;
         } else if (strcmp(arg, "--tty") == 0) {
             o->tty = 1;
+        } else if (strcmp(arg, "--stop-on") == 0) {
+            if (o->stop_mailbox) {
+                return usage("give --stop-on once");
+            }
+            if (value == NULL || strcmp(value, "mailbox") != 0) {
+                return usage("--stop-on needs mailbox");
+            }
+            o->stop_mailbox = 1;
+            i++;
         } else if (strcmp(arg, "--probe") == 0) {
             /* Alone, with one file name that is not an option. */
             if (argc != 3 || value == NULL || value[0] == '-') {
@@ -262,6 +281,9 @@ static int parse_options(int argc, char **argv, options *o)
     }
     if (o->tty && o->exe == NULL) {
         return usage("--tty needs --exe");
+    }
+    if (o->stop_mailbox && o->exe == NULL) {
+        return usage("--stop-on needs --exe");
     }
     if (o->frames == 0u && o->exe != NULL) {
         o->frames = EXE_FRAMES_DEFAULT;
@@ -515,8 +537,23 @@ static int run(const options *opt)
         }
         /* The guest reported through the exit port: the run ends here. The
            text it printed first is flushed below, then the code is reported. */
-        if (status == SCHWAY__EXIT_OK && res.stop == SCHWAY_STOP_HOOK) {
+        int hooked = status == SCHWAY__EXIT_OK && res.stop == SCHWAY_STOP_HOOK;
+        if (hooked) {
             exit_code = (uint32_t)(res.exit_code & 0xFFu);
+        }
+        /* The mailbox is read once per frame, after the frame's text is out, so a HOOK stop in
+           the same frame is read too. Done ends the run; fault and a CRC mismatch are status 6. */
+        if (status == SCHWAY__EXIT_OK && opt->stop_mailbox) {
+            int mb = schway__mailbox_check(inst, stdout);
+            if (mb == SCHWAY__MAILBOX_DONE) {
+                break;
+            }
+            if (mb != SCHWAY__MAILBOX_PENDING) {
+                status = SCHWAY__EXIT_FIXTURE;
+                break;
+            }
+        }
+        if (hooked) {
             break;
         }
         /* A stop request ends the run only between whole frames, after the
