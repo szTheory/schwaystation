@@ -3,6 +3,7 @@
 # Fault prevented: a documented exit status that differs from what the runner returns. Every table
 # line --help prints after "exit status:" must appear as a whole line in the document, and the
 # document must have no other line in that form.
+string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
 execute_process(COMMAND ${EMULATOR} "${RUN}" --help OUTPUT_VARIABLE out RESULT_VARIABLE rc)
 string(FIND "${out}" "exit status:\n" at)
 if(NOT rc STREQUAL "0" OR at EQUAL -1)

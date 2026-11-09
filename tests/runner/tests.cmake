@@ -379,8 +379,11 @@ schway_add_test(NAME runner.exit_table
   COMMAND ${runner_check} -DDOC=${runner_doc}
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/exit_table.cmake
   LABELS portable runner TIMEOUT 30)
+# The emulator's own semicolons would be split a second time inside -DCMD, so it travels with a bar
+# between its words and exit_table.cmake turns the bars back.
+string(REPLACE ";" "|" runner_emulator_bars "${CMAKE_CROSSCOMPILING_EMULATOR}")
 set(runner_table_cmd ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
-  "-DEMULATOR=${runner_emulator}" -DDOC=${runner_doc_copy}
+  "-DEMULATOR=${runner_emulator_bars}" -DDOC=${runner_doc_copy}
   -P ${PROJECT_SOURCE_DIR}/tests/cmake/exit_table.cmake)
 string(REPLACE ";" "$<SEMICOLON>" runner_table_cmd "${runner_table_cmd}")
 schway_add_test(NAME runner.exit_table.self_test
