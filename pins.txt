@@ -15,3 +15,7 @@ wasmtime-aarch64-macos 48.0.7 https://github.com/bytecodealliance/wasmtime/relea
 # RetroArch 1.22.2 Metal (universal) from the libretro buildbot: the hosted
 # retroarch job runs the built core in it.
 retroarch-dmg 1.22.2 https://buildbot.libretro.com/stable/1.22.2/apple/osx/universal/RetroArch_Metal.dmg 81b79121ba26d539064ae13b4d0419a120c3d165afbe656cf5f5412b15fdb434
+
+# armips (MIT): assembles the PS-EXE fixtures; cmake/Armips.cmake downloads the archive and checks the digest.
+# The digest was measured on the commit archive named by the full SHA, not a short-SHA URL.
+armips 62adab4ef30d https://github.com/Kingcom/armips/archive/62adab4ef30da765f5cf22a451eb08a59c54dc8b.tar.gz f7a65102febb4811a336a06e6d93c7e84cc86548182d54e1b1b4e2bffe562f56
