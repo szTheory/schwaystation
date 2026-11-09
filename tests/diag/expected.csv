@@ -1,0 +1,4 @@
+fixture,test,profile,expected,source,citation
+# The nth row of a fixture judges the mailbox record with id n, expected is a hex value or lo..hi. A line that starts with # is a comment.
+exc_matrix,syscall_cause,*,00000020,doc,psx-spx CPU Specifications: COP0 exception handling (ExcCode 08h Syscall with BD and BT clear)
+exc_matrix,syscall_epc,*,00000000,doc,psx-spx CPU Specifications: COP0 exception handling (EPC is the address of the SYSCALL itself)

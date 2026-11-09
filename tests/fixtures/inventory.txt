@@ -8,6 +8,7 @@ fixtures.boot.past_stub	fixtures,portable
 fixtures.boot.registered_handler	fixtures,portable
 fixtures.boot.split_with_exe	fixtures,portable
 fixtures.boot.stop_on_fault	fixtures,portable
+fixtures.exc_matrix	fixtures,portable
 fixtures.exit_port	fixtures,portable
 fixtures.gap_write	fixtures,portable
 fixtures.hang	fixtures,portable
