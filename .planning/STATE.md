@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-08-PLAN.md
-last_updated: "2026-11-09T19:49:32.895Z"
+stopped_at: Completed 02-09-PLAN.md
+last_updated: "2026-11-09T20:28:02.821Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 02 execution started
-state_head: 1fb5911426a4613625fbfeff70427945f49079f2
+state_head: d81157ff9591439c4e38c4fd96fc87c749ae721b
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 23
+  completed_plans: 24
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 9 of 27
+Plan: 10 of 27
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 02 execution started
 
@@ -81,6 +81,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P06 | 13 min | 3 tasks | 10 files |
 | Phase 02 P07 | 14 min | 3 tasks | 12 files |
 | Phase 02 P08 | 25 min | 2 tasks | 16 files |
+| Phase 02 P09 | 36 min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,7 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-07: the delay-register cost table uses the psx-spx formula as published (COM0, COM2, COM3; COM1 adds nothing), is derived, not saved, and is rebuilt on a delay or COM_DELAY write and on a state load; non-port I/O registers charge one approximate cycle
 - [Phase 02]: 02-07: EXP1 and EXP3 writes are dropped without a fault (reads are bus errors); the EXP2 debug ports act only for byte writes with the debug-port flag set and never fault; bus.bios is NULL until plan 02-16 so BIOS accesses are gaps
 - [Phase 02]: Exe status split: ERR_EXE_INVALID is a malformed file, ERR_EXE_RANGE is addresses or size outside RAM; launch block at physical 0200h
+- [Phase 02]: 02-09: armips builds unchanged on all eight hosted lanes; the probe found three phase-2 test-file failures only the hosted legs show (core.audio.pairs timeout tier 30 s, a drive-letter file URL, MSVC C4702), fixed in place; per-leg armips cost is in the 02-09 summary for plan 02-27 — run 42689688852 and 42691517611 green with CI required and hash-equality; draft probe pull request 7 stays open until it is closed unmerged before ship
 
 ### Pending Todos
 
@@ -197,8 +199,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T19:49:32.813Z
-Stopped at: Completed 02-08-PLAN.md
+Last session: 2026-11-09T20:28:02.716Z
+Stopped at: Completed 02-09-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4

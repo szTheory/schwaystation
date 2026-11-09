@@ -98,7 +98,7 @@ Plans:
   4. `schwaystation-run --exe hello.exe --tty --stop-on mailbox` prints `tty ` lines, shows the `SWMB` magic and exits 0. armips, built on every leg at its pin, assembles every fixture to one digest, and `fixtures.armips_pin.self_test` fails on a wrong digest.
   5. `schwaystation-run --probe FILE` prints the identity fields without emulating. `--trace first-fault`, run on a crafted EXE, prints one `fault ...` line and a 4,096-record tail and exits 7.
 
-**Plans**: 8/27 plans executed in 13 waves
+**Plans**: 9/27 plans executed in 13 waves
 
 Plans:
 **Wave 1**
@@ -114,7 +114,7 @@ Plans:
 - [x] 02-08-PLAN.md — API version 2 with the PS-EXE validator, schway_probe_exe and schway_load_exe
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-09-PLAN.md — Hosted probe: armips and the hello digest green on all eight lanes; armips doc corrections
+- [x] 02-09-PLAN.md — Hosted probe: armips and the hello digest green on all eight lanes; armips doc corrections
 - [ ] 02-10-PLAN.md — COP0, the exception entry, traps, branches and jumps (3,500 cases)
 - [ ] 02-11-PLAN.md — schway_run with a cycle budget, schway_peek, schway_get_fault, docs.api_names, the version-2 embedding guide
 
@@ -224,7 +224,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. A test frame in RetroArch | 15/15 | Ship PR #4 | 2026-10-29 |
-| 2. The CPU matches the public vectors | 8/27 | In Progress | - |
+| 2. The CPU matches the public vectors | 9/27 | In Progress | - |
 | 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
