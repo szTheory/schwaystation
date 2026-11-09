@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-18-PLAN.md
-last_updated: "2026-11-09T22:05:10.855Z"
+stopped_at: Completed 02-19-PLAN.md
+last_updated: "2026-11-09T22:24:12.782Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-18 (the stub putchar entries as MIPS, schway_tty and schway_get_tty, hello printing through the port and putchar, fixtures.tty.hello, ring and flag_off, the guide TTY section)
-state_head: ac716a0655fc8ff030ba4db477ba903a88c48473
+last_activity_desc: Completed 02-19 (interrupts into the CPU through a retirement stamp, the COP2 entry hook, 24 cpu.exception, 6 cpu.delay and 10 cpu.timing tests, the COP0 page's Interrupts section)
+state_head: bd605fddec2b5a3254e107b7b6363f94d0f4ffdf
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 33
+  completed_plans: 34
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 19 of 27
+Plan: 20 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-18: the stub putchar entries at A0h and B0h, schway_get_tty draining the 4 KiB TTY ring with a drop count, hello.exe printing through the port and putchar, and three fixtures.tty cases
+Last activity: 2026-11-09 — Completed 02-19: interrupts reach the CPU through a retirement stamp (2 retirements for a device edge, I_MASK and SR writes, 1 for CAUSE and RFE), the COP2 entry hook, and 40 cpu.exception, cpu.delay and cpu.timing tests
 
 Progress: [██░░░░░░░░] 17%
 
@@ -91,6 +91,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P16 | 5 min | 3 tasks | 12 files |
 | Phase 02 P17 | 12 min | 3 tasks | 15 files |
 | Phase 02 P18 | 3 min | 3 tasks | 15 files |
+| Phase 02 P19 | 20 min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -176,6 +177,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-17: mailbox layout follows the committed stub (CRC 04h, status byte 08h, version 09h, count 0Ah, id 0Bh, handler word 0Ch, records 10h+8n), not CONFORMANCE section 4; plan 02-23's runner reads status at 08h and the count at 0Ah
 - [Phase 02]: 02-18: the stub's A and B kernel entries are four-word RAM slots that jump to ROM putchar routines using only k0 and k1, and the reset code copies a 48-byte slot table; the stub is 620 bytes — A putchar that is real MIPS reaches the debug port through the bus like any guest store, so no host hook watches a kernel address
 - [Phase 02]: 02-18: schway_get_tty drains the 4 KiB ring oldest first and reports and clears the bytes dropped since the last drain, also for capacity 0; the ring stays outside the state, every hash and a load — The same pull shape as schway_get_audio; a host that drains every frame sees every byte, and a hash never depends on whether a host drained
+- [Phase 02]: 02-19: an interrupt is armed by a retirement stamp (irq_stamp, in the state) on the false-to-true change of the line, 2 retirements for a device edge, I_MASK and SR writes and 1 for CAUSE and RFE, taken at the last only if the line is still true — The latencies are an inference unmeasured on silicon; an interrupt due on an instruction beats SYSCALL, BREAK, RI, CpU and fetch errors and yields to data errors and overflow, per the documented order
+- [Phase 02]: 02-19: the interrupt entry calls schway__cop0_irq_entry_cop2 with the word at EPC, read without charge or first fault; it only reports a COP2 command and the GTE plan executes it — The double execution belongs to phase 3 with the GTE; the hook is this plan's whole deliverable for that bug
 
 ### Pending Todos
 
@@ -230,8 +233,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T22:05:10.744Z
-Stopped at: Completed 02-18-PLAN.md
+Last session: 2026-11-09T22:24:12.661Z
+Stopped at: Completed 02-19-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
