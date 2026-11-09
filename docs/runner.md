@@ -251,6 +251,7 @@ signal that was already ignored when the runner started, as under `nohup`, stays
   1  failure  a file could not be written or is not a valid PS-EXE, memory ran out or the core failed
   2  usage    the command line is invalid, so nothing ran
   6  fixture  the fixture reported failure: mailbox status FFh, a mailbox CRC mismatch or an exit port byte not 00h
+  7  fault    the first fault stopped the run
   8  hang     --stop-on mailbox saw no done or fault status by the frame cap
 ```
 

@@ -20,6 +20,8 @@ fixtures.mailbox_fault	fixtures,portable
 fixtures.probe.hello	fixtures,portable
 fixtures.stub.window	fixtures,portable
 fixtures.stub_drift	fixtures,portable
+fixtures.trace.criterion5	fixtures,portable
+fixtures.trace.unmapped_read	fixtures,portable
 fixtures.tty.flag_off	fixtures,portable
 fixtures.tty.hello	fixtures,portable
 fixtures.tty.ring	fixtures,portable

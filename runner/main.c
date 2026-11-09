@@ -3,7 +3,7 @@
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
- *                     [--stop-on mailbox] [--hash]
+ *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
@@ -42,6 +42,13 @@
  * that reaches the frame cap with neither prints "hang frames=<N> pc=0x<pc>"
  * and is status 8.
  *
+ * An --exe run stops at the program's first fault (--no-stop-on-fault turns that off): it prints
+ * "fault frame=<N> line=<L> dot=<D> pc=0x<pc> op=0x<op> addr=0x<addr> width=<W> dev=<device>
+ * kind=<kind>" and is status 7. --trace first-fault also prints the last 4,096 trace records, oldest
+ * first, as twelve tab-separated fields (trace.h), after a fault line or a hang line. An --exe run that
+ * ends with a non-zero count of accesses to devices that are not built prints one
+ * "unbuilt dev=<device> n=<count> last_pc=0x<pc>" line.
+ *
  * SIGINT or SIGTERM ends the run after the frame in progress: what was asked
  * is printed for the frames that ran, and the status is 0.
  *
@@ -66,6 +73,7 @@
 #include "schwaystation.h"
 #include "sha256.h"
 #include "stop.h"
+#include "trace.h"
 #include "xrgb8888.h"
 
 /* The tests build a second runner with SCHWAY_RUN_RAISE_AT=N, which raises
@@ -97,7 +105,8 @@ static const char synopsis[] =
     "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
-    "                         [--stop-on mailbox] [--hash]\n"
+    "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
+    "                         [--hash]\n"
     "       schwaystation-run --probe FILE\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
@@ -108,6 +117,8 @@ static const char synopsis[] =
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
     "  --tty              print the program's text as tty lines; needs --exe\n"
     "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe\n"
+    "  --trace first-fault  print the last 4096 trace records after a fault or a hang; needs --exe\n"
+    "  --no-stop-on-fault   keep running after the program's first fault; needs --exe\n"
     "  --probe FILE       print what a PS-EXE file is; runs nothing\n"
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
@@ -194,6 +205,8 @@ typedef struct options {
     const char *exe;   /* --exe FILE, else NULL */
     int tty;           /* --tty: debug-port flag and the tty lines */
     int stop_mailbox;  /* --stop-on mailbox */
+    int trace;         /* --trace first-fault */
+    int keep_going;    /* --no-stop-on-fault */
     uint32_t region;
     int printed; /* --help or --version ran; nothing else to do */
 } options;
@@ -266,6 +279,17 @@ static int parse_options(int argc, char **argv, options *o)
             }
             o->stop_mailbox = 1;
             i++;
+        } else if (strcmp(arg, "--trace") == 0) {
+            if (o->trace) {
+                return usage("give --trace once");
+            }
+            if (value == NULL || strcmp(value, "first-fault") != 0) {
+                return usage("--trace needs first-fault");
+            }
+            o->trace = 1;
+            i++;
+        } else if (strcmp(arg, "--no-stop-on-fault") == 0) {
+            o->keep_going = 1;
         } else if (strcmp(arg, "--probe") == 0) {
             /* Alone, with one file name that is not an option. */
             if (argc != 3 || value == NULL || value[0] == '-') {
@@ -284,6 +308,12 @@ static int parse_options(int argc, char **argv, options *o)
     }
     if (o->stop_mailbox && o->exe == NULL) {
         return usage("--stop-on needs --exe");
+    }
+    if (o->trace && o->exe == NULL) {
+        return usage("--trace needs --exe");
+    }
+    if (o->keep_going && o->exe == NULL) {
+        return usage("--no-stop-on-fault needs --exe");
     }
     if (o->frames == 0u && o->exe != NULL) {
         o->frames = EXE_FRAMES_DEFAULT;
@@ -462,6 +492,81 @@ static uint32_t guest_pc(const schway *inst)
     return pc;
 }
 
+/* The bus's unbuilt-device counters and the last unbuilt access, read through the state visitor. */
+typedef struct unbuilt_view {
+    uint32_t n[SCHWAY_DEVICE_UNMAPPED + 1u];
+    uint32_t last_dev;
+    uint32_t last_pc;
+} unbuilt_view;
+
+static void unbuilt_field(void *user, const char *name, const void *data, uint32_t count,
+                          uint32_t width)
+{
+    unbuilt_view *v = (unbuilt_view *)user;
+    if (width != 4u) {
+        return;
+    }
+    if (strcmp(name, "bus.unbuilt_n") == 0 && count == SCHWAY_DEVICE_UNMAPPED + 1u) {
+        memcpy(v->n, data, sizeof v->n);
+    } else if (strcmp(name, "bus.last_unbuilt.dev") == 0 && count == 1u) {
+        memcpy(&v->last_dev, data, 4u);
+    } else if (strcmp(name, "bus.last_unbuilt.pc") == 0 && count == 1u) {
+        memcpy(&v->last_pc, data, 4u);
+    }
+}
+
+/* Prints the unbuilt line when any device that is not built has been accessed: the last such device,
+   how many times it was, and the program counter of the last access. */
+static void print_unbuilt(const schway *inst)
+{
+    unbuilt_view v;
+    memset(&v, 0, sizeof v);
+    if (schway_state_visit(inst, unbuilt_field, &v) != SCHWAY_STATUS_OK) {
+        return;
+    }
+    uint32_t any = 0u;
+    for (size_t i = 0; i < sizeof v.n / sizeof v.n[0]; i++) {
+        any |= v.n[i];
+    }
+    if (any == 0u || v.last_dev >= sizeof v.n / sizeof v.n[0]) {
+        return;
+    }
+    printf("unbuilt dev=%s n=%lu last_pc=0x%08lx\n", schway__trace_device_name(v.last_dev),
+           (unsigned long)v.n[v.last_dev], (unsigned long)v.last_pc);
+}
+
+/* The first-fault line, from the core's fault record. */
+static void print_fault(const schway *inst)
+{
+    schway_fault f;
+    memset(&f, 0, sizeof f);
+    f.size = (uint32_t)sizeof f;
+    if (schway_get_fault(inst, &f) != SCHWAY_STATUS_OK) {
+        return;
+    }
+    printf("fault frame=%llu line=%lu dot=%lu pc=0x%08lx op=0x%08lx addr=0x%08lx width=%lu dev=%s "
+           "kind=%s\n",
+           (unsigned long long)f.frame, (unsigned long)f.line, (unsigned long)f.dot,
+           (unsigned long)f.pc, (unsigned long)f.opcode, (unsigned long)f.addr,
+           (unsigned long)f.width, schway__trace_device_name(f.device),
+           schway__trace_kind_name(f.kind));
+}
+
+/* The trace ring, oldest record first, one twelve-field line each. */
+static void print_tail(const schway *inst)
+{
+    schway_trace r;
+    char line[SCHWAY__TRACE_LINE_MAX];
+    memset(&r, 0, sizeof r);
+    r.size = (uint32_t)sizeof r;
+    for (uint32_t i = 0; schway_get_trace(inst, i, &r) == SCHWAY_STATUS_OK; i++) {
+        if (schway__trace_write_record(line, sizeof line, &r) < 0) {
+            return;
+        }
+        puts(line);
+    }
+}
+
 /* Runs the frames. The bench samples take 4 bytes per frame, so they are
    on the heap. Returns the exit status. */
 static int run(const options *opt)
@@ -526,12 +631,19 @@ static int run(const options *opt)
     uint32_t ran = 0;
     uint32_t exit_code = 0u; /* the byte the guest wrote to the exit port */
     int ended = 0;           /* the loop ended before the frame cap, by a stop of any kind */
+    int faulted = 0;         /* the core stopped the run on the program's first fault */
+    schway_budget budget;    /* an --exe run goes through schway_run, for its fault and trace flags */
+    memset(&budget, 0, sizeof budget);
+    budget.size = (uint32_t)sizeof budget;
+    budget.max_cycles = UINT64_MAX;
+    budget.flags = (opt->keep_going ? 0u : SCHWAY_RUN_STOP_ON_FAULT) |
+                   (opt->trace ? SCHWAY_RUN_TRACE : 0u);
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
         uint64_t start_ns = opt->bench ? schway__clock_ns() : 0u;
         schway_run_result res;
         memset(&res, 0, sizeof res);
         res.size = (uint32_t)sizeof res;
-        st = schway_run_frame(inst, &res);
+        st = opt->exe != NULL ? schway_run(inst, &budget, &res) : schway_run_frame(inst, &res);
         if (opt->bench) {
             samples[ran] = schway__bench_us(schway__clock_ns() - start_ns);
         }
@@ -548,6 +660,12 @@ static int run(const options *opt)
             fprintf(stderr, "schwaystation-run: schway_run_frame failed: %s\n",
                     schway_status_string(st));
             status = SCHWAY__EXIT_FAILURE;
+        }
+        /* A fault that stopped the run ends it here, after the frame's text. */
+        if (status == SCHWAY__EXIT_OK && res.stop == SCHWAY_STOP_FAULT) {
+            faulted = 1;
+            status = SCHWAY__EXIT_FAULT;
+            break;
         }
         if (status == SCHWAY__EXIT_OK && n == opt->png_frame) {
             status = write_png(inst, opt->png_path);
@@ -585,14 +703,26 @@ static int run(const options *opt)
     /* No done or fault status by the frame cap is a hang. */
     if (status == SCHWAY__EXIT_OK && opt->stop_mailbox && !ended) {
         printf("hang frames=%lu pc=0x%08lx\n", (unsigned long)ran, (unsigned long)guest_pc(inst));
+        if (opt->trace) {
+            print_tail(inst);
+        }
         status = SCHWAY__EXIT_HANG;
     }
     if (tty.len != 0u) {
         tty_emit(&tty);
     }
+    if (faulted) {
+        print_fault(inst);
+        if (opt->trace) {
+            print_tail(inst);
+        }
+    }
     if (status == SCHWAY__EXIT_OK && exit_code != 0u) {
         printf("exit code=0x%02lx\n", (unsigned long)exit_code);
         status = SCHWAY__EXIT_FIXTURE;
+    }
+    if (opt->exe != NULL) {
+        print_unbuilt(inst);
     }
     if (status == SCHWAY__EXIT_OK && opt->hash) {
         status = print_hash(inst, ran);

@@ -72,6 +72,27 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "schwaystation-run ${args} printed no line ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "trace")
+    # The runner's first-fault report for a fault.exe of one class: exit 7, the fault line naming the
+    # kind, then a tail of exactly 4,096 twelve-field lines that ends in the fault event. An exception
+    # loop's tail ends with its repeat count, NOTE, in the last field.
+    execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${FILE}" --trace first-fault --frames 30
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    if(NOT rc STREQUAL "7" OR NOT out MATCHES "(^|\n)fault frame=[0-9]+ [^\n]* kind=${KIND}\n")
+      message(FATAL_ERROR "schwaystation-run --exe ${FILE} --trace first-fault: expected exit 7 and a "
+        "fault line with kind=${KIND}, got exit ${rc}")
+    endif()
+    string(REPEAT "\t[^\t]+" 11 rest)
+    string(REGEX MATCHALL "[0-9]+${rest}\n" tail "${out}")
+    list(LENGTH tail n)
+    list(GET tail -1 last)
+    if(NOT n EQUAL 4096)
+      message(FATAL_ERROR "${KIND}: the tail has ${n} twelve-field lines, not 4096")
+    elseif(NOT last MATCHES "^[0-9]+\t[0-9]+\t[0-9]+\t[0-9]+\t0x[0-9a-f]+\t0x[0-9a-f]+\tfault\t")
+      message(FATAL_ERROR "${KIND}: the last tail line is not a fault event:\n${last}")
+    elseif(NOT "${NOTE}" STREQUAL "" AND NOT last MATCHES "\t${NOTE}\n$")
+      message(FATAL_ERROR "${KIND}: the fault event's note is not ${NOTE}:\n${last}")
+    endif()
   elseif(CASE STREQUAL "exit_port")
     # The runner's outcome for the exit port byte: 00h exits 0 and prints no report; 2Ah exits 6 and
     # prints the line that names it. The port needs the debug-port flag, so --tty is given.
@@ -157,6 +178,12 @@ schway__fixture(exit_port_fail.exe exit_port.asm -equ CODE 0x2A)
 schway__fixture(hang.exe hang.asm)
 schway__fixture(mailbox_fault.exe mailbox_fail.asm -equ MODE 0)
 schway__fixture(mailbox_crc.exe mailbox_fail.asm -equ MODE 1)
+set(schway__fault_kinds unmapped_read)
+set(schway__fault_index 1)
+foreach(kind IN LISTS schway__fault_kinds)
+  schway__fixture(fault_${kind}.exe fault.asm -equ KIND ${schway__fault_index})
+  math(EXPR schway__fault_index "${schway__fault_index} + 1")
+endforeach()
 schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
@@ -228,6 +255,26 @@ expect_runner(fixtures.mailbox_fault 6 "mailbox SWMB status=ff records=1"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/mailbox_fault.exe --stop-on mailbox --frames 30)
 expect_runner(fixtures.mailbox_crc 6 "mailbox crc mismatch"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/mailbox_crc.exe --stop-on mailbox --frames 30)
+
+# Fault prevented: a first fault that the runner misses, mislabels or reports with a short tail. Each
+# fault.exe class runs more than 4,096 trace records of preamble, then faults once: exit 7, the fault line
+# and a tail of exactly 4,096 twelve-field lines ending in the fault event.
+foreach(kind IN LISTS schway__fault_kinds)
+  set(note "")
+  if(kind STREQUAL exception_loop)
+    set(note 1000)
+  endif()
+  schway_add_test(NAME fixtures.trace.${kind}
+    COMMAND ${CMAKE_COMMAND} -DCASE=trace -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/fault_${kind}.exe
+      -DKIND=${kind} -DNOTE=${note} -DRUN=$<TARGET_FILE:schwaystation-run>
+      "-DEMULATOR=${schway__probe_emulator}" -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS fixtures portable TIMEOUT 30)
+endforeach()
+
+# Fault prevented: the success-criterion command, with no frame count, that no longer ends in a fault
+# line and exit 7 (the default cap is 600 frames).
+expect_runner(fixtures.trace.criterion5 7 "(^|\n)fault frame="
+  --exe ${SCHWAYSTATION_FIXTURES_DIR}/fault_unmapped_read.exe --trace first-fault)
 
 # Fault prevented: a tampered or wrongly pinned assembler accepted. The
 # digest check runs on a local file:// URL with an all-zero digest and must
