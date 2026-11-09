@@ -318,6 +318,81 @@ static void tty_hello(const char *dir)
     free(exe);
 }
 
+/* 5,000 bytes written to the port in one frame fill the 4 KiB ring: the first
+   4,096 stay in the order written, the other 904 are dropped, and the first
+   drain reports 904 whatever its capacity. A partial drain keeps the order of
+   the rest and reports nothing more, and a drain of an empty ring reports 0.
+   The byte written is the low byte of a counter that counts down from 5,000,
+   so a reordered or repeated byte differs from its place.
+   Fault prevented: a ring that overwrites old bytes, loses the drop count, or
+   reports it again after a drain. */
+static void tty_ring(void)
+{
+    uint8_t exe[EXE_SIZE];
+    const uint32_t code[] = {
+        0x3C08BF80u, /* 0x100: lui t0, 0xBF80 */
+        0x34091388u, /* 0x104: ori t1, zero, 5000 */
+        0xA1092080u, /* 0x108: sb t1, 0x2080(t0): 1F802080h in KSEG1 */
+        0x2529FFFFu, /* 0x10C: addiu t1, t1, -1 */
+        0x1520FFFDu, /* 0x110: bne t1, zero, 80010108h */
+        0x00000000u, /* 0x114: nop */
+        0x08004046u, /* 0x118: j 80010118h: itself */
+        0x00000000u, /* 0x11C: nop */
+    };
+    build_exe(exe, code, sizeof code / sizeof code[0], 0u);
+    schway *inst = make_debug();
+    load(inst, exe, sizeof exe);
+    schway_run_result r = run_frame(inst);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    static uint8_t got[SCHWAY__TTY_SIZE];
+    uint32_t dropped = 0u;
+    uint32_t first = drain_tty(inst, got, 1000u, &dropped);
+    CHECK_EQ_U64(first, 1000u);
+    CHECK_EQ_U64(dropped, 904u);
+    uint32_t rest = drain_tty(inst, got + first, sizeof got - first, &dropped);
+    CHECK_EQ_U64(rest, SCHWAY__TTY_SIZE - 1000u);
+    CHECK_EQ_U64(dropped, 0u);
+    for (uint32_t i = 0u; i < SCHWAY__TTY_SIZE; i++) {
+        if (got[i] != (uint8_t)(5000u - i)) {
+            fprintf(stderr, "tty byte %u is %02x, expected %02x\n", (unsigned)i, (unsigned)got[i],
+                    (unsigned)(uint8_t)(5000u - i));
+            check_failures++;
+            break;
+        }
+    }
+    CHECK_EQ_U64(drain_tty(inst, got, sizeof got, &dropped), 0u);
+    CHECK_EQ_U64(dropped, 0u);
+    schway_destroy(inst);
+}
+
+/* hello.exe on an instance whose debug-port flag is clear, as on a retail
+   host: it runs to its end, the ring stays empty, and the two ports' writes are
+   not a fault and not a count against any unbuilt device.
+   Fault prevented: debug ports decoded on a retail profile. */
+static void tty_flag_off(const char *dir)
+{
+    size_t n = 0u;
+    uint8_t *exe = read_file(dir, "hello.exe", &n);
+    schway *inst = make();
+    load(inst, exe, n);
+    for (int f = 0; f < 3 && mailbox(inst)[MB_STATUS] != 0u; f++) {
+        schway_run_result r = run_frame(inst);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    }
+    check_sealed(inst, 2u);
+    uint8_t got[64];
+    uint32_t dropped = 99u;
+    CHECK_EQ_U64(drain_tty(inst, got, sizeof got, &dropped), 0u);
+    CHECK_EQ_U64(dropped, 0u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    for (uint32_t i = 0u; i < SCHWAY__DEV_COUNT; i++) {
+        CHECK_EQ_U64(inst->bus.unbuilt_n[i], 0u);
+    }
+    CHECK_EQ_U64(inst->exit_pending, 0u);
+    schway_destroy(inst);
+    free(exe);
+}
+
 /* The exception record the stub's handler writes at 80000210h: Cause, EPC,
    BadVaddr and SR. */
 static void check_exc_record(const schway *inst, uint32_t cause, uint32_t epc)
@@ -681,6 +756,10 @@ int main(int argc, char **argv)
         hello_boot(argv[2]);
     } else if (strcmp(c, "tty_hello") == 0 && argc == 3) {
         tty_hello(argv[2]);
+    } else if (strcmp(c, "tty_ring") == 0) {
+        tty_ring();
+    } else if (strcmp(c, "tty_flag_off") == 0 && argc == 3) {
+        tty_flag_off(argv[2]);
     } else if (strcmp(c, "default_handler") == 0 && argc == 3) {
         default_handler(argv[2]);
     } else if (strcmp(c, "registered_handler") == 0 && argc == 3) {

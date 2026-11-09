@@ -176,6 +176,15 @@ schway_add_test(NAME fixtures.tty.hello
   COMMAND schwaystation-test-boot tty_hello ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
 
+# Fault prevented: a TTY ring that overwrites old bytes or loses its drop count,
+# and debug ports decoded on a retail profile.
+schway_add_test(NAME fixtures.tty.ring
+  COMMAND schwaystation-test-boot tty_ring
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.tty.flag_off
+  COMMAND schwaystation-test-boot tty_flag_off ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 30)
+
 # Fault prevented: a default exception handler that records the wrong
 # registers, or does not hand the exception to the handler an image registered.
 schway_add_test(NAME fixtures.boot.default_handler
