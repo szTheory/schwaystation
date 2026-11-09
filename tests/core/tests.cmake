@@ -20,12 +20,19 @@ schway_add_test(NAME core.no_alloc_after_load
 # reset or size-tag contract that drifts from the documents without a test
 # failing on some lane.
 foreach(case IN ITEMS testcard.pixels testcard.counter testcard.frames_differ testcard.full_redraw
-    video.tuple video.pitch info audio.pairs audio.ring profile.rejected profile.locked reset.power
+    video.tuple video.pitch info audio.ring profile.rejected profile.locked reset.power
     api.size_tags api.statuses api.error_changes_nothing create.allocator instances.independent)
   schway_add_test(NAME core.${case}
     COMMAND schwaystation-test-core ${case}
     LABELS core portable TIMEOUT 10)
 endforeach()
+
+# audio.pairs runs 8,000 frames, so its time is set by the lane's memory speed:
+# 1.2 s on an Apple core, 6.42 s on the Intel macOS runner in run 40942957712
+# (79 tests), over 10 s in run 42687433421 (114 tests, run in parallel).
+schway_add_test(NAME core.audio.pairs
+  COMMAND schwaystation-test-core audio.pairs
+  LABELS core portable TIMEOUT 30)
 
 # Save states and the field visitor. Fault prevented: a state that does not
 # round-trip byte for byte, a corruption applied before it is refused, or a
