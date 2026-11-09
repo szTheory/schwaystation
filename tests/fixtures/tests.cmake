@@ -154,6 +154,9 @@ schway__fixture(exc_default.exe exc_default.asm)
 schway__fixture(exc_handler.exe exc_default.asm -definelabel USE_HANDLER 1)
 schway__fixture(exit_port.exe exit_port.asm -equ CODE 0)
 schway__fixture(exit_port_fail.exe exit_port.asm -equ CODE 0x2A)
+schway__fixture(hang.exe hang.asm)
+schway__fixture(mailbox_fault.exe mailbox_fail.asm -equ MODE 0)
+schway__fixture(mailbox_crc.exe mailbox_fail.asm -equ MODE 1)
 schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
@@ -203,6 +206,28 @@ schway_add_test(NAME fixtures.exit_port
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
+
+# The runner's outcome for a fixture: expect_runner(<test> <exit status> <regex> <runner arguments>)
+# runs the runner on a built fixture and passes only for that exit status and a matching output.
+function(expect_runner name code regex)
+  set(cmd ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-run> ${ARGN})
+  string(REPLACE ";" "$<SEMICOLON>" cmd "${cmd}")
+  schway_add_test(NAME ${name}
+    COMMAND ${CMAKE_COMMAND} "-DCMD=${cmd}" -DCODE=${code} "-DREGEX=${regex}"
+      -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+    LABELS fixtures portable TIMEOUT 30)
+endfunction()
+
+# Fault prevented: a program that never finishes, a fixture that reports a fault and a mailbox whose
+# CRC is wrong, each reported as success or as the wrong outcome. A jump to itself is a hang, status 8,
+# naming the frame cap and the program counter; a fault status and a CRC mismatch are status 6.
+string(REPEAT "[0-9a-f]" 8 schway__hex8) # CMake regular expressions have no {n} count
+expect_runner(fixtures.hang 8 "^hang frames=[0-9]+ pc=0x${schway__hex8}"
+  --exe ${SCHWAYSTATION_FIXTURES_DIR}/hang.exe --stop-on mailbox --frames 5)
+expect_runner(fixtures.mailbox_fault 6 "mailbox SWMB status=ff records=1"
+  --exe ${SCHWAYSTATION_FIXTURES_DIR}/mailbox_fault.exe --stop-on mailbox --frames 30)
+expect_runner(fixtures.mailbox_crc 6 "mailbox crc mismatch"
+  --exe ${SCHWAYSTATION_FIXTURES_DIR}/mailbox_crc.exe --stop-on mailbox --frames 30)
 
 # Fault prevented: a tampered or wrongly pinned assembler accepted. The
 # digest check runs on a local file:// URL with an all-zero digest and must

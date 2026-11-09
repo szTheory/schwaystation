@@ -89,6 +89,12 @@ if(CMAKE_SCRIPT_MODE_FILE)
     refuse(--tty)
     refuse(--frames 1 --tty)
     refuse(--bench 1 --tty)
+    # --stop-on takes mailbox, once, and needs --exe.
+    refuse(--stop-on mailbox)
+    refuse(--frames 1 --stop-on mailbox)
+    refuse(--exe a.exe --stop-on)
+    refuse(--exe a.exe --stop-on exit)
+    refuse(--exe a.exe --stop-on mailbox --stop-on mailbox)
   elseif(CASE STREQUAL "exe_missing")
     # A file that is not there, or is not a PS-EXE, exits 1 naming the file
     # and the reason; no frame runs.
@@ -335,6 +341,29 @@ schway_add_test(NAME runner.exit.failure
 schway_add_test(NAME runner.exe.missing
   COMMAND ${runner_check} -DCASE=exe_missing -DOUT=${PROJECT_BINARY_DIR}/tests
     -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: a documented exit status that differs from what the runner returns. --help's
+# table and docs/runner.md's must match line for line, in either direction; the self test checks a
+# copy of the page without the hang row, which must fail naming that row.
+set(runner_doc ${PROJECT_SOURCE_DIR}/docs/runner.md)
+set(runner_doc_copy ${PROJECT_BINARY_DIR}/tests/runner_without_hang.md)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${runner_doc})
+file(READ ${runner_doc} runner_doc_text)
+string(REGEX REPLACE "\n  8  hang[^\n]*" "" runner_doc_text "${runner_doc_text}")
+file(WRITE ${runner_doc_copy} "${runner_doc_text}")
+schway_add_test(NAME runner.exit_table
+  COMMAND ${runner_check} -DDOC=${runner_doc}
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/exit_table.cmake
+  LABELS portable runner TIMEOUT 30)
+set(runner_table_cmd ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
+  "-DEMULATOR=${runner_emulator}" -DDOC=${runner_doc_copy}
+  -P ${PROJECT_SOURCE_DIR}/tests/cmake/exit_table.cmake)
+string(REPLACE ";" "$<SEMICOLON>" runner_table_cmd "${runner_table_cmd}")
+schway_add_test(NAME runner.exit_table.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${runner_table_cmd}" -DCODE=1
+    "-DREGEX=lacks the exit status line[^/]*8[^/]*hang"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: --version printing something a script cannot parse.

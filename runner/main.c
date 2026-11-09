@@ -446,6 +446,22 @@ static void tty_drain(schway *inst, tty_lines *t)
     }
 }
 
+/* The program counter, read through the state visitor's cpu.pc field. */
+static void pc_field(void *user, const char *name, const void *data, uint32_t count,
+                     uint32_t width)
+{
+    if (strcmp(name, "cpu.pc") == 0 && count == 1u && width == 4u) {
+        memcpy(user, data, 4u);
+    }
+}
+
+static uint32_t guest_pc(const schway *inst)
+{
+    uint32_t pc = 0u;
+    (void)schway_state_visit(inst, pc_field, &pc);
+    return pc;
+}
+
 /* Runs the frames. The bench samples take 4 bytes per frame, so they are
    on the heap. Returns the exit status. */
 static int run(const options *opt)
@@ -509,6 +525,7 @@ static int run(const options *opt)
     /* Only schway_run_frame is timed, not hashing or writing files. */
     uint32_t ran = 0;
     uint32_t exit_code = 0u; /* the byte the guest wrote to the exit port */
+    int ended = 0;           /* the loop ended before the frame cap, by a stop of any kind */
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
         uint64_t start_ns = opt->bench ? schway__clock_ns() : 0u;
         schway_run_result res;
@@ -546,6 +563,7 @@ static int run(const options *opt)
         if (status == SCHWAY__EXIT_OK && opt->stop_mailbox) {
             int mb = schway__mailbox_check(inst, stdout);
             if (mb == SCHWAY__MAILBOX_DONE) {
+                ended = 1;
                 break;
             }
             if (mb != SCHWAY__MAILBOX_PENDING) {
@@ -554,13 +572,20 @@ static int run(const options *opt)
             }
         }
         if (hooked) {
+            ended = 1;
             break;
         }
         /* A stop request ends the run only between whole frames, after the
            frame's outputs are written. */
         if (schway__stop_requested()) {
+            ended = 1;
             break;
         }
+    }
+    /* No done or fault status by the frame cap is a hang. */
+    if (status == SCHWAY__EXIT_OK && opt->stop_mailbox && !ended) {
+        printf("hang frames=%lu pc=0x%08lx\n", (unsigned long)ran, (unsigned long)guest_pc(inst));
+        status = SCHWAY__EXIT_HANG;
     }
     if (tty.len != 0u) {
         tty_emit(&tty);

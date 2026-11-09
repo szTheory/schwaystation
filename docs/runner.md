@@ -208,7 +208,8 @@ signal that was already ignored when the runner started, as under `nohup`, stays
   0  done     every frame ran, or SIGINT or SIGTERM ended the run after a whole frame
   1  failure  a file could not be written or is not a valid PS-EXE, memory ran out or the core failed
   2  usage    the command line is invalid, so nothing ran
-  6  fixture  the fixture reported failure: exit port byte not 00h
+  6  fixture  the fixture reported failure: mailbox status FFh, a mailbox CRC mismatch or an exit port byte not 00h
+  8  hang     --stop-on mailbox saw no done or fault status by the frame cap
 ```
 
 Errors and usage messages go to standard error. Standard output holds only the results described above.

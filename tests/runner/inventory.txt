@@ -6,6 +6,8 @@ runner.bench.format	bench,portable,runner
 runner.bench.percentile	bench,portable,runner
 runner.exe.missing	portable,runner
 runner.exit.failure	portable,runner
+runner.exit_table	portable,runner
+runner.exit_table.self_test	portable,runner
 runner.hash	portable,runner
 runner.hash.frame5	portable,runner
 runner.hash.ntsc_j	portable,runner
