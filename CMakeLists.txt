@@ -54,13 +54,15 @@ configure_file(cmake/version.h.in ${PROJECT_BINARY_DIR}/generated/schwaystation_
 # The options of every target that holds core code. The core links nothing
 # beyond memcpy, memmove, memset and memcmp: no stack protector or fortify
 # helpers, no MSVC security cookie and no default runtime library, and no
-# build path recorded in the objects.
+# build path recorded in the objects. A Debug build with -U alone still lets
+# the system headers route memcpy and memset to checking helpers the import
+# allowlist refuses, so fortify is defined away, not only undefined.
 function(schway_core_options target)
   set_target_properties(${target} PROPERTIES
     C_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON)
   target_compile_options(${target} PRIVATE
-    $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-fno-stack-protector -U_FORTIFY_SOURCE -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.>
+    $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-fno-stack-protector -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.>
     $<$<C_COMPILER_ID:MSVC>:/GS- /Zl>)
   if(SCHWAYSTATION_NOFP)
     target_compile_options(${target} PRIVATE -mgeneral-regs-only)
