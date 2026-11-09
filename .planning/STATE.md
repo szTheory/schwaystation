@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-17-PLAN.md
-last_updated: "2026-11-09T21:59:15.066Z"
+stopped_at: Completed 02-18-PLAN.md
+last_updated: "2026-11-09T22:05:10.855Z"
 last_activity: 2026-11-09
-last_activity_desc: "Completed 02-17 (block-based CPU run loop with HOOK, FAULT and double-fault stops, the frame advance running a loaded PS-EXE with the vsync I_STAT edge, hello.exe boot, exc_default and exc_handler fixtures, kernel layout on the CPU page)"
-state_head: d4cb97ef0058d1249e1a1ccc50a7c7d5b5533b7c
+last_activity_desc: Completed 02-18 (the stub putchar entries as MIPS, schway_tty and schway_get_tty, hello printing through the port and putchar, fixtures.tty.hello, ring and flag_off, the guide TTY section)
+state_head: ac716a0655fc8ff030ba4db477ba903a88c48473
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 32
+  completed_plans: 33
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 18 of 27
+Plan: 19 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-17: the block run loop (schway__cpu_run, cpu_block), IBE and the double-fault stop, the frame advance running a loaded PS-EXE with the vsync I_STAT edge, hello.exe booting through the stub and nine fixtures.boot cases
+Last activity: 2026-11-09 — Completed 02-18: the stub putchar entries at A0h and B0h, schway_get_tty draining the 4 KiB TTY ring with a drop count, hello.exe printing through the port and putchar, and three fixtures.tty cases
 
 Progress: [██░░░░░░░░] 17%
 
@@ -90,6 +90,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P15 | 15 min | 3 tasks | 9 files |
 | Phase 02 P16 | 5 min | 3 tasks | 12 files |
 | Phase 02 P17 | 12 min | 3 tasks | 15 files |
+| Phase 02 P18 | 3 min | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -173,6 +174,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-17: schway__cpu_run returns the stop reason and the cycles it ran are the advance of inst->ticks, added once per block; a stop sits on the first instruction boundary at or after the limit or frame end and carries no overshoot, so N then M equals N + M where N is a boundary of the one-shot run
 - [Phase 02]: 02-17: a failed instruction fetch is IBE (no BadVaddr), and one at BFC00180h or 80000080h is a double fault that stops the run with FAULT whatever the flags; the exit-port report consumes exit_pending and keeps exit_code
 - [Phase 02]: 02-17: mailbox layout follows the committed stub (CRC 04h, status byte 08h, version 09h, count 0Ah, id 0Bh, handler word 0Ch, records 10h+8n), not CONFORMANCE section 4; plan 02-23's runner reads status at 08h and the count at 0Ah
+- [Phase 02]: 02-18: the stub's A and B kernel entries are four-word RAM slots that jump to ROM putchar routines using only k0 and k1, and the reset code copies a 48-byte slot table; the stub is 620 bytes — A putchar that is real MIPS reaches the debug port through the bus like any guest store, so no host hook watches a kernel address
+- [Phase 02]: 02-18: schway_get_tty drains the 4 KiB ring oldest first and reports and clears the bytes dropped since the last drain, also for capacity 0; the ring stays outside the state, every hash and a load — The same pull shape as schway_get_audio; a host that drains every frame sees every byte, and a hash never depends on whether a host drained
 
 ### Pending Todos
 
@@ -227,8 +230,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T21:59:14.912Z
-Stopped at: Completed 02-17-PLAN.md
+Last session: 2026-11-09T22:05:10.744Z
+Stopped at: Completed 02-18-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
