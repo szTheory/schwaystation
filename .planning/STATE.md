@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-11-09T18:47:18.343Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-11-09T18:53:29.315Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 02 execution started
-state_head: 1b5969219e4f5a51ef21727fb80f8fb9aa18e360
+state_head: b4dbbf18fa9327a77702cac58bd013db4d8bfdfb
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 16
+  completed_plans: 17
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 2 of 27
+Plan: 3 of 27
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 02 execution started
 
@@ -74,6 +74,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 01 P14 | 17min | 3 tasks | 0 files |
 | Phase 01 P15 | 50min | 3 tasks | 27 files |
 | Phase 02 P01 | 2 min | 2 tasks | 15 files |
+| Phase 02 P02 | 4 min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,7 @@ Recent decisions affecting current work:
 
 - [Phase 01 CI tail]: Two controls on v0.1.0 each measured 1620424 Ir/frame three times with zero spread (runs 40939706087 and 40939709809); performance now gates above +1.00 percent, wasm32 is required, and hash-equality compares eight files. Implementation run 40940434499 is green.
 - [Phase 02]: Test selection files stay byte-sorted; SCHWAYSTATION_FIXTURES option declared in tests/tests.cmake before the fixtures include
+- [Phase 02]: 02-02: schway__irq_raise takes an interrupt number 0-10; I_STAT and I_MASK are bounded to bits 0-10 in the state; the profile flags survive a power reset
 
 ### Pending Todos
 
@@ -177,8 +179,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T18:47:18.291Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-11-09T18:53:29.264Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
