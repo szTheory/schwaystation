@@ -2,9 +2,10 @@
 
 `schwaystation-run` is the headless runner. It runs the emulator for a fixed number of frames with no window,
 sound device or input device. It can print a frame hash, write a PNG and report frame times. Scripts and CI use it
-to check that a build produces the expected picture. It can also say what a PS-EXE file is, without running it.
+to check that a build produces the expected picture. It can run a PS-EXE file and print the text the program writes,
+and it can say what a PS-EXE file is without running it.
 
-This release loads no BIOS and no disc. Every run shows the built-in test card, described in
+This release loads no BIOS and no disc. Without `--exe` every run shows the built-in test card, described in
 [embedding.md](embedding.md#the-test-card). `--probe` reads one file and runs nothing.
 
 ## Synopsis
@@ -12,6 +13,7 @@ This release loads no BIOS and no disc. Every run shows the built-in test card, 
 ```text
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--hash]
 schwaystation-run --probe FILE
 schwaystation-run --help | --version
 ```
@@ -22,6 +24,8 @@ schwaystation-run --help | --version
 |---|---|
 | `--frames N` | Run N frames, N from 1 to 1000000. Give either `--frames` or `--bench`, once. |
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
+| `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
+| `--tty` | Print the program's text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print what the PS-EXE file is, as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
@@ -30,8 +34,8 @@ schwaystation-run --help | --version
 | `--version` | Print the version and the Git revision the build was configured from. Give it alone. |
 
 Options may come in any order, except `--probe`, which takes no other option. Anything else on the command line is
-a usage error and nothing runs; that includes a file name that does not follow `--probe` and any option this
-release does not have.
+a usage error and nothing runs; that includes a file name that does not follow `--exe` or `--probe`, `--exe` twice
+or with `--probe`, `--tty` without `--exe`, and any option this release does not have.
 
 ## Examples
 
@@ -40,6 +44,8 @@ schwaystation-run --frames 60 --hash
 schwaystation-run --bench 600
 schwaystation-run --frames 60 --png 60:card.png
 schwaystation-run --region pal --frames 50 --hash
+schwaystation-run --exe game.exe --tty
+schwaystation-run --exe game.exe --frames 300 --hash
 schwaystation-run --probe game.exe
 schwaystation-run --help
 schwaystation-run --version
@@ -51,6 +57,51 @@ checkout:
 ```text
 schwaystation-run 0.0.0 0123456789abcdef0123456789abcdef01234567
 ```
+
+## Running a PS-EXE
+
+`--exe FILE` reads the file, checks it with the core's PS-EXE validator and loads it, then runs frames as `--frames`
+does. The stub kernel the core maps in place of a BIOS starts the program. Without `--frames` or `--bench` the run is
+600 frames; a program that is still running at the end of the last frame is not an error, and the status is 0.
+
+A file that is missing, unreadable, empty or not a valid PS-EXE exits 1 with one line on standard error and runs
+nothing, in the form `--probe` uses:
+
+```text
+schwaystation-run: game.exe: cannot open the file
+```
+
+`--hash`, `--png` and `--bench` work as they do without `--exe`. `--region` sets the region; it does not read one from
+the file.
+
+## TTY
+
+`--tty` sets the profile's debug-port flag, which a retail run leaves clear, and after every frame reads the text the
+program has written since the last frame. Programs write text two ways: bytes stored to the debug port at 1F802080h,
+and the kernel's putchar calls, A(3Ch) and B(3Dh). Both reach the same buffer, in the order they were written.
+
+Each completed line is printed as `tty ` followed by its bytes up to the line feed, which is not printed:
+
+```text
+tty hello port
+tty hello putchar
+```
+
+The bytes are printed as the program wrote them, with no character-set conversion. A line still open when the run
+ends is printed at the end, without its line feed. A line longer than 4096 bytes is printed in pieces of 4096. The
+buffer holds 4 KiB per frame; a program that writes more in one frame keeps the first 4096 bytes and loses the rest.
+
+## Exit port
+
+With `--tty` a program can end the run by storing one byte to the exit port at 1F802082h. Byte 00h ends the run with
+status 0. Any other byte prints one line and ends the run with status 6:
+
+```text
+exit code=0x2a
+```
+
+The text written before the exit is printed first. `--hash`, `--png` and `--bench` print nothing after an exit
+with status 6. Without `--tty` the port is not decoded and the write has no effect.
 
 ## Frame hash
 
@@ -157,6 +208,7 @@ signal that was already ignored when the runner started, as under `nohup`, stays
   0  done     every frame ran, or SIGINT or SIGTERM ended the run after a whole frame
   1  failure  a file could not be written or is not a valid PS-EXE, memory ran out or the core failed
   2  usage    the command line is invalid, so nothing ran
+  6  fixture  the fixture reported failure: exit port byte not 00h
 ```
 
 Errors and usage messages go to standard error. Standard output holds only the results described above.
