@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
-status: ready_to_execute
-stopped_at: Phase 2 planned (27 plans, 13 waves); next is /gsd-execute-phase 2
-last_updated: "2026-11-09T18:39:40.529Z"
+status: executing
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-11-09T18:47:18.343Z"
 last_activity: 2026-11-09
-last_activity_desc: Planned phase 2 (27 plans in 13 waves; research skipped, context carries the research)
-state_head: d920febdb5e7482e9e1c08293fb62a97fcd9e44e
+last_activity_desc: Phase 02 execution started
+state_head: 1b5969219e4f5a51ef21727fb80f8fb9aa18e360
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 15
+  completed_plans: 16
   percent: 17
 ---
 
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 02 — the CPU matches the public vectors
+**Current focus:** Phase 02 — The CPU matches the public vectors
 
 ## Current Position
 
-Phase: 02 (The CPU matches the public vectors) — READY TO EXECUTE
-Plan: 0 of 27
-Status: Planned; plans 02-01 to 02-27 in 13 waves, checker passes closed out by hand (see Runtime Log)
-Last activity: 2026-11-09 — Planned phase 2
+Phase: 02 (The CPU matches the public vectors) — EXECUTING
+Plan: 2 of 27
+Status: Ready to execute
+Last activity: 2026-11-09 — Phase 02 execution started
 
 Progress: [██░░░░░░░░] 17%
 
@@ -73,6 +73,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 01 P13 | 5min | 3 tasks | 6 files |
 | Phase 01 P14 | 17min | 3 tasks | 0 files |
 | Phase 01 P15 | 50min | 3 tasks | 27 files |
+| Phase 02 P01 | 2 min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Verification: 117 UAT entries pass, 5/5 pre-merge truths verified; no owner verification remains. Real publication and latest-download installation are confirmed at ship.
 
 - [Phase 01 CI tail]: Two controls on v0.1.0 each measured 1620424 Ir/frame three times with zero spread (runs 40939706087 and 40939709809); performance now gates above +1.00 percent, wasm32 is required, and hash-equality compares eight files. Implementation run 40940434499 is green.
+- [Phase 02]: Test selection files stay byte-sorted; SCHWAYSTATION_FIXTURES option declared in tests/tests.cmake before the fixtures include
 
 ### Pending Todos
 
@@ -171,12 +173,13 @@ come from `AGENTS.md`.
 | 2026-10-29 | /gsd-quick phase-1 CI tail | Codex, OpenGSD 1.19.0; inline quick fallback | GPT-6 (session; exact model ID not exposed) |
 | 2026-11-09 | /gsd-discuss-phase 2 | Claude Code, OpenGSD; seven advisor agents fanned out | claude-sonnet-5-5 |
 | 2026-11-09 | /gsd-plan-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, planner claude-opus-5-5 (4 rounds), checker claude-haiku-5-5 (4 passes); research skipped | claude-sonnet-5-5 |
+| 2026-11-09 | /gsd-execute-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, executors claude-sonnet-5-5 (sequential, no worktrees) | claude-sonnet-5-5 |
 
 ## Session Continuity
 
-Last session: 2026-11-09
-Stopped at: Phase 2 planned (27 plans, 13 waves); next is /gsd-execute-phase 2
-Resume file: .planning/phases/02-the-cpu-matches-the-public-vectors/02-01-PLAN.md
+Last session: 2026-11-09T18:47:18.291Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
