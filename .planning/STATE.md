@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-13-PLAN.md
-last_updated: "2026-11-09T21:13:55.848Z"
+stopped_at: Completed 02-14-PLAN.md
+last_updated: "2026-11-09T21:26:24.132Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-12 (loads, stores, mul/div, COP2 pre-phase; 5,500 vector cases pass)
-state_head: 2e9788ae3ab5d710c79a6a9b913e420fcff95c8b
+last_activity_desc: Completed 02-14 (I-cache, cache isolation and the write queue; 5,500 vector cases still pass)
+state_head: 78a644aa2e602166da53b627a9806f65803d54db
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 28
+  completed_plans: 29
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 14 of 27
+Plan: 15 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-13: schwaystation-run --probe prints a PS-EXE's identity fields, SHA-256 and rcheevos MD5 with no emulation
+Last activity: 2026-11-09 — Completed 02-14: a 256-line I-cache with per-word valid bits, SR.Isc isolation with TAG and IS1, and a 4-deep write queue drained by KSEG1 accesses
 
 Progress: [██░░░░░░░░] 17%
 
@@ -86,6 +86,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P11 | 10 min | 3 tasks | 14 files |
 | Phase 02 P12 | 14 min | 3 tasks | 12 files |
 | Phase 02 P13 | 13 min | 3 tasks | 13 files |
+| Phase 02 P14 | 11 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -162,6 +163,8 @@ Recent decisions affecting current work:
 - [Phase 02]: LWC1, SWC1, LWC3 and SWC3 follow the COP1/COP3 CpU rule; LWC0 and SWC0 stay reserved-instruction exceptions
 - [Phase 02]: 02-13: rcheevos_md5 is MD5 over the first t_size + 0800h bytes of the file (rcheevos dfdc64ea035c, rc_hash_disc.c rc_hash_psx line 965); a bare file has no boot-file name, so none is prepended
 - [Phase 02]: 02-13: --probe is valid only alone with one file argument not starting with a dash; every refused, empty, unreadable or missing file exits 1 with one stderr line and no report
+- [Phase 02]: 02-14: the write queue is a count with no retirement by time; it empties by a fifth store, a KSEG1 access or a power reset, and the 4-cycle drain is an estimate — Every store reaches the bus at once, so only the cost of waiting is modelled; a time-based rule would be an unmeasured timing behaviour no test may pin
+- [Phase 02]: 02-14: the I-cache refills from the missed word to the line end on any miss, IBLKSZ is ignored, isolation sends KUSEG, KSEG0 and KSEG1 data accesses to the cache arrays and leaves the KSEG2 cache-control word on the bus — One fill mechanism; FlushCache needs cache control reachable while Isc is set; the scratchpad alternative for TAG clear is not modelled and the bus page says so
 
 ### Pending Todos
 
@@ -216,8 +219,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T21:13:55.720Z
-Stopped at: Completed 02-13-PLAN.md
+Last session: 2026-11-09T21:26:24.048Z
+Stopped at: Completed 02-14-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
