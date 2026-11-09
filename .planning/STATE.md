@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-14-PLAN.md
-last_updated: "2026-11-09T21:26:24.132Z"
+stopped_at: Completed 02-15-PLAN.md
+last_updated: "2026-11-09T21:36:33.323Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-14 (I-cache, cache isolation and the write queue; 5,500 vector cases still pass)
-state_head: 78a644aa2e602166da53b627a9806f65803d54db
+last_activity_desc: Completed 02-15 (nightly vectors-full lane; 55,000 public vector cases pass at their pins, run 42703494243)
+state_head: ad2fcd35e7bc6b33db8f5808960d64601c336eac
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 29
+  completed_plans: 30
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 15 of 27
+Plan: 16 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-14: a 256-line I-cache with per-word valid bits, SR.Isc isolation with TAG and IS1, and a 4-deep write queue drained by KSEG1 accesses
+Last activity: 2026-11-09 — Completed 02-15: the nightly vectors-full lane, 55 blob-SHA-1 pins, --upstream and --prefix-of, and the nightly preset; the full 55,000 cases pass and the dispatched job is green (run 42703494243)
 
 Progress: [██░░░░░░░░] 17%
 
@@ -87,6 +87,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P12 | 14 min | 3 tasks | 12 files |
 | Phase 02 P13 | 13 min | 3 tasks | 13 files |
 | Phase 02 P14 | 11 min | 3 tasks | 10 files |
+| Phase 02 P15 | 15 min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -165,6 +166,7 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-13: --probe is valid only alone with one file argument not starting with a dash; every refused, empty, unreadable or missing file exits 1 with one stderr line and no report
 - [Phase 02]: 02-14: the write queue is a count with no retirement by time; it empties by a fifth store, a KSEG1 access or a power reset, and the 4-cycle drain is an estimate — Every store reaches the bus at once, so only the cost of waiting is modelled; a time-based rule would be an unmeasured timing behaviour no test may pin
 - [Phase 02]: 02-14: the I-cache refills from the missed word to the line end on any miss, IBLKSZ is ignored, isolation sends KUSEG, KSEG0 and KSEG1 data accesses to the cache arrays and leaves the KSEG2 cache-control word on the bus — One fill mechanism; FlushCache needs cache control reachable while Isc is set; the scratchpad alternative for TAG clear is not modelled and the bus page says so
+- [Phase 02]: Plan 02-15: the nightly lane's tests.cmake defines its own schwaystation-test-vectors target and the prefix check compares every sample byte after the count field with the upstream file
 
 ### Pending Todos
 
@@ -219,8 +221,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T21:26:24.048Z
-Stopped at: Completed 02-14-PLAN.md
+Last session: 2026-11-09T21:36:33.240Z
+Stopped at: Completed 02-15-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
