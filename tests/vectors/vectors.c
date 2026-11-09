@@ -311,7 +311,7 @@ static void load_upstream(const char *dir)
                 finish(1);
             }
         }
-        if ((uint64_t)n > 0xFFFFFFFFu) {
+        if (n != (size_t)(uint32_t)n) {
             die("the upstream file is over 4 GiB");
         }
         s->data = f;
