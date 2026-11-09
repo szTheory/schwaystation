@@ -152,3 +152,10 @@ schway_warnings(schwaystation-test-boot)
 schway_add_test(NAME fixtures.stub.window
   COMMAND schwaystation-test-boot stub_window
   LABELS fixtures portable TIMEOUT 10)
+
+# Fault prevented: a committed stub that no longer matches its source. The
+# assembled stub.bin and the array in src/stub_kernel.c are compared byte for
+# byte on every lane, and the first differing offset is printed.
+schway_add_test(NAME fixtures.stub_drift
+  COMMAND schwaystation-test-boot stub_drift ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 10)

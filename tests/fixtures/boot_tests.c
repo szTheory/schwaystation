@@ -74,6 +74,46 @@ static void stub_window(void)
     schway_destroy(inst);
 }
 
+/* The committed array is the assembled stub: stub.bin in the directory
+   argument holds the same bytes, and the first difference is printed by its
+   offset.
+   Fault prevented: a committed stub that no longer matches its source. */
+static void stub_drift(const char *dir)
+{
+    char path[1024];
+    int n = snprintf(path, sizeof path, "%s/stub.bin", dir);
+    CHECK(n > 0 && (size_t)n < sizeof path);
+    FILE *f = fopen(path, "rb");
+    if (f == NULL) {
+        fprintf(stderr, "%s: cannot open\n", path);
+        check_failures++;
+        return;
+    }
+    uint8_t buf[4096];
+    size_t got = fread(buf, 1u, sizeof buf, f);
+    int more = fgetc(f);
+    fclose(f);
+    if (more != EOF) {
+        fprintf(stderr, "%s: longer than %zu bytes\n", path, sizeof buf);
+        check_failures++;
+        return;
+    }
+    size_t common = got < schway__stub_kernel_size ? got : schway__stub_kernel_size;
+    for (size_t i = 0u; i < common; i++) {
+        if (buf[i] != schway__stub_kernel_image[i]) {
+            fprintf(stderr, "%s: differs from src/stub_kernel.c at offset %zu: %02x != %02x\n", path,
+                    i, (unsigned)buf[i], (unsigned)schway__stub_kernel_image[i]);
+            check_failures++;
+            return;
+        }
+    }
+    if (got != schway__stub_kernel_size) {
+        fprintf(stderr, "%s: %zu bytes, src/stub_kernel.c holds %u; they agree up to offset %zu\n",
+                path, got, (unsigned)schway__stub_kernel_size, common);
+        check_failures++;
+    }
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -83,6 +123,8 @@ int main(int argc, char **argv)
     const char *c = argv[1];
     if (strcmp(c, "stub_window") == 0) {
         stub_window();
+    } else if (strcmp(c, "stub_drift") == 0 && argc == 3) {
+        stub_drift(argv[2]);
     } else {
         fprintf(stderr, "schwaystation-test-boot: unknown case %s\n", c);
         return 2;
