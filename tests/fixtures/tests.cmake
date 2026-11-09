@@ -40,6 +40,19 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "--probe report lacks ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "tty")
+    # The runner's --tty report for hello.exe: each of the two lines, from the
+    # debug port and from the kernel's putchar, printed whole after the prefix.
+    execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${FILE}" --tty --frames 10 RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "schwaystation-run --exe ${FILE} --tty: exit ${rc}\n${out}")
+    endif()
+    foreach(line IN ITEMS "hello port" "hello putchar")
+      if(NOT out MATCHES "(^|\n)tty ${line}\n")
+        message(FATAL_ERROR "--tty report lacks the line ${line}:\n${out}")
+      endif()
+    endforeach()
   elseif(CASE STREQUAL "array")
     # Writes the assembled stub kernel as src/stub_kernel.c: 12 bytes to a line, the
     # array and its size, with the command that regenerates it.
@@ -124,6 +137,14 @@ schway_add_test(NAME fixtures.hello.header
 string(REPLACE ";" "$<SEMICOLON>" schway__probe_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
 schway_add_test(NAME fixtures.probe.hello
   COMMAND ${CMAKE_COMMAND} -DCASE=probe -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/hello.exe
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a runner that loads an image but loses its text, or prints
+# one of the two sources only: hello.exe's lines reach standard output.
+schway_add_test(NAME fixtures.hello.tty
+  COMMAND ${CMAKE_COMMAND} -DCASE=tty -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/hello.exe
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)

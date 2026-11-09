@@ -87,18 +87,18 @@ static void rcheevos_md5(const uint8_t *file, uint32_t hash_len, char hex[33])
     schway__md5_hex(digest, hex);
 }
 
-int schway__probe_print(FILE *out, const char *path)
+uint8_t *schway__read_exe_file(const char *path, size_t *n_out)
 {
     FILE *f = fopen(path, "rb");
     if (f == NULL) {
         refuse(path, "cannot open the file");
-        return 1;
+        return NULL;
     }
     uint8_t *file = (uint8_t *)malloc((size_t)EXE_MAX + 1u);
     if (file == NULL) {
         (void)fclose(f);
         refuse(path, "out of memory");
-        return 1;
+        return NULL;
     }
     /* One byte more than the largest valid file, so a longer file is seen as
        too long rather than cut to a valid size. */
@@ -108,11 +108,27 @@ int schway__probe_print(FILE *out, const char *path)
     if (!read_ok) {
         free(file);
         refuse(path, "cannot read the file");
-        return 1;
+        return NULL;
     }
     if (n == 0u) {
         free(file);
         refuse(path, "the file is empty");
+        return NULL;
+    }
+    *n_out = n;
+    return file;
+}
+
+void schway__refuse_file(const char *path, const char *why)
+{
+    refuse(path, why);
+}
+
+int schway__probe_print(FILE *out, const char *path)
+{
+    size_t n = 0;
+    uint8_t *file = schway__read_exe_file(path, &n);
+    if (file == NULL) {
         return 1;
     }
     schway_exe_info info;

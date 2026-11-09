@@ -2,6 +2,7 @@
  *
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--hash]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
@@ -24,6 +25,10 @@
  * --bench N runs N frames as --frames N does, times each schway_run_frame
  * with the runner's monotonic clock and prints the report described in
  * bench.h. The core reads no clock.
+ *
+ * --exe FILE loads a PS-EXE into the instance and runs it, 600 frames when
+ * neither --frames nor --bench is given. --tty sets the profile's debug-port
+ * flag and prints the guest's text, one "tty <line>" per line.
  *
  * --probe FILE prints the identity of a PS-EXE (probe.h) and runs nothing: no
  * instance is made and no frame runs. It is valid only alone.
@@ -61,6 +66,8 @@
 #endif
 
 #define FRAMES_MAX 1000000u
+#define EXE_FRAMES_DEFAULT 600u /* an --exe run that gives no frame count */
+#define TTY_LINE_MAX 4096u      /* a longer line is printed in pieces */
 
 /* The allocator the runner hands the core: the C library's malloc and free. */
 static void *run_alloc(void *user, size_t size)
@@ -79,6 +86,7 @@ static void run_free(void *user, void *ptr, size_t size)
 static const char synopsis[] =
     "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--hash]\n"
     "       schwaystation-run --probe FILE\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
@@ -86,6 +94,8 @@ static const char synopsis[] =
     "  --bench N          run N frames and report the time per frame\n"
     "  --hash             print the SHA-256 of the last frame\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
+    "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
+    "  --tty              print the program's text as tty lines; needs --exe\n"
     "  --probe FILE       print what a PS-EXE file is; runs nothing\n"
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
@@ -169,6 +179,8 @@ typedef struct options {
     uint32_t png_frame; /* 0 when no --png was given */
     const char *png_path;
     const char *probe; /* --probe FILE, else NULL */
+    const char *exe;   /* --exe FILE, else NULL */
+    int tty;           /* --tty: debug-port flag and the tty lines */
     uint32_t region;
     int printed; /* --help or --version ran; nothing else to do */
 } options;
@@ -221,6 +233,17 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("--region needs ntsc-u, ntsc-j or pal");
             }
             i++;
+        } else if (strcmp(arg, "--exe") == 0) {
+            if (o->exe != NULL) {
+                return usage("give --exe once");
+            }
+            if (value == NULL || value[0] == '-') {
+                return usage("--exe needs a file");
+            }
+            o->exe = value;
+            i++;
+        } else if (strcmp(arg, "--tty") == 0) {
+            o->tty = 1;
         } else if (strcmp(arg, "--probe") == 0) {
             /* Alone, with one file name that is not an option. */
             if (argc != 3 || value == NULL || value[0] == '-') {
@@ -233,6 +256,12 @@ static int parse_options(int argc, char **argv, options *o)
         } else {
             return usage(arg[0] == '-' ? "unknown option" : "unexpected argument");
         }
+    }
+    if (o->tty && o->exe == NULL) {
+        return usage("--tty needs --exe");
+    }
+    if (o->frames == 0u && o->exe != NULL) {
+        o->frames = EXE_FRAMES_DEFAULT;
     }
     if (o->frames == 0u) {
         return usage("--frames N or --bench N is required");
@@ -350,15 +379,66 @@ static int write_png(const schway *inst, const char *path)
     return status;
 }
 
+/* The guest's text, collected a line at a time. A line is the bytes up to a
+   0Ah, which is not part of it; bytes are printed as they came, with no
+   character-set conversion. */
+typedef struct tty_lines {
+    uint8_t line[TTY_LINE_MAX];
+    uint32_t len;
+} tty_lines;
+
+static void tty_emit(tty_lines *t)
+{
+    fputs("tty ", stdout);
+    (void)fwrite(t->line, 1u, t->len, stdout);
+    fputc('\n', stdout);
+    t->len = 0u;
+}
+
+/* Drains the instance's TTY ring (4 KiB, so one call takes all of it) and
+   prints each line that is now complete. A line over TTY_LINE_MAX bytes is
+   printed in pieces, so a guest that never ends a line cannot grow memory. */
+static void tty_drain(schway *inst, tty_lines *t)
+{
+    uint8_t bytes[4096];
+    schway_tty io;
+    memset(&io, 0, sizeof io);
+    io.size = (uint32_t)sizeof io;
+    io.bytes = bytes;
+    io.capacity = (uint32_t)sizeof bytes;
+    if (schway_get_tty(inst, &io) != SCHWAY_STATUS_OK) {
+        return;
+    }
+    for (uint32_t i = 0; i < io.written; i++) {
+        if (bytes[i] == 0x0Au) {
+            tty_emit(t);
+        } else {
+            if (t->len == TTY_LINE_MAX) {
+                tty_emit(t);
+            }
+            t->line[t->len++] = bytes[i];
+        }
+    }
+}
+
 /* Runs the frames. The bench samples take 4 bytes per frame, so they are
    on the heap. Returns the exit status. */
 static int run(const options *opt)
 {
+    uint8_t *exe = NULL;
+    size_t exe_size = 0;
+    if (opt->exe != NULL) {
+        exe = schway__read_exe_file(opt->exe, &exe_size);
+        if (exe == NULL) {
+            return SCHWAY__EXIT_FAILURE;
+        }
+    }
     uint32_t *samples = NULL;
     if (opt->bench) {
         samples = (uint32_t *)malloc(schway__bench_bytes(opt->frames));
         if (samples == NULL) {
             fprintf(stderr, "schwaystation-run: out of memory\n");
+            free(exe);
             return SCHWAY__EXIT_FAILURE;
         }
     }
@@ -373,14 +453,17 @@ static int run(const options *opt)
         fprintf(stderr, "schwaystation-run: schway_create failed: %s\n",
                 schway_status_string(st));
         free(samples);
+        free(exe);
         return SCHWAY__EXIT_FAILURE;
     }
     int status = SCHWAY__EXIT_OK;
-    if (opt->region != 0u) {
+    /* The debug-port flag is set for --tty and for nothing else. */
+    if (opt->region != 0u || opt->tty) {
         schway_profile p;
         memset(&p, 0, sizeof p);
         p.size = (uint32_t)sizeof p;
-        p.region = opt->region;
+        p.region = opt->region != 0u ? opt->region : SCHWAY_REGION_NTSC_U;
+        p.flags = opt->tty ? SCHWAY_PROFILE_DEBUG_PORT : 0u;
         st = schway_set_profile(inst, &p);
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: schway_set_profile failed: %s\n",
@@ -388,6 +471,16 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
         }
     }
+    if (status == SCHWAY__EXIT_OK && exe != NULL) {
+        st = schway_load_exe(inst, exe, exe_size);
+        if (st != SCHWAY_STATUS_OK) {
+            schway__refuse_file(opt->exe, schway_status_string(st));
+            status = SCHWAY__EXIT_FAILURE;
+        }
+    }
+    free(exe);
+    tty_lines tty;
+    tty.len = 0u;
     /* Only schway_run_frame is timed, not hashing or writing files. */
     uint32_t ran = 0;
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
@@ -402,6 +495,9 @@ static int run(const options *opt)
         }
 #endif
         ran = n;
+        if (opt->tty) {
+            tty_drain(inst, &tty);
+        }
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: schway_run_frame failed: %s\n",
                     schway_status_string(st));
@@ -415,6 +511,9 @@ static int run(const options *opt)
         if (schway__stop_requested()) {
             break;
         }
+    }
+    if (tty.len != 0u) {
+        tty_emit(&tty);
     }
     if (status == SCHWAY__EXIT_OK && opt->hash) {
         status = print_hash(inst, ran);
