@@ -1,6 +1,7 @@
 /* Replays the SingleStepTests r3000 vectors through schway__cpu_step_one:
      schwaystation-test-vectors FILE --expect N [--only NAME,...] [--allow FILE]
                                 [--flip-expected FIELD[@FILE]]
+     schwaystation-test-vectors --upstream DIR --prefix-of SAMPLE --expect N ...
    FILE holds the committed sample: a u16 slice count, then per slice a 16-byte
    NUL-padded name, a u32 byte length and the upstream bytes (a u32 case count,
    then the cases), all little-endian. A case is a 51-byte Pascal name, a u32
@@ -11,6 +12,13 @@
    cycles; the final state is compared field by field. Exit 0 when every case
    passes and N or more ran, 1 for a failure or a malformed file, 2 for a bad
    command line.
+
+   With --upstream DIR the cases come from the full upstream files instead:
+   for each slice name in the sample SAMPLE, DIR/NAME.json.bin is read whole,
+   and its first records must equal the sample's byte for byte (the count
+   field aside) or the run fails naming the file and the first differing
+   offset. The sample is read, checked and run through the same parser as any
+   other file.
 
    Two named rules adjust what a case is compared with, and the run prints how
    many cases each handled. Rule (a): the upstream vectors come from an
@@ -57,6 +65,7 @@ struct vcase {
 struct slice {
     char name[SLICE_NAME_BYTES + 1u];
     const uint8_t *data;
+    uint8_t *own; /* the upstream file data points into, or NULL */
     uint32_t len, cases;
     int selected;
 };
@@ -68,8 +77,10 @@ struct allowed {
 };
 
 static const char *path;
+static char upstream_path[1024];
 static uint8_t *buf;
 static struct slice *slices;
+static uint32_t slice_n;
 static schway *inst;
 static struct allowed allow[MAX_LISTED];
 static uint32_t allow_n;
@@ -77,6 +88,9 @@ static uint32_t allow_n;
 static void finish(int code)
 {
     schway_destroy(inst);
+    for (uint32_t i = 0; i < slice_n; i++) {
+        free(slices[i].own);
+    }
     free(slices);
     free(buf);
     exit(code);
@@ -91,7 +105,9 @@ static void die(const char *what)
 static void usage(void)
 {
     fprintf(stderr, "usage: schwaystation-test-vectors FILE --expect N [--only NAME,...] "
-                    "[--allow FILE] [--flip-expected FIELD[@FILE]]\n");
+                    "[--allow FILE] [--flip-expected FIELD[@FILE]]\n"
+                    "       schwaystation-test-vectors --upstream DIR --prefix-of SAMPLE "
+                    "--expect N ...\n");
     finish(2);
 }
 
@@ -203,8 +219,29 @@ static void parse_case(const uint8_t **pp, const uint8_t *end, struct vcase *c)
     *pp = p;
 }
 
-/* Reads the container and every case in it, so a malformed file is refused
-   whatever --only selects. Returns the slice count. */
+/* Reads every case of one slice, whose data and length are set, so a malformed
+   one is refused whatever --only selects. Sets its case count. */
+static void check_slice(struct slice *s)
+{
+    if (s->len < 4u) {
+        die("short slice");
+    }
+    s->cases = rd32(s->data);
+    if (s->cases > MAX_CASES) {
+        die("a case count is over 1000");
+    }
+    const uint8_t *p = s->data + 4;
+    const uint8_t *end = s->data + s->len;
+    struct vcase scratch;
+    for (uint32_t k = 0; k < s->cases; k++) {
+        parse_case(&p, end, &scratch);
+    }
+    if (p != end) {
+        die("a slice is longer than its cases");
+    }
+}
+
+/* Reads the container and every case in it. Returns the slice count. */
 static uint32_t parse_container(size_t n)
 {
     if (n == 0u) {
@@ -221,6 +258,7 @@ static uint32_t parse_container(size_t n)
     if (slices == NULL) {
         die("out of memory");
     }
+    slice_n = count;
     size_t off = 2u;
     for (uint32_t i = 0; i < count; i++) {
         if (n - off < SLICE_NAME_BYTES + 4u) {
@@ -234,29 +272,52 @@ static uint32_t parse_container(size_t n)
         if (n - off < s->len) {
             die("truncated slice");
         }
-        if (s->len < 4u) {
-            die("short slice");
-        }
         s->data = buf + off;
-        s->cases = rd32(s->data);
-        if (s->cases > MAX_CASES) {
-            die("a case count is over 1000");
-        }
-        const uint8_t *p = s->data + 4;
-        const uint8_t *end = s->data + s->len;
-        struct vcase scratch;
-        for (uint32_t k = 0; k < s->cases; k++) {
-            parse_case(&p, end, &scratch);
-        }
-        if (p != end) {
-            die("a slice is longer than its cases");
-        }
+        check_slice(s);
         off += s->len;
     }
     if (off != n) {
         die("long file: bytes after the last slice");
     }
     return count;
+}
+
+/* --upstream: replaces each slice of the sample with its whole upstream file,
+   after proving the sample is that file's first records. The count field at
+   the start is the one difference: the sample's is patched down to its own
+   case count. */
+static void load_upstream(const char *dir)
+{
+    for (uint32_t i = 0; i < slice_n; i++) {
+        struct slice *s = &slices[i];
+        int named = snprintf(upstream_path, sizeof upstream_path, "%s/%s.json.bin", dir, s->name);
+        if (named < 0 || (size_t)named >= sizeof upstream_path) {
+            die("the upstream directory name is too long");
+        }
+        path = upstream_path;
+        size_t n = 0u;
+        uint8_t *f = read_file(upstream_path, &n);
+        if (f == NULL) {
+            die("cannot read the upstream file");
+        }
+        s->own = f;
+        if (n < s->len) {
+            die("the upstream file is shorter than the committed sample");
+        }
+        for (uint32_t k = 4u; k < s->len; k++) {
+            if (f[k] != s->data[k]) {
+                fprintf(stderr, "vectors: %s: differs from the committed sample at offset %lu\n",
+                        upstream_path, (unsigned long)k);
+                finish(1);
+            }
+        }
+        if ((uint64_t)n > 0xFFFFFFFFu) {
+            die("the upstream file is over 4 GiB");
+        }
+        s->data = f;
+        s->len = (uint32_t)n;
+        check_slice(s);
+    }
 }
 
 /* The next space-separated word of *p, cut off with a NUL, or NULL at the end
@@ -677,6 +738,7 @@ static unsigned long parse_count(const char *text)
 int main(int argc, char **argv)
 {
     const char *only = NULL, *allow_path = NULL, *flip_field = NULL;
+    const char *upstream = NULL, *prefix_of = NULL;
     unsigned long expect = 0u;
     path = NULL;
     for (int i = 1; i < argc; i++) {
@@ -686,6 +748,10 @@ int main(int argc, char **argv)
             expect = parse_count(argv[++i]);
         } else if (strcmp(a, "--only") == 0 && has_value) {
             only = argv[++i];
+        } else if (strcmp(a, "--upstream") == 0 && has_value) {
+            upstream = argv[++i];
+        } else if (strcmp(a, "--prefix-of") == 0 && has_value) {
+            prefix_of = argv[++i];
         } else if (strcmp(a, "--allow") == 0 && has_value) {
             allow_path = argv[++i];
         } else if (strcmp(a, "--flip-expected") == 0 && has_value) {
@@ -703,6 +769,13 @@ int main(int argc, char **argv)
     }
     struct vstate probe;
     memset(&probe, 0, sizeof probe);
+    /* The sample is the positional FILE, or the --prefix-of file in upstream mode. */
+    if ((upstream != NULL) != (prefix_of != NULL) || (upstream != NULL && path != NULL)) {
+        usage();
+    }
+    if (upstream != NULL) {
+        path = prefix_of;
+    }
     if (path == NULL || expect == 0u || (flip_field != NULL && !flip(&probe, flip_field))) {
         usage();
     }
@@ -713,6 +786,9 @@ int main(int argc, char **argv)
         die("cannot read the file");
     }
     uint32_t count = parse_container(n);
+    if (upstream != NULL) {
+        load_upstream(upstream);
+    }
     if (allow_path != NULL) {
         load_allow(allow_path);
     }
