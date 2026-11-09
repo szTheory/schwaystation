@@ -622,5 +622,4 @@ int main(int argc, char **argv)
         fprintf(stderr, "vectors: ran %lu cases, expected at least %lu\n", ran, expect);
     }
     finish(failures != 0u || ran < expect || stale ? 1 : 0);
-    return 1;
 }
