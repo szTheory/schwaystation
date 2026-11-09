@@ -285,9 +285,7 @@ nothing and leaves the pairs queued; `samples` may be `NULL` only then. This rel
 
 ## TTY
 
-`schway_get_tty` drains the bytes the guest wrote to the TTY. Set `size`, point `bytes` at room for `capacity` bytes and
-call it; `written` bytes come back in the order the guest wrote them. The guest writes through the debug port or the
-putchar kernel call, and both need `SCHWAY_PROFILE_DEBUG_PORT`.
+`schway_get_tty` drains the text the guest wrote. Set `size`, point `bytes` at room for `capacity` bytes and call it:
 
 ```c
 uint8_t text[256];
@@ -296,8 +294,21 @@ memset(&tty, 0, sizeof tty);
 tty.size = (uint32_t)sizeof tty;
 tty.bytes = text;
 tty.capacity = sizeof text;
-schway_get_tty(inst, &tty); /* tty.written bytes */
+schway_get_tty(inst, &tty); /* tty.written bytes, oldest first */
 ```
+
+A guest has two ways to write a byte, and both need `SCHWAY_PROFILE_DEBUG_PORT`: a byte store to the debug port at
+`1F802080h`, and the putchar kernel call, `A(3Ch)` or `B(3Dh)`, which the stub kernel turns into the same store. A
+profile without the flag decodes neither, and the ring stays empty.
+
+The bytes queue in a ring of 4,096 in the order written. A drain returns up to `capacity` of them, oldest first, and
+leaves the rest queued; `written` is how many came back. A byte written to a full ring is dropped, and `dropped`
+reports how many were lost since the last drain and then starts again from zero. Drain every frame, as for audio. A
+drain with `capacity` 0 writes nothing and reports and clears the count; `bytes` may be `NULL` only then. The bytes
+are not text-decoded or line-split, and the core never prints them.
+
+The ring is not part of the machine state: it is outside `schway_save_state`, `schway_state_visit` and every hash, a
+load leaves it as it is, and a power reset empties it.
 
 ## Save states
 
