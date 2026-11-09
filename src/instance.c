@@ -63,6 +63,67 @@ void schway__fault_latch(schway *inst, uint32_t kind, uint32_t device, uint32_t 
     f->addr = addr;
 }
 
+/* Reads the RAM or scratchpad bytes at offset addr of the space, as a
+   little-endian value of width 1, 2 or 4, aligned. It touches nothing: no
+   fault, no counter, no cycle (ARCHITECTURE section 6). */
+schway_status schway_peek(const schway *inst, uint32_t space, uint32_t addr, uint32_t width,
+                          uint32_t *value)
+{
+    if (inst == NULL || value == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    const uint8_t *mem;
+    uint32_t size;
+    if (space == SCHWAY_SPACE_RAM) {
+        mem = inst->bus.ram;
+        size = SCHWAY__RAM_SIZE;
+    } else if (space == SCHWAY_SPACE_SCRATCHPAD) {
+        mem = inst->bus.scratch;
+        size = SCHWAY__SCRATCH_SIZE;
+    } else {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    if ((width != 1u && width != 2u && width != 4u) || addr % width != 0u || addr >= size ||
+        width > size - addr) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    uint32_t v = 0u;
+    for (uint32_t i = 0; i < width; i++) {
+        v |= (uint32_t)mem[addr + i] << (8u * i);
+    }
+    *value = v;
+    return SCHWAY_STATUS_OK;
+}
+
+/* The first-fault record, or all zero while none is latched. */
+schway_status schway_get_fault(const schway *inst, schway_fault *out)
+{
+    if (inst == NULL || out == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_status st = schway__instance_check_out_size(out, SCHWAY__FAULT_SIZE_FIRST);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    const struct schway__fault *f = &inst->fault;
+    schway_fault r;
+    memset(&r, 0, sizeof r);
+    r.size = out->size;
+    r.kind = f->kind;
+    r.device = f->device;
+    r.width = f->width;
+    r.frame = f->frame;
+    r.ticks = f->ticks;
+    r.line = f->line;
+    r.dot = f->dot;
+    r.pc = f->pc;
+    r.opcode = f->opcode;
+    r.addr = f->addr;
+    r.note = f->note;
+    schway__instance_write_out(out, &r, (uint32_t)sizeof r);
+    return SCHWAY_STATUS_OK;
+}
+
 void schway__tty_push(schway *inst, uint8_t byte)
 {
     struct schway__tty *t = &inst->tty;

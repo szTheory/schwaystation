@@ -202,6 +202,20 @@ _Static_assert(offsetof(schway_budget, flags) == 4, "budget.flags");
 _Static_assert(offsetof(schway_budget, max_cycles) == 8, "budget.max_cycles");
 _Static_assert(sizeof(schway_budget) == 16, "budget size");
 
+_Static_assert(offsetof(schway_fault, size) == 0, "fault.size");
+_Static_assert(offsetof(schway_fault, kind) == 4, "fault.kind");
+_Static_assert(offsetof(schway_fault, device) == 8, "fault.device");
+_Static_assert(offsetof(schway_fault, width) == 12, "fault.width");
+_Static_assert(offsetof(schway_fault, frame) == 16, "fault.frame");
+_Static_assert(offsetof(schway_fault, ticks) == 24, "fault.ticks");
+_Static_assert(offsetof(schway_fault, line) == 32, "fault.line");
+_Static_assert(offsetof(schway_fault, dot) == 36, "fault.dot");
+_Static_assert(offsetof(schway_fault, pc) == 40, "fault.pc");
+_Static_assert(offsetof(schway_fault, opcode) == 44, "fault.opcode");
+_Static_assert(offsetof(schway_fault, addr) == 48, "fault.addr");
+_Static_assert(offsetof(schway_fault, note) == 52, "fault.note");
+_Static_assert(sizeof(schway_fault) == 56, "fault size");
+
 _Static_assert(offsetof(schway_video, size) == 0, "video.size");
 _Static_assert(offsetof(schway_video, reserved0) == 4, "video.reserved0");
 _Static_assert(offsetof(schway_video, frame) == 8, "video.frame");
@@ -246,6 +260,7 @@ _Static_assert(sizeof(schway_audio) == 16 + 2 * SCHWAY__P, "audio size");
 #define SCHWAY__VIDEO_SIZE_FIRST ((uint32_t)(80 + 2 * SCHWAY__P))
 #define SCHWAY__AUDIO_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__EXE_INFO_SIZE_FIRST 56u
+#define SCHWAY__FAULT_SIZE_FIRST 56u
 _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first size");
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
@@ -256,6 +271,40 @@ _Static_assert(SCHWAY__BUDGET_SIZE_FIRST == sizeof(schway_budget), "budget first
 _Static_assert(SCHWAY__VIDEO_SIZE_FIRST == sizeof(schway_video), "video first size");
 _Static_assert(SCHWAY__AUDIO_SIZE_FIRST == sizeof(schway_audio), "audio first size");
 _Static_assert(SCHWAY__EXE_INFO_SIZE_FIRST == sizeof(schway_exe_info), "exe_info first size");
+_Static_assert(SCHWAY__FAULT_SIZE_FIRST == sizeof(schway_fault), "fault first size");
+
+/* The public fault kinds and devices are the internal ones, number for number. */
+_Static_assert(SCHWAY_FAULT_NONE == SCHWAY__FAULT_NONE, "fault none");
+_Static_assert(SCHWAY_FAULT_UNMAPPED_READ == SCHWAY__FAULT_UNMAPPED_READ, "fault unmapped read");
+_Static_assert(SCHWAY_FAULT_UNMAPPED_WRITE == SCHWAY__FAULT_UNMAPPED_WRITE, "fault unmapped write");
+_Static_assert(SCHWAY_FAULT_UNMAPPED_FETCH == SCHWAY__FAULT_UNMAPPED_FETCH, "fault unmapped fetch");
+_Static_assert(SCHWAY_FAULT_MISALIGNED_READ == SCHWAY__FAULT_MISALIGNED_READ, "fault misaligned read");
+_Static_assert(SCHWAY_FAULT_MISALIGNED_WRITE == SCHWAY__FAULT_MISALIGNED_WRITE,
+               "fault misaligned write");
+_Static_assert(SCHWAY_FAULT_MISALIGNED_FETCH == SCHWAY__FAULT_MISALIGNED_FETCH,
+               "fault misaligned fetch");
+_Static_assert(SCHWAY_FAULT_RESERVED_INSTRUCTION == SCHWAY__FAULT_RESERVED_INSTRUCTION,
+               "fault reserved instruction");
+_Static_assert(SCHWAY_FAULT_COP_UNUSABLE == SCHWAY__FAULT_COP_UNUSABLE, "fault cop unusable");
+_Static_assert(SCHWAY_FAULT_EXCEPTION_LOOP == SCHWAY__FAULT_EXCEPTION_LOOP, "fault exception loop");
+_Static_assert(SCHWAY_DEVICE_NONE == SCHWAY__DEV_NONE, "device none");
+_Static_assert(SCHWAY_DEVICE_RAM == SCHWAY__DEV_RAM, "device ram");
+_Static_assert(SCHWAY_DEVICE_SCRATCH == SCHWAY__DEV_SCRATCH, "device scratch");
+_Static_assert(SCHWAY_DEVICE_BIOS == SCHWAY__DEV_BIOS, "device bios");
+_Static_assert(SCHWAY_DEVICE_MEMCTL == SCHWAY__DEV_MEMCTL, "device memctl");
+_Static_assert(SCHWAY_DEVICE_IRQ == SCHWAY__DEV_IRQ, "device irq");
+_Static_assert(SCHWAY_DEVICE_DMA == SCHWAY__DEV_DMA, "device dma");
+_Static_assert(SCHWAY_DEVICE_TIMER == SCHWAY__DEV_TIMER, "device timer");
+_Static_assert(SCHWAY_DEVICE_CDROM == SCHWAY__DEV_CDROM, "device cdrom");
+_Static_assert(SCHWAY_DEVICE_GPU == SCHWAY__DEV_GPU, "device gpu");
+_Static_assert(SCHWAY_DEVICE_MDEC == SCHWAY__DEV_MDEC, "device mdec");
+_Static_assert(SCHWAY_DEVICE_SIO == SCHWAY__DEV_SIO, "device sio");
+_Static_assert(SCHWAY_DEVICE_SPU == SCHWAY__DEV_SPU, "device spu");
+_Static_assert(SCHWAY_DEVICE_EXP1 == SCHWAY__DEV_EXP1, "device exp1");
+_Static_assert(SCHWAY_DEVICE_EXP2 == SCHWAY__DEV_EXP2, "device exp2");
+_Static_assert(SCHWAY_DEVICE_EXP3 == SCHWAY__DEV_EXP3, "device exp3");
+_Static_assert(SCHWAY_DEVICE_GTE == SCHWAY__DEV_GTE, "device gte");
+_Static_assert(SCHWAY_DEVICE_UNMAPPED == SCHWAY__DEV_UNMAPPED, "device unmapped");
 
 /* Input structs: OK when the size tag at s is at least first and at most
    4096, and every byte past ours is zero; ERR_STRUCT_SIZE otherwise. */

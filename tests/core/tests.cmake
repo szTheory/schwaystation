@@ -76,7 +76,8 @@ set_target_properties(schwaystation-test-run PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-run)
 
-foreach(case IN ITEMS budget_resume)
+foreach(case IN ITEMS budget_resume split_equivalence peek_no_side_effects peek_rejects peek_values
+    fault_none fault_latched)
   schway_add_test(NAME core.run.${case}
     COMMAND schwaystation-test-run ${case}
     LABELS core portable TIMEOUT 10)

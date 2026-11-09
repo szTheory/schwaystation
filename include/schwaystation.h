@@ -39,6 +39,41 @@ typedef uint32_t schway_status;
 
 #define SCHWAY_RUN_STOP_ON_FAULT 1u
 
+#define SCHWAY_SPACE_RAM 1u
+#define SCHWAY_SPACE_SCRATCHPAD 2u
+
+/* Kinds of the first-fault record. */
+#define SCHWAY_FAULT_NONE 0u
+#define SCHWAY_FAULT_UNMAPPED_READ 1u
+#define SCHWAY_FAULT_UNMAPPED_WRITE 2u
+#define SCHWAY_FAULT_UNMAPPED_FETCH 3u
+#define SCHWAY_FAULT_MISALIGNED_READ 4u
+#define SCHWAY_FAULT_MISALIGNED_WRITE 5u
+#define SCHWAY_FAULT_MISALIGNED_FETCH 6u
+#define SCHWAY_FAULT_RESERVED_INSTRUCTION 7u
+#define SCHWAY_FAULT_COP_UNUSABLE 8u
+#define SCHWAY_FAULT_EXCEPTION_LOOP 9u
+
+/* Devices a fault names. */
+#define SCHWAY_DEVICE_NONE 0u
+#define SCHWAY_DEVICE_RAM 1u
+#define SCHWAY_DEVICE_SCRATCH 2u
+#define SCHWAY_DEVICE_BIOS 3u
+#define SCHWAY_DEVICE_MEMCTL 4u
+#define SCHWAY_DEVICE_IRQ 5u
+#define SCHWAY_DEVICE_DMA 6u
+#define SCHWAY_DEVICE_TIMER 7u
+#define SCHWAY_DEVICE_CDROM 8u
+#define SCHWAY_DEVICE_GPU 9u
+#define SCHWAY_DEVICE_MDEC 10u
+#define SCHWAY_DEVICE_SIO 11u
+#define SCHWAY_DEVICE_SPU 12u
+#define SCHWAY_DEVICE_EXP1 13u
+#define SCHWAY_DEVICE_EXP2 14u
+#define SCHWAY_DEVICE_EXP3 15u
+#define SCHWAY_DEVICE_GTE 16u
+#define SCHWAY_DEVICE_UNMAPPED 17u
+
 #define SCHWAY_RESET_POWER 1u
 
 #define SCHWAY_PROFILE_DEBUG_PORT 1u
@@ -112,6 +147,13 @@ typedef struct schway_budget {
     uint64_t max_cycles;
 } schway_budget;
 
+typedef struct schway_fault {
+    uint32_t size;
+    uint32_t kind, device, width; /* SCHWAY_FAULT_*, SCHWAY_DEVICE_*, bytes */
+    uint64_t frame, ticks;
+    uint32_t line, dot, pc, opcode, addr, note;
+} schway_fault;
+
 typedef struct schway_video {
     uint32_t size;
     uint32_t reserved0;
@@ -143,6 +185,9 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile);
 schway_status schway_reset(schway *inst, uint32_t kind); /* SCHWAY_RESET_* */
 schway_status schway_run_frame(schway *inst, schway_run_result *out); /* out may be NULL */
 schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_result *out);
+schway_status schway_peek(const schway *inst, uint32_t space, uint32_t addr, uint32_t width,
+                          uint32_t *value);
+schway_status schway_get_fault(const schway *inst, schway_fault *out);
 schway_status schway_get_info(const schway *inst, schway_info *out);
 schway_status schway_get_video(const schway *inst, schway_video *out);
 schway_status schway_get_audio(schway *inst, schway_audio *io);

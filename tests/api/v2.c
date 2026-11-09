@@ -39,6 +39,36 @@ int main(void)
     CHECK_EQ_U64(SCHWAY_STOP_HOOK, 4);
     CHECK_EQ_U64(SCHWAY_STOP_FAULT, 5);
     CHECK_EQ_U64(SCHWAY_RUN_STOP_ON_FAULT, 1);
+    CHECK_EQ_U64(SCHWAY_SPACE_RAM, 1);
+    CHECK_EQ_U64(SCHWAY_SPACE_SCRATCHPAD, 2);
+    CHECK_EQ_U64(SCHWAY_FAULT_NONE, 0);
+    CHECK_EQ_U64(SCHWAY_FAULT_UNMAPPED_READ, 1);
+    CHECK_EQ_U64(SCHWAY_FAULT_UNMAPPED_WRITE, 2);
+    CHECK_EQ_U64(SCHWAY_FAULT_UNMAPPED_FETCH, 3);
+    CHECK_EQ_U64(SCHWAY_FAULT_MISALIGNED_READ, 4);
+    CHECK_EQ_U64(SCHWAY_FAULT_MISALIGNED_WRITE, 5);
+    CHECK_EQ_U64(SCHWAY_FAULT_MISALIGNED_FETCH, 6);
+    CHECK_EQ_U64(SCHWAY_FAULT_RESERVED_INSTRUCTION, 7);
+    CHECK_EQ_U64(SCHWAY_FAULT_COP_UNUSABLE, 8);
+    CHECK_EQ_U64(SCHWAY_FAULT_EXCEPTION_LOOP, 9);
+    CHECK_EQ_U64(SCHWAY_DEVICE_NONE, 0);
+    CHECK_EQ_U64(SCHWAY_DEVICE_RAM, 1);
+    CHECK_EQ_U64(SCHWAY_DEVICE_SCRATCH, 2);
+    CHECK_EQ_U64(SCHWAY_DEVICE_BIOS, 3);
+    CHECK_EQ_U64(SCHWAY_DEVICE_MEMCTL, 4);
+    CHECK_EQ_U64(SCHWAY_DEVICE_IRQ, 5);
+    CHECK_EQ_U64(SCHWAY_DEVICE_DMA, 6);
+    CHECK_EQ_U64(SCHWAY_DEVICE_TIMER, 7);
+    CHECK_EQ_U64(SCHWAY_DEVICE_CDROM, 8);
+    CHECK_EQ_U64(SCHWAY_DEVICE_GPU, 9);
+    CHECK_EQ_U64(SCHWAY_DEVICE_MDEC, 10);
+    CHECK_EQ_U64(SCHWAY_DEVICE_SIO, 11);
+    CHECK_EQ_U64(SCHWAY_DEVICE_SPU, 12);
+    CHECK_EQ_U64(SCHWAY_DEVICE_EXP1, 13);
+    CHECK_EQ_U64(SCHWAY_DEVICE_EXP2, 14);
+    CHECK_EQ_U64(SCHWAY_DEVICE_EXP3, 15);
+    CHECK_EQ_U64(SCHWAY_DEVICE_GTE, 16);
+    CHECK_EQ_U64(SCHWAY_DEVICE_UNMAPPED, 17);
     CHECK_EQ_U64(SCHWAY_STATUS_ERR_EXE_INVALID, 11);
     CHECK_EQ_U64(SCHWAY_STATUS_ERR_EXE_RANGE, 12);
     CHECK_EQ_U64(SCHWAY_PROFILE_DEBUG_PORT, 1);
@@ -167,6 +197,35 @@ int main(void)
     budget.flags = 0u;
     budget.size = 8u;
     CHECK_EQ_U64(schway_run(inst, &budget, &res), SCHWAY_STATUS_ERR_STRUCT_SIZE);
+
+    /* Peek reads RAM and the scratchpad without touching them, and the fault
+       record is empty until something latches one. */
+    uint32_t value = 0xFFFFFFFFu;
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 0x10000u, 4u, &value), SCHWAY_STATUS_OK);
+    CHECK_EQ_HEX(value, 0u);
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_SCRATCHPAD, 0x3FCu, 4u, &value),
+                 SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_peek(inst, 3u, 0u, 1u, &value), SCHWAY_STATUS_ERR_ARGUMENT);
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 1u, 2u, &value), SCHWAY_STATUS_ERR_ARGUMENT);
+    schway_fault fault;
+    memset(&fault, 0xA5, sizeof fault);
+    fault.size = (uint32_t)sizeof fault;
+    fault.kind = 1u;
+    fault.device = 1u;
+    fault.width = 1u;
+    fault.frame = 1u;
+    fault.ticks = 1u;
+    fault.line = 1u;
+    fault.dot = 1u;
+    fault.pc = 1u;
+    fault.opcode = 1u;
+    fault.addr = 1u;
+    fault.note = 1u;
+    CHECK_EQ_U64(schway_get_fault(inst, &fault), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(fault.kind, SCHWAY_FAULT_NONE);
+    CHECK_EQ_U64(fault.device | fault.width | fault.frame | fault.ticks, 0u);
+    CHECK_EQ_U64(fault.line | fault.dot | fault.pc | fault.opcode | fault.addr | fault.note, 0u);
+    CHECK_EQ_U64(schway_get_fault(NULL, &fault), SCHWAY_STATUS_ERR_ARGUMENT);
     schway_destroy(inst);
     CHECK_DONE();
 }
