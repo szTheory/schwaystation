@@ -1,0 +1,1 @@
+# One line per accepted upstream mismatch: YYYY-MM-DD <file> <case-hex> <upstream-issue-URL>
