@@ -2,6 +2,7 @@
  *
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
+ *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
  * Runs N frames (1 <= N <= 1,000,000) of one instance with no BIOS and no
@@ -24,6 +25,9 @@
  * with the runner's monotonic clock and prints the report described in
  * bench.h. The core reads no clock.
  *
+ * --probe FILE prints the identity of a PS-EXE (probe.h) and runs nothing: no
+ * instance is made and no frame runs. It is valid only alone.
+ *
  * SIGINT or SIGTERM ends the run after the frame in progress: what was asked
  * is printed for the frames that ran, and the status is 0.
  *
@@ -41,6 +45,7 @@
 #include "clock.h"
 #include "exit_status.h"
 #include "png.h"
+#include "probe.h"
 #include "revision.h"
 #include "rss.h"
 #include "schwaystation.h"
@@ -74,12 +79,14 @@ static void run_free(void *user, void *ptr, size_t size)
 static const char synopsis[] =
     "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]\n"
+    "       schwaystation-run --probe FILE\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
     "  --frames N         run N frames (1 <= N <= 1000000)\n"
     "  --bench N          run N frames and report the time per frame\n"
     "  --hash             print the SHA-256 of the last frame\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
+    "  --probe FILE       print what a PS-EXE file is; runs nothing\n"
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
 
@@ -161,6 +168,7 @@ typedef struct options {
     int hash;
     uint32_t png_frame; /* 0 when no --png was given */
     const char *png_path;
+    const char *probe; /* --probe FILE, else NULL */
     uint32_t region;
     int printed; /* --help or --version ran; nothing else to do */
 } options;
@@ -213,6 +221,13 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("--region needs ntsc-u, ntsc-j or pal");
             }
             i++;
+        } else if (strcmp(arg, "--probe") == 0) {
+            /* Alone, with one file name that is not an option. */
+            if (argc != 3 || value == NULL || value[0] == '-') {
+                return usage("--probe takes one file and no other argument");
+            }
+            o->probe = value;
+            return SCHWAY__EXIT_OK;
         } else if (strcmp(arg, "--help") == 0 || strcmp(arg, "--version") == 0) {
             return usage("--help and --version take no other arguments");
         } else {
@@ -420,7 +435,10 @@ int main(int argc, char **argv)
     options opt;
     memset(&opt, 0, sizeof opt);
     int status = parse_options(argc, argv, &opt);
-    if (status == SCHWAY__EXIT_OK && !opt.printed) {
+    if (status == SCHWAY__EXIT_OK && opt.probe != NULL) {
+        status = schway__probe_print(stdout, opt.probe) == 0 ? SCHWAY__EXIT_OK
+                                                             : SCHWAY__EXIT_FAILURE;
+    } else if (status == SCHWAY__EXIT_OK && !opt.printed) {
         schway__stop_install();
         status = run(&opt);
     }

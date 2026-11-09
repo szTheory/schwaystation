@@ -21,6 +21,25 @@ if(CMAKE_SCRIPT_MODE_FILE)
     elseif(NOT t_size EQUAL body)
       message(FATAL_ERROR "${FILE}: t_size is ${t_size}, but the file holds ${size} - 2048 bytes after the header")
     endif()
+  elseif(CASE STREQUAL "probe")
+    # The runner's --probe report for the image: the identity fields, the
+    # size and the achievement-hash MD5, each from an independent reading of
+    # the file (the image's text is its whole body, so the MD5 covers the file).
+    file(SIZE "${FILE}" size)
+    file(MD5 "${FILE}" md5)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FILE}" RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    set(want "format=exe" "serial=n/a" "licence_area=north_america" "region_guess=ntsc-u"
+      "exe_name=hello[.]exe" "exe_size=${size}" "pc0=0x80010100" "t_addr=0x80010000"
+      "rcheevos_md5=${md5}")
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "schwaystation-run --probe ${FILE}: exit ${rc}\n${out}")
+    endif()
+    foreach(line IN LISTS want)
+      if(NOT out MATCHES "(^|\n)${line}\n")
+        message(FATAL_ERROR "--probe report lacks ${line}:\n${out}")
+      endif()
+    endforeach()
   else()
     message(FATAL_ERROR "unknown CASE '${CASE}'")
   endif()
@@ -55,6 +74,15 @@ add_custom_target(schwaystation-fixtures ALL DEPENDS ${schway__fixture_outputs})
 # every fixture built from header.inc loads wrongly.
 schway_add_test(NAME fixtures.hello.header
   COMMAND ${CMAKE_COMMAND} -DCASE=header -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/hello.exe
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a probe report that disagrees with the image's own bytes:
+# a header field, the size or the achievement-hash MD5 read wrongly.
+string(REPLACE ";" "$<SEMICOLON>" schway__probe_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+schway_add_test(NAME fixtures.probe.hello
+  COMMAND ${CMAKE_COMMAND} -DCASE=probe -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/hello.exe
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
 

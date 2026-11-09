@@ -1,3 +1,4 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
 fixtures.armips_pin.self_test	fixtures,portable
 fixtures.hello.header	fixtures,portable
+fixtures.probe.hello	fixtures,portable
