@@ -2,7 +2,68 @@
 # The validator, the probe and the loader through the public header, plus the
 # instance's RAM and state. One executable runs the case named on its command
 # line. White-box: the test sees src/, so it can read guest RAM directly.
-add_executable(schwaystation-test-exe ${CMAKE_CURRENT_LIST_DIR}/exe_tests.c)
+
+# Run as a script (cmake -DCASE=<case> ... -P tests.cmake), this file is one
+# probe check of the runner; include()d by tests/tests.cmake, it registers the tests.
+if(CMAKE_SCRIPT_MODE_FILE)
+  # Runs the runner with ARGN; sets rc, out (standard output) and err (standard error).
+  function(probe_run)
+    execute_process(COMMAND ${EMULATOR} ${RUN} ${ARGN} RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(rc "${rc}" PARENT_SCOPE)
+    set(out "${out}" PARENT_SCOPE)
+    set(err "${err}" PARENT_SCOPE)
+  endfunction()
+
+  file(REMOVE_RECURSE "${DIR}")
+  file(MAKE_DIRECTORY "${DIR}")
+  if(CASE STREQUAL "probe_refusals")
+    # The test program writes one good file and five bad ones. Each bad one,
+    # and a file that is not there, exits 1 with the file and a reason on
+    # standard error and no report; the good one exits 0 with its report.
+    execute_process(COMMAND ${EMULATOR} ${WRITER} write "${DIR}" RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "schwaystation-test-exe write: exit ${rc}\n${out}")
+    endif()
+    foreach(name bad_signature truncated no_entry empty oversized missing)
+      probe_run(--probe "${DIR}/${name}.exe")
+      if(NOT rc STREQUAL "1" OR NOT err MATCHES "^schwaystation-run: [^\n]*${name}[.]exe: [^\n]+\n$"
+          OR NOT out STREQUAL "")
+        message(FATAL_ERROR "--probe ${name}.exe: expected exit 1, a one-line error naming the file "
+          "and no report, got exit ${rc}\nstdout: ${out}\nstderr: ${err}")
+      endif()
+    endforeach()
+    probe_run(--probe "${DIR}/valid.exe")
+    if(NOT rc STREQUAL "0" OR NOT out MATCHES "(^|\n)licence_area=europe\n"
+        OR NOT out MATCHES "(^|\n)region_guess=pal\n" OR NOT out MATCHES "(^|\n)exe_name=valid[.]exe\n"
+        OR NOT out MATCHES "(^|\n)lint=0x00000000\n" OR NOT err STREQUAL "")
+      message(FATAL_ERROR "--probe valid.exe: exit ${rc}\nstdout: ${out}\nstderr: ${err}")
+    endif()
+  elseif(CASE STREQUAL "probe_usage")
+    # --probe stands alone: with another option, with no file or with two
+    # files it exits 2 with the usage text, before the file is opened, and
+    # writes nothing.
+    foreach(args IN ITEMS
+        "--probe;f.exe;--frames;1" "--frames;1;--probe;f.exe" "--probe;f.exe;--hash"
+        "--probe;f.exe;--png;1:${DIR}/x.png" "--probe;f.exe;--bench;1" "--probe;f.exe;--region;pal"
+        "--probe" "--probe;f.exe;g.exe" "--hash;--probe" "--probe;--hash")
+      probe_run(${args})
+      if(NOT rc STREQUAL "2" OR NOT err MATCHES "usage" OR NOT out STREQUAL "")
+        message(FATAL_ERROR "${args}: expected exit 2 and a usage message, got exit ${rc}\n"
+          "stdout: ${out}\nstderr: ${err}")
+      endif()
+    endforeach()
+    if(EXISTS "${DIR}/x.png")
+      message(FATAL_ERROR "a refused --probe wrote ${DIR}/x.png")
+    endif()
+  else()
+    message(FATAL_ERROR "unknown CASE '${CASE}'")
+  endif()
+  return()
+endif()
+add_executable(schwaystation-test-exe ${CMAKE_CURRENT_LIST_DIR}/exe_tests.c
+  ${PROJECT_SOURCE_DIR}/runner/md5.c)
 target_include_directories(schwaystation-test-exe PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-exe PRIVATE schwaystation::schwaystation)
 set_target_properties(schwaystation-test-exe PROPERTIES
@@ -63,4 +124,28 @@ schway_add_test(NAME exe.after_first_frame
 # that is accepted, or an older caller's profile that keeps a stale bit.
 schway_add_test(NAME exe.profile_flags
   COMMAND schwaystation-test-exe profile_flags
+  LABELS exe portable TIMEOUT 10)
+
+# Fault prevented: a runner that accepts a file the core refuses, prints a
+# report for it, or fails without naming the file, so a script cannot tell a
+# bad image from a good one.
+string(REPLACE ";" "$<SEMICOLON>" schway__exe_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+set(schway__probe_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
+  "-DEMULATOR=${schway__exe_emulator}" -DWRITER=$<TARGET_FILE:schwaystation-test-exe>)
+schway_add_test(NAME exe.probe_refusals
+  COMMAND ${schway__probe_check} -DCASE=probe_refusals -DDIR=${PROJECT_BINARY_DIR}/tests/probe_refusals
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS exe portable TIMEOUT 60)
+
+# Fault prevented: --probe combined with a run option, so a script that meant
+# to probe starts a run, or one that forgot the file gets a report for nothing.
+schway_add_test(NAME exe.probe_usage
+  COMMAND ${schway__probe_check} -DCASE=probe_usage -DDIR=${PROJECT_BINARY_DIR}/tests/probe_usage
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS exe portable TIMEOUT 60)
+
+# Fault prevented: a wrong MD5 round, padding or length, so the achievement
+# hash the probe prints names no real image.
+schway_add_test(NAME exe.md5_rfc1321
+  COMMAND schwaystation-test-exe md5_rfc1321
   LABELS exe portable TIMEOUT 10)

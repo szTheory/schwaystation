@@ -1,4 +1,5 @@
-/* The PS-EXE validator, probe and loader: schwaystation-test-exe <case>.
+/* The PS-EXE validator, probe and loader: schwaystation-test-exe <case>, or
+   schwaystation-test-exe write <dir> for the runner's probe tests.
    White-box: the test sees src/, so it can read guest RAM directly. */
 #include <stdint.h>
 #include <stdio.h>
@@ -8,6 +9,7 @@
 #include "schwaystation.h"
 #include "internal.h"
 #include "../check.h"
+#include "../../runner/md5.h"
 
 #define HEADER 0x800u
 #define RAM 0x200000u
@@ -675,6 +677,95 @@ static void case_profile_flags(void)
     schway_destroy(inst);
 }
 
+/* RFC 1321 appendix A.5: the test suite's seven messages and their digests,
+   then the same eight-line message fed a byte at a time, which crosses the
+   64-byte block boundary at every offset. */
+static void case_md5_rfc1321(void)
+{
+    static const struct {
+        const char *message;
+        const char *digest;
+    } suite[] = {
+        {"", "d41d8cd98f00b204e9800998ecf8427e"},
+        {"a", "0cc175b9c0f1b6a831c399e269772661"},
+        {"abc", "900150983cd24fb0d6963f7d28e17f72"},
+        {"message digest", "f96b697d7cb7938d525a2f31aaf161d0"},
+        {"abcdefghijklmnopqrstuvwxyz", "c3fcd3d76192e4007dfb496cca67e13b"},
+        {"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+         "d174ab98d277d9f5a5611c2c9f419d9f"},
+        {"1234567890123456789012345678901234567890123456789012345678901234567890"
+         "1234567890",
+         "57edf4a22be3c955ac49da2e2107b67a"},
+    };
+    for (size_t i = 0; i < sizeof suite / sizeof suite[0]; i++) {
+        const char *m = suite[i].message;
+        schway__md5 whole;
+        schway__md5 bytes;
+        uint8_t d[16];
+        char hex[33];
+        schway__md5_init(&whole);
+        schway__md5_update(&whole, m, strlen(m));
+        schway__md5_final(&whole, d);
+        schway__md5_hex(d, hex);
+        if (strcmp(hex, suite[i].digest) != 0) {
+            fprintf(stderr, "%s:%d: md5(\"%s\") = %s, want %s\n", __FILE__, __LINE__, m, hex,
+                    suite[i].digest);
+            check_failures++;
+        }
+        schway__md5_init(&bytes);
+        for (size_t k = 0; m[k] != '\0'; k++) {
+            schway__md5_update(&bytes, m + k, 1u);
+        }
+        schway__md5_final(&bytes, d);
+        schway__md5_hex(d, hex);
+        CHECK(strcmp(hex, suite[i].digest) == 0);
+    }
+}
+
+/* Writes n bytes to dir/name. */
+static void write_file(const char *dir, const char *name, const uint8_t *b, size_t n)
+{
+    char path[1024];
+    if (snprintf(path, sizeof path, "%s/%s", dir, name) >= (int)sizeof path) {
+        exit(1);
+    }
+    FILE *f = fopen(path, "wb");
+    if (f == NULL || (n != 0u && fwrite(b, 1u, n, f) != n) || fclose(f) != 0) {
+        fprintf(stderr, "cannot write %s\n", path);
+        exit(1);
+    }
+}
+
+/* The files the runner's probe tests read, written into dir: one the
+   validator accepts and five it refuses (wrong signature, a header cut short,
+   a rejected entry point, no bytes, one byte more than the largest file). */
+static void write_probe_files(const char *dir)
+{
+    struct hdr h = valid();
+    h.licence = "Sony Computer Entertainment Inc. for Europe area";
+    uint8_t *ok = build(&h, HEADER + 0x800u);
+    write_file(dir, "valid.exe", ok, HEADER + 0x800u);
+
+    ok[0] = 'X';
+    write_file(dir, "bad_signature.exe", ok, HEADER + 0x800u);
+    ok[0] = 'P';
+    write_file(dir, "truncated.exe", ok, 100u);
+    free(ok);
+
+    h.pc0 = 0u;
+    uint8_t *no_entry = build(&h, HEADER + 0x800u);
+    write_file(dir, "no_entry.exe", no_entry, HEADER + 0x800u);
+    free(no_entry);
+
+    write_file(dir, "empty.exe", NULL, 0u);
+
+    h = valid();
+    size_t big = (size_t)HEADER + RAM + 1u;
+    uint8_t *over = build(&h, big);
+    write_file(dir, "oversized.exe", over, big);
+    free(over);
+}
+
 typedef void (*case_fn)(void);
 
 static const struct {
@@ -690,10 +781,15 @@ static const struct {
     {"error_changes_nothing", case_error_changes_nothing},
     {"after_first_frame", case_after_first_frame},
     {"profile_flags", case_profile_flags},
+    {"md5_rfc1321", case_md5_rfc1321},
 };
 
 int main(int argc, char **argv)
 {
+    if (argc == 3 && strcmp(argv[1], "write") == 0) {
+        write_probe_files(argv[2]);
+        return 0;
+    }
     if (argc != 2) {
         return 2;
     }

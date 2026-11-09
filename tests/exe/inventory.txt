@@ -5,6 +5,9 @@ exe.error_changes_nothing	exe,portable
 exe.licence	exe,portable
 exe.lint	exe,portable
 exe.load_writes	exe,portable
+exe.md5_rfc1321	exe,portable
+exe.probe_refusals	exe,portable
+exe.probe_usage	exe,portable
 exe.probe_valid	exe,portable
 exe.profile_flags	exe,portable
 exe.rejects	exe,portable
