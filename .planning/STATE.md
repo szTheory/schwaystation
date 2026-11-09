@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-06-PLAN.md
-last_updated: "2026-11-09T19:27:44.116Z"
+stopped_at: Completed 02-07-PLAN.md
+last_updated: "2026-11-09T19:41:28.495Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 02 execution started
-state_head: 311772260a3bc8a0fb7545e1af65fed42242c9d8
+state_head: 900f01f1fab581e09693e622ecb16660e72c0d7f
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 21
+  completed_plans: 22
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 7 of 27
+Plan: 8 of 27
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 02 execution started
 
@@ -79,6 +79,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P04 | 5 min | 2 tasks | 6 files |
 | Phase 02 P05 | 11 min | 3 tasks | 11 files |
 | Phase 02 P06 | 13 min | 3 tasks | 10 files |
+| Phase 02 P07 | 14 min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,9 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-06: the vectors' next-PC model is pc plus the branch latch (next pc = target while take is set, else pc + 4) and every non-branch instruction clears the latch to zeros; the load latch is the pending load landing as the instruction ends, held as register 32 for none because a load into r0 is a real pending state
 - [Phase 02]: 02-06: schwaystation-test-vectors exits 1 for a failure, a malformed file or fewer cases than --expect and 2 for a bad command line; an allow line for a file that ran and matched no failing case is an error
 - [Phase 02]: 02-06: the cpu layout assertion pins offsetof(log) = 288 instead of sizeof, since the non-state log pointer differs by target; cpu_read and cpu_write are static inline until loads and stores land
+- [Phase 02]: 02-07: the CPU hands the bus the virtual address (cpu_physical removed from cpu_exec.inc) and the bus decodes the segment; the scratchpad is a KSEG1 gap and KSEG2 answers only FFFE0130h
+- [Phase 02]: 02-07: the delay-register cost table uses the psx-spx formula as published (COM0, COM2, COM3; COM1 adds nothing), is derived, not saved, and is rebuilt on a delay or COM_DELAY write and on a state load; non-port I/O registers charge one approximate cycle
+- [Phase 02]: 02-07: EXP1 and EXP3 writes are dropped without a fault (reads are bus errors); the EXP2 debug ports act only for byte writes with the debug-port flag set and never fault; bus.bios is NULL until plan 02-16 so BIOS accesses are gaps
 
 ### Pending Todos
 
@@ -191,8 +195,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T19:27:44.031Z
-Stopped at: Completed 02-06-PLAN.md
+Last session: 2026-11-09T19:41:28.346Z
+Stopped at: Completed 02-07-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
