@@ -5,11 +5,11 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-25-PLAN.md; 02-22 halted at its push step (push denied), so 02-26 and 02-27 are blocked
-last_updated: "2026-11-09T23:22:44.104Z"
+stopped_at: Completed 02-22-PLAN.md; next is 02-26
+last_updated: "2026-11-09T23:55:01.594Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-25 (exc_matrix fixture with 30 mailbox records judged by 30 doc rows in tests/diag/expected.csv, the mailbox judge, and the runner naming a fault it ran past under --no-stop-on-fault; the ci workflow passes 240 of 240 and the hygiene workflow passes)
-state_head: d3f5ea8a7f8358fab8a1dbba26d86d199a500a5f
+last_activity_desc: Completed 02-22 (loader fuzz target and gating replay; nightly fuzz run 42720996208 success with ASan at 53 exec/s and no crash; hosted CI run 42722584020 green on every leg after two be32 fixes)
+state_head: e24383d9df5804b4f897c94fb212d0531c4767e5
 progress:
   total_phases: 6
   completed_phases: 1
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
 Plan: 26 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-25: the exc_matrix fixture, its 30 doc rows and the mailbox judge (02-25-SUMMARY.md); 02-22 stays halted at its push, which is open
+Last activity: 2026-11-09 — Completed 02-22: the loader fuzz target; nightly run 42720996208 green (first ASan run, 53 exec/s, no crash) and hosted CI run 42722584020 green on 5c99bb4 after two be32 fixes (02-22-SUMMARY.md); 02-26 and 02-27 are unblocked
 
 Progress: [██░░░░░░░░] 17%
 
@@ -97,6 +97,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P23 | 6 min | 3 tasks | 14 files |
 | Phase 02 P24 | 12min | 3 tasks | 13 files |
 | Phase 02 P25 | 25min | 3 tasks | 8 files |
+| Phase 02 P22 | 55min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -246,8 +247,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T23:22:44.020Z
-Stopped at: Completed 02-25-PLAN.md
+Last session: 2026-11-09T23:55:01.480Z
+Stopped at: Completed 02-22-PLAN.md; next is 02-26
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4

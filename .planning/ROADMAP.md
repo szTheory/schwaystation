@@ -137,7 +137,7 @@ Plans:
 **Wave 8** *(blocked on Wave 7 completion)*
 - [x] 02-20-PLAN.md — Runner --exe (600-frame default cap) and --tty, exit port and exit 6
 - [x] 02-21-PLAN.md — Dual-compiled executor, trace ring and schway_get_trace
-- [ ] 02-22-PLAN.md — Loader fuzz target, in-memory seeds, gating fuzz.regress.exe, nightly fuzz job
+- [x] 02-22-PLAN.md — Loader fuzz target, in-memory seeds, gating fuzz.regress.exe, nightly fuzz job
 
 **Wave 9** *(blocked on Wave 8 completion)*
 - [x] 02-23-PLAN.md — Runner --stop-on mailbox, hang, exit-table check, hello frame hash in hashes.txt
