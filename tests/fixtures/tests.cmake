@@ -40,6 +40,44 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "--probe report lacks ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "array")
+    # Writes the assembled stub kernel as src/stub_kernel.c: 12 bytes to a line, the
+    # array and its size, with the command that regenerates it.
+    #   cmake -DCASE=array -DFILE=<build>/fixtures/stub.bin -DOUT=src/stub_kernel.c -P tests/fixtures/tests.cmake
+    file(READ "${FILE}" hex HEX)
+    string(REGEX MATCHALL ".." bytes "${hex}")
+    set(body "")
+    set(count 0)
+    foreach(byte IN LISTS bytes)
+      math(EXPR column "${count} % 12")
+      if(column EQUAL 0)
+        string(APPEND body "   ")
+      endif()
+      string(APPEND body " 0x${byte},")
+      math(EXPR count "${count} + 1")
+      math(EXPR column "${count} % 12")
+      if(column EQUAL 0)
+        string(APPEND body "\n")
+      endif()
+    endforeach()
+    if(NOT body MATCHES "\n$")
+      string(APPEND body "\n")
+    endif()
+    file(CONFIGURE OUTPUT "${OUT}" NEWLINE_STYLE UNIX @ONLY CONTENT
+"/* The stub kernel: the BIOS image the core maps at BFC00000h when the host gives none.
+   Generated from tests/fixtures/src/stub/stub.asm; do not edit. To regenerate, assemble
+   the fixtures, then
+     cmake -DCASE=array -DFILE=<build>/fixtures/stub.bin -DOUT=src/stub_kernel.c \\
+       -P tests/fixtures/tests.cmake
+   and update the digests in tests/fixtures/manifest.txt and PROVENANCE.md.
+   fixtures.stub_drift fails while the two disagree. */
+#include \"internal.h\"
+
+const uint8_t schway__stub_kernel_image[] = {
+${body}};
+
+const uint32_t schway__stub_kernel_size = (uint32_t)sizeof schway__stub_kernel_image;
+")
   else()
     message(FATAL_ERROR "unknown CASE '${CASE}'")
   endif()
@@ -66,6 +104,7 @@ function(schway__fixture name source)
 endfunction()
 
 schway__fixture(hello.exe hello.asm)
+schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
 add_custom_target(schwaystation-fixtures ALL DEPENDS ${schway__fixture_outputs})
@@ -99,3 +138,17 @@ schway_add_test(NAME fixtures.armips_pin.self_test
   COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__pin_cmd}" -DCODE=1 "-DREGEX=armips:.*SHA-256"
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS fixtures portable TIMEOUT 30)
+
+# The stub kernel in the core, white-box: the test sees src/ to read the committed array.
+add_executable(schwaystation-test-boot ${CMAKE_CURRENT_LIST_DIR}/boot_tests.c)
+target_include_directories(schwaystation-test-boot PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-boot PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-boot PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-boot)
+
+# Fault prevented: a BIOS window that maps another image than the stub, reads
+# its bytes in the wrong order, or lets a runaway read on past the image.
+schway_add_test(NAME fixtures.stub.window
+  COMMAND schwaystation-test-boot stub_window
+  LABELS fixtures portable TIMEOUT 10)

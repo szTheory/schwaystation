@@ -84,7 +84,9 @@ add_library(schwaystation_bus OBJECT
 add_library(schwaystation_cpu OBJECT
   src/cpu.c
   src/cop0.c)
-add_library(schwaystation_exe OBJECT src/exe.c)
+add_library(schwaystation_exe OBJECT
+  src/exe.c
+  src/stub_kernel.c)
 add_library(schwaystation_testcard OBJECT src/testcard.c)
 add_library(schwaystation_state OBJECT
   src/state.c

@@ -2,3 +2,4 @@
 fixtures.armips_pin.self_test	fixtures,portable
 fixtures.hello.header	fixtures,portable
 fixtures.probe.hello	fixtures,portable
+fixtures.stub.window	fixtures,portable

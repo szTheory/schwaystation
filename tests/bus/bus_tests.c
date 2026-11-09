@@ -285,15 +285,21 @@ static void scratchpad(void)
     drop(inst);
 }
 
-/* The BIOS window reads the host's image, and is a gap until one is mapped
-   (the stub or a BIOS maps it later). The image survives a power reset, a
-   write to the ROM is dropped, and its cost follows the DEV2 register.
-   Fault prevented: a window that reads past the image, answers with none
+/* The BIOS window reads the image mapped into it: the stub kernel after
+   create, and a host's image once one is mapped. The image survives a power
+   reset, a write to the ROM is dropped, and its cost follows the DEV2
+   register.
+   Fault prevented: a window that reads past the image, answers with nothing
    mapped, or loses the image at reset. */
 static void bios_window(void)
 {
     schway *inst = make();
     uint32_t v = 0u;
+    CHECK(inst->bus.bios == schway__stub_kernel_image);
+    CHECK_EQ_U64(rd(inst, 0xBFC00000u, 4u, &v), 0u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    /* With nothing mapped the window is a gap. */
+    inst->bus.bios = NULL;
     CHECK(rd(inst, 0xBFC00000u, 4u, &v) != 0);
     CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_UNMAPPED_READ);
     CHECK_EQ_U64(inst->fault.device, SCHWAY__DEV_BIOS);

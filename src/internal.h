@@ -345,6 +345,12 @@ void schway__frame_audio_clear(schway *inst);
    as crc; start from 0. */
 uint32_t schway__crc32_update(uint32_t crc, const uint8_t *p, size_t n);
 
+/* The stub kernel, the BIOS image mapped at BFC00000h while the host gives
+   none, and its size in bytes. The array is generated from
+   tests/fixtures/src/stub/stub.asm. */
+extern const uint8_t schway__stub_kernel_image[];
+extern const uint32_t schway__stub_kernel_size;
+
 /* The test card's 15-bit colour word at display dot (x, y) for a frame
    counter value. */
 uint16_t schway__testcard_pixel(uint32_t x, uint32_t y, uint32_t frame);
