@@ -142,11 +142,13 @@ first, and `stop` in the result says which:
 |------|-------|---------|
 | `SCHWAY_STOP_FRAME` | 1 | the frame ended; a budget that ends exactly on the boundary reports this |
 | `SCHWAY_STOP_BUDGET` | 2 | `max_cycles` ran out inside the frame |
-| `SCHWAY_STOP_HOOK` | 4 | reserved: nothing returns it yet |
-| `SCHWAY_STOP_FAULT` | 5 | `SCHWAY_RUN_STOP_ON_FAULT` is set and a fault is latched |
+| `SCHWAY_STOP_HOOK` | 4 | the guest wrote the exit port (profile flag `SCHWAY_PROFILE_DEBUG_PORT` set); `exit_code` holds the byte |
+| `SCHWAY_STOP_FAULT` | 5 | `SCHWAY_RUN_STOP_ON_FAULT` is set and a fault is latched, or the guest double-faulted at an exception vector |
 
-Values 3 and 6 are not used. A call never runs past the end of the frame, so to run exactly N cycles call again
-until the result's `ticks` has moved N.
+Values 3 and 6 are not used. A call never runs past the end of the frame, so to run N cycles call again until the
+result's `ticks` has moved N. With a program loaded a run stops at the first instruction boundary at or after the
+budget or the frame's end, so `ticks` can pass either by the rest of one instruction (see
+[the CPU page](hardware/cpu.md)).
 
 - `max_cycles` 0 returns `SCHWAY_STOP_BUDGET` and changes nothing, the profile lock included.
 - `flags` takes `SCHWAY_RUN_STOP_ON_FAULT` or 0; any other bit returns `SCHWAY_STATUS_ERR_ARGUMENT`. With it set, a
@@ -154,7 +156,8 @@ until the result's `ticks` has moved N.
 - `schway_run_frame` is the same advance with no limit. After a run that stopped inside a frame it finishes that
   frame.
 - A stopped run resumes where it stopped. With no program loaded, running N cycles and then M leaves exactly what
-  N + M cycles leave: the same state bytes, frame, ticks and audio pairs.
+  N + M cycles leave: the same state bytes, frame, ticks and audio pairs. With one loaded the same holds where N is
+  an instruction boundary the one-shot run passes through, for instance where a run of the same budget stopped.
 - In the result, `exit_code` is the code a guest asks to stop with (0 until one does) and `fault_present` is 1 once a
   fault is latched; `schway_run_frame` fills both too.
 - A run that would pass the save format's limits (see Running) returns `SCHWAY_STATUS_ERR_STATE_FIELD` and changes

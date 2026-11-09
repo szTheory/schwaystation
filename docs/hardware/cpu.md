@@ -8,8 +8,8 @@ and behaves the same on every platform. Facts come from the psx-spx CPU Specific
 
 This page covers what is implemented so far: the registers, the decode fields, the arithmetic, logic, shift,
 set-on-less-than and load-upper-immediate class, the trapping adds, branches and jumps, loads and stores, multiply and
-divide, COP2 before the GTE, the two delay latches and the vector tests. COP0 and the exception entry are on their own
-page, [cop0.md](cop0.md). The instruction cache and the write queue are on the bus page, [bus.md](bus.md); the part of the
+divide, COP2 before the GTE, the two delay latches, the vector tests, the run loop and the stub kernel's layout. COP0
+and the exception entry are on their own page, [cop0.md](cop0.md). The instruction cache and the write queue are on the bus page, [bus.md](bus.md); the part of the
 fetch that touches them is described here.
 
 ## Registers
@@ -106,8 +106,9 @@ an address error on the fetch (see Branches and jumps). Otherwise the fetch goes
 - In the BIOS window, in any segment, it bypasses the cache and goes to the bus.
 - In KSEG1 it first drains the write queue and then goes to the bus; KSEG2 is not executable and the bus refuses it.
 
-A bus error on a fetch reads as the word 0, a no-operation, and the bus records the first fault. The scratchpad is data
-only, so a fetch from it is that same bus error. With a replay log attached, as in the vector tests, the fetch is the next
+A bus error on a fetch raises IBE (06h) at the fetched address, with no BadVaddr, and the bus records the first fault;
+the word it read, 0, is never executed. The scratchpad is data only, so a fetch from it is that same bus error. An IBE
+taken while fetching from an exception vector is a double fault, described under The run loop. With a replay log attached, as in the vector tests, the fetch is the next
 recorded cycle and no cache or queue is used. The cache's rules, the isolation that SR.Isc turns on and the queue are in
 [bus.md](bus.md).
 
@@ -234,3 +235,100 @@ The harness rejects a short or a long file, a case name over 50 bytes, a cycle c
 a non-zero upper half in a value or address, a non-zero `r0`, and a branch flag that is not 0 or 1.
 
 `ctest -L vectors` runs the sample test and its controls. The sample test covers all 55 files, 5,500 cases.
+
+## The stub kernel and kernel RAM
+
+With no BIOS from the host the core maps its own stub kernel, 524 bytes of MIPS at `BFC00000h` (see [bus.md](bus.md)),
+and the CPU starts there. The stub is written for this project, holds no Sony byte and provides no kernel service
+beyond what is listed here. It uses only the addresses below, all in the low 64 KiB of RAM except the ROM, and the
+table keeps them disjoint:
+
+| Address | Holds |
+|---|---|
+| `80000080h`-`8000008Fh` | the general vector with SR.BEV clear: four words that load the handler's ROM address into `k0` and jump to it |
+| `800000A0h`, `800000B0h`, `800000C0h` | the entries of the A, B and C kernel calls; the stub does not write them |
+| `BFC00180h` | the general vector while SR.BEV is set: a jump to the same handler |
+| ROM after `BFC00180h` | the handler body, which uses only `k0` and `k1` |
+| `80000200h`-`8000020Fh` | the launch block: `pc0`, `gp0`, `s_addr`, `s_size`, written by `schway_load_exe` |
+| `80000210h`-`8000021Fh` | the exception record: Cause, EPC, BadVaddr, SR |
+| `80010000h`-`800100FFh` | the mailbox of a loaded image |
+
+**Reset sequence.** The stub writes the memory-control values the retail boot code writes, clears `I_MASK` and
+`I_STAT`, copies the four-word vector to `80000080h`, clears SR.BEV, then reads the launch block. With no image loaded
+(`pc0` zero) it stays in a loop. Otherwise `gp` is `gp0`, `sp` is `s_addr + s_size` (`801FFF00h` when `s_addr` is 0) and
+it jumps to `pc0`. The scratchpad is never touched. Between the reset code and `BFC00180h` every byte is `FFh`, an
+opcode that raises an exception, so a runaway that falls out of the reset code is recorded and never slides through
+no-operations.
+
+**The default handler.** An exception writes Cause, EPC, BadVaddr and SR to the exception record. If the mailbox magic is
+there, the handler sets the mailbox word at `08h` to `000000FFh` (status FFh) and jumps to the address in the word at
+`0Ch` when that is not zero; otherwise, and with no mailbox, it stops in a loop. An image replaces the default by
+writing its own handler address to the mailbox, or its own code at `80000080h`.
+
+**The mailbox.** A fixture image starts with 256 bytes at `80010000h` that the runner and the tests read:
+
+| Offset | Content |
+|---|---|
+| `00h` | magic `SWMB` |
+| `04h` | CRC-32 (IEEE) of bytes `10h`-`FFh`, little-endian |
+| `08h` | status: `80h` running, `81h` waiting for input, `00h` done, `FFh` fault |
+| `09h` | protocol version, 1 |
+| `0Ah` | record count, at most 30 |
+| `0Bh` | fixture id |
+| `0Ch` | address of the image's exception handler, 0 for none |
+| `10h + 8n` | record n: id (u16), flags (u16: bit 0 valid, bit 1 timed out, bit 2 profile dependent), value (u32) |
+
+The stub's `FFh` is a word store, so a fault also clears the version, count and id bytes, and it leaves the CRC as it
+was. An image that recovers writes them back.
+
+**Regenerating the stub array.** `src/stub_kernel.c` is generated from `tests/fixtures/src/stub/stub.asm`. After
+editing the source, build the fixtures (`cmake --build build/ci --target schwaystation-fixtures`), then
+
+```
+cmake -DCASE=array -DFILE=build/ci/fixtures/stub.bin -DOUT=src/stub_kernel.c -P tests/fixtures/tests.cmake
+```
+
+and update the digests in `tests/fixtures/manifest.txt` and `PROVENANCE.md`. `fixtures.stub_drift` fails while the
+array and the assembled image differ.
+
+## The run loop
+
+While a PS-EXE is loaded the frame advance runs the CPU; with none loaded no instruction runs and the machine shows its
+test card. The CPU runs in blocks of instructions, and a block ends after:
+
+- a branch's delay slot;
+- an exception entry, which includes `SYSCALL` and `BREAK`, `RFE`, and any `MTC0`, which can change SR or CAUSE;
+- a write to `I_STAT` or `I_MASK`, which can change the interrupt line;
+- the instruction after which the next one lies in another 4 KiB page, and the 128th instruction of the block;
+- a write to the exit port that takes effect;
+- the first fault latched in the block.
+
+The cycles of a block are added to the tick counter, and the audio pairs queued, once, when it ends; a first fault
+latched inside a block therefore carries the ticks of the block's start.
+
+**Where a block splits at a budget.** After each instruction the loop compares the cycles run with what is left of the
+budget, and the block ends at the first instruction boundary at or after it. The last instruction can carry the run past
+the budget by the rest of its own cycles (a bus wait, a cache fill or the wait for a multiply), a few dozen at most; the
+core assumes under 1,024. A stop carries no overshoot in the state: the ticks and the audio pairs sit at that boundary, the result reports
+the ticks it reached, and the next call starts there. Running N cycles and then M therefore equals running N + M when N
+is a boundary the one-shot run passes through, which is where a run of the same budget stopped.
+
+**The end of a frame.** The run stops at the first boundary at or after the frame's end. A frame end passed inside an
+instruction completes at that instruction's end: `I_STAT` bit 0 is raised, the frame count rises, and the next frame
+ends where the exact cycle accumulator puts it, so the next frame is shorter by the overshoot and the cumulative
+ticks stay exact. The CPU does not take interrupts yet; the vertical sync only sets the bit, and CAUSE bit 10 follows
+`I_STAT` and `I_MASK` as the COP0 page describes.
+
+**Stop reasons.**
+
+| Stop | When |
+|---|---|
+| `SCHWAY_STOP_FRAME` | the frame ended |
+| `SCHWAY_STOP_BUDGET` | the budget ran out inside the frame |
+| `SCHWAY_STOP_HOOK` | the guest wrote the exit port with the debug-port flag set; the byte is the result's `exit_code`, and the next run continues |
+| `SCHWAY_STOP_FAULT` | with `SCHWAY_RUN_STOP_ON_FAULT`, at the end of the instruction that latched the first fault; and, whatever the flags, at once on a double fault |
+
+A double fault is an instruction fetch that fails at an exception vector (`80000080h`, or `BFC00180h` while SR.BEV is
+set): the handler cannot run, so the exception would repeat for ever. When a hook and the frame's end coincide the hook
+is reported and the frame still completes. A guest that loops, or hammers an address no device answers, returns from
+every call: each call runs a bounded number of cycles, whatever the program does.
