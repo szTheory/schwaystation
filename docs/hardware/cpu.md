@@ -7,8 +7,9 @@ and behaves the same on every platform. Facts come from the psx-spx CPU Specific
 `.planning/preparation/PSX-SYSTEM.md`, which also names the sources it was checked against.
 
 This page covers what is implemented so far: the registers, the decode fields, the arithmetic, logic, shift,
-set-on-less-than and load-upper-immediate class, the two delay latches and the vector tests. Loads, stores, branches,
-multiply and divide, exceptions and the caches are added to it as they land.
+set-on-less-than and load-upper-immediate class, the trapping adds, branches and jumps, the two delay latches and the
+vector tests. COP0 and the exception entry are on their own page, [cop0.md](cop0.md). Loads, stores, multiply and divide
+and the caches are added to this page as they land.
 
 ## Registers
 
@@ -33,8 +34,9 @@ An instruction is one 32-bit word. The executor takes its fields with shifts and
 | funct | 5-0 | the operation within the SPECIAL group |
 | imm | 15-0 | immediate, sign-extended or zero-extended as the instruction says |
 
-Dispatch is a `switch` on op, and inside SPECIAL on funct. An encoding the executor does not decode yet records a
-reserved-instruction entry in the first-fault record and retires like a no-op.
+Dispatch is a `switch` on op, and inside SPECIAL on funct. An encoding that is not an instruction raises a reserved
+instruction exception and records a first fault; until loads, stores, multiply and divide and COP2 are decoded they
+arrive at the same place.
 
 ## Arithmetic, logic, shifts and sets
 
@@ -43,7 +45,8 @@ exception (PSX-SYSTEM section 2, Load delay).
 
 | Instructions | Result |
 |---|---|
-| `ADDU`, `ADDIU`, `SUBU` | wrap-around add and subtract. The immediate of `ADDIU` is sign-extended. The trapping forms `ADD`, `ADDI` and `SUB` come with exceptions. |
+| `ADDU`, `ADDIU`, `SUBU` | wrap-around add and subtract. The immediate of `ADDIU` is sign-extended. |
+| `ADD`, `ADDI`, `SUB` | the same, but a result that overflows as signed numbers raises an overflow exception and leaves the destination as it was |
 | `AND`, `OR`, `XOR`, `NOR` | bitwise, register to register |
 | `ANDI`, `ORI`, `XORI` | bitwise with the zero-extended immediate |
 | `SLL`, `SRL`, `SRA` | shift `rt` left, right logical or right arithmetic by `sa` |
@@ -68,8 +71,25 @@ it lands. With no load pending the register number reads 32 and the value 0.
 **Branch delay.** The instruction after a branch or jump always executes. The latch holds whether the instruction
 about to run is a delay slot, whether its branch is taken, and the branch target. There is no separate next-program-
 counter register: the next program counter is the target while a taken branch is pending, and the current program
-counter plus 4 otherwise. Each instruction ends by clearing the latch, and a branch (once decoded) sets it for the
-following one.
+counter plus 4 otherwise. Each instruction ends by clearing the latch, and a branch sets it for the following one.
+A branch in a delay slot computes its target from the address its own slot would go to next, so it follows a taken
+branch's target (PSX-SYSTEM section 2, Branch delay).
+
+## Branches and jumps
+
+| Instructions | Behaviour |
+|---|---|
+| `BEQ`, `BNE` | go when `rs` equals, or differs from, `rt` |
+| `BLEZ`, `BGTZ` | go when `rs` is at most, or above, 0 as a signed number |
+| `BLTZ`, `BGEZ` | go when `rs` is below, or at least, 0; bit 16 of the instruction picks which |
+| `BLTZAL`, `BGEZAL` | the same with the two instruction-field values `10h` and `11h`, and the return address is written to `r31` whether or not the branch goes |
+| `J`, `JAL` | the 26-bit field times 4 in the 256 MiB region of the delay slot; `JAL` writes `r31` |
+| `JR`, `JALR` | the target is `rs`; `JALR` writes the return address to `rd` |
+
+A branch offset is the signed 16-bit immediate times 4, added to the address of the delay slot. The return address is
+the address after the delay slot. The latch is always set by a branch, taken or not, with the target it would have had.
+A target that is not a multiple of 4 is an address error when it is fetched (PSX-SYSTEM section 2, Branch delay; the
+exception rules are in [cop0.md](cop0.md)).
 
 ## Vector tests
 

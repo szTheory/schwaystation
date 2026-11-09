@@ -1,1 +1,16 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+cpu.cop0.bev_vectors	cpu,portable
+cpu.cop0.branch_links	cpu,portable
+cpu.cop0.cause_writable	cpu,portable
+cpu.cop0.ce_only_cpu	cpu,portable
+cpu.cop0.cop1_cop3_unusable	cpu,portable
+cpu.cop0.cop_branches	cpu,portable
+cpu.cop0.entry_delay_slot	cpu,portable
+cpu.cop0.entry_plain	cpu,portable
+cpu.cop0.exception_loop	cpu,portable
+cpu.cop0.jr_misaligned	cpu,portable
+cpu.cop0.mfc0_delay	cpu,portable
+cpu.cop0.no_fault_for_traps	cpu,portable
+cpu.cop0.reserved_instruction	cpu,portable
+cpu.cop0.rfe	cpu,portable
+cpu.cop0.sr_mask	cpu,portable
