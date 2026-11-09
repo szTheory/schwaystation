@@ -228,7 +228,7 @@ void schway__cpu_state_io(struct schway__state_io *io, schway *inst);
    Returns SCHWAY_STOP_BUDGET when the limit or the frame end was reached,
    SCHWAY_STOP_HOOK when the guest wrote the exit port (inst->exit_code keeps
    the byte) and SCHWAY_STOP_FAULT at the first fault latched during the run
-   when SCHWAY_RUN_STOP_ON_FAULT is set, or at once for a double fault, an
+   when SCHWAY_RUN_STOP_ON_FAULT is set, or at once for a fault in a vector, an
    instruction fetch that failed at an exception vector. */
 uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags);
 
