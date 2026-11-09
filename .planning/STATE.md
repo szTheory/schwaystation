@@ -5,11 +5,11 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-19-PLAN.md
-last_updated: "2026-11-09T22:24:12.782Z"
+stopped_at: "Halted 02-22-PLAN.md at the push: fuzz job committed, branch not pushed, nightly not dispatched"
+last_updated: "2026-11-09T22:37:52.281Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-19 (interrupts into the CPU through a retirement stamp, the COP2 entry hook, 24 cpu.exception, 6 cpu.delay and 10 cpu.timing tests, the COP0 page's Interrupts section)
-state_head: bd605fddec2b5a3254e107b7b6363f94d0f4ffdf
+last_activity_desc: Halted 02-22 at the push (the loader fuzz target, 32 in-memory seeds, fuzz.regress.exe, the fuzz preset and the nightly fuzz job are committed; the branch is not pushed and the nightly is not dispatched)
+state_head: af8be7919954660305cc38b218ac0a021239f43f
 progress:
   total_phases: 6
   completed_phases: 1
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
 Plan: 20 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-19: interrupts reach the CPU through a retirement stamp (2 retirements for a device edge, I_MASK and SR writes, 1 for CAUSE and RFE), the COP2 entry hook, and 40 cpu.exception, cpu.delay and cpu.timing tests
+Last activity: 2026-11-09 — Halted 02-22 at the push: the loader fuzz target, fuzz.regress.exe, the fuzz preset and the nightly fuzz job are committed and verified locally; git push was refused, so the nightly dispatch is open (02-22-SUMMARY.md, status halted)
 
 Progress: [██░░░░░░░░] 17%
 
@@ -233,8 +233,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T22:24:12.661Z
-Stopped at: Completed 02-19-PLAN.md
+Last session: 2026-11-09T22:37:52.153Z
+Stopped at: Halted 02-22-PLAN.md at the push: fuzz job committed, branch not pushed, nightly not dispatched
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
