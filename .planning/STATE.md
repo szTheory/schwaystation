@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-12-PLAN.md
-last_updated: "2026-11-09T21:07:15.804Z"
+stopped_at: Completed 02-13-PLAN.md
+last_updated: "2026-11-09T21:13:55.848Z"
 last_activity: 2026-11-09
 last_activity_desc: Completed 02-12 (loads, stores, mul/div, COP2 pre-phase; 5,500 vector cases pass)
-state_head: 4df168be4b54d00092ae35ea55a769b8b536da16
+state_head: 2e9788ae3ab5d710c79a6a9b913e420fcff95c8b
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 27
+  completed_plans: 28
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 13 of 27
+Plan: 14 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-12: loads, stores, mul/div and COP2 before the GTE; all 5,500 vector cases pass
+Last activity: 2026-11-09 — Completed 02-13: schwaystation-run --probe prints a PS-EXE's identity fields, SHA-256 and rcheevos MD5 with no emulation
 
 Progress: [██░░░░░░░░] 17%
 
@@ -85,6 +85,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P10 | 13 min | 3 tasks | 11 files |
 | Phase 02 P11 | 10 min | 3 tasks | 14 files |
 | Phase 02 P12 | 14 min | 3 tasks | 12 files |
+| Phase 02 P13 | 13 min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -159,6 +160,8 @@ Recent decisions affecting current work:
 - [Phase 02]: A multiply or divide issued at counter t is ready at t plus 6, 9, 13 or 36; an early MFHI/MFLO waits to the stamp, capped at 36 cycles; MTHI/MTLO clear the stamp
 - [Phase 02]: A user-mode access outside KUSEG raises AdEL or AdES and records no first fault; a misaligned access records misaligned_read or misaligned_write
 - [Phase 02]: LWC1, SWC1, LWC3 and SWC3 follow the COP1/COP3 CpU rule; LWC0 and SWC0 stay reserved-instruction exceptions
+- [Phase 02]: 02-13: rcheevos_md5 is MD5 over the first t_size + 0800h bytes of the file (rcheevos dfdc64ea035c, rc_hash_disc.c rc_hash_psx line 965); a bare file has no boot-file name, so none is prepended
+- [Phase 02]: 02-13: --probe is valid only alone with one file argument not starting with a dash; every refused, empty, unreadable or missing file exits 1 with one stderr line and no report
 
 ### Pending Todos
 
@@ -213,8 +216,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T21:07:15.704Z
-Stopped at: Completed 02-12-PLAN.md
+Last session: 2026-11-09T21:13:55.720Z
+Stopped at: Completed 02-13-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
