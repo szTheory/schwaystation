@@ -2,7 +2,9 @@
 # trend data, never a gate (docs/testing.md, "Performance"). The runner
 # reports its own frame-time percentiles and max_rss_kib. Reports go to job
 # summaries and artifacts, never to commits. A failed night opens or updates
-# the one open issue labelled nightly; a good night closes it.
+# the one open issue labelled nightly; a good night closes it. The vectors-full
+# job replays all 55,000 public single-step vectors at their pin; it reports
+# through the same issue and is not part of the CI required aggregate.
 name: Nightly
 
 on:
@@ -98,10 +100,36 @@ jobs:
         if: inputs.force_failure
         run: exit 1
 
+  # The full public vectors (docs/testing.md, "The full vectors"): fetches the
+  # 55 pinned blobs, checks each against its git SHA-1, then runs the nightly
+  # preset. Nothing is cached or uploaded.
+  vectors-full:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5  # provisional
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch and check the pinned vector files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/sst
+          rows=$(grep '^r3000-' pins.txt)
+          while read -r name pin sha size; do
+            file="build/sst/${name#r3000-}.json.bin"
+            gh api "repos/SingleStepTests/r3000/git/blobs/$sha" -H 'Accept: application/vnd.github.raw' > "$file"
+            got=$(git hash-object "$file")
+            [ "$got" = "$sha" ] || { echo "vectors-full: $file hashes to $got, pins.txt has $sha"; exit 1; }
+          done <<< "$rows"
+      - run: cmake --workflow --preset nightly
+      - run: cmake -DJUNIT=build/nightly/junit.xml -DINVENTORY=tests/inventory/nightly.txt -P tests/cmake/check_junit.cmake
+
   # Decides from the jobs' results, never from a piped exit status: the
   # default shell has no pipefail.
   report:
-    needs: [bench, bench-wasm32]
+    needs: [bench, bench-wasm32, vectors-full]
     if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor (roll-up); 2 x 8 s (report), slowest of 2 runs, run 39457820699, provisional
