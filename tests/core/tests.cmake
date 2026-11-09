@@ -43,3 +43,17 @@ foreach(case IN ITEMS state.cpu_fields state.round_trip state.stable_bytes state
     COMMAND schwaystation-test-state ${case}
     LABELS core portable TIMEOUT 10)
 endforeach()
+
+# The I/O page sweep. Fault prevented: an address of 1F801000h-1F801FFFh that
+# is owned, unbuilt and a gap at once, none of them, or on the wrong side of a
+# range edge.
+add_executable(schwaystation-test-bus-unbuilt ${CMAKE_CURRENT_LIST_DIR}/bus_unbuilt.c)
+target_include_directories(schwaystation-test-bus-unbuilt PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-bus-unbuilt PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-bus-unbuilt PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-bus-unbuilt)
+
+schway_add_test(NAME core.bus_unbuilt
+  COMMAND schwaystation-test-bus-unbuilt
+  LABELS bus portable TIMEOUT 10)

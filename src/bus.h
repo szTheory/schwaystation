@@ -46,10 +46,31 @@ enum schway__dev {
    times, as the BIOS sets it (PSX-SYSTEM section 3). */
 #define SCHWAY__RAM_SIZE_POWER_ON 0x0B88u
 
+/* The ports with a delay register of their own: the first and third
+   expansion regions, the BIOS ROM, the SPU, the CD-ROM and the second
+   expansion region (DEV0, DEV1, DEV2, DEV4, DEV5, DEV8). */
+enum schway__port {
+    SCHWAY__PORT_EXP1 = 0,
+    SCHWAY__PORT_EXP3,
+    SCHWAY__PORT_BIOS,
+    SCHWAY__PORT_SPU,
+    SCHWAY__PORT_CDROM,
+    SCHWAY__PORT_EXP2,
+    SCHWAY__PORT_COUNT
+};
+
+/* Bit 0 of the profile flags: the guest's writes to the debug ports at
+   1F802080h and 1F802082h take effect. */
+#define SCHWAY__PROFILE_DEBUG_PORT 1u
+
 struct schway__bus {
     uint8_t ram[SCHWAY__RAM_SIZE];
     uint8_t scratch[SCHWAY__SCRATCH_SIZE];
     uint32_t memctl[SCHWAY__MEMCTL_REGS];
+    /* CPU cycles per port for {read8, read16, read32, write8, write16,
+       write32}, derived from memctl and rebuilt by a delay-register write and
+       by a state load: not part of the state. */
+    uint8_t cost[SCHWAY__PORT_COUNT][6];
     uint32_t ram_size;   /* RAM_SIZE, 1F801060h */
     uint32_t cache_ctrl; /* cache control, FFFE0130h */
     /* Accesses to devices not built yet, per device, and the last one: its
@@ -97,9 +118,21 @@ int schway__bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
 /* An instruction fetch of the word at addr. */
 int schway__bus_fetch(schway *inst, uint32_t addr, uint32_t *word, uint32_t *cycles);
 
+/* Counts an access to a device not built yet, by device, and keeps the last
+   one. The caller reads 0 or drops the write. */
+void schway__bus_unbuilt(schway *inst, uint32_t dev, uint32_t addr, uint32_t width, uint32_t wr,
+                         uint32_t val);
+
 /* Sets interrupt bit number bit (0-10) in I_STAT; other numbers are ignored.
-   The line is nonzero while an enabled bit is set. */
+   A bit already set stays as it is. The line is nonzero while an enabled bit
+   is set, and CAUSE bit 10 follows it at each change. */
 void schway__irq_raise(schway *inst, uint32_t bit);
+
+/* A write to I_STAT or I_MASK: lane holds the data in place, and mask names
+   the bytes the access covers. A 0 bit written to I_STAT clears it and a 1
+   leaves it; I_MASK keeps the bits written, 0-10 only. */
+void schway__irq_write_stat(schway *inst, uint32_t lane, uint32_t mask);
+void schway__irq_write_mask(schway *inst, uint32_t lane, uint32_t mask);
 uint32_t schway__irq_line(const schway *inst);
 
 #endif /* SCHWAYSTATION_BUS_H */

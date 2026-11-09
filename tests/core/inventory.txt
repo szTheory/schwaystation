@@ -4,6 +4,7 @@ core.api.size_tags	core,portable
 core.api.statuses	core,portable
 core.audio.pairs	core,portable
 core.audio.ring	core,portable
+core.bus_unbuilt	bus,portable
 core.create.allocator	core,portable
 core.info	core,portable
 core.instances.independent	core,portable
