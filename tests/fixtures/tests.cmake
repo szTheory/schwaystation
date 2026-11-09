@@ -53,6 +53,19 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "--tty report lacks the line ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "exit_port")
+    # The runner's outcome for the exit port byte: 00h exits 0 and prints no report; 2Ah exits 6 and
+    # prints the line that names it. The port needs the debug-port flag, so --tty is given.
+    function(expect_exit file code regex)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${file}" --tty --frames 10
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+      if(NOT rc STREQUAL code OR NOT out MATCHES "${regex}")
+        message(FATAL_ERROR "schwaystation-run --exe ${file}: expected exit ${code} and output matching\n"
+          "  ${regex}\ngot exit ${rc} and output\n${out}")
+      endif()
+    endfunction()
+    expect_exit("${OK}" 0 "^$")
+    expect_exit("${FAIL}" 6 "(^|\n)exit code=0x2a\n")
   elseif(CASE STREQUAL "array")
     # Writes the assembled stub kernel as src/stub_kernel.c: 12 bytes to a line, the
     # array and its size, with the command that regenerates it.
@@ -120,6 +133,8 @@ endfunction()
 schway__fixture(hello.exe hello.asm)
 schway__fixture(exc_default.exe exc_default.asm)
 schway__fixture(exc_handler.exe exc_default.asm -definelabel USE_HANDLER 1)
+schway__fixture(exit_port.exe exit_port.asm -equ CODE 0)
+schway__fixture(exit_port_fail.exe exit_port.asm -equ CODE 0x2A)
 schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
@@ -145,6 +160,16 @@ schway_add_test(NAME fixtures.probe.hello
 # one of the two sources only: hello.exe's lines reach standard output.
 schway_add_test(NAME fixtures.hello.tty
   COMMAND ${CMAKE_COMMAND} -DCASE=tty -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/hello.exe
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: an exit byte that is lost or reported as another value, or a
+# zero that fails the run. Byte 00h exits 0 with no report; 2Ah exits 6 and
+# the runner prints exit code=0x2a.
+schway_add_test(NAME fixtures.exit_port
+  COMMAND ${CMAKE_COMMAND} -DCASE=exit_port -DOK=${SCHWAYSTATION_FIXTURES_DIR}/exit_port.exe
+    -DFAIL=${SCHWAYSTATION_FIXTURES_DIR}/exit_port_fail.exe
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)

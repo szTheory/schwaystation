@@ -78,6 +78,23 @@ if(CMAKE_SCRIPT_MODE_FILE)
     refuse(--frames 1 --disc x.cue)
     refuse(--frames 1 --help)
     refuse(--version --frames 1)
+  elseif(CASE STREQUAL "exe")
+    # --exe takes one file, never with --probe, and --tty needs it.
+    refuse(--exe)
+    refuse(--frames 1 --exe)
+    refuse(--exe --hash)
+    refuse(--exe a.exe --exe b.exe)
+    refuse(--exe a.exe --probe b.exe)
+    refuse(--probe b.exe --exe a.exe)
+    refuse(--tty)
+    refuse(--frames 1 --tty)
+    refuse(--bench 1 --tty)
+  elseif(CASE STREQUAL "exe_missing")
+    # A file that is not there, or is not a PS-EXE, exits 1 naming the file
+    # and the reason; no frame runs.
+    expect_exit(1 "schwaystation-run: [^\n]*missing[.]exe: cannot (open|read)" --exe "${OUT}/missing.exe")
+    expect_exit(1 "schwaystation-run: [^\n]*tests[.]cmake: PS-EXE invalid" --exe "${CMAKE_CURRENT_LIST_FILE}"
+      --tty)
   elseif(CASE STREQUAL "positional")
     # This release loads no disc, so a file name is a usage error.
     refuse(--frames 1 game.cue)
@@ -248,9 +265,9 @@ schway_add_test(NAME runner.png_file
 
 # Fault prevented: a command line that runs something it should refuse, so a
 # CI step hashes a frame nobody asked for: no arguments, an option this
-# release lacks, a file name, a frame count out of range or missing, a
-# malformed or out-of-range --png, or an unknown region.
-foreach(case no_args unknown positional frame_range png_syntax region)
+# release lacks, a file name, --exe or --tty misused, a frame count out of
+# range or missing, a malformed or out-of-range --png, or an unknown region.
+foreach(case no_args unknown positional exe frame_range png_syntax region)
   schway_add_test(NAME runner.usage.${case}
     COMMAND ${runner_check} -DCASE=${case} -DOUT=${PROJECT_BINARY_DIR}/tests/refused.png
       -P ${CMAKE_CURRENT_LIST_FILE}
@@ -311,6 +328,13 @@ string(REPLACE ";" "$<SEMICOLON>" runner_failure_cmd "${runner_failure_cmd}")
 schway_add_test(NAME runner.exit.failure
   COMMAND ${CMAKE_COMMAND} "-DCMD=${runner_failure_cmd}" -DCODE=1 "-DREGEX=cannot write"
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: a missing or invalid --exe file that is run anyway, or that
+# is reported as a usage error, so a CI step passes on nothing.
+schway_add_test(NAME runner.exe.missing
+  COMMAND ${runner_check} -DCASE=exe_missing -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: --version printing something a script cannot parse.

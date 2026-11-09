@@ -33,6 +33,9 @@
  * --probe FILE prints the identity of a PS-EXE (probe.h) and runs nothing: no
  * instance is made and no frame runs. It is valid only alone.
  *
+ * With --tty a guest can end the run through the exit port: byte 00h is
+ * status 0, any other byte prints "exit code=0x<hh>" and is status 6.
+ *
  * SIGINT or SIGTERM ends the run after the frame in progress: what was asked
  * is printed for the frames that ran, and the status is 0.
  *
@@ -483,9 +486,13 @@ static int run(const options *opt)
     tty.len = 0u;
     /* Only schway_run_frame is timed, not hashing or writing files. */
     uint32_t ran = 0;
+    uint32_t exit_code = 0u; /* the byte the guest wrote to the exit port */
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
         uint64_t start_ns = opt->bench ? schway__clock_ns() : 0u;
-        st = schway_run_frame(inst, NULL);
+        schway_run_result res;
+        memset(&res, 0, sizeof res);
+        res.size = (uint32_t)sizeof res;
+        st = schway_run_frame(inst, &res);
         if (opt->bench) {
             samples[ran] = schway__bench_us(schway__clock_ns() - start_ns);
         }
@@ -506,6 +513,12 @@ static int run(const options *opt)
         if (status == SCHWAY__EXIT_OK && n == opt->png_frame) {
             status = write_png(inst, opt->png_path);
         }
+        /* The guest reported through the exit port: the run ends here. The
+           text it printed first is flushed below, then the code is reported. */
+        if (status == SCHWAY__EXIT_OK && res.stop == SCHWAY_STOP_HOOK) {
+            exit_code = (uint32_t)(res.exit_code & 0xFFu);
+            break;
+        }
         /* A stop request ends the run only between whole frames, after the
            frame's outputs are written. */
         if (schway__stop_requested()) {
@@ -514,6 +527,10 @@ static int run(const options *opt)
     }
     if (tty.len != 0u) {
         tty_emit(&tty);
+    }
+    if (status == SCHWAY__EXIT_OK && exit_code != 0u) {
+        printf("exit code=0x%02lx\n", (unsigned long)exit_code);
+        status = SCHWAY__EXIT_FIXTURE;
     }
     if (status == SCHWAY__EXIT_OK && opt->hash) {
         status = print_hash(inst, ran);
