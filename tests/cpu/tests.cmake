@@ -85,3 +85,21 @@ schway_add_test(NAME cpu.cop0.branch_links
 schway_add_test(NAME cpu.cop0.jr_misaligned
   COMMAND schwaystation-test-cop0 jr_misaligned
   LABELS cpu portable TIMEOUT 10)
+
+# COP2 before the GTE: one executable runs the case named on its command line.
+add_executable(schwaystation-test-cop2 ${CMAKE_CURRENT_LIST_DIR}/cop2_prephase.c)
+target_include_directories(schwaystation-test-cop2 PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-cop2 PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-cop2 PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-cop2)
+
+# Fault prevented: a missing GTE that answers as if it were there, a first fault recorded for a CpU a guest handler can take, or a store that reaches RAM before the coprocessor check.
+schway_add_test(NAME cpu.cop2_prephase.cu2_clear
+  COMMAND schwaystation-test-cop2 cu2_clear
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a register move that lands at once or never, a GTE access that is not counted, a load or store that skips the bus, or a coprocessor check that hides an alignment error.
+schway_add_test(NAME cpu.cop2_prephase.cu2_set
+  COMMAND schwaystation-test-cop2 cu2_set
+  LABELS cpu portable TIMEOUT 10)

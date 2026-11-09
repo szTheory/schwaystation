@@ -14,3 +14,5 @@ cpu.cop0.no_fault_for_traps	cpu,portable
 cpu.cop0.reserved_instruction	cpu,portable
 cpu.cop0.rfe	cpu,portable
 cpu.cop0.sr_mask	cpu,portable
+cpu.cop2_prephase.cu2_clear	cpu,portable
+cpu.cop2_prephase.cu2_set	cpu,portable

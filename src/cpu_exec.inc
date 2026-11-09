@@ -343,6 +343,54 @@ static void cpu_div(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t si
     cpu_muldiv_start(c, cycles, SCHWAY__MULDIV_MAX);
 }
 
+/* COP2, LWC2 and SWC2 before the GTE exists. An address error on LWC2 or SWC2
+   comes first. With SR.CU2 clear every form raises CpU with CE 2 and latches
+   no fault. With it set, MFC2 and CFC2 read 0 through the load delay, MTC2,
+   CTC2 and the commands do nothing, BC2 never goes (the condition line is
+   never true), LWC2 does the real bus read and drops it and SWC2 the real bus
+   write of 0; each counts as an access to the unbuilt GTE (ARCHITECTURE
+   section 6; PSX-SYSTEM section 2, SR bits). Returns 1 when it trapped. */
+static uint32_t cpu_cop2(schway *inst, uint32_t pc, uint32_t op, uint32_t next, uint32_t *cycles,
+                         uint32_t *load_reg, uint32_t *load_value, struct cpu_branch *br)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t opc = op >> 26;
+    uint32_t rs_n = (op >> 21) & 31u;
+    uint32_t rt_n = (op >> 16) & 31u;
+    uint32_t rd_n = (op >> 11) & 31u;
+    uint32_t addr = cpu_address(c, op);
+    uint32_t v = 0u;
+    if (opc != 0x12u && cpu_data_check(inst, pc, op, addr, 4u, opc == 0x3Au ? 1u : 0u) != 0u) {
+        return 1u;
+    }
+    if ((c->cop0.r[SCHWAY__COP0_SR] & SCHWAY__SR_CU2) == 0u) {
+        return cpu_unusable(inst, pc, op, 0u);
+    }
+    if (opc == 0x32u) { /* LWC2 */
+        if (cpu_bus_read(inst, pc, addr, 4u, &v, cycles) != 0u) {
+            return 1u;
+        }
+        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, addr, 4u, 0u, 0u);
+    } else if (opc == 0x3Au) { /* SWC2 */
+        if (cpu_bus_write(inst, pc, addr, 4u, 0u, cycles) != 0u) {
+            return 1u;
+        }
+        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, addr, 4u, 1u, 0u);
+    } else if (rs_n == 0u || rs_n == 2u) { /* MFC2, CFC2 */
+        cpu_load_issue(c, rt_n, 0u, load_reg, load_value);
+        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, rs_n == 2u ? 32u + rd_n : rd_n, 4u, 0u, 0u);
+    } else if (rs_n == 4u || rs_n == 6u) { /* MTC2, CTC2 */
+        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, rs_n == 6u ? 32u + rd_n : rd_n, 4u, 1u,
+                            c->r[rt_n]);
+    } else if (rs_n == 8u) { /* BC2F, BC2T */
+        cpu_branch_set(br, (rt_n & 1u) == 0u ? 1u : 0u, next + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u) * 4u);
+        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, 0u, 4u, 0u, 0u);
+    } else if ((rs_n & 0x10u) != 0u) { /* a GTE command */
+        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, op & 0x01FFFFFFu, 4u, 1u, 0u);
+    }
+    return 0u;
+}
+
 /* Signed overflow of a + b = sum, and of a - b = diff, on unsigned words
    (MIPS I: ADD, ADDI and SUB trap and leave rd unchanged). */
 static uint32_t cpu_add_overflows(uint32_t a, uint32_t b, uint32_t sum)
@@ -379,6 +427,9 @@ static uint32_t cpu_step(schway *inst)
     uint32_t neg = (rs & 0x80000000u) != 0u ? 1u : 0u;
     uint32_t sr = c->cop0.r[SCHWAY__COP0_SR];
     uint32_t trapped = 0u;
+    /* COP2, LWC2 and SWC2: the GTE's instructions, which cpu_cop2 handles
+       until the GTE does. */
+    uint32_t is_cop2 = (op >> 26) == 0x12u || (op >> 26) == 0x32u || (op >> 26) == 0x3Au ? 1u : 0u;
     uint32_t sum, value;
     struct cpu_branch br = {0u, 0u, 0u};
     uint32_t load_reg = SCHWAY__CPU_NO_LOAD;
@@ -391,6 +442,8 @@ static uint32_t cpu_step(schway *inst)
         schway__fault_latch(inst, SCHWAY__FAULT_MISALIGNED_FETCH, SCHWAY__DEV_NONE, 4u, pc, 0u,
                             pc);
         trapped = cpu_exception(inst, pc, SCHWAY__EXC_ADEL, 0u, 1u, pc);
+    } else if (is_cop2 != 0u) {
+        trapped = cpu_cop2(inst, pc, op, next, &cycles, &load_reg, &load_value, &br);
     } else {
         switch (op >> 26) {
         case 0x00u: /* SPECIAL */
@@ -615,13 +668,17 @@ static uint32_t cpu_step(schway *inst)
             break;
         case 0x11u: /* COP1 */
         case 0x13u: /* COP3 */
+        case 0x31u: /* LWC1 */
+        case 0x33u: /* LWC3 */
+        case 0x39u: /* SWC1 */
+        case 0x3Bu: /* SWC3 */
             /* With the coprocessor's SR.CUz bit set, BCzF always goes and
                BCzT never does, as the condition line is never true; every
                other instruction does nothing (PSX-SYSTEM section 2, SR
                bits). */
-            if ((sr & ((op >> 26) == 0x11u ? SCHWAY__SR_CU1 : SCHWAY__SR_CU3)) == 0u) {
+            if ((sr & (((op >> 26) & 3u) == 1u ? SCHWAY__SR_CU1 : SCHWAY__SR_CU3)) == 0u) {
                 trapped = cpu_unusable(inst, pc, op, 1u);
-            } else if (rs_n == 8u) {
+            } else if (rs_n == 8u && (op >> 31) == 0u) {
                 cpu_branch_set(&br, (rt_n & 1u) == 0u ? 1u : 0u, next + (simm << 2));
             }
             break;

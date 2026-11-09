@@ -7,9 +7,9 @@ and behaves the same on every platform. Facts come from the psx-spx CPU Specific
 `.planning/preparation/PSX-SYSTEM.md`, which also names the sources it was checked against.
 
 This page covers what is implemented so far: the registers, the decode fields, the arithmetic, logic, shift,
-set-on-less-than and load-upper-immediate class, the trapping adds, branches and jumps, the two delay latches and the
-vector tests. COP0 and the exception entry are on their own page, [cop0.md](cop0.md). Loads, stores, multiply and divide
-and the caches are added to this page as they land.
+set-on-less-than and load-upper-immediate class, the trapping adds, branches and jumps, loads and stores, multiply and
+divide, COP2 before the GTE, the two delay latches and the vector tests. COP0 and the exception entry are on their own
+page, [cop0.md](cop0.md). The caches are added to this page as they land.
 
 ## Registers
 
@@ -19,6 +19,7 @@ and the caches are added to this page as they land.
 - COP0 registers, indexed by number: `r6` TAR, `r12` SR, `r13` CAUSE, `r14` EPC and the others of PSX-SYSTEM
   section 2. SR is `00400000h` (BEV set) after power-on.
 - Two delay latches, described below.
+- A cycle counter and the ready stamp of the multiply and divide unit, described under Multiply and divide.
 
 ## Decode
 
@@ -35,8 +36,8 @@ An instruction is one 32-bit word. The executor takes its fields with shifts and
 | imm | 15-0 | immediate, sign-extended or zero-extended as the instruction says |
 
 Dispatch is a `switch` on op, and inside SPECIAL on funct. An encoding that is not an instruction raises a reserved
-instruction exception and records a first fault; until loads, stores, multiply and divide and COP2 are decoded they
-arrive at the same place.
+instruction exception and records a first fault. The coprocessor 2 forms (`COP2`, `LWC2` and `SWC2`) are picked out
+by a decode flag before the switch, so the GTE can take them over without a change to the rest of the decoder.
 
 ## Arithmetic, logic, shifts and sets
 
@@ -65,8 +66,10 @@ executor holds each as a small latch in the CPU state, so a saved state taken be
 
 **Load delay.** A load issued by one instruction is held as a register number and a value, and writes the register
 as the next instruction ends. That instruction therefore reads the old value. If it writes the same register, the
-load is cancelled and the register keeps the later write. A load into `r0` is held like any other and discarded when
-it lands. With no load pending the register number reads 32 and the value 0.
+load is cancelled and the register keeps the later write; if it is itself a load into that register, the earlier
+load is dropped and only the later one is pending. A load into `r0` is held like any other and discarded when it
+lands. A load that fails, by an address error or a bus error, issues nothing and leaves its register untouched. With no
+load pending the register number reads 32 and the value 0. `MFC0`, `MFC2` and `CFC2` use the same latch.
 
 **Branch delay.** The instruction after a branch or jump always executes. The latch holds whether the instruction
 about to run is a delay slot, whether its branch is taken, and the branch target. There is no separate next-program-
@@ -90,6 +93,66 @@ A branch offset is the signed 16-bit immediate times 4, added to the address of 
 the address after the delay slot. The latch is always set by a branch, taken or not, with the target it would have had.
 A target that is not a multiple of 4 is an address error when it is fetched (PSX-SYSTEM section 2, Branch delay; the
 exception rules are in [cop0.md](cop0.md)).
+
+## Loads and stores
+
+Every load and store goes through the data access front-end before it reaches the bus, in this order:
+
+1. **Alignment.** `LH`, `LHU`, `SH` take a half-word and `LW`, `SW` a word; an address that is not a multiple of the
+   width raises an address error, AdEL (ExcCode 04h) for a load and AdES (05h) for a store, with BadVaddr set to the
+   address. It happens before any bus access, and it is a first fault (`misaligned_read` or `misaligned_write`).
+   `LWL`, `LWR`, `SWL` and `SWR` never fault on alignment.
+2. **Segment.** In user mode (SR.KUc = 1) only KUSEG, the addresses below `80000000h`, may be touched; any other
+   address raises the same address error. A handler may take it, so it records no first fault.
+3. **The bus.** The virtual address goes to the bus, which decodes the segment and maps it (KSEG2 gets the full
+   address, because only the cache-control word answers there). The bus charges its wait cycles to the instruction. A
+   bus error, an address no device answers, raises DBE (07h); it sets no BadVaddr, and the bus records the first
+   fault (PSX-SYSTEM section 2, Address and bus errors and Segments).
+
+`LB`, `LH` and `LW` read 1, 2 or 4 bytes and sign-extend a byte or half-word; `LBU` and `LHU` zero-extend. The value
+goes through the load delay latch. `SB`, `SH` and `SW` write the low 1, 2 or 4 bytes of `rt`; the bus is handed all
+32 bits whatever the width (PSX-SYSTEM section 2, Stores). The address is `rs` plus the sign-extended immediate.
+
+**Unaligned forms.** `LWL` and `LWR` read the aligned word that holds the address, and replace the bytes of `rt` from
+the address toward the high end (`LWL`) or the low end (`LWR`); the other bytes of `rt` stay. The merge starts from
+the value of a load the previous instruction issued to the same register, not from the register's old value, so
+an `LWL`, `LWR` pair on one register needs no delay slot between them and the pair assembles an unaligned word
+(PSX-SYSTEM section 2, Stores, LWL/LWR). `SWL` and `SWR` write the matching bytes of `rt` into the bytes of the
+aligned word from its low end to the address (`SWL`) or from the address to its high end (`SWR`), as the largest
+aligned chunks of 4, 2 or 1 bytes, lowest first.
+
+## Multiply and divide
+
+`MULT` and `MULTU` put the 64-bit product of `rs` and `rt` in `HI:LO`, signed and unsigned. `DIV` and `DIVU` put the
+quotient in `LO` and the remainder in `HI`; the remainder of `DIV` has the sign of `rs`. Nothing traps. A zero
+divisor gives `LO` = -1 (`DIV` of a negative `rs` gives +1) and `HI` = `rs`, and `DIV` of -2147483648 by -1 gives
+`LO` = `80000000h` and `HI` = 0 (PSX-SYSTEM section 2, DIV/DIVU).
+
+The unit takes time, which the CPU state keeps as a cycle counter and a ready stamp: the counter value at which the
+running operation has produced `HI` and `LO`, or 0 when none is running. An operation issued at counter value t is
+ready at t plus its length. `MULT` takes 6, 9 or 13 cycles by the size of `rs` with its sign mirrored (`rs` XOR its
+sign bit spread over the word, below 800h, below 100000h, or more); `MULTU` classifies the same way on `rs` as it is;
+`DIV` and `DIVU` take 36. `MFHI` and `MFLO` issued before the stamp wait for it, never longer than 36 cycles whatever
+a loaded state holds. `MTHI` and `MTLO` write the register and set the stamp to 0, so a read after them does not wait.
+A new multiply or divide replaces one still running: the wait a later read sees is the new operation's own time.
+`HI`, `LO` and the stamp are not touched by an exception (PSX-SYSTEM section 2, MULTU/MULT).
+
+## COP2 before the GTE
+
+The GTE is not built yet, so COP2 behaves as the processor does when the coprocessor has not been enabled or has
+nothing behind it, and a later GTE replaces this with no change to the decoder.
+
+- With SR.CU2 clear, every COP2 form raises coprocessor unusable (ExcCode 0Bh) with CE 2: the register moves `MFC2`,
+  `CFC2`, `MTC2` and `CTC2`, the branches `BC2F` and `BC2T`, the commands, and `LWC2` and `SWC2`. The last two check
+  alignment first, so an odd address is an address error. It records no first fault, because a handler may take it.
+- With SR.CU2 set, `MFC2` and `CFC2` read 0 into `rt` through the load delay; `MTC2`, `CTC2` and the commands do
+  nothing; `BC2F` always goes and `BC2T` never does, as the condition line is never true; `LWC2` does the real bus read
+  and drops the data, so a read of a bus gap is still a bus error, and `SWC2` does the real bus write of 0. Each of
+  them counts once as an access to the unbuilt GTE, which the runner reports (PSX-SYSTEM section 2, SR bits).
+
+`COP1` and `COP3` do not exist on the console. With SR.CU1 or SR.CU3 clear their instructions, loads and stores
+included (`LWC1`, `SWC1`, `LWC3`, `SWC3`), raise coprocessor unusable with CE 1 or 3 and record a first fault; with the
+bit set they do nothing, except that `BCzF` always goes and `BCzT` never does.
 
 ## Vector tests
 
@@ -120,20 +183,34 @@ layout: `r0` to `r31`, `hi`, `lo`, `pc`, `epc`, `tar`, `cause`, the branch targe
 and value. A failure prints `<file> <case name> final <field>: want 0x%08x got 0x%08x`, or the cycle form with the
 cycle index. The first dozen failing cases print; every one counts.
 
+**Two named rules** adjust the comparison, are not lines of `allow.txt`, and print how many cases each handled; the
+sample has 310 cases of the first and 400 of the second.
+
+- *Misaligned accesses.* The upstream interpreter copies bits 27 and 26 of the instruction into CAUSE's CE field
+  for every exception, where the console sets it only for coprocessor unusable. For a misaligned `LH`, `LHU`, `LW`,
+  `SH` or `SW`, found from the opcode and the effective address, the harness therefore asserts the exception itself:
+  the vector `80000080h`, ExcCode 4 for a load or 5 for a store, BadVaddr the address and only the fetch on the bus.
+  It then compares every final field except the CE bits.
+- *Unaligned forms.* `LWL`, `LWR`, `SWL` and `SWR` are recorded upstream as chunks of 1, 2 and 4 bytes. The harness
+  coalesces the chunks to the set of bytes they cover, checks that set is the one the instruction names (bytes 0 to
+  the address for `LWL` and `SWL`, the address to 3 for `LWR` and `SWR`), and compares that. A load is replayed as one
+  read of the aligned word whose covered bytes hold the recorded data; a store's chunks are coalesced the same way
+  on the core's side, so chunking is not compared.
+
 **Running it.** `schwaystation-test-vectors FILE --expect N` takes the sample or any file in the container form.
 
-- `--only NAME,...` runs the named upstream files; an unknown name is an error.
+- `--only NAME,...` runs the named upstream files; an unknown name is an error. The sample test does not use it.
 - `--expect N` is the zero-case guard: the run fails when it replayed fewer than N cases, so an empty or truncated
-  file, or a `--only` list that selected nothing, cannot pass.
+  file, or a `--only` list that selected nothing, cannot pass. The sample test expects 5,500.
 - `--allow FILE` reads `YYYY-MM-DD <file> <case> <issue URL>` lines, one per accepted upstream mismatch. The case is
   the text after the `$` in its name. A line covers a failing case; a line for a file that ran and matched no failing
   case is an error. The file starts empty.
 - `--flip-expected FIELD` inverts one bit of the first case's expected final `r5`, `epc`, `tar`, `cause`,
-  `branch_target` or `load_value`. It exists only for the negative controls, one per field, that show a wrong
-  register, COP0 field or latch cannot pass.
+  `branch_target` or `load_value`; `FIELD@FILE` does it to the first case of the named upstream file instead. It exists
+  only for the negative controls, one per field and one for each of the two rules, that show a wrong register, COP0
+  field or latch cannot pass.
 
 The harness rejects a short or a long file, a case name over 50 bytes, a cycle count over 8, a case count over 1,000,
 a non-zero upper half in a value or address, a non-zero `r0`, and a branch flag that is not 0 or 1.
 
-`ctest -L vectors` runs the sample test and its controls. Today the sample test covers the 21 arithmetic, logic,
-shift, set and `LUI` files, 2,100 cases.
+`ctest -L vectors` runs the sample test and its controls. The sample test covers all 55 files, 5,500 cases.

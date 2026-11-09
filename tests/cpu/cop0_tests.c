@@ -321,6 +321,29 @@ static void cop1_cop3_unusable(void)
     CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
     CHECK_EQ_U64(exc_code(inst), 0u);
     schway_destroy(inst);
+
+    /* The loads and stores of the two coprocessors follow the same rule: LWC1
+       and SWC1 give CE 1, LWC3 and SWC3 give CE 3, and with the bit set they
+       do nothing, even with 8 in the base field where a branch would sit. */
+    static const struct {
+        uint32_t word, ce;
+    } mem[] = {{0xC4000000u, 1u}, {0xE4000000u, 1u}, {0xCC000000u, 3u}, {0xEC000000u, 3u}};
+    for (size_t i = 0; i < sizeof mem / sizeof mem[0]; i++) {
+        inst = make();
+        run_word(inst, 0x80001000u, mem[i].word);
+        CHECK_EQ_U64(exc_code(inst), 0x0Bu);
+        CHECK_EQ_U64((cop0(inst, SCHWAY__COP0_CAUSE) >> 28) & 3u, mem[i].ce);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_COP_UNUSABLE);
+        schway_destroy(inst);
+
+        inst = make();
+        inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_CU1 | 0x80000000u;
+        run_word(inst, 0x80001000u, mem[i].word | 0x01000000u);
+        CHECK_EQ_HEX(inst->cpu.pc, 0x80001004u);
+        CHECK_EQ_U64(inst->cpu.branch_slot, 0u);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        schway_destroy(inst);
+    }
 }
 
 /* With the coprocessor usable, BCzF always goes and BCzT never does, since
