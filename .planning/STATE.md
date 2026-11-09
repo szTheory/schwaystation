@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: "Halted 02-22-PLAN.md at the push: fuzz job committed, branch not pushed, nightly not dispatched"
-last_updated: "2026-11-09T22:37:52.281Z"
+stopped_at: Completed 02-20-PLAN.md
+last_updated: "2026-11-09T22:45:32.390Z"
 last_activity: 2026-11-09
-last_activity_desc: Halted 02-22 at the push (the loader fuzz target, 32 in-memory seeds, fuzz.regress.exe, the fuzz preset and the nightly fuzz job are committed; the branch is not pushed and the nightly is not dispatched)
-state_head: af8be7919954660305cc38b218ac0a021239f43f
+last_activity_desc: Completed 02-20 (the runner loads a PS-EXE with --exe, prints its text with --tty and ends on the exit port with status 0 or 6; fixtures.hello.tty, fixtures.exit_port, runner.usage.exe and runner.exe.missing pass in the ci workflow, 212 of 212)
+state_head: 3adfe4bb756b6abb79f3ac13b1cc9ccd0bb2a506
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 34
+  completed_plans: 36
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 20 of 27
+Plan: 21 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Halted 02-22 at the push: the loader fuzz target, fuzz.regress.exe, the fuzz preset and the nightly fuzz job are committed and verified locally; git push was refused, so the nightly dispatch is open (02-22-SUMMARY.md, status halted)
+Last activity: 2026-11-09 — Completed 02-20: --exe, --tty and the exit port in the runner, status 6, the runner page (02-20-SUMMARY.md); 02-22 stays halted at its push, which is open
 
 Progress: [██░░░░░░░░] 17%
 
@@ -92,6 +92,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P17 | 12 min | 3 tasks | 15 files |
 | Phase 02 P18 | 3 min | 3 tasks | 15 files |
 | Phase 02 P19 | 20 min | 3 tasks | 13 files |
+| Phase 02 P20 | 7 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -179,6 +180,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-18: schway_get_tty drains the 4 KiB ring oldest first and reports and clears the bytes dropped since the last drain, also for capacity 0; the ring stays outside the state, every hash and a load — The same pull shape as schway_get_audio; a host that drains every frame sees every byte, and a hash never depends on whether a host drained
 - [Phase 02]: 02-19: an interrupt is armed by a retirement stamp (irq_stamp, in the state) on the false-to-true change of the line, 2 retirements for a device edge, I_MASK and SR writes and 1 for CAUSE and RFE, taken at the last only if the line is still true — The latencies are an inference unmeasured on silicon; an interrupt due on an instruction beats SYSCALL, BREAK, RI, CpU and fetch errors and yields to data errors and overflow, per the documented order
 - [Phase 02]: 02-19: the interrupt entry calls schway__cop0_irq_entry_cop2 with the word at EPC, read without charge or first fault; it only reports a COP2 command and the GTE plan executes it — The double execution belongs to phase 3 with the GTE; the hook is this plan's whole deliverable for that bug
+- [Phase 02]: 02-20: the exit port acts only with the debug-port flag, so a fixture that reports through it runs with --tty; without --tty the write is ignored and the run goes the full frame count
+- [Phase 02]: 02-20: --exe shares the probe's file reader and refusal line; a line over 4096 bytes is printed in pieces; reaching the 600-frame cap with the program still running exits 0 until plan 02-23 lands the hang report
 
 ### Pending Todos
 
@@ -233,8 +236,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T22:37:52.153Z
-Stopped at: Halted 02-22-PLAN.md at the push: fuzz job committed, branch not pushed, nightly not dispatched
+Last session: 2026-11-09T22:45:32.261Z
+Stopped at: Completed 02-20-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
