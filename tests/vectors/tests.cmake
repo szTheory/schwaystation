@@ -17,12 +17,14 @@ set(vectors_alu ADDIU,ADDU,AND,ANDI,LUI,NOR,OR,ORI,SLL,SLLV,SLT,SLTI,SLTIU,SLTU,
 # The trapping adds, SYSCALL and BREAK, and every branch and jump: the files
 # that take the exception entry or leave the branch record set.
 set(vectors_exc ADD,ADDI,BCondZ,BEQ,BGTZ,BLEZ,BNE,BREAK,J,JAL,JALR,JR,SUB,SYSCALL)
+# The loads and stores.
+set(vectors_mem LW)
 
 # Fault prevented: an instruction whose result, bus cycles or delay latches
 # differ from the public vectors. The count is the zero-case guard: a run that
 # replayed fewer cases than expected fails.
 schway_add_test(NAME vectors.r3000.sample
-  COMMAND schwaystation-test-vectors ${vectors_sample} --only ${vectors_alu},${vectors_exc} --expect 3500
+  COMMAND schwaystation-test-vectors ${vectors_sample} --only ${vectors_alu},${vectors_exc},${vectors_mem} --expect 3600
     --allow ${vectors_dir}/allow.txt
   LABELS portable vectors TIMEOUT 60)
 
@@ -94,5 +96,14 @@ schway_add_test(NAME vectors.r3000.allow.self_test
 schway__vectors_cmd(cmd ${vectors_allow_args})
 schway_add_test(NAME vectors.r3000.allow_stale.self_test
   COMMAND ${CMAKE_COMMAND} "-DCMD=${cmd}" -DCODE=1 "-DREGEX=allow line ADDU 000 matched no failing case"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS portable vectors TIMEOUT 60)
+
+# Fault prevented: rule (a) skipping the comparison of a misaligned access, so
+# a wrong EPC or a wrong exception passes. The first LW case is misaligned; one
+# bit of its expected EPC is inverted and the run must fail naming that field.
+schway__vectors_cmd(cmd ${vectors_sample} --only LW --expect 100 --flip-expected epc)
+schway_add_test(NAME vectors.r3000.rule_misaligned.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${cmd}" -DCODE=1 "-DREGEX=final epc"
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS portable vectors TIMEOUT 60)

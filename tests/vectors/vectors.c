@@ -10,7 +10,16 @@
    size, the first and third as 64-bit values). The bus is replayed from the
    cycles; the final state is compared field by field. Exit 0 when every case
    passes and N or more ran, 1 for a failure or a malformed file, 2 for a bad
-   command line. */
+   command line.
+
+   Two named rules adjust what a case is compared with, and the run prints how
+   many cases each handled. Rule (a): the upstream vectors come from an
+   emulator that copies instruction bits 27 and 26 into the CAUSE CE field of
+   every exception, so a misaligned LH, LHU, LW, SH or SW is compared by the
+   exception it must raise (vector 80000080h, ExcCode 4 or 5, BadVaddr the
+   address, only the fetch on the bus) and then field by field with CE left
+   out. Rule (b): LWL, LWR, SWL and SWR are recorded upstream as chunks of 1, 2
+   and 4 bytes, which the harness coalesces to the byte set they cover. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -346,6 +355,9 @@ struct run {
     int print;
 };
 
+/* CAUSE bits 29-28, the CE field. */
+#define CAUSE_CE 0x30000000u
+
 /* A mismatch is counted for every case and printed only for the first few
    failing ones, so a broken executor does not bury the first line. */
 static void cycle_mismatch(struct run *r, uint32_t k, const char *field, uint32_t want,
@@ -415,7 +427,7 @@ static void compare_cycles(struct run *r, const struct schway__cpu_log *log)
     }
 }
 
-static void compare_final(struct run *r, const struct schway__cpu *cpu)
+static void compare_final(struct run *r, const struct schway__cpu *cpu, uint32_t cause_ignore)
 {
     const struct vstate *w = &r->c->final;
     char field[8];
@@ -428,13 +440,46 @@ static void compare_final(struct run *r, const struct schway__cpu *cpu)
     check(r, "pc", w->pc, cpu->pc);
     check(r, "epc", w->epc, cpu->cop0.r[SCHWAY__COP0_EPC]);
     check(r, "tar", w->tar, cpu->cop0.r[SCHWAY__COP0_TAR]);
-    check(r, "cause", w->cause, cpu->cop0.r[SCHWAY__COP0_CAUSE]);
+    check(r, "cause", w->cause & ~cause_ignore, cpu->cop0.r[SCHWAY__COP0_CAUSE] & ~cause_ignore);
     check(r, "branch_target", w->branch_target, cpu->branch_target);
     check(r, "branch_slot", w->branch_slot, cpu->branch_slot);
     check(r, "branch_take", w->branch_take, cpu->branch_take);
     check(r, "load_target", w->load_target,
           cpu->load_reg == SCHWAY__CPU_NO_LOAD ? NO_LOAD_TARGET : cpu->load_reg);
     check(r, "load_value", w->load_value, cpu->load_value);
+}
+
+/* Rule (a). Whether the case is a half-word or word access at an address that
+   is not a multiple of its size; the effective address is the base register
+   plus the sign-extended immediate. Sets *store for a store. */
+static int misaligned_access(const struct vcase *c, uint32_t *store, uint32_t *ea)
+{
+    uint32_t size = 0u;
+    *store = 0u;
+    switch (c->opcode >> 26) {
+    case 0x23u: /* LW */
+        size = 4u;
+        break;
+    default:
+        return 0;
+    }
+    *ea = c->initial.r[(c->opcode >> 21) & 31u] + (((c->opcode & 0xFFFFu) ^ 0x8000u) - 0x8000u);
+    return (*ea & (size - 1u)) != 0u;
+}
+
+/* Rule (a): the exception a misaligned access must raise, then every final
+   field except the CE bits the upstream emulator copies from the opcode. */
+static void rule_misaligned(struct run *r, const struct schway__cpu *cpu,
+                            const struct schway__cpu_log *log, uint32_t store, uint32_t ea)
+{
+    uint32_t cause = cpu->cop0.r[SCHWAY__COP0_CAUSE];
+    uint32_t code = (cause >> 2) & 31u;
+    int fetch_only = log->got_n == 1u && log->overflow == 0u && log->got[0].kind == SCHWAY__CYCLE_FETCH;
+    check(r, "exception vector", 0x80000080u, cpu->pc);
+    check(r, "exception code", store != 0u ? 5u : 4u, code);
+    check(r, "exception bus (fetch only)", 1u, fetch_only ? 1u : 0u);
+    check(r, "exception badvaddr", ea, cpu->cop0.r[SCHWAY__COP0_BADVADDR]);
+    compare_final(r, cpu, CAUSE_CE);
 }
 
 /* Inverts one bit of the first case's expected final FIELD, so a negative
@@ -487,6 +532,8 @@ static void make_instance(void)
 
 /* Replays the cases of one selected slice, adding to *ran every case run,
    to *failures the failing ones and to *absorbed those an allow line covers. */
+static unsigned long rule_a_cases;
+
 static void run_slice(struct slice *s, const char *flip_field, unsigned long *ran,
                       unsigned long *failures, unsigned long *absorbed, unsigned *printed)
 {
@@ -508,8 +555,14 @@ static void run_slice(struct slice *s, const char *flip_field, unsigned long *ra
         log.expect = c.cycle;
         log.expect_n = c.ncycles;
         schway__cpu_step_one(inst, &log);
-        compare_cycles(&r, &log);
-        compare_final(&r, &inst->cpu);
+        uint32_t store = 0u, ea = 0u;
+        if (misaligned_access(&c, &store, &ea)) {
+            rule_a_cases++;
+            rule_misaligned(&r, &inst->cpu, &log, store, ea);
+        } else {
+            compare_cycles(&r, &log);
+            compare_final(&r, &inst->cpu, 0u);
+        }
 
         (*ran)++;
         if (r.mismatches != 0u && a != NULL) {
@@ -615,6 +668,7 @@ int main(int argc, char **argv)
         }
     }
     printf("vectors: %lu cases, %lu failures\n", ran, failures);
+    printf("vectors: rule (a) handled %lu cases\n", rule_a_cases);
     if (absorbed != 0u) {
         printf("vectors: %lu cases failed and are allowed\n", absorbed);
     }

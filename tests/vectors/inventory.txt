@@ -8,5 +8,6 @@ vectors.r3000.flip.epc.self_test	portable,vectors
 vectors.r3000.flip.load_value.self_test	portable,vectors
 vectors.r3000.flip.r5.self_test	portable,vectors
 vectors.r3000.flip.tar.self_test	portable,vectors
+vectors.r3000.rule_misaligned.self_test	portable,vectors
 vectors.r3000.sample	portable,vectors
 vectors.r3000.truncated.self_test	portable,vectors

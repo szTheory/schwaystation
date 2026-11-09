@@ -24,10 +24,10 @@ static uint32_t cpu_log_access(struct schway__cpu_log *log, uint32_t kind, uint3
     return value;
 }
 
-/* The access front-ends. With a log attached they replay it; without, they
-   reach the bus with the virtual address, whose segment the bus decodes
-   (PSX-SYSTEM section 2, Segments; section 3, C4), and add its charge to
-   *cycles. A bus error reads as zero. */
+/* The instruction fetch front-end. With a log attached it replays it;
+   without, it reaches the bus with the virtual address, whose segment the bus
+   decodes (PSX-SYSTEM section 2, Segments; section 3, C4), and adds its
+   charge to *cycles. A bus error reads as zero. */
 static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles)
 {
     uint32_t word = 0u;
@@ -36,26 +36,6 @@ static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles)
     }
     (void)schway__bus_fetch(inst, vaddr, &word, cycles);
     return word;
-}
-
-static inline uint32_t cpu_read(schway *inst, uint32_t vaddr, uint32_t size, uint32_t *cycles)
-{
-    uint32_t value = 0u;
-    if (inst->cpu.log != NULL) {
-        return cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_READ, size, vaddr, 0u);
-    }
-    (void)schway__bus_read(inst, vaddr, size, &value, cycles);
-    return value;
-}
-
-static inline void cpu_write(schway *inst, uint32_t vaddr, uint32_t size, uint32_t value,
-                             uint32_t *cycles)
-{
-    if (inst->cpu.log != NULL) {
-        (void)cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_WRITE, size, vaddr, value);
-        return;
-    }
-    (void)schway__bus_write(inst, vaddr, size, value, cycles);
 }
 
 /* Writes general register n. A write to register 0 is discarded. A load
@@ -133,6 +113,80 @@ static uint32_t cpu_unusable(schway *inst, uint32_t pc, uint32_t op, uint32_t fi
         schway__fault_latch(inst, SCHWAY__FAULT_COP_UNUSABLE, SCHWAY__DEV_NONE, 4u, pc, op, 0u);
     }
     return cpu_exception(inst, pc, SCHWAY__EXC_CPU, (op >> 26) & 3u, 0u, 0u);
+}
+
+/* The data access front-end, checks first. A half or a word access at an
+   address that is not a multiple of its size is an address error, AdEL for a
+   load and AdES for a store, with BadVaddr the address; it is a first fault
+   and never reaches the bus. User mode (SR.KUc = 1) may touch only KUSEG, so
+   an address with bit 31 set is the same address error, which a handler may
+   take. LWL, LWR, SWL and SWR pass size 1 and never fault on alignment
+   (PSX-SYSTEM section 2, Address and bus errors and Segments). Returns 1 when
+   it took the exception. */
+static uint32_t cpu_data_check(schway *inst, uint32_t pc, uint32_t op, uint32_t addr,
+                               uint32_t size, uint32_t store)
+{
+    uint32_t sr = inst->cpu.cop0.r[SCHWAY__COP0_SR];
+    uint32_t code = store != 0u ? (uint32_t)SCHWAY__EXC_ADES : (uint32_t)SCHWAY__EXC_ADEL;
+    if ((addr & (size - 1u)) != 0u) {
+        schway__fault_latch(inst, store != 0u ? SCHWAY__FAULT_MISALIGNED_WRITE
+                                              : SCHWAY__FAULT_MISALIGNED_READ,
+                            SCHWAY__DEV_NONE, size, pc, op, addr);
+        return cpu_exception(inst, pc, code, 0u, 1u, addr);
+    }
+    if ((sr & SCHWAY__SR_KUC) != 0u && (addr & 0x80000000u) != 0u) {
+        return cpu_exception(inst, pc, code, 0u, 1u, addr);
+    }
+    return 0u;
+}
+
+/* One access on the bus with the address already checked: the virtual
+   address goes to the bus, which decodes the segment (KSEG2 gets the full
+   address), and its charge adds to *cycles. A bus error is DBE and carries no
+   BadVaddr; the bus has already latched it as the first fault (PSX-SYSTEM
+   section 2, Address and bus errors). Returns 1 when it took the exception.
+   A read yields the low size bytes of the datum. */
+static uint32_t cpu_bus_read(schway *inst, uint32_t pc, uint32_t addr, uint32_t size,
+                             uint32_t *value, uint32_t *cycles)
+{
+    uint32_t v = 0u;
+    if (inst->cpu.log != NULL) {
+        v = cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_READ, size, addr, 0u);
+    } else if (schway__bus_read(inst, addr, size, &v, cycles) != 0u) {
+        return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
+    }
+    *value = size == 4u ? v : v & ((1u << (8u * size)) - 1u);
+    return 0u;
+}
+
+/* Issues a load: the register is written one instruction later. A load still
+   pending for the same register is dropped, the later one winning (PSX-SYSTEM
+   section 2, Load delay). */
+static void cpu_load_issue(struct schway__cpu *c, uint32_t n, uint32_t v, uint32_t *load_reg,
+                           uint32_t *load_value)
+{
+    if (c->load_reg == n) {
+        c->load_reg = SCHWAY__CPU_NO_LOAD;
+        c->load_value = 0u;
+    }
+    *load_reg = n;
+    *load_value = v;
+}
+
+/* LW: the word at rs + the sign-extended immediate, into rt through the load
+   delay. A load that faults leaves rt untouched. Returns 1 when it trapped. */
+static uint32_t cpu_load_word(schway *inst, uint32_t pc, uint32_t op, uint32_t *cycles,
+                              uint32_t *load_reg, uint32_t *load_value)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t addr = c->r[(op >> 21) & 31u] + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u);
+    uint32_t v = 0u;
+    if (cpu_data_check(inst, pc, op, addr, 4u, 0u) != 0u ||
+        cpu_bus_read(inst, pc, addr, 4u, &v, cycles) != 0u) {
+        return 1u;
+    }
+    cpu_load_issue(c, (op >> 16) & 31u, v, load_reg, load_value);
+    return 0u;
 }
 
 /* Signed overflow of a + b = sum, and of a - b = diff, on unsigned words
@@ -321,6 +375,9 @@ static uint32_t cpu_step(schway *inst)
             break;
         case 0x0Fu: /* LUI */
             cpu_set(c, rt_n, imm << 16);
+            break;
+        case 0x23u: /* LW */
+            trapped = cpu_load_word(inst, pc, op, &cycles, &load_reg, &load_value);
             break;
         case 0x10u: /* COP0 */
             if ((sr & SCHWAY__SR_KUC) != 0u && (sr & SCHWAY__SR_CU0) == 0u) {
