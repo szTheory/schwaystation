@@ -169,15 +169,16 @@ come from `AGENTS.md`.
 | 2026-10-29 | /gsd-ship 1 | Codex, OpenGSD 1.19.0; inline shipping and hosted CI | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-29 | /gsd-verify-work 1 | Codex, OpenGSD 1.19.0; inline verification and hosted CI | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-29 | /gsd-quick phase-1 CI tail | Codex, OpenGSD 1.19.0; inline quick fallback | GPT-6 (session; exact model ID not exposed) |
+| 2026-11-09 | /gsd-discuss-phase 2 | Claude Code, OpenGSD; seven advisor agents fanned out | claude-sonnet-5-5 |
 
 ## Session Continuity
 
-Last session: 2026-10-29
-Stopped at: Phase-1 CI tail verified; PR #6 tracks final squash merge and main CI
-Resume file: None
+Last session: 2026-11-09
+Stopped at: Phase 2 context gathered (02-CONTEXT.md); next is /gsd-plan-phase 2
+Resume file: .planning/phases/02-the-cpu-matches-the-public-vectors/02-CONTEXT.md
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next command: `$gsd-discuss-phase 2` (after PR #6 merges green).
-Stop after this quick step; do not start phase 2 in this session.
+Next command: `/gsd-plan-phase 2`
+Stop after the discuss step; do not plan in this session.
