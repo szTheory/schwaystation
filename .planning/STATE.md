@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-07-PLAN.md
-last_updated: "2026-11-09T19:41:28.495Z"
+stopped_at: Completed 02-08-PLAN.md
+last_updated: "2026-11-09T19:49:32.895Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 02 execution started
-state_head: 900f01f1fab581e09693e622ecb16660e72c0d7f
+state_head: 1fb5911426a4613625fbfeff70427945f49079f2
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 22
+  completed_plans: 23
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 8 of 27
+Plan: 9 of 27
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 02 execution started
 
@@ -80,6 +80,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P05 | 11 min | 3 tasks | 11 files |
 | Phase 02 P06 | 13 min | 3 tasks | 10 files |
 | Phase 02 P07 | 14 min | 3 tasks | 12 files |
+| Phase 02 P08 | 25 min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,7 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-07: the CPU hands the bus the virtual address (cpu_physical removed from cpu_exec.inc) and the bus decodes the segment; the scratchpad is a KSEG1 gap and KSEG2 answers only FFFE0130h
 - [Phase 02]: 02-07: the delay-register cost table uses the psx-spx formula as published (COM0, COM2, COM3; COM1 adds nothing), is derived, not saved, and is rebuilt on a delay or COM_DELAY write and on a state load; non-port I/O registers charge one approximate cycle
 - [Phase 02]: 02-07: EXP1 and EXP3 writes are dropped without a fault (reads are bus errors); the EXP2 debug ports act only for byte writes with the debug-port flag set and never fault; bus.bios is NULL until plan 02-16 so BIOS accesses are gaps
+- [Phase 02]: Exe status split: ERR_EXE_INVALID is a malformed file, ERR_EXE_RANGE is addresses or size outside RAM; launch block at physical 0200h
 
 ### Pending Todos
 
@@ -195,8 +197,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T19:41:28.346Z
-Stopped at: Completed 02-07-PLAN.md
+Last session: 2026-11-09T19:49:32.813Z
+Stopped at: Completed 02-08-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
