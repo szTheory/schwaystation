@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-05-PLAN.md
-last_updated: "2026-11-09T19:13:23.453Z"
+stopped_at: Completed 02-06-PLAN.md
+last_updated: "2026-11-09T19:27:44.116Z"
 last_activity: 2026-11-09
 last_activity_desc: Phase 02 execution started
-state_head: 0879fc8e54d179737edb541e4cfbe4e14380cdae
+state_head: 311772260a3bc8a0fb7545e1af65fed42242c9d8
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 20
+  completed_plans: 21
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 6 of 27
+Plan: 7 of 27
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 02 execution started
 
@@ -78,6 +78,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P03 | 6 min | 3 tasks | 8 files |
 | Phase 02 P04 | 5 min | 2 tasks | 6 files |
 | Phase 02 P05 | 11 min | 3 tasks | 11 files |
+| Phase 02 P06 | 13 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,9 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-04: sst-sample.bin is a u16 count, then per slice a 16-byte name, a u32 length and the upstream slice with its count patched to 100 (2,395,390 bytes); records carry no opcode block after the cycles
 - [Phase 02]: 02-05: fixtures name their image IMAGE (OUTPUT collides with an add_custom_command keyword); header.inc uses .create IMAGE, 0 plus .headersize 0x80010000 - 0x800; the armips target is armips-bin
 - [Phase 02]: 02-05: a digest mismatch is fatal inside file(DOWNLOAD EXPECTED_HASH), so Armips.cmake prints an armips: ... SHA-256 line before downloading and the pin self test matches that
+- [Phase 02]: 02-06: the vectors' next-PC model is pc plus the branch latch (next pc = target while take is set, else pc + 4) and every non-branch instruction clears the latch to zeros; the load latch is the pending load landing as the instruction ends, held as register 32 for none because a load into r0 is a real pending state
+- [Phase 02]: 02-06: schwaystation-test-vectors exits 1 for a failure, a malformed file or fewer cases than --expect and 2 for a bad command line; an allow line for a file that ran and matched no failing case is an error
+- [Phase 02]: 02-06: the cpu layout assertion pins offsetof(log) = 288 instead of sizeof, since the non-state log pointer differs by target; cpu_read and cpu_write are static inline until loads and stores land
 
 ### Pending Todos
 
@@ -187,8 +191,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T19:13:23.286Z
-Stopped at: Completed 02-05-PLAN.md
+Last session: 2026-11-09T19:27:44.031Z
+Stopped at: Completed 02-06-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
