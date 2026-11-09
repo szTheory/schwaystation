@@ -7,9 +7,8 @@ psx-spx CPU Specifications page (COP0 registers and exception handling) and from
 `.planning/preparation/PSX-SYSTEM.md`, which also names the sources it was checked against. Where this page says a fact
 is not measured on the console, the tests pin the behaviour the documents describe and say so.
 
-This page covers the registers, the entry rules, the vectors, MFC0, MTC0 and RFE, coprocessor-unusable and the
-exception loop. Interrupts reach the same entry when the interrupt plumbing lands, and the breakpoint registers are held
-but do not break.
+This page covers the registers, the entry rules, the vectors, MFC0, MTC0 and RFE, coprocessor-unusable, the exception
+loop and interrupts. The breakpoint registers are held but do not break.
 
 ## Registers
 
@@ -137,11 +136,64 @@ The loop counter counts consecutive exceptions with one EPC and one ExcCode, inc
 since a handler that returns to the instruction that raised it never makes progress. A different EPC or ExcCode starts
 the count again, and an interrupt is neither counted nor does it break a run. The counter is part of the saved state.
 
+## Interrupts
+
+The interrupt line the CPU takes is true while any of CAUSE bits 8-15 is set with the matching SR mask bit (8-15) set
+and SR.IEc set. CAUSE bit 10 is the hardware line: it is the live result of I_STAT AND I_MASK, changed by the write or
+the raise that changes it, with no delay, so a `MFC0` of CAUSE right after an I_MASK write already sees the new value.
+Bits 8 and 9 are the two software flags a guest sets itself (PSX-SYSTEM section 2, SR bits and CAUSE bits; section 6).
+
+The interrupt is not taken at the change. The core keeps a retirement stamp, the `irq_stamp` field of the CPU state: 0
+while nothing is armed, otherwise the number of instructions still to retire before the entry. It is set when the line
+goes from false to true, by that change and nothing else, so reading CAUSE, SR or I_STAT never arms an interrupt, and
+a change to false disarms it. Each retired instruction counts it down, and at 0 the interrupt is taken before the next
+instruction runs, if the line is still true.
+
+| Change that makes the line true | Retirements before the entry | EPC |
+|---|---|---|
+| a device edge, for example the vertical blank raised at the end of a frame | 2 after the edge | the third instruction after it |
+| a write to I_MASK | 2, the write counting as the first | the write plus 8 |
+| `MTC0` to SR | 2, the `MTC0` counting as the first | the `MTC0` plus 8 |
+| `MTC0` to CAUSE | 1, the `MTC0` itself | the `MTC0` plus 4 |
+| `RFE`, which restores IEc | 1, the `RFE` itself | the instruction after the `RFE` |
+
+These latencies are an inference from the published behaviour, which is that a newly asserted interrupt is delayed by
+about two instructions (PSX-SYSTEM section 6, interrupts). Nothing measured on the console separates them from one
+instruction more or less, and the tests say so beside each value. The `doc` rows are pinned in
+`tests/cpu/exception_tests.c`: `MTC0` to CAUSE gives EPC = pc + 4, `MTC0` to SR enabling a pending line gives
+EPC = pc + 8, an I_MASK write gives EPC = pc + 8, and a CAUSE write in a delay slot is taken after the slot with BD = 0.
+A change to one of them needs a dated line in `tests/diag/allow.txt` that names the evidence for it, in the format
+`YYYY-MM-DD <fixture-or-test> <row> <new value> <evidence>`.
+
+What the entry does, on top of the steps under Entry:
+
+- ExcCode is 0 and no first fault is recorded. An interrupt returns to EPC itself: the instruction it was taken before,
+  or the branch before it when that instruction is a delay slot, with BD, BT and TAR as for any delay-slot exception.
+  A write to CAUSE in the slot of a branch is taken after the slot, when the branch is already gone, so BD is 0 and EPC
+  is where the branch went.
+- A load issued by the instruction just before lands first. The handler sees it, and the instruction the interrupt
+  cut off, which would have read the old value, reads the new one when it runs after the return (PSX-SYSTEM section 2,
+  Load delay).
+- Stores in the write queue stay queued. They are already in RAM in store order, and the first uncached read in the
+  handler empties the queue.
+- `RFE` looks at the line at once. A handler that returns without acknowledging its source is entered again after the
+  `RFE`.
+- When an interrupt is due on the same instruction as an exception of that instruction, the order is data AdEL, AdES
+  and DBE, then overflow, then the interrupt, then `SYSCALL`, `BREAK`, RI and CpU, then the fetch's AdEL and IBE
+  (PSX-SYSTEM section 2, Priority). The ones above the interrupt are taken and the interrupt waits for the return from
+  exception; the ones below are not, and the instruction runs again after the return.
+- The entry calls one hook, `schway__cop0_irq_entry_cop2`, with the word at EPC. On the console an interrupt taken
+  when the next instruction is a GTE command lets that command execute, so it runs twice (PSX-SYSTEM section 2, GTE in a
+  delay slot of an interrupt). The GTE does not exist yet, so the hook only reports whether the word is a GTE command and
+  executes nothing; the plan that builds the GTE executes it there.
+
 ## Tests
 
 `ctest -L cpu` runs the `cpu.cop0.*` cases, which place words in RAM, run them one instruction at a time and compare the
 registers, the delay latches and the first-fault record with values worked out from the facts above. The vector sample
 runs the exception entry for `SYSCALL`, `BREAK` and the overflowing adds, 100 cases each, with the status register
 cleared; the unit tests cover what the vectors do not: delay-slot state, the mode stack, `MFC0`, `MTC0`, `RFE`, the
-coprocessor cases and the loop. Both the vectors and the facts come from documents rather than from the console, so a
-pass shows agreement with them, not with silicon.
+coprocessor cases and the loop. The `cpu.exception.*` cases cover every exception class, the vector choice, bus errors,
+the interrupt latencies and priority; `cpu.delay.*` the load delay and its interlocks; and `cpu.timing.*` the multiply
+and divide times. Both the vectors and the facts come from documents rather than from the console, so a pass shows
+agreement with them, not with silicon.

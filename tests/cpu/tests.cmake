@@ -231,3 +231,99 @@ schway_add_test(NAME cpu.exception.irq_rfe
 schway_add_test(NAME cpu.exception.irq_dropped_before_entry
   COMMAND schwaystation-test-exception irq_dropped_before_entry
   LABELS cpu portable TIMEOUT 10)
+
+# The load delay and its interlocks: one executable runs the case named on its command line.
+add_executable(schwaystation-test-delay ${CMAKE_CURRENT_LIST_DIR}/delay_tests.c)
+target_include_directories(schwaystation-test-delay PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-delay PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-delay PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-delay)
+
+# Fault prevented: a load that is visible to the next instruction, or one that lands a second late.
+schway_add_test(NAME cpu.delay.load_delay
+  COMMAND schwaystation-test-delay load_delay
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a late load that lands over the newer value the program wrote.
+schway_add_test(NAME cpu.delay.write_cancels_pending
+  COMMAND schwaystation-test-delay write_cancels_pending
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a load that writes stale data into rt when it traps, or one that leaves an older load pending past the exception.
+schway_add_test(NAME cpu.delay.failed_load_untouched
+  COMMAND schwaystation-test-delay failed_load_untouched
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a load left pending into an interrupt handler, or one lost by the entry.
+schway_add_test(NAME cpu.delay.load_before_irq
+  COMMAND schwaystation-test-delay load_before_irq
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: an unaligned-load pair that needs a nop between its halves, or whose second half merges into stale register contents.
+schway_add_test(NAME cpu.delay.lwl_lwr_interlock
+  COMMAND schwaystation-test-delay lwl_lwr_interlock
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a COP0 read visible one instruction early, or landing over a newer write to its register.
+schway_add_test(NAME cpu.delay.mfc0_delay
+  COMMAND schwaystation-test-delay mfc0_delay
+  LABELS cpu portable TIMEOUT 10)
+
+# Multiply and divide timing: one executable runs the case named on its command line.
+add_executable(schwaystation-test-timing ${CMAKE_CURRENT_LIST_DIR}/timing_tests.c)
+target_include_directories(schwaystation-test-timing PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-timing PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-timing PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-timing)
+
+# Fault prevented: a multiply charged by its second operand, by a sign-blind rule, or by a bound one off.
+schway_add_test(NAME cpu.timing.mult_6
+  COMMAND schwaystation-test-timing mult_6
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a middle class that starts or ends one value off, on either sign.
+schway_add_test(NAME cpu.timing.mult_9
+  COMMAND schwaystation-test-timing mult_9
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a longest class that begins early or never applies to a negative first operand.
+schway_add_test(NAME cpu.timing.mult_13
+  COMMAND schwaystation-test-timing mult_13
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: an unsigned multiply that takes the signed classification.
+schway_add_test(NAME cpu.timing.multu_raw
+  COMMAND schwaystation-test-timing multu_raw
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a divide whose time depends on its operands, or one that traps on zero.
+schway_add_test(NAME cpu.timing.div_36
+  COMMAND schwaystation-test-timing div_36
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: an unsigned divide with a different time or a signed reading of a large dividend.
+schway_add_test(NAME cpu.timing.divu_36
+  COMMAND schwaystation-test-timing divu_36
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a read of HI or LO that returns before the result is there at no cost, or waits longer than the result takes.
+schway_add_test(NAME cpu.timing.early_read_stalls
+  COMMAND schwaystation-test-timing early_read_stalls
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a new multiply that waits for the old one, or whose stamp keeps the old completion.
+schway_add_test(NAME cpu.timing.replace_while_busy
+  COMMAND schwaystation-test-timing replace_while_busy
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a write to HI or LO that a running multiply overwrites or a read waits behind.
+schway_add_test(NAME cpu.timing.mtlo_mthi_stamp_zero
+  COMMAND schwaystation-test-timing mtlo_mthi_stamp_zero
+  LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: an exception entry that clears the multiply unit or forgets the result.
+schway_add_test(NAME cpu.timing.survives_exception
+  COMMAND schwaystation-test-timing survives_exception
+  LABELS cpu portable TIMEOUT 10)

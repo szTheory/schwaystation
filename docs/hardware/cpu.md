@@ -156,7 +156,8 @@ sign bit spread over the word, below 800h, below 100000h, or more); `MULTU` clas
 `DIV` and `DIVU` take 36. `MFHI` and `MFLO` issued before the stamp wait for it, never longer than 36 cycles whatever
 a loaded state holds. `MTHI` and `MTLO` write the register and set the stamp to 0, so a read after them does not wait.
 A new multiply or divide replaces one still running: the wait a later read sees is the new operation's own time.
-`HI`, `LO` and the stamp are not touched by an exception (PSX-SYSTEM section 2, MULTU/MULT).
+`HI`, `LO` and the stamp are not touched by an exception (PSX-SYSTEM section 2, MULTU/MULT). The `cpu.timing.*` tests
+pin these times and rules.
 
 ## COP2 before the GTE
 
