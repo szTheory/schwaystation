@@ -12,17 +12,19 @@
 #include "state.h"
 #include "../check.h"
 
-#define STATE_BUF (SCHWAY__VRAM_W * SCHWAY__VRAM_H * 2u + 4096u)
 #define MAX_FIELDS 64u
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
 
-static uint8_t good[STATE_BUF];
-static uint8_t bad[STATE_BUF];
-static uint8_t before[STATE_BUF];
-static uint8_t after[STATE_BUF];
-static uint8_t stream[STATE_BUF]; /* the visitor's own serialisation */
+/* Five buffers for saved states, sized from the core's own answer, so they
+   follow the state as it grows. */
+static uint8_t *good;
+static uint8_t *bad;
+static uint8_t *before;
+static uint8_t *after;
+static uint8_t *stream; /* the visitor's own serialisation */
+static size_t state_cap;
 static struct schway__state_field fields[MAX_FIELDS];
 
 static void *test_alloc(void *user, size_t size)
@@ -58,6 +60,33 @@ static schway *make(uint32_t region)
     return inst;
 }
 
+/* Sizes the five buffers from a fresh instance. */
+static void bufs_init(void)
+{
+    schway *probe = make(SCHWAY_REGION_NTSC_U);
+    state_cap = schway_state_size(probe);
+    schway_destroy(probe);
+    CHECK(state_cap > SCHWAY__STATE_HEADER_SIZE);
+    good = (uint8_t *)malloc(state_cap);
+    bad = (uint8_t *)malloc(state_cap);
+    before = (uint8_t *)malloc(state_cap);
+    after = (uint8_t *)malloc(state_cap);
+    stream = (uint8_t *)malloc(state_cap);
+    if (state_cap <= SCHWAY__STATE_HEADER_SIZE || good == NULL || bad == NULL ||
+        before == NULL || after == NULL || stream == NULL) {
+        exit(1);
+    }
+}
+
+static void bufs_free(void)
+{
+    free(good);
+    free(bad);
+    free(before);
+    free(after);
+    free(stream);
+}
+
 static void run_to(schway *inst, uint64_t frame)
 {
     while (inst->frame < frame) {
@@ -68,8 +97,8 @@ static void run_to(schway *inst, uint64_t frame)
 static size_t save(const schway *inst, uint8_t *buf)
 {
     size_t n = schway_state_size(inst);
-    CHECK(n > SCHWAY__STATE_HEADER_SIZE && n <= STATE_BUF);
-    if (n <= SCHWAY__STATE_HEADER_SIZE || n > STATE_BUF) {
+    CHECK(n > SCHWAY__STATE_HEADER_SIZE && n <= state_cap);
+    if (n <= SCHWAY__STATE_HEADER_SIZE || n > state_cap) {
         exit(1);
     }
     CHECK_EQ_U64(schway_save_state(inst, buf, n), SCHWAY_STATUS_OK);
@@ -259,7 +288,7 @@ static void on_field(void *user, const char *name, const void *data, uint32_t co
         c->bad_width = 1;
         return;
     }
-    if ((size_t)count * width > STATE_BUF - c->n) {
+    if ((size_t)count * width > state_cap - c->n) {
         c->overflow = 1;
         return;
     }
@@ -471,9 +500,10 @@ static void test_run_bounds(void)
     }
 }
 
-/* The cpu module's fields come back from a save, a power reset and a load
-   byte for byte, and the power-on values are the documented ones
-   (ARCHITECTURE section 7; PSX-SYSTEM section 2, COP0 registers). */
+/* The cpu, bus and fault fields come back from a save, a power reset and a
+   load byte for byte, and the power-on values are the documented ones
+   (ARCHITECTURE section 7; PSX-SYSTEM section 2, COP0 registers). The TTY
+   ring is outside the state and a power reset empties it. */
 static void test_cpu_fields(void)
 {
     schway_versions v;
@@ -499,15 +529,76 @@ static void test_cpu_fields(void)
     inst->cpu.hi = 0xCAFEF00Du;
     inst->cpu.pc = 0x80010000u;
     inst->cpu.cop0.r[14] = 0x80020004u;
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_U64(inst->bus.ram[0x1234], 0u);
+    CHECK_EQ_U64(inst->irq.stat | inst->irq.mask, 0u);
+
+    /* Guest RAM is little-endian; the first byte past 2 MiB is a bus error. */
+    uint32_t cycles = 0u, word = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0x1234u, 4u, 0xA1B2C3D4u, &cycles), 0u);
+    CHECK_EQ_HEX(inst->bus.ram[0x1234], 0xD4u);
+    CHECK_EQ_HEX(inst->bus.ram[0x1237], 0xA1u);
+    CHECK_EQ_U64(schway__bus_read(inst, 0x1235u, 2u, &word, &cycles), 0u);
+    CHECK_EQ_HEX(word, 0xB2C3u);
+    CHECK_EQ_U64(schway__bus_fetch(inst, 0x1234u, &word, &cycles), 0u);
+    CHECK_EQ_HEX(word, 0xA1B2C3D4u);
+    CHECK_EQ_U64(schway__bus_write(inst, 0x1FFFFFu, 1u, 0x5Au, &cycles), 0u);
+    CHECK(schway__bus_read(inst, 0x1FFFFEu, 4u, &word, &cycles) != 0);
+    CHECK(schway__bus_read(inst, 0x200000u, 1u, &word, &cycles) != 0);
+    CHECK_EQ_U64(word, 0u);
+    inst->bus.scratch[0x3FF] = 0x77u;
+    inst->bus.memctl[8] = 0x0B88u;
+    inst->bus.unbuilt_n[SCHWAY__DEV_GPU] = 3u;
+
+    /* The first fault wins; a later one changes nothing. */
+    schway__fault_latch(inst, SCHWAY__FAULT_UNMAPPED_READ, SCHWAY__DEV_GPU, 4u, 0x80010000u,
+                        0x8C220000u, 0x1F801814u);
+    schway__fault_latch(inst, SCHWAY__FAULT_COP_UNUSABLE, SCHWAY__DEV_NONE, 0u, 1u, 2u, 3u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_UNMAPPED_READ);
+    CHECK_EQ_HEX(inst->fault.addr, 0x1F801814u);
+
+    /* An enabled interrupt raises the line; a disabled one does not. */
+    schway__irq_raise(inst, 2u);
+    CHECK_EQ_U64(schway__irq_line(inst), 0u);
+    inst->irq.mask = 0x4u;
+    CHECK_EQ_U64(schway__irq_line(inst), 1u);
+    schway__irq_raise(inst, 11u);
+    CHECK_EQ_HEX(inst->irq.stat, 0x4u);
+
+    /* The TTY ring keeps 4096 bytes in order and counts the ones it drops. */
+    for (uint32_t i = 0; i < 4097u; i++) {
+        schway__tty_push(inst, (uint8_t)i);
+    }
+    CHECK_EQ_U64(inst->tty.count, 4096u);
+    CHECK_EQ_U64(inst->tty.dropped, 1u);
+    CHECK_EQ_HEX(inst->tty.buf[255], 0xFFu);
+    inst->exit_pending = 1u;
+
     size_t n = save(inst, good);
     CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(inst->cpu.r[5], 0u);
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
+    CHECK_EQ_U64(inst->bus.ram[0x1234], 0u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_U64(inst->tty.count | inst->tty.dropped | inst->exit_pending, 0u);
     CHECK_EQ_U64(schway_load_state(inst, good, n), SCHWAY_STATUS_OK);
     CHECK_EQ_HEX(inst->cpu.r[5], 0x12345678u);
     CHECK_EQ_HEX(inst->cpu.hi, 0xCAFEF00Du);
     CHECK_EQ_HEX(inst->cpu.pc, 0x80010000u);
     CHECK_EQ_HEX(inst->cpu.cop0.r[14], 0x80020004u);
+    CHECK_EQ_HEX(inst->bus.ram[0x1234], 0xD4u);
+    CHECK_EQ_HEX(inst->bus.ram[0x1FFFFF], 0x5Au);
+    CHECK_EQ_HEX(inst->bus.scratch[0x3FF], 0x77u);
+    CHECK_EQ_HEX(inst->bus.memctl[8], 0x0B88u);
+    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GPU], 3u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_UNMAPPED_READ);
+    CHECK_EQ_U64(inst->fault.device, SCHWAY__DEV_GPU);
+    CHECK_EQ_U64(inst->fault.width, 4u);
+    CHECK_EQ_HEX(inst->fault.pc, 0x80010000u);
+    CHECK_EQ_HEX(inst->fault.opcode, 0x8C220000u);
+    CHECK_EQ_HEX(inst->fault.addr, 0x1F801814u);
+    CHECK_EQ_HEX(inst->irq.stat, 0x4u);
+    CHECK_EQ_HEX(inst->irq.mask, 0x4u);
     CHECK_EQ_U64(save(inst, after), n);
     CHECK(memcmp(good, after, n) == 0);
     schway_destroy(inst);
@@ -534,7 +625,9 @@ int main(int argc, char **argv)
     }
     for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
         if (strcmp(argv[1], cases[i].name) == 0) {
+            bufs_init();
             cases[i].run();
+            bufs_free();
             CHECK_DONE();
         }
     }

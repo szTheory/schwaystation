@@ -43,6 +43,39 @@ void schway__instance_write_out(void *out, const void *full, uint32_t ours)
     memcpy(out, full, size < ours ? size : ours);
 }
 
+void schway__fault_latch(schway *inst, uint32_t kind, uint32_t device, uint32_t width,
+                         uint32_t pc, uint32_t opcode, uint32_t addr)
+{
+    struct schway__fault *f = &inst->fault;
+    if (f->kind != SCHWAY__FAULT_NONE) {
+        return;
+    }
+    f->kind = kind;
+    f->device = device;
+    f->width = width;
+    f->note = 0u;
+    f->frame = inst->frame;
+    f->ticks = inst->ticks;
+    f->line = 0u;
+    f->dot = 0u;
+    f->pc = pc;
+    f->opcode = opcode;
+    f->addr = addr;
+}
+
+void schway__tty_push(schway *inst, uint8_t byte)
+{
+    struct schway__tty *t = &inst->tty;
+    if (t->count >= SCHWAY__TTY_SIZE) {
+        if (t->dropped != UINT32_MAX) {
+            t->dropped++;
+        }
+        return;
+    }
+    t->buf[(t->head + t->count) % SCHWAY__TTY_SIZE] = byte;
+    t->count++;
+}
+
 /* The power-on display: GP1(06h) X1 = 260h, X2 = C60h and GP1(07h)
    Y1 = 10h, Y2 = 100h, 320-dot mode (divider 8), 240 lines, progressive,
    15-bit, display enabled (psx-spx, GPU Display Control Commands). */
@@ -64,6 +97,14 @@ static void power_on(schway *inst)
     schway__frame_audio_clear(inst);
     memset(inst->vram, 0, sizeof inst->vram);
     schway__cpu_reset(inst);
+    schway__bus_reset(inst);
+    schway__irq_reset(inst);
+    /* The profile, and its flags, survive a power reset. */
+    inst->exe_loaded = 0u;
+    memset(&inst->fault, 0, sizeof inst->fault);
+    memset(&inst->tty, 0, sizeof inst->tty);
+    inst->exit_pending = 0u;
+    inst->exit_code = 0u;
 }
 
 schway_status schway_get_versions(schway_versions *out)

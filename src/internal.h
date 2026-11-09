@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "schwaystation.h"
+#include "bus.h"
 #include "cpu.h"
 
 /* Internal version numbers reported by schway_get_versions. */
@@ -51,6 +52,41 @@ struct schway__display {
     uint32_t enabled, rgb24;
 };
 
+/* The first event since power-on that the model calls impossible or
+   unmodelled (ARCHITECTURE section 6). Only the first is kept: schway__fault_latch
+   writes it while kind is NONE. */
+enum {
+    SCHWAY__FAULT_NONE = 0,
+    SCHWAY__FAULT_UNMAPPED_READ,
+    SCHWAY__FAULT_UNMAPPED_WRITE,
+    SCHWAY__FAULT_UNMAPPED_FETCH,
+    SCHWAY__FAULT_MISALIGNED_READ,
+    SCHWAY__FAULT_MISALIGNED_WRITE,
+    SCHWAY__FAULT_MISALIGNED_FETCH,
+    SCHWAY__FAULT_RESERVED_INSTRUCTION,
+    SCHWAY__FAULT_COP_UNUSABLE,
+    SCHWAY__FAULT_EXCEPTION_LOOP
+};
+
+struct schway__fault {
+    uint32_t kind;   /* SCHWAY__FAULT_* */
+    uint32_t device; /* enum schway__dev */
+    uint32_t width;  /* bytes, 0 to 4 */
+    uint32_t note;
+    uint64_t frame, ticks;
+    uint32_t line, dot;
+    uint32_t pc, opcode, addr;
+};
+
+/* Bytes the guest wrote to the TTY, for the host to drain: 4 KiB, and
+   outside the state. A full ring drops the new byte and counts it. */
+#define SCHWAY__TTY_SIZE 4096u
+
+struct schway__tty {
+    uint8_t buf[SCHWAY__TTY_SIZE];
+    uint32_t head, count, dropped;
+};
+
 struct schway {
     schway_allocator allocator; /* the caller's, copied at create */
     size_t alloc_size;          /* the size given to alloc, given back to free */
@@ -65,7 +101,16 @@ struct schway {
     uint32_t audio_dropped; /* pairs lost since the last drain */
     int16_t audio[SCHWAY__AUDIO_RING_PAIRS][2];
     uint16_t vram[SCHWAY__VRAM_H][SCHWAY__VRAM_W];
+    uint32_t profile_flags;     /* the profile's flags, bit 0 the debug port */
+    uint32_t exe_loaded;        /* 1 after a PS-EXE was side-loaded */
     struct schway__cpu cpu;
+    struct schway__bus bus;
+    struct schway__irq irq;
+    struct schway__fault fault;
+    /* Not saved: the host drains these, and a power reset empties them. */
+    struct schway__tty tty;
+    uint32_t exit_pending;      /* the guest wrote the exit port */
+    uint32_t exit_code;         /* the byte it wrote */
 };
 
 /* Frame cycles per region, numerator and denominator. */
@@ -185,6 +230,22 @@ schway_status schway__instance_check_out_size(const void *s, uint32_t first);
 /* Writes min(caller's size tag, ours) bytes of the fully built struct full to
    out; bytes past ours are left as the caller set them. */
 void schway__instance_write_out(void *out, const void *full, uint32_t ours);
+
+_Static_assert(sizeof(struct schway__cop0) == 128, "cop0 size");
+_Static_assert(sizeof(struct schway__cpu) == 268, "cpu size");
+_Static_assert(sizeof(struct schway__irq) == 8, "irq size");
+_Static_assert(SCHWAY__DEV_COUNT == 18, "device count");
+_Static_assert(offsetof(struct schway__fault, frame) == 16, "fault.frame");
+_Static_assert(offsetof(struct schway__fault, line) == 32, "fault.line");
+_Static_assert(offsetof(struct schway__fault, addr) == 48, "fault.addr");
+
+/* Latches the first-fault record at the current frame and ticks, only while
+   none is held. The line and dot stay 0 until the GPU keeps a beam. */
+void schway__fault_latch(schway *inst, uint32_t kind, uint32_t device, uint32_t width,
+                         uint32_t pc, uint32_t opcode, uint32_t addr);
+
+/* Queues one TTY byte; a full ring drops it. */
+void schway__tty_push(schway *inst, uint8_t byte);
 
 /* Empties the audio ring and its dropped count. */
 void schway__frame_audio_clear(schway *inst);
