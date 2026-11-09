@@ -63,3 +63,20 @@ schway_add_test(NAME bus.irq_line
 schway_add_test(NAME bus.irq_cause_bit
   COMMAND schwaystation-test-bus irq_cause_bit
   LABELS bus portable TIMEOUT 10)
+
+# The instruction cache, cache isolation and the write queue through the CPU. One
+# executable runs the case named on its command line; it sees src/, so it can read
+# the cache arrays and the queue count.
+add_executable(schwaystation-test-cache ${CMAKE_CURRENT_LIST_DIR}/cache_tests.c)
+target_include_directories(schwaystation-test-cache PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-cache PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-cache PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-cache)
+
+# Fault prevented: a cached fetch that reads past the line's end or short of it, a
+# hit that costs a bus cycle, a KSEG1 fetch that fills or changes the line, or a
+# store that changes what a hit returns.
+schway_add_test(NAME bus.icache_fill
+  COMMAND schwaystation-test-cache icache_fill
+  LABELS bus portable TIMEOUT 10)

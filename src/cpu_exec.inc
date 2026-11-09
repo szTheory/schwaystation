@@ -24,15 +24,23 @@ static uint32_t cpu_log_access(struct schway__cpu_log *log, uint32_t kind, uint3
     return value;
 }
 
-/* The instruction fetch front-end. With a log attached it replays it;
-   without, it reaches the bus with the virtual address, whose segment the bus
-   decodes (PSX-SYSTEM section 2, Segments; section 3, C4), and adds its
-   charge to *cycles. A bus error reads as zero. */
+/* The instruction fetch front-end. With a log attached it replays it, with no
+   cache. Without one, a fetch in KUSEG or KSEG0 goes through the instruction
+   cache, except in the BIOS window, which is never cached; any other fetch
+   reaches the bus. The bus decodes the segment of the virtual address
+   (PSX-SYSTEM section 2, Segments and I-cache; section 3, C4), and its charge
+   adds to *cycles. A bus error reads as zero. */
 static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles)
 {
     uint32_t word = 0u;
+    uint32_t seg = schway__bus_segment(vaddr);
     if (inst->cpu.log != NULL) {
         return cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_FETCH, 4u, vaddr, 0u);
+    }
+    if ((seg == (uint32_t)SCHWAY__SEG_KUSEG || seg == (uint32_t)SCHWAY__SEG_KSEG0) &&
+        ((vaddr & 0x1FFFFFFFu) >> 19) != 0x3F8u) {
+        (void)schway__cpu_icache_fetch(inst, vaddr, &word, cycles);
+        return word;
     }
     (void)schway__bus_fetch(inst, vaddr, &word, cycles);
     return word;

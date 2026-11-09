@@ -92,6 +92,11 @@ struct schway__cpu_log {
    2, MULTU/MULT and DIV/DIVU). A read of HI or LO never waits longer. */
 #define SCHWAY__MULDIV_MAX 36u
 
+/* The instruction cache: 256 direct-mapped lines of 4 words, 4 KiB, indexed by
+   address bits 11:4. A line holds the tag, physical address bits 31:12, and a
+   valid bit per word (PSX-SYSTEM section 2, I-cache). */
+#define SCHWAY__ICACHE_LINES 256u
+
 /* The CPU: 32 general registers (r[0] is the zero register), HI and LO, the
    program counter, COP0 and the two delay latches. The next program counter
    is not stored: it is branch_target while a taken branch is pending and
@@ -103,7 +108,8 @@ struct schway__cpu_log {
    on instructions, and muldiv_ready is the value of cycle at which the
    running multiply or divide has produced HI and LO, 0 when none is running.
    The 64-bit fields come first so the layout does not depend on the
-   target's alignment of them. The log pointer is not state. */
+   target's alignment of them. icache_tag, icache_word and icache_valid are
+   the instruction cache. The log pointer is not state. */
 struct schway__cpu {
     uint64_t muldiv_ready;
     uint64_t cycle;
@@ -114,6 +120,9 @@ struct schway__cpu {
     uint32_t load_reg, load_value;
     uint32_t branch_slot, branch_take, branch_target;
     uint32_t exc_epc, exc_code, exc_repeat;
+    uint32_t icache_tag[SCHWAY__ICACHE_LINES];
+    uint32_t icache_word[SCHWAY__ICACHE_LINES][4];
+    uint8_t icache_valid[SCHWAY__ICACHE_LINES];
     struct schway__cpu_log *log;
 };
 
@@ -139,6 +148,14 @@ void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t 
 uint32_t schway__cop0_mfc0(schway *inst, uint32_t rd, uint32_t *value);
 uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value);
 void schway__cop0_rfe(schway *inst);
+
+/* An instruction fetch of the word at virtual address vaddr, which lies in
+   KUSEG or KSEG0, through the instruction cache. A hit costs nothing beyond the
+   instruction's own cycle. A miss, or a tag hit on a word that is not valid,
+   fills the line from that word to its end and adds the fill's cost to
+   *cycles. Returns 0 with the word in *word, or non-zero for a bus error on
+   the missed word, with the line untouched (PSX-SYSTEM section 2, I-cache). */
+uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, uint32_t *cycles);
 
 /* The cpu and cop0 fields of the state walk (state.h). */
 void schway__cpu_state_io(struct schway__state_io *io, schway *inst);

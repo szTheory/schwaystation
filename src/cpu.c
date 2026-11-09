@@ -18,6 +18,9 @@ static const char name_exc_code[] = "cpu.exc_code";
 static const char name_exc_repeat[] = "cpu.exc_repeat";
 static const char name_muldiv_ready[] = "cpu.muldiv_ready";
 static const char name_cycle[] = "cpu.cycle";
+static const char name_icache_tag[] = "cpu.icache_tag";
+static const char name_icache_word[] = "cpu.icache_word";
+static const char name_icache_valid[] = "cpu.icache_valid";
 
 /* General registers, HI and LO are 0 and the program counter is the BIOS
    entry: the machine starts at BFC00000h (ARCHITECTURE section 7,
@@ -39,6 +42,12 @@ void schway__cpu_reset(schway *inst)
     c->exc_repeat = 0u;
     c->muldiv_ready = 0u;
     c->cycle = 0u;
+    /* Every line starts invalid; the words are never read before a fill
+       writes them, and are zero so the state is the same on every run
+       (PSX-SYSTEM section 9, CPU, I-cache). */
+    memset(c->icache_tag, 0, sizeof c->icache_tag);
+    memset(c->icache_word, 0, sizeof c->icache_word);
+    memset(c->icache_valid, 0, sizeof c->icache_valid);
     c->log = NULL;
     schway__cop0_reset(inst);
 }
@@ -61,6 +70,61 @@ void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u32(io, name_exc_repeat, &c->exc_repeat, 0u, UINT32_MAX);
     (void)schway__state_u64(io, name_muldiv_ready, &c->muldiv_ready, 0u, UINT64_MAX);
     (void)schway__state_u64(io, name_cycle, &c->cycle, 0u, UINT64_MAX);
+    schway__state_u32_array(io, name_icache_tag, c->icache_tag, SCHWAY__ICACHE_LINES, 0u,
+                            0xFFFFFu);
+    schway__state_u32_array(io, name_icache_word, &c->icache_word[0][0], 4u * SCHWAY__ICACHE_LINES,
+                            0u, UINT32_MAX);
+    schway__state_u8_array(io, name_icache_valid, c->icache_valid, SCHWAY__ICACHE_LINES, 0u, 15u);
+}
+
+/* The instruction cache (PSX-SYSTEM section 2, I-cache; psx-spx Memory Map,
+   Cache Control). Direct mapped: address bits 11:4 pick the line, physical bits
+   31:12 are its tag, and each of its four words has a valid bit. A word that
+   hits is returned as it is, so a store to the same RAM never reaches it. A miss
+   on a different tag takes the line over, with no word valid; a miss on the
+   line's own tag (a word that is not valid) keeps the valid words it has. Either
+   way the fill reads the missed word and the words after it up to the line's
+   end, and cache-control IBLKSZ is ignored. The missed word costs what the bus
+   charges for it and each further word one cycle, the burst rate of RAM (4
+   cycles plus one per word; ARCHITECTURE section 2, Costs), an approximation for
+   other devices. A bus error on a later word ends the fill there: those words
+   stay invalid and the bus's first-fault record is put back, because the CPU
+   never asked for them. */
+uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, uint32_t *cycles)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t p = vaddr & 0x1FFFFFFFu;
+    uint32_t line = (p >> 4) & 0xFFu;
+    uint32_t w = (p >> 2) & 3u;
+    uint32_t tag = p >> 12;
+    uint32_t base = vaddr & ~0xFu;
+    uint32_t got = 0u;
+    if (c->icache_tag[line] == tag && (c->icache_valid[line] & (1u << w)) != 0u) {
+        *word = c->icache_word[line][w];
+        return 0u;
+    }
+    if (schway__bus_fetch(inst, vaddr & ~3u, &got, cycles) != 0) {
+        *word = 0u;
+        return 1u;
+    }
+    if (c->icache_tag[line] != tag) {
+        c->icache_tag[line] = tag;
+        c->icache_valid[line] = 0u;
+    }
+    c->icache_word[line][w] = got;
+    c->icache_valid[line] = (uint8_t)(c->icache_valid[line] | (1u << w));
+    struct schway__fault held = inst->fault;
+    for (uint32_t k = w + 1u; k < 4u; k++) {
+        uint32_t sink = 0u;
+        if (schway__bus_fetch(inst, base + 4u * k, &c->icache_word[line][k], &sink) != 0) {
+            inst->fault = held;
+            break;
+        }
+        c->icache_valid[line] = (uint8_t)(c->icache_valid[line] | (1u << k));
+        *cycles += 1u;
+    }
+    *word = got;
+    return 0u;
 }
 
 #include "cpu_exec.inc"

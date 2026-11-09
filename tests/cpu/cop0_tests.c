@@ -60,10 +60,13 @@ static schway *make(void)
     return inst;
 }
 
-/* Writes one word of RAM through the uncached segment. */
+/* Writes one word of RAM through the uncached segment. A test rewrites code in
+   place, which a program would follow with a cache flush, so the instruction
+   cache is emptied with it. */
 static void put(schway *inst, uint32_t addr, uint32_t word)
 {
     uint32_t cycles = 0u;
+    memset(inst->cpu.icache_valid, 0, sizeof inst->cpu.icache_valid);
     CHECK_EQ_U64(schway__bus_write(inst, 0xA0000000u | (addr & 0x1FFFFFFFu), 4u, word, &cycles), 0u);
 }
 
