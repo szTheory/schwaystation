@@ -117,7 +117,7 @@ jobs:
           set -euo pipefail
           mkdir -p build/sst
           rows=$(grep '^r3000-' pins.txt)
-          while read -r name pin sha size; do
+          while read -r name _ sha _; do
             file="build/sst/${name#r3000-}.json.bin"
             gh api "repos/SingleStepTests/r3000/git/blobs/$sha" -H 'Accept: application/vnd.github.raw' > "$file"
             got=$(git hash-object "$file")
