@@ -196,7 +196,7 @@ jobs:
       # The abi and release checks read binary shapes the instrumentation changes.
       - name: Every test ran
         run: >-
-          cmake -DJUNIT=build/asan/junit.xml -DINVENTORY=tests/inventory/ci.txt
+          cmake -DJUNIT=build/asan/junit.xml -DINVENTORY=tests/inventory/asan.txt
           "-DEXCLUDE=abi|release" -P tests/cmake/check_junit.cmake
 
   nofp:

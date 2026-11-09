@@ -57,3 +57,17 @@ schway_add_test(NAME fixtures.hello.header
   COMMAND ${CMAKE_COMMAND} -DCASE=header -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/hello.exe
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a tampered or wrongly pinned assembler accepted. The
+# digest check runs on a local file:// URL with an all-zero digest and must
+# exit 1 naming the SHA-256 check; no network is used.
+string(REPEAT 0 64 schway__zero_digest)
+string(REGEX REPLACE "^([^/])" "/\\1" schway__pin_path "${PROJECT_SOURCE_DIR}/pins.txt")
+set(schway__pin_cmd ${CMAKE_COMMAND} -DURL=file://${schway__pin_path}
+  -DSHA256=${schway__zero_digest} -DOUT=${PROJECT_BINARY_DIR}/tests/armips_pin.txt
+  -P ${PROJECT_SOURCE_DIR}/cmake/Armips.cmake)
+string(REPLACE ";" "$<SEMICOLON>" schway__pin_cmd "${schway__pin_cmd}")
+schway_add_test(NAME fixtures.armips_pin.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__pin_cmd}" -DCODE=1 "-DREGEX=armips:.*SHA-256"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable TIMEOUT 30)

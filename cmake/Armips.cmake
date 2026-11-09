@@ -12,6 +12,9 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "armips: -D${var} is required")
     endif()
   endforeach()
+  # A digest mismatch is a fatal error raised by file(DOWNLOAD) itself, before
+  # STATUS can be read, so this line is what names the check in the output.
+  message(STATUS "armips: ${URL}: downloading, expecting SHA-256 ${SHA256}")
   file(DOWNLOAD "${URL}" "${OUT}" EXPECTED_HASH SHA256=${SHA256} STATUS status)
   list(GET status 0 code)
   if(NOT code EQUAL 0)
@@ -54,6 +57,7 @@ if(EXISTS "${schway__armips_archive}")
   endif()
 endif()
 if(NOT schway__armips_have)
+  message(STATUS "armips: ${schway__armips_url}: downloading, expecting SHA-256 ${schway__armips_sha256}")
   file(DOWNLOAD "${schway__armips_url}" "${schway__armips_archive}"
     EXPECTED_HASH SHA256=${schway__armips_sha256} STATUS schway__armips_status)
   list(GET schway__armips_status 0 schway__armips_code)
