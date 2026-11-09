@@ -212,12 +212,51 @@ the GPU keeps one) and `note` extra detail (the repeat count for `SCHWAY_FAULT_E
 
 ## The trace
 
-A run whose budget has `SCHWAY_RUN_TRACE` set keeps the last 4,096 records of what the CPU did in the instance, and
-`schway_get_trace(inst, index, &trace)` copies record `index` into a `schway_trace`, counting from the oldest. An
-`index` past the last record, or an instance that has not been run traced, returns `SCHWAY_STATUS_ERR_ARGUMENT`.
+```c
+schway_budget budget;
+memset(&budget, 0, sizeof budget);
+budget.size = (uint32_t)sizeof budget;
+budget.flags = SCHWAY_RUN_STOP_ON_FAULT | SCHWAY_RUN_TRACE;
+budget.max_cycles = 100000;
+schway_run(inst, &budget, &result);
 
-`event` is `SCHWAY_TRACE_EXEC` (an instruction), `SCHWAY_TRACE_RD` or `SCHWAY_TRACE_WR` (a data access), `SCHWAY_TRACE_IRQ`
-(an interrupt taken) or `SCHWAY_TRACE_FAULT` (the first fault, from its record).
+schway_trace trace;
+memset(&trace, 0, sizeof trace);
+trace.size = (uint32_t)sizeof trace;
+for (uint32_t i = 0; schway_get_trace(inst, i, &trace) == SCHWAY_STATUS_OK; i++) {
+    /* record i, the oldest first; trace.count records are held */
+}
+```
+
+A run whose budget has `SCHWAY_RUN_TRACE` set keeps what the CPU did in a ring of 4,096 records inside the instance
+(about 128 KiB, allocated with it). A run that was not asked to trace adds nothing and pays nothing: the traced loop is
+a second compile of the executor, chosen once for the call, and the untraced one holds no trace code. A longer run keeps
+the last 4,096 records and a shorter one all of them, across calls, until a power reset empties the ring.
+`schway_run_frame` never traces.
+
+`schway_get_trace` copies record `index` into a `schway_trace`, counting from the oldest; `count` in it is the number of
+records held. An `index` at or past `count`, an instance whose ring is empty, a `NULL` pointer or a size tag below the
+first released size returns an error and leaves `trace` as it was. The ring is not in the saved state, a hash or the
+visitor, and tracing changes none of them: the same run traced and untraced gives the same state bytes, video, audio and
+fault record.
+
+| Event | Value | Record |
+|-------|-------|--------|
+| `SCHWAY_TRACE_EXEC` | 1 | an instruction: `pc` and `opcode` |
+| `SCHWAY_TRACE_RD` | 2 | a data read: `pc` of the instruction, `addr`, `width` in bytes, `device` and the `value` read (0 for a bus error) |
+| `SCHWAY_TRACE_WR` | 3 | a data write: the same, with the `value` written, cut to the width |
+| `SCHWAY_TRACE_IRQ` | 4 | an interrupt taken: `pc` the address returned to, `opcode` the word there and `value` CAUSE as it was |
+| `SCHWAY_TRACE_FAULT` | 5 | the first fault, from its record, in the block that latched it: `value` is the kind, with `pc`, `opcode`, `addr`, `width`, `device` and `note` as `schway_fault` has them |
+
+Every record has `frame`, `cycle` (CPU cycles since power-on: the instruction's start, plus what it spent before an
+access), `line` and `dot`. `device` is a `SCHWAY_DEVICE_*` value, `SCHWAY_DEVICE_NONE` for the events that name no
+device and for a data access with the cache isolated. `note` is 0 except in a fault record, which carries the repeat
+count of `SCHWAY_FAULT_EXCEPTION_LOOP` (up to 65,535). A fault ends the tail: under `SCHWAY_RUN_STOP_ON_FAULT` its
+record is the last one.
+
+Reads and writes are records too, so the ring spans about 1,500 to 2,500 instructions of history, not 4,096. How far
+back it reaches depends on how much of the code touches memory, and is documented, not fixed. `line` and `dot` are
+derived, not measured: see [the CPU page](hardware/cpu.md).
 
 ## Loading a PS-EXE
 

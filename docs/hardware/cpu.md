@@ -339,3 +339,19 @@ A double fault is an instruction fetch that fails at an exception vector (`80000
 set): the handler cannot run, so the exception would repeat for ever. When a hook and the frame's end coincide the hook
 is reported and the frame still completes. A guest that loops, or hammers an address no device answers, returns from
 every call: each call runs a bounded number of cycles, whatever the program does.
+
+## The trace
+
+A run with `SCHWAY_RUN_TRACE` in its budget runs the traced copy of the executor, the same source compiled a second
+time, and leaves its records in a ring of 4,096 in the instance, outside the state and every hash; `schway_get_trace`
+reads them (the embedding guide has the fields). The copy is chosen once per call; the untraced loop has no trace code.
+
+A record's `cycle` is the tick its block started on plus the cycles the CPU has spent since: for an instruction its
+start, for a data access the start plus the cycles the instruction spent before it (its issue cycle is not counted).
+The block's own ticks are added when it ends, so the position is exact at the block's start and follows the
+instruction costs after it.
+
+`line` and `dot` are derived until the GPU keeps a scan position of its own. They count the cycles since the record's
+frame began, convert them to GPU clocks at 11 to 7, and divide by the region's clocks per line: 3,413 for NTSC and
+3,406 for PAL. `line` is the quotient and `dot` the remainder, a count of GPU clocks into the line and not of dots. The
+fault record in `schway_get_fault` keeps its own `line` and `dot` of 0 until the GPU does.
