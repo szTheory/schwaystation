@@ -163,6 +163,70 @@ schway_status schway_get_tty(schway *inst, schway_tty *io)
     return SCHWAY_STATUS_OK;
 }
 
+/* GPU clocks per scan line (psx-spx, GPU Timings): NTSC lines are 3413 video
+   clocks, PAL lines 3406. */
+#define CLOCKS_PER_LINE_NTSC 3413u
+#define CLOCKS_PER_LINE_PAL 3406u
+
+/* Record index of the ring, counted from the oldest, as the public struct.
+   frame is widened from the 32 bits the ring keeps. line and dot come from the
+   cycles since the record's frame started, converted to GPU clocks (11 / 7 of
+   the CPU's) and split by the region's clocks per line, until the GPU keeps a
+   beam of its own; dot is the clock within the line. A frame's first cycle is
+   the exact floor of frame * num / den, built so no product passes 64 bits
+   (ARCHITECTURE section 1). A record from before a state load can lie outside
+   its frame, and then line and dot are 0. */
+schway_status schway_get_trace(const schway *inst, uint32_t index, schway_trace *out)
+{
+    if (inst == NULL || out == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_status st = schway__instance_check_out_size(out, SCHWAY__TRACE_SIZE_FIRST);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    const struct schway__trace_ring *ring = &inst->trace;
+    if (index >= ring->count) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    const struct schway__trace_rec *rec =
+        &ring->rec[(ring->head + index) % SCHWAY__TRACE_CAP];
+    uint64_t frame = (inst->frame & ~UINT64_C(0xFFFFFFFF)) | rec->frame;
+    if (frame > inst->frame && frame >= UINT64_C(0x100000000)) {
+        frame -= UINT64_C(0x100000000);
+    }
+    uint64_t num = schway__instance_frame_num(inst->region);
+    uint64_t den = schway__instance_frame_den(inst->region);
+    uint64_t start = frame * (num / den) + frame * (num % den) / den;
+    uint32_t line = 0u;
+    uint32_t dot = 0u;
+    if (rec->cycle >= start && rec->cycle - start < schway__instance_frame_max(inst->region)) {
+        uint64_t clocks = (rec->cycle - start) * 11u / 7u;
+        uint32_t per_line =
+            inst->region == SCHWAY_REGION_PAL ? CLOCKS_PER_LINE_PAL : CLOCKS_PER_LINE_NTSC;
+        line = (uint32_t)(clocks / per_line);
+        dot = (uint32_t)(clocks % per_line);
+    }
+    schway_trace r;
+    memset(&r, 0, sizeof r);
+    r.size = out->size;
+    r.event = SCHWAY__TRACE_EVENT(rec->meta);
+    r.frame = frame;
+    r.cycle = rec->cycle;
+    r.line = line;
+    r.dot = dot;
+    r.pc = rec->pc;
+    r.opcode = rec->opcode;
+    r.addr = rec->addr;
+    r.width = SCHWAY__TRACE_WIDTH(rec->meta);
+    r.device = SCHWAY__TRACE_DEVICE(rec->meta);
+    r.value = rec->value;
+    r.note = SCHWAY__TRACE_NOTE(rec->meta);
+    r.count = ring->count;
+    schway__instance_write_out(out, &r, (uint32_t)sizeof r);
+    return SCHWAY_STATUS_OK;
+}
+
 /* The power-on display: GP1(06h) X1 = 260h, X2 = C60h and GP1(07h)
    Y1 = 10h, Y2 = 100h, 320-dot mode (divider 8), 240 lines, progressive,
    15-bit, display enabled (psx-spx, GPU Display Control Commands). */
@@ -198,6 +262,7 @@ static void power_on(schway *inst)
     inst->exe_loaded = 0u;
     memset(&inst->fault, 0, sizeof inst->fault);
     memset(&inst->tty, 0, sizeof inst->tty);
+    memset(&inst->trace, 0, sizeof inst->trace);
     inst->exit_pending = 0u;
     inst->exit_code = 0u;
 }

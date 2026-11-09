@@ -87,6 +87,34 @@ struct schway__tty {
     uint32_t head, count, dropped;
 };
 
+/* The trace ring: the last 4,096 records of a traced run (ARCHITECTURE section
+   6), 32 bytes each. cycle is the tick the access began on; frame is the low 32
+   bits of the frame count, widened when a record is read; meta packs the event
+   (bits 0-2), the access width in bytes (3-5), the device (6-10) and a note
+   (16-31, saturating). t0 and c0 hold the running block's start tick and CPU
+   cycle count, the origin of the next cycle. Outside the state and every hash. */
+#define SCHWAY__TRACE_CAP 4096u
+#define SCHWAY__TRACE_META(event, width, device, note)                                             \
+    ((uint32_t)(event) | ((uint32_t)(width) << 3) | ((uint32_t)(device) << 6) |                    \
+     ((uint32_t)((note) > 0xFFFFu ? 0xFFFFu : (note)) << 16))
+#define SCHWAY__TRACE_EVENT(meta) ((meta) & 7u)
+#define SCHWAY__TRACE_WIDTH(meta) (((meta) >> 3) & 7u)
+#define SCHWAY__TRACE_DEVICE(meta) (((meta) >> 6) & 31u)
+#define SCHWAY__TRACE_NOTE(meta) ((meta) >> 16)
+
+struct schway__trace_rec {
+    uint64_t cycle;
+    uint32_t frame;
+    uint32_t pc, opcode, addr, value;
+    uint32_t meta;
+};
+
+struct schway__trace_ring {
+    struct schway__trace_rec rec[SCHWAY__TRACE_CAP];
+    uint32_t head, count;
+    uint64_t t0, c0;
+};
+
 struct schway {
     schway_allocator allocator; /* the caller's, copied at create */
     size_t alloc_size;          /* the size given to alloc, given back to free */
@@ -110,6 +138,7 @@ struct schway {
     struct schway__fault fault;
     /* Not saved: the host drains these, and a power reset empties them. */
     struct schway__tty tty;
+    struct schway__trace_ring trace;
     uint32_t exit_pending;      /* the guest wrote the exit port */
     uint32_t exit_code;         /* the byte it wrote */
 };
@@ -256,6 +285,25 @@ _Static_assert(offsetof(schway_tty, written) == 12 + SCHWAY__P, "tty.written");
 _Static_assert(offsetof(schway_tty, dropped) == 16 + SCHWAY__P, "tty.dropped");
 _Static_assert(sizeof(schway_tty) == 16 + 2 * SCHWAY__P, "tty size");
 
+_Static_assert(offsetof(schway_trace, size) == 0, "trace.size");
+_Static_assert(offsetof(schway_trace, event) == 4, "trace.event");
+_Static_assert(offsetof(schway_trace, frame) == 8, "trace.frame");
+_Static_assert(offsetof(schway_trace, cycle) == 16, "trace.cycle");
+_Static_assert(offsetof(schway_trace, line) == 24, "trace.line");
+_Static_assert(offsetof(schway_trace, dot) == 28, "trace.dot");
+_Static_assert(offsetof(schway_trace, pc) == 32, "trace.pc");
+_Static_assert(offsetof(schway_trace, opcode) == 36, "trace.opcode");
+_Static_assert(offsetof(schway_trace, addr) == 40, "trace.addr");
+_Static_assert(offsetof(schway_trace, width) == 44, "trace.width");
+_Static_assert(offsetof(schway_trace, device) == 48, "trace.device");
+_Static_assert(offsetof(schway_trace, value) == 52, "trace.value");
+_Static_assert(offsetof(schway_trace, note) == 56, "trace.note");
+_Static_assert(offsetof(schway_trace, count) == 60, "trace.count");
+_Static_assert(sizeof(schway_trace) == 64, "trace size");
+_Static_assert(sizeof(struct schway__trace_rec) <= 32, "trace record size");
+_Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_COUNT <= 32,
+               "trace meta fields");
+
 /* The size of each struct as first released. A caller's size tag below it
    is refused; each is pinned to the layout above, so appending a field later
    cannot move it. */
@@ -270,6 +318,7 @@ _Static_assert(sizeof(schway_tty) == 16 + 2 * SCHWAY__P, "tty size");
 #define SCHWAY__EXE_INFO_SIZE_FIRST 56u
 #define SCHWAY__FAULT_SIZE_FIRST 56u
 #define SCHWAY__TTY_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
+#define SCHWAY__TRACE_SIZE_FIRST 64u
 _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first size");
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
@@ -282,6 +331,7 @@ _Static_assert(SCHWAY__AUDIO_SIZE_FIRST == sizeof(schway_audio), "audio first si
 _Static_assert(SCHWAY__EXE_INFO_SIZE_FIRST == sizeof(schway_exe_info), "exe_info first size");
 _Static_assert(SCHWAY__FAULT_SIZE_FIRST == sizeof(schway_fault), "fault first size");
 _Static_assert(SCHWAY__TTY_SIZE_FIRST == sizeof(schway_tty), "tty first size");
+_Static_assert(SCHWAY__TRACE_SIZE_FIRST == sizeof(schway_trace), "trace first size");
 
 /* The public fault kinds and devices are the internal ones, number for number. */
 _Static_assert(SCHWAY_FAULT_NONE == SCHWAY__FAULT_NONE, "fault none");

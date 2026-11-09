@@ -271,7 +271,7 @@ static void test_budget_resume(void)
     ((uint8_t *)big)[sizeof big - 1u] = 1u;
     CHECK_EQ_U64(schway_run(a, big, NULL), SCHWAY_STATUS_ERR_STRUCT_SIZE);
     one.size = (uint32_t)sizeof one;
-    one.flags = 2u;
+    one.flags = 4u; /* a bit no release defines */
     CHECK_EQ_U64(schway_run(a, &one, NULL), SCHWAY_STATUS_ERR_ARGUMENT);
     one.flags = 0u;
     CHECK_EQ_U64(schway_run(NULL, &one, NULL), SCHWAY_STATUS_ERR_ARGUMENT);

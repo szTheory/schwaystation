@@ -118,6 +118,11 @@ int schway__bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
 /* An instruction fetch of the word at addr. */
 int schway__bus_fetch(schway *inst, uint32_t addr, uint32_t *word, uint32_t *cycles);
 
+/* The device the physical map gives to virtual address addr, for a trace
+   record: a SCHWAY__DEV_* value, UNMAPPED for a gap. It decodes only and
+   touches nothing. */
+uint32_t schway__bus_device(uint32_t addr);
+
 /* Counts an access to a device not built yet, by device, and keeps the last
    one. The caller reads 0 or drops the write. */
 void schway__bus_unbuilt(schway *inst, uint32_t dev, uint32_t addr, uint32_t width, uint32_t wr,

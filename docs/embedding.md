@@ -151,8 +151,9 @@ budget or the frame's end, so `ticks` can pass either by the rest of one instruc
 [the CPU page](hardware/cpu.md)).
 
 - `max_cycles` 0 returns `SCHWAY_STOP_BUDGET` and changes nothing, the profile lock included.
-- `flags` takes `SCHWAY_RUN_STOP_ON_FAULT` or 0; any other bit returns `SCHWAY_STATUS_ERR_ARGUMENT`. With it set, a
-  latched fault stops the run with `SCHWAY_STOP_FAULT` before any cycle runs.
+- `flags` takes `SCHWAY_RUN_STOP_ON_FAULT`, `SCHWAY_RUN_TRACE` or both; any other bit returns
+  `SCHWAY_STATUS_ERR_ARGUMENT`. With the first set, a latched fault stops the run with `SCHWAY_STOP_FAULT` before any
+  cycle runs. The second is [the trace](#the-trace).
 - `schway_run_frame` is the same advance with no limit. After a run that stopped inside a frame it finishes that
   frame.
 - A stopped run resumes where it stopped. With no program loaded, running N cycles and then M leaves exactly what
@@ -208,6 +209,15 @@ the GPU keeps one) and `note` extra detail (the repeat count for `SCHWAY_FAULT_E
 | `SCHWAY_DEVICE_MEMCTL` | 4 | `SCHWAY_DEVICE_GPU` | 9 | `SCHWAY_DEVICE_EXP3` | 15 |
 | | | `SCHWAY_DEVICE_MDEC` | 10 | `SCHWAY_DEVICE_GTE` | 16 |
 | | | | | `SCHWAY_DEVICE_UNMAPPED` | 17 |
+
+## The trace
+
+A run whose budget has `SCHWAY_RUN_TRACE` set keeps the last 4,096 records of what the CPU did in the instance, and
+`schway_get_trace(inst, index, &trace)` copies record `index` into a `schway_trace`, counting from the oldest. An
+`index` past the last record, or an instance that has not been run traced, returns `SCHWAY_STATUS_ERR_ARGUMENT`.
+
+`event` is `SCHWAY_TRACE_EXEC` (an instruction), `SCHWAY_TRACE_RD` or `SCHWAY_TRACE_WR` (a data access), `SCHWAY_TRACE_IRQ`
+(an interrupt taken) or `SCHWAY_TRACE_FAULT` (the first fault, from its record).
 
 ## Loading a PS-EXE
 

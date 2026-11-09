@@ -39,6 +39,12 @@ int main(void)
     CHECK_EQ_U64(SCHWAY_STOP_HOOK, 4);
     CHECK_EQ_U64(SCHWAY_STOP_FAULT, 5);
     CHECK_EQ_U64(SCHWAY_RUN_STOP_ON_FAULT, 1);
+    CHECK_EQ_U64(SCHWAY_RUN_TRACE, 2);
+    CHECK_EQ_U64(SCHWAY_TRACE_EXEC, 1);
+    CHECK_EQ_U64(SCHWAY_TRACE_RD, 2);
+    CHECK_EQ_U64(SCHWAY_TRACE_WR, 3);
+    CHECK_EQ_U64(SCHWAY_TRACE_IRQ, 4);
+    CHECK_EQ_U64(SCHWAY_TRACE_FAULT, 5);
     CHECK_EQ_U64(SCHWAY_SPACE_RAM, 1);
     CHECK_EQ_U64(SCHWAY_SPACE_SCRATCHPAD, 2);
     CHECK_EQ_U64(SCHWAY_FAULT_NONE, 0);
@@ -193,7 +199,7 @@ int main(void)
     CHECK_EQ_U64(schway_run(inst, &budget, NULL), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(schway_run(NULL, &budget, &res), SCHWAY_STATUS_ERR_ARGUMENT);
     CHECK_EQ_U64(schway_run(inst, NULL, &res), SCHWAY_STATUS_ERR_ARGUMENT);
-    budget.flags = 2u;
+    budget.flags = 4u;
     CHECK_EQ_U64(schway_run(inst, &budget, &res), SCHWAY_STATUS_ERR_ARGUMENT);
     budget.flags = 0u;
     budget.size = 8u;
@@ -250,6 +256,40 @@ int main(void)
     CHECK_EQ_U64(schway_get_tty(inst, NULL), SCHWAY_STATUS_ERR_ARGUMENT);
     tty.size = 8u;
     CHECK_EQ_U64(schway_get_tty(inst, &tty), SCHWAY_STATUS_ERR_STRUCT_SIZE);
+
+    /* A traced run leaves records to read from the oldest. No record is held
+       before one, the program is running, and an index past the end is refused. */
+    schway_trace trace;
+    memset(&trace, 0xA5, sizeof trace);
+    trace.size = (uint32_t)sizeof trace;
+    CHECK(sizeof trace == 64u);
+    CHECK_EQ_U64(schway_get_trace(inst, 0u, &trace), SCHWAY_STATUS_ERR_ARGUMENT);
+    budget.size = (uint32_t)sizeof budget;
+    budget.flags = SCHWAY_RUN_TRACE;
+    budget.max_cycles = 2000u;
+    CHECK_EQ_U64(schway_run(inst, &budget, &res), SCHWAY_STATUS_OK);
+    trace.event = 0u;
+    trace.frame = 1u;
+    trace.cycle = 1u;
+    trace.line = 1u;
+    trace.dot = 1u;
+    trace.pc = 1u;
+    trace.opcode = 1u;
+    trace.addr = 1u;
+    trace.width = 1u;
+    trace.device = 1u;
+    trace.value = 1u;
+    trace.note = 1u;
+    trace.count = 0u;
+    CHECK_EQ_U64(schway_get_trace(inst, 0u, &trace), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(trace.size, sizeof trace);
+    CHECK_EQ_U64(trace.event, SCHWAY_TRACE_EXEC);
+    CHECK_EQ_U64(trace.count > 0u, 1u);
+    CHECK_EQ_U64(trace.width | trace.device | trace.note | trace.addr | trace.value, 0u);
+    CHECK(trace.frame <= res.frame && trace.cycle > 0u && trace.pc != 0u);
+    CHECK(trace.line < 400u && trace.dot < 4000u);
+    CHECK_EQ_U64(schway_get_trace(inst, trace.count, &trace), SCHWAY_STATUS_ERR_ARGUMENT);
+    CHECK_EQ_U64(schway_get_trace(NULL, 0u, &trace), SCHWAY_STATUS_ERR_ARGUMENT);
     schway_destroy(inst);
     CHECK_DONE();
 }

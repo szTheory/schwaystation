@@ -1,6 +1,11 @@
-/* The executor: fetch, decode and execute one instruction. cpu.c includes it,
-   so the one-instruction entry and the run loop run the same code. The CPU is
-   a MIPS I R3000A (PSX-SYSTEM section 2). Integer only. */
+/* The executor: fetch, decode and execute one instruction. cpu.c includes it
+   twice (see the second part below), so the one-instruction entry and the run
+   loop run the same code. The CPU is a MIPS I R3000A (PSX-SYSTEM section 2).
+   Integer only. */
+
+#if SCHWAY_TRACE == 0
+/* Shared by both copies of the loop: nothing here writes a trace record, so it is
+   compiled once, with the untraced copy. */
 
 /* One access of the replay bus. The access is recorded, and a read or fetch
    returns the value the expected list holds at the same position (zero past
@@ -115,6 +120,202 @@ static void cpu_branch_set(struct cpu_branch *b, uint32_t take, uint32_t target)
     b->target = target;
 }
 
+/* Whether an exception of this code, raised by the instruction at pc, ranks
+   below an interrupt that is due on the same instruction. The order is data
+   AdEL, AdES and DBE, overflow, interrupt, then SYSCALL, BREAK, RI and CpU,
+   then the fetch's AdEL and IBE (PSX-SYSTEM section 2, Priority). A data AdEL
+   has an aligned pc; the fetch's has an odd one. */
+static uint32_t cpu_below_interrupt(uint32_t code, uint32_t pc)
+{
+    return code == (uint32_t)SCHWAY__EXC_SYS || code == (uint32_t)SCHWAY__EXC_BP ||
+                   code == (uint32_t)SCHWAY__EXC_RI || code == (uint32_t)SCHWAY__EXC_CPU ||
+                   code == (uint32_t)SCHWAY__EXC_IBE ||
+                   (code == (uint32_t)SCHWAY__EXC_ADEL && (pc & 3u) != 0u)
+               ? 1u
+               : 0u;
+}
+
+/* With SR.Isc set, a data access in KUSEG, KSEG0 or KSEG1 goes to the
+   instruction cache and never reaches the bus; KSEG2, the cache-control word,
+   still does. The line is the one address bits 11:4 name, the word bits 3:2
+   (PSX-SYSTEM section 2, Cache isolation, write queue; D-29). A load returns
+   that word's bytes whether or not the tag matches. A store writes the tag, the
+   physical address bits 31:12 of the datum, and sets the four valid bits to the
+   datum's low four bits when cache-control TAG (bit 2) and IS1 (bit 11) are both
+   set, and otherwise writes the bytes it covers into the word; that is how the
+   BIOS' FlushCache empties the cache. The bits of rt above the access width go
+   out too, as in any store, which is why a tag store reads the whole datum. */
+static uint32_t cpu_isolated(const schway *inst, uint32_t addr)
+{
+    return (inst->cpu.cop0.r[SCHWAY__COP0_SR] & SCHWAY__SR_ISC) != 0u &&
+                   schway__bus_segment(addr) != (uint32_t)SCHWAY__SEG_KSEG2
+               ? 1u
+               : 0u;
+}
+
+static uint32_t cpu_isolated_read(schway *inst, uint32_t addr, uint32_t size)
+{
+    uint32_t w = inst->cpu.icache_word[(addr >> 4) & 0xFFu][(addr >> 2) & 3u];
+    w >>= 8u * (addr & 3u);
+    return size == 4u ? w : w & ((1u << (8u * size)) - 1u);
+}
+
+static void cpu_isolated_write(schway *inst, uint32_t addr, uint32_t size, uint32_t value)
+{
+    struct schway__cpu *c = &inst->cpu;
+    uint32_t line = (addr >> 4) & 0xFFu;
+    uint32_t ctrl = inst->bus.cache_ctrl;
+    if ((ctrl & 0x4u) != 0u && (ctrl & 0x800u) != 0u) {
+        c->icache_tag[line] = value >> 12;
+        c->icache_valid[line] = (uint8_t)(value & 0xFu);
+    } else {
+        uint32_t shift = 8u * (addr & 3u);
+        uint32_t mask = (size == 4u ? 0xFFFFFFFFu : (1u << (8u * size)) - 1u) << shift;
+        uint32_t *w = &c->icache_word[line][(addr >> 2) & 3u];
+        *w = (*w & ~mask) | ((value << shift) & mask);
+    }
+}
+
+/* Issues a load: the register is written one instruction later. A load still
+   pending for the same register is dropped, the later one winning (PSX-SYSTEM
+   section 2, Load delay). */
+static void cpu_load_issue(struct schway__cpu *c, uint32_t n, uint32_t v, uint32_t *load_reg,
+                           uint32_t *load_value)
+{
+    if (c->load_reg == n) {
+        c->load_reg = SCHWAY__CPU_NO_LOAD;
+        c->load_value = 0u;
+    }
+    *load_reg = n;
+    *load_value = v;
+}
+
+/* The effective address of a load or store: the base register plus the
+   sign-extended immediate. */
+static uint32_t cpu_address(const struct schway__cpu *c, uint32_t op)
+{
+    return c->r[(op >> 21) & 31u] + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u);
+}
+
+/* The cycles an early read of HI or LO waits: until the running multiply or
+   divide is done, and never more than the longest one takes, whatever a loaded
+   state says. The read issues at the cycle counter plus what the instruction
+   spent before its own issue cycle (PSX-SYSTEM section 2, MULTU/MULT). */
+static uint32_t cpu_muldiv_wait(const struct schway__cpu *c, uint32_t cycles)
+{
+    uint64_t at = c->cycle + (cycles - 1u);
+    uint64_t wait = c->muldiv_ready > at ? c->muldiv_ready - at : 0u;
+    return wait > SCHWAY__MULDIV_MAX ? SCHWAY__MULDIV_MAX : (uint32_t)wait;
+}
+
+/* Starts a multiply or divide that takes n cycles from the issue; one that is
+   still running is replaced and the new one's time is all that counts. */
+static void cpu_muldiv_start(struct schway__cpu *c, uint32_t cycles, uint32_t n)
+{
+    c->muldiv_ready = c->cycle + (cycles - 1u) + n;
+}
+
+/* MULT and MULTU: the 64-bit product into HI:LO, in 6, 9 or 13 cycles by how
+   many bits the first operand needs. MULT classifies rs with its sign mirrored
+   (rs XOR its sign bit spread over the word), MULTU on rs as it is. The
+   product is built from magnitudes so no signed conversion is involved. */
+static void cpu_mult(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t sign,
+                     uint32_t cycles)
+{
+    uint32_t neg_rs = sign != 0u && (rs & 0x80000000u) != 0u ? 1u : 0u;
+    uint32_t neg_rt = sign != 0u && (rt & 0x80000000u) != 0u ? 1u : 0u;
+    uint32_t m = neg_rs != 0u ? ~rs : rs;
+    uint64_t p = (uint64_t)(neg_rs != 0u ? 0u - rs : rs) * (neg_rt != 0u ? 0u - rt : rt);
+    if (neg_rs != neg_rt) {
+        p = 0u - p;
+    }
+    c->lo = (uint32_t)p;
+    c->hi = (uint32_t)(p >> 32);
+    cpu_muldiv_start(c, cycles, m < 0x800u ? 6u : (m < 0x100000u ? 9u : 13u));
+}
+
+/* DIV and DIVU, 36 cycles, no trap. A zero divisor gives LO = -1 (or +1 for
+   DIV of a negative rs) and HI = rs; DIV of -80000000h by -1 gives LO =
+   80000000h and HI = 0 (PSX-SYSTEM section 2, DIV/DIVU). */
+static void cpu_div(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t sign,
+                    uint32_t cycles)
+{
+    uint32_t neg_rs = sign != 0u && (rs & 0x80000000u) != 0u ? 1u : 0u;
+    uint32_t neg_rt = sign != 0u && (rt & 0x80000000u) != 0u ? 1u : 0u;
+    if (rt == 0u) {
+        c->lo = neg_rs != 0u ? 1u : 0xFFFFFFFFu;
+        c->hi = rs;
+    } else if (sign != 0u && rs == 0x80000000u && rt == 0xFFFFFFFFu) {
+        c->lo = 0x80000000u;
+        c->hi = 0u;
+    } else {
+        uint32_t a = neg_rs != 0u ? 0u - rs : rs;
+        uint32_t b = neg_rt != 0u ? 0u - rt : rt;
+        uint32_t q = a / b;
+        uint32_t r = a % b;
+        c->lo = neg_rs != neg_rt ? 0u - q : q;
+        c->hi = neg_rs != 0u ? 0u - r : r;
+    }
+    cpu_muldiv_start(c, cycles, SCHWAY__MULDIV_MAX);
+}
+
+/* Signed overflow of a + b = sum, and of a - b = diff, on unsigned words
+   (MIPS I: ADD, ADDI and SUB trap and leave rd unchanged). */
+static uint32_t cpu_add_overflows(uint32_t a, uint32_t b, uint32_t sum)
+{
+    return (~(a ^ b) & (a ^ sum) & 0x80000000u) != 0u ? 1u : 0u;
+}
+
+static uint32_t cpu_sub_overflows(uint32_t a, uint32_t b, uint32_t diff)
+{
+    return ((a ^ b) & (a ^ diff) & 0x80000000u) != 0u ? 1u : 0u;
+}
+
+#endif /* SCHWAY_TRACE == 0 */
+
+/* The functions below reach a bus access or an exception entry, so they exist
+   twice: this file is included with SCHWAY_TRACE 0 and then 1. In the traced
+   copy every name gains _traced and TRACE(...) writes one record into the
+   instance's ring; in the other TRACE is empty, so the untraced copy holds no
+   trace code and no branch for one. schway__cpu_run picks the copy once per
+   call, from the budget's trace flag (DEC.24; ARCHITECTURE section 6). */
+#if SCHWAY_TRACE
+#define cpu_irq_enter cpu_irq_enter_traced
+#define cpu_exception cpu_exception_traced
+#define cpu_reserved cpu_reserved_traced
+#define cpu_unusable cpu_unusable_traced
+#define cpu_data_check cpu_data_check_traced
+#define cpu_bus_read cpu_bus_read_traced
+#define cpu_bus_write cpu_bus_write_traced
+#define cpu_load_int cpu_load_int_traced
+#define cpu_load_part cpu_load_part_traced
+#define cpu_store_int cpu_store_int_traced
+#define cpu_store_part cpu_store_part_traced
+#define cpu_cop2 cpu_cop2_traced
+#define cpu_step cpu_step_traced
+#define cpu_block cpu_block_traced
+/* The cycle an access at this point of the instruction happens on: the
+   instruction's start plus the cycles it has spent before the access. */
+#define TRACE_BEGIN(at, spent) uint64_t at = trace_now(inst) + (uint64_t)((spent) - 1u)
+#define TRACE(...) trace_push(inst, __VA_ARGS__)
+/* A block's start, from which every record's cycle is counted. */
+#define TRACE_START() (inst->trace.t0 = inst->ticks, inst->trace.c0 = inst->cpu.cycle)
+/* The record of a fault latched in the block just run. */
+#define TRACE_FAULT(latched, at)                                                                   \
+    do {                                                                                           \
+        if (latched) {                                                                             \
+            const struct schway__fault *tf_ = &inst->fault;                                        \
+            TRACE(SCHWAY_TRACE_FAULT, at, tf_->pc, tf_->opcode, tf_->addr, tf_->width,            \
+                  tf_->device, tf_->kind, tf_->note);                                              \
+        }                                                                                          \
+    } while (0)
+#else
+#define TRACE_BEGIN(at, spent) ((void)0)
+#define TRACE(...) ((void)0)
+#define TRACE_START() ((void)0)
+#define TRACE_FAULT(latched, at) ((void)0)
+#endif
+
 /* Takes the interrupt before the instruction at pc, ExcCode 0. The load issued
    by the instruction before lands first, so the handler sees it (PSX-SYSTEM
    section 2, Load delay). Interrupts return to EPC + 0: the instruction at pc,
@@ -145,23 +346,10 @@ static void cpu_irq_enter(schway *inst, uint32_t pc)
         (void)schway__bus_fetch(inst, epc & ~3u, &word, &sink);
         inst->fault = held;
     }
+    TRACE(SCHWAY_TRACE_IRQ, trace_now(inst), epc, word, 0u, 0u, (uint32_t)SCHWAY__DEV_NONE,
+          c->cop0.r[SCHWAY__COP0_CAUSE], 0u);
     schway__cop0_exception(inst, SCHWAY__EXC_INT, epc, slot, take, target, 0u, 0u, 0u);
     (void)schway__cop0_irq_entry_cop2(inst, word);
-}
-
-/* Whether an exception of this code, raised by the instruction at pc, ranks
-   below an interrupt that is due on the same instruction. The order is data
-   AdEL, AdES and DBE, overflow, interrupt, then SYSCALL, BREAK, RI and CpU,
-   then the fetch's AdEL and IBE (PSX-SYSTEM section 2, Priority). A data AdEL
-   has an aligned pc; the fetch's has an odd one. */
-static uint32_t cpu_below_interrupt(uint32_t code, uint32_t pc)
-{
-    return code == (uint32_t)SCHWAY__EXC_SYS || code == (uint32_t)SCHWAY__EXC_BP ||
-                   code == (uint32_t)SCHWAY__EXC_RI || code == (uint32_t)SCHWAY__EXC_CPU ||
-                   code == (uint32_t)SCHWAY__EXC_IBE ||
-                   (code == (uint32_t)SCHWAY__EXC_ADEL && (pc & 3u) != 0u)
-               ? 1u
-               : 0u;
 }
 
 /* Takes an exception for the instruction at pc. A delay-slot instruction
@@ -236,47 +424,6 @@ static uint32_t cpu_data_check(schway *inst, uint32_t pc, uint32_t op, uint32_t 
     return 0u;
 }
 
-/* With SR.Isc set, a data access in KUSEG, KSEG0 or KSEG1 goes to the
-   instruction cache and never reaches the bus; KSEG2, the cache-control word,
-   still does. The line is the one address bits 11:4 name, the word bits 3:2
-   (PSX-SYSTEM section 2, Cache isolation, write queue; D-29). A load returns
-   that word's bytes whether or not the tag matches. A store writes the tag, the
-   physical address bits 31:12 of the datum, and sets the four valid bits to the
-   datum's low four bits when cache-control TAG (bit 2) and IS1 (bit 11) are both
-   set, and otherwise writes the bytes it covers into the word; that is how the
-   BIOS' FlushCache empties the cache. The bits of rt above the access width go
-   out too, as in any store, which is why a tag store reads the whole datum. */
-static uint32_t cpu_isolated(const schway *inst, uint32_t addr)
-{
-    return (inst->cpu.cop0.r[SCHWAY__COP0_SR] & SCHWAY__SR_ISC) != 0u &&
-                   schway__bus_segment(addr) != (uint32_t)SCHWAY__SEG_KSEG2
-               ? 1u
-               : 0u;
-}
-
-static uint32_t cpu_isolated_read(schway *inst, uint32_t addr, uint32_t size)
-{
-    uint32_t w = inst->cpu.icache_word[(addr >> 4) & 0xFFu][(addr >> 2) & 3u];
-    w >>= 8u * (addr & 3u);
-    return size == 4u ? w : w & ((1u << (8u * size)) - 1u);
-}
-
-static void cpu_isolated_write(schway *inst, uint32_t addr, uint32_t size, uint32_t value)
-{
-    struct schway__cpu *c = &inst->cpu;
-    uint32_t line = (addr >> 4) & 0xFFu;
-    uint32_t ctrl = inst->bus.cache_ctrl;
-    if ((ctrl & 0x4u) != 0u && (ctrl & 0x800u) != 0u) {
-        c->icache_tag[line] = value >> 12;
-        c->icache_valid[line] = (uint8_t)(value & 0xFu);
-    } else {
-        uint32_t shift = 8u * (addr & 3u);
-        uint32_t mask = (size == 4u ? 0xFFFFFFFFu : (1u << (8u * size)) - 1u) << shift;
-        uint32_t *w = &c->icache_word[line][(addr >> 2) & 3u];
-        *w = (*w & ~mask) | ((value << shift) & mask);
-    }
-}
-
 /* One access on the bus with the address already checked: the virtual
    address goes to the bus, which decodes the segment (KSEG2 gets the full
    address), and its charge adds to *cycles. A KSEG1 read drains the write queue
@@ -288,34 +435,24 @@ static uint32_t cpu_bus_read(schway *inst, uint32_t pc, uint32_t addr, uint32_t 
                              uint32_t *value, uint32_t *cycles)
 {
     uint32_t v = 0u;
+    TRACE_BEGIN(at, *cycles);
     if (inst->cpu.log != NULL) {
         v = cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_READ, size, addr, 0u);
     } else if (cpu_isolated(inst, addr) != 0u) {
         v = cpu_isolated_read(inst, addr, size);
+        TRACE(SCHWAY_TRACE_RD, at, pc, 0u, addr, size, (uint32_t)SCHWAY__DEV_NONE, v, 0u);
     } else {
         if (schway__bus_segment(addr) == (uint32_t)SCHWAY__SEG_KSEG1) {
             cpu_wq_drain(&inst->cpu, cycles);
         }
-        if (schway__bus_read(inst, addr, size, &v, cycles) != 0u) {
+        uint32_t err = schway__bus_read(inst, addr, size, &v, cycles) != 0 ? 1u : 0u;
+        TRACE(SCHWAY_TRACE_RD, at, pc, 0u, addr, size, schway__bus_device(addr), v, 0u);
+        if (err != 0u) {
             return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
         }
     }
     *value = size == 4u ? v : v & ((1u << (8u * size)) - 1u);
     return 0u;
-}
-
-/* Issues a load: the register is written one instruction later. A load still
-   pending for the same register is dropped, the later one winning (PSX-SYSTEM
-   section 2, Load delay). */
-static void cpu_load_issue(struct schway__cpu *c, uint32_t n, uint32_t v, uint32_t *load_reg,
-                           uint32_t *load_value)
-{
-    if (c->load_reg == n) {
-        c->load_reg = SCHWAY__CPU_NO_LOAD;
-        c->load_value = 0u;
-    }
-    *load_reg = n;
-    *load_value = v;
 }
 
 /* The store counterpart: replayed with a log, sent to the cache when isolated,
@@ -324,27 +461,26 @@ static void cpu_load_issue(struct schway__cpu *c, uint32_t n, uint32_t v, uint32
 static uint32_t cpu_bus_write(schway *inst, uint32_t pc, uint32_t addr, uint32_t size,
                               uint32_t value, uint32_t *cycles)
 {
+    TRACE_BEGIN(at, *cycles);
     if (inst->cpu.log != NULL) {
         (void)cpu_log_access(inst->cpu.log, SCHWAY__CYCLE_WRITE, size, addr, value);
     } else if (cpu_isolated(inst, addr) != 0u) {
         cpu_isolated_write(inst, addr, size, value);
+        TRACE(SCHWAY_TRACE_WR, at, pc, 0u, addr, size, (uint32_t)SCHWAY__DEV_NONE,
+              size == 4u ? value : value & ((1u << (8u * size)) - 1u), 0u);
     } else {
         if (schway__bus_segment(addr) == (uint32_t)SCHWAY__SEG_KSEG1) {
             cpu_wq_drain(&inst->cpu, cycles);
         }
-        if (schway__bus_write(inst, addr, size, value, cycles) != 0u) {
+        uint32_t err = schway__bus_write(inst, addr, size, value, cycles) != 0 ? 1u : 0u;
+        TRACE(SCHWAY_TRACE_WR, at, pc, 0u, addr, size, schway__bus_device(addr),
+              size == 4u ? value : value & ((1u << (8u * size)) - 1u), 0u);
+        if (err != 0u) {
             return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
         }
         cpu_wq_push(&inst->cpu, addr, cycles);
     }
     return 0u;
-}
-
-/* The effective address of a load or store: the base register plus the
-   sign-extended immediate. */
-static uint32_t cpu_address(const struct schway__cpu *c, uint32_t op)
-{
-    return c->r[(op >> 21) & 31u] + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u);
 }
 
 /* LB, LBU, LH, LHU and LW: size bytes at the effective address into rt
@@ -437,68 +573,6 @@ static uint32_t cpu_store_part(schway *inst, uint32_t pc, uint32_t op, uint32_t 
     return 0u;
 }
 
-/* The cycles an early read of HI or LO waits: until the running multiply or
-   divide is done, and never more than the longest one takes, whatever a loaded
-   state says. The read issues at the cycle counter plus what the instruction
-   spent before its own issue cycle (PSX-SYSTEM section 2, MULTU/MULT). */
-static uint32_t cpu_muldiv_wait(const struct schway__cpu *c, uint32_t cycles)
-{
-    uint64_t at = c->cycle + (cycles - 1u);
-    uint64_t wait = c->muldiv_ready > at ? c->muldiv_ready - at : 0u;
-    return wait > SCHWAY__MULDIV_MAX ? SCHWAY__MULDIV_MAX : (uint32_t)wait;
-}
-
-/* Starts a multiply or divide that takes n cycles from the issue; one that is
-   still running is replaced and the new one's time is all that counts. */
-static void cpu_muldiv_start(struct schway__cpu *c, uint32_t cycles, uint32_t n)
-{
-    c->muldiv_ready = c->cycle + (cycles - 1u) + n;
-}
-
-/* MULT and MULTU: the 64-bit product into HI:LO, in 6, 9 or 13 cycles by how
-   many bits the first operand needs. MULT classifies rs with its sign mirrored
-   (rs XOR its sign bit spread over the word), MULTU on rs as it is. The
-   product is built from magnitudes so no signed conversion is involved. */
-static void cpu_mult(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t sign,
-                     uint32_t cycles)
-{
-    uint32_t neg_rs = sign != 0u && (rs & 0x80000000u) != 0u ? 1u : 0u;
-    uint32_t neg_rt = sign != 0u && (rt & 0x80000000u) != 0u ? 1u : 0u;
-    uint32_t m = neg_rs != 0u ? ~rs : rs;
-    uint64_t p = (uint64_t)(neg_rs != 0u ? 0u - rs : rs) * (neg_rt != 0u ? 0u - rt : rt);
-    if (neg_rs != neg_rt) {
-        p = 0u - p;
-    }
-    c->lo = (uint32_t)p;
-    c->hi = (uint32_t)(p >> 32);
-    cpu_muldiv_start(c, cycles, m < 0x800u ? 6u : (m < 0x100000u ? 9u : 13u));
-}
-
-/* DIV and DIVU, 36 cycles, no trap. A zero divisor gives LO = -1 (or +1 for
-   DIV of a negative rs) and HI = rs; DIV of -80000000h by -1 gives LO =
-   80000000h and HI = 0 (PSX-SYSTEM section 2, DIV/DIVU). */
-static void cpu_div(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t sign,
-                    uint32_t cycles)
-{
-    uint32_t neg_rs = sign != 0u && (rs & 0x80000000u) != 0u ? 1u : 0u;
-    uint32_t neg_rt = sign != 0u && (rt & 0x80000000u) != 0u ? 1u : 0u;
-    if (rt == 0u) {
-        c->lo = neg_rs != 0u ? 1u : 0xFFFFFFFFu;
-        c->hi = rs;
-    } else if (sign != 0u && rs == 0x80000000u && rt == 0xFFFFFFFFu) {
-        c->lo = 0x80000000u;
-        c->hi = 0u;
-    } else {
-        uint32_t a = neg_rs != 0u ? 0u - rs : rs;
-        uint32_t b = neg_rt != 0u ? 0u - rt : rt;
-        uint32_t q = a / b;
-        uint32_t r = a % b;
-        c->lo = neg_rs != neg_rt ? 0u - q : q;
-        c->hi = neg_rs != 0u ? 0u - r : r;
-    }
-    cpu_muldiv_start(c, cycles, SCHWAY__MULDIV_MAX);
-}
-
 /* COP2, LWC2 and SWC2 before the GTE exists. An address error on LWC2 or SWC2
    comes first. With SR.CU2 clear every form raises CpU with CE 2 and latches
    no fault. With it set, MFC2 and CFC2 read 0 through the load delay, MTC2,
@@ -547,18 +621,6 @@ static uint32_t cpu_cop2(schway *inst, uint32_t pc, uint32_t op, uint32_t next, 
     return 0u;
 }
 
-/* Signed overflow of a + b = sum, and of a - b = diff, on unsigned words
-   (MIPS I: ADD, ADDI and SUB trap and leave rd unchanged). */
-static uint32_t cpu_add_overflows(uint32_t a, uint32_t b, uint32_t sum)
-{
-    return (~(a ^ b) & (a ^ sum) & 0x80000000u) != 0u ? 1u : 0u;
-}
-
-static uint32_t cpu_sub_overflows(uint32_t a, uint32_t b, uint32_t diff)
-{
-    return ((a ^ b) & (a ^ diff) & 0x80000000u) != 0u ? 1u : 0u;
-}
-
 /* Executes the instruction at pc and returns the cycles it took: one to
    issue, plus what the bus charged. The program counter moves to pc + 4, or
    to the pending branch target when the instruction is its delay slot, or to
@@ -592,6 +654,7 @@ static uint32_t cpu_step(schway *inst)
     uint32_t load_reg = SCHWAY__CPU_NO_LOAD;
     uint32_t load_value = 0u;
 
+    TRACE(SCHWAY_TRACE_EXEC, trace_now(inst), pc, op, 0u, 0u, (uint32_t)SCHWAY__DEV_NONE, 0u, 0u);
     if (misaligned != 0u) {
         /* A fetch from an address that is not a multiple of 4 is an address
            error on the fetch, EPC and BadVaddr the address (PSX-SYSTEM
@@ -901,14 +964,40 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
     uint32_t fault = inst->fault.kind;
     uint64_t ran = 0u;
     c->block_end = 0u;
+    TRACE_START();
     for (uint32_t n = 0u; n < SCHWAY__BLOCK_MAX_INSNS; n++) {
         uint32_t slot = c->branch_slot;
+        TRACE_BEGIN(began, 1u);
         ran += cpu_step(inst);
         if (slot != 0u || c->block_end != 0u || ran >= limit || (c->pc >> 12) != page ||
             inst->exit_pending != 0u || inst->fault.kind != fault) {
+            /* The first fault, when this block latched it, ends the tail: its own
+               record, from the fault record, on the cycle its instruction began. */
+            TRACE_FAULT(inst->fault.kind != fault, began);
             break;
         }
     }
     inst->ticks += ran;
     return ran;
 }
+
+#undef TRACE
+#undef TRACE_BEGIN
+#undef TRACE_START
+#undef TRACE_FAULT
+#if SCHWAY_TRACE
+#undef cpu_irq_enter
+#undef cpu_exception
+#undef cpu_reserved
+#undef cpu_unusable
+#undef cpu_data_check
+#undef cpu_bus_read
+#undef cpu_bus_write
+#undef cpu_load_int
+#undef cpu_load_part
+#undef cpu_store_int
+#undef cpu_store_part
+#undef cpu_cop2
+#undef cpu_step
+#undef cpu_block
+#endif

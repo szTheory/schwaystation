@@ -30,5 +30,11 @@ core.testcard.counter	core,portable
 core.testcard.frames_differ	core,portable
 core.testcard.full_redraw	core,portable
 core.testcard.pixels	core,portable
+core.trace.exec_records	core,portable
+core.trace.index_past_end	core,portable
+core.trace.last_is_fault	core,portable
+core.trace.short_run	core,portable
+core.trace.wrap	core,portable
+core.trace_hash_equal	core,portable
 core.video.pitch	core,portable
 core.video.tuple	core,portable

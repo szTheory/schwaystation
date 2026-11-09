@@ -38,6 +38,7 @@ typedef uint32_t schway_status;
 #define SCHWAY_STOP_FAULT 5u
 
 #define SCHWAY_RUN_STOP_ON_FAULT 1u
+#define SCHWAY_RUN_TRACE 2u
 
 #define SCHWAY_SPACE_RAM 1u
 #define SCHWAY_SPACE_SCRATCHPAD 2u
@@ -73,6 +74,13 @@ typedef uint32_t schway_status;
 #define SCHWAY_DEVICE_EXP3 15u
 #define SCHWAY_DEVICE_GTE 16u
 #define SCHWAY_DEVICE_UNMAPPED 17u
+
+/* Events of a trace record. */
+#define SCHWAY_TRACE_EXEC 1u
+#define SCHWAY_TRACE_RD 2u
+#define SCHWAY_TRACE_WR 3u
+#define SCHWAY_TRACE_IRQ 4u
+#define SCHWAY_TRACE_FAULT 5u
 
 #define SCHWAY_RESET_POWER 1u
 
@@ -183,6 +191,14 @@ typedef struct schway_tty {
     uint32_t dropped;  /* out: bytes lost since the last drain */
 } schway_tty;
 
+typedef struct schway_trace {
+    uint32_t size;
+    uint32_t event; /* SCHWAY_TRACE_* */
+    uint64_t frame, cycle;
+    uint32_t line, dot, pc, opcode, addr, width, device, value, note;
+    uint32_t count; /* records held; every record carries it */
+} schway_trace;
+
 /* Called once per state field: count values of width bytes (1, 2, 4 or 8) in host order. */
 typedef void (*schway_state_visitor)(void *user, const char *name, const void *data,
                                      uint32_t count, uint32_t width);
@@ -201,6 +217,7 @@ schway_status schway_get_info(const schway *inst, schway_info *out);
 schway_status schway_get_video(const schway *inst, schway_video *out);
 schway_status schway_get_audio(schway *inst, schway_audio *io);
 schway_status schway_get_tty(schway *inst, schway_tty *io);
+schway_status schway_get_trace(const schway *inst, uint32_t index, schway_trace *out);
 size_t schway_state_size(const schway *inst);
 schway_status schway_save_state(const schway *inst, void *buf, size_t size);
 schway_status schway_load_state(schway *inst, const void *buf, size_t size);

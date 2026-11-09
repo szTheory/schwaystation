@@ -82,3 +82,24 @@ foreach(case IN ITEMS budget_resume split_equivalence peek_no_side_effects peek_
     COMMAND schwaystation-test-run ${case}
     LABELS core portable TIMEOUT 10)
 endforeach()
+
+# The trace ring. Fault prevented: a traced run that loses or misorders its
+# records, a ring that does not keep exactly the last 4,096, a fault that is not
+# the last record, an index past the end that answers, or tracing that changes
+# the state, video, audio or fault record.
+add_executable(schwaystation-test-trace ${CMAKE_CURRENT_LIST_DIR}/test_trace.c)
+target_include_directories(schwaystation-test-trace PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-trace PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-trace PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-trace)
+
+foreach(case IN ITEMS exec_records wrap short_run last_is_fault index_past_end)
+  schway_add_test(NAME core.trace.${case}
+    COMMAND schwaystation-test-trace ${case}
+    LABELS core portable TIMEOUT 10)
+endforeach()
+
+schway_add_test(NAME core.trace_hash_equal
+  COMMAND schwaystation-test-trace hash_equal
+  LABELS core portable TIMEOUT 10)

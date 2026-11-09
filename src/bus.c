@@ -173,6 +173,60 @@ static uint32_t classify(uint32_t p)
     return CLS_GAP;
 }
 
+/* The device a virtual address belongs to, for the trace. It decodes the same
+   map as bus_access and the I/O page's switch, and changes nothing. */
+uint32_t schway__bus_device(uint32_t addr)
+{
+    if (schway__bus_segment(addr) == (uint32_t)SCHWAY__SEG_KSEG2) {
+        return addr == 0xFFFE0130u ? (uint32_t)SCHWAY__DEV_MEMCTL : (uint32_t)SCHWAY__DEV_UNMAPPED;
+    }
+    uint32_t p = addr & 0x1FFFFFFFu;
+    switch (classify(p)) {
+    case CLS_RAM:
+        return SCHWAY__DEV_RAM;
+    case CLS_SCRATCH:
+        return SCHWAY__DEV_SCRATCH;
+    case CLS_EXP2:
+        return SCHWAY__DEV_EXP2;
+    case CLS_EXP1:
+        return SCHWAY__DEV_EXP1;
+    case CLS_BIOS:
+        return SCHWAY__DEV_BIOS;
+    case CLS_EXP3:
+        return SCHWAY__DEV_EXP3;
+    case CLS_IO: {
+        uint32_t slot = (p >> 4) & 0xFFu;
+        if (slot <= 0x02u || slot == 0x06u) {
+            return SCHWAY__DEV_MEMCTL;
+        }
+        if (slot == 0x04u || slot == 0x05u) {
+            return SCHWAY__DEV_SIO;
+        }
+        if (slot == 0x07u) {
+            return SCHWAY__DEV_IRQ;
+        }
+        if (slot >= 0x08u && slot <= 0x0Fu) {
+            return SCHWAY__DEV_DMA;
+        }
+        if (slot >= 0x10u && slot <= 0x12u) {
+            return SCHWAY__DEV_TIMER;
+        }
+        if (slot == 0x80u) {
+            return SCHWAY__DEV_CDROM;
+        }
+        if (slot == 0x81u) {
+            return SCHWAY__DEV_GPU;
+        }
+        if (slot == 0x82u) {
+            return SCHWAY__DEV_MDEC;
+        }
+        return slot >= 0xC0u ? (uint32_t)SCHWAY__DEV_SPU : (uint32_t)SCHWAY__DEV_UNMAPPED;
+    }
+    default:
+        return SCHWAY__DEV_UNMAPPED;
+    }
+}
+
 enum { K_READ, K_WRITE, K_FETCH };
 
 /* A bus error: the first one is kept as the first fault, naming the device

@@ -146,7 +146,7 @@ schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_r
     if (st != SCHWAY_STATUS_OK) {
         return st;
     }
-    if ((budget->flags & ~SCHWAY_RUN_STOP_ON_FAULT) != 0u) {
+    if ((budget->flags & ~(SCHWAY_RUN_STOP_ON_FAULT | SCHWAY_RUN_TRACE)) != 0u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
     if (out != NULL) {
