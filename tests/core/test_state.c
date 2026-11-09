@@ -471,10 +471,53 @@ static void test_run_bounds(void)
     }
 }
 
+/* The cpu module's fields come back from a save, a power reset and a load
+   byte for byte, and the power-on values are the documented ones
+   (ARCHITECTURE section 7; PSX-SYSTEM section 2, COP0 registers). */
+static void test_cpu_fields(void)
+{
+    schway_versions v;
+    memset(&v, 0, sizeof v);
+    v.size = (uint32_t)sizeof v;
+    CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(v.state_format, 2u);
+    CHECK_EQ_U64(v.behaviour_revision, 2u);
+
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[12], 0x00400000u);
+    CHECK_EQ_U64(inst->cpu.cop0.r[15], 2u);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[9], 0xFFFFFFFFu);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[11], 0xFFFFFFFFu);
+    CHECK_EQ_U64(inst->cpu.cop0.r[13], 0u);
+    for (uint32_t i = 0; i < 32u; i++) {
+        CHECK_EQ_U64(inst->cpu.r[i], 0u);
+    }
+    CHECK_EQ_U64(inst->cpu.hi | inst->cpu.lo, 0u);
+
+    inst->cpu.r[5] = 0x12345678u;
+    inst->cpu.hi = 0xCAFEF00Du;
+    inst->cpu.pc = 0x80010000u;
+    inst->cpu.cop0.r[14] = 0x80020004u;
+    size_t n = save(inst, good);
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(inst->cpu.r[5], 0u);
+    CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
+    CHECK_EQ_U64(schway_load_state(inst, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_HEX(inst->cpu.r[5], 0x12345678u);
+    CHECK_EQ_HEX(inst->cpu.hi, 0xCAFEF00Du);
+    CHECK_EQ_HEX(inst->cpu.pc, 0x80010000u);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[14], 0x80020004u);
+    CHECK_EQ_U64(save(inst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
+    {"state.cpu_fields", test_cpu_fields},
     {"state.record_sweep", test_record_sweep},
     {"state.rejects", test_rejects},
     {"state.round_trip", test_round_trip},

@@ -6,11 +6,12 @@
 #include <stdint.h>
 
 #include "schwaystation.h"
+#include "cpu.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 1u
-#define SCHWAY__STATE_FORMAT 1u
+#define SCHWAY__BEHAVIOUR_REVISION 2u
+#define SCHWAY__STATE_FORMAT 2u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -64,6 +65,7 @@ struct schway {
     uint32_t audio_dropped; /* pairs lost since the last drain */
     int16_t audio[SCHWAY__AUDIO_RING_PAIRS][2];
     uint16_t vram[SCHWAY__VRAM_H][SCHWAY__VRAM_W];
+    struct schway__cpu cpu;
 };
 
 /* Frame cycles per region, numerator and denominator. */

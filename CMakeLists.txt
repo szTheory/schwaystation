@@ -76,12 +76,16 @@ endfunction()
 add_library(schwaystation_instance OBJECT
   src/instance.c
   src/frame.c)
+add_library(schwaystation_cpu OBJECT
+  src/cpu.c
+  src/cop0.c)
 add_library(schwaystation_testcard OBJECT src/testcard.c)
 add_library(schwaystation_state OBJECT
   src/state.c
   src/crc32.c)
 add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_instance>
+  $<TARGET_OBJECTS:schwaystation_cpu>
   $<TARGET_OBJECTS:schwaystation_testcard>
   $<TARGET_OBJECTS:schwaystation_state>)
 add_library(schwaystation::schwaystation ALIAS schwaystation)
@@ -89,8 +93,8 @@ target_include_directories(schwaystation PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated>
   $<INSTALL_INTERFACE:include>)
-foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_testcard
-    schwaystation_state)
+foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_cpu
+    schwaystation_testcard schwaystation_state)
   schway_core_options(${core_target})
 endforeach()
 

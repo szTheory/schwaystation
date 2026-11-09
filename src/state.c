@@ -4,7 +4,7 @@
      header  magic (8 bytes), state format (u32), total size (u32), body
              CRC-32 (u32)
      body    instance.frame, instance.region, instance.ticks,
-             instance.tick_acc, gpu.vram
+             instance.tick_acc, gpu.vram, cpu and cop0 registers
    One field list drives every pass (state.h), so they cannot drift apart. A
    struct is never copied as a whole: padding, pointers and the allocator
    never reach the bytes. The audio ring is not saved; a load empties it.
@@ -57,6 +57,7 @@ static void body_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u64(io, name_tick_acc, &inst->tick_acc, 0u, den - 1u);
     schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
                             0u, UINT16_MAX);
+    schway__cpu_state_io(io, inst);
 }
 
 /* The whole state, in the order the format fixes. */

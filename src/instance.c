@@ -63,6 +63,7 @@ static void power_on(schway *inst)
     d->enabled = 1u;
     schway__frame_audio_clear(inst);
     memset(inst->vram, 0, sizeof inst->vram);
+    schway__cpu_reset(inst);
 }
 
 schway_status schway_get_versions(schway_versions *out)

@@ -14,6 +14,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "internal.h"
 
@@ -183,6 +184,79 @@ static inline void schway__state_u16_array(struct schway__state_io *io, const ch
             }
         }
         io->r += (size_t)count * 2u;
+        return;
+    }
+}
+
+/* An array of count words, one field, as the halfword helper above. */
+static inline void schway__state_u32_array(struct schway__state_io *io, const char *name,
+                                           uint32_t *a, uint32_t count, uint32_t min,
+                                           uint32_t max)
+{
+    switch (io->mode) {
+    case SCHWAY__STATE_RECORD:
+        schway__state_record_one(io, name, 4u, count, min, max);
+        io->n += (size_t)count * 4u;
+        return;
+    case SCHWAY__STATE_SIZE:
+        io->n += (size_t)count * 4u;
+        return;
+    case SCHWAY__STATE_VISIT:
+        io->visitor(io->user, name, a, count, 4u);
+        return;
+    case SCHWAY__STATE_WRITE:
+        for (uint32_t i = 0; i < count; i++) {
+            for (uint32_t k = 0; k < 4u; k++) {
+                io->w[4u * i + k] = (uint8_t)(a[i] >> (8u * k));
+            }
+        }
+        io->w += (size_t)count * 4u;
+        return;
+    default:
+        for (uint32_t i = 0; i < count; i++) {
+            uint32_t x = (uint32_t)io->r[4u * i] | ((uint32_t)io->r[4u * i + 1u] << 8) |
+                         ((uint32_t)io->r[4u * i + 2u] << 16) |
+                         ((uint32_t)io->r[4u * i + 3u] << 24);
+            if (io->mode == SCHWAY__STATE_APPLY) {
+                a[i] = x;
+            } else if (x < min || x > max) {
+                io->bad = 1;
+            }
+        }
+        io->r += (size_t)count * 4u;
+        return;
+    }
+}
+
+/* An array of count bytes, one field. */
+static inline void schway__state_u8_array(struct schway__state_io *io, const char *name,
+                                          uint8_t *a, uint32_t count, uint8_t min, uint8_t max)
+{
+    switch (io->mode) {
+    case SCHWAY__STATE_RECORD:
+        schway__state_record_one(io, name, 1u, count, min, max);
+        io->n += count;
+        return;
+    case SCHWAY__STATE_SIZE:
+        io->n += count;
+        return;
+    case SCHWAY__STATE_VISIT:
+        io->visitor(io->user, name, a, count, 1u);
+        return;
+    case SCHWAY__STATE_WRITE:
+        memcpy(io->w, a, count);
+        io->w += count;
+        return;
+    default:
+        for (uint32_t i = 0; i < count; i++) {
+            uint8_t x = io->r[i];
+            if (io->mode == SCHWAY__STATE_APPLY) {
+                a[i] = x;
+            } else if (x < min || x > max) {
+                io->bad = 1;
+            }
+        }
+        io->r += count;
         return;
     }
 }
