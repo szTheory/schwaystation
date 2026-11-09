@@ -1,13 +1,13 @@
 # cmake -DROOT=<source dir> -P budgets.cmake
-# Fault prevented: the README, the public header or a docs/*.md page reaching its
-# byte budget; each must be strictly under it, and every file over is named.
+# Fault prevented: the README, the public header or a docs/*.md or docs/*/*.md page reaching
+# its byte budget; each must be strictly under it, and every file over is named.
 if(NOT IS_DIRECTORY "${ROOT}")
   message(FATAL_ERROR "budgets: -DROOT=<source dir> is required")
 endif()
 file(REAL_PATH "${ROOT}" ROOT)
 set(checks "README.md=16384" "include/schwaystation.h=40960")
 # A glob matching no page adds no check: a budget only limits files that exist.
-file(GLOB docs RELATIVE "${ROOT}" "${ROOT}/docs/*.md")
+file(GLOB docs RELATIVE "${ROOT}" "${ROOT}/docs/*.md" "${ROOT}/docs/*/*.md")
 foreach(doc IN LISTS docs)
   list(APPEND checks "${doc}=61440")
 endforeach()

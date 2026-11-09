@@ -1,6 +1,8 @@
 * text=auto eol=lf
 # Fixture bytes are hashed in tests/fixtures/manifest.txt; git must never rewrite them.
 /tests/fixtures/** -text
+/tests/fixtures/src/** text eol=lf
+/tests/vectors/r3000/sst-sample.bin binary
 *.bin binary
 *.cue binary
 *.iso binary

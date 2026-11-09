@@ -37,7 +37,7 @@ schway_add_test(NAME policy.pass_regex_status.self_test
   LABELS policy portable TIMEOUT 10)
 
 # Byte budgets: README.md under 16384, include/schwaystation.h under 40960 and
-# each docs/*.md page under 61440.
+# each docs/*.md and docs/*/*.md page under 61440.
 schway_add_test(NAME docs.budgets
   COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -P ${policy_scripts}/budgets.cmake
   LABELS policy TIMEOUT 10)
