@@ -152,6 +152,22 @@ _Static_assert(offsetof(schway_profile, size) == 0, "profile.size");
 _Static_assert(offsetof(schway_profile, region) == 4, "profile.region");
 _Static_assert(sizeof(schway_profile) == 8, "profile size");
 
+_Static_assert(offsetof(schway_exe_info, size) == 0, "exe_info.size");
+_Static_assert(offsetof(schway_exe_info, pc0) == 4, "exe_info.pc0");
+_Static_assert(offsetof(schway_exe_info, gp0) == 8, "exe_info.gp0");
+_Static_assert(offsetof(schway_exe_info, t_addr) == 12, "exe_info.t_addr");
+_Static_assert(offsetof(schway_exe_info, t_size) == 16, "exe_info.t_size");
+_Static_assert(offsetof(schway_exe_info, d_addr) == 20, "exe_info.d_addr");
+_Static_assert(offsetof(schway_exe_info, d_size) == 24, "exe_info.d_size");
+_Static_assert(offsetof(schway_exe_info, b_addr) == 28, "exe_info.b_addr");
+_Static_assert(offsetof(schway_exe_info, b_size) == 32, "exe_info.b_size");
+_Static_assert(offsetof(schway_exe_info, s_addr) == 36, "exe_info.s_addr");
+_Static_assert(offsetof(schway_exe_info, s_size) == 40, "exe_info.s_size");
+_Static_assert(offsetof(schway_exe_info, licence_area) == 44, "exe_info.licence_area");
+_Static_assert(offsetof(schway_exe_info, lint) == 48, "exe_info.lint");
+_Static_assert(offsetof(schway_exe_info, hash_len) == 52, "exe_info.hash_len");
+_Static_assert(sizeof(schway_exe_info) == 56, "exe_info size");
+
 _Static_assert(offsetof(schway_info, size) == 0, "info.size");
 _Static_assert(offsetof(schway_info, width) == 4, "info.width");
 _Static_assert(offsetof(schway_info, height) == 8, "info.height");
@@ -211,6 +227,7 @@ _Static_assert(sizeof(schway_audio) == 16 + 2 * SCHWAY__P, "audio size");
 #define SCHWAY__RUN_RESULT_SIZE_FIRST 24u
 #define SCHWAY__VIDEO_SIZE_FIRST ((uint32_t)(80 + 2 * SCHWAY__P))
 #define SCHWAY__AUDIO_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
+#define SCHWAY__EXE_INFO_SIZE_FIRST 56u
 _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first size");
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == sizeof(schway_profile), "profile first size");
@@ -218,6 +235,7 @@ _Static_assert(SCHWAY__INFO_SIZE_FIRST == sizeof(schway_info), "info first size"
 _Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == sizeof(schway_run_result), "run_result first size");
 _Static_assert(SCHWAY__VIDEO_SIZE_FIRST == sizeof(schway_video), "video first size");
 _Static_assert(SCHWAY__AUDIO_SIZE_FIRST == sizeof(schway_audio), "audio first size");
+_Static_assert(SCHWAY__EXE_INFO_SIZE_FIRST == sizeof(schway_exe_info), "exe_info first size");
 
 /* Input structs: OK when the size tag at s is at least first and at most
    4096, and every byte past ours is zero; ERR_STRUCT_SIZE otherwise. */

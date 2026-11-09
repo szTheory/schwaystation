@@ -243,6 +243,8 @@ static const char text_state_magic[] = "not a state";
 static const char text_state_version[] = "state format not supported";
 static const char text_state_crc[] = "state checksum mismatch";
 static const char text_state_field[] = "state field out of range";
+static const char text_exe_invalid[] = "PS-EXE invalid";
+static const char text_exe_range[] = "PS-EXE outside RAM";
 static const char text_unknown[] = "unknown status";
 
 const char *schway_status_string(schway_status status)
@@ -270,6 +272,10 @@ const char *schway_status_string(schway_status status)
         return text_state_crc;
     case SCHWAY_STATUS_ERR_STATE_FIELD:
         return text_state_field;
+    case SCHWAY_STATUS_ERR_EXE_INVALID:
+        return text_exe_invalid;
+    case SCHWAY_STATUS_ERR_EXE_RANGE:
+        return text_exe_range;
     default:
         return text_unknown;
     }

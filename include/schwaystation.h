@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 1
+#define SCHWAY_API_VERSION 2
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -25,6 +25,8 @@ typedef uint32_t schway_status;
 #define SCHWAY_STATUS_ERR_STATE_VERSION 8u
 #define SCHWAY_STATUS_ERR_STATE_CRC 9u
 #define SCHWAY_STATUS_ERR_STATE_FIELD 10u
+#define SCHWAY_STATUS_ERR_EXE_INVALID 11u
+#define SCHWAY_STATUS_ERR_EXE_RANGE 12u
 
 #define SCHWAY_REGION_NTSC_J 1u
 #define SCHWAY_REGION_NTSC_U 2u
@@ -33,6 +35,14 @@ typedef uint32_t schway_status;
 #define SCHWAY_STOP_FRAME 1u
 
 #define SCHWAY_RESET_POWER 1u
+
+#define SCHWAY_LICENCE_NONE 0u
+#define SCHWAY_LICENCE_JAPAN 1u
+#define SCHWAY_LICENCE_EUROPE 2u
+#define SCHWAY_LICENCE_NORTH_AMERICA 3u
+
+#define SCHWAY_EXE_LINT_LOW_64K 1u
+#define SCHWAY_EXE_LINT_TRAILING 2u
 
 typedef struct schway schway;
 
@@ -61,6 +71,14 @@ typedef struct schway_profile {
     uint32_t size;
     uint32_t region; /* SCHWAY_REGION_* */
 } schway_profile;
+
+typedef struct schway_exe_info {
+    uint32_t size;
+    uint32_t pc0, gp0, t_addr, t_size, d_addr, d_size, b_addr, b_size, s_addr, s_size;
+    uint32_t licence_area; /* SCHWAY_LICENCE_* */
+    uint32_t lint;         /* SCHWAY_EXE_LINT_* bits */
+    uint32_t hash_len;     /* t_size + 0800h */
+} schway_exe_info;
 
 typedef struct schway_info {
     uint32_t size;
@@ -115,6 +133,7 @@ size_t schway_state_size(const schway *inst);
 schway_status schway_save_state(const schway *inst, void *buf, size_t size);
 schway_status schway_load_state(schway *inst, const void *buf, size_t size);
 schway_status schway_state_visit(const schway *inst, schway_state_visitor visitor, void *user);
+schway_status schway_probe_exe(const void *bytes, size_t n, schway_exe_info *out);
 const char *schway_status_string(schway_status status); /* never NULL */
 
 #ifdef __cplusplus

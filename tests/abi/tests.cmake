@@ -74,7 +74,7 @@ set(abi_cmd ${CMAKE_COMMAND} -DHEADER=${PROJECT_BINARY_DIR}/tests/abi/added_func
 string(REPLACE ";" "$<SEMICOLON>" abi_cmd "${abi_cmd}")
 schway_add_test(NAME abi.api_version.self_test
   COMMAND ${CMAKE_COMMAND} "-DCMD=${abi_cmd}" -DCODE=1
-    "-DREGEX=in no tests/api/vK[.]c[^:]*1:.*schway_added" -P ${abi_scripts}/expect_fail.cmake
+    "-DREGEX=in no tests/api/vK[.]c[^:]*[0-9]+:.*schway_added" -P ${abi_scripts}/expect_fail.cmake
   LABELS abi TIMEOUT 10)
 
 # The frozen API v1 program: every function, field and constant of version 1.
@@ -84,6 +84,15 @@ set_target_properties(schwaystation-test-api-v1 PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-api-v1)
 schway_add_test(NAME abi.api_v1 COMMAND schwaystation-test-api-v1
+  LABELS abi portable TIMEOUT 10)
+
+# The frozen API v2 program: every name version 2 added.
+add_executable(schwaystation-test-api-v2 ${PROJECT_SOURCE_DIR}/tests/api/v2.c)
+target_link_libraries(schwaystation-test-api-v2 PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-api-v2 PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-api-v2)
+schway_add_test(NAME abi.api_v2 COMMAND schwaystation-test-api-v2
   LABELS abi portable TIMEOUT 10)
 
 # The public header compiles alone as C17 and as C++17 with warnings fatal.
