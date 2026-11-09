@@ -11,6 +11,11 @@
 #define EXE_HEADER 0x800u
 #define EXE_LICENCE_OFFSET 0x4Cu
 
+/* Where the loader leaves the launch block for the boot stub: pc0, gp0,
+   s_addr and s_size as little-endian words, in kernel RAM clear of the
+   exception and call vectors at 80h to FFh. */
+#define EXE_LAUNCH_BLOCK 0x200u
+
 static const uint8_t exe_magic[8] = {'P', 'S', '-', 'X', ' ', 'E', 'X', 'E'};
 
 /* The region texts a licensed executable carries at 4Ch (PSXDEV-EXTRACTS). */
@@ -22,6 +27,14 @@ static uint32_t le32(const uint8_t *p)
 {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
            ((uint32_t)p[3] << 24);
+}
+
+static void put_le32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16);
+    p[3] = (uint8_t)(v >> 24);
 }
 
 static uint32_t licence_of(const uint8_t *b)
@@ -114,5 +127,30 @@ schway_status schway_probe_exe(const void *bytes, size_t n, schway_exe_info *out
     }
     info.size = out->size;
     schway__instance_write_out(out, &info, (uint32_t)sizeof info);
+    return SCHWAY_STATUS_OK;
+}
+
+/* Side-loads before the first frame: the text segment at its physical
+   address and the launch block, and nothing else. Validation finishes before
+   the first write, so a refused file changes nothing. A power reset erases
+   both; the host loads again. */
+schway_status schway_load_exe(schway *inst, const void *bytes, size_t n)
+{
+    if (inst == NULL || bytes == NULL || n == 0u || inst->frame != 0u) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    const uint8_t *b = (const uint8_t *)bytes;
+    schway_exe_info e;
+    schway_status st = validate(b, (uint64_t)n, &e);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    uint8_t *ram = inst->bus.ram;
+    memcpy(&ram[(size_t)physical(e.t_addr)], b + EXE_HEADER, e.t_size);
+    put_le32(&ram[EXE_LAUNCH_BLOCK], e.pc0);
+    put_le32(&ram[EXE_LAUNCH_BLOCK + 4u], e.gp0);
+    put_le32(&ram[EXE_LAUNCH_BLOCK + 8u], e.s_addr);
+    put_le32(&ram[EXE_LAUNCH_BLOCK + 12u], e.s_size);
+    inst->exe_loaded = 1u;
     return SCHWAY_STATUS_OK;
 }

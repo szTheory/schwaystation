@@ -5,8 +5,23 @@
    rename, a removal or a changed value fails to build or fails here. */
 #include <string.h>
 
+#include <stdlib.h>
+
 #include "schwaystation.h"
 #include "../check.h"
+
+static void *v2_alloc(void *user, size_t size)
+{
+    (void)user;
+    return malloc(size);
+}
+
+static void v2_free(void *user, void *ptr, size_t size)
+{
+    (void)user;
+    (void)size;
+    free(ptr);
+}
 
 static void put32(unsigned char *p, uint32_t v)
 {
@@ -21,6 +36,7 @@ int main(void)
     CHECK(SCHWAY_API_VERSION >= 2);
     CHECK_EQ_U64(SCHWAY_STATUS_ERR_EXE_INVALID, 11);
     CHECK_EQ_U64(SCHWAY_STATUS_ERR_EXE_RANGE, 12);
+    CHECK_EQ_U64(SCHWAY_PROFILE_DEBUG_PORT, 1);
     CHECK_EQ_U64(SCHWAY_LICENCE_NONE, 0);
     CHECK_EQ_U64(SCHWAY_LICENCE_JAPAN, 1);
     CHECK_EQ_U64(SCHWAY_LICENCE_EUROPE, 2);
@@ -85,7 +101,39 @@ int main(void)
     CHECK_EQ_U64(schway_probe_exe(NULL, sizeof exe, &info), SCHWAY_STATUS_ERR_ARGUMENT);
     CHECK_EQ_U64(schway_probe_exe(exe, 0u, &info), SCHWAY_STATUS_ERR_ARGUMENT);
     CHECK_EQ_U64(schway_probe_exe(exe, sizeof exe, NULL), SCHWAY_STATUS_ERR_ARGUMENT);
+
+    schway_config cfg;
+    memset(&cfg, 0, sizeof cfg);
+    cfg.size = (uint32_t)sizeof cfg;
+    cfg.allocator.alloc = v2_alloc;
+    cfg.allocator.free = v2_free;
+    schway *inst = NULL;
+    CHECK_EQ_U64(schway_create(&cfg, &inst), SCHWAY_STATUS_OK);
+    CHECK(inst != NULL);
+    if (inst == NULL) {
+        CHECK_DONE();
+    }
+    schway_profile profile;
+    memset(&profile, 0, sizeof profile);
+    profile.size = (uint32_t)sizeof profile;
+    profile.region = SCHWAY_REGION_NTSC_U;
+    profile.flags = SCHWAY_PROFILE_DEBUG_PORT;
+    CHECK_EQ_U64(schway_set_profile(inst, &profile), SCHWAY_STATUS_OK);
+    profile.flags = 2u;
+    CHECK_EQ_U64(schway_set_profile(inst, &profile), SCHWAY_STATUS_ERR_PROFILE_REJECTED);
+
+    CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_exe(NULL, exe, sizeof exe), SCHWAY_STATUS_ERR_ARGUMENT);
+    CHECK_EQ_U64(schway_load_exe(inst, exe, 0u), SCHWAY_STATUS_ERR_ARGUMENT);
     exe[0] = 'X';
+    CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_ERR_EXE_INVALID);
     CHECK_EQ_U64(schway_probe_exe(exe, sizeof exe, &info), SCHWAY_STATUS_ERR_EXE_INVALID);
+    exe[0] = 'P';
+    put32(exe + 0x18, 0xC0000000u);
+    CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_ERR_EXE_RANGE);
+    CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
+    put32(exe + 0x18, 0x80010000u);
+    CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_ERR_ARGUMENT);
+    schway_destroy(inst);
     CHECK_DONE();
 }

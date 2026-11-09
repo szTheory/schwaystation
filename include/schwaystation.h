@@ -36,6 +36,8 @@ typedef uint32_t schway_status;
 
 #define SCHWAY_RESET_POWER 1u
 
+#define SCHWAY_PROFILE_DEBUG_PORT 1u
+
 #define SCHWAY_LICENCE_NONE 0u
 #define SCHWAY_LICENCE_JAPAN 1u
 #define SCHWAY_LICENCE_EUROPE 2u
@@ -70,6 +72,7 @@ typedef struct schway_versions {
 typedef struct schway_profile {
     uint32_t size;
     uint32_t region; /* SCHWAY_REGION_* */
+    uint32_t flags;  /* SCHWAY_PROFILE_* bits */
 } schway_profile;
 
 typedef struct schway_exe_info {
@@ -134,6 +137,7 @@ schway_status schway_save_state(const schway *inst, void *buf, size_t size);
 schway_status schway_load_state(schway *inst, const void *buf, size_t size);
 schway_status schway_state_visit(const schway *inst, schway_state_visitor visitor, void *user);
 schway_status schway_probe_exe(const void *bytes, size_t n, schway_exe_info *out);
+schway_status schway_load_exe(schway *inst, const void *bytes, size_t n);
 const char *schway_status_string(schway_status status); /* never NULL */
 
 #ifdef __cplusplus

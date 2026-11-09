@@ -1,2 +1,10 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+exe.after_first_frame	exe,portable
+exe.boundaries	exe,portable
+exe.error_changes_nothing	exe,portable
+exe.licence	exe,portable
+exe.lint	exe,portable
+exe.load_writes	exe,portable
 exe.probe_valid	exe,portable
+exe.profile_flags	exe,portable
+exe.rejects	exe,portable

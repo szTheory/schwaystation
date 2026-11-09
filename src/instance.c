@@ -177,13 +177,17 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     if (st != SCHWAY_STATUS_OK) {
         return st;
     }
-    if (profile->region < SCHWAY_REGION_NTSC_J || profile->region > SCHWAY_REGION_PAL) {
+    /* A caller whose struct ends before flags predates them: none set. */
+    uint32_t flags = profile->size >= sizeof *profile ? profile->flags : 0u;
+    if (profile->region < SCHWAY_REGION_NTSC_J || profile->region > SCHWAY_REGION_PAL ||
+        (flags & ~SCHWAY_PROFILE_DEBUG_PORT) != 0u) {
         return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
     }
     if (inst->profile_locked) {
         return SCHWAY_STATUS_ERR_PROFILE_LOCKED;
     }
     inst->region = profile->region;
+    inst->profile_flags = flags;
     return SCHWAY_STATUS_OK;
 }
 

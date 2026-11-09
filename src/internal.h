@@ -150,7 +150,9 @@ _Static_assert(sizeof(schway_versions) == 32, "versions size");
 
 _Static_assert(offsetof(schway_profile, size) == 0, "profile.size");
 _Static_assert(offsetof(schway_profile, region) == 4, "profile.region");
-_Static_assert(sizeof(schway_profile) == 8, "profile size");
+_Static_assert(offsetof(schway_profile, flags) == 8, "profile.flags");
+_Static_assert(sizeof(schway_profile) == 12, "profile size");
+_Static_assert(SCHWAY__PROFILE_DEBUG_PORT == SCHWAY_PROFILE_DEBUG_PORT, "debug port flag");
 
 _Static_assert(offsetof(schway_exe_info, size) == 0, "exe_info.size");
 _Static_assert(offsetof(schway_exe_info, pc0) == 4, "exe_info.pc0");
@@ -222,7 +224,7 @@ _Static_assert(sizeof(schway_audio) == 16 + 2 * SCHWAY__P, "audio size");
    cannot move it. */
 #define SCHWAY__CONFIG_SIZE_FIRST ((uint32_t)(8 + 3 * SCHWAY__P))
 #define SCHWAY__VERSIONS_SIZE_FIRST 32u
-#define SCHWAY__PROFILE_SIZE_FIRST 8u
+#define SCHWAY__PROFILE_SIZE_FIRST 8u /* a literal: appended fields leave it alone */
 #define SCHWAY__INFO_SIZE_FIRST 36u
 #define SCHWAY__RUN_RESULT_SIZE_FIRST 24u
 #define SCHWAY__VIDEO_SIZE_FIRST ((uint32_t)(80 + 2 * SCHWAY__P))
@@ -230,7 +232,7 @@ _Static_assert(sizeof(schway_audio) == 16 + 2 * SCHWAY__P, "audio size");
 #define SCHWAY__EXE_INFO_SIZE_FIRST 56u
 _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first size");
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
-_Static_assert(SCHWAY__PROFILE_SIZE_FIRST == sizeof(schway_profile), "profile first size");
+_Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
 _Static_assert(SCHWAY__INFO_SIZE_FIRST == sizeof(schway_info), "info first size");
 _Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == sizeof(schway_run_result), "run_result first size");
 _Static_assert(SCHWAY__VIDEO_SIZE_FIRST == sizeof(schway_video), "video first size");
