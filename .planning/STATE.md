@@ -5,7 +5,7 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-25-PLAN.md
+stopped_at: Completed 02-25-PLAN.md; 02-22 halted at its push step (push denied), so 02-26 and 02-27 are blocked
 last_updated: "2026-11-09T23:22:44.104Z"
 last_activity: 2026-11-09
 last_activity_desc: Completed 02-25 (exc_matrix fixture with 30 mailbox records judged by 30 doc rows in tests/diag/expected.csv, the mailbox judge, and the runner naming a fault it ran past under --no-stop-on-fault; the ci workflow passes 240 of 240 and the hygiene workflow passes)
