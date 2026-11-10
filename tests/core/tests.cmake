@@ -115,7 +115,7 @@ set_target_properties(schwaystation-test-sched PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-sched)
 
-foreach(case IN ITEMS fault_ticks stall_freeze stall_carries event_dispatch state_next_derived)
+foreach(case IN ITEMS fault_ticks stall_freeze stall_carries event_dispatch state_next_derived stall_frame_end no_exe_events)
   schway_add_test(NAME core.sched.${case}
     COMMAND schwaystation-test-sched ${case}
     LABELS core portable TIMEOUT 10)

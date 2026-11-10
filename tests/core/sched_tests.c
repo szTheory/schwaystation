@@ -264,13 +264,65 @@ static void case_state_next_derived(void)
     schway_destroy(inst);
 }
 
+/* A stall that crosses the frame's end ends the frame at the frame's end tick
+   with no instruction run in the stalled stretch, and the rest of the stall is
+   still in the state for the next frame. */
+static void case_stall_frame_end(void)
+{
+    schway *inst = make_spinning();
+    uint64_t end = inst->frame_end;
+    (void)run(inst, end - 1000u - inst->ticks, 0u);
+    CHECK(inst->ticks >= end - 1000u && inst->ticks < end - 900u);
+    uint64_t held = inst->ticks + 5000u;
+    uint64_t c0 = inst->cpu.cycle;
+    inst->dma.stall_until = held;
+    schway_run_result r;
+    memset(&r, 0, sizeof r);
+    r.size = (uint32_t)sizeof r;
+    CHECK_EQ_U64(schway_run_frame(inst, &r), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    CHECK_EQ_U64(r.frame, 1u);
+    CHECK_EQ_U64(r.ticks, end);
+    CHECK_EQ_U64(inst->cpu.cycle, c0);
+    CHECK_EQ_U64(inst->dma.stall_until, held);
+    CHECK(held > end);
+    /* The next frame keeps waiting out the stall, then runs. */
+    CHECK_EQ_U64(schway_run_frame(inst, &r), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    CHECK_EQ_U64(r.frame, 2u);
+    CHECK(inst->cpu.cycle > c0);
+    CHECK_EQ_U64(inst->cpu.cycle - c0, r.ticks - held);
+    schway_destroy(inst);
+}
+
+/* With no program loaded an event that is due runs at its own deadline inside a
+   run, the deadline is recomputed and the ticks reach the budget; one that is
+   far off is left alone. */
+static void case_no_exe_events(void)
+{
+    schway *inst = make();
+    inst->sched.next = inst->ticks + 100u;
+    schway_run_result r = run(inst, 500u, 0u);
+    CHECK_EQ_U64(r.ticks, 500u);
+    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+    CHECK_EQ_U64(inst->cpu.blk_tick, 500u);
+
+    inst->sched.next = inst->ticks + 100000u;
+    r = run(inst, 500u, 0u);
+    CHECK_EQ_U64(r.ticks, 1000u);
+    CHECK_EQ_U64(inst->sched.next, 500u + 100000u);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
     {"event_dispatch", case_event_dispatch},
     {"fault_ticks", case_fault_ticks},
+    {"no_exe_events", case_no_exe_events},
     {"stall_carries", case_stall_carries},
+    {"stall_frame_end", case_stall_frame_end},
     {"stall_freeze", case_stall_freeze},
     {"state_next_derived", case_state_next_derived},
 };

@@ -305,7 +305,8 @@ test card. The CPU runs in blocks of instructions, and a block ends after:
 - the first fault latched in the block.
 
 The cycles of a block are added to the tick counter, and the audio pairs queued, once, when it ends; a first fault
-latched inside a block therefore carries the ticks of the block's start.
+latched inside a block carries the tick its own instruction began on, read from the block clock described under
+"Devices, the block clock and the stall".
 
 **Where a block splits at a budget.** After each instruction the loop compares the cycles run with what is left of the
 budget, and the block ends at the first instruction boundary at or after it. The last instruction can carry the run past
@@ -333,6 +334,42 @@ A double fault is an instruction fetch that fails at an exception vector (`80000
 set): the handler cannot run, so the exception would repeat for ever. When a hook and the frame's end coincide the hook
 is reported and the frame still completes. A guest that loops, or hammers an address no device answers, returns from
 every call: each call runs a bounded number of cycles, whatever the program does.
+
+## Devices, the block clock and the stall
+
+The tick counter moves only when a block ends, so a device that is read inside a block needs a clock of its own. The
+CPU keeps two values that are not state, the tick and the CPU cycle count at the block's start, set at the start of
+every block. The tick of an access is then
+
+    now = block start tick + (cycles run since the block's start) + (cycles this access has spent before its own) - 1
+
+where the last term counts a first cycle of 1, so an access on an instruction's own cycle sees the tick that
+instruction began on. A loop that polls a counter sees it move inside a block, and a fault latched by an instruction
+carries its own start tick whatever its place in a long block. The trace records use the same clock. A power reset, a
+state load and a run with no program restart it at the instance's tick.
+
+**Deadlines.** Each device that keeps time reports the tick it next needs attention at, and the earliest of them is
+kept as the next deadline, derived from the devices and never saved: a power reset and a state load recompute it, and
+a register write that moves a deadline ends the running block at the next instruction boundary, as a write to `I_STAT`
+does. Every block is cut at the next deadline as well as at the budget and the frame's end, and the device's event runs
+at the first instruction boundary at or after the deadline, once per pass of the run loop. A device whose deadline is
+still due after its event waits for the next instruction before it is offered again, so the loop always advances. A
+frame that no program runs holds no armed deadline in practice, and the loop then costs one compare per call.
+
+**The bus stall.** While a DMA unit moves its words it holds the bus. A bus access that has to wait for it, a read of
+RAM or an I/O register, an instruction fetch that misses the cache, or the fifth queued store (writes are buffered in
+the four-deep write queue, so only a full queue waits), sets the tick the CPU is held until. The scratchpad, a cache
+hit, COP0 and the GTE never touch the bus and never wait. The CPU does not execute while the stamp is ahead of the
+tick: the loop advances the tick, within the budget and the frame and stopping at the next deadline so events run on
+time, and the CPU cycle count does not move. This is a freeze rather than a charge on one instruction, because a unit
+can hold the bus for tens of thousands of cycles and charging that to a single instruction would pass the overrun
+bound above. The part of a stall that crosses the end of a budget or of a frame stays in the state and the next call
+keeps waiting, so the overrun past any limit is still at most one instruction.
+
+**The frame end.** With a program loaded the frame end raises `I_STAT` bit 0 and also drives the vertical blank to the
+root counters, high and then low at the same tick, because there is no line machine yet to give the blank a width; the
+counters page covers what they do with it. With no program no counter is stepped and only an event that is already
+due runs.
 
 ## The trace
 
