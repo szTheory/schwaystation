@@ -1,3 +1,4 @@
+gpu.beam.midline_dot_irq	gpu,portable
 gpu.decoder.fill_mmio	gpu,portable
 gpu.decoder.partial_packet_reset	gpu,portable
 gpu.decoder.register_images	gpu,portable

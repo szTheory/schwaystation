@@ -42,6 +42,18 @@ set_target_properties(schwaystation-test-gpu-spans PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu-spans)
 
+add_executable(schwaystation-test-gpu-beam ${CMAKE_CURRENT_LIST_DIR}/beam.c)
+target_include_directories(schwaystation-test-gpu-beam PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-gpu-beam PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-gpu-beam PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-gpu-beam)
+
+# Fault prevented: Timer0 dot-target IRQs drifting to a line boundary or across split runs.
+schway_add_test(NAME gpu.beam.midline_dot_irq
+  COMMAND schwaystation-test-gpu-beam midline_dot_irq
+  LABELS gpu portable TIMEOUT 10)
+
 # Fault prevented: lines or Gouraud polylines lose endpoints, interpolated colors, span rejection,
 # terminator placement, or bounded streaming state.
 schway_add_test(NAME gpu.span.polyline_packet
