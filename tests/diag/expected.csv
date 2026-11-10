@@ -56,3 +56,4 @@ gte_vectors,test_1,*,7893c118,hw,ps1-tests f727802fead1 gte/test-all/tests.c tes
 gte_vectors,test_2,*,8b8ac566,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 2
 gte_vectors,test_3,*,1f546961,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 3
 gte_vectors,test_4,*,72d15a83,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 4
+dma_chain,ot_last,*,00ffffff,hw,ps1-tests f727802fead1 dma/otc-test/main.cpp line 31 (testOtcStandard expects the lowest table word to hold 00FFFFFFh) and psx.log line 2 (pass)

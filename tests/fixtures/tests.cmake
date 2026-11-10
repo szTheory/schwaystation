@@ -282,6 +282,7 @@ schway__fixture(gap_write.exe unbuilt.asm -equ MODE 1)
 set(schway__fixture_extra ${schway__fixture_src}/gte_cases.inc) # the include only gte_vectors.asm reads
 schway__fixture(gte_vectors.exe gte_vectors.asm)
 set(schway__fixture_extra "")
+schway__fixture(dma_chain.exe dma_chain.asm)
 set(schway__fault_kinds unmapped_read unmapped_write unmapped_fetch misaligned_read misaligned_write
   misaligned_fetch reserved_instruction cop_unusable exception_loop)
 set(schway__fault_index 1)
@@ -383,6 +384,18 @@ schway_add_test(NAME fixtures.gte_vectors
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures gte portable TIMEOUT 30)
+
+# Fault prevented: a DMA transfer that is right when the engine is called directly but wrong behind the CPU's
+# stores to the DMA registers and its reads that wait: dma_chain.exe runs the ordering-table transfer and the
+# linked-list cases of the public hardware tests and times the transfer with Timer 2, and
+# tests/diag/expected.csv judges each record.
+schway_add_test(NAME fixtures.dma_chain
+  COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=dma_chain
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/dma_chain.exe -DFRAMES=30
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS dma fixtures portable TIMEOUT 30)
 
 # Fault prevented: a first fault that the runner misses, mislabels or reports with a short tail. Each
 # fault.exe class runs more than 4,096 trace records of preamble, then faults once: exit 7, the fault line
