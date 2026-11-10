@@ -104,6 +104,8 @@ static void body_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u, 1u);
     (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
     schway__bus_state_io(io, inst);
+    schway__state_check(io, ((io->cpu_cause & 0x00000400u) != 0u) ==
+                                ((io->irq_stat & io->irq_mask & SCHWAY__IRQ_BITS) != 0u));
     schway__dma_state_io(io, inst, ticks);
     schway__timers_state_io(io, inst);
     fault_io(io, &inst->fault);

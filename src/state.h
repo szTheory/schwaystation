@@ -56,6 +56,8 @@ struct schway__state_io {
     const uint8_t *r;                 /* VALIDATE and APPLY cursor */
     size_t n;                         /* SIZE and RECORD: bytes counted so far */
     int bad;                          /* VALIDATE: a range or cross-field rule failed */
+    uint32_t cpu_cause;               /* VALIDATE: CAUSE bits carried to the IRQ fields */
+    uint32_t irq_stat, irq_mask;      /* VALIDATE: the saved interrupt registers */
     struct schway__state_field *rec;  /* RECORD: output, or NULL to only count */
     size_t rec_cap;                   /* RECORD: capacity of rec */
     size_t rec_n;                     /* RECORD: fields seen, which may exceed rec_cap */

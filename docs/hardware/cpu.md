@@ -102,6 +102,11 @@ before reaching the bus. The exception is guest-visible and may be handled;
 it is not recorded as a first fault (psx-spx CPU Specifications, Privilege
 levels; docs/hardware/cop0.md, Address errors on the fetch).
 
+If a later word in an instruction-cache refill bus-errors, that word is marked
+invalid and its previous contents are preserved; the CPU restores the first
+fault record because those extra refill reads were not requested (docs/hardware/bus.md,
+Instruction cache).
+
 Each instruction is fetched at the program counter before it is decoded. A program counter that is not a multiple of 4 is
 an address error on the fetch (see Branches and jumps). Otherwise the fetch goes one of three ways, by segment
 (psx-spx CPU Specifications, Segments and I-cache):

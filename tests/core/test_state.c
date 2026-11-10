@@ -704,6 +704,7 @@ static void test_cpu_fields(void)
     schway__irq_raise(inst, 2u);
     CHECK_EQ_U64(schway__irq_line(inst), 0u);
     inst->irq.mask = 0x4u;
+    inst->cpu.cop0.r[13] |= 1u << 10;
     CHECK_EQ_U64(schway__irq_line(inst), 1u);
     schway__irq_raise(inst, 11u);
     CHECK_EQ_HEX(inst->irq.stat, 0x4u);

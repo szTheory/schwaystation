@@ -136,8 +136,12 @@ void schway__bus_state_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u32(io, name_last_addr, &b->last_unbuilt[1], 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_last_width, &b->last_unbuilt[2], 0u, 4u);
     (void)schway__state_u32(io, name_last_pc, &b->last_unbuilt[3], 0u, UINT32_MAX);
-    (void)schway__state_u32(io, name_irq_stat, &inst->irq.stat, 0u, SCHWAY__IRQ_BITS);
-    (void)schway__state_u32(io, name_irq_mask, &inst->irq.mask, 0u, SCHWAY__IRQ_BITS);
+    uint32_t irq_stat = schway__state_u32(io, name_irq_stat, &inst->irq.stat, 0u, SCHWAY__IRQ_BITS);
+    uint32_t irq_mask = schway__state_u32(io, name_irq_mask, &inst->irq.mask, 0u, SCHWAY__IRQ_BITS);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        io->irq_stat = irq_stat;
+        io->irq_mask = irq_mask;
+    }
     /* The cost table is derived from the delay registers, so a load rebuilds it. */
     if (io->mode == SCHWAY__STATE_APPLY) {
         port_costs(b);
