@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-11-10T05:17:56.628Z"
+stopped_at: Completed 03-05-PLAN.md
+last_updated: "2026-11-10T05:27:12.995Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 132b55a4c68acdc157db5ae439046ec21610b162
+state_head: 4fc5bffeb784152a69e886f9c04e0b879c041683
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 46
+  completed_plans: 47
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 5 of 26
+Plan: 6 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -105,6 +105,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P02 | 6 min | 3 tasks | 13 files |
 | Phase 03 P03 | 11 min | 3 tasks | 12 files |
 | Phase 03 P04 | 3 min | 3 tasks | 13 files |
+| Phase 03 P05 | 7 min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -210,6 +211,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-03: schway__sched_sync restarts the block clock after a power reset, a state load, a no-program run and the one-instruction entry, so fault.ticks needed no phase-2 assertion change
 - [Phase 03]: 03-04: the stall hook is called once per bus_access for reads and fetches on RAM, I/O, EXP1-3 and BIOS (not stores, scratchpad, gaps or the cache-control word); an I_STAT read syncs the timers and a write recomputes the deadline; core.bus_unbuilt reads owned=672 unbuilt=3228 gap=8388
 - [Phase 03]: 03-04: the interrupt entry's EPC read and the I-cache refill words reach the DMA hook through throwaway cycle sinks; plan 03-08 decides whether the EPC read may set a stall
+- [Phase 03]: 03-05: the GTE register file is seeded from ares interpreter-gte.cpp at 9408cb43d4948fc3ea6e152a307a34348df3fe04 with an SPDX header, a notices section and a PROVENANCE seed row; 16-bit registers are stored as patterns and extended on read, FLAG bit 31 is recomputed on write, on read and at the end of every command, and the 50 register-only hardware cases pass
 
 ### Pending Todos
 
@@ -267,8 +269,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T05:17:56.490Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-11-10T05:27:12.809Z
+Stopped at: Completed 03-05-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
