@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-11-PLAN.md
-last_updated: "2026-11-10T06:51:21.684Z"
+stopped_at: Completed 03-12-PLAN.md
+last_updated: "2026-11-10T07:00:05.992Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 6acaaf008ac114f3cb69fefc6ded21f2bf3d38fe
+state_head: f8edc3b6c79a33dbca4c89d10f5e0997c6f5205a
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 54
+  completed_plans: 55
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 13 of 26
+Plan: 14 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -113,6 +113,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P07 | 9min | 3 tasks | 5 files |
 | Phase 03 P10 | 7 min | 3 tasks | 6 files |
 | Phase 03 P11 | 10 min | 3 tasks | 9 files |
+| Phase 03 P12 | 10 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -232,6 +233,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-10: a sync 1 block takes its channel's request bit with it and schway__dma_dreq raises it again (a raise with the engine idle starts the channel); the linked-list and reserved modes are not pending until plans 03-14 and 03-15
 - [Phase 03]: 03-10: a unit costs n * rate + ceil(n / 16) with rates 1 (MDEC, GPU, OTC), 24 (CD-ROM, BIOS default; 40 is the phase-6 device end's choice), 4 (SPU), 20 (PIO); a sync 1 block adds a derived 11; the stub sink's word count and CRC-32 sit in dma.words and dma.crc, and remain is bounded at 10000h in the state walk
 - [Phase 03]: Plan 03-11: beam blank levels are stored state (timers.blank); a blank push of the held level is no edge; a blank reset has no hold; counters on dot or hblank clocks give no scheduler deadline
+- [Phase 03]: gte_vectors: register moves are .word encodings in macros (armips takes no macro argument as a coprocessor register); the loop variant uses -definelabel LOOP 1
 
 ### Pending Todos
 
@@ -289,8 +291,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T06:51:21.306Z
-Stopped at: Completed 03-11-PLAN.md
+Last session: 2026-11-10T07:00:05.788Z
+Stopped at: Completed 03-12-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
