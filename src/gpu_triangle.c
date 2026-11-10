@@ -55,10 +55,29 @@ static struct schway__gpu_edge make_edge(const struct schway__gpu_point *a,
     return edge;
 }
 
+static uint32_t spans_allowed(const struct schway__gpu_point *points, uint32_t count)
+{
+    int32_t min_x = points[0].x;
+    int32_t max_x = points[0].x;
+    int32_t min_y = points[0].y;
+    int32_t max_y = points[0].y;
+    for (uint32_t i = 1u; i < count; i++) {
+        if (points[i].x < min_x) min_x = points[i].x;
+        if (points[i].x > max_x) max_x = points[i].x;
+        if (points[i].y < min_y) min_y = points[i].y;
+        if (points[i].y > max_y) max_y = points[i].y;
+    }
+    return (int64_t)max_x - min_x <= 1023 && (int64_t)max_y - min_y <= 511;
+}
+
 static void render_triangle(schway *inst, struct schway__gpu_point a,
                             struct schway__gpu_point b, struct schway__gpu_point c,
                             uint32_t color, uint32_t flags)
 {
+    const struct schway__gpu_point triangle_points[3] = {a, b, c};
+    if (spans_allowed(triangle_points, 3u) == 0u) {
+        return;
+    }
     int64_t area = triangle_area(&a, &b, &c);
     if (area == 0) {
         return;
@@ -147,6 +166,9 @@ void schway__gpu_polygon(schway *inst, const uint32_t *position_words, uint32_t 
     for (uint32_t i = 0u; i < vertex_count; i++) {
         points[i].x = sign11(position_words[i]) + offset_x;
         points[i].y = sign11(position_words[i] >> 16) + offset_y;
+    }
+    if (spans_allowed(points, vertex_count) == 0u) {
+        return;
     }
 
     struct schway__gpu_point first[3] = {points[0], points[1], points[2]};
