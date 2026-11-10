@@ -25,7 +25,6 @@
 
 .definelabel CASE_BYTES, 66 * 4
 .definelabel KSEG1, 0x20000000          ; added to a KSEG0 address it names the same RAM, uncached
-.definelabel GTE_RUN_CASES, 1
 
 ; gte_w_d n / gte_w_c n: write word n of the buffer at a0 to data register n (MTC2) or control register n
 ; (CTC2). The register number is in the instruction, so each of the 64 is its own copy.
@@ -111,7 +110,7 @@ mailbox_header 7, 0
   li s4, scratch
 run_all:
   li s0, gte_cases
-  li s1, GTE_RUN_CASES
+  li s1, GTE_CASE_COUNT
   li s2, MB_BASE + MB_RECORDS           ; the next record's address
   li s3, 0x00010001                     ; its id word: id 1, flags valid
 
@@ -155,7 +154,7 @@ registers_only:
   nop
 .else
   li t0, MB_BASE
-  li t1, GTE_RUN_CASES
+  li t1, GTE_CASE_COUNT
   sb t1, MB_COUNT(t0)
 finish:
   mailbox_seal

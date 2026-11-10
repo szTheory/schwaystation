@@ -741,6 +741,94 @@ static void split_with_exe(const char *dir)
     schway_destroy(inst);
 }
 
+/* The whole of a file of at most 1 MiB, NUL-terminated after its n bytes. */
+static uint8_t *read_whole(const char *path, size_t *n)
+{
+    const size_t cap = (size_t)1u << 20;
+    FILE *f = fopen(path, "rb");
+    if (f == NULL) {
+        fprintf(stderr, "%s: cannot open\n", path);
+        exit(1);
+    }
+    uint8_t *buf = (uint8_t *)malloc(cap + 1u);
+    if (buf == NULL) {
+        exit(1);
+    }
+    *n = fread(buf, 1u, cap, f);
+    CHECK(*n > 0u && *n < cap);
+    buf[*n] = 0u;
+    fclose(f);
+    return buf;
+}
+
+/* The expected values of the gte_vectors fixture and the vector file are two paths to one value: every
+   gte_vectors row of the CSV is hw, its citation ends in the case number, and its value is the CRC-32 of that
+   case's 64 output words (little-endian bytes) in the vector file (a u32 count, then 516-byte records: the
+   command word, 64 inputs, 64 outputs). A value that drifted, a case that is not in the file and a CSV with
+   no gte_vectors row all fail.
+   Fault prevented: an expected value that drifted from the vector file it claims to come from. */
+static void gte_vectors_guard(const char *bin_path, const char *csv_path)
+{
+    const size_t record = 516u;
+    const size_t out_at = 4u + 64u * 4u; /* the outputs follow the command word and the inputs */
+    size_t bn = 0u;
+    size_t cn = 0u;
+    uint8_t *bin = read_whole(bin_path, &bn);
+    char *csv = (char *)read_whole(csv_path, &cn);
+    CHECK(bn >= 4u);
+    const uint32_t cases = bn >= 4u ? le32(bin) : 0u;
+    CHECK(cases > 0u && bn == 4u + (size_t)cases * record);
+    uint32_t rows = 0u;
+    char *line = csv;
+    while (*line != '\0') {
+        char *end = strchr(line, '\n');
+        if (end != NULL) {
+            *end = '\0';
+        }
+        if (strncmp(line, "gte_vectors,", 12u) == 0) {
+            char *field[6];
+            uint32_t nf = 0u;
+            char *p = line;
+            while (nf < 6u) {
+                field[nf++] = p;
+                p = strchr(p, ',');
+                if (p == NULL) {
+                    break;
+                }
+                *p++ = '\0';
+            }
+            CHECK_EQ_U64(nf, 6u);
+            if (nf == 6u) {
+                CHECK(strchr(field[5], ',') == NULL); /* a seventh field: the judge splits on commas */
+                char *tail = NULL;
+                const unsigned long want = strtoul(field[3], &tail, 16);
+                CHECK(field[3][0] != '\0' && *tail == '\0' && strlen(field[3]) == 8u);
+                CHECK(strcmp(field[4], "hw") == 0);
+                const char *at = strstr(field[5], " test ");
+                const unsigned long n = at != NULL ? strtoul(at + 6, &tail, 10) : 0ul;
+                CHECK(at != NULL && *tail == '\0' && n >= 1ul && n <= cases);
+                if (at != NULL && n >= 1ul && n <= cases && bn == 4u + (size_t)cases * record) {
+                    const uint8_t *words = bin + 4u + (size_t)(n - 1ul) * record + out_at;
+                    const uint32_t got = schway__crc32_update(0u, words, 256u);
+                    if (got != (uint32_t)want) {
+                        fprintf(stderr, "%s: case %lu: the row says %08lx, the vector file's outputs give %08x\n",
+                                field[1], n, want, (unsigned)got);
+                        check_failures++;
+                    }
+                }
+            }
+            rows++;
+        }
+        if (end == NULL) {
+            break;
+        }
+        line = end + 1;
+    }
+    CHECK(rows > 0u);
+    free(bin);
+    free(csv);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -776,6 +864,8 @@ int main(int argc, char **argv)
         bounded();
     } else if (strcmp(c, "split_with_exe") == 0 && argc == 3) {
         split_with_exe(argv[2]);
+    } else if (strcmp(c, "gte_vectors_guard") == 0 && argc == 4) {
+        gte_vectors_guard(argv[2], argv[3]);
     } else {
         fprintf(stderr, "schwaystation-test-boot: unknown case %s\n", c);
         return 2;

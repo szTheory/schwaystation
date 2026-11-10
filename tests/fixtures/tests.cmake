@@ -508,3 +508,10 @@ schway_add_test(NAME fixtures.boot.bounded
 schway_add_test(NAME fixtures.boot.split_with_exe
   COMMAND schwaystation-test-boot split_with_exe ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: an expected value that drifted from the vector file it claims to come from: every
+# gte_vectors row is recomputed from tests/vectors/gte/ps1tests-1150.bin in C and compared with the CSV.
+schway_add_test(NAME fixtures.gte_vectors.guard
+  COMMAND schwaystation-test-boot gte_vectors_guard
+    ${PROJECT_SOURCE_DIR}/tests/vectors/gte/ps1tests-1150.bin ${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+  LABELS fixtures gte portable TIMEOUT 30)
