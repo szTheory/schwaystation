@@ -51,6 +51,19 @@ Add `--region ntsc-j` or `--region pal` for the other regions' timing. The test 
 counter on the left, red, green, blue and grey ramps, a one-dot checkerboard and a frame counter that changes
 every frame.
 
+## Run a program
+
+The CPU runs a PS-X EXE under a small built-in kernel, with no BIOS. Give the runner the file:
+
+```sh
+bin/schwaystation-run --exe program.exe --tty
+```
+
+`--tty` prints the program's text and lets the program end the run; otherwise a run is 600 frames. To see
+what a file is without running it, use `--probe program.exe`. If the program faults, `--trace first-fault` prints the
+last instructions before the fault. All options, output lines and exit statuses are in
+[docs/runner.md](docs/runner.md).
+
 ## BIOS and discs
 
 You bring your own BIOS and disc images, dumped from hardware you own; schwaystation distributes neither

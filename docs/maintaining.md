@@ -165,6 +165,10 @@ and artifacts, never a gate. A failed night opens or comments on the one open is
 night closes it. To see the issue written, run it by hand on any branch with `force_failure` set:
 `gh workflow run nightly.yml --ref <branch> -f force_failure=true`.
 
+Two more jobs in the same workflow report through the same issue and are not part of `CI required`: `vectors-full`
+replays all 55,000 public CPU vectors at their pin, and `fuzz` runs the loader's fuzz target for 60 seconds. Both are
+described in [testing.md](testing.md#the-full-vectors); a red one is a finding to fix, not a block on a merge.
+
 ## After the first release
 
 One `ci:` pull request completes the first release's CI tail before the next phase starts:
@@ -190,3 +194,59 @@ next long-term-support line before the current one's end of life. Each bump is o
 digest comes from the release API (the asset's `digest` field). Packages installed with apt stay unpinned: they
 are signed, and drift fails loudly as a build failure or a hash change. Actions are pinned by commit SHA in the
 workflows, with the tag in a comment; `policy.action_pins` rejects any other reference.
+
+## Bumping armips
+
+armips assembles the fixtures and the stub kernel. A bump takes a new commit of the assembler, never a moving
+branch, and ends with the stub kernel checked against its source.
+
+1. Find the commit and its 12-character short form: `gh api repos/Kingcom/armips/commits/master --jq .sha`.
+2. Hash the archive of that full commit: `curl -fsSL https://github.com/Kingcom/armips/archive/<sha>.tar.gz | shasum -a 256`.
+3. Check what the archive vendors: `gh api 'repos/Kingcom/armips/contents/ext?ref=<sha>' --jq '.[].name'`. A new
+   submodule or a new vendored directory needs its row in `PROVENANCE.md` and a look at whether the build fetches it.
+4. Replace the `armips` row of `pins.txt` with the short commit, the archive URL and the digest, and the commit and
+   digest in the Kingcom/armips row of `PROVENANCE.md`.
+5. Build from nothing: `rm -rf build/ci && cmake --workflow --preset ci`. Configure fails with the expected and the
+   found digest if step 2 was wrong.
+6. If `fixtures.stub_drift` fails, the new assembler produced other bytes: follow
+   [Regenerating the stub kernel](#regenerating-the-stub-kernel) from its second step.
+7. Open one `ci:` pull request; `hash-equality` shows the eight lanes agree.
+
+## Re-pinning the CPU vectors
+
+The vectors are the SingleStepTests `r3000` files. `pins.txt` names each by its git blob SHA-1, and
+`tests/vectors/r3000/sst-sample.bin` holds the first 100 cases of each. Moving the pin replaces both.
+
+1. Find the commit: `gh api repos/SingleStepTests/r3000/commits/main --jq .sha`; its first 12 characters are the pin.
+2. List the files at it, as `pins.txt` rows:
+   `gh api 'repos/SingleStepTests/r3000/contents/v1?ref=<sha>' --jq '.[] | select(.name|endswith(".json.bin")) | "r3000-\(.name|rtrimstr(".json.bin")) <pin> \(.sha) \(.size)"'`.
+   Replace the `r3000-` rows of `pins.txt` with the output, and the pin in the comment above them.
+3. Fetch and check each file, never committing one:
+   `rm -rf build/sst && mkdir -p build/sst`, then
+   `grep '^r3000-' pins.txt | while read -r name _ sha _; do f=build/sst/${name#r3000-}.json.bin; gh api "repos/SingleStepTests/r3000/git/blobs/$sha" -H 'Accept: application/vnd.github.raw' > "$f"; test "$(git hash-object "$f")" = "$sha" || exit 1; done`.
+4. Slice the sample: `python3 -I tools/sst_slice.py build/sst tests/vectors/r3000/sst-sample.bin`, then
+   `shasum -a 256 tests/vectors/r3000/sst-sample.bin`.
+5. Put the new pin and that digest in the sample's row of `tests/fixtures/manifest.txt`. Put the pin wherever the old one
+   is named: `git grep -n <old pin> -- ':!pins.txt'` lists `ASSET_POLICY.md`, `PROVENANCE.md` and
+   `THIRD-PARTY-NOTICES.md`, the last with the full commit.
+6. If the number of files changed, change the case counts, 5500 for the sample in `tests/vectors/tests.cmake` and
+   55000 for the full set in `tests/nightly/tests.cmake`.
+7. Run both lanes: `cmake --workflow --preset ci`, then `cmake --workflow --preset nightly`. A case that now fails is
+   either a core bug to fix or an upstream error: the second is a dated line in `tests/vectors/r3000/allow.txt` with the
+   upstream issue's URL, and nothing else.
+
+## Regenerating the stub kernel
+
+`src/stub_kernel.c` is the assembled `tests/fixtures/src/stub/stub.asm` as a byte array. Never edit it by hand;
+`fixtures.stub_drift` fails while it differs from the source.
+
+1. Edit `tests/fixtures/src/stub/stub.asm`.
+2. Assemble it: `cmake --preset ci && cmake --build --preset ci`.
+3. Write the array:
+   `cmake -DCASE=array -DFILE=build/ci/fixtures/stub.bin -DOUT=src/stub_kernel.c -P tests/fixtures/tests.cmake`.
+4. Measure both files: `shasum -a 256 build/ci/fixtures/stub.bin src/stub_kernel.c` and
+   `wc -c < build/ci/fixtures/stub.bin`.
+5. Put the digest of `src/stub_kernel.c` in its row of `tests/fixtures/manifest.txt`, and the image's size and digest in
+   the Stub kernel row of `PROVENANCE.md`.
+6. Run everything again: `cmake --workflow --preset ci`. The hashes of any frame the stub ran change with it, in
+   `build/ci/hashes.txt`, and all eight lanes must still agree.

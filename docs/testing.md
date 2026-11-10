@@ -64,7 +64,34 @@ names each by its git blob SHA-1 (`r3000-<NAME>` rows). Fetch a file with
 `build/sst/<NAME>.json.bin` and check it with `git hash-object`; configure fails naming any file
 `SCHWAYSTATION_SST_DIR` lacks, so the lane never skips. The harness's `--upstream DIR --prefix-of SAMPLE` reads
 them and fails unless the first records of each equal the committed sample. The `vectors-full` job in
-`nightly.yml` does this on a schedule; it reports through the nightly issue and is not part of `CI required`.
+`nightly.yml` does this on a schedule; it reports through the nightly issue and is not part of `CI required`. The
+workflow's other jobs, the benches and the loader fuzz campaign below, report the same way and also sit outside
+`CI required`.
+
+### The vectors harness
+
+`schwaystation-test-vectors` replays public single-step vectors through the CPU's one-instruction entry, replaying the
+bus from each case's recorded cycles and comparing the final state field by field.
+
+```text
+schwaystation-test-vectors FILE --expect N [--only NAME,...] [--allow FILE] [--flip-expected FIELD[@NAME]]
+schwaystation-test-vectors --upstream DIR --prefix-of SAMPLE --expect N [--allow FILE]
+```
+
+| Option | Meaning |
+|---|---|
+| `FILE` | The committed sample, `tests/vectors/r3000/sst-sample.bin`: the first 100 cases of each of the 55 upstream files. |
+| `--expect N` | Fail unless at least N cases ran, so a run that read nothing or part of a file cannot pass. |
+| `--only NAME,...` | Run only the named slices; a name that does not exist is an error. |
+| `--allow FILE` | Accept the listed failing cases. A line is `YYYY-MM-DD NAME CASE-HEX ISSUE-URL`; a line that matches no failing case is an error, so an allowance goes when its failure is fixed. `tests/vectors/r3000/allow.txt` holds no entry. |
+| `--flip-expected FIELD[@NAME]` | Invert one bit of one case's expected final field, the first case of slice `NAME` if one is named; the negative controls use it. |
+| `--upstream DIR` | Replace each slice by the whole upstream file `DIR/NAME.json.bin`, which must begin with the sample's records byte for byte. Goes with `--prefix-of SAMPLE`, and then no positional `FILE`. |
+
+The exit status is 0 when every case passed and `N` or more ran, 1 for a failure or a malformed file and 2 for a bad
+command line. Two named rules, each counted in the output and each with its own control, adjust the comparison for
+what the vectors record: a misaligned halfword or word access is compared by the exception it must raise, and the
+unaligned loads and stores (LWL, LWR, SWL, SWR) by the set of bytes they cover. `vectors.r3000.sample` runs the sample on
+every lane; `vectors.r3000.full` runs all 55,000 cases in the `nightly` lane.
 
 ### The loader fuzz target
 
@@ -136,6 +163,26 @@ cmake -DJUNIT=build/ci/junit.xml -DINVENTORY=tests/inventory/ci.txt -DEXCLUDE=re
 It fails unless every selected inventory test whose labels match `LABELS` and not `EXCLUDE` appears exactly once,
 ran, and did not fail, error or skip. `policy.no_skip` fails when any test file sets a skip return code, a skip
 regular expression or disables a test, so no test is ever conditional.
+
+## The fixtures toolchain
+
+The PS-EXE fixtures are programs written in MIPS assembly for the pinned armips, an MIT-licensed assembler. Their
+sources are in `tests/fixtures/src` (`header.inc` and `mailbox.inc` are shared by all of them), and the stub kernel's
+is `tests/fixtures/src/stub/stub.asm`.
+
+- `pins.txt` has one `armips` row: a version, the URL of the archive of one full 40-character commit, and its
+  SHA-256. `cmake/Armips.cmake` downloads the archive into `build/<preset>/pins`, fails configure unless the digest
+  matches, and builds armips for the host. Nothing is installed on the machine. `fixtures.armips_pin.self_test` feeds
+  the check a wrong digest.
+- `tests/fixtures/tests.cmake` assembles each source into `build/<preset>/fixtures`; no fixture is committed. The
+  one generated file that is, `src/stub_kernel.c`, is the stub kernel as a byte array, listed in
+  `tests/fixtures/manifest.txt`; `fixtures.stub_drift` compares it with the freshly assembled image on every lane.
+  [Maintaining](maintaining.md) has the commands to rebuild it.
+- A test names the fixture it runs: `schwaystation-run --exe FIXTURE ...` for what the runner reports, and
+  `schwaystation-test-boot CASE` for what only the core can show (the launch block, the stub's exception record, the
+  debug-port bytes). The `nightly` preset sets `SCHWAYSTATION_FIXTURES=OFF` and never builds armips.
+- Every hosted leg and every local build uses the same assembler, so a fixture's bytes, and with them the `exe` line
+  of `hashes.txt`, are the same everywhere.
 
 ## Judged fixtures
 
