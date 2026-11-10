@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
 status: executing
-stopped_at: Completed 02-22-PLAN.md; next is 02-26
-last_updated: "2026-11-09T23:55:01.594Z"
+stopped_at: Completed 02-26-PLAN.md; next is 02-27
+last_updated: "2026-11-10T00:04:05.272Z"
 last_activity: 2026-11-09
-last_activity_desc: Completed 02-22 (loader fuzz target and gating replay; nightly fuzz run 42720996208 success with ASan at 53 exec/s and no crash; hosted CI run 42722584020 green on every leg after two be32 fixes)
-state_head: e24383d9df5804b4f897c94fb212d0531c4767e5
+last_activity_desc: Completed 02-26 (gate total 1495 of 1520 with no deferral; testing and maintaining guides, README, planning-ID and emulator-name scans both exit 1, source tree clean after a clean ci workflow); 02-27 is next
+state_head: c2b1c639af702077ad4ab8c182c46f94f263291e
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 40
+  completed_plans: 41
   percent: 17
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 26 of 27
+Plan: 27 of 27
 Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-22: the loader fuzz target; nightly run 42720996208 green (first ASan run, 53 exec/s, no crash) and hosted CI run 42722584020 green on 5c99bb4 after two be32 fixes (02-22-SUMMARY.md); 02-26 and 02-27 are unblocked
+Last activity: 2026-11-09 — Completed 02-26: the final gate total is 1495 of 1520 lines and nothing is deferred; the testing and maintaining guides and the README are written, both leak scans exit 1 and a clean ci workflow leaves the source tree untouched (02-26-SUMMARY.md); only 02-27, the hosted run, is left
 
 Progress: [██░░░░░░░░] 17%
 
@@ -98,6 +98,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P24 | 12min | 3 tasks | 13 files |
 | Phase 02 P25 | 25min | 3 tasks | 8 files |
 | Phase 02 P22 | 55min | 3 tasks | 13 files |
+| Phase 02 P26 | 9 min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -193,6 +194,7 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-23: --stop-on mailbox reads the fixture mailbox through schway_peek once per frame; done with a matching CRC-32 exits 0, a fault status or a CRC mismatch exits 6, and no verdict by the frame cap prints hang frames=N pc=0x... and exits 8, only under --stop-on, so a plain --exe run at its cap still exits 0 — A fault status skips the CRC check because the stub kernel writes FFh over the status word without rewriting the CRC; the exit-table check compares --help with docs/runner.md both ways and the gate total is 1494 lines against 1520 (plan 02-26 decides any deferral)
 - [Phase 02]: 02-24: an --exe run goes through schway_run per frame with stop-on-fault on by default and exit 7; the unbuilt line's n is the last device's count, printed once at the end of any --exe run; --trace and --no-stop-on-fault need --exe
 - [Phase 02]: 02-25: the mailbox judge pairs a fixture's CSV rows with its records by order (row n is record id n) and lives in the fixtures script case; under --no-stop-on-fault the runner prints the first fault the program made at the end of the run and keeps the run's status — ExcCode persists until the next exception, so the masked-line and CAUSE-after-I_STAT doc rows read 1Ch, not 0; those two rows and the interrupt EPC (MTC0 plus 8) pin models, not measurements, and change only through tests/diag/allow.txt
+- [Phase 02]: 02-26: the gate-line total is 1495 of 1520 after the last gate of the phase, so no check is deferred; the cap is never raised and ship ratchets it to the measured total — The stub regeneration commands live once, in docs/maintaining.md, with the armips and vectors procedures; the vectors one reproduced the committed sample byte for byte
 
 ### Pending Todos
 
@@ -247,8 +249,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-09T23:55:01.480Z
-Stopped at: Completed 02-22-PLAN.md; next is 02-26
+Last session: 2026-11-10T00:04:05.100Z
+Stopped at: Completed 02-26-PLAN.md; next is 02-27
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
