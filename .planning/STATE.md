@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-11-10T04:51:10.185Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-11-10T04:59:16.830Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 693df674351d40eb781a3912a70d420249a9ae41
+state_head: 4861f31ce18801157bd8c3db8cbefa9897d7bc85
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 43
+  completed_plans: 44
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 2 of 26
+Plan: 3 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -102,6 +102,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P26 | 9 min | 3 tasks | 6 files |
 | Phase 02 P27 | 37 min | 3 tasks | 7 files |
 | Phase 03 P01 | 25 min | 3 tasks | 30 files |
+| Phase 03 P02 | 6 min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -201,6 +202,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-27: build timeout 11 min (windows-x64 311 s, run 42725764966), hygiene 2 min, rehearsal 13 min; floors kept for asan, be32, wasm32, nofp, vectors-full, fuzz; each cites a run of this phase
 - [Phase 03]: 03-01: SCHWAY__DMA_BUSY_MAX is 2,691,328 cycles (65,536 words at the CD's 40 per word, 17 per 16 words on the RAM side, 256 per-unit overhead); CHCR mask 71770703h, DICR mask 7FFF803Fh, the timers' base tick is never walked and a load sets it to the loaded ticks
 - [Phase 03]: 03-01: the state field caps in test_state.c and test_run.c are 128, the embed test lists the new object libraries, and core.state.device_fields pins the DMA stored-bit and started-channel refusals that the max+1 sweep cannot reach
+- [Phase 03]: 03-02: gte_cases.inc holds 26 records of 66 words (case number, opcode, 64 inputs): one per command chosen by output FLAG, plus register-only cases 1 to 4
+- [Phase 03]: 03-02: policy.gate_budget limit is 1513, the measured total with policy.notices (30 lines) in; the vector file is a count plus 516-byte records (593,404 bytes, sha256 e8a0e61a...d9c2; the records alone hash to ed630d2f...58d2)
 
 ### Pending Todos
 
@@ -258,8 +261,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T04:51:10.096Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-11-10T04:59:16.735Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
