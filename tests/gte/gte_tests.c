@@ -1,11 +1,14 @@
 /* The geometry engine's tests; one case per command-line argument.
      schwaystation-test-gte vectors FILE --expect N [--ops LIST]
+     schwaystation-test-gte regs_sweep
    vectors replays the hardware cases of FILE (vectors.h) through the engine's
    register and command entry points. LIST holds hex command numbers and "reg"
    for the register-only cases; only those cases run. It prints the number of
    cases run and the first register that differs in each failing case. Exit 0
    when exactly N cases ran and all matched, 1 for a failure or another count,
-   2 for a bad command line. */
+   2 for a bad command line. regs_sweep drives every register and every command
+   with edge values and checks that reads repeat; run under the sanitizers, it
+   also proves the engine touches nothing outside its struct. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,11 +160,67 @@ static int run_vectors(int argc, char **argv)
     return failed != 0 ? 1 : 0;
 }
 
+/* Every register at edge values, then every command number with sf and lm both
+   ways on registers filled with each edge value. Reads must repeat, and a
+   command must not claim more cycles than the longest one. */
+static int run_regs_sweep(void)
+{
+    static const uint32_t values[7] = {0u,          0x7FFFu,     0x8000u,    0xFFFFu,
+                                       0x7FFFFFFFu, 0x80000000u, 0xFFFFFFFFu};
+    struct schway__gte *g = malloc(sizeof *g);
+    if (g == NULL) {
+        return 1;
+    }
+    int bad = 0;
+    for (uint32_t idx = 0u; idx < 64u; idx++) {
+        for (uint32_t k = 0u; k < 7u; k++) {
+            schway__gte_reset(g);
+            schway__gte_write(g, idx, values[k]);
+            uint32_t a = schway__gte_read(g, idx);
+            uint32_t b = schway__gte_read(g, idx);
+            if (a != b) {
+                fprintf(stderr, "regs_sweep: register %u reads %08lX then %08lX\n", (unsigned)idx,
+                        (unsigned long)a, (unsigned long)b);
+                bad = 1;
+            }
+        }
+    }
+    for (uint32_t cmd = 0u; cmd < 64u; cmd++) {
+        for (uint32_t flags = 0u; flags < 4u; flags++) {
+            uint32_t op = cmd | (flags & 1u) << 19 | (flags >> 1) << 10;
+            for (uint32_t k = 0u; k < 7u; k++) {
+                schway__gte_reset(g);
+                for (uint32_t idx = 0u; idx < 64u; idx++) {
+                    schway__gte_write(g, idx, values[k]);
+                }
+                uint32_t cycles = schway__gte_exec(g, op);
+                if (cycles > SCHWAY__GTE_STALL_MAX) {
+                    fprintf(stderr, "regs_sweep: command %02lX takes %lu cycles\n",
+                            (unsigned long)cmd, (unsigned long)cycles);
+                    bad = 1;
+                }
+                for (uint32_t idx = 0u; idx < 64u; idx++) {
+                    if (schway__gte_read(g, idx) != schway__gte_read(g, idx)) {
+                        fprintf(stderr, "regs_sweep: register %u after command %02lX differs\n",
+                                (unsigned)idx, (unsigned long)cmd);
+                        bad = 1;
+                    }
+                }
+            }
+        }
+    }
+    free(g);
+    return bad;
+}
+
 int main(int argc, char **argv)
 {
     if (argc >= 2 && strcmp(argv[1], "vectors") == 0) {
         return run_vectors(argc, argv);
     }
-    fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST]\n");
+    if (argc == 2 && strcmp(argv[1], "regs_sweep") == 0) {
+        return run_regs_sweep();
+    }
+    fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST] | regs_sweep\n");
     return 2;
 }

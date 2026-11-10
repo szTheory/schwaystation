@@ -17,3 +17,11 @@ set(gte_vectors_bin ${PROJECT_SOURCE_DIR}/tests/vectors/gte/ps1tests-1150.bin)
 schway_add_test(NAME gte.vectors.part1
   COMMAND schwaystation-test-gte vectors ${gte_vectors_bin} --expect 50 --ops reg
   LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: a register index, an edge value or a command number that
+# reads or writes outside the engine's struct, reads differently twice, or
+# claims more than the longest command's cycles. The asan lane's ASan and
+# UBSan do the bounds proof; the program checks the rest.
+schway_add_test(NAME gte.regs.sweep
+  COMMAND schwaystation-test-gte regs_sweep
+  LABELS gte portable TIMEOUT 30)
