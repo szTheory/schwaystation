@@ -139,10 +139,11 @@ void schway__gpu_pixel(schway *inst, uint32_t x, uint32_t y, uint16_t texel, uin
     uint32_t blue8 = source_channel(texel, color, flags, 2u);
     uint32_t dither_on = (flags & SCHWAY__GPU_PIXEL_DITHER_ELIGIBLE) != 0u &&
                          (g->draw_mode & (1u << 9)) != 0u &&
-                         !((flags & (SCHWAY__GPU_PIXEL_RAW_TEXTURE |
+                         !(textured != 0u &&
+                           (flags & (SCHWAY__GPU_PIXEL_RAW_TEXTURE |
                                      SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT)) ==
-                           (SCHWAY__GPU_PIXEL_RAW_TEXTURE |
-                            SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT));
+                               (SCHWAY__GPU_PIXEL_RAW_TEXTURE |
+                                SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT));
     int32_t dither = dither_on != 0u ? dither_value(x, y) : 0;
     uint32_t foreground_red = quantize_channel(red8, dither);
     uint32_t foreground_green = quantize_channel(green8, dither);
