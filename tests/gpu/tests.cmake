@@ -48,6 +48,21 @@ schway_add_test(NAME gpu.span.polyline_packet
   COMMAND schwaystation-test-gpu-spans polyline_packet
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: rectangle size modes, zero/max fields, clipping, E5, or dither change coverage.
+schway_add_test(NAME gpu.span.rectangle_sizes
+  COMMAND schwaystation-test-gpu-spans rectangle_sizes
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: rectangle texture UV/page wrapping, raw/modulated pixels, or texture ABE changes.
+schway_add_test(NAME gpu.span.rectangle_texture
+  COMMAND schwaystation-test-gpu-spans rectangle_texture
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: v0 profile accidentally applies v2-only rectangle texture flips.
+schway_add_test(NAME gpu.span.rectangle_profile
+  COMMAND schwaystation-test-gpu-spans rectangle_profile
+  LABELS gpu portable TIMEOUT 10)
+
 # Fault prevented: a GP0 fill that is lost between the bus and VRAM, or uses
 # byte rather than halfword coordinates, sizing, or color conversion.
 schway_add_test(NAME gpu.decoder.fill_mmio

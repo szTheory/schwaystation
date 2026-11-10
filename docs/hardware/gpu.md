@@ -71,8 +71,36 @@ These precision and rounding choices are a deterministic core model: the GPU spe
 interpolation precision, and no hardware-precision measurement is claimed here. Gouraud or modulated polygon pixels
 are dither-eligible; flat untextured polygons are not. Raw textured semi-transparent polygons do not acquire dither.
 
+## Lines and polylines
+
+Flat and Gouraud GP0 lines include both endpoints. A coincident line writes one pixel using its first color. The
+renderer adds signed E5 offsets, rejects the whole line when its vertex delta exceeds 1023 horizontally or 511
+vertically, then clips each sample against the inclusive E3/E4 draw area before writing through the shared pixel
+helper. Lines are dither-eligible, including flat lines, when E1 dithering is enabled; ABE uses the same blend path
+as other untextured primitives.
+
+The line walk uses an integer major-axis error accumulator. Coordinates and each 8-bit Gouraud channel use nearest
+integer stepping with midpoint ties rounded away from the starting value; both endpoint values are exact. This is a
+deterministic model choice. PSX-SPX describes inclusive Bresenham-class lines but does not specify tie handling or
+channel precision, and no hardware arithmetic measurement is claimed here.
+
+Polylines retain only their current vertex, color, next Gouraud color, mode, and parser phase. Each received vertex
+can emit at most one bounded line segment. The terminator mask is checked only where the stream expects a vertex in
+flat mode or a color in Gouraud mode. Those fields are part of the validated save state so a partial polyline can
+resume deterministically.
+
+## Rectangle texture flips
+
+Rectangles draw one span per row, with 10-bit width and 9-bit height masked directly from the variable-size word;
+zero dimensions draw nothing. Fixed sizes are 1 by 1, 8 by 8, and 16 by 16. E5 is applied before inclusive E3/E4
+clipping; rectangles do not dither. Texture coordinates wrap at eight bits and are fetched through the shared
+texture/CLUT cache path. E1 flip bits decrement U or V for v2 rectangles only. `SCHWAY_PROFILE_GPU_V0` selects the
+v0 profile, where those flip bits have no effect; GPU v2 is the default. PSX-SPX documents the flip revision limit,
+the mask widths, and the odd-UV/odd-width sampling anomaly; the current sampler records the latter as an unresolved
+hardware arithmetic detail rather than assigning an unsupported pixel pattern.
+
 These rules follow the PlayStation GPU command and raster descriptions in [PSX-SPX](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/)
-and the source notes in `.planning/preparation/PSX-GPU-AND-GTE.md`, sections 2.2, 2.3, and 3.6. Known-answer tests pin both
+and the source notes in `.planning/preparation/PSX-GPU-AND-GTE.md`, sections two point two, two point three, and three point six. Known-answer tests pin both
 sides of each span limit, edge ownership, clipping, signed offsets, Gouraud/UV values, page/CLUT effects, polygon flags,
 negative gradients, and narrow hostile slopes. They also check clipping invariance and state-split determinism. The
 directed interpolation tests pin the core model; they do not claim to calibrate GPU arithmetic precision against hardware.
