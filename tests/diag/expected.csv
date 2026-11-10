@@ -66,5 +66,9 @@ dma_chain,list_empty,*,00000003,hw,ps1-tests f727802fead1 dma/chain-looping/psx.
 dma_chain,list_single,*,00000000,hw,ps1-tests f727802fead1 dma/chain-looping/psx.log line 9 (single self-referencing chain: finished false and irq false)
 dma_chain,list_double,*,00000000,hw,ps1-tests f727802fead1 dma/chain-looping/psx.log line 11 (double self-referencing chain: finished false and irq false)
 dma_chain,otc_time,*,10f4..1130,doc,psx-spx DMA channels timing OTC 1 clock per word plus 1 per 16 words for 4096 words and nugget 9db6d88d23c4 tests/dma-priority/RESULTS.md measured 4358 as corroboration only
-timers_lines,vblank_count,ntsc-u,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so 23 frames give 23 interrupts
-timers_lines,vblank_count,pal,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so 23 frames give 23 interrupts
+timers_lines,vblank_count,ntsc-u,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so a run that ends on the 23rd blank counts 23
+timers_lines,div8_ticks,ntsc-u,15994d..15995e,doc,psx-spx Timers (counter 2 steps once per 8 system clocks) and the frame constants in src/internal.h (NTSC frame 405350378496/715909 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines,sysclk_ticks,ntsc-u,acca88..accacf,doc,psx-spx Timers (the system clock source counts every clock) and the frame constants in src/internal.h (NTSC frame 405350378496/715909 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines,vblank_count,pal,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so a run that ends on the 23rd blank counts 23
+timers_lines,div8_ticks,pal,19f8a2..19f8b3,doc,psx-spx Timers (counter 2 steps once per 8 system clocks) and the frame constants in src/internal.h (PAL frame 482961862656/709379 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines,sysclk_ticks,pal,cfc532..cfc579,doc,psx-spx Timers (the system clock source counts every clock) and the frame constants in src/internal.h (PAL frame 482961862656/709379 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
