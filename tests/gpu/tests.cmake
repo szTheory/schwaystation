@@ -19,6 +19,12 @@ schway_add_test(NAME gpu.decoder.partial_packet_reset
   COMMAND schwaystation-test-gpu partial_packet_reset
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: GPUSTAT, draw-environment query latches, IRQ1 and its
+# acknowledgement drifting from their register images.
+schway_add_test(NAME gpu.decoder.register_images
+  COMMAND schwaystation-test-gpu register_images
+  LABELS gpu portable TIMEOUT 10)
+
 # Keep the original test-card pixel and native-video contracts selected.
 foreach(case IN ITEMS testcard.pixels video.tuple)
   schway_add_test(NAME gpu.${case}

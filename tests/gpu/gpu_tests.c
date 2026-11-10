@@ -51,6 +51,14 @@ static void write_port(schway *inst, uint32_t addr, uint32_t word)
     CHECK(schway__bus_write(inst, addr, 4u, word, &cycles) == 0);
 }
 
+static uint32_t read_port(schway *inst, uint32_t addr)
+{
+    uint32_t cycles = 0u;
+    uint32_t value = 0u;
+    CHECK(schway__bus_read(inst, addr, 4u, &value, &cycles) == 0);
+    return value;
+}
+
 static void test_fill_mmio(void)
 {
     schway *inst = make_instance();
@@ -83,6 +91,45 @@ static void test_partial_packet_reset(void)
     schway_destroy(inst);
 }
 
+static void test_register_images(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return;
+    }
+    CHECK(read_port(inst, GP1) == 0x14802000u);
+
+    write_port(inst, GP0, 0xE1123456u);
+    CHECK((read_port(inst, GP1) & 0x000007FFu) == (0x123456u & 0x7FFu));
+    write_port(inst, GP0, 0xE2000000u | 0xABCDEu);
+    write_port(inst, GP0, 0xE3000000u | (0x12Au << 10) | 0x155u);
+    write_port(inst, GP0, 0xE4000000u | (0x1ABu << 10) | 0x2AAu);
+    write_port(inst, GP0, 0xE5000000u | 0x234567u);
+    write_port(inst, GP0, 0xE6000003u);
+
+    write_port(inst, GP1, 0x10000002u);
+    CHECK(read_port(inst, GP0) == 0xABCDEu);
+    write_port(inst, GP1, 0x10000003u);
+    CHECK(read_port(inst, GP0) == ((0x12Au << 10) | 0x155u));
+    write_port(inst, GP1, 0x10000004u);
+    CHECK(read_port(inst, GP0) == ((0x1ABu << 10) | 0x2AAu));
+    write_port(inst, GP1, 0x10000005u);
+    CHECK(read_port(inst, GP0) == (0x234567u & 0x003FFFFFu));
+    write_port(inst, GP1, 0x10000007u);
+    CHECK(read_port(inst, GP0) == 2u);
+    write_port(inst, GP1, 0x10000006u); /* unknown query preserves the latch */
+    CHECK(read_port(inst, GP0) == 2u);
+    CHECK((read_port(inst, GP1) & 0x00001800u) == 0x00001800u);
+
+    write_port(inst, GP0, 0x1F000000u);
+    CHECK((read_port(inst, GP1) & 0x01000000u) != 0u);
+    CHECK((inst->irq.stat & (1u << 1)) != 0u);
+    write_port(inst, GP1, 0x02000000u);
+    CHECK((read_port(inst, GP1) & 0x01000000u) == 0u);
+    CHECK((inst->irq.stat & (1u << 1)) == 0u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -93,6 +140,8 @@ int main(int argc, char **argv)
         test_fill_mmio();
     } else if (strcmp(argv[1], "partial_packet_reset") == 0) {
         test_partial_packet_reset();
+    } else if (strcmp(argv[1], "register_images") == 0) {
+        test_register_images();
     } else {
         fprintf(stderr, "unknown GPU case: %s\n", argv[1]);
         return 2;
