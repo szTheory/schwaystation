@@ -326,6 +326,21 @@ static int64_t mat_elem(const uint32_t *w, unsigned e)
     return s16v((e & 1u) != 0u ? w[e >> 1] >> 16 : w[e >> 1]);
 }
 
+/* OTZ is MAC0 over 1000h clamped to 0 to FFFFh. */
+static void set_otz(struct run *r, int64_t v)
+{
+    v = sar64(v, 12u);
+    if (v < 0) {
+        v = 0;
+        r->flag |= FLAG_SZ3_OTZ;
+    }
+    if (v > 0xFFFF) {
+        v = 0xFFFF;
+        r->flag |= FLAG_SZ3_OTZ;
+    }
+    r->g->d[7] = (uint32_t)v;
+}
+
 /* Pushes the screen FIFO's Z, clamped to 0 to FFFFh. */
 static void push_sz(struct run *r, int64_t sz)
 {
@@ -415,6 +430,13 @@ static uint32_t gte_divide(struct run *r, uint32_t lhs, uint32_t rhs)
     return result > 0x1FFFFu ? 0x1FFFFu : (uint32_t)result;
 }
 
+/* Entry i of the reciprocal table, 0 for an index past the end. A test reads
+   it to compare the literal with the formula. */
+uint8_t schway__gte_unr_entry(uint32_t i)
+{
+    return i < 257u ? unr_table[i] : 0u;
+}
+
 /* One perspective transform: the vertex through the rotation matrix and
    translation, the depth into the Z FIFO, the screen point from H over that
    depth, and, on the last vertex of the command, the depth cue into IR0 and
@@ -457,14 +479,66 @@ static void rtp(struct run *r, unsigned vertex, int last)
     g->d[8] = low16(sat_ir(r, 0u, wrap32(sar64(sz, 12u)), 0u));
 }
 
+/* The area of the screen triangle, MAC0 = SX0*(SY1-SY2) + SX1*(SY2-SY0) +
+   SX2*(SY0-SY1), summed as the six products the hardware forms. The unused
+   bits of the command word make no difference. */
+static void nclip(struct run *r)
+{
+    const struct schway__gte *g = r->g;
+    int64_t sx0 = s16v(g->d[12]), sy0 = s16v(g->d[12] >> 16);
+    int64_t sx1 = s16v(g->d[13]), sy1 = s16v(g->d[13] >> 16);
+    int64_t sx2 = s16v(g->d[14]), sy2 = s16v(g->d[14] >> 16);
+    (void)set_mac(r, 0u, sx0 * sy1 + sx1 * sy2 + sx2 * sy0 - sx0 * sy2 - sx1 * sy0 - sx2 * sy1);
+}
+
+/* The average depth: ZSF3 times the sum of SZ1 to SZ3, or ZSF4 times the sum
+   of SZ0 to SZ3, into MAC0 and over 1000h into OTZ. */
+static void avsz(struct run *r, int four)
+{
+    const struct schway__gte *g = r->g;
+    int64_t sum = (int64_t)(g->d[17] & 0xFFFFu) + (int64_t)(g->d[18] & 0xFFFFu) +
+                  (int64_t)(g->d[19] & 0xFFFFu);
+    int64_t zsf = s16v(g->c[29]);
+    if (four) {
+        sum += (int64_t)(g->d[16] & 0xFFFFu);
+        zsf = s16v(g->c[30]);
+    }
+    set_otz(r, set_mac(r, 0u, zsf * sum));
+}
+
+/* The square of IR1 to IR3 into MAC1 to MAC3 and IR1 to IR3. */
+static void sqr(struct run *r)
+{
+    int64_t v[3] = {ir_of(r, 1u), ir_of(r, 2u), ir_of(r, 3u)};
+    for (unsigned i = 0u; i < 3u; i++) {
+        set_mac_ir(r, i + 1u, v[i] * v[i], r->lm);
+    }
+}
+
+/* The outer product of IR with the diagonal of the rotation matrix, D1 = RT11,
+   D2 = RT22, D3 = RT33: MAC1 = D2*IR3 - D3*IR2, MAC2 = D3*IR1 - D1*IR3,
+   MAC3 = D1*IR2 - D2*IR1. The IR registers follow the MAC values. */
+static void op_cross(struct run *r)
+{
+    const uint32_t *rot = &r->g->c[0];
+    int64_t d1 = mat_elem(rot, 0u), d2 = mat_elem(rot, 4u), d3 = mat_elem(rot, 8u);
+    int64_t i1 = ir_of(r, 1u), i2 = ir_of(r, 2u), i3 = ir_of(r, 3u);
+    (void)set_mac(r, 1u, d2 * i3 - d3 * i2);
+    (void)set_mac(r, 2u, d3 * i1 - d1 * i3);
+    (void)set_mac(r, 3u, d1 * i2 - d2 * i1);
+    for (unsigned i = 1u; i < 4u; i++) {
+        set_ir(r, i, s32v(r->g->d[24u + i]), r->lm);
+    }
+}
+
 static void finish(struct run *r)
 {
     r->g->c[31] = flag_fix(r->flag);
 }
 
 /* The busy cycles of each command (psx-spx, Geometry Transformation Engine,
-   GTE Opcode Summary). RTPS computes; the others leave the registers as they
-   are until their numerics land. A number outside the table does nothing and
+   GTE Opcode Summary). RTPS, RTPT, NCLIP, AVSZ3, AVSZ4, SQR and OP compute; the
+   others leave the registers as they are until their numerics land. A number outside the table does nothing and
    takes the shortest documented time, 5 cycles; that is a placeholder, not a
    claim about the hardware. A command that computes clears FLAG first and
    recomputes bit 31 last; the others only recompute it. */
@@ -482,8 +556,12 @@ uint32_t schway__gte_exec(struct schway__gte *g, uint32_t op)
         finish(&r);
         return 15u;
     case 0x06u: /* NCLIP */
+        nclip(&r);
+        finish(&r);
         return 8u;
     case 0x0Cu: /* OP */
+        op_cross(&r);
+        finish(&r);
         return 6u;
     case 0x10u: /* DPCS */
         return 8u;
@@ -506,16 +584,26 @@ uint32_t schway__gte_exec(struct schway__gte *g, uint32_t op)
     case 0x20u: /* NCT */
         return 30u;
     case 0x28u: /* SQR */
+        sqr(&r);
+        finish(&r);
         return 5u;
     case 0x29u: /* DCPL */
         return 8u;
     case 0x2Au: /* DPCT */
         return 17u;
     case 0x2Du: /* AVSZ3 */
+        avsz(&r, 0);
+        finish(&r);
         return 5u;
     case 0x2Eu: /* AVSZ4 */
+        avsz(&r, 1);
+        finish(&r);
         return 6u;
     case 0x30u: /* RTPT */
+        rtp(&r, 0u, 0);
+        rtp(&r, 1u, 0);
+        rtp(&r, 2u, 1);
+        finish(&r);
         return 23u;
     case 0x3Du: /* GPF */
         return 5u;

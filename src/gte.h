@@ -44,4 +44,8 @@ void schway__gte_write(struct schway__gte *g, uint32_t idx, uint32_t v);
    directly. */
 uint32_t schway__gte_exec(struct schway__gte *g, uint32_t op);
 
+/* Entry i (0 to 256) of the divide's reciprocal table; a test compares the table
+   with the formula it comes from. */
+uint8_t schway__gte_unr_entry(uint32_t i);
+
 #endif /* SCHWAYSTATION_GTE_H */

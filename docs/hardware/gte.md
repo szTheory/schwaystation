@@ -9,10 +9,10 @@ public ps1-tests repository support; the numerics and the commands follow as the
 
 ## State of the engine
 
-The register file and its read and write rules are built and replayed against the hardware cases. The commands are
-dispatched and report their busy cycles, but compute nothing yet, so every case that runs a command except the
-register-only ones still fails; the run says how many cases ran. The CPU's COP2 forms reach this engine, as "COP2 and
-the GTE" in [the CPU page](cpu.md) describes.
+The register file, the numerics, the divide and seven commands are built and replayed against the hardware cases: RTPS,
+RTPT, NCLIP, AVSZ3, AVSZ4, SQR and OP. The other fifteen commands are dispatched and report their busy cycles but
+compute nothing yet, so the cases that run them still fail; a replay says how many cases ran. The CPU's COP2 forms reach
+this engine, as "COP2 and the GTE" in [the CPU page](cpu.md) describes.
 
 ## The two register files
 
@@ -116,6 +116,51 @@ claim about the hardware.
 
 The cycle counts are the ones psx-spx lists for the opcode summary. They are measured constants, not derived ones.
 
+## The numerics
+
+Every value a command works on is a 64-bit signed integer, so the product of two 16-bit values, or of the 17-bit divide
+result and a 16-bit value, is a widening multiply and cannot overflow. There is no signed right shift anywhere: a left
+shift of a signed value is a multiply by 4096 or 16, and a right shift is an arithmetic shift built on unsigned
+arithmetic that brings the sign bits in from the top. A command takes `sf` and `lm` from the command word into locals and
+builds FLAG in a local, which replaces the register when the command ends.
+
+- **MAC1 to MAC3** are 44-bit accumulators. Each term added to one is checked against minus 2 to the 43 and 2 to the 43
+  minus 1: a value above sets the positive bit (30, 29, 28), a value below sets the negative bit (27, 26, 25). A chain
+  of terms, as in a matrix row, checks and wraps to 44 bits after every addition. The register holds the low 32 bits of
+  the result shifted right by 12 when `sf` is set.
+- **MAC0** is a 32-bit accumulator with bit 16 for a value above and bit 15 for a value below. It is stored unshifted.
+- **IR1 to IR3** take the low 32 bits of the shifted MAC and clamp to minus 8000h up to 7FFFh, or 0 up to 7FFFh when `lm`
+  is set; a clamp sets bit 24, 23 or 22. **IR0** clamps to 0 up to 1000h and sets bit 12.
+- **IR3 in the projection** has a quirk: its flag comes from the value shifted right by 12 and clamped as if `lm` were
+  clear, but the register takes MAC3 clamped with the command's `lm`, whatever `sf` is.
+- **The Z FIFO and OTZ** clamp to 0 up to FFFFh and set bit 18. **The screen FIFO** clamps SX and SY to minus 400h up to
+  3FFh and sets bit 14 for X and bit 13 for Y.
+
+### The divide
+
+The projection divides H by SZ3 to a 17-bit result. If SZ3 times 2 is not above H, the result is 1FFFFh and bit 17
+is set. Otherwise the divisor is shifted left until bit 15 is set, a reciprocal comes from a 257-entry table with one
+Newton-Raphson step, and the product with the shifted dividend is rounded and clamped to 1FFFFh. The table is a literal
+in `src/gte.c`; entry i is the larger of 0 and `(40000h / (i + 100h) + 1) / 2 - 101h`, and the last entry is 0. The test
+`gte.unr_table` works the formula out in integers and compares all 257 bytes with the literal. The hardware cases pin
+the table only at the entries their divisors reach, so the comparison is what pins the rest.
+
+## The commands built so far
+
+| Command | What it computes |
+|---|---|
+| RTPS | rotation, translation and perspective transform of V0: MAC1 to MAC3 and IR1 to IR3, SZ3, SX2 and SY2 from H over SZ3 and the offsets, then MAC0 and IR0 from the depth cue |
+| RTPT | the same for V0, V1 and V2 in turn; MAC0 and IR0 come from the last vertex only, and the three points and depths fill the FIFOs |
+| NCLIP | MAC0 as the signed area of the screen triangle SXY0, SXY1, SXY2 |
+| AVSZ3, AVSZ4 | MAC0 as ZSF3 times SZ1 to SZ3, or ZSF4 times SZ0 to SZ3, and OTZ as that over 1000h |
+| SQR | IR1 to IR3 squared into MAC1 to MAC3 and IR1 to IR3 |
+| OP | the outer product of IR with the diagonal of the rotation matrix, into MAC1 to MAC3 and IR1 to IR3 |
+
+The command field bits 20 to 24 are ignored: NCLIP issued as `0140006h`, with the fake number and bit 18 set as Wipeout
+2097 does, gives the same 64 outputs and cycles as `6`. The test `gte.nclip_fake_bits` covers it, because the hardware
+cases never set those bits. A command number outside the table is a no-op with the placeholder cost above, and nothing
+here claims what the hardware does for it.
+
 ## The FLAG register
 
 FLAG is control register 63. Bits 12 to 30 are written and read as stored; bits 0 to 11 always read 0. Bit 31 is not
@@ -157,9 +202,10 @@ A case replays in one fixed order. The harness writes 0 to the registers 0 to 63
 runs the command unless the case is register-only, and reads the registers 0 to 63. Writing in order matters: LZCR
 and the screen FIFO depend on it, and setting registers directly instead of writing them fails about a thousand cases.
 The replay reaches the engine through three functions its caller supplies, so the same file can drive another
-implementation. `gte.vectors.part1` replays the 50 register-only cases; its count is checked, so a run that replays
-fewer fails. `gte.regs.sweep` writes every register with edge values (0, 7FFFh, 8000h, FFFFh, 7FFFFFFFh, 80000000h and
-FFFFFFFFh) and runs every command number from 00h to 3Fh with sf and lm both ways, and checks that reads repeat and no
+implementation. `gte.vectors.part1` replays the 50 register-only cases and the 350 cases of the seven commands above,
+400 in all; its count is checked, so a run that replays fewer fails. `gte.regs.sweep` writes every register with edge
+values (0, 7FFFh, 8000h, FFFFh, 7FFFFFFFh, 80000000h and FFFFFFFFh) and runs every command number from 00h to 3Fh with
+sf and lm both ways, and checks that reads repeat and no
 command claims more than 44 cycles. The address and memory sanitizers watch it, and between them they show that the engine
 touches nothing outside its struct.
 

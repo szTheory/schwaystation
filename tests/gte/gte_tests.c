@@ -1,6 +1,8 @@
 /* The geometry engine's tests; one case per command-line argument.
      schwaystation-test-gte vectors FILE --expect N [--ops LIST]
      schwaystation-test-gte regs_sweep
+     schwaystation-test-gte unr_table
+     schwaystation-test-gte nclip_fake_bits
    vectors replays the hardware cases of FILE (vectors.h) through the engine's
    register and command entry points. LIST holds hex command numbers and "reg"
    for the register-only cases; only those cases run. It prints the number of
@@ -8,7 +10,10 @@
    when exactly N cases ran and all matched, 1 for a failure or another count,
    2 for a bad command line. regs_sweep drives every register and every command
    with edge values and checks that reads repeat; run under the sanitizers, it
-   also proves the engine touches nothing outside its struct. */
+   also proves the engine touches nothing outside its struct. unr_table
+   regenerates the divide's reciprocal table from its formula and compares all
+   257 entries. nclip_fake_bits checks that the unused command bits 20 to 24
+   change nothing in NCLIP. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -213,6 +218,93 @@ static int run_regs_sweep(void)
     return bad;
 }
 
+/* The divide's reciprocal table from its formula, in integers (psx-spx, GTE
+   Division Inaccuracy): entry i is max(0, (40000h / (i + 100h) + 1) / 2 -
+   101h), which is 0 for the last entry. */
+static int run_unr_table(void)
+{
+    int bad = 0;
+    for (uint32_t i = 0u; i < 257u; i++) {
+        int32_t want = (int32_t)((0x40000u / (i + 0x100u) + 1u) / 2u) - 0x101;
+        if (want < 0) {
+            want = 0;
+        }
+        if (schway__gte_unr_entry(i) != (uint32_t)want) {
+            fprintf(stderr, "unr_table: entry %lu is %02lX, the formula gives %02lX\n",
+                    (unsigned long)i, (unsigned long)schway__gte_unr_entry(i), (unsigned long)want);
+            bad = 1;
+        }
+    }
+    if (schway__gte_unr_entry(257u) != 0u) {
+        fprintf(stderr, "unr_table: an index past the end is not 0\n");
+        bad = 1;
+    }
+    return bad;
+}
+
+/* NCLIP issued as 0140006h (the fake number and bit 18 set, as a game does)
+   gives the same 64 outputs and cycles as 6, on triangles of both windings and
+   on registers that hold stale flags and results. */
+static int run_nclip_fake_bits(void)
+{
+    static const int32_t tri[3][6] = {
+        {0, 0, 10, 0, 0, 10},
+        {0, 0, 0, 10, 10, 0},
+        {-1024, 1023, 1023, -1024, 32767, -32768},
+    };
+    static const uint32_t ops[4] = {0x0140006u, 0x1F00006u, 0x0000B46u, 0x0F80006u};
+    struct schway__gte *a = malloc(sizeof *a);
+    struct schway__gte *b = malloc(sizeof *b);
+    if (a == NULL || b == NULL) {
+        free(a);
+        free(b);
+        return 1;
+    }
+    int bad = 0;
+    for (uint32_t t = 0u; t < 3u; t++) {
+        for (uint32_t k = 0u; k < 4u; k++) {
+            struct schway__gte *s[2] = {a, b};
+            for (uint32_t w = 0u; w < 2u; w++) {
+                schway__gte_reset(s[w]);
+                for (uint32_t i = 0u; i < 3u; i++) {
+                    schway__gte_write(s[w], 12u + i,
+                                      ((uint32_t)tri[t][2u * i + 1u] << 16) |
+                                          ((uint32_t)tri[t][2u * i] & 0xFFFFu));
+                }
+                schway__gte_write(s[w], 24u, 0x12345678u);
+                schway__gte_write(s[w], 63u, 0x7FFFF000u);
+            }
+            uint32_t ca = schway__gte_exec(a, 6u);
+            uint32_t cb = schway__gte_exec(b, ops[k]);
+            if (ca != cb) {
+                fprintf(stderr, "nclip_fake_bits: %06lX takes %lu cycles, 6 takes %lu\n",
+                        (unsigned long)ops[k], (unsigned long)cb, (unsigned long)ca);
+                bad = 1;
+            }
+            for (uint32_t i = 0u; i < 64u; i++) {
+                if (schway__gte_read(a, i) != schway__gte_read(b, i)) {
+                    fprintf(stderr, "nclip_fake_bits: %06lX register %lu is %08lX, 6 gives %08lX\n",
+                            (unsigned long)ops[k], (unsigned long)i,
+                            (unsigned long)schway__gte_read(b, i),
+                            (unsigned long)schway__gte_read(a, i));
+                    bad = 1;
+                }
+            }
+            if (t == 0u && schway__gte_read(b, 24u) != 100u) {
+                fprintf(stderr, "nclip_fake_bits: the area of the first triangle is not 100\n");
+                bad = 1;
+            }
+            if (t == 1u && schway__gte_read(b, 24u) != 0xFFFFFF9Cu) {
+                fprintf(stderr, "nclip_fake_bits: the area of the second triangle is not -100\n");
+                bad = 1;
+            }
+        }
+    }
+    free(a);
+    free(b);
+    return bad;
+}
+
 int main(int argc, char **argv)
 {
     if (argc >= 2 && strcmp(argv[1], "vectors") == 0) {
@@ -221,6 +313,13 @@ int main(int argc, char **argv)
     if (argc == 2 && strcmp(argv[1], "regs_sweep") == 0) {
         return run_regs_sweep();
     }
-    fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST] | regs_sweep\n");
+    if (argc == 2 && strcmp(argv[1], "unr_table") == 0) {
+        return run_unr_table();
+    }
+    if (argc == 2 && strcmp(argv[1], "nclip_fake_bits") == 0) {
+        return run_nclip_fake_bits();
+    }
+    fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST] | regs_sweep |\n"
+                    "       unr_table | nclip_fake_bits\n");
     return 2;
 }

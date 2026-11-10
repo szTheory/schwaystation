@@ -16,7 +16,7 @@ set(gte_vectors_bin ${PROJECT_SOURCE_DIR}/tests/vectors/gte/ps1tests-1150.bin)
 # the upstream order and the count is the zero-case guard: a run that
 # replayed fewer fails.
 schway_add_test(NAME gte.vectors.part1
-  COMMAND schwaystation-test-gte vectors ${gte_vectors_bin} --expect 100 --ops reg,01
+  COMMAND schwaystation-test-gte vectors ${gte_vectors_bin} --expect 400 --ops reg,01,06,0c,28,2d,2e,30
   LABELS gte portable TIMEOUT 30)
 
 # Fault prevented: a register index, an edge value or a command number that
@@ -25,4 +25,18 @@ schway_add_test(NAME gte.vectors.part1
 # UBSan do the bounds proof; the program checks the rest.
 schway_add_test(NAME gte.regs.sweep
   COMMAND schwaystation-test-gte regs_sweep
+  LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: the reciprocal table the divide reads differing from its
+# formula in even one of 257 bytes, which would skew projected points only for
+# the divisors that index that entry and pass nearly every hardware case.
+schway_add_test(NAME gte.unr_table
+  COMMAND schwaystation-test-gte unr_table
+  LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: the unused command bits (20 to 24, as a game sets them for
+# NCLIP, 0140006h) changing the area, the flags or the cycles; the hardware
+# cases never set those bits.
+schway_add_test(NAME gte.nclip_fake_bits
+  COMMAND schwaystation-test-gte nclip_fake_bits
   LABELS gte portable TIMEOUT 30)
