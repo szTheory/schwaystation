@@ -80,6 +80,29 @@ static uint32_t gpu_dot_divisor(uint32_t mode)
     return (mode & 0x40u) != 0u ? 7u : divisors[mode & 3u];
 }
 
+/* The display registers describe native scan-out dimensions and its source
+   window (psx-spx, GPU Display Control Commands). */
+void schway__gpu_display(const schway *inst, struct schway__display *display)
+{
+    const struct schway__gpu *g = &inst->gpu;
+    uint32_t mode = g->display_mode;
+    static const uint32_t horizontal_pixels[4] = {256u, 320u, 512u, 640u};
+
+    display->x1 = g->horizontal_range & 0x0FFFu;
+    display->x2 = (g->horizontal_range >> 12) & 0x0FFFu;
+    display->y1 = g->vertical_range & 0x03FFu;
+    display->y2 = (g->vertical_range >> 10) & 0x03FFu;
+    display->dot_div = gpu_dot_divisor(mode);
+    display->field = (mode & 0x20u) != 0u ? (uint32_t)(inst->frame & 1u) : 0u;
+    display->interlaced = (mode >> 5) & 1u;
+    display->vres = (mode & 0x04u) != 0u ? 480u : 240u;
+    display->hres = (mode & 0x40u) != 0u ? 368u : horizontal_pixels[mode & 3u];
+    display->start_x = g->display_start & 0x03FFu;
+    display->start_y = (g->display_start >> 10) & 0x01FFu;
+    display->enabled = g->display_disabled == 0u;
+    display->rgb24 = (mode >> 4) & 1u;
+}
+
 /* Convert from a number of beam clocks to the first CPU tick that owns them, carrying
    the same fractional ratio through every access and scheduled event. */
 static uint64_t gpu_ticks_for_clocks(const struct schway__gpu *g, uint32_t region,

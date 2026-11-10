@@ -221,8 +221,8 @@ schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_r
     return SCHWAY_STATUS_OK;
 }
 
-/* Scan-out of the display area: width (((X2 - X1) / divider) + 2) & ~3 and
-   height Y2 - Y1, from VRAM at (start_x, start_y) (ARCHITECTURE section 4). */
+/* Scan-out of the display area uses native field height and packed rows
+   (PSX-GPU-AND-GTE sections four point five and eight point one). */
 schway_status schway_get_video(const schway *inst, schway_video *out)
 {
     if (inst == NULL || out == NULL) {
@@ -232,16 +232,17 @@ schway_status schway_get_video(const schway *inst, schway_video *out)
     if (st != SCHWAY_STATUS_OK) {
         return st;
     }
-    const struct schway__display *d = &inst->display;
+    struct schway__display display = inst->display;
+    if (inst->exe_loaded != 0u) {
+        schway__gpu_display(inst, &display);
+    }
+    const struct schway__display *d = &display;
     schway_video v;
     memset(&v, 0, sizeof v);
     v.size = out->size;
     v.frame = inst->frame;
-    v.pixels = &inst->vram[d->start_y][d->start_x];
-    v.width = (((d->x2 - d->x1) / d->dot_div) + 2u) & ~3u;
-    v.height = d->y2 - d->y1;
-    v.pitch_bytes = SCHWAY__VRAM_W * 2u;
-    v.bpp = 16u;
+    v.pixels = inst->video_scanout;
+    v.bpp = d->rgb24 != 0u ? 24u : 16u;
     v.field = d->field;
     v.interlaced = d->interlaced;
     v.vres = d->vres;
@@ -254,6 +255,46 @@ schway_status schway_get_video(const schway *inst, schway_video *out)
     v.start_y = d->start_y;
     v.enabled = d->enabled;
     v.rgb24 = d->rgb24;
+
+    if (d->dot_div != 0u && d->x2 >= d->x1 && d->y2 >= d->y1) {
+        uint32_t width = (((d->x2 - d->x1) / d->dot_div) + 2u) & ~3u;
+        uint32_t height = d->y2 - d->y1;
+        if (width != 0u && width <= SCHWAY__VRAM_W && height != 0u &&
+            height <= SCHWAY__VRAM_H) {
+            uint32_t bytes_per_pixel = d->rgb24 != 0u ? 3u : 2u;
+            v.width = width;
+            v.height = height;
+            v.pitch_bytes = width * bytes_per_pixel;
+
+            if (d->enabled == 0u) {
+                memset(inst->video_scanout, 0, (size_t)v.pitch_bytes * v.height);
+            } else if (d->rgb24 == 0u) {
+                for (uint32_t y = 0u; y < height; y++) {
+                    uint32_t source_y = (d->start_y + y) & (SCHWAY__VRAM_H - 1u);
+                    uint16_t *dst = (uint16_t *)(void *)(inst->video_scanout +
+                                                         (size_t)y * v.pitch_bytes);
+                    for (uint32_t x = 0u; x < width; x++) {
+                        uint32_t source_x = (d->start_x + x) & (SCHWAY__VRAM_W - 1u);
+                        dst[x] = inst->vram[source_y][source_x];
+                    }
+                }
+            } else {
+                for (uint32_t y = 0u; y < height; y++) {
+                    uint32_t source_y = (d->start_y + y) & (SCHWAY__VRAM_H - 1u);
+                    uint8_t *dst = inst->video_scanout + (size_t)y * v.pitch_bytes;
+                    for (uint32_t x = 0u; x < width; x++) {
+                        for (uint32_t channel = 0u; channel < 3u; channel++) {
+                            uint32_t byte_x = (d->start_x * 2u + x * 3u + channel) %
+                                              (SCHWAY__VRAM_W * 2u);
+                            uint16_t word = inst->vram[source_y][byte_x / 2u];
+                            dst[3u * x + channel] =
+                                (uint8_t)(word >> ((byte_x & 1u) * 8u));
+                        }
+                    }
+                }
+            }
+        }
+    }
     schway__instance_write_out(out, &v, (uint32_t)sizeof v);
     return SCHWAY_STATUS_OK;
 }

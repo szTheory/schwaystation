@@ -22,6 +22,7 @@
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
 #define SCHWAY__VRAM_H 512u
+#define SCHWAY__VIDEO_MAX_BYTES (SCHWAY__VRAM_W * SCHWAY__VRAM_H * 3u)
 
 /* One frame is an exact rational number of CPU cycles: num / den, with den
    the GPU clocks per frame (ARCHITECTURE section 1). The same den is the
@@ -134,6 +135,7 @@ struct schway {
     uint32_t audio_dropped; /* pairs lost since the last drain */
     int16_t audio[SCHWAY__AUDIO_RING_PAIRS][2];
     uint16_t vram[SCHWAY__VRAM_H][SCHWAY__VRAM_W];
+    uint8_t *video_scanout; /* Trailing derived host view; outside serialized machine state. */
     uint32_t profile_flags;     /* the profile's flags, bit 0 the debug port */
     uint32_t exe_loaded;        /* 1 after a PS-EXE was side-loaded */
     struct schway__cpu cpu;

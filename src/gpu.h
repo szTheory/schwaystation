@@ -7,6 +7,7 @@
 #include "schwaystation.h"
 
 struct schway__state_io;
+struct schway__display;
 
 #define SCHWAY__GPU_FIFO_WORDS 16u
 #define SCHWAY__GPU_TEXTURE_CACHE_LINES 256u
@@ -65,6 +66,7 @@ struct schway__gpu {
 };
 
 void schway__gpu_reset(schway *inst);
+void schway__gpu_display(const schway *inst, struct schway__display *display);
 void schway__gpu_sync(schway *inst, uint64_t now);
 uint64_t schway__gpu_next(const schway *inst);
 void schway__gpu_event(schway *inst, uint64_t now);

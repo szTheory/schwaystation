@@ -311,13 +311,14 @@ reset and lock with the region.
 
 `schway_get_video` describes the current frame. `pixels` points into the instance and stays valid until the next
 `schway_run_frame`, `schway_load_state`, `schway_reset` or `schway_destroy`; copy what you need before then. The
-frame is `width` by `height` 16-bit words in host byte order, rows `pitch_bytes` apart. Copy `width * 2` bytes per
-row; the pitch is wider than a row, so never copy the frame as one block.
-
-Each word is `0BBBBBGGGGGRRRRR` with bit 15 the mask bit, exactly as the console holds it. To show it, drop bit 15
-and widen each 5-bit channel `c` to 8 bits as `(c << 3) | (c >> 2)`. The other fields (`hres`, `vres`, `dot_div`,
-`interlaced`, `field`, `x1`, `y1`, `start_x`, `start_y`, `enabled`, `rgb24`) report the display mode the frame was
-made in.
+native field height is `Y2 - Y1`, including interlace. Rows are tightly packed and `pitch_bytes` is their byte
+stride. In 15-bit mode, each pixel is a host-order `uint16_t` word `0BBBBBGGGGGRRRRR`, with bit 15 the mask bit,
+exactly as the console holds it. In packed 24-bit mode, each pixel is three bytes in RGB order. A disabled display
+returns zero pixels and `enabled == 0`. A malformed or out-of-range GP1 display window returns an empty frame
+(`width == 0`, `height == 0`, `pitch_bytes == 0`) so a host can reject it before reading pixels. Valid display
+windows wrap around VRAM edges. To show a 15-bit pixel, drop bit 15 and widen each 5-bit channel `c` to 8 bits as
+`(c << 3) | (c >> 2)`. The other fields (`hres`, `vres`, `dot_div`, `interlaced`, `field`, `x1`, `y1`, `start_x`,
+`start_y`, `enabled`, `rgb24`) report the display mode the frame was made in.
 
 ## VRAM
 

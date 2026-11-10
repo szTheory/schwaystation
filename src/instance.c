@@ -311,13 +311,15 @@ schway_status schway_create(const schway_config *cfg, schway **out)
     if (a.alloc == NULL || a.free == NULL) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-    schway *inst = (schway *)a.alloc(a.user, sizeof *inst);
+    size_t alloc_size = sizeof(schway) + (size_t)SCHWAY__VIDEO_MAX_BYTES;
+    schway *inst = (schway *)a.alloc(a.user, alloc_size);
     if (inst == NULL) {
         return SCHWAY_STATUS_ERR_NO_MEMORY;
     }
-    memset(inst, 0, sizeof *inst);
+    memset(inst, 0, alloc_size);
     inst->allocator = a;
-    inst->alloc_size = sizeof *inst;
+    inst->alloc_size = alloc_size;
+    inst->video_scanout = (uint8_t *)(void *)(inst + 1);
     inst->region = SCHWAY_REGION_NTSC_U;
     power_on(inst);
     *out = inst;
