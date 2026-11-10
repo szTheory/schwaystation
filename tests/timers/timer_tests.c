@@ -14,6 +14,8 @@
 #include "schwaystation.h"
 #include "internal.h"
 #include "../check.h"
+#include "../prop.h"
+#include "ref.h"
 
 #define COUNT(n) (0x1F801100u + 0x10u * (n))
 #define MODE(n) (COUNT(n) + 4u)
@@ -954,6 +956,136 @@ static void case_unfed_unbuilt(void)
     schway_destroy(inst);
 }
 
+/* The operations of the random comparison. */
+#define REF_OPS 20000u
+#define REF_SEED UINT64_C(0x7154F4B1E5C0DE05)
+
+static void diverged(uint32_t op, const char *what, uint32_t n, uint32_t got, uint32_t want)
+{
+    fprintf(stderr, "timers.reference.random: op %u: %s of counter %u is %08x, the reference has %08x\n",
+            (unsigned)op, what, (unsigned)n, (unsigned)got, (unsigned)want);
+    exit(1);
+}
+
+/* A 16-bit value for a COUNT or TARGET write: aimed at 0, FFFFh and the
+   edges, at the counter's own target and its neighbours (the hold and the
+   dwell are all about the cycle the target is reached on), or small. */
+static uint32_t pick16(struct prop *p, uint32_t target)
+{
+    static const uint32_t edges[] = {0u, 1u, 2u, 3u, 0x7FFFu, 0x8000u, 0xFFFDu, 0xFFFEu, 0xFFFFu};
+    switch (prop_below(p, 4u)) {
+    case 0:
+        return prop_edge32(p, edges, sizeof edges / sizeof edges[0]);
+    case 1:
+        return target + prop_below(p, 3u) - 1u;
+    default:
+        return prop_below(p, 40u);
+    }
+}
+
+static uint32_t pick_mode(struct prop *p)
+{
+    uint32_t m = prop_below(p, 1024u);
+    if (prop_below(p, 2u) == 0u) {
+        m |= 0x18u;
+    }
+    if (prop_below(p, 3u) != 0u) {
+        m &= ~0x100u;
+    }
+    if (prop_below(p, 2u) == 0u) {
+        m &= ~1u;
+    }
+    return m;
+}
+
+/* The values the lazy model and the reference must agree on: every COUNT and
+   the interrupt bits 4 to 6 of I_STAT. */
+static void compare_all(schway *inst, uint32_t op)
+{
+    for (uint32_t n = 0; n < 3u; n++) {
+        uint32_t got = rd32(inst, COUNT(n));
+        if (got != ref_read(n, 0u)) {
+            diverged(op, "COUNT", n, got, ref_read(n, 0u));
+        }
+    }
+    uint32_t got = rd32(inst, ISTAT) & 0x70u;
+    if (got != ref_istat()) {
+        diverged(op, "I_STAT", 0u, got, ref_istat());
+    }
+}
+
+/* Fault prevented: an off-by-one in the write hold, the reset dwell, the
+   wrap, a landing or a synchronisation edge that no hand-made case happens to
+   reach. The lazy model and a naive model that steps one cycle at a time are
+   driven with one seeded stream of register writes, reads, acknowledgements,
+   blank and dot pushes and gaps of 0 to 300 cycles, and every value read and
+   every I_STAT bit must agree. The gaps are run by the instance's own loop,
+   which stops at each deadline, and the full comparison is made after only
+   some operations, so catch-ups happen at irregular distances. */
+static void case_reference_random(void)
+{
+    struct prop p;
+    schway *inst = make();
+    uint32_t ops = 0u;
+    prop_seed(&p, REF_SEED);
+    printf("timers.reference.random seed=%016llx ops=%u\n", (unsigned long long)REF_SEED, REF_OPS);
+    ref_reset();
+    for (uint32_t op = 0; op < REF_OPS; op++) {
+        uint32_t gap = prop_below(&p, 301u);
+        uint32_t kind = prop_below(&p, 100u);
+        uint32_t n = prop_below(&p, 3u);
+        ref_run(gap);
+        advance_to(inst, inst->ticks + gap);
+        if (kind < 10u) {
+            uint32_t v = pick16(&p, ref_read(n, 8u));
+            wr32(inst, COUNT(n), v);
+            ref_write(n, 0u, v);
+        } else if (kind < 25u) {
+            uint32_t v = pick_mode(&p);
+            wr32(inst, MODE(n), v);
+            ref_write(n, 4u, v);
+        } else if (kind < 35u) {
+            uint32_t v = pick16(&p, 0u);
+            wr32(inst, TARGET(n), v);
+            ref_write(n, 8u, v);
+        } else if (kind < 45u) {
+            uint32_t got = rd32(inst, COUNT(n));
+            if (got != ref_read(n, 0u)) {
+                diverged(op, "COUNT", n, got, ref_read(n, 0u));
+            }
+        } else if (kind < 50u) {
+            uint32_t got = rd32(inst, MODE(n));
+            if (got != ref_read(n, 4u)) {
+                diverged(op, "MODE", n, got, ref_read(n, 4u));
+            }
+        } else if (kind < 65u) {
+            uint32_t mask = (1u + prop_below(&p, 7u)) << 4;
+            wr32(inst, ISTAT, ~mask);
+            ref_ack(mask);
+        } else if (kind < 72u) {
+            uint32_t level = prop_below(&p, 2u);
+            schway__timers_vblank(inst, inst->ticks, level);
+            ref_vblank(level);
+        } else if (kind < 82u) {
+            uint32_t level = prop_below(&p, 2u);
+            schway__timers_hblank(inst, inst->ticks, level);
+            ref_hblank(level);
+        } else if (kind < 87u) {
+            uint32_t dots = prop_below(&p, 41u);
+            schway__timers_dots(inst, inst->ticks, dots);
+            ref_dots(dots);
+        }
+        if (prop_below(&p, 2u) == 0u) {
+            compare_all(inst, op);
+        }
+        ops++;
+    }
+    compare_all(inst, REF_OPS);
+    CHECK_EQ_U64(ops, REF_OPS);
+    CHECK(inst->ticks > 1000000u);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
@@ -969,6 +1101,7 @@ static const struct {
     {"irq_toggle", case_irq_toggle},
     {"mode_read_clears", case_mode_read_clears},
     {"mode_write", case_mode_write},
+    {"reference_random", case_reference_random},
     {"state_cadence", case_state_cadence},
     {"storm_collapse", case_storm_collapse},
     {"t0_hblank_modes", case_t0_hblank_modes},

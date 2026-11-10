@@ -7,6 +7,7 @@ timers.irq.repeat	portable,timers
 timers.irq.toggle	portable,timers
 timers.mode.read_clears	portable,timers
 timers.mode.write	portable,timers
+timers.reference.random	portable,timers
 timers.source.dot_feed	portable,timers
 timers.source.hblank_feed	portable,timers
 timers.source.unfed_unbuilt	portable,timers

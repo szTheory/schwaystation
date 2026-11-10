@@ -4,7 +4,8 @@
 # write hold and the four interrupt modes. One executable runs the case named on
 # its command line; it sees src/ to drive the registers through the bus and read
 # the scheduler's deadline.
-add_executable(schwaystation-test-timers ${CMAKE_CURRENT_LIST_DIR}/timer_tests.c)
+add_executable(schwaystation-test-timers ${CMAKE_CURRENT_LIST_DIR}/timer_tests.c
+  ${CMAKE_CURRENT_LIST_DIR}/ref.c)
 target_include_directories(schwaystation-test-timers PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-timers PRIVATE schwaystation::schwaystation)
 set_target_properties(schwaystation-test-timers PROPERTIES
@@ -140,3 +141,11 @@ schway_add_test(NAME timers.source.hblank_feed
 schway_add_test(NAME timers.source.unfed_unbuilt
   COMMAND schwaystation-test-timers unfed_unbuilt
   LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: an off-by-one in the hold, the dwell, a landing or a
+# synchronisation edge that no hand-made case reaches. A seeded random stream
+# of 20,000 operations drives the lazy model and a per-cycle reference, and
+# every read and every interrupt bit must agree.
+schway_add_test(NAME timers.reference.random
+  COMMAND schwaystation-test-timers reference_random
+  LABELS timers portable TIMEOUT 30)
