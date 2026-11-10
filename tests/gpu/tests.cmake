@@ -25,6 +25,12 @@ schway_add_test(NAME gpu.decoder.register_images
   COMMAND schwaystation-test-gpu register_images
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: a saved partial fill packet that loses its parser state or
+# a corrupt GPU field that is applied before validation finishes.
+schway_add_test(NAME gpu.state.partial_fill
+  COMMAND schwaystation-test-gpu state_partial_fill
+  LABELS gpu portable TIMEOUT 10)
+
 # Keep the original test-card pixel and native-video contracts selected.
 foreach(case IN ITEMS testcard.pixels video.tuple)
   schway_add_test(NAME gpu.${case}

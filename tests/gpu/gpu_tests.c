@@ -6,6 +6,7 @@
 
 #include "internal.h"
 #include "bus.h"
+#include "state.h"
 
 #define GP0 0x1F801810u
 #define GP1 0x1F801814u
@@ -57,6 +58,114 @@ static uint32_t read_port(schway *inst, uint32_t addr)
     uint32_t value = 0u;
     CHECK(schway__bus_read(inst, addr, 4u, &value, &cycles) == 0);
     return value;
+}
+
+static void put_le32(uint8_t *p, uint32_t value)
+{
+    p[0] = (uint8_t)value;
+    p[1] = (uint8_t)(value >> 8);
+    p[2] = (uint8_t)(value >> 16);
+    p[3] = (uint8_t)(value >> 24);
+}
+
+struct body_offset {
+    const char *wanted;
+    size_t cursor;
+    size_t offset;
+    int found;
+};
+
+static void locate_field(void *user, const char *name, const void *data, uint32_t count,
+                         uint32_t width)
+{
+    struct body_offset *field = (struct body_offset *)user;
+    (void)data;
+    if (!field->found && strcmp(name, field->wanted) == 0) {
+        field->found = 1;
+        field->offset = field->cursor;
+    }
+    field->cursor += (size_t)count * width;
+}
+
+static int corrupt_and_refuse(schway *target, schway *source, const char *name, uint32_t value)
+{
+    size_t size = schway_state_size(source);
+    uint8_t *candidate = (uint8_t *)malloc(size);
+    uint8_t *before = (uint8_t *)malloc(size);
+    uint8_t *after = (uint8_t *)malloc(size);
+    CHECK(candidate != NULL && before != NULL && after != NULL);
+    if (candidate == NULL || before == NULL || after == NULL) {
+        free(candidate);
+        free(before);
+        free(after);
+        return 0;
+    }
+    CHECK(schway_save_state(source, candidate, size) == SCHWAY_STATUS_OK);
+    struct body_offset field = {name, 0u, 0u, 0};
+    CHECK(schway_state_visit(source, locate_field, &field) == SCHWAY_STATUS_OK);
+    CHECK(field.found);
+    if (!field.found) {
+        free(candidate);
+        free(before);
+        free(after);
+        return 0;
+    }
+    put_le32(candidate + SCHWAY__STATE_HEADER_SIZE + field.offset, value);
+    put_le32(candidate + 16u,
+             schway__crc32_update(0u, candidate + SCHWAY__STATE_HEADER_SIZE,
+                                  size - SCHWAY__STATE_HEADER_SIZE));
+    CHECK(schway_save_state(target, before, size) == SCHWAY_STATUS_OK);
+    CHECK(schway_load_state(target, candidate, size) == SCHWAY_STATUS_ERR_STATE_FIELD);
+    CHECK(schway_save_state(target, after, size) == SCHWAY_STATUS_OK);
+    CHECK(memcmp(before, after, size) == 0);
+    free(candidate);
+    free(before);
+    free(after);
+    return 1;
+}
+
+static void test_state_partial_fill(void)
+{
+    schway *source = make_instance();
+    schway *target = make_instance();
+    if (source == NULL || target == NULL) {
+        schway_destroy(source);
+        schway_destroy(target);
+        return;
+    }
+    write_port(source, GP0, 0x020000F8u);
+    write_port(source, GP0, (7u << 16) | 19u);
+    size_t size = schway_state_size(source);
+    uint8_t *state = (uint8_t *)malloc(size);
+    CHECK(state != NULL);
+    if (state != NULL) {
+        CHECK(schway_save_state(source, state, size) == SCHWAY_STATUS_OK);
+        CHECK(schway_load_state(target, state, size) == SCHWAY_STATUS_OK);
+        write_port(target, GP0, (2u << 16) | 17u);
+        CHECK(target->vram[7][16] == 0x001Fu);
+        CHECK(target->vram[8][47] == 0x001Fu);
+        free(state);
+    }
+
+    schway *packet = make_instance();
+    if (packet != NULL) {
+        write_port(packet, GP0, 0x020000F8u);
+        write_port(packet, GP0, (7u << 16) | 19u);
+        CHECK(corrupt_and_refuse(target, packet, "gpu.fifo_count", 17u));
+        schway_destroy(packet);
+    }
+
+    schway *transfer = make_instance();
+    if (transfer != NULL) {
+        write_port(transfer, GP0, 0xA0000000u);
+        write_port(transfer, GP0, (6u << 16) | 100u);
+        write_port(transfer, GP0, (1u << 16) | 16u);
+        CHECK(corrupt_and_refuse(target, transfer, "gpu.phase", 99u));
+        CHECK(corrupt_and_refuse(target, transfer, "gpu.transfer_x", SCHWAY__VRAM_W));
+        schway_destroy(transfer);
+    }
+    schway_destroy(target);
+    schway_destroy(source);
 }
 
 static void test_fill_mmio(void)
@@ -165,6 +274,8 @@ int main(int argc, char **argv)
         test_partial_packet_reset();
     } else if (strcmp(argv[1], "register_images") == 0) {
         test_register_images();
+    } else if (strcmp(argv[1], "state_partial_fill") == 0) {
+        test_state_partial_fill();
     } else {
         fprintf(stderr, "unknown GPU case: %s\n", argv[1]);
         return 2;
