@@ -94,8 +94,9 @@ row; places where a preparation document is wrong are listed in D-39 and fixed b
   `busy_until` clears BUSY, sets the DICR flag and the I_STAT bit 3 edge; a CPU window follows; then the next
   unit. Run-to-completion per CHCR write is rejected (65,535 x 65,535 words is a hang) and so is per-word
   interleave (33.8M events a second).
-- **D-10:** **Stall is freeze-until, not a charge.** A bus access (RAM or I/O read or write, an instruction-fetch
-  miss, a fifth queued write) while `now < busy_until` sets `stall_until`; `cpu_run` then advances `ticks`,
+- **D-10:** **Stall is freeze-until, not a charge.** A bus access that waits on the bus (a RAM or I/O **read**, an instruction-fetch
+  miss, or the **fifth queued write**, because writes are buffered in the 4-deep write queue and only a full queue
+  waits) while `now < busy_until` sets `stall_until`; `cpu_run` then advances `ticks`,
   within the budget and running events, before the next instruction. Scratchpad, I-cache hits, COP0 and GTE are
   not bus accesses. This keeps the overrun at one instruction, so the 1,024 INSN margin (`cpu.h:79`,
   `frame.c:58`) holds; charging a 64K-word OTC (about 70,000 cycles) to one instruction would break it. Never
@@ -356,7 +357,7 @@ choice of the `--hash-state` output line format (after the existing runner lines
 - `.planning/phases/02-the-cpu-matches-the-public-vectors/02-CONTEXT.md` and `02-REVIEW-DISPOSITION.md`
 
 ### Hardware and design
-- `.planning/preparation/PSX-GPU-AND-GTE.md` section 5 (GTE); `PSX-SYSTEM.md` sections 4 to 6 (DMA, timers, interrupts)
+- `.planning/preparation/PSX-GPU-AND-GTE.md` section 5 (GTE; ares-derived, so the independent reference plan, which D-04 keeps clear of the seed, must NOT read it and uses the psx-spx GTE page instead); `PSX-SYSTEM.md` sections 4 to 6 (DMA, timers, interrupts)
 - `.planning/preparation/ARCHITECTURE.md` sections 1, 2, 5, 6, 7 (some claims are wrong, see D-39)
 - `.planning/preparation/CONFORMANCE.md` sections 2, 4, 5, 8; `PSXDEV-EXTRACTS.md` PX.12, PX.21; `ENGINEERING.md` sections 2 to 4, 8, 10, 11
 - `PROVENANCE.md`, `THIRD-PARTY-NOTICES.md`, `ASSET_POLICY.md`, `tests/fixtures/manifest.txt`, `pins.txt`
@@ -415,7 +416,9 @@ choice of the `--hash-state` output line format (after the existing runner lines
   `on_dma` hooks (v5.0); the 2-instruction GTE write-to-use latency; PGXP and any GTE sideband.
 - A CPU-bound Ir/frame perf fixture (bound to phase 4 `gpu_motion`); `policy.fixture_budget` (still deferred, 593 KB
   is far under the 4 MB cap); the SPDX scan and `.info` licence check of todo 005; `policy` pins gate (todo 003).
-- DICR bit 15 and bit 6 behaviour, CHCR writes while busy (unverified on hardware).
+- The 40-clock CD-ROM per-word cost: channel 3 is pinned at 24 in this phase; the CD-ROM device end (phase 6) selects 40 from its delay setting, and GTE-02's "24 or 40" is amended to say so.
+- DICR bit 15 and bit 6 behaviour, and every CHCR write while a channel is busy other than the CHCR = 0 stop the
+  upstream chain-looping test writes between cases (unverified on hardware, unmodelled).
 
 ### Reviewed Todos (not folded)
 - 001-004, 006, 009-017, 021, 022: not bound to phase 3 (see D-38 for where each goes).
