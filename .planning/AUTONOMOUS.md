@@ -62,3 +62,11 @@ When editing plan commands that contain regex anchors such as `$'`, use literal 
 callbacks: JavaScript replacement strings interpret `$'` as surrounding text and can corrupt task blocks.
 Before handing plans to a checker, use the existing failure-direction probe and one-shot balanced-tag/shell
 syntax checks. Keep these as workflow practice, not another repository gate.
+
+Execution should consume the existing context, research and predecessor interfaces instead of repeating broad
+research. Reopen a settled point only for a concrete missing fact or contradictory evidence. Keep required
+summary metadata and verification evidence, and avoid repeating the same outcome across prose sections.
+
+After adding rows to an exact test inventory, preserve its separators and sort the rows bytewise before
+configuring (for example, `LC_ALL=C sort -o FILE FILE`). Several phase-4 tracers first failed configuration
+only because their new rows were unsorted. This is an editing practice, not a new gate or test.
