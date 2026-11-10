@@ -146,14 +146,14 @@ static void clear_fault(schway *inst)
 /* The memory-control registers read back within their documented bits, and
    every delay write rebuilds that port's six costs {read8, read16, read32,
    write8, write16, write32} from the published formula (psx-spx Memory
-   Control; PSX-SYSTEM section 3). Hand-worked with COM_DELAY 00031125h
+   Control; docs/hardware/bus.md, Memory control). Hand-worked with COM_DELAY 00031125h
    (COM0 5, COM2 1, COM3 1):
    - power-on, every port 00000FFFh (delays 16, COM0, COM2 and COM3 selected, 8-bit):
      1ST = (4 + 1 = 5, below 6 so 6) + 16 + 2 = 24, SEQ = 4 + 1 + 18 = 23, so
      8-bit 24, 16-bit 24 + 23 = 47, 32-bit 24 + 3 * 23 = 93, for reads and writes;
    - BIOS 0013243Fh (read delay 4, write delay 16, COM2 selected, 8-bit): read
      1ST = (1, so 2) + 6 = 8, SEQ = 1 + 6 = 7, giving 8, 15, 29 (the 29 cycles of
-     PSX-SYSTEM section 3); write 1ST = 2 + 18 = 20, SEQ = 1 + 18 = 19, giving 20, 39, 77;
+     docs/hardware/bus.md, Memory control); write 1ST = 2 + 18 = 20, SEQ = 1 + 18 = 19, giving 20, 39, 77;
    - SPU 200931E1h (read delay 15, write delay 2, COM0 selected, 16-bit bus): read
      1ST = (4, so 5) + 17 = 22, SEQ = 4 + 17 = 21, giving 22, 22, 43; write
      1ST = 5 + 4 = 9, SEQ = 4 + 4 = 8, giving 9, 9, 17;
@@ -239,7 +239,7 @@ static void memctl_costs(void)
 }
 
 /* The scratchpad is data in KUSEG and KSEG0, a gap in KSEG1, and never
-   executed from (PSX-SYSTEM section 2, D-cache).
+   executed from (docs/hardware/bus.md, The scratchpad).
    Fault prevented: a KSEG1 alias that answers, a fetch that runs from the
    scratchpad, or an access that runs off its 1 KiB. */
 static void scratchpad(void)

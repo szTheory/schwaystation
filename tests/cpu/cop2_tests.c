@@ -3,7 +3,7 @@
    no replay log, and reads the registers, the delay latches, the fault record,
    the GTE's registers and the unbuilt-device counters. The register moves use
    data register 0 and control register 0, which read back exactly what was
-   written (PSX-SYSTEM section 2, SR bits and Address and bus errors; psx-spx,
+   written (docs/hardware/cop0.md, SR and Coprocessor unusable; psx-spx,
    Geometry Transformation Engine, Register Overview). */
 #include <stdint.h>
 #include <stdlib.h>

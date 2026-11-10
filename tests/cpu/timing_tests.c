@@ -4,7 +4,7 @@
    reads the cycle counter, HI, LO and the completion stamp. A multiply or divide
    issued at cycle counter t has HI and LO ready at t plus its latency, so
    latency is the stamp minus the counter before the instruction; an early read
-   of HI or LO waits until then (PSX-SYSTEM section 2, MULTU/MULT and DIV/DIVU;
+   of HI or LO waits until then (docs/hardware/cpu.md, Multiply and divide;
    psx-spx CPU Specifications, multiply and divide timing). */
 #include <stdint.h>
 #include <stdlib.h>
@@ -123,7 +123,7 @@ static struct md issue(uint32_t word, uint32_t rs, uint32_t rt)
 
 /* MULT takes 6 cycles when its first operand, with its sign mirrored (rs XOR
    its sign bit spread over the word), is below 800h, and the instruction itself
-   costs one (PSX-SYSTEM section 2, MULTU/MULT). 7FFh is the largest, and the
+   costs one (docs/hardware/cpu.md, Multiply and divide). 7FFh is the largest, and the
    mirror of -800h is 7FFh. The product is exact: 7FFh * 3 = 17FDh, and
    -800h * 3 = -1800h.
    Fault prevented: a multiply that is charged by its second operand, by a
@@ -149,7 +149,7 @@ static void mult_6(void)
 }
 
 /* From 800h up to FFFFFh, by the same mirrored rs, MULT takes 9 cycles; -801h
-   mirrors to 800h and -100000h to FFFFFh (PSX-SYSTEM section 2, MULTU/MULT).
+   mirrors to 800h and -100000h to FFFFFh (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a middle class that starts or ends one value off, on either
    sign. */
 static void mult_9(void)
@@ -164,7 +164,7 @@ static void mult_9(void)
 }
 
 /* Anything from 100000h up, mirrored, takes 13 cycles: 100000h, 7FFFFFFFh,
-   -100001h and -80000000h (PSX-SYSTEM section 2, MULTU/MULT).
+   -100001h and -80000000h (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a longest class that begins early or never applies to a
    negative first operand. */
 static void mult_13(void)
@@ -179,7 +179,7 @@ static void mult_13(void)
 
 /* MULTU classifies rs as it is, with no mirror: FFFFFFFFh is the longest class,
    where MULT of the same bits is the shortest, and FFFFF800h is the longest
-   too (PSX-SYSTEM section 2, MULTU/MULT). The product is unsigned:
+   too (docs/hardware/cpu.md, Multiply and divide). The product is unsigned:
    FFFFFFFFh * 1 is 00000000FFFFFFFFh.
    Fault prevented: an unsigned multiply that takes the signed classification. */
 static void multu_raw(void)
@@ -204,7 +204,7 @@ static void multu_raw(void)
    included, and never traps; the results are the documented ones: 7 / 2 is 3
    remainder 1, -7 / 2 is -3 remainder -1, a zero divisor gives LO = -1 and
    HI = rs (LO = +1 for a negative rs), and the one overflowing quotient wraps
-   (PSX-SYSTEM section 2, DIV/DIVU).
+   (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a divide whose time depends on its operands, or one that
    traps on zero. */
 static void div_36(void)
@@ -233,8 +233,8 @@ static void div_36(void)
 }
 
 /* DIVU takes 36 cycles too: 7 / 2, and a zero divisor gives LO = FFFFFFFFh and
-   HI = rs; FFFFFFFFh / 2 is 7FFFFFFFh remainder 1 (PSX-SYSTEM section 2,
-   DIV/DIVU).
+   HI = rs; FFFFFFFFh / 2 is 7FFFFFFFh remainder 1
+   (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: an unsigned divide with a different time or a signed
    reading of a large dividend. */
 static void divu_36(void)
@@ -258,8 +258,8 @@ static void divu_36(void)
    left of the latency, and nothing once it has elapsed. MFLO straight after a
    13-cycle MULT takes 13 cycles, MFHI straight after a divide takes 36, and
    after 4 no-operations the MULT's read takes 9 (13 less the 1 for its own issue
-   and 4 elapsed, plus its own cycle); after 20 it takes 1 (PSX-SYSTEM section 2,
-   MULTU/MULT: reading HI/LO early stalls until done).
+   and 4 elapsed, plus its own cycle); after 20 it takes 1
+   (docs/hardware/cpu.md, Multiply and divide: reading HI/LO early stalls until done).
    Fault prevented: a read that returns before the result is there at no cost, or
    one that waits longer than the result takes. */
 static void early_read_stalls(void)
@@ -310,7 +310,7 @@ static void early_read_stalls(void)
    new operation's own latency from its own issue, never the longer of the two. A
    13-cycle MULT then a DIV is ready 36 after the DIV, and a DIV then a 6-cycle
    MULT is ready 6 after the MULT, so a read right after it stalls 6 cycles
-   (PSX-SYSTEM section 2, MULTU/MULT).
+   (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a new multiply that waits for the old one, or one whose
    stamp keeps the old, later completion. */
 static void replace_while_busy(void)
@@ -340,7 +340,7 @@ static void replace_while_busy(void)
 
 /* MTLO and MTHI set the stamp to 0: the running multiply is over as far as a
    read can tell, so a read straight after takes 1 cycle and gives the written
-   value. Only that stall is pinned (PSX-SYSTEM section 2, MULTU/MULT).
+   value. Only that stall is pinned (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a write to HI or LO that a running multiply then overwrites
    or that a read waits behind. */
 static void mtlo_mthi_stamp_zero(void)
@@ -366,7 +366,7 @@ static void mtlo_mthi_stamp_zero(void)
 
 /* An exception leaves HI, LO and the stamp alone: SYSCALL taken while a
    multiply runs changes none of them, and a read in the handler still stalls to
-   the original completion (PSX-SYSTEM section 2, EPC and COP0 registers: the
+   the original completion (docs/hardware/cop0.md, Entry: the
    entry changes only COP0 and the program counter).
    Fault prevented: an exception entry that clears the multiply unit or
    forgets the result, so a handler reads zero. */

@@ -2,8 +2,8 @@
    schwaystation-test-cache <case>. White-box like the other bus tests: the test
    places words in RAM, runs them with schway__cpu_step_one and no replay log,
    and reads the cache arrays, the queue count, the registers and the cycle
-   counter. The expected behaviour is the documented one (PSX-SYSTEM section 2,
-   I-cache and Cache isolation, write queue). */
+   counter. The expected behaviour is the documented one (docs/hardware/bus.md,
+   Instruction cache and Write queue). */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

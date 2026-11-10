@@ -610,7 +610,7 @@ static void test_run_bounds(void)
 
 /* The cpu, bus and fault fields come back from a save, a power reset and a
    load byte for byte, and the power-on values are the documented ones
-   (ARCHITECTURE section 7; PSX-SYSTEM section 2, COP0 registers). The TTY
+   (ARCHITECTURE section 7; docs/hardware/cop0.md, Registers). The TTY
    ring is outside the state and a power reset empties it. */
 static void test_cpu_fields(void)
 {

@@ -16,7 +16,7 @@
 
 enum { OWNED, UNBUILT, GAP };
 
-/* The documented map, as offsets in the page (PSX-SYSTEM section 3):
+/* The documented map, as offsets in the page (docs/hardware/bus.md, Segments and the physical map):
    memory control 000h-023h, RAM_SIZE 060h-063h, I_STAT and I_MASK 070h-077h,
    the DMA registers 080h-0FFh and the timers 100h-12Fh are owned; SIO
    040h-05Fh, CD-ROM 800h-803h, GPU 810h-817h, MDEC 820h-827h and SPU

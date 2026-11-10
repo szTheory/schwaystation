@@ -3,8 +3,7 @@
    words in RAM, runs them with schway__cpu_step_one and no replay log, and reads
    the registers, the delay latches, the fault record and the retirement stamp.
    Expected values are worked by hand from the psx-spx CPU Specifications page
-   (COP0 registers, exception handling) and from sections 2 and 6 of
-   .planning/preparation/PSX-SYSTEM.md. */
+   (COP0 registers, exception handling) and from docs/hardware/cop0.md. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -123,7 +122,7 @@ static void enable_vblank(schway *inst)
    edge (the vertical blank raised at the end of a frame) happens between
    instructions, the two instructions after it retire, and the interrupt is taken
    before the third, so EPC names the third and the handler returns to it
-   (PSX-SYSTEM section 6; interrupts return to EPC + 0, section 2, EPC). CAUSE
+   (docs/hardware/cop0.md, Interrupts; interrupts return to EPC + 0, Entry). CAUSE
    bit 10 shows the line at once, and entry pushes the mode stack.
    Fault prevented: an interrupt that is never taken, one taken at the edge with
    no latency, or one that returns past an instruction. */
@@ -180,7 +179,7 @@ static void run_word(schway *inst, uint32_t pc, uint32_t word)
    (AdEL, ExcCode 4): BadVaddr is the address, EPC the instruction, the first
    fault is recorded and rt, which the load never reached, keeps its value with
    no load pending. The bus is not touched (psx-spx CPU Specifications,
-   exception handling; PSX-SYSTEM section 2, Address and bus errors).
+   exception handling; docs/hardware/cpu.md, Loads and stores).
    Fault prevented: a misaligned half-word read that returns data, or one whose
    handler reads the wrong BadVaddr. */
 static void adel_lh(void)
@@ -242,7 +241,7 @@ static void ades_sw(void)
 
 /* ADD of 7FFFFFFFh and 1 overflows: ExcCode 0Ch, rd as it was, EPC the
    instruction, no first fault and no BadVaddr (psx-spx CPU Specifications,
-   exception handling; PSX-SYSTEM section 2, Address and bus errors).
+   exception handling; docs/hardware/cop0.md, CAUSE).
    Fault prevented: a wrapped sum written to rd, or a first fault a handler
    that fixes the overflow would hide. */
 static void overflow_add(void)
@@ -264,7 +263,7 @@ static void overflow_add(void)
 /* An opcode that is not an instruction is a reserved-instruction exception
    (ExcCode 0Ah) with EPC the instruction and a first fault; so is a SPECIAL
    function that is not one (psx-spx CPU Specifications, opcode map;
-   PSX-SYSTEM section 2, ExcCodes).
+   docs/hardware/cop0.md, CAUSE).
    Fault prevented: an undefined encoding that retires as a no-operation. */
 static void reserved_instruction(void)
 {
@@ -284,7 +283,7 @@ static void reserved_instruction(void)
 /* A COP1 instruction with SR.CU1 clear is a coprocessor-unusable exception
    (ExcCode 0Bh) with CE = 1 in CAUSE bits 29-28, EPC the instruction, and a first
    fault, since the console has no COP1 (psx-spx CPU Specifications, exception
-   handling; PSX-SYSTEM section 2, SR bits).
+   handling; docs/hardware/cop0.md, Coprocessor unusable).
    Fault prevented: a missing coprocessor that executes, or a CE that names
    the wrong one. */
 static void cop1_unusable(void)
@@ -317,8 +316,7 @@ static void trap_epc(uint32_t word, uint32_t code)
 
 /* In a delay slot the exception returns to the branch: EPC is the branch, BD is
    set, BT says the branch was taken and TAR is where it was going (psx-spx CPU
-   Specifications, exception handling; PSX-SYSTEM section 2, EPC and Branch
-   delay). A taken BEQ r0, r0 at CODE with a target of CODE + 10h, the trap in
+   Specifications, exception handling; docs/hardware/cop0.md, Entry). A taken BEQ r0, r0 at CODE with a target of CODE + 10h, the trap in
    its slot. */
 static void trap_bd(uint32_t word, uint32_t code)
 {
@@ -363,8 +361,8 @@ static void break_bd(void)
    interrupt mask bit of the line, SR bit 10, are both set, and I_MASK lets I_STAT
    through to CAUSE bit 10. With one of the three clear nothing is armed, however
    many instructions run, and a read of CAUSE or SR never arms one. The level
-   stays visible in CAUSE bit 10 while SR holds it off (PSX-SYSTEM section 2, SR
-   bits and CAUSE bits; section 6).
+   stays visible in CAUSE bit 10 while SR holds it off (docs/hardware/cop0.md, SR,
+   CAUSE and Interrupts).
    Fault prevented: an interrupt taken in spite of IEc, IM2 or I_MASK, or one
    armed by looking at a register. */
 static void irq_masked_sr(void)
@@ -398,7 +396,7 @@ static void irq_masked_sr(void)
 
 /* SR.BEV picks the general vector, for an exception and for an interrupt alike:
    BFC00180h while it is set and 80000080h while it is clear (psx-spx CPU
-   Specifications, exception handling; PSX-SYSTEM section 2, Vectors).
+   Specifications, exception handling; docs/hardware/cop0.md, Entry).
    Fault prevented: a handler that is never entered because the vector ignores
    BEV, for the interrupt path as for the instruction path. */
 static void bev_vectors(void)
@@ -426,7 +424,7 @@ static void bev_vectors(void)
 /* A load from an address no device answers is a data bus error (DBE, ExcCode 7)
    with EPC the instruction, no BadVaddr, no load pending and rt untouched, and
    the first fault names it. The expansion region 1 is unused here (psx-spx
-   Memory Map; PSX-SYSTEM section 2, Address and bus errors).
+   Memory Map; docs/hardware/cpu.md, Loads and stores).
    Fault prevented: a read from nowhere that returns zero without a trap, or one
    that writes BadVaddr, which only address errors do. */
 static void dbe_unmapped_read(void)
@@ -447,7 +445,7 @@ static void dbe_unmapped_read(void)
 
 /* An instruction fetch from an address no device answers is an instruction bus
    error (IBE, ExcCode 6): EPC is that address, there is no BadVaddr, and the
-   first fault names the fetch (PSX-SYSTEM section 2, Address and bus errors).
+   first fault names the fetch (docs/hardware/cpu.md, Instruction fetch).
    Fault prevented: a fetch from nowhere that executes zeros, or reports a data
    error. */
 static void ibe_unmapped_fetch(void)
@@ -466,7 +464,7 @@ static void ibe_unmapped_fetch(void)
 /* When an interrupt and an exception of the instruction itself fall on the same
    instruction the order is data AdEL, AdES and DBE, then overflow, then the
    interrupt, then SYSCALL, BREAK, RI and CpU, then the fetch's AdEL and IBE
-   (PSX-SYSTEM section 2, Priority). The interrupt is due on the instruction at
+   (docs/hardware/cop0.md, Interrupts). The interrupt is due on the instruction at
    CODE + 4 here (the stamp is 1 as it starts). Below it the interrupt is taken
    at that instruction, which runs again after the return; above it the
    exception is taken, the entry clears IEc so the interrupt is not taken yet,
@@ -524,7 +522,7 @@ static void priority(void)
    in the write queue when the interrupt is entered. The queue is kept, RAM holds
    the stores in store order (the later store over the same word wins), and the
    handler's first uncached read finds that data and empties the queue
-   (PSX-SYSTEM section 2, Cache isolation, write queue).
+   (docs/hardware/bus.md, Instruction cache and Write queue).
    Fault prevented: an interrupt entry that drops or reorders queued stores, or
    one that leaves them queued behind a handler's uncached read. */
 static void irq_with_queued_stores(void)
@@ -571,7 +569,7 @@ static void irq_with_queued_stores(void)
    entry sets the engine's stamp 15 cycles after the entry's own cycle, the
    handler runs, and after the return the command's own issue sets it again, from
    the cycle it issues on, with the wait for the entry's command in front of it
-   (PSX-SYSTEM section 2, GTE in a delay slot of an interrupt). With SR.CU2 clear
+   (docs/hardware/cop0.md, Interrupts). With SR.CU2 clear
    the instruction would raise CpU, so the entry executes nothing.
    Fault prevented: an entry that does not run the pending command, one that runs
    it but loses the second run after the return, or one that runs a command the
@@ -760,7 +758,7 @@ static void irq_entry_peek(void)
 /* The latencies below are an inference, not a measurement: the published
    behaviour is that a newly asserted interrupt is delayed by about two
    instructions, and nothing measured on silicon separates a delay of one from
-   two for the sources below (PSX-SYSTEM section 6, interrupts). Each is pinned
+   two for the sources below (docs/hardware/cop0.md, Interrupts). Each is pinned
    as the documented value, and a change to one needs a dated line in
    tests/diag/allow.txt that names the evidence for it.
 
@@ -782,8 +780,8 @@ static void doc_cause_write(void)
     schway_destroy(inst);
 }
 
-/* The latency here is an inference, unmeasured on silicon (PSX-SYSTEM section 6,
-   interrupts); a change needs a dated line in tests/diag/allow.txt naming its
+/* The latency here is an inference, unmeasured on silicon (docs/hardware/cop0.md,
+   Interrupts); a change needs a dated line in tests/diag/allow.txt naming its
    evidence. MTC0 to SR that enables a line that is already pending is taken two
    retirements later, the MTC0 and the instruction after it, so EPC is pc + 8.
    Fault prevented: an SR write whose pending interrupt is taken at once, or
@@ -806,8 +804,8 @@ static void doc_sr_write(void)
     schway_destroy(inst);
 }
 
-/* The latency here is an inference, unmeasured on silicon (PSX-SYSTEM section 6,
-   interrupts); a change needs a dated line in tests/diag/allow.txt naming its
+/* The latency here is an inference, unmeasured on silicon (docs/hardware/cop0.md,
+   Interrupts); a change needs a dated line in tests/diag/allow.txt naming its
    evidence. A store to I_MASK that lets a latched source through is taken two
    retirements later, the store and the instruction after it, so EPC is pc + 8.
    Fault prevented: an I_MASK write whose interrupt is taken at the store, or
@@ -831,8 +829,8 @@ static void doc_imask_write(void)
     schway_destroy(inst);
 }
 
-/* The latency here is an inference, unmeasured on silicon (PSX-SYSTEM section 6,
-   interrupts); a change needs a dated line in tests/diag/allow.txt naming its
+/* The latency here is an inference, unmeasured on silicon (docs/hardware/cop0.md,
+   Interrupts); a change needs a dated line in tests/diag/allow.txt naming its
    evidence. A CAUSE write in the delay slot of a taken branch is taken after the
    slot, with the branch gone: EPC is the branch's destination and BD is 0 (the
    entry never splits a branch from its slot by naming the slot).
@@ -855,8 +853,8 @@ static void doc_cause_in_delay_slot(void)
 
 /* RFE looks at the line again at once: a handler that returns without
    acknowledging the source is entered again after the RFE, not after two more
-   instructions, and EPC is the instruction after the RFE (PSX-SYSTEM section 6;
-   section 2, SR bits).
+   instructions, and EPC is the instruction after the RFE (docs/hardware/cop0.md,
+   Interrupts and SR).
    Fault prevented: a return from exception that runs the interrupted program
    for a while with an interrupt it should take, or never takes it. */
 static void irq_rfe(void)
@@ -877,7 +875,7 @@ static void irq_rfe(void)
 }
 
 /* An armed interrupt is taken only if the line is still true when it is due:
-   acknowledging the source in between takes it back (PSX-SYSTEM section 6).
+   acknowledging the source in between takes it back (docs/hardware/cop0.md, Interrupts).
    Fault prevented: an interrupt taken for a source the handler or the program
    had already cleared. */
 static void irq_dropped_before_entry(void)

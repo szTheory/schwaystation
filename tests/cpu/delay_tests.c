@@ -2,8 +2,8 @@
    White-box like the exception tests: the test places words in RAM, runs them
    with schway__cpu_step_one and no replay log, and reads the registers and the
    delay latches. Expected values are worked by hand from the psx-spx CPU
-   Specifications page (load delay, COP0 registers) and from section 2 of
-   .planning/preparation/PSX-SYSTEM.md (Load delay, Stores and LWL/LWR). */
+   Specifications page (load delay, COP0 registers) and from the Delay latches
+   and Loads and stores sections of docs/hardware/cpu.md. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -87,8 +87,8 @@ static uint32_t cop0(const schway *inst, uint32_t reg)
 /* LW lands one instruction late: the instruction in its delay slot reads the
    register as it was, and the one after reads the loaded word. r2 starts at 1,
    the word is 600Dh; ADDU r3 in the slot copies the old r2 and ADDU r4 after it
-   the new one (psx-spx CPU Specifications, load delay; PSX-SYSTEM section 2,
-   Load delay).
+   the new one (psx-spx CPU Specifications, load delay; docs/hardware/cpu.md,
+   Delay latches).
    Fault prevented: a load that is visible to the next instruction, or one that
    lands a second late. */
 static void load_delay(void)
@@ -114,8 +114,8 @@ static void load_delay(void)
 
 /* A write to the loaded register, by the instruction in the delay slot, cancels
    the load: the later write wins and the loaded word never arrives. A second
-   load of the same register in the slot does the same to the first (PSX-SYSTEM
-   section 2, Load delay).
+   load of the same register in the slot does the same to the first
+   (docs/hardware/cpu.md, Delay latches).
    Fault prevented: a late load that lands over the newer value the program
    wrote. */
 static void write_cancels_pending(void)
@@ -151,7 +151,7 @@ static void write_cancels_pending(void)
 
 /* A load that fails, an address error or a bus error, leaves rt as it was and
    issues nothing, and a load an instruction earlier on another register still
-   completes as the failing one ends (PSX-SYSTEM section 2, Stores, LWL/LWR: a
+   completes as the failing one ends (docs/hardware/cpu.md, Loads and stores: a
    failed load leaves rt untouched).
    Fault prevented: a load that writes zero or stale data into rt when it
    traps, or one that leaves an older load pending past the exception. */
@@ -183,7 +183,7 @@ static void failed_load_untouched(void)
 /* A load whose interrupt is taken right after it completes before the handler
    runs: the handler sees the register loaded, and the instruction the interrupt
    cut off, which would have read the old value, reads the new one when it runs
-   after the return (PSX-SYSTEM section 2, Load delay: an interrupt between the
+   after the return (docs/hardware/cpu.md, Delay latches: an interrupt between the
    two changes this).
    Fault prevented: a load left pending into the handler, which the handler's
    first instruction then lands, or a load that is lost by the entry. */
@@ -224,7 +224,7 @@ static void load_before_irq(void)
    instruction between them: the second merges into the value the first is
    about to write, not the register's old contents, and the first load, which
    the second replaces, never lands on its own. The word at DATA + 1 is 44332211h
-   (PSX-SYSTEM section 2, Stores, LWL/LWR: lane merges with no delay needed
+   (docs/hardware/cpu.md, Loads and stores: lane merges with no delay needed
    between the pair).
    Fault prevented: a pair that needs a nop between its halves, or one whose
    second half merges into stale register contents. */
@@ -253,7 +253,7 @@ static void lwl_lwr_interlock(void)
 
 /* MFC0 has a delay slot of one instruction like a load: the register moves
    after the next instruction, which reads the old value, and a write to the same
-   register by that next instruction wins (PSX-SYSTEM section 2, COP delays).
+   register by that next instruction wins (docs/hardware/cop0.md, Registers).
    Fault prevented: a COP0 read visible one instruction early, or landing over a
    newer write to its register. */
 static void mfc0_delay(void)
