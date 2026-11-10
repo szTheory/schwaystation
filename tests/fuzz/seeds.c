@@ -17,7 +17,10 @@ enum code {
     CODE_NONE,    /* zero bytes: no-operations */
     CODE_SPIN,    /* a jump to itself */
     CODE_DEVICES, /* one read and write of each device window, then a jump back to the start */
-    CODE_GAPS     /* the same on addresses no device decodes */
+    CODE_GAPS,    /* the same on addresses no device decodes */
+    CODE_DMA,     /* arm DMA channels with hostile addresses and counts, then spin */
+    CODE_TIMERS,  /* arm the counters at target 0 with their interrupts on and no handler, then spin */
+    CODE_GTE      /* enable the coprocessor and write all ones to every register, then spin */
 };
 
 struct seed {
@@ -66,6 +69,16 @@ static const struct seed seeds[] = {
     {"stack_kseg2", TEXT, TEXT, 0x800u, 0xC0000000u, 0x10u, HEADER + 0x800u, CODE_SPIN},
     {"stack_size_wraps", TEXT, TEXT, 0x800u, 0x80000010u, 0xFFFFFFF0u, HEADER + 0x800u,
      CODE_SPIN},
+    {"dma_self_ref_list", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
+    {"dma_list_scratch", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
+    {"dma_list_bios", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
+    {"dma_list_unmapped", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
+    {"dma_otc_bcr_zero_wrap", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
+    {"dma_otc_ignored_bits", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
+    {"dma_bcr_all_ones", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
+    {"timer_storm", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_TIMERS},
+    {"gte_all_ones", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_GTE},
+    {"gte_every_command", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_GTE},
 };
 
 #define SEED_COUNT ((uint32_t)(sizeof seeds / sizeof seeds[0]))
@@ -127,6 +140,94 @@ static size_t emit_hammer(uint32_t *w, uint32_t start, const uint32_t *windows, 
     return n;
 }
 
+/* The coprocessor move encodings (MIPS I): mtc0 is op 10h, rs 4; mtc2 is op 12h,
+   rs 4 and ctc2 rs 6, with rt the CPU register and rd the register moved. */
+static uint32_t op_cop(uint32_t op, uint32_t rs, uint32_t rt, uint32_t rd)
+{
+    return (op << 26) | (rs << 21) | (rt << 16) | (rd << 11);
+}
+
+/* Stores a word at an address whose low half is below 8000h: lui, lui, ori, sw. */
+static size_t emit_sw(uint32_t *w, size_t n, uint32_t addr, uint32_t value)
+{
+    w[n++] = op_lui(R_T0, addr >> 16);
+    w[n++] = op_lui(R_T1, value >> 16);
+    w[n++] = op_i(0x0Du, R_T1, R_T1, value);
+    w[n++] = op_i(0x2Bu, R_T0, R_T1, addr);
+    return n;
+}
+
+/* A jump to itself and its delay slot, so the program ends in a spin. */
+static size_t emit_spin(uint32_t *w, size_t n, uint32_t start)
+{
+    w[n] = op_j(start + 4u * (uint32_t)n);
+    w[n + 1u] = 0u;
+    return n + 2u;
+}
+
+/* DPCR with every channel enabled, then one row of first channel, last
+   channel, MADR, BCR and CHCR (psx-spx, DMA Channels): a linked list into a
+   node that points at itself, into the scratchpad, the BIOS and unmapped
+   space; OTC with BCR 0 from the top of RAM (10000h words wrap past 0); OTC
+   with every bit it ignores set; and every channel with BCR all ones. */
+static size_t emit_dma(uint32_t *w, uint32_t start, uint32_t variant)
+{
+    static const uint32_t rows[][5] = {
+        {2u, 2u, 0x00100000u, 0u, 0x01000401u}, {2u, 2u, 0x1F800000u, 0u, 0x01000401u},
+        {2u, 2u, 0x1FC00000u, 0u, 0x01000401u}, {2u, 2u, 0x1FA00000u, 0u, 0x01000401u},
+        {6u, 6u, 0x00FFFFFCu, 0u, 0x11000000u}, {6u, 6u, 0x00100000u, 0x10u, 0x11770703u},
+        {0u, 6u, 0x00100000u, 0xFFFFFFFFu, 0x11000001u},
+    };
+    const uint32_t *r = rows[variant];
+    size_t n = emit_sw(w, 0u, 0xBF8010F0u, 0x08888888u);
+    if (variant == 0u) {
+        n = emit_sw(w, n, 0xA0100000u, 0x00100000u); /* the node: no words, next is itself */
+    }
+    for (uint32_t ch = r[0]; ch <= r[1]; ch++) {
+        uint32_t base = 0xBF801080u + 0x10u * ch;
+        n = emit_sw(w, n, base, r[2]);
+        n = emit_sw(w, n, base + 4u, r[3]);
+        n = emit_sw(w, n, base + 8u, r[4]);
+    }
+    return emit_spin(w, n, start);
+}
+
+/* Each counter at target 0 on the system clock, MODE 78h (reset at target,
+   interrupt at target and at overflow, repeat), I_MASK for the three, then SR
+   with IEc and IM2 so the raise reaches the CPU with no handler installed
+   (psx-spx, Timers; Interrupt Control). */
+static size_t emit_timers(uint32_t *w, uint32_t start)
+{
+    size_t n = 0;
+    for (uint32_t t = 0; t < 3u; t++) {
+        n = emit_sw(w, n, 0xBF801108u + 0x10u * t, 0u);
+        n = emit_sw(w, n, 0xBF801104u + 0x10u * t, 0x78u);
+    }
+    n = emit_sw(w, n, 0xBF801074u, 0x70u);
+    w[n++] = op_i(0x0Du, 0u, R_T1, 0x401u);
+    w[n++] = op_cop(0x10u, 4u, R_T1, 12u);
+    return emit_spin(w, n, start);
+}
+
+/* SR.CU2, then FFFFFFFFh by MTC2 and CTC2 to each of the 32 data and 32
+   control registers, and for the second variant every command number with sf
+   and lm both ways (the command word is 4A000000h, sf bit 19, lm bit 10). */
+static size_t emit_gte(uint32_t *w, uint32_t start, uint32_t variant)
+{
+    size_t n = 0;
+    w[n++] = op_lui(R_T1, 0x4000u);
+    w[n++] = op_cop(0x10u, 4u, R_T1, 12u);
+    w[n++] = op_i(0x09u, 0u, R_T0, 0xFFFFu);
+    for (uint32_t r = 0; r < 32u; r++) {
+        w[n++] = op_cop(0x12u, 4u, R_T0, r);
+        w[n++] = op_cop(0x12u, 6u, R_T0, r);
+    }
+    for (uint32_t k = 0; variant != 0u && k < 256u; k++) {
+        w[n++] = 0x4A000000u | ((k & 1u) << 19) | (((k >> 1) & 1u) << 10) | (k >> 2);
+    }
+    return emit_spin(w, n, start);
+}
+
 static void put32(uint8_t *p, uint32_t v)
 {
     p[0] = (uint8_t)v;
@@ -151,8 +252,12 @@ const char *seeds_name(uint32_t i)
 size_t seeds_build(uint32_t i, uint8_t *buf)
 {
     const struct seed *s = &seeds[i];
-    uint32_t words[256];
+    uint32_t words[512];
     size_t count = 0;
+    uint32_t variant = 0; /* this row's place among the rows of its code kind */
+    for (uint32_t k = 0; k < i; k++) {
+        variant += seeds[k].code == s->code;
+    }
     memset(buf, 0, SEEDS_SIZE_MAX);
     memcpy(buf, "PS-X EXE", 8);
     put32(buf + 0x10, s->pc0);
@@ -170,6 +275,12 @@ size_t seeds_build(uint32_t i, uint8_t *buf)
     } else if (s->code == CODE_GAPS) {
         count = emit_hammer(words, s->pc0, gap_windows,
                            sizeof gap_windows / sizeof gap_windows[0]);
+    } else if (s->code == CODE_DMA) {
+        count = emit_dma(words, s->pc0, variant);
+    } else if (s->code == CODE_TIMERS) {
+        count = emit_timers(words, s->pc0);
+    } else if (s->code == CODE_GTE) {
+        count = emit_gte(words, s->pc0, variant);
     }
     for (size_t k = 0; k < count && HEADER + 4u * (k + 1u) <= s->n; k++) {
         put32(buf + HEADER + 4u * k, words[k]);
