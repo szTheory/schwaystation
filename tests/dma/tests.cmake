@@ -156,3 +156,28 @@ schway_add_test(NAME dma.list.walk
 schway_add_test(NAME dma.list.empty
   COMMAND schwaystation-test-dma list_empty
   LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: a list that never ends hanging a step, finishing, raising a
+# flag or an interrupt, passing more than 1000h nodes in one step, or a frame
+# that does not end.
+schway_add_test(NAME dma.list.self_ref
+  COMMAND schwaystation-test-dma list_self_ref
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: the CHCR word 0 that leaves a looping list running, ends it
+# with a flag or an interrupt, or leaves the channel unable to run the next list.
+schway_add_test(NAME dma.list.stop
+  COMMAND schwaystation-test-dma list_stop
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a chopped transfer whose windows or CPU gaps take a time
+# outside the bands around the 64 rows of a public hardware log.
+schway_add_test(NAME dma.chopping.band
+  COMMAND schwaystation-test-dma chopping_band
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a list that takes the CPU's time at a rate outside the band
+# around the slowdown of a public hardware log.
+schway_add_test(NAME dma.list.cpu_band
+  COMMAND schwaystation-test-dma list_cpu_band
+  LABELS dma portable TIMEOUT 30)

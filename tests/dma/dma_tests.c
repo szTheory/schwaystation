@@ -1127,10 +1127,261 @@ static void case_list_empty(void)
     }
 }
 
+/* A list of one node that names itself (count 0), or of two that name each
+   other, at 3000h: the lists the public chain-looping test builds. */
+static void put_loop_list(schway *inst, uint32_t nodes)
+{
+    if (nodes == 1u) {
+        wr32(inst, 0x3000u, 0x00003000u);
+    } else {
+        wr32(inst, 0x3000u, 0x00003004u);
+        wr32(inst, 0x3004u, 0x00003000u);
+    }
+}
+
+static void start_loop_list(schway *inst, uint32_t nodes)
+{
+    put_loop_list(inst, nodes);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00840000u);
+    wr32(inst, MADR(2u), 0x3000u);
+    wr32(inst, CHCR(2u), CHCR_LIST);
+}
+
+/* The DICR flag bits and I_STAT bit 3: nothing may be set by a list that does
+   not end. */
+static void check_no_flag(const schway *inst)
+{
+    CHECK_EQ_HEX(inst->dma.dicr & 0x7F000000u, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+}
+
+/* Fault prevented: a list that never ends hanging a step, finishing, raising a
+   flag or an interrupt, or a frame that does not end. The guard is checked
+   directly: an engine step whose tick is so far ahead that more than 2000h
+   nodes are due passes 1000h of them and yields, with the channel still busy,
+   no flag, no interrupt and the next start after the tick it was given; the
+   next step does the same and the count of nodes since the start is 2000h.
+   Then through the public API a frame ends with the channel still busy. */
+static void case_list_self_ref(void)
+{
+    for (uint32_t nodes = 1u; nodes <= 2u; nodes++) {
+        schway *inst = make();
+        start_loop_list(inst, nodes);
+        CHECK_EQ_U64(inst->dma.nodes_done, 1u);
+        uint64_t far1 = now_of(inst) + 0x10000000u;
+        schway__dma_event(inst, far1);
+        CHECK_EQ_HEX(inst->dma.nodes_done, 0x1000u);
+        CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+        check_no_flag(inst);
+        CHECK(schway__dma_next(inst) > far1);
+        uint64_t far2 = far1 + 0x10000000u;
+        schway__dma_event(inst, far2);
+        CHECK_EQ_HEX(inst->dma.nodes_done, 0x2000u);
+        CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+        check_no_flag(inst);
+        CHECK(schway__dma_next(inst) > far2);
+        schway_destroy(inst);
+    }
+    for (uint32_t nodes = 1u; nodes <= 2u; nodes++) {
+        schway *inst = make();
+        start_loop_list(inst, nodes);
+        uint64_t end = inst->frame_end;
+        schway_run_result r;
+        memset(&r, 0, sizeof r);
+        r.size = (uint32_t)sizeof r;
+        CHECK_EQ_U64(schway_run_frame(inst, &r), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+        CHECK(r.ticks <= end + SCHWAY__DMA_BUSY_MAX);
+        CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+        check_no_flag(inst);
+        CHECK(inst->dma.nodes_done > 0x2000u);
+        schway_destroy(inst);
+    }
+}
+
+/* Fault prevented: a CHCR word of 0 that leaves a looping list running, ends
+   it with a flag or an interrupt, or leaves the channel unable to run the next
+   list. This is the procedure of the public chain-looping test, which writes 0
+   between its cases and sees the next one run normally: after a looping list
+   has run, in a unit or in its CPU window, the write stops it with no flag and
+   no interrupt, the register reads 0, and an empty list on the same channel
+   then completes with both. */
+static void case_list_stop(void)
+{
+    uint32_t seen_unit = 0u;
+    uint32_t seen_gap = 0u;
+    for (uint32_t k = 0u; k < 24u; k++) {
+        schway *inst = make();
+        start_loop_list(inst, 1u);
+        (void)run(inst, 1000u + k);
+        CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+        seen_unit += inst->dma.phase[2] == 1u ? 1u : 0u;
+        seen_gap += inst->dma.phase[2] == 3u ? 1u : 0u;
+        wr32(inst, CHCR(2u), 0u);
+        CHECK_EQ_HEX(rd32(inst, CHCR(2u)), 0u);
+        CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+        CHECK_EQ_U64(schway__dma_next(inst), UINT64_MAX);
+        (void)run(inst, 2000u);
+        CHECK_EQ_HEX(rd32(inst, CHCR(2u)), 0u);
+        check_no_flag(inst);
+        wr32(inst, 0x4000u, 0x00FFFFFFu);
+        wr32(inst, MADR(2u), 0x4000u);
+        wr32(inst, CHCR(2u), CHCR_LIST);
+        (void)run(inst, 200u);
+        CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
+        CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+        CHECK_EQ_HEX(rd32(inst, DICR), 0x84840000u);
+        schway_destroy(inst);
+    }
+    CHECK(seen_unit != 0u);
+    CHECK(seen_gap != 0u);
+}
+
+/* The 64 chopping rows of the public ps1-tests dma/chopping hardware log
+   (ps1-tests at f727802fead1, MIT: dma/chopping/psx.log, lines 68-131; the
+   program is dma/chopping/main.cpp): CPU cycles a chopped transfer of 8,192
+   bytes (2,048 words) from RAM to the GPU channel took, per DMA window of 2^n
+   words (n = 0 to 7, the row groups) and CPU window of 2^m cycles (m = 0 to 7,
+   within a group). The figures are copied as facts; the log is not kept. */
+static const uint32_t chop_rows[64] = {
+    16693u, 20595u, 22834u, 30867u, 47672u, 81926u, 80068u, 80007u,
+    10520u, 10519u, 12511u, 16463u, 24668u, 41037u, 73765u, 73705u,
+    5828u,  6287u,  7314u,  9390u,  13431u, 21832u, 37956u, 70651u,
+    4011u,  4275u,  4719u,  5797u,  7776u,  11909u, 20131u, 36307u,
+    3103u,  3251u,  3459u,  4021u,  4998u,  7031u,  11034u, 19235u,
+    2659u,  2724u,  2786u,  3092u,  3630u,  4598u,  6563u,  10721u,
+    2439u,  2469u,  2517u,  2643u,  2876u,  3392u,  4365u,  6378u,
+    2320u,  2338u,  2362u,  2419u,  2536u,  2765u,  3274u,  4184u,
+};
+
+/* The ticks from the CHCR write to the end of a chopped transfer of 2,048
+   words with DMA windows of 2^dw words and CPU windows of 2^cw cycles. The
+   engine is stepped to each deadline in turn. */
+static uint64_t chopped_cycles(uint32_t dw, uint32_t cw)
+{
+    schway *inst = make();
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, MADR(2u), 0x4000u);
+    wr32(inst, BCR(2u), 2048u);
+    uint64_t start = now_of(inst);
+    wr32(inst, CHCR(2u), 0x11000101u | (dw << 16) | (cw << 20));
+    uint64_t t = start;
+    for (uint32_t i = 0u; i < 1000000u && (inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u; i++) {
+        t = schway__dma_next(inst);
+        CHECK(t != UINT64_MAX);
+        schway__dma_event(inst, t);
+    }
+    CHECK_EQ_U64(inst->dma.words[2], 2048u);
+    schway_destroy(inst);
+    return t - start;
+}
+
+/* Fault prevented: a chopped transfer whose windows or CPU gaps are costed so
+   that its time leaves the hardware's. Each of the 64 rows is compared with
+   the model in bands, as a fitted model deserves (it is evidence of a fit to
+   one log, not of the hardware): every row within 12 %, and the mean of the
+   signed errors within 2 %, so the model is not biased high or low. The mean
+   absolute error is printed. */
+static void case_chopping_band(void)
+{
+    int64_t sum = 0;
+    int64_t abs_sum = 0;
+    for (uint32_t dw = 0u; dw < 8u; dw++) {
+        for (uint32_t cw = 0u; cw < 8u; cw++) {
+            uint64_t row = chop_rows[dw * 8u + cw];
+            uint64_t model = chopped_cycles(dw, cw);
+            int64_t err = ((int64_t)model - (int64_t)row) * 1000 / (int64_t)row;
+            if (err > 120 || err < -120) {
+                fprintf(stderr, "chopping: dma window 2^%u, cpu window 2^%u: model %llu, hardware %llu\n",
+                        (unsigned)dw, (unsigned)cw, (unsigned long long)model,
+                        (unsigned long long)row);
+            }
+            CHECK(err <= 120 && err >= -120);
+            sum += err;
+            abs_sum += err < 0 ? -err : err;
+        }
+    }
+    printf("chopping: mean error %lld per mille, mean absolute error %lld per mille\n",
+           (long long)(sum / 64), (long long)(abs_sum / 64));
+    CHECK(sum / 64 <= 20 && sum / 64 >= -20);
+}
+
+/* The loop the public chain-looping test times: 1,000 passes that read a
+   RAM word, add, and write it back. Marker t9 is set after the last pass. */
+static uint32_t put_work_loop(uint32_t *w)
+{
+    uint32_t n = 0u;
+    w[n++] = I_LUI(T6, 0x8000u);
+    w[n++] = I_ADDIU(T1, 0u, 0u);
+    w[n++] = I_ADDIU(T2, 0u, 1000u);
+    w[n++] = I_LW(T3, 0x200u, T6);
+    w[n++] = I_ADDIU(T1, T1, 1u);
+    w[n++] = I_ADDIU(T3, T3, 1u);
+    w[n++] = I_SW(T3, 0x200u, T6);
+    w[n++] = 0x14000000u | (T1 << 21) | (T2 << 16) | ((uint32_t)(-5) & 0xFFFFu); /* bne t1, t2, loop */
+    w[n++] = I_NOP;
+    w[n++] = I_ADDIU(T9, 0u, 1u);
+    w[n++] = I_BEQ(0u, 0u, -1);
+    w[n++] = I_NOP;
+    return n;
+}
+
+/* The cycles the work loop takes to its marker, with a looping list of the
+   given node count running from the start of the loop (0 for none). */
+static uint64_t work_cycles(uint32_t nodes)
+{
+    uint32_t w[16];
+    uint32_t n = put_work_loop(w);
+    schway *inst = make();
+    load(inst, w, n);
+    run_to_entry(inst);
+    uint64_t entry = inst->ticks;
+    if (nodes != 0u) {
+        start_loop_list(inst, nodes);
+    }
+    uint64_t marker = 0u;
+    for (uint32_t i = 0u; i < 200000u && marker == 0u; i++) {
+        if (inst->cpu.r[T9] != 0u) {
+            marker = inst->ticks;
+        } else {
+            (void)run(inst, 1u);
+        }
+    }
+    CHECK(marker != 0u);
+    CHECK_EQ_U64(inst->cpu.r[T1], 1000u);
+    schway_destroy(inst);
+    return marker - entry;
+}
+
+/* Fault prevented: a list that takes the CPU's time at a rate unlike the
+   hardware's. In the public chain-looping log a 1,000-pass loop takes 16,040
+   cycles alone and 25,632 and 25,640 next to a self-referencing list of one and
+   two nodes, a slowdown of about 1.6 times. The model is fitted to that one log,
+   so the test is a band: from 1.4 to 1.8 times for each list. The ratio is
+   printed. */
+static void case_list_cpu_band(void)
+{
+    uint64_t alone = work_cycles(0u);
+    CHECK(alone > 1000u);
+    for (uint32_t nodes = 1u; nodes <= 2u; nodes++) {
+        uint64_t with = work_cycles(nodes);
+        uint64_t ratio = with * 1000u / alone;
+        printf("list_cpu_band: %u node(s): %llu cycles against %llu alone, ratio %llu per mille\n",
+               (unsigned)nodes, (unsigned long long)with, (unsigned long long)alone,
+               (unsigned long long)ratio);
+        CHECK(ratio >= 1400u && ratio <= 1800u);
+    }
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
+    {"list_self_ref", case_list_self_ref},
+    {"list_stop", case_list_stop},
+    {"chopping_band", case_chopping_band},
+    {"list_cpu_band", case_list_cpu_band},
     {"list_walk", case_list_walk},
     {"list_empty", case_list_empty},
     {"sync0_gpu_sink", case_sync0_gpu_sink},

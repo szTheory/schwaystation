@@ -1,4 +1,5 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+dma.chopping.band	dma,portable
 dma.costs.per_channel	dma,portable
 dma.dicr.irq_edge	dma,portable
 dma.dicr.reads	dma,portable
@@ -7,7 +8,10 @@ dma.dpcr.priority	dma,portable
 dma.dpcr.rearbitrate	dma,portable
 dma.dpcr.reset	dma,portable
 dma.engine.step_contract	dma,portable
+dma.list.cpu_band	dma,portable
 dma.list.empty	dma,portable
+dma.list.self_ref	dma,portable
+dma.list.stop	dma,portable
 dma.list.walk	dma,portable
 dma.otc.bcr_zero	dma,portable
 dma.otc.clear	dma,portable

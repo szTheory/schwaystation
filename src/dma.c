@@ -94,14 +94,24 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
 #define DMA_PH_BLOCKS 2u
 #define DMA_PH_GAP 3u
 #define DMA_PH_NEXT 4u
+/* a unit in flight whose channel was told to stop: it ends with no flag and no
+   interrupt */
+#define DMA_PH_STOP 5u
+
+/* A window of a chopped burst costs its words as any unit does plus this many
+   cycles of setup, and is followed by a CPU window of CHCR's length, capped at
+   32 cycles per word of the DMA window. Fitted to the 64 chopping rows of the
+   public dma/chopping log, so derived: the model sits within 11 % of every row
+   and within about 1 % of them on average, and that is the evidence it gives. */
+#define DMA_WINDOW_OVERHEAD 6u
 
 /* The cycles the header fetch of a list node and the setup of the next one
    cost on top of its words, and the cycles the CPU runs between two nodes.
    Fitted to the public dma/chain-looping log, in which a loop that takes
    16,040 cycles alone takes 25,632 next to a self-referencing list: derived,
    not documented, and a band rather than a measurement. */
-#define DMA_NODE_OVERHEAD 6u
-#define DMA_NODE_GAP 10u
+#define DMA_NODE_OVERHEAD 20u
+#define DMA_NODE_GAP 6u
 
 /* Extra cycles a sync mode 1 block costs on top of its words: the request
    handshake and the setup of the next block. Fitted to the hardware log of
@@ -116,6 +126,7 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
 #define DMA_CHCR_FROM_RAM 0x00000001u
 #define DMA_CHCR_STEP_BACK 0x00000002u
 #define DMA_CHCR_TRIGGER 0x10000000u
+#define DMA_CHCR_CHOP 0x00000100u
 #define DMA_CHCR_OTC_MASK 0x51000000u
 #define DMA_CHCR_OTC_FIXED 0x00000002u
 
@@ -428,6 +439,19 @@ static void dma_start(schway *inst, uint64_t t)
         }
         d->nodes_done++;
         cost = dma_list_node(inst, ch);
+    } else if ((d->chcr[ch] & DMA_CHCR_CHOP) != 0u) {
+        /* Sync mode 0 chopped: BCR's low half words go in windows of 2^n
+           words, CHCR bits 16-18, with a CPU window after each but the last;
+           remain counts the words still to move. */
+        uint32_t window = UINT32_C(1) << ((d->chcr[ch] >> 16) & 7u);
+        if (d->phase[ch] != DMA_PH_NEXT) {
+            d->remain[ch] = n;
+        }
+        if (window > d->remain[ch]) {
+            window = d->remain[ch];
+        }
+        d->remain[ch] -= window;
+        cost = dma_cost(ch, window) + DMA_WINDOW_OVERHEAD + dma_move(inst, ch, window);
     } else {
         /* Sync mode 0: one burst of BCR's low half words. */
         d->remain[ch] = 0u;
@@ -438,24 +462,56 @@ static void dma_start(schway *inst, uint64_t t)
     d->busy_until = t + cost;
 }
 
-/* The end of the running unit, which ended at tick t. A sync mode 1 block with
-   blocks to go leaves the channel busy and waiting for the next request, and
-   the CPU runs until it comes: no flag, no interrupt. A list with a node to go
-   leaves the channel busy for the CPU's window between nodes, a gap in which
-   the engine holds nothing. Otherwise the channel stops being busy, its DICR
-   flag is set when both its enable and the master enable allow it, and the
-   interrupt edge follows (psx-spx, DMA Channels, DICR). */
-static void dma_finish(schway *inst, uint32_t ch, uint64_t t)
+/* The cycles the CPU runs after a unit of ch that has more to follow: the
+   fixed window between list nodes, or a chopped burst's CPU window, 2^m cycles
+   from CHCR bits 20-22 and at most 32 per word of the DMA window (the cap is a
+   fit to the public dma/chopping log). */
+static uint64_t dma_gap(const struct schway__dma *d, uint32_t ch)
+{
+    uint32_t c = d->chcr[ch];
+    if (((c >> 9) & 3u) == 2u) {
+        return DMA_NODE_GAP;
+    }
+    uint64_t cpu = UINT64_C(1) << ((c >> 20) & 7u);
+    uint64_t cap = (UINT64_C(1) << ((c >> 16) & 7u)) * 32u;
+    return cpu < cap ? cpu : cap;
+}
+
+/* The end of the running unit, which ended at tick t; the engine is being
+   caught up to tick now. A unit of a channel that was told to stop ends it with
+   no flag and no interrupt. A sync mode 1 block with blocks to go leaves the
+   channel busy and waiting for the next request, and the CPU runs until it
+   comes: no flag, no interrupt. A chopped burst or a list with more to go
+   leaves the channel busy for the CPU's window, a gap in which the engine holds
+   nothing; every 1000h nodes of a list that gap reaches past now, so the call
+   that is catching up returns with the channel still busy and the next node's
+   start after now: a yield, not an end (psx-spx, DMA Channels, Linked List).
+   Otherwise the channel stops being busy, its DICR flag is set when both its
+   enable and the master enable allow it, and the interrupt edge follows
+   (psx-spx, DMA Channels, DICR). */
+static void dma_finish(schway *inst, uint32_t ch, uint64_t t, uint64_t now)
 {
     struct schway__dma *d = &inst->dma;
     uint32_t dicr = d->dicr;
+    if (d->phase[ch] == DMA_PH_STOP) {
+        d->chcr[ch] &= ~SCHWAY__DMA_CHCR_BUSY;
+        d->phase[ch] = DMA_PH_IDLE;
+        d->remain[ch] = 0u;
+        d->cur = SCHWAY__DMA_NONE;
+        return;
+    }
     if (d->remain[ch] > 0u) {
         if (((d->chcr[ch] >> 9) & 3u) == 1u) {
             d->phase[ch] = DMA_PH_BLOCKS;
             d->cur = SCHWAY__DMA_NONE;
         } else {
+            uint64_t until = t + dma_gap(d, ch);
+            if (((d->chcr[ch] >> 9) & 3u) == 2u && d->nodes_done % SCHWAY__DMA_NODES_MAX == 0u &&
+                until <= now) {
+                until = now + 1u;
+            }
             d->phase[ch] = DMA_PH_GAP;
-            d->busy_until = t + DMA_NODE_GAP;
+            d->busy_until = until;
         }
         return;
     }
@@ -493,7 +549,7 @@ void schway__dma_event(schway *inst, uint64_t now)
             d->phase[ch] = DMA_PH_NEXT;
             d->cur = SCHWAY__DMA_NONE;
         } else {
-            dma_finish(inst, ch, t);
+            dma_finish(inst, ch, t, now);
         }
         if (d->cur == SCHWAY__DMA_NONE) {
             dma_start(inst, t);
@@ -546,9 +602,27 @@ static void dma_write(schway *inst, uint64_t now, uint32_t p, uint32_t width, ui
         uint32_t c = reg_put(d->chcr[ch], p, width, v);
         c &= ch == DMA_OTC ? DMA_CHCR_OTC_MASK : SCHWAY__DMA_CHCR_MASK;
         if (d->phase[ch] != DMA_PH_IDLE) {
-            /* The unit's words have moved and it ends on its own: a write
-               cannot stop it, so the channel stays busy. */
-            c |= SCHWAY__DMA_CHCR_BUSY;
+            if (width == 4u && v == 0u && d->phase[ch] != DMA_PH_UNIT &&
+                d->phase[ch] != DMA_PH_STOP) {
+                /* The word 0 stops a channel with no unit in flight at once:
+                   a CPU window, a wait for the next node or block. This is
+                   the write the public chain-looping test makes between its
+                   cases; no other write to a busy channel is modelled, and
+                   each leaves it busy. */
+                d->phase[ch] = DMA_PH_IDLE;
+                d->remain[ch] = 0u;
+                if (d->cur == ch) {
+                    d->cur = SCHWAY__DMA_NONE;
+                }
+            } else {
+                /* The unit's words have moved and it ends on its own: a write
+                   cannot end it early, so the channel stays busy. The word 0
+                   marks it to end with no flag and no interrupt. */
+                if (width == 4u && v == 0u) {
+                    d->phase[ch] = DMA_PH_STOP;
+                }
+                c |= SCHWAY__DMA_CHCR_BUSY;
+            }
         }
         d->chcr[ch] = c;
     }
