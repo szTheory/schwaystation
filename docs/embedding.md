@@ -303,6 +303,7 @@ reset and lock with the region.
 
 - `SCHWAY_PROFILE_DEBUG_PORT`: the guest's byte writes to the two debug ports (a TTY byte and an exit code) take effect.
   Retail hosts leave it clear, and then those writes do nothing.
+- `SCHWAY_PROFILE_GPU_V0`: select the early GPU v0 model, which lacks rectangle texture flips. The default is GPU v2.
 
 ## Video
 

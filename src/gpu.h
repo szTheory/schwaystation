@@ -36,6 +36,9 @@ struct schway__gpu {
     uint32_t transfer_x, transfer_y, transfer_width, transfer_height, transfer_index;
     uint32_t polyline_gouraud;
     uint32_t polyline_color;
+    uint32_t polyline_next_color;
+    uint32_t polyline_x, polyline_y, polyline_has_vertex;
+    uint32_t polyline_semi;
     uint32_t draw_mode;
     uint32_t texture_window;
     uint32_t draw_area_tl, draw_area_br;
@@ -69,6 +72,10 @@ void schway__gpu_pixel(schway *inst, uint32_t x, uint32_t y, uint16_t texel, uin
                        uint32_t flags);
 void schway__gpu_triangle(schway *inst, const int32_t vertices[3][2], uint32_t color,
                           uint32_t flags);
+void schway__gpu_line(schway *inst, uint32_t command, uint32_t position0, uint32_t position1,
+                      uint32_t color0, uint32_t color1, uint32_t flags);
+void schway__gpu_rectangle(schway *inst, uint32_t command, uint32_t position,
+                           uint32_t uv_clut, uint32_t size);
 void schway__gpu_polygon(schway *inst, const uint32_t *position_words,
                          const uint32_t *color_words, const uint32_t *uv_words,
                          uint32_t vertex_count, uint32_t flags);

@@ -86,6 +86,7 @@ typedef uint32_t schway_status;
 #define SCHWAY_RESET_POWER 1u
 
 #define SCHWAY_PROFILE_DEBUG_PORT 1u
+#define SCHWAY_PROFILE_GPU_V0 4u
 
 #define SCHWAY_LICENCE_NONE 0u
 #define SCHWAY_LICENCE_JAPAN 1u

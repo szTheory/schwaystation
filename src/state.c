@@ -99,7 +99,10 @@ static void body_io(struct schway__state_io *io, schway *inst)
     schway__gpu_state_io(io, inst);
     uint64_t cycle = schway__cpu_state_io(io, inst);
     schway__gte_state_io(io, inst, cycle);
-    (void)schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u, 1u);
+    uint32_t profile_flags = schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u,
+                                                7u);
+    schway__state_check(io, (profile_flags & ~(SCHWAY_PROFILE_DEBUG_PORT |
+                                                SCHWAY_PROFILE_GPU_V0)) == 0u);
     (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
     schway__bus_state_io(io, inst);
     schway__state_check(io, ((io->cpu_cause & 0x00000400u) != 0u) ==

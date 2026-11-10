@@ -1,4 +1,4 @@
-/* API version 4 adds a read-only view of the complete native VRAM. */
+/* API version 4 adds a read-only VRAM view and the early-GPU profile flag. */
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,6 +32,9 @@ int main(void)
     schway *inst = NULL;
     CHECK_EQ_U64(schway_create(&cfg, &inst), SCHWAY_STATUS_OK);
     if (inst != NULL) {
+        CHECK_EQ_U64(SCHWAY_PROFILE_GPU_V0, 4u);
+        schway_profile profile = {sizeof profile, SCHWAY_REGION_NTSC_U, SCHWAY_PROFILE_GPU_V0};
+        CHECK_EQ_U64(schway_set_profile(inst, &profile), SCHWAY_STATUS_OK);
         schway_span first;
         schway_span second;
         CHECK_EQ_U64(schway_get_vram(inst, &first), SCHWAY_STATUS_OK);

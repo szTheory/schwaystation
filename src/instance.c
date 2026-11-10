@@ -346,7 +346,7 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     /* A caller whose struct ends before flags predates them: none set. */
     uint32_t flags = profile->size >= sizeof *profile ? profile->flags : 0u;
     if (profile->region < SCHWAY_REGION_NTSC_J || profile->region > SCHWAY_REGION_PAL ||
-        (flags & ~SCHWAY_PROFILE_DEBUG_PORT) != 0u) {
+        (flags & ~(SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0)) != 0u) {
         return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
     }
     if (inst->profile_locked) {

@@ -17,6 +17,11 @@ static const char name_transfer_height[] = "gpu.transfer_height";
 static const char name_transfer_index[] = "gpu.transfer_index";
 static const char name_polyline_gouraud[] = "gpu.polyline_gouraud";
 static const char name_polyline_color[] = "gpu.polyline_color";
+static const char name_polyline_next_color[] = "gpu.polyline_next_color";
+static const char name_polyline_x[] = "gpu.polyline_x";
+static const char name_polyline_y[] = "gpu.polyline_y";
+static const char name_polyline_has_vertex[] = "gpu.polyline_has_vertex";
+static const char name_polyline_semi[] = "gpu.polyline_semi";
 static const char name_draw_mode[] = "gpu.draw_mode";
 static const char name_texture_window[] = "gpu.texture_window";
 static const char name_draw_area_tl[] = "gpu.draw_area_tl";
@@ -59,14 +64,24 @@ static void transfer_clear(struct schway__gpu *g)
     g->transfer_index = 0u;
 }
 
+static void polyline_clear(struct schway__gpu *g)
+{
+    g->polyline_gouraud = 0u;
+    g->polyline_color = 0u;
+    g->polyline_next_color = 0u;
+    g->polyline_x = 0u;
+    g->polyline_y = 0u;
+    g->polyline_has_vertex = 0u;
+    g->polyline_semi = 0u;
+}
+
 static void packet_clear(struct schway__gpu *g)
 {
     memset(g->fifo, 0, sizeof g->fifo);
     g->fifo_count = 0u;
     g->packet_words = 0u;
     g->phase = SCHWAY__GPU_IDLE;
-    g->polyline_gouraud = 0u;
-    g->polyline_color = 0u;
+    polyline_clear(g);
     transfer_clear(g);
 }
 
@@ -124,6 +139,7 @@ static void parser_idle(struct schway__gpu *g)
     g->fifo_count = 0u;
     g->packet_words = 0u;
     g->phase = SCHWAY__GPU_IDLE;
+    polyline_clear(g);
 }
 
 static uint16_t rgb555(uint32_t rgb)
@@ -395,88 +411,6 @@ static void apply_environment(schway *inst, uint32_t command)
     }
 }
 
-/* Signed GP0 coordinates follow docs/hardware/gpu.md#textured-rectangles. */
-static int32_t sign11(uint32_t value)
-{
-    value &= 0x7FFu;
-    return (value & 0x400u) != 0u ? (int32_t)value - 0x800 : (int32_t)value;
-}
-
-/* Rectangle packet length and sizes follow docs/hardware/gpu.md#textured-rectangles. */
-static void rectangle_size(const struct schway__gpu *g, uint32_t op, uint32_t *width,
-                           uint32_t *height)
-{
-    uint32_t size_mode = (op >> 3) & 3u;
-    if (size_mode == 0u) {
-        uint32_t vertex_index = 2u + ((op & 0x04u) != 0u ? 1u : 0u);
-        uint32_t size = g->fifo[vertex_index];
-        *width = size & 0x3FFu;
-        *height = (size >> 16) & 0x1FFu;
-    } else {
-        *width = size_mode == 1u ? 1u : (size_mode == 2u ? 8u : 16u);
-        *height = *width;
-    }
-}
-
-/* GP0 TGE, ABE, and TME are documented in docs/hardware/gpu.md#textured-rectangles. */
-static uint32_t rectangle_pixel_flags(uint32_t op)
-{
-    uint32_t flags = (op & 0x04u) != 0u ? SCHWAY__GPU_PIXEL_TEXTURED : 0u;
-    if ((op & 1u) != 0u) {
-        flags |= SCHWAY__GPU_PIXEL_RAW_TEXTURE;
-    }
-    if ((op & 2u) != 0u) {
-        flags |= SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT;
-    }
-    return flags;
-}
-
-/* Apply offset and E3/E4 clipping before VRAM wrap (docs/hardware/gpu.md#textured-rectangles). */
-static void render_rectangle(schway *inst, uint32_t command)
-{
-    struct schway__gpu *g = &inst->gpu;
-    uint32_t op = command >> 24;
-    uint32_t textured = (op & 0x04u) != 0u;
-    uint32_t position = g->fifo[1];
-    uint32_t uv_clut = textured != 0u ? g->fifo[2] : 0u;
-    uint32_t width;
-    uint32_t height;
-    rectangle_size(g, op, &width, &height);
-    if (width == 0u || height == 0u) {
-        return;
-    }
-
-    int32_t x0 = sign11(position) + sign11(g->draw_offset);
-    int32_t y0 = sign11(position >> 16) + sign11(g->draw_offset >> 11);
-    int32_t left = (int32_t)(g->draw_area_tl & 0x3FFu);
-    int32_t top = (int32_t)((g->draw_area_tl >> 10) & 0x1FFu);
-    int32_t right = (int32_t)(g->draw_area_br & 0x3FFu);
-    int32_t bottom = (int32_t)((g->draw_area_br >> 10) & 0x1FFu);
-    uint32_t flags = rectangle_pixel_flags(op);
-    uint32_t base_u = uv_clut & 0xFFu;
-    uint32_t base_v = (uv_clut >> 8) & 0xFFu;
-    for (uint32_t row = 0u; row < height; row++) {
-        int32_t y = y0 + (int32_t)row;
-        if (y < top || y > bottom) {
-            continue;
-        }
-        for (uint32_t col = 0u; col < width; col++) {
-            int32_t x = x0 + (int32_t)col;
-            if (x < left || x > right) {
-                continue;
-            }
-            uint16_t texel = 0u;
-            if (textured != 0u) {
-                uint32_t u = (base_u + col) & 0xFFu;
-                uint32_t v = (base_v + row) & 0xFFu;
-                texel = schway__gpu_texel(inst, (uv_clut & 0xFFFF0000u) | (v << 8) | u);
-            }
-            schway__gpu_pixel(inst, (uint32_t)x, (uint32_t)y, texel,
-                              command & 0x00FFFFFFu, flags);
-        }
-    }
-}
-
 static void gpu_ack_irq(schway *inst)
 {
     inst->gpu.irq_pending = 0u;
@@ -496,7 +430,10 @@ static void process_packet(schway *inst)
     } else if (op >= 0x80u && op <= 0x9Fu && word_count == 4u) {
         copy_vram(inst, g->fifo[1], g->fifo[2], g->fifo[3]);
     } else if (op >= 0x60u && op <= 0x7Fu) {
-        render_rectangle(inst, command);
+        uint32_t textured = (op & 4u) != 0u;
+        uint32_t size = (op & 0x18u) == 0u ? g->fifo[2u + textured] : 0u;
+        schway__gpu_rectangle(inst, command, g->fifo[1], textured != 0u ? g->fifo[2] : 0u,
+                              size);
     } else if (op >= 0x20u && op <= 0x3Fu) {
         uint32_t vertex_count = (op & 0x08u) != 0u ? 4u : 3u;
         uint32_t gouraud = (op & 0x10u) != 0u;
@@ -548,12 +485,25 @@ static void process_packet(schway *inst)
         parser_idle(g);
         g->phase = SCHWAY__GPU_TRANSFER_FROM_VRAM;
         return;
+    } else if (op >= 0x40u && op <= 0x5Fu && (op & 0x08u) == 0u) {
+        uint32_t gouraud = (op & 0x10u) != 0u;
+        uint32_t position0 = g->fifo[1];
+        uint32_t position1 = gouraud != 0u ? g->fifo[3] : g->fifo[2];
+        uint32_t color0 = command & 0x00FFFFFFu;
+        uint32_t color1 = gouraud != 0u ? g->fifo[2] & 0x00FFFFFFu : color0;
+        schway__gpu_line(inst, command, position0, position1, color0, color1, 0u);
     } else if (op >= 0x40u && op <= 0x5Fu && (op & 0x08u) != 0u) {
-        g->polyline_gouraud = (op & 0x10u) != 0u ? 1u : 0u;
-        g->polyline_color = command & 0x00FFFFFFu;
+        uint32_t gouraud = (op & 0x10u) != 0u;
+        uint32_t first_vertex = g->fifo[1];
         parser_idle(g);
-        g->phase = g->polyline_gouraud != 0u ? SCHWAY__GPU_POLYLINE_COLOR
-                                             : SCHWAY__GPU_POLYLINE_VERTEX;
+        g->polyline_gouraud = gouraud;
+        g->polyline_color = command & 0x00FFFFFFu;
+        g->polyline_semi = (op & 2u) != 0u ? 1u : 0u;
+        g->polyline_x = first_vertex & 0x7FFu;
+        g->polyline_y = (first_vertex >> 16) & 0x7FFu;
+        g->polyline_has_vertex = 1u;
+        g->phase = gouraud != 0u ? SCHWAY__GPU_POLYLINE_COLOR
+                                 : SCHWAY__GPU_POLYLINE_VERTEX;
         return;
     }
     parser_idle(g);
@@ -564,20 +514,42 @@ static int polyline_terminator(uint32_t word)
     return (word & 0xF000F000u) == 0x50005000u;
 }
 
-static void polyline_word(struct schway__gpu *g, uint32_t word)
+static void polyline_word(schway *inst, uint32_t word)
 {
+    struct schway__gpu *g = &inst->gpu;
     if (g->phase == SCHWAY__GPU_POLYLINE_COLOR) {
         if (polyline_terminator(word)) {
             parser_idle(g);
             return;
         }
-        g->polyline_color = word & 0x00FFFFFFu;
+        g->polyline_next_color = word & 0x00FFFFFFu;
         g->phase = SCHWAY__GPU_POLYLINE_VERTEX;
         return;
     }
-    if (polyline_terminator(word)) {
+    if (g->polyline_gouraud == 0u && polyline_terminator(word)) {
         parser_idle(g);
-    } else if (g->polyline_gouraud != 0u) {
+        return;
+    }
+    uint32_t x = word & 0x7FFu;
+    uint32_t y = (word >> 16) & 0x7FFu;
+    if (g->polyline_has_vertex != 0u) {
+        uint32_t position0 = g->polyline_x | (g->polyline_y << 16);
+        uint32_t position1 = x | (y << 16);
+        uint32_t color1 = g->polyline_gouraud != 0u ? g->polyline_next_color
+                                                     : g->polyline_color;
+        uint32_t command = (0x40u | (g->polyline_gouraud != 0u ? 0x10u : 0u) |
+                            (g->polyline_semi != 0u ? 2u : 0u)) << 24;
+        schway__gpu_line(inst, command, position0, position1, g->polyline_color, color1, 0u);
+        if (g->polyline_gouraud != 0u) {
+            g->polyline_color = g->polyline_next_color;
+            g->polyline_next_color = 0u;
+        }
+    } else {
+        g->polyline_has_vertex = 1u;
+    }
+    g->polyline_x = x;
+    g->polyline_y = y;
+    if (g->polyline_gouraud != 0u) {
         g->phase = SCHWAY__GPU_POLYLINE_COLOR;
     }
 }
@@ -595,7 +567,7 @@ void schway__gpu_word(schway *inst, uint32_t word)
     }
     if (g->phase == SCHWAY__GPU_POLYLINE_VERTEX ||
         g->phase == SCHWAY__GPU_POLYLINE_COLOR) {
-        polyline_word(g, word);
+        polyline_word(inst, word);
         return;
     }
     if (g->phase == SCHWAY__GPU_PACKET) {
@@ -821,7 +793,17 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst)
                                                  SCHWAY__VRAM_W * SCHWAY__VRAM_H);
     uint32_t polyline_gouraud = schway__state_u32(io, name_polyline_gouraud,
                                                    &g->polyline_gouraud, 0u, 1u);
-    (void)schway__state_u32(io, name_polyline_color, &g->polyline_color, 0u, 0x00FFFFFFu);
+    uint32_t polyline_color = schway__state_u32(io, name_polyline_color, &g->polyline_color, 0u,
+                                                 0x00FFFFFFu);
+    uint32_t polyline_next_color = schway__state_u32(io, name_polyline_next_color,
+                                                      &g->polyline_next_color, 0u,
+                                                      0x00FFFFFFu);
+    uint32_t polyline_x = schway__state_u32(io, name_polyline_x, &g->polyline_x, 0u, 0x7FFu);
+    uint32_t polyline_y = schway__state_u32(io, name_polyline_y, &g->polyline_y, 0u, 0x7FFu);
+    uint32_t polyline_has_vertex = schway__state_u32(io, name_polyline_has_vertex,
+                                                      &g->polyline_has_vertex, 0u, 1u);
+    uint32_t polyline_semi = schway__state_u32(io, name_polyline_semi, &g->polyline_semi, 0u,
+                                                1u);
     (void)schway__state_u32(io, name_draw_mode, &g->draw_mode, 0u, 0x7FFFu);
     (void)schway__state_u32(io, name_texture_window, &g->texture_window, 0u, 0x000FFFFFu);
     (void)schway__state_u32(io, name_draw_area_tl, &g->draw_area_tl, 0u, 0x000FFFFFu);
@@ -849,22 +831,40 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst)
     if (phase == SCHWAY__GPU_IDLE) {
         schway__state_check(io, owed_words == 0u && transfer_x == 0u && transfer_y == 0u &&
                                     transfer_width == 0u && transfer_height == 0u &&
-                                    transfer_index == 0u && polyline_gouraud == 0u);
+                                    transfer_index == 0u && polyline_gouraud == 0u &&
+                                    polyline_color == 0u &&
+                                    polyline_next_color == 0u && polyline_x == 0u &&
+                                    polyline_y == 0u && polyline_has_vertex == 0u &&
+                                    polyline_semi == 0u);
     } else if (phase == SCHWAY__GPU_PACKET) {
         schway__state_check(io, owed_words == 0u && transfer_x == 0u && transfer_y == 0u &&
                                     transfer_width == 0u && transfer_height == 0u &&
-                                    transfer_index == 0u && polyline_gouraud == 0u);
+                                    transfer_index == 0u && polyline_gouraud == 0u &&
+                                    polyline_color == 0u &&
+                                    polyline_next_color == 0u && polyline_x == 0u &&
+                                    polyline_y == 0u && polyline_has_vertex == 0u &&
+                                    polyline_semi == 0u);
     } else if (phase == SCHWAY__GPU_POLYLINE_VERTEX || phase == SCHWAY__GPU_POLYLINE_COLOR) {
         schway__state_check(io, owed_words == 0u && transfer_x == 0u && transfer_y == 0u &&
                                     transfer_width == 0u && transfer_height == 0u &&
                                     transfer_index == 0u &&
-                                    (phase != SCHWAY__GPU_POLYLINE_COLOR || polyline_gouraud != 0u));
+                                    (phase != SCHWAY__GPU_POLYLINE_COLOR ||
+                                     (polyline_gouraud != 0u && polyline_has_vertex != 0u &&
+                                      polyline_next_color == 0u)) &&
+                                    (polyline_has_vertex != 0u ||
+                                     (polyline_x == 0u && polyline_y == 0u &&
+                                      polyline_next_color == 0u)) &&
+                                    polyline_semi <= 1u &&
+                                    (polyline_gouraud != 0u || polyline_next_color == 0u));
     } else if (phase == SCHWAY__GPU_TRANSFER_TO_VRAM ||
                phase == SCHWAY__GPU_TRANSFER_FROM_VRAM) {
         schway__state_check(io, fifo_count == 0u && packet_words == 0u &&
                                     transfer_width != 0u && transfer_width <= SCHWAY__VRAM_W &&
                                     transfer_height != 0u && transfer_height <= SCHWAY__VRAM_H &&
-                                    polyline_gouraud == 0u);
+                                    polyline_gouraud == 0u && polyline_color == 0u &&
+                                    polyline_next_color == 0u && polyline_x == 0u &&
+                                    polyline_y == 0u && polyline_has_vertex == 0u &&
+                                    polyline_semi == 0u);
         if (transfer_width != 0u && transfer_width <= SCHWAY__VRAM_W &&
             transfer_height != 0u && transfer_height <= SCHWAY__VRAM_H) {
             uint32_t pixels = transfer_width * transfer_height;
