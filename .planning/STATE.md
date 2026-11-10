@@ -6,10 +6,10 @@ current_phase: 3
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: planning
 stopped_at: Phase 02 complete, ready to plan Phase 3
-last_updated: "2026-11-10T00:56:03.348Z"
+last_updated: "2026-11-10T01:46:31.539Z"
 last_activity: 2026-11-10
-last_activity_desc: Phase 02 complete, transitioned to Phase 3
-state_head: cb6e0fa94f8badec9e935db113af36dd6b42e84e
+last_activity_desc: "Phase 02 shipped as PR #8"
+state_head: 4bc75bd6ee75fc1496030ba70120fee428a17ae7
 progress:
   total_phases: 6
   completed_phases: 1
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 Phase: 3 — The GTE matches the hardware cases; DMA and timers
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-11-09 — Phase 02 complete, transitioned to Phase 3
+Last activity: 2026-11-09 -- Phase 02 shipped as PR #8
 
 Progress: [██░░░░░░░░] 17%
 
@@ -249,6 +249,7 @@ come from `AGENTS.md`.
 | 2026-11-09 | /gsd-discuss-phase 2 | Claude Code, OpenGSD; seven advisor agents fanned out | claude-sonnet-5-5 |
 | 2026-11-09 | /gsd-plan-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, planner claude-opus-5-5 (4 rounds), checker claude-haiku-5-5 (4 passes); research skipped | claude-sonnet-5-5 |
 | 2026-11-09 | /gsd-execute-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, executors claude-sonnet-5-5 (sequential, no worktrees) | claude-sonnet-5-5 |
+| 2026-11-09 | /gsd-ship 2 | Claude Code, OpenGSD; inline shipping, PR #8 | claude-sonnet-5-5 |
 
 ## Session Continuity
 
@@ -256,8 +257,9 @@ Last session: 2026-11-10T00:43:02.494Z
 Stopped at: Phase 02 complete, ready to plan Phase 3
 Resume file: None
 
-Ship PR: https://github.com/szTheory/schwaystation/pull/4
+Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
+Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next command: `/gsd-ship 2` (code review ran and found no critical issues, 13 findings recorded as open in 02-REVIEW-DISPOSITION.md; verification passed 5/5). Optional first: `/gsd-code-review 2 --fix` for WR-01, WR-03 and WR-04, which makes verification stale and needs a re-run.
-Stop after the plan step; do not execute in this session.
+Next: from a shell, `gh pr merge 8 --auto --squash`; confirm a CI run on the head commit, then confirm the release pull request is green after the merge. Then `/gsd-discuss-phase 3`.
+Stop after the ship step.
