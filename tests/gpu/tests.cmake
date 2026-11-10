@@ -28,6 +28,13 @@ set_target_properties(schwaystation-test-gpu-triangles PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu-triangles)
 
+add_executable(schwaystation-test-gpu-interpolation ${CMAKE_CURRENT_LIST_DIR}/interpolation.c)
+target_include_directories(schwaystation-test-gpu-interpolation PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-gpu-interpolation PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-gpu-interpolation PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-gpu-interpolation)
+
 # Fault prevented: a GP0 fill that is lost between the bus and VRAM, or uses
 # byte rather than halfword coordinates, sizing, or color conversion.
 schway_add_test(NAME gpu.decoder.fill_mmio
@@ -67,6 +74,14 @@ schway_add_test(NAME gpu.pixel.textured_rectangle_mmio
 schway_add_test(NAME gpu.triangle.flat_packet
   COMMAND schwaystation-test-gpu-triangles flat_packet
   LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: flat and Gouraud textured packets lose their independently tabulated affine
+# color/UV values or fail to update the texture page from vertex two.
+foreach(case IN ITEMS gouraud_textured texture_page_clut clip_interpolation)
+  schway_add_test(NAME gpu.triangle.${case}
+    COMMAND schwaystation-test-gpu-interpolation ${case}
+    LABELS gpu portable TIMEOUT 10)
+endforeach()
 
 # Fault prevented: the polygon size limit rejects exactly the documented horizontal spans.
 schway_add_test(NAME gpu.triangle.horizontal_spans
