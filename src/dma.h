@@ -80,11 +80,19 @@ void schway__dma_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint3
 /* The tick the engine next needs attention at, or UINT64_MAX for never. */
 uint64_t schway__dma_next(const schway *inst);
 
-/* Runs what is due at tick now. */
+/* Runs what is due at tick now. One call finishes each unit whose busy_until
+   is not past now and starts the next channel at that tick, until none is
+   due; it always leaves schway__dma_next strictly greater than now. */
 void schway__dma_event(schway *inst, uint64_t now);
 
-/* A bus access of the CPU at tick now that waits while a unit runs. */
+/* A bus access of the CPU at tick now that waits while a unit runs: the CPU
+   is held until the unit's end. */
 void schway__dma_bus_access(schway *inst, uint64_t now);
+
+/* The channel of mask (a bit per channel) that goes next, or SCHWAY__DMA_NONE:
+   among the channels with a transfer waiting and their DPCR enable set, the
+   lowest priority value, a tie to the higher channel number. */
+uint32_t schway__dma_arbitrate(const schway *inst, uint32_t mask);
 
 /* A device's request line for channel ch changes to level. */
 void schway__dma_dreq(schway *inst, uint32_t ch, uint32_t level);
