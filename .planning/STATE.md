@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-17-PLAN.md
-last_updated: "2026-11-10T07:53:25.198Z"
+stopped_at: Completed 03-18-PLAN.md
+last_updated: "2026-11-10T07:57:39.914Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: f4afab72d285262b5b76e59783f8f701b3fb23ee
+state_head: ef610eafdbddb94f0ccb0ac5a7acbd21eb37ce1f
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 61
+  completed_plans: 62
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 20 of 26
+Plan: 21 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -120,6 +120,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P16 | 5 min | 2 tasks | 5 files |
 | Phase 03 P24 | 6 min | 2 tasks | 3 files |
 | Phase 03 P17 | 4 min | 2 tasks | 5 files |
+| Phase 3 P18 | 22 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -247,6 +248,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-16: dma_chain records a list outcome as one value (bit 0 finished and bit 1 the DICR flag), the OTC time of 4,096 words reads 4,362 clocks through Timer 2 against the doc range 4,340..4,400, and no citation carries a comma or a semicolon because the judge splits rows with a CMake list
 - [Phase 03]: 03-24: the split case compares run_to targets, not run lengths, because a run with a program stops on the first instruction boundary at or after its budget; the program-loaded runs are made in NTSC-U and PAL and the multi-million-cycle ones in NTSC-U alone (2.2 s native)
 - [Phase 03]: 03-17: timers_lines installs its handler at the exception vector and snapshots counters against Timer 1 reset by the vertical blank — The stub path writes status FFh and costs about 700 cycles an entry, and a blank can land behind a timer handler, so the delay between blank and read must cancel
+- [Phase 3]: Seed variants come from a row's place among rows of the same code kind, not a struct field; the armips unity build leaves all 24 fixture digests unchanged
 
 ### Pending Todos
 
@@ -304,8 +306,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T07:53:25.088Z
-Stopped at: Completed 03-17-PLAN.md
+Last session: 2026-11-10T07:57:39.791Z
+Stopped at: Completed 03-18-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
