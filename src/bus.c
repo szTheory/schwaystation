@@ -262,6 +262,34 @@ static uint32_t ram_locate(uint32_t rs, uint32_t a)
     return UINT32_MAX;
 }
 
+/* The DMA engine's path to RAM: one aligned word at physical word address
+   addr in the 8 MiB RAM window, assembled and stored little-endian a byte at a
+   time. It raises no fault, charges no cycle, counts no unbuilt access and never
+   waits on a DMA unit. An address that RAM_SIZE leaves without RAM drops the
+   word, reads nothing and returns non-zero; it does not touch DICR (a DMA
+   word past RAM is not modelled as a bus error; PSX-SYSTEM section 4). The low
+   two address bits are ignored, as MADR's are. */
+int schway__bus_ram_word(schway *inst, uint32_t addr, uint32_t *word, uint32_t write)
+{
+    uint32_t off = ram_locate(inst->bus.ram_size, addr & ~UINT32_C(3));
+    if (off == UINT32_MAX) {
+        return 1;
+    }
+    uint8_t *ram = inst->bus.ram;
+    if (write != 0u) {
+        for (uint32_t i = 0; i < 4u; i++) {
+            ram[off + i] = (uint8_t)(*word >> (8u * i));
+        }
+        return 0;
+    }
+    uint32_t v = 0u;
+    for (uint32_t i = 0; i < 4u; i++) {
+        v |= (uint32_t)ram[off + i] << (8u * i);
+    }
+    *word = v;
+    return 0;
+}
+
 /* RAM costs 4 cycles plus one per word read, and 1 per write (ARCHITECTURE
    section 2, Costs). */
 #define RAM_READ_COST 5u

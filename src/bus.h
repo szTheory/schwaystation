@@ -118,6 +118,12 @@ int schway__bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
 /* An instruction fetch of the word at addr. */
 int schway__bus_fetch(schway *inst, uint32_t addr, uint32_t *word, uint32_t *cycles);
 
+/* The DMA's path to RAM: one aligned word at physical word address addr in the
+   8 MiB RAM window, moved to or from *word (write non-zero stores). No fault, no
+   cost, no unbuilt count, no stall; returns non-zero and moves nothing when
+   RAM_SIZE maps no RAM there. */
+int schway__bus_ram_word(schway *inst, uint32_t addr, uint32_t *word, uint32_t write);
+
 /* The device the physical map gives to virtual address addr, for a trace
    record: a SCHWAY__DEV_* value, UNMAPPED for a gap. It decodes only and
    touches nothing. */

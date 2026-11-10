@@ -596,6 +596,69 @@ static void irq_cause_bit(void)
     drop(inst);
 }
 
+/* The DMA's word path to RAM. A word stored through it reads back through the
+   bus at every mirror of the 8 MiB window, and a word the bus stored reads back
+   through it. An address RAM_SIZE leaves without RAM drops the word and
+   returns non-zero. Neither direction latches a fault, counts an unbuilt access,
+   adds a cycle or touches DICR.
+   Fault prevented: a DMA word that lands at the wrong mirror or byte order, one
+   past the banks that writes RAM, or a path that charges time or faults like a
+   CPU access. */
+static void ram_word(void)
+{
+    schway *inst = make();
+    uint32_t v = 0u;
+    uint32_t w = 0x11223344u;
+    uint64_t cycle0 = inst->cpu.cycle;
+    CHECK_EQ_U64(schway__bus_ram_word(inst, 0x00001000u, &w, 1u), 0u);
+    static const uint32_t same[] = {0x00001000u, 0x80001000u, 0xA0001000u, 0x00201000u,
+                                    0x80401000u, 0xA0601000u};
+    for (size_t i = 0; i < sizeof same / sizeof same[0]; i++) {
+        v = 0u;
+        CHECK_EQ_U64(rd(inst, same[i], 4u, &v), 0u);
+        CHECK_EQ_HEX(v, 0x11223344u);
+    }
+    /* The byte order is little-endian and a bus store reads back as a word. */
+    CHECK_EQ_U64(rd(inst, 0x00001000u, 1u, &v), 0u);
+    CHECK_EQ_HEX(v, 0x44u);
+    CHECK_EQ_U64(wr(inst, 0x00402004u, 4u, 0xA1B2C3D4u), 0u);
+    w = 0u;
+    CHECK_EQ_U64(schway__bus_ram_word(inst, 0x00002004u, &w, 0u), 0u);
+    CHECK_EQ_HEX(w, 0xA1B2C3D4u);
+    /* The last word of the window and a mirror of it. */
+    w = 0xCAFEF00Du;
+    CHECK_EQ_U64(schway__bus_ram_word(inst, 0x007FFFFCu, &w, 1u), 0u);
+    CHECK_EQ_U64(rd(inst, 0x001FFFFCu, 4u, &v), 0u);
+    CHECK_EQ_HEX(v, 0xCAFEF00Du);
+    /* Past the window nothing moves: a write is dropped, a read leaves *word. */
+    uint8_t *before = malloc(SCHWAY__RAM_SIZE);
+    CHECK(before != NULL);
+    if (before == NULL) {
+        exit(1);
+    }
+    memcpy(before, inst->bus.ram, SCHWAY__RAM_SIZE);
+    w = 0xFFFFFFFFu;
+    CHECK(schway__bus_ram_word(inst, 0x00800000u, &w, 1u) != 0);
+    CHECK(schway__bus_ram_word(inst, 0xFFFFFFFCu, &w, 1u) != 0);
+    w = 0x5A5A5A5Au;
+    CHECK(schway__bus_ram_word(inst, 0x00800000u, &w, 0u) != 0);
+    CHECK_EQ_HEX(w, 0x5A5A5A5Au);
+    /* A 2 MiB bank leaves 200000h without RAM, and the word is dropped too. */
+    inst->bus.ram_size = 0x0888u;
+    w = 0x01010101u;
+    CHECK(schway__bus_ram_word(inst, 0x00200000u, &w, 1u) != 0);
+    CHECK_EQ_U64(memcmp(before, inst->bus.ram, SCHWAY__RAM_SIZE), 0u);
+    free(before);
+    /* None of it faulted, counted, cost a cycle or touched DICR. */
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    for (uint32_t d = 0; d < SCHWAY__DEV_COUNT; d++) {
+        CHECK_EQ_U64(inst->bus.unbuilt_n[d], 0u);
+    }
+    CHECK_EQ_U64(inst->cpu.cycle, cycle0);
+    CHECK_EQ_HEX(inst->dma.dicr, 0u);
+    drop(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -605,6 +668,8 @@ int main(int argc, char **argv)
     const char *c = argv[1];
     if (strcmp(c, "ram_mirrors") == 0) {
         ram_mirrors();
+    } else if (strcmp(c, "ram_word") == 0) {
+        ram_word();
     } else if (strcmp(c, "memctl_costs") == 0) {
         memctl_costs();
     } else if (strcmp(c, "scratchpad") == 0) {

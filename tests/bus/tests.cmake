@@ -16,6 +16,13 @@ schway_add_test(NAME bus.ram_mirrors
   COMMAND schwaystation-test-bus ram_mirrors
   LABELS bus portable TIMEOUT 10)
 
+# Fault prevented: a DMA word that lands at the wrong mirror or byte order, one
+# past the banks RAM_SIZE selects that writes RAM, or a path that faults, counts or
+# charges time like a CPU access.
+schway_add_test(NAME bus.ram_word
+  COMMAND schwaystation-test-bus ram_word
+  LABELS bus portable TIMEOUT 10)
+
 # Fault prevented: a delay-register write that leaves the port costs stale, or
 # a memory-control register that keeps bits the hardware does not have.
 schway_add_test(NAME bus.memctl_costs
