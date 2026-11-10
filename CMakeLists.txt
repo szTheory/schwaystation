@@ -84,7 +84,7 @@ add_library(schwaystation_bus OBJECT
 add_library(schwaystation_cpu OBJECT
   src/cpu.c
   src/cop0.c)
-add_library(schwaystation_gpu OBJECT src/gpu.c src/gpu_pixel.c)
+add_library(schwaystation_gpu OBJECT src/gpu.c src/gpu_pixel.c src/gpu_triangle.c)
 add_library(schwaystation_gte OBJECT src/gte.c)
 add_library(schwaystation_dma OBJECT src/dma.c)
 add_library(schwaystation_timers OBJECT src/timers.c)
