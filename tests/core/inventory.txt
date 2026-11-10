@@ -18,6 +18,7 @@ core.run.fault_none	core,portable
 core.run.peek_no_side_effects	core,portable
 core.run.peek_rejects	core,portable
 core.run.peek_values	core,portable
+core.run.split_devices	core,portable
 core.run.split_equivalence	core,portable
 core.sched.event_dispatch	core,portable
 core.sched.fault_ticks	core,portable

@@ -83,6 +83,13 @@ foreach(case IN ITEMS budget_resume split_equivalence peek_no_side_effects peek_
     LABELS core portable TIMEOUT 10)
 endforeach()
 
+# The split property with the devices armed. Fault prevented: a root counter or
+# a DMA unit whose time depends on where a run was cut, so slices of a run give
+# different interrupts, DMA words or CPU registers than the same span run whole.
+schway_add_test(NAME core.run.split_devices
+  COMMAND schwaystation-test-run split_devices
+  LABELS core portable TIMEOUT 30)
+
 # The trace ring. Fault prevented: a traced run that loses or misorders its
 # records, a ring that does not keep exactly the last 4,096, a fault that is not
 # the last record, an index past the end that answers, or tracing that changes
