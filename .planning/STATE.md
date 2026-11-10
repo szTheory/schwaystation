@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-06-PLAN.md
-last_updated: "2026-11-10T05:37:14.716Z"
+stopped_at: Completed 03-26-PLAN.md
+last_updated: "2026-11-10T05:45:47.135Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: ff05731cb4bd39f62131d951be241d1a6fde41ed
+state_head: 8b5b737f691950cead14ba3c25c72ee7176d924b
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 48
+  completed_plans: 49
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 7 of 26
+Plan: 8 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -107,6 +107,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P04 | 3 min | 3 tasks | 13 files |
 | Phase 03 P05 | 7 min | 2 tasks | 9 files |
 | Phase 03 P06 | 9 min | 3 tasks | 12 files |
+| Phase 03 P26 | 5 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-05: the GTE register file is seeded from ares interpreter-gte.cpp at 9408cb43d4948fc3ea6e152a307a34348df3fe04 with an SPDX header, a notices section and a PROVENANCE seed row; 16-bit registers are stored as patterns and extended on read, FLAG bit 31 is recomputed on write, on read and at the end of every command, and the 50 register-only hardware cases pass
 - [Phase 03]: 03-06: the GTE interrupt hook returns 1 only when it executed a command, and does nothing with SR.CU2 clear or a non-interrupt ExcCode
 - [Phase 03]: 03-06: the entry's command stamps gte.ready from the entry cycle without waiting; the second run after the return waits through cpu_cop2
+- [Phase 03]: GTE numerics clamp IR to the low 32 bits of the shifted MAC as the seed does; the 1,150 cases do not separate that from a full-width clamp, so the reference differential decides
+- [Phase 03]: A GTE reciprocal table literal is pinned by a formula test, because the hardware cases pass with one entry corrupted
 
 ### Pending Todos
 
@@ -272,8 +275,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T05:37:14.552Z
-Stopped at: Completed 03-06-PLAN.md
+Last session: 2026-11-10T05:45:36.102Z
+Stopped at: Completed 03-26-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)

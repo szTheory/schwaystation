@@ -167,7 +167,7 @@ Plans:
   2. `ctest -L dma` passes for all seven channels, covering costs, chopping, MADR wrap, OTC clearing and the CPU stall. The `chain-looping` list terminates by the 1000h-node guard, and the pinned DMA fixture record matches.
   3. `ctest -L timers` passes for the three root counters with sync modes, targets, the write hold and every IRQ mode. The `timers_lines` sysclk, sysclk/8 and vblank-count records match per profile.
 
-**Plans**: 6/26 plans executed in 10 waves
+**Plans**: 7/26 plans executed in 10 waves
 
 Plans:
 **Wave 1**
@@ -181,7 +181,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [x] 03-06-PLAN.md — Spine B: COP2 through the GTE, the busy stall, the interrupt double-execute with the side-effect-free peek
-- [ ] 03-26-PLAN.md — GTE seed part 2: numerics, flags, UNR divide and the seven projection, averaging and product commands
+- [x] 03-26-PLAN.md — GTE seed part 2: numerics, flags, UNR divide and the seven projection, averaging and product commands
 - [ ] 03-08-PLAN.md — DMA registers, DPCR/DICR, the unit engine, OTC and the CPU stall
 - [ ] 03-09-PLAN.md — Root counters on the system clock: lazy closed form, targets, hold, MODE rules, IRQ modes, deadlines
 
@@ -273,7 +273,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. A test frame in RetroArch | 15/15 | Ship PR #4 | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
-| 3. The GTE matches the hardware cases; DMA and timers | 6/26 | In Progress | - |
+| 3. The GTE matches the hardware cases; DMA and timers | 7/26 | In Progress | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
