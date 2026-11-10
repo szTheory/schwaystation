@@ -78,9 +78,15 @@ if(CMAKE_SCRIPT_MODE_FILE)
     # id n, expected is a hex value or lo..hi, and a record outside its row, a row with no record or a
     # record with no row fails. ALLOW lines (date, fixture, row, new value, evidence) accept another
     # value for a row; one that applies to no record is an error. FLAGS are extra runner options and
-    # FAULT_KIND, when given, is the kind the printed first-fault line must name.
+    # FAULT_KIND, when given, is the kind the printed first-fault line must name. Only the rows whose
+    # profile is * or PROFILE are judged and numbered; SHIFT, a negative control's knob, is added to both
+    # bounds of every row.
+    separate_arguments(flags UNIX_COMMAND "${FLAGS}")
+    if(NOT DEFINED SHIFT)
+      set(SHIFT 0)
+    endif()
     execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --stop-on mailbox --frames ${FRAMES}
-      ${FLAGS} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+      ${flags} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
     set(errors "")
     if(NOT rc STREQUAL "0")
       list(APPEND errors "the runner exited ${rc}")
@@ -103,12 +109,15 @@ if(CMAKE_SCRIPT_MODE_FILE)
       list(GET fields 0 first)
       if(first STREQUAL FIXTURE)
         list(LENGTH fields nfields)
+        list(GET fields 2 profile)
         list(GET fields 4 source)
         if(NOT nfields EQUAL 6 OR NOT source MATCHES "^(doc|hw)$")
           list(APPEND errors "malformed row (six fields, source doc or hw): ${line}")
         endif()
-        math(EXPR nrows "${nrows} + 1")
-        set(row_${nrows} "${fields}")
+        if(profile STREQUAL "*" OR profile STREQUAL "${PROFILE}")
+          math(EXPR nrows "${nrows} + 1")
+          set(row_${nrows} "${fields}")
+        endif()
       endif()
     endforeach()
     set(allow_lines "")
@@ -145,8 +154,8 @@ if(CMAKE_SCRIPT_MODE_FILE)
         set(hi ${expected})
       endif()
       math(EXPR value_n "0x${value}")
-      math(EXPR lo_n "0x${lo}")
-      math(EXPR hi_n "0x${hi}")
+      math(EXPR lo_n "0x${lo} + ${SHIFT}")
+      math(EXPR hi_n "0x${hi} + ${SHIFT}")
       if(value_n LESS lo_n OR value_n GREATER hi_n)
         if("${test}=${value}" IN_LIST allowed)
           list(APPEND used "${test}=${value}")
@@ -283,6 +292,7 @@ set(schway__fixture_extra ${schway__fixture_src}/gte_cases.inc) # the include on
 schway__fixture(gte_vectors.exe gte_vectors.asm)
 set(schway__fixture_extra "")
 schway__fixture(dma_chain.exe dma_chain.asm)
+schway__fixture(timers_lines.exe timers_lines.asm)
 set(schway__fault_kinds unmapped_read unmapped_write unmapped_fetch misaligned_read misaligned_write
   misaligned_fetch reserved_instruction cop_unusable exception_loop)
 set(schway__fault_index 1)
@@ -396,6 +406,21 @@ schway_add_test(NAME fixtures.dma_chain
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS dma fixtures portable TIMEOUT 30)
+
+# Fault prevented: a timer or vertical-blank interrupt that is right for one machine profile and wrong for
+# the other: timers_lines.exe takes the blanks through its own handler on the NTSC and the PAL machine, and
+# the rows of tests/diag/expected.csv for that profile (and the rows for every profile) judge its records.
+foreach(schway__profile ntsc_u pal)
+  string(REPLACE "_" "-" schway__region ${schway__profile})
+  schway_add_test(NAME fixtures.timers_lines.${schway__profile}
+    COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines
+      -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=30
+      -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
+      -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+      -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS fixtures portable timers TIMEOUT 30)
+endforeach()
 
 # Fault prevented: a first fault that the runner misses, mislabels or reports with a short tail. Each
 # fault.exe class runs more than 4,096 trace records of preamble, then faults once: exit 7, the fault line

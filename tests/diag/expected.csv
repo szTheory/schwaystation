@@ -66,3 +66,5 @@ dma_chain,list_empty,*,00000003,hw,ps1-tests f727802fead1 dma/chain-looping/psx.
 dma_chain,list_single,*,00000000,hw,ps1-tests f727802fead1 dma/chain-looping/psx.log line 9 (single self-referencing chain: finished false and irq false)
 dma_chain,list_double,*,00000000,hw,ps1-tests f727802fead1 dma/chain-looping/psx.log line 11 (double self-referencing chain: finished false and irq false)
 dma_chain,otc_time,*,10f4..1130,doc,psx-spx DMA channels timing OTC 1 clock per word plus 1 per 16 words for 4096 words and nugget 9db6d88d23c4 tests/dma-priority/RESULTS.md measured 4358 as corroboration only
+timers_lines,vblank_count,ntsc-u,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so 23 frames give 23 interrupts
+timers_lines,vblank_count,pal,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so 23 frames give 23 interrupts

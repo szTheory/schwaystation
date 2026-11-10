@@ -25,6 +25,8 @@ fixtures.mailbox_fault	fixtures,portable
 fixtures.probe.hello	fixtures,portable
 fixtures.stub.window	fixtures,portable
 fixtures.stub_drift	fixtures,portable
+fixtures.timers_lines.ntsc_u	fixtures,portable,timers
+fixtures.timers_lines.pal	fixtures,portable,timers
 fixtures.trace.cop_unusable	fixtures,portable
 fixtures.trace.criterion5	fixtures,portable
 fixtures.trace.exception_loop	fixtures,portable

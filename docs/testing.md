@@ -196,7 +196,7 @@ fixture's rows.
 |---|---|
 | `fixture` | the fixture's name, `exc_matrix` for `exc_matrix.exe` |
 | `test` | the record's name |
-| `profile` | the machine profile the row holds for, `*` for any |
+| `profile` | the machine profile the row holds for, `*` for any; a test that names one (`-DPROFILE=pal`) judges only the rows for `*` and that profile, and numbers them in order |
 | `expected` | eight hex digits, or `lo..hi` for a range |
 | `source` | `doc` when a document gives the value, `hw` when a run on a console did |
 | `citation` | the document or the hardware run behind the value, with no comma |
