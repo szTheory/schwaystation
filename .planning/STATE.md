@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-11-10T19:51:07.395Z"
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-11-10T20:31:09.589Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 04 plan 04-04 completed
-state_head: b1e2f7df8534c97386a1698e2b0615f88779fdf6
+state_head: 3cce27e6861e3d063659e9270be5e0f0bb0cb4b4
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 72
+  completed_plans: 73
   percent: 50
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 5 of 32
+Plan: 6 of 32
 Status: Ready to execute
-Last activity: 2026-11-10 — Phase 04 plan 04-04 completed
+Last activity: 2026-11-10 — Phase 04 plan 04-05 completed
 
 Progress: [█████░░░░░] 50%
 
@@ -132,6 +132,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P02 | 32 min | 3 tasks | 13 files |
 | Phase 04 P03 | 47min | 2 tasks | 20 files |
 | Phase 04 P04 | 34min | 2 tasks | 6 files |
+| Phase 04 P05 | 39min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -276,6 +277,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Copies process source and destination coordinates in row-major order, making overlap reads observe earlier writes in the same packet.
 - [Phase 04]: Texture and CLUT cache data is instance-owned and serialized; GP0(01h) clears texture entries and GP1(01h) invalidates the CLUT row.
 - [Phase 04]: Cache behavior is a deterministic model contract for rendering and is not described as hardware-measured.
+- [Phase 04]: Reserved texture depth three follows the direct fifteen-bit model and remains a documented model rule.
+- [Phase 04]: Primitive callers decide dither eligibility; rectangles and raw textured semi-transparent polygons do not acquire dither.
+- [Phase 04]: Blend width and truncation remain doc/derived until a hardware capture distinguishes the internal arithmetic.
 
 ### Pending Todos
 
@@ -350,10 +354,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-04 | Codex, OpenGSD 1.20.0; sequential executor in shared checkout | gpt-6-luna xhigh |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-05 | Codex, OpenGSD 1.20.0; sequential executor, review follow-up, local CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-10T19:51:07.211Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-11-10T20:31:09.438Z
+Stopped at: Completed 04-05-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
