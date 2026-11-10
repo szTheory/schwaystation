@@ -68,6 +68,36 @@ schway_add_test(NAME gpu.triangle.flat_packet
   COMMAND schwaystation-test-gpu-triangles flat_packet
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: the polygon size limit rejects exactly the documented horizontal spans.
+schway_add_test(NAME gpu.triangle.horizontal_spans
+  COMMAND schwaystation-test-gpu-triangles horizontal_spans
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: the polygon size limit rejects exactly the documented vertical spans.
+schway_add_test(NAME gpu.triangle.vertical_spans
+  COMMAND schwaystation-test-gpu-triangles vertical_spans
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: inclusive and inverted E3/E4 windows clip polygon coverage correctly.
+schway_add_test(NAME gpu.triangle.clip_windows
+  COMMAND schwaystation-test-gpu-triangles clip_windows
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: signed E5 offsets and signed 11-bit vertices stay within bounded VRAM clipping.
+schway_add_test(NAME gpu.triangle.extreme_coordinates
+  COMMAND schwaystation-test-gpu-triangles extreme_coordinates
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: fully offscreen polygons do not wrap into visible VRAM.
+schway_add_test(NAME gpu.triangle.offscreen_rejection
+  COMMAND schwaystation-test-gpu-triangles offscreen_rejection
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: polygon writes and draw state remain owned by the selected instance.
+schway_add_test(NAME gpu.triangle.instances
+  COMMAND schwaystation-test-gpu-triangles instances
+  LABELS gpu portable TIMEOUT 10)
+
 # Fault prevented: pixel arithmetic, dither eligibility, raw texture, and write masks drift.
 foreach(case IN ITEMS arithmetic palette_wrap)
   schway_add_test(NAME gpu.pixel.${case}

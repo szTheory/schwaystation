@@ -61,6 +61,13 @@ static void full_draw_area(schway *inst)
     write_gp0(inst, 0xE407FFFFu);
 }
 
+static void draw_area(schway *inst, uint32_t left, uint32_t top, uint32_t right,
+                      uint32_t bottom)
+{
+    write_gp0(inst, 0xE3000000u | (left & 0x3FFu) | ((top & 0x1FFu) << 10));
+    write_gp0(inst, 0xE4000000u | (right & 0x3FFu) | ((bottom & 0x1FFu) << 10));
+}
+
 static void triangle(schway *inst, uint32_t opcode, uint32_t color,
                      const int32_t points[3][2])
 {
@@ -158,6 +165,135 @@ static void case_flat_packet(void)
     schway_destroy(inst);
 }
 
+static void case_horizontal_spans(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return;
+    }
+    full_draw_area(inst);
+    const int32_t span_1022[3][2] = {{0, 0}, {1022, 0}, {0, 2}};
+    triangle(inst, 0x20u, 0x000000FFu, span_1022);
+    CHECK(inst->vram[0][0] == 0x001Fu);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    const int32_t span_1023[3][2] = {{0, 0}, {1023, 0}, {0, 2}};
+    triangle(inst, 0x20u, 0x000000FFu, span_1023);
+    CHECK(inst->vram[0][0] == 0x001Fu);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    const int32_t span_1024[3][2] = {{-1, 0}, {1023, 0}, {-1, 2}};
+    triangle(inst, 0x20u, 0x000000FFu, span_1024);
+    CHECK(inst->vram[0][0] == 0u);
+    schway_destroy(inst);
+}
+
+static void case_vertical_spans(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return;
+    }
+    full_draw_area(inst);
+    const int32_t span_510[3][2] = {{0, 0}, {2, 0}, {0, 510}};
+    triangle(inst, 0x20u, 0x000000FFu, span_510);
+    CHECK(inst->vram[0][0] == 0x001Fu);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    const int32_t span_511[3][2] = {{0, 0}, {2, 0}, {0, 511}};
+    triangle(inst, 0x20u, 0x000000FFu, span_511);
+    CHECK(inst->vram[0][0] == 0x001Fu);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    const int32_t span_512[3][2] = {{0, 0}, {2, 0}, {0, 512}};
+    triangle(inst, 0x20u, 0x000000FFu, span_512);
+    CHECK(inst->vram[0][0] == 0u);
+    schway_destroy(inst);
+}
+
+static void case_clip_windows(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return;
+    }
+    draw_area(inst, 3u, 4u, 3u, 4u);
+    const int32_t covering[3][2] = {{0, 0}, {10, 0}, {0, 10}};
+    triangle(inst, 0x20u, 0x000000FFu, covering);
+    CHECK(inst->vram[4][3] == 0x001Fu);
+    CHECK(inst->vram[4][2] == 0u);
+    CHECK(inst->vram[4][4] == 0u);
+    CHECK(inst->vram[3][3] == 0u);
+    CHECK(inst->vram[5][3] == 0u);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    draw_area(inst, 5u, 5u, 4u, 4u);
+    triangle(inst, 0x20u, 0x000000FFu, covering);
+    CHECK(inst->vram[4][3] == 0u);
+    CHECK(inst->vram[5][5] == 0u);
+    schway_destroy(inst);
+}
+
+static void case_extreme_coordinates(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return;
+    }
+    full_draw_area(inst);
+    const int32_t small[3][2] = {{0, 0}, {2, 0}, {0, 2}};
+    write_gp0(inst, 0xE5200400u); /* Signed E5 offsets X=-1024,Y=-1024. */
+    triangle(inst, 0x20u, 0x000000FFu, small);
+    CHECK(inst->vram[0][0] == 0u);
+    CHECK(inst->vram[511][1023] == 0u);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    write_gp0(inst, 0xE50FFBFFu); /* Signed E5 offsets X=1023,Y=511. */
+    triangle(inst, 0x20u, 0x000000FFu, small);
+    CHECK(inst->vram[511][1023] == 0x001Fu);
+    CHECK(inst->vram[511][1022] == 0u);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    write_gp0(inst, 0xE5000000u);
+    const int32_t signed_extrema[3][2] = {{-1024, 0}, {1023, 0}, {-1024, 2}};
+    triangle(inst, 0x20u, 0x000000FFu, signed_extrema);
+    CHECK(inst->vram[0][0] == 0u);
+    schway_destroy(inst);
+}
+
+static void case_offscreen_rejection(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return;
+    }
+    full_draw_area(inst);
+    const int32_t offscreen[3][2] = {{-20, -20}, {-10, -20}, {-20, -10}};
+    triangle(inst, 0x20u, 0x000000FFu, offscreen);
+    CHECK(inst->vram[0][0] == 0u);
+    CHECK(inst->vram[511][1023] == 0u);
+    schway_destroy(inst);
+}
+
+static void case_instances(void)
+{
+    schway *first = make_instance();
+    schway *second = make_instance();
+    if (first == NULL || second == NULL) {
+        schway_destroy(first);
+        schway_destroy(second);
+        return;
+    }
+    full_draw_area(first);
+    full_draw_area(second);
+    const int32_t points[3][2] = {{0, 0}, {4, 0}, {0, 4}};
+    triangle(first, 0x20u, 0x000000FFu, points);
+    CHECK(first->vram[0][0] == 0x001Fu);
+    CHECK(second->vram[0][0] == 0u);
+    schway_destroy(first);
+    schway_destroy(second);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -166,6 +302,18 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "flat_packet") == 0) {
         case_flat_packet();
+    } else if (strcmp(argv[1], "horizontal_spans") == 0) {
+        case_horizontal_spans();
+    } else if (strcmp(argv[1], "vertical_spans") == 0) {
+        case_vertical_spans();
+    } else if (strcmp(argv[1], "clip_windows") == 0) {
+        case_clip_windows();
+    } else if (strcmp(argv[1], "extreme_coordinates") == 0) {
+        case_extreme_coordinates();
+    } else if (strcmp(argv[1], "offscreen_rejection") == 0) {
+        case_offscreen_rejection();
+    } else if (strcmp(argv[1], "instances") == 0) {
+        case_instances();
     } else {
         fprintf(stderr, "unknown GPU triangle case: %s\n", argv[1]);
         return 2;

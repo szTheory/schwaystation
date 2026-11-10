@@ -16,5 +16,11 @@ gpu.transfer.invalid_cursor	gpu,portable
 gpu.transfer.partial_state	gpu,portable
 gpu.transfer.reset_mid_packet	gpu,portable
 gpu.transfer.roundtrip	gpu,portable
+gpu.triangle.clip_windows	gpu,portable
+gpu.triangle.extreme_coordinates	gpu,portable
 gpu.triangle.flat_packet	gpu,portable
+gpu.triangle.horizontal_spans	gpu,portable
+gpu.triangle.instances	gpu,portable
+gpu.triangle.offscreen_rejection	gpu,portable
+gpu.triangle.vertical_spans	gpu,portable
 gpu.video.tuple	gpu,portable
