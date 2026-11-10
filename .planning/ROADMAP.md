@@ -164,7 +164,7 @@ Plans:
 **Requirements**: GTE-01, GTE-02, GTE-03
 **Success Criteria** (what must be TRUE):
   1. `ctest -L gte` passes all 1,150 transcoded ps1-tests cases, the UNR-table assertion and the property test against a straight C reference with flags. The `gte_vectors` fixture's `mailbox@30` records match the `hw` rows.
-  2. `ctest -L dma` passes for all seven channels, covering costs, chopping, MADR wrap, OTC clearing and the CPU stall. The `chain-looping` list terminates by the 1000h-node guard, and the pinned DMA fixture record matches.
+  2. `ctest -L dma` passes for all seven channels, covering costs, chopping, MADR wrap, OTC clearing and the CPU stall. The `chain-looping` list yields at the 1000h-node guard while the frame still ends, and the pinned DMA fixture record matches.
   3. `ctest -L timers` passes for the three root counters with sync modes, targets, the write hold and every IRQ mode. The `timers_lines` sysclk, sysclk/8 and vblank-count records match per profile.
 
 **Plans**: 21/26 plans executed in 10 waves
