@@ -13,11 +13,12 @@ provides:
   - Field-wrap frame completion with an independent reset-resistant run deadline
 affects: [04-10, 04-11, GPU, timers, scheduler, state]
 actuals:
-  tokens: 16412
+  tokens: 18687
   tasks: 2
-  commits: 4
+  commits: 5
+commits: 5
 plan_head_before: 38be52c6269e6352f39bbbcd8ae2b5da242fe2ad
-plan_head_after: c41b0b7d48a6410552da987fe3b7dbbdc2ea175e
+plan_head_after: ac8f78dd60cef45729fb247f6379add61dcb5fa0
 tech-stack:
   added: []
   patterns:
@@ -38,7 +39,7 @@ decisions:
   - Timer, beam, DMA, and SIO events retain deterministic same-tick ordering.
   - The no-content test-card frame path remains separate from loaded-content field timing.
 metrics:
-  duration: 59min
+  duration: 64min
   completed: 2026-11-10
 status: complete
 requirements-completed: []
@@ -67,9 +68,9 @@ coverage:
 
 ## Performance
 
-- **Duration:** 59 min
+- **Duration:** 64 min
 - **Started:** 2026-11-10T22:28:18Z
-- **Completed:** 2026-11-10T23:27:23Z
+- **Completed:** 2026-11-10T23:32:13Z
 - **Tasks:** 2
 - **Files modified:** 23
 
@@ -85,6 +86,8 @@ coverage:
 2. **Task 1 GREEN: ratio-carried beam timing** - `5510100` (feat)
 3. **Task 2 RED: field wrap and reset bounds** - `d3b6778` (test)
 4. **Task 2 GREEN: bounded content runs by field wrap** - `c41b0b7` (feat)
+
+**Plan metadata:** `ac8f78d` (docs: complete beam timing plan)
 
 ## Files Created/Modified
 
