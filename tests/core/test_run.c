@@ -832,15 +832,94 @@ static void check_split(uint32_t region, int with_exe, uint32_t flags, uint64_t 
     schway_destroy(whole);
 }
 
+/* Splits at the places a carried remainder or a derived deadline could make
+   the result depend on the cut: a tick on each side of the first Timer 0
+   deadline, of a later deadline found by running a probe, and of the OTC unit's
+   end, and the middle of the unit, where the CPU is held and the rest of the
+   hold is carried in the state. With no program loaded a run stops exactly on
+   the tick asked for, so the split on a deadline is exact; with the program the
+   run stops on the instruction boundary at or after it. */
+static void check_edges(uint32_t region, int with_exe, uint32_t flags)
+{
+    uint64_t at[16];
+    size_t n = 0u;
+    schway *probe = make_devices(region, with_exe, flags);
+    uint64_t d = schway__timers_next(probe);
+    CHECK(d != UINT64_MAX);
+    at[n++] = d - 1u;
+    at[n++] = d;
+    at[n++] = d + 1u;
+    if ((flags & ARM_DMA) != 0u) {
+        uint64_t u = probe->dma.busy_until;
+        CHECK(d < u);
+        at[n++] = u / 2u;
+        at[n++] = u - 1u;
+        at[n++] = u;
+        at[n++] = u + 1u;
+    }
+    /* A deadline after the first unit and the first interrupts: step the probe
+       until a counter has one armed. */
+    run_to(probe, 100000u);
+    for (uint32_t i = 0; i < 4000u && schway__timers_next(probe) == UINT64_MAX; i++) {
+        (void)run(probe, 1u, 0u);
+    }
+    uint64_t later = schway__timers_next(probe);
+    if (with_exe) {
+        CHECK(later != UINT64_MAX);
+    }
+    if (later != UINT64_MAX) {
+        at[n++] = later - 1u;
+        at[n++] = later;
+        at[n++] = later + 1u;
+    }
+    schway_destroy(probe);
+    for (size_t i = 0; i < n; i++) {
+        check_split(region, with_exe, flags, at[i], 200000u);
+    }
+}
+
 /* Fault prevented: a device whose time depends on where a run was cut, so a
    host that runs in slices gets different timer interrupts, DMA or CPU
    registers than one that runs a whole span. Timer 2 on the system clock over 8
    interrupts at FFFFh while a program polls and acknowledges it; a run split
    after the first of those interrupts and the first frame's end gives the
-   unsplit run's state bytes, frame, ticks and audio. */
+   unsplit run's state bytes, frame, ticks and audio. Then Timer 0 counts to a
+   target and a 60,000-word OTC unit is in flight over the splits of the plain
+   equivalence case and over the edges above, with and without the program, in
+   every region. */
 static void test_split_devices(void)
 {
+    static const uint32_t regions[] = {SCHWAY_REGION_NTSC_J, SCHWAY_REGION_NTSC_U,
+                                       SCHWAY_REGION_PAL};
+    static const uint64_t splits[][2] = {
+        {1u, 1u},         {767u, 1u},        {768u, 1u},          {769u, 767u},
+        {768u * 3u, 768u}, {566202u, 1u},    {566203u, 566203u},  {566203u, 1u},
+        {566204u, 700000u}, {1u, 1132406u},  {2000000u, 2000000u}, {3000000u, 100u},
+        {0u, 5000u},      {5000u, 0u},
+    };
     check_split(SCHWAY_REGION_NTSC_U, 1, ARM_TIMER2, 600000u, 600000u);
+    for (size_t k = 0; k < sizeof regions / sizeof regions[0]; k++) {
+        for (size_t i = 0; i < sizeof splits / sizeof splits[0]; i++) {
+            check_split(regions[k], 0, ARM_ALL, splits[i][0], splits[i][1]);
+        }
+        /* The two NTSC regions share their frame length, so the runs with the
+           program are made in NTSC-U and PAL; those of several million cycles
+           in NTSC-U alone, to keep the case short. */
+        if (regions[k] == SCHWAY_REGION_NTSC_J) {
+            continue;
+        }
+        for (size_t i = 0; i < sizeof splits / sizeof splits[0]; i++) {
+            if (splits[i][0] + splits[i][1] < 2000000u || regions[k] == SCHWAY_REGION_NTSC_U) {
+                check_split(regions[k], 1, ARM_ALL, splits[i][0], splits[i][1]);
+            }
+        }
+        check_edges(regions[k], 1, ARM_ALL);
+        check_edges(regions[k], 0, ARM_ALL);
+        if (regions[k] == SCHWAY_REGION_NTSC_U) {
+            check_edges(regions[k], 1, ARM_TIMER2);
+            check_edges(regions[k], 0, ARM_TIMER2);
+        }
+    }
 }
 
 static const struct {
