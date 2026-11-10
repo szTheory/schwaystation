@@ -181,7 +181,7 @@ is `tests/fixtures/src/stub/stub.asm`.
 - A test names the fixture it runs: `schwaystation-run --exe FIXTURE ...` for what the runner reports, and
   `schwaystation-test-boot CASE` for what only the core can show (the launch block, the stub's exception record, the
   debug-port bytes). The `nightly` preset sets `SCHWAYSTATION_FIXTURES=OFF` and never builds armips.
-- Every hosted leg and every local build uses the same assembler, so a fixture's bytes, and with them the `exe` line
+- Every hosted leg and every local build uses the same assembler, so a fixture's bytes, and with them the `exe` lines
   of `hashes.txt`, are the same everywhere.
 
 ## Judged fixtures

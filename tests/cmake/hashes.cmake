@@ -6,7 +6,7 @@ if(MODE STREQUAL "write")
   # <OUT>/hashes.txt, the file CI collects from every lane, in a fixed order:
   # four frame hashes, then the frame 5 PNG's digest, then one line per
   # assembled fixture file in FIXTURES (when given), sorted by name, so the
-  # eight lanes' fixture bytes are compared too, then hello.exe's frame 30.
+  # eight lanes' fixture bytes are compared too, then the frame and state at frame 30 of four fixtures.
   set(lines "")
   foreach(case "ntsc-u;5" "ntsc-u;60" "ntsc-j;60" "pal;60")
     list(GET case 0 region)
@@ -35,15 +35,15 @@ if(MODE STREQUAL "write")
       file(SHA256 "${FIXTURES}/${name}" digest)
       string(APPEND lines "fixture ${name} sha256 ${digest}\n")
     endforeach()
-    # The frame the CPU ran, which differs between lanes if any instruction or the stub kernel does.
-    set(args --exe "${FIXTURES}/hello.exe" --frames 30 --hash)
-    execute_process(COMMAND ${EMULATOR} "${RUN}" ${args}
-      OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
-    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^frame 30 sha256 [0-9a-f]+\n$")
-      message(FATAL_ERROR "schwaystation-run ${args}: expected exit 0 and one hash line, "
-        "got exit ${rc}\n${out}${err}")
-    endif()
-    string(APPEND lines "exe hello.exe ${out}")
+    # The frame and state the programs ran, which differ between lanes if an instruction, device or the stub kernel does.
+    foreach(exe hello gte_vectors dma_chain timers_lines)
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/${exe}.exe" --frames 30 --hash --hash-state
+        OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "(frame 30 sha256 [0-9a-f]+)\n(state sha256 [0-9a-f]+)\n$")
+        message(FATAL_ERROR "schwaystation-run ${exe}.exe: expected exit 0 and the two hash lines, got exit ${rc}\n${out}${err}")
+      endif()
+      string(APPEND lines "exe ${exe}.exe ${CMAKE_MATCH_1}\nexe ${exe}.exe ${CMAKE_MATCH_2}\n")
+    endforeach()
   endif()
   # Unix newlines on every host: file(WRITE) writes CRLF on Windows.
   file(CONFIGURE OUTPUT "${OUT}/hashes.txt" NEWLINE_STYLE UNIX CONTENT "${lines}")
