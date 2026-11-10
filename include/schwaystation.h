@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 3
+#define SCHWAY_API_VERSION 4
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -174,6 +174,12 @@ typedef struct schway_video {
     uint32_t reserved1;
 } schway_video;
 
+/* Read-only view of a contiguous byte span owned by an instance. */
+typedef struct schway_span {
+    const void *data;
+    size_t size; /* bytes */
+} schway_span;
+
 typedef struct schway_audio {
     uint32_t size;
     uint32_t reserved0;
@@ -216,6 +222,7 @@ schway_status schway_peek(const schway *inst, uint32_t space, uint32_t addr, uin
 schway_status schway_get_fault(const schway *inst, schway_fault *out);
 schway_status schway_get_info(const schway *inst, schway_info *out);
 schway_status schway_get_video(const schway *inst, schway_video *out);
+schway_status schway_get_vram(const schway *inst, schway_span *out);
 schway_status schway_get_audio(schway *inst, schway_audio *io);
 schway_status schway_get_tty(schway *inst, schway_tty *io);
 schway_status schway_get_trace(const schway *inst, uint32_t index, schway_trace *out);

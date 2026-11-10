@@ -316,6 +316,13 @@ and widen each 5-bit channel `c` to 8 bits as `(c << 3) | (c >> 2)`. The other f
 `interlaced`, `field`, `x1`, `y1`, `start_x`, `start_y`, `enabled`, `rgb24`) report the display mode the frame was
 made in.
 
+## VRAM
+
+`schway_get_vram` returns the instance's complete 1024 x 512 VRAM as a read-only `schway_span`. Its `data` points
+to 16-bit words in host byte order and `size` is the span's byte length. The pointer stays stable for the lifetime
+of the instance; its contents can change as the emulated GPU runs, when a state is loaded or when the instance is
+reset. Copy data you need before destroying the instance.
+
 ## Audio
 
 ```c
@@ -401,9 +408,9 @@ an unknown one included, and never `NULL`.
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
 
-`SCHWAY_API_VERSION` is 3. A version only adds names, so a program built against an earlier header runs unchanged.
-Version 3 added `SCHWAY_FAULT_DMA` and nothing else; a program that switches on the fault kind should treat a value it
-does not know as a fault it cannot name.
+`SCHWAY_API_VERSION` is 4. A version only adds names, so a program built against an earlier header runs unchanged.
+Version 3 added `SCHWAY_FAULT_DMA`; version 4 added the read-only `schway_span` and `schway_get_vram` view of native
+VRAM. A program that switches on the fault kind should treat a value it does not know as a fault it cannot name.
 
 ## The test card
 

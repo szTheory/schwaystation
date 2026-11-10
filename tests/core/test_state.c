@@ -12,7 +12,7 @@
 #include "state.h"
 #include "../check.h"
 
-#define MAX_FIELDS 128u
+#define MAX_FIELDS 256u
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
@@ -649,8 +649,8 @@ static void test_cpu_fields(void)
     memset(&v, 0, sizeof v);
     v.size = (uint32_t)sizeof v;
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(v.state_format, 3u);
-    CHECK_EQ_U64(v.behaviour_revision, 3u);
+    CHECK_EQ_U64(v.state_format, 4u);
+    CHECK_EQ_U64(v.behaviour_revision, 4u);
 
     schway *inst = make(SCHWAY_REGION_NTSC_U);
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);

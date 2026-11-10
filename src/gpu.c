@@ -546,6 +546,11 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst)
     struct schway__gpu *g = &inst->gpu;
     schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
                             0u, UINT16_MAX);
+    uint32_t packet_command = g->fifo[0];
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        packet_command = (uint32_t)io->r[0] | ((uint32_t)io->r[1] << 8) |
+                         ((uint32_t)io->r[2] << 16) | ((uint32_t)io->r[3] << 24);
+    }
     schway__state_u32_array(io, name_fifo, g->fifo, SCHWAY__GPU_FIFO_WORDS, 0u, UINT32_MAX);
     uint32_t fifo_count = schway__state_u32(io, name_fifo_count, &g->fifo_count, 0u,
                                            SCHWAY__GPU_FIFO_WORDS);
@@ -586,7 +591,7 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst)
 
     schway__state_check(io, phase != SCHWAY__GPU_PACKET ||
                                 (fifo_count != 0u && packet_words > fifo_count &&
-                                 packet_words == expected_packet_words(g->fifo[0])));
+                                 packet_words == expected_packet_words(packet_command)));
     schway__state_check(io, phase == SCHWAY__GPU_PACKET || (fifo_count == 0u && packet_words == 0u));
     if (phase == SCHWAY__GPU_IDLE) {
         schway__state_check(io, owed_words == 0u && transfer_x == 0u && transfer_y == 0u &&

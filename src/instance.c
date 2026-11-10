@@ -406,6 +406,16 @@ schway_status schway_get_info(const schway *inst, schway_info *out)
     return SCHWAY_STATUS_OK;
 }
 
+schway_status schway_get_vram(const schway *inst, schway_span *out)
+{
+    if (inst == NULL || out == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    out->data = &inst->vram[0][0];
+    out->size = sizeof inst->vram;
+    return SCHWAY_STATUS_OK;
+}
+
 /* Literals behind a switch, never a pointer table: the core keeps no
    relocated data. */
 static const char text_ok[] = "ok";

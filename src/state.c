@@ -4,7 +4,7 @@
      header  magic (8 bytes), state format (u32), total size (u32), body
              CRC-32 (u32)
      body    instance.frame, instance.region, instance.ticks,
-             instance.tick_acc, instance.frame_end, gpu.vram, cpu and cop0
+             instance.tick_acc, instance.frame_end, GPU and VRAM, CPU and cop0
              registers, the geometry engine, instance.profile_flags,
              instance.exe_loaded, the bus (RAM, scratchpad, memory control,
              unbuilt-device counters), irq, dma, the root counters and the
@@ -32,7 +32,6 @@ static const char name_region[] = "instance.region";
 static const char name_ticks[] = "instance.ticks";
 static const char name_tick_acc[] = "instance.tick_acc";
 static const char name_frame_end[] = "instance.frame_end";
-static const char name_vram[] = "gpu.vram";
 static const char name_profile_flags[] = "instance.profile_flags";
 static const char name_exe_loaded[] = "instance.exe_loaded";
 static const char name_fault_kind[] = "fault.kind";
@@ -97,8 +96,7 @@ static void body_io(struct schway__state_io *io, schway *inst)
                           SCHWAY__STATE_TICKS_MAX + schway__instance_frame_max(inst->region));
     schway__state_check(io, ticks <= frame_end &&
                                 frame_end - ticks <= schway__instance_frame_max(inst->region));
-    schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
-                            0u, UINT16_MAX);
+    schway__gpu_state_io(io, inst);
     uint64_t cycle = schway__cpu_state_io(io, inst);
     schway__gte_state_io(io, inst, cycle);
     (void)schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u, 1u);
