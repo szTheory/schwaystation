@@ -69,8 +69,9 @@ void schway__gpu_pixel(schway *inst, uint32_t x, uint32_t y, uint16_t texel, uin
                        uint32_t flags);
 void schway__gpu_triangle(schway *inst, const int32_t vertices[3][2], uint32_t color,
                           uint32_t flags);
-void schway__gpu_polygon(schway *inst, const uint32_t *position_words, uint32_t vertex_count,
-                         uint32_t color, uint32_t flags);
+void schway__gpu_polygon(schway *inst, const uint32_t *position_words,
+                         const uint32_t *color_words, const uint32_t *uv_words,
+                         uint32_t vertex_count, uint32_t flags);
 void schway__gpu_state_io(struct schway__state_io *io, schway *inst);
 
 #endif /* SCHWAYSTATION_GPU_H */

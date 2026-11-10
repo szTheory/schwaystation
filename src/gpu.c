@@ -497,11 +497,42 @@ static void process_packet(schway *inst)
         copy_vram(inst, g->fifo[1], g->fifo[2], g->fifo[3]);
     } else if (op >= 0x60u && op <= 0x7Fu) {
         render_rectangle(inst, command);
-    } else if (op >= 0x20u && op <= 0x3Fu && (op & 0x14u) == 0u) {
+    } else if (op >= 0x20u && op <= 0x3Fu) {
         uint32_t vertex_count = (op & 0x08u) != 0u ? 4u : 3u;
-        uint32_t flags = (op & 0x02u) != 0u ? SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT : 0u;
-        schway__gpu_polygon(inst, &g->fifo[1], vertex_count,
-                            command & 0x00FFFFFFu, flags);
+        uint32_t gouraud = (op & 0x10u) != 0u;
+        uint32_t textured = (op & 0x04u) != 0u;
+        uint32_t flags = 0u;
+        if ((op & 0x02u) != 0u) {
+            flags |= SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT;
+        }
+        if (textured != 0u) {
+            flags |= SCHWAY__GPU_PIXEL_TEXTURED;
+            if ((op & 0x01u) != 0u) {
+                flags |= SCHWAY__GPU_PIXEL_RAW_TEXTURE;
+            } else {
+                flags |= SCHWAY__GPU_PIXEL_DITHER_ELIGIBLE;
+            }
+        }
+        if (gouraud != 0u) {
+            flags |= SCHWAY__GPU_PIXEL_DITHER_ELIGIBLE;
+        }
+
+        uint32_t positions[4] = {0u, 0u, 0u, 0u};
+        uint32_t colors[4] = {command & 0x00FFFFFFu, command & 0x00FFFFFFu,
+                              command & 0x00FFFFFFu, command & 0x00FFFFFFu};
+        uint32_t uvs[4] = {0u, 0u, 0u, 0u};
+        uint32_t cursor = 1u;
+        for (uint32_t i = 0u; i < vertex_count; i++) {
+            positions[i] = g->fifo[cursor++];
+            if (textured != 0u) {
+                uvs[i] = g->fifo[cursor++];
+            }
+            if (gouraud != 0u && i + 1u < vertex_count) {
+                colors[i + 1u] = g->fifo[cursor++] & 0x00FFFFFFu;
+            }
+        }
+        schway__gpu_polygon(inst, positions, colors, textured != 0u ? uvs : NULL,
+                            vertex_count, flags);
     } else if (op == 0x1Fu) {
         g->irq_pending = 1u;
         schway__irq_raise(inst, GPU_IRQ_BIT);
