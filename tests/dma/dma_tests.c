@@ -1023,10 +1023,116 @@ static void case_dpcr_rearbitrate(void)
     }
 }
 
+/* CHCR of the GPU channel in linked list mode, from RAM, with bit 24 set. */
+#define CHCR_LIST 0x01000401u
+
+/* Runs one cycle at a time until the engine has passed n nodes of the list or
+   the channel stops being busy; returns the cycles run, with 100000 as the
+   bound a test never reaches. */
+static uint64_t run_to_node(schway *inst, uint32_t ch, uint32_t n)
+{
+    uint64_t at = inst->ticks;
+    for (uint32_t i = 0u; i < 100000u; i++) {
+        if (inst->dma.nodes_done >= n || (inst->dma.chcr[ch] & SCHWAY__DMA_CHCR_BUSY) == 0u) {
+            break;
+        }
+        (void)run(inst, 1u);
+    }
+    return inst->ticks - at;
+}
+
+/* Fault prevented: a list that sends its headers to the device, loses a node,
+   follows the wrong address, ends on a header word instead of the marker's bit
+   23 or finishes without the flag and the interrupt. Three nodes of 2, 0 and 5
+   words reach the GPU channel's stand-in sink as 7 words with the checksum of
+   the words in list order, and MADR is left at the end marker. */
+static void case_list_walk(void)
+{
+    schway *inst = make();
+    wr32(inst, 0x1000u, (2u << 24) | 0x1010u);
+    wr32(inst, 0x1004u, 0xA0000001u);
+    wr32(inst, 0x1008u, 0xA0000002u);
+    wr32(inst, 0x1010u, (0u << 24) | 0x1020u);
+    wr32(inst, 0x1020u, (5u << 24) | 0x00FFFFFFu);
+    for (uint32_t i = 0u; i < 5u; i++) {
+        wr32(inst, 0x1024u + 4u * i, 0xB0000001u + i);
+    }
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00840000u);
+    wr32(inst, MADR(2u), 0x1000u);
+    wr32(inst, CHCR(2u), CHCR_LIST);
+    /* The first node moved at the start; its header went nowhere. */
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+    CHECK_EQ_U64(inst->dma.nodes_done, 1u);
+    CHECK_EQ_U64(inst->dma.words[2], 2u);
+    CHECK_EQ_HEX(inst->dma.madr[2], 0x1010u);
+    (void)run_to_node(inst, 2u, 2u);
+    CHECK_EQ_U64(inst->dma.words[2], 2u);
+    CHECK_EQ_HEX(inst->dma.madr[2], 0x1020u);
+    (void)run_to_node(inst, 2u, 3u);
+    CHECK_EQ_U64(inst->dma.words[2], 7u);
+    CHECK_EQ_HEX(inst->dma.madr[2], 0xFFFFFFu);
+    CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+    (void)run(inst, 200u);
+    CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.nodes_done, 3u);
+    CHECK_EQ_U64(inst->dma.words[2], 7u);
+    uint32_t crc = 0u;
+    static const uint32_t sent[7] = {0xA0000001u, 0xA0000002u, 0xB0000001u, 0xB0000002u,
+                                     0xB0000003u, 0xB0000004u, 0xB0000005u};
+    for (uint32_t i = 0u; i < 7u; i++) {
+        uint8_t b[4] = {(uint8_t)sent[i], (uint8_t)(sent[i] >> 8), (uint8_t)(sent[i] >> 16),
+                        (uint8_t)(sent[i] >> 24)};
+        crc = schway__crc32_update(crc, b, sizeof b);
+    }
+    CHECK_EQ_HEX(inst->dma.crc[2], crc);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    CHECK_EQ_HEX(rd32(inst, DICR), 0x84840000u);
+    CHECK_EQ_HEX(rd32(inst, MADR(2u)), 0xFFFFFFu);
+    CHECK_EQ_HEX(rd32(inst, CHCR(2u)), 0x00000401u);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: a list whose first header already holds the end marker that
+   walks on, or one that finishes without the flag and the interrupt. The two
+   forms the public chain-looping test builds are checked: a header that is the
+   marker, and a header that points to one. The end is bit 23 of the next
+   address alone: 800000h ends a list and leaves itself in MADR. */
+static void case_list_empty(void)
+{
+    for (uint32_t form = 0u; form < 3u; form++) {
+        schway *inst = make();
+        uint32_t marker = form == 2u ? 0x800000u : 0xFFFFFFu;
+        if (form != 1u) {
+            wr32(inst, 0x2000u, marker);
+        } else {
+            wr32(inst, 0x2000u, 0x00002004u);
+            wr32(inst, 0x2004u, 0x00FFFFFFu);
+        }
+        wr32(inst, DPCR, DPCR_ALL);
+        wr32(inst, DICR, 0x00840000u);
+        wr32(inst, MADR(2u), 0x2000u);
+        wr32(inst, CHCR(2u), CHCR_LIST);
+        (void)run(inst, 200u);
+        CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
+        CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+        CHECK_EQ_U64(inst->dma.words[2], 0u);
+        CHECK_EQ_U64(inst->dma.nodes_done, form == 1u ? 2u : 1u);
+        CHECK_EQ_HEX(rd32(inst, MADR(2u)), form == 1u ? 0xFFFFFFu : marker);
+        CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+        CHECK_EQ_HEX(rd32(inst, DICR), 0x84840000u);
+        schway_destroy(inst);
+    }
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
+    {"list_walk", case_list_walk},
+    {"list_empty", case_list_empty},
     {"sync0_gpu_sink", case_sync0_gpu_sink},
     {"sync0_from_device", case_sync0_from_device},
     {"sync1_dreq_blocks", case_sync1_dreq_blocks},

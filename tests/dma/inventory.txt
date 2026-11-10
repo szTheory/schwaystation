@@ -7,6 +7,8 @@ dma.dpcr.priority	dma,portable
 dma.dpcr.rearbitrate	dma,portable
 dma.dpcr.reset	dma,portable
 dma.engine.step_contract	dma,portable
+dma.list.empty	dma,portable
+dma.list.walk	dma,portable
 dma.otc.bcr_zero	dma,portable
 dma.otc.clear	dma,portable
 dma.otc.ignores_bits	dma,portable

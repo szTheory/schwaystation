@@ -1,6 +1,6 @@
 /* DMA: power-on values, the state walk, the register window, arbitration, the
-   unit engine with the CPU hold, and the device ends. OTC and the burst mode
-   of the other six channels have units so far. */
+   unit engine with the CPU hold, and the device ends. OTC, the burst and
+   request-block modes and the linked list mode have units. */
 #include <string.h>
 
 #include "internal.h"
@@ -65,7 +65,9 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     schway__state_u32_array(io, name_phase, d->phase, SCHWAY__DMA_CHANNELS, 0u, 7u);
     schway__state_u32_array(io, name_remain, d->remain, SCHWAY__DMA_CHANNELS, 0u,
                             SCHWAY__DMA_UNIT_WORDS_MAX);
-    (void)schway__state_u32(io, name_nodes_done, &d->nodes_done, 0u, SCHWAY__DMA_NODES_MAX);
+    /* A count of the nodes a list has passed; it wraps, and any value is a
+       state the engine can be in. */
+    (void)schway__state_u32(io, name_nodes_done, &d->nodes_done, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_dreq, &d->dreq, 0u, (1u << SCHWAY__DMA_CHANNELS) - 1u);
     schway__state_u32_array(io, name_words, d->words, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
     schway__state_u32_array(io, name_crc, d->crc, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
@@ -82,11 +84,24 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
 #define DMA_UNIT_CHANNELS 0x7Fu
 
 /* phase of a channel: nothing running, its unit's words moved and the channel
-   busy until busy_until, or a sync mode 1 transfer between blocks (busy, no
-   unit, remain blocks still to go, waiting for the next request). */
+   busy until busy_until, a sync mode 1 transfer between blocks (busy, no
+   unit, remain blocks still to go, waiting for the next request), the CPU's
+   window between two units of a list (busy, cur still the channel and
+   busy_until the end of the window, no hold on the CPU), or that window over
+   and the next node waiting for the arbitration. */
 #define DMA_PH_IDLE 0u
 #define DMA_PH_UNIT 1u
 #define DMA_PH_BLOCKS 2u
+#define DMA_PH_GAP 3u
+#define DMA_PH_NEXT 4u
+
+/* The cycles the header fetch of a list node and the setup of the next one
+   cost on top of its words, and the cycles the CPU runs between two nodes.
+   Fitted to the public dma/chain-looping log, in which a loop that takes
+   16,040 cycles alone takes 25,632 next to a self-referencing list: derived,
+   not documented, and a band rather than a measurement. */
+#define DMA_NODE_OVERHEAD 6u
+#define DMA_NODE_GAP 10u
 
 /* Extra cycles a sync mode 1 block costs on top of its words: the request
    handshake and the setup of the next block. Fitted to the hardware log of
@@ -153,8 +168,10 @@ static void dicr_set(schway *inst, uint32_t dicr)
 
 /* A channel with a unit ready to run: bit 24 set, and bit 28 where the mode
    needs the start trigger. OTC always does; sync mode 0 does; sync mode 1
-   waits for the device's request line. The linked-list and reserved modes have
-   no unit yet, so they wait (psx-spx, DMA Channels, CHCR). */
+   waits for the device's request line; a linked list needs bit 24 alone, the
+   device being taken to be ready (no device end holds a request line yet). A
+   transfer whose CPU window is over is waiting for its next unit. The reserved
+   mode has no unit, so it waits (psx-spx, DMA Channels, CHCR). */
 static uint32_t dma_pending(const struct schway__dma *d, uint32_t ch)
 {
     uint32_t c = d->chcr[ch];
@@ -162,8 +179,14 @@ static uint32_t dma_pending(const struct schway__dma *d, uint32_t ch)
     if ((c & SCHWAY__DMA_CHCR_BUSY) == 0u) {
         return 0u;
     }
+    if (d->phase[ch] == DMA_PH_NEXT) {
+        return 1u;
+    }
     if (ch == DMA_OTC || sync == 0u) {
         return (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
+    }
+    if (sync == 2u) {
+        return 1u;
     }
     return sync == 1u && ((d->dreq >> ch) & 1u) != 0u ? 1u : 0u;
 }
@@ -314,6 +337,33 @@ static uint64_t dma_move(schway *inst, uint32_t ch, uint32_t n)
     return extra;
 }
 
+/* One node of a linked list. MADR names the node's header word: its top byte
+   is the count of words that follow it and its low 24 bits the address of the
+   next header. The words go to the device, whatever CHCR's direction bit says
+   (a list is a transfer to a device), MADR then holds the next address, and a
+   next address with bit 23 set ends the list, so the end marker FFFFFFh is
+   left in MADR (psx-spx, DMA Channels, Linked List). The header is not sent.
+   Returns the cycles the node takes: the header fetch and setup, then its
+   words. remain says whether a node follows: 1, or 0 for the end. */
+static uint64_t dma_list_node(schway *inst, uint32_t ch)
+{
+    struct schway__dma *d = &inst->dma;
+    uint32_t addr = d->madr[ch] & 0xFFFFFCu;
+    uint32_t header = 0u;
+    (void)schway__bus_ram_word(inst, addr, &header, 0u);
+    uint32_t count = header >> 24;
+    uint32_t next = header & SCHWAY__DMA_MADR_MASK;
+    uint64_t extra = 0u;
+    for (uint32_t i = 1u; i <= count; i++) {
+        uint32_t word = 0u;
+        (void)schway__bus_ram_word(inst, (addr + 4u * i) & 0xFFFFFCu, &word, 0u);
+        extra += dma_dev_write(inst, ch, word);
+    }
+    d->madr[ch] = next;
+    d->remain[ch] = (next & 0x800000u) != 0u ? 0u : 1u;
+    return DMA_NODE_OVERHEAD + dma_cost(ch, count) + extra;
+}
+
 /* OTC writes BCR words (0 means 10000h) from MADR downward: each word is the
    address of the entry before it and the last is FFFFFFh, so the table ends
    where it was meant to be walked from. The address wraps from 0 to FFFFFCh,
@@ -370,6 +420,14 @@ static void dma_start(schway *inst, uint64_t t)
         }
         d->dreq &= ~(UINT32_C(1) << ch);
         cost = dma_cost(ch, n) + DMA_BLOCK_OVERHEAD + dma_move(inst, ch, n);
+    } else if (((d->chcr[ch] >> 9) & 3u) == 2u) {
+        /* Linked list: one node per unit, counted from the start of the
+           transfer. */
+        if (d->phase[ch] != DMA_PH_NEXT) {
+            d->nodes_done = 0u;
+        }
+        d->nodes_done++;
+        cost = dma_list_node(inst, ch);
     } else {
         /* Sync mode 0: one burst of BCR's low half words. */
         d->remain[ch] = 0u;
@@ -380,18 +438,25 @@ static void dma_start(schway *inst, uint64_t t)
     d->busy_until = t + cost;
 }
 
-/* The end of the running unit. A sync mode 1 block with blocks to go leaves
-   the channel busy and waiting for the next request, and the CPU runs until it
-   comes: no flag, no interrupt. Otherwise the channel stops being busy, its
-   DICR flag is set when both its enable and the master enable allow it, and
-   the interrupt edge follows (psx-spx, DMA Channels, DICR). */
-static void dma_finish(schway *inst, uint32_t ch)
+/* The end of the running unit, which ended at tick t. A sync mode 1 block with
+   blocks to go leaves the channel busy and waiting for the next request, and
+   the CPU runs until it comes: no flag, no interrupt. A list with a node to go
+   leaves the channel busy for the CPU's window between nodes, a gap in which
+   the engine holds nothing. Otherwise the channel stops being busy, its DICR
+   flag is set when both its enable and the master enable allow it, and the
+   interrupt edge follows (psx-spx, DMA Channels, DICR). */
+static void dma_finish(schway *inst, uint32_t ch, uint64_t t)
 {
     struct schway__dma *d = &inst->dma;
     uint32_t dicr = d->dicr;
     if (d->remain[ch] > 0u) {
-        d->phase[ch] = DMA_PH_BLOCKS;
-        d->cur = SCHWAY__DMA_NONE;
+        if (((d->chcr[ch] >> 9) & 3u) == 1u) {
+            d->phase[ch] = DMA_PH_BLOCKS;
+            d->cur = SCHWAY__DMA_NONE;
+        } else {
+            d->phase[ch] = DMA_PH_GAP;
+            d->busy_until = t + DMA_NODE_GAP;
+        }
         return;
     }
     d->chcr[ch] &= ~SCHWAY__DMA_CHCR_BUSY;
@@ -421,8 +486,18 @@ void schway__dma_event(schway *inst, uint64_t now)
     struct schway__dma *d = &inst->dma;
     while (d->cur != SCHWAY__DMA_NONE && d->busy_until <= now) {
         uint64_t t = d->busy_until;
-        dma_finish(inst, d->cur);
-        dma_start(inst, t);
+        uint32_t ch = d->cur;
+        if (d->phase[ch] == DMA_PH_GAP) {
+            /* The CPU's window is over: the channel's next unit waits to be
+               picked, with the others, by the arbitration. */
+            d->phase[ch] = DMA_PH_NEXT;
+            d->cur = SCHWAY__DMA_NONE;
+        } else {
+            dma_finish(inst, ch, t);
+        }
+        if (d->cur == SCHWAY__DMA_NONE) {
+            dma_start(inst, t);
+        }
     }
 }
 
@@ -438,7 +513,7 @@ void schway__dma_event(schway *inst, uint64_t now)
 void schway__dma_bus_access(schway *inst, uint64_t now)
 {
     struct schway__dma *d = &inst->dma;
-    if (d->cur == SCHWAY__DMA_NONE || now >= d->busy_until) {
+    if (d->cur == SCHWAY__DMA_NONE || now >= d->busy_until || d->phase[d->cur] == DMA_PH_GAP) {
         return;
     }
     if (d->stall_until < d->busy_until) {
@@ -525,7 +600,7 @@ void schway__dma_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint3
         schway__sched_recalc(inst);
         return;
     }
-    if (d->cur != SCHWAY__DMA_NONE) {
+    if (d->cur != SCHWAY__DMA_NONE && d->phase[d->cur] != DMA_PH_GAP) {
         schway__dma_event(inst, d->busy_until);
         schway__sched_recalc(inst);
     }

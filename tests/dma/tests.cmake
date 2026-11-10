@@ -143,3 +143,16 @@ schway_add_test(NAME dma.costs.per_channel
 schway_add_test(NAME dma.dpcr.rearbitrate
   COMMAND schwaystation-test-dma dpcr_rearbitrate
   LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: a list that sends its headers to the device, loses or
+# reorders a node, follows the wrong address, ends on anything but the marker's
+# bit 23, or finishes without the flag and the interrupt.
+schway_add_test(NAME dma.list.walk
+  COMMAND schwaystation-test-dma list_walk
+  LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: a list whose first header ends it that walks on, or that
+# finishes without the flag and the interrupt.
+schway_add_test(NAME dma.list.empty
+  COMMAND schwaystation-test-dma list_empty
+  LABELS dma portable TIMEOUT 10)
