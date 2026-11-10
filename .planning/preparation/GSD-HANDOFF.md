@@ -174,9 +174,8 @@ Subagent reasoning effort comes from the owner's global GSD agent install, not f
   next, and GSD tests for the substring (`workflows/execute-phase.md:193`) [GH.01].
 - `/gsd-next`, `/gsd-autonomous`, `/gsd-manager` and `/gsd-progress --next` or `--do` start the following step.
 - In interactive mode the phase transition only moves STATE's pointer; it does not start the next phase [GH.01].
-- `scripts/hygiene.sh` refuses a commit if `.planning/config.json` leaves interactive mode or turns a chain flag
-  on. `SCHWAYSTATION_ALLOW_CHAIN=1` and `SCHWAYSTATION_ALLOW_MAIN_COMMIT=1` are bypasses for the owner's own
-  shell, never set by an agent (AGENTS rule 9).
+- `scripts/hygiene.sh` no longer enforces a stop policy; the owner allowed autonomous runs (AGENTS rule 9).
+  `SCHWAYSTATION_ALLOW_MAIN_COMMIT=1` stays an owner-only bypass, never set by an agent.
 
 ## 7. Owner tasks
 
