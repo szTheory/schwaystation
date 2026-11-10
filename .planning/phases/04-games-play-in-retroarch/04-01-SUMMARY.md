@@ -53,6 +53,7 @@ requirements-completed: []
 coverage:
   - id: D1
     description: Existing test-card pixels and native-video tuple assertions run through the GPU inventory.
+    requirement: GAME-01
     verification:
       - kind: unit
         ref: "ctest --test-dir build/ci -R '^gpu\\.(testcard\\.pixels|video\\.tuple)$' --no-tests=error --output-on-failure"
@@ -60,6 +61,12 @@ coverage:
     human_judgment: false
   - id: D2
     description: The five new test directories are included without registering nonexistent tests, and the ci inventory remains exact.
+    requirement:
+      - GAME-01
+      - GAME-03
+      - GAME-04
+      - GAME-05
+      - GAME-06
     verification:
       - kind: integration
         ref: "cmake --workflow --preset ci"
@@ -67,6 +74,9 @@ coverage:
     human_judgment: false
   - id: D3
     description: Repository hygiene, provenance, fixture policy, and the existing gate budgets remain valid.
+    requirement:
+      - GAME-05
+      - GAME-07
     verification:
       - kind: integration
         ref: "cmake --workflow --preset hygiene"
@@ -80,7 +90,7 @@ coverage:
 
 ## Performance
 
-- **Duration:** 14 min
+- **Duration:** 16 min
 - **Started:** 2026-11-10T17:20:04Z
 - **Completed:** 2026-11-10T17:36:16Z
 - **Tasks:** 3
