@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-14-PLAN.md
-last_updated: "2026-11-10T07:25:43.121Z"
+stopped_at: Completed 03-15-PLAN.md
+last_updated: "2026-11-10T07:30:45.285Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 56d3f8f84e30694d1eac21fa4b33618200f7afd1
+state_head: 8a5384bdef32ce1b2bd3b853e6ea768181d79e01
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 57
+  completed_plans: 58
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 16 of 26
+Plan: 17 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -116,6 +116,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P12 | 10 min | 3 tasks | 5 files |
 | Phase 03 P13 | 12 min | 3 tasks | 6 files |
 | Phase 03 P14 | 13 min | 3 tasks | 5 files |
+| Phase 03 P15 | 16 min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -239,6 +240,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-13: the independent GTE model takes SZ3 and the IR3 flag from the whole 44-bit sum shifted by 12 and saturates IR from the 32-bit MAC; it agreed with the engine on all 22,000 seeded cases at seed 0x6774652D70726F70, cycles included, so no engine fix was needed
 - [Phase 03]: 03-14: a list node costs 20 cycles of header fetch and setup plus its words with a 6-cycle CPU window between nodes, fitted to the chain-looping log (1.625 against 1.598, band 1.4 to 1.8); the first pair locked in phase with the test loop and showed no slowdown
 - [Phase 03]: 03-14: the 1000h-node guard is a gap that reaches past the step's tick, nodes_done wraps and is bounded only by the u32 range, and the CHCR word 0 stops a channel with no flag and no interrupt (the chain-looping test procedure); chopping windows cost ceil(17 * dw / 16) + 6 with a CPU window of min(2^m, 32 * dw), mean signed error 1.0 percent and largest row error 10.4 percent against the 64 hardware rows
+- [Phase 03]: 03-15: sync mode 3 on a non-OTC channel with the start bit does not start and latches SCHWAY_FAULT_DMA (10, API version 3); start bits dropped, other CHCR bits kept
 
 ### Pending Todos
 
@@ -296,8 +298,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T07:25:43.019Z
-Stopped at: Completed 03-14-PLAN.md
+Last session: 2026-11-10T07:30:45.159Z
+Stopped at: Completed 03-15-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
