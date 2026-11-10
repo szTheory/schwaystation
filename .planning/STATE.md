@@ -315,6 +315,9 @@ come from `AGENTS.md`.
 | 2026-11-09 | /gsd-ship 2 | Claude Code, OpenGSD; inline shipping, PR #8 | claude-sonnet-5-5 |
 | 2026-11-09 | /gsd-discuss-phase 3 (via /gsd-autonomous) | Claude Code, OpenGSD; six advisor agents fanned out | claude-sonnet-5-5 |
 | 2026-11-10 | /gsd-plan-phase 3 (via /gsd-autonomous) | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, planner claude-opus-5-5 (1 plan + 2 revision rounds), checker claude-haiku-5-5 (3 passes); research skipped; the last blocker (sweep vs sync-3 fault) and warnings patched by the orchestrator after pass 3 | claude-sonnet-5-5 |
+| 2026-11-10 | /gsd-execute-phase 3 (via /gsd-autonomous) | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, 26 sequential executors claude-sonnet-5-5 (no worktrees) | claude-sonnet-5-5 |
+| 2026-11-10 | /gsd-code-review 3 and fix round 1 | Claude Code, OpenGSD; deep review claude-sonnet-5-5, fixer claude-sonnet-5-5; CR-01 and WR-01 fixed, 7 info findings to todos 040-046 | claude-sonnet-5-5 |
+| 2026-11-10 | /gsd-verify-work 3 (verify step) | Claude Code, OpenGSD; verifier claude-sonnet-5-5, status passed, no human items | claude-sonnet-5-5 |
 
 ## Session Continuity
 
@@ -326,5 +329,8 @@ Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
 Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next: from a shell, `gh pr merge 8 --auto --squash`; confirm a CI run on the head commit, then confirm the release pull request is green after the merge. Then `/gsd-discuss-phase 3`.
+Next: `/gsd-ship 3` (PR title `feat: match the GTE hardware cases and add DMA and timers`), then from a shell
+`gh pr merge --auto --squash`, confirm a CI run on the head commit (the hosted asan, be32, wasm32, nofp, perf and
+eight-lane hash-equality jobs are confirmed there, not locally), and confirm the release pull request is green after the
+merge. Then `/gsd-discuss-phase 4`.
 Stop after the ship step.
