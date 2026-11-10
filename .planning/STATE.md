@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-18-PLAN.md
-last_updated: "2026-11-10T07:57:39.914Z"
+stopped_at: Completed 03-19-PLAN.md
+last_updated: "2026-11-10T08:01:52.977Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: ef610eafdbddb94f0ccb0ac5a7acbd21eb37ce1f
+state_head: 391a38abcf96f54ce9e9fbb21e275465cc7c93d8
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 62
+  completed_plans: 63
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 21 of 26
+Plan: 22 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -121,6 +121,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P24 | 6 min | 2 tasks | 3 files |
 | Phase 03 P17 | 4 min | 2 tasks | 5 files |
 | Phase 3 P18 | 22 min | 2 tasks | 2 files |
+| Phase 03 P19 | 19 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -249,6 +250,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-24: the split case compares run_to targets, not run lengths, because a run with a program stops on the first instruction boundary at or after its budget; the program-loaded runs are made in NTSC-U and PAL and the multi-million-cycle ones in NTSC-U alone (2.2 s native)
 - [Phase 03]: 03-17: timers_lines installs its handler at the exception vector and snapshots counters against Timer 1 reset by the vertical blank — The stub path writes status FFh and costs about 700 cycles an entry, and a blank can land behind a timer handler, so the delay between blank and read must cancel
 - [Phase 3]: Seed variants come from a row's place among rows of the same code kind, not a struct field; the armips unity build leaves all 24 fixture digests unchanged
+- [Phase 03]: 03-19: --hash-state hashes the saved state after its 20-byte header; hashes.txt carries the frame and state of hello, gte_vectors, dma_chain and timers_lines, and the gate total stays at 1513 — dma_chain prints an unbuilt line first, so hashes.cmake takes the last two lines with a capture group; the unbuilt count is in the state hash
 
 ### Pending Todos
 
@@ -306,8 +308,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T07:57:39.791Z
-Stopped at: Completed 03-18-PLAN.md
+Last session: 2026-11-10T08:01:52.854Z
+Stopped at: Completed 03-19-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
