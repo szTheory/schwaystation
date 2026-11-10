@@ -24,10 +24,13 @@ struct schway__timer {
 };
 
 /* base is the tick the stored views are as of. It is not state: a load sets it
-   to the loaded tick. */
+   to the loaded tick. blank holds the levels of the two blanking signals that
+   the beam pushes: bit 0 is the vertical blank and bit 1 the horizontal blank
+   (1 is inside the blank); a MODE write derives a counter's pause from them. */
 struct schway__timers {
     struct schway__timer t[SCHWAY__TIMERS];
     uint64_t base;
+    uint32_t blank;
 };
 
 /* Power-on: every counter is 0. */

@@ -19,6 +19,7 @@
 #define MODE(n) (COUNT(n) + 4u)
 #define TARGET(n) (COUNT(n) + 8u)
 #define ISTAT 0x1F801070u
+#define TEXT 0x80010000u
 
 /* MODE bits a case sets: synchronisation off, the reset point, the interrupt
    sources, repeat and toggle, and the clock source for counter 2 (system clock
@@ -609,6 +610,63 @@ static void case_state_cadence(void)
     schway_destroy(b);
 }
 
+static void put32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16);
+    p[3] = (uint8_t)(v >> 24);
+}
+
+/* A PS-EXE of one text sector at 80010000h holding the n words, entered at its
+   first word. */
+static void load(schway *inst, const uint32_t *words, uint32_t n)
+{
+    static uint8_t exe[0x1000];
+    memset(exe, 0, sizeof exe);
+    memcpy(exe, "PS-X EXE", 8);
+    put32(exe + 0x10, TEXT);
+    put32(exe + 0x18, TEXT);
+    put32(exe + 0x1C, 0x800u);
+    for (uint32_t i = 0; i < n; i++) {
+        put32(exe + 0x800u + 4u * i, words[i]);
+    }
+    CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_OK);
+}
+
+/* Fault prevented: a counter synchronised to the vertical blank that does not
+   see the blank the frame end produces, so that a reset at the blank never
+   happens and the counter just free-runs. A program sets counter 1 to the
+   system clock with synchronisation on and mode 1 (reset at the blank), then
+   spins to the frame end. Just after it the counter reads the cycles since the
+   frame end (0 at the end itself), not the cycles since the MODE write, which
+   were hundreds of thousands. */
+static void case_t1_vblank_frame(void)
+{
+    static const uint32_t program[] = {
+        0x3C081F80u, /* lui   t0, 1F80h */
+        0x35081110u, /* ori   t0, t0, 1110h */
+        0x24090003u, /* addiu t1, zero, 3 (synchronise, mode 1) */
+        0xAD090004u, /* sw    t1, 4(t0) */
+        0x1000FFFFu, /* beq   zero, zero, here */
+        0x00000000u, /* nop */
+    };
+    schway *inst = make();
+    load(inst, program, (uint32_t)(sizeof program / sizeof program[0]));
+    schway_run_result r;
+    memset(&r, 0, sizeof r);
+    r.size = (uint32_t)sizeof r;
+    CHECK_EQ_U64(schway_run_frame(inst, &r), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    CHECK_EQ_HEX(rd32(inst, MODE(1u)) & 0x3FFu, 3u);
+    uint64_t end = inst->ticks;
+    CHECK_EQ_U64(rd32(inst, COUNT(1u)), 0u);
+    (void)run(inst, 1000u);
+    CHECK(inst->ticks > end);
+    CHECK_EQ_U64(rd32(inst, COUNT(1u)), (inst->ticks - end) & 0xFFFFu);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
@@ -624,6 +682,7 @@ static const struct {
     {"mode_write", case_mode_write},
     {"state_cadence", case_state_cadence},
     {"storm_collapse", case_storm_collapse},
+    {"t1_vblank_frame", case_t1_vblank_frame},
     {"target_period", case_target_period},
     {"wrap_no_dwell", case_wrap_no_dwell},
     {"write_hold", case_write_hold},

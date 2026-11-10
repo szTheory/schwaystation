@@ -9,6 +9,7 @@ timers.mode.read_clears	portable,timers
 timers.mode.write	portable,timers
 timers.state.cadence	portable,timers
 timers.storm.collapse	portable,timers
+timers.sync.t1_vblank_frame	portable,timers
 timers.target.count_above	portable,timers
 timers.target.period	portable,timers
 timers.wrap.no_dwell	portable,timers

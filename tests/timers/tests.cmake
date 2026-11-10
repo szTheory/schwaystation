@@ -98,3 +98,9 @@ schway_add_test(NAME timers.deadline.progress
 schway_add_test(NAME timers.state.cadence
   COMMAND schwaystation-test-timers state_cadence
   LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: a counter synchronised to the vertical blank that does not
+# see the frame end's blank, so that its reset never happens.
+schway_add_test(NAME timers.sync.t1_vblank_frame
+  COMMAND schwaystation-test-timers t1_vblank_frame
+  LABELS timers portable TIMEOUT 10)

@@ -22,6 +22,7 @@ static const char name_irq_line[] = "timers.irq_line";
 static const char name_oneshot_done[] = "timers.oneshot_done";
 static const char name_paused[] = "timers.paused";
 static const char name_free_after[] = "timers.free_after";
+static const char name_blank[] = "timers.blank";
 
 /* MODE bits (psx-spx, Timers). Bits 0-9 are what a program writes; bit 10 is
    the interrupt line (1 is idle), kept in irq_line; bits 11 and 12 are the
@@ -108,16 +109,41 @@ static uint64_t source_tick(uint32_t n, uint32_t mode, uint64_t base, uint64_t s
     return source_of(n, mode) == SRC_DIV8 ? ((base >> 3) + steps) << 3 : base + steps;
 }
 
-/* Counter 2 with synchronisation on stops for modes 0 and 3 and free-runs for
-   1 and 2 (psx-spx, Timers). Counters 0 and 1 stop on a blanking level that
-   has no source yet, so they run. */
-static uint32_t paused_for(uint32_t n, uint32_t mode)
+/* The blanking signal a counter synchronises to: counter 0 the horizontal
+   blank, counter 1 the vertical blank (psx-spx, Timers). */
+#define BLANK_V 1u
+#define BLANK_H 2u
+
+static uint32_t level_of(uint32_t n, uint32_t blank)
+{
+    return (blank & (n == 0u ? BLANK_H : BLANK_V)) != 0u ? 1u : 0u;
+}
+
+/* Whether a counter is paused right after a MODE write, from its
+   synchronisation mode and the blank level at that moment (psx-spx, Timers).
+   Counter 2 stops for modes 0 and 3 and free-runs for 1 and 2. Counters 0 and
+   1 pause during the blank (mode 0), never (mode 1), outside it (mode 2) or
+   until the blank has come once (mode 3). */
+static uint32_t paused_for(uint32_t n, uint32_t mode, uint32_t blank)
 {
     uint32_t sync_mode = (mode >> 1) & 3u;
-    if (n != 2u || (mode & 1u) == 0u) {
+    uint32_t level = level_of(n, blank);
+    if ((mode & 1u) == 0u) {
         return 0u;
     }
-    return sync_mode == 0u || sync_mode == 3u ? 1u : 0u;
+    if (n == 2u) {
+        return sync_mode == 0u || sync_mode == 3u ? 1u : 0u;
+    }
+    switch (sync_mode) {
+    case 0u:
+        return level;
+    case 1u:
+        return 0u;
+    case 2u:
+        return level ^ 1u;
+    default:
+        return 1u;
+    }
 }
 
 /* How many k in [1, m] have (v + k) mod 65536 equal to x. */
@@ -326,7 +352,11 @@ uint64_t schway__timers_next(const schway *inst)
     for (uint32_t i = 0; i < SCHWAY__TIMERS; i++) {
         const struct schway__timer *t = &inst->timers.t[i];
         uint64_t steps;
-        if ((inst->irq.stat & (UINT32_C(1) << (4u + i))) != 0u) {
+        /* A counter that counts the beam's dots or horizontal blanks moves
+           when they are pushed, and raises there, so it has no tick to wait
+           for. */
+        if ((inst->irq.stat & (UINT32_C(1) << (4u + i))) != 0u ||
+            source_of(i, t->mode) == SRC_NONE) {
             continue;
         }
         steps = cycles_to_edge(t);
@@ -391,7 +421,7 @@ void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, ui
         t->hold = HOLD_WRITE;
         t->irq_line = 1u;
         t->oneshot_done = 0u;
-        t->paused = paused_for(n, t->mode);
+        t->paused = paused_for(n, t->mode, inst->timers.blank);
         t->free_after = 0u;
     } else if (reg == 8u) {
         t->target = lane_put(t->target, p, width, *value) & COUNT_MAX;
@@ -430,24 +460,77 @@ void schway__timers_state_io(struct schway__state_io *io, schway *inst)
         (void)schway__state_u32(io, name_paused, &t->paused, 0u, 1u);
         (void)schway__state_u32(io, name_free_after, &t->free_after, 0u, 1u);
     }
+    (void)schway__state_u32(io, name_blank, &inst->timers.blank, 0u, BLANK_V | BLANK_H);
     if (io->mode == SCHWAY__STATE_APPLY) {
         memcpy(inst->timers.t, v, sizeof v);
         inst->timers.base = inst->ticks;
     }
 }
 
+/* The effect of the blank going to level on a counter that synchronises to
+   it (psx-spx, Timers). Mode 0 pauses the counter inside the blank. Mode 1
+   resets it to 0 as the blank begins. Mode 2 resets it as the blank begins
+   and pauses it outside the blank. Mode 3 holds it until the blank begins
+   once and then lets it free-run. A reset counts from the next cycle, with no
+   hold. */
+static void blank_edge(struct schway__timer *t, uint32_t level)
+{
+    uint32_t sync_mode = (t->mode >> 1) & 3u;
+    if ((t->mode & 1u) == 0u) {
+        return;
+    }
+    if (level != 0u) {
+        switch (sync_mode) {
+        case 0u:
+            t->paused = 1u;
+            break;
+        case 1u:
+            t->value = 0u;
+            t->hold = 0u;
+            break;
+        case 2u:
+            t->value = 0u;
+            t->hold = 0u;
+            t->paused = 0u;
+            break;
+        default:
+            t->free_after = 1u;
+            t->paused = 0u;
+            break;
+        }
+    } else if (sync_mode == 0u) {
+        t->paused = 0u;
+    } else if (sync_mode == 2u) {
+        t->paused = 1u;
+    }
+}
+
+/* Brings the counters to tick, then moves one blanking signal to level.
+   Returns 1 when the signal went from 0 to 1. */
+static uint32_t blank_push(schway *inst, uint64_t tick, uint32_t n, uint32_t level)
+{
+    struct schway__timers *ts = &inst->timers;
+    uint32_t bit = n == 0u ? BLANK_H : BLANK_V;
+    uint32_t lv = level != 0u ? 1u : 0u;
+    schway__timers_sync(inst, tick);
+    if ((level_of(n, ts->blank)) == lv) {
+        return 0u;
+    }
+    ts->blank = lv != 0u ? (ts->blank | bit) : (ts->blank & ~bit);
+    blank_edge(&ts->t[n], lv);
+    schway__sched_recalc(inst);
+    return lv;
+}
+
+/* The vertical blank drives counter 1's synchronisation. */
 void schway__timers_vblank(schway *inst, uint64_t tick, uint32_t level)
 {
-    (void)inst;
-    (void)tick;
-    (void)level;
+    (void)blank_push(inst, tick, 1u, level);
 }
 
 void schway__timers_hblank(schway *inst, uint64_t tick, uint32_t level)
 {
-    (void)inst;
-    (void)tick;
-    (void)level;
+    (void)blank_push(inst, tick, 0u, level);
 }
 
 void schway__timers_dots(schway *inst, uint64_t tick, uint32_t dots)
