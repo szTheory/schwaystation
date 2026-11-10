@@ -288,7 +288,7 @@ static void case_state_next_derived(void)
 static void case_stall_frame_end(void)
 {
     schway *inst = make_spinning();
-    uint64_t end = inst->frame_end;
+    uint64_t end = inst->frame_end + 1u;
     (void)run(inst, end - 1000u - inst->ticks, 0u);
     CHECK(inst->ticks >= end - 1000u && inst->ticks < end - 900u);
     uint64_t held = inst->ticks + 5000u;

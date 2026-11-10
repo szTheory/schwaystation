@@ -424,8 +424,8 @@ static void case_irq(void)
         res = run(inst, 100000u, SCHWAY_RUN_TRACE);
     }
     CHECK_EQ_U64(res.frame, 1u);
-    /* The frame's end raised the interrupt; the next run takes it two
-       retirements later, so its record leads the vector's own instructions. */
+    /* The configured Y2 line raises VBlank before field wrap; the trace still
+       belongs to the field in which the guest enabled and observed the IRQ. */
     (void)run(inst, 300u, SCHWAY_RUN_TRACE);
     uint32_t n = held(inst);
     uint32_t at = n;
@@ -437,10 +437,9 @@ static void case_irq(void)
     CHECK(at < n);
     if (at < n) {
         schway_trace t = get(inst, at);
-        uint64_t start1 = UINT64_C(405350378496) / UINT64_C(715909);
         CHECK(t.pc == TEXT + 20u || t.pc == TEXT + 24u);
-        CHECK_EQ_U64(t.frame, 1u);
-        CHECK(t.cycle >= start1);
+        CHECK_EQ_U64(t.frame, 0u);
+        CHECK(t.cycle > 0u && t.cycle < UINT64_C(405350378496) / UINT64_C(715909));
         CHECK_EQ_U64(t.device, SCHWAY_DEVICE_NONE);
         CHECK((t.value & 0x400u) != 0u); /* CAUSE shows the hardware line */
         CHECK(at + 1u < n);

@@ -54,6 +54,31 @@ schway_add_test(NAME gpu.beam.midline_dot_irq
   COMMAND schwaystation-test-gpu-beam midline_dot_irq
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: Y1/Y2 equality or range cannot alter the fixed field wrap.
+schway_add_test(NAME gpu.beam.field_edges
+  COMMAND schwaystation-test-gpu-beam field_edges
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: loaded run_frame uses the GPU field wrap when Y2 suppresses VBlank.
+schway_add_test(NAME gpu.beam.public_field_wrap
+  COMMAND schwaystation-test-gpu-beam public_field_wrap
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: repeated GP1(00h) resets cannot restart the public call deadline.
+schway_add_test(NAME gpu.beam.reset_call_bound
+  COMMAND schwaystation-test-gpu-beam reset_call_bound
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: tied dot, horizontal blank and DMA deadlines are dispatched together.
+schway_add_test(NAME gpu.beam.equal_timer_beam_dma
+  COMMAND schwaystation-test-gpu-beam equal_timer_beam_dma
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: malformed serialized beam phase or position mutates a live instance.
+schway_add_test(NAME gpu.beam.reject_malformed_state
+  COMMAND schwaystation-test-gpu-beam reject_malformed_beam_state
+  LABELS gpu portable TIMEOUT 10)
+
 # Fault prevented: lines or Gouraud polylines lose endpoints, interpolated colors, span rejection,
 # terminator placement, or bounded streaming state.
 schway_add_test(NAME gpu.span.polyline_packet
