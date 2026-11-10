@@ -3,15 +3,17 @@
 The DMA controller moves blocks of words between main RAM and the devices without the CPU: seven channels, a priority
 register, an interrupt register, and a hold on the CPU's bus accesses while a transfer runs. This page covers the
 engine in `src/dma.c`: the registers and the bits they store, how the next channel is chosen, how a transfer is modelled
-in time, OTC (which builds an ordering table in RAM), the two block modes and the device ends of the other six channels,
-the cost of a word, what holds the CPU and what does not, and the sources. Everything is integer arithmetic and behaves the same on every platform. The bus side, the block clock and
+in time, OTC (which builds an ordering table in RAM), the block modes and the device ends of the other six channels,
+chopping, linked lists and the guard that keeps a looping list from hanging a run, the cost of a word, what holds the CPU
+and what does not, how hostile programs stay bounded, and the sources. Everything is integer arithmetic and behaves the
+same on every platform. The bus side, the block clock and
 the stall in the run loop are in [the CPU page](cpu.md) and [the bus page](bus.md).
 
 ## State of the engine
 
 The registers, arbitration, the interrupt rules, the unit engine, OTC, the burst and request-block modes with their
-device ends, the costs and the CPU hold are built. A channel written with a mode that has no unit yet (the linked
-list and the reserved mode) keeps its registers and stays busy. Every address of `1F801080h`-`1F8010FFh` answers at
+device ends, chopping, linked lists, the costs and the CPU hold are built. A channel written with the reserved mode
+keeps its registers and stays busy. Every address of `1F801080h`-`1F8010FFh` answers at
 every width, so the whole range counts as owned rather than unbuilt or a gap.
 
 ## The registers
@@ -34,7 +36,11 @@ restores them.
 `CHCR` bit 24 is both the start and the busy bit: a program sets it to start and the hardware clears it when the
 transfer ends. Bit 28 is cleared when the transfer begins. A write to the `CHCR` of the channel whose unit is running
 changes nothing about that unit: its words have moved and it ends on its own event, so bit 24 stays set until then.
-The hardware's way of stopping a running transfer by writing 0 is not modelled.
+The one write that does more is the word 0, which the public chain-looping test makes between its cases to stop a
+looping list: it stops a channel that has no unit in flight (in a CPU window or waiting for its next node or block) at
+once, and a channel with a unit in flight at the end of that unit, in both cases with no flag and no interrupt. This is
+the procedure of that test and nothing more; every other write to a busy channel is left unmodelled, and the channel
+stays busy.
 
 ## DPCR and arbitration
 
@@ -44,7 +50,9 @@ public dma-priority test measured by moving them against a running channel and f
 enable clear does not start.
 
 A channel is waiting when bit 24 of its `CHCR` is set and its mode has what it needs: OTC and synchronisation mode 0
-need bit 28 too; mode 1 needs the device's request line to be high. Among the waiting channels with
+need bit 28 too; mode 1 needs the device's request line to be high; mode 2 (the linked list) needs nothing more, the
+device being taken to be ready, and a chopped burst or list waiting for its next window or node is waiting. Among the
+waiting channels with
 their enable set the lowest priority value goes first and a tie goes to the higher channel number (psx-spx, DMA
 Channels; the public dma-priority test starts DMA2 and DMA6 together with one `DPCR` write and shows DMA6 finishing
 first at equal priorities and when its value is lower). A `DPCR` write is also a start: a channel that was written
@@ -78,16 +86,17 @@ emulated time inside one instruction, and a word-by-word interleave with the CPU
 events a second. The data is already in RAM when the unit starts, so a program that reads it early reads the final
 value, but every read that waits on the bus is held until the unit ends (below), so no program can see the difference.
 
-The engine's state is the current channel, the end tick of its unit and a phase per channel (idle, or unit running).
-The scheduler's next deadline for the engine is the end tick while a unit runs and none otherwise.
+The engine's state is the current channel, the end tick of its unit and a phase per channel (idle, unit running, between
+sync mode 1 blocks, in a CPU window, waiting for the next window or node, or stopping). The scheduler's next deadline
+for the engine is the end tick while a unit runs or a CPU window lasts and none otherwise.
 
 **The event step.** One call of the engine's event runs every unit that is due at the tick it is given: a unit whose end
 tick is not past that tick finishes at its own end tick (the channel stops being busy, the flag is set where allowed,
 the interrupt edge follows), and the channel that goes next then starts at that same tick, and so on until none is due.
 Every finish clears a channel's bit 24, so the loop ends. Every return leaves the next deadline strictly greater than
 the tick the call was given, either the end of a unit still running or none, so the scheduler and the run loop always
-advance. A later stage of the engine that yields after a long list also returns with the channel still busy and no
-interrupt, and keeps this rule.
+advance. A list that yields after 1000h nodes also returns with the channel still busy and no interrupt, and keeps this
+rule (below).
 
 A register access first brings the engine up to the access's own tick. A write then changes the registers and, with
 nothing running, starts the channel that goes next; every write recomputes the scheduler's deadline. A register read
@@ -135,8 +144,75 @@ line is high again and arbitration picks the channel. A channel that waits for t
 the CPU, whatever its `CHCR` says. The last block ends the transfer: the flag and the interrupt follow as for any unit,
 and not before. A raise of the line while another unit runs is picked up at that unit's end.
 
-The line is a latched level per channel, set by `schway__dma_dreq`; the devices call it as they are built. The linked
-list mode and the reserved mode have no unit yet.
+The line is a latched level per channel, set by `schway__dma_dreq`; the devices call it as they are built. The reserved
+mode has no unit yet.
+
+## Chopping
+
+With `CHCR` bit 8 set, a synchronisation mode 0 burst is cut into DMA windows of 2^n words, n from bits 16-18, with a
+CPU window of 2^m cycles, m from bits 20-22, between one window and the next (psx-spx, DMA Channels, CHCR). Each window
+is a unit; after each but the last the channel stays busy for the CPU window, during which the CPU runs free and the
+arbitration may pick another channel at the window's end. A window of `dw` words costs its words as any unit does, plus
+6 cycles of setup, and the CPU window is the smaller of `2^m` and `32 * dw` cycles:
+
+    window = ceil(17 * dw / 16) + 6        (at one cycle per word)
+    gap    = min(2^m, 32 * dw)
+
+The 6 and the cap of 32 cycles per word are fitted to the 64 rows of the public ps1-tests `dma/chopping` hardware log (2,048
+words from RAM to the GPU channel, every window size from 1 to 128 words against every CPU window from 1 to 128 cycles).
+They are labelled `derived`. The tests compare the model with the rows in bands: every row within 12 %, and the mean of
+the signed errors within 2 %. The model's largest error is 10.4 % (1-word windows with a 1-cycle CPU window), the mean
+signed error is about 1.0 % and the mean absolute error about 2.0 %. A fit to one log is evidence of the fit and says
+nothing about other consoles or other transfers, which is why the bands are wide.
+
+## Linked lists
+
+Synchronisation mode 2 walks a list in RAM. `MADR` names a node's header word: its top byte is the number of words that
+follow it and its low 24 bits are the address of the next header. Each node is a unit: the engine reads the header, sends
+the words after it to the channel's device end (whatever the direction bit says; the header itself is not sent), and
+leaves `MADR` at the next address. A next address with bit 23 set ends the list and is left in `MADR`, so the usual end
+marker `FFFFFFh` reads back as `FFFFFFh`. A list whose first header already holds the marker finishes at once with the
+flag and the interrupt. Only bit 24 of `CHCR` starts a list; bit 28 is cleared if set. A header or word address past the
+RAM window reads 0.
+
+Between two nodes the channel stays busy and the CPU runs free for a short window. A node costs 20 cycles of header fetch
+and setup plus its words, and the CPU window is 6 cycles. Both figures are fitted to the public `dma/chain-looping`
+hardware log, in which a loop that takes 16,040 cycles alone takes 25,632 next to a self-referencing list, about 1.6
+times as long; they are labelled `derived`. The test runs a similar loop of its own against a list of one node and a
+list of two that name themselves and accepts any slowdown from 1.4 to 1.8 times: the figure is calibrated to one log
+and one loop, not measured on a console.
+
+## The 1000h-node guard
+
+A list that never ends does not finish. The public `dma/chain-looping` log shows a self-referencing list leaving the
+channel busy with no flag and no interrupt, and so does the model: the guard is a yield, not an abort. The engine counts
+the nodes since the transfer started (`nodes_done`, which wraps). When the 1000h node, the 2000h node and so on
+ends, the step that is catching the engine up returns even if more nodes are due: the CPU window after it is
+extended past the tick the step was given, so the next node starts later than that tick, the channel stays busy, and no
+flag or interrupt is raised. The step contract therefore holds without exception: every return leaves the next deadline
+strictly after the tick, and a call with a tick far ahead of the engine does 1000h nodes and no more. In a normal run a
+node takes 26 cycles, so the guard is reached about every 100,000 cycles and costs nothing visible. A frame of a looping
+list still ends with the frame stop, the channel still busy.
+
+## Hostile programs and the frame bound
+
+A program may set every channel to its largest transfer (`BCR` of FFFFFFFFh), or point a list at itself. Every unit is
+bounded: a burst is at most 10000h words, a block at most FFFFh words, a chopping window at most 128 words and a node at
+most 255 words and a header.
+The longest unit is 2,691,328 cycles, the bound `SCHWAY__DMA_BUSY_MAX` that a state load enforces. The frame end
+preempts the engine: a run never goes past the end of the frame for a unit, the unit's end stays in the state as a
+deadline, and the next frame carries the remainder, so slicing the same time into frames or into smaller runs gives the
+same state. A CPU read that waits on a unit freezes the CPU only up to the frame's end, so the overrun past a frame stays
+one instruction. The tests start all seven channels at once with `BCR` FFFFFFFFh and a self-referencing list, with no
+program and with a program that reads RAM in a loop, and check that four frames each end with the frame stop at the
+frame's own length, with an engine state that saves and loads.
+
+A hostile program can also fill the audio ring faster than a host drains it: up to four frames of audio can be dropped
+and counted in `audio_dropped`. That is accepted and not an error.
+
+A sweep of every DMA register offset at every width with four edge values, each access from a power reset, finds no fault
+and no difference between two passes. It leaves out the `CHCR` word FFFFFFFFh of a channel other than OTC, which selects
+the reserved mode with the start bit, and runs under the sanitizer lanes.
 
 ## The device ends
 
@@ -158,13 +234,14 @@ in the state.
 | PIO, per word | 20 | `doc` |
 | RAM side, per 16 words | 1 | `doc` |
 | sync mode 1, per block | 11 | `derived` |
-| a chopped burst's windows | fitted per window | `derived` |
+| a chopped burst's window | 6 and a CPU window of at most 32 per word | `derived` |
+| a linked list's node | 20 and a CPU window of 6 | `derived` |
 
 The per-word rows are the psx-spx DMA Channels page, section "DMA Transfer Rates"; the RAM row is its "DRAM Hyper Page
 mode" section (17 cycles per 16 words). A unit of `n` words takes `n * rate + ceil(n / 16)` cycles, which is
 `ceil(n * 17 / 16)` at one cycle per word, and a sync mode 1 block of `bs` words takes that plus 11, so
-`blocks * (ceil(17 * bs / 16) + 11)` for a transfer at the fastest rate. The 11 and the chopping model are fitted to the
-64 rows of a public hardware log and are labelled `derived`: a fitted figure is evidence that the model fits the log, not
+`blocks * (ceil(17 * bs / 16) + 11)` for a transfer at the fastest rate. The 11, the chopping model and the node figures
+are fitted to rows of public hardware logs and are labelled `derived`: a fitted figure is evidence that the model fits the log, not
 evidence of the hardware. Tests pin the documented rows exactly and the fitted ones by their formula.
 
 The CD-ROM row is the BIOS default, 24 cycles per word. Most games write the delay setting that makes it 40 (the same
@@ -193,16 +270,16 @@ against the tick of the access, so a read that comes after the unit's end waits 
 
 ## Not built yet
 
-The devices behind channels 0 to 5, chopping, linked lists and the 1000h-node yield, and the fault for a mode a channel
-cannot use come with later stages of the engine; this page grows with them. The hardware's
-stop by writing 0 to `CHCR` while busy, and the behaviour of bit 29, are not modelled.
+The devices behind channels 0 to 5 and the fault for a mode a channel cannot use come with later stages. Every write to
+a busy channel's `CHCR` other than the word 0, and the behaviour of bit 29, are not modelled.
 
 ## Sources
 
 - psx-spx, DMA Channels page (`docs/dmachannels.md` of psx-spx/psx-spx.github.io at 6d7d1bc106a7): the registers, the
   DPCR and DICR layout, the interrupt edge, the transfer rates, the DRAM row and the CPU rules during DMA.
-- ps1-tests (JaCzekanski/ps1-tests at f727802fead1, MIT): `dma/otc-test` for OTC's table, ignored bits and readback, and
-  `dma/dpcr` for starting a channel by enabling it.
+- ps1-tests (JaCzekanski/ps1-tests at f727802fead1, MIT): `dma/otc-test` for OTC's table, ignored bits and readback,
+  `dma/dpcr` for starting a channel by enabling it, `dma/chopping` (`psx.log` lines 68-131) for the chopping bands and
+  `dma/chain-looping` for a list that does not end, the CPU's slowdown beside it and the stop by writing 0.
 - nugget (pcsx-redux/nugget at 9db6d88d23c4, MIT): `tests/dma-priority/RESULTS.md` for the priority order, the CPU field
   and the OTC timing, and `tests/dma/dma.c` for the `DICR` readings.
 

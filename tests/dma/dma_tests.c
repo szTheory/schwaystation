@@ -1374,10 +1374,219 @@ static void case_list_cpu_band(void)
     }
 }
 
+static schway_run_result run_frame(schway *inst)
+{
+    schway_run_result r;
+    memset(&r, 0, sizeof r);
+    r.size = (uint32_t)sizeof r;
+    CHECK_EQ_U64(schway_run_frame(inst, &r), SCHWAY_STATUS_OK);
+    return r;
+}
+
+/* The state saves, loads into a second instance and saves again to the same
+   bytes: the engine's fields, whatever the program did to them, are inside the
+   bounds a load enforces. */
+static void check_state_round_trip(schway *inst)
+{
+    size_t n = schway_state_size(inst);
+    uint8_t *a = (uint8_t *)malloc(n);
+    uint8_t *b = (uint8_t *)malloc(n);
+    if (a == NULL || b == NULL) {
+        exit(1);
+    }
+    schway *other = make();
+    CHECK_EQ_U64(schway_save_state(inst, a, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_state(other, a, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_save_state(other, b, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(memcmp(a, b, n), 0);
+    schway_destroy(other);
+    free(a);
+    free(b);
+}
+
+/* All seven channels written with BCR = FFFFFFFFh in a mode they can run, in
+   channel order, and started: MDEC in from RAM, MDEC out to RAM, the GPU
+   walking a list whose first header names itself, the CD-ROM to RAM, the SPU
+   from RAM, PIO to RAM and OTC. The addresses leave room for 10000h words each
+   and keep the list's header clear of the others. */
+static void hostile_start(schway *inst)
+{
+    static const uint32_t chcr[7] = {0x11000001u, 0x11000000u, 0x01000401u, 0x11000000u,
+                                     0x11000001u, 0x11000000u, 0x11000000u};
+    wr32(inst, 0x200u, 0x00000200u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00FF0000u);
+    for (uint32_t ch = 0u; ch < 7u; ch++) {
+        uint32_t madr = ch == 2u ? 0x200u : ch == 6u ? OTC_TOP : 0x20000u + 0x40000u * ch;
+        wr32(inst, MADR(ch), madr);
+        wr32(inst, BCR(ch), 0xFFFFFFFFu);
+    }
+    for (uint32_t ch = 0u; ch < 7u; ch++) {
+        wr32(inst, CHCR(ch), chcr[ch]);
+    }
+    CHECK_EQ_U64(inst->dma.cur, 0u);
+}
+
+/* Fault prevented: a program that sets every channel to its largest transfer,
+   or a list that never ends, stretching a frame, hanging a run, or leaving
+   engine fields a load would refuse. Four frames each end with the frame stop
+   within the frame's own length plus the longest unit, and the state after
+   each saves and loads. The same four frames run with no program, where time
+   moves only to the next deadline, and with a program that reads RAM in a loop,
+   which every running unit holds, where a hold that crosses the frame's end
+   ends the frame at that instruction. */
+static void case_hostile_bcr(void)
+{
+    for (uint32_t with_program = 0u; with_program < 2u; with_program++) {
+        schway *inst = make();
+        if (with_program != 0u) {
+            uint32_t w[4];
+            w[0] = I_LUI(T6, 0x8000u);
+            w[1] = I_LW(T5, 0x100u, T6);
+            w[2] = I_BEQ(0u, 0u, -2);
+            w[3] = I_NOP;
+            load(inst, w, 4u);
+            run_to_entry(inst);
+        }
+        hostile_start(inst);
+        for (uint32_t f = 0u; f < 4u; f++) {
+            uint64_t end = inst->frame_end;
+            uint64_t before = inst->ticks;
+            schway_run_result r = run_frame(inst);
+            CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+            CHECK(r.ticks >= end);
+            CHECK(r.ticks - before <= end - before + SCHWAY__DMA_BUSY_MAX);
+            CHECK(r.ticks <= end + SCHWAY__INSN_CYCLES_MAX);
+            CHECK_EQ_U64(r.fault_present, 0u);
+            CHECK(inst->dma.busy_until <= inst->ticks + SCHWAY__DMA_BUSY_MAX);
+            CHECK(schway__dma_next(inst) > inst->ticks);
+            check_state_round_trip(inst);
+        }
+        /* The list is the channel that never ends: busy, no flag. */
+        CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+        CHECK_EQ_U64(inst->dma.dicr & 0x04000000u, 0u);
+        schway_destroy(inst);
+    }
+}
+
+/* Fault prevented: a unit in flight at the frame's end that is lost, repeated
+   or finished early by the frame boundary. The CD-ROM channel moves 10000h
+   words, which take about three frames, and the SPU channel waits behind it.
+   After the first frame the unit is still in flight; the end state is the same
+   bytes whether the time was run as four frames or as slices of 100,003 cycles
+   (a run never crosses a frame boundary, so it stops at each). */
+static void case_preempt_carry(void)
+{
+    schway *whole = make();
+    schway *sliced = make();
+    schway *both[2] = {whole, sliced};
+    for (uint32_t i = 0u; i < 2u; i++) {
+        schway *inst = both[i];
+        wr32(inst, DPCR, DPCR_ALL);
+        wr32(inst, DICR, 0x00FF0000u);
+        wr32(inst, MADR(3u), 0x40000u);
+        wr32(inst, BCR(3u), 0u);
+        wr32(inst, MADR(4u), 0x100000u);
+        wr32(inst, BCR(4u), 4096u);
+        wr32(inst, CHCR(3u), 0x11000000u);
+        wr32(inst, CHCR(4u), 0x11000001u);
+    }
+    schway_run_result r = run_frame(whole);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    CHECK_EQ_U64(whole->dma.cur, 3u);
+    CHECK(whole->dma.busy_until > whole->ticks);
+    CHECK((whole->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(whole->dma.words[4], 0u);
+    for (uint32_t f = 0u; f < 3u; f++) {
+        (void)run_frame(whole);
+    }
+    CHECK_EQ_U64(whole->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(whole->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(whole->dma.words[4], 4096u);
+    CHECK_EQ_HEX(whole->dma.dicr & 0x7F000000u, 0x18000000u);
+    while (sliced->ticks < whole->ticks) {
+        uint64_t left = whole->ticks - sliced->ticks;
+        (void)run(sliced, left < 100003u ? left : 100003u);
+    }
+    CHECK_EQ_U64(sliced->ticks, whole->ticks);
+    size_t n = schway_state_size(whole);
+    uint8_t *a = (uint8_t *)malloc(n);
+    uint8_t *b = (uint8_t *)malloc(n);
+    if (a == NULL || b == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(whole, a, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_save_state(sliced, b, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(memcmp(a, b, n), 0);
+    free(a);
+    free(b);
+    schway_destroy(whole);
+    schway_destroy(sliced);
+}
+
+/* One pass of the register sweep: every offset of 1F801080h to 1F8010FFh at
+   widths 1, 2 and 4 with four edge values, each from a power reset, written,
+   read back, run for a while and read again. Returns the CRC-32 of everything
+   seen. The CHCR word FFFFFFFFh of a channel below 6 selects the reserved sync
+   mode with the start bit and is left out. */
+static uint32_t sweep_pass(schway *inst)
+{
+    static const uint32_t widths[3] = {1u, 2u, 4u};
+    static const uint32_t values[4] = {0x00000000u, 0xFFFFFFFFu, 0x55555555u, 0xAAAAAAAAu};
+    uint32_t crc = 0u;
+    for (uint32_t off = 0x80u; off < 0x100u; off++) {
+        for (uint32_t w = 0u; w < 3u; w++) {
+            for (uint32_t k = 0u; k < 4u; k++) {
+                uint32_t addr = 0xBF801000u + off;
+                uint32_t v = values[k];
+                if ((off & 0xCu) == 8u && off < 0xE0u && widths[w] == 4u && v == 0xFFFFFFFFu) {
+                    continue;
+                }
+                CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+                uint32_t cycles = 0u;
+                schway__sched_sync(inst);
+                CHECK_EQ_U64(schway__bus_write(inst, addr, widths[w], v, &cycles), 0u);
+                CHECK(schway__dma_next(inst) > now_of(inst));
+                uint32_t seen[3];
+                for (uint32_t pass = 0u; pass < 2u; pass++) {
+                    uint32_t rd = 0u;
+                    cycles = 0u;
+                    CHECK_EQ_U64(schway__bus_read(inst, addr, widths[w], &rd, &cycles), 0u);
+                    seen[pass] = rd;
+                    (void)run(inst, 3000u);
+                }
+                seen[2] = inst->fault.kind;
+                CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+                CHECK(schway__dma_next(inst) > inst->ticks);
+                crc = schway__crc32_update(crc, (const uint8_t *)seen, sizeof seen);
+                crc = schway__crc32_update(crc, (const uint8_t *)&inst->dma, sizeof inst->dma);
+                crc = schway__crc32_update(crc, (const uint8_t *)&inst->ticks, sizeof inst->ticks);
+            }
+        }
+    }
+    return crc;
+}
+
+/* Fault prevented: a DMA register access, at any offset, width or edge value,
+   that faults, hangs, leaves the engine with an unbounded deadline or answers
+   differently the second time. Run under the sanitizer lane, an access that
+   reads or writes outside the state shows up here. */
+static void case_regs_sweep(void)
+{
+    schway *inst = make();
+    uint32_t first = sweep_pass(inst);
+    uint32_t second = sweep_pass(inst);
+    CHECK_EQ_HEX(first, second);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
+    {"hostile_bcr", case_hostile_bcr},
+    {"preempt_carry", case_preempt_carry},
+    {"regs_sweep", case_regs_sweep},
     {"list_self_ref", case_list_self_ref},
     {"list_stop", case_list_stop},
     {"chopping_band", case_chopping_band},

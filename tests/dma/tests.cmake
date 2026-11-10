@@ -181,3 +181,23 @@ schway_add_test(NAME dma.chopping.band
 schway_add_test(NAME dma.list.cpu_band
   COMMAND schwaystation-test-dma list_cpu_band
   LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: every channel set to its largest transfer, or a list that
+# never ends, stretching a frame past the longest unit, hanging a run or leaving
+# engine fields that a state load refuses.
+schway_add_test(NAME dma.hostile.bcr
+  COMMAND schwaystation-test-dma hostile_bcr
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a unit in flight at a frame's end that is lost, repeated or
+# finished early, so that the state depends on how time was cut into runs.
+schway_add_test(NAME dma.hostile.preempt_carry
+  COMMAND schwaystation-test-dma preempt_carry
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a DMA register access at any offset, width or edge value that
+# faults, hangs, leaves an unbounded deadline or answers differently the second
+# time; the sanitizer lanes run it too.
+schway_add_test(NAME dma.regs.sweep
+  COMMAND schwaystation-test-dma regs_sweep
+  LABELS dma portable TIMEOUT 30)

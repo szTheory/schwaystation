@@ -8,6 +8,8 @@ dma.dpcr.priority	dma,portable
 dma.dpcr.rearbitrate	dma,portable
 dma.dpcr.reset	dma,portable
 dma.engine.step_contract	dma,portable
+dma.hostile.bcr	dma,portable
+dma.hostile.preempt_carry	dma,portable
 dma.list.cpu_band	dma,portable
 dma.list.empty	dma,portable
 dma.list.self_ref	dma,portable
@@ -20,6 +22,7 @@ dma.otc.madr_wrap	dma,portable
 dma.otc.needs_trigger	dma,portable
 dma.otc.read_sees_completion	dma,portable
 dma.otc.readback	dma,portable
+dma.regs.sweep	dma,portable
 dma.stall.cpu_access	dma,portable
 dma.stall.not_scratch	dma,portable
 dma.stall.write_queue	dma,portable
