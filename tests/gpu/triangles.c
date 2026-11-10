@@ -126,6 +126,14 @@ static void case_flat_packet(void)
     CHECK(inst->vram[1][0] == 0u);
     CHECK(inst->vram[1][1] == 0u);
 
+    /* This valid one-pixel footprint has area one and a 500-line vertex span. */
+    memset(inst->vram, 0, sizeof inst->vram);
+    const int32_t narrow_one_pixel[3][2] = {{0, 0}, {1, 500}, {0, 1}};
+    triangle(inst, 0x20u, 0x000000FFu, narrow_one_pixel);
+    for (uint32_t y = 0u; y <= 500u; y++) {
+        CHECK(inst->vram[y][0] == (y == 250u ? 0x001Fu : 0u));
+    }
+
     memset(inst->vram, 0, sizeof inst->vram);
     const int32_t zero_area[3][2] = {{1, 8}, {4, 8}, {7, 8}};
     triangle(inst, 0x20u, 0x000000FFu, zero_area);
