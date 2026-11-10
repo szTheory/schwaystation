@@ -2,7 +2,7 @@
    cost table, devices not built yet, gaps and the debug ports, and the state
    walk. The access path decodes the virtual address by segment, then by one
    switch on address class, and inside the I/O page by one switch on bits 4-11
-   (PSX-SYSTEM section 3; ARCHITECTURE section 2). */
+   (docs/hardware/bus.md; ARCHITECTURE section 2). */
 #include <string.h>
 
 #include "state.h"
@@ -23,12 +23,12 @@ static const char name_irq_mask[] = "irq.mask";
 /* Memory-control registers, in address order from 1F801000h: DEV0 base, DEV8
    base, the delay/size registers of DEV0, DEV1, DEV2 (BIOS), DEV4 (SPU), DEV5
    (CD-ROM) and DEV8, then COM_DELAY. Each port's delay register is memctl[2 +
-   port] (PSX-SYSTEM section 3; psx-spx Memory Control). */
+   port] (docs/hardware/bus.md; psx-spx Memory Control). */
 #define MEMCTL_COM 8u
 
 /* Power-on: the bases hold their boot values, every port uses the maximum
    delays (both fields 0Fh and all four COM periods selected), and COM_DELAY
-   holds its boot value 00031125h (PSX-SYSTEM section 3, section 9). */
+   holds its boot value 00031125h (docs/hardware/bus.md; PSX-SYSTEM section 9). */
 static uint32_t memctl_power_on(uint32_t i)
 {
     switch (i) {
@@ -45,7 +45,7 @@ static uint32_t memctl_power_on(uint32_t i)
 
 /* The cost, in CPU cycles, of reading or writing a port with its delay
    register dev and COM_DELAY com, as the formula of psx-spx Memory Control
-   gives it (PSX-SYSTEM section 3):
+   gives it (docs/hardware/bus.md):
      1ST = SEQ = 0, MIN = 0
      COM0 selected (bit 8):  1ST, SEQ += COM0 - 1
      COM2 selected (bit 10): 1ST, SEQ += COM2
@@ -144,7 +144,7 @@ void schway__bus_state_io(struct schway__state_io *io, schway *inst)
     }
 }
 
-/* Address classes of the physical map (PSX-SYSTEM section 3). */
+/* Address classes of the physical map (docs/hardware/bus.md). */
 enum { CLS_GAP, CLS_RAM, CLS_SCRATCH, CLS_IO, CLS_EXP2, CLS_EXP1, CLS_BIOS, CLS_EXP3 };
 
 static uint32_t classify(uint32_t p)
@@ -244,7 +244,7 @@ static int gap(schway *inst, uint32_t kind, uint32_t dev, uint32_t addr, uint32_
    UINT32_MAX for a bus error. The two banks follow each other: /RAS0 holds
    1, 2, 4 or 8 MiB from bits 9 and 11 of RAM_SIZE, /RAS1 the same from bits
    8 and 11 when bit 10 enables it, and a bank larger than the RAM mirrors it
-   (PSX-SYSTEM section 3, RAM_SIZE; psx-spx Memory Control, DRAM_CTRL). */
+   (docs/hardware/bus.md, Memory control; psx-spx Memory Control, DRAM_CTRL). */
 static uint32_t ram_locate(uint32_t rs, uint32_t a)
 {
     uint32_t size0 = UINT32_C(0x100000) << (((rs >> 8) & 2u) | ((rs >> 11) & 1u));
@@ -267,7 +267,7 @@ static uint32_t ram_locate(uint32_t rs, uint32_t a)
    time. It raises no fault, charges no cycle, counts no unbuilt access and never
    waits on a DMA unit. An address that RAM_SIZE leaves without RAM drops the
    word, reads nothing and returns non-zero; it does not touch DICR (a DMA
-   word past RAM is not modelled as a bus error; PSX-SYSTEM section 4). The low
+   word past RAM is not modelled as a bus error; docs/hardware/dma.md). The low
    two address bits are ignored, as MADR's are. */
 int schway__bus_ram_word(schway *inst, uint32_t addr, uint32_t *word, uint32_t write)
 {
@@ -605,7 +605,7 @@ static int bus_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t width
         return ram_access(inst, kind, addr, p, width, value, cycles);
     case CLS_SCRATCH: {
         /* The D-cache SRAM: data in KUSEG and KSEG0, a gap in KSEG1, and
-           never fetched from (PSX-SYSTEM section 2, D-cache). */
+           never fetched from (docs/hardware/bus.md, The scratchpad). */
         uint32_t off = p & (SCHWAY__SCRATCH_SIZE - 1u);
         if (schway__bus_segment(addr) == (uint32_t)SCHWAY__SEG_KSEG1 || kind == K_FETCH ||
             width > SCHWAY__SCRATCH_SIZE - off) {
@@ -632,7 +632,7 @@ static int bus_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t width
     case CLS_EXP1:
     case CLS_EXP3: {
         /* Reads and fetches find nothing and are bus errors; a write is
-           dropped (PSX-SYSTEM section 3, Memory map). */
+           dropped (docs/hardware/bus.md, Segments and the physical map). */
         uint32_t dev = cls == CLS_EXP1 ? SCHWAY__DEV_EXP1 : SCHWAY__DEV_EXP3;
         if (kind != K_WRITE) {
             return gap(inst, kind, dev, addr, width);

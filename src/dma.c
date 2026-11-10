@@ -22,7 +22,7 @@ static const char name_words[] = "dma.words";
 static const char name_crc[] = "dma.crc";
 
 /* DPCR is 07654321h after a power reset and the other registers are 0
-   (PSX-SYSTEM section 4). */
+   (docs/hardware/dma.md). */
 void schway__dma_reset(schway *inst)
 {
     struct schway__dma *d = &inst->dma;

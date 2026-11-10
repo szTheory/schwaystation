@@ -81,9 +81,9 @@ void schway__gte_state_io(struct schway__state_io *io, schway *inst, uint64_t cy
 }
 
 /* Registers 0-31 are the data registers and 32-63 the control registers
-   (PSX-GPU-AND-GTE section 5.1 and psx-spx, GTE Registers Summary). d[15] and
-   d[28] to d[29], d[31] hold nothing of their own: SXYP is SXY2, IRGB and
-   ORGB are computed from IR1-IR3 and LZCR from LZCS. */
+   (docs/hardware/gte.md, The two register files; psx-spx, GTE Registers
+   Summary). d[15] and d[28] to d[29], d[31] hold nothing of their own: SXYP is
+   SXY2, IRGB and ORGB are computed from IR1-IR3 and LZCR from LZCS. */
 uint32_t schway__gte_read(const struct schway__gte *g, uint32_t idx)
 {
     uint32_t r = idx & 31u;

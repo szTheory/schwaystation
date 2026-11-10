@@ -85,7 +85,7 @@ uint64_t schway__cpu_state_io(struct schway__state_io *io, schway *inst)
     return cycle;
 }
 
-/* The instruction cache (PSX-SYSTEM section 2, I-cache; psx-spx Memory Map,
+/* The instruction cache (docs/hardware/bus.md, Instruction cache; psx-spx Memory Map,
    Cache Control). Direct mapped: address bits 11:4 pick the line, physical bits
    31:12 are its tag, and each of its four words has a valid bit. A word that
    hits is returned as it is, so a store to the same RAM never reaches it. A miss

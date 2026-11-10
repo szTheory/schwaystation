@@ -6,8 +6,8 @@
 /* SR has BEV (bit 22) set and the interrupt, mode and cache bits clear; PRID
    reads 2 on the CXD8606CQ CPU; BPCM and BDAM, the breakpoint masks, read
    FFFFFFFFh; every other register, CAUSE and DCIC included, is 0
-   (ARCHITECTURE section 7, Power-on; PSX-SYSTEM section 2, COP0 registers
-   and Reset state). */
+   (ARCHITECTURE section 7, Power-on; docs/hardware/cop0.md, Registers
+   and Entry). */
 void schway__cop0_reset(schway *inst)
 {
     uint32_t *r = inst->cpu.cop0.r;
@@ -19,13 +19,13 @@ void schway__cop0_reset(schway *inst)
 }
 
 /* CAUSE bits the entry owns: ExcCode (2-6), CE (28-29), BT (30), BD (31). IP
-   bits 8-15 are left as they are (PSX-SYSTEM section 2, CAUSE bits). */
+   bits 8-15 are left as they are (docs/hardware/cop0.md, CAUSE). */
 #define CAUSE_ENTRY_BITS 0xF000007Cu
 
 /* Pushes the KU/IE stack: SR bits 0-5 are three pairs of (IE, KU), current,
    previous and old, and the entry shifts them left by 2, so the current pair
    becomes 0 (kernel mode, interrupts off) and the old pair is lost
-   (PSX-SYSTEM section 2, SR bits). */
+   (docs/hardware/cop0.md, SR). */
 void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t in_delay,
                             uint32_t taken, uint32_t target, uint32_t badvaddr,
                             uint32_t has_badvaddr, uint32_t ce)
@@ -77,7 +77,7 @@ void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t 
 
 /* The interrupt line the CPU takes: a CAUSE bit in 8-15 (the two software
    bits and the hardware line at bit 10) whose SR mask bit is set, with IEc set
-   (PSX-SYSTEM section 2, SR bits; section 6). */
+   (docs/hardware/cop0.md, SR and Interrupts). */
 uint32_t schway__cop0_irq_pending(const schway *inst)
 {
     const uint32_t *r = inst->cpu.cop0.r;
@@ -89,7 +89,7 @@ uint32_t schway__cop0_irq_pending(const schway *inst)
 
 /* The stamp is set on the false-to-true change of the line and nowhere else,
    so a read of CAUSE or SR never arms an interrupt. A change to false takes the
-   interrupt back (PSX-SYSTEM section 6). */
+   interrupt back (docs/hardware/cop0.md, Interrupts). */
 void schway__cop0_irq_edge(schway *inst, uint32_t was, uint32_t latency)
 {
     if (schway__cop0_irq_pending(inst) == 0u) {
@@ -101,8 +101,8 @@ void schway__cop0_irq_edge(schway *inst, uint32_t was, uint32_t latency)
 
 /* The interrupt entry's hook for the GTE. On the console an interrupt taken
    while the next instruction is a GTE command lets that command execute, and it
-   executes again after the return, because EPC names it (PSX-SYSTEM section 2,
-   GTE in a delay slot of an interrupt). word is the interrupted instruction.
+   executes again after the return, because EPC names it (docs/hardware/cop0.md,
+   Interrupts). word is the interrupted instruction.
    The command executes here, before the handler's first instruction, when
    CAUSE's ExcCode is 0, SR.CU2 is set and the word is a command; with CU2 clear
    the instruction would raise CpU instead and never reach the GTE. It keeps the
@@ -120,17 +120,17 @@ uint32_t schway__cop0_irq_entry_cop2(schway *inst, uint32_t word)
 
 /* SR writes keep the bits the CPU has: the coprocessor-usable bits, BEV, the
    cache and parity bits, the interrupt mask and the three mode and interrupt
-   pairs; bits 6-7, 20-21 and 23-27 read 0 (PSX-SYSTEM section 2, SR bits). */
+   pairs; bits 6-7, 20-21 and 23-27 read 0 (docs/hardware/cop0.md, SR). */
 #define SR_WRITABLE 0xF04FFF3Fu
 
 /* CAUSE bits 8-9 are the two software interrupt flags, the only writable
-   ones; bit 10 follows the interrupt registers (PSX-SYSTEM section 2, COP0
-   registers). */
+   ones; bit 10 follows the interrupt registers (docs/hardware/cop0.md,
+   Registers). */
 #define CAUSE_SOFTWARE 0x00000300u
 
 /* Registers 0-2, 4 and 10 are not there and raise a reserved instruction
    exception; 16-31 answer garbage without one, here 0, and ignore writes
-   (PSX-SYSTEM section 2, COP0 registers). */
+   (docs/hardware/cop0.md, Registers). */
 static uint32_t cop0_missing(uint32_t rd)
 {
     return rd <= 2u || rd == 4u || rd == 10u ? 1u : 0u;
@@ -180,8 +180,8 @@ uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value)
 }
 
 /* RFE shifts the previous and old pairs down, SR bits 2-5 into 0-3, and
-   leaves the old pair as it was; it does not jump (PSX-SYSTEM section 2, SR
-   bits and EPC). */
+   leaves the old pair as it was; it does not jump (docs/hardware/cop0.md,
+   RFE). */
 void schway__cop0_rfe(schway *inst)
 {
     uint32_t *r = inst->cpu.cop0.r;
@@ -189,6 +189,6 @@ void schway__cop0_rfe(schway *inst)
     inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
     r[SCHWAY__COP0_SR] = (r[SCHWAY__COP0_SR] & ~0xFu) | ((r[SCHWAY__COP0_SR] >> 2) & 0xFu);
     /* The restored IEc is looked at at once: a line that was held off by the
-       handler's mode is taken after this instruction (PSX-SYSTEM section 6). */
+       handler's mode is taken after this instruction (docs/hardware/cop0.md, Interrupts). */
     schway__cop0_irq_edge(inst, was, SCHWAY__IRQ_LATENCY_NEXT);
 }

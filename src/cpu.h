@@ -10,12 +10,12 @@
 
 struct schway__state_io;
 
-/* The reset vector: the BIOS ROM entry in KSEG1 (PSX-SYSTEM section 2,
-   Reset state). */
+/* The reset vector: the BIOS ROM entry in KSEG1 (docs/hardware/cpu.md,
+   Registers). */
 #define SCHWAY__CPU_RESET_PC 0xBFC00000u
 
-/* COP0 register numbers, with the documented names (PSX-SYSTEM section 2,
-   COP0 registers). Numbers not listed read as garbage or raise a reserved
+/* COP0 register numbers, with the documented names (docs/hardware/cop0.md,
+   Registers). Numbers not listed read as garbage or raise a reserved
    instruction exception. */
 enum {
     SCHWAY__COP0_BPC = 3,
@@ -31,7 +31,7 @@ enum {
     SCHWAY__COP0_PRID = 15
 };
 
-/* Exception codes of CAUSE bits 2-6 (PSX-SYSTEM section 2, ExcCodes). */
+/* Exception codes of CAUSE bits 2-6 (docs/hardware/cop0.md, CAUSE). */
 enum {
     SCHWAY__EXC_INT = 0x00,
     SCHWAY__EXC_ADEL = 0x04,
@@ -45,7 +45,7 @@ enum {
     SCHWAY__EXC_OVF = 0x0C
 };
 
-/* SR bits the executor reads (PSX-SYSTEM section 2, SR bits): KUc, the
+/* SR bits the executor reads (docs/hardware/cop0.md, SR): KUc, the
    current mode (1 is user), Isc, which isolates the cache, BEV and the
    coprocessor usable bits CU0 to CU3. */
 #define SCHWAY__SR_KUC 0x00000002u
@@ -61,7 +61,7 @@ enum {
 #define SCHWAY__EXC_LOOP_LIMIT 1000u
 
 /* The general exception vector: BFC00180h while SR.BEV is set and 80000080h
-   otherwise (PSX-SYSTEM section 2, Vectors). */
+   otherwise (docs/hardware/cop0.md, Entry). */
 #define SCHWAY__VECTOR_BEV 0xBFC00180u
 #define SCHWAY__VECTOR_RAM 0x80000080u
 
@@ -108,19 +108,18 @@ struct schway__cpu_log {
     uint32_t overflow;
 };
 
-/* The longest a multiply or divide takes: DIV and DIVU (PSX-SYSTEM section
-   2, MULTU/MULT and DIV/DIVU). A read of HI or LO never waits longer. */
+/* The longest a multiply or divide takes: DIV and DIVU
+   (docs/hardware/cpu.md, Multiply and divide). A read of HI or LO never waits longer. */
 #define SCHWAY__MULDIV_MAX 36u
 
 /* The instruction cache: 256 direct-mapped lines of 4 words, 4 KiB, indexed by
    address bits 11:4. A line holds the tag, physical address bits 31:12, and a
-   valid bit per word (PSX-SYSTEM section 2, I-cache). */
+   valid bit per word (docs/hardware/bus.md, Instruction cache). */
 #define SCHWAY__ICACHE_LINES 256u
 
 /* The write queue holds 4 stores; a fifth waits for one to leave. Each queued
    store is charged this many cycles when it leaves, an estimate: no published
-   figure gives the drain rate (PSX-SYSTEM section 2, Cache isolation, write
-   queue). */
+   figure gives the drain rate (docs/hardware/bus.md, Write queue). */
 #define SCHWAY__WQ_DEPTH 4u
 #define SCHWAY__WQ_DRAIN_CYCLES 4u
 
@@ -130,8 +129,8 @@ struct schway__cpu_log {
    pc + 4 otherwise. load_reg and load_value hold the load issued by the
    previous instruction, which lands when the current one ends; branch_slot
    says the instruction at pc is a branch delay slot, branch_take that its
-   branch is taken and branch_target where it goes (PSX-SYSTEM section 2,
-   Load delay and Branch delay). cycle counts the cycles the CPU has spent
+   branch is taken and branch_target where it goes (docs/hardware/cpu.md,
+   Delay latches and Branches and jumps). cycle counts the cycles the CPU has spent
    on instructions, and muldiv_ready is the value of cycle at which the
    running multiply or divide has produced HI and LO, 0 when none is running.
    The 64-bit fields come first so the layout does not depend on the
@@ -169,26 +168,26 @@ struct schway__cpu {
 void schway__cpu_reset(schway *inst);
 void schway__cop0_reset(schway *inst);
 
-/* The one exception entry (PSX-SYSTEM section 2, EPC and the SR, CAUSE and
-   Vectors rows). code is the ExcCode, epc the address to return to (the
-   branch itself for a delay-slot instruction), in_delay the BD bit and taken
-   the BT bit. target is written to TAR when in_delay is set; badvaddr is
-   written to BadVaddr when has_badvaddr is set; ce goes to CAUSE bits 28-29.
-   The KU/IE stack is pushed, pending delay-slot state is discarded and the
-   program counter moves to the vector. */
+/* The one exception entry (docs/hardware/cop0.md, Entry). code is the ExcCode,
+   epc the address to return to (the branch itself for a delay-slot
+   instruction), in_delay the BD bit and taken the BT bit. target is written
+   to TAR when in_delay is set; badvaddr is written to BadVaddr when
+   has_badvaddr is set; ce goes to CAUSE bits 28-29. The KU/IE stack is pushed,
+   pending delay-slot state is discarded and the program counter moves to the
+   vector. */
 void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t in_delay,
                             uint32_t taken, uint32_t target, uint32_t badvaddr,
                             uint32_t has_badvaddr, uint32_t ce);
 
 /* The interrupt line the CPU takes: any of CAUSE bits 8-15 whose SR bit 8-15
-   mask is set, with SR.IEc set (PSX-SYSTEM section 2, SR bits and CAUSE bits;
-   section 6). Returns 1 or 0. It reads the registers and arms nothing. */
+   mask is set, with SR.IEc set (docs/hardware/cop0.md, SR, CAUSE and
+   Interrupts). Returns 1 or 0. It reads the registers and arms nothing. */
 uint32_t schway__cop0_irq_pending(const schway *inst);
 
 /* Retirements from the change to the entry, counting the instruction that
    made the change when the CPU made it: a device edge, an I_MASK write or an
    SR write is taken after two, a CAUSE write or an RFE after one. An inference
-   from the published behaviour, unmeasured on silicon (PSX-SYSTEM section 6). */
+   from the published behaviour, unmeasured on silicon (docs/hardware/cop0.md, Interrupts). */
 #define SCHWAY__IRQ_LATENCY_EDGE 2u
 #define SCHWAY__IRQ_LATENCY_NEXT 1u
 
@@ -201,13 +200,13 @@ void schway__cop0_irq_edge(schway *inst, uint32_t was, uint32_t latency);
    instruction, the one at pc (the delay slot's, not the branch's). When it is a
    GTE command, ExcCode is 0 and SR.CU2 is set, the command executes here and
    the hook returns 1; a command the CPU could not issue never reaches the GTE
-   (PSX-SYSTEM section 2, GTE in a delay slot of an interrupt). */
+   (docs/hardware/cop0.md, Interrupts). */
 uint32_t schway__cop0_irq_entry_cop2(schway *inst, uint32_t word);
 
 /* MFC0 and MTC0 on COP0 register rd. Each returns 1, or 0 when rd is one of
    the numbers that raise a reserved instruction exception (0-2, 4 and 10).
    MFC0 stores the value read; the caller issues it through the load delay.
-   RFE pops the KU/IE stack (PSX-SYSTEM section 2, COP0 registers). */
+   RFE pops the KU/IE stack (docs/hardware/cop0.md, Registers). */
 uint32_t schway__cop0_mfc0(schway *inst, uint32_t rd, uint32_t *value);
 uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value);
 void schway__cop0_rfe(schway *inst);
@@ -217,7 +216,7 @@ void schway__cop0_rfe(schway *inst);
    instruction's own cycle. A miss, or a tag hit on a word that is not valid,
    fills the line from that word to its end and adds the fill's cost to
    *cycles. Returns 0 with the word in *word, or non-zero for a bus error on
-   the missed word, with the line untouched (PSX-SYSTEM section 2, I-cache). */
+   the missed word, with the line untouched (docs/hardware/bus.md, Instruction cache). */
 uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, uint32_t *cycles);
 
 /* The cpu and cop0 fields of the state walk (state.h). Returns the value the

@@ -22,7 +22,7 @@ struct schway__state_io;
    device is the CD at 40 cycles per word, and the RAM side adds 17 cycles per
    16 words: 65,536 * 40 + 65,536 * 17 / 16 = 2,691,072. Another 256 cycles
    cover the per-unit overhead, a chopping window's setup and the longest CPU
-   window, 128 cycles. The sum is 2,691,328 (PSX-SYSTEM section 4). A stored
+   window, 128 cycles. The sum is 2,691,328 (docs/hardware/dma.md). A stored
    stamp further ahead of the clock than this is refused. */
 #define SCHWAY__DMA_BUSY_MAX                                                                       \
     (SCHWAY__DMA_UNIT_WORDS_MAX * 40u + SCHWAY__DMA_UNIT_WORDS_MAX / 16u * 17u + 256u)
@@ -33,7 +33,7 @@ struct schway__state_io;
 
 /* The bits the hardware stores: MADR is 24 bits; CHCR keeps bits 0, 1, 8-10,
    16-18, 20-22, 24 and 28-30; DICR keeps bits 0-5, 15 and 16-30 (bit 31 is
-   derived). Anything else in a state is refused (PSX-SYSTEM section 4). */
+   derived). Anything else in a state is refused (docs/hardware/dma.md). */
 #define SCHWAY__DMA_MADR_MASK 0xFFFFFFu
 #define SCHWAY__DMA_CHCR_MASK 0x71770703u
 #define SCHWAY__DMA_CHCR_BUSY 0x01000000u
@@ -66,7 +66,7 @@ struct schway__dma {
 };
 
 /* Power-on: DPCR is 07654321h, every other register is 0 and no channel is
-   current (PSX-SYSTEM section 4). */
+   current (docs/hardware/dma.md). */
 void schway__dma_reset(schway *inst);
 
 /* The dma fields of the state walk (state.h). ticks is the value the walk has
