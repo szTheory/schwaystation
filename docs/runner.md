@@ -176,6 +176,7 @@ the GPU keeps a beam. `kind` is one of:
 | `reserved_instruction` | an instruction the R3000A does not have |
 | `cop_unusable` | a coprocessor 1 or 3 instruction, which this console lacks |
 | `exception_loop` | the same exception taken 1000 times in a row at the same address, which no handler gets out of |
+| `dma` | a DMA channel other than OTC written with the reserved synchronisation mode 3 and the start bit: it does not start; `addr` is its `CHCR`, `opcode` the value written and `pc` the instruction that wrote it |
 
 A SYSCALL, BREAK, arithmetic overflow or interrupt is an exception the program's own handler takes and is not a
 fault, and neither is an unaligned load or store by LWL, LWR, SWL or SWR.

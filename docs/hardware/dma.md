@@ -12,8 +12,7 @@ the stall in the run loop are in [the CPU page](cpu.md) and [the bus page](bus.m
 ## State of the engine
 
 The registers, arbitration, the interrupt rules, the unit engine, OTC, the burst and request-block modes with their
-device ends, chopping, linked lists, the costs and the CPU hold are built. A channel written with the reserved mode
-keeps its registers and stays busy. Every address of `1F801080h`-`1F8010FFh` answers at
+device ends, chopping, linked lists, the costs, the CPU hold and the fault for an unusable mode are built. Every address of `1F801080h`-`1F8010FFh` answers at
 every width, so the whole range counts as owned rather than unbuilt or a gap.
 
 ## The registers
@@ -145,7 +144,19 @@ the CPU, whatever its `CHCR` says. The last block ends the transfer: the flag an
 and not before. A raise of the line while another unit runs is picked up at that unit's end.
 
 The line is a latched level per channel, set by `schway__dma_dreq`; the devices call it as they are built. The reserved
-mode has no unit yet.
+mode has no unit: see [the fault for an unusable mode](#the-fault-for-an-unusable-mode).
+
+## The fault for an unusable mode
+
+Synchronisation mode 3 is reserved and no device answers it. A write to the `CHCR` of a channel other than OTC that
+leaves the channel idle with bit 24 set and the mode field (bits 9-10) at 3 does not start it: the start bits (24 and
+28) are dropped, the other bits are kept, and the first fault is latched as `SCHWAY_FAULT_DMA` (see
+[the embedding guide](../embedding.md#the-first-fault)), naming the DMA device, the register's address, the value
+written and the instruction that wrote it. Nothing moves, no flag is set and no interrupt is raised. A later write with a
+usable mode starts the channel as usual. OTC keeps only bits 24, 28 and 30, so it has no mode to get wrong. The mode
+without the start bit is only stored, as any other. A write to a channel that is already running is not modelled, so it
+latches nothing. The hardware's reaction to the reserved mode has not been measured; this is a statement of what the
+model does not run, not of what the console does.
 
 ## Chopping
 
@@ -211,8 +222,8 @@ A hostile program can also fill the audio ring faster than a host drains it: up 
 and counted in `audio_dropped`. That is accepted and not an error.
 
 A sweep of every DMA register offset at every width with four edge values, each access from a power reset, finds no fault
-and no difference between two passes. It leaves out the `CHCR` word FFFFFFFFh of a channel other than OTC, which selects
-the reserved mode with the start bit, and runs under the sanitizer lanes.
+and no difference between two passes, except that the `CHCR` word FFFFFFFFh of a channel other than OTC selects the
+reserved mode with the start bit and so latches the DMA fault; it runs under the sanitizer lanes.
 
 ## The device ends
 
@@ -270,7 +281,7 @@ against the tick of the access, so a read that comes after the unit's end waits 
 
 ## Not built yet
 
-The devices behind channels 0 to 5 and the fault for a mode a channel cannot use come with later stages. Every write to
+The devices behind channels 0 to 5 come with later stages. Every write to
 a busy channel's `CHCR` other than the word 0, and the behaviour of bit 29, are not modelled.
 
 ## Sources
