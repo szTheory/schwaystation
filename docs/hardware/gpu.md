@@ -118,6 +118,10 @@ horizontal blank, and Y2/Y1 comparisons start and end vertical blank when the li
 misses those comparisons can suppress an edge; it cannot stop line or field progression. Equal-tick processing catches
 up system-clock counters, applies beam and dot edges, then runs DMA events.
 
+Loaded content completes a public frame at the fixed line-counter wrap, independent of Y2 and its VBlank interrupt.
+GP1(00h) resets the beam position and partial command state. The public call's maximum-field deadline is fixed before
+the guest runs, so repeated resets return `SCHWAY_STOP_BUDGET` instead of extending the call.
+
 These constants and edge positions are the documented model derived from PSX-SPX GPU timing and the settled ratio/line
 choices in `.planning/preparation/DECISIONS.md` (DEC.09 and DEC.10), with architecture details in
 `.planning/preparation/ARCHITECTURE.md`, section one. They are doc/derived, not measured hardware results.

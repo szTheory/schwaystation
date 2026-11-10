@@ -198,12 +198,14 @@ static int gpu_beam_edges(schway *inst)
         g->beam_line++;
         if (g->beam_line == lines) {
             g->beam_line = 0u;
+            schway__frame_gpu_wrap(inst);
         }
 
         uint32_t y1 = g->vertical_range & 0x03FFu;
         uint32_t y2 = (g->vertical_range >> 10) & 0x03FFu;
         if (y2 < lines && g->beam_line == y2) {
             schway__timers_vblank(inst, g->beam_tick, 1u);
+            schway__irq_raise(inst, 0u);
         }
         if (y1 < lines && g->beam_line == y1) {
             schway__timers_vblank(inst, g->beam_tick, 0u);
@@ -847,6 +849,7 @@ static void gpu_gp1(schway *inst, uint32_t command, uint64_t tick)
         schway__gpu_reset(inst);
         inst->gpu.allow_2mb = allow_2mb;
         inst->gpu.beam_tick = tick;
+        schway__frame_gpu_reset(inst, tick);
         schway__timers_vblank(inst, tick, 0u);
         schway__timers_hblank(inst, tick, 0u);
         break;

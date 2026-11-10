@@ -212,8 +212,8 @@ static void trace_push(schway *inst, uint32_t event, uint64_t cycle, uint32_t pc
    lets one instruction run before the next offer, so the loop always advances. */
 uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
 {
-    uint64_t room = inst->frame_end - inst->ticks;
-    uint64_t limit = cycles < room ? cycles : room;
+    uint64_t limit = cycles;
+    uint64_t starting_frame = inst->frame;
     uint64_t ran = 0u;
     uint32_t stop = SCHWAY_STOP_BUDGET;
     /* The copy is chosen here, once for the whole call. */
@@ -222,6 +222,10 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
     while (ran < limit) {
         if (inst->sched.next <= inst->ticks) {
             schway__sched_run(inst);
+            if (inst->frame != starting_frame) {
+                stop = SCHWAY_STOP_FRAME;
+                break;
+            }
         }
         uint64_t left = limit - ran;
         uint64_t until = inst->sched.next > inst->ticks ? inst->sched.next - inst->ticks : 1u;
@@ -242,6 +246,10 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
             inst->gte.ready = inst->gte.ready > wait ? inst->gte.ready - wait : 0u;
             ran += wait;
             schway__sched_sync(inst);
+            if (inst->frame != starting_frame) {
+                stop = SCHWAY_STOP_FRAME;
+                break;
+            }
             continue;
         }
         ran += block(inst, left < until ? left : until);
@@ -257,6 +265,10 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
         }
         if ((flags & SCHWAY_RUN_STOP_ON_FAULT) != 0u && inst->fault.kind != SCHWAY__FAULT_NONE) {
             stop = SCHWAY_STOP_FAULT;
+            break;
+        }
+        if (inst->frame != starting_frame) {
+            stop = SCHWAY_STOP_FRAME;
             break;
         }
     }

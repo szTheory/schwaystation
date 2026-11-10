@@ -410,6 +410,8 @@ void schway__tty_push(schway *inst, uint8_t byte);
 
 /* Empties the audio ring and its dropped count. */
 void schway__frame_audio_clear(schway *inst);
+void schway__frame_gpu_wrap(schway *inst);
+void schway__frame_gpu_reset(schway *inst, uint64_t tick);
 
 /* CRC-32 as in Ethernet and PNG: reflected polynomial 0xEDB88320, initial
    value and final XOR 0xFFFFFFFF. Continue a running CRC by passing it back

@@ -345,12 +345,14 @@ core assumes under 1,024. A stop carries no overshoot in the state: the ticks an
 the ticks it reached, and the next call starts there. Running N cycles and then M therefore equals running N + M when N
 is a boundary the one-shot run passes through, which is where a run of the same budget stopped.
 
-**The end of a frame.** The run stops at the first boundary at or after the frame's end. A frame end passed inside an
-instruction completes at that instruction's end: `I_STAT` bit 0 is raised, the frame count rises, and the next frame
-ends where the exact cycle accumulator puts it, so the next frame is shorter by the overshoot and the cumulative
-ticks stay exact. The CPU takes interrupts from the vertical blank, the DMA and the timers: each raises its own `I_STAT` bit, CAUSE
-bit 10 follows `I_STAT` and `I_MASK`, and when SR allows it the CPU takes the interrupt as [cop0.md](cop0.md)
-(Interrupts) describes.
+**The end of a field.** Loaded content stops at the first instruction boundary after the GPU line counter wraps. The
+configured Y2 comparison raises `I_STAT` bit 0 and starts vertical blank; Y1 ends that blank. The field count advances
+at line wrap even when Y2 is out of range and raises no interrupt. GP1(00h) restarts the beam, but cannot move the
+maximum-field deadline fixed at the start of the current public call; if resets prevent a wrap, that call returns
+`SCHWAY_STOP_BUDGET` after at most one maximum regional field interval plus one instruction overrun. With no loaded
+program, the test-card frame timing remains the cycle accumulator's boundary. The CPU takes interrupts from vertical
+blank, DMA and timers: each raises its own `I_STAT` bit, CAUSE bit 10 follows `I_STAT` and `I_MASK`, and when SR allows
+it the CPU takes the interrupt as [cop0.md](cop0.md) (Interrupts) describes.
 
 **Stop reasons.**
 
@@ -399,10 +401,9 @@ can hold the bus for tens of thousands of cycles and charging that to a single i
 bound above. The part of a stall that crosses the end of a budget or of a frame stays in the state and the next call
 keeps waiting, so the overrun past any limit is still at most one instruction.
 
-**The frame end.** With a program loaded the frame end raises `I_STAT` bit 0 and also drives the vertical blank to the
-root counters, high and then low at the same tick, because there is no line machine yet to give the blank a width; the
-counters page covers what they do with it. With no program no counter is stepped and only an event that is already
-due runs.
+**The blank edges.** The GPU beam raises `I_STAT` bit 0 and drives Timer 1 at the configured Y2 line, then drives the
+counter again when the Y1 line ends vertical blank. A field wrap is independent of those programmable comparisons.
+The no-content test-card frame boundary does not synthesize a VBlank edge at its end.
 
 ## The trace
 

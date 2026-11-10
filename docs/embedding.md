@@ -111,7 +111,8 @@ schway_destroy(inst); /* NULL is fine */
   the flags (below); any other value returns `SCHWAY_STATUS_ERR_PROFILE_REJECTED`. It works only before the first
   cycle runs; after that it returns `SCHWAY_STATUS_ERR_PROFILE_LOCKED`, even after a reset. To change region, destroy
   and create again.
-- `schway_run_frame` runs to the end of the current frame and returns. The optional `schway_run_result` gets the stop reason
+- `schway_run_frame` runs to the current field wrap for loaded content and returns. With no loaded program it keeps the
+  deterministic test-card frame boundary. The optional `schway_run_result` gets the stop reason
   (`SCHWAY_STOP_FRAME`), the frame number since power-on and the CPU cycles run since power-on.
   If the next frame would exceed the save format's inclusive limits (2^62 ticks or
   floor(2^62 / 566,203) frames), it returns `SCHWAY_STATUS_ERR_STATE_FIELD` without changing the instance
@@ -135,27 +136,28 @@ result.size = (uint32_t)sizeof result;
 schway_run(inst, &budget, &result);
 ```
 
-`schway_run` advances until the end of the current frame or until `max_cycles` CPU cycles have run, whichever comes
-first, and `stop` in the result says which:
+`schway_run` advances until the field/frame boundary or until `max_cycles` CPU cycles have run, whichever comes first.
+For loaded content, each call also has an independent maximum-field interval; if repeated GPU resets prevent a field
+wrap, the call returns `SCHWAY_STOP_BUDGET` at that limit. The result says which stop occurred:
 
 | Stop | Value | Meaning |
 |------|-------|---------|
 | `SCHWAY_STOP_FRAME` | 1 | the frame ended; a budget that ends exactly on the boundary reports this |
-| `SCHWAY_STOP_BUDGET` | 2 | `max_cycles` ran out inside the frame |
+| `SCHWAY_STOP_BUDGET` | 2 | `max_cycles` or the independent loaded-content call bound ran out inside the frame |
 | `SCHWAY_STOP_HOOK` | 4 | the guest wrote the exit port (profile flag `SCHWAY_PROFILE_DEBUG_PORT` set); `exit_code` holds the byte |
 | `SCHWAY_STOP_FAULT` | 5 | `SCHWAY_RUN_STOP_ON_FAULT` is set and a fault is latched, or the guest double-faulted at an exception vector |
 
-Values 3 and 6 are not used. A call never runs past the end of the frame, so to run N cycles call again until the
-result's `ticks` has moved N. With a program loaded a run stops at the first instruction boundary at or after the
-budget or the frame's end, so `ticks` can pass either by the rest of one instruction (see
+Values 3 and 6 are not used. A loaded-content call is bounded by one maximum regional field interval plus the existing
+instruction overrun. With a program loaded a run stops at the first instruction boundary at or after the budget or the
+field wrap, so `ticks` can pass either by the rest of one instruction (see
 [the CPU page](hardware/cpu.md)).
 
 - `max_cycles` 0 returns `SCHWAY_STOP_BUDGET` and changes nothing, the profile lock included.
 - `flags` takes `SCHWAY_RUN_STOP_ON_FAULT`, `SCHWAY_RUN_TRACE` or both; any other bit returns
   `SCHWAY_STATUS_ERR_ARGUMENT`. With the first set, a latched fault stops the run with `SCHWAY_STOP_FAULT` before any
   cycle runs. The second is [the trace](#the-trace).
-- `schway_run_frame` is the same advance with no limit. After a run that stopped inside a frame it finishes that
-  frame.
+- `schway_run_frame` is the same advance with no caller limit. After a budgeted run it finishes the current field, unless
+  repeated GPU resets reach the independent call bound first.
 - A stopped run resumes where it stopped. With no program loaded, running N cycles and then M leaves exactly what
   N + M cycles leave: the same state bytes, frame, ticks and audio pairs. With one loaded the same holds where N is
   an instruction boundary the one-shot run passes through, for instance where a run of the same budget stopped.
