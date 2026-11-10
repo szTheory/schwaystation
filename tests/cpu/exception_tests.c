@@ -362,7 +362,7 @@ static void syscall_epc(void)
         next(inst); /* branch delay slot */
     }
     CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
-    CHECK_EQ_HEX(inst->cpu.pc, CODE + 4u);
+    CHECK_EQ_HEX(inst->cpu.pc, CODE);
     schway_destroy(inst);
 
     /* Returning to EPC is not progress. Keep exercising the actual handler
