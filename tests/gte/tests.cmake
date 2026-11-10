@@ -16,7 +16,7 @@ set(gte_vectors_bin ${PROJECT_SOURCE_DIR}/tests/vectors/gte/ps1tests-1150.bin)
 # the upstream order and the count is the zero-case guard: a run that
 # replayed fewer fails.
 schway_add_test(NAME gte.vectors.part1
-  COMMAND schwaystation-test-gte vectors ${gte_vectors_bin} --expect 400 --ops reg,01,06,0c,28,2d,2e,30
+  COMMAND schwaystation-test-gte vectors ${gte_vectors_bin} --expect 450 --ops reg,01,06,0c,12,28,2d,2e,30
   LABELS gte portable TIMEOUT 30)
 
 # Fault prevented: a register index, an edge value or a command number that

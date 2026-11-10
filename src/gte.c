@@ -319,11 +319,39 @@ static int64_t ir_of(const struct run *r, unsigned id)
     return s16v(r->g->d[8u + id]);
 }
 
-/* Element e of a 3 by 3 matrix of 16-bit values packed two to a word in row
-   order; the ninth sits alone in the last word. */
-static int64_t mat_elem(const uint32_t *w, unsigned e)
+/* A 3 by 3 matrix of 16-bit values, stored packed two to a word in row order
+   with the ninth alone in the last word, read out as nine signed values in row
+   order. */
+static void load_matrix(const uint32_t *w, int64_t m[9])
 {
-    return s16v((e & 1u) != 0u ? w[e >> 1] >> 16 : w[e >> 1]);
+    for (unsigned e = 0u; e < 9u; e++) {
+        m[e] = s16v((e & 1u) != 0u ? w[e >> 1] >> 16 : w[e >> 1]);
+    }
+}
+
+/* The matrix times a vector plus a translation, one row per accumulator: the
+   translation (three words, or none) shifted up 12, then the three products,
+   each addition checked against 44 bits (psx-spx, Geometry Transformation
+   Engine, GTE Matrix Multiplication). */
+static void matrix_multiply(struct run *r, const int64_t m[9], const int64_t vec[3],
+                            const uint32_t *tr, int64_t out[3])
+{
+    for (unsigned row = 0u; row < 3u; row++) {
+        unsigned id = row + 1u;
+        int64_t acc = tr != NULL ? s32v(tr[row]) * 4096 : 0;
+        for (unsigned col = 0u; col < 3u; col++) {
+            acc = extend(r, id, acc + m[row * 3u + col] * vec[col]);
+        }
+        out[row] = acc;
+    }
+}
+
+/* The three accumulators and IR1 to IR3 from a vector of sums. */
+static void set_mac_ir_vec(struct run *r, const int64_t v[3], unsigned lm)
+{
+    for (unsigned i = 0u; i < 3u; i++) {
+        set_mac_ir(r, i + 1u, v[i], lm);
+    }
 }
 
 /* OTZ is MAC0 over 1000h clamped to 0 to FFFFh. */
@@ -446,18 +474,12 @@ uint8_t schway__gte_unr_entry(uint32_t i)
 static void rtp(struct run *r, unsigned vertex, int last)
 {
     struct schway__gte *g = r->g;
-    const uint32_t *rot = &g->c[0];
+    int64_t rot[9];
     uint32_t vxy = g->d[2u * vertex];
     int64_t vec[3] = {s16v(vxy), s16v(vxy >> 16), s16v(g->d[2u * vertex + 1u])};
     int64_t out[3];
-    for (unsigned row = 0u; row < 3u; row++) {
-        unsigned id = row + 1u;
-        int64_t acc = s32v(g->c[5u + row]) * 4096;
-        for (unsigned col = 0u; col < 3u; col++) {
-            acc = extend(r, id, acc + mat_elem(rot, row * 3u + col) * vec[col]);
-        }
-        out[row] = acc;
-    }
+    load_matrix(&g->c[0], rot);
+    matrix_multiply(r, rot, vec, &g->c[5], out);
     set_mac_ir(r, 1u, out[0], r->lm);
     set_mac_ir(r, 2u, out[1], r->lm);
     (void)set_mac(r, 3u, out[2]);
@@ -520,8 +542,9 @@ static void sqr(struct run *r)
    MAC3 = D1*IR2 - D2*IR1. The IR registers follow the MAC values. */
 static void op_cross(struct run *r)
 {
-    const uint32_t *rot = &r->g->c[0];
-    int64_t d1 = mat_elem(rot, 0u), d2 = mat_elem(rot, 4u), d3 = mat_elem(rot, 8u);
+    int64_t rot[9];
+    load_matrix(&r->g->c[0], rot);
+    int64_t d1 = rot[0], d2 = rot[4], d3 = rot[8];
     int64_t i1 = ir_of(r, 1u), i2 = ir_of(r, 2u), i3 = ir_of(r, 3u);
     (void)set_mac(r, 1u, d2 * i3 - d3 * i2);
     (void)set_mac(r, 2u, d3 * i1 - d1 * i3);
@@ -529,6 +552,65 @@ static void op_cross(struct run *r)
     for (unsigned i = 1u; i < 4u; i++) {
         set_ir(r, i, s32v(r->g->d[24u + i]), r->lm);
     }
+}
+
+/* Matrix times vector plus translation. Command bits 17 to 18 pick the matrix
+   (rotation, light, colour, or the reserved fourth), 15 to 16 the vector (V0 to
+   V2 or IR1 to IR3) and 13 to 14 the translation (TR, the background colour,
+   the far colour or none). The reserved matrix is -R*10h, R*10h, IR0 in its
+   first row, RT13 three times in the second and RT22 three times in the third,
+   with R the red byte of RGBC. With the far colour the hardware drops the first
+   product from the result, so MAC and IR hold only the sum of the other two,
+   while FLAG and the saturation of IR on the way are those of the full sum
+   (psx-spx, Geometry Transformation Engine, GTE Command MVMVA). */
+static void mvmva(struct run *r, uint32_t op)
+{
+    struct schway__gte *g = r->g;
+    unsigned tv = (op >> 13) & 3u, mv = (op >> 15) & 3u, mm = (op >> 17) & 3u;
+    int64_t vec[3], m[9], out[3];
+    if (mv == 3u) {
+        for (unsigned i = 0u; i < 3u; i++) {
+            vec[i] = ir_of(r, i + 1u);
+        }
+    } else {
+        vec[0] = s16v(g->d[2u * mv]);
+        vec[1] = s16v(g->d[2u * mv] >> 16);
+        vec[2] = s16v(g->d[2u * mv + 1u]);
+    }
+    if (mm == 3u) {
+        int64_t red = (int64_t)(g->d[6] & 0xFFu) * 16;
+        int64_t rt13, rt22;
+        load_matrix(&g->c[0], m);
+        rt13 = m[2];
+        rt22 = m[4];
+        m[0] = -red;
+        m[1] = red;
+        m[2] = s16v(g->d[8]);
+        for (unsigned i = 3u; i < 6u; i++) {
+            m[i] = rt13;
+        }
+        for (unsigned i = 6u; i < 9u; i++) {
+            m[i] = rt22;
+        }
+    } else {
+        load_matrix(&g->c[mm == 0u ? 0u : (mm == 1u ? 8u : 16u)], m);
+    }
+    static const unsigned tr_word[3] = {5u, 13u, 21u};
+    const uint32_t *tr = tv == 3u ? NULL : &g->c[tr_word[tv]];
+    if (tv != 2u) {
+        matrix_multiply(r, m, vec, tr, out);
+        set_mac_ir_vec(r, out, r->lm);
+        return;
+    }
+    for (unsigned i = 0u; i < 3u; i++) {
+        int64_t first = extend(r, i + 1u, s32v(tr[i]) * 4096 + m[3u * i] * vec[0]);
+        set_ir(r, i + 1u, wrap32(sar64(first, r->sf != 0u ? 12u : 0u)), 0u);
+    }
+    for (unsigned i = 0u; i < 3u; i++) {
+        int64_t rest = extend(r, i + 1u, m[3u * i + 1u] * vec[1]);
+        out[i] = extend(r, i + 1u, rest + m[3u * i + 2u] * vec[2]);
+    }
+    set_mac_ir_vec(r, out, r->lm);
 }
 
 static void finish(struct run *r)
@@ -568,6 +650,8 @@ uint32_t schway__gte_exec(struct schway__gte *g, uint32_t op)
     case 0x11u: /* INTPL */
         return 8u;
     case 0x12u: /* MVMVA */
+        mvmva(&r, op);
+        finish(&r);
         return 8u;
     case 0x13u: /* NCDS */
         return 19u;
