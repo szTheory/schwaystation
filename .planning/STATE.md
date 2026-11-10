@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 02
 current_phase_name: The CPU matches the public vectors
-status: executing
-stopped_at: Completed 02-26-PLAN.md; next is 02-27
-last_updated: "2026-11-10T00:04:05.272Z"
-last_activity: 2026-11-09
-last_activity_desc: Completed 02-26 (gate total 1495 of 1520 with no deferral; testing and maintaining guides, README, planning-ID and emulator-name scans both exit 1, source tree clean after a clean ci workflow); 02-27 is next
-state_head: c2b1c639af702077ad4ab8c182c46f94f263291e
+status: verifying
+stopped_at: Completed 02-27-PLAN.md; phase 2 has all 27 plans executed, next is verification
+last_updated: "2026-11-10T00:43:02.579Z"
+last_activity: 2026-11-10
+last_activity_desc: Completed 02-27 (CI run 42729199629 and nightly dispatch 42728718880 green on the branch head, measured timeouts with this phase's run IDs, local ci workflow 8 s, probe PR #7 closed unmerged, todos 007, 008, 019, 020 and 023 moved to completed); all 27 plans of phase 2 are executed
+state_head: 5a5a7c738562432b05c5f112cd1f89e57d941267
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 42
-  completed_plans: 41
+  completed_plans: 42
   percent: 17
 ---
 
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 Phase: 02 (The CPU matches the public vectors) — EXECUTING
 Plan: 27 of 27
-Status: Ready to execute
-Last activity: 2026-11-09 — Completed 02-26: the final gate total is 1495 of 1520 lines and nothing is deferred; the testing and maintaining guides and the README are written, both leak scans exit 1 and a clean ci workflow leaves the source tree untouched (02-26-SUMMARY.md); only 02-27, the hosted run, is left
+Status: Phase complete — ready for verification
+Last activity: 2026-11-10 — Completed 02-27: the branch head is green on every hosted lane (CI run 42729199629, nightly dispatch 42728718880), the grown jobs carry measured timeouts, the local ci workflow takes 8 s for ship, probe PR #7 is closed unmerged and five todos moved to completed (02-27-SUMMARY.md); phase 2 is ready for verification
 
 Progress: [██░░░░░░░░] 17%
 
@@ -99,6 +99,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P25 | 25min | 3 tasks | 8 files |
 | Phase 02 P22 | 55min | 3 tasks | 13 files |
 | Phase 02 P26 | 9 min | 3 tasks | 6 files |
+| Phase 02 P27 | 37 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -195,6 +196,7 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-24: an --exe run goes through schway_run per frame with stop-on-fault on by default and exit 7; the unbuilt line's n is the last device's count, printed once at the end of any --exe run; --trace and --no-stop-on-fault need --exe
 - [Phase 02]: 02-25: the mailbox judge pairs a fixture's CSV rows with its records by order (row n is record id n) and lives in the fixtures script case; under --no-stop-on-fault the runner prints the first fault the program made at the end of the run and keeps the run's status — ExcCode persists until the next exception, so the masked-line and CAUSE-after-I_STAT doc rows read 1Ch, not 0; those two rows and the interrupt EPC (MTC0 plus 8) pin models, not measurements, and change only through tests/diag/allow.txt
 - [Phase 02]: 02-26: the gate-line total is 1495 of 1520 after the last gate of the phase, so no check is deferred; the cap is never raised and ship ratchets it to the measured total — The stub regeneration commands live once, in docs/maintaining.md, with the armips and vectors procedures; the vectors one reproduced the committed sample byte for byte
+- [Phase 02]: 02-27: build timeout 11 min (windows-x64 311 s, run 42725764966), hygiene 2 min, rehearsal 13 min; floors kept for asan, be32, wasm32, nofp, vectors-full, fuzz; each cites a run of this phase
 
 ### Pending Todos
 
@@ -249,12 +251,12 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T00:04:05.100Z
-Stopped at: Completed 02-26-PLAN.md; next is 02-27
+Last session: 2026-11-10T00:43:02.494Z
+Stopped at: Completed 02-27-PLAN.md; phase 2 has all 27 plans executed, next is verification
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next command: `/gsd-execute-phase 2`
+Next command: `/gsd-code-review 2`, then `/gsd-verify-work 2` (all 27 plans of phase 2 are executed)
 Stop after the plan step; do not execute in this session.
