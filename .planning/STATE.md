@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-11-10T17:37:23.873Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-11-10T18:19:06.700Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 04 execution started
-state_head: 98a4505ba9b4ce2118eb416864ce47f014150d88
+state_head: e199fbbe3f185028c3a3b0c439fdecdcdb3df0ac
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 69
+  completed_plans: 70
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 2 of 32
+Plan: 3 of 32
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 04 execution started
 
@@ -129,6 +129,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03 P23 | 6 min | 2 tasks | 7 files |
 | Phase 03 P25 | 7 min | 2 tasks | 32 files |
 | Phase 04 P01 | 16 min | 3 tasks | 14 files |
+| Phase 04 P02 | 32 min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -264,6 +265,9 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-25: todos 016 and 017 bind to SEED-007 (no later first caller), 014 to the phase 4 System.dat plan; every phase-2 review finding is fixed (WR-06, IN-01) or deferred with one todo (025-029, 032-037)
 - [Phase 04]: GPU smoke cases reuse the existing core test executable; a GPU-specific executable belongs to its first behavior implementation plan.
 - [Phase 04]: SIO, card, compatibility, and built-input registration seams start with empty inventories until real behavior tests exist.
+- [Phase 04]: User-mode kernel fetches reuse the data-access permission check to raise guest AdEL before bus access.
+- [Phase 04]: Saved Cause.IP2 is validated against serialized I_STAT and I_MASK before state application.
+- [Phase 04]: An RFE return to a taken branch target past EPC resets the non-interrupt exception-loop count; same-EPC and interrupt paths retain it.
 
 ### Pending Todos
 
@@ -332,10 +336,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 via /gsd-autonomous | Codex, OpenGSD 1.20.0; sequential typed executors in approved shared checkout | gpt-6-luna xhigh; orchestrator GPT-6 (session) |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-02 | Codex, OpenGSD 1.20.0; sequential executor | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-10T17:37:23.683Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-11-10T18:19:06.508Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
