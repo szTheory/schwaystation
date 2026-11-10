@@ -453,13 +453,14 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if ((p & 0x8u) != 0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
+        /* The root counters count lazily, so an I_STAT access first brings
+           them up to the tick of this access: an interrupt edge due by then
+           is in the register a read returns, and what happened while a bit
+           was set is behind a write that acknowledges it. */
+        if ((p & 4u) == 0u) {
+            schway__timers_sync(inst, schway__sched_now(inst, *cycles));
+        }
         if (wr == 0u) {
-            /* The root counters count lazily, so an I_STAT read first brings
-               them up to the tick of this access: an interrupt edge due by then
-               is in the register the program reads. */
-            if ((p & 4u) == 0u) {
-                schway__timers_sync(inst, schway__sched_now(inst, *cycles));
-            }
             *value = reg_get((p & 4u) != 0u ? inst->irq.mask : inst->irq.stat, p, width);
         } else if ((p & 4u) != 0u) {
             schway__irq_write_mask(inst, v << lane_shift(p), lane_mask(width) << lane_shift(p));

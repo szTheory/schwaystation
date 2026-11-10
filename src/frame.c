@@ -84,6 +84,12 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
         }
         schway__sched_sync(inst);
     }
+    /* A deadline that falls on or before the tick the advance ended on runs
+       now, not at the start of the next advance, so a state saved here never
+       holds an event behind its own tick. */
+    if (inst->sched.next <= inst->ticks) {
+        schway__sched_run(inst);
+    }
     /* One pair per 768-cycle boundary crossed. */
     audio_push_silence(inst, (uint32_t)(inst->ticks / SCHWAY__CYCLES_PER_PAIR -
                                         before / SCHWAY__CYCLES_PER_PAIR));
