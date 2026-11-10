@@ -202,10 +202,20 @@ schway_add_test(NAME cpu.exception.irq_with_queued_stores
   COMMAND schwaystation-test-exception irq_with_queued_stores
   LABELS cpu portable TIMEOUT 10)
 
-# Fault prevented: a hook that executes a GTE command in a build with no GTE, or reports the wrong words.
-schway_add_test(NAME cpu.exception.irq_entry_cop2_hook
-  COMMAND schwaystation-test-exception irq_entry_cop2_hook
-  LABELS cpu portable TIMEOUT 10)
+# Fault prevented: an entry that does not run the pending GTE command, one that loses the second run after the return, or one that runs a command the CPU could not issue.
+schway_add_test(NAME cpu.exception.irq_gte_double_execute
+  COMMAND schwaystation-test-exception irq_gte_double_execute
+  LABELS cpu gte portable TIMEOUT 10)
+
+# Fault prevented: a hook handed the branch at EPC instead of the delay slot's command, so the command is never run at the entry, or a branch read as the command.
+schway_add_test(NAME cpu.exception.irq_gte_delay_slot
+  COMMAND schwaystation-test-exception irq_gte_delay_slot
+  LABELS cpu gte portable TIMEOUT 10)
+
+# Fault prevented: an entry that reads the bus, so it sees RAM where the CPU would run the cached word, or that records its read as a first fault or a device access.
+schway_add_test(NAME cpu.exception.irq_entry_peek
+  COMMAND schwaystation-test-exception irq_entry_peek
+  LABELS cpu gte portable TIMEOUT 10)
 
 # Fault prevented: a CAUSE write whose interrupt is taken at the write, or two instructions on.
 schway_add_test(NAME cpu.exception.doc_cause_write

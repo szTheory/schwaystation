@@ -85,6 +85,44 @@ static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles, uint32
     return word;
 }
 
+/* The word the CPU would fetch at vaddr, read without a fault, an unbuilt
+   count or a cost: the instruction cache's word when the address is cached and
+   its line holds it (the cache may hold a word the RAM no longer does), else the
+   word of RAM, else the BIOS image, else 0. With a replay log attached there is no
+   memory to read and the word is 0 (PSX-SYSTEM section 2, Segments and I-cache).
+   The word is aligned down, as a fetch is. */
+static uint32_t cpu_peek_word(schway *inst, uint32_t vaddr)
+{
+    const struct schway__cpu *c = &inst->cpu;
+    uint32_t seg = schway__bus_segment(vaddr);
+    uint32_t p = vaddr & 0x1FFFFFFCu;
+    uint32_t word = 0u;
+    if (c->log != NULL || seg == (uint32_t)SCHWAY__SEG_KSEG2) {
+        return 0u;
+    }
+    if (seg != (uint32_t)SCHWAY__SEG_KSEG1 && (p >> 19) != 0x3F8u) {
+        uint32_t line = (p >> 4) & 0xFFu;
+        uint32_t w = (p >> 2) & 3u;
+        if (c->icache_tag[line] == (p >> 12) && (c->icache_valid[line] & (1u << w)) != 0u) {
+            return c->icache_word[line][w];
+        }
+    }
+    if (schway__bus_ram_word(inst, p, &word, 0u) == 0) {
+        return word;
+    }
+    if ((p >> 19) == 0x3F8u) {
+        uint32_t off = p - 0x1FC00000u;
+        const struct schway__bus *b = &inst->bus;
+        if (b->bios != NULL && off <= b->bios_size && b->bios_size - off >= 4u) {
+            for (uint32_t i = 0u; i < 4u; i++) {
+                word |= (uint32_t)b->bios[off + i] << (8u * i);
+            }
+            return word;
+        }
+    }
+    return 0u;
+}
+
 /* Writes general register n. A write to register 0 is discarded. A load
    still pending for the same register is cancelled: the later write wins
    (PSX-SYSTEM section 2, Load delay). */
@@ -334,10 +372,11 @@ static uint32_t cpu_sub_overflows(uint32_t a, uint32_t b, uint32_t diff)
    section 2, Load delay). Interrupts return to EPC + 0: the instruction at pc,
    or the branch before it when pc is a delay slot, which the entry records as
    BD with TAR the branch's destination (PSX-SYSTEM section 2, EPC). The entry
-   calls the one hook for the GTE with the word at EPC, read without charge and
-   without a first fault; with a replay log attached there is no memory to read
-   and the word is 0. The stores in the write queue stay queued: the first KSEG1
-   access after the entry drains them. */
+   calls the one hook for the GTE with the word of the interrupted instruction,
+   the one at pc even in a delay slot, where EPC names the branch, peeked
+   without charge and without a first fault; the hook executes it when it is a
+   GTE command, and it runs again after the return. The stores in the write
+   queue stay queued: the first KSEG1 access after the entry drains them. */
 static void cpu_irq_enter(schway *inst, uint32_t pc)
 {
     struct schway__cpu *c = &inst->cpu;
@@ -345,7 +384,7 @@ static void cpu_irq_enter(schway *inst, uint32_t pc)
     uint32_t take = c->branch_take;
     uint32_t epc = slot != 0u ? pc - 4u : pc;
     uint32_t target = take != 0u ? c->branch_target : pc + 4u;
-    uint32_t word = 0u;
+    uint32_t word;
     if (c->load_reg != SCHWAY__CPU_NO_LOAD) {
         if (c->load_reg != 0u) {
             c->r[c->load_reg] = c->load_value;
@@ -353,12 +392,7 @@ static void cpu_irq_enter(schway *inst, uint32_t pc)
         c->load_reg = SCHWAY__CPU_NO_LOAD;
         c->load_value = 0u;
     }
-    if (c->log == NULL) {
-        struct schway__fault held = inst->fault;
-        uint32_t sink = 0u;
-        (void)schway__bus_fetch(inst, epc & ~3u, &word, &sink);
-        inst->fault = held;
-    }
+    word = cpu_peek_word(inst, pc);
     TRACE(SCHWAY_TRACE_IRQ, trace_now(inst), epc, word, 0u, 0u, (uint32_t)SCHWAY__DEV_NONE,
           c->cop0.r[SCHWAY__COP0_CAUSE], 0u);
     schway__cop0_exception(inst, SCHWAY__EXC_INT, epc, slot, take, target, 0u, 0u, 0u);

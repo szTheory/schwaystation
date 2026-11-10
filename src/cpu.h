@@ -197,10 +197,11 @@ uint32_t schway__cop0_irq_pending(const schway *inst);
    stamp with latency, and a true-to-false one disarms it; nothing else does. */
 void schway__cop0_irq_edge(schway *inst, uint32_t was, uint32_t latency);
 
-/* The interrupt entry's one hook for the GTE: word is the instruction at the
-   EPC the entry just stored. Returns 1 when it is a COP2 command word and does
-   nothing else; the GTE plan executes the command there (PSX-SYSTEM section 2,
-   GTE in a delay slot of an interrupt). */
+/* The interrupt entry's one hook for the GTE: word is the interrupted
+   instruction, the one at pc (the delay slot's, not the branch's). When it is a
+   GTE command, ExcCode is 0 and SR.CU2 is set, the command executes here and
+   the hook returns 1; a command the CPU could not issue never reaches the GTE
+   (PSX-SYSTEM section 2, GTE in a delay slot of an interrupt). */
 uint32_t schway__cop0_irq_entry_cop2(schway *inst, uint32_t word);
 
 /* MFC0 and MTC0 on COP0 register rd. Each returns 1, or 0 when rd is one of

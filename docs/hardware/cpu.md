@@ -8,7 +8,7 @@ and behaves the same on every platform. Facts come from the psx-spx CPU Specific
 
 This page covers what is implemented so far: the registers, the decode fields, the arithmetic, logic, shift,
 set-on-less-than and load-upper-immediate class, the trapping adds, branches and jumps, loads and stores, multiply and
-divide, COP2 before the GTE, the two delay latches, the vector tests, the run loop and the stub kernel's layout. COP0
+divide, COP2 and the GTE, the two delay latches, the vector tests, the run loop and the stub kernel's layout. COP0
 and the exception entry are on their own page, [cop0.md](cop0.md). The instruction cache and the write queue are on the bus page, [bus.md](bus.md); the part of the
 fetch that touches them is described here.
 
@@ -38,7 +38,7 @@ An instruction is one 32-bit word. The executor takes its fields with shifts and
 
 Dispatch is a `switch` on op, and inside SPECIAL on funct. An encoding that is not an instruction raises a reserved
 instruction exception and records a first fault. The coprocessor 2 forms (`COP2`, `LWC2` and `SWC2`) are picked out
-by a decode flag before the switch, so the GTE can take them over without a change to the rest of the decoder.
+by a decode flag before the switch and handled in one function, which reaches the GTE.
 
 ## Arithmetic, logic, shifts and sets
 
@@ -159,18 +159,38 @@ A new multiply or divide replaces one still running: the wait a later read sees 
 `HI`, `LO` and the stamp are not touched by an exception (PSX-SYSTEM section 2, MULTU/MULT). The `cpu.timing.*` tests
 pin these times and rules.
 
-## COP2 before the GTE
+## COP2 and the GTE
 
-The GTE is not built yet, so COP2 behaves as the processor does when the coprocessor has not been enabled or has
-nothing behind it, and a later GTE replaces this with no change to the decoder.
+Coprocessor 2 is the geometry engine, described on [its own page](gte.md). The CPU reaches it with the forms below.
 
 - With SR.CU2 clear, every COP2 form raises coprocessor unusable (ExcCode 0Bh) with CE 2: the register moves `MFC2`,
   `CFC2`, `MTC2` and `CTC2`, the branches `BC2F` and `BC2T`, the commands, and `LWC2` and `SWC2`. The last two check
   alignment first, so an odd address is an address error. It records no first fault, because a handler may take it.
-- With SR.CU2 set, `MFC2` and `CFC2` read 0 into `rt` through the load delay; `MTC2`, `CTC2` and the commands do
-  nothing; `BC2F` always goes and `BC2T` never does, as the condition line is never true; `LWC2` does the real bus read
-  and drops the data, so a read of a bus gap is still a bus error, and `SWC2` does the real bus write of 0. Each of
-  them counts once as an access to the unbuilt GTE, which the runner reports (PSX-SYSTEM section 2, SR bits).
+- With SR.CU2 set, `MTC2` and `CTC2` write data register `rd` or control register 32 + `rd` with `rt`. `MFC2` and
+  `CFC2` read one into `rt` through the load delay, so the value is visible one instruction later. `LWC2` does the
+  real bus read of the word and writes it to data register `rt`, and `SWC2` does the real bus write of data register
+  `rt`; a read of a bus gap is still a bus error. `BC2F` always goes and `BC2T` never does, as the condition line is
+  never true. None of these counts as an access to an unbuilt device.
+- A command (an instruction with bit 25 of the word set) executes at once. It keeps the engine busy for its documented
+  time, 5 to 44 cycles by command; the CPU keeps the engine's ready stamp, the cycle counter value at which the last
+  command finishes, with the same convention as the multiply unit: a command issued at counter value t is ready at t
+  plus its busy time.
+- `MFC2`, `CFC2`, `SWC2` and a new command wait for the running command; `MTC2`, `CTC2` and `LWC2` do not (the
+  gte-timing hardware results, MIT, What waits). The wait is what is left of the busy time when the instruction
+  issues, so each instruction between the command and the one that waits shortens it by a cycle, and it is never more
+  than 44 cycles, the longest command, whatever a loaded state holds. `MFC2` right after a command takes the command's
+  busy time in all, as `MFLO` right after a multiply takes the multiply's.
+- Interrupts: an interrupt taken before a GTE command lets the command execute at the entry and again after the return.
+  The entry's busy stamp is set from the entry's own cycle. The command is the instruction at the program counter, in a
+  branch delay slot the slot's, not the branch EPC names; see [the COP0 page](cop0.md#interrupts).
+
+Deviation: on the console a write to a GTE register by `MTC2`, `CTC2` or `LWC2` is not visible to a command or a read
+for two instructions. This implementation does not model that latency, so a command or read right after the write sees
+the new value. Programs that depend on the old value in those two instructions are not reproduced, and the case is not
+in the hardware vectors replayed here.
+
+The `cpu.cop2.*` tests pin the moves and the unusable check, `cpu.timing.gte_cycles` and `cpu.timing.gte_stall_rules`
+the busy times and the wait rule, and the `cpu.exception.irq_gte_*` and `irq_entry_peek` tests the interrupt entry.
 
 `COP1` and `COP3` do not exist on the console. With SR.CU1 or SR.CU3 clear their instructions, loads and stores
 included (`LWC1`, `SWC1`, `LWC3`, `SWC3`), raise coprocessor unusable with CE 1 or 3 and record a first fault; with the

@@ -182,10 +182,14 @@ What the entry does, on top of the steps under Entry:
   and DBE, then overflow, then the interrupt, then `SYSCALL`, `BREAK`, RI and CpU, then the fetch's AdEL and IBE
   (PSX-SYSTEM section 2, Priority). The ones above the interrupt are taken and the interrupt waits for the return from
   exception; the ones below are not, and the instruction runs again after the return.
-- The entry calls one hook, `schway__cop0_irq_entry_cop2`, with the word at EPC. On the console an interrupt taken
-  when the next instruction is a GTE command lets that command execute, so it runs twice (PSX-SYSTEM section 2, GTE in a
-  delay slot of an interrupt). The GTE does not exist yet, so the hook only reports whether the word is a GTE command and
-  executes nothing; the plan that builds the GTE executes it there.
+- The entry calls one hook, `schway__cop0_irq_entry_cop2`, with the interrupted instruction: the word at the program
+  counter, read without a charge, a fault or a device count, from the instruction cache when it holds that address
+  (it may hold a word the RAM no longer does), else from RAM or the BIOS image. In a branch delay slot that is the
+  slot's instruction, while EPC names the branch. On the console an interrupt taken when the next instruction is a GTE
+  command lets that command execute, so it runs twice (PSX-SYSTEM section 2, GTE in a delay slot of an interrupt). The
+  hook executes the command at the entry, before the handler's first instruction, when the word is a command, ExcCode
+  is 0 and SR.CU2 is set; with CU2 clear the instruction would raise coprocessor unusable and never reach the GTE.
+  The command runs again after the return. With a replay log attached there is no memory to read and the word is 0.
 
 ## Exception matrix fixture
 

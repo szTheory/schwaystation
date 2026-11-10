@@ -562,25 +562,24 @@ static void irq_with_queued_stores(void)
     schway_destroy(inst);
 }
 
-/* The interrupt entry calls one hook with the word at EPC. In this build the
-   hook only reports whether that word is a command of the GTE: it returns 1 for
-   one and 0 for any other word, and executes nothing, so the GTE has seen no
-   access when the handler is entered. The command at EPC runs once, after the
-   handler returns to it. This changes with the GTE: on the console the command
-   also executes at the entry and then again after the return (PSX-SYSTEM section
-   2, GTE in a delay slot of an interrupt), and the plan that builds the GTE
-   replaces the last two checks.
-   Fault prevented: a hook that executes the command now, in a build with no GTE
-   to execute it, or one that reports the wrong words. */
-static void irq_entry_cop2_hook(void)
+/* RTPS, the command word used below, keeps the engine busy 15 cycles. */
+#define RTPS_BUSY 15u
+
+/* The interrupt entry hands the interrupted instruction to the one hook for the
+   GTE, and a command there executes before the handler's first instruction and
+   again when the return makes it run. An interrupt due before a command: the
+   entry sets the engine's stamp 15 cycles after the entry's own cycle, the
+   handler runs, and after the return the command's own issue sets it again, from
+   the cycle it issues on, with the wait for the entry's command in front of it
+   (PSX-SYSTEM section 2, GTE in a delay slot of an interrupt). With SR.CU2 clear
+   the instruction would raise CpU, so the entry executes nothing.
+   Fault prevented: an entry that does not run the pending command, one that runs
+   it but loses the second run after the return, or one that runs a command the
+   CPU could not issue. */
+static void irq_gte_double_execute(void)
 {
     schway *inst = make();
-    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, COP2_COMMAND), 1u);
-    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, 0x4BFFFFFFu), 1u);
-    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, COP2_MFC2), 0u);
-    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, NOP_WORD), 0u);
-    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, 0x4A000000u ^ 0x02000000u), 0u);
-
+    uint64_t at_entry, before, wait;
     inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_CU2 | SR_IEC | SR_IM2;
     enable_vblank(inst);
     put(inst, CODE, NOP_WORD);
@@ -590,11 +589,16 @@ static void irq_entry_cop2_hook(void)
     put(inst, VECTOR_RAM + 4u, NOP_WORD);
     put(inst, VECTOR_RAM + 8u, JR_WORD(26u));
     put(inst, VECTOR_RAM + 12u, RFE_WORD);
+    CHECK_EQ_U64(inst->gte.ready, 0u);
     schway__irq_raise(inst, 0u);
     step(inst, CODE);
     next(inst);
+    CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM);
     CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), CODE + 8u);
     CHECK_EQ_U64(exc_code(inst), 0u);
+    /* The command ran at the entry: the stamp is set, before any handler code. */
+    CHECK_EQ_U64(inst->gte.ready, inst->cpu.cycle + RTPS_BUSY);
+    at_entry = inst->gte.ready;
     CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GTE], 0u);
     /* The handler acknowledges the vertical blank and returns to EPC. */
     schway__irq_write_stat(inst, 0u, 0xFFFFFFFFu);
@@ -602,10 +606,155 @@ static void irq_entry_cop2_hook(void)
         next(inst);
     }
     CHECK_EQ_HEX(inst->cpu.pc, CODE + 8u);
-    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GTE], 0u);
+    CHECK_EQ_U64(inst->gte.ready, at_entry);
+    /* It runs again now, behind what is left of the entry's. */
+    before = inst->cpu.cycle;
+    wait = at_entry > before ? at_entry - before : 0u;
     next(inst);
-    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GTE], 0u);
+    CHECK_EQ_HEX(inst->cpu.pc, CODE + 12u);
+    CHECK_EQ_U64(inst->gte.ready, before + wait + RTPS_BUSY);
     schway_destroy(inst);
+
+    /* With CU2 clear the entry runs nothing. */
+    inst = make();
+    inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_IEC | SR_IM2;
+    enable_vblank(inst);
+    put(inst, CODE, NOP_WORD);
+    put(inst, CODE + 4u, NOP_WORD);
+    put(inst, CODE + 8u, COP2_COMMAND);
+    schway__irq_raise(inst, 0u);
+    step(inst, CODE);
+    next(inst);
+    CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), CODE + 8u);
+    CHECK_EQ_U64(inst->gte.ready, 0u);
+    schway_destroy(inst);
+
+    /* The hook itself, called directly: a word that is not a command runs
+       nothing. A command word runs only with ExcCode 0. */
+    inst = make();
+    inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_CU2;
+    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, COP2_MFC2), 0u);
+    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, NOP_WORD), 0u);
+    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, 0x4A000000u ^ 0x02000000u), 0u);
+    CHECK_EQ_U64(inst->gte.ready, 0u);
+    inst->cpu.cop0.r[SCHWAY__COP0_CAUSE] = 8u << 2;
+    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, COP2_COMMAND), 0u);
+    CHECK_EQ_U64(inst->gte.ready, 0u);
+    inst->cpu.cop0.r[SCHWAY__COP0_CAUSE] = 0u;
+    CHECK_EQ_U64(schway__cop0_irq_entry_cop2(inst, COP2_COMMAND), 1u);
+    CHECK_EQ_U64(inst->gte.ready, inst->cpu.cycle + RTPS_BUSY);
+    schway_destroy(inst);
+}
+
+/* An interrupt taken when the next instruction is the delay slot of a branch
+   returns to the branch, and it is the slot's instruction that is pending: a GTE
+   command in the slot executes at the entry, EPC naming the branch with BD set,
+   and again after the return when the slot runs. A word that is not a command in
+   the slot executes nothing, whatever the branch is.
+   Fault prevented: a hook handed the word at EPC, which is the branch, so a
+   command in a slot is never run at the entry or a branch is read as the
+   command. */
+static void irq_gte_delay_slot(void)
+{
+    schway *inst = make();
+    uint64_t at_entry, before, wait;
+    inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_CU2 | SR_IEC | SR_IM2;
+    enable_vblank(inst);
+    put(inst, CODE, NOP_WORD);
+    put(inst, CODE + 4u, ITYPE(4u, 0u, 0u, 4u)); /* BEQ r0, r0, +4: always taken */
+    put(inst, CODE + 8u, COP2_COMMAND);
+    put(inst, VECTOR_RAM, MFC0_WORD(26u, SCHWAY__COP0_EPC));
+    put(inst, VECTOR_RAM + 4u, NOP_WORD);
+    put(inst, VECTOR_RAM + 8u, JR_WORD(26u));
+    put(inst, VECTOR_RAM + 12u, RFE_WORD);
+    schway__irq_raise(inst, 0u);
+    step(inst, CODE);
+    next(inst);
+    CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM);
+    CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), CODE + 4u);
+    CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_CAUSE) & 0x80000000u, 0x80000000u);
+    CHECK_EQ_U64(inst->gte.ready, inst->cpu.cycle + RTPS_BUSY);
+    at_entry = inst->gte.ready;
+    /* Return to the branch: it runs, then its slot's command runs again. */
+    schway__irq_write_stat(inst, 0u, 0xFFFFFFFFu);
+    for (uint32_t i = 0u; i < 4u; i++) {
+        next(inst);
+    }
+    CHECK_EQ_HEX(inst->cpu.pc, CODE + 4u);
+    next(inst);
+    CHECK_EQ_HEX(inst->cpu.pc, CODE + 8u);
+    CHECK_EQ_U64(inst->gte.ready, at_entry);
+    before = inst->cpu.cycle;
+    wait = at_entry > before ? at_entry - before : 0u;
+    next(inst);
+    CHECK_EQ_U64(inst->gte.ready, before + wait + RTPS_BUSY);
+    schway_destroy(inst);
+
+    /* A plain word in the slot: nothing executes at the entry. */
+    inst = make();
+    inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_CU2 | SR_IEC | SR_IM2;
+    enable_vblank(inst);
+    put(inst, CODE, NOP_WORD);
+    put(inst, CODE + 4u, ITYPE(4u, 0u, 0u, 4u));
+    put(inst, CODE + 8u, NOP_WORD);
+    schway__irq_raise(inst, 0u);
+    step(inst, CODE);
+    next(inst);
+    CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), CODE + 4u);
+    CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM);
+    CHECK_EQ_U64(inst->gte.ready, 0u);
+    schway_destroy(inst);
+}
+
+/* The entry reads the pending word the way the CPU would fetch it and leaves no
+   trace of the read: a command held in the instruction cache runs even when the
+   RAM behind it has been overwritten with a no-operation, a command in uncached
+   RAM runs with the cache empty, and neither read counts an unbuilt access,
+   moves the last-access record or latches a fault.
+   Fault prevented: an entry that reads the bus, so it sees the new RAM word where
+   the CPU would run the cached one, or that records the peek as a first fault or
+   a device access. */
+static void irq_entry_peek(void)
+{
+    static const uint32_t bases[] = {CODE, 0xA0001000u};
+    for (size_t i = 0u; i < sizeof bases / sizeof bases[0]; i++) {
+        uint32_t base = bases[i];
+        schway *inst = make();
+        uint32_t unbuilt_n[SCHWAY__DEV_COUNT];
+        uint32_t last[4];
+        struct schway__fault fault;
+        uint32_t cycles = 0u;
+        inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_CU2 | SR_IEC | SR_IM2;
+        enable_vblank(inst);
+        put(inst, base, NOP_WORD);
+        put(inst, base + 4u, NOP_WORD);
+        put(inst, base + 8u, COP2_COMMAND);
+        put(inst, base + 12u, NOP_WORD);
+        if (i == 0u) {
+            /* Fill the line, then change the RAM under it, behind the cache. */
+            for (uint32_t k = 0u; k < 4u; k++) {
+                uint32_t word = 0u;
+                CHECK_EQ_U64(schway__cpu_icache_fetch(inst, base + 4u * k, &word, &cycles), 0u);
+            }
+            CHECK_EQ_U64(schway__bus_write(inst, 0xA0000000u | (base & 0x1FFFFFFFu) | 8u, 4u,
+                                           NOP_WORD, &cycles),
+                         0u);
+        }
+        schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, 0x1F801C00u, 4u, 0u, 0u);
+        memcpy(unbuilt_n, inst->bus.unbuilt_n, sizeof unbuilt_n);
+        memcpy(last, inst->bus.last_unbuilt, sizeof last);
+        fault = inst->fault;
+        schway__irq_raise(inst, 0u);
+        step(inst, base);
+        next(inst);
+        CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM);
+        CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), base + 8u);
+        CHECK_EQ_U64(inst->gte.ready, inst->cpu.cycle + RTPS_BUSY);
+        CHECK_EQ_U64(memcmp(unbuilt_n, inst->bus.unbuilt_n, sizeof unbuilt_n), 0);
+        CHECK_EQ_U64(memcmp(last, inst->bus.last_unbuilt, sizeof last), 0);
+        CHECK_EQ_U64(memcmp(&fault, &inst->fault, sizeof fault), 0);
+        schway_destroy(inst);
+    }
 }
 
 /* The latencies below are an inference, not a measurement: the published
@@ -775,7 +924,9 @@ int main(int argc, char **argv)
         {"ibe_unmapped_fetch", ibe_unmapped_fetch},
         {"priority", priority},
         {"irq_with_queued_stores", irq_with_queued_stores},
-        {"irq_entry_cop2_hook", irq_entry_cop2_hook},
+        {"irq_gte_double_execute", irq_gte_double_execute},
+        {"irq_gte_delay_slot", irq_gte_delay_slot},
+        {"irq_entry_peek", irq_entry_peek},
         {"doc_cause_write", doc_cause_write},
         {"doc_sr_write", doc_sr_write},
         {"doc_imask_write", doc_imask_write},

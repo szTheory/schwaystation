@@ -37,7 +37,9 @@ cpu.exception.doc_imask_write	cpu,portable
 cpu.exception.doc_sr_write	cpu,portable
 cpu.exception.ibe_unmapped_fetch	cpu,portable
 cpu.exception.irq_dropped_before_entry	cpu,portable
-cpu.exception.irq_entry_cop2_hook	cpu,portable
+cpu.exception.irq_entry_peek	cpu,gte,portable
+cpu.exception.irq_gte_delay_slot	cpu,gte,portable
+cpu.exception.irq_gte_double_execute	cpu,gte,portable
 cpu.exception.irq_latency_device	cpu,portable
 cpu.exception.irq_masked_sr	cpu,portable
 cpu.exception.irq_rfe	cpu,portable

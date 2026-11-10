@@ -11,8 +11,8 @@ public ps1-tests repository support; the numerics and the commands follow as the
 
 The register file and its read and write rules are built and replayed against the hardware cases. The commands are
 dispatched and report their busy cycles, but compute nothing yet, so every case that runs a command except the
-register-only ones still fails; the run says how many cases ran. The CPU's COP2 forms still take the path described in
-"COP2 before the GTE" in [the CPU page](cpu.md), which does not reach this engine yet.
+register-only ones still fails; the run says how many cases ran. The CPU's COP2 forms reach this engine, as "COP2 and
+the GTE" in [the CPU page](cpu.md) describes.
 
 ## The two register files
 

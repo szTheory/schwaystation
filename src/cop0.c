@@ -102,13 +102,20 @@ void schway__cop0_irq_edge(schway *inst, uint32_t was, uint32_t latency)
 /* The interrupt entry's hook for the GTE. On the console an interrupt taken
    while the next instruction is a GTE command lets that command execute, and it
    executes again after the return, because EPC names it (PSX-SYSTEM section 2,
-   GTE in a delay slot of an interrupt). The GTE does not exist yet, so the hook
-   only reports the command word; the plan that builds the GTE executes the
-   command here, once, before the handler's first instruction. */
+   GTE in a delay slot of an interrupt). word is the interrupted instruction.
+   The command executes here, before the handler's first instruction, when
+   CAUSE's ExcCode is 0, SR.CU2 is set and the word is a command; with CU2 clear
+   the instruction would raise CpU instead and never reach the GTE. It keeps the
+   engine busy from the entry's cycle. Returns 1 when it executed a command. */
 uint32_t schway__cop0_irq_entry_cop2(schway *inst, uint32_t word)
 {
-    (void)inst;
-    return (word >> 25) == 0x25u ? 1u : 0u;
+    const uint32_t *r = inst->cpu.cop0.r;
+    if ((word >> 25) != 0x25u || ((r[SCHWAY__COP0_CAUSE] >> 2) & 31u) != 0u ||
+        (r[SCHWAY__COP0_SR] & SCHWAY__SR_CU2) == 0u) {
+        return 0u;
+    }
+    inst->gte.ready = inst->cpu.cycle + schway__gte_exec(&inst->gte, word & 0x01FFFFFFu);
+    return 1u;
 }
 
 /* SR writes keep the bits the CPU has: the coprocessor-usable bits, BEV, the
