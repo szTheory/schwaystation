@@ -80,3 +80,21 @@ schway_add_test(NAME timers.irq.pulse
 schway_add_test(NAME timers.irq.toggle
   COMMAND schwaystation-test-timers irq_toggle
   LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: a repeating pulse counter at target 0 that gives the
+# scheduler an event for every hit, or one that raises while the bit is set.
+schway_add_test(NAME timers.storm.collapse
+  COMMAND schwaystation-test-timers storm_collapse
+  LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: a deadline at or before the tick it was made at in any
+# mode of any counter, which would run the same event for ever.
+schway_add_test(NAME timers.deadline.progress
+  COMMAND schwaystation-test-timers deadline_progress
+  LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: a state that depends on when the counters were last
+# caught up, or a save that changes the instance.
+schway_add_test(NAME timers.state.cadence
+  COMMAND schwaystation-test-timers state_cadence
+  LABELS timers portable TIMEOUT 10)

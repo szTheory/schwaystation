@@ -12,18 +12,19 @@ struct schway__state_io;
 /* Counters 0 to 2 (psx-spx, Timers). */
 #define SCHWAY__TIMERS 3u
 
-/* One counter as seen at the instance's tick, with no record of when it was
-   last brought up to date, so a state hash does not depend on when that
-   happened. value and target are 16 bits and mode has the 13 stored bits.
-   hold counts the cycles a changed request stays latched (0 to 2), and the
-   rest are flags. */
+/* One counter as of a tick. value and target are 16 bits; mode holds the 10
+   bits a program writes; hold counts the cycles a written value stays on show
+   (0 to 2); reached has the target flag in bit 0 and the FFFFh flag in bit 1;
+   irq_line is MODE bit 10 (1 is idle); the rest are flags. The saved state
+   holds the view as of the instance's tick, so it does not depend on when a
+   catch-up last ran. */
 struct schway__timer {
     uint32_t value, target, mode, hold;
     uint32_t reached, irq_line, oneshot_done, paused, free_after;
 };
 
-/* base is the tick the counters are as of. It is not state: a load sets it to
-   the loaded tick. */
+/* base is the tick the stored views are as of. It is not state: a load sets it
+   to the loaded tick. */
 struct schway__timers {
     struct schway__timer t[SCHWAY__TIMERS];
     uint64_t base;
@@ -41,7 +42,8 @@ void schway__timers_state_io(struct schway__state_io *io, schway *inst);
 void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint32_t *value,
                        uint32_t *cycles);
 
-/* The tick the next counter event falls on, or UINT64_MAX for never. */
+/* The tick of the next event that would raise a new I_STAT edge, or UINT64_MAX
+   for never. */
 uint64_t schway__timers_next(const schway *inst);
 
 /* Runs what is due at tick now. */

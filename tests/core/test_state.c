@@ -465,8 +465,15 @@ static void test_device_fields(void)
     src->dma.busy_until = src->ticks + 1000u;
     src->dma.dicr = 0x00A38000u;
     src->dma.crc[6] = 0xDEADBEEFu;
+    /* The counters are stored as seen at the instance's tick, so only a view
+       that does not move shows that the base tick is no part of the state:
+       sources 1 of counters 0 and 1 have no clock yet, and counter 2 waits
+       for its synchronisation. */
+    src->timers.t[0].mode = 0x0100u;
     src->timers.t[1].value = 0x1234u;
-    src->timers.t[1].mode = 0x1C00u;
+    src->timers.t[1].mode = 0x0100u;
+    src->timers.t[2].mode = 0x0001u;
+    src->timers.t[2].paused = 1u;
     src->timers.t[2].hold = 2u;
     size_t n = save(src, good);
     schway *dst = make(SCHWAY_REGION_NTSC_U);

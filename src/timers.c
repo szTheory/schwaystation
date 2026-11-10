@@ -399,22 +399,39 @@ void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, ui
     schway__sched_recalc(inst);
 }
 
-/* Each counter's nine fields in a fixed order, bounded to their widths. */
-void schway__timers_state_io(struct schway__state_io *io, schway *inst)
+/* The three counters as seen at tick now: the stored views carried forward by
+   a pure function, with no interrupt raised and nothing written back. */
+static void view_as_of(const struct schway__timers *src, uint64_t now,
+                       struct schway__timer out[SCHWAY__TIMERS])
 {
     for (uint32_t i = 0; i < SCHWAY__TIMERS; i++) {
-        struct schway__timer *t = &inst->timers.t[i];
-        (void)schway__state_u32(io, name_value, &t->value, 0u, 0xFFFFu);
-        (void)schway__state_u32(io, name_target, &t->target, 0u, 0xFFFFu);
-        (void)schway__state_u32(io, name_mode, &t->mode, 0u, 0x1FFFu);
-        (void)schway__state_u32(io, name_hold, &t->hold, 0u, 2u);
-        (void)schway__state_u32(io, name_reached, &t->reached, 0u, 3u);
+        out[i] = src->t[i];
+        (void)run_steps(&out[i], source_steps(i, out[i].mode, src->base, now));
+    }
+}
+
+/* Each counter's nine fields in a fixed order, bounded to their widths. The
+   walk is of the view as of the instance's tick, so the bytes do not depend on
+   when a catch-up last ran and saving changes nothing in the instance; a load
+   writes the view back and makes its tick the base. */
+void schway__timers_state_io(struct schway__state_io *io, schway *inst)
+{
+    struct schway__timer v[SCHWAY__TIMERS];
+    view_as_of(&inst->timers, inst->ticks, v);
+    for (uint32_t i = 0; i < SCHWAY__TIMERS; i++) {
+        struct schway__timer *t = &v[i];
+        (void)schway__state_u32(io, name_value, &t->value, 0u, COUNT_MAX);
+        (void)schway__state_u32(io, name_target, &t->target, 0u, COUNT_MAX);
+        (void)schway__state_u32(io, name_mode, &t->mode, 0u, MODE_WRITABLE);
+        (void)schway__state_u32(io, name_hold, &t->hold, 0u, HOLD_WRITE);
+        (void)schway__state_u32(io, name_reached, &t->reached, 0u, REACHED_TARGET | REACHED_FFFF);
         (void)schway__state_u32(io, name_irq_line, &t->irq_line, 0u, 1u);
         (void)schway__state_u32(io, name_oneshot_done, &t->oneshot_done, 0u, 1u);
         (void)schway__state_u32(io, name_paused, &t->paused, 0u, 1u);
         (void)schway__state_u32(io, name_free_after, &t->free_after, 0u, 1u);
     }
     if (io->mode == SCHWAY__STATE_APPLY) {
+        memcpy(inst->timers.t, v, sizeof v);
         inst->timers.base = inst->ticks;
     }
 }

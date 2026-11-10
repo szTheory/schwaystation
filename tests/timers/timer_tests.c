@@ -461,11 +461,160 @@ static void case_irq_toggle(void)
     schway_destroy(inst);
 }
 
+/* The frame's no-program loop with a count of the events it runs: the scheduler
+   stops at every deadline, runs what is due and goes on. The deadline each
+   event leaves behind is checked here too, since a deadline at or before the
+   tick it was made at would run again at once and never advance. */
+static uint64_t drive(schway *inst, uint64_t until, int ack_all)
+{
+    uint64_t events = 0u;
+    while (inst->ticks < until) {
+        if (inst->sched.next <= inst->ticks) {
+            uint64_t at_tick = inst->ticks;
+            schway__sched_run(inst);
+            events++;
+            CHECK(inst->sched.next > at_tick);
+            if (ack_all != 0) {
+                wr32(inst, ISTAT, 0u);
+                CHECK(inst->sched.next > at_tick);
+            }
+        }
+        uint64_t step = until - inst->ticks;
+        if (inst->sched.next > inst->ticks && inst->sched.next - inst->ticks < step) {
+            step = inst->sched.next - inst->ticks;
+        }
+        inst->ticks += step;
+    }
+    schway__sched_sync(inst);
+    return events;
+}
+
+/* Fault prevented: a pulse-repeat counter at target 0, which has an event every
+   second cycle, that gives the scheduler an event each. Without an
+   acknowledgement a whole frame is one event (one raise: setting the bit again
+   changes nothing) and the scheduler is left with no deadline; an
+   acknowledgement lets exactly one more through. */
+static void case_storm_collapse(void)
+{
+    schway *inst = make();
+    uint64_t frame = inst->frame_end;
+    wr32(inst, TARGET(0u), 0u);
+    wr32(inst, MODE(0u), M_RESET_TARGET | M_IRQ_TARGET | M_REPEAT);
+    CHECK_EQ_U64(inst->sched.next, 3u);
+    CHECK_EQ_U64(drive(inst, frame, 0), 1u);
+    CHECK_EQ_U64(stat_bit(inst, 4u), 1u);
+    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+    ack(inst, 4u);
+    CHECK(inst->sched.next > inst->ticks);
+    CHECK_EQ_U64(drive(inst, frame + 1000u, 0), 1u);
+    CHECK_EQ_U64(stat_bit(inst, 4u), 1u);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: a deadline at or before the tick it was computed at, in any
+   mode of any counter, which would make the scheduler run the same event
+   forever. All three counters are armed in each of the 24 combinations of reset
+   point, interrupt sources, repeat and toggle, with counts near FFFFh so both
+   sources fire; every event is acknowledged at once so that deadlines go on
+   being made. */
+static void case_deadline_progress(void)
+{
+    for (uint32_t m = 0; m < 24u; m++) {
+        uint32_t mode = ((m & 1u) != 0u ? M_RESET_TARGET : 0u) | ((m & 2u) != 0u ? M_REPEAT : 0u) |
+                        ((m & 4u) != 0u ? M_TOGGLE : 0u);
+        uint32_t irq = m / 8u;
+        mode |= irq == 0u ? M_IRQ_TARGET : irq == 1u ? M_IRQ_FFFF : (M_IRQ_TARGET | M_IRQ_FFFF);
+        schway *inst = make();
+        static const uint32_t targets[3] = {1u, 5u, 2u};
+        for (uint32_t i = 0; i < 3u; i++) {
+            wr32(inst, TARGET(i), targets[i]);
+            wr32(inst, MODE(i), mode | (i == 2u ? M_DIV8 : 0u));
+            wr32(inst, COUNT(i), 0xFFF8u);
+        }
+        uint64_t events = drive(inst, 3000u, 1);
+        CHECK(events >= 1u);
+        CHECK(events <= 3000u);
+        schway_destroy(inst);
+    }
+}
+
+static size_t save_state(const schway *inst, uint8_t **buf)
+{
+    size_t n = schway_state_size(inst);
+    *buf = (uint8_t *)malloc(n);
+    if (*buf == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(inst, *buf, n), SCHWAY_STATUS_OK);
+    return n;
+}
+
+/* The two instances' states are byte for byte equal, and saving moved nothing
+   in either. */
+static void same_state(schway *a, schway *b)
+{
+    struct schway__timers before = a->timers;
+    uint8_t *sa;
+    uint8_t *sb;
+    size_t na = save_state(a, &sa);
+    size_t nb = save_state(b, &sb);
+    CHECK(na == nb && memcmp(sa, sb, na) == 0);
+    CHECK(memcmp(before.t, a->timers.t, sizeof before.t) == 0 && before.base == a->timers.base);
+    free(sa);
+    free(sb);
+}
+
+/* Fault prevented: a state that depends on when the counters were last brought
+   up to date, or a save that changes the instance. Two instances run one
+   program of register accesses and runs across a frame end; one is caught up
+   before and after every step as well and the other only by the accesses
+   themselves, and their saved states are equal at both points of every step. */
+static void case_state_cadence(void)
+{
+    static const struct {
+        uint64_t tick;
+        uint32_t addr, value;
+    } program[] = {
+        {0u, TARGET(0u), 100u},
+        {0u, MODE(0u), M_RESET_TARGET | M_IRQ_TARGET | M_REPEAT | M_TOGGLE},
+        {0u, MODE(1u), M_IRQ_FFFF},
+        {0u, COUNT(1u), 0xFFF0u},
+        {0u, TARGET(2u), 5000u},
+        {0u, MODE(2u), M_RESET_TARGET | M_IRQ_TARGET | M_REPEAT | M_DIV8},
+        {37u, ISTAT, 0u},
+        {5000u, MODE(0u), M_RESET_TARGET | M_IRQ_TARGET | M_REPEAT | M_TOGGLE},
+        {12345u, ISTAT, 0u},
+        {70001u, COUNT(2u), 4990u},
+        {100000u, ISTAT, 0u},
+        {200001u, MODE(0u), 0u},
+        {600000u, COUNT(1u), 0xFFFFu},
+        {700000u, ISTAT, 0u},
+    };
+    schway *a = make();
+    schway *b = make();
+    for (size_t i = 0; i < sizeof program / sizeof program[0]; i++) {
+        advance_to(a, program[i].tick);
+        advance_to(b, program[i].tick);
+        schway__timers_sync(a, a->ticks);
+        same_state(a, b);
+        wr32(a, program[i].addr, program[i].value);
+        wr32(b, program[i].addr, program[i].value);
+        schway__timers_sync(a, a->ticks);
+        same_state(a, b);
+    }
+    advance_to(a, 800000u);
+    advance_to(b, 800000u);
+    same_state(a, b);
+    schway_destroy(a);
+    schway_destroy(b);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
     {"count_above", case_count_above},
+    {"deadline_progress", case_deadline_progress},
     {"div8_wrap_irq", case_div8_wrap_irq},
     {"irq_oneshot", case_irq_oneshot},
     {"irq_pulse", case_irq_pulse},
@@ -473,6 +622,8 @@ static const struct {
     {"irq_toggle", case_irq_toggle},
     {"mode_read_clears", case_mode_read_clears},
     {"mode_write", case_mode_write},
+    {"state_cadence", case_state_cadence},
+    {"storm_collapse", case_storm_collapse},
     {"target_period", case_target_period},
     {"wrap_no_dwell", case_wrap_no_dwell},
     {"write_hold", case_write_hold},
