@@ -12,10 +12,10 @@ last_activity_desc: "Phase 3 shipped as PR #12"
 state_head: 52cda5d7880e739ed824e3aa16e897cfa32ca13e
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 68
   completed_plans: 68
-  percent: 33
+  percent: 50
 ---
 
 # Project State
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 03 — The GTE matches the hardware cases; DMA and timers
+**Current focus:** Phase 04 — Games play in RetroArch
 
 ## Current Position
 
 Phase: 4 — Games play in RetroArch
-Plan: Not started
-Status: Ready to plan
+Plan: Discussion complete; planning next
+Status: Planning
 Last activity: 2026-11-10 -- Phase 3 shipped as PR #12
 
-Progress: [███░░░░░░░] 33%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -321,6 +321,8 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-ship 3; renewed /gsd-autonomous for remaining milestone | Codex, OpenGSD 1.20.0; inline shipping and hosted CI; next autonomous phase stops before ship | GPT-6 (session; exact model ID not exposed) |
 
+| 2026-11-10 | /gsd-discuss-phase 4 via /gsd-autonomous | Codex, OpenGSD 1.20.0; three parallel advisors and combined adversarial pass | GPT-6 (session; exact model ID not exposed); advisors gpt-6-luna at xhigh |
+
 ## Session Continuity
 
 Last session: 2026-11-10T08:23:44.047Z
@@ -332,8 +334,7 @@ Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8
 Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next: `/gsd-ship 3` (PR title `feat: match the GTE hardware cases and add DMA and timers`), then from a shell
-`gh pr merge --auto --squash`, confirm a CI run on the head commit (the hosted asan, be32, wasm32, nofp, perf and
-eight-lane hash-equality jobs are confirmed there, not locally), and confirm the release pull request is green after the
-merge. Then `/gsd-discuss-phase 4`.
-After phase 3 shipping and release confirmation, continue `/gsd-autonomous --from 4`; stop at the next phase's pre-ship boundary (AGENTS rule 9). Standing preferences are in `.planning/AUTONOMOUS.md`.
+Phase 3 merged as PR #12; release PR #13 is green and merged. v0.3.0 is latest with 19 assets.
+Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
+Continue `/gsd-autonomous --from 4` with planning, execution, review and verification. Stop before phase-4 ship
+(AGENTS rule 9). Standing preferences are in `.planning/AUTONOMOUS.md`.

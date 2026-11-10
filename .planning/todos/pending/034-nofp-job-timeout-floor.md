@@ -27,3 +27,11 @@ slow checkout or image pull cannot fail a required job with no code cause.
 - `grep -A3 'nofp:' .github/workflows/ci.yml` shows a `timeout-minutes` of at least 3 with the reason beside it, and
   the existing timeout checks in `cmake --workflow --preset ci` still pass.
 - No planning ID appears in the code it adds.
+
+## Reproduced at phase 3 ship
+
+Two runs timed out at the one-minute limit: release PR CI run 42840838785 and release publication run
+42841474140. The latter completed all nofp tests before cancellation. The same release commit passed its
+main-branch nofp job in 9 seconds; rerunning only the affected release job after competing runs ended passed
+in 10 seconds. Preserve the existing at-least-three-minute fix at the first phase-4 ci.yml caller.
+Evidence: https://github.com/szTheory/schwaystation/actions/runs/42841474140
