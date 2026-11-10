@@ -52,14 +52,11 @@ evidence. Lessons from the sibling emulators are in `.planning/LESSONS.md`; re-r
    session is bounded by time and tokens only. A failing harness assertion is a test bug to triage, not a release
    gate. Requirements never name a fact that only a published release can show, and never need a person who is
    not the owner.
-9. **One GSD step per session, then stop.** Report what finished and the exact next command. Never run
-   `/gsd-next`, `/gsd-manager`, `/gsd-progress --next` or `--do`, or `/gsd-profile-user`, and never set the
-   hygiene bypasses `SCHWAYSTATION_ALLOW_CHAIN` or `SCHWAYSTATION_ALLOW_MAIN_COMMIT`. Inside a step, proceed
-   without routine confirmations. Record the runtime and model used in STATE.md at every phase step.
-   Exception for milestone v1.0: the owner may start `/gsd-autonomous` (and so its `--auto` and `--chain`
-   flags) from a shell where the owner has exported `SCHWAYSTATION_ALLOW_CHAIN=1`. An agent never starts it,
-   never sets the bypass and never adds those flags on its own. Under it, discuss and verify steps follow
-   `.planning/AUTONOMOUS.md`, and a run stops where rule 10 needs a merge: at the end of a phase's verify, before
+9. **GSD steps, autonomous runs allowed.** The owner may run `/gsd-autonomous` and chained steps; no bypass or
+   export is needed, and the owner says when to turn the stop policy back on. Never run `/gsd-profile-user`, and
+   never set `SCHWAYSTATION_ALLOW_MAIN_COMMIT`. Inside a step, proceed without routine confirmations. Record the
+   runtime and model used in STATE.md at every phase step. Discuss and verify steps follow
+   `.planning/AUTONOMOUS.md`. A run stops where rule 10 needs a merge: at the end of a phase's verify, before
    `/gsd-ship`.
 10. **Branch, then pull request.** Never commit on `main` once a remote exists. Before the first GSD step that
     commits, branch off `origin/main`: `phase/NN-slug` for a phase, `milestone/vX.Y-slug` for milestone steps,

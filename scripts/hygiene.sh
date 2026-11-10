@@ -88,16 +88,6 @@ check_files() {
   set +f
   IFS=$old_ifs
 }
-# One GSD step per command; SCHWAYSTATION_ALLOW_CHAIN=1 is the owner's bypass, never an agent's.
-check_stop_policy() {
-  [ "${SCHWAYSTATION_ALLOW_CHAIN:-0}" = 1 ] && return 0
-  [ -f .planning/config.json ] || return 0
-  grep -q -E '"mode"[[:space:]]*:[[:space:]]*"interactive"' .planning/config.json ||
-    found 'GSD mode is not interactive' .planning/config.json
-  if grep -q -E '"(auto_advance|_auto_chain_active)"[[:space:]]*:[[:space:]]*true' .planning/config.json; then
-    found 'GSD auto-advance or chain flag is on' .planning/config.json
-  fi
-}
 check_identity() { # $1 is an email; $2 says where it came from
   case $1 in
     *@users.noreply.github.com | noreply@github.com) ;;
@@ -122,14 +112,12 @@ mode=${1:---tree}
 case $mode in
   --staged)
     check_files "$(git diff --cached --name-only -z --diff-filter=ACMR | tr '\0' '\n')" staged_show
-    check_stop_policy
     check_branch
     check_identity "$(git var GIT_AUTHOR_IDENT | sed -E 's/.*<([^>]*)>.*/\1/')" 'author'
     check_identity "$(git var GIT_COMMITTER_IDENT | sed -E 's/.*<([^>]*)>.*/\1/')" 'committer'
     ;;
   --tree)
     check_files "$(git ls-files -z --cached --others --exclude-standard | tr '\0' '\n')" tree_show
-    check_stop_policy
     ;;
   --history)
     [ $# -gt 0 ] || set -- --all
