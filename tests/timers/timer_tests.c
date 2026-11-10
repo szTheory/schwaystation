@@ -667,6 +667,293 @@ static void case_t1_vblank_frame(void)
     schway_destroy(inst);
 }
 
+/* A script of blanking-signal pushes and counter reads at ticks, against one
+   counter: what 0 pushes the signal low, 1 pushes it high, 2 reads COUNT and
+   expects v. Counter 0 listens to the horizontal blank and counter 1 to the
+   vertical blank. */
+struct step {
+    uint64_t tick;
+    uint32_t what;
+    uint32_t v;
+};
+
+#define LOW(t) {t, 0u, 0u}
+#define HIGH(t) {t, 1u, 0u}
+#define READ(t, want) {t, 2u, want}
+
+static void blank_push(schway *inst, uint32_t n, uint64_t tick, uint32_t level)
+{
+    if (n == 0u) {
+        schway__timers_hblank(inst, tick, level);
+    } else {
+        schway__timers_vblank(inst, tick, level);
+    }
+}
+
+/* MODE is written at tick 0, after the signal has gone high first when start_high is set,
+   so that the write sees the level that is already there. A write at tick W
+   shows 0 at W + 1 and W + 2, so with the counter running the value at tick t
+   is t - 2. */
+static void run_script(uint32_t n, uint32_t mode, uint32_t start_high, const struct step *steps,
+                       size_t count)
+{
+    schway *inst = make();
+    if (start_high != 0u) {
+        blank_push(inst, n, 0u, 1u);
+    }
+    wr32(inst, MODE(n), mode);
+    for (size_t i = 0; i < count; i++) {
+        advance_to(inst, steps[i].tick);
+        if (steps[i].what == 2u) {
+            uint32_t got = rd32(inst, COUNT(n));
+            if (got != steps[i].v) {
+                fprintf(stderr, "counter %u mode %03x step %zu: tick %llu read %u, want %u\n",
+                        (unsigned)n, (unsigned)mode, i, (unsigned long long)steps[i].tick,
+                        (unsigned)got, (unsigned)steps[i].v);
+                check_failures++;
+            }
+        } else {
+            blank_push(inst, n, steps[i].tick, steps[i].what);
+        }
+    }
+    schway_destroy(inst);
+}
+
+/* The synchronisation modes of the counters that listen to a blank (psx-spx,
+   Timers), for the counter n whose blank is the one pushed. Mode 0 pauses
+   during the blank; mode 1 resets at its start; mode 2 resets at its start and
+   pauses outside it; mode 3 waits for the blank once and then free-runs. The
+   second half writes MODE while the blank is already high: mode 0 is paused at
+   once, mode 2 runs, mode 3 still waits for a blank to begin. */
+static void sync_modes(uint32_t n, uint32_t first_mode, uint32_t last_mode)
+{
+    static const struct step m0[] = {READ(10, 8),  HIGH(10), READ(15, 8),  LOW(20),
+                                     READ(25, 13), HIGH(30), HIGH(31),     READ(40, 18)};
+    static const struct step m1[] = {READ(10, 8), HIGH(10), READ(10, 0),  READ(15, 5),  LOW(20),
+                                     READ(22, 12), HIGH(30), READ(30, 0), READ(34, 4)};
+    static const struct step m2[] = {READ(10, 0), HIGH(10), READ(15, 5),  LOW(20),
+                                     READ(30, 10), HIGH(40), READ(45, 5)};
+    static const struct step m3[] = {READ(10, 0), HIGH(10), READ(15, 5),   LOW(20),
+                                     READ(25, 15), HIGH(30), READ(35, 25)};
+    static const struct step h0[] = {READ(100, 0), LOW(100), READ(105, 5)};
+    static const struct step h2[] = {READ(10, 8), LOW(10), READ(20, 8), HIGH(30), READ(35, 5)};
+    static const struct step h3[] = {READ(10, 0), LOW(10), READ(20, 0), HIGH(20), READ(25, 5)};
+    static const struct {
+        const struct step *steps;
+        size_t count;
+        uint32_t mode, start_high;
+    } scripts[] = {
+        {m0, sizeof m0 / sizeof m0[0], 0x1u, 0u}, {m1, sizeof m1 / sizeof m1[0], 0x3u, 0u},
+        {m2, sizeof m2 / sizeof m2[0], 0x5u, 0u}, {m3, sizeof m3 / sizeof m3[0], 0x7u, 0u},
+        {h0, sizeof h0 / sizeof h0[0], 0x1u, 1u}, {h2, sizeof h2 / sizeof h2[0], 0x5u, 1u},
+        {h3, sizeof h3 / sizeof h3[0], 0x7u, 1u},
+    };
+    for (size_t i = 0; i < sizeof scripts / sizeof scripts[0]; i++) {
+        uint32_t sync_mode = (scripts[i].mode >> 1) & 3u;
+        if (sync_mode >= first_mode && sync_mode <= last_mode) {
+            run_script(n, scripts[i].mode, scripts[i].start_high, scripts[i].steps, scripts[i].count);
+        }
+    }
+}
+
+/* Fault prevented: a counter 0 synchronisation mode that pauses, resets or
+   releases at the wrong edge of the horizontal blank, or a MODE write that
+   does not take the pause from the level the blank already has. Pushed by the
+   test, since nothing in the core makes the horizontal blank yet. */
+static void case_t0_hblank_modes(void)
+{
+    sync_modes(0u, 0u, 3u);
+}
+
+/* The same for counter 1 and the vertical blank, which is the signal the frame
+   end makes. */
+static void case_t1_vblank_modes(void)
+{
+    sync_modes(1u, 0u, 3u);
+}
+
+/* Fault prevented: counter 2 that does not stop for the synchronisation modes
+   0 and 3, that stops for 1 and 2, or that a blank pushed to the others moves.
+   The stopped counter keeps a written value for ever, across a frame end and
+   with the prescaler on. */
+static void case_t2_stop_modes(void)
+{
+    static const struct {
+        uint32_t mode;
+        uint32_t stops;
+    } modes[] = {{0x1u, 1u}, {0x3u, 0u}, {0x5u, 0u}, {0x7u, 1u}, {0x201u, 1u}, {0x203u, 0u}};
+    for (size_t i = 0; i < sizeof modes / sizeof modes[0]; i++) {
+        schway *inst = make();
+        wr32(inst, MODE(2u), modes[i].mode);
+        wr32(inst, COUNT(2u), 0x50u);
+        for (uint64_t t = 1000u; t <= 8000u; t += 1000u) {
+            advance_to(inst, t);
+            schway__timers_vblank(inst, t, (uint32_t)(t / 1000u) & 1u);
+            schway__timers_hblank(inst, t, (uint32_t)(t / 2000u) & 1u);
+        }
+        uint32_t v = rd32(inst, COUNT(2u));
+        if (modes[i].stops != 0u) {
+            CHECK_EQ_U64(v, 0x50u);
+        } else {
+            CHECK_EQ_U64(v, 0x50u + (modes[i].mode >= 0x200u ? 8000u / 8u : 8000u) - 2u);
+        }
+        advance_to(inst, inst->frame_end + 100u);
+        CHECK_EQ_U64(rd32(inst, COUNT(2u)) == 0x50u, modes[i].stops);
+        schway_destroy(inst);
+    }
+}
+
+/* Fault prevented: dots pushed to counter 0 that do not count when the dot
+   clock is its source, that count when it is not, a counter that moves on the
+   system clock while it waits for dots, a raise that is missed, or a big push
+   that is not the same as the same number of small ones. */
+static void case_dot_feed(void)
+{
+    schway *inst = make();
+    wr32(inst, MODE(0u), 0x100u);
+    CHECK_EQ_U64(at(inst, 100u, COUNT(0u)), 0u);
+    schway__timers_dots(inst, 100u, 5u);
+    CHECK_EQ_U64(rd32(inst, COUNT(0u)), 3u);
+    schway__timers_dots(inst, 200u, 10u);
+    CHECK_EQ_U64(rd32(inst, COUNT(0u)), 13u);
+    CHECK_EQ_U64(at(inst, 5000u, COUNT(0u)), 13u);
+    schway_destroy(inst);
+
+    /* A reset at the target 20 with the interrupt on it: after the two hold
+       cycles it takes 20 dots to reach the target. */
+    inst = make();
+    wr32(inst, TARGET(0u), 20u);
+    wr32(inst, MODE(0u), 0x100u | M_RESET_TARGET | M_IRQ_TARGET | M_REPEAT);
+    schway__timers_dots(inst, 0u, 2u + 19u);
+    CHECK_EQ_U64(stat_bit(inst, 4u), 0u);
+    CHECK_EQ_U64(rd32(inst, COUNT(0u)), 19u);
+    schway__timers_dots(inst, 0u, 1u);
+    CHECK_EQ_U64(stat_bit(inst, 4u), 1u);
+    CHECK_EQ_HEX(rd32(inst, MODE(0u)) & M_REACHED_TARGET, M_REACHED_TARGET);
+    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+    schway_destroy(inst);
+
+    /* The system clock source takes no dots. */
+    inst = make();
+    wr32(inst, MODE(0u), 0u);
+    schway__timers_dots(inst, 0u, 50u);
+    CHECK_EQ_U64(rd32(inst, COUNT(0u)), 0u);
+    schway_destroy(inst);
+
+    /* One push of n is n pushes of 1, and a push of 2^32 - 1 returns. */
+    schway *a = make();
+    schway *b = make();
+    for (uint32_t k = 0; k < 2u; k++) {
+        schway *x = k == 0u ? a : b;
+        wr32(x, TARGET(0u), 7u);
+        wr32(x, MODE(0u), 0x100u | M_RESET_TARGET | M_IRQ_TARGET | M_REPEAT | M_TOGGLE);
+    }
+    schway__timers_dots(a, 0u, 1000u);
+    for (uint32_t i = 0; i < 1000u; i++) {
+        schway__timers_dots(b, 0u, 1u);
+    }
+    CHECK_EQ_U64(rd32(a, COUNT(0u)), rd32(b, COUNT(0u)));
+    CHECK_EQ_U64(a->timers.t[0].irq_line, b->timers.t[0].irq_line);
+    CHECK_EQ_U64(a->irq.stat, b->irq.stat);
+    schway__timers_dots(a, 0u, 0xFFFFFFFFu);
+    CHECK(rd32(a, COUNT(0u)) <= 7u);
+    schway_destroy(a);
+    schway_destroy(b);
+}
+
+/* Fault prevented: counter 1 on the horizontal blank that counts a falling
+   edge or a repeated level, that counts when the system clock is its source,
+   or that does not raise at its target. Each time the blank begins is one
+   step; the two hold cycles after the MODE write use the first two. */
+static void case_hblank_feed(void)
+{
+    schway *inst = make();
+    wr32(inst, MODE(1u), 0x100u);
+    for (uint32_t k = 0; k < 5u; k++) {
+        schway__timers_hblank(inst, 10u * k, 1u);
+        schway__timers_hblank(inst, 10u * k + 1u, 1u);
+        schway__timers_hblank(inst, 10u * k + 5u, 0u);
+    }
+    CHECK_EQ_U64(rd32(inst, COUNT(1u)), 3u);
+    CHECK_EQ_U64(at(inst, 5000u, COUNT(1u)), 3u);
+    schway_destroy(inst);
+
+    inst = make();
+    wr32(inst, TARGET(1u), 3u);
+    wr32(inst, MODE(1u), 0x100u | M_RESET_TARGET | M_IRQ_TARGET);
+    for (uint32_t k = 0; k < 4u; k++) {
+        schway__timers_hblank(inst, 10u * k, 1u);
+        schway__timers_hblank(inst, 10u * k + 5u, 0u);
+    }
+    CHECK_EQ_U64(rd32(inst, COUNT(1u)), 2u);
+    CHECK_EQ_U64(stat_bit(inst, 5u), 0u);
+    schway__timers_hblank(inst, 50u, 1u);
+    CHECK_EQ_U64(rd32(inst, COUNT(1u)), 3u);
+    CHECK_EQ_U64(stat_bit(inst, 5u), 1u);
+    schway_destroy(inst);
+
+    /* On the system clock the blank is not a clock. */
+    inst = make();
+    wr32(inst, MODE(1u), 0u);
+    schway__timers_hblank(inst, 0u, 1u);
+    schway__timers_hblank(inst, 0u, 0u);
+    schway__timers_hblank(inst, 0u, 1u);
+    CHECK_EQ_U64(rd32(inst, COUNT(1u)), 0u);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: an access to a counter that waits on a signal nothing
+   makes yet that is not counted for the footer or that is made a fault, a
+   counter that moves without its signal, a count at power-on or for the modes
+   that do not wait on the beam (system clock, vertical-blank sync, the
+   prescaler of counter 2), or a count that goes on after MODE is put back. */
+static void case_unfed_unbuilt(void)
+{
+    schway *inst = make();
+    uint32_t *n = &inst->bus.unbuilt_n[SCHWAY__DEV_TIMER];
+    for (uint32_t i = 0; i < 3u; i++) {
+        (void)rd32(inst, COUNT(i));
+        (void)rd32(inst, MODE(i));
+        (void)rd32(inst, TARGET(i));
+    }
+    CHECK_EQ_U64(*n, 0u);
+
+    /* Counter 0 on the dot clock: the write, the poll and the target read are
+       three accesses, and the counter stays at 0 for any number of ticks. */
+    wr32(inst, MODE(0u), 0x100u);
+    CHECK_EQ_U64(*n, 1u);
+    CHECK_EQ_U64(at(inst, 1000u, COUNT(0u)), 0u);
+    CHECK_EQ_U64(*n, 2u);
+    (void)rd32(inst, TARGET(0u));
+    CHECK_EQ_U64(*n, 3u);
+    CHECK_EQ_U64(inst->bus.last_unbuilt[0], SCHWAY__DEV_TIMER);
+    CHECK_EQ_HEX(inst->bus.last_unbuilt[1], TARGET(0u));
+
+    /* Counter 0 with synchronisation on waits for the horizontal blank. */
+    wr32(inst, MODE(0u), 0x1u);
+    CHECK_EQ_U64(*n, 4u);
+
+    /* Counter 1 on the horizontal blank, and not on the vertical blank. */
+    wr32(inst, MODE(1u), 0x100u);
+    CHECK_EQ_U64(*n, 5u);
+    CHECK_EQ_U64(at(inst, 3000u, COUNT(1u)), 0u);
+    CHECK_EQ_U64(*n, 6u);
+    wr32(inst, MODE(1u), 0x3u);
+    CHECK_EQ_U64(*n, 6u);
+    wr32(inst, MODE(2u), 0x301u);
+    (void)rd32(inst, COUNT(2u));
+    CHECK_EQ_U64(*n, 6u);
+
+    /* Back on the system clock, nothing more is counted. */
+    wr32(inst, MODE(0u), 0x0u);
+    (void)rd32(inst, COUNT(0u));
+    wr32(inst, MODE(1u), 0x0u);
+    (void)rd32(inst, COUNT(1u));
+    CHECK_EQ_U64(*n, 6u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
@@ -674,6 +961,8 @@ static const struct {
     {"count_above", case_count_above},
     {"deadline_progress", case_deadline_progress},
     {"div8_wrap_irq", case_div8_wrap_irq},
+    {"dot_feed", case_dot_feed},
+    {"hblank_feed", case_hblank_feed},
     {"irq_oneshot", case_irq_oneshot},
     {"irq_pulse", case_irq_pulse},
     {"irq_repeat", case_irq_repeat},
@@ -682,7 +971,11 @@ static const struct {
     {"mode_write", case_mode_write},
     {"state_cadence", case_state_cadence},
     {"storm_collapse", case_storm_collapse},
+    {"t0_hblank_modes", case_t0_hblank_modes},
     {"t1_vblank_frame", case_t1_vblank_frame},
+    {"t1_vblank_modes", case_t1_vblank_modes},
+    {"t2_stop_modes", case_t2_stop_modes},
+    {"unfed_unbuilt", case_unfed_unbuilt},
     {"target_period", case_target_period},
     {"wrap_no_dwell", case_wrap_no_dwell},
     {"write_hold", case_write_hold},

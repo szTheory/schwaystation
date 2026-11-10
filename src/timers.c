@@ -71,9 +71,9 @@ static uint32_t lane_put(uint32_t old, uint32_t p, uint32_t width, uint32_t valu
 
 /* The clock a counter counts, from its MODE clock source (psx-spx, Timers):
    counters 0 and 1 count the system clock for sources 0 and 2, and the dot
-   clock or horizontal blank for 1 and 3, which have no source yet and do not
-   advance. Counter 2 counts the system clock for sources 0 and 1 and the
-   system clock over 8 for 2 and 3. */
+   clock or horizontal blank for 1 and 3, which move when the beam pushes them
+   (timers_dots, timers_hblank) and not with the ticks. Counter 2 counts the
+   system clock for sources 0 and 1 and the system clock over 8 for 2 and 3. */
 enum { SRC_NONE, SRC_SYS, SRC_DIV8 };
 
 static uint32_t source_of(uint32_t n, uint32_t mode)
@@ -379,12 +379,25 @@ static uint32_t mode_image(const struct schway__timer *t)
            ((t->reached & REACHED_FFFF) << 11);
 }
 
+/* Whether a counter's MODE depends on a signal that nothing in the core
+   produces yet (psx-spx, Timers): counter 0 on the dot clock or with
+   synchronisation on (it waits on the horizontal blank), counter 1 on the
+   horizontal blank. The vertical blank is the frame's own, so counter 1's
+   synchronisation is not one. */
+static int needs_beam(uint32_t n, uint32_t mode)
+{
+    return (n == 0u && (mode & 0x101u) != 0u) || (n == 1u && (mode & 0x100u) != 0u);
+}
+
 /* The registers 1F801100h-112Fh at every width: COUNT, MODE and TARGET of
    each counter, with the word at offset 0Ch reading 0. The access first
    catches the counters up to its own tick. A MODE read returns bits 11 and 12
    and clears them. A COUNT write sets the value and starts the hold. A MODE
    write zeroes the counter, starts the hold, sets bit 10, re-arms the
-   one-shot and derives the pause. Every write recomputes the deadline. */
+   one-shot and derives the pause. Every write recomputes the deadline. An
+   access to a counter whose MODE needs the beam is counted as an access to a
+   device not built yet, and is never a fault: a program may read the counter,
+   which stays where it is until something pushes the beam's signals. */
 void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint32_t *value,
                        uint32_t *cycles)
 {
@@ -410,23 +423,26 @@ void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, ui
             r = t->target;
         }
         *value = lane_get(r, p, width);
-        return;
+    } else {
+        if (reg == 0u) {
+            t->value = lane_put(t->value, p, width, *value) & COUNT_MAX;
+            t->hold = HOLD_WRITE;
+        } else if (reg == 4u) {
+            t->mode = lane_put(mode_image(t), p, width, *value) & MODE_WRITABLE;
+            t->value = 0u;
+            t->hold = HOLD_WRITE;
+            t->irq_line = 1u;
+            t->oneshot_done = 0u;
+            t->paused = paused_for(n, t->mode, inst->timers.blank);
+            t->free_after = 0u;
+        } else if (reg == 8u) {
+            t->target = lane_put(t->target, p, width, *value) & COUNT_MAX;
+        }
+        schway__sched_recalc(inst);
     }
-    if (reg == 0u) {
-        t->value = lane_put(t->value, p, width, *value) & COUNT_MAX;
-        t->hold = HOLD_WRITE;
-    } else if (reg == 4u) {
-        t->mode = lane_put(mode_image(t), p, width, *value) & MODE_WRITABLE;
-        t->value = 0u;
-        t->hold = HOLD_WRITE;
-        t->irq_line = 1u;
-        t->oneshot_done = 0u;
-        t->paused = paused_for(n, t->mode, inst->timers.blank);
-        t->free_after = 0u;
-    } else if (reg == 8u) {
-        t->target = lane_put(t->target, p, width, *value) & COUNT_MAX;
+    if (needs_beam(n, t->mode)) {
+        schway__bus_unbuilt(inst, SCHWAY__DEV_TIMER, p, width, wr, *value);
     }
-    schway__sched_recalc(inst);
 }
 
 /* The three counters as seen at tick now: the stored views carried forward by
@@ -522,20 +538,40 @@ static uint32_t blank_push(schway *inst, uint64_t tick, uint32_t n, uint32_t lev
     return lv;
 }
 
+/* Moves a counter that counts the beam (counter 0 on the dot clock, counter 1
+   on the horizontal blank) by steps of its own clock, and raises its
+   interrupt now if one of them makes an edge. */
+static void beam_feed(schway *inst, uint32_t n, uint64_t steps)
+{
+    struct schway__timer *t = &inst->timers.t[n];
+    if ((t->mode & 0x100u) == 0u || steps == 0u) {
+        return;
+    }
+    if (run_steps(t, steps) != 0u) {
+        schway__irq_raise(inst, 4u + n);
+    }
+    schway__sched_recalc(inst);
+}
+
 /* The vertical blank drives counter 1's synchronisation. */
 void schway__timers_vblank(schway *inst, uint64_t tick, uint32_t level)
 {
     (void)blank_push(inst, tick, 1u, level);
 }
 
+/* The horizontal blank drives counter 0's synchronisation and is counter 1's
+   clock when it is the source: each time the blank begins is one step. */
 void schway__timers_hblank(schway *inst, uint64_t tick, uint32_t level)
 {
-    (void)blank_push(inst, tick, 0u, level);
+    if (blank_push(inst, tick, 0u, level) != 0u) {
+        beam_feed(inst, 1u, 1u);
+    }
 }
 
+/* Dots dot clocks have passed: counter 0 counts them when the dot clock is its
+   source. */
 void schway__timers_dots(schway *inst, uint64_t tick, uint32_t dots)
 {
-    (void)inst;
-    (void)tick;
-    (void)dots;
+    schway__timers_sync(inst, tick);
+    beam_feed(inst, 0u, dots);
 }

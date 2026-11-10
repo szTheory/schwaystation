@@ -104,3 +104,39 @@ schway_add_test(NAME timers.state.cadence
 schway_add_test(NAME timers.sync.t1_vblank_frame
   COMMAND schwaystation-test-timers t1_vblank_frame
   LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: a counter 0 synchronisation mode that pauses, resets or
+# releases at the wrong edge of the horizontal blank, or a MODE write that
+# ignores the level already there.
+schway_add_test(NAME timers.sync.t0_hblank_modes
+  COMMAND schwaystation-test-timers t0_hblank_modes
+  LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: the same for counter 1 and the vertical blank.
+schway_add_test(NAME timers.sync.t1_vblank_modes
+  COMMAND schwaystation-test-timers t1_vblank_modes
+  LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: counter 2 that runs when synchronisation stops it, stops
+# when it should run, or is moved by a blank pushed to the others.
+schway_add_test(NAME timers.sync.t2_stop_modes
+  COMMAND schwaystation-test-timers t2_stop_modes
+  LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: dots pushed to counter 0 that are not counted on the dot
+# clock, that count on the system clock, or whose raise is missed.
+schway_add_test(NAME timers.source.dot_feed
+  COMMAND schwaystation-test-timers dot_feed
+  LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: counter 1 on the horizontal blank that counts the wrong
+# edge or repeated levels, or does not raise at its target.
+schway_add_test(NAME timers.source.hblank_feed
+  COMMAND schwaystation-test-timers hblank_feed
+  LABELS timers portable TIMEOUT 10)
+
+# Fault prevented: an access to a counter that waits on a signal nothing makes
+# yet that is not counted, is made a fault, or moves the counter anyway.
+schway_add_test(NAME timers.source.unfed_unbuilt
+  COMMAND schwaystation-test-timers unfed_unbuilt
+  LABELS timers portable TIMEOUT 10)

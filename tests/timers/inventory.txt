@@ -7,9 +7,15 @@ timers.irq.repeat	portable,timers
 timers.irq.toggle	portable,timers
 timers.mode.read_clears	portable,timers
 timers.mode.write	portable,timers
+timers.source.dot_feed	portable,timers
+timers.source.hblank_feed	portable,timers
+timers.source.unfed_unbuilt	portable,timers
 timers.state.cadence	portable,timers
 timers.storm.collapse	portable,timers
+timers.sync.t0_hblank_modes	portable,timers
 timers.sync.t1_vblank_frame	portable,timers
+timers.sync.t1_vblank_modes	portable,timers
+timers.sync.t2_stop_modes	portable,timers
 timers.target.count_above	portable,timers
 timers.target.period	portable,timers
 timers.wrap.no_dwell	portable,timers

@@ -9,13 +9,12 @@ behaves the same on every platform. The block clock the counters read their tick
 
 ## State of the counters
 
-The counters on the system clock are built: counter 2 on the system clock and on the system clock over 8, and counters 0
-and 1 on the system clock. A source that comes from the GPU's beam (the dot clock for counter 0, the horizontal blank for
-counter 1) has no signal behind it yet, so a counter set to one of those sources does not advance. The synchronisation
-modes of counters 0 and 1 wait for the same beam and have no effect yet; counter 2's synchronisation modes act (below).
-The entry points for the vertical blank, the horizontal blank and the dot clock exist and change nothing yet: at the end
-of a frame with a program loaded the frame pushes the vertical blank high and low at the same tick, since the frame has
-no line machine to give it a width.
+All three counters are built, on the system clock, on the system clock over 8 (counter 2) and on the signals the GPU's
+beam makes. The core has no line machine yet, so nothing in it makes the dot clock or the horizontal blank: a counter
+whose clock source is one of them does not advance by itself, and a synchronisation to the horizontal blank sees no
+blank. The entry points exist and the unit tests push the signals through them. The vertical blank is the frame's own:
+at the end of a frame with a program loaded the frame pushes it high and low at the same tick, since the frame has no
+line machine to give it a width (below). The sections "Synchronisation" and "Beam sources" say what each signal does.
 
 Every address of `1F801100h`-`1F80112Fh` answers at every width, so the range counts as owned. The word at offset `0Ch` of
 each counter reads 0 and drops writes.
@@ -52,7 +51,7 @@ values are all 0, and a power reset restores them; a program always writes MODE 
 ## Clock sources
 
 Counters 0 and 1 count the system clock for sources 0 and 2 and, for sources 1 and 3, the dot clock (counter 0) or the
-horizontal blank (counter 1), which do not advance yet. Counter 2 counts the system clock for sources 0 and 1 and the
+horizontal blank (counter 1), which advance only as the beam's signals are pushed (see "Beam sources"). Counter 2 counts the system clock for sources 0 and 1 and the
 system clock over 8 for sources 2 and 3 (psx-spx, Timers). The system clock is the CPU clock the instance's tick counts.
 
 The eighth phase of counter 2's prescaler is the absolute tick: the counter takes a step at every tick that is a multiple
@@ -61,7 +60,58 @@ steps in a span of ticks are a difference of two shifts. Everything below that i
 cycles, so the hold of a counter on the prescaler lasts 16 ticks.
 
 Counter 2 with synchronisation on is stopped for modes 0 and 3 and runs free for modes 1 and 2 (psx-spx, Timers). The
-pause is worked out when MODE is written.
+pause is worked out when MODE is written, and no blank affects it afterwards.
+
+## Synchronisation
+
+Counter 0 listens to the horizontal blank and counter 1 to the vertical blank. With synchronisation on (MODE bit 0) the
+mode in bits 1-2 says what a blank does (psx-spx, Timers):
+
+| Mode | Counter 0 and 1 |
+|---|---|
+| 0 | paused while the blank is high |
+| 1 | reset to 0 when the blank begins |
+| 2 | reset to 0 when the blank begins, and paused while it is low |
+| 3 | paused until the blank begins once, then free-running |
+
+Each signal has a level, kept in the state. A push of the level it already has changes nothing. The beginning of a blank is
+the push that takes it from low to high; the end is the push that takes it from high to low. A reset takes effect at the
+tick of the push and the counter counts from the next cycle, with no hold, so a counter reset at the frame's end reads the
+number of cycles since that tick. A pending hold is dropped by it. Every push first brings the counters up to its tick.
+
+A MODE write takes the pause from the level the blank has at that moment: mode 0 is paused at once when the blank is high,
+mode 2 is paused when it is low, mode 1 never is, and mode 3 is paused whatever the level, because it needs a blank to
+begin. It does not reset the counter by itself, since the write zeroes the counter anyway. psx-spx does not say what mode
+3 does when it is written inside a blank, nor whether the hold of a write runs while the counter is paused; the model
+lets the hold run, and these two choices are the model's.
+
+The frame's end makes the vertical blank begin and end at one tick, so a counter 1 in mode 0 is never paused by it, in mode
+1 is reset at it, in mode 2 is reset at it and is then paused for the rest of the frame, and in mode 3 is released by the
+first. When the GPU has a line machine the signal gets its real width and this page's rules need no change.
+
+## Beam sources
+
+`schway__timers_hblank(inst, tick, level)` and `schway__timers_vblank(inst, tick, level)` set a blank to `level` at
+`tick`; `schway__timers_dots(inst, tick, dots)` says that `dots` dot clocks have passed. Counter 0 with MODE bit 8 set
+counts the dots, and counter 1 with MODE bit 8 set counts each beginning of the horizontal blank, one step each (psx-spx,
+Timers). A step is one cycle of the counter's own clock, so it uses the hold, the target, the wrap and the interrupt rules
+above in the same way, and a push of many dots costs no more than a push of one; a push of dots to a counter that is not on
+the dot clock does nothing. A counter on one of these sources has no tick to wait for, so it gives the scheduler no deadline:
+it raises its interrupt in the push that makes the edge.
+
+An access to a counter whose MODE needs a signal that nothing in the core makes yet is counted as an access to a device not
+built yet (the `unbuilt dev=timer` line of the runner) and is never a fault, since a program may read the counter or write
+its MODE for good reasons. These are counter 0 on the dot clock or with synchronisation on (it waits for the horizontal
+blank) and counter 1 on the horizontal blank. Counter 1's synchronisation is not one, nor is anything on counter 2. The
+count is made while a MODE of that kind is in force, whether or not a test pushes signals; a counter in that mode with no
+push stays at its value however many ticks pass, which is what a program that has no beam would see. At power-on, with MODE
+0, no access is counted.
+
+The GPU's integer dot accumulator belongs here, so that the dot clock is made without a wide multiply. With `div` the
+number of system clocks per dot of the video mode and `line_clocks` the system clocks of the line or span just passed, the
+dots to push are `dots += (phase + line_clocks) / div` and `phase = (phase + line_clocks) % div`. Never multiply the tick by
+the dot clock's numerator (the product of a 62-bit tick and a 20-bit factor overflows 64 bits, and the 32-bit big-endian and
+wasm32 builds have no 128-bit type), and never use an 11/7 shortcut for the clock ratio.
 
 ## Lazy counting
 
@@ -148,20 +198,22 @@ applies a span, and not the tick the stored fields were last brought up to date 
 when a catch-up last ran, and saving changes nothing in the instance. A load stores the fields and makes the loaded tick
 the base. Value and target are 16 bits, mode is the 10 written bits, `hold` is 0 to 2, `reached` has the two flags in
 bits 0 and 1, and the line, one-shot, pause and free-after fields are single bits (the last is for the synchronisation
-modes of counters 0 and 1 and is 0 until they are built). The deadline is derived from these, never stored: a stored
+modes of counters 0 and 1: it is set when mode 3 has seen its blank). After the counters come the levels of the two
+blanking signals, bit 0 the vertical and bit 1 the horizontal. The deadline is derived from these, never stored: a stored
 deadline from a hostile state would be an event storm or a wait that never ends.
 
 ## Not built yet
 
-The beam sources and the synchronisation modes of counters 0 and 1, the dot-clock and horizontal-blank feeds, and a
-vertical blank with a width come with the GPU's line machine. What the hardware shows when a program reads a counter that
-runs from the dot clock or the horizontal blank, which is unstable by a cycle, is not modelled.
+The beam itself: the dot clock and the horizontal blank have no source in the core, and the vertical blank has no width,
+until the GPU's line machine feeds them. What the hardware shows when a program reads a counter that runs from the dot
+clock or the horizontal blank, which is unstable by a cycle, is not modelled.
 
 ## Sources
 
 - psx-spx, Timers page (`docs/timers.md` of psx-spx/psx-spx.github.io at 6d7d1bc106a7): the registers, the MODE bits, the
-  clock sources, the synchronisation modes of counter 2, the reset and wrap rules, the hold and the first target case.
+  clock sources, the synchronisation modes, the reset and wrap rules, the hold and the first target case.
 
-The register rules are the page's. The timings of the hold in the model, the one-cycle reading of the reset dwell and the
+The register rules are the page's. The edges the synchronisation modes act on, the start of a blank as the moment of a reset
+and the choices named under "Synchronisation" are the model's reading of the page. The timings of the hold in the model, the one-cycle reading of the reset dwell and the
 interrupt rules for a one-shot counter with both sources enabled follow its text and are labelled doc, not hardware; the
 tests pin the model's reading.
