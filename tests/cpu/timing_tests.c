@@ -439,6 +439,88 @@ static void gte_cycles(void)
     }
 }
 
+/* The cycles instruction word takes when issued k instructions after an NCDT
+   (44 cycles busy), with k no-operations between; the data register under it
+   is 0 and the base register of the memory forms points at RAM. */
+static uint64_t after_ncdt(uint32_t word, uint32_t k)
+{
+    uint32_t words[8] = {GTE_CMD_WORD(0x16u), NOP_WORD, NOP_WORD, NOP_WORD, NOP_WORD, NOP_WORD,
+                         NOP_WORD, NOP_WORD};
+    schway *inst;
+    uint64_t took;
+    uint32_t n = 0u;
+    words[1u + k] = word;
+    inst = make_gte(words, 2u + k);
+    inst->cpu.r[1] = DATA;
+    (void)run(inst, CODE);
+    for (n = 0u; n < k; n++) {
+        (void)run(inst, CODE + 4u + 4u * n);
+    }
+    took = run(inst, CODE + 4u + 4u * k);
+    schway_destroy(inst);
+    return took;
+}
+
+/* MFC2, CFC2, SWC2 and a second command right after a command wait for it,
+   and MTC2, CTC2 and LWC2 do not (the gte-timing results, What waits). The wait
+   is the busy time less the cycles already spent: after an NCDT, MFC2 takes
+   44, with 3 no-operations between it takes 41, once the 44 have passed it
+   takes 1, and a stamp set far ahead of the counter, as a loaded state could
+   hold, waits exactly 44.
+   The forms that do not wait take their own time: 1 for the register moves and
+   a RAM read of the memory form takes 1 plus the bus's charge (the DATA word is
+   in RAM, not cached) which is the same with and without a command running.
+   Fault prevented: a register move or load that waits for the engine, a store
+   or second command that does not, a wait that does not shorten with time, or
+   one a bad loaded stamp makes longer than the longest command. */
+static void gte_stall_rules(void)
+{
+    uint32_t waits[] = {MFC2_WORD(3u, 9u), CFC2_WORD(3u, 4u), SWC2_WORD(1u, 5u, 0u),
+                        GTE_CMD_WORD(0x28u)};
+    uint32_t quiet[] = {MTC2_WORD(3u, 9u), CTC2_WORD(3u, 4u), LWC2_WORD(1u, 5u, 0u)};
+    uint32_t words[2];
+    schway *inst;
+    uint64_t base;
+    for (size_t i = 0u; i < sizeof waits / sizeof waits[0]; i++) {
+        /* On an idle engine the instruction takes its base time; after the
+           NCDT it takes that plus the wait. */
+        words[0] = NOP_WORD;
+        words[1] = waits[i];
+        inst = make_gte(words, 2u);
+        inst->cpu.r[1] = DATA;
+        (void)run(inst, CODE);
+        base = run(inst, CODE + 4u);
+        schway_destroy(inst);
+        CHECK_EQ_U64(after_ncdt(waits[i], 0u), base + 43u);
+        CHECK_EQ_U64(after_ncdt(waits[i], 3u), base + 40u);
+        CHECK_EQ_U64(after_ncdt(waits[i], 6u), base + 37u);
+    }
+    for (size_t i = 0u; i < sizeof quiet / sizeof quiet[0]; i++) {
+        words[0] = NOP_WORD;
+        words[1] = quiet[i];
+        inst = make_gte(words, 2u);
+        inst->cpu.r[1] = DATA;
+        (void)run(inst, CODE);
+        base = run(inst, CODE + 4u);
+        schway_destroy(inst);
+        CHECK_EQ_U64(after_ncdt(quiet[i], 0u), base);
+        CHECK_EQ_U64(after_ncdt(quiet[i], 3u), base);
+    }
+
+    /* A stamp far ahead waits the longest command's time and no more; one that
+       has passed waits nothing. */
+    words[0] = MFC2_WORD(3u, 9u);
+    inst = make_gte(words, 1u);
+    inst->gte.ready = inst->cpu.cycle + 1000000u;
+    CHECK_EQ_U64(run(inst, CODE), 1u + 44u);
+    schway_destroy(inst);
+    inst = make_gte(words, 1u);
+    inst->cpu.cycle = 100u;
+    inst->gte.ready = 50u;
+    CHECK_EQ_U64(run(inst, CODE), 1u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     static const struct {
@@ -456,6 +538,7 @@ int main(int argc, char **argv)
         {"mtlo_mthi_stamp_zero", mtlo_mthi_stamp_zero},
         {"survives_exception", survives_exception},
         {"gte_cycles", gte_cycles},
+        {"gte_stall_rules", gte_stall_rules},
     };
     if (argc != 2) {
         fprintf(stderr, "usage: schwaystation-test-timing <case>\n");

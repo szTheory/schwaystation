@@ -604,7 +604,7 @@ static void irq_entry_cop2_hook(void)
     CHECK_EQ_HEX(inst->cpu.pc, CODE + 8u);
     CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GTE], 0u);
     next(inst);
-    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GTE], 1u);
+    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GTE], 0u);
     schway_destroy(inst);
 }
 

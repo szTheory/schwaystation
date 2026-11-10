@@ -586,13 +586,17 @@ static uint32_t cpu_store_part(schway *inst, uint32_t pc, uint32_t op, uint32_t 
     return 0u;
 }
 
-/* COP2, LWC2 and SWC2 before the GTE exists. An address error on LWC2 or SWC2
-   comes first. With SR.CU2 clear every form raises CpU with CE 2 and latches
-   no fault. With it set, MFC2 and CFC2 read 0 through the load delay, MTC2,
-   CTC2 and the commands do nothing, BC2 never goes (the condition line is
-   never true), LWC2 does the real bus read and drops it and SWC2 the real bus
-   write of 0; each counts as an access to the unbuilt GTE (ARCHITECTURE
-   section 6; PSX-SYSTEM section 2, SR bits). Returns 1 when it trapped. */
+/* COP2, LWC2 and SWC2: the instructions that reach the GTE. An address error
+   on LWC2 or SWC2 comes first. With SR.CU2 clear every form raises CpU with CE 2
+   and latches no fault. With it set, MTC2 and CTC2 write data register rd or
+   control register 32 + rd; MFC2 and CFC2 read one through the load delay;
+   LWC2 does the real bus read into data register rt and SWC2 the real bus write
+   of it; a command executes at once and keeps the engine busy for its time.
+   MFC2, CFC2, SWC2 and a command first wait for the command still running;
+   MTC2, CTC2 and LWC2 do not (PSX-SYSTEM section 2, SR bits; psx-spx, Geometry
+   Transformation Engine; the gte-timing results, What waits). BC2F and BC2T
+   always take their branch or never do, as the condition line is never true.
+   Returns 1 when it trapped. */
 static uint32_t cpu_cop2(schway *inst, uint32_t pc, uint32_t op, uint32_t next, uint32_t *cycles,
                          uint32_t *load_reg, uint32_t *load_value, struct cpu_branch *br)
 {
@@ -613,27 +617,23 @@ static uint32_t cpu_cop2(schway *inst, uint32_t pc, uint32_t op, uint32_t next, 
         if (cpu_bus_read(inst, pc, addr, 4u, &v, cycles) != 0u) {
             return 1u;
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, addr, 4u, 0u, 0u);
+        schway__gte_write(&inst->gte, rt_n, v);
     } else if (opc == 0x3Au) { /* SWC2 */
-        if (cpu_bus_write(inst, pc, addr, 4u, 0u, cycles) != 0u) {
+        *cycles += cpu_gte_wait(inst, *cycles);
+        if (cpu_bus_write(inst, pc, addr, 4u, schway__gte_read(&inst->gte, rt_n), cycles) != 0u) {
             return 1u;
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, addr, 4u, 1u, 0u);
     } else if (rs_n == 0u || rs_n == 2u) { /* MFC2, CFC2 */
         *cycles += cpu_gte_wait(inst, *cycles);
         cpu_load_issue(c, rt_n, schway__gte_read(&inst->gte, rs_n == 2u ? 32u + rd_n : rd_n),
                        load_reg, load_value);
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, rs_n == 2u ? 32u + rd_n : rd_n, 4u, 0u, 0u);
     } else if (rs_n == 4u || rs_n == 6u) { /* MTC2, CTC2 */
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, rs_n == 6u ? 32u + rd_n : rd_n, 4u, 1u,
-                            c->r[rt_n]);
+        schway__gte_write(&inst->gte, rs_n == 6u ? 32u + rd_n : rd_n, c->r[rt_n]);
     } else if (rs_n == 8u) { /* BC2F, BC2T */
         cpu_branch_set(br, (rt_n & 1u) == 0u ? 1u : 0u, next + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u) * 4u);
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, 0u, 4u, 0u, 0u);
     } else if ((rs_n & 0x10u) != 0u) { /* a GTE command */
         *cycles += cpu_gte_wait(inst, *cycles);
         inst->gte.ready = c->cycle + (*cycles - 1u) + schway__gte_exec(&inst->gte, op & 0x01FFFFFFu);
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, op & 0x01FFFFFFu, 4u, 1u, 0u);
     }
     return 0u;
 }
@@ -663,8 +663,7 @@ static uint32_t cpu_step(schway *inst)
     uint32_t neg = (rs & 0x80000000u) != 0u ? 1u : 0u;
     uint32_t sr = c->cop0.r[SCHWAY__COP0_SR];
     uint32_t trapped = 0u;
-    /* COP2, LWC2 and SWC2: the GTE's instructions, which cpu_cop2 handles
-       until the GTE does. */
+    /* COP2, LWC2 and SWC2: the GTE's instructions, which cpu_cop2 handles. */
     uint32_t is_cop2 = (op >> 26) == 0x12u || (op >> 26) == 0x32u || (op >> 26) == 0x3Au ? 1u : 0u;
     uint32_t sum, value;
     struct cpu_branch br = {0u, 0u, 0u};

@@ -14,8 +14,9 @@ cpu.cop0.no_fault_for_traps	cpu,portable
 cpu.cop0.reserved_instruction	cpu,portable
 cpu.cop0.rfe	cpu,portable
 cpu.cop0.sr_mask	cpu,portable
-cpu.cop2_prephase.cu2_clear	cpu,portable
-cpu.cop2_prephase.cu2_set	cpu,portable
+cpu.cop2.cu2_clear	cpu,gte,portable
+cpu.cop2.moves	cpu,gte,portable
+cpu.cop2.no_unbuilt	cpu,gte,portable
 cpu.delay.failed_load_untouched	cpu,portable
 cpu.delay.load_before_irq	cpu,portable
 cpu.delay.load_delay	cpu,portable
@@ -50,6 +51,7 @@ cpu.timing.div_36	cpu,portable
 cpu.timing.divu_36	cpu,portable
 cpu.timing.early_read_stalls	cpu,portable
 cpu.timing.gte_cycles	cpu,gte,portable
+cpu.timing.gte_stall_rules	cpu,gte,portable
 cpu.timing.mtlo_mthi_stamp_zero	cpu,portable
 cpu.timing.mult_13	cpu,portable
 cpu.timing.mult_6	cpu,portable
