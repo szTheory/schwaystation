@@ -107,7 +107,7 @@ jobs:
   # preset. Nothing is cached or uploaded.
   vectors-full:
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 49 s (vectors-full), slowest of 6 runs, run 42720996208
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -133,7 +133,7 @@ jobs:
   # it; nothing is blocked. The crash files are kept for minimising.
   fuzz:
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # provisional
+    timeout-minutes: 5  # 5-minute floor (apt); 2 x 81 s (fuzz), slowest of 5 runs, run 42720996208
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
