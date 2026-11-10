@@ -239,7 +239,6 @@ come from `AGENTS.md`.
 | 2026-10-19 | /gsd-discuss-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-plan-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-execute-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
-| 2026-11-10 | /gsd-autonomous discuss 3 | Claude Code, OpenGSD | claude-sonnet-5-5 |
 | 2026-10-20 | /gsd-execute-phase 1 (continued) | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-20 | /gsd-code-review 1 | Codex, inline standard review | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-20 | /gsd-code-review 1 --fix | Codex, inline fix of CR-01; WR-01 remains a tooling seed | GPT-6 (session; exact model ID not exposed) |
@@ -251,6 +250,7 @@ come from `AGENTS.md`.
 | 2026-11-09 | /gsd-plan-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, planner claude-opus-5-5 (4 rounds), checker claude-haiku-5-5 (4 passes); research skipped | claude-sonnet-5-5 |
 | 2026-11-09 | /gsd-execute-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, executors claude-sonnet-5-5 (sequential, no worktrees) | claude-sonnet-5-5 |
 | 2026-11-09 | /gsd-ship 2 | Claude Code, OpenGSD; inline shipping, PR #8 | claude-sonnet-5-5 |
+| 2026-11-09 | /gsd-discuss-phase 3 (via /gsd-autonomous) | Claude Code, OpenGSD; six advisor agents fanned out | claude-sonnet-5-5 |
 
 ## Session Continuity
 
