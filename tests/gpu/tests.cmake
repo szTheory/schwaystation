@@ -49,6 +49,21 @@ set_target_properties(schwaystation-test-gpu-beam PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu-beam)
 
+add_executable(schwaystation-test-gpu-display ${CMAKE_CURRENT_LIST_DIR}/display.c)
+target_include_directories(schwaystation-test-gpu-display PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-gpu-display PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-gpu-display PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-gpu-display)
+
+# Fault prevented: GP1 mode dividers, display-window wrap, field height,
+# 24-bit packing, display-off output or malformed ranges drifting from scanout.
+foreach(case IN ITEMS width_modes native15_wrap native24_wrap interlace_and_off malformed_windows)
+  schway_add_test(NAME gpu.display.${case}
+    COMMAND schwaystation-test-gpu-display ${case}
+    LABELS gpu portable TIMEOUT 10)
+endforeach()
+
 # Fault prevented: Timer0 dot-target IRQs drifting to a line boundary or across split runs.
 schway_add_test(NAME gpu.beam.midline_dot_irq
   COMMAND schwaystation-test-gpu-beam midline_dot_irq
