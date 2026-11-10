@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-11-10T18:19:06.700Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-11-10T19:11:40.797Z"
 last_activity: 2026-11-10
-last_activity_desc: Phase 04 execution started
-state_head: e199fbbe3f185028c3a3b0c439fdecdcdb3df0ac
+last_activity_desc: Phase 04 plan 04-03 completed
+state_head: 844e7592393a449957ea0dbdaecc719e05d65f0e
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 70
+  completed_plans: 71
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 3 of 32
+Plan: 4 of 32
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 04 execution started
 
@@ -130,6 +130,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03 P25 | 7 min | 2 tasks | 32 files |
 | Phase 04 P01 | 16 min | 3 tasks | 14 files |
 | Phase 04 P02 | 32 min | 3 tasks | 13 files |
+| Phase 04 P03 | 47min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -268,6 +269,9 @@ Recent decisions affecting current work:
 - [Phase 04]: User-mode kernel fetches reuse the data-access permission check to raise guest AdEL before bus access.
 - [Phase 04]: Saved Cause.IP2 is validated against serialized I_STAT and I_MASK before state application.
 - [Phase 04]: An RFE return to a taken branch target past EPC resets the non-interrupt exception-loop count; same-EPC and interrupt paths retain it.
+- [Phase 04]: The bounded GPU word-entry path serves CPU MMIO and future DMA callers.
+- [Phase 04]: API v4 adds a read-only native VRAM span while preserving API v1-v3 callers.
+- [Phase 04]: GPU save-state validation checks candidate parser fields before applying state.
 
 ### Pending Todos
 
@@ -338,10 +342,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-02 | Codex, OpenGSD 1.20.0; sequential executor | gpt-6-luna xhigh |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-03 | Codex, OpenGSD 1.20.0; sequential executor in shared checkout | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-10T18:19:06.508Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-11-10T19:11:40.662Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
