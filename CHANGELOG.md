@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/szTheory/schwaystation/compare/v0.2.0...v0.3.0) (2026-11-10)
+
+
+### Features
+
+* match the GTE hardware cases and add DMA and timers ([#12](https://github.com/szTheory/schwaystation/issues/12)) ([e3dadb4](https://github.com/szTheory/schwaystation/commit/e3dadb4312993a040b82a08f99edd7d16dc512ae))
+
 ## [0.2.0](https://github.com/szTheory/schwaystation/compare/v0.1.0...v0.2.0) (2026-11-10)
 
 
