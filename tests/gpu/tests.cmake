@@ -35,6 +35,19 @@ set_target_properties(schwaystation-test-gpu-interpolation PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu-interpolation)
 
+add_executable(schwaystation-test-gpu-spans ${CMAKE_CURRENT_LIST_DIR}/spans.c)
+target_include_directories(schwaystation-test-gpu-spans PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-gpu-spans PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-gpu-spans PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-gpu-spans)
+
+# Fault prevented: lines or Gouraud polylines lose endpoints, interpolated colors, span rejection,
+# terminator placement, or bounded streaming state.
+schway_add_test(NAME gpu.span.polyline_packet
+  COMMAND schwaystation-test-gpu-spans polyline_packet
+  LABELS gpu portable TIMEOUT 10)
+
 # Fault prevented: a GP0 fill that is lost between the bus and VRAM, or uses
 # byte rather than halfword coordinates, sizing, or color conversion.
 schway_add_test(NAME gpu.decoder.fill_mmio

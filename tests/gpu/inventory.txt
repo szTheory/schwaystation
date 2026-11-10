@@ -4,6 +4,7 @@ gpu.decoder.register_images	gpu,portable
 gpu.pixel.arithmetic	gpu,portable
 gpu.pixel.palette_wrap	gpu,portable
 gpu.pixel.textured_rectangle_mmio	gpu,portable
+gpu.span.polyline_packet	gpu,portable
 gpu.state.cache_roundtrip	gpu,portable
 gpu.state.partial_fill	gpu,portable
 gpu.testcard.pixels	gpu,portable
