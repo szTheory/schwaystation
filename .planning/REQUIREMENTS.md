@@ -53,6 +53,18 @@ Phase 3's repository-check code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githoo
 - [ ] **GAME-06**: `tests/compat/ledger.csv` (ten columns keyed by serial plus rcheevos MD5 and predicate) and the generated `docs/compatibility.md` exist with the fixture rows, the ratchet (`unknown` to anything, `fail` to `pass`, `pass` to `pass`; anything else needs a dated `tests/compat/allow.txt` line) and the protected baseline that checks out the base ledger first; `policy.compat_doc_fresh` regenerates and compares; the local `library` preset (`scripts/library.sh`, never registered in `ci*`) reads `SCHWAYSTATION_BIOS_DIR` and `SCHWAYSTATION_DISC_DIR` from gitignored `.env.local`, runs every cue/bin against the ledger and writes only `build/library/results.csv` with serial, MD5, track SHA-1, DAT title, result and date, shown by a test that points it at a fixture in a temporary directory; the libretro `.info` carries `is_experimental "true"` until v2.0.
 - [ ] **GAME-07**: One integrated session in RetroArch (the hosted macOS job, at most 300 lines of e2e code in total, checked by `policy.e2e_budget`) loads `pad_counter.exe` as content with no BIOS in `system/` (the adapter boots PS-EXE content under the stub kernel), the picture differs between two `--max-frames` values, and each screenshot matches the runner's `--png` frame pixel for pixel; `supports_no_game`, `input_descriptors`, `core_options`, `memory_descriptors` (RAM at 0, 80000000h, A0000000h and the scratchpad at 1F800000h) and `disk_control` claims in the `.info` are each tied to a configure-time guard test.
 
+
+Phase 4's repository-check budget is **1,850 lines**, counted across `scripts/*.sh`,
+`tests/cmake/*.cmake` and `.githooks/*`, then ratcheted down to the actual total at ship. Phase 3's
+historical ship ratchet remains 1,513 lines. The additional planning allowance is 337 lines: firmware
+archive scanning (60, GAME-05, leaked retail bytes), host-claim guards (40, GAME-07, false .info claims),
+protected compatibility comparison (90, GAME-06, a head change weakening its own judge or regressing a pass),
+deterministic compatibility-doc freshness (40, GAME-06, stale claims), the local library script (80,
+GAME-06, private output/availability behavior), and existing hash/workflow/inventory adaptations (27).
+These are estimates within one absolute ceiling, not per-file quotas; actual code must fit the ceiling.
+All new checks must address those named faults, retain existing coverage, and stay in the counted set.
+No minification, relocation out of the counted set or speculative unnamed gate is used to meet the limit.
+
 ### The sound matches the console
 
 - [ ] **SOUND-01**: `ctest -L audio` steps the SPU model (one tick per 768 cycles, voices 1 to 24 then reverb, BRR decode with carried history, the 512-entry gaussian table, the ADSR step rule checked against the ares-generated table, the psx-spx noise form, the two-phase reverb with the 39-tap FIR, capture buffers written every sample, int32 mixing saturated at the documented points, IRQ on any RAM access at IRQA, the 32-halfword FIFO and DMA4 transfer paths) and the nightly lane compares the ps1-tests `spu/memory-transfer` log's seven hardware pass lines; `schwaystation-run --hash-audio` prints the SHA-256 over the int16 stereo stream for the `spu_tone` fixture (`audio@600`, `mailbox@600` with per-voice ENVX records), identical on every lane, where a unit test derives the same PCM from the block table without the CPU; exactly `frame_cycles / 768` samples per frame (737 or 738 NTSC, 886 or 887 PAL), never padded; `fuzz.regress.spu` replays its seeds.

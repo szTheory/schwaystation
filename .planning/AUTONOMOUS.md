@@ -57,3 +57,8 @@ runs and serial bottlenecks over adding caches, concurrency or dependencies. Kee
 For delegated research, write concise findings and verified pins to the assigned artifact early. When the
 remaining uncertainties are routine implementation probes, return them to the executor instead of delaying
 the whole phase. If a handoff stalls, recover existing evidence and artifacts before repeating any research.
+
+When editing plan commands that contain regex anchors such as `$'`, use literal patches or replacement
+callbacks: JavaScript replacement strings interpret `$'` as surrounding text and can corrupt task blocks.
+Before handing plans to a checker, use the existing failure-direction probe and one-shot balanced-tag/shell
+syntax checks. Keep these as workflow practice, not another repository gate.

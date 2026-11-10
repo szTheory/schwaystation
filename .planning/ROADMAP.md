@@ -231,7 +231,90 @@ Plans:
   4. OpenBIOS, built in CI from nugget at its pin, boots to its shell with a pinned frame hash that is the same on every platform that runs it. The compatibility ledger rejects any unratcheted regression. The local `library` preset, pointed at a fixture in a temporary directory, writes only `build/library/results.csv`.
   5. In the hosted RetroArch session, `pad_counter.exe` loads as content with no BIOS in `system/`. The picture changes between two `--max-frames` values, and each screenshot matches the runner's `--png` frame pixel for pixel.
 
-**Plans**: TBD
+**Plans**: 32
+**Wave 1**
+- [ ] 04-01 — Build skeleton and an inventoried VRAM-to-frame tracer
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 04-02 — Correct the first GPU/firmware callers of CPU and partial-store contracts
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 04-03 — Decode CPU GPU commands into real VRAM and serialized GPU state
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 04-04 — Complete GPU transfer and cache semantics
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 04-05 — Render one textured pixel through the complete native pixel pipeline
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 04-06 — Rasterize flat triangles and quads with exact shared-edge coverage
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 04-07 — Interpolate Gouraud colors and affine texture coordinates
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 04-08 — Complete lines, polylines and rectangle span families
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [ ] 04-09 — Advance beam events and dot timers on exact derived deadlines
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [ ] 04-10 — Scan native display windows and convert packed RGB24 safely
+- [ ] 04-14 — Schedule SIO0 bytes and digital-pad replies
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [ ] 04-11 — Run GPU DMA2 through busy/readiness deadlines and validated state
+- [ ] 04-15 — Expose deterministic input and full DualShock configuration/rumble
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [ ] 04-12 — Run moving GPU and exact line/dot fixtures through the runner
+- [ ] 04-16 — Commit card writes only at successful protocol completion
+
+**Wave 13** *(blocked on Wave 12 completion)*
+- [ ] 04-13 — Measure CPU-driven GPU performance and correct the first CI timeout caller
+- [ ] 04-17 — Import, lint and atomically persist host memory-card files
+
+**Wave 14** *(blocked on Wave 13 completion)*
+- [ ] 04-18 — Apply runner input movies and prove pad_counter changes play
+
+**Wave 15** *(blocked on Wave 14 completion)*
+- [ ] 04-19 — Persist runner cards across fresh processes and clean signals
+- [ ] 04-20 — Load copied BIOS bytes and report name-independent digest identity
+
+**Wave 16** *(blocked on Wave 15 completion)*
+- [ ] 04-21 — Admit the public BIOS digest table and scan every release member
+
+**Wave 17** *(blocked on Wave 16 completion)*
+- [ ] 04-22 — Build pinned OpenBIOS on Linux and establish its expected digest
+
+**Wave 18** *(blocked on Wave 17 completion)*
+- [ ] 04-23 — Boot OpenBIOS to a pinned shell frame on every applicable lane
+
+**Wave 19** *(blocked on Wave 18 completion)*
+- [ ] 04-24 — Protect the ten-column compatibility ratchet and generated document
+- [ ] 04-27 — Load BIOS-free PS-EXE content and switch libretro geometry
+
+**Wave 20** *(blocked on Wave 19 completion)*
+- [ ] 04-25 — Probe host-only cue/bin identity without claiming disc execution
+
+**Wave 21** *(blocked on Wave 20 completion)*
+- [ ] 04-26 — Run the local library preset against real temporary metadata fixtures
+
+**Wave 22** *(blocked on Wave 21 completion)*
+- [ ] 04-28 — Map libretro controllers, rumble, cards and truthful metadata claims
+
+**Wave 23** *(blocked on Wave 22 completion)*
+- [ ] 04-29 — Compare BIOS-free content screenshots in one hosted RetroArch session
+
+**Wave 24** *(blocked on Wave 23 completion)*
+- [ ] 04-30 — Judge all pinned GPU image and log oracles
+
+**Wave 25** *(blocked on Wave 24 completion)*
+- [ ] 04-31 — Replay hostile GPU, SIO and card inputs through bounded public runs
+
+**Wave 26** *(blocked on Wave 25 completion)*
+- [ ] 04-32 — Reconcile hardware contracts and verify complete Phase4 integration
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
 

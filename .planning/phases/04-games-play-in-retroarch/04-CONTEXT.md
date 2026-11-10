@@ -122,8 +122,9 @@ adversarial pass. Recommendations are followed without routine owner questions. 
   firmware, .info, persistence and nofp timeout (034). Avoid source/tooling review-to-requirement growth.
 - **D-24:** All behavior changes have CI tests. Add CI integration/e2e/smoke only for recurring feedback;
   perform useful one-shot checks directly and record command, exit status and run URL. Review before final
-  verification. Preserve the measured 1513-line gate limit until a justified phase-specific budget decision;
-  count new repository-check code honestly and reuse/remove duplication first. No unrequested gates.
+  verification. Apply the phase-specific 1850-line ceiling now named in REQUIREMENTS, preserving phase 3's
+  historical 1,513 ratchet. The 337-line additional allowance is a planning estimate for named required checks;
+  ratchet down to actual total at ship. Count code honestly and reuse helpers. No unrequested gates.
 - **D-25:** Carry the newly observed nofp timeout evidence into its existing first-CI-caller todo: a one-minute
   cap cancelled two runs while identical commits completed in seconds, and a targeted idle-runner retry passed.
   Apply the existing at-least-three-minute remedy with measured run citations when ci.yml is first edited.
