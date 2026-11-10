@@ -3,8 +3,7 @@
 The PlayStation's CPU is a MIPS I R3000A with a coprocessor for system control (COP0) and another for geometry (COP2).
 The core runs it as an interpreter: one function fetches, decodes and executes a single instruction, and both the
 frame loop and the vector tests call that function, so there is one decoder. Everything here is integer arithmetic
-and behaves the same on every platform. Facts come from the psx-spx CPU Specifications page and from section 2 of
-`.planning/preparation/PSX-SYSTEM.md`, which also names the sources it was checked against.
+and behaves the same on every platform. Facts come from the psx-spx CPU Specifications page.
 
 This page covers what is implemented so far: the registers, the decode fields, the arithmetic, logic, shift,
 set-on-less-than and load-upper-immediate class, the trapping adds, branches and jumps, loads and stores, multiply and
@@ -16,9 +15,9 @@ fetch that touches them is described here.
 
 - 32 general registers, `r0` to `r31`. `r0` always reads 0 and a write to it is discarded.
 - `HI` and `LO`, the multiply and divide result registers.
-- The program counter. At power-on it holds `BFC00000h`, the BIOS entry in KSEG1 (PSX-SYSTEM section 2, Reset state).
-- COP0 registers, indexed by number: `r6` TAR, `r12` SR, `r13` CAUSE, `r14` EPC and the others of PSX-SYSTEM
-  section 2. SR is `00400000h` (BEV set) after power-on.
+- The program counter. At power-on it holds `BFC00000h`, the BIOS entry in KSEG1 (psx-spx CPU Specifications, Reset state).
+- COP0 registers, indexed by number: `r6` TAR, `r12` SR, `r13` CAUSE, `r14` EPC and the others of the psx-spx CPU
+  Specifications page. SR is `00400000h` (BEV set) after power-on.
 - Two delay latches, described below.
 - A cycle counter and the ready stamp of the multiply and divide unit, described under Multiply and divide.
 
@@ -43,7 +42,7 @@ by a decode flag before the switch and handled in one function, which reaches th
 ## Arithmetic, logic, shifts and sets
 
 All of these read their operands before any load issued by the previous instruction lands, and none raises an
-exception (PSX-SYSTEM section 2, Load delay).
+exception (psx-spx CPU Specifications, Load delay).
 
 | Instructions | Result |
 |---|---|
@@ -62,7 +61,7 @@ load into `r0` like any other write.
 
 ## Delay latches
 
-The R3000A has one load delay slot and one branch delay slot (PSX-SYSTEM section 2, Load delay and Branch delay). The
+The R3000A has one load delay slot and one branch delay slot (psx-spx CPU Specifications, Load delay and Branch delay). The
 executor holds each as a small latch in the CPU state, so a saved state taken between two instructions resumes exactly.
 
 **Load delay.** A load issued by one instruction is held as a register number and a value, and writes the register
@@ -77,7 +76,7 @@ about to run is a delay slot, whether its branch is taken, and the branch target
 counter register: the next program counter is the target while a taken branch is pending, and the current program
 counter plus 4 otherwise. Each instruction ends by clearing the latch, and a branch sets it for the following one.
 A branch in a delay slot computes its target from the address its own slot would go to next, so it follows a taken
-branch's target (PSX-SYSTEM section 2, Branch delay).
+branch's target (psx-spx CPU Specifications, Branch delay).
 
 ## Branches and jumps
 
@@ -92,14 +91,14 @@ branch's target (PSX-SYSTEM section 2, Branch delay).
 
 A branch offset is the signed 16-bit immediate times 4, added to the address of the delay slot. The return address is
 the address after the delay slot. The latch is always set by a branch, taken or not, with the target it would have had.
-A target that is not a multiple of 4 is an address error when it is fetched (PSX-SYSTEM section 2, Branch delay; the
+A target that is not a multiple of 4 is an address error when it is fetched (psx-spx CPU Specifications, Branch delay; the
 exception rules are in [cop0.md](cop0.md)).
 
 ## Instruction fetch
 
 Each instruction is fetched at the program counter before it is decoded. A program counter that is not a multiple of 4 is
 an address error on the fetch (see Branches and jumps). Otherwise the fetch goes one of three ways, by segment
-(PSX-SYSTEM section 2, Segments and I-cache):
+(psx-spx CPU Specifications, Segments and I-cache):
 
 - In KUSEG or KSEG0 it goes through the instruction cache, a hit costing nothing beyond the instruction's own cycle and
   a miss filling the line from the missed word to its end.
@@ -128,17 +127,17 @@ Every load and store goes through the data access front-end before it reaches th
    address, because only the cache-control word answers there). The bus charges its wait cycles to the instruction, and
    a store that landed joins the write queue. A
    bus error, an address no device answers, raises DBE (07h); it sets no BadVaddr, and the bus records the first
-   fault (PSX-SYSTEM section 2, Address and bus errors and Segments).
+   fault (psx-spx CPU Specifications, Address and bus errors and Segments).
 
 `LB`, `LH` and `LW` read 1, 2 or 4 bytes and sign-extend a byte or half-word; `LBU` and `LHU` zero-extend. The value
 goes through the load delay latch. `SB`, `SH` and `SW` write the low 1, 2 or 4 bytes of `rt`; the bus is handed all
-32 bits whatever the width (PSX-SYSTEM section 2, Stores). The address is `rs` plus the sign-extended immediate.
+32 bits whatever the width (psx-spx CPU Specifications, Stores). The address is `rs` plus the sign-extended immediate.
 
 **Unaligned forms.** `LWL` and `LWR` read the aligned word that holds the address, and replace the bytes of `rt` from
 the address toward the high end (`LWL`) or the low end (`LWR`); the other bytes of `rt` stay. The merge starts from
 the value of a load the previous instruction issued to the same register, not from the register's old value, so
 an `LWL`, `LWR` pair on one register needs no delay slot between them and the pair assembles an unaligned word
-(PSX-SYSTEM section 2, Stores, LWL/LWR). `SWL` and `SWR` write the matching bytes of `rt` into the bytes of the
+(psx-spx CPU Specifications, Stores, LWL/LWR). `SWL` and `SWR` write the matching bytes of `rt` into the bytes of the
 aligned word from its low end to the address (`SWL`) or from the address to its high end (`SWR`), as the largest
 aligned chunks of 4, 2 or 1 bytes, lowest first.
 
@@ -147,7 +146,7 @@ aligned chunks of 4, 2 or 1 bytes, lowest first.
 `MULT` and `MULTU` put the 64-bit product of `rs` and `rt` in `HI:LO`, signed and unsigned. `DIV` and `DIVU` put the
 quotient in `LO` and the remainder in `HI`; the remainder of `DIV` has the sign of `rs`. Nothing traps. A zero
 divisor gives `LO` = -1 (`DIV` of a negative `rs` gives +1) and `HI` = `rs`, and `DIV` of -2147483648 by -1 gives
-`LO` = `80000000h` and `HI` = 0 (PSX-SYSTEM section 2, DIV/DIVU).
+`LO` = `80000000h` and `HI` = 0 (psx-spx CPU Specifications, DIV/DIVU).
 
 The unit takes time, which the CPU state keeps as a cycle counter and a ready stamp: the counter value at which the
 running operation has produced `HI` and `LO`, or 0 when none is running. An operation issued at counter value t is
@@ -156,7 +155,7 @@ sign bit spread over the word, below 800h, below 100000h, or more); `MULTU` clas
 `DIV` and `DIVU` take 36. `MFHI` and `MFLO` issued before the stamp wait for it, never longer than 36 cycles whatever
 a loaded state holds. `MTHI` and `MTLO` write the register and set the stamp to 0, so a read after them does not wait.
 A new multiply or divide replaces one still running: the wait a later read sees is the new operation's own time.
-`HI`, `LO` and the stamp are not touched by an exception (PSX-SYSTEM section 2, MULTU/MULT). The `cpu.timing.*` tests
+`HI`, `LO` and the stamp are not touched by an exception (psx-spx CPU Specifications, MULTU/MULT). The `cpu.timing.*` tests
 pin these times and rules.
 
 ## COP2 and the GTE
@@ -338,8 +337,9 @@ is a boundary the one-shot run passes through, which is where a run of the same 
 **The end of a frame.** The run stops at the first boundary at or after the frame's end. A frame end passed inside an
 instruction completes at that instruction's end: `I_STAT` bit 0 is raised, the frame count rises, and the next frame
 ends where the exact cycle accumulator puts it, so the next frame is shorter by the overshoot and the cumulative
-ticks stay exact. The CPU does not take interrupts yet; the vertical sync only sets the bit, and CAUSE bit 10 follows
-`I_STAT` and `I_MASK` as the COP0 page describes.
+ticks stay exact. The CPU takes interrupts from the vertical blank, the DMA and the timers: each raises its own `I_STAT` bit, CAUSE
+bit 10 follows `I_STAT` and `I_MASK`, and when SR allows it the CPU takes the interrupt as [cop0.md](cop0.md)
+(Interrupts) describes.
 
 **Stop reasons.**
 
