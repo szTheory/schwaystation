@@ -40,15 +40,19 @@ static void cpu_wq_drain(struct schway__cpu *c, uint32_t *cycles)
 }
 
 /* A store that reached the bus joins the write queue, unless it went to the
-   scratchpad, which is not behind the queue. A fifth store waits for the oldest
-   to leave, which costs one drain, and the queue stays full. The data is
-   already on the bus, so only the wait is modelled. */
-static void cpu_wq_push(struct schway__cpu *c, uint32_t addr, uint32_t *cycles)
+   scratchpad, which is not behind the queue. Writes are buffered, so a store
+   waits on the bus, and so on a transferring DMA unit, only when it is the
+   fifth queued store: it waits for the oldest to leave, which costs one drain,
+   and the queue stays full. The first four stores and every scratchpad store
+   never wait. The data is already on the bus, so only the wait is modelled. */
+static void cpu_wq_push(schway *inst, uint32_t addr, uint32_t *cycles)
 {
+    struct schway__cpu *c = &inst->cpu;
     if ((addr & 0x1FFFFC00u) == 0x1F800000u) {
         return;
     }
     if (c->wq_count >= SCHWAY__WQ_DEPTH) {
+        schway__dma_bus_access(inst, schway__sched_now(inst, *cycles));
         *cycles += SCHWAY__WQ_DRAIN_CYCLES;
     } else {
         c->wq_count++;
@@ -475,7 +479,7 @@ static uint32_t cpu_bus_write(schway *inst, uint32_t pc, uint32_t addr, uint32_t
         if (err != 0u) {
             return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
         }
-        cpu_wq_push(&inst->cpu, addr, cycles);
+        cpu_wq_push(inst, addr, cycles);
     }
     return 0u;
 }

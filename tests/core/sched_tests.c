@@ -98,6 +98,45 @@ static void load_nops_then_fault(schway *inst)
     load(inst, words, 44u);
 }
 
+/* A jump to itself with a no-op in its slot. */
+static void load_spin(schway *inst)
+{
+    static const uint32_t spin[] = {
+        0x08004000u, /* j 80010000h */
+        0x00000000u, /* nop */
+    };
+    load(inst, spin, 2u);
+}
+
+/* 100 no-ops, then a jump to the first of them: blocks of the program are long. */
+static void load_nops_then_jump(schway *inst)
+{
+    uint32_t words[102];
+    memset(words, 0, sizeof words);
+    words[100] = 0x08004000u; /* j 80010000h */
+    load(inst, words, 102u);
+}
+
+/* Runs the stub kernel's boot one cycle at a time until the program's first
+   instruction is next, so the program starts on a block of its own. */
+static void run_to_entry(schway *inst)
+{
+    for (uint32_t i = 0; i < 4000u && inst->cpu.pc != TEXT; i++) {
+        (void)run(inst, 1u, 0u);
+    }
+    CHECK_EQ_HEX(inst->cpu.pc, TEXT);
+}
+
+/* The instance spinning in the program, past the stub kernel's boot. */
+static schway *make_spinning(void)
+{
+    schway *inst = make();
+    load_spin(inst);
+    (void)run(inst, 20000u, 0u);
+    CHECK(inst->ticks >= 20000u);
+    return inst;
+}
+
 /* The first fault of a long block carries the tick its own instruction began
    on, not the tick the block started on. The reference runs the same program
    one cycle at a time, so each block is one instruction and the tick before the
@@ -134,11 +173,106 @@ static void case_fault_ticks(void)
     schway_destroy(whole);
 }
 
+/* A stall freezes the CPU: with 500 cycles of stall left and a 1,000-cycle
+   budget, 500 cycles pass with no instruction, the CPU then runs the other 500
+   (to its next instruction boundary), and the stall is over. */
+static void case_stall_freeze(void)
+{
+    schway *inst = make_spinning();
+    uint64_t t0 = inst->ticks;
+    uint64_t c0 = inst->cpu.cycle;
+    inst->dma.stall_until = t0 + 500u;
+    schway_run_result r = run(inst, 1000u, 0u);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+    uint64_t dt = r.ticks - t0;
+    uint64_t dc = inst->cpu.cycle - c0;
+    CHECK(dt >= 1000u && dt < 1000u + 16u);
+    CHECK_EQ_U64(dc, dt - 500u);
+    CHECK(dc >= 500u && dc < 500u + 16u);
+    CHECK_EQ_U64(inst->dma.stall_until, t0 + 500u);
+    schway_destroy(inst);
+}
+
+/* A stall longer than the budget uses all of it: ticks advance, no instruction
+   runs, the stamp stays and the next call keeps waiting; the call that outlasts
+   the stall runs the rest of its budget. */
+static void case_stall_carries(void)
+{
+    schway *inst = make_spinning();
+    uint64_t t0 = inst->ticks;
+    uint64_t c0 = inst->cpu.cycle;
+    uint32_t pc0 = inst->cpu.pc;
+    inst->dma.stall_until = t0 + 5000u;
+    schway_run_result r = run(inst, 1000u, 0u);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(r.ticks, t0 + 1000u);
+    CHECK_EQ_U64(inst->cpu.cycle, c0);
+    CHECK_EQ_U64(inst->cpu.pc, pc0);
+    CHECK_EQ_U64(inst->dma.stall_until, t0 + 5000u);
+    r = run(inst, 1000u, 0u);
+    CHECK_EQ_U64(r.ticks, t0 + 2000u);
+    CHECK_EQ_U64(inst->cpu.cycle, c0);
+    CHECK_EQ_U64(inst->dma.stall_until, t0 + 5000u);
+    r = run(inst, 4000u, 0u);
+    CHECK(r.ticks >= t0 + 6000u && r.ticks < t0 + 6000u + 16u);
+    CHECK(inst->cpu.cycle - c0 >= 1000u && inst->cpu.cycle - c0 < 1000u + 16u);
+    schway_destroy(inst);
+}
+
+/* A deadline ends the block that is running, and the event runs at the first
+   instruction boundary after it. The program is 100 straight-line no-ops, so a
+   block that ignored the deadline would run on past the budget, and the run
+   would end with the deadline still waiting. A deadline far beyond the run is
+   left alone. */
+static void case_event_dispatch(void)
+{
+    schway *inst = make();
+    load_nops_then_jump(inst);
+    run_to_entry(inst);
+    inst->sched.next = inst->ticks + 37u;
+    (void)run(inst, 200u, 0u);
+    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+
+    schway *far = make();
+    load_nops_then_jump(far);
+    run_to_entry(far);
+    uint64_t at = far->ticks + 100000u;
+    far->sched.next = at;
+    (void)run(far, 200u, 0u);
+    CHECK_EQ_U64(far->sched.next, at);
+    schway_destroy(inst);
+    schway_destroy(far);
+}
+
+/* The deadline is derived: a state that was saved while it said something else
+   loads with it recomputed from the devices. */
+static void case_state_next_derived(void)
+{
+    schway *inst = make_spinning();
+    size_t n = schway_state_size(inst);
+    uint8_t *buf = (uint8_t *)malloc(n);
+    if (buf == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(inst, buf, n), SCHWAY_STATUS_OK);
+    inst->sched.next = 1u;
+    CHECK_EQ_U64(schway_load_state(inst, buf, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+    CHECK_EQ_U64(inst->cpu.blk_tick, inst->ticks);
+    CHECK_EQ_U64(inst->cpu.blk_cycle, inst->cpu.cycle);
+    free(buf);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
+    {"event_dispatch", case_event_dispatch},
     {"fault_ticks", case_fault_ticks},
+    {"stall_carries", case_stall_carries},
+    {"stall_freeze", case_stall_freeze},
+    {"state_next_derived", case_state_next_derived},
 };
 
 int main(int argc, char **argv)

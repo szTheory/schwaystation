@@ -20,14 +20,28 @@ void schway__sched_sync(schway *inst)
     inst->cpu.blk_cycle = inst->cpu.cycle;
 }
 
+/* The earliest deadline over the devices. It ends the running block at the
+   next instruction boundary, so the new deadline is seen without waiting for a
+   whole block to run out. */
 void schway__sched_recalc(schway *inst)
 {
     uint64_t dma = schway__dma_next(inst);
     uint64_t timers = schway__timers_next(inst);
     inst->sched.next = dma < timers ? dma : timers;
+    inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
 }
 
+/* Runs each device whose deadline is due, once, then recomputes the deadline. A
+   device that is still due after its event is not run again in this call, so
+   the runner always returns. */
 void schway__sched_run(schway *inst)
 {
+    uint64_t now = inst->ticks;
+    if (schway__dma_next(inst) <= now) {
+        schway__dma_event(inst, now);
+    }
+    if (schway__timers_next(inst) <= now) {
+        schway__timers_event(inst, now);
+    }
     schway__sched_recalc(inst);
 }

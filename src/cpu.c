@@ -177,6 +177,15 @@ static void trace_push(schway *inst, uint32_t event, uint64_t cycle, uint32_t pc
 #include "cpu_exec.inc"
 #undef SCHWAY_TRACE
 
+/* The run loop. Each pass first runs the device events that are due, which
+   happens at the first instruction boundary at or after a deadline. A DMA unit
+   that holds the bus freezes the CPU: ticks advance without an instruction,
+   within the budget and the frame, and stop at the next deadline so its event
+   runs on time. The rest of a stall that crosses the end of the budget or of the
+   frame stays in the state for the next call, so the overrun past a limit stays
+   one instruction. Otherwise one block runs, cut at the budget's end and at the
+   next deadline. A device that leaves its deadline due after its event still
+   lets one instruction run before the next offer, so the loop always advances. */
 uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
 {
     uint64_t room = inst->frame_end - inst->ticks;
@@ -187,7 +196,23 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
     uint64_t (*block)(schway *, uint64_t) =
         (flags & SCHWAY_RUN_TRACE) != 0u ? cpu_block_traced : cpu_block;
     while (ran < limit) {
-        ran += block(inst, limit - ran);
+        if (inst->sched.next <= inst->ticks) {
+            schway__sched_run(inst);
+        }
+        uint64_t left = limit - ran;
+        uint64_t until = inst->sched.next > inst->ticks ? inst->sched.next - inst->ticks : 1u;
+        if (inst->dma.stall_until > inst->ticks) {
+            uint64_t wait = inst->dma.stall_until - inst->ticks;
+            wait = wait < left ? wait : left;
+            if (inst->sched.next > inst->ticks && wait > until) {
+                wait = until;
+            }
+            inst->ticks += wait;
+            ran += wait;
+            schway__sched_sync(inst);
+            continue;
+        }
+        ran += block(inst, left < until ? left : until);
         if ((inst->cpu.block_end & SCHWAY__BLOCK_DOUBLE_FAULT) != 0u) {
             stop = SCHWAY_STOP_FAULT;
             break;
