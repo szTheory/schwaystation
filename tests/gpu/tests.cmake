@@ -14,6 +14,13 @@ set_target_properties(schwaystation-test-gpu-transfer PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu-transfer)
 
+add_executable(schwaystation-test-gpu-pixels ${CMAKE_CURRENT_LIST_DIR}/pixels.c)
+target_include_directories(schwaystation-test-gpu-pixels PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-gpu-pixels PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-gpu-pixels PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-gpu-pixels)
+
 # Fault prevented: a GP0 fill that is lost between the bus and VRAM, or uses
 # byte rather than halfword coordinates, sizing, or color conversion.
 schway_add_test(NAME gpu.decoder.fill_mmio
@@ -42,6 +49,11 @@ schway_add_test(NAME gpu.state.partial_fill
 # or malformed cache metadata that is applied before state validation.
 schway_add_test(NAME gpu.state.cache_roundtrip
   COMMAND schwaystation-test-gpu state_cache_roundtrip
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: textured rectangles fail to fetch and write one native RGB555 pixel.
+schway_add_test(NAME gpu.pixel.textured_rectangle_mmio
+  COMMAND schwaystation-test-gpu-pixels textured_rectangle_mmio
   LABELS gpu portable TIMEOUT 10)
 
 # Fault prevented: transfer dimensions, endian order, wrapping, padding, reset,
