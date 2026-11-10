@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-05-PLAN.md
-last_updated: "2026-11-10T05:27:12.995Z"
+stopped_at: Completed 03-06-PLAN.md
+last_updated: "2026-11-10T05:37:14.716Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 4fc5bffeb784152a69e886f9c04e0b879c041683
+state_head: ff05731cb4bd39f62131d951be241d1a6fde41ed
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 47
+  completed_plans: 48
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 6 of 26
+Plan: 7 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -106,6 +106,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P03 | 11 min | 3 tasks | 12 files |
 | Phase 03 P04 | 3 min | 3 tasks | 13 files |
 | Phase 03 P05 | 7 min | 2 tasks | 9 files |
+| Phase 03 P06 | 9 min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -212,6 +213,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-04: the stall hook is called once per bus_access for reads and fetches on RAM, I/O, EXP1-3 and BIOS (not stores, scratchpad, gaps or the cache-control word); an I_STAT read syncs the timers and a write recomputes the deadline; core.bus_unbuilt reads owned=672 unbuilt=3228 gap=8388
 - [Phase 03]: 03-04: the interrupt entry's EPC read and the I-cache refill words reach the DMA hook through throwaway cycle sinks; plan 03-08 decides whether the EPC read may set a stall
 - [Phase 03]: 03-05: the GTE register file is seeded from ares interpreter-gte.cpp at 9408cb43d4948fc3ea6e152a307a34348df3fe04 with an SPDX header, a notices section and a PROVENANCE seed row; 16-bit registers are stored as patterns and extended on read, FLAG bit 31 is recomputed on write, on read and at the end of every command, and the 50 register-only hardware cases pass
+- [Phase 03]: 03-06: the GTE interrupt hook returns 1 only when it executed a command, and does nothing with SR.CU2 clear or a non-interrupt ExcCode
+- [Phase 03]: 03-06: the entry's command stamps gte.ready from the entry cycle without waiting; the second run after the return waits through cpu_cop2
 
 ### Pending Todos
 
@@ -269,8 +272,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T05:27:12.809Z
-Stopped at: Completed 03-05-PLAN.md
+Last session: 2026-11-10T05:37:14.552Z
+Stopped at: Completed 03-06-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
