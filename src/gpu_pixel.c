@@ -1,4 +1,4 @@
-/* Pixel order follows PSX-GPU-AND-GTE.md, sections three point one to three point five. */
+/* Pixel rules are documented in docs/hardware/gpu.md#pixel-pipeline and sourced there. */
 #include "gpu.h"
 
 #include "internal.h"
@@ -8,7 +8,7 @@ static uint16_t min_u16(uint16_t a, uint16_t b)
     return a < b ? a : b;
 }
 
-/* Apply E2's five-bit masks and offsets before adding the E1 texture page. */
+/* E2 windowing precedes E1 page addition (docs/hardware/gpu.md#textured-rectangles). */
 static uint32_t window_coordinate(const struct schway__gpu *g, uint32_t uv, uint32_t axis)
 {
     uint32_t shift = axis == 0u ? 0u : 5u;
@@ -18,7 +18,7 @@ static uint32_t window_coordinate(const struct schway__gpu *g, uint32_t uv, uint
     return (uv & 0xFFu & ~(mask * 8u)) | ((offset & mask) * 8u);
 }
 
-/* Decode one packed 4/8-bit texel or direct 15-bit word through the GPU caches. */
+/* Decode E1 depth and CLUT formats through the caches (docs/hardware/gpu.md#textured-rectangles). */
 uint16_t schway__gpu_texel(schway *inst, uint32_t uv_clut)
 {
     if (inst == NULL) {
@@ -45,7 +45,7 @@ uint16_t schway__gpu_texel(schway *inst, uint32_t uv_clut)
         return schway__gpu_clut_read(inst, clut_x, clut_y, index,
                                      SCHWAY__GPU_CLUT_CACHE_ENTRIES);
     }
-    /* Reserved depth 3 follows the documented direct-15-bit model. */
+    /* Reserved depth 3 follows the direct-15-bit model in docs/hardware/gpu.md#textured-rectangles. */
     return schway__gpu_texture_read(inst, page_x + u, page_y + v);
 }
 
@@ -54,6 +54,7 @@ static uint32_t channel8(uint32_t color, uint32_t shift)
     return (color >> shift) & 0xFFu;
 }
 
+/* Integer modulation follows docs/hardware/gpu.md#pixel-pipeline. */
 static uint32_t modulate_channel(uint32_t texel, uint32_t color8)
 {
     uint32_t value = (texel * color8) >> 4;
@@ -74,6 +75,7 @@ static uint32_t source_channel(uint16_t texel, uint32_t color, uint32_t flags,
     return modulate_channel(texel5, color8);
 }
 
+/* Signed matrix order follows docs/hardware/gpu.md#pixel-pipeline. */
 static int32_t dither_value(uint32_t x, uint32_t y)
 {
     static const int8_t matrix[4][4] = {
@@ -92,6 +94,7 @@ static uint32_t quantize_channel(uint32_t value, int32_t dither)
     return (uint32_t)adjusted >> 3;
 }
 
+/* Five-bit ABR equations follow docs/hardware/gpu.md#pixel-pipeline. */
 static uint32_t blend_channel(uint32_t background, uint32_t foreground, uint32_t mode)
 {
     uint32_t value;
@@ -121,7 +124,7 @@ static uint16_t blend_rgb555(uint16_t background, uint16_t foreground, uint32_t 
     return (uint16_t)(red | (green << 5) | (blue << 10));
 }
 
-/* Write one clipped pixel, applying ABE, PBC and PBW to native RGB555. */
+/* ABE, PBC, PBW, and RGB555 order follow docs/hardware/gpu.md#pixel-pipeline. */
 void schway__gpu_pixel(schway *inst, uint32_t x, uint32_t y, uint16_t texel, uint32_t color,
                        uint32_t flags)
 {

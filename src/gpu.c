@@ -395,34 +395,53 @@ static void apply_environment(schway *inst, uint32_t command)
     }
 }
 
+/* Signed GP0 coordinates follow docs/hardware/gpu.md#textured-rectangles. */
 static int32_t sign11(uint32_t value)
 {
     value &= 0x7FFu;
     return (value & 0x400u) != 0u ? (int32_t)value - 0x800 : (int32_t)value;
 }
 
+/* Rectangle packet length and sizes follow docs/hardware/gpu.md#textured-rectangles. */
+static void rectangle_size(const struct schway__gpu *g, uint32_t op, uint32_t *width,
+                           uint32_t *height)
+{
+    uint32_t size_mode = (op >> 3) & 3u;
+    if (size_mode == 0u) {
+        uint32_t vertex_index = 2u + ((op & 0x04u) != 0u ? 1u : 0u);
+        uint32_t size = g->fifo[vertex_index];
+        *width = size & 0x3FFu;
+        *height = (size >> 16) & 0x1FFu;
+    } else {
+        *width = size_mode == 1u ? 1u : (size_mode == 2u ? 8u : 16u);
+        *height = *width;
+    }
+}
+
+/* GP0 TGE, ABE, and TME are documented in docs/hardware/gpu.md#textured-rectangles. */
+static uint32_t rectangle_pixel_flags(uint32_t op)
+{
+    uint32_t flags = (op & 0x04u) != 0u ? SCHWAY__GPU_PIXEL_TEXTURED : 0u;
+    if ((op & 1u) != 0u) {
+        flags |= SCHWAY__GPU_PIXEL_RAW_TEXTURE;
+    }
+    if ((op & 2u) != 0u) {
+        flags |= SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT;
+    }
+    return flags;
+}
+
+/* Apply offset and E3/E4 clipping before VRAM wrap (docs/hardware/gpu.md#textured-rectangles). */
 static void render_rectangle(schway *inst, uint32_t command)
 {
     struct schway__gpu *g = &inst->gpu;
     uint32_t op = command >> 24;
     uint32_t textured = (op & 0x04u) != 0u;
-    uint32_t size_mode = (op >> 3) & 3u;
     uint32_t position = g->fifo[1];
-    uint32_t vertex_index = 2u;
-    uint32_t uv_clut = 0u;
-    if (textured != 0u) {
-        uv_clut = g->fifo[vertex_index++];
-    }
+    uint32_t uv_clut = textured != 0u ? g->fifo[2] : 0u;
     uint32_t width;
     uint32_t height;
-    if (size_mode == 0u) {
-        uint32_t size = g->fifo[vertex_index];
-        width = size & 0x3FFu;
-        height = (size >> 16) & 0x1FFu;
-    } else {
-        width = size_mode == 1u ? 1u : (size_mode == 2u ? 8u : 16u);
-        height = width;
-    }
+    rectangle_size(g, op, &width, &height);
     if (width == 0u || height == 0u) {
         return;
     }
@@ -433,17 +452,9 @@ static void render_rectangle(schway *inst, uint32_t command)
     int32_t top = (int32_t)((g->draw_area_tl >> 10) & 0x1FFu);
     int32_t right = (int32_t)(g->draw_area_br & 0x3FFu);
     int32_t bottom = (int32_t)((g->draw_area_br >> 10) & 0x1FFu);
-    uint32_t flags = textured != 0u ? SCHWAY__GPU_PIXEL_TEXTURED : 0u;
-    if ((op & 1u) != 0u) {
-        flags |= SCHWAY__GPU_PIXEL_RAW_TEXTURE;
-    }
-    if ((op & 2u) != 0u) {
-        flags |= SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT;
-    }
+    uint32_t flags = rectangle_pixel_flags(op);
     uint32_t base_u = uv_clut & 0xFFu;
     uint32_t base_v = (uv_clut >> 8) & 0xFFu;
-    uint32_t flip_x = (g->draw_mode >> 12) & 1u;
-    uint32_t flip_y = (g->draw_mode >> 13) & 1u;
     for (uint32_t row = 0u; row < height; row++) {
         int32_t y = y0 + (int32_t)row;
         if (y < top || y > bottom) {
@@ -456,8 +467,8 @@ static void render_rectangle(schway *inst, uint32_t command)
             }
             uint16_t texel = 0u;
             if (textured != 0u) {
-                uint32_t u = (base_u + (flip_x != 0u ? 0u - col : col)) & 0xFFu;
-                uint32_t v = (base_v + (flip_y != 0u ? 0u - row : row)) & 0xFFu;
+                uint32_t u = (base_u + col) & 0xFFu;
+                uint32_t v = (base_v + row) & 0xFFu;
                 texel = schway__gpu_texel(inst, (uv_clut & 0xFFFF0000u) | (v << 8) | u);
             }
             schway__gpu_pixel(inst, (uint32_t)x, (uint32_t)y, texel,

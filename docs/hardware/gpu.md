@@ -6,12 +6,15 @@ line, and beam behavior is added by the plans that first implement those paths.
 
 ## Textured rectangles
 
-A textured rectangle carries a position, one UV/CLUT word, and an optional size word. E1 supplies the texture page and
-pixel depth. E2 applies its five-bit masks and offsets to the eight-bit U and V coordinates before the page origin is
-added. Four-bit and eight-bit texels are unpacked from VRAM words and resolved through the CLUT; fifteen-bit texels are
-read directly. The reserved depth value follows the direct fifteen-bit model. X and Y wrap at the VRAM edges, and CLUT
-indices wrap across the row. The texture and CLUT caches are per instance and form a deterministic rendering model;
-their replacement and stale-hit behavior are not claimed as measured hardware behavior.
+A rectangle command encodes raw-texture (TGE), semi-transparency (ABE), texturing (TME), and a size mode. The size mode
+selects variable dimensions, 1 by 1, 8 by 8, or 16 by 16. Its position is signed 11-bit X/Y; E5 offset is applied before
+clipping against E3/E4, then the resulting coordinates wrap into VRAM. A textured rectangle carries a UV/CLUT word and,
+for variable dimensions, a size word. E1 supplies the texture page and pixel depth. E2 applies its five-bit masks and
+offsets to the eight-bit U and V coordinates before the page origin is added. Four-bit and eight-bit
+texels are unpacked from VRAM words and resolved through the CLUT; fifteen-bit texels are read directly. The reserved
+depth value follows the direct fifteen-bit model. X and Y wrap at the VRAM edges, and CLUT indices wrap across the row.
+The texture and CLUT caches are per instance and form a deterministic rendering model; their replacement and stale-hit
+behavior are not claimed as measured hardware behavior.
 
 ## Pixel pipeline
 
