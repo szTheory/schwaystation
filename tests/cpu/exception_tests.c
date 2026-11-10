@@ -459,6 +459,27 @@ static void ibe_unmapped_fetch(void)
     CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM);
     CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_UNMAPPED_FETCH);
     schway_destroy(inst);
+
+    /* User mode may fetch only from KUSEG. KSEG0, KSEG1 and the BIOS window
+       all raise a guest AdEL before touching the bus; the vector handler runs
+       in kernel mode and can accept each exception without a first fault. */
+    static const uint32_t forbidden[] = {0x80001000u, 0xA0001000u, 0xBFC00000u};
+    for (size_t i = 0u; i < sizeof forbidden / sizeof forbidden[0]; i++) {
+        inst = make();
+        put(inst, VECTOR_RAM, NOP_WORD);
+        inst->cpu.cop0.r[SCHWAY__COP0_SR] = 0x00000002u;
+        inst->cpu.cop0.r[SCHWAY__COP0_BADVADDR] = 0x0BADC0DEu;
+        step(inst, forbidden[i]);
+        CHECK_EQ_U64(exc_code(inst), 4u);
+        CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), forbidden[i]);
+        CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_BADVADDR), forbidden[i]);
+        CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        next(inst);
+        CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM + 4u);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        schway_destroy(inst);
+    }
 }
 
 /* When an interrupt and an exception of the instruction itself fall on the same

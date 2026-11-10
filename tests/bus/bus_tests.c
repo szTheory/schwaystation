@@ -9,6 +9,10 @@
 #include "internal.h"
 #include "../check.h"
 
+#define STORE_PART_WORD(left, rs, rt)                                                               \
+    ((((left) != 0u ? 0x2Au : 0x2Eu) << 26) | ((rs) << 21) | ((rt) << 16))
+#define LOAD_WORD(rt, rs) (((0x23u) << 26) | ((rs) << 21) | ((rt) << 16))
+
 static void *test_alloc(void *user, size_t size)
 {
     (void)user;
@@ -53,6 +57,25 @@ static int wr(schway *inst, uint32_t addr, uint32_t width, uint32_t v)
 {
     uint32_t cycles = 0u;
     return schway__bus_write(inst, addr, width, v, &cycles);
+}
+
+static void cpu_code(schway *inst, uint32_t index, uint32_t word)
+{
+    uint32_t addr = 0x00001000u + index * 4u;
+    CHECK_EQ_U64(schway__bus_ram_word(inst, addr, &word, 1u), 0u);
+}
+
+static uint32_t store_part_expected(uint32_t original, uint32_t value, uint32_t left,
+                                    uint32_t offset)
+{
+    for (uint32_t lane = 0u; lane < 4u; lane++) {
+        if ((left != 0u && lane <= offset) || (left == 0u && lane >= offset)) {
+            uint32_t source = left != 0u ? 3u - offset + lane : lane - offset;
+            uint32_t mask = 0xFFu << (8u * lane);
+            original = (original & ~mask) | (((value >> (8u * source)) & 0xFFu) << (8u * lane));
+        }
+    }
+    return original;
 }
 
 /* A word written through KSEG1 reads back through KUSEG, KSEG0 and every RAM
@@ -656,6 +679,73 @@ static void ram_word(void)
     }
     CHECK_EQ_U64(inst->cpu.cycle, cycle0);
     CHECK_EQ_HEX(inst->dma.dicr, 0u);
+
+    /* SWL/SWR use the largest aligned 4/2/1-byte chunks, low lane first.
+       The lane result is fixed by the CPU instruction; exact MMIO chunk widths
+       below are the core's documented model because the cited hardware sources
+       do not specify the bus decomposition. */
+    static const uint32_t chunk_count[2][4] = {{1u, 2u, 1u, 1u}, {1u, 1u, 2u, 1u}};
+    static const uint32_t last_lane[2][4] = {{0u, 2u, 2u, 3u}, {0u, 0u, 2u, 0u}};
+    static const uint32_t last_width[2][4] = {{4u, 2u, 2u, 1u}, {1u, 2u, 1u, 4u}};
+    const uint32_t original = 0xAABBCCDDu;
+    const uint32_t value = 0x11223344u;
+    uint32_t code_index = 0u;
+    for (uint32_t left = 0u; left < 2u; left++) {
+        for (uint32_t off = 0u; off < 4u; off++) {
+            cpu_code(inst, code_index++, STORE_PART_WORD(left, 1u, 2u));
+        }
+    }
+    for (uint32_t left = 0u; left < 2u; left++) {
+        for (uint32_t off = 0u; off < 4u; off++) {
+            cpu_code(inst, code_index, STORE_PART_WORD(left, 1u, 2u));
+            cpu_code(inst, code_index + 1u, LOAD_WORD(3u, 1u));
+            code_index += 2u;
+        }
+    }
+    memset(inst->cpu.icache_valid, 0, sizeof inst->cpu.icache_valid);
+    code_index = 0u;
+    for (uint32_t left = 0u; left < 2u; left++) {
+        for (uint32_t off = 0u; off < 4u; off++) {
+            uint32_t word = original;
+            CHECK_EQ_U64(schway__bus_ram_word(inst, 0x00003000u, &word, 1u), 0u);
+            inst->cpu.r[1] = 0x80003000u + off;
+            inst->cpu.r[2] = value;
+            inst->cpu.pc = 0x80001000u + code_index * 4u;
+            schway__cpu_step_one(inst, NULL);
+            word = 0u;
+            CHECK_EQ_U64(schway__bus_ram_word(inst, 0x00003000u, &word, 0u), 0u);
+            CHECK_EQ_HEX(word, store_part_expected(original, value, left, off));
+            CHECK_EQ_U64(inst->cpu.wq_count, chunk_count[left][off]);
+            inst->cpu.wq_count = 0u;
+            code_index++;
+        }
+    }
+
+    /* The unbuilt GPU register records every access's width, address and count.
+       A following CPU load from KSEG1 must drain the queued final store. */
+    for (uint32_t left = 0u; left < 2u; left++) {
+        for (uint32_t off = 0u; off < 4u; off++) {
+            uint32_t store_index = code_index;
+            inst->cpu.r[1] = 0xBF801810u + off;
+            inst->cpu.r[2] = value;
+            inst->cpu.wq_count = 0u;
+            uint32_t before_unbuilt = inst->bus.unbuilt_n[SCHWAY__DEV_GPU];
+            inst->cpu.pc = 0x80001000u + store_index * 4u;
+            schway__cpu_step_one(inst, NULL);
+            CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GPU] - before_unbuilt,
+                         chunk_count[left][off]);
+            CHECK_EQ_U64(inst->bus.last_unbuilt[0], SCHWAY__DEV_GPU);
+            CHECK_EQ_HEX(inst->bus.last_unbuilt[1], 0x1F801810u + last_lane[left][off]);
+            CHECK_EQ_U64(inst->bus.last_unbuilt[2], last_width[left][off]);
+            CHECK_EQ_HEX(inst->bus.last_unbuilt[3], 0x80001000u + store_index * 4u);
+            CHECK_EQ_U64(inst->cpu.wq_count, 1u);
+            inst->cpu.r[1] = 0xBF801810u;
+            inst->cpu.pc = 0x80001000u + (store_index + 1u) * 4u;
+            schway__cpu_step_one(inst, NULL);
+            CHECK_EQ_U64(inst->cpu.wq_count, 0u);
+            code_index += 2u;
+        }
+    }
     drop(inst);
 }
 
