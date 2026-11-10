@@ -22,7 +22,7 @@ audio hashes identical on six platforms plus the `be32` and `wasm32` lanes.
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: A test frame in RetroArch** - The library, runner and libretro core ship automatically, and a built-in test card hashes identically on eight lanes (verified 2026-10-29; ship PR #4)
-- [ ] **Phase 2: The CPU matches the public vectors** - The R3000A, COP0, bus, memory control, I-cache and interrupts pass the vectors; PS-EXEs run under the own stub kernel
+- [x] **Phase 2: The CPU matches the public vectors** - The R3000A, COP0, bus, memory control, I-cache and interrupts pass the vectors; PS-EXEs run under the own stub kernel (completed 2026-11-09)
 - [ ] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests
 - [ ] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch
 - [ ] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro
@@ -98,7 +98,62 @@ Plans:
   4. `schwaystation-run --exe hello.exe --tty --stop-on mailbox` prints `tty ` lines, shows the `SWMB` magic and exits 0. armips, built on every leg at its pin, assembles every fixture to one digest, and `fixtures.armips_pin.self_test` fails on a wrong digest.
   5. `schwaystation-run --probe FILE` prints the identity fields without emulating. `--trace first-fault`, run on a crafted EXE, prints one `fault ...` line and a 4,096-record tail and exits 7.
 
-**Plans**: TBD
+**Plans**: 27/27 plans complete in 13 waves
+
+Plans:
+**Wave 1**
+- [x] 02-01-PLAN.md — Test skeleton: the six per-directory inventories and the ci and wasm32 selections
+- [x] 02-02-PLAN.md — Core skeleton: cpu and bus object libraries, power-on state, fault record, state format 2, fortify off
+- [x] 02-03-PLAN.md — Rules: PASS_REGEX checks exit status, gate budget 1,520 named in REQUIREMENTS, docs glob, attributes, testing-guide rows
+- [x] 02-04-PLAN.md — The committed SingleStepTests sample, its slicer, manifest row and notice
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 02-05-PLAN.md — armips at its pin assembles hello.exe; asan and perf skip it; fixture digests in hashes.txt
+- [x] 02-06-PLAN.md — Vector harness, step_one, the ALU class (2,100 cases)
+- [x] 02-07-PLAN.md — Bus decode, mirrors, memory control and costs, unbuilt devices, gaps, debug ports, I_STAT/I_MASK and CAUSE bit 10
+- [x] 02-08-PLAN.md — API version 2 with the PS-EXE validator, schway_probe_exe and schway_load_exe
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 02-09-PLAN.md — Hosted probe: armips and the hello digest green on all eight lanes; armips doc corrections
+- [x] 02-10-PLAN.md — COP0, the exception entry, traps, branches and jumps (3,500 cases)
+- [x] 02-11-PLAN.md — schway_run with a cycle budget, schway_peek, schway_get_fault, docs.api_names, the version-2 embedding guide
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 02-12-PLAN.md — Loads, stores, delay latch, mul/div and the COP2 pre-phase: all 5,500 cases
+- [x] 02-13-PLAN.md — schwaystation-run --probe with SHA-256 and the rcheevos MD5
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 02-14-PLAN.md — I-cache, cache isolation and the write queue
+- [x] 02-15-PLAN.md — Nightly vectors-full lane over the 55,000 cases at the pin
+- [x] 02-16-PLAN.md — Own stub kernel: source, committed array, drift test, BIOS window
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 02-17-PLAN.md — Block loop and stop reasons, PS-EXE boot with the vblank edge, hello reports done
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 02-18-PLAN.md — TTY in the core: stub putchar and schway_get_tty
+- [x] 02-19-PLAN.md — Interrupt latency model, the phase-3 COP2 hook, exception, delay and timing tests
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 02-20-PLAN.md — Runner --exe (600-frame default cap) and --tty, exit port and exit 6
+- [x] 02-21-PLAN.md — Dual-compiled executor, trace ring and schway_get_trace
+- [x] 02-22-PLAN.md — Loader fuzz target, in-memory seeds, gating fuzz.regress.exe, nightly fuzz job
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 02-23-PLAN.md — Runner --stop-on mailbox, hang, exit-table check, hello frame hash in hashes.txt
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 02-24-PLAN.md — --trace first-fault, fault line, exit 7, unbuilt footer, one fixture per fault class
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 02-25-PLAN.md — exc_matrix fixture judged by expected.csv doc rows
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [x] 02-26-PLAN.md — Final gate total and budget rule, guides, README, planning-ID and emulator-name scans, source-tree write check
+
+**Wave 13** *(blocked on Wave 12 completion)*
+- [x] 02-27-PLAN.md — Hosted CI and nightly green on the branch; timeouts measured from this phase's runs; probe PR closed; todo moves
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SYSTEM.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/PSXDEV-EXTRACTS.md`
 
@@ -169,7 +224,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. A test frame in RetroArch | 15/15 | Ship PR #4 | 2026-10-29 |
-| 2. The CPU matches the public vectors | 0/TBD | Not started | - |
+| 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |

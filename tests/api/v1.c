@@ -1,8 +1,9 @@
 /* API version 1, as first released. FROZEN: once released this file never
-   changes. It calls every function, assigns every field of every struct and
-   checks every constant of version 1, so a rename, a removal or a changed
-   value fails to build or fails here. Each later API version adds its own
-   file, v2.c and so on, beside this one. */
+   changes, except that the two version checks are lower bounds because a
+   later API version keeps every version-1 name. It calls every function,
+   assigns every field of every struct and checks every constant of version
+   1, so a rename, a removal or a changed value fails to build or fails here.
+   Each later API version adds its own file, v2.c and so on, beside this one. */
 #include <stdlib.h>
 #include <string.h>
 
@@ -35,7 +36,7 @@ static void v1_visit(void *user, const char *name, const void *data, uint32_t co
 
 int main(void)
 {
-    CHECK_EQ_U64(SCHWAY_API_VERSION, 1);
+    CHECK(SCHWAY_API_VERSION >= 1);
     CHECK_EQ_U64(SCHWAY_STATUS_OK, 0);
     CHECK_EQ_U64(SCHWAY_STATUS_ERR_ARGUMENT, 1);
     CHECK_EQ_U64(SCHWAY_STATUS_ERR_STRUCT_SIZE, 2);
@@ -72,7 +73,7 @@ int main(void)
     CHECK_EQ_U64(v.library_major, SCHWAYSTATION_VERSION_MAJOR);
     CHECK_EQ_U64(v.library_minor, SCHWAYSTATION_VERSION_MINOR);
     CHECK_EQ_U64(v.library_patch, SCHWAYSTATION_VERSION_PATCH);
-    CHECK_EQ_U64(v.api, 1);
+    CHECK(v.api >= 1u);
     CHECK(v.abi >= 1u);
     CHECK(v.behaviour_revision >= 1u);
     CHECK(v.state_format >= 1u);

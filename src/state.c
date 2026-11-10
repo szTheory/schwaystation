@@ -4,7 +4,10 @@
      header  magic (8 bytes), state format (u32), total size (u32), body
              CRC-32 (u32)
      body    instance.frame, instance.region, instance.ticks,
-             instance.tick_acc, gpu.vram
+             instance.tick_acc, instance.frame_end, gpu.vram, cpu and cop0
+             registers, instance.profile_flags, instance.exe_loaded, the bus
+             (RAM, scratchpad, memory control, unbuilt-device counters), irq
+             and the first-fault record
    One field list drives every pass (state.h), so they cannot drift apart. A
    struct is never copied as a whole: padding, pointers and the allocator
    never reach the bytes. The audio ring is not saved; a load empties it.
@@ -27,7 +30,21 @@ static const char name_frame[] = "instance.frame";
 static const char name_region[] = "instance.region";
 static const char name_ticks[] = "instance.ticks";
 static const char name_tick_acc[] = "instance.tick_acc";
+static const char name_frame_end[] = "instance.frame_end";
 static const char name_vram[] = "gpu.vram";
+static const char name_profile_flags[] = "instance.profile_flags";
+static const char name_exe_loaded[] = "instance.exe_loaded";
+static const char name_fault_kind[] = "fault.kind";
+static const char name_fault_device[] = "fault.device";
+static const char name_fault_width[] = "fault.width";
+static const char name_fault_note[] = "fault.note";
+static const char name_fault_frame[] = "fault.frame";
+static const char name_fault_ticks[] = "fault.ticks";
+static const char name_fault_line[] = "fault.line";
+static const char name_fault_dot[] = "fault.dot";
+static const char name_fault_pc[] = "fault.pc";
+static const char name_fault_opcode[] = "fault.opcode";
+static const char name_fault_addr[] = "fault.addr";
 static const char name_header[] = "header";
 
 /* One header field whose only valid value is v. */
@@ -47,16 +64,45 @@ static void header_io(struct schway__state_io *io, uint32_t total)
     (void)schway__state_field_io(io, name_header, 0u, 4u, 0u, UINT32_MAX);
 }
 
+/* The first-fault record: the kind and device are the known ones. */
+static void fault_io(struct schway__state_io *io, struct schway__fault *f)
+{
+    (void)schway__state_u32(io, name_fault_kind, &f->kind, SCHWAY__FAULT_NONE,
+                            SCHWAY__FAULT_EXCEPTION_LOOP);
+    (void)schway__state_u32(io, name_fault_device, &f->device, 0u, SCHWAY__DEV_COUNT - 1u);
+    (void)schway__state_u32(io, name_fault_width, &f->width, 0u, 4u);
+    (void)schway__state_u32(io, name_fault_note, &f->note, 0u, UINT32_MAX);
+    (void)schway__state_u64(io, name_fault_frame, &f->frame, 0u, SCHWAY__STATE_FRAME_MAX);
+    (void)schway__state_u64(io, name_fault_ticks, &f->ticks, 0u, SCHWAY__STATE_TICKS_MAX);
+    (void)schway__state_u32(io, name_fault_line, &f->line, 0u, UINT32_MAX);
+    (void)schway__state_u32(io, name_fault_dot, &f->dot, 0u, UINT32_MAX);
+    (void)schway__state_u32(io, name_fault_pc, &f->pc, 0u, UINT32_MAX);
+    (void)schway__state_u32(io, name_fault_opcode, &f->opcode, 0u, UINT32_MAX);
+    (void)schway__state_u32(io, name_fault_addr, &f->addr, 0u, UINT32_MAX);
+}
+
 static void body_io(struct schway__state_io *io, schway *inst)
 {
     uint64_t den = schway__instance_frame_den(inst->region);
     (void)schway__state_u64(io, name_frame, &inst->frame, 0u, SCHWAY__STATE_FRAME_MAX);
     /* A state loads only into an instance of the same region. */
     (void)schway__state_u32(io, name_region, &inst->region, inst->region, inst->region);
-    (void)schway__state_u64(io, name_ticks, &inst->ticks, 0u, SCHWAY__STATE_TICKS_MAX);
+    uint64_t ticks = schway__state_u64(io, name_ticks, &inst->ticks, 0u, SCHWAY__STATE_TICKS_MAX);
     (void)schway__state_u64(io, name_tick_acc, &inst->tick_acc, 0u, den - 1u);
+    /* The frame ends at or after the tick the state is at, and within one
+       frame of it, so a run from a loaded state is bounded. */
+    uint64_t frame_end =
+        schway__state_u64(io, name_frame_end, &inst->frame_end, 0u,
+                          SCHWAY__STATE_TICKS_MAX + schway__instance_frame_max(inst->region));
+    schway__state_check(io, ticks <= frame_end &&
+                                frame_end - ticks <= schway__instance_frame_max(inst->region));
     schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
                             0u, UINT16_MAX);
+    schway__cpu_state_io(io, inst);
+    (void)schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u, 1u);
+    (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
+    schway__bus_state_io(io, inst);
+    fault_io(io, &inst->fault);
 }
 
 /* The whole state, in the order the format fixes. */

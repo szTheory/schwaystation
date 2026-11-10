@@ -2,19 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 01
-current_phase_name: A test frame in RetroArch
-status: verified
-stopped_at: Phase 01 CI tail verified; PR 6 tracks final squash merge and main CI; next is phase 2 discussion
-last_updated: "2026-10-29T19:36:51Z"
-last_activity: 2026-10-29
-last_activity_desc: Completed quick task 261029-ldd; phase-1 CI tail verified in hosted run 40940434499
-state_head: 37a029b99bcfbafe5b88529fcdea9ff27c325622
+current_phase: 3
+current_phase_name: The GTE matches the hardware cases; DMA and timers
+status: planning
+stopped_at: Phase 02 complete, ready to plan Phase 3
+last_updated: "2026-11-10T01:46:31.539Z"
+last_activity: 2026-11-10
+last_activity_desc: "Phase 02 shipped as PR #8"
+state_head: 4bc75bd6ee75fc1496030ba70120fee428a17ae7
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 42
+  completed_plans: 42
   percent: 17
 ---
 
@@ -25,21 +25,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 01 — separate CI tail after v0.1.0
+**Current focus:** Phase 02 — The CPU matches the public vectors
 
 ## Current Position
 
-Phase: 01 (A test frame in RetroArch) — CI TAIL
-Plan: 15 of 15
-Status: CI tail complete and verified; PR #6 tracks final automatic merge and main CI
-Last activity: 2026-10-29 — Completed quick task 261029-ldd: phase-1 CI tail; hosted run 40940434499 green
+Phase: 3 — The GTE matches the hardware cases; DMA and timers
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-09 -- Phase 02 shipped as PR #8
 
 Progress: [██░░░░░░░░] 17%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 42
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -48,6 +48,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 15 | - | - |
+| 02 | 27 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -73,6 +74,33 @@ Progress: [██░░░░░░░░] 17%
 | Phase 01 P13 | 5min | 3 tasks | 6 files |
 | Phase 01 P14 | 17min | 3 tasks | 0 files |
 | Phase 01 P15 | 50min | 3 tasks | 27 files |
+| Phase 02 P01 | 2 min | 2 tasks | 15 files |
+| Phase 02 P02 | 4 min | 3 tasks | 16 files |
+| Phase 02 P03 | 6 min | 3 tasks | 8 files |
+| Phase 02 P04 | 5 min | 2 tasks | 6 files |
+| Phase 02 P05 | 11 min | 3 tasks | 11 files |
+| Phase 02 P06 | 13 min | 3 tasks | 10 files |
+| Phase 02 P07 | 14 min | 3 tasks | 12 files |
+| Phase 02 P08 | 25 min | 2 tasks | 16 files |
+| Phase 02 P09 | 36 min | 3 tasks | 6 files |
+| Phase 02 P10 | 13 min | 3 tasks | 11 files |
+| Phase 02 P11 | 10 min | 3 tasks | 14 files |
+| Phase 02 P12 | 14 min | 3 tasks | 12 files |
+| Phase 02 P13 | 13 min | 3 tasks | 13 files |
+| Phase 02 P14 | 11 min | 3 tasks | 10 files |
+| Phase 02 P15 | 15 min | 3 tasks | 9 files |
+| Phase 02 P16 | 5 min | 3 tasks | 12 files |
+| Phase 02 P17 | 12 min | 3 tasks | 15 files |
+| Phase 02 P18 | 3 min | 3 tasks | 15 files |
+| Phase 02 P19 | 20 min | 3 tasks | 13 files |
+| Phase 02 P20 | 7 min | 3 tasks | 10 files |
+| Phase 02 P21 | 15 min | 3 tasks | 15 files |
+| Phase 02 P23 | 6 min | 3 tasks | 14 files |
+| Phase 02 P24 | 12min | 3 tasks | 13 files |
+| Phase 02 P25 | 25min | 3 tasks | 8 files |
+| Phase 02 P22 | 55min | 3 tasks | 13 files |
+| Phase 02 P26 | 9 min | 3 tasks | 6 files |
+| Phase 02 P27 | 37 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -121,6 +149,55 @@ Recent decisions affecting current work:
 - [Phase 01]: Verification: 117 UAT entries pass, 5/5 pre-merge truths verified; no owner verification remains. Real publication and latest-download installation are confirmed at ship.
 
 - [Phase 01 CI tail]: Two controls on v0.1.0 each measured 1620424 Ir/frame three times with zero spread (runs 40939706087 and 40939709809); performance now gates above +1.00 percent, wasm32 is required, and hash-equality compares eight files. Implementation run 40940434499 is green.
+- [Phase 02]: Test selection files stay byte-sorted; SCHWAYSTATION_FIXTURES option declared in tests/tests.cmake before the fixtures include
+- [Phase 02]: 02-02: schway__irq_raise takes an interrupt number 0-10; I_STAT and I_MASK are bounded to bits 0-10 in the state; the profile flags survive a power reset
+- [Phase 02]: PASS_REGEX tests run through expect_fail.cmake with CODE 0; the self test nests through a configure-time driver script
+- [Phase 02]: docs.budgets globs docs/*/*.md in the same file(GLOB) as docs/*.md, so policy.gate_budget stays at 1392 lines against the 1520 limit
+- [Phase 02]: 02-04: sst-sample.bin is a u16 count, then per slice a 16-byte name, a u32 length and the upstream slice with its count patched to 100 (2,395,390 bytes); records carry no opcode block after the cycles
+- [Phase 02]: 02-05: fixtures name their image IMAGE (OUTPUT collides with an add_custom_command keyword); header.inc uses .create IMAGE, 0 plus .headersize 0x80010000 - 0x800; the armips target is armips-bin
+- [Phase 02]: 02-05: a digest mismatch is fatal inside file(DOWNLOAD EXPECTED_HASH), so Armips.cmake prints an armips: ... SHA-256 line before downloading and the pin self test matches that
+- [Phase 02]: 02-06: the vectors' next-PC model is pc plus the branch latch (next pc = target while take is set, else pc + 4) and every non-branch instruction clears the latch to zeros; the load latch is the pending load landing as the instruction ends, held as register 32 for none because a load into r0 is a real pending state
+- [Phase 02]: 02-06: schwaystation-test-vectors exits 1 for a failure, a malformed file or fewer cases than --expect and 2 for a bad command line; an allow line for a file that ran and matched no failing case is an error
+- [Phase 02]: 02-06: the cpu layout assertion pins offsetof(log) = 288 instead of sizeof, since the non-state log pointer differs by target; cpu_read and cpu_write are static inline until loads and stores land
+- [Phase 02]: 02-07: the CPU hands the bus the virtual address (cpu_physical removed from cpu_exec.inc) and the bus decodes the segment; the scratchpad is a KSEG1 gap and KSEG2 answers only FFFE0130h
+- [Phase 02]: 02-07: the delay-register cost table uses the psx-spx formula as published (COM0, COM2, COM3; COM1 adds nothing), is derived, not saved, and is rebuilt on a delay or COM_DELAY write and on a state load; non-port I/O registers charge one approximate cycle
+- [Phase 02]: 02-07: EXP1 and EXP3 writes are dropped without a fault (reads are bus errors); the EXP2 debug ports act only for byte writes with the debug-port flag set and never fault; bus.bios is NULL until plan 02-16 so BIOS accesses are gaps
+- [Phase 02]: Exe status split: ERR_EXE_INVALID is a malformed file, ERR_EXE_RANGE is addresses or size outside RAM; launch block at physical 0200h
+- [Phase 02]: 02-09: armips builds unchanged on all eight hosted lanes; the probe found three phase-2 test-file failures only the hosted legs show (core.audio.pairs timeout tier 30 s, a drive-letter file URL, MSVC C4702), fixed in place; per-leg armips cost is in the 02-09 summary for plan 02-27 — run 42689688852 and 42691517611 green with CI required and hash-equality; draft probe pull request 7 stays open until it is closed unmerged before ship
+- [Phase 02]: 02-10: Exception entry: schway__cop0_exception is the one entry; cpu_step takes a trapped flag so the program counter stays at the vector, and writes the branch record and the issued load once at the end
+- [Phase 02]: 02-10: Layout assertion: offsetof(exc_repeat) == 296 pins the cpu state part, since the log pointer after a 300-byte state aligns differently on 32 and 64 bit
+- [Phase 02]: 02-10: COP0 behaviour not covered by vectors: MTC0 ignores TAR, BadVaddr, EPC and PRID; MFC0 into r0 is a discarded pending load; COP0 in user mode with CU0 clear is CpU with CE 0 and no first fault; BCondZ links only for rt 10h and 11h
+- [Phase 02]: 02-11: schway_run never crosses a frame boundary, and a budget ending exactly on it reports FRAME; max_cycles 0 changes nothing
+- [Phase 02]: 02-11: instance.frame_end joins the state, validated as ticks <= frame_end <= ticks + the region's longest frame, so a run from a hostile state stays bounded
+- [Phase 02]: 02-11: gate total after docs.api_names is 1457 lines against the 1520 limit; todo 008 is closed, plan 02-27 moves the file
+- [Phase 02]: Rule (a) of the vector harness asserts the exception for a misaligned access and compares every other final field with CAUSE CE masked; the upstream interpreter copies opcode bits 27-26 into CE
+- [Phase 02]: LWL and LWR read the aligned word once, SWL and SWR write the covered bytes as aligned chunks, and rule (b) coalesces upstream chunks to the covered byte set; no bus-hook field was needed
+- [Phase 02]: A multiply or divide issued at counter t is ready at t plus 6, 9, 13 or 36; an early MFHI/MFLO waits to the stamp, capped at 36 cycles; MTHI/MTLO clear the stamp
+- [Phase 02]: A user-mode access outside KUSEG raises AdEL or AdES and records no first fault; a misaligned access records misaligned_read or misaligned_write
+- [Phase 02]: LWC1, SWC1, LWC3 and SWC3 follow the COP1/COP3 CpU rule; LWC0 and SWC0 stay reserved-instruction exceptions
+- [Phase 02]: 02-13: rcheevos_md5 is MD5 over the first t_size + 0800h bytes of the file (rcheevos dfdc64ea035c, rc_hash_disc.c rc_hash_psx line 965); a bare file has no boot-file name, so none is prepended
+- [Phase 02]: 02-13: --probe is valid only alone with one file argument not starting with a dash; every refused, empty, unreadable or missing file exits 1 with one stderr line and no report
+- [Phase 02]: 02-14: the write queue is a count with no retirement by time; it empties by a fifth store, a KSEG1 access or a power reset, and the 4-cycle drain is an estimate — Every store reaches the bus at once, so only the cost of waiting is modelled; a time-based rule would be an unmeasured timing behaviour no test may pin
+- [Phase 02]: 02-14: the I-cache refills from the missed word to the line end on any miss, IBLKSZ is ignored, isolation sends KUSEG, KSEG0 and KSEG1 data accesses to the cache arrays and leaves the KSEG2 cache-control word on the bus — One fill mechanism; FlushCache needs cache control reachable while Isc is set; the scratchpad alternative for TAG clear is not modelled and the bus page says so
+- [Phase 02]: Plan 02-15: the nightly lane's tests.cmake defines its own schwaystation-test-vectors target and the prefix check compares every sample byte after the count field with the upstream file
+- [Phase 02]: 02-16: the stub's RAM vector is a four-word lui, ori, jr, nop jump to a handler body in ROM (a KSEG0 J cannot reach KSEG1), the handler uses only k0 and k1, the bytes between the reset code and BFC00180h are FFh so a runaway records an exception, and the array is regenerated by cmake -DCASE=array -P tests/fixtures/tests.cmake — The image is 524 bytes (sha256 c567e5b4...); power-on maps it when bus.bios is NULL and a mapped image survives a reset
+- [Phase 02]: 02-17: schway__cpu_run returns the stop reason and the cycles it ran are the advance of inst->ticks, added once per block; a stop sits on the first instruction boundary at or after the limit or frame end and carries no overshoot, so N then M equals N + M where N is a boundary of the one-shot run
+- [Phase 02]: 02-17: a failed instruction fetch is IBE (no BadVaddr), and one at BFC00180h or 80000080h is a double fault that stops the run with FAULT whatever the flags; the exit-port report consumes exit_pending and keeps exit_code
+- [Phase 02]: 02-17: mailbox layout follows the committed stub (CRC 04h, status byte 08h, version 09h, count 0Ah, id 0Bh, handler word 0Ch, records 10h+8n), not CONFORMANCE section 4; plan 02-23's runner reads status at 08h and the count at 0Ah
+- [Phase 02]: 02-18: the stub's A and B kernel entries are four-word RAM slots that jump to ROM putchar routines using only k0 and k1, and the reset code copies a 48-byte slot table; the stub is 620 bytes — A putchar that is real MIPS reaches the debug port through the bus like any guest store, so no host hook watches a kernel address
+- [Phase 02]: 02-18: schway_get_tty drains the 4 KiB ring oldest first and reports and clears the bytes dropped since the last drain, also for capacity 0; the ring stays outside the state, every hash and a load — The same pull shape as schway_get_audio; a host that drains every frame sees every byte, and a hash never depends on whether a host drained
+- [Phase 02]: 02-19: an interrupt is armed by a retirement stamp (irq_stamp, in the state) on the false-to-true change of the line, 2 retirements for a device edge, I_MASK and SR writes and 1 for CAUSE and RFE, taken at the last only if the line is still true — The latencies are an inference unmeasured on silicon; an interrupt due on an instruction beats SYSCALL, BREAK, RI, CpU and fetch errors and yields to data errors and overflow, per the documented order
+- [Phase 02]: 02-19: the interrupt entry calls schway__cop0_irq_entry_cop2 with the word at EPC, read without charge or first fault; it only reports a COP2 command and the GTE plan executes it — The double execution belongs to phase 3 with the GTE; the hook is this plan's whole deliverable for that bug
+- [Phase 02]: 02-20: the exit port acts only with the debug-port flag, so a fixture that reports through it runs with --tty; without --tty the write is ignored and the run goes the full frame count
+- [Phase 02]: 02-20: --exe shares the probe's file reader and refusal line; a line over 4096 bytes is printed in pieces; reaching the 600-frame cap with the program still running exits 0 until plan 02-23 lands the hang report
+- [Phase 02]: the trace ring is a member of struct schway (131,096 bytes: 4,096 32-byte records plus bookkeeping), outside the state and every hash, and is cleared only by a power reset so a per-frame runner keeps one rolling tail
+- [Phase 02]: schway_trace is 64 bytes with no reserved field; a record packs event, width, device and a 16-bit note into one word and keeps the frame's low 32 bits, widened by schway_get_trace
+- [Phase 02]: line and dot of a trace record are derived at read time from the cycles since its frame began at 11 to 7 GPU clocks over 3,413 (NTSC) or 3,406 (PAL) clocks per line until the GPU keeps a beam
+- [Phase 02]: 02-23: --stop-on mailbox reads the fixture mailbox through schway_peek once per frame; done with a matching CRC-32 exits 0, a fault status or a CRC mismatch exits 6, and no verdict by the frame cap prints hang frames=N pc=0x... and exits 8, only under --stop-on, so a plain --exe run at its cap still exits 0 — A fault status skips the CRC check because the stub kernel writes FFh over the status word without rewriting the CRC; the exit-table check compares --help with docs/runner.md both ways and the gate total is 1494 lines against 1520 (plan 02-26 decides any deferral)
+- [Phase 02]: 02-24: an --exe run goes through schway_run per frame with stop-on-fault on by default and exit 7; the unbuilt line's n is the last device's count, printed once at the end of any --exe run; --trace and --no-stop-on-fault need --exe
+- [Phase 02]: 02-25: the mailbox judge pairs a fixture's CSV rows with its records by order (row n is record id n) and lives in the fixtures script case; under --no-stop-on-fault the runner prints the first fault the program made at the end of the run and keeps the run's status — ExcCode persists until the next exception, so the masked-line and CAUSE-after-I_STAT doc rows read 1Ch, not 0; those two rows and the interrupt EPC (MTC0 plus 8) pin models, not measurements, and change only through tests/diag/allow.txt
+- [Phase 02]: 02-26: the gate-line total is 1495 of 1520 after the last gate of the phase, so no check is deferred; the cap is never raised and ship ratchets it to the measured total — The stub regeneration commands live once, in docs/maintaining.md, with the armips and vectors procedures; the vectors one reproduced the committed sample byte for byte
+- [Phase 02]: 02-27: build timeout 11 min (windows-x64 311 s, run 42725764966), hygiene 2 min, rehearsal 13 min; floors kept for asan, be32, wasm32, nofp, vectors-full, fuzz; each cites a run of this phase
 
 ### Pending Todos
 
@@ -169,15 +246,20 @@ come from `AGENTS.md`.
 | 2026-10-29 | /gsd-ship 1 | Codex, OpenGSD 1.19.0; inline shipping and hosted CI | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-29 | /gsd-verify-work 1 | Codex, OpenGSD 1.19.0; inline verification and hosted CI | GPT-6 (session; exact model ID not exposed) |
 | 2026-10-29 | /gsd-quick phase-1 CI tail | Codex, OpenGSD 1.19.0; inline quick fallback | GPT-6 (session; exact model ID not exposed) |
+| 2026-11-09 | /gsd-discuss-phase 2 | Claude Code, OpenGSD; seven advisor agents fanned out | claude-sonnet-5-5 |
+| 2026-11-09 | /gsd-plan-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, planner claude-opus-5-5 (4 rounds), checker claude-haiku-5-5 (4 passes); research skipped | claude-sonnet-5-5 |
+| 2026-11-09 | /gsd-execute-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, executors claude-sonnet-5-5 (sequential, no worktrees) | claude-sonnet-5-5 |
+| 2026-11-09 | /gsd-ship 2 | Claude Code, OpenGSD; inline shipping, PR #8 | claude-sonnet-5-5 |
 
 ## Session Continuity
 
-Last session: 2026-10-29
-Stopped at: Phase-1 CI tail verified; PR #6 tracks final squash merge and main CI
+Last session: 2026-11-10T00:43:02.494Z
+Stopped at: Phase 02 complete, ready to plan Phase 3
 Resume file: None
 
-Ship PR: https://github.com/szTheory/schwaystation/pull/4
+Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
+Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next command: `$gsd-discuss-phase 2` (after PR #6 merges green).
-Stop after this quick step; do not start phase 2 in this session.
+Next: from a shell, `gh pr merge 8 --auto --squash`; confirm a CI run on the head commit, then confirm the release pull request is green after the merge. Then `/gsd-discuss-phase 3`.
+Stop after the ship step.

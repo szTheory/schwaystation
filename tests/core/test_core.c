@@ -11,9 +11,6 @@
 #include "../alloc.h"
 #include "../check.h"
 
-/* A state buffer: the 1024 x 512 VRAM and a few words, rounded up. */
-#define STATE_BUF (SCHWAY__VRAM_W * SCHWAY__VRAM_H * 2u + 4096u)
-
 /* The display, the card and the frame cycles as the documents give them:
    docs/embedding.md "The test card", ARCHITECTURE sections 1 and 4, and
    psx-spx GPU Display Control Commands for the power-on display range. */
@@ -34,8 +31,11 @@
 #define TAG_BUF 8192u  /* bytes in the size-tag scratch buffer */
 #define TAG_MAX 4096u  /* the largest input size tag the core accepts */
 
-static uint8_t state_buf[STATE_BUF];
-static uint8_t state_buf2[STATE_BUF];
+/* Two buffers for saved states, sized from the core's own answer, so they
+   follow the state as it grows. */
+static uint8_t *state_buf;
+static uint8_t *state_buf2;
+static size_t state_cap;
 static int16_t audio_buf[2u * RING_PAIRS + 64u];
 static uint16_t tight[CARD_W * CARD_H + 64u];     /* a 640-byte pitch, then a guard */
 static uint16_t padded[1024u * CARD_H];           /* a 2048-byte pitch */
@@ -98,6 +98,25 @@ static schway *make(uint32_t region)
     schway_profile p = make_profile(region);
     CHECK_EQ_U64(schway_set_profile(inst, &p), SCHWAY_STATUS_OK);
     return inst;
+}
+
+/* Sizes the state buffers from a fresh instance. */
+static void state_bufs_init(void)
+{
+    schway_config cfg = plain_config();
+    schway *probe = NULL;
+    CHECK_EQ_U64(schway_create(&cfg, &probe), SCHWAY_STATUS_OK);
+    if (probe == NULL) {
+        exit(1);
+    }
+    state_cap = schway_state_size(probe);
+    schway_destroy(probe);
+    CHECK(state_cap > 0u);
+    state_buf = (uint8_t *)malloc(state_cap);
+    state_buf2 = (uint8_t *)malloc(state_cap);
+    if (state_cap == 0u || state_buf == NULL || state_buf2 == NULL) {
+        exit(1);
+    }
 }
 
 static schway_run_result run(schway *inst, uint32_t frames)
@@ -194,8 +213,8 @@ static uint32_t card_mismatches(const schway *inst, uint32_t frame)
 static size_t save(const schway *inst, uint8_t *buf)
 {
     size_t n = schway_state_size(inst);
-    CHECK(n > 0u && n <= STATE_BUF);
-    if (n == 0u || n > STATE_BUF) {
+    CHECK(n > 0u && n <= state_cap);
+    if (n == 0u || n > state_cap) {
         exit(1);
     }
     CHECK_EQ_U64(schway_save_state(inst, buf, n), SCHWAY_STATUS_OK);
@@ -1004,8 +1023,8 @@ static void test_no_alloc_after_load(void)
     CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(schway_set_profile(inst, &pal), SCHWAY_STATUS_ERR_PROFILE_LOCKED);
     size_t n = schway_state_size(inst);
-    CHECK(n > 0u && n <= sizeof state_buf);
-    if (n > 0u && n <= sizeof state_buf) {
+    CHECK(n > 0u && n <= state_cap);
+    if (n > 0u && n <= state_cap) {
         CHECK_EQ_U64(schway_save_state(inst, state_buf, n), SCHWAY_STATUS_OK);
         CHECK_EQ_U64(schway_load_state(inst, state_buf, n), SCHWAY_STATUS_OK);
     }
@@ -1062,7 +1081,10 @@ int main(int argc, char **argv)
     }
     for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
         if (strcmp(argv[1], cases[i].name) == 0) {
+            state_bufs_init();
             cases[i].run();
+            free(state_buf);
+            free(state_buf2);
             CHECK_DONE();
         }
     }

@@ -54,13 +54,15 @@ configure_file(cmake/version.h.in ${PROJECT_BINARY_DIR}/generated/schwaystation_
 # The options of every target that holds core code. The core links nothing
 # beyond memcpy, memmove, memset and memcmp: no stack protector or fortify
 # helpers, no MSVC security cookie and no default runtime library, and no
-# build path recorded in the objects.
+# build path recorded in the objects. A Debug build with -U alone still lets
+# the system headers route memcpy and memset to checking helpers the import
+# allowlist refuses, so fortify is defined away, not only undefined.
 function(schway_core_options target)
   set_target_properties(${target} PROPERTIES
     C_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON)
   target_compile_options(${target} PRIVATE
-    $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-fno-stack-protector -U_FORTIFY_SOURCE -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.>
+    $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-fno-stack-protector -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.>
     $<$<C_COMPILER_ID:MSVC>:/GS- /Zl>)
   if(SCHWAYSTATION_NOFP)
     target_compile_options(${target} PRIVATE -mgeneral-regs-only)
@@ -76,12 +78,24 @@ endfunction()
 add_library(schwaystation_instance OBJECT
   src/instance.c
   src/frame.c)
+add_library(schwaystation_bus OBJECT
+  src/bus.c
+  src/irq.c)
+add_library(schwaystation_cpu OBJECT
+  src/cpu.c
+  src/cop0.c)
+add_library(schwaystation_exe OBJECT
+  src/exe.c
+  src/stub_kernel.c)
 add_library(schwaystation_testcard OBJECT src/testcard.c)
 add_library(schwaystation_state OBJECT
   src/state.c
   src/crc32.c)
 add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_instance>
+  $<TARGET_OBJECTS:schwaystation_bus>
+  $<TARGET_OBJECTS:schwaystation_cpu>
+  $<TARGET_OBJECTS:schwaystation_exe>
   $<TARGET_OBJECTS:schwaystation_testcard>
   $<TARGET_OBJECTS:schwaystation_state>)
 add_library(schwaystation::schwaystation ALIAS schwaystation)
@@ -89,8 +103,8 @@ target_include_directories(schwaystation PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated>
   $<INSTALL_INTERFACE:include>)
-foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_testcard
-    schwaystation_state)
+foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_bus
+    schwaystation_cpu schwaystation_exe schwaystation_testcard schwaystation_state)
   schway_core_options(${core_target})
 endforeach()
 

@@ -78,6 +78,37 @@ if(CMAKE_SCRIPT_MODE_FILE)
     refuse(--frames 1 --disc x.cue)
     refuse(--frames 1 --help)
     refuse(--version --frames 1)
+  elseif(CASE STREQUAL "exe")
+    # --exe takes one file, never with --probe, and --tty needs it.
+    refuse(--exe)
+    refuse(--frames 1 --exe)
+    refuse(--exe --hash)
+    refuse(--exe a.exe --exe b.exe)
+    refuse(--exe a.exe --probe b.exe)
+    refuse(--probe b.exe --exe a.exe)
+    refuse(--tty)
+    refuse(--frames 1 --tty)
+    refuse(--bench 1 --tty)
+    # --stop-on takes mailbox, once, and needs --exe.
+    refuse(--stop-on mailbox)
+    refuse(--frames 1 --stop-on mailbox)
+    refuse(--exe a.exe --stop-on)
+    refuse(--exe a.exe --stop-on exit)
+    refuse(--exe a.exe --stop-on mailbox --stop-on mailbox)
+    # --trace takes first-fault, once, and needs --exe; --no-stop-on-fault needs --exe.
+    refuse(--trace first-fault)
+    refuse(--frames 1 --trace first-fault)
+    refuse(--exe a.exe --trace)
+    refuse(--exe a.exe --trace cpu)
+    refuse(--exe a.exe --trace first-fault --trace first-fault)
+    refuse(--no-stop-on-fault)
+    refuse(--frames 1 --no-stop-on-fault)
+  elseif(CASE STREQUAL "exe_missing")
+    # A file that is not there, or is not a PS-EXE, exits 1 naming the file
+    # and the reason; no frame runs.
+    expect_exit(1 "schwaystation-run: [^\n]*missing[.]exe: cannot (open|read)" --exe "${OUT}/missing.exe")
+    expect_exit(1 "schwaystation-run: [^\n]*tests[.]cmake: PS-EXE invalid" --exe "${CMAKE_CURRENT_LIST_FILE}"
+      --tty)
   elseif(CASE STREQUAL "positional")
     # This release loads no disc, so a file name is a usage error.
     refuse(--frames 1 game.cue)
@@ -165,9 +196,14 @@ schway_add_test(NAME runner.hash.pal
 # compares byte for byte.
 string(REPLACE ";" "$<SEMICOLON>" runner_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
 set(runner_hashes ${PROJECT_SOURCE_DIR}/tests/cmake/hashes.cmake)
+set(runner_fixtures_arg "")
+if(SCHWAYSTATION_FIXTURES)
+  set(runner_fixtures_arg -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures)
+endif()
 schway_add_test(NAME runner.hashes_file
   COMMAND ${CMAKE_COMMAND} -DMODE=write -DRUN=$<TARGET_FILE:schwaystation-run>
-    "-DEMULATOR=${runner_emulator}" -DOUT=${PROJECT_BINARY_DIR} -P ${runner_hashes}
+    "-DEMULATOR=${runner_emulator}" ${runner_fixtures_arg} -DOUT=${PROJECT_BINARY_DIR}
+    -P ${runner_hashes}
   LABELS portable runner TIMEOUT 60)
 
 # Fault prevented: a comparison that passes lanes which differ, or a lane
@@ -243,9 +279,9 @@ schway_add_test(NAME runner.png_file
 
 # Fault prevented: a command line that runs something it should refuse, so a
 # CI step hashes a frame nobody asked for: no arguments, an option this
-# release lacks, a file name, a frame count out of range or missing, a
-# malformed or out-of-range --png, or an unknown region.
-foreach(case no_args unknown positional frame_range png_syntax region)
+# release lacks, a file name, --exe or --tty misused, a frame count out of
+# range or missing, a malformed or out-of-range --png, or an unknown region.
+foreach(case no_args unknown positional exe frame_range png_syntax region)
   schway_add_test(NAME runner.usage.${case}
     COMMAND ${runner_check} -DCASE=${case} -DOUT=${PROJECT_BINARY_DIR}/tests/refused.png
       -P ${CMAKE_CURRENT_LIST_FILE}
@@ -305,6 +341,54 @@ set(runner_failure_cmd ${runner_cmd} --frames 1 --png "1:${PROJECT_BINARY_DIR}/t
 string(REPLACE ";" "$<SEMICOLON>" runner_failure_cmd "${runner_failure_cmd}")
 schway_add_test(NAME runner.exit.failure
   COMMAND ${CMAKE_COMMAND} "-DCMD=${runner_failure_cmd}" -DCODE=1 "-DREGEX=cannot write"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: a missing or invalid --exe file that is run anyway, or that
+# is reported as a usage error, so a CI step passes on nothing.
+schway_add_test(NAME runner.exe.missing
+  COMMAND ${runner_check} -DCASE=exe_missing -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# The trace record formatter, tested directly: it links the formatter alone, with no instance.
+add_executable(schwaystation-test-trace-format
+  ${CMAKE_CURRENT_LIST_DIR}/test_trace.c
+  ${PROJECT_SOURCE_DIR}/runner/trace.c)
+target_link_libraries(schwaystation-test-trace-format PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-trace-format PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-trace-format)
+
+# Fault prevented: a trace line whose fields, order, hex width or event and device names drift from
+# what docs/runner.md says, so a script that reads the tail misparses it. One golden line per event.
+schway_add_test(NAME runner.trace.golden
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-trace-format>
+  LABELS portable runner TIMEOUT 10)
+
+# Fault prevented: a documented exit status that differs from what the runner returns. --help's
+# table and docs/runner.md's must match line for line, in either direction; the self test checks a
+# copy of the page without the hang row, which must fail naming that row.
+set(runner_doc ${PROJECT_SOURCE_DIR}/docs/runner.md)
+set(runner_doc_copy ${PROJECT_BINARY_DIR}/tests/runner_without_hang.md)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${runner_doc})
+file(READ ${runner_doc} runner_doc_text)
+string(REGEX REPLACE "\n  8  hang[^\n]*" "" runner_doc_text "${runner_doc_text}")
+file(WRITE ${runner_doc_copy} "${runner_doc_text}")
+schway_add_test(NAME runner.exit_table
+  COMMAND ${runner_check} -DDOC=${runner_doc}
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/exit_table.cmake
+  LABELS portable runner TIMEOUT 30)
+# The emulator's own semicolons would be split a second time inside -DCMD, so it travels with a bar
+# between its words and exit_table.cmake turns the bars back.
+string(REPLACE ";" "|" runner_emulator_bars "${CMAKE_CROSSCOMPILING_EMULATOR}")
+set(runner_table_cmd ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
+  "-DEMULATOR=${runner_emulator_bars}" -DDOC=${runner_doc_copy}
+  -P ${PROJECT_SOURCE_DIR}/tests/cmake/exit_table.cmake)
+string(REPLACE ";" "$<SEMICOLON>" runner_table_cmd "${runner_table_cmd}")
+schway_add_test(NAME runner.exit_table.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${runner_table_cmd}" -DCODE=1
+    "-DREGEX=lacks the exit status line[^/]*8[^/]*hang"
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS portable runner TIMEOUT 30)
 

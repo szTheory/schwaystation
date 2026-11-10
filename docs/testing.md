@@ -33,9 +33,11 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `ci-msvc` | The same with MSVC and the static C runtime. | `ci` | all but `release` |
 | `hygiene` | The repository is clean: tree scan, BIOS and executable bytes, the integer-only text scan, titles, the publish script, the workflow's timeouts and action pins, and the gate-line and end-to-end budgets. | `hygiene` | `hygiene` |
 | `asan` | No memory or undefined-behaviour fault, with clang-21's AddressSanitizer and UndefinedBehaviorSanitizer; any finding stops the test. | `ci` | all but `abi` and `release`, whose binary-shape checks the instrumentation changes |
+| `fuzz` | The loader's libFuzzer target and its replay build with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binary. | `asan` | none |
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
 | `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
+| `nightly` | All 55,000 public single-step vectors pass at their pin, and the committed sample is their first records. | `nightly` | `vectors.r3000.full` |
 | `perf` | A Release build for the instructions-per-frame job. Configure and build only. | `ci` | none |
 
 `SCHWAYSTATION_TIMEOUT_SCALE` multiplies every test timeout: 3 for `asan`, 8 for `be32` and 5 for `wasm32`.
@@ -45,7 +47,7 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 `dev`, `ci` and `hygiene` run on any Linux or macOS host with the tools above. The others need:
 
 - `nofp`: GCC itself, since configure stops for any other compiler (on macOS, `gcc` is clang);
-- `asan`: `clang-21` with its sanitizer runtimes;
+- `asan` and `fuzz`: `clang-21` with its sanitizer runtimes (and, for `fuzz`, its libFuzzer runtime);
 - `be32`: a PowerPC cross compiler and `qemu-ppc`;
 - `wasm32`: clang-21, lld-21, `wasi-libc`, the wasm32 compiler runtime, and wasmtime in `build/pins/wasmtime`;
 - the `perf` job: Valgrind (Cachegrind);
@@ -54,12 +56,68 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 On Ubuntu these come from the distribution's packages. Where a host lacks them, CI's run of that lane is the
 evidence; the workflow is the same command.
 
+### The full vectors
+
+The `nightly` lane needs the 55 upstream vector files, which are never committed, cached or uploaded. `pins.txt`
+names each by its git blob SHA-1 (`r3000-<NAME>` rows). Fetch a file with
+`gh api repos/SingleStepTests/r3000/git/blobs/<sha> -H 'Accept: application/vnd.github.raw'` into
+`build/sst/<NAME>.json.bin` and check it with `git hash-object`; configure fails naming any file
+`SCHWAYSTATION_SST_DIR` lacks, so the lane never skips. The harness's `--upstream DIR --prefix-of SAMPLE` reads
+them and fails unless the first records of each equal the committed sample. The `vectors-full` job in
+`nightly.yml` does this on a schedule; it reports through the nightly issue and is not part of `CI required`. The
+workflow's other jobs, the benches and the loader fuzz campaign below, report the same way and also sit outside
+`CI required`.
+
+### The vectors harness
+
+`schwaystation-test-vectors` replays public single-step vectors through the CPU's one-instruction entry, replaying the
+bus from each case's recorded cycles and comparing the final state field by field.
+
+```text
+schwaystation-test-vectors FILE --expect N [--only NAME,...] [--allow FILE] [--flip-expected FIELD[@NAME]]
+schwaystation-test-vectors --upstream DIR --prefix-of SAMPLE --expect N [--allow FILE]
+```
+
+| Option | Meaning |
+|---|---|
+| `FILE` | The committed sample, `tests/vectors/r3000/sst-sample.bin`: the first 100 cases of each of the 55 upstream files. |
+| `--expect N` | Fail unless at least N cases ran, so a run that read nothing or part of a file cannot pass. |
+| `--only NAME,...` | Run only the named slices; a name that does not exist is an error. |
+| `--allow FILE` | Accept the listed failing cases. A line is `YYYY-MM-DD NAME CASE-HEX ISSUE-URL`; a line that matches no failing case is an error, so an allowance goes when its failure is fixed. `tests/vectors/r3000/allow.txt` holds no entry. |
+| `--flip-expected FIELD[@NAME]` | Invert one bit of one case's expected final field, the first case of slice `NAME` if one is named; the negative controls use it. |
+| `--upstream DIR` | Replace each slice by the whole upstream file `DIR/NAME.json.bin`, which must begin with the sample's records byte for byte. Goes with `--prefix-of SAMPLE`, and then no positional `FILE`. |
+
+The exit status is 0 when every case passed and `N` or more ran, 1 for a failure or a malformed file and 2 for a bad
+command line. Two named rules, each counted in the output and each with its own control, adjust the comparison for
+what the vectors record: a misaligned halfword or word access is compared by the exception it must raise, and the
+unaligned loads and stores (LWL, LWR, SWL, SWR) by the set of bytes they cover. `vectors.r3000.sample` runs the sample on
+every lane; `vectors.r3000.full` runs all 55,000 cases in the `nightly` lane.
+
+### The loader fuzz target
+
+`tests/fuzz/exe.c` is the target. Each input is a whole PS-X EXE file: it is probed and loaded into a power-reset
+instance, and the probe and the load must agree, a refused file must change no RAM byte, an accepted one only the
+text segment and the launch block, and two frames of the loaded program (`SCHWAY_RUN_STOP_ON_FAULT`) must each
+return with a stop reason. A broken invariant prints which one and aborts. `tests/fuzz/seeds.c` builds the seeds in
+memory (one either side of each header bound, spans that wrap or leave RAM, and code that hammers addresses no
+device decodes), so no seed byte is committed.
+
+`fuzz.regress.exe` replays every seed and every `tests/fuzz/regress/*.hex` through `schwaystation-fuzz-exe-replay`,
+which has no fuzzing engine and so runs on every leg, `be32` and `wasm32` included. It gates like any other test.
+The campaign is the report-only half: the `fuzz` job in `nightly.yml` builds the `fuzz` preset, writes the seeds with
+`schwaystation-fuzz-exe-replay --write DIR`, and runs `schwaystation-fuzz-exe` for 60 seconds with
+`-max_len=2099200`. A crash fails the job, which opens or updates the nightly issue and blocks nothing.
+
+To keep a crasher, minimise it (`schwaystation-fuzz-exe -minimize_crash=1 -runs=100000 FILE`), commit it as
+`tests/fuzz/regress/<name>.hex` (hexadecimal text; whitespace and `#` comments are skipped) with its fix, and add its
+row to `tests/fixtures/manifest.txt`: path, `own generated bytes`, `-`, `MIT`, its SHA-256 and `-`.
+
 ## The inventories
 
 The tests a lane registers are listed in two levels of plain text:
 
-- `tests/inventory/<preset>.txt` selects directories, one per line (`ci.txt`, `hygiene.txt`, `nofp.txt`,
-  `wasm32.txt`); lines starting with `#` are comments.
+- `tests/inventory/<preset>.txt` selects directories, one per line (`ci.txt`, `hygiene.txt`, `nightly.txt`,
+  `nofp.txt`, `wasm32.txt`); lines starting with `#` are comments.
 - `tests/<dir>/inventory.txt` lists that directory's tests, one `name<TAB>labels` line each, labels sorted and
   comma-separated, lines sorted in byte order.
 
@@ -76,12 +134,22 @@ the same file.
 | `portable` | Tests that hold on every platform, including the frame hashes; the emulated lanes run these. |
 | `abi` | The public header compiled alone as C17 and C++17, the API test, and the library's symbols. |
 | `runner` | `schwaystation-run` options, output, exit statuses and the PNG writer. |
+| `cpu` | The R3000A core: instruction behaviour, exceptions, delay slots and the first-fault trace. |
+| `bus` | The address map: physical decode, RAM mirrors, memory control, the I-cache, the scratchpad and the interrupt registers. |
+| `vectors` | The committed sample of public single-step vectors, run case by case against the core. |
+| `fuzz` | The executable loader's committed fuzz seeds, replayed on every leg; the time-boxed campaign runs nightly and only reports. |
+| `exe` | Loading a PS-X EXE under the stub kernel and `--probe`, including the rejected headers. |
+| `fixtures` | The fixture toolchain: pinned downloads, the committed stub kernel's source, the manifest rows and the fixtures that run to a sealed mailbox. |
 | `libretro` | The libretro core in an in-process host and its `.info` file. |
 | `install` | The library installed and found by an outside project. |
 | `perf` | Allocation-free frames and the instructions-per-frame gate's own logic. |
 | `policy` | Rules about the repository, the documents and the tests themselves. |
 | `release` | The packaged archives, run after the package step. |
 | `hygiene` | The hygiene lane's checks. |
+
+The directories `cpu`, `bus`, `vectors`, `fuzz`, `exe` and `fixtures` each hold an `inventory.txt` and carry the
+label of the same name. `tests/diag/` is a data directory, with no tests of its own: it holds the judged fixture rows
+and their dated changes.
 
 ### The JUnit check
 
@@ -96,6 +164,52 @@ It fails unless every selected inventory test whose labels match `LABELS` and no
 ran, and did not fail, error or skip. `policy.no_skip` fails when any test file sets a skip return code, a skip
 regular expression or disables a test, so no test is ever conditional.
 
+## The fixtures toolchain
+
+The PS-EXE fixtures are programs written in MIPS assembly for the pinned armips, an MIT-licensed assembler. Their
+sources are in `tests/fixtures/src` (`header.inc` and `mailbox.inc` are shared by all of them), and the stub kernel's
+is `tests/fixtures/src/stub/stub.asm`.
+
+- `pins.txt` has one `armips` row: a version, the URL of the archive of one full 40-character commit, and its
+  SHA-256. `cmake/Armips.cmake` downloads the archive into `build/<preset>/pins`, fails configure unless the digest
+  matches, and builds armips for the host. Nothing is installed on the machine. `fixtures.armips_pin.self_test` feeds
+  the check a wrong digest.
+- `tests/fixtures/tests.cmake` assembles each source into `build/<preset>/fixtures`; no fixture is committed. The
+  one generated file that is, `src/stub_kernel.c`, is the stub kernel as a byte array, listed in
+  `tests/fixtures/manifest.txt`; `fixtures.stub_drift` compares it with the freshly assembled image on every lane.
+  [Maintaining](maintaining.md) has the commands to rebuild it.
+- A test names the fixture it runs: `schwaystation-run --exe FIXTURE ...` for what the runner reports, and
+  `schwaystation-test-boot CASE` for what only the core can show (the launch block, the stub's exception record, the
+  debug-port bytes). The `nightly` preset sets `SCHWAYSTATION_FIXTURES=OFF` and never builds armips.
+- Every hosted leg and every local build uses the same assembler, so a fixture's bytes, and with them the `exe` line
+  of `hashes.txt`, are the same everywhere.
+
+## Judged fixtures
+
+A fixture measures and never judges itself. It writes its results as records into the mailbox at the start of its
+image and seals it; `tests/diag/expected.csv` holds the verdicts. A test such as `fixtures.exc_matrix` runs
+`schwaystation-run --exe FIXTURE --stop-on mailbox --frames F`, so the mailbox is read at frame F, and the runner prints
+one `mailbox ID=VALUE` line per record (see [the runner page](runner.md#mailbox)). The test then reads the
+fixture's rows.
+
+| Column | Meaning |
+|---|---|
+| `fixture` | the fixture's name, `exc_matrix` for `exc_matrix.exe` |
+| `test` | the record's name |
+| `profile` | the machine profile the row holds for, `*` for any |
+| `expected` | eight hex digits, or `lo..hi` for a range |
+| `source` | `doc` when a document gives the value, `hw` when a run on a console did |
+| `citation` | the document or the hardware run behind the value, with no comma |
+
+The nth row of a fixture judges the record with id n, so the order of the rows is the order of the records. A line
+that starts with `#` is a comment. The test fails on a record outside its row, a row with no record, a record with no
+row, a runner that does not exit 0, and a row whose source is not `doc` or `hw`. A row is `hw` only when a hardware
+result exists to cite.
+
+A value may change only through `tests/diag/allow.txt`: a dated line `YYYY-MM-DD fixture row value evidence` that names
+the row, the new value as hex and the evidence for it. The test accepts that value for that row. A line that
+applies to no record, because the row does not exist or the record has another value, is an error.
+
 ## Adding a test
 
 1. Register it in its directory's `tests/<dir>/tests.cmake`:
@@ -107,7 +221,8 @@ regular expression or disables a test, so no test is ever conditional.
    ```
 
    `NAME`, `COMMAND`, `LABELS` and `TIMEOUT` are required; `PASS_REGEX` makes the test pass only when its output
-   matches, and `COST` orders long tests first. A comment above it names the fault the test prevents.
+   matches and its command exits 0 (the helper runs it through `expect_fail.cmake` with `CODE` 0, because CTest's own
+   pass pattern would override a non-zero exit), and `COST` orders long tests first. A comment above it names the fault the test prevents.
 2. Add `runner.example<TAB>runner` to `tests/<dir>/inventory.txt` at its sorted place.
 3. Run `cmake --workflow --preset ci`. If configure fails, its message names the difference between what was
    registered and what the inventories list.
@@ -137,13 +252,15 @@ written into the build tree when CMake configures, so no tracked file holds them
 ## Budgets
 
 **Documents.** `docs.budgets` keeps `README.md` under 16,384 bytes, `include/schwaystation.h` under 40,960 bytes and
-each `docs/*.md` page under 61,440 bytes, each strictly below its limit, and names every file at or over it with
+each `docs/*.md` and `docs/*/*.md` page under 61,440 bytes, each strictly below its limit, and names every file at or over it with
 its size. Run it by hand with `cmake -DROOT=. -P tests/cmake/budgets.cmake`.
 
 **Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` (hygiene lane) counts
 every line of `scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*` against a fixed limit set in
-`tests/hygiene/tests.cmake`; the limit is an absolute line count, lowered when a release ships. Check the total with
-`wc -l scripts/*.sh tests/cmake/*.cmake .githooks/* | tail -1`. Gate logic stays in those files: it is not moved
+`tests/hygiene/tests.cmake`; the limit is an absolute line count, lowered when a release ships. It is 1520 lines
+for the CPU phase, whose last gate left the total at 1495, and it is never raised: a gate that does not fit
+replaces or folds an older one. Shipping the phase sets the limit to the total then measured. Check the total with
+`cat scripts/*.sh tests/cmake/*.cmake .githooks/* | wc -l`. Gate logic stays in those files: it is not moved
 into `tests/<dir>/tests.cmake`, `cmake/` or workflow YAML to fit.
 
 **End-to-end code.** Everything under `tests/retroarch` stays within 300 lines in total; `policy.e2e_budget`
@@ -193,7 +310,8 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
 | `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, `320x240, every pixel equal`, and the flipped-pixel control must fail naming `7,3`. | yes |
 | `perf` | Cachegrind instructions per frame at head and at the merge base, then `perf_compare.cmake` in gate mode on pull requests. Manual runs measure one commit three times and report its spread. | yes |
-| `rehearsal`, `cleanup` | Rehearse publication on same-repository pull requests that change release inputs, then delete the rehearsal release and tag. See [maintaining.md](maintaining.md). | yes, when applicable |
+| `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
+| `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `CI required` | The one check the ruleset requires. It passes only when every job above succeeded or was skipped as allowed: heavy jobs when `heavy=false`, `title` and `perf` outside pull requests, `perf` in a call from `release.yml`, and rehearsal jobs when publication is not applicable. | the check |
 
 `wasm32` became required after a successful run on `main`. Timeouts are twice the slowest successful duration

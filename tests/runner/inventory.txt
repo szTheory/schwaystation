@@ -4,7 +4,10 @@ build.revision_matches_head.self_test	runner
 runner.bench.bytes	bench,portable,runner
 runner.bench.format	bench,portable,runner
 runner.bench.percentile	bench,portable,runner
+runner.exe.missing	portable,runner
 runner.exit.failure	portable,runner
+runner.exit_table	portable,runner
+runner.exit_table.self_test	portable,runner
 runner.hash	portable,runner
 runner.hash.frame5	portable,runner
 runner.hash.ntsc_j	portable,runner
@@ -16,6 +19,8 @@ runner.hashes_file	portable,runner
 runner.png	portable,runner
 runner.png_file	portable,runner
 runner.stop	portable,runner
+runner.trace.golden	portable,runner
+runner.usage.exe	portable,runner
 runner.usage.frame_range	portable,runner
 runner.usage.no_args	portable,runner
 runner.usage.png_syntax	portable,runner

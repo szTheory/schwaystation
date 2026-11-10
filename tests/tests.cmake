@@ -1,8 +1,8 @@
 # Every directory's tests. Each file is include()d, never add_subdirectory()d,
 # so the top-level directory's TESTS property holds every name and the
 # inventory check in cmake/SchwaystationTests.cmake sees them all. The hygiene
-# lane registers only its own tests, and the nofp lane only the abi and nofp
-# tests.
+# lane registers only its own tests, the nofp lane only the abi and nofp tests,
+# and the nightly lane only the full vector run.
 if(SCHWAYSTATION_HYGIENE)
   include(${CMAKE_CURRENT_LIST_DIR}/hygiene/tests.cmake)
   return()
@@ -12,9 +12,23 @@ if(SCHWAYSTATION_NOFP)
   include(${CMAKE_CURRENT_LIST_DIR}/nofp/tests.cmake)
   return()
 endif()
+if(SCHWAYSTATION_INVENTORY STREQUAL "nightly")
+  include(${CMAKE_CURRENT_LIST_DIR}/nightly/tests.cmake)
+  return()
+endif()
 include(${CMAKE_CURRENT_LIST_DIR}/testcard_pins.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/abi/tests.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/bus/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/core/tests.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cpu/tests.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/exe/tests.cmake)
+# The fixtures need the pinned armips; a lane without it turns them off.
+option(SCHWAYSTATION_FIXTURES "Assemble the PS-EXE fixtures with the pinned armips" ON)
+if(SCHWAYSTATION_FIXTURES)
+  include(${CMAKE_CURRENT_LIST_DIR}/fixtures/tests.cmake)
+endif()
+include(${CMAKE_CURRENT_LIST_DIR}/fuzz/tests.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/vectors/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/install/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/perf/tests.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/policy/tests.cmake)

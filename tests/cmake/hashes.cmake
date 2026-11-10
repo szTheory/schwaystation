@@ -1,10 +1,12 @@
 # The hashes every lane prints, and their comparison across lanes, run as
-#   cmake -DMODE=write -DRUN=<schwaystation-run> [-DEMULATOR=<list>] -DOUT=<dir> -P hashes.cmake
+#   cmake -DMODE=write -DRUN=<schwaystation-run> [-DEMULATOR=<list>] [-DFIXTURES=<dir>] -DOUT=<dir> -P hashes.cmake
 #   cmake -DMODE=compare -DFILES=<list> -DCOUNT=<n> -P hashes.cmake
 if(MODE STREQUAL "write")
   # Fault prevented: a lane's output silently not compared. Writes
   # <OUT>/hashes.txt, the file CI collects from every lane, in a fixed order:
-  # four frame hashes, then the frame 5 PNG's digest.
+  # four frame hashes, then the frame 5 PNG's digest, then one line per
+  # assembled fixture file in FIXTURES (when given), sorted by name, so the
+  # eight lanes' fixture bytes are compared too, then hello.exe's frame 30.
   set(lines "")
   foreach(case "ntsc-u;5" "ntsc-u;60" "ntsc-j;60" "pal;60")
     list(GET case 0 region)
@@ -26,6 +28,23 @@ if(MODE STREQUAL "write")
   endif()
   file(SHA256 "${OUT}/hashes-card.png" png)
   string(APPEND lines "ntsc-u png 5 sha256 ${png}\n")
+  if(NOT "${FIXTURES}" STREQUAL "")
+    file(GLOB names RELATIVE "${FIXTURES}" "${FIXTURES}/*")
+    list(SORT names)
+    foreach(name IN LISTS names)
+      file(SHA256 "${FIXTURES}/${name}" digest)
+      string(APPEND lines "fixture ${name} sha256 ${digest}\n")
+    endforeach()
+    # The frame the CPU ran, which differs between lanes if any instruction or the stub kernel does.
+    set(args --exe "${FIXTURES}/hello.exe" --frames 30 --hash)
+    execute_process(COMMAND ${EMULATOR} "${RUN}" ${args}
+      OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^frame 30 sha256 [0-9a-f]+\n$")
+      message(FATAL_ERROR "schwaystation-run ${args}: expected exit 0 and one hash line, "
+        "got exit ${rc}\n${out}${err}")
+    endif()
+    string(APPEND lines "exe hello.exe ${out}")
+  endif()
   # Unix newlines on every host: file(WRITE) writes CRLF on Windows.
   file(CONFIGURE OUTPUT "${OUT}/hashes.txt" NEWLINE_STYLE UNIX CONTENT "${lines}")
 elseif(MODE STREQUAL "compare")

@@ -4,6 +4,7 @@ core.api.size_tags	core,portable
 core.api.statuses	core,portable
 core.audio.pairs	core,portable
 core.audio.ring	core,portable
+core.bus_unbuilt	bus,portable
 core.create.allocator	core,portable
 core.info	core,portable
 core.instances.independent	core,portable
@@ -11,6 +12,14 @@ core.no_alloc_after_load	perf,portable
 core.profile.locked	core,portable
 core.profile.rejected	core,portable
 core.reset.power	core,portable
+core.run.budget_resume	core,portable
+core.run.fault_latched	core,portable
+core.run.fault_none	core,portable
+core.run.peek_no_side_effects	core,portable
+core.run.peek_rejects	core,portable
+core.run.peek_values	core,portable
+core.run.split_equivalence	core,portable
+core.state.cpu_fields	core,portable
 core.state.record_sweep	core,portable
 core.state.rejects	core,portable
 core.state.round_trip	core,portable
@@ -21,5 +30,12 @@ core.testcard.counter	core,portable
 core.testcard.frames_differ	core,portable
 core.testcard.full_redraw	core,portable
 core.testcard.pixels	core,portable
+core.trace.exec_records	core,portable
+core.trace.index_past_end	core,portable
+core.trace.irq	core,portable
+core.trace.last_is_fault	core,portable
+core.trace.short_run	core,portable
+core.trace.wrap	core,portable
+core.trace_hash_equal	core,portable
 core.video.pitch	core,portable
 core.video.tuple	core,portable

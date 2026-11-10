@@ -1,9 +1,15 @@
 # Directories whose inventory.txt this preset registers, one per line; label subsets come from check_junit.cmake's LABELS and EXCLUDE.
 abi
+bus
 core
+cpu
+exe
+fixtures
+fuzz
 install
 libretro
 perf
 policy
 release
 runner
+vectors

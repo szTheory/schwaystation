@@ -24,6 +24,7 @@
 *.sav
 *.state
 !/tests/fixtures/**
+!/tests/vectors/r3000/sst-sample.bin
 /discs/
 /bios/
 /private/

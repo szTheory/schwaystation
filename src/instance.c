@@ -43,6 +43,190 @@ void schway__instance_write_out(void *out, const void *full, uint32_t ours)
     memcpy(out, full, size < ours ? size : ours);
 }
 
+void schway__fault_latch(schway *inst, uint32_t kind, uint32_t device, uint32_t width,
+                         uint32_t pc, uint32_t opcode, uint32_t addr)
+{
+    struct schway__fault *f = &inst->fault;
+    if (f->kind != SCHWAY__FAULT_NONE) {
+        return;
+    }
+    f->kind = kind;
+    f->device = device;
+    f->width = width;
+    f->note = 0u;
+    f->frame = inst->frame;
+    f->ticks = inst->ticks;
+    f->line = 0u;
+    f->dot = 0u;
+    f->pc = pc;
+    f->opcode = opcode;
+    f->addr = addr;
+}
+
+/* Reads the RAM or scratchpad bytes at offset addr of the space, as a
+   little-endian value of width 1, 2 or 4, aligned. It touches nothing: no
+   fault, no counter, no cycle (ARCHITECTURE section 6). */
+schway_status schway_peek(const schway *inst, uint32_t space, uint32_t addr, uint32_t width,
+                          uint32_t *value)
+{
+    if (inst == NULL || value == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    const uint8_t *mem;
+    uint32_t size;
+    if (space == SCHWAY_SPACE_RAM) {
+        mem = inst->bus.ram;
+        size = SCHWAY__RAM_SIZE;
+    } else if (space == SCHWAY_SPACE_SCRATCHPAD) {
+        mem = inst->bus.scratch;
+        size = SCHWAY__SCRATCH_SIZE;
+    } else {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    if ((width != 1u && width != 2u && width != 4u) || addr % width != 0u || addr >= size ||
+        width > size - addr) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    uint32_t v = 0u;
+    for (uint32_t i = 0; i < width; i++) {
+        v |= (uint32_t)mem[addr + i] << (8u * i);
+    }
+    *value = v;
+    return SCHWAY_STATUS_OK;
+}
+
+/* The first-fault record, or all zero while none is latched. */
+schway_status schway_get_fault(const schway *inst, schway_fault *out)
+{
+    if (inst == NULL || out == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_status st = schway__instance_check_out_size(out, SCHWAY__FAULT_SIZE_FIRST);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    const struct schway__fault *f = &inst->fault;
+    schway_fault r;
+    memset(&r, 0, sizeof r);
+    r.size = out->size;
+    r.kind = f->kind;
+    r.device = f->device;
+    r.width = f->width;
+    r.frame = f->frame;
+    r.ticks = f->ticks;
+    r.line = f->line;
+    r.dot = f->dot;
+    r.pc = f->pc;
+    r.opcode = f->opcode;
+    r.addr = f->addr;
+    r.note = f->note;
+    schway__instance_write_out(out, &r, (uint32_t)sizeof r);
+    return SCHWAY_STATUS_OK;
+}
+
+void schway__tty_push(schway *inst, uint8_t byte)
+{
+    struct schway__tty *t = &inst->tty;
+    if (t->count >= SCHWAY__TTY_SIZE) {
+        if (t->dropped != UINT32_MAX) {
+            t->dropped++;
+        }
+        return;
+    }
+    t->buf[(t->head + t->count) % SCHWAY__TTY_SIZE] = byte;
+    t->count++;
+}
+
+schway_status schway_get_tty(schway *inst, schway_tty *io)
+{
+    if (inst == NULL || io == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_status st =
+        schway__instance_check_size(io, SCHWAY__TTY_SIZE_FIRST, (uint32_t)sizeof *io);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    if (io->bytes == NULL && io->capacity != 0u) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    struct schway__tty *t = &inst->tty;
+    uint32_t n = io->capacity < t->count ? io->capacity : t->count;
+    for (uint32_t i = 0; i < n; i++) {
+        io->bytes[i] = t->buf[(t->head + i) % SCHWAY__TTY_SIZE];
+    }
+    t->head = (t->head + n) % SCHWAY__TTY_SIZE;
+    t->count -= n;
+    io->written = n;
+    io->dropped = t->dropped;
+    t->dropped = 0u;
+    return SCHWAY_STATUS_OK;
+}
+
+/* GPU clocks per scan line (psx-spx, GPU Timings): NTSC lines are 3413 video
+   clocks, PAL lines 3406. */
+#define CLOCKS_PER_LINE_NTSC 3413u
+#define CLOCKS_PER_LINE_PAL 3406u
+
+/* Record index of the ring, counted from the oldest, as the public struct.
+   frame is widened from the 32 bits the ring keeps. line and dot come from the
+   cycles since the record's frame started, converted to GPU clocks (11 / 7 of
+   the CPU's) and split by the region's clocks per line, until the GPU keeps a
+   beam of its own; dot is the clock within the line. A frame's first cycle is
+   the exact floor of frame * num / den, built so no product passes 64 bits
+   (ARCHITECTURE section 1). A record from before a state load can lie outside
+   its frame, and then line and dot are 0. */
+schway_status schway_get_trace(const schway *inst, uint32_t index, schway_trace *out)
+{
+    if (inst == NULL || out == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_status st = schway__instance_check_out_size(out, SCHWAY__TRACE_SIZE_FIRST);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    const struct schway__trace_ring *ring = &inst->trace;
+    if (index >= ring->count) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    const struct schway__trace_rec *rec =
+        &ring->rec[(ring->head + index) % SCHWAY__TRACE_CAP];
+    uint64_t frame = (inst->frame & ~UINT64_C(0xFFFFFFFF)) | rec->frame;
+    if (frame > inst->frame && frame >= UINT64_C(0x100000000)) {
+        frame -= UINT64_C(0x100000000);
+    }
+    uint64_t num = schway__instance_frame_num(inst->region);
+    uint64_t den = schway__instance_frame_den(inst->region);
+    uint64_t start = frame * (num / den) + frame * (num % den) / den;
+    uint32_t line = 0u;
+    uint32_t dot = 0u;
+    if (rec->cycle >= start && rec->cycle - start < schway__instance_frame_max(inst->region)) {
+        uint64_t clocks = (rec->cycle - start) * 11u / 7u;
+        uint32_t per_line =
+            inst->region == SCHWAY_REGION_PAL ? CLOCKS_PER_LINE_PAL : CLOCKS_PER_LINE_NTSC;
+        line = (uint32_t)(clocks / per_line);
+        dot = (uint32_t)(clocks % per_line);
+    }
+    schway_trace r;
+    memset(&r, 0, sizeof r);
+    r.size = out->size;
+    r.event = SCHWAY__TRACE_EVENT(rec->meta);
+    r.frame = frame;
+    r.cycle = rec->cycle;
+    r.line = line;
+    r.dot = dot;
+    r.pc = rec->pc;
+    r.opcode = rec->opcode;
+    r.addr = rec->addr;
+    r.width = SCHWAY__TRACE_WIDTH(rec->meta);
+    r.device = SCHWAY__TRACE_DEVICE(rec->meta);
+    r.value = rec->value;
+    r.note = SCHWAY__TRACE_NOTE(rec->meta);
+    r.count = ring->count;
+    schway__instance_write_out(out, &r, (uint32_t)sizeof r);
+    return SCHWAY_STATUS_OK;
+}
+
 /* The power-on display: GP1(06h) X1 = 260h, X2 = C60h and GP1(07h)
    Y1 = 10h, Y2 = 100h, 320-dot mode (divider 8), 240 lines, progressive,
    15-bit, display enabled (psx-spx, GPU Display Control Commands). */
@@ -51,6 +235,8 @@ static void power_on(schway *inst)
     inst->frame = 0u;
     inst->ticks = 0u;
     inst->tick_acc = 0u;
+    inst->frame_end = schway__instance_frame_num(inst->region) /
+                      schway__instance_frame_den(inst->region);
     struct schway__display *d = &inst->display;
     memset(d, 0, sizeof *d);
     d->x1 = 0x260u;
@@ -63,6 +249,22 @@ static void power_on(schway *inst)
     d->enabled = 1u;
     schway__frame_audio_clear(inst);
     memset(inst->vram, 0, sizeof inst->vram);
+    schway__cpu_reset(inst);
+    schway__bus_reset(inst);
+    schway__irq_reset(inst);
+    /* With no BIOS image the BIOS window holds the stub kernel; a mapped
+       image, the host's, is kept across a power reset. */
+    if (inst->bus.bios == NULL) {
+        inst->bus.bios = schway__stub_kernel_image;
+        inst->bus.bios_size = schway__stub_kernel_size;
+    }
+    /* The profile, and its flags, survive a power reset. */
+    inst->exe_loaded = 0u;
+    memset(&inst->fault, 0, sizeof inst->fault);
+    memset(&inst->tty, 0, sizeof inst->tty);
+    memset(&inst->trace, 0, sizeof inst->trace);
+    inst->exit_pending = 0u;
+    inst->exit_code = 0u;
 }
 
 schway_status schway_get_versions(schway_versions *out)
@@ -135,13 +337,23 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     if (st != SCHWAY_STATUS_OK) {
         return st;
     }
-    if (profile->region < SCHWAY_REGION_NTSC_J || profile->region > SCHWAY_REGION_PAL) {
+    /* A caller whose struct ends before flags predates them: none set. */
+    uint32_t flags = profile->size >= sizeof *profile ? profile->flags : 0u;
+    if (profile->region < SCHWAY_REGION_NTSC_J || profile->region > SCHWAY_REGION_PAL ||
+        (flags & ~SCHWAY_PROFILE_DEBUG_PORT) != 0u) {
         return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
     }
     if (inst->profile_locked) {
         return SCHWAY_STATUS_ERR_PROFILE_LOCKED;
     }
     inst->region = profile->region;
+    inst->profile_flags = flags;
+    /* The first frame is the region's; nothing has run before the first
+       frame locks the profile. */
+    if (inst->ticks == 0u) {
+        inst->frame_end = schway__instance_frame_num(inst->region) /
+                          schway__instance_frame_den(inst->region);
+    }
     return SCHWAY_STATUS_OK;
 }
 
@@ -201,6 +413,8 @@ static const char text_state_magic[] = "not a state";
 static const char text_state_version[] = "state format not supported";
 static const char text_state_crc[] = "state checksum mismatch";
 static const char text_state_field[] = "state field out of range";
+static const char text_exe_invalid[] = "PS-EXE invalid";
+static const char text_exe_range[] = "PS-EXE outside RAM";
 static const char text_unknown[] = "unknown status";
 
 const char *schway_status_string(schway_status status)
@@ -228,6 +442,10 @@ const char *schway_status_string(schway_status status)
         return text_state_crc;
     case SCHWAY_STATUS_ERR_STATE_FIELD:
         return text_state_field;
+    case SCHWAY_STATUS_ERR_EXE_INVALID:
+        return text_exe_invalid;
+    case SCHWAY_STATUS_ERR_EXE_RANGE:
+        return text_exe_range;
     default:
         return text_unknown;
     }

@@ -35,9 +35,9 @@ set(install_build_options
 
 # name, build directory, C runtime, program, expected output
 set(install_consumers
-  "install.consumer|consumer|MultiThreaded$<$<CONFIG:Debug>:Debug>|consumer|consumer: api 1, one frame 320x240"
-  "install.consumer.dll_crt|consumer_dll_crt|MultiThreaded$<$<CONFIG:Debug>:Debug>DLL|consumer|consumer: api 1, one frame 320x240"
-  "install.consumer.cxx|consumer_cxx|MultiThreaded$<$<CONFIG:Debug>:Debug>|consumer_cxx|consumer_cxx: api 1")
+  "install.consumer|consumer|MultiThreaded$<$<CONFIG:Debug>:Debug>|consumer|consumer: api [0-9]+, one frame 320x240"
+  "install.consumer.dll_crt|consumer_dll_crt|MultiThreaded$<$<CONFIG:Debug>:Debug>DLL|consumer|consumer: api [0-9]+, one frame 320x240"
+  "install.consumer.cxx|consumer_cxx|MultiThreaded$<$<CONFIG:Debug>:Debug>|consumer_cxx|consumer_cxx: api [0-9]+")
 foreach(install_row IN LISTS install_consumers)
   string(REPLACE "|" ";" install_row "${install_row}")
   list(GET install_row 0 install_name)
@@ -70,4 +70,4 @@ schway_add_test(NAME embed.subdirectory
       -DSCHWAYSTATION_SOURCE_DIR=${PROJECT_SOURCE_DIR}
       ${install_build_options}
     --test-command embed
-  LABELS install TIMEOUT 120 PASS_REGEX "consumer: api 1, one frame 320x240")
+  LABELS install TIMEOUT 120 PASS_REGEX "consumer: api [0-9]+, one frame 320x240")

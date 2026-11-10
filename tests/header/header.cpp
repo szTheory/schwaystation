@@ -15,9 +15,10 @@ SIZE_FIRST(schway_info);
 SIZE_FIRST(schway_run_result);
 SIZE_FIRST(schway_video);
 SIZE_FIRST(schway_audio);
+SIZE_FIRST(schway_exe_info);
 static_assert(sizeof(schway_allocator) >= 3 * sizeof(void *), "allocator holds three pointers");
 static_assert(sizeof(schway_status) == 4, "status is 32 bits");
-static_assert(SCHWAY_API_VERSION == 1, "API version");
+static_assert(SCHWAY_API_VERSION >= 1, "API version");
 
 // Each function keeps its declared signature, with C linkage.
 static schway_status (*const get_versions_fn)(schway_versions *) = schway_get_versions;
@@ -34,6 +35,8 @@ static schway_status (*const save_state_fn)(const schway *, void *, size_t) = sc
 static schway_status (*const load_state_fn)(schway *, const void *, size_t) = schway_load_state;
 static schway_status (*const state_visit_fn)(const schway *, schway_state_visitor,
                                              void *) = schway_state_visit;
+static schway_status (*const probe_exe_fn)(const void *, size_t, schway_exe_info *) =
+    schway_probe_exe;
 static const char *(*const status_string_fn)(schway_status) = schway_status_string;
 static_assert(std::is_same<schway_state_visitor,
                            void (*)(void *, const char *, const void *, uint32_t, uint32_t)>::value,
@@ -59,6 +62,7 @@ int header_check(schway_status st)
     (void)save_state_fn;
     (void)load_state_fn;
     (void)state_visit_fn;
+    (void)probe_exe_fn;
     (void)status_string_fn;
     // A status compares against the constants without a sign or enum warning.
     return (st == SCHWAY_STATUS_OK || st == SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL) &&
