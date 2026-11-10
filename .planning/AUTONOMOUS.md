@@ -53,3 +53,7 @@ does not remove that boundary. No routine owner UAT or redundant confirmation is
 
 For CI and CD efficiency, first measure critical-path time and duplicate work. Prefer removing redundant
 runs and serial bottlenecks over adding caches, concurrency or dependencies. Keep all required coverage.
+
+For delegated research, write concise findings and verified pins to the assigned artifact early. When the
+remaining uncertainties are routine implementation probes, return them to the executor instead of delaying
+the whole phase. If a handoff stalls, recover existing evidence and artifacts before repeating any research.

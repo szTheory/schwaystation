@@ -323,6 +323,8 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-discuss-phase 4 via /gsd-autonomous | Codex, OpenGSD 1.20.0; three parallel advisors and combined adversarial pass | GPT-6 (session; exact model ID not exposed); advisors gpt-6-luna at xhigh |
 
+| 2026-11-10 | /gsd-plan-phase 4 research | Codex, OpenGSD 1.20.0; independent researcher handoff recovered after a stalled write; pins rechecked by orchestrator | gpt-6-luna at xhigh; orchestrator GPT-6 (session) |
+
 ## Session Continuity
 
 Last session: 2026-11-10T08:23:44.047Z

@@ -38,7 +38,10 @@ adversarial pass. Recommendations are followed without routine owner questions. 
   New hardware evidence can change the model; do not manufacture hardware labels or require owner capture.
 - **D-04:** Fetch-only build-158 executables and captures are digest-pinned, noticed and never distributed.
   Quantize reference images to RGB555 and require exact whole-VRAM comparison for the named GAME-01 cases,
-  with only documented case-specific allow.txt variants. Every registered test gates. A released binary oracle
+  with only documented case-specific allow.txt variants. New archive inspection found three named cases
+  without captures: gp0-e1 and mask-bit have only logs; gpustat exists only in the pinned source. Preserve
+  those behaviors with actual register/log assertions and correct GAME-01 accordingly (04-RESEARCH.md).
+  Every registered test gates. A released binary oracle
   may help locate a divergence; it cannot replace required hardware-reference checks or become a new release gate.
 - **D-05:** CPU GP0 writes and DMA2 share one bounded packet decoder and transfer state. Preserve the existing
   atomic block/node DMA timing and stalls; implement GPU request/readiness bits 26/28 and command busy budget.
