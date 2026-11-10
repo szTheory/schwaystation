@@ -87,7 +87,7 @@ covered_files:
   - tests/timers/timer_tests.c
   - tests/vectors/gte/ps1tests-1150.bin
   - tools/gte2bin.py
-covered_digest: "v4:sha256:3167e1a0a2410933ff7ed02bcd84299a8db1b763e243d5388346bd9091c3a047"
+covered_digest: "v4:sha256:fbbc6fa3ab2ae589572c12cd1f36a3cec841bb8f1c9207299568e027a5e8053e"
 behavior_unverified: 0
 overrides_applied: 0
 advisory_notes:
@@ -266,3 +266,25 @@ cost deferral should be bound to a phase 6 plan or todo; it does not affect phas
 
 _Verified: 2026-11-10_
 _Verifier: Claude (gsd-verifier)_
+
+## Ship-time harness correction (Codex, 2026-11-10)
+
+The first final-head hosted run failed only the two timer negative controls on wasm32 and be32.
+The real fixture judges passed. Nested CMake list expansion dropped Wasmtime's directory preopen and
+QEMU's `-L` sysroot. The negative-control command now encodes its emulator list with bars and the
+mailbox judge decodes it, following the existing runner exit-table pattern. No core code or expected
+hardware result changed. The three-line diff was inspected before the checks below.
+
+- `gh api repos/szTheory/schwaystation/actions/jobs/129910193024/logs`: exit 0 after allowing terminal escapes;
+  [hosted failure](https://github.com/szTheory/schwaystation/actions/runs/42839268127).
+- `cmake --preset ci '-DCMAKE_CROSSCOMPILING_EMULATOR=/bin/sh;/tmp/schway-require-permit.sh;--permit'`
+  followed by `ctest --test-dir build/ci -R '^fixtures.timers_lines\.' --output-on-failure`:
+  before fix exit 8 (both negative controls fail), after fix exit 0 (all four checks pass).
+  The throwaway wrapper requires its permit argument before executing the native runner. It proves the
+  nested command preserves the complete emulator argument list; hosted CI confirms real Wasmtime and QEMU.
+- `cmake --preset ci -DCMAKE_CROSSCOMPILING_EMULATOR=`: exit 0, restored native configuration.
+- `cmake --workflow --preset ci`: exit 0 after the correction; 337 tests and both archive checks pass.
+
+The fingerprint below was recomputed over the same covered inputs after this harness correction.
+All earlier core verification remains applicable because no core or expected data changed. Final hosted
+confirmation is recorded by the PR check run; this section does not claim that pending result.

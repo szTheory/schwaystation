@@ -73,6 +73,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
       endif()
     endforeach()
   elseif(CASE STREQUAL "mailbox_judge")
+    string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
     # Runs the fixture to its sealed mailbox and judges every record against the fixture's rows in CSV
     # (fixture,test,profile,expected,source,citation): the nth row of the fixture is the record with
     # id n, expected is a hex value or lo..hi, and a record outside its row, a row with no record or a
@@ -423,11 +424,12 @@ foreach(schway__profile ntsc_u pal)
 
   # Fault prevented: ranges too wide to tell a wrong counter from a right one: the same run judged against
   # the rows moved up by one counter period (10000h) must fail naming both counters' records.
+  string(REPLACE ";" "|" schway__judge_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
   set(schway__judge ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines
     -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=30 -DSHIFT=65536
     -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
     -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
-    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__judge_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE})
   string(REPLACE ";" "$<SEMICOLON>" schway__judge "${schway__judge}")
   schway_add_test(NAME fixtures.timers_lines.${schway__profile}.self_test
