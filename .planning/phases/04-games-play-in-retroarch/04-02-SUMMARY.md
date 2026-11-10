@@ -158,7 +158,7 @@ status: complete
 
 ## Verification Evidence
 
-- TDD RED for task 1: `cpu.exception.ibe_unmapped_fetch` and `bus.ram_word` failed the planned assertions; both reports were accepted by `check tdd-red-evidence` as `RED_EVIDENCE_OK`. GREEN commit: `28c8334`.
+- TDD RED for task 1: `cpu.exception.ibe_unmapped_fetch` failed on the missing user-mode fetch exception; the partial-store RAM/MMIO/queue checks already passed against existing behavior. The fetch failure report was accepted by `check tdd-red-evidence` as `RED_EVIDENCE_OK`. GREEN commit: `28c8334`.
 - TDD RED for task 2: `bus.ram_word` and `core.state.rejects` failed because the cache word remained valid/was overwritten and malformed CPU state was accepted. Both reports were accepted as `RED_EVIDENCE_OK`. GREEN commit: `ef68ab1`.
 - TDD RED for task 3: `cpu.exception.syscall_epc` failed because the progressing handler hit the 1,000-exception fault; the same-EPC handler assertions passed. The report was accepted as `RED_EVIDENCE_OK`. GREEN commit: `e199fbb`.
 - `cmake --workflow --preset ci` — exit 0; all 339 tests passed, followed by both release archive checks.
