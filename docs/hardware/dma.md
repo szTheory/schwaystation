@@ -125,6 +125,14 @@ The row is documented in psx-spx (DMA Transfer Rates; DRAM Hyper Page mode). The
 cycles for 4,096 words on two consoles, 6 more than the model, which is the cost of the register write path and not
 modelled; a test that pins a range around the model's value is the cross-check, and a measured row is not claimed.
 
+**The fixture.** `dma_chain.exe` (see [the testing page](../testing.md#judged-fixtures)) runs the same transfer from
+assembled code with Timer 2 on the system clock: one counter read before the `CHCR` write and one after the `CHCR` read
+that waits for the end. It sits in the range 4,340 to 4,400 clocks, the model's 4,352 plus the few cycles the reads and
+the write cost, and the core gives 4,362. The range is a `doc` row (the per-word model with a margin); nugget's 4,358 is
+corroboration only. The same fixture records the ordering table's two ends, the `CHCR` and `DICR` readings, the
+master-disabled control and the three list outcomes of `dma/chain-looping`, each row labelled `doc` or `hw` in
+`tests/diag/expected.csv`.
+
 ## Sync mode 0, sync mode 1 and the request line
 
 Channels 0 to 5 run two modes, chosen by `CHCR` bits 9-10. Bit 0 gives the direction (1 moves words from RAM to the
