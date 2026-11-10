@@ -25,8 +25,20 @@
 #define MFLO_WORD(rd) (((rd) << 11) | 0x12u)
 #define MTLO_WORD(rs) (((rs) << 21) | 0x13u)
 
+#define SR_CU2 0x40000000u
 #define VECTOR_RAM 0x80000080u
 #define CODE 0x80001000u
+#define DATA 0x80002000u
+
+/* A GTE command word: COP2 with bit 25 set and the command number in the low
+   six bits; the register moves and the memory forms. */
+#define GTE_CMD_WORD(n) (0x4A000000u | (n))
+#define MFC2_WORD(rt, rd) (0x48000000u | ((rt) << 16) | ((rd) << 11))
+#define CFC2_WORD(rt, rd) (0x48400000u | ((rt) << 16) | ((rd) << 11))
+#define MTC2_WORD(rt, rd) (0x48800000u | ((rt) << 16) | ((rd) << 11))
+#define CTC2_WORD(rt, rd) (0x48C00000u | ((rt) << 16) | ((rd) << 11))
+#define LWC2_WORD(base, rt, off) ((0x32u << 26) | ((base) << 21) | ((rt) << 16) | ((off) & 0xFFFFu))
+#define SWC2_WORD(base, rt, off) ((0x3Au << 26) | ((base) << 21) | ((rt) << 16) | ((off) & 0xFFFFu))
 
 static void *test_alloc(void *user, size_t size)
 {
@@ -382,6 +394,51 @@ static void survives_exception(void)
     schway_destroy(inst);
 }
 
+/* The engine's 22 commands and the cycles each keeps it busy (psx-spx,
+   Geometry Transformation Engine, GTE Opcode Summary; measured on both console
+   boards by the gte-timing results). */
+static const struct {
+    uint32_t num, busy;
+} gte_commands[] = {
+    {0x01u, 15u}, {0x06u, 8u},  {0x0Cu, 6u},  {0x10u, 8u},  {0x11u, 8u},  {0x12u, 8u},
+    {0x13u, 19u}, {0x14u, 13u}, {0x16u, 44u}, {0x1Bu, 17u}, {0x1Cu, 11u}, {0x1Eu, 14u},
+    {0x20u, 30u}, {0x28u, 5u},  {0x29u, 8u},  {0x2Au, 17u},  {0x2Du, 5u},  {0x2Eu, 6u},
+    {0x30u, 23u}, {0x3Du, 5u},  {0x3Eu, 5u},  {0x3Fu, 39u},
+};
+
+/* A kernel-mode CPU with the GTE usable, the instruction at CODE primed. */
+static schway *make_gte(const uint32_t *words, uint32_t n)
+{
+    schway *inst = make();
+    inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_CU2;
+    for (uint32_t i = 0u; i < n; i++) {
+        put(inst, CODE + 4u * i, words[i]);
+    }
+    prime(inst, CODE, n);
+    return inst;
+}
+
+/* A command followed at once by MFC2 of IR1: the command takes its own cycle and
+   sets the stamp its busy time after its issue, and the read waits for what is
+   left, the busy time less the one cycle the command's successor started
+   after, so the read takes exactly the busy time (as MFLO right after a
+   multiply takes the multiply's time). All 22 commands.
+   Fault prevented: a command with the wrong busy time, a stamp counted from the
+   wrong cycle, or a result read that does not wait for the engine. */
+static void gte_cycles(void)
+{
+    for (size_t i = 0u; i < sizeof gte_commands / sizeof gte_commands[0]; i++) {
+        uint32_t words[2] = {GTE_CMD_WORD(gte_commands[i].num), MFC2_WORD(3u, 9u)};
+        schway *inst = make_gte(words, 2u);
+        uint64_t before = inst->cpu.cycle;
+        CHECK_EQ_U64(run(inst, CODE), 1u);
+        CHECK_EQ_U64(inst->gte.ready - before, gte_commands[i].busy);
+        CHECK_EQ_U64(run(inst, CODE + 4u), gte_commands[i].busy);
+        CHECK_EQ_U64(inst->cpu.cycle - before, 1u + gte_commands[i].busy);
+        schway_destroy(inst);
+    }
+}
+
 int main(int argc, char **argv)
 {
     static const struct {
@@ -398,6 +455,7 @@ int main(int argc, char **argv)
         {"replace_while_busy", replace_while_busy},
         {"mtlo_mthi_stamp_zero", mtlo_mthi_stamp_zero},
         {"survives_exception", survives_exception},
+        {"gte_cycles", gte_cycles},
     };
     if (argc != 2) {
         fprintf(stderr, "usage: schwaystation-test-timing <case>\n");

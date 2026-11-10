@@ -49,6 +49,7 @@ cpu.exception.syscall_epc	cpu,portable
 cpu.timing.div_36	cpu,portable
 cpu.timing.divu_36	cpu,portable
 cpu.timing.early_read_stalls	cpu,portable
+cpu.timing.gte_cycles	cpu,gte,portable
 cpu.timing.mtlo_mthi_stamp_zero	cpu,portable
 cpu.timing.mult_13	cpu,portable
 cpu.timing.mult_6	cpu,portable

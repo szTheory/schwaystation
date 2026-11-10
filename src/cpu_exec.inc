@@ -219,6 +219,18 @@ static void cpu_muldiv_start(struct schway__cpu *c, uint32_t cycles, uint32_t n)
     c->muldiv_ready = c->cycle + (cycles - 1u) + n;
 }
 
+/* The cycles an instruction that needs the GTE waits: until the running command
+   is done, and never more than the longest one takes, whatever a loaded state
+   says. It is the same rule as the multiply unit's, on the engine's own stamp
+   (psx-spx, Geometry Transformation Engine, GTE Opcode Summary; MFC2, CFC2,
+   SWC2 and a new command wait, MTC2, CTC2 and LWC2 do not). */
+static uint32_t cpu_gte_wait(const schway *inst, uint32_t cycles)
+{
+    uint64_t at = inst->cpu.cycle + (cycles - 1u);
+    uint64_t wait = inst->gte.ready > at ? inst->gte.ready - at : 0u;
+    return wait > SCHWAY__GTE_STALL_MAX ? SCHWAY__GTE_STALL_MAX : (uint32_t)wait;
+}
+
 /* MULT and MULTU: the 64-bit product into HI:LO, in 6, 9 or 13 cycles by how
    many bits the first operand needs. MULT classifies rs with its sign mirrored
    (rs XOR its sign bit spread over the word), MULTU on rs as it is. The
@@ -608,7 +620,9 @@ static uint32_t cpu_cop2(schway *inst, uint32_t pc, uint32_t op, uint32_t next, 
         }
         schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, addr, 4u, 1u, 0u);
     } else if (rs_n == 0u || rs_n == 2u) { /* MFC2, CFC2 */
-        cpu_load_issue(c, rt_n, 0u, load_reg, load_value);
+        *cycles += cpu_gte_wait(inst, *cycles);
+        cpu_load_issue(c, rt_n, schway__gte_read(&inst->gte, rs_n == 2u ? 32u + rd_n : rd_n),
+                       load_reg, load_value);
         schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, rs_n == 2u ? 32u + rd_n : rd_n, 4u, 0u, 0u);
     } else if (rs_n == 4u || rs_n == 6u) { /* MTC2, CTC2 */
         schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, rs_n == 6u ? 32u + rd_n : rd_n, 4u, 1u,
@@ -617,6 +631,8 @@ static uint32_t cpu_cop2(schway *inst, uint32_t pc, uint32_t op, uint32_t next, 
         cpu_branch_set(br, (rt_n & 1u) == 0u ? 1u : 0u, next + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u) * 4u);
         schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, 0u, 4u, 0u, 0u);
     } else if ((rs_n & 0x10u) != 0u) { /* a GTE command */
+        *cycles += cpu_gte_wait(inst, *cycles);
+        inst->gte.ready = c->cycle + (*cycles - 1u) + schway__gte_exec(&inst->gte, op & 0x01FFFFFFu);
         schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, op & 0x01FFFFFFu, 4u, 1u, 0u);
     }
     return 0u;

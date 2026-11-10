@@ -327,3 +327,8 @@ schway_add_test(NAME cpu.timing.mtlo_mthi_stamp_zero
 schway_add_test(NAME cpu.timing.survives_exception
   COMMAND schwaystation-test-timing survives_exception
   LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a GTE command with the wrong busy time, a stamp counted from the wrong cycle, or a result read that does not wait for the engine.
+schway_add_test(NAME cpu.timing.gte_cycles
+  COMMAND schwaystation-test-timing gte_cycles
+  LABELS cpu gte portable TIMEOUT 10)
