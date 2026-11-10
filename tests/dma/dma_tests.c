@@ -196,11 +196,13 @@ static void case_dpcr_reset(void)
 
 /* Fault prevented: arbitration that picks by channel number alone, lets the
    CPU field decide, ignores the master enables or breaks a tie the wrong way.
-   Channels 2 and 5 wait with sync mode 0 and the start trigger; nothing
-   starts them yet, so the pick is the arbitration alone. */
+   Channels 2 and 5 wait with sync mode 0 and the start trigger; a unit that
+   is already running keeps the engine from starting either, so the pick is
+   the arbitration alone. */
 static void case_dpcr_priority(void)
 {
     schway *inst = make();
+    fake_unit(inst, 6u, UINT64_MAX);
     wr32(inst, CHCR(2u), 0x11000000u);
     wr32(inst, CHCR(5u), 0x11000000u);
     const uint32_t all = 0x7Fu;
@@ -778,10 +780,63 @@ static void case_stall_write_queue(void)
     run_store_loop(0x1F80u, 0u);
 }
 
+/* Fills n words of RAM from addr with a pattern of the word index. */
+static void fill_ram(schway *inst, uint32_t addr, uint32_t n, uint32_t seed)
+{
+    for (uint32_t i = 0u; i < n; i++) {
+        wr32(inst, addr + 4u * i, seed + i * 0x01010101u);
+    }
+}
+
+/* The CRC-32 of n little-endian words starting from the pattern fill_ram
+   writes. */
+static uint32_t pattern_crc(uint32_t n, uint32_t seed)
+{
+    uint32_t crc = 0u;
+    for (uint32_t i = 0u; i < n; i++) {
+        uint32_t w = seed + i * 0x01010101u;
+        uint8_t b[4] = {(uint8_t)w, (uint8_t)(w >> 8), (uint8_t)(w >> 16), (uint8_t)(w >> 24)};
+        crc = schway__crc32_update(crc, b, sizeof b);
+    }
+    return crc;
+}
+
+/* Fault prevented: a burst that moves the wrong words to a device, forgets to
+   count or checksum them in the stand-in sink, leaves MADR where it was, or
+   forgets the completion flag and the interrupt. 256 words go from RAM to the
+   GPU channel. */
+static void case_sync0_gpu_sink(void)
+{
+    schway *inst = make();
+    fill_ram(inst, 0x1000u, 256u, 0xA5000001u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00840000u);
+    wr32(inst, MADR(2u), 0x1000u);
+    wr32(inst, BCR(2u), 256u);
+    uint64_t start = now_of(inst);
+    wr32(inst, CHCR(2u), 0x11000001u);
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+    CHECK_EQ_U64(inst->dma.words[2], 256u);
+    CHECK_EQ_HEX(inst->dma.crc[2], pattern_crc(256u, 0xA5000001u));
+    CHECK_EQ_HEX(inst->dma.madr[2], 0x1400u);
+    CHECK_EQ_U64(inst->dma.busy_until - start, 272u);
+    CHECK_EQ_U64(inst->dma.words[0] + inst->dma.words[1] + inst->dma.words[3], 0u);
+    (void)run(inst, 271u);
+    CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+    (void)run(inst, 2u);
+    CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    CHECK_EQ_HEX(rd32(inst, DICR), 0x84840000u);
+    CHECK_EQ_HEX(rd32(inst, MADR(2u)), 0x1400u);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
+    {"sync0_gpu_sink", case_sync0_gpu_sink},
     {"otc_clear", case_otc_clear},
     {"dpcr_reset", case_dpcr_reset},
     {"dpcr_priority", case_dpcr_priority},

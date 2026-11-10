@@ -1,5 +1,6 @@
-/* DMA: power-on values, the state walk, the register window, arbitration and
-   the unit engine with the CPU hold. Only OTC has a unit so far. */
+/* DMA: power-on values, the state walk, the register window, arbitration, the
+   unit engine with the CPU hold, and the device ends. OTC and the burst mode
+   of the other six channels have units so far. */
 #include <string.h>
 
 #include "internal.h"
@@ -74,19 +75,22 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
    of the busy time finishes it, and the next channel then starts. A unit is
    data-atomic and time-evented: a run to completion on a register write could
    hang on a 65,535-word burst and a per-word interleave would cost millions of
-   events a second. Only OTC has a unit so far, so only it can start; the
-   other channels keep their registers and wait (psx-spx, DMA Channels). */
+   events a second. A channel whose mode has no unit yet keeps its registers
+   and waits (psx-spx, DMA Channels). */
 #define DMA_OTC 6u
-#define DMA_UNIT_CHANNELS (1u << DMA_OTC)
+#define DMA_UNIT_CHANNELS 0x7Fu
 
 /* phase of a channel: nothing running, or its unit's words moved and the
    channel busy until busy_until. */
 #define DMA_PH_IDLE 0u
 #define DMA_PH_UNIT 1u
 
-/* CHCR bit 28 starts a transfer without waiting for a request; bits 9-10 are
-   the sync mode (psx-spx, DMA Channels, CHCR). OTC keeps only bits 24, 28 and
-   30, and bit 1 always reads as 1. */
+/* CHCR bit 0 is the direction (1 is RAM to the device), bit 1 the step (1 is
+   backward), bit 28 starts a transfer without waiting for a request, bits 9-10
+   are the sync mode (psx-spx, DMA Channels, CHCR). OTC keeps only bits 24, 28
+   and 30, and bit 1 always reads as 1. */
+#define DMA_CHCR_FROM_RAM 0x00000001u
+#define DMA_CHCR_STEP_BACK 0x00000002u
 #define DMA_CHCR_TRIGGER 0x10000000u
 #define DMA_CHCR_OTC_MASK 0x51000000u
 #define DMA_CHCR_OTC_FIXED 0x00000002u
@@ -138,19 +142,21 @@ static void dicr_set(schway *inst, uint32_t dicr)
     }
 }
 
-/* A channel with a transfer waiting: bit 24 set, and bit 28 where the mode
-   needs the start trigger. OTC always does; sync mode 0 does; the request
-   modes start on their own request line (psx-spx, DMA Channels, CHCR). */
+/* A channel with a unit ready to run: bit 24 set, and bit 28 where the mode
+   needs the start trigger. OTC always does; sync mode 0 does. The request and
+   linked-list modes have no unit yet, so they wait (psx-spx, DMA Channels,
+   CHCR). */
 static uint32_t dma_pending(const struct schway__dma *d, uint32_t ch)
 {
     uint32_t c = d->chcr[ch];
+    uint32_t sync = (c >> 9) & 3u;
     if ((c & SCHWAY__DMA_CHCR_BUSY) == 0u) {
         return 0u;
     }
-    if (ch == DMA_OTC || ((c >> 9) & 3u) == 0u) {
+    if (ch == DMA_OTC || sync == 0u) {
         return (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
     }
-    return 1u;
+    return 0u;
 }
 
 /* The channel of mask that goes next, or SCHWAY__DMA_NONE: among the channels
@@ -177,6 +183,117 @@ uint32_t schway__dma_arbitrate(const schway *inst, uint32_t mask)
     return best;
 }
 
+/* Clocks per word on the device side (psx-spx, DMA Channels, DMA Transfer
+   Rates). */
+static uint32_t dma_word_cycles(uint32_t ch)
+{
+    (void)ch;
+    return 1u;
+}
+
+/* The cycles a unit of n words takes: each word on the device's rate, plus one
+   cycle per 16 words for the DRAM row address (psx-spx, DMA Channels, DRAM
+   Hyper Page mode). At one cycle per word this is ceil(n * 17 / 16). */
+static uint64_t dma_cost(uint32_t ch, uint32_t n)
+{
+    return (uint64_t)n * dma_word_cycles(ch) + (n + 15u) / 16u;
+}
+
+/* The stand-in for a device that is not built: the sink counts the words and
+   folds their bytes, little-endian, into a CRC-32 kept per channel in the
+   state; the source supplies zeros (an unbuilt device reads 0). Both take no
+   extra cycles. A device replaces the one case of its channel. */
+static uint32_t dma_stub_sink(schway *inst, uint32_t ch, uint32_t word)
+{
+    struct schway__dma *d = &inst->dma;
+    uint8_t b[4];
+    for (uint32_t i = 0; i < 4u; i++) {
+        b[i] = (uint8_t)(word >> (8u * i));
+    }
+    d->words[ch]++;
+    d->crc[ch] = schway__crc32_update(d->crc[ch], b, sizeof b);
+    return 0u;
+}
+
+static uint32_t dma_stub_source(uint32_t *word)
+{
+    *word = 0u;
+    return 0u;
+}
+
+/* One word from RAM to the device of channel ch; returns the extra busy
+   cycles. */
+static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word)
+{
+    switch (ch) {
+    case 0u: /* MDEC in */
+        return dma_stub_sink(inst, ch, word);
+    case 1u: /* MDEC out */
+        return dma_stub_sink(inst, ch, word);
+    case 2u: /* GPU */
+        return dma_stub_sink(inst, ch, word);
+    case 3u: /* CD-ROM */
+        return dma_stub_sink(inst, ch, word);
+    case 4u: /* SPU */
+        return dma_stub_sink(inst, ch, word);
+    case 5u: /* PIO */
+        return dma_stub_sink(inst, ch, word);
+    default:
+        return 0u;
+    }
+}
+
+/* One word from the device of channel ch to *word; returns the extra busy
+   cycles. */
+static uint32_t dma_dev_read(schway *inst, uint32_t ch, uint32_t *word)
+{
+    (void)inst;
+    switch (ch) {
+    case 0u: /* MDEC in */
+        return dma_stub_source(word);
+    case 1u: /* MDEC out */
+        return dma_stub_source(word);
+    case 2u: /* GPU */
+        return dma_stub_source(word);
+    case 3u: /* CD-ROM */
+        return dma_stub_source(word);
+    case 4u: /* SPU */
+        return dma_stub_source(word);
+    case 5u: /* PIO */
+        return dma_stub_source(word);
+    default:
+        *word = 0u;
+        return 0u;
+    }
+}
+
+/* Moves n words between RAM at MADR and the device of channel ch, in the
+   direction and with the step CHCR gives, and leaves MADR after the last word.
+   The address wraps at 24 bits (FFFFFCh to 0 and back); a word whose address
+   is past the RAM window is dropped when it is written and reads 0. Returns
+   the extra cycles the device asked for. */
+static uint64_t dma_move(schway *inst, uint32_t ch, uint32_t n)
+{
+    struct schway__dma *d = &inst->dma;
+    uint32_t addr = d->madr[ch] & 0xFFFFFCu;
+    uint32_t step = (d->chcr[ch] & DMA_CHCR_STEP_BACK) != 0u ? 0xFFFFFFFCu : 4u;
+    uint32_t from_ram = d->chcr[ch] & DMA_CHCR_FROM_RAM;
+    uint64_t extra = 0u;
+    for (uint32_t i = 0u; i < n; i++) {
+        uint32_t word = 0u;
+        if (from_ram != 0u) {
+            (void)schway__bus_ram_word(inst, addr, &word, 0u);
+            extra += dma_dev_write(inst, ch, word);
+        } else {
+            extra += dma_dev_read(inst, ch, &word);
+            (void)schway__bus_ram_word(inst, addr, &word, 1u);
+        }
+        addr = (addr + step) & SCHWAY__DMA_MADR_MASK;
+    }
+    d->madr[ch] = addr;
+    return extra;
+}
+
 /* OTC writes BCR words (0 means 10000h) from MADR downward: each word is the
    address of the entry before it and the last is FFFFFFh, so the table ends
    where it was meant to be walked from. The address wraps from 0 to FFFFFCh,
@@ -199,7 +316,7 @@ static uint64_t dma_otc_unit(schway *inst)
         (void)schway__bus_ram_word(inst, addr, &word, 1u);
         addr = prev;
     }
-    return ((uint64_t)n * 17u + 15u) / 16u;
+    return dma_cost(DMA_OTC, n);
 }
 
 /* Starts the unit of the channel that goes next, at tick t. Bit 28 is cleared
@@ -212,10 +329,19 @@ static void dma_start(schway *inst, uint64_t t)
     if (ch == SCHWAY__DMA_NONE) {
         return;
     }
+    uint64_t cost;
     d->chcr[ch] &= ~DMA_CHCR_TRIGGER;
+    if (ch == DMA_OTC) {
+        cost = dma_otc_unit(inst);
+    } else {
+        /* Sync mode 0: one burst of BCR's low half words, 0 meaning 10000h. */
+        uint32_t n = d->bcr[ch] & 0xFFFFu;
+        n = n == 0u ? SCHWAY__DMA_UNIT_WORDS_MAX : n;
+        cost = dma_cost(ch, n) + dma_move(inst, ch, n);
+    }
     d->phase[ch] = DMA_PH_UNIT;
     d->cur = ch;
-    d->busy_until = t + dma_otc_unit(inst);
+    d->busy_until = t + cost;
 }
 
 /* The end of the running unit: the channel stops being busy, its DICR flag is
@@ -301,7 +427,7 @@ static void dma_write(schway *inst, uint64_t now, uint32_t p, uint32_t width, ui
     } else if (reg == 8u) {
         uint32_t c = reg_put(d->chcr[ch], p, width, v);
         c &= ch == DMA_OTC ? DMA_CHCR_OTC_MASK : SCHWAY__DMA_CHCR_MASK;
-        if (d->cur == ch) {
+        if (d->phase[ch] != DMA_PH_IDLE) {
             /* The unit's words have moved and it ends on its own: a write
                cannot stop it, so the channel stays busy. */
             c |= SCHWAY__DMA_CHCR_BUSY;

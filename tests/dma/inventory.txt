@@ -15,3 +15,4 @@ dma.otc.readback	dma,portable
 dma.stall.cpu_access	dma,portable
 dma.stall.not_scratch	dma,portable
 dma.stall.write_queue	dma,portable
+dma.sync0.gpu_sink	dma,portable

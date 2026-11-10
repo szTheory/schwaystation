@@ -105,3 +105,10 @@ schway_add_test(NAME dma.stall.write_queue
 schway_add_test(NAME dma.otc.read_sees_completion
   COMMAND schwaystation-test-dma otc_read_sees_completion
   LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a burst from RAM that moves the wrong words to a device,
+# forgets to count or checksum them in the stand-in sink, leaves MADR where it
+# was, or forgets the completion flag and the interrupt.
+schway_add_test(NAME dma.sync0.gpu_sink
+  COMMAND schwaystation-test-dma sync0_gpu_sink
+  LABELS dma portable TIMEOUT 10)
