@@ -201,3 +201,10 @@ schway_add_test(NAME dma.hostile.preempt_carry
 schway_add_test(NAME dma.regs.sweep
   COMMAND schwaystation-test-dma regs_sweep
   LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a CHCR write that selects the reserved sync mode on a channel
+# other than OTC and goes unreported, starts the channel anyway or leaves it busy
+# for ever; the fault names the register, the value and the writing instruction.
+schway_add_test(NAME dma.fault.sync3
+  COMMAND schwaystation-test-dma fault_sync3
+  LABELS dma portable TIMEOUT 30)

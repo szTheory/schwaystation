@@ -1528,7 +1528,8 @@ static void case_preempt_carry(void)
    widths 1, 2 and 4 with four edge values, each from a power reset, written,
    read back, run for a while and read again. Returns the CRC-32 of everything
    seen. The CHCR word FFFFFFFFh of a channel below 6 selects the reserved sync
-   mode with the start bit and is left out. */
+   mode with the start bit, which latches the DMA fault; every other access
+   latches no fault. */
 static uint32_t sweep_pass(schway *inst)
 {
     static const uint32_t widths[3] = {1u, 2u, 4u};
@@ -1539,9 +1540,12 @@ static uint32_t sweep_pass(schway *inst)
             for (uint32_t k = 0u; k < 4u; k++) {
                 uint32_t addr = 0xBF801000u + off;
                 uint32_t v = values[k];
-                if ((off & 0xCu) == 8u && off < 0xE0u && widths[w] == 4u && v == 0xFFFFFFFFu) {
-                    continue;
-                }
+                /* The one access that may latch the DMA fault: the word
+                   FFFFFFFFh into a CHCR below OTC's, at any byte offset in it. */
+                uint32_t may_fault = (off & 0xCu) == 8u && off < 0xE0u && widths[w] == 4u &&
+                                             v == 0xFFFFFFFFu
+                                         ? 1u
+                                         : 0u;
                 CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
                 uint32_t cycles = 0u;
                 schway__sched_sync(inst);
@@ -1556,7 +1560,8 @@ static uint32_t sweep_pass(schway *inst)
                     (void)run(inst, 3000u);
                 }
                 seen[2] = inst->fault.kind;
-                CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+                CHECK(inst->fault.kind == SCHWAY__FAULT_NONE ||
+                      (may_fault != 0u && inst->fault.kind == SCHWAY__FAULT_DMA));
                 CHECK(schway__dma_next(inst) > inst->ticks);
                 crc = schway__crc32_update(crc, (const uint8_t *)seen, sizeof seen);
                 crc = schway__crc32_update(crc, (const uint8_t *)&inst->dma, sizeof inst->dma);
@@ -1580,10 +1585,78 @@ static void case_regs_sweep(void)
     schway_destroy(inst);
 }
 
+/* Fault prevented: a CHCR write that selects the reserved sync mode (3) on a
+   channel other than OTC and goes unreported, starts the channel anyway or
+   leaves it busy for ever. The write with the start bits latches the first fault
+   of kind DMA at the CHCR address with the value written and the CPU's program
+   counter, nothing moves and the channel is not busy; the same mode without the
+   start bit, and OTC with the same bits, latch nothing; a later write of a
+   usable mode starts the channel; and a second hostile write leaves the first
+   record alone. */
+static void case_fault_sync3(void)
+{
+    schway *inst = make();
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, MADR(2u), 0x1000u);
+    wr32(inst, BCR(2u), 64u);
+    wr32(inst, CHCR(2u), 0x00000601u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    schway_destroy(inst);
+
+    inst = make();
+    (void)otc_start(inst, OTC_TOP, 4u, 0x11000602u);
+    CHECK_EQ_U64(inst->dma.cur, 6u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    schway_destroy(inst);
+
+    inst = make();
+    fill_ram(inst, 0x1000u, 64u, 0xB5000001u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00840000u);
+    wr32(inst, MADR(2u), 0x1000u);
+    wr32(inst, BCR(2u), 64u);
+    wr32(inst, CHCR(2u), 0x11000601u);
+    schway_fault f;
+    memset(&f, 0, sizeof f);
+    f.size = (uint32_t)sizeof f;
+    CHECK_EQ_U64(schway_get_fault(inst, &f), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(f.kind, SCHWAY_FAULT_DMA);
+    CHECK_EQ_U64(f.device, SCHWAY_DEVICE_DMA);
+    CHECK_EQ_U64(f.width, 4u);
+    CHECK_EQ_HEX(f.addr, CHCR(2u));
+    CHECK_EQ_HEX(f.opcode, 0x11000601u);
+    CHECK_EQ_HEX(f.pc, inst->cpu.pc);
+    CHECK_EQ_U64(inst->dma.chcr[2] & (SCHWAY__DMA_CHCR_BUSY | 0x10000000u), 0u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[2], 0u);
+    CHECK_EQ_HEX(inst->dma.madr[2], 0x1000u);
+    CHECK(schway__dma_next(inst) > now_of(inst));
+    (void)run(inst, 1000u);
+    CHECK_EQ_U64(inst->dma.words[2], 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+    CHECK_EQ_HEX(rd32(inst, CHCR(2u)) & SCHWAY__DMA_CHCR_BUSY, 0u);
+
+    /* A second hostile write on another channel keeps the first record. */
+    wr32(inst, CHCR(4u), 0x11000601u);
+    CHECK_EQ_U64(schway_get_fault(inst, &f), SCHWAY_STATUS_OK);
+    CHECK_EQ_HEX(f.addr, CHCR(2u));
+
+    /* The same channel then takes a usable mode and moves its words. */
+    wr32(inst, CHCR(2u), 0x11000001u);
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+    CHECK_EQ_U64(inst->dma.words[2], 64u);
+    CHECK_EQ_HEX(inst->dma.crc[2], pattern_crc(64u, 0xB5000001u));
+    (void)run(inst, 1000u);
+    CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
+    {"fault_sync3", case_fault_sync3},
     {"hostile_bcr", case_hostile_bcr},
     {"preempt_carry", case_preempt_carry},
     {"regs_sweep", case_regs_sweep},

@@ -601,6 +601,17 @@ static void dma_write(schway *inst, uint64_t now, uint32_t p, uint32_t width, ui
     } else if (reg == 8u) {
         uint32_t c = reg_put(d->chcr[ch], p, width, v);
         c &= ch == DMA_OTC ? DMA_CHCR_OTC_MASK : SCHWAY__DMA_CHCR_MASK;
+        if (ch != DMA_OTC && d->phase[ch] == DMA_PH_IDLE && (c & SCHWAY__DMA_CHCR_BUSY) != 0u &&
+            ((c >> 9) & 3u) == 3u) {
+            /* Synchronisation mode 3 is reserved: no device end answers it, so a
+               channel written with it and the start bit would wait for ever. It
+               does not start (the start bits are dropped) and the first fault
+               names the register, the value and the writing instruction. A
+               later write with a usable mode starts the channel as usual. */
+            c &= ~(SCHWAY__DMA_CHCR_BUSY | DMA_CHCR_TRIGGER);
+            schway__fault_latch(inst, SCHWAY__FAULT_DMA, SCHWAY__DEV_DMA, width, inst->cpu.pc, v,
+                                p & ~3u);
+        }
         if (d->phase[ch] != DMA_PH_IDLE) {
             if (width == 4u && v == 0u && d->phase[ch] != DMA_PH_UNIT &&
                 d->phase[ch] != DMA_PH_STOP) {

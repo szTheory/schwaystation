@@ -69,7 +69,7 @@ static void header_io(struct schway__state_io *io, uint32_t total)
 static void fault_io(struct schway__state_io *io, struct schway__fault *f)
 {
     (void)schway__state_u32(io, name_fault_kind, &f->kind, SCHWAY__FAULT_NONE,
-                            SCHWAY__FAULT_EXCEPTION_LOOP);
+                            SCHWAY__FAULT_DMA);
     (void)schway__state_u32(io, name_fault_device, &f->device, 0u, SCHWAY__DEV_COUNT - 1u);
     (void)schway__state_u32(io, name_fault_width, &f->width, 0u, 4u);
     (void)schway__state_u32(io, name_fault_note, &f->note, 0u, UINT32_MAX);

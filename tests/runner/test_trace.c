@@ -92,11 +92,11 @@ int main(void)
     CHECK(strcmp(schway__trace_device_name(SCHWAY_DEVICE_UNMAPPED + 1u), "unknown") == 0);
     static const char *const kinds[] = {"none", "unmapped_read", "unmapped_write", "unmapped_fetch",
                                         "misaligned_read", "misaligned_write", "misaligned_fetch",
-                                        "reserved_instruction", "cop_unusable", "exception_loop"};
+                                        "reserved_instruction", "cop_unusable", "exception_loop", "dma"};
     for (uint32_t i = 0; i < sizeof kinds / sizeof kinds[0]; i++) {
         CHECK(strcmp(schway__trace_kind_name(i), kinds[i]) == 0);
     }
-    CHECK(strcmp(schway__trace_kind_name(SCHWAY_FAULT_EXCEPTION_LOOP + 1u), "unknown") == 0);
+    CHECK(strcmp(schway__trace_kind_name(SCHWAY_FAULT_DMA + 1u), "unknown") == 0);
     CHECK(strcmp(schway__trace_event_name(0u), "unknown") == 0);
 
     /* A buffer one byte too small, a NULL buffer and a NULL record are refused, never overrun. */

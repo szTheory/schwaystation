@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 2
+#define SCHWAY_API_VERSION 3
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -54,6 +54,7 @@ typedef uint32_t schway_status;
 #define SCHWAY_FAULT_RESERVED_INSTRUCTION 7u
 #define SCHWAY_FAULT_COP_UNUSABLE 8u
 #define SCHWAY_FAULT_EXCEPTION_LOOP 9u
+#define SCHWAY_FAULT_DMA 10u
 
 /* Devices a fault names. */
 #define SCHWAY_DEVICE_NONE 0u

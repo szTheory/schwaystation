@@ -69,7 +69,8 @@ enum {
     SCHWAY__FAULT_MISALIGNED_FETCH,
     SCHWAY__FAULT_RESERVED_INSTRUCTION,
     SCHWAY__FAULT_COP_UNUSABLE,
-    SCHWAY__FAULT_EXCEPTION_LOOP
+    SCHWAY__FAULT_EXCEPTION_LOOP,
+    SCHWAY__FAULT_DMA
 };
 
 struct schway__fault {
@@ -354,6 +355,7 @@ _Static_assert(SCHWAY_FAULT_RESERVED_INSTRUCTION == SCHWAY__FAULT_RESERVED_INSTR
                "fault reserved instruction");
 _Static_assert(SCHWAY_FAULT_COP_UNUSABLE == SCHWAY__FAULT_COP_UNUSABLE, "fault cop unusable");
 _Static_assert(SCHWAY_FAULT_EXCEPTION_LOOP == SCHWAY__FAULT_EXCEPTION_LOOP, "fault exception loop");
+_Static_assert(SCHWAY_FAULT_DMA == SCHWAY__FAULT_DMA, "fault dma");
 _Static_assert(SCHWAY_DEVICE_NONE == SCHWAY__DEV_NONE, "device none");
 _Static_assert(SCHWAY_DEVICE_RAM == SCHWAY__DEV_RAM, "device ram");
 _Static_assert(SCHWAY_DEVICE_SCRATCH == SCHWAY__DEV_SCRATCH, "device scratch");
