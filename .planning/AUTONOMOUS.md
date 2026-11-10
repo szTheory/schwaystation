@@ -41,3 +41,15 @@ Whenever a CI or release run is in progress or finished, look for low-hanging wi
 time and Actions cost: caching, job parallelism, skipping a job a change cannot affect, trimmed matrix legs,
 timeouts that follow measured runs. Never trade away check quality. Apply a safe win in the same step; record
 anything larger as one todo (rule 7).
+
+## Current authorization and boundaries
+
+The owner renewed autonomous authorization for the rest of milestone v1.0 on 2026-11-10 in Codex,
+including focused subagent fan-out for discussion, synthesis and an adversarial pass, and automation-first
+verification. Continue routine work inside the selected phase without acknowledgements. Finish phase 3
+shipping first, including hosted CI, auto-merge and release confirmation, then begin phase 4.
+AGENTS.md rule 9 still stops each later autonomous phase after verification and before ship; this renewal
+does not remove that boundary. No routine owner UAT or redundant confirmation is introduced.
+
+For CI and CD efficiency, first measure critical-path time and duplicate work. Prefer removing redundant
+runs and serial bottlenecks over adding caches, concurrency or dependencies. Keep all required coverage.

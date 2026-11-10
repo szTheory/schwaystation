@@ -319,6 +319,8 @@ come from `AGENTS.md`.
 | 2026-11-10 | /gsd-code-review 3 and fix round 1 | Claude Code, OpenGSD; deep review claude-sonnet-5-5, fixer claude-sonnet-5-5; CR-01 and WR-01 fixed, 7 info findings to todos 040-046 | claude-sonnet-5-5 |
 | 2026-11-10 | /gsd-verify-work 3 (verify step) | Claude Code, OpenGSD; verifier claude-sonnet-5-5, status passed, no human items | claude-sonnet-5-5 |
 
+| 2026-11-10 | /gsd-ship 3; renewed /gsd-autonomous for remaining milestone | Codex, OpenGSD 1.20.0; inline shipping and hosted CI; next autonomous phase stops before ship | GPT-6 (session; exact model ID not exposed) |
+
 ## Session Continuity
 
 Last session: 2026-11-10T08:23:44.047Z
@@ -333,4 +335,4 @@ Next: `/gsd-ship 3` (PR title `feat: match the GTE hardware cases and add DMA an
 `gh pr merge --auto --squash`, confirm a CI run on the head commit (the hosted asan, be32, wasm32, nofp, perf and
 eight-lane hash-equality jobs are confirmed there, not locally), and confirm the release pull request is green after the
 merge. Then `/gsd-discuss-phase 4`.
-Stop after the ship step.
+After phase 3 shipping and release confirmation, continue `/gsd-autonomous --from 4`; stop at the next phase's pre-ship boundary (AGENTS rule 9). Standing preferences are in `.planning/AUTONOMOUS.md`.
