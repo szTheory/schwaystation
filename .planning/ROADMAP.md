@@ -257,7 +257,7 @@ Plans:
 - [x] 04-08 — Complete lines, polylines and rectangle span families
 
 **Wave 9** *(blocked on Wave 8 completion)*
-- [ ] 04-09 — Advance beam events and dot timers on exact derived deadlines
+- [x] 04-09 — Advance beam events and dot timers on exact derived deadlines
 
 **Wave 10** *(blocked on Wave 9 completion)*
 - [ ] 04-10 — Scan native display windows and convert packed RGB24 safely
@@ -357,6 +357,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 8/32 | In Progress | - |
+| 4. Games play in RetroArch | 9/32 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

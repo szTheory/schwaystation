@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-08-PLAN.md
-last_updated: "2026-11-10T22:28:18.266Z"
+stopped_at: Completed 04-09-PLAN.md
+last_updated: "2026-11-10T23:30:29.757Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 04 plan 04-08 completed
-state_head: 397e161df258724d43cf045c8316c4fae35df5a1
+state_head: c41b0b7d48a6410552da987fe3b7dbbdc2ea175e
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 76
+  completed_plans: 77
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 9 of 32
+Plan: 10 of 32
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 04 plan 04-07 completed
 
@@ -136,6 +136,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P06 | 20min | 2 tasks | 8 files |
 | Phase 04 P07 | 24min | 2 tasks | 7 files |
 | Phase 04 P08 | 38min 51s+ (lower bound; includes restart gap) | 2 tasks | 13 files |
+| Phase 04 P09 | 59 min | 2 tasks | 23 files |
 
 ## Accumulated Context
 
@@ -291,6 +292,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Advance attributes from original geometry when clipping polygon spans.
 - [Phase 04]: Plan 04-08: GPU v0 uses additive profile flag value 4; default remains v2 and frozen API v1-v3 callers remain unchanged.
 - [Phase 04]: Plan 04-08: Odd-UV/odd-width rectangle sampling remains uncharacterized pending plan 30 pinned capture comparison.
+- [Phase 04]: GPU beam catch-up uses instance-owned rational carry and deadline scheduling; dot IRQs do not poll each dot or recurse into the scheduler.
+- [Phase 04]: Loaded-content frame completion is driven by beam wrap, while the reset-resistant public-call ceiling and no-content test-card path remain independent.
 
 ### Pending Todos
 
@@ -373,10 +376,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-08 (recovered after daemon restart) | Codex, OpenGSD 1.20.0; sequential executor, line/polyline and rectangle spans, local CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-09 | Codex, OpenGSD 1.20.0; sequential executor, beam/timer integration, local CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-10T22:28:18.046Z
-Stopped at: Completed 04-08-PLAN.md
+Last session: 2026-11-10T23:30:29.611Z
+Stopped at: Completed 04-09-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
