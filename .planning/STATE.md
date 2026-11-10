@@ -259,5 +259,5 @@ Resume file: None
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next command: `/gsd-code-review 2`, then `/gsd-verify-work 2` (all 27 plans of phase 2 are executed)
+Next command: `/gsd-ship 2` (code review ran and found no critical issues, 13 findings recorded as open in 02-REVIEW-DISPOSITION.md; verification passed 5/5). Optional first: `/gsd-code-review 2 --fix` for WR-01, WR-03 and WR-04, which makes verification stale and needs a re-run.
 Stop after the plan step; do not execute in this session.
