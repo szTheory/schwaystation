@@ -103,3 +103,20 @@ endforeach()
 schway_add_test(NAME core.trace_hash_equal
   COMMAND schwaystation-test-trace hash_equal
   LABELS core portable TIMEOUT 10)
+
+# The scheduler spine. Fault prevented: a first fault inside a long block that
+# carries the block's start tick instead of the tick its own instruction began
+# on, a block that runs past a device deadline, an event that never runs, or a
+# DMA stall that charges the CPU instead of freezing it.
+add_executable(schwaystation-test-sched ${CMAKE_CURRENT_LIST_DIR}/sched_tests.c)
+target_include_directories(schwaystation-test-sched PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-sched PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-sched PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-sched)
+
+foreach(case IN ITEMS fault_ticks)
+  schway_add_test(NAME core.sched.${case}
+    COMMAND schwaystation-test-sched ${case}
+    LABELS core portable TIMEOUT 10)
+endforeach()

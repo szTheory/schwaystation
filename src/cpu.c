@@ -138,12 +138,12 @@ uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, 
 /* The trace ring (ARCHITECTURE section 6): the instance keeps the last
    SCHWAY__TRACE_CAP records in a ring outside the state and every hash, written
    only by the traced copy of the executor. A record's cycle is the tick the
-   block started on plus the cycles the CPU has spent since, so t0 and c0 are
-   the block's start; the frame is kept as its low 32 bits and widened when a
+   block started on plus the cycles the CPU has spent since, the block clock the
+   devices read too; the frame is kept as its low 32 bits and widened when a
    record is read. A full ring overwrites its oldest record. */
 static uint64_t trace_now(const schway *inst)
 {
-    return inst->trace.t0 + (inst->cpu.cycle - inst->trace.c0);
+    return inst->cpu.blk_tick + (inst->cpu.cycle - inst->cpu.blk_cycle);
 }
 
 static void trace_push(schway *inst, uint32_t event, uint64_t cycle, uint32_t pc, uint32_t opcode,
@@ -210,6 +210,7 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
 void schway__cpu_step_one(schway *inst, struct schway__cpu_log *log)
 {
     inst->cpu.log = log;
+    schway__sched_sync(inst);
     (void)cpu_step(inst);
     inst->cpu.log = NULL;
 }

@@ -142,7 +142,9 @@ struct schway__cpu_log {
    0 while none is armed, otherwise the retirements still to count before it is
    taken (see the Interrupts section of docs/hardware/cop0.md). block_end and
    the log pointer are not state:
-   block_end holds the SCHWAY__BLOCK_* reasons of the block in progress. */
+   block_end holds the SCHWAY__BLOCK_* reasons of the block in progress, and
+   blk_tick and blk_cycle the instance's tick and the CPU's cycle count at the
+   block's start, from which every device access reads its own tick. */
 struct schway__cpu {
     uint64_t muldiv_ready;
     uint64_t cycle;
@@ -159,6 +161,7 @@ struct schway__cpu {
     uint32_t icache_word[SCHWAY__ICACHE_LINES][4];
     uint8_t icache_valid[SCHWAY__ICACHE_LINES];
     uint32_t block_end;
+    uint64_t blk_tick, blk_cycle;
     struct schway__cpu_log *log;
 };
 

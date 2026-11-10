@@ -298,8 +298,6 @@ static uint32_t cpu_sub_overflows(uint32_t a, uint32_t b, uint32_t diff)
    instruction's start plus the cycles it has spent before the access. */
 #define TRACE_BEGIN(at, spent) uint64_t at = trace_now(inst) + (uint64_t)((spent) - 1u)
 #define TRACE(...) trace_push(inst, __VA_ARGS__)
-/* A block's start, from which every record's cycle is counted. */
-#define TRACE_START() (inst->trace.t0 = inst->ticks, inst->trace.c0 = inst->cpu.cycle)
 /* The record of a fault latched in the block just run. */
 #define TRACE_FAULT(latched, at)                                                                   \
     do {                                                                                           \
@@ -312,7 +310,6 @@ static uint32_t cpu_sub_overflows(uint32_t a, uint32_t b, uint32_t diff)
 #else
 #define TRACE_BEGIN(at, spent) ((void)0)
 #define TRACE(...) ((void)0)
-#define TRACE_START() ((void)0)
 #define TRACE_FAULT(latched, at) ((void)0)
 #endif
 
@@ -955,8 +952,10 @@ static uint32_t cpu_step(schway *inst)
    at the first instruction boundary at or after limit cycles. The cycles are
    added to inst->ticks once, at the end, so what the instructions did not
    change, the state of the other devices, is as of the block's start
-   (PSX-SYSTEM section 6; a fault latched in the block carries the ticks of its
-   start). */
+   (PSX-SYSTEM section 6). The block clock, blk_tick and blk_cycle, is set at
+   the start of every block, so a device access inside it reads its own tick
+   (schway__sched_now) and a fault latched in the block carries the tick its
+   instruction began on. */
 static uint64_t cpu_block(schway *inst, uint64_t limit)
 {
     struct schway__cpu *c = &inst->cpu;
@@ -964,7 +963,8 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
     uint32_t fault = inst->fault.kind;
     uint64_t ran = 0u;
     c->block_end = 0u;
-    TRACE_START();
+    c->blk_tick = inst->ticks;
+    c->blk_cycle = c->cycle;
     for (uint32_t n = 0u; n < SCHWAY__BLOCK_MAX_INSNS; n++) {
         uint32_t slot = c->branch_slot;
         TRACE_BEGIN(began, 1u);
@@ -983,7 +983,6 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
 
 #undef TRACE
 #undef TRACE_BEGIN
-#undef TRACE_START
 #undef TRACE_FAULT
 #if SCHWAY_TRACE
 #undef cpu_irq_enter

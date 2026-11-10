@@ -69,6 +69,7 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
         inst->ticks += cycles;
+        schway__sched_sync(inst);
     }
     /* One pair per 768-cycle boundary crossed. */
     audio_push_silence(inst, (uint32_t)(inst->ticks / SCHWAY__CYCLES_PER_PAIR -

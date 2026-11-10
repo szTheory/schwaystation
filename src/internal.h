@@ -95,8 +95,7 @@ struct schway__tty {
    6), 32 bytes each. cycle is the tick the access began on; frame is the low 32
    bits of the frame count, widened when a record is read; meta packs the event
    (bits 0-2), the access width in bytes (3-5), the device (6-10) and a note
-   (16-31, saturating). t0 and c0 hold the running block's start tick and CPU
-   cycle count, the origin of the next cycle. Outside the state and every hash. */
+   (16-31, saturating). Outside the state and every hash. */
 #define SCHWAY__TRACE_CAP 4096u
 #define SCHWAY__TRACE_META(event, width, device, note)                                             \
     ((uint32_t)(event) | ((uint32_t)(width) << 3) | ((uint32_t)(device) << 6) |                    \
@@ -116,7 +115,6 @@ struct schway__trace_rec {
 struct schway__trace_ring {
     struct schway__trace_rec rec[SCHWAY__TRACE_CAP];
     uint32_t head, count;
-    uint64_t t0, c0;
 };
 
 struct schway {

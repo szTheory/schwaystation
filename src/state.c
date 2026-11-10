@@ -231,6 +231,7 @@ schway_status schway_load_state(schway *inst, const void *buf, size_t size)
     io.mode = SCHWAY__STATE_APPLY;
     io.r = b;
     state_io(&io, inst, (uint32_t)need);
+    schway__sched_sync(inst);
     schway__sched_recalc(inst);
     schway__frame_audio_clear(inst);
     return SCHWAY_STATUS_OK;

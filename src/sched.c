@@ -1,15 +1,23 @@
 /* The scheduler spine: the earliest deadline over the devices that keep time. */
 #include "internal.h"
 
+/* The block clock: the tick the running block started on, plus the cycles the
+   CPU has spent since, plus the cycles this access has spent before its own
+   (the first cycle of an instruction is the one it starts on). cycles 0 counts
+   as 1. */
 uint64_t schway__sched_now(const schway *inst, uint32_t cycles)
 {
-    (void)cycles;
-    return inst->ticks;
+    const struct schway__cpu *c = &inst->cpu;
+    return c->blk_tick + (c->cycle - c->blk_cycle) + (uint64_t)(cycles != 0u ? cycles - 1u : 0u);
 }
 
+/* Restarts the block clock at the instance's tick, for a change of the tick or
+   the cycle count outside a block: a power reset, a state load, a run with no
+   program. */
 void schway__sched_sync(schway *inst)
 {
-    (void)inst;
+    inst->cpu.blk_tick = inst->ticks;
+    inst->cpu.blk_cycle = inst->cpu.cycle;
 }
 
 void schway__sched_recalc(schway *inst)
