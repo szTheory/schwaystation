@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-21-PLAN.md
-last_updated: "2026-11-10T08:10:14.570Z"
+stopped_at: Completed 03-22-PLAN.md
+last_updated: "2026-11-10T08:13:37.249Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 8197c0e7e7ec8ac9b26e66458c4512861f0c2c66
+state_head: 19da8d444575dceb6f0b40b933726a15a9959b01
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 65
+  completed_plans: 66
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 24 of 26
+Plan: 25 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -124,6 +124,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P19 | 19 min | 2 tasks | 6 files |
 | Phase 03 P20 | 10 min | 2 tasks | 3 files |
 | Phase 03 P21 | 5 min | 2 tasks | 14 files |
+| Phase 03 P22 | 4min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -254,6 +255,7 @@ Recent decisions affecting current work:
 - [Phase 3]: Seed variants come from a row's place among rows of the same code kind, not a struct field; the armips unity build leaves all 24 fixture digests unchanged
 - [Phase 03]: 03-19: --hash-state hashes the saved state after its 20-byte header; hashes.txt carries the frame and state of hello, gte_vectors, dma_chain and timers_lines, and the gate total stays at 1513 — dma_chain prints an unbuilt line first, so hashes.cmake takes the last two lines with a capture group; the unbuilt count is in the state hash
 - [Phase 03]: 03-21: a source comment cites docs/hardware/<page>.md and a heading that exists on that page, checked by script; a hardware page cites psx-spx and says the core's own model for a cost, so no citation points back to a preparation section
+- [Phase 03]: 03-22: test and fixture comments cite docs/hardware pages and headings; the stub keeps PSX-SYSTEM sections 7 and 9
 
 ### Pending Todos
 
@@ -311,8 +313,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T08:10:14.442Z
-Stopped at: Completed 03-21-PLAN.md
+Last session: 2026-11-10T08:13:37.109Z
+Stopped at: Completed 03-22-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
