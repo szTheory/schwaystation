@@ -1,2 +1,4 @@
+gpu.decoder.fill_mmio	gpu,portable
+gpu.decoder.partial_packet_reset	gpu,portable
 gpu.testcard.pixels	gpu,portable
 gpu.video.tuple	gpu,portable
