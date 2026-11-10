@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
-status: executing
-stopped_at: Completed 03-23-PLAN.md
-last_updated: "2026-11-10T08:19:42.299Z"
+status: verifying
+stopped_at: Completed 03-25-PLAN.md
+last_updated: "2026-11-10T08:23:44.174Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: ddb4a2ba921e1bafd3324f169be025478bf19e50
+state_head: 04572dd279f4785b2aae94c6afb5fc63c351949b
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 67
+  completed_plans: 68
   percent: 17
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
 Plan: 26 of 26
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-11-09 — Phase 03 execution started
 
 Progress: [██░░░░░░░░] 17%
@@ -126,6 +126,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P21 | 5 min | 2 tasks | 14 files |
 | Phase 03 P22 | 4min | 2 tasks | 10 files |
 | Phase 03 P23 | 6 min | 2 tasks | 7 files |
+| Phase 03 P25 | 7 min | 2 tasks | 32 files |
 
 ## Accumulated Context
 
@@ -258,6 +259,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-21: a source comment cites docs/hardware/<page>.md and a heading that exists on that page, checked by script; a hardware page cites psx-spx and says the core's own model for a cost, so no citation points back to a preparation section
 - [Phase 03]: 03-22: test and fixture comments cite docs/hardware pages and headings; the stub keeps PSX-SYSTEM sections 7 and 9
 - [Phase 03]: 03-23: the preparation sections that docs/hardware pages replace keep their headings, Sources rows and the C3 to C6 and 5.A choice paragraphs, with the corrections phase 3 found stated in each
+- [Phase 03]: 03-25: todos 016 and 017 bind to SEED-007 (no later first caller), 014 to the phase 4 System.dat plan; every phase-2 review finding is fixed (WR-06, IN-01) or deferred with one todo (025-029, 032-037)
 
 ### Pending Todos
 
@@ -315,8 +317,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T08:19:42.185Z
-Stopped at: Completed 03-23-PLAN.md
+Last session: 2026-11-10T08:23:44.047Z
+Stopped at: Completed 03-25-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
