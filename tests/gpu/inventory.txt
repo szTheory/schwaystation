@@ -1,0 +1,2 @@
+gpu.testcard.pixels	gpu,portable
+gpu.video.tuple	gpu,portable
