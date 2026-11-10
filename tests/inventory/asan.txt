@@ -8,6 +8,7 @@ dma
 exe
 fuzz
 gte
+gpu
 install
 libretro
 perf
