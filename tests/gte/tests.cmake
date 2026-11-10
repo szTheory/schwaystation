@@ -1,7 +1,8 @@
 # The geometry engine: the hardware cases, the reference model and the register tests.
 # One executable runs the case named on its command line. It also sees src/,
 # so it reaches the engine's register and command entry points directly.
-add_executable(schwaystation-test-gte ${CMAKE_CURRENT_LIST_DIR}/gte_tests.c)
+add_executable(schwaystation-test-gte ${CMAKE_CURRENT_LIST_DIR}/gte_tests.c
+  ${CMAKE_CURRENT_LIST_DIR}/ref.c ${CMAKE_CURRENT_LIST_DIR}/ref_tests.c)
 target_include_directories(schwaystation-test-gte PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-gte PRIVATE schwaystation::schwaystation)
 set_target_properties(schwaystation-test-gte PROPERTIES
@@ -134,3 +135,12 @@ schway_add_test(NAME gte.quirk.rtpt_ir0
 schway_add_test(NAME gte.unlisted_noop
   COMMAND schwaystation-test-gte unlisted_noop
   LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: the independent model, which the differential test trusts as
+# the other half of its comparison, disagreeing with the hardware-captured
+# cases. It replays the same file in the same order as the engine does, so a
+# difference between the two models is known to be a difference in the
+# engine or the model, not in the data.
+schway_add_test(NAME gte.ref.vectors
+  COMMAND schwaystation-test-gte ref_vectors ${gte_vectors_bin} --expect 100 --ops reg,01
+  LABELS gte portable TIMEOUT 60)

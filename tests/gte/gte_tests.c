@@ -31,6 +31,7 @@
 
 #include "schwaystation.h"
 #include "gte.h"
+#include "ref.h"
 #include "vectors.h"
 
 static void rd_write(void *ctx, uint32_t idx, uint32_t v)
@@ -582,6 +583,9 @@ int main(int argc, char **argv)
     if (argc >= 2 && strcmp(argv[1], "vectors") == 0) {
         return run_vectors(argc, argv);
     }
+    if (argc >= 2 && strcmp(argv[1], "ref_vectors") == 0) {
+        return ref_run_vectors(argc, argv);
+    }
     if (argc == 2 && strcmp(argv[1], "regs_sweep") == 0) {
         return run_regs_sweep();
     }
@@ -613,8 +617,8 @@ int main(int argc, char **argv)
         return run_unlisted_noop();
     }
     fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST] [--histogram]\n"
-                    "         [--flip N] | regs_sweep | unr_table | nclip_fake_bits | quirk_fc |\n"
-                    "       quirk_mx3 | quirk_ir3_lm | quirk_h_sign | quirk_clip_end | quirk_rtpt_ir0 |\n"
-                    "       unlisted_noop\n");
+                    "         [--flip N] | ref_vectors FILE --expect N [--ops LIST] | regs_sweep |\n"
+                    "       unr_table | nclip_fake_bits | quirk_fc | quirk_mx3 | quirk_ir3_lm |\n"
+                    "       quirk_h_sign | quirk_clip_end | quirk_rtpt_ir0 | unlisted_noop\n");
     return 2;
 }
