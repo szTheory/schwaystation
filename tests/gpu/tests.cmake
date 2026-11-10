@@ -38,10 +38,16 @@ schway_add_test(NAME gpu.state.partial_fill
   COMMAND schwaystation-test-gpu state_partial_fill
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: cached texture/CLUT data or tags that are lost on save/load
+# or malformed cache metadata that is applied before state validation.
+schway_add_test(NAME gpu.state.cache_roundtrip
+  COMMAND schwaystation-test-gpu state_cache_roundtrip
+  LABELS gpu portable TIMEOUT 10)
+
 # Fault prevented: transfer dimensions, endian order, wrapping, padding, reset,
 # partial-state resume, and malformed transfer cursors drifting from the bus.
-foreach(case IN ITEMS copy_masks copy_order copy_wrap roundtrip dimensions partial_state
-                      reset_mid_packet invalid_cursor)
+foreach(case IN ITEMS cache_contract copy_masks copy_order copy_wrap roundtrip dimensions
+                      partial_state reset_mid_packet invalid_cursor)
   schway_add_test(NAME gpu.transfer.${case}
     COMMAND schwaystation-test-gpu-transfer ${case}
     LABELS gpu portable TIMEOUT 10)

@@ -1,8 +1,10 @@
 gpu.decoder.fill_mmio	gpu,portable
 gpu.decoder.partial_packet_reset	gpu,portable
 gpu.decoder.register_images	gpu,portable
+gpu.state.cache_roundtrip	gpu,portable
 gpu.state.partial_fill	gpu,portable
 gpu.testcard.pixels	gpu,portable
+gpu.transfer.cache_contract	gpu,portable
 gpu.transfer.copy_masks	gpu,portable
 gpu.transfer.copy_order	gpu,portable
 gpu.transfer.copy_wrap	gpu,portable

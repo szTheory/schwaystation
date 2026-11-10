@@ -168,6 +168,48 @@ static void test_state_partial_fill(void)
     schway_destroy(source);
 }
 
+static void test_state_cache_roundtrip(void)
+{
+    schway *source = make_instance();
+    schway *target = make_instance();
+    if (source == NULL || target == NULL) {
+        CHECK(0);
+        schway_destroy(source);
+        schway_destroy(target);
+        return;
+    }
+    source->vram[0][0] = 0x1234u;
+    CHECK(schway__gpu_texture_read(source, 0u, 0u) == 0x1234u);
+    source->vram[0][0] = 0x5678u;
+    source->vram[4][1023] = 0x3456u;
+    CHECK(schway__gpu_clut_read(source, 1023u, 4u, 0u, 16u) == 0x3456u);
+    source->vram[4][1023] = 0x789Au;
+
+    size_t size = schway_state_size(source);
+    uint8_t *state = (uint8_t *)malloc(size);
+    CHECK(state != NULL);
+    if (state != NULL) {
+        CHECK(schway_save_state(source, state, size) == SCHWAY_STATUS_OK);
+        CHECK(schway_load_state(target, state, size) == SCHWAY_STATUS_OK);
+        CHECK(target->vram[0][0] == 0x5678u);
+        CHECK(target->vram[4][1023] == 0x789Au);
+        CHECK(target->gpu.texture_valid[0] == 1u);
+        CHECK(target->gpu.texture_tags[0] == 0u);
+        CHECK(target->gpu.texture_cache[0][0] == 0x1234u);
+        CHECK(target->gpu.clut_valid == 1u);
+        CHECK(target->gpu.clut_count == 16u);
+        CHECK(target->gpu.clut_cache[0] == 0x3456u);
+        CHECK(schway__gpu_texture_read(target, 0u, 0u) == 0x1234u);
+        CHECK(schway__gpu_clut_read(target, 1023u, 4u, 0u, 16u) == 0x3456u);
+        free(state);
+    }
+
+    CHECK(corrupt_and_refuse(target, source, "gpu.texture_tags", 512u));
+    CHECK(corrupt_and_refuse(target, source, "gpu.clut_count", 0u));
+    schway_destroy(target);
+    schway_destroy(source);
+}
+
 static void test_fill_mmio(void)
 {
     schway *inst = make_instance();
@@ -265,7 +307,7 @@ static void test_register_images(void)
 int main(int argc, char **argv)
 {
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-gpu <fill_mmio|partial_packet_reset>\n");
+        fprintf(stderr, "usage: schwaystation-test-gpu <case>\n");
         return 2;
     }
     if (strcmp(argv[1], "fill_mmio") == 0) {
@@ -276,6 +318,8 @@ int main(int argc, char **argv)
         test_register_images();
     } else if (strcmp(argv[1], "state_partial_fill") == 0) {
         test_state_partial_fill();
+    } else if (strcmp(argv[1], "state_cache_roundtrip") == 0) {
+        test_state_cache_roundtrip();
     } else {
         fprintf(stderr, "unknown GPU case: %s\n", argv[1]);
         return 2;

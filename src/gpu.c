@@ -32,6 +32,14 @@ static const char name_display_mode[] = "gpu.display_mode";
 static const char name_allow_2mb[] = "gpu.allow_2mb";
 static const char name_read_latch[] = "gpu.read_latch";
 static const char name_irq_pending[] = "gpu.irq_pending";
+static const char name_texture_cache[] = "gpu.texture_cache";
+static const char name_texture_tags[] = "gpu.texture_tags";
+static const char name_texture_valid[] = "gpu.texture_valid";
+static const char name_clut_cache[] = "gpu.clut_cache";
+static const char name_clut_x[] = "gpu.clut_x";
+static const char name_clut_y[] = "gpu.clut_y";
+static const char name_clut_count[] = "gpu.clut_count";
+static const char name_clut_valid[] = "gpu.clut_valid";
 
 #define GPU_IRQ_BIT 1u
 #define GPU_IRQ_MASK (UINT32_C(1) << GPU_IRQ_BIT)
@@ -149,6 +157,108 @@ static uint32_t transfer_pixels(const struct schway__gpu *g)
     return g->transfer_width * g->transfer_height;
 }
 
+static int mask_allows_write(const struct schway__gpu *g, uint16_t destination)
+{
+    return (g->mask & 2u) == 0u || (destination & 0x8000u) == 0u;
+}
+
+static uint16_t mask_write_value(const struct schway__gpu *g, uint16_t value)
+{
+    return (uint16_t)(value | ((g->mask & 1u) != 0u ? 0x8000u : 0u));
+}
+
+static void texture_cache_clear(struct schway__gpu *g)
+{
+    memset(g->texture_cache, 0, sizeof g->texture_cache);
+    memset(g->texture_tags, 0, sizeof g->texture_tags);
+    memset(g->texture_valid, 0, sizeof g->texture_valid);
+}
+
+static void clut_cache_clear(struct schway__gpu *g)
+{
+    memset(g->clut_cache, 0, sizeof g->clut_cache);
+    g->clut_x = 0u;
+    g->clut_y = 0u;
+    g->clut_count = 0u;
+    g->clut_valid = 0u;
+}
+
+/* The 2 KiB texture cache is 256 direct-mapped eight-byte lines. */
+uint16_t schway__gpu_texture_read(schway *inst, uint32_t x, uint32_t y)
+{
+    if (inst == NULL) {
+        return 0u;
+    }
+    x &= 0x3FFu;
+    y &= 0x1FFu;
+    struct schway__gpu *g = &inst->gpu;
+    uint32_t block = (y * SCHWAY__VRAM_W + x) / SCHWAY__GPU_TEXTURE_CACHE_PIXELS;
+    uint32_t line = block % SCHWAY__GPU_TEXTURE_CACHE_LINES;
+    uint32_t tag = block / SCHWAY__GPU_TEXTURE_CACHE_LINES;
+    if (g->texture_valid[line] == 0u || g->texture_tags[line] != tag) {
+        uint32_t base_x = x & ~(SCHWAY__GPU_TEXTURE_CACHE_PIXELS - 1u);
+        for (uint32_t i = 0u; i < SCHWAY__GPU_TEXTURE_CACHE_PIXELS; i++) {
+            g->texture_cache[line][i] = inst->vram[y][base_x + i];
+        }
+        g->texture_tags[line] = tag;
+        g->texture_valid[line] = 1u;
+    }
+    return g->texture_cache[line][x & (SCHWAY__GPU_TEXTURE_CACHE_PIXELS - 1u)];
+}
+
+/* CLUT rows persist until a new palette address or GP1(01h) replaces them. */
+uint16_t schway__gpu_clut_read(schway *inst, uint32_t x, uint32_t y, uint32_t index,
+                               uint32_t count)
+{
+    if (inst == NULL || (count != 16u && count != SCHWAY__GPU_CLUT_CACHE_ENTRIES) ||
+        index >= count) {
+        return 0u;
+    }
+    x &= 0x3FFu;
+    y &= 0x1FFu;
+    struct schway__gpu *g = &inst->gpu;
+    if (g->clut_valid == 0u || g->clut_x != x || g->clut_y != y || count > g->clut_count) {
+        for (uint32_t i = 0u; i < count; i++) {
+            g->clut_cache[i] = inst->vram[y][(x + i) & 0x3FFu];
+        }
+        g->clut_x = x;
+        g->clut_y = y;
+        g->clut_count = count;
+        g->clut_valid = 1u;
+    }
+    return g->clut_cache[index];
+}
+
+/* GP0(80h) scans source and destination rows in order; each coordinate wraps
+   independently and E6 checks the old destination before forcing bit 15
+   (psx-spx, GPU Commands; .planning/preparation/PSX-GPU-AND-GTE.md, GP0 Commands). */
+static void copy_vram(schway *inst, uint32_t source, uint32_t destination, uint32_t size)
+{
+    struct schway__gpu *g = &inst->gpu;
+    uint32_t source_x = source & 0x3FFu;
+    uint32_t source_y = (source >> 16) & 0x1FFu;
+    uint32_t dest_x = destination & 0x3FFu;
+    uint32_t dest_y = (destination >> 16) & 0x1FFu;
+    uint32_t encoded_width = size & 0x3FFu;
+    uint32_t encoded_height = (size >> 16) & 0x1FFu;
+    uint32_t width = ((encoded_width - 1u) & 0x3FFu) + 1u;
+    uint32_t height = ((encoded_height - 1u) & 0x1FFu) + 1u;
+
+    for (uint32_t row = 0u; row < height; row++) {
+        uint32_t sy = (source_y + row) & 0x1FFu;
+        uint32_t dy = (dest_y + row) & 0x1FFu;
+        for (uint32_t col = 0u; col < width; col++) {
+            uint32_t sx = (source_x + col) & 0x3FFu;
+            uint32_t dx = (dest_x + col) & 0x3FFu;
+            uint16_t color = inst->vram[sy][sx];
+            uint16_t old = inst->vram[dy][dx];
+            if (mask_allows_write(g, old)) {
+                inst->vram[dy][dx] = mask_write_value(g, color);
+            }
+        }
+    }
+}
+
 static void transfer_begin(struct schway__gpu *g, uint32_t phase, uint32_t position,
                            uint32_t size)
 {
@@ -179,8 +289,8 @@ static void upload_word(schway *inst, uint32_t word)
         uint32_t y = (g->transfer_y + index / g->transfer_width) & 0x1FFu;
         uint16_t color = (uint16_t)(word >> (16u * half));
         uint16_t old = inst->vram[y][x];
-        if ((g->mask & 2u) == 0u || (old & 0x8000u) == 0u) {
-            inst->vram[y][x] = (uint16_t)(color | ((g->mask & 1u) != 0u ? 0x8000u : 0u));
+        if (mask_allows_write(g, old)) {
+            inst->vram[y][x] = mask_write_value(g, color);
         }
     }
     g->owed_words--;
@@ -299,6 +409,10 @@ static void process_packet(schway *inst)
     uint32_t word_count = g->fifo_count;
     if (op == 0x02u && word_count == 3u) {
         fill_vram(inst, command, g->fifo[1], g->fifo[2]);
+    } else if (op == 0x01u) {
+        texture_cache_clear(g);
+    } else if (op >= 0x80u && op <= 0x9Fu && word_count == 4u) {
+        copy_vram(inst, g->fifo[1], g->fifo[2], g->fifo[3]);
     } else if (op == 0x1Fu) {
         g->irq_pending = 1u;
         schway__irq_raise(inst, GPU_IRQ_BIT);
@@ -442,6 +556,7 @@ static void gpu_gp1(schway *inst, uint32_t command)
     }
     case 0x01u:
         packet_clear(g);
+        clut_cache_clear(g);
         break;
     case 0x02u:
         gpu_ack_irq(inst);
@@ -546,6 +661,20 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst)
     struct schway__gpu *g = &inst->gpu;
     schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
                             0u, UINT16_MAX);
+    schway__state_u16_array(io, name_texture_cache, &g->texture_cache[0][0],
+                            SCHWAY__GPU_TEXTURE_CACHE_LINES * SCHWAY__GPU_TEXTURE_CACHE_PIXELS,
+                            0u, UINT16_MAX);
+    schway__state_u32_array(io, name_texture_tags, g->texture_tags,
+                            SCHWAY__GPU_TEXTURE_CACHE_LINES, 0u, 511u);
+    schway__state_u8_array(io, name_texture_valid, g->texture_valid,
+                           SCHWAY__GPU_TEXTURE_CACHE_LINES, 0u, 1u);
+    schway__state_u16_array(io, name_clut_cache, g->clut_cache,
+                            SCHWAY__GPU_CLUT_CACHE_ENTRIES, 0u, UINT16_MAX);
+    uint32_t clut_x = schway__state_u32(io, name_clut_x, &g->clut_x, 0u, SCHWAY__VRAM_W - 1u);
+    uint32_t clut_y = schway__state_u32(io, name_clut_y, &g->clut_y, 0u, SCHWAY__VRAM_H - 1u);
+    uint32_t clut_count = schway__state_u32(io, name_clut_count, &g->clut_count, 0u,
+                                            SCHWAY__GPU_CLUT_CACHE_ENTRIES);
+    uint32_t clut_valid = schway__state_u32(io, name_clut_valid, &g->clut_valid, 0u, 1u);
     uint32_t packet_command = g->fifo[0];
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         packet_command = (uint32_t)io->r[0] | ((uint32_t)io->r[1] << 8) |
@@ -593,6 +722,10 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst)
                                 (fifo_count != 0u && packet_words > fifo_count &&
                                  packet_words == expected_packet_words(packet_command)));
     schway__state_check(io, phase == SCHWAY__GPU_PACKET || (fifo_count == 0u && packet_words == 0u));
+    schway__state_check(io, clut_valid == 0u
+                                ? (clut_x == 0u && clut_y == 0u && clut_count == 0u)
+                                : (clut_count == 16u ||
+                                   clut_count == SCHWAY__GPU_CLUT_CACHE_ENTRIES));
     if (phase == SCHWAY__GPU_IDLE) {
         schway__state_check(io, owed_words == 0u && transfer_x == 0u && transfer_y == 0u &&
                                     transfer_width == 0u && transfer_height == 0u &&

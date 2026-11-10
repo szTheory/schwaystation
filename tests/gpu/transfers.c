@@ -395,6 +395,22 @@ static void test_copy_masks(void)
     copy_rect(inst, 9u, 9u, 10u, 10u, 2u, 1u);
     CHECK(inst->vram[10][10] == 0x8002u);
     CHECK(inst->vram[10][11] == 0x8456u);
+
+    write_port(inst, GP0, 0xE6000003u);
+    inst->vram[12][30] = 0x8001u;
+    inst->vram[12][31] = 0x0002u;
+    start_transfer(inst, 0xA0000000u, 30u, 12u, 2u, 1u);
+    write_port(inst, GP0, 0x1234ABCDu);
+    CHECK(inst->vram[12][30] == 0x8001u);
+    CHECK(inst->vram[12][31] == 0x9234u);
+
+    inst->vram[14][16] = 0x8001u;
+    inst->vram[14][17] = 0x0002u;
+    write_port(inst, GP0, 0x020000F8u);
+    write_port(inst, GP0, (14u << 16) | 16u);
+    write_port(inst, GP0, (1u << 16) | 2u);
+    CHECK(inst->vram[14][16] == 0x001Fu);
+    CHECK(inst->vram[14][17] == 0x001Fu);
     schway_destroy(inst);
 }
 
@@ -427,6 +443,50 @@ static void test_copy_wrap(void)
     schway_destroy(inst);
 }
 
+static void test_cache_contract(void)
+{
+    schway *inst = make_instance();
+    schway *other = make_instance();
+    if (inst == NULL || other == NULL) {
+        CHECK(0);
+        schway_destroy(inst);
+        schway_destroy(other);
+        return;
+    }
+
+    inst->vram[7][8] = 0x1122u;
+    CHECK(schway__gpu_texture_read(inst, 8u, 7u) == 0x1122u);
+    inst->vram[7][8] = 0x3344u;
+    CHECK(schway__gpu_texture_read(inst, 1032u, 7u) == 0x1122u);
+    write_port(inst, GP0, 0x01000000u);
+    CHECK(schway__gpu_texture_read(inst, 8u, 7u) == 0x3344u);
+
+    other->vram[7][8] = 0x5566u;
+    CHECK(schway__gpu_texture_read(other, 8u, 7u) == 0x5566u);
+
+    inst->vram[5][1022] = 0x1001u;
+    inst->vram[5][1023] = 0x1002u;
+    inst->vram[5][0] = 0x1003u;
+    CHECK(schway__gpu_clut_read(inst, 1022u, 5u, 0u, 16u) == 0x1001u);
+    inst->vram[5][1022] = 0x2001u;
+    CHECK(schway__gpu_clut_read(inst, 1022u, 5u, 0u, 16u) == 0x1001u);
+    write_port(inst, GP0, 0x01000000u);
+    CHECK(schway__gpu_clut_read(inst, 1022u, 5u, 0u, 16u) == 0x1001u);
+
+    inst->vram[5][32] = 0x3001u;
+    CHECK(schway__gpu_clut_read(inst, 32u, 5u, 0u, 16u) == 0x3001u);
+    inst->vram[5][32] = 0x4001u;
+    CHECK(schway__gpu_clut_read(inst, 32u, 5u, 0u, 16u) == 0x3001u);
+    write_port(inst, GP1, 0x01000000u);
+    CHECK(inst->gpu.clut_valid == 0u);
+    CHECK(schway__gpu_clut_read(inst, 32u, 5u, 0u, 16u) == 0x4001u);
+
+    other->vram[5][1022] = 0x9001u;
+    CHECK(schway__gpu_clut_read(other, 1022u, 5u, 0u, 16u) == 0x9001u);
+    schway_destroy(other);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -449,6 +509,8 @@ int main(int argc, char **argv)
         test_copy_masks();
     } else if (strcmp(argv[1], "copy_wrap") == 0) {
         test_copy_wrap();
+    } else if (strcmp(argv[1], "cache_contract") == 0) {
+        test_cache_contract();
     } else {
         fprintf(stderr, "unknown GPU transfer case: %s\n", argv[1]);
         return 2;

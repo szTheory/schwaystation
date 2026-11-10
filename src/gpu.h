@@ -9,6 +9,9 @@
 struct schway__state_io;
 
 #define SCHWAY__GPU_FIFO_WORDS 16u
+#define SCHWAY__GPU_TEXTURE_CACHE_LINES 256u
+#define SCHWAY__GPU_TEXTURE_CACHE_PIXELS 4u
+#define SCHWAY__GPU_CLUT_CACHE_ENTRIES 256u
 
 enum schway__gpu_phase {
     SCHWAY__GPU_IDLE = 0u,
@@ -41,6 +44,11 @@ struct schway__gpu {
     uint32_t allow_2mb;
     uint32_t read_latch;
     uint32_t irq_pending;
+    uint16_t texture_cache[SCHWAY__GPU_TEXTURE_CACHE_LINES][SCHWAY__GPU_TEXTURE_CACHE_PIXELS];
+    uint32_t texture_tags[SCHWAY__GPU_TEXTURE_CACHE_LINES];
+    uint8_t texture_valid[SCHWAY__GPU_TEXTURE_CACHE_LINES];
+    uint16_t clut_cache[SCHWAY__GPU_CLUT_CACHE_ENTRIES];
+    uint32_t clut_x, clut_y, clut_count, clut_valid;
 };
 
 void schway__gpu_reset(schway *inst);
@@ -48,6 +56,9 @@ void schway__gpu_word(schway *inst, uint32_t word);
 int schway__gpu_io(schway *inst, uint32_t wr, uint32_t addr, uint32_t width,
                    uint32_t *value, uint32_t *cycles);
 int schway__gpu_peek(const schway *inst, uint32_t addr, uint32_t width, uint32_t *value);
+uint16_t schway__gpu_texture_read(schway *inst, uint32_t x, uint32_t y);
+uint16_t schway__gpu_clut_read(schway *inst, uint32_t x, uint32_t y, uint32_t index,
+                               uint32_t count);
 void schway__gpu_state_io(struct schway__state_io *io, schway *inst);
 
 #endif /* SCHWAYSTATION_GPU_H */
