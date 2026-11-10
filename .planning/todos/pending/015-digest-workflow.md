@@ -16,6 +16,7 @@ A scheduled `digest.yml` workflow writes one weekly issue summarising CI and nig
 - Seed: none; write the minimum new code.
 - Bound to the v1.0 milestone tune-up (SEED-007): no seed carries the file; SEED-007 lists the weekly triage digest as tune-up work.
 - Deferred in phase 1 because no phase 1 requirement names it (01-CONTEXT D-24 and D-25, AGENTS rule 7).
+- Reviewed at phase 3: the binding above is unchanged.
 
 ## Acceptance Criteria
 

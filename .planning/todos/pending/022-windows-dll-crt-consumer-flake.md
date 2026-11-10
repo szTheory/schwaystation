@@ -21,7 +21,7 @@ the consumer's exit status so the next failure says why.
 - An empty output with no message fits a process that never reached `main` (a missing DLL exits 0xC0000135
   silently) or was blocked while the fresh executable was scanned.
 - A failing harness assertion is a test bug to triage, not a release gate (AGENTS rule 8).
-- Bound to phase 2: the first plan that edits `tests/install/tests.cmake`, or the next hosted occurrence, whichever
+- Rebound at phase 3: bound to the first plan that edits `tests/install/tests.cmake`, or the next hosted occurrence, whichever comes first; otherwise SEED-007, the milestone tune-up.
   comes first.
 
 ## Acceptance Criteria

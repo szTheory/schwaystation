@@ -16,6 +16,7 @@ theme: libretro
 - Seed: `tests/cmake/info_claims.cmake` in szTheory/cogmaster at f09ac97096acda99888270e4c1e4dc96e12ffdfe (fetch it with `gh api`, never from a local checkout).
 - Bound to phase 4: the phase 4 plan that sets `supports_no_game`, `input_descriptors`, `core_options`, `memory_descriptors` and `disk_control` in the `.info` (GAME-07).
 - Deferred in phase 1 because no phase 1 requirement names it (01-CONTEXT D-24 and D-25, AGENTS rule 7).
+- Reviewed at phase 3: the binding above is unchanged.
 
 ## Acceptance Criteria
 
