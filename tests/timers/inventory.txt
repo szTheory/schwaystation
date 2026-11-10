@@ -1,2 +1,12 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
 timers.div8.wrap_irq	portable,timers
+timers.irq.oneshot	portable,timers
+timers.irq.pulse	portable,timers
+timers.irq.repeat	portable,timers
+timers.irq.toggle	portable,timers
+timers.mode.read_clears	portable,timers
+timers.mode.write	portable,timers
+timers.target.count_above	portable,timers
+timers.target.period	portable,timers
+timers.wrap.no_dwell	portable,timers
+timers.write.hold	portable,timers
