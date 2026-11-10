@@ -13,6 +13,11 @@ struct schway__state_io;
 #define SCHWAY__GPU_TEXTURE_CACHE_PIXELS 4u
 #define SCHWAY__GPU_CLUT_CACHE_ENTRIES 256u
 
+#define SCHWAY__GPU_PIXEL_TEXTURED (1u << 0)
+#define SCHWAY__GPU_PIXEL_RAW_TEXTURE (1u << 1)
+#define SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT (1u << 2)
+#define SCHWAY__GPU_PIXEL_DITHER_ELIGIBLE (1u << 3)
+
 enum schway__gpu_phase {
     SCHWAY__GPU_IDLE = 0u,
     SCHWAY__GPU_PACKET,
@@ -59,6 +64,9 @@ int schway__gpu_peek(const schway *inst, uint32_t addr, uint32_t width, uint32_t
 uint16_t schway__gpu_texture_read(schway *inst, uint32_t x, uint32_t y);
 uint16_t schway__gpu_clut_read(schway *inst, uint32_t x, uint32_t y, uint32_t index,
                                uint32_t count);
+uint16_t schway__gpu_texel(schway *inst, uint32_t uv_clut);
+void schway__gpu_pixel(schway *inst, uint32_t x, uint32_t y, uint16_t texel, uint32_t color,
+                       uint32_t flags);
 void schway__gpu_state_io(struct schway__state_io *io, schway *inst);
 
 #endif /* SCHWAYSTATION_GPU_H */

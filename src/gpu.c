@@ -100,7 +100,7 @@ static uint32_t command_words(uint32_t command)
     }
     if (op >= 0x60u && op <= 0x7Fu) {
         uint32_t textured = (op & 0x04u) != 0u ? 1u : 0u;
-        uint32_t variable_size = (op & 0x03u) == 0u ? 1u : 0u;
+        uint32_t variable_size = (op & 0x18u) == 0u ? 1u : 0u;
         return 2u + textured + variable_size;
     }
     if (op >= 0x80u && op <= 0x9Fu) {
@@ -395,6 +395,77 @@ static void apply_environment(schway *inst, uint32_t command)
     }
 }
 
+static int32_t sign11(uint32_t value)
+{
+    value &= 0x7FFu;
+    return (value & 0x400u) != 0u ? (int32_t)value - 0x800 : (int32_t)value;
+}
+
+static void render_rectangle(schway *inst, uint32_t command)
+{
+    struct schway__gpu *g = &inst->gpu;
+    uint32_t op = command >> 24;
+    uint32_t textured = (op & 0x04u) != 0u;
+    uint32_t size_mode = (op >> 3) & 3u;
+    uint32_t position = g->fifo[1];
+    uint32_t vertex_index = 2u;
+    uint32_t uv_clut = 0u;
+    if (textured != 0u) {
+        uv_clut = g->fifo[vertex_index++];
+    }
+    uint32_t width;
+    uint32_t height;
+    if (size_mode == 0u) {
+        uint32_t size = g->fifo[vertex_index];
+        width = size & 0x3FFu;
+        height = (size >> 16) & 0x1FFu;
+    } else {
+        width = size_mode == 1u ? 1u : (size_mode == 2u ? 8u : 16u);
+        height = width;
+    }
+    if (width == 0u || height == 0u) {
+        return;
+    }
+
+    int32_t x0 = sign11(position) + sign11(g->draw_offset);
+    int32_t y0 = sign11(position >> 16) + sign11(g->draw_offset >> 11);
+    int32_t left = (int32_t)(g->draw_area_tl & 0x3FFu);
+    int32_t top = (int32_t)((g->draw_area_tl >> 10) & 0x1FFu);
+    int32_t right = (int32_t)(g->draw_area_br & 0x3FFu);
+    int32_t bottom = (int32_t)((g->draw_area_br >> 10) & 0x1FFu);
+    uint32_t flags = textured != 0u ? SCHWAY__GPU_PIXEL_TEXTURED : 0u;
+    if ((op & 1u) != 0u) {
+        flags |= SCHWAY__GPU_PIXEL_RAW_TEXTURE;
+    }
+    if ((op & 2u) != 0u) {
+        flags |= SCHWAY__GPU_PIXEL_SEMI_TRANSPARENT;
+    }
+    uint32_t base_u = uv_clut & 0xFFu;
+    uint32_t base_v = (uv_clut >> 8) & 0xFFu;
+    uint32_t flip_x = (g->draw_mode >> 12) & 1u;
+    uint32_t flip_y = (g->draw_mode >> 13) & 1u;
+    for (uint32_t row = 0u; row < height; row++) {
+        int32_t y = y0 + (int32_t)row;
+        if (y < top || y > bottom) {
+            continue;
+        }
+        for (uint32_t col = 0u; col < width; col++) {
+            int32_t x = x0 + (int32_t)col;
+            if (x < left || x > right) {
+                continue;
+            }
+            uint16_t texel = 0u;
+            if (textured != 0u) {
+                uint32_t u = (base_u + (flip_x != 0u ? 0u - col : col)) & 0xFFu;
+                uint32_t v = (base_v + (flip_y != 0u ? 0u - row : row)) & 0xFFu;
+                texel = schway__gpu_texel(inst, (uv_clut & 0xFFFF0000u) | (v << 8) | u);
+            }
+            schway__gpu_pixel(inst, (uint32_t)x, (uint32_t)y, texel,
+                              command & 0x00FFFFFFu, flags);
+        }
+    }
+}
+
 static void gpu_ack_irq(schway *inst)
 {
     inst->gpu.irq_pending = 0u;
@@ -413,6 +484,8 @@ static void process_packet(schway *inst)
         texture_cache_clear(g);
     } else if (op >= 0x80u && op <= 0x9Fu && word_count == 4u) {
         copy_vram(inst, g->fifo[1], g->fifo[2], g->fifo[3]);
+    } else if (op >= 0x60u && op <= 0x7Fu) {
+        render_rectangle(inst, command);
     } else if (op == 0x1Fu) {
         g->irq_pending = 1u;
         schway__irq_raise(inst, GPU_IRQ_BIT);
