@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-09-PLAN.md
-last_updated: "2026-11-10T06:22:43.042Z"
+stopped_at: Completed 03-07-PLAN.md
+last_updated: "2026-11-10T06:32:52.494Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: cb05725cb209f90d4dd10b0e596ce946866b53fc
+state_head: 8dc7d952429a87bdccdd89597b00d4d619eb25b5
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 51
+  completed_plans: 52
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 10 of 26
+Plan: 11 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -110,6 +110,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P26 | 5 min | 2 tasks | 6 files |
 | Phase 03 P08 | 15 min | 3 tasks | 6 files |
 | Phase 03 P09 | 19 min | 3 tasks | 9 files |
+| Phase 03 P07 | 9min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -225,6 +226,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-08: A DMA register read finishes a running unit as of its end tick (the bus hook has frozen the CPU until then); a CHCR write to the running channel keeps bit 24 set; OTC costs ceil(words*17/16), 4,352 cycles for 4,096 words
 - [Phase 03]: 03-09: the write hold is two counter cycles after the write's own cycle (a write at W shows at W+1 and W+2, counts from W+3); a reset at the target shows 0 for two cycles counting the landing, so the loop is target + 2; a landing is a count or a reset, never a software write
 - [Phase 03]: 03-09: a counter whose I_STAT bit is set gives no deadline, an I_STAT write catches the counters up first, and an advance runs a deadline that falls on its end tick, so a saved state never holds an event behind its tick; the saved timers view is as of the instance's tick and the span function is shared by catch-up, save and the bisection that finds the next raise
+- [Phase 03]: GTE: a command number outside the 22 documented ones changes no register (the seed's mirrors of 00h and 1Ah are not copied); documented as an engine choice, not a hardware claim
 
 ### Pending Todos
 
@@ -282,8 +284,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T06:22:42.909Z
-Stopped at: Completed 03-09-PLAN.md
+Last session: 2026-11-10T06:32:52.391Z
+Stopped at: Completed 03-07-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
