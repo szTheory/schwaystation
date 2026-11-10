@@ -44,7 +44,7 @@ set_target_properties(schwaystation-test-state PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-state)
 
-foreach(case IN ITEMS state.cpu_fields state.round_trip state.stable_bytes state.rejects state.visit
+foreach(case IN ITEMS state.cpu_fields state.device_fields state.round_trip state.stable_bytes state.rejects state.visit
     state.record_sweep state.run_bounds)
   schway_add_test(NAME core.${case}
     COMMAND schwaystation-test-state ${case}

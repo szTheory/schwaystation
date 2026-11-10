@@ -20,6 +20,7 @@ core.run.peek_rejects	core,portable
 core.run.peek_values	core,portable
 core.run.split_equivalence	core,portable
 core.state.cpu_fields	core,portable
+core.state.device_fields	core,portable
 core.state.record_sweep	core,portable
 core.state.rejects	core,portable
 core.state.round_trip	core,portable

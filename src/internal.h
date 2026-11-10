@@ -9,6 +9,9 @@
 #include "bus.h"
 #include "cpu.h"
 #include "gte.h"
+#include "dma.h"
+#include "timers.h"
+#include "sched.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
@@ -137,7 +140,11 @@ struct schway {
     struct schway__gte gte;
     struct schway__bus bus;
     struct schway__irq irq;
+    struct schway__dma dma;
+    struct schway__timers timers;
     struct schway__fault fault;
+    /* Not saved: derived from the state, and rebuilt after a load. */
+    struct schway__sched sched;
     /* Not saved: the host drains these, and a power reset empties them. */
     struct schway__tty tty;
     struct schway__trace_ring trace;

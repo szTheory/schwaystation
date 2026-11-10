@@ -7,7 +7,8 @@
              instance.tick_acc, instance.frame_end, gpu.vram, cpu and cop0
              registers, the geometry engine, instance.profile_flags,
              instance.exe_loaded, the bus (RAM, scratchpad, memory control,
-             unbuilt-device counters), irq and the first-fault record
+             unbuilt-device counters), irq, dma, the root counters and the
+             first-fault record
    One field list drives every pass (state.h), so they cannot drift apart. A
    struct is never copied as a whole: padding, pointers and the allocator
    never reach the bytes. The audio ring is not saved; a load empties it.
@@ -103,6 +104,8 @@ static void body_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u, 1u);
     (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
     schway__bus_state_io(io, inst);
+    schway__dma_state_io(io, inst, ticks);
+    schway__timers_state_io(io, inst);
     fault_io(io, &inst->fault);
 }
 
@@ -228,6 +231,7 @@ schway_status schway_load_state(schway *inst, const void *buf, size_t size)
     io.mode = SCHWAY__STATE_APPLY;
     io.r = b;
     state_io(&io, inst, (uint32_t)need);
+    schway__sched_recalc(inst);
     schway__frame_audio_clear(inst);
     return SCHWAY_STATUS_OK;
 }

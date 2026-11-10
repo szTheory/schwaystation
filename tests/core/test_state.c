@@ -396,7 +396,7 @@ static void test_record_sweep(void)
     /* A stamp ahead of a clock is refused at its recorded maximum, so each
        such field must record one below the type's: the probe above then
        reached the bound and refused the stamp one past it. */
-    static const char *const stamps[] = {"gte.ready"};
+    static const char *const stamps[] = {"gte.ready", "dma.busy_until", "dma.stall_until"};
     for (size_t k = 0; k < sizeof stamps / sizeof stamps[0]; k++) {
         int found = 0;
         for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
@@ -428,6 +428,89 @@ static void test_record_sweep(void)
     reseal(bad, n);
     CHECK_EQ_U64(schway_load_state(target, bad, n), SCHWAY_STATUS_OK);
     schway_destroy(target);
+    schway_destroy(src);
+}
+
+/* The offset of the first field called name in a saved state, or 0. */
+static uint32_t offset_of(const schway *inst, const char *name)
+{
+    size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
+    CHECK(nf <= MAX_FIELDS);
+    for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
+        if (strcmp(fields[i].name, name) == 0) {
+            return fields[i].offset;
+        }
+    }
+    CHECK(0);
+    return 0u;
+}
+
+/* The geometry engine, DMA and counter fields come back from a save and a
+   load byte for byte; a timer's base tick is no part of the state; and a
+   load refuses the DMA bits the hardware does not store and a current
+   channel that is not started, and changes nothing. */
+static void test_device_fields(void)
+{
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    run_to(src, 5);
+    CHECK_EQ_HEX(src->dma.dpcr, 0x07654321u);
+    CHECK_EQ_U64(src->dma.cur, SCHWAY__DMA_NONE);
+    src->gte.ready = src->cpu.cycle + 20u;
+    src->gte.d[3] = 0x80000001u;
+    src->gte.c[31] = 0x7FFFF000u;
+    src->dma.madr[2] = 0x123456u;
+    src->dma.bcr[2] = 0x00040010u;
+    src->dma.chcr[2] = 0x01000201u;
+    src->dma.cur = 2u;
+    src->dma.busy_until = src->ticks + 1000u;
+    src->dma.dicr = 0x00A38000u;
+    src->dma.crc[6] = 0xDEADBEEFu;
+    src->timers.t[1].value = 0x1234u;
+    src->timers.t[1].mode = 0x1C00u;
+    src->timers.t[2].hold = 2u;
+    size_t n = save(src, good);
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK(save(dst, after) == n && memcmp(good, after, n) == 0);
+    CHECK_EQ_U64(dst->gte.ready, src->gte.ready);
+    CHECK_EQ_HEX(dst->gte.d[3], 0x80000001u);
+    CHECK_EQ_HEX(dst->dma.chcr[2], 0x01000201u);
+    CHECK_EQ_U64(dst->dma.cur, 2u);
+    CHECK_EQ_HEX(dst->dma.crc[6], 0xDEADBEEFu);
+    CHECK_EQ_U64(dst->timers.t[1].value, 0x1234u);
+    CHECK_EQ_U64(dst->timers.base, dst->ticks);
+    src->timers.base = 12345u;
+    CHECK(save(src, after) == n && memcmp(good, after, n) == 0);
+
+    uint32_t chcr2 = offset_of(src, "dma.chcr") + 8u;
+    uint32_t chcr3 = chcr2 + 4u;
+    uint32_t dicr_at = offset_of(src, "dma.dicr");
+    uint32_t cur_at = offset_of(src, "dma.cur");
+    const struct {
+        const char *what;
+        uint32_t at;
+        uint32_t v;
+    } refused[] = {
+        {"chcr bit 2", chcr2, 0x01000205u},
+        {"chcr bit 31", chcr2, 0x81000201u},
+        {"dicr bit 6", dicr_at, 0x00A38040u},
+        {"dicr bit 31", dicr_at, 0x80A38000u},
+        {"current channel not started", cur_at, 3u},
+    };
+    for (size_t i = 0; i < sizeof refused / sizeof refused[0]; i++) {
+        memcpy(bad, good, n);
+        put_le(bad + refused[i].at, refused[i].v, 4u);
+        reseal(bad, n);
+        expect_refused(refused[i].what, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    /* The same current channel, started, loads. */
+    memcpy(bad, good, n);
+    put_le(bad + chcr3, 0x01000000u, 4u);
+    put_le(bad + cur_at, 3u, 4u);
+    reseal(bad, n);
+    CHECK_EQ_U64(schway_load_state(dst, bad, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(dst->dma.cur, 3u);
+    schway_destroy(dst);
     schway_destroy(src);
 }
 
@@ -631,6 +714,7 @@ static const struct {
     void (*run)(void);
 } cases[] = {
     {"state.cpu_fields", test_cpu_fields},
+    {"state.device_fields", test_device_fields},
     {"state.record_sweep", test_record_sweep},
     {"state.rejects", test_rejects},
     {"state.round_trip", test_round_trip},

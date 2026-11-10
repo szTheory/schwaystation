@@ -441,12 +441,12 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
     case 0x0Du:
     case 0x0Eu:
     case 0x0Fu:
-        schway__bus_unbuilt(inst, SCHWAY__DEV_DMA, p, width, wr, v);
+        schway__dma_io(inst, wr, p, width, value, cycles);
         break;
     case 0x10u:
     case 0x11u:
     case 0x12u:
-        schway__bus_unbuilt(inst, SCHWAY__DEV_TIMER, p, width, wr, v);
+        schway__timers_io(inst, wr, p, width, value, cycles);
         break;
     case 0x80u:
         if ((p & 0xCu) != 0u) {

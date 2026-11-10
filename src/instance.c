@@ -253,6 +253,8 @@ static void power_on(schway *inst)
     schway__gte_reset(&inst->gte);
     schway__bus_reset(inst);
     schway__irq_reset(inst);
+    schway__dma_reset(inst);
+    schway__timers_reset(inst);
     /* With no BIOS image the BIOS window holds the stub kernel; a mapped
        image, the host's, is kept across a power reset. */
     if (inst->bus.bios == NULL) {

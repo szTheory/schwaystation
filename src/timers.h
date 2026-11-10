@@ -1,0 +1,59 @@
+/* The three root counters: state structs and the module's declarations. Not
+   installed. The instance embeds the structs, so timers.c is edited alone. */
+#ifndef SCHWAYSTATION_TIMERS_H
+#define SCHWAYSTATION_TIMERS_H
+
+#include <stdint.h>
+
+#include "schwaystation.h"
+
+struct schway__state_io;
+
+/* Counters 0 to 2 (psx-spx, Timers). */
+#define SCHWAY__TIMERS 3u
+
+/* One counter as seen at the instance's tick, with no record of when it was
+   last brought up to date, so a state hash does not depend on when that
+   happened. value and target are 16 bits and mode has the 13 stored bits.
+   hold counts the cycles a changed request stays latched (0 to 2), and the
+   rest are flags. */
+struct schway__timer {
+    uint32_t value, target, mode, hold;
+    uint32_t reached, irq_line, oneshot_done, paused, free_after;
+};
+
+/* base is the tick the counters are as of. It is not state: a load sets it to
+   the loaded tick. */
+struct schway__timers {
+    struct schway__timer t[SCHWAY__TIMERS];
+    uint64_t base;
+};
+
+/* Power-on: every counter is 0. */
+void schway__timers_reset(schway *inst);
+
+/* The timers fields of the state walk (state.h). */
+void schway__timers_state_io(struct schway__state_io *io, schway *inst);
+
+/* One access to the counter registers at physical address p, of width 1, 2 or
+   4 bytes: wr is 1 for a write, with the data in *value; a read leaves its
+   result in *value. *cycles is the access's cost so far. */
+void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint32_t *value,
+                       uint32_t *cycles);
+
+/* The tick the next counter event falls on, or UINT64_MAX for never. */
+uint64_t schway__timers_next(const schway *inst);
+
+/* Runs what is due at tick now. */
+void schway__timers_event(schway *inst, uint64_t now);
+
+/* Brings the counters up to date as of tick now. */
+void schway__timers_sync(schway *inst, uint64_t now);
+
+/* The GPU's blanking signals, at the tick they change: vertical and
+   horizontal blank go to level, and dots dot clocks have passed. */
+void schway__timers_vblank(schway *inst, uint64_t tick, uint32_t level);
+void schway__timers_hblank(schway *inst, uint64_t tick, uint32_t level);
+void schway__timers_dots(schway *inst, uint64_t tick, uint32_t dots);
+
+#endif /* SCHWAYSTATION_TIMERS_H */
