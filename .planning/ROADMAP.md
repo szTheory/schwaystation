@@ -233,7 +233,7 @@ Plans:
 
 **Plans**: 32
 **Wave 1**
-- [ ] 04-01 — Build skeleton and an inventoried VRAM-to-frame tracer
+- [x] 04-01 — Build skeleton and an inventoried VRAM-to-frame tracer
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 04-02 — Correct the first GPU/firmware callers of CPU and partial-store contracts
@@ -357,6 +357,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 0/TBD | Not started | - |
+| 4. Games play in RetroArch | 1/32 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

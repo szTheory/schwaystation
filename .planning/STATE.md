@@ -2,19 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 4
+current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Phase 3 complete, ready to plan Phase 4
-last_updated: "2026-11-10T17:14:06.352Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-11-10T17:37:23.873Z"
 last_activity: 2026-11-10
-last_activity_desc: "Phase 3 shipped as PR #12"
-state_head: 9cdc5844a6e66ef59641c2cf26ba0eeac283606f
+last_activity_desc: Phase 04 execution started
+state_head: 98a4505ba9b4ce2118eb416864ce47f014150d88
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 68
+  completed_plans: 69
   percent: 50
 ---
 
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 ## Current Position
 
-Phase: 4 (Games play in RetroArch) — READY TO EXECUTE
-Plan: Discussion complete; planning next
+Phase: 04 (Games play in RetroArch) — EXECUTING
+Plan: 2 of 32
 Status: Ready to execute
-Last activity: 2026-11-10 -- Phase 3 shipped as PR #12
+Last activity: 2026-11-10 — Phase 04 execution started
 
 Progress: [█████░░░░░] 50%
 
@@ -128,6 +128,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03 P22 | 4min | 2 tasks | 10 files |
 | Phase 03 P23 | 6 min | 2 tasks | 7 files |
 | Phase 03 P25 | 7 min | 2 tasks | 32 files |
+| Phase 04 P01 | 16 min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -261,6 +262,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-22: test and fixture comments cite docs/hardware pages and headings; the stub keeps PSX-SYSTEM sections 7 and 9
 - [Phase 03]: 03-23: the preparation sections that docs/hardware pages replace keep their headings, Sources rows and the C3 to C6 and 5.A choice paragraphs, with the corrections phase 3 found stated in each
 - [Phase 03]: 03-25: todos 016 and 017 bind to SEED-007 (no later first caller), 014 to the phase 4 System.dat plan; every phase-2 review finding is fixed (WR-06, IN-01) or deferred with one todo (025-029, 032-037)
+- [Phase 04]: GPU smoke cases reuse the existing core test executable; a GPU-specific executable belongs to its first behavior implementation plan.
+- [Phase 04]: SIO, card, compatibility, and built-input registration seams start with empty inventories until real behavior tests exist.
 
 ### Pending Todos
 
@@ -327,10 +330,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-plan-phase 4 complete | Codex, OpenGSD 1.20.0; 32 plans, focused revision, independent check/recheck passed; literal command repair verified | planner gpt-6.1-sol high; checkers gpt-6-luna xhigh; orchestrator GPT-6 (session) |
 
+| 2026-11-10 | /gsd-execute-phase 4 via /gsd-autonomous | Codex, OpenGSD 1.20.0; sequential typed executors in approved shared checkout | gpt-6-luna xhigh; orchestrator GPT-6 (session) |
+
 ## Session Continuity
 
-Last session: 2026-11-10T08:23:44.047Z
-Stopped at: Phase 3 complete, ready to plan Phase 4
+Last session: 2026-11-10T17:37:23.683Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
