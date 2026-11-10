@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Phase 02 complete, ready to plan Phase 3
-last_updated: "2026-11-10T04:39:59.526Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-11-10T04:51:10.185Z"
 last_activity: 2026-11-10
-last_activity_desc: "Phase 02 shipped as PR #8"
-state_head: be754e954e69ca76e1c4660fd6524a11a986b9dd
+last_activity_desc: Phase 03 execution started
+state_head: 693df674351d40eb781a3912a70d420249a9ae41
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 42
+  completed_plans: 43
   percent: 17
 ---
 
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 02 — The CPU matches the public vectors
+**Current focus:** Phase 03 — The GTE matches the hardware cases; DMA and timers
 
 ## Current Position
 
-Phase: 03 (The GTE matches the hardware cases; DMA and timers) — READY TO EXECUTE
-Plan: Not started
+Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
+Plan: 2 of 26
 Status: Ready to execute
-Last activity: 2026-11-09 -- Phase 02 shipped as PR #8
+Last activity: 2026-11-09 — Phase 03 execution started
 
 Progress: [██░░░░░░░░] 17%
 
@@ -101,6 +101,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P22 | 55min | 3 tasks | 13 files |
 | Phase 02 P26 | 9 min | 3 tasks | 6 files |
 | Phase 02 P27 | 37 min | 3 tasks | 7 files |
+| Phase 03 P01 | 25 min | 3 tasks | 30 files |
 
 ## Accumulated Context
 
@@ -198,6 +199,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-25: the mailbox judge pairs a fixture's CSV rows with its records by order (row n is record id n) and lives in the fixtures script case; under --no-stop-on-fault the runner prints the first fault the program made at the end of the run and keeps the run's status — ExcCode persists until the next exception, so the masked-line and CAUSE-after-I_STAT doc rows read 1Ch, not 0; those two rows and the interrupt EPC (MTC0 plus 8) pin models, not measurements, and change only through tests/diag/allow.txt
 - [Phase 02]: 02-26: the gate-line total is 1495 of 1520 after the last gate of the phase, so no check is deferred; the cap is never raised and ship ratchets it to the measured total — The stub regeneration commands live once, in docs/maintaining.md, with the armips and vectors procedures; the vectors one reproduced the committed sample byte for byte
 - [Phase 02]: 02-27: build timeout 11 min (windows-x64 311 s, run 42725764966), hygiene 2 min, rehearsal 13 min; floors kept for asan, be32, wasm32, nofp, vectors-full, fuzz; each cites a run of this phase
+- [Phase 03]: 03-01: SCHWAY__DMA_BUSY_MAX is 2,691,328 cycles (65,536 words at the CD's 40 per word, 17 per 16 words on the RAM side, 256 per-unit overhead); CHCR mask 71770703h, DICR mask 7FFF803Fh, the timers' base tick is never walked and a load sets it to the loaded ticks
+- [Phase 03]: 03-01: the state field caps in test_state.c and test_run.c are 128, the embed test lists the new object libraries, and core.state.device_fields pins the DMA stored-bit and started-channel refusals that the max+1 sweep cannot reach
 
 ### Pending Todos
 
@@ -255,8 +258,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T00:43:02.494Z
-Stopped at: Phase 02 complete, ready to plan Phase 3
+Last session: 2026-11-10T04:51:10.096Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
