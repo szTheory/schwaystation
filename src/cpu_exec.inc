@@ -138,7 +138,7 @@ static uint32_t cpu_below_interrupt(uint32_t code, uint32_t pc)
 /* With SR.Isc set, a data access in KUSEG, KSEG0 or KSEG1 goes to the
    instruction cache and never reaches the bus; KSEG2, the cache-control word,
    still does. The line is the one address bits 11:4 name, the word bits 3:2
-   (PSX-SYSTEM section 2, Cache isolation, write queue; D-29). A load returns
+   (PSX-SYSTEM section 2, Cache isolation, write queue). A load returns
    that word's bytes whether or not the tag matches. A store writes the tag, the
    physical address bits 31:12 of the datum, and sets the four valid bits to the
    datum's low four bits when cache-control TAG (bit 2) and IS1 (bit 11) are both
@@ -278,7 +278,7 @@ static uint32_t cpu_sub_overflows(uint32_t a, uint32_t b, uint32_t diff)
    copy every name gains _traced and TRACE(...) writes one record into the
    instance's ring; in the other TRACE is empty, so the untraced copy holds no
    trace code and no branch for one. schway__cpu_run picks the copy once per
-   call, from the budget's trace flag (DEC.24; ARCHITECTURE section 6). */
+   call, from the budget's trace flag (ARCHITECTURE section 6). */
 #if SCHWAY_TRACE
 #define cpu_irq_enter cpu_irq_enter_traced
 #define cpu_exception cpu_exception_traced

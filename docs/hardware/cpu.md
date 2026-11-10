@@ -288,15 +288,9 @@ writing its own handler address to the mailbox, or its own code at `80000080h`.
 The stub's `FFh` is a word store, so a fault also clears the version, count and id bytes, and it leaves the CRC as it
 was. An image that recovers writes them back.
 
-**Regenerating the stub array.** `src/stub_kernel.c` is generated from `tests/fixtures/src/stub/stub.asm`. After
-editing the source, build the fixtures (`cmake --build build/ci --target schwaystation-fixtures`), then
-
-```
-cmake -DCASE=array -DFILE=build/ci/fixtures/stub.bin -DOUT=src/stub_kernel.c -P tests/fixtures/tests.cmake
-```
-
-and update the digests in `tests/fixtures/manifest.txt` and `PROVENANCE.md`. `fixtures.stub_drift` fails while the
-array and the assembled image differ.
+**Regenerating the stub array.** `src/stub_kernel.c` is generated from `tests/fixtures/src/stub/stub.asm`, and
+`fixtures.stub_drift` fails while the two differ. The commands are in
+[Regenerating the stub kernel](../maintaining.md#regenerating-the-stub-kernel).
 
 ## The run loop
 

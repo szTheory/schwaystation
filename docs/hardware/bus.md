@@ -197,9 +197,10 @@ bus at once and lands in order, so the queue never changes what a store does, on
 - The vector tests bypass it: with a replay log attached each store's bus cycle is emitted at its issue point, in the
   upstream order, and the count does not change.
 
-A drain costs 4 cycles. That figure is an estimate: no source gives the drain rate, and ares charges a RAM write 1 cycle
-with an unbounded queue (PSX-SYSTEM section 3, C4). Stall timing is therefore documented and not pinned: the tests assert
-the depth, the order and the drain, and that a wait costs more than none, never the cycles of a wait. Retiring a queued
+A drain costs 4 cycles. That figure is an estimate: no source gives the drain rate, and a reference emulator charges
+a RAM write 1 cycle with an unbounded queue (PSX-SYSTEM section 3, C4). Stall timing is therefore documented and not
+pinned: the tests assert the depth, the order and the drain, and that a wait costs more than none, never the cycles of
+a wait. Retiring a queued
 store as time passes is not modelled, so a long run of stores to cached RAM pays for the wait on each store after the
 fourth until a KSEG1 access drains it; a measurement against hardware would settle a better rule.
 
