@@ -203,12 +203,12 @@ reaches back about 1,500 to 2,500 instructions, depending on how much of the cod
 all of its records. An EXE that never faults prints no fault line and no tail under `--trace first-fault`, and a hang
 ([`--stop-on mailbox`](#mailbox)) prints its line and then the same tail, without a `fault` event.
 
-At the end of an `--exe` run in which the program touched a device the core does not build yet, as the GPU, DMA or
-timers are not at this release, the runner prints one more line, after a fault's or a hang's lines and on a clean exit
-too:
+At the end of an `--exe` run in which the program touched a device the core does not build yet, as the GPU, SPU,
+CD-ROM, MDEC and serial ports are not at this release, the runner prints one more line, after a fault's or a hang's
+lines and on a clean exit too:
 
 ```text
-unbuilt dev=dma n=1 last_pc=0x80010120
+unbuilt dev=gpu n=1 last_pc=0x80010120
 ```
 
 `dev` is the device touched last, `n` how many times that device was touched and `last_pc` the program counter of the

@@ -115,13 +115,23 @@ GPU and MDEC ports) cost one cycle, which is approximate. The SPU and the CD-ROM
 
 ## Devices not built yet
 
-The DMA registers (`1F801080h`-`1F8010FFh`), the timers (`1F801100h`-`1F80112Fh`), the serial ports
-(`1F801040h`-`1F80105Fh`), the CD-ROM (`1F801800h`-`1F801803h`), the GPU (`1F801810h`-`1F801817h`), the MDEC
-(`1F801820h`-`1F801827h`) and the SPU (`1F801C00h`-`1F801FFFh`) are documented but not modelled. At any width a read
-returns 0 and a write is dropped, with no fault. Each access is counted per device in `unbuilt_n`, saturating at the
+The serial ports (`1F801040h`-`1F80105Fh`), the CD-ROM (`1F801800h`-`1F801803h`), the GPU
+(`1F801810h`-`1F801817h`), the MDEC (`1F801820h`-`1F801827h`) and the SPU (`1F801C00h`-`1F801FFFh`) are documented but
+not modelled. At any width a read returns 0 and a write is dropped, with no fault. Each access is counted per device in `unbuilt_n`, saturating at the
 largest 32-bit value, and the last one is kept as the device, address, width and program counter. Both are part of the
 state. A program that polls a register of one of these devices therefore spins with a count that grows and a last
 program counter that names the loop. A later release replaces each case with the device itself.
+
+The DMA registers (`1F801080h`-`1F8010FFh`) and the timers (`1F801100h`-`1F80112Fh`) belong to their own modules, not
+to this list: every address answers at every width with no fault and no unbuilt count, and the DMA and timer pages
+describe what they do. A DMA unit moves its RAM words through a path of its own: one aligned word at a physical address
+in the 8 MiB RAM window, with no fault, no cost, no unbuilt count and no wait. An address the `RAM_SIZE` banks leave
+without RAM drops the word.
+
+The bus tells the DMA engine about every CPU read and every instruction fetch that misses the cache, at the tick of the
+access, so a running unit can hold the CPU. It does not tell it about a store, which waits only when the four-deep
+write queue is full. The scratchpad and the cache-control word are not bus accesses that wait. Reading `I_STAT` first
+brings the timers up to the tick of that read, and writing it recomputes when a device next needs attention.
 
 The rest of the I/O page between and around those ranges is a gap. `core.bus_unbuilt` sweeps all of `1F801000h`-
 `1F801FFFh` at widths 1, 2 and 4, for reads and writes, and requires every address to be owned, unbuilt or a gap,
