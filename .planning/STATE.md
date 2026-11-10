@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-11-10T04:59:16.830Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-11-10T05:12:38.256Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 4861f31ce18801157bd8c3db8cbefa9897d7bc85
+state_head: ca7a21c9bd41e79dccf50eeb49e5bdcc72e6631a
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 44
+  completed_plans: 45
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 3 of 26
+Plan: 4 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -103,6 +103,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P27 | 37 min | 3 tasks | 7 files |
 | Phase 03 P01 | 25 min | 3 tasks | 30 files |
 | Phase 03 P02 | 6 min | 3 tasks | 13 files |
+| Phase 03 P03 | 11 min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -204,6 +205,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-01: the state field caps in test_state.c and test_run.c are 128, the embed test lists the new object libraries, and core.state.device_fields pins the DMA stored-bit and started-channel refusals that the max+1 sweep cannot reach
 - [Phase 03]: 03-02: gte_cases.inc holds 26 records of 66 words (case number, opcode, 64 inputs): one per command chosen by output FLAG, plus register-only cases 1 to 4
 - [Phase 03]: 03-02: policy.gate_budget limit is 1513, the measured total with policy.notices (30 lines) in; the vector file is a count plus 516-byte records (593,404 bytes, sha256 e8a0e61a...d9c2; the records alone hash to ed630d2f...58d2)
+- [Phase 03]: 03-03: a deadline still due after its event limits the next block to one instruction so the run loop always advances; the no-program path steps ticks to the next deadline and the test card moved 121 Ir/frame (1,620,545 against 1,620,424, run 42760163838)
+- [Phase 03]: 03-03: schway__sched_sync restarts the block clock after a power reset, a state load, a no-program run and the one-instruction entry, so fault.ticks needed no phase-2 assertion change
 
 ### Pending Todos
 
@@ -261,8 +264,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T04:59:16.735Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-11-10T05:12:38.147Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)

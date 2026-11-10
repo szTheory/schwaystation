@@ -167,7 +167,7 @@ Plans:
   2. `ctest -L dma` passes for all seven channels, covering costs, chopping, MADR wrap, OTC clearing and the CPU stall. The `chain-looping` list terminates by the 1000h-node guard, and the pinned DMA fixture record matches.
   3. `ctest -L timers` passes for the three root counters with sync modes, targets, the write hold and every IRQ mode. The `timers_lines` sysclk, sysclk/8 and vblank-count records match per profile.
 
-**Plans**: 2/26 plans executed in 10 waves
+**Plans**: 3/26 plans executed in 10 waves
 
 Plans:
 **Wave 1**
@@ -175,7 +175,7 @@ Plans:
 - [x] 03-02-PLAN.md — tools/gte2bin.py, the 1,150-case vector file, the fixture include, manifest, pin and notice rows, policy.notices, budget ratchet
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 03-03-PLAN.md — Spine A: block clock, deadline limit, event runner, freeze-until stall, fifth-queued-store stall hook, vblank push
+- [x] 03-03-PLAN.md — Spine A: block clock, deadline limit, event runner, freeze-until stall, fifth-queued-store stall hook, vblank push
 - [ ] 03-04-PLAN.md — Bus wiring: owned DMA and timer ranges, the DMA RAM word path, stall hook on reads and fetches, I_STAT timer sync
 - [ ] 03-05-PLAN.md — GTE seed part 1 from ares: register file, replay harness, register sweep, notice and provenance row
 
@@ -273,7 +273,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. A test frame in RetroArch | 15/15 | Ship PR #4 | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
-| 3. The GTE matches the hardware cases; DMA and timers | 2/26 | In Progress | - |
+| 3. The GTE matches the hardware cases; DMA and timers | 3/26 | In Progress | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
