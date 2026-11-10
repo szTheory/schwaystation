@@ -8,11 +8,12 @@
 #include "schwaystation.h"
 #include "bus.h"
 #include "cpu.h"
+#include "gte.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 2u
-#define SCHWAY__STATE_FORMAT 2u
+#define SCHWAY__BEHAVIOUR_REVISION 3u
+#define SCHWAY__STATE_FORMAT 3u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -133,6 +134,7 @@ struct schway {
     uint32_t profile_flags;     /* the profile's flags, bit 0 the debug port */
     uint32_t exe_loaded;        /* 1 after a PS-EXE was side-loaded */
     struct schway__cpu cpu;
+    struct schway__gte gte;
     struct schway__bus bus;
     struct schway__irq irq;
     struct schway__fault fault;

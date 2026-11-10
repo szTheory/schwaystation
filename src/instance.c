@@ -250,6 +250,7 @@ static void power_on(schway *inst)
     schway__frame_audio_clear(inst);
     memset(inst->vram, 0, sizeof inst->vram);
     schway__cpu_reset(inst);
+    schway__gte_reset(&inst->gte);
     schway__bus_reset(inst);
     schway__irq_reset(inst);
     /* With no BIOS image the BIOS window holds the stub kernel; a mapped

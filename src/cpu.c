@@ -57,7 +57,7 @@ void schway__cpu_reset(schway *inst)
     schway__cop0_reset(inst);
 }
 
-void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
+uint64_t schway__cpu_state_io(struct schway__state_io *io, schway *inst)
 {
     struct schway__cpu *c = &inst->cpu;
     schway__state_u32_array(io, name_r, c->r, 32u, 0u, UINT32_MAX);
@@ -74,7 +74,7 @@ void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u32(io, name_exc_code, &c->exc_code, 0u, 31u);
     (void)schway__state_u32(io, name_exc_repeat, &c->exc_repeat, 0u, UINT32_MAX);
     (void)schway__state_u64(io, name_muldiv_ready, &c->muldiv_ready, 0u, UINT64_MAX);
-    (void)schway__state_u64(io, name_cycle, &c->cycle, 0u, UINT64_MAX);
+    uint64_t cycle = schway__state_u64(io, name_cycle, &c->cycle, 0u, UINT64_MAX);
     (void)schway__state_u32(io, name_wq_count, &c->wq_count, 0u, SCHWAY__WQ_DEPTH);
     (void)schway__state_u32(io, name_irq_stamp, &c->irq_stamp, 0u, SCHWAY__IRQ_LATENCY_EDGE);
     schway__state_u32_array(io, name_icache_tag, c->icache_tag, SCHWAY__ICACHE_LINES, 0u,
@@ -82,6 +82,7 @@ void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u32_array(io, name_icache_word, &c->icache_word[0][0], 4u * SCHWAY__ICACHE_LINES,
                             0u, UINT32_MAX);
     schway__state_u8_array(io, name_icache_valid, c->icache_valid, SCHWAY__ICACHE_LINES, 0u, 15u);
+    return cycle;
 }
 
 /* The instruction cache (PSX-SYSTEM section 2, I-cache; psx-spx Memory Map,

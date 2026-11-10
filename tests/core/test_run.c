@@ -11,7 +11,7 @@
 #include "state.h"
 #include "../check.h"
 
-#define MAX_FIELDS 64u
+#define MAX_FIELDS 128u
 #define H_BODY_CRC 16u
 
 static void *test_alloc(void *user, size_t size)

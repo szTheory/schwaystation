@@ -12,7 +12,7 @@
 #include "state.h"
 #include "../check.h"
 
-#define MAX_FIELDS 64u
+#define MAX_FIELDS 128u
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
@@ -393,6 +393,20 @@ static void test_record_sweep(void)
        instance.tick_acc; gpu.vram takes every halfword. */
     CHECK(swept_body >= 5u);
     CHECK(swept_header >= 8u);
+    /* A stamp ahead of a clock is refused at its recorded maximum, so each
+       such field must record one below the type's: the probe above then
+       reached the bound and refused the stamp one past it. */
+    static const char *const stamps[] = {"gte.ready"};
+    for (size_t k = 0; k < sizeof stamps / sizeof stamps[0]; k++) {
+        int found = 0;
+        for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
+            if (strcmp(fields[i].name, stamps[k]) == 0) {
+                found = 1;
+                CHECK(fields[i].max < UINT64_MAX);
+            }
+        }
+        CHECK(found);
+    }
     /* The accumulator's remainder is below the frame denominator, 715,909
        cycles for NTSC (ARCHITECTURE section 1), so a remainder equal to it
        is refused whatever bound the record reports. */
@@ -514,8 +528,8 @@ static void test_cpu_fields(void)
     memset(&v, 0, sizeof v);
     v.size = (uint32_t)sizeof v;
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(v.state_format, 2u);
-    CHECK_EQ_U64(v.behaviour_revision, 2u);
+    CHECK_EQ_U64(v.state_format, 3u);
+    CHECK_EQ_U64(v.behaviour_revision, 3u);
 
     schway *inst = make(SCHWAY_REGION_NTSC_U);
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);

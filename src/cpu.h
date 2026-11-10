@@ -216,8 +216,9 @@ void schway__cop0_rfe(schway *inst);
    the missed word, with the line untouched (PSX-SYSTEM section 2, I-cache). */
 uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, uint32_t *cycles);
 
-/* The cpu and cop0 fields of the state walk (state.h). */
-void schway__cpu_state_io(struct schway__state_io *io, schway *inst);
+/* The cpu and cop0 fields of the state walk (state.h). Returns the value the
+   walk read for cycle, which the next module's bounds depend on. */
+uint64_t schway__cpu_state_io(struct schway__state_io *io, schway *inst);
 
 /* Runs the CPU for the program loaded as a PS-EXE: blocks of instructions
    until the cycle limit or the current frame's end is reached, at an
