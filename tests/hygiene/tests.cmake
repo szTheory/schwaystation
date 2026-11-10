@@ -22,6 +22,28 @@ schway_add_test(NAME policy.gate_budget.self_test
     -P ${hygiene_scripts}/expect_fail.cmake
   LABELS hygiene policy TIMEOUT 30)
 
+# Fault prevented: a committed third-party binary or table whose notice does
+# not name it, or a notice naming a path that does not exist. The self test's
+# fixture holds a one-row manifest whose path is on no Applies-to line and a
+# notices file that names a missing path; both must be named.
+schway_add_test(NAME policy.notices
+  COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}
+    -DMANIFEST=${CMAKE_SOURCE_DIR}/tests/fixtures/manifest.txt
+    -DNOTICES=${CMAKE_SOURCE_DIR}/THIRD-PARTY-NOTICES.md -P ${hygiene_scripts}/notices.cmake
+  LABELS hygiene policy TIMEOUT 30)
+set(hygiene_notices ${CMAKE_BINARY_DIR}/hygiene/notices_fixture)
+file(REMOVE_RECURSE ${hygiene_notices})
+file(WRITE ${hygiene_notices}/manifest.txt "# fixture\nstray/unlisted.bin\tsource\tpin\tMIT\tdigest\tNOTICES.md\n")
+file(WRITE ${hygiene_notices}/NOTICES.md "## Fixture\n\n- **Applies to:** `gone/missing.txt`\n")
+set(hygiene_cmd ${CMAKE_COMMAND} -DROOT=${hygiene_notices} -DMANIFEST=${hygiene_notices}/manifest.txt
+  -DNOTICES=${hygiene_notices}/NOTICES.md -P ${hygiene_scripts}/notices.cmake)
+string(REPLACE ";" "$<SEMICOLON>" hygiene_cmd "${hygiene_cmd}")
+schway_add_test(NAME policy.notices.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${hygiene_cmd}" -DCODE=1
+    "-DREGEX=gone/missing\\.txt, which does not exist.*stray/unlisted\\.bin has a notice in the manifest"
+    -P ${hygiene_scripts}/expect_fail.cmake
+  LABELS hygiene policy TIMEOUT 30)
+
 # Fault prevented: a personal path or address, an unlisted binary, a game
 # image or GPL text in any file git would track, ignored build output aside.
 schway_add_test(NAME hygiene.tree

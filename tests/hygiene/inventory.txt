@@ -17,6 +17,8 @@ policy.e2e_budget	hygiene,policy
 policy.e2e_budget.self_test	hygiene,policy
 policy.gate_budget	hygiene,policy
 policy.gate_budget.self_test	hygiene,policy
+policy.notices	hygiene,policy
+policy.notices.self_test	hygiene,policy
 policy.publish_ref	hygiene,policy
 policy.publish_set	hygiene,policy
 policy.publish_set.self_test	hygiene,policy

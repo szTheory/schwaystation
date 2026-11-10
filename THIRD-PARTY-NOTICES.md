@@ -66,3 +66,38 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## ps1-tests GTE cases
+
+- **Applies to:** `tests/vectors/gte/ps1tests-1150.bin` and `tests/fixtures/src/gte_cases.inc`
+- **Upstream:** https://github.com/JaCzekanski/ps1-tests, the file `gte/test-all/tests.c` at commit
+  `f727802fead11f1daa7549285548392ef87749cb`. The repository's `LICENSE` is MIT.
+- **SHA-256:** `e8a0e61a57a6582ac53d39b941eeaa83b87498444a3ada915d9de73d313dd9c2` (the `.bin`; the include's digest is in `tests/fixtures/manifest.txt`)
+- **Changes:** transcoded by `tools/gte2bin.py`; values unchanged. The `.bin` holds all 1,150 cases, the
+  include 26 of them, copied verbatim; case names are dropped and case N is the upstream "test N".
+- **Provenance:** hardware-captured per upstream, not verified here.
+- **Licence:** MIT
+
+```
+MIT License
+
+Copyright (c) 2020 Jakub Czekański
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

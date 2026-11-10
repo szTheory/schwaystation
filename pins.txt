@@ -79,3 +79,8 @@ r3000-SWR 51e227447d0b 8a403380357b5d3ee55ac59ee7d80903b0583f91 461292
 r3000-SYSCALL 51e227447d0b 21298b17fd6f20c86c78749f6527b107ab013270 431004
 r3000-XOR 51e227447d0b c1bd7bac1798cb8e461fb402142cb35343af539e 431004
 r3000-XORI 51e227447d0b 7e85caa885f0a0975e6713f13f0ca3853dad931d 431004
+
+# ps1-tests GTE cases at f727802fead1: one row in the same blob format (name pin blob-sha1 size). Fetch it with
+# `gh api repos/JaCzekanski/ps1-tests/git/blobs/<sha> -H "Accept: application/vnd.github.raw"`, check it with
+# `git hash-object`, never commit it; tools/gte2bin.py reads it. The ps1-tests executables stay fetch-only.
+ps1tests-gte-test-all f727802fead1 a03aa72173f122bf916039f438c8cde89e61e526 3874318
