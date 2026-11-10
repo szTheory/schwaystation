@@ -1,8 +1,8 @@
 # GPU
 
 The GPU stores a 1024 by 512 array of native RGB555 words. GP0 packets update that array immediately; texture reads and
-VRAM readback therefore share one source of truth. This page describes the implemented rectangle and flat polygon pixel
-paths. Gouraud and textured polygons, lines, and beam behavior are added by the plans that first implement those paths.
+VRAM readback therefore share one source of truth. This page describes the implemented rectangle and polygon pixel
+paths. Lines and beam behavior are described by their own hardware sections as those paths are implemented.
 
 ## Textured rectangles
 
@@ -47,21 +47,35 @@ the model but do not prove the GPU's internal blend width. The local known-answe
 saturation, subtraction, all sixteen dither positions, the limits, raw texture, STP gating, E6 masks, palette wrapping,
 and the raw semi-transparent dither exception.
 
-## Flat polygons
+## Polygons
 
-Flat untextured GP0 triangles and quads use signed 11-bit vertices with the signed E5 draw offset added before clipping.
-E3/E4 edges are inclusive; an inverted draw area produces no pixels. The renderer rejects the whole polygon when its
-offset-applied vertex span exceeds 1023 horizontally or 511 vertically, before clipping to VRAM.
+GP0 supports flat and Gouraud colors, textured and untextured pixels, raw and modulated texture, and semi-transparency.
+Coordinates are signed 11-bit values with the signed E5 draw offset added before clipping. E3/E4 edges are inclusive;
+an inverted draw area produces no pixels. The renderer rejects the whole polygon when its offset-applied vertex span
+exceeds 1023 horizontally or 511 vertically, before clipping to VRAM. A textured polygon takes its CLUT from the first
+vertex's UV word and updates only E1/GPUSTAT texture-page bits 0 through 8 from the second vertex's UV word.
 
 Triangles use widened integer edge equations sampled at pixel centers. Winding is normalized without culling, zero-area
 triangles draw nothing, and the top and left edges own samples exactly on an edge. Quads draw as triangles (1,2,3) then
 (2,3,4); this gives the shared diagonal to one triangle so immediate pixel writes neither leave a crack nor blend a
-shared pixel twice. Covered pixels use the pixel pipeline above; flat untextured polygons are not dithered. Other polygon
-attributes are not implemented by this renderer yet.
+shared pixel twice. Each triangle interpolates its vertex colors and UV coordinates over the original geometry, before
+draw-area clipping. Flat polygons reuse one color at all vertices; textured polygons use affine UV interpolation, and
+the pixel pipeline above handles raw/modulated color, dithering, transparency, and write masks.
+
+Color and UV planes use signed 16.16 steps. Setup products and division use 64-bit intermediates; step slopes are
+rounded to the nearest 16.16 value with ties away from zero, and each interpolated eight-bit channel or UV coordinate
+is truncated to an integer before pixel processing. The stored horizontal and vertical steps are 32-bit. When an
+extreme slope cannot fit that representation, the covered pixel is evaluated from the original vertices with the same
+widened integer plane arithmetic. This keeps hostile narrow triangles defined without changing the stored-step model.
+These precision and rounding choices are a deterministic core model: the GPU specification does not define its
+interpolation precision, and no hardware-precision measurement is claimed here. Gouraud or modulated polygon pixels
+are dither-eligible; flat untextured polygons are not. Raw textured semi-transparent polygons do not acquire dither.
 
 These rules follow the PlayStation GPU command and raster descriptions in [PSX-SPX](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/)
 and the source notes in `.planning/preparation/PSX-GPU-AND-GTE.md`, sections 2.2, 2.3, and 3.6. Known-answer tests pin both
-sides of each span limit, edge ownership, clipping, signed offsets, and hostile coordinates.
+sides of each span limit, edge ownership, clipping, signed offsets, Gouraud/UV values, page/CLUT effects, polygon flags,
+negative gradients, and narrow hostile slopes. They also check clipping invariance and state-split determinism. The
+directed interpolation tests pin the core model; they do not claim to calibrate GPU arithmetic precision against hardware.
 
 ## Source
 

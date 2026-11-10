@@ -77,7 +77,11 @@ schway_add_test(NAME gpu.triangle.flat_packet
 
 # Fault prevented: flat and Gouraud textured packets lose their independently tabulated affine
 # color/UV values or fail to update the texture page from vertex two.
-foreach(case IN ITEMS gouraud_textured texture_page_clut clip_interpolation)
+# Fault prevented: polygon flags, signed/edge UV gradients, quad interpolation, or split-state
+# replay changes visible VRAM or escapes the bounded fixed-point coordinate range.
+foreach(case IN ITEMS gouraud_textured texture_page_clut clip_interpolation flag_matrix
+                      equal_gouraud uv_negative_wrap quad_attributes split_state hostile_slope
+                      channel_midpoint)
   schway_add_test(NAME gpu.triangle.${case}
     COMMAND schwaystation-test-gpu-interpolation ${case}
     LABELS gpu portable TIMEOUT 10)
