@@ -364,6 +364,27 @@ static void syscall_epc(void)
     CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
     CHECK_EQ_HEX(inst->cpu.pc, CODE + 4u);
     schway_destroy(inst);
+
+    /* Returning to EPC is not progress. Keep exercising the actual handler
+       path and retain the bounded-loop fault at the existing threshold. */
+    inst = make();
+    inst->cpu.pc = CODE;
+    put(inst, CODE, SYSCALL_WORD);
+    put(inst, VECTOR_RAM, MFC0_WORD(1u, SCHWAY__COP0_EPC));
+    put(inst, VECTOR_RAM + 4u, NOP_WORD);
+    put(inst, VECTOR_RAM + 8u, JR_WORD(1u));
+    put(inst, VECTOR_RAM + 12u, RFE_WORD);
+    for (uint32_t i = 0u; i < SCHWAY__EXC_LOOP_LIMIT; i++) {
+        next(inst); /* SYSCALL */
+        next(inst); /* MFC0 EPC */
+        next(inst); /* MFC0 delay slot */
+        next(inst); /* JR EPC */
+        next(inst); /* RFE in the return delay slot */
+    }
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_EXCEPTION_LOOP);
+    CHECK_EQ_U64(inst->fault.note, SCHWAY__EXC_LOOP_LIMIT);
+    CHECK_EQ_HEX(inst->cpu.pc, CODE);
+    schway_destroy(inst);
 }
 
 /* Fault prevented: a SYSCALL in a delay slot whose EPC names the slot, so the
