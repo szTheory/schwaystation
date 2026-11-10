@@ -1,6 +1,8 @@
 ---
 title: "Make the dev preset's abi.undefined pass on macOS Debug"
-status: pending
+status: completed
+completed: 2026-11-09
+closed_by: "02-02"
 priority: P2
 source: "phase 01, plan 01-15"
 created: 2026-10-20
@@ -21,3 +23,7 @@ theme: abi
 
 - `cmake --workflow --preset dev` exits 0 on macOS.
 - `abi.undefined.self_test` still fails its fixture.
+
+## Completion
+
+Completed by plan 02-02. The core options carry -D_FORTIFY_SOURCE=0, so the dev preset passes abi.undefined on macOS and abi.undefined.self_test still fails its fixture. Plan 02-27 moved this file from pending to completed.

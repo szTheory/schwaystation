@@ -1,6 +1,8 @@
 ---
 title: "Port the public names check (docs.api_names)"
-status: pending
+status: completed
+completed: 2026-11-09
+closed_by: "02-11"
 priority: P2
 source: "phase 01, plan 01-15 (a seed gate deferred under D-25 and AGENTS rule 7)"
 created: 2026-10-20
@@ -22,3 +24,7 @@ theme: docs
 - The check or file lands in phase 2, in the plan named above, with a test that `cmake --workflow --preset ci` or `cmake --workflow --preset hygiene` runs.
 - Port it from the seed with its notice kept as PROVENANCE.md describes, trimmed to a usage line and a "Fault prevented" line, with a `<name>.self_test` negative control through `expect_fail.cmake`, inside the phase's `policy.gate_budget`.
 - It names the fault it prevents, and no planning ID appears in the code it adds.
+
+## Completion
+
+Completed by plan 02-11. tests/cmake/api_names.cmake registers docs.api_names with its self test. Plan 02-27 moved this file from pending to completed.

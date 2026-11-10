@@ -1,6 +1,8 @@
 ---
 title: "Add the rehearsal and cleanup rows to the CI table in docs/testing.md"
-status: pending
+status: completed
+completed: 2026-11-09
+closed_by: "02-03"
 priority: P2
 source: "phase 01, plan 01-15"
 created: 2026-10-20
@@ -19,3 +21,7 @@ The CI job table in `docs/testing.md` names every job in `ci.yml`, including `re
 ## Acceptance Criteria
 
 - `grep -c '^| `rehearsal`' docs/testing.md` and `grep -c '^| `cleanup`' docs/testing.md` each print at least 1.
+
+## Completion
+
+Completed by plan 02-03. docs/testing.md names the rehearsal and cleanup jobs in its CI table. Plan 02-27 moved this file from pending to completed.
