@@ -1,2 +1,13 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+dma.dicr.irq_edge	dma,portable
+dma.dicr.reads	dma,portable
+dma.dpcr.enable	dma,portable
+dma.dpcr.priority	dma,portable
+dma.dpcr.reset	dma,portable
+dma.engine.step_contract	dma,portable
+dma.otc.bcr_zero	dma,portable
 dma.otc.clear	dma,portable
+dma.otc.ignores_bits	dma,portable
+dma.otc.madr_wrap	dma,portable
+dma.otc.needs_trigger	dma,portable
+dma.otc.readback	dma,portable
