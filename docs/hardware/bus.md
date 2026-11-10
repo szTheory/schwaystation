@@ -191,6 +191,16 @@ the one address bits 11:4 name and the word bits 3:2 (psx-spx CPU Specifications
 - The sources add that, with TAG clear, an isolated access reaches the scratchpad instead. The model does not do that:
   every isolated access goes to the instruction-cache arrays.
 
+## Partial stores
+
+`SWL` and `SWR` update the byte lanes their instruction names (psx-spx CPU
+Specifications, `SWL` and `SWR`). This core emits those lanes as the largest
+aligned 4-, 2- or 1-byte chunks, in increasing address order. Each chunk is a
+separate bus write and a separate write-queue entry. An uncached partial store
+therefore drains any queued write before each chunk, as for any KSEG1 access.
+The hardware documents the byte result but not the bus transaction widths; the
+chunk decomposition is the core's model, pinned by `bus.ram_word`.
+
 ## Write queue
 
 The CPU can hold 4 stores in flight, and a fifth waits until one has gone (psx-spx CPU Specifications, Cache isolation, write

@@ -96,6 +96,12 @@ exception rules are in [cop0.md](cop0.md)).
 
 ## Instruction fetch
 
+With SR.KUc set, the CPU can fetch only from KUSEG. A fetch from KSEG0, KSEG1,
+KSEG2 or the BIOS window raises AdEL with BadVaddr equal to the program counter
+before reaching the bus. The exception is guest-visible and may be handled;
+it is not recorded as a first fault (psx-spx CPU Specifications, Privilege
+levels; docs/hardware/cop0.md, Address errors on the fetch).
+
 Each instruction is fetched at the program counter before it is decoded. A program counter that is not a multiple of 4 is
 an address error on the fetch (see Branches and jumps). Otherwise the fetch goes one of three ways, by segment
 (psx-spx CPU Specifications, Segments and I-cache):

@@ -683,8 +683,14 @@ static uint32_t cpu_step(schway *inst)
     uint32_t cycles = 1u;
     uint32_t pc = c->pc;
     uint32_t misaligned = (pc & 3u) != 0u ? 1u : 0u;
+    uint32_t user_fetch = (c->cop0.r[SCHWAY__COP0_SR] & SCHWAY__SR_KUC) != 0u &&
+                                  (pc & 0x80000000u) != 0u
+                              ? 1u
+                              : 0u;
     uint32_t fetch_err = 0u;
-    uint32_t op = misaligned != 0u ? 0u : cpu_fetch(inst, pc, &cycles, &fetch_err);
+    uint32_t op = misaligned != 0u || user_fetch != 0u
+                      ? 0u
+                      : cpu_fetch(inst, pc, &cycles, &fetch_err);
     uint32_t next = c->branch_take != 0u ? c->branch_target : pc + 4u;
     uint32_t rs_n = (op >> 21) & 31u;
     uint32_t rt_n = (op >> 16) & 31u;
@@ -712,6 +718,10 @@ static uint32_t cpu_step(schway *inst)
         schway__fault_latch(inst, SCHWAY__FAULT_MISALIGNED_FETCH, SCHWAY__DEV_NONE, 4u, pc, 0u,
                             pc);
         trapped = cpu_exception(inst, pc, SCHWAY__EXC_ADEL, 0u, 1u, pc);
+    } else if (user_fetch != 0u) {
+        /* User mode can fetch only from KUSEG. Reuse the data-path privilege
+           check so this is a guest AdEL rather than a host first fault. */
+        trapped = cpu_data_check(inst, pc, 0u, pc, 4u, 0u);
     } else if (fetch_err != 0u) {
         /* A bus error on the fetch is IBE with no BadVaddr
            (docs/hardware/cop0.md, Address errors on the fetch). At an exception vector it cannot be
