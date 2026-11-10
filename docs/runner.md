@@ -14,7 +14,7 @@ This release loads no BIOS and no disc. Without `--exe` every run shows the buil
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
-                  [--trace first-fault] [--no-stop-on-fault] [--hash]
+                  [--trace first-fault] [--no-stop-on-fault] [--hash] [--hash-state]
 schwaystation-run --probe FILE
 schwaystation-run --help | --version
 ```
@@ -31,6 +31,7 @@ schwaystation-run --help | --version
 | `--trace first-fault` | After a [fault](#diagnostics) or a hang, print the last 4096 trace records as twelve-field lines. Needs `--exe`. Give it once. |
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
+| `--hash-state` | After the last frame and every other line, print the SHA-256 of the saved [machine state](#frame-hash). |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print what the PS-EXE file is, as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
 | `--region NAME` | `ntsc-u` (the default), `ntsc-j` or `pal`: the console's region and its video timing. |
@@ -229,6 +230,16 @@ words, each stored low byte first: field, interlaced, vres, hres, dot_div, regio
 enabled, rgb24 and bpp. The pixels follow as the displayed rows from top to bottom, each pixel a 16-bit word
 stored low byte first, with no padding between rows. The hash is therefore the same on little-endian and
 big-endian hosts. The card changes every frame, so the frame number matters.
+
+Until a GPU draws, every frame is the test card whatever the CPU, the GTE, DMA or the timers did, so the frame hash
+cannot show them. `--hash-state` prints one more line, after every other line the run prints:
+
+```text
+state sha256 9c6fd5660fd9bb9fb3d50604a8c43827f9833d81db21ab3b024a0da754e5d8a6
+```
+
+It is the SHA-256 of the state `schway_save_state` writes, without its 20-byte header, so it covers every register
+and counter the instance keeps. A state is the same bytes on every platform. A save that fails exits 1.
 
 ## PNG output
 
