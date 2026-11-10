@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-11-10T20:57:54.648Z"
+stopped_at: Completed 04-07-PLAN.md
+last_updated: "2026-11-10T21:35:57.948Z"
 last_activity: 2026-11-10
-last_activity_desc: Phase 04 plan 04-04 completed
-state_head: 600155a9fd691acbba72c20e04a158a0a504372f
+last_activity_desc: Phase 04 plan 04-07 completed
+state_head: adc060b38e72556ebc3a02a92eddd1238c0868f1
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 74
+  completed_plans: 75
   percent: 50
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 7 of 32
+Plan: 8 of 32
 Status: Ready to execute
-Last activity: 2026-11-10 — Phase 04 plan 04-05 completed
+Last activity: 2026-11-10 — Phase 04 plan 04-07 completed
 
 Progress: [█████░░░░░] 50%
 
@@ -134,6 +134,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P04 | 34min | 2 tasks | 6 files |
 | Phase 04 P05 | 39min | 2 tasks | 9 files |
 | Phase 04 P06 | 20min | 2 tasks | 8 files |
+| Phase 04 P07 | 24min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -284,6 +285,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Use 64-bit integer area and edge setup, normalize winding, and assign exact-edge samples with a top-left rule.
 - [Phase 04]: Reject offset-applied spans above 1023 by 511 before clipping; retain inclusive E3/E4 edges.
 - [Phase 04]: Split quads into triangles (1,2,3) then (2,3,4) and write each covered pixel immediately through the shared helper.
+- [Phase 04]: Store Gouraud and UV attributes as signed 32-bit 16.16 steps, using wider setup and wide evaluation when a step is unrepresentable.
+- [Phase 04]: Treat 16.16 rounding as the deterministic model; hardware precision awaits plan 30 pinned capture comparison.
+- [Phase 04]: Advance attributes from original geometry when clipping polygon spans.
 
 ### Pending Todos
 
@@ -362,10 +366,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-06 | Codex, OpenGSD 1.20.0; sequential executor, flat polygon implementation, local CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-07 | Codex, OpenGSD 1.20.0; sequential executor, polygon interpolation tests, local CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-10T20:57:54.462Z
-Stopped at: Completed 04-06-PLAN.md
+Last session: 2026-11-10T21:35:57.683Z
+Stopped at: Completed 04-07-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
