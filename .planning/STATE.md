@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-16-PLAN.md
-last_updated: "2026-11-10T07:36:24.640Z"
+stopped_at: Completed 03-24-PLAN.md
+last_updated: "2026-11-10T07:43:27.675Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 75dff473dac17cea37dd924fd2804863ff4e3bf1
+state_head: 1793099825a675d0f47a2766370281c5bdc26811
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 59
+  completed_plans: 60
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 18 of 26
+Plan: 19 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -118,6 +118,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P14 | 13 min | 3 tasks | 5 files |
 | Phase 03 P15 | 16 min | 2 tasks | 15 files |
 | Phase 03 P16 | 5 min | 2 tasks | 5 files |
+| Phase 03 P24 | 6 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -243,6 +244,7 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-14: the 1000h-node guard is a gap that reaches past the step's tick, nodes_done wraps and is bounded only by the u32 range, and the CHCR word 0 stops a channel with no flag and no interrupt (the chain-looping test procedure); chopping windows cost ceil(17 * dw / 16) + 6 with a CPU window of min(2^m, 32 * dw), mean signed error 1.0 percent and largest row error 10.4 percent against the 64 hardware rows
 - [Phase 03]: 03-15: sync mode 3 on a non-OTC channel with the start bit does not start and latches SCHWAY_FAULT_DMA (10, API version 3); start bits dropped, other CHCR bits kept
 - [Phase 03]: 03-16: dma_chain records a list outcome as one value (bit 0 finished and bit 1 the DICR flag), the OTC time of 4,096 words reads 4,362 clocks through Timer 2 against the doc range 4,340..4,400, and no citation carries a comma or a semicolon because the judge splits rows with a CMake list
+- [Phase 03]: 03-24: the split case compares run_to targets, not run lengths, because a run with a program stops on the first instruction boundary at or after its budget; the program-loaded runs are made in NTSC-U and PAL and the multi-million-cycle ones in NTSC-U alone (2.2 s native)
 
 ### Pending Todos
 
@@ -300,8 +302,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T07:36:24.509Z
-Stopped at: Completed 03-16-PLAN.md
+Last session: 2026-11-10T07:43:27.564Z
+Stopped at: Completed 03-24-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
