@@ -3,13 +3,16 @@ abi
 bus
 core
 cpu
+dma
 exe
 fixtures
 fuzz
+gte
 install
 libretro
 perf
 policy
 release
 runner
+timers
 vectors

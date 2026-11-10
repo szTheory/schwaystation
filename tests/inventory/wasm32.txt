@@ -4,12 +4,15 @@ abi
 bus
 core
 cpu
+dma
 exe
 fixtures
 fuzz
+gte
 install
 perf
 policy
 release
 runner
+timers
 vectors
