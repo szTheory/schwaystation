@@ -65,6 +65,26 @@ static void cpu_code(schway *inst, uint32_t index, uint32_t word)
     CHECK_EQ_U64(schway__bus_ram_word(inst, addr, &word, 1u), 0u);
 }
 
+static void cache_later_word_failure(void)
+{
+    schway *inst = make();
+    const uint32_t addr = 0x9F801070u; /* I_STAT, then I_MASK, then an I/O gap. */
+    const uint32_t p = addr & 0x1FFFFFFFu;
+    const uint32_t line = (p >> 4) & 0xFFu;
+    const uint32_t tag = p >> 12;
+    const uint32_t old_word = 0xA55A3CC3u;
+    uint32_t word = 0u;
+    uint32_t cycles = 0u;
+    inst->cpu.icache_tag[line] = tag;
+    inst->cpu.icache_valid[line] = 1u << 2;
+    inst->cpu.icache_word[line][2] = old_word;
+    CHECK_EQ_U64(schway__cpu_icache_fetch(inst, addr, &word, &cycles), 0u);
+    CHECK_EQ_U64(inst->cpu.icache_valid[line] & (1u << 2), 0u);
+    CHECK_EQ_HEX(inst->cpu.icache_word[line][2], old_word);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    drop(inst);
+}
+
 static uint32_t store_part_expected(uint32_t original, uint32_t value, uint32_t left,
                                     uint32_t offset)
 {
@@ -746,6 +766,7 @@ static void ram_word(void)
             code_index += 2u;
         }
     }
+    cache_later_word_failure();
     drop(inst);
 }
 

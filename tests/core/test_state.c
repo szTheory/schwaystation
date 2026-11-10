@@ -248,6 +248,37 @@ static void test_rejects(void)
         }
     }
 
+    /* The architectural zero register and COP0's stored/derived bits cannot
+       be chosen by a state file, even when its checksum is valid. */
+    uint32_t cpu_r_at = 0u;
+    uint32_t cop0_at = 0u;
+    for (size_t i = 0u; i < nf && i < MAX_FIELDS; i++) {
+        if (strcmp(fields[i].name, "cpu.r") == 0) {
+            cpu_r_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "cop0.r") == 0) {
+            cop0_at = fields[i].offset;
+        }
+    }
+    CHECK(cpu_r_at >= SCHWAY__STATE_HEADER_SIZE);
+    CHECK(cop0_at >= SCHWAY__STATE_HEADER_SIZE);
+    if (cpu_r_at >= SCHWAY__STATE_HEADER_SIZE && cop0_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + cpu_r_at, 1u, 4u);
+        reseal(bad, n);
+        expect_refused("cpu.r0", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+
+        memcpy(bad, good, n);
+        put_le(bad + cop0_at + 12u * 4u, 0x00400040u, 4u);
+        reseal(bad, n);
+        expect_refused("cop0.SR reserved bit", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+
+        memcpy(bad, good, n);
+        put_le(bad + cop0_at + 13u * 4u, 0x00000400u, 4u);
+        reseal(bad, n);
+        expect_refused("cop0.CAUSE interrupt mismatch", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+
     size_t m = schway_state_size(target);
     CHECK_EQ_U64(schway_save_state(target, after, m - 1u), SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL);
     CHECK_EQ_U64(schway_save_state(target, after, 0u), SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL);
