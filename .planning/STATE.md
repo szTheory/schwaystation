@@ -2,14 +2,14 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 02
-current_phase_name: The CPU matches the public vectors
-status: verifying
-stopped_at: Completed 02-27-PLAN.md; phase 2 has all 27 plans executed, next is verification
-last_updated: "2026-11-10T00:43:02.579Z"
+current_phase: 3
+current_phase_name: The GTE matches the hardware cases; DMA and timers
+status: planning
+stopped_at: Phase 02 complete, ready to plan Phase 3
+last_updated: "2026-11-10T00:56:03.348Z"
 last_activity: 2026-11-10
-last_activity_desc: Completed 02-27 (CI run 42729199629 and nightly dispatch 42728718880 green on the branch head, measured timeouts with this phase's run IDs, local ci workflow 8 s, probe PR #7 closed unmerged, todos 007, 008, 019, 020 and 023 moved to completed); all 27 plans of phase 2 are executed
-state_head: 5a5a7c738562432b05c5f112cd1f89e57d941267
+last_activity_desc: Phase 02 complete, transitioned to Phase 3
+state_head: cb6e0fa94f8badec9e935db113af36dd6b42e84e
 progress:
   total_phases: 6
   completed_phases: 1
@@ -29,17 +29,17 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 ## Current Position
 
-Phase: 02 (The CPU matches the public vectors) — EXECUTING
-Plan: 27 of 27
-Status: Phase complete — ready for verification
-Last activity: 2026-11-10 — Completed 02-27: the branch head is green on every hosted lane (CI run 42729199629, nightly dispatch 42728718880), the grown jobs carry measured timeouts, the local ci workflow takes 8 s for ship, probe PR #7 is closed unmerged and five todos moved to completed (02-27-SUMMARY.md); phase 2 is ready for verification
+Phase: 3 — The GTE matches the hardware cases; DMA and timers
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-09 — Phase 02 complete, transitioned to Phase 3
 
 Progress: [██░░░░░░░░] 17%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 42
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -48,6 +48,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 15 | - | - |
+| 02 | 27 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -252,7 +253,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-10T00:43:02.494Z
-Stopped at: Completed 02-27-PLAN.md; phase 2 has all 27 plans executed, next is verification
+Stopped at: Phase 02 complete, ready to plan Phase 3
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/4
