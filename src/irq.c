@@ -33,12 +33,15 @@ void schway__irq_raise(schway *inst, uint32_t bit)
 }
 
 /* A write to I_STAT or I_MASK ends the block, so a line it raises is seen
-   before another instruction runs. */
+   before another instruction runs. An I_STAT write is an acknowledgement, which
+   moves the next moment a root counter has an interrupt edge to raise, so the
+   deadline is recomputed. */
 void schway__irq_write_stat(schway *inst, uint32_t lane, uint32_t mask)
 {
     inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
     inst->irq.stat &= (lane | ~mask) & SCHWAY__IRQ_BITS;
     irq_sync(inst);
+    schway__sched_recalc(inst);
 }
 
 void schway__irq_write_mask(schway *inst, uint32_t lane, uint32_t mask)

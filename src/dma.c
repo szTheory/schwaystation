@@ -1,5 +1,6 @@
 /* DMA: power-on values, the state walk and the register window. The engine
-   itself is not built yet: the registers still count as an unbuilt device. */
+   itself is not built yet: the registers are owned by this module and read 0
+   until it is. */
 #include <string.h>
 
 #include "state.h"
@@ -68,12 +69,15 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     schway__state_u32_array(io, name_crc, d->crc, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
 }
 
-/* The registers read 0 and drop writes, counted as an unbuilt device. */
+/* The registers read 0 and drop writes; the access is owned, so it is neither
+   counted as unbuilt nor a fault. */
 void schway__dma_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint32_t *value,
                     uint32_t *cycles)
 {
+    (void)inst;
+    (void)p;
+    (void)width;
     (void)cycles;
-    schway__bus_unbuilt(inst, SCHWAY__DEV_DMA, p, width, wr, wr != 0u ? *value : 0u);
     if (wr == 0u) {
         *value = 0u;
     }

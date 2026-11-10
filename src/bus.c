@@ -454,6 +454,12 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
         if (wr == 0u) {
+            /* The root counters count lazily, so an I_STAT read first brings
+               them up to the tick of this access: an interrupt edge due by then
+               is in the register the program reads. */
+            if ((p & 4u) == 0u) {
+                schway__timers_sync(inst, schway__sched_now(inst, *cycles));
+            }
             *value = reg_get((p & 4u) != 0u ? inst->irq.mask : inst->irq.stat, p, width);
         } else if ((p & 4u) != 0u) {
             schway__irq_write_mask(inst, v << lane_shift(p), lane_mask(width) << lane_shift(p));
@@ -583,7 +589,17 @@ static int bus_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t width
         return 0;
     }
     uint32_t p = addr & 0x1FFFFFFFu;
-    switch (classify(p)) {
+    uint32_t cls = classify(p);
+    /* A read or an instruction-fetch miss that reaches RAM, the I/O page, an
+       expansion region or the BIOS waits for a running DMA unit, so the engine
+       is told first, at the tick of this access. A store does not tell it: it
+       goes into the 4-deep write queue and only the fifth queued store waits,
+       which the CPU's queue push reports. The scratchpad, the cache-control
+       word and a gap are not bus accesses that wait. */
+    if (kind != K_WRITE && cls != CLS_SCRATCH && cls != CLS_GAP) {
+        schway__dma_bus_access(inst, schway__sched_now(inst, *cycles));
+    }
+    switch (cls) {
     case CLS_RAM:
         return ram_access(inst, kind, addr, p, width, value, cycles);
     case CLS_SCRATCH: {
@@ -616,7 +632,7 @@ static int bus_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t width
     case CLS_EXP3: {
         /* Reads and fetches find nothing and are bus errors; a write is
            dropped (PSX-SYSTEM section 3, Memory map). */
-        uint32_t dev = classify(p) == CLS_EXP1 ? SCHWAY__DEV_EXP1 : SCHWAY__DEV_EXP3;
+        uint32_t dev = cls == CLS_EXP1 ? SCHWAY__DEV_EXP1 : SCHWAY__DEV_EXP3;
         if (kind != K_WRITE) {
             return gap(inst, kind, dev, addr, width);
         }
