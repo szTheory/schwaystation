@@ -56,6 +56,13 @@ schway_add_test(NAME gpu.pixel.textured_rectangle_mmio
   COMMAND schwaystation-test-gpu-pixels textured_rectangle_mmio
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: pixel arithmetic, dither eligibility, raw texture, and write masks drift.
+foreach(case IN ITEMS arithmetic palette_wrap)
+  schway_add_test(NAME gpu.pixel.${case}
+    COMMAND schwaystation-test-gpu-pixels ${case}
+    LABELS gpu portable TIMEOUT 10)
+endforeach()
+
 # Fault prevented: transfer dimensions, endian order, wrapping, padding, reset,
 # partial-state resume, and malformed transfer cursors drifting from the bus.
 foreach(case IN ITEMS cache_contract copy_masks copy_order copy_wrap roundtrip dimensions
