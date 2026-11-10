@@ -142,5 +142,5 @@ schway_add_test(NAME gte.unlisted_noop
 # difference between the two models is known to be a difference in the
 # engine or the model, not in the data.
 schway_add_test(NAME gte.ref.vectors
-  COMMAND schwaystation-test-gte ref_vectors ${gte_vectors_bin} --expect 100 --ops reg,01
+  COMMAND schwaystation-test-gte ref_vectors ${gte_vectors_bin} --expect 1150
   LABELS gte portable TIMEOUT 60)

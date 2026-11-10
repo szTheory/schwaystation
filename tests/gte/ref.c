@@ -483,24 +483,503 @@ static void rtp_vertex(struct gte_ref *r, int vi, unsigned shift, int lm, int de
     }
 }
 
+/* sf is bit 19 of the command word: when set the results keep 12 fraction bits
+   less, which is a right shift of 12; lm is bit 10 (psx-spx, GTE Command
+   Encoding). */
+static unsigned sf_shift(uint32_t op)
+{
+    return (op >> 19 & 1u) != 0u ? 12u : 0u;
+}
+
+static int lm_bit(uint32_t op)
+{
+    return (int)(op >> 10 & 1u);
+}
+
+/* The R, G or B byte of RGBC for k = 1 to 3. */
+static int32_t rgbc_part(const struct gte_ref *r, int k)
+{
+    return k == 1 ? r->rgbc_r : (k == 2 ? r->rgbc_g : r->rgbc_b);
+}
+
+/* IR1 to IR3 from MAC1 to MAC3 with the command's lm. */
+static void ir_all(struct gte_ref *r, int lm)
+{
+    for (int k = 1; k <= 3; k++) {
+        ir_from_mac(r, k, lm);
+    }
+}
+
+/* MAC1 to MAC3 from the three accumulators. */
+static void mac_all(struct gte_ref *r, const int64_t acc[4], unsigned shift)
+{
+    for (int k = 1; k <= 3; k++) {
+        mac_set(r, k, acc[k], shift);
+    }
+}
+
+/* The colour FIFO takes MAC1 to MAC3 divided by 16 and saturated to 0 to
+   FFh, with the CODE byte of RGBC; the older entries move down one stage; a
+   saturation sets flags 21 to 19 (psx-spx, GTE Color Calculation Commands,
+   Notes). */
+static void color_push(struct gte_ref *r)
+{
+    int32_t c[3];
+    for (int k = 1; k <= 3; k++) {
+        int64_t q = floor_shr(r->mac[k], 4);
+        if (q < 0) {
+            q = 0;
+            r->flag |= F_COLOR >> (k - 1);
+        } else if (q > 0xFF) {
+            q = 0xFF;
+            r->flag |= F_COLOR >> (k - 1);
+        }
+        c[k - 1] = (int32_t)q;
+    }
+    for (int n = 0; n < 2; n++) {
+        r->rgb_r[n] = r->rgb_r[n + 1];
+        r->rgb_g[n] = r->rgb_g[n + 1];
+        r->rgb_b[n] = r->rgb_b[n + 1];
+        r->rgb_c[n] = r->rgb_c[n + 1];
+    }
+    r->rgb_r[2] = c[0];
+    r->rgb_g[2] = c[1];
+    r->rgb_b[2] = c[2];
+    r->rgb_c[2] = r->rgbc_c;
+}
+
+/* The end of every colour command: the FIFO push, then IR1 to IR3 from the
+   MACs with the command's lm. */
+static void color_finish(struct gte_ref *r, int lm)
+{
+    color_push(r);
+    ir_all(r, lm);
+}
+
+/* MAC + (FC - MAC) * IR0 on the unshifted accumulators (psx-spx, GTE Color
+   Calculation Commands, Details on "MAC+(FC-MAC)*IR0"). The difference is
+   shifted by sf and saturated into IR as if lm were 0, with its flag; the
+   saturated IR times IR0 is added to the accumulator. */
+static void far_blend(struct gte_ref *r, int64_t acc[4], unsigned shift)
+{
+    for (int k = 1; k <= 3; k++) {
+        int64_t d = acc_step(r, k, (int64_t)r->fc[k - 1] * 0x1000 - acc[k]);
+        r->mac[k] = low32(floor_shr(d, shift));
+        ir_from_mac(r, k, 0);
+        acc[k] = acc_step(r, k, (int64_t)r->ir[k] * r->ir[0] + acc[k]);
+    }
+}
+
+/* MAC = (LLM * vector) shifted by sf, then IR = MAC (psx-spx, Details on
+   "(LLM*V0) SAR (sf*12)"). */
+static void light_step(struct gte_ref *r, int vi, unsigned shift, int lm)
+{
+    const int32_t v[3] = {r->vx[vi], r->vy[vi], r->vz[vi]};
+    for (int k = 1; k <= 3; k++) {
+        mac_set(r, k, row_sum(r, k, 0, r->ll[k - 1], v), shift);
+    }
+    ir_all(r, lm);
+}
+
+/* MAC = (BK * 1000h + LCM * IR) shifted by sf, then IR = MAC. */
+static void tint_step(struct gte_ref *r, unsigned shift, int lm)
+{
+    const int32_t v[3] = {r->ir[1], r->ir[2], r->ir[3]};
+    for (int k = 1; k <= 3; k++) {
+        mac_set(r, k, row_sum(r, k, (int64_t)r->bk[k - 1] * 0x1000, r->lc[k - 1], v), shift);
+    }
+    ir_all(r, lm);
+}
+
 static uint32_t op_rtps(struct gte_ref *r, uint32_t op)
 {
-    rtp_vertex(r, 0, (op >> 19 & 1u) != 0u ? 12u : 0u, (int)(op >> 10 & 1u), 1);
+    rtp_vertex(r, 0, sf_shift(op), lm_bit(op), 1);
     return 15u;
+}
+
+static uint32_t op_rtpt(struct gte_ref *r, uint32_t op)
+{
+    for (int vi = 0; vi < 3; vi++) {
+        rtp_vertex(r, vi, sf_shift(op), lm_bit(op), vi == 2);
+    }
+    return 23u;
+}
+
+/* MAC0 = SX0*SY1 + SX1*SY2 + SX2*SY0 - SX0*SY2 - SX1*SY0 - SX2*SY1 (psx-spx,
+   NCLIP). */
+static uint32_t op_nclip(struct gte_ref *r, uint32_t op)
+{
+    (void)op;
+    int64_t s = (int64_t)r->sx[0] * r->sy[1] + (int64_t)r->sx[1] * r->sy[2] + (int64_t)r->sx[2] * r->sy[0] -
+                (int64_t)r->sx[0] * r->sy[2] - (int64_t)r->sx[1] * r->sy[0] - (int64_t)r->sx[2] * r->sy[1];
+    mac0_set(r, s);
+    return 8u;
+}
+
+/* Cross product of IR with the diagonal of the rotation matrix (psx-spx, OP). */
+static uint32_t op_op(struct gte_ref *r, uint32_t op)
+{
+    unsigned shift = sf_shift(op);
+    int64_t i1 = r->ir[1], i2 = r->ir[2], i3 = r->ir[3];
+    int64_t d1 = r->rt[0][0], d2 = r->rt[1][1], d3 = r->rt[2][2];
+    mac_set(r, 1, i3 * d2 - i2 * d3, shift);
+    mac_set(r, 2, i1 * d3 - i3 * d1, shift);
+    mac_set(r, 3, i2 * d1 - i1 * d2, shift);
+    ir_all(r, lm_bit(op));
+    return 6u;
+}
+
+/* Depth cueing of the RGB bytes shifted up 16, towards the far colour. The
+   triple form reads the bottom of the colour FIFO each time and so rewrites
+   the whole FIFO (psx-spx, DPCS and DPCT). */
+static void dpc_once(struct gte_ref *r, uint32_t op, int from_fifo)
+{
+    unsigned shift = sf_shift(op);
+    int64_t acc[4] = {0, 0, 0, 0};
+    for (int k = 1; k <= 3; k++) {
+        int32_t c = from_fifo ? (k == 1 ? r->rgb_r[0] : (k == 2 ? r->rgb_g[0] : r->rgb_b[0])) : rgbc_part(r, k);
+        acc[k] = (int64_t)c * 0x10000;
+    }
+    far_blend(r, acc, shift);
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+}
+
+static uint32_t op_dpcs(struct gte_ref *r, uint32_t op)
+{
+    dpc_once(r, op, 0);
+    return 8u;
+}
+
+static uint32_t op_dpct(struct gte_ref *r, uint32_t op)
+{
+    for (int n = 0; n < 3; n++) {
+        dpc_once(r, op, 1);
+    }
+    return 17u;
+}
+
+/* Interpolation of IR (shifted up 12) towards the far colour. */
+static uint32_t op_intpl(struct gte_ref *r, uint32_t op)
+{
+    unsigned shift = sf_shift(op);
+    int64_t acc[4] = {0, 0, 0, 0};
+    for (int k = 1; k <= 3; k++) {
+        acc[k] = (int64_t)r->ir[k] * 0x1000;
+    }
+    far_blend(r, acc, shift);
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+    return 8u;
+}
+
+/* Multiply a vector by a matrix and add a vector (psx-spx, MVMVA). The matrix
+   field 3 is a made-up matrix, and the far-colour translation (field 2) keeps
+   only the last two products of each row in MAC and IR, while its first
+   product still sets the flags as the whole sum would. */
+static uint32_t op_mvmva(struct gte_ref *r, uint32_t op)
+{
+    unsigned shift = sf_shift(op);
+    int lm = lm_bit(op);
+    uint32_t mx = op >> 17 & 3u, vv = op >> 15 & 3u, cv = op >> 13 & 3u;
+    int32_t m[3][3];
+    int32_t v[3];
+    int32_t t[3] = {0, 0, 0};
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (mx == 0u) {
+                m[i][j] = r->rt[i][j];
+            } else if (mx == 1u) {
+                m[i][j] = r->ll[i][j];
+            } else if (mx == 2u) {
+                m[i][j] = r->lc[i][j];
+            } else if (i == 0) {
+                m[i][j] = j == 0 ? -(r->rgbc_r * 16) : (j == 1 ? r->rgbc_r * 16 : r->ir[0]);
+            } else {
+                m[i][j] = i == 1 ? r->rt[0][2] : r->rt[1][1];
+            }
+        }
+    }
+    if (vv < 3u) {
+        v[0] = r->vx[vv];
+        v[1] = r->vy[vv];
+        v[2] = r->vz[vv];
+    } else {
+        v[0] = r->ir[1];
+        v[1] = r->ir[2];
+        v[2] = r->ir[3];
+    }
+    for (int i = 0; i < 3; i++) {
+        if (cv == 0u) {
+            t[i] = r->tr[i];
+        } else if (cv == 1u) {
+            t[i] = r->bk[i];
+        } else if (cv == 2u) {
+            t[i] = r->fc[i];
+        }
+    }
+    for (int k = 1; k <= 3; k++) {
+        int64_t sum;
+        if (cv != 2u) {
+            sum = row_sum(r, k, (int64_t)t[k - 1] * 0x1000, m[k - 1], v);
+        } else {
+            int64_t first = acc_step(r, k, (int64_t)t[k - 1] * 0x1000 + (int64_t)m[k - 1][0] * v[0]);
+            int32_t q = low32(floor_shr(first, shift));
+            if (q < -0x8000 || q > 0x7FFF) {
+                r->flag |= F_IR >> (k - 1);
+            }
+            sum = acc_step(r, k, (int64_t)m[k - 1][1] * v[1] + (int64_t)m[k - 1][2] * v[2]);
+        }
+        mac_set(r, k, sum, shift);
+    }
+    ir_all(r, lm);
+    return 8u;
+}
+
+/* The three accumulators for a colour: the RGBC byte times IR, shifted up 4
+   (psx-spx, GTE Color Calculation Commands). */
+static void tint_product(const struct gte_ref *r, int64_t acc[4])
+{
+    for (int k = 1; k <= 3; k++) {
+        acc[k] = (int64_t)rgbc_part(r, k) * r->ir[k] * 16;
+    }
+}
+
+/* Light, tint, colour: one vertex of NCCS (and each of NCCT's three). */
+static void nccs_vertex(struct gte_ref *r, uint32_t op, int vi)
+{
+    unsigned shift = sf_shift(op);
+    int64_t acc[4] = {0, 0, 0, 0};
+    light_step(r, vi, shift, lm_bit(op));
+    tint_step(r, shift, lm_bit(op));
+    tint_product(r, acc);
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+}
+
+/* The same with the far colour blended in: one vertex of NCDS and NCDT. */
+static void ncds_vertex(struct gte_ref *r, uint32_t op, int vi)
+{
+    unsigned shift = sf_shift(op);
+    int64_t acc[4] = {0, 0, 0, 0};
+    light_step(r, vi, shift, lm_bit(op));
+    tint_step(r, shift, lm_bit(op));
+    tint_product(r, acc);
+    far_blend(r, acc, shift);
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+}
+
+/* Light and tint only: one vertex of NCS and NCT. */
+static void ncs_vertex(struct gte_ref *r, uint32_t op, int vi)
+{
+    light_step(r, vi, sf_shift(op), lm_bit(op));
+    tint_step(r, sf_shift(op), lm_bit(op));
+    color_finish(r, lm_bit(op));
+}
+
+static uint32_t op_ncds(struct gte_ref *r, uint32_t op)
+{
+    ncds_vertex(r, op, 0);
+    return 19u;
+}
+
+static uint32_t op_ncdt(struct gte_ref *r, uint32_t op)
+{
+    for (int vi = 0; vi < 3; vi++) {
+        ncds_vertex(r, op, vi);
+    }
+    return 44u;
+}
+
+static uint32_t op_nccs(struct gte_ref *r, uint32_t op)
+{
+    nccs_vertex(r, op, 0);
+    return 17u;
+}
+
+static uint32_t op_ncct(struct gte_ref *r, uint32_t op)
+{
+    for (int vi = 0; vi < 3; vi++) {
+        nccs_vertex(r, op, vi);
+    }
+    return 39u;
+}
+
+static uint32_t op_ncs(struct gte_ref *r, uint32_t op)
+{
+    ncs_vertex(r, op, 0);
+    return 14u;
+}
+
+static uint32_t op_nct(struct gte_ref *r, uint32_t op)
+{
+    for (int vi = 0; vi < 3; vi++) {
+        ncs_vertex(r, op, vi);
+    }
+    return 30u;
+}
+
+/* Colour * IR from the IR vector already in place: tint, then the product. */
+static uint32_t op_cc(struct gte_ref *r, uint32_t op)
+{
+    unsigned shift = sf_shift(op);
+    int64_t acc[4] = {0, 0, 0, 0};
+    tint_step(r, shift, lm_bit(op));
+    tint_product(r, acc);
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+    return 11u;
+}
+
+/* The same with the far colour blended in. */
+static uint32_t op_cdp(struct gte_ref *r, uint32_t op)
+{
+    unsigned shift = sf_shift(op);
+    int64_t acc[4] = {0, 0, 0, 0};
+    tint_step(r, shift, lm_bit(op));
+    tint_product(r, acc);
+    far_blend(r, acc, shift);
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+    return 13u;
+}
+
+/* The depth-cue colour light: the RGBC byte times IR, shifted up 4, towards
+   the far colour. */
+static uint32_t op_dcpl(struct gte_ref *r, uint32_t op)
+{
+    unsigned shift = sf_shift(op);
+    int64_t acc[4] = {0, 0, 0, 0};
+    tint_product(r, acc);
+    far_blend(r, acc, shift);
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+    return 8u;
+}
+
+/* The square of each IR, shifted by sf. */
+static uint32_t op_sqr(struct gte_ref *r, uint32_t op)
+{
+    for (int k = 1; k <= 3; k++) {
+        mac_set(r, k, (int64_t)r->ir[k] * r->ir[k], sf_shift(op));
+    }
+    ir_all(r, lm_bit(op));
+    return 5u;
+}
+
+/* The average of three or four Z values times a scale factor; OTZ is the sum
+   divided by 1000h, saturated to 0 to FFFFh (psx-spx, AVSZ3 and AVSZ4). */
+static void avsz_finish(struct gte_ref *r, int64_t s)
+{
+    mac0_set(r, s);
+    int64_t q = floor_shr(s, 12);
+    if (q < 0 || q > 0xFFFF) {
+        r->flag |= F_SZ_OTZ;
+        q = q < 0 ? 0 : 0xFFFF;
+    }
+    r->otz = (int32_t)q;
+}
+
+static uint32_t op_avsz3(struct gte_ref *r, uint32_t op)
+{
+    (void)op;
+    avsz_finish(r, (int64_t)r->zsf3 * ((int64_t)r->sz[1] + r->sz[2] + r->sz[3]));
+    return 5u;
+}
+
+static uint32_t op_avsz4(struct gte_ref *r, uint32_t op)
+{
+    (void)op;
+    avsz_finish(r, (int64_t)r->zsf4 * ((int64_t)r->sz[0] + r->sz[1] + r->sz[2] + r->sz[3]));
+    return 6u;
+}
+
+/* IR times IR0, from zero (GPF) or added to the old MAC shifted up by sf
+   (GPL), then shifted down by sf; the result goes to the colour FIFO. */
+static uint32_t op_gpf(struct gte_ref *r, uint32_t op)
+{
+    unsigned shift = sf_shift(op);
+    int64_t acc[4] = {0, 0, 0, 0};
+    for (int k = 1; k <= 3; k++) {
+        acc[k] = (int64_t)r->ir[k] * r->ir[0];
+    }
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+    return 5u;
+}
+
+static uint32_t op_gpl(struct gte_ref *r, uint32_t op)
+{
+    unsigned shift = sf_shift(op);
+    int64_t scale = (int64_t)1 << shift;
+    int64_t acc[4] = {0, 0, 0, 0};
+    for (int k = 1; k <= 3; k++) {
+        acc[k] = acc_step(r, k, (int64_t)r->mac[k] * scale + (int64_t)r->ir[k] * r->ir[0]);
+    }
+    mac_all(r, acc, shift);
+    color_finish(r, lm_bit(op));
+    return 5u;
 }
 
 /* ---- command dispatch --------------------------------------------------- */
 
+/* Every listed command starts by clearing FLAG (psx-spx, GTE Saturation); a
+   number the description does not list is left alone. */
 uint32_t gte_ref_exec(struct gte_ref *r, uint32_t op)
 {
-    uint32_t cycles;
-    switch (op & 0x3Fu) {
-    case 0x01u:
-        r->flag = 0;
-        cycles = op_rtps(r, op);
-        break;
-    default:
+    uint32_t n = op & 0x3Fu;
+    if (n != 0x01u && n != 0x06u && n != 0x0Cu && n != 0x10u && n != 0x11u && n != 0x12u && n != 0x13u &&
+        n != 0x14u && n != 0x16u && n != 0x1Bu && n != 0x1Cu && n != 0x1Eu && n != 0x20u && n != 0x28u &&
+        n != 0x29u && n != 0x2Au && n != 0x2Du && n != 0x2Eu && n != 0x30u && n != 0x3Du && n != 0x3Eu &&
+        n != 0x3Fu) {
         return 0u;
     }
-    return cycles;
+    r->flag = 0;
+    switch (n) {
+    case 0x01u:
+        return op_rtps(r, op);
+    case 0x06u:
+        return op_nclip(r, op);
+    case 0x0Cu:
+        return op_op(r, op);
+    case 0x10u:
+        return op_dpcs(r, op);
+    case 0x11u:
+        return op_intpl(r, op);
+    case 0x12u:
+        return op_mvmva(r, op);
+    case 0x13u:
+        return op_ncds(r, op);
+    case 0x14u:
+        return op_cdp(r, op);
+    case 0x16u:
+        return op_ncdt(r, op);
+    case 0x1Bu:
+        return op_nccs(r, op);
+    case 0x1Cu:
+        return op_cc(r, op);
+    case 0x1Eu:
+        return op_ncs(r, op);
+    case 0x20u:
+        return op_nct(r, op);
+    case 0x28u:
+        return op_sqr(r, op);
+    case 0x29u:
+        return op_dcpl(r, op);
+    case 0x2Au:
+        return op_dpct(r, op);
+    case 0x2Du:
+        return op_avsz3(r, op);
+    case 0x2Eu:
+        return op_avsz4(r, op);
+    case 0x30u:
+        return op_rtpt(r, op);
+    case 0x3Du:
+        return op_gpf(r, op);
+    case 0x3Eu:
+        return op_gpl(r, op);
+    default: /* 0x3F */
+        return op_ncct(r, op);
+    }
 }
