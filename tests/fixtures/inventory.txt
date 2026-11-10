@@ -11,6 +11,7 @@ fixtures.boot.stop_on_fault	fixtures,portable
 fixtures.exc_matrix	fixtures,portable
 fixtures.exit_port	fixtures,portable
 fixtures.gap_write	fixtures,portable
+fixtures.gte_vectors	fixtures,gte,portable
 fixtures.hang	fixtures,portable
 fixtures.hello.boot	fixtures,portable
 fixtures.hello.criterion4	fixtures,portable

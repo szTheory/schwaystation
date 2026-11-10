@@ -262,7 +262,7 @@ function(schway__fixture name source)
     COMMAND ${SCHWAYSTATION_ARMIPS} -strequ IMAGE ${out} ${ARGN} ${source}
     WORKING_DIRECTORY ${schway__fixture_src}
     DEPENDS schwaystation-armips ${schway__fixture_src}/${source} ${schway__fixture_src}/header.inc
-      ${schway__fixture_src}/mailbox.inc
+      ${schway__fixture_src}/mailbox.inc ${schway__fixture_extra}
     COMMENT "armips ${source}"
     VERBATIM)
   set_property(GLOBAL APPEND PROPERTY SCHWAY__FIXTURE_OUTPUTS ${out})
@@ -279,6 +279,9 @@ schway__fixture(mailbox_fault.exe mailbox_fail.asm -equ MODE 0)
 schway__fixture(mailbox_crc.exe mailbox_fail.asm -equ MODE 1)
 schway__fixture(unbuilt.exe unbuilt.asm -equ MODE 0)
 schway__fixture(gap_write.exe unbuilt.asm -equ MODE 1)
+set(schway__fixture_extra ${schway__fixture_src}/gte_cases.inc) # the include only gte_vectors.asm reads
+schway__fixture(gte_vectors.exe gte_vectors.asm)
+set(schway__fixture_extra "")
 set(schway__fault_kinds unmapped_read unmapped_write unmapped_fetch misaligned_read misaligned_write
   misaligned_fetch reserved_instruction cop_unusable exception_loop)
 set(schway__fault_index 1)
@@ -369,6 +372,17 @@ schway_add_test(NAME fixtures.exc_matrix
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a GTE whose results are right when called directly but wrong behind the CPU's COP2 moves,
+# load delays and busy stall: gte_vectors.exe replays hardware-captured cases with real COP2 instructions and
+# records the CRC-32 of the 64 registers read back; tests/diag/expected.csv judges each against the hardware.
+schway_add_test(NAME fixtures.gte_vectors
+  COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=gte_vectors
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/gte_vectors.exe -DFRAMES=30
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures gte portable TIMEOUT 30)
 
 # Fault prevented: a first fault that the runner misses, mislabels or reports with a short tail. Each
 # fault.exe class runs more than 4,096 trace records of preamble, then faults once: exit 7, the fault line

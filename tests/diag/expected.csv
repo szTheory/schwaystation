@@ -30,3 +30,4 @@ exc_matrix,irq_masked_entries,*,0000000B,doc,psx-spx CPU Specifications: COP0 ex
 exc_matrix,cause_after_istat_write,*,0000001C,doc,docs/hardware/cop0.md Interrupts (model in which the I_STAT write commits within its own instruction and CAUSE bit 10 clears at once and ExcCode keeps 07h from the last exception and no console measurement exists)
 exc_matrix,irq_unmasked_cause,*,00000400,doc,psx-spx CPU Specifications: COP0 exception handling (ExcCode 00h INT with IP bit 10 set)
 exc_matrix,irq_unmasked_epc,*,00000008,doc,docs/hardware/cop0.md Interrupts (an MTC0 to SR enabling a pending line is taken at the MTC0 plus 8 as an inference from the published two-instruction delay)
+gte_vectors,test_51,*,a0b3b721,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 51
