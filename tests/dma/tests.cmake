@@ -112,3 +112,34 @@ schway_add_test(NAME dma.otc.read_sees_completion
 schway_add_test(NAME dma.sync0.gpu_sink
   COMMAND schwaystation-test-dma sync0_gpu_sink
   LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: a read from a device that does not write zeros to RAM, a
+# backward step that goes forward, or a CD-ROM burst off its 24 clocks per word.
+schway_add_test(NAME dma.sync0.from_device
+  COMMAND schwaystation-test-dma sync0_from_device
+  LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: sync mode 1 that moves every block on one request, loses
+# the block count or the address, or finishes without the flag.
+schway_add_test(NAME dma.sync1.dreq_blocks
+  COMMAND schwaystation-test-dma sync1_dreq_blocks
+  LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: a channel waiting for its request line that holds the CPU
+# or slows a program reading RAM.
+schway_add_test(NAME dma.sync1.no_dreq_no_stall
+  COMMAND schwaystation-test-dma sync1_no_dreq_no_stall
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a channel whose burst costs another number of cycles than
+# its device rate plus the DRAM row, or a 10000h-word CD-ROM burst past the
+# longest the engine bounds.
+schway_add_test(NAME dma.costs.per_channel
+  COMMAND schwaystation-test-dma costs_per_channel
+  LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: a DPCR priority change that does not take effect at the
+# next unit boundary.
+schway_add_test(NAME dma.dpcr.rearbitrate
+  COMMAND schwaystation-test-dma dpcr_rearbitrate
+  LABELS dma portable TIMEOUT 10)

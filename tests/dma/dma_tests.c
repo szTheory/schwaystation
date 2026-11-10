@@ -832,11 +832,207 @@ static void case_sync0_gpu_sink(void)
     schway_destroy(inst);
 }
 
+/* Fault prevented: a read from a device that does not write zeros to RAM,
+   one that steps forward when CHCR says backward, or a cost off the CD-ROM's
+   24 clocks per word. Eight words from channel 3 go to RAM downward from
+   2000h over a filled area: the words at 2000h down to 1FE4h become 0 and
+   nothing around them changes. */
+static void case_sync0_from_device(void)
+{
+    schway *inst = make();
+    fill_ram(inst, 0x1FC0u, 32u, 0x11111111u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, MADR(3u), 0x2000u);
+    wr32(inst, BCR(3u), 8u);
+    uint64_t start = now_of(inst);
+    wr32(inst, CHCR(3u), 0x11000002u);
+    CHECK_EQ_U64(inst->dma.cur, 3u);
+    CHECK_EQ_U64(inst->dma.busy_until - start, 8u * 24u + 1u);
+    CHECK_EQ_HEX(inst->dma.madr[3], 0x1FE0u);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        uint32_t a = 0x1FC0u + 4u * i;
+        uint32_t filled = 0x11111111u + i * 0x01010101u;
+        uint32_t moved = a >= 0x1FE4u && a <= 0x2000u;
+        CHECK_EQ_HEX(ram_word(inst, a), moved ? 0u : filled);
+    }
+    CHECK_EQ_U64(inst->dma.words[3], 0u);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: sync mode 1 that moves every block on one request, waits
+   for none, loses the block count or its address, or finishes without the
+   flag. Four blocks of 16 words go to the SPU channel, one block per raise of
+   the request line. */
+static void case_sync1_dreq_blocks(void)
+{
+    schway *inst = make();
+    fill_ram(inst, 0x3000u, 64u, 0x5A000001u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00900000u);
+    wr32(inst, MADR(4u), 0x3000u);
+    wr32(inst, BCR(4u), (4u << 16) | 16u);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    /* No request, so nothing moves and the channel is busy. */
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 0u);
+    CHECK((rd32(inst, CHCR(4u)) & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    for (uint32_t b = 0u; b < 4u; b++) {
+        uint64_t at = now_of(inst);
+        schway__dma_dreq(inst, 4u, 1u);
+        CHECK_EQ_U64(inst->dma.cur, 4u);
+        CHECK_EQ_U64(inst->dma.words[4], 16u * (b + 1u));
+        CHECK_EQ_U64(inst->dma.busy_until - at, 16u * 4u + 1u + 11u);
+        CHECK_EQ_U64((inst->dma.dreq >> 4) & 1u, 0u);
+        CHECK_EQ_HEX(inst->dma.madr[4], 0x3000u + 64u * (b + 1u));
+        (void)run(inst, 77u);
+        CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+        if (b < 3u) {
+            CHECK((inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+            CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+            CHECK_EQ_U64(inst->dma.remain[4], 3u - b);
+            /* Nothing moves until the next request. */
+            (void)run(inst, 500u);
+            CHECK_EQ_U64(inst->dma.words[4], 16u * (b + 1u));
+        }
+    }
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    CHECK_EQ_HEX(rd32(inst, DICR), 0x90900000u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(64u, 0x5A000001u));
+    /* A request after the end starts nothing. */
+    schway__dma_dreq(inst, 4u, 1u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    schway_destroy(inst);
+}
+
+/* Words of a program that points t0 at the I/O page, sets DPCR, then MADR,
+   BCR and CHCR of channel 4 (the SPU) to a transfer of four 16-word blocks
+   with the CHCR value given, and loops on a read from RAM that counts in t9. */
+static uint32_t put_request_loop(uint32_t *w, uint32_t chcr)
+{
+    uint32_t n = 0u;
+    w[n++] = I_LUI(T0, 0x1F80u);
+    w[n++] = I_ORI(T0, T0, 0x1000u);
+    w[n++] = I_LUI(T1, DPCR_ALL >> 16);
+    w[n++] = I_ORI(T1, T1, DPCR_ALL & 0xFFFFu);
+    w[n++] = I_SW(T1, 0xF0u, T0);
+    w[n++] = I_ORI(T2, 0u, 0x3000u);
+    w[n++] = I_SW(T2, 0xC0u, T0);
+    w[n++] = I_LUI(T3, 4u);
+    w[n++] = I_ORI(T3, T3, 16u);
+    w[n++] = I_SW(T3, 0xC4u, T0);
+    w[n++] = I_LUI(T4, chcr >> 16);
+    w[n++] = I_ORI(T4, T4, chcr & 0xFFFFu);
+    w[n++] = I_SW(T4, 0xC8u, T0);
+    w[n++] = I_LUI(T6, 0x8000u);
+    w[n++] = I_LW(T5, 0x100u, T6);
+    w[n++] = I_BEQ(0u, 0u, -2);
+    w[n++] = I_ADDIU(T9, T9, 1u);
+    return n;
+}
+
+/* Fault prevented: a channel that waits for its request line and still holds
+   the CPU, or a program whose RAM reads slow down because a transfer is
+   pending. The same loop runs against a request-mode transfer that was started
+   and one whose CHCR write left bit 24 clear: after the same number of cycles
+   both have counted the same passes, the CPU never was held and the started
+   channel is still busy. */
+static void case_sync1_no_dreq_no_stall(void)
+{
+    uint32_t w[20];
+    uint32_t n = put_request_loop(w, 0x01000201u);
+    schway *busy = make();
+    load(busy, w, n);
+    run_to_entry(busy);
+    (void)run(busy, 6000u);
+    uint32_t passes_busy = busy->cpu.r[T9];
+    CHECK_EQ_U64(busy->dma.stall_until, 0u);
+    CHECK_EQ_U64(busy->dma.cur, SCHWAY__DMA_NONE);
+    CHECK((busy->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    uint32_t idle_w[20];
+    n = put_request_loop(idle_w, 0x00000201u);
+    schway *idle = make();
+    load(idle, idle_w, n);
+    run_to_entry(idle);
+    (void)run(idle, 6000u);
+    CHECK_EQ_U64(idle->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK(passes_busy > 100u);
+    CHECK_EQ_U64(passes_busy, idle->cpu.r[T9]);
+    schway_destroy(busy);
+    schway_destroy(idle);
+}
+
+/* Fault prevented: a channel whose burst costs another number of cycles than
+   its device rate plus the DRAM row: 64 words take 64 * rate + 4 cycles, with
+   the rate 1 for the MDEC channels and the GPU, 24 for the CD-ROM (the
+   documented BIOS default), 4 for the SPU and 20 for PIO. */
+static void case_costs_per_channel(void)
+{
+    static const uint32_t rate[6] = {1u, 1u, 1u, 24u, 4u, 20u};
+    static const uint32_t chcr[6] = {0x11000001u, 0x11000000u, 0x11000001u,
+                                     0x11000000u, 0x11000001u, 0x11000000u};
+    for (uint32_t ch = 0u; ch < 6u; ch++) {
+        schway *inst = make();
+        wr32(inst, DPCR, DPCR_ALL);
+        wr32(inst, MADR(ch), 0x4000u);
+        wr32(inst, BCR(ch), 64u);
+        uint64_t start = now_of(inst);
+        wr32(inst, CHCR(ch), chcr[ch]);
+        CHECK_EQ_U64(inst->dma.cur, ch);
+        CHECK_EQ_U64(inst->dma.busy_until - start, 64u * rate[ch] + 4u);
+        schway_destroy(inst);
+    }
+    /* A word count of 0 is 10000h words: the CD-ROM's longest burst, within
+       the bound the engine keeps on a unit. */
+    schway *inst = make();
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, MADR(3u), 0u);
+    wr32(inst, BCR(3u), 0u);
+    uint64_t start = now_of(inst);
+    wr32(inst, CHCR(3u), 0x11000000u);
+    CHECK_EQ_U64(inst->dma.busy_until - start, 65536u * 24u + 4096u);
+    CHECK(inst->dma.busy_until - start <= SCHWAY__DMA_BUSY_MAX);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: a priority change in DPCR that does not take effect at the
+   next unit boundary. Channel 1 runs; channels 4 and 5 wait with priorities 5
+   and 6, so 4 goes next; the same wait with channel 5 raised to priority 0
+   while channel 1 runs makes 5 go next. */
+static void case_dpcr_rearbitrate(void)
+{
+    for (uint32_t raise = 0u; raise < 2u; raise++) {
+        schway *inst = make();
+        wr32(inst, DPCR, DPCR_ALL);
+        wr32(inst, MADR(1u), 0x4000u);
+        wr32(inst, BCR(1u), 64u);
+        wr32(inst, CHCR(1u), 0x11000000u);
+        CHECK_EQ_U64(inst->dma.cur, 1u);
+        wr32(inst, BCR(4u), 8u);
+        wr32(inst, CHCR(4u), 0x11000001u);
+        wr32(inst, BCR(5u), 8u);
+        wr32(inst, CHCR(5u), 0x11000001u);
+        CHECK_EQ_U64(inst->dma.cur, 1u);
+        if (raise != 0u) {
+            wr32(inst, DPCR, (DPCR_ALL & ~0x00F00000u) | 0x00800000u);
+            CHECK_EQ_U64(inst->dma.cur, 1u);
+        }
+        schway__dma_event(inst, inst->dma.busy_until);
+        CHECK_EQ_U64(inst->dma.cur, raise != 0u ? 5u : 4u);
+        schway_destroy(inst);
+    }
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
     {"sync0_gpu_sink", case_sync0_gpu_sink},
+    {"sync0_from_device", case_sync0_from_device},
+    {"sync1_dreq_blocks", case_sync1_dreq_blocks},
+    {"sync1_no_dreq_no_stall", case_sync1_no_dreq_no_stall},
+    {"costs_per_channel", case_costs_per_channel},
+    {"dpcr_rearbitrate", case_dpcr_rearbitrate},
     {"otc_clear", case_otc_clear},
     {"dpcr_reset", case_dpcr_reset},
     {"dpcr_priority", case_dpcr_priority},

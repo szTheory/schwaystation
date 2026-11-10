@@ -63,7 +63,8 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
                                 (cur < SCHWAY__DMA_CHANNELS &&
                                  (chcr[cur] & SCHWAY__DMA_CHCR_BUSY) != 0u));
     schway__state_u32_array(io, name_phase, d->phase, SCHWAY__DMA_CHANNELS, 0u, 7u);
-    schway__state_u32_array(io, name_remain, d->remain, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
+    schway__state_u32_array(io, name_remain, d->remain, SCHWAY__DMA_CHANNELS, 0u,
+                            SCHWAY__DMA_UNIT_WORDS_MAX);
     (void)schway__state_u32(io, name_nodes_done, &d->nodes_done, 0u, SCHWAY__DMA_NODES_MAX);
     (void)schway__state_u32(io, name_dreq, &d->dreq, 0u, (1u << SCHWAY__DMA_CHANNELS) - 1u);
     schway__state_u32_array(io, name_words, d->words, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
@@ -80,10 +81,18 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
 #define DMA_OTC 6u
 #define DMA_UNIT_CHANNELS 0x7Fu
 
-/* phase of a channel: nothing running, or its unit's words moved and the
-   channel busy until busy_until. */
+/* phase of a channel: nothing running, its unit's words moved and the channel
+   busy until busy_until, or a sync mode 1 transfer between blocks (busy, no
+   unit, remain blocks still to go, waiting for the next request). */
 #define DMA_PH_IDLE 0u
 #define DMA_PH_UNIT 1u
+#define DMA_PH_BLOCKS 2u
+
+/* Extra cycles a sync mode 1 block costs on top of its words: the request
+   handshake and the setup of the next block. Fitted to the hardware log of
+   the public dma/chopping test, so derived, not documented (the same fit as
+   the window overhead of a chopped burst). */
+#define DMA_BLOCK_OVERHEAD 11u
 
 /* CHCR bit 0 is the direction (1 is RAM to the device), bit 1 the step (1 is
    backward), bit 28 starts a transfer without waiting for a request, bits 9-10
@@ -143,9 +152,9 @@ static void dicr_set(schway *inst, uint32_t dicr)
 }
 
 /* A channel with a unit ready to run: bit 24 set, and bit 28 where the mode
-   needs the start trigger. OTC always does; sync mode 0 does. The request and
-   linked-list modes have no unit yet, so they wait (psx-spx, DMA Channels,
-   CHCR). */
+   needs the start trigger. OTC always does; sync mode 0 does; sync mode 1
+   waits for the device's request line. The linked-list and reserved modes have
+   no unit yet, so they wait (psx-spx, DMA Channels, CHCR). */
 static uint32_t dma_pending(const struct schway__dma *d, uint32_t ch)
 {
     uint32_t c = d->chcr[ch];
@@ -156,7 +165,7 @@ static uint32_t dma_pending(const struct schway__dma *d, uint32_t ch)
     if (ch == DMA_OTC || sync == 0u) {
         return (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
     }
-    return 0u;
+    return sync == 1u && ((d->dreq >> ch) & 1u) != 0u ? 1u : 0u;
 }
 
 /* The channel of mask that goes next, or SCHWAY__DMA_NONE: among the channels
@@ -187,8 +196,19 @@ uint32_t schway__dma_arbitrate(const schway *inst, uint32_t mask)
    Rates). */
 static uint32_t dma_word_cycles(uint32_t ch)
 {
-    (void)ch;
-    return 1u;
+    switch (ch) {
+    case 3u:
+        /* The BIOS default of 24; most games write the delay setting that
+           makes it 40. The CD-ROM device end chooses between them when it
+           is built, so nothing here reads the delay register. */
+        return 24u;
+    case 4u:
+        return 4u;
+    case 5u:
+        return 20u;
+    default:
+        return 1u; /* MDEC in and out, GPU and OTC */
+    }
 }
 
 /* The cycles a unit of n words takes: each word on the device's rate, plus one
@@ -330,13 +350,29 @@ static void dma_start(schway *inst, uint64_t t)
         return;
     }
     uint64_t cost;
+    uint32_t n = d->bcr[ch] & 0xFFFFu;
+    n = n == 0u ? SCHWAY__DMA_UNIT_WORDS_MAX : n;
     d->chcr[ch] &= ~DMA_CHCR_TRIGGER;
     if (ch == DMA_OTC) {
+        d->remain[ch] = 0u;
         cost = dma_otc_unit(inst);
+    } else if (((d->chcr[ch] >> 9) & 3u) == 1u) {
+        /* Sync mode 1: BCR's high half counts the blocks (0 meaning 10000h),
+           counted down in remain; one block moves per request, and the block
+           takes the request with it: the device raises the line again when
+           it can take or give another. */
+        if (d->phase[ch] != DMA_PH_BLOCKS) {
+            uint32_t blocks = d->bcr[ch] >> 16;
+            d->remain[ch] = blocks == 0u ? SCHWAY__DMA_UNIT_WORDS_MAX : blocks;
+        }
+        if (d->remain[ch] > 0u) {
+            d->remain[ch]--;
+        }
+        d->dreq &= ~(UINT32_C(1) << ch);
+        cost = dma_cost(ch, n) + DMA_BLOCK_OVERHEAD + dma_move(inst, ch, n);
     } else {
-        /* Sync mode 0: one burst of BCR's low half words, 0 meaning 10000h. */
-        uint32_t n = d->bcr[ch] & 0xFFFFu;
-        n = n == 0u ? SCHWAY__DMA_UNIT_WORDS_MAX : n;
+        /* Sync mode 0: one burst of BCR's low half words. */
+        d->remain[ch] = 0u;
         cost = dma_cost(ch, n) + dma_move(inst, ch, n);
     }
     d->phase[ch] = DMA_PH_UNIT;
@@ -344,13 +380,20 @@ static void dma_start(schway *inst, uint64_t t)
     d->busy_until = t + cost;
 }
 
-/* The end of the running unit: the channel stops being busy, its DICR flag is
-   set when both its enable and the master enable allow it, and the interrupt
-   edge follows (psx-spx, DMA Channels, DICR). */
+/* The end of the running unit. A sync mode 1 block with blocks to go leaves
+   the channel busy and waiting for the next request, and the CPU runs until it
+   comes: no flag, no interrupt. Otherwise the channel stops being busy, its
+   DICR flag is set when both its enable and the master enable allow it, and
+   the interrupt edge follows (psx-spx, DMA Channels, DICR). */
 static void dma_finish(schway *inst, uint32_t ch)
 {
     struct schway__dma *d = &inst->dma;
     uint32_t dicr = d->dicr;
+    if (d->remain[ch] > 0u) {
+        d->phase[ch] = DMA_PH_BLOCKS;
+        d->cur = SCHWAY__DMA_NONE;
+        return;
+    }
     d->chcr[ch] &= ~SCHWAY__DMA_CHCR_BUSY;
     d->phase[ch] = DMA_PH_IDLE;
     d->cur = SCHWAY__DMA_NONE;
@@ -489,7 +532,9 @@ void schway__dma_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint3
     *value = reg_get(dma_read(inst, p), p, width);
 }
 
-/* The levels are latched, a bit per channel. */
+/* The levels are latched, a bit per channel. A raised line starts the channel
+   when it is waiting for it and nothing is running; with a unit running, the
+   next unit boundary picks it up. */
 void schway__dma_dreq(schway *inst, uint32_t ch, uint32_t level)
 {
     if (ch >= SCHWAY__DMA_CHANNELS) {
@@ -497,6 +542,10 @@ void schway__dma_dreq(schway *inst, uint32_t ch, uint32_t level)
     }
     if (level != 0u) {
         inst->dma.dreq |= 1u << ch;
+        if (inst->dma.cur == SCHWAY__DMA_NONE) {
+            dma_start(inst, schway__sched_now(inst, 0u));
+            schway__sched_recalc(inst);
+        }
     } else {
         inst->dma.dreq &= ~(1u << ch);
     }

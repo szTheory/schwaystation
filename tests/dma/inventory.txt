@@ -1,8 +1,10 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+dma.costs.per_channel	dma,portable
 dma.dicr.irq_edge	dma,portable
 dma.dicr.reads	dma,portable
 dma.dpcr.enable	dma,portable
 dma.dpcr.priority	dma,portable
+dma.dpcr.rearbitrate	dma,portable
 dma.dpcr.reset	dma,portable
 dma.engine.step_contract	dma,portable
 dma.otc.bcr_zero	dma,portable
@@ -15,4 +17,7 @@ dma.otc.readback	dma,portable
 dma.stall.cpu_access	dma,portable
 dma.stall.not_scratch	dma,portable
 dma.stall.write_queue	dma,portable
+dma.sync0.from_device	dma,portable
 dma.sync0.gpu_sink	dma,portable
+dma.sync1.dreq_blocks	dma,portable
+dma.sync1.no_dreq_no_stall	dma,portable
