@@ -257,9 +257,9 @@ its size. Run it by hand with `cmake -DROOT=. -P tests/cmake/budgets.cmake`.
 
 **Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` (hygiene lane) counts
 every line of `scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*` against a fixed limit set in
-`tests/hygiene/tests.cmake`; the limit is an absolute line count, lowered when a release ships. It is 1520 lines
-for the CPU phase, whose last gate left the total at 1495, and it is never raised: a gate that does not fit
-replaces or folds an older one. Shipping the phase sets the limit to the total then measured. Check the total with
+`tests/hygiene/tests.cmake`; the limit is an absolute line count that only falls, and is re-measured when a release
+ships. It is 1513 lines, the total measured once the notices gate landed (1483 before it), and it is never raised:
+a gate that does not fit replaces or folds an older one. Shipping a release sets the limit to the total then measured. Check the total with
 `cat scripts/*.sh tests/cmake/*.cmake .githooks/* | wc -l`. Gate logic stays in those files: it is not moved
 into `tests/<dir>/tests.cmake`, `cmake/` or workflow YAML to fit.
 
