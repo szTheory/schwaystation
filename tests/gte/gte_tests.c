@@ -1,5 +1,5 @@
 /* The geometry engine's tests; one case per command-line argument.
-     schwaystation-test-gte vectors FILE --expect N [--ops LIST]
+     schwaystation-test-gte vectors FILE --expect N [--ops LIST] [--histogram] [--flip N]
      schwaystation-test-gte regs_sweep
      schwaystation-test-gte unr_table
      schwaystation-test-gte nclip_fake_bits
@@ -8,7 +8,10 @@
    for the register-only cases; only those cases run. It prints the number of
    cases run and the first register that differs in each failing case. Exit 0
    when exactly N cases ran and all matched, 1 for a failure or another count,
-   2 for a bad command line. regs_sweep drives every register and every command
+   2 for a bad command line. --histogram also requires the file to hold 50
+   register-only cases and 50 for each of the 22 documented command numbers.
+   --flip N inverts one bit of the expected output of case N (counted from 1)
+   in memory, so that case must fail. regs_sweep drives every register and every command
    with edge values and checks that reads repeat; run under the sanitizers, it
    also proves the engine touches nothing outside its struct. unr_table
    regenerates the divide's reciprocal table from its formula and compares all
@@ -95,12 +98,47 @@ static uint8_t *read_file(const char *path, size_t *len)
     return buf;
 }
 
+/* The documented command numbers: each appears in 50 cases of the file, and
+   50 cases are register-only (a count of the file's cases, not of a run). */
+static int histogram_ok(const uint8_t *data, long total)
+{
+    static const uint8_t ops[22] = {0x01, 0x06, 0x0C, 0x10, 0x11, 0x12, 0x13, 0x14, 0x16, 0x1B, 0x1C,
+                                    0x1E, 0x20, 0x28, 0x29, 0x2A, 0x2D, 0x2E, 0x30, 0x3D, 0x3E, 0x3F};
+    long count[64] = {0};
+    long reg_only = 0;
+    for (long n = 0; n < total; n++) {
+        struct gtev_case c;
+        gtev_load(data, (uint32_t)n, &c);
+        if (c.opcode == GTEV_REG_ONLY) {
+            reg_only++;
+        } else {
+            count[c.opcode & 0x3Fu]++;
+        }
+    }
+    int ok = reg_only == 50 && total == 50 * 23;
+    if (reg_only != 50) {
+        fprintf(stderr, "gte vectors: %ld register-only cases, expected 50\n", reg_only);
+    }
+    for (unsigned k = 0u; k < 22u; k++) {
+        if (count[ops[k]] != 50) {
+            fprintf(stderr, "gte vectors: command %02X in %ld cases, expected 50\n", (unsigned)ops[k],
+                    count[ops[k]]);
+            ok = 0;
+        }
+    }
+    if (total != 50 * 23) {
+        fprintf(stderr, "gte vectors: %ld cases in the file, expected %d\n", total, 50 * 23);
+    }
+    return ok;
+}
+
 static int run_vectors(int argc, char **argv)
 {
     const char *file = NULL;
     long expect = -1;
     uint64_t mask = 0u;
-    int reg = 0, have_ops = 0;
+    int reg = 0, have_ops = 0, histogram = 0;
+    long flip = 0;
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--expect") == 0 && i + 1 < argc) {
             expect = strtol(argv[++i], NULL, 10);
@@ -110,6 +148,10 @@ static int run_vectors(int argc, char **argv)
                 fprintf(stderr, "gte vectors: bad --ops list\n");
                 return 2;
             }
+        } else if (strcmp(argv[i], "--histogram") == 0) {
+            histogram = 1;
+        } else if (strcmp(argv[i], "--flip") == 0 && i + 1 < argc) {
+            flip = strtol(argv[++i], NULL, 10);
         } else if (file == NULL && argv[i][0] != '-') {
             file = argv[i];
         } else {
@@ -118,7 +160,8 @@ static int run_vectors(int argc, char **argv)
         }
     }
     if (file == NULL || expect < 0) {
-        fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST]\n");
+        fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST] "
+                        "[--histogram] [--flip N]\n");
         return 2;
     }
     size_t len = 0u;
@@ -126,6 +169,10 @@ static int run_vectors(int argc, char **argv)
     long total = data == NULL ? -1 : gtev_count(data, len);
     if (total < 0) {
         fprintf(stderr, "gte vectors: %s is unreadable or truncated\n", file);
+        free(data);
+        return 1;
+    }
+    if (histogram && !histogram_ok(data, total)) {
         free(data);
         return 1;
     }
@@ -138,6 +185,9 @@ static int run_vectors(int argc, char **argv)
     for (long n = 0; n < total; n++) {
         struct gtev_case c;
         gtev_load(data, (uint32_t)n, &c);
+        if (n + 1 == flip) {
+            c.out[0] ^= 1u;
+        }
         if (have_ops) {
             int wanted = c.opcode == GTEV_REG_ONLY ? reg : (int)((mask >> (c.opcode & 0x3Fu)) & 1u);
             if (!wanted) {
@@ -319,7 +369,7 @@ int main(int argc, char **argv)
     if (argc == 2 && strcmp(argv[1], "nclip_fake_bits") == 0) {
         return run_nclip_fake_bits();
     }
-    fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST] | regs_sweep |\n"
-                    "       unr_table | nclip_fake_bits\n");
+    fprintf(stderr, "usage: schwaystation-test-gte vectors FILE --expect N [--ops LIST] [--histogram]\n"
+                    "         [--flip N] | regs_sweep | unr_table | nclip_fake_bits\n");
     return 2;
 }

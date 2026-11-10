@@ -2,4 +2,7 @@
 gte.nclip_fake_bits	gte,portable
 gte.regs.sweep	gte,portable
 gte.unr_table	gte,portable
-gte.vectors.part1	gte,portable
+gte.vectors.empty.self_test	gte,portable
+gte.vectors.flipped.self_test	gte,portable
+gte.vectors.ps1tests	gte,portable
+gte.vectors.truncated.self_test	gte,portable

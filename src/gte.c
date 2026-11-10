@@ -554,6 +554,172 @@ static void op_cross(struct run *r)
     }
 }
 
+/* The colour FIFO: MAC1 to MAC3 over 10h, each clamped to 0 to FFh (flag bits
+   21, 20 and 19), pushed with the code byte of RGBC (psx-spx, Geometry
+   Transformation Engine, GTE Color FIFO). */
+static void push_color(struct run *r)
+{
+    struct schway__gte *g = r->g;
+    uint32_t px = 0u;
+    for (unsigned i = 0u; i < 3u; i++) {
+        int64_t c = sar64(s32v(g->d[25u + i]), 4u);
+        if (c < 0) {
+            c = 0;
+            r->flag |= 1u << (21u - i);
+        }
+        if (c > 255) {
+            c = 255;
+            r->flag |= 1u << (21u - i);
+        }
+        px |= (uint32_t)c << (8u * i);
+    }
+    g->d[20] = g->d[21];
+    g->d[21] = g->d[22];
+    g->d[22] = px | (g->d[6] & 0xFF000000u);
+}
+
+/* The red, green and blue bytes of a colour word, each times 10h. */
+static void rgb16(uint32_t word, int64_t out[3])
+{
+    for (unsigned i = 0u; i < 3u; i++) {
+        out[i] = (int64_t)((word >> (8u * i)) & 0xFFu) * 16;
+    }
+}
+
+/* The depth cue towards a colour: IR1 to IR3 become the far colour less the
+   colour, saturated without lm, then the colour plus IR0 times that (psx-spx,
+   Geometry Transformation Engine, GTE Color Commands DPCS). col is a colour
+   byte times 10h. */
+static void depth_cue(struct run *r, const int64_t col[3])
+{
+    const struct schway__gte *g = r->g;
+    int64_t sum[3];
+    for (unsigned i = 0u; i < 3u; i++) {
+        set_mac_ir(r, i + 1u, s32v(g->c[21u + i]) * 4096 - col[i] * 4096, 0u);
+    }
+    for (unsigned i = 0u; i < 3u; i++) {
+        sum[i] = col[i] * 4096 + s16v(g->d[8]) * ir_of(r, i + 1u);
+    }
+    set_mac_ir_vec(r, sum, r->lm);
+    push_color(r);
+}
+
+/* The far-colour blend of DCPL, CDP and NCDx: the far colour less colour times
+   IR, saturated without lm, then colour times IR plus IR0 times that. */
+static void colour_far(struct run *r)
+{
+    const struct schway__gte *g = r->g;
+    int64_t col[3], old[3], sum[3];
+    rgb16(g->d[6], col);
+    for (unsigned i = 0u; i < 3u; i++) {
+        old[i] = ir_of(r, i + 1u);
+        set_mac_ir(r, i + 1u, s32v(g->c[21u + i]) * 4096 - col[i] * old[i], 0u);
+    }
+    for (unsigned i = 0u; i < 3u; i++) {
+        sum[i] = col[i] * old[i] + s16v(g->d[8]) * ir_of(r, i + 1u);
+    }
+    set_mac_ir_vec(r, sum, r->lm);
+}
+
+/* The light and colour matrices applied to a vector: IR becomes the lit
+   background colour; NCS and NCT stop there, NCCx multiply the colour in and
+   NCDx blend it with the far colour (psx-spx, Geometry Transformation Engine,
+   GTE Color Commands). mode is 0, 1 or 2 respectively. */
+static void normal_colour(struct run *r, unsigned vertex, unsigned mode)
+{
+    struct schway__gte *g = r->g;
+    int64_t m[9], vec[3], out[3];
+    vec[0] = s16v(g->d[2u * vertex]);
+    vec[1] = s16v(g->d[2u * vertex] >> 16);
+    vec[2] = s16v(g->d[2u * vertex + 1u]);
+    load_matrix(&g->c[8], m);
+    matrix_multiply(r, m, vec, NULL, out);
+    set_mac_ir_vec(r, out, r->lm);
+    for (unsigned i = 0u; i < 3u; i++) {
+        vec[i] = ir_of(r, i + 1u);
+    }
+    load_matrix(&g->c[16], m);
+    matrix_multiply(r, m, vec, &g->c[13], out);
+    set_mac_ir_vec(r, out, r->lm);
+    if (mode == 1u) {
+        int64_t col[3];
+        rgb16(g->d[6], col);
+        for (unsigned i = 0u; i < 3u; i++) {
+            set_mac_ir(r, i + 1u, col[i] * ir_of(r, i + 1u), 0u);
+        }
+    } else if (mode == 2u) {
+        colour_far(r);
+    }
+    push_color(r);
+}
+
+/* The colour matrix applied to IR (CDP and CC), then the colour multiplied
+   in (CC) or blended with the far colour (CDP). */
+static void colour_matrix(struct run *r, int blend)
+{
+    struct schway__gte *g = r->g;
+    int64_t m[9], vec[3], out[3], col[3];
+    for (unsigned i = 0u; i < 3u; i++) {
+        vec[i] = ir_of(r, i + 1u);
+    }
+    load_matrix(&g->c[16], m);
+    matrix_multiply(r, m, vec, &g->c[13], out);
+    set_mac_ir_vec(r, out, r->lm);
+    if (blend) {
+        colour_far(r);
+    } else {
+        rgb16(g->d[6], col);
+        for (unsigned i = 0u; i < 3u; i++) {
+            out[i] = col[i] * ir_of(r, i + 1u);
+        }
+        set_mac_ir_vec(r, out, r->lm);
+    }
+    push_color(r);
+}
+
+/* The depth cue of the colour (DPCS) or of the three colours at the front of
+   the colour FIFO (DPCT): each pass reads the oldest colour, which the pass
+   before it pushed out. */
+static void dpc(struct run *r, int three)
+{
+    int64_t col[3];
+    for (unsigned n = 0u; n < (three ? 3u : 1u); n++) {
+        rgb16(r->g->d[three ? 20 : 6], col);
+        depth_cue(r, col);
+    }
+}
+
+/* Interpolation of IR towards the far colour by IR0 (INTPL). */
+static void intpl(struct run *r)
+{
+    const struct schway__gte *g = r->g;
+    int64_t old[3], sum[3];
+    for (unsigned i = 0u; i < 3u; i++) {
+        old[i] = ir_of(r, i + 1u);
+        set_mac_ir(r, i + 1u, s32v(g->c[21u + i]) * 4096 - old[i] * 4096, 0u);
+    }
+    for (unsigned i = 0u; i < 3u; i++) {
+        sum[i] = s16v(g->d[8]) * ir_of(r, i + 1u) + old[i] * 4096;
+    }
+    set_mac_ir_vec(r, sum, r->lm);
+    push_color(r);
+}
+
+/* IR times IR0 (GPF), or MAC shifted up by sf plus IR times IR0 (GPL). */
+static void gp(struct run *r, int add)
+{
+    const struct schway__gte *g = r->g;
+    int64_t sum[3];
+    for (unsigned i = 0u; i < 3u; i++) {
+        sum[i] = s16v(g->d[8]) * ir_of(r, i + 1u);
+        if (add) {
+            sum[i] += s32v(g->d[25u + i]) * (r->sf != 0u ? 4096 : 1);
+        }
+    }
+    set_mac_ir_vec(r, sum, r->lm);
+    push_color(r);
+}
+
 /* Matrix times vector plus translation. Command bits 17 to 18 pick the matrix
    (rotation, light, colour, or the reserved fourth), 15 to 16 the vector (V0 to
    V2 or IR1 to IR3) and 13 to 14 the translation (TR, the background colour,
@@ -619,11 +785,10 @@ static void finish(struct run *r)
 }
 
 /* The busy cycles of each command (psx-spx, Geometry Transformation Engine,
-   GTE Opcode Summary). RTPS, RTPT, NCLIP, AVSZ3, AVSZ4, SQR and OP compute; the
-   others leave the registers as they are until their numerics land. A number outside the table does nothing and
-   takes the shortest documented time, 5 cycles; that is a placeholder, not a
-   claim about the hardware. A command that computes clears FLAG first and
-   recomputes bit 31 last; the others only recompute it. */
+   GTE Opcode Summary). All 22 documented commands compute. A number outside
+   that table changes no register and takes the shortest documented time, 5
+   cycles; that is a choice of this engine, not a claim about the hardware.
+   Every command clears FLAG first and recomputes bit 31 last. */
 uint32_t schway__gte_exec(struct schway__gte *g, uint32_t op)
 {
     struct run r;
@@ -646,34 +811,61 @@ uint32_t schway__gte_exec(struct schway__gte *g, uint32_t op)
         finish(&r);
         return 6u;
     case 0x10u: /* DPCS */
+        dpc(&r, 0);
+        finish(&r);
         return 8u;
     case 0x11u: /* INTPL */
+        intpl(&r);
+        finish(&r);
         return 8u;
     case 0x12u: /* MVMVA */
         mvmva(&r, op);
         finish(&r);
         return 8u;
     case 0x13u: /* NCDS */
+        normal_colour(&r, 0u, 2u);
+        finish(&r);
         return 19u;
     case 0x14u: /* CDP */
+        colour_matrix(&r, 1);
+        finish(&r);
         return 13u;
     case 0x16u: /* NCDT */
+        normal_colour(&r, 0u, 2u);
+        normal_colour(&r, 1u, 2u);
+        normal_colour(&r, 2u, 2u);
+        finish(&r);
         return 44u;
     case 0x1Bu: /* NCCS */
+        normal_colour(&r, 0u, 1u);
+        finish(&r);
         return 17u;
     case 0x1Cu: /* CC */
+        colour_matrix(&r, 0);
+        finish(&r);
         return 11u;
     case 0x1Eu: /* NCS */
+        normal_colour(&r, 0u, 0u);
+        finish(&r);
         return 14u;
     case 0x20u: /* NCT */
+        normal_colour(&r, 0u, 0u);
+        normal_colour(&r, 1u, 0u);
+        normal_colour(&r, 2u, 0u);
+        finish(&r);
         return 30u;
     case 0x28u: /* SQR */
         sqr(&r);
         finish(&r);
         return 5u;
     case 0x29u: /* DCPL */
+        colour_far(&r);
+        push_color(&r);
+        finish(&r);
         return 8u;
     case 0x2Au: /* DPCT */
+        dpc(&r, 1);
+        finish(&r);
         return 17u;
     case 0x2Du: /* AVSZ3 */
         avsz(&r, 0);
@@ -690,10 +882,18 @@ uint32_t schway__gte_exec(struct schway__gte *g, uint32_t op)
         finish(&r);
         return 23u;
     case 0x3Du: /* GPF */
+        gp(&r, 0);
+        finish(&r);
         return 5u;
     case 0x3Eu: /* GPL */
+        gp(&r, 1);
+        finish(&r);
         return 5u;
     case 0x3Fu: /* NCCT */
+        normal_colour(&r, 0u, 1u);
+        normal_colour(&r, 1u, 1u);
+        normal_colour(&r, 2u, 1u);
+        finish(&r);
         return 39u;
     default:
         return 5u;
