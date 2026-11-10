@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 03
 current_phase_name: The GTE matches the hardware cases; DMA and timers
 status: executing
-stopped_at: Completed 03-08-PLAN.md
-last_updated: "2026-11-10T06:02:24.075Z"
+stopped_at: Completed 03-09-PLAN.md
+last_updated: "2026-11-10T06:22:43.042Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 03 execution started
-state_head: 54a5d54229568306dbd3d8cbc9859b7406972a68
+state_head: cb05725cb209f90d4dd10b0e596ce946866b53fc
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 68
-  completed_plans: 50
+  completed_plans: 51
   percent: 17
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 03 (The GTE matches the hardware cases; DMA and timers) — EXECUTING
-Plan: 9 of 26
+Plan: 10 of 26
 Status: Ready to execute
 Last activity: 2026-11-09 — Phase 03 execution started
 
@@ -109,6 +109,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 03 P06 | 9 min | 3 tasks | 12 files |
 | Phase 03 P26 | 5 min | 2 tasks | 6 files |
 | Phase 03 P08 | 15 min | 3 tasks | 6 files |
+| Phase 03 P09 | 19 min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -222,6 +223,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-08: Unit enum: a phase per channel, 0 idle and 1 unit running; DMA_UNIT_CHANNELS (OTC only) is the mask the engine passes to schway__dma_arbitrate, so channels 0-5 keep registers and wait until plan 03-10
 - [Phase 03]: 03-08: DICR bit 31 is bit 15 OR (bit 23 AND any flag): the per-channel enables gate only the setting of a flag, as the nugget reading 84800000h requires; OTC CHCR stores bits 24, 28 and 30 only, reads bit 1 as 1, clears bit 28 at the start and bit 24 at the end
 - [Phase 03]: 03-08: A DMA register read finishes a running unit as of its end tick (the bus hook has frozen the CPU until then); a CHCR write to the running channel keeps bit 24 set; OTC costs ceil(words*17/16), 4,352 cycles for 4,096 words
+- [Phase 03]: 03-09: the write hold is two counter cycles after the write's own cycle (a write at W shows at W+1 and W+2, counts from W+3); a reset at the target shows 0 for two cycles counting the landing, so the loop is target + 2; a landing is a count or a reset, never a software write
+- [Phase 03]: 03-09: a counter whose I_STAT bit is set gives no deadline, an I_STAT write catches the counters up first, and an advance runs a deadline that falls on its end tick, so a saved state never holds an event behind its tick; the saved timers view is as of the instance's tick and the span function is shared by catch-up, save and the bisection that finds the next raise
 
 ### Pending Todos
 
@@ -279,8 +282,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-10T06:02:23.968Z
-Stopped at: Completed 03-08-PLAN.md
+Last session: 2026-11-10T06:22:42.909Z
+Stopped at: Completed 03-09-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
