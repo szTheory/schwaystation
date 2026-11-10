@@ -2,7 +2,7 @@
 title: "Decisions already made"
 summary: "One line per settled choice for schwaystation, with its reason and the preparation file and section that support it; the open questions, each with the test or phase that settles it, at the end."
 read_when: "Before reopening any choice, and whenever a phase needs to know what is settled. Reopen a decision only with new evidence, and record the change here with its date."
-updated: 2026-10-19
+updated: 2026-11-10
 ---
 
 # Decisions already made

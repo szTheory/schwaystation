@@ -2,7 +2,7 @@
 title: "Preparation index"
 summary: "Which preparation file answers which question, and the conventions every file in this directory shares."
 read_when: "First, before opening any other file in this directory; again when adding, renaming or retiring one."
-updated: 2026-10-19
+updated: 2026-11-10
 ---
 
 # Preparation index
@@ -19,8 +19,8 @@ reading end to end. `BRIEF.md` holds the conventions and the fan-out method ever
 | [BRIEF.md](BRIEF.md) | Conventions, source tiers, licence rules for research, the fan-out method | Before writing or revising any file here |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | The core's spine: the CPU-cycle time base and frame boundary, modules and the bus, the `schway_` C API with stop reasons, I/O contracts, the fixed-size visitor state, observability, determinism and the three hashes, the interpreter and its fast-path constraints, the rasteriser, the SPU/CD/MDEC pipeline, build order, performance posture, settled conflicts | Before designing a core subsystem, the public header, the libretro adapter or the runner |
 | [DECISIONS.md](DECISIONS.md) | One row per settled choice (`DEC.NN`) with its reason and supporting section; open questions with the test or phase that settles each | Before reopening a choice, or when a phase needs to know what is settled |
-| [PSX-SYSTEM.md](PSX-SYSTEM.md) | Clocks and the master tick, the R3000A and COP0, memory map and bus control, DMA, root counters, interrupts, BIOS and boot, regions and revisions, power-on state, confidence | Changing the time base, CPU, bus, DMA, timers, interrupts, boot path, region handling or any timing that crosses chips |
-| [PSX-GPU-AND-GTE.md](PSX-GPU-AND-GTE.md) | GPU revisions and GPUSTAT, GP0/GP1 commands, rasterisation rules, video clocks and display, the GTE, tests and oracles, accuracy model, enhancement seeds and the v1 frame format, low-power rasteriser | Writing or changing `gpu.c` or `gte.c`, the frame format or display timing, or when a picture diverges |
+| [PSX-SYSTEM.md](PSX-SYSTEM.md) | Clocks and the master tick, BIOS and boot, regions and revisions, power-on state, confidence; sections 2 to 6 (the R3000A and COP0, memory map and bus control, DMA, root counters, interrupts) are pointers to `docs/hardware/cpu.md`, `cop0.md`, `bus.md`, `dma.md` and `timers.md` plus the corrections phase 3 found | Changing the time base, CPU, bus, DMA, timers, interrupts, boot path, region handling or any timing that crosses chips |
+| [PSX-GPU-AND-GTE.md](PSX-GPU-AND-GTE.md) | GPU revisions and GPUSTAT, GP0/GP1 commands, rasterisation rules, video clocks and display, the GTE (section 5 is a pointer to `docs/hardware/gte.md`), tests and oracles, accuracy model, enhancement seeds and the v1 frame format, low-power rasteriser | Writing or changing `gpu.c` or `gte.c`, the frame format or display timing, or when a picture diverges |
 | [PSX-SPU-CDROM-AND-MDEC.md](PSX-SPU-CDROM-AND-MDEC.md) | The SPU, the CD-ROM controller and its timings, disc images and the host disc interface, the MDEC, tests and fixtures, determinism and A/V sync, confidence | Building the SPU, CD-ROM, XA, MDEC, the disc helper, the mixer or audio tests |
 | [PSX-PERIPHERALS-AND-SAVES.md](PSX-PERIPHERALS-AND-SAVES.md) | SIO0, every pad and gun, memory cards and card file formats, save-state constraints, game identity and rcheevos hash, patches and cheats, hostile-input bounds, milestone placement | Changing SIO0, a device model, cards, saves, the probe, patch handling or fuzz targets |
 | [PSX-ECOSYSTEM-AND-USERS.md](PSX-ECOSYSTEM-AND-USERS.md) | Every PS1 emulator with its licence at a pin, user complaints mapped to responses, personas by horizon, low-power and WASM budgets, library sizes, the slot schwaystation fills | Ranking features or horizons, choosing an oracle, planning a port, answering "why not emulator X" |
@@ -40,14 +40,14 @@ reading end to end. `BRIEF.md` holds the conventions and the fan-out method ever
 | Question | File and section |
 |---|---|
 | What is one tick; how are the GPU, dot, SPU and CD clocks derived from it without floating point; what are the exact line and frame rates? | PSX-SYSTEM 1; ARCHITECTURE 1; PSX-GPU-AND-GTE 4 |
-| What must the CPU model: pipeline, delay slots, mul/div, COP0, exceptions, I-cache, scratchpad? | PSX-SYSTEM 2; DECISIONS CPU rows |
-| What answers each address, how do the BIU delay registers shape timing, what do unmapped regions do? | PSX-SYSTEM 3; ARCHITECTURE 2 |
-| How do the DMA channels, chopping and CPU stalls, the root counters and I_STAT/I_MASK work? | PSX-SYSTEM 4 to 6 |
+| What must the CPU model: pipeline, delay slots, mul/div, COP0, exceptions, I-cache, scratchpad? | [docs/hardware/cpu.md](../../docs/hardware/cpu.md), [cop0.md](../../docs/hardware/cop0.md) (PSX-SYSTEM 2 points there); DECISIONS CPU rows |
+| What answers each address, how do the BIU delay registers shape timing, what do unmapped regions do? | [docs/hardware/bus.md](../../docs/hardware/bus.md) (PSX-SYSTEM 3 points there); ARCHITECTURE 2 |
+| How do the DMA channels, chopping and CPU stalls, the root counters and I_STAT/I_MASK work? | [docs/hardware/dma.md](../../docs/hardware/dma.md), [timers.md](../../docs/hardware/timers.md), [bus.md](../../docs/hardware/bus.md) (PSX-SYSTEM 4 to 6 point there) |
 | Which BIOSes exist with which digests, what an EXE needs, and how CI boots without a Sony BIOS? | PSX-SYSTEM 7; PSXDEV-EXTRACTS 5; ASSET_POLICY 5 |
 | Which regions and board revisions differ, what are the profile fields, what is the power-on state? | PSX-SYSTEM 8, 9 |
 | GPU revisions, VRAM and GPUSTAT; the GP0/GP1 command set; dither, blend, modulation, mask, texture decode, fill rule? | PSX-GPU-AND-GTE 1 to 3 |
 | Video clocks, hblank and vblank, FIFO and DMA, primitive cost, display mapping? | PSX-GPU-AND-GTE 4 |
-| GTE registers, opcodes, cycle counts, flags and the UNR division? | PSX-GPU-AND-GTE 5 |
+| GTE registers, opcodes, cycle counts, flags and the UNR division? | [docs/hardware/gte.md](../../docs/hardware/gte.md) (PSX-GPU-AND-GTE 5 points there) |
 | What does the v1 output frame look like, and where do enhancements hook in later? | PSX-GPU-AND-GTE 8; ARCHITECTURE 9; HOSTS-AND-INTEGRATION 8 |
 | SPU voices, ADSR, reverb and mixing; the audio contract and hash; A/V sync? | PSX-SPU-CDROM-AND-MDEC 1, 6; ARCHITECTURE 10 |
 | CD-ROM commands, INT semantics, measured timings, GetID and region, LibCrypt? | PSX-SPU-CDROM-AND-MDEC 2 |

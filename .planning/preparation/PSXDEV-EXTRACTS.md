@@ -2,7 +2,7 @@
 title: "PSX development-community extracts for schwaystation (PS1 / PSX)"
 summary: "Paraphrased high-signal facts from psx-spx (nocash original and the consoledev.net edition), the PCSX-Redux nugget test farm, ps1-tests and the other PS1 test-program authors, with who measured what and how; the test-program inventory with licences checked at pins; the toolchain pins (armips, mipsel-none-elf GCC, PSn00bSDK, mkpsxiso) with SHA-256 digests; the BIOS stand-in options; the fixture candidate list; and the hash databases."
 read_when: "Before citing any community (T2/T4) claim about R3000, GTE, GPU, SPU, CD-ROM, MDEC or timer behaviour; before choosing a test program, vector set, fixture, assembler, disc-image tool or BIOS stand-in for CI; before keying the compatibility ledger."
-updated: 2026-10-19
+updated: 2026-11-10
 ---
 
 # PSX development-community extracts

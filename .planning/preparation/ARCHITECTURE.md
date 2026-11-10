@@ -2,7 +2,7 @@
 title: "Architecture: time base, modules and bus, public C API, I/O contracts, state, observability, execution engine, GPU and audio pipelines, build order, conflicts"
 summary: "The technical spine of the schwaystation core: one CPU-cycle timeline with a lazy event scheduler, the module and register-owner map, the schway_ C API with its contracts and stop reasons, the video, audio, input, disc and memory-card contracts, the fixed-size visitor state, counters and first fault, the determinism rules and the three hash definitions, the interpreter written for a cached interpreter and JIT seed, the span rasteriser, the SPU/CD/MDEC pipeline, the four v1.0 phases, the Ir budgets, and every conflict between the preparation files with its settled answer."
 read_when: "Before planning or writing core, runner or libretro code; before adding a module, API call, profile field, hash or stop reason; whenever two preparation files disagree."
-updated: 2026-10-19
+updated: 2026-11-10
 ---
 
 # schwaystation architecture

@@ -2,7 +2,7 @@
 title: "Conformance: vectors, fixtures, oracles, diagnostics and the compatibility ledger"
 summary: "Which PS1 vector sets and test programs schwaystation may use under which licence and disposition, the self-authored armips PS-EXE and mkpsxiso disc fixtures that are the primary v1.0 evidence, the RAM-mailbox and TTY protocol the runner reads, which released emulators act as headless oracles (PCSX-Redux with OpenBIOS in CI; DuckStation regtest, Mednafen and ares locally), the ledger keyed by Redump serial and hash with its ratchet, first-fault diagnostics, CI tiers and cost, fuzz targets, admission rules and the milestone map."
 read_when: "Admitting a vector set, test program or fixture; writing a fixture; building the runner's mailbox, TTY or first-fault code; adding a ledger row, an oracle lane or a CI tier; planning which evidence lands in which v1.0 phase."
-updated: 2026-10-19
+updated: 2026-11-10
 ---
 
 # Conformance, oracles and the compatibility ledger
