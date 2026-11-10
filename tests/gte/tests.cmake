@@ -10,12 +10,13 @@ schway_warnings(schwaystation-test-gte)
 
 set(gte_vectors_bin ${PROJECT_SOURCE_DIR}/tests/vectors/gte/ps1tests-1150.bin)
 
-# Fault prevented: a register that reads or writes differently from the
-# hardware-captured cases (a mirror, a sign extension, the FIFO push, LZCR, the
-# FLAG summary bit). The 50 register-only cases run in the upstream order and
-# the count is the zero-case guard: a run that replayed fewer fails.
+# Fault prevented: a register or a command that reads, writes or computes
+# differently from the hardware-captured cases (a mirror, a sign extension, the
+# FIFO push, LZCR, the FLAG bits, a saturation, the divide). The cases run in
+# the upstream order and the count is the zero-case guard: a run that
+# replayed fewer fails.
 schway_add_test(NAME gte.vectors.part1
-  COMMAND schwaystation-test-gte vectors ${gte_vectors_bin} --expect 50 --ops reg
+  COMMAND schwaystation-test-gte vectors ${gte_vectors_bin} --expect 100 --ops reg,01
   LABELS gte portable TIMEOUT 30)
 
 # Fault prevented: a register index, an edge value or a command number that
