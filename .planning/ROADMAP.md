@@ -167,7 +167,7 @@ Plans:
   2. `ctest -L dma` passes for all seven channels, covering costs, chopping, MADR wrap, OTC clearing and the CPU stall. The `chain-looping` list terminates by the 1000h-node guard, and the pinned DMA fixture record matches.
   3. `ctest -L timers` passes for the three root counters with sync modes, targets, the write hold and every IRQ mode. The `timers_lines` sysclk, sysclk/8 and vblank-count records match per profile.
 
-**Plans**: 16/26 plans executed in 10 waves
+**Plans**: 17/26 plans executed in 10 waves
 
 Plans:
 **Wave 1**
@@ -197,7 +197,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [x] 03-15-PLAN.md — SCHWAY_FAULT_DMA and API version 3
-- [ ] 03-16-PLAN.md — The dma_chain fixture with OTC, DICR, list outcomes and the Timer 2 OTC time
+- [x] 03-16-PLAN.md — The dma_chain fixture with OTC, DICR, list outcomes and the Timer 2 OTC time
 - [ ] 03-24-PLAN.md — Split equivalence with the timers and DMA armed
 
 **Wave 7** *(blocked on Wave 6 completion)*
@@ -273,7 +273,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. A test frame in RetroArch | 15/15 | Ship PR #4 | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
-| 3. The GTE matches the hardware cases; DMA and timers | 16/26 | In Progress | - |
+| 3. The GTE matches the hardware cases; DMA and timers | 17/26 | In Progress | - |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
