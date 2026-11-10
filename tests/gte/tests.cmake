@@ -144,3 +144,22 @@ schway_add_test(NAME gte.unlisted_noop
 schway_add_test(NAME gte.ref.vectors
   COMMAND schwaystation-test-gte ref_vectors ${gte_vectors_bin} --expect 1150
   LABELS gte portable TIMEOUT 60)
+
+# Fault prevented: the engine and the independent model disagreeing on any of
+# the 64 registers (FLAG included) or on the cycles of any command, for inputs
+# the hardware cases never reach: the register limits, sums on the 43-bit and
+# 31-bit boundaries, and every sf, lm and matrix, vector and translation field.
+# It runs 1,000 seeded cases of each of the 22 commands, prints the seed, and
+# fails unless all 22,000 ran.
+schway_add_test(NAME gte.ref.property
+  COMMAND schwaystation-test-gte property
+  LABELS gte portable TIMEOUT 60)
+
+# Fault prevented: a differential test that compares too little, so a wrong
+# register still passes. The same run flips one bit of one engine-side read
+# and must fail naming the difference.
+schway__gte_cmd(cmd property --mutate)
+schway_add_test(NAME gte.ref.property.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${cmd}" -DCODE=1 "-DREGEX=gte property: engine differs from the model"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS gte portable TIMEOUT 60)

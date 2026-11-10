@@ -6,6 +6,8 @@ gte.quirk.h_sign	gte,portable
 gte.quirk.ir3_lm	gte,portable
 gte.quirk.mx3	gte,portable
 gte.quirk.rtpt_ir0	gte,portable
+gte.ref.property	gte,portable
+gte.ref.property.self_test	gte,portable
 gte.ref.vectors	gte,portable
 gte.regs.sweep	gte,portable
 gte.unlisted_noop	gte,portable
