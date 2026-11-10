@@ -40,7 +40,8 @@ schway_add_test(NAME gpu.state.partial_fill
 
 # Fault prevented: transfer dimensions, endian order, wrapping, padding, reset,
 # partial-state resume, and malformed transfer cursors drifting from the bus.
-foreach(case IN ITEMS roundtrip dimensions partial_state reset_mid_packet invalid_cursor)
+foreach(case IN ITEMS copy_masks copy_order copy_wrap roundtrip dimensions partial_state
+                      reset_mid_packet invalid_cursor)
   schway_add_test(NAME gpu.transfer.${case}
     COMMAND schwaystation-test-gpu-transfer ${case}
     LABELS gpu portable TIMEOUT 10)

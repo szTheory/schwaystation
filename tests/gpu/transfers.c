@@ -146,6 +146,15 @@ static void start_transfer(schway *inst, uint32_t command, uint32_t x, uint32_t 
     write_port(inst, GP0, ((height & 0x1FFu) << 16) | (width & 0x3FFu));
 }
 
+static void copy_rect(schway *inst, uint32_t source_x, uint32_t source_y, uint32_t dest_x,
+                      uint32_t dest_y, uint32_t width, uint32_t height)
+{
+    write_port(inst, GP0, 0x80000000u);
+    write_port(inst, GP0, ((source_y & 0x1FFu) << 16) | (source_x & 0x3FFu));
+    write_port(inst, GP0, ((dest_y & 0x1FFu) << 16) | (dest_x & 0x3FFu));
+    write_port(inst, GP0, ((height & 0x1FFu) << 16) | (width & 0x3FFu));
+}
+
 static void test_roundtrip(void)
 {
     schway *inst = make_instance();
@@ -301,6 +310,123 @@ static void test_invalid_cursor(void)
     schway_destroy(source);
 }
 
+static void test_copy_order(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        CHECK(0);
+        return;
+    }
+    inst->vram[10][10] = 0x0011u;
+    inst->vram[10][11] = 0x0022u;
+    inst->vram[10][12] = 0x0033u;
+    copy_rect(inst, 10u, 10u, 11u, 10u, 3u, 1u);
+    CHECK(inst->vram[10][10] == 0x0011u);
+    CHECK(inst->vram[10][11] == 0x0011u);
+    CHECK(inst->vram[10][12] == 0x0011u);
+    CHECK(inst->vram[10][13] == 0x0011u);
+
+    inst->vram[12][10] = 0u;
+    inst->vram[12][11] = 0x0044u;
+    inst->vram[12][12] = 0x0055u;
+    inst->vram[12][13] = 0x0066u;
+    copy_rect(inst, 11u, 12u, 10u, 12u, 3u, 1u);
+    CHECK(inst->vram[12][10] == 0x0044u);
+    CHECK(inst->vram[12][11] == 0x0055u);
+    CHECK(inst->vram[12][12] == 0x0066u);
+
+    inst->vram[20][30] = 0x0101u;
+    inst->vram[21][30] = 0x0202u;
+    inst->vram[22][30] = 0x0303u;
+    copy_rect(inst, 30u, 20u, 30u, 21u, 1u, 3u);
+    CHECK(inst->vram[21][30] == 0x0101u);
+    CHECK(inst->vram[22][30] == 0x0101u);
+    CHECK(inst->vram[23][30] == 0x0101u);
+
+    inst->vram[31][40] = 0x1111u;
+    inst->vram[32][40] = 0x2222u;
+    inst->vram[33][40] = 0x3333u;
+    copy_rect(inst, 40u, 31u, 40u, 30u, 1u, 3u);
+    CHECK(inst->vram[30][40] == 0x1111u);
+    CHECK(inst->vram[31][40] == 0x2222u);
+    CHECK(inst->vram[32][40] == 0x3333u);
+
+    inst->vram[40][100] = 1u;
+    inst->vram[40][101] = 2u;
+    inst->vram[41][100] = 3u;
+    inst->vram[41][101] = 4u;
+    copy_rect(inst, 100u, 40u, 101u, 41u, 2u, 2u);
+    CHECK(inst->vram[41][101] == 1u);
+    CHECK(inst->vram[41][102] == 2u);
+    CHECK(inst->vram[42][101] == 3u);
+    CHECK(inst->vram[42][102] == 1u);
+    schway_destroy(inst);
+}
+
+static void test_copy_masks(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        CHECK(0);
+        return;
+    }
+    write_port(inst, GP0, 0xE3000000u | (10u << 10) | 10u);
+    write_port(inst, GP0, 0xE4000000u | (10u << 10) | 10u);
+    inst->vram[4][4] = 0x0123u;
+    inst->vram[4][5] = 0x5678u;
+    inst->vram[5][5] = 0x8001u;
+    inst->vram[5][6] = 0x0002u;
+    write_port(inst, GP0, 0xE6000003u);
+    copy_rect(inst, 4u, 4u, 5u, 5u, 2u, 1u);
+    CHECK(inst->vram[5][5] == 0x8001u);
+    CHECK(inst->vram[5][6] == 0xD678u);
+
+    write_port(inst, GP0, 0xE6000001u);
+    inst->vram[7][7] = 0x0123u;
+    inst->vram[8][8] = 0x8000u;
+    copy_rect(inst, 7u, 7u, 8u, 8u, 1u, 1u);
+    CHECK(inst->vram[8][8] == 0x8123u);
+
+    write_port(inst, GP0, 0xE6000002u);
+    inst->vram[9][9] = 0x9234u;
+    inst->vram[10][10] = 0x8002u;
+    inst->vram[9][10] = 0x8456u;
+    inst->vram[10][11] = 0x0003u;
+    copy_rect(inst, 9u, 9u, 10u, 10u, 2u, 1u);
+    CHECK(inst->vram[10][10] == 0x8002u);
+    CHECK(inst->vram[10][11] == 0x8456u);
+    schway_destroy(inst);
+}
+
+static void test_copy_wrap(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        CHECK(0);
+        return;
+    }
+    inst->vram[510][1023] = 0x0011u;
+    inst->vram[510][0] = 0x0022u;
+    inst->vram[511][1023] = 0x0033u;
+    inst->vram[511][0] = 0x0044u;
+    copy_rect(inst, 1023u, 510u, 20u, 20u, 2u, 2u);
+    CHECK(inst->vram[20][20] == 0x0011u);
+    CHECK(inst->vram[20][21] == 0x0022u);
+    CHECK(inst->vram[21][20] == 0x0033u);
+    CHECK(inst->vram[21][21] == 0x0044u);
+
+    inst->vram[4][4] = 0x0055u;
+    inst->vram[4][5] = 0x0066u;
+    inst->vram[5][4] = 0x0077u;
+    inst->vram[5][5] = 0x0088u;
+    copy_rect(inst, 4u, 4u, 1023u, 511u, 2u, 2u);
+    CHECK(inst->vram[511][1023] == 0x0055u);
+    CHECK(inst->vram[511][0] == 0x0066u);
+    CHECK(inst->vram[0][1023] == 0x0077u);
+    CHECK(inst->vram[0][0] == 0x0088u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -317,6 +443,12 @@ int main(int argc, char **argv)
         test_reset_mid_packet();
     } else if (strcmp(argv[1], "invalid_cursor") == 0) {
         test_invalid_cursor();
+    } else if (strcmp(argv[1], "copy_order") == 0) {
+        test_copy_order();
+    } else if (strcmp(argv[1], "copy_masks") == 0) {
+        test_copy_masks();
+    } else if (strcmp(argv[1], "copy_wrap") == 0) {
+        test_copy_wrap();
     } else {
         fprintf(stderr, "unknown GPU transfer case: %s\n", argv[1]);
         return 2;
