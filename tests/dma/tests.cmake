@@ -215,3 +215,10 @@ schway_add_test(NAME dma.fault.sync3
 schway_add_test(NAME dma.read.chain_saves
   COMMAND schwaystation-test-dma read_chain_saves
   LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a DMA stall that leaves the CPU's cycle count where it was, so
+# a GTE command or a divide long finished still makes the next read of its result
+# wait the rest of its latency.
+schway_add_test(NAME dma.stall.engines_decay
+  COMMAND schwaystation-test-dma stall_decays_engines
+  LABELS dma portable TIMEOUT 30)

@@ -1690,6 +1690,61 @@ static void case_read_chain_saves(void)
     schway_destroy(inst);
 }
 
+/* The cycles a read of an engine's result costs once a DMA unit has held the CPU
+   for thousands of cycles: the program enables the GTE, issues the word issue
+   (a GTE command or a divide, or a nop for the control), starts OTC, loads from
+   the I/O page (the load waits for the unit) and then runs the word read, whose
+   cost is measured from the tick it is next to the tick it retires. */
+static uint64_t engine_read_cost(uint32_t issue, uint32_t read)
+{
+    uint32_t w[24];
+    uint32_t n = put_setup(w, DPCR_OTC);
+    w[n++] = I_LUI(15u, 0x4000u);
+    w[n++] = 0x40806000u | (15u << 16);
+    w[n++] = issue;
+    w[n++] = I_SW(T4, 0xE8u, T0);
+    w[n++] = I_LW(T5, 0xE8u, T0);
+    const uint32_t read_pc = TEXT + 4u * n;
+    w[n++] = read;
+    w[n++] = I_ADDIU(T9, 0u, 1u);
+    w[n++] = I_BEQ(0u, 0u, -1);
+    w[n++] = I_NOP;
+    schway *inst = make();
+    load(inst, w, n);
+    run_to_entry(inst);
+    for (uint32_t i = 0; i < 20000u; i++) {
+        if (inst->cpu.pc == read_pc && inst->dma.stall_until <= inst->ticks) {
+            break;
+        }
+        (void)run(inst, 1u);
+    }
+    CHECK_EQ_HEX(inst->cpu.pc, read_pc);
+    uint64_t before = inst->ticks;
+    (void)run(inst, 1u);
+    uint64_t cost = inst->ticks - before;
+    schway_destroy(inst);
+    return cost;
+}
+
+/* Fault prevented: a DMA stall that does not count in the CPU's cycle count, so
+   that the GTE's and the multiply unit's busy stamps do not run down while the
+   bus holds the CPU and a read of their result, long after the command, still
+   waits the rest of its latency. */
+static void case_stall_decays_engines(void)
+{
+    /* NCDT, 44 cycles, then MFC2 of IR1; DIV, 36 cycles, then MFLO. */
+    const uint32_t ncdt = 0x4A000016u;
+    const uint32_t mfc2 = 0x48000000u | (24u << 16) | (9u << 11);
+    const uint32_t div = (T4 << 21) | (T6 << 16) | 0x1Au;
+    const uint32_t mflo = (24u << 11) | 0x12u;
+    uint64_t control = engine_read_cost(I_NOP, mfc2);
+    CHECK(control >= 1u && control < 10u);
+    CHECK_EQ_U64(engine_read_cost(ncdt, mfc2), control);
+    control = engine_read_cost(I_NOP, mflo);
+    CHECK(control >= 1u && control < 10u);
+    CHECK_EQ_U64(engine_read_cost(div, mflo), control);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
@@ -1727,6 +1782,7 @@ static const struct {
     {"stall_write_queue", case_stall_write_queue},
     {"otc_read_sees_completion", case_otc_read_sees_completion},
     {"read_chain_saves", case_read_chain_saves},
+    {"stall_decays_engines", case_stall_decays_engines},
 };
 
 int main(int argc, char **argv)

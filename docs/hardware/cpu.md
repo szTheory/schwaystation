@@ -381,7 +381,9 @@ RAM or an I/O register, an instruction fetch that misses the cache, or the fifth
 the four-deep write queue, so only a full queue waits), sets the tick the CPU is held until. The scratchpad, a cache
 hit, COP0 and the GTE never touch the bus and never wait. The CPU does not execute while the stamp is ahead of the
 tick: the loop advances the tick, within the budget and the frame and stopping at the next deadline so events run on
-time, and the CPU cycle count does not move. This is a freeze rather than a charge on one instruction, because a unit
+time, and the CPU cycle count does not move. The multiply unit and the GTE keep running through the freeze, so their
+busy stamps, which are values of that count, move back by the freeze and a later read of their result waits only for what
+was left of the latency. This is a freeze rather than a charge on one instruction, because a unit
 can hold the bus for tens of thousands of cycles and charging that to a single instruction would pass the overrun
 bound above. The part of a stall that crosses the end of a budget or of a frame stays in the state and the next call
 keeps waiting, so the overrun past any limit is still at most one instruction.

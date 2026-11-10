@@ -208,6 +208,14 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
                 wait = until;
             }
             inst->ticks += wait;
+            /* The multiply unit and the GTE keep running while the bus holds
+               the CPU. Their stamps are values of the CPU's cycle count, which
+               does not move in a freeze, so the stamps move back by the
+               freeze instead: a result then waits only for what is left of its
+               latency (0 is no stamp). */
+            uint64_t *mul = &inst->cpu.muldiv_ready;
+            *mul = *mul > wait ? *mul - wait : 0u;
+            inst->gte.ready = inst->gte.ready > wait ? inst->gte.ready - wait : 0u;
             ran += wait;
             schway__sched_sync(inst);
             continue;

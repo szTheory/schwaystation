@@ -26,6 +26,7 @@ dma.otc.readback	dma,portable
 dma.read.chain_saves	dma,portable
 dma.regs.sweep	dma,portable
 dma.stall.cpu_access	dma,portable
+dma.stall.engines_decay	dma,portable
 dma.stall.not_scratch	dma,portable
 dma.stall.write_queue	dma,portable
 dma.sync0.from_device	dma,portable
