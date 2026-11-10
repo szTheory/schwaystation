@@ -7,6 +7,13 @@ set_target_properties(schwaystation-test-gpu PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu)
 
+add_executable(schwaystation-test-gpu-transfer ${CMAKE_CURRENT_LIST_DIR}/transfers.c)
+target_include_directories(schwaystation-test-gpu-transfer PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-gpu-transfer PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-gpu-transfer PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-gpu-transfer)
+
 # Fault prevented: a GP0 fill that is lost between the bus and VRAM, or uses
 # byte rather than halfword coordinates, sizing, or color conversion.
 schway_add_test(NAME gpu.decoder.fill_mmio
@@ -30,6 +37,14 @@ schway_add_test(NAME gpu.decoder.register_images
 schway_add_test(NAME gpu.state.partial_fill
   COMMAND schwaystation-test-gpu state_partial_fill
   LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: transfer dimensions, endian order, wrapping, padding, reset,
+# partial-state resume, and malformed transfer cursors drifting from the bus.
+foreach(case IN ITEMS roundtrip dimensions partial_state reset_mid_packet invalid_cursor)
+  schway_add_test(NAME gpu.transfer.${case}
+    COMMAND schwaystation-test-gpu-transfer ${case}
+    LABELS gpu portable TIMEOUT 10)
+endforeach()
 
 # Keep the original test-card pixel and native-video contracts selected.
 foreach(case IN ITEMS testcard.pixels video.tuple)

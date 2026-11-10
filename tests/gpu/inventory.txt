@@ -3,4 +3,9 @@ gpu.decoder.partial_packet_reset	gpu,portable
 gpu.decoder.register_images	gpu,portable
 gpu.state.partial_fill	gpu,portable
 gpu.testcard.pixels	gpu,portable
+gpu.transfer.dimensions	gpu,portable
+gpu.transfer.invalid_cursor	gpu,portable
+gpu.transfer.partial_state	gpu,portable
+gpu.transfer.reset_mid_packet	gpu,portable
+gpu.transfer.roundtrip	gpu,portable
 gpu.video.tuple	gpu,portable
