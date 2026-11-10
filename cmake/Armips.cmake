@@ -76,6 +76,8 @@ endif()
 # needs macOS 10.15, above the 10.13 the library itself targets.
 set(schway__armips_args -DCMAKE_BUILD_TYPE=Release -DARMIPS_USE_STD_FILESYSTEM=ON
   -DARMIPS_LIBRARY_ONLY=OFF)
+# One translation unit per directory: the assembler builds several times faster with the same output.
+list(APPEND schway__armips_args -DCMAKE_UNITY_BUILD=ON)
 if(CMAKE_HOST_APPLE)
   list(APPEND schway__armips_args -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15)
 endif()
