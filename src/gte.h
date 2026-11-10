@@ -16,9 +16,11 @@ struct schway__state_io;
 /* ready is the value of cpu.cycle at which the engine finishes its last
    command; a read of a result or a new command issued before it waits to
    that stamp. d and c are the data registers (cop2r0-31) and the control
-   registers (cop2r32-63) in the forms a program stores them
-   (PSX-GPU-AND-GTE section 5.1). ready comes first so the layout does not
-   depend on alignment. */
+   registers (cop2r32-63) in the forms a program stores them: a 16-bit
+   register holds its 16-bit pattern and extends on read as the hardware does,
+   SXYP, IRGB and ORGB hold nothing of their own, and LZCR is stored, derived
+   when LZCS is written (docs/hardware/gte.md). ready comes first so the layout
+   does not depend on alignment. */
 struct schway__gte {
     uint64_t ready;
     uint32_t d[32];
