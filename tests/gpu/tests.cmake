@@ -21,6 +21,13 @@ set_target_properties(schwaystation-test-gpu-pixels PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu-pixels)
 
+add_executable(schwaystation-test-gpu-triangles ${CMAKE_CURRENT_LIST_DIR}/triangles.c)
+target_include_directories(schwaystation-test-gpu-triangles PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-gpu-triangles PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-gpu-triangles PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-gpu-triangles)
+
 # Fault prevented: a GP0 fill that is lost between the bus and VRAM, or uses
 # byte rather than halfword coordinates, sizing, or color conversion.
 schway_add_test(NAME gpu.decoder.fill_mmio
@@ -54,6 +61,11 @@ schway_add_test(NAME gpu.state.cache_roundtrip
 # Fault prevented: textured rectangles fail to fetch and write one native RGB555 pixel.
 schway_add_test(NAME gpu.pixel.textured_rectangle_mmio
   COMMAND schwaystation-test-gpu-pixels textured_rectangle_mmio
+  LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: real flat triangle and quad packets lose coverage, winding invariance, or single blend ownership.
+schway_add_test(NAME gpu.triangle.flat_packet
+  COMMAND schwaystation-test-gpu-triangles flat_packet
   LABELS gpu portable TIMEOUT 10)
 
 # Fault prevented: pixel arithmetic, dither eligibility, raw texture, and write masks drift.

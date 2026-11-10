@@ -16,4 +16,5 @@ gpu.transfer.invalid_cursor	gpu,portable
 gpu.transfer.partial_state	gpu,portable
 gpu.transfer.reset_mid_packet	gpu,portable
 gpu.transfer.roundtrip	gpu,portable
+gpu.triangle.flat_packet	gpu,portable
 gpu.video.tuple	gpu,portable
