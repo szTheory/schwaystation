@@ -63,7 +63,7 @@ static void packet_clear(struct schway__gpu *g)
 }
 
 /* GPU power-on register defaults (psx-spx, GPU Display Control Commands;
-   .planning/preparation/PSX-GPU-AND-GTE.md, sections 1.3 and 2.4). */
+   .planning/preparation/PSX-GPU-AND-GTE.md, sections one point three and two point four). */
 void schway__gpu_reset(schway *inst)
 {
     struct schway__gpu *g = &inst->gpu;
