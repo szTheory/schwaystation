@@ -5,14 +5,13 @@ projects vertices, lights colours and averages depths. This page covers the engi
 rules for reading and writing them, the command encoding, the FLAG register, timing, and how the hardware-captured
 cases are replayed. Everything is integer arithmetic and behaves the same on every platform. Facts come from the
 psx-spx pages on the Geometry Transformation Engine (registers, opcode summary, FLAG), which the hardware cases in the
-public ps1-tests repository support; the numerics and the commands follow as they are built and are marked below.
+public ps1-tests repository support; the numerics, the commands and the quirks follow.
 
 ## State of the engine
 
-The register file, the numerics, the divide and seven commands are built and replayed against the hardware cases: RTPS,
-RTPT, NCLIP, AVSZ3, AVSZ4, SQR and OP. The other fifteen commands are dispatched and report their busy cycles but
-compute nothing yet, so the cases that run them still fail; a replay says how many cases ran. The CPU's COP2 forms reach
-this engine, as "COP2 and the GTE" in [the CPU page](cpu.md) describes.
+The engine is complete: the register file, the numerics, the divide and all 22 documented commands are built and
+replayed against the 1,150 hardware cases, and the quirks the cases pin only thinly have tests of their own. The CPU's
+COP2 forms reach this engine, as "COP2 and the GTE" in [the CPU page](cpu.md) describes.
 
 ## The two register files
 
@@ -97,8 +96,9 @@ A COP2 command is the instruction word `0100101b` in bits 31 to 25 followed by a
 | 5 to 0 | command | the command number |
 
 The engine decodes `op & 3Fh` as the command, takes sf from bit 19 and lm from bit 10 into locals, and stores neither.
-A command number outside the 22 of the table below does nothing and takes 5 cycles; that is a placeholder choice, not a
-claim about the hardware.
+A command number outside the 22 of the table below changes no register, FLAG included, and takes 5 cycles; that is a
+choice of this engine, not a claim about the hardware, and the two numbers the seed treated as copies of other commands
+(00h and 1Ah) are not copies here.
 
 | Number | Name | Busy cycles | Number | Name | Busy cycles |
 |---|---|---|---|---|---|
@@ -145,7 +145,11 @@ in `src/gte.c`; entry i is the larger of 0 and `(40000h / (i + 100h) + 1) / 2 - 
 `gte.unr_table` works the formula out in integers and compares all 257 bytes with the literal. The hardware cases pin
 the table only at the entries their divisors reach, so the comparison is what pins the rest.
 
-## The commands built so far
+## The commands
+
+Every command builds FLAG afresh, takes `sf` and `lm` from the command word and ends with FLAG recomputed; the table
+says what each computes. A "colour" is the RGBC bytes R, G, B each times 10h, and "pushed" means the colour FIFO takes
+the three results (below).
 
 | Command | What it computes |
 |---|---|
@@ -155,11 +159,50 @@ the table only at the entries their divisors reach, so the comparison is what pi
 | AVSZ3, AVSZ4 | MAC0 as ZSF3 times SZ1 to SZ3, or ZSF4 times SZ0 to SZ3, and OTZ as that over 1000h |
 | SQR | IR1 to IR3 squared into MAC1 to MAC3 and IR1 to IR3 |
 | OP | the outer product of IR with the diagonal of the rotation matrix, into MAC1 to MAC3 and IR1 to IR3 |
+| MVMVA | a matrix times a vector plus a translation, chosen by command bits 17 to 13, into MAC1 to MAC3 and IR1 to IR3 |
+| NCS, NCT | the light matrix on V0 (NCS) or V0, V1 and V2 (NCT), then the colour matrix on the result plus the background colour; each result is pushed |
+| NCCS, NCCT | as NCS and NCT, then the result times the colour is pushed |
+| NCDS, NCDT | as NCS and NCT, then the result is blended with the far colour by IR0 and pushed |
+| CC | the colour matrix on IR plus the background colour, times the colour, pushed |
+| CDP | the colour matrix on IR plus the background colour, blended with the far colour by IR0, pushed |
+| DCPL | IR times the colour, blended with the far colour by IR0, pushed |
+| DPCS, DPCT | the colour blended with the far colour by IR0, pushed; DPCT does it for RGB0, RGB1 and RGB2 in turn, each time taking the oldest colour the pass before pushed out |
+| INTPL | IR blended with the far colour by IR0, pushed |
+| GPF | IR times IR0, pushed |
+| GPL | MAC shifted left by 12 when `sf` is set, plus IR times IR0, pushed |
 
-The command field bits 20 to 24 are ignored: NCLIP issued as `0140006h`, with the fake number and bit 18 set as Wipeout
-2097 does, gives the same 64 outputs and cycles as `6`. The test `gte.nclip_fake_bits` covers it, because the hardware
-cases never set those bits. A command number outside the table is a no-op with the placeholder cost above, and nothing
-here claims what the hardware does for it.
+**The colour FIFO.** A push takes MAC1 to MAC3 shifted right by 4, clamps each to 0 up to FFh (bits 21, 20 and 19 for
+red, green and blue), moves RGB1 into RGB0 and RGB2 into RGB1 and stores the three bytes with the code byte of RGBC in
+RGB2. A blend with the far colour takes two steps: IR1 to IR3 first become the far colour less the operand, clamped as
+if `lm` were clear, and then the operand plus IR0 times that; only the second step honours `lm`. The first step still
+sets its saturation flags.
+
+**MVMVA.** Bits 18 to 17 pick the matrix (rotation, light, colour, or the reserved fourth), bits 16 to 15 the vector
+(V0, V1, V2, or IR1 to IR3) and bits 14 to 13 the translation (TR, BK, FC, or none). The sum for each row is the
+translation shifted left by 12 and then the three products, checked against 44 bits after every addition.
+
+## The quirks
+
+These are the behaviours the hardware cases pin only thinly. Each has its own test, with its expected values worked
+out by hand in the test's comment from the psx-spx pages.
+
+- **The far colour.** MVMVA with the far colour as translation (bits 14 to 13 equal to 2) leaves the translation and the
+  first product out of MAC and IR: they hold only the second and third products. FLAG and the saturation of IR on the
+  way behave as if the full first term had been added. `gte.quirk.fc`.
+- **The reserved matrix.** MVMVA with bits 18 to 17 equal to 3 multiplies by a matrix built from other registers: the
+  first row is minus R times 10h, R times 10h and IR0, the second row is RT13 three times and the third is RT22 three
+  times, with R the red byte of RGBC. `gte.quirk.mx3`.
+- **IR3 and lm.** The projection's IR3 flag ignores `lm`, as the numerics section says. `gte.quirk.ir3_lm` runs a
+  negative MAC3 with `lm` set and clear.
+- **H.** H reads back sign-extended but divides as an unsigned 16-bit value. `gte.quirk.h_sign`.
+- **Saturation at the end.** IR saturates once, on the finished sum of a row, not on its partial products, so a row whose
+  products each exceed 16 bits but whose total fits sets no flag. `gte.quirk.clip_end`.
+- **RTPT and IR0.** IR0 and MAC0 are those of the last vertex alone. `gte.quirk.rtpt_ir0`.
+- **Unused bits.** The command field bits 20 to 24 are ignored: NCLIP issued as `0140006h`, with the fake number and
+  bit 18 set as Wipeout 2097 does, gives the same 64 outputs and cycles as `6`. `gte.nclip_fake_bits` covers it,
+  because the hardware cases never set those bits.
+- **A number outside the table.** It changes no register and costs 5 cycles. `gte.unlisted_noop` runs all 42 such
+  numbers with `sf` and `lm` both ways on registers that all differ and requires all 64 to read as before.
 
 ## The FLAG register
 
@@ -202,12 +245,14 @@ A case replays in one fixed order. The harness writes 0 to the registers 0 to 63
 runs the command unless the case is register-only, and reads the registers 0 to 63. Writing in order matters: LZCR
 and the screen FIFO depend on it, and setting registers directly instead of writing them fails about a thousand cases.
 The replay reaches the engine through three functions its caller supplies, so the same file can drive another
-implementation. `gte.vectors.part1` replays the 50 register-only cases and the 350 cases of the seven commands above,
-400 in all; its count is checked, so a run that replays fewer fails. `gte.regs.sweep` writes every register with edge
+implementation. `gte.vectors.ps1tests` replays all 1,150 cases and
+checks a histogram of the file: 50 register-only cases and 50 for each of the 22 commands. Its count is checked, so a
+run that replays fewer fails. Three controls prove the run can fail: `gte.vectors.empty.self_test` and
+`gte.vectors.truncated.self_test` feed it an empty file and the first 1,000 bytes, and `gte.vectors.flipped.self_test`
+inverts one expected bit of case 600; each must fail and say why. `gte.regs.sweep` writes every register with edge
 values (0, 7FFFh, 8000h, FFFFh, 7FFFFFFFh, 80000000h and FFFFFFFFh) and runs every command number from 00h to 3Fh with
-sf and lm both ways, and checks that reads repeat and no
-command claims more than 44 cycles. The address and memory sanitizers watch it, and between them they show that the engine
-touches nothing outside its struct.
+sf and lm both ways, and checks that reads repeat and no command claims more than 44 cycles. The address and memory
+sanitizers watch it, and between them they show that the engine touches nothing outside its struct.
 
 ## The seed and its notice
 

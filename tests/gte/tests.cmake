@@ -91,3 +91,46 @@ schway_add_test(NAME gte.unr_table
 schway_add_test(NAME gte.nclip_fake_bits
   COMMAND schwaystation-test-gte nclip_fake_bits
   LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: MVMVA with the far colour keeping the first product or the
+# translation in MAC and IR, or its first-term saturation flag going missing;
+# the hardware cases pin it for only a few encodings.
+schway_add_test(NAME gte.quirk.fc
+  COMMAND schwaystation-test-gte quirk_fc
+  LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: the reserved fourth MVMVA matrix built from the wrong
+# registers, in the wrong order or with the wrong sign.
+schway_add_test(NAME gte.quirk.mx3
+  COMMAND schwaystation-test-gte quirk_mx3
+  LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: the projection's IR3 saturation flag following lm, which
+# sets bit 22 for a small negative depth, or the IR3 register ignoring lm.
+schway_add_test(NAME gte.quirk.ir3_lm
+  COMMAND schwaystation-test-gte quirk_ir3_lm
+  LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: H reaching the divide sign-extended, so that 8000h
+# overflows it, or reading back as 8000h instead of FFFF8000h.
+schway_add_test(NAME gte.quirk.h_sign
+  COMMAND schwaystation-test-gte quirk_h_sign
+  LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: IR saturating, and flagging, on the partial products of a
+# row instead of on its finished sum.
+schway_add_test(NAME gte.quirk.clip_end
+  COMMAND schwaystation-test-gte quirk_clip_end
+  LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: RTPT taking IR0 and MAC0 from the first or second vertex
+# instead of the third.
+schway_add_test(NAME gte.quirk.rtpt_ir0
+  COMMAND schwaystation-test-gte quirk_rtpt_ir0
+  LABELS gte portable TIMEOUT 30)
+
+# Fault prevented: a command number outside the 22 documented ones, including
+# the two the seed mirrored onto other commands, changing a register.
+schway_add_test(NAME gte.unlisted_noop
+  COMMAND schwaystation-test-gte unlisted_noop
+  LABELS gte portable TIMEOUT 30)
