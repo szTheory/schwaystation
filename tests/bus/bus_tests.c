@@ -741,25 +741,25 @@ static void ram_word(void)
         }
     }
 
-    /* The unbuilt GPU register records every access's width, address and count.
+    /* The unbuilt MDEC register records every access's width, address and count.
        A following CPU load from KSEG1 must drain the queued final store. */
     for (uint32_t left = 0u; left < 2u; left++) {
         for (uint32_t off = 0u; off < 4u; off++) {
             uint32_t store_index = code_index;
-            inst->cpu.r[1] = 0xBF801810u + off;
+            inst->cpu.r[1] = 0xBF801820u + off;
             inst->cpu.r[2] = value;
             inst->cpu.wq_count = 0u;
-            uint32_t before_unbuilt = inst->bus.unbuilt_n[SCHWAY__DEV_GPU];
+            uint32_t before_unbuilt = inst->bus.unbuilt_n[SCHWAY__DEV_MDEC];
             inst->cpu.pc = 0x80001000u + store_index * 4u;
             schway__cpu_step_one(inst, NULL);
-            CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_GPU] - before_unbuilt,
+            CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_MDEC] - before_unbuilt,
                          chunk_count[left][off]);
-            CHECK_EQ_U64(inst->bus.last_unbuilt[0], SCHWAY__DEV_GPU);
-            CHECK_EQ_HEX(inst->bus.last_unbuilt[1], 0x1F801810u + last_lane[left][off]);
+            CHECK_EQ_U64(inst->bus.last_unbuilt[0], SCHWAY__DEV_MDEC);
+            CHECK_EQ_HEX(inst->bus.last_unbuilt[1], 0x1F801820u + last_lane[left][off]);
             CHECK_EQ_U64(inst->bus.last_unbuilt[2], last_width[left][off]);
             CHECK_EQ_HEX(inst->bus.last_unbuilt[3], 0x80001000u + store_index * 4u);
             CHECK_EQ_U64(inst->cpu.wq_count, 1u);
-            inst->cpu.r[1] = 0xBF801810u;
+            inst->cpu.r[1] = 0xBF801820u;
             inst->cpu.pc = 0x80001000u + (store_index + 1u) * 4u;
             schway__cpu_step_one(inst, NULL);
             CHECK_EQ_U64(inst->cpu.wq_count, 0u);

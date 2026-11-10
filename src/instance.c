@@ -253,6 +253,7 @@ static void power_on(schway *inst)
     schway__gte_reset(&inst->gte);
     schway__bus_reset(inst);
     schway__irq_reset(inst);
+    schway__gpu_reset(inst);
     schway__dma_reset(inst);
     schway__timers_reset(inst);
     schway__sched_sync(inst);

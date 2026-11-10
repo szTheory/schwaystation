@@ -35,7 +35,7 @@ foreach(target IN ITEMS schwaystation-run schwaystation_libretro schwaystation-h
 endforeach()
 get_property(targets DIRECTORY ${SCHWAYSTATION_SOURCE_DIR} PROPERTY BUILDSYSTEM_TARGETS)
 list(SORT targets)
-if(NOT targets STREQUAL "schwaystation;schwaystation_bus;schwaystation_cpu;schwaystation_dma;schwaystation_exe;schwaystation_gte;schwaystation_instance;schwaystation_sched;schwaystation_state;schwaystation_testcard;schwaystation_timers")
+if(NOT targets STREQUAL "schwaystation;schwaystation_bus;schwaystation_cpu;schwaystation_dma;schwaystation_exe;schwaystation_gpu;schwaystation_gte;schwaystation_instance;schwaystation_sched;schwaystation_state;schwaystation_testcard;schwaystation_timers")
   message(FATAL_ERROR "embed: schwaystation added the targets '${targets}', not only the library")
 endif()
 if(NOT TARGET schwaystation::schwaystation)

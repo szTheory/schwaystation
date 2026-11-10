@@ -498,8 +498,10 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if ((p & 0x8u) != 0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GPU, p, width, wr, v);
-        break;
+        if (schway__gpu_io(inst, wr, p, width, value, cycles) != 0) {
+            return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
+        }
+        return 0;
     case 0x82u:
         if ((p & 0x8u) != 0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);

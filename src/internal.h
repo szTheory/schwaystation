@@ -8,6 +8,7 @@
 #include "schwaystation.h"
 #include "bus.h"
 #include "cpu.h"
+#include "gpu.h"
 #include "gte.h"
 #include "dma.h"
 #include "timers.h"
@@ -136,6 +137,7 @@ struct schway {
     uint32_t profile_flags;     /* the profile's flags, bit 0 the debug port */
     uint32_t exe_loaded;        /* 1 after a PS-EXE was side-loaded */
     struct schway__cpu cpu;
+    struct schway__gpu gpu;
     struct schway__gte gte;
     struct schway__bus bus;
     struct schway__irq irq;

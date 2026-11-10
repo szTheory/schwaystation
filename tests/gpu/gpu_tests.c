@@ -74,6 +74,19 @@ static void test_fill_mmio(void)
     CHECK(inst->vram[7][48] == 0u);
     CHECK(inst->vram[8][16] == 0x001Fu);
     CHECK(inst->vram[9][16] == 0u);
+
+    write_port(inst, GP0, 0x0200F800u); /* wrap at the lower-right VRAM edge */
+    write_port(inst, GP0, (511u << 16) | 1009u);
+    write_port(inst, GP0, (2u << 16) | 17u);
+    CHECK(inst->vram[511][1008] == 0x03E0u);
+    CHECK(inst->vram[511][0] == 0x03E0u);
+    CHECK(inst->vram[0][1008] == 0x03E0u);
+    CHECK(inst->vram[0][0] == 0x03E0u);
+
+    write_port(inst, GP0, 0x020000F8u);
+    write_port(inst, GP0, 0u);
+    write_port(inst, GP0, (512u << 16) | 16u); /* height masks to zero */
+    CHECK(inst->vram[0][0] == 0x03E0u);
     schway_destroy(inst);
 }
 
@@ -108,6 +121,9 @@ static void test_register_images(void)
     write_port(inst, GP0, 0xE6000003u);
 
     write_port(inst, GP1, 0x10000002u);
+    uint32_t peeked = 0u;
+    CHECK(schway__gpu_peek(inst, GP0, 4u, &peeked) == 0);
+    CHECK(peeked == 0xABCDEu);
     CHECK(read_port(inst, GP0) == 0xABCDEu);
     write_port(inst, GP1, 0x10000003u);
     CHECK(read_port(inst, GP0) == ((0x12Au << 10) | 0x155u));
@@ -127,6 +143,13 @@ static void test_register_images(void)
     write_port(inst, GP1, 0x02000000u);
     CHECK((read_port(inst, GP1) & 0x01000000u) == 0u);
     CHECK((inst->irq.stat & (1u << 1)) == 0u);
+
+    write_port(inst, GP1, 0x09000001u);
+    write_port(inst, GP0, 0x1F000000u);
+    write_port(inst, GP1, 0x00000000u);
+    CHECK(read_port(inst, GP1) == 0x14802000u);
+    CHECK((inst->irq.stat & (1u << 1)) == 0u);
+    CHECK(inst->gpu.allow_2mb == 1u);
     schway_destroy(inst);
 }
 
