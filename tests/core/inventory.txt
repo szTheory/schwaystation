@@ -18,8 +18,17 @@ core.run.fault_none	core,portable
 core.run.peek_no_side_effects	core,portable
 core.run.peek_rejects	core,portable
 core.run.peek_values	core,portable
+core.run.split_devices	core,portable
 core.run.split_equivalence	core,portable
+core.sched.event_dispatch	core,portable
+core.sched.fault_ticks	core,portable
+core.sched.no_exe_events	core,portable
+core.sched.stall_carries	core,portable
+core.sched.stall_frame_end	core,portable
+core.sched.stall_freeze	core,portable
+core.sched.state_next_derived	core,portable
 core.state.cpu_fields	core,portable
+core.state.device_fields	core,portable
 core.state.record_sweep	core,portable
 core.state.rejects	core,portable
 core.state.round_trip	core,portable

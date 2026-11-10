@@ -1,9 +1,10 @@
-/* COP2 before the GTE exists: schwaystation-test-cop2 <case>. White-box like
-   the COP0 tests: the test places words in RAM, runs them with
-   schway__cpu_step_one and no replay log, and reads the registers, the delay
-   latches, the fault record and the unbuilt-device counters. The expected
-   behaviour is the documented one for a CPU whose coprocessor 2 is not there
-   yet (PSX-SYSTEM section 2, SR bits and Address and bus errors). */
+/* COP2 through the GTE: schwaystation-test-cop2 <case>. White-box like the COP0
+   tests: the test places words in RAM, runs them with schway__cpu_step_one and
+   no replay log, and reads the registers, the delay latches, the fault record,
+   the GTE's registers and the unbuilt-device counters. The register moves use
+   data register 0 and control register 0, which read back exactly what was
+   written (docs/hardware/cop0.md, SR and Coprocessor unusable; psx-spx,
+   Geometry Transformation Engine, Register Overview). */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,10 +61,13 @@ static schway *make(uint32_t sr)
     return inst;
 }
 
-/* One word of RAM, written and read through the uncached segment. */
+/* One word of RAM, written and read through the uncached segment. A test
+   rewrites code in place, which a program would follow with a cache flush, so the
+   instruction cache is emptied with it. */
 static void put(schway *inst, uint32_t addr, uint32_t word)
 {
     uint32_t cycles = 0u;
+    memset(inst->cpu.icache_valid, 0, sizeof inst->cpu.icache_valid);
     CHECK_EQ_U64(schway__bus_write(inst, 0xA0000000u | (addr & 0x1FFFFFFFu), 4u, word, &cycles), 0u);
 }
 
@@ -155,53 +159,97 @@ static void cu2_clear(void)
     schway_destroy(inst);
 }
 
-/* With SR.CU2 set nothing raises. MFC2 and CFC2 give 0 through the one-slot
-   load delay; MTC2, CTC2 and the commands do nothing; BC2F goes and BC2T does
-   not; LWC2 does the real bus read and drops the data, so a read of a bus gap
-   is still a bus error; SWC2 does the real write of 0. Each counts once as an
-   access to the unbuilt GTE. An odd address is still an address error.
-   Fault prevented: a register move that lands at once or never, a GTE access
-   that is not counted (a hang polling it would go unexplained), a load or
-   store that skips the bus, or a coprocessor check that hides an alignment
-   error. */
-static void cu2_set(void)
+
+/* With SR.CU2 set, MTC2 and CTC2 write data register 0 and control register 0,
+   and MFC2 and CFC2 give the value back one instruction later, through the
+   load delay. LWC2 reads a RAM word on the real bus into the data register and
+   SWC2 writes the data register to RAM on the real bus.
+   Fault prevented: a register move that lands at once or never, a move that
+   goes to the wrong register file, a load or store that skips the bus, or a
+   store of the wrong register. */
+static void moves(void)
 {
-    /* MFC2 and CFC2: the value 0 arrives one instruction later. */
-    for (uint32_t sub = MFC2_SUB; sub <= CFC2_SUB; sub += 2u) {
+    static const uint32_t pairs[][2] = {
+        {COP2_WORD(MTC2_SUB, 3u, 0u), COP2_WORD(MFC2_SUB, 4u, 0u)},
+        {COP2_WORD(CTC2_SUB, 3u, 0u), COP2_WORD(CFC2_SUB, 4u, 0u)},
+    };
+    for (size_t i = 0; i < sizeof pairs / sizeof pairs[0]; i++) {
         schway *inst = make(SR_CU2);
-        inst->cpu.r[3] = 0x1234u;
-        run_word(inst, CODE, COP2_WORD(sub, 3u, 4u));
+        inst->cpu.r[3] = 0x00120034u;
+        inst->cpu.r[4] = 0x77u;
+        run_word(inst, CODE, pairs[i][0]);
         CHECK_EQ_HEX(inst->cpu.pc, CODE + 4u);
         CHECK_EQ_U64(exc_code(inst), 0u);
-        CHECK_EQ_HEX(inst->cpu.r[3], 0x1234u);
-        CHECK_EQ_U64(inst->cpu.load_reg, 3u);
-        CHECK_EQ_HEX(inst->cpu.load_value, 0u);
-        CHECK_EQ_U64(gte_count(inst), 1u);
-        CHECK_EQ_U64(inst->bus.last_unbuilt[0], SCHWAY__DEV_GTE);
-        run_word(inst, CODE + 4u, 0u); /* SLL r0, r0, 0 */
-        CHECK_EQ_HEX(inst->cpu.r[3], 0u);
+        CHECK_EQ_U64(inst->cpu.load_reg, SCHWAY__CPU_NO_LOAD);
+        run_word(inst, CODE + 4u, pairs[i][1]);
+        /* The read is visible only after the load delay. */
+        CHECK_EQ_HEX(inst->cpu.r[4], 0x77u);
+        CHECK_EQ_U64(inst->cpu.load_reg, 4u);
+        CHECK_EQ_HEX(inst->cpu.load_value, 0x00120034u);
+        run_word(inst, CODE + 8u, 0u); /* SLL r0, r0, 0 */
+        CHECK_EQ_HEX(inst->cpu.r[4], 0x00120034u);
         CHECK_EQ_U64(inst->cpu.load_reg, SCHWAY__CPU_NO_LOAD);
         schway_destroy(inst);
     }
 
-    /* MTC2, CTC2 and a command change nothing the CPU can see. */
-    static const uint32_t quiet[] = {COP2_WORD(MTC2_SUB, 3u, 4u), COP2_WORD(CTC2_SUB, 3u, 4u),
-                                     COP2_COMMAND};
-    for (size_t i = 0; i < sizeof quiet / sizeof quiet[0]; i++) {
-        schway *inst = make(SR_CU2);
-        inst->cpu.r[3] = 0x1234u;
-        run_word(inst, CODE, quiet[i]);
-        CHECK_EQ_HEX(inst->cpu.pc, CODE + 4u);
-        CHECK_EQ_U64(exc_code(inst), 0u);
-        CHECK_EQ_HEX(inst->cpu.r[3], 0x1234u);
-        CHECK_EQ_U64(inst->cpu.load_reg, SCHWAY__CPU_NO_LOAD);
-        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
-        CHECK_EQ_U64(gte_count(inst), 1u);
-        schway_destroy(inst);
-    }
+    /* The two register files are separate: data register 0 does not show in
+       control register 0. */
+    schway *inst = make(SR_CU2);
+    inst->cpu.r[3] = 0xAAAA5555u;
+    run_word(inst, CODE, COP2_WORD(MTC2_SUB, 3u, 0u));
+    run_word(inst, CODE + 4u, COP2_WORD(CFC2_SUB, 4u, 0u));
+    run_word(inst, CODE + 8u, 0u);
+    CHECK_EQ_HEX(inst->cpu.r[4], 0u);
+    schway_destroy(inst);
+
+    /* LWC2 loads data register 0 from RAM at once, and the general registers
+       are left alone. */
+    inst = make(SR_CU2);
+    inst->cpu.r[1] = DATA;
+    inst->cpu.r[5] = 0x77u;
+    put(inst, DATA, 0x0BADF00Du);
+    run_word(inst, CODE, LWC2_WORD(1u, 0u, 0u));
+    CHECK_EQ_HEX(inst->cpu.pc, CODE + 4u);
+    CHECK_EQ_U64(exc_code(inst), 0u);
+    CHECK_EQ_HEX(inst->cpu.r[5], 0x77u);
+    CHECK_EQ_U64(inst->cpu.load_reg, SCHWAY__CPU_NO_LOAD);
+    CHECK_EQ_HEX(schway__gte_read(&inst->gte, 0u), 0x0BADF00Du);
+    run_word(inst, CODE + 4u, COP2_WORD(MFC2_SUB, 4u, 0u));
+    run_word(inst, CODE + 8u, 0u);
+    CHECK_EQ_HEX(inst->cpu.r[4], 0x0BADF00Du);
+
+    /* SWC2 writes it back to another word of RAM. */
+    inst->cpu.r[1] = DATA + 4u;
+    put(inst, DATA + 4u, 0xCAFEBABEu);
+    run_word(inst, CODE + 12u, SWC2_WORD(1u, 0u, 0u));
+    CHECK_EQ_HEX(inst->cpu.pc, CODE + 16u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_HEX(get(inst, DATA + 4u), 0x0BADF00Du);
+    schway_destroy(inst);
+
+    /* The read is real: an address no device answers is a bus error (ExcCode
+       7) that carries no BadVaddr, and the data register keeps its value. */
+    inst = make(SR_CU2);
+    inst->cpu.r[1] = 0xBF000000u;
+    schway__gte_write(&inst->gte, 0u, 0x1234u);
+    run_word(inst, CODE, LWC2_WORD(1u, 0u, 0u));
+    CHECK_EQ_U64(exc_code(inst), 0x07u);
+    CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), CODE);
+    CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_BADVADDR), 0u);
+    CHECK_EQ_HEX(schway__gte_read(&inst->gte, 0u), 0x1234u);
+    schway_destroy(inst);
+
+    /* An odd address is an address error before the coprocessor is asked. */
+    inst = make(SR_CU2);
+    inst->cpu.r[1] = DATA + 2u;
+    put(inst, DATA, 0xCAFEBABEu);
+    run_word(inst, CODE, SWC2_WORD(1u, 0u, 0u));
+    CHECK_EQ_U64(exc_code(inst), 0x05u);
+    CHECK_EQ_HEX(get(inst, DATA), 0xCAFEBABEu);
+    schway_destroy(inst);
 
     /* BC2F goes, BC2T does not; both have a delay slot. */
-    schway *inst = make(SR_CU2);
+    inst = make(SR_CU2);
     run_word(inst, CODE, (COP2_WORD(BC2_SUB, 0u, 0u) | 3u) /* BC2F +3 */);
     CHECK_EQ_U64(inst->cpu.branch_slot, 1u);
     CHECK_EQ_U64(inst->cpu.branch_take, 1u);
@@ -212,53 +260,33 @@ static void cu2_set(void)
     CHECK_EQ_U64(inst->cpu.branch_slot, 1u);
     CHECK_EQ_U64(inst->cpu.branch_take, 0u);
     schway_destroy(inst);
+}
 
-    /* LWC2: the read happens, the data is dropped, and nothing but the count
-       changes. */
-    inst = make(SR_CU2);
-    inst->cpu.r[1] = DATA;
-    inst->cpu.r[5] = 0x77u;
-    put(inst, DATA, 0xCAFEBABEu);
-    run_word(inst, CODE, LWC2_WORD(1u, 5u, 0u));
-    CHECK_EQ_HEX(inst->cpu.pc, CODE + 4u);
-    CHECK_EQ_U64(exc_code(inst), 0u);
-    CHECK_EQ_HEX(inst->cpu.r[5], 0x77u);
-    CHECK_EQ_U64(inst->cpu.load_reg, SCHWAY__CPU_NO_LOAD);
-    CHECK_EQ_U64(gte_count(inst), 1u);
-    CHECK_EQ_HEX(inst->bus.last_unbuilt[1], DATA);
-    schway_destroy(inst);
-
-    /* The read is real: an address no device answers is a bus error (ExcCode
-       7) that carries no BadVaddr, and the GTE count is not touched. */
-    inst = make(SR_CU2);
-    inst->cpu.r[1] = 0xBF000000u;
-    run_word(inst, CODE, LWC2_WORD(1u, 5u, 0u));
-    CHECK_EQ_U64(exc_code(inst), 0x07u);
-    CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), CODE);
-    CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_BADVADDR), 0u);
-    CHECK_EQ_U64(gte_count(inst), 0u);
-    schway_destroy(inst);
-
-    /* SWC2 writes the word 0. */
-    inst = make(SR_CU2);
-    inst->cpu.r[1] = DATA;
-    put(inst, DATA, 0xCAFEBABEu);
-    run_word(inst, CODE, SWC2_WORD(1u, 5u, 0u));
-    CHECK_EQ_HEX(inst->cpu.pc, CODE + 4u);
-    CHECK_EQ_HEX(get(inst, DATA), 0u);
-    CHECK_EQ_U64(gte_count(inst), 1u);
-    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
-    schway_destroy(inst);
-
-    /* An odd address is an address error before the coprocessor is asked. */
-    inst = make(SR_CU2);
-    inst->cpu.r[1] = DATA + 2u;
-    put(inst, DATA, 0xCAFEBABEu);
-    run_word(inst, CODE, SWC2_WORD(1u, 5u, 0u));
-    CHECK_EQ_U64(exc_code(inst), 0x05u);
-    CHECK_EQ_HEX(get(inst, DATA), 0xCAFEBABEu);
-    CHECK_EQ_U64(gte_count(inst), 0u);
-    schway_destroy(inst);
+/* With SR.CU2 set, none of the COP2 forms counts as an access to an unbuilt
+   device: the register moves, the memory forms, the branches and a command
+   leave the GTE's slot of the counters at 0 and the last-access record alone.
+   Fault prevented: a GTE access still counted as unbuilt, which the runner
+   would report as a missing device. */
+static void no_unbuilt(void)
+{
+    static const uint32_t forms[] = {
+        COP2_WORD(MFC2_SUB, 3u, 4u), COP2_WORD(CFC2_SUB, 3u, 4u), COP2_WORD(MTC2_SUB, 3u, 4u),
+        COP2_WORD(CTC2_SUB, 3u, 4u), (COP2_WORD(BC2_SUB, 0u, 0u) | 3u), (COP2_WORD(BC2_SUB, 1u, 0u) | 3u),
+        COP2_COMMAND,                LWC2_WORD(1u, 5u, 0u),             SWC2_WORD(1u, 5u, 0u),
+    };
+    for (size_t i = 0; i < sizeof forms / sizeof forms[0]; i++) {
+        schway *inst = make(SR_CU2);
+        inst->cpu.r[1] = DATA;
+        inst->cpu.r[3] = 0x1234u;
+        run_word(inst, CODE, forms[i]);
+        CHECK_EQ_U64(exc_code(inst), 0u);
+        CHECK_EQ_U64(gte_count(inst), 0u);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        for (uint32_t dev = 0u; dev < SCHWAY__DEV_COUNT; dev++) {
+            CHECK_EQ_U64(inst->bus.unbuilt_n[dev], 0u);
+        }
+        schway_destroy(inst);
+    }
 }
 
 int main(int argc, char **argv)
@@ -268,7 +296,8 @@ int main(int argc, char **argv)
         void (*fn)(void);
     } cases[] = {
         {"cu2_clear", cu2_clear},
-        {"cu2_set", cu2_set},
+        {"moves", moves},
+        {"no_unbuilt", no_unbuilt},
     };
     if (argc != 2) {
         fprintf(stderr, "usage: schwaystation-test-cop2 <case>\n");

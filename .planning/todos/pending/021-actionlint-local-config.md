@@ -16,6 +16,7 @@ A local `actionlint` run over `.github/workflows` exits 0, with the `ubuntu-26.0
 - Noted by plan 01-14's executor: the local actionlint reports those labels and that key as unknown; hosted runs accept them.
 - No gate calls actionlint today, so this is a maintainer convenience: an `.github/actionlint.yaml` with `self-hosted-runner.labels` and an ignore pattern for the queue key.
 - Bound to the v1.0 milestone tune-up (SEED-007), unless a phase adds an actionlint gate first.
+- Reviewed at phase 3: the binding above is unchanged.
 
 ## Acceptance Criteria
 

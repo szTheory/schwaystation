@@ -3,12 +3,11 @@
 The PlayStation's CPU is a MIPS I R3000A with a coprocessor for system control (COP0) and another for geometry (COP2).
 The core runs it as an interpreter: one function fetches, decodes and executes a single instruction, and both the
 frame loop and the vector tests call that function, so there is one decoder. Everything here is integer arithmetic
-and behaves the same on every platform. Facts come from the psx-spx CPU Specifications page and from section 2 of
-`.planning/preparation/PSX-SYSTEM.md`, which also names the sources it was checked against.
+and behaves the same on every platform. Facts come from the psx-spx CPU Specifications page.
 
 This page covers what is implemented so far: the registers, the decode fields, the arithmetic, logic, shift,
 set-on-less-than and load-upper-immediate class, the trapping adds, branches and jumps, loads and stores, multiply and
-divide, COP2 before the GTE, the two delay latches, the vector tests, the run loop and the stub kernel's layout. COP0
+divide, COP2 and the GTE, the two delay latches, the vector tests, the run loop and the stub kernel's layout. COP0
 and the exception entry are on their own page, [cop0.md](cop0.md). The instruction cache and the write queue are on the bus page, [bus.md](bus.md); the part of the
 fetch that touches them is described here.
 
@@ -16,9 +15,9 @@ fetch that touches them is described here.
 
 - 32 general registers, `r0` to `r31`. `r0` always reads 0 and a write to it is discarded.
 - `HI` and `LO`, the multiply and divide result registers.
-- The program counter. At power-on it holds `BFC00000h`, the BIOS entry in KSEG1 (PSX-SYSTEM section 2, Reset state).
-- COP0 registers, indexed by number: `r6` TAR, `r12` SR, `r13` CAUSE, `r14` EPC and the others of PSX-SYSTEM
-  section 2. SR is `00400000h` (BEV set) after power-on.
+- The program counter. At power-on it holds `BFC00000h`, the BIOS entry in KSEG1 (psx-spx CPU Specifications, Reset state).
+- COP0 registers, indexed by number: `r6` TAR, `r12` SR, `r13` CAUSE, `r14` EPC and the others of the psx-spx CPU
+  Specifications page. SR is `00400000h` (BEV set) after power-on.
 - Two delay latches, described below.
 - A cycle counter and the ready stamp of the multiply and divide unit, described under Multiply and divide.
 
@@ -38,12 +37,12 @@ An instruction is one 32-bit word. The executor takes its fields with shifts and
 
 Dispatch is a `switch` on op, and inside SPECIAL on funct. An encoding that is not an instruction raises a reserved
 instruction exception and records a first fault. The coprocessor 2 forms (`COP2`, `LWC2` and `SWC2`) are picked out
-by a decode flag before the switch, so the GTE can take them over without a change to the rest of the decoder.
+by a decode flag before the switch and handled in one function, which reaches the GTE.
 
 ## Arithmetic, logic, shifts and sets
 
 All of these read their operands before any load issued by the previous instruction lands, and none raises an
-exception (PSX-SYSTEM section 2, Load delay).
+exception (psx-spx CPU Specifications, Load delay).
 
 | Instructions | Result |
 |---|---|
@@ -62,7 +61,7 @@ load into `r0` like any other write.
 
 ## Delay latches
 
-The R3000A has one load delay slot and one branch delay slot (PSX-SYSTEM section 2, Load delay and Branch delay). The
+The R3000A has one load delay slot and one branch delay slot (psx-spx CPU Specifications, Load delay and Branch delay). The
 executor holds each as a small latch in the CPU state, so a saved state taken between two instructions resumes exactly.
 
 **Load delay.** A load issued by one instruction is held as a register number and a value, and writes the register
@@ -77,7 +76,7 @@ about to run is a delay slot, whether its branch is taken, and the branch target
 counter register: the next program counter is the target while a taken branch is pending, and the current program
 counter plus 4 otherwise. Each instruction ends by clearing the latch, and a branch sets it for the following one.
 A branch in a delay slot computes its target from the address its own slot would go to next, so it follows a taken
-branch's target (PSX-SYSTEM section 2, Branch delay).
+branch's target (psx-spx CPU Specifications, Branch delay).
 
 ## Branches and jumps
 
@@ -92,14 +91,14 @@ branch's target (PSX-SYSTEM section 2, Branch delay).
 
 A branch offset is the signed 16-bit immediate times 4, added to the address of the delay slot. The return address is
 the address after the delay slot. The latch is always set by a branch, taken or not, with the target it would have had.
-A target that is not a multiple of 4 is an address error when it is fetched (PSX-SYSTEM section 2, Branch delay; the
+A target that is not a multiple of 4 is an address error when it is fetched (psx-spx CPU Specifications, Branch delay; the
 exception rules are in [cop0.md](cop0.md)).
 
 ## Instruction fetch
 
 Each instruction is fetched at the program counter before it is decoded. A program counter that is not a multiple of 4 is
 an address error on the fetch (see Branches and jumps). Otherwise the fetch goes one of three ways, by segment
-(PSX-SYSTEM section 2, Segments and I-cache):
+(psx-spx CPU Specifications, Segments and I-cache):
 
 - In KUSEG or KSEG0 it goes through the instruction cache, a hit costing nothing beyond the instruction's own cycle and
   a miss filling the line from the missed word to its end.
@@ -128,17 +127,17 @@ Every load and store goes through the data access front-end before it reaches th
    address, because only the cache-control word answers there). The bus charges its wait cycles to the instruction, and
    a store that landed joins the write queue. A
    bus error, an address no device answers, raises DBE (07h); it sets no BadVaddr, and the bus records the first
-   fault (PSX-SYSTEM section 2, Address and bus errors and Segments).
+   fault (psx-spx CPU Specifications, Address and bus errors and Segments).
 
 `LB`, `LH` and `LW` read 1, 2 or 4 bytes and sign-extend a byte or half-word; `LBU` and `LHU` zero-extend. The value
 goes through the load delay latch. `SB`, `SH` and `SW` write the low 1, 2 or 4 bytes of `rt`; the bus is handed all
-32 bits whatever the width (PSX-SYSTEM section 2, Stores). The address is `rs` plus the sign-extended immediate.
+32 bits whatever the width (psx-spx CPU Specifications, Stores). The address is `rs` plus the sign-extended immediate.
 
 **Unaligned forms.** `LWL` and `LWR` read the aligned word that holds the address, and replace the bytes of `rt` from
 the address toward the high end (`LWL`) or the low end (`LWR`); the other bytes of `rt` stay. The merge starts from
 the value of a load the previous instruction issued to the same register, not from the register's old value, so
 an `LWL`, `LWR` pair on one register needs no delay slot between them and the pair assembles an unaligned word
-(PSX-SYSTEM section 2, Stores, LWL/LWR). `SWL` and `SWR` write the matching bytes of `rt` into the bytes of the
+(psx-spx CPU Specifications, Stores, LWL/LWR). `SWL` and `SWR` write the matching bytes of `rt` into the bytes of the
 aligned word from its low end to the address (`SWL`) or from the address to its high end (`SWR`), as the largest
 aligned chunks of 4, 2 or 1 bytes, lowest first.
 
@@ -147,7 +146,7 @@ aligned chunks of 4, 2 or 1 bytes, lowest first.
 `MULT` and `MULTU` put the 64-bit product of `rs` and `rt` in `HI:LO`, signed and unsigned. `DIV` and `DIVU` put the
 quotient in `LO` and the remainder in `HI`; the remainder of `DIV` has the sign of `rs`. Nothing traps. A zero
 divisor gives `LO` = -1 (`DIV` of a negative `rs` gives +1) and `HI` = `rs`, and `DIV` of -2147483648 by -1 gives
-`LO` = `80000000h` and `HI` = 0 (PSX-SYSTEM section 2, DIV/DIVU).
+`LO` = `80000000h` and `HI` = 0 (psx-spx CPU Specifications, DIV/DIVU).
 
 The unit takes time, which the CPU state keeps as a cycle counter and a ready stamp: the counter value at which the
 running operation has produced `HI` and `LO`, or 0 when none is running. An operation issued at counter value t is
@@ -156,21 +155,41 @@ sign bit spread over the word, below 800h, below 100000h, or more); `MULTU` clas
 `DIV` and `DIVU` take 36. `MFHI` and `MFLO` issued before the stamp wait for it, never longer than 36 cycles whatever
 a loaded state holds. `MTHI` and `MTLO` write the register and set the stamp to 0, so a read after them does not wait.
 A new multiply or divide replaces one still running: the wait a later read sees is the new operation's own time.
-`HI`, `LO` and the stamp are not touched by an exception (PSX-SYSTEM section 2, MULTU/MULT). The `cpu.timing.*` tests
+`HI`, `LO` and the stamp are not touched by an exception (psx-spx CPU Specifications, MULTU/MULT). The `cpu.timing.*` tests
 pin these times and rules.
 
-## COP2 before the GTE
+## COP2 and the GTE
 
-The GTE is not built yet, so COP2 behaves as the processor does when the coprocessor has not been enabled or has
-nothing behind it, and a later GTE replaces this with no change to the decoder.
+Coprocessor 2 is the geometry engine, described on [its own page](gte.md). The CPU reaches it with the forms below.
 
 - With SR.CU2 clear, every COP2 form raises coprocessor unusable (ExcCode 0Bh) with CE 2: the register moves `MFC2`,
   `CFC2`, `MTC2` and `CTC2`, the branches `BC2F` and `BC2T`, the commands, and `LWC2` and `SWC2`. The last two check
   alignment first, so an odd address is an address error. It records no first fault, because a handler may take it.
-- With SR.CU2 set, `MFC2` and `CFC2` read 0 into `rt` through the load delay; `MTC2`, `CTC2` and the commands do
-  nothing; `BC2F` always goes and `BC2T` never does, as the condition line is never true; `LWC2` does the real bus read
-  and drops the data, so a read of a bus gap is still a bus error, and `SWC2` does the real bus write of 0. Each of
-  them counts once as an access to the unbuilt GTE, which the runner reports (PSX-SYSTEM section 2, SR bits).
+- With SR.CU2 set, `MTC2` and `CTC2` write data register `rd` or control register 32 + `rd` with `rt`. `MFC2` and
+  `CFC2` read one into `rt` through the load delay, so the value is visible one instruction later. `LWC2` does the
+  real bus read of the word and writes it to data register `rt`, and `SWC2` does the real bus write of data register
+  `rt`; a read of a bus gap is still a bus error. `BC2F` always goes and `BC2T` never does, as the condition line is
+  never true. None of these counts as an access to an unbuilt device.
+- A command (an instruction with bit 25 of the word set) executes at once. It keeps the engine busy for its documented
+  time, 5 to 44 cycles by command; the CPU keeps the engine's ready stamp, the cycle counter value at which the last
+  command finishes, with the same convention as the multiply unit: a command issued at counter value t is ready at t
+  plus its busy time.
+- `MFC2`, `CFC2`, `SWC2` and a new command wait for the running command; `MTC2`, `CTC2` and `LWC2` do not (the
+  gte-timing hardware results, MIT, What waits). The wait is what is left of the busy time when the instruction
+  issues, so each instruction between the command and the one that waits shortens it by a cycle, and it is never more
+  than 44 cycles, the longest command, whatever a loaded state holds. `MFC2` right after a command takes the command's
+  busy time in all, as `MFLO` right after a multiply takes the multiply's.
+- Interrupts: an interrupt taken before a GTE command lets the command execute at the entry and again after the return.
+  The entry's busy stamp is set from the entry's own cycle. The command is the instruction at the program counter, in a
+  branch delay slot the slot's, not the branch EPC names; see [the COP0 page](cop0.md#interrupts).
+
+Deviation: on the console a write to a GTE register by `MTC2`, `CTC2` or `LWC2` is not visible to a command or a read
+for two instructions. This implementation does not model that latency, so a command or read right after the write sees
+the new value. Programs that depend on the old value in those two instructions are not reproduced, and the case is not
+in the hardware vectors replayed here.
+
+The `cpu.cop2.*` tests pin the moves and the unusable check, `cpu.timing.gte_cycles` and `cpu.timing.gte_stall_rules`
+the busy times and the wait rule, and the `cpu.exception.irq_gte_*` and `irq_entry_peek` tests the interrupt entry.
 
 `COP1` and `COP3` do not exist on the console. With SR.CU1 or SR.CU3 clear their instructions, loads and stores
 included (`LWC1`, `SWC1`, `LWC3`, `SWC3`), raise coprocessor unusable with CE 1 or 3 and record a first fault; with the
@@ -305,7 +324,8 @@ test card. The CPU runs in blocks of instructions, and a block ends after:
 - the first fault latched in the block.
 
 The cycles of a block are added to the tick counter, and the audio pairs queued, once, when it ends; a first fault
-latched inside a block therefore carries the ticks of the block's start.
+latched inside a block carries the tick its own instruction began on, read from the block clock described under
+"Devices, the block clock and the stall".
 
 **Where a block splits at a budget.** After each instruction the loop compares the cycles run with what is left of the
 budget, and the block ends at the first instruction boundary at or after it. The last instruction can carry the run past
@@ -317,8 +337,9 @@ is a boundary the one-shot run passes through, which is where a run of the same 
 **The end of a frame.** The run stops at the first boundary at or after the frame's end. A frame end passed inside an
 instruction completes at that instruction's end: `I_STAT` bit 0 is raised, the frame count rises, and the next frame
 ends where the exact cycle accumulator puts it, so the next frame is shorter by the overshoot and the cumulative
-ticks stay exact. The CPU does not take interrupts yet; the vertical sync only sets the bit, and CAUSE bit 10 follows
-`I_STAT` and `I_MASK` as the COP0 page describes.
+ticks stay exact. The CPU takes interrupts from the vertical blank, the DMA and the timers: each raises its own `I_STAT` bit, CAUSE
+bit 10 follows `I_STAT` and `I_MASK`, and when SR allows it the CPU takes the interrupt as [cop0.md](cop0.md)
+(Interrupts) describes.
 
 **Stop reasons.**
 
@@ -333,6 +354,44 @@ A double fault is an instruction fetch that fails at an exception vector (`80000
 set): the handler cannot run, so the exception would repeat for ever. When a hook and the frame's end coincide the hook
 is reported and the frame still completes. A guest that loops, or hammers an address no device answers, returns from
 every call: each call runs a bounded number of cycles, whatever the program does.
+
+## Devices, the block clock and the stall
+
+The tick counter moves only when a block ends, so a device that is read inside a block needs a clock of its own. The
+CPU keeps two values that are not state, the tick and the CPU cycle count at the block's start, set at the start of
+every block. The tick of an access is then
+
+    now = block start tick + (cycles run since the block's start) + (cycles this access has spent before its own) - 1
+
+where the last term counts a first cycle of 1, so an access on an instruction's own cycle sees the tick that
+instruction began on. A loop that polls a counter sees it move inside a block, and a fault latched by an instruction
+carries its own start tick whatever its place in a long block. The trace records use the same clock. A power reset, a
+state load and a run with no program restart it at the instance's tick.
+
+**Deadlines.** Each device that keeps time reports the tick it next needs attention at, and the earliest of them is
+kept as the next deadline, derived from the devices and never saved: a power reset and a state load recompute it, and
+a register write that moves a deadline ends the running block at the next instruction boundary, as a write to `I_STAT`
+does. Every block is cut at the next deadline as well as at the budget and the frame's end, and the device's event runs
+at the first instruction boundary at or after the deadline, once per pass of the run loop. A device whose deadline is
+still due after its event waits for the next instruction before it is offered again, so the loop always advances. A
+frame that no program runs holds no armed deadline in practice, and the loop then costs one compare per call.
+
+**The bus stall.** While a DMA unit moves its words it holds the bus. A bus access that has to wait for it, a read of
+RAM or an I/O register, an instruction fetch that misses the cache, or the fifth queued store (writes are buffered in
+the four-deep write queue, so only a full queue waits), sets the tick the CPU is held until. The scratchpad, a cache
+hit, COP0 and the GTE never touch the bus and never wait. The CPU does not execute while the stamp is ahead of the
+tick: the loop advances the tick, within the budget and the frame and stopping at the next deadline so events run on
+time, and the CPU cycle count does not move. The multiply unit and the GTE keep running through the freeze, so their
+busy stamps, which are values of that count, move back by the freeze and a later read of their result waits only for what
+was left of the latency. This is a freeze rather than a charge on one instruction, because a unit
+can hold the bus for tens of thousands of cycles and charging that to a single instruction would pass the overrun
+bound above. The part of a stall that crosses the end of a budget or of a frame stays in the state and the next call
+keeps waiting, so the overrun past any limit is still at most one instruction.
+
+**The frame end.** With a program loaded the frame end raises `I_STAT` bit 0 and also drives the vertical blank to the
+root counters, high and then low at the same tick, because there is no line machine yet to give the blank a width; the
+counters page covers what they do with it. With no program no counter is stepped and only an event that is already
+due runs.
 
 ## The trace
 

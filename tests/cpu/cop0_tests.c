@@ -3,7 +3,7 @@
    in RAM, runs them with schway__cpu_step_one and no replay log, and reads the
    registers, the delay latches and the fault record. Expected values are worked
    by hand from the psx-spx CPU Specifications page (COP0 registers, exception
-   handling) and from section 2 of .planning/preparation/PSX-SYSTEM.md. */
+   handling) and from docs/hardware/cop0.md. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -99,7 +99,7 @@ static uint32_t exc_code(const schway *inst)
    discarded: the next instruction comes from the vector. A branch that is not
    taken (BNE r0, r0) gives BD = 1, BT = 0 and the instruction after the slot
    in TAR (psx-spx CPU Specifications, COP0 registers TAR and CAUSE;
-   PSX-SYSTEM section 2, EPC and Branch delay).
+   docs/hardware/cop0.md, Entry).
    Fault prevented: an EPC that points at the slot, so the handler re-executes
    it, or a stale TAR or BT that sends a handler to the wrong place. */
 static void entry_delay_slot(void)
@@ -140,7 +140,7 @@ static void entry_delay_slot(void)
    and everything above them is kept. With BEV set the vector is BFC00180h.
    ADDU of the same operands wraps and takes nothing, and SUB of
    80000000h - 1 overflows the other way (psx-spx CPU Specifications,
-   exception handling; PSX-SYSTEM section 2, SR bits, ExcCodes and Vectors).
+   exception handling; docs/hardware/cop0.md, SR, CAUSE and Entry).
    Fault prevented: a missing or mis-shifted mode stack, a changed rd after a
    trap, or a BadVaddr or TAR written by an exception that is not an address
    error or a delay slot. */
@@ -184,8 +184,8 @@ static void entry_plain(void)
 }
 
 /* MTC0 to SR keeps the bits of the mask F04FFF3Fh and nothing else, and MFC0
-   reads the result back through its delay slot (PSX-SYSTEM section 2, SR
-   bits and COP0 registers).
+   reads the result back through its delay slot (docs/hardware/cop0.md, SR
+   and Registers).
    Fault prevented: a writable bit the CPU does not have, such as bit 7 or the
    timer-shutdown bit. */
 static void sr_mask(void)
@@ -205,7 +205,7 @@ static void sr_mask(void)
 
 /* MTC0 to CAUSE changes bits 8-9 only: the exception code, the coprocessor
    field, BT, BD and the interrupt line at bit 10 stay. TAR, BadVaddr, EPC and
-   PRID ignore writes (PSX-SYSTEM section 2, COP0 registers).
+   PRID ignore writes (docs/hardware/cop0.md, Registers).
    Fault prevented: a CAUSE write that clears a pending exception code or the
    interrupt line, or a handler-visible register a guest can overwrite. */
 static void cause_writable(void)
@@ -234,7 +234,7 @@ static void cause_writable(void)
 
 /* RFE shifts SR bits 2-5 into 0-3 at once, leaves bits 4-5 as they are and
    everything above them untouched, and does not jump: 101101b becomes
-   101011b (PSX-SYSTEM section 2, SR bits and EPC). CU0 is set so that the
+   101011b (docs/hardware/cop0.md, SR and RFE). CU0 is set so that the
    user mode the second step runs in may still use COP0.
    Fault prevented: a return from exception that loses the previous mode or
    interrupt-enable pair, or one that moves the program counter. */
@@ -253,8 +253,8 @@ static void rfe(void)
 
 /* CE is set for a coprocessor-unusable exception only, to the coprocessor
    number, and the other exceptions write 0 there; BadVaddr is written by an
-   address error and by nothing else (PSX-SYSTEM section 2, CAUSE bits and
-   Address and bus errors).
+   address error and by nothing else (docs/hardware/cop0.md, CAUSE and
+   Registers).
    Fault prevented: a stale CE after an unrelated exception, or a BadVaddr
    that follows every exception. */
 static void ce_only_cpu(void)
@@ -280,7 +280,7 @@ static void ce_only_cpu(void)
 }
 
 /* SR.BEV picks the general vector: BFC00180h while it is 1, 80000080h while
-   it is 0 (PSX-SYSTEM section 2, Vectors).
+   it is 0 (docs/hardware/cop0.md, Entry).
    Fault prevented: a handler that is never entered because the vector reads
    the wrong BEV state. */
 static void bev_vectors(void)
@@ -297,7 +297,7 @@ static void bev_vectors(void)
 
 /* COP1 and COP3 with their SR.CUz bit clear raise CpU, and latch a first
    fault because the console has neither; with the bit set they do nothing
-   (PSX-SYSTEM section 2, SR bits and Address and bus errors).
+   (docs/hardware/cop0.md, SR and Coprocessor unusable).
    Fault prevented: a guest that touches a missing coprocessor running on as if
    it were there, or a first-fault record that stays empty. */
 static void cop1_cop3_unusable(void)
@@ -351,7 +351,7 @@ static void cop1_cop3_unusable(void)
 
 /* With the coprocessor usable, BCzF always goes and BCzT never does, since
    the condition line is never true; a taken one has its delay slot and its
-   target like any branch (PSX-SYSTEM section 2, SR bits and Branch delay).
+   target like any branch (docs/hardware/cop0.md, SR and Entry).
    Fault prevented: a coprocessor branch that falls through where it must go,
    or the reverse. */
 static void cop_branches(void)
@@ -376,7 +376,7 @@ static void cop_branches(void)
 /* An encoding that is no instruction raises RI (ExcCode 0Ah) and latches a
    first fault with the pc and the opcode; so do MFC0 and MTC0 of the COP0
    registers that do not exist, 0-2, 4 and 10, while register 3 and 16 are
-   accepted (PSX-SYSTEM section 2, COP0 registers).
+   accepted (docs/hardware/cop0.md, Registers).
    Fault prevented: an undefined opcode that retires as a no-op, or a COP0
    register number that answers when the CPU has none. */
 static void reserved_instruction(void)
@@ -407,8 +407,8 @@ static void reserved_instruction(void)
 
 /* SYSCALL, BREAK, an overflowing ADD and a coprocessor-unusable exception on
    COP0 are architectural exceptions a handler takes, so none of them leaves a
-   first fault (ARCHITECTURE section 6 and PSX-SYSTEM section 2, Address and
-   bus errors).
+   first fault (ARCHITECTURE section 6 and docs/hardware/cop0.md, Which exceptions
+   are a first fault).
    Fault prevented: a first-fault record filled by an exception that is part of
    normal guest behaviour, which would hide the first real fault. */
 static void no_fault_for_traps(void)
@@ -484,8 +484,8 @@ static void exception_loop(void)
 
 /* MFC0 has one delay slot: the instruction after it still reads the old
    register, and the value lands as that instruction ends. A write to the same
-   register by the next instruction cancels the load (PSX-SYSTEM section 2,
-   Load delay and COP delays).
+   register by the next instruction cancels the load (docs/hardware/cpu.md,
+   Delay latches, and docs/hardware/cop0.md, Registers).
    Fault prevented: a coprocessor read that is visible at once, or one that
    lands over a newer write. */
 static void mfc0_delay(void)
@@ -511,7 +511,7 @@ static void mfc0_delay(void)
 }
 
 /* BLTZAL and BGEZAL write the return address, the address after the delay
-   slot, whether or not the branch goes (PSX-SYSTEM section 2, Branch delay).
+   slot, whether or not the branch goes (docs/hardware/cpu.md, Branches and jumps).
    Fault prevented: a call that loses its return address on the not-taken
    side. */
 static void branch_links(void)
@@ -536,7 +536,7 @@ static void branch_links(void)
 
 /* JR and JALR to a misaligned target run the delay slot, then raise an address
    error on the fetch: ExcCode 4, and EPC and BadVaddr both the bad target
-   (PSX-SYSTEM section 2, Branch delay). JALR writes the return address first.
+   (docs/hardware/cop0.md, Address errors on the fetch). JALR writes the return address first.
    Fault prevented: a jump to an odd address that executes whatever word the
    truncated address names. */
 static void jr_misaligned(void)

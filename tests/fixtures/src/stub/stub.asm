@@ -3,7 +3,7 @@
 ;
 ;   armips -strequ IMAGE <file> stub.asm
 ;
-; Reset (PSX-SYSTEM sections 3, 7 and 9): write the memory-control boot values, clear I_MASK and
+; Reset (docs/hardware/bus.md, Memory control; PSX-SYSTEM sections 7 and 9): write the memory-control boot values, clear I_MASK and
 ; I_STAT, put one jump at the general exception vector 80000080h, clear SR.BEV, read the launch
 ; block the loader wrote, set gp and sp and jump to pc0. Until BEV is clear an exception lands
 ; at BFC00180h, which holds a jump to the same handler body.
@@ -42,7 +42,7 @@
 
 .org 0xBFC00000
 reset:
-  ; Memory control: the values the retail boot code writes (PSX-SYSTEM section 3).
+  ; Memory control: the values the retail boot code writes (docs/hardware/bus.md, Memory control).
   li t0, IO
   li t1, 0x1F000000
   sw t1, 0x000(t0)                       ; DEV0 base

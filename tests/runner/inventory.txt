@@ -12,6 +12,7 @@ runner.hash	portable,runner
 runner.hash.frame5	portable,runner
 runner.hash.ntsc_j	portable,runner
 runner.hash.pal	portable,runner
+runner.hash_state	portable,runner
 runner.hashes_compare.byte.self_test	runner
 runner.hashes_compare.count.self_test	runner
 runner.hashes_compare.eight	runner

@@ -55,7 +55,7 @@ void schway__fault_latch(schway *inst, uint32_t kind, uint32_t device, uint32_t 
     f->width = width;
     f->note = 0u;
     f->frame = inst->frame;
-    f->ticks = inst->ticks;
+    f->ticks = schway__sched_now(inst, 1u);
     f->line = 0u;
     f->dot = 0u;
     f->pc = pc;
@@ -250,8 +250,13 @@ static void power_on(schway *inst)
     schway__frame_audio_clear(inst);
     memset(inst->vram, 0, sizeof inst->vram);
     schway__cpu_reset(inst);
+    schway__gte_reset(&inst->gte);
     schway__bus_reset(inst);
     schway__irq_reset(inst);
+    schway__dma_reset(inst);
+    schway__timers_reset(inst);
+    schway__sched_sync(inst);
+    schway__sched_recalc(inst);
     /* With no BIOS image the BIOS window holds the stub kernel; a mapped
        image, the host's, is kept across a power reset. */
     if (inst->bus.bios == NULL) {

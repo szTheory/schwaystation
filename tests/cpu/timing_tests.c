@@ -4,7 +4,7 @@
    reads the cycle counter, HI, LO and the completion stamp. A multiply or divide
    issued at cycle counter t has HI and LO ready at t plus its latency, so
    latency is the stamp minus the counter before the instruction; an early read
-   of HI or LO waits until then (PSX-SYSTEM section 2, MULTU/MULT and DIV/DIVU;
+   of HI or LO waits until then (docs/hardware/cpu.md, Multiply and divide;
    psx-spx CPU Specifications, multiply and divide timing). */
 #include <stdint.h>
 #include <stdlib.h>
@@ -25,8 +25,20 @@
 #define MFLO_WORD(rd) (((rd) << 11) | 0x12u)
 #define MTLO_WORD(rs) (((rs) << 21) | 0x13u)
 
+#define SR_CU2 0x40000000u
 #define VECTOR_RAM 0x80000080u
 #define CODE 0x80001000u
+#define DATA 0x80002000u
+
+/* A GTE command word: COP2 with bit 25 set and the command number in the low
+   six bits; the register moves and the memory forms. */
+#define GTE_CMD_WORD(n) (0x4A000000u | (n))
+#define MFC2_WORD(rt, rd) (0x48000000u | ((rt) << 16) | ((rd) << 11))
+#define CFC2_WORD(rt, rd) (0x48400000u | ((rt) << 16) | ((rd) << 11))
+#define MTC2_WORD(rt, rd) (0x48800000u | ((rt) << 16) | ((rd) << 11))
+#define CTC2_WORD(rt, rd) (0x48C00000u | ((rt) << 16) | ((rd) << 11))
+#define LWC2_WORD(base, rt, off) ((0x32u << 26) | ((base) << 21) | ((rt) << 16) | ((off) & 0xFFFFu))
+#define SWC2_WORD(base, rt, off) ((0x3Au << 26) | ((base) << 21) | ((rt) << 16) | ((off) & 0xFFFFu))
 
 static void *test_alloc(void *user, size_t size)
 {
@@ -111,7 +123,7 @@ static struct md issue(uint32_t word, uint32_t rs, uint32_t rt)
 
 /* MULT takes 6 cycles when its first operand, with its sign mirrored (rs XOR
    its sign bit spread over the word), is below 800h, and the instruction itself
-   costs one (PSX-SYSTEM section 2, MULTU/MULT). 7FFh is the largest, and the
+   costs one (docs/hardware/cpu.md, Multiply and divide). 7FFh is the largest, and the
    mirror of -800h is 7FFh. The product is exact: 7FFh * 3 = 17FDh, and
    -800h * 3 = -1800h.
    Fault prevented: a multiply that is charged by its second operand, by a
@@ -137,7 +149,7 @@ static void mult_6(void)
 }
 
 /* From 800h up to FFFFFh, by the same mirrored rs, MULT takes 9 cycles; -801h
-   mirrors to 800h and -100000h to FFFFFh (PSX-SYSTEM section 2, MULTU/MULT).
+   mirrors to 800h and -100000h to FFFFFh (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a middle class that starts or ends one value off, on either
    sign. */
 static void mult_9(void)
@@ -152,7 +164,7 @@ static void mult_9(void)
 }
 
 /* Anything from 100000h up, mirrored, takes 13 cycles: 100000h, 7FFFFFFFh,
-   -100001h and -80000000h (PSX-SYSTEM section 2, MULTU/MULT).
+   -100001h and -80000000h (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a longest class that begins early or never applies to a
    negative first operand. */
 static void mult_13(void)
@@ -167,7 +179,7 @@ static void mult_13(void)
 
 /* MULTU classifies rs as it is, with no mirror: FFFFFFFFh is the longest class,
    where MULT of the same bits is the shortest, and FFFFF800h is the longest
-   too (PSX-SYSTEM section 2, MULTU/MULT). The product is unsigned:
+   too (docs/hardware/cpu.md, Multiply and divide). The product is unsigned:
    FFFFFFFFh * 1 is 00000000FFFFFFFFh.
    Fault prevented: an unsigned multiply that takes the signed classification. */
 static void multu_raw(void)
@@ -192,7 +204,7 @@ static void multu_raw(void)
    included, and never traps; the results are the documented ones: 7 / 2 is 3
    remainder 1, -7 / 2 is -3 remainder -1, a zero divisor gives LO = -1 and
    HI = rs (LO = +1 for a negative rs), and the one overflowing quotient wraps
-   (PSX-SYSTEM section 2, DIV/DIVU).
+   (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a divide whose time depends on its operands, or one that
    traps on zero. */
 static void div_36(void)
@@ -221,8 +233,8 @@ static void div_36(void)
 }
 
 /* DIVU takes 36 cycles too: 7 / 2, and a zero divisor gives LO = FFFFFFFFh and
-   HI = rs; FFFFFFFFh / 2 is 7FFFFFFFh remainder 1 (PSX-SYSTEM section 2,
-   DIV/DIVU).
+   HI = rs; FFFFFFFFh / 2 is 7FFFFFFFh remainder 1
+   (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: an unsigned divide with a different time or a signed
    reading of a large dividend. */
 static void divu_36(void)
@@ -246,8 +258,8 @@ static void divu_36(void)
    left of the latency, and nothing once it has elapsed. MFLO straight after a
    13-cycle MULT takes 13 cycles, MFHI straight after a divide takes 36, and
    after 4 no-operations the MULT's read takes 9 (13 less the 1 for its own issue
-   and 4 elapsed, plus its own cycle); after 20 it takes 1 (PSX-SYSTEM section 2,
-   MULTU/MULT: reading HI/LO early stalls until done).
+   and 4 elapsed, plus its own cycle); after 20 it takes 1
+   (docs/hardware/cpu.md, Multiply and divide: reading HI/LO early stalls until done).
    Fault prevented: a read that returns before the result is there at no cost, or
    one that waits longer than the result takes. */
 static void early_read_stalls(void)
@@ -298,7 +310,7 @@ static void early_read_stalls(void)
    new operation's own latency from its own issue, never the longer of the two. A
    13-cycle MULT then a DIV is ready 36 after the DIV, and a DIV then a 6-cycle
    MULT is ready 6 after the MULT, so a read right after it stalls 6 cycles
-   (PSX-SYSTEM section 2, MULTU/MULT).
+   (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a new multiply that waits for the old one, or one whose
    stamp keeps the old, later completion. */
 static void replace_while_busy(void)
@@ -328,7 +340,7 @@ static void replace_while_busy(void)
 
 /* MTLO and MTHI set the stamp to 0: the running multiply is over as far as a
    read can tell, so a read straight after takes 1 cycle and gives the written
-   value. Only that stall is pinned (PSX-SYSTEM section 2, MULTU/MULT).
+   value. Only that stall is pinned (docs/hardware/cpu.md, Multiply and divide).
    Fault prevented: a write to HI or LO that a running multiply then overwrites
    or that a read waits behind. */
 static void mtlo_mthi_stamp_zero(void)
@@ -354,7 +366,7 @@ static void mtlo_mthi_stamp_zero(void)
 
 /* An exception leaves HI, LO and the stamp alone: SYSCALL taken while a
    multiply runs changes none of them, and a read in the handler still stalls to
-   the original completion (PSX-SYSTEM section 2, EPC and COP0 registers: the
+   the original completion (docs/hardware/cop0.md, Entry: the
    entry changes only COP0 and the program counter).
    Fault prevented: an exception entry that clears the multiply unit or
    forgets the result, so a handler reads zero. */
@@ -382,6 +394,133 @@ static void survives_exception(void)
     schway_destroy(inst);
 }
 
+/* The engine's 22 commands and the cycles each keeps it busy (psx-spx,
+   Geometry Transformation Engine, GTE Opcode Summary; measured on both console
+   boards by the gte-timing results). */
+static const struct {
+    uint32_t num, busy;
+} gte_commands[] = {
+    {0x01u, 15u}, {0x06u, 8u},  {0x0Cu, 6u},  {0x10u, 8u},  {0x11u, 8u},  {0x12u, 8u},
+    {0x13u, 19u}, {0x14u, 13u}, {0x16u, 44u}, {0x1Bu, 17u}, {0x1Cu, 11u}, {0x1Eu, 14u},
+    {0x20u, 30u}, {0x28u, 5u},  {0x29u, 8u},  {0x2Au, 17u},  {0x2Du, 5u},  {0x2Eu, 6u},
+    {0x30u, 23u}, {0x3Du, 5u},  {0x3Eu, 5u},  {0x3Fu, 39u},
+};
+
+/* A kernel-mode CPU with the GTE usable, the instruction at CODE primed. */
+static schway *make_gte(const uint32_t *words, uint32_t n)
+{
+    schway *inst = make();
+    inst->cpu.cop0.r[SCHWAY__COP0_SR] = SR_CU2;
+    for (uint32_t i = 0u; i < n; i++) {
+        put(inst, CODE + 4u * i, words[i]);
+    }
+    prime(inst, CODE, n);
+    return inst;
+}
+
+/* A command followed at once by MFC2 of IR1: the command takes its own cycle and
+   sets the stamp its busy time after its issue, and the read waits for what is
+   left, the busy time less the one cycle the command's successor started
+   after, so the read takes exactly the busy time (as MFLO right after a
+   multiply takes the multiply's time). All 22 commands.
+   Fault prevented: a command with the wrong busy time, a stamp counted from the
+   wrong cycle, or a result read that does not wait for the engine. */
+static void gte_cycles(void)
+{
+    for (size_t i = 0u; i < sizeof gte_commands / sizeof gte_commands[0]; i++) {
+        uint32_t words[2] = {GTE_CMD_WORD(gte_commands[i].num), MFC2_WORD(3u, 9u)};
+        schway *inst = make_gte(words, 2u);
+        uint64_t before = inst->cpu.cycle;
+        CHECK_EQ_U64(run(inst, CODE), 1u);
+        CHECK_EQ_U64(inst->gte.ready - before, gte_commands[i].busy);
+        CHECK_EQ_U64(run(inst, CODE + 4u), gte_commands[i].busy);
+        CHECK_EQ_U64(inst->cpu.cycle - before, 1u + gte_commands[i].busy);
+        schway_destroy(inst);
+    }
+}
+
+/* The cycles instruction word takes when issued k instructions after an NCDT
+   (44 cycles busy), with k no-operations between; the data register under it
+   is 0 and the base register of the memory forms points at RAM. */
+static uint64_t after_ncdt(uint32_t word, uint32_t k)
+{
+    uint32_t words[8] = {GTE_CMD_WORD(0x16u), NOP_WORD, NOP_WORD, NOP_WORD, NOP_WORD, NOP_WORD,
+                         NOP_WORD, NOP_WORD};
+    schway *inst;
+    uint64_t took;
+    uint32_t n = 0u;
+    words[1u + k] = word;
+    inst = make_gte(words, 2u + k);
+    inst->cpu.r[1] = DATA;
+    (void)run(inst, CODE);
+    for (n = 0u; n < k; n++) {
+        (void)run(inst, CODE + 4u + 4u * n);
+    }
+    took = run(inst, CODE + 4u + 4u * k);
+    schway_destroy(inst);
+    return took;
+}
+
+/* MFC2, CFC2, SWC2 and a second command right after a command wait for it,
+   and MTC2, CTC2 and LWC2 do not (the gte-timing results, What waits). The wait
+   is the busy time less the cycles already spent: after an NCDT, MFC2 takes
+   44, with 3 no-operations between it takes 41, once the 44 have passed it
+   takes 1, and a stamp set far ahead of the counter, as a loaded state could
+   hold, waits exactly 44.
+   The forms that do not wait take their own time: 1 for the register moves and
+   a RAM read of the memory form takes 1 plus the bus's charge (the DATA word is
+   in RAM, not cached) which is the same with and without a command running.
+   Fault prevented: a register move or load that waits for the engine, a store
+   or second command that does not, a wait that does not shorten with time, or
+   one a bad loaded stamp makes longer than the longest command. */
+static void gte_stall_rules(void)
+{
+    uint32_t waits[] = {MFC2_WORD(3u, 9u), CFC2_WORD(3u, 4u), SWC2_WORD(1u, 5u, 0u),
+                        GTE_CMD_WORD(0x28u)};
+    uint32_t quiet[] = {MTC2_WORD(3u, 9u), CTC2_WORD(3u, 4u), LWC2_WORD(1u, 5u, 0u)};
+    uint32_t words[2];
+    schway *inst;
+    uint64_t base;
+    for (size_t i = 0u; i < sizeof waits / sizeof waits[0]; i++) {
+        /* On an idle engine the instruction takes its base time; after the
+           NCDT it takes that plus the wait. */
+        words[0] = NOP_WORD;
+        words[1] = waits[i];
+        inst = make_gte(words, 2u);
+        inst->cpu.r[1] = DATA;
+        (void)run(inst, CODE);
+        base = run(inst, CODE + 4u);
+        schway_destroy(inst);
+        CHECK_EQ_U64(after_ncdt(waits[i], 0u), base + 43u);
+        CHECK_EQ_U64(after_ncdt(waits[i], 3u), base + 40u);
+        CHECK_EQ_U64(after_ncdt(waits[i], 6u), base + 37u);
+    }
+    for (size_t i = 0u; i < sizeof quiet / sizeof quiet[0]; i++) {
+        words[0] = NOP_WORD;
+        words[1] = quiet[i];
+        inst = make_gte(words, 2u);
+        inst->cpu.r[1] = DATA;
+        (void)run(inst, CODE);
+        base = run(inst, CODE + 4u);
+        schway_destroy(inst);
+        CHECK_EQ_U64(after_ncdt(quiet[i], 0u), base);
+        CHECK_EQ_U64(after_ncdt(quiet[i], 3u), base);
+    }
+
+    /* A stamp far ahead waits the longest command's time and no more; one that
+       has passed waits nothing. */
+    words[0] = MFC2_WORD(3u, 9u);
+    inst = make_gte(words, 1u);
+    inst->gte.ready = inst->cpu.cycle + 1000000u;
+    CHECK_EQ_U64(run(inst, CODE), 1u + 44u);
+    schway_destroy(inst);
+    inst = make_gte(words, 1u);
+    inst->cpu.cycle = 100u;
+    inst->gte.ready = 50u;
+    CHECK_EQ_U64(run(inst, CODE), 1u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     static const struct {
@@ -398,6 +537,8 @@ int main(int argc, char **argv)
         {"replace_while_busy", replace_while_busy},
         {"mtlo_mthi_stamp_zero", mtlo_mthi_stamp_zero},
         {"survives_exception", survives_exception},
+        {"gte_cycles", gte_cycles},
+        {"gte_stall_rules", gte_stall_rules},
     };
     if (argc != 2) {
         fprintf(stderr, "usage: schwaystation-test-timing <case>\n");

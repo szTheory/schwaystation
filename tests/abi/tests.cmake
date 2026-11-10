@@ -54,7 +54,7 @@ foreach(case IN ITEMS "abi.symbols;symbols;symbol;outside[^:]*namespace:.*abi_sy
 endforeach()
 
 # Every header name is in a versioned API test, so a declaration added after
-# a release needs tests/api/v2.c and with it SCHWAY_API_VERSION 2. The self
+# a release needs tests/api/v3.c and with it SCHWAY_API_VERSION 3. The self
 # test reads a copy of the header with one extra function and no bump, and
 # expects that function named.
 schway_add_test(NAME abi.api_version
@@ -93,6 +93,15 @@ set_target_properties(schwaystation-test-api-v2 PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-api-v2)
 schway_add_test(NAME abi.api_v2 COMMAND schwaystation-test-api-v2
+  LABELS abi portable TIMEOUT 10)
+
+# The frozen API v3 program: every name version 3 added.
+add_executable(schwaystation-test-api-v3 ${PROJECT_SOURCE_DIR}/tests/api/v3.c)
+target_link_libraries(schwaystation-test-api-v3 PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-api-v3 PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-api-v3)
+schway_add_test(NAME abi.api_v3 COMMAND schwaystation-test-api-v3
   LABELS abi portable TIMEOUT 10)
 
 # The public header compiles alone as C17 and as C++17 with warnings fatal.

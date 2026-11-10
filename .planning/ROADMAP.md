@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: A test frame in RetroArch** - The library, runner and libretro core ship automatically, and a built-in test card hashes identically on eight lanes (verified 2026-10-29; ship PR #4)
 - [x] **Phase 2: The CPU matches the public vectors** - The R3000A, COP0, bus, memory control, I-cache and interrupts pass the vectors; PS-EXEs run under the own stub kernel (completed 2026-11-09)
-- [ ] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests
+- [x] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests (completed 2026-11-10)
 - [ ] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch
 - [ ] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro
 - [ ] **Phase 6: Discs and FMV** - CD-ROM with cue/bin, iso and m3u, XA, CD-DA, MDEC and disk control, and the own disc boots through OpenBIOS in RetroArch
@@ -164,10 +164,58 @@ Plans:
 **Requirements**: GTE-01, GTE-02, GTE-03
 **Success Criteria** (what must be TRUE):
   1. `ctest -L gte` passes all 1,150 transcoded ps1-tests cases, the UNR-table assertion and the property test against a straight C reference with flags. The `gte_vectors` fixture's `mailbox@30` records match the `hw` rows.
-  2. `ctest -L dma` passes for all seven channels, covering costs, chopping, MADR wrap, OTC clearing and the CPU stall. The `chain-looping` list terminates by the 1000h-node guard, and the pinned DMA fixture record matches.
+  2. `ctest -L dma` passes for all seven channels, covering costs, chopping, MADR wrap, OTC clearing and the CPU stall. The `chain-looping` list yields at the 1000h-node guard while the frame still ends, and the pinned DMA fixture record matches.
   3. `ctest -L timers` passes for the three root counters with sync modes, targets, the write hold and every IRQ mode. The `timers_lines` sysclk, sysclk/8 and vblank-count records match per profile.
 
-**Plans**: TBD
+**Plans**: 26/26 plans complete in 10 waves
+
+Plans:
+**Wave 1**
+- [x] 03-01-PLAN.md — Skeleton: gte, dma, timers and sched modules, state structs, body_io, format and revision 3, thin bus dispatch, three test directories
+- [x] 03-02-PLAN.md — tools/gte2bin.py, the 1,150-case vector file, the fixture include, manifest, pin and notice rows, policy.notices, budget ratchet
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 03-03-PLAN.md — Spine A: block clock, deadline limit, event runner, freeze-until stall, fifth-queued-store stall hook, vblank push
+- [x] 03-04-PLAN.md — Bus wiring: owned DMA and timer ranges, the DMA RAM word path, stall hook on reads and fetches, I_STAT timer sync
+- [x] 03-05-PLAN.md — GTE seed part 1 from ares: register file, replay harness, register sweep, notice and provenance row
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 03-06-PLAN.md — Spine B: COP2 through the GTE, the busy stall, the interrupt double-execute with the side-effect-free peek
+- [x] 03-26-PLAN.md — GTE seed part 2: numerics, flags, UNR divide and the seven projection, averaging and product commands
+- [x] 03-08-PLAN.md — DMA registers, DPCR/DICR, the unit engine, OTC and the CPU stall
+- [x] 03-09-PLAN.md — Root counters on the system clock: lazy closed form, targets, hold, MODE rules, IRQ modes, deadlines
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 03-07-PLAN.md — GTE seed part 3: every command, all 1,150 cases with controls, directed quirk tests
+- [x] 03-10-PLAN.md — DMA sync 0 and sync 1, device-end switch with stub sink, DREQ, per-device costs
+- [x] 03-11-PLAN.md — Timer sync modes, blank and dot entry points, unfed sources, prop.h and the naive reference oracle
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 03-12-PLAN.md — The gte_vectors fixture on the real CPU path with hw rows and the vector-file guard
+- [x] 03-13-PLAN.md — Independent straight-C GTE reference, all 1,150 cases, the 22,000-case property test
+- [x] 03-14-PLAN.md — DMA linked lists with the 1000h-node yield, chopping bands, hostile bounds, register sweep
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 03-15-PLAN.md — SCHWAY_FAULT_DMA and API version 3
+- [x] 03-16-PLAN.md — The dma_chain fixture with OTC, DICR, list outcomes and the Timer 2 OTC time
+- [x] 03-24-PLAN.md — Split equivalence with the timers and DMA armed
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 03-17-PLAN.md — The per-profile judge and the timers_lines fixture
+- [x] 03-18-PLAN.md — DMA, timer and GTE fuzz seed rows; the armips unity build
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 03-19-PLAN.md — schwaystation-run --hash-state and state lines in hashes.txt
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 03-20-PLAN.md — REQUIREMENTS and ROADMAP corrections and the testing guide
+- [x] 03-21-PLAN.md — Source and hardware-page citations re-pointed, the CPU page's interrupt sentence fixed
+- [x] 03-22-PLAN.md — Test and fixture citations re-pointed
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 03-23-PLAN.md — Preparation corrections and the shrink of PSX-SYSTEM 2-6 and PSX-GPU-AND-GTE 5 to pointers
+- [x] 03-25-PLAN.md — Todos for the review findings and deferrals, rebinding, review dispositions
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/PSX-SYSTEM.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/PSXDEV-EXTRACTS.md`
 
@@ -225,7 +273,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. A test frame in RetroArch | 15/15 | Ship PR #4 | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
-| 3. The GTE matches the hardware cases; DMA and timers | 0/TBD | Not started | - |
+| 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 0/TBD | Not started | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

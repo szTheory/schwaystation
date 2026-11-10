@@ -4,6 +4,7 @@
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
+ *                     [--hash-state]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
@@ -18,6 +19,14 @@
  * enabled, rgb24, bpp), then the display rows top to bottom, each pixel as a
  * little-endian u16, with no padding (ARCHITECTURE section 7), so it does not
  * depend on the host's byte order.
+ *
+ * --hash-state prints, after the frame line and every other line, the SHA-256 of the saved state
+ * without its 20-byte header:
+ *
+ *   state sha256 <64 lowercase hex digits>
+ *
+ * With no picture beyond the test card a frame hash cannot show what the CPU, the GTE, DMA or the
+ * timers did; the state hash can, and it is the same on every platform.
  *
  * --png N:FILE writes frame N (1 <= N <= --frames) to FILE as an 8-bit RGB
  * PNG, each pixel converted by the shared XRGB8888 converter with the X byte
@@ -107,13 +116,14 @@ static const char synopsis[] =
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
-    "                         [--hash]\n"
+    "                         [--hash] [--hash-state]\n"
     "       schwaystation-run --probe FILE\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
     "  --frames N         run N frames (1 <= N <= 1000000)\n"
     "  --bench N          run N frames and report the time per frame\n"
     "  --hash             print the SHA-256 of the last frame\n"
+    "  --hash-state       print the SHA-256 of the saved machine state\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
     "  --tty              print the program's text as tty lines; needs --exe\n"
@@ -200,6 +210,7 @@ typedef struct options {
     uint32_t frames;
     int bench; /* --bench N rather than --frames N */
     int hash;
+    int hash_state; /* --hash-state: the SHA-256 of the saved state */
     uint32_t png_frame; /* 0 when no --png was given */
     const char *png_path;
     const char *probe; /* --probe FILE, else NULL */
@@ -241,6 +252,8 @@ static int parse_options(int argc, char **argv, options *o)
             i++;
         } else if (strcmp(arg, "--hash") == 0) {
             o->hash = 1;
+        } else if (strcmp(arg, "--hash-state") == 0) {
+            o->hash_state = 1;
         } else if (strcmp(arg, "--png") == 0) {
             if (o->png_frame != 0u) {
                 return usage("give --png once");
@@ -378,6 +391,39 @@ static int print_hash(const schway *inst, uint32_t frames)
     schway__sha256_final(&s, digest);
     schway__sha256_hex(digest, hex);
     printf("frame %lu sha256 %s\n", (unsigned long)frames, hex);
+    return SCHWAY__EXIT_OK;
+}
+
+/* The state's header: magic, format, total size and body CRC-32, 20 bytes (docs/embedding.md). The
+   hash covers the body only, so it does not depend on the format number or the checksum. */
+#define STATE_HEADER_SIZE 20u
+
+/* Prints the state hash line: the SHA-256 of the saved state after its header. The runner may
+   allocate; the core does not. Returns the exit status. */
+static int print_state_hash(const schway *inst)
+{
+    size_t size = schway_state_size(inst);
+    uint8_t *buf = size > STATE_HEADER_SIZE ? (uint8_t *)malloc(size) : NULL;
+    if (buf == NULL) {
+        fprintf(stderr, "schwaystation-run: cannot size the state\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+    schway_status st = schway_save_state(inst, buf, size);
+    if (st != SCHWAY_STATUS_OK) {
+        fprintf(stderr, "schwaystation-run: schway_save_state failed: %s\n",
+                schway_status_string(st));
+        free(buf);
+        return SCHWAY__EXIT_FAILURE;
+    }
+    schway__sha256 s;
+    uint8_t digest[32];
+    char hex[65];
+    schway__sha256_init(&s);
+    schway__sha256_update(&s, buf + STATE_HEADER_SIZE, size - STATE_HEADER_SIZE);
+    schway__sha256_final(&s, digest);
+    schway__sha256_hex(digest, hex);
+    printf("state sha256 %s\n", hex);
+    free(buf);
     return SCHWAY__EXIT_OK;
 }
 
@@ -726,6 +772,9 @@ static int run(const options *opt)
     }
     if (status == SCHWAY__EXIT_OK && opt->hash) {
         status = print_hash(inst, ran);
+    }
+    if (status == SCHWAY__EXIT_OK && opt->hash_state) {
+        status = print_state_hash(inst);
     }
     if (status == SCHWAY__EXIT_OK && opt->bench) {
         char report[512];

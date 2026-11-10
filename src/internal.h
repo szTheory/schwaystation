@@ -8,11 +8,15 @@
 #include "schwaystation.h"
 #include "bus.h"
 #include "cpu.h"
+#include "gte.h"
+#include "dma.h"
+#include "timers.h"
+#include "sched.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 2u
-#define SCHWAY__STATE_FORMAT 2u
+#define SCHWAY__BEHAVIOUR_REVISION 3u
+#define SCHWAY__STATE_FORMAT 3u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -65,7 +69,8 @@ enum {
     SCHWAY__FAULT_MISALIGNED_FETCH,
     SCHWAY__FAULT_RESERVED_INSTRUCTION,
     SCHWAY__FAULT_COP_UNUSABLE,
-    SCHWAY__FAULT_EXCEPTION_LOOP
+    SCHWAY__FAULT_EXCEPTION_LOOP,
+    SCHWAY__FAULT_DMA
 };
 
 struct schway__fault {
@@ -91,8 +96,7 @@ struct schway__tty {
    6), 32 bytes each. cycle is the tick the access began on; frame is the low 32
    bits of the frame count, widened when a record is read; meta packs the event
    (bits 0-2), the access width in bytes (3-5), the device (6-10) and a note
-   (16-31, saturating). t0 and c0 hold the running block's start tick and CPU
-   cycle count, the origin of the next cycle. Outside the state and every hash. */
+   (16-31, saturating). Outside the state and every hash. */
 #define SCHWAY__TRACE_CAP 4096u
 #define SCHWAY__TRACE_META(event, width, device, note)                                             \
     ((uint32_t)(event) | ((uint32_t)(width) << 3) | ((uint32_t)(device) << 6) |                    \
@@ -112,7 +116,6 @@ struct schway__trace_rec {
 struct schway__trace_ring {
     struct schway__trace_rec rec[SCHWAY__TRACE_CAP];
     uint32_t head, count;
-    uint64_t t0, c0;
 };
 
 struct schway {
@@ -133,9 +136,14 @@ struct schway {
     uint32_t profile_flags;     /* the profile's flags, bit 0 the debug port */
     uint32_t exe_loaded;        /* 1 after a PS-EXE was side-loaded */
     struct schway__cpu cpu;
+    struct schway__gte gte;
     struct schway__bus bus;
     struct schway__irq irq;
+    struct schway__dma dma;
+    struct schway__timers timers;
     struct schway__fault fault;
+    /* Not saved: derived from the state, and rebuilt after a load. */
+    struct schway__sched sched;
     /* Not saved: the host drains these, and a power reset empties them. */
     struct schway__tty tty;
     struct schway__trace_ring trace;
@@ -347,6 +355,7 @@ _Static_assert(SCHWAY_FAULT_RESERVED_INSTRUCTION == SCHWAY__FAULT_RESERVED_INSTR
                "fault reserved instruction");
 _Static_assert(SCHWAY_FAULT_COP_UNUSABLE == SCHWAY__FAULT_COP_UNUSABLE, "fault cop unusable");
 _Static_assert(SCHWAY_FAULT_EXCEPTION_LOOP == SCHWAY__FAULT_EXCEPTION_LOOP, "fault exception loop");
+_Static_assert(SCHWAY_FAULT_DMA == SCHWAY__FAULT_DMA, "fault dma");
 _Static_assert(SCHWAY_DEVICE_NONE == SCHWAY__DEV_NONE, "device none");
 _Static_assert(SCHWAY_DEVICE_RAM == SCHWAY__DEV_RAM, "device ram");
 _Static_assert(SCHWAY_DEVICE_SCRATCH == SCHWAY__DEV_SCRATCH, "device scratch");

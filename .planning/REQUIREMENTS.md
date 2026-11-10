@@ -37,9 +37,11 @@ Phase 2's repository-check code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githoo
 
 ### The GTE matches the hardware cases; DMA and timers
 
-- [ ] **GTE-01**: `ctest -L gte` runs the 1,150 ps1-tests GTE cases (test-all) transcoded by `tools/gte2bin.py` from the MIT C table at `f727802fead1` into `tests/vectors/gte/ps1tests-1150.bin` with the notice in `THIRD-PARTY-NOTICES.md`, with 64-bit accumulators, 44-bit clipping, ares flag placement, the UNR table asserted against the printed table and the documented IR3/lm, FC, mx = 3 and H sign-extend quirks; the GTE cycle counts and the busy stall are covered in `tests/cpu/timing_tests.c`; the `gte_vectors` fixture's `mailbox@30` records match `expected.csv` rows sourced `hw`; a property test compares random inputs against a straight C reference including the flags.
-- [ ] **GTE-02**: `ctest -L dma` passes register-level tests for the seven DMA channels with DPCR/DICR, per-word costs (1, 4, 24 or 40), the CPU stall rule, chopping windows, the 1000h-node linked-list guard, MADR wrapping at FFFFFCh, OTC (DMA6) clearing, and the `chain-looping` self-reference terminating by the guard; a fixture `mailbox` record of a DMA transfer is pinned in `expected.csv`.
-- [ ] **GTE-03**: `ctest -L timers` passes register-level tests for the three root counters with sync modes, targets, the 2-cycle write hold and the zero dwell, and the IRQ modes (one-shot, repeat, pulse and toggle); the `timers_lines` fixture is assembled and its sysclk, sysclk/8 and vblank-count records judged per profile against PX.12 and PX.21 (its dot-clock and hblank records pin in GAME-02 once the GPU line machine exists).
+- [x] **GTE-01**: `ctest -L gte` runs the 1,150 ps1-tests GTE cases (test-all) transcoded by `tools/gte2bin.py` from the MIT C table at `f727802fead1` into `tests/vectors/gte/ps1tests-1150.bin` with the notice in `THIRD-PARTY-NOTICES.md`, with 64-bit accumulators, 44-bit clipping, ares flag placement, the UNR table asserted against the printed table and the documented IR3/lm, FC, mx = 3 and H sign-extend quirks; the GTE cycle counts and the busy stall are covered in `tests/cpu/timing_tests.c`; the `gte_vectors` fixture's `mailbox@30` holds at most 30 records, which match `expected.csv` rows sourced `hw`; a property test compares random inputs against a straight C reference including the flags.
+- [x] **GTE-02**: `ctest -L dma` passes register-level tests for the seven DMA channels with DPCR/DICR, per-word costs (1, 4, 24, or 40 selected by the CD-ROM device end in phase 6), the CPU stall rule, chopping windows, the 1000h-node linked-list guard, MADR wrapping at FFFFFCh, OTC (DMA6) clearing, and the `chain-looping` self-reference yielding at the guard while the frame still ends; a fixture `mailbox` record of a DMA transfer is pinned in `expected.csv`.
+- [x] **GTE-03**: `ctest -L timers` passes register-level tests for the three root counters with sync modes, targets, the 2-cycle write hold and the zero dwell, and the IRQ modes (one-shot, repeat, pulse and toggle); the `timers_lines` fixture is assembled and its sysclk, sysclk/8 and vblank-count records judged per profile against ranges derived from the frame constants (the exact 715909/451584 ratio, with the fixed interrupt-path overhead), every phase-3 timer row sourced `doc`, never `hw` (its dot-clock and hblank records pin in GAME-02 once the GPU line machine exists).
+
+Phase 3's repository-check code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githooks/*`) stays at or under 1,520 lines, ratcheted to the measured total at ship (AGENTS rules 7 and 14). The one gate it adds is `policy.notices`, with its own `.self_test`; the fault it prevents is a committed third-party binary or table whose notice does not name it, or a notice naming a path that does not exist. `schwaystation-run --hash-state` prints the SHA-256 of the saved state after its 20-byte header, and `hashes.txt` carries that line for the fixture executables, so the eight-lane comparison covers the devices this phase adds, which no frame hash can show while no GPU draws.
 
 ### Games play in RetroArch
 
@@ -126,9 +128,9 @@ Later milestones. Each has a seed in `.planning/seeds/` that says when it comes 
 | CPU-03 | Phase 2 | Complete |
 | CPU-04 | Phase 2 | Complete |
 | CPU-05 | Phase 2 | Complete |
-| GTE-01 | Phase 3 | Pending |
-| GTE-02 | Phase 3 | Pending |
-| GTE-03 | Phase 3 | Pending |
+| GTE-01 | Phase 3 | Complete |
+| GTE-02 | Phase 3 | Complete |
+| GTE-03 | Phase 3 | Complete |
 | GAME-01 | Phase 4 | Pending |
 | GAME-02 | Phase 4 | Pending |
 | GAME-03 | Phase 4 | Pending |

@@ -2,7 +2,7 @@
    cost table, devices not built yet, gaps and the debug ports, and the state
    walk. The access path decodes the virtual address by segment, then by one
    switch on address class, and inside the I/O page by one switch on bits 4-11
-   (PSX-SYSTEM section 3; ARCHITECTURE section 2). */
+   (docs/hardware/bus.md; ARCHITECTURE section 2). */
 #include <string.h>
 
 #include "state.h"
@@ -23,12 +23,12 @@ static const char name_irq_mask[] = "irq.mask";
 /* Memory-control registers, in address order from 1F801000h: DEV0 base, DEV8
    base, the delay/size registers of DEV0, DEV1, DEV2 (BIOS), DEV4 (SPU), DEV5
    (CD-ROM) and DEV8, then COM_DELAY. Each port's delay register is memctl[2 +
-   port] (PSX-SYSTEM section 3; psx-spx Memory Control). */
+   port] (docs/hardware/bus.md; psx-spx Memory Control). */
 #define MEMCTL_COM 8u
 
 /* Power-on: the bases hold their boot values, every port uses the maximum
    delays (both fields 0Fh and all four COM periods selected), and COM_DELAY
-   holds its boot value 00031125h (PSX-SYSTEM section 3, section 9). */
+   holds its boot value 00031125h (docs/hardware/bus.md; PSX-SYSTEM section 9). */
 static uint32_t memctl_power_on(uint32_t i)
 {
     switch (i) {
@@ -45,7 +45,7 @@ static uint32_t memctl_power_on(uint32_t i)
 
 /* The cost, in CPU cycles, of reading or writing a port with its delay
    register dev and COM_DELAY com, as the formula of psx-spx Memory Control
-   gives it (PSX-SYSTEM section 3):
+   gives it (docs/hardware/bus.md):
      1ST = SEQ = 0, MIN = 0
      COM0 selected (bit 8):  1ST, SEQ += COM0 - 1
      COM2 selected (bit 10): 1ST, SEQ += COM2
@@ -144,7 +144,7 @@ void schway__bus_state_io(struct schway__state_io *io, schway *inst)
     }
 }
 
-/* Address classes of the physical map (PSX-SYSTEM section 3). */
+/* Address classes of the physical map (docs/hardware/bus.md). */
 enum { CLS_GAP, CLS_RAM, CLS_SCRATCH, CLS_IO, CLS_EXP2, CLS_EXP1, CLS_BIOS, CLS_EXP3 };
 
 static uint32_t classify(uint32_t p)
@@ -244,7 +244,7 @@ static int gap(schway *inst, uint32_t kind, uint32_t dev, uint32_t addr, uint32_
    UINT32_MAX for a bus error. The two banks follow each other: /RAS0 holds
    1, 2, 4 or 8 MiB from bits 9 and 11 of RAM_SIZE, /RAS1 the same from bits
    8 and 11 when bit 10 enables it, and a bank larger than the RAM mirrors it
-   (PSX-SYSTEM section 3, RAM_SIZE; psx-spx Memory Control, DRAM_CTRL). */
+   (docs/hardware/bus.md, Memory control; psx-spx Memory Control, DRAM_CTRL). */
 static uint32_t ram_locate(uint32_t rs, uint32_t a)
 {
     uint32_t size0 = UINT32_C(0x100000) << (((rs >> 8) & 2u) | ((rs >> 11) & 1u));
@@ -260,6 +260,34 @@ static uint32_t ram_locate(uint32_t rs, uint32_t a)
         }
     }
     return UINT32_MAX;
+}
+
+/* The DMA engine's path to RAM: one aligned word at physical word address
+   addr in the 8 MiB RAM window, assembled and stored little-endian a byte at a
+   time. It raises no fault, charges no cycle, counts no unbuilt access and never
+   waits on a DMA unit. An address that RAM_SIZE leaves without RAM drops the
+   word, reads nothing and returns non-zero; it does not touch DICR (a DMA
+   word past RAM is not modelled as a bus error; docs/hardware/dma.md). The low
+   two address bits are ignored, as MADR's are. */
+int schway__bus_ram_word(schway *inst, uint32_t addr, uint32_t *word, uint32_t write)
+{
+    uint32_t off = ram_locate(inst->bus.ram_size, addr & ~UINT32_C(3));
+    if (off == UINT32_MAX) {
+        return 1;
+    }
+    uint8_t *ram = inst->bus.ram;
+    if (write != 0u) {
+        for (uint32_t i = 0; i < 4u; i++) {
+            ram[off + i] = (uint8_t)(*word >> (8u * i));
+        }
+        return 0;
+    }
+    uint32_t v = 0u;
+    for (uint32_t i = 0; i < 4u; i++) {
+        v |= (uint32_t)ram[off + i] << (8u * i);
+    }
+    *word = v;
+    return 0;
 }
 
 /* RAM costs 4 cycles plus one per word read, and 1 per write (ARCHITECTURE
@@ -425,6 +453,13 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if ((p & 0x8u) != 0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
+        /* The root counters count lazily, so an I_STAT access first brings
+           them up to the tick of this access: an interrupt edge due by then
+           is in the register a read returns, and what happened while a bit
+           was set is behind a write that acknowledges it. */
+        if ((p & 4u) == 0u) {
+            schway__timers_sync(inst, schway__sched_now(inst, *cycles));
+        }
         if (wr == 0u) {
             *value = reg_get((p & 4u) != 0u ? inst->irq.mask : inst->irq.stat, p, width);
         } else if ((p & 4u) != 0u) {
@@ -441,12 +476,12 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
     case 0x0Du:
     case 0x0Eu:
     case 0x0Fu:
-        schway__bus_unbuilt(inst, SCHWAY__DEV_DMA, p, width, wr, v);
+        schway__dma_io(inst, wr, p, width, value, cycles);
         break;
     case 0x10u:
     case 0x11u:
     case 0x12u:
-        schway__bus_unbuilt(inst, SCHWAY__DEV_TIMER, p, width, wr, v);
+        schway__timers_io(inst, wr, p, width, value, cycles);
         break;
     case 0x80u:
         if ((p & 0xCu) != 0u) {
@@ -555,12 +590,22 @@ static int bus_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t width
         return 0;
     }
     uint32_t p = addr & 0x1FFFFFFFu;
-    switch (classify(p)) {
+    uint32_t cls = classify(p);
+    /* A read or an instruction-fetch miss that reaches RAM, the I/O page, an
+       expansion region or the BIOS waits for a running DMA unit, so the engine
+       is told first, at the tick of this access. A store does not tell it: it
+       goes into the 4-deep write queue and only the fifth queued store waits,
+       which the CPU's queue push reports. The scratchpad, the cache-control
+       word and a gap are not bus accesses that wait. */
+    if (kind != K_WRITE && cls != CLS_SCRATCH && cls != CLS_GAP) {
+        schway__dma_bus_access(inst, schway__sched_now(inst, *cycles));
+    }
+    switch (cls) {
     case CLS_RAM:
         return ram_access(inst, kind, addr, p, width, value, cycles);
     case CLS_SCRATCH: {
         /* The D-cache SRAM: data in KUSEG and KSEG0, a gap in KSEG1, and
-           never fetched from (PSX-SYSTEM section 2, D-cache). */
+           never fetched from (docs/hardware/bus.md, The scratchpad). */
         uint32_t off = p & (SCHWAY__SCRATCH_SIZE - 1u);
         if (schway__bus_segment(addr) == (uint32_t)SCHWAY__SEG_KSEG1 || kind == K_FETCH ||
             width > SCHWAY__SCRATCH_SIZE - off) {
@@ -587,8 +632,8 @@ static int bus_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t width
     case CLS_EXP1:
     case CLS_EXP3: {
         /* Reads and fetches find nothing and are bus errors; a write is
-           dropped (PSX-SYSTEM section 3, Memory map). */
-        uint32_t dev = classify(p) == CLS_EXP1 ? SCHWAY__DEV_EXP1 : SCHWAY__DEV_EXP3;
+           dropped (docs/hardware/bus.md, Segments and the physical map). */
+        uint32_t dev = cls == CLS_EXP1 ? SCHWAY__DEV_EXP1 : SCHWAY__DEV_EXP3;
         if (kind != K_WRITE) {
             return gap(inst, kind, dev, addr, width);
         }

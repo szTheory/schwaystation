@@ -44,7 +44,7 @@ set_target_properties(schwaystation-test-state PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-state)
 
-foreach(case IN ITEMS state.cpu_fields state.round_trip state.stable_bytes state.rejects state.visit
+foreach(case IN ITEMS state.cpu_fields state.device_fields state.round_trip state.stable_bytes state.rejects state.visit
     state.record_sweep state.run_bounds)
   schway_add_test(NAME core.${case}
     COMMAND schwaystation-test-state ${case}
@@ -83,6 +83,13 @@ foreach(case IN ITEMS budget_resume split_equivalence peek_no_side_effects peek_
     LABELS core portable TIMEOUT 10)
 endforeach()
 
+# The split property with the devices armed. Fault prevented: a root counter or
+# a DMA unit whose time depends on where a run was cut, so slices of a run give
+# different interrupts, DMA words or CPU registers than the same span run whole.
+schway_add_test(NAME core.run.split_devices
+  COMMAND schwaystation-test-run split_devices
+  LABELS core portable TIMEOUT 30)
+
 # The trace ring. Fault prevented: a traced run that loses or misorders its
 # records, a ring that does not keep exactly the last 4,096, a fault that is not
 # the last record, an index past the end that answers, or tracing that changes
@@ -103,3 +110,20 @@ endforeach()
 schway_add_test(NAME core.trace_hash_equal
   COMMAND schwaystation-test-trace hash_equal
   LABELS core portable TIMEOUT 10)
+
+# The scheduler spine. Fault prevented: a first fault inside a long block that
+# carries the block's start tick instead of the tick its own instruction began
+# on, a block that runs past a device deadline, an event that never runs, or a
+# DMA stall that charges the CPU instead of freezing it.
+add_executable(schwaystation-test-sched ${CMAKE_CURRENT_LIST_DIR}/sched_tests.c)
+target_include_directories(schwaystation-test-sched PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-sched PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-sched PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-sched)
+
+foreach(case IN ITEMS fault_ticks stall_freeze stall_carries event_dispatch state_next_derived stall_frame_end no_exe_events)
+  schway_add_test(NAME core.sched.${case}
+    COMMAND schwaystation-test-sched ${case}
+    LABELS core portable TIMEOUT 10)
+endforeach()

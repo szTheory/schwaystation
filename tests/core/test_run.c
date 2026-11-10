@@ -11,7 +11,7 @@
 #include "state.h"
 #include "../check.h"
 
-#define MAX_FIELDS 64u
+#define MAX_FIELDS 128u
 #define H_BODY_CRC 16u
 
 static void *test_alloc(void *user, size_t size)
@@ -613,6 +613,315 @@ static void test_fault_latched(void)
     schway_destroy(inst);
 }
 
+/* ---- the split property with the devices armed ---- */
+
+#define TEXT 0x80010000u
+
+#define T0 8u
+#define T1 9u
+#define T2 10u
+#define T3 11u
+#define T4 12u
+#define T5 13u
+#define T6 14u
+
+#define I_LUI(rt, imm) (0x3C000000u | ((rt) << 16) | ((uint32_t)(imm) & 0xFFFFu))
+#define I_ORI(rt, rs, imm) (0x34000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(imm) & 0xFFFFu))
+#define I_SW(rt, off, rs) (0xAC000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(off) & 0xFFFFu))
+#define I_LW(rt, off, rs) (0x8C000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(off) & 0xFFFFu))
+#define I_BEQ(rs, rt, off) (0x10000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(off) & 0xFFFFu))
+#define I_ADDU(rd, rs, rt) (((rs) << 21) | ((rt) << 16) | ((rd) << 11) | 0x21u)
+#define I_OR(rd, rs, rt) (((rs) << 21) | ((rt) << 16) | ((rd) << 11) | 0x25u)
+#define I_NOP 0u
+
+/* Registers a case writes through the bus: interrupt status, the three
+   channels' counters (count at +0, mode at +4, target at +8) and the OTC
+   channel with the arbitration and interrupt registers it needs (psx-spx,
+   Timers and DMA Channels). */
+#define ISTAT 0x1F801070u
+#define TCOUNT(n) (0x1F801100u + 0x10u * (n))
+#define TMODE(n) (TCOUNT(n) + 4u)
+#define TTARGET(n) (TCOUNT(n) + 8u)
+#define OTC_MADR 0x1F8010E0u
+#define OTC_BCR 0x1F8010E4u
+#define OTC_CHCR 0x1F8010E8u
+#define DPCR 0x1F8010F0u
+#define DICR 0x1F8010F4u
+
+/* The devices a case arms. Timer 2 runs on the system clock over 8 and
+   interrupts at FFFFh in repeat mode; Timer 0 runs on the system clock, resets
+   at a target of 1000 and interrupts there in repeat mode; the DMA is one
+   60,000-word OTC unit, with the channel's interrupt enabled. */
+#define ARM_TIMER2 1u
+#define ARM_TIMER0 2u
+#define ARM_DMA 4u
+#define ARM_ALL (ARM_TIMER2 | ARM_TIMER0 | ARM_DMA)
+
+#define OTC_WORDS 60000u
+
+static void put32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16);
+    p[3] = (uint8_t)(v >> 24);
+}
+
+/* A PS-EXE of one text sector at 80010000h. It reads the interrupt status,
+   acknowledges every bit, reads Timer 0 and Timer 2 and keeps what it saw: t4
+   collects the status bits, t5 and t6 add up the two counts. The loop makes the
+   registers depend on the exact tick of every access, and the acknowledgement
+   lets each counter raise its next interrupt. */
+static void load_loop(schway *inst)
+{
+    static uint8_t exe[0x1000];
+    const uint32_t words[] = {
+        I_LUI(T0, 0x1F80u),
+        I_ORI(T0, T0, 0x1000u),
+        I_LW(T1, 0x70u, T0),
+        I_SW(0u, 0x70u, T0),
+        I_LW(T2, 0x100u, T0),
+        I_LW(T3, 0x120u, T0),
+        I_OR(T4, T4, T1),
+        I_ADDU(T5, T5, T2),
+        I_ADDU(T6, T6, T3),
+        I_BEQ(0u, 0u, -8),
+        I_NOP,
+    };
+    memset(exe, 0, sizeof exe);
+    memcpy(exe, "PS-X EXE", 8);
+    put32(exe + 0x10, TEXT);
+    put32(exe + 0x18, TEXT);
+    put32(exe + 0x1C, 0x800u);
+    for (uint32_t i = 0; i < sizeof words / sizeof words[0]; i++) {
+        put32(exe + 0x800u + 4u * i, words[i]);
+    }
+    CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_OK);
+}
+
+/* One register write through the bus at the instance's current tick. */
+static void dev_wr32(schway *inst, uint32_t addr, uint32_t v)
+{
+    uint32_t cycles = 0u;
+    schway__sched_sync(inst);
+    CHECK_EQ_U64(schway__bus_write(inst, addr, 4u, v, &cycles), 0u);
+}
+
+static void arm(schway *inst, uint32_t flags)
+{
+    if ((flags & ARM_TIMER2) != 0u) {
+        dev_wr32(inst, TTARGET(2u), 0u);
+        dev_wr32(inst, TMODE(2u), 0x200u | 0x20u | 0x40u);
+    }
+    if ((flags & ARM_TIMER0) != 0u) {
+        dev_wr32(inst, TTARGET(0u), 1000u);
+        dev_wr32(inst, TMODE(0u), 0x08u | 0x10u | 0x40u);
+    }
+    if ((flags & ARM_DMA) != 0u) {
+        dev_wr32(inst, DPCR, 0x0F654321u);
+        dev_wr32(inst, DICR, 0x00C00000u);
+        dev_wr32(inst, OTC_MADR, 0x001FFFFCu);
+        dev_wr32(inst, OTC_BCR, OTC_WORDS);
+        dev_wr32(inst, OTC_CHCR, 0x11000000u);
+    }
+}
+
+/* A fresh instance, with the loop loaded or not, and the devices armed at tick
+   0. */
+static schway *make_devices(uint32_t region, int with_exe, uint32_t flags)
+{
+    schway *inst = make(region);
+    if (with_exe) {
+        load_loop(inst);
+    }
+    arm(inst, flags);
+    return inst;
+}
+
+/* Runs until the instance's tick has reached target, in as many calls as the
+   frame boundaries need. A run stops on the first instruction boundary at or
+   after its budget, so a split is made by targets, not by lengths: the same
+   boundaries are passed whatever the split. */
+static void run_to(schway *inst, uint64_t target)
+{
+    while (inst->ticks < target) {
+        uint64_t before = inst->ticks;
+        (void)run(inst, target - before, 0u);
+        CHECK(inst->ticks > before);
+        if (inst->ticks <= before) {
+            exit(1);
+        }
+    }
+}
+
+/* The name of the state field the byte at offset off belongs to. */
+static const char *field_at(const schway *inst, size_t off)
+{
+    struct schway__state_field fields[MAX_FIELDS];
+    size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
+    const char *name = "header";
+    for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
+        if (fields[i].offset <= off) {
+            name = fields[i].name;
+        }
+    }
+    return name;
+}
+
+/* The two instances' saved states are the same bytes. A difference prints the
+   first differing offset and the field it is in, which names the device whose
+   state depends on where the run was cut. */
+static void same_state(const schway *split, const schway *whole, const char *what)
+{
+    size_t na, nb;
+    uint8_t *sa = save(split, &na);
+    uint8_t *sb = save(whole, &nb);
+    CHECK(na == nb);
+    if (na == nb && memcmp(sa, sb, na) != 0) {
+        size_t at = 0u;
+        while (sa[at] == sb[at]) {
+            at++;
+        }
+        fprintf(stderr, "%s: state differs at byte %llu (field %s)\n", what,
+                (unsigned long long)at, field_at(whole, at));
+        CHECK(0 && "split state differs from the unsplit run");
+    }
+    free(sa);
+    free(sb);
+}
+
+/* Runs n cycles then m on one instance and n + m on another, from the same
+   start, and checks the ticks, frame, state bytes and audio are the same. A run
+   long enough for every armed counter to have fired also checks that the
+   devices did something, so the comparison is not of two idle machines. */
+static void check_split(uint32_t region, int with_exe, uint32_t flags, uint64_t n, uint64_t m)
+{
+    char what[96];
+    snprintf(what, sizeof what, "region %u exe %d arm %u split %llu+%llu", (unsigned)region,
+             with_exe, (unsigned)flags, (unsigned long long)n, (unsigned long long)m);
+    schway *split = make_devices(region, with_exe, flags);
+    schway *whole = make_devices(region, with_exe, flags);
+    run_to(split, n);
+    run_to(split, n + m);
+    run_to(whole, n + m);
+    CHECK_EQ_U64(split->ticks, whole->ticks);
+    CHECK_EQ_U64(split->frame, whole->frame);
+    same_state(split, whole, what);
+    uint32_t da, db;
+    uint32_t wa = drain(split, pcm_a, &da);
+    uint32_t wb = drain(whole, pcm_b, &db);
+    CHECK_EQ_U64(wa, wb);
+    CHECK_EQ_U64(da, db);
+    CHECK(memcmp(pcm_a, pcm_b, (size_t)2u * wa * sizeof pcm_a[0]) == 0);
+    CHECK_EQ_U64((uint64_t)wa + da, whole->ticks / 768u);
+    if (n + m >= 1200000u) {
+        /* The program keeps the status bits it saw; without it the bits stay
+           set in I_STAT, which nothing acknowledges. */
+        uint32_t seen = with_exe ? whole->cpu.r[T4] : whole->irq.stat;
+        if ((flags & ARM_TIMER2) != 0u) {
+            CHECK_EQ_HEX(seen & 0x40u, 0x40u);
+        }
+        if ((flags & ARM_TIMER0) != 0u) {
+            CHECK_EQ_HEX(seen & 0x10u, 0x10u);
+        }
+        if ((flags & ARM_DMA) != 0u) {
+            CHECK_EQ_HEX(seen & 0x08u, 0x08u);
+        }
+    }
+    schway_destroy(split);
+    schway_destroy(whole);
+}
+
+/* Splits at the places a carried remainder or a derived deadline could make
+   the result depend on the cut: a tick on each side of the first Timer 0
+   deadline, of a later deadline found by running a probe, and of the OTC unit's
+   end, and the middle of the unit, where the CPU is held and the rest of the
+   hold is carried in the state. With no program loaded a run stops exactly on
+   the tick asked for, so the split on a deadline is exact; with the program the
+   run stops on the instruction boundary at or after it. */
+static void check_edges(uint32_t region, int with_exe, uint32_t flags)
+{
+    uint64_t at[16];
+    size_t n = 0u;
+    schway *probe = make_devices(region, with_exe, flags);
+    uint64_t d = schway__timers_next(probe);
+    CHECK(d != UINT64_MAX);
+    at[n++] = d - 1u;
+    at[n++] = d;
+    at[n++] = d + 1u;
+    if ((flags & ARM_DMA) != 0u) {
+        uint64_t u = probe->dma.busy_until;
+        CHECK(d < u);
+        at[n++] = u / 2u;
+        at[n++] = u - 1u;
+        at[n++] = u;
+        at[n++] = u + 1u;
+    }
+    /* A deadline after the first unit and the first interrupts: step the probe
+       until a counter has one armed. */
+    run_to(probe, 100000u);
+    for (uint32_t i = 0; i < 4000u && schway__timers_next(probe) == UINT64_MAX; i++) {
+        (void)run(probe, 1u, 0u);
+    }
+    uint64_t later = schway__timers_next(probe);
+    if (with_exe) {
+        CHECK(later != UINT64_MAX);
+    }
+    if (later != UINT64_MAX) {
+        at[n++] = later - 1u;
+        at[n++] = later;
+        at[n++] = later + 1u;
+    }
+    schway_destroy(probe);
+    for (size_t i = 0; i < n; i++) {
+        check_split(region, with_exe, flags, at[i], 200000u);
+    }
+}
+
+/* Fault prevented: a device whose time depends on where a run was cut, so a
+   host that runs in slices gets different timer interrupts, DMA or CPU
+   registers than one that runs a whole span. Timer 2 on the system clock over 8
+   interrupts at FFFFh while a program polls and acknowledges it; a run split
+   after the first of those interrupts and the first frame's end gives the
+   unsplit run's state bytes, frame, ticks and audio. Then Timer 0 counts to a
+   target and a 60,000-word OTC unit is in flight over the splits of the plain
+   equivalence case and over the edges above, with and without the program, in
+   every region. */
+static void test_split_devices(void)
+{
+    static const uint32_t regions[] = {SCHWAY_REGION_NTSC_J, SCHWAY_REGION_NTSC_U,
+                                       SCHWAY_REGION_PAL};
+    static const uint64_t splits[][2] = {
+        {1u, 1u},         {767u, 1u},        {768u, 1u},          {769u, 767u},
+        {768u * 3u, 768u}, {566202u, 1u},    {566203u, 566203u},  {566203u, 1u},
+        {566204u, 700000u}, {1u, 1132406u},  {2000000u, 2000000u}, {3000000u, 100u},
+        {0u, 5000u},      {5000u, 0u},
+    };
+    check_split(SCHWAY_REGION_NTSC_U, 1, ARM_TIMER2, 600000u, 600000u);
+    for (size_t k = 0; k < sizeof regions / sizeof regions[0]; k++) {
+        for (size_t i = 0; i < sizeof splits / sizeof splits[0]; i++) {
+            check_split(regions[k], 0, ARM_ALL, splits[i][0], splits[i][1]);
+        }
+        /* The two NTSC regions share their frame length, so the runs with the
+           program are made in NTSC-U and PAL; those of several million cycles
+           in NTSC-U alone, to keep the case short. */
+        if (regions[k] == SCHWAY_REGION_NTSC_J) {
+            continue;
+        }
+        for (size_t i = 0; i < sizeof splits / sizeof splits[0]; i++) {
+            if (splits[i][0] + splits[i][1] < 2000000u || regions[k] == SCHWAY_REGION_NTSC_U) {
+                check_split(regions[k], 1, ARM_ALL, splits[i][0], splits[i][1]);
+            }
+        }
+        check_edges(regions[k], 1, ARM_ALL);
+        check_edges(regions[k], 0, ARM_ALL);
+        if (regions[k] == SCHWAY_REGION_NTSC_U) {
+            check_edges(regions[k], 1, ARM_TIMER2);
+            check_edges(regions[k], 0, ARM_TIMER2);
+        }
+    }
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
@@ -623,6 +932,7 @@ static const struct {
     {"peek_no_side_effects", test_peek_no_side_effects},
     {"peek_rejects", test_peek_rejects},
     {"peek_values", test_peek_values},
+    {"split_devices", test_split_devices},
     {"split_equivalence", test_split_equivalence},
 };
 

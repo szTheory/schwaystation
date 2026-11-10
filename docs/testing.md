@@ -15,7 +15,9 @@ builds, and runs every test except those labelled `release`, writing `build/ci/j
 check the packaged archives and run after the package step, with `ctest --preset ci-release`.
 
 `ctest --test-dir build/ci -R <regex> --output-on-failure` reruns part of the suite after a build;
-`ctest --test-dir build/ci -L <label>` selects by label.
+`ctest --test-dir build/ci -L <label>` selects by label. `-L` takes a regular expression that matches anywhere in a
+label, so `-L gte` would also select any longer label that contains it; write `-L '^gte$'`, `-L '^dma$'` and
+`-L '^timers$'` to select exactly one.
 
 **Reconfigure after each commit.** Some checks read git's list of tracked files, and the runner's revision is
 embedded when CMake configures. A new file is seen only once git tracks it, and `build.revision_matches_head`
@@ -39,6 +41,10 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
 | `nightly` | All 55,000 public single-step vectors pass at their pin, and the committed sample is their first records. | `nightly` | `vectors.r3000.full` |
 | `perf` | A Release build for the instructions-per-frame job. Configure and build only. | `ci` | none |
+
+The `gte`, `dma` and `timers` directories are in the `ci`, `asan` and `wasm32` inventories, and `be32` runs their
+`portable` tests through `ci`. The `nofp`, `hygiene` and `nightly` inventories do not run them. Under `asan` the
+register sweeps of `gte` and `dma` (`gte.regs.sweep`, `dma.regs.sweep`) are the bounds proof.
 
 `SCHWAYSTATION_TIMEOUT_SCALE` multiplies every test timeout: 3 for `asan`, 8 for `be32` and 5 for `wasm32`.
 
@@ -67,6 +73,60 @@ them and fails unless the first records of each equal the committed sample. The 
 `nightly.yml` does this on a schedule; it reports through the nightly issue and is not part of `CI required`. The
 workflow's other jobs, the benches and the loader fuzz campaign below, report the same way and also sit outside
 `CI required`.
+
+### The GTE, DMA and timer checks
+
+Three directories hold the checks of the geometry engine, the DMA controller and the root counters. Each has one
+test executable that runs the case named on its command line (`schwaystation-test-gte`, `schwaystation-test-dma`,
+`schwaystation-test-timers`), reaches the device's register and step entry points directly, and carries the label of
+its directory and `portable`.
+
+```sh
+ctest --test-dir build/ci -L '^gte$' --output-on-failure
+ctest --test-dir build/ci -L '^dma$' --output-on-failure
+ctest --test-dir build/ci -L '^timers$' --output-on-failure
+```
+
+**The 1,150 cases.** `gte.vectors.ps1tests` replays `tests/vectors/gte/ps1tests-1150.bin`, the hardware cases of the
+ps1-tests GTE run transcoded by `tools/gte2bin.py` (see [Maintaining](maintaining.md)), in the upstream order. The
+harness checks the file's histogram (50 register-only cases and 50 of each of 22 commands) and `--expect 1150`, which
+is the zero-case guard. Its controls: `gte.vectors.empty.self_test` and `gte.vectors.truncated.self_test` feed it an
+empty file and the first 1,000 bytes, and `gte.vectors.flipped.self_test` flips one expected bit of case 600 and must
+fail naming that case. The quirk tests (`gte.quirk.*`, `gte.nclip_fake_bits`, `gte.unlisted_noop`, `gte.unr_table`)
+pin what the hardware cases reach only in a few encodings.
+
+**Two reference models.** A test that compares an implementation with a model written apart from it is only as good as
+the model, so each has its own seed and case count, printed with every run so a failure replays.
+
+| Test | Model | Seed | Cases |
+|---|---|---|---|
+| `gte.ref.property` | A straight C model of the GTE in `tests/gte/ref.c`, written from the public hardware description and not from the engine, replayed first over the 1,150 cases (`gte.ref.vectors`) | `0x6774652D70726F70` | 22 commands of 1,000 cases each, comparing all 64 registers (FLAG included) and the cycles |
+| `timers.reference.random` | A per-cycle counter model in `tests/timers/ref.c`, against which the lazy one that the core runs is compared | `0x7154F4B1E5C0DE05` | 20,000 operations, comparing every read and every interrupt bit |
+
+`gte.ref.property.self_test` flips one bit of one engine-side read and must fail with `engine differs from the model`.
+
+**The `gte_vectors` guard.** `fixtures.gte_vectors.guard` recomputes every `gte_vectors` row of
+`tests/diag/expected.csv` from the vector file in C and compares it with the CSV, so an expected value cannot drift
+from the file it cites.
+
+**Where a value comes from.** A row or a band is marked by its source. `hw` means the value is copied from a
+hardware-captured artefact of an MIT-licensed upstream test at the pinned commit, with the file and the case or line in
+the citation: it is hardware-captured per upstream, not verified here, and a value produced by this core or by another
+emulator is never `hw`. `doc` means a published document gives it. `derived` means a fitted model gives it; the DMA
+tests keep those as bands (a window, a block cost, the CPU slowdown of a looping list) and never as exact pins, and no
+`expected.csv` row carries it, since the judge reads only `doc` and `hw`. Every timer row is `doc`, because the only
+hardware log of the counters comes from a console whose clock does not match the NTSC machine.
+
+**The per-profile judge.** A fixture whose records depend on the machine runs once per profile
+(`fixtures.timers_lines.ntsc_u` and `fixtures.timers_lines.pal`): the judge reads the rows for `*` and for that
+profile, in order, and the ranges come from the frame constants with the interrupt path's fixed overhead. Each has a
+control, `.self_test`, that shifts every range by one counter period and must fail naming both counters' records.
+
+**The state lines.** With no picture yet, every frame hash is the test card whatever the CPU and the devices did, so
+`hashes.txt` also carries, for `hello`, `gte_vectors`, `dma_chain` and `timers_lines`, two lines after the fixture
+digests: `exe NAME.exe frame 30 sha256 ...` and `exe NAME.exe state sha256 ...`. The second is
+`schwaystation-run --hash-state`, the SHA-256 of the saved state after its 20-byte header, which covers the GTE, DMA
+and timer registers. `hash-equality` compares them across the eight lanes like every other line.
 
 ### The vectors harness
 
@@ -137,6 +197,9 @@ the same file.
 | `cpu` | The R3000A core: instruction behaviour, exceptions, delay slots and the first-fault trace. |
 | `bus` | The address map: physical decode, RAM mirrors, memory control, the I-cache, the scratchpad and the interrupt registers. |
 | `vectors` | The committed sample of public single-step vectors, run case by case against the core. |
+| `gte` | The geometry engine: the 1,150 hardware cases, the model comparison and the quirks, and the `gte_vectors` rows. |
+| `dma` | The seven DMA channels: registers, costs, chopping, linked lists, the order-table channel and the CPU stall. |
+| `timers` | The three root counters: modes, targets, the write hold, interrupts, and the `timers_lines` records per profile. |
 | `fuzz` | The executable loader's committed fuzz seeds, replayed on every leg; the time-boxed campaign runs nightly and only reports. |
 | `exe` | Loading a PS-X EXE under the stub kernel and `--probe`, including the rejected headers. |
 | `fixtures` | The fixture toolchain: pinned downloads, the committed stub kernel's source, the manifest rows and the fixtures that run to a sealed mailbox. |
@@ -147,8 +210,8 @@ the same file.
 | `release` | The packaged archives, run after the package step. |
 | `hygiene` | The hygiene lane's checks. |
 
-The directories `cpu`, `bus`, `vectors`, `fuzz`, `exe` and `fixtures` each hold an `inventory.txt` and carry the
-label of the same name. `tests/diag/` is a data directory, with no tests of its own: it holds the judged fixture rows
+The directories `cpu`, `bus`, `vectors`, `fuzz`, `exe`, `fixtures`, `gte`, `dma` and `timers` each hold an
+`inventory.txt` and carry the label of the same name. `tests/diag/` is a data directory, with no tests of its own: it holds the judged fixture rows
 and their dated changes.
 
 ### The JUnit check
@@ -181,7 +244,7 @@ is `tests/fixtures/src/stub/stub.asm`.
 - A test names the fixture it runs: `schwaystation-run --exe FIXTURE ...` for what the runner reports, and
   `schwaystation-test-boot CASE` for what only the core can show (the launch block, the stub's exception record, the
   debug-port bytes). The `nightly` preset sets `SCHWAYSTATION_FIXTURES=OFF` and never builds armips.
-- Every hosted leg and every local build uses the same assembler, so a fixture's bytes, and with them the `exe` line
+- Every hosted leg and every local build uses the same assembler, so a fixture's bytes, and with them the `exe` lines
   of `hashes.txt`, are the same everywhere.
 
 ## Judged fixtures
@@ -196,10 +259,10 @@ fixture's rows.
 |---|---|
 | `fixture` | the fixture's name, `exc_matrix` for `exc_matrix.exe` |
 | `test` | the record's name |
-| `profile` | the machine profile the row holds for, `*` for any |
+| `profile` | the machine profile the row holds for, `*` for any; a test that names one (`-DPROFILE=pal`) judges only the rows for `*` and that profile, and numbers them in order |
 | `expected` | eight hex digits, or `lo..hi` for a range |
-| `source` | `doc` when a document gives the value, `hw` when a run on a console did |
-| `citation` | the document or the hardware run behind the value, with no comma |
+| `source` | `doc` when a document gives the value, `hw` when a hardware capture does (see [where a value comes from](#the-gte-dma-and-timer-checks)) |
+| `citation` | the document or the hardware capture behind the value, with its file and case or line, and no comma |
 
 The nth row of a fixture judges the record with id n, so the order of the rows is the order of the records. A line
 that starts with `#` is a comment. The test fails on a record outside its row, a row with no record, a record with no
@@ -257,9 +320,9 @@ its size. Run it by hand with `cmake -DROOT=. -P tests/cmake/budgets.cmake`.
 
 **Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` (hygiene lane) counts
 every line of `scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*` against a fixed limit set in
-`tests/hygiene/tests.cmake`; the limit is an absolute line count, lowered when a release ships. It is 1520 lines
-for the CPU phase, whose last gate left the total at 1495, and it is never raised: a gate that does not fit
-replaces or folds an older one. Shipping the phase sets the limit to the total then measured. Check the total with
+`tests/hygiene/tests.cmake`; the limit is an absolute line count that only falls, and is re-measured when a release
+ships. It is 1513 lines, the total measured once the notices gate landed (1483 before it), and it is never raised:
+a gate that does not fit replaces or folds an older one. Shipping a release sets the limit to the total then measured. Check the total with
 `cat scripts/*.sh tests/cmake/*.cmake .githooks/* | wc -l`. Gate logic stays in those files: it is not moved
 into `tests/<dir>/tests.cmake`, `cmake/` or workflow YAML to fit.
 

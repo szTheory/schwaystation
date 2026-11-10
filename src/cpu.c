@@ -57,7 +57,7 @@ void schway__cpu_reset(schway *inst)
     schway__cop0_reset(inst);
 }
 
-void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
+uint64_t schway__cpu_state_io(struct schway__state_io *io, schway *inst)
 {
     struct schway__cpu *c = &inst->cpu;
     schway__state_u32_array(io, name_r, c->r, 32u, 0u, UINT32_MAX);
@@ -74,7 +74,7 @@ void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u32(io, name_exc_code, &c->exc_code, 0u, 31u);
     (void)schway__state_u32(io, name_exc_repeat, &c->exc_repeat, 0u, UINT32_MAX);
     (void)schway__state_u64(io, name_muldiv_ready, &c->muldiv_ready, 0u, UINT64_MAX);
-    (void)schway__state_u64(io, name_cycle, &c->cycle, 0u, UINT64_MAX);
+    uint64_t cycle = schway__state_u64(io, name_cycle, &c->cycle, 0u, UINT64_MAX);
     (void)schway__state_u32(io, name_wq_count, &c->wq_count, 0u, SCHWAY__WQ_DEPTH);
     (void)schway__state_u32(io, name_irq_stamp, &c->irq_stamp, 0u, SCHWAY__IRQ_LATENCY_EDGE);
     schway__state_u32_array(io, name_icache_tag, c->icache_tag, SCHWAY__ICACHE_LINES, 0u,
@@ -82,9 +82,10 @@ void schway__cpu_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u32_array(io, name_icache_word, &c->icache_word[0][0], 4u * SCHWAY__ICACHE_LINES,
                             0u, UINT32_MAX);
     schway__state_u8_array(io, name_icache_valid, c->icache_valid, SCHWAY__ICACHE_LINES, 0u, 15u);
+    return cycle;
 }
 
-/* The instruction cache (PSX-SYSTEM section 2, I-cache; psx-spx Memory Map,
+/* The instruction cache (docs/hardware/bus.md, Instruction cache; psx-spx Memory Map,
    Cache Control). Direct mapped: address bits 11:4 pick the line, physical bits
    31:12 are its tag, and each of its four words has a valid bit. A word that
    hits is returned as it is, so a store to the same RAM never reaches it. A miss
@@ -137,12 +138,12 @@ uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, 
 /* The trace ring (ARCHITECTURE section 6): the instance keeps the last
    SCHWAY__TRACE_CAP records in a ring outside the state and every hash, written
    only by the traced copy of the executor. A record's cycle is the tick the
-   block started on plus the cycles the CPU has spent since, so t0 and c0 are
-   the block's start; the frame is kept as its low 32 bits and widened when a
+   block started on plus the cycles the CPU has spent since, the block clock the
+   devices read too; the frame is kept as its low 32 bits and widened when a
    record is read. A full ring overwrites its oldest record. */
 static uint64_t trace_now(const schway *inst)
 {
-    return inst->trace.t0 + (inst->cpu.cycle - inst->trace.c0);
+    return inst->cpu.blk_tick + (inst->cpu.cycle - inst->cpu.blk_cycle);
 }
 
 static void trace_push(schway *inst, uint32_t event, uint64_t cycle, uint32_t pc, uint32_t opcode,
@@ -176,6 +177,15 @@ static void trace_push(schway *inst, uint32_t event, uint64_t cycle, uint32_t pc
 #include "cpu_exec.inc"
 #undef SCHWAY_TRACE
 
+/* The run loop. Each pass first runs the device events that are due, which
+   happens at the first instruction boundary at or after a deadline. A DMA unit
+   that holds the bus freezes the CPU: ticks advance without an instruction,
+   within the budget and the frame, and stop at the next deadline so its event
+   runs on time. The rest of a stall that crosses the end of the budget or of the
+   frame stays in the state for the next call, so the overrun past a limit stays
+   one instruction. Otherwise one block runs, cut at the budget's end and at the
+   next deadline. A device that leaves its deadline due after its event still
+   lets one instruction run before the next offer, so the loop always advances. */
 uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
 {
     uint64_t room = inst->frame_end - inst->ticks;
@@ -186,7 +196,31 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
     uint64_t (*block)(schway *, uint64_t) =
         (flags & SCHWAY_RUN_TRACE) != 0u ? cpu_block_traced : cpu_block;
     while (ran < limit) {
-        ran += block(inst, limit - ran);
+        if (inst->sched.next <= inst->ticks) {
+            schway__sched_run(inst);
+        }
+        uint64_t left = limit - ran;
+        uint64_t until = inst->sched.next > inst->ticks ? inst->sched.next - inst->ticks : 1u;
+        if (inst->dma.stall_until > inst->ticks) {
+            uint64_t wait = inst->dma.stall_until - inst->ticks;
+            wait = wait < left ? wait : left;
+            if (inst->sched.next > inst->ticks && wait > until) {
+                wait = until;
+            }
+            inst->ticks += wait;
+            /* The multiply unit and the GTE keep running while the bus holds
+               the CPU. Their stamps are values of the CPU's cycle count, which
+               does not move in a freeze, so the stamps move back by the
+               freeze instead: a result then waits only for what is left of its
+               latency (0 is no stamp). */
+            uint64_t *mul = &inst->cpu.muldiv_ready;
+            *mul = *mul > wait ? *mul - wait : 0u;
+            inst->gte.ready = inst->gte.ready > wait ? inst->gte.ready - wait : 0u;
+            ran += wait;
+            schway__sched_sync(inst);
+            continue;
+        }
+        ran += block(inst, left < until ? left : until);
         if ((inst->cpu.block_end & SCHWAY__BLOCK_DOUBLE_FAULT) != 0u) {
             stop = SCHWAY_STOP_FAULT;
             break;
@@ -209,6 +243,7 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
 void schway__cpu_step_one(schway *inst, struct schway__cpu_log *log)
 {
     inst->cpu.log = log;
+    schway__sched_sync(inst);
     (void)cpu_step(inst);
     inst->cpu.log = NULL;
 }

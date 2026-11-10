@@ -89,6 +89,8 @@ const char *schway__trace_kind_name(uint32_t kind)
         return "cop_unusable";
     case SCHWAY_FAULT_EXCEPTION_LOOP:
         return "exception_loop";
+    case SCHWAY_FAULT_DMA:
+        return "dma";
     default:
         return "unknown";
     }

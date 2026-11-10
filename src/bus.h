@@ -39,11 +39,11 @@ enum schway__dev {
 #define SCHWAY__SCRATCH_SIZE 0x400u
 
 /* Memory control: the nine registers at 1F801000h-1F801020h and RAM_SIZE at
-   1F801060h (PSX-SYSTEM section 3). */
+   1F801060h (docs/hardware/bus.md). */
 #define SCHWAY__MEMCTL_REGS 9u
 
 /* RAM_SIZE after a power reset: a 2 MiB RAM in an 8 MiB bank, mirrored four
-   times, as the BIOS sets it (PSX-SYSTEM section 3). */
+   times, as the BIOS sets it (docs/hardware/bus.md). */
 #define SCHWAY__RAM_SIZE_POWER_ON 0x0B88u
 
 /* The ports with a delay register of their own: the first and third
@@ -82,7 +82,7 @@ struct schway__bus {
     uint32_t bios_size;
 };
 
-/* I_STAT and I_MASK, bits 0-10 (PSX-SYSTEM section 6). */
+/* I_STAT and I_MASK, bits 0-10 (docs/hardware/bus.md, Interrupt registers). */
 #define SCHWAY__IRQ_BITS 0x7FFu
 
 struct schway__irq {
@@ -98,7 +98,7 @@ void schway__irq_reset(schway *inst);
 void schway__bus_state_io(struct schway__state_io *io, schway *inst);
 
 /* The segment of a virtual address: the top three bits, with 0-3 all KUSEG
-   and 6-7 both KSEG2 (PSX-SYSTEM section 2, Segments). KUSEG, KSEG0 and KSEG1
+   and 6-7 both KSEG2 (docs/hardware/bus.md, Segments and the physical map). KUSEG, KSEG0 and KSEG1
    map to the physical address addr & 1FFFFFFFh. */
 enum { SCHWAY__SEG_KUSEG = 0, SCHWAY__SEG_KSEG0 = 4, SCHWAY__SEG_KSEG1 = 5, SCHWAY__SEG_KSEG2 = 6 };
 
@@ -117,6 +117,12 @@ int schway__bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
                       uint32_t *cycles);
 /* An instruction fetch of the word at addr. */
 int schway__bus_fetch(schway *inst, uint32_t addr, uint32_t *word, uint32_t *cycles);
+
+/* The DMA's path to RAM: one aligned word at physical word address addr in the
+   8 MiB RAM window, moved to or from *word (write non-zero stores). No fault, no
+   cost, no unbuilt count, no stall; returns non-zero and moves nothing when
+   RAM_SIZE maps no RAM there. */
+int schway__bus_ram_word(schway *inst, uint32_t addr, uint32_t *word, uint32_t write);
 
 /* The device the physical map gives to virtual address addr, for a trace
    record: a SCHWAY__DEV_* value, UNMAPPED for a gap. It decodes only and

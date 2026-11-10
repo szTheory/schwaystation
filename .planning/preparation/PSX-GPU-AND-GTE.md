@@ -2,7 +2,7 @@
 title: "PSX-GPU-AND-GTE: GPU revisions, VRAM, GP0/GP1 commands, rasterisation rules, timing, display, GTE, oracles, output format"
 summary: "What gpu.c and gte.c must do: the v0/v2 GPU differences, VRAM addressing, every GPUSTAT bit, the GP0 primitive set with word counts, the exact dither matrix, blend and modulation formulas, mask bits, texture windows and CLUTs, the fill rules and size limits, video clocks and display geometry as rationals, FIFO and DMA behaviour, measured primitive costs, every GTE register, opcode, cycle count and flag, the UNR division, the oracles and their licences, the accuracy model, the v1 frame format, and the hooks later enhancements need."
 read_when: "Before writing or changing gpu.c, gte.c, the frame output path, GPU DMA, timers that use dotclock or hblank, or when a game's geometry, colours, blending, interlacing or GTE-driven culling diverges."
-updated: 2026-10-19
+updated: 2026-11-10
 ---
 
 # PSX-GPU-AND-GTE
@@ -15,7 +15,7 @@ updated: 2026-10-19
 | GP0 command set, word counts, attributes E1 to E6, fills and copies, GP1 commands | 2 |
 | Dither matrix, blend equations, modulation, mask bit, texture decode, fill rule, size limits, lines, rectangles | 3 |
 | Clocks, line and frame counts, dotclocks, hblank/vblank, FIFO, DMA, primitive cost, display mapping | 4 |
-| GTE registers, formats, opcodes and cycles, flags, UNR division, traps, access delays | 5 |
+| GTE registers, formats, opcodes and cycles, flags, UNR division, traps, access delays (now docs/hardware/gte.md) | 5 |
 | Test programs, licences, what is bit-exact, what is committed vs fetched | 6 |
 | Accuracy model and confidence table | 7 |
 | Enhancement seeds and the v1 output frame format | 8 |
@@ -185,66 +185,19 @@ ares converted these to clocks per pixel but disabled the model with the note th
 **4.5 Mapping the display area to an image.** Source: GP1(05h) start X,Y in VRAM, width from GP1(06h) with the resolution's divider, height Y2-Y1 (×2 interlaced). ares subtracts a per-width nominal X1 (228h for 256, 260h otherwise) and nominal Y1 (10h NTSC 240, 20h PAL 256) to place the picture in a 640x512 canvas and draws black elsewhere [GPU.05]. Titles that move the window with 06h/07h (Chrono Cross) are reproduced only if the host honours the offset [GPU.01]. The wobble of vertices and the affine "swimming" of textures are real hardware: the GTE emits integer screen coordinates and the GPU interpolates UV linearly in screen space with no Z, so a native-resolution core must keep them [GPU.01][GPU.18].
 
 ## 5. GTE (COP2)
-**5.1 Registers** (data cop2r0-31, control cop2r32-63; formats s = sign bits, i = integer bits, f = fraction bits) [GPU.02]
 
-| Regs | Name | Format | Notes |
-|---|---|---|---|
-| 0-5 | VXY0/VZ0, VXY1/VZ1, VXY2/VZ2 | 3 × s16 | VZ sign-extended on read |
-| 6 | RGBC | 4 × u8 | R, G, B, CODE |
-| 7 | OTZ | u16 | AVSZ result |
-| 8 | IR0 | 1.3.12 | interpolation factor, saturates 0..1000h |
-| 9-11 | IR1-3 | s16 | saturate -8000h..7FFFh or 0..7FFFh (lm) |
-| 12-15 | SXY0-2, SXYP | 2 × s16 | 3-stage FIFO; SXYP write pushes, SXY2 write does not |
-| 16-19 | SZ0-3 | u16 | 4-stage FIFO |
-| 20-23 | RGB0-2, RES1 | 4 × u8 | 3-stage colour FIFO; RES1 is an inert R/W slot |
-| 24-27 | MAC0-3 | s32 | never saturated |
-| 28, 29 | IRGB, ORGB | u15 | 5:5:5 to IR1-3 (× 80h) and back (/ 80h saturated, no flags); IRGB readable after 2-3 nops |
-| 30, 31 | LZCS, LZCR | s32, 1..32 | leading zeros (positive) or ones (negative) |
-| 32-36 | RT11..RT33 | 1.3.12 | RT33 alone in r36, sign-extended |
-| 37-39 | TRX,TRY,TRZ | s32 | |
-| 40-44, 48-52 | L (light), LC (colour) matrices | 1.3.12 | same packing as RT |
-| 45-47 | RBK,GBK,BBK | 1.19.12 | |
-| 53-55 | RFC,GFC,BFC | 1.27.4 | |
-| 56-57 | OFX,OFY | 1.15.16 | |
-| 58 | H | u16 | read sign-extends (bug), maths uses it unsigned |
-| 59, 60 | DQA, DQB | 1.7.8, 1.7.24 | |
-| 61-62 | ZSF3, ZSF4 | 1.3.12 | |
-| 63 | FLAG | u20 at bits 12-31 | §5.3 |
+Moved to the public page [docs/hardware/gte.md](../../docs/hardware/gte.md): the two register files and their formats, the command encoding, the numerics and the divide, every command, the quirks, the FLAG register, the timing and the hardware cases. What this section called 5.1 to 5.6 (registers, encoding and opcode cycles, FLAG, core formulas, the UNR division, access and delays) is there; the Sources rows below still define [GPU.02], [GPU.06], [GPU.10] and [GPU.11].
 
-Writing a 32-bit value to a 16-bit register truncates without flags [GPU.02]. ares stores exactly these packings [GPU.06].
-
-**5.2 Command encoding and opcodes.** COP2 imm25: bits 25-31 = 0100101b, 20-24 fake number (ignored), 19 sf (shift MAC by 12), 17-18 MVMVA matrix (RT, L, LC, garbage), 15-16 MVMVA vector (V0, V1, V2, IR), 13-14 MVMVA translation (TR, BK, FC bugged, none), 10 lm, 0-5 real opcode [GPU.02].
-
-| Op | Name | Cycles | Op | Name | Cycles |
-|---|---|---|---|---|---|
-| 01h | RTPS | 15 | 1Ch | CC | 11 |
-| 06h | NCLIP | 8 | 1Eh | NCS | 14 |
-| 0Ch | OP | 6 | 20h | NCT | 30 |
-| 10h | DPCS | 8 | 28h | SQR | 5 |
-| 11h | INTPL | 8 | 29h | DCPL | 8 |
-| 12h | MVMVA | 8 | 2Ah | DPCT | 17 |
-| 13h | NCDS | 19 | 2Dh | AVSZ3 | 5 |
-| 14h | CDP | 13 | 2Eh | AVSZ4 | 6 |
-| 16h | NCDT | 44 | 30h | RTPT | 23 |
-| 1Bh | NCCS | 17 | 3Dh | GPF | 5 |
-| 3Eh | GPL | 5 | 3Fh | NCCT | 39 |
-
-The 42 other opcodes are undocumented; amidog's test exercises all 64 and the sf/lm/MVMVA bits on every one [GPU.02][GPU.11]. Wipeout 2097 issues NCLIP as 0140006h (wrong fake number and bit 18) and must still work [GPU.02].
-
-**5.3 FLAG** bits: 30/29/28 MAC1-3 > 43 bits positive, 27/26/25 negative, 24/23/22 IR1-3 saturated, 21/20/19 colour FIFO R/G/B saturated, 18 SZ3 or OTZ saturated, 17 divide overflow, 16/15 MAC0 > 31 bits positive/negative, 14/13 SX2/SY2 saturated to -400h..3FFh, 12 IR0 saturated, 31 = OR of 30-23 and 18-13. Cleared at the start of every command; bits 12-30 writable [GPU.02]. ares checks MAC after every addition in the matrix sum and clips the accumulator to 44 bits between terms [GPU.06]. amidog observed that once an addition overflows, later additions in the same MVMVA keep setting flags, so a negative overflow followed by a valid result sets both positive and negative bits; his model is an internal sticky overflow using bits 43 and 44 [GPU.10].
-
-**5.4 Core formulas** [GPU.02][GPU.06]
-- RTPS/RTPT: `MAC1-3 = (TR << 12 + RT · V) >> (sf*12)`; IR1-3 from MAC with lm; `SZ3 = MAC3 >> ((1-sf)*12)` saturated 0..FFFFh; `n = divide(H, SZ3)`; `MAC0 = n*IR1 + OFX, SX2 = MAC0 >> 16` saturated -400h..3FFh, same for Y; `MAC0 = n*DQA + DQB, IR0 = MAC0 >> 12` saturated 0..1000h (only on the last vertex of RTPT in ares). The IR3 saturation flag is evaluated as if lm = 0 on `MAC3 >> 12` while the stored IR3 obeys lm (and with sf = 0 the flag only reflects the shifted value).
-- NCLIP: `MAC0 = SX0*SY1 + SX1*SY2 + SX2*SY0 - SX0*SY2 - SX1*SY0 - SX2*SY1` (sign = winding; 0 = degenerate).
-- AVSZ3/4: `MAC0 = ZSF3*(SZ1+SZ2+SZ3)` or `ZSF4*(SZ0+..+SZ3)`, `OTZ = MAC0 >> 12` saturated 0..FFFFh.
-- MVMVA: as RTPS without the projection; cv = 2 (FC) is bugged: the first product is dropped (`MAC = (Mx·2*V2 + Mx·3*V3) >> sf`) while flags behave as if full; mx = 3 is a garbage matrix `[-R<<4, R<<4, IR0; RT13 ×3; RT22 ×3]`.
-- Colour: NCx = `IR = (L·V) >> sf`, `IR = (BK << 12 + LC·IR) >> sf`; NCCx then `MAC = (RGB << 4) * IR`; NCDx then depth cue `MAC = MAC + (FC - MAC) * IR0` where `(FC << 12 - MAC) >> sf` is first saturated into IR as if lm = 0; CC/CDP skip the L step; DCPL/DPCS/DPCT/INTPL are the cue alone from `RGB*IR << 4`, `RGB << 16`, `IR << 12`; DPCT runs three times reading RGB0 each time; GPF = `IR*IR0 >> sf`, GPL = `(MAC << sf + IR*IR0) >> sf` (44-bit overflow possible); SQR = `IR*IR >> sf`; OP = cross product of IR with (RT11, RT22, RT33). Colour FIFO gets `MAC >> 4` saturated 0..FFh with CODE from RGBC.
-
-**5.5 UNR division** [GPU.02][GPU.06]: if `H >= SZ3*2` then n = 1FFFFh with flags 17 and 31; else `z = clz16(SZ3); n = H << z; d = SZ3 << z; u = table[(d - 7FC0h) >> 7] + 101h; d = (2000080h - d*u) >> 8; d = (80h + d*u) >> 8; n = min(1FFFFh, (n*d + 8000h) >> 16)`. Table: `table[i] = max(0, (40000h / (i + 100h) + 1) / 2 - 101h)` for i = 0..255 and `table[256] = 0` (ares generates it this way; psx-spx prints the 257 bytes). Results of exactly 20000h (FE3Fh/7F20h, F015h/780Bh) saturate without flags. (derived) The generator and the printed table agree entry for entry; the conformance phase should assert that at startup.
-
-**5.6 Access and delays** [GPU.02][GPU.06]: MFC2/CFC2 load the GPR with a one-instruction delay like a memory load (Tekken 2 breaks without it); MTC2/CTC2/LWC2/SWC2 are immediate in ares; psx-spx's "2 instruction" note for loads is marked doubtful by its own author. A GTE register read or a new command while a command is in flight stalls the CPU for the remaining cycles from the table above; the CPU otherwise runs on. Writing FLAG recomputes bit 31. COP2 disabled in SR raises a coprocessor-unusable exception.
+Corrections phase 3 found (the page carries them):
+- The wait for a running command applies to a read of a result (MFC2, CFC2, SWC2) and to a new command, not to MTC2, CTC2 or LWC2 (nugget `tests/gte-timing/RESULTS.md`, measured on hardware). The old 5.6 said a register read stalls and that SWC2 is immediate; SWC2 is not immediate, it waits like MFC2 and CFC2.
+- The wait is a ready stamp that decays one per cycle and is clamped to 44; the two-instruction write-to-use latency of psx-spx is a documented deviation, not built.
+- A command number outside the 22 documented ones changes no register and takes 5 cycles (an engine choice, not a hardware claim).
+- The reciprocal table is a literal of 257 bytes checked against the formula in a test, and a hardware-case run alone does not pin it (one corrupted entry still passes).
+- The 1,150 hardware cases (50 register-only and 22 commands at 50 each) are committed as a transcoded vector file; the Wipeout encoding of NCLIP, 0140006h, has a directed test because no case sets the unused command bits 20 to 24.
 
 **Choice 5.A (GTE implementation).** Recommendation: a straight integer implementation of §5.4 with 64-bit accumulators, 44-bit clipping between terms, the ares flag placement, the UNR table from the generator, the IR3/lm quirk, the FC and mx = 3 bugs, the H sign-extend read bug, a per-command busy counter from §5.2 that stalls the next COP2 access, and the MFC2/CFC2 load-delay slot shared with the CPU's load delay logic. Strongest alternative: a table-free exact division (fails amidog). Would change if: amidog's flag-chaining model (§5.3) is confirmed by his test to differ from per-term checks; then the MVMVA accumulator gains a sticky overflow bit.
+
+Phase 3 built choice 5.A with the table as a literal in place of a generator and a busy stamp in place of a counter.
 
 ## 6. Tests and oracles
 

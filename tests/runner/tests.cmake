@@ -69,6 +69,26 @@ if(CMAKE_SCRIPT_MODE_FILE)
     set(RUN ${HOOKED})
     expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash)
     expect_exit(0 "^frames 5\n.*max_rss_kib [0-9]+\n$" --bench 60)
+  elseif(CASE STREQUAL "hash_state")
+    # One well-formed line, the same twice, and a different one a frame later. CMake regexes have no
+    # {64}, so the sixty-four digits are repeated.
+    string(REPEAT "[0-9a-f]" 64 digits)
+    foreach(frames 5 5 6)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash-state RESULT_VARIABLE rc
+        OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "^state sha256 ${digits}\n$")
+        message(FATAL_ERROR "--frames ${frames} --hash-state: expected exit 0 and one 64-digit line, "
+          "got exit ${rc}\n${out}${err}")
+      endif()
+      list(APPEND states "${out}")
+    endforeach()
+    list(GET states 0 first)
+    list(GET states 1 second)
+    list(GET states 2 third)
+    if(NOT first STREQUAL second OR first STREQUAL third)
+      message(FATAL_ERROR "the state hash is not stable for the same run or not different for another:\n"
+        "${first}${second}${third}")
+    endif()
   elseif(CASE STREQUAL "no_args")
     refuse()
   elseif(CASE STREQUAL "unknown")
@@ -267,6 +287,12 @@ schway_add_test(NAME runner.xrgb8888
 
 set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
   "-DEMULATOR=${runner_emulator}")
+
+# Fault prevented: a state hash that is unstable, malformed or blind to the frames run, so devices
+# a test-card frame cannot show are not compared across lanes.
+schway_add_test(NAME runner.hash_state
+  COMMAND ${runner_check} -DCASE=hash_state -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: the reference PNG the RetroArch screenshot is compared
 # with changes bytes (converter, layout or encoder) while the frame hash

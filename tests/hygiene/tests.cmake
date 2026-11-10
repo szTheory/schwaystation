@@ -3,10 +3,10 @@ set(hygiene_scripts ${CMAKE_CURRENT_LIST_DIR}/../cmake)
 
 # Fault prevented: repository-check code growing past its budget. Every line
 # of the shell scripts, the CMake check scripts and the hooks counts, at most
-# 1520; the self test counts a 10-line fixture against a limit of 9.
+# 1513, the total measured with the notices gate in; the self test counts a 10-line fixture against a limit of 9.
 schway_add_test(NAME policy.gate_budget
   COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}
-    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=1520
+    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=1513
     -P ${hygiene_scripts}/line_budget.cmake
   LABELS hygiene policy TIMEOUT 30)
 set(hygiene_budget ${CMAKE_BINARY_DIR}/hygiene/line_budget_fixture)
@@ -19,6 +19,28 @@ string(REPLACE ";" "$<SEMICOLON>" hygiene_cmd "${hygiene_cmd}")
 schway_add_test(NAME policy.gate_budget.self_test
   COMMAND ${CMAKE_COMMAND} "-DCMD=${hygiene_cmd}" -DCODE=1
     "-DREGEX=line_budget: 10 lines in .* exceeds the limit of 9"
+    -P ${hygiene_scripts}/expect_fail.cmake
+  LABELS hygiene policy TIMEOUT 30)
+
+# Fault prevented: a committed third-party binary or table whose notice does
+# not name it, or a notice naming a path that does not exist. The self test's
+# fixture holds a one-row manifest whose path is on no Applies-to line and a
+# notices file that names a missing path; both must be named.
+schway_add_test(NAME policy.notices
+  COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}
+    -DMANIFEST=${CMAKE_SOURCE_DIR}/tests/fixtures/manifest.txt
+    -DNOTICES=${CMAKE_SOURCE_DIR}/THIRD-PARTY-NOTICES.md -P ${hygiene_scripts}/notices.cmake
+  LABELS hygiene policy TIMEOUT 30)
+set(hygiene_notices ${CMAKE_BINARY_DIR}/hygiene/notices_fixture)
+file(REMOVE_RECURSE ${hygiene_notices})
+file(WRITE ${hygiene_notices}/manifest.txt "# fixture\nstray/unlisted.bin\tsource\tpin\tMIT\tdigest\tNOTICES.md\n")
+file(WRITE ${hygiene_notices}/NOTICES.md "## Fixture\n\n- **Applies to:** `gone/missing.txt`\n")
+set(hygiene_cmd ${CMAKE_COMMAND} -DROOT=${hygiene_notices} -DMANIFEST=${hygiene_notices}/manifest.txt
+  -DNOTICES=${hygiene_notices}/NOTICES.md -P ${hygiene_scripts}/notices.cmake)
+string(REPLACE ";" "$<SEMICOLON>" hygiene_cmd "${hygiene_cmd}")
+schway_add_test(NAME policy.notices.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${hygiene_cmd}" -DCODE=1
+    "-DREGEX=gone/missing\\.txt, which does not exist.*stray/unlisted\\.bin has a notice in the manifest"
     -P ${hygiene_scripts}/expect_fail.cmake
   LABELS hygiene policy TIMEOUT 30)
 

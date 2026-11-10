@@ -2,7 +2,7 @@
 title: "PlayStation system: clocks and the master tick, R3000A CPU, memory map and bus control, DMA, root counters, interrupts, BIOS and boot, regions and revisions, power-on state"
 summary: "Tick-level system facts with sources and disagreements: the 768 x 44100 Hz CPU clock and the asynchronous GPU clock as exact rationals, the CW33300 pipeline, delay slots, mul/div latencies, COP0 and exception rules, the decoded memory map with the BIU delay registers, the seven DMA channels and CPU stall rules, the three root counters and their edge cases, I_STAT/I_MASK semantics, the BIOS family with public digests, the PS-EXE format and the BIOS-free CI boot decision, machine-profile fields and the power-on image."
 read_when: "Before designing or changing the time base, bus, CPU core, memory control, DMA, timers, interrupt controller, BIOS loading, EXE side-loading, machine profiles, power-on state or any timing that crosses chips."
-updated: 2026-10-19
+updated: 2026-11-10
 ---
 
 # PlayStation system timing, CPU, maps, DMA, timers, interrupts and boot
@@ -57,30 +57,9 @@ implementation does [SYS.20]; report the emulated rates 53,693,175/897,619 = 59.
 
 ## 2. The CPU (CXD8530/CXD8606, LSI CW33300 core, MIPS I)
 
-| Topic | Fact | Sources |
-|---|---|---|
-| Pipeline | 5 stages IF, RD, ALU, MEM, WB; one instruction issued per cycle; ALU results are forwarded, mul/div results interlock | [SYS.13] |
-| Load delay | one instruction: the target register is written only after the next instruction completes, which usually reads the old value; an interrupt between the two changes this because the load completes before the handler | [SYS.13][SYS.01] |
-| Branch delay | the instruction after any branch or jump always executes; BLTZAL/BGEZAL always write $ra; JR/JALR to a misaligned target raises AdEL at the fetch, EPC = the bad target | [SYS.13][SYS.01] |
-| MULTU/MULT | 6 / 9 / 13 cycles by rs: 0..7FFh (or sign mirror), 800h..FFFFFh, else; issue costs 1 cycle; reading HI/LO early stalls until done | [SYS.01] |
-| DIV/DIVU | 36 cycles fixed; no trap: DIVU by 0 gives LO = FFFFFFFFh, HI = rs; DIV by 0 gives LO = -1 (rs >= 0) or +1 (rs < 0), HI = rs; DIV -80000000h / -1 gives LO = 80000000h, HI = 0; nocash notes an unexplained "do not touch HI/LO for about 2 cycles after an access" rule | [SYS.01] |
-| COP0 registers | r3 BPC, r5 BDA, r6 TAR (R), r7 DCIC, r8 BadVaddr (R), r9 BDAM, r11 BPCM, r12 SR, r13 CAUSE (bits 8-9 R/W), r14 EPC (R), r15 PRID = 00000002h on CXD8606CQ; r16-31 garbage without exception; r0-2, r4, r10 and the COP0 range 32-63 raise RI | [SYS.01] |
-| SR bits | 0 IEc, 1 KUc, 2-3 IEp/KUp, 4-5 IEo/KUo (RFE pops), 8-15 Im, 16 Isc, 17 Swc (no observable effect on PSX), 18 PZ, 19 CM, 20 PE, 21 TS, 22 BEV, 25 RE (may not exist), 28-31 CU0-3 (CU2 = GTE; CU1 none) | [SYS.01][SYS.13] |
-| CAUSE bits | 2-6 ExcCode, 8-9 software IP (R/W), 10-15 IP, 28-29 CE, 30 BT, 31 BD | [SYS.01] |
-| ExcCodes | 00 INT, 04 AdEL, 05 AdES, 06 IBE, 07 DBE, 08 Sys, 09 Bp, 0A RI, 0B CpU, 0C Ovf; 01-03 (TLB) never occur | [SYS.01] |
-| Vectors | Reset BFC00000h; BEV=0: UTLB 80000000h, break 80000040h, general 80000080h; BEV=1: BFC00100h/140h/180h; the PSX BIOS only contains the reset vector among BEV=1 vectors | [SYS.01][SYS.13] |
-| Priority | reset; data AdEL/AdES/DBE; Ovf; INT; Sys/Bp/RI/CpU; fetch AdEL/IBE | [SYS.01] |
-| EPC | the faulting instruction, or the branch when BD; interrupts return to EPC+0; RFE does not jump | [SYS.01] |
-| GTE in a delay slot of an interrupt | hardware bug: an interrupt taken when the next instruction is a GTE command lets the GTE command execute (EPC points at it, so it runs twice); ares executes the COP2 op inside the exception path; Crash Bandicoot, Jinx, Spyro affected | [SYS.01][SYS.15] |
-| Address and bus errors | AdEL/AdES on misaligned half/word and on user-mode access outside KUSEG, and only they update BadVaddr; reads or fetches from unused regions (including I/O gaps) raise DBE/IBE; CE is not set for bus errors or hardware breakpoints | [SYS.01][SYS.13][SYS.02][SYS.15] |
-| Segments | KUSEG 00000000h (cached, only the first 512 MB maps; the rest raises an exception), KSEG0 80000000h cached, KSEG1 A0000000h uncached, KSEG2 C0000000h (cache control only; not executable); user mode (KUc = 1) may touch only KUSEG | [SYS.02][SYS.13] |
-| I-cache | 4 KB, direct mapped, 256 lines x 4 words, index bits 11:4, tag = physical bits 31:12 plus 4 per-word valid bits; a fill starts at the missed word and runs to the end of the line; a tag hit with an invalid word refills the whole line; stores never invalidate it; FFFE0130h IBLKSZ = 0 limits a fill from word 0 to 2 words | [SYS.02] |
-| D-cache | none as a cache; the 1 KB scratchpad at 1F800000h..1F8003FFh is the D-cache SRAM (FFFE0130h bit 3 = 1, bit 7 = 1); not executable (bus error on the first fetch); mirrored in KUSEG and KSEG0, not KSEG1 | [SYS.02][SYS.03] |
-| Cache isolation, write queue | SR Isc = 1 sends loads and stores to the cache: with FFFE0130h TAG set to I-cache tags (how FlushCache works), otherwise to the scratchpad; the 4-deep write buffer is flushed by a read of a just-written address, by any KSEG1 access (which stalls until it drains) and by a byte read at BFC00000h | [SYS.01][SYS.19][SYS.02][SYS.13] |
-| Stores, LWL/LWR | 8/16-bit stores put all 32 GPR bits on the bus (some I/O registers see a 32-bit write); LWL/LWR are lane merges of 1-4 bytes with no delay needed between the pair; a failed load leaves rt untouched | [SYS.01] |
-| COP delays, garbage r16-31 | MFC0/CFC0 and MFC2/CFC2 have one-instruction delays; COP2 writes need 2-3 cycles; SR bit 30 (CU2) takes about 2 cycles; COP0 r16-31 return roughly the last valid COP0 read, later 20h/40h/100h, even in user mode with COP0 disabled | [SYS.01] |
-| DCIC | hardware breakpoints go to 80000040h with ExcCode 09h; BREAK opcodes to 80000080h; bits 12-13 "jump redirection" can set PC = [00000000h] without recording a source; Soul Reaver keeps LibCrypt data in BPC/BDA | [SYS.01] |
-| Reset state | SWc, KUc, IEc cleared, BEV set, other registers undefined; MAME starts SR = BEV, CAUSE = 0, PRID = 2, DCIC = 0, BPCM = BDAM = FFFFFFFFh, PC = BFC00000h; ares zeroes SR, CAUSE, EPC, all GPRs and HI/LO | [SYS.13][SYS.21][SYS.15] |
+Moved to the public pages: [docs/hardware/cpu.md](../../docs/hardware/cpu.md) (pipeline, load and branch delay, multiply and divide, loads and stores, the instruction fetch, the run loop), [docs/hardware/cop0.md](../../docs/hardware/cop0.md) (COP0 registers, SR, CAUSE, exceptions and their order, the vectors, interrupts, the interrupt that runs a GTE command twice) and [docs/hardware/bus.md](../../docs/hardware/bus.md) (segments, the instruction cache, the scratchpad, cache isolation and the write queue). Each cites psx-spx and the IDT manual and says where the core's own model replaces a measurement. The facts this section held are in those pages; the Sources table below still defines every [SYS.nn] ID that other files cite.
+
+Corrections phase 3 found (the pages carry them): the GTE command that the interrupt entry runs a second time is the instruction at the program counter, which is not the word at EPC when the interrupted instruction sits in a branch delay slot (EPC then names the branch); and the wait for a running GTE command applies to a read of a result (MFC2, CFC2, SWC2) and to a new command, not to a move in (MTC2, CTC2, LWC2), so the row's "MFC2/CFC2 have one-instruction delays; COP2 writes need 2-3 cycles" is replaced by the stamp model on [docs/hardware/gte.md](../../docs/hardware/gte.md) (Timing); the two-instruction write-to-use latency is not modelled.
 
 **C3 CPU core shape.** Recommendation: an interpreter with an explicit load-delay queue and branch-delay record (ares'
 `delay-slots` model [SYS.15]), a mul/div completion timestamp (stall on an early HI/LO read), the full direct-mapped
@@ -90,37 +69,7 @@ the bus [SYS.21]. Would change if: a JIT becomes necessary for the handheld budg
 
 ## 3. Memory map and bus control
 
-| Physical range | Device | Notes | Sources |
-|---|---|---|---|
-| 00000000h-001FFFFFh | 2 MB RAM | mirrored 4 times across 8 MB by the BIOS' RAM_SIZE value; first 64 KB is kernel space | [SYS.02][SYS.03] |
-| 1F000000h-1F7FFFFFh | DEV0 expansion 1 (cartridge/PIO), base movable, size up to 8 MB | 8-bit bus, 512 KB by default; unmounted reads are bus errors in ares, "open bus" is not documented | [SYS.02][SYS.03][SYS.15] |
-| 1F800000h-1F8003FFh | scratchpad 1 KB | not in KSEG1 | [SYS.02] |
-| 1F801000h-1F801FFFh | I/O ports, 4 KB; gaps raise bus errors | memory control 1000h-1020h, 1060h; peripheral 1040h-105Fh; I_STAT/I_MASK 1070h/1074h; DMA 1080h-10FFh; timers 1100h-112Fh; CD-ROM 1800h-1803h; GPU 1810h/1814h; MDEC 1820h/1824h; SPU 1C00h-1FFFh | [SYS.02][SYS.19] |
-| 1F802000h-1F803FFFh | DEV8 expansion 2 (debug/DUART), 128 bytes by default; any base other than 1F802000h disables it | | [SYS.03] |
-| 1FA00000h-1FBFFFFFh | DEV1 expansion 3 (SRAM BIOS, DTL cards); base fixed | | [SYS.02][SYS.03] |
-| 1FC00000h-1FC7FFFFh | BIOS 512 KB (DEV2), mirror within 4 MB disabled by default | 8-bit bus, read delay 3 (4 cycles): about 8 + 7 + 7 + 7 = 29 cycles for a 32-bit read | [SYS.02][SYS.03] |
-| FFFE0130h | cache control (BCC), KSEG2 | word access only in ares | [SYS.03][SYS.19] |
-
-Memory control registers (values the retail bootcode writes):
-
-| Register | Address | Boot value | Meaning | Sources |
-|---|---|---|---|---|
-| DEV0 base, DEV8 base | 1F801000h, 1F801004h | 1F000000h, 1F802000h | DEV0 bits 24-31 fixed 1Fh (System 573 moves it); any other DEV8 base disables it | [SYS.03] |
-| DEV0, DEV1 delay/size | 1F801008h, 1F80100Ch | 0013243Fh (512 KB, 8-bit), 00003022h | | [SYS.03] |
-| DEV2 BIOS delay/size | 1F801010h | 0013243Fh (CEX-7000 kernel: 1 MB) | first store the ROM executes (`lui t0,0x13; ori t0,0x243f; sw`); the speed-up is visible only from BFC00018h on a logic analyser | [SYS.03][SYS.07] |
-| DEV4 SPU delay | 1F801014h | 200931E1h (220931E1h for SPU RAM reads) | size bits ignored; applies to 1F801C00h and 1F801E00h | [SYS.03] |
-| DEV5 CD-ROM delay | 1F801018h | 00020843h or 00020943h | size bits ignored | [SYS.03] |
-| DEV8 delay/size | 1F80101Ch | 00070777h | 128 bytes, 8-bit | [SYS.03] |
-| COM_DELAY | 1F801020h | 00031125h, 0000132Ch or 00001325h | COM0 recovery, COM1 hold, COM2 floating, COM3 pre-strobe | [SYS.03] |
-| RAM_SIZE (DRAM_CTRL) | 1F801060h | 00000B88h (PU-7 and early PU-8: 0B80h) | bits 0-2 refresh hold-off, 3 /CAS wiring (late CPUs), 4-5 refresh period, 7 consecutive-access wait, 8-11 bank sizes and /RAS1 enable; "2 MB" is set as an 8 MB bank, which creates the three mirrors Puzzle Bobble, Gundam Battle Assault 2 and FreePSXBoot rely on; Wipeout shrinks it with SetMem | [SYS.03][SYS.07] |
-| Cache control | FFFE0130h | not documented as a reset value; BIOS values 804h then 1E988h (unverified) | 0 LOCK, 1 INV, 2 TAG, 3 scratchpad enable, 4-5 DBLKSZ (broken), 7 DS, 8-9 IBLKSZ, 11 IS1, 12 INTP, 13 RDPRI, 14 NOPAD, 15 BGNT, 16 LDSCH, 17 NOSTR | [SYS.03][SYS.19] |
-
-- Delay register fields: bits 0-3 write delay, 4-7 read delay (N+1 cycles), 8-11 use COM0-3, 12 bus width, 13 auto-increment,
-  16-20 address bits (window 1 << N), 24-27 DMA timing override, 28 address-error flag, 29 DMA timing select, 30 wide DMA,
-  31 wait for the device. A 32-bit access on an 8-bit port is 1ST + 3 x SEQ; the fastest setting is 3 cycles per byte; at
-  reset every port uses the maximum delays [SYS.03]. ares charges RAM read 4 + words, RAM write 1 (infinite write queue for
-  now), DMA from RAM 1 per word plus 1 per 16-word row, GPU/MDEC ports 1 per word, the rest by their delay registers
-  [SYS.19]; nocash gives main RAM a "6 cycle access time" [SYS.01]. Unused regions: bus error, never open bus [SYS.02].
+Moved to the public page [docs/hardware/bus.md](../../docs/hardware/bus.md): the physical map and the segments, RAM and its mirrors, the scratchpad, the BIOS window, the memory-control registers with their boot values and the per-port cost formula, the expansion regions and debug ports, the instruction cache and the write queue, and the interrupt registers. The Sources table below keeps [SYS.02], [SYS.03] and [SYS.19]. Nothing in this section was found wrong in phase 3; the map and the delay formula are as the page states them.
 
 **C4 Bus model.** Recommendation: decode on physical address (mask 1FFFFFFFh after a 3-bit segment switch, as ares and MAME
 do), charge the delay-register formula for every port, keep RAM_SIZE bank mirroring and bus faults real, and keep the memory
@@ -130,61 +79,33 @@ formula on a real board; then the table is corrected from that measurement.
 
 ## 4. DMA
 
-| Item | Fact | Sources |
-|---|---|---|
-| Channels | 0 MDEC in, 1 MDEC out, 2 GPU, 3 CD-ROM, 4 SPU, 5 PIO (arcade only), 6 OTC; registers at 1F801080h + N x 10h: MADR (+0, bits 0-23), BCR (+4), CHCR (+8); +8 mirrored at +Ch | [SYS.04][SYS.02] |
-| DPCR 1F8010F0h | 3-bit priority (0 highest) + enable per channel, 4 bits each; bits 28-30 CPU priority; reset 07654321h; equal priority resolved by higher channel number | [SYS.04] |
-| DICR 1F8010F4h | 0-6 per-channel "IRQ per slice/node" mode, 15 bus-error flag (forces 31), 16-22 enables, 23 master enable, 24-30 flags (write 1 to clear), 31 = bit 15 OR (23 AND any of 24-30); a 0 to 1 edge of bit 31 sets I_STAT bit 3; flags are only set while the channel enable and bit 23 are on | [SYS.04] |
-| CHCR | 0 direction (1 = RAM to device), 1 step (-4), 8 chopping (in linked-list mode: header before data; in slice mode it hangs), 9-10 sync 0 burst / 1 slice / 2 linked list, 16-18 DMA window 1 << N words, 20-22 CPU window 1 << N cycles, 24 start/busy, 28 force start (sync 0 only), 29 pause, 30 bus snoop; OTC only honours bits 24, 28, 30 and reads bit 1 = 1 | [SYS.04] |
-| Typical CHCR | MDEC in 01000201h, MDEC out 01000200h, GPU 01000200h/01000201h/01000401h, CD 11000000h (chopped 11400100h), SPU 01000201h/01000200h, OTC 11000002h | [SYS.04] |
-| Sync modes | 0: OTC and CD-ROM, BCR words (0 = 10000h), whole block after DREQ, MADR not updated unless chopping. 1: MDEC, SPU, GPU VRAM data, BCR = BS (max 10h GPU/SPU, 20h MDEC) and BA, one block per DREQ, MADR advances. 2: GPU lists, header = next address (0-23) and word count (24-31), ends at an address with bit 23 set (FFFFFFh by convention); ares guards at 1000h nodes | [SYS.04][SYS.18] |
-| OTC | writes `addr - 4` into each word, the last word FFFFFFh, decrementing from MADR | [SYS.18] |
-| Timings | MDEC, GPU, OTC 1 clock per word; SPU 4; CD 24 (BIOS default) or 40 (most games); PIO 20; CD/SPU/PIO adjustable through memory control | [SYS.04] |
-| CPU stall | the CPU runs only while it touches cache, scratchpad, COP0 or GTE; it may queue 4 writes; any RAM or I/O read, or a fifth write, stalls until the DMA ends; it resumes between slice blocks, linked-list nodes and chopping windows | [SYS.04] |
-| Address wrap, reset | MADR wraps FFFFFCh to 0; words past the 8 MB region are dropped; a node above 8 MB with 2 MB settings raises a DMA error, which some games use to end a chain; reset: DPCR 07654321h, DICR 0, all CHCR 0 (MAME and ares) | [SYS.04][SYS.22][SYS.18] |
+Moved to the public page [docs/hardware/dma.md](../../docs/hardware/dma.md): the channels and registers, DPCR and arbitration, DICR and the interrupt edge, the unit model, OTC, the sync modes and the request line, the fault for an unusable mode, chopping, linked lists, the 1000h-node guard, the hostile-program bound, the device ends, the costs and what holds the CPU.
+
+Corrections phase 3 found (the page carries them): (1) the DICR row of the table this section held named bits 0-6 for the per-channel interrupt mode, where ares and the built core store bits 0-5 and bit 6 is unverified and unmodelled; (2) a list node whose next address is above 8 MiB cannot raise a DMA error, because a next address with bit 23 set ends the list first, so the claim that some games end a chain that way through an error is not modelled; (3) a list that passes 1000h nodes in one step yields and the channel stays busy, with no flag and no interrupt, as the hardware log of a self-referencing chain shows (it does not abort); (4) DICR bit 31 is not stored, and the per-channel enables gate only the setting of a flag, not the bit; (5) a lower DPCR priority value wins and a tie goes to the higher channel number, and the CPU priority field has no measured effect; (6) the CD-ROM channel's per-word cost is 24 in the model, and 40 is the choice of the CD-ROM device end.
 
 **C5 DMA scheduling.** Recommendation: a single DMA scheduler on the CPU tick that runs whole slice blocks or nodes
 atomically, charges the per-word costs above, stalls the CPU by the stall rule (ares `waitDMA`), and implements chopping for
 sync 0 as alternating windows. Strongest alternative: per-word interleaving with the CPU. Would change if: ps1-tests
 `dma/chopping` or `gpu/gpustat` show visible intra-block CPU progress on hardware that the block model cannot reproduce.
 
+Phase 3 built the scheduler as data-atomic and time-evented: a unit moves its words at once and the channel is busy for the unit's cost, with a CPU window after it, and a bus access that waits freezes the CPU until the unit ends (see the page). The "alternating windows" recommendation above holds for chopping only.
+
 ## 5. Root counters (timers)
 
-| Item | Fact | Sources |
-|---|---|---|
-| Registers | 1F801100h + N x 10h: +0 COUNT (16 bits), +4 MODE, +8 TARGET; upper bits garbage | [SYS.05] |
-| MODE bits | 0 sync enable, 1-2 sync mode, 3 reset on target (else at FFFFh), 4 IRQ on target, 5 IRQ on FFFFh, 6 repeat, 7 toggle, 8 clock source (T0: dot, T1: hblank), 9 T2 /8, 10 IRQ flag (0 = asserted), 11 reached target, 12 reached FFFFh (both cleared on read) | [SYS.05][SYS.16] |
-| Sync modes | T0 (hblank) and T1 (vblank): 0 pause during blank, 1 reset at blank, 2 reset at blank and pause outside, 3 pause until the first blank then free-run. T2: 0 or 3 stop permanently, 1 or 2 free-run | [SYS.05][SYS.16] |
-| Writes | a MODE write zeroes COUNT, sets the IRQ flag bit 10 to 1, re-arms one-shot; COUNT or MODE writes hold the value 2 cycles before counting (ares `WAIT_CYCLES = 2`) | [SYS.05][SYS.16] |
-| Reset on target | counter goes 0 after reaching target and stays 2 cycles; wrap at FFFFh stays 0 for 1 cycle; example with target 1: 0,0,1,0,0,1 | [SYS.05][SYS.16] |
-| Writing COUNT above TARGET | no compare IRQ until the counter wraps and reaches target again | [SYS.05] |
-| IRQ modes | pulse: bit 10 is 1 except a few cycles at an IRQ; toggle: bit 10 inverts on each IRQ, so repeated IRQs fire every second event; one-shot suppresses further IRQs until MODE is rewritten (the counter keeps running) | [SYS.05][SYS.16] |
-| Dot and hblank sources; reset | the dot clock and hblank run during blanking; a 0-width display makes hblank endless; COUNT reads on dot/hblank clocks can be unstable because the clocks are asynchronous; reset: all zero with bit 10 = 1 | [SYS.05][SYS.10][SYS.16] |
+Moved to the public page [docs/hardware/timers.md](../../docs/hardware/timers.md): the registers and MODE bits, the clock sources, the synchronisation modes, the beam sources, lazy counting, targets and wraps, the hold, the interrupts, the deadline and the saved state.
+
+Corrections phase 3 found (the page carries them): (1) ares holds a written timer value 1 cycle (its `WAIT_CYCLES` is 1, not 2 as the row said), while psx-spx says the value stays for 2 clock cycles and the core holds it two counter cycles after the write's own cycle; (2) a reset at the target has the period target + 2, and a wrap at FFFFh has no extra dwell (the row's "stays 0 for 1 cycle" is dropped); (3) pulse mode leaves bit 10 at 1, and toggle mode raises only when the flip takes bit 10 to 0; (4) only sysclk and sysclk/8 are modelled until the GPU line machine exists, so Timer 0 on the dot clock or hblank and Timer 1 on hblank do not advance and the access counts as unbuilt.
 
 **C6 Timer model.** Recommendation: step timers from the CPU tick (sysclk, /8) and from GPU events (dots via the C1
 accumulator, hblank at the GPU's display-range X2 as ares does), with the 2-cycle write hold and 1/2-cycle zero dwell.
 Strongest alternative: event-scheduled target hits. Would change if: ps1-tests `timers` on hardware show hblank edges at a
 different point in the line than X2; then the edge moves, not the model.
 
+Phase 3 built the counters as a lazy closed form with one derived deadline instead of per-step ticking, so the "step timers from the CPU tick" recommendation above is superseded; the "strongest alternative" is what was built.
+
 ## 6. Interrupts
 
-| Bit | Source | Ack also at | Sources |
-|---|---|---|---|
-| 0 | VBLANK | none | [SYS.06] |
-| 1 | GPU (rarely used) | GP0/GP1 | [SYS.06] |
-| 2 | CD-ROM | CD register 3 | [SYS.06] |
-| 3 | DMA | DICR bits 24-30 | [SYS.06][SYS.04] |
-| 4-6 | Timer 0-2 | none | [SYS.06] |
-| 7 | controller and memory card byte received | JOY_CTRL bit 4 | [SYS.06] |
-| 8 | SIO | SIO_CTRL | [SYS.06] |
-| 9 | SPU | SPU control | [SYS.06] |
-| 10 | lightpen; also PIO and DTL cards; secondary controller at 1F802030h | device | [SYS.06] |
-
-- I_STAT bits set on a 0 to 1 edge of the source only; writing 0 clears, writing 1 leaves; bits 11-15 are 0, 16-31 garbage.
-  Acknowledge I_STAT before the device, otherwise a new edge in the same cycle is lost for ever [SYS.06].
-- CAUSE bit 10 = (I_STAT AND I_MASK) != 0, not latched; the CPU takes it when SR bit 10 and IEc are both set; CAUSE bits 8-9
-  are software latches [SYS.06]. ares delays a newly asserted interrupt by 2 instructions [SYS.15][SYS.17]; MAME resets
-  I_STAT and I_MASK to 0 [SYS.22].
+Moved to the public pages: the I_STAT and I_MASK registers and their bits in [docs/hardware/bus.md](../../docs/hardware/bus.md) (Interrupt registers), the CAUSE bit 10 line, the interrupt entry and its latency in [docs/hardware/cop0.md](../../docs/hardware/cop0.md) (Interrupts), the DMA interrupt edge in [docs/hardware/dma.md](../../docs/hardware/dma.md) and the counters' interrupt bits in [docs/hardware/timers.md](../../docs/hardware/timers.md). I_STAT is set on a 0-to-1 edge of the source only, and the DMA bit is raised when DICR bit 31 goes from 0 to 1, as the pages say; no correction to this section's table was needed beyond the DMA one above.
 
 ## 7. BIOS, kernel and boot
 

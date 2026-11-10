@@ -199,6 +199,7 @@ the GPU keeps one) and `note` extra detail (the repeat count for `SCHWAY_FAULT_E
 | `SCHWAY_FAULT_RESERVED_INSTRUCTION` | 7 | an encoding the CPU does not define |
 | `SCHWAY_FAULT_COP_UNUSABLE` | 8 | an instruction for coprocessor 1 or 3, which the console lacks |
 | `SCHWAY_FAULT_EXCEPTION_LOOP` | 9 | the same exception return address taken 1,000 times |
+| `SCHWAY_FAULT_DMA` | 10 | a DMA setup the model does not run: a channel other than OTC written with the reserved sync mode 3 and the start bit; `device` is `SCHWAY_DEVICE_DMA`, `addr` the channel's `CHCR`, `opcode` the value written and `pc` the writing instruction |
 
 | Device | Value | Device | Value | Device | Value |
 |--------|-------|--------|-------|--------|-------|
@@ -399,6 +400,10 @@ an unknown one included, and never `NULL`.
 `schway_get_versions` reports the library version, `api` (`SCHWAY_API_VERSION` of the header the library was
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
+
+`SCHWAY_API_VERSION` is 3. A version only adds names, so a program built against an earlier header runs unchanged.
+Version 3 added `SCHWAY_FAULT_DMA` and nothing else; a program that switches on the fault kind should treat a value it
+does not know as a fault it cannot name.
 
 ## The test card
 

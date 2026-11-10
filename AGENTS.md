@@ -76,6 +76,9 @@ evidence. Lessons from the sibling emulators are in `.planning/LESSONS.md`; re-r
     plans run in parallel waves wherever they share no inventory or header, and sequentially where they do. A
     plan past 30 minutes is split. No test is "non-gating".
 
+Discuss, verify, CI and release steps read `.planning/AUTONOMOUS.md` for the owner's standing research,
+automation and efficiency preferences; autonomous authorization and phase boundaries are recorded there.
+
 ## GSD summaries
 
 Every plan SUMMARY carries `requirements-completed:` and a block-style `coverage:` list. Each entry has `id`,

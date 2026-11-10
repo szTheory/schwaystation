@@ -3,8 +3,7 @@
 COP0 is the system-control coprocessor of the R3000A. It holds the mode and interrupt-enable stack, the exception
 state and the breakpoint registers, and every exception the CPU takes goes through one function, `schway__cop0_exception`
 in `src/cop0.c`. Everything here is integer arithmetic and behaves the same on every platform. Facts come from the
-psx-spx CPU Specifications page (COP0 registers and exception handling) and from section 2 of
-`.planning/preparation/PSX-SYSTEM.md`, which also names the sources it was checked against. Where this page says a fact
+psx-spx CPU Specifications page (COP0 registers and exception handling) and the psx-spx Interrupts page. Where this page says a fact
 is not measured on the console, the tests pin the behaviour the documents describe and say so.
 
 This page covers the registers, the entry rules, the vectors, MFC0, MTC0 and RFE, coprocessor-unusable, the exception
@@ -12,7 +11,7 @@ loop and interrupts. The breakpoint registers are held but do not break.
 
 ## Registers
 
-`MFC0` and `MTC0` move a general register to or from COP0 register `rd` (PSX-SYSTEM section 2, COP0 registers).
+`MFC0` and `MTC0` move a general register to or from COP0 register `rd` (psx-spx CPU Specifications, COP0 registers).
 
 | Register | Name | Reads | Writes |
 |---|---|---|---|
@@ -30,7 +29,7 @@ loop and interrupts. The breakpoint registers are held but do not break.
 The breakpoint registers keep their values and take no action: no breakpoint is modelled.
 
 `MFC0` has one delay slot, like a load: the instruction after it still sees the old register, and the value lands as
-that instruction ends. A write to the same register by the next instruction cancels it (PSX-SYSTEM section 2, Load delay
+that instruction ends. A write to the same register by the next instruction cancels it (psx-spx CPU Specifications, Load delay
 and COP delays). A COP0 instruction with the user-mode bit set and `CU0` clear is a coprocessor-unusable exception, below.
 
 ## SR
@@ -45,7 +44,7 @@ and COP delays). A COP0 instruction with the user-mode bit set and `CU0` clear i
 | 28-31 | CU0-CU3 | coprocessor usable; CU2 is the GTE, CU1 and CU3 are not on the console |
 
 Bits 6-7, 20-21 and 23-27 read 0 and ignore writes. The three (IE, KU) pairs are a stack of three: an exception pushes it, `RFE` pops it
-(PSX-SYSTEM section 2, SR bits).
+(psx-spx CPU Specifications, SR bits).
 
 ## CAUSE
 
@@ -70,11 +69,11 @@ Bits 6-7, 20-21 and 23-27 read 0 and ignore writes. The three (IE, KU) pairs are
 | 0Bh | CpU | a coprocessor instruction with its `CU` bit clear |
 | 0Ch | Ovf | `ADD`, `ADDI` or `SUB` overflowing as signed numbers |
 
-Codes 01h to 03h belong to the TLB, which the console does not have, and never occur (PSX-SYSTEM section 2, ExcCodes).
+Codes 01h to 03h belong to the TLB, which the console does not have, and never occur (psx-spx CPU Specifications, ExcCodes).
 
 ## Entry
 
-An exception does these things at once (PSX-SYSTEM section 2, EPC, Priority and Vectors; psx-spx CPU Specifications):
+An exception does these things at once (psx-spx CPU Specifications, EPC, Priority and Vectors):
 
 1. SR bits 0-5 shift left by 2. The current pair becomes 0, so the handler runs in kernel mode with interrupts off, and
    the old pair is lost.
@@ -93,34 +92,34 @@ An exception does these things at once (PSX-SYSTEM section 2, EPC, Priority and 
 | 1 | `BFC00180h` |
 | 0 | `80000080h` |
 
-Reset leaves BEV set, so an exception before the guest clears it runs ROM code (PSX-SYSTEM section 2, Vectors and Reset
+Reset leaves BEV set, so an exception before the guest clears it runs ROM code (psx-spx CPU Specifications, Vectors and Reset
 state).
 
 A load issued by the instruction before an exception still lands, so an exception handler never sees it half done
-(PSX-SYSTEM section 2, Load delay).
+(psx-spx CPU Specifications, Load delay).
 
 ## RFE
 
 `RFE` shifts SR bits 2-5 into 0-3 and leaves bits 4-5 as they are. It does not jump: the handler returns with
-`JR` to EPC and `RFE` in the delay slot (PSX-SYSTEM section 2, SR bits and EPC).
+`JR` to EPC and `RFE` in the delay slot (psx-spx CPU Specifications, SR bits and EPC).
 
 ## Address errors on the fetch
 
 A jump register or `JALR` to an address that is not a multiple of 4 runs its delay slot and then raises AdEL when the
-target is fetched. EPC and BadVaddr are both the bad target, and BD is 0 (PSX-SYSTEM section 2, Branch delay). Nothing
+target is fetched. EPC and BadVaddr are both the bad target, and BD is 0 (psx-spx CPU Specifications, Branch delay). Nothing
 is read from the bus for the bad fetch.
 
 ## Coprocessor unusable
 
 `COP1` and `COP3` with `CU1` or `CU3` clear raise CpU with CE 1 or 3. The console has neither coprocessor, so the first
 such exception is also recorded as a first fault. With the bit set the instruction does nothing, except `BCzF`, which
-always goes, and `BCzT`, which never does, because the coprocessor's condition line is never true (PSX-SYSTEM section 2,
+always goes, and `BCzT`, which never does, because the coprocessor's condition line is never true (psx-spx CPU Specifications,
 SR bits). A COP0 instruction in user mode with `CU0` clear is CpU with CE 0, and is an ordinary exception a guest handler
 may take, not a first fault. COP2, the geometry engine, is handled with the GTE.
 
 ## Which exceptions are a first fault
 
-The core keeps the first event it calls impossible or unmodelled (ARCHITECTURE section 6). An exception the guest is
+The core keeps the first event it calls impossible or unmodelled. An exception the guest is
 meant to take leaves nothing there:
 
 | Exception | First fault |
@@ -141,7 +140,7 @@ the count again, and an interrupt is neither counted nor does it break a run. Th
 The interrupt line the CPU takes is true while any of CAUSE bits 8-15 is set with the matching SR mask bit (8-15) set
 and SR.IEc set. CAUSE bit 10 is the hardware line: it is the live result of I_STAT AND I_MASK, changed by the write or
 the raise that changes it, with no delay, so a `MFC0` of CAUSE right after an I_MASK write already sees the new value.
-Bits 8 and 9 are the two software flags a guest sets itself (PSX-SYSTEM section 2, SR bits and CAUSE bits; section 6).
+Bits 8 and 9 are the two software flags a guest sets itself (psx-spx CPU Specifications, SR bits and CAUSE bits; psx-spx Interrupts).
 
 The interrupt is not taken at the change. The core keeps a retirement stamp, the `irq_stamp` field of the CPU state: 0
 while nothing is armed, otherwise the number of instructions still to retire before the entry. It is set when the line
@@ -158,7 +157,7 @@ instruction runs, if the line is still true.
 | `RFE`, which restores IEc | 1, the `RFE` itself | the instruction after the `RFE` |
 
 These latencies are an inference from the published behaviour, which is that a newly asserted interrupt is delayed by
-about two instructions (PSX-SYSTEM section 6, interrupts). Nothing measured on the console separates them from one
+about two instructions (psx-spx Interrupts). Nothing measured on the console separates them from one
 instruction more or less, and the tests say so beside each value. The `doc` rows are pinned in
 `tests/cpu/exception_tests.c`: `MTC0` to CAUSE gives EPC = pc + 4, `MTC0` to SR enabling a pending line gives
 EPC = pc + 8, an I_MASK write gives EPC = pc + 8, and a CAUSE write in a delay slot is taken after the slot with BD = 0.
@@ -172,7 +171,7 @@ What the entry does, on top of the steps under Entry:
   A write to CAUSE in the slot of a branch is taken after the slot, when the branch is already gone, so BD is 0 and EPC
   is where the branch went.
 - A load issued by the instruction just before lands first. The handler sees it, and the instruction the interrupt
-  cut off, which would have read the old value, reads the new one when it runs after the return (PSX-SYSTEM section 2,
+  cut off, which would have read the old value, reads the new one when it runs after the return (psx-spx CPU Specifications,
   Load delay).
 - Stores in the write queue stay queued. They are already in RAM in store order, and the first uncached read in the
   handler empties the queue.
@@ -180,12 +179,16 @@ What the entry does, on top of the steps under Entry:
   `RFE`.
 - When an interrupt is due on the same instruction as an exception of that instruction, the order is data AdEL, AdES
   and DBE, then overflow, then the interrupt, then `SYSCALL`, `BREAK`, RI and CpU, then the fetch's AdEL and IBE
-  (PSX-SYSTEM section 2, Priority). The ones above the interrupt are taken and the interrupt waits for the return from
+  (psx-spx CPU Specifications, Priority). The ones above the interrupt are taken and the interrupt waits for the return from
   exception; the ones below are not, and the instruction runs again after the return.
-- The entry calls one hook, `schway__cop0_irq_entry_cop2`, with the word at EPC. On the console an interrupt taken
-  when the next instruction is a GTE command lets that command execute, so it runs twice (PSX-SYSTEM section 2, GTE in a
-  delay slot of an interrupt). The GTE does not exist yet, so the hook only reports whether the word is a GTE command and
-  executes nothing; the plan that builds the GTE executes it there.
+- The entry calls one hook, `schway__cop0_irq_entry_cop2`, with the interrupted instruction: the word at the program
+  counter, read without a charge, a fault or a device count, from the instruction cache when it holds that address
+  (it may hold a word the RAM no longer does), else from RAM or the BIOS image. In a branch delay slot that is the
+  slot's instruction, while EPC names the branch. On the console an interrupt taken when the next instruction is a GTE
+  command lets that command execute, so it runs twice (psx-spx CPU Specifications, GTE in a delay slot of an interrupt). The
+  hook executes the command at the entry, before the handler's first instruction, when the word is a command, ExcCode
+  is 0 and SR.CU2 is set; with CU2 clear the instruction would raise coprocessor unusable and never reach the GTE.
+  The command runs again after the return. With a replay log attached there is no memory to read and the word is 0.
 
 ## Exception matrix fixture
 

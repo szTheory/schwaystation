@@ -235,6 +235,24 @@ The vectors are the SingleStepTests `r3000` files. `pins.txt` names each by its 
    either a core bug to fix or an upstream error: the second is a dated line in `tests/vectors/r3000/allow.txt` with the
    upstream issue's URL, and nothing else.
 
+## Regenerating the GTE vector file
+
+`tests/vectors/gte/ps1tests-1150.bin` holds the 1,150 hardware-captured GTE cases of JaCzekanski/ps1-tests, and
+`tests/fixtures/src/gte_cases.inc` the 26 cases the `gte_vectors` fixture replays. `tools/gte2bin.py` makes both from the
+upstream `gte/test-all/tests.c`, pinned by the `ps1tests-gte-test-all` row of `pins.txt`. CI never runs the tool; the
+files change only when the pin or the layout does.
+
+1. Fetch the pinned blob, never committing it:
+   `mkdir -p build/ps1tests && gh api repos/JaCzekanski/ps1-tests/git/blobs/<sha> -H 'Accept: application/vnd.github.raw' > build/ps1tests/tests.c`,
+   with `<sha>` the row's third column.
+2. Check it: `git hash-object build/ps1tests/tests.c` prints that SHA. The tool refuses any other input.
+3. Transcode: `python3 -I tools/gte2bin.py build/ps1tests/tests.c tests/vectors/gte/ps1tests-1150.bin --inc tests/fixtures/src/gte_cases.inc`.
+4. Prove it repeats: run it again into `build/ps1tests/again.bin` and `build/ps1tests/again.inc`, then `cmp` each with the
+   committed file. Both must match, byte for byte.
+5. If the layout or the selection changed, put the new SHA-256 of each file in its row of `tests/fixtures/manifest.txt`
+   and the `.bin` digest in the "ps1-tests GTE cases" section of `THIRD-PARTY-NOTICES.md`. `policy.notices` fails if either
+   file stops being named there.
+
 ## Regenerating the stub kernel
 
 `src/stub_kernel.c` is the assembled `tests/fixtures/src/stub/stub.asm` as a byte array. Never edit it by hand;

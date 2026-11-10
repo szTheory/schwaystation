@@ -30,3 +30,45 @@ exc_matrix,irq_masked_entries,*,0000000B,doc,psx-spx CPU Specifications: COP0 ex
 exc_matrix,cause_after_istat_write,*,0000001C,doc,docs/hardware/cop0.md Interrupts (model in which the I_STAT write commits within its own instruction and CAUSE bit 10 clears at once and ExcCode keeps 07h from the last exception and no console measurement exists)
 exc_matrix,irq_unmasked_cause,*,00000400,doc,psx-spx CPU Specifications: COP0 exception handling (ExcCode 00h INT with IP bit 10 set)
 exc_matrix,irq_unmasked_epc,*,00000008,doc,docs/hardware/cop0.md Interrupts (an MTC0 to SR enabling a pending line is taken at the MTC0 plus 8 as an inference from the published two-instruction delay)
+gte_vectors,test_51,*,a0b3b721,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 51
+gte_vectors,test_138,*,850852b4,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 138
+gte_vectors,test_151,*,ba408a7e,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 151
+gte_vectors,test_201,*,5b28adcb,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 201
+gte_vectors,test_251,*,a96e713e,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 251
+gte_vectors,test_301,*,c601f00a,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 301
+gte_vectors,test_351,*,e4977b03,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 351
+gte_vectors,test_401,*,e4977b03,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 401
+gte_vectors,test_451,*,e35998f2,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 451
+gte_vectors,test_501,*,342edcf5,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 501
+gte_vectors,test_551,*,342edcf5,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 551
+gte_vectors,test_601,*,d2ad76d7,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 601
+gte_vectors,test_651,*,b411ed19,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 651
+gte_vectors,test_701,*,f793732e,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 701
+gte_vectors,test_751,*,d0ae555b,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 751
+gte_vectors,test_801,*,698c77e9,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 801
+gte_vectors,test_851,*,c51434c0,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 851
+gte_vectors,test_904,*,95ab64c5,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 904
+gte_vectors,test_951,*,123ab679,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 951
+gte_vectors,test_1001,*,f4addef8,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 1001
+gte_vectors,test_1051,*,a4d1a7ef,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 1051
+gte_vectors,test_1101,*,09656b84,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 1101
+gte_vectors,test_1,*,7893c118,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 1
+gte_vectors,test_2,*,8b8ac566,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 2
+gte_vectors,test_3,*,1f546961,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 3
+gte_vectors,test_4,*,72d15a83,hw,ps1-tests f727802fead1 gte/test-all/tests.c test 4
+dma_chain,ot_first,*,00103ff8,doc,psx-spx DMA Channels: OTC (each word holds the address of the word before it so the word at MADR 80103FFCh holds 00103FF8h)
+dma_chain,ot_last,*,00ffffff,hw,ps1-tests f727802fead1 dma/otc-test/main.cpp line 31 (testOtcStandard expects the lowest table word to hold 00FFFFFFh) and psx.log line 2 (pass)
+dma_chain,otc_chcr,*,00000002,hw,ps1-tests f727802fead1 dma/otc-test/main.cpp line 219 (testOtcControlBitsAfterTransfer expects D6_CHCR to read 00000002h) and psx.log line 13 (pass)
+dma_chain,otc_dicr,*,c0c00000,doc,psx-spx DMA Channels: DICR (bit 31 is the master flag and bit 30 is the channel 6 flag with enables 22 and 23 as written)
+dma_chain,otc_istat,*,00000001,doc,psx-spx Interrupts: I_STAT bit 3 is the DMA interrupt and DMA Channels: DICR (it is raised when bit 31 goes from 0 to 1)
+dma_chain,otc_master_off,*,44444444,hw,ps1-tests f727802fead1 dma/otc-test/main.cpp line 259 (testOtcStandardWithMasterDisabled expects the word at MADR to keep 44444444h) and psx.log line 14 (pass)
+dma_chain,list_empty,*,00000003,hw,ps1-tests f727802fead1 dma/chain-looping/psx.log line 7 (empty but complete chain: finished true and irq true give bits 0 and 1)
+dma_chain,list_single,*,00000000,hw,ps1-tests f727802fead1 dma/chain-looping/psx.log line 9 (single self-referencing chain: finished false and irq false)
+dma_chain,list_double,*,00000000,hw,ps1-tests f727802fead1 dma/chain-looping/psx.log line 11 (double self-referencing chain: finished false and irq false)
+dma_chain,otc_time,*,10f4..1130,doc,psx-spx DMA channels timing OTC 1 clock per word plus 1 per 16 words for 4096 words and nugget 9db6d88d23c4 tests/dma-priority/RESULTS.md measured 4358 as corroboration only
+timers_lines,vblank_count,ntsc-u,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so a run that ends on the 23rd blank counts 23
+timers_lines,div8_ticks,ntsc-u,15994d..15995e,doc,psx-spx Timers (counter 2 steps once per 8 system clocks) and the frame constants in src/internal.h (NTSC frame 405350378496/715909 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines,sysclk_ticks,ntsc-u,acca88..accacf,doc,psx-spx Timers (the system clock source counts every clock) and the frame constants in src/internal.h (NTSC frame 405350378496/715909 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines,vblank_count,pal,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so a run that ends on the 23rd blank counts 23
+timers_lines,div8_ticks,pal,19f8a2..19f8b3,doc,psx-spx Timers (counter 2 steps once per 8 system clocks) and the frame constants in src/internal.h (PAL frame 482961862656/709379 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines,sysclk_ticks,pal,cfc532..cfc579,doc,psx-spx Timers (the system clock source counts every clock) and the frame constants in src/internal.h (PAL frame 482961862656/709379 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm

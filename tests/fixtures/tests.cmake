@@ -73,14 +73,21 @@ if(CMAKE_SCRIPT_MODE_FILE)
       endif()
     endforeach()
   elseif(CASE STREQUAL "mailbox_judge")
+    string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
     # Runs the fixture to its sealed mailbox and judges every record against the fixture's rows in CSV
     # (fixture,test,profile,expected,source,citation): the nth row of the fixture is the record with
     # id n, expected is a hex value or lo..hi, and a record outside its row, a row with no record or a
     # record with no row fails. ALLOW lines (date, fixture, row, new value, evidence) accept another
     # value for a row; one that applies to no record is an error. FLAGS are extra runner options and
-    # FAULT_KIND, when given, is the kind the printed first-fault line must name.
+    # FAULT_KIND, when given, is the kind the printed first-fault line must name. Only the rows whose
+    # profile is * or PROFILE are judged and numbered; SHIFT, a negative control's knob, is added to both
+    # bounds of every row.
+    separate_arguments(flags UNIX_COMMAND "${FLAGS}")
+    if(NOT DEFINED SHIFT)
+      set(SHIFT 0)
+    endif()
     execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --stop-on mailbox --frames ${FRAMES}
-      ${FLAGS} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+      ${flags} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
     set(errors "")
     if(NOT rc STREQUAL "0")
       list(APPEND errors "the runner exited ${rc}")
@@ -103,12 +110,15 @@ if(CMAKE_SCRIPT_MODE_FILE)
       list(GET fields 0 first)
       if(first STREQUAL FIXTURE)
         list(LENGTH fields nfields)
+        list(GET fields 2 profile)
         list(GET fields 4 source)
         if(NOT nfields EQUAL 6 OR NOT source MATCHES "^(doc|hw)$")
           list(APPEND errors "malformed row (six fields, source doc or hw): ${line}")
         endif()
-        math(EXPR nrows "${nrows} + 1")
-        set(row_${nrows} "${fields}")
+        if(profile STREQUAL "*" OR profile STREQUAL "${PROFILE}")
+          math(EXPR nrows "${nrows} + 1")
+          set(row_${nrows} "${fields}")
+        endif()
       endif()
     endforeach()
     set(allow_lines "")
@@ -145,8 +155,8 @@ if(CMAKE_SCRIPT_MODE_FILE)
         set(hi ${expected})
       endif()
       math(EXPR value_n "0x${value}")
-      math(EXPR lo_n "0x${lo}")
-      math(EXPR hi_n "0x${hi}")
+      math(EXPR lo_n "0x${lo} + ${SHIFT}")
+      math(EXPR hi_n "0x${hi} + ${SHIFT}")
       if(value_n LESS lo_n OR value_n GREATER hi_n)
         if("${test}=${value}" IN_LIST allowed)
           list(APPEND used "${test}=${value}")
@@ -262,7 +272,7 @@ function(schway__fixture name source)
     COMMAND ${SCHWAYSTATION_ARMIPS} -strequ IMAGE ${out} ${ARGN} ${source}
     WORKING_DIRECTORY ${schway__fixture_src}
     DEPENDS schwaystation-armips ${schway__fixture_src}/${source} ${schway__fixture_src}/header.inc
-      ${schway__fixture_src}/mailbox.inc
+      ${schway__fixture_src}/mailbox.inc ${schway__fixture_extra}
     COMMENT "armips ${source}"
     VERBATIM)
   set_property(GLOBAL APPEND PROPERTY SCHWAY__FIXTURE_OUTPUTS ${out})
@@ -279,6 +289,11 @@ schway__fixture(mailbox_fault.exe mailbox_fail.asm -equ MODE 0)
 schway__fixture(mailbox_crc.exe mailbox_fail.asm -equ MODE 1)
 schway__fixture(unbuilt.exe unbuilt.asm -equ MODE 0)
 schway__fixture(gap_write.exe unbuilt.asm -equ MODE 1)
+set(schway__fixture_extra ${schway__fixture_src}/gte_cases.inc) # the include only gte_vectors.asm reads
+schway__fixture(gte_vectors.exe gte_vectors.asm)
+set(schway__fixture_extra "")
+schway__fixture(dma_chain.exe dma_chain.asm)
+schway__fixture(timers_lines.exe timers_lines.asm)
 set(schway__fault_kinds unmapped_read unmapped_write unmapped_fetch misaligned_read misaligned_write
   misaligned_fetch reserved_instruction cop_unusable exception_loop)
 set(schway__fault_index 1)
@@ -370,6 +385,60 @@ schway_add_test(NAME fixtures.exc_matrix
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
 
+# Fault prevented: a GTE whose results are right when called directly but wrong behind the CPU's COP2 moves,
+# load delays and busy stall: gte_vectors.exe replays hardware-captured cases with real COP2 instructions and
+# records the CRC-32 of the 64 registers read back; tests/diag/expected.csv judges each against the hardware.
+schway_add_test(NAME fixtures.gte_vectors
+  COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=gte_vectors
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/gte_vectors.exe -DFRAMES=30
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures gte portable TIMEOUT 30)
+
+# Fault prevented: a DMA transfer that is right when the engine is called directly but wrong behind the CPU's
+# stores to the DMA registers and its reads that wait: dma_chain.exe runs the ordering-table transfer and the
+# linked-list cases of the public hardware tests and times the transfer with Timer 2, and
+# tests/diag/expected.csv judges each record.
+schway_add_test(NAME fixtures.dma_chain
+  COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=dma_chain
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/dma_chain.exe -DFRAMES=30
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS dma fixtures portable TIMEOUT 30)
+
+# Fault prevented: a timer or vertical-blank interrupt that is right for one machine profile and wrong for
+# the other: timers_lines.exe takes the blanks through its own handler on the NTSC and the PAL machine, and
+# the rows of tests/diag/expected.csv for that profile (and the rows for every profile) judge its records.
+foreach(schway__profile ntsc_u pal)
+  string(REPLACE "_" "-" schway__region ${schway__profile})
+  schway_add_test(NAME fixtures.timers_lines.${schway__profile}
+    COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines
+      -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=30
+      -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
+      -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+      -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS fixtures portable timers TIMEOUT 30)
+
+  # Fault prevented: ranges too wide to tell a wrong counter from a right one: the same run judged against
+  # the rows moved up by one counter period (10000h) must fail naming both counters' records.
+  string(REPLACE ";" "|" schway__judge_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+  set(schway__judge ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=30 -DSHIFT=65536
+    -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__judge_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE})
+  string(REPLACE ";" "$<SEMICOLON>" schway__judge "${schway__judge}")
+  schway_add_test(NAME fixtures.timers_lines.${schway__profile}.self_test
+    COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__judge}" -DCODE=1
+      "-DREGEX=div8_ticks: record 2 is.*sysclk_ticks: record 3 is"
+      -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+    LABELS fixtures portable timers TIMEOUT 30)
+endforeach()
+
 # Fault prevented: a first fault that the runner misses, mislabels or reports with a short tail. Each
 # fault.exe class runs more than 4,096 trace records of preamble, then faults once: exit 7, the fault line
 # and a tail of exactly 4,096 twelve-field lines ending in the fault event.
@@ -391,10 +460,10 @@ expect_runner(fixtures.trace.criterion5 7 "(^|\n)fault frame="
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/fault_unmapped_read.exe --trace first-fault)
 
 # Fault prevented: accesses to devices that are not built yet that leave no sign of a program stuck on
-# one, and a write to a gap that is dropped without a fault. GPU and DMA writes end with exit 0 and an
+# one, and a write to a gap that is dropped without a fault. SPU and GPU writes end with exit 0 and an
 # unbuilt line; a write to 1F801030h is a first fault.
 expect_runner(fixtures.unbuilt_footer 0
-  "(^|\n)unbuilt dev=(gpu|dma) n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
+  "(^|\n)unbuilt dev=(gpu|spu) n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/unbuilt.exe --stop-on mailbox --frames 30)
 expect_runner(fixtures.gap_write 7 "(^|\n)fault frame=[0-9]+ [^\n]* kind=unmapped_write(\n|$)"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/gap_write.exe --frames 30)
@@ -494,3 +563,10 @@ schway_add_test(NAME fixtures.boot.bounded
 schway_add_test(NAME fixtures.boot.split_with_exe
   COMMAND schwaystation-test-boot split_with_exe ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: an expected value that drifted from the vector file it claims to come from: every
+# gte_vectors row is recomputed from tests/vectors/gte/ps1tests-1150.bin in C and compared with the CSV.
+schway_add_test(NAME fixtures.gte_vectors.guard
+  COMMAND schwaystation-test-boot gte_vectors_guard
+    ${PROJECT_SOURCE_DIR}/tests/vectors/gte/ps1tests-1150.bin ${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+  LABELS fixtures gte portable TIMEOUT 30)

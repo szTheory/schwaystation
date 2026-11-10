@@ -1,6 +1,7 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
 abi.api_v1	abi,portable
 abi.api_v2	abi,portable
+abi.api_v3	abi,portable
 abi.api_version	abi
 abi.api_version.self_test	abi
 abi.globals	abi

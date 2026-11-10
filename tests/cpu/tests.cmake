@@ -86,23 +86,28 @@ schway_add_test(NAME cpu.cop0.jr_misaligned
   COMMAND schwaystation-test-cop0 jr_misaligned
   LABELS cpu portable TIMEOUT 10)
 
-# COP2 before the GTE: one executable runs the case named on its command line.
-add_executable(schwaystation-test-cop2 ${CMAKE_CURRENT_LIST_DIR}/cop2_prephase.c)
+# COP2 through the GTE: one executable runs the case named on its command line.
+add_executable(schwaystation-test-cop2 ${CMAKE_CURRENT_LIST_DIR}/cop2_tests.c)
 target_include_directories(schwaystation-test-cop2 PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-cop2 PRIVATE schwaystation::schwaystation)
 set_target_properties(schwaystation-test-cop2 PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-cop2)
 
-# Fault prevented: a missing GTE that answers as if it were there, a first fault recorded for a CpU a guest handler can take, or a store that reaches RAM before the coprocessor check.
-schway_add_test(NAME cpu.cop2_prephase.cu2_clear
+# Fault prevented: a missing coprocessor check that answers as if the GTE were enabled, a first fault recorded for a CpU a guest handler can take, or a store that reaches RAM before the coprocessor check.
+schway_add_test(NAME cpu.cop2.cu2_clear
   COMMAND schwaystation-test-cop2 cu2_clear
-  LABELS cpu portable TIMEOUT 10)
+  LABELS cpu gte portable TIMEOUT 10)
 
-# Fault prevented: a register move that lands at once or never, a GTE access that is not counted, a load or store that skips the bus, or a coprocessor check that hides an alignment error.
-schway_add_test(NAME cpu.cop2_prephase.cu2_set
-  COMMAND schwaystation-test-cop2 cu2_set
-  LABELS cpu portable TIMEOUT 10)
+# Fault prevented: a register move that lands at once or never, one that goes to the wrong register file, a load or store that skips the bus, or a coprocessor check that hides an alignment error.
+schway_add_test(NAME cpu.cop2.moves
+  COMMAND schwaystation-test-cop2 moves
+  LABELS cpu gte portable TIMEOUT 10)
+
+# Fault prevented: a GTE access still counted as an unbuilt device, which the runner would report as a missing GTE.
+schway_add_test(NAME cpu.cop2.no_unbuilt
+  COMMAND schwaystation-test-cop2 no_unbuilt
+  LABELS cpu gte portable TIMEOUT 10)
 
 # Exceptions and interrupts: one executable runs the case named on its command line.
 add_executable(schwaystation-test-exception ${CMAKE_CURRENT_LIST_DIR}/exception_tests.c)
@@ -197,10 +202,20 @@ schway_add_test(NAME cpu.exception.irq_with_queued_stores
   COMMAND schwaystation-test-exception irq_with_queued_stores
   LABELS cpu portable TIMEOUT 10)
 
-# Fault prevented: a hook that executes a GTE command in a build with no GTE, or reports the wrong words.
-schway_add_test(NAME cpu.exception.irq_entry_cop2_hook
-  COMMAND schwaystation-test-exception irq_entry_cop2_hook
-  LABELS cpu portable TIMEOUT 10)
+# Fault prevented: an entry that does not run the pending GTE command, one that loses the second run after the return, or one that runs a command the CPU could not issue.
+schway_add_test(NAME cpu.exception.irq_gte_double_execute
+  COMMAND schwaystation-test-exception irq_gte_double_execute
+  LABELS cpu gte portable TIMEOUT 10)
+
+# Fault prevented: a hook handed the branch at EPC instead of the delay slot's command, so the command is never run at the entry, or a branch read as the command.
+schway_add_test(NAME cpu.exception.irq_gte_delay_slot
+  COMMAND schwaystation-test-exception irq_gte_delay_slot
+  LABELS cpu gte portable TIMEOUT 10)
+
+# Fault prevented: an entry that reads the bus, so it sees RAM where the CPU would run the cached word, or that records its read as a first fault or a device access.
+schway_add_test(NAME cpu.exception.irq_entry_peek
+  COMMAND schwaystation-test-exception irq_entry_peek
+  LABELS cpu gte portable TIMEOUT 10)
 
 # Fault prevented: a CAUSE write whose interrupt is taken at the write, or two instructions on.
 schway_add_test(NAME cpu.exception.doc_cause_write
@@ -327,3 +342,13 @@ schway_add_test(NAME cpu.timing.mtlo_mthi_stamp_zero
 schway_add_test(NAME cpu.timing.survives_exception
   COMMAND schwaystation-test-timing survives_exception
   LABELS cpu portable TIMEOUT 10)
+
+# Fault prevented: a GTE command with the wrong busy time, a stamp counted from the wrong cycle, or a result read that does not wait for the engine.
+schway_add_test(NAME cpu.timing.gte_cycles
+  COMMAND schwaystation-test-timing gte_cycles
+  LABELS cpu gte portable TIMEOUT 10)
+
+# Fault prevented: a register move or load that waits for the engine, a store or second command that does not, a wait that does not shorten with time, or one a bad loaded stamp makes longer than the longest command.
+schway_add_test(NAME cpu.timing.gte_stall_rules
+  COMMAND schwaystation-test-timing gte_stall_rules
+  LABELS cpu gte portable TIMEOUT 10)

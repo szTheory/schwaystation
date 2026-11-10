@@ -25,6 +25,7 @@
 *.state
 !/tests/fixtures/**
 !/tests/vectors/r3000/sst-sample.bin
+!/tests/vectors/gte/ps1tests-1150.bin
 /discs/
 /bios/
 /private/

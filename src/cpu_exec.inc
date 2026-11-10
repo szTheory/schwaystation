@@ -1,6 +1,6 @@
 /* The executor: fetch, decode and execute one instruction. cpu.c includes it
    twice (see the second part below), so the one-instruction entry and the run
-   loop run the same code. The CPU is a MIPS I R3000A (PSX-SYSTEM section 2).
+   loop run the same code. The CPU is a MIPS I R3000A (docs/hardware/cpu.md).
    Integer only. */
 
 #if SCHWAY_TRACE == 0
@@ -31,8 +31,8 @@ static uint32_t cpu_log_access(struct schway__cpu_log *log, uint32_t kind, uint3
 
 /* A KSEG1 access, data or instruction, waits for the write queue to empty
    first, so uncached memory and devices see the stores in order: each store
-   still queued is charged its drain, and an empty queue adds nothing (PSX-SYSTEM
-   section 2, Cache isolation, write queue). */
+   still queued is charged its drain, and an empty queue adds nothing
+   (docs/hardware/bus.md, Write queue). */
 static void cpu_wq_drain(struct schway__cpu *c, uint32_t *cycles)
 {
     *cycles += c->wq_count * SCHWAY__WQ_DRAIN_CYCLES;
@@ -40,15 +40,19 @@ static void cpu_wq_drain(struct schway__cpu *c, uint32_t *cycles)
 }
 
 /* A store that reached the bus joins the write queue, unless it went to the
-   scratchpad, which is not behind the queue. A fifth store waits for the oldest
-   to leave, which costs one drain, and the queue stays full. The data is
-   already on the bus, so only the wait is modelled. */
-static void cpu_wq_push(struct schway__cpu *c, uint32_t addr, uint32_t *cycles)
+   scratchpad, which is not behind the queue. Writes are buffered, so a store
+   waits on the bus, and so on a transferring DMA unit, only when it is the
+   fifth queued store: it waits for the oldest to leave, which costs one drain,
+   and the queue stays full. The first four stores and every scratchpad store
+   never wait. The data is already on the bus, so only the wait is modelled. */
+static void cpu_wq_push(schway *inst, uint32_t addr, uint32_t *cycles)
 {
+    struct schway__cpu *c = &inst->cpu;
     if ((addr & 0x1FFFFC00u) == 0x1F800000u) {
         return;
     }
     if (c->wq_count >= SCHWAY__WQ_DEPTH) {
+        schway__dma_bus_access(inst, schway__sched_now(inst, *cycles));
         *cycles += SCHWAY__WQ_DRAIN_CYCLES;
     } else {
         c->wq_count++;
@@ -59,7 +63,7 @@ static void cpu_wq_push(struct schway__cpu *c, uint32_t addr, uint32_t *cycles)
    cache and no queue. Without one, a fetch in KUSEG or KSEG0 goes through the
    instruction cache, except in the BIOS window, which is never cached; a fetch
    in KSEG1 drains the write queue and reaches the bus. The bus decodes the
-   segment of the virtual address (PSX-SYSTEM section 2, Segments and I-cache;
+   segment of the virtual address (docs/hardware/bus.md, Instruction cache;
    section 3, C4), and its charge adds to *cycles. A bus error sets *err and the
    word reads as zero; the bus has already latched it as the first fault. */
 static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles, uint32_t *err)
@@ -81,9 +85,47 @@ static uint32_t cpu_fetch(schway *inst, uint32_t vaddr, uint32_t *cycles, uint32
     return word;
 }
 
+/* The word the CPU would fetch at vaddr, read without a fault, an unbuilt
+   count or a cost: the instruction cache's word when the address is cached and
+   its line holds it (the cache may hold a word the RAM no longer does), else the
+   word of RAM, else the BIOS image, else 0. With a replay log attached there is no
+   memory to read and the word is 0 (docs/hardware/bus.md, Instruction cache).
+   The word is aligned down, as a fetch is. */
+static uint32_t cpu_peek_word(schway *inst, uint32_t vaddr)
+{
+    const struct schway__cpu *c = &inst->cpu;
+    uint32_t seg = schway__bus_segment(vaddr);
+    uint32_t p = vaddr & 0x1FFFFFFCu;
+    uint32_t word = 0u;
+    if (c->log != NULL || seg == (uint32_t)SCHWAY__SEG_KSEG2) {
+        return 0u;
+    }
+    if (seg != (uint32_t)SCHWAY__SEG_KSEG1 && (p >> 19) != 0x3F8u) {
+        uint32_t line = (p >> 4) & 0xFFu;
+        uint32_t w = (p >> 2) & 3u;
+        if (c->icache_tag[line] == (p >> 12) && (c->icache_valid[line] & (1u << w)) != 0u) {
+            return c->icache_word[line][w];
+        }
+    }
+    if (schway__bus_ram_word(inst, p, &word, 0u) == 0) {
+        return word;
+    }
+    if ((p >> 19) == 0x3F8u) {
+        uint32_t off = p - 0x1FC00000u;
+        const struct schway__bus *b = &inst->bus;
+        if (b->bios != NULL && off <= b->bios_size && b->bios_size - off >= 4u) {
+            for (uint32_t i = 0u; i < 4u; i++) {
+                word |= (uint32_t)b->bios[off + i] << (8u * i);
+            }
+            return word;
+        }
+    }
+    return 0u;
+}
+
 /* Writes general register n. A write to register 0 is discarded. A load
    still pending for the same register is cancelled: the later write wins
-   (PSX-SYSTEM section 2, Load delay). */
+   (docs/hardware/cpu.md, Delay latches). */
 static void cpu_set(struct schway__cpu *c, uint32_t n, uint32_t v)
 {
     if (c->load_reg == n) {
@@ -123,7 +165,7 @@ static void cpu_branch_set(struct cpu_branch *b, uint32_t take, uint32_t target)
 /* Whether an exception of this code, raised by the instruction at pc, ranks
    below an interrupt that is due on the same instruction. The order is data
    AdEL, AdES and DBE, overflow, interrupt, then SYSCALL, BREAK, RI and CpU,
-   then the fetch's AdEL and IBE (PSX-SYSTEM section 2, Priority). A data AdEL
+   then the fetch's AdEL and IBE (docs/hardware/cop0.md, Interrupts). A data AdEL
    has an aligned pc; the fetch's has an odd one. */
 static uint32_t cpu_below_interrupt(uint32_t code, uint32_t pc)
 {
@@ -138,7 +180,7 @@ static uint32_t cpu_below_interrupt(uint32_t code, uint32_t pc)
 /* With SR.Isc set, a data access in KUSEG, KSEG0 or KSEG1 goes to the
    instruction cache and never reaches the bus; KSEG2, the cache-control word,
    still does. The line is the one address bits 11:4 name, the word bits 3:2
-   (PSX-SYSTEM section 2, Cache isolation, write queue). A load returns
+   (docs/hardware/bus.md, Write queue). A load returns
    that word's bytes whether or not the tag matches. A store writes the tag, the
    physical address bits 31:12 of the datum, and sets the four valid bits to the
    datum's low four bits when cache-control TAG (bit 2) and IS1 (bit 11) are both
@@ -177,8 +219,8 @@ static void cpu_isolated_write(schway *inst, uint32_t addr, uint32_t size, uint3
 }
 
 /* Issues a load: the register is written one instruction later. A load still
-   pending for the same register is dropped, the later one winning (PSX-SYSTEM
-   section 2, Load delay). */
+   pending for the same register is dropped, the later one winning
+   (docs/hardware/cpu.md, Delay latches). */
 static void cpu_load_issue(struct schway__cpu *c, uint32_t n, uint32_t v, uint32_t *load_reg,
                            uint32_t *load_value)
 {
@@ -200,7 +242,7 @@ static uint32_t cpu_address(const struct schway__cpu *c, uint32_t op)
 /* The cycles an early read of HI or LO waits: until the running multiply or
    divide is done, and never more than the longest one takes, whatever a loaded
    state says. The read issues at the cycle counter plus what the instruction
-   spent before its own issue cycle (PSX-SYSTEM section 2, MULTU/MULT). */
+   spent before its own issue cycle (docs/hardware/cpu.md, Multiply and divide). */
 static uint32_t cpu_muldiv_wait(const struct schway__cpu *c, uint32_t cycles)
 {
     uint64_t at = c->cycle + (cycles - 1u);
@@ -213,6 +255,18 @@ static uint32_t cpu_muldiv_wait(const struct schway__cpu *c, uint32_t cycles)
 static void cpu_muldiv_start(struct schway__cpu *c, uint32_t cycles, uint32_t n)
 {
     c->muldiv_ready = c->cycle + (cycles - 1u) + n;
+}
+
+/* The cycles an instruction that needs the GTE waits: until the running command
+   is done, and never more than the longest one takes, whatever a loaded state
+   says. It is the same rule as the multiply unit's, on the engine's own stamp
+   (psx-spx, Geometry Transformation Engine, GTE Opcode Summary; MFC2, CFC2,
+   SWC2 and a new command wait, MTC2, CTC2 and LWC2 do not). */
+static uint32_t cpu_gte_wait(const schway *inst, uint32_t cycles)
+{
+    uint64_t at = inst->cpu.cycle + (cycles - 1u);
+    uint64_t wait = inst->gte.ready > at ? inst->gte.ready - at : 0u;
+    return wait > SCHWAY__GTE_STALL_MAX ? SCHWAY__GTE_STALL_MAX : (uint32_t)wait;
 }
 
 /* MULT and MULTU: the 64-bit product into HI:LO, in 6, 9 or 13 cycles by how
@@ -236,7 +290,7 @@ static void cpu_mult(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t s
 
 /* DIV and DIVU, 36 cycles, no trap. A zero divisor gives LO = -1 (or +1 for
    DIV of a negative rs) and HI = rs; DIV of -80000000h by -1 gives LO =
-   80000000h and HI = 0 (PSX-SYSTEM section 2, DIV/DIVU). */
+   80000000h and HI = 0 (docs/hardware/cpu.md, Multiply and divide). */
 static void cpu_div(struct schway__cpu *c, uint32_t rs, uint32_t rt, uint32_t sign,
                     uint32_t cycles)
 {
@@ -298,8 +352,6 @@ static uint32_t cpu_sub_overflows(uint32_t a, uint32_t b, uint32_t diff)
    instruction's start plus the cycles it has spent before the access. */
 #define TRACE_BEGIN(at, spent) uint64_t at = trace_now(inst) + (uint64_t)((spent) - 1u)
 #define TRACE(...) trace_push(inst, __VA_ARGS__)
-/* A block's start, from which every record's cycle is counted. */
-#define TRACE_START() (inst->trace.t0 = inst->ticks, inst->trace.c0 = inst->cpu.cycle)
 /* The record of a fault latched in the block just run. */
 #define TRACE_FAULT(latched, at)                                                                   \
     do {                                                                                           \
@@ -312,19 +364,19 @@ static uint32_t cpu_sub_overflows(uint32_t a, uint32_t b, uint32_t diff)
 #else
 #define TRACE_BEGIN(at, spent) ((void)0)
 #define TRACE(...) ((void)0)
-#define TRACE_START() ((void)0)
 #define TRACE_FAULT(latched, at) ((void)0)
 #endif
 
 /* Takes the interrupt before the instruction at pc, ExcCode 0. The load issued
-   by the instruction before lands first, so the handler sees it (PSX-SYSTEM
-   section 2, Load delay). Interrupts return to EPC + 0: the instruction at pc,
+   by the instruction before lands first, so the handler sees it
+   (docs/hardware/cpu.md, Delay latches). Interrupts return to EPC + 0: the instruction at pc,
    or the branch before it when pc is a delay slot, which the entry records as
-   BD with TAR the branch's destination (PSX-SYSTEM section 2, EPC). The entry
-   calls the one hook for the GTE with the word at EPC, read without charge and
-   without a first fault; with a replay log attached there is no memory to read
-   and the word is 0. The stores in the write queue stay queued: the first KSEG1
-   access after the entry drains them. */
+   BD with TAR the branch's destination (docs/hardware/cop0.md, Entry). The entry
+   calls the one hook for the GTE with the word of the interrupted instruction,
+   the one at pc even in a delay slot, where EPC names the branch, peeked
+   without charge and without a first fault; the hook executes it when it is a
+   GTE command, and it runs again after the return. The stores in the write
+   queue stay queued: the first KSEG1 access after the entry drains them. */
 static void cpu_irq_enter(schway *inst, uint32_t pc)
 {
     struct schway__cpu *c = &inst->cpu;
@@ -332,7 +384,7 @@ static void cpu_irq_enter(schway *inst, uint32_t pc)
     uint32_t take = c->branch_take;
     uint32_t epc = slot != 0u ? pc - 4u : pc;
     uint32_t target = take != 0u ? c->branch_target : pc + 4u;
-    uint32_t word = 0u;
+    uint32_t word;
     if (c->load_reg != SCHWAY__CPU_NO_LOAD) {
         if (c->load_reg != 0u) {
             c->r[c->load_reg] = c->load_value;
@@ -340,12 +392,7 @@ static void cpu_irq_enter(schway *inst, uint32_t pc)
         c->load_reg = SCHWAY__CPU_NO_LOAD;
         c->load_value = 0u;
     }
-    if (c->log == NULL) {
-        struct schway__fault held = inst->fault;
-        uint32_t sink = 0u;
-        (void)schway__bus_fetch(inst, epc & ~3u, &word, &sink);
-        inst->fault = held;
-    }
+    word = cpu_peek_word(inst, pc);
     TRACE(SCHWAY_TRACE_IRQ, trace_now(inst), epc, word, 0u, 0u, (uint32_t)SCHWAY__DEV_NONE,
           c->cop0.r[SCHWAY__COP0_CAUSE], 0u);
     schway__cop0_exception(inst, SCHWAY__EXC_INT, epc, slot, take, target, 0u, 0u, 0u);
@@ -354,8 +401,8 @@ static void cpu_irq_enter(schway *inst, uint32_t pc)
 
 /* Takes an exception for the instruction at pc. A delay-slot instruction
    returns to the branch before it, and its TAR is where the branch goes, or
-   the instruction after the slot when it was not taken (PSX-SYSTEM section 2,
-   EPC and Branch delay). Returns 1 so the caller can note that the program
+   the instruction after the slot when it was not taken (docs/hardware/cop0.md,
+   Entry). Returns 1 so the caller can note that the program
    counter now holds the vector. An interrupt that is due on this very
    instruction wins over the exceptions that rank below it: it is taken at pc and
    the instruction runs again after the return. The ones that rank above it
@@ -389,7 +436,7 @@ static uint32_t cpu_reserved(schway *inst, uint32_t pc, uint32_t op)
 /* A coprocessor instruction whose SR.CUz bit is clear: CpU with CE the
    coprocessor number. Only COP1 and COP3, which the console does not have,
    are a first fault; COP0 and COP2 are real, and a handler may take the
-   exception (PSX-SYSTEM section 2, Address and bus errors; ARCHITECTURE
+   exception (docs/hardware/cop0.md, Address errors on the fetch; ARCHITECTURE
    section 6). */
 static uint32_t cpu_unusable(schway *inst, uint32_t pc, uint32_t op, uint32_t first_fault)
 {
@@ -405,7 +452,7 @@ static uint32_t cpu_unusable(schway *inst, uint32_t pc, uint32_t op, uint32_t fi
    and never reaches the bus. User mode (SR.KUc = 1) may touch only KUSEG, so
    an address with bit 31 set is the same address error, which a handler may
    take. LWL, LWR, SWL and SWR pass size 1 and never fault on alignment
-   (PSX-SYSTEM section 2, Address and bus errors and Segments). Returns 1 when
+   (docs/hardware/cpu.md, Loads and stores). Returns 1 when
    it took the exception. */
 static uint32_t cpu_data_check(schway *inst, uint32_t pc, uint32_t op, uint32_t addr,
                                uint32_t size, uint32_t store)
@@ -428,7 +475,7 @@ static uint32_t cpu_data_check(schway *inst, uint32_t pc, uint32_t op, uint32_t 
    address goes to the bus, which decodes the segment (KSEG2 gets the full
    address), and its charge adds to *cycles. A KSEG1 read drains the write queue
    first. A bus error is DBE and carries no BadVaddr; the bus has already
-   latched it as the first fault (PSX-SYSTEM section 2, Address and bus errors).
+   latched it as the first fault (docs/hardware/cop0.md, Address errors on the fetch).
    Returns 1 when it took the exception. A read yields the low size bytes of the
    datum. */
 static uint32_t cpu_bus_read(schway *inst, uint32_t pc, uint32_t addr, uint32_t size,
@@ -478,7 +525,7 @@ static uint32_t cpu_bus_write(schway *inst, uint32_t pc, uint32_t addr, uint32_t
         if (err != 0u) {
             return cpu_exception(inst, pc, SCHWAY__EXC_DBE, 0u, 0u, 0u);
         }
-        cpu_wq_push(&inst->cpu, addr, cycles);
+        cpu_wq_push(inst, addr, cycles);
     }
     return 0u;
 }
@@ -509,8 +556,8 @@ static uint32_t cpu_load_int(schway *inst, uint32_t pc, uint32_t op, uint32_t si
    bytes from the address toward the high end (LWL) or the low end (LWR) of
    the register replace the same bytes of rt and leave the others. The merge
    starts from the value a load issued by the previous instruction is about to
-   write, so a pair on one register needs no delay between them (PSX-SYSTEM
-   section 2, Stores, LWL/LWR). Neither faults on alignment. */
+   write, so a pair on one register needs no delay between them
+   (docs/hardware/cpu.md, Loads and stores). Neither faults on alignment. */
 static uint32_t cpu_load_part(schway *inst, uint32_t pc, uint32_t op, uint32_t left,
                               uint32_t *cycles, uint32_t *load_reg, uint32_t *load_value)
 {
@@ -532,7 +579,7 @@ static uint32_t cpu_load_part(schway *inst, uint32_t pc, uint32_t op, uint32_t l
 }
 
 /* SB, SH and SW: the low size bytes of rt at the effective address. All 32
-   bits of rt go on the bus whatever the width (PSX-SYSTEM section 2, Stores).
+   bits of rt go on the bus whatever the width (docs/hardware/cpu.md, Loads and stores).
    Returns 1 when it trapped. */
 static uint32_t cpu_store_int(schway *inst, uint32_t pc, uint32_t op, uint32_t size,
                               uint32_t *cycles)
@@ -573,13 +620,17 @@ static uint32_t cpu_store_part(schway *inst, uint32_t pc, uint32_t op, uint32_t 
     return 0u;
 }
 
-/* COP2, LWC2 and SWC2 before the GTE exists. An address error on LWC2 or SWC2
-   comes first. With SR.CU2 clear every form raises CpU with CE 2 and latches
-   no fault. With it set, MFC2 and CFC2 read 0 through the load delay, MTC2,
-   CTC2 and the commands do nothing, BC2 never goes (the condition line is
-   never true), LWC2 does the real bus read and drops it and SWC2 the real bus
-   write of 0; each counts as an access to the unbuilt GTE (ARCHITECTURE
-   section 6; PSX-SYSTEM section 2, SR bits). Returns 1 when it trapped. */
+/* COP2, LWC2 and SWC2: the instructions that reach the GTE. An address error
+   on LWC2 or SWC2 comes first. With SR.CU2 clear every form raises CpU with CE 2
+   and latches no fault. With it set, MTC2 and CTC2 write data register rd or
+   control register 32 + rd; MFC2 and CFC2 read one through the load delay;
+   LWC2 does the real bus read into data register rt and SWC2 the real bus write
+   of it; a command executes at once and keeps the engine busy for its time.
+   MFC2, CFC2, SWC2 and a command first wait for the command still running;
+   MTC2, CTC2 and LWC2 do not (docs/hardware/cop0.md, SR; psx-spx, Geometry
+   Transformation Engine; the gte-timing results, What waits). BC2F and BC2T
+   always take their branch or never do, as the condition line is never true.
+   Returns 1 when it trapped. */
 static uint32_t cpu_cop2(schway *inst, uint32_t pc, uint32_t op, uint32_t next, uint32_t *cycles,
                          uint32_t *load_reg, uint32_t *load_value, struct cpu_branch *br)
 {
@@ -600,23 +651,23 @@ static uint32_t cpu_cop2(schway *inst, uint32_t pc, uint32_t op, uint32_t next, 
         if (cpu_bus_read(inst, pc, addr, 4u, &v, cycles) != 0u) {
             return 1u;
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, addr, 4u, 0u, 0u);
+        schway__gte_write(&inst->gte, rt_n, v);
     } else if (opc == 0x3Au) { /* SWC2 */
-        if (cpu_bus_write(inst, pc, addr, 4u, 0u, cycles) != 0u) {
+        *cycles += cpu_gte_wait(inst, *cycles);
+        if (cpu_bus_write(inst, pc, addr, 4u, schway__gte_read(&inst->gte, rt_n), cycles) != 0u) {
             return 1u;
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, addr, 4u, 1u, 0u);
     } else if (rs_n == 0u || rs_n == 2u) { /* MFC2, CFC2 */
-        cpu_load_issue(c, rt_n, 0u, load_reg, load_value);
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, rs_n == 2u ? 32u + rd_n : rd_n, 4u, 0u, 0u);
+        *cycles += cpu_gte_wait(inst, *cycles);
+        cpu_load_issue(c, rt_n, schway__gte_read(&inst->gte, rs_n == 2u ? 32u + rd_n : rd_n),
+                       load_reg, load_value);
     } else if (rs_n == 4u || rs_n == 6u) { /* MTC2, CTC2 */
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, rs_n == 6u ? 32u + rd_n : rd_n, 4u, 1u,
-                            c->r[rt_n]);
+        schway__gte_write(&inst->gte, rs_n == 6u ? 32u + rd_n : rd_n, c->r[rt_n]);
     } else if (rs_n == 8u) { /* BC2F, BC2T */
         cpu_branch_set(br, (rt_n & 1u) == 0u ? 1u : 0u, next + (((op & 0xFFFFu) ^ 0x8000u) - 0x8000u) * 4u);
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, 0u, 4u, 0u, 0u);
     } else if ((rs_n & 0x10u) != 0u) { /* a GTE command */
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GTE, op & 0x01FFFFFFu, 4u, 1u, 0u);
+        *cycles += cpu_gte_wait(inst, *cycles);
+        inst->gte.ready = c->cycle + (*cycles - 1u) + schway__gte_exec(&inst->gte, op & 0x01FFFFFFu);
     }
     return 0u;
 }
@@ -646,8 +697,7 @@ static uint32_t cpu_step(schway *inst)
     uint32_t neg = (rs & 0x80000000u) != 0u ? 1u : 0u;
     uint32_t sr = c->cop0.r[SCHWAY__COP0_SR];
     uint32_t trapped = 0u;
-    /* COP2, LWC2 and SWC2: the GTE's instructions, which cpu_cop2 handles
-       until the GTE does. */
+    /* COP2, LWC2 and SWC2: the GTE's instructions, which cpu_cop2 handles. */
     uint32_t is_cop2 = (op >> 26) == 0x12u || (op >> 26) == 0x32u || (op >> 26) == 0x3Au ? 1u : 0u;
     uint32_t sum, value;
     struct cpu_branch br = {0u, 0u, 0u};
@@ -657,14 +707,14 @@ static uint32_t cpu_step(schway *inst)
     TRACE(SCHWAY_TRACE_EXEC, trace_now(inst), pc, op, 0u, 0u, (uint32_t)SCHWAY__DEV_NONE, 0u, 0u);
     if (misaligned != 0u) {
         /* A fetch from an address that is not a multiple of 4 is an address
-           error on the fetch, EPC and BadVaddr the address (PSX-SYSTEM
-           section 2, Branch delay: JR and JALR to a misaligned target). */
+           error on the fetch, EPC and BadVaddr the address
+           (docs/hardware/cop0.md, Address errors on the fetch). */
         schway__fault_latch(inst, SCHWAY__FAULT_MISALIGNED_FETCH, SCHWAY__DEV_NONE, 4u, pc, 0u,
                             pc);
         trapped = cpu_exception(inst, pc, SCHWAY__EXC_ADEL, 0u, 1u, pc);
     } else if (fetch_err != 0u) {
-        /* A bus error on the fetch is IBE with no BadVaddr (PSX-SYSTEM section
-           2, Address and bus errors). At an exception vector it cannot be
+        /* A bus error on the fetch is IBE with no BadVaddr
+           (docs/hardware/cop0.md, Address errors on the fetch). At an exception vector it cannot be
            recovered: the handler would fault again, so the run loop stops. */
         trapped = cpu_exception(inst, pc, SCHWAY__EXC_IBE, 0u, 0u, 0u);
         if (pc == SCHWAY__VECTOR_BEV || pc == SCHWAY__VECTOR_RAM) {
@@ -784,8 +834,8 @@ static uint32_t cpu_step(schway *inst)
             /* Bit 16 of the instruction selects "greater or equal" over
                "less than". Only 10h and 11h link; every other value of the
                field acts as the plain compare. The link register is written
-               whether or not the branch goes (PSX-SYSTEM section 2, Branch
-               delay). */
+               whether or not the branch goes (docs/hardware/cpu.md, Branches and
+               jumps). */
             cpu_branch_set(&br, (rt_n & 1u) != 0u ? 1u - neg : neg, next + (simm << 2));
             if (rt_n == 0x10u || rt_n == 0x11u) {
                 cpu_set(c, 31u, next + 4u);
@@ -902,8 +952,7 @@ static uint32_t cpu_step(schway *inst)
         case 0x3Bu: /* SWC3 */
             /* With the coprocessor's SR.CUz bit set, BCzF always goes and
                BCzT never does, as the condition line is never true; every
-               other instruction does nothing (PSX-SYSTEM section 2, SR
-               bits). */
+               other instruction does nothing (docs/hardware/cop0.md, Coprocessor unusable). */
             if ((sr & (((op >> 26) & 3u) == 1u ? SCHWAY__SR_CU1 : SCHWAY__SR_CU3)) == 0u) {
                 trapped = cpu_unusable(inst, pc, op, 1u);
             } else if (rs_n == 8u && (op >> 31) == 0u) {
@@ -955,8 +1004,10 @@ static uint32_t cpu_step(schway *inst)
    at the first instruction boundary at or after limit cycles. The cycles are
    added to inst->ticks once, at the end, so what the instructions did not
    change, the state of the other devices, is as of the block's start
-   (PSX-SYSTEM section 6; a fault latched in the block carries the ticks of its
-   start). */
+   (docs/hardware/cop0.md, Interrupts). The block clock, blk_tick and blk_cycle, is set at
+   the start of every block, so a device access inside it reads its own tick
+   (schway__sched_now) and a fault latched in the block carries the tick its
+   instruction began on. */
 static uint64_t cpu_block(schway *inst, uint64_t limit)
 {
     struct schway__cpu *c = &inst->cpu;
@@ -964,7 +1015,8 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
     uint32_t fault = inst->fault.kind;
     uint64_t ran = 0u;
     c->block_end = 0u;
-    TRACE_START();
+    c->blk_tick = inst->ticks;
+    c->blk_cycle = c->cycle;
     for (uint32_t n = 0u; n < SCHWAY__BLOCK_MAX_INSNS; n++) {
         uint32_t slot = c->branch_slot;
         TRACE_BEGIN(began, 1u);
@@ -983,7 +1035,6 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
 
 #undef TRACE
 #undef TRACE_BEGIN
-#undef TRACE_START
 #undef TRACE_FAULT
 #if SCHWAY_TRACE
 #undef cpu_irq_enter

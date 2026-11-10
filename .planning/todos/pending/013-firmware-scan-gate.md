@@ -16,6 +16,7 @@ theme: release
 - Seed: `tests/cmake/firmware_scan.cmake` in szTheory/muhtari at d698364b180df42894ef6737179d4ed9fcc97817 (fetch it with `gh api`, never from a local checkout).
 - Bound to phase 4: the phase 4 plan that builds OpenBIOS and vendors the `System.dat` digest table (GAME-05).
 - Deferred in phase 1 because no phase 1 requirement names it (01-CONTEXT D-24 and D-25, AGENTS rule 7).
+- Reviewed at phase 3: the binding above is unchanged.
 
 ## Acceptance Criteria
 

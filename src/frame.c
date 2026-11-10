@@ -43,7 +43,7 @@ static void audio_push_silence(schway *inst, uint32_t n)
    then M equal N + M only where N is a boundary of the one-shot run; a frame
    end passed inside an instruction completes at that instruction's end, and
    the vertical sync that ends the frame raises I_STAT bit 0 first (psx-spx,
-   Interrupts). Refuses, with nothing changed, an advance that would leave the
+   Interrupts) and the root counters are given the vertical blank. Refuses, with nothing changed, an advance that would leave the
    save format's inclusive bounds (ARCHITECTURE section 5), with the longest
    instruction's cycles as margin when the CPU runs. Returns OK, with *done set
    when the frame completed and *stop the CPU's stop reason. */
@@ -68,7 +68,27 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             (*done && inst->frame >= SCHWAY__STATE_FRAME_MAX)) {
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
-        inst->ticks += cycles;
+        /* No program runs and no device is stepped; only an event already due
+           runs, at its own deadline, and with none armed the loop is one
+           compare. */
+        uint64_t target = inst->ticks + cycles;
+        while (inst->ticks < target) {
+            if (inst->sched.next <= inst->ticks) {
+                schway__sched_run(inst);
+            }
+            uint64_t step = target - inst->ticks;
+            if (inst->sched.next > inst->ticks && inst->sched.next - inst->ticks < step) {
+                step = inst->sched.next - inst->ticks;
+            }
+            inst->ticks += step;
+        }
+        schway__sched_sync(inst);
+    }
+    /* A deadline that falls on or before the tick the advance ended on runs
+       now, not at the start of the next advance, so a state saved here never
+       holds an event behind its own tick. */
+    if (inst->sched.next <= inst->ticks) {
+        schway__sched_run(inst);
     }
     /* One pair per 768-cycle boundary crossed. */
     audio_push_silence(inst, (uint32_t)(inst->ticks / SCHWAY__CYCLES_PER_PAIR -
@@ -78,7 +98,11 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
         uint64_t num = schway__instance_frame_num(inst->region);
         uint64_t den = schway__instance_frame_den(inst->region);
         if (inst->exe_loaded != 0u) {
+            /* The vertical blank has no width until a line machine exists, so
+               it goes high and low at the frame's end tick. */
             schway__irq_raise(inst, 0u);
+            schway__timers_vblank(inst, inst->ticks, 1u);
+            schway__timers_vblank(inst, inst->ticks, 0u);
         }
         inst->frame++;
         inst->tick_acc = (inst->tick_acc + num) % den;

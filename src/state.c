@@ -5,9 +5,10 @@
              CRC-32 (u32)
      body    instance.frame, instance.region, instance.ticks,
              instance.tick_acc, instance.frame_end, gpu.vram, cpu and cop0
-             registers, instance.profile_flags, instance.exe_loaded, the bus
-             (RAM, scratchpad, memory control, unbuilt-device counters), irq
-             and the first-fault record
+             registers, the geometry engine, instance.profile_flags,
+             instance.exe_loaded, the bus (RAM, scratchpad, memory control,
+             unbuilt-device counters), irq, dma, the root counters and the
+             first-fault record
    One field list drives every pass (state.h), so they cannot drift apart. A
    struct is never copied as a whole: padding, pointers and the allocator
    never reach the bytes. The audio ring is not saved; a load empties it.
@@ -68,7 +69,7 @@ static void header_io(struct schway__state_io *io, uint32_t total)
 static void fault_io(struct schway__state_io *io, struct schway__fault *f)
 {
     (void)schway__state_u32(io, name_fault_kind, &f->kind, SCHWAY__FAULT_NONE,
-                            SCHWAY__FAULT_EXCEPTION_LOOP);
+                            SCHWAY__FAULT_DMA);
     (void)schway__state_u32(io, name_fault_device, &f->device, 0u, SCHWAY__DEV_COUNT - 1u);
     (void)schway__state_u32(io, name_fault_width, &f->width, 0u, 4u);
     (void)schway__state_u32(io, name_fault_note, &f->note, 0u, UINT32_MAX);
@@ -98,10 +99,13 @@ static void body_io(struct schway__state_io *io, schway *inst)
                                 frame_end - ticks <= schway__instance_frame_max(inst->region));
     schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
                             0u, UINT16_MAX);
-    schway__cpu_state_io(io, inst);
+    uint64_t cycle = schway__cpu_state_io(io, inst);
+    schway__gte_state_io(io, inst, cycle);
     (void)schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u, 1u);
     (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
     schway__bus_state_io(io, inst);
+    schway__dma_state_io(io, inst, ticks);
+    schway__timers_state_io(io, inst);
     fault_io(io, &inst->fault);
 }
 
@@ -227,6 +231,8 @@ schway_status schway_load_state(schway *inst, const void *buf, size_t size)
     io.mode = SCHWAY__STATE_APPLY;
     io.r = b;
     state_io(&io, inst, (uint32_t)need);
+    schway__sched_sync(inst);
+    schway__sched_recalc(inst);
     schway__frame_audio_clear(inst);
     return SCHWAY_STATUS_OK;
 }

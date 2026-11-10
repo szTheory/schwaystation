@@ -16,6 +16,7 @@ theme: ci
 - Seed: `.github/workflows/dependabot-automerge.yml` in szTheory/muhtari at d698364b180df42894ef6737179d4ed9fcc97817 (fetch it with `gh api`, never from a local checkout).
 - Bound to the v1.0 milestone tune-up (SEED-007): no phase adds a caller; it needs todo 010 and the release App, and answers the DECISIONS open question on `vars` in Dependabot runs.
 - Deferred in phase 1 because no phase 1 requirement names it (01-CONTEXT D-24 and D-25, AGENTS rule 7).
+- Reviewed at phase 3: the binding above is unchanged.
 
 ## Acceptance Criteria
 

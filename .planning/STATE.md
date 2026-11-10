@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 3
-current_phase_name: The GTE matches the hardware cases; DMA and timers
+current_phase: 4
+current_phase_name: Games play in RetroArch
 status: planning
-stopped_at: Phase 02 complete, ready to plan Phase 3
-last_updated: "2026-11-10T01:46:31.539Z"
+stopped_at: Phase 3 complete, ready to plan Phase 4
+last_updated: "2026-11-10T14:56:33.076Z"
 last_activity: 2026-11-10
-last_activity_desc: "Phase 02 shipped as PR #8"
-state_head: 4bc75bd6ee75fc1496030ba70120fee428a17ae7
+last_activity_desc: "Phase 3 shipped as PR #12"
+state_head: 52cda5d7880e739ed824e3aa16e897cfa32ca13e
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 42
-  completed_plans: 42
-  percent: 17
+  completed_phases: 2
+  total_plans: 68
+  completed_plans: 68
+  percent: 33
 ---
 
 # Project State
@@ -25,21 +25,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 02 — The CPU matches the public vectors
+**Current focus:** Phase 03 — The GTE matches the hardware cases; DMA and timers
 
 ## Current Position
 
-Phase: 3 — The GTE matches the hardware cases; DMA and timers
+Phase: 4 — Games play in RetroArch
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-11-09 -- Phase 02 shipped as PR #8
+Last activity: 2026-11-10 -- Phase 3 shipped as PR #12
 
-Progress: [██░░░░░░░░] 17%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 42
+- Total plans completed: 68
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -49,6 +49,7 @@ Progress: [██░░░░░░░░] 17%
 |-------|-------|-------|----------|
 | 1 | 15 | - | - |
 | 02 | 27 | - | - |
+| 3 | 26 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -101,6 +102,32 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P22 | 55min | 3 tasks | 13 files |
 | Phase 02 P26 | 9 min | 3 tasks | 6 files |
 | Phase 02 P27 | 37 min | 3 tasks | 7 files |
+| Phase 03 P01 | 25 min | 3 tasks | 30 files |
+| Phase 03 P02 | 6 min | 3 tasks | 13 files |
+| Phase 03 P03 | 11 min | 3 tasks | 12 files |
+| Phase 03 P04 | 3 min | 3 tasks | 13 files |
+| Phase 03 P05 | 7 min | 2 tasks | 9 files |
+| Phase 03 P06 | 9 min | 3 tasks | 12 files |
+| Phase 03 P26 | 5 min | 2 tasks | 6 files |
+| Phase 03 P08 | 15 min | 3 tasks | 6 files |
+| Phase 03 P09 | 19 min | 3 tasks | 9 files |
+| Phase 03 P07 | 9min | 3 tasks | 5 files |
+| Phase 03 P10 | 7 min | 3 tasks | 6 files |
+| Phase 03 P11 | 10 min | 3 tasks | 9 files |
+| Phase 03 P12 | 10 min | 3 tasks | 5 files |
+| Phase 03 P13 | 12 min | 3 tasks | 6 files |
+| Phase 03 P14 | 13 min | 3 tasks | 5 files |
+| Phase 03 P15 | 16 min | 2 tasks | 15 files |
+| Phase 03 P16 | 5 min | 2 tasks | 5 files |
+| Phase 03 P24 | 6 min | 2 tasks | 3 files |
+| Phase 03 P17 | 4 min | 2 tasks | 5 files |
+| Phase 3 P18 | 22 min | 2 tasks | 2 files |
+| Phase 03 P19 | 19 min | 2 tasks | 6 files |
+| Phase 03 P20 | 10 min | 2 tasks | 3 files |
+| Phase 03 P21 | 5 min | 2 tasks | 14 files |
+| Phase 03 P22 | 4min | 2 tasks | 10 files |
+| Phase 03 P23 | 6 min | 2 tasks | 7 files |
+| Phase 03 P25 | 7 min | 2 tasks | 32 files |
 
 ## Accumulated Context
 
@@ -198,6 +225,42 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-25: the mailbox judge pairs a fixture's CSV rows with its records by order (row n is record id n) and lives in the fixtures script case; under --no-stop-on-fault the runner prints the first fault the program made at the end of the run and keeps the run's status — ExcCode persists until the next exception, so the masked-line and CAUSE-after-I_STAT doc rows read 1Ch, not 0; those two rows and the interrupt EPC (MTC0 plus 8) pin models, not measurements, and change only through tests/diag/allow.txt
 - [Phase 02]: 02-26: the gate-line total is 1495 of 1520 after the last gate of the phase, so no check is deferred; the cap is never raised and ship ratchets it to the measured total — The stub regeneration commands live once, in docs/maintaining.md, with the armips and vectors procedures; the vectors one reproduced the committed sample byte for byte
 - [Phase 02]: 02-27: build timeout 11 min (windows-x64 311 s, run 42725764966), hygiene 2 min, rehearsal 13 min; floors kept for asan, be32, wasm32, nofp, vectors-full, fuzz; each cites a run of this phase
+- [Phase 03]: 03-01: SCHWAY__DMA_BUSY_MAX is 2,691,328 cycles (65,536 words at the CD's 40 per word, 17 per 16 words on the RAM side, 256 per-unit overhead); CHCR mask 71770703h, DICR mask 7FFF803Fh, the timers' base tick is never walked and a load sets it to the loaded ticks
+- [Phase 03]: 03-01: the state field caps in test_state.c and test_run.c are 128, the embed test lists the new object libraries, and core.state.device_fields pins the DMA stored-bit and started-channel refusals that the max+1 sweep cannot reach
+- [Phase 03]: 03-02: gte_cases.inc holds 26 records of 66 words (case number, opcode, 64 inputs): one per command chosen by output FLAG, plus register-only cases 1 to 4
+- [Phase 03]: 03-02: policy.gate_budget limit is 1513, the measured total with policy.notices (30 lines) in; the vector file is a count plus 516-byte records (593,404 bytes, sha256 e8a0e61a...d9c2; the records alone hash to ed630d2f...58d2)
+- [Phase 03]: 03-03: a deadline still due after its event limits the next block to one instruction so the run loop always advances; the no-program path steps ticks to the next deadline and the test card moved 121 Ir/frame (1,620,545 against 1,620,424, run 42760163838)
+- [Phase 03]: 03-03: schway__sched_sync restarts the block clock after a power reset, a state load, a no-program run and the one-instruction entry, so fault.ticks needed no phase-2 assertion change
+- [Phase 03]: 03-04: the stall hook is called once per bus_access for reads and fetches on RAM, I/O, EXP1-3 and BIOS (not stores, scratchpad, gaps or the cache-control word); an I_STAT read syncs the timers and a write recomputes the deadline; core.bus_unbuilt reads owned=672 unbuilt=3228 gap=8388
+- [Phase 03]: 03-04: the interrupt entry's EPC read and the I-cache refill words reach the DMA hook through throwaway cycle sinks; plan 03-08 decides whether the EPC read may set a stall
+- [Phase 03]: 03-05: the GTE register file is seeded from ares interpreter-gte.cpp at 9408cb43d4948fc3ea6e152a307a34348df3fe04 with an SPDX header, a notices section and a PROVENANCE seed row; 16-bit registers are stored as patterns and extended on read, FLAG bit 31 is recomputed on write, on read and at the end of every command, and the 50 register-only hardware cases pass
+- [Phase 03]: 03-06: the GTE interrupt hook returns 1 only when it executed a command, and does nothing with SR.CU2 clear or a non-interrupt ExcCode
+- [Phase 03]: 03-06: the entry's command stamps gte.ready from the entry cycle without waiting; the second run after the return waits through cpu_cop2
+- [Phase 03]: GTE numerics clamp IR to the low 32 bits of the shifted MAC as the seed does; the 1,150 cases do not separate that from a full-width clamp, so the reference differential decides
+- [Phase 03]: A GTE reciprocal table literal is pinned by a formula test, because the hardware cases pass with one entry corrupted
+- [Phase 03]: 03-08: Unit enum: a phase per channel, 0 idle and 1 unit running; DMA_UNIT_CHANNELS (OTC only) is the mask the engine passes to schway__dma_arbitrate, so channels 0-5 keep registers and wait until plan 03-10
+- [Phase 03]: 03-08: DICR bit 31 is bit 15 OR (bit 23 AND any flag): the per-channel enables gate only the setting of a flag, as the nugget reading 84800000h requires; OTC CHCR stores bits 24, 28 and 30 only, reads bit 1 as 1, clears bit 28 at the start and bit 24 at the end
+- [Phase 03]: 03-08: A DMA register read finishes a running unit as of its end tick (the bus hook has frozen the CPU until then); a CHCR write to the running channel keeps bit 24 set; OTC costs ceil(words*17/16), 4,352 cycles for 4,096 words
+- [Phase 03]: 03-09: the write hold is two counter cycles after the write's own cycle (a write at W shows at W+1 and W+2, counts from W+3); a reset at the target shows 0 for two cycles counting the landing, so the loop is target + 2; a landing is a count or a reset, never a software write
+- [Phase 03]: 03-09: a counter whose I_STAT bit is set gives no deadline, an I_STAT write catches the counters up first, and an advance runs a deadline that falls on its end tick, so a saved state never holds an event behind its tick; the saved timers view is as of the instance's tick and the span function is shared by catch-up, save and the bisection that finds the next raise
+- [Phase 03]: GTE: a command number outside the 22 documented ones changes no register (the seed's mirrors of 00h and 1Ah are not copied); documented as an engine choice, not a hardware claim
+- [Phase 03]: 03-10: a sync 1 block takes its channel's request bit with it and schway__dma_dreq raises it again (a raise with the engine idle starts the channel); the linked-list and reserved modes are not pending until plans 03-14 and 03-15
+- [Phase 03]: 03-10: a unit costs n * rate + ceil(n / 16) with rates 1 (MDEC, GPU, OTC), 24 (CD-ROM, BIOS default; 40 is the phase-6 device end's choice), 4 (SPU), 20 (PIO); a sync 1 block adds a derived 11; the stub sink's word count and CRC-32 sit in dma.words and dma.crc, and remain is bounded at 10000h in the state walk
+- [Phase 03]: Plan 03-11: beam blank levels are stored state (timers.blank); a blank push of the held level is no edge; a blank reset has no hold; counters on dot or hblank clocks give no scheduler deadline
+- [Phase 03]: gte_vectors: register moves are .word encodings in macros (armips takes no macro argument as a coprocessor register); the loop variant uses -definelabel LOOP 1
+- [Phase 03]: 03-13: the independent GTE model takes SZ3 and the IR3 flag from the whole 44-bit sum shifted by 12 and saturates IR from the 32-bit MAC; it agreed with the engine on all 22,000 seeded cases at seed 0x6774652D70726F70, cycles included, so no engine fix was needed
+- [Phase 03]: 03-14: a list node costs 20 cycles of header fetch and setup plus its words with a 6-cycle CPU window between nodes, fitted to the chain-looping log (1.625 against 1.598, band 1.4 to 1.8); the first pair locked in phase with the test loop and showed no slowdown
+- [Phase 03]: 03-14: the 1000h-node guard is a gap that reaches past the step's tick, nodes_done wraps and is bounded only by the u32 range, and the CHCR word 0 stops a channel with no flag and no interrupt (the chain-looping test procedure); chopping windows cost ceil(17 * dw / 16) + 6 with a CPU window of min(2^m, 32 * dw), mean signed error 1.0 percent and largest row error 10.4 percent against the 64 hardware rows
+- [Phase 03]: 03-15: sync mode 3 on a non-OTC channel with the start bit does not start and latches SCHWAY_FAULT_DMA (10, API version 3); start bits dropped, other CHCR bits kept
+- [Phase 03]: 03-16: dma_chain records a list outcome as one value (bit 0 finished and bit 1 the DICR flag), the OTC time of 4,096 words reads 4,362 clocks through Timer 2 against the doc range 4,340..4,400, and no citation carries a comma or a semicolon because the judge splits rows with a CMake list
+- [Phase 03]: 03-24: the split case compares run_to targets, not run lengths, because a run with a program stops on the first instruction boundary at or after its budget; the program-loaded runs are made in NTSC-U and PAL and the multi-million-cycle ones in NTSC-U alone (2.2 s native)
+- [Phase 03]: 03-17: timers_lines installs its handler at the exception vector and snapshots counters against Timer 1 reset by the vertical blank — The stub path writes status FFh and costs about 700 cycles an entry, and a blank can land behind a timer handler, so the delay between blank and read must cancel
+- [Phase 3]: Seed variants come from a row's place among rows of the same code kind, not a struct field; the armips unity build leaves all 24 fixture digests unchanged
+- [Phase 03]: 03-19: --hash-state hashes the saved state after its 20-byte header; hashes.txt carries the frame and state of hello, gte_vectors, dma_chain and timers_lines, and the gate total stays at 1513 — dma_chain prints an unbuilt line first, so hashes.cmake takes the last two lines with a capture group; the unbuilt count is in the state hash
+- [Phase 03]: 03-21: a source comment cites docs/hardware/<page>.md and a heading that exists on that page, checked by script; a hardware page cites psx-spx and says the core's own model for a cost, so no citation points back to a preparation section
+- [Phase 03]: 03-22: test and fixture comments cite docs/hardware pages and headings; the stub keeps PSX-SYSTEM sections 7 and 9
+- [Phase 03]: 03-23: the preparation sections that docs/hardware pages replace keep their headings, Sources rows and the C3 to C6 and 5.A choice paragraphs, with the corrections phase 3 found stated in each
+- [Phase 03]: 03-25: todos 016 and 017 bind to SEED-007 (no later first caller), 014 to the phase 4 System.dat plan; every phase-2 review finding is fixed (WR-06, IN-01) or deferred with one todo (025-029, 032-037)
 
 ### Pending Todos
 
@@ -250,16 +313,27 @@ come from `AGENTS.md`.
 | 2026-11-09 | /gsd-plan-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, planner claude-opus-5-5 (4 rounds), checker claude-haiku-5-5 (4 passes); research skipped | claude-sonnet-5-5 |
 | 2026-11-09 | /gsd-execute-phase 2 | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, executors claude-sonnet-5-5 (sequential, no worktrees) | claude-sonnet-5-5 |
 | 2026-11-09 | /gsd-ship 2 | Claude Code, OpenGSD; inline shipping, PR #8 | claude-sonnet-5-5 |
+| 2026-11-09 | /gsd-discuss-phase 3 (via /gsd-autonomous) | Claude Code, OpenGSD; six advisor agents fanned out | claude-sonnet-5-5 |
+| 2026-11-10 | /gsd-plan-phase 3 (via /gsd-autonomous) | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, planner claude-opus-5-5 (1 plan + 2 revision rounds), checker claude-haiku-5-5 (3 passes); research skipped; the last blocker (sweep vs sync-3 fault) and warnings patched by the orchestrator after pass 3 | claude-sonnet-5-5 |
+| 2026-11-10 | /gsd-execute-phase 3 (via /gsd-autonomous) | Claude Code, OpenGSD; orchestrator claude-sonnet-5-5, 26 sequential executors claude-sonnet-5-5 (no worktrees) | claude-sonnet-5-5 |
+| 2026-11-10 | /gsd-code-review 3 and fix round 1 | Claude Code, OpenGSD; deep review claude-sonnet-5-5, fixer claude-sonnet-5-5; CR-01 and WR-01 fixed, 7 info findings to todos 040-046 | claude-sonnet-5-5 |
+| 2026-11-10 | /gsd-verify-work 3 (verify step) | Claude Code, OpenGSD; verifier claude-sonnet-5-5, status passed, no human items | claude-sonnet-5-5 |
+
+| 2026-11-10 | /gsd-ship 3; renewed /gsd-autonomous for remaining milestone | Codex, OpenGSD 1.20.0; inline shipping and hosted CI; next autonomous phase stops before ship | GPT-6 (session; exact model ID not exposed) |
 
 ## Session Continuity
 
-Last session: 2026-11-10T00:43:02.494Z
-Stopped at: Phase 02 complete, ready to plan Phase 3
+Last session: 2026-11-10T08:23:44.047Z
+Stopped at: Phase 3 complete, ready to plan Phase 4
 Resume file: None
 
-Ship PR: https://github.com/szTheory/schwaystation/pull/8 (phase 2)
+Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
+Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8
 Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next: from a shell, `gh pr merge 8 --auto --squash`; confirm a CI run on the head commit, then confirm the release pull request is green after the merge. Then `/gsd-discuss-phase 3`.
-Stop after the ship step.
+Next: `/gsd-ship 3` (PR title `feat: match the GTE hardware cases and add DMA and timers`), then from a shell
+`gh pr merge --auto --squash`, confirm a CI run on the head commit (the hosted asan, be32, wasm32, nofp, perf and
+eight-lane hash-equality jobs are confirmed there, not locally), and confirm the release pull request is green after the
+merge. Then `/gsd-discuss-phase 4`.
+After phase 3 shipping and release confirmation, continue `/gsd-autonomous --from 4`; stop at the next phase's pre-ship boundary (AGENTS rule 9). Standing preferences are in `.planning/AUTONOMOUS.md`.

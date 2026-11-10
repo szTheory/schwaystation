@@ -16,18 +16,19 @@
 
 enum { OWNED, UNBUILT, GAP };
 
-/* The documented map, as offsets in the page (PSX-SYSTEM section 3):
-   memory control 000h-023h, RAM_SIZE 060h-063h, I_STAT and I_MASK 070h-077h
-   are owned; SIO 040h-05Fh, DMA 080h-0FFh, timers 100h-12Fh, CD-ROM
-   800h-803h, GPU 810h-817h, MDEC 820h-827h and SPU C00h-FFFh are unbuilt. */
+/* The documented map, as offsets in the page (docs/hardware/bus.md, Segments and the physical map):
+   memory control 000h-023h, RAM_SIZE 060h-063h, I_STAT and I_MASK 070h-077h,
+   the DMA registers 080h-0FFh and the timers 100h-12Fh are owned; SIO
+   040h-05Fh, CD-ROM 800h-803h, GPU 810h-817h, MDEC 820h-827h and SPU
+   C00h-FFFh are unbuilt. */
 static int expected(uint32_t off)
 {
-    if (off <= 0x023u || (off >= 0x060u && off <= 0x063u) || (off >= 0x070u && off <= 0x077u)) {
+    if (off <= 0x023u || (off >= 0x060u && off <= 0x063u) || (off >= 0x070u && off <= 0x077u) ||
+        (off >= 0x080u && off <= 0x12Fu)) {
         return OWNED;
     }
-    if ((off >= 0x040u && off <= 0x05Fu) || (off >= 0x080u && off <= 0x12Fu) ||
-        (off >= 0x800u && off <= 0x803u) || (off >= 0x810u && off <= 0x817u) ||
-        (off >= 0x820u && off <= 0x827u) || off >= 0xC00u) {
+    if ((off >= 0x040u && off <= 0x05Fu) || (off >= 0x800u && off <= 0x803u) ||
+        (off >= 0x810u && off <= 0x817u) || (off >= 0x820u && off <= 0x827u) || off >= 0xC00u) {
         return UNBUILT;
     }
     return GAP;
@@ -98,6 +99,8 @@ int main(void)
                 memset(&inst->fault, 0, sizeof inst->fault);
                 inst->cpu.pc = 0x80010000u;
                 schway__irq_reset(inst);
+                schway__dma_reset(inst);
+                schway__timers_reset(inst);
                 inst->cpu.cop0.r[SCHWAY__COP0_CAUSE] = 0u;
 
                 uint32_t addr = 0xBF801000u + off;
