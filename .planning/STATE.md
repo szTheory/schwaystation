@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-11-10T20:31:09.589Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-11-10T20:57:54.648Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 04 plan 04-04 completed
-state_head: 3cce27e6861e3d063659e9270be5e0f0bb0cb4b4
+state_head: 600155a9fd691acbba72c20e04a158a0a504372f
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 73
+  completed_plans: 74
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 6 of 32
+Plan: 7 of 32
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 04 plan 04-05 completed
 
@@ -133,6 +133,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P03 | 47min | 2 tasks | 20 files |
 | Phase 04 P04 | 34min | 2 tasks | 6 files |
 | Phase 04 P05 | 39min | 2 tasks | 9 files |
+| Phase 04 P06 | 20min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -280,6 +281,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Reserved texture depth three follows the direct fifteen-bit model and remains a documented model rule.
 - [Phase 04]: Primitive callers decide dither eligibility; rectangles and raw textured semi-transparent polygons do not acquire dither.
 - [Phase 04]: Blend width and truncation remain doc/derived until a hardware capture distinguishes the internal arithmetic.
+- [Phase 04]: Use 64-bit integer area and edge setup, normalize winding, and assign exact-edge samples with a top-left rule.
+- [Phase 04]: Reject offset-applied spans above 1023 by 511 before clipping; retain inclusive E3/E4 edges.
+- [Phase 04]: Split quads into triangles (1,2,3) then (2,3,4) and write each covered pixel immediately through the shared helper.
 
 ### Pending Todos
 
@@ -356,10 +360,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-05 | Codex, OpenGSD 1.20.0; sequential executor, review follow-up, local CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-06 | Codex, OpenGSD 1.20.0; sequential executor, flat polygon implementation, local CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-10T20:31:09.438Z
-Stopped at: Completed 04-05-PLAN.md
+Last session: 2026-11-10T20:57:54.462Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
