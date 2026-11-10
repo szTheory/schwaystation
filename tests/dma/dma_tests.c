@@ -509,6 +509,275 @@ static void case_step_contract(void)
     schway_destroy(inst);
 }
 
+/* ---- programs ---- */
+
+#define T0 8u
+#define T1 9u
+#define T2 10u
+#define T3 11u
+#define T4 12u
+#define T5 13u
+#define T6 14u
+#define T9 25u
+
+#define I_LUI(rt, imm) (0x3C000000u | ((rt) << 16) | ((uint32_t)(imm) & 0xFFFFu))
+#define I_ORI(rt, rs, imm) (0x34000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(imm) & 0xFFFFu))
+#define I_ADDIU(rt, rs, imm)                                                                       \
+    (0x24000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(imm) & 0xFFFFu))
+#define I_SW(rt, off, rs) (0xAC000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(off) & 0xFFFFu))
+#define I_LW(rt, off, rs) (0x8C000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(off) & 0xFFFFu))
+#define I_BEQ(rs, rt, off) (0x10000000u | ((rs) << 21) | ((rt) << 16) | ((uint32_t)(off) & 0xFFFFu))
+#define I_J(target) (0x08000000u | (((uint32_t)(target) >> 2) & 0x03FFFFFFu))
+#define I_NOP 0u
+
+static void put32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16);
+    p[3] = (uint8_t)(v >> 24);
+}
+
+/* A PS-EXE of one text sector at 80010000h holding the n words, entered at its
+   first word. */
+static void load(schway *inst, const uint32_t *words, uint32_t n)
+{
+    static uint8_t exe[0x1000];
+    memset(exe, 0, sizeof exe);
+    memcpy(exe, "PS-X EXE", 8);
+    put32(exe + 0x10, TEXT);
+    put32(exe + 0x18, TEXT);
+    put32(exe + 0x1C, 0x800u);
+    for (uint32_t i = 0; i < n; i++) {
+        put32(exe + 0x800u + 4u * i, words[i]);
+    }
+    CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_OK);
+}
+
+/* Runs the stub kernel's boot until the program's first instruction is next. */
+static void run_to_entry(schway *inst)
+{
+    for (uint32_t i = 0; i < 4000u && inst->cpu.pc != TEXT; i++) {
+        (void)run(inst, 1u);
+    }
+    CHECK_EQ_HEX(inst->cpu.pc, TEXT);
+}
+
+/* The first 12 words of a program that points t0 at the I/O page, sets DPCR to
+   dpcr, MADR and BCR of OTC to the top of RAM and 4,096 words, and leaves the
+   start value in t4 and a RAM address in t6. The next word, number 12, starts
+   a line of the instruction cache, so the words after the CHCR store are
+   already cached when it runs. */
+static uint32_t put_setup(uint32_t *w, uint32_t dpcr)
+{
+    uint32_t n = 0u;
+    w[n++] = I_LUI(T0, 0x1F80u);
+    w[n++] = I_ORI(T0, T0, 0x1000u);
+    w[n++] = I_LUI(T1, dpcr >> 16);
+    w[n++] = I_ORI(T1, T1, dpcr & 0xFFFFu);
+    w[n++] = I_SW(T1, 0xF0u, T0);
+    w[n++] = I_LUI(T2, 0x001Fu);
+    w[n++] = I_ORI(T2, T2, 0xFFFCu);
+    w[n++] = I_SW(T2, 0xE0u, T0);
+    w[n++] = I_ORI(T3, 0u, 0x1000u);
+    w[n++] = I_SW(T3, 0xE4u, T0);
+    w[n++] = I_LUI(T4, 0x1100u);
+    w[n++] = I_LUI(T6, 0x8000u);
+    return n;
+}
+
+/* Runs one cycle at a time until the unit has started and returns its end
+   tick, or 0 when it never starts. */
+static uint64_t step_to_unit(schway *inst)
+{
+    for (uint32_t i = 0; i < 4000u; i++) {
+        if (inst->dma.cur != SCHWAY__DMA_NONE) {
+            return inst->dma.busy_until;
+        }
+        (void)run(inst, 1u);
+    }
+    return 0u;
+}
+
+/* Runs the program that starts OTC, then does one RAM read, then sets t9; the
+   marker's tick is returned, and the unit's end in *end (0 for none). */
+static uint64_t run_read_program(uint32_t dpcr, uint64_t *end, uint64_t *entry, uint32_t chcr_read)
+{
+    uint32_t w[17];
+    uint32_t n = put_setup(w, dpcr);
+    w[n++] = I_SW(T4, 0xE8u, T0);
+    w[n++] = chcr_read != 0u ? I_LW(T5, 0xE8u, T0) : I_LW(T5, 0x100u, T6);
+    w[n++] = I_ADDIU(T9, 0u, 1u);
+    w[n++] = I_BEQ(0u, 0u, -1);
+    w[n++] = I_NOP;
+    schway *inst = make();
+    load(inst, w, n);
+    run_to_entry(inst);
+    *entry = inst->ticks;
+    *end = 0u;
+    uint64_t marker = 0u;
+    for (uint32_t i = 0; i < 20000u && marker == 0u; i++) {
+        if (*end == 0u && inst->dma.cur != SCHWAY__DMA_NONE) {
+            *end = inst->dma.busy_until;
+        }
+        if (inst->cpu.r[T9] != 0u) {
+            marker = inst->ticks;
+        } else {
+            (void)run(inst, 1u);
+        }
+    }
+    if (chcr_read != 0u) {
+        CHECK_EQ_HEX(inst->cpu.r[T5], 0x00000002u);
+    }
+    schway_destroy(inst);
+    return marker;
+}
+
+/* Fault prevented: a CPU read from RAM that runs on while a transfer holds the
+   bus. The instruction after the read starts no earlier than the unit's end;
+   without a unit the same program takes a few hundred cycles. */
+static void case_stall_cpu_access(void)
+{
+    uint64_t end = 0u;
+    uint64_t entry = 0u;
+    uint64_t marker = run_read_program(DPCR_OTC, &end, &entry, 0u);
+    CHECK(end != 0u);
+    CHECK(end - entry >= 4352u);
+    CHECK(marker >= end);
+    CHECK(marker < end + 100u);
+    uint64_t cend = 1u;
+    uint64_t centry = 0u;
+    uint64_t control = run_read_program(0x07654321u, &cend, &centry, 0u);
+    CHECK_EQ_U64(cend, 0u);
+    CHECK(control != 0u);
+    CHECK(control - centry < 1000u);
+}
+
+/* Fault prevented: a CHCR read that returns the busy value, or one that does
+   not hold the CPU until the unit is done. The read right after the start
+   shows completion, and the next instruction runs after the unit's end. */
+static void case_otc_read_sees_completion(void)
+{
+    uint64_t end = 0u;
+    uint64_t entry = 0u;
+    uint64_t marker = run_read_program(DPCR_OTC, &end, &entry, 1u);
+    CHECK(end != 0u);
+    CHECK(marker >= end);
+    CHECK(marker < end + 100u);
+}
+
+/* Fault prevented: a CPU that stops for a transfer when it only touches the
+   scratchpad, the cache and the registers. After the CHCR store the loop reads
+   the scratchpad and counts; it keeps going the whole unit long and the engine
+   never holds it. */
+static void case_stall_not_scratch(void)
+{
+    uint32_t w[17];
+    uint32_t n = put_setup(w, DPCR_OTC);
+    w[n++] = I_SW(T4, 0xE8u, T0);
+    w[n++] = I_LW(T5, 0xF000u, T0);
+    w[n++] = I_BEQ(0u, 0u, -2);
+    w[n++] = I_ADDIU(T9, T9, 1u);
+    schway *inst = make();
+    load(inst, w, n);
+    run_to_entry(inst);
+    uint64_t end = step_to_unit(inst);
+    CHECK(end != 0u);
+    while (inst->ticks < end) {
+        (void)run(inst, 1u);
+        CHECK_EQ_U64(inst->dma.stall_until, 0u);
+    }
+    /* Each pass is a load, a branch and its slot: a few cycles, so a unit of
+       4,352 cycles holds hundreds of passes. */
+    CHECK(inst->cpu.r[T9] > 500u);
+    schway_destroy(inst);
+}
+
+/* Runs the five-store loop with a unit started at its top: store addresses at
+   base. Returns with the fifth store's results checked against stalls. */
+static void run_store_loop(uint32_t base_hi, uint32_t expect_stall)
+{
+    const uint32_t loop = TEXT + 16u;
+    uint32_t w[12];
+    w[0] = I_LUI(T0, base_hi);
+    w[1] = I_ORI(T0, T0, base_hi == 0x8000u ? 0x0400u : 0u);
+    w[2] = I_NOP;
+    w[3] = I_NOP;
+    w[4] = I_SW(T1, 0u, T0);
+    w[5] = I_SW(T1, 4u, T0);
+    w[6] = I_SW(T1, 8u, T0);
+    w[7] = I_SW(T1, 12u, T0);
+    w[8] = I_SW(T1, 16u, T0);
+    w[9] = I_ADDIU(T9, 0u, 1u);
+    w[10] = I_J(loop);
+    w[11] = I_NOP;
+    schway *inst = make();
+    load(inst, w, 12u);
+    run_to_entry(inst);
+    /* A few hundred passes with no unit warm the cache and fill the queue. */
+    (void)run(inst, 3000u);
+    for (uint32_t i = 0; i < 40u && inst->cpu.pc != loop; i++) {
+        (void)run(inst, 1u);
+    }
+    CHECK_EQ_HEX(inst->cpu.pc, loop);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    /* Empty queue, marker cleared, then the unit starts through the registers. */
+    inst->cpu.wq_count = 0u;
+    inst->cpu.r[T9] = 0u;
+    wr32(inst, DPCR, DPCR_OTC);
+    wr32(inst, MADR(6u), OTC_TOP);
+    wr32(inst, BCR(6u), 4096u);
+    wr32(inst, CHCR(6u), 0x11000000u);
+    uint64_t end = inst->dma.busy_until;
+    CHECK_EQ_U64(inst->dma.cur, 6u);
+    CHECK(end > inst->ticks);
+    CHECK_EQ_U64(inst->dma.stall_until, 0u);
+    uint32_t seen_fourth = 0u;
+    uint32_t seen_fifth = 0u;
+    uint64_t marker = 0u;
+    for (uint32_t i = 0; i < 20000u && marker == 0u; i++) {
+        (void)run(inst, 1u);
+        if (inst->cpu.pc == loop + 16u && seen_fourth == 0u) {
+            /* Four stores done: none of them held the CPU. */
+            seen_fourth = 1u;
+            CHECK(inst->dma.stall_until <= inst->ticks);
+        }
+        if (inst->cpu.pc == loop + 20u && seen_fifth == 0u) {
+            /* The fifth store is the one that waits. */
+            seen_fifth = 1u;
+            if (expect_stall != 0u) {
+                CHECK_EQ_U64(inst->dma.stall_until, end);
+            } else {
+                CHECK_EQ_U64(inst->dma.stall_until, 0u);
+            }
+        }
+        if (inst->cpu.r[T9] != 0u) {
+            marker = inst->ticks;
+        }
+    }
+    CHECK_EQ_U64(seen_fourth, 1u);
+    CHECK_EQ_U64(seen_fifth, 1u);
+    CHECK(marker != 0u);
+    if (expect_stall != 0u) {
+        CHECK(marker >= end);
+    } else {
+        CHECK(marker < end);
+        CHECK_EQ_U64(inst->dma.stall_until, 0u);
+    }
+    schway_destroy(inst);
+}
+
+/* Fault prevented: a store that holds the CPU while the write queue has room,
+   a fifth store that does not, or a scratchpad store that does. With the code
+   already cached and the queue empty when the unit starts, the first four
+   stores to RAM go through, the fifth waits for the unit's end and the
+   instruction after it runs no earlier; five scratchpad stores never wait. */
+static void case_stall_write_queue(void)
+{
+    run_store_loop(0x8000u, 1u);
+    run_store_loop(0x1F80u, 0u);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
@@ -525,6 +794,10 @@ static const struct {
     {"otc_ignores_bits", case_otc_ignores_bits},
     {"otc_bcr_zero", case_otc_bcr_zero},
     {"step_contract", case_step_contract},
+    {"stall_cpu_access", case_stall_cpu_access},
+    {"stall_not_scratch", case_stall_not_scratch},
+    {"stall_write_queue", case_stall_write_queue},
+    {"otc_read_sees_completion", case_otc_read_sees_completion},
 };
 
 int main(int argc, char **argv)

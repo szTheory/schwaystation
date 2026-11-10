@@ -81,3 +81,27 @@ schway_add_test(NAME dma.otc.bcr_zero
 schway_add_test(NAME dma.engine.step_contract
   COMMAND schwaystation-test-dma step_contract
   LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: a CPU read from RAM that runs on while a transfer holds the
+# bus.
+schway_add_test(NAME dma.stall.cpu_access
+  COMMAND schwaystation-test-dma stall_cpu_access
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a CPU that stops for a transfer when it only touches the
+# scratchpad, the cache and the registers.
+schway_add_test(NAME dma.stall.not_scratch
+  COMMAND schwaystation-test-dma stall_not_scratch
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a store that holds the CPU while the write queue has room, a
+# fifth store that does not, or a scratchpad store that does.
+schway_add_test(NAME dma.stall.write_queue
+  COMMAND schwaystation-test-dma stall_write_queue
+  LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a CHCR read that shows the busy value, or one that does not
+# hold the CPU until the unit is done.
+schway_add_test(NAME dma.otc.read_sees_completion
+  COMMAND schwaystation-test-dma otc_read_sees_completion
+  LABELS dma portable TIMEOUT 30)
