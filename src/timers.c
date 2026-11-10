@@ -21,7 +21,6 @@ static const char name_reached[] = "timers.reached";
 static const char name_irq_line[] = "timers.irq_line";
 static const char name_oneshot_done[] = "timers.oneshot_done";
 static const char name_paused[] = "timers.paused";
-static const char name_free_after[] = "timers.free_after";
 static const char name_blank[] = "timers.blank";
 
 /* MODE bits (psx-spx, Timers). Bits 0-9 are what a program writes; bit 10 is
@@ -368,6 +367,17 @@ uint64_t schway__timers_next(const schway *inst)
     return best;
 }
 
+/* Timer 0's dot-clock deadline is measured in dots; the GPU converts it to a CPU tick. */
+uint32_t schway__timers_dot_next(const schway *inst)
+{
+    const struct schway__timer *t = &inst->timers.t[0];
+    if ((inst->irq.stat & (UINT32_C(1) << 4)) != 0u || (t->mode & 0x100u) == 0u) {
+        return UINT32_MAX;
+    }
+    uint64_t steps = cycles_to_edge(t);
+    return steps == 0u || steps > UINT32_MAX ? UINT32_MAX : (uint32_t)steps;
+}
+
 void schway__timers_event(schway *inst, uint64_t now)
 {
     schway__timers_sync(inst, now);
@@ -379,38 +389,21 @@ static uint32_t mode_image(const struct schway__timer *t)
            ((t->reached & REACHED_FFFF) << 11);
 }
 
-/* Whether a counter's MODE depends on a signal that nothing in the core
-   produces yet (psx-spx, Timers): counter 0 on the dot clock or with
-   synchronisation on (it waits on the horizontal blank), counter 1 on the
-   horizontal blank. The vertical blank is the frame's own, so counter 1's
-   synchronisation is not one. */
-static int needs_beam(uint32_t n, uint32_t mode)
-{
-    return (n == 0u && (mode & 0x101u) != 0u) || (n == 1u && (mode & 0x100u) != 0u);
-}
-
 /* The registers 1F801100h-112Fh at every width: COUNT, MODE and TARGET of
    each counter, with the word at offset 0Ch reading 0. The access first
    catches the counters up to its own tick. A MODE read returns bits 11 and 12
    and clears them. A COUNT write sets the value and starts the hold. A MODE
    write zeroes the counter, starts the hold, sets bit 10, re-arms the
-   one-shot and derives the pause. Every write recomputes the deadline. An
-   access to a counter whose MODE needs the beam is counted as an access to a
-   device not built yet, and is never a fault: a program may read the counter,
-   which stays where it is until something pushes the beam's signals. */
+   one-shot and derives the pause. Every write recomputes the deadline. */
 void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint32_t *value,
                        uint32_t *cycles)
 {
     uint32_t n = (p >> 4) & 3u;
     uint32_t reg = p & 0xCu;
     struct schway__timer *t;
-    schway__timers_sync(inst, schway__sched_now(inst, *cycles));
-    if (n >= SCHWAY__TIMERS) {
-        if (wr == 0u) {
-            *value = 0u;
-        }
-        return;
-    }
+    uint64_t tick = schway__sched_now(inst, *cycles);
+    schway__gpu_sync(inst, tick);
+    schway__timers_sync(inst, tick);
     t = &inst->timers.t[n];
     if (wr == 0u) {
         uint32_t r = 0u;
@@ -434,14 +427,10 @@ void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, ui
             t->irq_line = 1u;
             t->oneshot_done = 0u;
             t->paused = paused_for(n, t->mode, inst->timers.blank);
-            t->free_after = 0u;
         } else if (reg == 8u) {
             t->target = lane_put(t->target, p, width, *value) & COUNT_MAX;
         }
         schway__sched_recalc(inst);
-    }
-    if (needs_beam(n, t->mode)) {
-        schway__bus_unbuilt(inst, SCHWAY__DEV_TIMER, p, width, wr, *value);
     }
 }
 
@@ -456,7 +445,7 @@ static void view_as_of(const struct schway__timers *src, uint64_t now,
     }
 }
 
-/* Each counter's nine fields in a fixed order, bounded to their widths. The
+/* Each counter's eight fields in a fixed order, bounded to their widths. The
    walk is of the view as of the instance's tick, so the bytes do not depend on
    when a catch-up last ran and saving changes nothing in the instance; a load
    writes the view back and makes its tick the base. */
@@ -474,7 +463,6 @@ void schway__timers_state_io(struct schway__state_io *io, schway *inst)
         (void)schway__state_u32(io, name_irq_line, &t->irq_line, 0u, 1u);
         (void)schway__state_u32(io, name_oneshot_done, &t->oneshot_done, 0u, 1u);
         (void)schway__state_u32(io, name_paused, &t->paused, 0u, 1u);
-        (void)schway__state_u32(io, name_free_after, &t->free_after, 0u, 1u);
     }
     (void)schway__state_u32(io, name_blank, &inst->timers.blank, 0u, BLANK_V | BLANK_H);
     if (io->mode == SCHWAY__STATE_APPLY) {
@@ -510,7 +498,6 @@ static void blank_edge(struct schway__timer *t, uint32_t level)
             t->paused = 0u;
             break;
         default:
-            t->free_after = 1u;
             t->paused = 0u;
             break;
         }

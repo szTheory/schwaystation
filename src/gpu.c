@@ -37,6 +37,11 @@ static const char name_display_mode[] = "gpu.display_mode";
 static const char name_allow_2mb[] = "gpu.allow_2mb";
 static const char name_read_latch[] = "gpu.read_latch";
 static const char name_irq_pending[] = "gpu.irq_pending";
+static const char name_beam_tick[] = "gpu.beam_tick";
+static const char name_beam_ratio_remainder[] = "gpu.beam_ratio_remainder";
+static const char name_beam_line_clock[] = "gpu.beam_line_clock";
+static const char name_beam_line[] = "gpu.beam_line";
+static const char name_beam_dot_phase[] = "gpu.beam_dot_phase";
 static const char name_texture_cache[] = "gpu.texture_cache";
 static const char name_texture_tags[] = "gpu.texture_tags";
 static const char name_texture_valid[] = "gpu.texture_valid";
@@ -48,6 +53,56 @@ static const char name_clut_valid[] = "gpu.clut_valid";
 
 #define GPU_IRQ_BIT 1u
 #define GPU_IRQ_MASK (UINT32_C(1) << GPU_IRQ_BIT)
+#define GPU_RATIO_DEN UINT64_C(451584)
+#define GPU_HBLANK_BIT 2u
+#define GPU_VBLANK_BIT 1u
+
+/* The beam and timer dots use the documented ratio and line lengths (PSX-GPU-AND-GTE section four
+   point one; PSX-SYSTEM section one). All phases are carried as integers. */
+static uint32_t gpu_clock_num(uint32_t region)
+{
+    return region == SCHWAY_REGION_PAL ? 709379u : 715909u;
+}
+
+static uint32_t gpu_line_clocks(uint32_t region)
+{
+    return region == SCHWAY_REGION_PAL ? 3406u : 3413u;
+}
+
+static uint32_t gpu_lines(uint32_t region)
+{
+    return region == SCHWAY_REGION_PAL ? 314u : 263u;
+}
+
+static uint32_t gpu_dot_divisor(uint32_t mode)
+{
+    static const uint32_t divisors[4] = {10u, 8u, 5u, 4u};
+    return (mode & 0x40u) != 0u ? 7u : divisors[mode & 3u];
+}
+
+/* Convert from a number of beam clocks to the first CPU tick that owns them, carrying
+   the same fractional ratio through every access and scheduled event. */
+static uint64_t gpu_ticks_for_clocks(const struct schway__gpu *g, uint32_t region,
+                                     uint64_t clocks)
+{
+    if (clocks == 0u) {
+        return 0u;
+    }
+    uint64_t numerator = clocks * GPU_RATIO_DEN - g->beam_ratio_remainder;
+    uint64_t rate = gpu_clock_num(region);
+    return numerator / rate + (numerator % rate != 0u ? 1u : 0u);
+}
+
+/* Advance the ratio by a bounded CPU span without multiplying a large absolute tick. */
+static uint64_t gpu_clocks_for_ticks(const struct schway__gpu *g, uint32_t region,
+                                     uint64_t ticks, uint32_t *remainder)
+{
+    uint64_t rate = gpu_clock_num(region);
+    uint64_t whole = (ticks / GPU_RATIO_DEN) * rate;
+    uint64_t part = g->beam_ratio_remainder + (ticks % GPU_RATIO_DEN) * rate;
+    *remainder = (uint32_t)(part % GPU_RATIO_DEN);
+    return whole + part / GPU_RATIO_DEN;
+}
 
 static uint32_t min_u32(uint32_t a, uint32_t b)
 {
@@ -94,6 +149,153 @@ void schway__gpu_reset(schway *inst)
     g->display_disabled = 1u;
     g->horizontal_range = 0x00C60260u;
     g->vertical_range = 0x00040010u;
+    g->beam_tick = inst->ticks;
+}
+
+static int gpu_beam_active(const schway *inst)
+{
+    return inst->exe_loaded != 0u || inst->gpu.display_mode != 0u;
+}
+
+/* Push a span of GPU clocks to Timer 0 without polling individual dots. */
+static void gpu_beam_advance(schway *inst, uint64_t tick, uint64_t ticks)
+{
+    struct schway__gpu *g = &inst->gpu;
+    uint32_t remainder;
+    uint64_t clocks = gpu_clocks_for_ticks(g, inst->region, ticks, &remainder);
+    uint32_t divisor = gpu_dot_divisor(g->display_mode);
+    uint64_t dots = ((uint64_t)g->beam_dot_phase + clocks) / divisor;
+    schway__timers_sync(inst, tick);
+    g->beam_ratio_remainder = remainder;
+    g->beam_line_clock += (uint32_t)clocks;
+    g->beam_dot_phase = (uint32_t)(((uint64_t)g->beam_dot_phase + clocks) % divisor);
+    g->beam_tick = tick;
+    if (dots != 0u) {
+        schway__timers_dots(inst, tick, (uint32_t)dots);
+    }
+}
+
+/* Apply hblank at X2 and vblank at the Y2/Y1 line comparisons. Invalid coordinates do not
+   prevent line wrap; this is the documented range comparison model, not a measured timing claim. */
+static int gpu_beam_edges(schway *inst)
+{
+    struct schway__gpu *g = &inst->gpu;
+    uint32_t line_clocks = gpu_line_clocks(inst->region);
+    uint32_t lines = gpu_lines(inst->region);
+    uint32_t hblank_at = (g->horizontal_range >> 12) & 0x0FFFu;
+    int changed = 0;
+
+    if (hblank_at <= line_clocks && g->beam_line_clock >= hblank_at &&
+        (inst->timers.blank & GPU_HBLANK_BIT) == 0u) {
+        schway__timers_hblank(inst, g->beam_tick, 1u);
+        changed = 1;
+    }
+    if (g->beam_line_clock >= line_clocks) {
+        if ((inst->timers.blank & GPU_HBLANK_BIT) != 0u) {
+            schway__timers_hblank(inst, g->beam_tick, 0u);
+        }
+        g->beam_line_clock -= line_clocks;
+        g->beam_line++;
+        if (g->beam_line == lines) {
+            g->beam_line = 0u;
+        }
+
+        uint32_t y1 = g->vertical_range & 0x03FFu;
+        uint32_t y2 = (g->vertical_range >> 10) & 0x03FFu;
+        if (y2 < lines && g->beam_line == y2) {
+            schway__timers_vblank(inst, g->beam_tick, 1u);
+        }
+        if (y1 < lines && g->beam_line == y1) {
+            schway__timers_vblank(inst, g->beam_tick, 0u);
+        }
+        changed = 1;
+    }
+    return changed;
+}
+
+/* The next display edge, line end, or enabled Timer 0 dot-source IRQ. */
+uint64_t schway__gpu_next(const schway *inst)
+{
+    const struct schway__gpu *g = &inst->gpu;
+    if (!gpu_beam_active(inst)) {
+        return UINT64_MAX;
+    }
+    uint32_t line_clocks = gpu_line_clocks(inst->region);
+    if (g->beam_line_clock >= line_clocks) {
+        return g->beam_tick;
+    }
+    uint32_t hblank_at = (g->horizontal_range >> 12) & 0x0FFFu;
+    uint64_t clocks = line_clocks - g->beam_line_clock;
+
+    if (hblank_at <= line_clocks && (inst->timers.blank & GPU_HBLANK_BIT) == 0u) {
+        uint64_t hblank_clocks = hblank_at > g->beam_line_clock
+                                     ? hblank_at - g->beam_line_clock
+                                     : 0u;
+        if (hblank_clocks < clocks) {
+            clocks = hblank_clocks;
+        }
+    }
+
+    uint32_t dot_steps = schway__timers_dot_next(inst);
+    if (dot_steps != UINT32_MAX) {
+        uint32_t divisor = gpu_dot_divisor(g->display_mode);
+        uint64_t dot_clocks = (uint64_t)dot_steps * divisor - g->beam_dot_phase;
+        if (dot_clocks < clocks) {
+            clocks = dot_clocks;
+        }
+    }
+
+    return g->beam_tick + gpu_ticks_for_clocks(g, inst->region, clocks);
+}
+
+/* Lazy catch-up splits only at a line/display edge or a derived dot-target deadline. */
+void schway__gpu_sync(schway *inst, uint64_t now)
+{
+    struct schway__gpu *g = &inst->gpu;
+    if (!gpu_beam_active(inst)) {
+        return;
+    }
+    if (now < g->beam_tick) {
+        return;
+    }
+    for (;;) {
+        if (gpu_beam_edges(inst) != 0) {
+            continue;
+        }
+        if (g->beam_tick == now) {
+            break;
+        }
+
+        uint32_t line_clocks = gpu_line_clocks(inst->region);
+        uint32_t hblank_at = (g->horizontal_range >> 12) & 0x0FFFu;
+        uint64_t to_event = line_clocks - g->beam_line_clock;
+        if (hblank_at <= line_clocks && (inst->timers.blank & GPU_HBLANK_BIT) == 0u &&
+            hblank_at > g->beam_line_clock && hblank_at - g->beam_line_clock < to_event) {
+            to_event = hblank_at - g->beam_line_clock;
+        }
+        uint32_t dot_steps = schway__timers_dot_next(inst);
+        if (dot_steps != UINT32_MAX) {
+            uint32_t divisor = gpu_dot_divisor(g->display_mode);
+            uint64_t dot_clocks = (uint64_t)dot_steps * divisor - g->beam_dot_phase;
+            if (dot_clocks < to_event) {
+                to_event = dot_clocks;
+            }
+        }
+
+        uint64_t elapsed = gpu_ticks_for_clocks(g, inst->region, to_event);
+        uint64_t event_tick = g->beam_tick + elapsed;
+        if (event_tick > now) {
+            gpu_beam_advance(inst, now, now - g->beam_tick);
+            break;
+        }
+        gpu_beam_advance(inst, event_tick, elapsed);
+    }
+    schway__timers_sync(inst, now);
+}
+
+void schway__gpu_event(schway *inst, uint64_t now)
+{
+    schway__gpu_sync(inst, now);
 }
 
 /* GP0 packet lengths and polyline terminators follow psx-spx, GPU Commands
@@ -632,7 +834,7 @@ int schway__gpu_peek(const schway *inst, uint32_t addr, uint32_t width, uint32_t
     return 0;
 }
 
-static void gpu_gp1(schway *inst, uint32_t command)
+static void gpu_gp1(schway *inst, uint32_t command, uint64_t tick)
 {
     struct schway__gpu *g = &inst->gpu;
     uint32_t op = command >> 24;
@@ -644,6 +846,9 @@ static void gpu_gp1(schway *inst, uint32_t command)
         gpu_ack_irq(inst);
         schway__gpu_reset(inst);
         inst->gpu.allow_2mb = allow_2mb;
+        inst->gpu.beam_tick = tick;
+        schway__timers_vblank(inst, tick, 0u);
+        schway__timers_hblank(inst, tick, 0u);
         break;
     }
     case 0x01u:
@@ -670,6 +875,7 @@ static void gpu_gp1(schway *inst, uint32_t command)
         break;
     case 0x08u:
         g->display_mode = value & 0xFFu;
+        g->beam_dot_phase %= gpu_dot_divisor(g->display_mode);
         break;
     case 0x09u:
         g->allow_2mb = value & 1u;
@@ -713,12 +919,14 @@ int schway__gpu_io(schway *inst, uint32_t wr, uint32_t addr, uint32_t width,
     if (slot != 0u && slot != 4u) {
         return 1;
     }
+    uint64_t tick = schway__sched_now(inst, *cycles);
+    schway__gpu_sync(inst, tick);
     if (wr != 0u) {
         uint32_t word = (*value & lane_mask(width)) << lane_shift(addr);
         if (slot == 0u) {
             schway__gpu_word(inst, word);
         } else {
-            gpu_gp1(inst, word);
+            gpu_gp1(inst, word, tick);
         }
     } else {
         if (schway__gpu_peek(inst, addr, width, value) != 0) {
@@ -738,6 +946,7 @@ int schway__gpu_io(schway *inst, uint32_t wr, uint32_t addr, uint32_t width,
         }
     }
     *cycles += 1u;
+    schway__sched_recalc(inst);
     return 0;
 }
 
@@ -748,7 +957,7 @@ static uint32_t expected_packet_words(uint32_t command)
 
 /* One state walk owns VRAM and every field that can affect command decoding
    or a partially completed transfer. */
-void schway__gpu_state_io(struct schway__state_io *io, schway *inst)
+void schway__gpu_state_io(struct schway__state_io *io, schway *inst, uint64_t state_ticks)
 {
     struct schway__gpu *g = &inst->gpu;
     schway__state_u16_array(io, name_vram, &inst->vram[0][0], SCHWAY__VRAM_W * SCHWAY__VRAM_H,
@@ -815,10 +1024,26 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u32(io, name_display_start, &g->display_start, 0u, 0x0007FFFFu);
     (void)schway__state_u32(io, name_horizontal_range, &g->horizontal_range, 0u, 0x00FFFFFFu);
     (void)schway__state_u32(io, name_vertical_range, &g->vertical_range, 0u, 0x000FFFFFu);
-    (void)schway__state_u32(io, name_display_mode, &g->display_mode, 0u, 0xFFu);
+    uint32_t display_mode = schway__state_u32(io, name_display_mode, &g->display_mode, 0u, 0xFFu);
     (void)schway__state_u32(io, name_allow_2mb, &g->allow_2mb, 0u, 1u);
     (void)schway__state_u32(io, name_read_latch, &g->read_latch, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_irq_pending, &g->irq_pending, 0u, 1u);
+    uint64_t beam_tick = schway__state_u64(io, name_beam_tick, &g->beam_tick, 0u,
+                                           SCHWAY__STATE_TICKS_MAX);
+    uint32_t beam_ratio_remainder = schway__state_u32(io, name_beam_ratio_remainder,
+                                                       &g->beam_ratio_remainder, 0u,
+                                                       (uint32_t)GPU_RATIO_DEN - 1u);
+    uint32_t beam_line_clock = schway__state_u32(io, name_beam_line_clock, &g->beam_line_clock,
+                                                  0u, 3413u);
+    uint32_t beam_line = schway__state_u32(io, name_beam_line, &g->beam_line, 0u, 313u);
+    uint32_t beam_dot_phase = schway__state_u32(io, name_beam_dot_phase, &g->beam_dot_phase,
+                                                 0u, 9u);
+
+    schway__state_check(io, beam_tick <= state_ticks);
+    schway__state_check(io, beam_line_clock < gpu_line_clocks(inst->region));
+    schway__state_check(io, beam_line < gpu_lines(inst->region));
+    schway__state_check(io, beam_ratio_remainder < GPU_RATIO_DEN);
+    schway__state_check(io, beam_dot_phase < gpu_dot_divisor(display_mode));
 
     schway__state_check(io, phase != SCHWAY__GPU_PACKET ||
                                 (fifo_count != 0u && packet_words > fifo_count &&

@@ -105,6 +105,23 @@ sides of each span limit, edge ownership, clipping, signed offsets, Gouraud/UV v
 negative gradients, and narrow hostile slopes. They also check clipping invariance and state-split determinism. The
 directed interpolation tests pin the core model; they do not claim to calibrate GPU arithmetic precision against hardware.
 
+## Beam and timer timing
+
+The beam advances lazily on the CPU tick line. It carries the exact GPU/CPU ratio remainder: 715,909 GPU clocks per
+451,584 CPU cycles for NTSC and 709,379 per 451,584 for PAL. A line is 3,413 GPU clocks for NTSC or 3,406 for PAL;
+the progressive field contains 263 or 314 lines. Dot clocks divide GPU clocks by 10, 8, 5, or 4, with the 368-dot
+mode using 7. Both fractional phases live in each instance and are serialized.
+
+The scheduler derives the next horizontal-blank edge, line end, or enabled Timer 0 dot-target deadline. It advances by
+whole spans between those points, so Timer 0 can raise an IRQ in the middle of a line without polling each dot. X2 starts
+horizontal blank, and Y2/Y1 comparisons start and end vertical blank when the line value is within the field. A range that
+misses those comparisons can suppress an edge; it cannot stop line or field progression. Equal-tick processing catches
+up system-clock counters, applies beam and dot edges, then runs DMA events.
+
+These constants and edge positions are the documented model derived from PSX-SPX GPU timing and the settled ratio/line
+choices in `.planning/preparation/DECISIONS.md` (DEC.09 and DEC.10), with architecture details in
+`.planning/preparation/ARCHITECTURE.md`, section one. They are doc/derived, not measured hardware results.
+
 ## Source
 
 - [PSX-SPX Graphics Processing Unit chapter](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/) documents GP0 rectangles, E1/E2/E6, texture decoding, modulation, dithering, and blending.

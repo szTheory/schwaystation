@@ -52,6 +52,11 @@ struct schway__gpu {
     uint32_t allow_2mb;
     uint32_t read_latch;
     uint32_t irq_pending;
+    uint64_t beam_tick;
+    uint32_t beam_ratio_remainder;
+    uint32_t beam_line_clock;
+    uint32_t beam_line;
+    uint32_t beam_dot_phase;
     uint16_t texture_cache[SCHWAY__GPU_TEXTURE_CACHE_LINES][SCHWAY__GPU_TEXTURE_CACHE_PIXELS];
     uint32_t texture_tags[SCHWAY__GPU_TEXTURE_CACHE_LINES];
     uint8_t texture_valid[SCHWAY__GPU_TEXTURE_CACHE_LINES];
@@ -60,6 +65,9 @@ struct schway__gpu {
 };
 
 void schway__gpu_reset(schway *inst);
+void schway__gpu_sync(schway *inst, uint64_t now);
+uint64_t schway__gpu_next(const schway *inst);
+void schway__gpu_event(schway *inst, uint64_t now);
 void schway__gpu_word(schway *inst, uint32_t word);
 int schway__gpu_io(schway *inst, uint32_t wr, uint32_t addr, uint32_t width,
                    uint32_t *value, uint32_t *cycles);
@@ -79,6 +87,6 @@ void schway__gpu_rectangle(schway *inst, uint32_t command, uint32_t position,
 void schway__gpu_polygon(schway *inst, const uint32_t *position_words,
                          const uint32_t *color_words, const uint32_t *uv_words,
                          uint32_t vertex_count, uint32_t flags);
-void schway__gpu_state_io(struct schway__state_io *io, schway *inst);
+void schway__gpu_state_io(struct schway__state_io *io, schway *inst, uint64_t state_ticks);
 
 #endif /* SCHWAYSTATION_GPU_H */

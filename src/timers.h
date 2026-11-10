@@ -20,7 +20,7 @@ struct schway__state_io;
    catch-up last ran. */
 struct schway__timer {
     uint32_t value, target, mode, hold;
-    uint32_t reached, irq_line, oneshot_done, paused, free_after;
+    uint32_t reached, irq_line, oneshot_done, paused;
 };
 
 /* base is the tick the stored views are as of. It is not state: a load sets it
@@ -48,6 +48,9 @@ void schway__timers_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, ui
 /* The tick of the next event that would raise a new I_STAT edge, or UINT64_MAX
    for never. */
 uint64_t schway__timers_next(const schway *inst);
+
+/* Timer 0 dot-source steps until its next interrupt edge, or UINT32_MAX for none. */
+uint32_t schway__timers_dot_next(const schway *inst);
 
 /* Runs what is due at tick now. */
 void schway__timers_event(schway *inst, uint64_t now);

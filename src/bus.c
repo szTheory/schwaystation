@@ -462,7 +462,9 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
            is in the register a read returns, and what happened while a bit
            was set is behind a write that acknowledges it. */
         if ((p & 4u) == 0u) {
-            schway__timers_sync(inst, schway__sched_now(inst, *cycles));
+            uint64_t tick = schway__sched_now(inst, *cycles);
+            schway__gpu_sync(inst, tick);
+            schway__timers_sync(inst, tick);
         }
         if (wr == 0u) {
             *value = reg_get((p & 4u) != 0u ? inst->irq.mask : inst->irq.stat, p, width);

@@ -219,25 +219,43 @@ static void case_stall_carries(void)
     schway_destroy(inst);
 }
 
-/* A deadline ends the block that is running, and the event runs at the first
+/* A GPU edge ends the block that is running, and the event runs at the first
    instruction boundary after it. The program is 100 straight-line no-ops, so a
-   block that ignored the deadline would run on past the budget, and the run
-   would end with the deadline still waiting. A deadline far beyond the run is
-   left alone. */
+   block that ignored the deadline would run on past the budget. A beam edge
+   beyond the run is left alone. */
 static void case_event_dispatch(void)
 {
     schway *inst = make();
     load_nops_then_jump(inst);
     run_to_entry(inst);
-    inst->sched.next = inst->ticks + 37u;
+    inst->gpu.display_mode = 1u;
+    inst->gpu.horizontal_range = 1u << 12;
+    inst->gpu.beam_tick = inst->ticks;
+    inst->gpu.beam_ratio_remainder = 0u;
+    inst->gpu.beam_line_clock = 0u;
+    inst->gpu.beam_line = 0u;
+    inst->gpu.beam_dot_phase = 0u;
+    schway__sched_sync(inst);
+    uint64_t deadline = inst->sched.next;
+    CHECK(deadline > inst->ticks && deadline < inst->ticks + 16u);
     (void)run(inst, 200u, 0u);
-    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+    CHECK(inst->ticks >= deadline && inst->ticks < deadline + SCHWAY__INSN_CYCLES_MAX);
+    CHECK((inst->timers.blank & (1u << 1)) != 0u);
+    CHECK(inst->sched.next > deadline);
 
     schway *far = make();
     load_nops_then_jump(far);
     run_to_entry(far);
-    uint64_t at = far->ticks + 100000u;
-    far->sched.next = at;
+    far->gpu.display_mode = 1u;
+    far->gpu.horizontal_range = 1000u << 12;
+    far->gpu.beam_tick = far->ticks;
+    far->gpu.beam_ratio_remainder = 0u;
+    far->gpu.beam_line_clock = 0u;
+    far->gpu.beam_line = 0u;
+    far->gpu.beam_dot_phase = 0u;
+    schway__sched_sync(far);
+    uint64_t at = far->sched.next;
+    CHECK(at > far->ticks + 200u);
     (void)run(far, 200u, 0u);
     CHECK_EQ_U64(far->sched.next, at);
     schway_destroy(inst);
@@ -257,7 +275,7 @@ static void case_state_next_derived(void)
     CHECK_EQ_U64(schway_save_state(inst, buf, n), SCHWAY_STATUS_OK);
     inst->sched.next = 1u;
     CHECK_EQ_U64(schway_load_state(inst, buf, n), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+    CHECK_EQ_U64(inst->sched.next, schway__gpu_next(inst));
     CHECK_EQ_U64(inst->cpu.blk_tick, inst->ticks);
     CHECK_EQ_U64(inst->cpu.blk_cycle, inst->cpu.cycle);
     free(buf);
@@ -295,22 +313,25 @@ static void case_stall_frame_end(void)
     schway_destroy(inst);
 }
 
-/* With no program loaded an event that is due runs at its own deadline inside a
-   run, the deadline is recomputed and the ticks reach the budget; one that is
-   far off is left alone. */
+/* With no program loaded the beam still supplies exact GPU events; the blank
+   transition runs during the bounded call and the next line deadline is kept. */
 static void case_no_exe_events(void)
 {
     schway *inst = make();
-    inst->sched.next = inst->ticks + 100u;
+    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+    inst->gpu.display_mode = 1u;
+    inst->gpu.horizontal_range = 1u << 12;
+    inst->gpu.beam_tick = inst->ticks;
+    inst->gpu.beam_ratio_remainder = 0u;
+    inst->gpu.beam_line_clock = 0u;
+    inst->gpu.beam_line = 0u;
+    inst->gpu.beam_dot_phase = 0u;
+    schway__sched_sync(inst);
     schway_run_result r = run(inst, 500u, 0u);
     CHECK_EQ_U64(r.ticks, 500u);
-    CHECK_EQ_U64(inst->sched.next, UINT64_MAX);
+    CHECK((inst->timers.blank & (1u << 1)) != 0u);
+    CHECK_EQ_U64(inst->sched.next, schway__gpu_next(inst));
     CHECK_EQ_U64(inst->cpu.blk_tick, 500u);
-
-    inst->sched.next = inst->ticks + 100000u;
-    r = run(inst, 500u, 0u);
-    CHECK_EQ_U64(r.ticks, 1000u);
-    CHECK_EQ_U64(inst->sched.next, 500u + 100000u);
     schway_destroy(inst);
 }
 

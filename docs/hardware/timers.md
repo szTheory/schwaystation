@@ -1,7 +1,7 @@
 # Timers
 
 The three root counters are 16-bit up-counters with a target, a reset rule and an interrupt each. This page covers the
-module in `src/timers.c`: the registers and the bits of MODE, the clock sources and which ones count yet, why the
+module in `src/timers.c`: the registers and the bits of MODE, the clock sources, why the
 counters are computed on demand instead of stepped, the rules for targets, wraps and the write hold, the four interrupt
 modes, the one deadline a counter gives the scheduler, the state, and the sources. Everything is integer arithmetic and
 behaves the same on every platform. The block clock the counters read their tick from is described in
@@ -9,12 +9,10 @@ behaves the same on every platform. The block clock the counters read their tick
 
 ## State of the counters
 
-All three counters are built, on the system clock, on the system clock over 8 (counter 2) and on the signals the GPU's
-beam makes. The core has no line machine yet, so nothing in it makes the dot clock or the horizontal blank: a counter
-whose clock source is one of them does not advance by itself, and a synchronisation to the horizontal blank sees no
-blank. The entry points exist and the unit tests push the signals through them. The vertical blank is the frame's own:
-at the end of a frame with a program loaded the frame pushes it high and low at the same tick, since the frame has no
-line machine to give it a width (below). The sections "Synchronisation" and "Beam sources" say what each signal does.
+All three counters are built, on the system clock, on the system clock over 8 (counter 2) and on signals from the GPU
+beam. The beam supplies dot clocks, horizontal blank, vertical blank and field wrap. Its exact integer ratio and derived
+line timing are described in [the GPU page](gpu.md#beam-and-timer-timing); these are documented model values, not new
+hardware measurements. The sections "Synchronisation" and "Beam sources" say what each signal does.
 
 Every address of `1F801100h`-`1F80112Fh` answers at every width, so the range counts as owned. The word at offset `0Ch` of
 each counter reads 0 and drops writes.
@@ -85,9 +83,9 @@ begin. It does not reset the counter by itself, since the write zeroes the count
 3 does when it is written inside a blank, nor whether the hold of a write runs while the counter is paused; the model
 lets the hold run, and these two choices are the model's.
 
-The frame's end makes the vertical blank begin and end at one tick, so a counter 1 in mode 0 is never paused by it, in mode
-1 is reset at it, in mode 2 is reset at it and is then paused for the rest of the frame, and in mode 3 is released by the
-first. When the GPU has a line machine the signal gets its real width and this page's rules need no change.
+The beam now gives vertical blank its configured Y2-to-Y1 interval. A counter 1 in mode 0 pauses for that interval, in
+mode 1 resets at its start, in mode 2 resets at its start and is then paused until the end, and in mode 3 is released by
+its first start edge.
 
 ## Beam sources
 
@@ -96,22 +94,18 @@ first. When the GPU has a line machine the signal gets its real width and this p
 counts the dots, and counter 1 with MODE bit 8 set counts each beginning of the horizontal blank, one step each (psx-spx,
 Timers). A step is one cycle of the counter's own clock, so it uses the hold, the target, the wrap and the interrupt rules
 above in the same way, and a push of many dots costs no more than a push of one; a push of dots to a counter that is not on
-the dot clock does nothing. A counter on one of these sources has no tick to wait for, so it gives the scheduler no deadline:
-it raises its interrupt in the push that makes the edge.
+the dot clock does nothing. A Timer 0 dot target is exposed in dot steps; the GPU converts those steps through its saved
+dot and GPU/CPU phases into a CPU-tick deadline. The IRQ is raised by the dot push at that deadline, without per-dot
+polling. Horizontal-blank counts are raised by the corresponding beam edge.
 
-An access to a counter whose MODE needs a signal that nothing in the core makes yet is counted as an access to a device not
-built yet (the `unbuilt dev=timer` line of the runner) and is never a fault, since a program may read the counter or write
-its MODE for good reasons. These are counter 0 on the dot clock or with synchronisation on (it waits for the horizontal
-blank) and counter 1 on the horizontal blank. Counter 1's synchronisation is not one, nor is anything on counter 2. The
-count is made while a MODE of that kind is in force, whether or not a test pushes signals; a counter in that mode with no
-push stays at its value however many ticks pass, which is what a program that has no beam would see. At power-on, with MODE
-0, no access is counted.
+Counter 0 can count dot clocks or synchronize to horizontal blank; counter 1 can count horizontal blank or synchronize to
+vertical blank. Counter 1's clock is not vertical blank, nor is anything on counter 2. A MODE read or write is an ordinary
+register access in every mode.
 
-The GPU's integer dot accumulator belongs here, so that the dot clock is made without a wide multiply. With `div` the
-number of system clocks per dot of the video mode and `line_clocks` the system clocks of the line or span just passed, the
-dots to push are `dots += (phase + line_clocks) / div` and `phase = (phase + line_clocks) % div`. Never multiply the tick by
-the dot clock's numerator (the product of a 62-bit tick and a 20-bit factor overflows 64 bits, and the 32-bit big-endian and
-wasm32 builds have no 128-bit type), and never use an 11/7 shortcut for the clock ratio.
+The GPU's integer dot accumulator uses whole GPU clocks, never absolute ticks. For `div` GPU clocks per dot and
+`line_clocks` GPU clocks in the span, `dots += (phase + line_clocks) / div` and `phase = (phase + line_clocks) % div`.
+The GPU/CPU ratio remainder is carried separately, so a target's CPU-tick deadline is derived from both phases. This
+avoids wide tick multiplication and preserves exact split-run behavior on every supported integer width.
 
 ## Lazy counting
 
@@ -193,20 +187,14 @@ left with no deadline until the program acknowledges.
 
 ## The state
 
-The state holds each counter's nine fields as they are at the instance's tick, computed by the same function that
+The state holds each counter's eight fields as they are at the instance's tick, computed by the same function that
 applies a span, and not the tick the stored fields were last brought up to date at. The bytes therefore do not depend on
 when a catch-up last ran, and saving changes nothing in the instance. A load stores the fields and makes the loaded tick
 the base. Value and target are 16 bits, mode is the 10 written bits, `hold` is 0 to 2, `reached` has the two flags in
-bits 0 and 1, and the line, one-shot, pause and free-after fields are single bits (the last is for the synchronisation
-modes of counters 0 and 1: it is set when mode 3 has seen its blank). After the counters come the levels of the two
-blanking signals, bit 0 the vertical and bit 1 the horizontal. The deadline is derived from these, never stored: a stored
-deadline from a hostile state would be an event storm or a wait that never ends.
-
-## Not built yet
-
-The beam itself: the dot clock and the horizontal blank have no source in the core, and the vertical blank has no width,
-until the GPU's line machine feeds them. What the hardware shows when a program reads a counter that runs from the dot
-clock or the horizontal blank, which is unstable by a cycle, is not modelled.
+bits 0 and 1, and the line, one-shot and pause fields are single bits. After the counters come the levels of the two
+blanking signals, bit 0 the vertical and bit 1 the horizontal. The beam ratio, line position, dot phase and beam tick are
+validated and serialized with GPU state. Deadlines are derived from those phases, never stored: a hostile state cannot
+inject an event time that storms or waits indefinitely.
 
 ## Sources
 

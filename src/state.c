@@ -96,7 +96,7 @@ static void body_io(struct schway__state_io *io, schway *inst)
                           SCHWAY__STATE_TICKS_MAX + schway__instance_frame_max(inst->region));
     schway__state_check(io, ticks <= frame_end &&
                                 frame_end - ticks <= schway__instance_frame_max(inst->region));
-    schway__gpu_state_io(io, inst);
+    schway__gpu_state_io(io, inst, ticks);
     uint64_t cycle = schway__cpu_state_io(io, inst);
     schway__gte_state_io(io, inst, cycle);
     uint32_t profile_flags = schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u,
