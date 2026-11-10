@@ -3,16 +3,16 @@
 The DMA controller moves blocks of words between main RAM and the devices without the CPU: seven channels, a priority
 register, an interrupt register, and a hold on the CPU's bus accesses while a transfer runs. This page covers the
 engine in `src/dma.c`: the registers and the bits they store, how the next channel is chosen, how a transfer is modelled
-in time, the first channel built (OTC, which builds an ordering table in RAM), what holds the CPU and what does not, and
-the sources. Everything is integer arithmetic and behaves the same on every platform. The bus side, the block clock and
+in time, OTC (which builds an ordering table in RAM), the two block modes and the device ends of the other six channels,
+the cost of a word, what holds the CPU and what does not, and the sources. Everything is integer arithmetic and behaves the same on every platform. The bus side, the block clock and
 the stall in the run loop are in [the CPU page](cpu.md) and [the bus page](bus.md).
 
 ## State of the engine
 
-The registers, arbitration, the interrupt rules, the unit engine, OTC and the CPU hold are built. Channels 0 to 5 keep
-their registers and read them back, and arbitration sees them, but no transfer starts on them yet: a channel written
-with bit 24 set stays busy until the block modes and the device ends are built. Every address of `1F801080h`-`1F8010FFh`
-answers at every width, so the whole range counts as owned rather than unbuilt or a gap.
+The registers, arbitration, the interrupt rules, the unit engine, OTC, the burst and request-block modes with their
+device ends, the costs and the CPU hold are built. A channel written with a mode that has no unit yet (the linked
+list and the reserved mode) keeps its registers and stays busy. Every address of `1F801080h`-`1F8010FFh` answers at
+every width, so the whole range counts as owned rather than unbuilt or a gap.
 
 ## The registers
 
@@ -43,13 +43,14 @@ Bits 28-31 are the CPU's priority and enable fields; they are stored and read ba
 public dma-priority test measured by moving them against a running channel and finding no change. A channel with its
 enable clear does not start.
 
-A channel is waiting when bit 24 of its `CHCR` is set and, where the mode needs a trigger, bit 28 is too: OTC and
-synchronisation mode 0 need it; the request modes start on their own request line. Among the waiting channels with
+A channel is waiting when bit 24 of its `CHCR` is set and its mode has what it needs: OTC and synchronisation mode 0
+need bit 28 too; mode 1 needs the device's request line to be high. Among the waiting channels with
 their enable set the lowest priority value goes first and a tie goes to the higher channel number (psx-spx, DMA
 Channels; the public dma-priority test starts DMA2 and DMA6 together with one `DPCR` write and shows DMA6 finishing
 first at equal priorities and when its value is lower). A `DPCR` write is also a start: a channel that was written
 while its enable was clear starts when the enable is set, which is how the public `dma/dpcr` and nugget tests start a
-channel. While a unit runs, a change to `DPCR` takes effect at the next unit boundary.
+channel. While a unit runs, a change to `DPCR` takes effect at the next unit boundary: the engine arbitrates afresh
+whenever a unit ends, so raising a waiting channel's priority while another runs makes it the next one.
 
 ## DICR and the interrupt edge
 
@@ -116,6 +117,60 @@ The row is documented in psx-spx (DMA Transfer Rates; DRAM Hyper Page mode). The
 cycles for 4,096 words on two consoles, 6 more than the model, which is the cost of the register write path and not
 modelled; a test that pins a range around the model's value is the cross-check, and a measured row is not claimed.
 
+## Sync mode 0, sync mode 1 and the request line
+
+Channels 0 to 5 run two modes, chosen by `CHCR` bits 9-10. Bit 0 gives the direction (1 moves words from RAM to the
+device, 0 from the device to RAM) and bit 1 the step (0 forward by 4, 1 backward by 4). `MADR` wraps at 24 bits, from
+FFFFFCh to 0 and back, and is left after the last word moved. A word whose RAM address is past the RAM window is
+dropped and reads as 0, with no fault.
+
+**Sync mode 0** moves `BCR`'s low half words (0 means 10000h) as one unit, and starts when bits 24 and 28 are set and
+the `DPCR` enable is set. It does not wait for the request line.
+
+**Sync mode 1** moves one block of `BCR`'s low half words per raise of the channel's request line, and `BCR`'s high half
+counts the blocks (0 means 10000h). Each block is a unit. A block takes the request with it: the engine clears the
+channel's request bit when it starts the block, and the device raises the line again when it can take or give another.
+Between blocks the channel stays busy with no unit running, so the CPU runs, and the next block starts as soon as the
+line is high again and arbitration picks the channel. A channel that waits for the line holds nothing: it never stalls
+the CPU, whatever its `CHCR` says. The last block ends the transfer: the flag and the interrupt follow as for any unit,
+and not before. A raise of the line while another unit runs is picked up at that unit's end.
+
+The line is a latched level per channel, set by `schway__dma_dreq`; the devices call it as they are built. The linked
+list mode and the reserved mode have no unit yet.
+
+## The device ends
+
+The device side of a channel is two functions in `src/dma.c`, one for words going to the device and one for words coming
+from it, each a single `switch` on the channel with a case per channel. A case moves one word and returns the extra busy
+cycles the device asks for. A device that is not built is a stand-in in its case: the sink counts the words it is given
+in `dma.words` and folds their bytes, little-endian, into a CRC-32 per channel in `dma.crc`, both kept in the state from
+power-on; the source supplies 0, as every unbuilt device does. The stand-ins ask for no extra cycles. Building a device
+replaces its two cases, and nothing else in the engine changes; there is no table of callbacks and no function pointer
+in the state.
+
+## Costs
+
+| Row | Cycles | Label |
+|---|---|---|
+| MDEC in, MDEC out, GPU and OTC, per word | 1 | `doc` |
+| SPU, per word | 4 | `doc` |
+| CD-ROM, per word | 24 | `doc` |
+| PIO, per word | 20 | `doc` |
+| RAM side, per 16 words | 1 | `doc` |
+| sync mode 1, per block | 11 | `derived` |
+| a chopped burst's windows | fitted per window | `derived` |
+
+The per-word rows are the psx-spx DMA Channels page, section "DMA Transfer Rates"; the RAM row is its "DRAM Hyper Page
+mode" section (17 cycles per 16 words). A unit of `n` words takes `n * rate + ceil(n / 16)` cycles, which is
+`ceil(n * 17 / 16)` at one cycle per word, and a sync mode 1 block of `bs` words takes that plus 11, so
+`blocks * (ceil(17 * bs / 16) + 11)` for a transfer at the fastest rate. The 11 and the chopping model are fitted to the
+64 rows of a public hardware log and are labelled `derived`: a fitted figure is evidence that the model fits the log, not
+evidence of the hardware. Tests pin the documented rows exactly and the fitted ones by their formula.
+
+The CD-ROM row is the BIOS default, 24 cycles per word. Most games write the delay setting that makes it 40 (the same
+page); that cost is not modelled yet, and the CD-ROM device end selects 40 from that setting when it is built. Nothing
+in the engine reads the delay register. The slowest unit the engine bounds is 10000h words at 40 cycles.
+
 ## What holds the CPU
 
 While a unit transfers, the CPU may run on the instruction cache, the scratchpad, COP0 and the GTE, may use the
@@ -138,8 +193,8 @@ against the tick of the access, so a read that comes after the unit's end waits 
 
 ## Not built yet
 
-The synchronisation modes and device ends of channels 0 to 5, chopping, linked lists and the 1000h-node yield, and the
-fault for a mode a channel cannot use come with later stages of the engine; this page grows with them. The hardware's
+The devices behind channels 0 to 5, chopping, linked lists and the 1000h-node yield, and the fault for a mode a channel
+cannot use come with later stages of the engine; this page grows with them. The hardware's
 stop by writing 0 to `CHCR` while busy, and the behaviour of bit 29, are not modelled.
 
 ## Sources
