@@ -1652,6 +1652,44 @@ static void case_fault_sync3(void)
     schway_destroy(inst);
 }
 
+/* Two channels armed at their longest, then a read of a DMA register while the
+   first runs: the read sees the first unit complete, and the engine's state
+   still saves, loads and saves again to the same bytes (the second unit starts
+   at the first's end, not at the read), then both transfers finish in order. */
+static void case_read_chain_saves(void)
+{
+    schway *inst = make();
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00FF0000u);
+    wr32(inst, MADR(3u), 0x20000u);
+    wr32(inst, BCR(3u), 0u);
+    wr32(inst, CHCR(3u), 0x11000000u);
+    wr32(inst, MADR(5u), 0x80000u);
+    wr32(inst, BCR(5u), 0u);
+    wr32(inst, CHCR(5u), 0x11000000u);
+    CHECK_EQ_U64(inst->dma.cur, 3u);
+    uint64_t first_end = inst->dma.busy_until;
+    CHECK_EQ_U64(rd32(inst, CHCR(3u)) & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK(inst->dma.busy_until <= inst->ticks + SCHWAY__DMA_BUSY_MAX);
+    CHECK(inst->sched.next <= first_end);
+    check_state_round_trip(inst);
+    /* The waiting channel starts at the first unit's end and is still busy
+       after it, and both finish with their flags. */
+    for (uint32_t i = 0u; i < 16u && inst->ticks <= first_end; i++) {
+        (void)run(inst, first_end + 1000u);
+    }
+    CHECK_EQ_U64(inst->dma.cur, 5u);
+    CHECK(inst->dma.busy_until > inst->ticks);
+    check_state_round_trip(inst);
+    for (uint32_t i = 0u; i < 16u && inst->dma.cur != SCHWAY__DMA_NONE; i++) {
+        (void)run(inst, 3000000u);
+    }
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64((inst->dma.chcr[3] | inst->dma.chcr[5]) & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(inst->dma.dicr & 0x2A000000u, 0x28000000u);
+    schway_destroy(inst);
+}
+
 static const struct {
     const char *name;
     void (*run)(void);
@@ -1688,6 +1726,7 @@ static const struct {
     {"stall_not_scratch", case_stall_not_scratch},
     {"stall_write_queue", case_stall_write_queue},
     {"otc_read_sees_completion", case_otc_read_sees_completion},
+    {"read_chain_saves", case_read_chain_saves},
 };
 
 int main(int argc, char **argv)

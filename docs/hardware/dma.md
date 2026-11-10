@@ -101,6 +101,10 @@ A register access first brings the engine up to the access's own tick. A write t
 nothing running, starts the channel that goes next; every write recomputes the scheduler's deadline. A register read
 while a unit runs has already held the CPU until the unit's end, so the unit is finished as of that end before the read
 and the program reads the completed state: a `CHCR` read right after a long transfer starts shows bit 24 clear.
+The channel that goes next does not start at the read: it waits, and the scheduler's deadline is the finished unit's end,
+where it starts as it always does. Starting it at the read would put its end a whole unit past a clock that has not
+moved, and two units of 10000h words would exceed the bound a state load enforces, so the core would save a state it
+refuses to load.
 
 ## OTC
 

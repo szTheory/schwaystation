@@ -23,6 +23,7 @@ dma.otc.madr_wrap	dma,portable
 dma.otc.needs_trigger	dma,portable
 dma.otc.read_sees_completion	dma,portable
 dma.otc.readback	dma,portable
+dma.read.chain_saves	dma,portable
 dma.regs.sweep	dma,portable
 dma.stall.cpu_access	dma,portable
 dma.stall.not_scratch	dma,portable

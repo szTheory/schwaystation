@@ -79,7 +79,9 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
 void schway__dma_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint32_t *value,
                     uint32_t *cycles);
 
-/* The tick the engine next needs attention at, or UINT64_MAX for never. */
+/* The tick the engine next needs attention at, or UINT64_MAX for never: the end
+   of the running unit, or, with none running and a channel waiting, the tick that
+   channel starts at. */
 uint64_t schway__dma_next(const schway *inst);
 
 /* Runs what is due at tick now. One call finishes each unit whose busy_until

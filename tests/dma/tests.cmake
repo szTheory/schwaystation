@@ -208,3 +208,10 @@ schway_add_test(NAME dma.regs.sweep
 schway_add_test(NAME dma.fault.sync3
   COMMAND schwaystation-test-dma fault_sync3
   LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: a DMA register read that finishes the running unit and starts
+# the next waiting channel at once, so two maximal units chain past the engine's
+# bound and the core saves a state that its own load refuses.
+schway_add_test(NAME dma.read.chain_saves
+  COMMAND schwaystation-test-dma read_chain_saves
+  LABELS dma portable TIMEOUT 30)

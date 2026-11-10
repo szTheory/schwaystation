@@ -524,23 +524,40 @@ static void dma_finish(schway *inst, uint32_t ch, uint64_t t, uint64_t now)
     dicr_set(inst, dicr);
 }
 
+/* With a unit running, its end. With none running and a channel waiting, the
+   tick that channel starts at, which is the end of the unit before it (only a
+   register read leaves this state: it finishes a running unit ahead of the
+   clock, and the next one must not start before the clock gets there). */
 uint64_t schway__dma_next(const schway *inst)
 {
-    return inst->dma.cur != SCHWAY__DMA_NONE ? inst->dma.busy_until : UINT64_MAX;
+    if (inst->dma.cur == SCHWAY__DMA_NONE &&
+        schway__dma_arbitrate(inst, DMA_UNIT_CHANNELS) == SCHWAY__DMA_NONE) {
+        return UINT64_MAX;
+    }
+    return inst->dma.busy_until;
 }
 
 /* Runs what is due at tick now, in order: a unit whose busy_until is not past
    now finishes at that tick, and the channel that goes next starts at that
-   same tick and may finish too, until none is due. Each finish clears a
-   channel's bit 24, so the loop ends, and every return leaves
-   schway__dma_next strictly greater than now (a unit still running ends after
-   now; with none running it is UINT64_MAX), so the scheduler always makes
-   progress. A unit that passes 1000h list nodes yields in the same way: it
-   returns with the channel still busy and no flag or interrupt. */
-void schway__dma_event(schway *inst, uint64_t now)
+   same tick and may finish too, until none is due. With start_next 0 the loop
+   stops after the finish and the channel that goes next stays waiting; it
+   starts at busy_until, the finished unit's end, in a later call that is due
+   by then. Each finish clears a channel's bit 24, so the loop ends. */
+static void dma_run(schway *inst, uint64_t now, uint32_t start_next)
 {
     struct schway__dma *d = &inst->dma;
-    while (d->cur != SCHWAY__DMA_NONE && d->busy_until <= now) {
+    for (;;) {
+        if (d->cur == SCHWAY__DMA_NONE) {
+            if (start_next == 0u || d->busy_until > now ||
+                schway__dma_arbitrate(inst, DMA_UNIT_CHANNELS) == SCHWAY__DMA_NONE) {
+                return;
+            }
+            dma_start(inst, d->busy_until);
+            continue;
+        }
+        if (d->busy_until > now) {
+            return;
+        }
         uint64_t t = d->busy_until;
         uint32_t ch = d->cur;
         if (d->phase[ch] == DMA_PH_GAP) {
@@ -551,10 +568,17 @@ void schway__dma_event(schway *inst, uint64_t now)
         } else {
             dma_finish(inst, ch, t, now);
         }
-        if (d->cur == SCHWAY__DMA_NONE) {
-            dma_start(inst, t);
-        }
     }
+}
+
+/* Every return leaves schway__dma_next strictly greater than now (a unit
+   still running ends after now; with none running and none waiting it is
+   UINT64_MAX), so the scheduler always makes progress. A unit that passes 1000h
+   list nodes yields in the same way: it returns with the channel still busy and
+   no flag or interrupt. */
+void schway__dma_event(schway *inst, uint64_t now)
+{
+    dma_run(inst, now, 1u);
 }
 
 /* A CPU bus access that waits on the bus at tick now, while a unit is
@@ -673,7 +697,10 @@ static uint32_t dma_read(const schway *inst, uint32_t p)
    start a unit; every write recomputes the scheduler's deadline. A read that
    finds a unit running has already held the CPU until its end (the bus told
    the engine), so the unit is finished as of its end tick before the read, and
-   the program reads the completed state. */
+   the program reads the completed state. The next channel does not start
+   yet: its unit would end a whole unit past a clock that has not moved, beyond
+   what a state may hold, so it starts at the finished unit's end tick, when
+   the clock gets there. */
 void schway__dma_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint32_t *value,
                     uint32_t *cycles)
 {
@@ -686,7 +713,7 @@ void schway__dma_io(schway *inst, uint32_t wr, uint32_t p, uint32_t width, uint3
         return;
     }
     if (d->cur != SCHWAY__DMA_NONE && d->phase[d->cur] != DMA_PH_GAP) {
-        schway__dma_event(inst, d->busy_until);
+        dma_run(inst, d->busy_until, 0u);
         schway__sched_recalc(inst);
     }
     *value = reg_get(dma_read(inst, p), p, width);
