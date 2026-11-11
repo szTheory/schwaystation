@@ -4,17 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
+current_plan: 17 of 49
 status: executing
-stopped_at: Phase 04 focused sizing warnings addressed; ready for coordinator handoff
-last_updated: "2026-11-11T06:14:22Z"
+stopped_at: Completed 04-16-PLAN.md
+last_updated: "2026-11-11T07:12:02.401Z"
 last_activity: 2026-11-11
-last_activity_desc: Phase 04 remaining work split using measured execution evidence
-state_head: e5c3ccddb9533222a97371c148922b1fe7398ef4
+last_activity_desc: Completed Phase 04 plan 04-16 with card reads, stable spans, full CI and hygiene
+state_head: "0bf37baf838f1ea58f1a3a7a5e45a3d8a3b93dd0"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 82
+  completed_plans: 83
   percent: 50
 ---
 
@@ -30,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 14 completed of 49; next ready 04-16 (04-13 also ready)
-Status: Focused sizing warnings addressed; next execution 04-16
-Last activity: 2026-11-11 — Remaining Phase 04 plans resized; independent focused check next
+Current Plan: 17 of 49
+Status: Plan 04-16 complete; ready for the next orchestrated Phase 04 plan.
+Last activity: 2026-11-11 — Card Read/GetID, stable spans, state ownership, full CI and hygiene completed.
 
 Progress: [█████░░░░░] 50%
 
@@ -142,6 +143,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P11 | 100min | 2 tasks | 17 files |
 | Phase 04 P15 | 58min | 2 tasks | 11 files |
 | Phase 04 P12 | 74min+ | 2 tasks | 10 files |
+| Phase 04 P16 | 44 min | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -312,6 +314,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep pending host input outside save states; serialize frame-latched controller input and in-flight protocol state.
 - [Phase 04]: 04-12: Keep dot totals derived from documented beam rates and line lengths; correct CPU sampling cadence using the PAL /4 endpoint trace.
 - [Phase 04]: 04-12: Put GPU-motion frame and continuation-state hashes into the portable lane artifacts, including be32.
+- [Phase 04]: API v4 memory and card names remain additive under the unreleased v4 policy; frozen v1-v3 callers remain unchanged.
+- [Phase 04]: Card bytes and generations stay outside ordinary states; only in-flight card protocol state is serialized.
+- [Phase 04]: Card ACK and Read pause timing are deterministic model values, not new physical hardware measurements.
 
 ### Pending Todos
 
@@ -410,10 +415,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | Phase 04 focused sizing-warning revision | Codex, OpenGSD 1.20.0; focused verification commands, preserved required oracle/hosted evidence | gpt-6.1-sol high |
 
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-16 | Codex, OpenGSD 1.20.0; sequential executor in shared checkout; full CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T05:45:40Z
-Stopped at: Phase 04 remaining-plan sizing complete; focused independent check next
+Last session: 2026-11-11T07:12:02.212Z
+Stopped at: Completed 04-16-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
