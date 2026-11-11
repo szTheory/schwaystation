@@ -27,6 +27,7 @@ dma.otc.read_sees_completion	dma,portable
 dma.otc.readback	dma,portable
 dma.read.chain_saves	dma,portable
 dma.regs.sweep	dma,portable
+dma.spu.request_blocks	dma,portable
 dma.stall.cpu_access	dma,portable
 dma.stall.engines_decay	dma,portable
 dma.stall.not_scratch	dma,portable

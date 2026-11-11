@@ -67,6 +67,13 @@ static void wr32(schway *inst, uint32_t addr, uint32_t v)
     CHECK_EQ_U64(schway__bus_write(inst, addr, 4u, v, &cycles), 0u);
 }
 
+static void wr16(schway *inst, uint32_t addr, uint16_t v)
+{
+    uint32_t cycles = 0u;
+    schway__sched_sync(inst);
+    CHECK_EQ_U64(schway__bus_write(inst, addr, 2u, v, &cycles), 0u);
+}
+
 static uint32_t rd32(schway *inst, uint32_t addr)
 {
     uint32_t cycles = 0u;
@@ -959,6 +966,43 @@ static void case_sync1_dreq_blocks(void)
     /* A request after the end starts nothing. */
     schway__dma_dreq(inst, 4u, 1u);
     CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: ATTR DMA-write mode failing to supply persistent readiness
+   for every request-mode block sent to the unbuilt SPU sink. The 48 words are
+   judged by source RAM pattern, address, block cost and final IRQ state. */
+static void case_spu_request_blocks(void)
+{
+    const uint32_t seed = 0x5A000001u;
+    schway *inst = make();
+    fill_ram(inst, 0x6000u, 48u, seed);
+    wr16(inst, 0x1F801DAAu, 0x0020u);
+    CHECK_EQ_HEX(inst->bus.spu_attr, 0x0020u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00900000u);
+    wr32(inst, MADR(4u), 0x6000u);
+    wr32(inst, BCR(4u), (3u << 16) | 16u);
+    uint64_t start = now_of(inst);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    CHECK_EQ_U64(inst->dma.busy_until - start, 76u);
+    CHECK((inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->dma.dicr & 0x01000000u, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+    CHECK_EQ_HEX(inst->dma.madr[4], 0x6040u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(16u, seed));
+    schway__dma_event(inst, start + 75u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    schway__dma_event(inst, start + 228u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 48u);
+    CHECK_EQ_HEX(inst->dma.madr[4], 0x60C0u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(48u, seed));
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(rd32(inst, DICR), 0x90900000u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
     schway_destroy(inst);
 }
 
@@ -1897,6 +1941,7 @@ static const struct {
     {"gpu_linked_list_readback", case_gpu_linked_list_readback},
     {"sync0_from_device", case_sync0_from_device},
     {"sync1_dreq_blocks", case_sync1_dreq_blocks},
+    {"spu_request_blocks", case_spu_request_blocks},
     {"sync1_no_dreq_no_stall", case_sync1_no_dreq_no_stall},
     {"costs_per_channel", case_costs_per_channel},
     {"dpcr_rearbitrate", case_dpcr_rearbitrate},

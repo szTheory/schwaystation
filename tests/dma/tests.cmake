@@ -124,6 +124,12 @@ schway_add_test(NAME dma.sync1.dreq_blocks
   COMMAND schwaystation-test-dma sync1_dreq_blocks
   LABELS dma portable TIMEOUT 10)
 
+# Fault prevented: ATTR DMA-write readiness that is lost after the first block,
+# moves a wrong RAM pattern, or completes without the modeled cost and IRQ.
+schway_add_test(NAME dma.spu.request_blocks
+  COMMAND schwaystation-test-dma spu_request_blocks
+  LABELS dma portable TIMEOUT 10)
+
 # Fault prevented: a channel waiting for its request line that holds the CPU
 # or slows a program reading RAM.
 schway_add_test(NAME dma.sync1.no_dreq_no_stall
