@@ -345,8 +345,8 @@ loadable, including an unknown image or OpenBIOS; a file name does not establish
 size, or load after a PS-EXE or guest execution returns `SCHWAY_STATUS_ERR_ARGUMENT` without changing the current
 BIOS. A power reset preserves the loaded image and starts the CPU again at `BFC00000h`.
 
-`schway_get_bios_info` reports `SCHWAY_BIOS_INFO_LOADED` and the image's SHA-256 in `sha256`. If no host image was
-loaded, `flags` is zero and the digest bytes are zero; the built-in PS-EXE stub is not reported as a loaded BIOS.
+`schway_get_bios_info` fills `schway_bios_info` with `SCHWAY_BIOS_INFO_LOADED` and the image's SHA-256 in `sha256`.
+If no host image was loaded, `flags` is zero and the digest bytes are zero; the built-in PS-EXE stub is not reported as a loaded BIOS.
 SHA-256 is the image's identity digest. Retail recognition is a separate result based on the MD5 and SHA-1 rows
 in [ASSET_POLICY.md](../ASSET_POLICY.md); the core does not derive a SHA-256 value from those digests.
 

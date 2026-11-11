@@ -830,8 +830,8 @@ foreach(row IN LISTS schway__motion_hashes)
     LABELS fixtures portable TIMEOUT 60)
 endforeach()
 foreach(row IN ITEMS
-    "150|ab25eb56bade19baa1d3b3b85bb9f9d572061e8514f30f8d0450ab78e510977c"
-    "180|743cd46cbbeff839cc83acb6e0ac83ba159645b1adf2388a05b3912d73f034a2")
+    "150|80b9db129988542118edf73eb84fe02b9be083ba71429ce282c0186dd7660065"
+    "180|a6e0524077fd2bd2676eb4463d699c50b90973035e83e073edc660c2a6a9ed00")
   string(REPLACE "|" ";" fields "${row}")
   list(GET fields 0 frame)
   list(GET fields 1 hash)
