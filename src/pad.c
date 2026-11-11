@@ -1,4 +1,4 @@
-/* Pad replies and rumble follow .planning/preparation/PSX-PERIPHERALS-AND-SAVES.md, sections 2.1-2.4. */
+/* Pad replies and rumble follow .planning/preparation/PSX-PERIPHERALS-AND-SAVES.md. */
 #include "internal.h"
 
 #include <string.h>
@@ -24,6 +24,7 @@ static const char name_analog_lock[] = "pad.analog_lock";
 static const char name_selector[] = "pad.selector";
 static const char name_old_rumble[] = "pad.old_rumble";
 static const char name_rumble_locked[] = "pad.rumble_locked";
+static const char name_rumble_map_valid[] = "pad.rumble_map_valid";
 static const char name_rumble_large[] = "pad.rumble_large";
 static const char name_rumble_small[] = "pad.rumble_small";
 static const char name_rumble_stage_large[] = "pad.rumble_stage_large";
@@ -48,6 +49,7 @@ void schway__pad_reset(schway *inst)
         inst->pad.buttons[port] = UINT16_MAX;
         inst->pad.present[port] = 1u;
         inst->pad.device[port] = SCHWAY_INPUT_DEVICE_DIGITAL;
+        inst->pad.rumble_map_valid[port] = 1u;
         for (uint32_t i = 0u; i < 6u; i++) {
             inst->pad.rumble_map[port][i] = 0xFFu;
             inst->pad.rumble_map_stage[port][i] = 0xFFu;
@@ -99,10 +101,12 @@ void schway__pad_frame_start(schway *inst)
                     inst->pad.analog_mode[port] = 1u;
                     inst->pad.analog_lock[port] = 0u;
                     inst->pad.rumble_locked[port] = 0u;
+                    inst->pad.old_rumble[port] = 1u;
                 } else {
                     inst->pad.analog_mode[port] = 0u;
                     inst->pad.config_mode[port] = 0u;
                     inst->pad.watchdog_deadline[port] = 0u;
+                    inst->pad.old_rumble[port] = 0u;
                     inst->pad.rumble_large[port] = 0u;
                     inst->pad.rumble_small[port] = 0u;
                 }
@@ -181,6 +185,7 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u8_array(io, name_selector, inst->pad.selector, 2u, 0u, UINT8_MAX);
     schway__state_u8_array(io, name_old_rumble, inst->pad.old_rumble, 2u, 0u, 1u);
     schway__state_u8_array(io, name_rumble_locked, inst->pad.rumble_locked, 2u, 0u, 1u);
+    schway__state_u8_array(io, name_rumble_map_valid, inst->pad.rumble_map_valid, 2u, 0u, 1u);
     schway__state_u8_array(io, name_rumble_large, inst->pad.rumble_large, 2u, 0u, UINT8_MAX);
     schway__state_u8_array(io, name_rumble_small, inst->pad.rumble_small, 2u, 0u, 1u);
     schway__state_u8_array(io, name_rumble_stage_large, inst->pad.rumble_stage_large, 2u, 0u,
@@ -225,6 +230,7 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
         schway__state_check(io, saved_config[port] == 0u ||
                                     (saved_device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
                                      saved_watchdog[port] != 0u));
+        schway__state_check(io, saved_config[port] != 0u || saved_watchdog[port] == 0u);
     }
 }
 
@@ -266,18 +272,61 @@ static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t
 
 static uint8_t command_reply(const struct schway__pad *pad, uint32_t port, uint32_t index)
 {
-    uint8_t response_mode = pad->response_mode[port];
     switch (pad->command[port]) {
     case 0x42u:
-        if (pad->config_mode[port] != 0u) {
-            return poll_reply(pad, port, index);
-        }
         return poll_reply(pad, port, index);
     case 0x43u:
-        if (response_mode != 0u) {
+        if (pad->response_mode[port] != 0u) {
             return 0u;
         }
         return poll_reply(pad, port, index);
+    case 0x44u:
+        return index == 2u ? pad->selector[port] : 0u;
+    case 0x45u:
+        switch (index) {
+        case 0u:
+            return 0x01u;
+        case 1u:
+            return 0x02u;
+        case 2u:
+            return pad->analog_mode[port] != 0u ? 1u : 0u;
+        case 3u:
+            return 0x02u;
+        case 4u:
+            return 0x01u;
+        default:
+            return 0u;
+        }
+    case 0x46u:
+        if (pad->selector[port] > 1u) {
+            return 0xFFu;
+        }
+        switch (index) {
+        case 2u:
+            return 0x01u;
+        case 3u:
+            return pad->selector[port] == 0u ? 0x02u : 0x01u;
+        case 4u:
+            return pad->selector[port] == 0u ? 0u : 1u;
+        case 5u:
+            return pad->selector[port] == 0u ? 10u : 20u;
+        default:
+            return 0u;
+        }
+    case 0x47u:
+        switch (index) {
+        case 2u:
+            return 0x02u;
+        case 4u:
+            return 0x01u;
+        default:
+            return 0u;
+        }
+    case 0x4Cu:
+        if (pad->selector[port] > 1u) {
+            return 0xFFu;
+        }
+        return index == 3u ? (pad->selector[port] == 0u ? 0x04u : 0x07u) : 0u;
     case 0x4Du:
         return pad->rumble_map[port][index];
     default:
@@ -290,13 +339,14 @@ static void finish_payload(schway *inst, uint32_t port, uint64_t now)
     struct schway__pad *pad = &inst->pad;
     uint8_t command = pad->command[port];
     if (command == 0x42u) {
-        if (pad->config_mode[port] != 0u) {
+        if (pad->rumble_locked[port] == 0u && pad->config_mode[port] != 0u) {
             pad->rumble_large[port] = pad->rumble_stage_large[port];
             pad->rumble_small[port] = pad->rumble_stage_small[port];
-        } else if (pad->old_rumble[port] != 0u) {
+        } else if (pad->rumble_locked[port] == 0u && pad->old_rumble[port] != 0u &&
+                   pad->analog_mode[port] == 0u) {
             uint8_t large = pad->rumble_stage_large[port];
             uint8_t small = pad->rumble_stage_small[port];
-            pad->rumble_large[port] = large >= 0x40u && large <= 0x7Fu && small != 0u
+            pad->rumble_large[port] = large >= 0x40u && large <= 0x7Fu && (small & 1u) != 0u
                                           ? 0xFFu
                                           : 0u;
             pad->rumble_small[port] = 0u;
@@ -308,8 +358,10 @@ static void finish_payload(schway *inst, uint32_t port, uint64_t now)
         }
         refresh_watchdog(inst, port, now);
     } else if (command == 0x4Du) {
-        for (uint32_t i = 0u; i < 6u; i++) {
-            pad->rumble_map[port][i] = pad->rumble_map_stage[port][i];
+        if (pad->rumble_map_valid[port] != 0u) {
+            for (uint32_t i = 0u; i < 6u; i++) {
+                pad->rumble_map[port][i] = pad->rumble_map_stage[port][i];
+            }
         }
         refresh_watchdog(inst, port, now);
     }
@@ -324,13 +376,14 @@ static uint8_t pad_payload(schway *inst, uint32_t port, uint8_t sent, uint64_t n
     uint8_t received = command_reply(pad, port, index);
     uint8_t command = pad->command[port];
     if (command == 0x42u) {
-        uint8_t mapping = pad->rumble_map[port][index];
-        if (mapping == 0u) {
-            pad->rumble_stage_small[port] = sent & 1u;
-        } else if (mapping == 1u) {
-            pad->rumble_stage_large[port] = sent;
-        }
-        if (pad->config_mode[port] == 0u && pad->old_rumble[port] != 0u) {
+        if (pad->config_mode[port] != 0u) {
+            uint8_t mapping = pad->rumble_map[port][index];
+            if (mapping == 0u) {
+                pad->rumble_stage_small[port] = sent & 1u;
+            } else if (mapping == 1u) {
+                pad->rumble_stage_large[port] = sent;
+            }
+        } else if (pad->old_rumble[port] != 0u && pad->analog_mode[port] == 0u) {
             if (index == 0u) {
                 pad->rumble_stage_large[port] = sent;
             } else if (index == 1u) {
@@ -352,8 +405,31 @@ static uint8_t pad_payload(schway *inst, uint32_t port, uint8_t sent, uint64_t n
         if (sent == 0u || sent == 1u || sent == 0xFFu) {
             pad->rumble_map_stage[port][index] = sent;
         } else {
+            pad->rumble_map_valid[port] = 0u;
             received = 0xFFu;
         }
+        refresh_watchdog(inst, port, now);
+    } else if (command == 0x44u) {
+        if (index == 0u) {
+            if (sent <= 1u) {
+                pad->analog_mode[port] = sent;
+            } else {
+                pad->selector[port] = 1u;
+            }
+        } else if (index == 1u) {
+            if (sent <= 3u) {
+                pad->analog_lock[port] = sent == 3u ? 1u : 0u;
+            } else {
+                pad->selector[port] = 1u;
+            }
+        }
+        refresh_watchdog(inst, port, now);
+    } else if (command == 0x46u || command == 0x4Cu) {
+        if (index == 0u) {
+            pad->selector[port] = sent <= 1u ? sent : 0xFFu;
+        }
+        refresh_watchdog(inst, port, now);
+    } else if (command == 0x45u || command == 0x47u) {
         refresh_watchdog(inst, port, now);
     }
     pad->data_index[port]++;
@@ -396,19 +472,30 @@ uint32_t schway__pad_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t no
             pad->command[port] = sent;
             pad->response_mode[port] = pad->config_mode[port];
             pad->old_rumble[port] = 0u;
+            pad->rumble_large[port] = 0u;
+            pad->rumble_small[port] = 0u;
             *received = pad->config_mode[port] != 0u ? 0xF3u : normal_id(pad, port);
             pad->phase[port] = PAD_ID_END;
             refresh_watchdog(inst, port, now);
             return 1u;
         }
-        if (sent == 0x4Du && pad->device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
-            pad->config_mode[port] != 0u) {
+        if (pad->device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
+            pad->config_mode[port] != 0u &&
+            (sent == 0x44u || sent == 0x45u || sent == 0x46u || sent == 0x47u ||
+             sent == 0x4Cu || sent == 0x4Du)) {
             pad->command[port] = sent;
             pad->response_mode[port] = 1u;
             pad->old_rumble[port] = 0u;
+            pad->rumble_large[port] = 0u;
+            pad->rumble_small[port] = 0u;
             *received = 0xF3u;
             pad->phase[port] = PAD_ID_END;
-            memset(pad->rumble_map_stage[port], 0xFF, sizeof pad->rumble_map_stage[port]);
+            pad->selector[port] = 0u;
+            if (sent == 0x4Du) {
+                pad->rumble_map_valid[port] = 1u;
+                memcpy(pad->rumble_map_stage[port], pad->rumble_map[port],
+                       sizeof pad->rumble_map_stage[port]);
+            }
             refresh_watchdog(inst, port, now);
             return 1u;
         }
@@ -418,7 +505,10 @@ uint32_t schway__pad_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t no
         *received = 0x5Au;
         if (pad->command[port] == 0x42u) {
             pad->phase[port] = PAD_PAYLOAD;
-        } else if (pad->command[port] == 0x43u || pad->command[port] == 0x4Du) {
+        } else if (pad->command[port] == 0x43u || pad->command[port] == 0x44u ||
+                   pad->command[port] == 0x45u || pad->command[port] == 0x46u ||
+                   pad->command[port] == 0x47u || pad->command[port] == 0x4Cu ||
+                   pad->command[port] == 0x4Du) {
             pad->phase[port] = PAD_PAYLOAD;
         } else {
             pad->phase[port] = PAD_IDLE;

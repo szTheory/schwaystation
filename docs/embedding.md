@@ -86,6 +86,29 @@ The appended `schway_run_result.lag` is 1 when no complete controller poll occur
 count. `rumble[0]` and `rumble[1]` report each port as `large << 8 | small`, where large is 0–255 and small is
 0 or 1. A smaller result struct from an older caller keeps its existing fields and is not written past its `size`.
 
+### DualShock commands and rumble
+
+An analog DualShock answers a normal `42h` poll with ID `73h`; digital mode uses `41h`. Config mode answers
+`F3h`, and its `42h` poll always includes buttons and all four axes. Command `43h` enters config with data byte
+`01h` and leaves it with `00h`. Outside config its six reply bytes are the normal poll; inside config they are
+zeroes.
+
+In config mode, command `44h` sets the analog LED (data byte 0: `00h` off, `01h` on) and analog-button lock
+(data byte 1: `03h` locks; `00h`–`02h` unlock). Its response is `00 00 Err 00 00 00`. Command `45h` reports
+`01 02 analogMode 02 01 00`. Command `46h` selects actuator information: selector `00h` reports
+`00 00 01 02 00 0A`; selector `01h` reports `00 00 01 01 01 14`. Command `47h` returns
+`00 00 02 00 01 00`. Command `4Ch` returns `00 00 00 04 00 00` for selector `00h` or
+`00 00 00 07 00 00` for `01h`.
+
+Command `4Dh` returns the previous six motor-map bytes while installing the new mapping when the transfer
+completes. Each entry is `00h` for the small motor's bit 0, `01h` for the large motor's byte, or `FFh` to ignore
+that poll byte. The default is six `FFh` entries; `00 01 FF FF FF FF` enables both motors.
+
+Before a config command is used, the older two-byte motor request turns on the single motor when its first data
+byte is `40h`–`7Fh` and bit 0 of the second byte is set; `00 00` turns it off. Config use disables this older
+method until reset. If no command arrives for exactly 33,868,800 emulated CPU ticks, the pad exits config, returns
+to digital mode and locks rumble until reset. The host receives the motor levels in `schway_run_result.rumble`.
+
 ## The allocator
 
 ```c

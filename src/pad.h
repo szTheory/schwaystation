@@ -24,6 +24,7 @@ struct schway__pad {
     uint8_t selector[2];
     uint8_t old_rumble[2];
     uint8_t rumble_locked[2];
+    uint8_t rumble_map_valid[2];
     uint8_t rumble_large[2];
     uint8_t rumble_small[2];
     uint8_t rumble_stage_large[2];
