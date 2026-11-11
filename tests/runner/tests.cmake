@@ -136,6 +136,65 @@ if(CMAKE_SCRIPT_MODE_FILE)
     if(NOT event_after_output STREQUAL event_repeat_output)
       message(FATAL_ERROR "replaying the same input movie changed its hashes")
     endif()
+  elseif(CASE STREQUAL "inputs_controls")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    function(accept_input_movie name contents frames result_name)
+      set(path "${OUT}/runner-input-${name}.txt")
+      file(WRITE "${path}" "${contents}")
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state --inputs "${path}"
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame ${frames} sha256 ${digits}" OR
+         NOT out MATCHES "state sha256 ${digits}")
+        message(FATAL_ERROR "valid input '${name}': expected exit 0 and frame/state hashes, "
+          "got exit ${rc}\n${out}${err}")
+      endif()
+      set(${result_name} "${out}" PARENT_SCOPE)
+    endfunction()
+    function(refuse_input_movie name contents)
+      set(path "${OUT}/runner-input-${name}.txt")
+      file(WRITE "${path}" "${contents}")
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash --hash-state --inputs "${path}"
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "2" OR NOT out STREQUAL "" OR NOT err MATCHES "invalid input movie" OR
+         NOT err MATCHES "usage")
+        message(FATAL_ERROR "invalid input '${name}': expected bounded usage refusal before output, "
+          "got exit ${rc}\n${out}${err}")
+      endif()
+    endfunction()
+    string(CONCAT endpoints "# controller endpoints\r\n"
+      "1000000 p1=dualshock:.:0,255,0,255 p2=.\r\n"
+      "1 p1=dualshock:UDLRSsTOXQ1234<>M:0,255,0,255 p2=digital:UDLRSsTOXQ1234:128,128,128,128 # frame one\r\n")
+    accept_input_movie(endpoints "${endpoints}" 1 endpoints_output)
+    string(CONCAT duplicate "2 p1=dualshock:X:128,128,128,128 p2=.\n"
+      "2 p1=dualshock:X:128,128,128,128 p2=.\n")
+    accept_input_movie(duplicate "${duplicate}" 2 duplicate_output)
+    if(NOT duplicate_output MATCHES "frame 2 sha256 ${digits}")
+      message(FATAL_ERROR "an identical same-frame record was not accepted")
+    endif()
+    refuse_input_movie(frame_zero "0 p1=. p2=.\n")
+    refuse_input_movie(frame_over "1000001 p1=. p2=.\n")
+    refuse_input_movie(frame_overflow "4294967295 p1=. p2=.\n")
+    refuse_input_movie(port_zero "1 p0=. p2=.\n")
+    refuse_input_movie(port_three "1 p1=. p3=.\n")
+    refuse_input_movie(port_order "1 p2=. p1=.\n")
+    refuse_input_movie(device "1 p1=analog:.:128,128,128,128 p2=.\n")
+    refuse_input_movie(button_symbol "1 p1=digital:Z:128,128,128,128 p2=.\n")
+    refuse_input_movie(button_repeat "1 p1=digital:XX:128,128,128,128 p2=.\n")
+    string(ASCII 233 non_ascii)
+    refuse_input_movie(non_ascii "1 p1=digital:${non_ascii}:128,128,128,128 p2=.\n")
+    refuse_input_movie(axis_low "1 p1=dualshock:.:-1,128,128,128 p2=.\n")
+    refuse_input_movie(axis_high "1 p1=dualshock:.:256,128,128,128 p2=.\n")
+    refuse_input_movie(axis_encoding "1 p1=dualshock:.:1x,128,128,128 p2=.\n")
+    refuse_input_movie(missing_axis "1 p1=dualshock:.:128,128,128 p2=.\n")
+    string(CONCAT conflicting_frame "2 p1=dualshock:X:128,128,128,128 p2=.\n"
+      "2 p1=dualshock:.:128,128,128,128 p2=.\n")
+    refuse_input_movie(conflicting_frame "${conflicting_frame}")
+    string(CONCAT late_invalid "1 p1=dualshock:X:128,128,128,128 p2=.\n"
+      "2 p1=dualshock:.:999,128,128,128 p2=.\n")
+    refuse_input_movie(late_invalid "${late_invalid}")
+    refuse(--frames 1 --inputs)
+    refuse(--frames 1 --inputs "${OUT}/runner-input-endpoints.txt" --inputs "${OUT}/runner-input-endpoints.txt")
+    expect_exit(1 "cannot read input movie" --frames 1 --inputs "${OUT}/runner-input-missing.txt")
   elseif(CASE STREQUAL "no_args")
     refuse()
   elseif(CASE STREQUAL "unknown")
@@ -353,6 +412,12 @@ schway_add_test(NAME runner.hash_state
 # changes the content-free frame instead of the serialized latched input state.
 schway_add_test(NAME runner.inputs.script
   COMMAND ${runner_check} -DCASE=inputs_script -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: malformed frame, port, button, axis, ordering, or encoding values reaching the core.
+schway_add_test(NAME runner.inputs.controls
+  COMMAND ${runner_check} -DCASE=inputs_controls -DOUT=${PROJECT_BINARY_DIR}/tests
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
