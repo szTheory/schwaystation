@@ -17,8 +17,8 @@
  * The hash is SHA-256 over the video metadata as 13 little-endian u32 words
  * (field, interlaced, vres, hres, dot_div, region, x1, y1, start_x, start_y,
  * enabled, rgb24, bpp), then the display rows top to bottom, each pixel as a
- * little-endian u16, with no padding (ARCHITECTURE section 7), so it does not
- * depend on the host's byte order.
+ * little-endian u16 (RGB555) or packed RGB byte triples (RGB24), with no
+ * padding (ARCHITECTURE section 7), so it does not depend on host byte order.
  *
  * --hash-state prints, after the frame line and every other line, the SHA-256 of the saved state
  * without its 20-byte header:
@@ -75,6 +75,7 @@
 #include "bench.h"
 #include "clock.h"
 #include "exit_status.h"
+#include "frame_hash.h"
 #include "mailbox.h"
 #include "png.h"
 #include "probe.h"
@@ -84,6 +85,7 @@
 #include "sha256.h"
 #include "stop.h"
 #include "trace.h"
+#include "tty.h"
 #include "xrgb8888.h"
 
 /* The tests build a second runner with SCHWAY_RUN_RAISE_AT=N, which raises
@@ -341,15 +343,6 @@ static int parse_options(int argc, char **argv, options *o)
     return SCHWAY__EXIT_OK;
 }
 
-static void put_u32(schway__sha256 *s, uint32_t v)
-{
-    uint8_t b[4];
-    for (uint32_t i = 0; i < 4u; i++) {
-        b[i] = (uint8_t)(v >> (8u * i));
-    }
-    schway__sha256_update(s, b, sizeof b);
-}
-
 /* Prints the hash line for the frame just run. Returns the exit status. */
 static int print_hash(const schway *inst, uint32_t frames)
 {
@@ -362,34 +355,11 @@ static int print_hash(const schway *inst, uint32_t frames)
                 schway_status_string(st));
         return SCHWAY__EXIT_FAILURE;
     }
-    if (v.bpp != 16u || v.width > 1024u) {
+    char hex[65];
+    if (!schway__runner_frame_hash(&v, hex)) {
         fprintf(stderr, "schwaystation-run: unexpected video format\n");
         return SCHWAY__EXIT_FAILURE;
     }
-    const uint32_t tuple[13] = {v.field,  v.interlaced, v.vres,    v.hres,    v.dot_div,
-                                v.region, v.x1,         v.y1,      v.start_x, v.start_y,
-                                v.enabled, v.rgb24,     v.bpp};
-    schway__sha256 s;
-    uint8_t digest[32];
-    char hex[65];
-    uint8_t row[2u * 1024u];
-    schway__sha256_init(&s);
-    for (size_t i = 0; i < sizeof tuple / sizeof tuple[0]; i++) {
-        put_u32(&s, tuple[i]);
-    }
-    /* Each row is serialised low byte first before hashing, so the result is
-       the same on a big-endian host. */
-    const uint8_t *base = (const uint8_t *)v.pixels;
-    for (uint32_t y = 0; y < v.height; y++) {
-        const uint16_t *src = (const uint16_t *)(const void *)(base + (size_t)y * v.pitch_bytes);
-        for (uint32_t x = 0; x < v.width; x++) {
-            row[2u * x] = (uint8_t)(src[x] & 0xFFu);
-            row[2u * x + 1u] = (uint8_t)(src[x] >> 8);
-        }
-        schway__sha256_update(&s, row, (size_t)v.width * 2u);
-    }
-    schway__sha256_final(&s, digest);
-    schway__sha256_hex(digest, hex);
     printf("frame %lu sha256 %s\n", (unsigned long)frames, hex);
     return SCHWAY__EXIT_OK;
 }
@@ -441,8 +411,12 @@ static int write_png(const schway *inst, const char *path)
                 schway_status_string(st));
         return SCHWAY__EXIT_FAILURE;
     }
+    if (!schway_host_video_valid(&v)) {
+        fprintf(stderr, "schwaystation-run: unexpected video format\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
     size_t size = schway__png_size(v.width, v.height);
-    if (v.bpp != 16u || v.width > 1024u || v.height > 512u || size == 0u) {
+    if (size == 0u) {
         fprintf(stderr, "schwaystation-run: unexpected video format\n");
         return SCHWAY__EXIT_FAILURE;
     }
@@ -455,19 +429,25 @@ static int write_png(const schway *inst, const char *path)
         fprintf(stderr, "schwaystation-run: out of memory\n");
         status = SCHWAY__EXIT_FAILURE;
     } else {
-        schway_host_xrgb8888_frame(&v, xrgb, v.width);
-        for (size_t i = 0; i < count; i++) {
-            rgb[3u * i] = (uint8_t)(xrgb[i] >> 16);
-            rgb[3u * i + 1u] = (uint8_t)(xrgb[i] >> 8);
-            rgb[3u * i + 2u] = (uint8_t)xrgb[i];
+        size_t n = 0u;
+        if (schway_host_xrgb8888_frame(&v, xrgb, v.width)) {
+            for (size_t i = 0; i < count; i++) {
+                rgb[3u * i] = (uint8_t)(xrgb[i] >> 16);
+                rgb[3u * i + 1u] = (uint8_t)(xrgb[i] >> 8);
+                rgb[3u * i + 2u] = (uint8_t)xrgb[i];
+            }
+            n = schway__png_write(file, size, rgb, v.width, v.height);
         }
-        size_t n = schway__png_write(file, size, rgb, v.width, v.height);
+        if (n == 0u) {
+            fprintf(stderr, "schwaystation-run: unexpected video format\n");
+            status = SCHWAY__EXIT_FAILURE;
+        }
         FILE *f = n != 0u ? fopen(path, "wb") : NULL;
         int ok = f != NULL && fwrite(file, 1, n, f) == n;
         if (f != NULL && fclose(f) != 0) {
             ok = 0;
         }
-        if (!ok) {
+        if (n != 0u && !ok) {
             fprintf(stderr, "schwaystation-run: cannot write %s\n", path);
             if (f != NULL) {
                 (void)remove(path);
@@ -482,8 +462,7 @@ static int write_png(const schway *inst, const char *path)
 }
 
 /* The guest's text, collected a line at a time. A line is the bytes up to a
-   0Ah, which is not part of it; bytes are printed as they came, with no
-   character-set conversion. */
+   0Ah, which is not part of it; other non-text bytes are replaced with '?'. */
 typedef struct tty_lines {
     uint8_t line[TTY_LINE_MAX];
     uint32_t len;
@@ -518,7 +497,7 @@ static void tty_drain(schway *inst, tty_lines *t)
             if (t->len == TTY_LINE_MAX) {
                 tty_emit(t);
             }
-            t->line[t->len++] = bytes[i];
+            t->line[t->len++] = schway__runner_tty_byte(bytes[i]);
         }
     }
 }

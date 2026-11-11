@@ -177,8 +177,8 @@ static uint8_t *read_file(const char *path, size_t limit, size_t *n)
     return buf;
 }
 
-/* The runner's PNG of frame 5 is the card's frame 5 through the converter,
-   whose rule the xrgb8888 case pins on its own. */
+/* The runner's PNG of frame 5 is the card's frame 5 with independent
+   RGB555-to-RGB8 expectations. */
 static void png_file(const char *path)
 {
     enum { W = 320, H = 240, FRAME = 5 };
@@ -285,6 +285,24 @@ static void rgb24(void)
     CHECK_EQ_HEX(dst[1][0], 0x000000FFu);
     CHECK_EQ_HEX(dst[1][1], 0x00FFFFFFu);
     CHECK_EQ_HEX(dst[1][2], 1u);
+
+    /* The PNG pixels are checked against literals, not a call to the shared
+       converter, so a common color error cannot make both sides pass. */
+    uint8_t png_rgb[12];
+    for (uint32_t y = 0; y < 2u; y++) {
+        for (uint32_t x = 0; x < 2u; x++) {
+            uint32_t pixel = dst[y][x];
+            png_rgb[6u * y + 3u * x] = (uint8_t)(pixel >> 16);
+            png_rgb[6u * y + 3u * x + 1u] = (uint8_t)(pixel >> 8);
+            png_rgb[6u * y + 3u * x + 2u] = (uint8_t)pixel;
+        }
+    }
+    static const uint8_t expected[12] = {255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255};
+    uint8_t png[82], decoded[14];
+    CHECK_EQ_U64(schway__png_write(png, sizeof png, png_rgb, 2u, 2u), sizeof png);
+    CHECK(decode(png, sizeof png, 2u, 2u, decoded) == 0);
+    CHECK(memcmp(decoded + 1, expected, 6) == 0);
+    CHECK(memcmp(decoded + 8, expected + 6, 6) == 0);
 }
 
 /* The validator applies the same hard native bounds to hashes and PNGs. */
@@ -303,6 +321,8 @@ static void video_bounds(void)
     CHECK_EQ_U64(schway_host_video_valid(&v), 1u);
     v.height = 513;
     CHECK_EQ_U64(schway_host_video_valid(&v), 0u);
+    uint32_t output[4];
+    CHECK_EQ_U64(schway_host_xrgb8888_frame(&v, output, 2), 0u);
     v.height = 2;
     v.width = 1025;
     CHECK_EQ_U64(schway_host_video_valid(&v), 0u);
