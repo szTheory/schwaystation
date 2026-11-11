@@ -1,4 +1,9 @@
 /* Host-only file operations for raw memory cards. */
+#ifndef _WIN32
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#endif
 #include "cards.h"
 
 #include <errno.h>
@@ -11,6 +16,7 @@
 #include <windows.h>
 #include <fcntl.h>
 #include <io.h>
+#include <share.h>
 #include <sys/stat.h>
 #else
 #include <fcntl.h>
@@ -34,7 +40,12 @@
 static int schway__host_cards_open_temp(const char *path)
 {
 #ifdef _WIN32
-    return _open(path, _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY, _S_IREAD | _S_IWRITE);
+    int fd = -1;
+    if (_sopen_s(&fd, path, _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY, _SH_DENYNO,
+                 _S_IREAD | _S_IWRITE) != 0) {
+        return -1;
+    }
+    return fd;
 #else
     return open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
 #endif
