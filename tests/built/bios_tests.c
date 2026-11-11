@@ -316,6 +316,61 @@ static void identity(void)
     CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_RECOGNIZED);
     CHECK_EQ_U64(info.region, SCHWAY_REGION_NTSC_U);
     CHECK(memcmp(info.sha256, expected_sha256, sizeof expected_sha256) == 0);
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    CHECK_EQ_U64(schway_get_bios_info(inst, &info), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(info.flags, SCHWAY_BIOS_INFO_LOADED | SCHWAY_BIOS_INFO_RECOGNIZED);
+    CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_RECOGNIZED);
+    CHECK_EQ_U64(info.region, SCHWAY_REGION_NTSC_U);
+    CHECK(memcmp(info.sha256, expected_sha256, sizeof expected_sha256) == 0);
+    schway_destroy(inst);
+}
+
+static void identity_edges(void)
+{
+    static uint8_t zero_bios[SCHWAY_BIOS_SIZE];
+    schway *inst = new_instance();
+    if (inst == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(schway_load_bios(inst, zero_bios, sizeof zero_bios), SCHWAY_STATUS_OK);
+
+    /* The synthetic lookup key is isolated from the production digest table. */
+    schway_bios_info info;
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    CHECK_EQ_U64(schway_get_bios_info(inst, &info), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(info.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(info.region, SCHWAY_BIOS_REGION_UNKNOWN);
+    uint8_t sha256_before_reset[sizeof info.sha256];
+    memcpy(sha256_before_reset, info.sha256, sizeof sha256_before_reset);
+
+    /* The original 40-byte output prefix remains valid and is not over-written. */
+    schway_bios_info legacy;
+    memset(&legacy, 0xA5, sizeof legacy);
+    legacy.size = 40u;
+    CHECK_EQ_U64(schway_get_bios_info(inst, &legacy), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(legacy.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_HEX(legacy.status, 0xA5A5A5A5u);
+    CHECK_EQ_HEX(legacy.region, 0xA5A5A5A5u);
+
+    schway_bios_info invalid;
+    memset(&invalid, 0x5A, sizeof invalid);
+    invalid.size = 39u;
+    schway_bios_info before = invalid;
+    CHECK_EQ_U64(schway_get_bios_info(inst, &invalid), SCHWAY_STATUS_ERR_STRUCT_SIZE);
+    CHECK(memcmp(&invalid, &before, sizeof invalid) == 0);
+
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    CHECK_EQ_U64(schway_get_bios_info(inst, &info), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(info.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(info.region, SCHWAY_BIOS_REGION_UNKNOWN);
+    CHECK(memcmp(info.sha256, sha256_before_reset, sizeof sha256_before_reset) == 0);
     schway_destroy(inst);
 }
 
@@ -328,6 +383,8 @@ int main(int argc, char **argv)
         copy_edges();
     } else if (argc == 2 && strcmp(argv[1], "identity") == 0) {
         identity();
+    } else if (argc == 2 && strcmp(argv[1], "identity_edges") == 0) {
+        identity_edges();
     } else {
         CHECK(0);
     }

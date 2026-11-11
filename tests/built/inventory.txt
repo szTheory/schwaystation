@@ -1,4 +1,5 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
 built.bios.copy_edges	bios,portable
 built.bios.identity	bios,portable
+built.bios.identity_edges	bios,portable
 built.bios.synthetic_rom	bios,portable

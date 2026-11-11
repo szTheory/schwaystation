@@ -33,3 +33,7 @@ schway_add_test(NAME built.bios.copy_edges
 schway_add_test(NAME built.bios.identity
   COMMAND schwaystation-test-bios-synthetic identity
   LABELS bios portable TIMEOUT 10)
+
+schway_add_test(NAME built.bios.identity_edges
+  COMMAND schwaystation-test-bios identity_edges
+  LABELS bios portable TIMEOUT 10)

@@ -356,6 +356,9 @@ facts in the pinned libretro `System.dat` rows in [ASSET_POLICY.md](../ASSET_POL
 are retained as source metadata. The core does not infer SHA-256 from either DAT digest. Unknown images and OpenBIOS
 remain loadable and report unknown recognition.
 
+The original 40-byte `schway_bios_info` prefix remains valid for callers built before status and region were added.
+When such a caller sets `size` to 40, the core writes through `sha256` and leaves the appended fields untouched.
+
 BIOS bytes are not included in ordinary save states. A state stores the loaded-image flag and SHA-256 identity, and
 `schway_load_state` refuses a state made with a different BIOS before changing the instance.
 
