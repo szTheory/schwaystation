@@ -741,6 +741,119 @@ static void split_with_exe(const char *dir)
     schway_destroy(inst);
 }
 
+/* Copies the public frame view so later runs cannot change the saved image. */
+static size_t copy_motion_video(const schway *inst, uint32_t frame, uint8_t **copy)
+{
+    schway_video video;
+    memset(&video, 0, sizeof video);
+    video.size = (uint32_t)sizeof video;
+    CHECK_EQ_U64(schway_get_video(inst, &video), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(video.frame, frame);
+    CHECK_EQ_U64(video.width, 256u);
+    CHECK_EQ_U64(video.height, 240u);
+    CHECK_EQ_U64(video.pitch_bytes, 512u);
+    CHECK_EQ_U64(video.bpp, 16u);
+    CHECK_EQ_U64(video.dot_div, 10u);
+    CHECK_EQ_U64(video.region, SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(video.enabled, 1u);
+    CHECK_EQ_U64(video.rgb24, 0u);
+    size_t size = (size_t)video.pitch_bytes * video.height;
+    CHECK(video.pixels != NULL && size != 0u);
+    *copy = (uint8_t *)malloc(size);
+    if (*copy == NULL || video.pixels == NULL) {
+        exit(1);
+    }
+    memcpy(*copy, video.pixels, size);
+    return size;
+}
+
+static void check_motion_pixels(const uint8_t *pixels, uint32_t drawn)
+{
+    const uint16_t *words = (const uint16_t *)pixels;
+    for (uint32_t x = 0u; x < drawn; x++) {
+        CHECK_EQ_HEX(words[100u * 256u + x], 0x001Fu);
+    }
+    CHECK_EQ_HEX(words[100u * 256u + drawn], 0u);
+}
+
+/* The assembled program draws one new GP0 pixel per beam interrupt. Check the
+   visible pixels at three points and prove a frame-150 save can resume to the
+   same frame and complete state as straight execution.
+   Fault prevented: GPU commands that do not affect scan-out, a stationary
+   primitive, or VRAM/frame state lost by loading a saved state. */
+static void gpu_motion(const char *dir)
+{
+    size_t exe_size = 0u;
+    uint8_t *exe = read_file(dir, "gpu_motion.exe", &exe_size);
+    schway *straight = make();
+    load(straight, exe, exe_size);
+    free(exe);
+
+    uint8_t *frame60 = NULL;
+    uint8_t *frame120 = NULL;
+    uint8_t *frame180 = NULL;
+    size_t frame_size = 0u;
+    size_t state_size = schway_state_size(straight);
+    uint8_t *state150 = (uint8_t *)malloc(state_size);
+    if (state150 == NULL) {
+        exit(1);
+    }
+    for (uint32_t frame = 1u; frame <= 150u; frame++) {
+        schway_run_result result = run_frame(straight);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(result.frame, frame);
+        if (frame == 60u) {
+            frame_size = copy_motion_video(straight, frame, &frame60);
+        } else if (frame == 120u) {
+            CHECK_EQ_U64(copy_motion_video(straight, frame, &frame120), frame_size);
+        }
+    }
+    CHECK_EQ_U64(schway_save_state(straight, state150, state_size), SCHWAY_STATUS_OK);
+
+    schway *resumed = make();
+    CHECK_EQ_U64(schway_load_state(resumed, state150, state_size), SCHWAY_STATUS_OK);
+    for (uint32_t frame = 151u; frame <= 180u; frame++) {
+        schway_run_result result = run_frame(resumed);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(result.frame, frame);
+    }
+    size_t resumed_size = copy_motion_video(resumed, 180u, &frame180);
+
+    for (uint32_t frame = 151u; frame <= 180u; frame++) {
+        schway_run_result result = run_frame(straight);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(result.frame, frame);
+    }
+    uint8_t *straight180 = NULL;
+    CHECK_EQ_U64(copy_motion_video(straight, 180u, &straight180), resumed_size);
+    CHECK(memcmp(frame180, straight180, resumed_size) == 0);
+    CHECK(memcmp(frame60, frame120, frame_size) != 0);
+    CHECK(memcmp(frame120, frame180, frame_size) != 0);
+
+    uint8_t *straight_state = (uint8_t *)malloc(state_size);
+    uint8_t *resumed_state = (uint8_t *)malloc(state_size);
+    if (straight_state == NULL || resumed_state == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(straight, straight_state, state_size), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_save_state(resumed, resumed_state, state_size), SCHWAY_STATUS_OK);
+    CHECK(memcmp(straight_state, resumed_state, state_size) == 0);
+
+    check_motion_pixels(frame60, 60u);
+    check_motion_pixels(frame120, 120u);
+    check_motion_pixels(frame180, 180u);
+
+    free(straight_state);
+    free(resumed_state);
+    free(frame60);
+    free(frame120);
+    free(frame180);
+    free(straight180);
+    free(state150);
+    schway_destroy(resumed);
+    schway_destroy(straight);
+}
+
 /* The whole of a file of at most 1 MiB, NUL-terminated after its n bytes. */
 static uint8_t *read_whole(const char *path, size_t *n)
 {
@@ -864,6 +977,8 @@ int main(int argc, char **argv)
         bounded();
     } else if (strcmp(c, "split_with_exe") == 0 && argc == 3) {
         split_with_exe(argv[2]);
+    } else if (strcmp(c, "gpu_motion") == 0 && argc == 3) {
+        gpu_motion(argv[2]);
     } else if (strcmp(c, "gte_vectors_guard") == 0 && argc == 4) {
         gte_vectors_guard(argv[2], argv[3]);
     } else {

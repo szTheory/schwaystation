@@ -294,6 +294,7 @@ schway__fixture(gte_vectors.exe gte_vectors.asm)
 set(schway__fixture_extra "")
 schway__fixture(dma_chain.exe dma_chain.asm)
 schway__fixture(timers_lines.exe timers_lines.asm)
+schway__fixture(gpu_motion.exe gpu_motion.asm)
 set(schway__fault_kinds unmapped_read unmapped_write unmapped_fetch misaligned_read misaligned_write
   misaligned_fetch reserved_instruction cop_unusable exception_loop)
 set(schway__fault_index 1)
@@ -563,6 +564,12 @@ schway_add_test(NAME fixtures.boot.bounded
 schway_add_test(NAME fixtures.boot.split_with_exe
   COMMAND schwaystation-test-boot split_with_exe ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a real GP0/DMA primitive that fails to change visible
+# frames, or GPU VRAM and serialized state lost across a frame-150 resume.
+schway_add_test(NAME fixtures.gpu_motion
+  COMMAND schwaystation-test-boot gpu_motion ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 60)
 
 # Fault prevented: an expected value that drifted from the vector file it claims to come from: every
 # gte_vectors row is recomputed from tests/vectors/gte/ps1tests-1150.bin in C and compared with the CSV.
