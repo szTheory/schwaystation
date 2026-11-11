@@ -27,7 +27,7 @@ int schway_host_video_valid(const schway_video *video)
         video->width > SCHWAY_HOST_VIDEO_MAX_WIDTH ||
         video->height > SCHWAY_HOST_VIDEO_MAX_HEIGHT ||
         (video->bpp != 16u && video->bpp != 24u) ||
-        video->rgb24 != (video->bpp == 24u)) {
+        video->rgb24 != (uint32_t)(video->bpp == 24u)) {
         return 0;
     }
 

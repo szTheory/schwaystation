@@ -536,7 +536,7 @@ endforeach()
 set(schway__timer_shift ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines_d10_w10
   -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines_d10_w10.exe -DFRAMES=120 -DSHIFT=1
   -DPROFILE=ntsc-u "-DFLAGS=--region ntsc-u" -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
-  -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}" -P ${CMAKE_CURRENT_LIST_FILE})
+  -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__judge_emulator}" -P ${CMAKE_CURRENT_LIST_FILE})
 string(REPLACE ";" "$<SEMICOLON>" schway__timer_shift "${schway__timer_shift}")
 schway_add_test(NAME fixtures.timers_lines.ntsc_u.div10.self_test
   COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__timer_shift}" -DCODE=1

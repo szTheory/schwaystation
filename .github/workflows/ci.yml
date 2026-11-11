@@ -10,6 +10,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      control_ref:
+        description: "Optional commit with which to compare GPU-motion performance"
+        type: string
+        required: false
+        default: ""
   workflow_call:
     inputs:
       ref:
@@ -363,17 +369,19 @@ jobs:
   # pull request's head commit against its merge base with the base branch,
   # the base measured twice. The merge commit's first parent is not used: it
   # is the base branch tip, which also counts commits that landed after the
-  # branch point. Direct runs only (a nested call passes ref). On
-  # workflow_dispatch it measures both fixtures three times for control.
+  # branch point. Direct runs only (a nested call passes ref). A manual run
+  # without control_ref measures both fixtures three times; with control_ref
+  # it compares gpu_motion with that exact commit.
   perf:
     needs: changes
     if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt); 2 x 22 s (perf), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 6  # 6-minute floor; workflow_dispatch perf took 4m59 in run 42980564011 before adding the control build
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
       EVENT: ${{ github.event_name }}
+      CONTROL_REF: ${{ inputs.control_ref || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -400,7 +408,17 @@ jobs:
           }
           build . "$RUNNER_TEMP/perf/head"
           if [ "$EVENT" = workflow_dispatch ]; then
-            echo no_base=none >> "$GITHUB_OUTPUT"
+            if [ -z "$CONTROL_REF" ]; then
+              echo no_base=none >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [[ ! "$CONTROL_REF" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "${CONTROL_REF}^{commit}"; then
+              echo "perf: control_ref must be a full commit SHA available in this checkout" >&2
+              exit 2
+            fi
+            git worktree add --detach "$RUNNER_TEMP/base" "$CONTROL_REF"
+            build "$RUNNER_TEMP/base" "$RUNNER_TEMP/perf/base"
+            echo no_base=false >> "$GITHUB_OUTPUT"
             exit 0
           fi
           base=$(git merge-base "origin/$BASE_REF" "$HEAD_SHA")
@@ -456,18 +474,21 @@ jobs:
             done
             exit 0
           fi
-          head=$(per_frame "$RUNNER_TEMP/perf/head" testcard)
-          base1='' base2=''
-          if [ "$NO_BASE" = false ]; then
-            base1=$(per_frame "$RUNNER_TEMP/perf/base" testcard)
-            base2=$(per_frame "$RUNNER_TEMP/perf/base" testcard)
-          fi
+          fixtures=(testcard gpu_motion)
           rc=0
-          cmake -DFIXTURE=testcard "-DHEAD=$head" "-DBASE1=$base1" "-DBASE2=$base2" -DALLOW=tests/perf/allow.txt \
-            "-DTODAY=$(date -u +%Y-%m-%d)" "-DNO_BASE=$NO_BASE" \
-            -P tests/cmake/perf_compare.cmake > perf.txt 2>&1 || rc=$?
-          cat perf.txt
-          grep '^perf ' perf.txt >> "$GITHUB_STEP_SUMMARY" || true
+          for fixture in "${fixtures[@]}"; do
+            head=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+            base1='' base2=''
+            if [ "$NO_BASE" = false ]; then
+              base1=$(per_frame "$RUNNER_TEMP/perf/base" "$fixture") || exit 1
+              base2=$(per_frame "$RUNNER_TEMP/perf/base" "$fixture") || exit 1
+            fi
+            cmake "-DFIXTURE=$fixture" "-DHEAD=$head" "-DBASE1=$base1" "-DBASE2=$base2" -DALLOW=tests/perf/allow.txt \
+              "-DTODAY=$(date -u +%Y-%m-%d)" "-DNO_BASE=$NO_BASE" \
+              -P tests/cmake/perf_compare.cmake > perf.txt 2>&1 || rc=$?
+            cat perf.txt
+            grep '^perf ' perf.txt >> "$GITHUB_STEP_SUMMARY" || true
+          done
           exit "$rc"
 
   # Every publish step of a release, rehearsed with the release App's token on

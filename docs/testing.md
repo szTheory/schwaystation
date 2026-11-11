@@ -345,12 +345,14 @@ counts them with the same script, `tests/cmake/line_budget.cmake`.
 
 ## Performance
 
-**Instructions per frame.** CI's `perf` job counts the instructions `schwaystation-run` executes per frame of the
-test card under Cachegrind: Ir per frame = (Ir at 360 frames − Ir at 60) / 300, in integers. It measures the pull
-request's head once and its base twice, then `tests/cmake/perf_compare.cmake` prints one line:
+**Instructions per frame.** CI's `perf` job counts the instructions `schwaystation-run` executes per frame under
+Cachegrind: Ir per frame = (Ir at 360 frames − Ir at 60) / 300, in integers. It measures both the test card and
+`gpu_motion`, which runs CPU/GPU work, against the same fixture on the control commit. A pull request's head is
+measured once and its base twice, then `tests/cmake/perf_compare.cmake` prints one line per fixture:
 
 ```text
 perf testcard head=<n> base=<n> delta_bp=<n> verdict=PASS
+perf gpu_motion head=<n> base=<n> delta_bp=<n> verdict=PASS
 ```
 
 `delta_bp` is the change in basis points. `PASS` means at most 1.00 % slower (exactly +1.00 % passes); `FAIL` more
@@ -358,8 +360,13 @@ than that or more than the allow file permits; `UNSTABLE` the two base measureme
 no `perf` preset. An empty or non-numeric measurement is an input error, never a pass.
 
 **Gate mode.** CI sets `SCHWAYSTATION_PERF_MODE` to `gate`: `FAIL`, `UNSTABLE` and `NO_BASE` exit 1. The script
-also accepts `report`, which prints the verdict and exits 0; bad input always fails. Two manual control runs
-measuring the released commit three times each showed zero spread before the gate was armed.
+also accepts `report`, which prints the verdict and exits 0; bad input always fails. A manual run without inputs
+measures both fixtures three times and reports their spread. A manual run with `control_ref` set to a full commit
+SHA compares both fixtures on the current commit with that exact control, which permits collecting the first
+control/head comparison before arming a new fixture. On control commit `c87f40b`, run 42980564011 measured
+`gpu_motion` at 137,678,337 instructions per frame on all three repeats (spread 0); the test-card control was
+1,620,845 on all three repeats (spread 0). The run is at
+[Actions run 42980564011](https://github.com/szTheory/schwaystation/actions/runs/42980564011).
 
 **Exceptions.** A pull request that must be slower adds a line to `tests/perf/allow.txt`:
 `<fixture> <max % × 100> <expiry YYYY-MM-DD> <reason>`. It raises that fixture's limit through its expiry, at most
@@ -367,7 +374,13 @@ measuring the released commit three times each showed zero spread before the gat
 
 The `perf.gate.*` tests feed the comparison its edge cases on synthetic measurements, so they run on every lane
 without Valgrind: identical runs, exactly +1.00 %, +1.01 %, an allowed and an expired exception, unstable bases, no
-base, a missing measurement and an unset mode.
+base, a missing measurement and an unset mode. A separate slow `gpu_motion` synthetic row must fail above +1.00 %.
+
+The `nofp` job has a three-minute floor because its one-minute timeout cancelled the same release commit twice
+while hosted checkouts/images were starting: runs [42840838785](https://github.com/szTheory/schwaystation/actions/runs/42840838785)
+and [42841474140](https://github.com/szTheory/schwaystation/actions/runs/42841474140). The release commit then passed
+on `main` in 9 seconds and an isolated rerun passed in 10 seconds, confirming that the cancellation was startup
+contention rather than a core failure.
 
 ## CI jobs
 
@@ -386,7 +399,7 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt` must be byte-identical. | yes |
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
 | `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, `320x240, every pixel equal`, and the flipped-pixel control must fail naming `7,3`. | yes |
-| `perf` | Cachegrind instructions per frame at head and at the merge base, then `perf_compare.cmake` in gate mode on pull requests. Manual runs measure one commit three times and report its spread. | yes |
+| `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, compared with the merge base in gate mode on pull requests. Manual runs measure both fixtures three times or compare `gpu_motion` with an explicit control commit. | yes |
 | `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `CI required` | The one check the ruleset requires. It passes only when every job above succeeded or was skipped as allowed: heavy jobs when `heavy=false`, `title` and `perf` outside pull requests, `perf` in a call from `release.yml`, and rehearsal jobs when publication is not applicable. | the check |

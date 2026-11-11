@@ -1,7 +1,7 @@
 # SCHWAYSTATION_PERF_MODE=<gate|report> cmake -DFIXTURE=<name> -DHEAD=<n> -DBASE1=<n>
 #   -DBASE2=<n> -DALLOW=<file> -DTODAY=<YYYY-MM-DD> [-DNO_BASE=true] -P perf_compare.cmake
 # Fault prevented: a pull request slowing the core unnoticed. HEAD is Cachegrind Ir per
-# frame, (Ir at 360 frames - Ir at 60) / 300; BASE1 and BASE2 measure the first parent.
+# frame, (Ir at 360 frames - Ir at 60) / 300; BASE1 and BASE2 measure the same fixture on the control.
 # Fails above +1.00 % (or a dated allow line's cap) only in gate mode; bad input always.
 cmake_minimum_required(VERSION 3.25)
 function(perf_error reason)
