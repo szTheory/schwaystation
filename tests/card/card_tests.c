@@ -187,6 +187,22 @@ static void write_finish(schway *inst, uint8_t checksum, uint8_t result)
     CHECK_EQ_HEX(transfer(inst, 0u, 0u), result);
 }
 
+static int write_success(schway *inst, uint32_t sector, uint8_t expected_flag,
+                         const uint8_t *data)
+{
+    if (!write_preamble(inst, expected_flag)) {
+        return 0;
+    }
+    uint8_t address = write_address(inst, sector, CARD_ACK);
+    if (address != 0u) {
+        CHECK_EQ_HEX(address, 0u);
+        return 0;
+    }
+    write_data(inst, data, 0u, SCHWAY__CARD_SECTOR_SIZE);
+    write_finish(inst, write_checksum(sector, data), 0x47u);
+    return 1;
+}
+
 static void make_write_data(uint8_t *data, uint32_t seed)
 {
     for (uint32_t i = 0u; i < SCHWAY__CARD_SECTOR_SIZE; i++) {
@@ -452,6 +468,159 @@ static void protocol_write_commit(void)
     free(original);
 }
 
+static void protocol_write_boundaries(void)
+{
+    uint8_t *original = make_card(23u);
+    uint8_t *expected = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t first[SCHWAY__CARD_SECTOR_SIZE];
+    uint8_t last[SCHWAY__CARD_SECTOR_SIZE];
+    CHECK(expected != NULL);
+    if (expected == NULL) {
+        free(original);
+        return;
+    }
+    memcpy(expected, original, SCHWAY_MEMCARD_SIZE);
+    make_write_data(first, 17u);
+    make_write_data(last, 91u);
+    schway *inst = make();
+    CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, original,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    schway_span card;
+    CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD1, &card), SCHWAY_STATUS_OK);
+    configure(inst, 0u);
+    CHECK(write_success(inst, 0u, 0x08u, first));
+    memcpy(expected, first, sizeof first);
+    CHECK(memcmp(card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
+    CHECK(write_success(inst, SCHWAY__CARD_SECTOR_COUNT - 1u, 0u, last));
+    memcpy(&expected[(SCHWAY__CARD_SECTOR_COUNT - 1u) * SCHWAY__CARD_SECTOR_SIZE],
+           last, sizeof last);
+    CHECK(memcmp(card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 2u);
+    schway_destroy(inst);
+    free(expected);
+    free(original);
+}
+
+static void protocol_write_slots(void)
+{
+    uint8_t *original1 = make_card(31u);
+    uint8_t *original2 = make_card(87u);
+    uint8_t *expected1 = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *expected2 = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t data1[SCHWAY__CARD_SECTOR_SIZE];
+    uint8_t data2[SCHWAY__CARD_SECTOR_SIZE];
+    CHECK(expected1 != NULL);
+    CHECK(expected2 != NULL);
+    if (expected1 == NULL || expected2 == NULL) {
+        free(expected2);
+        free(expected1);
+        free(original2);
+        free(original1);
+        return;
+    }
+    memcpy(expected1, original1, SCHWAY_MEMCARD_SIZE);
+    memcpy(expected2, original2, SCHWAY_MEMCARD_SIZE);
+    make_write_data(data1, 47u);
+    make_write_data(data2, 109u);
+    schway *inst = make();
+    CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, original1,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, original2,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    schway_span card1;
+    schway_span card2;
+    CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD1, &card1), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD2, &card2), SCHWAY_STATUS_OK);
+    configure(inst, 0u);
+    CHECK(write_success(inst, 3u, 0x08u, data1));
+    memcpy(&expected1[3u * SCHWAY__CARD_SECTOR_SIZE], data1, sizeof data1);
+    CHECK(memcmp(card1.data, expected1, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK(memcmp(card2.data, original2, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_2), 0u);
+
+    configure(inst, 1u);
+    CHECK(write_success(inst, 12u, 0x08u, data2));
+    memcpy(&expected2[12u * SCHWAY__CARD_SECTOR_SIZE], data2, sizeof data2);
+    CHECK(memcmp(card1.data, expected1, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK(memcmp(card2.data, expected2, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_2), 1u);
+    schway_destroy(inst);
+    free(expected2);
+    free(expected1);
+    free(original2);
+    free(original1);
+}
+
+static void protocol_write_repeated_and_truncated(void)
+{
+    const uint32_t sector = 5u;
+    uint8_t *original = make_card(61u);
+    uint8_t *expected = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t first[SCHWAY__CARD_SECTOR_SIZE];
+    uint8_t second[SCHWAY__CARD_SECTOR_SIZE];
+    uint8_t rejected[SCHWAY__CARD_SECTOR_SIZE];
+    CHECK(expected != NULL);
+    if (expected == NULL) {
+        free(original);
+        return;
+    }
+    memcpy(expected, original, SCHWAY_MEMCARD_SIZE);
+    make_write_data(first, 33u);
+    make_write_data(second, 77u);
+    make_write_data(rejected, 143u);
+    schway *inst = make();
+    CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, original,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    schway_span card;
+    CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD1, &card), SCHWAY_STATUS_OK);
+    configure(inst, 0u);
+    CHECK(write_success(inst, sector, 0x08u, first));
+    memcpy(&expected[sector * SCHWAY__CARD_SECTOR_SIZE], first, sizeof first);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
+    CHECK(write_success(inst, sector, 0u, second));
+    memcpy(&expected[sector * SCHWAY__CARD_SECTOR_SIZE], second, sizeof second);
+    CHECK(memcmp(card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 2u);
+
+    CHECK(write_preamble(inst, 0u));
+    CHECK_EQ_HEX(write_address(inst, sector, CARD_ACK), 0u);
+    write_data(inst, rejected, 0u, SCHWAY__CARD_SECTOR_SIZE);
+    write_finish(inst, (uint8_t)(write_checksum(sector, rejected) ^ 1u), 0x4Eu);
+    CHECK(memcmp(card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 2u);
+    CHECK_EQ_HEX(read_card_flag(inst), 0x04u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1043u);
+    configure(inst, 0u);
+
+    CHECK(write_preamble(inst, 0u));
+    CHECK_EQ_HEX(write_address(inst, sector + 1u, CARD_ACK), 0u);
+    write_data(inst, rejected, 0u, 17u);
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK(memcmp(card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 2u);
+
+    configure(inst, 0u);
+    CHECK(write_preamble(inst, 0x08u));
+    CHECK_EQ_HEX(write_address(inst, sector + 2u, CARD_ACK), 0u);
+    write_data(inst, rejected, 0u, 13u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1001u);
+    CHECK(memcmp(card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 2u);
+    schway_destroy(inst);
+    free(expected);
+    free(original);
+}
+
+static void protocol_write_edges(void)
+{
+    protocol_write_boundaries();
+    protocol_write_slots();
+    protocol_write_repeated_and_truncated();
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -463,6 +632,8 @@ int main(int argc, char **argv)
         protocol_read_edges();
     } else if (strcmp(argv[1], "protocol_write_commit") == 0) {
         protocol_write_commit();
+    } else if (strcmp(argv[1], "protocol_write_edges") == 0) {
+        protocol_write_edges();
     } else {
         return 2;
     }
