@@ -329,14 +329,19 @@ written into the build tree when CMake configures, so no tracked file holds them
 ## Release firmware scan
 
 The release-labeled release.firmware_scan check reads the retail BIOS MD5 and SHA-1 pairs from the same
-src/bios_table.inc table used by the core. It hashes every tracked file and every file member extracted from
-each release archive, regardless of the member name or suffix. Extraction happens in a unique temporary
-directory outside the tracked tree and archive directories. A missing archive, malformed table, failed
-extraction, or archive with no file members is an infrastructure error.
+src/bios_table.inc table used by the core. It scans every tracked file and every file member extracted from
+each release archive, regardless of the member name or suffix. It rejects a listed BIOS digest, an exact
+524,288-byte member, the PS-X EXE signature at offset 0, CD001 at the 2048-byte or raw-sector offset, or a
+32-byte window of the Sony licence marker. Signatures and licence windows are compared as hex. Extraction
+happens in a unique temporary directory outside the tracked tree and archive directories. A missing archive,
+malformed table, failed extraction, or archive with no file members is an infrastructure error.
 
 The registered release.firmware_scan.self_test creates synthetic bytes and a separate one-row digest table in
-the build directory. It verifies that a matching tracked file and a nested archive member are rejected; the
-synthetic row is never added to the production BIOS table. No retail firmware bytes are needed or used.
+the build directory. It verifies that a matching tracked file and an archive member are rejected; the synthetic
+row is never added to the production BIOS table. The archive-edge test also checks a nested matching member,
+a one-byte-changed clean input, each prohibited content signature, a zero-file archive, and a malformed
+archive. A separate BIOS test runs the synthetic all-zero key through the production identification binary
+and confirms that it remains unknown. No retail firmware bytes are needed or used.
 
 ## Budgets
 

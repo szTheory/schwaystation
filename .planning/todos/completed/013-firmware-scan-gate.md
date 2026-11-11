@@ -1,10 +1,11 @@
 ---
 title: "Port the firmware scan (release.firmware_scan)"
-status: pending
+status: completed
 priority: P2
 source: "phase 01, plan 01-15 (a seed gate deferred under D-25 and AGENTS rule 7)"
 created: 2026-10-20
 theme: release
+completed: 2026-11-11
 ---
 
 ## Goal

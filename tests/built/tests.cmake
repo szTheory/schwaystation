@@ -37,3 +37,7 @@ schway_add_test(NAME built.bios.identity
 schway_add_test(NAME built.bios.identity_edges
   COMMAND schwaystation-test-bios identity_edges
   LABELS bios portable TIMEOUT 10)
+
+schway_add_test(NAME built.bios.test_key_isolation
+  COMMAND schwaystation-test-bios test_key_isolation
+  LABELS bios portable TIMEOUT 10)

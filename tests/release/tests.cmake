@@ -48,10 +48,10 @@ set(release_scan_stage ${release_scan_dir}/archive_stage)
 set(release_scan_archive ${release_scan_dir}/synthetic.zip)
 set(release_scan_table ${release_scan_dir}/synthetic_table.inc)
 file(REMOVE_RECURSE "${release_scan_dir}")
-file(MAKE_DIRECTORY "${release_scan_root}" "${release_scan_stage}/nested")
+file(MAKE_DIRECTORY "${release_scan_root}" "${release_scan_stage}")
 set(release_scan_payload "Synthetic scanner fixture; no firmware bytes.\n")
 file(WRITE "${release_scan_root}/matching.data" "${release_scan_payload}")
-file(WRITE "${release_scan_stage}/nested/matching.member" "${release_scan_payload}")
+file(WRITE "${release_scan_stage}/matching.member" "${release_scan_payload}")
 file(MD5 "${release_scan_root}/matching.data" release_scan_md5)
 file(SHA1 "${release_scan_root}/matching.data" release_scan_sha1)
 
@@ -74,7 +74,7 @@ execute_process(COMMAND "${GIT_EXECUTABLE}" init --quiet "${release_scan_root}"
 execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${release_scan_root}" add -- matching.data
   WORKING_DIRECTORY "${release_scan_root}" COMMAND_ERROR_IS_FATAL ANY)
 execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf "${release_scan_archive}"
-  --format=zip nested/matching.member
+  --format=zip matching.member
   WORKING_DIRECTORY "${release_scan_stage}" COMMAND_ERROR_IS_FATAL ANY)
 
 set(release_scan_self_cmd "${CMAKE_COMMAND}" -DTRACKED=1
@@ -90,6 +90,56 @@ schway_add_test(NAME release.firmware_scan
   LABELS release TIMEOUT 60)
 schway_add_test(NAME release.firmware_scan.self_test
   COMMAND ${CMAKE_COMMAND} "-DCMD=${release_scan_self_cmd}" -DCODE=1
-    "-DREGEX=2 listed BIOS digest matches found"
+    "-DREGEX=2 prohibited content matches found"
     -P ${release_scripts}/expect_fail.cmake
+  LABELS release TIMEOUT 30)
+
+set(release_scan_edge_dir ${release_scan_dir}/archive_edges)
+set(release_scan_edge_stage ${release_scan_edge_dir}/nested_stage)
+set(release_scan_edge_root ${release_scan_edge_dir}/clean_tracked)
+set(release_scan_clean_stage ${release_scan_edge_dir}/clean_stage)
+set(release_scan_empty_stage ${release_scan_edge_dir}/empty_stage)
+set(release_scan_content_stage ${release_scan_edge_dir}/content_stage)
+file(MAKE_DIRECTORY "${release_scan_edge_stage}/deep/nested"
+  "${release_scan_edge_root}" "${release_scan_clean_stage}/nested"
+  "${release_scan_empty_stage}/empty" "${release_scan_content_stage}")
+file(WRITE "${release_scan_edge_stage}/deep/nested/matching.data" "${release_scan_payload}")
+set(release_scan_changed_payload "Synthetic scanner fixture; no firmware bytes!\n")
+file(WRITE "${release_scan_edge_root}/changed.data" "${release_scan_changed_payload}")
+file(WRITE "${release_scan_clean_stage}/nested/changed.member" "${release_scan_changed_payload}")
+execute_process(COMMAND "${GIT_EXECUTABLE}" init --quiet "${release_scan_edge_root}"
+  COMMAND_ERROR_IS_FATAL ANY)
+execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${release_scan_edge_root}" add -- changed.data
+  WORKING_DIRECTORY "${release_scan_edge_root}" COMMAND_ERROR_IS_FATAL ANY)
+execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf "${release_scan_edge_dir}/nested.zip"
+  --format=zip deep/nested/matching.data
+  WORKING_DIRECTORY "${release_scan_edge_stage}" COMMAND_ERROR_IS_FATAL ANY)
+execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf "${release_scan_edge_dir}/clean.zip"
+  --format=zip nested/changed.member
+  WORKING_DIRECTORY "${release_scan_clean_stage}" COMMAND_ERROR_IS_FATAL ANY)
+execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf "${release_scan_edge_dir}/empty.zip"
+  --format=zip empty
+  WORKING_DIRECTORY "${release_scan_empty_stage}" COMMAND_ERROR_IS_FATAL ANY)
+file(WRITE "${release_scan_edge_dir}/invalid.zip" "synthetic invalid archive")
+string(REPEAT "x" 524288 release_scan_bios_size)
+file(WRITE "${release_scan_content_stage}/size.member" "${release_scan_bios_size}")
+string(ASCII 80 83 45 88 32 69 88 69 release_scan_exe_signature)
+file(WRITE "${release_scan_content_stage}/exe.member" "${release_scan_exe_signature}")
+string(REPEAT "x" 32769 release_scan_cd_prefix)
+string(ASCII 67 68 48 48 49 release_scan_cd_signature)
+file(WRITE "${release_scan_content_stage}/cd_2048.member"
+  "${release_scan_cd_prefix}${release_scan_cd_signature}")
+string(REPEAT "x" 37657 release_scan_cd_prefix)
+file(WRITE "${release_scan_content_stage}/cd_2352.member"
+  "${release_scan_cd_prefix}${release_scan_cd_signature}")
+string(ASCII 76 105 99 101 110 115 101 100 32 98 121 32 83 111 110 121
+  32 67 111 109 112 117 116 101 114 32 69 110 116 101 114 116 release_scan_licence_window)
+file(WRITE "${release_scan_content_stage}/licence.member" "${release_scan_licence_window}")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf "${release_scan_edge_dir}/content.zip"
+  --format=zip size.member exe.member cd_2048.member cd_2352.member licence.member
+  WORKING_DIRECTORY "${release_scan_content_stage}" COMMAND_ERROR_IS_FATAL ANY)
+schway_add_test(NAME release.firmware_scan.archive_edges
+  COMMAND ${CMAKE_COMMAND} -DARCHIVE_EDGE_TEST=1
+    "-DEDGE_DIR=${release_scan_edge_dir}" "-DGIT=${GIT_EXECUTABLE}"
+    "-DBIOS_TABLE=${release_scan_table}" -P ${release_scripts}/firmware_scan.cmake
   LABELS release TIMEOUT 30)

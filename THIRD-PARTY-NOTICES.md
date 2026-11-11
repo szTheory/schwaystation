@@ -11,7 +11,8 @@ needed.
 - **Upstream:** https://github.com/szTheory/muhtari, file tests/cmake/firmware_scan.cmake at commit
   d698364b180df42894ef6737179d4ed9fcc97817. The repository is MIT-licensed at this pin.
 - **Changes:** adapted to read this project's BIOS MD5 and SHA-1 table and scan tracked files and release archive
-  members. The Atari cartridge and known-ROM checks were removed.
+  members, adding this project's firmware-size and content-signature checks. The Atari cartridge and known-ROM
+  checks were removed.
 - **Licence:** MIT
 
     MIT License

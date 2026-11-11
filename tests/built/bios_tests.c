@@ -374,6 +374,25 @@ static void identity_edges(void)
     schway_destroy(inst);
 }
 
+static void test_key_isolation(void)
+{
+    static uint8_t synthetic_bios[SCHWAY_BIOS_SIZE];
+    schway *inst = new_instance();
+    if (inst == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(schway_load_bios(inst, synthetic_bios, sizeof synthetic_bios), SCHWAY_STATUS_OK);
+
+    schway_bios_info info;
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    CHECK_EQ_U64(schway_get_bios_info(inst, &info), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(info.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(info.region, SCHWAY_BIOS_REGION_UNKNOWN);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     CHECK(argc == 2);
@@ -385,6 +404,8 @@ int main(int argc, char **argv)
         identity();
     } else if (argc == 2 && strcmp(argv[1], "identity_edges") == 0) {
         identity_edges();
+    } else if (argc == 2 && strcmp(argv[1], "test_key_isolation") == 0) {
+        test_key_isolation();
     } else {
         CHECK(0);
     }
