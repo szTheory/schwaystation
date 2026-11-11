@@ -337,7 +337,7 @@ static void protocol_read_edges(void)
         read_sector(b, sector, &card_b[sector * SCHWAY__CARD_SECTOR_SIZE]);
 
         CHECK_EQ_HEX(transfer(b, 0x81u, CARD_ACK), 0xFFu);
-        CHECK_EQ_HEX(transfer(b, 0x57u, 0u), 0xFFu);
+        CHECK_EQ_HEX(transfer(b, 0x54u, 0u), 0xFFu);
         CHECK_EQ_HEX(transfer(b, 0x81u, CARD_ACK), 0xFFu);
         CHECK_EQ_HEX(transfer(b, 0x52u, CARD_ACK), 0x08u);
         CHECK_EQ_HEX(transfer(b, 0u, CARD_ACK), 0x5Au);

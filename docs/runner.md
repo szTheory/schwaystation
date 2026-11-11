@@ -236,7 +236,7 @@ cannot show them. `--hash-state` prints one more line, after every other line th
 `gpu_motion.exe` fixture at frame 150 prints:
 
 ```text
-state sha256 5dc52fadde7aa55e1a7a0b57862b91e66b366ca90820968ab5bc1e0a1974b333
+state sha256 ab25eb56bade19baa1d3b3b85bb9f9d572061e8514f30f8d0450ab78e510977c
 ```
 
 It is the SHA-256 of the state `schway_save_state` writes, without its 20-byte header, so it covers every register
