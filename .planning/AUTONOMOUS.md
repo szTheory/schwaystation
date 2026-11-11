@@ -74,3 +74,5 @@ summary metadata and verification evidence, and avoid repeating the same outcome
 After adding rows to an exact test inventory, preserve its separators and sort the rows bytewise before
 configuring (for example, `LC_ALL=C sort -o FILE FILE`). Several phase-4 tracers first failed configuration
 only because their new rows were unsorted. This is an editing practice, not a new gate or test.
+
+Phase 4 API/state/behavior revision 4 is unreleased and is completed across its implementation slices. Preserve released/frozen API v1–v3 callers. Add concrete v4 fields and update affected interim v4 content-state goldens with evidence; these additions do not require another revision bump within this phase. Once revision 4 is released, the normal compatibility/version policy applies.

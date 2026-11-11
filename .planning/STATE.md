@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 17 of 49
+current_plan: 16 of 49
 status: executing
 stopped_at: Completed 04-16-PLAN.md
 last_updated: "2026-11-11T07:12:02.401Z"
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 17 of 49
+Current Plan: 16 of 49
 Status: Plan 04-16 complete; ready for the next orchestrated Phase 04 plan.
 Last activity: 2026-11-11 — Card Read/GetID, stable spans, state ownership, full CI and hygiene completed.
 
