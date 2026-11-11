@@ -12,6 +12,7 @@ static const char name_scratch[] = "bus.scratch";
 static const char name_memctl[] = "bus.memctl";
 static const char name_ram_size[] = "bus.ram_size";
 static const char name_cache_ctrl[] = "bus.cache_ctrl";
+static const char name_spu_attr[] = "bus.spu_attr";
 static const char name_unbuilt_n[] = "bus.unbuilt_n";
 static const char name_bios_loaded[] = "bus.bios.loaded";
 static const char name_bios_sha256[] = "bus.bios.sha256";
@@ -118,6 +119,7 @@ void schway__bus_reset(schway *inst)
     port_costs(b);
     b->ram_size = SCHWAY__RAM_SIZE_POWER_ON;
     b->cache_ctrl = 0u;
+    b->spu_attr = 0u;
     memset(b->unbuilt_n, 0, sizeof b->unbuilt_n);
     memset(b->last_unbuilt, 0, sizeof b->last_unbuilt);
 }
@@ -133,6 +135,7 @@ void schway__bus_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u32_array(io, name_memctl, b->memctl, SCHWAY__MEMCTL_REGS, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_ram_size, &b->ram_size, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_cache_ctrl, &b->cache_ctrl, 0u, UINT32_MAX);
+    schway__state_u16_array(io, name_spu_attr, &b->spu_attr, 1u, 0u, UINT16_MAX);
     uint32_t bios_loaded = schway__state_u32(io, name_bios_loaded, &b->bios_loaded, 0u, 1u);
     schway__state_check(io, bios_loaded == b->bios_loaded);
     schway__state_match_u8_array(io, name_bios_sha256, b->bios_sha256,
@@ -526,7 +529,18 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if (slot < 0xC0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, p, width, wr, v);
+        /* ATTR is a 16-bit control register; retain its exact halfword value
+           for read-after-write callers. No SPU transfer behavior is implied
+           (docs/hardware/bus.md, SPU control readback; PSX-SPX SCM.01). */
+        if (p == 0x1F801DAAu && width == 2u) {
+            if (wr != 0u) {
+                inst->bus.spu_attr = (uint16_t)v;
+            } else {
+                *value = (uint32_t)inst->bus.spu_attr;
+            }
+        } else {
+            schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, p, width, wr, v);
+        }
         port = SCHWAY__PORT_SPU;
         break;
     }

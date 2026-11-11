@@ -490,6 +490,10 @@ rest) and then every field, little-endian. `schway_save_state` returns `SCHWAY_S
 
 A load empties the audio queue. Saving, loading and saving again gives the same bytes.
 
+The bus state includes the exact 16-bit SPU ATTR value written at `1F801DAAh`; loading a state restores that value.
+The emulator's power reset clears this latch to its deterministic zero model. This narrow control readback does not
+model SPU audio, transfer side effects or STATX timing; see [the bus model](hardware/bus.md#spu-control-readback).
+
 `schway_state_visit` calls your `schway_state_visitor` once per field with its name, its values in host order, the number of
 values and the width of each (1, 2, 4 or 8 bytes). The names are static strings you may keep, such as
 `instance.frame` and `gpu.vram`. Writing each visited value little-endian, in visit order, gives exactly the bytes

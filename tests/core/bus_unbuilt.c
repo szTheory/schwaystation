@@ -21,7 +21,8 @@ enum { OWNED, UNBUILT, GAP };
    memory control 000h-023h, SIO0 040h-04Fh, RAM_SIZE 060h-063h, I_STAT and
    I_MASK 070h-077h, the DMA registers 080h-0FFh and the timers 100h-12Fh are
    owned; SIO1 050h-05Fh, CD-ROM 800h-803h, MDEC 820h-827h and SPU C00h-FFFh
-   are unbuilt; the GPU owns 810h-817h. */
+   are unbuilt except the exact halfword ATTR access at DAAh; the GPU owns
+   810h-817h. */
 static int register_access(uint32_t off, uint32_t base, uint32_t size, uint32_t width,
                            uint32_t max_width)
 {
@@ -30,6 +31,9 @@ static int register_access(uint32_t off, uint32_t base, uint32_t size, uint32_t 
 
 static int expected(uint32_t off, uint32_t width)
 {
+    if (off == 0xDAAu && width == 2u) {
+        return OWNED;
+    }
     if (off == 0x040u || register_access(off, 0x044u, 4u, width, 4u) ||
         register_access(off, 0x048u, 2u, width, 2u) ||
         register_access(off, 0x04Au, 2u, width, 2u) ||

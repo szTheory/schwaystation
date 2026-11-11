@@ -879,6 +879,7 @@ static void spu_attr(void)
     CHECK_EQ_HEX(value, 0x0020u);
 
     const uint32_t before_unbuilt = inst->bus.unbuilt_n[SCHWAY__DEV_SPU];
+    CHECK_EQ_U64(before_unbuilt, 0u);
     static const struct {
         uint32_t addr;
         uint32_t width;
@@ -898,7 +899,7 @@ static void spu_attr(void)
                                       &access_value, &cycles), 0u);
         CHECK_EQ_HEX(access_value, 0u);
         CHECK_EQ_U64(cycles, 7u + inst->bus.cost[SCHWAY__PORT_SPU][cost_index]);
-        CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], before_unbuilt + (uint32_t)i + 1u);
+        CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], before_unbuilt + 2u * (uint32_t)i + 1u);
 
         cycles = 11u;
         CHECK_EQ_U64(schway__bus_write(inst, unsupported[i].addr, unsupported[i].width,

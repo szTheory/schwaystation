@@ -507,8 +507,14 @@ static void test_device_fields(void)
     src->timers.t[2].mode = 0x0001u;
     src->timers.t[2].paused = 1u;
     src->timers.t[2].hold = 2u;
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(src, 0xBF801DAAu, 2u, 0x0020u, &cycles), 0u);
+    CHECK_EQ_HEX(src->bus.spu_attr, 0x0020u);
     size_t n = save(src, good);
     schway *dst = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_HEX(dst->bus.spu_attr, 0u);
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(dst, 0xBF801DAAu, 2u, 0x0010u, &cycles), 0u);
     CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
     CHECK(save(dst, after) == n && memcmp(good, after, n) == 0);
     CHECK_EQ_U64(dst->gte.ready, src->gte.ready);
@@ -516,6 +522,7 @@ static void test_device_fields(void)
     CHECK_EQ_HEX(dst->dma.chcr[2], 0x01000201u);
     CHECK_EQ_U64(dst->dma.cur, 2u);
     CHECK_EQ_HEX(dst->dma.crc[6], 0xDEADBEEFu);
+    CHECK_EQ_HEX(dst->bus.spu_attr, 0x0020u);
     CHECK_EQ_U64(dst->timers.t[1].value, 0x1234u);
     CHECK_EQ_U64(dst->timers.base, dst->ticks);
     src->timers.base = 12345u;
@@ -572,6 +579,8 @@ static void test_device_fields(void)
     reseal(bad, n);
     CHECK_EQ_U64(schway_load_state(dst, bad, n), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(dst->dma.cur, 3u);
+    CHECK_EQ_U64(schway_reset(src, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK_EQ_HEX(src->bus.spu_attr, 0u);
     schway_destroy(dst);
     schway_destroy(src);
 }

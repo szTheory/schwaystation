@@ -115,12 +115,31 @@ GPU and MDEC ports) cost one cycle, which is approximate. The SPU and the CD-ROM
 
 ## Devices not built yet
 
-The serial ports (`1F801040h`-`1F80105Fh`), the CD-ROM (`1F801800h`-`1F801803h`), the GPU
-(`1F801810h`-`1F801817h`), the MDEC (`1F801820h`-`1F801827h`) and the SPU (`1F801C00h`-`1F801FFFh`) are documented but
-not modelled. At any width a read returns 0 and a write is dropped, with no fault. Each access is counted per device in `unbuilt_n`, saturating at the
-largest 32-bit value, and the last one is kept as the device, address, width and program counter. Both are part of the
-state. A program that polls a register of one of these devices therefore spins with a count that grows and a last
-program counter that names the loop. A later release replaces each case with the device itself.
+The serial ports (`1F801040h`-`1F80105Fh`), the CD-ROM (`1F801800h`-`1F801803h`), the MDEC
+(`1F801820h`-`1F801827h`) and most of the SPU (`1F801C00h`-`1F801FFFh`) are documented but not modelled. For an
+unbuilt access at any width a read returns 0 and a write is dropped, with no fault. Each access is counted per device in
+`unbuilt_n`, saturating at the largest 32-bit value, and the last one is kept as the device, address, width and program
+counter. Both are part of the state. A program that polls an unbuilt register therefore spins with a count that grows
+and a last program counter that names the loop. A later release replaces each unbuilt case with the device itself.
+
+### SPU control readback
+
+The exact halfword at `1F801DAAh` is ATTR, a read/write control register whose bits 5-4 select the transfer mode. The
+bus stores and returns the raw 16-bit value for that exact access, retains the normal DEV4 port cost, and does not count
+it as unbuilt. This allows a caller to read back a control value such as `0020h`; it does not move SPU RAM, generate
+audio or cause register side effects. Byte or word access at ATTR, and every other SPU access including the read-only
+status register STATX at `1F801DAEh`, keep the unbuilt zero-read/dropped-write behavior, accounting and DEV4 cost.
+
+The latch is instance state named `bus.spu_attr` and is serialized with other bus fields. A power reset sets it to zero
+as the emulator's deterministic reset model; this is not a hardware power-on-value claim. The [PSX-SPX SPU register
+notes](https://psx-spx.consoledev.net/soundprocessingunitspu/) distinguish ATTR from delayed STATX status. The
+pinned [MIT nugget ATTR definition](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/common/hardware/spu.h)
+and [modplayer poll](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/modplayer/modplayer.c)
+show the exact halfword write/read contract. The model implements only that readback contract, not SPU timing or audio.
+
+The GPU (`1F801810h`-`1F801817h`) is implemented by its own module. The rest of the I/O page is checked by
+`core.bus_unbuilt` at widths 1, 2 and 4 for reads and writes; the sweep requires every address to be owned, unbuilt or a
+gap, including edges such as `1F80105Fh` against `1F801060h`.
 
 The DMA registers (`1F801080h`-`1F8010FFh`) and the timers (`1F801100h`-`1F80112Fh`) belong to their own modules, not
 to this list: every address answers at every width with no fault and no unbuilt count, and the DMA and timer pages
@@ -133,9 +152,7 @@ access, so a running unit can hold the CPU. It does not tell it about a store, w
 write queue is full. The scratchpad and the cache-control word are not bus accesses that wait. Reading `I_STAT` first
 brings the timers up to the tick of that read, and writing it recomputes when a device next needs attention.
 
-The rest of the I/O page between and around those ranges is a gap. `core.bus_unbuilt` sweeps all of `1F801000h`-
-`1F801FFFh` at widths 1, 2 and 4, for reads and writes, and requires every address to be owned, unbuilt or a gap,
-including the edges such as `1F80105Fh` against `1F801060h`.
+The rest of the I/O page between and around those ranges is a gap.
 
 ## Expansion regions and the debug ports
 
