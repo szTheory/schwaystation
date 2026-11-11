@@ -130,6 +130,12 @@ schway_add_test(NAME dma.spu.request_blocks
   COMMAND schwaystation-test-dma spu_request_blocks
   LABELS dma portable TIMEOUT 10)
 
+# Fault prevented: DMA4 mode, stop, state or read-ahead controls that grant an
+# extra block, bypass a deadline, or change the independently judged 757-block run.
+schway_add_test(NAME dma.spu.request_controls
+  COMMAND schwaystation-test-dma spu_request_controls
+  LABELS dma portable TIMEOUT 30)
+
 # Fault prevented: a channel waiting for its request line that holds the CPU
 # or slows a program reading RAM.
 schway_add_test(NAME dma.sync1.no_dreq_no_stall
