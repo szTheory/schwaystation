@@ -268,7 +268,7 @@ Plans:
 - [x] 04-15 — Expose deterministic input and full DualShock configuration/rumble
 
 **Wave 12** *(blocked on Wave 11 completion)*
-- [ ] 04-12 — Run moving GPU and exact line/dot fixtures through the runner
+- [x] 04-12 — Run moving GPU and exact line/dot fixtures through the runner
 - [ ] 04-16 — Commit card writes only at successful protocol completion
 
 **Wave 13** *(blocked on Wave 12 completion)*
@@ -357,6 +357,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 13/32 | In Progress | - |
+| 4. Games play in RetroArch | 14/32 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
