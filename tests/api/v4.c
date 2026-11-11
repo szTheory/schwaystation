@@ -45,6 +45,9 @@ int main(void)
     CHECK_EQ_U64(SCHWAY_INPUT_DEVICE_NONE, 0u);
     CHECK_EQ_U64(SCHWAY_INPUT_DEVICE_DIGITAL, 1u);
     CHECK_EQ_U64(SCHWAY_INPUT_DEVICE_DUALSHOCK, 2u);
+    CHECK_EQ_U64(SCHWAY_BIOS_INFO_RECOGNIZED, 2u);
+    CHECK_EQ_U64(SCHWAY_BIOS_STATUS_RECOGNIZED, 1u);
+    CHECK_EQ_U64(SCHWAY_BIOS_REGION_ANY, 4u);
     schway_config cfg;
     memset(&cfg, 0, sizeof cfg);
     cfg.size = (uint32_t)sizeof cfg;
