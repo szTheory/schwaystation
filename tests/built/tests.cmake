@@ -95,9 +95,28 @@ schway_add_test(NAME built.openbios.handoff
   LABELS bios portable TIMEOUT 10)
 
 # Fault prevented: corrupted or missing handoff data being treated as firmware.
+set(openbios_handoff_control_dir "${PROJECT_BINARY_DIR}/tests/built/openbios/handoff-controls")
+file(MAKE_DIRECTORY "${openbios_handoff_control_dir}")
+set(openbios_handoff_corrupt_input "${openbios_handoff_control_dir}/openbios-corrupt.bin")
+file(COPY_FILE "${openbios_handoff_input}" "${openbios_handoff_corrupt_input}")
+file(APPEND "${openbios_handoff_corrupt_input}" "x")
+set(openbios_handoff_corrupt_cmd ${CMAKE_COMMAND}
+  "-DOPENBIOS_INPUT=${openbios_handoff_corrupt_input}"
+  "-DEXPECTED_FILE=${openbios_handoff_expected}" -P ${PROJECT_SOURCE_DIR}/cmake/OpenBIOS.cmake)
+string(REPLACE ";" "$<SEMICOLON>" openbios_handoff_corrupt_cmd "${openbios_handoff_corrupt_cmd}")
 schway_add_test(NAME built.openbios.handoff_corruption
-  COMMAND ${CMAKE_COMMAND} "-DOPENBIOS_INPUT=${openbios_handoff_input}"
-    "-DEXPECTED_FILE=${openbios_handoff_expected}"
-    "-DOPENBIOS_CHECK_SCRIPT=${PROJECT_SOURCE_DIR}/cmake/OpenBIOS.cmake"
-    -P ${PROJECT_SOURCE_DIR}/tests/cmake/openbios_handoff_corruption.cmake
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${openbios_handoff_corrupt_cmd}" -DCODE=1
+    "-DREGEX=OpenBIOS: expected 524288 bytes" -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS bios portable TIMEOUT 10)
+
+set(openbios_handoff_missing_input "${openbios_handoff_control_dir}/openbios-missing.bin")
+file(REMOVE "${openbios_handoff_missing_input}")
+set(openbios_handoff_missing_cmd ${CMAKE_COMMAND}
+  "-DOPENBIOS_INPUT=${openbios_handoff_missing_input}"
+  "-DEXPECTED_FILE=${openbios_handoff_expected}" -P ${PROJECT_SOURCE_DIR}/cmake/OpenBIOS.cmake)
+string(REPLACE ";" "$<SEMICOLON>" openbios_handoff_missing_cmd "${openbios_handoff_missing_cmd}")
+schway_add_test(NAME built.openbios.handoff_missing
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${openbios_handoff_missing_cmd}" -DCODE=1
+    "-DREGEX=OpenBIOS: input is missing or not a file"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS bios portable TIMEOUT 10)
