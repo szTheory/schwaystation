@@ -89,6 +89,53 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "the state hash is not stable for the same run or not different for another:\n"
         "${first}${second}${third}")
     endif()
+  elseif(CASE STREQUAL "inputs_script")
+    file(WRITE "${OUT}/runner-empty.inputs" "")
+    file(WRITE "${OUT}/runner-button.inputs" "2 1 digital 0001 128 128 128 128 0\n")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    function(run_movie frames movie result_name)
+      set(movie_arg)
+      if(NOT movie STREQUAL "none")
+        set(movie_arg --inputs "${movie}")
+      endif()
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state ${movie_arg}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame ${frames} sha256 ${digits}" OR
+         NOT out MATCHES "state sha256 ${digits}")
+        message(FATAL_ERROR "--frames ${frames} input '${movie}': expected exit 0 and frame/state hashes, "
+          "got exit ${rc}\\n${out}${err}")
+      endif()
+      string(REGEX MATCH "frame ${frames} sha256 ([0-9a-f]+)" frame_line "${out}")
+      set(frame_hash "${CMAKE_MATCH_1}")
+      string(REGEX MATCH "state sha256 ([0-9a-f]+)" state_line "${out}")
+      set(state_hash "${CMAKE_MATCH_1}")
+      set(${result_name}_frame "${frame_hash}" PARENT_SCOPE)
+      set(${result_name}_state "${state_hash}" PARENT_SCOPE)
+      set(${result_name}_output "${out}" PARENT_SCOPE)
+    endfunction()
+    run_movie(1 none no_movie_before)
+    run_movie(1 "${OUT}/runner-button.inputs" event_before)
+    run_movie(2 none no_movie_after)
+    run_movie(2 "${OUT}/runner-empty.inputs" empty_movie)
+    run_movie(2 "${OUT}/runner-button.inputs" event_after)
+    run_movie(2 "${OUT}/runner-button.inputs" event_repeat)
+    if(NOT no_movie_before_frame STREQUAL event_before_frame OR
+       NOT no_movie_before_state STREQUAL event_before_state)
+      message(FATAL_ERROR "an input scheduled for frame 2 changed the frame-1 state")
+    endif()
+    if(NOT no_movie_after_frame STREQUAL empty_movie_frame OR
+       NOT no_movie_after_state STREQUAL empty_movie_state)
+      message(FATAL_ERROR "an empty input movie changed the no-input run")
+    endif()
+    if(NOT no_movie_after_frame STREQUAL event_after_frame)
+      message(FATAL_ERROR "input changed the content-free frame hash")
+    endif()
+    if(no_movie_after_state STREQUAL event_after_state)
+      message(FATAL_ERROR "the event-frame input did not change the saved latched state")
+    endif()
+    if(NOT event_after_output STREQUAL event_repeat_output)
+      message(FATAL_ERROR "replaying the same input movie changed its hashes")
+    endif()
   elseif(CASE STREQUAL "no_args")
     refuse()
   elseif(CASE STREQUAL "unknown")
@@ -300,6 +347,13 @@ set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
 # a test-card frame cannot show are not compared across lanes.
 schway_add_test(NAME runner.hash_state
   COMMAND ${runner_check} -DCASE=hash_state -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: a movie applied after the frame latch, rejected after execution starts, or
+# changes the content-free frame instead of the serialized latched input state.
+schway_add_test(NAME runner.inputs.script
+  COMMAND ${runner_check} -DCASE=inputs_script -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: the reference PNG the RetroArch screenshot is compared
