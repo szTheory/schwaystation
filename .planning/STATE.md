@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 30 of 49
+current_plan: 31 of 49
 status: executing
-stopped_at: Completed 04-39-PLAN.md
-last_updated: "2026-11-11T19:23:54.140Z"
+stopped_at: Completed 04-23-PLAN.md
+last_updated: "2026-11-11T19:59:15.627Z"
 last_activity: 2026-11-11
-last_activity_desc: Completed plan 04-39; exact-head CI run 43083684528 passed with the same-run OpenBIOS digest verified in every consumer
-state_head: 11a79aeebacc9734c2bc5a5295e1815cfeb15b38
+last_activity_desc: Completed plan 04-23; synthetic runner BIOS reset and CLI edge tests passed with local CI and hygiene
+state_head: a70b173b25a1e6318d9e31869cbccf03521d3927
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 97
+  completed_plans: 98
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 30 of 49
-Status: Plan 04-39 is complete; GAME-05 remains pending until the runner BIOS CLI and shell-boot plans finish.
-Last activity: 2026-11-11 — Exact-head CI run 43083684528 passed with same-run OpenBIOS verification across all consumers.
+Current Plan: 31 of 49
+Status: Plan 04-23 is complete; GAME-05 remains pending until the OpenBIOS shell observation in plan 04-40.
+Last activity: 2026-11-11 — Synthetic runner BIOS reset and CLI edge tests passed with local CI and hygiene.
 
 Progress: [█████░░░░░] 50%
 
@@ -158,6 +158,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P21 | 44min | 2 tasks | 9 files |
 | Phase 04 P22 | 106min | 2 tasks | 20 files |
 | Phase 04 P39 | 1h 15m | 2 tasks | 7 files |
+| Phase 04 P23 | 24 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -359,6 +360,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Raise the be32 job timeout to seven minutes based on the expanded 433-test suite; the exact-head lane completed in 6m09s with all tests retained.
 - [Phase 04]: Keep OpenBIOS transfer in a one-day current-run artifact; consumers verify expected size and SHA-256 before use, with no cross-run cache or package/publication path.
 - [Phase 04]: Preserve distinct empty-input, repeated-held, and three-edge guest proofs at frame 300; reuse the existing one-edge pin instead of repeating a redundant guest run.
+- [Phase 04]: Runner BIOS recognition follows the image digest, never the filename; exact-size unknown images remain loadable.
+- [Phase 04]: The runner rejects simultaneous --bios and --exe selectors and preserves the BIOS-free PS-EXE stub-kernel path.
+- [Phase 04]: Synthetic BIOS fixtures are generated only under the build directory; actual OpenBIOS shell observation is deferred to plan 04-40.
 
 ### Pending Todos
 
@@ -476,10 +480,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-39 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; same-run OpenBIOS handoff with digest-checked consumers, corruption/missing refusal, local CI/hygiene, and exact-head hosted CI | gpt-6-luna xhigh |
 
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-23 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; synthetic runner BIOS reset proof, CLI edge tests, local CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T19:23:53.858Z
-Stopped at: Completed 04-39-PLAN.md
+Last session: 2026-11-11T19:59:15.247Z
+Stopped at: Completed 04-23-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)

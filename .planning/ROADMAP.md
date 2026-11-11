@@ -308,7 +308,7 @@ Plans:
 - [x] 04-39-PLAN.md — Transfer checked OpenBIOS only within its build run
 
 **Wave 24**
-- [ ] 04-23-PLAN.md — Load explicit BIOS files through the real runner reset path
+- [x] 04-23-PLAN.md — Load explicit BIOS files through the real runner reset path
 
 **Wave 25**
 - [ ] 04-40-PLAN.md — Pin the inspected OpenBIOS shell across applicable lanes
@@ -405,6 +405,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 29/49 | In Progress | - |
+| 4. Games play in RetroArch | 30/49 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
