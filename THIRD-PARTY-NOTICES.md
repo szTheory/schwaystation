@@ -5,6 +5,39 @@ licences. Each section below names those files, where they came from, what chang
 upstream requires to travel with source and binaries. [PROVENANCE.md](PROVENANCE.md) says when a section is
 needed.
 
+## pcsx-redux/nugget OpenBIOS CI stand-in
+
+- **Applies to:** `.github/workflows/ci.yml` and `tests/built/expected.txt`, which identify the Linux-only build
+  from nugget's OpenBIOS, C shell and common source trees at commit `9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9`;
+  the resulting ROM remains in the runner's temporary directory.
+- **Upstream:** https://github.com/pcsx-redux/nugget at the pinned commit. Its root `LICENSE` and the consumed
+  OpenBIOS source headers are MIT-licensed.
+- **Changes:** none to the source. The build uses the Makefile's `OPENBIOS_SHELL=shell` option with the pinned
+  Linux GCC 12.3.0 archive. The firmware output is not committed, uploaded or shipped.
+- **Licence:** MIT
+
+    MIT License
+
+    Copyright (c) 2019 PCSX-Redux authors
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
 ## muhtari firmware scanner
 
 - **Applies to:** tests/cmake/firmware_scan.cmake

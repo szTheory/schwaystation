@@ -728,17 +728,18 @@ static void state_import_atomic(void)
         make_write_data(data, 109u);
         configure(inst, 0u);
         CHECK(write_success(inst, 9u, 0x08u, data));
-        uint8_t expected[SCHWAY_MEMCARD_SIZE];
-        memcpy(expected, card.data, sizeof expected);
+        uint8_t *expected = make_card(0u);
+        memcpy(expected, card.data, SCHWAY_MEMCARD_SIZE);
         CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
         CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, short_image,
                                          sizeof short_image),
                      SCHWAY_STATUS_ERR_ARGUMENT);
-        CHECK(memcmp(card.data, expected, sizeof expected) == 0);
+        CHECK(memcmp(card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
         CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
         CHECK_EQ_U64(schway_load_state(inst, idle_state, saved_size), SCHWAY_STATUS_OK);
-        CHECK(memcmp(card.data, expected, sizeof expected) == 0);
+        CHECK(memcmp(card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
         CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
+        free(expected);
         free(idle_state);
     }
     free(oversized);
@@ -836,7 +837,7 @@ static void state_pending_edges(void)
     target = make();
     source_image = make_card(43u);
     target_image = make_card(101u);
-    uint8_t expected[SCHWAY_MEMCARD_SIZE];
+    uint8_t *expected = make_card(0u);
     make_write_data(data, 67u);
     CHECK_EQ_U64(schway_load_memcard(source, SCHWAY_CARD_SLOT_1, source_image,
                                      SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
@@ -861,9 +862,9 @@ static void state_pending_edges(void)
         CHECK_EQ_HEX(transfer(target, 0u, CARD_ACK), 0x5Cu);
         CHECK_EQ_HEX(transfer(target, 0u, CARD_ACK), 0x5Du);
         CHECK_EQ_HEX(transfer(target, 0u, 0u), 0x47u);
-        memcpy(expected, target_image, sizeof expected);
+        memcpy(expected, target_image, SCHWAY_MEMCARD_SIZE);
         memcpy(&expected[5u * SCHWAY__CARD_SECTOR_SIZE], data, sizeof data);
-        CHECK(memcmp(target_card.data, expected, sizeof expected) == 0);
+        CHECK(memcmp(target_card.data, expected, SCHWAY_MEMCARD_SIZE) == 0);
         CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 1u);
         schway_span source_card;
         CHECK_EQ_U64(schway_get_memory(source, SCHWAY_MEMORY_CARD1, &source_card),
@@ -872,6 +873,7 @@ static void state_pending_edges(void)
         CHECK_EQ_U64(card_generation(source, SCHWAY_CARD_SLOT_1), 0u);
         free(state);
     }
+    free(expected);
     schway_destroy(target);
     schway_destroy(source);
     free(target_image);

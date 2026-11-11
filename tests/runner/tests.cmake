@@ -3,6 +3,7 @@
 # Run as a script (cmake -DCASE=<case> ... -P tests.cmake), this file is one
 # runner check; include()d by tests/tests.cmake, it registers the tests.
 if(CMAKE_SCRIPT_MODE_FILE)
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
   # Runs the runner with ARGN and fails unless it exits with code and its
   # merged output matches regex.
   function(expect_exit code regex)
@@ -70,7 +71,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash)
     expect_exit(0 "^frames 5\n.*max_rss_kib [0-9]+\n$" --bench 60)
   elseif(CASE STREQUAL "cards_persistence")
-    set(RUN ${HOOKED})
+    set(RUN ${EMULATOR} ${HOOKED})
     string(REPEAT "[0-9a-f]" 64 digits)
     set(card_dir "${OUT}/runner-cards-persistence")
     file(MAKE_DIRECTORY "${card_dir}")
@@ -87,7 +88,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "normal exit did not save only slot 1's completed card generation")
     endif()
   elseif(CASE STREQUAL "cards_sigterm")
-    set(RUN ${HOOKED})
+    set(RUN ${EMULATOR} ${HOOKED})
     string(REPEAT "[0-9a-f]" 64 digits)
     set(card_dir "${OUT}/runner-cards-sigterm")
     file(MAKE_DIRECTORY "${card_dir}")
@@ -103,7 +104,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "SIGTERM did not flush only slot 2 after frame 5")
     endif()
   elseif(CASE STREQUAL "cards_controls")
-    set(RUN ${HOOKED})
+    set(RUN ${EMULATOR} ${HOOKED})
     string(REPEAT "[0-9a-f]" 64 digits)
 
     # Missing cards begin as formatted blanks and stay absent until a game writes them.
@@ -130,7 +131,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     file(MAKE_DIRECTORY "${invalid_dir}")
     file(WRITE "${invalid_dir}/schwaystation.srm" "")
     file(SHA256 "${invalid_dir}/schwaystation.srm" old_invalid)
-    execute_process(COMMAND ${RUN} --frames 1 --hash --save-dir "${invalid_dir}"
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash --save-dir "${invalid_dir}"
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     file(SHA256 "${invalid_dir}/schwaystation.srm" new_invalid)
     if(NOT rc STREQUAL "1" OR NOT err MATCHES "cannot import card file" OR
@@ -544,8 +545,9 @@ foreach(case rgb24 video_bounds native_hash)
     LABELS portable runner TIMEOUT 10)
 endforeach()
 
+string(REPLACE ";" "|" runner_emulator_bars "${CMAKE_CROSSCOMPILING_EMULATOR}")
 set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
-  "-DEMULATOR=${runner_emulator}")
+  "-DEMULATOR=${runner_emulator_bars}")
 
 # Fault prevented: a state hash that is unstable, malformed or blind to the frames run, so devices
 # a test-card frame cannot show are not compared across lanes.

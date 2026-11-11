@@ -116,7 +116,7 @@
         "SCHWAYSTATION_BUILD_LIBRETRO": "OFF",
         "SCHWAYSTATION_TIMEOUT_SCALE": "5",
         "SCHWAYSTATION_INVENTORY": "wasm32",
-        "CMAKE_CROSSCOMPILING_EMULATOR": "${sourceDir}/build/pins/wasmtime/wasmtime;run;--dir=${sourceDir}::${sourceDir}"
+        "CMAKE_CROSSCOMPILING_EMULATOR": "${sourceDir}/build/pins/wasmtime/wasmtime;run;--dir=${sourceDir}::${sourceDir};--dir=."
       }
     },
     {

@@ -343,6 +343,32 @@ a one-byte-changed clean input, each prohibited content signature, a zero-file a
 archive. A separate BIOS test runs the synthetic all-zero key through the production identification binary
 and confirms that it remains unknown. No retail firmware bytes are needed or used.
 
+## Pinned OpenBIOS CI build
+
+The Linux x64 CI job builds the public `pcsx-redux/nugget` source at
+[`9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9`](https://github.com/pcsx-redux/nugget/commit/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9)
+with the PSn00bSDK GCC 12.3.0 Linux archive pinned in `pins.txt` by SHA-256
+`228f031a25cf2687d8845fd1421f625bafc211fa27da428e458e80d030a726f8`. Its OpenBIOS Makefile supports
+`OPENBIOS_SHELL=shell`, the older C shell. CI selects that option to build the pinned ROM without the separate
+`shello`/psyqo C++ target, which requires a `<utility>` header absent from the pinned compiler archive. Source
+files remain unchanged. Plan 04-40 carries the later shell-specific checks.
+
+The build command is `make -C openbios -j2 BUILD=Release BOARD=psx BOOT=rom OPENBIOS_SHELL=shell`. The output
+stays in the hosted Linux runner's temporary directory. CI checks the size and expected SHA-256 with:
+
+```sh
+cmake "-DOPENBIOS_INPUT=$RUNNER_TEMP/nugget/openbios/openbios.bin" \
+  -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+```
+
+The image must be exactly 524,288 bytes and match SHA-256
+`92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8`. The registered
+`built.openbios.digest` and `built.openbios.digest_corrupt` tests exercise matching and one-byte corrupted
+synthetic copies in the build tree; neither test stores firmware bytes in the repository.
+
+The measured Linux step exited 0 in [workflow run 43060258449](https://github.com/szTheory/schwaystation/actions/runs/43060258449).
+The ROM is neither committed, uploaded, nor reused across runs.
+
 ## Budgets
 
 **Documents.** `docs.budgets` keeps `README.md` under 16,384 bytes, `include/schwaystation.h` under 40,960 bytes and
