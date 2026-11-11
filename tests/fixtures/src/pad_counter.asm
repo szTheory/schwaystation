@@ -51,6 +51,9 @@ frame_wait:
   nop
   sw zero, 0x070(s0)                   ; acknowledge the completed vertical blank
   addiu s1, s1, 1
+  andi t0, s1, 1
+  bne t0, zero, counter_done           ; poll on alternating fields to expose lag accounting
+  nop
   li a0, 0x01
   li a1, 1
   jal sio_exchange
@@ -121,7 +124,25 @@ counter_done:
   li t1, 0x00010002                     ; record 2: pixel at the counter origin
   sw t1, MB_RECORDS + 8(t0)
   sw t2, MB_RECORDS + 12(t0)
-  li t1, 2
+  ; Check the last counter pixel too: an incorrect edge count that only draws at x=0 fails.
+  li t1, 0xC0000000                     ; GP0(C0h): read one VRAM pixel
+  sw t1, 0x810(s0)
+  li t1, 0x00640000                     ; x=0 when empty, otherwise x=count minus one; y=100
+  beq s2, zero, pixel_last_read
+  nop
+  addiu t1, t1, -1
+  addu t1, t1, s2
+pixel_last_read:
+  sw t1, 0x810(s0)
+  li t1, 0x00010001                     ; width=1, height=1
+  sw t1, 0x810(s0)
+  lw t2, 0x810(s0)                     ; GPUREAD exposes the stored RGB555 word
+  nop
+  andi t2, t2, 0xFFFF
+  li t1, 0x00010003                     ; record 3: last pixel drawn by the counter
+  sw t1, MB_RECORDS + 16(t0)
+  sw t2, MB_RECORDS + 20(t0)
+  li t1, 3
   sb t1, MB_COUNT(t0)
   mailbox_seal
   li t0, MB_BASE

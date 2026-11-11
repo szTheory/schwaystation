@@ -121,8 +121,8 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "pad_counter ${scenario} mailbox judge failed: ${judge_out}${judge_err}")
       endif()
       file(READ "${capture}" report)
-      if(NOT report MATCHES "(^|\n)lag frames=0(\n|$)")
-        message(FATAL_ERROR "pad_counter ${scenario} did not report zero lag frames:\n${report}")
+      if(NOT report MATCHES "(^|\n)lag frames=150(\n|$)")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report 150 lag frames across mailbox peeks:\n${report}")
       endif()
       string(REGEX MATCH "frame 300 sha256 [0-9a-f]+" frame_line "${report}")
       if(frame_line STREQUAL "")
@@ -142,6 +142,71 @@ if(CMAKE_SCRIPT_MODE_FILE)
     if(pad_counter_hash_none STREQUAL pad_counter_hash_press60)
       message(FATAL_ERROR "press@60 did not change the frame 300 hash")
     endif()
+  elseif(CASE STREQUAL "pad_counter_movies")
+    string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+    file(WRITE "${OUT}/pad-counter-empty.inputs" "")
+    file(WRITE "${OUT}/pad-counter-single.inputs"
+      "60 p1=digital:X:128,128,128,128 p2=.\n")
+    file(WRITE "${OUT}/pad-counter-held.inputs"
+      "60 p1=digital:X:128,128,128,128 p2=.\n"
+      "120 p1=digital:X:128,128,128,128 p2=.\n"
+      "180 p1=digital:X:128,128,128,128 p2=.\n"
+      "240 p1=digital:X:128,128,128,128 p2=.\n")
+    file(WRITE "${OUT}/pad-counter-three_edges.inputs"
+      "180 p1=digital:X:128,128,128,128 p2=.\n"
+      "181 p1=digital:.:128,128,128,128 p2=.\n"
+      "60 p1=digital:X:128,128,128,128 p2=.\n"
+      "61 p1=digital:.:128,128,128,128 p2=.\n"
+      "120 p1=digital:X:128,128,128,128 p2=.\n"
+      "121 p1=digital:.:128,128,128,128 p2=.\n")
+    foreach(scenario IN ITEMS empty single held three_edges)
+      set(fixture pad_counter_${scenario})
+      set(capture "${OUT}/pad-counter-movies-${scenario}.txt")
+      set(movie_flags "--inputs ${OUT}/pad-counter-${scenario}.inputs --hash")
+      if(scenario STREQUAL "three_edges")
+        string(APPEND movie_flags " --png 300:${OUT}/pad-counter-three_edges.png")
+      endif()
+      execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge
+          -DFIXTURE=${fixture} -DIMAGE=${IMAGE} -DFRAMES=300 -DPROFILE=ntsc-u
+          "-DFLAGS=${movie_flags}"
+          -DCSV=${CSV} -DCAPTURE=${capture} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
+          -P ${CMAKE_CURRENT_LIST_FILE}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE judge_out ERROR_VARIABLE judge_err)
+      if(NOT rc STREQUAL "0")
+        message(FATAL_ERROR "pad_counter ${scenario} mailbox judge failed: ${judge_out}${judge_err}")
+      endif()
+      file(READ "${capture}" report)
+      if(NOT report MATCHES "(^|\n)lag frames=150(\n|$)")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report 150 lag frames across mailbox peeks:\n${report}")
+      endif()
+      string(REGEX MATCH "frame 300 sha256 ([0-9a-f]+)" frame_line "${report}")
+      if(frame_line STREQUAL "")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report its frame 300 hash:\n${report}")
+      endif()
+      set(pad_counter_hash_${scenario} "${CMAKE_MATCH_1}")
+    endforeach()
+    if(pad_counter_hash_empty STREQUAL pad_counter_hash_single OR
+       NOT pad_counter_hash_single STREQUAL pad_counter_hash_held OR
+       pad_counter_hash_empty STREQUAL pad_counter_hash_three_edges OR
+       pad_counter_hash_single STREQUAL pad_counter_hash_three_edges)
+      message(FATAL_ERROR "empty/single/held/three-edge movies produced unexpected frame-300 hashes")
+    endif()
+    function(refuse_pad_movie name contents expected_reason)
+      set(path "${OUT}/pad-counter-${name}-invalid.inputs")
+      file(WRITE "${path}" "${contents}")
+      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --frames 1
+          --stop-on mailbox --inputs "${path}"
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "2" OR NOT out STREQUAL "" OR
+         NOT err MATCHES "invalid input movie at line [0-9]+" OR NOT err MATCHES "${expected_reason}")
+        message(FATAL_ERROR "pad_counter invalid movie ${name} was not refused before guest output:\n${out}${err}")
+      endif()
+    endfunction()
+    refuse_pad_movie(ordering
+      "60 p1=digital:X:128,128,128,128 p2=.\n60 p1=digital:.:128,128,128,128 p2=.\n"
+      "conflicting records")
+    refuse_pad_movie(encoding "60 p1=digital:.:1x,128,128,128 p2=.\n"
+      "axis values must be decimal numbers")
   elseif(CASE STREQUAL "mailbox_judge")
     string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
     # Runs the fixture to its sealed mailbox and judges every record against the fixture's rows in CSV
@@ -448,6 +513,16 @@ schway_add_test(NAME fixtures.pad_counter.press60
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 120)
+
+# Fault prevented: repeated held snapshots count as extra edges, released presses are missed,
+# peeks clear lag, or malformed/conflicting movies reach guest execution.
+schway_add_test(NAME fixtures.pad_counter.movies
+  COMMAND ${CMAKE_COMMAND} -DCASE=pad_counter_movies -DOUT=${PROJECT_BINARY_DIR}/tests
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/pad_counter.exe -DFRAMES=300
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 180)
 
 # Fault prevented: a runner that never reads the fixture's mailbox, or reads it wrongly: the sealed
 # mailbox of hello.exe ends the run with exit 0 and prints its records. The second test is the

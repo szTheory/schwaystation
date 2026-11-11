@@ -77,7 +77,9 @@ file or memory failure exits 1. The test-card frame hash remains unchanged by in
 the latched controller state.
 
 With `--inputs`, the runner also prints `lag frames=N`. The count sums the core's per-frame result: a frame is lagged
-when the guest completes no controller poll through SIO0. A `schway_peek` is read-only and never counts as a poll.
+when the guest completes no controller poll through SIO0. Mailbox checks and other `schway_peek` reads are read-only
+and never count as a poll or clear one. The pad-counter fixture polls on alternating frames, then checks its mailbox
+after every frame; the 300-frame run reports 150 lagged frames.
 
 ## Shared host memory-card file behavior
 
