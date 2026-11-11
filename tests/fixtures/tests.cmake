@@ -103,6 +103,17 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "schwaystation-run ${args} printed no line ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "pad_counter_lag")
+    file(WRITE "${OUT}/pad-counter-empty.inputs" "")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1
+        --inputs "${OUT}/pad-counter-empty.inputs"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "runner exited ${rc}: ${err}")
+    endif()
+    if(NOT out MATCHES "(^|\\n)lag frames=1(\\n|$)")
+      message(FATAL_ERROR "runner did not report one lag frame: ${out}")
+    endif()
   elseif(CASE STREQUAL "mailbox_judge")
     string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
     # Runs the fixture to its sealed mailbox and judges every record against the fixture's rows in CSV
@@ -392,6 +403,13 @@ schway_add_test(NAME fixtures.probe.hello
 # one of the two sources only: hello.exe's lines reach standard output.
 schway_add_test(NAME fixtures.hello.tty
   COMMAND ${CMAKE_COMMAND} -DCASE=tty -DFILE=${SCHWAYSTATION_FIXTURES_DIR}/hello.exe
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: --inputs accepting a pad movie but omitting the guest-polled lag count.
+schway_add_test(NAME fixtures.pad_counter.press60
+  COMMAND ${CMAKE_COMMAND} -DCASE=pad_counter_lag -DOUT=${PROJECT_BINARY_DIR}/tests
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
