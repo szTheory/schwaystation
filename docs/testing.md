@@ -46,6 +46,16 @@ The `gte`, `dma` and `timers` directories are in the `ci`, `asan` and `wasm32` i
 `portable` tests through `ci`. The `nofp`, `hygiene` and `nightly` inventories do not run them. Under `asan` the
 register sweeps of `gte` and `dma` (`gte.regs.sweep`, `dma.regs.sweep`) are the bounds proof.
 
+### OpenBIOS handoff
+
+The required CI run builds the pinned OpenBIOS shell once, checks its size and SHA-256 before uploading it as the
+`openbios-handoff` Actions artifact, then makes each applicable build lane download that artifact from the same
+run. The registered `built.openbios.handoff` test checks the expected digest in every consumer before the runner
+uses the image. The artifact expires after one day and is never cached across runs. Packaging installs only the
+library, runner and libretro components; release collection downloads only `archives-*`, so the firmware does not
+enter a package or publication artifact. A transfer or digest failure is an infrastructure failure, not an
+emulation result.
+
 `SCHWAYSTATION_TIMEOUT_SCALE` multiplies every test timeout: 3 for `asan`, 8 for `be32` and 5 for `wasm32`.
 
 ### Lanes that need tools only CI has

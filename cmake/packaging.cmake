@@ -1,7 +1,8 @@
 # Release archives: one ZIP per install component, named
 # schwaystation-COMPONENT-OS-ARCH.zip with no version, so a download link to the
 # latest release never changes, and with no top-level directory. The package
-# step of the ci workflow writes them into the build directory.
+# step of the ci workflow writes them into the build directory. The short-lived
+# OpenBIOS handoff is a separate run-local artifact, never an install component.
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(SCHWAYSTATION_OS linux)

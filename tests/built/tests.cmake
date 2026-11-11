@@ -74,3 +74,23 @@ schway_add_test(NAME built.openbios.digest_corrupt
   COMMAND ${CMAKE_COMMAND} "-DCMD=${openbios_corrupt_cmd}" -DCODE=1
     "-DREGEX=OpenBIOS SHA256 mismatch" -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS bios portable TIMEOUT 10)
+
+# CI must use the artifact downloaded from this run; local builds use the
+# existing generated fixture when no hosted handoff is available.
+set(openbios_handoff_input "${PROJECT_BINARY_DIR}/openbios/openbios.bin")
+set(openbios_handoff_expected "${PROJECT_SOURCE_DIR}/tests/built/expected.txt")
+if(NOT EXISTS "${openbios_handoff_input}")
+  if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
+    message(FATAL_ERROR "OpenBIOS handoff artifact is missing from this CI consumer")
+  endif()
+  set(openbios_handoff_input "${openbios_fixture_path}")
+  set(openbios_handoff_expected "${openbios_expected_path}")
+endif()
+
+# Fault prevented: a consumer using a missing or altered artifact from another
+# run instead of this run's digest-checked OpenBIOS handoff.
+schway_add_test(NAME built.openbios.handoff
+  COMMAND ${CMAKE_COMMAND} "-DOPENBIOS_INPUT=${openbios_handoff_input}"
+    "-DEXPECTED_FILE=${openbios_handoff_expected}"
+    -P ${PROJECT_SOURCE_DIR}/cmake/OpenBIOS.cmake
+  LABELS bios portable TIMEOUT 10)

@@ -84,6 +84,49 @@ jobs:
               --jq '.[] | .filename, (.previous_filename // empty)' || echo '(listing failed)'; } |
             sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
 
+  # Build once in this run, then hand the digest-checked image to every build
+  # consumer through a short-retention Actions artifact (never a cache).
+  openbios:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 8  # OpenBIOS source/toolchain build plus pinned digest check
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || '' }}
+      - name: Build and verify pinned OpenBIOS
+        env:
+          OPENBIOS_PIN: 9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9
+        run: |
+          set -eu
+          source_dir="$RUNNER_TEMP/nugget"
+          archive_dir="$RUNNER_TEMP/openbios-archive"
+          toolchain_dir="$RUNNER_TEMP/openbios-toolchain"
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/pcsx-redux/nugget.git "$source_dir"
+          git -C "$source_dir" fetch --quiet --depth=1 origin "$OPENBIOS_PIN"
+          git -C "$source_dir" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$source_dir" rev-parse HEAD)" = "$OPENBIOS_PIN"
+          mkdir -p "$archive_dir" "$toolchain_dir" build/openbios
+          sh scripts/fetch-pin.sh gcc-mipsel-none-elf-linux "$archive_dir"
+          toolchain_zip=$(find "$archive_dir" -maxdepth 1 -type f -name '*.zip' -print -quit)
+          test -n "$toolchain_zip"
+          unzip -t "$toolchain_zip" > /dev/null
+          unzip -q "$toolchain_zip" -d "$toolchain_dir"
+          test -x "$toolchain_dir/bin/mipsel-none-elf-gcc"
+          PATH="$toolchain_dir/bin:$PATH" make -C "$source_dir/openbios" -j2 \
+            BUILD=Release BOARD=psx BOOT=rom OPENBIOS_SHELL=shell
+          cmake "-DOPENBIOS_INPUT=$source_dir/openbios/openbios.bin" \
+            -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+          cp "$source_dir/openbios/openbios.bin" build/openbios/openbios.bin
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: openbios-handoff
+          path: build/openbios/openbios.bin
+          retention-days: 1
+          if-no-files-found: error
+
   # The image has git and jq; configure finds them.
   hygiene:
     runs-on: ubuntu-26.04
@@ -121,7 +164,7 @@ jobs:
             sh scripts/check-title.sh "$title"
 
   build:
-    needs: changes
+    needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     name: build (${{ matrix.os }}-${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
@@ -141,6 +184,14 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openbios-handoff
+          path: build/${{ matrix.preset }}/openbios
+      - name: Verify run-local OpenBIOS before consumers
+        run: >-
+          cmake -DOPENBIOS_INPUT=build/${{ matrix.preset }}/openbios/openbios.bin
+          -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       # The MSVC developer environment for the runner's own architecture,
       # without a third-party action.
       - name: MSVC environment
@@ -168,32 +219,6 @@ jobs:
         run: |
           cmake -DREADME=README.md "-DBASE_URL=file://$PWD/build/ci/" -P tests/cmake/install_line.cmake
           cmake -DREADME=README.md "-DBASE_URL=file://$PWD/build/ci/" -DFLIP=1 -P tests/cmake/install_line.cmake
-      # The source and compiler are pinned; the 512 KiB image stays in this
-      # Linux job and only its measured size and digest appear in the log.
-      - name: Build and measure pinned OpenBIOS
-        if: matrix.os == 'linux' && matrix.arch == 'x64'
-        env:
-          OPENBIOS_PIN: 9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9
-        run: |
-          set -eu
-          source_dir="$RUNNER_TEMP/nugget"
-          archive_dir="$RUNNER_TEMP/openbios-archive"
-          toolchain_dir="$RUNNER_TEMP/openbios-toolchain"
-          git clone --quiet --filter=blob:none --no-checkout https://github.com/pcsx-redux/nugget.git "$source_dir"
-          git -C "$source_dir" fetch --quiet --depth=1 origin "$OPENBIOS_PIN"
-          git -C "$source_dir" checkout --quiet --detach FETCH_HEAD
-          test "$(git -C "$source_dir" rev-parse HEAD)" = "$OPENBIOS_PIN"
-          mkdir -p "$archive_dir" "$toolchain_dir"
-          sh scripts/fetch-pin.sh gcc-mipsel-none-elf-linux "$archive_dir"
-          toolchain_zip=$(find "$archive_dir" -maxdepth 1 -type f -name '*.zip' -print -quit)
-          test -n "$toolchain_zip"
-          unzip -t "$toolchain_zip" > /dev/null
-          unzip -q "$toolchain_zip" -d "$toolchain_dir"
-          test -x "$toolchain_dir/bin/mipsel-none-elf-gcc"
-          PATH="$toolchain_dir/bin:$PATH" make -C "$source_dir/openbios" -j2 \
-            BUILD=Release BOARD=psx BOOT=rom OPENBIOS_SHELL=shell
-          cmake "-DOPENBIOS_INPUT=$source_dir/openbios/openbios.bin" \
-            -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       # The commit these archives were built from; a release publishes only
       # archives that all record its own commit.
       - name: The commit built
@@ -221,6 +246,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openbios-handoff
+          path: build/asan/openbios
+      - name: Verify run-local OpenBIOS before consumers
+        run: cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       # clang-21 is on the image; its sanitizer runtimes may not be.
       - name: Sanitizer runtimes
         run: dpkg -s libclang-rt-21-dev > /dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y libclang-rt-21-dev; }
@@ -262,6 +293,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openbios-handoff
+          path: build/be32/openbios
+      - name: Verify run-local OpenBIOS before consumers
+        run: cmake -DOPENBIOS_INPUT=build/be32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       - name: Cross compiler and qemu-user
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-powerpc-linux-gnu g++-powerpc-linux-gnu qemu-user
       - run: cmake --workflow --preset be32
@@ -307,6 +344,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openbios-handoff
+          path: build/wasm32/openbios
+      - name: Verify run-local OpenBIOS before consumers
+        run: cmake -DOPENBIOS_INPUT=build/wasm32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       - name: WASI sysroot and runtime
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends wasi-libc libclang-rt-21-dev-wasm32
