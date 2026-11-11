@@ -559,17 +559,19 @@ static int bios_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, u
     return 0;
 }
 
-/* The debug ports of the second expansion region. They answer only while the
-   profile's debug-port flag is set, and are silently ignored otherwise:
-   1F802080h takes a byte for the TTY and 1F802082h an exit code. Every other
-   address of the region is a gap. */
+/* The second expansion region has two profile-controlled debug ports and one
+   source-identified POST byte sink; every other access is a gap. */
 static int exp2_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uint32_t width,
                        uint32_t *value, uint32_t *cycles)
 {
-    if (p != 0x1F802080u && p != 0x1F802082u) {
+    if (p == 0x1F802041u && kind == K_WRITE && width == 1u) {
+        /* OpenBIOS writes this byte before startup; this ignored compatibility
+           sink is documented with its pinned source in docs/hardware/bus.md. */
+    } else if (p != 0x1F802080u && p != 0x1F802082u) {
         return gap(inst, kind, SCHWAY__DEV_EXP2, addr, width);
     }
-    if (kind == K_WRITE && width == 1u && (inst->profile_flags & SCHWAY__PROFILE_DEBUG_PORT) != 0u) {
+    if (p != 0x1F802041u && kind == K_WRITE && width == 1u &&
+        (inst->profile_flags & SCHWAY__PROFILE_DEBUG_PORT) != 0u) {
         if (p == 0x1F802080u) {
             schway__tty_push(inst, (uint8_t)*value);
         } else {

@@ -141,12 +141,18 @@ including the edges such as `1F80105Fh` against `1F801060h`.
 
 A read or fetch of the first (`1F000000h`-`1F7FFFFFh`) or third (`1FA00000h`-`1FBFFFFFh`) expansion region is a bus error
 naming it, because nothing is plugged in; a write is dropped and costs the port's write cost. Of the second region
-(`1F802000h`-`1F803FFFh`) only two addresses answer, and every other address is a bus error naming it.
+(`1F802000h`-`1F803FFFh`), two addresses are debug ports and one exact byte write is a modeled POST sink. Every other
+address is a bus error naming the region, and the POST address has only the byte-write behavior described below.
 
-| Address | Port |
+| Address | Modeled access |
 |---|---|
+| `1F802041h` | A byte write is accepted and ignored as an OpenBIOS POST status write; it is not stored or readable |
 | `1F802080h` | a byte written here is queued for the host to read as TTY output |
 | `1F802082h` | a byte written here is the exit code, and the guest has asked to stop |
+
+The POST write pays the normal EXP2 byte-write cost. Reads, wider accesses and neighboring addresses remain gaps. This
+narrow compatibility model follows the pinned [MIT nugget OpenBIOS register definition](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/common/hardware/hwregs.h)
+and [startup writes](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/openbios/main/main.c): the source defines `POST` as an 8-bit register at `BF802041h` and writes `0Fh`/`0Eh` before splash and boot. This is source-supported compatibility behavior, not a hardware measurement or evidence that the shell starts successfully.
 
 Both ports act only while the profile's debug-port flag is set, and only for a byte write; a wider write, or any
 access with the flag clear, answers and does nothing. A read returns 0. A retail profile leaves the flag clear. The
