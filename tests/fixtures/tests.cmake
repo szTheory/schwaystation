@@ -103,7 +103,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "schwaystation-run ${args} printed no line ${line}:\n${out}")
       endif()
     endforeach()
-  elseif(CASE STREQUAL "memcard_roundtrip")
+  elseif(CASE STREQUAL "memcard_roundtrip" OR CASE STREQUAL "memcard_controls")
     file(REMOVE_RECURSE "${OUT}")
     file(MAKE_DIRECTORY "${OUT}")
     function(run_memcard_guest profile name directory out_hash)
@@ -130,6 +130,10 @@ if(CMAKE_SCRIPT_MODE_FILE)
         set(expected_hash "c532f85314c83a974466042df32a03ef7ce02ce8aea7c386843e44242d027a99")
       elseif(name STREQUAL "second")
         set(expected_hash "cd1c037ef800397a9c95eb23ebc5524710f55db2eca8e03c975f841f0e9232db")
+      elseif(name STREQUAL "missing")
+        set(expected_hash "c532f85314c83a974466042df32a03ef7ce02ce8aea7c386843e44242d027a99")
+      elseif(name STREQUAL "wrong")
+        set(expected_hash "543fbfefe1dd81b5e59def1ab73bd902bd13a93285f332f54664e1479e40e545")
       endif()
       if(DEFINED expected_hash AND NOT frame_hash STREQUAL expected_hash)
         message(FATAL_ERROR "memcard ${name} frame-120 hash is ${frame_hash}, expected ${expected_hash}")
@@ -155,16 +159,32 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "${label} sector-1 frame checksum is ${frame_checksum}, expected ${value}")
       endif()
     endfunction()
-    run_memcard_guest(first first "${OUT}" first_hash)
-    check_memcard_value("${OUT}/memcard_roundtrip.srm" "01" "first-process card 1")
-    check_memcard_value("${OUT}/memcard_roundtrip.1.mcr" "02" "first-process card 2")
-    run_memcard_guest(second second "${OUT}" second_hash)
-    check_memcard_value("${OUT}/memcard_roundtrip.srm" "02" "second-process card 1")
-    check_memcard_value("${OUT}/memcard_roundtrip.1.mcr" "03" "second-process card 2")
-    if(first_hash STREQUAL second_hash)
-      message(FATAL_ERROR "fresh card values 1/2 and 2/3 produced the same frame-120 hash")
+    if(CASE STREQUAL "memcard_roundtrip")
+      run_memcard_guest(first first "${OUT}" first_hash)
+      check_memcard_value("${OUT}/memcard_roundtrip.srm" "01" "first-process card 1")
+      check_memcard_value("${OUT}/memcard_roundtrip.1.mcr" "02" "first-process card 2")
+      run_memcard_guest(second second "${OUT}" second_hash)
+      check_memcard_value("${OUT}/memcard_roundtrip.srm" "02" "second-process card 1")
+      check_memcard_value("${OUT}/memcard_roundtrip.1.mcr" "03" "second-process card 2")
+      if(first_hash STREQUAL second_hash)
+        message(FATAL_ERROR "fresh card values 1/2 and 2/3 produced the same frame-120 hash")
+      endif()
+      message(STATUS "memcard frame-120 hashes: first=${first_hash} second=${second_hash}")
+    else()
+      file(MAKE_DIRECTORY "${OUT}/missing" "${OUT}/wrong")
+      run_memcard_guest(missing missing "${OUT}/missing" missing_hash)
+      check_memcard_value("${OUT}/missing/memcard_roundtrip.srm" "01" "missing-card control card 1")
+      check_memcard_value("${OUT}/missing/memcard_roundtrip.1.mcr" "02" "missing-card control card 2")
+      file(COPY_FILE "${OUT}/missing/memcard_roundtrip.1.mcr"
+        "${OUT}/wrong/memcard_roundtrip.srm")
+      run_memcard_guest(wrong wrong "${OUT}/wrong" wrong_hash)
+      check_memcard_value("${OUT}/wrong/memcard_roundtrip.srm" "03" "wrong-card control card 1")
+      check_memcard_value("${OUT}/wrong/memcard_roundtrip.1.mcr" "02" "wrong-card control card 2")
+      if(missing_hash STREQUAL wrong_hash)
+        message(FATAL_ERROR "missing and wrong card images produced the same frame-120 hash")
+      endif()
+      message(STATUS "memcard control frame-120 hashes: missing=${missing_hash} wrong=${wrong_hash}")
     endif()
-    message(STATUS "memcard frame-120 hashes: first=${first_hash} second=${second_hash}")
   elseif(CASE STREQUAL "pad_counter_press60")
     file(MAKE_DIRECTORY "${OUT}")
     file(WRITE "${OUT}/pad-counter-none.inputs"
@@ -585,6 +605,15 @@ schway_add_test(NAME fixtures.memcard_roundtrip.persistence
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 120)
+
+# Fault prevented: absent or wrong-slot card images that fail to change the guest's visible value.
+schway_add_test(NAME fixtures.memcard_roundtrip.controls
+  COMMAND ${CMAKE_COMMAND} -DCASE=memcard_controls -DOUT=${PROJECT_BINARY_DIR}/tests/memcard-controls
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/memcard_roundtrip.exe
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 180)
 
 # Fault prevented: repeated held snapshots count as extra edges, released presses are missed,
 # peeks clear lag, or malformed/conflicting movies reach guest execution.

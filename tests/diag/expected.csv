@@ -163,3 +163,13 @@ memcard_roundtrip,card2,second,00000003,doc,docs/hardware/sio.md Memory-card Rea
 memcard_roundtrip,pixel1,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
 memcard_roundtrip,pixel1_last,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
 memcard_roundtrip,pixel2_last,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,card1,missing,00000001,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,card2,missing,00000002,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,pixel1,missing,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel1_last,missing,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel2_last,missing,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,card1,wrong,00000003,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,card2,wrong,00000002,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,pixel1,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel1_last,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel2_last,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline

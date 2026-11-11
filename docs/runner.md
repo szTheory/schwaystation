@@ -104,7 +104,9 @@ SIGTERM still finishes the current frame and flushes completed writes before ret
 The `memcard_roundtrip` fixture verifies this path with fresh runner processes. From an empty save directory,
 the first process reads and writes card 1 value 1 and independent card 2 value 2; a second process reads them
 back and writes 2 and 3. The frame-120 hashes must differ, and the guest mailbox checks the counters and red
-RGB555 pixels read back from VRAM. Card images and PNGs are generated only in the build tree.
+RGB555 pixels read back from VRAM. A control places the card-2 image under card 1's filename and verifies that
+the guest sees a different counter pair and frame hash from a missing-card run. Card images and PNGs are generated
+only in the build tree.
 
 ## Shared host memory-card file behavior
 
