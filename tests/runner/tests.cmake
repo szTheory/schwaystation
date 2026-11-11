@@ -346,7 +346,6 @@ if(CMAKE_SCRIPT_MODE_FILE)
   elseif(CASE STREQUAL "unknown")
     # An option this release does not have, and --help or --version with
     # anything else.
-    refuse(--frames 1 --bios)
     refuse(--frames 1 --disc x.cue)
     refuse(--frames 1 --help)
     refuse(--version --frames 1)

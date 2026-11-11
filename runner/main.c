@@ -2,15 +2,16 @@
  *
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
+ *                     [--hash] [--hash-state]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
  *                     [--hash-state]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
- * Runs N frames (1 <= N <= 1,000,000) of one instance with no BIOS and no
- * disc, which shows the built-in test card. With --hash it prints, after the
- * last frame:
+ * A frame run without --bios or --exe shows the built-in test card. With
+ * --hash the runner prints, after the last frame:
  *
  *   frame <N> sha256 <64 lowercase hex digits>
  *
@@ -39,6 +40,10 @@
  * --exe FILE loads a PS-EXE into the instance and runs it, 600 frames when
  * neither --frames nor --bench is given. --tty sets the profile's debug-port
  * flag and prints the guest's text, one "tty <line>" per line.
+ *
+ * --bios FILE loads an exactly 524288-byte BIOS image into the instance before
+ * reset. It prints the copied image's SHA-256 and digest-table flags, then runs
+ * it for 600 frames by default. Its file name does not determine recognition.
  *
  * --probe FILE prints the identity of a PS-EXE (probe.h) and runs nothing: no
  * instance is made and no frame runs. It is valid only alone.
@@ -123,6 +128,8 @@ static void run_free(void *user, void *ptr, size_t size)
 static const char synopsis[] =
     "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--png N:FILE]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
+    "                         [--hash] [--hash-state]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
     "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
@@ -139,8 +146,9 @@ static const char synopsis[] =
     "  --memcard-names MODE  basename (default) or serial\n"
     "  --serial SERIAL   use this validated serial as the card basename with serial mode\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
+    "  --bios FILE        load an exactly 524288-byte BIOS image and report its identity\n"
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
-    "  --tty              print the program's text as tty lines; needs --exe\n"
+    "  --tty              print guest text as tty lines; needs --exe or --bios\n"
     "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe\n"
     "  --trace first-fault  print the last 4096 trace records after a fault or a hang; needs --exe\n"
     "  --no-stop-on-fault   keep running after the program's first fault; needs --exe\n"
@@ -152,6 +160,93 @@ static int usage(const char *why)
 {
     fprintf(stderr, "schwaystation-run: %s\n%s", why, synopsis);
     return SCHWAY__EXIT_USAGE;
+}
+
+/* Read one exact-size BIOS image. The extra-byte probe bounds memory even for
+   a hostile file and distinguishes a valid 512 KiB image from a longer one. */
+static uint8_t *runner_read_bios_file(const char *path)
+{
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        schway__refuse_file(path, "cannot open");
+        return NULL;
+    }
+    uint8_t *bytes = (uint8_t *)malloc(SCHWAY_BIOS_SIZE);
+    if (bytes == NULL) {
+        (void)fclose(file);
+        fprintf(stderr, "schwaystation-run: out of memory\n");
+        return NULL;
+    }
+    size_t count = fread(bytes, 1u, SCHWAY_BIOS_SIZE, file);
+    int read_error = ferror(file);
+    int extra = EOF;
+    if (count == SCHWAY_BIOS_SIZE && !read_error) {
+        extra = fgetc(file);
+        read_error = ferror(file);
+    }
+    if (fclose(file) != 0) {
+        read_error = 1;
+    }
+    if (read_error) {
+        schway__refuse_file(path, "cannot read");
+        free(bytes);
+        return NULL;
+    }
+    if (count != SCHWAY_BIOS_SIZE || extra != EOF) {
+        schway__refuse_file(path, "BIOS must be exactly 524288 bytes");
+        free(bytes);
+        return NULL;
+    }
+    return bytes;
+}
+
+static const char *runner_bios_status_name(uint32_t status)
+{
+    return status == SCHWAY_BIOS_STATUS_RECOGNIZED ? "recognized" : "unknown";
+}
+
+static const char *runner_bios_region_name(uint32_t region)
+{
+    switch (region) {
+    case SCHWAY_REGION_NTSC_U:
+        return "ntsc-u";
+    case SCHWAY_REGION_NTSC_J:
+        return "ntsc-j";
+    case SCHWAY_REGION_PAL:
+        return "pal";
+    case SCHWAY_BIOS_REGION_ANY:
+        return "any";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *runner_bios_flags_name(uint32_t flags)
+{
+    if (flags == (SCHWAY_BIOS_INFO_LOADED | SCHWAY_BIOS_INFO_RECOGNIZED)) {
+        return "loaded,recognized";
+    }
+    if (flags == SCHWAY_BIOS_INFO_LOADED) {
+        return "loaded";
+    }
+    return "none";
+}
+
+static int runner_print_bios_info(const schway *inst)
+{
+    schway_bios_info info;
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    if (schway_get_bios_info(inst, &info) != SCHWAY_STATUS_OK) {
+        fprintf(stderr, "schwaystation-run: cannot read BIOS identity\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+    char sha256[65];
+    schway__sha256_hex(info.sha256, sha256);
+    printf("bios flags=%s status=%s region=%s sha256=%s\n",
+           runner_bios_flags_name(info.flags), runner_bios_status_name(info.status),
+           runner_bios_region_name(info.region), sha256);
+    return SCHWAY__EXIT_OK;
 }
 
 static void help(void)
@@ -233,6 +328,7 @@ typedef struct options {
     int serial_card_names; /* --memcard-names serial */
     int memcard_names_set;
     const char *probe; /* --probe FILE, else NULL */
+    const char *bios;  /* --bios FILE, else NULL */
     const char *exe;   /* --exe FILE, else NULL */
     int tty;           /* --tty: debug-port flag and the tty lines */
     int stop_mailbox;  /* --stop-on mailbox */
@@ -375,6 +471,15 @@ static int parse_options(int argc, char **argv, options *o)
             }
             o->exe = value;
             i++;
+        } else if (strcmp(arg, "--bios") == 0) {
+            if (o->bios != NULL) {
+                return usage("give --bios once");
+            }
+            if (value == NULL || value[0] == '\0' || value[0] == '-') {
+                return usage("--bios needs a file");
+            }
+            o->bios = value;
+            i++;
         } else if (strcmp(arg, "--tty") == 0) {
             o->tty = 1;
         } else if (strcmp(arg, "--stop-on") == 0) {
@@ -410,8 +515,11 @@ static int parse_options(int argc, char **argv, options *o)
             return usage(arg[0] == '-' ? "unknown option" : "unexpected argument");
         }
     }
-    if (o->tty && o->exe == NULL) {
-        return usage("--tty needs --exe");
+    if (o->bios != NULL && o->exe != NULL) {
+        return usage("--bios and --exe cannot be used together");
+    }
+    if (o->tty && o->exe == NULL && o->bios == NULL) {
+        return usage("--tty needs --exe or --bios");
     }
     if (o->stop_mailbox && o->exe == NULL) {
         return usage("--stop-on needs --exe");
@@ -433,7 +541,7 @@ static int parse_options(int argc, char **argv, options *o)
         return usage("card test options need --save-dir");
     }
 #endif
-    if (o->frames == 0u && o->exe != NULL) {
+    if (o->frames == 0u && (o->exe != NULL || o->bios != NULL)) {
         o->frames = EXE_FRAMES_DEFAULT;
     }
     if (o->frames == 0u) {
@@ -1043,11 +1151,20 @@ static int run(const options *opt)
             return SCHWAY__EXIT_FAILURE;
         }
     }
+    uint8_t *bios = NULL;
+    if (opt->bios != NULL) {
+        bios = runner_read_bios_file(opt->bios);
+        if (bios == NULL) {
+            schway__inputs_release(&movie);
+            return SCHWAY__EXIT_FAILURE;
+        }
+    }
     uint8_t *exe = NULL;
     size_t exe_size = 0;
     if (opt->exe != NULL) {
         exe = schway__read_exe_file(opt->exe, &exe_size);
         if (exe == NULL) {
+            free(bios);
             schway__inputs_release(&movie);
             return SCHWAY__EXIT_FAILURE;
         }
@@ -1057,6 +1174,7 @@ static int run(const options *opt)
         samples = (uint32_t *)malloc(schway__bench_bytes(opt->frames));
         if (samples == NULL) {
             fprintf(stderr, "schwaystation-run: out of memory\n");
+            free(bios);
             free(exe);
             schway__inputs_release(&movie);
             return SCHWAY__EXIT_FAILURE;
@@ -1073,6 +1191,7 @@ static int run(const options *opt)
         fprintf(stderr, "schwaystation-run: schway_create failed: %s\n",
                 schway_status_string(st));
         free(samples);
+        free(bios);
         free(exe);
         schway__inputs_release(&movie);
         return SCHWAY__EXIT_FAILURE;
@@ -1095,6 +1214,15 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
         }
     }
+    if (status == SCHWAY__EXIT_OK && bios != NULL) {
+        st = schway_load_bios(inst, bios, SCHWAY_BIOS_SIZE);
+        if (st != SCHWAY_STATUS_OK) {
+            schway__refuse_file(opt->bios, schway_status_string(st));
+            status = SCHWAY__EXIT_FAILURE;
+        } else {
+            status = runner_print_bios_info(inst);
+        }
+    }
     if (status == SCHWAY__EXIT_OK && exe != NULL) {
         st = schway_load_exe(inst, exe, exe_size);
         if (st != SCHWAY_STATUS_OK) {
@@ -1109,6 +1237,7 @@ static int run(const options *opt)
         status = SCHWAY__EXIT_FAILURE;
     }
 #endif
+    free(bios);
     free(exe);
     tty_lines tty;
     tty.len = 0u;

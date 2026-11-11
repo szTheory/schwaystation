@@ -5,7 +5,7 @@ sound device or input device. It can print a frame hash, write a PNG and report 
 to check that a build produces the expected picture. It can run a PS-EXE file and print the text the program writes,
 and it can say what a PS-EXE file is without running it.
 
-This release loads no BIOS and no disc. Without `--exe` every run shows the built-in test card, described in
+The runner loads no disc. A run without `--bios` or `--exe` shows the built-in test card, described in
 [embedding.md](embedding.md#the-test-card). `--probe` reads one file and runs nothing.
 
 ## Synopsis
@@ -13,6 +13,7 @@ This release loads no BIOS and no disc. Without `--exe` every run shows the buil
 ```text
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-state]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
                   [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-state]
@@ -26,8 +27,9 @@ schwaystation-run --help | --version
 |---|---|
 | `--frames N` | Run N frames, N from 1 to 1000000. Give either `--frames` or `--bench`, once. |
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
+| `--bios FILE` | Load an exactly 524288-byte BIOS image, report its digest identity, then run it. Without `--frames` or `--bench` the run is 600 frames. Give it once. See [BIOS images](#bios-images). |
 | `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
-| `--tty` | Print the program's text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe`. |
+| `--tty` | Print guest text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe` or `--bios`. |
 | `--stop-on mailbox` | End the run when the program's [mailbox](#mailbox) reports done or fault; a run that reaches the frame cap with neither is a [hang](#mailbox). Needs `--exe`. Give it once. |
 | `--trace first-fault` | After a [fault](#diagnostics) or a hang, print the last 4096 trace records as twelve-field lines. Needs `--exe`. Give it once. |
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
@@ -44,10 +46,31 @@ schwaystation-run --help | --version
 | `--version` | Print the version and the Git revision the build was configured from. Give it alone. |
 
 Options may come in any order, except `--probe`, which takes no other option. Anything else on the command line is
-a usage error and nothing runs; that includes a file name that does not follow `--exe` or `--probe`, `--exe` twice
-or with `--probe`, `--tty`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything
-but `mailbox`, `--trace` with anything but `first-fault`, `--serial` without serial naming, and any option this
-release does not have.
+a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--exe` or `--probe`,
+`--bios` or `--exe` twice, `--bios` together with `--exe`, `--exe` with `--probe`, `--tty` without `--exe` or
+`--bios`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything but `mailbox`,
+`--trace` with anything but `first-fault`, `--serial` without serial naming, and any option this release does not have.
+
+## BIOS images
+
+`--bios FILE` accepts exactly 524288 bytes. A missing, unreadable, short or overlong file exits 1 before a frame runs.
+The runner copies the image into the emulator instance before reset, then prints its identity:
+
+```text
+bios flags=loaded,recognized status=recognized region=ntsc-u sha256=<64 lowercase hex digits>
+```
+
+Unknown exact-size images print `flags=loaded status=unknown region=unknown`; they remain loadable. Recognition and
+region come from the BIOS digest table, never from the filename. The SHA-256 identifies the exact bytes supplied.
+The repository does not include BIOS files. For example, a user can pass a BIOS file they already have:
+
+```sh
+schwaystation-run --bios ./bios.bin --frames 600 --tty
+```
+
+Without `--frames` or `--bench`, the runner allows 600 frames for BIOS startup. `--tty` enables the debug ports and
+prints text or a nonzero exit-port result. `--stop-on mailbox`, `--trace first-fault` and `--no-stop-on-fault` remain
+PS-EXE options. The separate `--exe FILE` path continues to run without a BIOS file, using the core's stub kernel.
 
 ## Input scripts
 
