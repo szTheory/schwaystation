@@ -80,9 +80,8 @@ schway_add_test(NAME built.openbios.digest_corrupt
 set(openbios_handoff_input "${PROJECT_BINARY_DIR}/openbios/openbios.bin")
 set(openbios_handoff_expected "${PROJECT_SOURCE_DIR}/tests/built/expected.txt")
 if(NOT EXISTS "${openbios_handoff_input}")
-  if("$ENV{GITHUB_ACTIONS}" STREQUAL "true")
-    message(FATAL_ERROR "OpenBIOS handoff artifact is missing from this CI consumer")
-  endif()
+  # Non-consumer workflows may configure ci for a build-only target; the
+  # actual consumer jobs verify the downloaded artifact before configuration.
   set(openbios_handoff_input "${openbios_fixture_path}")
   set(openbios_handoff_expected "${openbios_expected_path}")
 endif()

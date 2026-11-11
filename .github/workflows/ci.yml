@@ -90,7 +90,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 8  # OpenBIOS source/toolchain build plus pinned digest check
+    timeout-minutes: 8  # 8-minute provisional bound until the producer has measured runs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
