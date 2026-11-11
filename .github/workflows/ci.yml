@@ -237,7 +237,7 @@ jobs:
           if-no-files-found: error
 
   asan:
-    needs: changes
+    needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor (apt); 2 x 28 s (asan), slowest of 5 runs, run 42722584020
@@ -284,7 +284,7 @@ jobs:
   # 32-bit big-endian PowerPC under qemu-ppc: label portable, and its
   # hashes.txt joins the comparison.
   be32:
-    needs: changes
+    needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 7  # 5-minute run 43067261917 ended with pad_counter.movies still running (433 tests; prior 102 s run had 208)
@@ -335,7 +335,7 @@ jobs:
 
   # The WebAssembly lane participates in the same required hash comparison.
   wasm32:
-    needs: changes
+    needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor (apt); 2 x 60 s (wasm32), slowest of 5 runs, run 42691517611
