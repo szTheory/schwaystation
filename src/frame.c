@@ -148,6 +148,28 @@ static void write_result(const schway *inst, schway_run_result *out, uint32_t st
     schway__instance_write_out(out, &r, (uint32_t)sizeof r);
 }
 
+schway_status schway_set_input(schway *inst, const schway_input *input)
+{
+    if (inst == NULL || input == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_status st = schway__instance_check_size(input, SCHWAY__INPUT_SIZE_FIRST,
+                                                    (uint32_t)sizeof *input);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    if (input->reserved0 != 0u) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    for (uint32_t port = 0u; port < 2u; port++) {
+        if (input->device[port] > SCHWAY_INPUT_DEVICE_DUALSHOCK ||
+            input->analog_button[port] > 1u) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+    }
+    return SCHWAY_STATUS_OK;
+}
+
 /* The result's stop reason: a hook or a fault the CPU stopped on, else the
    frame's end, else the budget. */
 static uint32_t stop_reason(uint32_t cpu_stop, int done)

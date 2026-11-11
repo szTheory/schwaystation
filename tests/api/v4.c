@@ -45,6 +45,39 @@ int main(void)
         CHECK_EQ_U64(schway_get_vram(inst, &second), SCHWAY_STATUS_OK);
         CHECK(second.data == first.data);
         CHECK_EQ_U64(second.size, first.size);
+
+        schway_input input;
+        memset(&input, 0, sizeof input);
+        input.size = (uint32_t)sizeof input;
+        input.device[0] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
+        input.axes[0][0] = 128u;
+        input.axes[0][1] = 128u;
+        input.axes[0][2] = 128u;
+        input.axes[0][3] = 128u;
+        CHECK_EQ_U64(schway_set_input(inst, &input), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_set_input(inst, NULL), SCHWAY_STATUS_ERR_ARGUMENT);
+
+        schway_run_result result;
+        memset(&result, 0, sizeof result);
+        result.size = (uint32_t)sizeof result;
+        CHECK_EQ_U64(schway_run_frame(inst, &result), SCHWAY_STATUS_OK);
+        (void)result.lag;
+        (void)result.rumble[0];
+        (void)result.rumble[1];
+
+        struct old_run_result {
+            uint32_t size;
+            uint32_t stop;
+            uint64_t frame;
+            uint64_t ticks;
+            uint32_t canary;
+        } old_result;
+        memset(&old_result, 0, sizeof old_result);
+        old_result.size = 24u;
+        old_result.canary = 0xC35AA53Cu;
+        CHECK_EQ_U64(schway_run_frame(inst, (schway_run_result *)(void *)&old_result),
+                     SCHWAY_STATUS_OK);
+        CHECK_EQ_HEX(old_result.canary, 0xC35AA53Cu);
         schway_destroy(inst);
     }
 #endif

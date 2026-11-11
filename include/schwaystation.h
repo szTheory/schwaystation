@@ -88,6 +88,10 @@ typedef uint32_t schway_status;
 #define SCHWAY_PROFILE_DEBUG_PORT 1u
 #define SCHWAY_PROFILE_GPU_V0 4u
 
+#define SCHWAY_INPUT_DEVICE_NONE 0u
+#define SCHWAY_INPUT_DEVICE_DIGITAL 1u
+#define SCHWAY_INPUT_DEVICE_DUALSHOCK 2u
+
 #define SCHWAY_LICENCE_NONE 0u
 #define SCHWAY_LICENCE_JAPAN 1u
 #define SCHWAY_LICENCE_EUROPE 2u
@@ -149,7 +153,18 @@ typedef struct schway_run_result {
     uint64_t ticks;
     uint32_t exit_code;
     uint32_t fault_present; /* 1 once a fault is latched */
+    uint32_t lag; /* 1 if the current frame has no completed pad poll */
+    uint32_t rumble[2]; /* per-port large << 8 | small */
 } schway_run_result;
+
+typedef struct schway_input {
+    uint32_t size;
+    uint32_t device[2]; /* SCHWAY_INPUT_DEVICE_* */
+    uint16_t buttons[2]; /* bit set means pressed; the serial reply is active low */
+    uint8_t axes[2][4]; /* right X, right Y, left X, left Y; centre is 128 */
+    uint8_t analog_button[2]; /* 0 released, 1 pressed */
+    uint16_t reserved0;
+} schway_input;
 
 typedef struct schway_budget {
     uint32_t size;
@@ -218,6 +233,7 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile);
 schway_status schway_reset(schway *inst, uint32_t kind); /* SCHWAY_RESET_* */
 schway_status schway_run_frame(schway *inst, schway_run_result *out); /* out may be NULL */
 schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_result *out);
+schway_status schway_set_input(schway *inst, const schway_input *input);
 schway_status schway_peek(const schway *inst, uint32_t space, uint32_t addr, uint32_t width,
                           uint32_t *value);
 schway_status schway_get_fault(const schway *inst, schway_fault *out);

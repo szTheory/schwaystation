@@ -6,6 +6,17 @@ set_target_properties(schwaystation-test-sio PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-sio)
 
+add_executable(schwaystation-test-sio-pad ${CMAKE_CURRENT_LIST_DIR}/pad_tests.c)
+target_include_directories(schwaystation-test-sio-pad PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-sio-pad PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-sio-pad PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-sio-pad)
+
+schway_add_test(NAME sio.pad.input_latch
+  COMMAND schwaystation-test-sio-pad input_latch_and_rumble
+  LABELS sio portable TIMEOUT 10)
+
 # Fault prevented: a byte reply or IRQ7 that precedes its baud or pad-ACK deadline,
 # a digital pad with the wrong handshake, or an ACK on the final byte.
 schway_add_test(NAME sio.digital.poll_irq

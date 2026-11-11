@@ -240,7 +240,17 @@ _Static_assert(offsetof(schway_run_result, frame) == 8, "run_result.frame");
 _Static_assert(offsetof(schway_run_result, ticks) == 16, "run_result.ticks");
 _Static_assert(offsetof(schway_run_result, exit_code) == 24, "run_result.exit_code");
 _Static_assert(offsetof(schway_run_result, fault_present) == 28, "run_result.fault_present");
-_Static_assert(sizeof(schway_run_result) == 32, "run_result size");
+_Static_assert(offsetof(schway_run_result, lag) == 32, "run_result.lag");
+_Static_assert(offsetof(schway_run_result, rumble) == 36, "run_result.rumble");
+_Static_assert(sizeof(schway_run_result) == 48, "run_result size");
+
+_Static_assert(offsetof(schway_input, size) == 0, "input.size");
+_Static_assert(offsetof(schway_input, device) == 4, "input.device");
+_Static_assert(offsetof(schway_input, buttons) == 12, "input.buttons");
+_Static_assert(offsetof(schway_input, axes) == 16, "input.axes");
+_Static_assert(offsetof(schway_input, analog_button) == 24, "input.analog_button");
+_Static_assert(offsetof(schway_input, reserved0) == 26, "input.reserved0");
+_Static_assert(sizeof(schway_input) == 28, "input size");
 
 _Static_assert(offsetof(schway_budget, size) == 0, "budget.size");
 _Static_assert(offsetof(schway_budget, flags) == 4, "budget.flags");
@@ -328,6 +338,7 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__PROFILE_SIZE_FIRST 8u /* a literal: appended fields leave it alone */
 #define SCHWAY__INFO_SIZE_FIRST 36u
 #define SCHWAY__RUN_RESULT_SIZE_FIRST 24u /* a literal: appended fields leave it alone */
+#define SCHWAY__INPUT_SIZE_FIRST ((uint32_t)sizeof(schway_input))
 #define SCHWAY__BUDGET_SIZE_FIRST 16u
 #define SCHWAY__VIDEO_SIZE_FIRST ((uint32_t)(80 + 2 * SCHWAY__P))
 #define SCHWAY__AUDIO_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
@@ -339,6 +350,7 @@ _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
 _Static_assert(SCHWAY__INFO_SIZE_FIRST == sizeof(schway_info), "info first size");
+_Static_assert(SCHWAY__INPUT_SIZE_FIRST == sizeof(schway_input), "input first size");
 _Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == offsetof(schway_run_result, exit_code),
                "run_result first size");
 _Static_assert(SCHWAY__BUDGET_SIZE_FIRST == sizeof(schway_budget), "budget first size");
