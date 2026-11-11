@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 33 of 51
+current_plan: 33 of 52
 status: executing
-stopped_at: Completed 04-51-PLAN.md
-last_updated: "2026-11-11T21:51:10.227Z"
+stopped_at: DMA4 request first caller isolated; plan 04-52 ready before real shell acceptance
+last_updated: "2026-11-11T22:08:54Z"
 last_activity: 2026-11-11
-last_activity_desc: Added exact ATTR control readback with saved/reset instance ownership; real shell acceptance remains pending
-state_head: 081a0c8b5a2a8c3a7d42e88366f6b8293530e30a
+last_activity_desc: Planned ATTR-driven DMA4 request continuation into the existing sink; shell still unaccepted
+state_head: 89a9bbbe0274953959a8c4f623a8dbb747b3d9f9
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 119
+  total_plans: 120
   completed_plans: 100
   percent: 50
 ---
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 33 of 51
-Status: Plan 04-51 is complete; 04-40 still requires actual recognizable shell and same-run portable frame acceptance.
-Last activity: 2026-11-11 — Added exact ATTR readback with state/reset coverage; no shell hash accepted.
+Current Plan: 33 of 52
+Status: Source-owned plan 04-52 is next ready; 04-40 waits and retains real shell/portable acceptance.
+Last activity: 2026-11-11 — Added DMA4 request/continuation plan from actual boot evidence; no shell hash accepted.
 
 Progress: [█████░░░░░] 50%
 
@@ -494,10 +494,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-plan 04-51 | Codex, OpenGSD 1.20.0; sequential executor, exact ATTR readback with RED/GREEN, full CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | Phase 04 DMA4 first-caller planning | Codex, OpenGSD 1.20.0; actual DMA credit/ATTR/state/deadline review, planning-only source slice and ordering | gpt-6.1-sol high |
+
 ## Session Continuity
 
-Last session: 2026-11-11T21:51:09.427Z
-Stopped at: Completed 04-51-PLAN.md
+Last session: 2026-11-11T22:08:54Z
+Stopped at: Plan 04-52 ready for focused independent check; 04-40 waits
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)

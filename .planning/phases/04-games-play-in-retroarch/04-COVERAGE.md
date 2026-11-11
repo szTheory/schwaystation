@@ -114,7 +114,7 @@ Original references above denote the complete ordered chains below. First IDs pr
 |04-20|04-20, 04-38|
 |04-21|04-21|
 |04-22|04-22, 04-39|
-|04-23|04-23, 04-50, 04-51, 04-40|
+|04-23|04-23, 04-50, 04-51, 04-52, 04-40|
 |04-24|04-24, 04-41|
 |04-25|04-25, 04-49, 04-42|
 |04-26|04-26|
@@ -136,3 +136,9 @@ Original references above denote the complete ordered chains below. First IDs pr
 | Source | New evidence and retained coverage | Executable plan |
 | --- | --- | --- |
 | GOAL criterion 4 / GAME-05 / RESEARCH real pinned firmware boot / CONTEXT D-16, D-22–D-24 | The real boot trace polls writable ATTR at 1F801DAAh after writing transfer mode 0020h. Exact halfword readback needs one instance/reset/state-owned latch, with unchanged unsupported-width/neighbor/STATX unbuilt behavior, costs, independent ownership sweep and attributed interim-v4 content-state pins. This adds no audio, SPU timing, hardware reset-value or shell-success claim. Real inspected shell and same-run portable tuple remain in 40. | 51 before 40, after 50/23/39 |
+
+## Source-owned DMA4 first caller
+
+| Source | New evidence and retained coverage | Executable plan |
+| --- | --- | --- |
+| GOAL criterion 4 / GAME-05 / RESEARCH real pinned firmware upload / CONTEXT D-16, D-22–D-24 | Actual enabled/active DMA4 waits with zero DREQ and words. Derive persistent automatic write readiness from saved ATTR mode, retain manual block credits and existing atomic sink/costs, and test continuation/deassert/deadline/state boundaries. No duplicate producer state, SPU FIFO/audio/RAM or hardware-latency claim; actual recognizable-shell and same-run portable acceptance remain in 40. | 52 before 40, after 51 |
