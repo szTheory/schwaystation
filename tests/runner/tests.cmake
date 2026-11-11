@@ -285,7 +285,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     string(REPEAT "[0-9a-f]" 64 digits)
     function(accept_input_movie name contents frames result_name)
       set(path "${OUT}/runner-input-${name}.txt")
-      file(WRITE "${path}" "${contents}")
+      file(CONFIGURE OUTPUT "${path}" NEWLINE_STYLE UNIX CONTENT "${contents}")
       execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state --inputs "${path}"
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
       if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame ${frames} sha256 ${digits}" OR
@@ -297,7 +297,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endfunction()
     function(refuse_input_movie name contents)
       set(path "${OUT}/runner-input-${name}.txt")
-      file(WRITE "${path}" "${contents}")
+      file(CONFIGURE OUTPUT "${path}" NEWLINE_STYLE UNIX CONTENT "${contents}")
       execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash --hash-state --inputs "${path}"
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
       if(NOT rc STREQUAL "2" OR NOT out STREQUAL "" OR NOT err MATCHES "invalid input movie" OR
