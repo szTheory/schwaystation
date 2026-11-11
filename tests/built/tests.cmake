@@ -15,6 +15,55 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "BIOS reset code did not run: ${output}")
     endif()
     return()
+  elseif(CASE STREQUAL "bios_runner_edges")
+    function(expect_bios_run path digest exit_code)
+      execute_process(COMMAND "${RUN}" --bios "${path}" --frames 1 --tty
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      set(output "${out}${err}")
+      if(NOT "${rc}" STREQUAL "6" OR
+         NOT output MATCHES "bios flags=loaded status=unknown region=unknown sha256=${digest}" OR
+         NOT output MATCHES "exit code=0x${exit_code}")
+        message(FATAL_ERROR "BIOS run for ${path}: expected unknown ${digest} and exit 0x${exit_code}, got ${rc}: ${output}")
+      endif()
+    endfunction()
+    function(expect_bios_refusal path reason)
+      execute_process(COMMAND "${RUN}" --bios "${path}" --frames 1
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      set(output "${out}${err}")
+      if(NOT "${rc}" STREQUAL "1" OR NOT output MATCHES "${reason}")
+        message(FATAL_ERROR "BIOS refusal for ${path}: expected status 1 and ${reason}, got ${rc}: ${output}")
+      endif()
+    endfunction()
+
+    if(NOT "${BIOS_SHA256}" STREQUAL "${RENAMED_SHA256}")
+      message(FATAL_ERROR "renaming identical BIOS bytes changed the independently computed SHA-256")
+    endif()
+    expect_bios_run("${RENAMED_BIOS}" "${BIOS_SHA256}" 42)
+    expect_bios_run("${UNKNOWN_BIOS}" "${UNKNOWN_SHA256}" 43)
+    expect_bios_refusal("${EMPTY_BIOS}" "BIOS must be exactly 524288 bytes")
+    expect_bios_refusal("${SHORT_BIOS}" "BIOS must be exactly 524288 bytes")
+    expect_bios_refusal("${LONG_BIOS}" "BIOS must be exactly 524288 bytes")
+    expect_bios_refusal("${MISSING_BIOS}" "cannot open")
+
+    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --exe "${MISSING_EXE}" --frames 1
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(NOT "${rc}" STREQUAL "2" OR NOT output MATCHES "--bios and --exe cannot be used together")
+      message(FATAL_ERROR "conflicting content selectors were not refused before loading: ${rc}: ${output}")
+    endif()
+    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --bios "${RENAMED_BIOS}" --frames 1
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(NOT "${rc}" STREQUAL "2" OR NOT output MATCHES "give --bios once")
+      message(FATAL_ERROR "duplicate --bios was not refused: ${rc}: ${output}")
+    endif()
+    execute_process(COMMAND "${RUN}" --bios --frames 1
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(NOT "${rc}" STREQUAL "2" OR NOT output MATCHES "--bios needs a file")
+      message(FATAL_ERROR "missing --bios path was not refused: ${rc}: ${output}")
+    endif()
+    return()
   endif()
   message(FATAL_ERROR "unknown built BIOS script case: ${CASE}")
 endif()
@@ -30,6 +79,39 @@ string(REPEAT "S" 524268 bios_runner_tail)
 set(bios_runner_fixture "${bios_runner_fixture_dir}/scph5501.bin")
 file(WRITE "${bios_runner_fixture}" "${bios_runner_reset_code}${bios_runner_tail}")
 file(SHA256 "${bios_runner_fixture}" bios_runner_sha256)
+file(SIZE "${bios_runner_fixture}" bios_runner_size)
+if(NOT bios_runner_size EQUAL 524288)
+  message(FATAL_ERROR "synthetic BIOS fixture is ${bios_runner_size} bytes, expected 524288")
+endif()
+
+set(bios_runner_renamed_fixture "${bios_runner_fixture_dir}/other-name.bin")
+file(WRITE "${bios_runner_renamed_fixture}" "${bios_runner_reset_code}${bios_runner_tail}")
+file(SHA256 "${bios_runner_renamed_fixture}" bios_runner_renamed_sha256)
+
+string(ASCII 128 31 8 60 113 15 8 53 67 67 9 60 67 67 41 53 17 17 9 161
+  bios_runner_unknown_reset_code)
+string(REPEAT "U" 524268 bios_runner_unknown_tail)
+set(bios_runner_unknown_fixture "${bios_runner_fixture_dir}/unknown-image.bin")
+file(WRITE "${bios_runner_unknown_fixture}" "${bios_runner_unknown_reset_code}${bios_runner_unknown_tail}")
+file(SHA256 "${bios_runner_unknown_fixture}" bios_runner_unknown_sha256)
+
+set(bios_runner_empty_fixture "${bios_runner_fixture_dir}/empty.bin")
+file(WRITE "${bios_runner_empty_fixture}" "")
+string(REPEAT "S" 524267 bios_runner_short_tail)
+set(bios_runner_short_fixture "${bios_runner_fixture_dir}/short.bin")
+file(WRITE "${bios_runner_short_fixture}" "${bios_runner_reset_code}${bios_runner_short_tail}")
+string(REPEAT "S" 524269 bios_runner_long_tail)
+set(bios_runner_long_fixture "${bios_runner_fixture_dir}/long.bin")
+file(WRITE "${bios_runner_long_fixture}" "${bios_runner_reset_code}${bios_runner_long_tail}")
+file(SIZE "${bios_runner_empty_fixture}" bios_runner_empty_size)
+file(SIZE "${bios_runner_short_fixture}" bios_runner_short_size)
+file(SIZE "${bios_runner_long_fixture}" bios_runner_long_size)
+if(NOT bios_runner_empty_size EQUAL 0 OR NOT bios_runner_short_size EQUAL 524287 OR
+   NOT bios_runner_long_size EQUAL 524289)
+  message(FATAL_ERROR "synthetic BIOS boundary fixtures have incorrect sizes")
+endif()
+set(bios_runner_missing_fixture "${bios_runner_fixture_dir}/missing.bin")
+set(bios_runner_missing_exe "${bios_runner_fixture_dir}/missing.exe")
 
 set(bios_runner_cmd ${CMAKE_COMMAND}
   "-DRUN=$<TARGET_FILE:schwaystation-run>"
@@ -38,6 +120,24 @@ set(bios_runner_cmd ${CMAKE_COMMAND}
   -DCASE=bios_runner -P ${CMAKE_CURRENT_LIST_FILE})
 schway_add_test(NAME built.bios.runner
   COMMAND ${bios_runner_cmd}
+  LABELS bios portable runner TIMEOUT 30)
+
+set(bios_runner_edges_cmd ${CMAKE_COMMAND}
+  "-DRUN=$<TARGET_FILE:schwaystation-run>"
+  "-DBIOS=${bios_runner_fixture}"
+  "-DBIOS_SHA256=${bios_runner_sha256}"
+  "-DRENAMED_BIOS=${bios_runner_renamed_fixture}"
+  "-DRENAMED_SHA256=${bios_runner_renamed_sha256}"
+  "-DUNKNOWN_BIOS=${bios_runner_unknown_fixture}"
+  "-DUNKNOWN_SHA256=${bios_runner_unknown_sha256}"
+  "-DEMPTY_BIOS=${bios_runner_empty_fixture}"
+  "-DSHORT_BIOS=${bios_runner_short_fixture}"
+  "-DLONG_BIOS=${bios_runner_long_fixture}"
+  "-DMISSING_BIOS=${bios_runner_missing_fixture}"
+  "-DMISSING_EXE=${bios_runner_missing_exe}"
+  -DCASE=bios_runner_edges -P ${CMAKE_CURRENT_LIST_FILE})
+schway_add_test(NAME built.bios.runner_edges
+  COMMAND ${bios_runner_edges_cmd}
   LABELS bios portable runner TIMEOUT 30)
 
 # Fault prevented: a BIOS load can borrow caller memory or report an unrelated
