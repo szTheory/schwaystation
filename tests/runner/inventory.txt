@@ -17,10 +17,13 @@ runner.hashes_compare.byte.self_test	runner
 runner.hashes_compare.count.self_test	runner
 runner.hashes_compare.eight	runner
 runner.hashes_file	portable,runner
+runner.native_hash	portable,runner
 runner.png	portable,runner
 runner.png_file	portable,runner
+runner.rgb24	portable,runner
 runner.stop	portable,runner
 runner.trace.golden	portable,runner
+runner.tty_sanitize	portable,runner
 runner.usage.exe	portable,runner
 runner.usage.frame_range	portable,runner
 runner.usage.no_args	portable,runner
@@ -29,4 +32,5 @@ runner.usage.positional	portable,runner
 runner.usage.region	portable,runner
 runner.usage.unknown	portable,runner
 runner.version	portable,runner
+runner.video_bounds	portable,runner
 runner.xrgb8888	portable,runner

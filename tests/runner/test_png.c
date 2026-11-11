@@ -17,6 +17,7 @@
 #include "schwaystation.h"
 #include "xrgb8888.h"
 #include "../../runner/crc32.h"
+#include "../../runner/frame_hash.h"
 #include "../../runner/png.h"
 #include "../check.h"
 
@@ -193,7 +194,12 @@ static void png_file(const char *path)
             for (uint32_t x = 0; x < W; x++) {
                 uint32_t got = ((uint32_t)row[3u * x] << 16) | ((uint32_t)row[3u * x + 1u] << 8) |
                                row[3u * x + 2u];
-                uint32_t want = schway_host_xrgb8888_pixel(schway__testcard_pixel(x, y, FRAME));
+                uint16_t word = schway__testcard_pixel(x, y, FRAME);
+                uint32_t r5 = word & 31u;
+                uint32_t g5 = (word >> 5) & 31u;
+                uint32_t b5 = (word >> 10) & 31u;
+                uint32_t want = (((r5 << 3) | (r5 >> 2)) << 16) |
+                                (((g5 << 3) | (g5 >> 2)) << 8) | ((b5 << 3) | (b5 >> 2));
                 bad += (uint32_t)(got != want);
             }
         }
@@ -246,13 +252,108 @@ static void xrgb8888(void)
     v.pitch_bytes = (uint32_t)sizeof src[0];
     v.bpp = 16;
     v.pixels = &src[0][0];
-    schway_host_xrgb8888_frame(&v, &dst[0][0], 3);
+    CHECK_EQ_U64(schway_host_xrgb8888_frame(&v, &dst[0][0], 3), 1u);
     CHECK_EQ_HEX(dst[0][0], 0x00FF0000u);
     CHECK_EQ_HEX(dst[0][1], 0x0000FF00u);
     CHECK_EQ_HEX(dst[0][2], 1u);
     CHECK_EQ_HEX(dst[1][0], 0x000000FFu);
     CHECK_EQ_HEX(dst[1][1], 0x00000000u);
     CHECK_EQ_HEX(dst[1][2], 1u);
+}
+
+/* Native RGB24 is packed RGB bytes, independent of 16-bit word alignment.
+   Odd source pitch and output padding must not become pixels. */
+static void rgb24(void)
+{
+    const uint8_t src[14] = {255, 0, 0, 0, 255, 0, 0xA5,
+                             0, 0, 255, 255, 255, 255, 0x5A};
+    uint32_t dst[2][3] = {{1, 1, 1}, {1, 1, 1}};
+    schway_video v;
+    memset(&v, 0, sizeof v);
+    v.size = (uint32_t)sizeof v;
+    v.width = 2;
+    v.height = 2;
+    v.pitch_bytes = 7;
+    v.bpp = 24;
+    v.rgb24 = 1;
+    v.pixels = src;
+    CHECK_EQ_U64(schway_host_video_valid(&v), 1u);
+    CHECK_EQ_U64(schway_host_xrgb8888_frame(&v, &dst[0][0], 3), 1u);
+    CHECK_EQ_HEX(dst[0][0], 0x00FF0000u);
+    CHECK_EQ_HEX(dst[0][1], 0x0000FF00u);
+    CHECK_EQ_HEX(dst[0][2], 1u);
+    CHECK_EQ_HEX(dst[1][0], 0x000000FFu);
+    CHECK_EQ_HEX(dst[1][1], 0x00FFFFFFu);
+    CHECK_EQ_HEX(dst[1][2], 1u);
+}
+
+/* The validator applies the same hard native bounds to hashes and PNGs. */
+static void video_bounds(void)
+{
+    uint8_t bytes[24] = {0};
+    schway_video v;
+    memset(&v, 0, sizeof v);
+    v.size = (uint32_t)sizeof v;
+    v.pixels = bytes;
+    v.width = 2;
+    v.height = 2;
+    v.pitch_bytes = 6;
+    v.bpp = 24;
+    v.rgb24 = 1;
+    CHECK_EQ_U64(schway_host_video_valid(&v), 1u);
+    v.height = 513;
+    CHECK_EQ_U64(schway_host_video_valid(&v), 0u);
+    v.height = 2;
+    v.width = 1025;
+    CHECK_EQ_U64(schway_host_video_valid(&v), 0u);
+    v.width = 2;
+    v.pitch_bytes = 5;
+    CHECK_EQ_U64(schway_host_video_valid(&v), 0u);
+    v.pitch_bytes = UINT32_MAX;
+    CHECK_EQ_U64(schway_host_video_valid(&v), 0u);
+    v.pitch_bytes = 6;
+    v.bpp = 15;
+    CHECK_EQ_U64(schway_host_video_valid(&v), 0u);
+    v.bpp = 24;
+    v.width = 0;
+    CHECK_EQ_U64(schway_host_video_valid(&v), 0u);
+}
+
+/* Known native frame digest: metadata precedes tightly packed native rows;
+   row padding does not enter the digest, and changing metadata alone does. */
+static void native_hash(void)
+{
+    const uint8_t pixels[14] = {255, 0, 0, 0, 255, 0, 0xA5,
+                                0, 0, 255, 255, 255, 255, 0x5A};
+    schway_video v;
+    char hash[65];
+    memset(&v, 0, sizeof v);
+    v.size = (uint32_t)sizeof v;
+    v.pixels = pixels;
+    v.width = 2;
+    v.height = 2;
+    v.pitch_bytes = 7;
+    v.bpp = 24;
+    v.rgb24 = 1;
+    v.field = 1;
+    v.interlaced = 1;
+    v.vres = 240;
+    v.hres = 320;
+    v.dot_div = 7;
+    v.region = 2;
+    v.x1 = 19;
+    v.y1 = 23;
+    v.start_x = 0x123;
+    v.start_y = 0x45;
+    v.enabled = 1;
+    CHECK_EQ_U64(schway__runner_frame_hash(&v, hash), 1u);
+    CHECK(strcmp(hash, "183e0e692b6fdd374a94a3dae25c27f25028a80c5070281e65c49d743d5b9d44") == 0);
+    v.x1++;
+    char moved[65];
+    CHECK_EQ_U64(schway__runner_frame_hash(&v, moved), 1u);
+    CHECK(strcmp(hash, moved) != 0);
+    v.height = 513;
+    CHECK_EQ_U64(schway__runner_frame_hash(&v, moved), 0u);
 }
 
 int main(int argc, char **argv)
@@ -263,8 +364,14 @@ int main(int argc, char **argv)
         png_file(argv[2]);
     } else if (argc == 2 && strcmp(argv[1], "xrgb8888") == 0) {
         xrgb8888();
+    } else if (argc == 2 && strcmp(argv[1], "rgb24") == 0) {
+        rgb24();
+    } else if (argc == 2 && strcmp(argv[1], "video_bounds") == 0) {
+        video_bounds();
+    } else if (argc == 2 && strcmp(argv[1], "native_hash") == 0) {
+        native_hash();
     } else {
-        fprintf(stderr, "usage: schwaystation-test-runner png | png_file PATH | xrgb8888\n");
+        fprintf(stderr, "usage: schwaystation-test-runner png | png_file PATH | xrgb8888 | rgb24 | video_bounds | native_hash\n");
         return 2;
     }
     CHECK_DONE();

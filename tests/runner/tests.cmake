@@ -265,7 +265,9 @@ endforeach()
 add_executable(schwaystation-test-runner
   ${CMAKE_CURRENT_LIST_DIR}/test_png.c
   ${PROJECT_SOURCE_DIR}/runner/png.c
-  ${PROJECT_SOURCE_DIR}/runner/crc32.c)
+  ${PROJECT_SOURCE_DIR}/runner/crc32.c
+  ${PROJECT_SOURCE_DIR}/runner/frame_hash.c
+  ${PROJECT_SOURCE_DIR}/runner/sha256.c)
 target_include_directories(schwaystation-test-runner PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-runner PRIVATE schwaystation::schwaystation
   schwaystation-host)
@@ -284,6 +286,12 @@ schway_add_test(NAME runner.png
 schway_add_test(NAME runner.xrgb8888
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-runner> xrgb8888
   LABELS portable runner TIMEOUT 10)
+
+foreach(case rgb24 video_bounds native_hash)
+  schway_add_test(NAME runner.${case}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-runner> ${case}
+    LABELS portable runner TIMEOUT 10)
+endforeach()
 
 set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
   "-DEMULATOR=${runner_emulator}")
@@ -341,6 +349,11 @@ set(bench_check ${runner_check} -DUNIT=$<TARGET_FILE:schwaystation-test-bench>)
 schway_add_test(NAME runner.bench.percentile
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-bench> percentile
   LABELS bench portable runner TIMEOUT 10)
+
+# Fault prevented: hostile guest terminal control bytes reaching the user's terminal.
+schway_add_test(NAME runner.tty_sanitize
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-bench> tty_sanitize
+  LABELS portable runner TIMEOUT 10)
 
 # Fault prevented: a bench report missing a line, out of order or not in
 # whole units, so a script reading it misreads the times.
