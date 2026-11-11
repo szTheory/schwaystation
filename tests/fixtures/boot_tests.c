@@ -826,6 +826,8 @@ static void gpu_motion(const char *dir)
     }
     uint8_t *straight180 = NULL;
     CHECK_EQ_U64(copy_motion_video(straight, 180u, &straight180), resumed_size);
+    CHECK_EQ_HEX(straight->dma.madr[2], 0x001100Cu);
+    CHECK_EQ_HEX(straight->vram[100u][179u], 0x001Fu);
     CHECK(memcmp(frame180, straight180, resumed_size) == 0);
     CHECK(memcmp(frame60, frame120, frame_size) != 0);
     CHECK(memcmp(frame120, frame180, frame_size) != 0);

@@ -13,6 +13,12 @@ fixtures.exc_matrix	fixtures,portable
 fixtures.exit_port	fixtures,portable
 fixtures.gap_write	fixtures,portable
 fixtures.gpu_motion	fixtures,portable
+fixtures.gpu_motion.hash.120	fixtures,portable
+fixtures.gpu_motion.hash.180	fixtures,portable
+fixtures.gpu_motion.hash.60	fixtures,portable
+fixtures.gpu_motion.hash.self_test	fixtures,portable
+fixtures.gpu_motion.state.150	fixtures,portable
+fixtures.gpu_motion.state.180	fixtures,portable
 fixtures.gte_vectors	fixtures,gte,portable
 fixtures.gte_vectors.guard	fixtures,gte,portable
 fixtures.hang	fixtures,portable

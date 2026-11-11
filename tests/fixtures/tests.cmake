@@ -40,6 +40,37 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "--probe report lacks ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "gpu_motion_hash")
+    string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+    set(args --exe "${IMAGE}" --frames "${FRAMES}")
+    if(NOT "${FRAME_HASH}" STREQUAL "")
+      list(APPEND args --hash)
+    endif()
+    if(NOT "${STATE_HASH}" STREQUAL "")
+      list(APPEND args --hash-state)
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" ${args} RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "gpu_motion runner ${args}: exit ${rc}\n${out}${err}")
+    endif()
+    if(NOT "${FRAME_HASH}" STREQUAL "" AND
+       NOT out MATCHES "(^|\n)frame ${FRAMES} sha256 ${FRAME_HASH}\n")
+      message(FATAL_ERROR "gpu_motion frame ${FRAMES} did not match its pinned hash:\n${out}")
+    endif()
+    if(NOT "${STATE_HASH}" STREQUAL "" AND NOT out MATCHES "(^|\n)state sha256 ${STATE_HASH}\n")
+      message(FATAL_ERROR "gpu_motion state at frame ${FRAMES} did not match its pinned hash:\n${out}")
+    endif()
+  elseif(CASE STREQUAL "gpu_motion_hash_negative")
+    string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+    execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=gpu_motion_hash -DFRAMES=60
+      -DFRAME_HASH=0000000000000000000000000000000000000000000000000000000000000000
+      -DSTATE_HASH= -DIMAGE=${IMAGE} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
+      -P ${CMAKE_CURRENT_LIST_FILE} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    if(rc STREQUAL "0" OR NOT out MATCHES "did not match its pinned hash")
+      message(FATAL_ERROR "the wrong gpu_motion hash was not rejected as a pin mismatch:\n${out}")
+    endif()
+    message(STATUS "gpu_motion wrong-hash control rejected the deliberate mismatch")
   elseif(CASE STREQUAL "tty")
     # The runner's --tty report for hello.exe: each of the two lines, from the
     # debug port and from the kernel's putchar, printed whole after the prefix.
@@ -569,6 +600,40 @@ schway_add_test(NAME fixtures.boot.split_with_exe
 # frames, or GPU VRAM and serialized state lost across a frame-150 resume.
 schway_add_test(NAME fixtures.gpu_motion
   COMMAND schwaystation-test-boot gpu_motion ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 60)
+
+set(schway__motion_hashes
+  "60|20c3dcac8ba7b17ac4a6fd611164d1ca2c1aab03419f72c9ef58f04fe6d47042"
+  "120|f92191242105428b4345519f237979aaf0b50b33431ce945f209f03b1d47257d"
+  "180|29250a8d7c15cd85cd60c5dd5eeba71ed677de9c1dae7255721374f3081e3cc8")
+foreach(row IN LISTS schway__motion_hashes)
+  string(REPLACE "|" ";" fields "${row}")
+  list(GET fields 0 frame)
+  list(GET fields 1 hash)
+  schway_add_test(NAME fixtures.gpu_motion.hash.${frame}
+    COMMAND ${CMAKE_COMMAND} -DCASE=gpu_motion_hash -DFRAMES=${frame} -DFRAME_HASH=${hash}
+      -DSTATE_HASH= -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/gpu_motion.exe
+      -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS fixtures portable TIMEOUT 60)
+endforeach()
+foreach(row IN ITEMS
+    "150|0aa2de287a15fc5beb287c8a40d9795b38bd382cf2ea98c757c133ab3752cca7"
+    "180|cb30d86347b1edffec83ecf21e49ce7a507f3302fdaff66f465a3f9838ba65fd")
+  string(REPLACE "|" ";" fields "${row}")
+  list(GET fields 0 frame)
+  list(GET fields 1 hash)
+  schway_add_test(NAME fixtures.gpu_motion.state.${frame}
+    COMMAND ${CMAKE_COMMAND} -DCASE=gpu_motion_hash -DFRAMES=${frame} -DFRAME_HASH=
+      -DSTATE_HASH=${hash} -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/gpu_motion.exe
+      -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS fixtures portable TIMEOUT 60)
+endforeach()
+schway_add_test(NAME fixtures.gpu_motion.hash.self_test
+  COMMAND ${CMAKE_COMMAND} -DCASE=gpu_motion_hash_negative
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/gpu_motion.exe -DRUN=$<TARGET_FILE:schwaystation-run>
+    "-DEMULATOR=${schway__probe_emulator}" -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 60)
 
 # Fault prevented: an expected value that drifted from the vector file it claims to come from: every
