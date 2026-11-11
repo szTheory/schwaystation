@@ -4,6 +4,7 @@ gpu.beam.midline_dot_irq	gpu,portable
 gpu.beam.public_field_wrap	gpu,portable
 gpu.beam.reject_malformed_state	gpu,portable
 gpu.beam.reset_call_bound	gpu,portable
+gpu.beam.status_fields	gpu,portable
 gpu.decoder.fill_mmio	gpu,portable
 gpu.decoder.partial_packet_reset	gpu,portable
 gpu.decoder.register_images	gpu,portable

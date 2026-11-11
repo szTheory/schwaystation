@@ -83,6 +83,15 @@ static void run_cycles(schway *inst, uint64_t cycles)
     CHECK(result.stop == SCHWAY_STOP_BUDGET);
 }
 
+static void run_one_frame(schway *inst)
+{
+    schway_run_result result;
+    memset(&result, 0, sizeof result);
+    result.size = (uint32_t)sizeof result;
+    CHECK(schway_run_frame(inst, &result) == SCHWAY_STATUS_OK);
+    CHECK(result.stop == SCHWAY_STOP_FRAME);
+}
+
 static void put_le32(uint8_t *p, uint32_t value)
 {
     for (uint32_t i = 0u; i < 4u; i++) {
@@ -264,6 +273,81 @@ static void test_field_edges(void)
     }
 }
 
+static void test_status_fields(void)
+{
+    const uint32_t region = SCHWAY_REGION_NTSC_U;
+    const uint32_t lines = 263u;
+    static const uint32_t gpu_flags[] = {0u, SCHWAY_PROFILE_GPU_V0};
+
+    for (size_t f = 0u; f < sizeof gpu_flags / sizeof gpu_flags[0]; f++) {
+        uint32_t flags = gpu_flags[f];
+        schway *inst = make_instance(region, flags);
+        CHECK(inst != NULL);
+        if (inst == NULL) {
+            continue;
+        }
+        load_spin(inst);
+
+        uint32_t status = read_port(inst, GP1);
+        CHECK(((status >> 13u) & 1u) == (flags == 0u ? 1u : 0u));
+        CHECK(((status >> 31u) & 1u) == 0u);
+
+        write_port(inst, GP1, 0x07041C00u); /* Y1=0, Y2=263. */
+        write_port(inst, GP1, 0x08000024u); /* 480-line interlace, NTSC. */
+        status = read_port(inst, GP1);
+        CHECK(((status >> 13u) & 1u) == (flags == 0u ? 1u : 0u));
+        CHECK(((status >> 31u) & 1u) == 0u);
+
+        uint32_t peek = 0u;
+        CHECK(schway__gpu_peek(inst, GP1, 4u, &peek) == 0);
+        CHECK(peek == status);
+        CHECK(read_port(inst, GP1) == status);
+
+        run_cycles(inst, frame_tick(region, lines - 1u));
+        status = read_port(inst, GP1);
+        CHECK(inst->gpu.beam_line == lines - 1u);
+        CHECK(((status >> 13u) & 1u) == 0u);
+        CHECK(((status >> 31u) & 1u) == 1u);
+
+        size_t state_size = schway_state_size(inst);
+        uint8_t *state = (uint8_t *)malloc(state_size);
+        CHECK(state != NULL);
+        if (state != NULL) {
+            CHECK(schway_save_state(inst, state, state_size) == SCHWAY_STATUS_OK);
+            schway *restored = make_instance(region, flags);
+            CHECK(restored != NULL);
+            if (restored != NULL) {
+                load_spin(restored);
+                write_port(restored, GP1, 0x07041C00u);
+                write_port(restored, GP1, 0x08000024u);
+                CHECK(((read_port(restored, GP1) >> 13u) & 1u) ==
+                      (flags == 0u ? 1u : 0u));
+                CHECK(schway_load_state(restored, state, state_size) == SCHWAY_STATUS_OK);
+                uint32_t restored_status = read_port(restored, GP1);
+                CHECK(((restored_status >> 13u) & 1u) == 0u);
+                CHECK(((restored_status >> 31u) & 1u) == 1u);
+                schway_destroy(restored);
+            }
+            free(state);
+        }
+
+        write_port(inst, GP1, 0x08000004u); /* Disable IRS while retaining phase. */
+        status = read_port(inst, GP1);
+        CHECK(((status >> 13u) & 1u) == 0u);
+        run_one_frame(inst);
+        run_one_frame(inst);
+        CHECK(((read_port(inst, GP1) >> 13u) & 1u) == 0u);
+        write_port(inst, GP1, 0x01000000u); /* Reset the command buffer only. */
+        CHECK(((read_port(inst, GP1) >> 13u) & 1u) == 0u);
+
+        write_port(inst, GP1, 0x00000000u); /* Full GPU reset restores the profile default. */
+        status = read_port(inst, GP1);
+        CHECK(((status >> 13u) & 1u) == (flags == 0u ? 1u : 0u));
+        CHECK(((status >> 31u) & 1u) == 0u);
+        schway_destroy(inst);
+    }
+}
+
 static void test_public_field_wrap(void)
 {
     schway *inst = make_instance(SCHWAY_REGION_NTSC_U, 0u);
@@ -435,6 +519,8 @@ int main(int argc, char **argv)
         test_midline_dot_irq();
     } else if (strcmp(argv[1], "field_edges") == 0) {
         test_field_edges();
+    } else if (strcmp(argv[1], "status_fields") == 0) {
+        test_status_fields();
     } else if (strcmp(argv[1], "public_field_wrap") == 0) {
         test_public_field_wrap();
     } else if (strcmp(argv[1], "reset_call_bound") == 0) {

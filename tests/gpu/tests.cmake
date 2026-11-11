@@ -74,6 +74,11 @@ schway_add_test(NAME gpu.beam.field_edges
   COMMAND schwaystation-test-gpu-beam field_edges
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: GPUSTAT field phase, revision visibility, read purity, and reset/state retention.
+schway_add_test(NAME gpu.beam.status_fields
+  COMMAND schwaystation-test-gpu-beam status_fields
+  LABELS gpu portable TIMEOUT 10)
+
 # Fault prevented: loaded run_frame uses the GPU field wrap when Y2 suppresses VBlank.
 schway_add_test(NAME gpu.beam.public_field_wrap
   COMMAND schwaystation-test-gpu-beam public_field_wrap
