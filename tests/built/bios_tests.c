@@ -312,7 +312,7 @@ static void identity(void)
     memset(&info, 0, sizeof info);
     info.size = (uint32_t)sizeof info;
     CHECK_EQ_U64(schway_get_bios_info(inst, &info), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(info.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_U64(info.flags, SCHWAY_BIOS_INFO_LOADED | SCHWAY_BIOS_INFO_RECOGNIZED);
     CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_RECOGNIZED);
     CHECK_EQ_U64(info.region, SCHWAY_REGION_NTSC_U);
     CHECK(memcmp(info.sha256, expected_sha256, sizeof expected_sha256) == 0);

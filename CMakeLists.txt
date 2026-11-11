@@ -99,7 +99,7 @@ add_library(schwaystation_testcard OBJECT src/testcard.c)
 add_library(schwaystation_state OBJECT
   src/state.c
   src/crc32.c)
-add_library(schwaystation_sha256 OBJECT runner/sha256.c)
+add_library(schwaystation_sha256 OBJECT runner/sha256.c runner/md5.c)
 add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_instance>
   $<TARGET_OBJECTS:schwaystation_bios>

@@ -55,6 +55,7 @@ typedef uint32_t schway_status;
 #define SCHWAY_MEMCARD_SIZE 131072u
 #define SCHWAY_BIOS_SIZE 524288u
 #define SCHWAY_BIOS_INFO_LOADED 1u
+#define SCHWAY_BIOS_INFO_RECOGNIZED 2u
 
 /* BIOS identity results. Status values are append-only. */
 #define SCHWAY_BIOS_STATUS_UNKNOWN 0u

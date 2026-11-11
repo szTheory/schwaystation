@@ -99,9 +99,12 @@ between legs of one run only).
 
 ## 5. BIOS recognition digests
 Firmware identity digests are facts and may be committed; BIOS bytes may not. Names, sizes, MD5 and SHA-1 below are
-the libretro `System.dat` rows at `12c21cf79f1e`, read raw on 2026-10-19 [AP.02]; every listed image is 524,288
-bytes. These MD5/SHA-1 pairs recognize retail images. The API separately reports the SHA-256 of every loaded
-exact-size image; it does not infer SHA-256 from the DAT, and an image name alone does not establish identity.
+the libretro `System.dat` rows at `12c21cf79f1e20eff6ac68b80875816c717d0a7a`, read raw on 2026-10-19 [AP.02]; the
+raw file's first-fetch SHA-256 is `57f83609a28122b0e5e0bfc6a1993a3b512580698be7dd2affb307913087544b`. Every listed
+image is 524,288 bytes. The core matches the MD5 facts and retains their paired SHA-1 values in `src/bios_table.inc`;
+it does not infer or match SHA-256 from the DAT. The API separately reports SHA-256 computed from every loaded
+exact-size image and returns recognition status and region only after an MD5 match. An image name alone does not
+establish identity.
 Unknown images and OpenBIOS remain loadable without a retail recognition result. The libretro `.info` lists
 `scph5500.bin`, `scph5501.bin` and `scph5502.bin` as required and `psxonpsp660.bin` and `ps1_rom.bin` as optional.
 
@@ -177,7 +180,7 @@ copies. A fixture whose licence turns out wrong moves to section 3 in the same P
 | ID | Tier | Source (URL) | Pin or access date | Supports |
 |---|---|---|---|---|
 | AP.01 | T1 | github.com/szTheory/cogmaster `ASSET_POLICY.md`; github.com/szTheory/muhtari `ASSET_POLICY.md` | `abd950941e93`; `d698364b180d` | template and section structure |
-| AP.02 | T1 | github.com/libretro/libretro-database `dat/System.dat` L498 to L519, fetched raw with `gh api` and read here (tested); `LICENSE` CC BY-SA 4.0 (digests are facts) | `12c21cf79f1e` | section 5 names, sizes, MD5, SHA-1 |
+| AP.02 | T1 | github.com/libretro/libretro-database `dat/System.dat` L498 to L519, fetched raw with `gh api` and read here (tested); `LICENSE` CC BY-SA 4.0 (digests are facts) | commit `12c21cf79f1e20eff6ac68b80875816c717d0a7a`; raw file SHA-256 above | section 5 names, sizes, MD5, SHA-1 and runtime region recognition |
 | AP.03 | T1 | github.com/pcsx-redux/nugget `LICENSE` (MIT), `openbios/README.md`, `openbios/Makefile`, `.github/workflows/build.yml` | `9db6d88d23c4` | OpenBIOS build-in-CI disposition |
 | AP.04 | T1 | github.com/SingleStepTests/r3000 `LICENSE` (MIT), README, `transcode_json.py`, `v1/` tree sizes | `51e227447d0b` | sample and full-set dispositions, sizes |
 | AP.05 | T1 | github.com/JaCzekanski/ps1-tests `LICENSE` (MIT), README, `common.mk` (libpsn00b link), `gte/test-all/tests.c`, release `build-158` asset | `f727802fead1`; `build-158` | reference images and logs, GTE table, MPL bytes in executables |
