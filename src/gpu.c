@@ -34,6 +34,7 @@ static const char name_display_start[] = "gpu.display_start";
 static const char name_horizontal_range[] = "gpu.horizontal_range";
 static const char name_vertical_range[] = "gpu.vertical_range";
 static const char name_display_mode[] = "gpu.display_mode";
+static const char name_field_status[] = "gpu.field_status";
 static const char name_allow_2mb[] = "gpu.allow_2mb";
 static const char name_read_latch[] = "gpu.read_latch";
 static const char name_irq_pending[] = "gpu.irq_pending";
@@ -168,8 +169,8 @@ static void packet_clear(struct schway__gpu *g)
     transfer_clear(g);
 }
 
-/* GPU power-on register defaults (psx-spx, GPU Display Control Commands;
-   .planning/preparation/PSX-GPU-AND-GTE.md, sections one point three and two point four). */
+/* GPU power-on defaults (PSX-SPX GPU Display Control Commands and GPUSTAT; docs/hardware/gpu.md,
+   "GPUSTAT field and line status"). */
 void schway__gpu_reset(schway *inst)
 {
     struct schway__gpu *g = &inst->gpu;
@@ -177,6 +178,7 @@ void schway__gpu_reset(schway *inst)
     g->display_disabled = 1u;
     g->horizontal_range = 0x00C60260u;
     g->vertical_range = 0x00040010u;
+    g->field_status = 1u;
     g->beam_tick = inst->ticks;
 }
 
@@ -224,6 +226,11 @@ static int gpu_beam_edges(schway *inst)
         }
         g->beam_line_clock -= line_clocks;
         g->beam_line++;
+        /* ODE2 changes on the modeled final line while IRS is enabled
+           (docs/hardware/gpu.md, "GPUSTAT field and line status"). */
+        if ((g->display_mode & 0x20u) != 0u && g->beam_line == lines - 1u) {
+            g->field_status ^= 1u;
+        }
         if (g->beam_line == lines) {
             g->beam_line = 0u;
             schway__frame_gpu_wrap(inst);
@@ -802,10 +809,21 @@ static uint32_t gpu_status(const struct schway *inst)
     if (g->phase == SCHWAY__GPU_TRANSFER_FROM_VRAM && g->owed_words != 0u) {
         status |= UINT32_C(1) << 27;
     }
-    if ((g->display_mode & 0x20u) == 0u) {
-        status |= UINT32_C(1) << 13;
-    }
+    uint32_t gpu_v0 = (inst->profile_flags & SCHWAY_PROFILE_GPU_V0) != 0u;
+    status |= (gpu_v0 == 0u ? g->field_status : 0u) << 13;
     status |= (g->dma_direction & 3u) << 29;
+    uint32_t lines = gpu_lines(inst->region);
+    uint32_t y1 = g->vertical_range & 0x03FFu;
+    uint32_t y2 = (g->vertical_range >> 10) & 0x03FFu;
+    if (y2 > lines) {
+        y2 = lines;
+    }
+    if (y1 < lines && g->beam_line >= y1 && g->beam_line < y2) {
+        uint32_t line_status = (g->display_mode & 0x24u) == 0x24u
+                                   ? g->field_status ^ 1u
+                                   : g->beam_line & 1u;
+        status |= line_status << 31;
+    }
     return status;
 }
 
@@ -1156,9 +1174,17 @@ static void gpu_gp1(schway *inst, uint32_t command, uint64_t tick)
         g->vertical_range = value & 0x000FFFFFu;
         break;
     case 0x08u:
-        g->display_mode = value & 0xFFu;
+    {
+        uint32_t mode = value & 0xFFu;
+        /* IRS entry selects the modeled initial phase (docs/hardware/gpu.md,
+           "GPUSTAT field and line status"). */
+        if ((g->display_mode & 0x20u) == 0u && (mode & 0x20u) != 0u) {
+            g->field_status = 1u;
+        }
+        g->display_mode = mode;
         g->beam_dot_phase %= gpu_dot_divisor(g->display_mode);
         break;
+    }
     case 0x09u:
         g->allow_2mb = value & 1u;
         break;
@@ -1315,6 +1341,7 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst, uint64_t st
                             ? UINT64_MAX
                             : state_ticks + GPU_BUSY_MAX;
     uint64_t busy_until = schway__state_u64(io, name_busy_until, &g->busy_until, 0u, busy_max);
+    (void)schway__state_u32(io, name_field_status, &g->field_status, 0u, 1u);
 
     schway__state_check(io, beam_tick <= state_ticks);
     schway__state_check(io, beam_line_clock < gpu_line_clocks(inst->region));

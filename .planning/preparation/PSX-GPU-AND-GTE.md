@@ -2,7 +2,7 @@
 title: "PSX-GPU-AND-GTE: GPU revisions, VRAM, GP0/GP1 commands, rasterisation rules, timing, display, GTE, oracles, output format"
 summary: "What gpu.c and gte.c must do: the v0/v2 GPU differences, VRAM addressing, every GPUSTAT bit, the GP0 primitive set with word counts, the exact dither matrix, blend and modulation formulas, mask bits, texture windows and CLUTs, the fill rules and size limits, video clocks and display geometry as rationals, FIFO and DMA behaviour, measured primitive costs, every GTE register, opcode, cycle count and flag, the UNR division, the oracles and their licences, the accuracy model, the v1 frame format, and the hooks later enhancements need."
 read_when: "Before writing or changing gpu.c, gte.c, the frame output path, GPU DMA, timers that use dotclock or hblank, or when a game's geometry, colours, blending, interlacing or GTE-driven culling diverges."
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # PSX-GPU-AND-GTE
@@ -55,7 +55,7 @@ Detection in the field: Perfect Assassin latches index 4 then index 7 and compar
 | 9 | DTD | dithering enabled |
 | 10 | DFE | drawing to display area allowed |
 | 11, 12 | PBW, PBC | force mask bit on write; skip masked pixels |
-| 13 | ODE2 | interlace field (always 1 when GP1(08h).5 = 0 on v2, always 0 on v0) |
+| 13 | ODE2 | saved interlace field phase on v2 (reset high, retained when IRS is disabled); always 0 on v0 [GPU.21] |
 | 14 | REV | v1 screen flip, nonfunctional on v2 |
 | 15 | TBY2 | tpage Y base bit 1 (2 MB) |
 | 16, 17-18 | HDS2, HDS | 368 select; 256/320/512/640 |
@@ -67,7 +67,14 @@ Detection in the field: Perfect Assassin latches index 4 then index 7 and compar
 | 27 | RFFL | VRAM-to-CPU data ready (GP0(C0h)) |
 | 28 | WFEP | ready for DMA block; cleared when a command and its parameters are received, but for polygons and lines cleared on the command word itself |
 | 29-30 | DMD | DMA direction |
-| 31 | ODE | odd line being drawn; changes per frame in 480-line mode, per line in 240-line mode, 0 during vblank |
+| 31 | ODE | drawing line phase; 0 outside displayed vertical lines, alternates per 480-line field and per line in 240-line mode [GPU.21] |
+
+The 2026-11-03 PSX-SPX probe update [GPU.21] supersedes the earlier bit-13 shortcut: v2 retains its last ODE2 value
+after IRS is disabled, while v0 reads zero. With IRS enabled ODE2 changes at the last scanline, independently of the
+programmable vblank edge. ODE is suppressed outside the programmed vertical display range; in effective 480-line
+interlace ODE and ODE2 have opposite phases, while effective 240-line modes use scanline parity. These are hardware
+status semantics; the core maps them onto its fixed beam model as documented in `docs/hardware/gpu.md` and does not
+claim the probe's alternating physical field lengths or early-vblank mode-entry exception.
 
 ## 2. Command sets
 **2.1 Ports.** GP0 1F801810h write = rendering and VRAM packets, read = GP0(C0h) data or GP1(10h) latch; GP1 1F801814h write = display control, read = GPUSTAT. GP0 has a 16-word FIFO; GP1 commands bypass it. DMA2 is equivalent to writing GP0 [GPU.01].
@@ -160,7 +167,7 @@ Applies to gouraud or modulated polygons, to all lines (even flat), never to rec
 | Dots per line | 341.3, 426.625, 487.5714, 682.6, 853.25 | 340.6, 425.75, 486.5714, 681.2, 851.5 |
 | Dotclocks (MHz) | 5.3693175, 6.7116469, 7.6704536, 10.738635, 13.4232938 | 5.3203425, 6.6504281, 7.6004893, 10.640685, 13.3008563 |
 
-A console always runs its region's crystal whatever GP1(08h).3 says, so the other mode drifts [GPU.01]. Timer 0 counts whole dots per line (fractions dropped, 425.75 rounds up); timer 1 counts hblanks, which also occur during vblank; the hblank and vblank of the timers are not exactly the video signal's [GPU.01][GPU.04]. ares models the line as `hblankStart = X2` then `htotal`, raises vblank at `vcounter == Y2` and lowers it at `Y1`, toggles the field at frame end, and reports GPUSTAT bit 31 as `!vblank && (interlace ? !field : vcounter & 1)` [GPU.05].
+A console always runs its region's crystal whatever GP1(08h).3 says, so the other mode drifts [GPU.01]. Timer 0 counts whole dots per line (fractions dropped, 425.75 rounds up); timer 1 counts hblanks, which also occur during vblank; the hblank and vblank of the timers are not exactly the video signal's [GPU.01][GPU.04]. The 2026 PSX-SPX status probes [GPU.21] report alternating physical interlaced field lengths and an early-vblank mode-entry exception. The core retains the fixed 263/314-line model from DEC.09/DEC.10; its deterministic phase entry and status edge therefore do not claim those exact physical timeline offsets.
 
 **4.2 FIFO and ready bits.** 16 words; GP0(00h), the NOP mirrors and E3h-E5h take no space; GP1 bypasses it. Bit 28 falls on the command word for polygons and lines, so DMA mode 2 must deliver a primitive's parameters in the same block [GPU.01]. ps1-tests `gpustat` passes a 12-case matrix (CPU, linked-list DMA, sync DMA with directions 1 and 2, before/during/after rendering) on hardware; its expectations are in its source [GPU.09].
 
@@ -288,3 +295,4 @@ The hardware images in ps1-tests are 1024x512 PNGs of VRAM; a bit-exact comparis
 | GPU.18 | T4 | libretro.com/?p=45256 (Beetle PSX PGXP write-up) | accessed 2026-10-19 | wobble = integer vertices, warping = affine UV; PGXP needs both sub-pixel precision and perspective correction |
 | GPU.19 | T4 | en.wikipedia.org/wiki/PlayStation_technical_specifications | accessed 2026-10-19 | marketing fill rates (unverified) |
 | GPU.20 | T4 | tasvideos.org/Forum/Topics/20751 | accessed 2026-10-19 | Mednafen presents interlaced output as alternating fields in a 480-line buffer |
+| GPU.21 | T1, measured (published probe report) | psx-spx GPU status-register update, PR 234 | 519c8dbcc025467a6c80b02e61aafe3adcfa497b (2026-11-03) | v0/v2 ODE/ODE2 behavior, interlace retention, PAL probes and fixed-model confidence boundary |

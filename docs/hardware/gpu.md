@@ -154,7 +154,27 @@ These constants and edge positions are the documented model derived from PSX-SPX
 choices in `.planning/preparation/DECISIONS.md` (DEC.09 and DEC.10), with architecture details in
 `.planning/preparation/ARCHITECTURE.md`, section one. They are doc/derived, not measured hardware results.
 
+## GPUSTAT field and line status
+
+GPUSTAT bit 13 reports the saved field phase on v2 and reads as zero on v0. A full GPU reset starts the v2 phase at
+one. A transition from progressive mode into interlace selects that same initial phase; while IRS is enabled, the
+existing beam edge entering the model's last scanline toggles it. Disabling IRS preserves the phase, and resetting
+the GP1 command buffer does not change it. The phase is serialized independently of the current display mode.
+
+Bit 31 is zero outside the programmed vertical display interval, clipped to the modeled field. In effective 480-line
+interlace it is the inverse of the saved field phase. In effective 240-line modes, including IRS enabled with VDS off,
+it follows beam-line parity. Display disable and GPU IRQ acknowledgement do not gate either status bit. Status
+composition and public peeks are pure. A real GP1 read performs the existing scheduled beam catch-up first, so any
+transition it observes is caused by elapsed emulated time, not by the read itself.
+
+These rules follow the v0/v2 probe report published in the [PSX-SPX GPU status documentation](
+https://psx-spx.consoledev.net/graphicsprocessingunitgpu/) and its [2026-11-03 update, commit 519c8db](
+https://github.com/psx-spx/psx-spx.github.io/commit/519c8dbcc025467a6c80b02e61aafe3adcfa497b). The implementation maps those
+semantics onto the existing fixed 263/314-line beam. It does not model the reported alternating physical field lengths
+or the early-vblank interlace-entry exception, so its phase-entry and edge ticks are deterministic model choices.
+
 ## Source
 
 - [PSX-SPX Graphics Processing Unit chapter](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/) documents GP0 rectangles, E1/E2/E6, texture decoding, modulation, dithering, and blending.
+- [PSX-SPX GPU status-register update, commit 519c8db](https://github.com/psx-spx/psx-spx.github.io/commit/519c8dbcc025467a6c80b02e61aafe3adcfa497b) reports v0/v2 bit 13 and 31 probes, mode retention, and PAL behavior.
 - The source and oracle inventory for this implementation is in `.planning/preparation/PSX-GPU-AND-GTE.md`, sections two and three. Its pinned GPU images do not cover every arithmetic branch or the raw textured semi-transparent dither case.

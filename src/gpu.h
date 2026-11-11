@@ -50,6 +50,7 @@ struct schway__gpu {
     uint32_t display_start;
     uint32_t horizontal_range, vertical_range;
     uint32_t display_mode;
+    uint32_t field_status;
     uint32_t allow_2mb;
     uint32_t read_latch;
     uint32_t irq_pending;
