@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-11-PLAN.md
-last_updated: "2026-11-11T02:47:11.489Z"
+stopped_at: Completed 04-15-PLAN.md
+last_updated: "2026-11-11T03:47:27.427Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 04 plan 04-11 completed
-state_head: 1bfc795dc9c024f29332135879de55ef1d030448
+state_head: deb3e46a70c5c9a42eae77d970a9c32426f4d839
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 80
+  completed_plans: 81
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 13 of 32
+Plan: 14 of 32
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 04 plan 04-11 completed
 
@@ -140,6 +140,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P10 | 16min | 2 tasks | 24 files |
 | Phase 04 P14 | 47min | 3 tasks | 17 files |
 | Phase 04 P11 | 100min | 2 tasks | 17 files |
+| Phase 04 P15 | 58min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -306,6 +307,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep state format 4 and scalar nodes_done shape; store linked-list counts in each channel's remain slot.
 - [Phase 04]: Treat busy DMA sync-mode-3 rewrites as a derived fail-closed policy because console behavior is unmeasured.
 - [Phase 04]: Accept valid DMA phases 0 through 5 and reject only out-of-range phases and invalid cross-field links.
+- [Phase 04]: Keep the approved API at version 4 and preserve frozen v1-v3 callers while appending host input and result fields.
+- [Phase 04]: Keep pending host input outside save states; serialize frame-latched controller input and in-flight protocol state.
 
 ### Pending Todos
 
@@ -396,10 +399,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-11 | Codex, OpenGSD 1.20.0; sequential executor, GPU DMA2 integration, DMA validation, local CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-15 | Codex, OpenGSD 1.20.0; sequential executor, input/rumble tracer CI, full CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T02:47:11.300Z
-Stopped at: Completed 04-11-PLAN.md
+Last session: 2026-11-11T03:47:27.269Z
+Stopped at: Completed 04-15-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
