@@ -94,6 +94,12 @@ static void run_to(schway *inst, uint64_t frame)
     }
 }
 
+static void bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t value)
+{
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, addr, width, value, &cycles), 0u);
+}
+
 static size_t save(const schway *inst, uint8_t *buf)
 {
     size_t n = schway_state_size(inst);
@@ -583,6 +589,45 @@ static void test_device_fields(void)
     CHECK_EQ_HEX(src->bus.spu_attr, 0u);
     schway_destroy(dst);
     schway_destroy(src);
+
+    /* A loaded ATTR latch, rather than a destination's prior value or a
+       duplicated DMA request level, supplies the next DMA4 block. */
+    schway *spu_src = make(SCHWAY_REGION_NTSC_U);
+    schway *spu_dst = make(SCHWAY_REGION_NTSC_U);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        bus_write(spu_src, 0x80001000u + i * 4u, 4u, 0xA5000000u + i);
+    }
+    bus_write(spu_src, 0xBF801DAAu, 2u, 0x0020u);
+    bus_write(spu_src, 0xBF8010F0u, 4u, 0x0FEDCBA9u);
+    bus_write(spu_src, 0xBF8010F4u, 4u, 0x00900000u);
+    bus_write(spu_src, 0xBF8010C0u, 4u, 0x1000u);
+    bus_write(spu_src, 0xBF8010C4u, 4u, (2u << 16) | 16u);
+    bus_write(spu_src, 0xBF8010C8u, 4u, 0x01000201u);
+    CHECK_EQ_U64(spu_src->dma.cur, 4u);
+    CHECK_EQ_U64(spu_src->dma.words[4], 16u);
+    CHECK_EQ_U64((spu_src->dma.dreq >> 4) & 1u, 0u);
+    size_t spu_n = save(spu_src, good);
+    bus_write(spu_dst, 0xBF801DAAu, 2u, 0x0010u);
+    CHECK_EQ_HEX(spu_dst->bus.spu_attr, 0x0010u);
+    CHECK_EQ_U64(schway_load_state(spu_dst, good, spu_n), SCHWAY_STATUS_OK);
+    CHECK_EQ_HEX(spu_dst->bus.spu_attr, 0x0020u);
+    CHECK_EQ_U64(spu_dst->dma.cur, 4u);
+    CHECK_EQ_U64(spu_dst->dma.words[4], 16u);
+    CHECK_EQ_U64(save(spu_dst, after), spu_n);
+    CHECK(memcmp(good, after, spu_n) == 0);
+    uint64_t first_end = spu_dst->dma.busy_until;
+    schway__dma_event(spu_dst, first_end);
+    CHECK_EQ_U64(spu_dst->dma.cur, 4u);
+    CHECK_EQ_U64(spu_dst->dma.words[4], 32u);
+    CHECK((spu_dst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    schway__dma_event(spu_dst, first_end + 76u);
+    CHECK_EQ_U64(spu_dst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(spu_dst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(spu_dst->dma.madr[4], 0x1080u);
+    CHECK_EQ_U64(spu_src->dma.words[4], 16u);
+    CHECK_EQ_HEX(spu_src->bus.spu_attr, 0x0020u);
+    schway_destroy(spu_dst);
+    schway_destroy(spu_src);
 }
 
 /* Accepted counter boundaries must either advance to another loadable state

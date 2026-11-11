@@ -143,6 +143,7 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
    events a second. A channel whose mode has no unit yet keeps its registers
    and waits (psx-spx, DMA Channels). */
 #define DMA_OTC 6u
+#define DMA_SPU 4u
 /* phase of a channel: nothing running, its unit's words moved and the channel
    busy until busy_until, a sync mode 1 transfer between blocks (busy, no
    unit, remain blocks still to go, waiting for the next request), the CPU's
@@ -231,9 +232,11 @@ static void dicr_set(schway *inst, uint32_t dicr)
 
 /* A channel with a unit ready to run has bit 24 set and bit 28 where its mode
    needs the start trigger. OTC and sync mode 0 need bit 28; sync mode 1 needs
-   the device request line; linked-list mode needs bit 24 and, for DMA2, an
-   expired GPU busy deadline. A transfer whose CPU window is over waits for its
-   next unit. The reserved mode has no unit (psx-spx, DMA Channels, CHCR). */
+   the device request line, except DMA4's derived ATTR-write readiness for
+   RAM-to-SPU blocks; linked-list mode needs bit 24 and, for DMA2, an expired
+   GPU busy deadline. A transfer whose CPU window is over waits for its next
+   unit. The reserved mode has no unit (psx-spx, DMA Channels, CHCR; see
+   docs/hardware/dma.md, modeled SPU DMA4 readiness). */
 static uint32_t dma_pending(const schway *inst, uint32_t ch)
 {
     const struct schway__dma *d = &inst->dma;
@@ -251,7 +254,14 @@ static uint32_t dma_pending(const schway *inst, uint32_t ch)
     if (sync == 2u) {
         return ch != 2u || schway__gpu_dma_ready(inst);
     }
-    return sync == 1u && ((d->dreq >> ch) & 1u) != 0u ? 1u : 0u;
+    if (sync != 1u) {
+        return 0u;
+    }
+    if (ch == DMA_SPU && (c & DMA_CHCR_FROM_RAM) != 0u &&
+        (inst->bus.spu_attr & 0x0030u) == 0x0020u) {
+        return 1u;
+    }
+    return ((d->dreq >> ch) & 1u) != 0u ? 1u : 0u;
 }
 
 /* The channel of mask that goes next, or SCHWAY__DMA_NONE: among the channels
@@ -459,6 +469,9 @@ static uint64_t dma_otc_unit(schway *inst)
 static void dma_start(schway *inst, uint64_t t)
 {
     struct schway__dma *d = &inst->dma;
+    if (d->cur != SCHWAY__DMA_NONE || d->busy_until > t) {
+        return;
+    }
     uint32_t ch = schway__dma_arbitrate(inst, UINT32_MAX);
     if (ch == SCHWAY__DMA_NONE) {
         return;
@@ -807,4 +820,15 @@ void schway__dma_dreq(schway *inst, uint32_t ch, uint32_t level)
     } else {
         inst->dma.dreq &= ~(1u << ch);
     }
+}
+
+/* ATTR changes can make a waiting DMA4 block ready at this exact bus tick.
+   Keep a unit completed ahead of the CPU clock at its saved boundary. The
+   level itself is derived from bus.spu_attr and is never stored in dreq. */
+void schway__dma_spu_control_changed(schway *inst, uint64_t now)
+{
+    if (inst->dma.cur == SCHWAY__DMA_NONE && inst->dma.busy_until <= now) {
+        dma_start(inst, now);
+    }
+    schway__sched_recalc(inst);
 }

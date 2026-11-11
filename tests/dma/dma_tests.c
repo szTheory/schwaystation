@@ -1004,6 +1004,28 @@ static void case_spu_request_blocks(void)
     CHECK_EQ_HEX(rd32(inst, DICR), 0x90900000u);
     CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
     schway_destroy(inst);
+
+    /* ATTR may become ready after an active transfer has already waited. */
+    inst = make();
+    fill_ram(inst, 0x7000u, 16u, seed);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00900000u);
+    wr32(inst, MADR(4u), 0x7000u);
+    wr32(inst, BCR(4u), (1u << 16) | 16u);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 0u);
+    uint64_t wake = now_of(inst);
+    wr16(inst, 0x1F801DAAu, 0x0020u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    CHECK_EQ_U64(inst->dma.busy_until - wake, 76u);
+    schway__dma_event(inst, wake + 76u);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(inst->dma.madr[4], 0x7040u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(16u, seed));
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    schway_destroy(inst);
 }
 
 /* Words of a program that points t0 at the I/O page, sets DPCR, then MADR,

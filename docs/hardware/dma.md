@@ -170,6 +170,16 @@ and not before. A raise of the line while another unit runs is picked up at that
 The line is a latched level per channel, set by `schway__dma_dreq`; the devices call it as they are built. The reserved
 mode has no unit: see [the fault for an unusable mode](#the-fault-for-an-unusable-mode).
 
+The current SPU compatibility slice derives persistent readiness for channel 4 from the saved `ATTR` latch: a write
+to the exact halfword whose bits 5-4 select mode `2` makes a busy sync-mode-1 RAM-to-device transfer ready for another block. It does
+not set or consume `dma.dreq`, so explicit request credits and other channels remain independent. A block already
+started is atomic; changing `ATTR` only affects a later block. The bus catches DMA up through the ATTR write's tick
+before changing the latch, and a block left waiting behind a future completed-unit deadline cannot start early. This
+is a deterministic policy that feeds the existing unbuilt SPU sink, not a model of FIFO occupancy, STATX, sample RAM,
+audio, or measured request latency. The [SPU control readback](bus.md#spu-control-readback) section describes the
+ATTR access and the pinned [PSX-SPX SPU register notes](https://psx-spx.consoledev.net/soundprocessingunitspu/) name
+the transfer-mode bits.
+
 ## The fault for an unusable mode
 
 Synchronisation mode 3 is reserved and no device answers it. An idle channel written with bit 24 set and mode 3 does

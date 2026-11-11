@@ -127,8 +127,11 @@ and a last program counter that names the loop. A later release replaces each un
 The exact halfword at `1F801DAAh` is ATTR, a read/write control register whose bits 5-4 select the transfer mode. The
 bus stores and returns the raw 16-bit value for that exact access, retains the normal DEV4 port cost, and does not count
 it as unbuilt. This allows a caller to read back a control value such as `0020h`; it does not move SPU RAM, generate
-audio or cause register side effects. Byte or word access at ATTR, and every other SPU access including the read-only
-status register STATX at `1F801DAEh`, keep the unbuilt zero-read/dropped-write behavior, accounting and DEV4 cost.
+audio or implement other SPU register side effects. For this first caller, a write selecting transfer mode `0020h`
+also makes request-mode DMA4 RAM-to-device blocks persistently ready for the existing deterministic sink; the DMA
+page documents the modeled scheduling and its limits. Byte or word access at ATTR, and every other SPU access
+including the read-only status register STATX at `1F801DAEh`, keep the unbuilt zero-read/dropped-write behavior,
+accounting and DEV4 cost.
 
 The latch is instance state named `bus.spu_attr` and is serialized with other bus fields. A power reset sets it to zero
 as the emulator's deterministic reset model; this is not a hardware power-on-value claim. The [PSX-SPX SPU register

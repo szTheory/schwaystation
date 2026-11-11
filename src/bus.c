@@ -534,7 +534,10 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
            (docs/hardware/bus.md, SPU control readback; PSX-SPX SCM.01). */
         if (p == 0x1F801DAAu && width == 2u) {
             if (wr != 0u) {
+                uint64_t tick = schway__sched_now(inst, *cycles);
+                schway__dma_event(inst, tick);
                 inst->bus.spu_attr = (uint16_t)v;
+                schway__dma_spu_control_changed(inst, tick);
             } else {
                 *value = (uint32_t)inst->bus.spu_attr;
             }
