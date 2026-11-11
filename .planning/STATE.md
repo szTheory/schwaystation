@@ -5,8 +5,8 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Phase 04 remaining-plan sizing complete; focused independent check next
-last_updated: "2026-11-11T05:42:03Z"
+stopped_at: Phase 04 focused sizing warnings addressed; ready for coordinator handoff
+last_updated: "2026-11-11T06:14:22Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 04 remaining work split using measured execution evidence
 state_head: e5c3ccddb9533222a97371c148922b1fe7398ef4
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
 Plan: 14 completed of 49; next ready 04-16 (04-13 also ready)
-Status: Resized plans ready for focused independent check; next execution 04-16
+Status: Focused sizing warnings addressed; next execution 04-16
 Last activity: 2026-11-11 — Remaining Phase 04 plans resized; independent focused check next
 
 Progress: [█████░░░░░] 50%
@@ -407,6 +407,8 @@ come from `AGENTS.md`.
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-12 | Codex, OpenGSD 1.20.0; sequential executor, GPU-motion and beam-timing fixtures, local CI and hygiene | gpt-6-luna xhigh |
 
 | 2026-11-11 | Phase 04 execution-evidence replan at safe boundary | Codex, OpenGSD 1.20.0; planning-only sizing/dependency/source-coverage check, sequential/no worktrees | gpt-6.1-sol high |
+
+| 2026-11-11 | Phase 04 focused sizing-warning revision | Codex, OpenGSD 1.20.0; focused verification commands, preserved required oracle/hosted evidence | gpt-6.1-sol high |
 
 ## Session Continuity
 
