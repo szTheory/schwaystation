@@ -50,12 +50,17 @@ static const char name_clut_x[] = "gpu.clut_x";
 static const char name_clut_y[] = "gpu.clut_y";
 static const char name_clut_count[] = "gpu.clut_count";
 static const char name_clut_valid[] = "gpu.clut_valid";
+static const char name_busy_until[] = "gpu.busy_until";
 
 #define GPU_IRQ_BIT 1u
 #define GPU_IRQ_MASK (UINT32_C(1) << GPU_IRQ_BIT)
 #define GPU_RATIO_DEN UINT64_C(451584)
 #define GPU_HBLANK_BIT 2u
 #define GPU_VBLANK_BIT 1u
+#define GPU_BUSY_MAX (UINT64_C(1024) * 512u * 4u + 65536u)
+
+static void gpu_update_dreq(schway *inst);
+static void gpu_dma_resume(schway *inst, uint64_t now);
 
 /* The beam and timer dots use the documented ratio and line lengths (PSX-GPU-AND-GTE section four
    point one; PSX-SYSTEM section one). All phases are carried as integers. */
@@ -242,12 +247,13 @@ static int gpu_beam_edges(schway *inst)
 uint64_t schway__gpu_next(const schway *inst)
 {
     const struct schway__gpu *g = &inst->gpu;
+    uint64_t next = g->busy_until != 0u ? g->busy_until : UINT64_MAX;
     if (!gpu_beam_active(inst)) {
-        return UINT64_MAX;
+        return next;
     }
     uint32_t line_clocks = gpu_line_clocks(inst->region);
     if (g->beam_line_clock >= line_clocks) {
-        return g->beam_tick;
+        return g->beam_tick < next ? g->beam_tick : next;
     }
     uint32_t hblank_at = (g->horizontal_range >> 12) & 0x0FFFu;
     uint64_t clocks = line_clocks - g->beam_line_clock;
@@ -270,7 +276,8 @@ uint64_t schway__gpu_next(const schway *inst)
         }
     }
 
-    return g->beam_tick + gpu_ticks_for_clocks(g, inst->region, clocks);
+    uint64_t beam = g->beam_tick + gpu_ticks_for_clocks(g, inst->region, clocks);
+    return beam < next ? beam : next;
 }
 
 /* Lazy catch-up splits only at a line/display edge or a derived dot-target deadline. */
@@ -278,6 +285,11 @@ void schway__gpu_sync(schway *inst, uint64_t now)
 {
     struct schway__gpu *g = &inst->gpu;
     if (!gpu_beam_active(inst)) {
+        if (g->busy_until != 0u && g->busy_until <= now) {
+            g->busy_until = 0u;
+            gpu_update_dreq(inst);
+            gpu_dma_resume(inst, now);
+        }
         return;
     }
     if (now < g->beam_tick) {
@@ -316,6 +328,11 @@ void schway__gpu_sync(schway *inst, uint64_t now)
         gpu_beam_advance(inst, event_tick, elapsed);
     }
     schway__timers_sync(inst, now);
+    if (g->busy_until != 0u && g->busy_until <= now) {
+        g->busy_until = 0u;
+        gpu_update_dreq(inst);
+        gpu_dma_resume(inst, now);
+    }
 }
 
 void schway__gpu_event(schway *inst, uint64_t now)
@@ -358,6 +375,174 @@ static uint32_t command_words(uint32_t command)
         return 1u; /* unknown command: consume its FIFO word, without effects */
     }
     return 1u;
+}
+
+enum gpu_busy_class {
+    GPU_BUSY_FILL = 0u,
+    GPU_BUSY_RECTANGLE,
+    GPU_BUSY_RECTANGLE_SEMI,
+    GPU_BUSY_TEXTURED_RECTANGLE,
+    GPU_BUSY_TEXTURED_RECTANGLE_SEMI,
+    GPU_BUSY_POLYGON,
+    GPU_BUSY_POLYGON_SEMI,
+    GPU_BUSY_TEXTURED_POLYGON,
+    GPU_BUSY_TEXTURED_POLYGON_SEMI,
+    GPU_BUSY_LINE,
+    GPU_BUSY_COPY,
+    GPU_BUSY_CLASS_COUNT
+};
+
+struct gpu_busy_cost {
+    uint32_t setup;
+    uint32_t milli_per_pixel;
+};
+
+/* Integer setup-plus-pixel costs seeded from PSX-GPU-AND-GTE section four point four and
+   choice four point A. They are a deterministic model, not a hardware timing claim. */
+static const struct gpu_busy_cost gpu_busy_costs[GPU_BUSY_CLASS_COUNT] = {
+    {8u, 81u},   {8u, 530u},  {8u, 797u},  {8u, 1188u}, {8u, 1497u}, {8u, 538u},
+    {8u, 812u},  {8u, 2980u}, {8u, 3463u}, {8u, 1000u}, {8u, 1000u},
+};
+
+static uint32_t gpu_extent(uint32_t encoded, uint32_t mask)
+{
+    return ((encoded - 1u) & mask) + 1u;
+}
+
+static int32_t gpu_signed_vertex(uint32_t word, uint32_t shift)
+{
+    int32_t value = (int32_t)((word >> shift) & 0x7FFu);
+    return (value & 0x400) != 0 ? value - 0x800 : value;
+}
+
+static uint32_t gpu_abs_i32(int32_t value)
+{
+    return value < 0 ? (uint32_t)(-value) : (uint32_t)value;
+}
+
+static uint64_t gpu_busy_cost(uint32_t cost_class, uint64_t pixels)
+{
+    const struct gpu_busy_cost *cost = &gpu_busy_costs[cost_class];
+    return (uint64_t)cost->setup + (pixels * cost->milli_per_pixel + 999u) / 1000u;
+}
+
+static uint32_t gpu_fill_pixels(uint32_t size)
+{
+    uint32_t width = size & 0x3FFu;
+    uint32_t height = gpu_extent((size >> 16) & 0x1FFu, 0x1FFu);
+    width = (width + 15u) & ~15u;
+    if (width == 0u) {
+        width = 16u;
+    }
+    if (width > SCHWAY__VRAM_W) {
+        width = SCHWAY__VRAM_W;
+    }
+    return width * height;
+}
+
+static uint64_t gpu_packet_busy_clocks(const struct schway__gpu *g, uint32_t command)
+{
+    uint32_t op = command >> 24;
+    if (op == 0x02u && g->fifo_count == 3u) {
+        return gpu_busy_cost(GPU_BUSY_FILL, gpu_fill_pixels(g->fifo[2]));
+    }
+    if (op >= 0x80u && op <= 0x9Fu && g->fifo_count == 4u) {
+        uint32_t width = gpu_extent(g->fifo[3] & 0x3FFu, 0x3FFu);
+        uint32_t height = gpu_extent((g->fifo[3] >> 16) & 0x1FFu, 0x1FFu);
+        return gpu_busy_cost(GPU_BUSY_COPY, (uint64_t)width * height);
+    }
+    if (op >= 0x60u && op <= 0x7Fu) {
+        uint32_t textured = (op & 4u) != 0u;
+        uint32_t size = (op & 0x18u) == 0u ? g->fifo[2u + textured] : 0u;
+        uint32_t width;
+        uint32_t height;
+        if ((op & 0x18u) == 0u) {
+            width = gpu_extent(size & 0x3FFu, 0x3FFu);
+            height = gpu_extent((size >> 16) & 0x1FFu, 0x1FFu);
+        } else {
+            static const uint32_t fixed[4] = {1u, 1u, 8u, 16u};
+            width = fixed[(op >> 3) & 3u];
+            height = width;
+        }
+        uint32_t cost_class = textured != 0u
+                                  ? ((op & 2u) != 0u ? GPU_BUSY_TEXTURED_RECTANGLE_SEMI
+                                                     : GPU_BUSY_TEXTURED_RECTANGLE)
+                                  : ((op & 2u) != 0u ? GPU_BUSY_RECTANGLE_SEMI
+                                                     : GPU_BUSY_RECTANGLE);
+        return gpu_busy_cost(cost_class, (uint64_t)width * height);
+    }
+    if (op >= 0x20u && op <= 0x3Fu) {
+        uint32_t vertices = (op & 0x08u) != 0u ? 4u : 3u;
+        uint32_t textured = (op & 0x04u) != 0u;
+        uint32_t gouraud = (op & 0x10u) != 0u;
+        uint32_t cursor = 1u;
+        int32_t min_x = INT32_MAX;
+        int32_t max_x = INT32_MIN;
+        int32_t min_y = INT32_MAX;
+        int32_t max_y = INT32_MIN;
+        for (uint32_t i = 0u; i < vertices; i++) {
+            int32_t x = gpu_signed_vertex(g->fifo[cursor], 0u);
+            int32_t y = gpu_signed_vertex(g->fifo[cursor], 16u);
+            cursor++;
+            if (x < min_x) {
+                min_x = x;
+            }
+            if (x > max_x) {
+                max_x = x;
+            }
+            if (y < min_y) {
+                min_y = y;
+            }
+            if (y > max_y) {
+                max_y = y;
+            }
+            if (textured != 0u) {
+                cursor++;
+            }
+            if (gouraud != 0u && i + 1u < vertices) {
+                cursor++;
+            }
+        }
+        uint32_t width = (uint32_t)(max_x - min_x + 1);
+        uint32_t height = (uint32_t)(max_y - min_y + 1);
+        if (width > SCHWAY__VRAM_W) {
+            width = SCHWAY__VRAM_W;
+        }
+        if (height > SCHWAY__VRAM_H) {
+            height = SCHWAY__VRAM_H;
+        }
+        uint32_t cost_class = textured != 0u
+                                  ? ((op & 2u) != 0u ? GPU_BUSY_TEXTURED_POLYGON_SEMI
+                                                     : GPU_BUSY_TEXTURED_POLYGON)
+                                  : ((op & 2u) != 0u ? GPU_BUSY_POLYGON_SEMI : GPU_BUSY_POLYGON);
+        return gpu_busy_cost(cost_class, (uint64_t)width * height);
+    }
+    if (op >= 0x40u && op <= 0x5Fu && (op & 8u) == 0u) {
+        uint32_t gouraud = (op & 0x10u) != 0u;
+        uint32_t word0 = g->fifo[1];
+        uint32_t word1 = g->fifo[gouraud != 0u ? 3u : 2u];
+        int32_t x0 = gpu_signed_vertex(word0, 0u);
+        int32_t y0 = gpu_signed_vertex(word0, 16u);
+        int32_t x1 = gpu_signed_vertex(word1, 0u);
+        int32_t y1 = gpu_signed_vertex(word1, 16u);
+        uint32_t dx = gpu_abs_i32(x1 - x0);
+        uint32_t dy = gpu_abs_i32(y1 - y0);
+        return gpu_busy_cost(GPU_BUSY_LINE, (uint64_t)(dx > dy ? dx : dy) + 1u);
+    }
+    return 0u;
+}
+
+static void gpu_busy_add(schway *inst, uint64_t tick, uint64_t clocks)
+{
+    struct schway__gpu *g = &inst->gpu;
+    if (clocks == 0u) {
+        return;
+    }
+    uint64_t base = g->busy_until > tick ? g->busy_until : tick;
+    uint64_t delta = gpu_ticks_for_clocks(g, inst->region, clocks);
+    uint64_t proposed = base > UINT64_MAX - delta ? UINT64_MAX : base + delta;
+    uint64_t limit = tick > UINT64_MAX - GPU_BUSY_MAX ? UINT64_MAX : tick + GPU_BUSY_MAX;
+    g->busy_until = proposed < limit ? proposed : limit;
 }
 
 static void parser_idle(struct schway__gpu *g)
@@ -561,6 +746,18 @@ static uint32_t download_peek(const schway *inst, const struct schway__gpu *g)
 static uint32_t gpu_status(const struct schway *inst)
 {
     const struct schway__gpu *g = &inst->gpu;
+    uint32_t idle = g->busy_until == 0u ? 1u : 0u;
+    uint32_t command_ready = idle != 0u && g->phase == SCHWAY__GPU_IDLE ? 1u : 0u;
+    uint32_t block_ready = command_ready;
+    if (idle != 0u && (g->phase == SCHWAY__GPU_TRANSFER_TO_VRAM ||
+                       g->phase == SCHWAY__GPU_POLYLINE_VERTEX ||
+                       g->phase == SCHWAY__GPU_POLYLINE_COLOR)) {
+        block_ready = 1u;
+    }
+    if (idle != 0u && g->phase == SCHWAY__GPU_PACKET) {
+        uint32_t op = g->fifo[0] >> 24;
+        block_ready = op < 0x20u || op > 0x5Fu;
+    }
     uint32_t status = g->draw_mode & 0x7FFu;
     status |= (g->mask & 3u) << 11;
     status |= ((g->draw_mode >> 11) & 1u) << 15;
@@ -579,12 +776,12 @@ static uint32_t gpu_status(const struct schway *inst)
     }
     switch (g->dma_direction) {
     case 1u:
-        if (g->fifo_count < SCHWAY__GPU_FIFO_WORDS) {
+        if (idle != 0u && g->fifo_count < SCHWAY__GPU_FIFO_WORDS) {
             status |= UINT32_C(1) << 25;
         }
         break;
     case 2u:
-        if (g->phase == SCHWAY__GPU_IDLE) {
+        if (block_ready != 0u) {
             status |= UINT32_C(1) << 25;
         }
         break;
@@ -596,8 +793,11 @@ static uint32_t gpu_status(const struct schway *inst)
     default:
         break;
     }
-    if (g->phase == SCHWAY__GPU_IDLE) {
-        status |= (UINT32_C(1) << 26) | (UINT32_C(1) << 28);
+    if (command_ready != 0u) {
+        status |= UINT32_C(1) << 26;
+    }
+    if (block_ready != 0u) {
+        status |= UINT32_C(1) << 28;
     }
     if (g->phase == SCHWAY__GPU_TRANSFER_FROM_VRAM && g->owed_words != 0u) {
         status |= UINT32_C(1) << 27;
@@ -607,6 +807,26 @@ static uint32_t gpu_status(const struct schway *inst)
     }
     status |= (g->dma_direction & 3u) << 29;
     return status;
+}
+
+uint32_t schway__gpu_dma_request(const schway *inst)
+{
+    return (gpu_status(inst) >> 25) & 1u;
+}
+
+uint32_t schway__gpu_dma_ready(const schway *inst)
+{
+    return inst->gpu.busy_until == 0u ? 1u : 0u;
+}
+
+static void gpu_update_dreq(schway *inst)
+{
+    schway__dma_dreq(inst, 2u, schway__gpu_dma_request(inst));
+}
+
+static void gpu_dma_resume(schway *inst, uint64_t now)
+{
+    schway__dma_event(inst, now);
 }
 
 static void apply_environment(schway *inst, uint32_t command)
@@ -644,7 +864,7 @@ static void gpu_ack_irq(schway *inst)
     schway__irq_write_stat(inst, 0u, GPU_IRQ_MASK);
 }
 
-static void process_packet(schway *inst)
+static void process_packet(schway *inst, uint64_t tick)
 {
     struct schway__gpu *g = &inst->gpu;
     uint32_t command = g->fifo[0];
@@ -733,6 +953,7 @@ static void process_packet(schway *inst)
                                  : SCHWAY__GPU_POLYLINE_VERTEX;
         return;
     }
+    gpu_busy_add(inst, tick, gpu_packet_busy_clocks(g, command));
     parser_idle(g);
 }
 
@@ -741,7 +962,7 @@ static int polyline_terminator(uint32_t word)
     return (word & 0xF000F000u) == 0x50005000u;
 }
 
-static void polyline_word(schway *inst, uint32_t word)
+static void polyline_word(schway *inst, uint32_t word, uint64_t tick)
 {
     struct schway__gpu *g = &inst->gpu;
     if (g->phase == SCHWAY__GPU_POLYLINE_COLOR) {
@@ -767,6 +988,9 @@ static void polyline_word(schway *inst, uint32_t word)
         uint32_t command = (0x40u | (g->polyline_gouraud != 0u ? 0x10u : 0u) |
                             (g->polyline_semi != 0u ? 2u : 0u)) << 24;
         schway__gpu_line(inst, command, position0, position1, g->polyline_color, color1, 0u);
+        uint32_t dx = gpu_abs_i32((int32_t)x - (int32_t)g->polyline_x);
+        uint32_t dy = gpu_abs_i32((int32_t)y - (int32_t)g->polyline_y);
+        gpu_busy_add(inst, tick, gpu_busy_cost(GPU_BUSY_LINE, (uint64_t)(dx > dy ? dx : dy) + 1u));
         if (g->polyline_gouraud != 0u) {
             g->polyline_color = g->polyline_next_color;
             g->polyline_next_color = 0u;
@@ -782,7 +1006,7 @@ static void polyline_word(schway *inst, uint32_t word)
 }
 
 /* CPU writes and DMA2 enter here, one bounded word at a time. */
-void schway__gpu_word(schway *inst, uint32_t word)
+void schway__gpu_word(schway *inst, uint32_t word, uint64_t tick)
 {
     struct schway__gpu *g = &inst->gpu;
     if (g->phase == SCHWAY__GPU_TRANSFER_TO_VRAM) {
@@ -794,7 +1018,7 @@ void schway__gpu_word(schway *inst, uint32_t word)
     }
     if (g->phase == SCHWAY__GPU_POLYLINE_VERTEX ||
         g->phase == SCHWAY__GPU_POLYLINE_COLOR) {
-        polyline_word(inst, word);
+        polyline_word(inst, word, tick);
         return;
     }
     if (g->phase == SCHWAY__GPU_PACKET) {
@@ -804,7 +1028,7 @@ void schway__gpu_word(schway *inst, uint32_t word)
         }
         g->fifo[g->fifo_count++] = word;
         if (g->fifo_count == g->packet_words) {
-            process_packet(inst);
+            process_packet(inst, tick);
         }
         return;
     }
@@ -814,7 +1038,7 @@ void schway__gpu_word(schway *inst, uint32_t word)
     if (g->packet_words > SCHWAY__GPU_FIFO_WORDS || g->packet_words == 0u) {
         packet_clear(g);
     } else if (g->packet_words == 1u) {
-        process_packet(inst);
+        process_packet(inst, tick);
     } else {
         g->phase = SCHWAY__GPU_PACKET;
     }
@@ -842,6 +1066,38 @@ static uint32_t gpuread(const schway *inst)
         return download_peek(inst, g);
     }
     return g->read_latch;
+}
+
+static void gpu_read_consume(schway *inst, uint32_t addr, uint32_t width)
+{
+    if ((addr & 0xCu) == 0u && inst->gpu.phase == SCHWAY__GPU_TRANSFER_FROM_VRAM &&
+        inst->gpu.owed_words != 0u) {
+        struct schway__gpu *g = &inst->gpu;
+        uint32_t pixels = transfer_pixels(g);
+        uint32_t remain = pixels - g->transfer_index;
+        g->read_latch = lane_get(download_peek(inst, g), addr, width);
+        g->transfer_index += min_u32(remain, 2u);
+        g->owed_words--;
+        if (g->owed_words == 0u) {
+            transfer_finish(g);
+        }
+    }
+}
+
+void schway__gpu_dma_write(schway *inst, uint32_t word, uint64_t tick)
+{
+    schway__gpu_sync(inst, tick);
+    schway__gpu_word(inst, word, tick);
+    gpu_update_dreq(inst);
+}
+
+uint32_t schway__gpu_dma_read(schway *inst, uint64_t tick)
+{
+    schway__gpu_sync(inst, tick);
+    uint32_t value = gpuread(inst);
+    gpu_read_consume(inst, 0x1F801810u, 4u);
+    gpu_update_dreq(inst);
+    return value;
 }
 
 /* Side-effect-free port image used by the bus and internal inspection. */
@@ -950,26 +1206,17 @@ int schway__gpu_io(schway *inst, uint32_t wr, uint32_t addr, uint32_t width,
     if (wr != 0u) {
         uint32_t word = (*value & lane_mask(width)) << lane_shift(addr);
         if (slot == 0u) {
-            schway__gpu_word(inst, word);
+            schway__gpu_word(inst, word, tick);
         } else {
             gpu_gp1(inst, word, tick);
         }
+        gpu_update_dreq(inst);
     } else {
         if (schway__gpu_peek(inst, addr, width, value) != 0) {
             return 1;
         }
-        if (slot == 0u && inst->gpu.phase == SCHWAY__GPU_TRANSFER_FROM_VRAM &&
-            inst->gpu.owed_words != 0u) {
-            struct schway__gpu *g = &inst->gpu;
-            uint32_t pixels = transfer_pixels(g);
-            uint32_t remain = pixels - g->transfer_index;
-            g->read_latch = lane_get(download_peek(inst, g), addr, width);
-            g->transfer_index += min_u32(remain, 2u);
-            g->owed_words--;
-            if (g->owed_words == 0u) {
-                transfer_finish(g);
-            }
-        }
+        gpu_read_consume(inst, addr, width);
+        gpu_update_dreq(inst);
     }
     *cycles += 1u;
     schway__sched_recalc(inst);
@@ -1064,12 +1311,17 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst, uint64_t st
     uint32_t beam_line = schway__state_u32(io, name_beam_line, &g->beam_line, 0u, 313u);
     uint32_t beam_dot_phase = schway__state_u32(io, name_beam_dot_phase, &g->beam_dot_phase,
                                                  0u, 9u);
+    uint64_t busy_max = state_ticks > UINT64_MAX - GPU_BUSY_MAX
+                            ? UINT64_MAX
+                            : state_ticks + GPU_BUSY_MAX;
+    uint64_t busy_until = schway__state_u64(io, name_busy_until, &g->busy_until, 0u, busy_max);
 
     schway__state_check(io, beam_tick <= state_ticks);
     schway__state_check(io, beam_line_clock < gpu_line_clocks(inst->region));
     schway__state_check(io, beam_line < gpu_lines(inst->region));
     schway__state_check(io, beam_ratio_remainder < GPU_RATIO_DEN);
     schway__state_check(io, beam_dot_phase < gpu_dot_divisor(display_mode));
+    schway__state_check(io, busy_until == 0u || busy_until > state_ticks);
 
     schway__state_check(io, phase != SCHWAY__GPU_PACKET ||
                                 (fifo_count != 0u && packet_words > fifo_count &&

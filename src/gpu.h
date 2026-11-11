@@ -63,6 +63,7 @@ struct schway__gpu {
     uint8_t texture_valid[SCHWAY__GPU_TEXTURE_CACHE_LINES];
     uint16_t clut_cache[SCHWAY__GPU_CLUT_CACHE_ENTRIES];
     uint32_t clut_x, clut_y, clut_count, clut_valid;
+    uint64_t busy_until;
 };
 
 void schway__gpu_reset(schway *inst);
@@ -70,7 +71,11 @@ void schway__gpu_display(const schway *inst, struct schway__display *display);
 void schway__gpu_sync(schway *inst, uint64_t now);
 uint64_t schway__gpu_next(const schway *inst);
 void schway__gpu_event(schway *inst, uint64_t now);
-void schway__gpu_word(schway *inst, uint32_t word);
+void schway__gpu_word(schway *inst, uint32_t word, uint64_t tick);
+void schway__gpu_dma_write(schway *inst, uint32_t word, uint64_t tick);
+uint32_t schway__gpu_dma_read(schway *inst, uint64_t tick);
+uint32_t schway__gpu_dma_request(const schway *inst);
+uint32_t schway__gpu_dma_ready(const schway *inst);
 int schway__gpu_io(schway *inst, uint32_t wr, uint32_t addr, uint32_t width,
                    uint32_t *value, uint32_t *cycles);
 int schway__gpu_peek(const schway *inst, uint32_t addr, uint32_t width, uint32_t *value);

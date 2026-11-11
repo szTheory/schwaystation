@@ -82,7 +82,6 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
    and waits (psx-spx, DMA Channels). */
 #define DMA_OTC 6u
 #define DMA_UNIT_CHANNELS 0x7Fu
-
 /* phase of a channel: nothing running, its unit's words moved and the channel
    busy until busy_until, a sync mode 1 transfer between blocks (busy, no
    unit, remain blocks still to go, waiting for the next request), the CPU's
@@ -183,21 +182,22 @@ static void dicr_set(schway *inst, uint32_t dicr)
    device being taken to be ready (no device end holds a request line yet). A
    transfer whose CPU window is over is waiting for its next unit. The reserved
    mode has no unit, so it waits (psx-spx, DMA Channels, CHCR). */
-static uint32_t dma_pending(const struct schway__dma *d, uint32_t ch)
+static uint32_t dma_pending(const schway *inst, uint32_t ch)
 {
+    const struct schway__dma *d = &inst->dma;
     uint32_t c = d->chcr[ch];
     uint32_t sync = (c >> 9) & 3u;
     if ((c & SCHWAY__DMA_CHCR_BUSY) == 0u) {
         return 0u;
     }
     if (d->phase[ch] == DMA_PH_NEXT) {
-        return 1u;
+        return ch != 2u || sync != 2u || schway__gpu_dma_ready(inst);
     }
     if (ch == DMA_OTC || sync == 0u) {
         return (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
     }
     if (sync == 2u) {
-        return 1u;
+        return ch != 2u || schway__gpu_dma_ready(inst);
     }
     return sync == 1u && ((d->dreq >> ch) & 1u) != 0u ? 1u : 0u;
 }
@@ -215,7 +215,8 @@ uint32_t schway__dma_arbitrate(const schway *inst, uint32_t mask)
     uint32_t best_pri = 8u;
     for (uint32_t ch = 0u; ch < SCHWAY__DMA_CHANNELS; ch++) {
         uint32_t field = d->dpcr >> (4u * ch);
-        if ((mask & (1u << ch)) == 0u || (field & 8u) == 0u || dma_pending(d, ch) == 0u) {
+        if ((mask & (1u << ch)) == 0u || (field & 8u) == 0u ||
+            dma_pending(inst, ch) == 0u) {
             continue;
         }
         if ((field & 7u) <= best_pri) {
@@ -277,7 +278,7 @@ static uint32_t dma_stub_source(uint32_t *word)
 
 /* One word from RAM to the device of channel ch; returns the extra busy
    cycles. */
-static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word)
+static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word, uint64_t tick)
 {
     switch (ch) {
     case 0u: /* MDEC in */
@@ -285,7 +286,8 @@ static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word)
     case 1u: /* MDEC out */
         return dma_stub_sink(inst, ch, word);
     case 2u: /* GPU */
-        return dma_stub_sink(inst, ch, word);
+        schway__gpu_dma_write(inst, word, tick);
+        return 0u;
     case 3u: /* CD-ROM */
         return dma_stub_sink(inst, ch, word);
     case 4u: /* SPU */
@@ -299,16 +301,16 @@ static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word)
 
 /* One word from the device of channel ch to *word; returns the extra busy
    cycles. */
-static uint32_t dma_dev_read(schway *inst, uint32_t ch, uint32_t *word)
+static uint32_t dma_dev_read(schway *inst, uint32_t ch, uint32_t *word, uint64_t tick)
 {
-    (void)inst;
     switch (ch) {
     case 0u: /* MDEC in */
         return dma_stub_source(word);
     case 1u: /* MDEC out */
         return dma_stub_source(word);
     case 2u: /* GPU */
-        return dma_stub_source(word);
+        *word = schway__gpu_dma_read(inst, tick);
+        return 0u;
     case 3u: /* CD-ROM */
         return dma_stub_source(word);
     case 4u: /* SPU */
@@ -326,7 +328,7 @@ static uint32_t dma_dev_read(schway *inst, uint32_t ch, uint32_t *word)
    The address wraps at 24 bits (FFFFFCh to 0 and back); a word whose address
    is past the RAM window is dropped when it is written and reads 0. Returns
    the extra cycles the device asked for. */
-static uint64_t dma_move(schway *inst, uint32_t ch, uint32_t n)
+static uint64_t dma_move(schway *inst, uint32_t ch, uint32_t n, uint64_t tick)
 {
     struct schway__dma *d = &inst->dma;
     uint32_t addr = d->madr[ch] & 0xFFFFFCu;
@@ -337,9 +339,9 @@ static uint64_t dma_move(schway *inst, uint32_t ch, uint32_t n)
         uint32_t word = 0u;
         if (from_ram != 0u) {
             (void)schway__bus_ram_word(inst, addr, &word, 0u);
-            extra += dma_dev_write(inst, ch, word);
+            extra += dma_dev_write(inst, ch, word, tick);
         } else {
-            extra += dma_dev_read(inst, ch, &word);
+            extra += dma_dev_read(inst, ch, &word, tick);
             (void)schway__bus_ram_word(inst, addr, &word, 1u);
         }
         addr = (addr + step) & SCHWAY__DMA_MADR_MASK;
@@ -356,7 +358,7 @@ static uint64_t dma_move(schway *inst, uint32_t ch, uint32_t n)
    left in MADR (psx-spx, DMA Channels, Linked List). The header is not sent.
    Returns the cycles the node takes: the header fetch and setup, then its
    words. remain says whether a node follows: 1, or 0 for the end. */
-static uint64_t dma_list_node(schway *inst, uint32_t ch)
+static uint64_t dma_list_node(schway *inst, uint32_t ch, uint64_t tick)
 {
     struct schway__dma *d = &inst->dma;
     uint32_t addr = d->madr[ch] & 0xFFFFFCu;
@@ -368,7 +370,7 @@ static uint64_t dma_list_node(schway *inst, uint32_t ch)
     for (uint32_t i = 1u; i <= count; i++) {
         uint32_t word = 0u;
         (void)schway__bus_ram_word(inst, (addr + 4u * i) & 0xFFFFFCu, &word, 0u);
-        extra += dma_dev_write(inst, ch, word);
+        extra += dma_dev_write(inst, ch, word, tick);
     }
     d->madr[ch] = next;
     d->remain[ch] = (next & 0x800000u) != 0u ? 0u : 1u;
@@ -414,6 +416,7 @@ static void dma_start(schway *inst, uint64_t t)
     uint32_t n = d->bcr[ch] & 0xFFFFu;
     n = n == 0u ? SCHWAY__DMA_UNIT_WORDS_MAX : n;
     d->chcr[ch] &= ~DMA_CHCR_TRIGGER;
+    d->cur = ch;
     if (ch == DMA_OTC) {
         d->remain[ch] = 0u;
         cost = dma_otc_unit(inst);
@@ -430,7 +433,7 @@ static void dma_start(schway *inst, uint64_t t)
             d->remain[ch]--;
         }
         d->dreq &= ~(UINT32_C(1) << ch);
-        cost = dma_cost(ch, n) + DMA_BLOCK_OVERHEAD + dma_move(inst, ch, n);
+        cost = dma_cost(ch, n) + DMA_BLOCK_OVERHEAD + dma_move(inst, ch, n, t);
     } else if (((d->chcr[ch] >> 9) & 3u) == 2u) {
         /* Linked list: one node per unit, counted from the start of the
            transfer. */
@@ -438,7 +441,7 @@ static void dma_start(schway *inst, uint64_t t)
             d->nodes_done = 0u;
         }
         d->nodes_done++;
-        cost = dma_list_node(inst, ch);
+        cost = dma_list_node(inst, ch, t);
     } else if ((d->chcr[ch] & DMA_CHCR_CHOP) != 0u) {
         /* Sync mode 0 chopped: BCR's low half words go in windows of 2^n
            words, CHCR bits 16-18, with a CPU window after each but the last;
@@ -451,14 +454,13 @@ static void dma_start(schway *inst, uint64_t t)
             window = d->remain[ch];
         }
         d->remain[ch] -= window;
-        cost = dma_cost(ch, window) + DMA_WINDOW_OVERHEAD + dma_move(inst, ch, window);
+        cost = dma_cost(ch, window) + DMA_WINDOW_OVERHEAD + dma_move(inst, ch, window, t);
     } else {
         /* Sync mode 0: one burst of BCR's low half words. */
         d->remain[ch] = 0u;
-        cost = dma_cost(ch, n) + dma_move(inst, ch, n);
+        cost = dma_cost(ch, n) + dma_move(inst, ch, n, t);
     }
     d->phase[ch] = DMA_PH_UNIT;
-    d->cur = ch;
     d->busy_until = t + cost;
 }
 
@@ -506,8 +508,8 @@ static void dma_finish(schway *inst, uint32_t ch, uint64_t t, uint64_t now)
             d->cur = SCHWAY__DMA_NONE;
         } else {
             uint64_t until = t + dma_gap(d, ch);
-            if (((d->chcr[ch] >> 9) & 3u) == 2u && d->nodes_done % SCHWAY__DMA_NODES_MAX == 0u &&
-                until <= now) {
+            if (((d->chcr[ch] >> 9) & 3u) == 2u &&
+                d->nodes_done % SCHWAY__DMA_NODES_MAX == 0u && until <= now) {
                 until = now + 1u;
             }
             d->phase[ch] = DMA_PH_GAP;
