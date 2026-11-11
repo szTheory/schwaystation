@@ -15,3 +15,8 @@ schway_add_test(NAME card.protocol.read
 schway_add_test(NAME card.protocol.read_edges
   COMMAND schwaystation-test-card protocol_read_edges
   LABELS card portable TIMEOUT 10)
+
+# Fault prevented: card writes become visible before their successful terminal byte.
+schway_add_test(NAME card.protocol.write_commit
+  COMMAND schwaystation-test-card protocol_write_commit
+  LABELS card portable TIMEOUT 10)
