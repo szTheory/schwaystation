@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 32 of 50
+current_plan: 32 of 51
 status: executing
-stopped_at: Completed 04-50-PLAN.md
-last_updated: "2026-11-11T20:50:49.733Z"
+stopped_at: ATTR readback boot blocker isolated; source-owned plan 04-51 ready
+last_updated: "2026-11-11T21:15:54Z"
 last_activity: 2026-11-11
-last_activity_desc: Implemented the exact POST byte compatibility fix; actual shell acceptance remains pending
-state_head: f28443b0e1756c3e94866b5dad411812be86986a
+last_activity_desc: Planned exact ATTR control/state readback before real shell acceptance
+state_head: e8268569dab7aa25a9ba0ce46a70e07339233ffe
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 118
+  total_plans: 119
   completed_plans: 99
   percent: 50
 ---
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 32 of 50
-Status: Plan 04-50 is complete; 04-40 still requires actual shell inspection and portable frame/hash acceptance.
-Last activity: 2026-11-11 — Removed only the diagnosed POST byte fault; no shell frame/hash accepted.
+Current Plan: 32 of 51
+Status: Source-owned plan 04-51 is next ready; 04-40 still requires actual recognizable shell and portable frame acceptance.
+Last activity: 2026-11-11 — Added focused ATTR readback/state plan from actual boot evidence; no shell hash accepted.
 
 Progress: [█████░░░░░] 50%
 
@@ -488,10 +488,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-plan 04-50 | Codex, OpenGSD 1.20.0; sequential executor, source-specific POST bus fix, RED/GREEN, full CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | Phase 04 source-owned ATTR first-caller planning | Codex, OpenGSD 1.20.0; minimal bus/reset/state ownership and primary-source review; planning-only ordering/coverage update | gpt-6.1-sol high |
+
 ## Session Continuity
 
-Last session: 2026-11-11T20:50:49.283Z
-Stopped at: Completed 04-50-PLAN.md
+Last session: 2026-11-11T21:15:54Z
+Stopped at: Source-owned plan 04-51 ready for independent check; 04-40 waits
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
