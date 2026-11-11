@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 27 of 49
+current_plan: 28 of 49
 status: executing
-stopped_at: Completed 04-38-PLAN.md in 51min; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; final CI and hygiene passed
-last_updated: "2026-11-11T15:10:22.854Z"
+stopped_at: Completed 04-21-PLAN.md in 44min; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; final CI and hygiene passed
+last_updated: "2026-11-11T15:55:23.759Z"
 last_activity: 2026-11-11
-last_activity_desc: Completed Phase 04 plan 04-38 with BIOS recognition from pinned DAT MD5 rows; final CI and hygiene passed
-state_head: bce177bbcc36d39b50230b5e6aba8cbceae17702
+last_activity_desc: Completed Phase 04 plan 04-21 with release firmware scanning and synthetic-key isolation; final CI and hygiene passed
+state_head: ce2dcb13fc5a33c0e7ca1f1c3c56f1a17201cfa4
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 94
+  completed_plans: 95
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 27 of 49
-Status: Plan 04-38 complete; refresh the ready-plan index before the next dispatch.
-Last activity: 2026-11-11 — BIOS recognition from pinned DAT MD5 rows completed; final CI and hygiene passed.
+Current Plan: 28 of 49
+Status: Plan 04-21 complete; refresh the ready-plan index before the next dispatch.
+Last activity: 2026-11-11 — Release firmware scanning and synthetic-key isolation completed; final CI and hygiene passed.
 
 Progress: [█████░░░░░] 50%
 
@@ -155,6 +155,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P20 | 40min | 2 tasks | 21 files |
 | Phase 04 P37 | 49min | 2 tasks | 6 files |
 | Phase 04 P38 | 51min | 2 tasks | 14 files |
+| Phase 04 P21 | 44min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -350,6 +351,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Normalize formatted blank-card sector value A0h to visible slot counters 1 and 2, then increment each saved slot independently.
 - [Phase 04]: Wait for 117 guest VBlanks so the mailbox and selected frame-120 capture complete under the runner's 120-frame cap.
 - [Phase 04]: BIOS recognition matches the pinned DAT MD5 rows; SHA-1 remains metadata, public SHA-256 is independent, and unknown images stay loadable.
+- [Phase 04]: Keep firmware-size and content-marker checks inside the existing release firmware scanner gate.
+- [Phase 04]: Generate synthetic digest keys and content-marker samples only in build-directory fixtures.
 
 ### Pending Todos
 
@@ -461,10 +464,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-37 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; guest card persistence, full CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-21 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; firmware scanner and archive controls, full CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T15:10:22.126Z
-Stopped at: Completed 04-38-PLAN.md in 51min; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; final CI and hygiene passed
+Last session: 2026-11-11T15:55:23.480Z
+Stopped at: Completed 04-21-PLAN.md in 44min; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; final CI and hygiene passed
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
