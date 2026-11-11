@@ -40,5 +40,6 @@ in 10 seconds. Preserve the existing at-least-three-minute fix at the first phas
 
 The nofp job now has a three-minute floor with the slow-checkout/image-startup reason beside it. The fix was
 verified in hosted run [42980564011](https://github.com/szTheory/schwaystation/actions/runs/42980564011); both
-Linux nofp legs passed in 9 and 19 seconds. The two earlier cancellations and the isolated successful rerun are
-preserved above.
+Linux nofp legs passed in 9 and 19 seconds. They passed again in the final full control/head run
+[42985306022](https://github.com/szTheory/schwaystation/actions/runs/42985306022). The two earlier cancellations
+and the isolated successful rerun are preserved above.

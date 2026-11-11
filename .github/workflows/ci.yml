@@ -376,7 +376,7 @@ jobs:
     needs: changes
     if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 6  # 6-minute floor; workflow_dispatch perf took 4m59 in run 42980564011 before adding the control build
+    timeout-minutes: 5  # 5-minute floor (apt); perf took 1m15 and 1m39 in runs 42984345515 and 42985306022, provisional
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}

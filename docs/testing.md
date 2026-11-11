@@ -363,11 +363,19 @@ no `perf` preset. An empty or non-numeric measurement is an input error, never a
 **Gate mode.** CI sets `SCHWAYSTATION_PERF_MODE` to `gate`: `FAIL`, `UNSTABLE` and `NO_BASE` exit 1. The script
 also accepts `report`, which prints the verdict and exits 0; bad input always fails. A manual run without inputs
 measures both fixtures three times and reports their spread. A manual run with `control_ref` set to a full commit
-SHA compares both fixtures on the current commit with that exact control, which permits collecting the first
-control/head comparison before arming a new fixture. On control commit `c87f40b`, run 42980564011 measured
-`gpu_motion` at 137,678,337 instructions per frame on all three repeats (spread 0); the test-card control was
-1,620,845 on all three repeats (spread 0). The run is at
-[Actions run 42980564011](https://github.com/szTheory/schwaystation/actions/runs/42980564011).
+SHA compares both fixtures on the current commit with that exact control. Before arming the GPU-motion row, run
+42980564011 measured control commit `c87f40b` at 137,678,337 instructions per frame on all three GPU-motion
+repeats (spread 0), and 1,620,845 on all three test-card repeats (spread 0). With the shorter GPU-motion window,
+control run 42984345515 measured 137,678,369 on three repeats (spread 0). The final comparison run 42985306022
+compared head `3bb84fa` against control `045b76a`:
+
+```text
+perf testcard head=1620845 base=1620845 delta_bp=0 verdict=PASS
+perf gpu_motion head=137678369 base=137678369 delta_bp=0 verdict=PASS
+```
+
+The `perf` job took 1m39; `be32` was the slowest required job at 4m20, and the complete workflow took 4m48. The
+comparison is at [Actions run 42985306022](https://github.com/szTheory/schwaystation/actions/runs/42985306022).
 
 **Exceptions.** A pull request that must be slower adds a line to `tests/perf/allow.txt`:
 `<fixture> <max % × 100> <expiry YYYY-MM-DD> <reason>`. It raises that fixture's limit through its expiry, at most
@@ -381,7 +389,7 @@ The `nofp` job has a three-minute floor because its one-minute timeout cancelled
 while hosted checkouts/images were starting: runs [42840838785](https://github.com/szTheory/schwaystation/actions/runs/42840838785)
 and [42841474140](https://github.com/szTheory/schwaystation/actions/runs/42841474140). The release commit then passed
 on `main` in 9 seconds and an isolated rerun passed in 10 seconds, confirming that the cancellation was startup
-contention rather than a core failure.
+contention rather than a core failure. Both no-fp legs passed again in the final hosted run above.
 
 ## CI jobs
 
