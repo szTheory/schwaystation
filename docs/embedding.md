@@ -5,8 +5,8 @@ through the allocator you pass, keeps all state in the instance, starts no threa
 and uses no floating point. It needs nothing from the C library beyond `memcpy`, `memmove`, `memset` and `memcmp`.
 Two instances in one process share nothing, so a host may run several side by side.
 
-This release shows the built-in test card: it loads no BIOS or disc yet. A PS-EXE can be loaded into RAM (see
-"Loading a PS-EXE"), but nothing runs it yet.
+With no host-supplied BIOS or PS-EXE, an instance shows the built-in test card. A host may load a BIOS or PS-EXE
+before execution. The core opens no files; the host supplies BIOS bytes through the API.
 
 ## Getting it
 
@@ -187,8 +187,8 @@ wrap, the call returns `SCHWAY_STOP_BUDGET` at that limit. The result says which
 | `SCHWAY_STOP_FAULT` | 5 | `SCHWAY_RUN_STOP_ON_FAULT` is set and a fault is latched, or the guest double-faulted at an exception vector |
 
 Values 3 and 6 are not used. A loaded-content call is bounded by one maximum regional field interval plus the existing
-instruction overrun. With a program loaded a run stops at the first instruction boundary at or after the budget or the
-field wrap, so `ticks` can pass either by the rest of one instruction (see
+instruction overrun. With a BIOS or program loaded, a run stops at the first instruction boundary at or after the
+budget or field wrap, so `ticks` can pass either by the rest of one instruction (see
 [the CPU page](hardware/cpu.md)).
 
 - `max_cycles` 0 returns `SCHWAY_STOP_BUDGET` and changes nothing, the profile lock included.
@@ -197,9 +197,10 @@ field wrap, so `ticks` can pass either by the rest of one instruction (see
   cycle runs. The second is [the trace](#the-trace).
 - `schway_run_frame` is the same advance with no caller limit. After a budgeted run it finishes the current field, unless
   repeated GPU resets reach the independent call bound first.
-- A stopped run resumes where it stopped. With no program loaded, running N cycles and then M leaves exactly what
-  N + M cycles leave: the same state bytes, frame, ticks and audio pairs. With one loaded the same holds where N is
-  an instruction boundary the one-shot run passes through, for instance where a run of the same budget stopped.
+- A stopped run resumes where it stopped. With no BIOS or program loaded, running N cycles and then M leaves exactly
+  what N + M cycles leave: the same state bytes, frame, ticks and audio pairs. With a BIOS or program loaded, the same
+  holds where N is an instruction boundary the one-shot run passes through, for instance where a run of the same
+  budget stopped.
 - In the result, `exit_code` is the code a guest asks to stop with (0 until one does) and `fault_present` is 1 once a
   fault is latched; `schway_run_frame` fills both too.
 - A run that would pass the save format's limits (see Running) returns `SCHWAY_STATUS_ERR_STATE_FIELD` and changes
@@ -336,6 +337,22 @@ An empty text is accepted. A stack address of 0 is accepted with any size.
 - `lint` is a set of notes, never a refusal: `SCHWAY_EXE_LINT_LOW_64K` (the text starts in the kernel's low 64 KiB)
   and `SCHWAY_EXE_LINT_TRAILING` (bytes follow the text).
 
+## Loading a BIOS
+
+`schway_load_bios` accepts exactly `SCHWAY_BIOS_SIZE` bytes (524,288). It copies them into the instance before guest
+execution starts, so the caller may change or release its input buffer after the call. Any exact-size image is
+loadable, including an unknown image or OpenBIOS; a file name does not establish identity. A null pointer, wrong
+size, or load after a PS-EXE or guest execution returns `SCHWAY_STATUS_ERR_ARGUMENT` without changing the current
+BIOS. A power reset preserves the loaded image and starts the CPU again at `BFC00000h`.
+
+`schway_get_bios_info` reports `SCHWAY_BIOS_INFO_LOADED` and the image's SHA-256 in `sha256`. If no host image was
+loaded, `flags` is zero and the digest bytes are zero; the built-in PS-EXE stub is not reported as a loaded BIOS.
+SHA-256 is the image's identity digest. Retail recognition is a separate result based on the MD5 and SHA-1 rows
+in [ASSET_POLICY.md](../ASSET_POLICY.md); the core does not derive a SHA-256 value from those digests.
+
+BIOS bytes are not included in ordinary save states. A state stores the loaded-image flag and SHA-256 identity, and
+`schway_load_state` refuses a state made with a different BIOS before changing the instance.
+
 ## Profile flags
 
 `schway_profile.flags` is the second profile field, after `region`. A caller whose struct ends before it gets no
@@ -371,9 +388,10 @@ reset. Copy data you need before destroying the instance.
 `schway_get_memory` exposes read-only spans selected by `SCHWAY_MEMORY_RAM`, `SCHWAY_MEMORY_SCRATCHPAD`,
 `SCHWAY_MEMORY_VRAM`, `SCHWAY_MEMORY_BIOS`, `SCHWAY_MEMORY_CARD1` or `SCHWAY_MEMORY_CARD2`. It returns the
 instance's 2 MiB RAM, 1 KiB scratchpad, 1 MiB VRAM, current BIOS image or one of two 131,072-byte card images.
-Each pointer remains stable for the instance lifetime. RAM, scratchpad and VRAM contents change as the core runs;
-card pointers and bytes remain stable across reads, state loads and power resets. `schway_get_vram` remains a
-convenience accessor for the VRAM span.
+RAM, scratchpad, VRAM and card pointers remain stable for the instance lifetime. The BIOS span initially names the
+built-in PS-EXE stub; after a host BIOS is loaded it names the instance's copied image and stays stable through
+resets. RAM, scratchpad and VRAM contents change as the core runs; card pointers and bytes remain stable across
+reads, state loads and power resets. `schway_get_vram` remains a convenience accessor for the VRAM span.
 
 Cards start as formatted blank images. Before execution, a host can import a raw image up to 131,072 bytes.
 Short images are padded with `FFh` through the end of the card, as required for an unallocated raw card area:
@@ -482,9 +500,9 @@ built with), `abi`, `behaviour_revision` (raised when the same inputs give diffe
 `state_format`.
 
 `SCHWAY_API_VERSION` is 4. A version only adds names, so a program built against an earlier header runs unchanged.
-Version 3 added `SCHWAY_FAULT_DMA`; version 4 added read-only `schway_span` memory views, card loading and card
-generation queries. A program that switches on the fault kind should treat a value it does not know as a fault it
-cannot name.
+Version 3 added `SCHWAY_FAULT_DMA`; version 4 adds read-only `schway_span` memory views, card loading and card
+generation queries, plus copied BIOS loading and SHA-256 reporting. A program that switches on the fault kind should
+treat a value it does not know as a fault it cannot name.
 
 ## The test card
 

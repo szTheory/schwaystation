@@ -140,7 +140,7 @@ struct schway {
     uint16_t vram[SCHWAY__VRAM_H][SCHWAY__VRAM_W];
     uint8_t *video_scanout; /* Trailing derived host view; outside serialized machine state. */
     uint32_t profile_flags;     /* the profile's flags, bit 0 the debug port */
-    uint32_t exe_loaded;        /* 1 after a PS-EXE was side-loaded */
+    uint32_t exe_loaded;        /* 1 when BIOS or PS-EXE execution is enabled */
     struct schway__cpu cpu;
     struct schway__gpu gpu;
     struct schway__gte gte;
@@ -345,6 +345,7 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__VIDEO_SIZE_FIRST ((uint32_t)(80 + 2 * SCHWAY__P))
 #define SCHWAY__AUDIO_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__EXE_INFO_SIZE_FIRST 56u
+#define SCHWAY__BIOS_INFO_SIZE_FIRST 40u
 #define SCHWAY__FAULT_SIZE_FIRST 56u
 #define SCHWAY__TTY_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__TRACE_SIZE_FIRST 64u
@@ -359,6 +360,9 @@ _Static_assert(SCHWAY__BUDGET_SIZE_FIRST == sizeof(schway_budget), "budget first
 _Static_assert(SCHWAY__VIDEO_SIZE_FIRST == sizeof(schway_video), "video first size");
 _Static_assert(SCHWAY__AUDIO_SIZE_FIRST == sizeof(schway_audio), "audio first size");
 _Static_assert(SCHWAY__EXE_INFO_SIZE_FIRST == sizeof(schway_exe_info), "exe_info first size");
+_Static_assert(SCHWAY__BIOS_INFO_SIZE_FIRST == sizeof(schway_bios_info), "bios_info first size");
+_Static_assert(offsetof(schway_bios_info, flags) == 4, "bios_info.flags");
+_Static_assert(offsetof(schway_bios_info, sha256) == 8, "bios_info.sha256");
 _Static_assert(SCHWAY__FAULT_SIZE_FIRST == sizeof(schway_fault), "fault first size");
 _Static_assert(SCHWAY__TTY_SIZE_FIRST == sizeof(schway_tty), "tty first size");
 _Static_assert(SCHWAY__TRACE_SIZE_FIRST == sizeof(schway_trace), "trace first size");

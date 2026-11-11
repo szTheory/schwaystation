@@ -27,7 +27,7 @@ void schway__frame_gpu_wrap(schway *inst)
     inst->frame_end += (inst->tick_acc + num) / den;
 }
 
-/* Keep the saved-state horizon valid when GP1 restarts a loaded game's beam.
+/* Keep the saved-state horizon valid when GP1 restarts a guest's beam.
    Each public call still keeps a separate, immutable deadline. */
 void schway__frame_gpu_reset(schway *inst, uint64_t tick)
 {
@@ -56,10 +56,10 @@ static void audio_push_silence(schway *inst, uint32_t n)
    pair per 768-cycle boundary crossed. No-content calls stop at the synthetic
    frame_end and redraw the test card. Loaded content stops at the GPU field
    wrap, with an independent maximum-field call bound so video resets cannot
-   hold a host call forever. With no PS-EXE loaded no instruction runs,
-   so a stop at any cycle leaves the state a later stop would pass through and
-   N cycles then M equal N + M. With one loaded the CPU runs instead and stops
-   at the first instruction boundary at or after the limit or the field wrap,
+   hold a host call forever. With neither a BIOS nor PS-EXE loaded no guest
+   instruction runs, so a stop at any cycle leaves the state a later stop would
+   pass through and N cycles then M equal N + M. With a BIOS or PS-EXE loaded,
+   the CPU stops at the first instruction boundary at or after the limit or the field wrap,
    so the advance can pass either by the rest of one instruction, and N cycles
    then M equal N + M only where N is a boundary of the one-shot run; a frame
    wrap passed inside an instruction completes at that instruction's end.

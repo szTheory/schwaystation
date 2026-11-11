@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 
+#include "bios.h"
 #include "schwaystation.h"
 
 struct schway__state_io;
@@ -66,6 +67,9 @@ enum schway__port {
 struct schway__bus {
     uint8_t ram[SCHWAY__RAM_SIZE];
     uint8_t scratch[SCHWAY__SCRATCH_SIZE];
+    uint8_t bios_storage[SCHWAY__BIOS_SIZE];
+    uint8_t bios_sha256[32];
+    uint32_t bios_loaded;
     uint32_t memctl[SCHWAY__MEMCTL_REGS];
     /* CPU cycles per port for {read8, read16, read32, write8, write16,
        write32}, derived from memctl and rebuilt by a delay-register write and

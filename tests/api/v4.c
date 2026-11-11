@@ -1,4 +1,4 @@
-/* API version 4 adds memory spans, memory-card loading and the GPU profile flag. */
+/* API version 4 adds memory spans, memory-card and BIOS loading, and GPU profile flags. */
 #include <stdlib.h>
 #include <string.h>
 

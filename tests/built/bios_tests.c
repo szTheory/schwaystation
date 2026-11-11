@@ -28,6 +28,18 @@ static void put_le32(uint8_t *dst, uint32_t value)
     dst[3] = (uint8_t)(value >> 24);
 }
 
+static uint8_t *make_rom(uint32_t marker)
+{
+    uint8_t *bytes = (uint8_t *)calloc(1u, SCHWAY_BIOS_SIZE);
+    if (bytes == NULL) {
+        return NULL;
+    }
+    put_le32(bytes, 0x3C090001u); /* LUI t1, 1 */
+    put_le32(bytes + 4u, 0x24080000u | (marker & 0xFFFFu)); /* ADDIU t0, zero, marker */
+    put_le32(bytes + 8u, 0xAD280000u); /* SW t0, 0(t1) */
+    return bytes;
+}
+
 static schway *new_instance(void)
 {
     schway_config config;
@@ -52,16 +64,12 @@ static void synthetic_rom(void)
     if (inst == NULL) {
         return;
     }
-    uint8_t *source = (uint8_t *)malloc(SCHWAY_BIOS_SIZE);
+    uint8_t *source = make_rom(42u);
     CHECK(source != NULL);
     if (source == NULL) {
         schway_destroy(inst);
         return;
     }
-    memset(source, 0, SCHWAY_BIOS_SIZE);
-    put_le32(source, 0x3C090001u); /* LUI t1, 1 */
-    put_le32(source + 4u, 0x2408002Au); /* ADDIU t0, zero, 42 */
-    put_le32(source + 8u, 0xAD280000u); /* SW t0, 0(t1) */
     CHECK_EQ_U64(schway_load_bios(inst, source, SCHWAY_BIOS_SIZE), SCHWAY_STATUS_OK);
 
     schway_bios_info info;
@@ -82,14 +90,20 @@ static void synthetic_rom(void)
     }
 
     CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
-    schway_budget budget = {(uint32_t)sizeof budget, 0u, 32u};
+    schway_budget budget = {(uint32_t)sizeof budget, SCHWAY_RUN_TRACE, 256u};
     schway_run_result result;
     memset(&result, 0, sizeof result);
     result.size = (uint32_t)sizeof result;
     CHECK_EQ_U64(schway_run(inst, &budget, &result), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    schway_trace trace;
+    memset(&trace, 0, sizeof trace);
+    trace.size = (uint32_t)sizeof trace;
+    CHECK_EQ_U64(schway_get_trace(inst, 0u, &trace), SCHWAY_STATUS_OK);
+    CHECK_EQ_HEX(trace.pc, 0xBFC00000u);
+    CHECK_EQ_HEX(trace.opcode, 0x3C090001u);
     uint32_t marker = 0u;
-    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 0x1000u, 4u, &marker),
+    CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 0x10000u, 4u, &marker),
                  SCHWAY_STATUS_OK);
     CHECK_EQ_U64(marker, 42u);
     schway_destroy(inst);

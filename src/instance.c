@@ -268,7 +268,7 @@ static void power_on(schway *inst)
         inst->bus.bios_size = schway__stub_kernel_size;
     }
     /* The profile, and its flags, survive a power reset. */
-    inst->exe_loaded = 0u;
+    inst->exe_loaded = inst->bus.bios_loaded;
     memset(&inst->fault, 0, sizeof inst->fault);
     memset(&inst->tty, 0, sizeof inst->tty);
     memset(&inst->trace, 0, sizeof inst->trace);

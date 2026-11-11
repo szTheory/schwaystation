@@ -13,6 +13,8 @@ static const char name_memctl[] = "bus.memctl";
 static const char name_ram_size[] = "bus.ram_size";
 static const char name_cache_ctrl[] = "bus.cache_ctrl";
 static const char name_unbuilt_n[] = "bus.unbuilt_n";
+static const char name_bios_loaded[] = "bus.bios.loaded";
+static const char name_bios_sha256[] = "bus.bios.sha256";
 static const char name_last_dev[] = "bus.last_unbuilt.dev";
 static const char name_last_addr[] = "bus.last_unbuilt.addr";
 static const char name_last_width[] = "bus.last_unbuilt.width";
@@ -120,9 +122,9 @@ void schway__bus_reset(schway *inst)
     memset(b->last_unbuilt, 0, sizeof b->last_unbuilt);
 }
 
-/* The counters and the last access are state, and the host's BIOS is not.
-   The device and width of the last access are bounded, so a state never
-   names a device the build does not know. */
+/* The counters and the last access are state. BIOS bytes remain host-owned;
+   a state stores and validates only the loaded-image identity. The device and
+   width of the last access are bounded, so a state never names an unknown device. */
 void schway__bus_state_io(struct schway__state_io *io, schway *inst)
 {
     struct schway__bus *b = &inst->bus;
@@ -131,6 +133,10 @@ void schway__bus_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u32_array(io, name_memctl, b->memctl, SCHWAY__MEMCTL_REGS, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_ram_size, &b->ram_size, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_cache_ctrl, &b->cache_ctrl, 0u, UINT32_MAX);
+    uint32_t bios_loaded = schway__state_u32(io, name_bios_loaded, &b->bios_loaded, 0u, 1u);
+    schway__state_check(io, bios_loaded == b->bios_loaded);
+    schway__state_match_u8_array(io, name_bios_sha256, b->bios_sha256,
+                                 (uint32_t)sizeof b->bios_sha256);
     schway__state_u32_array(io, name_unbuilt_n, b->unbuilt_n, SCHWAY__DEV_COUNT, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_last_dev, &b->last_unbuilt[0], 0u, SCHWAY__DEV_COUNT - 1u);
     (void)schway__state_u32(io, name_last_addr, &b->last_unbuilt[1], 0u, UINT32_MAX);
