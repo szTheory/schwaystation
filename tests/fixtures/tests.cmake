@@ -106,21 +106,65 @@ if(CMAKE_SCRIPT_MODE_FILE)
   elseif(CASE STREQUAL "memcard_roundtrip")
     file(REMOVE_RECURSE "${OUT}")
     file(MAKE_DIRECTORY "${OUT}")
-    execute_process(COMMAND ${RUN} --exe "${IMAGE}" --frames 120 --save-dir "${OUT}"
-        --png "120:${OUT}/first.png" --hash
-      RESULT_VARIABLE rc OUTPUT_VARIABLE first ERROR_VARIABLE first_err)
-    if(NOT rc STREQUAL "0")
-      message(FATAL_ERROR "first fresh memcard process failed: ${first}${first_err}")
+    function(run_memcard_guest profile name directory out_hash)
+      set(capture "${directory}/${name}.txt")
+      execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=memcard_roundtrip
+          -DIMAGE=${IMAGE} -DFRAMES=120 -DPROFILE=${profile}
+          "-DFLAGS=--save-dir ${directory} --hash --png 120:${directory}/${name}.png"
+          -DCSV=${CSV} -DCAPTURE=${capture} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
+          -P ${CMAKE_CURRENT_LIST_FILE}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE judge_out ERROR_VARIABLE judge_err)
+      if(NOT rc STREQUAL "0")
+        message(FATAL_ERROR "memcard ${name} mailbox judge failed: ${judge_out}${judge_err}")
+      endif()
+      file(READ "${capture}" report)
+      if(report MATCHES "bad frame checksums")
+        message(FATAL_ERROR "memcard ${name} imported an invalid persisted frame:\n${report}")
+      endif()
+      string(REGEX MATCH "frame 120 sha256 ([0-9a-f]+)" frame_line "${report}")
+      if(frame_line STREQUAL "")
+        message(FATAL_ERROR "memcard ${name} did not print its frame-120 hash:\n${report}")
+      endif()
+      string(REGEX REPLACE ".*sha256 " "" frame_hash "${frame_line}")
+      if(name STREQUAL "first")
+        set(expected_hash "c532f85314c83a974466042df32a03ef7ce02ce8aea7c386843e44242d027a99")
+      elseif(name STREQUAL "second")
+        set(expected_hash "cd1c037ef800397a9c95eb23ebc5524710f55db2eca8e03c975f841f0e9232db")
+      endif()
+      if(DEFINED expected_hash AND NOT frame_hash STREQUAL expected_hash)
+        message(FATAL_ERROR "memcard ${name} frame-120 hash is ${frame_hash}, expected ${expected_hash}")
+      endif()
+      set(${out_hash} "${frame_hash}" PARENT_SCOPE)
+    endfunction()
+    function(check_memcard_value path value label)
+      if(NOT EXISTS "${path}")
+        message(FATAL_ERROR "${label} card image was not persisted: ${path}")
+      endif()
+      file(SIZE "${path}" card_size)
+      if(NOT card_size EQUAL 131072)
+        message(FATAL_ERROR "${label} card image has ${card_size} bytes, expected 131072")
+      endif()
+      file(READ "${path}" card_value LIMIT 1 OFFSET 128 HEX)
+      string(TOLOWER "${card_value}" card_value)
+      if(NOT card_value STREQUAL value)
+        message(FATAL_ERROR "${label} sector-1 counter is ${card_value}, expected ${value}")
+      endif()
+      file(READ "${path}" frame_checksum LIMIT 1 OFFSET 255 HEX)
+      string(TOLOWER "${frame_checksum}" frame_checksum)
+      if(NOT frame_checksum STREQUAL value)
+        message(FATAL_ERROR "${label} sector-1 frame checksum is ${frame_checksum}, expected ${value}")
+      endif()
+    endfunction()
+    run_memcard_guest(first first "${OUT}" first_hash)
+    check_memcard_value("${OUT}/memcard_roundtrip.srm" "01" "first-process card 1")
+    check_memcard_value("${OUT}/memcard_roundtrip.1.mcr" "02" "first-process card 2")
+    run_memcard_guest(second second "${OUT}" second_hash)
+    check_memcard_value("${OUT}/memcard_roundtrip.srm" "02" "second-process card 1")
+    check_memcard_value("${OUT}/memcard_roundtrip.1.mcr" "03" "second-process card 2")
+    if(first_hash STREQUAL second_hash)
+      message(FATAL_ERROR "fresh card values 1/2 and 2/3 produced the same frame-120 hash")
     endif()
-    if(NOT EXISTS "${OUT}/memcard_roundtrip.srm")
-      message(FATAL_ERROR "first fresh process did not persist the card value read through SIO0")
-    endif()
-    execute_process(COMMAND ${RUN} --exe "${IMAGE}" --frames 120 --save-dir "${OUT}"
-        --png "120:${OUT}/second.png" --hash
-      RESULT_VARIABLE rc OUTPUT_VARIABLE second ERROR_VARIABLE second_err)
-    if(NOT rc STREQUAL "0")
-      message(FATAL_ERROR "second fresh memcard process failed: ${second}${second_err}")
-    endif()
+    message(STATUS "memcard frame-120 hashes: first=${first_hash} second=${second_hash}")
   elseif(CASE STREQUAL "pad_counter_press60")
     file(MAKE_DIRECTORY "${OUT}")
     file(WRITE "${OUT}/pad-counter-none.inputs"
@@ -537,7 +581,8 @@ schway_add_test(NAME fixtures.pad_counter.press60
 schway_add_test(NAME fixtures.memcard_roundtrip.persistence
   COMMAND ${CMAKE_COMMAND} -DCASE=memcard_roundtrip -DOUT=${PROJECT_BINARY_DIR}/tests/memcard-roundtrip
     -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/memcard_roundtrip.exe
-    -DRUN=$<TARGET_FILE:schwaystation-run>
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 120)
 

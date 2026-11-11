@@ -153,3 +153,13 @@ pad_counter_single,pixel_last,ntsc-u,0000001f,doc,docs/hardware/gpu.md last pixe
 pad_counter_three_edges,presses,ntsc-u,00000003,doc,docs/hardware/sio.md three released Cross presses at frames 60 120 and 180
 pad_counter_three_edges,pixel0,ntsc-u,0000001f,doc,docs/hardware/gpu.md first flat red RGB555 counter pixel
 pad_counter_three_edges,pixel_last,ntsc-u,0000001f,doc,docs/hardware/gpu.md third counter pixel is red after three edges
+memcard_roundtrip,card1,first,00000001,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,card2,first,00000002,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,pixel1,first,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel1_last,first,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel2_last,first,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,card1,second,00000002,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,card2,second,00000003,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,pixel1,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel1_last,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel2_last,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline

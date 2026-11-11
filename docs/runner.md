@@ -101,6 +101,11 @@ unchanged slot is not replaced. Files are written through an exclusive sibling t
 replaced. A failed import or save returns status 1; a failed save preserves the previous destination. SIGINT or
 SIGTERM still finishes the current frame and flushes completed writes before returning status 0.
 
+The `memcard_roundtrip` fixture verifies this path with fresh runner processes. From an empty save directory,
+the first process reads and writes card 1 value 1 and independent card 2 value 2; a second process reads them
+back and writes 2 and 3. The frame-120 hashes must differ, and the guest mailbox checks the counters and red
+RGB555 pixels read back from VRAM. Card images and PNGs are generated only in the build tree.
+
 ## Shared host memory-card file behavior
 
 The shared host helper imports raw memory-card images from 1 to 131,072 bytes and pads short raw images with `FFh`
