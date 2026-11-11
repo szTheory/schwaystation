@@ -5,7 +5,7 @@ priority: P3
 source: "phase 03 discussion, decision on the performance gate"
 created: 2026-11-10
 theme: perf
-bound_step: "phase 4, the plan that lands the gpu_motion fixture"
+bound_step: "phase 04-13, measure gpu_motion CPU/GPU instructions per frame against a control and arm the separate ceiling"
 ---
 
 ## Goal
@@ -19,8 +19,8 @@ the CPU loop, the GTE or the DMA engine moves a number the gate watches.
   (1,620,424 instructions per frame at the phase 1 pin; plan 03-03 moved it to 1,620,545 with the scheduler).
 - Phase 3 changed `cpu_run` and re-measured the gate once; it added no gate of its own and recorded one `--bench`
   wall-clock run of a looping `gte_vectors`.
-- Bound to phase 4: the plan that lands the `gpu_motion` fixture, the first fixture that runs the CPU every frame
-  and so can carry a second Ir ceiling.
+- Plan 04-12 lands `gpu_motion`; plan 04-13 measures its CPU/GPU instructions per frame against an actual control
+  and closes this todo with the command, exit status and hosted run URL.
 
 ## Acceptance Criteria
 
