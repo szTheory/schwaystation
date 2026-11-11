@@ -7,3 +7,4 @@ built.bios.test_key_isolation	bios,portable
 built.openbios.digest	bios,portable
 built.openbios.digest_corrupt	bios,portable
 built.openbios.handoff	bios,portable
+built.openbios.handoff_corruption	bios,portable

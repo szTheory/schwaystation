@@ -93,3 +93,11 @@ schway_add_test(NAME built.openbios.handoff
     "-DEXPECTED_FILE=${openbios_handoff_expected}"
     -P ${PROJECT_SOURCE_DIR}/cmake/OpenBIOS.cmake
   LABELS bios portable TIMEOUT 10)
+
+# Fault prevented: corrupted or missing handoff data being treated as firmware.
+schway_add_test(NAME built.openbios.handoff_corruption
+  COMMAND ${CMAKE_COMMAND} "-DOPENBIOS_INPUT=${openbios_handoff_input}"
+    "-DEXPECTED_FILE=${openbios_handoff_expected}"
+    "-DOPENBIOS_CHECK_SCRIPT=${PROJECT_SOURCE_DIR}/cmake/OpenBIOS.cmake"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/openbios_handoff_corruption.cmake
+  LABELS bios portable TIMEOUT 10)

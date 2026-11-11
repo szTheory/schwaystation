@@ -51,7 +51,10 @@ register sweeps of `gte` and `dma` (`gte.regs.sweep`, `dma.regs.sweep`) are the 
 The required CI run builds the pinned OpenBIOS shell once, checks its size and SHA-256 before uploading it as the
 `openbios-handoff` Actions artifact, then makes each applicable build lane download that artifact from the same
 run. The registered `built.openbios.handoff` test checks the expected digest in every consumer before the runner
-uses the image. The artifact expires after one day and is never cached across runs. Packaging installs only the
+uses the image. `built.openbios.handoff_corruption` verifies that a changed or missing consumer copy is refused;
+`built.openbios.digest_corrupt` also checks a same-size digest mismatch. Local or build-only configurations without
+a handoff use the generated test fixture, while consumer jobs verify the downloaded file before configuring tests.
+The artifact expires after one day and is never cached across runs. Packaging installs only the
 library, runner and libretro components; release collection downloads only `archives-*`, so the firmware does not
 enter a package or publication artifact. A transfer or digest failure is an infrastructure failure, not an
 emulation result.
