@@ -1,5 +1,9 @@
 fixture,test,profile,expected,source,citation
 # The nth row of a fixture judges the mailbox record with id n, expected is a hex value or lo..hi. A line that starts with # is a comment.
+pad_counter_none,presses,ntsc-u,00000000,doc,docs/hardware/sio.md digital poll with no Cross input
+pad_counter_none,pixel0,ntsc-u,00000000,doc,docs/hardware/gpu.md one-pixel VRAM readback from untouched counter origin
+pad_counter_press60,presses,ntsc-u,00000001,doc,docs/hardware/sio.md active-low Cross snapshot at frame 60
+pad_counter_press60,pixel0,ntsc-u,0000001f,doc,docs/hardware/gpu.md flat red RGB555 counter pixel after one Cross edge
 exc_matrix,syscall_cause,*,00000020,doc,psx-spx CPU Specifications: COP0 exception handling (ExcCode 08h Syscall with BD and BT clear)
 exc_matrix,syscall_epc,*,00000000,doc,psx-spx CPU Specifications: COP0 exception handling (EPC is the address of the SYSCALL itself)
 exc_matrix,syscall_bd_cause,*,C0000020,doc,psx-spx CPU Specifications: COP0 exception handling (ExcCode 08h with BD set and BT set for a taken branch)

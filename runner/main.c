@@ -696,6 +696,7 @@ static int run(const options *opt)
     tty.len = 0u;
     /* Only schway_run_frame is timed, not hashing or writing files. */
     uint32_t ran = 0;
+    uint32_t lag_frames = 0u;
     uint32_t exit_code = 0u; /* the byte the guest wrote to the exit port */
     int ended = 0;           /* the loop ended before the frame cap, by a stop of any kind */
     int faulted = 0;         /* the core stopped the run on the program's first fault */
@@ -726,6 +727,9 @@ static int run(const options *opt)
         st = opt->exe != NULL ? schway_run(inst, &budget, &res) : schway_run_frame(inst, &res);
         if (opt->bench) {
             samples[ran] = schway__bench_us(schway__clock_ns() - start_ns);
+        }
+        if (st == SCHWAY_STATUS_OK && opt->inputs != NULL && res.lag != 0u) {
+            lag_frames++;
         }
 #ifdef SCHWAY_RUN_RAISE_AT
         if (n == SCHWAY_RUN_RAISE_AT) {
@@ -807,6 +811,9 @@ static int run(const options *opt)
     }
     if (status == SCHWAY__EXIT_OK && opt->hash_state) {
         status = print_state_hash(inst);
+    }
+    if (status == SCHWAY__EXIT_OK && opt->inputs != NULL) {
+        printf("lag frames=%lu\n", (unsigned long)lag_frames);
     }
     if (status == SCHWAY__EXIT_OK && opt->bench) {
         char report[512];

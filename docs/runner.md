@@ -32,7 +32,7 @@ schwaystation-run --help | --version
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
 | `--hash-state` | After the last frame and every other line, print the SHA-256 of the saved [machine state](#frame-hash). |
-| `--inputs FILE` | Parse and apply a bounded controller script before each frame latch. Give it once. See [Input scripts](#input-scripts). |
+| `--inputs FILE` | Parse and apply a bounded controller script before each frame latch, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print what the PS-EXE file is, as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
 | `--region NAME` | `ntsc-u` (the default), `ntsc-j` or `pal`: the console's region and its video timing. |
@@ -75,6 +75,9 @@ conflicting records for that frame are rejected. Frames must be from 1 to 1,000,
 the core instance or runs a frame. A malformed record exits 2 with a bounded line-numbered error; an unreadable
 file or memory failure exits 1. The test-card frame hash remains unchanged by input, while `--hash-state` includes
 the latched controller state.
+
+With `--inputs`, the runner also prints `lag frames=N`. The count sums the core's per-frame result: a frame is lagged
+when the guest completes no controller poll through SIO0. A `schway_peek` is read-only and never counts as a poll.
 
 ## Shared host memory-card file behavior
 

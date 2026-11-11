@@ -103,16 +103,44 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "schwaystation-run ${args} printed no line ${line}:\n${out}")
       endif()
     endforeach()
-  elseif(CASE STREQUAL "pad_counter_lag")
-    file(WRITE "${OUT}/pad-counter-empty.inputs" "")
-    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1
-        --inputs "${OUT}/pad-counter-empty.inputs"
-      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
-    if(NOT rc STREQUAL "0")
-      message(FATAL_ERROR "runner exited ${rc}: ${err}")
-    endif()
-    if(NOT out MATCHES "(^|\\n)lag frames=1(\\n|$)")
-      message(FATAL_ERROR "runner did not report one lag frame: ${out}")
+  elseif(CASE STREQUAL "pad_counter_press60")
+    file(MAKE_DIRECTORY "${OUT}")
+    file(WRITE "${OUT}/pad-counter-none.inputs"
+      "1 p1=digital:.:128,128,128,128 p2=.\n")
+    file(WRITE "${OUT}/pad-counter-press60.inputs"
+      "1 p1=digital:.:128,128,128,128 p2=.\n60 p1=digital:X:128,128,128,128 p2=.\n61 p1=digital:.:128,128,128,128 p2=.\n")
+    foreach(scenario IN ITEMS none press60)
+      set(capture "${OUT}/pad-counter-${scenario}.txt")
+      execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge
+          -DFIXTURE=pad_counter_${scenario} -DIMAGE=${IMAGE} -DFRAMES=300 -DPROFILE=ntsc-u
+          "-DFLAGS=--inputs ${OUT}/pad-counter-${scenario}.inputs --hash"
+          -DCSV=${CSV} -DCAPTURE=${capture} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
+          -P ${CMAKE_CURRENT_LIST_FILE}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE judge_out ERROR_VARIABLE judge_err)
+      if(NOT rc STREQUAL "0")
+        message(FATAL_ERROR "pad_counter ${scenario} mailbox judge failed: ${judge_out}${judge_err}")
+      endif()
+      file(READ "${capture}" report)
+      if(NOT report MATCHES "(^|\n)lag frames=0(\n|$)")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report zero lag frames:\n${report}")
+      endif()
+      string(REGEX MATCH "frame 300 sha256 [0-9a-f]+" frame_line "${report}")
+      if(frame_line STREQUAL "")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report its frame 300 hash:\n${report}")
+      endif()
+      string(REGEX REPLACE ".*sha256 ([0-9a-f]+)" "\\1" frame_hash "${frame_line}")
+      if(scenario STREQUAL "none")
+        set(expected_hash "83358471dc7807f9a7b070097835835ff27fa73a3db1f8ad468e3ef5208317b1")
+      else()
+        set(expected_hash "cfcae1a726602580ac1741eb597c951cd3977f8f96a8df6be30c9ea50d9543b4")
+      endif()
+      if(NOT frame_hash STREQUAL expected_hash)
+        message(FATAL_ERROR "pad_counter ${scenario} frame 300 hash did not match its pixel-checked pin")
+      endif()
+      set(pad_counter_hash_${scenario} "${frame_hash}")
+    endforeach()
+    if(pad_counter_hash_none STREQUAL pad_counter_hash_press60)
+      message(FATAL_ERROR "press@60 did not change the frame 300 hash")
     endif()
   elseif(CASE STREQUAL "mailbox_judge")
     string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
@@ -134,6 +162,9 @@ if(CMAKE_SCRIPT_MODE_FILE)
     else()
       execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --stop-on mailbox --frames ${FRAMES}
         ${flags} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    endif()
+    if(DEFINED CAPTURE)
+      file(WRITE "${CAPTURE}" "${out}")
     endif()
     set(errors "")
     if(NOT rc STREQUAL "0")
@@ -361,6 +392,7 @@ set(schway__fixture_extra "")
 schway__fixture(dma_chain.exe dma_chain.asm)
 schway__fixture(timers_lines.exe timers_lines.asm)
 schway__fixture(gpu_motion.exe gpu_motion.asm)
+schway__fixture(pad_counter.exe pad_counter.asm)
 foreach(row IN ITEMS
     "10|0|10" "8|1|8" "7|64|7" "5|2|5" "4|3|4" "10|0|5" "8|1|2" "4|3|1")
   string(REPLACE "|" ";" fields "${row}")
@@ -407,12 +439,15 @@ schway_add_test(NAME fixtures.hello.tty
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
 
-# Fault prevented: --inputs accepting a pad movie but omitting the guest-polled lag count.
+# Fault prevented: input snapshots that do not reach scheduled guest SIO polls, the counter pixels,
+# the lag result or the frame-300 image.
 schway_add_test(NAME fixtures.pad_counter.press60
-  COMMAND ${CMAKE_COMMAND} -DCASE=pad_counter_lag -DOUT=${PROJECT_BINARY_DIR}/tests
+  COMMAND ${CMAKE_COMMAND} -DCASE=pad_counter_press60 -DOUT=${PROJECT_BINARY_DIR}/tests
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/pad_counter.exe -DFRAMES=300
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
-  LABELS fixtures portable TIMEOUT 30)
+  LABELS fixtures portable TIMEOUT 120)
 
 # Fault prevented: a runner that never reads the fixture's mailbox, or reads it wrongly: the sealed
 # mailbox of hello.exe ends the run with exit 0 and prints its records. The second test is the
