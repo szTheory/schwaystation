@@ -16,6 +16,26 @@ schway_warnings(schwaystation-test-sio-pad)
 schway_add_test(NAME sio.pad.input_latch
   COMMAND schwaystation-test-sio-pad input_latch_and_rumble
   LABELS sio portable TIMEOUT 10)
+# Fault prevented: DualShock command replies, selectors or staged actuator mappings change unexpectedly.
+schway_add_test(NAME sio.pad.config_commands
+  COMMAND schwaystation-test-sio-pad config_commands
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: the analog button toggles on a held level or through its configuration lock.
+schway_add_test(NAME sio.pad.analog_button_edges
+  COMMAND schwaystation-test-sio-pad analog_button_edges
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: the legacy 0140h motor command is lost or remains on after 0000h.
+schway_add_test(NAME sio.pad.old_rumble
+  COMMAND schwaystation-test-sio-pad old_rumble
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: the config watchdog expires early, late, or fails to lock rumble.
+schway_add_test(NAME sio.pad.watchdog_boundary
+  COMMAND schwaystation-test-sio-pad watchdog_boundary
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: split protocol data or an actuator map is lost across saved-state load.
+schway_add_test(NAME sio.pad.state_split_config
+  COMMAND schwaystation-test-sio-pad state_split_config
+  LABELS sio portable TIMEOUT 10)
 
 # Fault prevented: a byte reply or IRQ7 that precedes its baud or pad-ACK deadline,
 # a digital pad with the wrong handshake, or an ACK on the final byte.
