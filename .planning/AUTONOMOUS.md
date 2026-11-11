@@ -28,6 +28,10 @@ it. Do not ask the owner a routine question.
 
 The goal is zero human verification. This is settled (rule 6); do not re-propose it or loop back to it.
 
+Launch automated apps and tests in the background under the standing preference in `AGENTS.md`.
+Headless CLI and hosted checks already avoid desktop activation. Apply this to local RetroArch
+checks as well; diagnose background failures before considering any foreground check.
+
 - Automate integration, end-to-end, smoke and seam checks, shifted left. A check goes into CI only when it
   catches a recurring regression (rule 6); a check with no recurring value is run once by the agent and recorded
   as a command and an exit status. Throwaway verification is fine.

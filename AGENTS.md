@@ -1,5 +1,10 @@
 # schwaystation
 
+Launch automated apps and tests in the background so the shared computer remains usable.
+Use the foreground only when the specific check requires it; explain why before activation and
+bound that interval. A timeout alone does not justify taking focus: diagnose background failures
+within the existing limits. This preference applies across projects and future sessions.
+
 A Sony PlayStation (PS1) emulator core in C. This repository ships three things: a C library, a headless
 command-line runner (`schwaystation-run`), and a libretro core (`schwaystation_libretro`). RetroArch or another
 host provides the window. One core covers every console revision (SCPH-1000 through SCPH-102 and the PS one) and

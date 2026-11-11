@@ -85,6 +85,7 @@ coverage:
     human_judgment: false
   - id: D4
     description: All registered SIO behavior passes the CI and hygiene workflows, including packaging and repository checks.
+    requirement: GAME-03
     verification:
       - kind: other
         ref: cmake --workflow --preset ci
@@ -163,7 +164,7 @@ Task 2's required state/abort/independence behavior was already implemented in T
 - The first Task 1 test run exposed that I_STAT is write-zero-to-clear; the test was corrected to clear bit 7 by writing zero.
 - A new Task 2 assertion initially expected three completed pad polls after two polls on one instance; it was corrected to the documented one-count-per-poll behavior.
 
-## Verification
+## Evidence
 
 - **Task 1 RED:** `ctest --test-dir build/ci -R '^sio\.digital\.poll_irq$' --no-tests=error --output-on-failure --output-junit build/ci/sio-red.junit.xml` — exit 8. The named test failed because RX stayed empty and JOY_RX_DATA returned zero before SIO0 existed. The machine-validated report is preserved at `build/ci/build/ci/sio-red.junit.xml`.
 - **Task 1 GREEN:** `cmake --workflow --preset ci` — exit 0; 394/394 tests and both release-archive checks passed.
