@@ -293,6 +293,181 @@ static void independent_ports_instances(void)
     schway_destroy(a);
 }
 
+static void send_without_pop(schway *inst, uint8_t sent, int ack)
+{
+    uint64_t start = inst->ticks;
+    write_mmio(inst, JOY_DATA, 1u, sent);
+    advance_to(inst, start + 1088u);
+    if (ack) {
+        advance_to(inst, start + 1426u);
+        write_mmio(inst, I_STAT, 4u, 0u);
+        write_mmio(inst, JOY_CTRL, 2u, 0x1013u);
+        advance_to(inst, start + 1494u);
+        write_mmio(inst, JOY_CTRL, 2u, 0x1003u);
+    }
+}
+
+static void fifo_widths(void)
+{
+    schway *inst = make();
+    configure(inst, 0u);
+    send_without_pop(inst, 0x01u, 1);
+    send_without_pop(inst, 0x42u, 1);
+    send_without_pop(inst, 0x00u, 1);
+    send_without_pop(inst, 0x00u, 1);
+    CHECK_EQ_U64(inst->sio.rx_count, 4u);
+    CHECK_EQ_HEX(read_mmio(inst, JOY_DATA, 2u), 0xFFu);
+    CHECK_EQ_U64(inst->sio.rx_count, 3u);
+    CHECK_EQ_HEX(read_mmio(inst, JOY_DATA, 1u), 0x41u);
+    CHECK_EQ_U64(inst->sio.rx_count, 2u);
+    CHECK_EQ_HEX(read_mmio(inst, JOY_DATA, 4u), 0x0000FF5Au);
+    CHECK_EQ_U64(inst->sio.rx_count, 0u);
+    CHECK_EQ_HEX(read_mmio(inst, JOY_DATA, 4u), 0xFFu);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 2u) == 0u);
+    schway_destroy(inst);
+}
+
+static void fifo_overrun(void)
+{
+    schway *inst = make();
+    write_mmio(inst, JOY_MODE, 2u, 0x000Cu);
+    write_mmio(inst, JOY_BAUD, 2u, 0x0088u);
+    for (uint32_t i = 0u; i < 9u; i++) {
+        uint64_t start = inst->ticks;
+        write_mmio(inst, JOY_CTRL, 2u, 0x0B05u);
+        write_mmio(inst, JOY_DATA, 1u, i);
+        advance_to(inst, start + 1088u);
+        if (i < 7u) {
+            CHECK((inst->irq.stat & 0x80u) == 0u);
+        } else {
+            CHECK((inst->irq.stat & 0x80u) != 0u);
+        }
+    }
+    CHECK_EQ_U64(inst->sio.rx_count, SCHWAY__SIO_RX_CAP);
+    CHECK(inst->sio.parity_error != 0u);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & (1u << 3)) != 0u);
+    CHECK_EQ_HEX(read_mmio(inst, JOY_DATA, 4u), 0xFFFFFFFFu);
+    CHECK_EQ_U64(inst->sio.rx_count, 4u);
+    (void)read_mmio(inst, JOY_DATA, 4u);
+    CHECK_EQ_U64(inst->sio.rx_count, 0u);
+    write_mmio(inst, I_STAT, 4u, 0u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x0B15u);
+    CHECK(inst->sio.parity_error == 0u);
+    CHECK(inst->sio.irq == 0u);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & ((1u << 3) | 0x200u)) == 0u);
+    schway_destroy(inst);
+}
+
+static void baud_character_length(void)
+{
+    schway *inst = make();
+    write_mmio(inst, JOY_MODE, 2u, 0x0000u);
+    write_mmio(inst, JOY_BAUD, 2u, 0x0002u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1005u);
+    write_mmio(inst, JOY_DATA, 1u, 0xA5u);
+    advance_to(inst, 9u);
+    CHECK_EQ_U64(inst->sio.rx_count, 0u);
+    advance_to(inst, 10u);
+    CHECK_EQ_U64(inst->sio.rx_count, 1u);
+    CHECK_EQ_HEX(read_mmio(inst, JOY_DATA, 1u), 0xFFu);
+
+    write_mmio(inst, JOY_MODE, 2u, 0x000Eu);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1005u);
+    uint64_t start = inst->ticks;
+    write_mmio(inst, JOY_DATA, 1u, 0xA5u);
+    advance_to(inst, start + 255u);
+    CHECK_EQ_U64(inst->sio.rx_count, 0u);
+    advance_to(inst, start + 256u);
+    CHECK_EQ_U64(inst->sio.rx_count, 1u);
+    (void)read_mmio(inst, JOY_DATA, 1u);
+
+    write_mmio(inst, JOY_MODE, 2u, 0x001Eu);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1005u);
+    start = inst->ticks;
+    write_mmio(inst, JOY_DATA, 1u, 0xA5u);
+    advance_to(inst, start + 287u);
+    CHECK_EQ_U64(inst->sio.rx_count, 0u);
+    advance_to(inst, start + 288u);
+    CHECK_EQ_U64(inst->sio.rx_count, 1u);
+    schway_destroy(inst);
+}
+
+static void irq_ack_order(void)
+{
+    schway *inst = make();
+    configure(inst, 0u);
+    write_mmio(inst, JOY_DATA, 1u, 0x01u);
+    advance_to(inst, 1088u);
+    advance_to(inst, 1426u);
+    CHECK((inst->irq.stat & 0x80u) != 0u);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x200u) != 0u);
+    write_mmio(inst, I_STAT, 4u, 0u);
+    CHECK((inst->irq.stat & 0x80u) == 0u);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x200u) != 0u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1013u);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x200u) == 0u);
+    advance_to(inst, 1494u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1003u);
+
+    write_mmio(inst, JOY_DATA, 1u, 0x42u);
+    advance_to(inst, 2582u);
+    advance_to(inst, 2920u);
+    CHECK((inst->irq.stat & 0x80u) != 0u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1013u);
+    CHECK((inst->irq.stat & 0x80u) != 0u);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x200u) == 0u);
+    write_mmio(inst, I_STAT, 4u, 0u);
+    CHECK((inst->irq.stat & 0x80u) == 0u);
+    schway_destroy(inst);
+}
+
+static void no_final_ack(void)
+{
+    schway *inst = make();
+    configure(inst, 0u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), 0xFFu);
+    CHECK(inst->sio.ack_pending == 0u);
+    CHECK(inst->sio.ack_low == 0u);
+    CHECK(inst->pad.transfers == 1u);
+    CHECK((inst->irq.stat & 0x80u) == 0u);
+    advance_to(inst, inst->ticks + 338u);
+    CHECK(inst->sio.ack_pending == 0u);
+    CHECK(inst->sio.ack_low == 0u);
+    CHECK((inst->irq.stat & 0x80u) == 0u);
+    schway_destroy(inst);
+}
+
+static void peek_pure(void)
+{
+    schway *inst = make();
+    configure(inst, 0u);
+    write_mmio(inst, JOY_DATA, 1u, 0x01u);
+    schway *before = clone_state(inst);
+    uint32_t value = 0u;
+    CHECK_EQ_U64(schway__sio_peek(inst, JOY_DATA, 4u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+    CHECK_EQ_U64(schway__sio_peek(inst, JOY_STAT, 4u, &value), 0u);
+    check_states_equal(inst, before);
+
+    advance_to(inst, 1088u);
+    advance_to(before, 1088u);
+    CHECK_EQ_U64(inst->sio.rx_count, 1u);
+    CHECK_EQ_U64(inst->pad.transfers, 0u);
+    CHECK_EQ_U64(schway__sio_peek(inst, JOY_DATA, 4u, &value), 0u);
+    CHECK_EQ_HEX(value, 0xFFu);
+    CHECK_EQ_U64(schway__sio_peek(inst, JOY_STAT, 4u, &value), 0u);
+    CHECK((value & 2u) != 0u);
+    CHECK_EQ_U64(inst->sio.rx_count, 1u);
+    CHECK_EQ_U64(inst->pad.transfers, 0u);
+    check_states_equal(inst, before);
+    schway_destroy(before);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -308,6 +483,18 @@ int main(int argc, char **argv)
         transport_abort();
     } else if (strcmp(argv[1], "independent_ports_instances") == 0) {
         independent_ports_instances();
+    } else if (strcmp(argv[1], "fifo_widths") == 0) {
+        fifo_widths();
+    } else if (strcmp(argv[1], "fifo_overrun") == 0) {
+        fifo_overrun();
+    } else if (strcmp(argv[1], "baud_character_length") == 0) {
+        baud_character_length();
+    } else if (strcmp(argv[1], "irq_ack_order") == 0) {
+        irq_ack_order();
+    } else if (strcmp(argv[1], "no_final_ack") == 0) {
+        no_final_ack();
+    } else if (strcmp(argv[1], "peek_pure") == 0) {
+        peek_pure();
     } else {
         return 2;
     }

@@ -27,3 +27,27 @@ schway_add_test(NAME sio.transport.abort
 schway_add_test(NAME sio.pad.independent_ports_instances
   COMMAND schwaystation-test-sio independent_ports_instances
   LABELS sio portable TIMEOUT 10)
+# Fault prevented: baud factors or character-length bits shift RX completion.
+schway_add_test(NAME sio.control.baud
+  COMMAND schwaystation-test-sio baud_character_length
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: data-register widths pop the wrong number of FIFO entries.
+schway_add_test(NAME sio.fifo.widths
+  COMMAND schwaystation-test-sio fifo_widths
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: FIFO overflow is unbounded, silent, or clears incorrectly.
+schway_add_test(NAME sio.fifo.overrun
+  COMMAND schwaystation-test-sio fifo_overrun
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: IRQ7 and JOY_STAT IRQ status lose their two-step clear ordering.
+schway_add_test(NAME sio.irq.ack_order
+  COMMAND schwaystation-test-sio irq_ack_order
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: a digital pad requests another ACK after its final reply byte.
+schway_add_test(NAME sio.pad.final_no_ack
+  COMMAND schwaystation-test-sio no_final_ack
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: peeking advances the device or consumes FIFO data.
+schway_add_test(NAME sio.peek.pure
+  COMMAND schwaystation-test-sio peek_pure
+  LABELS sio portable TIMEOUT 10)
