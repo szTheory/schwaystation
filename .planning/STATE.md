@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 20 of 49
+current_plan: 21 of 49
 status: executing
-stopped_at: Completed 04-17-PLAN.md
-last_updated: "2026-11-11T10:14:45.208Z"
+stopped_at: Completed 04-35-PLAN.md
+last_updated: "2026-11-11T10:46:03.033Z"
 last_activity: 2026-11-11
-last_activity_desc: Completed Phase 04 plan 04-13 with GPU-motion performance control and hosted CI evidence
-state_head: 3af8a803e9111184d0094d29794b7a327290a938
+last_activity_desc: Completed Phase 04 plan 04-35 with wrapper imports and canonical save names; full CI and hygiene passed
+state_head: 88bd06c53913e732eac8eac47e0dd51b6f6dc115
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 87
+  completed_plans: 88
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 20 of 49
-Status: Plan 04-34 complete; plan 04-35 is ready.
-Last activity: 2026-11-11 — Raw card imports and pending transport validation completed; full CI and hygiene passed.
+Current Plan: 21 of 49
+Status: Plan 04-35 complete; plan 04-18 is ready.
+Last activity: 2026-11-11 — Legacy card wrappers and canonical save names completed; full CI and hygiene passed.
 
 Progress: [█████░░░░░] 50%
 
@@ -148,6 +148,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P33 | 35min | 2 tasks | 9 files |
 | Phase 04 P34 | 28 min | 2 tasks | 8 files |
 | Phase 04 P17 | 23min | 2 tasks | 7 files |
+| Phase 04 P35 | 29min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -329,6 +330,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Accept raw imports up to the fixed image size, pad the suffix with FFh, and reject all invalid or late imports before mutation.
 - [Phase 04]: Keep persistent card bytes and generations out of ordinary states while validating pending transport before state application.
 - [Phase 04]: Use exclusive sibling temp names and fail without mutation if all 64 candidates are occupied.
+- [Phase 04]: Card files remain host-owned; the core does not read files or resolve save paths.
+- [Phase 04]: Content basename is the default card save-name source; validated serial naming is optional.
 
 ### Pending Todos
 
@@ -436,10 +439,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-17 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; raw card host helper, focused and full CI, hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-35 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; legacy card wrappers, canonical save names, full CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T10:14:44.604Z
-Stopped at: Completed 04-17-PLAN.md
+Last session: 2026-11-11T10:46:02.862Z
+Stopped at: Completed 04-35-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)

@@ -282,7 +282,7 @@ Plans:
 - [x] 04-17-PLAN.md — Import raw cards and save them atomically in the host helper
 
 **Wave 16**
-- [ ] 04-35-PLAN.md — Import legacy wrappers and enforce canonical save names
+- [x] 04-35-PLAN.md — Import legacy wrappers and enforce canonical save names
 
 **Wave 17**
 - [ ] 04-18-PLAN.md — Apply validated input movies before the runner frame latch
@@ -405,6 +405,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 19/49 | In Progress | - |
+| 4. Games play in RetroArch | 20/49 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
