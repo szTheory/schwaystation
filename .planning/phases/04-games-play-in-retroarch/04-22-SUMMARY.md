@@ -26,9 +26,9 @@ key-files:
   created:
     - cmake/OpenBIOS.cmake
     - tests/built/expected.txt
+  modified:
     - tests/built/inventory.txt
     - tests/built/tests.cmake
-  modified:
     - .github/workflows/ci.yml
     - CMakePresets.json
     - docs/testing.md
@@ -82,6 +82,8 @@ status: complete
 
 ## Accomplishments
 
+- Added `cmake/OpenBIOS.cmake` and `tests/built/expected.txt` for the checked build.
+
 - CI fetched nugget commit `9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9` and verified the pinned Linux GCC 12.3.0 archive (`228f031a25cf2687d8845fd1421f625bafc211fa27da428e458e80d030a726f8`). The build used upstream's supported `OPENBIOS_SHELL=shell` option.
 - The real Linux build produced 524288 bytes with SHA-256 `92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8`. `tests/built/expected.txt` contains that digest; the firmware bytes stayed in the runner's temporary directory.
 - The registered `built.openbios.digest` and `built.openbios.digest_corrupt` tests passed, including the one-byte-corrupted negative control.
@@ -94,7 +96,7 @@ status: complete
 - Task 2 documentation and WASI wiring: `8170554`.
 - Hosted be32 and runner-card corrections: `522a48f`.
 
-## Verification
+## Evidence
 
 - `cmake --build --preset ci --target schwaystation-run schwaystation-test-run-stop && ctest --test-dir build/ci -R '^runner\.cards\.' --no-tests=error --output-on-failure` — exit 0; 3/3 runner card tests passed.
 - `cmake --workflow --preset ci` — exit 0; 466 regular tests and 5 release tests passed.
@@ -102,7 +104,7 @@ status: complete
 - Hosted CI run [43069874480](https://github.com/szTheory/schwaystation/actions/runs/43069874480), captured as `OPENBIOS_RUN_ID=43069874480`, used exact head `522a48fd10e2b9b8a2820cfb21a4d8aa2f179167` and finished with `CI required` success. Its Linux x64 job [130694615653](https://github.com/szTheory/schwaystation/actions/runs/43069874480/job/130694615653) ran `sh scripts/fetch-pin.sh gcc-mipsel-none-elf-linux "$archive_dir"`, checked the ZIP, built with `make -C "$source_dir/openbios" -j2 BUILD=Release BOARD=psx BOOT=rom OPENBIOS_SHELL=shell`, and checked the output with `cmake -DOPENBIOS_INPUT=... -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake`; exit 0. The log reports the expected size and SHA-256.
 - Hosted be32 job [130694615418](https://github.com/szTheory/schwaystation/actions/runs/43069874480/job/130694615418) passed 433/433 tests in 6m09s. `runner.hashes_file` took 83.55s and `fixtures.pad_counter.movies` took 268.31s. The three runner-card tests passed in 0.66s, 0.06s, and 0.06s.
 - Hosted WASI job 130694615476 passed; the Linux x64 suite also recorded both digest tests passing.
-- `shasum -a 256 /private/tmp/schwaystation-gcc-mipsel-none-elf-12.3.0-linux.zip` exited 0 with the pinned GCC SHA-256. GitHub API returned the pinned nugget commit and its MIT root license; `openbios/kernel/alloc.c`, `openbios/main/main.c`, `openbios/shell/shell.c`, `shell/main.c`, and `common/psxlibc/fastmemset.s` at that commit carry MIT headers.
+- shasum -a 256 /private/tmp/schwaystation-gcc-mipsel-none-elf-12.3.0-linux.zip exited 0 with the pinned GCC SHA-256. GitHub API returned the pinned nugget commit and its MIT root license; `openbios/kernel/alloc.c`, `openbios/main/main.c`, `openbios/shell/shell.c`, `shell/main.c`, and `common/psxlibc/fastmemset.s` at that commit carry MIT headers.
 
 ## Decisions Made
 
