@@ -79,6 +79,11 @@ schway_add_test(NAME gpu.beam.status_fields
   COMMAND schwaystation-test-gpu-beam status_fields
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: status range edges, mode retention, malformed phase state, and split-run drift.
+schway_add_test(NAME gpu.beam.status_controls
+  COMMAND schwaystation-test-gpu-beam status_controls
+  LABELS gpu portable TIMEOUT 10)
+
 # Fault prevented: loaded run_frame uses the GPU field wrap when Y2 suppresses VBlank.
 schway_add_test(NAME gpu.beam.public_field_wrap
   COMMAND schwaystation-test-gpu-beam public_field_wrap
