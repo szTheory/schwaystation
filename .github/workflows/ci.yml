@@ -256,7 +256,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt); 2 x 102 s (be32), slowest of 5 runs, run 42724296965
+    timeout-minutes: 7  # 5-minute run 43067261917 ended with pad_counter.movies still running (433 tests; prior 102 s run had 208)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
