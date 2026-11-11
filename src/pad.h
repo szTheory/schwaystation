@@ -10,7 +10,7 @@ struct schway__state_io;
 
 struct schway__pad {
     uint16_t buttons[2];
-    uint8_t axes[2][4];
+    uint8_t axes[8];
     uint8_t present[2];
     uint8_t device[2];
     uint8_t phase[2];
@@ -29,8 +29,8 @@ struct schway__pad {
     uint8_t rumble_small[2];
     uint8_t rumble_stage_large[2];
     uint8_t rumble_stage_small[2];
-    uint8_t rumble_map[2][6];
-    uint8_t rumble_map_stage[2][6];
+    uint8_t rumble_map[12];
+    uint8_t rumble_map_stage[12];
     uint8_t frame_polls;
     uint8_t frame_latched;
     uint64_t watchdog_deadline[2];

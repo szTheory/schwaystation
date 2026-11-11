@@ -204,7 +204,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: nofp (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 1  # 2 x 28 s (nofp ubuntu-26.04), slowest of 5 runs, run 42691517611
+    timeout-minutes: 3  # floor covers slow checkout/image startup; one-minute cancellations: runs 42840838785 and 42841474140
     strategy:
       fail-fast: false
       matrix:
@@ -359,12 +359,12 @@ jobs:
           path: build/frames/*.png
           if-no-files-found: warn
 
-  # Cachegrind instructions per frame of the test card: the pull request's
-  # head commit against its merge base with the base branch, the base
-  # measured twice. The merge commit's first parent is not used: it is the
-  # base branch tip, which also counts commits that landed after the branch
-  # point. Direct runs only (a nested call passes ref). On workflow_dispatch
-  # it measures one commit three times: a control run for arming the gate.
+  # Cachegrind instructions per frame of the test card and gpu_motion: the
+  # pull request's head commit against its merge base with the base branch,
+  # the base measured twice. The merge commit's first parent is not used: it
+  # is the base branch tip, which also counts commits that landed after the
+  # branch point. Direct runs only (a nested call passes ref). On
+  # workflow_dispatch it measures both fixtures three times for control.
   perf:
     needs: changes
     if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
@@ -389,9 +389,14 @@ jobs:
       - name: Build the runner at head and base
         id: build
         run: |
+          cmake --preset ci
+          cmake --build build/ci --target fixtures/gpu_motion.exe
+          mkdir -p "$RUNNER_TEMP/perf"
+          cp build/ci/fixtures/gpu_motion.exe "$RUNNER_TEMP/perf/gpu_motion.exe"
           build() {
             (cd "$1" && cmake --workflow --preset perf) || return 1
-            mkdir -p "$2" && cp "$1/build/perf/schwaystation-run" "$2/schwaystation-run"
+            mkdir -p "$2" && cp "$1/build/perf/schwaystation-run" "$2/schwaystation-run" && \
+              cp "$RUNNER_TEMP/perf/gpu_motion.exe" "$2/gpu_motion.exe"
           }
           build . "$RUNNER_TEMP/perf/head"
           if [ "$EVENT" = workflow_dispatch ]; then
@@ -413,12 +418,16 @@ jobs:
           NO_BASE: ${{ steps.build.outputs.no_base }}
         run: |
           valgrind=$(command -v valgrind)
-          # Ir of one run of the runner under $1 for $2 frames, from the
-          # summary line of Cachegrind's output; empty output is a failure.
+          # Ir of one runner/workload combination for the requested frames,
+          # from Cachegrind's summary line; empty output is a failure.
           ir() {
             rm -f "$RUNNER_TEMP/cg.out"
+            local args=(--frames "$3")
+            if [ "$2" = gpu_motion ]; then
+              args=(--exe "$1/gpu_motion.exe" --frames "$3")
+            fi
             env -i "$valgrind" --tool=cachegrind --cache-sim=no --cachegrind-out-file="$RUNNER_TEMP/cg.out" \
-              "$1/schwaystation-run" --frames "$2" > /dev/null 2>&1 || return 1
+              "$1/schwaystation-run" "${args[@]}" > /dev/null 2>&1 || return 1
             local v
             v=$(sed -n 's/^summary: *\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/cg.out")
             [ -n "$v" ] || return 1
@@ -427,28 +436,31 @@ jobs:
           # Ir/frame = (Ir at 360 frames - Ir at 60) / 300, in integers.
           per_frame() {
             local a b
-            a=$(ir "$1" 60) || return 1
-            b=$(ir "$1" 360) || return 1
+            a=$(ir "$1" "$2" 60) || return 1
+            b=$(ir "$1" "$2" 360) || return 1
             echo $(( (b - a) / 300 ))
           }
-          head=$(per_frame "$RUNNER_TEMP/perf/head")
           if [ "$NO_BASE" = none ]; then
-            h2=$(per_frame "$RUNNER_TEMP/perf/head")
-            h3=$(per_frame "$RUNNER_TEMP/perf/head")
-            max=$head min=$head
-            for v in "$h2" "$h3"; do
-              if [ "$v" -gt "$max" ]; then max=$v; fi
-              if [ "$v" -lt "$min" ]; then min=$v; fi
+            for fixture in testcard gpu_motion; do
+              control=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+              control2=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+              control3=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+              max=$control min=$control
+              for v in "$control2" "$control3"; do
+                if [ "$v" -gt "$max" ]; then max=$v; fi
+                if [ "$v" -lt "$min" ]; then min=$v; fi
+              done
+              line="perf control $fixture runs=$control,$control2,$control3 spread=$((max - min))"
+              echo "$line"
+              echo "$line" >> "$GITHUB_STEP_SUMMARY"
             done
-            line="perf control testcard runs=$head,$h2,$h3 spread=$((max - min))"
-            echo "$line"
-            echo "$line" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          head=$(per_frame "$RUNNER_TEMP/perf/head" testcard)
           base1='' base2=''
           if [ "$NO_BASE" = false ]; then
-            base1=$(per_frame "$RUNNER_TEMP/perf/base")
-            base2=$(per_frame "$RUNNER_TEMP/perf/base")
+            base1=$(per_frame "$RUNNER_TEMP/perf/base" testcard)
+            base2=$(per_frame "$RUNNER_TEMP/perf/base" testcard)
           fi
           rc=0
           cmake -DFIXTURE=testcard "-DHEAD=$head" "-DBASE1=$base1" "-DBASE2=$base2" -DALLOW=tests/perf/allow.txt \

@@ -308,7 +308,7 @@ void schway__sio_event(schway *inst, uint64_t now)
             raise_irq(inst);
         }
         if ((sio->ctrl & CTRL_RXEN) != 0u) {
-            sio->ctrl &= (uint16_t)~CTRL_RXEN;
+            sio->ctrl &= (uint16_t)(UINT16_MAX ^ CTRL_RXEN);
         }
         if (ack != 0u) {
             sio->ack_pending = 1u;
@@ -379,7 +379,7 @@ static int write_ctrl(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
         sio->parity_error = 0u;
         sio->irq = 0u;
     }
-    sio->ctrl = next & (uint16_t)~CTRL_ACK;
+    sio->ctrl = (uint16_t)(next & (UINT16_MAX ^ CTRL_ACK));
     schway__sched_recalc(inst);
     return 0;
 }

@@ -51,8 +51,9 @@ void schway__pad_reset(schway *inst)
         inst->pad.device[port] = SCHWAY_INPUT_DEVICE_DIGITAL;
         inst->pad.rumble_map_valid[port] = 1u;
         for (uint32_t i = 0u; i < 6u; i++) {
-            inst->pad.rumble_map[port][i] = 0xFFu;
-            inst->pad.rumble_map_stage[port][i] = 0xFFu;
+            uint32_t index = port * 6u + i;
+            inst->pad.rumble_map[index] = 0xFFu;
+            inst->pad.rumble_map_stage[index] = 0xFFu;
         }
     }
 }
@@ -121,8 +122,8 @@ void schway__pad_frame_start(schway *inst)
             }
             inst->pad.analog_button[port] = pressed;
             inst->pad.buttons[port] = (uint16_t)~inst->pad.pending_input.buttons[port];
-            memcpy(inst->pad.axes[port], inst->pad.pending_input.axes[port],
-                   sizeof inst->pad.axes[port]);
+            memcpy(&inst->pad.axes[port * 4u], inst->pad.pending_input.axes[port],
+                   sizeof inst->pad.pending_input.axes[port]);
         }
         inst->pad.pending_valid = 0u;
     }
@@ -158,7 +159,7 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     uint8_t saved_map[12];
     uint8_t saved_map_stage[12];
     schway__state_u16_array(io, name_buttons, inst->pad.buttons, 2u, 0u, UINT16_MAX);
-    schway__state_u8_array(io, name_axes, &inst->pad.axes[0][0], 8u, 0u, UINT8_MAX);
+    schway__state_u8_array(io, name_axes, inst->pad.axes, 8u, 0u, UINT8_MAX);
     const uint8_t *read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_present, inst->pad.present, 2u, 0u, 1u);
     if (read_bytes != NULL) {
@@ -192,20 +193,19 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
                            UINT8_MAX);
     schway__state_u8_array(io, name_rumble_stage_small, inst->pad.rumble_stage_small, 2u, 0u, 1u);
     read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
-    schway__state_u8_array(io, name_rumble_map, &inst->pad.rumble_map[0][0], 12u, 0u,
-                           UINT8_MAX);
+    schway__state_u8_array(io, name_rumble_map, inst->pad.rumble_map, 12u, 0u, UINT8_MAX);
     if (read_bytes != NULL) {
         memcpy(saved_map, read_bytes, sizeof saved_map);
     } else {
-        memcpy(saved_map, &inst->pad.rumble_map[0][0], sizeof saved_map);
+        memcpy(saved_map, inst->pad.rumble_map, sizeof saved_map);
     }
     read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
-    schway__state_u8_array(io, name_rumble_map_stage, &inst->pad.rumble_map_stage[0][0], 12u, 0u,
+    schway__state_u8_array(io, name_rumble_map_stage, inst->pad.rumble_map_stage, 12u, 0u,
                            UINT8_MAX);
     if (read_bytes != NULL) {
         memcpy(saved_map_stage, read_bytes, sizeof saved_map_stage);
     } else {
-        memcpy(saved_map_stage, &inst->pad.rumble_map_stage[0][0], sizeof saved_map_stage);
+        memcpy(saved_map_stage, inst->pad.rumble_map_stage, sizeof saved_map_stage);
     }
     schway__state_u8_array(io, name_frame_polls, &inst->pad.frame_polls, 1u, 0u, 3u);
     schway__state_u8_array(io, name_frame_latched, &inst->pad.frame_latched, 1u, 0u, 1u);
@@ -267,7 +267,7 @@ static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t
     if (index == 1u) {
         return (uint8_t)(pad->buttons[port] >> 8);
     }
-    return pad->axes[port][index - 2u];
+    return pad->axes[port * 4u + index - 2u];
 }
 
 static uint8_t command_reply(const struct schway__pad *pad, uint32_t port, uint32_t index)
@@ -307,7 +307,7 @@ static uint8_t command_reply(const struct schway__pad *pad, uint32_t port, uint3
         case 3u:
             return pad->selector[port] == 0u ? 0x02u : 0x01u;
         case 4u:
-            return pad->selector[port] == 0u ? 0u : 1u;
+            return (uint8_t)(pad->selector[port] == 0u ? 0u : 1u);
         case 5u:
             return pad->selector[port] == 0u ? 10u : 20u;
         default:
@@ -328,7 +328,7 @@ static uint8_t command_reply(const struct schway__pad *pad, uint32_t port, uint3
         }
         return index == 3u ? (pad->selector[port] == 0u ? 0x04u : 0x07u) : 0u;
     case 0x4Du:
-        return pad->rumble_map[port][index];
+        return pad->rumble_map[port * 6u + index];
     default:
         return 0xFFu;
     }
@@ -360,7 +360,8 @@ static void finish_payload(schway *inst, uint32_t port, uint64_t now)
     } else if (command == 0x4Du) {
         if (pad->rumble_map_valid[port] != 0u) {
             for (uint32_t i = 0u; i < 6u; i++) {
-                pad->rumble_map[port][i] = pad->rumble_map_stage[port][i];
+                uint32_t index = port * 6u + i;
+                pad->rumble_map[index] = pad->rumble_map_stage[index];
             }
         }
         refresh_watchdog(inst, port, now);
@@ -377,7 +378,7 @@ static uint8_t pad_payload(schway *inst, uint32_t port, uint8_t sent, uint64_t n
     uint8_t command = pad->command[port];
     if (command == 0x42u) {
         if (pad->config_mode[port] != 0u) {
-            uint8_t mapping = pad->rumble_map[port][index];
+            uint8_t mapping = pad->rumble_map[port * 6u + index];
             if (mapping == 0u) {
                 pad->rumble_stage_small[port] = sent & 1u;
             } else if (mapping == 1u) {
@@ -403,7 +404,7 @@ static uint8_t pad_payload(schway *inst, uint32_t port, uint8_t sent, uint64_t n
         refresh_watchdog(inst, port, now);
     } else if (command == 0x4Du) {
         if (sent == 0u || sent == 1u || sent == 0xFFu) {
-            pad->rumble_map_stage[port][index] = sent;
+            pad->rumble_map_stage[port * 6u + index] = sent;
         } else {
             pad->rumble_map_valid[port] = 0u;
             received = 0xFFu;
@@ -493,8 +494,8 @@ uint32_t schway__pad_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t no
             pad->selector[port] = 0u;
             if (sent == 0x4Du) {
                 pad->rumble_map_valid[port] = 1u;
-                memcpy(pad->rumble_map_stage[port], pad->rumble_map[port],
-                       sizeof pad->rumble_map_stage[port]);
+                uint32_t map_offset = port * 6u;
+                memcpy(&pad->rumble_map_stage[map_offset], &pad->rumble_map[map_offset], 6u);
             }
             refresh_watchdog(inst, port, now);
             return 1u;

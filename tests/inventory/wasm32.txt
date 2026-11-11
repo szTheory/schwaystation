@@ -2,18 +2,20 @@
 # No libretro: WASI has no dynamic loading.
 abi
 bus
+card
 core
 cpu
 dma
 exe
 fixtures
 fuzz
-gte
 gpu
+gte
 install
 perf
 policy
 release
 runner
+sio
 timers
 vectors

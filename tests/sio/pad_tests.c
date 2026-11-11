@@ -392,13 +392,13 @@ static void state_split_config(void)
         (void)exchange(inst, mapping[i], i != 5u);
     }
     uint8_t expected[6];
-    memcpy(expected, inst->pad.rumble_map[0], sizeof expected);
+    memcpy(expected, inst->pad.rumble_map, sizeof expected);
     CHECK_EQ_U64(schway_load_state(inst, saved, state_size), SCHWAY_STATUS_OK);
     for (uint32_t i = 2u; i < 6u; i++) {
         (void)exchange(inst, mapping[i], i != 5u);
     }
     for (uint32_t i = 0u; i < 6u; i++) {
-        CHECK_EQ_HEX(inst->pad.rumble_map[0][i], expected[i]);
+        CHECK_EQ_HEX(inst->pad.rumble_map[i], expected[i]);
     }
     free(saved);
     schway_destroy(inst);

@@ -2,18 +2,20 @@
 # No fixtures: the asan lane never builds armips.
 abi
 bus
+card
 core
 cpu
 dma
 exe
 fuzz
-gte
 gpu
+gte
 install
 libretro
 perf
 policy
 release
 runner
+sio
 timers
 vectors
