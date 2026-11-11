@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 18 of 49
+current_plan: 19 of 49
 status: executing
-stopped_at: Completed 04-33-PLAN.md
-last_updated: "2026-11-11T09:11:50.936Z"
+stopped_at: Completed 04-34-PLAN.md
+last_updated: "2026-11-11T09:44:19.272Z"
 last_activity: 2026-11-11
 last_activity_desc: Completed Phase 04 plan 04-13 with GPU-motion performance control and hosted CI evidence
-state_head: efb6d88437b54fbb852019c9b936868a403d8ecd
+state_head: ef9ef7b454634d9a0ebd9c25346ec717ede44c12
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 85
+  completed_plans: 86
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 18 of 49
-Status: Plan 04-33 complete; plan 04-34 is ready in wave 14.
-Last activity: 2026-11-11 — Transactional SIO card writes and regression coverage completed; full CI and hygiene passed.
+Current Plan: 19 of 49
+Status: Plan 04-34 complete; plan 04-35 is ready.
+Last activity: 2026-11-11 — Raw card imports and pending transport validation completed; full CI and hygiene passed.
 
 Progress: [█████░░░░░] 50%
 
@@ -146,6 +146,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P16 | 44 min | 2 tasks | 18 files |
 | Phase 04 P13 | 1h 11m | 2 tasks | 16 files |
 | Phase 04 P33 | 35min | 2 tasks | 9 files |
+| Phase 04 P34 | 28 min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -323,6 +324,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Use frames 10 through 60 for gpu_motion after the original hosted Cachegrind window exceeded its job budget.
 - [Phase 04]: Keep all required CI lanes and retain a provisional five-minute perf-job timeout based on measured successful runs.
 - [Phase 04]: SIO card writes stage payload per slot and commit only at terminal 47h; failures and interruption preserve committed bytes and generation.
+- [Phase 04]: Keep the unreleased API, state format, and behavior revision at 4; preserve frozen v1-v3 callers.
+- [Phase 04]: Accept raw imports up to the fixed image size, pad the suffix with FFh, and reject all invalid or late imports before mutation.
+- [Phase 04]: Keep persistent card bytes and generations out of ordinary states while validating pending transport before state application.
 
 ### Pending Todos
 
@@ -426,10 +430,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-33 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; full CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-34 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; card import/state validation, full CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T09:11:50.777Z
-Stopped at: Completed 04-33-PLAN.md
+Last session: 2026-11-11T09:44:19.062Z
+Stopped at: Completed 04-34-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
