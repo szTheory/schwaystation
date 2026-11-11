@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 25 of 49
+current_plan: 26 of 49
 status: executing
-stopped_at: Completed 04-20-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; full CI and hygiene passed
-last_updated: "2026-11-11T13:25:33.660Z"
+stopped_at: Completed 04-37-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; full CI and hygiene passed
+last_updated: "2026-11-11T14:17:19.586Z"
 last_activity: 2026-11-11
 last_activity_desc: Completed Phase 04 plan 04-19 with runner card persistence and clean signal saves; full CI and hygiene passed
-state_head: 0383228858d3577189a095caf337b61a09411d09
+state_head: 688255579c5fb7f6db49668e1561d1f66582e516
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 92
+  completed_plans: 93
   percent: 50
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 25 of 49
+Current Plan: 26 of 49
 Status: Plan 04-20 complete; plan 04-37 is next in the execution queue.
 Last activity: 2026-11-11 — Copied BIOS execution and SHA-256 identity completed; full CI and hygiene passed.
 
@@ -153,6 +153,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P36 | 41 min | 2 tasks | 7 files |
 | Phase 04 P19 | 29 min | 2 tasks | 5 files |
 | Phase 04 P20 | 40min | 2 tasks | 21 files |
+| Phase 04 P37 | 48min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -345,6 +346,8 @@ Recent decisions affecting current work:
 - [Phase 04]: The runner saves a slot only after a successful card Write advances its generation; signal handlers only request a stop.
 - [Phase 04]: Save states store BIOS loaded state and SHA-256 identity, not BIOS bytes, and reject a different image before mutation.
 - [Phase 04]: Public SHA-256 image identity remains separate from the DAT-based retail recognition planned in 04-38.
+- [Phase 04]: Normalize formatted blank-card sector value A0h to visible slot counters 1 and 2, then increment each saved slot independently.
+- [Phase 04]: Wait for 117 guest VBlanks so the mailbox and selected frame-120 capture complete under the runner's 120-frame cap.
 
 ### Pending Todos
 
@@ -454,10 +457,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-35 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; legacy card wrappers, canonical save names, full CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-37 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; guest card persistence, full CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T13:25:33.482Z
-Stopped at: Completed 04-20-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; full CI and hygiene passed
+Last session: 2026-11-11T14:17:19.151Z
+Stopped at: Completed 04-37-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; full CI and hygiene passed
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
