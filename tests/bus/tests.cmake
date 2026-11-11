@@ -53,6 +53,12 @@ schway_add_test(NAME bus.exp_regions
   COMMAND schwaystation-test-bus exp_regions
   LABELS bus portable TIMEOUT 10)
 
+# Fault prevented: an ATTR read-after-write poll stuck at zero, a shared latch,
+# or a wider/neighboring SPU access escaping the unbuilt path and its port cost.
+schway_add_test(NAME bus.spu_attr
+  COMMAND schwaystation-test-bus spu_attr
+  LABELS bus portable TIMEOUT 10)
+
 # Fault prevented: a segment that classifies wrong, a KSEG2 hole that answers,
 # or a KUSEG alias that misses the physical map.
 schway_add_test(NAME bus.kseg2

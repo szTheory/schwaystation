@@ -13,6 +13,7 @@ bus.memctl_costs	bus,portable
 bus.ram_mirrors	bus,portable
 bus.ram_word	bus,portable
 bus.scratchpad	bus,portable
+bus.spu_attr	bus,portable
 bus.write_queue_depth	bus,portable
 bus.write_queue_drain	bus,portable
 bus.write_queue_exception	bus,portable

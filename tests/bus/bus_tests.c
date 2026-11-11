@@ -843,6 +843,86 @@ static void ram_word(void)
     drop(inst);
 }
 
+/* ATTR is the one SPU control halfword whose stored value is read back. Its
+   transfer-mode bits must let the startup poll observe a DMA-write selection;
+   STATX, neighbouring registers and every unsupported width remain unbuilt.
+   Fault prevented: a read-after-write poll stuck at zero, shared instance
+   state, a widened ATTR decode, or a changed SPU port cost. */
+static void spu_attr(void)
+{
+    schway *inst = make();
+    schway *other = make();
+    uint32_t value = UINT32_MAX;
+    CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+
+    CHECK_EQ_U64(wr(inst, 0x1F801DAAu, 2u, 0u), 0u);
+    CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+    CHECK_EQ_U64(wr(inst, 0xBF801DAAu, 2u, 0x0020u), 0u);
+    static const uint32_t attr_aliases[] = {0x1F801DAAu, 0x9F801DAAu, 0xBF801DAAu};
+    for (size_t i = 0u; i < sizeof attr_aliases / sizeof attr_aliases[0]; i++) {
+        value = 0u;
+        CHECK_EQ_U64(rd(inst, attr_aliases[i], 2u, &value), 0u);
+        CHECK_EQ_HEX(value, 0x0020u);
+        CHECK_EQ_HEX(value & 0x0030u, 0x0020u);
+    }
+    CHECK_EQ_U64(wr(inst, 0x1F801DAAu, 2u, 0xFFFFu), 0u);
+    CHECK_EQ_U64(rd(inst, 0x9F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0xFFFFu);
+    CHECK_EQ_U64(wr(inst, 0x1F801DAAu, 2u, 0x0020u), 0u);
+    value = UINT32_MAX;
+    CHECK_EQ_U64(rd(other, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+    CHECK_EQ_U64(wr(other, 0x1F801DAAu, 2u, 0x1234u), 0u);
+    CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0x0020u);
+
+    const uint32_t before_unbuilt = inst->bus.unbuilt_n[SCHWAY__DEV_SPU];
+    static const struct {
+        uint32_t addr;
+        uint32_t width;
+    } unsupported[] = {
+        {0x1F801DAAu, 1u},
+        {0x1F801DAAu, 4u},
+        {0x1F801DA8u, 4u},
+        {0x1F801DA8u, 2u},
+        {0x1F801DACu, 2u},
+        {0x1F801DAEu, 2u},
+    };
+    for (size_t i = 0u; i < sizeof unsupported / sizeof unsupported[0]; i++) {
+        uint32_t cycles = 7u;
+        uint32_t access_value = UINT32_MAX;
+        uint32_t cost_index = unsupported[i].width == 4u ? 2u : unsupported[i].width - 1u;
+        CHECK_EQ_U64(schway__bus_read(inst, unsupported[i].addr, unsupported[i].width,
+                                      &access_value, &cycles), 0u);
+        CHECK_EQ_HEX(access_value, 0u);
+        CHECK_EQ_U64(cycles, 7u + inst->bus.cost[SCHWAY__PORT_SPU][cost_index]);
+        CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], before_unbuilt + (uint32_t)i + 1u);
+
+        cycles = 11u;
+        CHECK_EQ_U64(schway__bus_write(inst, unsupported[i].addr, unsupported[i].width,
+                                       0xA5A55A5Au, &cycles), 0u);
+        CHECK_EQ_U64(cycles, 11u + inst->bus.cost[SCHWAY__PORT_SPU][3u + cost_index]);
+        CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], before_unbuilt + 2u * (uint32_t)(i + 1u));
+        value = 0u;
+        CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+        CHECK_EQ_HEX(value, 0x0020u);
+    }
+    CHECK_EQ_HEX(inst->bus.last_unbuilt[0], SCHWAY__DEV_SPU);
+    CHECK_EQ_HEX(inst->bus.last_unbuilt[1], 0x1F801DAEu);
+    CHECK_EQ_U64(inst->bus.last_unbuilt[2], 2u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    value = UINT32_MAX;
+    CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], 0u);
+    drop(other);
+    drop(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -854,6 +934,8 @@ int main(int argc, char **argv)
         ram_mirrors();
     } else if (strcmp(c, "ram_word") == 0) {
         ram_word();
+    } else if (strcmp(c, "spu_attr") == 0) {
+        spu_attr();
     } else if (strcmp(c, "memctl_costs") == 0) {
         memctl_costs();
     } else if (strcmp(c, "scratchpad") == 0) {
