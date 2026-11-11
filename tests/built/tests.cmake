@@ -41,3 +41,36 @@ schway_add_test(NAME built.bios.identity_edges
 schway_add_test(NAME built.bios.test_key_isolation
   COMMAND schwaystation-test-bios test_key_isolation
   LABELS bios portable TIMEOUT 10)
+
+# Fault prevented: a same-sized OpenBIOS output with changed bytes being accepted.
+# Generate both inputs in the build tree so no firmware or source bytes are retained.
+set(openbios_fixture_dir "${PROJECT_BINARY_DIR}/tests/built/openbios")
+file(MAKE_DIRECTORY "${openbios_fixture_dir}")
+string(REPEAT "S" 524288 openbios_fixture)
+set(openbios_fixture_path "${openbios_fixture_dir}/openbios.bin")
+set(openbios_expected_path "${openbios_fixture_dir}/expected.txt")
+set(openbios_corrupt_path "${openbios_fixture_dir}/openbios-corrupt.bin")
+file(WRITE "${openbios_fixture_path}" "${openbios_fixture}")
+file(SHA256 "${openbios_fixture_path}" openbios_fixture_sha256)
+file(WRITE "${openbios_expected_path}" "${openbios_fixture_sha256}\n")
+string(SUBSTRING "${openbios_fixture}" 0 1 openbios_first)
+string(SUBSTRING "${openbios_fixture}" 1 -1 openbios_tail)
+if(openbios_first STREQUAL "S")
+  set(openbios_bad_first "T")
+else()
+  set(openbios_bad_first "S")
+endif()
+file(WRITE "${openbios_corrupt_path}" "${openbios_bad_first}${openbios_tail}")
+
+schway_add_test(NAME built.openbios.digest
+  COMMAND ${CMAKE_COMMAND} "-DOPENBIOS_INPUT=${openbios_fixture_path}"
+    "-DEXPECTED_FILE=${openbios_expected_path}" -P ${PROJECT_SOURCE_DIR}/cmake/OpenBIOS.cmake
+  LABELS bios portable TIMEOUT 10)
+
+set(openbios_corrupt_cmd ${CMAKE_COMMAND} "-DOPENBIOS_INPUT=${openbios_corrupt_path}"
+  "-DEXPECTED_FILE=${openbios_expected_path}" -P ${PROJECT_SOURCE_DIR}/cmake/OpenBIOS.cmake)
+string(REPLACE ";" "$<SEMICOLON>" openbios_corrupt_cmd "${openbios_corrupt_cmd}")
+schway_add_test(NAME built.openbios.digest_corrupt
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${openbios_corrupt_cmd}" -DCODE=1
+    "-DREGEX=OpenBIOS SHA256 mismatch" -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS bios portable TIMEOUT 10)
