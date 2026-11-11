@@ -135,6 +135,145 @@ static void make_valid_card(uint8_t *bytes)
     }
 }
 
+schway_host_card_status schway_host_card_import_file(const char *path, void *out,
+                                                      size_t out_size,
+                                                      schway_host_card_lint *lint)
+{
+    (void)path;
+    (void)out;
+    (void)out_size;
+    (void)lint;
+    return SCHWAY_HOST_CARD_ERR_IO;
+}
+
+schway_host_card_status schway_host_card_paths_for_serial(const char *directory,
+                                                           const char *serial,
+                                                           char *slot1, size_t slot1_size,
+                                                           char *slot2, size_t slot2_size)
+{
+    (void)directory;
+    (void)serial;
+    (void)slot1;
+    (void)slot1_size;
+    (void)slot2;
+    (void)slot2_size;
+    return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+}
+
+static void wrappers(void)
+{
+    enum { GME_HEADER_SIZE = 0x0F40, VGS_HEADER_SIZE = 64, PSX_HEADER_SIZE = 256 };
+    char first_directory[TEMP_PATH_CAP] = {0};
+    char second_directory[TEMP_PATH_CAP] = {0};
+    char gme_path[TEMP_PATH_CAP] = {0};
+    char vgs_path[TEMP_PATH_CAP] = {0};
+    char psx_path[TEMP_PATH_CAP] = {0};
+    char first_slot1[TEMP_PATH_CAP] = {0};
+    char first_slot2[TEMP_PATH_CAP] = {0};
+    char second_slot1[TEMP_PATH_CAP] = {0};
+    char second_slot2[TEMP_PATH_CAP] = {0};
+    uint8_t *card = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *wrapped = (uint8_t *)malloc((size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
+    uint8_t *out = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    int made_first_directory = 0;
+    int made_second_directory = 0;
+    int have_gme = 0;
+    int have_vgs = 0;
+    int have_psx = 0;
+    int have_slot1 = 0;
+    int have_slot2 = 0;
+
+    CHECK(card != NULL && wrapped != NULL && out != NULL);
+    if (card == NULL || wrapped == NULL || out == NULL) {
+        goto cleanup;
+    }
+    made_first_directory = create_work_directory(first_directory, sizeof first_directory);
+    made_second_directory = create_work_directory(second_directory, sizeof second_directory);
+    CHECK(made_first_directory != 0 && made_second_directory != 0);
+    if (!made_first_directory || !made_second_directory ||
+        !set_path(gme_path, sizeof gme_path, first_directory, "legacy.gme") ||
+        !set_path(vgs_path, sizeof vgs_path, first_directory, "legacy.mem") ||
+        !set_path(psx_path, sizeof psx_path, first_directory, "legacy.psx")) {
+        CHECK(0);
+        goto cleanup;
+    }
+
+    make_valid_card(card);
+    memset(wrapped, 0, GME_HEADER_SIZE);
+    memcpy(wrapped, "123-456-STD", 11u);
+    wrapped[11] = 0u;
+    wrapped[0x12] = 1u;
+    wrapped[0x14] = 1u;
+    memset(wrapped + 0x25, 0x08, 16u);
+    memcpy(wrapped + GME_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    CHECK(write_file(gme_path, wrapped, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE));
+    have_gme = 1;
+    schway_host_card_lint lint = {UINT32_MAX, UINT32_MAX};
+    memset(out, 0x5A, SCHWAY_MEMCARD_SIZE);
+    schway_host_card_status status =
+        schway_host_card_import_file(gme_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    if (status == SCHWAY_HOST_CARD_OK) {
+        CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(lint.flags, 0u);
+        CHECK_EQ_U64(lint.bad_frame_checksums, 0u);
+    }
+
+    memset(wrapped, 0, VGS_HEADER_SIZE);
+    memcpy(wrapped, "VgsM", 4u);
+    memcpy(wrapped + VGS_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    CHECK(write_file(vgs_path, wrapped, (size_t)VGS_HEADER_SIZE + SCHWAY_MEMCARD_SIZE));
+    have_vgs = 1;
+    status = schway_host_card_import_file(vgs_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    if (status == SCHWAY_HOST_CARD_OK) {
+        CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(lint.flags, 0u);
+    }
+
+    memset(wrapped, 0, PSX_HEADER_SIZE);
+    memcpy(wrapped, "PSV", 3u);
+    memcpy(wrapped + PSX_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    CHECK(write_file(psx_path, wrapped, (size_t)PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE));
+    have_psx = 1;
+    status = schway_host_card_import_file(psx_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    if (status == SCHWAY_HOST_CARD_OK) {
+        CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(lint.flags, 0u);
+    }
+
+    CHECK(schway_host_card_paths_for_serial(first_directory, "SLUS_123.45",
+                                            first_slot1, sizeof first_slot1,
+                                            first_slot2, sizeof first_slot2) == SCHWAY_HOST_CARD_OK);
+    CHECK(schway_host_card_paths_for_serial(second_directory, "SLUS_123.45",
+                                            second_slot1, sizeof second_slot1,
+                                            second_slot2, sizeof second_slot2) == SCHWAY_HOST_CARD_OK);
+    CHECK(strstr(first_slot1, "/SLUS_123.45.srm") != NULL);
+    CHECK(strstr(first_slot2, "/SLUS_123.45.1.mcr") != NULL);
+    CHECK(strcmp(first_slot1, second_slot1) != 0 && strcmp(first_slot2, second_slot2) != 0);
+    if (first_slot1[0] != '\0' && first_slot2[0] != '\0') {
+        status = schway_host_card_save_atomic(first_slot1, card, SCHWAY_MEMCARD_SIZE);
+        CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+        have_slot1 = status == SCHWAY_HOST_CARD_OK;
+        status = schway_host_card_save_atomic(first_slot2, card, SCHWAY_MEMCARD_SIZE);
+        CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+        have_slot2 = status == SCHWAY_HOST_CARD_OK;
+    }
+
+cleanup:
+    if (have_slot2) (void)remove(first_slot2);
+    if (have_slot1) (void)remove(first_slot1);
+    if (have_psx) (void)remove(psx_path);
+    if (have_vgs) (void)remove(vgs_path);
+    if (have_gme) (void)remove(gme_path);
+    if (made_second_directory) (void)remove_directory(second_directory);
+    if (made_first_directory) (void)remove_directory(first_directory);
+    free(out);
+    free(wrapped);
+    free(card);
+}
+
 static void atomic_roundtrip(void)
 {
     char directory[TEMP_PATH_CAP] = {0};
@@ -436,6 +575,8 @@ int main(int argc, char **argv)
         atomic_roundtrip();
     } else if (strcmp(argv[1], "atomic_failures") == 0) {
         atomic_failures();
+    } else if (strcmp(argv[1], "wrappers") == 0) {
+        wrappers();
     } else {
         fprintf(stderr, "unknown card file test name\n");
         return 2;

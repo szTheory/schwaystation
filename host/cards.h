@@ -27,6 +27,13 @@ typedef struct schway_host_card_lint {
 schway_host_card_status schway_host_card_import_raw(const char *path, void *out,
                                                      size_t out_size,
                                                      schway_host_card_lint *lint);
+schway_host_card_status schway_host_card_import_file(const char *path, void *out,
+                                                      size_t out_size,
+                                                      schway_host_card_lint *lint);
+schway_host_card_status schway_host_card_paths_for_serial(const char *directory,
+                                                           const char *serial,
+                                                           char *slot1, size_t slot1_size,
+                                                           char *slot2, size_t slot2_size);
 schway_host_card_status schway_host_card_save_atomic(const char *path, const void *bytes,
                                                       size_t size);
 

@@ -57,3 +57,8 @@ schway_add_test(NAME card.files.atomic_roundtrip
 schway_add_test(NAME card.files.atomic_failures
   COMMAND schwaystation-test-card-files atomic_failures
   LABELS card portable TIMEOUT 10)
+
+# Fault prevented: approved legacy wrappers are not imported and serial card names escape their directory.
+schway_add_test(NAME card.files.wrappers
+  COMMAND schwaystation-test-card-files wrappers
+  LABELS card portable TIMEOUT 10)
