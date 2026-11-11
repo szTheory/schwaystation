@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 33 of 52
+current_plan: 34 of 52
 status: executing
-stopped_at: DMA4 request first caller isolated; plan 04-52 ready before real shell acceptance
-last_updated: "2026-11-11T22:08:54Z"
+stopped_at: Completed 04-52-PLAN.md
+last_updated: "2026-11-11T22:45:33.215Z"
 last_activity: 2026-11-11
 last_activity_desc: Planned ATTR-driven DMA4 request continuation into the existing sink; shell still unaccepted
-state_head: 89a9bbbe0274953959a8c4f623a8dbb747b3d9f9
+state_head: 3fbc91104d0ad85fbd0322ee0b988122d5eef208
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 120
-  completed_plans: 100
+  completed_plans: 101
   percent: 50
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 33 of 52
+Current Plan: 34 of 52
 Status: Source-owned plan 04-52 is next ready; 04-40 waits and retains real shell/portable acceptance.
 Last activity: 2026-11-11 — Added DMA4 request/continuation plan from actual boot evidence; no shell hash accepted.
 
@@ -161,6 +161,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P23 | 24 min | 2 tasks | 5 files |
 | Phase 04 P50 | 17 min | 2 tasks | 5 files |
 | Phase 04 P51 | 22min | 2 tasks | 10 files |
+| Phase 04 P52 | 18m 38s | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -367,6 +368,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Synthetic BIOS fixtures are generated only under the build directory; actual OpenBIOS shell observation is deferred to plan 04-40.
 - [Phase 04]: Accept only source-identified width-one writes to physical 1F802041h as ignored POST status, preserving EXP2 gap faults and existing debug-port behavior.
 - [Phase 04]: Keep API, state and behavior revision 4; model only exact halfword ATTR readback as saved instance state.
+- [Phase 04]: Derive DMA4 RAM-to-device readiness from saved ATTR bits 5-4 equal to mode 2; keep manual DREQ credits independent.
+- [Phase 04]: Keep the deterministic sink, existing unit cost and serialized DMA fields; no new state layout or revision is needed.
 
 ### Pending Todos
 
@@ -496,10 +499,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | Phase 04 DMA4 first-caller planning | Codex, OpenGSD 1.20.0; actual DMA credit/ATTR/state/deadline review, planning-only source slice and ordering | gpt-6.1-sol high |
 
+| 2026-11-11 | /gsd-execute-plan 04-52 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; ATTR-derived DMA4 request path, RED/GREEN controls, full CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T22:08:54Z
-Stopped at: Plan 04-52 ready for focused independent check; 04-40 waits
+Last session: 2026-11-11T22:45:32.911Z
+Stopped at: Completed 04-52-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
