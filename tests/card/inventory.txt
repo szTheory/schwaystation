@@ -1,6 +1,7 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
 card.files.atomic_failures	card,portable
 card.files.atomic_roundtrip	card,portable
+card.files.wrapper_edges	card,portable
 card.files.wrappers	card,portable
 card.protocol.read	card,portable
 card.protocol.read_edges	card,portable

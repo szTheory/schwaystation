@@ -26,7 +26,7 @@
 #define SCHWAY_HOST_CARD_GME_HEADER_SIZE 0x0F40u
 #define SCHWAY_HOST_CARD_VGS_HEADER_SIZE 64u
 #define SCHWAY_HOST_CARD_PSX_HEADER_SIZE 256u
-#define SCHWAY_HOST_CARD_SERIAL_CAP 64u
+#define SCHWAY_HOST_CARD_BASENAME_CAP 64u
 #define SCHWAY__HOST_CARD_FAILURE_NONE 0
 #define SCHWAY__HOST_CARD_FAILURE_FLUSH 1
 #define SCHWAY__HOST_CARD_FAILURE_RENAME 2
@@ -244,13 +244,13 @@ schway_host_card_status schway_host_card_import_file(const char *path, void *out
     return SCHWAY_HOST_CARD_OK;
 }
 
-static int schway__host_cards_serial_length(const char *serial, size_t *length)
+static int schway__host_cards_basename_length(const char *basename, size_t *length)
 {
-    if (serial == NULL || length == NULL) {
+    if (basename == NULL || length == NULL) {
         return 0;
     }
-    for (size_t i = 0u; i < SCHWAY_HOST_CARD_SERIAL_CAP; i++) {
-        char value = serial[i];
+    for (size_t i = 0u; i < SCHWAY_HOST_CARD_BASENAME_CAP; i++) {
+        char value = basename[i];
         if (value == '\0') {
             if (i == 0u) {
                 return 0;
@@ -275,11 +275,17 @@ static int schway__host_cards_name_size(size_t directory_size, size_t separator_
                                          size_t *required)
 {
     size_t size = directory_size;
-    if (size > SIZE_MAX - separator_size) return 0;
+    if (size > SIZE_MAX - separator_size) {
+        return 0;
+    }
     size += separator_size;
-    if (size > SIZE_MAX - serial_size) return 0;
+    if (size > SIZE_MAX - serial_size) {
+        return 0;
+    }
     size += serial_size;
-    if (size > SIZE_MAX - suffix_size) return 0;
+    if (size > SIZE_MAX - suffix_size) {
+        return 0;
+    }
     *required = size + suffix_size;
     return 1;
 }
@@ -300,16 +306,16 @@ static void schway__host_cards_write_name(char *out, const char *directory,
     memcpy(out + offset, suffix, suffix_size);
 }
 
-schway_host_card_status schway_host_card_paths_for_serial(const char *directory,
-                                                           const char *serial,
-                                                           char *slot1, size_t slot1_size,
-                                                           char *slot2, size_t slot2_size)
+schway_host_card_status schway_host_card_paths_for_basename(const char *directory,
+                                                             const char *basename,
+                                                             char *slot1, size_t slot1_size,
+                                                             char *slot2, size_t slot2_size)
 {
     if (directory == NULL || slot1 == NULL || slot2 == NULL || slot1 == slot2) {
         return SCHWAY_HOST_CARD_ERR_ARGUMENT;
     }
-    size_t serial_size = 0u;
-    if (!schway__host_cards_serial_length(serial, &serial_size)) {
+    size_t basename_size = 0u;
+    if (!schway__host_cards_basename_length(basename, &basename_size)) {
         return SCHWAY_HOST_CARD_ERR_ARGUMENT;
     }
 
@@ -321,9 +327,9 @@ schway_host_card_status schway_host_card_paths_for_serial(const char *directory,
             : 0u;
     size_t slot1_required = 0u;
     size_t slot2_required = 0u;
-    if (!schway__host_cards_name_size(directory_size, separator_size, serial_size,
+    if (!schway__host_cards_name_size(directory_size, separator_size, basename_size,
                                        sizeof(".srm"), &slot1_required) ||
-        !schway__host_cards_name_size(directory_size, separator_size, serial_size,
+        !schway__host_cards_name_size(directory_size, separator_size, basename_size,
                                        sizeof(".1.mcr"), &slot2_required)) {
         return SCHWAY_HOST_CARD_ERR_SIZE;
     }
@@ -332,9 +338,9 @@ schway_host_card_status schway_host_card_paths_for_serial(const char *directory,
     }
 
     schway__host_cards_write_name(slot1, directory, directory_size, separator_size,
-                                  serial, serial_size, ".srm", sizeof(".srm"));
+                                  basename, basename_size, ".srm", sizeof(".srm"));
     schway__host_cards_write_name(slot2, directory, directory_size, separator_size,
-                                  serial, serial_size, ".1.mcr", sizeof(".1.mcr"));
+                                  basename, basename_size, ".1.mcr", sizeof(".1.mcr"));
     return SCHWAY_HOST_CARD_OK;
 }
 

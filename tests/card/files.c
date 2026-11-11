@@ -89,6 +89,17 @@ static int read_file(const char *path, void *out, size_t capacity, size_t *size)
     return 1;
 }
 
+static void check_file_unchanged(const char *path, const void *expected, size_t expected_size,
+                                 void *snapshot, size_t snapshot_capacity)
+{
+    size_t size = 0u;
+    CHECK(read_file(path, snapshot, snapshot_capacity, &size));
+    CHECK_EQ_U64(size, expected_size);
+    if (size == expected_size) {
+        CHECK(memcmp(snapshot, expected, expected_size) == 0);
+    }
+}
+
 static int set_temp_path(char *out, size_t capacity, const char *destination, unsigned index)
 {
     int written = snprintf(out, capacity, "%s.schwaystation.tmp.%u", destination, index);
@@ -135,6 +146,25 @@ static void make_valid_card(uint8_t *bytes)
     }
 }
 
+static void expect_import_refusal(const char *path, schway_host_card_status expected_status,
+                                  const void *source, size_t source_size,
+                                  uint8_t *out, schway_host_card_lint *lint,
+                                  uint8_t *snapshot, size_t snapshot_capacity)
+{
+    memset(out, 0x5A, SCHWAY_MEMCARD_SIZE);
+    lint->flags = 0x12345678u;
+    lint->bad_frame_checksums = 0x87654321u;
+    schway_host_card_status status =
+        schway_host_card_import_file(path, out, SCHWAY_MEMCARD_SIZE, lint);
+    CHECK_EQ_U64(status, expected_status);
+    CHECK(all_bytes_are(out, SCHWAY_MEMCARD_SIZE, 0x5Au));
+    CHECK_EQ_U64(lint->flags, 0x12345678u);
+    CHECK_EQ_U64(lint->bad_frame_checksums, 0x87654321u);
+    if (source != NULL) {
+        check_file_unchanged(path, source, source_size, snapshot, snapshot_capacity);
+    }
+}
+
 static void wrappers(void)
 {
     enum { GME_HEADER_SIZE = 0x0F40, VGS_HEADER_SIZE = 64, PSX_HEADER_SIZE = 256 };
@@ -147,8 +177,13 @@ static void wrappers(void)
     char first_slot2[TEMP_PATH_CAP] = {0};
     char second_slot1[TEMP_PATH_CAP] = {0};
     char second_slot2[TEMP_PATH_CAP] = {0};
+    char content_slot1[TEMP_PATH_CAP] = {0};
+    char content_slot2[TEMP_PATH_CAP] = {0};
+    char expected_slot1[TEMP_PATH_CAP] = {0};
+    char expected_slot2[TEMP_PATH_CAP] = {0};
     uint8_t *card = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
     uint8_t *wrapped = (uint8_t *)malloc((size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
+    uint8_t *snapshot = (uint8_t *)malloc((size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
     uint8_t *out = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
     int made_first_directory = 0;
     int made_second_directory = 0;
@@ -157,9 +192,11 @@ static void wrappers(void)
     int have_psx = 0;
     int have_slot1 = 0;
     int have_slot2 = 0;
+    int have_second_slot1 = 0;
+    int have_second_slot2 = 0;
 
-    CHECK(card != NULL && wrapped != NULL && out != NULL);
-    if (card == NULL || wrapped == NULL || out == NULL) {
+    CHECK(card != NULL && wrapped != NULL && snapshot != NULL && out != NULL);
+    if (card == NULL || wrapped == NULL || snapshot == NULL || out == NULL) {
         goto cleanup;
     }
     made_first_directory = create_work_directory(first_directory, sizeof first_directory);
@@ -188,6 +225,8 @@ static void wrappers(void)
     schway_host_card_status status =
         schway_host_card_import_file(gme_path, out, SCHWAY_MEMCARD_SIZE, &lint);
     CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    check_file_unchanged(gme_path, wrapped, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE,
+                         snapshot, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
     if (status == SCHWAY_HOST_CARD_OK) {
         CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
         CHECK_EQ_U64(lint.flags, 0u);
@@ -201,6 +240,8 @@ static void wrappers(void)
     have_vgs = 1;
     status = schway_host_card_import_file(vgs_path, out, SCHWAY_MEMCARD_SIZE, &lint);
     CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    check_file_unchanged(vgs_path, wrapped, (size_t)VGS_HEADER_SIZE + SCHWAY_MEMCARD_SIZE,
+                         snapshot, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
     if (status == SCHWAY_HOST_CARD_OK) {
         CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
         CHECK_EQ_U64(lint.flags, 0u);
@@ -213,19 +254,31 @@ static void wrappers(void)
     have_psx = 1;
     status = schway_host_card_import_file(psx_path, out, SCHWAY_MEMCARD_SIZE, &lint);
     CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    check_file_unchanged(psx_path, wrapped, (size_t)PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE,
+                         snapshot, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
     if (status == SCHWAY_HOST_CARD_OK) {
         CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
         CHECK_EQ_U64(lint.flags, 0u);
     }
 
-    CHECK(schway_host_card_paths_for_serial(first_directory, "SLUS_123.45",
-                                            first_slot1, sizeof first_slot1,
-                                            first_slot2, sizeof first_slot2) == SCHWAY_HOST_CARD_OK);
-    CHECK(schway_host_card_paths_for_serial(second_directory, "SLUS_123.45",
-                                            second_slot1, sizeof second_slot1,
-                                            second_slot2, sizeof second_slot2) == SCHWAY_HOST_CARD_OK);
-    CHECK(strstr(first_slot1, "/SLUS_123.45.srm") != NULL);
-    CHECK(strstr(first_slot2, "/SLUS_123.45.1.mcr") != NULL);
+    CHECK(schway_host_card_paths_for_basename(first_directory, "game",
+                                              content_slot1, sizeof content_slot1,
+                                              content_slot2, sizeof content_slot2) == SCHWAY_HOST_CARD_OK);
+    CHECK(set_path(expected_slot1, sizeof expected_slot1, first_directory, "game.srm"));
+    CHECK(set_path(expected_slot2, sizeof expected_slot2, first_directory, "game.1.mcr"));
+    CHECK(strcmp(content_slot1, expected_slot1) == 0);
+    CHECK(strcmp(content_slot2, expected_slot2) == 0);
+
+    CHECK(schway_host_card_paths_for_basename(first_directory, "SLUS_123.45",
+                                              first_slot1, sizeof first_slot1,
+                                              first_slot2, sizeof first_slot2) == SCHWAY_HOST_CARD_OK);
+    CHECK(schway_host_card_paths_for_basename(second_directory, "SLUS_123.45",
+                                              second_slot1, sizeof second_slot1,
+                                              second_slot2, sizeof second_slot2) == SCHWAY_HOST_CARD_OK);
+    CHECK(set_path(expected_slot1, sizeof expected_slot1, first_directory, "SLUS_123.45.srm"));
+    CHECK(set_path(expected_slot2, sizeof expected_slot2, first_directory, "SLUS_123.45.1.mcr"));
+    CHECK(strcmp(first_slot1, expected_slot1) == 0);
+    CHECK(strcmp(first_slot2, expected_slot2) == 0);
     CHECK(strcmp(first_slot1, second_slot1) != 0 && strcmp(first_slot2, second_slot2) != 0);
     if (first_slot1[0] != '\0' && first_slot2[0] != '\0') {
         status = schway_host_card_save_atomic(first_slot1, card, SCHWAY_MEMCARD_SIZE);
@@ -234,18 +287,220 @@ static void wrappers(void)
         status = schway_host_card_save_atomic(first_slot2, card, SCHWAY_MEMCARD_SIZE);
         CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
         have_slot2 = status == SCHWAY_HOST_CARD_OK;
+        status = schway_host_card_save_atomic(second_slot1, card, SCHWAY_MEMCARD_SIZE);
+        CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+        have_second_slot1 = status == SCHWAY_HOST_CARD_OK;
+        status = schway_host_card_save_atomic(second_slot2, card, SCHWAY_MEMCARD_SIZE);
+        CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+        have_second_slot2 = status == SCHWAY_HOST_CARD_OK;
     }
 
 cleanup:
-    if (have_slot2) (void)remove(first_slot2);
-    if (have_slot1) (void)remove(first_slot1);
-    if (have_psx) (void)remove(psx_path);
-    if (have_vgs) (void)remove(vgs_path);
-    if (have_gme) (void)remove(gme_path);
-    if (made_second_directory) (void)remove_directory(second_directory);
-    if (made_first_directory) (void)remove_directory(first_directory);
+    if (have_second_slot2) {
+        (void)remove(second_slot2);
+    }
+    if (have_second_slot1) {
+        (void)remove(second_slot1);
+    }
+    if (have_slot2) {
+        (void)remove(first_slot2);
+    }
+    if (have_slot1) {
+        (void)remove(first_slot1);
+    }
+    if (have_psx) {
+        (void)remove(psx_path);
+    }
+    if (have_vgs) {
+        (void)remove(vgs_path);
+    }
+    if (have_gme) {
+        (void)remove(gme_path);
+    }
+    if (made_second_directory) {
+        (void)remove_directory(second_directory);
+    }
+    if (made_first_directory) {
+        (void)remove_directory(first_directory);
+    }
     free(out);
+    free(snapshot);
     free(wrapped);
+    free(card);
+}
+
+static void wrapper_edges(void)
+{
+    enum { GME_HEADER_SIZE = 0x0F40, VGS_HEADER_SIZE = 64, PSX_HEADER_SIZE = 256 };
+    const size_t input_capacity = (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE;
+    char directory[TEMP_PATH_CAP] = {0};
+    char source_path[TEMP_PATH_CAP] = {0};
+    char missing_path[TEMP_PATH_CAP] = {0};
+    char slot1[TEMP_PATH_CAP];
+    char slot2[TEMP_PATH_CAP];
+    char long_serial[65];
+    uint8_t *card = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *input = (uint8_t *)malloc(input_capacity + 1u);
+    uint8_t *out = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *snapshot = (uint8_t *)malloc(input_capacity + 1u);
+    int made_directory = 0;
+    int have_source = 0;
+
+    CHECK(card != NULL && input != NULL && out != NULL && snapshot != NULL);
+    if (card == NULL || input == NULL || out == NULL || snapshot == NULL) {
+        goto cleanup;
+    }
+    made_directory = create_work_directory(directory, sizeof directory);
+    CHECK(made_directory != 0);
+    if (!made_directory || !set_path(source_path, sizeof source_path, directory, "malformed.card") ||
+        !set_path(missing_path, sizeof missing_path, directory, "missing.card")) {
+        CHECK(0);
+        goto cleanup;
+    }
+
+    schway_host_card_lint lint = {0u, 0u};
+    expect_import_refusal(missing_path, SCHWAY_HOST_CARD_ERR_IO, NULL, 0u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    make_valid_card(card);
+    CHECK(write_file(source_path, card, 0u));
+    have_source = 1;
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, card, 0u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0x47, (size_t)SCHWAY_MEMCARD_SIZE + 1u);
+    CHECK(write_file(source_path, input, (size_t)SCHWAY_MEMCARD_SIZE + 1u));
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input,
+                          (size_t)SCHWAY_MEMCARD_SIZE + 1u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0, GME_HEADER_SIZE);
+    memcpy(input, "123-456-STD", 11u);
+    memcpy(input + GME_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    size_t gme_size = (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE;
+    CHECK(write_file(source_path, input, gme_size - 1u));
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input, gme_size - 1u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    input[11] = 1u;
+    CHECK(write_file(source_path, input, gme_size));
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input, gme_size,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0, VGS_HEADER_SIZE);
+    memcpy(input, "VgsM", 4u);
+    memcpy(input + VGS_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    size_t vgs_size = (size_t)VGS_HEADER_SIZE + SCHWAY_MEMCARD_SIZE;
+    CHECK(write_file(source_path, input, vgs_size - 1u));
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input, vgs_size - 1u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0, PSX_HEADER_SIZE);
+    memcpy(input, "PSV", 3u);
+    memcpy(input + PSX_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    size_t psx_size = (size_t)PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE;
+    CHECK(write_file(source_path, input, psx_size - 1u));
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input, psx_size - 1u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0, VGS_HEADER_SIZE);
+    input[0] = (uint8_t)'X';
+    memcpy(input + VGS_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    CHECK(write_file(source_path, input, vgs_size));
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input, vgs_size,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0x31, SCHWAY_MEMCARD_SIZE + 1u);
+    memcpy(input, "MCX", 3u);
+    CHECK(write_file(source_path, input, SCHWAY_MEMCARD_SIZE + 1u));
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input,
+                          SCHWAY_MEMCARD_SIZE + 1u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0x29, 23u);
+    CHECK(write_file(source_path, input, 23u));
+    memset(out, 0x5A, SCHWAY_MEMCARD_SIZE);
+    lint.flags = UINT32_MAX;
+    lint.bad_frame_checksums = UINT32_MAX;
+    schway_host_card_status status =
+        schway_host_card_import_file(source_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(memcmp(out, input, 23u) == 0);
+    CHECK(all_bytes_are(out + 23u, SCHWAY_MEMCARD_SIZE - 23u, 0xFFu));
+    CHECK((lint.flags & SCHWAY_HOST_CARD_LINT_BAD_HEADER) != 0u);
+    check_file_unchanged(source_path, input, 23u, snapshot, input_capacity + 1u);
+
+    make_valid_card(card);
+    const size_t header_offset = 63u * 128u;
+    card[header_offset] = (uint8_t)'X';
+    card[header_offset + 127u] = frame_checksum(card + header_offset);
+    memset(input, 0, VGS_HEADER_SIZE);
+    memcpy(input, "VgsM", 4u);
+    memcpy(input + VGS_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    CHECK(write_file(source_path, input, vgs_size));
+    status = schway_host_card_import_file(source_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(lint.flags, SCHWAY_HOST_CARD_LINT_BAD_HEADER);
+    CHECK_EQ_U64(lint.bad_frame_checksums, 0u);
+    check_file_unchanged(source_path, input, vgs_size, snapshot, input_capacity + 1u);
+
+    make_valid_card(card);
+    card[0] ^= 1u;
+    memset(input, 0, PSX_HEADER_SIZE);
+    memcpy(input, "PSV", 3u);
+    memcpy(input + PSX_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    CHECK(write_file(source_path, input, psx_size));
+    status = schway_host_card_import_file(source_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK_EQ_U64(lint.flags, SCHWAY_HOST_CARD_LINT_BAD_CHECKSUM);
+    CHECK_EQ_U64(lint.bad_frame_checksums, 1u);
+    check_file_unchanged(source_path, input, psx_size, snapshot, input_capacity + 1u);
+
+    const char *invalid_serials[] = {
+        "", ".", "..", "SLUS/../escape", "SLUS\\..\\escape", "BAD:SERIAL", "SERIAL NAME"
+    };
+    for (size_t i = 0u; i < sizeof invalid_serials / sizeof invalid_serials[0]; i++) {
+        memset(slot1, 'Q', sizeof slot1);
+        memset(slot2, 'R', sizeof slot2);
+        status = schway_host_card_paths_for_basename(directory, invalid_serials[i],
+                                                     slot1, sizeof slot1,
+                                                     slot2, sizeof slot2);
+        CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+        CHECK(all_bytes_are((const uint8_t *)slot1, sizeof slot1, (uint8_t)'Q'));
+        CHECK(all_bytes_are((const uint8_t *)slot2, sizeof slot2, (uint8_t)'R'));
+    }
+    memset(long_serial, 'A', sizeof long_serial - 1u);
+    long_serial[sizeof long_serial - 1u] = '\0';
+    memset(slot1, 'Q', sizeof slot1);
+    memset(slot2, 'R', sizeof slot2);
+    status = schway_host_card_paths_for_basename(directory, long_serial,
+                                                 slot1, sizeof slot1,
+                                                 slot2, sizeof slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)slot1, sizeof slot1, (uint8_t)'Q'));
+    CHECK(all_bytes_are((const uint8_t *)slot2, sizeof slot2, (uint8_t)'R'));
+
+    memset(slot1, 'Q', sizeof slot1);
+    memset(slot2, 'R', sizeof slot2);
+    status = schway_host_card_paths_for_basename(directory, "SLUS_123.45",
+                                                 slot1, 1u, slot2, sizeof slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are((const uint8_t *)slot1, sizeof slot1, (uint8_t)'Q'));
+    CHECK(all_bytes_are((const uint8_t *)slot2, sizeof slot2, (uint8_t)'R'));
+    status = schway_host_card_paths_for_basename(directory, "SLUS_123.45",
+                                                 slot1, sizeof slot1, slot2, 1u);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are((const uint8_t *)slot1, sizeof slot1, (uint8_t)'Q'));
+    CHECK(all_bytes_are((const uint8_t *)slot2, sizeof slot2, (uint8_t)'R'));
+
+cleanup:
+    if (have_source) (void)remove(source_path);
+    if (made_directory) (void)remove_directory(directory);
+    free(snapshot);
+    free(out);
+    free(input);
     free(card);
 }
 
@@ -552,6 +807,8 @@ int main(int argc, char **argv)
         atomic_failures();
     } else if (strcmp(argv[1], "wrappers") == 0) {
         wrappers();
+    } else if (strcmp(argv[1], "wrapper_edges") == 0) {
+        wrapper_edges();
     } else {
         fprintf(stderr, "unknown card file test name\n");
         return 2;

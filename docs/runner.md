@@ -58,10 +58,11 @@ Wrapped images with a truncated payload, an invalid header or trailing bytes are
 formats are unsupported. Import reports lint flags for a missing `MC` header or bad frame checksums, but those
 warnings do not reject an otherwise valid image. Lint reads the imported bytes and never rewrites the source file.
 
-Per-game names use the game's serial as one filename component: slot 1 is `basename.srm`, and slot 2 is
-`basename.1.mcr`. The shared helper refuses serials with path separators, unsupported filename characters, or
-more than 63 characters; it builds both names under the supplied directory. The same serial in separate
-directories therefore produces separate save paths. Slot 2 does not use the stale `.2.mcr` spelling.
+By default, per-game names use the content basename: slot 1 is `basename.srm`, and slot 2 is
+`basename.1.mcr`. A host may select serial naming instead, using the game serial as that basename so multi-disc
+sets share a card. The shared helper refuses path separators, unsupported filename characters, or more than 63
+characters; it builds both names under the supplied directory. The same basename in separate directories
+therefore produces separate save paths. Slot 2 does not use the stale `.2.mcr` spelling.
 
 Saving requires a complete 131,072-byte image. The helper writes a new sibling temporary file, flushes it, forces
 the file data to storage (`fsync` on POSIX and `_commit` on Windows), then atomically replaces the destination.

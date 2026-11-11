@@ -62,3 +62,8 @@ schway_add_test(NAME card.files.atomic_failures
 schway_add_test(NAME card.files.wrappers
   COMMAND schwaystation-test-card-files wrappers
   LABELS card portable TIMEOUT 10)
+
+# Fault prevented: malformed wrappers, unsafe serial paths, or lint can mutate source or output state.
+schway_add_test(NAME card.files.wrapper_edges
+  COMMAND schwaystation-test-card-files wrapper_edges
+  LABELS card portable TIMEOUT 10)
