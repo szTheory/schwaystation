@@ -231,7 +231,7 @@ Plans:
   4. OpenBIOS, built in CI from nugget at its pin, boots to its shell with a pinned frame hash that is the same on every platform that runs it. The compatibility ledger rejects any unratcheted regression. The local `library` preset, pointed at a fixture in a temporary directory, writes only `build/library/results.csv`.
   5. In the hosted RetroArch session, `pad_counter.exe` loads as content with no BIOS in `system/`. The picture changes between two `--max-frames` values, and each screenshot matches the runner's `--png` frame pixel for pixel.
 
-**Plans**: 32
+**Plans**: 49
 **Wave 1**
 - [x] 04-01 — Build skeleton and an inventoried VRAM-to-frame tracer
 
@@ -267,54 +267,102 @@ Plans:
 - [x] 04-11 — Run GPU DMA2 through busy/readiness deadlines and validated state
 - [x] 04-15 — Expose deterministic input and full DualShock configuration/rumble
 
-**Wave 12** *(blocked on Wave 11 completion)*
-- [x] 04-12 — Run moving GPU and exact line/dot fixtures through the runner
-- [ ] 04-16 — Commit card writes only at successful protocol completion
+**Wave 12**
+- [x] 04-12-PLAN.md — Run moving GPU and exact line/dot fixtures through the runner
+- [ ] 04-16-PLAN.md — Read both SIO cards through stable raw memory spans
 
-**Wave 13** *(blocked on Wave 12 completion)*
-- [ ] 04-13 — Measure CPU-driven GPU performance and correct the first CI timeout caller
-- [ ] 04-17 — Import, lint and atomically persist host memory-card files
+**Wave 13**
+- [ ] 04-13-PLAN.md — Measure CPU-driven GPU performance and correct the first CI timeout caller
+- [ ] 04-33-PLAN.md — Commit a staged SIO card write only on successful 47h
 
-**Wave 14** *(blocked on Wave 13 completion)*
-- [ ] 04-18 — Apply runner input movies and prove pad_counter changes play
+**Wave 14**
+- [ ] 04-34-PLAN.md — Validate card imports and pending transport atomically
 
-**Wave 15** *(blocked on Wave 14 completion)*
-- [ ] 04-19 — Persist runner cards across fresh processes and clean signals
-- [ ] 04-20 — Load copied BIOS bytes and report name-independent digest identity
+**Wave 15**
+- [ ] 04-17-PLAN.md — Import raw cards and save them atomically in the host helper
 
-**Wave 16** *(blocked on Wave 15 completion)*
-- [ ] 04-21 — Admit the public BIOS digest table and scan every release member
+**Wave 16**
+- [ ] 04-35-PLAN.md — Import legacy wrappers and enforce canonical save names
 
-**Wave 17** *(blocked on Wave 16 completion)*
-- [ ] 04-22 — Build pinned OpenBIOS on Linux and establish its expected digest
+**Wave 17**
+- [ ] 04-18-PLAN.md — Apply validated input movies before the runner frame latch
 
-**Wave 18** *(blocked on Wave 17 completion)*
-- [ ] 04-23 — Boot OpenBIOS to a pinned shell frame on every applicable lane
+**Wave 18**
+- [ ] 04-36-PLAN.md — Prove input edges, guest pixels and polling lag
 
-**Wave 19** *(blocked on Wave 18 completion)*
-- [ ] 04-24 — Protect the ten-column compatibility ratchet and generated document
-- [ ] 04-27 — Load BIOS-free PS-EXE content and switch libretro geometry
+**Wave 19**
+- [ ] 04-19-PLAN.md — Persist runner cards on normal and clean signal exits
+- [ ] 04-20-PLAN.md — Execute copied BIOS bytes and report their SHA256 identity
 
-**Wave 20** *(blocked on Wave 19 completion)*
-- [ ] 04-25 — Probe host-only cue/bin identity without claiming disc execution
+**Wave 20**
+- [ ] 04-37-PLAN.md — Prove card values survive two fresh guest processes
+- [ ] 04-38-PLAN.md — Recognize BIOS images from the pinned DAT digest rows
 
-**Wave 21** *(blocked on Wave 20 completion)*
-- [ ] 04-26 — Run the local library preset against real temporary metadata fixtures
+**Wave 21**
+- [ ] 04-21-PLAN.md — Scan release firmware and prove complete isolated-key rejection
 
-**Wave 22** *(blocked on Wave 21 completion)*
-- [ ] 04-28 — Map libretro controllers, rumble, cards and truthful metadata claims
+**Wave 22**
+- [ ] 04-22-PLAN.md — Build pinned OpenBIOS on Linux and measure the output digest
 
-**Wave 23** *(blocked on Wave 22 completion)*
-- [ ] 04-29 — Compare BIOS-free content screenshots in one hosted RetroArch session
+**Wave 23**
+- [ ] 04-39-PLAN.md — Transfer checked OpenBIOS only within its build run
 
-**Wave 24** *(blocked on Wave 23 completion)*
-- [ ] 04-30 — Judge all pinned GPU image and log oracles
+**Wave 24**
+- [ ] 04-23-PLAN.md — Load explicit BIOS files through the real runner reset path
 
-**Wave 25** *(blocked on Wave 24 completion)*
-- [ ] 04-31 — Replay hostile GPU, SIO and card inputs through bounded public runs
+**Wave 25**
+- [ ] 04-40-PLAN.md — Pin the inspected OpenBIOS shell across applicable lanes
 
-**Wave 26** *(blocked on Wave 25 completion)*
-- [ ] 04-32 — Reconcile hardware contracts and verify complete Phase4 integration
+**Wave 26**
+- [ ] 04-24-PLAN.md — Judge ten-column compatibility rows and generate fresh docs
+- [ ] 04-27-PLAN.md — Load BIOS-free fullpath PS-EXEs in libretro
+
+**Wave 27**
+- [ ] 04-41-PLAN.md — Run the compatibility judge copied from the actual PR base
+- [ ] 04-43-PLAN.md — Notify libretro geometry and rate changes for native video
+
+**Wave 28**
+- [ ] 04-25-PLAN.md — Probe one bounded ISO boot executable through runner identity
+
+**Wave 29**
+- [ ] 04-49-PLAN.md — Resolve bounded CUE tracks and sector layouts into boot identity
+
+**Wave 30**
+- [ ] 04-42-PLAN.md — Join full track metadata and reject hostile private inputs
+
+**Wave 31**
+- [ ] 04-26-PLAN.md — Run the private library seam with meaningful and privacy controls
+
+**Wave 32**
+- [ ] 04-28-PLAN.md — Map libretro controllers and both rumble motors
+
+**Wave 33**
+- [ ] 04-44-PLAN.md — Persist libretro cards and resolve memory descriptor aliases
+
+**Wave 34**
+- [ ] 04-45-PLAN.md — Guard only functional libretro metadata claims
+
+**Wave 35**
+- [ ] 04-29-PLAN.md — Compare two BIOS-free content frames in real background RetroArch
+
+**Wave 36**
+- [ ] 04-30-PLAN.md — Compare canonical whole-VRAM output against independent known answers
+
+**Wave 37**
+- [ ] 04-46-PLAN.md — Run the pinned clipping executable against its actual hardware capture
+
+**Wave 38**
+- [ ] 04-47-PLAN.md — Compare all remaining nine actual GPU image captures
+
+**Wave 39**
+- [ ] 04-48-PLAN.md — Judge the three real GPU hardware logs and run the required lane
+
+**Wave 40**
+- [ ] 04-31-PLAN.md — Replay hostile GPU, SIO and card inputs through bounded calls
+
+**Wave 41**
+- [ ] 04-32-PLAN.md — Reconcile API and hardware contracts, then verify the reviewed phase
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
 

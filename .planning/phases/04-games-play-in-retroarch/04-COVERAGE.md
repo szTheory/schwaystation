@@ -100,3 +100,27 @@ Rows preserve the input order of `/tmp/schway-phase4-edge-coverage.json`. Generi
 | 31 | GAME-07 precision | 10 independent RGB conversion, 28 exact signed-axis and motor scaling, 29 pixel-exact screenshots at both frame limits |
 
 Deferred SPU/audio, CD-ROM controller/m3u/MDEC, later library formats and unresolved physical timing alternatives remain outside this phase exactly as CONTEXT specifies. Metadata probing does not claim disc boot/play. No source item is silently dropped.
+
+## Execution-evidence slice expansion
+
+Original references above denote the complete ordered chains below. First IDs preserve their callers; each chain retains every original acceptance item. See04-SIZING.md for evidence and retained/consolidated scope.
+
+| Original plan | Complete executable chain |
+| --- | --- |
+|04-16|04-16, 04-33, 04-34|
+|04-17|04-17, 04-35|
+|04-18|04-18, 04-36|
+|04-19|04-19, 04-37|
+|04-20|04-20, 04-38|
+|04-21|04-21|
+|04-22|04-22, 04-39|
+|04-23|04-23, 04-40|
+|04-24|04-24, 04-41|
+|04-25|04-25, 04-49, 04-42|
+|04-26|04-26|
+|04-27|04-27, 04-43|
+|04-28|04-28, 04-44, 04-45|
+|04-29|04-29|
+|04-30|04-30, 04-46, 04-47, 04-48|
+|04-31|04-31|
+|04-32|04-32|

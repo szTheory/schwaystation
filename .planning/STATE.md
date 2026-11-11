@@ -5,15 +5,15 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-12-PLAN.md
-last_updated: "2026-11-11T05:30:53.957Z"
-last_activity: 2026-11-10
-last_activity_desc: Phase 04 plan 04-11 completed
-state_head: 331ee30022f91213458c07011d6e5fed1170c65b
+stopped_at: Phase 04 remaining-plan sizing complete; focused independent check next
+last_updated: "2026-11-11T05:42:03Z"
+last_activity: 2026-11-11
+last_activity_desc: Phase 04 remaining work split using measured execution evidence
+state_head: e5c3ccddb9533222a97371c148922b1fe7398ef4
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 100
+  total_plans: 117
   completed_plans: 82
   percent: 50
 ---
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 15 of 32
-Status: Ready to execute
-Last activity: 2026-11-10 — Phase 04 plan 04-11 completed
+Plan: 14 completed of 49; next ready 04-16 (04-13 also ready)
+Status: Resized plans ready for focused independent check; next execution 04-16
+Last activity: 2026-11-11 — Remaining Phase 04 plans resized; independent focused check next
 
 Progress: [█████░░░░░] 50%
 
@@ -406,10 +406,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-12 | Codex, OpenGSD 1.20.0; sequential executor, GPU-motion and beam-timing fixtures, local CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | Phase 04 execution-evidence replan at safe boundary | Codex, OpenGSD 1.20.0; planning-only sizing/dependency/source-coverage check, sequential/no worktrees | gpt-6.1-sol high |
+
 ## Session Continuity
 
-Last session: 2026-11-11T05:30:53.799Z
-Stopped at: Completed 04-12-PLAN.md
+Last session: 2026-11-11T05:45:40Z
+Stopped at: Phase 04 remaining-plan sizing complete; focused independent check next
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
