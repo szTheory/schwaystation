@@ -191,7 +191,7 @@ jobs:
           unzip -q "$toolchain_zip" -d "$toolchain_dir"
           test -x "$toolchain_dir/bin/mipsel-none-elf-gcc"
           PATH="$toolchain_dir/bin:$PATH" make -C "$source_dir/openbios" -j2 \
-            BUILD=Release BOARD=psx BOOT=rom OPENBIOS_SHELL=shello
+            BUILD=Release BOARD=psx BOOT=rom OPENBIOS_SHELL=shell
           cmake "-DOPENBIOS_INPUT=$source_dir/openbios/openbios.bin" -P cmake/OpenBIOS.cmake
       # The commit these archives were built from; a release publishes only
       # archives that all record its own commit.
