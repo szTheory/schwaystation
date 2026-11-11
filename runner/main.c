@@ -76,6 +76,7 @@
 #include "clock.h"
 #include "exit_status.h"
 #include "frame_hash.h"
+#include "inputs.h"
 #include "mailbox.h"
 #include "png.h"
 #include "probe.h"
@@ -114,11 +115,11 @@ static void run_free(void *user, void *ptr, size_t size)
 }
 
 static const char synopsis[] =
-    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]\n"
-    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]\n"
+    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--hash] [--png N:FILE]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--hash] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
-    "                         [--hash] [--hash-state]\n"
+    "                         [--inputs FILE] [--hash] [--hash-state]\n"
     "       schwaystation-run --probe FILE\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
@@ -126,6 +127,7 @@ static const char synopsis[] =
     "  --bench N          run N frames and report the time per frame\n"
     "  --hash             print the SHA-256 of the last frame\n"
     "  --hash-state       print the SHA-256 of the saved machine state\n"
+    "  --inputs FILE     apply a validated controller script before each frame latch\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
     "  --tty              print the program's text as tty lines; needs --exe\n"
@@ -215,6 +217,7 @@ typedef struct options {
     int hash_state; /* --hash-state: the SHA-256 of the saved state */
     uint32_t png_frame; /* 0 when no --png was given */
     const char *png_path;
+    const char *inputs; /* --inputs FILE, else NULL */
     const char *probe; /* --probe FILE, else NULL */
     const char *exe;   /* --exe FILE, else NULL */
     int tty;           /* --tty: debug-port flag and the tty lines */
@@ -256,6 +259,15 @@ static int parse_options(int argc, char **argv, options *o)
             o->hash = 1;
         } else if (strcmp(arg, "--hash-state") == 0) {
             o->hash_state = 1;
+        } else if (strcmp(arg, "--inputs") == 0) {
+            if (o->inputs != NULL) {
+                return usage("give --inputs once");
+            }
+            if (value == NULL || value[0] == '-') {
+                return usage("--inputs needs a file");
+            }
+            o->inputs = value;
+            i++;
         } else if (strcmp(arg, "--png") == 0) {
             if (o->png_frame != 0u) {
                 return usage("give --png once");
@@ -598,11 +610,37 @@ static void print_tail(const schway *inst)
    on the heap. Returns the exit status. */
 static int run(const options *opt)
 {
+    schway__input_movie movie;
+    memset(&movie, 0, sizeof movie);
+    if (opt->inputs != NULL) {
+        schway__inputs_error error;
+        memset(&error, 0, sizeof error);
+        schway__inputs_status input_status = schway__inputs_load(opt->inputs, &movie, &error);
+        if (input_status != SCHWAY__INPUTS_OK) {
+            if (input_status == SCHWAY__INPUTS_INVALID) {
+                fprintf(stderr, "schwaystation-run: invalid input movie");
+                if (error.line != 0u) {
+                    fprintf(stderr, " at line %lu", (unsigned long)error.line);
+                }
+                if (error.reason != NULL) {
+                    fprintf(stderr, ": %s", error.reason);
+                }
+                fputc('\n', stderr);
+                fputs(synopsis, stderr);
+                return SCHWAY__EXIT_USAGE;
+            }
+            fprintf(stderr, "schwaystation-run: %s\n",
+                    input_status == SCHWAY__INPUTS_MEMORY ? "out of memory" :
+                                                           "cannot read input movie");
+            return SCHWAY__EXIT_FAILURE;
+        }
+    }
     uint8_t *exe = NULL;
     size_t exe_size = 0;
     if (opt->exe != NULL) {
         exe = schway__read_exe_file(opt->exe, &exe_size);
         if (exe == NULL) {
+            schway__inputs_release(&movie);
             return SCHWAY__EXIT_FAILURE;
         }
     }
@@ -612,6 +650,7 @@ static int run(const options *opt)
         if (samples == NULL) {
             fprintf(stderr, "schwaystation-run: out of memory\n");
             free(exe);
+            schway__inputs_release(&movie);
             return SCHWAY__EXIT_FAILURE;
         }
     }
@@ -627,6 +666,7 @@ static int run(const options *opt)
                 schway_status_string(st));
         free(samples);
         free(exe);
+        schway__inputs_release(&movie);
         return SCHWAY__EXIT_FAILURE;
     }
     int status = SCHWAY__EXIT_OK;
@@ -665,7 +705,20 @@ static int run(const options *opt)
     budget.max_cycles = UINT64_MAX;
     budget.flags = (opt->keep_going ? 0u : SCHWAY_RUN_STOP_ON_FAULT) |
                    (opt->trace ? SCHWAY_RUN_TRACE : 0u);
+    size_t input_cursor = 0u;
+    schway_input input_snapshot;
+    memset(&input_snapshot, 0, sizeof input_snapshot);
+    input_snapshot.size = (uint32_t)sizeof input_snapshot;
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
+        if (opt->inputs != NULL) {
+            st = schway__inputs_apply_frame(inst, &movie, &input_cursor, &input_snapshot, n);
+            if (st != SCHWAY_STATUS_OK) {
+                fprintf(stderr, "schwaystation-run: schway_set_input failed: %s\n",
+                        schway_status_string(st));
+                status = SCHWAY__EXIT_FAILURE;
+                break;
+            }
+        }
         uint64_t start_ns = opt->bench ? schway__clock_ns() : 0u;
         schway_run_result res;
         memset(&res, 0, sizeof res);
@@ -763,6 +816,7 @@ static int run(const options *opt)
     }
     schway_destroy(inst);
     free(samples);
+    schway__inputs_release(&movie);
     return status;
 }
 

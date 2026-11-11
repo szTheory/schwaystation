@@ -11,10 +11,10 @@ This release loads no BIOS and no disc. Without `--exe` every run shows the buil
 ## Synopsis
 
 ```text
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--hash] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--hash] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
-                  [--trace first-fault] [--no-stop-on-fault] [--hash] [--hash-state]
+                  [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--hash] [--hash-state]
 schwaystation-run --probe FILE
 schwaystation-run --help | --version
 ```
@@ -32,6 +32,7 @@ schwaystation-run --help | --version
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
 | `--hash-state` | After the last frame and every other line, print the SHA-256 of the saved [machine state](#frame-hash). |
+| `--inputs FILE` | Parse and apply a bounded controller script before each frame latch. Give it once. See [Input scripts](#input-scripts). |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print what the PS-EXE file is, as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
 | `--region NAME` | `ntsc-u` (the default), `ntsc-j` or `pal`: the console's region and its video timing. |
@@ -42,6 +43,38 @@ Options may come in any order, except `--probe`, which takes no other option. An
 a usage error and nothing runs; that includes a file name that does not follow `--exe` or `--probe`, `--exe` twice
 or with `--probe`, `--tty`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything
 but `mailbox`, `--trace` with anything but `first-fault`, and any option this release does not have.
+
+## Input scripts
+
+`--inputs FILE` accepts ASCII text of at most 64 MiB and 1,000,000 records. Blank lines and `#` comments are
+allowed. Records may appear in any order; the runner sorts them by frame before playback. Each one-based record
+gives a complete snapshot for both ports:
+
+```text
+FRAME p1=DEVICE:BUTTONS:LX,LY,RX,RY p2=DEVICE:BUTTONS:LX,LY,RX,RY
+```
+
+Use `.` for a disconnected port. For a connected pad with no pressed buttons, use `DEVICE:.:LX,LY,RX,RY`.
+`DEVICE` is `digital` or `dualshock`. Button symbols may be combined in any order: `U`, `D`, `L`, `R` are the
+directions; `S` is Start and `s` is Select; `T`, `O`, `X`, `Q` are Triangle, Circle, Cross and Square; `1`, `2`,
+`3`, `4` are L1, R1, L2 and R2;
+`<` and `>` are L3 and R3. `M` holds the DualShock analog-mode button. Repeating a symbol is invalid. Axis values
+are decimal 0–255 in left-X, left-Y, right-X, right-Y order; 128 is the centre. A connected pad with no pressed
+buttons still includes its four axis values.
+
+For example, a Cross press on port 1 at frame 60, released at frame 61, is:
+
+```text
+60 p1=dualshock:X:128,128,128,128 p2=.
+61 p1=dualshock:.:128,128,128,128 p2=.
+```
+
+A snapshot remains active until a later record changes it. Repeated identical records for one frame are accepted;
+conflicting records for that frame are rejected. Frames must be from 1 to 1,000,000 and may exceed the run's
+`--frames` cap; later records are validated but not applied. The runner validates the whole file before it creates
+the core instance or runs a frame. A malformed record exits 2 with a bounded line-numbered error; an unreadable
+file or memory failure exits 1. The test-card frame hash remains unchanged by input, while `--hash-state` includes
+the latched controller state.
 
 ## Shared host memory-card file behavior
 
@@ -76,6 +109,7 @@ schwaystation-run --frames 60 --hash
 schwaystation-run --bench 600
 schwaystation-run --frames 60 --png 60:card.png
 schwaystation-run --region pal --frames 50 --hash
+schwaystation-run --frames 120 --inputs movie.txt --hash-state
 schwaystation-run --exe game.exe --tty
 schwaystation-run --exe game.exe --tty --stop-on mailbox
 schwaystation-run --exe game.exe --trace first-fault > fault.txt
