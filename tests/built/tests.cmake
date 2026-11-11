@@ -10,3 +10,7 @@ schway_warnings(schwaystation-test-bios)
 schway_add_test(NAME built.bios.synthetic_rom
   COMMAND schwaystation-test-bios synthetic_rom
   LABELS bios portable TIMEOUT 10)
+
+schway_add_test(NAME built.bios.copy_edges
+  COMMAND schwaystation-test-bios copy_edges
+  LABELS bios portable TIMEOUT 10)
