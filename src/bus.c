@@ -441,6 +441,12 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         break;
     case 0x04u:
     case 0x05u:
+        if (p >= 0x1F801040u && p < 0x1F801050u) {
+            if (schway__sio_io(inst, wr, p, width, value, cycles) != 0) {
+                return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
+            }
+            break;
+        }
         schway__bus_unbuilt(inst, SCHWAY__DEV_SIO, p, width, wr, v);
         break;
     case 0x06u:

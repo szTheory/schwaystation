@@ -88,7 +88,7 @@ static uint64_t transfer(schway *inst, uint8_t sent, uint8_t expected, int last)
     advance_to(inst, start + 1426u);
     CHECK((inst->irq.stat & 0x80u) != 0u);
     CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x280u) == 0x280u);
-    write_mmio(inst, I_STAT, 4u, 0x80u);
+    write_mmio(inst, I_STAT, 4u, 0u);
     write_mmio(inst, JOY_CTRL, 2u, 0x1013u);
     advance_to(inst, start + 1494u);
     CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u);
