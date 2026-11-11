@@ -43,6 +43,17 @@ a usage error and nothing runs; that includes a file name that does not follow `
 or with `--probe`, `--tty`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything
 but `mailbox`, `--trace` with anything but `first-fault`, and any option this release does not have.
 
+## Shared host memory-card file behavior
+
+The host helper reads raw memory-card images up to 131,072 bytes. Empty files and larger images are rejected;
+short images are padded with `FFh` in memory. Import reports a lint flag for a missing `MC` header or bad frame
+checksums, but it does not reject a card for those warnings or rewrite the source file.
+
+Saving requires a complete 131,072-byte image. The helper writes a new sibling temporary file, flushes it, forces
+the file data to storage (`fsync` on POSIX and `_commit` on Windows), then atomically replaces the destination.
+Temporary names are opened exclusively, so an existing file is never overwritten. A write, flush or replacement
+failure returns an I/O error and leaves the previous destination in place.
+
 ## Examples
 
 ```sh
