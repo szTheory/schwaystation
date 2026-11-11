@@ -1,1 +1,2 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
+sio.digital.poll_irq	portable,sio

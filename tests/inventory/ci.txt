@@ -15,5 +15,6 @@ perf
 policy
 release
 runner
+sio
 timers
 vectors
