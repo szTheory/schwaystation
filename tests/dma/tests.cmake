@@ -151,6 +151,12 @@ schway_add_test(NAME dma.list.walk
   COMMAND schwaystation-test-dma list_walk
   LABELS dma portable TIMEOUT 10)
 
+# Fault prevented: an interleaved list walker resetting another channel's
+# 1000h-node yield count.
+schway_add_test(NAME dma.list.independent_yields
+  COMMAND schwaystation-test-dma list_independent_yields
+  LABELS dma portable TIMEOUT 10)
+
 # Fault prevented: a list whose first header ends it that walks on, or that
 # finishes without the flag and the interrupt.
 schway_add_test(NAME dma.list.empty

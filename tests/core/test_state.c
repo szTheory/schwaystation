@@ -493,6 +493,7 @@ static void test_device_fields(void)
     src->dma.bcr[2] = 0x00040010u;
     src->dma.chcr[2] = 0x01000201u;
     src->dma.cur = 2u;
+    src->dma.phase[2] = 1u;
     src->dma.busy_until = src->ticks + 1000u;
     src->dma.dicr = 0x00A38000u;
     src->dma.crc[6] = 0xDEADBEEFu;
@@ -524,6 +525,10 @@ static void test_device_fields(void)
     uint32_t chcr3 = chcr2 + 4u;
     uint32_t dicr_at = offset_of(src, "dma.dicr");
     uint32_t cur_at = offset_of(src, "dma.cur");
+    uint32_t phase2_at = offset_of(src, "dma.phase") + 2u * 4u;
+    uint32_t phase3_at = phase2_at + 4u;
+    uint32_t busy_at = offset_of(src, "dma.busy_until");
+    uint32_t stall_at = offset_of(src, "dma.stall_until");
     const struct {
         const char *what;
         uint32_t at;
@@ -541,9 +546,28 @@ static void test_device_fields(void)
         reseal(bad, n);
         expect_refused(refused[i].what, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
     }
+    memcpy(bad, good, n);
+    put_le(bad + phase2_at, 6u, 4u);
+    reseal(bad, n);
+    expect_refused("DMA phase outside the engine states", dst, bad, n,
+                   SCHWAY_STATUS_ERR_STATE_FIELD);
+
+    /* A request-waiting channel may be busy with no current unit, but a
+       nonzero CPU stall belongs only to a running unit. */
+    memcpy(bad, good, n);
+    put_le(bad + phase2_at, 0u, 4u);
+    put_le(bad + cur_at, SCHWAY__DMA_NONE, 4u);
+    put_le(bad + busy_at, 0u, 8u);
+    put_le(bad + stall_at, src->ticks + 1u, 8u);
+    reseal(bad, n);
+    expect_refused("DMA stall without a current channel", dst, bad, n,
+                   SCHWAY_STATUS_ERR_STATE_FIELD);
+
     /* The same current channel, started, loads. */
     memcpy(bad, good, n);
     put_le(bad + chcr3, 0x01000000u, 4u);
+    put_le(bad + phase2_at, 0u, 4u);
+    put_le(bad + phase3_at, 1u, 4u);
     put_le(bad + cur_at, 3u, 4u);
     reseal(bad, n);
     CHECK_EQ_U64(schway_load_state(dst, bad, n), SCHWAY_STATUS_OK);

@@ -1150,6 +1150,45 @@ static void case_list_walk(void)
     schway_destroy(inst);
 }
 
+/* Fault prevented: an interleaved walker resetting another channel's node
+   count, which would let a self-reference run past its own 1000h-node yield. */
+static void case_list_independent_yields(void)
+{
+    schway *inst = make();
+    /* Channel 1 outranks channel 2 so it can interrupt the first walk at the
+       boundary immediately before channel 2 reaches its yield. */
+    wr32(inst, DPCR, 0x00000980u);
+    wr32(inst, 0x3000u, 0x00003000u);
+    wr32(inst, 0x4000u, 0x00800000u);
+    wr32(inst, MADR(2u), 0x3000u);
+    wr32(inst, CHCR(2u), CHCR_LIST);
+    for (uint32_t i = 1u; i < SCHWAY__DMA_NODES_MAX - 1u; i++) {
+        schway__dma_event(inst, inst->dma.busy_until);
+        schway__dma_event(inst, inst->dma.busy_until);
+    }
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+
+    wr32(inst, MADR(1u), 0x4000u);
+    wr32(inst, CHCR(1u), CHCR_LIST);
+    uint64_t ch2_end = inst->dma.busy_until;
+    schway__dma_event(inst, ch2_end);
+    schway__dma_event(inst, inst->dma.busy_until);
+    CHECK_EQ_U64(inst->dma.cur, 1u);
+
+    uint64_t ch1_end = inst->dma.busy_until;
+    schway__dma_event(inst, ch1_end);
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+    ch2_end = inst->dma.busy_until;
+    uint64_t caught_up_to = ch2_end + 10u;
+    schway__dma_event(inst, caught_up_to);
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+    CHECK_EQ_U64(inst->dma.busy_until, caught_up_to + 1u);
+    CHECK(schway__dma_next(inst) > caught_up_to);
+    CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->dma.chcr[1] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    schway_destroy(inst);
+}
+
 /* Fault prevented: a list whose first header already holds the end marker that
    walks on, or one that finishes without the flag and the interrupt. The two
    forms the public chain-looping test builds are checked: a header that is the
@@ -1697,13 +1736,43 @@ static void case_fault_sync3(void)
     CHECK_EQ_HEX(f.addr, CHCR(2u));
 
     /* The same channel then takes a usable mode and moves its words. */
+    wr32(inst, 0x1F801814u, 0x04000001u);
+    wr32(inst, 0x1000u, 0xA0000000u);
+    wr32(inst, 0x1004u, (10u << 16) | 10u);
+    wr32(inst, 0x1008u, 0x00010001u);
+    wr32(inst, 0x100Cu, 0x00007C1Fu);
+    wr32(inst, BCR(2u), 4u);
     wr32(inst, CHCR(2u), 0x11000001u);
     CHECK_EQ_U64(inst->dma.cur, 2u);
-    CHECK_EQ_U64(inst->dma.words[2], 64u);
-    CHECK_EQ_HEX(inst->dma.crc[2], pattern_crc(64u, 0xB5000001u));
+    CHECK_EQ_HEX(inst->vram[10][10], 0x7C1Fu);
     (void)run(inst, 1000u);
     CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
     CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    schway_destroy(inst);
+
+    /* Replacing a live transfer with reserved sync mode must fail closed.
+       The accepted model latches the write, lets only the current unit end,
+       then stops without completing or starting a reserved-mode transfer. */
+    inst = make();
+    fill_ram(inst, 0x5000u, 64u, 0x64000001u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00900000u);
+    wr32(inst, MADR(4u), 0x5000u);
+    wr32(inst, BCR(4u), 64u);
+    wr32(inst, CHCR(4u), 0x11000001u);
+    uint64_t unit_end = inst->dma.busy_until;
+    wr32(inst, CHCR(4u), 0x11000601u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_DMA);
+    CHECK_EQ_HEX(inst->fault.addr, CHCR(4u));
+    CHECK_EQ_HEX(inst->fault.opcode, 0x11000601u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.busy_until, unit_end);
+    CHECK_EQ_HEX(inst->dma.chcr[4] & 0x600u, 0u);
+    schway__dma_event(inst, unit_end);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(inst->dma.dicr & (1u << 28), 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
     schway_destroy(inst);
 }
 
@@ -1813,6 +1882,7 @@ static const struct {
     {"chopping_band", case_chopping_band},
     {"list_cpu_band", case_list_cpu_band},
     {"list_walk", case_list_walk},
+    {"list_independent_yields", case_list_independent_yields},
     {"list_empty", case_list_empty},
     {"sync0_gpu_sink", case_sync0_gpu_sink},
     {"gpu_linked_list_readback", case_gpu_linked_list_readback},

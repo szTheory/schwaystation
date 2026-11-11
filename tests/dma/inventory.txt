@@ -14,6 +14,7 @@ dma.hostile.bcr	dma,portable
 dma.hostile.preempt_carry	dma,portable
 dma.list.cpu_band	dma,portable
 dma.list.empty	dma,portable
+dma.list.independent_yields	dma,portable
 dma.list.self_ref	dma,portable
 dma.list.stop	dma,portable
 dma.list.walk	dma,portable
