@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 16 of 49
+current_plan: 17 of 49
 status: executing
-stopped_at: Completed 04-16-PLAN.md
-last_updated: "2026-11-11T07:12:02.401Z"
+stopped_at: Completed 04-13-PLAN.md
+last_updated: "2026-11-11T08:35:13.611Z"
 last_activity: 2026-11-11
-last_activity_desc: Completed Phase 04 plan 04-16 with card reads, stable spans, full CI and hygiene
-state_head: "0bf37baf838f1ea58f1a3a7a5e45a3d8a3b93dd0"
+last_activity_desc: Completed Phase 04 plan 04-13 with GPU-motion performance control and hosted CI evidence
+state_head: 1b24bf15ef35ec335c71791e99622516a0b6c451
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 83
+  completed_plans: 84
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 16 of 49
-Status: Plan 04-16 complete; ready for the next orchestrated Phase 04 plan.
-Last activity: 2026-11-11 — Card Read/GetID, stable spans, state ownership, full CI and hygiene completed.
+Current Plan: 17 of 49
+Status: Plan 04-13 complete; plan 04-33 is ready in wave 13.
+Last activity: 2026-11-11 — GPU-motion performance control/head comparison and hosted CI completed.
 
 Progress: [█████░░░░░] 50%
 
@@ -144,6 +144,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P15 | 58min | 2 tasks | 11 files |
 | Phase 04 P12 | 74min+ | 2 tasks | 10 files |
 | Phase 04 P16 | 44 min | 2 tasks | 18 files |
+| Phase 04 P13 | 1h 11m | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -317,6 +318,9 @@ Recent decisions affecting current work:
 - [Phase 04]: API v4 memory and card names remain additive under the unreleased v4 policy; frozen v1-v3 callers remain unchanged.
 - [Phase 04]: Card bytes and generations stay outside ordinary states; only in-flight card protocol state is serialized.
 - [Phase 04]: Card ACK and Read pause timing are deterministic model values, not new physical hardware measurements.
+- [Phase 04]: Measure gpu_motion against the same fixture at an explicit control commit; preserve the separate test-card ceiling.
+- [Phase 04]: Use frames 10 through 60 for gpu_motion after the original hosted Cachegrind window exceeded its job budget.
+- [Phase 04]: Keep all required CI lanes and retain a provisional five-minute perf-job timeout based on measured successful runs.
 
 ### Pending Todos
 
@@ -384,6 +388,7 @@ come from `AGENTS.md`.
 | 2026-11-10 | /gsd-plan-phase 4 complete | Codex, OpenGSD 1.20.0; 32 plans, focused revision, independent check/recheck passed; literal command repair verified | planner gpt-6.1-sol high; checkers gpt-6-luna xhigh; orchestrator GPT-6 (session) |
 
 | 2026-11-10 | /gsd-execute-phase 4 via /gsd-autonomous | Codex, OpenGSD 1.20.0; sequential typed executors in approved shared checkout | gpt-6-luna xhigh; orchestrator GPT-6 (session) |
+| 2026-11-11 | /gsd-execute-plan 04-13 | Codex, OpenGSD 1.20.0; sequential executor with hosted workflow dispatch, fixes, and plan bookkeeping | gpt-6-luna xhigh |
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-02 | Codex, OpenGSD 1.20.0; sequential executor | gpt-6-luna xhigh |
 
@@ -419,8 +424,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-11T07:12:02.212Z
-Stopped at: Completed 04-16-PLAN.md
+Last session: 2026-11-11T08:35:13.291Z
+Stopped at: Completed 04-13-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
