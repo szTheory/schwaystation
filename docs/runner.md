@@ -11,10 +11,11 @@ This release loads no BIOS and no disc. Without `--exe` every run shows the buil
 ## Synopsis
 
 ```text
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--hash] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--hash] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
-                  [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--hash] [--hash-state]
+                  [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
+                  [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-state]
 schwaystation-run --probe FILE
 schwaystation-run --help | --version
 ```
@@ -33,6 +34,9 @@ schwaystation-run --help | --version
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
 | `--hash-state` | After the last frame and every other line, print the SHA-256 of the saved [machine state](#frame-hash). |
 | `--inputs FILE` | Parse and apply a bounded controller script before each frame latch, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
+| `--save-dir DIR` | Load and save the two memory cards under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
+| `--memcard-names MODE` | Use `basename` (default) or `serial` for the card filenames. Give it once. |
+| `--serial SERIAL` | Use this safe serial basename with `--memcard-names serial`. A bare PS-EXE does not contain a disc serial, so the caller supplies it. |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print what the PS-EXE file is, as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
 | `--region NAME` | `ntsc-u` (the default), `ntsc-j` or `pal`: the console's region and its video timing. |
@@ -42,7 +46,8 @@ schwaystation-run --help | --version
 Options may come in any order, except `--probe`, which takes no other option. Anything else on the command line is
 a usage error and nothing runs; that includes a file name that does not follow `--exe` or `--probe`, `--exe` twice
 or with `--probe`, `--tty`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything
-but `mailbox`, `--trace` with anything but `first-fault`, and any option this release does not have.
+but `mailbox`, `--trace` with anything but `first-fault`, `--serial` without serial naming, and any option this
+release does not have.
 
 ## Input scripts
 
@@ -81,6 +86,21 @@ when the guest completes no controller poll through SIO0. Mailbox checks and oth
 and never count as a poll or clear one. The pad-counter fixture polls on alternating frames, then checks its mailbox
 after every frame; the 300-frame run reports 150 lagged frames.
 
+## Runner memory cards
+
+With `--save-dir DIR`, the runner imports both card files before loading and running the PS-EXE. By default it uses
+the executable filename without its final extension as the basename; a content-free run uses `schwaystation`.
+Slot 1 is `basename.srm` and slot 2 is `basename.1.mcr`. To share cards across a multi-disc set, pass
+`--memcard-names serial --serial SLUS-00001` (replace the example with the game's serial). The supplied serial is
+validated as a single filename component. The runner does not create DIR.
+
+Missing card files leave the core's formatted blank cards in place. Invalid or unreadable card files stop the run
+with status 1 before any frame is executed, and the source file is never rewritten during import. At exit, each
+slot is saved only when a successful card Write command completed and advanced that slot's generation. An
+unchanged slot is not replaced. Files are written through an exclusive sibling temporary, synced, and atomically
+replaced. A failed import or save returns status 1; a failed save preserves the previous destination. SIGINT or
+SIGTERM still finishes the current frame and flushes completed writes before returning status 0.
+
 ## Shared host memory-card file behavior
 
 The shared host helper imports raw memory-card images from 1 to 131,072 bytes and pads short raw images with `FFh`
@@ -117,6 +137,8 @@ schwaystation-run --region pal --frames 50 --hash
 schwaystation-run --frames 120 --inputs movie.txt --hash-state
 schwaystation-run --exe game.exe --tty
 schwaystation-run --exe game.exe --tty --stop-on mailbox
+schwaystation-run --exe game.exe --frames 300 --save-dir saves
+schwaystation-run --exe game.exe --frames 300 --save-dir saves --memcard-names serial --serial SLUS-00001
 schwaystation-run --exe game.exe --trace first-fault > fault.txt
 schwaystation-run --exe game.exe --no-stop-on-fault --frames 300
 schwaystation-run --exe game.exe --frames 300 --hash
@@ -396,7 +418,7 @@ signal that was already ignored when the runner started, as under `nohup`, stays
 
 ```text
   0  done     every frame ran, or SIGINT or SIGTERM ended the run after a whole frame
-  1  failure  a file could not be written or is not a valid PS-EXE, memory ran out or the core failed
+  1  failure  a file or card could not be read or written, a PS-EXE is invalid, memory ran out or the core failed
   2  usage    the command line is invalid, so nothing ran
   6  fixture  the fixture reported failure: mailbox status FFh, a mailbox CRC mismatch or an exit port byte not 00h
   7  fault    the first fault stopped the run

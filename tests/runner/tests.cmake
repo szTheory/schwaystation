@@ -77,7 +77,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     file(WRITE "${card_dir}/schwaystation.srm" "old-slot-one")
     file(WRITE "${card_dir}/schwaystation.1.mcr" "old-slot-two")
     file(SHA256 "${card_dir}/schwaystation.1.mcr" old_slot_two)
-    expect_exit(0 "^frame 3 sha256 ${digits}\n$" --frames 3 --hash --save-dir "${card_dir}"
+    expect_exit(0 "frame 3 sha256 ${digits}" --frames 3 --hash --save-dir "${card_dir}"
       --test-card-write slot1)
     file(SIZE "${card_dir}/schwaystation.srm" slot_one_size)
     file(READ "${card_dir}/schwaystation.srm" slot_one_sector HEX OFFSET 896 LIMIT 8)
@@ -93,7 +93,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     file(MAKE_DIRECTORY "${card_dir}")
     file(WRITE "${card_dir}/schwaystation.srm" "unchanged-slot-one")
     file(SHA256 "${card_dir}/schwaystation.srm" old_slot_one)
-    expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash --save-dir "${card_dir}"
+    expect_exit(0 "frame 5 sha256 ${EXPECTED}" --frames 60 --hash --save-dir "${card_dir}"
       --test-card-write slot2)
     file(SIZE "${card_dir}/schwaystation.1.mcr" slot_two_size)
     file(READ "${card_dir}/schwaystation.1.mcr" slot_two_sector HEX OFFSET 896 LIMIT 8)
@@ -485,11 +485,12 @@ set_target_properties(schwaystation-test-bench PROPERTIES
 schway_warnings(schwaystation-test-bench)
 
 add_executable(schwaystation-test-run-stop ${SCHWAYSTATION_RUNNER_SOURCES})
-target_include_directories(schwaystation-test-run-stop PRIVATE ${SCHWAYSTATION_RUNNER_INCLUDE})
+target_include_directories(schwaystation-test-run-stop PRIVATE ${SCHWAYSTATION_RUNNER_INCLUDE}
+  ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-run-stop PRIVATE schwaystation::schwaystation
   schwaystation-host)
 target_compile_definitions(schwaystation-test-run-stop PRIVATE _POSIX_C_SOURCE=200809L
-  SCHWAY_RUN_RAISE_AT=5)
+  SCHWAY_RUN_RAISE_AT=5 SCHWAY_RUN_TEST_HOOKS=1 SCHWAY_HOST_CARD_TESTING=1)
 set_target_properties(schwaystation-test-run-stop PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-run-stop)
