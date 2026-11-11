@@ -27,9 +27,11 @@ typedef struct schway_host_card_lint {
 schway_host_card_status schway_host_card_import_raw(const char *path, void *out,
                                                      size_t out_size,
                                                      schway_host_card_lint *lint);
+/* Imports raw and approved wrapped images, leaving out and lint unchanged on refusal. */
 schway_host_card_status schway_host_card_import_file(const char *path, void *out,
                                                       size_t out_size,
                                                       schway_host_card_lint *lint);
+/* Builds slot names from one safe serial component inside the supplied directory. */
 schway_host_card_status schway_host_card_paths_for_serial(const char *directory,
                                                            const char *serial,
                                                            char *slot1, size_t slot1_size,

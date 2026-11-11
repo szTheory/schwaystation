@@ -23,6 +23,10 @@
 #define SCHWAY_HOST_CARD_HEADER_FRAME 63u
 #define SCHWAY_HOST_CARD_TEMP_CANDIDATES 64u
 #define SCHWAY_HOST_CARD_TEMP_SUFFIX_CAP 24u
+#define SCHWAY_HOST_CARD_GME_HEADER_SIZE 0x0F40u
+#define SCHWAY_HOST_CARD_VGS_HEADER_SIZE 64u
+#define SCHWAY_HOST_CARD_PSX_HEADER_SIZE 256u
+#define SCHWAY_HOST_CARD_SERIAL_CAP 64u
 #define SCHWAY__HOST_CARD_FAILURE_NONE 0
 #define SCHWAY__HOST_CARD_FAILURE_FLUSH 1
 #define SCHWAY__HOST_CARD_FAILURE_RENAME 2
@@ -152,6 +156,185 @@ schway_host_card_status schway_host_card_import_raw(const char *path, void *out,
         *lint = result;
     }
     free(image);
+    return SCHWAY_HOST_CARD_OK;
+}
+
+schway_host_card_status schway_host_card_import_file(const char *path, void *out,
+                                                      size_t out_size,
+                                                      schway_host_card_lint *lint)
+{
+    if (path == NULL || path[0] == '\0' || out == NULL || out_size != SCHWAY_MEMCARD_SIZE) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+
+    const size_t input_capacity =
+        (size_t)SCHWAY_HOST_CARD_GME_HEADER_SIZE + (size_t)SCHWAY_MEMCARD_SIZE;
+    uint8_t *input = (uint8_t *)malloc(input_capacity);
+    uint8_t *image = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    if (input == NULL || image == NULL) {
+        free(image);
+        free(input);
+        return SCHWAY_HOST_CARD_ERR_IO;
+    }
+
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        free(image);
+        free(input);
+        return SCHWAY_HOST_CARD_ERR_IO;
+    }
+    size_t count = fread(input, 1u, input_capacity, file);
+    int read_error = ferror(file);
+    int extra = read_error ? EOF : fgetc(file);
+    int close_error = fclose(file);
+    if (read_error || close_error != 0) {
+        free(image);
+        free(input);
+        return SCHWAY_HOST_CARD_ERR_IO;
+    }
+    if (extra != EOF || count == 0u) {
+        free(image);
+        free(input);
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    }
+
+    const uint8_t *card = input;
+    size_t card_size = count;
+    if (count >= 11u && memcmp(input, "123-456-STD", 11u) == 0) {
+        if (count != (size_t)SCHWAY_HOST_CARD_GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE ||
+            input[11] != 0u) {
+            free(image);
+            free(input);
+            return SCHWAY_HOST_CARD_ERR_SIZE;
+        }
+        card = input + SCHWAY_HOST_CARD_GME_HEADER_SIZE;
+        card_size = SCHWAY_MEMCARD_SIZE;
+    } else if (count >= 4u && memcmp(input, "VgsM", 4u) == 0) {
+        if (count != (size_t)SCHWAY_HOST_CARD_VGS_HEADER_SIZE + SCHWAY_MEMCARD_SIZE) {
+            free(image);
+            free(input);
+            return SCHWAY_HOST_CARD_ERR_SIZE;
+        }
+        card = input + SCHWAY_HOST_CARD_VGS_HEADER_SIZE;
+        card_size = SCHWAY_MEMCARD_SIZE;
+    } else if (count >= 3u && memcmp(input, "PSV", 3u) == 0) {
+        if (count != (size_t)SCHWAY_HOST_CARD_PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE) {
+            free(image);
+            free(input);
+            return SCHWAY_HOST_CARD_ERR_SIZE;
+        }
+        card = input + SCHWAY_HOST_CARD_PSX_HEADER_SIZE;
+        card_size = SCHWAY_MEMCARD_SIZE;
+    } else if (count > SCHWAY_MEMCARD_SIZE) {
+        free(image);
+        free(input);
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    }
+
+    memset(image, 0xFF, SCHWAY_MEMCARD_SIZE);
+    memcpy(image, card, card_size);
+    schway_host_card_lint result;
+    schway__host_cards_lint(image, &result);
+    memcpy(out, image, SCHWAY_MEMCARD_SIZE);
+    if (lint != NULL) {
+        *lint = result;
+    }
+    free(image);
+    free(input);
+    return SCHWAY_HOST_CARD_OK;
+}
+
+static int schway__host_cards_serial_length(const char *serial, size_t *length)
+{
+    if (serial == NULL || length == NULL) {
+        return 0;
+    }
+    for (size_t i = 0u; i < SCHWAY_HOST_CARD_SERIAL_CAP; i++) {
+        char value = serial[i];
+        if (value == '\0') {
+            if (i == 0u) {
+                return 0;
+            }
+            *length = i;
+            return 1;
+        }
+        if (!((value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') ||
+              (value >= '0' && value <= '9') || value == '_' || value == '-' || value == '.')) {
+            return 0;
+        }
+        if (i == 0u && !((value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') ||
+                         (value >= '0' && value <= '9'))) {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+static int schway__host_cards_name_size(size_t directory_size, size_t separator_size,
+                                         size_t serial_size, size_t suffix_size,
+                                         size_t *required)
+{
+    size_t size = directory_size;
+    if (size > SIZE_MAX - separator_size) return 0;
+    size += separator_size;
+    if (size > SIZE_MAX - serial_size) return 0;
+    size += serial_size;
+    if (size > SIZE_MAX - suffix_size) return 0;
+    *required = size + suffix_size;
+    return 1;
+}
+
+static void schway__host_cards_write_name(char *out, const char *directory,
+                                          size_t directory_size, size_t separator_size,
+                                          const char *serial, size_t serial_size,
+                                          const char *suffix, size_t suffix_size)
+{
+    size_t offset = 0u;
+    memcpy(out + offset, directory, directory_size);
+    offset += directory_size;
+    if (separator_size != 0u) {
+        out[offset++] = '/';
+    }
+    memcpy(out + offset, serial, serial_size);
+    offset += serial_size;
+    memcpy(out + offset, suffix, suffix_size);
+}
+
+schway_host_card_status schway_host_card_paths_for_serial(const char *directory,
+                                                           const char *serial,
+                                                           char *slot1, size_t slot1_size,
+                                                           char *slot2, size_t slot2_size)
+{
+    if (directory == NULL || slot1 == NULL || slot2 == NULL || slot1 == slot2) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    size_t serial_size = 0u;
+    if (!schway__host_cards_serial_length(serial, &serial_size)) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+
+    size_t directory_size = strlen(directory);
+    size_t separator_size =
+        directory_size != 0u && directory[directory_size - 1u] != '/' &&
+                directory[directory_size - 1u] != '\\'
+            ? 1u
+            : 0u;
+    size_t slot1_required = 0u;
+    size_t slot2_required = 0u;
+    if (!schway__host_cards_name_size(directory_size, separator_size, serial_size,
+                                       sizeof(".srm"), &slot1_required) ||
+        !schway__host_cards_name_size(directory_size, separator_size, serial_size,
+                                       sizeof(".1.mcr"), &slot2_required)) {
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    }
+    if (slot1_size < slot1_required || slot2_size < slot2_required) {
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    }
+
+    schway__host_cards_write_name(slot1, directory, directory_size, separator_size,
+                                  serial, serial_size, ".srm", sizeof(".srm"));
+    schway__host_cards_write_name(slot2, directory, directory_size, separator_size,
+                                  serial, serial_size, ".1.mcr", sizeof(".1.mcr"));
     return SCHWAY_HOST_CARD_OK;
 }
 

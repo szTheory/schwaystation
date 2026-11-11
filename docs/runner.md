@@ -45,9 +45,23 @@ but `mailbox`, `--trace` with anything but `first-fault`, and any option this re
 
 ## Shared host memory-card file behavior
 
-The host helper reads raw memory-card images up to 131,072 bytes. Empty files and larger images are rejected;
-short images are padded with `FFh` in memory. Import reports a lint flag for a missing `MC` header or bad frame
-checksums, but it does not reject a card for those warnings or rewrite the source file.
+The shared host helper imports raw memory-card images from 1 to 131,072 bytes and pads short raw images with `FFh`
+in memory. It also imports these full-card wrappers by their header bytes:
+
+| Format | Required image | Card payload |
+|---|---:|---:|
+| DexDrive `.gme` | 131,072 bytes after a 3,904-byte header beginning `123-456-STD` and a NUL byte | offset `0F40h` |
+| VGS `.mem` or `.vgs` | 131,072 bytes after a 64-byte header beginning `VgsM` | offset 64 |
+| PlayStation Magazine `.psx` | 131,072 bytes after a 256-byte header beginning `PSV` | offset 256 |
+
+Wrapped images with a truncated payload, an invalid header or trailing bytes are rejected. PSP/Vita signed card
+formats are unsupported. Import reports lint flags for a missing `MC` header or bad frame checksums, but those
+warnings do not reject an otherwise valid image. Lint reads the imported bytes and never rewrites the source file.
+
+Per-game names use the game's serial as one filename component: slot 1 is `basename.srm`, and slot 2 is
+`basename.1.mcr`. The shared helper refuses serials with path separators, unsupported filename characters, or
+more than 63 characters; it builds both names under the supplied directory. The same serial in separate
+directories therefore produces separate save paths. Slot 2 does not use the stale `.2.mcr` spelling.
 
 Saving requires a complete 131,072-byte image. The helper writes a new sibling temporary file, flushes it, forces
 the file data to storage (`fsync` on POSIX and `_commit` on Windows), then atomically replaces the destination.

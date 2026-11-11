@@ -135,31 +135,6 @@ static void make_valid_card(uint8_t *bytes)
     }
 }
 
-schway_host_card_status schway_host_card_import_file(const char *path, void *out,
-                                                      size_t out_size,
-                                                      schway_host_card_lint *lint)
-{
-    (void)path;
-    (void)out;
-    (void)out_size;
-    (void)lint;
-    return SCHWAY_HOST_CARD_ERR_IO;
-}
-
-schway_host_card_status schway_host_card_paths_for_serial(const char *directory,
-                                                           const char *serial,
-                                                           char *slot1, size_t slot1_size,
-                                                           char *slot2, size_t slot2_size)
-{
-    (void)directory;
-    (void)serial;
-    (void)slot1;
-    (void)slot1_size;
-    (void)slot2;
-    (void)slot2_size;
-    return SCHWAY_HOST_CARD_ERR_ARGUMENT;
-}
-
 static void wrappers(void)
 {
     enum { GME_HEADER_SIZE = 0x0F40, VGS_HEADER_SIZE = 64, PSX_HEADER_SIZE = 256 };
