@@ -114,7 +114,7 @@ Original references above denote the complete ordered chains below. First IDs pr
 |04-20|04-20, 04-38|
 |04-21|04-21|
 |04-22|04-22, 04-39|
-|04-23|04-23, 04-50, 04-51, 04-52, 04-40|
+|04-23|04-23, 04-50, 04-51, 04-52, 04-53, 04-40|
 |04-24|04-24, 04-41|
 |04-25|04-25, 04-49, 04-42|
 |04-26|04-26|
@@ -142,3 +142,9 @@ Original references above denote the complete ordered chains below. First IDs pr
 | Source | New evidence and retained coverage | Executable plan |
 | --- | --- | --- |
 | GOAL criterion 4 / GAME-05 / RESEARCH real pinned firmware upload / CONTEXT D-16, D-22–D-24 | Actual enabled/active DMA4 waits with zero DREQ and words. Derive persistent automatic write readiness from saved ATTR mode, retain manual block credits and existing atomic sink/costs, and test continuation/deassert/deadline/state boundaries. No duplicate producer state, SPU FIFO/audio/RAM or hardware-latency claim; actual recognizable-shell and same-run portable acceptance remain in 40. | 52 before 40, after 51 |
+
+## Source-owned GPUSTAT field status
+
+| Source | New evidence and retained coverage | Executable plan |
+| --- | --- | --- |
+| GOAL criterion 4 / GAME-05 / RESEARCH real pinned shell VSync first caller / CONTEXT D-16, D-22–D-24 | Missing dynamic bits 31/13 block the real caller. Primary PSX-SPX 519c8db supersedes stale bit 13 prose and requires one saved phase for interlace-off retention; scheduled status, v0/v2, mode/blank/state/purity controls use the existing explicitly limited beam clock model. Actual captured readiness log 48 remains independent; only 40 accepts a recognizable shell/portable tuple. | 53 before 40, after 52; see 53-EVIDENCE |

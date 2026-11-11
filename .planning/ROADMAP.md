@@ -231,7 +231,7 @@ Plans:
   4. OpenBIOS, built in CI from nugget at its pin, boots to its shell with a pinned frame hash that is the same on every platform that runs it. The compatibility ledger rejects any unratcheted regression. The local `library` preset, pointed at a fixture in a temporary directory, writes only `build/library/results.csv`.
   5. In the hosted RetroArch session, `pad_counter.exe` loads as content with no BIOS in `system/`. The picture changes between two `--max-frames` values, and each screenshot matches the runner's `--png` frame pixel for pixel.
 
-**Plans**: 52
+**Plans**: 53
 **Wave 1**
 - [x] 04-01 — Build skeleton and an inventoried VRAM-to-frame tracer
 
@@ -320,56 +320,59 @@ Plans:
 - [x] 04-52-PLAN.md — Supply the concrete DMA4 request producer and continuation needed by the pinned OpenBIOS upload per D-16/D-23
 
 **Wave 28**
-- [ ] 04-40-PLAN.md — Pin the inspected OpenBIOS shell across applicable lanes
+- [ ] 04-53-PLAN.md — Remove the missing GPUSTAT field-status blocker per D-16/D-23 using primary status semantics rather than the values one shell happens to need
 
 **Wave 29**
+- [ ] 04-40-PLAN.md — Pin the inspected OpenBIOS shell across applicable lanes
+
+**Wave 30**
 - [ ] 04-24-PLAN.md — Judge ten-column compatibility rows and generate fresh docs
 - [ ] 04-27-PLAN.md — Load BIOS-free fullpath PS-EXEs in libretro
 
-**Wave 30**
+**Wave 31**
 - [ ] 04-41-PLAN.md — Run the compatibility judge copied from the actual PR base
 - [ ] 04-43-PLAN.md — Notify libretro geometry and rate changes for native video
 
-**Wave 31**
+**Wave 32**
 - [ ] 04-25-PLAN.md — Probe one bounded ISO boot executable through runner identity
 
-**Wave 32**
+**Wave 33**
 - [ ] 04-49-PLAN.md — Resolve bounded CUE tracks and sector layouts into boot identity
 
-**Wave 33**
+**Wave 34**
 - [ ] 04-42-PLAN.md — Join full track metadata and reject hostile private inputs
 
-**Wave 34**
+**Wave 35**
 - [ ] 04-26-PLAN.md — Run the private library seam with meaningful and privacy controls
 
-**Wave 35**
+**Wave 36**
 - [ ] 04-28-PLAN.md — Map libretro controllers and both rumble motors
 
-**Wave 36**
+**Wave 37**
 - [ ] 04-44-PLAN.md — Persist libretro cards and resolve memory descriptor aliases
 
-**Wave 37**
+**Wave 38**
 - [ ] 04-45-PLAN.md — Guard only functional libretro metadata claims
 
-**Wave 38**
+**Wave 39**
 - [ ] 04-29-PLAN.md — Compare two BIOS-free content frames in real background RetroArch
 
-**Wave 39**
+**Wave 40**
 - [ ] 04-30-PLAN.md — Compare canonical whole-VRAM output against independent known answers
 
-**Wave 40**
+**Wave 41**
 - [ ] 04-46-PLAN.md — Run the pinned clipping executable against its actual hardware capture
 
-**Wave 41**
+**Wave 42**
 - [ ] 04-47-PLAN.md — Compare all remaining nine actual GPU image captures
 
-**Wave 42**
+**Wave 43**
 - [ ] 04-48-PLAN.md — Judge the three real GPU hardware logs and run the required lane
 
-**Wave 43**
+**Wave 44**
 - [ ] 04-31-PLAN.md — Replay hostile GPU, SIO and card inputs through bounded calls
 
-**Wave 44**
+**Wave 45**
 - [ ] 04-32-PLAN.md — Reconcile API and hardware contracts, then verify the reviewed phase
 
 **UI hint**: no

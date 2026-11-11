@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 34 of 52
+current_plan: 34 of 53
 status: executing
-stopped_at: Completed 04-52-PLAN.md
-last_updated: "2026-11-11T22:45:33.215Z"
+stopped_at: GPUSTAT field-status blocker isolated; plan 04-53 ready before shell acceptance
+last_updated: "2026-11-11T23:16:01Z"
 last_activity: 2026-11-11
-last_activity_desc: Planned ATTR-driven DMA4 request continuation into the existing sink; shell still unaccepted
-state_head: 3fbc91104d0ad85fbd0322ee0b988122d5eef208
+last_activity_desc: Planned measured-source GPUSTAT phase behavior with one approved saved latch; shell remains unaccepted
+state_head: 558b24cc914e192e7436c317189ba686a3d755cb
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 120
+  total_plans: 121
   completed_plans: 101
   percent: 50
 ---
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 34 of 52
-Status: Source-owned plan 04-52 is next ready; 04-40 waits and retains real shell/portable acceptance.
-Last activity: 2026-11-11 — Added DMA4 request/continuation plan from actual boot evidence; no shell hash accepted.
+Current Plan: 34 of 53
+Status: Plan 04-53 is next ready; 04-40 waits and retains real recognizable-shell/portable acceptance.
+Last activity: 2026-11-11 — Added GPUSTAT status/state slice using new primary hardware evidence; no shell hash accepted.
 
 Progress: [█████░░░░░] 50%
 
@@ -501,10 +501,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-plan 04-52 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; ATTR-derived DMA4 request path, RED/GREEN controls, full CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | Phase 04 GPUSTAT first-caller planning | Codex, OpenGSD 1.20.0; current primary status evidence, approved minimal saved phase, planning-only ordering/coverage update | gpt-6.1-sol high |
+
 ## Session Continuity
 
-Last session: 2026-11-11T22:45:32.911Z
-Stopped at: Completed 04-52-PLAN.md
+Last session: 2026-11-11T23:16:01Z
+Stopped at: Plan 04-53 ready for focused independent check; 04-40 waits
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
