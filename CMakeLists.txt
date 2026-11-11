@@ -78,6 +78,7 @@ endfunction()
 add_library(schwaystation_instance OBJECT
   src/instance.c
   src/frame.c)
+add_library(schwaystation_bios OBJECT src/bios.c)
 add_library(schwaystation_bus OBJECT
   src/bus.c
   src/irq.c)
@@ -98,8 +99,10 @@ add_library(schwaystation_testcard OBJECT src/testcard.c)
 add_library(schwaystation_state OBJECT
   src/state.c
   src/crc32.c)
+add_library(schwaystation_sha256 OBJECT runner/sha256.c)
 add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_instance>
+  $<TARGET_OBJECTS:schwaystation_bios>
   $<TARGET_OBJECTS:schwaystation_bus>
   $<TARGET_OBJECTS:schwaystation_cpu>
   $<TARGET_OBJECTS:schwaystation_gpu>
@@ -111,13 +114,15 @@ add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_card>
   $<TARGET_OBJECTS:schwaystation_exe>
   $<TARGET_OBJECTS:schwaystation_testcard>
-  $<TARGET_OBJECTS:schwaystation_state>)
+  $<TARGET_OBJECTS:schwaystation_state>
+  $<TARGET_OBJECTS:schwaystation_sha256>)
 add_library(schwaystation::schwaystation ALIAS schwaystation)
 target_include_directories(schwaystation PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated>
   $<INSTALL_INTERFACE:include>)
-foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_bus
+target_include_directories(schwaystation_bios PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
+foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_bios schwaystation_sha256 schwaystation_bus
     schwaystation_cpu schwaystation_gpu schwaystation_gte schwaystation_dma schwaystation_timers
     schwaystation_sched schwaystation_sio schwaystation_card schwaystation_exe schwaystation_testcard schwaystation_state)
   schway_core_options(${core_target})

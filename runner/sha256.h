@@ -1,4 +1,4 @@
-/* SHA-256 (FIPS 180-4), owned code for the runner's frame hashes. */
+/* Shared SHA-256 (FIPS 180-4) implementation for core and runner hashes. */
 #ifndef SCHWAYSTATION_RUNNER_SHA256_H
 #define SCHWAYSTATION_RUNNER_SHA256_H
 

@@ -53,6 +53,8 @@ typedef uint32_t schway_status;
 #define SCHWAY_CARD_SLOT_1 1u
 #define SCHWAY_CARD_SLOT_2 2u
 #define SCHWAY_MEMCARD_SIZE 131072u
+#define SCHWAY_BIOS_SIZE 524288u
+#define SCHWAY_BIOS_INFO_LOADED 1u
 
 /* Kinds of the first-fault record. */
 #define SCHWAY_FAULT_NONE 0u
@@ -207,6 +209,12 @@ typedef struct schway_span {
     size_t size; /* bytes */
 } schway_span;
 
+typedef struct schway_bios_info {
+    uint32_t size;
+    uint32_t flags; /* SCHWAY_BIOS_INFO_* */
+    uint8_t sha256[32];
+} schway_bios_info;
+
 typedef struct schway_audio {
     uint32_t size;
     uint32_t reserved0;
@@ -252,6 +260,8 @@ schway_status schway_get_info(const schway *inst, schway_info *out);
 schway_status schway_get_video(const schway *inst, schway_video *out);
 schway_status schway_get_vram(const schway *inst, schway_span *out);
 schway_status schway_get_memory(const schway *inst, uint32_t memory, schway_span *out);
+schway_status schway_load_bios(schway *inst, const void *bytes, size_t size);
+schway_status schway_get_bios_info(const schway *inst, schway_bios_info *out);
 schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes, size_t size);
 schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint64_t *out);
 schway_status schway_get_audio(schway *inst, schway_audio *io);

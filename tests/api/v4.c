@@ -8,6 +8,7 @@
 #if SCHWAY_API_VERSION >= 4
 static uint8_t v4_card1[SCHWAY_MEMCARD_SIZE];
 static uint8_t v4_card2[SCHWAY_MEMCARD_SIZE];
+static uint8_t v4_bios[SCHWAY_BIOS_SIZE];
 static uint32_t visitor_saw_card_persistent_bytes;
 
 static void *v4_alloc(void *user, size_t size)
@@ -79,6 +80,19 @@ int main(void)
         CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_BIOS, &bios), SCHWAY_STATUS_OK);
         CHECK(bios.data != NULL);
         CHECK(bios.size != 0u);
+        CHECK_EQ_U64(schway_load_bios(inst, v4_bios, sizeof v4_bios), SCHWAY_STATUS_OK);
+        schway_bios_info bios_info;
+        memset(&bios_info, 0, sizeof bios_info);
+        bios_info.size = (uint32_t)sizeof bios_info;
+        CHECK_EQ_U64(schway_get_bios_info(inst, &bios_info), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(bios_info.flags, SCHWAY_BIOS_INFO_LOADED);
+        static const uint8_t zero_bios_sha256[32] = {
+            0x07u, 0x85u, 0x4Du, 0x2Fu, 0xEFu, 0x29u, 0x7Au, 0x06u,
+            0xBAu, 0x81u, 0x68u, 0x5Eu, 0x66u, 0x0Cu, 0x33u, 0x2Du,
+            0xE3u, 0x6Du, 0x5Du, 0x18u, 0xD5u, 0x46u, 0x92u, 0x7Du,
+            0x30u, 0xDAu, 0xADu, 0x6Du, 0x7Fu, 0xDAu, 0x15u, 0x41u,
+        };
+        CHECK(memcmp(bios_info.sha256, zero_bios_sha256, sizeof zero_bios_sha256) == 0);
         CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD1, &card1), SCHWAY_STATUS_OK);
         CHECK_EQ_U64(card1.size, SCHWAY_MEMCARD_SIZE);
         CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD2, &card2), SCHWAY_STATUS_OK);
