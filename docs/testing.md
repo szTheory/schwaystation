@@ -326,6 +326,18 @@ schway_add_test(NAME policy.no_skip.self_test
 repository's own scans (a home directory path, an executable signature, a skip property) are built in pieces or
 written into the build tree when CMake configures, so no tracked file holds them.
 
+## Release firmware scan
+
+The release-labeled release.firmware_scan check reads the retail BIOS MD5 and SHA-1 pairs from the same
+src/bios_table.inc table used by the core. It hashes every tracked file and every file member extracted from
+each release archive, regardless of the member name or suffix. Extraction happens in a unique temporary
+directory outside the tracked tree and archive directories. A missing archive, malformed table, failed
+extraction, or archive with no file members is an infrastructure error.
+
+The registered release.firmware_scan.self_test creates synthetic bytes and a separate one-row digest table in
+the build directory. It verifies that a matching tracked file and a nested archive member are rejected; the
+synthetic row is never added to the production BIOS table. No retail firmware bytes are needed or used.
+
 ## Budgets
 
 **Documents.** `docs.budgets` keeps `README.md` under 16,384 bytes, `include/schwaystation.h` under 40,960 bytes and

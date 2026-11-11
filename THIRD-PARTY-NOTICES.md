@@ -5,6 +5,37 @@ licences. Each section below names those files, where they came from, what chang
 upstream requires to travel with source and binaries. [PROVENANCE.md](PROVENANCE.md) says when a section is
 needed.
 
+## muhtari firmware scanner
+
+- **Applies to:** tests/cmake/firmware_scan.cmake
+- **Upstream:** https://github.com/szTheory/muhtari, file tests/cmake/firmware_scan.cmake at commit
+  d698364b180df42894ef6737179d4ed9fcc97817. The repository is MIT-licensed at this pin.
+- **Changes:** adapted to read this project's BIOS MD5 and SHA-1 table and scan tracked files and release archive
+  members. The Atari cartridge and known-ROM checks were removed.
+- **Licence:** MIT
+
+    MIT License
+
+    Copyright (c) 2026 muhtari contributors
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
 ## libretro.h
 
 - **Applies to:** `libretro/libretro.h`
