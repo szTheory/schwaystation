@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-14-PLAN.md
-last_updated: "2026-11-11T01:01:45.903Z"
+stopped_at: Completed 04-11-PLAN.md
+last_updated: "2026-11-11T02:47:11.489Z"
 last_activity: 2026-11-10
-last_activity_desc: Phase 04 plan 04-14 completed
-state_head: d05e8b64d224c155b2dc187f40a96b22500c09c1
+last_activity_desc: Phase 04 plan 04-11 completed
+state_head: 1bfc795dc9c024f29332135879de55ef1d030448
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 79
+  completed_plans: 80
   percent: 50
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 12 of 32
+Plan: 13 of 32
 Status: Ready to execute
-Last activity: 2026-11-10 — Phase 04 plan 04-14 completed
+Last activity: 2026-11-10 — Phase 04 plan 04-11 completed
 
 Progress: [█████░░░░░] 50%
 
@@ -139,6 +139,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P09 | 59 min | 2 tasks | 23 files |
 | Phase 04 P10 | 16min | 2 tasks | 24 files |
 | Phase 04 P14 | 47min | 3 tasks | 17 files |
+| Phase 04 P11 | 100min | 2 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -302,6 +303,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep byte completion, pad ACK assertion, and ACK release at separate scheduler ticks; keep card timing distinct.
 - [Phase 04]: Store SIO and pad state per instance and serialize it through the existing visitor without changing API or state format revisions.
 - [Phase 04]: Leave GAME-03 partial until DualShock, card, host-input, and integrated gameplay plans complete their behavior.
+- [Phase 04]: Keep state format 4 and scalar nodes_done shape; store linked-list counts in each channel's remain slot.
+- [Phase 04]: Treat busy DMA sync-mode-3 rewrites as a derived fail-closed policy because console behavior is unmeasured.
+- [Phase 04]: Accept valid DMA phases 0 through 5 and reject only out-of-range phases and invalid cross-field links.
 
 ### Pending Todos
 
@@ -390,10 +394,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-14 | Codex, OpenGSD 1.20.0; sequential executor, scheduled SIO0 digital polling, local CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-11 | Codex, OpenGSD 1.20.0; sequential executor, GPU DMA2 integration, DMA validation, local CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T01:01:45.708Z
-Stopped at: Completed 04-14-PLAN.md
+Last session: 2026-11-11T02:47:11.300Z
+Stopped at: Completed 04-11-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
