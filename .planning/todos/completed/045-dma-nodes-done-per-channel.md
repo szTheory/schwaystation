@@ -1,11 +1,12 @@
 ---
 title: "Count list nodes per channel"
-status: pending
+status: completed
 priority: P3
 source: "phase 03 code review, finding IN-06"
 created: 2026-11-10
 theme: dma
 bound_step: "phase 4, the first plan that lets a second channel walk a list (the GPU DMA end) or phase 5 (SPU), whichever comes first"
+completed: 2026-11-10
 ---
 
 ## Goal

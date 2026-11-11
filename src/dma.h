@@ -42,8 +42,9 @@ struct schway__state_io;
 /* A struct of arrays, one entry per channel. madr, bcr and chcr are the raw
    registers. busy_until is the tick the current unit ends on and stall_until
    the tick the CPU is held until; phase and remain are the engine's step and
-   count for a channel (the blocks still to move in sync mode 1), nodes_done
-   the list nodes passed in the current step, dreq the latched request levels
+   count for a channel (blocks in sync mode 1, list nodes in sync mode 2, or
+   words in a chopped burst), nodes_done the last list channel's node count,
+   dreq the latched request levels
    (a bit per channel; a sync mode 1 block takes its channel's bit with it),
    and words and crc what the stand-in sink for a channel has taken since
    power-on (a word count and a rolling CRC-32 over the words' little-endian

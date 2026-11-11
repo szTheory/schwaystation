@@ -1090,7 +1090,7 @@ static uint64_t run_to_node(schway *inst, uint32_t ch, uint32_t n)
 {
     uint64_t at = inst->ticks;
     for (uint32_t i = 0u; i < 100000u; i++) {
-        if (inst->dma.nodes_done >= n ||
+        if (inst->dma.remain[ch] >= n ||
             (inst->dma.chcr[ch] & SCHWAY__DMA_CHCR_BUSY) == 0u) {
             break;
         }
@@ -1123,7 +1123,7 @@ static void case_list_walk(void)
     wr32(inst, CHCR(2u), CHCR_LIST);
     /* The first node moved at the start; its header went nowhere. */
     CHECK_EQ_U64(inst->dma.cur, 2u);
-    CHECK_EQ_U64(inst->dma.nodes_done, 1u);
+    CHECK_EQ_U64(inst->dma.remain[2], 1u);
     CHECK_EQ_HEX(inst->dma.madr[2], 0x1010u);
     (void)run_to_node(inst, 2u, 2u);
     CHECK_EQ_HEX(inst->dma.madr[2], 0x1020u);
@@ -1134,7 +1134,7 @@ static void case_list_walk(void)
     (void)run(inst, 200u);
     CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
     CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
-    CHECK_EQ_U64(inst->dma.nodes_done, 3u);
+    CHECK_EQ_U64(inst->dma.remain[2], 0u);
     CHECK_EQ_HEX(inst->vram[8][7], 0x03E0u);
     CHECK_EQ_HEX(inst->vram[8][8], 0x7C1Fu);
     CHECK_EQ_HEX(inst->vram[9][7], 0x7FE0u);
@@ -1213,7 +1213,7 @@ static void case_list_empty(void)
         CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
         CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
         CHECK_EQ_U64(inst->dma.words[2], 0u);
-        CHECK_EQ_U64(inst->dma.nodes_done, form == 1u ? 2u : 1u);
+        CHECK_EQ_U64(inst->dma.remain[2], 0u);
         CHECK_EQ_HEX(rd32(inst, MADR(2u)), form == 1u ? 0xFFFFFFu : marker);
         CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
         CHECK_EQ_HEX(rd32(inst, DICR), 0x84840000u);
@@ -1262,16 +1262,16 @@ static void case_list_self_ref(void)
     for (uint32_t nodes = 1u; nodes <= 2u; nodes++) {
         schway *inst = make();
         start_loop_list(inst, nodes);
-        CHECK_EQ_U64(inst->dma.nodes_done, 1u);
+        CHECK_EQ_U64(inst->dma.remain[2], 1u);
         uint64_t far1 = now_of(inst) + 0x10000000u;
         schway__dma_event(inst, far1);
-        CHECK_EQ_HEX(inst->dma.nodes_done, 0x1000u);
+        CHECK_EQ_HEX(inst->dma.remain[2], 0x1000u);
         CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
         check_no_flag(inst);
         CHECK(schway__dma_next(inst) > far1);
         uint64_t far2 = far1 + 0x10000000u;
         schway__dma_event(inst, far2);
-        CHECK_EQ_HEX(inst->dma.nodes_done, 0x2000u);
+        CHECK_EQ_HEX(inst->dma.remain[2], 0x2000u);
         CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
         check_no_flag(inst);
         CHECK(schway__dma_next(inst) > far2);
@@ -1289,7 +1289,7 @@ static void case_list_self_ref(void)
         CHECK(r.ticks <= end + SCHWAY__DMA_BUSY_MAX);
         CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
         check_no_flag(inst);
-        CHECK(inst->dma.nodes_done > 0x2000u);
+        CHECK(inst->dma.remain[2] > 0x2000u);
         schway_destroy(inst);
     }
 }
@@ -1355,6 +1355,11 @@ static const uint32_t chop_rows[64] = {
 static uint64_t chopped_cycles(uint32_t dw, uint32_t cw)
 {
     schway *inst = make();
+    fill_ram(inst, 0x4000u, 2048u, 0u);
+    wr32(inst, 0x1F801814u, 0x04000001u);
+    wr32(inst, 0x4000u, 0xA0000000u);
+    wr32(inst, 0x4004u, 0u);
+    wr32(inst, 0x4008u, (5u << 16) | 818u);
     wr32(inst, DPCR, DPCR_ALL);
     wr32(inst, MADR(2u), 0x4000u);
     wr32(inst, BCR(2u), 2048u);
@@ -1366,7 +1371,11 @@ static uint64_t chopped_cycles(uint32_t dw, uint32_t cw)
         CHECK(t != UINT64_MAX);
         schway__dma_event(inst, t);
     }
-    CHECK_EQ_U64(inst->dma.words[2], 2048u);
+    CHECK_EQ_HEX(inst->vram[0][0], 0x0303u);
+    CHECK_EQ_HEX(inst->vram[0][1], 0x0303u);
+    CHECK_EQ_U64(inst->gpu.phase, SCHWAY__GPU_IDLE);
+    CHECK_EQ_U64(inst->gpu.owed_words, 0u);
+    CHECK_EQ_HEX(inst->dma.madr[2], 0x6000u);
     schway_destroy(inst);
     return t - start;
 }

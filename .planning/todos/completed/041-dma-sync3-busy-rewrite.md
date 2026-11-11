@@ -1,11 +1,12 @@
 ---
 title: "A sync-mode-3 rewrite of a busy channel is defined and tested"
-status: pending
+status: completed
 priority: P3
 source: "phase 03 code review, finding IN-02"
 created: 2026-11-10
 theme: dma
 bound_step: "phase 4, the first plan that edits the CHCR write path in src/dma.c"
+completed: 2026-11-10
 ---
 
 ## Goal

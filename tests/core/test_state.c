@@ -552,8 +552,8 @@ static void test_device_fields(void)
     expect_refused("DMA phase outside the engine states", dst, bad, n,
                    SCHWAY_STATUS_ERR_STATE_FIELD);
 
-    /* A request-waiting channel may be busy with no current unit, but a
-       nonzero CPU stall belongs only to a running unit. */
+    /* A future CPU stall needs either a running unit or its completed unit
+       deadline; an unlinked stamp with no current DMA deadline is invalid. */
     memcpy(bad, good, n);
     put_le(bad + phase2_at, 0u, 4u);
     put_le(bad + cur_at, SCHWAY__DMA_NONE, 4u);

@@ -12,7 +12,8 @@ the stall in the run loop are in [the CPU page](cpu.md) and [the bus page](bus.m
 ## State of the engine
 
 The registers, arbitration, the interrupt rules, the unit engine, OTC, the burst and request-block modes with their
-device ends, chopping, linked lists, the costs, the CPU hold and the fault for an unusable mode are built. Every address of `1F801080h`-`1F8010FFh` answers at
+device ends, GPU packet and readback DMA, chopping, linked lists with per-channel yield counts, the costs, the CPU hold,
+cross-field state validation and the fault for an unusable mode are built. Every address of `1F801080h`-`1F8010FFh` answers at
 every width, so the whole range counts as owned rather than unbuilt or a gap.
 
 ## The registers
@@ -35,11 +36,15 @@ restores them.
 `CHCR` bit 24 is both the start and the busy bit: a program sets it to start and the hardware clears it when the
 transfer ends. Bit 28 is cleared when the transfer begins. A write to the `CHCR` of the channel whose unit is running
 changes nothing about that unit: its words have moved and it ends on its own event, so bit 24 stays set until then.
-The one write that does more is the word 0, which the public chain-looping test makes between its cases to stop a
-looping list: it stops a channel that has no unit in flight (in a CPU window or waiting for its next node or block) at
-once, and a channel with a unit in flight at the end of that unit, in both cases with no flag and no interrupt. This is
-the procedure of that test and nothing more; every other write to a busy channel is left unmodelled, and the channel
-stays busy.
+An attempted rewrite to reserved sync mode 3 is the exception. The hardware response is unmeasured; this model latches
+the DMA fault and fails closed: an active unit ends without setting a completion flag, while a channel with no unit
+in flight stops immediately. The attempted control word is discarded. This is a derived safety policy, not a hardware
+timing claim.
+Outside the reserved-mode fault above, the word 0 is the one other write that does more. The public chain-looping test
+makes it between its cases to stop a looping list: it stops a channel that has no unit in flight (in a CPU window or
+waiting for its next node or block) at once, and a channel with a unit in flight at the end of that unit, in both cases
+with no flag and no interrupt. This is the procedure of that test and nothing more; every other write to a busy channel
+is left unmodelled, and the channel stays busy.
 
 ## DPCR and arbitration
 
@@ -49,8 +54,9 @@ public dma-priority test measured by moving them against a running channel and f
 enable clear does not start.
 
 A channel is waiting when bit 24 of its `CHCR` is set and its mode has what it needs: OTC and synchronisation mode 0
-need bit 28 too; mode 1 needs the device's request line to be high; mode 2 (the linked list) needs nothing more, the
-device being taken to be ready, and a chopped burst or list waiting for its next window or node is waiting. Among the
+need bit 28 too; mode 1 needs the device's request line to be high; mode 2 (the linked list) needs nothing more except
+that DMA2 waits for the GPU's busy deadline; a chopped burst or list waiting for its next window or node is waiting.
+Among the
 waiting channels with
 their enable set the lowest priority value goes first and a tie goes to the higher channel number (psx-spx, DMA
 Channels; the public dma-priority test starts DMA2 and DMA6 together with one `DPCR` write and shows DMA6 finishing
@@ -86,7 +92,13 @@ events a second. The data is already in RAM when the unit starts, so a program t
 value, but every read that waits on the bus is held until the unit ends (below), so no program can see the difference.
 
 The engine's state is the current channel, the end tick of its unit and a phase per channel (idle, unit running, between
-sync mode 1 blocks, in a CPU window, waiting for the next window or node, or stopping). The scheduler's next deadline
+sync mode 1 blocks, in a CPU window, waiting for the next window or node, or stopping). List-node progress is counted
+per channel in that channel's `remain` slot, so an interleaved walker cannot consume another channel's 1000h-node yield
+allowance. The scalar `nodes_done` field keeps its state-format shape and reports the most recently advanced list
+counter. State loads reject phases outside this set and inconsistent links between the running channel, CHCR busy bit,
+unit deadline and CPU stall. A DMA-register read can finish a unit ahead of the CPU tick; in that case the saved CPU
+hold stamp matches the completed unit deadline even though no channel is current.
+The scheduler's next deadline
 for the engine is the end tick while a unit runs or a CPU window lasts and none otherwise.
 
 **The event step.** One call of the engine's event runs every unit that is due at the tick it is given: a unit whose end
@@ -160,15 +172,17 @@ mode has no unit: see [the fault for an unusable mode](#the-fault-for-an-unusabl
 
 ## The fault for an unusable mode
 
-Synchronisation mode 3 is reserved and no device answers it. A write to the `CHCR` of a channel other than OTC that
-leaves the channel idle with bit 24 set and the mode field (bits 9-10) at 3 does not start it: the start bits (24 and
-28) are dropped, the other bits are kept, and the first fault is latched as `SCHWAY_FAULT_DMA` (see
-[the embedding guide](../embedding.md#the-first-fault)), naming the DMA device, the register's address, the value
-written and the instruction that wrote it. Nothing moves, no flag is set and no interrupt is raised. A later write with a
-usable mode starts the channel as usual. OTC keeps only bits 24, 28 and 30, so it has no mode to get wrong. The mode
-without the start bit is only stored, as any other. A write to a channel that is already running is not modelled, so it
-latches nothing. The hardware's reaction to the reserved mode has not been measured; this is a statement of what the
-model does not run, not of what the console does.
+Synchronisation mode 3 is reserved and no device answers it. An idle channel written with bit 24 set and mode 3 does
+not start: the start bits (24 and 28) are dropped, the other bits are kept, and the first fault is latched as
+`SCHWAY_FAULT_DMA` (see [the embedding guide](../embedding.md#the-first-fault)), naming the DMA device, register
+address, written value and instruction. Nothing moves, no flag is set and no interrupt is raised. A later usable-mode
+write starts the channel as usual.
+
+A busy rewrite selecting mode 3 also latches the fault and is handled by a derived fail-closed rule because its hardware
+response is unmeasured. The attempted control word is discarded. If a unit is in flight, it finishes and clears bit 24
+without a DICR flag or interrupt. If the channel is waiting for a request, node or CPU window, it stops immediately with
+the start bits clear. OTC keeps only bits 24, 28 and 30, so it has no mode to get wrong. A mode-3 value without bit 24
+is only stored, as any other.
 
 ## Chopping
 
@@ -193,7 +207,9 @@ nothing about other consoles or other transfers, which is why the bands are wide
 Synchronisation mode 2 walks a list in RAM. `MADR` names a node's header word: its top byte is the number of words that
 follow it and its low 24 bits are the address of the next header. Each node is a unit: the engine reads the header, sends
 the words after it to the channel's device end (whatever the direction bit says; the header itself is not sent), and
-leaves `MADR` at the next address. A next address with bit 23 set ends the list and is left in `MADR`, so the usual end
+leaves `MADR` at the next address. DMA2 sends each word through the same GP0 decoder used by CPU writes; a packet can
+continue across nodes, and GPU-to-RAM DMA reads GPUREAD data. DMA2 waits for GPU readiness before its next linked-list
+node, while the GPU DREQ line controls sync mode 1. A next address with bit 23 set ends the list and is left in `MADR`, so the usual end
 marker `FFFFFFh` reads back as `FFFFFFh`. A list whose first header already holds the marker finishes at once with the
 flag and the interrupt. Only bit 24 of `CHCR` starts a list; bit 28 is cleared if set. A header or word address past the
 RAM window reads 0.
@@ -209,8 +225,8 @@ and one loop, not measured on a console.
 
 A list that never ends does not finish. The public `dma/chain-looping` log shows a self-referencing list leaving the
 channel busy with no flag and no interrupt, and so does the model: the guard is a yield, not an abort. The engine counts
-the nodes since the transfer started (`nodes_done`, which wraps). When the 1000h node, the 2000h node and so on
-ends, the step that is catching the engine up returns even if more nodes are due: the CPU window after it is
+the nodes since each channel's transfer started (stored in its `remain` slot, which wraps per channel). When the 1000h
+node, the 2000h node and so on ends, the step that is catching the engine up returns even if more nodes are due: the CPU window after it is
 extended past the tick the step was given, so the next node starts later than that tick, the channel stays busy, and no
 flag or interrupt is raised. The step contract therefore holds without exception: every return leaves the next deadline
 strictly after the tick, and a call with a tick far ahead of the engine does 1000h nodes and no more. In a normal run a
@@ -241,11 +257,10 @@ reserved mode with the start bit and so latches the DMA fault; it runs under the
 
 The device side of a channel is two functions in `src/dma.c`, one for words going to the device and one for words coming
 from it, each a single `switch` on the channel with a case per channel. A case moves one word and returns the extra busy
-cycles the device asks for. A device that is not built is a stand-in in its case: the sink counts the words it is given
-in `dma.words` and folds their bytes, little-endian, into a CRC-32 per channel in `dma.crc`, both kept in the state from
-power-on; the source supplies 0, as every unbuilt device does. The stand-ins ask for no extra cycles. Building a device
-replaces its two cases, and nothing else in the engine changes; there is no table of callbacks and no function pointer
-in the state.
+cycles the device asks for. DMA2 is connected to the GPU's shared GP0 packet and GPUREAD paths. Other unbuilt devices
+use a stand-in in their case: the sink counts words in `dma.words` and folds their little-endian bytes into a per-channel
+CRC-32 in `dma.crc`, both kept in the state from power-on; the source supplies 0. The stand-ins ask for no extra cycles.
+There is no table of callbacks or function pointer in the state.
 
 ## Costs
 

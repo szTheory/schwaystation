@@ -1,11 +1,12 @@
 ---
 title: "Remove vestigial timer and DMA code"
-status: pending
+status: completed
 priority: P3
 source: "phase 03 code review, finding IN-04"
 created: 2026-11-10
 theme: cleanup
 bound_step: "phase 4 plan 11, the first plan that edits the DMA arbiter"
+completed: 2026-11-10
 ---
 
 ## Goal

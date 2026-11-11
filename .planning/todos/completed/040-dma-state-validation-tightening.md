@@ -1,11 +1,12 @@
 ---
 title: "DMA state validation matches the invariants the engine keeps"
-status: pending
+status: completed
 priority: P3
 source: "phase 03 code review, finding IN-01"
 created: 2026-11-10
 theme: state
 bound_step: "phase 4, the first plan that edits the DMA part of src/state.c or src/dma.c (the GPU channel's device end)"
+completed: 2026-11-10
 ---
 
 ## Goal

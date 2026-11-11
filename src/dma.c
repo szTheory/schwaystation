@@ -21,6 +21,15 @@ static const char name_dreq[] = "dma.dreq";
 static const char name_words[] = "dma.words";
 static const char name_crc[] = "dma.crc";
 
+/* Engine phases: idle, a unit, request-mode blocks, a CPU gap, the next node/window,
+   or a unit marked to stop when it finishes. */
+#define DMA_PH_IDLE 0u
+#define DMA_PH_UNIT 1u
+#define DMA_PH_BLOCKS 2u
+#define DMA_PH_GAP 3u
+#define DMA_PH_NEXT 4u
+#define DMA_PH_STOP 5u
+
 /* DPCR is 07654321h after a power reset and the other registers are 0
    (docs/hardware/dma.md). */
 void schway__dma_reset(schway *inst)
@@ -46,8 +55,10 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     struct schway__dma *d = &inst->dma;
     uint64_t clock_max = sat_add(ticks, SCHWAY__DMA_BUSY_MAX);
     uint32_t chcr[SCHWAY__DMA_CHANNELS];
-    (void)schway__state_u64(io, name_busy_until, &d->busy_until, 0u, clock_max);
-    (void)schway__state_u64(io, name_stall_until, &d->stall_until, 0u, clock_max);
+    uint32_t phase[SCHWAY__DMA_CHANNELS];
+    uint32_t remain[SCHWAY__DMA_CHANNELS];
+    uint64_t busy_until = schway__state_u64(io, name_busy_until, &d->busy_until, 0u, clock_max);
+    uint64_t stall_until = schway__state_u64(io, name_stall_until, &d->stall_until, 0u, clock_max);
     schway__state_u32_array(io, name_madr, d->madr, SCHWAY__DMA_CHANNELS, 0u,
                             SCHWAY__DMA_MADR_MASK);
     schway__state_u32_array(io, name_bcr, d->bcr, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
@@ -62,15 +73,66 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     schway__state_check(io, cur == SCHWAY__DMA_NONE ||
                                 (cur < SCHWAY__DMA_CHANNELS &&
                                  (chcr[cur] & SCHWAY__DMA_CHCR_BUSY) != 0u));
-    schway__state_u32_array(io, name_phase, d->phase, SCHWAY__DMA_CHANNELS, 0u, 7u);
-    schway__state_u32_array(io, name_remain, d->remain, SCHWAY__DMA_CHANNELS, 0u,
-                            SCHWAY__DMA_UNIT_WORDS_MAX);
-    /* A count of the nodes a list has passed; it wraps, and any value is a
-       state the engine can be in. */
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t i = 0u; i < SCHWAY__DMA_CHANNELS; i++) {
+            const uint8_t *p = io->r + 4u * i;
+            phase[i] = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+                       ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+        }
+    } else {
+        memcpy(phase, d->phase, sizeof phase);
+    }
+    schway__state_u32_array(io, name_phase, d->phase, SCHWAY__DMA_CHANNELS, 0u, DMA_PH_STOP);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t i = 0u; i < SCHWAY__DMA_CHANNELS; i++) {
+            const uint8_t *p = io->r + 4u * i;
+            remain[i] = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+                        ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+        }
+    } else {
+        memcpy(remain, d->remain, sizeof remain);
+    }
+    schway__state_u32_array(io, name_remain, d->remain, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_nodes_done, &d->nodes_done, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_dreq, &d->dreq, 0u, (1u << SCHWAY__DMA_CHANNELS) - 1u);
     schway__state_u32_array(io, name_words, d->words, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
     schway__state_u32_array(io, name_crc, d->crc, SCHWAY__DMA_CHANNELS, 0u, UINT32_MAX);
+    for (uint32_t i = 0u; i < SCHWAY__DMA_CHANNELS; i++) {
+        uint32_t current_phase = phase[i] == DMA_PH_UNIT || phase[i] == DMA_PH_GAP ||
+                                 phase[i] == DMA_PH_STOP;
+        schway__state_check(io, current_phase != 0u ? cur == i : cur != i);
+        if (phase[i] != DMA_PH_IDLE) {
+            schway__state_check(io, (chcr[i] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+        }
+        if (((chcr[i] >> 9) & 3u) != 2u) {
+            schway__state_check(io, remain[i] <= SCHWAY__DMA_UNIT_WORDS_MAX);
+        }
+    }
+    if (cur == SCHWAY__DMA_NONE) {
+        if (stall_until > ticks) {
+            /* A DMA-register read can finish the unit ahead of the CPU clock;
+               its saved hold stamp then equals the completed unit deadline. */
+            schway__state_check(io, stall_until == busy_until);
+        }
+    } else if (cur < SCHWAY__DMA_CHANNELS) {
+        schway__state_check(io, busy_until > ticks);
+        if (phase[cur] == DMA_PH_GAP) {
+            schway__state_check(io, stall_until <= ticks);
+        } else {
+            schway__state_check(io, stall_until <= ticks || stall_until <= busy_until);
+        }
+    } else {
+        schway__state_check(io, 0);
+    }
+    /* State format 4 exposed nodes_done as one scalar. Earlier format-4
+       states used remain as the list end marker, so recover the current
+       channel's old count when loading one of those active states. */
+    if (io->mode == SCHWAY__STATE_APPLY && cur < SCHWAY__DMA_CHANNELS &&
+        ((d->chcr[cur] >> 9) & 3u) == 2u &&
+        (d->phase[cur] == DMA_PH_UNIT || d->phase[cur] == DMA_PH_GAP) &&
+        d->remain[cur] <= 1u && d->nodes_done > 1u) {
+        d->remain[cur] = d->nodes_done;
+    }
 }
 
 /* The engine. One unit is one run of a channel that moves its words at once
@@ -81,21 +143,12 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
    events a second. A channel whose mode has no unit yet keeps its registers
    and waits (psx-spx, DMA Channels). */
 #define DMA_OTC 6u
-#define DMA_UNIT_CHANNELS 0x7Fu
 /* phase of a channel: nothing running, its unit's words moved and the channel
    busy until busy_until, a sync mode 1 transfer between blocks (busy, no
    unit, remain blocks still to go, waiting for the next request), the CPU's
    window between two units of a list (busy, cur still the channel and
    busy_until the end of the window, no hold on the CPU), or that window over
    and the next node waiting for the arbitration. */
-#define DMA_PH_IDLE 0u
-#define DMA_PH_UNIT 1u
-#define DMA_PH_BLOCKS 2u
-#define DMA_PH_GAP 3u
-#define DMA_PH_NEXT 4u
-/* a unit in flight whose channel was told to stop: it ends with no flag and no
-   interrupt */
-#define DMA_PH_STOP 5u
 
 /* A window of a chopped burst costs its words as any unit does plus this many
    cycles of setup, and is followed by a CPU window of CHCR's length, capped at
@@ -176,12 +229,11 @@ static void dicr_set(schway *inst, uint32_t dicr)
     }
 }
 
-/* A channel with a unit ready to run: bit 24 set, and bit 28 where the mode
-   needs the start trigger. OTC always does; sync mode 0 does; sync mode 1
-   waits for the device's request line; a linked list needs bit 24 alone, the
-   device being taken to be ready (no device end holds a request line yet). A
-   transfer whose CPU window is over is waiting for its next unit. The reserved
-   mode has no unit, so it waits (psx-spx, DMA Channels, CHCR). */
+/* A channel with a unit ready to run has bit 24 set and bit 28 where its mode
+   needs the start trigger. OTC and sync mode 0 need bit 28; sync mode 1 needs
+   the device request line; linked-list mode needs bit 24 and, for DMA2, an
+   expired GPU busy deadline. A transfer whose CPU window is over waits for its
+   next unit. The reserved mode has no unit (psx-spx, DMA Channels, CHCR). */
 static uint32_t dma_pending(const schway *inst, uint32_t ch)
 {
     const struct schway__dma *d = &inst->dma;
@@ -357,7 +409,7 @@ static uint64_t dma_move(schway *inst, uint32_t ch, uint32_t n, uint64_t tick)
    next address with bit 23 set ends the list, so the end marker FFFFFFh is
    left in MADR (psx-spx, DMA Channels, Linked List). The header is not sent.
    Returns the cycles the node takes: the header fetch and setup, then its
-   words. remain says whether a node follows: 1, or 0 for the end. */
+   words. MADR's end bit says whether a node follows. */
 static uint64_t dma_list_node(schway *inst, uint32_t ch, uint64_t tick)
 {
     struct schway__dma *d = &inst->dma;
@@ -373,7 +425,6 @@ static uint64_t dma_list_node(schway *inst, uint32_t ch, uint64_t tick)
         extra += dma_dev_write(inst, ch, word, tick);
     }
     d->madr[ch] = next;
-    d->remain[ch] = (next & 0x800000u) != 0u ? 0u : 1u;
     return DMA_NODE_OVERHEAD + dma_cost(ch, count) + extra;
 }
 
@@ -408,7 +459,7 @@ static uint64_t dma_otc_unit(schway *inst)
 static void dma_start(schway *inst, uint64_t t)
 {
     struct schway__dma *d = &inst->dma;
-    uint32_t ch = schway__dma_arbitrate(inst, DMA_UNIT_CHANNELS);
+    uint32_t ch = schway__dma_arbitrate(inst, UINT32_MAX);
     if (ch == SCHWAY__DMA_NONE) {
         return;
     }
@@ -417,6 +468,7 @@ static void dma_start(schway *inst, uint64_t t)
     n = n == 0u ? SCHWAY__DMA_UNIT_WORDS_MAX : n;
     d->chcr[ch] &= ~DMA_CHCR_TRIGGER;
     d->cur = ch;
+    d->stall_until = 0u;
     if (ch == DMA_OTC) {
         d->remain[ch] = 0u;
         cost = dma_otc_unit(inst);
@@ -435,12 +487,13 @@ static void dma_start(schway *inst, uint64_t t)
         d->dreq &= ~(UINT32_C(1) << ch);
         cost = dma_cost(ch, n) + DMA_BLOCK_OVERHEAD + dma_move(inst, ch, n, t);
     } else if (((d->chcr[ch] >> 9) & 3u) == 2u) {
-        /* Linked list: one node per unit, counted from the start of the
-           transfer. */
+        /* Linked list: one node per unit. remain tracks each channel's count
+           without changing the frozen format-4 nodes_done field shape. */
         if (d->phase[ch] != DMA_PH_NEXT) {
-            d->nodes_done = 0u;
+            d->remain[ch] = 0u;
         }
-        d->nodes_done++;
+        d->remain[ch]++;
+        d->nodes_done = d->remain[ch];
         cost = dma_list_node(inst, ch, t);
     } else if ((d->chcr[ch] & DMA_CHCR_CHOP) != 0u) {
         /* Sync mode 0 chopped: BCR's low half words go in windows of 2^n
@@ -502,14 +555,16 @@ static void dma_finish(schway *inst, uint32_t ch, uint64_t t, uint64_t now)
         d->cur = SCHWAY__DMA_NONE;
         return;
     }
-    if (d->remain[ch] > 0u) {
-        if (((d->chcr[ch] >> 9) & 3u) == 1u) {
+    uint32_t sync = (d->chcr[ch] >> 9) & 3u;
+    uint32_t more = sync == 2u ? (d->madr[ch] & 0x800000u) == 0u
+                               : d->remain[ch] > 0u;
+    if (more != 0u) {
+        if (sync == 1u) {
             d->phase[ch] = DMA_PH_BLOCKS;
             d->cur = SCHWAY__DMA_NONE;
         } else {
             uint64_t until = t + dma_gap(d, ch);
-            if (((d->chcr[ch] >> 9) & 3u) == 2u &&
-                d->nodes_done % SCHWAY__DMA_NODES_MAX == 0u && until <= now) {
+            if (sync == 2u && d->remain[ch] % SCHWAY__DMA_NODES_MAX == 0u && until <= now) {
                 until = now + 1u;
             }
             d->phase[ch] = DMA_PH_GAP;
@@ -519,6 +574,7 @@ static void dma_finish(schway *inst, uint32_t ch, uint64_t t, uint64_t now)
     }
     d->chcr[ch] &= ~SCHWAY__DMA_CHCR_BUSY;
     d->phase[ch] = DMA_PH_IDLE;
+    d->remain[ch] = 0u;
     d->cur = SCHWAY__DMA_NONE;
     if (((dicr >> (16u + ch)) & 1u) != 0u && (dicr & DMA_DICR_MASTER_EN) != 0u) {
         dicr |= UINT32_C(1) << (24u + ch);
@@ -533,7 +589,7 @@ static void dma_finish(schway *inst, uint32_t ch, uint64_t t, uint64_t now)
 uint64_t schway__dma_next(const schway *inst)
 {
     if (inst->dma.cur == SCHWAY__DMA_NONE &&
-        schway__dma_arbitrate(inst, DMA_UNIT_CHANNELS) == SCHWAY__DMA_NONE) {
+        schway__dma_arbitrate(inst, UINT32_MAX) == SCHWAY__DMA_NONE) {
         return UINT64_MAX;
     }
     return inst->dma.busy_until;
@@ -551,7 +607,7 @@ static void dma_run(schway *inst, uint64_t now, uint32_t start_next)
     for (;;) {
         if (d->cur == SCHWAY__DMA_NONE) {
             if (start_next == 0u || d->busy_until > now ||
-                schway__dma_arbitrate(inst, DMA_UNIT_CHANNELS) == SCHWAY__DMA_NONE) {
+                schway__dma_arbitrate(inst, UINT32_MAX) == SCHWAY__DMA_NONE) {
                 return;
             }
             dma_start(inst, d->busy_until);
@@ -567,6 +623,7 @@ static void dma_run(schway *inst, uint64_t now, uint32_t start_next)
                picked, with the others, by the arbitration. */
             d->phase[ch] = DMA_PH_NEXT;
             d->cur = SCHWAY__DMA_NONE;
+            d->stall_until = 0u;
         } else {
             dma_finish(inst, ch, t, now);
         }
@@ -627,18 +684,30 @@ static void dma_write(schway *inst, uint64_t now, uint32_t p, uint32_t width, ui
     } else if (reg == 8u) {
         uint32_t c = reg_put(d->chcr[ch], p, width, v);
         c &= ch == DMA_OTC ? DMA_CHCR_OTC_MASK : SCHWAY__DMA_CHCR_MASK;
-        if (ch != DMA_OTC && d->phase[ch] == DMA_PH_IDLE && (c & SCHWAY__DMA_CHCR_BUSY) != 0u &&
+        if (ch != DMA_OTC && (c & SCHWAY__DMA_CHCR_BUSY) != 0u &&
             ((c >> 9) & 3u) == 3u) {
-            /* Synchronisation mode 3 is reserved: no device end answers it, so a
-               channel written with it and the start bit would wait for ever. It
-               does not start (the start bits are dropped) and the first fault
-               names the register, the value and the writing instruction. A
-               later write with a usable mode starts the channel as usual. */
-            c &= ~(SCHWAY__DMA_CHCR_BUSY | DMA_CHCR_TRIGGER);
+            /* The response to a busy reserved-mode rewrite is unmeasured. The
+               core fails closed: a running unit finishes without completion;
+               a channel without a unit stops now. */
             schway__fault_latch(inst, SCHWAY__FAULT_DMA, SCHWAY__DEV_DMA, width, inst->cpu.pc, v,
                                 p & ~3u);
-        }
-        if (d->phase[ch] != DMA_PH_IDLE) {
+            if (d->phase[ch] == DMA_PH_UNIT || d->phase[ch] == DMA_PH_STOP) {
+                d->phase[ch] = DMA_PH_STOP;
+                c = d->chcr[ch] | SCHWAY__DMA_CHCR_BUSY;
+            } else if (d->phase[ch] != DMA_PH_IDLE ||
+                       (d->chcr[ch] & SCHWAY__DMA_CHCR_BUSY) != 0u) {
+                c = d->chcr[ch] & ~(SCHWAY__DMA_CHCR_BUSY | DMA_CHCR_TRIGGER);
+                d->phase[ch] = DMA_PH_IDLE;
+                d->remain[ch] = 0u;
+                d->stall_until = 0u;
+                if (d->cur == ch) {
+                    d->cur = SCHWAY__DMA_NONE;
+                    d->busy_until = 0u;
+                }
+            } else {
+                c &= ~(SCHWAY__DMA_CHCR_BUSY | DMA_CHCR_TRIGGER);
+            }
+        } else if (d->phase[ch] != DMA_PH_IDLE) {
             if (width == 4u && v == 0u && d->phase[ch] != DMA_PH_UNIT &&
                 d->phase[ch] != DMA_PH_STOP) {
                 /* The word 0 stops a channel with no unit in flight at once:

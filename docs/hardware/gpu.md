@@ -4,6 +4,34 @@ The GPU stores a 1024 by 512 array of native RGB555 words. GP0 packets update th
 VRAM readback therefore share one source of truth. This page describes the implemented rectangle and polygon pixel
 paths. Lines and beam behavior are described by their own hardware sections as those paths are implemented.
 
+## GPU readiness and DMA
+
+DMA2 writes use the same GP0 packet parser as CPU writes, so packet state carries across blocks and linked-list nodes.
+DMA2 reads consume the same GPUREAD stream as CPU reads. A transfer reset clears an unfinished packet or VRAM transfer.
+
+GPUSTAT bit 26 is set only when the command parser is idle and the GPU is ready. Bit 28 follows the block-ready rule:
+it is low while GPU work is busy, low while a polygon or line packet still owes parameters, and high for an active VRAM
+upload or polyline continuation when the GPU is idle. Bit 27 reports unread VRAM-to-CPU words. Bit 25 and DMA2's
+request line follow GP1's DMA direction: direction 1 requests while the GPU is idle with FIFO space, direction 2
+requests when bit 28 is set, and direction 3 requests while a VRAM read has words remaining.
+
+The GPU busy deadline is a deterministic model seeded from `.planning/preparation/PSX-GPU-AND-GTE.md`, section four
+point four. It charges 8 setup clocks plus the rounded per-pixel cost below after rasterization; it is not a console
+timing measurement. DMA2 linked-list nodes wait for this deadline, except when they carry parameters owed by an already
+started packet. Upload blocks and list nodes retain their existing atomic DMA cost.
+
+| Operation | GPU clocks per pixel (model) |
+|---|---:|
+| Fill | 0.081 |
+| Flat / semi-transparent rectangle | 0.530 / 0.797 |
+| Textured / semi-transparent textured rectangle | 1.188 / 1.497 |
+| Flat / semi-transparent polygon | 0.538 / 0.812 |
+| Textured / semi-transparent textured polygon | 2.980 / 3.463 |
+| Line / VRAM copy | 1.000 / 1.000 |
+
+GPUREAD and busy timing are saved as instance state, so a state load resumes unread transfer data and the remaining
+readiness deadline.
+
 ## Textured rectangles
 
 A rectangle command encodes raw-texture (TGE), semi-transparency (ABE), texturing (TME), and a size mode. The size mode
