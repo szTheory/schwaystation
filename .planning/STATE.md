@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 29 of 49
+current_plan: 30 of 49
 status: executing
-stopped_at: Completed 04-22-PLAN.md; exact-head hosted CI passed
-last_updated: "2026-11-11T17:54:31.351Z"
+stopped_at: Completed 04-39-PLAN.md
+last_updated: "2026-11-11T19:23:54.140Z"
 last_activity: 2026-11-11
-last_activity_desc: Completed plan 04-22; exact-head CI run 43069874480 passed, including the pinned Linux OpenBIOS digest, WASI, and all 433 be32 tests
-state_head: 522a48fd10e2b9b8a2820cfb21a4d8aa2f179167
+last_activity_desc: Completed plan 04-39; exact-head CI run 43083684528 passed with the same-run OpenBIOS digest verified in every consumer
+state_head: 11a79aeebacc9734c2bc5a5295e1815cfeb15b38
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 96
+  completed_plans: 97
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 29 of 49
-Status: Plan 04-22 is complete; GAME-05 remains pending until the later OpenBIOS transfer and shell-boot plans finish.
-Last activity: 2026-11-11 — Exact-head CI run 43069874480 passed; the pinned Linux OpenBIOS output and cross-platform tests are verified.
+Current Plan: 30 of 49
+Status: Plan 04-39 is complete; GAME-05 remains pending until the runner BIOS CLI and shell-boot plans finish.
+Last activity: 2026-11-11 — Exact-head CI run 43083684528 passed with same-run OpenBIOS verification across all consumers.
 
 Progress: [█████░░░░░] 50%
 
@@ -157,6 +157,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P38 | 51min | 2 tasks | 14 files |
 | Phase 04 P21 | 44min | 2 tasks | 9 files |
 | Phase 04 P22 | 106min | 2 tasks | 20 files |
+| Phase 04 P39 | 1h 15m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -356,6 +357,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Generate synthetic digest keys and content-marker samples only in build-directory fixtures.
 - [Phase 04]: Use the upstream-supported OPENBIOS_SHELL=shell target with pinned nugget source and Linux GCC; no custom standard-library overlay is needed.
 - [Phase 04]: Raise the be32 job timeout to seven minutes based on the expanded 433-test suite; the exact-head lane completed in 6m09s with all tests retained.
+- [Phase 04]: Keep OpenBIOS transfer in a one-day current-run artifact; consumers verify expected size and SHA-256 before use, with no cross-run cache or package/publication path.
+- [Phase 04]: Preserve distinct empty-input, repeated-held, and three-edge guest proofs at frame 300; reuse the existing one-edge pin instead of repeating a redundant guest run.
 
 ### Pending Todos
 
@@ -471,10 +474,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-22 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; pinned OpenBIOS output 524288 bytes/SHA-256 verified, digest corruption refused; CI run 43069874480 passed, including WASI and 433 be32 tests; local CI/hygiene passed | gpt-6-luna xhigh |
 
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-39 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; same-run OpenBIOS handoff with digest-checked consumers, corruption/missing refusal, local CI/hygiene, and exact-head hosted CI | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T17:54:30.919Z
-Stopped at: Completed 04-22-PLAN.md; exact-head hosted CI passed
+Last session: 2026-11-11T19:23:53.858Z
+Stopped at: Completed 04-39-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
