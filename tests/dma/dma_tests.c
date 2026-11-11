@@ -859,6 +859,61 @@ static void case_sync0_from_device(void)
     schway_destroy(inst);
 }
 
+/* Fault prevented: DMA2 discarding GP0 words, losing a packet split across
+   linked-list nodes or a CPU continuation, returning zeros instead of VRAM,
+   or failing to request another sync-mode-1 block while its FIFO has room. */
+static void case_gpu_linked_list_readback(void)
+{
+    schway *inst = make();
+    schway *reference = make();
+    const uint32_t x = 12u;
+    const uint32_t y = 3u;
+    const uint32_t pixel = 0x7C1Fu;
+
+    wr32(inst, 0x1F801814u, 0x04000001u);
+    wr32(inst, 0x1000u, (2u << 24) | 0x1020u);
+    wr32(inst, 0x1004u, 0xA0000000u);
+    wr32(inst, 0x1008u, (y << 16) | x);
+    wr32(inst, 0x1020u, (2u << 24) | 0x00FFFFFFu);
+    wr32(inst, 0x1024u, 0x00010001u);
+    wr32(inst, 0x1028u, pixel);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, MADR(2u), 0x1000u);
+    wr32(inst, CHCR(2u), 0x01000401u);
+    (void)run(inst, 200u);
+
+    wr32(reference, 0x1F801810u, 0xA0000000u);
+    wr32(reference, 0x1F801810u, (y << 16) | x);
+    wr32(reference, 0x1F801810u, 0x00010001u);
+    wr32(reference, 0x1F801810u, pixel);
+    CHECK_EQ_HEX(inst->vram[y][x], pixel);
+    CHECK_EQ_HEX(inst->vram[y][x], reference->vram[y][x]);
+
+    /* CPU starts the packet; a one-block DMA continues its owed words. */
+    wr32(inst, 0x1F801810u, 0xA0000000u);
+    wr32(inst, 0x1F801810u, (4u << 16) | 20u);
+    wr32(inst, 0x2000u, 0x00010001u);
+    wr32(inst, 0x2004u, 0x03E0u);
+    wr32(inst, MADR(2u), 0x2000u);
+    wr32(inst, BCR(2u), 2u);
+    wr32(inst, CHCR(2u), 0x11000001u);
+    (void)run(inst, 100u);
+    CHECK_EQ_HEX(inst->vram[4u][20u], 0x03E0u);
+
+    /* GPU-to-RAM DMA returns the real packed GPUREAD word. */
+    wr32(inst, 0x1F801814u, 0x04000003u);
+    wr32(inst, 0x1F801810u, 0xC0000000u);
+    wr32(inst, 0x1F801810u, (y << 16) | x);
+    wr32(inst, 0x1F801810u, 0x00010001u);
+    wr32(inst, MADR(2u), 0x3000u);
+    wr32(inst, BCR(2u), 1u);
+    wr32(inst, CHCR(2u), 0x11000000u);
+    CHECK_EQ_HEX(ram_word(inst, 0x3000u), pixel);
+    CHECK_EQ_U64(inst->gpu.owed_words, 0u);
+    schway_destroy(reference);
+    schway_destroy(inst);
+}
+
 /* Fault prevented: sync mode 1 that moves every block on one request, waits
    for none, loses the block count or its address, or finishes without the
    flag. Four blocks of 16 words go to the SPU channel, one block per raise of
@@ -1760,6 +1815,7 @@ static const struct {
     {"list_walk", case_list_walk},
     {"list_empty", case_list_empty},
     {"sync0_gpu_sink", case_sync0_gpu_sink},
+    {"gpu_linked_list_readback", case_gpu_linked_list_readback},
     {"sync0_from_device", case_sync0_from_device},
     {"sync1_dreq_blocks", case_sync1_dreq_blocks},
     {"sync1_no_dreq_no_stall", case_sync1_no_dreq_no_stall},

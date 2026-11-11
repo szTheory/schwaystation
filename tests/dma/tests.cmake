@@ -222,3 +222,9 @@ schway_add_test(NAME dma.read.chain_saves
 schway_add_test(NAME dma.stall.engines_decay
   COMMAND schwaystation-test-dma stall_decays_engines
   LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: GPU DMA2 packet state diverging across linked-list nodes,
+# CPU continuation or readback, and sync mode 1 losing the GPU request line.
+schway_add_test(NAME dma.gpu.linked_list_readback
+  COMMAND schwaystation-test-dma gpu_linked_list_readback
+  LABELS dma portable TIMEOUT 10)

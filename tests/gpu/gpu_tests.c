@@ -304,6 +304,49 @@ static void test_register_images(void)
     schway_destroy(inst);
 }
 
+static void test_dma_ready_budget(void)
+{
+    schway *inst = make_instance();
+    uint32_t status = read_port(inst, GP1);
+    CHECK((status & ((1u << 26) | (1u << 28))) == ((1u << 26) | (1u << 28)));
+    CHECK((status & (1u << 25)) == 0u);
+
+    write_port(inst, GP1, 0x04000001u);
+    status = read_port(inst, GP1);
+    CHECK((status & (1u << 25)) != 0u);
+    CHECK((inst->dma.dreq & (1u << 2)) != 0u);
+
+    write_port(inst, GP1, 0x04000002u);
+    status = read_port(inst, GP1);
+    CHECK((status & (1u << 25)) != 0u);
+    CHECK((inst->dma.dreq & (1u << 2)) != 0u);
+
+    write_port(inst, GP0, 0x020000FFu);
+    write_port(inst, GP0, 0u);
+    write_port(inst, GP0, 0x00010001u);
+    uint64_t deadline = schway__gpu_next(inst);
+    CHECK(deadline > inst->ticks);
+    CHECK(deadline != UINT64_MAX);
+    status = read_port(inst, GP1);
+    CHECK((status & ((1u << 26) | (1u << 28))) == 0u);
+    CHECK((status & (1u << 25)) == 0u);
+    CHECK((inst->dma.dreq & (1u << 2)) == 0u);
+
+    schway__gpu_event(inst, deadline);
+    CHECK(schway__gpu_peek(inst, GP1, 4u, &status) == 0);
+    CHECK((status & ((1u << 26) | (1u << 28))) == ((1u << 26) | (1u << 28)));
+    CHECK((status & (1u << 25)) != 0u);
+    CHECK((inst->dma.dreq & (1u << 2)) != 0u);
+
+    write_port(inst, GP1, 0x04000003u);
+    status = read_port(inst, GP1);
+    CHECK((status & (1u << 25)) == 0u);
+    write_port(inst, GP1, 0x04000000u);
+    status = read_port(inst, GP1);
+    CHECK((status & (1u << 25)) == 0u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -320,6 +363,8 @@ int main(int argc, char **argv)
         test_state_partial_fill();
     } else if (strcmp(argv[1], "state_cache_roundtrip") == 0) {
         test_state_cache_roundtrip();
+    } else if (strcmp(argv[1], "dma_ready_budget") == 0) {
+        test_dma_ready_budget();
     } else {
         fprintf(stderr, "unknown GPU case: %s\n", argv[1]);
         return 2;

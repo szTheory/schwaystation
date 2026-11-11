@@ -219,3 +219,9 @@ foreach(case IN ITEMS testcard.pixels video.tuple)
     COMMAND schwaystation-test-core ${case}
     LABELS gpu portable TIMEOUT 10)
 endforeach()
+
+# Fault prevented: GPU ready bits and DMA request state staying asserted during
+# primitive work, or failing to follow the selected GP1 DMA direction.
+schway_add_test(NAME gpu.dma.ready_budget
+  COMMAND schwaystation-test-gpu dma_ready_budget
+  LABELS gpu portable TIMEOUT 10)

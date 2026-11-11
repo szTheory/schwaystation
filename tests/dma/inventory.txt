@@ -9,6 +9,7 @@ dma.dpcr.rearbitrate	dma,portable
 dma.dpcr.reset	dma,portable
 dma.engine.step_contract	dma,portable
 dma.fault.sync3	dma,portable
+dma.gpu.linked_list_readback	dma,portable
 dma.hostile.bcr	dma,portable
 dma.hostile.preempt_carry	dma,portable
 dma.list.cpu_band	dma,portable

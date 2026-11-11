@@ -12,6 +12,7 @@ gpu.display.malformed_windows	gpu,portable
 gpu.display.native15_wrap	gpu,portable
 gpu.display.native24_wrap	gpu,portable
 gpu.display.width_modes	gpu,portable
+gpu.dma.ready_budget	gpu,portable
 gpu.pixel.arithmetic	gpu,portable
 gpu.pixel.palette_wrap	gpu,portable
 gpu.pixel.textured_rectangle_mmio	gpu,portable
