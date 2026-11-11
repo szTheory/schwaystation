@@ -70,6 +70,22 @@ The size tag lets a program built against one header run with a library built fr
 
 A call that returns an error changes nothing: not the instance, not your struct.
 
+## Pad input and frame reports
+
+`schway_input` is a host snapshot for both controller ports. `device` uses `SCHWAY_INPUT_DEVICE_NONE` to
+disconnect a port, `SCHWAY_INPUT_DEVICE_DIGITAL` for a two-button-byte pad and `SCHWAY_INPUT_DEVICE_DUALSHOCK`
+for a DualShock. Set bits in `buttons` mean pressed; SIO returns those buttons active-low. The four raw axis bytes
+are right X, right Y, left X and left Y, with 128 at centre. `analog_button` is a held 0/1 input; a rising edge
+toggles analog mode when the pad has not locked that button.
+
+Zero the struct, set its `size`, then call `schway_set_input`. The snapshot takes effect at the next frame start,
+so input set during a frame cannot change a poll already in progress. Host input itself is outside save states;
+the latched pad and in-progress serial protocol are saved.
+
+The appended `schway_run_result.lag` is 1 when no complete controller poll occurred in that frame; peeks do not
+count. `rumble[0]` and `rumble[1]` report each port as `large << 8 | small`, where large is 0–255 and small is
+0 or 1. A smaller result struct from an older caller keeps its existing fields and is not written past its `size`.
+
 ## The allocator
 
 ```c

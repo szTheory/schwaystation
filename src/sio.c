@@ -283,7 +283,7 @@ void schway__sio_event(schway *inst, uint64_t now)
         uint8_t received = 0xFFu;
         uint32_t ack = 0u;
         if ((sio->ctrl & CTRL_SELECT) != 0u) {
-            ack = schway__pad_byte(inst, sio->tx_port, sio->tx_data, &received);
+            ack = schway__pad_byte(inst, sio->tx_port, sio->tx_data, now, &received);
         }
         sio->byte_deadline = 0u;
         sio->tx_pending = 0u;

@@ -136,6 +136,7 @@ static void input_latch_and_rumble(void)
 
     const uint8_t enter_config[] = {0x01u, 0u, 0u, 0u, 0u, 0u};
     send_command(inst, 0x43u, enter_config, 0x73u);
+    CHECK_EQ_U64(inst->pad.config_mode[0], 1u);
 
     const uint8_t mapping[] = {0u, 1u, 0xFFu, 0xFFu, 0xFFu, 0xFFu};
     send_command(inst, 0x4Du, mapping, 0xF3u);

@@ -24,6 +24,9 @@ int main(void)
 {
     CHECK(SCHWAY_API_VERSION >= 4);
 #if SCHWAY_API_VERSION >= 4
+    CHECK_EQ_U64(SCHWAY_INPUT_DEVICE_NONE, 0u);
+    CHECK_EQ_U64(SCHWAY_INPUT_DEVICE_DIGITAL, 1u);
+    CHECK_EQ_U64(SCHWAY_INPUT_DEVICE_DUALSHOCK, 2u);
     schway_config cfg;
     memset(&cfg, 0, sizeof cfg);
     cfg.size = (uint32_t)sizeof cfg;
@@ -50,6 +53,7 @@ int main(void)
         memset(&input, 0, sizeof input);
         input.size = (uint32_t)sizeof input;
         input.device[0] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
+        input.device[1] = SCHWAY_INPUT_DEVICE_NONE;
         input.axes[0][0] = 128u;
         input.axes[0][1] = 128u;
         input.axes[0][2] = 128u;

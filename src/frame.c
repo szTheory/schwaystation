@@ -86,6 +86,7 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             inst->frame >= SCHWAY__STATE_FRAME_MAX) {
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
+        schway__pad_frame_start(inst);
         inst->profile_locked = 1u;
         *stop = schway__cpu_run(inst, cycles, flags);
         *done = inst->frame != starting_frame;
@@ -95,6 +96,7 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             (*done && inst->frame >= SCHWAY__STATE_FRAME_MAX)) {
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
+        schway__pad_frame_start(inst);
         /* No program runs and no device is stepped; only an event already due
            runs, at its own deadline, and with none armed the loop is one
            compare. */
@@ -117,6 +119,7 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
     if (inst->sched.next <= inst->ticks) {
         schway__sched_run(inst);
     }
+    schway__pad_update_watchdog(inst, inst->ticks);
     if (inst->exe_loaded != 0u) {
         *done = inst->frame != starting_frame;
     }
@@ -132,6 +135,9 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
         inst->frame_end += (inst->tick_acc + num) / den;
         schway__testcard_draw(&inst->vram[0][0], (uint32_t)inst->frame);
     }
+    if (*done) {
+        schway__pad_frame_end(inst);
+    }
     return SCHWAY_STATUS_OK;
 }
 
@@ -145,6 +151,11 @@ static void write_result(const schway *inst, schway_run_result *out, uint32_t st
     r.ticks = inst->ticks;
     r.exit_code = stop == SCHWAY_STOP_HOOK ? inst->exit_code : 0u;
     r.fault_present = inst->fault.kind != SCHWAY__FAULT_NONE;
+    r.lag = inst->pad.frame_polls == 0u ? 1u : 0u;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        r.rumble[port] = ((uint32_t)inst->pad.rumble_large[port] << 8) |
+                         inst->pad.rumble_small[port];
+    }
     schway__instance_write_out(out, &r, (uint32_t)sizeof r);
 }
 
@@ -167,6 +178,8 @@ schway_status schway_set_input(schway *inst, const schway_input *input)
             return SCHWAY_STATUS_ERR_ARGUMENT;
         }
     }
+    memcpy(&inst->pad.pending_input, input, sizeof *input);
+    inst->pad.pending_valid = 1u;
     return SCHWAY_STATUS_OK;
 }
 
