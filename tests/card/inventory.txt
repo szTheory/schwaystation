@@ -4,3 +4,4 @@ card.protocol.read_edges	card,portable
 card.protocol.write_commit	card,portable
 card.protocol.write_edges	card,portable
 card.state.import_atomic	card,portable
+card.state.pending_edges	card,portable

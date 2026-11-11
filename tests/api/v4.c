@@ -118,8 +118,26 @@ int main(void)
                      SCHWAY_STATUS_OK);
         CHECK(((const uint8_t *)card2.data)[0] == v4_card2[0]);
         CHECK_EQ_HEX(((const uint8_t *)card2.data)[1], 0xFFu);
+        int second_slot_padded = 1;
+        for (uint32_t i = 1u; i < SCHWAY_MEMCARD_SIZE; i++) {
+            second_slot_padded &= ((const uint8_t *)card2.data)[i] == 0xFFu;
+        }
+        CHECK(second_slot_padded);
+        uint64_t second_generation = UINT64_MAX;
+        CHECK_EQ_U64(schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &second_generation),
+                     SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(second_generation, 0u);
+        CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, v4_card2, 0u),
+                     SCHWAY_STATUS_OK);
+        int empty_slot_is_ff = 1;
+        for (uint32_t i = 0u; i < SCHWAY_MEMCARD_SIZE; i++) {
+            empty_slot_is_ff &= ((const uint8_t *)card2.data)[i] == 0xFFu;
+        }
+        CHECK(empty_slot_is_ff);
         CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, v4_card1,
                                          SCHWAY_MEMCARD_SIZE + 1u),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
+        CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, NULL, 0u),
                      SCHWAY_STATUS_ERR_ARGUMENT);
         CHECK(((const uint8_t *)card1.data)[0] == v4_card1[0]);
         generation = UINT64_C(0xCAFE);
@@ -135,10 +153,18 @@ int main(void)
         CHECK(second.data == first.data);
         CHECK_EQ_U64(second.size, first.size);
         uint8_t card_before_refused_import = ((const uint8_t *)card1.data)[0];
+        uint8_t card2_before_refused_import = ((const uint8_t *)card2.data)[0];
         v4_card1[0] ^= 0xFFu;
         CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, v4_card1, sizeof v4_card1),
                      SCHWAY_STATUS_ERR_ARGUMENT);
+        CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, v4_card2, 1u),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
         CHECK_EQ_U64(((const uint8_t *)card1.data)[0], card_before_refused_import);
+        CHECK_EQ_U64(((const uint8_t *)card2.data)[0], card2_before_refused_import);
+        CHECK_EQ_HEX(((const uint8_t *)card2.data)[SCHWAY_MEMCARD_SIZE - 1u], 0xFFu);
+        CHECK_EQ_U64(schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &second_generation),
+                     SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(second_generation, 0u);
         v4_card1[0] ^= 0xFFu;
 
         schway_input input;
