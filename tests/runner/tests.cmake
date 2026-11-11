@@ -69,6 +69,39 @@ if(CMAKE_SCRIPT_MODE_FILE)
     set(RUN ${HOOKED})
     expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash)
     expect_exit(0 "^frames 5\n.*max_rss_kib [0-9]+\n$" --bench 60)
+  elseif(CASE STREQUAL "cards_persistence")
+    set(RUN ${HOOKED})
+    string(REPEAT "[0-9a-f]" 64 digits)
+    set(card_dir "${OUT}/runner-cards-persistence")
+    file(MAKE_DIRECTORY "${card_dir}")
+    file(WRITE "${card_dir}/schwaystation.srm" "old-slot-one")
+    file(WRITE "${card_dir}/schwaystation.1.mcr" "old-slot-two")
+    file(SHA256 "${card_dir}/schwaystation.1.mcr" old_slot_two)
+    expect_exit(0 "^frame 3 sha256 ${digits}\n$" --frames 3 --hash --save-dir "${card_dir}"
+      --test-card-write slot1)
+    file(SIZE "${card_dir}/schwaystation.srm" slot_one_size)
+    file(READ "${card_dir}/schwaystation.srm" slot_one_sector HEX OFFSET 896 LIMIT 8)
+    file(SHA256 "${card_dir}/schwaystation.1.mcr" new_slot_two)
+    if(NOT slot_one_size EQUAL 131072 OR NOT slot_one_sector STREQUAL "314e6b88a5c2dffc" OR
+       NOT old_slot_two STREQUAL new_slot_two)
+      message(FATAL_ERROR "normal exit did not save only slot 1's completed card generation")
+    endif()
+  elseif(CASE STREQUAL "cards_sigterm")
+    set(RUN ${HOOKED})
+    string(REPEAT "[0-9a-f]" 64 digits)
+    set(card_dir "${OUT}/runner-cards-sigterm")
+    file(MAKE_DIRECTORY "${card_dir}")
+    file(WRITE "${card_dir}/schwaystation.srm" "unchanged-slot-one")
+    file(SHA256 "${card_dir}/schwaystation.srm" old_slot_one)
+    expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash --save-dir "${card_dir}"
+      --test-card-write slot2)
+    file(SIZE "${card_dir}/schwaystation.1.mcr" slot_two_size)
+    file(READ "${card_dir}/schwaystation.1.mcr" slot_two_sector HEX OFFSET 896 LIMIT 8)
+    file(SHA256 "${card_dir}/schwaystation.srm" new_slot_one)
+    if(NOT slot_two_size EQUAL 131072 OR NOT slot_two_sector STREQUAL "627f9cb9d6f3102d" OR
+       NOT old_slot_one STREQUAL new_slot_one)
+      message(FATAL_ERROR "SIGTERM did not flush only slot 2 after frame 5")
+    endif()
   elseif(CASE STREQUAL "hash_state")
     # One well-formed line, the same twice, and a different one a frame later. CMake regexes have no
     # {64}, so the sixty-four digits are repeated.
@@ -492,6 +525,16 @@ schway_add_test(NAME runner.stop
   COMMAND ${bench_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
     -DEXPECTED=${SCHWAYSTATION_TESTCARD_SHA256_FRAME5} -DCASE=stop -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: completed card generations are not flushed on normal exit or after a clean
+# SIGTERM, or an unchanged slot is needlessly replaced.
+set(runner_cards_check ${runner_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
+  -DEXPECTED=${SCHWAYSTATION_TESTCARD_SHA256_FRAME5} -DOUT=${PROJECT_BINARY_DIR}/tests)
+foreach(case persistence sigterm)
+  schway_add_test(NAME runner.cards.${case}
+    COMMAND ${runner_cards_check} -DCASE=cards_${case} -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS portable runner TIMEOUT 60)
+endforeach()
 
 # Fault prevented: a runner that exits 0 after failing to write a file, or
 # calls a failure a usage error.
