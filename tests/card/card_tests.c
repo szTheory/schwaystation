@@ -5,6 +5,7 @@
 
 #include "schwaystation.h"
 #include "internal.h"
+#include "state.h"
 #include "../check.h"
 
 #define JOY_DATA 0x1F801040u
@@ -215,6 +216,63 @@ static uint64_t card_generation(const schway *inst, uint32_t slot)
     uint64_t generation = UINT64_MAX;
     CHECK_EQ_U64(schway_memcard_generation(inst, slot, &generation), SCHWAY_STATUS_OK);
     return generation;
+}
+
+static int replace_state_field(schway *inst, uint8_t *state, size_t size,
+                               const char *name, uint32_t element, uint64_t value)
+{
+    size_t count = schway__state_record(inst, NULL, 0u);
+    struct schway__state_field *fields =
+        (struct schway__state_field *)calloc(count, sizeof *fields);
+    CHECK(fields != NULL);
+    if (fields == NULL) {
+        return 0;
+    }
+    CHECK_EQ_U64(schway__state_record(inst, fields, count), count);
+    int found = 0;
+    for (size_t i = 0u; i < count; i++) {
+        if (strcmp(fields[i].name, name) == 0) {
+            CHECK(element < fields[i].count);
+            CHECK(fields[i].width <= sizeof value);
+            if (element < fields[i].count && fields[i].width <= sizeof value) {
+                size_t offset = fields[i].offset + (size_t)element * fields[i].width;
+                for (uint32_t byte = 0u; byte < fields[i].width; byte++) {
+                    state[offset + byte] = (uint8_t)(value >> (8u * byte));
+                }
+                found = 1;
+            }
+            break;
+        }
+    }
+    CHECK(found);
+    if (found != 0) {
+        schway__state_seal(state, size);
+    }
+    free(fields);
+    return found;
+}
+
+static void reject_mutated_state(schway *source, schway *target, const char *name,
+                                 uint32_t element, uint64_t value)
+{
+    size_t size = schway_state_size(source);
+    uint8_t *state = (uint8_t *)malloc(size);
+    uint8_t *snapshot = (uint8_t *)malloc(sizeof *target);
+    CHECK(state != NULL);
+    CHECK(snapshot != NULL);
+    if (state == NULL || snapshot == NULL) {
+        free(snapshot);
+        free(state);
+        return;
+    }
+    CHECK_EQ_U64(schway_save_state(source, state, size), SCHWAY_STATUS_OK);
+    if (replace_state_field(source, state, size, name, element, value) != 0) {
+        memcpy(snapshot, target, sizeof *target);
+        CHECK_EQ_U64(schway_load_state(target, state, size), SCHWAY_STATUS_ERR_STATE_FIELD);
+        CHECK(memcmp(target, snapshot, sizeof *target) == 0);
+    }
+    free(snapshot);
+    free(state);
 }
 
 static uint8_t read_card_flag(schway *inst)
@@ -621,6 +679,91 @@ static void protocol_write_edges(void)
     protocol_write_repeated_and_truncated();
 }
 
+static void state_import_atomic(void)
+{
+    uint8_t short_image[37];
+    for (uint32_t i = 0u; i < sizeof short_image; i++) {
+        short_image[i] = (uint8_t)(i * 7u + 3u);
+    }
+    schway *inst = make();
+    schway_span card;
+    CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD1, &card), SCHWAY_STATUS_OK);
+    const void *card_address = card.data;
+    CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, short_image,
+                                     sizeof short_image), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD1, &card), SCHWAY_STATUS_OK);
+    CHECK(card.data == card_address);
+    CHECK(memcmp(card.data, short_image, sizeof short_image) == 0);
+    const uint8_t *loaded = (const uint8_t *)card.data;
+    int padded = 1;
+    for (uint32_t i = sizeof short_image; i < SCHWAY_MEMCARD_SIZE; i++) {
+        padded &= loaded[i] == 0xFFu;
+    }
+    CHECK(padded);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 0u);
+
+    uint8_t *oversized = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE + 1u);
+    CHECK(oversized != NULL);
+    if (oversized != NULL) {
+        memset(oversized, 0xA5, SCHWAY_MEMCARD_SIZE + 1u);
+        CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, oversized,
+                                         SCHWAY_MEMCARD_SIZE + 1u),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
+        CHECK_EQ_U64(schway_load_memcard(inst, 0u, oversized, SCHWAY_MEMCARD_SIZE),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
+        int refused_without_mutation = memcmp(card.data, short_image, sizeof short_image) == 0;
+        for (uint32_t i = sizeof short_image; i < SCHWAY_MEMCARD_SIZE; i++) {
+            refused_without_mutation &= loaded[i] == 0xFFu;
+        }
+        CHECK(refused_without_mutation);
+        CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 0u);
+    }
+
+    size_t saved_size = schway_state_size(inst);
+    uint8_t *idle_state = (uint8_t *)malloc(saved_size);
+    CHECK(idle_state != NULL);
+    if (idle_state != NULL) {
+        CHECK_EQ_U64(schway_save_state(inst, idle_state, saved_size), SCHWAY_STATUS_OK);
+        uint8_t data[SCHWAY__CARD_SECTOR_SIZE];
+        make_write_data(data, 109u);
+        configure(inst, 0u);
+        CHECK(write_success(inst, 9u, 0x08u, data));
+        uint8_t expected[SCHWAY_MEMCARD_SIZE];
+        memcpy(expected, card.data, sizeof expected);
+        CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
+        CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, short_image,
+                                         sizeof short_image),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
+        CHECK(memcmp(card.data, expected, sizeof expected) == 0);
+        CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
+        CHECK_EQ_U64(schway_load_state(inst, idle_state, saved_size), SCHWAY_STATUS_OK);
+        CHECK(memcmp(card.data, expected, sizeof expected) == 0);
+        CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), 1u);
+        free(idle_state);
+    }
+    free(oversized);
+    schway_destroy(inst);
+
+    uint8_t *card_image = make_card(23u);
+    schway *source = make();
+    schway *target = make();
+    CHECK_EQ_U64(schway_load_memcard(source, SCHWAY_CARD_SLOT_1, card_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_memcard(target, SCHWAY_CARD_SLOT_1, card_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    uint8_t data[SCHWAY__CARD_SECTOR_SIZE];
+    make_write_data(data, 41u);
+    configure(source, 0u);
+    CHECK(write_preamble(source, 0x08u));
+    CHECK_EQ_HEX(write_address(source, 3u, CARD_ACK), 0u);
+    write_data(source, data, 0u, 4u);
+    uint32_t bad_checksum = (source->card.slot[0].checksum + 1u) & 0xFFu;
+    reject_mutated_state(source, target, "card.slot1.checksum", 0u, bad_checksum);
+    schway_destroy(target);
+    schway_destroy(source);
+    free(card_image);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -634,6 +777,8 @@ int main(int argc, char **argv)
         protocol_write_commit();
     } else if (strcmp(argv[1], "protocol_write_edges") == 0) {
         protocol_write_edges();
+    } else if (strcmp(argv[1], "state_import_atomic") == 0) {
+        state_import_atomic();
     } else {
         return 2;
     }

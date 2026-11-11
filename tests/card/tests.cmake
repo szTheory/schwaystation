@@ -25,3 +25,8 @@ schway_add_test(NAME card.protocol.write_commit
 schway_add_test(NAME card.protocol.write_edges
   COMMAND schwaystation-test-card protocol_write_edges
   LABELS card portable TIMEOUT 10)
+
+# Fault prevented: imports or state restores partially apply invalid card data or roll back saves.
+schway_add_test(NAME card.state.import_atomic
+  COMMAND schwaystation-test-card state_import_atomic
+  LABELS card portable TIMEOUT 10)

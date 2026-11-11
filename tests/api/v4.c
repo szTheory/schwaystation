@@ -109,7 +109,18 @@ int main(void)
         CHECK_EQ_U64(schway_load_memcard(inst, 3u, v4_card1, sizeof v4_card1),
                      SCHWAY_STATUS_ERR_ARGUMENT);
         CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, v4_card1,
-                                         sizeof v4_card1 - 1u), SCHWAY_STATUS_ERR_ARGUMENT);
+                                         sizeof v4_card1 - 1u), SCHWAY_STATUS_OK);
+        CHECK(((const uint8_t *)card1.data)[0] == v4_card1[0]);
+        CHECK(((const uint8_t *)card1.data)[SCHWAY_MEMCARD_SIZE - 2u] ==
+              v4_card1[SCHWAY_MEMCARD_SIZE - 2u]);
+        CHECK_EQ_HEX(((const uint8_t *)card1.data)[SCHWAY_MEMCARD_SIZE - 1u], 0xFFu);
+        CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, v4_card2, 1u),
+                     SCHWAY_STATUS_OK);
+        CHECK(((const uint8_t *)card2.data)[0] == v4_card2[0]);
+        CHECK_EQ_HEX(((const uint8_t *)card2.data)[1], 0xFFu);
+        CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, v4_card1,
+                                         SCHWAY_MEMCARD_SIZE + 1u),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
         CHECK(((const uint8_t *)card1.data)[0] == v4_card1[0]);
         generation = UINT64_C(0xCAFE);
         CHECK_EQ_U64(schway_memcard_generation(inst, 0u, &generation),
