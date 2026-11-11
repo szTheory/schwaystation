@@ -52,3 +52,8 @@ schway_add_test(NAME card.state.pending_edges
 schway_add_test(NAME card.files.atomic_roundtrip
   COMMAND schwaystation-test-card-files atomic_roundtrip
   LABELS card portable TIMEOUT 10)
+
+# Fault prevented: malformed imports mutate a card or failed durable writes replace the old image.
+schway_add_test(NAME card.files.atomic_failures
+  COMMAND schwaystation-test-card-files atomic_failures
+  LABELS card portable TIMEOUT 10)

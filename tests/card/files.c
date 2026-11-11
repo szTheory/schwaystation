@@ -95,6 +95,46 @@ static int set_temp_path(char *out, size_t capacity, const char *destination, un
     return written >= 0 && (size_t)written < capacity;
 }
 
+static int file_exists(const char *path)
+{
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        return 0;
+    }
+    return fclose(file) == 0;
+}
+
+static int all_bytes_are(const uint8_t *bytes, size_t size, uint8_t expected)
+{
+    for (size_t i = 0u; i < size; i++) {
+        if (bytes[i] != expected) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static uint8_t frame_checksum(const uint8_t *frame)
+{
+    uint8_t checksum = 0u;
+    for (size_t i = 0u; i < 127u; i++) {
+        checksum ^= frame[i];
+    }
+    return checksum;
+}
+
+static void make_valid_card(uint8_t *bytes)
+{
+    memset(bytes, 0xFF, SCHWAY_MEMCARD_SIZE);
+    const size_t header_offset = 63u * 128u;
+    bytes[header_offset] = (uint8_t)'M';
+    bytes[header_offset + 1u] = (uint8_t)'C';
+    for (size_t frame = 0u; frame < SCHWAY_MEMCARD_SIZE / 128u; frame++) {
+        uint8_t *contents = bytes + frame * 128u;
+        contents[127] = frame_checksum(contents);
+    }
+}
+
 static void atomic_roundtrip(void)
 {
     char directory[TEMP_PATH_CAP] = {0};
@@ -143,6 +183,8 @@ static void atomic_roundtrip(void)
         goto cleanup;
     }
     CHECK(memcmp(imported, raw, sizeof raw) == 0);
+    CHECK_EQ_U64(lint.flags, SCHWAY_HOST_CARD_LINT_BAD_HEADER | SCHWAY_HOST_CARD_LINT_BAD_CHECKSUM);
+    CHECK_EQ_U64(lint.bad_frame_checksums, 1u);
     size_t source_size = 0u;
     CHECK(read_file(source, source_readback, sizeof source_readback, &source_size));
     CHECK_EQ_U64(source_size, sizeof raw);
@@ -222,12 +264,181 @@ cleanup:
     free(initial);
 }
 
+static void atomic_failures(void)
+{
+    char first_directory[TEMP_PATH_CAP] = {0};
+    char second_directory[TEMP_PATH_CAP] = {0};
+    char exact_source[TEMP_PATH_CAP] = {0};
+    char empty_source[TEMP_PATH_CAP] = {0};
+    char oversized_source[TEMP_PATH_CAP] = {0};
+    char missing_source[TEMP_PATH_CAP] = {0};
+    char first_destination[TEMP_PATH_CAP] = {0};
+    char second_destination[TEMP_PATH_CAP] = {0};
+    char temporary[TEMP_PATH_CAP] = {0};
+    uint8_t marker = 0xD2u;
+    uint8_t *first = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *second = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *oversized = (uint8_t *)malloc((size_t)SCHWAY_MEMCARD_SIZE + 1u);
+    uint8_t *out = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *readback = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    int made_first_directory = 0;
+    int made_second_directory = 0;
+    int have_exact_source = 0;
+    int have_empty_source = 0;
+    int have_oversized_source = 0;
+    int have_first_destination = 0;
+    int have_second_destination = 0;
+    int have_temp_marker = 0;
+
+    CHECK(first != NULL && second != NULL && oversized != NULL && out != NULL && readback != NULL);
+    if (first == NULL || second == NULL || oversized == NULL || out == NULL || readback == NULL) {
+        goto cleanup;
+    }
+    made_first_directory = create_work_directory(first_directory, sizeof first_directory);
+    CHECK(made_first_directory != 0);
+    made_second_directory = create_work_directory(second_directory, sizeof second_directory);
+    CHECK(made_second_directory != 0);
+    if (!made_first_directory || !made_second_directory ||
+        !set_path(exact_source, sizeof exact_source, first_directory, "exact.raw") ||
+        !set_path(empty_source, sizeof empty_source, first_directory, "empty.raw") ||
+        !set_path(oversized_source, sizeof oversized_source, first_directory, "oversized.raw") ||
+        !set_path(missing_source, sizeof missing_source, first_directory, "missing.raw") ||
+        !set_path(first_destination, sizeof first_destination, first_directory, "save.mcr") ||
+        !set_path(second_destination, sizeof second_destination, second_directory, "save.mcr")) {
+        CHECK(0);
+        goto cleanup;
+    }
+
+    make_valid_card(first);
+    CHECK(write_file(exact_source, first, SCHWAY_MEMCARD_SIZE));
+    have_exact_source = 1;
+    memset(out, 0x5A, SCHWAY_MEMCARD_SIZE);
+    schway_host_card_lint lint = {UINT32_MAX, UINT32_MAX};
+    schway_host_card_status status =
+        schway_host_card_import_raw(exact_source, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(lint.flags == 0u);
+    CHECK_EQ_U64(lint.bad_frame_checksums, 0u);
+    CHECK(memcmp(out, first, SCHWAY_MEMCARD_SIZE) == 0);
+
+    CHECK(write_file(empty_source, &marker, 0u));
+    have_empty_source = 1;
+    memset(out, 0x5A, SCHWAY_MEMCARD_SIZE);
+    status = schway_host_card_import_raw(empty_source, out, SCHWAY_MEMCARD_SIZE, NULL);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are(out, SCHWAY_MEMCARD_SIZE, 0x5Au));
+
+    memset(oversized, 0x39, (size_t)SCHWAY_MEMCARD_SIZE + 1u);
+    CHECK(write_file(oversized_source, oversized, (size_t)SCHWAY_MEMCARD_SIZE + 1u));
+    have_oversized_source = 1;
+    status = schway_host_card_import_raw(oversized_source, out, SCHWAY_MEMCARD_SIZE, NULL);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are(out, SCHWAY_MEMCARD_SIZE, 0x5Au));
+    status = schway_host_card_import_raw(missing_source, out, SCHWAY_MEMCARD_SIZE, NULL);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_IO);
+    CHECK(all_bytes_are(out, SCHWAY_MEMCARD_SIZE, 0x5Au));
+    status = schway_host_card_import_raw(exact_source, out, SCHWAY_MEMCARD_SIZE - 1u, NULL);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are(out, SCHWAY_MEMCARD_SIZE, 0x5Au));
+
+    for (size_t i = 0u; i < SCHWAY_MEMCARD_SIZE; i++) {
+        first[i] = (uint8_t)(i * 7u + 1u);
+        second[i] = (uint8_t)(i * 11u + 2u);
+    }
+    CHECK(set_temp_path(temporary, sizeof temporary, first_destination, 0u));
+    CHECK(write_file(temporary, &marker, sizeof marker));
+    have_temp_marker = 1;
+    status = schway_host_card_save_atomic(first_destination, first, SCHWAY_MEMCARD_SIZE);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    have_first_destination = 1;
+    status = schway_host_card_save_atomic(second_destination, second, SCHWAY_MEMCARD_SIZE);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    have_second_destination = 1;
+    size_t readback_size = 0u;
+    CHECK(read_file(first_destination, readback, SCHWAY_MEMCARD_SIZE, &readback_size));
+    CHECK_EQ_U64(readback_size, SCHWAY_MEMCARD_SIZE);
+    CHECK(memcmp(readback, first, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK(read_file(second_destination, readback, SCHWAY_MEMCARD_SIZE, &readback_size));
+    CHECK_EQ_U64(readback_size, SCHWAY_MEMCARD_SIZE);
+    CHECK(memcmp(readback, second, SCHWAY_MEMCARD_SIZE) == 0);
+    uint8_t marker_read = 0u;
+    size_t marker_size = 0u;
+    CHECK(read_file(temporary, &marker_read, sizeof marker_read, &marker_size));
+    CHECK_EQ_U64(marker_size, sizeof marker);
+    CHECK_EQ_HEX(marker_read, marker);
+
+    status = schway_host_card_save_atomic(first_destination, second, SCHWAY_MEMCARD_SIZE - 1u);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(read_file(first_destination, readback, SCHWAY_MEMCARD_SIZE, &readback_size));
+    CHECK(memcmp(readback, first, SCHWAY_MEMCARD_SIZE) == 0);
+
+    CHECK(remove(temporary) == 0);
+    have_temp_marker = 0;
+    status = schway_host_card_test_save_atomic(first_destination, second, SCHWAY_MEMCARD_SIZE,
+                                               SCHWAY_HOST_CARD_TEST_FAILURE_FLUSH);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_IO);
+    CHECK(read_file(first_destination, readback, SCHWAY_MEMCARD_SIZE, &readback_size));
+    CHECK(memcmp(readback, first, SCHWAY_MEMCARD_SIZE) == 0);
+    for (unsigned i = 0u; i < TEMP_CANDIDATES; i++) {
+        CHECK(set_temp_path(temporary, sizeof temporary, first_destination, i));
+        CHECK(file_exists(temporary) == 0);
+    }
+
+    status = schway_host_card_test_save_atomic(first_destination, second, SCHWAY_MEMCARD_SIZE,
+                                               SCHWAY_HOST_CARD_TEST_FAILURE_RENAME);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_IO);
+    CHECK(read_file(first_destination, readback, SCHWAY_MEMCARD_SIZE, &readback_size));
+    CHECK(memcmp(readback, first, SCHWAY_MEMCARD_SIZE) == 0);
+    for (unsigned i = 0u; i < TEMP_CANDIDATES; i++) {
+        CHECK(set_temp_path(temporary, sizeof temporary, first_destination, i));
+        CHECK(file_exists(temporary) == 0);
+    }
+
+cleanup:
+    if (have_temp_marker) {
+        (void)remove(temporary);
+    }
+    if (have_exact_source) {
+        (void)remove(exact_source);
+    }
+    if (have_empty_source) {
+        (void)remove(empty_source);
+    }
+    if (have_oversized_source) {
+        (void)remove(oversized_source);
+    }
+    if (have_first_destination) {
+        (void)remove(first_destination);
+    }
+    if (have_second_destination) {
+        (void)remove(second_destination);
+    }
+    if (made_second_directory) {
+        (void)remove_directory(second_directory);
+    }
+    if (made_first_directory) {
+        (void)remove_directory(first_directory);
+    }
+    free(readback);
+    free(out);
+    free(oversized);
+    free(second);
+    free(first);
+}
+
 int main(int argc, char **argv)
 {
-    if (argc != 2 || strcmp(argv[1], "atomic_roundtrip") != 0) {
+    if (argc != 2) {
         fprintf(stderr, "expected one known card file test name\n");
         return 2;
     }
-    atomic_roundtrip();
+    if (strcmp(argv[1], "atomic_roundtrip") == 0) {
+        atomic_roundtrip();
+    } else if (strcmp(argv[1], "atomic_failures") == 0) {
+        atomic_failures();
+    } else {
+        fprintf(stderr, "unknown card file test name\n");
+        return 2;
+    }
     CHECK_DONE();
 }
