@@ -1,2 +1,6 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
 sio.digital.poll_irq	portable,sio
+sio.pad.independent_ports_instances	portable,sio
+sio.state.pending_ack	portable,sio
+sio.state.pending_byte	portable,sio
+sio.transport.abort	portable,sio

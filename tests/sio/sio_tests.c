@@ -112,11 +112,204 @@ static void digital_poll_irq(void)
     schway_destroy(inst);
 }
 
+static uint8_t *save_state(const schway *inst, size_t *size)
+{
+    *size = schway_state_size(inst);
+    uint8_t *buf = (uint8_t *)malloc(*size);
+    CHECK(buf != NULL);
+    if (buf == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(inst, buf, *size), SCHWAY_STATUS_OK);
+    return buf;
+}
+
+static void check_states_equal(const schway *a, const schway *b)
+{
+    size_t a_size = 0u;
+    size_t b_size = 0u;
+    uint8_t *a_buf = save_state(a, &a_size);
+    uint8_t *b_buf = save_state(b, &b_size);
+    CHECK_EQ_U64(a_size, b_size);
+    if (a_size == b_size) {
+        CHECK(memcmp(a_buf, b_buf, a_size) == 0);
+    }
+    free(a_buf);
+    free(b_buf);
+}
+
+static void configure(schway *inst, uint32_t port)
+{
+    write_mmio(inst, JOY_MODE, 2u, 0x000Cu);
+    write_mmio(inst, JOY_BAUD, 2u, 0x0088u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1003u | (port != 0u ? 0x2000u : 0u));
+}
+
+static schway *clone_state(const schway *source)
+{
+    size_t size = 0u;
+    uint8_t *buf = save_state(source, &size);
+    schway *copy = make();
+    CHECK_EQ_U64(schway_load_state(copy, buf, size), SCHWAY_STATUS_OK);
+    free(buf);
+    return copy;
+}
+
+static void state_pending_byte(void)
+{
+    schway *source = make();
+    configure(source, 0u);
+    write_mmio(source, JOY_DATA, 1u, 0x01u);
+    CHECK(source->sio.tx_pending != 0u);
+    CHECK_EQ_U64(source->sio.byte_deadline, 1088u);
+    schway *copy = clone_state(source);
+    CHECK_EQ_U64(copy->sio.byte_deadline, source->sio.byte_deadline);
+
+    advance_to(source, 1088u);
+    advance_to(copy, 1088u);
+    CHECK_EQ_HEX(read_mmio(source, JOY_DATA, 1u), 0xFFu);
+    CHECK_EQ_HEX(read_mmio(copy, JOY_DATA, 1u), 0xFFu);
+    CHECK_EQ_U64(source->sio.ack_deadline, 1426u);
+    CHECK_EQ_U64(copy->sio.ack_deadline, 1426u);
+    CHECK((source->irq.stat & 0x80u) == 0u);
+    CHECK((copy->irq.stat & 0x80u) == 0u);
+    check_states_equal(source, copy);
+    schway_destroy(copy);
+    schway_destroy(source);
+}
+
+static void state_pending_ack(void)
+{
+    schway *source = make();
+    configure(source, 0u);
+    write_mmio(source, JOY_DATA, 1u, 0x01u);
+    advance_to(source, 1088u);
+    CHECK(source->sio.ack_pending != 0u);
+    schway *copy = clone_state(source);
+    CHECK_EQ_U64(copy->sio.ack_deadline, source->sio.ack_deadline);
+
+    advance_to(source, 1425u);
+    advance_to(copy, 1425u);
+    CHECK((source->irq.stat & 0x80u) == 0u);
+    CHECK((copy->irq.stat & 0x80u) == 0u);
+    advance_to(source, 1426u);
+    advance_to(copy, 1426u);
+    CHECK((source->irq.stat & 0x80u) != 0u);
+    CHECK((copy->irq.stat & 0x80u) != 0u);
+    CHECK(source->sio.ack_low != 0u);
+    CHECK(copy->sio.ack_low != 0u);
+    check_states_equal(source, copy);
+
+    write_mmio(source, I_STAT, 4u, 0u);
+    write_mmio(copy, I_STAT, 4u, 0u);
+    write_mmio(source, JOY_CTRL, 2u, 0x1013u);
+    write_mmio(copy, JOY_CTRL, 2u, 0x1013u);
+    advance_to(source, 1494u);
+    advance_to(copy, 1494u);
+    CHECK(source->sio.ack_low == 0u);
+    CHECK(copy->sio.ack_low == 0u);
+    CHECK((source->irq.stat & 0x80u) == 0u);
+    CHECK((copy->irq.stat & 0x80u) == 0u);
+    check_states_equal(source, copy);
+    schway_destroy(copy);
+    schway_destroy(source);
+}
+
+static void transport_abort(void)
+{
+    schway *reset = make();
+    configure(reset, 0u);
+    write_mmio(reset, JOY_DATA, 1u, 0x01u);
+    advance_to(reset, 500u);
+    write_mmio(reset, JOY_CTRL, 2u, 0x1043u);
+    CHECK(reset->sio.tx_pending == 0u);
+    CHECK(reset->sio.byte_deadline == 0u);
+    CHECK(reset->pad.phase[0] == 0u);
+    advance_to(reset, 1088u);
+    CHECK(reset->sio.rx_count == 0u);
+    CHECK((reset->irq.stat & 0x80u) == 0u);
+    schway_destroy(reset);
+
+    schway *deselect = make();
+    configure(deselect, 0u);
+    write_mmio(deselect, JOY_DATA, 1u, 0x01u);
+    advance_to(deselect, 1088u);
+    CHECK(deselect->sio.ack_pending != 0u);
+    write_mmio(deselect, JOY_CTRL, 2u, 0x1001u);
+    CHECK(deselect->sio.ack_pending == 0u);
+    CHECK(deselect->sio.ack_deadline == 0u);
+    CHECK(deselect->pad.phase[0] == 0u);
+    advance_to(deselect, 1426u);
+    CHECK((deselect->irq.stat & 0x80u) == 0u);
+    CHECK(deselect->sio.ack_low == 0u);
+    schway_destroy(deselect);
+}
+
+static uint8_t exchange_byte(schway *inst, uint8_t sent, int ack)
+{
+    uint64_t start = inst->ticks;
+    write_mmio(inst, JOY_DATA, 1u, sent);
+    advance_to(inst, start + 1088u);
+    uint8_t received = (uint8_t)read_mmio(inst, JOY_DATA, 1u);
+    if (ack) {
+        advance_to(inst, start + 1426u);
+        write_mmio(inst, I_STAT, 4u, 0u);
+        write_mmio(inst, JOY_CTRL, 2u, 0x1013u |
+                                             ((inst->sio.ctrl & 0x2000u) != 0u ? 0x2000u : 0u));
+        advance_to(inst, start + 1494u);
+        write_mmio(inst, JOY_CTRL, 2u, 0x1003u |
+                                             ((inst->sio.ctrl & 0x2000u) != 0u ? 0x2000u : 0u));
+    }
+    return received;
+}
+
+static void check_poll(schway *inst, uint32_t port, uint16_t buttons)
+{
+    uint32_t port_bit = port != 0u ? 0x2000u : 0u;
+    write_mmio(inst, JOY_CTRL, 2u, 0x1003u | port_bit);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)(buttons & 0xFFu));
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), (uint8_t)(buttons >> 8));
+}
+
+static void independent_ports_instances(void)
+{
+    schway *a = make();
+    schway *b = make();
+    configure(a, 0u);
+    configure(b, 0u);
+    schway__pad_set_buttons(a, 0u, 0x1234u);
+    schway__pad_set_buttons(a, 1u, 0x5678u);
+    schway__pad_set_buttons(b, 0u, 0x9ABCu);
+    schway__pad_set_connected(a, 1u, 1u);
+    check_poll(a, 0u, 0x1234u);
+    check_poll(a, 1u, 0x5678u);
+    check_poll(b, 0u, 0x9ABCu);
+    CHECK_EQ_U64(a->pad.transfers, 2u);
+    CHECK_EQ_U64(b->pad.transfers, 1u);
+    schway_destroy(b);
+    schway_destroy(a);
+}
+
 int main(int argc, char **argv)
 {
-    if (argc != 2 || strcmp(argv[1], "digital_poll_irq") != 0) {
+    if (argc != 2) {
         return 2;
     }
-    digital_poll_irq();
+    if (strcmp(argv[1], "digital_poll_irq") == 0) {
+        digital_poll_irq();
+    } else if (strcmp(argv[1], "state_pending_byte") == 0) {
+        state_pending_byte();
+    } else if (strcmp(argv[1], "state_pending_ack") == 0) {
+        state_pending_ack();
+    } else if (strcmp(argv[1], "transport_abort") == 0) {
+        transport_abort();
+    } else if (strcmp(argv[1], "independent_ports_instances") == 0) {
+        independent_ports_instances();
+    } else {
+        return 2;
+    }
     CHECK_DONE();
 }
