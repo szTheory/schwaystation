@@ -451,12 +451,16 @@ jobs:
             [ -n "$v" ] || return 1
             echo "$v"
           }
-          # Ir/frame = (Ir at 360 frames - Ir at 60) / 300, in integers.
+          # Keep testcard's established window; gpu_motion uses a 50-frame window for Cachegrind.
           per_frame() {
-            local a b
-            a=$(ir "$1" "$2" 60) || return 1
-            b=$(ir "$1" "$2" 360) || return 1
-            echo $(( (b - a) / 300 ))
+            local start=60 end=360 a b
+            if [ "$2" = gpu_motion ]; then
+              start=10
+              end=60
+            fi
+            a=$(ir "$1" "$2" "$start") || return 1
+            b=$(ir "$1" "$2" "$end") || return 1
+            echo $(( (b - a) / (end - start) ))
           }
           if [ "$NO_BASE" = none ]; then
             for fixture in testcard gpu_motion; do

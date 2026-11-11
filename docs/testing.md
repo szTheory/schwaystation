@@ -346,9 +346,10 @@ counts them with the same script, `tests/cmake/line_budget.cmake`.
 ## Performance
 
 **Instructions per frame.** CI's `perf` job counts the instructions `schwaystation-run` executes per frame under
-Cachegrind: Ir per frame = (Ir at 360 frames − Ir at 60) / 300, in integers. It measures both the test card and
-`gpu_motion`, which runs CPU/GPU work, against the same fixture on the control commit. A pull request's head is
-measured once and its base twice, then `tests/cmake/perf_compare.cmake` prints one line per fixture:
+Cachegrind. Test-card Ir per frame = (Ir at 360 frames − Ir at 60) / 300. The CPU/GPU `gpu_motion` fixture uses
+(Ir at 60 frames − Ir at 10) / 50 to keep the Cachegrind workload within the measured job budget. Both compare
+against the same fixture on the control commit. A pull request's head is measured once and its base twice, then
+`tests/cmake/perf_compare.cmake` prints one line per fixture:
 
 ```text
 perf testcard head=<n> base=<n> delta_bp=<n> verdict=PASS
