@@ -757,7 +757,7 @@ static int runner_test_card_mode(schway *inst, int mode)
     }
     if (mode == 5) {
         return runner_test_card_write(inst, 0u, 0x31u, 1u, 0x08u) &&
-               runner_test_card_write(inst, 0u, 0x62u, 4u, 0x04u);
+               runner_test_card_write(inst, 0u, 0x62u, 4u, 0u);
     }
     return 0;
 }

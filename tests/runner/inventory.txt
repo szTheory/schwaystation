@@ -4,6 +4,7 @@ build.revision_matches_head.self_test	runner
 runner.bench.bytes	bench,portable,runner
 runner.bench.format	bench,portable,runner
 runner.bench.percentile	bench,portable,runner
+runner.cards.controls	portable,runner
 runner.cards.persistence	portable,runner
 runner.cards.sigterm	portable,runner
 runner.exe.missing	portable,runner

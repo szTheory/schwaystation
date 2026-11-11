@@ -102,6 +102,118 @@ if(CMAKE_SCRIPT_MODE_FILE)
        NOT old_slot_one STREQUAL new_slot_one)
       message(FATAL_ERROR "SIGTERM did not flush only slot 2 after frame 5")
     endif()
+  elseif(CASE STREQUAL "cards_controls")
+    set(RUN ${HOOKED})
+    string(REPEAT "[0-9a-f]" 64 digits)
+
+    # Missing cards begin as formatted blanks and stay absent until a game writes them.
+    set(missing_dir "${OUT}/runner-cards-missing")
+    file(MAKE_DIRECTORY "${missing_dir}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${missing_dir}")
+    if(EXISTS "${missing_dir}/schwaystation.srm" OR EXISTS "${missing_dir}/schwaystation.1.mcr")
+      message(FATAL_ERROR "an unchanged blank card was written")
+    endif()
+
+    # An imported short raw image is preserved byte-for-byte when its generation is unchanged.
+    set(unchanged_dir "${OUT}/runner-cards-unchanged")
+    file(MAKE_DIRECTORY "${unchanged_dir}")
+    file(WRITE "${unchanged_dir}/schwaystation.srm" "unchanged-short-card")
+    file(SHA256 "${unchanged_dir}/schwaystation.srm" old_unchanged)
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${unchanged_dir}")
+    file(SHA256 "${unchanged_dir}/schwaystation.srm" new_unchanged)
+    if(NOT old_unchanged STREQUAL new_unchanged OR EXISTS "${unchanged_dir}/schwaystation.1.mcr")
+      message(FATAL_ERROR "an unchanged short card was replaced or an absent slot was created")
+    endif()
+
+    # Empty imports fail before the first frame and leave the source untouched.
+    set(invalid_dir "${OUT}/runner-cards-invalid-import")
+    file(MAKE_DIRECTORY "${invalid_dir}")
+    file(WRITE "${invalid_dir}/schwaystation.srm" "")
+    file(SHA256 "${invalid_dir}/schwaystation.srm" old_invalid)
+    execute_process(COMMAND ${RUN} --frames 1 --hash --save-dir "${invalid_dir}"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    file(SHA256 "${invalid_dir}/schwaystation.srm" new_invalid)
+    if(NOT rc STREQUAL "1" OR NOT err MATCHES "cannot import card file" OR
+       out MATCHES "frame 1 sha256" OR NOT old_invalid STREQUAL new_invalid)
+      message(FATAL_ERROR "an invalid card did not fail before execution and preserve its source\n${out}${err}")
+    endif()
+
+    # Half-transactions and rejected checksums cannot dirty a durable generation.
+    foreach(mode partial1 bad1)
+      set(preserve_dir "${OUT}/runner-cards-${mode}")
+      file(MAKE_DIRECTORY "${preserve_dir}")
+      file(WRITE "${preserve_dir}/schwaystation.srm" "durable-${mode}")
+      file(SHA256 "${preserve_dir}/schwaystation.srm" old_preserved)
+      expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${preserve_dir}"
+        --test-card-write "${mode}")
+      file(SHA256 "${preserve_dir}/schwaystation.srm" new_preserved)
+      if(NOT old_preserved STREQUAL new_preserved)
+        message(FATAL_ERROR "${mode} changed a card without a completed successful write")
+      endif()
+    endforeach()
+
+    # A successful slot 1 write followed by a rejected write flushes only the completed data.
+    set(rejected_after_success_dir "${OUT}/runner-cards-rejected-after-success")
+    file(MAKE_DIRECTORY "${rejected_after_success_dir}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${rejected_after_success_dir}"
+      --test-card-write slot1_then_bad)
+    file(SIZE "${rejected_after_success_dir}/schwaystation.srm" slot_one_size)
+    file(READ "${rejected_after_success_dir}/schwaystation.srm" slot_one_sector HEX OFFSET 896 LIMIT 8)
+    if(NOT slot_one_size EQUAL 131072 OR NOT slot_one_sector STREQUAL "314e6b88a5c2dffc" OR
+       EXISTS "${rejected_after_success_dir}/schwaystation.1.mcr")
+      message(FATAL_ERROR "a rejected write replaced completed data or dirtied the other slot")
+    endif()
+
+    # A slot 2 write must preserve slot 1 and create only slot 2.
+    set(slot_two_dir "${OUT}/runner-cards-slot-two")
+    file(MAKE_DIRECTORY "${slot_two_dir}")
+    file(WRITE "${slot_two_dir}/schwaystation.srm" "keep-slot-one")
+    file(SHA256 "${slot_two_dir}/schwaystation.srm" old_slot_one)
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${slot_two_dir}"
+      --test-card-write slot2)
+    file(SHA256 "${slot_two_dir}/schwaystation.srm" new_slot_one)
+    file(SIZE "${slot_two_dir}/schwaystation.1.mcr" slot_two_size)
+    file(READ "${slot_two_dir}/schwaystation.1.mcr" slot_two_sector HEX OFFSET 896 LIMIT 8)
+    if(NOT old_slot_one STREQUAL new_slot_one OR NOT slot_two_size EQUAL 131072 OR
+       NOT slot_two_sector STREQUAL "627f9cb9d6f3102d")
+      message(FATAL_ERROR "slot 2 persistence changed the wrong slot or saved incorrect data")
+    endif()
+
+    # Explicit serial naming creates only the serial card paths.
+    set(serial_dir "${OUT}/runner-cards-serial")
+    file(MAKE_DIRECTORY "${serial_dir}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${serial_dir}"
+      --memcard-names serial --serial SLUS_123.45 --test-card-write slot1)
+    if(NOT EXISTS "${serial_dir}/SLUS_123.45.srm" OR
+       EXISTS "${serial_dir}/schwaystation.srm")
+      message(FATAL_ERROR "serial card naming did not use the validated serial basename")
+    endif()
+
+    # A forced atomic replacement failure returns status 1, preserves the old card, and cleans its temp.
+    set(failed_save_dir "${OUT}/runner-cards-failed-save")
+    file(MAKE_DIRECTORY "${failed_save_dir}")
+    file(WRITE "${failed_save_dir}/schwaystation.srm" "durable-before-failure")
+    file(SHA256 "${failed_save_dir}/schwaystation.srm" old_save)
+    expect_exit(1 "cannot save card file" --frames 1 --save-dir "${failed_save_dir}"
+      --test-card-write slot1 --test-save-failure rename)
+    file(SHA256 "${failed_save_dir}/schwaystation.srm" new_save)
+    file(GLOB temporary_files "${failed_save_dir}/*.schwaystation.tmp.*")
+    if(NOT old_save STREQUAL new_save OR temporary_files)
+      message(FATAL_ERROR "a failed atomic replacement damaged the old card or left a temporary file")
+    endif()
+
+    # A missing save directory is not created and cannot produce a successful dirty-card exit.
+    set(no_directory "${OUT}/runner-cards-no-directory")
+    file(REMOVE_RECURSE "${no_directory}")
+    expect_exit(1 "cannot save card file" --frames 1 --save-dir "${no_directory}"
+      --test-card-write slot1)
+    if(EXISTS "${no_directory}")
+      message(FATAL_ERROR "the runner created a save directory that the caller did not provide")
+    endif()
+
+    # Invalid naming options are refused as usage errors before any run.
+    refuse(--serial SLUS_123.45)
+    refuse(--save-dir "${serial_dir}" --memcard-names serial --serial ../escape)
   elseif(CASE STREQUAL "hash_state")
     # One well-formed line, the same twice, and a different one a frame later. CMake regexes have no
     # {64}, so the sixty-four digits are repeated.
@@ -531,7 +643,7 @@ schway_add_test(NAME runner.stop
 # SIGTERM, or an unchanged slot is needlessly replaced.
 set(runner_cards_check ${runner_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
   -DEXPECTED=${SCHWAYSTATION_TESTCARD_SHA256_FRAME5} -DOUT=${PROJECT_BINARY_DIR}/tests)
-foreach(case persistence sigterm)
+foreach(case controls persistence sigterm)
   schway_add_test(NAME runner.cards.${case}
     COMMAND ${runner_cards_check} -DCASE=cards_${case} -P ${CMAKE_CURRENT_LIST_FILE}
     LABELS portable runner TIMEOUT 60)
