@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 22 of 49
+current_plan: 23 of 49
 status: executing
-stopped_at: Completed 04-18-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh
-last_updated: "2026-11-11T11:20:38.787Z"
+stopped_at: Completed 04-36-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; full CI and hygiene passed
+last_updated: "2026-11-11T12:06:50.373Z"
 last_activity: 2026-11-11
 last_activity_desc: Completed Phase 04 plan 04-35 with wrapper imports and canonical save names; full CI and hygiene passed
-state_head: b2b61c993290d8c82e77b661ec6b069c16cdf5fb
+state_head: 31a4e4fc77de6baf2a466b85f75f822604360bf8
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 89
+  completed_plans: 90
   percent: 50
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 22 of 49
+Current Plan: 23 of 49
 Status: Plan 04-35 complete; plan 04-18 is ready.
 Last activity: 2026-11-11 — Legacy card wrappers and canonical save names completed; full CI and hygiene passed.
 
@@ -150,6 +150,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P17 | 23min | 2 tasks | 7 files |
 | Phase 04 P35 | 29min | 2 tasks | 6 files |
 | Phase 04 P18 | 27 min | 2 tasks | 7 files |
+| Phase 04 P36 | 41 min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -336,6 +337,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep the runner's input-file I/O outside the emulator core and validate the entire script before execution.
 - [Phase 04]: Use one-based frame records with explicit digital or DualShock devices, documented button symbols, and left-X/left-Y/right-X/right-Y axes.
 - [Phase 04]: Keep API revision 4 and preserve the no-content frame hash; the saved state hash proves latched input reached the core.
+- [Phase 04]: Use the guest SIO0 path and GPUREAD mailbox records to prove that scheduled input changes actual counter pixels.
+- [Phase 04]: Poll every other VBlank so runner lag totals remain observable while mailbox peeks run each frame.
 
 ### Pending Todos
 
@@ -447,8 +450,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-11T11:20:38.601Z
-Stopped at: Completed 04-18-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh
+Last session: 2026-11-11T12:06:50.189Z
+Stopped at: Completed 04-36-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; full CI and hygiene passed
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
