@@ -41,6 +41,12 @@ schway_add_test(NAME bus.bios_window
   COMMAND schwaystation-test-bus bios_window
   LABELS bus portable TIMEOUT 10)
 
+# Fault prevented: accepting more than the source-confirmed POST byte or
+# mutating status, debug output, exit state or unbuilt accounting for it.
+schway_add_test(NAME bus.exp2_post
+  COMMAND schwaystation-test-bus exp2_post
+  LABELS bus portable TIMEOUT 10)
+
 # Fault prevented: an expansion read that returns data, a debug port that acts
 # with the profile flag clear, or a neighbour of a debug port that answers.
 schway_add_test(NAME bus.exp_regions

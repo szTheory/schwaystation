@@ -393,10 +393,83 @@ static void bios_window(void)
 }
 
 /* The expansion regions: reads of the first and third are bus errors naming
-   them and their writes are dropped; the second answers only its two debug
-   ports, and those act only while the profile's debug-port flag is set.
+   them and their writes are dropped; the second answers only the modeled POST
+   byte and its two debug ports. The debug ports act only while the profile's
+   debug-port flag is set.
    Fault prevented: an expansion read that returns data, a debug port that
-   writes with the flag clear, or a neighbour of a port that answers. */
+   writes with the flag clear, or a neighbouring gap that answers. */
+static void expect_exp2_fault(schway *inst, uint32_t kind, uint32_t addr, uint32_t width)
+{
+    clear_fault(inst);
+    uint32_t value = UINT32_MAX;
+    int result = kind == SCHWAY__FAULT_UNMAPPED_READ
+                     ? rd(inst, addr, width, &value)
+                     : wr(inst, addr, width, UINT32_MAX);
+    CHECK(result != 0);
+    CHECK_EQ_U64(inst->fault.kind, kind);
+    CHECK_EQ_U64(inst->fault.device, SCHWAY__DEV_EXP2);
+    CHECK_EQ_HEX(inst->fault.addr, addr);
+    CHECK_EQ_U64(inst->fault.width, width);
+    if (kind == SCHWAY__FAULT_UNMAPPED_READ) {
+        CHECK_EQ_U64(value, 0u);
+    }
+}
+
+/* Only an ignored byte write to OpenBIOS' POST address answers, including its
+   KSEG aliases and both profile-flag settings. It charges as EXP2, but does
+   not become a saved status, unbuilt device, TTY byte, exit request or fault.
+   Reads, wider accesses and neighboring bytes remain EXP2 gaps.
+   Fault prevented: accepting a larger POST range or mutating guest-visible
+   status while removing the startup fault. */
+static void exp2_post(void)
+{
+    static const uint32_t addresses[3] = {0x1F802041u, 0x9F802041u, 0xBF802041u};
+    static const uint32_t values[4] = {0u, 0x0Eu, 0x0Fu, 0xFFu};
+    static const uint32_t flags[2] = {0u, SCHWAY__PROFILE_DEBUG_PORT};
+
+    for (size_t f = 0u; f < sizeof flags / sizeof flags[0]; f++) {
+        schway *inst = make();
+        inst->profile_flags = flags[f];
+        uint32_t unbuilt_n[SCHWAY__DEV_COUNT];
+        uint32_t last_unbuilt[4];
+        struct schway__fault fault = inst->fault;
+        struct schway__tty tty = inst->tty;
+        memcpy(unbuilt_n, inst->bus.unbuilt_n, sizeof unbuilt_n);
+        memcpy(last_unbuilt, inst->bus.last_unbuilt, sizeof last_unbuilt);
+
+        for (size_t a = 0u; a < sizeof addresses / sizeof addresses[0]; a++) {
+            for (size_t v = 0u; v < sizeof values / sizeof values[0]; v++) {
+                uint32_t cycles = 0u;
+                CHECK_EQ_U64(schway__bus_write(inst, addresses[a], 1u, values[v], &cycles), 0u);
+                CHECK_EQ_U64(cycles, inst->bus.cost[SCHWAY__PORT_EXP2][3]);
+                CHECK(memcmp(unbuilt_n, inst->bus.unbuilt_n, sizeof unbuilt_n) == 0);
+                CHECK(memcmp(last_unbuilt, inst->bus.last_unbuilt, sizeof last_unbuilt) == 0);
+                CHECK(memcmp(&fault, &inst->fault, sizeof fault) == 0);
+                CHECK(memcmp(&tty, &inst->tty, sizeof tty) == 0);
+                CHECK_EQ_U64(inst->exit_pending, 0u);
+                CHECK_EQ_U64(inst->exit_code, 0u);
+            }
+        }
+
+        /* None of the byte values written above can be read back as status. */
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_READ, 0xBF802041u, 1u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_READ, 0xBF802041u, 2u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_READ, 0xBF802041u, 4u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0xBF802041u, 2u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0xBF802041u, 4u);
+
+        /* Direct bus widths deliberately bypass CPU alignment checks. These
+           aligned accesses cover POST; unaligned direct calls stay gaps too. */
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802040u, 2u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802040u, 4u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802041u, 2u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802041u, 4u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802040u, 1u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802042u, 1u);
+        drop(inst);
+    }
+}
+
 static void exp_regions(void)
 {
     schway *inst = make();
@@ -428,11 +501,11 @@ static void exp_regions(void)
     CHECK(rd(inst, 0xBFC80000u, 1u, &v) != 0);
     CHECK_EQ_U64(inst->fault.device, SCHWAY__DEV_UNMAPPED);
 
-    /* The second expansion region: every address but two is a gap. */
+    /* The second expansion region: only POST and the two debug ports answer. */
     clear_fault(inst);
     CHECK(rd(inst, 0xBF802000u, 1u, &v) != 0);
     CHECK_EQ_U64(inst->fault.device, SCHWAY__DEV_EXP2);
-    CHECK(wr(inst, 0xBF802041u, 1u, 1u) != 0);
+    CHECK(wr(inst, 0xBF802042u, 1u, 1u) != 0);
     CHECK(rd(inst, 0xBF802081u, 1u, &v) != 0);
     CHECK(rd(inst, 0xBF803FFFu, 1u, &v) != 0);
     clear_fault(inst);
@@ -789,6 +862,8 @@ int main(int argc, char **argv)
         bios_window();
     } else if (strcmp(c, "exp_regions") == 0) {
         exp_regions();
+    } else if (strcmp(c, "exp2_post") == 0) {
+        exp2_post();
     } else if (strcmp(c, "kseg2") == 0) {
         kseg2();
     } else if (strcmp(c, "irq_edge") == 0) {

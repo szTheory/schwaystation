@@ -1,5 +1,6 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
 bus.bios_window	bus,portable
+bus.exp2_post	bus,portable
 bus.exp_regions	bus,portable
 bus.icache_fill	bus,portable
 bus.icache_isolation	bus,portable
