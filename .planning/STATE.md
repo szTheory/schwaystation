@@ -9,7 +9,7 @@ status: executing
 stopped_at: Completed 04-38-PLAN.md; Codex / OpenGSD 1.20.0; executor gpt-6-luna xhigh; final CI and hygiene passed
 last_updated: "2026-11-11T15:06:12.128Z"
 last_activity: 2026-11-11
-last_activity_desc: Completed Phase 04 plan 04-19 with runner card persistence and clean signal saves; full CI and hygiene passed
+last_activity_desc: Completed Phase 04 plan 04-38 with BIOS recognition from pinned DAT MD5 rows; final CI and hygiene passed
 state_head: 0d169c5fa619dc744083fa4b7e209167fca17a81
 progress:
   total_phases: 6
@@ -32,8 +32,8 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
 Current Plan: 27 of 49
-Status: Plan 04-37 complete; plan 04-38 is next in the execution queue.
-Last activity: 2026-11-11 — Copied BIOS execution and SHA-256 identity completed; full CI and hygiene passed.
+Status: Plan 04-38 complete; refresh the ready-plan index before the next dispatch.
+Last activity: 2026-11-11 — BIOS recognition from pinned DAT MD5 rows completed; final CI and hygiene passed.
 
 Progress: [█████░░░░░] 50%
 
