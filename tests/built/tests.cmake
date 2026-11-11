@@ -2,7 +2,7 @@
 # captured output and the exact runner exit status without helper scripts.
 if(CMAKE_SCRIPT_MODE_FILE)
   if(CASE STREQUAL "bios_runner")
-    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --frames 1
+    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --frames 1 --tty
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     set(output "${out}${err}")
     if(NOT "${rc}" STREQUAL "6")
@@ -24,7 +24,7 @@ endif()
 # image; no firmware bytes are stored in the source tree.
 set(bios_runner_fixture_dir "${PROJECT_BINARY_DIR}/tests/built/bios-runner")
 file(MAKE_DIRECTORY "${bios_runner_fixture_dir}")
-string(ASCII 128 31 8 60 113 15 8 53 66 66 9 60 66 66 41 53 17 17 9 173
+string(ASCII 128 31 8 60 113 15 8 53 66 66 9 60 66 66 41 53 17 17 9 161
   bios_runner_reset_code)
 string(REPEAT "S" 524268 bios_runner_tail)
 set(bios_runner_fixture "${bios_runner_fixture_dir}/scph5501.bin")
