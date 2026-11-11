@@ -15,6 +15,7 @@
 #include "sched.h"
 #include "sio.h"
 #include "pad.h"
+#include "card.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
@@ -149,6 +150,7 @@ struct schway {
     struct schway__timers timers;
     struct schway__sio sio;
     struct schway__pad pad;
+    struct schway__card card;
     struct schway__fault fault;
     /* Not saved: derived from the state, and rebuilt after a load. */
     struct schway__sched sched;

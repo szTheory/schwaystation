@@ -8,7 +8,7 @@
              registers, the geometry engine, instance.profile_flags,
              instance.exe_loaded, the bus (RAM, scratchpad, memory control,
              unbuilt-device counters), irq, dma, the root counters and the
-             first-fault record, digital pad and SIO0 transport
+             first-fault record, digital pad, SIO0 transport and card protocol
    One field list drives every pass (state.h), so they cannot drift apart. A
    struct is never copied as a whole: padding, pointers and the allocator
    never reach the bytes. The audio ring is not saved; a load empties it.
@@ -112,6 +112,7 @@ static void body_io(struct schway__state_io *io, schway *inst)
     fault_io(io, &inst->fault);
     schway__pad_state_io(io, inst);
     schway__sio_state_io(io, inst, ticks);
+    schway__card_state_io(io, inst);
 }
 
 /* The whole state, in the order the format fixes. */

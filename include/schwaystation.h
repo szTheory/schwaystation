@@ -43,6 +43,17 @@ typedef uint32_t schway_status;
 #define SCHWAY_SPACE_RAM 1u
 #define SCHWAY_SPACE_SCRATCHPAD 2u
 
+#define SCHWAY_MEMORY_RAM SCHWAY_SPACE_RAM
+#define SCHWAY_MEMORY_SCRATCHPAD SCHWAY_SPACE_SCRATCHPAD
+#define SCHWAY_MEMORY_VRAM 3u
+#define SCHWAY_MEMORY_BIOS 4u
+#define SCHWAY_MEMORY_CARD1 5u
+#define SCHWAY_MEMORY_CARD2 6u
+
+#define SCHWAY_CARD_SLOT_1 1u
+#define SCHWAY_CARD_SLOT_2 2u
+#define SCHWAY_MEMCARD_SIZE 131072u
+
 /* Kinds of the first-fault record. */
 #define SCHWAY_FAULT_NONE 0u
 #define SCHWAY_FAULT_UNMAPPED_READ 1u
@@ -240,6 +251,9 @@ schway_status schway_get_fault(const schway *inst, schway_fault *out);
 schway_status schway_get_info(const schway *inst, schway_info *out);
 schway_status schway_get_video(const schway *inst, schway_video *out);
 schway_status schway_get_vram(const schway *inst, schway_span *out);
+schway_status schway_get_memory(const schway *inst, uint32_t memory, schway_span *out);
+schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes, size_t size);
+schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint64_t *out);
 schway_status schway_get_audio(schway *inst, schway_audio *io);
 schway_status schway_get_tty(schway *inst, schway_tty *io);
 schway_status schway_get_trace(const schway *inst, uint32_t index, schway_trace *out);

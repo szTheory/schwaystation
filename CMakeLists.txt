@@ -90,6 +90,7 @@ add_library(schwaystation_dma OBJECT src/dma.c)
 add_library(schwaystation_timers OBJECT src/timers.c)
 add_library(schwaystation_sched OBJECT src/sched.c)
 add_library(schwaystation_sio OBJECT src/sio.c src/pad.c)
+add_library(schwaystation_card OBJECT src/card.c)
 add_library(schwaystation_exe OBJECT
   src/exe.c
   src/stub_kernel.c)
@@ -107,6 +108,7 @@ add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_timers>
   $<TARGET_OBJECTS:schwaystation_sched>
   $<TARGET_OBJECTS:schwaystation_sio>
+  $<TARGET_OBJECTS:schwaystation_card>
   $<TARGET_OBJECTS:schwaystation_exe>
   $<TARGET_OBJECTS:schwaystation_testcard>
   $<TARGET_OBJECTS:schwaystation_state>)
@@ -117,7 +119,7 @@ target_include_directories(schwaystation PUBLIC
   $<INSTALL_INTERFACE:include>)
 foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_bus
     schwaystation_cpu schwaystation_gpu schwaystation_gte schwaystation_dma schwaystation_timers
-    schwaystation_sched schwaystation_sio schwaystation_exe schwaystation_testcard schwaystation_state)
+    schwaystation_sched schwaystation_sio schwaystation_card schwaystation_exe schwaystation_testcard schwaystation_state)
   schway_core_options(${core_target})
 endforeach()
 

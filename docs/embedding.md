@@ -366,6 +366,28 @@ to 16-bit words in host byte order and `size` is the span's byte length. The poi
 of the instance; its contents can change as the emulated GPU runs, when a state is loaded or when the instance is
 reset. Copy data you need before destroying the instance.
 
+## Memory spans and cards
+
+`schway_get_memory` exposes read-only spans selected by `SCHWAY_MEMORY_RAM`, `SCHWAY_MEMORY_SCRATCHPAD`,
+`SCHWAY_MEMORY_VRAM`, `SCHWAY_MEMORY_BIOS`, `SCHWAY_MEMORY_CARD1` or `SCHWAY_MEMORY_CARD2`. It returns the
+instance's 2 MiB RAM, 1 KiB scratchpad, 1 MiB VRAM, current BIOS image or one of two 131,072-byte card images.
+Each pointer remains stable for the instance lifetime. RAM, scratchpad and VRAM contents change as the core runs;
+card bytes survive a power reset. `schway_get_vram` remains a convenience accessor for the VRAM span.
+
+Cards start as formatted blank images. Before the first frame, a host can import an exact 131,072-byte raw image:
+
+```c
+uint64_t generation = 0;
+schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, raw_card, SCHWAY_MEMCARD_SIZE);
+schway_memcard_generation(inst, SCHWAY_CARD_SLOT_1, &generation);
+```
+
+The card slot constants are one-based. A null pointer, invalid slot, wrong image size or import after execution
+returns `SCHWAY_STATUS_ERR_ARGUMENT` and leaves the current card untouched. Card images and generations are not
+included in ordinary save states; in-flight SIO/card protocol state is included. The currently implemented card
+protocol is read-only, so generations remain zero. The API reserves increments for completed writes ending in
+`47h`; reads do not change them.
+
 ## Audio
 
 ```c
@@ -452,8 +474,9 @@ built with), `abi`, `behaviour_revision` (raised when the same inputs give diffe
 `state_format`.
 
 `SCHWAY_API_VERSION` is 4. A version only adds names, so a program built against an earlier header runs unchanged.
-Version 3 added `SCHWAY_FAULT_DMA`; version 4 added the read-only `schway_span` and `schway_get_vram` view of native
-VRAM. A program that switches on the fault kind should treat a value it does not know as a fault it cannot name.
+Version 3 added `SCHWAY_FAULT_DMA`; version 4 added read-only `schway_span` memory views, card loading and card
+generation queries. A program that switches on the fault kind should treat a value it does not know as a fault it
+cannot name.
 
 ## The test card
 

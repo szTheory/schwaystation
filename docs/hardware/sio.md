@@ -1,8 +1,8 @@
 # Serial I/O and digital pads
 
 SIO0 is the console's serial port for controllers and memory cards. The core models the SIO0 registers, an
-eight-byte receive FIFO, scheduled byte completion, and two independent digital-pad ports. SIO1 and
-memory-card transactions are not implemented by this module.
+eight-byte receive FIFO, scheduled byte completion, two digital-pad ports and one memory card per port. SIO1
+is outside this module. Card Read (52h) and GetID (53h) are supported; Write (57h) is not supported yet.
 
 ## Digital poll
 
@@ -25,9 +25,21 @@ second. Together these values place IRQ7 at tick 1,426 after a transmit at tick 
 ticks that the kernel waits before acknowledging an older IRQ7. Tests assert these model boundaries; they do not
 claim a new hardware measurement.
 
-Card timing remains a separate device rule. The source model uses a 170-tick card ACK delay, and the console
-reference also describes a longer card-specific wait during reads. This digital-pad implementation does not reuse
-either delay for cards.
+Card timing is separate from the pad rule: the model schedules a card ACK about 1,500 CPU ticks after the byte's
+transmit start, and pauses about 31,000 ticks after the seventh byte of a Read command, when the sector address is
+complete. These are modeled timing values, not measurements from a physical console. The 68-tick ACK hold is shared.
+
+## Memory-card Read and GetID
+
+The host selects port 1 or 2 with JOY_CTRL. A card transaction starts with `81`; `52` reads a sector and `53`
+returns the card ID. A Read returns the flag, `5A 5D 00 00 5C 5D`, the sector address, 128 bytes, the XOR checksum
+of the address and data, and `47`. The final `47` byte has no ACK. An address above sector `3FF` returns `FF FF` and
+ends the transaction. GetID returns the Sony-card reply `5A 5D 5C 5D 04 00 00 80` after the flag. Other commands
+abort without changing card bytes.
+
+Both slots own separate 131,072-byte raw spans. A new instance starts with formatted blank cards and flag `08`;
+the host can import an exact-size raw image before execution. Card bytes and their generation counters are outside
+ordinary save states, while the in-flight SIO/card read phase is saved so a pending read can resume.
 
 ## Register and interrupt behavior
 
@@ -45,8 +57,7 @@ deadlines; save states retain those deadlines and their per-port transaction sta
 - The register map, baud formula, FIFO widths, and acknowledge order follow the pinned psx-spx SIO and
   controller references at revision `6d7d1bc106a7`. These are secondary hardware-documentation sources.
 - The approximate pad ACK delay and minimum ACK pulse width come from the pinned controller reference at the
-  same revision. The 338-tick software-model value and distinct 170-tick card value are corroborating model
-  values pinned at revision `9408cb43d494` in the project's peripheral reference index. Neither value is
-  presented as a direct hardware measurement.
-- The 1,088-, 1,426-, and 1,494-tick boundaries are deterministic model values derived from those inputs and
-  are covered by SIO tests.
+  same revision. The 338-tick pad value and card timing are modeled values; they are not presented as direct
+  hardware measurements.
+- The 1,088-, 1,426-, 1,494-, 1,500- and 31,000-tick boundaries are deterministic model values and are covered
+  by SIO and card tests.
