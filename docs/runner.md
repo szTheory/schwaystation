@@ -232,10 +232,11 @@ stored low byte first, with no padding between rows. The hash is therefore the s
 big-endian hosts. The card changes every frame, so the frame number matters.
 
 Until a GPU draws, every frame is the test card whatever the CPU, the GTE, DMA or the timers did, so the frame hash
-cannot show them. `--hash-state` prints one more line, after every other line the run prints:
+cannot show them. `--hash-state` prints one more line, after every other line the run prints. For example, the
+`gpu_motion.exe` fixture at frame 150 prints:
 
 ```text
-state sha256 9c6fd5660fd9bb9fb3d50604a8c43827f9833d81db21ab3b024a0da754e5d8a6
+state sha256 5dc52fadde7aa55e1a7a0b57862b91e66b366ca90820968ab5bc1e0a1974b333
 ```
 
 It is the SHA-256 of the state `schway_save_state` writes, without its 20-byte header, so it covers every register
