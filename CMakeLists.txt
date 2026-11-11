@@ -156,7 +156,7 @@ endif()
 # the core's determinism boundary: nothing here is hashed. Built
 # position-independent and hidden, as the libretro module links them.
 if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
-  add_library(schwaystation-host STATIC host/xrgb8888.c)
+  add_library(schwaystation-host STATIC host/cards.c host/xrgb8888.c)
   target_include_directories(schwaystation-host
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/host
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/generated)
@@ -164,6 +164,9 @@ if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
     C_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON)
   schway_warnings(schwaystation-host)
+  if(SCHWAYSTATION_BUILD_TESTS)
+    target_compile_definitions(schwaystation-host PRIVATE SCHWAY_HOST_CARD_TESTING=1)
+  endif()
 endif()
 if(SCHWAYSTATION_BUILD_RUNNER)
   add_subdirectory(runner)
