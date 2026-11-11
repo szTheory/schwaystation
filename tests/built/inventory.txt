@@ -2,6 +2,7 @@
 built.bios.copy_edges	bios,portable
 built.bios.identity	bios,portable
 built.bios.identity_edges	bios,portable
+built.bios.runner	bios,portable,runner
 built.bios.synthetic_rom	bios,portable
 built.bios.test_key_isolation	bios,portable
 built.openbios.digest	bios,portable

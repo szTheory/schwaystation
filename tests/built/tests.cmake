@@ -1,3 +1,45 @@
+# Run selected runner BIOS assertions as a script so tests can inspect both
+# captured output and the exact runner exit status without helper scripts.
+if(CMAKE_SCRIPT_MODE_FILE)
+  if(CASE STREQUAL "bios_runner")
+    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --frames 1
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(NOT "${rc}" STREQUAL "6")
+      message(FATAL_ERROR "BIOS reset case expected exit 6, got ${rc}: ${output}")
+    endif()
+    if(NOT output MATCHES "bios flags=loaded status=unknown region=unknown sha256=${BIOS_SHA256}")
+      message(FATAL_ERROR "BIOS reset case did not report the copied image identity: ${output}")
+    endif()
+    if(NOT output MATCHES "exit code=0x42")
+      message(FATAL_ERROR "BIOS reset code did not run: ${output}")
+    endif()
+    return()
+  endif()
+  message(FATAL_ERROR "unknown built BIOS script case: ${CASE}")
+endif()
+
+# This synthetic ROM contains only self-authored MIPS reset instructions. Its
+# exit-port write proves that the actual CLI copied and executed the supplied
+# image; no firmware bytes are stored in the source tree.
+set(bios_runner_fixture_dir "${PROJECT_BINARY_DIR}/tests/built/bios-runner")
+file(MAKE_DIRECTORY "${bios_runner_fixture_dir}")
+string(ASCII 128 31 8 60 113 15 8 53 66 66 9 60 66 66 41 53 17 17 9 173
+  bios_runner_reset_code)
+string(REPEAT "S" 524268 bios_runner_tail)
+set(bios_runner_fixture "${bios_runner_fixture_dir}/scph5501.bin")
+file(WRITE "${bios_runner_fixture}" "${bios_runner_reset_code}${bios_runner_tail}")
+file(SHA256 "${bios_runner_fixture}" bios_runner_sha256)
+
+set(bios_runner_cmd ${CMAKE_COMMAND}
+  "-DRUN=$<TARGET_FILE:schwaystation-run>"
+  "-DBIOS=${bios_runner_fixture}"
+  "-DBIOS_SHA256=${bios_runner_sha256}"
+  -DCASE=bios_runner -P ${CMAKE_CURRENT_LIST_FILE})
+schway_add_test(NAME built.bios.runner
+  COMMAND ${bios_runner_cmd}
+  LABELS bios portable runner TIMEOUT 30)
+
 # Fault prevented: a BIOS load can borrow caller memory or report an unrelated
 # digest instead of executing a copied exact-size ROM from the reset vector.
 add_executable(schwaystation-test-bios ${CMAKE_CURRENT_LIST_DIR}/bios_tests.c)
