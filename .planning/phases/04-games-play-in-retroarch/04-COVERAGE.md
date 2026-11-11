@@ -114,7 +114,7 @@ Original references above denote the complete ordered chains below. First IDs pr
 |04-20|04-20, 04-38|
 |04-21|04-21|
 |04-22|04-22, 04-39|
-|04-23|04-23, 04-40|
+|04-23|04-23, 04-50, 04-40|
 |04-24|04-24, 04-41|
 |04-25|04-25, 04-49, 04-42|
 |04-26|04-26|
@@ -124,3 +124,9 @@ Original references above denote the complete ordered chains below. First IDs pr
 |04-30|04-30, 04-46, 04-47, 04-48|
 |04-31|04-31|
 |04-32|04-32|
+
+## Source-owned boot blocker
+
+| Source | New evidence and retained coverage | Executable plan |
+| --- | --- | --- |
+| GOAL criterion 4 / GAME-05 / RESEARCH actual pinned firmware boot / CONTEXT D-16, D-22–D-24 | The matching pinned OpenBIOS POST byte write faults before splash startup. Model only that exact write as an ignored status sink with fault/unbuilt/width/neighbor controls and source-confidence documentation. All inspected-shell/native-frame/same-run portable acceptance remains in 40; no hardware measurement or shell success is inferred from the fix. | 50 before 40, after 23/39 |

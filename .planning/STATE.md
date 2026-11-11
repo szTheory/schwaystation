@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 31 of 49
+current_plan: 31 of 50
 status: executing
-stopped_at: Completed 04-23-PLAN.md
-last_updated: "2026-11-11T19:59:15.627Z"
+stopped_at: OpenBIOS POST fault isolated; source-owned plan 04-50 ready before 04-40
+last_updated: "2026-11-11T20:22:31Z"
 last_activity: 2026-11-11
-last_activity_desc: Completed plan 04-23; synthetic runner BIOS reset and CLI edge tests passed with local CI and hygiene
-state_head: a70b173b25a1e6318d9e31869cbccf03521d3927
+last_activity_desc: Added focused POST compatibility plan 04-50 from actual boot evidence; shell acceptance pending
+state_head: 2239cce636cef1007216b2ec9d6aeb90c9a23f0e
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 117
+  total_plans: 118
   completed_plans: 98
   percent: 50
 ---
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 31 of 49
-Status: Plan 04-23 is complete; GAME-05 remains pending until the OpenBIOS shell observation in plan 04-40.
-Last activity: 2026-11-11 — Synthetic runner BIOS reset and CLI edge tests passed with local CI and hygiene.
+Current Plan: 31 of 50
+Status: Plan 04-50 is next ready; 04-40 waits for the POST fix and still requires actual shell inspection.
+Last activity: 2026-11-11 — Added the narrow POST compatibility fix plan; no shell frame/hash accepted.
 
 Progress: [█████░░░░░] 50%
 
@@ -482,10 +482,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-23 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; synthetic runner BIOS reset proof, CLI edge tests, local CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-11 | Phase 04 source-owned POST boot-blocker re-slice | Codex, OpenGSD 1.20.0; pinned source/bus-width review, planning-only dependency and coverage update | gpt-6.1-sol high |
+
 ## Session Continuity
 
-Last session: 2026-11-11T19:59:15.247Z
-Stopped at: Completed 04-23-PLAN.md
+Last session: 2026-11-11T20:22:31Z
+Stopped at: Focused plan 04-50 ready; independent check before execution, then resume 04-40
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
