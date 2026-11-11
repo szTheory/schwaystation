@@ -77,6 +77,8 @@ static void synthetic_rom(void)
     info.size = (uint32_t)sizeof info;
     CHECK_EQ_U64(schway_get_bios_info(inst, &info), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(info.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(info.region, SCHWAY_BIOS_REGION_UNKNOWN);
     CHECK(memcmp(info.sha256, expected_sha256, sizeof expected_sha256) == 0);
 
     source[0] = 0u;
@@ -156,6 +158,8 @@ static void copy_edges(void)
     info.size = (uint32_t)sizeof info;
     CHECK_EQ_U64(schway_get_bios_info(source, &info), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(info.flags, 0u);
+    CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(info.region, SCHWAY_BIOS_REGION_UNKNOWN);
     uint8_t zero_digest[sizeof info.sha256] = {0};
     CHECK(memcmp(info.sha256, zero_digest, sizeof zero_digest) == 0);
 
@@ -181,10 +185,12 @@ static void copy_edges(void)
     info.size = (uint32_t)sizeof info;
     CHECK_EQ_U64(schway_get_bios_info(source, &info), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(info.flags, 0u);
+    CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(info.region, SCHWAY_BIOS_REGION_UNKNOWN);
     CHECK(memcmp(info.sha256, zero_digest, sizeof zero_digest) == 0);
     schway_bios_info short_info;
     memset(&short_info, 0, sizeof short_info);
-    short_info.size = (uint32_t)sizeof short_info - 1u;
+    short_info.size = 39u;
     CHECK_EQ_U64(schway_get_bios_info(source, &short_info), SCHWAY_STATUS_ERR_STRUCT_SIZE);
 
     CHECK_EQ_U64(schway_load_bios(source, rom_a, SCHWAY_BIOS_SIZE), SCHWAY_STATUS_OK);
@@ -201,6 +207,8 @@ static void copy_edges(void)
     source_info.size = (uint32_t)sizeof source_info;
     CHECK_EQ_U64(schway_get_bios_info(source, &source_info), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(source_info.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_U64(source_info.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(source_info.region, SCHWAY_BIOS_REGION_UNKNOWN);
     CHECK_EQ_U64(schway_load_bios(source, rom_b, SCHWAY_BIOS_SIZE - 1u),
                  SCHWAY_STATUS_ERR_ARGUMENT);
     schway_span after_loaded_refusal;
@@ -253,6 +261,8 @@ static void copy_edges(void)
     after_reset.size = (uint32_t)sizeof after_reset;
     CHECK_EQ_U64(schway_get_bios_info(source, &after_reset), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(after_reset.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_U64(after_reset.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(after_reset.region, SCHWAY_BIOS_REGION_UNKNOWN);
     CHECK(memcmp(after_reset.sha256, source_info.sha256, sizeof source_info.sha256) == 0);
     schway_span after_reset_span;
     CHECK_EQ_U64(schway_get_memory(source, SCHWAY_MEMORY_BIOS, &after_reset_span),
@@ -269,6 +279,8 @@ static void copy_edges(void)
     memset(&after_late_load, 0, sizeof after_late_load);
     after_late_load.size = (uint32_t)sizeof after_late_load;
     CHECK_EQ_U64(schway_get_bios_info(source, &after_late_load), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(after_late_load.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+    CHECK_EQ_U64(after_late_load.region, SCHWAY_BIOS_REGION_UNKNOWN);
     CHECK(memcmp(after_late_load.sha256, source_info.sha256, sizeof source_info.sha256) == 0);
     schway_span after_late_span;
     CHECK_EQ_U64(schway_get_memory(source, SCHWAY_MEMORY_BIOS, &after_late_span),
@@ -282,6 +294,31 @@ static void copy_edges(void)
     schway_destroy(different);
 }
 
+static void identity(void)
+{
+    static uint8_t zero_bios[SCHWAY_BIOS_SIZE];
+    static const uint8_t expected_sha256[32] = {
+        0x07u, 0x85u, 0x4Du, 0x2Fu, 0xEFu, 0x29u, 0x7Au, 0x06u,
+        0xBAu, 0x81u, 0x68u, 0x5Eu, 0x66u, 0x0Cu, 0x33u, 0x2Du,
+        0xE3u, 0x6Du, 0x5Du, 0x18u, 0xD5u, 0x46u, 0x92u, 0x7Du,
+        0x30u, 0xDAu, 0xADu, 0x6Du, 0x7Fu, 0xDAu, 0x15u, 0x41u,
+    };
+    schway *inst = new_instance();
+    if (inst == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(schway_load_bios(inst, zero_bios, sizeof zero_bios), SCHWAY_STATUS_OK);
+    schway_bios_info info;
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    CHECK_EQ_U64(schway_get_bios_info(inst, &info), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(info.flags, SCHWAY_BIOS_INFO_LOADED);
+    CHECK_EQ_U64(info.status, SCHWAY_BIOS_STATUS_RECOGNIZED);
+    CHECK_EQ_U64(info.region, SCHWAY_REGION_NTSC_U);
+    CHECK(memcmp(info.sha256, expected_sha256, sizeof expected_sha256) == 0);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     CHECK(argc == 2);
@@ -289,6 +326,8 @@ int main(int argc, char **argv)
         synthetic_rom();
     } else if (argc == 2 && strcmp(argv[1], "copy_edges") == 0) {
         copy_edges();
+    } else if (argc == 2 && strcmp(argv[1], "identity") == 0) {
+        identity();
     } else {
         CHECK(0);
     }

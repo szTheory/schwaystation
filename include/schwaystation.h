@@ -56,6 +56,12 @@ typedef uint32_t schway_status;
 #define SCHWAY_BIOS_SIZE 524288u
 #define SCHWAY_BIOS_INFO_LOADED 1u
 
+/* BIOS identity results. Status values are append-only. */
+#define SCHWAY_BIOS_STATUS_UNKNOWN 0u
+#define SCHWAY_BIOS_STATUS_RECOGNIZED 1u
+#define SCHWAY_BIOS_REGION_UNKNOWN 0u
+#define SCHWAY_BIOS_REGION_ANY 4u
+
 /* Kinds of the first-fault record. */
 #define SCHWAY_FAULT_NONE 0u
 #define SCHWAY_FAULT_UNMAPPED_READ 1u
@@ -213,6 +219,8 @@ typedef struct schway_bios_info {
     uint32_t size;
     uint32_t flags; /* SCHWAY_BIOS_INFO_* */
     uint8_t sha256[32];
+    uint32_t status; /* SCHWAY_BIOS_STATUS_* */
+    uint32_t region; /* SCHWAY_REGION_* or SCHWAY_BIOS_REGION_* */
 } schway_bios_info;
 
 typedef struct schway_audio {

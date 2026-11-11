@@ -86,6 +86,8 @@ int main(void)
         bios_info.size = (uint32_t)sizeof bios_info;
         CHECK_EQ_U64(schway_get_bios_info(inst, &bios_info), SCHWAY_STATUS_OK);
         CHECK_EQ_U64(bios_info.flags, SCHWAY_BIOS_INFO_LOADED);
+        CHECK_EQ_U64(bios_info.status, SCHWAY_BIOS_STATUS_UNKNOWN);
+        CHECK_EQ_U64(bios_info.region, SCHWAY_BIOS_REGION_UNKNOWN);
         static const uint8_t zero_bios_sha256[32] = {
             0x07u, 0x85u, 0x4Du, 0x2Fu, 0xEFu, 0x29u, 0x7Au, 0x06u,
             0xBAu, 0x81u, 0x68u, 0x5Eu, 0x66u, 0x0Cu, 0x33u, 0x2Du,

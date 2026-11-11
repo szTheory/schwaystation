@@ -360,9 +360,13 @@ _Static_assert(SCHWAY__BUDGET_SIZE_FIRST == sizeof(schway_budget), "budget first
 _Static_assert(SCHWAY__VIDEO_SIZE_FIRST == sizeof(schway_video), "video first size");
 _Static_assert(SCHWAY__AUDIO_SIZE_FIRST == sizeof(schway_audio), "audio first size");
 _Static_assert(SCHWAY__EXE_INFO_SIZE_FIRST == sizeof(schway_exe_info), "exe_info first size");
-_Static_assert(SCHWAY__BIOS_INFO_SIZE_FIRST == sizeof(schway_bios_info), "bios_info first size");
+_Static_assert(SCHWAY__BIOS_INFO_SIZE_FIRST == offsetof(schway_bios_info, status),
+               "bios_info first size");
 _Static_assert(offsetof(schway_bios_info, flags) == 4, "bios_info.flags");
 _Static_assert(offsetof(schway_bios_info, sha256) == 8, "bios_info.sha256");
+_Static_assert(offsetof(schway_bios_info, status) == 40, "bios_info.status");
+_Static_assert(offsetof(schway_bios_info, region) == 44, "bios_info.region");
+_Static_assert(sizeof(schway_bios_info) == 48, "bios_info size");
 _Static_assert(SCHWAY__FAULT_SIZE_FIRST == sizeof(schway_fault), "fault first size");
 _Static_assert(SCHWAY__TTY_SIZE_FIRST == sizeof(schway_tty), "tty first size");
 _Static_assert(SCHWAY__TRACE_SIZE_FIRST == sizeof(schway_trace), "trace first size");
