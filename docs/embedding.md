@@ -375,21 +375,26 @@ Each pointer remains stable for the instance lifetime. RAM, scratchpad and VRAM 
 card pointers and bytes remain stable across reads, state loads and power resets. `schway_get_vram` remains a
 convenience accessor for the VRAM span.
 
-Cards start as formatted blank images. Before the first frame, a host can import an exact 131,072-byte raw image:
+Cards start as formatted blank images. Before execution, a host can import a raw image up to 131,072 bytes.
+Short images are padded with `FFh` through the end of the card, as required for an unallocated raw card area:
 
 ```c
 uint64_t generation = 0;
-schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, raw_card, SCHWAY_MEMCARD_SIZE);
+schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, raw_card, raw_card_size);
 schway_memcard_generation(inst, SCHWAY_CARD_SLOT_1, &generation);
 ```
 
 The one-based slots are `SCHWAY_CARD_SLOT_1` and `SCHWAY_CARD_SLOT_2`; each image has `SCHWAY_MEMCARD_SIZE`
-bytes. A null pointer, invalid slot, wrong image size or import after execution returns
-`SCHWAY_STATUS_ERR_ARGUMENT` and leaves the current card untouched. Card images and generations are not
-included in ordinary save states, so loading a state never rewinds imported card bytes; in-flight SIO/card
-protocol state is included. The currently implemented card protocol is read-only, so generations remain zero.
-The API reserves increments for completed writes ending in
-`47h`; reads do not change them.
+bytes. The core accepts raw bytes only; the host owns file access and any wrapper decoding. A null pointer, invalid
+slot, oversized image or import after execution returns `SCHWAY_STATUS_ERR_ARGUMENT` without changing the current
+card or its generation. Successful imports keep the span address stable and reset that slot's generation to zero.
+
+Ordinary save states include the pending SIO/card protocol but exclude card bytes and generations. Before applying
+a state, the core validates card phase and address progression, checks checksum consistency where the saved fields
+allow it, and verifies the staged write payload. A refused state leaves the instance untouched. Loading a state
+therefore never rewinds persistent card data, including after a completed write. A completed successful `47h`
+write updates one sector and increments that slot's generation once; reads, rejected writes and interrupted writes
+do not increment it.
 
 ## Audio
 

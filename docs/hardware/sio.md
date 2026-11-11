@@ -38,8 +38,9 @@ ends the transaction. GetID returns the Sony-card reply `5A 5D 5C 5D 04 00 00 80
 abort without changing card bytes.
 
 Both slots own separate 131,072-byte raw spans. A new instance starts with formatted blank cards and flag `08`;
-the host can import an exact-size raw image before execution. Card bytes and their generation counters are outside
-ordinary save states, while the in-flight SIO/card protocol state is saved so a pending transfer can resume.
+before execution the host can import a raw image up to 131,072 bytes, padded with `FFh` when shorter. Card bytes
+and their generation counters are outside ordinary save states, while the in-flight SIO/card protocol state is
+saved so a pending transfer can resume.
 
 Write (57h) stages the addressed sector and its checksum while the old raw span remains visible. The final
 successful `47` response copies all 128 bytes at once, increments that slot's generation once, and clears the

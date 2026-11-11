@@ -457,13 +457,16 @@ schway_status schway_get_memory(const schway *inst, uint32_t memory, schway_span
 
 schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes, size_t size)
 {
-    if (inst == NULL || bytes == NULL || size != SCHWAY_MEMCARD_SIZE ||
+    if (inst == NULL || bytes == NULL || size > SCHWAY_MEMCARD_SIZE ||
         (slot != SCHWAY_CARD_SLOT_1 && slot != SCHWAY_CARD_SLOT_2) ||
         inst->profile_locked != 0u || inst->frame != 0u || inst->ticks != 0u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
     uint32_t index = slot == SCHWAY_CARD_SLOT_1 ? 0u : 1u;
-    memcpy(inst->card.slot[index].bytes, bytes, SCHWAY_MEMCARD_SIZE);
+    memmove(inst->card.slot[index].bytes, bytes, size);
+    if (size < SCHWAY_MEMCARD_SIZE) {
+        memset(inst->card.slot[index].bytes + size, 0xFF, SCHWAY_MEMCARD_SIZE - size);
+    }
     inst->card.slot[index].generation = 0u;
     schway__card_abort(inst, index);
     return SCHWAY_STATUS_OK;

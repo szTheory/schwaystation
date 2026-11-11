@@ -49,6 +49,82 @@ static uint8_t frame_checksum(const uint8_t *frame)
     return checksum;
 }
 
+static int pending_payload_valid(const struct schway__state_io *io, uint32_t phase,
+                                uint32_t sector, uint32_t checksum, uint32_t write_step)
+{
+    const uint8_t *data = io->r;
+    uint32_t data_count = 0u;
+    uint8_t expected_checksum = 0u;
+    if (phase == CARD_WRITE) {
+        if (write_step == 4u) {
+            expected_checksum = (uint8_t)(sector >> 8);
+        } else if (write_step >= 5u) {
+            data_count = write_step - 5u;
+            if (data_count > SCHWAY__CARD_SECTOR_SIZE) {
+                data_count = SCHWAY__CARD_SECTOR_SIZE;
+            }
+            expected_checksum = (uint8_t)((sector >> 8) ^ sector);
+        }
+    }
+    int valid = 1;
+    for (uint32_t i = 0u; i < SCHWAY__CARD_SECTOR_SIZE; i++) {
+        if (i < data_count) {
+            expected_checksum = (uint8_t)(expected_checksum ^ data[i]);
+        } else if (data[i] != 0u) {
+            valid = 0;
+        }
+    }
+    return valid != 0 && (phase != CARD_WRITE || checksum == expected_checksum);
+}
+
+static int protocol_fields_valid(uint32_t phase, uint32_t command, uint32_t read_step,
+                                 uint32_t sector, uint32_t checksum, uint32_t invalid_sector,
+                                 uint32_t write_step, uint32_t write_bad_checksum)
+{
+    if (phase == CARD_IDLE || phase == CARD_COMMAND) {
+        return command == 0u && read_step == 0u && sector == 0u && checksum == 0u &&
+               invalid_sector == 0u && write_step == 0u && write_bad_checksum == 0u;
+    }
+    if (phase == CARD_READ) {
+        int address_valid = 0;
+        if (read_step < 4u) {
+            address_valid = sector == 0u && checksum == 0u;
+        } else if (read_step == 4u) {
+            address_valid = (sector & 0xFFu) == 0u && checksum == (sector >> 8);
+        } else if (read_step <= 8u) {
+            address_valid = checksum == (uint8_t)((sector >> 8) ^ sector);
+        } else {
+            address_valid = 1;
+        }
+        int sector_valid = invalid_sector == 0u;
+        if (read_step >= 5u && sector >= SCHWAY__CARD_SECTOR_COUNT) {
+            sector_valid = invalid_sector == 1u && read_step <= 7u;
+        } else if (read_step >= 5u) {
+            sector_valid = invalid_sector == 0u;
+        }
+        return command == 0x52u && read_step <= 137u && address_valid && sector_valid &&
+               write_step == 0u && write_bad_checksum == 0u;
+    }
+    if (phase == CARD_ID) {
+        return command == 0x53u && read_step <= 7u && sector == 0u && checksum == 0u &&
+               invalid_sector == 0u && write_step == 0u && write_bad_checksum == 0u;
+    }
+    if (phase == CARD_WRITE) {
+        int address_valid = 0;
+        if (write_step < 4u) {
+            address_valid = sector == 0u && checksum == 0u;
+        } else if (write_step == 4u) {
+            address_valid = (sector & 0xFFu) == 0u && checksum == (sector >> 8);
+        } else {
+            address_valid = sector < SCHWAY__CARD_SECTOR_COUNT;
+        }
+        return command == 0x57u && read_step == 0u && address_valid && invalid_sector == 0u &&
+               write_step <= SCHWAY__CARD_WRITE_FINAL_STEP &&
+               (write_bad_checksum == 0u || write_step >= 134u);
+    }
+    return 0;
+}
+
 static void initialize_slot(struct schway__card_slot *slot)
 {
     memset(slot->bytes, 0xFF, sizeof slot->bytes);
@@ -114,30 +190,17 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
                                              SCHWAY__CARD_WRITE_FINAL_STEP);
     uint32_t write_bad_checksum = schway__state_u32(io, write_bad_checksum_name,
                                                      &slot->write_bad_checksum, 0u, 1u);
+    int payload_valid = 1;
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        payload_valid = pending_payload_valid(io, phase, sector, checksum, write_step);
+    }
     schway__state_u8_array(io, write_data_name, slot->write_data,
                            SCHWAY__CARD_SECTOR_SIZE, 0u, UINT8_MAX);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
-        schway__state_check(io, (phase != CARD_IDLE ||
-                                 (command == 0u && read_step == 0u && sector == 0u &&
-                                  checksum == 0u && invalid_sector == 0u && write_step == 0u &&
-                                  write_bad_checksum == 0u)) &&
-                                (phase != CARD_COMMAND ||
-                                 (command == 0u && read_step == 0u && write_step == 0u &&
-                                  write_bad_checksum == 0u)) &&
-                                (phase != CARD_READ ||
-                                 (command == 0x52u && read_step <= 137u &&
-                                  write_step == 0u && write_bad_checksum == 0u &&
-                                  invalid_sector == (read_step < 5u ? 0u :
-                                      sector >= SCHWAY__CARD_SECTOR_COUNT ? 1u : 0u))) &&
-                                (phase != CARD_ID || (command == 0x53u && read_step <= 7u &&
-                                                      write_step == 0u &&
-                                                      write_bad_checksum == 0u)) &&
-                                (phase != CARD_WRITE ||
-                                 (command == 0x57u && read_step == 0u &&
-                                  write_step <= SCHWAY__CARD_WRITE_FINAL_STEP &&
-                                  invalid_sector == 0u &&
-                                  (write_step < 5u || sector < SCHWAY__CARD_SECTOR_COUNT) &&
-                                  (write_bad_checksum == 0u || write_step >= 134u))));
+        schway__state_check(io, payload_valid != 0 &&
+                                    protocol_fields_valid(phase, command, read_step, sector,
+                                                          checksum, invalid_sector, write_step,
+                                                          write_bad_checksum));
     }
 }
 
