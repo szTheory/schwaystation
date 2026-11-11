@@ -117,21 +117,45 @@ if(CMAKE_SCRIPT_MODE_FILE)
     if(NOT DEFINED SHIFT)
       set(SHIFT 0)
     endif()
-    execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --stop-on mailbox --frames ${FRAMES}
-      ${flags} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    if(DEFINED FAKE_OUTPUT)
+      string(REPLACE "|" "\n" out "${FAKE_OUTPUT}")
+      set(rc 0)
+    else()
+      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --stop-on mailbox --frames ${FRAMES}
+        ${flags} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    endif()
     set(errors "")
     if(NOT rc STREQUAL "0")
       list(APPEND errors "the runner exited ${rc}")
+    endif()
+    if(NOT out MATCHES "(^|\n)mailbox SWMB status=([0-9a-f][0-9a-f]) records=([0-9]+)\n")
+      list(APPEND errors "no mailbox header with status and record count")
+    else()
+      set(mailbox_status "${CMAKE_MATCH_2}")
+      set(mailbox_count "${CMAKE_MATCH_3}")
+      if(NOT mailbox_status STREQUAL "00")
+        list(APPEND errors "mailbox status is ${mailbox_status}, not 00")
+      endif()
     endif()
     if(NOT "${FAULT_KIND}" STREQUAL "" AND NOT out MATCHES "(^|\n)fault frame=[0-9]+ [^\n]* kind=${FAULT_KIND}\n")
       list(APPEND errors "no first-fault line with kind=${FAULT_KIND}")
     endif()
     string(REGEX MATCHALL "(^|\n)mailbox [0-9a-f]+=[0-9a-f]+" lines "${out}")
+    set(record_ids "")
+    list(LENGTH lines reported_records)
+    if(DEFINED mailbox_count AND NOT reported_records EQUAL mailbox_count)
+      list(APPEND errors "mailbox header says ${mailbox_count} records, output has ${reported_records}")
+    endif()
     foreach(line IN LISTS lines)
       string(REGEX REPLACE "^\n?mailbox ([0-9a-f]+)=([0-9a-f]+)$" "\\1;\\2" pair "${line}")
       list(GET pair 0 id_hex)
       list(GET pair 1 value)
       math(EXPR id "0x${id_hex}")
+      if(id IN_LIST record_ids)
+        list(APPEND errors "duplicate mailbox record ID ${id}")
+      else()
+        list(APPEND record_ids "${id}")
+      endif()
       set(record_${id} "${value}")
     endforeach()
     file(STRINGS "${CSV}" csv_lines)
@@ -326,6 +350,16 @@ set(schway__fixture_extra "")
 schway__fixture(dma_chain.exe dma_chain.asm)
 schway__fixture(timers_lines.exe timers_lines.asm)
 schway__fixture(gpu_motion.exe gpu_motion.asm)
+foreach(row IN ITEMS
+    "10|0|10" "8|1|8" "7|64|7" "5|2|5" "4|3|4" "10|0|5" "8|1|2" "4|3|1")
+  string(REPLACE "|" ";" fields "${row}")
+  list(GET fields 0 divisor)
+  list(GET fields 1 display_mode)
+  list(GET fields 2 window)
+  schway__fixture(timers_lines_d${divisor}_w${window}.exe timers_lines.asm
+    -definelabel TIMING 1 -definelabel DIVISOR ${divisor}
+    -definelabel DISPLAY_MODE ${display_mode} -definelabel WINDOW ${window})
+endforeach()
 set(schway__fault_kinds unmapped_read unmapped_write unmapped_fetch misaligned_read misaligned_write
   misaligned_fetch reserved_instruction cop_unusable exception_loop)
 set(schway__fault_index 1)
@@ -443,11 +477,11 @@ schway_add_test(NAME fixtures.dma_chain
 # Fault prevented: a timer or vertical-blank interrupt that is right for one machine profile and wrong for
 # the other: timers_lines.exe takes the blanks through its own handler on the NTSC and the PAL machine, and
 # the rows of tests/diag/expected.csv for that profile (and the rows for every profile) judge its records.
-foreach(schway__profile ntsc_u pal)
+foreach(schway__profile ntsc_u ntsc_j pal)
   string(REPLACE "_" "-" schway__region ${schway__profile})
   schway_add_test(NAME fixtures.timers_lines.${schway__profile}
     COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines
-      -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=30
+      -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=120
       -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
       -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
       -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
@@ -458,7 +492,7 @@ foreach(schway__profile ntsc_u pal)
   # the rows moved up by one counter period (10000h) must fail naming both counters' records.
   string(REPLACE ";" "|" schway__judge_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
   set(schway__judge ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines
-    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=30 -DSHIFT=65536
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=120 -DSHIFT=65536
     -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
     -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__judge_emulator}"
@@ -470,6 +504,56 @@ foreach(schway__profile ntsc_u pal)
       -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
     LABELS fixtures portable timers TIMEOUT 30)
 endforeach()
+
+foreach(schway__profile ntsc_u ntsc_j pal)
+  string(REPLACE "_" "-" schway__region ${schway__profile})
+  foreach(divisor IN ITEMS 10 8 7 5 4)
+    if(schway__profile STREQUAL "pal")
+      if(divisor EQUAL 10 OR divisor EQUAL 5)
+        set(window 5)
+      elseif(divisor EQUAL 8)
+        set(window 2)
+      elseif(divisor EQUAL 7)
+        set(window 7)
+      else()
+        set(window 1)
+      endif()
+    else()
+      set(window ${divisor})
+    endif()
+    set(fixture timers_lines_d${divisor}_w${window})
+    schway_add_test(NAME fixtures.timers_lines.${schway__profile}.div${divisor}
+      COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=${fixture}
+        -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/${fixture}.exe -DFRAMES=120
+        -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
+        -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+        -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+        -P ${CMAKE_CURRENT_LIST_FILE}
+      LABELS fixtures portable timers TIMEOUT 60)
+  endforeach()
+endforeach()
+
+set(schway__timer_shift ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines_d10_w10
+  -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines_d10_w10.exe -DFRAMES=120 -DSHIFT=1
+  -DPROFILE=ntsc-u "-DFLAGS=--region ntsc-u" -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+  -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}" -P ${CMAKE_CURRENT_LIST_FILE})
+string(REPLACE ";" "$<SEMICOLON>" schway__timer_shift "${schway__timer_shift}")
+schway_add_test(NAME fixtures.timers_lines.ntsc_u.div10.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__timer_shift}" -DCODE=1
+    "-DREGEX=dot_ticks: record 2 is.*lines_per_frame: record 3 is"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable timers TIMEOUT 60)
+
+set(schway__timer_duplicate ${CMAKE_COMMAND} -DCASE=mailbox_judge
+  "-DFAKE_OUTPUT=mailbox SWMB status=00 records=2|mailbox 0001=0000000d|mailbox 0001=0000000d"
+  -DFIXTURE=timers_lines_d10_w10 -DFRAMES=120 -DPROFILE=ntsc-u
+  -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv -P ${CMAKE_CURRENT_LIST_FILE})
+string(REPLACE ";" "$<SEMICOLON>" schway__timer_duplicate "${schway__timer_duplicate}")
+schway_add_test(NAME fixtures.timers_lines.mailbox_duplicate.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__timer_duplicate}" -DCODE=1
+    "-DREGEX=duplicate mailbox record ID 1"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable timers TIMEOUT 30)
 
 # Fault prevented: a first fault that the runner misses, mislabels or reports with a short tail. Each
 # fault.exe class runs more than 4,096 trace records of preamble, then faults once: exit 7, the fault line

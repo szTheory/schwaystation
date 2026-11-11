@@ -112,21 +112,35 @@ from the file it cites.
 **Where a value comes from.** A row or a band is marked by its source. `hw` means the value is copied from a
 hardware-captured artefact of an MIT-licensed upstream test at the pinned commit, with the file and the case or line in
 the citation: it is hardware-captured per upstream, not verified here, and a value produced by this core or by another
-emulator is never `hw`. `doc` means a published document gives it. `derived` means a fitted model gives it; the DMA
-tests keep those as bands (a window, a block cost, the CPU slowdown of a looping list) and never as exact pins, and no
-`expected.csv` row carries it, since the judge reads only `doc` and `hw`. Every timer row is `doc`, because the only
-hardware log of the counters comes from a console whose clock does not match the NTSC machine.
+emulator is never `hw`. `doc` means the published hardware description supplies the rule or constant; an exact value
+derived from those documented constants remains `doc`, with the calculation included in its citation. `derived` means
+a fitted model gives it; the DMA tests keep those as bands (a window, a block cost, the CPU slowdown of a looping list)
+and never as exact pins. The timer records are `doc`: the expected line and dot counts follow the documented beam ratio,
+line length and counter sources, rather than a measurement copied from this core or another emulator.
 
-**The per-profile judge.** A fixture whose records depend on the machine runs once per profile
-(`fixtures.timers_lines.ntsc_u` and `fixtures.timers_lines.pal`): the judge reads the rows for `*` and for that
-profile, in order, and the ranges come from the frame constants with the interrupt path's fixed overhead. Each has a
-control, `.self_test`, that shifts every range by one counter period and must fail naming both counters' records.
+**The per-profile judge.** The legacy `timers_lines.exe` records keep their documented interrupt-latency bands and run
+on NTSC-U, NTSC-J and PAL. The timing variants configure each dot divider and choose a phase-restoring window: the
+window is the divider in NTSC; in PAL it is 5, 2, 7, 5 and 1 frames for dividers 10, 8, 7, 5 and 4. Timer 0 counts
+GPU dots and Timer 1 counts HBlank edges. The fixture records the VBlank count, total dots, HBlanks per frame and total
+HBlanks. Their exact totals are the documented line clock times 263 or 314 lines times the window, divided by the
+selected dot divider; the windows make that division integral. The judge reads the common and matching profile rows
+in record order, rejects missing, extra or duplicate record IDs, checks the mailbox status and count, and verifies the
+record CRC before judging. A one-count-shift control must fail the dot and line records; a separate control rejects a
+duplicate ID.
 
-**The state lines.** With no picture yet, every frame hash is the test card whatever the CPU and the devices did, so
-`hashes.txt` also carries, for `hello`, `gte_vectors`, `dma_chain` and `timers_lines`, two lines after the fixture
-digests: `exe NAME.exe frame 30 sha256 ...` and `exe NAME.exe state sha256 ...`. The second is
-`schwaystation-run --hash-state`, the SHA-256 of the saved state after its 20-byte header, which covers the GTE, DMA
-and timer registers. `hash-equality` compares them across the eight lanes like every other line.
+The fixture reads I_STAT twice before Timer 0 COUNT, then Timer 1 COUNT and I_STAT again. Tracing the PAL /4 case showed
+the Timer 0 bus read 14 CPU cycles after both VBlank edges. At those edges the ratio carries are 75,185 and 203,030
+modulo 451,584. An 8-cycle sample would advance 12 GPU clocks at one endpoint and 13 at the other; the fixed 14-cycle
+sampling path advances 22 at both. This explains the earlier one-dot-short result as CPU instruction/IRQ endpoint
+latency. It keeps the expected dot total derived from the documented beam model instead of fitting the oracle to the
+observed output.
+
+**The state lines.** With no picture yet, the ordinary frame hash is the test card whatever the CPU and devices did, so
+`hashes.txt` carries frame 30 and state hashes for `hello`, `gte_vectors`, `dma_chain` and `timers_lines`. It also carries
+`gpu_motion.exe` frame hashes at 60, 120 and 180 and state hashes at 150 and 180. This fixture draws moving pixels
+through GP0 and DMA2, so its frame digest covers rendered output; its saved-state digests cover the VRAM and GPU state
+needed to continue after frame 150. `hash-equality` compares every row across all eight lanes, including the portable
+be32 lane.
 
 ### The vectors harness
 
@@ -320,9 +334,9 @@ its size. Run it by hand with `cmake -DROOT=. -P tests/cmake/budgets.cmake`.
 
 **Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` (hygiene lane) counts
 every line of `scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*` against a fixed limit set in
-`tests/hygiene/tests.cmake`; the limit is an absolute line count that only falls, and is re-measured when a release
-ships. It is 1513 lines, the total measured once the notices gate landed (1483 before it), and it is never raised:
-a gate that does not fit replaces or folds an older one. Shipping a release sets the limit to the total then measured. Check the total with
+`tests/hygiene/tests.cmake`; the limit is an absolute line count. Phase 3 closed at 1513 lines; the approved Phase 4
+ceiling is 1850 lines for its added repository checks. This phase ceiling is temporary: shipping a release measures
+the total and ratchets the limit down to that total. A gate that does not fit replaces or folds an older one. Check the total with
 `cat scripts/*.sh tests/cmake/*.cmake .githooks/* | wc -l`. Gate logic stays in those files: it is not moved
 into `tests/<dir>/tests.cmake`, `cmake/` or workflow YAML to fit.
 

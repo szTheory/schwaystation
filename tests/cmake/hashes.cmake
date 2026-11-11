@@ -6,7 +6,8 @@ if(MODE STREQUAL "write")
   # <OUT>/hashes.txt, the file CI collects from every lane, in a fixed order:
   # four frame hashes, then the frame 5 PNG's digest, then one line per
   # assembled fixture file in FIXTURES (when given), sorted by name, so the
-  # eight lanes' fixture bytes are compared too, then the frame and state at frame 30 of four fixtures.
+  # eight lanes' fixture bytes are compared too, then device fixture hashes and
+  # the moving GPU fixture's frames and continuation state.
   set(lines "")
   foreach(case "ntsc-u;5" "ntsc-u;60" "ntsc-j;60" "pal;60")
     list(GET case 0 region)
@@ -44,6 +45,26 @@ if(MODE STREQUAL "write")
       endif()
       string(APPEND lines "exe ${exe}.exe ${CMAKE_MATCH_1}\nexe ${exe}.exe ${CMAKE_MATCH_2}\n")
     endforeach()
+    foreach(frames IN ITEMS 60 120)
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
+        --frames ${frames} --hash OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "^(frame ${frames} sha256 [0-9a-f]+)\n$")
+        message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames ${frames}: expected exit 0 and one hash line, got exit ${rc}\n${out}${err}")
+      endif()
+      string(APPEND lines "exe gpu_motion.exe ${CMAKE_MATCH_1}\n")
+    endforeach()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
+      --frames 150 --hash-state OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^state sha256 ([0-9a-f]+)\n$")
+      message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames 150 --hash-state: expected exit 0 and one state line, got exit ${rc}\n${out}${err}")
+    endif()
+    string(APPEND lines "exe gpu_motion.exe state 150 sha256 ${CMAKE_MATCH_1}\n")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
+      --frames 180 --hash --hash-state OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^frame 180 sha256 ([0-9a-f]+)\nstate sha256 ([0-9a-f]+)\n$")
+      message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames 180 --hash --hash-state: expected exit 0 and frame/state lines, got exit ${rc}\n${out}${err}")
+    endif()
+    string(APPEND lines "exe gpu_motion.exe frame 180 sha256 ${CMAKE_MATCH_1}\nexe gpu_motion.exe state 180 sha256 ${CMAKE_MATCH_2}\n")
   endif()
   # Unix newlines on every host: file(WRITE) writes CRLF on Windows.
   file(CONFIGURE OUTPUT "${OUT}/hashes.txt" NEWLINE_STYLE UNIX CONTENT "${lines}")
