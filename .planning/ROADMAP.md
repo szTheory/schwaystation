@@ -273,7 +273,7 @@ Plans:
 
 **Wave 13**
 - [x] 04-13-PLAN.md — Measure CPU-driven GPU performance and correct the first CI timeout caller
-- [ ] 04-33-PLAN.md — Commit a staged SIO card write only on successful 47h
+- [x] 04-33-PLAN.md — Commit a staged SIO card write only on successful 47h
 
 **Wave 14**
 - [ ] 04-34-PLAN.md — Validate card imports and pending transport atomically
@@ -405,6 +405,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 16/49 | In Progress | - |
+| 4. Games play in RetroArch | 17/49 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
