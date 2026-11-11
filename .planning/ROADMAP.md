@@ -302,7 +302,7 @@ Plans:
 - [x] 04-21-PLAN.md — Scan release firmware and prove complete isolated-key rejection
 
 **Wave 22**
-- [ ] 04-22-PLAN.md — Build pinned OpenBIOS on Linux and measure the output digest
+- [x] 04-22-PLAN.md — Build pinned OpenBIOS on Linux and measure the output digest
 
 **Wave 23**
 - [ ] 04-39-PLAN.md — Transfer checked OpenBIOS only within its build run
@@ -405,6 +405,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 27/49 | In Progress | - |
+| 4. Games play in RetroArch | 28/49 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 28 of 49
+current_plan: 29 of 49
 status: executing
-stopped_at: 04-22 implementation committed locally; exact-head hosted acceptance remains pending
-last_updated: "2026-11-11T17:18:44Z"
+stopped_at: Completed 04-22-PLAN.md; exact-head hosted CI passed
+last_updated: "2026-11-11T17:54:31.351Z"
 last_activity: 2026-11-11
-last_activity_desc: Implemented pinned OpenBIOS digest checking and corrected hosted WASI card-test wiring; focused tests, full CI and hygiene passed, exact-head hosted acceptance pending
-state_head: ce2dcb13fc5a33c0e7ca1f1c3c56f1a17201cfa4
+last_activity_desc: Completed plan 04-22; exact-head CI run 43069874480 passed, including the pinned Linux OpenBIOS digest, WASI, and all 433 be32 tests
+state_head: 522a48fd10e2b9b8a2820cfb21a4d8aa2f179167
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 117
-  completed_plans: 95
+  completed_plans: 96
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 28 of 49
-Status: Plan 04-22 is in progress; exact-head hosted CI must pass before its summary or dependent plan.
-Last activity: 2026-11-11 — Pinned OpenBIOS digest path and WASI card-test fixes are implemented; focused tests, full CI and hygiene passed.
+Current Plan: 29 of 49
+Status: Plan 04-22 is complete; GAME-05 remains pending until the later OpenBIOS transfer and shell-boot plans finish.
+Last activity: 2026-11-11 — Exact-head CI run 43069874480 passed; the pinned Linux OpenBIOS output and cross-platform tests are verified.
 
 Progress: [█████░░░░░] 50%
 
@@ -156,6 +156,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P37 | 49min | 2 tasks | 6 files |
 | Phase 04 P38 | 51min | 2 tasks | 14 files |
 | Phase 04 P21 | 44min | 2 tasks | 9 files |
+| Phase 04 P22 | 106min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -353,6 +354,8 @@ Recent decisions affecting current work:
 - [Phase 04]: BIOS recognition matches the pinned DAT MD5 rows; SHA-1 remains metadata, public SHA-256 is independent, and unknown images stay loadable.
 - [Phase 04]: Keep firmware-size and content-marker checks inside the existing release firmware scanner gate.
 - [Phase 04]: Generate synthetic digest keys and content-marker samples only in build-directory fixtures.
+- [Phase 04]: Use the upstream-supported OPENBIOS_SHELL=shell target with pinned nugget source and Linux GCC; no custom standard-library overlay is needed.
+- [Phase 04]: Raise the be32 job timeout to seven minutes based on the expanded 433-test suite; the exact-head lane completed in 6m09s with all tests retained.
 
 ### Pending Todos
 
@@ -364,7 +367,6 @@ retain their bound plans and seed dispositions.
 
 ### Blockers/Concerns
 
-- [Phase 4 plan 04-22]: Required exact-head hosted acceptance is pending. Run 43060258449 attempt 3 built the real pinned Linux OpenBIOS image (524288 bytes, SHA-256 92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8), but the WASI leg exposed test-harness stack, filesystem-preopen and nested-emulator failures. The attributable fixes pass all 13 focused local card/runner cases; full local CI/hygiene and the next committed-head hosted workflow remain required. Do not mark GAME-05 complete or start 04-39 until the actual Linux step and required workflow pass on the committed head. Details: 04-22-BLOCKED.md.
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
 
@@ -467,13 +469,13 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-phase 4 plan 04-21 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; firmware scanner and archive controls, full CI and hygiene | gpt-6-luna xhigh |
 
-| 2026-11-11 | /gsd-execute-phase 4 plan 04-22 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; pinned Linux OpenBIOS digest and WASI test-harness fixes; focused checks, full CI and hygiene passed; exact-head hosted acceptance pending | gpt-6-luna xhigh |
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-22 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; pinned OpenBIOS output 524288 bytes/SHA-256 verified, digest corruption refused; CI run 43069874480 passed, including WASI and 433 be32 tests; local CI/hygiene passed | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-11T17:18:44Z
-Stopped at: 04-22 implementation locally verified; exact-head hosted acceptance pending
-Resume file: .planning/phases/04-games-play-in-retroarch/04-22-BLOCKED.md
+Last session: 2026-11-11T17:54:30.919Z
+Stopped at: Completed 04-22-PLAN.md; exact-head hosted CI passed
+Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
 Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8
