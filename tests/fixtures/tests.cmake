@@ -3,6 +3,8 @@
 #
 # Run as a script (cmake -DCASE=<case> ... -P tests.cmake), this file is one
 # check; include()d by tests/tests.cmake, it builds armips and registers the tests.
+set(schway__pad_counter_no_press_hash "83358471dc7807f9a7b070097835835ff27fa73a3db1f8ad468e3ef5208317b1")
+set(schway__pad_counter_one_press_hash "cfcae1a726602580ac1741eb597c951cd3977f8f96a8df6be30c9ea50d9543b4")
 if(CMAKE_SCRIPT_MODE_FILE)
   if(CASE STREQUAL "header")
     # The magic, the size in whole sectors and the load size at 1Ch, from the bytes alone.
@@ -212,9 +214,9 @@ if(CMAKE_SCRIPT_MODE_FILE)
       endif()
       string(REGEX REPLACE ".*sha256 ([0-9a-f]+)" "\\1" frame_hash "${frame_line}")
       if(scenario STREQUAL "none")
-        set(expected_hash "83358471dc7807f9a7b070097835835ff27fa73a3db1f8ad468e3ef5208317b1")
+        set(expected_hash "${schway__pad_counter_no_press_hash}")
       else()
-        set(expected_hash "cfcae1a726602580ac1741eb597c951cd3977f8f96a8df6be30c9ea50d9543b4")
+        set(expected_hash "${schway__pad_counter_one_press_hash}")
       endif()
       if(NOT frame_hash STREQUAL expected_hash)
         message(FATAL_ERROR "pad_counter ${scenario} frame 300 hash did not match its pixel-checked pin")
@@ -227,8 +229,6 @@ if(CMAKE_SCRIPT_MODE_FILE)
   elseif(CASE STREQUAL "pad_counter_movies")
     string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
     file(WRITE "${OUT}/pad-counter-empty.inputs" "")
-    file(WRITE "${OUT}/pad-counter-single.inputs"
-      "60 p1=digital:X:128,128,128,128 p2=.\n")
     file(WRITE "${OUT}/pad-counter-held.inputs"
       "60 p1=digital:X:128,128,128,128 p2=.\n"
       "120 p1=digital:X:128,128,128,128 p2=.\n"
@@ -241,7 +241,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
       "61 p1=digital:.:128,128,128,128 p2=.\n"
       "120 p1=digital:X:128,128,128,128 p2=.\n"
       "121 p1=digital:.:128,128,128,128 p2=.\n")
-    foreach(scenario IN ITEMS empty single held three_edges)
+    foreach(scenario IN ITEMS empty held three_edges)
       set(fixture pad_counter_${scenario})
       set(capture "${OUT}/pad-counter-movies-${scenario}.txt")
       set(movie_flags "--inputs ${OUT}/pad-counter-${scenario}.inputs --hash")
@@ -267,11 +267,11 @@ if(CMAKE_SCRIPT_MODE_FILE)
       endif()
       set(pad_counter_hash_${scenario} "${CMAKE_MATCH_1}")
     endforeach()
-    if(pad_counter_hash_empty STREQUAL pad_counter_hash_single OR
-       NOT pad_counter_hash_single STREQUAL pad_counter_hash_held OR
+    if(NOT pad_counter_hash_empty STREQUAL schway__pad_counter_no_press_hash OR
+       NOT pad_counter_hash_held STREQUAL schway__pad_counter_one_press_hash OR
        pad_counter_hash_empty STREQUAL pad_counter_hash_three_edges OR
-       pad_counter_hash_single STREQUAL pad_counter_hash_three_edges)
-      message(FATAL_ERROR "empty/single/held/three-edge movies produced unexpected frame-300 hashes")
+       pad_counter_hash_held STREQUAL pad_counter_hash_three_edges)
+      message(FATAL_ERROR "empty/held/three-edge movies produced unexpected frame-300 hashes")
     endif()
     function(refuse_pad_movie name contents expected_reason)
       set(path "${OUT}/pad-counter-${name}-invalid.inputs")
