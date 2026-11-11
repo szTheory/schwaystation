@@ -29,6 +29,7 @@ fixtures.hello.mailbox	fixtures,portable
 fixtures.hello.tty	fixtures,portable
 fixtures.mailbox_crc	fixtures,portable
 fixtures.mailbox_fault	fixtures,portable
+fixtures.memcard_roundtrip.persistence	fixtures,portable
 fixtures.pad_counter.movies	fixtures,portable
 fixtures.pad_counter.press60	fixtures,portable
 fixtures.probe.hello	fixtures,portable

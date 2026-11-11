@@ -103,6 +103,24 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "schwaystation-run ${args} printed no line ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "memcard_roundtrip")
+    file(REMOVE_RECURSE "${OUT}")
+    file(MAKE_DIRECTORY "${OUT}")
+    execute_process(COMMAND ${RUN} --exe "${IMAGE}" --frames 120 --save-dir "${OUT}"
+        --png "120:${OUT}/first.png" --hash
+      RESULT_VARIABLE rc OUTPUT_VARIABLE first ERROR_VARIABLE first_err)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "first fresh memcard process failed: ${first}${first_err}")
+    endif()
+    if(NOT EXISTS "${OUT}/memcard_roundtrip.srm")
+      message(FATAL_ERROR "first fresh process did not persist the card value read through SIO0")
+    endif()
+    execute_process(COMMAND ${RUN} --exe "${IMAGE}" --frames 120 --save-dir "${OUT}"
+        --png "120:${OUT}/second.png" --hash
+      RESULT_VARIABLE rc OUTPUT_VARIABLE second ERROR_VARIABLE second_err)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "second fresh memcard process failed: ${second}${second_err}")
+    endif()
   elseif(CASE STREQUAL "pad_counter_press60")
     file(MAKE_DIRECTORY "${OUT}")
     file(WRITE "${OUT}/pad-counter-none.inputs"
@@ -458,6 +476,7 @@ schway__fixture(dma_chain.exe dma_chain.asm)
 schway__fixture(timers_lines.exe timers_lines.asm)
 schway__fixture(gpu_motion.exe gpu_motion.asm)
 schway__fixture(pad_counter.exe pad_counter.asm)
+schway__fixture(memcard_roundtrip.exe memcard_roundtrip.asm)
 foreach(row IN ITEMS
     "10|0|10" "8|1|8" "7|64|7" "5|2|5" "4|3|4" "10|0|5" "8|1|2" "4|3|1")
   string(REPLACE "|" ";" fields "${row}")
@@ -511,6 +530,14 @@ schway_add_test(NAME fixtures.pad_counter.press60
     -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/pad_counter.exe -DFRAMES=300
     -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 120)
+
+# Fault prevented: card writes that never survive a fresh runner process or are routed to the wrong slot.
+schway_add_test(NAME fixtures.memcard_roundtrip.persistence
+  COMMAND ${CMAKE_COMMAND} -DCASE=memcard_roundtrip -DOUT=${PROJECT_BINARY_DIR}/tests/memcard-roundtrip
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/memcard_roundtrip.exe
+    -DRUN=$<TARGET_FILE:schwaystation-run>
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 120)
 

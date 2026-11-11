@@ -2,6 +2,7 @@
 tests/vectors/r3000/sst-sample.bin	SingleStepTests/r3000 v1, first 100 cases of each file	51e227447d0b	MIT	d6ef9a9ce978c487d2065c60c7312959a8bb6ddbd67b19c8465d1e28557d5ffc	THIRD-PARTY-NOTICES.md
 src/stub_kernel.c	tests/fixtures/src/stub/stub.asm	-	MIT	d8f54416f2475cff7ad329177c8bb7a22d44f8718fb96d9e7ee8d0ce9231c589	-
 tests/fixtures/src/gpu_motion.asm	schwaystation first-party fixture	-	MIT	c9af0565caa7a5786c270fde6aaf661faea346ed51f597294fc0d9e7bec7eb1f	-
+tests/fixtures/src/memcard_roundtrip.asm	schwaystation first-party fixture	-	MIT	47432998b70d4cbfe542fe2d4b51cd152ca51db33e94ad514542fa89047b6a2b	-
 tests/fixtures/src/pad_counter.asm	schwaystation first-party fixture	-	MIT	8520b66e145ae33ae44b7a30c0c4886adc97f32a1afe7cce90032f107ffb3057	-
 tests/vectors/gte/ps1tests-1150.bin	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	e8a0e61a57a6582ac53d39b941eeaa83b87498444a3ada915d9de73d313dd9c2	THIRD-PARTY-NOTICES.md
 tests/fixtures/src/gte_cases.inc	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	22d83f53a818096106543758c20c8cab3218255af740faff37ff403b6e581220	THIRD-PARTY-NOTICES.md
