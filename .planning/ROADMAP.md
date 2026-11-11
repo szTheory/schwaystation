@@ -261,7 +261,7 @@ Plans:
 
 **Wave 10** *(blocked on Wave 9 completion)*
 - [x] 04-10 — Scan native display windows and convert packed RGB24 safely
-- [ ] 04-14 — Schedule SIO0 bytes and digital-pad replies
+- [x] 04-14 — Schedule SIO0 bytes and digital-pad replies
 
 **Wave 11** *(blocked on Wave 10 completion)*
 - [ ] 04-11 — Run GPU DMA2 through busy/readiness deadlines and validated state
@@ -357,6 +357,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 10/32 | In Progress | - |
+| 4. Games play in RetroArch | 11/32 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

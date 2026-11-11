@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 status: executing
-stopped_at: Completed 04-10-PLAN.md
-last_updated: "2026-11-11T00:11:03.860Z"
+stopped_at: Completed 04-14-PLAN.md
+last_updated: "2026-11-11T01:01:45.903Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 04 plan 04-10 completed
-state_head: 2c42c1972ab9841362c45fdeda79ba5038d6a6a3
+state_head: d05e8b64d224c155b2dc187f40a96b22500c09c1
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 100
-  completed_plans: 78
+  completed_plans: 79
   percent: 50
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Plan: 11 of 32
+Plan: 12 of 32
 Status: Ready to execute
-Last activity: 2026-11-10 — Phase 04 plan 04-07 completed
+Last activity: 2026-11-10 — Phase 04 plan 04-14 completed
 
 Progress: [█████░░░░░] 50%
 
@@ -138,6 +138,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P08 | 38min 51s+ (lower bound; includes restart gap) | 2 tasks | 13 files |
 | Phase 04 P09 | 59 min | 2 tasks | 23 files |
 | Phase 04 P10 | 16min | 2 tasks | 24 files |
+| Phase 04 P14 | 47min | 3 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -298,6 +299,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep no-content test-card scanout and pinned output separate from guest-programmed GPU scanout.
 - [Phase 04]: Use one bounded native video validator for runner hashing, PNG output, and host conversion.
 - [Phase 04]: Leave libretro dynamic geometry notifications and public runner documentation to plans 04-27 and 04-32.
+- [Phase 04]: Keep byte completion, pad ACK assertion, and ACK release at separate scheduler ticks; keep card timing distinct.
+- [Phase 04]: Store SIO and pad state per instance and serialize it through the existing visitor without changing API or state format revisions.
+- [Phase 04]: Leave GAME-03 partial until DualShock, card, host-input, and integrated gameplay plans complete their behavior.
 
 ### Pending Todos
 
@@ -384,10 +388,12 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-execute-phase 4 plan 04-10 | Codex, OpenGSD 1.20.0; sequential executor, native GPU scanout and RGB24 runner conversion, local CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-14 | Codex, OpenGSD 1.20.0; sequential executor, scheduled SIO0 digital polling, local CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T00:11:03.638Z
-Stopped at: Completed 04-10-PLAN.md
+Last session: 2026-11-11T01:01:45.708Z
+Stopped at: Completed 04-14-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
