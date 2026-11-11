@@ -372,7 +372,8 @@ reset. Copy data you need before destroying the instance.
 `SCHWAY_MEMORY_VRAM`, `SCHWAY_MEMORY_BIOS`, `SCHWAY_MEMORY_CARD1` or `SCHWAY_MEMORY_CARD2`. It returns the
 instance's 2 MiB RAM, 1 KiB scratchpad, 1 MiB VRAM, current BIOS image or one of two 131,072-byte card images.
 Each pointer remains stable for the instance lifetime. RAM, scratchpad and VRAM contents change as the core runs;
-card bytes survive a power reset. `schway_get_vram` remains a convenience accessor for the VRAM span.
+card pointers and bytes remain stable across reads, state loads and power resets. `schway_get_vram` remains a
+convenience accessor for the VRAM span.
 
 Cards start as formatted blank images. Before the first frame, a host can import an exact 131,072-byte raw image:
 
@@ -382,10 +383,12 @@ schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, raw_card, SCHWAY_MEMCARD_SIZE);
 schway_memcard_generation(inst, SCHWAY_CARD_SLOT_1, &generation);
 ```
 
-The card slot constants are one-based. A null pointer, invalid slot, wrong image size or import after execution
-returns `SCHWAY_STATUS_ERR_ARGUMENT` and leaves the current card untouched. Card images and generations are not
-included in ordinary save states; in-flight SIO/card protocol state is included. The currently implemented card
-protocol is read-only, so generations remain zero. The API reserves increments for completed writes ending in
+The one-based slots are `SCHWAY_CARD_SLOT_1` and `SCHWAY_CARD_SLOT_2`; each image has `SCHWAY_MEMCARD_SIZE`
+bytes. A null pointer, invalid slot, wrong image size or import after execution returns
+`SCHWAY_STATUS_ERR_ARGUMENT` and leaves the current card untouched. Card images and generations are not
+included in ordinary save states, so loading a state never rewinds imported card bytes; in-flight SIO/card
+protocol state is included. The currently implemented card protocol is read-only, so generations remain zero.
+The API reserves increments for completed writes ending in
 `47h`; reads do not change them.
 
 ## Audio

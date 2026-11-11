@@ -1,2 +1,3 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
 card.protocol.read	card,portable
+card.protocol.read_edges	card,portable

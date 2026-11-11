@@ -143,6 +143,15 @@ static void read_sector(schway *inst, uint32_t sector, const uint8_t *expected)
     read_sector_tail(inst, sector, expected);
 }
 
+static void read_invalid_sector(schway *inst, uint32_t sector)
+{
+    read_prefix_to_high(inst, sector);
+    CHECK_EQ_HEX(transfer(inst, (uint8_t)sector, CARD_ACK), 0x5Cu);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x5Du);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_READ_PAUSE), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
+}
+
 static void get_id(schway *inst)
 {
     static const uint8_t expected[8] = {0x5Au, 0x5Du, 0x5Cu, 0x5Du, 0x04u, 0u, 0u, 0x80u};
@@ -210,6 +219,66 @@ static void protocol_read(void)
     free(card1);
 }
 
+static void protocol_read_edges(void)
+{
+    const uint32_t sector = 7u;
+    uint8_t *card_a = make_card(29u);
+    uint8_t *card_b = make_card(111u);
+    schway *a = make();
+    schway *b = make();
+    CHECK_EQ_U64(schway_load_memcard(a, SCHWAY_CARD_SLOT_1, card_a, SCHWAY_MEMCARD_SIZE),
+                 SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_memcard(b, SCHWAY_CARD_SLOT_1, card_b, SCHWAY_MEMCARD_SIZE),
+                 SCHWAY_STATUS_OK);
+    schway_span a_card;
+    schway_span b_card;
+    CHECK_EQ_U64(schway_get_memory(a, SCHWAY_MEMORY_CARD1, &a_card), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_get_memory(b, SCHWAY_MEMORY_CARD1, &b_card), SCHWAY_STATUS_OK);
+    CHECK(a_card.data != b_card.data);
+    CHECK(memcmp(a_card.data, card_a, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK(memcmp(b_card.data, card_b, SCHWAY_MEMCARD_SIZE) == 0);
+
+    configure(a, 0u);
+    read_prefix_to_high(a, sector);
+    size_t state_size = schway_state_size(a);
+    uint8_t *saved = (uint8_t *)malloc(state_size);
+    CHECK(saved != NULL);
+    if (saved != NULL) {
+        CHECK_EQ_U64(schway_save_state(a, saved, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(b, saved, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_get_memory(b, SCHWAY_MEMORY_CARD1, &b_card), SCHWAY_STATUS_OK);
+        CHECK(b_card.data != a_card.data);
+        CHECK(memcmp(b_card.data, card_b, SCHWAY_MEMCARD_SIZE) == 0);
+        read_sector_tail(b, sector, &card_b[sector * SCHWAY__CARD_SECTOR_SIZE]);
+        CHECK_EQ_U64(schway_get_memory(b, SCHWAY_MEMORY_CARD1, &b_card), SCHWAY_STATUS_OK);
+        CHECK(b_card.data != a_card.data);
+        read_sector(b, sector, &card_b[sector * SCHWAY__CARD_SECTOR_SIZE]);
+        read_invalid_sector(b, SCHWAY__CARD_SECTOR_COUNT);
+        read_sector(b, sector, &card_b[sector * SCHWAY__CARD_SECTOR_SIZE]);
+
+        CHECK_EQ_HEX(transfer(b, 0x81u, CARD_ACK), 0xFFu);
+        CHECK_EQ_HEX(transfer(b, 0x57u, 0u), 0xFFu);
+        CHECK_EQ_HEX(transfer(b, 0x81u, CARD_ACK), 0xFFu);
+        CHECK_EQ_HEX(transfer(b, 0x52u, CARD_ACK), 0x08u);
+        CHECK_EQ_HEX(transfer(b, 0u, CARD_ACK), 0x5Au);
+        free(saved);
+    }
+    CHECK(memcmp(a_card.data, card_a, SCHWAY_MEMCARD_SIZE) == 0);
+    CHECK(memcmp(b_card.data, card_b, SCHWAY_MEMCARD_SIZE) == 0);
+    uint64_t generation = UINT64_MAX;
+    CHECK_EQ_U64(schway_memcard_generation(b, SCHWAY_CARD_SLOT_1, &generation),
+                 SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(generation, 0u);
+    CHECK_EQ_U64(schway_reset(b, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_get_memory(b, SCHWAY_MEMORY_CARD1, &b_card), SCHWAY_STATUS_OK);
+    CHECK(b_card.data != a_card.data);
+    CHECK(memcmp(b_card.data, card_b, SCHWAY_MEMCARD_SIZE) == 0);
+    schway_destroy(b);
+    schway_destroy(a);
+    free(card_b);
+    free(card_a);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -217,6 +286,8 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "protocol_read") == 0) {
         protocol_read();
+    } else if (strcmp(argv[1], "protocol_read_edges") == 0) {
+        protocol_read_edges();
     } else {
         return 2;
     }

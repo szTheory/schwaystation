@@ -10,3 +10,8 @@ schway_warnings(schwaystation-test-card)
 schway_add_test(NAME card.protocol.read
   COMMAND schwaystation-test-card protocol_read
   LABELS card portable TIMEOUT 10)
+
+# Fault prevented: invalid sectors and restored protocol state corrupt card images or stall reads.
+schway_add_test(NAME card.protocol.read_edges
+  COMMAND schwaystation-test-card protocol_read_edges
+  LABELS card portable TIMEOUT 10)

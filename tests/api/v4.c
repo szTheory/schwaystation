@@ -106,9 +106,18 @@ int main(void)
         CHECK_EQ_U64(invalid_span.size, 17u);
         CHECK_EQ_U64(schway_load_memcard(inst, 0u, v4_card1, sizeof v4_card1),
                      SCHWAY_STATUS_ERR_ARGUMENT);
+        CHECK_EQ_U64(schway_load_memcard(inst, 3u, v4_card1, sizeof v4_card1),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
         CHECK_EQ_U64(schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, v4_card1,
                                          sizeof v4_card1 - 1u), SCHWAY_STATUS_ERR_ARGUMENT);
         CHECK(((const uint8_t *)card1.data)[0] == v4_card1[0]);
+        generation = UINT64_C(0xCAFE);
+        CHECK_EQ_U64(schway_memcard_generation(inst, 0u, &generation),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
+        CHECK_EQ_U64(generation, UINT64_C(0xCAFE));
+        CHECK_EQ_U64(schway_memcard_generation(inst, 3u, &generation),
+                     SCHWAY_STATUS_ERR_ARGUMENT);
+        CHECK_EQ_U64(generation, UINT64_C(0xCAFE));
         CHECK_EQ_U64(schway_state_size(inst), state_size);
         CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
         CHECK_EQ_U64(schway_get_vram(inst, &second), SCHWAY_STATUS_OK);
