@@ -8,7 +8,8 @@
              registers, the geometry engine, instance.profile_flags,
              instance.exe_loaded, the bus (RAM, scratchpad, memory control,
              unbuilt-device counters), irq, dma, the root counters and the
-             first-fault record, digital pad, SIO0 transport and card protocol
+             first-fault record, digital pad, SIO0 transport and card protocol,
+             including staged write payloads
    One field list drives every pass (state.h), so they cannot drift apart. A
    struct is never copied as a whole: padding, pointers and the allocator
    never reach the bytes. The audio ring is not saved; a load empties it.

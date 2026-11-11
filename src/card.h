@@ -13,6 +13,7 @@ struct schway__state_io;
 #define SCHWAY__CARD_SECTOR_COUNT 1024u
 #define SCHWAY__CARD_ACK_FROM_TX 1500u
 #define SCHWAY__CARD_READ_PAUSE_FROM_TX 31000u
+#define SCHWAY__CARD_WRITE_FINAL_STEP 136u
 
 enum {
     SCHWAY__CARD_BYTE_UNHANDLED = 0u,
@@ -31,6 +32,9 @@ struct schway__card_slot {
     uint32_t sector;
     uint32_t checksum;
     uint32_t invalid_sector;
+    uint32_t write_step;
+    uint32_t write_bad_checksum;
+    uint8_t write_data[SCHWAY__CARD_SECTOR_SIZE];
 };
 
 struct schway__card {

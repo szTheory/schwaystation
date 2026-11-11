@@ -2,7 +2,7 @@
 
 SIO0 is the console's serial port for controllers and memory cards. The core models the SIO0 registers, an
 eight-byte receive FIFO, scheduled byte completion, two digital-pad ports and one memory card per port. SIO1
-is outside this module. Card Read (52h) and GetID (53h) are supported; Write (57h) is not supported yet.
+is outside this module. Card Read (52h), GetID (53h), and Write (57h) are supported.
 
 ## Digital poll
 
@@ -39,7 +39,17 @@ abort without changing card bytes.
 
 Both slots own separate 131,072-byte raw spans. A new instance starts with formatted blank cards and flag `08`;
 the host can import an exact-size raw image before execution. Card bytes and their generation counters are outside
-ordinary save states, while the in-flight SIO/card read phase is saved so a pending read can resume.
+ordinary save states, while the in-flight SIO/card protocol state is saved so a pending transfer can resume.
+
+Write (57h) stages the addressed sector and its checksum while the old raw span remains visible. The final
+successful `47` response copies all 128 bytes at once, increments that slot's generation once, and clears the
+fresh-card flag. A bad checksum returns `4E`; an out-of-range sector returns `FF`. These rejected writes set the
+write-error flag, which the next supported command returns and clears, and leave card bytes and generation
+unchanged. Reset or port deselection cancels an incomplete write without changing either. Staged payload,
+address, checksum and protocol position are
+saved so a state taken mid-write can resume; loading a state still does not roll back card bytes or generation.
+Atomic failed-write handling is a deterministic model choice where the reference does not establish whether a
+failed transfer can have partially changed the card.
 
 ## Register and interrupt behavior
 
