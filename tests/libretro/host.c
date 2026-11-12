@@ -185,11 +185,16 @@ static int16_t got_audio[MAX_PAIRS * 2u];
 static size_t got_pairs;
 static int content_test;
 static unsigned content_polls;
+static int input_movie_mode;
+static unsigned input_movie_variant;
+static unsigned input_poll_calls, input_state_calls;
+static unsigned controller_info_calls, input_descriptor_calls;
 static const char *bios_option_value = "none";
 static const char *system_directory;
 static const char *analog_mode_value = "analog";
 static const char *analog_toggle_value = "enabled";
 static int rumble_available;
+static int rumble_axis_mode;
 struct rumble_event {
     unsigned port;
     enum retro_rumble_effect effect;
@@ -263,6 +268,59 @@ static void check_variables(const struct retro_variable *v)
     CHECK(v[4].key == NULL);
 }
 
+static void check_controller_info(const struct retro_controller_info *info)
+{
+    static const unsigned expected_ids[] = {RETRO_DEVICE_ANALOG, RETRO_DEVICE_JOYPAD,
+                                            RETRO_DEVICE_NONE};
+    static const char *expected_names[] = {"DualShock", "PlayStation Controller", "None"};
+    controller_info_calls++;
+    CHECK(info != NULL);
+    if (info == NULL) {
+        return;
+    }
+    for (unsigned port = 0u; port < 2u; port++) {
+        CHECK_EQ_U64(info[port].num_types, 3u);
+        CHECK(info[port].types != NULL);
+        if (info[port].types == NULL) {
+            continue;
+        }
+        for (unsigned i = 0u; i < 3u; i++) {
+            CHECK_EQ_U64(info[port].types[i].id, expected_ids[i]);
+            check_string("controller type name", info[port].types[i].desc, expected_names[i]);
+        }
+    }
+    CHECK(info[2].types == NULL);
+}
+
+static void check_input_descriptors(const struct retro_input_descriptor *descriptors)
+{
+    unsigned cross_ports = 0u, left_x_ports = 0u, right_y_ports = 0u;
+    input_descriptor_calls++;
+    CHECK(descriptors != NULL);
+    if (descriptors == NULL) {
+        return;
+    }
+    for (const struct retro_input_descriptor *item = descriptors; item->description != NULL; item++) {
+        if (item->device == RETRO_DEVICE_JOYPAD && item->id == RETRO_DEVICE_ID_JOYPAD_B &&
+            strcmp(item->description, "Cross") == 0) {
+            cross_ports |= 1u << item->port;
+        }
+        if (item->device == RETRO_DEVICE_ANALOG &&
+            item->index == RETRO_DEVICE_INDEX_ANALOG_LEFT &&
+            item->id == RETRO_DEVICE_ID_ANALOG_X && strcmp(item->description, "Left Stick X") == 0) {
+            left_x_ports |= 1u << item->port;
+        }
+        if (item->device == RETRO_DEVICE_ANALOG &&
+            item->index == RETRO_DEVICE_INDEX_ANALOG_RIGHT &&
+            item->id == RETRO_DEVICE_ID_ANALOG_Y && strcmp(item->description, "Right Stick Y") == 0) {
+            right_y_ports |= 1u << item->port;
+        }
+    }
+    CHECK_EQ_U64(cross_ports, 3u);
+    CHECK_EQ_U64(left_x_ports, 3u);
+    CHECK_EQ_U64(right_y_ports, 3u);
+}
+
 static bool RETRO_CALLCONV rumble(unsigned port, enum retro_rumble_effect effect, uint16_t strength)
 {
     if (rumble_event_count < sizeof rumble_events / sizeof rumble_events[0]) {
@@ -298,6 +356,12 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
     case RETRO_ENVIRONMENT_SET_VARIABLES:
         variables_calls++;
         check_variables((const struct retro_variable *)data);
+        return true;
+    case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
+        check_controller_info((const struct retro_controller_info *)data);
+        return true;
+    case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
+        check_input_descriptors((const struct retro_input_descriptor *)data);
         return true;
     case RETRO_ENVIRONMENT_GET_VARIABLE: {
         struct retro_variable *var = (struct retro_variable *)data;
@@ -395,6 +459,7 @@ static size_t RETRO_CALLCONV batch(const int16_t *data, size_t frames)
 
 static void RETRO_CALLCONV on_poll(void)
 {
+    input_poll_calls++;
     if (content_test) {
         content_polls++;
     }
@@ -402,6 +467,62 @@ static void RETRO_CALLCONV on_poll(void)
 
 static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned index, unsigned id)
 {
+    if (rumble_axis_mode && device == RETRO_DEVICE_ANALOG && port < 2u) {
+        if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_X) {
+            return INT16_MIN;
+        }
+        if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_Y) {
+            return 0;
+        }
+        if (index == RETRO_DEVICE_INDEX_ANALOG_RIGHT && id == RETRO_DEVICE_ID_ANALOG_X) {
+            return INT16_MAX;
+        }
+        if (index == RETRO_DEVICE_INDEX_ANALOG_RIGHT && id == RETRO_DEVICE_ID_ANALOG_Y) {
+            return 0;
+        }
+    }
+    if (input_movie_mode) {
+        unsigned frame_index = content_polls;
+        input_state_calls++;
+        if (device == RETRO_DEVICE_JOYPAD && index == 0u && id == RETRO_DEVICE_ID_JOYPAD_B &&
+            port == 0u &&
+            ((input_movie_variant == 1u && frame_index == 60u) ||
+             (input_movie_variant == 2u &&
+              (frame_index == 60u || frame_index == 100u || frame_index == 120u)) ||
+             (input_movie_variant == 3u && frame_index >= 60u && frame_index <= 180u))) {
+            return 1;
+        }
+        if (device == RETRO_DEVICE_ANALOG && port < 2u && id <= RETRO_DEVICE_ID_ANALOG_Y &&
+            (index == RETRO_DEVICE_INDEX_ANALOG_LEFT ||
+             index == RETRO_DEVICE_INDEX_ANALOG_RIGHT)) {
+            if (frame_index == 1u) {
+                if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_X) {
+                    return INT16_MIN;
+                }
+                if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_Y) {
+                    return 0;
+                }
+                if (index == RETRO_DEVICE_INDEX_ANALOG_RIGHT && id == RETRO_DEVICE_ID_ANALOG_X) {
+                    return INT16_MAX;
+                }
+                return INT16_MIN;
+            }
+            if (frame_index == 2u) {
+                if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_X) {
+                    return 0;
+                }
+                if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_Y) {
+                    return INT16_MAX;
+                }
+                if (index == RETRO_DEVICE_INDEX_ANALOG_RIGHT && id == RETRO_DEVICE_ID_ANALOG_X) {
+                    return INT16_MIN;
+                }
+                return 0;
+            }
+            return 0;
+        }
+        return 0;
+    }
     if (content_test && port == 0u && device == RETRO_DEVICE_JOYPAD && index == 0u &&
         id == RETRO_DEVICE_ID_JOYPAD_B && content_polls == 60u) {
         return 1;
@@ -1038,9 +1159,517 @@ static int test_native_video_geometry_edges(const char *path)
     return check_failures != 0 ? 1 : 0;
 }
 
+struct input_state_snapshot {
+    uint8_t device[2];
+    uint8_t axes[8];
+};
+
+#define INPUT_MOVIE_FRAMES 300u
+#define INPUT_MOVIE_CHECKPOINTS 6u
+#define INPUT_MOVIE_VARIANTS 4u
+
+static const unsigned input_movie_checkpoints[INPUT_MOVIE_CHECKPOINTS] = {1u, 2u, 60u,
+                                                                           100u, 120u, 300u};
+
+struct movie_pixel_run {
+    uint32_t count;
+    uint32_t pixel;
+};
+
+struct movie_frame_reference {
+    unsigned width, height;
+    size_t run_count;
+    struct movie_pixel_run *runs;
+    size_t audio_pairs;
+    int16_t *audio;
+};
+
+struct movie_state_reference {
+    size_t size;
+    unsigned char *bytes[INPUT_MOVIE_CHECKPOINTS];
+};
+
+struct movie_mailbox_reference {
+    unsigned char bytes[0x100];
+};
+
+static uint32_t load_le32(const unsigned char *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) | ((uint32_t)bytes[2] << 16) |
+           ((uint32_t)bytes[3] << 24);
+}
+
+static void visit_input_state(void *user, const char *name, const void *data, uint32_t count,
+                              uint32_t width)
+{
+    struct input_state_snapshot *snapshot = (struct input_state_snapshot *)user;
+    if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
+        memcpy(snapshot->device, data, sizeof snapshot->device);
+    } else if (strcmp(name, "pad.axes") == 0 && count == 8u && width == 1u) {
+        memcpy(snapshot->axes, data, sizeof snapshot->axes);
+    }
+}
+
+static void capture_input_state(schway *ref, struct movie_state_reference *state,
+                               unsigned frame_index)
+{
+    size_t reference_size = schway_state_size(ref);
+    unsigned checkpoint = INPUT_MOVIE_CHECKPOINTS;
+    for (unsigned i = 0u; i < INPUT_MOVIE_CHECKPOINTS; i++) {
+        if (input_movie_checkpoints[i] == frame_index) {
+            checkpoint = i;
+            break;
+        }
+    }
+    CHECK(checkpoint < INPUT_MOVIE_CHECKPOINTS);
+    CHECK(reference_size != 0u);
+    if (checkpoint >= INPUT_MOVIE_CHECKPOINTS || reference_size == 0u) {
+        return;
+    }
+    state->size = reference_size;
+    state->bytes[checkpoint] = (unsigned char *)malloc(reference_size);
+    CHECK(state->bytes[checkpoint] != NULL);
+    if (state->bytes[checkpoint] == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(schway_save_state(ref, state->bytes[checkpoint], reference_size),
+                 SCHWAY_STATUS_OK);
+}
+
+static void check_module_input_state(const struct movie_state_reference *state, unsigned layout,
+                                     unsigned frame_index)
+{
+    size_t module_size = p_serialize_size();
+    unsigned checkpoint = INPUT_MOVIE_CHECKPOINTS;
+    unsigned char *module_state;
+    const unsigned char *reference_state;
+
+    for (unsigned i = 0u; i < INPUT_MOVIE_CHECKPOINTS; i++) {
+        if (input_movie_checkpoints[i] == frame_index) {
+            checkpoint = i;
+            break;
+        }
+    }
+    CHECK(checkpoint < INPUT_MOVIE_CHECKPOINTS);
+    if (checkpoint >= INPUT_MOVIE_CHECKPOINTS) {
+        return;
+    }
+    reference_state = state->bytes[checkpoint];
+    CHECK(reference_state != NULL);
+    CHECK_EQ_U64(module_size, state->size);
+    if (reference_state == NULL || module_size == 0u || module_size != state->size) {
+        return;
+    }
+    module_state = (unsigned char *)malloc(module_size);
+    CHECK(module_state != NULL);
+    if (module_state == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(p_serialize(module_state, module_size), true);
+    if (memcmp(module_state, reference_state, module_size) != 0) {
+        size_t offset = 0u;
+        while (offset < module_size && module_state[offset] == reference_state[offset]) {
+            offset++;
+        }
+        fprintf(stderr, "input state layout %u frame %u differs at byte %lu: %02X != %02X\n",
+                layout, frame_index, (unsigned long)offset, module_state[offset],
+                reference_state[offset]);
+        check_failures++;
+    }
+    free(module_state);
+}
+
+static void expected_movie_input(schway_input *input_snapshot, unsigned layout, unsigned variant,
+                                 unsigned frame_index)
+{
+    memset(input_snapshot, 0, sizeof *input_snapshot);
+    input_snapshot->size = (uint32_t)sizeof *input_snapshot;
+    input_snapshot->device[0] = layout == 0u ? SCHWAY_INPUT_DEVICE_DUALSHOCK
+                                             : SCHWAY_INPUT_DEVICE_DIGITAL;
+    input_snapshot->device[1] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
+    for (unsigned port = 0u; port < 2u; port++) {
+        for (unsigned axis = 0u; axis < 4u; axis++) {
+            input_snapshot->axes[port][axis] = 128u;
+        }
+    }
+    if ((variant == 1u && frame_index == 60u) ||
+        (variant == 2u &&
+         (frame_index == 60u || frame_index == 100u || frame_index == 120u)) ||
+        (variant == 3u && frame_index >= 60u && frame_index <= 180u)) {
+        input_snapshot->buttons[0] = 0x4000u;
+    }
+    if (frame_index == 1u) {
+        uint8_t *axes = input_snapshot->axes[layout == 0u ? 0u : 1u];
+        axes[0] = 255u;
+        axes[1] = 0u;
+        axes[2] = 0u;
+        axes[3] = 128u;
+        if (layout == 0u) {
+            memcpy(input_snapshot->axes[1], axes, 4u);
+        }
+        if (layout == 0u) {
+            input_snapshot->analog_button[0] = 1u;
+            input_snapshot->analog_button[1] = 1u;
+        }
+    } else if (frame_index == 2u) {
+        uint8_t *axes = input_snapshot->axes[layout == 0u ? 0u : 1u];
+        axes[0] = 0u;
+        axes[1] = 128u;
+        axes[2] = 128u;
+        axes[3] = 255u;
+        if (layout == 0u) {
+            memcpy(input_snapshot->axes[1], axes, 4u);
+        }
+    }
+}
+
+static void check_movie_pixels(unsigned variant, unsigned frame_index)
+{
+    unsigned pressed = 0u;
+    if (variant == 1u && frame_index >= 60u) {
+        pressed = 1u;
+    } else if (variant == 2u) {
+        pressed = (frame_index >= 60u) + (frame_index >= 100u) + (frame_index >= 120u);
+    } else if (variant == 3u && frame_index >= 60u) {
+        pressed = 1u;
+    }
+    CHECK(frame_h > 100u);
+    CHECK(frame_w >= 4u);
+    if (frame_h > 100u && frame_w >= 4u) {
+        for (unsigned x = 0u; x < 4u; x++) {
+            uint32_t expected = x < pressed ? 0x00FF0000u : 0u;
+            CHECK_EQ_HEX(frame[(size_t)100u * frame_w + x], expected);
+        }
+    }
+}
+
+static void capture_movie_pixels(struct movie_frame_reference *expected)
+{
+    size_t pixel_count = (size_t)want_w * want_h;
+    size_t run_count = pixel_count == 0u ? 0u : 1u;
+
+    expected->width = want_w;
+    expected->height = want_h;
+    for (size_t i = 1u; i < pixel_count; i++) {
+        if (want[i] != want[i - 1u]) {
+            run_count++;
+        }
+    }
+    expected->runs = run_count != 0u ?
+                         (struct movie_pixel_run *)malloc(run_count * sizeof *expected->runs) :
+                         NULL;
+    CHECK(run_count == 0u || expected->runs != NULL);
+    if (run_count == 0u || expected->runs == NULL) {
+        expected->run_count = 0u;
+        return;
+    }
+    expected->run_count = run_count;
+    size_t run = 0u;
+    expected->runs[run].count = 1u;
+    expected->runs[run].pixel = want[0];
+    for (size_t i = 1u; i < pixel_count; i++) {
+        if (want[i] == expected->runs[run].pixel) {
+            expected->runs[run].count++;
+        } else {
+            run++;
+            expected->runs[run].count = 1u;
+            expected->runs[run].pixel = want[i];
+        }
+    }
+}
+
+static void check_movie_pixels_equal(const uint32_t *pixels, unsigned width, unsigned height,
+                                     const struct movie_frame_reference *expected, unsigned layout,
+                                     unsigned frame_index)
+{
+    size_t pixel_index = 0u;
+    size_t pixel_count = (size_t)expected->width * expected->height;
+    if (width != expected->width || height != expected->height) {
+        fprintf(stderr, "input movie layout %u frame %u: delivered %ux%u, expected %ux%u\n",
+                layout, frame_index, width, height, expected->width, expected->height);
+        check_failures++;
+        return;
+    }
+    for (size_t run = 0u; run < expected->run_count; run++) {
+        for (uint32_t item = 0u; item < expected->runs[run].count; item++, pixel_index++) {
+            if (pixel_index >= pixel_count || pixels[pixel_index] != expected->runs[run].pixel) {
+                fprintf(stderr,
+                        "input movie layout %u frame %u differs at (%lu,%lu): 0x%08lx, "
+                        "reference 0x%08lx\n",
+                        layout, frame_index, (unsigned long)(pixel_index % expected->width),
+                        (unsigned long)(pixel_index / expected->width),
+                        (unsigned long)pixels[pixel_index],
+                        (unsigned long)expected->runs[run].pixel);
+                check_failures++;
+                return;
+            }
+        }
+    }
+    CHECK_EQ_U64(pixel_index, pixel_count);
+}
+
+static void visit_movie_mailbox(void *user, const char *name, const void *data, uint32_t count,
+                                uint32_t width)
+{
+    struct movie_mailbox_reference *mailbox = (struct movie_mailbox_reference *)user;
+    if (strcmp(name, "bus.ram") == 0 && width == 1u && count >= 0x10100u) {
+        memcpy(mailbox->bytes, (const unsigned char *)data + 0x10000u,
+               sizeof mailbox->bytes);
+    }
+}
+
+static void check_movie_mailbox(const struct movie_mailbox_reference *mailbox, unsigned variant)
+{
+    static const unsigned expected_presses[INPUT_MOVIE_VARIANTS] = {0u, 1u, 3u, 1u};
+    uint32_t expected_pixel = expected_presses[variant] != 0u ? 0x1Fu : 0u;
+    CHECK(memcmp(mailbox->bytes, "SWMB", 4u) == 0);
+    CHECK_EQ_U64(mailbox->bytes[0x08u], 0u);
+    CHECK_EQ_U64(mailbox->bytes[0x09u], 1u);
+    CHECK_EQ_U64(mailbox->bytes[0x0Au], 3u);
+    CHECK_EQ_U64(mailbox->bytes[0x0Bu], 11u);
+    CHECK_EQ_HEX(load_le32(&mailbox->bytes[0x10u]), 0x00010001u);
+    CHECK_EQ_U64(load_le32(&mailbox->bytes[0x14u]), expected_presses[variant]);
+    CHECK_EQ_HEX(load_le32(&mailbox->bytes[0x18u]), 0x00010002u);
+    CHECK_EQ_U64(load_le32(&mailbox->bytes[0x1Cu]), expected_pixel);
+    CHECK_EQ_HEX(load_le32(&mailbox->bytes[0x20u]), 0x00010003u);
+    CHECK_EQ_U64(load_le32(&mailbox->bytes[0x24u]), expected_pixel);
+}
+
+static void free_movie_reference(struct movie_frame_reference *frames)
+{
+    for (unsigned frame_index = 0u; frame_index < INPUT_MOVIE_FRAMES; frame_index++) {
+        free(frames[frame_index].runs);
+        free(frames[frame_index].audio);
+    }
+}
+
+static void free_movie_states(struct movie_state_reference *state)
+{
+    for (unsigned checkpoint = 0u; checkpoint < INPUT_MOVIE_CHECKPOINTS; checkpoint++) {
+        free(state->bytes[checkpoint]);
+    }
+}
+
+static void capture_movie_reference_frame(schway *reference, unsigned layout, unsigned variant,
+                                          unsigned frame_index, unsigned audio_floor,
+                                          struct movie_frame_reference *expected)
+{
+    int16_t reference_audio[MAX_PAIRS * 2u];
+    schway_audio audio;
+    const char *label = layout == 0u ? "DualShock digital-wire movie reference"
+                                     : "digital controller movie reference";
+    (void)variant;
+
+    CHECK_EQ_U64(schway_run_frame(reference, NULL), SCHWAY_STATUS_OK);
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = reference_audio;
+    audio.capacity = MAX_PAIRS;
+    CHECK_EQ_U64(schway_get_audio(reference, &audio), SCHWAY_STATUS_OK);
+    if (audio.written != audio_floor && audio.written != (size_t)audio_floor + 1u) {
+        fprintf(stderr, "%s frame %u: %lu audio pairs, expected %u or %u\n", label, frame_index,
+                (unsigned long)audio.written, audio_floor, audio_floor + 1u);
+        check_failures++;
+    }
+    ref_convert(reference);
+    if (layout == 0u) {
+        expected->audio_pairs = audio.written;
+        if (audio.written > 0u && audio.written <= MAX_PAIRS) {
+            expected->audio = (int16_t *)malloc(audio.written * 2u * sizeof reference_audio[0]);
+            CHECK(expected->audio != NULL);
+            if (expected->audio != NULL) {
+                memcpy(expected->audio, reference_audio,
+                       audio.written * 2u * sizeof reference_audio[0]);
+            }
+        } else {
+            CHECK(audio.written <= MAX_PAIRS);
+        }
+        capture_movie_pixels(expected);
+    } else {
+        check_movie_pixels_equal(want, want_w, want_h, expected, layout, frame_index);
+        CHECK_EQ_U64(audio.written, expected->audio_pairs);
+        if (audio.written == expected->audio_pairs && audio.written <= MAX_PAIRS &&
+            expected->audio != NULL) {
+            CHECK(memcmp(reference_audio, expected->audio,
+                         audio.written * 2u * sizeof reference_audio[0]) == 0);
+        }
+    }
+}
+
+static void check_movie_reference_input(schway *reference, const schway_input *expected,
+                                        unsigned layout, unsigned frame_index)
+{
+    struct input_state_snapshot snapshot;
+    memset(&snapshot, 0, sizeof snapshot);
+    CHECK_EQ_U64(schway_state_visit(reference, visit_input_state, &snapshot), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(snapshot.device[0], expected->device[0]);
+    CHECK_EQ_U64(snapshot.device[1], expected->device[1]);
+    CHECK(memcmp(snapshot.axes, expected->axes, sizeof snapshot.axes) == 0);
+    if (layout == 0u && frame_index == 1u) {
+        CHECK_EQ_U64(expected->analog_button[0], 1u);
+        CHECK_EQ_U64(expected->analog_button[1], 1u);
+    }
+}
+
+static void run_movie_reference_layout(const unsigned char *image, size_t image_size, unsigned layout,
+                                       unsigned variant, unsigned audio_floor,
+                                       struct movie_frame_reference *expected_frames,
+                                       struct movie_state_reference *states,
+                                       struct movie_mailbox_reference *mailbox)
+{
+    schway *reference = ref_create(SCHWAY_REGION_NTSC_U);
+    CHECK(reference != NULL);
+    if (reference == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(schway_load_exe(reference, image, image_size), SCHWAY_STATUS_OK);
+    for (unsigned frame_index = 1u; frame_index <= INPUT_MOVIE_FRAMES; frame_index++) {
+        schway_input input_snapshot;
+        expected_movie_input(&input_snapshot, layout, variant, frame_index);
+        CHECK_EQ_U64(schway_set_input(reference, &input_snapshot), SCHWAY_STATUS_OK);
+        capture_movie_reference_frame(reference, layout, variant, frame_index, audio_floor,
+                                      &expected_frames[frame_index - 1u]);
+        if (frame_index <= 2u) {
+            check_movie_reference_input(reference, &input_snapshot, layout, frame_index);
+        }
+        for (unsigned checkpoint = 0u; checkpoint < INPUT_MOVIE_CHECKPOINTS; checkpoint++) {
+            if (input_movie_checkpoints[checkpoint] == frame_index) {
+                capture_input_state(reference, states, frame_index);
+                break;
+            }
+        }
+    }
+    memset(mailbox, 0, sizeof *mailbox);
+    CHECK_EQ_U64(schway_state_visit(reference, visit_movie_mailbox, mailbox), SCHWAY_STATUS_OK);
+    check_movie_mailbox(mailbox, variant);
+    schway_destroy(reference);
+}
+
+static int test_input_movies(const char *path)
+{
+    struct retro_game_info game;
+    schway_info info;
+    struct movie_frame_reference expected_frames[INPUT_MOVIE_FRAMES];
+    struct movie_state_reference states[2];
+    struct movie_mailbox_reference mailboxes[2];
+    unsigned char *image = NULL;
+    FILE *file = NULL;
+    long file_length;
+    unsigned audio_floor = 0u;
+
+    file = fopen(path, "rb");
+    CHECK(file != NULL);
+    if (file == NULL) {
+        if (file != NULL) {
+            (void)fclose(file);
+        }
+        p_deinit();
+        module_close();
+        return 1;
+    }
+    CHECK_EQ_U64(fseek(file, 0L, SEEK_END), 0);
+    file_length = ftell(file);
+    CHECK(file_length > 0L);
+    CHECK_EQ_U64(fseek(file, 0L, SEEK_SET), 0);
+    if (file_length <= 0L) {
+        (void)fclose(file);
+        p_deinit();
+        module_close();
+        return 1;
+    }
+    image = (unsigned char *)malloc((size_t)file_length);
+    CHECK(image != NULL);
+    if (image == NULL) {
+        (void)fclose(file);
+        p_deinit();
+        module_close();
+        return 1;
+    }
+    CHECK_EQ_U64(fread(image, 1u, (size_t)file_length, file), (size_t)file_length);
+    CHECK_EQ_U64(fclose(file), 0);
+    file = NULL;
+    memset(&game, 0, sizeof game);
+    game.path = path;
+    memset(states, 0, sizeof states);
+    input_movie_mode = 1;
+    schway *audio_reference = ref_create(SCHWAY_REGION_NTSC_U);
+    CHECK(audio_reference != NULL);
+    if (audio_reference != NULL) {
+        memset(&info, 0, sizeof info);
+        info.size = (uint32_t)sizeof info;
+        CHECK_EQ_U64(schway_get_info(audio_reference, &info), SCHWAY_STATUS_OK);
+        if (info.sample_rate_den != 0u && info.fps_num != 0u) {
+            uint64_t numerator = (uint64_t)info.sample_rate_num * info.fps_den;
+            uint64_t denominator = (uint64_t)info.sample_rate_den * info.fps_num;
+            audio_floor = (unsigned)(numerator / denominator);
+        }
+        schway_destroy(audio_reference);
+    }
+    for (unsigned variant = 0u; variant < INPUT_MOVIE_VARIANTS; variant++) {
+        memset(expected_frames, 0, sizeof expected_frames);
+        memset(states, 0, sizeof states);
+        for (unsigned layout = 0u; layout < 2u; layout++) {
+            run_movie_reference_layout(image, (size_t)file_length, layout, variant, audio_floor,
+                                       expected_frames, &states[layout], &mailboxes[layout]);
+        }
+        CHECK(memcmp(mailboxes[0].bytes, mailboxes[1].bytes,
+                     sizeof mailboxes[0].bytes) == 0);
+        for (unsigned layout = 0u; layout < 2u; layout++) {
+            analog_mode_value = layout == 0u ? "digital" : "analog";
+            input_movie_variant = variant;
+            p_set_controller_port_device(0u,
+                                         layout == 0u ? RETRO_DEVICE_ANALOG : RETRO_DEVICE_JOYPAD);
+            CHECK_EQ_U64(p_load_game(&game), 1u);
+            content_polls = 0u;
+            input_poll_calls = 0u;
+            input_state_calls = 0u;
+            for (unsigned frame_index = 1u; frame_index <= INPUT_MOVIE_FRAMES; frame_index++) {
+                run_one();
+                check_movie_pixels_equal(frame, frame_w, frame_h,
+                                         &expected_frames[frame_index - 1u], layout, frame_index);
+                CHECK_EQ_U64(got_pairs, expected_frames[frame_index - 1u].audio_pairs);
+                if (got_pairs == expected_frames[frame_index - 1u].audio_pairs &&
+                    expected_frames[frame_index - 1u].audio != NULL) {
+                    CHECK(memcmp(got_audio, expected_frames[frame_index - 1u].audio,
+                                 got_pairs * 2u * sizeof got_audio[0]) == 0);
+                }
+                if (frame_index == 59u || frame_index == 60u || frame_index == 80u ||
+                    frame_index == 100u || frame_index == 120u || frame_index == 180u ||
+                    frame_index == 300u) {
+                    check_movie_pixels(variant, frame_index);
+                }
+                for (unsigned checkpoint = 0u; checkpoint < INPUT_MOVIE_CHECKPOINTS; checkpoint++) {
+                    if (input_movie_checkpoints[checkpoint] == frame_index) {
+                        check_module_input_state(&states[layout], layout, frame_index);
+                        break;
+                    }
+                }
+            }
+            CHECK_EQ_U64(input_poll_calls, INPUT_MOVIE_FRAMES);
+            CHECK_EQ_U64(content_polls, INPUT_MOVIE_FRAMES);
+            CHECK_EQ_U64(input_state_calls, layout == 0u ? 12000u : 10800u);
+            p_unload_game();
+        }
+        free_movie_reference(expected_frames);
+        free_movie_states(&states[0]);
+        free_movie_states(&states[1]);
+    }
+    input_movie_mode = 0;
+    input_movie_variant = 0u;
+    p_deinit();
+    module_close();
+    free(image);
+    return check_failures != 0 ? 1 : 0;
+}
+
 static void append_sh(uint32_t *code, size_t *count, unsigned reg, unsigned base, unsigned offset)
 {
     code[(*count)++] = 0xA4000000u | (base << 21) | (reg << 16) | offset;
+}
+
+static void append_sb(uint32_t *code, size_t *count, unsigned reg, unsigned base, unsigned offset)
+{
+    code[(*count)++] = 0xA0000000u | (base << 21) | (reg << 16) | offset;
 }
 
 static size_t append_branch(uint32_t *code, size_t *count, unsigned opcode, unsigned left,
@@ -1093,6 +1722,7 @@ static int write_rumble_guest(const char *path, uint8_t small, uint8_t large)
     size_t frame_wait, rx_wait, ack_wait, release_wait, done, sio_entry;
 
     append_li(code, &count, 16u, 0xBF801000u); /* s0: hardware I/O */
+    append_li(code, &count, 17u, 0x80020000u); /* s1: guest-visible SIO response scratch */
     append_li(code, &count, 8u, 0x000Cu);
     append_sh(code, &count, 8u, 16u, 0x048u);
     append_li(code, &count, 8u, 0x0088u);
@@ -1107,17 +1737,17 @@ static int write_rumble_guest(const char *path, uint8_t small, uint8_t large)
 
     frame_wait = count;
     for (unsigned port = 0u; port < 2u; port++) {
+        const uint8_t motor_bytes[6] = {small, large, 0u, 0u, 0u, 0u};
         append_li(code, &count, 8u, 0x0003u | (port != 0u ? 0x2000u : 0u));
         append_sh(code, &count, 8u, 16u, 0x04Au);
         append_sio_tx(code, &count, jal_sites, &site_count, 0x01u, 1u);
         append_sio_tx(code, &count, jal_sites, &site_count, 0x42u, 1u);
         append_sio_tx(code, &count, jal_sites, &site_count, 0u, 1u);
-        append_sio_tx(code, &count, jal_sites, &site_count, small, 1u);
-        append_sio_tx(code, &count, jal_sites, &site_count, large, 1u);
-        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 1u);
-        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 1u);
-        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 1u);
-        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 0u);
+        for (unsigned index = 0u; index < 6u; index++) {
+            append_sio_tx(code, &count, jal_sites, &site_count, motor_bytes[index],
+                          index != 5u ? 1u : 0u);
+            append_sb(code, &count, 2u, 17u, port * 6u + index);
+        }
     }
     size_t loop_branch = append_branch(code, &count, 0x10000000u, 0u, 0u);
     code[count++] = 0u;
@@ -1173,13 +1803,21 @@ static int write_rumble_guest(const char *path, uint8_t small, uint8_t large)
     return write_test_file(path, image, sizeof image);
 }
 
+struct rumble_reference_snapshot {
+    uint32_t device[2];
+    uint8_t poll_response[12];
+};
+
 static void visit_rumble_reference(void *user, const char *name, const void *data, uint32_t count,
                                    uint32_t width)
 {
-    uint32_t *found = (uint32_t *)user;
+    struct rumble_reference_snapshot *found = (struct rumble_reference_snapshot *)user;
     if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
-        found[0] = ((const uint8_t *)data)[0];
-        found[1] = ((const uint8_t *)data)[1];
+        found->device[0] = ((const uint8_t *)data)[0];
+        found->device[1] = ((const uint8_t *)data)[1];
+    } else if (strcmp(name, "bus.ram") == 0 && width == 1u && count >= 0x2000Cu) {
+        memcpy(found->poll_response, (const uint8_t *)data + 0x20000u,
+               sizeof found->poll_response);
     }
 }
 
@@ -1211,7 +1849,7 @@ static int test_rumble_guest(const char *path)
     schway *reference = ref_create(SCHWAY_REGION_NTSC_U);
     unsigned char exe[0x1000];
     FILE *file;
-    uint32_t devices[2] = {0u, 0u};
+    struct rumble_reference_snapshot reference_snapshot;
 
     CHECK(reference != NULL);
     CHECK(write_rumble_guest(path, 1u, 255u));
@@ -1232,9 +1870,10 @@ static int test_rumble_guest(const char *path)
     input_snapshot.device[0] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
     input_snapshot.device[1] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
     for (unsigned port = 0u; port < 2u; port++) {
-        for (unsigned axis = 0u; axis < 4u; axis++) {
-            input_snapshot.axes[port][axis] = 128u;
-        }
+        input_snapshot.axes[port][0] = 255u;
+        input_snapshot.axes[port][1] = 128u;
+        input_snapshot.axes[port][2] = 0u;
+        input_snapshot.axes[port][3] = 128u;
     }
     CHECK_EQ_U64(schway_load_exe(reference, exe, sizeof exe), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(schway_set_input(reference, &input_snapshot), SCHWAY_STATUS_OK);
@@ -1247,17 +1886,29 @@ static int test_rumble_guest(const char *path)
             CHECK_EQ_HEX(result.rumble[1], 0xFF01u);
         }
     }
-    CHECK_EQ_U64(schway_state_visit(reference, visit_rumble_reference, devices), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(devices[0], SCHWAY_INPUT_DEVICE_DUALSHOCK);
-    CHECK_EQ_U64(devices[1], SCHWAY_INPUT_DEVICE_DUALSHOCK);
+    memset(&reference_snapshot, 0, sizeof reference_snapshot);
+    CHECK_EQ_U64(schway_state_visit(reference, visit_rumble_reference, &reference_snapshot),
+                 SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(reference_snapshot.device[0], SCHWAY_INPUT_DEVICE_DUALSHOCK);
+    CHECK_EQ_U64(reference_snapshot.device[1], SCHWAY_INPUT_DEVICE_DUALSHOCK);
+    for (unsigned port = 0u; port < 2u; port++) {
+        size_t offset = port * 6u;
+        CHECK_EQ_HEX(reference_snapshot.poll_response[offset], 0xFFu);
+        CHECK_EQ_HEX(reference_snapshot.poll_response[offset + 1u], 0xFFu);
+        CHECK_EQ_HEX(reference_snapshot.poll_response[offset + 2u], 0xFFu);
+        CHECK_EQ_HEX(reference_snapshot.poll_response[offset + 3u], 128u);
+        CHECK_EQ_HEX(reference_snapshot.poll_response[offset + 4u], 0u);
+        CHECK_EQ_HEX(reference_snapshot.poll_response[offset + 5u], 128u);
+    }
     schway_destroy(reference);
 
     memset(&game, 0, sizeof game);
     game.path = path;
-    rumble_event_count = 0u;
+    rumble_axis_mode = 1;
     CHECK_EQ_U64(p_load_game(&game), 1u);
     p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
     p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    rumble_event_count = 0u;
     for (unsigned frame_index = 0u; frame_index < 4u; frame_index++) {
         size_t before = rumble_event_count;
         run_one();
@@ -1265,6 +1916,7 @@ static int test_rumble_guest(const char *path)
     }
     CHECK_EQ_U64(rumble_event_count, 16u);
     p_unload_game();
+    rumble_axis_mode = 0;
     p_deinit();
     module_close();
     (void)remove(path);
@@ -1288,20 +1940,23 @@ int main(int argc, char **argv)
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
+    int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
 
-    if ((!content_mode && !video_geometry_mode && !video_edges_mode && !lifecycle_mode &&
+    if ((!content_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
+         !lifecycle_mode &&
          !rumble_guest_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
-          rumble_guest_mode) && argv[3][0] == '\0') ||
+          input_movies_mode || rumble_guest_mode) && argv[3][0] == '\0') ||
         (lifecycle_mode && argv[4][0] == '\0')) {
         fprintf(stderr,
                 "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe> | video-geometry-edges <exe> | rumble-guest <exe>\n");
         return 2;
     }
-    content_test = content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode;
+    content_test = content_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
+                   lifecycle_mode;
     rumble_available = rumble_guest_mode;
     pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
@@ -1370,11 +2025,16 @@ int main(int argc, char **argv)
         return test_native_video_geometry_edges(argv[3]);
     }
 
+    if (input_movies_mode) {
+        return test_input_movies(argv[3]);
+    }
+
     if (content_mode) {
         unsigned red_pixel_seen = 0u;
         memset(&game, 0, sizeof game);
         game.path = argv[3];
         CHECK_EQ_U64(p_load_game(&game), 1);
+        p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
         if (p_serialize_size() == 0u) {
             module_close();
             CHECK_DONE();

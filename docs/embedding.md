@@ -326,6 +326,20 @@ in core options; the selected file is read relative to the frontend's system dir
 `schway_load_bios`. A missing or wrong-sized selected file refuses that load instead of falling back to the test
 card. Disc and playlist formats are not accepted.
 
+### Libretro controllers and rumble
+
+Each port offers DualShock, PlayStation Controller and None; DualShock is the default device. The
+`schwaystation_analog_mode` option selects the DualShock wire mode (`analog` or `digital`). With
+`schwaystation_analog_toggle` enabled, holding Select, Start, L1, L2, R1 and R2 together for 60 frames toggles that
+mode. Buttons and stick axes are sampled into one input snapshot per `retro_run`; signed stick endpoints map to
+0–255 with zero at 128. Selecting None disconnects that port, and an unsupported device request leaves its prior
+selection in place.
+
+When the frontend provides `GET_RUMBLE_INTERFACE`, every successful frame reports strong and weak motor levels
+for both ports, including unchanged levels. Strong values scale the core's 0–255 level by 257; weak is 65535 for
+on and 0 for off. Reset and unload send zero to both effects on both ports. A frontend without a rumble interface
+continues to run normally.
+
 The libretro adapter converts native 15-bit and packed 24-bit frames to XRGB8888 in its fixed maximum-size host
 buffer. It announces `SET_GEOMETRY` from `retro_run` only when frame dimensions change; `SET_SYSTEM_AV_INFO` is
 reserved for a region change that changes the reported rate. A malformed or out-of-range native frame is dropped

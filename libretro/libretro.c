@@ -30,6 +30,13 @@
 #define LR_EXE_HEADER 0x800u
 #define LR_EXE_MAX_BYTES (LR_EXE_HEADER + 2u * 1024u * 1024u)
 #define LR_BIOS_KEY "schwaystation_bios"
+#define LR_ANALOG_MODE_KEY "schwaystation_analog_mode"
+#define LR_ANALOG_TOGGLE_KEY "schwaystation_analog_toggle"
+#define LR_ANALOG_TOGGLE_FRAMES 60u
+#define LR_ANALOG_TOGGLE_BUTTONS                                                            \
+    ((1u << RETRO_DEVICE_ID_JOYPAD_SELECT) | (1u << RETRO_DEVICE_ID_JOYPAD_START) |        \
+     (1u << RETRO_DEVICE_ID_JOYPAD_L) | (1u << RETRO_DEVICE_ID_JOYPAD_L2) |               \
+     (1u << RETRO_DEVICE_ID_JOYPAD_R) | (1u << RETRO_DEVICE_ID_JOYPAD_R2))
 
 /* All adapter state. A frontend may keep the module loaded between sessions,
    so retro_deinit returns every one of these to its initial value (L8866). */
@@ -44,6 +51,13 @@ static schway_info info;
 static uint32_t *pixels;
 static int16_t *samples;
 static unsigned geometry_width, geometry_height;
+static struct retro_rumble_interface lr_rumble;
+static unsigned lr_controller_devices[2] = {RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG};
+static uint8_t lr_analog_mode = 1u;
+static uint8_t lr_analog_toggle_enabled = 1u;
+static uint8_t lr_mode_pulse_pending[2];
+static uint8_t lr_toggle_latched[2];
+static uint8_t lr_toggle_frames[2];
 
 /* The region option (HOSTS-AND-INTEGRATION section 1, Core options): the
    machine profile's region, applied by recreating the instance, since a
@@ -70,6 +84,22 @@ static struct retro_core_option_v2_definition lr_option_defs[] = {
       {"scph5502.bin", "SCPH-5502"},
       {NULL, NULL}},
      "none"},
+    {LR_ANALOG_MODE_KEY,
+     "DualShock mode",
+     NULL,
+     "The mode used when a DualShock controller is connected.",
+     NULL,
+     NULL,
+     {{"analog", "Analog"}, {"digital", "Digital"}, {NULL, NULL}},
+     "analog"},
+    {LR_ANALOG_TOGGLE_KEY,
+     "DualShock mode toggle",
+     NULL,
+     "Allow holding Select, Start, L1, L2, R1 and R2 for one second to toggle mode.",
+     NULL,
+     NULL,
+     {{"enabled", "Enabled"}, {"disabled", "Disabled"}, {NULL, NULL}},
+     "enabled"},
     {NULL, NULL, NULL, NULL, NULL, NULL, {{NULL, NULL}}, NULL},
 };
 static struct retro_core_option_v2_category lr_option_cats[] = {{NULL, NULL, NULL}};
@@ -78,8 +108,54 @@ static struct retro_core_options_v2 lr_options = {lr_option_cats, lr_option_defs
 static struct retro_variable lr_variables[] = {
     {LR_REGION_KEY, "Region; ntsc-u|ntsc-j|pal"},
     {LR_BIOS_KEY, "BIOS for no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin"},
+    {LR_ANALOG_MODE_KEY, "DualShock mode; analog|digital"},
+    {LR_ANALOG_TOGGLE_KEY, "DualShock mode toggle; enabled|disabled"},
     {NULL, NULL},
 };
+
+static struct retro_controller_description lr_controller_types[] = {
+    {"DualShock", RETRO_DEVICE_ANALOG},
+    {"PlayStation Controller", RETRO_DEVICE_JOYPAD},
+    {"None", RETRO_DEVICE_NONE},
+};
+static struct retro_controller_info lr_controller_info[] = {
+    {lr_controller_types, (unsigned)(sizeof lr_controller_types / sizeof lr_controller_types[0])},
+    {lr_controller_types, (unsigned)(sizeof lr_controller_types / sizeof lr_controller_types[0])},
+    {NULL, 0u},
+};
+
+#define LR_PAD_DESCRIPTORS(port_)                                                             \
+    {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_B, "Cross"},                     \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_A, "Circle"},                \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_Y, "Square"},                \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_X, "Triangle"},              \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_L, "L1"},                    \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_R, "R1"},                    \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_L2, "L2"},                   \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_R2, "R2"},                   \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_L3, "L3"},                   \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_R3, "R3"},                   \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_SELECT, "Select"},           \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_START, "Start"},             \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_UP, "Up"},                   \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right"},             \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down"},               \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left"},               \
+        {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, \
+         "Left Stick X"},                                                                    \
+        {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, \
+         "Left Stick Y"},                                                                    \
+        {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, \
+         "Right Stick X"},                                                                   \
+        {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, \
+         "Right Stick Y"}
+
+static struct retro_input_descriptor lr_input_descriptors[] = {
+    LR_PAD_DESCRIPTORS(0u),
+    LR_PAD_DESCRIPTORS(1u),
+    {0u, 0u, 0u, 0u, NULL},
+};
+#undef LR_PAD_DESCRIPTORS
 
 /* The allocator the adapter hands the core: the C library's malloc and free. */
 static void *lr_alloc(void *user, size_t size)
@@ -95,9 +171,49 @@ static void lr_free(void *user, void *ptr, size_t size)
     free(ptr);
 }
 
+static void lr_set_rumble(unsigned port, enum retro_rumble_effect effect, uint16_t strength)
+{
+    if (lr_rumble.set_rumble_state != NULL) {
+        (void)lr_rumble.set_rumble_state(port, effect, strength);
+    }
+}
+
+static void lr_clear_rumble(void)
+{
+    for (unsigned port = 0u; port < 2u; port++) {
+        lr_set_rumble(port, RETRO_RUMBLE_STRONG, 0u);
+        lr_set_rumble(port, RETRO_RUMBLE_WEAK, 0u);
+    }
+}
+
+static void lr_acquire_rumble(void)
+{
+    struct retro_rumble_interface interface;
+    if (env_cb == NULL) {
+        return;
+    }
+    memset(&interface, 0, sizeof interface);
+    if (env_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &interface) &&
+        interface.set_rumble_state != NULL) {
+        lr_rumble = interface;
+    }
+}
+
 /* Destroys the instance and frees the frame buffer. */
 static void lr_unload(void)
 {
+    if (inst != NULL) {
+        lr_clear_rumble();
+    }
+    for (unsigned port = 0u; port < 2u; port++) {
+        lr_mode_pulse_pending[port] =
+            (lr_controller_devices[port] & RETRO_DEVICE_MASK) == RETRO_DEVICE_ANALOG &&
+                    lr_analog_mode == 0u
+                ? 1u
+                : 0u;
+        lr_toggle_frames[port] = 0u;
+        lr_toggle_latched[port] = 0u;
+    }
     schway_destroy(inst);
     inst = NULL;
     free(pixels);
@@ -218,12 +334,77 @@ static void lr_queue_input(void)
     memset(&snapshot, 0, sizeof snapshot);
     snapshot.size = (uint32_t)sizeof snapshot;
     for (unsigned port = 0u; port < 2u; port++) {
-        snapshot.device[port] = SCHWAY_INPUT_DEVICE_DIGITAL;
-        for (size_t i = 0u; i < sizeof mapping / sizeof mapping[0]; i++) {
-            if (input_state_cb != NULL &&
-                input_state_cb(port, RETRO_DEVICE_JOYPAD, 0u, mapping[i].id) != 0) {
-                snapshot.buttons[port] |= mapping[i].mask;
+        for (unsigned axis = 0u; axis < 4u; axis++) {
+            snapshot.axes[port][axis] = 128u;
+        }
+    }
+    for (unsigned port = 0u; port < 2u; port++) {
+        unsigned device = lr_controller_devices[port] & RETRO_DEVICE_MASK;
+        uint32_t toggle_buttons = 0u;
+        uint8_t toggle_pulse = 0u;
+
+        if (device == RETRO_DEVICE_ANALOG) {
+            snapshot.device[port] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
+        } else if (device == RETRO_DEVICE_JOYPAD) {
+            snapshot.device[port] = SCHWAY_INPUT_DEVICE_DIGITAL;
+        } else {
+            snapshot.device[port] = SCHWAY_INPUT_DEVICE_NONE;
+        }
+        if (snapshot.device[port] != SCHWAY_INPUT_DEVICE_NONE) {
+            for (size_t i = 0u; i < sizeof mapping / sizeof mapping[0]; i++) {
+                if (input_state_cb != NULL &&
+                    input_state_cb(port, RETRO_DEVICE_JOYPAD, 0u, mapping[i].id) != 0) {
+                    snapshot.buttons[port] |= mapping[i].mask;
+                    if (mapping[i].id < 32u) {
+                        toggle_buttons |= 1u << mapping[i].id;
+                    }
+                }
             }
+        }
+        if (snapshot.device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK && input_state_cb != NULL) {
+            int16_t left_x = input_state_cb(port, RETRO_DEVICE_ANALOG,
+                                            RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                            RETRO_DEVICE_ID_ANALOG_X);
+            int16_t left_y = input_state_cb(port, RETRO_DEVICE_ANALOG,
+                                            RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                            RETRO_DEVICE_ID_ANALOG_Y);
+            int16_t right_x = input_state_cb(port, RETRO_DEVICE_ANALOG,
+                                             RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                             RETRO_DEVICE_ID_ANALOG_X);
+            int16_t right_y = input_state_cb(port, RETRO_DEVICE_ANALOG,
+                                             RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                             RETRO_DEVICE_ID_ANALOG_Y);
+            int32_t axes[4] = {right_x, right_y, left_x, left_y};
+            for (unsigned axis = 0u; axis < 4u; axis++) {
+                int32_t value = axes[axis];
+                snapshot.axes[port][axis] = value < 0
+                                                ? (uint8_t)(((value + 32768) * 128) / 32768)
+                                                : (uint8_t)(128 + (value * 127) / 32767);
+            }
+        }
+        if (snapshot.device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK) {
+            if (lr_mode_pulse_pending[port] != 0u) {
+                toggle_pulse = 1u;
+                lr_mode_pulse_pending[port] = 0u;
+            }
+            if (lr_analog_toggle_enabled != 0u &&
+                (toggle_buttons & LR_ANALOG_TOGGLE_BUTTONS) == LR_ANALOG_TOGGLE_BUTTONS) {
+                if (lr_toggle_frames[port] < LR_ANALOG_TOGGLE_FRAMES) {
+                    lr_toggle_frames[port]++;
+                }
+                if (lr_toggle_frames[port] == LR_ANALOG_TOGGLE_FRAMES &&
+                    lr_toggle_latched[port] == 0u) {
+                    toggle_pulse = 1u;
+                    lr_toggle_latched[port] = 1u;
+                }
+            } else {
+                lr_toggle_frames[port] = 0u;
+                lr_toggle_latched[port] = 0u;
+            }
+            snapshot.analog_button[port] = toggle_pulse;
+        } else {
+            lr_toggle_frames[port] = 0u;
+            lr_toggle_latched[port] = 0u;
         }
     }
     (void)schway_set_input(inst, &snapshot);
@@ -252,6 +433,38 @@ static const char *lr_option_bios(void)
         return "none";
     }
     return var.value;
+}
+
+static void lr_refresh_input_options(void)
+{
+    struct retro_variable var = {LR_ANALOG_MODE_KEY, NULL};
+    if (env_cb != NULL && env_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value != NULL) {
+        uint8_t mode;
+        if (strcmp(var.value, "digital") == 0) {
+            mode = 0u;
+        } else if (strcmp(var.value, "analog") == 0) {
+            mode = 1u;
+        } else {
+            mode = lr_analog_mode;
+        }
+        if (mode != lr_analog_mode) {
+            lr_analog_mode = mode;
+            for (unsigned port = 0u; port < 2u; port++) {
+                lr_mode_pulse_pending[port] = 1u;
+            }
+        }
+    }
+    var.key = LR_ANALOG_TOGGLE_KEY;
+    var.value = NULL;
+    if (env_cb != NULL && env_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value != NULL) {
+        if (strcmp(var.value, "enabled") == 0) {
+            lr_analog_toggle_enabled = 1u;
+        } else if (strcmp(var.value, "disabled") == 0) {
+            lr_analog_toggle_enabled = 0u;
+            memset(lr_toggle_frames, 0, sizeof lr_toggle_frames);
+            memset(lr_toggle_latched, 0, sizeof lr_toggle_latched);
+        }
+    }
 }
 
 /* BIOS values are relative to the frontend's system directory. Reject
@@ -362,6 +575,8 @@ void retro_set_environment(retro_environment_t cb)
     } else {
         (void)cb(RETRO_ENVIRONMENT_SET_VARIABLES, lr_variables);
     }
+    (void)cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, lr_controller_info);
+    (void)cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, lr_input_descriptors);
 }
 
 void retro_set_video_refresh(retro_video_refresh_t cb)
@@ -392,6 +607,7 @@ void retro_set_input_state(retro_input_state_t cb)
 /* L8841: the instance is created in retro_load_game, not here. */
 void retro_init(void)
 {
+    lr_acquire_rumble();
 }
 
 /* L8866: release everything and reset every static; the module may be
@@ -399,6 +615,14 @@ void retro_init(void)
 void retro_deinit(void)
 {
     lr_unload();
+    memset(&lr_rumble, 0, sizeof lr_rumble);
+    lr_controller_devices[0] = RETRO_DEVICE_ANALOG;
+    lr_controller_devices[1] = RETRO_DEVICE_ANALOG;
+    lr_analog_mode = 1u;
+    lr_analog_toggle_enabled = 1u;
+    memset(lr_mode_pulse_pending, 0, sizeof lr_mode_pulse_pending);
+    memset(lr_toggle_latched, 0, sizeof lr_toggle_latched);
+    memset(lr_toggle_frames, 0, sizeof lr_toggle_frames);
     env_cb = NULL;
     video_cb = NULL;
     audio_cb = NULL;
@@ -450,13 +674,31 @@ void retro_get_system_av_info(struct retro_system_av_info *av)
 
 void retro_set_controller_port_device(unsigned port, unsigned device)
 {
-    (void)port;
-    (void)device;
+    unsigned base = device & RETRO_DEVICE_MASK;
+    if (port >= 2u || (base != RETRO_DEVICE_NONE && base != RETRO_DEVICE_JOYPAD &&
+                       base != RETRO_DEVICE_ANALOG)) {
+        return;
+    }
+    lr_controller_devices[port] = device;
+    lr_toggle_frames[port] = 0u;
+    lr_toggle_latched[port] = 0u;
+    lr_mode_pulse_pending[port] =
+        base == RETRO_DEVICE_ANALOG && lr_analog_mode == 0u ? 1u : 0u;
 }
 
 /* L8939: a power cycle, the only reset this release has. */
 void retro_reset(void)
 {
+    lr_clear_rumble();
+    for (unsigned port = 0u; port < 2u; port++) {
+        lr_mode_pulse_pending[port] =
+            (lr_controller_devices[port] & RETRO_DEVICE_MASK) == RETRO_DEVICE_ANALOG &&
+                    lr_analog_mode == 0u
+                ? 1u
+                : 0u;
+        lr_toggle_frames[port] = 0u;
+        lr_toggle_latched[port] = 0u;
+    }
     if (inst != NULL) {
         (void)schway_reset(inst, SCHWAY_RESET_POWER);
     }
@@ -496,6 +738,7 @@ static int lr_check_region(void)
     if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) || !updated) {
         return 1;
     }
+    lr_refresh_input_options();
     region = lr_option_region();
     if (region == info.region) {
         return 1;
@@ -514,6 +757,7 @@ static int lr_check_region(void)
 void retro_run(void)
 {
     schway_video video;
+    schway_run_result result;
 
     if (input_poll_cb != NULL) {
         input_poll_cb();
@@ -522,8 +766,16 @@ void retro_run(void)
         return;
     }
     lr_queue_input();
-    if (schway_run_frame(inst, NULL) != SCHWAY_STATUS_OK) {
+    memset(&result, 0, sizeof result);
+    result.size = (uint32_t)sizeof result;
+    if (schway_run_frame(inst, &result) != SCHWAY_STATUS_OK) {
         return;
+    }
+    for (unsigned port = 0u; port < 2u; port++) {
+        uint8_t small = (uint8_t)(result.rumble[port] & 0xFFu);
+        uint8_t large = (uint8_t)(result.rumble[port] >> 8);
+        lr_set_rumble(port, RETRO_RUMBLE_STRONG, (uint16_t)((uint32_t)large * 257u));
+        lr_set_rumble(port, RETRO_RUMBLE_WEAK, small != 0u ? UINT16_MAX : 0u);
     }
     memset(&video, 0, sizeof video);
     video.size = (uint32_t)sizeof video;
@@ -591,6 +843,9 @@ bool retro_load_game(const struct retro_game_info *game)
     schway_exe_info exe_info;
     uint8_t *bios = NULL;
     size_t bios_size = 0u;
+
+    lr_acquire_rumble();
+    lr_refresh_input_options();
 
     if (game != NULL) {
         if (!lr_is_exe_path(game->path)) {
