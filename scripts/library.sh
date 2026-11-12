@@ -3,6 +3,25 @@ set -eu
 
 fail() { printf '%s\n' "library: $1" >&2; exit 1; }
 project_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd -P)
+
+schway__library_absolute_path() {
+    case "$1" in
+        /*|[A-Za-z]:/*) printf '%s\n' "$1" ;;
+        *) return 1 ;;
+    esac
+}
+
+schway__library_absolute_directory() {
+    schway__directory=$(schway__library_absolute_path "$1") || return 1
+    (CDPATH= cd "$schway__directory" 2>/dev/null && pwd -P)
+}
+
+schway__library_absolute_file() {
+    schway__file=$(schway__library_absolute_path "$1") || return 1
+    schway__directory=$(schway__library_absolute_directory "$(dirname "$schway__file")") || return 1
+    printf '%s/%s\n' "$schway__directory" "$(basename "$schway__file")"
+}
+
 test_root= test_config= test_ledger= test_dat= test_probe_config= test_runner=
 test_mode=0
 while [ "$#" -gt 0 ]; do
@@ -23,13 +42,26 @@ if [ "$test_mode" -eq 1 ]; then
     [ -n "$test_root" ] && [ -n "$test_config" ] && [ -n "$test_ledger" ] &&
         [ -n "$test_dat" ] && [ -n "$test_probe_config" ] && [ -n "$test_runner" ] ||
         fail 'temporary test configuration is incomplete'
-    case "$test_root" in /*) ;; *) fail 'temporary root must be absolute' ;; esac
+    case "$test_root" in /*|[A-Za-z]:/*) ;; *) fail 'temporary root must be absolute' ;; esac
+    test_root=$(schway__library_absolute_directory "$test_root") || fail 'temporary root must be absolute'
     for path in "$test_config" "$test_ledger" "$test_dat" "$test_probe_config"; do
-        case "$path" in "$test_root"/*) ;; *) fail 'temporary inputs must stay inside the test root' ;; esac
+        case "$path" in /*|[A-Za-z]:/*) ;; *) fail 'temporary inputs must stay inside the test root' ;; esac
         case "/$path/" in */../*) fail 'temporary input path is invalid' ;; esac
     done
+    test_config=$(schway__library_absolute_file "$test_config") || fail 'temporary input path is invalid'
+    test_ledger=$(schway__library_absolute_file "$test_ledger") || fail 'temporary input path is invalid'
+    test_dat=$(schway__library_absolute_file "$test_dat") || fail 'temporary input path is invalid'
+    test_probe_config=$(schway__library_absolute_file "$test_probe_config") || fail 'temporary input path is invalid'
+    for path in "$test_config" "$test_ledger" "$test_dat" "$test_probe_config"; do
+        case "$path" in "$test_root"/*) ;; *) fail 'temporary inputs must stay inside the test root' ;; esac
+        [ ! -L "$path" ] || fail 'temporary input path is invalid'
+    done
+    case "$test_runner" in /*|[A-Za-z]:/*) ;; *) fail 'test runner is invalid' ;; esac
+    case "/$test_runner/" in */../*) fail 'test runner is invalid' ;; esac
+    test_runner_directory=$(schway__library_absolute_directory "$(dirname "$test_runner")") || fail 'test runner is invalid'
+    test_runner="$test_runner_directory/$(basename "$test_runner")"
     case "$test_runner" in
-        "$project_root"/build/*/tests/schwaystation-run-test|"$project_root"/build/*/tests/compat/schwaystation-run-test) ;;
+        "$project_root"/build/*/tests/schwaystation-run-test|"$project_root"/build/*/tests/schwaystation-run-test.exe|"$project_root"/build/*/tests/compat/schwaystation-run-test|"$project_root"/build/*/tests/compat/schwaystation-run-test.exe) ;;
         *) fail 'test runner is invalid' ;;
     esac
     [ -x "$test_runner" ] || fail 'test runner is unavailable'
@@ -48,6 +80,7 @@ else
     [ -f "$config" ] || fail 'copy .env.example to .env.local and set both directories'
     disc_dir= bios_dir= probe_config=
     runner=$project_root/build/library/schwaystation-run
+    if [ ! -x "$runner" ] && [ -x "$runner.exe" ]; then runner=$runner.exe; fi
     ledger=$project_root/tests/compat/ledger.csv
     dat="$project_root/build/library/Sony - PlayStation.dat"
     output_root=$project_root

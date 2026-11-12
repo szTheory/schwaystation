@@ -157,6 +157,49 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   set(root "${WORK_ROOT}/compat-library-controls")
   library_prepare("${root}")
 
+  if(NOT DEFINED RUNNER_LAUNCHER OR "${RUNNER_LAUNCHER}" STREQUAL "")
+    file(MAKE_DIRECTORY "${WORK_ROOT}/tests/compat")
+    set(suffixed_test_runner "${WORK_ROOT}/tests/compat/schwaystation-run-test.exe")
+    file(COPY_FILE "${RUN}" "${suffixed_test_runner}")
+    set(RUN "${suffixed_test_runner}")
+  endif()
+
+  execute_process(COMMAND sh "${SOURCE_ROOT}/scripts/library.sh"
+      --test-root relative-library-root
+      --test-config relative-library-root/config.txt
+      --test-ledger relative-library-root/ledger.csv
+      --test-dat relative-library-root/metadata.dat
+      --test-probe-config relative-library-root/probe.conf
+      --test-runner "${RUN}"
+    RESULT_VARIABLE relative_root_rc ERROR_VARIABLE relative_root_err)
+  if(relative_root_rc STREQUAL "0" OR NOT relative_root_err MATCHES "temporary root must be absolute")
+    message(FATAL_ERROR "library test mode accepted a relative prepared root: ${relative_root_rc}")
+  endif()
+
+  execute_process(COMMAND sh "${SOURCE_ROOT}/scripts/library.sh"
+      --test-root "${root}"
+      --test-config "${root}/../escaped-config.txt"
+      --test-ledger "${root}/ledger.csv"
+      --test-dat "${root}/metadata.dat"
+      --test-probe-config "${root}/probe.conf"
+      --test-runner "${RUN}"
+    RESULT_VARIABLE escaped_input_rc ERROR_VARIABLE escaped_input_err)
+  if(escaped_input_rc STREQUAL "0" OR NOT escaped_input_err MATCHES "temporary input path is invalid")
+    message(FATAL_ERROR "library test mode accepted a path escaping its prepared root: ${escaped_input_rc}")
+  endif()
+
+  execute_process(COMMAND sh "${SOURCE_ROOT}/scripts/library.sh"
+      --test-root "${root}"
+      --test-config "${root}/config.txt"
+      --test-ledger "${root}/ledger.csv"
+      --test-dat "${root}/metadata.dat"
+      --test-probe-config "${root}/probe.conf"
+      --test-runner schwaystation-run-test.exe
+    RESULT_VARIABLE relative_runner_rc ERROR_VARIABLE relative_runner_err)
+  if(relative_runner_rc STREQUAL "0" OR NOT relative_runner_err MATCHES "test runner is invalid")
+    message(FATAL_ERROR "library test mode accepted a relative runner path: ${relative_runner_rc}")
+  endif()
+
   file(WRITE "${root}/build/library/results.csv" "previous report\n")
   file(SHA256 "${root}/build/library/results.csv" old_report)
   library_invoke("${root}" "${root}/missing-config.txt" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
@@ -366,7 +409,8 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   if(DEFINED PRODUCTION_RUNNER_LAUNCHER AND NOT "${PRODUCTION_RUNNER_LAUNCHER}" STREQUAL "")
     file(COPY_FILE "${PRODUCTION_RUNNER_LAUNCHER}" "${ordinary_root}/build/library/schwaystation-run")
   else()
-    file(COPY_FILE "${PRODUCTION_RUN}" "${ordinary_root}/build/library/schwaystation-run")
+    get_filename_component(production_runner_name "${PRODUCTION_RUN}" NAME)
+    file(COPY_FILE "${PRODUCTION_RUN}" "${ordinary_root}/build/library/${production_runner_name}")
   endif()
   file(COPY_FILE "${LIBRARY_LEDGER}" "${ordinary_root}/tests/compat/ledger.csv")
   file(COPY_FILE "${LIBRARY_DAT}" "${ordinary_root}/build/library/Sony - PlayStation.dat")
