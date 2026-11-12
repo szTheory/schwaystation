@@ -1,0 +1,116 @@
+name: Phase 4 Windows path probe
+
+on:
+  push:
+    branches:
+      - phase/04-games-play-in-retroarch
+    paths:
+      - .github/workflows/phase4-windows-path-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  path-probe:
+    if: github.ref == 'refs/heads/phase/04-games-play-in-retroarch'
+    runs-on: windows-2025
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: MSVC environment
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x64 && set" |
+            ForEach-Object { if ($_ -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" >> $env:GITHUB_ENV } }
+
+      - name: Configure the existing MSVC preset
+        run: cmake --preset ci-msvc
+
+      - name: Build only the affected test consumers
+        run: cmake --build build/ci-msvc --target schwaystation-test-library --parallel 4
+
+      - name: Reproduce and diagnose the synthetic path failures
+        shell: pwsh
+        run: |
+          $env:SCHWAY_RUN_PATH_DIAGNOSTICS = "1"
+          $log = "build/ci-msvc/path-diagnostic-ctest.log"
+          ctest --test-dir build/ci-msvc --output-on-failure --parallel 1 `
+            -R '^(compat\.library\.(synthetic_result|controls)|compat\.probe\.(full_identity|cue_modes|cue_edges))$' *> $log
+          $status = $LASTEXITCODE
+          if ($status -ne 0) {
+            try {
+              $sh = (Get-Command sh -ErrorAction Stop).Source
+              $configs = @(
+                @{ label = "library-synthetic"; path = "build/ci-msvc/compat-library-synthetic/config.txt" },
+                @{ label = "library-controls"; path = "build/ci-msvc/compat-library-controls/config.txt" },
+                @{ label = "probe-full-identity"; path = "build/ci-msvc/compat-probe-full-identity/metadata/config.txt" },
+                @{ label = "probe-cue-2048"; path = "build/ci-msvc/compat-probe-cue-modes/cue_2048/metadata/config.txt" },
+                @{ label = "probe-cue-mode1-2352"; path = "build/ci-msvc/compat-probe-cue-modes/cue_mode1_2352/metadata/config.txt" },
+                @{ label = "probe-cue-mode2-2352"; path = "build/ci-msvc/compat-probe-cue-modes/cue_mode2_2352/metadata/config.txt" },
+                @{ label = "probe-cue-mode2-2336"; path = "build/ci-msvc/compat-probe-cue-modes/cue_mode2_2336/metadata/config.txt" },
+                @{ label = "probe-cue-track99"; path = "build/ci-msvc/compat-probe-cue-modes/cue_track99/metadata/config.txt" }
+              )
+              $probePath = "build/ci-msvc/path-probe.sh"
+              $probe = @'
+          #!/bin/sh
+          set -eu
+          classify() {
+            case "$1" in
+              [A-Za-z]:/*) printf 'drive-forward-slash' ;;
+              [A-Za-z]:*) printf 'drive-other-separator' ;;
+              /*) printf 'posix-root' ;;
+              *) printf 'other' ;;
+            esac
+          }
+          source=$1
+          config=$2
+          while IFS='=' read -r key value; do
+            case "$key" in
+              SCHWAYSTATION_DISC_DIR|SCHWAYSTATION_BIOS_DIR)
+                printf 'source=%s key=%s style=' "$source" "$key"
+                classify "$value"
+                printf ' length=%s ' "${#value}"
+                if (CDPATH= cd "$value" 2>/dev/null); then
+                  printf 'cd=succeeded\n'
+                else
+                  printf 'cd=failed\n'
+                fi
+                ;;
+            esac
+          done < "$config"
+          '@
+              $probe = $probe.Replace("`r`n", "`n")
+              [IO.File]::WriteAllText($probePath, $probe, [Text.UTF8Encoding]::new($false))
+              foreach ($config in $configs) {
+                if (Test-Path -LiteralPath $config.path) {
+                  & $sh $probePath $config.label $config.path
+                } else {
+                  Write-Output "source=$($config.label) config=missing"
+                }
+              }
+            } catch {
+              Write-Output "path diagnostics unavailable"
+            }
+          }
+          exit $status
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: windows-path-diagnostic-x64
+          path: |
+            build/ci-msvc/path-diagnostic-ctest.log
+            build/ci-msvc/compat-library-synthetic/config.txt
+            build/ci-msvc/compat-library-controls/config.txt
+            build/ci-msvc/compat-probe-full-identity/metadata/config.txt
+            build/ci-msvc/compat-probe-cue-modes/cue_2048/metadata/config.txt
+            build/ci-msvc/compat-probe-cue-modes/cue_mode1_2352/metadata/config.txt
+            build/ci-msvc/compat-probe-cue-modes/cue_mode2_2352/metadata/config.txt
+            build/ci-msvc/compat-probe-cue-modes/cue_mode2_2336/metadata/config.txt
+            build/ci-msvc/compat-probe-cue-modes/cue_track99/metadata/config.txt
+          if-no-files-found: ignore
+          retention-days: 1
