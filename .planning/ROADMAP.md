@@ -326,7 +326,7 @@ Plans:
 - [x] 04-40-PLAN.md — Pin the inspected OpenBIOS shell across applicable lanes
 
 **Wave 30**
-- [ ] 04-24-PLAN.md — Judge ten-column compatibility rows and generate fresh docs
+- [x] 04-24-PLAN.md — Judge ten-column compatibility rows and generate fresh docs
 - [x] 04-27-PLAN.md — Load BIOS-free fullpath PS-EXEs in libretro
 
 **Wave 31**
@@ -417,6 +417,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 36/53 | In Progress | - |
+| 4. Games play in RetroArch | 37/53 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

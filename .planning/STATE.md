@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 37 of 53
+current_plan: 38 of 53
 status: executing
-stopped_at: Completed 04-27; approved 2300-line ceiling permits resuming incomplete 04-24
-last_updated: "2026-11-12T03:10:11.360Z"
+stopped_at: Completed 04-24-PLAN.md; next plan 04-41 owns protected base capture
+last_updated: "2026-11-12T03:51:34.250Z"
 last_activity: 2026-11-12
 last_activity_desc: Applied the owner-approved 2300-line Phase 4 gate ceiling; resume unfinished 04-24 judge and generated-doc controls.
-state_head: aba2b7b03da6472237938c393ce86dc3178e0407
+state_head: 4b19188d0a0c79774e8c6d296410b4a858876b28
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 104
+  completed_plans: 105
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 37 of 53
-Status: Plan 04-27 complete; resume incomplete 04-24 under the approved 2300-line ceiling.
-Last activity: 2026-11-12 — Recorded the owner's whole-phase gate-budget approval after the measured prototype review.
+Current Plan: 38 of 53
+Status: Plan 04-24 complete under the approved 2300-line ceiling; next plan 04-41 owns protected-base capture.
+Last activity: 2026-11-12 — Completed the compatibility ratchet/docs and recorded the actual task-order deviation.
 
 Progress: [█████░░░░░] 50%
 
@@ -165,6 +165,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P53 | 45min | 2 tasks | 8 files |
 | Phase 04 P40 | 4h 28m | 2 tasks | 7 files |
 | Phase 04 P27 | at least 20 min (start unavailable after compaction) | 2 tasks | 8 files |
+| Phase 04 P24 | 35 min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -380,6 +381,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Require OpenBIOS only at consumer execution time and reuse the existing comparison helper for portable refusal controls.
 - [Phase 04]: Plan 04-27: default no-content loads keep the test card; selected BIOS images apply only to no-content boot, while PS-EXE content always uses the stub.
 - [Phase 04]: Plan 04-27: validate EXE structure before refusing valid late loads to preserve frozen API error statuses.
+- [Phase 04]: Compatibility rows use (serial, MD5, predicate) keys; fresh fixture rows and statuses must match in both directions.
+- [Phase 04]: Ratchet accepts an optional prior ledger; protected PR-base capture and artifact plumbing remain in plan 04-41.
+- [Phase 04]: Compatibility allowances identify behavior revision 4 and expire within an inclusive maximum 60-day window.
+- [Phase 04]: Resumed plan task-order deviation: remaining Task 1 judge/docs and Task 2 controls landed together after the preserved RED and partial GREEN commits; no second RED or history rewrite.
 
 ### Pending Todos
 
@@ -521,12 +526,13 @@ come from `AGENTS.md`.
 | 2026-11-12 | /gsd-execute-plan 04-24 (incomplete checkpoint) | Codex, OpenGSD 1.20.0; sequential executor; measured ledger/schema GREEN subset, scratch ratchet/docs sizing and refusal controls; plan remains incomplete | GPT-6 (session; exact model ID not exposed) |
 | 2026-11-12 | /gsd-execute-plan 04-27 | Codex, OpenGSD 1.20.0; sequential executor; PS-EXE libretro loading, no-content BIOS selection, full CI and hygiene | gpt-6-luna xhigh |
 | 2026-11-12 | Phase 04 approved gate-budget implementation | Codex, OpenGSD 1.20.0; concrete 2300-line ceiling and approval record, no plan advance | GPT-6 (session; exact model ID not exposed) |
+| 2026-11-12 | /gsd-execute-plan 04-24 (resumed after approval) | Codex, OpenGSD 1.20.0; sequential shared-checkout execution; compatibility ratchet/docs, full CI and hygiene; preserved task-order deviation recorded | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-12T03:10:10.887Z
-Stopped at: Completed 04-27; approved 2300-line ceiling permits resuming incomplete 04-24
-Resume file: .planning/phases/04-games-play-in-retroarch/04-24-CHECKPOINT.md
+Last session: 2026-11-12T03:51:33.900Z
+Stopped at: Completed 04-24-PLAN.md; next plan 04-41 owns protected base capture
+Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
 Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8

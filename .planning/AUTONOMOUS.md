@@ -82,3 +82,8 @@ after reviewing the measured implementation, compatibility prototypes and whole-
 This supersedes older Phase 4 plan text naming 1,850. Preserve every named check, honest counting and
 the existing 300-line RetroArch limit; do not relocate or minify gate logic. Ratchet the actual counted
 total at ship. Plan 04-24 may resume its unfinished judge/docs work without another budget question.
+
+Preserve passing commits when resuming a checkpointed plan. If TDD or task ordering was missed before the
+checkpoint, record the actual sequence in SUMMARY and STATE and continue from the verified HEAD. Do not amend,
+reset or split solely to make history appear ideal or to manufacture RED/GREEN timing; legitimate corrective
+history work remains available when the actual correction calls for it.
