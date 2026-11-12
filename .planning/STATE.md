@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 48 of 55
+current_plan: 49 of 55
 status: executing
-stopped_at: Completed 04-54-PLAN.md; 04-55 next, then combined hosted CI and 04-29 acceptance
-last_updated: "2026-11-12T18:51:33.134Z"
+stopped_at: Completed 04-55-PLAN.md
+last_updated: "2026-11-12T19:17:47.734Z"
 last_activity: 2026-11-12
 last_activity_desc: Completed 04-54 compiler portability, inventory-owned compatibility registration and emulator forwarding; four-job local CI/release passed, while hosted acceptance and 04-29 remain pending.
-state_head: 476691714166dc42eda50d1877db4f74a9e7b6bc
+state_head: 041790b3563d7bbdee232e4f284effe2a5be9758
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 123
-  completed_plans: 115
+  completed_plans: 116
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 48 of 55
-Status: 47 phase plans complete; eight remain. Plan 04-29 is incomplete (0/2 acceptance); Plan 04-54 is complete and 04-55 is next.
-Last activity: 2026-11-12 — Completed source-owned compiler portability, inventory registration and emulator-forwarding repairs. The four-job local CI/release workflow passes; hosted compiler/BE32 acceptance and 04-29's two RetroArch frames remain open. Local RetroArch stop remains in force.
+Current Plan: 49 of 55
+Status: 48 phase plans complete; seven remain. Plan 04-29 is incomplete (0/2 acceptance) and is next after its completed 04-54/04-55 prerequisites.
+Last activity: 2026-11-12 — Completed the movie-only active-pixel poison fill and byte-work documentation. The 509-test CI workflow, five release checks and 23 hygiene checks pass; hosted movie timing remains pending the combined run. The local RetroArch stop remains in force.
 
 Progress: [█████░░░░░] 50%
 
@@ -176,6 +176,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P44 | 50min | 2 tasks | 5 files |
 | Phase 04 P45 | 45min | 2 tasks | 11 files |
 | Phase 04 P54 | 40 min | 2 tasks | 7 files |
+| Phase 04 P55 | 17min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -424,6 +425,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Preserve repository CI defaults and use an ignored four-job preset for local bounded verification.
 - [Phase 04]: Keep GAME-03, GAME-06 and GAME-07 acceptance pending until their full hosted/runtime evidence is available.
 - [Phase 04]: Validate the local OpenBIOS handoff, then place it at the test integration's expected binaryDir path before configuring a temporary workflow preset.
+- [Phase 04]: Use independently captured reference extents to poison movie active pixels; invalid extents retain full-buffer fallback.
+- [Phase 04]: Treat the byte reduction as measured work only; runtime improvement and timeout causality require hosted timing.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -601,10 +604,12 @@ come from `AGENTS.md`.
 
 | 2026-11-12 | /gsd-execute-plan 04-54 | Codex/OpenGSD; sequential shared checkout; strict compiler portability, inventory-owned compatibility registration and emulator argument forwarding; 509/509 local CI tests, package/release 5/5; hygiene CTest log 23 passed with outer exit unrecorded; hosted acceptance pending | executor gpt-6-luna xhigh; planner gpt-6.1-sol high; checker gpt-6-luna xhigh |
 
+| 2026-11-12 | /gsd-execute-plan 04-55 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded movie active-pixel poison canaries, measured byte work, 509 CI tests, package/release 5/5, hygiene 23/23; hosted timing pending combined run | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-12T18:51:32.638Z
-Stopped at: Completed 04-54-PLAN.md; 04-55 next, then combined hosted CI and 04-29 acceptance
+Last session: 2026-11-12T19:17:47.384Z
+Stopped at: Completed 04-55-PLAN.md
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 
