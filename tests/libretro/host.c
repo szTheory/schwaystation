@@ -2960,10 +2960,11 @@ int main(int argc, char **argv)
     p_get_system_av_info(&av);
     check_av(&av, region);
 
-    /* No memory regions in this release. */
-    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 0);
-    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 0);
-    CHECK(p_get_memory_data(RETRO_MEMORY_SAVE_RAM) == NULL);
+    /* Loaded games expose the first card and main RAM through libretro. */
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 131072u);
+    CHECK(p_get_memory_data(RETRO_MEMORY_SAVE_RAM) != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 2u * 1024u * 1024u);
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) != NULL);
     p_set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
     p_set_controller_port_device(1, RETRO_DEVICE_JOYPAD);
     p_cheat_reset();
