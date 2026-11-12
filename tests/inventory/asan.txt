@@ -1,5 +1,5 @@
 # Directories whose inventory.txt this preset registers, one per line; label subsets come from check_junit.cmake's LABELS and EXCLUDE.
-# No fixtures: the asan lane never builds armips.
+# The producer builds for selected libretro consumers; standalone fixture tests are not selected.
 abi
 built
 bus

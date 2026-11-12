@@ -64,13 +64,13 @@
         "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=address,undefined",
         "SCHWAYSTATION_TIMEOUT_SCALE": "3",
         "SCHWAYSTATION_INVENTORY": "asan",
-        "SCHWAYSTATION_FIXTURES": "OFF"
+        "SCHWAYSTATION_FIXTURES": "ON"
       }
     },
     {
       "name": "fuzz",
       "inherits": "base",
-      "$comment": "The loader fuzz target under clang-21 with ASan and UBSan, on the asan inventory without fixtures. Only schwaystation-fuzz-exe links libFuzzer; every other object takes the coverage instrumentation of fuzzer-no-link. It has no test step: the nightly job runs the binary.",
+      "$comment": "The loader fuzz target under clang-21 with ASan and UBSan. Its selected libretro consumers use generated fixtures, while the asan inventory omits standalone fixture tests. Only schwaystation-fuzz-exe links libFuzzer; every other object takes the coverage instrumentation of fuzzer-no-link. It has no test step: the nightly job runs the binary.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -83,7 +83,7 @@
         "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=address,undefined",
         "SCHWAYSTATION_TIMEOUT_SCALE": "3",
         "SCHWAYSTATION_INVENTORY": "asan",
-        "SCHWAYSTATION_FIXTURES": "OFF",
+        "SCHWAYSTATION_FIXTURES": "ON",
         "SCHWAYSTATION_FUZZ": "ON"
       }
     },

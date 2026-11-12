@@ -321,6 +321,9 @@ is `tests/fixtures/src/stub/stub.asm`.
   SHA-256. `cmake/Armips.cmake` downloads the archive into `build/<preset>/pins`, fails configure unless the digest
   matches, and builds armips for the host. Nothing is installed on the machine. `fixtures.armips_pin.self_test` feeds
   the check a wrong digest.
+- The `asan` and `fuzz` presets enable fixture production for their selected libretro consumers. Inventory selection
+  still controls standalone test registration: CI keeps all 74 fixture cases, while ASan and fuzz register no
+  standalone fixture cases and retain all 18 libretro cases.
 - `tests/fixtures/tests.cmake` assembles each source into `build/<preset>/fixtures`; no fixture is committed. The
   one generated file that is, `src/stub_kernel.c`, is the stub kernel as a byte array, listed in
   `tests/fixtures/manifest.txt`; `fixtures.stub_drift` compares it with the freshly assembled image on every lane.

@@ -2,7 +2,8 @@
 # Only the sources are tracked; no assembled image is ever committed.
 #
 # Run as a script (cmake -DCASE=<case> ... -P tests.cmake), this file is one
-# check; include()d by tests/tests.cmake, it builds armips and registers the tests.
+# check; include()d by tests/tests.cmake, it builds armips and registers tests only when
+# the selected inventory includes the fixtures directory.
 set(schway__pad_counter_no_press_hash "83358471dc7807f9a7b070097835835ff27fa73a3db1f8ad468e3ef5208317b1")
 set(schway__pad_counter_one_press_hash "cfcae1a726602580ac1741eb597c951cd3977f8f96a8df6be30c9ea50d9543b4")
 if(CMAKE_SCRIPT_MODE_FILE)
@@ -561,6 +562,10 @@ schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
 add_custom_target(schwaystation-fixtures ALL DEPENDS ${schway__fixture_outputs})
+
+if(NOT schway__include_fixture_tests)
+  return()
+endif()
 
 # Fault prevented: an assembled image whose header does not describe it, so
 # every fixture built from header.inc loads wrongly.
