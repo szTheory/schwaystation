@@ -69,11 +69,12 @@ static void write_executable(uint8_t *out)
     out[0x1Du] = 0x08u;
 }
 
-static int make_synthetic_iso(const char *path)
+static int make_synthetic_iso(const char *path, const char *mode)
 {
     static const uint8_t dot[] = {0u};
     static const uint8_t dotdot[] = {1u};
     static const char system_cnf[] = "BOOT = cdrom:\\SWAY_000.01;1\r\n";
+    static const char traversal_system_cnf[] = "BOOT = cdrom:\\..\\SWAY_000.01;1\r\n";
     static const uint8_t pvd_id[] = {'C', 'D', '0', '0', '1'};
     uint8_t image[PROBE_TEST_SECTOR_SIZE * PROBE_TEST_IMAGE_SECTORS];
     uint8_t *pvd = image + 16u * PROBE_TEST_SECTOR_SIZE;
@@ -82,6 +83,8 @@ static int make_synthetic_iso(const char *path)
     uint8_t *exe = image + 20u * PROBE_TEST_SECTOR_SIZE;
     size_t offset = 0u;
     FILE *file;
+    const char *system_contents = strcmp(mode, "traversal") == 0 ?
+                                  traversal_system_cnf : system_cnf;
 
     memset(image, 0, sizeof image);
     pvd[0] = 1u;
@@ -100,14 +103,22 @@ static int make_synthetic_iso(const char *path)
 
     offset += write_record(root, offset, 18u, PROBE_TEST_SECTOR_SIZE, 2u, dot, sizeof dot);
     offset += write_record(root, offset, 18u, PROBE_TEST_SECTOR_SIZE, 2u, dotdot, sizeof dotdot);
-    offset += write_named_record(root, offset, 19u, (uint32_t)(sizeof system_cnf - 1u), 0u,
-                                 "SYSTEM.CNF;1");
-    offset += write_named_record(root, offset, 20u, 4096u, 0u, "SWAY_000.01;1");
+    if (strcmp(mode, "fallback") != 0 && strcmp(mode, "missing") != 0) {
+        offset += write_named_record(root, offset, 19u, (uint32_t)strlen(system_contents), 0u,
+                                     "SYSTEM.CNF;1");
+    }
+    if (strcmp(mode, "missing") != 0) {
+        const char *boot_file = strcmp(mode, "fallback") == 0 ? "PSX.EXE" : "SWAY_000.01;1";
+        uint32_t boot_extent = strcmp(mode, "bad_extent") == 0 ? PROBE_TEST_IMAGE_SECTORS : 20u;
+        offset += write_named_record(root, offset, boot_extent, 4096u, 0u, boot_file);
+    }
     if (offset == 0u) {
         return 1;
     }
-    memcpy(image + 19u * PROBE_TEST_SECTOR_SIZE, system_cnf, sizeof system_cnf - 1u);
-    write_executable(exe);
+    if (strcmp(mode, "fallback") != 0 && strcmp(mode, "missing") != 0) {
+        memcpy(image + 19u * PROBE_TEST_SECTOR_SIZE, system_contents, strlen(system_contents));
+    }
+    if (strcmp(mode, "missing") != 0) write_executable(exe);
 
     file = fopen(path, "wb");
     if (file == NULL) {
@@ -122,9 +133,13 @@ static int make_synthetic_iso(const char *path)
 
 int main(int argc, char **argv)
 {
-    if (argc != 3 || strcmp(argv[1], "synthetic") != 0) {
-        (void)fprintf(stderr, "usage: schwaystation-test-probe synthetic <image.iso>\n");
+    if (argc != 3 || (strcmp(argv[1], "synthetic") != 0 &&
+                      strcmp(argv[1], "fallback") != 0 &&
+                      strcmp(argv[1], "missing") != 0 &&
+                      strcmp(argv[1], "bad_extent") != 0 &&
+                      strcmp(argv[1], "traversal") != 0)) {
+        (void)fprintf(stderr, "usage: schwaystation-test-probe <synthetic|fallback|missing|bad_extent|traversal> <image.iso>\n");
         return 2;
     }
-    return make_synthetic_iso(argv[2]);
+    return make_synthetic_iso(argv[2], argv[1]);
 }

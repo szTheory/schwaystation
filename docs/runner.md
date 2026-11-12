@@ -420,11 +420,12 @@ playing as unavailable. The report is these lines, in this order, each `key=valu
 
 | Key | Value |
 |---|---|
-| `format` | `exe` |
-| `serial` | `n/a`: a bare executable has no disc serial |
+| `format` | `exe` for a bare file; `disc` for a raw ISO9660 image |
+| `serial` | `n/a` for a bare executable; inferred from a disc's boot name when it has the conventional form |
 | `licence_area` | the market named by the licence text at offset 4Ch: `japan`, `europe`, `north_america` or `none` |
 | `region_guess` | `ntsc-j`, `pal` or `ntsc-u` for the three markets, `unknown` for `none` |
-| `exe_name` | the file's name without its directory, any byte outside printable ASCII shown as `?` |
+| `exe_name` | for a bare file, its name without the directory; bytes outside printable ASCII show as `?` |
+| `boot_name` | for a disc, the boot executable's name without an ISO version suffix |
 | `exe_size` | the file's size in bytes, in decimal |
 | `sha256` | SHA-256 of the whole file, 64 lowercase hex digits |
 | `rcheevos_md5` | the MD5 an achievement set is keyed on, 32 lowercase hex digits, see below |
@@ -433,6 +434,7 @@ playing as unavailable. The report is these lines, in this order, each `key=valu
 | `d_addr`, `d_size`, `b_addr`, `b_size` | the data and BSS fields, printed as the header holds them |
 | `s_addr`, `s_size` | the initial stack base and offset, zero when the header gives none |
 | `lint` | notes on a valid file, as bits: `0x1` the text lies in the low 64 KiB, `0x2` bytes follow the text |
+| `boot_status`, `play_status` | for a disc, both are `unavailable` |
 
 For a raw ISO9660 image, `format` is `disc`; `serial` is inferred from a conventional boot executable name or
 `n/a`; `boot_name` is the boot executable's canonical name without an ISO version suffix. The executable fields

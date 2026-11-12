@@ -316,7 +316,7 @@ static schway__iso_find_status schway__iso_resolve_boot(
             file, volume_sectors, &directory, components[i], &child);
         if (status != SCHWAY__ISO_FIND_OK) return status;
         if (i + 1u < component_count) {
-            if ((child.flags & 2u) == 0u) return SCHWAY__ISO_FIND_MISSING;
+            if ((child.flags & 2u) == 0u) return SCHWAY__ISO_FIND_BAD;
             directory = child;
         } else {
             if ((child.flags & 2u) != 0u || child.size == 0u || child.size > SCHWAY__ISO_EXE_MAX) {
@@ -443,6 +443,7 @@ static schway_host_disc_probe_status schway__iso_process(
                                          component_count, &boot);
         if (found == SCHWAY__ISO_FIND_MEMORY) return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
         if (found == SCHWAY__ISO_FIND_MISSING) return SCHWAY_HOST_DISC_PROBE_NO_BOOT_EXE;
+        if (found == SCHWAY__ISO_FIND_BAD) return SCHWAY_HOST_DISC_PROBE_BAD_ISO;
         if (found != SCHWAY__ISO_FIND_OK) return SCHWAY_HOST_DISC_PROBE_BAD_BOOT_PATH;
         const char *last = components[component_count - 1u];
         size_t last_size = strlen(last);

@@ -35,6 +35,73 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_synthetic_identity")
   return()
 endif()
 
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_iso_edges")
+  foreach(required WORK_ROOT TEST_BINARY RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "ISO edge probe test requires ${required}")
+    endif()
+  endforeach()
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+  set(work "${WORK_ROOT}/compat-probe-edges")
+  file(REMOVE_RECURSE "${work}")
+  file(MAKE_DIRECTORY "${work}")
+
+  set(image "${work}/fallback.iso")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" fallback "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate fallback ISO fixture: ${rc}: ${out}${err}")
+  endif()
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0" OR NOT out MATCHES "format=disc" OR
+     NOT out MATCHES "serial=n/a" OR NOT out MATCHES "boot_name=PSX[.]EXE" OR
+     NOT out MATCHES "boot_status=unavailable" OR NOT out MATCHES "play_status=unavailable")
+    message(FATAL_ERROR "missing SYSTEM.CNF did not fall back to root PSX.EXE: ${rc}: ${out}${err}")
+  endif()
+
+  set(image "${work}/missing.iso")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" missing "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate missing-boot ISO fixture: ${rc}: ${out}${err}")
+  endif()
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR
+     NOT err MATCHES "disc boot executable not found")
+    message(FATAL_ERROR "ISO with no boot inputs was accepted: ${rc}: ${out}${err}")
+  endif()
+
+  set(image "${work}/bad-extent.iso")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" bad_extent "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate bad-extent ISO fixture: ${rc}: ${out}${err}")
+  endif()
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR
+     NOT err MATCHES "invalid ISO9660 metadata")
+    message(FATAL_ERROR "ISO with an out-of-volume boot extent was accepted: ${rc}: ${out}${err}")
+  endif()
+
+  set(image "${work}/traversal.iso")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" traversal "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate traversal ISO fixture: ${rc}: ${out}${err}")
+  endif()
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR
+     NOT err MATCHES "invalid SYSTEM[.]CNF boot metadata")
+    message(FATAL_ERROR "SYSTEM.CNF parent traversal was accepted: ${rc}: ${out}${err}")
+  endif()
+  message(STATUS "ISO probe fallback and refusal edges passed")
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_baseline")
   foreach(required SOURCE_ROOT WORK_ROOT)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -276,6 +343,14 @@ schway_add_test(NAME compat.probe.synthetic_identity
     -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -DCASE=probe_synthetic_identity -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 30)
+
+# Fault prevented: a missing, unavailable or out-of-volume boot input being reported as a probe success.
+schway_add_test(NAME compat.probe.iso_edges
+  COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DCASE=probe_iso_edges -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
 # Fault prevented: a changed head judge accepting a regression against a protected base.
