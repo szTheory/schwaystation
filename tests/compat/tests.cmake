@@ -35,6 +35,44 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_synthetic_identity")
   return()
 endif()
 
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_full_identity")
+  foreach(required WORK_ROOT TEST_BINARY RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "full identity probe test requires ${required}")
+    endif()
+  endforeach()
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+  set(work "${WORK_ROOT}/compat-probe-full-identity")
+  file(REMOVE_RECURSE "${work}")
+  file(MAKE_DIRECTORY "${work}/metadata")
+  set(image "${work}/synthetic.iso")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" synthetic "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate ISO fixture: ${rc}: ${out}${err}")
+  endif()
+  file(SHA1 "${image}" track_sha1)
+  set(ledger "${work}/metadata/ledger.csv")
+  set(dat "${work}/metadata/title.dat")
+  set(config "${work}/metadata/config.txt")
+  file(WRITE "${dat}" "clrmamepro (\n name \"Synthetic test DAT\"\n)\ngame (\n name \"Schway Synthetic Metadata Fixture\"\n region \"USA\"\n serial \"SWAY-00001\"\n)\n")
+  file(WRITE "${ledger}" "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,metadata.identity,pass,synthetic:iso9660-known-answer,2026-11-12\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,boots@600,unknown,unavailable,2026-11-12\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,plays@600,unknown,unavailable,2026-11-12\n")
+  file(WRITE "${config}" "schwaystation-test-metadata-v1\n")
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0" OR
+     NOT out MATCHES "serial=SWAY-00001" OR
+     NOT out MATCHES "rcheevos_md5=12481bed29c6c0d54a6f776ef5cec981" OR
+     NOT out MATCHES "track1_sha1=${track_sha1}" OR
+     NOT out MATCHES "title=Schway Synthetic Metadata Fixture" OR
+     NOT out MATCHES "metadata[.]identity=pass" OR
+     NOT out MATCHES "boot_status=unknown" OR
+     NOT out MATCHES "play_status=unknown")
+    message(FATAL_ERROR "runner did not join exact synthetic track and DAT identity: ${rc}: ${out}${err}")
+  endif()
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_cue_modes")
   foreach(required WORK_ROOT TEST_BINARY RUN)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -428,6 +466,14 @@ schway_add_test(NAME compat.probe.synthetic_identity
     -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -DCASE=probe_synthetic_identity -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 30)
+
+# Fault prevented: a matching serial, boot MD5, track SHA-1 and DAT title failing to join.
+schway_add_test(NAME compat.probe.full_identity
+  COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DCASE=probe_full_identity -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
 # Fault prevented: CUE sector representations changing the canonical boot identity.
