@@ -990,6 +990,93 @@ static int test_card_persistence(const char *exe_path, const char *directory)
     return check_failures != 0 ? 1 : 0;
 }
 
+static const struct retro_memory_descriptor *resolve_memory_address(size_t address,
+                                                                      size_t *byte_offset)
+{
+    for (unsigned i = 0u; i < memory_descriptor_count; i++) {
+        const struct retro_memory_descriptor *descriptor = &memory_descriptors[i];
+        size_t mapped = address & ~descriptor->disconnect;
+        size_t offset;
+        if ((address & descriptor->select) != (descriptor->start & descriptor->select) ||
+            mapped < descriptor->start) {
+            continue;
+        }
+        offset = mapped - descriptor->start;
+        if (descriptor->len != 0u && offset >= descriptor->len) {
+            continue;
+        }
+        if (descriptor->ptr != NULL) {
+            *byte_offset = descriptor->offset + offset;
+            return descriptor;
+        }
+    }
+    return NULL;
+}
+
+static const struct retro_memory_descriptor *check_memory_address(size_t address,
+                                                                   size_t expected_offset)
+{
+    size_t actual_offset = 0u;
+    const struct retro_memory_descriptor *descriptor = resolve_memory_address(address,
+                                                                               &actual_offset);
+    CHECK(descriptor != NULL);
+    if (descriptor != NULL) {
+        CHECK_EQ_U64(actual_offset, expected_offset);
+    }
+    return descriptor;
+}
+
+static int test_memory_aliases(void)
+{
+    static const size_t ram_bases[] = {0u, (size_t)0x80000000u, (size_t)0xA0000000u};
+    void *system_ram;
+
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    CHECK(memory_map_calls > 0u);
+    CHECK_EQ_U64(memory_descriptor_count, 5u);
+    system_ram = p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(system_ram != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 2u * 1024u * 1024u);
+
+    for (size_t region = 0u; region < sizeof ram_bases / sizeof ram_bases[0]; region++) {
+        const struct retro_memory_descriptor *first = check_memory_address(ram_bases[region], 0u);
+        const struct retro_memory_descriptor *last =
+            check_memory_address(ram_bases[region] + 0x001FFFFFu, 0x001FFFFFu);
+        const struct retro_memory_descriptor *mirror_first =
+            check_memory_address(ram_bases[region] + 0x00200000u, 0u);
+        const struct retro_memory_descriptor *mirror_last =
+            check_memory_address(ram_bases[region] + 0x007FFFFFu, 0x001FFFFFu);
+        CHECK(first != NULL && first->ptr == system_ram);
+        CHECK(last != NULL && last->ptr == system_ram);
+        CHECK(mirror_first != NULL && mirror_first->ptr == system_ram);
+        CHECK(mirror_last != NULL && mirror_last->ptr == system_ram);
+        CHECK_EQ_U64(first != NULL ? first->disconnect : 0u, 0x00600000u);
+        CHECK_EQ_U64(first != NULL ? first->select : 0u, ~(size_t)0x00600000u);
+    }
+
+    CHECK(resolve_memory_address((size_t)0x00800000u, &(size_t){0u}) == NULL);
+    CHECK(resolve_memory_address((size_t)0x80800000u, &(size_t){0u}) == NULL);
+    CHECK(resolve_memory_address((size_t)0xA0800000u, &(size_t){0u}) == NULL);
+    {
+        const struct retro_memory_descriptor *scratch_first =
+            check_memory_address((size_t)0x1F800000u, 0u);
+        const struct retro_memory_descriptor *scratch_last =
+            check_memory_address((size_t)0x1F8003FFu, 0x3FFu);
+        const struct retro_memory_descriptor *scratch_alias =
+            check_memory_address((size_t)0x9F800000u, 0u);
+        CHECK(scratch_first != NULL && scratch_first->len == 0x400u);
+        CHECK(scratch_last != NULL && scratch_last->ptr == scratch_first->ptr);
+        CHECK(scratch_alias != NULL && scratch_alias->ptr == scratch_first->ptr);
+    }
+    CHECK(resolve_memory_address((size_t)0x1F800400u, &(size_t){0u}) == NULL);
+    CHECK(resolve_memory_address((size_t)0xBF800000u, &(size_t){0u}) == NULL);
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
 static void store_le32(unsigned char *bytes, size_t offset, uint32_t value)
 {
     bytes[offset] = (unsigned char)value;
@@ -2470,12 +2557,13 @@ int main(int argc, char **argv)
     int input_controls_mode = argc == 4 && strcmp(argv[2], "input-controls") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
+    int memory_aliases_mode = argc == 3 && strcmp(argv[2], "memory-aliases") == 0;
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
     if ((!content_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
-         !rumble_guest_mode && !rumble_controls_mode &&
+         !memory_aliases_mode && !rumble_guest_mode && !rumble_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
@@ -2554,6 +2642,10 @@ int main(int argc, char **argv)
 
     if (card_persistence_mode) {
         return test_card_persistence(argv[3], argv[4]);
+    }
+
+    if (memory_aliases_mode) {
+        return test_memory_aliases();
     }
 
     if (video_geometry_mode) {

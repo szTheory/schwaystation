@@ -50,6 +50,13 @@ schway_add_test(NAME libretro.cards.persistence
     ${PROJECT_BINARY_DIR}/fixtures/memcard_roundtrip.exe ${PROJECT_BINARY_DIR}/tests
   LABELS libretro portable TIMEOUT 120)
 
+# Fault prevented: address-space descriptors omit valid RAM/scratchpad aliases
+# or claim holes and adjacent non-memory regions.
+schway_add_test(NAME libretro.memory.aliases
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> memory-aliases
+  LABELS libretro portable TIMEOUT 120)
+
 # Fault prevented: a controller layout, axis endpoint, or once-per-frame input latch diverges from guest play.
 schway_add_test(NAME libretro.input.controls
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
