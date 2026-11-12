@@ -187,6 +187,16 @@ static int content_test;
 static unsigned content_polls;
 static const char *bios_option_value = "none";
 static const char *system_directory;
+static const char *analog_mode_value = "analog";
+static const char *analog_toggle_value = "enabled";
+static int rumble_available;
+struct rumble_event {
+    unsigned port;
+    enum retro_rumble_effect effect;
+    uint16_t strength;
+};
+static struct rumble_event rumble_events[128];
+static size_t rumble_event_count;
 
 /* got must equal want; prints both. */
 static void check_string(const char *what, const char *got, const char *want)
@@ -220,7 +230,17 @@ static void check_options_v2(const struct retro_core_options_v2 *o)
     check_string("BIOS option value 2", d[1].values[2].value, "scph5501.bin");
     check_string("BIOS option value 3", d[1].values[3].value, "scph5502.bin");
     CHECK(d[1].values[4].value == NULL);
-    CHECK(d[2].key == NULL);
+    check_string("analog mode option key", d[2].key, "schwaystation_analog_mode");
+    check_string("analog mode option default", d[2].default_value, "analog");
+    check_string("analog mode value 0", d[2].values[0].value, "analog");
+    check_string("analog mode value 1", d[2].values[1].value, "digital");
+    CHECK(d[2].values[2].value == NULL);
+    check_string("analog toggle option key", d[3].key, "schwaystation_analog_toggle");
+    check_string("analog toggle option default", d[3].default_value, "enabled");
+    check_string("analog toggle value 0", d[3].values[0].value, "enabled");
+    check_string("analog toggle value 1", d[3].values[1].value, "disabled");
+    CHECK(d[3].values[2].value == NULL);
+    CHECK(d[4].key == NULL);
 }
 
 /* The version 0 variables (L7483) carry both options. */
@@ -236,7 +256,22 @@ static void check_variables(const struct retro_variable *v)
     check_string("BIOS variable value",
                  v[1].value,
                  "BIOS for no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin");
-    CHECK(v[2].key == NULL);
+    check_string("analog mode variable key", v[2].key, "schwaystation_analog_mode");
+    check_string("analog mode variable value", v[2].value, "Analog mode; analog|digital");
+    check_string("analog toggle variable key", v[3].key, "schwaystation_analog_toggle");
+    check_string("analog toggle variable value", v[3].value, "Analog toggle; enabled|disabled");
+    CHECK(v[4].key == NULL);
+}
+
+static bool RETRO_CALLCONV rumble(unsigned port, enum retro_rumble_effect effect, uint16_t strength)
+{
+    if (rumble_event_count < sizeof rumble_events / sizeof rumble_events[0]) {
+        rumble_events[rumble_event_count].port = port;
+        rumble_events[rumble_event_count].effect = effect;
+        rumble_events[rumble_event_count].strength = strength;
+    }
+    rumble_event_count++;
+    return true;
 }
 
 static bool RETRO_CALLCONV env(unsigned cmd, void *data)
@@ -278,6 +313,14 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
             var->value = bios_option_value;
             return true;
         }
+        if (strcmp(var->key, "schwaystation_analog_mode") == 0) {
+            var->value = analog_mode_value;
+            return true;
+        }
+        if (strcmp(var->key, "schwaystation_analog_toggle") == 0) {
+            var->value = analog_toggle_value;
+            return true;
+        }
         return false;
     }
     case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
@@ -289,6 +332,12 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
     case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
         *(bool *)data = option_updated;
         option_updated = false;
+        return true;
+    case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE:
+        if (!rumble_available || data == NULL) {
+            return false;
+        }
+        ((struct retro_rumble_interface *)data)->set_rumble_state = rumble;
         return true;
     case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
         av_info_calls++;
@@ -989,6 +1038,239 @@ static int test_native_video_geometry_edges(const char *path)
     return check_failures != 0 ? 1 : 0;
 }
 
+static void append_sh(uint32_t *code, size_t *count, unsigned reg, unsigned base, unsigned offset)
+{
+    code[(*count)++] = 0xA4000000u | (base << 21) | (reg << 16) | offset;
+}
+
+static size_t append_branch(uint32_t *code, size_t *count, unsigned opcode, unsigned left,
+                            unsigned right)
+{
+    size_t at = *count;
+    code[(*count)++] = opcode | (left << 21) | (right << 16);
+    return at;
+}
+
+static void patch_branch(uint32_t *code, size_t at, size_t target)
+{
+    int32_t displacement = (int32_t)target - (int32_t)(at + 1u);
+    code[at] |= (uint16_t)displacement;
+}
+
+static void append_sio_tx(uint32_t *code, size_t *count, size_t *jal_sites, size_t *site_count,
+                          unsigned value, unsigned ack)
+{
+    append_li(code, count, 4u, value); /* a0: byte to send */
+    append_li(code, count, 5u, ack);   /* a1: wait for ACK */
+    jal_sites[(*site_count)++] = *count;
+    code[(*count)++] = 0x0C000000u;
+    code[(*count)++] = 0u;
+}
+
+static void append_sio_command(uint32_t *code, size_t *count, size_t *jal_sites,
+                               size_t *site_count, unsigned port, unsigned command,
+                               const uint8_t payload[6])
+{
+    append_li(code, count, 8u, 0x0003u | (port != 0u ? 0x2000u : 0u));
+    append_sh(code, count, 8u, 16u, 0x04Au);
+    append_sio_tx(code, count, jal_sites, site_count, 0x01u, 1u);
+    append_sio_tx(code, count, jal_sites, site_count, command, 1u);
+    append_sio_tx(code, count, jal_sites, site_count, 0u, 1u);
+    for (size_t i = 0u; i < 6u; i++) {
+        append_sio_tx(code, count, jal_sites, site_count, payload[i], i != 5u ? 1u : 0u);
+    }
+}
+
+/* A first-party PS-X EXE enters DualShock config, maps both motors, and polls
+   both ports once per frame. It sends a fixed real 42h motor transaction. */
+static int write_rumble_guest(const char *path, uint8_t small, uint8_t large)
+{
+    unsigned char image[0x1000] = {0};
+    uint32_t code[512];
+    size_t count = 0u, site_count = 0u, jal_sites[128];
+    const uint8_t enter_config[6] = {1u, 0u, 0u, 0u, 0u, 0u};
+    const uint8_t motor_map[6] = {0u, 1u, 0xFFu, 0xFFu, 0xFFu, 0xFFu};
+    size_t frame_wait, rx_wait, ack_wait, release_wait, done, sio_entry;
+
+    append_li(code, &count, 16u, 0xBF801000u); /* s0: hardware I/O */
+    append_li(code, &count, 8u, 0x000Cu);
+    append_sh(code, &count, 8u, 16u, 0x048u);
+    append_li(code, &count, 8u, 0x0088u);
+    append_sh(code, &count, 8u, 16u, 0x04Eu);
+    append_li(code, &count, 8u, 0x0003u);
+    append_sh(code, &count, 8u, 16u, 0x04Au);
+
+    append_sio_command(code, &count, jal_sites, &site_count, 0u, 0x43u, enter_config);
+    append_sio_command(code, &count, jal_sites, &site_count, 0u, 0x4Du, motor_map);
+    append_sio_command(code, &count, jal_sites, &site_count, 1u, 0x43u, enter_config);
+    append_sio_command(code, &count, jal_sites, &site_count, 1u, 0x4Du, motor_map);
+
+    frame_wait = count;
+    for (unsigned port = 0u; port < 2u; port++) {
+        append_li(code, &count, 8u, 0x0003u | (port != 0u ? 0x2000u : 0u));
+        append_sh(code, &count, 8u, 16u, 0x04Au);
+        append_sio_tx(code, &count, jal_sites, &site_count, 0x01u, 1u);
+        append_sio_tx(code, &count, jal_sites, &site_count, 0x42u, 1u);
+        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 1u);
+        append_sio_tx(code, &count, jal_sites, &site_count, small, 1u);
+        append_sio_tx(code, &count, jal_sites, &site_count, large, 1u);
+        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 1u);
+        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 1u);
+        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 1u);
+        append_sio_tx(code, &count, jal_sites, &site_count, 0u, 0u);
+    }
+    size_t loop_branch = append_branch(code, &count, 0x10000000u, 0u, 0u);
+    code[count++] = 0u;
+    patch_branch(code, loop_branch, frame_wait);
+
+    sio_entry = count;
+    code[count++] = 0xA2040040u; /* sb a0, 40h(s0) */
+    rx_wait = count;
+    code[count++] = 0x96080044u; /* lhu t0, 44h(s0) */
+    code[count++] = 0u;
+    code[count++] = 0x31080002u; /* andi t0, t0, 2 */
+    size_t rx_branch = append_branch(code, &count, 0x11000000u, 8u, 0u);
+    code[count++] = 0u;
+    code[count++] = 0x92020040u; /* lbu v0, 40h(s0) */
+    size_t no_ack_branch = append_branch(code, &count, 0x10A00000u, 5u, 0u);
+    code[count++] = 0u;
+    ack_wait = count;
+    code[count++] = 0x96080044u;
+    code[count++] = 0u;
+    code[count++] = 0x31080080u;
+    size_t ack_branch = append_branch(code, &count, 0x11000000u, 8u, 0u);
+    code[count++] = 0u;
+    release_wait = count;
+    code[count++] = 0x96080044u;
+    code[count++] = 0u;
+    code[count++] = 0x31080080u;
+    size_t release_branch = append_branch(code, &count, 0x15000000u, 8u, 0u);
+    code[count++] = 0u;
+    done = count;
+    code[count++] = 0x03E00008u; /* jr ra */
+    code[count++] = 0u;
+    patch_branch(code, rx_branch, rx_wait);
+    patch_branch(code, no_ack_branch, done);
+    patch_branch(code, ack_branch, ack_wait);
+    patch_branch(code, release_branch, release_wait);
+    for (size_t i = 0u; i < site_count; i++) {
+        uint32_t target = 0x80010100u + (uint32_t)(sio_entry * sizeof code[0]);
+        code[jal_sites[i]] |= (target >> 2) & 0x03FFFFFFu;
+    }
+
+    if (count * sizeof code[0] > 0x800u) {
+        return 0;
+    }
+    memcpy(image, "PS-X EXE", 8u);
+    store_le32(image, 0x10u, 0x80010100u);
+    store_le32(image, 0x18u, 0x80010000u);
+    store_le32(image, 0x1Cu, 0x800u);
+    store_le32(image, 0x30u, 0x801FF000u);
+    store_le32(image, 0x34u, 0x1000u);
+    for (size_t i = 0u; i < count; i++) {
+        store_le32(image, 0x900u + 4u * i, code[i]);
+    }
+    return write_test_file(path, image, sizeof image);
+}
+
+static void visit_rumble_reference(void *user, const char *name, const void *data, uint32_t count,
+                                   uint32_t width)
+{
+    uint32_t *found = (uint32_t *)user;
+    if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
+        found[0] = ((const uint8_t *)data)[0];
+        found[1] = ((const uint8_t *)data)[1];
+    }
+}
+
+static void check_rumble_events(size_t offset, uint16_t strong, uint16_t weak)
+{
+    CHECK(rumble_event_count >= offset + 4u);
+    if (rumble_event_count < offset + 4u) {
+        return;
+    }
+    CHECK_EQ_U64(rumble_events[offset].port, 0u);
+    CHECK_EQ_U64(rumble_events[offset].effect, RETRO_RUMBLE_STRONG);
+    CHECK_EQ_U64(rumble_events[offset].strength, strong);
+    CHECK_EQ_U64(rumble_events[offset + 1u].port, 0u);
+    CHECK_EQ_U64(rumble_events[offset + 1u].effect, RETRO_RUMBLE_WEAK);
+    CHECK_EQ_U64(rumble_events[offset + 1u].strength, weak);
+    CHECK_EQ_U64(rumble_events[offset + 2u].port, 1u);
+    CHECK_EQ_U64(rumble_events[offset + 2u].effect, RETRO_RUMBLE_STRONG);
+    CHECK_EQ_U64(rumble_events[offset + 2u].strength, strong);
+    CHECK_EQ_U64(rumble_events[offset + 3u].port, 1u);
+    CHECK_EQ_U64(rumble_events[offset + 3u].effect, RETRO_RUMBLE_WEAK);
+    CHECK_EQ_U64(rumble_events[offset + 3u].strength, weak);
+}
+
+static int test_rumble_guest(const char *path)
+{
+    struct retro_game_info game;
+    schway_input input_snapshot;
+    schway_run_result result;
+    schway *reference = ref_create(SCHWAY_REGION_NTSC_U);
+    unsigned char exe[0x1000];
+    FILE *file;
+    uint32_t devices[2] = {0u, 0u};
+
+    CHECK(reference != NULL);
+    CHECK(write_rumble_guest(path, 1u, 255u));
+    file = fopen(path, "rb");
+    CHECK(file != NULL);
+    if (reference == NULL || file == NULL) {
+        schway_destroy(reference);
+        if (file != NULL) {
+            (void)fclose(file);
+        }
+        (void)remove(path);
+        return 1;
+    }
+    CHECK_EQ_U64(fread(exe, 1u, sizeof exe, file), sizeof exe);
+    CHECK_EQ_U64(fclose(file), 0u);
+    memset(&input_snapshot, 0, sizeof input_snapshot);
+    input_snapshot.size = (uint32_t)sizeof input_snapshot;
+    input_snapshot.device[0] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
+    input_snapshot.device[1] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
+    for (unsigned port = 0u; port < 2u; port++) {
+        for (unsigned axis = 0u; axis < 4u; axis++) {
+            input_snapshot.axes[port][axis] = 128u;
+        }
+    }
+    CHECK_EQ_U64(schway_load_exe(reference, exe, sizeof exe), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_set_input(reference, &input_snapshot), SCHWAY_STATUS_OK);
+    for (unsigned frame_index = 0u; frame_index < 4u; frame_index++) {
+        memset(&result, 0, sizeof result);
+        result.size = (uint32_t)sizeof result;
+        CHECK_EQ_U64(schway_run_frame(reference, &result), SCHWAY_STATUS_OK);
+        if (frame_index >= 1u) {
+            CHECK_EQ_HEX(result.rumble[0], 0xFF01u);
+            CHECK_EQ_HEX(result.rumble[1], 0xFF01u);
+        }
+    }
+    CHECK_EQ_U64(schway_state_visit(reference, visit_rumble_reference, devices), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(devices[0], SCHWAY_INPUT_DEVICE_DUALSHOCK);
+    CHECK_EQ_U64(devices[1], SCHWAY_INPUT_DEVICE_DUALSHOCK);
+    schway_destroy(reference);
+
+    memset(&game, 0, sizeof game);
+    game.path = path;
+    rumble_event_count = 0u;
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    for (unsigned frame_index = 0u; frame_index < 4u; frame_index++) {
+        size_t before = rumble_event_count;
+        run_one();
+        check_rumble_events(before, (uint16_t)(255u * 257u), UINT16_MAX);
+    }
+    CHECK_EQ_U64(rumble_event_count, 16u);
+    p_unload_game();
+    p_deinit();
+    module_close();
+    (void)remove(path);
+    return check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -1007,16 +1289,20 @@ int main(int argc, char **argv)
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
+    int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
 
     if ((!content_mode && !video_geometry_mode && !video_edges_mode && !lifecycle_mode &&
+         !rumble_guest_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
-        ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode) && argv[3][0] == '\0') ||
+        ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
+          rumble_guest_mode) && argv[3][0] == '\0') ||
         (lifecycle_mode && argv[4][0] == '\0')) {
         fprintf(stderr,
-                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe> | video-geometry-edges <exe>\n");
+                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe> | video-geometry-edges <exe> | rumble-guest <exe>\n");
         return 2;
     }
     content_test = content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode;
+    rumble_available = rumble_guest_mode;
     pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
     region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
@@ -1063,6 +1349,10 @@ int main(int argc, char **argv)
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
     set_callbacks();
+
+    if (rumble_guest_mode) {
+        return test_rumble_guest(argv[3]);
+    }
 
     if (lifecycle_mode) {
         content_lifecycle(argv[3], argv[4]);
