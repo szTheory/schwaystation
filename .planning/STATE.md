@@ -6,11 +6,11 @@ current_phase: 04
 current_phase_name: Games play in RetroArch
 current_plan: 49 of 55
 status: executing
-stopped_at: Completed 04-55-PLAN.md
-last_updated: "2026-11-12T19:17:47.734Z"
+stopped_at: Committed the 04-54 Windows path follow-up; 04-29 remains next and open
+last_updated: "2026-11-12T19:37:23.706Z"
 last_activity: 2026-11-12
-last_activity_desc: Completed 04-54 compiler portability, inventory-owned compatibility registration and emulator forwarding; four-job local CI/release passed, while hosted acceptance and 04-29 remain pending.
-state_head: 041790b3563d7bbdee232e4f284effe2a5be9758
+last_activity_desc: Added a narrow 04-54 follow-up for drive-rooted Windows CMake paths and .exe runners; focused compatibility controls pass 2/2. Native Windows CI remains pending; ordinal 49/55 and the open 04-29 next step are unchanged.
+state_head: cdf99341a9f0c0d3cc9038fc5bff2a33c4e9e00b
 progress:
   total_phases: 6
   completed_phases: 3
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 Phase: 04 (Games play in RetroArch) — EXECUTING
 Current Plan: 49 of 55
 Status: 48 phase plans complete; seven remain. Plan 04-29 is incomplete (0/2 acceptance) and is next after its completed 04-54/04-55 prerequisites.
-Last activity: 2026-11-12 — Completed the movie-only active-pixel poison fill and byte-work documentation. The 509-test CI workflow, five release checks and 23 hygiene checks pass; hosted movie timing remains pending the combined run. The local RetroArch stop remains in force.
+Last activity: 2026-11-12 — Added a narrow 04-54 follow-up for drive-rooted Windows CMake paths and `.exe` runners; focused compatibility controls pass 2/2. Native Windows CI and 04-29's two RetroArch frames remain pending. Current ordinal 49/55 and the local RetroArch stop are unchanged.
 
 Progress: [█████░░░░░] 50%
 
@@ -606,10 +606,12 @@ come from `AGENTS.md`.
 
 | 2026-11-12 | /gsd-execute-plan 04-55 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded movie active-pixel poison canaries, measured byte work, 509 CI tests, package/release 5/5, hygiene 23/23; hosted timing pending combined run | gpt-6-luna xhigh |
 
+| 2026-11-12 | /gsd-execute-plan 04-54 post-closeout follow-up | Codex/OpenGSD; sequential shared checkout; canonicalized drive-rooted CMake paths, retained `.exe` runner names and refusal controls; focused `compat.library` tests 2/2 passed; native Windows CI pending | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-12T19:17:47.384Z
-Stopped at: Completed 04-55-PLAN.md
+Last session: 2026-11-12T19:37:23.125Z
+Stopped at: Committed the 04-54 Windows path follow-up; 04-29 remains next and open
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 

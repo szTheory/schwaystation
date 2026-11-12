@@ -18,6 +18,10 @@ actuals:
 commits: 2
 plan_head_before: 2618185b24c770393b77afb13ab9d83bbf3136c2
 plan_head_after: 476691714166dc42eda50d1877db4f74a9e7b6bc
+post_closeout_followup:
+  parent_head: 4eeaab0f9bb87247076b31eda46cc1065a587d7e
+  commit: cdf99341a9f0c0d3cc9038fc5bff2a33c4e9e00b
+  diff_bytes: 7450
 tech-stack:
   added: []
   patterns:
@@ -54,12 +58,18 @@ coverage:
         status: unknown
     human_judgment: false
   - id: GAME-06
-    description: Compatibility registration follows the chosen inventory and emulator prefixes reach helpers and both library runner modes; hosted BE32 acceptance remains pending.
+    description: Compatibility registration follows the chosen inventory; emulator prefixes and native CMake drive paths reach only approved build-tree runners, including `.exe`; Windows and BE32 acceptance remain pending.
     requirement: GAME-06
     verification:
       - kind: integration
         ref: "compat.library.controls/synthetic_result and full ci-local-4 workflow, including compat ratchet"
         status: pass
+      - kind: integration
+        ref: "Focused library controls: `.exe` runner, relative root/runner refusal and `../` input refusal"
+        status: pass
+      - kind: integration
+        ref: "Combined hosted Windows CI after 04-55; drive-rooted CMake paths and PE executable launch"
+        status: unknown
       - kind: integration
         ref: "Combined hosted CI after 04-55; BE32 compatibility consumers"
         status: unknown
@@ -97,6 +107,7 @@ Strict compiler consumers, selected compatibility inventories and emulator forwa
 
 - Made the controller movie's pressed count explicitly unsigned and routed all four read-only probe opens through a private `fopen_s`/`fopen` helper without changing failure or cleanup behavior.
 - Registered compatibility tests only when the selected inventory lists `compat`. Forwarded decoded emulator arguments to existing raw helpers and generated quoted shell launchers for test and production runners, preserving the single-runner library interface.
+- Added a post-closeout Windows path fix: normalize drive-rooted CMake paths using the POSIX shell's `cd`/`pwd`, accept only the existing build-tree runner locations with optional `.exe`, and preserve production executable suffixes in the ordinary-mode mirror.
 - Reused the repo-validated OpenBIOS image at the exact local test input path. The full four-job CI workflow, package step and release tests completed successfully.
 - Recorded durable recovery guidance: use command/session evidence and repository snapshots before interrupting quiet executors, and align temporary CMake binary directories with expected fixture paths.
 
@@ -104,6 +115,15 @@ Strict compiler consumers, selected compatibility inventories and emulator forwa
 
 1. **Task 1: Restore strict compiler portability** — `8665f1b` (`fix`)
 2. **Task 2: Register compatibility by inventory and forward emulator arguments** — `4766917` (`fix`)
+
+The later Windows path follow-up is recorded separately because Plan 55 commits are between the original measured Plan 54 ledger boundary and that commit.
+
+## Post-closeout Follow-up
+
+- Commit: `cdf9934` (`fix(04-54): accept native Windows library test paths`), parent `4eeaab0` (completed Plan 55 head), 7,450-byte diff.
+- Native Windows CMake paths are canonicalized through shell `cd`/`pwd`; the runner allowlist remains restricted to the same build-tree targets, with `.exe` added. The ordinary-mode mirror keeps the actual executable filename, and the default local runner checks the `.exe` form when the extensionless form is unavailable.
+- Added existing-case controls for an `.exe`-suffixed runner, relative prepared root, relative runner and parent-directory escape.
+- Focused command: `cmake --preset ci && cmake --build --preset ci --target schwaystation-test-library schwaystation-run-test schwaystation-run && ctest --test-dir build/ci --parallel 4 -R '^compat[.]library[.](controls|synthetic_result)$' --no-tests=error --output-on-failure` — exit 0; 2/2 cases passed. The drive-letter filesystem branch remains pending hosted Windows CI.
 
 ## Deviations from Plan
 
@@ -121,6 +141,7 @@ Strict compiler consumers, selected compatibility inventories and emulator forwa
 ## Deferred Validation
 
 - Cross-platform compiler and inventory claims await the combined normal hosted run after 04-55. Do not infer MSVC, GCC cross-compiler, ASan, WASI or BE32 acceptance from this local run.
+- The follow-up's native POSIX test proves `.exe` suffix and path-refusal controls, not Windows filesystem behavior; hosted Windows x64/arm64 validation remains required.
 - 04-29 remains incomplete: its two distinct RetroArch frames are still mandatory, and the local LaunchServices denial continues to prohibit a local RetroArch run. This plan does not close or weaken that acceptance.
 
 ## User Setup Required
@@ -132,3 +153,4 @@ None. Hosted CI dispatch remains with the coordinator after 04-55.
 - Summary file exists.
 - Task commits `8665f1b` and `4766917` are ancestors of HEAD.
 - Persisted plan ledger measures 2 commits from `2618185b24c770393b77afb13ab9d83bbf3136c2` through `476691714166dc42eda50d1877db4f74a9e7b6bc`.
+- Follow-up commit `cdf9934` is a child of the recorded post-55 base `4eeaab0`; current phase ordinal and open 04-29 checkpoint are unchanged.
