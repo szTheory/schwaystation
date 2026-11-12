@@ -629,3 +629,7 @@ Phase 3 merged as PR #12; release PR #13 is green and merged. v0.3.0 is latest w
 Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
 Continue `/gsd-autonomous --from 4` with planning, execution, review and verification. Stop before phase-4 ship
 (AGENTS rule 9). Standing preferences are in `.planning/AUTONOMOUS.md`.
+
+### Independent local work during immutable CI (2026-11-12)
+
+Codex coordinator / inherited parent model: plan29 explicitly acknowledged monitor-only ownership of run43321926969 at ea3ec542, with no active local command or source/shared metadata work. Plan30's edge to29 was sequencing only; its existing VRAM/runner/PNG interfaces and other prerequisites are complete, and its GPU inventory/runner-main/doc source paths do not overlap the monitor. Remove only that edge and run30 as the single local writer. Plan29 metadata closeout waits for the safe writer handoff; this old-head run does not verify30 or replace final current-source verification. Actual progress remains49/56 summaries until another terminal summary exists.
