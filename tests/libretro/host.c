@@ -946,6 +946,37 @@ static void check_card_file_value(const char *path, int expected)
     CHECK_EQ_U64(fclose(file), 0u);
 }
 
+static int read_card_file(const char *path, unsigned char *bytes)
+{
+    FILE *file = fopen(path, "rb");
+    size_t count;
+    int extra, failed;
+    if (file == NULL) {
+        return 0;
+    }
+    count = fread(bytes, 1u, SCHWAY_MEMCARD_SIZE, file);
+    failed = ferror(file);
+    extra = failed ? EOF : fgetc(file);
+    if (fclose(file) != 0) {
+        failed = 1;
+    }
+    return !failed && count == SCHWAY_MEMCARD_SIZE && extra == EOF;
+}
+
+static void check_card_file_equal(const char *path, const unsigned char *expected)
+{
+    unsigned char *actual = (unsigned char *)malloc(SCHWAY_MEMCARD_SIZE);
+    CHECK(actual != NULL);
+    if (actual != NULL) {
+        int read_ok = read_card_file(path, actual);
+        CHECK(read_ok);
+        if (read_ok) {
+            CHECK(memcmp(actual, expected, SCHWAY_MEMCARD_SIZE) == 0);
+        }
+        free(actual);
+    }
+}
+
 static int test_card_persistence(const char *exe_path, const char *directory)
 {
     char card_one[4096], card_two[4096];
@@ -985,6 +1016,145 @@ static int test_card_persistence(const char *exe_path, const char *directory)
             }
         }
     }
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static int test_card_controls(const char *exe_path, const char *directory)
+{
+    enum { BLOCKER_COUNT = 64 };
+    char card_one[4096], card_two[4096], backup_card[4096];
+    char missing_directory[4096], missing_card_two[4096];
+    char blocker[4096];
+    struct retro_game_info game;
+    unsigned char *baseline = (unsigned char *)malloc(SCHWAY_MEMCARD_SIZE);
+    unsigned char wrong_image = 0x5Au;
+    int loaded;
+
+    CHECK(baseline != NULL);
+    CHECK(test_path(card_one, sizeof card_one, directory, "memcard_roundtrip.srm"));
+    CHECK(test_path(card_two, sizeof card_two, directory, "memcard_roundtrip.1.mcr"));
+    CHECK(test_path(backup_card, sizeof backup_card, directory, "previous-good-card.mcr"));
+    CHECK(test_path(missing_directory, sizeof missing_directory, directory, "missing-save-dir"));
+    CHECK(test_path(missing_card_two, sizeof missing_card_two, missing_directory,
+                    "memcard_roundtrip.1.mcr"));
+    if (baseline == NULL || check_failures != 0) {
+        free(baseline);
+        return 1;
+    }
+    (void)remove(card_one);
+    (void)remove(card_two);
+    (void)remove(backup_card);
+    save_directory = directory;
+    save_directory_available = 1;
+    memset(&game, 0, sizeof game);
+    game.path = exe_path;
+
+    /* Seed a real, guest-written previous save for the refusal controls. */
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    for (unsigned frame_index = 0u; loaded && frame_index < 120u; frame_index++) {
+        run_one();
+    }
+    p_unload_game();
+    check_card_file_value(card_two, 2);
+    CHECK(read_card_file(card_two, baseline));
+
+    /* No card write means the same generation and no persistence attempt. */
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (loaded) {
+        CHECK_EQ_U64(rename(card_two, backup_card), 0u);
+        p_unload_game();
+        {
+            FILE *unexpected_write = fopen(card_two, "rb");
+            CHECK(unexpected_write == NULL);
+            if (unexpected_write != NULL) {
+                (void)fclose(unexpected_write);
+            }
+        }
+        CHECK_EQ_U64(rename(backup_card, card_two), 0u);
+    } else {
+        p_unload_game();
+    }
+    check_card_file_equal(card_two, baseline);
+
+    /* A wrong-sized card is ignored; the guest can replace it with a fresh card. */
+    CHECK(write_test_file(card_two, &wrong_image, sizeof wrong_image));
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    for (unsigned frame_index = 0u; loaded && frame_index < 120u; frame_index++) {
+        run_one();
+    }
+    p_unload_game();
+    check_card_file_value(card_two, 2);
+    CHECK(read_card_file(card_two, baseline));
+
+    /* Exhaust the helper's exclusive temporary names. Atomic failure must
+       leave the previous complete card untouched. */
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    for (unsigned frame_index = 0u; loaded && frame_index < 120u; frame_index++) {
+        run_one();
+    }
+    for (unsigned i = 0u; i < BLOCKER_COUNT; i++) {
+        int written = snprintf(blocker, sizeof blocker, "%s.schwaystation.tmp.%u", card_two, i);
+        CHECK(written > 0 && (size_t)written < sizeof blocker);
+        if (written > 0 && (size_t)written < sizeof blocker) {
+            (void)remove(blocker);
+            CHECK(write_test_file(blocker, &wrong_image, sizeof wrong_image));
+        }
+    }
+    p_unload_game();
+    check_card_file_equal(card_two, baseline);
+    for (unsigned i = 0u; i < BLOCKER_COUNT; i++) {
+        int written = snprintf(blocker, sizeof blocker, "%s.schwaystation.tmp.%u", card_two, i);
+        if (written > 0 && (size_t)written < sizeof blocker) {
+            (void)remove(blocker);
+        }
+    }
+
+    /* An absent callback disables card2 I/O without changing the existing file. */
+    save_directory_available = 0;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    for (unsigned frame_index = 0u; loaded && frame_index < 120u; frame_index++) {
+        run_one();
+    }
+    p_unload_game();
+    check_card_file_equal(card_two, baseline);
+
+    /* A callback can succeed while its directory is unavailable. The core
+       still runs and the failed atomic create leaves that directory absent. */
+    save_directory_available = 1;
+    save_directory = missing_directory;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    for (unsigned frame_index = 0u; loaded && frame_index < 120u; frame_index++) {
+        run_one();
+    }
+    p_unload_game();
+    {
+        FILE *missing_file = fopen(missing_card_two, "rb");
+        CHECK(missing_file == NULL);
+        if (missing_file != NULL) {
+            (void)fclose(missing_file);
+        }
+    }
+    save_directory = directory;
+    save_directory_available = 1;
+    check_card_file_equal(card_two, baseline);
+    {
+        FILE *card_one_file = fopen(card_one, "rb");
+        CHECK(card_one_file == NULL);
+        if (card_one_file != NULL) {
+            (void)fclose(card_one_file);
+        }
+    }
+    (void)remove(card_two);
+    (void)remove(backup_card);
+    free(baseline);
     p_deinit();
     module_close();
     return check_failures != 0 ? 1 : 0;
@@ -1075,6 +1245,62 @@ static int test_memory_aliases(void)
 
     p_unload_game();
     p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static int test_memory_boundaries(void)
+{
+    unsigned map_calls;
+    void *ram;
+    size_t byte_offset = 0u;
+
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    CHECK_EQ_U64(memory_descriptor_count, 6u);
+    ram = p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    map_calls = memory_map_calls;
+    CHECK(resolve_memory_address((size_t)0x80000000u, &byte_offset) != NULL);
+    CHECK_EQ_U64(byte_offset, 0u);
+
+    p_reset();
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) == ram);
+    CHECK_EQ_U64(memory_map_calls, map_calls);
+    CHECK_EQ_U64(memory_descriptor_count, 6u);
+    byte_offset = 0u;
+    CHECK(resolve_memory_address((size_t)0x807FFFFFu, &byte_offset) != NULL);
+    CHECK_EQ_U64(byte_offset, 0x001FFFFFu);
+
+    p_unload_game();
+    CHECK(memory_map_calls > map_calls);
+    CHECK_EQ_U64(memory_descriptor_count, 0u);
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) == NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 0u);
+
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    CHECK_EQ_U64(memory_descriptor_count, 6u);
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) != NULL);
+    p_deinit();
+    CHECK_EQ_U64(memory_descriptor_count, 0u);
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) == NULL);
+
+    /* A frontend that declines the optional map still gets a working core
+       and direct SYSTEM_RAM access. */
+    memory_maps_available = 0;
+    map_calls = memory_map_calls;
+    p_set_environment(env);
+    p_init();
+    set_callbacks();
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    CHECK_EQ_U64(memory_map_calls, map_calls + 1u);
+    CHECK_EQ_U64(memory_descriptor_count, 0u);
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 2u * 1024u * 1024u);
+    p_unload_game();
+    CHECK_EQ_U64(memory_descriptor_count, 0u);
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) == NULL);
+    p_deinit();
+    memory_maps_available = 1;
     module_close();
     return check_failures != 0 ? 1 : 0;
 }
@@ -2559,25 +2785,33 @@ int main(int argc, char **argv)
     int input_controls_mode = argc == 4 && strcmp(argv[2], "input-controls") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
+    int card_controls_mode = argc == 5 && strcmp(argv[2], "card-controls") == 0;
     int memory_aliases_mode = argc == 3 && strcmp(argv[2], "memory-aliases") == 0;
+    int memory_boundaries_mode = argc == 3 && strcmp(argv[2], "memory-boundaries") == 0;
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
     if ((!content_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
-         !memory_aliases_mode && !rumble_guest_mode && !rumble_controls_mode &&
+         !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
+         !rumble_guest_mode && !rumble_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
-          card_persistence_mode) &&
+          card_persistence_mode || card_controls_mode) &&
          argv[3][0] == '\0') ||
-        ((lifecycle_mode || card_persistence_mode) && argv[4][0] == '\0')) {
+        ((lifecycle_mode || card_persistence_mode || card_controls_mode) && argv[4][0] == '\0')) {
         fprintf(stderr,
-                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
+                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | "
+                "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
+                "card-controls <exe> <save-dir> | memory-aliases | memory-boundaries | "
+                "video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | "
+                "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
     content_test = content_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
-                   input_controls_mode || lifecycle_mode || card_persistence_mode;
+                   input_controls_mode || lifecycle_mode || card_persistence_mode ||
+                   card_controls_mode;
     rumble_available = rumble_guest_mode || rumble_controls_mode;
     pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
@@ -2646,8 +2880,16 @@ int main(int argc, char **argv)
         return test_card_persistence(argv[3], argv[4]);
     }
 
+    if (card_controls_mode) {
+        return test_card_controls(argv[3], argv[4]);
+    }
+
     if (memory_aliases_mode) {
         return test_memory_aliases();
+    }
+
+    if (memory_boundaries_mode) {
+        return test_memory_boundaries();
     }
 
     if (video_geometry_mode) {
