@@ -3,6 +3,7 @@ abi
 bus
 built
 card
+compat
 core
 cpu
 dma
