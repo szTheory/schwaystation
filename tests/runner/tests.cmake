@@ -375,10 +375,10 @@ if(CMAKE_SCRIPT_MODE_FILE)
     refuse(--no-stop-on-fault)
     refuse(--frames 1 --no-stop-on-fault)
   elseif(CASE STREQUAL "exe_missing")
-    # A file that is not there, or is not a PS-EXE, exits 1 naming the file
-    # and the reason; no frame runs.
-    expect_exit(1 "schwaystation-run: [^\n]*missing[.]exe: cannot (open|read)" --exe "${OUT}/missing.exe")
-    expect_exit(1 "schwaystation-run: [^\n]*tests[.]cmake: PS-EXE invalid" --exe "${CMAKE_CURRENT_LIST_FILE}"
+    # A file that is not there, or is not a PS-EXE, exits 1 with a generic
+    # reason; private file paths are not echoed and no frame runs.
+    expect_exit(1 "schwaystation-run: input: cannot (open|read)" --exe "${OUT}/missing.exe")
+    expect_exit(1 "schwaystation-run: input: PS-EXE invalid" --exe "${CMAKE_CURRENT_LIST_FILE}"
       --tty)
   elseif(CASE STREQUAL "positional")
     # This release loads no disc, so a file name is a usage error.

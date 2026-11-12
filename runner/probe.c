@@ -9,7 +9,6 @@
 
 #include "md5.h"
 #include "schwaystation.h"
-#include "sha256.h"
 #include "sha1.h"
 #include "disc_probe.h"
 
@@ -31,18 +30,6 @@ static void refuse(const char *path, const char *why)
     fputs("schwaystation-run: ", stderr);
     put_text(stderr, path);
     fprintf(stderr, ": %s\n", why);
-}
-
-/* The file's name without its directory, split at either kind of slash. */
-static const char *base_name(const char *path)
-{
-    const char *name = path;
-    for (const char *p = path; *p != '\0'; p++) {
-        if (*p == '/' || *p == '\\') {
-            name = p + 1;
-        }
-    }
-    return name;
 }
 
 /* The licence text names the console's market (psx-spx, "PSX EXE Format");
@@ -75,20 +62,7 @@ static const char *region_guess(uint32_t area)
     }
 }
 
-/* The achievement-hash rule for a PS-EXE: MD5 over the file's first
-   t_size + 0800h bytes, the header included (rcheevos src/hash/rc_hash_disc.c,
-   rc_hash_psx, line 965). The validator has checked that many bytes exist. A
-   bare file has no boot-file name, which a disc's hash prepends. */
-static void rcheevos_md5(const uint8_t *file, uint32_t hash_len, char hex[33])
-{
-    schway__md5 m;
-    uint8_t digest[16];
-    schway__md5_init(&m);
-    schway__md5_update(&m, file, hash_len);
-    schway__md5_final(&m, digest);
-    schway__md5_hex(digest, hex);
-}
-
+/* The achievement-hash rule prepends the boot name before executable bytes. */
 static void rcheevos_disc_md5(const char *boot_name, const uint8_t *file,
                               uint32_t hash_len, char hex[33])
 {
@@ -159,7 +133,7 @@ static int dat_value(char *line, const char *key, char *value, size_t capacity)
         memchr(start, ',', size) != NULL) return -1;
     for (size_t i = 0u; i < size; i++) {
         unsigned char c = (unsigned char)start[i];
-        if (c < 0x20u || c == 0x7Fu) return -1;
+        if (c < 0x20u || c > 0x7Eu) return -1;
     }
     memcpy(value, start, size);
     value[size] = '\0';
@@ -226,7 +200,7 @@ static int dat_title_for_serial(const char *path, const char *wanted, char title
 }
 
 static int ledger_matches(const char *path, const char *serial, const char *md5,
-                          const char *track_sha1, const char *title)
+                          const char *track_sha1, const char *title, char date[11])
 {
     static const char header[] =
         "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date";
@@ -235,7 +209,13 @@ static int ledger_matches(const char *path, const char *serial, const char *md5,
     unsigned row = 0u;
     int matched = 0;
     int valid = 1;
+    long end;
     if (file == NULL) return 0;
+    if (fseek(file, 0L, SEEK_END) != 0 || (end = ftell(file)) < 0L ||
+        end > 16L * 1024L * 1024L || fseek(file, 0L, SEEK_SET) != 0) {
+        (void)fclose(file);
+        return 0;
+    }
     while (fgets(line, sizeof line, file) != NULL) {
         char *fields[10];
         size_t size = strlen(line);
@@ -259,7 +239,16 @@ static int ledger_matches(const char *path, const char *serial, const char *md5,
         if (strcmp(fields[0], serial) == 0 && strcmp(fields[1], md5) == 0 &&
             strcmp(fields[2], track_sha1) == 0 && strcmp(fields[3], title) == 0 &&
             strcmp(fields[5], "cue/bin") == 0 && strcmp(fields[6], "metadata.identity") == 0 &&
-            strcmp(fields[7], "pass") == 0) {
+            strcmp(fields[7], "pass") == 0 && strlen(fields[9]) == 10u &&
+            fields[9][4] == '-' && fields[9][7] == '-') {
+            int date_ok = 1;
+            for (size_t i = 0u; i < 10u; i++) {
+                if (i != 4u && i != 7u && (fields[9][i] < '0' || fields[9][i] > '9')) {
+                    date_ok = 0;
+                }
+            }
+            if (!date_ok) continue;
+            memcpy(date, fields[9], 11u);
             matched = 1;
         }
     }
@@ -270,25 +259,25 @@ static int ledger_matches(const char *path, const char *serial, const char *md5,
 
 static int metadata_identity(const schway__probe_test_inputs *inputs, const char *image,
                              const schway_host_disc_probe *disc, const char *md5,
-                             char track_sha1[41], char title[256])
+                             char track_sha1[41], char title[256], char date[11])
 {
     schway__sha1_hex(disc->track1_sha1, track_sha1);
     if (!test_config_ready(inputs, image) || disc->serial[0] == '\0' ||
         !dat_title_for_serial(inputs->dat, disc->serial, title)) return 0;
-    return ledger_matches(inputs->ledger, disc->serial, md5, track_sha1, title);
+    return ledger_matches(inputs->ledger, disc->serial, md5, track_sha1, title, date);
 }
 
 uint8_t *schway__read_exe_file(const char *path, size_t *n_out)
 {
     FILE *f = fopen(path, "rb");
     if (f == NULL) {
-        refuse(path, "cannot open the file");
+        refuse("input", "cannot open the file");
         return NULL;
     }
     uint8_t *file = (uint8_t *)malloc((size_t)EXE_MAX + 1u);
     if (file == NULL) {
         (void)fclose(f);
-        refuse(path, "out of memory");
+        refuse("input", "out of memory");
         return NULL;
     }
     /* One byte more than the largest valid file, so a longer file is seen as
@@ -298,12 +287,12 @@ uint8_t *schway__read_exe_file(const char *path, size_t *n_out)
     (void)fclose(f);
     if (!read_ok) {
         free(file);
-        refuse(path, "cannot read the file");
+        refuse("input", "cannot read the file");
         return NULL;
     }
     if (n == 0u) {
         free(file);
-        refuse(path, "the file is empty");
+        refuse("input", "the file is empty");
         return NULL;
     }
     *n_out = n;
@@ -312,7 +301,8 @@ uint8_t *schway__read_exe_file(const char *path, size_t *n_out)
 
 void schway__refuse_file(const char *path, const char *why)
 {
-    refuse(path, why);
+    (void)path;
+    refuse("input", why);
 }
 
 int schway__probe_print(FILE *out, const char *path,
@@ -334,38 +324,25 @@ int schway__probe_print(FILE *out, const char *path,
             refuse("input", schway_status_string(validation));
             return 1;
         }
-        schway__sha256 sha;
-        uint8_t sha_digest[32];
-        char sha_hex[65];
         char md5_hex[33];
         char track_sha1_hex[41];
         char title[256] = "";
-        schway__sha256_init(&sha);
-        schway__sha256_update(&sha, disc.exe_bytes, disc.exe_size);
-        schway__sha256_final(&sha, sha_digest);
-        schway__sha256_hex(sha_digest, sha_hex);
+        char date[11] = "";
         rcheevos_disc_md5(disc.boot_name, disc.exe_bytes, disc_info.hash_len, md5_hex);
         int identity_match = metadata_identity(test_inputs, path, &disc, md5_hex,
-                                               track_sha1_hex, title);
-        fputs("format=disc\nserial=", out);
-        fputs(disc.serial[0] == '\0' ? "n/a" : disc.serial, out);
-        fprintf(out, "\nlicence_area=%s\nregion_guess=%s\nboot_name=%s\nexe_size=%lu\nsha256=%s\nrcheevos_md5=%s\ntrack1_sha1=%s\n",
-                licence_area_name(disc_info.licence_area), region_guess(disc_info.licence_area),
-                disc.boot_name, (unsigned long)disc.exe_size, sha_hex, md5_hex, track_sha1_hex);
-        fprintf(out, "pc0=0x%08lx\ngp0=0x%08lx\n", (unsigned long)disc_info.pc0,
-                (unsigned long)disc_info.gp0);
-        fprintf(out, "t_addr=0x%08lx\nt_size=0x%08lx\n", (unsigned long)disc_info.t_addr,
-                (unsigned long)disc_info.t_size);
-        fprintf(out, "d_addr=0x%08lx\nd_size=0x%08lx\nb_addr=0x%08lx\nb_size=0x%08lx\n",
-                (unsigned long)disc_info.d_addr, (unsigned long)disc_info.d_size,
-                (unsigned long)disc_info.b_addr, (unsigned long)disc_info.b_size);
-        fprintf(out, "s_addr=0x%08lx\ns_size=0x%08lx\nlint=0x%08lx\n",
-                (unsigned long)disc_info.s_addr, (unsigned long)disc_info.s_size,
-                (unsigned long)disc_info.lint);
-        fprintf(out, "metadata.identity=%s\ntitle=", identity_match ? "pass" : "unknown");
-        if (identity_match) put_text(out, title);
-        else fputs("unavailable", out);
-        fputs("\nboot_status=unknown\nplay_status=unknown\n", out);
+                                               track_sha1_hex, title, date);
+        fputs("format=disc\n", out);
+        if (identity_match) {
+            fprintf(out, "serial=%s\nrcheevos_md5=%s\ntrack1_sha1=%s\ntitle=",
+                    disc.serial, md5_hex, track_sha1_hex);
+            put_text(out, title);
+            fprintf(out, "\nmetadata.identity=pass\nmetadata.identity_date=%s\n", date);
+        } else {
+            fputs("serial=redacted\nrcheevos_md5=redacted\ntrack1_sha1=redacted\n"
+                  "boot_name=redacted\nsha256=redacted\ntitle=unavailable\n"
+                  "metadata.identity=unknown\n", out);
+        }
+        fputs("boot_status=unknown\nplay_status=unknown\n", out);
         schway__disc_probe_dispose(&disc);
         return ferror(out) == 0 ? 0 : 1;
     }
@@ -384,22 +361,14 @@ int schway__probe_print(FILE *out, const char *path,
         return 1;
     }
 
-    schway__sha256 s;
-    uint8_t digest[32];
-    char sha_hex[65];
-    char md5_hex[33];
-    schway__sha256_init(&s);
-    schway__sha256_update(&s, file, n);
-    schway__sha256_final(&s, digest);
-    schway__sha256_hex(digest, sha_hex);
-    rcheevos_md5(file, info.hash_len, md5_hex);
     free(file);
 
     fputs("format=exe\nserial=n/a\n", out);
-    fprintf(out, "licence_area=%s\nregion_guess=%s\nexe_name=", licence_area_name(info.licence_area),
-            region_guess(info.licence_area));
-    put_text(out, base_name(path));
-    fprintf(out, "\nexe_size=%lu\nsha256=%s\nrcheevos_md5=%s\n", (unsigned long)n, sha_hex, md5_hex);
+    fprintf(out, "licence_area=%s\nregion_guess=%s\nexe_name=redacted\n"
+                 "exe_size=%lu\nsha256=redacted\nrcheevos_md5=redacted\n",
+            licence_area_name(info.licence_area), region_guess(info.licence_area),
+            (unsigned long)n);
+    fputs("metadata.identity=unknown\n", out);
     fprintf(out, "pc0=0x%08lx\ngp0=0x%08lx\n", (unsigned long)info.pc0, (unsigned long)info.gp0);
     fprintf(out, "t_addr=0x%08lx\nt_size=0x%08lx\n", (unsigned long)info.t_addr,
             (unsigned long)info.t_size);

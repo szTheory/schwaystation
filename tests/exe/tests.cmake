@@ -19,8 +19,8 @@ if(CMAKE_SCRIPT_MODE_FILE)
   file(MAKE_DIRECTORY "${DIR}")
   if(CASE STREQUAL "probe_refusals")
     # The test program writes one good file and five bad ones. Each bad one,
-    # and a file that is not there, exits 1 with the file and a reason on
-    # standard error and no report; the good one exits 0 with its report.
+    # and a file that is not there, exits 1 with a generic reason on standard
+    # error and no report; the good one exits 0 with its report.
     execute_process(COMMAND ${EMULATOR} ${WRITER} write "${DIR}" RESULT_VARIABLE rc
       OUTPUT_VARIABLE out ERROR_VARIABLE out)
     if(NOT rc STREQUAL "0")
@@ -28,15 +28,16 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
     foreach(name bad_signature truncated no_entry empty oversized missing)
       probe_run(--probe "${DIR}/${name}.exe")
-      if(NOT rc STREQUAL "1" OR NOT err MATCHES "^schwaystation-run: [^\n]*${name}[.]exe: [^\n]+\n$"
+      if(NOT rc STREQUAL "1" OR NOT err MATCHES "^schwaystation-run: input: [^\n]+\n$"
           OR NOT out STREQUAL "")
-        message(FATAL_ERROR "--probe ${name}.exe: expected exit 1, a one-line error naming the file "
+        message(FATAL_ERROR "--probe ${name}.exe: expected exit 1, a one-line generic error "
           "and no report, got exit ${rc}\nstdout: ${out}\nstderr: ${err}")
       endif()
     endforeach()
     probe_run(--probe "${DIR}/valid.exe")
     if(NOT rc STREQUAL "0" OR NOT out MATCHES "(^|\n)licence_area=europe\n"
-        OR NOT out MATCHES "(^|\n)region_guess=pal\n" OR NOT out MATCHES "(^|\n)exe_name=valid[.]exe\n"
+        OR NOT out MATCHES "(^|\n)region_guess=pal\n" OR NOT out MATCHES "(^|\n)exe_name=redacted\n"
+        OR NOT out MATCHES "(^|\n)rcheevos_md5=redacted\n"
         OR NOT out MATCHES "(^|\n)lint=0x00000000\n" OR NOT err STREQUAL "")
       message(FATAL_ERROR "--probe valid.exe: exit ${rc}\nstdout: ${out}\nstderr: ${err}")
     endif()

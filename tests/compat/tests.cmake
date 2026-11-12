@@ -1,3 +1,17 @@
+function(probe_write_metadata root track_sha1)
+  set(metadata_dir "${root}/metadata")
+  file(MAKE_DIRECTORY "${metadata_dir}")
+  set(PROBE_LEDGER "${metadata_dir}/ledger.csv")
+  set(PROBE_DAT "${metadata_dir}/title.dat")
+  set(PROBE_CONFIG "${metadata_dir}/config.txt")
+  file(WRITE "${PROBE_DAT}" "clrmamepro (\n name \"Synthetic test DAT\"\n)\ngame (\n name \"Schway Synthetic Metadata Fixture\"\n region \"USA\"\n serial \"SWAY-00001\"\n)\n")
+  file(WRITE "${PROBE_LEDGER}" "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,metadata.identity,pass,synthetic:iso9660-known-answer,2026-11-12\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,boots@600,unknown,unavailable,2026-11-12\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,plays@600,unknown,unavailable,2026-11-12\n")
+  file(WRITE "${PROBE_CONFIG}" "schwaystation-test-metadata-v1\n")
+  set(PROBE_LEDGER "${PROBE_LEDGER}" PARENT_SCOPE)
+  set(PROBE_DAT "${PROBE_DAT}" PARENT_SCOPE)
+  set(PROBE_CONFIG "${PROBE_CONFIG}" PARENT_SCOPE)
+endfunction()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_synthetic_identity")
   foreach(required WORK_ROOT TEST_BINARY RUN)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -22,13 +36,15 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_synthetic_identity")
     RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if(NOT rc STREQUAL "0" OR
      NOT out MATCHES "format=disc" OR
-     NOT out MATCHES "serial=SWAY-00001" OR
-     NOT out MATCHES "boot_name=SWAY_000[.]01" OR
-     NOT out MATCHES "exe_size=4096" OR
-     NOT out MATCHES "rcheevos_md5=12481bed29c6c0d54a6f776ef5cec981" OR
-     NOT out MATCHES "boot_status=unavailable" OR
-     NOT out MATCHES "play_status=unavailable")
-    message(FATAL_ERROR "runner did not report the exact synthetic ISO identity: ${rc}: ${out}${err}")
+     NOT out MATCHES "serial=redacted" OR
+     NOT out MATCHES "boot_name=redacted" OR
+     NOT out MATCHES "rcheevos_md5=redacted" OR
+     NOT out MATCHES "track1_sha1=redacted" OR
+     NOT out MATCHES "metadata[.]identity=unknown" OR
+     NOT out MATCHES "boot_status=unknown" OR
+     NOT out MATCHES "play_status=unknown" OR
+     out MATCHES "SWAY-00001|SWAY_000[.]01|12481bed29c6c0d54a6f776ef5cec981|${track_sha1}")
+    message(FATAL_ERROR "unlisted ISO identity was not safely redacted: ${rc}: ${out}${err}")
   endif()
   file(WRITE "${WORK_ROOT}/compat-probe-track1.sha1" "${track_sha1}\n")
   message(STATUS "ISO probe reported the exact synthetic metadata identity")
@@ -68,10 +84,132 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_full_identity")
      NOT out MATCHES "track1_sha1=${track_sha1}" OR
      NOT out MATCHES "title=Schway Synthetic Metadata Fixture" OR
      NOT out MATCHES "metadata[.]identity=pass" OR
+     NOT out MATCHES "metadata[.]identity_date=2026-11-12" OR
      NOT out MATCHES "boot_status=unknown" OR
      NOT out MATCHES "play_status=unknown")
     message(FATAL_ERROR "runner did not join exact synthetic track and DAT identity: ${rc}: ${out}${err}")
   endif()
+  return()
+endif()
+
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_malformed")
+  foreach(required WORK_ROOT TEST_BINARY RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "malformed probe test requires ${required}")
+    endif()
+  endforeach()
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+  set(work "${WORK_ROOT}/compat-probe-malformed")
+  file(REMOVE_RECURSE "${work}")
+  file(MAKE_DIRECTORY "${work}")
+
+  foreach(mode IN ITEMS truncated overlap loop bad_extent)
+    set(root "${work}/${mode}")
+    file(MAKE_DIRECTORY "${root}")
+    set(image "${root}/input.iso")
+    execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" "${mode}" "${image}"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "cannot generate ${mode} ISO: ${rc}: ${out}${err}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR
+       NOT err MATCHES "schwaystation-run: input:" OR err MATCHES "${root}")
+      message(FATAL_ERROR "${mode} ISO was accepted, leaked its path, or escaped bounded refusal: ${rc}: ${out}${err}")
+    endif()
+  endforeach()
+
+  set(cue "${work}/bad.cue")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" cue_bad_msf "${cue}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate malformed CUE: ${rc}: ${out}${err}")
+  endif()
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${cue}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR
+     NOT err MATCHES "invalid CUE track metadata" OR err MATCHES "bad[.]cue")
+    message(FATAL_ERROR "malformed CUE was accepted or exposed its path: ${rc}: ${out}${err}")
+  endif()
+
+  set(absent "${work}/PRIVATE_SENTINEL_ABSENT.iso")
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${absent}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR
+     NOT err MATCHES "cannot open the file" OR err MATCHES "PRIVATE_SENTINEL")
+    message(FATAL_ERROR "absent input was accepted or its path leaked: ${rc}: ${out}${err}")
+  endif()
+  set(unsupported "${work}/PRIVATE_SENTINEL_MEDIA.pbp")
+  file(WRITE "${unsupported}" "PRIVATE_SENTINEL_CONTENT")
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${unsupported}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR
+     NOT err MATCHES "unsupported disc image media" OR err MATCHES "PRIVATE_SENTINEL")
+    message(FATAL_ERROR "unsupported media was accepted or exposed private input: ${rc}: ${out}${err}")
+  endif()
+
+  set(root "${work}/PRIVATE_SENTINEL_ROOT_04_42")
+  file(MAKE_DIRECTORY "${root}")
+  set(image "${root}/PRIVATE_SENTINEL_NAME.iso")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" synthetic "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate unlisted ISO: ${rc}: ${out}${err}")
+  endif()
+  file(SHA1 "${image}" track_sha1)
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0" OR NOT out MATCHES "metadata[.]identity=unknown" OR
+     NOT out MATCHES "serial=redacted" OR NOT out MATCHES "rcheevos_md5=redacted" OR
+     NOT out MATCHES "track1_sha1=redacted" OR NOT out MATCHES "boot_name=redacted" OR
+     out MATCHES "PRIVATE_SENTINEL|SWAY-00001|SWAY_000[.]01|12481bed29c6c0d54a6f776ef5cec981|${track_sha1}")
+    message(FATAL_ERROR "unlisted valid identity was not redacted: ${rc}: ${out}${err}")
+  endif()
+
+  foreach(control IN ITEMS wrong_md5 wrong_sha1 wrong_title missing_dat missing_ledger all_unknown)
+    set(root "${work}/${control}")
+    file(MAKE_DIRECTORY "${root}")
+    set(image "${root}/input.iso")
+    execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" synthetic "${image}"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "cannot generate ${control} ISO: ${rc}: ${out}${err}")
+    endif()
+    file(SHA1 "${image}" track_sha1)
+    probe_write_metadata("${root}" "${track_sha1}")
+    if(control STREQUAL "wrong_md5")
+      file(READ "${PROBE_LEDGER}" text)
+      string(REPLACE "12481bed29c6c0d54a6f776ef5cec981" "00000000000000000000000000000000" text "${text}")
+      file(WRITE "${PROBE_LEDGER}" "${text}")
+    elseif(control STREQUAL "wrong_sha1")
+      file(READ "${PROBE_LEDGER}" text)
+      string(REPLACE "${track_sha1}" "0000000000000000000000000000000000000000" text "${text}")
+      file(WRITE "${PROBE_LEDGER}" "${text}")
+    elseif(control STREQUAL "wrong_title")
+      file(READ "${PROBE_DAT}" text)
+      string(REPLACE "Schway Synthetic Metadata Fixture" "Private Wrong Title" text "${text}")
+      file(WRITE "${PROBE_DAT}" "${text}")
+    elseif(control STREQUAL "missing_dat")
+      set(PROBE_DAT "${root}/metadata/absent.dat")
+    elseif(control STREQUAL "missing_ledger")
+      set(PROBE_LEDGER "${root}/metadata/absent.csv")
+    elseif(control STREQUAL "all_unknown")
+      file(READ "${PROBE_LEDGER}" text)
+      string(REPLACE "metadata.identity,pass" "metadata.identity,unknown" text "${text}")
+      file(WRITE "${PROBE_LEDGER}" "${text}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+        --test-ledger "${PROBE_LEDGER}" --test-dat "${PROBE_DAT}"
+        --test-root "${root}" --test-config "${PROBE_CONFIG}"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "0" OR NOT out MATCHES "metadata[.]identity=unknown" OR
+       NOT out MATCHES "serial=redacted" OR NOT out MATCHES "rcheevos_md5=redacted" OR
+       NOT out MATCHES "track1_sha1=redacted" OR
+       out MATCHES "SWAY-00001|SWAY_000[.]01|12481bed29c6c0d54a6f776ef5cec981|${track_sha1}|Private Wrong Title")
+      message(FATAL_ERROR "${control} metadata join was accepted or leaked private identity: ${rc}: ${out}${err}")
+    endif()
+  endforeach()
   return()
 endif()
 
@@ -100,21 +238,32 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_cue_modes")
   file(MAKE_DIRECTORY "${work}")
 
   foreach(mode IN ITEMS cue_2048 cue_mode1_2352 cue_mode2_2352 cue_mode2_2336 cue_track99)
-    set(cue "${work}/${mode}.cue")
+    set(mode_dir "${work}/${mode}")
+    file(MAKE_DIRECTORY "${mode_dir}")
+    set(cue "${mode_dir}/${mode}.cue")
     execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" "${mode}" "${cue}"
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     if(NOT rc STREQUAL "0")
       message(FATAL_ERROR "cannot generate ${mode} CUE fixture: ${rc}: ${out}${err}")
     endif()
+    set(track_file "${mode_dir}/synthetic.bin")
+    if(mode STREQUAL "cue_track99")
+      set(track_file "${cue}.track1")
+    endif()
+    file(SHA1 "${track_file}" track_sha1)
+    probe_write_metadata("${mode_dir}" "${track_sha1}")
     execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${cue}"
+        --test-ledger "${PROBE_LEDGER}" --test-dat "${PROBE_DAT}"
+        --test-root "${mode_dir}" --test-config "${PROBE_CONFIG}"
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     if(NOT rc STREQUAL "0" OR NOT out MATCHES "format=disc" OR
        NOT out MATCHES "serial=SWAY-00001" OR
-       NOT out MATCHES "boot_name=SWAY_000[.]01" OR
-       NOT out MATCHES "exe_size=4096" OR
        NOT out MATCHES "rcheevos_md5=12481bed29c6c0d54a6f776ef5cec981" OR
-       NOT out MATCHES "boot_status=unavailable" OR
-       NOT out MATCHES "play_status=unavailable")
+       NOT out MATCHES "track1_sha1=${track_sha1}" OR
+       NOT out MATCHES "title=Schway Synthetic Metadata Fixture" OR
+       NOT out MATCHES "metadata[.]identity=pass" OR
+       NOT out MATCHES "boot_status=unknown" OR
+       NOT out MATCHES "play_status=unknown")
       message(FATAL_ERROR "${mode} CUE did not preserve the synthetic disc identity: ${rc}: ${out}${err}")
     endif()
   endforeach()
@@ -143,14 +292,28 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_cue_edges")
     if(NOT rc STREQUAL "0")
       message(FATAL_ERROR "cannot generate ${mode} CUE fixture: ${rc}: ${out}${err}")
     endif()
-    execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${cue}"
+    set(probe_args)
+    if(mode STREQUAL "cue_name_255")
+      string(REPEAT "a" 251 name_prefix)
+      set(track_file "${case_dir}/${name_prefix}.bin")
+    elseif(mode STREQUAL "cue_max_bytes")
+      set(track_file "${case_dir}/synthetic.bin")
+    endif()
+    if(mode STREQUAL "cue_name_255" OR mode STREQUAL "cue_max_bytes")
+      file(SHA1 "${track_file}" track_sha1)
+      probe_write_metadata("${case_dir}" "${track_sha1}")
+      list(APPEND probe_args --test-ledger "${PROBE_LEDGER}" --test-dat "${PROBE_DAT}"
+        --test-root "${case_dir}" --test-config "${PROBE_CONFIG}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${cue}" ${probe_args}
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     if(mode STREQUAL "cue_name_255" OR mode STREQUAL "cue_max_bytes")
       if(NOT rc STREQUAL "0" OR NOT out MATCHES "format=disc" OR
          NOT out MATCHES "serial=SWAY-00001" OR
-         NOT out MATCHES "boot_name=SWAY_000[.]01" OR
          NOT out MATCHES "rcheevos_md5=12481bed29c6c0d54a6f776ef5cec981" OR
-         NOT out MATCHES "boot_status=unavailable" OR NOT out MATCHES "play_status=unavailable")
+         NOT out MATCHES "track1_sha1=${track_sha1}" OR
+         NOT out MATCHES "metadata[.]identity=pass" OR
+         NOT out MATCHES "boot_status=unknown" OR NOT out MATCHES "play_status=unknown")
         message(FATAL_ERROR "${mode} CUE boundary did not preserve identity: ${rc}: ${out}${err}")
       endif()
     else()
@@ -193,9 +356,9 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_iso_edges")
   execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if(NOT rc STREQUAL "0" OR NOT out MATCHES "format=disc" OR
-     NOT out MATCHES "serial=n/a" OR NOT out MATCHES "boot_name=PSX[.]EXE" OR
-     NOT out MATCHES "boot_status=unavailable" OR NOT out MATCHES "play_status=unavailable")
-    message(FATAL_ERROR "missing SYSTEM.CNF did not fall back to root PSX.EXE: ${rc}: ${out}${err}")
+     NOT out MATCHES "metadata[.]identity=unknown" OR
+     NOT out MATCHES "boot_status=unknown" OR NOT out MATCHES "play_status=unknown")
+    message(FATAL_ERROR "missing SYSTEM.CNF fallback input was refused or exposed private metadata: ${rc}: ${out}${err}")
   endif()
 
   set(image "${work}/missing.iso")
@@ -501,11 +664,19 @@ schway_add_test(NAME compat.probe.sha1_vectors
     -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
+# Fault prevented: hostile ISO/CUE inputs hanging or private unlisted identity leaking.
+schway_add_test(NAME compat.probe.malformed
+  COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
+    -DRUN=$<TARGET_FILE:schwaystation-run-test> "-DEMULATOR=${schway__probe_emulator}"
+    -DCASE=probe_malformed -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 30)
+
 # Fault prevented: CUE sector representations changing the canonical boot identity.
 schway_add_test(NAME compat.probe.cue_modes
   COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
     -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
-    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DRUN=$<TARGET_FILE:schwaystation-run-test> "-DEMULATOR=${schway__probe_emulator}"
     -DCASE=probe_cue_modes -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
@@ -513,7 +684,7 @@ schway_add_test(NAME compat.probe.cue_modes
 schway_add_test(NAME compat.probe.cue_edges
   COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
     -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
-    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DRUN=$<TARGET_FILE:schwaystation-run-test> "-DEMULATOR=${schway__probe_emulator}"
     -DCASE=probe_cue_edges -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 

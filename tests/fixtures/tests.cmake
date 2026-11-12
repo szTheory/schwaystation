@@ -25,15 +25,14 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   elseif(CASE STREQUAL "probe")
     # The runner's --probe report for the image: the identity fields, the
-    # size and the achievement-hash MD5, each from an independent reading of
-    # the file (the image's text is its whole body, so the MD5 covers the file).
+    # size and non-identifying header fields. Bare executable identities and
+    # digests are withheld unless they join a disc metadata record.
     file(SIZE "${FILE}" size)
-    file(MD5 "${FILE}" md5)
     execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FILE}" RESULT_VARIABLE rc
       OUTPUT_VARIABLE out ERROR_VARIABLE out)
     set(want "format=exe" "serial=n/a" "licence_area=north_america" "region_guess=ntsc-u"
-      "exe_name=hello[.]exe" "exe_size=${size}" "pc0=0x80010100" "t_addr=0x80010000"
-      "rcheevos_md5=${md5}")
+      "exe_name=redacted" "exe_size=${size}" "pc0=0x80010100" "t_addr=0x80010000"
+      "rcheevos_md5=redacted" "sha256=redacted")
     if(NOT rc STREQUAL "0")
       message(FATAL_ERROR "schwaystation-run --probe ${FILE}: exit ${rc}\n${out}")
     endif()

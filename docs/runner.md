@@ -411,57 +411,53 @@ shows that frame's time, and with fewer than 100,000 frames p99.999 is the maxim
 
 ## Probe
 
-`--probe FILE` reads a PS-EXE, a direct raw ISO9660 image, or a CUE sheet with its referenced BINARY files. It
-checks the boot executable with the core's PS-EXE validator and prints metadata. It makes no instance, loads
-nothing into the emulated console, sends no sector to the console and runs no frame. Raw ISO9660 images use
-2048-byte sectors. CUE sheets are at most 64 KiB with at most 99 tracks and 99 indexes; each relative `FILE` name
-is at most 255 bytes and cannot escape the sheet's directory. Companion image files together are at most 1 GiB.
-Supported CUE layouts are `MODE1/2048`, `MODE1/2352`, `MODE2/2336`, `MODE2/2352` and `AUDIO`;
-timestamps range through `99:59:74`. ISO data uses at most 64 volume descriptors, directories no larger than
-64 KiB with at most 4096 entries, `SYSTEM.CNF` up to 2047 ASCII bytes, and boot paths up to 16 safe components
-of at most 63 bytes each. CD-ROM behavior, playlist parsing and disc execution are outside this probe. It reports
-booting and playing as unavailable. The report is these lines, in this order, each `key=value`:
+`--probe FILE` reads a PS-EXE, a raw ISO9660 image, or a CUE sheet with its referenced BINARY files. It validates a
+disc's boot executable but does not create an emulator instance, submit sectors, or run a frame. Raw ISO images use
+2048-byte sectors. CUE sheets are at most 64 KiB with at most 99 tracks and indexes; each relative `FILE` name is at
+most 255 bytes and cannot escape the sheet's directory. Companion images together are capped at 1 GiB. Supported
+CUE layouts are `MODE1/2048`, `MODE1/2352`, `MODE2/2336`, `MODE2/2352` and `AUDIO`; timestamps range through
+`99:59:74`. ISO parsing is bounded to 64 descriptors, 64 KiB directories with 4096 records, 2047 bytes of
+`SYSTEM.CNF`, and 16 boot-path components of at most 63 bytes each. `.chd`, `.pbp`, `.ecm` and `.ccd` are refused
+as unsupported media. The probe never executes a disc. Boot and play status remain `unknown`.
+
+The output only reveals a disc identity when its serial, rcheevos MD5, first-track SHA-1, DAT title and passing
+`metadata.identity` ledger row all match. Otherwise its serial, names and digests are redacted. Bare PS-EXE names
+and digests are redacted because they have no disc metadata join. Probe errors use the generic label `input`; they
+do not echo a private path. Identity fields are:
 
 | Key | Value |
 |---|---|
 | `format` | `exe` for a bare file; `disc` for a raw ISO9660 image or CUE sheet |
-| `serial` | `n/a` for a bare executable; inferred from a disc's boot name when it has the conventional form |
-| `licence_area` | the market named by the licence text at offset 4Ch: `japan`, `europe`, `north_america` or `none` |
-| `region_guess` | `ntsc-j`, `pal` or `ntsc-u` for the three markets, `unknown` for `none` |
-| `exe_name` | for a bare file, its name without the directory; bytes outside printable ASCII show as `?` |
-| `boot_name` | for a disc, the boot executable's name without an ISO version suffix |
-| `exe_size` | the file's size in bytes, in decimal |
-| `sha256` | SHA-256 of the whole file, 64 lowercase hex digits |
-| `rcheevos_md5` | the MD5 an achievement set is keyed on, 32 lowercase hex digits, see below |
-| `pc0`, `gp0` | the entry point and the initial global pointer |
-| `t_addr`, `t_size` | where the text loads and how many bytes it has |
-| `d_addr`, `d_size`, `b_addr`, `b_size` | the data and BSS fields, printed as the header holds them |
-| `s_addr`, `s_size` | the initial stack base and offset, zero when the header gives none |
-| `lint` | notes on a valid file, as bits: `0x1` the text lies in the low 64 KiB, `0x2` bytes follow the text |
-| `boot_status`, `play_status` | for a disc, both are `unavailable` |
+| `serial` | matched DAT serial; otherwise `redacted` |
+| `rcheevos_md5` | matched boot-executable MD5; otherwise `redacted` |
+| `track1_sha1` | matched physical first-track SHA-1; otherwise `redacted` |
+| `title` | matched DAT title; otherwise `unavailable` |
+| `metadata.identity` | `pass` only for the exact ledger/DAT join; otherwise `unknown` |
+| `metadata.identity_date` | ledger measurement date, present only when identity matches |
+| `boot_status`, `play_status` | both `unknown`; the probe never boots or plays a disc |
 
-For a raw ISO9660 image or CUE sheet, `format` is `disc`; `serial` is inferred from a conventional boot executable
-name or `n/a`; `boot_name` is the boot executable's canonical name without an ISO version suffix. The executable
-fields and hashes describe that file. `rcheevos_md5` hashes the canonical boot name followed by the PS-EXE header
-and text bytes selected by its header. `boot_status` and `play_status` are always `unavailable`: this probe does
-not boot or run discs. If `SYSTEM.CNF` is missing, the probe tries a root `PSX.EXE` file.
+The boot MD5 follows the RetroAchievements rule: hash the canonical boot filename without its ISO version suffix,
+then the PS-EXE header and text bytes selected by the header. The SHA-1 covers the physical bytes of track 1,
+including sector headers for raw CUE tracks. The first data track can be later than track 1.
 
-The ten header values, from `pc0` to `s_size`, are printed as `0x` and eight hex digits, and so is `lint`.
+The title source is libretro-database's Redump Sony PlayStation DAT at commit
+[`12c21cf79f1e20eff6ac68b80875816c717d0a7a`](https://github.com/libretro/libretro-database/tree/12c21cf79f1e20eff6ac68b80875816c717d0a7a),
+`metadat/redump/Sony - PlayStation.dat`, under CC-BY-SA-4.0. The project and license are credited here; the DAT is
+not copied into the runner. Lookup input is bounded to 16 MiB with lines no longer than 4096 bytes. Test builds
+expose isolated `--test-ledger`, `--test-dat`, `--test-root` and `--test-config` inputs to the test runner; the
+packaged `schwaystation-run` does not accept these options. The ten-column ledger accepts unquoted printable ASCII
+titles only, so a DAT entry with a comma, quote, escape or non-ASCII title remains unavailable. No package is
+required.
 
-`rcheevos_md5` is the MD5 of the file's first `t_size` + 0800h bytes, which is the header and the text. This is the
-rule RetroAchievements applies to a PS-EXE. A disc's hash also begins with the name of its boot file; a bare file
-has none, so nothing is added. A file longer than that, as a `lint` of `0x2` reports, hashes as if it were cut there.
-
-The file must be a PS-EXE the core would load: the `PS-X EXE` signature, a header the validator accepts, and a size
-from 0800h to 0800h + 2 MiB. Otherwise nothing is printed on standard output and the runner prints one line to
-standard error and exits 1:
+The input must be a PS-EXE the core would load or a bounded, valid disc image. Otherwise nothing is printed on
+standard output and the runner prints one generic line to standard error and exits 1:
 
 ```text
-schwaystation-run: game.exe: PS-EXE invalid
+schwaystation-run: input: PS-EXE invalid
 ```
 
-The reason is `PS-EXE invalid` or `PS-EXE outside RAM` from the core, or `the file is empty`, `cannot open the
-file` or `cannot read the file`. `--probe` with any other option, with no file or with a second file exits 2.
+The reason is a validation or I/O result from the probe. `--probe` with any other option, with no file or with a
+second file exits 2.
 
 ## Stopping
 

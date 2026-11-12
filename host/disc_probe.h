@@ -19,7 +19,8 @@ typedef enum schway_host_disc_probe_status {
     SCHWAY_HOST_DISC_PROBE_CUE_PATH = 10,
     SCHWAY_HOST_DISC_PROBE_CUE_IO = 11,
     SCHWAY_HOST_DISC_PROBE_CUE_MODE = 12,
-    SCHWAY_HOST_DISC_PROBE_CUE_NO_DATA = 13
+    SCHWAY_HOST_DISC_PROBE_CUE_NO_DATA = 13,
+    SCHWAY_HOST_DISC_PROBE_UNSUPPORTED = 14
 } schway_host_disc_probe_status;
 
 typedef struct schway_host_disc_probe {

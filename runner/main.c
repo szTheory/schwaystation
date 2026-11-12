@@ -327,6 +327,7 @@ typedef struct options {
     const char *serial; /* --serial SERIAL when serial card naming is selected */
     int serial_card_names; /* --memcard-names serial */
     int memcard_names_set;
+    int region_set; /* --region was supplied */
     const char *probe; /* --probe FILE, else NULL */
 #ifdef SCHWAY_RUN_TEST_HOOKS
     const char *test_ledger;
@@ -467,6 +468,7 @@ static int parse_options(int argc, char **argv, options *o)
             } else {
                 return usage("--region needs ntsc-u, ntsc-j or pal");
             }
+            o->region_set = 1;
             i++;
         } else if (strcmp(arg, "--exe") == 0) {
             if (o->exe != NULL) {
@@ -548,7 +550,8 @@ static int parse_options(int argc, char **argv, options *o)
         if ((any_test_input && !all_test_inputs) || o->frames != 0u || o->bios != NULL ||
             o->exe != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash ||
             o->hash_state || o->bench || o->tty || o->stop_mailbox || o->trace ||
-            o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL) {
+            o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
+            o->region_set) {
             return usage("--probe cannot be combined with run options or partial test metadata");
         }
         return SCHWAY__EXIT_OK;
@@ -561,7 +564,7 @@ static int parse_options(int argc, char **argv, options *o)
         if (o->frames != 0u || o->bios != NULL || o->exe != NULL || o->inputs != NULL ||
             o->save_dir != NULL || o->hash || o->hash_state || o->bench || o->tty ||
             o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
-            o->memcard_names_set || o->serial != NULL) {
+            o->memcard_names_set || o->serial != NULL || o->region_set) {
             return usage("--probe takes no other option");
         }
         return SCHWAY__EXIT_OK;

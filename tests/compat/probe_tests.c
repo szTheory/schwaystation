@@ -78,6 +78,7 @@ static int make_synthetic_iso(const char *path, const char *mode)
     static const uint8_t dotdot[] = {1u};
     static const char system_cnf[] = "BOOT = cdrom:\\SWAY_000.01;1\r\n";
     static const char traversal_system_cnf[] = "BOOT = cdrom:\\..\\SWAY_000.01;1\r\n";
+    char loop_system_cnf[256];
     static const uint8_t pvd_id[] = {'C', 'D', '0', '0', '1'};
     uint8_t image[PROBE_TEST_SECTOR_SIZE * PROBE_TEST_IMAGE_SECTORS];
     uint8_t *pvd = image + 16u * PROBE_TEST_SECTOR_SIZE;
@@ -88,6 +89,19 @@ static int make_synthetic_iso(const char *path, const char *mode)
     FILE *file;
     const char *system_contents = strcmp(mode, "traversal") == 0 ?
                                   traversal_system_cnf : system_cnf;
+    if (strcmp(mode, "loop") == 0) {
+        static const char prefix[] = "BOOT = cdrom:\\";
+        static const char component[] = "LOOP\\";
+        static const char executable[] = "SWAY_000.01;1\r\n";
+        size_t used = sizeof prefix - 1u;
+        memcpy(loop_system_cnf, prefix, used);
+        for (unsigned i = 0u; i < 15u; i++) {
+            memcpy(loop_system_cnf + used, component, sizeof component - 1u);
+            used += sizeof component - 1u;
+        }
+        memcpy(loop_system_cnf + used, executable, sizeof executable);
+        system_contents = loop_system_cnf;
+    }
 
     memset(image, 0, sizeof image);
     pvd[0] = 1u;
@@ -98,7 +112,8 @@ static int make_synthetic_iso(const char *path, const char *mode)
     put16_le_be(pvd + 124u, 1u);
     put16_le_be(pvd + 128u, PROBE_TEST_SECTOR_SIZE);
     put32_le_be(pvd + 132u, 0u);
-    (void)write_record(pvd, 156u, 18u, PROBE_TEST_SECTOR_SIZE, 2u, dot, sizeof dot);
+    uint32_t root_extent = strcmp(mode, "overlap") == 0 ? 16u : 18u;
+    (void)write_record(pvd, 156u, root_extent, PROBE_TEST_SECTOR_SIZE, 2u, dot, sizeof dot);
 
     terminator[0] = 255u;
     memcpy(terminator + 1u, pvd_id, sizeof pvd_id);
@@ -115,6 +130,9 @@ static int make_synthetic_iso(const char *path, const char *mode)
         uint32_t boot_extent = strcmp(mode, "bad_extent") == 0 ? PROBE_TEST_IMAGE_SECTORS : 20u;
         offset += write_named_record(root, offset, boot_extent, 4096u, 0u, boot_file);
     }
+    if (strcmp(mode, "loop") == 0) {
+        offset += write_named_record(root, offset, 21u, PROBE_TEST_SECTOR_SIZE, 2u, "LOOP");
+    }
     if (offset == 0u) {
         return 1;
     }
@@ -122,12 +140,24 @@ static int make_synthetic_iso(const char *path, const char *mode)
         memcpy(image + 19u * PROBE_TEST_SECTOR_SIZE, system_contents, strlen(system_contents));
     }
     if (strcmp(mode, "missing") != 0) write_executable(exe);
+    if (strcmp(mode, "loop") == 0) {
+        uint8_t *loop_dir = image + 21u * PROBE_TEST_SECTOR_SIZE;
+        size_t loop_offset = 0u;
+        loop_offset += write_record(loop_dir, loop_offset, 21u, PROBE_TEST_SECTOR_SIZE,
+                                    2u, dot, sizeof dot);
+        loop_offset += write_record(loop_dir, loop_offset, 18u, PROBE_TEST_SECTOR_SIZE,
+                                    2u, dotdot, sizeof dotdot);
+        (void)write_named_record(loop_dir, loop_offset, 21u, PROBE_TEST_SECTOR_SIZE,
+                                 2u, "LOOP");
+    }
 
     file = fopen(path, "wb");
     if (file == NULL) {
         return 1;
     }
-    int failed = fwrite(image, 1u, sizeof image, file) != sizeof image;
+    size_t image_size = strcmp(mode, "truncated") == 0 ?
+                        17u * PROBE_TEST_SECTOR_SIZE : sizeof image;
+    int failed = fwrite(image, 1u, image_size, file) != image_size;
     if (fclose(file) != 0) {
         failed = 1;
     }
@@ -181,6 +211,8 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
     FILE *source = NULL;
     FILE *bin = NULL;
     FILE *cue = NULL;
+    FILE *track1 = NULL;
+    char *track1_path = NULL;
     int failed = 0;
     size_t sector_size = PROBE_TEST_SECTOR_SIZE;
     size_t data_offset = 0u;
@@ -247,6 +279,23 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
     if (fclose(bin) != 0) failed = 1;
     bin = NULL;
     if (failed) goto done;
+    if (track99) {
+        uint8_t audio_sector[2352] = {0};
+        track1_path = (char *)malloc(cue_path_size + 16u);
+        if (track1_path == NULL) {
+            failed = 1;
+            goto done;
+        }
+        (void)snprintf(track1_path, cue_path_size + 16u, "%s.track1", cue_path);
+        track1 = fopen(track1_path, "wb");
+        if (track1 == NULL || fwrite(audio_sector, 1u, sizeof audio_sector, track1) != sizeof audio_sector) {
+            failed = 1;
+            goto done;
+        }
+        if (fclose(track1) != 0) failed = 1;
+        track1 = NULL;
+        if (failed) goto done;
+    }
 
     cue = fopen(cue_path, "wb");
     if (cue == NULL) {
@@ -278,9 +327,11 @@ done:
     if (source != NULL && fclose(source) != 0) failed = 1;
     if (bin != NULL && fclose(bin) != 0) failed = 1;
     if (cue != NULL && fclose(cue) != 0) failed = 1;
+    if (track1 != NULL && fclose(track1) != 0) failed = 1;
     if (source_path != NULL) (void)remove(source_path);
     free(source_path);
     free(bin_path);
+    free(track1_path);
     return failed;
 }
 
@@ -459,8 +510,11 @@ int main(int argc, char **argv)
                       strcmp(argv[1], "fallback") != 0 &&
                       strcmp(argv[1], "missing") != 0 &&
                       strcmp(argv[1], "bad_extent") != 0 &&
-                      strcmp(argv[1], "traversal") != 0)) {
-        (void)fprintf(stderr, "usage: schwaystation-test-probe <synthetic|fallback|missing|bad_extent|traversal|cue_2048|cue_mode1_2352|cue_mode2_2352|cue_mode2_2336|cue_track99> <image>\n");
+                      strcmp(argv[1], "traversal") != 0 &&
+                      strcmp(argv[1], "truncated") != 0 &&
+                      strcmp(argv[1], "overlap") != 0 &&
+                      strcmp(argv[1], "loop") != 0)) {
+        (void)fprintf(stderr, "usage: schwaystation-test-probe <synthetic|fallback|missing|bad_extent|traversal|truncated|overlap|loop|cue_2048|cue_mode1_2352|cue_mode2_2352|cue_mode2_2336|cue_track99> <image>\n");
         return 2;
     }
     return make_synthetic_iso(argv[2], argv[1]);

@@ -988,6 +988,18 @@ static int schway__path_is_cue(const char *path)
            schway__cue_word_is(dot, ".cue");
 }
 
+static int schway__path_is_unsupported(const char *path)
+{
+    const char *dot = strrchr(path, '.');
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+    const char *last = slash;
+    if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
+    if (dot == NULL || (last != NULL && dot < last)) return 0;
+    return schway__cue_word_is(dot, ".chd") || schway__cue_word_is(dot, ".pbp") ||
+           schway__cue_word_is(dot, ".ecm") || schway__cue_word_is(dot, ".ccd");
+}
+
 schway_host_disc_probe_status schway__disc_probe_image(const char *path,
                                                         schway_host_disc_probe *out)
 {
@@ -998,6 +1010,7 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
     long end;
     int is_cue;
     if (path == NULL || out == NULL) return SCHWAY_HOST_DISC_PROBE_IO;
+    if (schway__path_is_unsupported(path)) return SCHWAY_HOST_DISC_PROBE_UNSUPPORTED;
     memset(&source, 0, sizeof source);
     is_cue = schway__path_is_cue(path);
     if (is_cue) {
@@ -1070,6 +1083,7 @@ const char *schway__disc_probe_status_string(schway_host_disc_probe_status statu
     case SCHWAY_HOST_DISC_PROBE_CUE_IO: return "cannot read CUE track file";
     case SCHWAY_HOST_DISC_PROBE_CUE_MODE: return "unsupported CUE track mode";
     case SCHWAY_HOST_DISC_PROBE_CUE_NO_DATA: return "CUE has no data track";
+    case SCHWAY_HOST_DISC_PROBE_UNSUPPORTED: return "unsupported disc image media";
     case SCHWAY_HOST_DISC_PROBE_OK: return "ok";
     }
     return "invalid disc probe status";
