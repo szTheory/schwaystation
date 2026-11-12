@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 Phase: 04 (Games play in RetroArch) — EXECUTING
 Current Plan: 43 of 53
 Status: Plan 04-49 complete; 12 phase plans remain incomplete.
-Last activity: 2026-11-12 — Completed bounded CUE/BIN identity probing; CI and hygiene passed. Runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh.
+Last activity: 2026-11-12 — Completed full disc identity joining and bounded privacy controls; CI and hygiene passed. Runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh.
 
 Progress: [█████░░░░░] 50%
 
