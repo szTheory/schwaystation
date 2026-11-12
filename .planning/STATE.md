@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 36 of 53
+current_plan: 37 of 53
 status: executing
-stopped_at: Checkpointed incomplete 04-24 after measured schema/data GREEN
-last_updated: "2026-11-12T02:22:51.000Z"
+stopped_at: Completed 04-27; 04-24 remains incomplete at its budget checkpoint
+last_updated: "2026-11-12T03:10:11.360Z"
 last_activity: 2026-11-12
 last_activity_desc: Committed the measured 04-24 schema/data subset; compatibility judge and generated-doc controls await a whole-phase gate-budget decision.
-state_head: 2b8c94c31583116f45f2314ac07d302011403c60
+state_head: aba2b7b03da6472237938c393ce86dc3178e0407
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 103
+  completed_plans: 104
   percent: 50
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 36 of 53
+Current Plan: 37 of 53
 Status: Plan 04-40 complete; the next roadmap plan is 04-24.
 Last activity: 2026-11-12 — Inspected and pinned the OpenBIOS shell at frame 240; portable hash equality and all required hosted checks passed.
 
@@ -164,6 +164,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P52 | 18m 38s | 2 tasks | 9 files |
 | Phase 04 P53 | 45min | 2 tasks | 8 files |
 | Phase 04 P40 | 4h 28m | 2 tasks | 7 files |
+| Phase 04 P27 | at least 20 min (start unavailable after compaction) | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -377,6 +378,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Pin NTSC-U frame 240 because it is the earliest independently inspected frame with a clearly recognizable cube shell.
 - [Phase 04]: Make the shell test a CTest fixture setup for runner.hashes_file so tuple provenance is fresh in each run.
 - [Phase 04]: Require OpenBIOS only at consumer execution time and reuse the existing comparison helper for portable refusal controls.
+- [Phase 04]: Plan 04-27: default no-content loads keep the test card; selected BIOS images apply only to no-content boot, while PS-EXE content always uses the stub.
+- [Phase 04]: Plan 04-27: validate EXE structure before refusing valid late loads to preserve frozen API error statuses.
 
 ### Pending Todos
 
@@ -516,11 +519,12 @@ come from `AGENTS.md`.
 | 2026-11-12 | /gsd-execute-plan 04-40 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; inspected shell frame 240, portable selector/refusal controls, full CI/hygiene and exact-head hosted CI | gpt-6-luna xhigh |
 
 | 2026-11-12 | /gsd-execute-plan 04-24 (incomplete checkpoint) | Codex, OpenGSD 1.20.0; sequential executor; measured ledger/schema GREEN subset, scratch ratchet/docs sizing and refusal controls; plan remains incomplete | GPT-6 (session; exact model ID not exposed) |
+| 2026-11-12 | /gsd-execute-plan 04-27 | Codex, OpenGSD 1.20.0; sequential executor; PS-EXE libretro loading, no-content BIOS selection, full CI and hygiene | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-12T02:22:51.000Z
-Stopped at: Checkpointed incomplete 04-24; awaiting the whole-phase gate-budget decision
+Last session: 2026-11-12T03:10:10.887Z
+Stopped at: Completed 04-27; 04-24 remains incomplete at its budget checkpoint
 Resume file: .planning/phases/04-games-play-in-retroarch/04-24-CHECKPOINT.md
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
