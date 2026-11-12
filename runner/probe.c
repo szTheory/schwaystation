@@ -1,4 +1,4 @@
-/* schwaystation-run --probe: the identity of a PS-EXE file. The core's
+/* schwaystation-run --probe: the identity of a PS-EXE or bounded disc image. The core's
    validator supplies the header fields; the runner adds the file's name and
    size and two digests. No instance is made and no frame runs. */
 #include "probe.h"
@@ -140,7 +140,7 @@ void schway__refuse_file(const char *path, const char *why)
 int schway__probe_print(FILE *out, const char *path)
 {
     schway_host_disc_probe disc;
-    schway_host_disc_probe_status disc_status = schway__disc_probe_iso(path, &disc);
+    schway_host_disc_probe_status disc_status = schway__disc_probe_image(path, &disc);
     if (disc_status != SCHWAY_HOST_DISC_PROBE_NOT_ISO) {
         if (disc_status != SCHWAY_HOST_DISC_PROBE_OK) {
             refuse(path, schway__disc_probe_status_string(disc_status));

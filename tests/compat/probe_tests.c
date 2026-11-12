@@ -231,11 +231,9 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
 
     if (track99) {
         uint8_t audio_sector[2352] = {0};
-        uint8_t pregap[PROBE_TEST_SECTOR_SIZE] = {0};
         for (unsigned i = 0u; i < 98u && !failed; i++) {
             if (fwrite(audio_sector, 1u, sizeof audio_sector, bin) != sizeof audio_sector) failed = 1;
         }
-        if (!failed && fwrite(pregap, 1u, sizeof pregap, bin) != sizeof pregap) failed = 1;
         for (size_t i = 0u; i < PROBE_TEST_IMAGE_SECTORS && !failed; i++) {
             failed = write_iso_sector(bin, iso, i, PROBE_TEST_SECTOR_SIZE, 0u, 0);
         }
@@ -267,10 +265,8 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
             write_msf(cue, i);
             (void)fprintf(cue, "\n");
         }
-        (void)fprintf(cue, "TRACK 99 MODE1/2048\nINDEX 00 ");
+        (void)fprintf(cue, "TRACK 99 MODE1/2048\nINDEX 01 ");
         write_msf(cue, 98u);
-        (void)fprintf(cue, "\nINDEX 01 ");
-        write_msf(cue, 99u);
         (void)fprintf(cue, "\n");
     }
     if (fclose(cue) != 0) failed = 1;

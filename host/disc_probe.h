@@ -14,7 +14,12 @@ typedef enum schway_host_disc_probe_status {
     SCHWAY_HOST_DISC_PROBE_BAD_SYSTEM_CNF = 5,
     SCHWAY_HOST_DISC_PROBE_NO_BOOT_EXE = 6,
     SCHWAY_HOST_DISC_PROBE_BAD_BOOT_PATH = 7,
-    SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY = 8
+    SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY = 8,
+    SCHWAY_HOST_DISC_PROBE_BAD_CUE = 9,
+    SCHWAY_HOST_DISC_PROBE_CUE_PATH = 10,
+    SCHWAY_HOST_DISC_PROBE_CUE_IO = 11,
+    SCHWAY_HOST_DISC_PROBE_CUE_MODE = 12,
+    SCHWAY_HOST_DISC_PROBE_CUE_NO_DATA = 13
 } schway_host_disc_probe_status;
 
 typedef struct schway_host_disc_probe {
@@ -26,8 +31,8 @@ typedef struct schway_host_disc_probe {
 
 /* Success transfers an allocated executable buffer to out. Failure leaves
    out unchanged. NOT_ISO means the caller may try another file format. */
-schway_host_disc_probe_status schway__disc_probe_iso(const char *path,
-                                                      schway_host_disc_probe *out);
+schway_host_disc_probe_status schway__disc_probe_image(const char *path,
+                                                        schway_host_disc_probe *out);
 void schway__disc_probe_dispose(schway_host_disc_probe *probe);
 const char *schway__disc_probe_status_string(schway_host_disc_probe_status status);
 
