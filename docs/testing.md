@@ -523,7 +523,7 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `be32` | The `be32` preset (`portable` tests) and uploads `hashes-be32`. | yes |
 | `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt` must be byte-identical. | yes |
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
-| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, `320x240, every pixel equal`, and the flipped-pixel control must fail naming `7,3`. It also runs a no-input content replay diagnostic. | yes |
+| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel at `320x240`. Pixel and wrong-dimension controls must fail. It also replays `pad_counter.exe` with Cross at guest frame 60; captures for guest frames 59 and 60 must differ and each must equal its runner PNG. | yes |
 | `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, compared with the merge base in gate mode on pull requests. Manual runs measure both fixtures three times or compare `gpu_motion` with an explicit control commit. | yes |
 | `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
@@ -531,7 +531,13 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 
 `wasm32` became required after a successful run on `main`. Timeouts are twice the slowest successful duration
 measured in this repository's own runs (5 minutes at least for network-bound and roll-up jobs); the shared build
-timeout also covers an observed Windows ARM64 overrun. Each names its evidence run and stays marked
+timeout also covers an observed Windows ARM64 overrun. BE32 uses a 15-minute provisional job bound because run
+43292417084 reached its 7-minute cap with two bounded tests active; the full `input.movies` duration was unknown.
+The 13m36s estimate was projected from same-run x64 test ratios, not measured. The next complete run should set
+the bound from its actual lane duration. `libretro.input.movies` is serial with a 240-second base CTest timeout
+(scaled by each lane as usual); runs 43271212007 and 43292417084 reached its former 120-second limit. The longer
+bound and serialization preserve every movie and assertion and are provisional until a complete host timing is
+available; they do not claim a speedup or prove why earlier runs were slow. Each timeout names its evidence run and stays marked
 `provisional` while fewer than 10 samples exist; `hygiene.timeout_comments` fails a `timeout-minutes` line that
 names neither a run nor `provisional`, and `policy.action_pins` fails a `uses:` line that is not a full 40-hex
 commit with a `# v` comment.
@@ -539,19 +545,34 @@ commit with a `# v` comment.
 **Downloads.** `pins.txt` lists every download CI makes (wasmtime and the RetroArch DMG) with its SHA-256;
 `scripts/fetch-pin.sh NAME DEST` refuses a file whose digest differs.
 
-**A red retroarch job.** The job prints RetroArch's verbose log and uploads `retroarch-frames`, holding `shot.png`
-(RetroArch's screenshot), `runner.png` (the runner's frame), and the replay diagnostic captures. The step output names
-the first differing pixel.
+**A red retroarch job.** The job prints RetroArch's verbose logs and uploads `retroarch-frames` on failure, holding
+`shot.png` and `runner.png` for the no-content comparison plus both content captures and runner references. The
+step output names the first differing pixel or geometry. The one-day `retroarch-replay-probe` artifact contains
+the raw same-run BSV, its guarded Cross variant, and the isolated record/playback logs; it is diagnostic input,
+not a release archive.
 Download the artifact with `gh run download <run id> -n retroarch-frames` and open both images. A size difference
 means the core reported another geometry; a whole-image difference with the same layout usually means RetroArch's
 frame and the runner's frame are not the same frame, which the test card's frame counter shows.
 
-The replay diagnostic downloads `pad-counter-fixture` as a separate one-day artifact, records 60 frames of
-`pad_counter.exe` to a run-local BSV, then replays it and compares the two captured images. Its isolated core
-options set `schwaystation_analog_mode = "digital"` because this guest speaks the five-byte digital SIO protocol;
-the core's default DualShock mode remains analog. This checks RetroArch's recorder/parser and core state support.
-The diagnostic uses no input, so it does not prove gameplay changed between frames or satisfy GAME-07's animated
-frame comparison.
+The hosted content check downloads `pad-counter-fixture` as a separate one-day artifact and keeps `system/` empty.
+The guest speaks the five-byte digital SIO protocol, so this isolated session sets
+`schwaystation_analog_mode = "digital"`; the core's default DualShock mode remains analog. RetroArch records a
+fresh 60-limit replay on the same run. A bounded parser checks its v2 header, checkpoint lengths, all 59 records,
+both complete joypad event sets, the zero-input Cross values and back-references. It copies the movie and changes
+only the final port-0 Cross value from zero to one; the checkpoint and content metadata stay byte-identical.
+Playback itself validates the untouched checkpoint through the pinned frontend. No movie bytes are committed or
+cached across runs.
+
+The pinned frontend counts presented video callbacks for `--max-frames`, while the restored core checkpoint is
+already at frame 1. Its first replay input drives core output frame 2. Therefore limits 58 and 59 capture guest
+frames 59 and 60, respectively; the runner references use `--frames 59` and `--frames 60`. The screenshot check
+occurs after the callback at the requested frontend count. At EOF the frontend can refresh a cached frame, so a
+60-limit capture would not prove a new guest frame. See the pinned
+[RetroArch runloop frame-limit check](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L5697),
+[screenshot/exit ordering](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L5921-L5945)
+and [video callback counter](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/gfx/video_driver.c#L4324-L4347).
+The two decoded captures must differ and each must be pixel-exact to its corresponding runner image. This is the
+recurring real-host proof; the in-process input, card and rumble matrices remain independent.
 
 **Reproducing a red job.** Run the job's preset locally (`cmake --workflow --preset <name>`) and the same JUnit
 check. Lanes this host cannot run are listed above under "Lanes that need tools only CI has".

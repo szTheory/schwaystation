@@ -454,7 +454,7 @@ jobs:
           python3 ../../tests/retroarch/verify.py compare runner.bmp shot.bmp 320 240
           python3 ../../tests/retroarch/verify.py pixel-control shot.bmp 7 3
           python3 ../../tests/retroarch/verify.py dimension-control shot.bmp 319 240
-      - name: Diagnostic replay recording and playback
+      - name: Record and replay deterministic Cross input
         run: >-
           cmake -DRETROARCH=build/RetroArch.app/Contents/MacOS/RetroArch
           -DCORE=build/libretro/cores/schwaystation_libretro.dylib -DINFO=build/libretro/info/schwaystation_libretro.info
