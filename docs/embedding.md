@@ -333,7 +333,8 @@ Each port offers DualShock, PlayStation Controller and None; DualShock is the de
 `schwaystation_analog_toggle` enabled, holding Select, Start, L1, L2, R1 and R2 together for 60 frames toggles that
 mode. Buttons and stick axes are sampled into one input snapshot per `retro_run`; signed stick endpoints map to
 0–255 with zero at 128. Selecting None disconnects that port, and an unsupported device request leaves its prior
-selection in place.
+selection in place. The frontend device and wire mode are separate: a DualShock selected in digital mode sends
+the two-byte button response, while analog mode sends the six-byte packet with both sticks.
 
 When the frontend provides `GET_RUMBLE_INTERFACE`, every successful frame reports strong and weak motor levels
 for both ports, including unchanged levels. Strong values scale the core's 0–255 level by 257; weak is 65535 for

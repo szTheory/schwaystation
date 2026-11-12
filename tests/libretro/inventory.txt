@@ -3,7 +3,9 @@ libretro.content.lifecycle	libretro,portable
 libretro.content.no_bios	libretro,portable
 libretro.host	libretro,portable
 libretro.host.pal	libretro,portable
+libretro.input.controls	libretro,portable
 libretro.input.movies	libretro,portable
+libretro.rumble.controls	libretro,portable
 libretro.rumble.guest	libretro,portable
 libretro.video.geometry	libretro,portable
 libretro.video.geometry_edges	libretro,portable

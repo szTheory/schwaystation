@@ -187,6 +187,9 @@ static int content_test;
 static unsigned content_polls;
 static int input_movie_mode;
 static unsigned input_movie_variant;
+static int input_controls_active;
+static unsigned input_controls_chord_until;
+static int input_controls_chord_enabled;
 static unsigned input_poll_calls, input_state_calls;
 static unsigned controller_info_calls, input_descriptor_calls;
 static const char *bios_option_value = "none";
@@ -481,6 +484,17 @@ static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned ind
             return 0;
         }
     }
+    if (input_controls_active) {
+        input_state_calls++;
+        if (input_controls_chord_enabled != 0 && port == 0u && device == RETRO_DEVICE_JOYPAD &&
+            index == 0u && content_polls <= input_controls_chord_until &&
+            (id == RETRO_DEVICE_ID_JOYPAD_SELECT || id == RETRO_DEVICE_ID_JOYPAD_START ||
+             id == RETRO_DEVICE_ID_JOYPAD_L || id == RETRO_DEVICE_ID_JOYPAD_L2 ||
+             id == RETRO_DEVICE_ID_JOYPAD_R || id == RETRO_DEVICE_ID_JOYPAD_R2)) {
+            return 1;
+        }
+        return 0;
+    }
     if (input_movie_mode) {
         unsigned frame_index = content_polls;
         input_state_calls++;
@@ -523,7 +537,7 @@ static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned ind
         }
         return 0;
     }
-    if (content_test && port == 0u && device == RETRO_DEVICE_JOYPAD && index == 0u &&
+    if (content_test && input_controls_active == 0 && port == 0u && device == RETRO_DEVICE_JOYPAD && index == 0u &&
         id == RETRO_DEVICE_ID_JOYPAD_B && content_polls == 60u) {
         return 1;
     }
@@ -1161,6 +1175,9 @@ static int test_native_video_geometry_edges(const char *path)
 
 struct input_state_snapshot {
     uint8_t device[2];
+    uint8_t present[2];
+    uint8_t analog_mode[2];
+    uint16_t buttons[2];
     uint8_t axes[8];
 };
 
@@ -1205,6 +1222,12 @@ static void visit_input_state(void *user, const char *name, const void *data, ui
     struct input_state_snapshot *snapshot = (struct input_state_snapshot *)user;
     if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
         memcpy(snapshot->device, data, sizeof snapshot->device);
+    } else if (strcmp(name, "pad.present") == 0 && count == 2u && width == 1u) {
+        memcpy(snapshot->present, data, sizeof snapshot->present);
+    } else if (strcmp(name, "pad.analog_mode") == 0 && count == 2u && width == 1u) {
+        memcpy(snapshot->analog_mode, data, sizeof snapshot->analog_mode);
+    } else if (strcmp(name, "pad.buttons") == 0 && count == 2u && width == 2u) {
+        memcpy(snapshot->buttons, data, sizeof snapshot->buttons);
     } else if (strcmp(name, "pad.axes") == 0 && count == 8u && width == 1u) {
         memcpy(snapshot->axes, data, sizeof snapshot->axes);
     }
@@ -1662,6 +1685,311 @@ static int test_input_movies(const char *path)
     return check_failures != 0 ? 1 : 0;
 }
 
+static void check_controls_state(schway *reference, const schway_input *input_snapshot,
+                                 const uint8_t analog_mode[2], const char *label,
+                                 int compare_serialized)
+{
+    struct input_state_snapshot snapshot;
+    size_t module_size = p_serialize_size();
+    size_t reference_size = schway_state_size(reference);
+    unsigned char *module_state = NULL;
+    unsigned char *reference_state = NULL;
+
+    memset(&snapshot, 0, sizeof snapshot);
+    CHECK_EQ_U64(schway_state_visit(reference, visit_input_state, &snapshot), SCHWAY_STATUS_OK);
+    for (unsigned port = 0u; port < 2u; port++) {
+        CHECK_EQ_U64(snapshot.device[port], input_snapshot->device[port]);
+        CHECK_EQ_U64(snapshot.present[port],
+                     input_snapshot->device[port] == SCHWAY_INPUT_DEVICE_NONE ? 0u : 1u);
+        CHECK_EQ_U64(snapshot.analog_mode[port], analog_mode[port]);
+        CHECK_EQ_U64(snapshot.buttons[port], (uint16_t)~input_snapshot->buttons[port]);
+        CHECK(memcmp(&snapshot.axes[port * 4u], input_snapshot->axes[port], 4u) == 0);
+    }
+    if (compare_serialized == 0) {
+        return;
+    }
+    CHECK_EQ_U64(module_size, reference_size);
+    if (module_size == 0u || module_size != reference_size) {
+        return;
+    }
+    module_state = (unsigned char *)malloc(module_size);
+    reference_state = (unsigned char *)malloc(reference_size);
+    CHECK(module_state != NULL);
+    CHECK(reference_state != NULL);
+    if (module_state == NULL || reference_state == NULL) {
+        free(module_state);
+        free(reference_state);
+        return;
+    }
+    CHECK_EQ_U64(p_serialize(module_state, module_size), true);
+    CHECK_EQ_U64(schway_save_state(reference, reference_state, reference_size), SCHWAY_STATUS_OK);
+    if (memcmp(module_state, reference_state, module_size) != 0) {
+        size_t offset = 0u;
+        while (offset < module_size && module_state[offset] == reference_state[offset]) {
+            offset++;
+        }
+        fprintf(stderr, "%s: serialized input state differs at byte %lu\n", label,
+                (unsigned long)offset);
+        check_failures++;
+    }
+    free(module_state);
+    free(reference_state);
+}
+
+static void controls_input(schway_input *input_snapshot, uint8_t device0, uint8_t device1)
+{
+    memset(input_snapshot, 0, sizeof *input_snapshot);
+    input_snapshot->size = (uint32_t)sizeof *input_snapshot;
+    input_snapshot->device[0] = device0;
+    input_snapshot->device[1] = device1;
+    for (unsigned port = 0u; port < 2u; port++) {
+        for (unsigned axis = 0u; axis < 4u; axis++) {
+            input_snapshot->axes[port][axis] = 128u;
+        }
+    }
+}
+
+static void controls_step(schway *reference, schway_input *input_snapshot,
+                          const uint8_t analog_mode[2], const char *label, unsigned audio_floor,
+                          int compare_serialized)
+{
+    CHECK_EQ_U64(schway_set_input(reference, input_snapshot), SCHWAY_STATUS_OK);
+    step(reference, label, audio_floor);
+    check_controls_state(reference, input_snapshot, analog_mode, label, compare_serialized);
+}
+
+static schway *controls_reference(const unsigned char *image, size_t image_size)
+{
+    schway *reference = ref_create(SCHWAY_REGION_NTSC_U);
+    CHECK(reference != NULL);
+    if (reference != NULL) {
+        CHECK_EQ_U64(schway_load_exe(reference, image, image_size), SCHWAY_STATUS_OK);
+    }
+    return reference;
+}
+
+static int test_input_controls(const char *path)
+{
+    static const uint8_t analog[2] = {1u, 1u};
+    static const uint8_t digital[2] = {0u, 0u};
+    static const uint8_t digital_analog[2] = {0u, 1u};
+    static const uint8_t digital_none[2] = {0u, 0u};
+    static const uint8_t none_analog[2] = {0u, 1u};
+    static const uint8_t analog_digital[2] = {1u, 0u};
+    const uint16_t chord = 0x0F09u;
+    struct retro_game_info game;
+    schway_input input_snapshot;
+    schway_info info;
+    schway *reference;
+    unsigned char *image;
+    FILE *file = fopen(path, "rb");
+    long file_length;
+    unsigned audio_floor = 0u;
+
+    CHECK(file != NULL);
+    if (file == NULL) {
+        p_deinit();
+        module_close();
+        return 1;
+    }
+    CHECK_EQ_U64(fseek(file, 0L, SEEK_END), 0);
+    file_length = ftell(file);
+    CHECK(file_length > 0L);
+    CHECK_EQ_U64(fseek(file, 0L, SEEK_SET), 0);
+    if (file_length <= 0L) {
+        (void)fclose(file);
+        p_deinit();
+        module_close();
+        return 1;
+    }
+    image = (unsigned char *)malloc((size_t)file_length);
+    CHECK(image != NULL);
+    if (image == NULL) {
+        (void)fclose(file);
+        p_deinit();
+        module_close();
+        return 1;
+    }
+    CHECK_EQ_U64(fread(image, 1u, (size_t)file_length, file), (size_t)file_length);
+    CHECK_EQ_U64(fclose(file), 0);
+    memset(&game, 0, sizeof game);
+    game.path = path;
+    input_controls_active = 1;
+    input_controls_chord_enabled = 0;
+    input_controls_chord_until = 0u;
+    analog_mode_value = "analog";
+    analog_toggle_value = "enabled";
+    p_set_input_state(input);
+
+    reference = controls_reference(image, (size_t)file_length);
+    CHECK(reference != NULL);
+    if (reference != NULL) {
+        memset(&info, 0, sizeof info);
+        info.size = (uint32_t)sizeof info;
+        CHECK_EQ_U64(schway_get_info(reference, &info), SCHWAY_STATUS_OK);
+        if (info.sample_rate_den != 0u && info.fps_num != 0u) {
+            audio_floor = (unsigned)(((uint64_t)info.sample_rate_num * info.fps_den) /
+                                     ((uint64_t)info.sample_rate_den * info.fps_num));
+        }
+        schway_destroy(reference);
+    }
+
+    /* No controller selection means the documented DualShock/analog defaults on both ports. */
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    reference = controls_reference(image, (size_t)file_length);
+    CHECK(reference != NULL);
+    if (reference != NULL) {
+        controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DUALSHOCK,
+                       SCHWAY_INPUT_DEVICE_DUALSHOCK);
+        controls_step(reference, &input_snapshot, analog, "default DualShock analog mode",
+                      audio_floor, 1);
+        schway_destroy(reference);
+    }
+    p_unload_game();
+
+    /* Without the optional callback, buttons release and both sticks stay centered. */
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    reference = controls_reference(image, (size_t)file_length);
+    CHECK(reference != NULL);
+    p_set_input_state(NULL);
+    if (reference != NULL) {
+        controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DUALSHOCK,
+                       SCHWAY_INPUT_DEVICE_DUALSHOCK);
+        controls_step(reference, &input_snapshot, analog, "absent input-state callback",
+                      audio_floor, 1);
+        schway_destroy(reference);
+    }
+    p_set_input_state(input);
+    p_unload_game();
+
+    /* The configured digital option is sent as a one-frame mode pulse to each DualShock. */
+    analog_mode_value = "digital";
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    reference = controls_reference(image, (size_t)file_length);
+    CHECK(reference != NULL);
+    if (reference != NULL) {
+        controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DUALSHOCK,
+                       SCHWAY_INPUT_DEVICE_DUALSHOCK);
+        input_snapshot.analog_button[0] = 1u;
+        input_snapshot.analog_button[1] = 1u;
+        controls_step(reference, &input_snapshot, digital, "configured digital mode",
+                      audio_floor, 1);
+        input_snapshot.analog_button[0] = 0u;
+        input_snapshot.analog_button[1] = 0u;
+        controls_step(reference, &input_snapshot, digital, "digital mode stays selected",
+                      audio_floor, 1);
+        schway_destroy(reference);
+    }
+    p_unload_game();
+
+    /* Per-port switches work; invalid device and port requests keep the prior selection. */
+    analog_mode_value = "analog";
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    reference = controls_reference(image, (size_t)file_length);
+    CHECK(reference != NULL);
+    if (reference != NULL) {
+        p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+        p_set_controller_port_device(1u, RETRO_DEVICE_NONE);
+        controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DIGITAL, SCHWAY_INPUT_DEVICE_NONE);
+        controls_step(reference, &input_snapshot, digital_none,
+                      "independent digital and none ports", audio_floor, 1);
+        p_set_controller_port_device(0u, RETRO_DEVICE_MOUSE);
+        p_set_controller_port_device(2u, RETRO_DEVICE_ANALOG);
+        controls_step(reference, &input_snapshot, digital_none,
+                      "invalid requests preserve selected devices", audio_floor, 1);
+        p_set_controller_port_device(0u, RETRO_DEVICE_NONE);
+        p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+        controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_NONE,
+                       SCHWAY_INPUT_DEVICE_DUALSHOCK);
+        controls_step(reference, &input_snapshot, none_analog, "switch none and DualShock",
+                      audio_floor, 1);
+        p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+        p_set_controller_port_device(1u, RETRO_DEVICE_JOYPAD);
+        controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DUALSHOCK,
+                       SCHWAY_INPUT_DEVICE_DIGITAL);
+        controls_step(reference, &input_snapshot, analog_digital, "switch DualShock and digital",
+                      audio_floor, 1);
+        schway_destroy(reference);
+    }
+    p_unload_game();
+
+    /* The six-button chord changes mode at frame 60 exactly once while held. */
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    reference = controls_reference(image, (size_t)file_length);
+    CHECK(reference != NULL);
+    input_controls_chord_enabled = 1;
+    input_controls_chord_until = 60u;
+    content_polls = 0u;
+    if (reference != NULL) {
+        for (unsigned frame_index = 1u; frame_index <= 61u; frame_index++) {
+            controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DUALSHOCK,
+                           SCHWAY_INPUT_DEVICE_DUALSHOCK);
+            if (frame_index <= 60u) {
+                input_snapshot.buttons[0] = chord;
+            }
+            input_snapshot.analog_button[0] = frame_index == 60u ? 1u : 0u;
+            controls_step(reference, &input_snapshot,
+                          frame_index < 60u ? analog : digital_analog,
+                          "enabled 60-frame mode toggle", audio_floor,
+                          frame_index == 59u || frame_index == 60u || frame_index == 61u);
+        }
+        schway_destroy(reference);
+    }
+    p_unload_game();
+
+    /* Disabling the option prevents that chord from changing the analog mode. */
+    analog_toggle_value = "disabled";
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    reference = controls_reference(image, (size_t)file_length);
+    CHECK(reference != NULL);
+    content_polls = 0u;
+    if (reference != NULL) {
+        for (unsigned frame_index = 1u; frame_index <= 61u; frame_index++) {
+            controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DUALSHOCK,
+                           SCHWAY_INPUT_DEVICE_DUALSHOCK);
+            if (frame_index <= 60u) {
+                input_snapshot.buttons[0] = chord;
+            }
+            controls_step(reference, &input_snapshot, analog, "disabled mode toggle",
+                          audio_floor,
+                          frame_index == 59u || frame_index == 60u || frame_index == 61u);
+        }
+        schway_destroy(reference);
+    }
+    input_controls_chord_enabled = 0;
+    input_controls_active = 0;
+    p_unload_game();
+    p_deinit();
+
+    /* Reinitializing the module restores the default controller and mode state. */
+    analog_mode_value = "analog";
+    analog_toggle_value = "enabled";
+    p_set_environment(env);
+    p_init();
+    set_callbacks();
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    reference = controls_reference(image, (size_t)file_length);
+    CHECK(reference != NULL);
+    if (reference != NULL) {
+        controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DUALSHOCK,
+                       SCHWAY_INPUT_DEVICE_DUALSHOCK);
+        controls_step(reference, &input_snapshot, analog, "deinit restores input defaults",
+                      audio_floor, 1);
+        schway_destroy(reference);
+    }
+    p_unload_game();
+    p_deinit();
+    module_close();
+    free(image);
+    return check_failures != 0 ? 1 : 0;
+}
+
 static void append_sh(uint32_t *code, size_t *count, unsigned reg, unsigned base, unsigned offset)
 {
     code[(*count)++] = 0xA4000000u | (base << 21) | (reg << 16) | offset;
@@ -1923,6 +2251,90 @@ static int test_rumble_guest(const char *path)
     return check_failures != 0 ? 1 : 0;
 }
 
+static int test_rumble_controls(const char *path)
+{
+    struct retro_game_info game;
+    unsigned video_before;
+    size_t offset;
+
+    CHECK(write_rumble_guest(path, 1u, 255u));
+    memset(&game, 0, sizeof game);
+    game.path = path;
+    rumble_axis_mode = 1;
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    rumble_event_count = 0u;
+    for (unsigned frame_index = 0u; frame_index < 4u; frame_index++) {
+        run_one();
+        check_rumble_events((size_t)frame_index * 4u, (uint16_t)(255u * 257u), UINT16_MAX);
+    }
+    CHECK_EQ_U64(rumble_event_count, 16u);
+
+    /* Reset clears both reported motors on both ports before the guest restarts. */
+    offset = rumble_event_count;
+    p_reset();
+    CHECK_EQ_U64(rumble_event_count, offset + 4u);
+    check_rumble_events(offset, 0u, 0u);
+    offset = rumble_event_count;
+    p_unload_game();
+    CHECK_EQ_U64(rumble_event_count, offset + 4u);
+    check_rumble_events(offset, 0u, 0u);
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    offset = rumble_event_count;
+    for (unsigned frame_index = 0u; frame_index < 4u; frame_index++) {
+        run_one();
+        check_rumble_events(offset + (size_t)frame_index * 4u, (uint16_t)(255u * 257u),
+                            UINT16_MAX);
+    }
+    offset = rumble_event_count;
+    p_unload_game();
+    CHECK_EQ_U64(rumble_event_count, offset + 4u);
+    check_rumble_events(offset, 0u, 0u);
+
+    /* A real mapped transaction with both motors off reports zero repeatedly. */
+    CHECK(write_rumble_guest(path, 0u, 0u));
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    offset = rumble_event_count;
+    for (unsigned frame_index = 0u; frame_index < 4u; frame_index++) {
+        run_one();
+        check_rumble_events(offset + (size_t)frame_index * 4u, 0u, 0u);
+    }
+    CHECK_EQ_U64(rumble_event_count, offset + 16u);
+    offset = rumble_event_count;
+    p_unload_game();
+    CHECK_EQ_U64(rumble_event_count, offset + 4u);
+    check_rumble_events(offset, 0u, 0u);
+
+    /* With no frontend interface, guest input, video and frames continue safely. */
+    p_deinit();
+    rumble_available = 0;
+    p_set_environment(env);
+    p_init();
+    set_callbacks();
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    p_set_controller_port_device(1u, RETRO_DEVICE_ANALOG);
+    offset = rumble_event_count;
+    video_before = video_calls;
+    for (unsigned frame_index = 0u; frame_index < 4u; frame_index++) {
+        run_one();
+    }
+    CHECK_EQ_U64(video_calls, video_before + 4u);
+    CHECK_EQ_U64(rumble_event_count, offset);
+    p_unload_game();
+    CHECK_EQ_U64(rumble_event_count, offset);
+    rumble_axis_mode = 0;
+    p_deinit();
+    module_close();
+    (void)remove(path);
+    return check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -1941,23 +2353,25 @@ int main(int argc, char **argv)
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
+    int input_controls_mode = argc == 4 && strcmp(argv[2], "input-controls") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
+    int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
     if ((!content_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
-         !lifecycle_mode &&
-         !rumble_guest_mode &&
+         !input_controls_mode && !lifecycle_mode && !rumble_guest_mode && !rumble_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
-          input_movies_mode || rumble_guest_mode) && argv[3][0] == '\0') ||
+          input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode) &&
+         argv[3][0] == '\0') ||
         (lifecycle_mode && argv[4][0] == '\0')) {
         fprintf(stderr,
-                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe> | video-geometry-edges <exe> | rumble-guest <exe>\n");
+                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
     content_test = content_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
-                   lifecycle_mode;
-    rumble_available = rumble_guest_mode;
+                   input_controls_mode || lifecycle_mode;
+    rumble_available = rumble_guest_mode || rumble_controls_mode;
     pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
     region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
@@ -2009,6 +2423,10 @@ int main(int argc, char **argv)
         return test_rumble_guest(argv[3]);
     }
 
+    if (rumble_controls_mode) {
+        return test_rumble_controls(argv[3]);
+    }
+
     if (lifecycle_mode) {
         content_lifecycle(argv[3], argv[4]);
         p_unload_game();
@@ -2027,6 +2445,10 @@ int main(int argc, char **argv)
 
     if (input_movies_mode) {
         return test_input_movies(argv[3]);
+    }
+
+    if (input_controls_mode) {
+        return test_input_controls(argv[3]);
     }
 
     if (content_mode) {
