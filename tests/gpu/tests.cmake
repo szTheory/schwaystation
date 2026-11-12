@@ -15,6 +15,13 @@ if(CMAKE_SCRIPT_MODE_FILE)
       --frames 1 --hash-vram)
     expect_runner(2 "usage" --frames 1 --hash-vram --hash-vram)
     expect_runner(2 "usage" --frames 1 --hash-vram --probe unused.exe)
+  elseif(CASE STREQUAL "controls")
+    execute_process(COMMAND ${EMULATOR} ${UNIT} controls RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    string(APPEND out "${err}")
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "GPU reference controls exited ${rc}\n${out}")
+    endif()
   else()
     message(FATAL_ERROR "unknown GPU reference case '${CASE}'")
   endif()
@@ -278,4 +285,10 @@ schway_add_test(NAME gpu.reference.cli
 # Fault prevented: PNG channel quantization or any canonical whole-VRAM pixel changes.
 schway_add_test(NAME gpu.reference.quantization
   COMMAND schwaystation-test-gpu-reference quantization
+  LABELS gpu portable TIMEOUT 30)
+
+# Fault prevented: reference color order, mask handling, dimensions, or bad pixels drifting.
+schway_add_test(NAME gpu.reference.controls
+  COMMAND ${CMAKE_COMMAND} -DCASE=controls -DUNIT=$<TARGET_FILE:schwaystation-test-gpu-reference>
+    "-DEMULATOR=${gpu_reference_emulator}" -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS gpu portable TIMEOUT 30)

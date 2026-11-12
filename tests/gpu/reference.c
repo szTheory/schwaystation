@@ -248,14 +248,63 @@ static void quantization(void)
     free_fixture(&fixture);
 }
 
+static void controls(void)
+{
+    quantization();
+    reference_fixture fixture;
+    int made = make_fixture(&fixture, VRAM_WIDTH, VRAM_HEIGHT);
+    CHECK(made);
+    if (!made) {
+        free_fixture(&fixture);
+        return;
+    }
+
+    /* Fixed primary colors pin channel order and the 15-bit word layout. */
+    CHECK(fixture.words[0] == 0x001fu && fixture.rgb[0] == 255u && fixture.rgb[1] == 0u &&
+          fixture.rgb[2] == 0u);
+    CHECK(fixture.words[1] == 0x03e0u && fixture.rgb[3] == 0u && fixture.rgb[4] == 255u &&
+          fixture.rgb[5] == 0u);
+    CHECK(fixture.words[2] == 0x7c00u && fixture.rgb[6] == 0u && fixture.rgb[7] == 0u &&
+          fixture.rgb[8] == 255u);
+    CHECK(compare_reference_png(fixture.words, VRAM_WORDS, fixture.png, fixture.png_size) ==
+          REFERENCE_MATCH);
+
+    /* Bit 15 is a mask flag, not part of the RGB555 reference color. */
+    fixture.words[3] ^= 0x8000u;
+    CHECK(compare_reference_png(fixture.words, VRAM_WORDS, fixture.png, fixture.png_size) ==
+          REFERENCE_MATCH);
+    fixture.words[3] ^= 0x8000u;
+
+    /* An eight-step red change crosses one RGB555 bucket and must be visible. */
+    fixture.rgb[0] = (uint8_t)(fixture.rgb[0] - 8u);
+    CHECK(encode_fixture(&fixture, VRAM_WIDTH, VRAM_HEIGHT));
+    CHECK(compare_reference_png(fixture.words, VRAM_WORDS, fixture.png, fixture.png_size) ==
+          REFERENCE_MISMATCH);
+    fixture.rgb[0] = 255u;
+    CHECK(encode_fixture(&fixture, VRAM_WIDTH, VRAM_HEIGHT));
+
+    reference_fixture wrong_dimensions;
+    int wrong_made = make_fixture(&wrong_dimensions, VRAM_WIDTH - 1u, VRAM_HEIGHT);
+    CHECK(wrong_made);
+    if (wrong_made) {
+        CHECK(compare_reference_png(fixture.words, VRAM_WORDS, wrong_dimensions.png,
+                                    wrong_dimensions.png_size) == REFERENCE_INVALID);
+    }
+    free_fixture(&wrong_dimensions);
+    CHECK(compare_reference_png(fixture.words, VRAM_WORDS, NULL, 0u) == REFERENCE_INVALID);
+    free_fixture(&fixture);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-gpu-reference quantization\n");
+        fprintf(stderr, "usage: schwaystation-test-gpu-reference quantization|controls\n");
         return 2;
     }
     if (strcmp(argv[1], "quantization") == 0) {
         quantization();
+    } else if (strcmp(argv[1], "controls") == 0) {
+        controls();
     } else {
         fprintf(stderr, "unknown GPU reference case: %s\n", argv[1]);
         return 2;

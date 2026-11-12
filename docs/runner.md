@@ -11,12 +11,12 @@ The runner loads no disc. A run without `--bios` or `--exe` shows the built-in t
 ## Synopsis
 
 ```text
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-state]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-vram] [--hash-state]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
-                  [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-state]
+                  [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-vram] [--hash-state]
 schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]
 schwaystation-run --help | --version
 ```
@@ -34,6 +34,7 @@ schwaystation-run --help | --version
 | `--trace first-fault` | After a [fault](#diagnostics) or a hang, print the last 4096 trace records as twelve-field lines. Needs `--exe`. Give it once. |
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
+| `--hash-vram` | After the last frame, print the SHA-256 of all VRAM words as row-major little-endian RGB555 with bit 15 cleared. |
 | `--hash-state` | After the last frame and every other line, print the SHA-256 of the saved [machine state](#frame-hash). |
 | `--inputs FILE` | Parse and apply a bounded controller script before each frame latch, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
 | `--save-dir DIR` | Load and save the two memory cards under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
@@ -371,6 +372,18 @@ state sha256 ab25eb56bade19baa1d3b3b85bb9f9d572061e8514f30f8d0450ab78e510977c
 
 It is the SHA-256 of the state `schway_save_state` writes, without its 20-byte header, so it covers every register
 and counter the instance keeps. A state is the same bytes on every platform. A save that fails exits 1.
+
+## VRAM hash
+
+`--hash-vram` prints one line after the last frame:
+
+```text
+vram sha256 67222605a58edbac567cba036618e52bb4a3eb933c32006c891d06adbb035041
+```
+
+The SHA-256 input is all 1024x512 VRAM words in row-major order. Each word has bit 15 cleared and is serialized
+low byte first, so the digest is stable across host byte orders and ignores the non-color mask flag. It can be
+used with `--hash` to report both the displayed-frame and whole-VRAM hashes.
 
 ## PNG output
 
