@@ -28,7 +28,10 @@ if [ "$test_mode" -eq 1 ]; then
         case "$path" in "$test_root"/*) ;; *) fail 'temporary inputs must stay inside the test root' ;; esac
         case "/$path/" in */../*) fail 'temporary input path is invalid' ;; esac
     done
-    case "$test_runner" in "$project_root"/build/*/tests/schwaystation-run-test) ;; *) fail 'test runner is invalid' ;; esac
+    case "$test_runner" in
+        "$project_root"/build/*/tests/schwaystation-run-test|"$project_root"/build/*/tests/compat/schwaystation-run-test) ;;
+        *) fail 'test runner is invalid' ;;
+    esac
     [ -x "$test_runner" ] || fail 'test runner is unavailable'
     [ -f "$test_config" ] && [ -f "$test_ledger" ] && [ -f "$test_dat" ] &&
         [ -f "$test_probe_config" ] && [ -d "$test_root" ] || fail 'temporary input is missing'

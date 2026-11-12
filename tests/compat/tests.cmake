@@ -1,3 +1,24 @@
+if(CMAKE_SCRIPT_MODE_FILE AND DEFINED EMULATOR)
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+endif()
+
+function(schway__compat_write_runner_launcher target launcher)
+  get_target_property(output_dir ${target} RUNTIME_OUTPUT_DIRECTORY)
+  get_target_property(output_name ${target} OUTPUT_NAME)
+  if(NOT output_name)
+    set(output_name ${target})
+  endif()
+  set(program "${output_dir}/${output_name}${CMAKE_EXECUTABLE_SUFFIX}")
+  set(command "")
+  foreach(argument IN LISTS CMAKE_CROSSCOMPILING_EMULATOR)
+    string(REPLACE "'" "'\\''" quoted "${argument}")
+    string(APPEND command " '${quoted}'")
+  endforeach()
+  string(REPLACE "'" "'\\''" quoted_program "${program}")
+  file(WRITE "${launcher}" "#!/bin/sh\nexec${command} '${quoted_program}' \"\$@\"\n")
+  file(CHMOD "${launcher}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+endfunction()
+
 function(probe_write_metadata root track_sha1)
   set(metadata_dir "${root}/metadata")
   file(MAKE_DIRECTORY "${metadata_dir}")
@@ -15,7 +36,7 @@ endfunction()
 function(library_prepare root)
   file(REMOVE_RECURSE "${root}")
   file(MAKE_DIRECTORY "${root}/discs" "${root}/bios" "${root}/metadata")
-  execute_process(COMMAND "${TEST_PROBE}" cue_2048 "${root}/discs/synthetic.cue"
+  execute_process(COMMAND ${EMULATOR} "${TEST_PROBE}" cue_2048 "${root}/discs/synthetic.cue"
     RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET)
   if(NOT rc STREQUAL "0")
     message(FATAL_ERROR "cannot generate bounded CUE/BIN fixture: ${rc}")
@@ -92,7 +113,7 @@ function(library_invoke root config ledger dat probe_config runner)
 endfunction()
 
 function(library_validate root mode track_sha1 expected)
-  execute_process(COMMAND "${LIBRARY_TEST}" "${mode}" "${root}/build/library/results.csv" "${track_sha1}"
+  execute_process(COMMAND ${EMULATOR} "${LIBRARY_TEST}" "${mode}" "${root}/build/library/results.csv" "${track_sha1}"
     RESULT_VARIABLE result OUTPUT_QUIET ERROR_QUIET)
   if(expected AND NOT result STREQUAL "0")
     message(FATAL_ERROR "library report failed ${mode} validation: ${result}")
@@ -107,6 +128,9 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_synthetic_result")
       message(FATAL_ERROR "library synthetic test requires ${required}")
     endif()
   endforeach()
+  if(DEFINED RUNNER_LAUNCHER AND NOT "${RUNNER_LAUNCHER}" STREQUAL "")
+    set(RUN "${RUNNER_LAUNCHER}")
+  endif()
   set(root "${WORK_ROOT}/compat-library-synthetic")
   library_prepare("${root}")
   library_snapshot("${root}" before)
@@ -127,6 +151,9 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
       message(FATAL_ERROR "library control test requires ${required}")
     endif()
   endforeach()
+  if(DEFINED RUNNER_LAUNCHER AND NOT "${RUNNER_LAUNCHER}" STREQUAL "")
+    set(RUN "${RUNNER_LAUNCHER}")
+  endif()
   set(root "${WORK_ROOT}/compat-library-controls")
   library_prepare("${root}")
 
@@ -188,7 +215,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   file(WRITE "${duplicate_root}/discs/duplicate.cue" "${duplicate_cue}")
   file(COPY_FILE "${track}" "${duplicate_root}/discs/standalone.bin")
   set(cue2352_source "${duplicate_root}/metadata/companion.cue")
-  execute_process(COMMAND "${TEST_PROBE}" cue_mode1_2352 "${cue2352_source}"
+  execute_process(COMMAND ${EMULATOR} "${TEST_PROBE}" cue_mode1_2352 "${cue2352_source}"
     RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET)
   if(NOT rc STREQUAL "0")
     message(FATAL_ERROR "cannot generate 2352 CUE companion fixture")
@@ -313,7 +340,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   set(system_root "${WORK_ROOT}/compat-library-bad-system")
   library_prepare("${system_root}")
   set(system_iso "${system_root}/discs/bad-system.iso")
-  execute_process(COMMAND "${TEST_PROBE}" traversal "${system_iso}"
+  execute_process(COMMAND ${EMULATOR} "${TEST_PROBE}" traversal "${system_iso}"
     RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET)
   if(NOT rc STREQUAL "0")
     message(FATAL_ERROR "cannot generate invalid SYSTEM.CNF fixture")
@@ -336,7 +363,11 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   file(MAKE_DIRECTORY "${ordinary_root}/scripts" "${ordinary_root}/build/library"
     "${ordinary_root}/tests/compat" "${fake_bin}")
   file(COPY_FILE "${SOURCE_ROOT}/scripts/library.sh" "${ordinary_root}/scripts/library.sh")
-  file(COPY_FILE "${PRODUCTION_RUN}" "${ordinary_root}/build/library/schwaystation-run")
+  if(DEFINED PRODUCTION_RUNNER_LAUNCHER AND NOT "${PRODUCTION_RUNNER_LAUNCHER}" STREQUAL "")
+    file(COPY_FILE "${PRODUCTION_RUNNER_LAUNCHER}" "${ordinary_root}/build/library/schwaystation-run")
+  else()
+    file(COPY_FILE "${PRODUCTION_RUN}" "${ordinary_root}/build/library/schwaystation-run")
+  endif()
   file(COPY_FILE "${LIBRARY_LEDGER}" "${ordinary_root}/tests/compat/ledger.csv")
   file(COPY_FILE "${LIBRARY_DAT}" "${ordinary_root}/build/library/Sony - PlayStation.dat")
   file(WRITE "${ordinary_root}/.env.local"
@@ -924,7 +955,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_live")
       message(FATAL_ERROR "compatibility live check requires ${required}")
     endif()
   endforeach()
-  execute_process(COMMAND "${TEST_BINARY}" schema "${LEDGER}" RESULT_VARIABLE rc)
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" schema "${LEDGER}" RESULT_VARIABLE rc)
   if(NOT rc STREQUAL "0")
     message(FATAL_ERROR "compatibility ledger schema check failed: ${rc}")
   endif()
@@ -1019,13 +1050,25 @@ add_dependencies(schwaystation-test-library schwaystation-test-probe schwaystati
 add_dependencies(schwaystation-test-library schwaystation-run)
 
 string(REPLACE ";" "|" schway__probe_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+set(schway__library_test_runner_launcher "")
+set(schway__library_production_runner_launcher "")
+if(CMAKE_CROSSCOMPILING_EMULATOR)
+  set(schway__compat_launcher_dir "${PROJECT_BINARY_DIR}/tests/compat")
+  file(MAKE_DIRECTORY "${schway__compat_launcher_dir}")
+  set(schway__library_test_runner_launcher "${schway__compat_launcher_dir}/schwaystation-run-test")
+  set(schway__library_production_runner_launcher "${schway__compat_launcher_dir}/schwaystation-run")
+  schway__compat_write_runner_launcher(schwaystation-run-test "${schway__library_test_runner_launcher}")
+  schway__compat_write_runner_launcher(schwaystation-run "${schway__library_production_runner_launcher}")
+endif()
 
 # Fault prevented: library output losing an exact track and metadata identity join.
 schway_add_test(NAME compat.library.synthetic_result
   COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
     -DTEST_PROBE=$<TARGET_FILE:schwaystation-test-probe>
     -DLIBRARY_TEST=$<TARGET_FILE:schwaystation-test-library>
-    -DRUN=$<TARGET_FILE:schwaystation-run-test> -DCASE=library_synthetic_result
+    -DRUN=$<TARGET_FILE:schwaystation-run-test>
+    "-DEMULATOR=${schway__probe_emulator}"
+    "-DRUNNER_LAUNCHER=${schway__library_test_runner_launcher}" -DCASE=library_synthetic_result
     -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat library portable TIMEOUT 30)
 
@@ -1035,7 +1078,11 @@ schway_add_test(NAME compat.library.controls
     -DTEST_PROBE=$<TARGET_FILE:schwaystation-test-probe>
     -DLIBRARY_TEST=$<TARGET_FILE:schwaystation-test-library>
     -DRUN=$<TARGET_FILE:schwaystation-run-test>
-    -DPRODUCTION_RUN=$<TARGET_FILE:schwaystation-run> -DCASE=library_controls
+    -DPRODUCTION_RUN=$<TARGET_FILE:schwaystation-run>
+    "-DEMULATOR=${schway__probe_emulator}"
+    "-DRUNNER_LAUNCHER=${schway__library_test_runner_launcher}"
+    "-DPRODUCTION_RUNNER_LAUNCHER=${schway__library_production_runner_launcher}"
+    -DCASE=library_controls
     -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat library portable TIMEOUT 60)
 

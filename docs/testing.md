@@ -254,6 +254,10 @@ The metadata probe uses a private read-only opener that calls `fopen_s` on MSVC 
 changing its input or failure behavior. Windows and GCC cross-compiler acceptance is established by the hosted
 matrix, not by a native configure.
 
+Compatibility scripts prefix each raw helper and runner call with the complete `CMAKE_CROSSCOMPILING_EMULATOR`
+argument list. The shell library accepts one runner executable, so cross-emulated library checks use generated
+build-tree launchers that quote the emulator arguments and pass runner arguments through unchanged.
+
 | Label | Tests |
 |---|---|
 | `core` | The library's behaviour: the API contract, sizes, allocation, faults, state, the frame and the test card. |
