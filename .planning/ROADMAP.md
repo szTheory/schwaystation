@@ -331,7 +331,7 @@ Plans:
 
 **Wave 31**
 - [x] 04-41-PLAN.md — Run the compatibility judge copied from the actual PR base
-- [ ] 04-43-PLAN.md — Notify libretro geometry and rate changes for native video
+- [x] 04-43-PLAN.md — Notify libretro geometry and rate changes for native video
 
 **Wave 32**
 - [ ] 04-25-PLAN.md — Probe one bounded ISO boot executable through runner identity
@@ -417,6 +417,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 38/53 | In Progress | - |
+| 4. Games play in RetroArch | 39/53 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

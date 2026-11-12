@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 39 of 53
+current_plan: 40 of 53
 status: executing
-stopped_at: Completed 04-41-PLAN.md; independent review and final phase verification remain in 04-32
-last_updated: "2026-11-12T04:29:31.979Z"
+stopped_at: "Completed 04-43-PLAN.md; runtime/model: Codex OpenGSD 1.20.1, gpt-6-luna xhigh"
+last_updated: "2026-11-12T05:05:05.531Z"
 last_activity: 2026-11-12
-last_activity_desc: Applied the owner-approved 2300-line Phase 4 gate ceiling; resume unfinished 04-24 judge and generated-doc controls.
-state_head: f22aa2e2694c903abaac4803054b94cff006cb25
+last_activity_desc: Completed plan 04-43 native libretro RGB555/RGB24 delivery and geometry/rate edge coverage; next ordinal is plan 04-25 in wave 32.
+state_head: 38f983e730508fe76cb60ae559414cb726e3c86c
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 106
+  completed_plans: 107
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 39 of 53
-Status: Plan 04-24 complete under the approved 2300-line ceiling; next plan 04-41 owns protected-base capture.
-Last activity: 2026-11-12 — Completed the compatibility ratchet/docs and recorded the actual task-order deviation.
+Current Plan: 40 of 53
+Status: Plan 04-43 complete; next ordinal is plan 04-25 in wave 32.
+Last activity: 2026-11-12 — Completed native libretro video conversion and geometry/rate edge coverage.
 
 Progress: [█████░░░░░] 50%
 
@@ -167,6 +167,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P27 | at least 20 min (start unavailable after compaction) | 2 tasks | 8 files |
 | Phase 04 P24 | 35 min | 2 tasks | 11 files |
 | Phase 04 P41 | 23min | 2 tasks | 7 files |
+| Phase 04 P43 | 31min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -388,6 +389,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Resumed plan task-order deviation: remaining Task 1 judge/docs and Task 2 controls landed together after the preserved RED and partial GREEN commits; no second RED or history rewrite.
 - [Phase 04]: Protected compatibility baseline is selected from the exact pull-request base SHA; only both artifacts absent selects introduction.
 - [Phase 04]: Preserve the exact sparse base checkout in RUNNER_TEMP before head checkout so workspace cleanup cannot remove the protected judge.
+- [Phase 04]: Native libretro video uses the shared bounded converter for RGB555 and packed RGB24 before host callbacks.
+- [Phase 04]: SET_GEOMETRY is sent only when dimensions change, and SET_SYSTEM_AV_INFO only when the rate changes.
 
 ### Pending Todos
 
@@ -531,11 +534,12 @@ come from `AGENTS.md`.
 | 2026-11-12 | Phase 04 approved gate-budget implementation | Codex, OpenGSD 1.20.0; concrete 2300-line ceiling and approval record, no plan advance | GPT-6 (session; exact model ID not exposed) |
 | 2026-11-12 | /gsd-execute-plan 04-24 (resumed after approval) | Codex, OpenGSD 1.20.0; sequential shared-checkout execution; compatibility ratchet/docs, full CI and hygiene; preserved task-order deviation recorded | gpt-6-luna xhigh |
 | 2026-11-12 | /gsd-execute-plan 04-41 | Codex, OpenGSD 1.20.0; sequential executor; protected base judge and controls, full CI and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | /gsd-execute-plan 04-43 | Codex, OpenGSD 1.20.1; sequential executor in shared phase checkout; native RGB555/RGB24 adapter conversion, geometry/rate edge tests, full CI and hygiene | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-12T04:29:31.542Z
-Stopped at: Completed 04-41-PLAN.md; independent review and final phase verification remain in 04-32
+Last session: 2026-11-12T05:05:05.196Z
+Stopped at: Completed 04-43-PLAN.md; runtime/model: Codex OpenGSD 1.20.1, gpt-6-luna xhigh
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
