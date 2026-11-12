@@ -2,14 +2,17 @@
  * client of schwaystation.h. "Lnnn" is a line of the vendored libretro.h
  * (libretro-common, pinned in PROVENANCE.md).
  *
- * This release loads no content: retro_load_game(NULL) boots the built-in
- * test card and any content is refused. Audio is the core's own silent pairs,
- * exactly as many per frame as its clock gives, so a frontend that paces on
- * audio runs at the core's rate. The av_info divisions are the only floating
- * point in the shipped code; the core itself is integer only. */
+ * Fullpath PS-EXEs are copied through the bounded reader into the core; the
+ * emulator core never opens a file. With no selected content,
+ * retro_load_game(NULL) keeps the built-in test-card path. Audio is the
+ * core's own silent pairs, exactly as many per frame as its clock gives, so
+ * a frontend that paces on audio runs at the core's rate. The av_info
+ * divisions are the only floating point in the shipped code; the core itself
+ * is integer only. */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,6 +26,8 @@
 #define LR_MAX_W 640u
 #define LR_MAX_H_NTSC 480u
 #define LR_MAX_H_PAL 576u
+#define LR_EXE_HEADER 0x800u
+#define LR_EXE_MAX_BYTES (LR_EXE_HEADER + 2u * 1024u * 1024u)
 
 /* All adapter state. A frontend may keep the module loaded between sessions,
    so retro_deinit returns every one of these to its initial value (L8866). */
@@ -36,6 +41,7 @@ static schway *inst;
 static schway_info info;
 static uint32_t *pixels;
 static int16_t *samples;
+static unsigned geometry_width, geometry_height;
 
 /* The region option (HOSTS-AND-INTEGRATION section 1, Core options): the
    machine profile's region, applied by recreating the instance, since a
@@ -83,6 +89,8 @@ static void lr_unload(void)
     pixels = NULL;
     free(samples);
     samples = NULL;
+    geometry_width = 0u;
+    geometry_height = 0u;
     memset(&info, 0, sizeof info);
 }
 
@@ -118,7 +126,92 @@ static int lr_create(uint32_t region)
         lr_unload();
         return 0;
     }
+    geometry_width = info.width;
+    geometry_height = info.height;
     return 1;
+}
+
+/* Content selection is a host file operation. Read at most the largest image
+   schway_probe_exe can accept, plus one byte to distinguish oversized input. */
+static uint8_t *lr_read_exe(const char *path, size_t *size)
+{
+    FILE *file;
+    uint8_t *bytes;
+    size_t length;
+    int failed;
+
+    if (path == NULL || size == NULL) {
+        return NULL;
+    }
+    *size = 0u;
+    file = fopen(path, "rb");
+    if (file == NULL) {
+        return NULL;
+    }
+    bytes = (uint8_t *)malloc((size_t)LR_EXE_MAX_BYTES + 1u);
+    if (bytes == NULL) {
+        (void)fclose(file);
+        return NULL;
+    }
+    length = fread(bytes, 1u, (size_t)LR_EXE_MAX_BYTES + 1u, file);
+    failed = ferror(file);
+    if (fclose(file) != 0) {
+        failed = 1;
+    }
+    if (failed != 0 || length > (size_t)LR_EXE_MAX_BYTES) {
+        free(bytes);
+        return NULL;
+    }
+    *size = length;
+    return bytes;
+}
+
+static int lr_is_exe_path(const char *path)
+{
+    const char *extension;
+    if (path == NULL) {
+        return 0;
+    }
+    extension = strrchr(path, '.');
+    if (extension == NULL || extension[1] == '\0' || extension[2] == '\0' ||
+        extension[3] == '\0' || extension[4] != '\0') {
+        return 0;
+    }
+    return (extension[1] == 'e' || extension[1] == 'E') &&
+           (extension[2] == 'x' || extension[2] == 'X') &&
+           (extension[3] == 'e' || extension[3] == 'E');
+}
+
+/* RetroPad positions map to the active-low serial word used by the PSX pad. */
+static void lr_queue_input(void)
+{
+    static const struct {
+        unsigned id;
+        uint16_t mask;
+    } mapping[] = {
+        {RETRO_DEVICE_ID_JOYPAD_SELECT, 0x0001u}, {RETRO_DEVICE_ID_JOYPAD_L3, 0x0002u},
+        {RETRO_DEVICE_ID_JOYPAD_R3, 0x0004u},     {RETRO_DEVICE_ID_JOYPAD_START, 0x0008u},
+        {RETRO_DEVICE_ID_JOYPAD_UP, 0x0010u},     {RETRO_DEVICE_ID_JOYPAD_RIGHT, 0x0020u},
+        {RETRO_DEVICE_ID_JOYPAD_DOWN, 0x0040u},   {RETRO_DEVICE_ID_JOYPAD_LEFT, 0x0080u},
+        {RETRO_DEVICE_ID_JOYPAD_L2, 0x0100u},     {RETRO_DEVICE_ID_JOYPAD_R2, 0x0200u},
+        {RETRO_DEVICE_ID_JOYPAD_L, 0x0400u},      {RETRO_DEVICE_ID_JOYPAD_R, 0x0800u},
+        {RETRO_DEVICE_ID_JOYPAD_X, 0x1000u},      {RETRO_DEVICE_ID_JOYPAD_A, 0x2000u},
+        {RETRO_DEVICE_ID_JOYPAD_B, 0x4000u},      {RETRO_DEVICE_ID_JOYPAD_Y, 0x8000u},
+    };
+    schway_input snapshot;
+
+    memset(&snapshot, 0, sizeof snapshot);
+    snapshot.size = (uint32_t)sizeof snapshot;
+    for (unsigned port = 0u; port < 2u; port++) {
+        snapshot.device[port] = SCHWAY_INPUT_DEVICE_DIGITAL;
+        for (size_t i = 0u; i < sizeof mapping / sizeof mapping[0]; i++) {
+            if (input_state_cb != NULL &&
+                input_state_cb(port, RETRO_DEVICE_JOYPAD, 0u, mapping[i].id) != 0) {
+                snapshot.buttons[port] |= mapping[i].mask;
+            }
+        }
+    }
+    (void)schway_set_input(inst, &snapshot);
 }
 
 /* The region the frontend's option names; ntsc-u when it names none. */
@@ -205,9 +298,8 @@ unsigned retro_api_version(void)
     return RETRO_API_VERSION;
 }
 
-/* L8886: static strings. No content loads yet, so no extension is listed. A
-   disc image is opened by path and never extracted from an archive
-   (HOSTS-AND-INTEGRATION section 1, Content). */
+/* L8886: PS-EXEs use a fullpath host read. Disc images remain unsupported and
+   archives are not extracted. */
 void retro_get_system_info(struct retro_system_info *sys)
 {
     if (sys == NULL) {
@@ -216,7 +308,7 @@ void retro_get_system_info(struct retro_system_info *sys)
     memset(sys, 0, sizeof *sys);
     sys->library_name = "schwaystation";
     sys->library_version = SCHWAYSTATION_LIBRETRO_VERSION;
-    sys->valid_extensions = "";
+    sys->valid_extensions = "exe";
     sys->need_fullpath = true;
     sys->block_extract = true;
 }
@@ -312,7 +404,11 @@ void retro_run(void)
     if (input_poll_cb != NULL) {
         input_poll_cb();
     }
-    if (inst == NULL || !lr_check_region() || schway_run_frame(inst, NULL) != SCHWAY_STATUS_OK) {
+    if (inst == NULL || !lr_check_region()) {
+        return;
+    }
+    lr_queue_input();
+    if (schway_run_frame(inst, NULL) != SCHWAY_STATUS_OK) {
         return;
     }
     memset(&video, 0, sizeof video);
@@ -321,6 +417,18 @@ void retro_run(void)
         video.width > LR_MAX_W || video.height > LR_MAX_H_PAL) {
         return;
     }
+    if ((video.width != geometry_width || video.height != geometry_height) && env_cb != NULL) {
+        struct retro_game_geometry geometry;
+        memset(&geometry, 0, sizeof geometry);
+        geometry.base_width = video.width;
+        geometry.base_height = video.height;
+        geometry.max_width = LR_MAX_W;
+        geometry.max_height = info.region == SCHWAY_REGION_PAL ? LR_MAX_H_PAL : LR_MAX_H_NTSC;
+        geometry.aspect_ratio = 4.0f / 3.0f;
+        (void)env_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
+    }
+    geometry_width = video.width;
+    geometry_height = video.height;
     schway_host_xrgb8888_frame(&video, pixels, video.width);
     if (video_cb != NULL) {
         video_cb(pixels, video.width, video.height, (size_t)video.width * sizeof pixels[0]);
@@ -357,21 +465,48 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
     (void)code;
 }
 
-/* L9020. A NULL game boots the test card; content is refused in this
-   release. XRGB8888 is requested here (L870); the default 0RGB1555 is
-   deprecated. The region option is read here, before the first frame. */
+/* L9020. NULL boots the test card. A fullpath PS-EXE uses the host reader and
+   the core's real-MIPS stub when no BIOS has been selected. XRGB8888 is
+   requested here (L870); the default 0RGB1555 is deprecated. */
 bool retro_load_game(const struct retro_game_info *game)
 {
     enum retro_pixel_format format = RETRO_PIXEL_FORMAT_XRGB8888;
+    uint8_t *exe = NULL;
+    size_t exe_size = 0u;
+    schway_exe_info exe_info;
 
-    lr_unload();
     if (game != NULL) {
-        return false;
+        if (!lr_is_exe_path(game->path)) {
+            return false;
+        }
+        exe = lr_read_exe(game->path, &exe_size);
+        if (exe == NULL) {
+            return false;
+        }
+        memset(&exe_info, 0, sizeof exe_info);
+        exe_info.size = (uint32_t)sizeof exe_info;
+        if (schway_probe_exe(exe, exe_size, &exe_info) != SCHWAY_STATUS_OK) {
+            free(exe);
+            return false;
+        }
     }
     if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &format)) {
+        free(exe);
         return false;
     }
-    return lr_create(lr_option_region()) != 0;
+    if (!lr_create(lr_option_region())) {
+        free(exe);
+        return false;
+    }
+    if (game != NULL) {
+        schway_status status = schway_load_exe(inst, exe, exe_size);
+        free(exe);
+        if (status != SCHWAY_STATUS_OK) {
+            lr_unload();
+            return false;
+        }
+    }
+    return true;
 }
 
 bool retro_load_game_special(unsigned game_type, const struct retro_game_info *game,

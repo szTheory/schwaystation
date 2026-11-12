@@ -314,9 +314,14 @@ if (schway_probe_exe(bytes, n, &info) == SCHWAY_STATUS_OK) {
 
 `schway_probe_exe` checks a file and describes it without needing an instance; `schway_load_exe` runs the same checks
 and then copies the file's text segment into RAM at its address. Load after `schway_create` or a power reset and
-before the first frame: a call after a frame has run returns `SCHWAY_STATUS_ERR_ARGUMENT`, and a power reset erases
-what was loaded, so load again after one. A refused file changes nothing. A `NULL` pointer or `n` of 0 returns
-`SCHWAY_STATUS_ERR_ARGUMENT`.
+before guest execution advances: a call after any guest ticks, after a frame has run, or after an executable or BIOS
+is already loaded returns `SCHWAY_STATUS_ERR_ARGUMENT`. A power reset erases an executable, so load it again after
+one. A refused file changes nothing. A `NULL` pointer or `n` of 0 returns `SCHWAY_STATUS_ERR_ARGUMENT`.
+
+The libretro adapter accepts only fullpath `.exe` content. It reads at most the PS-EXE header plus 2 MiB, validates
+the complete file before replacing the active instance, then passes its bytes to `schway_load_exe`. With no host
+BIOS selected, the core's real-MIPS stub starts the executable. `retro_load_game(NULL)` remains available for the
+built-in test card. Disc and playlist formats are not accepted.
 
 The loader writes the text segment at its physical address and a 16-byte launch block at `0200h` of RAM: the entry
 point, the global pointer, the stack address and the stack size as four little-endian words. It writes nothing else.
