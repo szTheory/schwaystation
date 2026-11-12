@@ -282,6 +282,138 @@ done:
     return failed;
 }
 
+static int copy_file(FILE *source, FILE *destination)
+{
+    uint8_t buffer[4096];
+    size_t count;
+    while ((count = fread(buffer, 1u, sizeof buffer, source)) != 0u) {
+        if (fwrite(buffer, 1u, count, destination) != count) return 1;
+    }
+    return ferror(source) ? 1 : 0;
+}
+
+static int make_cue_edge_fixture(const char *cue_path, const char *mode)
+{
+    char file_name[257] = "synthetic.bin";
+    char track_number[3] = "01";
+    const char *track_mode = "MODE1/2048";
+    const char *index = "00:00:00";
+    size_t cue_path_size = strlen(cue_path);
+    const char *slash = strrchr(cue_path, '/');
+    const char *backslash = strrchr(cue_path, '\\');
+    const char *last = slash;
+    size_t directory_size;
+    char *source_path = NULL;
+    char *bin_path = NULL;
+    FILE *source = NULL;
+    FILE *bin = NULL;
+    FILE *cue = NULL;
+    int create_companion = 1;
+    size_t padded_size = 0u;
+    int failed = 0;
+
+    if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
+    directory_size = last == NULL ? 0u : (size_t)(last - cue_path + 1);
+    if (strcmp(mode, "cue_endpoint") == 0) {
+        index = "99:59:74";
+    } else if (strcmp(mode, "cue_bad_msf") == 0) {
+        index = "100:00:00";
+        create_companion = 0;
+    } else if (strcmp(mode, "cue_bad_mode") == 0) {
+        track_mode = "MODE1/4096";
+        create_companion = 0;
+    } else if (strcmp(mode, "cue_bad_track") == 0) {
+        memcpy(track_number, "00", sizeof track_number);
+        create_companion = 0;
+    } else if (strcmp(mode, "cue_bad_index") == 0 ||
+               strcmp(mode, "cue_escape") == 0 ||
+               strcmp(mode, "cue_missing") == 0 ||
+               strcmp(mode, "cue_name_255") == 0 ||
+               strcmp(mode, "cue_name_256") == 0 ||
+               strcmp(mode, "cue_max_bytes") == 0 ||
+               strcmp(mode, "cue_over_bytes") == 0) {
+        if (strcmp(mode, "cue_bad_index") == 0) create_companion = 0;
+        if (strcmp(mode, "cue_escape") == 0) {
+            memcpy(file_name, "../escaped.bin", sizeof "../escaped.bin");
+            create_companion = 0;
+        } else if (strcmp(mode, "cue_missing") == 0) {
+            memcpy(file_name, "missing.bin", sizeof "missing.bin");
+            create_companion = 0;
+        } else if (strcmp(mode, "cue_name_255") == 0 ||
+                   strcmp(mode, "cue_name_256") == 0) {
+            size_t name_size = strcmp(mode, "cue_name_255") == 0 ? 255u : 256u;
+            memset(file_name, 'a', name_size);
+            if (name_size == 255u) memcpy(file_name + 251u, ".bin", 5u);
+            else {
+                file_name[256] = '\0';
+                create_companion = 0;
+            }
+        }
+        if (strcmp(mode, "cue_max_bytes") == 0) padded_size = 65536u;
+        if (strcmp(mode, "cue_over_bytes") == 0) padded_size = 65537u;
+    } else {
+        return 1;
+    }
+
+    source_path = (char *)malloc(cue_path_size + 16u);
+    bin_path = (char *)malloc(cue_path_size + sizeof file_name + 2u);
+    if (source_path == NULL || bin_path == NULL) {
+        failed = 1;
+        goto done;
+    }
+    (void)snprintf(source_path, cue_path_size + 16u, "%s.source", cue_path);
+    memcpy(bin_path, cue_path, directory_size);
+    memcpy(bin_path + directory_size, file_name, strlen(file_name) + 1u);
+    if (create_companion) {
+        if (make_synthetic_iso(source_path, "synthetic") != 0) {
+            failed = 1;
+            goto done;
+        }
+        source = fopen(source_path, "rb");
+        bin = fopen(bin_path, "wb");
+        if (source == NULL || bin == NULL || copy_file(source, bin) != 0) failed = 1;
+        if (source != NULL && fclose(source) != 0) failed = 1;
+        source = NULL;
+        if (bin != NULL && fclose(bin) != 0) failed = 1;
+        bin = NULL;
+        if (failed) goto done;
+    }
+
+    cue = fopen(cue_path, "wb");
+    if (cue == NULL) {
+        failed = 1;
+        goto done;
+    }
+    (void)fprintf(cue, "FILE \"%s\" BINARY\nTRACK %s %s\nINDEX 01 %s\n",
+                  file_name, track_number, track_mode, index);
+    if (strcmp(mode, "cue_bad_index") == 0) {
+        (void)fprintf(cue, "INDEX 00 00:00:00\n");
+    }
+    if (padded_size != 0u) {
+        long current = ftell(cue);
+        if (current < 0L || (size_t)current > padded_size) failed = 1;
+        while (!failed && (size_t)current < padded_size) {
+            size_t count = padded_size - (size_t)current;
+            if (count > 4096u) count = 4096u;
+            char spaces[4096];
+            memset(spaces, ' ', count);
+            if (fwrite(spaces, 1u, count, cue) != count) failed = 1;
+            current += (long)count;
+        }
+    }
+    if (fclose(cue) != 0) failed = 1;
+    cue = NULL;
+
+done:
+    if (source != NULL && fclose(source) != 0) failed = 1;
+    if (bin != NULL && fclose(bin) != 0) failed = 1;
+    if (cue != NULL && fclose(cue) != 0) failed = 1;
+    if (source_path != NULL) (void)remove(source_path);
+    free(source_path);
+    free(bin_path);
+    return failed;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 3 && (strcmp(argv[1], "cue_2048") == 0 ||
@@ -290,6 +422,9 @@ int main(int argc, char **argv)
                       strcmp(argv[1], "cue_mode2_2336") == 0 ||
                       strcmp(argv[1], "cue_track99") == 0)) {
         return make_cue_fixture(argv[2], argv[1]);
+    }
+    if (argc == 3 && strncmp(argv[1], "cue_", 4u) == 0) {
+        return make_cue_edge_fixture(argv[2], argv[1]);
     }
     if (argc != 3 || (strcmp(argv[1], "synthetic") != 0 &&
                       strcmp(argv[1], "fallback") != 0 &&

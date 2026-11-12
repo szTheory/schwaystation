@@ -55,7 +55,6 @@ typedef struct schway__cue_manifest {
     size_t file_count;
     size_t track_count;
     size_t index_count;
-    uint64_t cue_size;
 } schway__cue_manifest;
 
 typedef struct schway__iso_record {
@@ -613,7 +612,6 @@ static int schway__cue_safe_name(const char *name)
 
 static char *schway__cue_join_path(const char *cue_path, const char *name)
 {
-    size_t cue_size = strlen(cue_path);
     size_t name_size = strlen(name);
     const char *slash = strrchr(cue_path, '/');
     const char *backslash = strrchr(cue_path, '\\');
@@ -630,7 +628,6 @@ static char *schway__cue_join_path(const char *cue_path, const char *name)
         joined[directory_size + i] = name[i] == '\\' ? '/' : name[i];
     }
     joined[directory_size + name_size] = '\0';
-    (void)cue_size;
     return joined;
 }
 
@@ -653,7 +650,6 @@ static schway_host_disc_probe_status schway__cue_parse(const char *path,
         return SCHWAY_HOST_DISC_PROBE_LIMIT;
     }
     size = (size_t)end;
-    manifest->cue_size = (uint64_t)size;
     if (size == 0u || fseek(file, 0L, SEEK_SET) != 0) {
         (void)fclose(file);
         return SCHWAY_HOST_DISC_PROBE_BAD_CUE;
@@ -822,7 +818,7 @@ static schway_host_disc_probe_status schway__cue_parse(const char *path,
 static schway_host_disc_probe_status schway__cue_file_sizes(
     const char *cue_path, schway__cue_manifest *manifest)
 {
-    uint64_t total = manifest->cue_size;
+    uint64_t total = 0u;
     for (size_t i = 0u; i < manifest->file_count; i++) {
         char *path = schway__cue_join_path(cue_path, manifest->files[i].name);
         FILE *file;

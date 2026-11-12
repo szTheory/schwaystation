@@ -6,7 +6,7 @@ to check that a build produces the expected picture. It can run a PS-EXE file an
 and it can say what a PS-EXE file is without running it.
 
 The runner loads no disc. A run without `--bios` or `--exe` shows the built-in test card, described in
-[embedding.md](embedding.md#the-test-card). `--probe` reads one PS-EXE or direct raw ISO9660 image and runs nothing.
+[embedding.md](embedding.md#the-test-card). `--probe` reads one PS-EXE or disc image and runs nothing.
 
 ## Synopsis
 
@@ -40,7 +40,7 @@ schwaystation-run --help | --version
 | `--memcard-names MODE` | Use `basename` (default) or `serial` for the card filenames. Give it once. |
 | `--serial SERIAL` | Use this safe serial basename with `--memcard-names serial`. A bare PS-EXE does not contain a disc serial, so the caller supplies it. |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
-| `--probe FILE` | Print what the PS-EXE file is, as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
+| `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
 | `--region NAME` | `ntsc-u` (the default), `ntsc-j` or `pal`: the console's region and its video timing. |
 | `--help` | Print the usage text and the exit statuses. Give it alone. |
 | `--version` | Print the version and the Git revision the build was configured from. Give it alone. |
@@ -411,16 +411,20 @@ shows that frame's time, and with fewer than 100,000 frames p99.999 is the maxim
 
 ## Probe
 
-`--probe FILE` reads a PS-EXE or a direct raw ISO9660 image, checks the executable with the core's PS-EXE
-validator and prints metadata. It makes no instance, loads nothing, reads no CUE file, sends no sector to the
-emulated console and runs no frame. The ISO path accepts only 2048-byte sectors, images no larger than 1 GiB,
-at most 64 volume descriptors, directories no larger than 64 KiB with at most 4096 entries, `SYSTEM.CNF` up to
-2047 ASCII bytes, and boot paths up to 16 safe components of at most 63 bytes each. It reports booting and
-playing as unavailable. The report is these lines, in this order, each `key=value`:
+`--probe FILE` reads a PS-EXE, a direct raw ISO9660 image, or a CUE sheet with its referenced BINARY files. It
+checks the boot executable with the core's PS-EXE validator and prints metadata. It makes no instance, loads
+nothing into the emulated console, sends no sector to the console and runs no frame. Raw ISO9660 images use
+2048-byte sectors. CUE sheets are at most 64 KiB with at most 99 tracks and 99 indexes; each relative `FILE` name
+is at most 255 bytes and cannot escape the sheet's directory. Companion image files together are at most 1 GiB.
+Supported CUE layouts are `MODE1/2048`, `MODE1/2352`, `MODE2/2336`, `MODE2/2352` and `AUDIO`;
+timestamps range through `99:59:74`. ISO data uses at most 64 volume descriptors, directories no larger than
+64 KiB with at most 4096 entries, `SYSTEM.CNF` up to 2047 ASCII bytes, and boot paths up to 16 safe components
+of at most 63 bytes each. CD-ROM behavior, playlist parsing and disc execution are outside this probe. It reports
+booting and playing as unavailable. The report is these lines, in this order, each `key=value`:
 
 | Key | Value |
 |---|---|
-| `format` | `exe` for a bare file; `disc` for a raw ISO9660 image |
+| `format` | `exe` for a bare file; `disc` for a raw ISO9660 image or CUE sheet |
 | `serial` | `n/a` for a bare executable; inferred from a disc's boot name when it has the conventional form |
 | `licence_area` | the market named by the licence text at offset 4Ch: `japan`, `europe`, `north_america` or `none` |
 | `region_guess` | `ntsc-j`, `pal` or `ntsc-u` for the three markets, `unknown` for `none` |
@@ -436,11 +440,11 @@ playing as unavailable. The report is these lines, in this order, each `key=valu
 | `lint` | notes on a valid file, as bits: `0x1` the text lies in the low 64 KiB, `0x2` bytes follow the text |
 | `boot_status`, `play_status` | for a disc, both are `unavailable` |
 
-For a raw ISO9660 image, `format` is `disc`; `serial` is inferred from a conventional boot executable name or
-`n/a`; `boot_name` is the boot executable's canonical name without an ISO version suffix. The executable fields
-and hashes describe that file. `rcheevos_md5` hashes the canonical boot name followed by the PS-EXE header and
-text bytes selected by its header. `boot_status` and `play_status` are always `unavailable`: this probe does not
-boot or run discs. If `SYSTEM.CNF` is missing, the probe tries a root `PSX.EXE` file.
+For a raw ISO9660 image or CUE sheet, `format` is `disc`; `serial` is inferred from a conventional boot executable
+name or `n/a`; `boot_name` is the boot executable's canonical name without an ISO version suffix. The executable
+fields and hashes describe that file. `rcheevos_md5` hashes the canonical boot name followed by the PS-EXE header
+and text bytes selected by its header. `boot_status` and `play_status` are always `unavailable`: this probe does
+not boot or run discs. If `SYSTEM.CNF` is missing, the probe tries a root `PSX.EXE` file.
 
 The ten header values, from `pc0` to `s_size`, are printed as `0x` and eight hex digits, and so is `lint`.
 

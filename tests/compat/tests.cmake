@@ -69,6 +69,57 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_cue_modes")
   return()
 endif()
 
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_cue_edges")
+  foreach(required WORK_ROOT TEST_BINARY RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "CUE edge probe test requires ${required}")
+    endif()
+  endforeach()
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+  set(work "${WORK_ROOT}/compat-probe-cue-edges")
+  file(REMOVE_RECURSE "${work}")
+  file(MAKE_DIRECTORY "${work}")
+
+  foreach(mode IN ITEMS cue_endpoint cue_bad_msf cue_bad_mode cue_bad_track cue_bad_index
+      cue_escape cue_missing cue_name_255 cue_name_256 cue_max_bytes cue_over_bytes)
+    set(case_dir "${work}/${mode}")
+    file(MAKE_DIRECTORY "${case_dir}")
+    set(cue "${case_dir}/synthetic.cue")
+    execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" "${mode}" "${cue}"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "cannot generate ${mode} CUE fixture: ${rc}: ${out}${err}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${cue}"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(mode STREQUAL "cue_name_255" OR mode STREQUAL "cue_max_bytes")
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "format=disc" OR
+         NOT out MATCHES "serial=SWAY-00001" OR
+         NOT out MATCHES "boot_name=SWAY_000[.]01" OR
+         NOT out MATCHES "rcheevos_md5=12481bed29c6c0d54a6f776ef5cec981" OR
+         NOT out MATCHES "boot_status=unavailable" OR NOT out MATCHES "play_status=unavailable")
+        message(FATAL_ERROR "${mode} CUE boundary did not preserve identity: ${rc}: ${out}${err}")
+      endif()
+    else()
+      set(expected "invalid CUE track metadata")
+      if(mode STREQUAL "cue_endpoint" OR mode STREQUAL "cue_missing")
+        set(expected "cannot read CUE track file")
+      elseif(mode STREQUAL "cue_bad_mode")
+        set(expected "unsupported CUE track mode")
+      elseif(mode STREQUAL "cue_escape")
+        set(expected "unsafe or escaping CUE FILE path")
+      elseif(mode STREQUAL "cue_over_bytes")
+        set(expected "disc image exceeds probe limits")
+      endif()
+      if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR NOT err MATCHES "${expected}")
+        message(FATAL_ERROR "${mode} CUE edge was accepted or refused unexpectedly: ${rc}: ${out}${err}")
+      endif()
+    endif()
+  endforeach()
+  message(STATUS "CUE timestamp, metadata, path and size edges passed through --probe")
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_iso_edges")
   foreach(required WORK_ROOT TEST_BINARY RUN)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -385,6 +436,14 @@ schway_add_test(NAME compat.probe.cue_modes
     -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -DCASE=probe_cue_modes -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 30)
+
+# Fault prevented: a CUE timestamp, track, mode, path or input-size boundary being accepted incorrectly.
+schway_add_test(NAME compat.probe.cue_edges
+  COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DCASE=probe_cue_edges -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
 # Fault prevented: a missing, unavailable or out-of-volume boot input being reported as a probe success.

@@ -1,4 +1,5 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
+compat.probe.cue_edges	compat,portable
 compat.probe.cue_modes	compat,portable
 compat.probe.iso_edges	compat,portable
 compat.probe.synthetic_identity	compat,portable
