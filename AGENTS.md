@@ -89,6 +89,12 @@ automation and efficiency preferences; autonomous authorization and phase bounda
 - During quiet-executor recovery, inspect attributable command/session evidence and a fresh repository snapshot first. New work in a fresh snapshot weighs against interruption; do not clean processes or take over based only on a missing status reply.
 - For temporary CMake workflow presets, keep `binaryDir` aligned with the test integration's expected handoff path. For later local reruns, reuse CI configure/build artifacts and override only test parallelism when preset rules permit.
 
+## Integration efficiency
+
+- Keep small related integration repairs within the existing owner and plan follow-up when the concrete implementation stays under 30 minutes. Create a new plan for material scope or size, not routine repair bookkeeping.
+- Check affected native configure graphs, compilers and targeted consumers before broad CI. Batch coherent portability, producer, timing and real-host integration fixes into one changed-head hosted run where practical; metadata-only edits do not justify a broad suite.
+- Tune provisional executor-chosen timeouts from attributed workload and measured runs without another owner approval. Preserve explicit owner limits, all cases and assertions, and distinguish a larger allowance from a speed improvement.
+
 ## GSD summaries
 
 Every plan SUMMARY carries `requirements-completed:` and a block-style `coverage:` list. Each entry has `id`,

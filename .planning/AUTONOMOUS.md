@@ -90,3 +90,5 @@ Preserve passing commits when resuming a checkpointed plan. If TDD or task order
 checkpoint, record the actual sequence in SUMMARY and STATE and continue from the verified HEAD. Do not amend,
 reset or split solely to make history appear ideal or to manufacture RED/GREEN timing; legitimate corrective
 history work remains available when the actual correction calls for it.
+
+On 2026-11-12 the owner explicitly requested faster implementation and process after prolonged Phase 4 integration. Keep small related repairs under the current plan/owner with focused checks and honest summary updates; split only material scope or work exceeding the existing 30-minute planning rule. Run affected native configure/compiler/target checks before broad CI, combine coherent changed-head fixes into one hosted run when practical, and do not repeat broad suites for metadata. Executor-chosen provisional test/job timeouts may be adjusted from attributed evidence without owner approval; actual owner caps and every required behavior check remain binding. Parallel read-only diagnosis may remove independent investigation from the source executor's critical path.
