@@ -1,6 +1,6 @@
 # 04-40 OpenBIOS boot diagnosis
 
-**Status:** The POST, ATTR readback, DMA4 request/continuation and GPUSTAT field-status fixes are complete in plans 04-50 through 04-53. The checked C-shell reaches an independently inspected cube frame at NTSC-U frame 240, and its native image hash is pinned in plan 04-40 tests. The tracer commit passed its current-head hosted portable run; plan 04-40 still requires its selector/refusal controls and a final hosted run for that completed head. Earlier black-frame evidence below records the resolved blocker.
+**Status:** The POST, ATTR readback, DMA4 request/continuation and GPUSTAT field-status fixes are complete in plans 04-50 through 04-53. The checked C-shell reaches an independently inspected cube frame at NTSC-U frame 240, and its native image hash is pinned in plan 04-40 tests. The shell selector/refusal controls and exact-head hosted portable verification both passed; this diagnosis records the observed frame and run evidence. Earlier black-frame evidence below records the resolved blocker.
 
 ## Evidence
 
@@ -89,6 +89,10 @@ The temporary post-53 GPU trace at frame 80 reports 255 GPU writes, 132489 GPUST
 
 Local checks after adding the tracer exited 0: `cmake --preset ci`, `cmake --build --preset ci --target schwaystation-run`, `ctest --test-dir build/ci -R '^built\.openbios\.shell$' --no-tests=error --output-on-failure` (1.01 s), and `runner.hashes_file` (2.39 s). The lane hash output contains the pinned tuple `openbios shell ntsc-u frame 240 sha256 4d1f0ff260e2cf065ae0b7add4ba60353b2b01241dda8325309b5398ba00acec`. The local build used a temporary copy of the earlier exact-digest handoff.
 
-## Current-head hosted tracer verification
+## Hosted tracer verification
 
 `gh run view 43131466212 --json conclusion,headSha,status,url,event,headBranch` exited 0 for `workflow_dispatch` on `phase/04-games-play-in-retroarch`, exact head `852c1628304beb92194c30a359c29a8848a10396`; [run 43131466212](https://github.com/szTheory/schwaystation/actions/runs/43131466212) concluded success. The run-local OpenBIOS producer, six native build lanes, be32, WASI, ASAN, nofp, perf, RetroArch, hygiene, hash equality and required aggregate all passed. This validates the tracer commit; the newly added selector/refusal controls still require a fresh current-head run.
+
+## Final current-head hosted acceptance
+
+`gh run view 43133593393 --json status,conclusion,headSha,event,headBranch,url` exited 0 for `workflow_dispatch` on `phase/04-games-play-in-retroarch`, exact head `b7fa360b3967d9a7d91d136c14a608580a71f1e4`; [run 43133593393](https://github.com/szTheory/schwaystation/actions/runs/43133593393) concluded success. The run-local firmware producer, eight applicable consumer lanes, six native builds, WASI, be32, ASAN, nofp, perf, RetroArch, hygiene, hash equality and required aggregate all passed. The be32 job took 4m01s overall; `cmake --workflow --preset be32`, including the new one-frame NTSC-J/PAL controls, took 3m41s. Existing timeouts and the frame-300 movie assertions remain unchanged.

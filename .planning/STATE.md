@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 35 of 53
+current_plan: 36 of 53
 status: executing
-stopped_at: Completed 04-53-PLAN.md
-last_updated: "2026-11-12T00:03:10.119Z"
-last_activity: 2026-11-11
-last_activity_desc: Planned measured-source GPUSTAT phase behavior with one approved saved latch; shell remains unaccepted
-state_head: cef488e7d4dd79b28c9250c3449061d5c93b885d
+stopped_at: Completed 04-40-PLAN.md
+last_updated: "2026-11-12T01:32:15.340Z"
+last_activity: 2026-11-12
+last_activity_desc: Completed the inspected OpenBIOS shell, portable refusal controls, and exact-head hosted CI acceptance.
+state_head: b7fa360b3967d9a7d91d136c14a608580a71f1e4
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 102
+  completed_plans: 103
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 35 of 53
-Status: Plan 04-53 complete; 04-40 waits and retains real recognizable-shell/portable acceptance.
-Last activity: 2026-11-11 — Added GPUSTAT status/state slice using new primary hardware evidence; no shell hash accepted.
+Current Plan: 36 of 53
+Status: Plan 04-40 complete; the next roadmap plan is 04-24.
+Last activity: 2026-11-12 — Inspected and pinned the OpenBIOS shell at frame 240; portable hash equality and all required hosted checks passed.
 
 Progress: [█████░░░░░] 50%
 
@@ -163,6 +163,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P51 | 22min | 2 tasks | 10 files |
 | Phase 04 P52 | 18m 38s | 2 tasks | 9 files |
 | Phase 04 P53 | 45min | 2 tasks | 8 files |
+| Phase 04 P40 | 4h 28m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -373,6 +374,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep the deterministic sink, existing unit cost and serialized DMA fields; no new state layout or revision is needed.
 - [Phase 04]: Plan 04-53: save one GPU field-status phase because bit 13 retains its value after IRS is disabled; expose v2 bit 13 and mask v0.
 - [Phase 04]: Plan 04-53: preserve the fixed 263/314-line beam model and document unmodeled physical-field timing instead of claiming exact timeline parity.
+- [Phase 04]: Pin NTSC-U frame 240 because it is the earliest independently inspected frame with a clearly recognizable cube shell.
+- [Phase 04]: Make the shell test a CTest fixture setup for runner.hashes_file so tuple provenance is fresh in each run.
+- [Phase 04]: Require OpenBIOS only at consumer execution time and reuse the existing comparison helper for portable refusal controls.
 
 ### Pending Todos
 
@@ -508,10 +512,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | /gsd-execute-plan 04-53 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; GPUSTAT saved-phase latch, RED/GREEN, full CI and hygiene | gpt-6-luna xhigh |
 
+| 2026-11-12 | /gsd-execute-plan 04-40 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; inspected shell frame 240, portable selector/refusal controls, full CI/hygiene and exact-head hosted CI | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-12T00:03:09.863Z
-Stopped at: Completed 04-53-PLAN.md
+Last session: 2026-11-12T01:32:15.007Z
+Stopped at: Completed 04-40-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
