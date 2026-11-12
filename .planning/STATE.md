@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 45 of 53
+current_plan: 46 of 53
 status: executing
-stopped_at: Completed 04-28-PLAN.md
-last_updated: "2026-11-12T15:15:20.390Z"
+stopped_at: Completed 04-44-PLAN.md
+last_updated: "2026-11-12T16:10:39.754Z"
 last_activity: 2026-11-12
-last_activity_desc: Completed 04-28 controller and rumble support with focused cases, full CI, release checks, and hygiene passing.
-state_head: 0c2f7644c439b1079d7b4ada361a4bab3d11d193
+last_activity_desc: Completed 04-44 libretro card persistence and memory descriptors; focused tests, full CI and release checks, and hygiene passed.
+state_head: ae6a56d80dc0c6b76496032816b112baf2c60029
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 112
+  completed_plans: 113
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 45 of 53
-Status: Plan 04-28 complete. Eight phase plans remain.
-Last activity: 2026-11-12 — Added libretro controller mapping and guest-driven rumble, then passed focused cases, full CI, release checks, and hygiene.
+Current Plan: 46 of 53
+Status: Plan 04-44 complete. Eight phase plans remain.
+Last activity: 2026-11-12 — Added libretro card persistence and memory descriptors, then passed focused cases, full CI, release checks, and hygiene.
 
 Progress: [█████░░░░░] 50%
 
@@ -173,6 +173,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P42 | 40min | 2 tasks | 16 files |
 | Phase 04 P26 | 86min | 2 tasks | 11 files |
 | Phase 04 P28 | 92 min | 2 tasks | 5 files |
+| Phase 04 P44 | 50min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -412,6 +413,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep libretro controller-family selection separate from the DualShock digital/analog wire protocol.
 - [Phase 04]: Use independent serialized-state references per controller family and prove full analog packet/axis behavior with a separate real guest.
 - [Phase 04]: Deliver both ports’ strong and weak rumble reports once per frame with exact scaling and lifecycle clearing.
+- [Phase 04]: The frontend owns card-one .srm writes; libretro exposes the stable SAVE_RAM span and does not write the file.
+- [Phase 04]: Card two uses GET_SAVE_DIRECTORY and the canonical content basename, with atomic persistence gated by a changed successful-write generation.
+- [Phase 04]: Memory descriptors map existing RAM and scratchpad spans with explicit aliases and are cleared with adapter lifetime.
 
 ### Pending Todos
 
@@ -559,11 +563,12 @@ come from `AGENTS.md`.
 | 2026-11-12 | /gsd-execute-plan 04-26 resumed after approved budget update | Codex, OpenGSD 1.20.0; sequential shared checkout; applied candidate, focused library cases, full CI, hygiene and plan closeout | gpt-6-luna xhigh |
 | 2026-11-12 | Phase 04 complete-code budget approval implementation | Codex/OpenGSD; concrete 2700-line ceiling, preserved proposal and renewed efficiency authority; no plan advance | GPT-6 session |
 | 2026-11-12 | /gsd-execute-plan 04-28 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; per-port controller mapping, family-specific guest movies, analog DualShock and both-port rumble proof, full CI/release checks and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | /gsd-execute-plan 04-44 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; libretro card persistence and memory descriptors, full CI/release checks and hygiene | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-12T15:15:19.945Z
-Stopped at: Completed 04-28-PLAN.md
+Last session: 2026-11-12T16:10:39.505Z
+Stopped at: Completed 04-44-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
