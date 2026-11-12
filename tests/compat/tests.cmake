@@ -1,3 +1,55 @@
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_baseline")
+  foreach(required SOURCE_ROOT WORK_ROOT)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "protected compatibility test requires ${required}")
+    endif()
+  endforeach()
+  string(RANDOM LENGTH 10 ALPHABET 0123456789abcdef suffix)
+  set(work "${WORK_ROOT}/compat-baseline-${suffix}")
+  set(base "${work}/base")
+  set(head "${work}/head")
+  foreach(root IN ITEMS "${base}" "${head}")
+    file(MAKE_DIRECTORY "${root}/scripts" "${root}/tests/cmake" "${root}/tests/compat")
+    configure_file("${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${root}/scripts/compat-ratchet.sh" COPYONLY)
+  endforeach()
+  configure_file("${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake" "${base}/tests/cmake/compat-ratchet.cmake" COPYONLY)
+  file(WRITE "${head}/tests/cmake/compat-ratchet.cmake" "message(STATUS \"head judge accepted all rows\")\n")
+  set(header "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date")
+  set(pass "fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,pass,fixture.control:exit=0,2026-11-11")
+  set(fail "fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,fail,fixture.control:exit=1,2026-11-11")
+  file(WRITE "${base}/tests/compat/ledger.csv" "${header}\n${pass}\n")
+  execute_process(COMMAND git init -q "${base}" RESULT_VARIABLE result ERROR_VARIABLE error)
+  if(NOT "${result}" STREQUAL "0")
+    message(FATAL_ERROR "cannot initialize protected-base fixture: ${error}")
+  endif()
+  execute_process(COMMAND git -C "${base}" config user.name "Compat Tests" RESULT_VARIABLE result)
+  execute_process(COMMAND git -C "${base}" config user.email "12345678+compat-tests@users.noreply.github.com" RESULT_VARIABLE result)
+  execute_process(COMMAND git -C "${base}" add scripts tests RESULT_VARIABLE result)
+  execute_process(COMMAND git -C "${base}" commit -qm "protected compatibility base" RESULT_VARIABLE result)
+  if(NOT "${result}" STREQUAL "0")
+    message(FATAL_ERROR "cannot commit protected-base fixture")
+  endif()
+  execute_process(COMMAND git -C "${base}" rev-parse HEAD RESULT_VARIABLE result OUTPUT_VARIABLE base_sha OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT "${result}" STREQUAL "0")
+    message(FATAL_ERROR "cannot identify protected-base fixture commit")
+  endif()
+  set(candidate "${work}/candidate.csv")
+  set(fresh "${work}/fresh.csv")
+  set(allow "${work}/allow.txt")
+  file(WRITE "${candidate}" "${header}\n${fail}\n")
+  file(WRITE "${fresh}" "${header}\n${fail}\n")
+  file(WRITE "${allow}" "")
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env "COMPAT_BASE_DIR=${base}" "COMPAT_BASE_SHA=${base_sha}"
+      sh "${head}/scripts/compat-ratchet.sh" "${candidate}" "${fresh}" "" "${allow}" 2026-11-12
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if("${result}" STREQUAL "0")
+    message(FATAL_ERROR "protected base judge accepted a later regression: ${output}${error}")
+  endif()
+  file(REMOVE_RECURSE "${work}")
+  message(STATUS "compatibility: copied base judge rejected a later regression")
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_live")
   foreach(required SOURCE_ROOT WORK_ROOT LEDGER TEST_BINARY RUN FIXTURE_DIR)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -83,6 +135,12 @@ add_executable(schwaystation-test-compat ${CMAKE_CURRENT_LIST_DIR}/compat_tests.
 set_target_properties(schwaystation-test-compat PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-compat)
+
+# Fault prevented: a changed head judge accepting a regression against a protected base.
+schway_add_test(NAME compat.ratchet.baseline
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DCASE=compat_baseline -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 30)
 
 # Fault prevented: rows or a header that do not use the ten meaningful fields.
 schway_add_test(NAME compat.ratchet.rows

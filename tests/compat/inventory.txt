@@ -1,4 +1,5 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
+compat.ratchet.baseline	compat,portable
 compat.ratchet.rows	compat,portable
 compat.ratchet.transitions	compat,portable
 policy.compat_doc_fresh	compat,portable
