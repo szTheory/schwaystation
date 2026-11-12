@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -61,7 +63,7 @@ static int set_path(char *out, size_t capacity, const char *directory, const cha
 
 static int write_file(const char *path, const void *bytes, size_t size)
 {
-    FILE *file = fopen(path, "wb");
+    FILE *file = schway__test_open_file(path, "wb");
     if (file == NULL) {
         return 0;
     }
@@ -74,7 +76,7 @@ static int write_file(const char *path, const void *bytes, size_t size)
 
 static int read_file(const char *path, void *out, size_t capacity, size_t *size)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     if (file == NULL) {
         return 0;
     }
@@ -108,7 +110,7 @@ static int set_temp_path(char *out, size_t capacity, const char *destination, un
 
 static int file_exists(const char *path)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     if (file == NULL) {
         return 0;
     }

@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "schwaystation.h"
 #include "internal.h"
 #include "../check.h"
@@ -752,7 +754,7 @@ static void write_file(const char *dir, const char *name, const uint8_t *b, size
     if (snprintf(path, sizeof path, "%s/%s", dir, name) >= (int)sizeof path) {
         exit(1);
     }
-    FILE *f = fopen(path, "wb");
+    FILE *f = schway__test_open_file(path, "wb");
     if (f == NULL || (n != 0u && fwrite(b, 1u, n, f) != n) || fclose(f) != 0) {
         fprintf(stderr, "cannot write %s\n", path);
         exit(1);

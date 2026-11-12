@@ -29,6 +29,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "../check.h"
 #include "libretro.h"
 #include "schwaystation.h"
@@ -809,7 +811,7 @@ static int test_path(char *path, size_t capacity, const char *directory, const c
 
 static int write_test_file(const char *path, const void *bytes, size_t size)
 {
-    FILE *file = fopen(path, "wb");
+    FILE *file = schway__test_open_file(path, "wb");
     int ok;
     if (file == NULL) {
         return 0;
@@ -824,13 +826,13 @@ static int write_test_file(const char *path, const void *bytes, size_t size)
 static int copy_test_file(const char *source_path, const char *destination_path)
 {
     unsigned char buffer[4096];
-    FILE *source = fopen(source_path, "rb");
+    FILE *source = schway__test_open_file(source_path, "rb");
     FILE *destination;
     int ok = 1;
     if (source == NULL) {
         return 0;
     }
-    destination = fopen(destination_path, "wb");
+    destination = schway__test_open_file(destination_path, "wb");
     if (destination == NULL) {
         (void)fclose(source);
         return 0;
@@ -1090,7 +1092,7 @@ cleanup:
 
 static void check_card_file_value(const char *path, int expected)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     CHECK(file != NULL);
     if (file == NULL) {
         return;
@@ -1102,7 +1104,7 @@ static void check_card_file_value(const char *path, int expected)
 
 static int read_card_file(const char *path, unsigned char *bytes)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     size_t count;
     int extra, failed;
     if (file == NULL) {
@@ -1163,7 +1165,7 @@ static int test_card_persistence(const char *exe_path, const char *directory)
         CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 0u);
         check_card_file_value(card_two, pass == 0u ? 2 : 3);
         {
-            FILE *card_one_file = fopen(card_one, "rb");
+            FILE *card_one_file = schway__test_open_file(card_one, "rb");
             CHECK(card_one_file == NULL);
             if (card_one_file != NULL) {
                 (void)fclose(card_one_file);
@@ -1222,7 +1224,7 @@ static int test_card_controls(const char *exe_path, const char *directory)
         CHECK_EQ_U64(rename(card_two, backup_card), 0u);
         p_unload_game();
         {
-            FILE *unexpected_write = fopen(card_two, "rb");
+            FILE *unexpected_write = schway__test_open_file(card_two, "rb");
             CHECK(unexpected_write == NULL);
             if (unexpected_write != NULL) {
                 (void)fclose(unexpected_write);
@@ -1290,7 +1292,7 @@ static int test_card_controls(const char *exe_path, const char *directory)
     }
     p_unload_game();
     {
-        FILE *missing_file = fopen(missing_card_two, "rb");
+        FILE *missing_file = schway__test_open_file(missing_card_two, "rb");
         CHECK(missing_file == NULL);
         if (missing_file != NULL) {
             (void)fclose(missing_file);
@@ -1300,7 +1302,7 @@ static int test_card_controls(const char *exe_path, const char *directory)
     save_directory_available = 1;
     check_card_file_equal(card_two, baseline);
     {
-        FILE *card_one_file = fopen(card_one, "rb");
+        FILE *card_one_file = schway__test_open_file(card_one, "rb");
         CHECK(card_one_file == NULL);
         if (card_one_file != NULL) {
             (void)fclose(card_one_file);
@@ -1614,7 +1616,7 @@ static int write_native_video_exe(const char *path)
 static void check_native_video_fixture(const char *path)
 {
     unsigned char image[0x1000];
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     schway_video native;
     schway *ref = ref_create(SCHWAY_REGION_NTSC_U);
 
@@ -2165,7 +2167,7 @@ static int test_input_movies(const char *path)
     long file_length;
     unsigned audio_floor = 0u;
 
-    file = fopen(path, "rb");
+    file = schway__test_open_file(path, "rb");
     CHECK(file != NULL);
     if (file == NULL) {
         if (file != NULL) {
@@ -2368,7 +2370,7 @@ static int test_input_controls(const char *path)
     schway_info info;
     schway *reference;
     unsigned char *image;
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     long file_length;
     unsigned audio_floor = 0u;
 
@@ -2767,7 +2769,7 @@ static int test_rumble_guest(const char *path)
 
     CHECK(reference != NULL);
     CHECK(write_rumble_guest(path, 1u, 255u));
-    file = fopen(path, "rb");
+    file = schway__test_open_file(path, "rb");
     CHECK(file != NULL);
     if (reference == NULL || file == NULL) {
         schway_destroy(reference);

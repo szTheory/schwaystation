@@ -271,7 +271,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt); 2 x 28 s (asan), slowest of 5 runs, run 42722584020
+    timeout-minutes: 15  # Provisional: 404/405 tests at the old 5m job cap; movies ran 3m22 (run 43309540398)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -318,7 +318,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 15  # Provisional: run 43292417084 projected 13m36s; measure the repaired full lane before ratcheting
+    timeout-minutes: 25  # Provisional: 475/476 at 15m; input.movies ran 7m54 after other 4x-x64 movie costs (run 43309540398)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -481,23 +481,24 @@ jobs:
           ../runner/bin/schwaystation-run --exe ../fixtures/pad_counter.exe --frames 60 \
             --inputs pad-counter.inputs --png 60:runner60.png
           test -d ../ra-replay/system && test -z "$(find ../ra-replay/system -mindepth 1 -print -quit)"
-          for f in runner59 runner60 replay.58 replay.59; do
+          for f in runner59 runner60 replay.59 replay.60; do
             sips --deleteColorManagementProperties "$f.png" > /dev/null
             sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
           done
-          python3 ../../tests/retroarch/verify.py compare runner59.bmp replay.58.bmp 256 240
-          python3 ../../tests/retroarch/verify.py compare runner60.bmp replay.59.bmp 256 240
-          python3 ../../tests/retroarch/verify.py distinct replay.58.bmp replay.59.bmp
+          python3 ../../tests/retroarch/verify.py compare runner59.bmp replay.59.bmp 256 240
+          python3 ../../tests/retroarch/verify.py compare runner60.bmp replay.60.bmp 256 240
+          python3 ../../tests/retroarch/verify.py distinct replay.59.bmp replay.60.bmp
       - name: RetroArch logs
         if: failure()
         run: cat build/ra/*.log build/ra-replay/*.log || true
       # Captures from both comparisons aid diagnosis.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
+        if: always()
         with:
           name: retroarch-frames
           path: build/frames/*.png
-          if-no-files-found: warn
+          retention-days: 1
+          if-no-files-found: ignore
 
   # Cachegrind instructions per frame of the test card and gpu_motion: the
   # pull request's head commit against its merge base with the base branch,

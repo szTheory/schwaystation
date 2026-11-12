@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #define COMPAT_FIELD_COUNT 10
 #define COMPAT_LINE_SIZE 2048
 #define COMPAT_MAX_ROWS 64
@@ -76,7 +78,7 @@ static int check_schema(const char *path)
     char line[COMPAT_LINE_SIZE];
     char keys[COMPAT_MAX_ROWS][COMPAT_LINE_SIZE];
     size_t row_count = 0;
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     if (file == NULL) {
         fprintf(stderr, "compat.ratchet.rows: cannot open ledger\n");
         return 1;

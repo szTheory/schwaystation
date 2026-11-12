@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "sha1.h"
 
 #define PROBE_TEST_SECTOR_SIZE 2048u
@@ -151,7 +153,7 @@ static int make_synthetic_iso(const char *path, const char *mode)
                                  2u, "LOOP");
     }
 
-    file = fopen(path, "wb");
+    file = schway__test_open_file(path, "wb");
     if (file == NULL) {
         return 1;
     }
@@ -253,8 +255,8 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
         failed = 1;
         goto done;
     }
-    source = fopen(source_path, "rb");
-    bin = fopen(bin_path, "wb");
+    source = schway__test_open_file(source_path, "rb");
+    bin = schway__test_open_file(bin_path, "wb");
     if (source == NULL || bin == NULL ||
         fread(iso, 1u, sizeof iso, source) != sizeof iso) {
         failed = 1;
@@ -287,7 +289,7 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
             goto done;
         }
         (void)snprintf(track1_path, cue_path_size + 16u, "%s.track1", cue_path);
-        track1 = fopen(track1_path, "wb");
+        track1 = schway__test_open_file(track1_path, "wb");
         if (track1 == NULL || fwrite(audio_sector, 1u, sizeof audio_sector, track1) != sizeof audio_sector) {
             failed = 1;
             goto done;
@@ -297,7 +299,7 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
         if (failed) goto done;
     }
 
-    cue = fopen(cue_path, "wb");
+    cue = schway__test_open_file(cue_path, "wb");
     if (cue == NULL) {
         failed = 1;
         goto done;
@@ -422,8 +424,8 @@ static int make_cue_edge_fixture(const char *cue_path, const char *mode)
             failed = 1;
             goto done;
         }
-        source = fopen(source_path, "rb");
-        bin = fopen(bin_path, "wb");
+        source = schway__test_open_file(source_path, "rb");
+        bin = schway__test_open_file(bin_path, "wb");
         if (source == NULL || bin == NULL || copy_file(source, bin) != 0) failed = 1;
         if (source != NULL && fclose(source) != 0) failed = 1;
         source = NULL;
@@ -432,7 +434,7 @@ static int make_cue_edge_fixture(const char *cue_path, const char *mode)
         if (failed) goto done;
     }
 
-    cue = fopen(cue_path, "wb");
+    cue = schway__test_open_file(cue_path, "wb");
     if (cue == NULL) {
         failed = 1;
         goto done;

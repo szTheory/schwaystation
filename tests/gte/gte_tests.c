@@ -29,6 +29,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "schwaystation.h"
 #include "gte.h"
 #include "ref.h"
@@ -78,7 +80,7 @@ static int parse_ops(const char *list, uint64_t *mask, int *reg)
 
 static uint8_t *read_file(const char *path, size_t *len)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = schway__test_open_file(path, "rb");
     if (f == NULL) {
         return NULL;
     }

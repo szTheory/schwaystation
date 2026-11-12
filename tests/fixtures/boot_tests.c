@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "schwaystation.h"
 #include "internal.h"
 #include "../check.h"
@@ -84,7 +86,7 @@ static void stub_drift(const char *dir)
     char path[1024];
     int n = snprintf(path, sizeof path, "%s/stub.bin", dir);
     CHECK(n > 0 && (size_t)n < sizeof path);
-    FILE *f = fopen(path, "rb");
+    FILE *f = schway__test_open_file(path, "rb");
     if (f == NULL) {
         fprintf(stderr, "%s: cannot open\n", path);
         check_failures++;
@@ -136,7 +138,7 @@ static uint8_t *read_file(const char *dir, const char *name, size_t *n)
     char path[1024];
     int len = snprintf(path, sizeof path, "%s/%s", dir, name);
     CHECK(len > 0 && (size_t)len < sizeof path);
-    FILE *f = fopen(path, "rb");
+    FILE *f = schway__test_open_file(path, "rb");
     if (f == NULL) {
         fprintf(stderr, "%s: cannot open\n", path);
         exit(1);
@@ -860,7 +862,7 @@ static void gpu_motion(const char *dir)
 static uint8_t *read_whole(const char *path, size_t *n)
 {
     const size_t cap = (size_t)1u << 20;
-    FILE *f = fopen(path, "rb");
+    FILE *f = schway__test_open_file(path, "rb");
     if (f == NULL) {
         fprintf(stderr, "%s: cannot open\n", path);
         exit(1);

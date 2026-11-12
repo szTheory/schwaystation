@@ -264,9 +264,11 @@ the same file.
 
 The compatibility directory is included only when the selected inventory lists `compat`. The native CI and
 BE32 presets select `ci`, so they retain every compatibility case; ASan and WASI use inventories that omit it.
-The runner and host disc probes use private read-only openers that call `fopen_s` on MSVC and `fopen` elsewhere,
-without changing their input or failure behavior. Windows and GCC cross-compiler acceptance is established by the
-hosted matrix, not by a native configure.
+The runner and host disc probes use private read-only openers that call `fopen_s` on MSVC and `fopen` elsewhere.
+Selected test callers use `tests/test_open.h` for the same CRT-specific spelling while preserving their original
+mode strings and NULL-on-open-failure behavior. The libretro content and BIOS readers likewise use a private
+read-only opener. This avoids global warning suppression and keeps Windows `/WX` intact. Windows and GCC
+cross-compiler acceptance is established by the hosted matrix, not by a native configure.
 
 Compatibility scripts prefix each raw helper and runner call with the complete `CMAKE_CROSSCOMPILING_EMULATOR`
 argument list. The shell library accepts one runner executable, so cross-emulated library checks use generated
@@ -531,13 +533,14 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 
 `wasm32` became required after a successful run on `main`. Timeouts are twice the slowest successful duration
 measured in this repository's own runs (5 minutes at least for network-bound and roll-up jobs); the shared build
-timeout also covers an observed Windows ARM64 overrun. BE32 uses a 15-minute provisional job bound because run
-43292417084 reached its 7-minute cap with two bounded tests active; the full `input.movies` duration was unknown.
-The 13m36s estimate was projected from same-run x64 test ratios, not measured. The next complete run should set
-the bound from its actual lane duration. `libretro.input.movies` is serial with a 240-second base CTest timeout
-(scaled by each lane as usual); runs 43271212007 and 43292417084 reached its former 120-second limit. The longer
-bound and serialization preserve every movie and assertion and are provisional until a complete host timing is
-available; they do not claim a speedup or prove why earlier runs were slow. Each timeout names its evidence run and stays marked
+timeout also covers an observed Windows ARM64 overrun. ASan has a 15-minute provisional job bound after run
+43309540398 reached its old 5-minute cap at test 404 of 405, with `libretro.input.movies` active for 3m22s.
+BE32 has a 25-minute provisional bound after the same run reached its old 15-minute cap at test 475 of 476, with
+`libretro.input.movies` active for 7m54s. Earlier BE32 movie cases were also much slower than their x64 counterparts.
+These bounds allow the remaining current workload to finish; neither lane has yet established a complete duration.
+`libretro.input.movies` is serial with a 240-second base CTest timeout (scaled by each lane as usual); runs
+43271212007 and 43292417084 reached its former 120-second limit. The longer bound and serialization preserve every
+movie and assertion and are provisional; they do not claim a speedup or prove why earlier runs were slow. Each timeout names its evidence run and stays marked
 `provisional` while fewer than 10 samples exist; `hygiene.timeout_comments` fails a `timeout-minutes` line that
 names neither a run nor `provisional`, and `policy.action_pins` fails a `uses:` line that is not a full 40-hex
 commit with a `# v` comment.
@@ -545,7 +548,8 @@ commit with a `# v` comment.
 **Downloads.** `pins.txt` lists every download CI makes (wasmtime and the RetroArch DMG) with its SHA-256;
 `scripts/fetch-pin.sh NAME DEST` refuses a file whose digest differs.
 
-**A red retroarch job.** The job prints RetroArch's verbose logs and uploads `retroarch-frames` on failure, holding
+**A red retroarch job.** The job prints RetroArch's verbose logs and uploads `retroarch-frames` after success or
+failure for one day, holding
 `shot.png` and `runner.png` for the no-content comparison plus both content captures and runner references. The
 step output names the first differing pixel or geometry. The one-day `retroarch-replay-probe` artifact contains
 the raw same-run BSV, its guarded Cross variant, and the isolated record/playback logs; it is diagnostic input,
@@ -563,12 +567,18 @@ only the final port-0 Cross value from zero to one; the checkpoint and content m
 Playback itself validates the untouched checkpoint through the pinned frontend. No movie bytes are committed or
 cached across runs.
 
-The pinned frontend counts presented video callbacks for `--max-frames`, while the restored core checkpoint is
-already at frame 1. Its first replay input drives core output frame 2. Therefore limits 58 and 59 capture guest
-frames 59 and 60, respectively. Each runner reference uses `--exe pad_counter.exe`, the same digital
+The pinned frontend counts presented video callbacks for `--max-frames`. Content initialization queues replay
+startup, but the ordinary frontend loop runs once before it checks that queue. That first video callback is a
+pre-replay content frame; then the replay task restores the checkpoint at core frame 1 and preloads input group 1.
+So frontend limits 59 and 60 consume 58 and 59 replay groups and capture guest outputs 59 and 60, respectively.
+At limit 60, the frame-count exit check runs before a later paused cached-frame refresh, so this is the output
+with group 59's Cross press rather than a duplicate. Each runner reference uses `--exe pad_counter.exe`, the same digital
 `--inputs` script with Cross pressed at guest frame 60, and `--frames 59` or `--frames 60`. The screenshot check
-occurs after the callback at the requested frontend count. At EOF the frontend can refresh a cached frame, so a
-60-limit capture would not prove a new guest frame. See the pinned
+occurs after the callback at the requested frontend count. The task-queue order and frame check are visible in
+the pinned frontend sources: [normal loop ordering](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/retroarch.c#L6063-L6065),
+[replay task startup](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/tasks/task_movie.c#L71-L113),
+[task dequeue before the core call](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L7213-L7215), and
+[frame-limit exit check](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L5921-L5954). Also see the pinned
 [RetroArch runloop frame-limit check](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L5697),
 [screenshot/exit ordering](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L5921-L5945)
 and [video callback counter](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/gfx/video_driver.c#L4324-L4347).

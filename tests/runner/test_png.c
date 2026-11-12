@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "internal.h"
 #include "schwaystation.h"
 #include "xrgb8888.h"
@@ -167,7 +169,7 @@ static void png(void)
 /* Reads the file at path into a heap buffer; *n is its size. */
 static uint8_t *read_file(const char *path, size_t limit, size_t *n)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = schway__test_open_file(path, "rb");
     if (f == NULL) {
         return NULL;
     }

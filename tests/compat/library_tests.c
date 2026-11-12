@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #define LIBRARY_HEADER "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date"
 #define LIBRARY_LINE 2048
 
@@ -55,7 +57,7 @@ static int check_report(const char *path, const char *mode, const char *track_sh
     int identity = 0;
     int boot = 0;
     int play = 0;
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     if (file == NULL || fgets(line, sizeof line, file) == NULL) return 1;
     line[strcspn(line, "\r\n")] = '\0';
     if (strcmp(line, LIBRARY_HEADER) != 0) { (void)fclose(file); return 1; }

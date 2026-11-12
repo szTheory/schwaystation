@@ -26,8 +26,10 @@ if(NOT "${PROBE_CONTENT}" STREQUAL "")
   endif()
   file(REAL_PATH "${PROBE_CONTENT}" probe_content)
   file(REAL_PATH "${VERIFY}" verify)
-  set(modes record 58 59)
-  file(REMOVE "${SHOT}.record.png" "${SHOT}.58.png" "${SHOT}.59.png")
+  # Startup emits one counted content frame before RetroArch's queued replay task restores frame 1.
+  # Limits 59 and 60 therefore capture guest frames 59 and 60, respectively.
+  set(modes record 59 60)
+  file(REMOVE "${SHOT}.record.png" "${SHOT}.59.png" "${SHOT}.60.png")
 else()
   file(REMOVE "${SHOT}")
 endif()

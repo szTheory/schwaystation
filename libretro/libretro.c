@@ -415,6 +415,19 @@ static int lr_create(uint32_t region)
 
 /* Content selection is a host file operation. Read at most the largest image
    schway_probe_exe can accept, plus one byte to distinguish oversized input. */
+static FILE *lr_open_readonly(const char *path)
+{
+#if defined(_MSC_VER)
+    FILE *file = NULL;
+    if (fopen_s(&file, path, "rb") != 0) {
+        return NULL;
+    }
+    return file;
+#else
+    return fopen(path, "rb");
+#endif
+}
+
 static uint8_t *lr_read_exe(const char *path, size_t *size)
 {
     FILE *file;
@@ -426,7 +439,7 @@ static uint8_t *lr_read_exe(const char *path, size_t *size)
         return NULL;
     }
     *size = 0u;
-    file = fopen(path, "rb");
+    file = lr_open_readonly(path);
     if (file == NULL) {
         return NULL;
     }
@@ -693,7 +706,7 @@ static uint8_t *lr_read_bios(const char *name, size_t *size)
     }
     memcpy(path + dir_len + separator, name, name_len);
     path[path_len] = '\0';
-    file = fopen(path, "rb");
+    file = lr_open_readonly(path);
     free(path);
     if (file == NULL) {
         return NULL;
