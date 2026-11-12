@@ -55,10 +55,12 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_full_identity")
   set(ledger "${work}/metadata/ledger.csv")
   set(dat "${work}/metadata/title.dat")
   set(config "${work}/metadata/config.txt")
-  file(WRITE "${dat}" "clrmamepro (\n name \"Synthetic test DAT\"\n)\ngame (\n name \"Schway Synthetic Metadata Fixture\"\n region \"USA\"\n serial \"SWAY-00001\"\n)\n")
+  file(WRITE "${dat}" "clrmamepro (\n name \"Synthetic test DAT\"\n)\ngame (\n name \"Legacy, title with unsupported CSV separator\"\n region \"USA\"\n serial \"SLES-00000\"\n)\ngame (\n name \"Schway Synthetic Metadata Fixture\"\n region \"USA\"\n serial \"SWAY-00001\"\n)\n")
   file(WRITE "${ledger}" "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,metadata.identity,pass,synthetic:iso9660-known-answer,2026-11-12\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,boots@600,unknown,unavailable,2026-11-12\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,plays@600,unknown,unavailable,2026-11-12\n")
   file(WRITE "${config}" "schwaystation-test-metadata-v1\n")
   execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+      --test-ledger "${ledger}" --test-dat "${dat}" --test-root "${work}"
+      --test-config "${config}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if(NOT rc STREQUAL "0" OR
      NOT out MATCHES "serial=SWAY-00001" OR
@@ -69,6 +71,19 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_full_identity")
      NOT out MATCHES "boot_status=unknown" OR
      NOT out MATCHES "play_status=unknown")
     message(FATAL_ERROR "runner did not join exact synthetic track and DAT identity: ${rc}: ${out}${err}")
+  endif()
+  return()
+endif()
+
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_sha1_vectors")
+  if(NOT DEFINED TEST_BINARY OR "${TEST_BINARY}" STREQUAL "")
+    message(FATAL_ERROR "SHA-1 vectors require TEST_BINARY")
+  endif()
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" sha1_vectors
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "streaming SHA-1 known-answer vector failed: ${rc}: ${out}${err}")
   endif()
   return()
 endif()
@@ -457,6 +472,8 @@ add_executable(schwaystation-test-probe ${CMAKE_CURRENT_LIST_DIR}/probe_tests.c)
 set_target_properties(schwaystation-test-probe PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-probe)
+target_link_libraries(schwaystation-test-probe PRIVATE schwaystation-host)
+add_dependencies(schwaystation-test-probe schwaystation-run-test)
 
 string(REPLACE ";" "|" schway__probe_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
 
@@ -464,7 +481,7 @@ string(REPLACE ";" "|" schway__probe_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}"
 schway_add_test(NAME compat.probe.synthetic_identity
   COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
     -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
-    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DRUN=$<TARGET_FILE:schwaystation-run-test> "-DEMULATOR=${schway__probe_emulator}"
     -DCASE=probe_synthetic_identity -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
@@ -472,8 +489,16 @@ schway_add_test(NAME compat.probe.synthetic_identity
 schway_add_test(NAME compat.probe.full_identity
   COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
     -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
-    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DRUN=$<TARGET_FILE:schwaystation-run-test> "-DEMULATOR=${schway__probe_emulator}"
     -DCASE=probe_full_identity -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 30)
+
+# Fault prevented: a track SHA-1 implementation disagreeing with standard vectors.
+schway_add_test(NAME compat.probe.sha1_vectors
+  COMMAND ${CMAKE_COMMAND}
+    -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
+    "-DEMULATOR=${schway__probe_emulator}" -DCASE=probe_sha1_vectors
+    -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
 # Fault prevented: CUE sector representations changing the canonical boot identity.

@@ -3,6 +3,7 @@ compat.probe.cue_edges	compat,portable
 compat.probe.cue_modes	compat,portable
 compat.probe.full_identity	compat,portable
 compat.probe.iso_edges	compat,portable
+compat.probe.sha1_vectors	compat,portable
 compat.probe.synthetic_identity	compat,portable
 compat.ratchet.baseline	compat,portable
 compat.ratchet.protected_controls	compat,portable

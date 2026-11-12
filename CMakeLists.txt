@@ -161,7 +161,7 @@ endif()
 # the core's determinism boundary: nothing here is hashed. Built
 # position-independent and hidden, as the libretro module links them.
 if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
-  add_library(schwaystation-host STATIC host/cards.c host/xrgb8888.c)
+  add_library(schwaystation-host STATIC host/cards.c host/xrgb8888.c host/sha1.c)
   target_include_directories(schwaystation-host
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/host
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/generated)

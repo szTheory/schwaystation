@@ -10,6 +10,7 @@
 #include "md5.h"
 #include "schwaystation.h"
 #include "sha256.h"
+#include "sha1.h"
 #include "disc_probe.h"
 
 #define EXE_HEADER 0x800u
@@ -100,6 +101,183 @@ static void rcheevos_disc_md5(const char *boot_name, const uint8_t *file,
     schway__md5_hex(digest, hex);
 }
 
+static int path_inside(const char *root, const char *path)
+{
+    size_t size = strlen(root);
+    if (size == 0u || path == NULL || strncmp(root, path, size) != 0 || path[size] != '/') {
+        return 0;
+    }
+    const char *part = path + size + 1u;
+    while (*part != '\0') {
+        const char *end = strchr(part, '/');
+        size_t part_size = end == NULL ? strlen(part) : (size_t)(end - part);
+        if ((part_size == 1u && part[0] == '.') ||
+            (part_size == 2u && part[0] == '.' && part[1] == '.')) return 0;
+        if (end == NULL) break;
+        part = end + 1u;
+    }
+    return root[0] == '/';
+}
+
+static int test_config_ready(const schway__probe_test_inputs *inputs, const char *image)
+{
+    FILE *file;
+    char line[64];
+    if (inputs == NULL || !path_inside(inputs->root, inputs->ledger) ||
+        !path_inside(inputs->root, inputs->dat) || !path_inside(inputs->root, inputs->config) ||
+        !path_inside(inputs->root, image)) return 0;
+    file = fopen(inputs->config, "rb");
+    if (file == NULL) return 0;
+    int ok = fgets(line, sizeof line, file) != NULL &&
+             strcmp(line, "schwaystation-test-metadata-v1\n") == 0 &&
+             fgetc(file) == EOF && ferror(file) == 0;
+    if (fclose(file) != 0) ok = 0;
+    return ok;
+}
+
+static void trim_eol(char *line)
+{
+    size_t size = strlen(line);
+    while (size != 0u && (line[size - 1u] == '\n' || line[size - 1u] == '\r')) {
+        line[--size] = '\0';
+    }
+}
+
+static int dat_value(char *line, const char *key, char *value, size_t capacity)
+{
+    char *start = line;
+    size_t key_size = strlen(key);
+    while (*start == ' ' || *start == '\t') start++;
+    if (strncmp(start, key, key_size) != 0 || start[key_size] != ' ') return 0;
+    start += key_size + 1u;
+    while (*start == ' ') start++;
+    if (*start++ != '"') return -1;
+    char *end = strchr(start, '"');
+    if (end == NULL || end[1] != '\0') return -1;
+    size_t size = (size_t)(end - start);
+    if (size == 0u || size >= capacity || memchr(start, '\\', size) != NULL ||
+        memchr(start, ',', size) != NULL) return -1;
+    for (size_t i = 0u; i < size; i++) {
+        unsigned char c = (unsigned char)start[i];
+        if (c < 0x20u || c == 0x7Fu) return -1;
+    }
+    memcpy(value, start, size);
+    value[size] = '\0';
+    return 1;
+}
+
+static int dat_title_for_serial(const char *path, const char *wanted, char title[256])
+{
+    FILE *file = fopen(path, "rb");
+    char line[4097];
+    char name[256] = "";
+    char serial[64] = "";
+    long end;
+    int inside_game = 0;
+    int bad_game = 0;
+    int found = 0;
+    if (file == NULL) return 0;
+    if (fseek(file, 0L, SEEK_END) != 0 || (end = ftell(file)) < 0L ||
+        end > 16L * 1024L * 1024L || fseek(file, 0L, SEEK_SET) != 0) {
+        (void)fclose(file);
+        return 0;
+    }
+    while (fgets(line, sizeof line, file) != NULL) {
+        size_t size = strlen(line);
+        if (size == sizeof line - 1u && line[size - 1u] != '\n' && !feof(file)) {
+            inside_game = 0;
+            found = 0;
+            break;
+        }
+        trim_eol(line);
+        char *trim = line;
+        while (*trim == ' ' || *trim == '\t') trim++;
+        if (strcmp(trim, "game (") == 0) {
+            inside_game = 1;
+            bad_game = 0;
+            name[0] = '\0';
+            serial[0] = '\0';
+        } else if (inside_game && strcmp(trim, ")") == 0) {
+            if (!bad_game && strcmp(serial, wanted) == 0 && name[0] != '\0') {
+                if (found && strcmp(title, name) != 0) {
+                    found = 0;
+                    break;
+                }
+                memcpy(title, name, strlen(name) + 1u);
+                found = 1;
+            }
+            inside_game = 0;
+        } else if (inside_game) {
+            int result = dat_value(line, "name", name, sizeof name);
+            if (result < 0) {
+                bad_game = 1;
+            }
+            result = dat_value(line, "serial", serial, sizeof serial);
+            if (result < 0) {
+                bad_game = 1;
+            }
+        }
+    }
+    if (inside_game) found = 0;
+    int io_error = ferror(file) != 0;
+    if (fclose(file) != 0) io_error = 1;
+    if (io_error) return 0;
+    return found;
+}
+
+static int ledger_matches(const char *path, const char *serial, const char *md5,
+                          const char *track_sha1, const char *title)
+{
+    static const char header[] =
+        "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date";
+    FILE *file = fopen(path, "rb");
+    char line[2048];
+    unsigned row = 0u;
+    int matched = 0;
+    int valid = 1;
+    if (file == NULL) return 0;
+    while (fgets(line, sizeof line, file) != NULL) {
+        char *fields[10];
+        size_t size = strlen(line);
+        size_t field = 0u;
+        if (size == sizeof line - 1u && line[size - 1u] != '\n' && !feof(file)) { valid = 0; break; }
+        trim_eol(line);
+        if (row++ == 0u) {
+            if (strcmp(line, header) != 0) { valid = 0; break; }
+            continue;
+        }
+        fields[field++] = line;
+        for (char *p = line; *p != '\0'; p++) {
+            if (*p == '"') { field = 0u; break; }
+            if (*p == ',') {
+                *p = '\0';
+                if (field >= 10u) { field = 0u; break; }
+                fields[field++] = p + 1;
+            }
+        }
+        if (field != 10u) { valid = 0; break; }
+        if (strcmp(fields[0], serial) == 0 && strcmp(fields[1], md5) == 0 &&
+            strcmp(fields[2], track_sha1) == 0 && strcmp(fields[3], title) == 0 &&
+            strcmp(fields[5], "cue/bin") == 0 && strcmp(fields[6], "metadata.identity") == 0 &&
+            strcmp(fields[7], "pass") == 0) {
+            matched = 1;
+        }
+    }
+    if (row == 0u || ferror(file) != 0) valid = 0;
+    if (fclose(file) != 0) valid = 0;
+    return valid && matched;
+}
+
+static int metadata_identity(const schway__probe_test_inputs *inputs, const char *image,
+                             const schway_host_disc_probe *disc, const char *md5,
+                             char track_sha1[41], char title[256])
+{
+    schway__sha1_hex(disc->track1_sha1, track_sha1);
+    if (!test_config_ready(inputs, image) || disc->serial[0] == '\0' ||
+        !dat_title_for_serial(inputs->dat, disc->serial, title)) return 0;
+    return ledger_matches(inputs->ledger, disc->serial, md5, track_sha1, title);
+}
+
 uint8_t *schway__read_exe_file(const char *path, size_t *n_out)
 {
     FILE *f = fopen(path, "rb");
@@ -137,13 +315,14 @@ void schway__refuse_file(const char *path, const char *why)
     refuse(path, why);
 }
 
-int schway__probe_print(FILE *out, const char *path)
+int schway__probe_print(FILE *out, const char *path,
+                        const schway__probe_test_inputs *test_inputs)
 {
     schway_host_disc_probe disc;
     schway_host_disc_probe_status disc_status = schway__disc_probe_image(path, &disc);
     if (disc_status != SCHWAY_HOST_DISC_PROBE_NOT_ISO) {
         if (disc_status != SCHWAY_HOST_DISC_PROBE_OK) {
-            refuse(path, schway__disc_probe_status_string(disc_status));
+            refuse("input", schway__disc_probe_status_string(disc_status));
             return 1;
         }
         schway_exe_info disc_info;
@@ -152,23 +331,27 @@ int schway__probe_print(FILE *out, const char *path)
         schway_status validation = schway_probe_exe(disc.exe_bytes, disc.exe_size, &disc_info);
         if (validation != SCHWAY_STATUS_OK) {
             schway__disc_probe_dispose(&disc);
-            refuse(path, schway_status_string(validation));
+            refuse("input", schway_status_string(validation));
             return 1;
         }
         schway__sha256 sha;
         uint8_t sha_digest[32];
         char sha_hex[65];
         char md5_hex[33];
+        char track_sha1_hex[41];
+        char title[256] = "";
         schway__sha256_init(&sha);
         schway__sha256_update(&sha, disc.exe_bytes, disc.exe_size);
         schway__sha256_final(&sha, sha_digest);
         schway__sha256_hex(sha_digest, sha_hex);
         rcheevos_disc_md5(disc.boot_name, disc.exe_bytes, disc_info.hash_len, md5_hex);
+        int identity_match = metadata_identity(test_inputs, path, &disc, md5_hex,
+                                               track_sha1_hex, title);
         fputs("format=disc\nserial=", out);
         fputs(disc.serial[0] == '\0' ? "n/a" : disc.serial, out);
-        fprintf(out, "\nlicence_area=%s\nregion_guess=%s\nboot_name=%s\nexe_size=%lu\nsha256=%s\nrcheevos_md5=%s\n",
+        fprintf(out, "\nlicence_area=%s\nregion_guess=%s\nboot_name=%s\nexe_size=%lu\nsha256=%s\nrcheevos_md5=%s\ntrack1_sha1=%s\n",
                 licence_area_name(disc_info.licence_area), region_guess(disc_info.licence_area),
-                disc.boot_name, (unsigned long)disc.exe_size, sha_hex, md5_hex);
+                disc.boot_name, (unsigned long)disc.exe_size, sha_hex, md5_hex, track_sha1_hex);
         fprintf(out, "pc0=0x%08lx\ngp0=0x%08lx\n", (unsigned long)disc_info.pc0,
                 (unsigned long)disc_info.gp0);
         fprintf(out, "t_addr=0x%08lx\nt_size=0x%08lx\n", (unsigned long)disc_info.t_addr,
@@ -179,7 +362,10 @@ int schway__probe_print(FILE *out, const char *path)
         fprintf(out, "s_addr=0x%08lx\ns_size=0x%08lx\nlint=0x%08lx\n",
                 (unsigned long)disc_info.s_addr, (unsigned long)disc_info.s_size,
                 (unsigned long)disc_info.lint);
-        fputs("boot_status=unavailable\nplay_status=unavailable\n", out);
+        fprintf(out, "metadata.identity=%s\ntitle=", identity_match ? "pass" : "unknown");
+        if (identity_match) put_text(out, title);
+        else fputs("unavailable", out);
+        fputs("\nboot_status=unknown\nplay_status=unknown\n", out);
         schway__disc_probe_dispose(&disc);
         return ferror(out) == 0 ? 0 : 1;
     }
@@ -194,7 +380,7 @@ int schway__probe_print(FILE *out, const char *path)
     schway_status st = schway_probe_exe(file, n, &info);
     if (st != SCHWAY_STATUS_OK) {
         free(file);
-        refuse(path, schway_status_string(st));
+        refuse("input", schway_status_string(st));
         return 1;
     }
 

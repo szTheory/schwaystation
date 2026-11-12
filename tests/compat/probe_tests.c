@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sha1.h"
+
 #define PROBE_TEST_SECTOR_SIZE 2048u
 #define PROBE_TEST_IMAGE_SECTORS 24u
 
@@ -416,6 +418,33 @@ done:
 
 int main(int argc, char **argv)
 {
+    if (argc == 2 && strcmp(argv[1], "sha1_vectors") == 0) {
+        static const char *vectors[] = {
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            "a9993e364706816aba3e25717850c26c9cd0d89d",
+            "34aa973cd4c4daa4f61eeb2bdbad27316534016f"
+        };
+        static const uint8_t abc[] = {'a', 'b', 'c'};
+        uint8_t digest[20];
+        char hex[41];
+        schway__sha1 state;
+        schway__sha1_init(&state);
+        schway__sha1_final(&state, digest);
+        schway__sha1_hex(digest, hex);
+        if (strcmp(hex, vectors[0]) != 0) return 1;
+        schway__sha1_init(&state);
+        schway__sha1_update(&state, abc, sizeof abc);
+        schway__sha1_final(&state, digest);
+        schway__sha1_hex(digest, hex);
+        if (strcmp(hex, vectors[1]) != 0) return 1;
+        schway__sha1_init(&state);
+        uint8_t block[1000];
+        memset(block, 'a', sizeof block);
+        for (unsigned i = 0u; i < 1000u; i++) schway__sha1_update(&state, block, sizeof block);
+        schway__sha1_final(&state, digest);
+        schway__sha1_hex(digest, hex);
+        return strcmp(hex, vectors[2]) == 0 ? 0 : 1;
+    }
     if (argc == 3 && (strcmp(argv[1], "cue_2048") == 0 ||
                       strcmp(argv[1], "cue_mode1_2352") == 0 ||
                       strcmp(argv[1], "cue_mode2_2352") == 0 ||

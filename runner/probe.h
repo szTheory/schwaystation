@@ -6,6 +6,13 @@
 #include <stdint.h>
 #include <stdio.h>
 
+typedef struct schway__probe_test_inputs {
+    const char *ledger;
+    const char *dat;
+    const char *root;
+    const char *config;
+} schway__probe_test_inputs;
+
 /* Reads the file at path, at most 0800h + 2 MiB + 1 bytes. Returns a malloc'd
    buffer and sets *n to the bytes read, or returns NULL after printing
    "schwaystation-run: <path>: <reason>" to standard error when the file is
@@ -22,6 +29,7 @@ void schway__refuse_file(const char *path, const char *why);
    unreadable, empty or not a valid PS-EXE it prints
    "schwaystation-run: <path>: <reason>" to standard error, prints nothing to
    out and returns 1. No instance is created. */
-int schway__probe_print(FILE *out, const char *path);
+int schway__probe_print(FILE *out, const char *path,
+                        const schway__probe_test_inputs *test_inputs);
 
 #endif /* SCHWAYSTATION_RUNNER_PROBE_H */

@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sha1.h"
+
 #define SCHWAY__ISO_SECTOR_SIZE 2048u
 #define SCHWAY__ISO_MAX_BYTES 1073741824u
 #define SCHWAY__ISO_DESCRIPTOR_LIMIT 64u
@@ -21,9 +23,12 @@
 
 typedef struct schway__iso_source {
     FILE *file;
+    FILE *track1_file;
     uint64_t file_size;
     uint64_t data_offset;
     uint64_t data_bytes;
+    uint64_t track1_offset;
+    uint64_t track1_bytes;
     uint32_t sector_bytes;
     uint32_t user_offset;
     uint32_t sector_count;
@@ -858,6 +863,7 @@ static schway_host_disc_probe_status schway__cue_source(
     schway_host_disc_probe_status status;
     size_t selected = SIZE_MAX;
     uint64_t selected_bytes = 0u;
+    uint64_t track1_bytes = 0u;
     FILE *file;
     long end;
     memset(&manifest, 0, sizeof manifest);
@@ -908,6 +914,7 @@ static schway_host_disc_probe_status schway__cue_source(
             span % track->sector_bytes != 0u) {
             return SCHWAY_HOST_DISC_PROBE_BAD_CUE;
         }
+        if (i == 0u) track1_bytes = span;
         if (!track->audio && selected == SIZE_MAX) {
             selected = i;
             selected_bytes = span;
@@ -932,7 +939,42 @@ static schway_host_disc_probe_status schway__cue_source(
     source->sector_bytes = track->sector_bytes;
     source->user_offset = track->user_offset;
     source->sector_count = (uint32_t)(selected_bytes / track->sector_bytes);
+    schway__cue_track *first = &manifest.tracks[0];
+    path = schway__cue_join_path(cue_path, manifest.files[first->file_index].name);
+    if (path == NULL) {
+        (void)fclose(source->file);
+        source->file = NULL;
+        return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
+    }
+    source->track1_file = fopen(path, "rb");
+    free(path);
+    if (source->track1_file == NULL) {
+        (void)fclose(source->file);
+        source->file = NULL;
+        return SCHWAY_HOST_DISC_PROBE_CUE_IO;
+    }
+    source->track1_offset = first->start_offset;
+    source->track1_bytes = track1_bytes;
     return SCHWAY_HOST_DISC_PROBE_OK;
+}
+
+static int schway__sha1_file_range(FILE *file, uint64_t offset, uint64_t size,
+                                    uint8_t digest[20])
+{
+    uint8_t buffer[8192];
+    schway__sha1 state;
+    if (file == NULL || offset > (uint64_t)LONG_MAX || fseek(file, (long)offset, SEEK_SET) != 0) {
+        return 0;
+    }
+    schway__sha1_init(&state);
+    while (size != 0u) {
+        size_t count = size > sizeof buffer ? sizeof buffer : (size_t)size;
+        if (fread(buffer, 1u, count, file) != count) return 0;
+        schway__sha1_update(&state, buffer, count);
+        size -= count;
+    }
+    schway__sha1_final(&state, digest);
+    return 1;
 }
 
 static int schway__path_is_cue(const char *path)
@@ -978,18 +1020,30 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
             return SCHWAY_HOST_DISC_PROBE_IO;
         }
         source.file = file;
+        source.track1_file = file;
         source.file_size = (uint64_t)(unsigned long)end;
         source.data_bytes = source.file_size;
+        source.track1_bytes = source.file_size;
         source.sector_bytes = SCHWAY__ISO_SECTOR_SIZE;
         source.sector_count = (uint32_t)(source.file_size / SCHWAY__ISO_SECTOR_SIZE);
     }
     memset(&candidate, 0, sizeof candidate);
     status = schway__iso_process(&source, &candidate);
+    if (status == SCHWAY_HOST_DISC_PROBE_OK &&
+        !schway__sha1_file_range(source.track1_file, source.track1_offset,
+                                  source.track1_bytes, candidate.track1_sha1)) {
+        status = SCHWAY_HOST_DISC_PROBE_IO;
+    }
+    if (source.track1_file != source.file && fclose(source.track1_file) != 0 &&
+        status == SCHWAY_HOST_DISC_PROBE_OK) {
+        status = SCHWAY_HOST_DISC_PROBE_IO;
+    }
     if (fclose(source.file) != 0 && status == SCHWAY_HOST_DISC_PROBE_OK) {
         free(candidate.exe_bytes);
         return SCHWAY_HOST_DISC_PROBE_IO;
     }
     if (status == SCHWAY_HOST_DISC_PROBE_OK) *out = candidate;
+    else free(candidate.exe_bytes);
     return status;
 }
 

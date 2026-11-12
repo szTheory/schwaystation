@@ -328,6 +328,12 @@ typedef struct options {
     int serial_card_names; /* --memcard-names serial */
     int memcard_names_set;
     const char *probe; /* --probe FILE, else NULL */
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    const char *test_ledger;
+    const char *test_dat;
+    const char *test_root;
+    const char *test_config;
+#endif
     const char *bios;  /* --bios FILE, else NULL */
     const char *exe;   /* --exe FILE, else NULL */
     int tty;           /* --tty: debug-port flag and the tty lines */
@@ -503,12 +509,27 @@ static int parse_options(int argc, char **argv, options *o)
         } else if (strcmp(arg, "--no-stop-on-fault") == 0) {
             o->keep_going = 1;
         } else if (strcmp(arg, "--probe") == 0) {
-            /* Alone, with one file name that is not an option. */
-            if (argc != 3 || value == NULL || value[0] == '-') {
-                return usage("--probe takes one file and no other argument");
+            if (o->probe != NULL || value == NULL || value[0] == '-') {
+                return usage("--probe needs one file");
             }
             o->probe = value;
-            return SCHWAY__EXIT_OK;
+            i++;
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        } else if (strcmp(arg, "--test-ledger") == 0 ||
+                   strcmp(arg, "--test-dat") == 0 ||
+                   strcmp(arg, "--test-root") == 0 ||
+                   strcmp(arg, "--test-config") == 0) {
+            const char **slot = NULL;
+            if (strcmp(arg, "--test-ledger") == 0) slot = &o->test_ledger;
+            else if (strcmp(arg, "--test-dat") == 0) slot = &o->test_dat;
+            else if (strcmp(arg, "--test-root") == 0) slot = &o->test_root;
+            else slot = &o->test_config;
+            if (*slot != NULL || value == NULL || value[0] == '-') {
+                return usage("--test-* takes one path once");
+            }
+            *slot = value;
+            i++;
+#endif
         } else if (strcmp(arg, "--help") == 0 || strcmp(arg, "--version") == 0) {
             return usage("--help and --version take no other arguments");
         } else {
@@ -518,6 +539,34 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->bios != NULL && o->exe != NULL) {
         return usage("--bios and --exe cannot be used together");
     }
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    if (o->probe != NULL) {
+        int any_test_input = o->test_ledger != NULL || o->test_dat != NULL ||
+                             o->test_root != NULL || o->test_config != NULL;
+        int all_test_inputs = o->test_ledger != NULL && o->test_dat != NULL &&
+                              o->test_root != NULL && o->test_config != NULL;
+        if ((any_test_input && !all_test_inputs) || o->frames != 0u || o->bios != NULL ||
+            o->exe != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash ||
+            o->hash_state || o->bench || o->tty || o->stop_mailbox || o->trace ||
+            o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL) {
+            return usage("--probe cannot be combined with run options or partial test metadata");
+        }
+        return SCHWAY__EXIT_OK;
+    }
+    if (o->test_ledger != NULL || o->test_dat != NULL || o->test_root != NULL || o->test_config != NULL) {
+        return usage("--test-* needs --probe");
+    }
+#else
+    if (o->probe != NULL) {
+        if (o->frames != 0u || o->bios != NULL || o->exe != NULL || o->inputs != NULL ||
+            o->save_dir != NULL || o->hash || o->hash_state || o->bench || o->tty ||
+            o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
+            o->memcard_names_set || o->serial != NULL) {
+            return usage("--probe takes no other option");
+        }
+        return SCHWAY__EXIT_OK;
+    }
+#endif
     if (o->tty && o->exe == NULL && o->bios == NULL) {
         return usage("--tty needs --exe or --bios");
     }
@@ -1382,8 +1431,17 @@ int main(int argc, char **argv)
     memset(&opt, 0, sizeof opt);
     int status = parse_options(argc, argv, &opt);
     if (status == SCHWAY__EXIT_OK && opt.probe != NULL) {
-        status = schway__probe_print(stdout, opt.probe) == 0 ? SCHWAY__EXIT_OK
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        schway__probe_test_inputs test_inputs = {
+            opt.test_ledger, opt.test_dat, opt.test_root, opt.test_config
+        };
+        status = schway__probe_print(stdout, opt.probe,
+                                     opt.test_ledger != NULL ? &test_inputs : NULL) == 0 ? SCHWAY__EXIT_OK
+                                                                                       : SCHWAY__EXIT_FAILURE;
+#else
+        status = schway__probe_print(stdout, opt.probe, NULL) == 0 ? SCHWAY__EXIT_OK
                                                              : SCHWAY__EXIT_FAILURE;
+#endif
     } else if (status == SCHWAY__EXIT_OK && !opt.printed) {
         schway__stop_install();
         status = run(&opt);
