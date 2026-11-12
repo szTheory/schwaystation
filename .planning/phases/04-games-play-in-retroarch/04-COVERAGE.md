@@ -120,7 +120,7 @@ Original references above denote the complete ordered chains below. First IDs pr
 |04-26|04-26|
 |04-27|04-27, 04-43|
 |04-28|04-28, 04-44, 04-45|
-|04-29|04-29|
+|04-29|04-54, 04-55, 04-29|
 |04-30|04-30, 04-46, 04-47, 04-48|
 |04-31|04-31|
 |04-32|04-32|
@@ -148,3 +148,15 @@ Original references above denote the complete ordered chains below. First IDs pr
 | Source | New evidence and retained coverage | Executable plan |
 | --- | --- | --- |
 | GOAL criterion 4 / GAME-05 / RESEARCH real pinned shell VSync first caller / CONTEXT D-16, D-22–D-24 | Missing dynamic bits 31/13 block the real caller. Primary PSX-SPX 519c8db supersedes stale bit 13 prose and requires one saved phase for interlace-off retention; scheduled status, v0/v2, mode/blank/state/purity controls use the existing explicitly limited beam clock model. Actual captured readiness log 48 remains independent; only 40 accepts a recognizable shell/portable tuple. | 53 before 40, after 52; see 53-EVIDENCE |
+
+## Source-owned hosted portability prerequisites
+
+This focused amendment retains the complete four-source audit above; every other GOAL, GAME-01–GAME-07, RESEARCH and D-01–D-25 mapping remains covered by its existing plan. No deferred item is introduced.
+
+| Source | Retained contract and concrete new evidence | Plan | Status |
+| --- | --- | --- | --- |
+| GOAL criteria 2/4/5 | Existing controller/metadata code must compile and register correctly before a normal hosted run can prove play and exact screenshots. Actual GCC/MSVC/configuration failures are preserved in 29 CHECKPOINT. | 54 → 55 → 29 | COVERED |
+| REQ GAME-03/GAME-07 | Four variants, two family-specific references, 300 frames each, all pixel/audio/state/mailbox/poll checks, analog packets and both-port motors remain intact. Active pixels retain poison canaries; only unread trailing fill work is removed. Actual macOS timeout is evidence, not a proved cause. | 54, 55; actual host proof remains 29 | COVERED |
+| REQ GAME-06 | Selected inventory controls compat inclusion; native/BE32 retain all cases and complete emulator arguments reach direct and shell-owned consumers. ASan/WASI exact inventories remain unchanged, with no fabricated fixtures. | 54 | COVERED |
+| RESEARCH existing converter/host/inventory seams | Reuse packed callback/reference and existing CMake/portable helper patterns; no new dependency, gate, source subsystem or package. Hosted compiler/BE32/WASI acceptance is from the next combined changed-head run, never inferred locally. | 54, 55, 29 | COVERED |
+| CONTEXT D-13, D-19, D-21, D-23–D-25 | Preserve distinct 59/60 images with Cross at 60 and exact runner PNGs/empty BIOS; zero-input replay is diagnostic only. Respect local safety stop, 2700/300 budgets and existing job/case timeouts; measure work and actual timing without assuming speedup. | 54, 55, 29 | COVERED |

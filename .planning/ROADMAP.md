@@ -231,7 +231,7 @@ Plans:
   4. OpenBIOS, built in CI from nugget at its pin, boots to its shell with a pinned frame hash that is the same on every platform that runs it. The compatibility ledger rejects any unratcheted regression. The local `library` preset, pointed at a fixture in a temporary directory, writes only `build/library/results.csv`.
   5. In the hosted RetroArch session, `pad_counter.exe` loads as content with no BIOS in `system/`. The picture changes between two `--max-frames` values, and each screenshot matches the runner's `--png` frame pixel for pixel.
 
-**Plans**: 53
+**Plans**: 55
 **Wave 1**
 - [x] 04-01 — Build skeleton and an inventoried VRAM-to-frame tracer
 
@@ -355,24 +355,30 @@ Plans:
 - [x] 04-45-PLAN.md — Guard only functional libretro metadata claims
 
 **Wave 39**
-- [ ] 04-29-PLAN.md — Compare two BIOS-free content frames in real background RetroArch
+- [ ] 04-54-PLAN.md — Repair strict-compiler portability, inventory-owned compatibility registration and emulator forwarding
 
 **Wave 40**
-- [ ] 04-30-PLAN.md — Compare canonical whole-VRAM output against independent known answers
+- [ ] 04-55-PLAN.md — Remove unread movie-buffer fill work while preserving active-pixel canaries and every behavior check
 
 **Wave 41**
-- [ ] 04-46-PLAN.md — Run the pinned clipping executable against its actual hardware capture
+- [ ] 04-29-PLAN.md — Compare two BIOS-free content frames in real background RetroArch
 
 **Wave 42**
-- [ ] 04-47-PLAN.md — Compare all remaining nine actual GPU image captures
+- [ ] 04-30-PLAN.md — Compare canonical whole-VRAM output against independent known answers
 
 **Wave 43**
-- [ ] 04-48-PLAN.md — Judge the three real GPU hardware logs and run the required lane
+- [ ] 04-46-PLAN.md — Run the pinned clipping executable against its actual hardware capture
 
 **Wave 44**
-- [ ] 04-31-PLAN.md — Replay hostile GPU, SIO and card inputs through bounded calls
+- [ ] 04-47-PLAN.md — Compare all remaining nine actual GPU image captures
 
 **Wave 45**
+- [ ] 04-48-PLAN.md — Judge the three real GPU hardware logs and run the required lane
+
+**Wave 46**
+- [ ] 04-31-PLAN.md — Replay hostile GPU, SIO and card inputs through bounded calls
+
+**Wave 47**
 - [ ] 04-32-PLAN.md — Reconcile API and hardware contracts, then verify the reviewed phase
 
 **UI hint**: no
@@ -417,6 +423,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 46/53 | In Progress | - |
+| 4. Games play in RetroArch | 46/55 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
