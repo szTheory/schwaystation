@@ -48,3 +48,8 @@ schway_add_test(NAME libretro.video.geometry
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> video-geometry ${PROJECT_BINARY_DIR}/tests/native_video.exe
   LABELS libretro portable TIMEOUT 120)
+
+schway_add_test(NAME libretro.video.geometry_edges
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> video-geometry-edges ${PROJECT_BINARY_DIR}/tests/native_video_edges.exe
+  LABELS libretro portable TIMEOUT 120)

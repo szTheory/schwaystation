@@ -713,6 +713,88 @@ static void append_sw(uint32_t *code, size_t *count, unsigned reg, unsigned base
     code[(*count)++] = 0xAC000000u | (base << 21) | (reg << 16) | offset;
 }
 
+struct native_video_mode {
+    unsigned width, height, start_x, start_y, frames;
+    unsigned rgb24, interlaced, enabled;
+};
+
+static void append_gp1(uint32_t *code, size_t *count, uint32_t value)
+{
+    append_li(code, count, 9u, value);
+    append_sw(code, count, 9u, 16u, 0x814u);
+}
+
+static void append_mode(uint32_t *code, size_t *count, const struct native_video_mode *mode)
+{
+    unsigned divider, resolution, mode_bits;
+    unsigned horizontal_end, vertical_end;
+
+    switch (mode->width) {
+    case 256u:
+        divider = 10u;
+        resolution = 0u;
+        break;
+    case 320u:
+        divider = 8u;
+        resolution = 1u;
+        break;
+    case 512u:
+        divider = 5u;
+        resolution = 2u;
+        break;
+    default:
+        divider = 4u;
+        resolution = 3u;
+        break;
+    }
+    horizontal_end = 0x260u + mode->width * divider;
+    vertical_end = mode->height;
+    mode_bits = resolution | (mode->height > 240u ? 4u : 0u) |
+                (mode->rgb24 != 0u ? 0x10u : 0u) |
+                (mode->interlaced != 0u ? 0x20u : 0u);
+
+    append_gp1(code, count, 0x05000000u | (mode->start_y << 10) | mode->start_x);
+    append_gp1(code, count, 0x06000000u | (horizontal_end << 12) | 0x260u);
+    append_gp1(code, count, 0x07000000u | (vertical_end << 10));
+    append_gp1(code, count, 0x08000000u | mode_bits);
+    append_gp1(code, count, 0x03000000u | (mode->enabled != 0u ? 0u : 1u));
+
+    append_li(code, count, 9u, 0xE3000000u);
+    append_sw(code, count, 9u, 16u, 0x810u);
+    append_li(code, count, 9u, 0xE407FFFFu);
+    append_sw(code, count, 9u, 16u, 0x810u);
+    append_li(code, count, 9u, 0x600000FFu);
+    append_sw(code, count, 9u, 16u, 0x810u);
+    append_li(code, count, 9u, (mode->start_y << 16) | mode->start_x);
+    append_sw(code, count, 9u, 16u, 0x810u);
+    append_li(code, count, 9u, 0x00010001u);
+    append_sw(code, count, 9u, 16u, 0x810u);
+}
+
+static int write_native_video_exe_for_mode(const char *path, const struct native_video_mode *mode)
+{
+    unsigned char image[0x1000] = {0};
+    uint32_t code[64];
+    size_t count = 0u;
+
+    code[count++] = 0x3C10BF80u; /* lui s0, 0xbf80 */
+    code[count++] = 0x36101000u; /* ori s0, s0, 0x1000 */
+    append_mode(code, &count, mode);
+    code[count++] = 0x1000FFFFu; /* beq zero, zero, self */
+    code[count++] = 0u;
+
+    memcpy(image, "PS-X EXE", 8u);
+    store_le32(image, 0x10u, 0x80010100u);
+    store_le32(image, 0x18u, 0x80010000u);
+    store_le32(image, 0x1Cu, 0x800u);
+    store_le32(image, 0x30u, 0x801FF000u);
+    store_le32(image, 0x34u, 0x1000u);
+    for (size_t i = 0u; i < count; i++) {
+        store_le32(image, 0x900u + 4u * i, code[i]);
+    }
+    return write_test_file(path, image, sizeof image);
+}
+
 /* Build a first-party guest that selects a native display mode, draws one
    red RGB555 pixel, and then stays in a guest loop. */
 static int write_native_video_exe(const char *path)
@@ -848,6 +930,65 @@ static int test_native_rgb24_geometry(const char *path)
     return check_failures != 0 ? 1 : 0;
 }
 
+static int test_native_video_geometry_edges(const char *path)
+{
+    static const struct native_video_mode modes[] = {
+        {320u, 240u, 0u, 0u, 1u, 0u, 0u, 1u},
+        {320u, 240u, 0u, 0u, 1u, 1u, 0u, 1u},
+        {640u, 240u, 0u, 0u, 1u, 1u, 0u, 1u},
+        {320u, 240u, 4u, 3u, 1u, 1u, 0u, 1u},
+        {320u, 480u, 0u, 0u, 2u, 0u, 1u, 1u},
+        {320u, 240u, 0u, 0u, 1u, 0u, 0u, 0u},
+        {320u, 240u, 0u, 0u, 1u, 0u, 0u, 1u},
+    };
+    static const uint32_t expected_pixels[] = {
+        0x00FF0000u, 0x001F0000u, 0x001F0000u, 0x001F0000u,
+        0x00FF0000u, 0u,          0x00FF0000u,
+    };
+    struct retro_game_info game;
+    for (size_t i = 0u; i < sizeof modes / sizeof modes[0]; i++) {
+        unsigned video_before = video_calls;
+        unsigned geometry_before = geometry_calls;
+        unsigned changed_dimensions = modes[i].width != 320u || modes[i].height != 240u;
+
+        CHECK(write_native_video_exe_for_mode(path, &modes[i]));
+        memset(&game, 0, sizeof game);
+        game.path = path;
+        CHECK_EQ_U64(p_load_game(&game), 1u);
+        for (unsigned frame_index = 0u; frame_index < modes[i].frames; frame_index++) {
+            run_one();
+            CHECK_EQ_U64(video_calls, video_before + frame_index + 1u);
+            CHECK_EQ_U64(video_bad, 0u);
+            CHECK_EQ_U64(frame_w, modes[i].width);
+            CHECK_EQ_U64(frame_h, modes[i].height);
+            CHECK_EQ_U64(frame[0], expected_pixels[i]);
+            CHECK_EQ_U64(geometry_calls, geometry_before + changed_dimensions);
+            CHECK_EQ_U64(av_info_calls, 0u);
+        }
+        if (changed_dimensions) {
+            CHECK_EQ_U64(geometry_sent.base_width, modes[i].width);
+            CHECK_EQ_U64(geometry_sent.base_height, modes[i].height);
+        }
+    }
+
+    option_value = "pal";
+    option_updated = true;
+    run_one();
+    CHECK_EQ_U64(av_info_calls, 1u);
+    CHECK_EQ_U64(geometry_calls, 2u);
+    check_av(&av_info_sent, SCHWAY_REGION_PAL);
+    option_updated = true;
+    run_one();
+    CHECK_EQ_U64(av_info_calls, 1u);
+    CHECK_EQ_U64(geometry_calls, 2u);
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    (void)remove(path);
+    return check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -864,17 +1005,18 @@ int main(int argc, char **argv)
     uint32_t region, other;
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
+    int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
 
-    if ((!content_mode && !video_geometry_mode && !lifecycle_mode &&
+    if ((!content_mode && !video_geometry_mode && !video_edges_mode && !lifecycle_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
-        ((content_mode || video_geometry_mode || lifecycle_mode) && argv[3][0] == '\0') ||
+        ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode) && argv[3][0] == '\0') ||
         (lifecycle_mode && argv[4][0] == '\0')) {
         fprintf(stderr,
-                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe>\n");
+                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe> | video-geometry-edges <exe>\n");
         return 2;
     }
-    content_test = content_mode || video_geometry_mode || lifecycle_mode;
+    content_test = content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode;
     pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
     region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
@@ -932,6 +1074,10 @@ int main(int argc, char **argv)
 
     if (video_geometry_mode) {
         return test_native_rgb24_geometry(argv[3]);
+    }
+
+    if (video_edges_mode) {
+        return test_native_video_geometry_edges(argv[3]);
     }
 
     if (content_mode) {
