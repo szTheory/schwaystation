@@ -265,9 +265,10 @@ static void check_variables(const struct retro_variable *v)
                  v[1].value,
                  "BIOS for no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin");
     check_string("analog mode variable key", v[2].key, "schwaystation_analog_mode");
-    check_string("analog mode variable value", v[2].value, "Analog mode; analog|digital");
+    check_string("analog mode variable value", v[2].value, "DualShock mode; analog|digital");
     check_string("analog toggle variable key", v[3].key, "schwaystation_analog_toggle");
-    check_string("analog toggle variable value", v[3].value, "Analog toggle; enabled|disabled");
+    check_string("analog toggle variable value", v[3].value,
+                 "DualShock mode toggle; enabled|disabled");
     CHECK(v[4].key == NULL);
 }
 
@@ -663,6 +664,23 @@ static void step(schway *ref, const char *what, unsigned lo)
     }
 }
 
+static void step_with_devices(schway *ref, const char *what, unsigned lo, uint8_t device0,
+                              uint8_t device1)
+{
+    schway_input input_snapshot;
+    memset(&input_snapshot, 0, sizeof input_snapshot);
+    input_snapshot.size = (uint32_t)sizeof input_snapshot;
+    input_snapshot.device[0] = device0;
+    input_snapshot.device[1] = device1;
+    for (unsigned port = 0u; port < 2u; port++) {
+        for (unsigned axis = 0u; axis < 4u; axis++) {
+            input_snapshot.axes[port][axis] = 128u;
+        }
+    }
+    CHECK_EQ_U64(schway_set_input(ref, &input_snapshot), SCHWAY_STATUS_OK);
+    step(ref, what, lo);
+}
+
 /* Sets the frontend callbacks, as a frontend does after retro_init. */
 static void set_callbacks(void)
 {
@@ -812,6 +830,7 @@ static void content_lifecycle(const char *exe_path, const char *directory)
     memset(&game, 0, sizeof game);
     game.path = exe_path;
     content_polls = 0u;
+    p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
     CHECK_EQ_U64(p_load_game(&game), 1);
     if (p_serialize_size() == 0u) {
         goto cleanup;
@@ -2508,6 +2527,7 @@ int main(int argc, char **argv)
     CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 0);
     CHECK(p_get_memory_data(RETRO_MEMORY_SAVE_RAM) == NULL);
     p_set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
+    p_set_controller_port_device(1, RETRO_DEVICE_JOYPAD);
     p_cheat_reset();
     p_cheat_set(0, true, "");
 
@@ -2523,7 +2543,8 @@ int main(int argc, char **argv)
     size = 0u;
     state = ref_state = NULL;
     for (run = 1; run <= FRAMES; run++) {
-        step(ref, "frame", lo);
+        step_with_devices(ref, "frame", lo, SCHWAY_INPUT_DEVICE_DIGITAL,
+                          SCHWAY_INPUT_DEVICE_DIGITAL);
         if (run == SAVE_AT) {
             size = p_serialize_size();
             CHECK(size > 0u);
@@ -2557,7 +2578,8 @@ int main(int argc, char **argv)
         CHECK_EQ_U64(p_unserialize(state, size), 1);
         CHECK_EQ_U64(schway_load_state(ref, ref_state, size), SCHWAY_STATUS_OK);
         for (run = SAVE_AT + 1u; run <= FRAMES; run++) {
-            step(ref, "replayed frame", lo);
+            step_with_devices(ref, "replayed frame", lo, SCHWAY_INPUT_DEVICE_DIGITAL,
+                              SCHWAY_INPUT_DEVICE_DIGITAL);
         }
         CHECK(memcmp(frame, frame60, sizeof frame60) == 0);
     }
@@ -2567,11 +2589,13 @@ int main(int argc, char **argv)
     /* A power cycle, on both. */
     p_reset();
     CHECK_EQ_U64(schway_reset(ref, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
-    step(ref, "frame after reset", lo);
+    step_with_devices(ref, "frame after reset", lo, SCHWAY_INPUT_DEVICE_DIGITAL,
+                      SCHWAY_INPUT_DEVICE_DIGITAL);
 
     /* An update that leaves the region alone keeps the instance. */
     option_updated = true;
-    step(ref, "frame after an unchanged option", lo);
+    step_with_devices(ref, "frame after an unchanged option", lo, SCHWAY_INPUT_DEVICE_DIGITAL,
+                      SCHWAY_INPUT_DEVICE_DIGITAL);
     CHECK_EQ_U64(av_info_calls, 0);
 
     /* A new region recreates the instance from power-on and sends the new
@@ -2585,7 +2609,8 @@ int main(int argc, char **argv)
     }
     option_value = other == SCHWAY_REGION_PAL ? "pal" : "ntsc-j";
     option_updated = true;
-    step(ref, "frame after a region change", other_lo);
+    step_with_devices(ref, "frame after a region change", other_lo, SCHWAY_INPUT_DEVICE_DIGITAL,
+                      SCHWAY_INPUT_DEVICE_DIGITAL);
     CHECK_EQ_U64(av_info_calls, 1);
     check_av(&av_info_sent, other);
     CHECK_EQ_U64(p_get_region(), other == SCHWAY_REGION_PAL ? RETRO_REGION_PAL : RETRO_REGION_NTSC);
@@ -2611,7 +2636,8 @@ int main(int argc, char **argv)
     ref = ref_create(region);
     CHECK(ref != NULL);
     if (ref != NULL) {
-        step(ref, "first frame after deinit", lo);
+        step_with_devices(ref, "first frame after deinit", lo, SCHWAY_INPUT_DEVICE_DUALSHOCK,
+                          SCHWAY_INPUT_DEVICE_DUALSHOCK);
         schway_destroy(ref);
     }
 
