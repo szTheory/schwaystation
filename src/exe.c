@@ -137,8 +137,7 @@ schway_status schway_probe_exe(const void *bytes, size_t n, schway_exe_info *out
    again. */
 schway_status schway_load_exe(schway *inst, const void *bytes, size_t n)
 {
-    if (inst == NULL || bytes == NULL || n == 0u || inst->ticks != 0u || inst->frame != 0u ||
-        inst->exe_loaded != 0u) {
+    if (inst == NULL || bytes == NULL || n == 0u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
     const uint8_t *b = (const uint8_t *)bytes;
@@ -146,6 +145,9 @@ schway_status schway_load_exe(schway *inst, const void *bytes, size_t n)
     schway_status st = validate(b, (uint64_t)n, &e);
     if (st != SCHWAY_STATUS_OK) {
         return st;
+    }
+    if (inst->ticks != 0u || inst->frame != 0u || inst->exe_loaded != 0u) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
     }
     uint8_t *ram = inst->bus.ram;
     memcpy(&ram[(size_t)physical(e.t_addr)], b + EXE_HEADER, e.t_size);
