@@ -23,6 +23,12 @@
       }
     },
     {
+      "name": "library",
+      "inherits": "ci",
+      "$comment": "Local-only compatibility report checks use temporary fixtures; owner data is scanned only by scripts/library.sh after the workflow.",
+      "binaryDir": "${sourceDir}/build/library"
+    },
+    {
       "name": "ci-msvc",
       "inherits": "base",
       "cacheVariables": {
@@ -141,6 +147,7 @@
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev" },
     { "name": "ci", "configurePreset": "ci" },
+    { "name": "library", "configurePreset": "library" },
     { "name": "ci-msvc", "configurePreset": "ci-msvc" },
     { "name": "hygiene", "configurePreset": "hygiene" },
     { "name": "asan", "configurePreset": "asan" },
@@ -170,6 +177,16 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^release$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
+      "name": "library",
+      "configurePreset": "library",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/library/junit.xml"
+      },
+      "filter": { "include": { "label": "^library$" } },
       "execution": { "noTestsAction": "error", "jobs": "" }
     },
     {
@@ -283,6 +300,14 @@
         { "type": "test", "name": "ci" },
         { "type": "package", "name": "ci" },
         { "type": "test", "name": "ci-release" }
+      ]
+    },
+    {
+      "name": "library",
+      "steps": [
+        { "type": "configure", "name": "library" },
+        { "type": "build", "name": "library" },
+        { "type": "test", "name": "library" }
       ]
     },
     {

@@ -17,7 +17,7 @@ schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
                   [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-state]
-schwaystation-run --probe FILE
+schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]
 schwaystation-run --help | --version
 ```
 
@@ -40,12 +40,14 @@ schwaystation-run --help | --version
 | `--memcard-names MODE` | Use `basename` (default) or `serial` for the card filenames. Give it once. |
 | `--serial SERIAL` | Use this safe serial basename with `--memcard-names serial`. A bare PS-EXE does not contain a disc serial, so the caller supplies it. |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
-| `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
+| `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it once. |
+| `--metadata-ledger CSV` and `--metadata-dat DAT` | Supply both bounded lookup files to `--probe`; identity is shown only after an exact DAT and passing-ledger match. |
 | `--region NAME` | `ntsc-u` (the default), `ntsc-j` or `pal`: the console's region and its video timing. |
 | `--help` | Print the usage text and the exit statuses. Give it alone. |
 | `--version` | Print the version and the Git revision the build was configured from. Give it alone. |
 
-Options may come in any order, except `--probe`, which takes no other option. Anything else on the command line is
+Options may come in any order, except `--probe`, which takes no other option except the `--metadata-ledger` and
+`--metadata-dat` pair. Anything else on the command line is
 a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--exe` or `--probe`,
 `--bios` or `--exe` twice, `--bios` together with `--exe`, `--exe` with `--probe`, `--tty` without `--exe` or
 `--bios`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything but `mailbox`,
@@ -440,14 +442,13 @@ The boot MD5 follows the RetroAchievements rule: hash the canonical boot filenam
 then the PS-EXE header and text bytes selected by the header. The SHA-1 covers the physical bytes of track 1,
 including sector headers for raw CUE tracks. The first data track can be later than track 1.
 
-The title source is libretro-database's Redump Sony PlayStation DAT at commit
+The `--metadata-ledger` and `--metadata-dat` inputs must be supplied together. Without both, disc identity fields
+remain redacted. Lookup inputs are bounded to 16 MiB with lines no longer than 4096 bytes. The documented title
+source is libretro-database's Redump Sony PlayStation DAT at commit
 [`12c21cf79f1e20eff6ac68b80875816c717d0a7a`](https://github.com/libretro/libretro-database/tree/12c21cf79f1e20eff6ac68b80875816c717d0a7a),
 `metadat/redump/Sony - PlayStation.dat`, under CC-BY-SA-4.0. The project and license are credited here; the DAT is
-not copied into the runner. Lookup input is bounded to 16 MiB with lines no longer than 4096 bytes. Test builds
-expose isolated `--test-ledger`, `--test-dat`, `--test-root` and `--test-config` inputs to the test runner; the
-packaged `schwaystation-run` does not accept these options. The ten-column ledger accepts unquoted printable ASCII
-titles only, so a DAT entry with a comma, quote, escape or non-ASCII title remains unavailable. No package is
-required.
+not copied into the runner. The ten-column ledger accepts unquoted printable ASCII titles only, so a DAT entry
+with a comma, quote, escape or non-ASCII title remains unavailable. No package is required.
 
 The input must be a PS-EXE the core would load or a bounded, valid disc image. Otherwise nothing is printed on
 standard output and the runner prints one generic line to standard error and exits 1:
@@ -457,7 +458,26 @@ schwaystation-run: input: PS-EXE invalid
 ```
 
 The reason is a validation or I/O result from the probe. `--probe` with any other option, with no file or with a
-second file exits 2.
+second file exits 2. Its only optional arguments are the complete metadata pair documented above.
+
+## Local compatibility library
+
+Copy `.env.example` to the ignored `.env.local`, set `SCHWAYSTATION_DISC_DIR` and `SCHWAYSTATION_BIOS_DIR` to
+existing directories, then run `scripts/library.sh` from the repository root. The script parses those values as
+data; it never sources the file or evaluates shell expressions. It runs the separate `library` workflow, fetches
+and verifies the pinned Redump DAT if it is absent from the ignored build directory, and probes top-level CUE and ISO files
+plus standalone raw 2048-byte BIN files. A BIN referenced by a CUE `FILE` entry is treated as that sheet's
+companion and is not probed again as a standalone image. Each probe joins to the committed ten-column ledger and
+DAT. Matched identity rows report boot and play as `unknown`/`unavailable`; unlisted images produce only generic
+unknown rows without serials, names or hashes. Invalid supported images fail the scan and preserve the previous
+report. The report is written only to ignored `build/library/results.csv`.
+
+The local lookup uses `tests/compat/ledger.csv` and the DAT at `build/library/Sony - PlayStation.dat`. If the DAT
+is absent, it is fetched from libretro-database commit `12c21cf79f1e20eff6ac68b80875816c717d0a7a` and checked by
+SHA-256; an existing local DAT is reused. Boot and play remain unknown until a disc
+backend measures them. CI exercises the same host lookup code with isolated temporary DAT and ledger fixtures,
+never `.env.local` or owner content. Public compatibility documentation is regenerated from the committed ledger
+only.
 
 ## Stopping
 

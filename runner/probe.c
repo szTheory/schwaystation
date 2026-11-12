@@ -93,11 +93,15 @@ static int path_inside(const char *root, const char *path)
     return root[0] == '/';
 }
 
-static int test_config_ready(const schway__probe_test_inputs *inputs, const char *image)
+static int metadata_sources_ready(const schway__probe_metadata_inputs *inputs,
+                                  const char *image)
 {
     FILE *file;
     char line[64];
-    if (inputs == NULL || !path_inside(inputs->root, inputs->ledger) ||
+    if (inputs == NULL || inputs->ledger == NULL || inputs->dat == NULL) return 0;
+    if (inputs->root == NULL && inputs->config == NULL) return 1;
+    if (inputs->root == NULL || inputs->config == NULL ||
+        !path_inside(inputs->root, inputs->ledger) ||
         !path_inside(inputs->root, inputs->dat) || !path_inside(inputs->root, inputs->config) ||
         !path_inside(inputs->root, image)) return 0;
     file = fopen(inputs->config, "rb");
@@ -257,12 +261,12 @@ static int ledger_matches(const char *path, const char *serial, const char *md5,
     return valid && matched;
 }
 
-static int metadata_identity(const schway__probe_test_inputs *inputs, const char *image,
+static int metadata_identity(const schway__probe_metadata_inputs *inputs, const char *image,
                              const schway_host_disc_probe *disc, const char *md5,
                              char track_sha1[41], char title[256], char date[11])
 {
     schway__sha1_hex(disc->track1_sha1, track_sha1);
-    if (!test_config_ready(inputs, image) || disc->serial[0] == '\0' ||
+    if (!metadata_sources_ready(inputs, image) || disc->serial[0] == '\0' ||
         !dat_title_for_serial(inputs->dat, disc->serial, title)) return 0;
     return ledger_matches(inputs->ledger, disc->serial, md5, track_sha1, title, date);
 }
@@ -306,7 +310,7 @@ void schway__refuse_file(const char *path, const char *why)
 }
 
 int schway__probe_print(FILE *out, const char *path,
-                        const schway__probe_test_inputs *test_inputs)
+                        const schway__probe_metadata_inputs *metadata)
 {
     schway_host_disc_probe disc;
     schway_host_disc_probe_status disc_status = schway__disc_probe_image(path, &disc);
@@ -329,7 +333,7 @@ int schway__probe_print(FILE *out, const char *path,
         char title[256] = "";
         char date[11] = "";
         rcheevos_disc_md5(disc.boot_name, disc.exe_bytes, disc_info.hash_len, md5_hex);
-        int identity_match = metadata_identity(test_inputs, path, &disc, md5_hex,
+        int identity_match = metadata_identity(metadata, path, &disc, md5_hex,
                                                track_sha1_hex, title, date);
         fputs("format=disc\n", out);
         if (identity_match) {

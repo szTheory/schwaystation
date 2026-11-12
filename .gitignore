@@ -35,8 +35,9 @@
 .env.*
 !.env.example
 
-# Build output
+# Build output, including local-only library reports
 /build/
+/build/library/results.csv
 /out/
 /CMakeUserPresets.json
 compile_commands.json

@@ -134,7 +134,7 @@ static const char synopsis[] =
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
     "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
     "                         [--serial SERIAL] [--hash] [--hash-state]\n"
-    "       schwaystation-run --probe FILE\n"
+    "       schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
     "  --frames N         run N frames (1 <= N <= 1000000)\n"
@@ -152,7 +152,8 @@ static const char synopsis[] =
     "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe\n"
     "  --trace first-fault  print the last 4096 trace records after a fault or a hang; needs --exe\n"
     "  --no-stop-on-fault   keep running after the program's first fault; needs --exe\n"
-    "  --probe FILE       print what a PS-EXE file is; runs nothing\n"
+    "  --probe FILE       print PS-EXE or disc metadata; runs nothing\n"
+    "  --metadata-ledger CSV and --metadata-dat DAT  reveal identity only on exact match\n"
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
 
@@ -329,6 +330,8 @@ typedef struct options {
     int memcard_names_set;
     int region_set; /* --region was supplied */
     const char *probe; /* --probe FILE, else NULL */
+    const char *metadata_ledger;
+    const char *metadata_dat;
 #ifdef SCHWAY_RUN_TEST_HOOKS
     const char *test_ledger;
     const char *test_dat;
@@ -516,6 +519,15 @@ static int parse_options(int argc, char **argv, options *o)
             }
             o->probe = value;
             i++;
+        } else if (strcmp(arg, "--metadata-ledger") == 0 ||
+                   strcmp(arg, "--metadata-dat") == 0) {
+            const char **slot = strcmp(arg, "--metadata-ledger") == 0 ?
+                                &o->metadata_ledger : &o->metadata_dat;
+            if (*slot != NULL || value == NULL || value[0] == '-') {
+                return usage("--metadata-* takes one path once");
+            }
+            *slot = value;
+            i++;
 #ifdef SCHWAY_RUN_TEST_HOOKS
         } else if (strcmp(arg, "--test-ledger") == 0 ||
                    strcmp(arg, "--test-dat") == 0 ||
@@ -547,7 +559,10 @@ static int parse_options(int argc, char **argv, options *o)
                              o->test_root != NULL || o->test_config != NULL;
         int all_test_inputs = o->test_ledger != NULL && o->test_dat != NULL &&
                               o->test_root != NULL && o->test_config != NULL;
-        if ((any_test_input && !all_test_inputs) || o->frames != 0u || o->bios != NULL ||
+        int any_metadata = o->metadata_ledger != NULL || o->metadata_dat != NULL;
+        int all_metadata = o->metadata_ledger != NULL && o->metadata_dat != NULL;
+        if ((any_test_input && !all_test_inputs) || (any_metadata && !all_metadata) ||
+            (any_test_input && any_metadata) || o->frames != 0u || o->bios != NULL ||
             o->exe != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash ||
             o->hash_state || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
@@ -559,15 +574,22 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->test_ledger != NULL || o->test_dat != NULL || o->test_root != NULL || o->test_config != NULL) {
         return usage("--test-* needs --probe");
     }
+    if (o->metadata_ledger != NULL || o->metadata_dat != NULL) {
+        return usage("--metadata-* needs --probe");
+    }
 #else
     if (o->probe != NULL) {
-        if (o->frames != 0u || o->bios != NULL || o->exe != NULL || o->inputs != NULL ||
+        if ((o->metadata_ledger == NULL) != (o->metadata_dat == NULL) ||
+            o->frames != 0u || o->bios != NULL || o->exe != NULL || o->inputs != NULL ||
             o->save_dir != NULL || o->hash || o->hash_state || o->bench || o->tty ||
             o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
             o->memcard_names_set || o->serial != NULL || o->region_set) {
             return usage("--probe takes no other option");
         }
         return SCHWAY__EXIT_OK;
+    }
+    if (o->metadata_ledger != NULL || o->metadata_dat != NULL) {
+        return usage("--metadata-* needs --probe");
     }
 #endif
     if (o->tty && o->exe == NULL && o->bios == NULL) {
@@ -1434,16 +1456,23 @@ int main(int argc, char **argv)
     memset(&opt, 0, sizeof opt);
     int status = parse_options(argc, argv, &opt);
     if (status == SCHWAY__EXIT_OK && opt.probe != NULL) {
-#ifdef SCHWAY_RUN_TEST_HOOKS
-        schway__probe_test_inputs test_inputs = {
-            opt.test_ledger, opt.test_dat, opt.test_root, opt.test_config
+        schway__probe_metadata_inputs metadata = {
+            opt.metadata_ledger, opt.metadata_dat, NULL, NULL
         };
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        if (opt.test_ledger != NULL) {
+            metadata.ledger = opt.test_ledger;
+            metadata.dat = opt.test_dat;
+            metadata.root = opt.test_root;
+            metadata.config = opt.test_config;
+        }
         status = schway__probe_print(stdout, opt.probe,
-                                     opt.test_ledger != NULL ? &test_inputs : NULL) == 0 ? SCHWAY__EXIT_OK
-                                                                                       : SCHWAY__EXIT_FAILURE;
+                                     metadata.ledger != NULL ? &metadata : NULL) == 0 ? SCHWAY__EXIT_OK
+                                                                                   : SCHWAY__EXIT_FAILURE;
 #else
-        status = schway__probe_print(stdout, opt.probe, NULL) == 0 ? SCHWAY__EXIT_OK
-                                                             : SCHWAY__EXIT_FAILURE;
+        status = schway__probe_print(stdout, opt.probe,
+                                     metadata.ledger != NULL ? &metadata : NULL) == 0 ? SCHWAY__EXIT_OK
+                                                                                   : SCHWAY__EXIT_FAILURE;
 #endif
     } else if (status == SCHWAY__EXIT_OK && !opt.printed) {
         schway__stop_install();

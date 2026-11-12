@@ -12,6 +12,379 @@ function(probe_write_metadata root track_sha1)
   set(PROBE_CONFIG "${PROBE_CONFIG}" PARENT_SCOPE)
 endfunction()
 
+function(library_prepare root)
+  file(REMOVE_RECURSE "${root}")
+  file(MAKE_DIRECTORY "${root}/discs" "${root}/bios" "${root}/metadata")
+  execute_process(COMMAND "${TEST_PROBE}" cue_2048 "${root}/discs/synthetic.cue"
+    RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate bounded CUE/BIN fixture: ${rc}")
+  endif()
+  file(GLOB tracks "${root}/discs/*.bin")
+  list(LENGTH tracks track_count)
+  if(NOT track_count EQUAL 1)
+    message(FATAL_ERROR "the CUE fixture did not produce one physical track")
+  endif()
+  list(GET tracks 0 track)
+  file(SHA1 "${track}" track_sha1)
+  set(config "${root}/config.txt")
+  set(ledger "${root}/metadata/ledger.csv")
+  set(dat "${root}/metadata/title.dat")
+  set(probe_config "${root}/metadata/config.txt")
+  file(WRITE "${config}" "SCHWAYSTATION_DISC_DIR=${root}/discs\nSCHWAYSTATION_BIOS_DIR=${root}/bios\n")
+  file(WRITE "${probe_config}" "schwaystation-test-metadata-v1\n")
+  file(WRITE "${dat}" "clrmamepro (\n name \"Synthetic test DAT\"\n)\ngame (\n name \"Schway Synthetic Metadata Fixture\"\n region \"USA\"\n serial \"SWAY-00001\"\n)\n")
+  file(WRITE "${ledger}" "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,metadata.identity,pass,synthetic:iso9660-known-answer,2026-11-12\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,boots@600,unknown,unavailable,2026-11-12\nSWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${track_sha1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,plays@600,unknown,unavailable,2026-11-12\n")
+  set(LIBRARY_ROOT "${root}" PARENT_SCOPE)
+  set(LIBRARY_TRACK_SHA1 "${track_sha1}" PARENT_SCOPE)
+  set(LIBRARY_CONFIG "${config}" PARENT_SCOPE)
+  set(LIBRARY_LEDGER "${ledger}" PARENT_SCOPE)
+  set(LIBRARY_DAT "${dat}" PARENT_SCOPE)
+  set(LIBRARY_PROBE_CONFIG "${probe_config}" PARENT_SCOPE)
+endfunction()
+
+function(library_snapshot root snapshot)
+  file(GLOB_RECURSE paths LIST_DIRECTORIES FALSE RELATIVE "${root}" "${root}/*")
+  set(entries)
+  foreach(path IN LISTS paths)
+    file(SHA256 "${root}/${path}" digest)
+    list(APPEND entries "${path}|${digest}")
+  endforeach()
+  list(SORT entries)
+  set(${snapshot} "${entries}" PARENT_SCOPE)
+endfunction()
+
+function(library_assert_snapshot root before)
+  file(GLOB_RECURSE paths LIST_DIRECTORIES FALSE RELATIVE "${root}" "${root}/*")
+  set(entries)
+  foreach(path IN LISTS paths)
+    if(NOT path STREQUAL "build/library/results.csv")
+      file(SHA256 "${root}/${path}" digest)
+      list(APPEND entries "${path}|${digest}")
+    endif()
+  endforeach()
+  list(SORT entries)
+  if(NOT "${entries}" STREQUAL "${before}")
+    message(FATAL_ERROR "library command created or changed a file outside build/library/results.csv")
+  endif()
+  if(NOT EXISTS "${root}/build/library/results.csv")
+    message(FATAL_ERROR "library command did not create build/library/results.csv")
+  endif()
+endfunction()
+
+function(library_invoke root config ledger dat probe_config runner)
+  if(ARGC GREATER 7)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+        "LIBRARY_REAL_RUNNER=${ARGV6}" "LIBRARY_PROBE_LOG=${ARGV7}"
+        sh "${SOURCE_ROOT}/scripts/library.sh"
+        --test-root "${root}" --test-config "${config}" --test-ledger "${ledger}"
+        --test-dat "${dat}" --test-probe-config "${probe_config}" --test-runner "${runner}"
+      RESULT_VARIABLE library_rc OUTPUT_VARIABLE library_out ERROR_VARIABLE library_err)
+  else()
+    execute_process(COMMAND sh "${SOURCE_ROOT}/scripts/library.sh"
+        --test-root "${root}" --test-config "${config}" --test-ledger "${ledger}"
+        --test-dat "${dat}" --test-probe-config "${probe_config}" --test-runner "${runner}"
+      RESULT_VARIABLE library_rc OUTPUT_VARIABLE library_out ERROR_VARIABLE library_err)
+  endif()
+  set(LIBRARY_RC "${library_rc}" PARENT_SCOPE)
+  set(LIBRARY_OUT "${library_out}" PARENT_SCOPE)
+  set(LIBRARY_ERR "${library_err}" PARENT_SCOPE)
+endfunction()
+
+function(library_validate root mode track_sha1 expected)
+  execute_process(COMMAND "${LIBRARY_TEST}" "${mode}" "${root}/build/library/results.csv" "${track_sha1}"
+    RESULT_VARIABLE result OUTPUT_QUIET ERROR_QUIET)
+  if(expected AND NOT result STREQUAL "0")
+    message(FATAL_ERROR "library report failed ${mode} validation: ${result}")
+  elseif(NOT expected AND result STREQUAL "0")
+    message(FATAL_ERROR "library report unexpectedly passed ${mode} validation")
+  endif()
+endfunction()
+
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_synthetic_result")
+  foreach(required WORK_ROOT SOURCE_ROOT TEST_PROBE LIBRARY_TEST RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "library synthetic test requires ${required}")
+    endif()
+  endforeach()
+  set(root "${WORK_ROOT}/compat-library-synthetic")
+  library_prepare("${root}")
+  library_snapshot("${root}" before)
+  library_invoke("${root}" "${LIBRARY_CONFIG}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(NOT LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "temporary library invocation failed: ${LIBRARY_RC} ${LIBRARY_ERR}")
+  endif()
+  library_assert_snapshot("${root}" "${before}")
+  library_validate("${root}" identity "${LIBRARY_TRACK_SHA1}" TRUE)
+  message(STATUS "library report joined the exact CUE/BIN identity without changing other inputs")
+  return()
+endif()
+
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
+  foreach(required WORK_ROOT SOURCE_ROOT TEST_PROBE LIBRARY_TEST RUN PRODUCTION_RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "library control test requires ${required}")
+    endif()
+  endforeach()
+  set(root "${WORK_ROOT}/compat-library-controls")
+  library_prepare("${root}")
+
+  file(WRITE "${root}/build/library/results.csv" "previous report\n")
+  file(SHA256 "${root}/build/library/results.csv" old_report)
+  library_invoke("${root}" "${root}/missing-config.txt" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "absent temporary configuration was accepted")
+  endif()
+  file(SHA256 "${root}/build/library/results.csv" actual_report)
+  if(NOT actual_report STREQUAL old_report)
+    message(FATAL_ERROR "absent configuration changed the previous report")
+  endif()
+
+  set(malicious "${root}/malicious-config.txt")
+  file(WRITE "${malicious}" "SCHWAYSTATION_DISC_DIR=$(touch ${root}/PRIVATE_SENTINEL_EXECUTED)\nSCHWAYSTATION_BIOS_DIR=${root}/bios\n")
+  library_invoke("${root}" "${malicious}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(LIBRARY_RC STREQUAL "0" OR EXISTS "${root}/PRIVATE_SENTINEL_EXECUTED")
+    message(FATAL_ERROR "configuration was evaluated as shell code")
+  endif()
+  set(bad_bios_config "${root}/bad-bios-config.txt")
+  file(WRITE "${bad_bios_config}" "SCHWAYSTATION_DISC_DIR=${root}/discs\nSCHWAYSTATION_BIOS_DIR=${root}/absent-bios\n")
+  library_invoke("${root}" "${bad_bios_config}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "missing configured BIOS directory was accepted")
+  endif()
+
+  set(empty_root "${WORK_ROOT}/compat-library-empty")
+  library_prepare("${empty_root}")
+  file(GLOB inputs "${empty_root}/discs/*")
+  file(REMOVE ${inputs})
+  library_snapshot("${empty_root}" before_empty)
+  library_invoke("${empty_root}" "${LIBRARY_CONFIG}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(NOT LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "valid empty library input was rejected: ${LIBRARY_ERR}")
+  endif()
+  library_assert_snapshot("${empty_root}" "${before_empty}")
+  library_validate("${empty_root}" empty "${LIBRARY_TRACK_SHA1}" TRUE)
+
+  set(duplicate_root "${WORK_ROOT}/compat-library-duplicates")
+  library_prepare("${duplicate_root}")
+  set(wrapper_dir "${WORK_ROOT}/library-runner/tests")
+  file(MAKE_DIRECTORY "${wrapper_dir}")
+  set(wrapper "${wrapper_dir}/schwaystation-run-test")
+  set(probe_log "${WORK_ROOT}/library-probe-calls.txt")
+  file(REMOVE "${probe_log}")
+  file(WRITE "${wrapper}" "#!/bin/sh\nprintf '%s\\n' \"$2\" >> \"$LIBRARY_PROBE_LOG\"\nexec \"$LIBRARY_REAL_RUNNER\" \"$@\"\n")
+  file(CHMOD "${wrapper}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  file(GLOB tracks "${duplicate_root}/discs/*.bin")
+  list(GET tracks 0 track)
+  get_filename_component(track_name "${track}" NAME)
+  file(READ "${duplicate_root}/discs/synthetic.cue" cue_text)
+  string(REPLACE "\"${track_name}\"" "\"duplicate.bin\"" duplicate_cue "${cue_text}")
+  file(COPY_FILE "${track}" "${duplicate_root}/discs/duplicate.bin")
+  file(WRITE "${duplicate_root}/discs/duplicate.cue" "${duplicate_cue}")
+  file(COPY_FILE "${track}" "${duplicate_root}/discs/standalone.bin")
+  set(cue2352_source "${duplicate_root}/metadata/companion.cue")
+  execute_process(COMMAND "${TEST_PROBE}" cue_mode1_2352 "${cue2352_source}"
+    RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate 2352 CUE companion fixture")
+  endif()
+  file(READ "${cue2352_source}" cue2352_text)
+  string(REPLACE "\"synthetic.bin\"" "\"companion2352.bin\"" cue2352_text "${cue2352_text}")
+  file(COPY_FILE "${duplicate_root}/metadata/synthetic.bin"
+    "${duplicate_root}/discs/companion2352.bin")
+  file(WRITE "${duplicate_root}/discs/companion2352.cue" "${cue2352_text}")
+  library_snapshot("${duplicate_root}" before_duplicate)
+  library_invoke("${duplicate_root}" "${LIBRARY_CONFIG}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${wrapper}" "${RUN}" "${probe_log}")
+  if(NOT LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "duplicate CUE/BIN or standalone BIN identity was rejected: ${LIBRARY_ERR}")
+  endif()
+  library_assert_snapshot("${duplicate_root}" "${before_duplicate}")
+  library_validate("${duplicate_root}" identity "${LIBRARY_TRACK_SHA1}" TRUE)
+  file(STRINGS "${probe_log}" probed_images)
+  list(LENGTH probed_images probe_count)
+  list(FIND probed_images "${duplicate_root}/discs/standalone.bin" standalone_index)
+  if(NOT probe_count EQUAL 4 OR standalone_index EQUAL -1 OR
+     "${probed_images}" MATCHES "synthetic[.]bin|duplicate[.]bin|companion2352[.]bin")
+    message(FATAL_ERROR "standalone BIN was not probed exactly once or a CUE companion was probed raw: ${probed_images}")
+  endif()
+
+  set(invalid_bin "${duplicate_root}/discs/PRIVATE_SENTINEL_INVALID.bin")
+  file(WRITE "${invalid_bin}" "not a raw 2048-sector image")
+  file(SHA256 "${duplicate_root}/build/library/results.csv" old_report)
+  library_invoke("${duplicate_root}" "${LIBRARY_CONFIG}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(LIBRARY_RC STREQUAL "0" OR LIBRARY_ERR MATCHES "PRIVATE_SENTINEL")
+    message(FATAL_ERROR "invalid standalone BIN was accepted or its name leaked")
+  endif()
+  file(SHA256 "${duplicate_root}/build/library/results.csv" actual_report)
+  if(NOT actual_report STREQUAL old_report)
+    message(FATAL_ERROR "invalid standalone BIN replaced the previous report")
+  endif()
+  file(REMOVE "${invalid_bin}")
+
+  set(unlisted_root "${WORK_ROOT}/PRIVATE_SENTINEL_LIBRARY_ROOT")
+  library_prepare("${unlisted_root}")
+  file(READ "${LIBRARY_LEDGER}" ledger_text)
+  string(REPLACE "${LIBRARY_TRACK_SHA1}" "0000000000000000000000000000000000000000"
+    wrong_ledger_text "${ledger_text}")
+  set(wrong_ledger "${unlisted_root}/metadata/wrong.csv")
+  file(WRITE "${wrong_ledger}" "${wrong_ledger_text}")
+  library_invoke("${unlisted_root}" "${LIBRARY_CONFIG}" "${wrong_ledger}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(NOT LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "wrong identity join should remain private: ${LIBRARY_ERR}")
+  endif()
+  if(LIBRARY_OUT MATCHES "PRIVATE_SENTINEL|SWAY-00001|SWAY_000[.]01|12481bed29c6c0d54a6f776ef5cec981|${LIBRARY_TRACK_SHA1}" OR
+     LIBRARY_ERR MATCHES "PRIVATE_SENTINEL")
+    message(FATAL_ERROR "unjoined input identity or path leaked to command output")
+  endif()
+  library_validate("${unlisted_root}" identity "${LIBRARY_TRACK_SHA1}" FALSE)
+  library_validate("${unlisted_root}" unlisted "${LIBRARY_TRACK_SHA1}" TRUE)
+  file(READ "${unlisted_root}/build/library/results.csv" redacted)
+  if(redacted MATCHES "PRIVATE_SENTINEL|SWAY-00001|SWAY_000[.]01|12481bed29c6c0d54a6f776ef5cec981|${LIBRARY_TRACK_SHA1}")
+    message(FATAL_ERROR "unjoined identity data was written to the local report")
+  endif()
+
+  string(REPLACE "metadata.identity,pass,synthetic:iso9660-known-answer"
+    "metadata.identity,unknown,unavailable" unknown_ledger_text "${ledger_text}")
+  set(unknown_ledger "${unlisted_root}/metadata/unknown.csv")
+  file(WRITE "${unknown_ledger}" "${unknown_ledger_text}")
+  library_invoke("${unlisted_root}" "${LIBRARY_CONFIG}" "${unknown_ledger}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(NOT LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "all-unavailable measurements were rejected: ${LIBRARY_ERR}")
+  endif()
+  library_validate("${unlisted_root}" identity "${LIBRARY_TRACK_SHA1}" FALSE)
+  library_validate("${unlisted_root}" unlisted "${LIBRARY_TRACK_SHA1}" TRUE)
+
+  set(duplicate_ledger "${unlisted_root}/metadata/duplicate.csv")
+  string(REGEX MATCH "[^\n]*metadata[.]identity,pass[^\n]*" identity_row "${ledger_text}")
+  file(WRITE "${duplicate_ledger}" "${ledger_text}${identity_row}\n")
+  file(WRITE "${unlisted_root}/build/library/results.csv" "previous report\n")
+  file(SHA256 "${unlisted_root}/build/library/results.csv" old_report)
+  library_invoke("${unlisted_root}" "${LIBRARY_CONFIG}" "${duplicate_ledger}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "duplicate metadata identity keys were accepted")
+  endif()
+  file(SHA256 "${unlisted_root}/build/library/results.csv" actual_report)
+  if(NOT actual_report STREQUAL old_report)
+    message(FATAL_ERROR "bad ledger changed the previous report")
+  endif()
+
+  set(unsupported_root "${WORK_ROOT}/compat-library-unsupported")
+  library_prepare("${unsupported_root}")
+  file(GLOB inputs "${unsupported_root}/discs/*")
+  file(REMOVE ${inputs})
+  file(WRITE "${unsupported_root}/discs/PRIVATE_SENTINEL_MEDIA.chd" "unsupported image")
+  library_invoke("${unsupported_root}" "${LIBRARY_CONFIG}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(NOT LIBRARY_RC STREQUAL "0")
+    message(FATAL_ERROR "unsupported media should be counted without an identity result")
+  endif()
+  library_validate("${unsupported_root}" empty "${LIBRARY_TRACK_SHA1}" TRUE)
+
+  set(malformed_root "${WORK_ROOT}/compat-library-malformed")
+  library_prepare("${malformed_root}")
+  file(GLOB tracks "${malformed_root}/discs/*.bin")
+  list(GET tracks 0 track)
+  get_filename_component(track_name "${track}" NAME)
+  file(READ "${malformed_root}/discs/synthetic.cue" cue_text)
+  string(REPLACE "\"${track_name}\"" "\"PRIVATE_SENTINEL_ABSENT.bin\"" malformed_cue "${cue_text}")
+  file(WRITE "${malformed_root}/discs/synthetic.cue" "${malformed_cue}")
+  file(WRITE "${malformed_root}/build/library/results.csv" "previous report\n")
+  file(SHA256 "${malformed_root}/build/library/results.csv" old_report)
+  library_invoke("${malformed_root}" "${LIBRARY_CONFIG}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(LIBRARY_RC STREQUAL "0" OR LIBRARY_ERR MATCHES "PRIVATE_SENTINEL")
+    message(FATAL_ERROR "malformed CUE was accepted or its path leaked")
+  endif()
+  file(SHA256 "${malformed_root}/build/library/results.csv" actual_report)
+  if(NOT actual_report STREQUAL old_report)
+    message(FATAL_ERROR "malformed input changed the previous report")
+  endif()
+
+  set(system_root "${WORK_ROOT}/compat-library-bad-system")
+  library_prepare("${system_root}")
+  set(system_iso "${system_root}/discs/bad-system.iso")
+  execute_process(COMMAND "${TEST_PROBE}" traversal "${system_iso}"
+    RESULT_VARIABLE rc OUTPUT_QUIET ERROR_QUIET)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate invalid SYSTEM.CNF fixture")
+  endif()
+  file(WRITE "${system_root}/build/library/results.csv" "previous report\n")
+  file(SHA256 "${system_root}/build/library/results.csv" old_report)
+  library_invoke("${system_root}" "${LIBRARY_CONFIG}" "${LIBRARY_LEDGER}" "${LIBRARY_DAT}"
+    "${LIBRARY_PROBE_CONFIG}" "${RUN}")
+  if(LIBRARY_RC STREQUAL "0" OR LIBRARY_ERR MATCHES "bad-system.iso")
+    message(FATAL_ERROR "invalid SYSTEM.CNF was accepted or its path leaked")
+  endif()
+  file(SHA256 "${system_root}/build/library/results.csv" actual_report)
+  if(NOT actual_report STREQUAL old_report)
+    message(FATAL_ERROR "invalid SYSTEM.CNF changed the previous report")
+  endif()
+
+  set(ordinary_root "${WORK_ROOT}/compat-library-ordinary")
+  set(fake_bin "${ordinary_root}/test-bin")
+  file(REMOVE_RECURSE "${ordinary_root}")
+  file(MAKE_DIRECTORY "${ordinary_root}/scripts" "${ordinary_root}/build/library"
+    "${ordinary_root}/tests/compat" "${fake_bin}")
+  file(COPY_FILE "${SOURCE_ROOT}/scripts/library.sh" "${ordinary_root}/scripts/library.sh")
+  file(COPY_FILE "${PRODUCTION_RUN}" "${ordinary_root}/build/library/schwaystation-run")
+  file(COPY_FILE "${LIBRARY_LEDGER}" "${ordinary_root}/tests/compat/ledger.csv")
+  file(COPY_FILE "${LIBRARY_DAT}" "${ordinary_root}/build/library/Sony - PlayStation.dat")
+  file(WRITE "${ordinary_root}/.env.local"
+    "SCHWAYSTATION_DISC_DIR=${duplicate_root}/discs\nSCHWAYSTATION_BIOS_DIR=${duplicate_root}/bios\n")
+  set(fake_cmake "${fake_bin}/cmake")
+  file(WRITE "${fake_cmake}" "#!/bin/sh\n[ \"$*\" = \"--workflow --preset library\" ] || exit 2\nexit 0\n")
+  file(CHMOD "${fake_cmake}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  if(WIN32)
+    set(path_separator ";")
+  else()
+    set(path_separator ":")
+  endif()
+  set(mirror_path "${fake_bin}${path_separator}$ENV{PATH}")
+  library_snapshot("${ordinary_root}" before_ordinary)
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${mirror_path}" sh
+      "${ordinary_root}/scripts/library.sh"
+    WORKING_DIRECTORY "${ordinary_root}"
+    RESULT_VARIABLE ordinary_rc OUTPUT_VARIABLE ordinary_out ERROR_VARIABLE ordinary_err)
+  if(NOT ordinary_rc STREQUAL "0")
+    message(FATAL_ERROR "ordinary library mode failed against its temporary provider: ${ordinary_rc}: ${ordinary_out}${ordinary_err}")
+  endif()
+  library_assert_snapshot("${ordinary_root}" "${before_ordinary}")
+  file(READ "${ordinary_root}/build/library/results.csv" ordinary_report)
+  if(NOT ordinary_report MATCHES "SWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${LIBRARY_TRACK_SHA1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,metadata[.]identity,pass,synthetic:iso9660-known-answer,2026-11-12" OR
+     NOT ordinary_report MATCHES "SWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${LIBRARY_TRACK_SHA1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,boots@600,unknown,unavailable:boots@600," OR
+     NOT ordinary_report MATCHES "SWAY-00001,12481bed29c6c0d54a6f776ef5cec981,${LIBRARY_TRACK_SHA1},Schway Synthetic Metadata Fixture,ntsc-u,cue/bin,plays@600,unknown,unavailable:plays@600," OR
+     NOT ordinary_report MATCHES "unlisted,unavailable,unavailable,unavailable,unknown,cue/bin,metadata[.]identity,unknown,unavailable," OR
+     ordinary_report MATCHES "companion2352|PRIVATE_SENTINEL")
+    message(FATAL_ERROR "ordinary mode did not join known identity or keep an unlisted CUE/BIN private")
+  endif()
+
+  file(SHA256 "${ordinary_root}/build/library/results.csv" old_report)
+  file(WRITE "${duplicate_root}/discs/PRIVATE_SENTINEL_INVALID.bin" "not a raw 2048-sector image")
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${mirror_path}" sh
+      "${ordinary_root}/scripts/library.sh"
+    WORKING_DIRECTORY "${ordinary_root}"
+    RESULT_VARIABLE invalid_bin_rc OUTPUT_VARIABLE invalid_bin_out ERROR_VARIABLE invalid_bin_err)
+  if(invalid_bin_rc STREQUAL "0" OR invalid_bin_err MATCHES "PRIVATE_SENTINEL")
+    message(FATAL_ERROR "ordinary mode accepted or exposed an invalid standalone BIN")
+  endif()
+  file(SHA256 "${ordinary_root}/build/library/results.csv" actual_report)
+  if(NOT actual_report STREQUAL old_report)
+    message(FATAL_ERROR "ordinary mode replaced the previous report after an invalid BIN")
+  endif()
+  message(STATUS "library controls rejected unsafe configuration and joins without leaking or replacing results")
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_synthetic_identity")
   foreach(required WORK_ROOT TEST_BINARY RUN)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -638,7 +1011,33 @@ schway_warnings(schwaystation-test-probe)
 target_link_libraries(schwaystation-test-probe PRIVATE schwaystation-host)
 add_dependencies(schwaystation-test-probe schwaystation-run-test)
 
+add_executable(schwaystation-test-library ${CMAKE_CURRENT_LIST_DIR}/library_tests.c)
+set_target_properties(schwaystation-test-library PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-library)
+add_dependencies(schwaystation-test-library schwaystation-test-probe schwaystation-run-test)
+add_dependencies(schwaystation-test-library schwaystation-run)
+
 string(REPLACE ";" "|" schway__probe_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+
+# Fault prevented: library output losing an exact track and metadata identity join.
+schway_add_test(NAME compat.library.synthetic_result
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DTEST_PROBE=$<TARGET_FILE:schwaystation-test-probe>
+    -DLIBRARY_TEST=$<TARGET_FILE:schwaystation-test-library>
+    -DRUN=$<TARGET_FILE:schwaystation-run-test> -DCASE=library_synthetic_result
+    -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat library portable TIMEOUT 30)
+
+# Fault prevented: malformed configuration, joins or inputs replacing a private report.
+schway_add_test(NAME compat.library.controls
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DTEST_PROBE=$<TARGET_FILE:schwaystation-test-probe>
+    -DLIBRARY_TEST=$<TARGET_FILE:schwaystation-test-library>
+    -DRUN=$<TARGET_FILE:schwaystation-run-test>
+    -DPRODUCTION_RUN=$<TARGET_FILE:schwaystation-run> -DCASE=library_controls
+    -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat library portable TIMEOUT 60)
 
 # Fault prevented: a raw ISO probe reporting a different synthetic boot identity.
 schway_add_test(NAME compat.probe.synthetic_identity
