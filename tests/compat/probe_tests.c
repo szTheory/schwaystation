@@ -384,6 +384,7 @@ static int make_cue_edge_fixture(const char *cue_path, const char *mode)
                strcmp(mode, "cue_escape") == 0 ||
                strcmp(mode, "cue_missing") == 0 ||
                strcmp(mode, "cue_name_255") == 0 ||
+               strcmp(mode, "cue_name_255_no_companion") == 0 ||
                strcmp(mode, "cue_name_256") == 0 ||
                strcmp(mode, "cue_max_bytes") == 0 ||
                strcmp(mode, "cue_over_bytes") == 0) {
@@ -395,11 +396,15 @@ static int make_cue_edge_fixture(const char *cue_path, const char *mode)
             memcpy(file_name, "missing.bin", sizeof "missing.bin");
             create_companion = 0;
         } else if (strcmp(mode, "cue_name_255") == 0 ||
+                   strcmp(mode, "cue_name_255_no_companion") == 0 ||
                    strcmp(mode, "cue_name_256") == 0) {
-            size_t name_size = strcmp(mode, "cue_name_255") == 0 ? 255u : 256u;
+            int name_255 = strcmp(mode, "cue_name_256") != 0;
+            size_t name_size = name_255 ? 255u : 256u;
             memset(file_name, 'a', name_size);
-            if (name_size == 255u) memcpy(file_name + 251u, ".bin", 5u);
-            else {
+            if (name_255) {
+                memcpy(file_name + 251u, ".bin", 5u);
+                if (strcmp(mode, "cue_name_255_no_companion") == 0) create_companion = 0;
+            } else {
                 file_name[256] = '\0';
                 create_companion = 0;
             }

@@ -89,6 +89,11 @@ static void rcheevos_disc_md5(const char *boot_name, const uint8_t *file,
 static int path_inside(const char *root, const char *path)
 {
     size_t size = strlen(root);
+    int absolute = root[0] == '/' ||
+                   (size >= 3u &&
+                    ((root[0] >= 'A' && root[0] <= 'Z') ||
+                     (root[0] >= 'a' && root[0] <= 'z')) &&
+                    root[1] == ':' && root[2] == '/');
     if (size == 0u || path == NULL || strncmp(root, path, size) != 0 || path[size] != '/') {
         return 0;
     }
@@ -101,7 +106,7 @@ static int path_inside(const char *root, const char *path)
         if (end == NULL) break;
         part = end + 1u;
     }
-    return root[0] == '/';
+    return absolute;
 }
 
 static int metadata_sources_ready(const schway__probe_metadata_inputs *inputs,

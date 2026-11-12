@@ -271,7 +271,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 15  # Provisional: 404/405 tests at the old 5m job cap; movies ran 3m22 (run 43309540398)
+    timeout-minutes: 9  # Measured: run 43317211769 passed 405/405 in 4m06; movies took 2m32
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

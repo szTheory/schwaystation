@@ -97,8 +97,9 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < "$config"
 [ "$disc_seen" -eq 1 ] && [ "$bios_seen" -eq 1 ] && [ -n "$disc_dir" ] && [ -n "$bios_dir" ] ||
     fail 'configuration must set both directories'
+disc_dir=$(CDPATH= cd "$disc_dir" 2>/dev/null && pwd -P) || fail 'configured directory is unavailable'
+bios_dir=$(CDPATH= cd "$bios_dir" 2>/dev/null && pwd -P) || fail 'configured directory is unavailable'
 [ -d "$disc_dir" ] && [ -r "$disc_dir" ] && [ -d "$bios_dir" ] || fail 'configured directory is unavailable'
-disc_dir=$(CDPATH= cd "$disc_dir" && pwd -P)
 umask 077
 temporary=${TMPDIR:-/tmp}/schway-library-$$
 mkdir "$temporary" || fail 'cannot create temporary report'
