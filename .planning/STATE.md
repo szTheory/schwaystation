@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 49 of 55
+current_plan: 49 of 56
 status: executing
-stopped_at: Committed the 04-54 Windows path follow-up; 04-29 remains next and open
-last_updated: "2026-11-12T19:37:23.706Z"
+stopped_at: Planned focused 04-56 source prerequisites from the second hosted failure; 04-29 remains open
+last_updated: "2026-11-12T20:10:03Z"
 last_activity: 2026-11-12
-last_activity_desc: Added a narrow 04-54 follow-up for drive-rooted Windows CMake paths and .exe runners; focused compatibility controls pass 2/2. Native Windows CI remains pending; ordinal 49/55 and the open 04-29 next step are unchanged.
+last_activity_desc: Added 04-56 for portable disc opens and explicit ASan/fuzz fixture production; preserved 48 completed plans, next ordinal 49, and incomplete RetroArch acceptance. Timing diagnosis remains separate before the next hosted retry.
 state_head: cdf99341a9f0c0d3cc9038fc5bff2a33c4e9e00b
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 123
+  total_plans: 124
   completed_plans: 116
   percent: 50
 ---
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 49 of 55
-Status: 48 phase plans complete; seven remain. Plan 04-29 is incomplete (0/2 acceptance) and is next after its completed 04-54/04-55 prerequisites.
-Last activity: 2026-11-12 — Added a narrow 04-54 follow-up for drive-rooted Windows CMake paths and `.exe` runners; focused compatibility controls pass 2/2. Native Windows CI and 04-29's two RetroArch frames remain pending. Current ordinal 49/55 and the local RetroArch stop are unchanged.
+Current Plan: 49 of 56
+Status: 48 phase plans complete; eight remain. New 04-56 repairs source prerequisites before incomplete 04-29 (0/2 acceptance); 04-54/04-55 stay complete. Separate timing diagnosis precedes the next hosted retry.
+Last activity: 2026-11-12 — Planned portable disc opens and explicit ASan/fuzz fixture production from the second terminal hosted run. Zero-input replay succeeds with identical pictures and does not satisfy content acceptance. Native Windows/Linux sanitizer evidence, timing diagnosis and distinct Cross-driven RetroArch frames remain pending; the local RetroArch stop is unchanged.
 
 Progress: [█████░░░░░] 50%
 
@@ -608,10 +608,12 @@ come from `AGENTS.md`.
 
 | 2026-11-12 | /gsd-execute-plan 04-54 post-closeout follow-up | Codex/OpenGSD; sequential shared checkout; canonicalized drive-rooted CMake paths, retained `.exe` runner names and refusal controls; focused `compat.library` tests 2/2 passed; native Windows CI pending | gpt-6-luna xhigh |
 
+| 2026-11-12 | Phase 04 second hosted-run source prerequisite planning | Codex, OpenGSD 1.20.0; focused 04-56 and downstream DAG/checkpoint bookkeeping only; no execution advance or source/test run | gpt-6.1-sol high |
+
 ## Session Continuity
 
-Last session: 2026-11-12T19:37:23.125Z
-Stopped at: Committed the 04-54 Windows path follow-up; 04-29 remains next and open
+Last session: 2026-11-12T20:10:03Z
+Stopped at: Planned 04-56 source prerequisites; coordinator/checker next, with separate timing diagnosis before hosted retry and 04-29 acceptance still open
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 

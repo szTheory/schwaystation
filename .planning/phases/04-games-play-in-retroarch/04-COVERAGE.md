@@ -120,7 +120,7 @@ Original references above denote the complete ordered chains below. First IDs pr
 |04-26|04-26|
 |04-27|04-27, 04-43|
 |04-28|04-28, 04-44, 04-45|
-|04-29|04-54, 04-55, 04-29|
+|04-29|04-54, 04-55, 04-56, 04-29|
 |04-30|04-30, 04-46, 04-47, 04-48|
 |04-31|04-31|
 |04-32|04-32|
@@ -157,6 +157,17 @@ This focused amendment retains the complete four-source audit above; every other
 | --- | --- | --- | --- |
 | GOAL criteria 2/4/5 | Existing controller/metadata code must compile and register correctly before a normal hosted run can prove play and exact screenshots. Actual GCC/MSVC/configuration failures are preserved in 29 CHECKPOINT. | 54 → 55 → 29 | COVERED |
 | REQ GAME-03/GAME-07 | Four variants, two family-specific references, 300 frames each, all pixel/audio/state/mailbox/poll checks, analog packets and both-port motors remain intact. Active pixels retain poison canaries; only unread trailing fill work is removed. Actual macOS timeout is evidence, not a proved cause. | 54, 55; actual host proof remains 29 | COVERED |
-| REQ GAME-06 | Selected inventory controls compat inclusion; native/BE32 retain all cases and complete emulator arguments reach direct and shell-owned consumers. ASan/WASI exact inventories remain unchanged, with no fabricated fixtures. | 54 | COVERED |
+| REQ GAME-06 | Selected inventory controls compat inclusion; native/BE32 retain all cases and complete emulator arguments reach direct and shell-owned consumers. ASan/WASI exact directory rows remain unchanged; 56 explicitly enables the existing producer for real selected ASan/fuzz libretro consumers while standalone fixtures remain unselected. | 54, 56 | COVERED |
 | RESEARCH existing converter/host/inventory seams | Reuse packed callback/reference and existing CMake/portable helper patterns; no new dependency, gate, source subsystem or package. Hosted compiler/BE32/WASI acceptance is from the next combined changed-head run, never inferred locally. | 54, 55, 29 | COVERED |
 | CONTEXT D-13, D-19, D-21, D-23–D-25 | Preserve distinct 59/60 images with Cross at 60 and exact runner PNGs/empty BIOS; zero-input replay is diagnostic only. Respect local safety stop, 2700/300 budgets and existing job/case timeouts; measure work and actual timing without assuming speedup. | 54, 55, 29 | COVERED |
+
+## Second hosted-run prerequisite source audit
+
+| Source | Preserved contract and actual new evidence | Executable coverage | Status |
+| --- | --- | --- | --- |
+| GOAL criteria 4/5 | Strict Windows disc metadata and real ASan libretro content consumers must build before portable play can be claimed. Second run 43292417084 fails both prerequisites; actual zero-input replay does not close the distinct-frame goal. | 56 → 29 | COVERED |
+| REQ GAME-06/GAME-07 | Private binary disc opens preserve every refusal/identity control; all 74 normal standalone fixture cases and 18 ASan libretro cases remain selected exactly as before. Fixture bytes come from the existing real producer, explicitly enabled for asan/fuzz. | 56; 29 retains actual hosted play acceptance | COVERED |
+| RESEARCH existing producer/inventory/portable helper patterns | Reuse the pinned armips producer and private opener; separate production from standalone registration without new packages, pipelines, copied structures or skipped consumers. | 56 tasks 1–2 | COVERED |
+| CONTEXT D-19/D-23–D-25 | Preserve metadata privacy, real bounded host checks, no local RetroArch under the unresolved denial, 2700/300 budgets and truthful command/status/run evidence. Timing failure diagnosis is separate; executor-authored timeout values are not owner consent boundaries. | 56; 29 CHECKPOINT | COVERED |
+
+The existing full GOAL/REQ/RESEARCH/D-01–D-25 coverage above is unchanged; completed slices are not replanned. Deferred ideas remain excluded. Source plan completion does not claim hosted Windows/Linux sanitizer or Cross-at-60 acceptance.
