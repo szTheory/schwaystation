@@ -259,6 +259,13 @@ jobs:
           name: hashes-${{ matrix.os }}-${{ matrix.arch }}
           path: build/${{ matrix.preset }}/hashes.txt
           if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.os == 'macos' && matrix.arch == 'arm64'
+        with:
+          name: pad-counter-fixture
+          path: build/${{ matrix.preset }}/fixtures/pad_counter.exe
+          retention-days: 1
+          if-no-files-found: error
 
   asan:
     needs: [changes, openbios]
@@ -411,6 +418,10 @@ jobs:
         with:
           name: archives-macos-arm64
           path: build/archives
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pad-counter-fixture
+          path: build/fixtures
       - name: Core and runner from the build
         run: |
           unzip -q build/archives/schwaystation-libretro-macos-arm64.zip -d build/libretro
@@ -447,10 +458,26 @@ jobs:
         run: >-
           cmake -DCOMPARE=./compare -DEXPECTED=shot.bmp -DBMP=runner.bmp -DFLIPPED=flipped.bmp
           -P ../../tests/retroarch/flip.cmake
+      - name: Diagnostic replay recording and playback
+        run: >-
+          cmake -DRETROARCH=build/RetroArch.app/Contents/MacOS/RetroArch
+          -DCORE=build/libretro/cores/schwaystation_libretro.dylib -DINFO=build/libretro/info/schwaystation_libretro.info
+          -DTEMPLATE=tests/retroarch/test.cfg.in "-DRA_DIR=$PWD/build/ra-replay" -DFRAMES=60
+          "-DSHOT=$PWD/build/frames/replay" -DPROBE_CONTENT=build/fixtures/pad_counter.exe
+          -P tests/retroarch/run_retroarch.cmake
+      - name: The replay round trip preserves the captured frame
+        working-directory: build/frames
+        run: |
+          for f in replay.record replay.playback; do
+            sips --deleteColorManagementProperties "$f.png" > /dev/null
+            sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
+          done
+          ./compare replay.record.bmp replay.playback.bmp | tee replay-compare.txt
+          grep -q ', every pixel equal$' replay-compare.txt
       - name: RetroArch log
         if: failure()
-        run: cat build/ra/retroarch.log || true
-      # Both PNGs, so a failed compare's frame counter can be read.
+        run: cat build/ra/retroarch.log build/ra-replay/retroarch.log || true
+      # Captures from both comparisons aid diagnosis.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:

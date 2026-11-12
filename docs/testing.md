@@ -496,7 +496,7 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `be32` | The `be32` preset (`portable` tests) and uploads `hashes-be32`. | yes |
 | `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt` must be byte-identical. | yes |
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
-| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, `320x240, every pixel equal`, and the flipped-pixel control must fail naming `7,3`. | yes |
+| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel, `320x240, every pixel equal`, and the flipped-pixel control must fail naming `7,3`. It also runs a no-input content replay diagnostic. | yes |
 | `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, compared with the merge base in gate mode on pull requests. Manual runs measure both fixtures three times or compare `gpu_motion` with an explicit control commit. | yes |
 | `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
@@ -513,10 +513,18 @@ commit with a `# v` comment.
 `scripts/fetch-pin.sh NAME DEST` refuses a file whose digest differs.
 
 **A red retroarch job.** The job prints RetroArch's verbose log and uploads `retroarch-frames`, holding `shot.png`
-(RetroArch's screenshot) and `runner.png` (the runner's frame). The step output names the first differing pixel.
+(RetroArch's screenshot), `runner.png` (the runner's frame), and the replay diagnostic captures. The step output names
+the first differing pixel.
 Download the artifact with `gh run download <run id> -n retroarch-frames` and open both images. A size difference
 means the core reported another geometry; a whole-image difference with the same layout usually means RetroArch's
 frame and the runner's frame are not the same frame, which the test card's frame counter shows.
+
+The replay diagnostic downloads `pad-counter-fixture` as a separate one-day artifact, records 60 frames of
+`pad_counter.exe` to a run-local BSV, then replays it and compares the two captured images. Its isolated core
+options set `schwaystation_analog_mode = "digital"` because this guest speaks the five-byte digital SIO protocol;
+the core's default DualShock mode remains analog. This checks RetroArch's recorder/parser and core state support.
+The diagnostic uses no input, so it does not prove gameplay changed between frames or satisfy GAME-07's animated
+frame comparison.
 
 **Reproducing a red job.** Run the job's preset locally (`cmake --workflow --preset <name>`) and the same JUnit
 check. Lanes this host cannot run are listed above under "Lanes that need tools only CI has".

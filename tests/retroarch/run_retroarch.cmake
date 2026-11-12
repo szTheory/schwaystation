@@ -1,15 +1,4 @@
-# Runs the built libretro core in RetroArch, unattended and with no content,
-# and keeps the screenshot RetroArch takes after N frames.
-#
-#   cmake -DRETROARCH=<RetroArch.app/Contents/MacOS/RetroArch> -DCORE=<core>
-#         -DINFO=<.info> -DTEMPLATE=<test.cfg.in> -DRA_DIR=<run directory>
-#         -DFRAMES=<N> -DSHOT=<png> -P run_retroarch.cmake
-#
-# Fault prevented: a core that a real frontend cannot start, or whose frame
-# there differs from the one the library produces. RetroArch gets a home,
-# configuration and every directory inside RA_DIR, so nothing outside it is
-# read or written. The launch is bounded at 50 seconds; any failure prints
-# RetroArch's verbose log. Needs a GUI session: RetroArch opens a window.
+# Starts pinned RetroArch in an isolated home; PROBE_CONTENT round-trips replay.
 cmake_minimum_required(VERSION 3.25)
 foreach(var RETROARCH CORE INFO TEMPLATE RA_DIR FRAMES SHOT)
   if("${${var}}" STREQUAL "")
@@ -17,38 +6,67 @@ foreach(var RETROARCH CORE INFO TEMPLATE RA_DIR FRAMES SHOT)
   endif()
 endforeach()
 
-# A fresh run directory holding every directory test.cfg names, so
-# RetroArch never falls back to a default location for a missing one.
 file(REMOVE_RECURSE "${RA_DIR}")
 foreach(sub home assets cache cores info logs playlists saves shots states system)
   file(MAKE_DIRECTORY "${RA_DIR}/${sub}")
 endforeach()
 configure_file("${TEMPLATE}" "${RA_DIR}/test.cfg" @ONLY)
 file(COPY "${INFO}" DESTINATION "${RA_DIR}/info")
+if(NOT "${PROBE_CONTENT}" STREQUAL "")
+  file(WRITE "${RA_DIR}/retroarch-core-options.cfg" "schwaystation_analog_mode = \"digital\"\n")
+endif()
 file(REAL_PATH "${CORE}" core)
 file(REAL_PATH "${RETROARCH}" retroarch)
 get_filename_component(shot_dir "${SHOT}" DIRECTORY)
 file(MAKE_DIRECTORY "${shot_dir}")
-file(REMOVE "${SHOT}")
-
-# The macOS app creates first-run directories under its home folder even
-# when every configured path is redirected, so the child gets its own home
-# (HOME for POSIX calls, CFFIXED_USER_HOME for Foundation's).
-execute_process(
-  COMMAND "${CMAKE_COMMAND}" -E env "HOME=${RA_DIR}/home" "CFFIXED_USER_HOME=${RA_DIR}/home"
-    "${retroarch}" --verbose --config "${RA_DIR}/test.cfg" -L "${core}"
-    "--max-frames=${FRAMES}" --max-frames-ss "--max-frames-ss-path=${SHOT}"
-  RESULT_VARIABLE result
-  OUTPUT_VARIABLE log
-  ERROR_VARIABLE log
-  TIMEOUT 50)
-file(WRITE "${RA_DIR}/retroarch.log" "${log}")
-
-if(NOT result STREQUAL "0")
-  message(FATAL_ERROR "RetroArch exited with '${result}'. Its log:\n${log}")
+set(modes run)
+if(NOT "${PROBE_CONTENT}" STREQUAL "")
+  if(NOT EXISTS "${PROBE_CONTENT}")
+    message(FATAL_ERROR "run_retroarch: PROBE_CONTENT does not exist")
+  endif()
+  file(REAL_PATH "${PROBE_CONTENT}" probe_content)
+  set(modes record playback)
+  file(REMOVE "${SHOT}.record.png" "${SHOT}.playback.png")
+else()
+  file(REMOVE "${SHOT}")
 endif()
-if(NOT EXISTS "${SHOT}")
-  message(FATAL_ERROR "RetroArch wrote no screenshot at ${SHOT}. Its log:\n${log}")
+
+# The app also writes under HOME; redirect both home variables.
+foreach(mode IN LISTS modes)
+  set(run_shot "${SHOT}")
+  set(movie_args)
+  set(content_args)
+  if(mode STREQUAL "record")
+    set(run_shot "${SHOT}.record.png")
+    set(movie_args "--record-replay=${RA_DIR}/probe.bsv")
+    set(content_args "${probe_content}")
+  elseif(mode STREQUAL "playback")
+    set(run_shot "${SHOT}.playback.png")
+    set(movie_args "--play-replay=${RA_DIR}/probe.bsv")
+    set(content_args "${probe_content}")
+  endif()
+  execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env "HOME=${RA_DIR}/home" "CFFIXED_USER_HOME=${RA_DIR}/home"
+      "${retroarch}" --verbose --config "${RA_DIR}/test.cfg" -L "${core}"
+      ${movie_args} "--max-frames=${FRAMES}" --max-frames-ss "--max-frames-ss-path=${run_shot}" ${content_args}
+    RESULT_VARIABLE result OUTPUT_VARIABLE log ERROR_VARIABLE log TIMEOUT 50)
+  file(WRITE "${RA_DIR}/retroarch.log" "${log}")
+  if(NOT result STREQUAL "0")
+    message(FATAL_ERROR "RetroArch ${mode} exited with '${result}'. Its log:\n${log}")
+  endif()
+  if(NOT EXISTS "${run_shot}")
+    message(FATAL_ERROR "RetroArch wrote no screenshot at ${run_shot}. Its log:\n${log}")
+  endif()
+  file(SIZE "${run_shot}" size)
+  message(STATUS "RetroArch ${mode} ran ${FRAMES} frames and wrote ${run_shot} (${size} bytes)")
+endforeach()
+if(NOT "${PROBE_CONTENT}" STREQUAL "")
+  if(NOT EXISTS "${RA_DIR}/probe.bsv")
+    message(FATAL_ERROR "RetroArch created no replay file")
+  endif()
+  file(SIZE "${RA_DIR}/probe.bsv" size)
+  if(size EQUAL 0)
+    message(FATAL_ERROR "RetroArch created an empty replay file")
+  endif()
+  message(STATUS "RetroArch replay round trip used ${size} bytes")
 endif()
-file(SIZE "${SHOT}" size)
-message(STATUS "RetroArch ran ${FRAMES} frames and wrote ${SHOT} (${size} bytes)")

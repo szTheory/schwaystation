@@ -1,22 +1,14 @@
-# RetroArch configuration for the hosted retroarch job. run_retroarch.cmake
-# writes it with @RA_DIR@ replaced and starts RetroArch with --config on it,
-# so no other retroarch.cfg is read. Key names are those of RetroArch
-# 1.22.2's retroarch.cfg template; RetroArch ignores a key it does not know.
-
-# Never write this file back, never go fullscreen.
+# Isolated RetroArch 1.22.2 config; substitute @RA_DIR@ and disable writes/fullscreen.
 config_save_on_exit = "false"
 video_fullscreen = "false"
 
-# The screenshot is the core's own frame at the size the core reports: no
-# scaling, shader, aspect correction or on-screen text from the GPU path.
+# Capture the core frame without scaling or on-screen text.
 video_gpu_screenshot = "false"
 video_font_enable = "false"
 notification_show_autoconfig = "false"
 notification_show_remap_load = "false"
 notification_show_config_override_load = "false"
-
-# No sound device, and keep running when the window is not focused (the
-# default pauses it and the launch would time out).
+# No sound device; keep running when the window is unfocused.
 audio_driver = "null"
 audio_enable = "false"
 pause_nonactive = "false"
@@ -27,7 +19,6 @@ rgui_show_start_screen = "false"
 history_list_enable = "false"
 content_runtime_log = "false"
 log_to_file = "false"
-
 # Every directory RetroArch reads or writes is inside the run directory.
 assets_directory = "@RA_DIR@/assets"
 cache_directory = "@RA_DIR@/cache"
@@ -40,7 +31,5 @@ savestate_directory = "@RA_DIR@/states"
 screenshot_directory = "@RA_DIR@/shots"
 system_directory = "@RA_DIR@/system"
 log_dir = "@RA_DIR@/logs"
-
-# The macOS app unpacks its bundled assets into the user's RetroArch
-# directory on every launch unless this is off (measured with 1.22.2).
+# Prevent the macOS app from extracting bundled assets into the user's home.
 bundle_assets_extract_enable = "false"
