@@ -21,6 +21,17 @@
 #define SCHWAY__CUE_NAME_MAX 255u
 #define SCHWAY__CUE_TRACK_LIMIT 99u
 
+static FILE *disc_probe_open_readonly(const char *path)
+{
+#if defined(_MSC_VER)
+    FILE *file = NULL;
+    if (fopen_s(&file, path, "rb") != 0) return NULL;
+    return file;
+#else
+    return fopen(path, "rb");
+#endif
+}
+
 typedef struct schway__iso_source {
     FILE *file;
     FILE *track1_file;
@@ -639,7 +650,7 @@ static char *schway__cue_join_path(const char *cue_path, const char *name)
 static schway_host_disc_probe_status schway__cue_parse(const char *path,
                                                         schway__cue_manifest *manifest)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = disc_probe_open_readonly(path);
     long end = -1L;
     char *bytes;
     size_t size;
@@ -830,7 +841,7 @@ static schway_host_disc_probe_status schway__cue_file_sizes(
         long end;
         int failed;
         if (path == NULL) return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
-        file = fopen(path, "rb");
+        file = disc_probe_open_readonly(path);
         free(path);
         if (file == NULL) return SCHWAY_HOST_DISC_PROBE_CUE_IO;
         failed = fseek(file, 0L, SEEK_END) != 0;
@@ -924,7 +935,7 @@ static schway_host_disc_probe_status schway__cue_source(
     schway__cue_track *track = &manifest.tracks[selected];
     char *path = schway__cue_join_path(cue_path, manifest.files[track->file_index].name);
     if (path == NULL) return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
-    file = fopen(path, "rb");
+    file = disc_probe_open_readonly(path);
     free(path);
     if (file == NULL) return SCHWAY_HOST_DISC_PROBE_CUE_IO;
     if (fseek(file, 0L, SEEK_END) != 0 || (end = ftell(file)) < 0L ||
@@ -946,7 +957,7 @@ static schway_host_disc_probe_status schway__cue_source(
         source->file = NULL;
         return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
     }
-    source->track1_file = fopen(path, "rb");
+    source->track1_file = disc_probe_open_readonly(path);
     free(path);
     if (source->track1_file == NULL) {
         (void)fclose(source->file);
@@ -1017,7 +1028,7 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
         status = schway__cue_source(path, &source);
         if (status != SCHWAY_HOST_DISC_PROBE_OK) return status;
     } else {
-        file = fopen(path, "rb");
+        file = disc_probe_open_readonly(path);
         if (file == NULL) return SCHWAY_HOST_DISC_PROBE_NOT_ISO;
         if (fseek(file, 0L, SEEK_END) != 0 || (end = ftell(file)) < 0L) {
             (void)fclose(file);

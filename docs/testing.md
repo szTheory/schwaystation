@@ -264,9 +264,9 @@ the same file.
 
 The compatibility directory is included only when the selected inventory lists `compat`. The native CI and
 BE32 presets select `ci`, so they retain every compatibility case; ASan and WASI use inventories that omit it.
-The metadata probe uses a private read-only opener that calls `fopen_s` on MSVC and `fopen` elsewhere, without
-changing its input or failure behavior. Windows and GCC cross-compiler acceptance is established by the hosted
-matrix, not by a native configure.
+The runner and host disc probes use private read-only openers that call `fopen_s` on MSVC and `fopen` elsewhere,
+without changing their input or failure behavior. Windows and GCC cross-compiler acceptance is established by the
+hosted matrix, not by a native configure.
 
 Compatibility scripts prefix each raw helper and runner call with the complete `CMAKE_CROSSCOMPILING_EMULATOR`
 argument list. The shell library accepts one runner executable, so cross-emulated library checks use generated
