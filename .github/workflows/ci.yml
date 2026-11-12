@@ -181,6 +181,18 @@ jobs:
           - { runner: windows-11-arm, preset: ci-msvc, os: windows, arch: arm64 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          persist-credentials: false
+          repository: ${{ github.event.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: compat-base
+          sparse-checkout: |
+            scripts/compat-ratchet.sh
+            tests/cmake/compat-ratchet.cmake
+            tests/compat/ledger.csv
+          sparse-checkout-cone-mode: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
@@ -203,6 +215,9 @@ jobs:
           cmd /c "`"$vs\VC\Auxiliary\Build\vcvarsall.bat`" $arch && set" |
             ForEach-Object { if ($_ -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" >> $env:GITHUB_ENV } }
       - name: Build, test, package
+        env:
+          COMPAT_BASE_DIR: ${{ github.event_name == 'pull_request' && format('{0}/compat-base', github.workspace) || '' }}
+          COMPAT_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
         run: cmake --workflow --preset ${{ matrix.preset }}
       - name: Every test ran
         run: >-
