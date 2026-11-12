@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 46 of 53
+current_plan: 47 of 53
 status: executing
-stopped_at: Completed 04-44-PLAN.md
-last_updated: "2026-11-12T16:10:39.754Z"
+stopped_at: Completed 04-45-PLAN.md
+last_updated: "2026-11-12T16:56:55.651Z"
 last_activity: 2026-11-12
-last_activity_desc: Completed 04-44 libretro card persistence and memory descriptors; focused tests, full CI and release checks, and hygiene passed.
-state_head: ae6a56d80dc0c6b76496032816b112baf2c60029
+last_activity_desc: Completed 04-45 libretro metadata claims, PSEXE loading, and descriptor assertions; bounded full CI/release checks and hygiene passed.
+state_head: 946325b04ca24ec33d3e2a253e1c34653b7bc664
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 113
+  completed_plans: 114
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 46 of 53
-Status: Plan 04-44 complete. Eight phase plans remain.
-Last activity: 2026-11-12 — Added libretro card persistence and memory descriptors, then passed focused cases, full CI, release checks, and hygiene.
+Current Plan: 47 of 53
+Status: Plan 04-45 complete. Seven phase plans remain.
+Last activity: 2026-11-12 — Grounded functional libretro metadata claims in configure-time and host behavior tests; bounded CI, release checks, and hygiene passed.
 
 Progress: [█████░░░░░] 50%
 
@@ -174,6 +174,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P26 | 86min | 2 tasks | 11 files |
 | Phase 04 P28 | 92 min | 2 tasks | 5 files |
 | Phase 04 P44 | 50min | 2 tasks | 5 files |
+| Phase 04 P45 | 45min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -416,15 +417,42 @@ Recent decisions affecting current work:
 - [Phase 04]: The frontend owns card-one .srm writes; libretro exposes the stable SAVE_RAM span and does not write the file.
 - [Phase 04]: Card two uses GET_SAVE_DIRECTORY and the canonical content basename, with atomic persistence gated by a changed successful-write generation.
 - [Phase 04]: Memory descriptors map existing RAM and scratchpad spans with explicit aliases and are cleared with adapter lifetime.
+- [Phase 04]: Keep disk-control, cheats, save states, and subsystem claims false until their behavior exists.
+- [Phase 04]: Advertise PSEXE only after the shared loader passes a case-varied PSEXE fixture.
+- [Phase 04]: Back the input-descriptor claim with assertions for all mappings and their callback lifetime.
+- [Phase 04]: Preserve repository CI defaults and use an ignored four-job preset for local bounded verification.
 
 ### Pending Todos
-
-22 pending tooling/seed todos live in `.planning/todos/pending/`. Ship owns the
-gate-budget ratchet (018, completed at ship); the next test-helper caller in phase 2 plan 1 owns
-WR-01 (023). The CI tail completed the Windows ARM64 timeout sample (024),
-using the observed 198 s overrun and 10 successful ARM64 samples. Existing todos
-retain their bound plans and seed dispositions.
-
+- [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
+- [2026-10-20] [general] "Port the release floor check (release.floor)" — [todo file](.planning/todos/pending/002-release-floor-gate.md)
+- [2026-10-20] [general] "Port the pins file check (policy.pins)" — [todo file](.planning/todos/pending/003-pins-gate.md)
+- [2026-10-20] [general] "Port the single version source check (release.single_version_source)" — [todo file](.planning/todos/pending/004-single-version-source-gate.md)
+- [2026-10-20] [general] "Port the notice checks (policy.notices and release.notices)" — [todo file](.planning/todos/pending/005-notices-gates.md)
+- [2026-10-20] [general] "Port the vendored-file digest check (libretro.vendored)" — [todo file](.planning/todos/pending/006-vendored-digest-gate.md)
+- [2026-10-20] [general] "Add the Dependabot configuration" — [todo file](.planning/todos/pending/010-dependabot-config.md)
+- [2026-10-20] [general] "Add the Dependabot auto-merge workflow" — [todo file](.planning/todos/pending/011-dependabot-automerge-workflow.md)
+- [2026-10-20] [general] "Port the Dependabot auto-merge decision check" — [todo file](.planning/todos/pending/012-dependabot-gate.md)
+- [2026-10-20] [general] "Port the test-only key check" — [todo file](.planning/todos/pending/014-no-test-entries-gate.md)
+- [2026-10-20] [general] "Add the weekly digest workflow" — [todo file](.planning/todos/pending/015-digest-workflow.md)
+- [2026-10-20] [general] "Add the formatting check (hygiene.format)" — [todo file](.planning/todos/pending/016-hygiene-format-gate.md)
+- [2026-10-20] [general] "Add the static analyzer check (hygiene.analyzer)" — [todo file](.planning/todos/pending/017-hygiene-analyzer-gate.md)
+- [2026-10-20] [general] "Teach a local actionlint run the runner labels and queue key the workflows use" — [todo file](.planning/todos/pending/021-actionlint-local-config.md)
+- [2026-10-20] [general] "Triage the one-off install.consumer.dll_crt failure on windows-x64" — [todo file](.planning/todos/pending/022-windows-dll-crt-consumer-flake.md)
+- [2026-11-10] [general] "Raise an address error for a user-mode instruction fetch outside KUSEG" — [todo file](.planning/todos/pending/025-user-mode-fetch-address-error.md)
+- [2026-11-10] [general] "Validate r0 and the COP0 registers when a state loads" — [todo file](.planning/todos/pending/026-state-load-cop0-and-r0-validation.md)
+- [2026-11-10] [general] "Keep a valid cached word when a later refill word bus-errors" — [todo file](.planning/todos/pending/027-icache-refill-bus-error-word.md)
+- [2026-11-10] [general] "Stop the exception-loop heuristic reporting a guest that makes progress" — [todo file](.planning/todos/pending/028-exception-loop-progress-heuristic.md)
+- [2026-11-10] [general] "Zero the vector harness case record and reject doubly covered store bytes" — [todo file](.planning/todos/pending/033-vector-harness-uninitialised-record.md)
+- [2026-11-10] [general] "Reject a long file stem in the SST slice tool" — [todo file](.planning/todos/pending/035-sst-slice-name-field.md)
+- [2026-11-10] [general] "Refuse schway_load_exe on an instance that has already run" — [todo file](.planning/todos/pending/036-load-exe-after-run.md)
+- [2026-11-10] [general] "Decide the bus contract for SWL and SWR and pin it with a test" — [todo file](.planning/todos/pending/037-swl-swr-single-bus-write.md)
+- [2026-11-10] [general] "Model the two-instruction write-to-use latency of MTC2, CTC2 and LWC2" — [todo file](.planning/todos/pending/038-gte-write-to-use-latency.md)
+- [2026-11-10] [general] "The DMA fault record uses addr and opcode like every other fault kind" — [todo file](.planning/todos/pending/042-dma-fault-record-fields.md)
+- [2026-11-10] [general] "Share the register-lane helpers" — [todo file](.planning/todos/pending/044-lane-helpers-shared.md)
+- [2026-11-10] [general] "Put the ISC permission text in the src/gte.c header" — [todo file](.planning/todos/pending/046-gte-file-header-notice.md)
+- [2026-11-10] [general] "Select the 40-clock CD-ROM DMA cost from the CD-ROM delay setting" — [todo file](.planning/todos/pending/047-cd-dma-40-clock-cost.md)
+- [2026-11-10] [general] "Split long GPU pixel test cases" — [todo file](.planning/todos/pending/048-split-gpu-pixel-test-cases.md)
+- [2026-11-11] [general] "Review runner and checkpoint repeats against existing frame and state output" — [todo file](.planning/todos/pending/049-review-runner-checkpoint-repeats.md)
 ### Blockers/Concerns
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
@@ -564,11 +592,12 @@ come from `AGENTS.md`.
 | 2026-11-12 | Phase 04 complete-code budget approval implementation | Codex/OpenGSD; concrete 2700-line ceiling, preserved proposal and renewed efficiency authority; no plan advance | GPT-6 session |
 | 2026-11-12 | /gsd-execute-plan 04-28 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; per-port controller mapping, family-specific guest movies, analog DualShock and both-port rumble proof, full CI/release checks and hygiene | gpt-6-luna xhigh |
 | 2026-11-12 | /gsd-execute-plan 04-44 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; libretro card persistence and memory descriptors, full CI/release checks and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | /gsd-execute-plan 04-45 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; metadata truth guard, PSEXE host proof, input-descriptor assertions, bounded four-job CI/release checks, and hygiene | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-12T16:10:39.505Z
-Stopped at: Completed 04-44-PLAN.md
+Last session: 2026-11-12T16:56:55.293Z
+Stopped at: Completed 04-45-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
