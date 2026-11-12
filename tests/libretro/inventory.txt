@@ -1,3 +1,4 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+libretro.content.no_bios	libretro,portable
 libretro.host	libretro,portable
 libretro.host.pal	libretro,portable

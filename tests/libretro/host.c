@@ -176,11 +176,15 @@ static const char *option_value; /* what GET_VARIABLE answers */
 static bool option_updated;      /* what GET_VARIABLE_UPDATE answers, once */
 static unsigned av_info_calls;
 static struct retro_system_av_info av_info_sent;
+static unsigned geometry_calls;
+static struct retro_game_geometry geometry_sent;
 static unsigned video_calls, video_bad;
 static unsigned frame_w, frame_h;
 static uint32_t frame[MAX_W * MAX_H];
 static int16_t got_audio[MAX_PAIRS * 2u];
 static size_t got_pairs;
+static int content_test;
+static unsigned content_polls;
 
 /* got must equal want; prints both. */
 static void check_string(const char *what, const char *got, const char *want)
@@ -264,6 +268,10 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         av_info_calls++;
         memcpy(&av_info_sent, data, sizeof av_info_sent);
         return true;
+    case RETRO_ENVIRONMENT_SET_GEOMETRY:
+        geometry_calls++;
+        memcpy(&geometry_sent, data, sizeof geometry_sent);
+        return true;
     default:
         return false;
     }
@@ -312,14 +320,17 @@ static size_t RETRO_CALLCONV batch(const int16_t *data, size_t frames)
 
 static void RETRO_CALLCONV on_poll(void)
 {
+    if (content_test) {
+        content_polls++;
+    }
 }
 
 static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned index, unsigned id)
 {
-    (void)port;
-    (void)device;
-    (void)index;
-    (void)id;
+    if (content_test && port == 0u && device == RETRO_DEVICE_JOYPAD && index == 0u &&
+        id == RETRO_DEVICE_ID_JOYPAD_B && content_polls == 60u) {
+        return 1;
+    }
     return 0;
 }
 
@@ -485,13 +496,18 @@ int main(int argc, char **argv)
     size_t size;
     unsigned run, lo, other_lo;
     uint32_t region, other;
+    int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
 
-    if (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0)) {
-        fprintf(stderr, "usage: schwaystation-test-libretro-host <module> ntsc-u|pal\n");
+    if ((!content_mode &&
+         (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
+        (content_mode && argv[3][0] == '\0')) {
+        fprintf(stderr,
+                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe>\n");
         return 2;
     }
-    pal = strcmp(argv[2], "pal") == 0;
-    option_value = argv[2];
+    content_test = content_mode;
+    pal = !content_mode && strcmp(argv[2], "pal") == 0;
+    option_value = pal ? "pal" : "ntsc-u";
     region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
     /* The region a changed option switches to, and both regions' pairs per
        frame: 33,868,800 x 44,100 / (768 x 44,100) per second over the frame
@@ -530,12 +546,44 @@ int main(int argc, char **argv)
     p_get_system_info(&sys);
     check_string("library_name", sys.library_name, "schwaystation");
     check_string("library_version", sys.library_version, version);
-    check_string("valid_extensions", sys.valid_extensions, "");
+    if (!content_mode) {
+        check_string("valid_extensions", sys.valid_extensions, "exe");
+    }
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
     set_callbacks();
 
-    /* Content is refused; only the test card runs in this release. */
+    if (content_mode) {
+        unsigned red_pixel_seen = 0u;
+        memset(&game, 0, sizeof game);
+        game.path = argv[3];
+        CHECK_EQ_U64(p_load_game(&game), 1);
+        if (p_serialize_size() == 0u) {
+            module_close();
+            CHECK_DONE();
+        }
+        check_string("valid_extensions", sys.valid_extensions, "exe");
+        for (run = 1u; run <= 60u; run++) {
+            run_one();
+            if (frame_h > 100u && frame_w != 0u && frame[(size_t)100u * frame_w] == 0x00FF0000u) {
+                red_pixel_seen = 1u;
+            }
+        }
+        CHECK_EQ_U64(video_calls, 60u);
+        CHECK_EQ_U64(video_bad, 0u);
+        CHECK_EQ_U64(red_pixel_seen, 1u);
+        CHECK_EQ_U64(geometry_calls, 1u);
+        CHECK_EQ_U64(geometry_sent.base_width, frame_w);
+        CHECK_EQ_U64(geometry_sent.base_height, frame_h);
+        p_unload_game();
+        CHECK_EQ_U64(p_serialize_size(), 0u);
+        p_deinit();
+        module_close();
+        CHECK_DONE();
+    }
+
+    /* The selected content test is kept separate; normal modes exercise the
+       no-content test-card contract below. */
     memset(&game, 0, sizeof game);
     game.path = "game.cue";
     game.data = one_byte;

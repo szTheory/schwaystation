@@ -11,6 +11,7 @@ set_target_properties(schwaystation-test-libretro-host PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-libretro-host)
 add_dependencies(schwaystation-test-libretro-host schwaystation_libretro)
+add_dependencies(schwaystation-test-libretro-host schwaystation-fixtures)
 
 # Fault prevented: the core RetroArch loads shows a frame, rate, geometry or
 # audio length other than the library's, needs content to start, loses its
@@ -25,3 +26,10 @@ foreach(case IN ITEMS "libretro.host;ntsc-u" "libretro.host.pal;pal")
       $<TARGET_FILE:schwaystation_libretro> ${mode}
     LABELS libretro portable TIMEOUT 60)
 endforeach()
+
+# Fault prevented: a fullpath PS-EXE that cannot run with the built-in stub
+# kernel, or whose SIO input never changes the guest's independently known GPU pixel.
+schway_add_test(NAME libretro.content.no_bios
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> content-no-bios ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe
+  LABELS libretro portable TIMEOUT 120)
