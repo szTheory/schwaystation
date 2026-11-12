@@ -1,6 +1,6 @@
 # 04-40 OpenBIOS boot diagnosis
 
-**Status:** The POST, ATTR readback, and DMA4 request/continuation fixes are complete in plans 04-50, 04-51, and 04-52. The checked C-shell reaches GPU setup and enables interlaced display, but does not reach its first render because its VSync loop sees no GPUSTAT field transition. The frame remains black and no shell frame is accepted or pinned. Plan 04-40 is paused for a focused GPUSTAT field-status fix.
+**Status:** The POST, ATTR readback, DMA4 request/continuation and GPUSTAT field-status fixes are complete in plans 04-50 through 04-53. The checked C-shell now reaches an independently inspected cube frame at NTSC-U frame 240, and its native image hash is pinned in plan 04-40 tests. Current-head hosted portable verification is still required before plan 04-40 is complete. Earlier black-frame evidence below records the resolved blocker.
 
 ## Evidence
 
@@ -57,7 +57,7 @@ The project's DMA documentation states that sync mode 1 transfers exactly one BC
 
 Plan 04-52 added ATTR-driven DMA4 request/continuation through the existing deterministic channel-4 sink, preserving cost semantics. It completed request, per-block continuation, completion, reset, channel/mode, instance, and state controls, and documented the modeled FIFO/request behavior. See [04-52-SUMMARY.md](04-52-SUMMARY.md). It did not add SPU audio, sample RAM, voices, or hardware-timing claims. The fix passed the DMA wait on this checked BIOS; actual shell and portable-lane acceptance remain open.
 
-## Current shell blocker after DMA4 continuation
+## Historical shell blocker after DMA4 continuation
 
 The input remained the same supported C-shell image from the one-day `openbios-handoff` artifact, downloaded from successful run [43083684528](https://github.com/szTheory/schwaystation/actions/runs/43083684528). That run used an earlier head; it is usable for local boot diagnosis only. The image is exactly 524288 bytes with SHA-256 `92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8`. The pinned nugget revision remains `9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9`, built by the unchanged Linux GCC archive SHA-256 `228f031a25cf2687d8845fd1421f625bafc211fa27da428e458e80d030a726f8` with upstream's `OPENBIOS_SHELL=shell` option.
 
@@ -73,6 +73,18 @@ At the pinned nugget revision, [`shell/gpu.c::waitVSync`](https://github.com/pcs
 
 In `src/gpu.c`, `gpu_status()` never sets bit 31. It sets bit 13 only when display mode bit 5 is clear, so both bits remain zero in the shell's interlaced mode `0x27`. Preparation reference `.planning/preparation/PSX-GPU-AND-GTE.md`, section 1.3, defines bit 13 as ODE2 and bit 31 as ODE (odd line being drawn; frame-dependent in 480-line mode, line-dependent in 240-line mode, and zero during vertical blank). The display code already tracks field and beam position. This evidence isolates the defect to missing dynamic GPUSTAT field-status behavior; it does not support changing DMA4, CD-ROM, SPU, or the acceptance oracle.
 
-## Focused GPUSTAT re-slice proposal
+## Evidence that led to the 04-53 GPUSTAT fix
 
-Add the documented dynamic ODE/ODE2 status behavior using the existing instance-owned field, beam, and blank state, with no new serialized field or state revision. Add a GPUSTAT read regression that proves the interlaced field transition needed by `waitVSync`, plus progressive/blank controls to preserve current status behavior, and update `docs/hardware/gpu.md`. Candidate ownership is `src/gpu.c`, `tests/gpu/display.c` or `tests/gpu/gpu_tests.c`, `tests/gpu/tests.cmake`, `tests/gpu/inventory.txt`, and `docs/hardware/gpu.md`. Keep the model tied to the existing PSX-GPU-AND-GTE reference; make no new timing or audio claim. Focused implementation and controls are forecast at 20–28 minutes. Resume 04-40 only after this behavior is independently rechecked against the unchanged BIOS; do not pin a black frame or launch current-head portable acceptance before a recognizable shell is inspected.
+Plan 04-53 implemented the field-status behavior using existing instance-owned display state, without adding saved state. It passed its regression and unchanged-BIOS recheck; see [04-53-SUMMARY.md](04-53-SUMMARY.md).
+
+## Inspected shell frame after 04-53
+
+The unchanged C-shell image from the earlier one-day handoff at [run 43083684528](https://github.com/szTheory/schwaystation/actions/runs/43083684528) remains exactly 524288 bytes with SHA-256 `92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8`. That prior run's firmware is used here only for local diagnosis; it is not current-head hosted acceptance.
+
+The selected command `build/ci/schwaystation-run --region ntsc-u --bios /private/tmp/schwaystation-openbios-43083684528/openbios.bin --frames 240 --tty --hash --png 240:/private/tmp/schway-openbios-actual-240.png` exited 0. It reported `bios flags=loaded status=unknown region=unknown sha256=92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8` and frame hash `4d1f0ff260e2cf065ae0b7add4ba60353b2b01241dda8325309b5398ba00acec`. I independently viewed the 640x239 PNG: the shell is drawing its rotating 3D cube on the teal background. Frame 120 is edge-on and frame 180 only partly shows the cube, so 240 is the earliest inspected clearly recognizable shell frame. The inspected PNG digest is `2dd216c41430d7f86b8023c31a0b0ac73daa65fd9bfac37cfe9ad284fbbe405c`.
+
+The same command produced no host `tty ` lines. At the pinned source revision, `shell/tty.c` defaults `g_installTTY` to zero and uses its dummy console; `shell/main.c`'s startup text uses RAM syscall A0/3F. The runner's `--tty` captures the separate debug-port text path, so no output is expected and this is not a boot failure.
+
+The temporary post-53 GPU trace at frame 80 reports 255 GPU writes, 132489 GPUSTAT reads, display enabled in mode `0x27`, and 307200 nonzero VRAM bytes at 640x239. It includes the shell's environment and polygon/fill command stream. This register/VRAM progression and the independently viewed image support the shell identification; the image and temporary trace remain outside the repository.
+
+Local checks after adding the tracer exited 0: `cmake --preset ci`, `cmake --build --preset ci --target schwaystation-run`, `ctest --test-dir build/ci -R '^built\.openbios\.shell$' --no-tests=error --output-on-failure` (1.01 s), and the changed `runner.hashes_file` case (2.39 s). The lane hash output contains the pinned tuple `openbios shell ntsc-u frame 240 sha256 4d1f0ff260e2cf065ae0b7add4ba60353b2b01241dda8325309b5398ba00acec`. The local build used a temporary copy of the earlier exact-digest handoff; the same-head hosted portable run remains pending.

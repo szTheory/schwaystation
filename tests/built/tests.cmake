@@ -1,7 +1,72 @@
 # Run selected runner BIOS assertions as a script so tests can inspect both
 # captured output and the exact runner exit status without helper scripts.
 if(CMAKE_SCRIPT_MODE_FILE)
-  if(CASE STREQUAL "bios_runner")
+  if(CASE STREQUAL "openbios_shell")
+    foreach(var RUN BIOS EXPECTED_FILE REGION SHELL_FRAME SHELL_SHA256 TUPLE_FILE)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "OpenBIOS shell test requires ${var}")
+      endif()
+    endforeach()
+    file(REMOVE "${TUPLE_FILE}")
+    if(NOT EXISTS "${BIOS}" OR IS_DIRECTORY "${BIOS}")
+      message(FATAL_ERROR "OpenBIOS shell test requires the checked handoff")
+    endif()
+    file(SIZE "${BIOS}" bios_size)
+    file(SHA256 "${BIOS}" bios_digest)
+    file(READ "${EXPECTED_FILE}" expected_bios_digest)
+    string(STRIP "${expected_bios_digest}" expected_bios_digest)
+    if(NOT bios_size EQUAL 524288 OR NOT bios_digest STREQUAL expected_bios_digest)
+      message(FATAL_ERROR "OpenBIOS shell test refused unchecked input (${bios_size} bytes, ${bios_digest})")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --region "${REGION}" --bios "${BIOS}"
+      --frames "${SHELL_FRAME}" --tty --hash
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(NOT rc STREQUAL "0" OR
+       NOT output MATCHES "bios flags=loaded status=unknown region=unknown sha256=${expected_bios_digest}" OR
+       NOT output MATCHES "frame ${SHELL_FRAME} sha256 ${SHELL_SHA256}")
+      message(FATAL_ERROR "OpenBIOS shell frame did not match its checked native tuple: ${rc}: ${output}")
+    endif()
+    file(WRITE "${TUPLE_FILE}" "openbios shell ${REGION} frame ${SHELL_FRAME} sha256 ${SHELL_SHA256}\n")
+    message("${output}")
+    return()
+  elseif(CASE STREQUAL "openbios_shell_selector")
+    foreach(var RUN BIOS EXPECTED_FILE REGION)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "OpenBIOS selector test requires ${var}")
+      endif()
+    endforeach()
+    if(NOT EXISTS "${BIOS}" OR IS_DIRECTORY "${BIOS}")
+      message(FATAL_ERROR "OpenBIOS selector test requires the checked handoff")
+    endif()
+    file(SIZE "${BIOS}" bios_size)
+    file(SHA256 "${BIOS}" bios_digest)
+    file(READ "${EXPECTED_FILE}" expected_bios_digest)
+    string(STRIP "${expected_bios_digest}" expected_bios_digest)
+    if(NOT bios_size EQUAL 524288 OR NOT bios_digest STREQUAL expected_bios_digest)
+      message(FATAL_ERROR "OpenBIOS selector test refused unchecked input (${bios_size} bytes, ${bios_digest})")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --region "${REGION}" --bios "${BIOS}" --frames 1 --hash
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(NOT rc STREQUAL "0" OR
+       NOT output MATCHES "bios flags=loaded status=unknown region=unknown sha256=${expected_bios_digest}" OR
+       NOT output MATCHES "frame 1 sha256 [0-9a-f]+")
+      message(FATAL_ERROR "OpenBIOS region selector ${REGION} did not run with the checked image: ${rc}: ${output}")
+    endif()
+    return()
+  elseif(CASE STREQUAL "openbios_shell_not_applicable")
+    if(NOT DEFINED TUPLE_FILE OR "${TUPLE_FILE}" STREQUAL "")
+      message(FATAL_ERROR "OpenBIOS shell applicability result requires TUPLE_FILE")
+    endif()
+    file(REMOVE "${TUPLE_FILE}")
+    if("$ENV{CI}" STREQUAL "true")
+      message(FATAL_ERROR "OpenBIOS shell is required in CI, but the checked handoff is missing")
+    endif()
+    file(WRITE "${TUPLE_FILE}" "openbios shell ${REGION} frame ${SHELL_FRAME} not-applicable no-checked-handoff\n")
+    message("OpenBIOS shell: not-applicable because there is no local checked handoff")
+    return()
+  elseif(CASE STREQUAL "bios_runner")
     execute_process(COMMAND "${RUN}" --bios "${BIOS}" --frames 1 --tty
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     set(output "${out}${err}")
@@ -67,6 +132,8 @@ if(CMAKE_SCRIPT_MODE_FILE)
   endif()
   message(FATAL_ERROR "unknown built BIOS script case: ${CASE}")
 endif()
+
+include(${PROJECT_SOURCE_DIR}/tests/cmake/hashes.cmake)
 
 # This synthetic ROM contains only self-authored MIPS reset instructions. Its
 # exit-port write proves that the actual CLI copied and executed the supplied
@@ -227,6 +294,42 @@ if(NOT EXISTS "${openbios_handoff_input}")
   set(openbios_handoff_input "${openbios_fixture_path}")
   set(openbios_handoff_expected "${openbios_expected_path}")
 endif()
+
+set(openbios_shell_input "${PROJECT_BINARY_DIR}/openbios/openbios.bin")
+set(openbios_shell_tuple_file "${PROJECT_BINARY_DIR}/openbios-shell-tuple.txt")
+file(REMOVE "${openbios_shell_tuple_file}")
+if(NOT EXISTS "${openbios_shell_input}" AND "$ENV{CI}" STREQUAL "true")
+  message(FATAL_ERROR "CI must provide the same-run checked OpenBIOS handoff to the shell test")
+endif()
+# Fault prevented: a checked BIOS that no longer reaches its inspected shell frame.
+if(EXISTS "${openbios_shell_input}")
+  string(REPLACE ";" "$<SEMICOLON>" openbios_shell_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+  set(openbios_shell_cmd ${CMAKE_COMMAND}
+    "-DRUN=$<TARGET_FILE:schwaystation-run>"
+    "-DEMULATOR=${openbios_shell_emulator}"
+    "-DBIOS=${openbios_shell_input}"
+    "-DEXPECTED_FILE=${openbios_handoff_expected}"
+    "-DREGION=${SCHWAY_OPENBIOS_SHELL_REGION}"
+    "-DSHELL_FRAME=${SCHWAY_OPENBIOS_SHELL_FRAME}"
+    "-DSHELL_SHA256=${SCHWAY_OPENBIOS_SHELL_SHA256}"
+    "-DTUPLE_FILE=${openbios_shell_tuple_file}"
+    -DCASE=openbios_shell -P ${CMAKE_CURRENT_LIST_FILE})
+  schway_add_test(NAME built.openbios.shell
+    COMMAND ${openbios_shell_cmd}
+    LABELS bios portable runner TIMEOUT 30
+    PASS_REGEX "frame ${SCHWAY_OPENBIOS_SHELL_FRAME} sha256 ${SCHWAY_OPENBIOS_SHELL_SHA256}")
+else()
+  schway_add_test(NAME built.openbios.shell
+    COMMAND ${CMAKE_COMMAND}
+      "-DTUPLE_FILE=${openbios_shell_tuple_file}"
+      "-DREGION=${SCHWAY_OPENBIOS_SHELL_REGION}"
+      "-DSHELL_FRAME=${SCHWAY_OPENBIOS_SHELL_FRAME}"
+      -DCASE=openbios_shell_not_applicable -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS bios portable runner TIMEOUT 10
+    PASS_REGEX "not-applicable because there is no local checked handoff")
+endif()
+
+cmake_language(DEFER CALL set_tests_properties runner.hashes_file PROPERTIES DEPENDS built.openbios.shell)
 
 # Fault prevented: a consumer using a missing or altered artifact from another
 # run instead of this run's digest-checked OpenBIOS handoff.

@@ -356,6 +356,11 @@ facts in the pinned libretro `System.dat` rows in [ASSET_POLICY.md](../ASSET_POL
 are retained as source metadata. The core does not infer SHA-256 from either DAT digest. Unknown images and OpenBIOS
 remain loadable and report unknown recognition.
 
+The host selects and reads the image, then supplies its bytes to `schway_load_bios`; the core opens no BIOS path.
+OpenBIOS is used as a checked CI handoff and is not included in the library, runner, libretro core or release
+archives. Loading it therefore leaves the retail-recognition flag clear and reports unknown status, regardless of
+the source file's name.
+
 The original 40-byte `schway_bios_info` prefix remains valid for callers built before status and region were added.
 When such a caller sets `size` to 40, the core writes through `sha256` and leaves the appended fields untouched.
 

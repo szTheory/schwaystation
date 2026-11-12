@@ -68,6 +68,17 @@ The repository does not include BIOS files. For example, a user can pass a BIOS 
 schwaystation-run --bios ./bios.bin --frames 600 --tty
 ```
 
+The checked OpenBIOS shell used by CI is an unknown image, so the runner reports the same unknown flags. The host
+chooses the image with `--bios` and the machine profile with `--region`; it may inspect the shell's 240th NTSC-U
+frame with:
+
+```sh
+schwaystation-run --region ntsc-u --bios ./openbios.bin --frames 240 --hash --png 240:openbios-shell.png
+```
+
+That public development image is a one-day CI handoff, not part of a runner, library or libretro package. A matching
+digest identifies the supplied bytes independently of the path used to name them.
+
 Without `--frames` or `--bench`, the runner allows 600 frames for BIOS startup. `--tty` enables the debug ports and
 prints text or a nonzero exit-port result. `--stop-on mailbox`, `--trace first-fault` and `--no-stop-on-fault` remain
 PS-EXE options. The separate `--exe FILE` path continues to run without a BIOS file, using the core's stub kernel.
