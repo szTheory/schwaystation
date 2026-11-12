@@ -19,6 +19,7 @@
 
 #include "libretro.h"
 #include "schwaystation.h"
+#include "cards.h"
 #include "xrgb8888.h"
 
 /* The largest display the GPU scans out: 640 dots by 480 lines NTSC or 576
@@ -29,6 +30,8 @@
 #define LR_MAX_H_PAL 576u
 #define LR_EXE_HEADER 0x800u
 #define LR_EXE_MAX_BYTES (LR_EXE_HEADER + 2u * 1024u * 1024u)
+#define LR_CARD_PATH_CAP 4096u
+#define LR_MEMORY_DESCRIPTOR_COUNT 6u
 #define LR_BIOS_KEY "schwaystation_bios"
 #define LR_ANALOG_MODE_KEY "schwaystation_analog_mode"
 #define LR_ANALOG_TOGGLE_KEY "schwaystation_analog_toggle"
@@ -51,6 +54,11 @@ static schway_info info;
 static uint32_t *pixels;
 static int16_t *samples;
 static unsigned geometry_width, geometry_height;
+static char lr_card2_path[LR_CARD_PATH_CAP];
+static uint64_t lr_card2_saved_generation;
+static struct retro_memory_descriptor lr_memory_descriptors[LR_MEMORY_DESCRIPTOR_COUNT];
+static struct retro_memory_map lr_memory_map;
+static int lr_memory_map_registered;
 static struct retro_rumble_interface lr_rumble;
 static unsigned lr_controller_devices[2] = {RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG};
 static uint8_t lr_analog_mode = 1u;
@@ -199,9 +207,150 @@ static void lr_acquire_rumble(void)
     }
 }
 
+static void lr_card2_flush(void)
+{
+    schway_span card;
+    uint64_t generation;
+    if (inst == NULL || lr_card2_path[0] == '\0' ||
+        schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &generation) != SCHWAY_STATUS_OK ||
+        generation == lr_card2_saved_generation ||
+        schway_get_memory(inst, SCHWAY_MEMORY_CARD2, &card) != SCHWAY_STATUS_OK ||
+        card.size != SCHWAY_MEMCARD_SIZE) {
+        return;
+    }
+    if (schway_host_card_save_atomic(lr_card2_path, card.data, card.size) ==
+        SCHWAY_HOST_CARD_OK) {
+        lr_card2_saved_generation = generation;
+    }
+}
+
+static void lr_memory_map_clear(void)
+{
+    if (lr_memory_map_registered && env_cb != NULL) {
+        struct retro_memory_map empty = {NULL, 0u};
+        (void)env_cb(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &empty);
+    }
+    memset(lr_memory_descriptors, 0, sizeof lr_memory_descriptors);
+    memset(&lr_memory_map, 0, sizeof lr_memory_map);
+    lr_memory_map_registered = 0;
+}
+
+static void lr_memory_descriptor_set(unsigned index, uint64_t flags, void *ptr, size_t start,
+                                     size_t select, size_t disconnect, size_t length)
+{
+    struct retro_memory_descriptor *descriptor = &lr_memory_descriptors[index];
+    descriptor->flags = flags;
+    descriptor->ptr = ptr;
+    descriptor->offset = 0u;
+    descriptor->start = start;
+    descriptor->select = select;
+    descriptor->disconnect = disconnect;
+    descriptor->len = length;
+    descriptor->addrspace = "PSX";
+}
+
+/* The instance owns mutable bytes; the public span is read-only but libretro
+   exposes the same live storage through its writable memory API. */
+static void *lr_memory_mutable_pointer(const void *data)
+{
+    return (void *)(uintptr_t)data;
+}
+
+static void lr_memory_map_register(void)
+{
+    static const size_t ram_starts[3] = {0u, (size_t)0x80000000u, (size_t)0xA0000000u};
+    static const size_t scratch_starts[2] = {(size_t)0x1F800000u, (size_t)0x9F800000u};
+    schway_span ram, scratchpad;
+    if (inst == NULL ||
+        schway_get_memory(inst, SCHWAY_MEMORY_RAM, &ram) != SCHWAY_STATUS_OK ||
+        schway_get_memory(inst, SCHWAY_MEMORY_SCRATCHPAD, &scratchpad) != SCHWAY_STATUS_OK ||
+        ram.size != 0x200000u || scratchpad.size != 0x400u) {
+        return;
+    }
+    for (unsigned i = 0u; i < 3u; i++) {
+        lr_memory_descriptor_set(i, RETRO_MEMDESC_SYSTEM_RAM,
+                                 lr_memory_mutable_pointer(ram.data), ram_starts[i],
+                                 ~(size_t)0x007FFFFFu, 0x00600000u, ram.size);
+    }
+    for (unsigned i = 0u; i < 2u; i++) {
+        lr_memory_descriptor_set(3u + i, 0u, lr_memory_mutable_pointer(scratchpad.data),
+                                 scratch_starts[i],
+                                 ~(size_t)0x3FFu, 0u, scratchpad.size);
+    }
+    lr_memory_descriptor_set(5u, 0u, NULL, 0u, (size_t)0xFFFFFFFFu, 0u, 0u);
+    lr_memory_map.descriptors = lr_memory_descriptors;
+    lr_memory_map.num_descriptors = LR_MEMORY_DESCRIPTOR_COUNT;
+    if (env_cb != NULL) {
+        lr_memory_map_registered =
+            env_cb(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &lr_memory_map) ? 1 : 0;
+    }
+}
+
+static int lr_card2_path_for_game(const struct retro_game_info *game,
+                                  char path[LR_CARD_PATH_CAP])
+{
+    const char *save_directory = NULL;
+    const char *basename;
+    const char *extension;
+    char content_name[64];
+    char card_one[LR_CARD_PATH_CAP];
+    size_t name_size;
+    if (game == NULL || game->path == NULL || env_cb == NULL ||
+        !env_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &save_directory) ||
+        save_directory == NULL || save_directory[0] == '\0') {
+        return 0;
+    }
+    basename = game->path;
+    for (const char *scan = game->path; *scan != '\0'; scan++) {
+        if (*scan == '/' || *scan == '\\') {
+            basename = scan + 1;
+        }
+    }
+    extension = strrchr(basename, '.');
+    if (extension == NULL || extension == basename) {
+        return 0;
+    }
+    name_size = (size_t)(extension - basename);
+    if (name_size == 0u || name_size >= sizeof content_name) {
+        return 0;
+    }
+    memcpy(content_name, basename, name_size);
+    content_name[name_size] = '\0';
+    return schway_host_card_paths_for_basename(save_directory, content_name, card_one,
+                                                sizeof card_one, path, LR_CARD_PATH_CAP) ==
+           SCHWAY_HOST_CARD_OK;
+}
+
+static void lr_card2_load(const char *path)
+{
+    uint8_t *bytes;
+    uint64_t generation = 0u;
+    if (inst == NULL || path == NULL || path[0] == '\0') {
+        return;
+    }
+    bytes = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    if (bytes == NULL) {
+        return;
+    }
+    if (schway_host_card_import_file(path, bytes, SCHWAY_MEMCARD_SIZE, NULL) ==
+            SCHWAY_HOST_CARD_OK &&
+        schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, bytes, SCHWAY_MEMCARD_SIZE) !=
+            SCHWAY_STATUS_OK) {
+        free(bytes);
+        return;
+    }
+    free(bytes);
+    memcpy(lr_card2_path, path, strlen(path) + 1u);
+    if (schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &generation) == SCHWAY_STATUS_OK) {
+        lr_card2_saved_generation = generation;
+    }
+}
+
 /* Destroys the instance and frees the frame buffer. */
 static void lr_unload(void)
 {
+    lr_card2_flush();
+    lr_memory_map_clear();
     if (inst != NULL) {
         lr_clear_rumble();
     }
@@ -222,6 +371,8 @@ static void lr_unload(void)
     samples = NULL;
     geometry_width = 0u;
     geometry_height = 0u;
+    lr_card2_path[0] = '\0';
+    lr_card2_saved_generation = 0u;
     memset(&info, 0, sizeof info);
 }
 
@@ -843,6 +994,10 @@ bool retro_load_game(const struct retro_game_info *game)
     schway_exe_info exe_info;
     uint8_t *bios = NULL;
     size_t bios_size = 0u;
+    char card2_path[LR_CARD_PATH_CAP];
+    int have_card2_path = 0;
+
+    card2_path[0] = '\0';
 
     lr_acquire_rumble();
     lr_refresh_input_options();
@@ -861,6 +1016,7 @@ bool retro_load_game(const struct retro_game_info *game)
             free(exe);
             return false;
         }
+        have_card2_path = lr_card2_path_for_game(game, card2_path);
     } else {
         const char *bios_name = lr_option_bios();
         if (strcmp(bios_name, "none") != 0) {
@@ -880,6 +1036,9 @@ bool retro_load_game(const struct retro_game_info *game)
         free(bios);
         return false;
     }
+    if (have_card2_path) {
+        lr_card2_load(card2_path);
+    }
     if (game != NULL) {
         schway_status status = schway_load_exe(inst, exe, exe_size);
         free(exe);
@@ -895,6 +1054,7 @@ bool retro_load_game(const struct retro_game_info *game)
             return false;
         }
     }
+    lr_memory_map_register();
     return true;
 }
 
@@ -919,15 +1079,31 @@ unsigned retro_get_region(void)
     return info.region == SCHWAY_REGION_PAL ? RETRO_REGION_PAL : RETRO_REGION_NTSC;
 }
 
-/* L9085: no memory regions are exposed in this release. */
+static int lr_memory_span(unsigned id, schway_span *span)
+{
+    uint32_t memory;
+    if (inst == NULL || span == NULL) {
+        return 0;
+    }
+    if (id == RETRO_MEMORY_SAVE_RAM) {
+        memory = SCHWAY_MEMORY_CARD1;
+    } else if (id == RETRO_MEMORY_SYSTEM_RAM) {
+        memory = SCHWAY_MEMORY_RAM;
+    } else {
+        return 0;
+    }
+    return schway_get_memory(inst, memory, span) == SCHWAY_STATUS_OK;
+}
+
+/* L9085: frontend SAVE_RAM is card 1; the system memory API reports main RAM. */
 void *retro_get_memory_data(unsigned id)
 {
-    (void)id;
-    return NULL;
+    schway_span span;
+    return lr_memory_span(id, &span) ? lr_memory_mutable_pointer(span.data) : NULL;
 }
 
 size_t retro_get_memory_size(unsigned id)
 {
-    (void)id;
-    return 0u;
+    schway_span span;
+    return lr_memory_span(id, &span) ? span.size : 0u;
 }

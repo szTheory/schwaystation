@@ -346,6 +346,25 @@ buffer. It announces `SET_GEOMETRY` from `retro_run` only when frame dimensions 
 reserved for a region change that changes the reported rate. A malformed or out-of-range native frame is dropped
 before it changes geometry state or reaches the video callback.
 
+### Libretro memory and cards
+
+While a game is loaded, `RETRO_MEMORY_SAVE_RAM` exposes card 1 as its stable 131,072-byte instance span.
+`RETRO_MEMORY_SYSTEM_RAM` exposes the 2 MiB main RAM span. Their pointers remain valid until unload or deinit.
+The core does not write card 1's `.srm` file; the frontend owns that file.
+
+For fullpath PS-EXE content, the adapter asks `GET_SAVE_DIRECTORY` for the save location and uses the filename
+without `.exe` as the card basename. Card 2 loads from `<basename>.1.mcr`; a missing or rejected image leaves the
+instance's blank card in place. After a successful guest card write changes its generation, unload and deinit
+persist card 2 through the host's atomic card-file helper. An unchanged generation causes no write. If the save
+directory callback or a usable directory is absent, the game still runs and card 2 stays in memory for that session.
+Card bytes and generations remain outside ordinary save states.
+
+The registered `PSX` memory map describes the 2 MiB RAM span at physical `00000000h`, cached `80000000h` and
+uncached `A0000000h` addresses. Bits 21–22 are disconnected mirror bits; the region selector ignores those bits
+and the in-region byte offset. The 1 KiB scratchpad is mapped at `1F800000h` and its cached alias `9F800000h`;
+there is no scratchpad descriptor at `BF800000h`. Descriptor pointers refer to existing instance spans and remain
+valid for the loaded game. Unmapped holes remain outside a descriptor.
+
 The loader writes the text segment at its physical address and a 16-byte launch block at `0200h` of RAM: the entry
 point, the global pointer, the stack address and the stack size as four little-endian words. It writes nothing else.
 

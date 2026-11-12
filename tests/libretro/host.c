@@ -1033,7 +1033,9 @@ static int test_memory_aliases(void)
 
     CHECK_EQ_U64(p_load_game(NULL), 1u);
     CHECK(memory_map_calls > 0u);
-    CHECK_EQ_U64(memory_descriptor_count, 5u);
+    CHECK_EQ_U64(memory_descriptor_count, 6u);
+    CHECK(memory_descriptors[5].ptr == NULL);
+    CHECK_EQ_U64(memory_descriptors[5].select, (size_t)0xFFFFFFFFu);
     system_ram = p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
     CHECK(system_ram != NULL);
     CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 2u * 1024u * 1024u);
@@ -1051,7 +1053,7 @@ static int test_memory_aliases(void)
         CHECK(mirror_first != NULL && mirror_first->ptr == system_ram);
         CHECK(mirror_last != NULL && mirror_last->ptr == system_ram);
         CHECK_EQ_U64(first != NULL ? first->disconnect : 0u, 0x00600000u);
-        CHECK_EQ_U64(first != NULL ? first->select : 0u, ~(size_t)0x00600000u);
+        CHECK_EQ_U64(first != NULL ? first->select : 0u, ~(size_t)0x007FFFFFu);
     }
 
     CHECK(resolve_memory_address((size_t)0x00800000u, &(size_t){0u}) == NULL);
