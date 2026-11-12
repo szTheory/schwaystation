@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 42 of 53
+current_plan: 43 of 53
 status: executing
-stopped_at: "Completed 04-49-PLAN.md; runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh"
-last_updated: "2026-11-12T06:24:09.388Z"
+stopped_at: "Completed 04-42-PLAN.md; runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh"
+last_updated: "2026-11-12T07:08:02.140Z"
 last_activity: 2026-11-12
 last_activity_desc: Completed plan 04-25 bounded raw ISO identity probe with full CI and hygiene; next ordinal is plan 04-49 in wave 33.
-state_head: 3633e27267fbad55d6e099cd96c79b694fe233e0
+state_head: c3b09a69127b15e4225e4066b0458dd9cc83305f
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 109
+  completed_plans: 110
   percent: 50
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 42 of 53
+Current Plan: 43 of 53
 Status: Plan 04-49 complete; 12 phase plans remain incomplete.
 Last activity: 2026-11-12 — Completed bounded CUE/BIN identity probing; CI and hygiene passed. Runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh.
 
@@ -170,6 +170,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P43 | 31min | 2 tasks | 5 files |
 | Phase 04 P25 | 37min | 2 tasks | 8 files |
 | Phase 04 P49 | 38min | 2 tasks | 7 files |
+| Phase 04 P42 | 40min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -399,6 +400,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep CUE parsing in the runner's host-only probe; it does not execute a disc or add CD-ROM behavior.
 - [Phase 04]: Cap each CUE sheet at 64 KiB, tracks and total indexes at 99, relative FILE names at 255 bytes, and companion image bytes together at 1 GiB.
 - [Phase 04]: Preserve boot_status and play_status as unavailable because the probe only reports identity.
+- [Phase 04]: Expose a disc serial, boot MD5, physical track-1 SHA-1 and DAT title only for an exact passing metadata.identity ledger row.
+- [Phase 04]: Keep boot_status and play_status unknown; the probe does not execute a disc.
+- [Phase 04]: Use the pinned libretro-database PlayStation DAT only as an attributed title source; do not vendor it or add a package.
+- [Phase 04]: Keep test metadata arguments in a dedicated non-installed test runner and require an isolated root and marker file.
 
 ### Pending Todos
 
@@ -546,8 +551,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-12T06:24:08.881Z
-Stopped at: Completed 04-49-PLAN.md; runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh
+Last session: 2026-11-12T07:08:01.881Z
+Stopped at: Completed 04-42-PLAN.md; runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
