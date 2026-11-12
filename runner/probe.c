@@ -15,6 +15,17 @@
 #define EXE_HEADER 0x800u
 #define EXE_MAX (EXE_HEADER + 0x200000u) /* the validator's largest file */
 
+static FILE *probe_open_readonly(const char *path)
+{
+#if defined(_MSC_VER)
+    FILE *file = NULL;
+    if (fopen_s(&file, path, "rb") != 0) return NULL;
+    return file;
+#else
+    return fopen(path, "rb");
+#endif
+}
+
 /* Writes text with every byte outside printable ASCII shown as '?', so a
    hostile name cannot add a line or a control sequence to the report. */
 static void put_text(FILE *f, const char *text)
@@ -104,7 +115,7 @@ static int metadata_sources_ready(const schway__probe_metadata_inputs *inputs,
         !path_inside(inputs->root, inputs->ledger) ||
         !path_inside(inputs->root, inputs->dat) || !path_inside(inputs->root, inputs->config) ||
         !path_inside(inputs->root, image)) return 0;
-    file = fopen(inputs->config, "rb");
+    file = probe_open_readonly(inputs->config);
     if (file == NULL) return 0;
     int ok = fgets(line, sizeof line, file) != NULL &&
              strcmp(line, "schwaystation-test-metadata-v1\n") == 0 &&
@@ -146,7 +157,7 @@ static int dat_value(char *line, const char *key, char *value, size_t capacity)
 
 static int dat_title_for_serial(const char *path, const char *wanted, char title[256])
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = probe_open_readonly(path);
     char line[4097];
     char name[256] = "";
     char serial[64] = "";
@@ -208,7 +219,7 @@ static int ledger_matches(const char *path, const char *serial, const char *md5,
 {
     static const char header[] =
         "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date";
-    FILE *file = fopen(path, "rb");
+    FILE *file = probe_open_readonly(path);
     char line[2048];
     unsigned row = 0u;
     int matched = 0;
@@ -273,7 +284,7 @@ static int metadata_identity(const schway__probe_metadata_inputs *inputs, const 
 
 uint8_t *schway__read_exe_file(const char *path, size_t *n_out)
 {
-    FILE *f = fopen(path, "rb");
+    FILE *f = probe_open_readonly(path);
     if (f == NULL) {
         refuse("input", "cannot open the file");
         return NULL;

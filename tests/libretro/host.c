@@ -1920,7 +1920,9 @@ static void check_movie_pixels(unsigned variant, unsigned frame_index)
     if (variant == 1u && frame_index >= 60u) {
         pressed = 1u;
     } else if (variant == 2u) {
-        pressed = (frame_index >= 60u) + (frame_index >= 100u) + (frame_index >= 120u);
+        pressed = (frame_index >= 60u ? 1u : 0u) +
+                  (frame_index >= 100u ? 1u : 0u) +
+                  (frame_index >= 120u ? 1u : 0u);
     } else if (variant == 3u && frame_index >= 60u) {
         pressed = 1u;
     }
