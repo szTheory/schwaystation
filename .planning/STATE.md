@@ -636,3 +636,7 @@ Continue `/gsd-autonomous --from 4` with planning, execution, review and verific
 ### Independent local work during immutable CI (2026-11-12)
 
 Codex coordinator / inherited parent model: plan29 explicitly acknowledged monitor-only ownership of run43321926969 at ea3ec542, with no active local command or source/shared metadata work. Plan30's edge to29 was sequencing only; its existing VRAM/runner/PNG interfaces and other prerequisites are complete, and its GPU inventory/runner-main/doc source paths do not overlap the monitor. Remove only that edge and run30 as the single local writer. Plan29 metadata closeout waits for the safe writer handoff; this old-head run does not verify30 or replace final current-source verification. Actual progress remains49/56 summaries until another terminal summary exists.
+
+### Hardware-reference writer handoff (2026-11-12)
+
+Codex coordinator / inherited parent model: plan30 returned terminal complete at3bdad2b; actual progress50/56 summaries, next ordinal51. Plan29 explicitly retains monitor-only ownership of the Windows diagnostic and /tmp findings with no local source/shared metadata writes. Plan46 is the sole local writer using the evidence-backed host-Python input-adapter/C per-word-comparison seam. Old dispatched CI/diagnostic heads do not verify46 or replace final current-source verification.
