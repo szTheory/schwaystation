@@ -466,7 +466,7 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `changes` | Lists the pull request's files. `heavy=false` only when every path is under `.planning/`; then the build jobs skip. | yes |
 | `hygiene` | The `hygiene` preset and its JUnit check. | yes |
 | `title` | `scripts/check-title.sh` on the pull request's live title and body (pull requests only). | yes |
-| `build` | The `ci` preset on `ubuntu-26.04`, `ubuntu-26.04-arm`, `macos-15` and `macos-15-intel`, `ci-msvc` on `windows-2025` and `windows-11-arm`. Both JUnit checks (all but `release`, then `release`), the README install line and its flipped-byte control on macOS arm64, then uploads `archives-<os>-<arch>` (the three zips and `commit.txt`) and `hashes-<os>-<arch>`. | yes |
+| `build` | The `ci` preset on `ubuntu-26.04`, `ubuntu-26.04-arm`, `macos-15` and `macos-15-intel`, `ci-msvc` on `windows-2025` and `windows-11-arm`. Pull requests also check out the exact base SHA's compatibility files before the head; the ratchet runs the copied base judge against same-run fixture results. Both JUnit checks (all but `release`, then `release`), the README install line and its flipped-byte control on macOS arm64, then uploads `archives-<os>-<arch>` (the three zips and `commit.txt`) and `hashes-<os>-<arch>`. | yes |
 | `asan` | The `asan` preset; JUnit check without `abi` and `release`. | yes |
 | `nofp` | The `nofp` preset on both Linux legs. | yes |
 | `be32` | The `be32` preset (`portable` tests) and uploads `hashes-be32`. | yes |

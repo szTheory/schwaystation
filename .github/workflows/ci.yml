@@ -192,6 +192,16 @@ jobs:
             tests/cmake/compat-ratchet.cmake
             tests/compat/ledger.csv
           sparse-checkout-cone-mode: false
+      - name: Preserve protected base checkout for ratchet
+        if: github.event_name == 'pull_request'
+        env:
+          COMPAT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -eu
+          protected_base="$RUNNER_TEMP/compat-base"
+          cmake -E copy_directory "$GITHUB_WORKSPACE/compat-base" "$protected_base"
+          test "$(git -C "$protected_base" rev-parse --verify HEAD)" = "$COMPAT_BASE_SHA"
+          printf 'COMPAT_BASE_DIR=%s\n' "$protected_base" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -216,7 +226,6 @@ jobs:
             ForEach-Object { if ($_ -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" >> $env:GITHUB_ENV } }
       - name: Build, test, package
         env:
-          COMPAT_BASE_DIR: ${{ github.event_name == 'pull_request' && format('{0}/compat-base', github.workspace) || '' }}
           COMPAT_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
         run: cmake --workflow --preset ${{ matrix.preset }}
       - name: Every test ran
