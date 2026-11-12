@@ -42,6 +42,14 @@ schway_add_test(NAME libretro.content.lifecycle
     ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe ${PROJECT_BINARY_DIR}/tests
   LABELS libretro portable TIMEOUT 120)
 
+# Fault prevented: libretro hides SAVE_RAM, writes the frontend-owned first
+# card, or fails to load and persist the independent second card.
+schway_add_test(NAME libretro.cards.persistence
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> card-persistence
+    ${PROJECT_BINARY_DIR}/fixtures/memcard_roundtrip.exe ${PROJECT_BINARY_DIR}/tests
+  LABELS libretro portable TIMEOUT 120)
+
 # Fault prevented: a controller layout, axis endpoint, or once-per-frame input latch diverges from guest play.
 schway_add_test(NAME libretro.input.controls
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>

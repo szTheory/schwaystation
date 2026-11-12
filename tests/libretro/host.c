@@ -194,6 +194,14 @@ static unsigned input_poll_calls, input_state_calls;
 static unsigned controller_info_calls, input_descriptor_calls;
 static const char *bios_option_value = "none";
 static const char *system_directory;
+static const char *save_directory;
+static int save_directory_available = 1;
+static int memory_maps_available = 1;
+static unsigned memory_map_calls;
+#define MEMORY_DESCRIPTOR_CAP 16u
+static struct retro_memory_descriptor memory_descriptors[MEMORY_DESCRIPTOR_CAP];
+static char memory_addrspaces[MEMORY_DESCRIPTOR_CAP][64];
+static unsigned memory_descriptor_count;
 static const char *analog_mode_value = "analog";
 static const char *analog_toggle_value = "enabled";
 static int rumble_available;
@@ -397,6 +405,37 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         }
         *(const char **)data = system_directory;
         return true;
+    case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
+        if (!save_directory_available || save_directory == NULL || data == NULL) {
+            return false;
+        }
+        *(const char **)data = save_directory;
+        return true;
+    case RETRO_ENVIRONMENT_SET_MEMORY_MAPS: {
+        const struct retro_memory_map *map = (const struct retro_memory_map *)data;
+        memory_map_calls++;
+        if (!memory_maps_available || map == NULL ||
+            map->num_descriptors > MEMORY_DESCRIPTOR_CAP ||
+            (map->num_descriptors != 0u && map->descriptors == NULL)) {
+            return false;
+        }
+        memory_descriptor_count = map->num_descriptors;
+        for (unsigned i = 0u; i < memory_descriptor_count; i++) {
+            memory_descriptors[i] = map->descriptors[i];
+            memory_addrspaces[i][0] = '\0';
+            if (map->descriptors[i].addrspace != NULL) {
+                size_t length = strlen(map->descriptors[i].addrspace);
+                if (length >= sizeof memory_addrspaces[i]) {
+                    return false;
+                }
+                memcpy(memory_addrspaces[i], map->descriptors[i].addrspace, length + 1u);
+                memory_descriptors[i].addrspace = memory_addrspaces[i];
+            } else {
+                memory_descriptors[i].addrspace = NULL;
+            }
+        }
+        return true;
+    }
     case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
         *(bool *)data = option_updated;
         option_updated = false;
@@ -893,6 +932,62 @@ cleanup:
     if (have_short_exe) {
         (void)remove(short_exe);
     }
+}
+
+static void check_card_file_value(const char *path, int expected)
+{
+    FILE *file = fopen(path, "rb");
+    CHECK(file != NULL);
+    if (file == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(fseek(file, 128L, SEEK_SET), 0);
+    CHECK_EQ_U64(fgetc(file), (unsigned)expected);
+    CHECK_EQ_U64(fclose(file), 0u);
+}
+
+static int test_card_persistence(const char *exe_path, const char *directory)
+{
+    char card_one[4096], card_two[4096];
+    struct retro_game_info game;
+
+    CHECK(test_path(card_one, sizeof card_one, directory, "memcard_roundtrip.srm"));
+    CHECK(test_path(card_two, sizeof card_two, directory, "memcard_roundtrip.1.mcr"));
+    if (check_failures != 0) {
+        return 1;
+    }
+    (void)remove(card_one);
+    (void)remove(card_two);
+    save_directory = directory;
+    memset(&game, 0, sizeof game);
+    game.path = exe_path;
+
+    for (unsigned pass = 0u; pass < 2u; pass++) {
+        void *save_ram;
+        CHECK_EQ_U64(p_load_game(&game), 1u);
+        save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+        CHECK(save_ram != NULL);
+        CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 131072u);
+        CHECK(memory_map_calls > 0u);
+        CHECK(memory_descriptor_count > 0u);
+        for (unsigned frame_index = 0u; frame_index < 120u; frame_index++) {
+            run_one();
+        }
+        CHECK(p_get_memory_data(RETRO_MEMORY_SAVE_RAM) == save_ram);
+        p_unload_game();
+        CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 0u);
+        check_card_file_value(card_two, pass == 0u ? 2 : 3);
+        {
+            FILE *card_one_file = fopen(card_one, "rb");
+            CHECK(card_one_file == NULL);
+            if (card_one_file != NULL) {
+                (void)fclose(card_one_file);
+            }
+        }
+    }
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
 }
 
 static void store_le32(unsigned char *bytes, size_t offset, uint32_t value)
@@ -2374,22 +2469,25 @@ int main(int argc, char **argv)
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
     int input_controls_mode = argc == 4 && strcmp(argv[2], "input-controls") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
+    int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
     if ((!content_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
-         !input_controls_mode && !lifecycle_mode && !rumble_guest_mode && !rumble_controls_mode &&
+         !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
+         !rumble_guest_mode && !rumble_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
-          input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode) &&
+          input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
+          card_persistence_mode) &&
          argv[3][0] == '\0') ||
-        (lifecycle_mode && argv[4][0] == '\0')) {
+        ((lifecycle_mode || card_persistence_mode) && argv[4][0] == '\0')) {
         fprintf(stderr,
                 "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
     content_test = content_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
-                   input_controls_mode || lifecycle_mode;
+                   input_controls_mode || lifecycle_mode || card_persistence_mode;
     rumble_available = rumble_guest_mode || rumble_controls_mode;
     pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
@@ -2452,6 +2550,10 @@ int main(int argc, char **argv)
         p_deinit();
         module_close();
         CHECK_DONE();
+    }
+
+    if (card_persistence_mode) {
+        return test_card_persistence(argv[3], argv[4]);
     }
 
     if (video_geometry_mode) {
