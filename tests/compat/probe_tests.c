@@ -1,6 +1,7 @@
 /* Small ISO9660 fixtures for the host-only compatibility probe tests. */
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define PROBE_TEST_SECTOR_SIZE 2048u
@@ -131,14 +132,175 @@ static int make_synthetic_iso(const char *path, const char *mode)
     return failed;
 }
 
+static int write_iso_sector(FILE *file, const uint8_t *iso, size_t sector,
+                            size_t sector_size, size_t data_offset, int mode2)
+{
+    uint8_t raw[2352];
+    if (sector_size == PROBE_TEST_SECTOR_SIZE) {
+        return fwrite(iso + sector * PROBE_TEST_SECTOR_SIZE, 1u,
+                      PROBE_TEST_SECTOR_SIZE, file) == PROBE_TEST_SECTOR_SIZE ? 0 : 1;
+    }
+    memset(raw, 0, sizeof raw);
+    if (sector_size == 2352u) {
+        raw[0] = 0u;
+        memset(raw + 1u, 0xFF, 10u);
+        raw[11] = 0u;
+        raw[15] = mode2 ? 2u : 1u;
+        if (mode2) {
+            raw[16] = 0u;
+            raw[17] = 0u;
+            raw[18] = 8u;
+            raw[19] = 0u;
+            memcpy(raw + 20u, raw + 16u, 4u);
+        }
+    } else if (sector_size == 2336u) {
+        raw[2] = 8u;
+        raw[6] = 8u;
+    }
+    memcpy(raw + data_offset, iso + sector * PROBE_TEST_SECTOR_SIZE,
+           PROBE_TEST_SECTOR_SIZE);
+    return fwrite(raw, 1u, sector_size, file) == sector_size ? 0 : 1;
+}
+
+static void write_msf(FILE *cue, unsigned frames)
+{
+    unsigned minute = frames / (60u * 75u);
+    unsigned second = (frames / 75u) % 60u;
+    unsigned frame = frames % 75u;
+    (void)fprintf(cue, "%02u:%02u:%02u", minute, second, frame);
+}
+
+static int make_cue_fixture(const char *cue_path, const char *mode)
+{
+    uint8_t iso[PROBE_TEST_SECTOR_SIZE * PROBE_TEST_IMAGE_SECTORS];
+    char *source_path = NULL;
+    char *bin_path = NULL;
+    size_t cue_path_size = strlen(cue_path);
+    FILE *source = NULL;
+    FILE *bin = NULL;
+    FILE *cue = NULL;
+    int failed = 0;
+    size_t sector_size = PROBE_TEST_SECTOR_SIZE;
+    size_t data_offset = 0u;
+    int mode2 = 0;
+    int track99 = strcmp(mode, "cue_track99") == 0;
+
+    if (strcmp(mode, "cue_mode1_2352") == 0) {
+        sector_size = 2352u;
+        data_offset = 16u;
+    } else if (strcmp(mode, "cue_mode2_2352") == 0) {
+        sector_size = 2352u;
+        data_offset = 24u;
+        mode2 = 1;
+    } else if (strcmp(mode, "cue_mode2_2336") == 0) {
+        sector_size = 2336u;
+        data_offset = 8u;
+        mode2 = 1;
+    } else if (strcmp(mode, "cue_2048") != 0 && !track99) {
+        return 1;
+    }
+
+    source_path = (char *)malloc(cue_path_size + 16u);
+    bin_path = (char *)malloc(cue_path_size + 16u);
+    if (source_path == NULL || bin_path == NULL) {
+        failed = 1;
+        goto done;
+    }
+    (void)snprintf(source_path, cue_path_size + 16u, "%s.source", cue_path);
+    const char *slash = strrchr(cue_path, '/');
+    const char *backslash = strrchr(cue_path, '\\');
+    const char *last = slash;
+    if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
+    size_t directory_size = last == NULL ? 0u : (size_t)(last - cue_path + 1);
+    memcpy(bin_path, cue_path, directory_size);
+    (void)snprintf(bin_path + directory_size, cue_path_size + 16u - directory_size,
+                   "synthetic.bin");
+    if (make_synthetic_iso(source_path, "synthetic") != 0) {
+        failed = 1;
+        goto done;
+    }
+    source = fopen(source_path, "rb");
+    bin = fopen(bin_path, "wb");
+    if (source == NULL || bin == NULL ||
+        fread(iso, 1u, sizeof iso, source) != sizeof iso) {
+        failed = 1;
+        goto done;
+    }
+    if (fclose(source) != 0) failed = 1;
+    source = NULL;
+
+    if (track99) {
+        uint8_t audio_sector[2352] = {0};
+        uint8_t pregap[PROBE_TEST_SECTOR_SIZE] = {0};
+        for (unsigned i = 0u; i < 98u && !failed; i++) {
+            if (fwrite(audio_sector, 1u, sizeof audio_sector, bin) != sizeof audio_sector) failed = 1;
+        }
+        if (!failed && fwrite(pregap, 1u, sizeof pregap, bin) != sizeof pregap) failed = 1;
+        for (size_t i = 0u; i < PROBE_TEST_IMAGE_SECTORS && !failed; i++) {
+            failed = write_iso_sector(bin, iso, i, PROBE_TEST_SECTOR_SIZE, 0u, 0);
+        }
+    } else {
+        for (size_t i = 0u; i < PROBE_TEST_IMAGE_SECTORS && !failed; i++) {
+            failed = write_iso_sector(bin, iso, i, sector_size, data_offset, mode2);
+        }
+    }
+    if (fclose(bin) != 0) failed = 1;
+    bin = NULL;
+    if (failed) goto done;
+
+    cue = fopen(cue_path, "wb");
+    if (cue == NULL) {
+        failed = 1;
+        goto done;
+    }
+    if (!track99) {
+        const char *cue_mode = "MODE1/2048";
+        if (strcmp(mode, "cue_mode1_2352") == 0) cue_mode = "MODE1/2352";
+        else if (strcmp(mode, "cue_mode2_2352") == 0) cue_mode = "MODE2/2352";
+        else if (strcmp(mode, "cue_mode2_2336") == 0) cue_mode = "MODE2/2336";
+        (void)fprintf(cue, "FILE \"synthetic.bin\" BINARY\nTRACK 01 %s\nINDEX 01 00:00:00\n",
+                      cue_mode);
+    } else {
+        (void)fprintf(cue, "FILE \"synthetic.bin\" BINARY\n");
+        for (unsigned i = 0u; i < 98u; i++) {
+            (void)fprintf(cue, "TRACK %02u AUDIO\nINDEX 01 ", i + 1u);
+            write_msf(cue, i);
+            (void)fprintf(cue, "\n");
+        }
+        (void)fprintf(cue, "TRACK 99 MODE1/2048\nINDEX 00 ");
+        write_msf(cue, 98u);
+        (void)fprintf(cue, "\nINDEX 01 ");
+        write_msf(cue, 99u);
+        (void)fprintf(cue, "\n");
+    }
+    if (fclose(cue) != 0) failed = 1;
+    cue = NULL;
+
+done:
+    if (source != NULL && fclose(source) != 0) failed = 1;
+    if (bin != NULL && fclose(bin) != 0) failed = 1;
+    if (cue != NULL && fclose(cue) != 0) failed = 1;
+    if (source_path != NULL) (void)remove(source_path);
+    free(source_path);
+    free(bin_path);
+    return failed;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc == 3 && (strcmp(argv[1], "cue_2048") == 0 ||
+                      strcmp(argv[1], "cue_mode1_2352") == 0 ||
+                      strcmp(argv[1], "cue_mode2_2352") == 0 ||
+                      strcmp(argv[1], "cue_mode2_2336") == 0 ||
+                      strcmp(argv[1], "cue_track99") == 0)) {
+        return make_cue_fixture(argv[2], argv[1]);
+    }
     if (argc != 3 || (strcmp(argv[1], "synthetic") != 0 &&
                       strcmp(argv[1], "fallback") != 0 &&
                       strcmp(argv[1], "missing") != 0 &&
                       strcmp(argv[1], "bad_extent") != 0 &&
                       strcmp(argv[1], "traversal") != 0)) {
-        (void)fprintf(stderr, "usage: schwaystation-test-probe <synthetic|fallback|missing|bad_extent|traversal> <image.iso>\n");
+        (void)fprintf(stderr, "usage: schwaystation-test-probe <synthetic|fallback|missing|bad_extent|traversal|cue_2048|cue_mode1_2352|cue_mode2_2352|cue_mode2_2336|cue_track99> <image>\n");
         return 2;
     }
     return make_synthetic_iso(argv[2], argv[1]);
