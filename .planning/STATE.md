@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 44 of 53
+current_plan: 45 of 53
 status: executing
-stopped_at: Completed 04-26-PLAN.md
-last_updated: "2026-11-12T13:40:53.359Z"
+stopped_at: Completed 04-28-PLAN.md
+last_updated: "2026-11-12T15:15:20.390Z"
 last_activity: 2026-11-12
-last_activity_desc: Completed 04-26 with the approved 2700-line ceiling, 2448 measured gate lines, and passing full CI and hygiene.
-state_head: bbaac44b9a6c3081d6c0d9a06910540930044d7d
+last_activity_desc: Completed 04-28 controller and rumble support with focused cases, full CI, release checks, and hygiene passing.
+state_head: 0c2f7644c439b1079d7b4ada361a4bab3d11d193
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 111
+  completed_plans: 112
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 44 of 53
-Status: Plan 04-26 complete under the approved 2700-line ceiling. Eleven phase plans remain.
-Last activity: 2026-11-12 — Applied the preserved candidate, passed focused/full CI and hygiene, and completed plan metadata.
+Current Plan: 45 of 53
+Status: Plan 04-28 complete. Eight phase plans remain.
+Last activity: 2026-11-12 — Added libretro controller mapping and guest-driven rumble, then passed focused cases, full CI, release checks, and hygiene.
 
 Progress: [█████░░░░░] 50%
 
@@ -172,6 +172,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P49 | 38min | 2 tasks | 7 files |
 | Phase 04 P42 | 40min | 2 tasks | 16 files |
 | Phase 04 P26 | 86min | 2 tasks | 11 files |
+| Phase 04 P28 | 92 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -408,6 +409,9 @@ Recent decisions affecting current work:
 - [Phase 04]: The local library and isolated tests share the production runner metadata lookup path.
 - [Phase 04]: Unknown and unlisted discs remain private, and boot/play remain unavailable until measured by a disc backend.
 - [Phase 04]: The approved Phase 4 repository-check ceiling is 2700 lines; plan 04-26 measures 2448 lines with all checks retained.
+- [Phase 04]: Keep libretro controller-family selection separate from the DualShock digital/analog wire protocol.
+- [Phase 04]: Use independent serialized-state references per controller family and prove full analog packet/axis behavior with a separate real guest.
+- [Phase 04]: Deliver both ports’ strong and weak rumble reports once per frame with exact scaling and lifecycle clearing.
 
 ### Pending Todos
 
@@ -418,8 +422,6 @@ using the observed 198 s overrun and 10 successful ARM64 samples. Existing todos
 retain their bound plans and seed dispositions.
 
 ### Blockers/Concerns
-
-- Plan 04-26 remains incomplete but its resource blocker is resolved: the owner approved a 2700-line ceiling for the complete 2633-line proposal. Apply the verified candidate, finish integration and full verification, then write its SUMMARY. See `04-26-CHECKPOINT.md`; no completion or plan advance follows from resource approval alone.
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
@@ -556,11 +558,12 @@ come from `AGENTS.md`.
 | 2026-11-12 | /gsd-execute-plan 04-26 incomplete resource checkpoint | Codex/OpenGSD; complete library candidate and ordinary-mode/BIN proof preserved off-tree; no plan advance | executor gpt-6-luna xhigh; coordinator GPT-6 session |
 | 2026-11-12 | /gsd-execute-plan 04-26 resumed after approved budget update | Codex, OpenGSD 1.20.0; sequential shared checkout; applied candidate, focused library cases, full CI, hygiene and plan closeout | gpt-6-luna xhigh |
 | 2026-11-12 | Phase 04 complete-code budget approval implementation | Codex/OpenGSD; concrete 2700-line ceiling, preserved proposal and renewed efficiency authority; no plan advance | GPT-6 session |
+| 2026-11-12 | /gsd-execute-plan 04-28 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; per-port controller mapping, family-specific guest movies, analog DualShock and both-port rumble proof, full CI/release checks and hygiene | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-12T13:40:52.839Z
-Stopped at: Completed 04-26-PLAN.md
+Last session: 2026-11-12T15:15:19.945Z
+Stopped at: Completed 04-28-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
