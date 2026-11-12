@@ -716,6 +716,21 @@ static void run_one(void)
     p_run();
 }
 
+/* Movie references bound poisoning to their expected packed active extent. */
+static void run_one_movie(unsigned expected_width, unsigned expected_height)
+{
+    size_t poison_bytes = sizeof frame;
+    if (expected_width != 0u && expected_width <= MAX_W && expected_height != 0u &&
+        expected_height <= MAX_H) {
+        size_t expected_pixels = (size_t)expected_width * (size_t)expected_height;
+        poison_bytes = expected_pixels * sizeof frame[0];
+    }
+    memset(frame, POISON, poison_bytes);
+    frame_w = frame_h = 0u;
+    got_pairs = 0u;
+    p_run();
+}
+
 /* One frame of the module and of the reference instance: the frame must be
    the reference's conversion, and the audio exactly the pairs the reference
    drains for that frame, lo or lo + 1 of them. */
@@ -2217,9 +2232,10 @@ static int test_input_movies(const char *path)
             input_poll_calls = 0u;
             input_state_calls = 0u;
             for (unsigned frame_index = 1u; frame_index <= INPUT_MOVIE_FRAMES; frame_index++) {
-                run_one();
+                const struct movie_frame_reference *expected = &expected_frames[frame_index - 1u];
+                run_one_movie(expected->width, expected->height);
                 check_movie_pixels_equal(frame, frame_w, frame_h,
-                                         &expected_frames[frame_index - 1u], layout, frame_index);
+                                         expected, layout, frame_index);
                 CHECK_EQ_U64(got_pairs, expected_frames[frame_index - 1u].audio_pairs);
                 if (got_pairs == expected_frames[frame_index - 1u].audio_pairs &&
                     expected_frames[frame_index - 1u].audio != NULL) {
