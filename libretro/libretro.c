@@ -4,7 +4,8 @@
  *
  * Fullpath PS-EXEs are copied through the bounded reader into the core; the
  * emulator core never opens a file. With no selected content,
- * retro_load_game(NULL) keeps the built-in test-card path. Audio is the
+ * retro_load_game(NULL) keeps the built-in test-card path unless the frontend
+ * explicitly selects a BIOS relative to its system directory. Audio is the
  * core's own silent pairs, exactly as many per frame as its clock gives, so
  * a frontend that paces on audio runs at the core's rate. The av_info
  * divisions are the only floating point in the shipped code; the core itself
@@ -28,6 +29,7 @@
 #define LR_MAX_H_PAL 576u
 #define LR_EXE_HEADER 0x800u
 #define LR_EXE_MAX_BYTES (LR_EXE_HEADER + 2u * 1024u * 1024u)
+#define LR_BIOS_KEY "schwaystation_bios"
 
 /* All adapter state. A frontend may keep the module loaded between sessions,
    so retro_deinit returns every one of these to its initial value (L8866). */
@@ -56,6 +58,18 @@ static struct retro_core_option_v2_definition lr_option_defs[] = {
      NULL,
      {{"ntsc-u", "NTSC-U/C"}, {"ntsc-j", "NTSC-J"}, {"pal", "PAL"}, {NULL, NULL}},
      "ntsc-u"},
+    {LR_BIOS_KEY,
+     "BIOS for no-content runs",
+     NULL,
+     "Optional file relative to system/. Missing or invalid files refuse this load. PS-EXE content uses the stub.",
+     NULL,
+     NULL,
+     {{"none", "Built-in test card"},
+      {"scph5500.bin", "SCPH-5500"},
+      {"scph5501.bin", "SCPH-5501"},
+      {"scph5502.bin", "SCPH-5502"},
+      {NULL, NULL}},
+     "none"},
     {NULL, NULL, NULL, NULL, NULL, NULL, {{NULL, NULL}}, NULL},
 };
 static struct retro_core_option_v2_category lr_option_cats[] = {{NULL, NULL, NULL}};
@@ -63,6 +77,7 @@ static struct retro_core_options_v2 lr_options = {lr_option_cats, lr_option_defs
 /* The same option for a frontend without core options version 2 (L1021). */
 static struct retro_variable lr_variables[] = {
     {LR_REGION_KEY, "Region; ntsc-u|ntsc-j|pal"},
+    {LR_BIOS_KEY, "BIOS for no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin"},
     {NULL, NULL},
 };
 
@@ -228,6 +243,105 @@ static uint32_t lr_option_region(void)
         return SCHWAY_REGION_PAL;
     }
     return SCHWAY_REGION_NTSC_U;
+}
+
+static const char *lr_option_bios(void)
+{
+    struct retro_variable var = {LR_BIOS_KEY, NULL};
+    if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) || var.value == NULL) {
+        return "none";
+    }
+    return var.value;
+}
+
+/* BIOS values are relative to the frontend's system directory. Reject
+   absolute paths and dot segments so the selection cannot escape that directory. */
+static int lr_bios_path_is_relative(const char *name)
+{
+    const char *part;
+    if (name == NULL || name[0] == '\0' || name[0] == '/' || name[0] == '\\' ||
+        (name[0] != '\0' && name[1] == ':')) {
+        return 0;
+    }
+    part = name;
+    for (const char *p = name;; p++) {
+        if (*p == '\\' || *p == ':') {
+            return 0;
+        }
+        if (*p == '/' || *p == '\0') {
+            size_t length = (size_t)(p - part);
+            if (length == 0u || (length == 1u && part[0] == '.') ||
+                (length == 2u && part[0] == '.' && part[1] == '.')) {
+                return 0;
+            }
+            if (*p == '\0') {
+                return 1;
+            }
+            part = p + 1;
+        }
+    }
+}
+
+/* Reads only an exact-size user BIOS from the frontend's system directory. */
+static uint8_t *lr_read_bios(const char *name, size_t *size)
+{
+    const char *system_dir = NULL;
+    char *path;
+    FILE *file;
+    uint8_t *bytes;
+    size_t dir_len, name_len, separator, path_len, length;
+    int failed;
+
+    if (size == NULL || !lr_bios_path_is_relative(name) || env_cb == NULL ||
+        !env_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) || system_dir == NULL ||
+        system_dir[0] == '\0') {
+        return NULL;
+    }
+    *size = 0u;
+    dir_len = strlen(system_dir);
+    name_len = strlen(name);
+    if (dir_len > 4096u || name_len > 1024u) {
+        return NULL;
+    }
+    separator = dir_len != 0u && system_dir[dir_len - 1u] != '/' &&
+                        system_dir[dir_len - 1u] != '\\'
+                    ? 1u
+                    : 0u;
+    if (dir_len > SIZE_MAX - name_len || dir_len + name_len > SIZE_MAX - separator - 1u) {
+        return NULL;
+    }
+    path_len = dir_len + name_len + separator;
+    path = (char *)malloc(path_len + 1u);
+    if (path == NULL) {
+        return NULL;
+    }
+    memcpy(path, system_dir, dir_len);
+    if (separator != 0u) {
+        path[dir_len] = '/';
+    }
+    memcpy(path + dir_len + separator, name, name_len);
+    path[path_len] = '\0';
+    file = fopen(path, "rb");
+    free(path);
+    if (file == NULL) {
+        return NULL;
+    }
+    bytes = (uint8_t *)malloc((size_t)SCHWAY_BIOS_SIZE + 1u);
+    if (bytes == NULL) {
+        (void)fclose(file);
+        return NULL;
+    }
+    length = fread(bytes, 1u, (size_t)SCHWAY_BIOS_SIZE + 1u, file);
+    failed = ferror(file);
+    if (fclose(file) != 0) {
+        failed = 1;
+    }
+    if (failed != 0 || length != (size_t)SCHWAY_BIOS_SIZE) {
+        free(bytes);
+        return NULL;
+    }
+    *size = length;
+    return bytes;
 }
 
 /* L8770, called before retro_init (L8766). Declaring no-game support (L1056)
@@ -465,15 +579,17 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
     (void)code;
 }
 
-/* L9020. NULL boots the test card. A fullpath PS-EXE uses the host reader and
-   the core's real-MIPS stub when no BIOS has been selected. XRGB8888 is
-   requested here (L870); the default 0RGB1555 is deprecated. */
+/* L9020. NULL boots the test card or an explicitly selected BIOS. A fullpath
+   PS-EXE always uses the core's real-MIPS stub. XRGB8888 is requested here
+   (L870); the default 0RGB1555 is deprecated. */
 bool retro_load_game(const struct retro_game_info *game)
 {
     enum retro_pixel_format format = RETRO_PIXEL_FORMAT_XRGB8888;
     uint8_t *exe = NULL;
     size_t exe_size = 0u;
     schway_exe_info exe_info;
+    uint8_t *bios = NULL;
+    size_t bios_size = 0u;
 
     if (game != NULL) {
         if (!lr_is_exe_path(game->path)) {
@@ -489,18 +605,35 @@ bool retro_load_game(const struct retro_game_info *game)
             free(exe);
             return false;
         }
+    } else {
+        const char *bios_name = lr_option_bios();
+        if (strcmp(bios_name, "none") != 0) {
+            bios = lr_read_bios(bios_name, &bios_size);
+            if (bios == NULL) {
+                return false;
+            }
+        }
     }
     if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &format)) {
         free(exe);
+        free(bios);
         return false;
     }
     if (!lr_create(lr_option_region())) {
         free(exe);
+        free(bios);
         return false;
     }
     if (game != NULL) {
         schway_status status = schway_load_exe(inst, exe, exe_size);
         free(exe);
+        if (status != SCHWAY_STATUS_OK) {
+            lr_unload();
+            return false;
+        }
+    } else if (bios != NULL) {
+        schway_status status = schway_load_bios(inst, bios, bios_size);
+        free(bios);
         if (status != SCHWAY_STATUS_OK) {
             lr_unload();
             return false;

@@ -319,9 +319,12 @@ is already loaded returns `SCHWAY_STATUS_ERR_ARGUMENT`. A power reset erases an 
 one. A refused file changes nothing. A `NULL` pointer or `n` of 0 returns `SCHWAY_STATUS_ERR_ARGUMENT`.
 
 The libretro adapter accepts only fullpath `.exe` content. It reads at most the PS-EXE header plus 2 MiB, validates
-the complete file before replacing the active instance, then passes its bytes to `schway_load_exe`. With no host
-BIOS selected, the core's real-MIPS stub starts the executable. `retro_load_game(NULL)` remains available for the
-built-in test card. Disc and playlist formats are not accepted.
+the complete file before replacing the active instance, then passes its bytes to `schway_load_exe`. PS-EXE content
+always starts with the core's real-MIPS stub; the BIOS option applies only to a no-content load.
+`retro_load_game(NULL)` defaults to the built-in test card. A frontend may explicitly select one of the BIOS choices
+in core options; the selected file is read relative to the frontend's system directory and passed to
+`schway_load_bios`. A missing or wrong-sized selected file refuses that load instead of falling back to the test
+card. Disc and playlist formats are not accepted.
 
 The loader writes the text segment at its physical address and a 16-byte launch block at `0200h` of RAM: the entry
 point, the global pointer, the stack address and the stack size as four little-endian words. It writes nothing else.

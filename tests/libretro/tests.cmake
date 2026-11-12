@@ -33,3 +33,11 @@ schway_add_test(NAME libretro.content.no_bios
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> content-no-bios ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe
   LABELS libretro portable TIMEOUT 120)
+
+# Fault prevented: selected BIOS files silently fall back or replace active
+# state on failure, or PS-EXE content accidentally inherits the BIOS option.
+schway_add_test(NAME libretro.content.lifecycle
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> content-lifecycle
+    ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe ${PROJECT_BINARY_DIR}/tests
+  LABELS libretro portable TIMEOUT 120)

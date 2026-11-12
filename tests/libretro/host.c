@@ -185,6 +185,8 @@ static int16_t got_audio[MAX_PAIRS * 2u];
 static size_t got_pairs;
 static int content_test;
 static unsigned content_polls;
+static const char *bios_option_value = "none";
+static const char *system_directory;
 
 /* got must equal want; prints both. */
 static void check_string(const char *what, const char *got, const char *want)
@@ -196,8 +198,8 @@ static void check_string(const char *what, const char *got, const char *want)
     }
 }
 
-/* The version 2 definitions (L7747) must hold exactly the region option,
-   default first, with its three values. */
+/* The version 2 definitions (L7747) must hold the region and no-content BIOS
+   options, each with its default first and exact values. */
 static void check_options_v2(const struct retro_core_options_v2 *o)
 {
     const struct retro_core_option_v2_definition *d = o != NULL ? o->definitions : NULL;
@@ -211,10 +213,17 @@ static void check_options_v2(const struct retro_core_options_v2 *o)
     check_string("option value 1", d[0].values[1].value, "ntsc-j");
     check_string("option value 2", d[0].values[2].value, "pal");
     CHECK(d[0].values[3].value == NULL);
-    CHECK(d[1].key == NULL);
+    check_string("BIOS option key", d[1].key, "schwaystation_bios");
+    check_string("BIOS option default", d[1].default_value, "none");
+    check_string("BIOS option value 0", d[1].values[0].value, "none");
+    check_string("BIOS option value 1", d[1].values[1].value, "scph5500.bin");
+    check_string("BIOS option value 2", d[1].values[2].value, "scph5501.bin");
+    check_string("BIOS option value 3", d[1].values[3].value, "scph5502.bin");
+    CHECK(d[1].values[4].value == NULL);
+    CHECK(d[2].key == NULL);
 }
 
-/* The version 0 variables (L7483) carry the same option, default first. */
+/* The version 0 variables (L7483) carry both options. */
 static void check_variables(const struct retro_variable *v)
 {
     CHECK(v != NULL);
@@ -223,7 +232,11 @@ static void check_variables(const struct retro_variable *v)
     }
     check_string("variable key", v[0].key, "schwaystation_region");
     check_string("variable value", v[0].value, "Region; ntsc-u|ntsc-j|pal");
-    CHECK(v[1].key == NULL);
+    check_string("BIOS variable key", v[1].key, "schwaystation_bios");
+    check_string("BIOS variable value",
+                 v[1].value,
+                 "BIOS for no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin");
+    CHECK(v[2].key == NULL);
 }
 
 static bool RETRO_CALLCONV env(unsigned cmd, void *data)
@@ -254,12 +267,25 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
     case RETRO_ENVIRONMENT_GET_VARIABLE: {
         struct retro_variable *var = (struct retro_variable *)data;
         get_variable_calls++;
-        if (var == NULL || var->key == NULL || strcmp(var->key, "schwaystation_region") != 0) {
+        if (var == NULL || var->key == NULL) {
             return false;
         }
-        var->value = option_value;
-        return true;
+        if (strcmp(var->key, "schwaystation_region") == 0) {
+            var->value = option_value;
+            return true;
+        }
+        if (strcmp(var->key, "schwaystation_bios") == 0) {
+            var->value = bios_option_value;
+            return true;
+        }
+        return false;
     }
+    case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+        if (system_directory == NULL) {
+            return false;
+        }
+        *(const char **)data = system_directory;
+        return true;
     case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
         *(bool *)data = option_updated;
         option_updated = false;
@@ -482,6 +508,190 @@ static void check_av(const struct retro_system_av_info *av, uint32_t region)
     }
 }
 
+static int test_path(char *path, size_t capacity, const char *directory, const char *name)
+{
+    int written = snprintf(path, capacity, "%s/%s", directory, name);
+    return written > 0 && (size_t)written < capacity;
+}
+
+static int write_test_file(const char *path, const void *bytes, size_t size)
+{
+    FILE *file = fopen(path, "wb");
+    int ok;
+    if (file == NULL) {
+        return 0;
+    }
+    ok = fwrite(bytes, 1u, size, file) == size;
+    if (fclose(file) != 0) {
+        ok = 0;
+    }
+    return ok;
+}
+
+static unsigned char *save_libretro_state(size_t *size)
+{
+    unsigned char *state;
+    *size = p_serialize_size();
+    if (*size == 0u) {
+        return NULL;
+    }
+    state = (unsigned char *)malloc(*size);
+    if (state == NULL || !p_serialize(state, *size)) {
+        free(state);
+        return NULL;
+    }
+    return state;
+}
+
+static int libretro_state_matches(const unsigned char *saved, size_t size)
+{
+    unsigned char *current;
+    int matches;
+    if (saved == NULL || size == 0u || p_serialize_size() != size) {
+        return 0;
+    }
+    current = (unsigned char *)malloc(size);
+    if (current == NULL) {
+        return 0;
+    }
+    matches = p_serialize(current, size) && memcmp(saved, current, size) == 0;
+    free(current);
+    return matches;
+}
+
+/* Selected BIOS failures and rejected content leave the current serialized
+   instance intact; a selected BIOS applies only to a no-content load. */
+static void content_lifecycle(const char *exe_path, const char *directory)
+{
+    char missing_bios[4096], short_bios[4096], valid_bios[4096];
+    char wrong_extension[4096], short_exe[4096], missing_exe[4096];
+    static const unsigned char short_image[] = {0x53u, 0x43u, 0x50u, 0x48u};
+    struct retro_game_info game;
+    unsigned char *bios_bytes = NULL, *state = NULL;
+    size_t state_size = 0u;
+    unsigned red_pixel_seen = 0u;
+    int have_short_bios = 0, have_valid_bios = 0, have_short_exe = 0;
+
+    CHECK(test_path(missing_bios, sizeof missing_bios, directory, "scph5500.bin"));
+    CHECK(test_path(short_bios, sizeof short_bios, directory, "scph5501.bin"));
+    CHECK(test_path(valid_bios, sizeof valid_bios, directory, "scph5502.bin"));
+    CHECK(test_path(wrong_extension, sizeof wrong_extension, directory, "missing.bin"));
+    CHECK(test_path(short_exe, sizeof short_exe, directory, "truncated.exe"));
+    CHECK(test_path(missing_exe, sizeof missing_exe, directory, "missing.exe"));
+    if (check_failures != 0) {
+        return;
+    }
+
+    system_directory = directory;
+    bios_option_value = "none";
+    CHECK_EQ_U64(p_load_game(NULL), 1);
+    state = save_libretro_state(&state_size);
+    CHECK(state != NULL);
+    if (state == NULL) {
+        goto cleanup;
+    }
+
+    bios_option_value = "scph5500.bin";
+    CHECK_EQ_U64(p_load_game(NULL), 0);
+    CHECK(libretro_state_matches(state, state_size));
+    bios_option_value = "scph5501.bin";
+    have_short_bios = write_test_file(short_bios, short_image, sizeof short_image);
+    CHECK(have_short_bios);
+    CHECK_EQ_U64(p_load_game(NULL), 0);
+    CHECK(libretro_state_matches(state, state_size));
+
+    bios_bytes = (unsigned char *)calloc((size_t)SCHWAY_BIOS_SIZE, 1u);
+    CHECK(bios_bytes != NULL);
+    if (bios_bytes == NULL) {
+        goto cleanup;
+    }
+    have_valid_bios = write_test_file(valid_bios, bios_bytes, (size_t)SCHWAY_BIOS_SIZE);
+    CHECK(have_valid_bios);
+    if (!have_valid_bios) {
+        goto cleanup;
+    }
+    bios_option_value = "scph5502.bin";
+    CHECK_EQ_U64(p_load_game(NULL), 1);
+    CHECK(p_serialize_size() == state_size);
+    if (p_serialize_size() == state_size) {
+        unsigned char *bios_state = save_libretro_state(&state_size);
+        CHECK(bios_state != NULL);
+        if (bios_state != NULL) {
+            CHECK(memcmp(state, bios_state, state_size) != 0);
+        }
+        free(state);
+        state = bios_state;
+    }
+
+    /* Even with a valid BIOS option selected, an EXE must start from the
+       stub path. The pad counter's guest-visible red pixel proves it ran. */
+    memset(&game, 0, sizeof game);
+    game.path = exe_path;
+    content_polls = 0u;
+    CHECK_EQ_U64(p_load_game(&game), 1);
+    if (p_serialize_size() == 0u) {
+        goto cleanup;
+    }
+    for (unsigned run = 1u; run <= 60u; run++) {
+        run_one();
+        if (frame_h > 100u && frame_w != 0u &&
+            frame[(size_t)100u * frame_w] == 0x00FF0000u) {
+            red_pixel_seen = 1u;
+        }
+    }
+    CHECK_EQ_U64(red_pixel_seen, 1u);
+    free(state);
+    state = save_libretro_state(&state_size);
+    CHECK(state != NULL);
+    if (state == NULL) {
+        goto cleanup;
+    }
+
+    game.path = wrong_extension;
+    CHECK_EQ_U64(p_load_game(&game), 0);
+    CHECK(libretro_state_matches(state, state_size));
+    have_short_exe = write_test_file(short_exe, short_image, sizeof short_image);
+    CHECK(have_short_exe);
+    game.path = short_exe;
+    CHECK_EQ_U64(p_load_game(&game), 0);
+    CHECK(libretro_state_matches(state, state_size));
+    game.path = missing_exe;
+    CHECK_EQ_U64(p_load_game(&game), 0);
+    CHECK(libretro_state_matches(state, state_size));
+
+    /* A failed load after a frame ran also leaves the current instance intact. */
+    run_one();
+    free(state);
+    state = save_libretro_state(&state_size);
+    CHECK(state != NULL);
+    game.path = wrong_extension;
+    CHECK_EQ_U64(p_load_game(&game), 0);
+    CHECK(libretro_state_matches(state, state_size));
+
+    p_unload_game();
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    memset(&game, 0, sizeof game);
+    game.path = exe_path;
+    CHECK_EQ_U64(p_load_game(&game), 1);
+    CHECK(p_serialize_size() > 0u);
+    p_unload_game();
+    bios_option_value = "none";
+    CHECK_EQ_U64(p_load_game(NULL), 1);
+
+cleanup:
+    free(state);
+    free(bios_bytes);
+    if (have_short_bios) {
+        (void)remove(short_bios);
+    }
+    if (have_valid_bios) {
+        (void)remove(valid_bios);
+    }
+    if (have_short_exe) {
+        (void)remove(short_exe);
+    }
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -497,16 +707,18 @@ int main(int argc, char **argv)
     unsigned run, lo, other_lo;
     uint32_t region, other;
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
+    int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
 
-    if ((!content_mode &&
+    if ((!content_mode && !lifecycle_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
-        (content_mode && argv[3][0] == '\0')) {
+        ((content_mode || lifecycle_mode) && argv[3][0] == '\0') ||
+        (lifecycle_mode && argv[4][0] == '\0')) {
         fprintf(stderr,
-                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe>\n");
+                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir>\n");
         return 2;
     }
-    content_test = content_mode;
-    pal = !content_mode && strcmp(argv[2], "pal") == 0;
+    content_test = content_mode || lifecycle_mode;
+    pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
     region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
     /* The region a changed option switches to, and both regions' pairs per
@@ -546,12 +758,20 @@ int main(int argc, char **argv)
     p_get_system_info(&sys);
     check_string("library_name", sys.library_name, "schwaystation");
     check_string("library_version", sys.library_version, version);
-    if (!content_mode) {
+    if (!content_test) {
         check_string("valid_extensions", sys.valid_extensions, "exe");
     }
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
     set_callbacks();
+
+    if (lifecycle_mode) {
+        content_lifecycle(argv[3], argv[4]);
+        p_unload_game();
+        p_deinit();
+        module_close();
+        CHECK_DONE();
+    }
 
     if (content_mode) {
         unsigned red_pixel_seen = 0u;
