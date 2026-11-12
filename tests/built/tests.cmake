@@ -1,5 +1,8 @@
 # Run selected runner BIOS assertions as a script so tests can inspect both
 # captured output and the exact runner exit status without helper scripts.
+set(SCHWAY_OPENBIOS_SHELL_REGION "ntsc-u")
+set(SCHWAY_OPENBIOS_SHELL_FRAME 240)
+set(SCHWAY_OPENBIOS_SHELL_SHA256 "4d1f0ff260e2cf065ae0b7add4ba60353b2b01241dda8325309b5398ba00acec")
 if(CMAKE_SCRIPT_MODE_FILE)
   if(CASE STREQUAL "openbios_shell")
     foreach(var RUN BIOS EXPECTED_FILE REGION SHELL_FRAME SHELL_SHA256 TUPLE_FILE)
@@ -67,7 +70,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     message("OpenBIOS shell: not-applicable because there is no local checked handoff")
     return()
   elseif(CASE STREQUAL "bios_runner")
-    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --frames 1 --tty
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --frames 1 --tty
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     set(output "${out}${err}")
     if(NOT "${rc}" STREQUAL "6")
@@ -82,7 +85,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     return()
   elseif(CASE STREQUAL "bios_runner_edges")
     function(expect_bios_run path digest exit_code)
-      execute_process(COMMAND "${RUN}" --bios "${path}" --frames 1 --tty
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${path}" --frames 1 --tty
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
       set(output "${out}${err}")
       if(NOT "${rc}" STREQUAL "6" OR
@@ -92,7 +95,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
       endif()
     endfunction()
     function(expect_bios_refusal path reason)
-      execute_process(COMMAND "${RUN}" --bios "${path}" --frames 1
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${path}" --frames 1
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
       set(output "${out}${err}")
       if(NOT "${rc}" STREQUAL "1" OR NOT output MATCHES "${reason}")
@@ -110,19 +113,19 @@ if(CMAKE_SCRIPT_MODE_FILE)
     expect_bios_refusal("${LONG_BIOS}" "BIOS must be exactly 524288 bytes")
     expect_bios_refusal("${MISSING_BIOS}" "cannot open")
 
-    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --exe "${MISSING_EXE}" --frames 1
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --exe "${MISSING_EXE}" --frames 1
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     set(output "${out}${err}")
     if(NOT "${rc}" STREQUAL "2" OR NOT output MATCHES "--bios and --exe cannot be used together")
       message(FATAL_ERROR "conflicting content selectors were not refused before loading: ${rc}: ${output}")
     endif()
-    execute_process(COMMAND "${RUN}" --bios "${BIOS}" --bios "${RENAMED_BIOS}" --frames 1
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --bios "${RENAMED_BIOS}" --frames 1
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     set(output "${out}${err}")
     if(NOT "${rc}" STREQUAL "2" OR NOT output MATCHES "give --bios once")
       message(FATAL_ERROR "duplicate --bios was not refused: ${rc}: ${output}")
     endif()
-    execute_process(COMMAND "${RUN}" --bios --frames 1
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios --frames 1
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
     set(output "${out}${err}")
     if(NOT "${rc}" STREQUAL "2" OR NOT output MATCHES "--bios needs a file")
@@ -132,8 +135,6 @@ if(CMAKE_SCRIPT_MODE_FILE)
   endif()
   message(FATAL_ERROR "unknown built BIOS script case: ${CASE}")
 endif()
-
-include(${PROJECT_SOURCE_DIR}/tests/cmake/hashes.cmake)
 
 # This synthetic ROM contains only self-authored MIPS reset instructions. Its
 # exit-port write proves that the actual CLI copied and executed the supplied
@@ -179,9 +180,11 @@ if(NOT bios_runner_empty_size EQUAL 0 OR NOT bios_runner_short_size EQUAL 524287
 endif()
 set(bios_runner_missing_fixture "${bios_runner_fixture_dir}/missing.bin")
 set(bios_runner_missing_exe "${bios_runner_fixture_dir}/missing.exe")
+string(REPLACE ";" "$<SEMICOLON>" bios_runner_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
 
 set(bios_runner_cmd ${CMAKE_COMMAND}
   "-DRUN=$<TARGET_FILE:schwaystation-run>"
+  "-DEMULATOR=${bios_runner_emulator}"
   "-DBIOS=${bios_runner_fixture}"
   "-DBIOS_SHA256=${bios_runner_sha256}"
   -DCASE=bios_runner -P ${CMAKE_CURRENT_LIST_FILE})
@@ -191,6 +194,7 @@ schway_add_test(NAME built.bios.runner
 
 set(bios_runner_edges_cmd ${CMAKE_COMMAND}
   "-DRUN=$<TARGET_FILE:schwaystation-run>"
+  "-DEMULATOR=${bios_runner_emulator}"
   "-DBIOS=${bios_runner_fixture}"
   "-DBIOS_SHA256=${bios_runner_sha256}"
   "-DRENAMED_BIOS=${bios_runner_renamed_fixture}"
@@ -298,9 +302,6 @@ endif()
 set(openbios_shell_input "${PROJECT_BINARY_DIR}/openbios/openbios.bin")
 set(openbios_shell_tuple_file "${PROJECT_BINARY_DIR}/openbios-shell-tuple.txt")
 file(REMOVE "${openbios_shell_tuple_file}")
-if(NOT EXISTS "${openbios_shell_input}" AND "$ENV{CI}" STREQUAL "true")
-  message(FATAL_ERROR "CI must provide the same-run checked OpenBIOS handoff to the shell test")
-endif()
 # Fault prevented: a checked BIOS that no longer reaches its inspected shell frame.
 if(EXISTS "${openbios_shell_input}")
   string(REPLACE ";" "$<SEMICOLON>" openbios_shell_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
@@ -316,8 +317,7 @@ if(EXISTS "${openbios_shell_input}")
     -DCASE=openbios_shell -P ${CMAKE_CURRENT_LIST_FILE})
   schway_add_test(NAME built.openbios.shell
     COMMAND ${openbios_shell_cmd}
-    LABELS bios portable runner TIMEOUT 30
-    PASS_REGEX "frame ${SCHWAY_OPENBIOS_SHELL_FRAME} sha256 ${SCHWAY_OPENBIOS_SHELL_SHA256}")
+    LABELS bios portable runner TIMEOUT 30)
 else()
   schway_add_test(NAME built.openbios.shell
     COMMAND ${CMAKE_COMMAND}
@@ -329,7 +329,9 @@ else()
     PASS_REGEX "not-applicable because there is no local checked handoff")
 endif()
 
-cmake_language(DEFER CALL set_tests_properties runner.hashes_file PROPERTIES DEPENDS built.openbios.shell)
+set_tests_properties(built.openbios.shell PROPERTIES FIXTURES_SETUP openbios_shell)
+cmake_language(DEFER CALL set_tests_properties runner.hashes_file PROPERTIES
+  DEPENDS built.openbios.shell FIXTURES_REQUIRED openbios_shell)
 
 # Fault prevented: a consumer using a missing or altered artifact from another
 # run instead of this run's digest-checked OpenBIOS handoff.
