@@ -318,7 +318,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 7  # 5-minute run 43067261917 ended with pad_counter.movies still running (433 tests; prior 102 s run had 208)
+    timeout-minutes: 15  # Provisional: run 43292417084 projected 13m36s; measure the repaired full lane before ratcheting
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -451,42 +451,42 @@ jobs:
             sips --deleteColorManagementProperties "$f.png" > /dev/null
             sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
           done
-          cc -std=c17 -O2 -Wall -Wextra -Werror -o compare ../../tests/retroarch/bmp.c ../../tests/retroarch/compare.c
-          ./compare runner.bmp shot.bmp | tee compare.txt
-          grep -q '^320x240, every pixel equal$' compare.txt
-      - name: The compare's negative control
-        working-directory: build/frames
-        run: >-
-          cmake -DCOMPARE=./compare -DEXPECTED=shot.bmp -DBMP=runner.bmp -DFLIPPED=flipped.bmp
-          -P ../../tests/retroarch/flip.cmake
+          python3 ../../tests/retroarch/verify.py compare runner.bmp shot.bmp 320 240
+          python3 ../../tests/retroarch/verify.py pixel-control shot.bmp 7 3
+          python3 ../../tests/retroarch/verify.py dimension-control shot.bmp 319 240
       - name: Diagnostic replay recording and playback
         run: >-
           cmake -DRETROARCH=build/RetroArch.app/Contents/MacOS/RetroArch
           -DCORE=build/libretro/cores/schwaystation_libretro.dylib -DINFO=build/libretro/info/schwaystation_libretro.info
-          -DTEMPLATE=tests/retroarch/test.cfg.in "-DRA_DIR=$PWD/build/ra-replay" -DFRAMES=60
-          "-DSHOT=$PWD/build/frames/replay" -DPROBE_CONTENT=build/fixtures/pad_counter.exe
-          -P tests/retroarch/run_retroarch.cmake
+          -DTEMPLATE=tests/retroarch/test.cfg.in "-DRA_DIR=$PWD/build/ra-replay"
+          "-DSHOT=$PWD/build/frames/replay" -DPROBE_CONTENT=build/fixtures/pad_counter.exe -DFRAMES=60
+          -DVERIFY=tests/retroarch/verify.py -P tests/retroarch/run_retroarch.cmake
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: retroarch-replay-probe
           path: |
             build/ra-replay/probe.bsv
-            build/ra-replay/retroarch.log
+            build/ra-replay/*.log
+            build/ra-replay/probe.cross.bsv
           retention-days: 1
           if-no-files-found: ignore
-      - name: The replay round trip preserves the captured frame
+      - name: Both RetroArch frames equal their runner references
         working-directory: build/frames
         run: |
-          for f in replay.record replay.playback; do
+          ../runner/bin/schwaystation-run --frames 59 --png 59:runner59.png
+          ../runner/bin/schwaystation-run --frames 60 --png 60:runner60.png
+          test -d ../ra-replay/system && test -z "$(find ../ra-replay/system -mindepth 1 -print -quit)"
+          for f in runner59 runner60 replay.59 replay.60; do
             sips --deleteColorManagementProperties "$f.png" > /dev/null
             sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
           done
-          ./compare replay.record.bmp replay.playback.bmp | tee replay-compare.txt
-          grep -q ', every pixel equal$' replay-compare.txt
-      - name: RetroArch log
+          python3 ../../tests/retroarch/verify.py compare runner59.bmp replay.58.bmp 320 240
+          python3 ../../tests/retroarch/verify.py compare runner60.bmp replay.59.bmp 320 240
+          python3 ../../tests/retroarch/verify.py distinct replay.58.bmp replay.59.bmp
+      - name: RetroArch logs
         if: failure()
-        run: cat build/ra/retroarch.log build/ra-replay/retroarch.log || true
+        run: cat build/ra/*.log build/ra-replay/*.log || true
       # Captures from both comparisons aid diagnosis.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()

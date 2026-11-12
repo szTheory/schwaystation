@@ -117,7 +117,9 @@ schway_add_test(NAME libretro.input.descriptors
 schway_add_test(NAME libretro.input.movies
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> input-movies ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe
-  LABELS libretro portable TIMEOUT 120)
+  LABELS libretro portable TIMEOUT 240)
+# Runs 43271212007 and 43292417084 hit the old bound; serialize this matrix to capture a full host timing.
+set_tests_properties(libretro.input.movies PROPERTIES RUN_SERIAL TRUE)
 
 # Fault prevented: absent interfaces, zero motors, reset or unload leave a stale rumble report.
 schway_add_test(NAME libretro.rumble.controls
