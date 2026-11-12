@@ -567,15 +567,18 @@ only the final port-0 Cross value from zero to one; the checkpoint and content m
 Playback itself validates the untouched checkpoint through the pinned frontend. No movie bytes are committed or
 cached across runs.
 
-The pinned frontend counts presented video callbacks for `--max-frames`. Content initialization queues replay
-startup, but the ordinary frontend loop runs once before it checks that queue. That first video callback is a
-pre-replay content frame; then the replay task restores the checkpoint at core frame 1 and preloads input group 1.
-So frontend limits 59 and 60 consume 58 and 59 replay groups and capture guest outputs 59 and 60, respectively.
+The pinned frontend counts presented video callbacks for `--max-frames`. Its default threaded task queue can
+finish replay startup after different numbers of frontend iterations, so the isolated test config disables
+`threaded_data_runloop_enable`. The synchronous queue processes replay startup after exactly one pre-replay
+content frame; then the replay task restores the checkpoint at core frame 1 and preloads input group 1. Thus
+frontend limits 59 and 60 consume 58 and 59 replay groups and capture guest outputs 59 and 60, respectively.
 At limit 60, the frame-count exit check runs before a later paused cached-frame refresh, so this is the output
 with group 59's Cross press rather than a duplicate. Each runner reference uses `--exe pad_counter.exe`, the same digital
 `--inputs` script with Cross pressed at guest frame 60, and `--frames 59` or `--frames 60`. The screenshot check
 occurs after the callback at the requested frontend count. The task-queue order and frame check are visible in
-the pinned frontend sources: [normal loop ordering](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/retroarch.c#L6063-L6065),
+the pinned frontend sources: [threading default](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/config.def.h#L449-L458),
+[queue initialization](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/retroarch.c#L8144-L8150),
+[normal loop ordering](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/retroarch.c#L6063-L6065),
 [replay task startup](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/tasks/task_movie.c#L71-L113),
 [task dequeue before the core call](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L7213-L7215), and
 [frame-limit exit check](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L5921-L5954). Also see the pinned

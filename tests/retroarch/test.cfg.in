@@ -12,6 +12,8 @@ notification_show_config_override_load = "false"
 audio_driver = "null"
 audio_enable = "false"
 pause_nonactive = "false"
+# Keep queued replay startup synchronous so its preplay frame offset cannot vary by worker timing.
+threaded_data_runloop_enable = "false"
 
 # No start screen or menu at launch. RGUI draws without asset files.
 menu_driver = "rgui"
