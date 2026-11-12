@@ -192,6 +192,7 @@ static unsigned input_controls_chord_until;
 static int input_controls_chord_enabled;
 static unsigned input_poll_calls, input_state_calls;
 static unsigned controller_info_calls, input_descriptor_calls;
+static const struct retro_input_descriptor *published_input_descriptors;
 static const char *bios_option_value = "none";
 static const char *system_directory;
 static const char *save_directory;
@@ -304,33 +305,69 @@ static void check_controller_info(const struct retro_controller_info *info)
     CHECK(info[2].types == NULL);
 }
 
-static void check_input_descriptors(const struct retro_input_descriptor *descriptors)
+#define EXPECTED_PAD_DESCRIPTORS(port_)                                                              \
+    {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_B, "Cross"},                           \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_A, "Circle"},                     \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_Y, "Square"},                     \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_X, "Triangle"},                   \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_L, "L1"},                         \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_R, "R1"},                         \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_L2, "L2"},                       \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_R2, "R2"},                       \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_L3, "L3"},                       \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_R3, "R3"},                       \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_SELECT, "Select"},               \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_START, "Start"},                 \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_UP, "Up"},                       \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right"},                 \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down"},                   \
+        {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left"},                   \
+        {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X,     \
+         "Left Stick X"},                                                                        \
+        {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y,     \
+         "Left Stick Y"},                                                                        \
+        {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X,    \
+         "Right Stick X"},                                                                       \
+        {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y,    \
+         "Right Stick Y"}
+
+static void validate_input_descriptors(const struct retro_input_descriptor *descriptors)
 {
-    unsigned cross_ports = 0u, left_x_ports = 0u, right_y_ports = 0u;
-    input_descriptor_calls++;
+    static const struct retro_input_descriptor expected[] = {
+        EXPECTED_PAD_DESCRIPTORS(0u),
+        EXPECTED_PAD_DESCRIPTORS(1u),
+        {0u, 0u, 0u, 0u, NULL},
+    };
+    unsigned index = 0u;
     CHECK(descriptors != NULL);
     if (descriptors == NULL) {
         return;
     }
-    for (const struct retro_input_descriptor *item = descriptors; item->description != NULL; item++) {
-        if (item->device == RETRO_DEVICE_JOYPAD && item->id == RETRO_DEVICE_ID_JOYPAD_B &&
-            strcmp(item->description, "Cross") == 0) {
-            cross_ports |= 1u << item->port;
+    for (; expected[index].description != NULL; index++) {
+        const struct retro_input_descriptor *actual = &descriptors[index];
+        CHECK(actual->description != NULL);
+        if (actual->description == NULL) {
+            return;
         }
-        if (item->device == RETRO_DEVICE_ANALOG &&
-            item->index == RETRO_DEVICE_INDEX_ANALOG_LEFT &&
-            item->id == RETRO_DEVICE_ID_ANALOG_X && strcmp(item->description, "Left Stick X") == 0) {
-            left_x_ports |= 1u << item->port;
-        }
-        if (item->device == RETRO_DEVICE_ANALOG &&
-            item->index == RETRO_DEVICE_INDEX_ANALOG_RIGHT &&
-            item->id == RETRO_DEVICE_ID_ANALOG_Y && strcmp(item->description, "Right Stick Y") == 0) {
-            right_y_ports |= 1u << item->port;
-        }
+        CHECK_EQ_U64(actual->port, expected[index].port);
+        CHECK_EQ_U64(actual->device, expected[index].device);
+        CHECK_EQ_U64(actual->index, expected[index].index);
+        CHECK_EQ_U64(actual->id, expected[index].id);
+        check_string("input descriptor", actual->description, expected[index].description);
     }
-    CHECK_EQ_U64(cross_ports, 3u);
-    CHECK_EQ_U64(left_x_ports, 3u);
-    CHECK_EQ_U64(right_y_ports, 3u);
+    CHECK(descriptors[index].description == NULL);
+    CHECK_EQ_U64(descriptors[index].port, 0u);
+    CHECK_EQ_U64(descriptors[index].device, 0u);
+    CHECK_EQ_U64(descriptors[index].index, 0u);
+    CHECK_EQ_U64(descriptors[index].id, 0u);
+}
+#undef EXPECTED_PAD_DESCRIPTORS
+
+static void check_input_descriptors(const struct retro_input_descriptor *descriptors)
+{
+    input_descriptor_calls++;
+    published_input_descriptors = descriptors;
+    validate_input_descriptors(descriptors);
 }
 
 static bool RETRO_CALLCONV rumble(unsigned port, enum retro_rumble_effect effect, uint16_t strength)
@@ -769,6 +806,45 @@ static int write_test_file(const char *path, const void *bytes, size_t size)
     return ok;
 }
 
+static int copy_test_file(const char *source_path, const char *destination_path)
+{
+    unsigned char buffer[4096];
+    FILE *source = fopen(source_path, "rb");
+    FILE *destination;
+    int ok = 1;
+    if (source == NULL) {
+        return 0;
+    }
+    destination = fopen(destination_path, "wb");
+    if (destination == NULL) {
+        (void)fclose(source);
+        return 0;
+    }
+    for (;;) {
+        size_t count = fread(buffer, 1u, sizeof buffer, source);
+        if (count == 0u) {
+            break;
+        }
+        if (fwrite(buffer, 1u, count, destination) != count) {
+            ok = 0;
+            break;
+        }
+    }
+    if (ferror(source) != 0) {
+        ok = 0;
+    }
+    if (fclose(source) != 0) {
+        ok = 0;
+    }
+    if (fclose(destination) != 0) {
+        ok = 0;
+    }
+    if (!ok) {
+        (void)remove(destination_path);
+    }
+    return ok;
+}
+
 static unsigned char *save_libretro_state(size_t *size)
 {
     unsigned char *state;
@@ -798,6 +874,69 @@ static int libretro_state_matches(const unsigned char *saved, size_t size)
     matches = p_serialize(current, size) && memcmp(saved, current, size) == 0;
     free(current);
     return matches;
+}
+
+static int test_content_psexe(const char *exe_path, const char *directory)
+{
+    char psexe_path[4096];
+    struct retro_system_info sys;
+    struct retro_game_info game;
+    unsigned red_pixel_seen = 0u;
+    int copied = 0;
+
+    CHECK(test_path(psexe_path, sizeof psexe_path, directory, "pad_counter.PsExE"));
+    if (check_failures != 0) {
+        goto cleanup;
+    }
+    copied = copy_test_file(exe_path, psexe_path);
+    CHECK(copied);
+    if (!copied) {
+        goto cleanup;
+    }
+    memset(&sys, 0, sizeof sys);
+    p_get_system_info(&sys);
+    check_string("valid_extensions", sys.valid_extensions, "exe|psexe");
+    memset(&game, 0, sizeof game);
+    game.path = psexe_path;
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    if (p_serialize_size() != 0u) {
+        p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+        for (unsigned run = 1u; run <= 60u; run++) {
+            run_one();
+            if (frame_h > 100u && frame_w != 0u &&
+                frame[(size_t)100u * frame_w] == 0x00FF0000u) {
+                red_pixel_seen = 1u;
+            }
+        }
+        CHECK_EQ_U64(video_calls, 60u);
+        CHECK_EQ_U64(video_bad, 0u);
+        CHECK_EQ_U64(red_pixel_seen, 1u);
+    }
+    p_unload_game();
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+
+cleanup:
+    if (copied) {
+        (void)remove(psexe_path);
+    }
+    p_deinit();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static int test_input_descriptors(void)
+{
+    CHECK_EQ_U64(input_descriptor_calls, 1u);
+    validate_input_descriptors(published_input_descriptors);
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    run_one();
+    validate_input_descriptors(published_input_descriptors);
+    p_unload_game();
+    validate_input_descriptors(published_input_descriptors);
+    p_deinit();
+    validate_input_descriptors(published_input_descriptors);
+    module_close();
+    return check_failures != 0 ? 1 : 0;
 }
 
 /* Selected BIOS failures and rejected content leave the current serialized
@@ -2779,6 +2918,8 @@ int main(int argc, char **argv)
     unsigned run, lo, other_lo;
     uint32_t region, other;
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
+    int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
+    int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
@@ -2791,25 +2932,28 @@ int main(int argc, char **argv)
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
-    if ((!content_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
+    if ((!content_mode && !psexe_mode && !input_descriptors_mode &&
+         !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
-        ((content_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
+        ((content_mode || psexe_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
           card_persistence_mode || card_controls_mode) &&
          argv[3][0] == '\0') ||
-        ((lifecycle_mode || card_persistence_mode || card_controls_mode) && argv[4][0] == '\0')) {
+        ((psexe_mode || lifecycle_mode || card_persistence_mode || card_controls_mode) &&
+         argv[4][0] == '\0')) {
         fprintf(stderr,
                 "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | "
+                "content-psexe <exe> <directory> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
                 "card-controls <exe> <save-dir> | memory-aliases | memory-boundaries | "
                 "video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | "
                 "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
-    content_test = content_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
+    content_test = content_mode || psexe_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
                    input_controls_mode || lifecycle_mode || card_persistence_mode ||
                    card_controls_mode;
     rumble_available = rumble_guest_mode || rumble_controls_mode;
@@ -2854,7 +2998,7 @@ int main(int argc, char **argv)
     check_string("library_name", sys.library_name, "schwaystation");
     check_string("library_version", sys.library_version, version);
     if (!content_test) {
-        check_string("valid_extensions", sys.valid_extensions, "exe");
+        check_string("valid_extensions", sys.valid_extensions, "exe|psexe");
     }
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
@@ -2866,6 +3010,14 @@ int main(int argc, char **argv)
 
     if (rumble_controls_mode) {
         return test_rumble_controls(argv[3]);
+    }
+
+    if (input_descriptors_mode) {
+        return test_input_descriptors();
+    }
+
+    if (psexe_mode) {
+        return test_content_psexe(argv[3], argv[4]);
     }
 
     if (lifecycle_mode) {
@@ -2918,7 +3070,7 @@ int main(int argc, char **argv)
             module_close();
             CHECK_DONE();
         }
-        check_string("valid_extensions", sys.valid_extensions, "exe");
+        check_string("valid_extensions", sys.valid_extensions, "exe|psexe");
         for (run = 1u; run <= 60u; run++) {
             run_one();
             if (frame_h > 100u && frame_w != 0u && frame[(size_t)100u * frame_w] == 0x00FF0000u) {

@@ -3,9 +3,12 @@ libretro.cards.controls	libretro,portable
 libretro.cards.persistence	libretro,portable
 libretro.content.lifecycle	libretro,portable
 libretro.content.no_bios	libretro,portable
+libretro.content.psexe	libretro,portable
 libretro.host	libretro,portable
 libretro.host.pal	libretro,portable
+libretro.info.claims	libretro,portable
 libretro.input.controls	libretro,portable
+libretro.input.descriptors	libretro,portable
 libretro.input.movies	libretro,portable
 libretro.memory.aliases	libretro,portable
 libretro.memory.boundaries	libretro,portable

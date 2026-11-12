@@ -451,17 +451,25 @@ static uint8_t *lr_read_exe(const char *path, size_t *size)
 static int lr_is_exe_path(const char *path)
 {
     const char *extension;
+    size_t length;
     if (path == NULL) {
         return 0;
     }
     extension = strrchr(path, '.');
-    if (extension == NULL || extension[1] == '\0' || extension[2] == '\0' ||
-        extension[3] == '\0' || extension[4] != '\0') {
+    if (extension == NULL) {
         return 0;
     }
-    return (extension[1] == 'e' || extension[1] == 'E') &&
-           (extension[2] == 'x' || extension[2] == 'X') &&
-           (extension[3] == 'e' || extension[3] == 'E');
+    length = strlen(extension);
+    if (length == 4u && (extension[1] == 'e' || extension[1] == 'E') &&
+        (extension[2] == 'x' || extension[2] == 'X') &&
+        (extension[3] == 'e' || extension[3] == 'E')) {
+        return 1;
+    }
+    return length == 6u && (extension[1] == 'p' || extension[1] == 'P') &&
+           (extension[2] == 's' || extension[2] == 'S') &&
+           (extension[3] == 'e' || extension[3] == 'E') &&
+           (extension[4] == 'x' || extension[4] == 'X') &&
+           (extension[5] == 'e' || extension[5] == 'E');
 }
 
 /* RetroPad positions map to the active-low serial word used by the PSX pad. */
@@ -797,7 +805,7 @@ void retro_get_system_info(struct retro_system_info *sys)
     memset(sys, 0, sizeof *sys);
     sys->library_name = "schwaystation";
     sys->library_version = SCHWAYSTATION_LIBRETRO_VERSION;
-    sys->valid_extensions = "exe";
+    sys->valid_extensions = "exe|psexe";
     sys->need_fullpath = true;
     sys->block_extract = true;
 }

@@ -13,6 +13,15 @@ schway_warnings(schwaystation-test-libretro-host)
 add_dependencies(schwaystation-test-libretro-host schwaystation_libretro)
 add_dependencies(schwaystation-test-libretro-host schwaystation-fixtures)
 
+# Fault prevented: a generated .info file advertises a functional claim
+# without a gating registered inventory row.
+schway_add_test(NAME libretro.info.claims
+  COMMAND ${CMAKE_COMMAND}
+    -DINFO_FILE=${PROJECT_BINARY_DIR}/libretro/schwaystation_libretro.info
+    -DINVENTORY=${CMAKE_CURRENT_LIST_DIR}/inventory.txt
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/info_claims.cmake
+  LABELS libretro portable TIMEOUT 30)
+
 # Fault prevented: the core RetroArch loads shows a frame, rate, geometry or
 # audio length other than the library's, needs content to start, loses its
 # region option, or resets or restores a state other than the library does.
@@ -32,6 +41,15 @@ endforeach()
 schway_add_test(NAME libretro.content.no_bios
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> content-no-bios ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe
+  LABELS libretro portable TIMEOUT 120)
+
+# Fault prevented: the advertised case-insensitive .psexe extension does not
+# load a real fullpath guest through the same BIOS-free adapter path as .exe.
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-psexe)
+schway_add_test(NAME libretro.content.psexe
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> content-psexe
+    ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe ${PROJECT_BINARY_DIR}/tests/libretro-psexe
   LABELS libretro portable TIMEOUT 120)
 
 # Fault prevented: selected BIOS files silently fall back or replace active
@@ -78,6 +96,13 @@ schway_add_test(NAME libretro.memory.boundaries
 schway_add_test(NAME libretro.input.controls
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> input-controls ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe
+  LABELS libretro portable TIMEOUT 120)
+
+# Fault prevented: published input descriptors have wrong ports, IDs,
+# descriptions, or do not remain valid through load, run, unload and deinit.
+schway_add_test(NAME libretro.input.descriptors
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> input-descriptors
   LABELS libretro portable TIMEOUT 120)
 
 schway_add_test(NAME libretro.input.movies
