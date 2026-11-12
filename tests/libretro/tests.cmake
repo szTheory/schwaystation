@@ -21,6 +21,15 @@ schway_add_test(NAME libretro.info.claims
     -DINVENTORY=${CMAKE_CURRENT_LIST_DIR}/inventory.txt
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/info_claims.cmake
   LABELS libretro portable TIMEOUT 30)
+schway_add_test(NAME libretro.info.claims.self_test
+  COMMAND ${CMAKE_COMMAND}
+    -DINFO_FILE=${PROJECT_BINARY_DIR}/libretro/schwaystation_libretro.info
+    -DINVENTORY=${CMAKE_CURRENT_LIST_DIR}/inventory.txt
+    -DCHECKER=${PROJECT_SOURCE_DIR}/tests/cmake/info_claims.cmake
+    -DEXPECT_FAIL=${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+    -DWORK=${PROJECT_BINARY_DIR}/tests/libretro/info-claims-self-test
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/info_claims_self_test.cmake
+  LABELS libretro portable TIMEOUT 30)
 
 # Fault prevented: the core RetroArch loads shows a frame, rate, geometry or
 # audio length other than the library's, needs content to start, loses its

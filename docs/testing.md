@@ -216,6 +216,10 @@ in CTest. The checker requires every true functional key to map to registered te
 tests/libretro/inventory.txt. The host tests exercise the callback or loaded content; an inventory row alone is
 not behavior evidence.
 
+libretro.info.claims.self_test runs all 19 failure-direction controls through tests/cmake/expect_fail.cmake. It
+checks missing and duplicate keys, malformed values, unsupported claims, removed inventory rows, and an
+ungrounded camera=true claim. This confirms that a new true metadata key cannot pass configuration without a test.
+
 | Claim | Behavior cases |
 |---|---|
 | supports_no_game | libretro.host, libretro.host.pal load without content and check the test-card path. |

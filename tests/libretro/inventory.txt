@@ -7,6 +7,7 @@ libretro.content.psexe	libretro,portable
 libretro.host	libretro,portable
 libretro.host.pal	libretro,portable
 libretro.info.claims	libretro,portable
+libretro.info.claims.self_test	libretro,portable
 libretro.input.controls	libretro,portable
 libretro.input.descriptors	libretro,portable
 libretro.input.movies	libretro,portable

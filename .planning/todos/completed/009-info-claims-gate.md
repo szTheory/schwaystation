@@ -1,10 +1,12 @@
 ---
 title: "Port the libretro .info claims check (libretro.info_claims)"
-status: pending
+status: completed
 priority: P2
 source: "phase 01, plan 01-15 (a seed gate deferred under D-25 and AGENTS rule 7)"
 created: 2026-10-20
 theme: libretro
+completed: 2026-11-12
+closed_by: "04-45"
 ---
 
 ## Goal
