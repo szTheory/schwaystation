@@ -474,15 +474,19 @@ jobs:
       - name: Both RetroArch frames equal their runner references
         working-directory: build/frames
         run: |
-          ../runner/bin/schwaystation-run --frames 59 --png 59:runner59.png
-          ../runner/bin/schwaystation-run --frames 60 --png 60:runner60.png
+          printf '%s\n' '1 p1=digital:.:128,128,128,128 p2=.' \
+            '60 p1=digital:X:128,128,128,128 p2=.' > pad-counter.inputs
+          ../runner/bin/schwaystation-run --exe ../fixtures/pad_counter.exe --frames 59 \
+            --inputs pad-counter.inputs --png 59:runner59.png
+          ../runner/bin/schwaystation-run --exe ../fixtures/pad_counter.exe --frames 60 \
+            --inputs pad-counter.inputs --png 60:runner60.png
           test -d ../ra-replay/system && test -z "$(find ../ra-replay/system -mindepth 1 -print -quit)"
-          for f in runner59 runner60 replay.59 replay.60; do
+          for f in runner59 runner60 replay.58 replay.59; do
             sips --deleteColorManagementProperties "$f.png" > /dev/null
             sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
           done
-          python3 ../../tests/retroarch/verify.py compare runner59.bmp replay.58.bmp 320 240
-          python3 ../../tests/retroarch/verify.py compare runner60.bmp replay.59.bmp 320 240
+          python3 ../../tests/retroarch/verify.py compare runner59.bmp replay.58.bmp 256 240
+          python3 ../../tests/retroarch/verify.py compare runner60.bmp replay.59.bmp 256 240
           python3 ../../tests/retroarch/verify.py distinct replay.58.bmp replay.59.bmp
       - name: RetroArch logs
         if: failure()

@@ -565,14 +565,17 @@ cached across runs.
 
 The pinned frontend counts presented video callbacks for `--max-frames`, while the restored core checkpoint is
 already at frame 1. Its first replay input drives core output frame 2. Therefore limits 58 and 59 capture guest
-frames 59 and 60, respectively; the runner references use `--frames 59` and `--frames 60`. The screenshot check
+frames 59 and 60, respectively. Each runner reference uses `--exe pad_counter.exe`, the same digital
+`--inputs` script with Cross pressed at guest frame 60, and `--frames 59` or `--frames 60`. The screenshot check
 occurs after the callback at the requested frontend count. At EOF the frontend can refresh a cached frame, so a
 60-limit capture would not prove a new guest frame. See the pinned
 [RetroArch runloop frame-limit check](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L5697),
 [screenshot/exit ordering](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/runloop.c#L5921-L5945)
 and [video callback counter](https://github.com/libretro/RetroArch/blob/69a4f0ea1e8aaf442ae4858f2e7f2b31a1776576/gfx/video_driver.c#L4324-L4347).
-The two decoded captures must differ and each must be pixel-exact to its corresponding runner image. This is the
-recurring real-host proof; the in-process input, card and rumble matrices remain independent.
+The guest output is 256x240: frame 59 is blank, and the frame-60 Cross edge draws one red pixel at (0,100).
+The two decoded RetroArch captures must differ and each must be pixel-exact to its corresponding runner image.
+The runner uses `--exe` without `--bios`, so it exercises the same BIOS-free stub-kernel path. This is the recurring
+real-host proof; the in-process input, card and rumble matrices remain independent.
 
 **Reproducing a red job.** Run the job's preset locally (`cmake --workflow --preset <name>`) and the same JUnit
 check. Lanes this host cannot run are listed above under "Lanes that need tools only CI has".
