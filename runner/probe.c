@@ -112,8 +112,17 @@ static int path_inside(const char *root, const char *path)
 #if defined(SCHWAY_RUN_TEST_HOOKS)
 static int path_diagnostics_enabled(void)
 {
+#if defined(_MSC_VER)
+    char *value = NULL;
+    size_t size = 0u;
+    int enabled = _dupenv_s(&value, &size, "SCHWAY_RUN_PATH_DIAGNOSTICS") == 0 &&
+                  value != NULL && strcmp(value, "1") == 0;
+    free(value);
+    return enabled;
+#else
     const char *value = getenv("SCHWAY_RUN_PATH_DIAGNOSTICS");
     return value != NULL && strcmp(value, "1") == 0;
+#endif
 }
 
 static const char *test_path_class(const char *path)
