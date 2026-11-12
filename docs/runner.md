@@ -69,8 +69,8 @@ schwaystation-run --bios ./bios.bin --frames 600 --tty
 ```
 
 The checked OpenBIOS shell used by CI is an unknown image, so the runner reports the same unknown flags. The host
-chooses the image with `--bios` and the machine profile with `--region`; it may inspect the shell's 240th NTSC-U
-frame with:
+chooses the image with `--bios` and the machine profile with `--region`; the portable shell check also boots the
+same checked image with the NTSC-J and PAL selectors. To inspect its 240th NTSC-U frame, use:
 
 ```sh
 schwaystation-run --region ntsc-u --bios ./openbios.bin --frames 240 --hash --png 240:openbios-shell.png

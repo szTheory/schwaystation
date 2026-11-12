@@ -58,6 +58,68 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "OpenBIOS region selector ${REGION} did not run with the checked image: ${rc}: ${output}")
     endif()
     return()
+  elseif(CASE STREQUAL "openbios_shell_controls")
+    foreach(var RUN BIOS EXPECTED_FILE HASHES_SCRIPT CONTROL_DIR SHELL_REGION SHELL_FRAME SHELL_SHA256)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "OpenBIOS shell controls require ${var}")
+      endif()
+    endforeach()
+    if(EXISTS "${BIOS}" AND NOT IS_DIRECTORY "${BIOS}")
+      file(SIZE "${BIOS}" bios_size)
+      file(SHA256 "${BIOS}" bios_digest)
+      file(READ "${EXPECTED_FILE}" expected_bios_digest)
+      string(STRIP "${expected_bios_digest}" expected_bios_digest)
+      if(NOT bios_size EQUAL 524288 OR NOT bios_digest STREQUAL expected_bios_digest)
+        message(FATAL_ERROR "OpenBIOS selector controls refused unchecked input (${bios_size} bytes, ${bios_digest})")
+      endif()
+      foreach(region IN ITEMS ntsc-j pal)
+        execute_process(COMMAND ${EMULATOR} "${RUN}" --region "${region}" --bios "${BIOS}" --frames 1 --hash
+          RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+        set(output "${out}${err}")
+        if(NOT rc STREQUAL "0" OR
+           NOT output MATCHES "bios flags=loaded status=unknown region=unknown sha256=${expected_bios_digest}" OR
+           NOT output MATCHES "frame 1 sha256 [0-9a-f]+")
+          message(FATAL_ERROR "OpenBIOS ${region} selector failed with the checked image: ${rc}: ${output}")
+        endif()
+      endforeach()
+    elseif("$ENV{CI}" STREQUAL "true")
+      message(FATAL_ERROR "OpenBIOS shell selectors require the same-run checked handoff")
+    else()
+      message("OpenBIOS region selectors: not applicable without a local checked handoff")
+    endif()
+
+    file(MAKE_DIRECTORY "${CONTROL_DIR}")
+    set(files "")
+    foreach(lane IN ITEMS linux-x64 linux-arm64 macos-x64 macos-arm64 windows-x64 windows-arm64 be32 wasm32)
+      set(file "${CONTROL_DIR}/${lane}.txt")
+      file(WRITE "${file}" "openbios shell ${SHELL_REGION} frame ${SHELL_FRAME} sha256 ${SHELL_SHA256}\n")
+      list(APPEND files "${file}")
+    endforeach()
+    set(missing_lane_files "${files}")
+    list(POP_BACK missing_lane_files)
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DFILES=${missing_lane_files}" -DCOUNT=8 -DMODE=compare
+      -P "${HASHES_SCRIPT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(rc STREQUAL "0" OR NOT output MATCHES "expected 8 files, got 7")
+      message(FATAL_ERROR "OpenBIOS missing-lane control was accepted: ${rc}: ${output}")
+    endif()
+    list(GET files 7 last_file)
+    file(WRITE "${last_file}" "")
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DFILES=${files}" -DCOUNT=8 -DMODE=compare
+      -P "${HASHES_SCRIPT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(rc STREQUAL "0" OR NOT output MATCHES "wasm32.txt[^/]*differs")
+      message(FATAL_ERROR "OpenBIOS missing-tuple control was accepted: ${rc}: ${output}")
+    endif()
+    file(WRITE "${last_file}" "openbios shell ${SHELL_REGION} frame ${SHELL_FRAME} sha256 0000000000000000000000000000000000000000000000000000000000000000\n")
+    execute_process(COMMAND "${CMAKE_COMMAND}" "-DFILES=${files}" -DCOUNT=8 -DMODE=compare
+      -P "${HASHES_SCRIPT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    set(output "${out}${err}")
+    if(rc STREQUAL "0" OR NOT output MATCHES "wasm32.txt[^/]*differs")
+      message(FATAL_ERROR "OpenBIOS wrong-hash control was accepted: ${rc}: ${output}")
+    endif()
+    message("OpenBIOS NTSC-J/PAL selectors and eight-lane tuple refusal controls passed")
+    return()
   elseif(CASE STREQUAL "openbios_shell_not_applicable")
     if(NOT DEFINED TUPLE_FILE OR "${TUPLE_FILE}" STREQUAL "")
       message(FATAL_ERROR "OpenBIOS shell applicability result requires TUPLE_FILE")
@@ -302,9 +364,9 @@ endif()
 set(openbios_shell_input "${PROJECT_BINARY_DIR}/openbios/openbios.bin")
 set(openbios_shell_tuple_file "${PROJECT_BINARY_DIR}/openbios-shell-tuple.txt")
 file(REMOVE "${openbios_shell_tuple_file}")
+string(REPLACE ";" "$<SEMICOLON>" openbios_shell_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
 # Fault prevented: a checked BIOS that no longer reaches its inspected shell frame.
 if(EXISTS "${openbios_shell_input}")
-  string(REPLACE ";" "$<SEMICOLON>" openbios_shell_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
   set(openbios_shell_cmd ${CMAKE_COMMAND}
     "-DRUN=$<TARGET_FILE:schwaystation-run>"
     "-DEMULATOR=${openbios_shell_emulator}"
@@ -328,6 +390,22 @@ else()
     LABELS bios portable runner TIMEOUT 10
     PASS_REGEX "not-applicable because there is no local checked handoff")
 endif()
+
+set(openbios_shell_controls_dir "${PROJECT_BINARY_DIR}/tests/built/openbios/shell-controls")
+set(openbios_shell_controls_cmd ${CMAKE_COMMAND}
+  "-DRUN=$<TARGET_FILE:schwaystation-run>"
+  "-DEMULATOR=${openbios_shell_emulator}"
+  "-DBIOS=${openbios_shell_input}"
+  "-DEXPECTED_FILE=${PROJECT_SOURCE_DIR}/tests/built/expected.txt"
+  "-DHASHES_SCRIPT=${PROJECT_SOURCE_DIR}/tests/cmake/hashes.cmake"
+  "-DCONTROL_DIR=${openbios_shell_controls_dir}"
+  "-DSHELL_REGION=${SCHWAY_OPENBIOS_SHELL_REGION}"
+  "-DSHELL_FRAME=${SCHWAY_OPENBIOS_SHELL_FRAME}"
+  "-DSHELL_SHA256=${SCHWAY_OPENBIOS_SHELL_SHA256}"
+  -DCASE=openbios_shell_controls -P ${CMAKE_CURRENT_LIST_FILE})
+schway_add_test(NAME built.openbios.shell_controls
+  COMMAND ${openbios_shell_controls_cmd}
+  LABELS bios portable runner TIMEOUT 30)
 
 set_tests_properties(built.openbios.shell PROPERTIES FIXTURES_SETUP openbios_shell)
 cmake_language(DEFER CALL set_tests_properties runner.hashes_file PROPERTIES

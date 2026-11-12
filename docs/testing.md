@@ -51,8 +51,10 @@ register sweeps of `gte` and `dma` (`gte.regs.sweep`, `dma.regs.sweep`) are the 
 The required CI run builds the pinned OpenBIOS shell once, checks its size and SHA-256 before uploading it as the
 `openbios-handoff` Actions artifact, then makes each applicable build lane download that artifact from the same
 run. Each consumer verifies that handoff before configuring tests. `built.openbios.shell` boots those same bytes in
-NTSC-U to frame 240 and checks the independently inspected shell-frame hash. The hash file adds that named
-profile/frame tuple to the existing eight-lane comparison; CI requires the checked artifact, while a local
+NTSC-U to frame 240 and checks the independently inspected shell-frame hash. `built.openbios.shell_controls` boots
+the checked image for one frame under the NTSC-J and PAL selectors, then asks the existing comparison helper to
+reject a missing lane, missing shell tuple and wrong native hash. The hash file adds that named profile/frame tuple
+to the existing eight-lane comparison; CI requires the checked artifact, while a local
 build-only run without it writes an explicit not-applicable row. `built.openbios.handoff_corruption` and
 `built.openbios.handoff_missing` verify that changed and missing consumer copies are refused;
 `built.openbios.digest_corrupt` also checks a same-size digest mismatch. Local or build-only configurations without
@@ -62,9 +64,9 @@ library, runner and libretro components; release collection downloads only `arch
 enter a package or publication artifact. A transfer or digest failure is an infrastructure failure, not an
 emulation result.
 
-The shell tuple is produced by `built.openbios.shell` and consumed by `runner.hashes_file` after that test. To run
-only the lane-hash check, select both tests with
-`ctest --test-dir build/ci -R '^(built\.openbios\.shell|runner\.hashes_file)$' --output-on-failure`.
+The shell test is a CTest fixture setup for `runner.hashes_file`. It clears the tuple before booting, and the hash
+writer requires the tuple created by that current test run. Selecting only `runner.hashes_file` automatically runs
+the shell setup first: `ctest --test-dir build/ci -R '^runner\.hashes_file$' --output-on-failure`.
 
 `SCHWAYSTATION_TIMEOUT_SCALE` multiplies every test timeout: 3 for `asan`, 8 for `be32` and 5 for `wasm32`.
 

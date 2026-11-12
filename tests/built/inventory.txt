@@ -12,3 +12,4 @@ built.openbios.handoff	bios,portable
 built.openbios.handoff_corruption	bios,portable
 built.openbios.handoff_missing	bios,portable
 built.openbios.shell	bios,portable,runner
+built.openbios.shell_controls	bios,portable,runner
