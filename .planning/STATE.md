@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 40 of 53
+current_plan: 41 of 53
 status: executing
-stopped_at: "Completed 04-43-PLAN.md; runtime/model: Codex OpenGSD 1.20.1, gpt-6-luna xhigh"
-last_updated: "2026-11-12T05:05:05.531Z"
+stopped_at: "Completed 04-25-PLAN.md; runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh"
+last_updated: "2026-11-12T05:45:39.034Z"
 last_activity: 2026-11-12
-last_activity_desc: Completed plan 04-43 native libretro RGB555/RGB24 delivery and geometry/rate edge coverage; next ordinal is plan 04-25 in wave 32.
-state_head: 38f983e730508fe76cb60ae559414cb726e3c86c
+last_activity_desc: Completed plan 04-25 bounded raw ISO identity probe with full CI and hygiene; next ordinal is plan 04-49 in wave 33.
+state_head: a62b9e4470aa34d801e298d9aebd15ef629cde82
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 107
+  completed_plans: 108
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 40 of 53
-Status: Plan 04-43 complete; next ordinal is plan 04-25 in wave 32.
-Last activity: 2026-11-12 — Completed native libretro video conversion and geometry/rate edge coverage.
+Current Plan: 41 of 53
+Status: Plan 04-25 complete; next ordinal is plan 04-49 in wave 33.
+Last activity: 2026-11-12 — Completed bounded raw ISO identity probing; CI and hygiene passed. Runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh.
 
 Progress: [█████░░░░░] 50%
 
@@ -168,6 +168,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P24 | 35 min | 2 tasks | 11 files |
 | Phase 04 P41 | 23min | 2 tasks | 7 files |
 | Phase 04 P43 | 31min | 2 tasks | 5 files |
+| Phase 04 P25 | 37min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -391,6 +392,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Preserve the exact sparse base checkout in RUNNER_TEMP before head checkout so workspace cleanup cannot remove the protected judge.
 - [Phase 04]: Native libretro video uses the shared bounded converter for RGB555 and packed RGB24 before host callbacks.
 - [Phase 04]: SET_GEOMETRY is sent only when dimensions change, and SET_SYSTEM_AV_INFO only when the rate changes.
+- [Phase 04]: Plan 04-25 probes direct raw ISO9660 metadata only; CUE and track modes remain with 04-49.
+- [Phase 04]: Plan 04-25 reports boot and play as unavailable and never starts the core or submits sectors.
+- [Phase 04]: The synthetic track SHA-1 is computed independently by CMake; production identity reuses the existing MD5 implementation.
 
 ### Pending Todos
 
@@ -538,8 +542,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-12T05:05:05.196Z
-Stopped at: Completed 04-43-PLAN.md; runtime/model: Codex OpenGSD 1.20.1, gpt-6-luna xhigh
+Last session: 2026-11-12T05:45:38.624Z
+Stopped at: Completed 04-25-PLAN.md; runtime/model: Codex OpenGSD 1.20.0, gpt-6-luna xhigh
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
