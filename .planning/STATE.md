@@ -6,10 +6,10 @@ current_phase: 04
 current_phase_name: Games play in RetroArch
 current_plan: 37 of 53
 status: executing
-stopped_at: Completed 04-27; 04-24 remains incomplete at its budget checkpoint
+stopped_at: Completed 04-27; approved 2300-line ceiling permits resuming incomplete 04-24
 last_updated: "2026-11-12T03:10:11.360Z"
 last_activity: 2026-11-12
-last_activity_desc: Committed the measured 04-24 schema/data subset; compatibility judge and generated-doc controls await a whole-phase gate-budget decision.
+last_activity_desc: Applied the owner-approved 2300-line Phase 4 gate ceiling; resume unfinished 04-24 judge and generated-doc controls.
 state_head: aba2b7b03da6472237938c393ce86dc3178e0407
 progress:
   total_phases: 6
@@ -32,8 +32,8 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
 Current Plan: 37 of 53
-Status: Plan 04-40 complete; the next roadmap plan is 04-24.
-Last activity: 2026-11-12 — Inspected and pinned the OpenBIOS shell at frame 240; portable hash equality and all required hosted checks passed.
+Status: Plan 04-27 complete; resume incomplete 04-24 under the approved 2300-line ceiling.
+Last activity: 2026-11-12 — Recorded the owner's whole-phase gate-budget approval after the measured prototype review.
 
 Progress: [█████░░░░░] 50%
 
@@ -393,7 +393,7 @@ retain their bound plans and seed dispositions.
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
-- Phase 04 plan 04-24 remains incomplete after the measured schema/data GREEN slice: the repository-check budget is 1842/1850 lines, while a tested but incomplete ratchet/docs/protected-base prototype sample adds 254 counted lines and the remaining library/.info plans estimate another 120. The prototype is not a proven minimum or integrated production judge. Preserve the ten-column behavior and controls; resolve one whole-phase gate-budget decision before completing 04-24. Current plan ordinal and ROADMAP completion remain unchanged.
+- Phase 04 plan 04-24 remains incomplete after the measured schema/data GREEN slice. The owner explicitly approved the whole-phase ceiling increase from 1850 to 2300 after reviewing the 1842-line implementation, tested 254-line scratch sample and remaining library/.info estimates. The budget blocker is resolved; finish the actual judge/docs integration and controls before completing 04-24. The 2216-line partial forecast is not a proven minimum. Current plan ordinal and ROADMAP completion remain unchanged.
 
 ### Quick Tasks Completed
 
@@ -520,11 +520,12 @@ come from `AGENTS.md`.
 
 | 2026-11-12 | /gsd-execute-plan 04-24 (incomplete checkpoint) | Codex, OpenGSD 1.20.0; sequential executor; measured ledger/schema GREEN subset, scratch ratchet/docs sizing and refusal controls; plan remains incomplete | GPT-6 (session; exact model ID not exposed) |
 | 2026-11-12 | /gsd-execute-plan 04-27 | Codex, OpenGSD 1.20.0; sequential executor; PS-EXE libretro loading, no-content BIOS selection, full CI and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | Phase 04 approved gate-budget implementation | Codex, OpenGSD 1.20.0; concrete 2300-line ceiling and approval record, no plan advance | GPT-6 (session; exact model ID not exposed) |
 
 ## Session Continuity
 
 Last session: 2026-11-12T03:10:10.887Z
-Stopped at: Completed 04-27; 04-24 remains incomplete at its budget checkpoint
+Stopped at: Completed 04-27; approved 2300-line ceiling permits resuming incomplete 04-24
 Resume file: .planning/phases/04-games-play-in-retroarch/04-24-CHECKPOINT.md
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)

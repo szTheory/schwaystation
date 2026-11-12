@@ -2,6 +2,10 @@
 
 **Status:** Incomplete. The ten-column ledger/schema slice is committed and passes its focused test. The compatibility transition judge, full registered refusal coverage, generated documentation, and documentation-freshness gate remain unfinished. No `04-24-SUMMARY.md` was created, and the plan/roadmap ordinal remains unchanged.
 
+**Budget decision resolved:** The owner subsequently approved the 2,300-line whole-phase ceiling.
+The concrete requirement, configured limit and standing authorization now reflect it. The measurements
+and proposal below remain historical provenance; resume the unfinished implementation and controls.
+
 ## Committed work
 
 - `59ad2c5d589b`: TDD RED registration and missing-ledger schema assertion. Its focused CTest run exited 8 because the ledger did not exist; `gsd_run check tdd-red-evidence` accepted the named failing assertion.
