@@ -406,7 +406,8 @@ jobs:
   # saying so. A range of frames is never accepted.
   retroarch:
     needs: [changes, build]
-    if: needs.changes.outputs.heavy == 'true'
+    # Keep the host result when another build leg fails; the required aggregate still fails.
+    if: ${{ !cancelled() && needs.changes.outputs.heavy == 'true' }}
     runs-on: macos-15
     timeout-minutes: 5  # 5-minute floor; 2 x 23 s (retroarch), slowest of 1 run, run 39455724329, provisional
     steps:
