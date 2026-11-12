@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 34 of 53
+current_plan: 35 of 53
 status: executing
-stopped_at: GPUSTAT field-status blocker isolated; plan 04-53 ready before shell acceptance
-last_updated: "2026-11-11T23:16:01Z"
+stopped_at: Completed 04-53-PLAN.md
+last_updated: "2026-11-12T00:03:10.119Z"
 last_activity: 2026-11-11
 last_activity_desc: Planned measured-source GPUSTAT phase behavior with one approved saved latch; shell remains unaccepted
-state_head: 558b24cc914e192e7436c317189ba686a3d755cb
+state_head: cef488e7d4dd79b28c9250c3449061d5c93b885d
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 101
+  completed_plans: 102
   percent: 50
 ---
 
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 34 of 53
-Status: Plan 04-53 is next ready; 04-40 waits and retains real recognizable-shell/portable acceptance.
+Current Plan: 35 of 53
+Status: Plan 04-53 complete; 04-40 waits and retains real recognizable-shell/portable acceptance.
 Last activity: 2026-11-11 — Added GPUSTAT status/state slice using new primary hardware evidence; no shell hash accepted.
 
 Progress: [█████░░░░░] 50%
@@ -162,6 +162,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P50 | 17 min | 2 tasks | 5 files |
 | Phase 04 P51 | 22min | 2 tasks | 10 files |
 | Phase 04 P52 | 18m 38s | 2 tasks | 9 files |
+| Phase 04 P53 | 45min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -370,6 +371,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep API, state and behavior revision 4; model only exact halfword ATTR readback as saved instance state.
 - [Phase 04]: Derive DMA4 RAM-to-device readiness from saved ATTR bits 5-4 equal to mode 2; keep manual DREQ credits independent.
 - [Phase 04]: Keep the deterministic sink, existing unit cost and serialized DMA fields; no new state layout or revision is needed.
+- [Phase 04]: Plan 04-53: save one GPU field-status phase because bit 13 retains its value after IRS is disabled; expose v2 bit 13 and mask v0.
+- [Phase 04]: Plan 04-53: preserve the fixed 263/314-line beam model and document unmodeled physical-field timing instead of claiming exact timeline parity.
 
 ### Pending Todos
 
@@ -503,10 +506,12 @@ come from `AGENTS.md`.
 
 | 2026-11-11 | Phase 04 GPUSTAT first-caller planning | Codex, OpenGSD 1.20.0; current primary status evidence, approved minimal saved phase, planning-only ordering/coverage update | gpt-6.1-sol high |
 
+| 2026-11-11 | /gsd-execute-plan 04-53 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; GPUSTAT saved-phase latch, RED/GREEN, full CI and hygiene | gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-11T23:16:01Z
-Stopped at: Plan 04-53 ready for focused independent check; 04-40 waits
+Last session: 2026-11-12T00:03:09.863Z
+Stopped at: Completed 04-53-PLAN.md
 Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
