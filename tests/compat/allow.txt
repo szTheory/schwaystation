@@ -1,0 +1,1 @@
+# YYYY-MM-DD <serial> <md5> <predicate> behavior-rev=<n> expires=YYYY-MM-DD <reason>
