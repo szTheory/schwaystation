@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 43 of 53
+current_plan: 44 of 53
 status: executing
-stopped_at: "Owner approved 2700-line ceiling; resume complete 04-26 candidate"
-last_updated: "2026-11-12T13:20:51Z"
+stopped_at: Completed 04-26-PLAN.md
+last_updated: "2026-11-12T13:40:53.359Z"
 last_activity: 2026-11-12
-last_activity_desc: Applied the owner-approved 2700-line ceiling after complete 2633-line accounting; resume 04-26 and measured efficiency work.
-state_head: c3b09a69127b15e4225e4066b0458dd9cc83305f
+last_activity_desc: Completed 04-26 with the approved 2700-line ceiling, 2448 measured gate lines, and passing full CI and hygiene.
+state_head: bbaac44b9a6c3081d6c0d9a06910540930044d7d
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 121
-  completed_plans: 110
+  completed_plans: 111
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 43 of 53
-Status: Plan 04-42 complete; resume incomplete 04-26 under the approved 2700-line ceiling. Eleven phase plans remain.
-Last activity: 2026-11-12 — Recorded the explicit resource approval and renewed measured efficiency instruction; no plan advance.
+Current Plan: 44 of 53
+Status: Plan 04-26 complete under the approved 2700-line ceiling. Eleven phase plans remain.
+Last activity: 2026-11-12 — Applied the preserved candidate, passed focused/full CI and hygiene, and completed plan metadata.
 
 Progress: [█████░░░░░] 50%
 
@@ -171,6 +171,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P25 | 37min | 2 tasks | 8 files |
 | Phase 04 P49 | 38min | 2 tasks | 7 files |
 | Phase 04 P42 | 40min | 2 tasks | 16 files |
+| Phase 04 P26 | 86min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -404,6 +405,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep boot_status and play_status unknown; the probe does not execute a disc.
 - [Phase 04]: Use the pinned libretro-database PlayStation DAT only as an attributed title source; do not vendor it or add a package.
 - [Phase 04]: Keep test metadata arguments in a dedicated non-installed test runner and require an isolated root and marker file.
+- [Phase 04]: The local library and isolated tests share the production runner metadata lookup path.
+- [Phase 04]: Unknown and unlisted discs remain private, and boot/play remain unavailable until measured by a disc backend.
+- [Phase 04]: The approved Phase 4 repository-check ceiling is 2700 lines; plan 04-26 measures 2448 lines with all checks retained.
 
 ### Pending Todos
 
@@ -550,13 +554,14 @@ come from `AGENTS.md`.
 | 2026-11-12 | /gsd-execute-plan 04-41 | Codex, OpenGSD 1.20.0; sequential executor; protected base judge and controls, full CI and hygiene | gpt-6-luna xhigh |
 | 2026-11-12 | /gsd-execute-plan 04-43 | Codex, OpenGSD 1.20.1; sequential executor in shared phase checkout; native RGB555/RGB24 adapter conversion, geometry/rate edge tests, full CI and hygiene | gpt-6-luna xhigh |
 | 2026-11-12 | /gsd-execute-plan 04-26 incomplete resource checkpoint | Codex/OpenGSD; complete library candidate and ordinary-mode/BIN proof preserved off-tree; no plan advance | executor gpt-6-luna xhigh; coordinator GPT-6 session |
+| 2026-11-12 | /gsd-execute-plan 04-26 resumed after approved budget update | Codex, OpenGSD 1.20.0; sequential shared checkout; applied candidate, focused library cases, full CI, hygiene and plan closeout | gpt-6-luna xhigh |
 | 2026-11-12 | Phase 04 complete-code budget approval implementation | Codex/OpenGSD; concrete 2700-line ceiling, preserved proposal and renewed efficiency authority; no plan advance | GPT-6 session |
 
 ## Session Continuity
 
-Last session: 2026-11-12T13:20:51Z
-Stopped at: Owner approved 2700-line ceiling; resume complete 04-26 candidate
-Resume file: .planning/phases/04-games-play-in-retroarch/04-26-CHECKPOINT.md
+Last session: 2026-11-12T13:40:52.839Z
+Stopped at: Completed 04-26-PLAN.md
+Resume file: None
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
 Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8
