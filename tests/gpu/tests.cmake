@@ -2,14 +2,19 @@
 # inspect the instance's native VRAM. One executable runs the named case.
 if(CMAKE_SCRIPT_MODE_FILE)
   string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
-  if(CASE STREQUAL "cli")
-    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-vram
-      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  function(expect_runner code regex)
+    execute_process(COMMAND ${EMULATOR} ${RUN} ${ARGN} RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE err)
     string(APPEND out "${err}")
-    if(NOT rc STREQUAL "0" OR
-       NOT out MATCHES "^vram sha256 67222605a58edbac567cba036618e52bb4a3eb933c32006c891d06adbb035041\n$")
-      message(FATAL_ERROR "--frames 1 --hash-vram: expected the canonical frame-1 VRAM hash, got exit ${rc}\n${out}")
+    if(NOT rc STREQUAL "${code}" OR NOT out MATCHES "${regex}")
+      message(FATAL_ERROR "runner ${ARGN}: expected exit ${code} and output matching ${regex}; got ${rc}\n${out}")
     endif()
+  endfunction()
+  if(CASE STREQUAL "cli")
+    expect_runner(0 "^vram sha256 67222605a58edbac567cba036618e52bb4a3eb933c32006c891d06adbb035041\n$"
+      --frames 1 --hash-vram)
+    expect_runner(2 "usage" --frames 1 --hash-vram --hash-vram)
+    expect_runner(2 "usage" --frames 1 --hash-vram --probe unused.exe)
   else()
     message(FATAL_ERROR "unknown GPU reference case '${CASE}'")
   endif()
@@ -71,6 +76,16 @@ target_link_libraries(schwaystation-test-gpu-display PRIVATE schwaystation::schw
 set_target_properties(schwaystation-test-gpu-display PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu-display)
+
+add_executable(schwaystation-test-gpu-reference
+  ${CMAKE_CURRENT_LIST_DIR}/reference.c
+  ${PROJECT_SOURCE_DIR}/runner/png.c
+  ${PROJECT_SOURCE_DIR}/runner/crc32.c)
+target_include_directories(schwaystation-test-gpu-reference PRIVATE ${PROJECT_SOURCE_DIR}/runner)
+target_link_libraries(schwaystation-test-gpu-reference PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-gpu-reference PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-gpu-reference)
 
 # Fault prevented: GP1 mode dividers, display-window wrap, field height,
 # 24-bit packing, display-off output or malformed ranges drifting from scanout.
@@ -258,4 +273,9 @@ string(REPLACE ";" "|" gpu_reference_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}"
 schway_add_test(NAME gpu.reference.cli
   COMMAND ${CMAKE_COMMAND} -DCASE=cli -DRUN=$<TARGET_FILE:schwaystation-run>
     "-DEMULATOR=${gpu_reference_emulator}" -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS gpu portable TIMEOUT 30)
+
+# Fault prevented: PNG channel quantization or any canonical whole-VRAM pixel changes.
+schway_add_test(NAME gpu.reference.quantization
+  COMMAND schwaystation-test-gpu-reference quantization
   LABELS gpu portable TIMEOUT 30)
