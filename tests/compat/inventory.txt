@@ -1,4 +1,5 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
+compat.probe.synthetic_identity	compat,portable
 compat.ratchet.baseline	compat,portable
 compat.ratchet.protected_controls	compat,portable
 compat.ratchet.rows	compat,portable

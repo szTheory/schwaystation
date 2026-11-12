@@ -1,3 +1,38 @@
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_synthetic_identity")
+  foreach(required WORK_ROOT TEST_BINARY RUN)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "ISO probe test requires ${required}")
+    endif()
+  endforeach()
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+  set(work "${WORK_ROOT}/compat-probe-synthetic")
+  file(REMOVE_RECURSE "${work}")
+  file(MAKE_DIRECTORY "${work}")
+  set(image "${work}/synthetic.iso")
+  execute_process(COMMAND ${EMULATOR} "${TEST_BINARY}" synthetic "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "cannot generate ISO fixture: ${rc}: ${out}${err}")
+  endif()
+  file(SHA1 "${image}" track_sha1)
+  if(NOT track_sha1 STREQUAL "b7a1f733d515077a111f6d792d6549fde163f912")
+    message(FATAL_ERROR "generated ISO track SHA-1 changed: ${track_sha1}")
+  endif()
+  execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0" OR
+     NOT out MATCHES "format=disc\\nserial=SWAY-00001\\n" OR
+     NOT out MATCHES "boot_name=SWAY_000[.]01\\n" OR
+     NOT out MATCHES "exe_size=4096\\n" OR
+     NOT out MATCHES "rcheevos_md5=12481bed29c6c0d54a6f776ef5cec981\\n" OR
+     NOT out MATCHES "boot_status=unavailable\\nplay_status=unavailable\\n")
+    message(FATAL_ERROR "runner did not report the exact synthetic ISO identity: ${rc}: ${out}${err}")
+  endif()
+  file(WRITE "${WORK_ROOT}/compat-probe-track1.sha1" "${track_sha1}\n")
+  message(STATUS "ISO probe reported the exact synthetic metadata identity")
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_baseline")
   foreach(required SOURCE_ROOT WORK_ROOT)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -225,6 +260,21 @@ add_executable(schwaystation-test-compat ${CMAKE_CURRENT_LIST_DIR}/compat_tests.
 set_target_properties(schwaystation-test-compat PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-compat)
+
+add_executable(schwaystation-test-probe ${CMAKE_CURRENT_LIST_DIR}/probe_tests.c)
+set_target_properties(schwaystation-test-probe PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-probe)
+
+string(REPLACE ";" "|" schway__probe_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+
+# Fault prevented: a raw ISO probe reporting a different synthetic boot identity.
+schway_add_test(NAME compat.probe.synthetic_identity
+  COMMAND ${CMAKE_COMMAND} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DTEST_BINARY=$<TARGET_FILE:schwaystation-test-probe>
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -DCASE=probe_synthetic_identity -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 30)
 
 # Fault prevented: a changed head judge accepting a regression against a protected base.
 schway_add_test(NAME compat.ratchet.baseline
