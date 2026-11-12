@@ -692,6 +692,162 @@ cleanup:
     }
 }
 
+static void store_le32(unsigned char *bytes, size_t offset, uint32_t value)
+{
+    bytes[offset] = (unsigned char)value;
+    bytes[offset + 1u] = (unsigned char)(value >> 8);
+    bytes[offset + 2u] = (unsigned char)(value >> 16);
+    bytes[offset + 3u] = (unsigned char)(value >> 24);
+}
+
+static void append_li(uint32_t *code, size_t *count, unsigned reg, uint32_t value)
+{
+    code[(*count)++] = 0x3C000000u | (reg << 16) | (value >> 16);
+    if ((value & 0xFFFFu) != 0u) {
+        code[(*count)++] = 0x34000000u | (reg << 21) | (reg << 16) | (value & 0xFFFFu);
+    }
+}
+
+static void append_sw(uint32_t *code, size_t *count, unsigned reg, unsigned base, unsigned offset)
+{
+    code[(*count)++] = 0xAC000000u | (base << 21) | (reg << 16) | offset;
+}
+
+/* Build a first-party guest that selects a native display mode, draws one
+   red RGB555 pixel, and then stays in a guest loop. */
+static int write_native_video_exe(const char *path)
+{
+    unsigned char image[0x1000] = {0};
+    uint32_t code[64];
+    size_t count = 0u;
+    const unsigned io = 16u;
+    const unsigned value = 9u;
+
+    code[count++] = 0x3C10BF80u; /* lui s0, 0xbf80 */
+    code[count++] = 0x36101000u; /* ori s0, s0, 0x1000 */
+    append_li(code, &count, value, 0x03000001u); /* Display off while mode changes. */
+    append_sw(code, &count, value, io, 0x814u);
+    append_li(code, &count, value, 0x05000000u); /* Display start at VRAM (0, 0). */
+    append_sw(code, &count, value, io, 0x814u);
+    append_li(code, &count, value, 0x06C60260u); /* 640 dots at divider 4. */
+    append_sw(code, &count, value, io, 0x814u);
+    append_li(code, &count, value, 0x0703C000u); /* 240 native rows. */
+    append_sw(code, &count, value, io, 0x814u);
+    append_li(code, &count, value, 0x08000013u); /* 640x240, packed RGB24. */
+    append_sw(code, &count, value, io, 0x814u);
+    append_li(code, &count, value, 0x03000000u); /* Display on. */
+    append_sw(code, &count, value, io, 0x814u);
+    append_li(code, &count, value, 0xE3000000u); /* Draw area top-left. */
+    append_sw(code, &count, value, io, 0x810u);
+    append_li(code, &count, value, 0xE407FFFFu); /* Draw area covers VRAM. */
+    append_sw(code, &count, value, io, 0x810u);
+    append_li(code, &count, value, 0x600000FFu); /* Flat red 1x1 rectangle. */
+    append_sw(code, &count, value, io, 0x810u);
+    append_li(code, &count, value, 0u);
+    append_sw(code, &count, value, io, 0x810u);
+    append_li(code, &count, value, 0x00010001u);
+    append_sw(code, &count, value, io, 0x810u);
+    code[count++] = 0x1000FFFFu; /* beq zero, zero, self */
+    code[count++] = 0u;
+
+    memcpy(image, "PS-X EXE", 8u);
+    store_le32(image, 0x10u, 0x80010100u);
+    store_le32(image, 0x18u, 0x80010000u);
+    store_le32(image, 0x1Cu, 0x800u);
+    store_le32(image, 0x30u, 0x801FF000u);
+    store_le32(image, 0x34u, 0x1000u);
+    for (size_t i = 0u; i < count; i++) {
+        store_le32(image, 0x900u + 4u * i, code[i]);
+    }
+    return write_test_file(path, image, sizeof image);
+}
+
+static void check_native_video_fixture(const char *path)
+{
+    unsigned char image[0x1000];
+    FILE *file = fopen(path, "rb");
+    schway_video native;
+    schway *ref = ref_create(SCHWAY_REGION_NTSC_U);
+
+    CHECK(file != NULL);
+    CHECK(ref != NULL);
+    if (file == NULL || ref == NULL) {
+        if (file != NULL) {
+            (void)fclose(file);
+        }
+        schway_destroy(ref);
+        return;
+    }
+    CHECK(fread(image, 1u, sizeof image, file) == sizeof image);
+    CHECK_EQ_U64(fclose(file), 0u);
+    CHECK_EQ_U64(schway_load_exe(ref, image, sizeof image), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_run_frame(ref, NULL), SCHWAY_STATUS_OK);
+    memset(&native, 0, sizeof native);
+    native.size = (uint32_t)sizeof native;
+    CHECK_EQ_U64(schway_get_video(ref, &native), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(native.bpp, 24u);
+    CHECK_EQ_U64(native.width, 640u);
+    CHECK_EQ_U64(native.height, 240u);
+    if (native.pixels != NULL) {
+        const unsigned char *pixels = (const unsigned char *)native.pixels;
+        CHECK_EQ_U64(pixels[0], 0x1Fu);
+        CHECK_EQ_U64(pixels[1], 0u);
+        CHECK_EQ_U64(pixels[2], 0u);
+    } else {
+        CHECK(native.pixels != NULL);
+    }
+    schway_destroy(ref);
+}
+
+static int test_native_rgb24_geometry(const char *path)
+{
+    struct retro_game_info game;
+    const unsigned video_before = video_calls;
+
+    CHECK(write_native_video_exe(path));
+    check_native_video_fixture(path);
+    memset(&game, 0, sizeof game);
+    game.path = path;
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    run_one();
+    CHECK_EQ_U64(video_calls, video_before + 1u);
+    CHECK_EQ_U64(video_bad, 0u);
+    CHECK_EQ_U64(frame_w, 640u);
+    CHECK_EQ_U64(frame_h, 240u);
+    CHECK_EQ_U64(frame[0], 0x00001F00u);
+    CHECK_EQ_U64(frame[1], 0u);
+    CHECK_EQ_U64(geometry_calls, 1u);
+    CHECK_EQ_U64(geometry_sent.base_width, 640u);
+    CHECK_EQ_U64(geometry_sent.base_height, 240u);
+    CHECK_EQ_U64(geometry_sent.max_width, 640u);
+    CHECK_EQ_U64(av_info_calls, 0u);
+
+    for (unsigned i = 0u; i < 2u; i++) {
+        run_one();
+        CHECK_EQ_U64(video_calls, video_before + 2u + i);
+        CHECK_EQ_U64(frame[0], 0x00001F00u);
+        CHECK_EQ_U64(geometry_calls, 1u);
+        CHECK_EQ_U64(av_info_calls, 0u);
+    }
+
+    option_value = "pal";
+    option_updated = true;
+    run_one();
+    CHECK_EQ_U64(av_info_calls, 1u);
+    check_av(&av_info_sent, SCHWAY_REGION_PAL);
+    CHECK_EQ_U64(geometry_calls, 1u);
+    option_updated = true;
+    run_one();
+    CHECK_EQ_U64(av_info_calls, 1u);
+    CHECK_EQ_U64(geometry_calls, 1u);
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    (void)remove(path);
+    return check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     struct retro_system_info sys;
@@ -707,17 +863,18 @@ int main(int argc, char **argv)
     unsigned run, lo, other_lo;
     uint32_t region, other;
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
+    int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
 
-    if ((!content_mode && !lifecycle_mode &&
+    if ((!content_mode && !video_geometry_mode && !lifecycle_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
-        ((content_mode || lifecycle_mode) && argv[3][0] == '\0') ||
+        ((content_mode || video_geometry_mode || lifecycle_mode) && argv[3][0] == '\0') ||
         (lifecycle_mode && argv[4][0] == '\0')) {
         fprintf(stderr,
-                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir>\n");
+                "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | content-lifecycle <exe> <system-dir> | video-geometry <exe>\n");
         return 2;
     }
-    content_test = content_mode || lifecycle_mode;
+    content_test = content_mode || video_geometry_mode || lifecycle_mode;
     pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
     region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
@@ -771,6 +928,10 @@ int main(int argc, char **argv)
         p_deinit();
         module_close();
         CHECK_DONE();
+    }
+
+    if (video_geometry_mode) {
+        return test_native_rgb24_geometry(argv[3]);
     }
 
     if (content_mode) {

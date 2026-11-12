@@ -3,3 +3,4 @@ libretro.content.lifecycle	libretro,portable
 libretro.content.no_bios	libretro,portable
 libretro.host	libretro,portable
 libretro.host.pal	libretro,portable
+libretro.video.geometry	libretro,portable

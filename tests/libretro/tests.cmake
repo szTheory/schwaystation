@@ -41,3 +41,10 @@ schway_add_test(NAME libretro.content.lifecycle
     $<TARGET_FILE:schwaystation_libretro> content-lifecycle
     ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe ${PROJECT_BINARY_DIR}/tests
   LABELS libretro portable TIMEOUT 120)
+
+# Fault prevented: a native packed-RGB24 frame is dropped instead of converted,
+# dimension changes fail to notify, or a rate notification is repeated.
+schway_add_test(NAME libretro.video.geometry
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> video-geometry ${PROJECT_BINARY_DIR}/tests/native_video.exe
+  LABELS libretro portable TIMEOUT 120)
