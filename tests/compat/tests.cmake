@@ -21,11 +21,13 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_synthetic_identity")
   execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${image}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if(NOT rc STREQUAL "0" OR
-     NOT out MATCHES "format=disc\\nserial=SWAY-00001\\n" OR
-     NOT out MATCHES "boot_name=SWAY_000[.]01\\n" OR
-     NOT out MATCHES "exe_size=4096\\n" OR
-     NOT out MATCHES "rcheevos_md5=12481bed29c6c0d54a6f776ef5cec981\\n" OR
-     NOT out MATCHES "boot_status=unavailable\\nplay_status=unavailable\\n")
+     NOT out MATCHES "format=disc" OR
+     NOT out MATCHES "serial=SWAY-00001" OR
+     NOT out MATCHES "boot_name=SWAY_000[.]01" OR
+     NOT out MATCHES "exe_size=4096" OR
+     NOT out MATCHES "rcheevos_md5=12481bed29c6c0d54a6f776ef5cec981" OR
+     NOT out MATCHES "boot_status=unavailable" OR
+     NOT out MATCHES "play_status=unavailable")
     message(FATAL_ERROR "runner did not report the exact synthetic ISO identity: ${rc}: ${out}${err}")
   endif()
   file(WRITE "${WORK_ROOT}/compat-probe-track1.sha1" "${track_sha1}\n")

@@ -6,7 +6,7 @@ to check that a build produces the expected picture. It can run a PS-EXE file an
 and it can say what a PS-EXE file is without running it.
 
 The runner loads no disc. A run without `--bios` or `--exe` shows the built-in test card, described in
-[embedding.md](embedding.md#the-test-card). `--probe` reads one file and runs nothing.
+[embedding.md](embedding.md#the-test-card). `--probe` reads one PS-EXE or direct raw ISO9660 image and runs nothing.
 
 ## Synopsis
 
@@ -411,8 +411,12 @@ shows that frame's time, and with fewer than 100,000 frames p99.999 is the maxim
 
 ## Probe
 
-`--probe FILE` reads the file, checks it with the core's PS-EXE validator and prints what it is. It makes no
-instance, loads nothing and runs no frame. The report is these lines, in this order, each `key=value`:
+`--probe FILE` reads a PS-EXE or a direct raw ISO9660 image, checks the executable with the core's PS-EXE
+validator and prints metadata. It makes no instance, loads nothing, reads no CUE file, sends no sector to the
+emulated console and runs no frame. The ISO path accepts only 2048-byte sectors, images no larger than 1 GiB,
+at most 64 volume descriptors, directories no larger than 64 KiB with at most 4096 entries, `SYSTEM.CNF` up to
+2047 ASCII bytes, and boot paths up to 16 safe components of at most 63 bytes each. It reports booting and
+playing as unavailable. The report is these lines, in this order, each `key=value`:
 
 | Key | Value |
 |---|---|
@@ -429,6 +433,12 @@ instance, loads nothing and runs no frame. The report is these lines, in this or
 | `d_addr`, `d_size`, `b_addr`, `b_size` | the data and BSS fields, printed as the header holds them |
 | `s_addr`, `s_size` | the initial stack base and offset, zero when the header gives none |
 | `lint` | notes on a valid file, as bits: `0x1` the text lies in the low 64 KiB, `0x2` bytes follow the text |
+
+For a raw ISO9660 image, `format` is `disc`; `serial` is inferred from a conventional boot executable name or
+`n/a`; `boot_name` is the boot executable's canonical name without an ISO version suffix. The executable fields
+and hashes describe that file. `rcheevos_md5` hashes the canonical boot name followed by the PS-EXE header and
+text bytes selected by its header. `boot_status` and `play_status` are always `unavailable`: this probe does not
+boot or run discs. If `SYSTEM.CNF` is missing, the probe tries a root `PSX.EXE` file.
 
 The ten header values, from `pc0` to `s_size`, are printed as `0x` and eight hex digits, and so is `lint`.
 

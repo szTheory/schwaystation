@@ -10,6 +10,7 @@
 #include "md5.h"
 #include "schwaystation.h"
 #include "sha256.h"
+#include "disc_probe.h"
 
 #define EXE_HEADER 0x800u
 #define EXE_MAX (EXE_HEADER + 0x200000u) /* the validator's largest file */
@@ -87,6 +88,18 @@ static void rcheevos_md5(const uint8_t *file, uint32_t hash_len, char hex[33])
     schway__md5_hex(digest, hex);
 }
 
+static void rcheevos_disc_md5(const char *boot_name, const uint8_t *file,
+                              uint32_t hash_len, char hex[33])
+{
+    schway__md5 m;
+    uint8_t digest[16];
+    schway__md5_init(&m);
+    schway__md5_update(&m, boot_name, (uint32_t)strlen(boot_name));
+    schway__md5_update(&m, file, hash_len);
+    schway__md5_final(&m, digest);
+    schway__md5_hex(digest, hex);
+}
+
 uint8_t *schway__read_exe_file(const char *path, size_t *n_out)
 {
     FILE *f = fopen(path, "rb");
@@ -126,6 +139,50 @@ void schway__refuse_file(const char *path, const char *why)
 
 int schway__probe_print(FILE *out, const char *path)
 {
+    schway_host_disc_probe disc;
+    schway_host_disc_probe_status disc_status = schway__disc_probe_iso(path, &disc);
+    if (disc_status != SCHWAY_HOST_DISC_PROBE_NOT_ISO) {
+        if (disc_status != SCHWAY_HOST_DISC_PROBE_OK) {
+            refuse(path, schway__disc_probe_status_string(disc_status));
+            return 1;
+        }
+        schway_exe_info disc_info;
+        memset(&disc_info, 0, sizeof disc_info);
+        disc_info.size = (uint32_t)sizeof disc_info;
+        schway_status validation = schway_probe_exe(disc.exe_bytes, disc.exe_size, &disc_info);
+        if (validation != SCHWAY_STATUS_OK) {
+            schway__disc_probe_dispose(&disc);
+            refuse(path, schway_status_string(validation));
+            return 1;
+        }
+        schway__sha256 sha;
+        uint8_t sha_digest[32];
+        char sha_hex[65];
+        char md5_hex[33];
+        schway__sha256_init(&sha);
+        schway__sha256_update(&sha, disc.exe_bytes, disc.exe_size);
+        schway__sha256_final(&sha, sha_digest);
+        schway__sha256_hex(sha_digest, sha_hex);
+        rcheevos_disc_md5(disc.boot_name, disc.exe_bytes, disc_info.hash_len, md5_hex);
+        fputs("format=disc\nserial=", out);
+        fputs(disc.serial[0] == '\0' ? "n/a" : disc.serial, out);
+        fprintf(out, "\nlicence_area=%s\nregion_guess=%s\nboot_name=%s\nexe_size=%lu\nsha256=%s\nrcheevos_md5=%s\n",
+                licence_area_name(disc_info.licence_area), region_guess(disc_info.licence_area),
+                disc.boot_name, (unsigned long)disc.exe_size, sha_hex, md5_hex);
+        fprintf(out, "pc0=0x%08lx\ngp0=0x%08lx\n", (unsigned long)disc_info.pc0,
+                (unsigned long)disc_info.gp0);
+        fprintf(out, "t_addr=0x%08lx\nt_size=0x%08lx\n", (unsigned long)disc_info.t_addr,
+                (unsigned long)disc_info.t_size);
+        fprintf(out, "d_addr=0x%08lx\nd_size=0x%08lx\nb_addr=0x%08lx\nb_size=0x%08lx\n",
+                (unsigned long)disc_info.d_addr, (unsigned long)disc_info.d_size,
+                (unsigned long)disc_info.b_addr, (unsigned long)disc_info.b_size);
+        fprintf(out, "s_addr=0x%08lx\ns_size=0x%08lx\nlint=0x%08lx\n",
+                (unsigned long)disc_info.s_addr, (unsigned long)disc_info.s_size,
+                (unsigned long)disc_info.lint);
+        fputs("boot_status=unavailable\nplay_status=unavailable\n", out);
+        schway__disc_probe_dispose(&disc);
+        return ferror(out) == 0 ? 0 : 1;
+    }
     size_t n = 0;
     uint8_t *file = schway__read_exe_file(path, &n);
     if (file == NULL) {
