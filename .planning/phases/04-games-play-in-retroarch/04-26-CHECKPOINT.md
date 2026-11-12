@@ -1,5 +1,10 @@
 # Phase 04 Plan 26 — Incomplete resource checkpoint
 
+**Decision resolved:** The owner explicitly approved the 2,700-line ceiling and continued Phase 4
+execution, including measured low-hanging efficiency work. The configured limit and standing authority
+now reflect that approval. Preserve the proposal below as historical evidence and resume the complete
+patch; no development reconstruction or further budget confirmation is required within 2,700.
+
 Plan 04-26 remains incomplete. The complete, tested candidate is preserved as a reviewable patch; no
 implementation, overflow, SUMMARY or plan advance has been committed. The repository-check ceiling
 remains 2,300 while the owner considers the concrete 2,700-line proposal.

@@ -54,13 +54,14 @@ Phase 3's repository-check code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githoo
 - [ ] **GAME-07**: One integrated session in RetroArch (the hosted macOS job, at most 300 lines of e2e code in total, checked by `policy.e2e_budget`) loads `pad_counter.exe` as content with no BIOS in `system/` (the adapter boots PS-EXE content under the stub kernel), the picture differs between two `--max-frames` values, and each screenshot matches the runner's `--png` frame pixel for pixel; `supports_no_game`, `input_descriptors`, `core_options`, `memory_descriptors` (RAM at 0, 80000000h, A0000000h and the scratchpad at 1F800000h) and `disk_control` claims in the `.info` are each tied to a configure-time guard test.
 
 
-Phase 4's repository-check budget is **2,300 lines**, counted across `scripts/*.sh`,
+Phase 4's repository-check budget is **2,700 lines**, counted across `scripts/*.sh`,
 `tests/cmake/*.cmake` and `.githooks/*`, then ratcheted down to the actual total at ship. Phase 3's
 historical ship ratchet remains 1,513 lines. The owner approved the revised absolute ceiling after
-reviewing the measured 1,842-line implementation and a tested 254-line compatibility/docs/protected-base
-prototype, plus the remaining 80-line local-library and 40-line host-claim estimates. Their combined
-2,216-line forecast is partial and is not a proven minimum; the ceiling leaves room for the remaining
-integration and controls. The 787-line allowance above phase 3 covers firmware archive scanning
+reviewing the complete local-library implementation and its ordinary-mode/BIN controls plus the complete
+host-claim guard and self-test. The measured combined proposal is 2,633 lines, including every counted
+negative-control helper and a 10-line reduction from genuine helper reuse. The earlier 2,300 ceiling
+relied on a prototype sample that omitted a 164-line registered-control helper; that estimate is
+superseded. The 1,187-line allowance above phase 3 covers firmware archive scanning
 (GAME-05, leaked retail bytes), host-claim guards (GAME-07, false .info claims), protected compatibility
 comparison (GAME-06, a head change weakening its own judge or regressing a pass), deterministic
 compatibility-doc freshness (GAME-06, stale claims), the local library script (GAME-06, private

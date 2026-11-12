@@ -1,6 +1,6 @@
 # Phase 4 executable coverage
 
-All items below are covered by the numbered plans in this directory. Task acceptance and its adjacent automated/fails_when pair are the executable contract. Every registered test gates; code review and accepted fixes precede final verification in plan 32. No owner UAT or further budget approval is required within the explicitly approved 2300-line ceiling. The owner revised it after measured whole-phase sizing; 1513 remains the historical phase-3 ratchet. Older plan/research references to 1850 are superseded by REQUIREMENTS and AUTONOMOUS.
+All items below are covered by the numbered plans in this directory. Task acceptance and its adjacent automated/fails_when pair are the executable contract. Every registered test gates; code review and accepted fixes precede final verification in plan 32. No owner UAT or further budget approval is required within the explicitly approved 2700-line ceiling. The owner revised it after reviewing the complete 2633-line proposal, including all counted controls; 1513 remains the historical phase-3 ratchet. Older plan/research references to 1850 or 2300 are superseded by REQUIREMENTS and AUTONOMOUS.
 
 ## Goal and requirements
 

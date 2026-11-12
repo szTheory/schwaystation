@@ -6,10 +6,10 @@ current_phase: 04
 current_phase_name: Games play in RetroArch
 current_plan: 43 of 53
 status: executing
-stopped_at: "04-26 complete candidate preserved; awaiting actual gate-budget decision"
-last_updated: "2026-11-12T08:15:38Z"
+stopped_at: "Owner approved 2700-line ceiling; resume complete 04-26 candidate"
+last_updated: "2026-11-12T13:20:51Z"
 last_activity: 2026-11-12
-last_activity_desc: Preserved complete 04-26 candidate and whole-phase 2633-line gate accounting; current 2300 ceiling remains unchanged pending the owner decision.
+last_activity_desc: Applied the owner-approved 2700-line ceiling after complete 2633-line accounting; resume 04-26 and measured efficiency work.
 state_head: c3b09a69127b15e4225e4066b0458dd9cc83305f
 progress:
   total_phases: 6
@@ -32,8 +32,8 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
 Current Plan: 43 of 53
-Status: Plan 04-42 complete; 04-26 remains incomplete while its concrete resource proposal is pending. Eleven phase plans remain.
-Last activity: 2026-11-12 — Preserved the tested library patch and complete remaining gate/control count; no implementation overflow or plan advance.
+Status: Plan 04-42 complete; resume incomplete 04-26 under the approved 2700-line ceiling. Eleven phase plans remain.
+Last activity: 2026-11-12 — Recorded the explicit resource approval and renewed measured efficiency instruction; no plan advance.
 
 Progress: [█████░░░░░] 50%
 
@@ -415,11 +415,10 @@ retain their bound plans and seed dispositions.
 
 ### Blockers/Concerns
 
-- Plan 04-26 has a complete reviewable candidate at `/private/tmp/phase4-26.patch`. It would bring the counted total to 2448; the complete downstream info guard and self-test add 185 for 2633. The owner is considering a 2700 ceiling; the current 2300 remains strict. See `04-26-CHECKPOINT.md`. No SUMMARY or plan advance is authorized by this checkpoint.
+- Plan 04-26 remains incomplete but its resource blocker is resolved: the owner approved a 2700-line ceiling for the complete 2633-line proposal. Apply the verified candidate, finish integration and full verification, then write its SUMMARY. See `04-26-CHECKPOINT.md`; no completion or plan advance follows from resource approval alone.
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
-- Phase 04 plan 04-24 remains incomplete after the measured schema/data GREEN slice. The owner explicitly approved the whole-phase ceiling increase from 1850 to 2300 after reviewing the 1842-line implementation, tested 254-line scratch sample and remaining library/.info estimates. The budget blocker is resolved; finish the actual judge/docs integration and controls before completing 04-24. The 2216-line partial forecast is not a proven minimum. Current plan ordinal and ROADMAP completion remain unchanged.
 
 ### Quick Tasks Completed
 
@@ -551,11 +550,12 @@ come from `AGENTS.md`.
 | 2026-11-12 | /gsd-execute-plan 04-41 | Codex, OpenGSD 1.20.0; sequential executor; protected base judge and controls, full CI and hygiene | gpt-6-luna xhigh |
 | 2026-11-12 | /gsd-execute-plan 04-43 | Codex, OpenGSD 1.20.1; sequential executor in shared phase checkout; native RGB555/RGB24 adapter conversion, geometry/rate edge tests, full CI and hygiene | gpt-6-luna xhigh |
 | 2026-11-12 | /gsd-execute-plan 04-26 incomplete resource checkpoint | Codex/OpenGSD; complete library candidate and ordinary-mode/BIN proof preserved off-tree; no plan advance | executor gpt-6-luna xhigh; coordinator GPT-6 session |
+| 2026-11-12 | Phase 04 complete-code budget approval implementation | Codex/OpenGSD; concrete 2700-line ceiling, preserved proposal and renewed efficiency authority; no plan advance | GPT-6 session |
 
 ## Session Continuity
 
-Last session: 2026-11-12T08:15:38Z
-Stopped at: 04-26 complete candidate preserved; awaiting actual gate-budget decision
+Last session: 2026-11-12T13:20:51Z
+Stopped at: Owner approved 2700-line ceiling; resume complete 04-26 candidate
 Resume file: .planning/phases/04-games-play-in-retroarch/04-26-CHECKPOINT.md
 
 Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
