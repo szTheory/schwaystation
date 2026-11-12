@@ -527,8 +527,10 @@ void retro_run(void)
     }
     memset(&video, 0, sizeof video);
     video.size = (uint32_t)sizeof video;
-    if (schway_get_video(inst, &video) != SCHWAY_STATUS_OK || video.bpp != 16u ||
-        video.width > LR_MAX_W || video.height > LR_MAX_H_PAL) {
+    if (schway_get_video(inst, &video) != SCHWAY_STATUS_OK ||
+        !schway_host_video_valid(&video) || video.width > LR_MAX_W ||
+        video.height > LR_MAX_H_PAL ||
+        !schway_host_xrgb8888_frame(&video, pixels, video.width)) {
         return;
     }
     if ((video.width != geometry_width || video.height != geometry_height) && env_cb != NULL) {
@@ -543,7 +545,6 @@ void retro_run(void)
     }
     geometry_width = video.width;
     geometry_height = video.height;
-    schway_host_xrgb8888_frame(&video, pixels, video.width);
     if (video_cb != NULL) {
         video_cb(pixels, video.width, video.height, (size_t)video.width * sizeof pixels[0]);
     }

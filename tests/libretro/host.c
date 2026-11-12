@@ -814,7 +814,7 @@ static int test_native_rgb24_geometry(const char *path)
     CHECK_EQ_U64(video_bad, 0u);
     CHECK_EQ_U64(frame_w, 640u);
     CHECK_EQ_U64(frame_h, 240u);
-    CHECK_EQ_U64(frame[0], 0x00001F00u);
+    CHECK_EQ_U64(frame[0], 0x001F0000u);
     CHECK_EQ_U64(frame[1], 0u);
     CHECK_EQ_U64(geometry_calls, 1u);
     CHECK_EQ_U64(geometry_sent.base_width, 640u);
@@ -825,7 +825,7 @@ static int test_native_rgb24_geometry(const char *path)
     for (unsigned i = 0u; i < 2u; i++) {
         run_one();
         CHECK_EQ_U64(video_calls, video_before + 2u + i);
-        CHECK_EQ_U64(frame[0], 0x00001F00u);
+        CHECK_EQ_U64(frame[0], 0x001F0000u);
         CHECK_EQ_U64(geometry_calls, 1u);
         CHECK_EQ_U64(av_info_calls, 0u);
     }

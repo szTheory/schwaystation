@@ -326,6 +326,11 @@ in core options; the selected file is read relative to the frontend's system dir
 `schway_load_bios`. A missing or wrong-sized selected file refuses that load instead of falling back to the test
 card. Disc and playlist formats are not accepted.
 
+The libretro adapter converts native 15-bit and packed 24-bit frames to XRGB8888 in its fixed maximum-size host
+buffer. It announces `SET_GEOMETRY` from `retro_run` only when frame dimensions change; `SET_SYSTEM_AV_INFO` is
+reserved for a region change that changes the reported rate. A malformed or out-of-range native frame is dropped
+before it changes geometry state or reaches the video callback.
+
 The loader writes the text segment at its physical address and a 16-byte launch block at `0200h` of RAM: the entry
 point, the global pointer, the stack address and the stack size as four little-endian words. It writes nothing else.
 
