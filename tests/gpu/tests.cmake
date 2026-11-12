@@ -1,5 +1,21 @@
 # The GPU tests issue register writes through the same bus path as the CPU and
 # inspect the instance's native VRAM. One executable runs the named case.
+if(CMAKE_SCRIPT_MODE_FILE)
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+  if(CASE STREQUAL "cli")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-vram
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    string(APPEND out "${err}")
+    if(NOT rc STREQUAL "0" OR
+       NOT out MATCHES "^vram sha256 67222605a58edbac567cba036618e52bb4a3eb933c32006c891d06adbb035041\n$")
+      message(FATAL_ERROR "--frames 1 --hash-vram: expected the canonical frame-1 VRAM hash, got exit ${rc}\n${out}")
+    endif()
+  else()
+    message(FATAL_ERROR "unknown GPU reference case '${CASE}'")
+  endif()
+  return()
+endif()
+
 add_executable(schwaystation-test-gpu ${CMAKE_CURRENT_LIST_DIR}/gpu_tests.c)
 target_include_directories(schwaystation-test-gpu PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-gpu PRIVATE schwaystation::schwaystation)
@@ -235,3 +251,11 @@ endforeach()
 schway_add_test(NAME gpu.dma.ready_budget
   COMMAND schwaystation-test-gpu dma_ready_budget
   LABELS gpu portable TIMEOUT 10)
+
+# Fault prevented: a canonical whole-VRAM hash differs from the independent
+# little-endian RGB555 frame-1 known answer.
+string(REPLACE ";" "|" gpu_reference_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+schway_add_test(NAME gpu.reference.cli
+  COMMAND ${CMAKE_COMMAND} -DCASE=cli -DRUN=$<TARGET_FILE:schwaystation-run>
+    "-DEMULATOR=${gpu_reference_emulator}" -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS gpu portable TIMEOUT 30)
