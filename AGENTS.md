@@ -84,6 +84,11 @@ evidence. Lessons from the sibling emulators are in `.planning/LESSONS.md`; re-r
 Discuss, verify, CI and release steps read `.planning/AUTONOMOUS.md` for the owner's standing research,
 automation and efficiency preferences; autonomous authorization and phase boundaries are recorded there.
 
+## Recovery and local verification
+
+- During quiet-executor recovery, inspect attributable command/session evidence and a fresh repository snapshot first. New work in a fresh snapshot weighs against interruption; do not clean processes or take over based only on a missing status reply.
+- For temporary CMake workflow presets, keep `binaryDir` aligned with the test integration's expected handoff path. For later local reruns, reuse CI configure/build artifacts and override only test parallelism when preset rules permit.
+
 ## GSD summaries
 
 Every plan SUMMARY carries `requirements-completed:` and a block-style `coverage:` list. Each entry has `id`,

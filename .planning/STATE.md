@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 47 of 55
+current_plan: 48 of 55
 status: executing
-stopped_at: Plan 04-29 checkpoint; source prerequisites 04-54 and 04-55 planned, awaiting independent check
-last_updated: "2026-11-12T17:55:38Z"
+stopped_at: Completed 04-54-PLAN.md; 04-55 next, then combined hosted CI and 04-29 acceptance
+last_updated: "2026-11-12T18:51:33.134Z"
 last_activity: 2026-11-12
-last_activity_desc: Preserved incomplete hosted RetroArch checkpoint and planned source-owned compiler, registration, emulator-forwarding and equivalent movie-fill prerequisites; no execution advance.
-state_head: 993d70565653c6439da9acd55bd4b489e16c70e6
+last_activity_desc: Completed 04-54 compiler portability, inventory-owned compatibility registration and emulator forwarding; four-job local CI/release passed, while hosted acceptance and 04-29 remain pending.
+state_head: 476691714166dc42eda50d1877db4f74a9e7b6bc
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 123
-  completed_plans: 114
+  completed_plans: 115
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 47 of 55
-Status: 46 phase plans complete; nine remain. Plan 04-29 incomplete (0/2 acceptance), with 04-54 then 04-55 prerequisites ready after independent plan check.
-Last activity: 2026-11-12 — Recorded actual hosted compiler/configuration failures and movie timeout; appended two focused prerequisites without advancing execution. Local RetroArch safety stop remains; coordinator continues authorized repairs and combined hosted verification, stopping before ship.
+Current Plan: 48 of 55
+Status: 47 phase plans complete; eight remain. Plan 04-29 is incomplete (0/2 acceptance); Plan 04-54 is complete and 04-55 is next.
+Last activity: 2026-11-12 — Completed source-owned compiler portability, inventory registration and emulator-forwarding repairs. The four-job local CI/release workflow passes; hosted compiler/BE32 acceptance and 04-29's two RetroArch frames remain open. Local RetroArch stop remains in force.
 
 Progress: [█████░░░░░] 50%
 
@@ -175,6 +175,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P28 | 92 min | 2 tasks | 5 files |
 | Phase 04 P44 | 50min | 2 tasks | 5 files |
 | Phase 04 P45 | 45min | 2 tasks | 11 files |
+| Phase 04 P54 | 40 min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -421,6 +422,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Advertise PSEXE only after the shared loader passes a case-varied PSEXE fixture.
 - [Phase 04]: Back the input-descriptor claim with assertions for all mappings and their callback lifetime.
 - [Phase 04]: Preserve repository CI defaults and use an ignored four-job preset for local bounded verification.
+- [Phase 04]: Keep GAME-03, GAME-06 and GAME-07 acceptance pending until their full hosted/runtime evidence is available.
+- [Phase 04]: Validate the local OpenBIOS handoff, then place it at the test integration's expected binaryDir path before configuring a temporary workflow preset.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -596,10 +599,12 @@ come from `AGENTS.md`.
 
 | 2026-11-12 | Phase 04 source-owned hosted portability prerequisite planning | Codex, OpenGSD 1.20.0; 29 checkpoint preserved, two focused prerequisite plans, no execution advance | gpt-6.1-sol high |
 
+| 2026-11-12 | /gsd-execute-plan 04-54 | Codex/OpenGSD; sequential shared checkout; strict compiler portability, inventory-owned compatibility registration and emulator argument forwarding; 509/509 local CI tests, package/release 5/5; hygiene CTest log 23 passed with outer exit unrecorded; hosted acceptance pending | executor gpt-6-luna xhigh; planner gpt-6.1-sol high; checker gpt-6-luna xhigh |
+
 ## Session Continuity
 
-Last session: 2026-11-12T16:56:55.293Z
-Stopped at: Plan 04-29 checkpoint; 04-54/55 prerequisites planned, awaiting independent check
+Last session: 2026-11-12T18:51:32.638Z
+Stopped at: Completed 04-54-PLAN.md; 04-55 next, then combined hosted CI and 04-29 acceptance
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 
