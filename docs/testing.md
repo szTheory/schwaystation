@@ -232,6 +232,20 @@ ungrounded camera=true claim. This confirms that a new true metadata key cannot 
 is_experimental stays true until v2.0. Disk control, cheats, save states, frontend save files and subsystems stay
 false because those capabilities are not advertised by this phase.
 
+### Libretro movie frame canaries
+
+`libretro.input.movies` runs four input variants under both controller layouts for 300 frames each. The reference
+captures each frame's dimensions independently. Before each module frame, the host poisons exactly the validated
+packed `width * height` active-pixel extent; if either expected dimension is zero or exceeds the 640 by 576 host
+buffer, it poisons the full buffer instead. Other host paths continue to use the full-buffer `run_one` fill.
+
+The video callback packs each delivered row by its delivered width. The movie comparator first requires those
+dimensions to match the reference, then checks every active pixel in the captured RLE runs and verifies the total
+pixel count. Thus the canary still detects a missing write anywhere in the expected active image, while writes to
+the unused trailing allocation are not repeated. Throwaway instrumentation measured 589,824,000 poisoned bytes
+over the 2,400 module movie frames, compared with 3,538,944,000 bytes for full-buffer fills. This byte count
+describes removed writes; it does not establish a runtime speedup or explain a hosted timeout.
+
 ## The inventories
 
 The tests a lane registers are listed in two levels of plain text:
