@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 49 of 56
+current_plan: 50 of 56
 status: executing
-stopped_at: Planned focused 04-56 source prerequisites from the second hosted failure; 04-29 remains open
-last_updated: "2026-11-12T20:10:03Z"
+stopped_at: Completed 04-56-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; local CI and hygiene passed; coordinator next for hosted acceptance.
+last_updated: "2026-11-12T20:42:19.488Z"
 last_activity: 2026-11-12
-last_activity_desc: Added 04-56 for portable disc opens and explicit ASan/fuzz fixture production; preserved 48 completed plans, next ordinal 49, and incomplete RetroArch acceptance. Timing diagnosis remains separate before the next hosted retry.
-state_head: cdf99341a9f0c0d3cc9038fc5bff2a33c4e9e00b
+last_activity_desc: Completed 04-56 portable disc opens and ASan/fuzz fixture production; 49 phase plans are complete, next ordinal 50, and 04-29 acceptance remains incomplete. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh. Coordinator handles the separate timing diagnosis and hosted acceptance next.
+state_head: 8e8d9b8c3941450e445328e7a8a534b2bf042bd4
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 124
-  completed_plans: 116
+  completed_plans: 117
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 49 of 56
-Status: 48 phase plans complete; eight remain. New 04-56 repairs source prerequisites before incomplete 04-29 (0/2 acceptance); 04-54/04-55 stay complete. Separate timing diagnosis precedes the next hosted retry.
-Last activity: 2026-11-12 — Planned portable disc opens and explicit ASan/fuzz fixture production from the second terminal hosted run. Zero-input replay succeeds with identical pictures and does not satisfy content acceptance. Native Windows/Linux sanitizer evidence, timing diagnosis and distinct Cross-driven RetroArch frames remain pending; the local RetroArch stop is unchanged.
+Current Plan: 50 of 56
+Status: 49 phase plans complete; seven remain. 04-56 repairs portable host disc opens and sanitizer fixture inputs; 04-29 remains incomplete at 0/2 acceptance. Separate timing diagnosis precedes the next hosted retry.
+Last activity: 2026-11-12 — Completed 04-56 with local CI and hygiene passing. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh. Native Windows/Linux sanitizer evidence and distinct Cross-driven RetroArch frames remain pending; the local RetroArch stop is unchanged. Coordinator acts next.
 
 Progress: [█████░░░░░] 50%
 
@@ -177,6 +177,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P45 | 45min | 2 tasks | 11 files |
 | Phase 04 P54 | 40 min | 2 tasks | 7 files |
 | Phase 04 P55 | 17min | 2 tasks | 2 files |
+| Phase 04 P56 | 16 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -427,6 +428,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Validate the local OpenBIOS handoff, then place it at the test integration's expected binaryDir path before configuring a temporary workflow preset.
 - [Phase 04]: Use independently captured reference extents to poison movie active pixels; invalid extents retain full-buffer fallback.
 - [Phase 04]: Treat the byte reduction as measured work only; runtime improvement and timeout causality require hosted timing.
+- [Phase 04]: Use one file-local, NULL-initialized fopen_s/fopen helper at all five host disc-probe binary opens while preserving error behavior.
+- [Phase 04]: Keep fixture production available to selected ASan/fuzz libretro consumers while the selected inventory controls standalone test registration.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -612,8 +615,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-12T20:10:03Z
-Stopped at: Planned 04-56 source prerequisites; coordinator/checker next, with separate timing diagnosis before hosted retry and 04-29 acceptance still open
+Last session: 2026-11-12T20:42:18.307Z
+Stopped at: Completed 04-56-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; local CI and hygiene passed; coordinator next for hosted acceptance.
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 
