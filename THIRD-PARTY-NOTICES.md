@@ -200,7 +200,7 @@ SOFTWARE.
 
 ## ps1-tests GPU clipping reference
 
-- **Applies to:** The `ps1-tests` build-158 release archive named in `pins.txt`, fetched only for the nightly GPU reference test.
+- **Applies to:** The ps1-tests-gpu-captures row in `pins.txt`; its build-158 archive is fetched only for the nightly GPU reference test.
 - **Upstream:** https://github.com/JaCzekanski/ps1-tests at commit `f727802fead11f1daa7549285548392ef87749cb`. The repository's `LICENSE` is MIT.
 - **Use:** The nightly test extracts the clipping executable and captured VRAM PNG into `build/nightly`; decoded pixels are generated there. The archive and all derived inputs are excluded from source, upload and package artifacts.
 - **Licence:** MIT; no upstream executable or capture is redistributed.

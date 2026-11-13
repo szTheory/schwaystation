@@ -14,7 +14,7 @@ jobs:
   path-probe:
     if: github.ref == 'refs/heads/phase/04-games-play-in-retroarch'
     runs-on: windows-2025
-    timeout-minutes: 8
+    timeout-minutes: 8  # provisional bound for the Windows path diagnostic
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
