@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../src/internal.h"
 #include "schwaystation.h"
 #include "../check.h"
 
@@ -166,6 +167,20 @@ static void check_split_run_boundaries(void)
     schway_destroy(inst);
 }
 
+static void check_instance_owns_spu_ram(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    if (inst == NULL) {
+        return;
+    }
+#ifdef SCHWAY__SPU_RAM_SIZE
+    CHECK_EQ_U64(sizeof inst->spu.ram, 0x80000u);
+#else
+    CHECK_EQ_U64(0u, 0x80000u);
+#endif
+    schway_destroy(inst);
+}
+
 static void check_ring_partial_wrap_and_drops(void)
 {
     schway *inst = make(SCHWAY_REGION_PAL);
@@ -237,6 +252,7 @@ int main(int argc, char **argv)
     check_region_cadence(SCHWAY_REGION_PAL, PAL_FRAME_NUM, PAL_FRAME_DEN,
                          53203425u, 1069484u, 887u, 886u);
     check_split_run_boundaries();
+    check_instance_owns_spu_ram();
     check_ring_partial_wrap_and_drops();
     check_reset_and_load_clear_drain();
     CHECK_DONE();
