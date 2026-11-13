@@ -34,8 +34,8 @@ function(expect_judge name candidate fresh prior allow expected)
 endfunction()
 
 function(expect_doc name ledger output mode expected)
-  execute_process(COMMAND sh "${SOURCE_ROOT}/scripts/compat-doc.sh" "${ledger}" "${output}" "${mode}"
-    RESULT_VARIABLE result OUTPUT_QUIET ERROR_QUIET)
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA= sh
+      "${SOURCE_ROOT}/scripts/compat-doc.sh" "${ledger}" "${output}" "${mode}" RESULT_VARIABLE result OUTPUT_QUIET ERROR_QUIET)
   if(expected AND NOT "${result}" STREQUAL "0")
     message(FATAL_ERROR "compatibility docs ${name}: expected success, got ${result}")
   elseif(NOT expected AND "${result}" STREQUAL "0")
