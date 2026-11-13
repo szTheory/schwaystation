@@ -23,10 +23,9 @@ endfunction()
 
 function(expect_judge name candidate fresh prior allow expected)
   execute_process(
-    COMMAND sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh"
-      "${candidate}" "${fresh}" "${prior}" "${allow}" "${today}"
-    RESULT_VARIABLE result
-    OUTPUT_QUIET ERROR_QUIET)
+    COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA= sh
+      "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${candidate}" "${fresh}" "${prior}" "${allow}" "${today}"
+    RESULT_VARIABLE result OUTPUT_QUIET ERROR_QUIET)
   if(expected AND NOT "${result}" STREQUAL "0")
     message(FATAL_ERROR "${name}: expected acceptance, got ${result}")
   elseif(NOT expected AND "${result}" STREQUAL "0")

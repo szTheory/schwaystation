@@ -55,7 +55,7 @@ Phase 3's repository-check code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githoo
 
 
 Phase 4's repository-check ceiling was **2,700 lines**, counted across `scripts/*.sh`,
-`tests/cmake/*.cmake` and `.githooks/*`. At ship, the measured total was **2,689 lines**, and the gate
+`tests/cmake/*.cmake` and `.githooks/*`. At ship, the measured total was **2,688 lines**, and the gate
 was ratcheted to that total. Phase 3's
 historical ship ratchet remains 1,513 lines. The owner approved the revised absolute ceiling after
 reviewing the complete local-library implementation and its ordinary-mode/BIN controls plus the complete
