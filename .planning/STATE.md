@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 52 of 56
+current_plan: 52 of 58
 status: executing
-stopped_at: Completed 04-46-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
-last_updated: "2026-11-13T01:13:46.913Z"
-last_activity: 2026-11-12
-last_activity_desc: "Completed 04-30 canonical VRAM hash and synthetic PNG reference checks with local CI and hygiene passing; 50 of 56 phase plans have summaries, six remain, and 04-29 acceptance remains incomplete. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh. Coordinator resumes 04-29 metadata and hosted acceptance follow-up next."
+stopped_at: Checked IRQ prerequisites ready; 47 incomplete at cf9f287, 29 incomplete after Windows repair
+last_updated: "2026-11-13T03:33:52.162Z"
+last_activity: 2026-11-13
+last_activity_desc: "51 of 58 phase plans have summaries; checked IRQ prerequisites 57/58 are ready before checkpointed 47. Windows targeted repair passed; final current-source acceptance and reviewed phase verification remain pending. Codex/OpenGSD 1.20.0; planner gpt-6.1-sol high, checker gpt-6-luna xhigh."
 state_head: 86a695f6e2ee2d1bd9884f9a0239eb1dab7698df
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 124
+  total_plans: 126
   completed_plans: 119
   percent: 50
 ---
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 52 of 56
-Status: 50 of 56 phase plans have summaries; six remain. 04-29 remains incomplete while its immutable hosted run is monitored and acceptance follow-up is coordinated.
-Last activity: 2026-11-12 — Completed 04-30 with local CI and hygiene passing. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh. Coordinator resumes 04-29 metadata and hosted acceptance follow-up next.
+Current Plan: 52 of 58
+Status: 51 summaries; seven plans remain. 57 then 58 supply the observed registered VBlank hook/return contract before 47 resumes. 29's Windows repair passed targeted validation; normal final-source CI remains pending.
+Last activity: 2026-11-13 — Applied focused independently checked IRQ plans without advancing a completed-plan count. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6.1-sol high planner, gpt-6-luna xhigh checker, inherited-model coordinator.
 
 Progress: [█████░░░░░] 50%
 
@@ -649,3 +649,7 @@ Codex coordinator / inherited parent model: plan30 returned terminal complete at
 ### Remaining GPU capture writer handoff (2026-11-13)
 
 Codex coordinator / inherited parent model: plan46 returned terminal complete at eb93663; actual progress51/56 summaries, next ordinal52. Plan29 explicitly retains monitor-only ownership of targeted Windows run43345311739 at f502338 and has no active local command/source/shared metadata writes. Plan47 is the sole local writer using46's independently checked adapter and C word-comparison path, with per-guest source-supported fixed bounds. Old dispatched runs do not verify47 or replace final current-source verification.
+
+### Focused registered IRQ prerequisite application (2026-11-13)
+
+The source-owned first caller is the exact build-158 overlap program: IRQ0 interrupts upload before completion because its B0(19) hook is not dispatched. Independently checked plans57/58 split the measured45–60-minute implementation/validation scope into two25–30-minute forecasts. Context remains guest RAM; valid SWMB, unregistered exceptions, SYS1/2 and original reset-installed slots remain intact. Chain46→57→58→47→48→31→32 preserves all other dependencies and leaves47/29 incomplete. Actual physical summary count stays51; only denominator changes56→58. Stable production review is staged at8c3bdcb with a file fingerprint; its reported findings require disposition before final phase verification.

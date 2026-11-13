@@ -179,9 +179,19 @@ record what 1.18.0 does, not a diff).
 Lesson SW-TEST-001 (2026-11-12, schwaystation@f41ffdb)
 Symptom and reproduction: the x64 Windows path diagnostic failed five synthetic library/probe cases; its one-day run is [43329257561](https://github.com/szTheory/schwaystation/actions/runs/43329257561). The probe opened the marker but rejected CRLF bytes, and the library parser passed a CR-suffixed directory to `cd`.
 Root cause / invariant: native Windows text output uses CRLF; POSIX `read -r` removes LF but keeps CR. The internal binary marker remains canonical LF, while public config accepts LF or CRLF by normalizing exactly one line-ending CR before strict key/value validation.
-Fix and evidence: configure marker fixtures as UNIX LF, config fixtures as CRLF, and strip exactly one terminal CR in the shell parser. `cmake --preset ci`, `cmake --build build/ci --target schwaystation-test-library --parallel 4`, and the five selected compatibility CTests all exited 0 locally; Windows retest is pending.
+Fix and evidence: configure marker fixtures as UNIX LF, config fixtures as CRLF, and strip exactly one terminal CR in the shell parser. `cmake --preset ci`, `cmake --build build/ci --target schwaystation-test-library --parallel 4`, and the five selected compatibility CTests all exited 0 locally; The final targeted Windows run [43354167038](https://github.com/szTheory/schwaystation/actions/runs/43354167038) passed all five cases on013ecf9 after a separate shell-path expectation correction.
 Applies when: a cross-platform test or shell parser consumes generated line-oriented text.
-Does not establish: Windows repair success before the targeted x64 rerun, or a need for path conversion.
+Does not establish: a complete final-source matrix pass, or a need for production path conversion.
 Suggested check: keep byte-exact marker producers explicitly LF and exercise CRLF config input on every host.
 Sources: [Windows diagnostic run](https://github.com/szTheory/schwaystation/actions/runs/43329257561).
+Status: reproduced
+
+
+Lesson SW-ORACLE-001 (2026-11-13, phase4 real GPU captures)
+Symptom and reproduction: synthetic GPU tests encoded stale CLUT invalidation and half-pixel assumptions; the pinned programs contradicted them. The GP0 cache regression failed before the documented fix, then the original CLUT capture passed. Original triangle/quad/UV captures passed after the independently modeled raster correction atcf9f287.
+Root cause / invariant: run each pinned real oracle at its first runnable subsystem caller; synthetic self-consistency is insufficient. Verify executable, image and inspected-source identity, including capture history when a release retains an older image. Distinguish guest completion/capture state from rendering errors before changing arithmetic.
+Fix and evidence: `ctest --test-dir build/nightly -R '^gpu\.reference\.(quad|triangle|uv-interpolation)$' --no-tests=error --output-on-failure --parallel 3` exited0 with unchanged captured pixels. Independent throwaway static models reproduced the original differences exactly, then predicted the complete images without emulator reruns.
+Applies when: planning hardware subsystems and diagnosing external conformance failures.
+Does not establish: a general precision proof from one image, permission to alter goldens, or a need for another maintained diagnostic harness.
+Suggested check: fetch/decode early; establish source-supported progress and fixed bounds; retain exact oracles and reuse static arithmetic only as bounded analysis.
 Status: reproduced

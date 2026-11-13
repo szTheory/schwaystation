@@ -171,3 +171,13 @@ This focused amendment retains the complete four-source audit above; every other
 | CONTEXT D-19/D-23–D-25 | Preserve metadata privacy, real bounded host checks, no local RetroArch under the unresolved denial, 2700/300 budgets and truthful command/status/run evidence. Timing failure diagnosis is separate; executor-authored timeout values are not owner consent boundaries. | 56; 29 CHECKPOINT | COVERED |
 
 The existing full GOAL/REQ/RESEARCH/D-01–D-25 coverage above is unchanged; completed slices are not replanned. Deferred ideas remain excluded. Source plan completion does not claim hosted Windows/Linux sanitizer or Cross-at-60 acceptance.
+
+## Registered VBlank hook first-caller coverage
+
+| Source | Retained exact contract | Executable coverage | Status |
+| --- | --- | --- | --- |
+| GAME-01 / D-04 / D-20 | Registered guest IRQ0 hook, guest acknowledgement/callback and B0(17) return unblock the pinned program; no BIOS replacement or fabricated pixel pass | 57 → 58 → existing47/48 | PLANNED |
+| D-11 / D-22 | Original reset-installed slots/state pins, SWMB precedence and unknown exception path remain; hook/context lives in already serialized guest RAM | 57 happy path;58 full context/replay/precedence | PLANNED |
+| D-23 / D-24 | Two executable <=30-minute forecasts, sequential ownership, ordinary CI regressions and one shared local closeout; review before final verification | 57/58; original32 final verification | PLANNED |
+
+All prior GOAL/GAME/RESEARCH/decision assignments remain intact. This prerequisite does not complete GAME-01,47 or29 and does not change any captured pixel or resource ceiling.
