@@ -11,7 +11,17 @@ model: executor gpt-6-luna xhigh; focused prerequisite planner gpt-6.1-sol high
 
 # RetroArch content checkpoint
 
-Plan 29 has no SUMMARY and remains incomplete. Diagnostic commits 3133c14, 41dd821 and 993d705 are retained; do not reset/amend them to fabricate task order. Neither wiring/actual hosted content acceptance nor completed evidence/documentation acceptance has passed.
+Plan 29 has no SUMMARY and remains incomplete. Diagnostic commits 3133c14, 41dd821 and 993d705 are retained; do not reset/amend them to fabricate task order. GAME-07 RetroArch content acceptance and final evidence/documentation acceptance remain incomplete.
+
+## Latest targeted Windows follow-up (2026-11-13)
+
+- Commit `f502338` accepts one terminal CR in the library config reader, keeps marker files canonical LF, and writes the synthetic config fixture as CRLF. Commit `013ecf9` compares the standalone image path after canonicalizing the fixture directory with the same `sh` `cd`/`pwd -P` behavior used by the library script; the exact count-of-four and companion exclusions remain.
+- Earlier targeted Windows run [43345311739](https://github.com/szTheory/schwaystation/actions/runs/43345311739) passed four of five cases; only `compat.library.controls` failed because the test expected `D:/...` while Git Bash emitted `/d/...`. This was a test path-spelling mismatch, not a production newline failure.
+- Local configure/build and all five selected compatibility CTests passed. The focused policy controls passed; measured budgets were 2689/2700 repository lines and 299/300 RetroArch lines.
+- Hosted Windows x64 run [43354167038](https://github.com/szTheory/schwaystation/actions/runs/43354167038), on exact source head `013ecf93eabf0fde9530226290e4a68af8e04d15`, passed configure/build and all five selected CTests: `compat.library.synthetic_result`, `compat.library.controls`, `compat.probe.full_identity`, `compat.probe.cue_modes`, and `compat.probe.cue_edges`.
+- The temporary one-off Windows workflow is removed after that targeted success. The next normal full current-source matrix remains required; this targeted run does not establish full CI or GAME-07 acceptance.
+
+Plan 29 remains 0/2 acceptance, with no SUMMARY or STATE/ROADMAP advancement. A real hosted RetroArch session must still prove distinct frame-59/frame-60 images, each pixel-exact against its runner reference, with Cross input at frame 60 and empty `system/`.
 
 The normal full run at 41dd821 failed: https://github.com/szTheory/schwaystation/actions/runs/43271212007. Its RetroArch job was skipped by aggregate build dependency; it produced no BSV or content screenshots. At 993d705 the existing host job condition permits execution when not cancelled despite another build leg failing, while the required CI result still fails on any build failure. No successful run of that change is claimed.
 
@@ -45,4 +55,4 @@ After 56 and separate timing diagnosis, coordinator commits/pushes the repaired/
 
 Plan 29 still requires a real hosted background session, empty system/, deterministic Cross at frame 60, two DISTINCT decoded screenshots at 59 and 60, each pixel-exact against its corresponding runner PNG. A zero-input record/playback equality or identical pair cannot satisfy this. Require command, exit status, actual run URL and matching source head; retain comparator wrong-pixel/dimension controls. If actual replay evidence leaves input production unresolved, keep 29 checkpointed and report the precise missing fact rather than advancing dependent plans.
 
-Completed phase count is 48 of 56; current execution ordinal remains 49. Plans 54/55 are complete. Remaining order is 56 → 29 → 30 → 46 → 47 → 48 → 31 → 32, with separate timing diagnosis before the next hosted retry. Plan 29 remains 0/2 acceptance and has no SUMMARY. No owner action is needed for authorized source repair/diagnosis. Coordinator/checker acts next; stop after phase verification before ship.
+The STATE snapshot remains at 50 of 56 summaries and current ordinal 52. Plan 47's partial source work is retained, with its IRQ implementation still pending. Root/coordinator owns the next normal full current-source run after the remaining source work is reconciled. Plan 29 remains incomplete and has no SUMMARY. No owner action is needed for this authorized cleanup. Stop after phase verification before ship.
