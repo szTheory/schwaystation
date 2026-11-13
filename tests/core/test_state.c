@@ -222,6 +222,11 @@ static void test_rejects(void)
     expect_refused("format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
+    put_le(bad + H_FORMAT, 4u, 4u);
+    expect_refused("released revision-4 state", target, bad, n,
+                   SCHWAY_STATUS_ERR_STATE_VERSION);
+
+    memcpy(bad, good, n);
     bad[H_TOTAL] ^= 0x01u;
     expect_refused("size word", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
     expect_refused("one byte short", target, good, n - 1u, SCHWAY_STATUS_ERR_STATE_FIELD);
@@ -389,6 +394,7 @@ static void test_record_sweep(void)
     schway *src = make(SCHWAY_REGION_NTSC_U);
     run_to(src, 60);
     size_t n = save(src, good);
+    CHECK(n <= 4u * 1024u * 1024u);
     schway *target = make(SCHWAY_REGION_NTSC_U);
     run_to(target, 5);
     size_t nf = schway__state_record(src, fields, MAX_FIELDS);
@@ -616,6 +622,47 @@ static void test_spu_state_continuation(void)
     schway_destroy(src);
 }
 
+static void test_spu_invalid_states(void)
+{
+    struct invalid_field {
+        const char *name;
+        uint32_t offset;
+        uint32_t width;
+        uint64_t value;
+    };
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    size_t n = save(src, good);
+    const struct invalid_field invalid[] = {
+        {"SPU transfer FIFO head", offset_of(src, "spu.transfer_head"), 4u,
+         SCHWAY__SPU_FIFO_HALFWORDS},
+        {"SPU transfer FIFO count", offset_of(src, "spu.transfer_count"), 4u,
+         SCHWAY__SPU_FIFO_HALFWORDS + 1u},
+        {"SPU pending write count", offset_of(src, "spu.pending_count"), 4u,
+         SCHWAY__SPU_PENDING_WRITES + 1u},
+        {"SPU capture cursor", offset_of(src, "spu.capture_cursor"), 4u, 0x200u},
+        {"SPU voice envelope phase", offset_of(src, "spu.voice.envelope_phase") +
+                                          (SCHWAY__SPU_VOICE_COUNT - 1u) * 4u,
+         4u, 5u},
+        {"SPU FIR cursor", offset_of(src, "spu.reverb_fir_cursor"), 4u,
+         SCHWAY__SPU_REVERB_FIR_TAPS},
+        {"SPU work cursor", offset_of(src, "spu.reverb_work_cursor"), 4u,
+         SCHWAY__SPU_REVERB_WORK_WORDS},
+        {"SPU noise LFSR", offset_of(src, "spu.noise_lfsr"), 2u, 0u},
+        {"SPU reverb address alignment", offset_of(src, "spu.reverb_address"), 4u, 1u},
+        {"SPU IRQA alignment", offset_of(src, "spu.irqa_addr"), 4u, 1u},
+        {"SPU sample phase", offset_of(src, "spu.next_tick"), 8u, 512u},
+    };
+    for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; i++) {
+        memcpy(bad, good, n);
+        put_le(bad + invalid[i].offset, invalid[i].value, invalid[i].width);
+        reseal(bad, n);
+        expect_refused(invalid[i].name, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    schway_destroy(dst);
+    schway_destroy(src);
+}
+
 /* The geometry engine, DMA and counter fields come back from a save and a
    load byte for byte; a timer's base tick is no part of the state; and a
    load refuses the DMA bits the hardware does not store and a current
@@ -764,6 +811,7 @@ static void test_device_fields(void)
     schway_destroy(spu_src);
 
     test_spu_state_continuation();
+    test_spu_invalid_states();
 }
 
 /* Accepted counter boundaries must either advance to another loadable state
@@ -873,8 +921,10 @@ static void test_cpu_fields(void)
     memset(&v, 0, sizeof v);
     v.size = (uint32_t)sizeof v;
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(v.state_format, 4u);
-    CHECK_EQ_U64(v.behaviour_revision, 4u);
+    CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
+    CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
+    CHECK_EQ_U64(v.state_format, 5u);
+    CHECK_EQ_U64(v.behaviour_revision, 5u);
 
     schway *inst = make(SCHWAY_REGION_NTSC_U);
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
