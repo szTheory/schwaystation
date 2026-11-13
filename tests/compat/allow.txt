@@ -1,1 +1,2 @@
 # YYYY-MM-DD <serial> <md5> <predicate> behavior-rev=<n> expires=YYYY-MM-DD <reason>
+2026-11-13 fixture/openbios-shell - frame@240=4d1f0ff260e2cf065ae0b7add4ba60353b2b01241dda8325309b5398ba00acec behavior-rev=4 expires=2027-01-12 Capture-backed integer-origin triangle correction; old triangle object restored the prior hash and inspected PNGs differed only at boundary pixels
