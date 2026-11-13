@@ -87,7 +87,9 @@ else
 fi
 
 disc_seen=0 bios_seen=0
+cr=$(printf '\r')
 while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in *"$cr") line=${line%"$cr"} ;; esac
     case "$line" in ''|'#'*) continue ;; *=*) key=${line%%=*}; value=${line#*=} ;; *) fail 'configuration line is malformed' ;; esac
     case "$key" in
         SCHWAYSTATION_DISC_DIR) [ "$disc_seen" -eq 0 ] || fail 'disc directory is repeated'; disc_dir=$value; disc_seen=1 ;;

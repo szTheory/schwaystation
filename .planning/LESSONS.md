@@ -2,7 +2,7 @@
 title: "Lesson exchange"
 summary: "Lessons imported from the owner's sibling emulators (hypotheses until reproduced here) and the template for exporting this project's lessons."
 read_when: "At every discuss step, at each phase or milestone boundary, when a sibling lesson might apply, or when the owner asks to export lessons."
-updated: 2026-10-19
+updated: 2026-11-12
 ---
 
 # Lesson exchange
@@ -176,4 +176,12 @@ record what 1.18.0 does, not a diff).
 
 ## Lessons learned here
 
-None yet. The first export is offered at the v1.0 phase 1 close.
+Lesson SW-TEST-001 (2026-11-12, schwaystation@f41ffdb)
+Symptom and reproduction: the x64 Windows path diagnostic failed five synthetic library/probe cases; its one-day run is [43329257561](https://github.com/szTheory/schwaystation/actions/runs/43329257561). The probe opened the marker but rejected CRLF bytes, and the library parser passed a CR-suffixed directory to `cd`.
+Root cause / invariant: native Windows text output uses CRLF; POSIX `read -r` removes LF but keeps CR. The internal binary marker remains canonical LF, while public config accepts LF or CRLF by normalizing exactly one line-ending CR before strict key/value validation.
+Fix and evidence: configure marker fixtures as UNIX LF, config fixtures as CRLF, and strip exactly one terminal CR in the shell parser. `cmake --preset ci`, `cmake --build build/ci --target schwaystation-test-library --parallel 4`, and the five selected compatibility CTests all exited 0 locally; Windows retest is pending.
+Applies when: a cross-platform test or shell parser consumes generated line-oriented text.
+Does not establish: Windows repair success before the targeted x64 rerun, or a need for path conversion.
+Suggested check: keep byte-exact marker producers explicitly LF and exercise CRLF config input on every host.
+Sources: [Windows diagnostic run](https://github.com/szTheory/schwaystation/actions/runs/43329257561).
+Status: reproduced

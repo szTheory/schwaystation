@@ -109,61 +109,6 @@ static int path_inside(const char *root, const char *path)
     return absolute;
 }
 
-#if defined(SCHWAY_RUN_TEST_HOOKS)
-static int path_diagnostics_enabled(void)
-{
-#if defined(_MSC_VER)
-    char *value = NULL;
-    size_t size = 0u;
-    int enabled = _dupenv_s(&value, &size, "SCHWAY_RUN_PATH_DIAGNOSTICS") == 0 &&
-                  value != NULL && strcmp(value, "1") == 0;
-    free(value);
-    return enabled;
-#else
-    const char *value = getenv("SCHWAY_RUN_PATH_DIAGNOSTICS");
-    return value != NULL && strcmp(value, "1") == 0;
-#endif
-}
-
-static const char *test_path_class(const char *path)
-{
-    if (path == NULL) return "null";
-    size_t size = strlen(path);
-    int drive = size >= 2u &&
-                ((path[0] >= 'A' && path[0] <= 'Z') ||
-                 (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':';
-    if (drive && size >= 3u && path[2] == '/') return "drive-forward-slash";
-    if (drive && size >= 3u && path[2] == '\\') return "drive-backslash";
-    if (drive) return "drive-other";
-    if (path[0] == '/') return "posix-root";
-    return "relative";
-}
-
-static void report_path_diagnostic(const char *operand, const char *category,
-                                   const char *root, const char *path,
-                                   int open_ok, int header_ok)
-{
-    size_t root_size = root == NULL ? 0u : strlen(root);
-    size_t path_size = path == NULL ? 0u : strlen(path);
-    int root_absolute = root != NULL &&
-        (root[0] == '/' || (root_size >= 3u &&
-         (((root[0] >= 'A' && root[0] <= 'Z') ||
-           (root[0] >= 'a' && root[0] <= 'z')) && root[1] == ':' &&
-          (root[2] == '/' || root[2] == '\\'))));
-    int prefix = root != NULL && path != NULL && path_size >= root_size &&
-                 strncmp(root, path, root_size) == 0;
-    int separator = prefix && path_size > root_size && path[root_size] == '/';
-    int component = prefix && (path_size == root_size || separator);
-    int inside = root != NULL && path != NULL && path_inside(root, path);
-    fprintf(stderr,
-        "schwaystation-run: test-path operand=%s category=%s root_class=%s path_class=%s root_len=%zu path_len=%zu root_absolute=%u prefix=%u separator=%u component_boundary=%u inside=%u open=%u header=%u\n",
-        operand, category, test_path_class(root), test_path_class(path),
-        root_size, path_size, (unsigned)root_absolute, (unsigned)prefix,
-        (unsigned)separator, (unsigned)component, (unsigned)inside,
-        (unsigned)open_ok, (unsigned)header_ok);
-}
-#endif
-
 static int metadata_sources_ready(const schway__probe_metadata_inputs *inputs,
                                   const char *image)
 {
@@ -171,47 +116,17 @@ static int metadata_sources_ready(const schway__probe_metadata_inputs *inputs,
     char line[64];
     if (inputs == NULL || inputs->ledger == NULL || inputs->dat == NULL) return 0;
     if (inputs->root == NULL && inputs->config == NULL) return 1;
-    if (inputs->root == NULL || inputs->config == NULL) {
-#if defined(SCHWAY_RUN_TEST_HOOKS)
-        if (path_diagnostics_enabled())
-            report_path_diagnostic("config", "containment", inputs->root,
-                                   inputs->config, 0, 0);
-#endif
-        return 0;
-    }
-#if defined(SCHWAY_RUN_TEST_HOOKS)
-    const char *operands[] = { "ledger", "dat", "config", "image" };
-#endif
-    const char *paths[] = { inputs->ledger, inputs->dat, inputs->config, image };
-    for (size_t i = 0u; i < sizeof paths / sizeof paths[0]; i++) {
-        if (!path_inside(inputs->root, paths[i])) {
-#if defined(SCHWAY_RUN_TEST_HOOKS)
-            if (path_diagnostics_enabled())
-                report_path_diagnostic(operands[i], "containment", inputs->root,
-                                       paths[i], 0, 0);
-#endif
-            return 0;
-        }
-    }
+    if (inputs->root == NULL || inputs->config == NULL ||
+        !path_inside(inputs->root, inputs->ledger) ||
+        !path_inside(inputs->root, inputs->dat) || !path_inside(inputs->root, inputs->config) ||
+        !path_inside(inputs->root, image)) return 0;
     file = probe_open_readonly(inputs->config);
-    if (file == NULL) {
-#if defined(SCHWAY_RUN_TEST_HOOKS)
-        if (path_diagnostics_enabled())
-            report_path_diagnostic("config", "open", inputs->root,
-                                   inputs->config, 0, 0);
-#endif
-        return 0;
-    }
-    int header_ok = fgets(line, sizeof line, file) != NULL &&
-                    strcmp(line, "schwaystation-test-metadata-v1\n") == 0 &&
-                    fgetc(file) == EOF && ferror(file) == 0;
-    int close_ok = fclose(file) == 0;
-#if defined(SCHWAY_RUN_TEST_HOOKS)
-    if ((!header_ok || !close_ok) && path_diagnostics_enabled())
-        report_path_diagnostic("config", close_ok ? "header" : "close",
-                               inputs->root, inputs->config, 1, header_ok);
-#endif
-    return header_ok && close_ok;
+    if (file == NULL) return 0;
+    int ok = fgets(line, sizeof line, file) != NULL &&
+             strcmp(line, "schwaystation-test-metadata-v1\n") == 0 &&
+             fgetc(file) == EOF && ferror(file) == 0;
+    if (fclose(file) != 0) ok = 0;
+    return ok;
 }
 
 static void trim_eol(char *line)
