@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 52 of 58
+current_plan: 53 of 58
 status: executing
-stopped_at: Checked IRQ prerequisites ready; 47 incomplete at cf9f287, 29 incomplete after Windows repair
-last_updated: "2026-11-13T03:33:52.162Z"
+stopped_at: Recovered completed IRQ tracer; expanded IRQ validation is next
+last_updated: "2026-11-13T04:37:24Z"
 last_activity: 2026-11-13
-last_activity_desc: "51 of 58 phase plans have summaries; checked IRQ prerequisites 57/58 are ready before checkpointed 47. Windows targeted repair passed; final current-source acceptance and reviewed phase verification remain pending. Codex/OpenGSD 1.20.0; planner gpt-6.1-sol high, checker gpt-6-luna xhigh."
-state_head: 86a695f6e2ee2d1bd9884f9a0239eb1dab7698df
+last_activity_desc: "52 of 58 phase summaries; recovered committed IRQ tracer and interrupted bookkeeping. Expanded IRQ validation, remaining captures, fixes and final verification pending."
+state_head: 5858e5cfc887d4cd9a246dde2abfc46f6be704c0
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 126
-  completed_plans: 119
+  completed_plans: 120
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 52 of 58
-Status: 51 summaries; seven plans remain. 57 then 58 supply the observed registered VBlank hook/return contract before 47 resumes. 29's Windows repair passed targeted validation; normal final-source CI remains pending.
-Last activity: 2026-11-13 — Applied focused independently checked IRQ plans without advancing a completed-plan count. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6.1-sol high planner, gpt-6-luna xhigh checker, inherited-model coordinator.
+Current Plan: 53 of 58
+Status: 52 summaries; six plans remain. IRQ tracer 57 is complete; expanded validation 58 precedes checkpointed 47. Review fixes are prepared off-tree, not applied.
+Last activity: 2026-11-13 — Reconciled daemon-interrupted 57 completion from committed source, recorded focused checks and verified summary; no source or test rerun. Runtime/model: Codex/OpenGSD 1.20.0, GPT-6 session recovery; executor gpt-6-luna xhigh.
 
 Progress: [█████░░░░░] 50%
 
@@ -180,6 +180,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P56 | 16 min | 2 tasks | 6 files |
 | Phase 04 P30 | at least 19 min; executor start unavailable after recovery | 2 tasks | 5 files |
 | Phase 04 P46 | 96 min | 2 tasks | 20 files |
+| Phase 04 P57 | 47min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -623,8 +624,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T01:13:46.202Z
-Stopped at: Completed 04-46-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
+Last session: 2026-11-13T04:37:24Z
+Stopped at: Recovery reconciled completed 04-57; continue 04-58, then 04-47. Prepared card/region fixes remain off-tree.
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 
@@ -653,3 +654,11 @@ Codex coordinator / inherited parent model: plan46 returned terminal complete at
 ### Focused registered IRQ prerequisite application (2026-11-13)
 
 The source-owned first caller is the exact build-158 overlap program: IRQ0 interrupts upload before completion because its B0(19) hook is not dispatched. Independently checked plans57/58 split the measured45–60-minute implementation/validation scope into two25–30-minute forecasts. Context remains guest RAM; valid SWMB, unregistered exceptions, SYS1/2 and original reset-installed slots remain intact. Chain46→57→58→47→48→31→32 preserves all other dependencies and leaves47/29 incomplete. Actual physical summary count stays51; only denominator changes56→58. Stable production review is staged at8c3bdcb with a file fingerprint; its reported findings require disposition before final phase verification.
+
+### Daemon recovery after the registered IRQ tracer (2026-11-13)
+
+The previous agents ended at restart; current source commits and the interrupted57 summary were preserved. Native summary checks and source digest confirm the recorded7-case tracer result still belongs to this source. Native counters advanced once to52/58, next ordinal53; no completed source work was repeated. Root coordinates directly from here. Plan58 is the next sole writer, followed by47/48/31/32 and29 acceptance. Source review precedes final verification; stop before ship4.
+
+Both retained stable-review defects have real failing caller proofs and isolated native repair candidates. Card candidate: /private/tmp/phase4-card-fix/READY.md (two files, registered card regression, state/API compatibility checks). Region candidate: /private/tmp/phase4-region-fix (adapter, host regression and embedding prose; native lifecycle RED/GREEN and NTSC/PAL host checks passed). Fixed instance profiles survive reset, so the authorized region repair defers selection until next content load and says Reload content to apply; live input options remain live. No new API, allocation layer or content cache. Neither candidate is applied yet; review/check base fingerprints at the safe source handoff.
+
+Staged stable review was corrected: BIOS identity binding already exists; the initial claim read phase-start bus.c. Retained transient error04 and runtime region-loss claims have independent runtime RED. Fresh08 metadata, card bytes and generation stay receiver-owned. Final changed-source review remains required. The earlier local RetroArch LaunchServices denial remains a safety stop; no bypass or foreground test is authorized by recovery.

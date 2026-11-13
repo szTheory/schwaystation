@@ -195,3 +195,9 @@ Applies when: planning hardware subsystems and diagnosing external conformance f
 Does not establish: a general precision proof from one image, permission to alter goldens, or a need for another maintained diagnostic harness.
 Suggested check: fetch/decode early; establish source-supported progress and fixed bounds; retain exact oracles and reuse static arithmetic only as bounded analysis.
 Status: reproduced
+
+Lesson SW-REVIEW-001 (2026-11-13, frozen review source)
+Symptom and reproduction: the first stable review claimed missing BIOS state binding after reading phase-start bus.c. The frozen current blob already validates loaded-image identity; the corrected reviewer retracted that claim.
+Root cause / invariant: a diff base identifies changes, but every behavior claim and dependency read must use the frozen review revision. Cite exact file/blob identities for retained findings.
+Fix and evidence: corrected the same staged report, rejected the false finding without changing BIOS code, and proved the two retained defects through real callers before preparing fixes.
+Suggested check: verify snapshot fingerprints once and resolve all claimed code/dependencies at that snapshot; do not add a repository gate or duplicate full review.
