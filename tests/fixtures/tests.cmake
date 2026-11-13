@@ -889,6 +889,18 @@ schway_add_test(NAME fixtures.boot.registered_handler
 schway_add_test(NAME fixtures.boot.stub_syscalls
   COMMAND schwaystation-test-boot stub_syscalls
   LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.stub_irq_hook
+  COMMAND schwaystation-test-boot stub_irq_hook
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.stub_irq_context
+  COMMAND schwaystation-test-boot stub_irq_context
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.stub_irq_state
+  COMMAND schwaystation-test-boot stub_irq_state
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.stub_irq_controls
+  COMMAND schwaystation-test-boot stub_irq_controls
+  LABELS fixtures portable TIMEOUT 30)
 
 # Fault prevented: a runaway past the stub's image that slides on as no-operations.
 schway_add_test(NAME fixtures.boot.past_stub
