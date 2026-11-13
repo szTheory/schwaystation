@@ -11,12 +11,22 @@ schway_add_test(NAME spu.model
   COMMAND schwaystation-test-spu "${SCHWAYSTATION_FIXTURES_DIR}" "$<TARGET_FILE:schwaystation-run>"
   LABELS audio portable TIMEOUT 10)
 
-add_executable(schwaystation-test-spu-reference ${CMAKE_CURRENT_LIST_DIR}/reference.c)
-target_include_directories(schwaystation-test-spu-reference PRIVATE ${PROJECT_SOURCE_DIR}/tests)
-set_target_properties(schwaystation-test-spu-reference PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
-schway_warnings(schwaystation-test-spu-reference)
+include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
+schway_prepare_spu_reference_assets(
+  spu_reference_dir spu_reference_exe spu_reference_log
+  spu_reference_exe_sha256 spu_reference_log_sha256)
+schway_add_spu_reference_target("${spu_reference_exe_sha256}" "${spu_reference_log_sha256}")
 
 schway_add_test(NAME spu.reference.controls
   COMMAND schwaystation-test-spu-reference predicate_controls
+  LABELS audio portable TIMEOUT 10)
+
+schway_add_test(NAME spu.reference.fetch_controls
+  COMMAND ${CMAKE_COMMAND}
+    "-DSCHWAY_SPU_REFERENCE_CONTROL_DIR=${PROJECT_BINARY_DIR}/tests/spu/reference-fetch-controls"
+    -P ${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake
+  LABELS audio portable TIMEOUT 30)
+
+schway_add_test(NAME spu.reference.log
+  COMMAND schwaystation-test-spu-reference log "${spu_reference_log}"
   LABELS audio portable TIMEOUT 10)
