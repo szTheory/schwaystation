@@ -471,7 +471,8 @@ static void test_cache_contract(void)
     inst->vram[5][1022] = 0x2001u;
     CHECK(schway__gpu_clut_read(inst, 1022u, 5u, 0u, 16u) == 0x1001u);
     write_port(inst, GP0, 0x01000000u);
-    CHECK(schway__gpu_clut_read(inst, 1022u, 5u, 0u, 16u) == 0x1001u);
+    CHECK(inst->gpu.clut_valid == 0u);
+    CHECK(schway__gpu_clut_read(inst, 1022u, 5u, 0u, 16u) == 0x2001u);
 
     inst->vram[5][32] = 0x3001u;
     CHECK(schway__gpu_clut_read(inst, 32u, 5u, 0u, 16u) == 0x3001u);

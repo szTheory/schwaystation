@@ -1,0 +1,1 @@
+# No source-documented per-case RGB555 alternatives exist in the selected corpus.

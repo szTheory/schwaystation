@@ -24,13 +24,34 @@ endforeach()
 
 include(${PROJECT_SOURCE_DIR}/cmake/GPUReferences.cmake)
 schway_add_gpu_reference_target()
-schway_prepare_gpu_reference_capture(clipping_exe clipping_png clipping_golden)
+schway_prepare_gpu_reference_capture(clipping clipping_exe clipping_png clipping_golden)
 
 # Fault prevented: the pinned clipping executable's complete VRAM differs from
 # its independently captured hardware reference at any RGB555 word.
 schway_add_test(NAME gpu.reference.clipping
-  COMMAND schwaystation-test-gpu-reference capture ${clipping_exe} ${clipping_golden}
+  COMMAND schwaystation-test-gpu-reference capture clipping ${clipping_exe} ${clipping_golden} 1
   LABELS gpu nightly portable TIMEOUT 120)
+
+# Every guest draws before its first VSync loop. Bounds are fixed from the
+# pinned source: rectangles issues 128 draws; UV interpolation issues 768
+# polygons; overflow uploads two textures; CLUT caching writes 3,712 halfwords;
+# overlapping copies write 27,657 pixels and copy 147 blocks. The small
+# primitive guests use one call, these four use two, and overlap uses eight.
+foreach(case IN LISTS SCHWAY_GPU_REFERENCE_CASES)
+  schway_prepare_gpu_reference_capture(${case} case_exe case_png case_golden)
+  set(case_advances 1)
+  if(case STREQUAL "rectangles" OR case STREQUAL "uv-interpolation" OR
+     case STREQUAL "texture-overflow" OR case STREQUAL "clut-cache")
+    set(case_advances 2)
+  elseif(case STREQUAL "vram-to-vram-overlap")
+    set(case_advances 8)
+  endif()
+
+  # Fault prevented: a pinned GPU guest's full VRAM differs from its hardware PNG.
+  schway_add_test(NAME gpu.reference.${case}
+    COMMAND schwaystation-test-gpu-reference capture ${case} ${case_exe} ${case_golden} ${case_advances}
+    LABELS gpu nightly portable TIMEOUT 120)
+endforeach()
 
 add_executable(schwaystation-test-vectors ${PROJECT_SOURCE_DIR}/tests/vectors/vectors.c)
 target_include_directories(schwaystation-test-vectors PRIVATE ${PROJECT_SOURCE_DIR}/src)

@@ -5,8 +5,17 @@
 # executable and PNG.
 
 set(SCHWAY__GPU_REFERENCE_MODULE "${CMAKE_CURRENT_LIST_FILE}")
+set(SCHWAY_GPU_REFERENCE_CASES
+  clut-cache lines quad rectangles texture-overflow transparency triangle
+  uv-interpolation vram-to-vram-overlap)
 
 function(schway__gpu_reference_fetch url destination sha256)
+  if(EXISTS "${destination}")
+    file(SHA256 "${destination}" current_sha256)
+    if("${current_sha256}" STREQUAL "${sha256}")
+      return()
+    endif()
+  endif()
   file(DOWNLOAD "${url}" "${destination}"
     EXPECTED_HASH "SHA256=${sha256}"
     STATUS fetch_status
@@ -110,8 +119,13 @@ function(schway_add_gpu_reference_target)
   schway_warnings(schwaystation-test-gpu-reference)
 endfunction()
 
-function(schway_prepare_gpu_reference_capture output_exe output_png output_golden)
+function(schway_prepare_gpu_reference_capture case output_exe output_png output_golden)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+  set(allowed_cases clipping ${SCHWAY_GPU_REFERENCE_CASES})
+  if(NOT case IN_LIST allowed_cases)
+    message(FATAL_ERROR "GPU_REFERENCE_CASE_ERROR: unsupported selected capture '${case}'")
+  endif()
 
   file(STRINGS "${PROJECT_SOURCE_DIR}/pins.txt" pin_rows
     REGEX "^ps1-tests-gpu-captures ")
@@ -136,14 +150,14 @@ function(schway_prepare_gpu_reference_capture output_exe output_png output_golde
   schway__gpu_reference_fetch("${archive_url}" "${archive}" "${archive_sha256}")
 
   file(ARCHIVE_EXTRACT INPUT "${archive}" DESTINATION "${reference_dir}"
-    PATTERNS "gpu/clipping/clipping.exe" "gpu/clipping/vram.png")
-  set(executable "${reference_dir}/gpu/clipping/clipping.exe")
-  set(png "${reference_dir}/gpu/clipping/vram.png")
+    PATTERNS "gpu/${case}/${case}.exe" "gpu/${case}/vram.png")
+  set(executable "${reference_dir}/gpu/${case}/${case}.exe")
+  set(png "${reference_dir}/gpu/${case}/vram.png")
   if(NOT EXISTS "${executable}" OR NOT EXISTS "${png}")
-    message(FATAL_ERROR "GPU_REFERENCE_ARCHIVE_ERROR: pinned archive lacks clipping inputs")
+    message(FATAL_ERROR "GPU_REFERENCE_ARCHIVE_ERROR: pinned archive lacks ${case} inputs")
   endif()
 
-  set(golden "${reference_dir}/clipping-vram.rgb555le")
+  set(golden "${reference_dir}/${case}-vram.rgb555le")
   execute_process(
     COMMAND "${Python3_EXECUTABLE}"
       "${PROJECT_SOURCE_DIR}/tests/gpu/reference_png.py"
@@ -156,10 +170,10 @@ function(schway_prepare_gpu_reference_capture output_exe output_png output_golde
   endif()
   file(SIZE "${golden}" golden_size)
   if(NOT golden_size EQUAL 1048576)
-    message(FATAL_ERROR "GPU_REFERENCE_PNG_ERROR: canonical clipping capture has the wrong byte length")
+    message(FATAL_ERROR "GPU_REFERENCE_PNG_ERROR: canonical ${case} capture has the wrong byte length")
   endif()
 
-  set(${output_exe} "gpu-reference/gpu/clipping/clipping.exe" PARENT_SCOPE)
-  set(${output_png} "gpu-reference/gpu/clipping/vram.png" PARENT_SCOPE)
-  set(${output_golden} "gpu-reference/clipping-vram.rgb555le" PARENT_SCOPE)
+  set(${output_exe} "gpu-reference/gpu/${case}/${case}.exe" PARENT_SCOPE)
+  set(${output_png} "gpu-reference/gpu/${case}/vram.png" PARENT_SCOPE)
+  set(${output_golden} "gpu-reference/${case}-vram.rgb555le" PARENT_SCOPE)
 endfunction()

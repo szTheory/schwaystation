@@ -83,7 +83,7 @@ claim the probe's alternating physical field lengths or early-vblank mode-entry 
 
 | Code | Group | Bits (polygon / line / rectangle) | Words after the command word |
 |---|---|---|---|
-| 000 | misc | 00h NOP (no FIFO space), 01h clear texture cache, 02h fill, 03h unknown (takes FIFO space), 04h-1Eh NOP mirrors, 1Fh IRQ1 | fill: 2 |
+| 000 | misc | 00h NOP (no FIFO space), 01h clear texture and CLUT caches, 02h fill, 03h unknown (takes FIFO space), 04h-1Eh NOP mirrors, 1Fh IRQ1 | fill: 2 |
 | 001 | polygon | 24 TGE raw texture, 25 ABE semi-transparent, 26 TME textured, 27 VTX quad, 28 IIP gouraud | 3 or 4 vertices × (1 + IIP + TME) minus 1 (first colour is in the command word) |
 | 010 | line | 25 ABE, 27 PLL polyline, 28 IIP | 2 vertices × (1 + IIP) minus 1; polyline ends at a word with (w & F000F000h) == 50005000h |
 | 011 | rectangle | 24 TGE, 25 ABE, 26 TME, 27-28 SIZ 0 variable, 1 1x1, 2 8x8, 3 16x16 | 1 vertex + TME + (SIZ == 0) |
@@ -137,7 +137,7 @@ Applies to gouraud or modulated polygons, to all lines (even flat), never to rec
 
 **3.4 Modulation.** `out = (texel5 * colour8) >> 7` per channel with 80h = unity and 81h..FFh brighter, saturated to 1Fh (v2); v0 crops colour to 5 bits first (§1.1) [GPU.01][GPU.10]. ares: `min(255, (texel5 * colour8) >> 4)` in 8-bit space, equivalent [GPU.05].
 
-**3.5 Texture decode.** `u = (u & ~(maskX*8)) | ((offX & maskX)*8)`, same for v; 4-bit: halfword `vram[(v + TBY) & 511][(u/4 + TBX) & 1023]` nibble `u & 3`; 8-bit: byte `u & 1`; CLUT entry `vram[CLY][(CLX*16 + index) & 1023]`; 15-bit: `vram[(v + TBY) & 511][(u + TBX) & 1023]` [GPU.01][GPU.05]. UV are 8-bit, so a texture is at most 256x256; rectangles larger than 256 repeat the source [GPU.01]. Texture cache: 2 KB, 64x64 (4-bit), 32x64 (8-bit), 32x32 (15-bit) with 256 eight-byte entries per block and one entry per index; the CLUT cache survives between commands and is invalidated by a different CLUT address or GP1(01h). ps1-tests `clut-cache` shows the stale-cache effect [GPU.01][GPU.07].
+**3.5 Texture decode.** `u = (u & ~(maskX*8)) | ((offX & maskX)*8)`, same for v; 4-bit: halfword `vram[(v + TBY) & 511][(u/4 + TBX) & 1023]` nibble `u & 3`; 8-bit: byte `u & 1`; CLUT entry `vram[CLY][(CLX*16 + index) & 1023]`; 15-bit: `vram[(v + TBY) & 511][(u + TBX) & 1023]` [GPU.01][GPU.05]. UV are 8-bit, so a texture is at most 256x256; rectangles larger than 256 repeat the source [GPU.01]. Texture cache: 2 KB, 64x64 (4-bit), 32x64 (8-bit), 32x32 (15-bit) with 256 eight-byte entries per block and one entry per index; the CLUT cache survives between commands and is invalidated by a different CLUT address, GP0(01h), or GP1(01h). ps1-tests `clut-cache` shows the stale-cache effect [GPU.01][GPU.07].
 
 **3.6 Triangle rules** [GPU.01][GPU.05]
 - Quads are two triangles, vertices (1,2,3) then (2,3,4); vertex order does not matter for visibility (no GPU culling).

@@ -39,7 +39,7 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
 | `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
-| `nightly` | All 55,000 public single-step vectors pass at their pin, and the pinned GPU clipping program matches its captured whole-VRAM reference. | `nightly` | `gpu.reference.clipping`, `vectors.r3000.full` |
+| `nightly` | All 55,000 public single-step vectors pass at their pin, and the ten selected GPU guests match their captured whole-VRAM references. | `nightly` | `gpu.reference.*`, `vectors.r3000.full` |
 | `perf` | A Release build for the instructions-per-frame job. Configure and build only. | `ci` | none |
 
 The `gte`, `dma` and `timers` directories are in the `ci`, `asan` and `wasm32` inventories, and `be32` runs their
@@ -96,17 +96,24 @@ them and fails unless the first records of each equal the committed sample. The 
 workflow's other jobs, the benches and the loader fuzz campaign below, report the same way and also sit outside
 `CI required`.
 
-### The GPU clipping capture
+### GPU hardware captures
 
 The `nightly` lane fetches the `ps1-tests` build-158 archive named in `pins.txt` and verifies its SHA-256 before
-extracting only the clipping executable and its captured `vram.png` into `build/nightly/gpu-reference`. The
-host's Python standard library decodes the bounded capture formats into a temporary little-endian RGB555 file;
-alpha is ignored and no color management or rescaling is applied. The C judge loads the pinned executable with
-the public core API and makes one bounded frame-advance call. It accepts the documented `FRAME` or no-fault
-`BUDGET` stop after ticks advance; the executable waits in `VSync(0)`, so a bounded stop need not mean the guest
-returned from that wait. It then compares all 524,288 VRAM words after clearing only bit 15. Every color word must
-match. The archive, executable, PNG and decoded pixels are build inputs only: none is committed, uploaded or
-packaged. A fetch or digest error is reported separately from a raster mismatch.
+extracting only the selected executable and `vram.png` files into `build/nightly/gpu-reference`. It checks
+clipping, lines, rectangles, transparency, quad, triangle, UV interpolation, texture overflow, overlapping VRAM
+copies and CLUT caching. The host's Python standard library decodes the bounded capture formats into temporary
+little-endian RGB555 files; alpha is ignored and no color management, compositing or rescaling is applied.
+
+Each guest draws its reference image before its first `VSync(0)` wait. The judge uses fixed `schway_run_frame`
+call bounds derived from each pinned source: one call for clipping, lines, transparency, quad and triangle; two
+for rectangles (128 draw commands), UV interpolation (768 polygons), texture overflow (two texture uploads) and
+CLUT caching (3,712 uploaded halfwords); eight for overlapping VRAM copies (27,657 individual writes and 147
+copies). Every call must advance ticks without a fault. The
+judge accepts only the bounded `FRAME` or no-fault `BUDGET` stop, then compares all 524,288 VRAM words after
+clearing only bit 15. Every color word must match. `tests/gpu/allow.txt` has no entries because this corpus has no
+source-documented per-case color alternatives. The archive, executables, PNGs and decoded pixels are build inputs
+only: none is committed, uploaded or packaged. A fetch or digest error is reported separately from a raster
+mismatch.
 
 ### The GTE, DMA and timer checks
 

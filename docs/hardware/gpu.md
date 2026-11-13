@@ -41,8 +41,10 @@ for variable dimensions, a size word. E1 supplies the texture page and pixel dep
 offsets to the eight-bit U and V coordinates before the page origin is added. Four-bit and eight-bit
 texels are unpacked from VRAM words and resolved through the CLUT; fifteen-bit texels are read directly. The reserved
 depth value follows the direct fifteen-bit model. X and Y wrap at the VRAM edges, and CLUT indices wrap across the row.
-The texture and CLUT caches are per instance and form a deterministic rendering model; their replacement and stale-hit
-behavior are not claimed as measured hardware behavior.
+The texture and CLUT caches are per instance and form a deterministic rendering model. GP0(01h) invalidates both
+caches, and a different CLUT address invalidates the CLUT cache, following the
+[PSX-SPX GPU documentation](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/#gpu-texture-caching). Other cache
+replacement and stale-hit behavior is not claimed as measured hardware behavior.
 
 ## Pixel pipeline
 

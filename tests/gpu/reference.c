@@ -1,10 +1,11 @@
 /* Synthetic RGB555 controls and a whole-VRAM comparison for pinned captures.
    Python's bounded host adapter canonicalizes the capture; this file loads the
    pinned program through the public API and compares every VRAM word. */
-#include <stdint.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "schwaystation.h"
 #include "png.h"
@@ -17,7 +18,7 @@ enum {
     RGB_BYTES = 3u,
     MAX_PNG_BYTES = 2u * 1024u * 1024u,
     MAX_EXE_BYTES = 2u * 1024u * 1024u + 0x800u,
-    CAPTURE_RUN_ADVANCES = 1u
+    MAX_CAPTURE_ADVANCES = 16u
 };
 
 enum {
@@ -291,7 +292,8 @@ static uint16_t read_le16(const uint8_t *bytes)
     return (uint16_t)((uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8));
 }
 
-static int compare_capture(const char *exe_path, const char *golden_path)
+static int compare_capture(const char *case_name, const char *exe_path, const char *golden_path,
+                           uint32_t advance_limit)
 {
     size_t exe_size = 0u;
     size_t golden_size = 0u;
@@ -301,7 +303,7 @@ static int compare_capture(const char *exe_path, const char *golden_path)
     int exit_code = 2;
 
     if (exe == NULL || exe_size == 0u) {
-        fprintf(stderr, "GPU_REFERENCE_INPUT_ERROR: cannot read bounded clipping executable\n");
+        fprintf(stderr, "GPU_REFERENCE_INPUT_ERROR: cannot read bounded %s executable\n", case_name);
         goto cleanup;
     }
     if (golden == NULL || golden_size != VRAM_WORDS * 2u) {
@@ -323,7 +325,7 @@ static int compare_capture(const char *exe_path, const char *golden_path)
 
     status = schway_load_exe(inst, exe, exe_size);
     if (status != SCHWAY_STATUS_OK) {
-        fprintf(stderr, "GPU_REFERENCE_INPUT_ERROR: clipping executable was refused: %s\n",
+        fprintf(stderr, "GPU_REFERENCE_INPUT_ERROR: %s executable was refused: %s\n", case_name,
                 schway_status_string(status));
         goto cleanup;
     }
@@ -331,7 +333,7 @@ static int compare_capture(const char *exe_path, const char *golden_path)
     uint64_t previous_frame = 0u;
     uint64_t previous_ticks = 0u;
     uint32_t last_stop = 0u;
-    for (uint32_t advance = 0u; advance < CAPTURE_RUN_ADVANCES; advance++) {
+    for (uint32_t advance = 0u; advance < advance_limit; advance++) {
         schway_run_result result;
         memset(&result, 0, sizeof result);
         result.size = (uint32_t)sizeof result;
@@ -346,9 +348,9 @@ static int compare_capture(const char *exe_path, const char *golden_path)
             (result.stop == SCHWAY_STOP_FRAME && result.frame == previous_frame) ||
             result.ticks <= previous_ticks || result.fault_present != 0u) {
             fprintf(stderr,
-                    "GPU_REFERENCE_CORE_ERROR: bounded run %u stopped unexpectedly "
+                    "GPU_REFERENCE_CORE_ERROR: %s bounded run %u stopped unexpectedly "
                     "(stop=%u frame=%llu ticks=%llu fault=%u)\n",
-                    advance + 1u, result.stop, (unsigned long long)result.frame,
+                    case_name, advance + 1u, result.stop, (unsigned long long)result.frame,
                     (unsigned long long)result.ticks, result.fault_present);
             goto cleanup;
         }
@@ -385,14 +387,15 @@ static int compare_capture(const char *exe_path, const char *golden_path)
 
     if (mismatches != 0u) {
         fprintf(stderr,
-                "GPU_REFERENCE_RASTER_MISMATCH: %u of %u words; first=%zu expected=%04x actual=%04x\n",
-                mismatches, VRAM_WORDS, first_mismatch, first_expected, first_actual);
+                "GPU_REFERENCE_RASTER_MISMATCH: %s: %u of %u words; first=%zu expected=%04x actual=%04x; advances=%u ticks=%llu\n",
+                case_name, mismatches, VRAM_WORDS, first_mismatch, first_expected, first_actual,
+                advance_limit, (unsigned long long)previous_ticks);
         exit_code = 1;
         goto cleanup;
     }
 
-    printf("GPU_REFERENCE_CAPTURE_MATCH: words=%u advances=%u stop=%s ticks=%llu tolerance=0\n",
-           VRAM_WORDS, CAPTURE_RUN_ADVANCES,
+    printf("GPU_REFERENCE_CAPTURE_MATCH: case=%s words=%u advances=%u stop=%s ticks=%llu tolerance=0\n",
+           case_name, VRAM_WORDS, advance_limit,
            last_stop == SCHWAY_STOP_FRAME ? "frame" : "budget",
            (unsigned long long)previous_ticks);
     exit_code = 0;
@@ -402,6 +405,18 @@ cleanup:
     free(exe);
     free(golden);
     return exit_code;
+}
+
+static int parse_advance_limit(const char *text, uint32_t *out)
+{
+    char *end = NULL;
+    errno = 0;
+    unsigned long value = strtoul(text, &end, 10);
+    if (errno != 0 || end == text || *end != '\0' || value == 0u || value > MAX_CAPTURE_ADVANCES) {
+        return 0;
+    }
+    *out = (uint32_t)value;
+    return 1;
 }
 
 static void quantization(void)
@@ -467,12 +482,18 @@ static void controls(void)
 
 int main(int argc, char **argv)
 {
-    if (argc == 4 && strcmp(argv[1], "capture") == 0) {
-        return compare_capture(argv[2], argv[3]);
+    if (argc == 6 && strcmp(argv[1], "capture") == 0) {
+        uint32_t advance_limit = 0u;
+        if (!parse_advance_limit(argv[5], &advance_limit)) {
+            fprintf(stderr, "GPU_REFERENCE_INPUT_ERROR: advance bound must be between 1 and %u\n",
+                    (unsigned)MAX_CAPTURE_ADVANCES);
+            return 2;
+        }
+        return compare_capture(argv[2], argv[3], argv[4], advance_limit);
     }
     if (argc != 2) {
         fprintf(stderr,
-                "usage: schwaystation-test-gpu-reference quantization|controls|capture EXE RGB555LE\n");
+                "usage: schwaystation-test-gpu-reference quantization|controls|capture CASE EXE RGB555LE ADVANCES\n");
         return 2;
     }
     if (strcmp(argv[1], "quantization") == 0) {

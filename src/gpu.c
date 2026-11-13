@@ -891,7 +891,9 @@ static void process_packet(schway *inst, uint64_t tick)
     if (op == 0x02u && word_count == 3u) {
         fill_vram(inst, command, g->fifo[1], g->fifo[2]);
     } else if (op == 0x01u) {
+        /* GP0(01h) invalidates texture and CLUT caches (docs/hardware/gpu.md#textured-rectangles). */
         texture_cache_clear(g);
+        clut_cache_clear(g);
     } else if (op >= 0x80u && op <= 0x9Fu && word_count == 4u) {
         copy_vram(inst, g->fifo[1], g->fifo[2], g->fifo[3]);
     } else if (op >= 0x60u && op <= 0x7Fu) {
