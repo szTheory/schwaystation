@@ -645,3 +645,7 @@ Codex coordinator / inherited parent model: plan29 explicitly acknowledged monit
 ### Hardware-reference writer handoff (2026-11-12)
 
 Codex coordinator / inherited parent model: plan30 returned terminal complete at3bdad2b; actual progress50/56 summaries, next ordinal51. Plan29 explicitly retains monitor-only ownership of the Windows diagnostic and /tmp findings with no local source/shared metadata writes. Plan46 is the sole local writer using the evidence-backed host-Python input-adapter/C per-word-comparison seam. Old dispatched CI/diagnostic heads do not verify46 or replace final current-source verification.
+
+### Remaining GPU capture writer handoff (2026-11-13)
+
+Codex coordinator / inherited parent model: plan46 returned terminal complete at eb93663; actual progress51/56 summaries, next ordinal52. Plan29 explicitly retains monitor-only ownership of targeted Windows run43345311739 at f502338 and has no active local command/source/shared metadata writes. Plan47 is the sole local writer using46's independently checked adapter and C word-comparison path, with per-guest source-supported fixed bounds. Old dispatched runs do not verify47 or replace final current-source verification.
