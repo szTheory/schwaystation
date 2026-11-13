@@ -1,0 +1,2 @@
+# Tests this directory registers: name<TAB>labels, lines sorted by name.
+spu.model	audio,portable
