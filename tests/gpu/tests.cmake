@@ -86,6 +86,19 @@ schway_warnings(schwaystation-test-gpu-display)
 
 include(${PROJECT_SOURCE_DIR}/cmake/GPUReferences.cmake)
 schway_add_gpu_reference_target()
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+# Fault prevented: a bad PNG adapter input or a wrong/mutated fetched reference
+# being accepted before it can reach the pinned capture comparison.
+schway_add_test(NAME gpu.reference.fetch_controls
+  COMMAND ${CMAKE_COMMAND}
+    "-DSCHWAY_GPU_REFERENCE_CONTROL_DIR=${PROJECT_BINARY_DIR}/tests/gpu/reference-fetch-controls"
+    -P ${PROJECT_SOURCE_DIR}/cmake/GPUReferences.cmake
+  LABELS gpu portable TIMEOUT 30)
+
+schway_add_test(NAME gpu.reference.png_controls
+  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/gpu/reference_png.py" self-test
+  LABELS gpu portable TIMEOUT 30)
 
 # Fault prevented: GP1 mode dividers, display-window wrap, field height,
 # 24-bit packing, display-off output or malformed ranges drifting from scanout.
