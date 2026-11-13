@@ -6,6 +6,7 @@ on:
       - phase/04-games-play-in-retroarch
     paths:
       - .github/workflows/phase4-windows-path-probe.yml
+      - tests/compat/tests.cmake
 
 permissions:
   contents: read

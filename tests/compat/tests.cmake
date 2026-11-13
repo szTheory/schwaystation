@@ -278,7 +278,13 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "library_controls")
   library_validate("${duplicate_root}" identity "${LIBRARY_TRACK_SHA1}" TRUE)
   file(STRINGS "${probe_log}" probed_images)
   list(LENGTH probed_images probe_count)
-  list(FIND probed_images "${duplicate_root}/discs/standalone.bin" standalone_index)
+  execute_process(COMMAND sh -c "CDPATH= cd \"$1\" && pwd -P" sh "${duplicate_root}/discs"
+    RESULT_VARIABLE expected_discs_status OUTPUT_VARIABLE expected_discs
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT expected_discs_status STREQUAL "0")
+    message(FATAL_ERROR "cannot canonicalize synthetic disc directory: ${expected_discs_status}")
+  endif()
+  list(FIND probed_images "${expected_discs}/standalone.bin" standalone_index)
   if(NOT probe_count EQUAL 4 OR standalone_index EQUAL -1 OR
      "${probed_images}" MATCHES "synthetic[.]bin|duplicate[.]bin|companion2352[.]bin")
     message(FATAL_ERROR "standalone BIN was not probed exactly once or a CUE companion was probed raw: ${probed_images}")
