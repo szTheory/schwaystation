@@ -6,11 +6,11 @@ current_phase: 04
 current_phase_name: Games play in RetroArch
 current_plan: 58 of 58
 status: completed
-stopped_at: Phase 4 verified; stopped before $gsd-ship 4 under AGENTS rule 9; Phase 5 not started
-last_updated: "2026-11-13T14:04:55.325Z"
+stopped_at: Phase 04 shipped as v0.4.0; Phase 5 not started
+last_updated: "2026-11-13T17:03:45Z"
 last_activity: 2026-11-13
-last_activity_desc: "Phase 04 ship PR #14 created; auto-merge after required CI. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0."
-state_head: b1c9f21c117866bcc5891aa5c6bc720240a3e321
+last_activity_desc: "Phase 04 shipped through PR #14 and release PR #15; v0.4.0 published and post-merge CI passed. Phase 5 not started. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0."
+state_head: 2959b100812540942de4f0f6499413925bd1cb1e
 progress:
   total_phases: 6
   completed_phases: 4
@@ -26,14 +26,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 04 — Games play in RetroArch
+**Current focus:** Phase 04 shipped as v0.4.0; Phase 5 has not started.
 
 ## Current Position
 
-Phase: 04 — Games play in RetroArch — VERIFIED
+Phase: 04 — Games play in RetroArch — SHIPPED
 Current Plan: 58 of 58
-Status: Verified; stopped before ship. No human verification remains. The owner acts next with `$gsd-ship 4`; Phase 5 has not started.
-Last activity: 2026-11-13 -- Phase 04 ship PR #14 created; auto-merge after required CI. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0.
+Status: Shipped as v0.4.0. Phase 5 has not started.
+Last activity: 2026-11-13 -- Phase 04 released through PR #14 and release PR #15; post-merge CI and artifact verification passed. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0.
 
 Progress: [███████░░░] 67%
 

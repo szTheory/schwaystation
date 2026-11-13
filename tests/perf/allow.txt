@@ -4,4 +4,3 @@
 # test card slow down by up to 2.50 % until 1 December. A line applies from the
 # day it is checked through its expiry, which must be at most 60 days away. It
 # is reviewed in the pull request that needs it and removed after that merges.
-gpu_motion 210 2027-01-12 phase-4 GPU work absent from the phase-3 baseline; PR run 43439503174 measured +201bp while testcard was +1bp
