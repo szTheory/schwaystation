@@ -185,7 +185,7 @@ entry_slots:
 
 ; The minimal BIOS-call dispatcher stays out of the fixed A/B/C slot image.
 ; B0(19h) registers a guest-owned JumpBuffer; B0(17h) returns only while a
-; supported IRQ context is active. An inactive return is an ordinary B-call return.
+; supported IRQ context is active. An inactive return remains unhandled and stops.
 call_b_dispatch:
   ori k1, zero, 0x19
   beq t1, k1, hook_register
@@ -208,7 +208,7 @@ return_from_exception:
   lw k1, (STUB_ACTIVE - STUB_RAM)(k1)
   nop
   ori k0, zero, 1
-  bne k1, k0, call_b_return
+  bne k1, k0, spin
   nop
   j irq_return
   nop

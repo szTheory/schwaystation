@@ -957,7 +957,6 @@ static void stub_irq_controls(void)
     irq_fixture_write(inst, f.wait_pc + 16u, 0u);
     irq_fixture_write(inst, f.wait_pc + 20u, mips_i(0x09u, 0u, 16u, 1));
     irq_fixture_expect_stop(inst);
-    CHECK_EQ_HEX(le32(inst->bus.ram + 0x210u), 0x20u);
     CHECK_EQ_U64(le32(inst->bus.ram + 0x304u), 0u);
     CHECK_EQ_HEX(inst->cpu.r[16], 0x110u);
     schway_destroy(inst);

@@ -313,10 +313,10 @@ For an IRQ0 with no valid `SWMB` mailbox, the stub saves r1-r31 except the scrat
 exception SR and EPC, before loading the callback fields. It enters the registered address with `v0` = 1 and the
 registered stack and callee-saved registers. The guest callback reads `I_STAT` and `I_MASK` and acknowledges its own
 interrupt; the stub does not acknowledge it. Calling B0(17h) restores the saved CPU state and uses RFE to resume at
-the saved EPC itself. A valid `SWMB` mailbox keeps its existing priority. An unregistered IRQ0 and unsupported BIOS
-services stop in the stub's bounded loop; nested exceptions are unsupported and do not replace the active saved
-context. This is one caller's hook path, not a general BIOS interrupt chain, and it adds no core fields or state
-version.
+the saved EPC itself. A valid `SWMB` mailbox keeps its existing priority. An unregistered IRQ0, B0(17h) with no
+active saved context, and unsupported BIOS services stop in the stub's bounded loop; nested exceptions are
+unsupported and do not replace the active saved context. This is one caller's hook path, not a general BIOS
+interrupt chain, and it adds no core fields or state version.
 
 **The default handler.** An exception writes Cause, EPC, BadVaddr and SR to the exception record. If the mailbox magic is
 there, the handler sets the mailbox word at `08h` to `000000FFh` (status FFh) and jumps to the address in the word at
