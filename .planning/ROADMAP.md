@@ -370,7 +370,7 @@ Plans:
 - [x] 04-30-PLAN.md — Compare canonical whole-VRAM output against independent known answers
 
 **Wave 44**
-- [ ] 04-46-PLAN.md — Run the pinned clipping executable against its actual hardware capture
+- [x] 04-46-PLAN.md — Run the pinned clipping executable against its actual hardware capture
 
 **Wave 45**
 - [ ] 04-47-PLAN.md — Compare all remaining nine actual GPU image captures
@@ -426,6 +426,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 50/56 | In Progress | - |
+| 4. Games play in RetroArch | 51/56 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 51 of 56
+current_plan: 52 of 56
 status: executing
-stopped_at: Completed 04-30; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
-last_updated: "2026-11-12T23:14:04.349Z"
+stopped_at: Completed 04-46-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
+last_updated: "2026-11-13T01:13:46.913Z"
 last_activity: 2026-11-12
 last_activity_desc: "Completed 04-30 canonical VRAM hash and synthetic PNG reference checks with local CI and hygiene passing; 50 of 56 phase plans have summaries, six remain, and 04-29 acceptance remains incomplete. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh. Coordinator resumes 04-29 metadata and hosted acceptance follow-up next."
-state_head: 75049e6fe86c7b698e4d3643e62d9fd4938d235d
+state_head: 86a695f6e2ee2d1bd9884f9a0239eb1dab7698df
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 124
-  completed_plans: 118
+  completed_plans: 119
   percent: 50
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 51 of 56
+Current Plan: 52 of 56
 Status: 50 of 56 phase plans have summaries; six remain. 04-29 remains incomplete while its immutable hosted run is monitored and acceptance follow-up is coordinated.
 Last activity: 2026-11-12 — Completed 04-30 with local CI and hygiene passing. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh. Coordinator resumes 04-29 metadata and hosted acceptance follow-up next.
 
@@ -179,6 +179,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P55 | 17min | 2 tasks | 2 files |
 | Phase 04 P56 | 16 min | 2 tasks | 6 files |
 | Phase 04 P30 | at least 19 min; executor start unavailable after recovery | 2 tasks | 5 files |
+| Phase 04 P46 | 96 min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -433,6 +434,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Keep fixture production available to selected ASan/fuzz libretro consumers while the selected inventory controls standalone test registration.
 - [Phase 04]: Hash all 1024x512 VRAM words after clearing bit 15 and serializing each word low byte first.
 - [Phase 04]: Keep the PNG reference decoder synthetic-only; extend it for indexed 4-bit and dynamic-DEFLATE captures before 04-46 runs its captured clipping oracle.
+- [Phase 04]: The selected capture adapter uses host Python standard-library features only and emits build-tree RGB555LE pixels for the ten pinned PNGs.
+- [Phase 04]: The clipping judge accepts a FRAME or a no-fault progressing BUDGET stop and compares the fixed whole-VRAM golden.
+- [Phase 04]: The test BIOS stub supports SYS(01h)/SYS(02h) with SWMB precedence and keeps reset-installed entry bytes stable.
+- [Phase 04]: An ignored local CMake user preset caps CTest at four jobs while tracked and hosted defaults remain unchanged.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -618,8 +623,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-12T23:14:03.983Z
-Stopped at: Completed 04-30; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
+Last session: 2026-11-13T01:13:46.202Z
+Stopped at: Completed 04-46-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 
