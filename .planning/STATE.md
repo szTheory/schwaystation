@@ -7,10 +7,10 @@ current_phase_name: Games play in RetroArch
 current_plan: 58 of 58
 status: completed
 stopped_at: Phase 4 verified; stopped before $gsd-ship 4 under AGENTS rule 9; Phase 5 not started
-last_updated: "2026-11-13T10:36:07Z"
+last_updated: "2026-11-13T14:04:55.325Z"
 last_activity: 2026-11-13
-last_activity_desc: "Phase 4 verified with successful hosted CI; awaiting owner ship step. Runtime/model: Codex/OpenGSD 1.20.0, executor and verifier gpt-6-luna xhigh."
-state_head: b5be30d9c65e677b7656a90d021819c36bcd908b
+last_activity_desc: "Phase 04 ship PR #14 created; auto-merge after required CI. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0."
+state_head: b1c9f21c117866bcc5891aa5c6bc720240a3e321
 progress:
   total_phases: 6
   completed_phases: 4
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 Phase: 04 — Games play in RetroArch — VERIFIED
 Current Plan: 58 of 58
 Status: Verified; stopped before ship. No human verification remains. The owner acts next with `$gsd-ship 4`; Phase 5 has not started.
-Last activity: 2026-11-13 — All seven requirements and five roadmap criteria verified; exact-source hosted CI passed, including real RetroArch and eight-lane hash equality. See 04-VERIFICATION.md.
+Last activity: 2026-11-13 -- Phase 04 ship PR #14 created; auto-merge after required CI. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0.
 
 Progress: [███████░░░] 67%
 
