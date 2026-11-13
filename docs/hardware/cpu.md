@@ -269,7 +269,7 @@ a non-zero upper half in a value or address, a non-zero `r0`, and a branch flag 
 
 ## The stub kernel and kernel RAM
 
-With no BIOS from the host the core maps its own stub kernel, 620 bytes of MIPS at `BFC00000h` (see [bus.md](bus.md)),
+With no BIOS from the host the core maps its own stub kernel, 1,552 bytes of MIPS at `BFC00000h` (see [bus.md](bus.md)),
 and the CPU starts there. The stub is written for this project, holds no Sony byte and provides no kernel service
 beyond what is listed here. It uses only the addresses below, all in the low 64 KiB of RAM except the ROM, and the
 table keeps them disjoint:
@@ -282,7 +282,13 @@ table keeps them disjoint:
 | ROM after `BFC00180h` | the handler body, which uses only `k0` and `k1` |
 | `80000200h`-`8000020Fh` | the launch block: `pc0`, `gp0`, `s_addr`, `s_size`, written by `schway_load_exe` |
 | `80000210h`-`8000021Fh` | the exception record: Cause, EPC, BadVaddr, SR |
+| `80000300h`-`80000303h` | the guest's registered B0(19h) `JmpBuf` pointer |
+| `80000304h`-`80000307h` | the active-interrupt-context flag |
+| `80000310h`-`8000039Bh` | private saved interrupt context: r1-r31 (the k0 slot is reserved), HI, LO, SR and EPC |
 | `80010000h`-`800100FFh` | the mailbox of a loaded image |
+
+The `80000300h`-`800003BFh` range is reserved by this stub for its hook and context. A guest that loads an image into
+low RAM must keep its own data and code out of this private range; the loaded EXE fixtures start above `80010000h`.
 
 **Reset sequence.** The stub writes the memory-control values the retail boot code writes, clears `I_MASK` and
 `I_STAT`, copies the four-word vector to `80000080h`, clears SR.BEV, then reads the launch block. With no image loaded
@@ -296,6 +302,21 @@ with `t1` = `3Ch`, or to `B0h` with `t1` = `3Dh`, stores the low byte of `a0` to
 returns. Any other function number returns at once, and so does `C0h`. The routines use only `k0` and `k1`, so every
 other register survives the call. With the profile's debug-port flag clear the store is ignored, and the byte goes
 nowhere.
+
+**The registered IRQ0 hook.** The stub implements the narrow `HookEntryInt`/`ReturnFromException` pair, B0(19h) and
+B0(17h), described in [PSX-SYSTEM.md](../../.planning/preparation/PSX-SYSTEM.md) (SYS.07). B0(19h) registers the
+guest-owned `JmpBuf` pointer from `a0`. Its words are `ra`/entry at offset 00h, `sp` at 04h, `fp` at 08h, `s0`-`s7`
+at 0Ch-28h and `gp` at 2Ch. A public PSn00bSDK v0.24 declaration was inspected only to confirm these interface
+offsets; no SDK implementation was copied (see [PROVENANCE.md](../../PROVENANCE.md), PV.15).
+
+For an IRQ0 with no valid `SWMB` mailbox, the stub saves r1-r31 except the scratch register `k0`, plus HI, LO, the
+exception SR and EPC, before loading the callback fields. It enters the registered address with `v0` = 1 and the
+registered stack and callee-saved registers. The guest callback reads `I_STAT` and `I_MASK` and acknowledges its own
+interrupt; the stub does not acknowledge it. Calling B0(17h) restores the saved CPU state and uses RFE to resume at
+the saved EPC itself. A valid `SWMB` mailbox keeps its existing priority. An unregistered IRQ0 and unsupported BIOS
+services stop in the stub's bounded loop; nested exceptions are unsupported and do not replace the active saved
+context. This is one caller's hook path, not a general BIOS interrupt chain, and it adds no core fields or state
+version.
 
 **The default handler.** An exception writes Cause, EPC, BadVaddr and SR to the exception record. If the mailbox magic is
 there, the handler sets the mailbox word at `08h` to `000000FFh` (status FFh) and jumps to the address in the word at
