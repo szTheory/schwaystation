@@ -54,8 +54,9 @@ Phase 3's repository-check code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githoo
 - [x] **GAME-07**: One integrated session in RetroArch (the hosted macOS job, at most 300 lines of e2e code in total, checked by `policy.e2e_budget`) loads `pad_counter.exe` as content with no BIOS in `system/` (the adapter boots PS-EXE content under the stub kernel), the picture differs between two `--max-frames` values, and each screenshot matches the runner's `--png` frame pixel for pixel; `supports_no_game`, `input_descriptors`, `core_options`, `memory_descriptors` (RAM at 0, 80000000h, A0000000h and the scratchpad at 1F800000h) and `disk_control` claims in the `.info` are each tied to a configure-time guard test.
 
 
-Phase 4's repository-check budget is **2,700 lines**, counted across `scripts/*.sh`,
-`tests/cmake/*.cmake` and `.githooks/*`, then ratcheted down to the actual total at ship. Phase 3's
+Phase 4's repository-check ceiling was **2,700 lines**, counted across `scripts/*.sh`,
+`tests/cmake/*.cmake` and `.githooks/*`. At ship, the measured total was **2,689 lines**, and the gate
+was ratcheted to that total. Phase 3's
 historical ship ratchet remains 1,513 lines. The owner approved the revised absolute ceiling after
 reviewing the complete local-library implementation and its ordinary-mode/BIN controls plus the complete
 host-claim guard and self-test. The measured combined proposal is 2,633 lines, including every counted
