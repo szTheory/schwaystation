@@ -100,7 +100,7 @@ status: complete
 | 1 | `core.state.device_fields` failed with exit 8 because all 31 expected SPU records were absent and the saved sample deadline was not restored. `gsd_run check tdd-red-evidence` returned `RED_EVIDENCE_OK`; semantic inspection confirmed the planned assertions failed. | Planned focused CMake/CTest command passed all 9 state and SPU tests. | RED → GREEN committed in order; no refactor was needed. |
 | 2 | `core.state.rejects` failed with exit 8 because format 4 was accepted and changed the destination; malformed SPU controls passed. Evidence returned `RED_EVIDENCE_OK`; semantic inspection confirmed the compatibility assertion failure. | Focused state, SPU, and frozen API v1 CTest command passed all 10 tests. | RED → GREEN committed in order; no refactor was needed. |
 
-## Verification
+## Commands and Evidence
 
 - Task 1 command: `cmake --preset ci && cmake --build --preset ci --target schwaystation-test-state schwaystation-test-spu && ctest --test-dir build/ci -R '^core\.state\.|^spu\.model$' --no-tests=error --output-on-failure` — exit 0, 9/9 tests passed.
 - Task 2 command: `cmake --preset ci && cmake --build --preset ci --target schwaystation-test-state schwaystation-test-spu schwaystation-test-api-v1 && ctest --test-dir build/ci -R '^core\.state\.|^spu\.model$|^abi\.api_v1$' --no-tests=error --output-on-failure` — exit 0, 10/10 tests passed.

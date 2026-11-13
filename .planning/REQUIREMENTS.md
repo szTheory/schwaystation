@@ -73,8 +73,8 @@ No minification, relocation out of the counted set or speculative unnamed gate i
 
 ### The sound matches the console
 
-- [x] **SOUND-01**: `ctest -L audio` steps the SPU model (one tick per 768 cycles, voices 1 to 24 then reverb, BRR decode with carried history, the 512-entry gaussian table, the ADSR step rule checked against the ares-generated table, the psx-spx noise form, the two-phase reverb with the 39-tap FIR, capture buffers written every sample, int32 mixing saturated at the documented points, IRQ on any RAM access at IRQA, the 32-halfword FIFO and DMA4 transfer paths) and the nightly lane compares the ps1-tests `spu/memory-transfer` log's seven hardware pass lines; `schwaystation-run --hash-audio` prints the SHA-256 over the int16 stereo stream for the `spu_tone` fixture (`audio@600`, `mailbox@600` with per-voice ENVX records), identical on every lane, where a unit test derives the same PCM from the block table without the CPU; exactly `frame_cycles / 768` samples per frame (737 or 738 NTSC, 886 or 887 PAL), never padded; `fuzz.regress.spu` replays its seeds.
-- [x] **SOUND-02**: The libretro batch and single-sample audio paths deliver PCM equal to the runner's stream, shown by the in-process `libretro.host` test; the hosted RetroArch session boots `spu_tone.exe` as content under the stub kernel (the GAME-07 path) and proves video only; `core.no_busy_loop` holds for the idle SPU.
+- [ ] **SOUND-01**: `ctest -L audio` steps the SPU model (one tick per 768 cycles, voices 1 to 24 then reverb, BRR decode with carried history, the 512-entry gaussian table, the ADSR step rule checked against the ares-generated table, the psx-spx noise form, the two-phase reverb with the 39-tap FIR, capture buffers written every sample, int32 mixing saturated at the documented points, IRQ on any RAM access at IRQA, the 32-halfword FIFO and DMA4 transfer paths) and the nightly lane compares the ps1-tests `spu/memory-transfer` log's seven hardware pass lines; `schwaystation-run --hash-audio` prints the SHA-256 over the int16 stereo stream for the `spu_tone` fixture (`audio@600`, `mailbox@600` with per-voice ENVX records), identical on every lane, where a unit test derives the same PCM from the block table without the CPU; exactly `frame_cycles / 768` samples per frame (737 or 738 NTSC, 886 or 887 PAL), never padded; `fuzz.regress.spu` replays its seeds.
+- [ ] **SOUND-02**: The libretro batch and single-sample audio paths deliver PCM equal to the runner's stream, shown by the in-process `libretro.host` test; the hosted RetroArch session boots `spu_tone.exe` as content under the stub kernel (the GAME-07 path) and proves video only; `core.no_busy_loop` holds for the idle SPU.
 
 ### Discs and FMV
 
@@ -156,8 +156,8 @@ Later milestones. Each has a seed in `.planning/seeds/` that says when it comes 
 | GAME-05 | Phase 4 | Complete |
 | GAME-06 | Phase 4 | Complete |
 | GAME-07 | Phase 4 | Complete |
-| SOUND-01 | Phase 5 | Complete |
-| SOUND-02 | Phase 5 | Complete |
+| SOUND-01 | Phase 5 | Pending |
+| SOUND-02 | Phase 5 | Pending |
 | DISC-01 | Phase 6 | Pending |
 | DISC-02 | Phase 6 | Pending |
 | DISC-03 | Phase 6 | Pending |
