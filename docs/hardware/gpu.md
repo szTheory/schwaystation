@@ -9,11 +9,13 @@ paths. Lines and beam behavior are described by their own hardware sections as t
 DMA2 writes use the same GP0 packet parser as CPU writes, so packet state carries across blocks and linked-list nodes.
 DMA2 reads consume the same GPUREAD stream as CPU reads. A transfer reset clears an unfinished packet or VRAM transfer.
 
-GPUSTAT bit 26 is set only when the command parser is idle and the GPU is ready. Bit 28 follows the block-ready rule:
-it is low while GPU work is busy, low while a polygon or line packet still owes parameters, and high for an active VRAM
-upload or polyline continuation when the GPU is idle. Bit 27 reports unread VRAM-to-CPU words. Bit 25 and DMA2's
-request line follow GP1's DMA direction: direction 1 requests while the GPU is idle with FIFO space, direction 2
-requests when bit 28 is set, and direction 3 requests while a VRAM read has words remaining.
+GPUSTAT bit 26 is set only when the command parser is idle and the GPU is ready. Bit 28 follows the parser's block-ready
+state independently of bit 26: it remains high for a completed CPU-fed GP0 command in DMA direction 0 while that
+primitive is still rendering, and is low for busy rendering under a nonzero DMA direction. Partial polygon or line
+packets and active VRAM uploads or polyline continuations retain their parser-specific rules. Bit 27 reports unread
+VRAM-to-CPU words. Bit 25 and DMA2's request line follow GP1's DMA direction: direction 1 reports FIFO space, even
+while rendering is busy; direction 2 follows bit 28, and direction 3 requests while VRAM read words remain. These
+rules match the ordered source-backed `gpustat` observations and do not claim a complete physical FIFO model.
 
 The GPU busy deadline is a deterministic model seeded from `.planning/preparation/PSX-GPU-AND-GTE.md`, section four
 point four. It charges 8 setup clocks plus the rounded per-pixel cost below after rasterization; it is not a console
@@ -83,7 +85,11 @@ GP0 supports flat and Gouraud colors, textured and untextured pixels, raw and mo
 Coordinates are signed 11-bit values with the signed E5 draw offset added before clipping. E3/E4 edges are inclusive;
 an inverted draw area produces no pixels. The renderer rejects the whole polygon when its offset-applied vertex span
 exceeds 1023 horizontally or 511 vertically, before clipping to VRAM. A textured polygon takes its CLUT from the first
-vertex's UV word and updates only E1/GPUSTAT texture-page bits 0 through 8 from the second vertex's UV word.
+vertex's UV word and updates E1/GPUSTAT texture-page bits 0 through 8 from the second vertex's UV word. Its TPage bit
+11 updates GPUSTAT bit 15 only on v2 when GP1(09h) has enabled the 2 MB texture-Y gate. Clearing the page bit clears
+the latched status bit; a set bit is ignored when the gate is disabled. GP0(E1h).11 uses the same gate. Disabling
+GP1(09h) alone preserves the last accepted status bit. GPU v0 ignores GP1(09h) and always reads bit 15 as zero. This
+status latch does not add a second VRAM bank or change texture sampling.
 
 Triangles use widened integer edge equations sampled at integer pixel coordinates. Winding is normalized without culling, zero-area
 triangles draw nothing, and the top and left edges own samples exactly on an edge. Quads draw as triangles (1,2,3) then

@@ -771,13 +771,21 @@ static uint32_t gpu_status(const struct schway *inst)
                        g->phase == SCHWAY__GPU_POLYLINE_COLOR)) {
         block_ready = 1u;
     }
+    /* GPUSTAT bit 28 remains set after a CPU-fed GP0 packet in direction 0,
+       even while its primitive is rendering (docs/hardware/gpu.md, GPU readiness and DMA). */
+    if (idle == 0u && g->dma_direction == 0u && g->phase == SCHWAY__GPU_IDLE) {
+        block_ready = 1u;
+    }
     if (idle != 0u && g->phase == SCHWAY__GPU_PACKET) {
         uint32_t op = g->fifo[0] >> 24;
         block_ready = op < 0x20u || op > 0x5Fu;
     }
+    uint32_t gpu_v0 = (inst->profile_flags & SCHWAY_PROFILE_GPU_V0) != 0u;
     uint32_t status = g->draw_mode & 0x7FFu;
     status |= (g->mask & 3u) << 11;
-    status |= ((g->draw_mode >> 11) & 1u) << 15;
+    if (gpu_v0 == 0u) {
+        status |= ((g->draw_mode >> 11) & 1u) << 15;
+    }
     status |= ((g->display_mode >> 7) & 1u) << 14;
     status |= ((g->display_mode >> 6) & 1u) << 16;
     status |= (g->display_mode & 3u) << 17;
@@ -793,7 +801,7 @@ static uint32_t gpu_status(const struct schway *inst)
     }
     switch (g->dma_direction) {
     case 1u:
-        if (idle != 0u && g->fifo_count < SCHWAY__GPU_FIFO_WORDS) {
+        if (g->fifo_count < SCHWAY__GPU_FIFO_WORDS) {
             status |= UINT32_C(1) << 25;
         }
         break;
@@ -819,7 +827,6 @@ static uint32_t gpu_status(const struct schway *inst)
     if (g->phase == SCHWAY__GPU_TRANSFER_FROM_VRAM && g->owed_words != 0u) {
         status |= UINT32_C(1) << 27;
     }
-    uint32_t gpu_v0 = (inst->profile_flags & SCHWAY_PROFILE_GPU_V0) != 0u;
     status |= (gpu_v0 == 0u ? g->field_status : 0u) << 13;
     status |= (g->dma_direction & 3u) << 29;
     uint32_t lines = gpu_lines(inst->region);
@@ -863,9 +870,19 @@ static void apply_environment(schway *inst, uint32_t command)
     uint32_t op = command >> 24;
     uint32_t value = command & 0x00FFFFFFu;
     switch (op) {
-    case 0xE1u:
-        g->draw_mode = value & 0x7FFFu;
+    case 0xE1u: {
+        /* GP1(09h) gates TBY2 writes on v2; an accepted bit remains latched
+           when the gate is later disabled (docs/hardware/gpu.md, Polygons). */
+        uint32_t tby2 = UINT32_C(1) << 11;
+        uint32_t draw_mode = value & 0x7FFFu;
+        if ((inst->profile_flags & SCHWAY_PROFILE_GPU_V0) != 0u) {
+            draw_mode &= ~tby2;
+        } else if (g->allow_2mb == 0u && (draw_mode & tby2) != 0u) {
+            draw_mode = (draw_mode & ~tby2) | (g->draw_mode & tby2);
+        }
+        g->draw_mode = draw_mode;
         break;
+    }
     case 0xE2u:
         g->texture_window = value & 0x000FFFFFu;
         break;
@@ -1198,7 +1215,10 @@ static void gpu_gp1(schway *inst, uint32_t command, uint64_t tick)
         break;
     }
     case 0x09u:
-        g->allow_2mb = value & 1u;
+        /* GP1(09h) exists only on v2 (docs/hardware/gpu.md, Polygons). */
+        if ((inst->profile_flags & SCHWAY_PROFILE_GPU_V0) == 0u) {
+            g->allow_2mb = value & 1u;
+        }
         break;
     case 0x10u: {
         uint32_t index = value & 0x0Fu;

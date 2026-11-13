@@ -23,6 +23,7 @@ gpu.reference.cli	gpu,portable
 gpu.reference.controls	gpu,portable
 gpu.reference.fetch_controls	gpu,portable
 gpu.reference.png_controls	gpu,portable
+gpu.reference.predicate_controls	gpu,portable
 gpu.reference.quantization	gpu,portable
 gpu.span.polyline_packet	gpu,portable
 gpu.span.rectangle_profile	gpu,portable

@@ -280,6 +280,11 @@ schway_add_test(NAME gpu.dma.ready_budget
   COMMAND schwaystation-test-gpu dma_ready_budget
   LABELS gpu portable TIMEOUT 10)
 
+# Fault prevented: a bad, missing, failed, reordered, or incomplete hardware predicate log passes.
+schway_add_test(NAME gpu.reference.predicate_controls
+  COMMAND schwaystation-test-gpu-reference predicate_controls
+  LABELS gpu portable TIMEOUT 30)
+
 # Fault prevented: a canonical whole-VRAM hash differs from the independent
 # little-endian RGB555 frame-1 known answer.
 string(REPLACE ";" "|" gpu_reference_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")

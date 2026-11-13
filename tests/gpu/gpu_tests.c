@@ -288,6 +288,17 @@ static void test_register_images(void)
     CHECK(read_port(inst, GP0) == 2u);
     CHECK((read_port(inst, GP1) & 0x00001800u) == 0x00001800u);
 
+    write_port(inst, GP1, 0x09000000u);
+    write_port(inst, GP0, 0xE1000800u);
+    CHECK((read_port(inst, GP1) & 0x00008000u) == 0u);
+    write_port(inst, GP1, 0x09000001u);
+    write_port(inst, GP0, 0xE1000800u);
+    CHECK((read_port(inst, GP1) & 0x00008000u) != 0u);
+    write_port(inst, GP1, 0x09000000u);
+    CHECK((read_port(inst, GP1) & 0x00008000u) != 0u);
+    write_port(inst, GP0, 0xE1000000u);
+    CHECK((read_port(inst, GP1) & 0x00008000u) == 0u);
+
     write_port(inst, GP0, 0x1F000000u);
     CHECK((read_port(inst, GP1) & 0x01000000u) != 0u);
     CHECK((inst->irq.stat & (1u << 1)) != 0u);
@@ -302,6 +313,22 @@ static void test_register_images(void)
     CHECK((inst->irq.stat & (1u << 1)) == 0u);
     CHECK(inst->gpu.allow_2mb == 1u);
     schway_destroy(inst);
+
+    schway *v0 = make_instance();
+    if (v0 == NULL) {
+        return;
+    }
+    schway_profile profile;
+    memset(&profile, 0, sizeof profile);
+    profile.size = (uint32_t)sizeof profile;
+    profile.region = SCHWAY_REGION_NTSC_U;
+    profile.flags = SCHWAY_PROFILE_GPU_V0;
+    CHECK(schway_set_profile(v0, &profile) == SCHWAY_STATUS_OK);
+    write_port(v0, GP1, 0x09000001u);
+    CHECK(v0->gpu.allow_2mb == 0u);
+    write_port(v0, GP0, 0xE1000800u);
+    CHECK((read_port(v0, GP1) & 0x00008000u) == 0u);
+    schway_destroy(v0);
 }
 
 static void test_dma_ready_budget(void)
@@ -338,12 +365,31 @@ static void test_dma_ready_budget(void)
     CHECK((status & (1u << 25)) != 0u);
     CHECK((inst->dma.dreq & (1u << 2)) != 0u);
 
+    write_port(inst, GP1, 0x04000001u);
+    write_port(inst, GP0, 0x020000FFu);
+    write_port(inst, GP0, 0u);
+    write_port(inst, GP0, 0x00010001u);
+    deadline = schway__gpu_next(inst);
+    status = read_port(inst, GP1);
+    CHECK((status & (1u << 25)) != 0u);
+    CHECK((status & ((1u << 26) | (1u << 28))) == 0u);
+    CHECK((inst->dma.dreq & (1u << 2)) != 0u);
+    CHECK(deadline > inst->ticks);
+    schway__gpu_event(inst, deadline);
+
     write_port(inst, GP1, 0x04000003u);
     status = read_port(inst, GP1);
     CHECK((status & (1u << 25)) == 0u);
     write_port(inst, GP1, 0x04000000u);
     status = read_port(inst, GP1);
     CHECK((status & (1u << 25)) == 0u);
+    write_port(inst, GP0, 0x020000FFu);
+    write_port(inst, GP0, 0u);
+    write_port(inst, GP0, 0x00010001u);
+    status = read_port(inst, GP1);
+    CHECK((status & (1u << 25)) == 0u);
+    CHECK((status & (1u << 26)) == 0u);
+    CHECK((status & (1u << 28)) != 0u);
     schway_destroy(inst);
 }
 

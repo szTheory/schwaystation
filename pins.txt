@@ -22,6 +22,8 @@ gcc-mipsel-none-elf-linux 12.3.0 https://github.com/Lameguy64/PSn00bSDK/releases
 # ps1-tests build-158 GPU clipping reference. Nightly fetches the archive with this digest;
 # only the test executable and captured PNG are used from build/nightly (fetch-only, not shipped).
 ps1-tests-gpu-captures build-158 https://github.com/JaCzekanski/ps1-tests/releases/download/build-158/tests.zip 5de0e82854c1a511697a7ade381c2d778ec4b2fff4a7d7ac79e8098c35eb859b
+# gpustat's hardware log is absent from build-158; fetch this text source only at the public source commit.
+ps1-tests-gpu-gpustat-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/gpu/gpustat/psx.log 1ac340f7f505ab831b12d34a02624963e1e907873bd57f2fd50f09a9ed11eab3
 
 # armips (MIT): assembles the PS-EXE fixtures; cmake/Armips.cmake downloads the archive and checks the digest.
 # The digest was measured on the commit archive named by the full SHA, not a short-SHA URL.

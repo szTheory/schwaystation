@@ -5,26 +5,41 @@
 # files were never fetched. Configure fails naming the first pinned file that
 # SCHWAYSTATION_SST_DIR lacks; fetch them with the commands in pins.txt.
 set(SCHWAYSTATION_SST_DIR "" CACHE PATH "Directory of the fetched pinned vector files, NAME.json.bin each")
+option(SCHWAYSTATION_GPU_REFERENCE_ONLY "Configure only GPU references without fetching CPU vectors" OFF)
 if(SCHWAYSTATION_SST_DIR STREQUAL "")
-  message(FATAL_ERROR "nightly: set SCHWAYSTATION_SST_DIR to the directory of the fetched pinned blobs")
-endif()
-get_filename_component(nightly_sst_dir "${SCHWAYSTATION_SST_DIR}" ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
-file(STRINGS ${PROJECT_SOURCE_DIR}/pins.txt nightly_rows REGEX "^r3000-")
-if(NOT nightly_rows)
-  message(FATAL_ERROR "nightly: pins.txt has no r3000- rows")
-endif()
-foreach(row IN LISTS nightly_rows)
-  if(NOT row MATCHES "^r3000-([A-Za-z]+) ")
-    message(FATAL_ERROR "nightly: pins.txt row is not 'r3000-NAME pin sha1 size': ${row}")
+  if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY)
+    message(FATAL_ERROR "nightly: set SCHWAYSTATION_SST_DIR to the directory of the fetched pinned blobs")
   endif()
-  if(NOT EXISTS "${nightly_sst_dir}/${CMAKE_MATCH_1}.json.bin")
-    message(FATAL_ERROR "nightly: ${nightly_sst_dir}/${CMAKE_MATCH_1}.json.bin is missing; fetch the pinned blobs first")
+  set(nightly_sst_dir "${PROJECT_BINARY_DIR}/sst")
+else()
+  get_filename_component(nightly_sst_dir "${SCHWAYSTATION_SST_DIR}" ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
+endif()
+if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY)
+  file(STRINGS ${PROJECT_SOURCE_DIR}/pins.txt nightly_rows REGEX "^r3000-")
+  if(NOT nightly_rows)
+    message(FATAL_ERROR "nightly: pins.txt has no r3000- rows")
   endif()
-endforeach()
+  foreach(row IN LISTS nightly_rows)
+    if(NOT row MATCHES "^r3000-([A-Za-z]+) ")
+      message(FATAL_ERROR "nightly: pins.txt row is not 'r3000-NAME pin sha1 size': ${row}")
+    endif()
+    if(NOT EXISTS "${nightly_sst_dir}/${CMAKE_MATCH_1}.json.bin")
+      message(FATAL_ERROR "nightly: ${nightly_sst_dir}/${CMAKE_MATCH_1}.json.bin is missing; fetch the pinned blobs first")
+    endif()
+  endforeach()
+endif()
 
 include(${PROJECT_SOURCE_DIR}/cmake/GPUReferences.cmake)
 schway_add_gpu_reference_target()
 schway_prepare_gpu_reference_capture(clipping clipping_exe clipping_png clipping_golden)
+
+# The log guests' source-defined MMIO predicates are judged against their real ordered hardware pass logs.
+foreach(case IN ITEMS gp0-e1 gpustat mask-bit)
+  schway_prepare_gpu_reference_log(${case} case_log)
+  schway_add_test(NAME gpu.reference.${case}
+    COMMAND schwaystation-test-gpu-reference log ${case} ${case_log}
+    LABELS gpu nightly portable TIMEOUT 30)
+endforeach()
 
 # Fault prevented: the pinned clipping executable's complete VRAM differs from
 # its independently captured hardware reference at any RGB555 word.

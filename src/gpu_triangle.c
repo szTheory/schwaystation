@@ -283,7 +283,17 @@ void schway__gpu_polygon(schway *inst, const uint32_t *position_words,
     if ((flags & SCHWAY__GPU_PIXEL_TEXTURED) != 0u) {
         clut = uv_words[0] & 0xFFFF0000u;
         uint32_t page = (uv_words[1] >> 16) & 0x1FFu;
-        inst->gpu.draw_mode = (inst->gpu.draw_mode & ~0x1FFu) | page;
+        /* The second TPage replaces TBY2 as well as bits 0-8 on supported v2
+           hardware; keep this change confined to the status/draw-mode latch. */
+        uint32_t tby2 = (uv_words[1] >> 27) & 1u;
+        uint32_t tby2_mask = UINT32_C(1) << 11;
+        uint32_t draw_mode = (inst->gpu.draw_mode & ~0x1FFu) | page;
+        if ((inst->profile_flags & SCHWAY_PROFILE_GPU_V0) != 0u) {
+            draw_mode &= ~tby2_mask;
+        } else if (inst->gpu.allow_2mb != 0u || tby2 == 0u) {
+            draw_mode = (draw_mode & ~tby2_mask) | (tby2 << 11);
+        }
+        inst->gpu.draw_mode = draw_mode;
     }
     if (spans_allowed(points, vertex_count) == 0u) {
         return;
