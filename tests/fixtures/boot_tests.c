@@ -446,6 +446,196 @@ static void registered_handler(const char *dir)
     free(exe);
 }
 
+static uint32_t mips_i(uint32_t op, uint32_t rs, uint32_t rt, int32_t imm)
+{
+    return (op << 26) | (rs << 21) | (rt << 16) | ((uint32_t)imm & 0xFFFFu);
+}
+
+static uint32_t mips_r(uint32_t rs, uint32_t rt, uint32_t rd, uint32_t fn)
+{
+    return (rs << 21) | (rt << 16) | (rd << 11) | fn;
+}
+
+static uint32_t mips_j(uint32_t op, uint32_t target)
+{
+    return (op << 26) | ((target >> 2) & 0x03FFFFFFu);
+}
+
+static void stub_irq_hook(void)
+{
+#define IRQ_ENTRY 0x80010400u
+    enum {
+        IRQ_ENTRY_WORD = 0xC0u
+    };
+    uint8_t exe[EXE_SIZE];
+    uint32_t code[256] = {0u};
+    size_t n = 0u;
+
+    /* The guest registers its own callback context with B0(19h). */
+    code[n++] = mips_i(0x0Fu, 0u, 4u, 0x8001); /* lui a0, 8001h */
+    code[n++] = mips_i(0x0Du, 4u, 4u, 0x0300); /* ori a0, a0, 300h */
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0x8000); /* lui t0, 8000h */
+    code[n++] = mips_i(0x0Du, 8u, 8u, 0x00B0); /* ori t0, t0, B0h */
+    code[n++] = mips_i(0x09u, 0u, 9u, 0x19);   /* addiu t1, zero, 19h */
+    code[n++] = mips_r(8u, 0u, 31u, 0x09u);    /* jalr ra, t0 */
+    code[n++] = 0u;                            /* nop: jalr delay slot */
+
+    /* Allow only IRQ0 at the controller, then give every caller register a
+       distinct value. The later polling loop uses k0 alone. */
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0xBF80); /* lui t0, BF80h */
+    code[n++] = mips_i(0x09u, 0u, 9u, 1);      /* addiu t1, zero, 1 */
+    code[n++] = mips_i(0x2Bu, 8u, 9u, 0x1074); /* sw t1, 1074h(t0) */
+    for (uint32_t reg = 1u; reg < 32u; reg++) {
+        if (reg != 26u) {
+            code[n++] = mips_i(0x09u, 0u, reg, (int32_t)(0x100u + reg));
+            /* addiu rN, zero, 100h+N; k0 is deliberately left available. */
+        }
+    }
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x1357); /* lui k0, 1357h */
+    code[n++] = mips_i(0x0Du, 26u, 26u, 0x9BDF); /* ori k0, k0, 9BDFh */
+    code[n++] = mips_r(26u, 0u, 0u, 0x11u);      /* mthi k0 */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x2468); /* lui k0, 2468h */
+    code[n++] = mips_i(0x0Du, 26u, 26u, 0xACE0); /* ori k0, k0, ACE0h */
+    code[n++] = mips_r(26u, 0u, 0u, 0x13u);      /* mtlo k0 */
+    code[n++] = 0u;                            /* nop: HI/LO setup spacing */
+    code[n++] = mips_i(0x0Du, 0u, 26u, 0x0401); /* ori k0, zero, IEc|IM2 */
+    code[n++] = (0x10u << 26) | (4u << 21) | (26u << 16) | (12u << 11); /* mtc0 k0, SR */
+    code[n++] = 0u;                            /* nop: COP0 write spacing */
+
+    size_t wait = n;
+    code[n++] = mips_i(4u, 0u, 0u, -1); /* wait: beq zero, zero, self */
+    code[n++] = 0u;                      /* nop: branch delay slot */
+
+    CHECK(n < IRQ_ENTRY_WORD);
+    while (n < IRQ_ENTRY_WORD) {
+        code[n++] = 0u;
+    }
+
+    /* The registered guest ISR snapshots its JmpBuf inputs, observes the
+       masked pending bit, acknowledges only IRQ0, and calls B0(17h). */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001); /* lui k0, 8001h */
+    code[n++] = mips_i(0x2Bu, 26u, 31u, 0x0350); /* sw ra, observed+0(k0) */
+    code[n++] = mips_i(0x2Bu, 26u, 2u, 0x0354);  /* sw v0, observed+4(k0) */
+    code[n++] = mips_i(0x2Bu, 26u, 29u, 0x0358); /* sw sp, observed+8(k0) */
+    code[n++] = mips_i(0x2Bu, 26u, 30u, 0x035C); /* sw fp, observed+12(k0) */
+    for (uint32_t reg = 16u; reg <= 23u; reg++) {
+        code[n++] = mips_i(0x2Bu, 26u, reg, (int32_t)(0x0360u + (reg - 16u) * 4u));
+        /* sw sN, observed+16h+4*N(k0) */
+    }
+    code[n++] = mips_i(0x2Bu, 26u, 28u, 0x0380); /* sw gp, observed+30h(k0) */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0xBF80); /* lui k0, BF80h */
+    code[n++] = mips_i(0x23u, 26u, 27u, 0x1070); /* lw k1, I_STAT(k0) */
+    code[n++] = mips_i(0x23u, 26u, 8u, 0x1074);  /* lw t0, I_MASK(k0) */
+    code[n++] = 0u;                             /* nop: load delay */
+    code[n++] = mips_r(27u, 8u, 27u, 0x24u);     /* and k1, k1, t0 */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001); /* lui k0, 8001h */
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x0384); /* sw k1, observed+34h(k0) */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0xBF80); /* lui k0, BF80h */
+    code[n++] = mips_i(0x09u, 0u, 27u, -2);     /* addiu k1, zero, -2 */
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x1070); /* sw k1, I_STAT(k0) */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001); /* lui k0, 8001h */
+    code[n++] = mips_i(0x23u, 26u, 27u, 0x0340); /* lw k1, callback(k0) */
+    code[n++] = 0u;                             /* nop: load delay */
+    code[n++] = mips_i(0x09u, 27u, 27u, 1);     /* addiu k1, k1, 1 */
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x0340); /* sw k1, callback(k0) */
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0x8000);  /* lui t0, 8000h */
+    code[n++] = mips_i(0x0Du, 8u, 8u, 0x00B0);  /* ori t0, t0, B0h */
+    code[n++] = mips_i(0x09u, 0u, 9u, 0x17);    /* addiu t1, zero, 17h */
+    code[n++] = mips_r(8u, 0u, 31u, 0x09u);     /* jalr ra, t0 */
+    code[n++] = 0u;                             /* nop: jalr delay slot */
+    size_t isr_spin = n;
+    code[n++] = mips_j(2u, 0x80010100u + (uint32_t)isr_spin * 4u); /* j isr_spin */
+    code[n++] = 0u;                             /* nop: jump delay slot */
+
+    build_exe(exe, code, n, 0u);
+    const uint32_t jump_buffer[12] = {
+        IRQ_ENTRY, 0x801FF000u, 0x12345000u,
+        0x00001600u, 0x00001601u, 0x00001602u, 0x00001603u,
+        0x00001604u, 0x00001605u, 0x00001606u, 0x00001607u,
+        0x80012000u
+    };
+    for (size_t i = 0u; i < sizeof jump_buffer / sizeof jump_buffer[0]; i++) {
+        put32(exe + 0x800u + 0x300u + 4u * i, jump_buffer[i]);
+    }
+    put32(exe + 0x800u + 0x340u, 0u);
+
+    schway *inst = make();
+    load(inst, exe, sizeof exe);
+    schway_run_result r = run(inst, 10000u, 0u);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10340u), 0u);
+    const uint32_t wait_pc = 0x80010100u + (uint32_t)wait * 4u;
+    for (uint32_t step = 0u; step < 8u && inst->cpu.pc != wait_pc; step++) {
+        r = run(inst, 1u, 0u);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    }
+    const uint32_t interrupted_pc = inst->cpu.pc;
+    CHECK_EQ_HEX(interrupted_pc, wait_pc);
+    for (uint32_t reg = 1u; reg < 32u; reg++) {
+        if (reg != 26u) {
+            CHECK_EQ_HEX(inst->cpu.r[reg], 0x100u + reg);
+        }
+    }
+
+    /* The test host supplies only an IRQ-controller edge; CPU entry and all
+       hook work still run as guest instructions under schway_run. */
+    schway__irq_raise(inst, 1u);
+    schway__irq_raise(inst, 0u);
+    uint32_t saved_epc = 0u;
+    uint32_t was_stub = 0u;
+    uint32_t entered = 0u;
+    uint32_t returned = 0u;
+    for (uint32_t step = 0u; step < 4096u && returned == 0u; step++) {
+        r = run(inst, 1u, 0u);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        uint32_t pc = inst->cpu.pc;
+        uint32_t in_stub = (pc >= 0xBFC00000u &&
+                            pc < 0xBFC00000u + schway__stub_kernel_size) ||
+                           (pc >= 0x80000080u && pc < 0x800000D0u);
+        if (in_stub != 0u) {
+            was_stub = 1u;
+            entered = 1u;
+            saved_epc = inst->cpu.cop0.r[SCHWAY__COP0_EPC];
+        } else if (was_stub != 0u && entered != 0u && pc == saved_epc) {
+            returned = 1u;
+            was_stub = 0u;
+        }
+    }
+    CHECK_EQ_U64(entered, 1u);
+    CHECK_EQ_U64(returned, 1u);
+    CHECK_EQ_U64(le32(inst->bus.ram + 0x10340u), 1u);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10384u), 1u);
+    CHECK_EQ_U64(inst->irq.stat & 1u, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 2u, 2u);
+    CHECK_EQ_U64(inst->irq.mask & 1u, 1u);
+    CHECK_EQ_U64(le32(inst->bus.ram + 0x304u), 0u);
+    CHECK_EQ_HEX(saved_epc, wait_pc);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x398u), wait_pc);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[SCHWAY__COP0_EPC], wait_pc);
+    CHECK_EQ_HEX(inst->cpu.hi, 0x13579BDFu);
+    CHECK_EQ_HEX(inst->cpu.lo, 0x2468ACE0u);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[SCHWAY__COP0_SR], 0x0401u);
+    for (uint32_t reg = 1u; reg < 32u; reg++) {
+        if (reg != 26u) {
+            CHECK_EQ_HEX(inst->cpu.r[reg], 0x100u + reg);
+        }
+    }
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10350u), IRQ_ENTRY);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10354u), 1u);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10358u), jump_buffer[1]);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x1035Cu), jump_buffer[2]);
+    for (size_t i = 3u; i <= 10u; i++) {
+        CHECK_EQ_HEX(le32(inst->bus.ram + 0x10350u + 4u * (i + 1u)), jump_buffer[i]);
+    }
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10380u), jump_buffer[11]);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    schway_destroy(inst);
+#undef IRQ_ENTRY
+}
+
 /* With no SWMB mailbox, the stub handles only BIOS SYS(01h) and SYS(02h):
    EnterCriticalSection tests and clears the saved IEp/IM2 bits, ExitCriticalSection
    sets them, and both return through RFE. A valid SWMB mailbox still takes the
@@ -529,6 +719,8 @@ static void stub_syscalls(void)
     CHECK(inst->cpu.pc >= 0xBFC00000u &&
           inst->cpu.pc < 0xBFC00000u + schway__stub_kernel_size);
     schway_destroy(inst);
+
+    stub_irq_hook();
 }
 
 /* A jump to the first address past the stub image is a bus error on the
