@@ -84,6 +84,10 @@ int main(void)
         CHECK(bios.data != NULL);
         CHECK(bios.size != 0u);
         CHECK_EQ_U64(schway_load_bios(inst, v4_bios, sizeof v4_bios), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_BIOS, &bios), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(bios.size, SCHWAY_BIOS_SIZE);
+        CHECK(((const uint8_t *)bios.data)[0] == 0u);
+        CHECK(((const uint8_t *)bios.data)[SCHWAY_BIOS_SIZE - 1u] == 0u);
         schway_bios_info bios_info;
         memset(&bios_info, 0, sizeof bios_info);
         bios_info.size = (uint32_t)sizeof bios_info;
@@ -97,6 +101,11 @@ int main(void)
             0xE3u, 0x6Du, 0x5Du, 0x18u, 0xD5u, 0x46u, 0x92u, 0x7Du,
             0x30u, 0xDAu, 0xADu, 0x6Du, 0x7Fu, 0xDAu, 0x15u, 0x41u,
         };
+        CHECK(memcmp(bios_info.sha256, zero_bios_sha256, sizeof zero_bios_sha256) == 0);
+        memset(v4_bios, 0xA5, sizeof v4_bios);
+        CHECK(((const uint8_t *)bios.data)[0] == 0u);
+        CHECK(((const uint8_t *)bios.data)[SCHWAY_BIOS_SIZE - 1u] == 0u);
+        CHECK_EQ_U64(schway_get_bios_info(inst, &bios_info), SCHWAY_STATUS_OK);
         CHECK(memcmp(bios_info.sha256, zero_bios_sha256, sizeof zero_bios_sha256) == 0);
         CHECK_EQ_U64(schway_get_memory(inst, SCHWAY_MEMORY_CARD1, &card1), SCHWAY_STATUS_OK);
         CHECK_EQ_U64(card1.size, SCHWAY_MEMCARD_SIZE);
@@ -167,6 +176,36 @@ int main(void)
                      SCHWAY_STATUS_ERR_ARGUMENT);
         CHECK_EQ_U64(generation, UINT64_C(0xCAFE));
         CHECK_EQ_U64(schway_state_size(inst), state_size);
+        uint8_t *state_before_observations = (uint8_t *)malloc(state_size);
+        uint8_t *state_after_observations = (uint8_t *)malloc(state_size);
+        CHECK(state_before_observations != NULL);
+        CHECK(state_after_observations != NULL);
+        if (state_before_observations != NULL && state_after_observations != NULL) {
+            schway_status before_status = schway_save_state(inst, state_before_observations, state_size);
+            CHECK_EQ_U64(before_status, SCHWAY_STATUS_OK);
+            uint32_t peek_value = UINT32_MAX;
+            CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_RAM, 0x10000u, 4u, &peek_value),
+                         SCHWAY_STATUS_OK);
+            CHECK_EQ_U64(peek_value, 0u);
+            CHECK_EQ_U64(schway_peek(inst, SCHWAY_SPACE_SCRATCHPAD, 0x3FCu, 4u, &peek_value),
+                         SCHWAY_STATUS_OK);
+            schway_budget empty_budget;
+            memset(&empty_budget, 0, sizeof empty_budget);
+            empty_budget.size = (uint32_t)sizeof empty_budget;
+            schway_run_result empty_result;
+            memset(&empty_result, 0, sizeof empty_result);
+            empty_result.size = (uint32_t)sizeof empty_result;
+            CHECK_EQ_U64(schway_run(inst, &empty_budget, &empty_result), SCHWAY_STATUS_OK);
+            CHECK_EQ_U64(empty_result.stop, SCHWAY_STOP_BUDGET);
+            CHECK_EQ_U64(schway_set_profile(inst, &profile), SCHWAY_STATUS_OK);
+            schway_status after_status = schway_save_state(inst, state_after_observations, state_size);
+            CHECK_EQ_U64(after_status, SCHWAY_STATUS_OK);
+            if (before_status == SCHWAY_STATUS_OK && after_status == SCHWAY_STATUS_OK) {
+                CHECK(memcmp(state_before_observations, state_after_observations, state_size) == 0);
+            }
+        }
+        free(state_before_observations);
+        free(state_after_observations);
         CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
         CHECK_EQ_U64(schway_get_vram(inst, &second), SCHWAY_STATUS_OK);
         CHECK(second.data == first.data);
@@ -202,9 +241,9 @@ int main(void)
         memset(&result, 0, sizeof result);
         result.size = (uint32_t)sizeof result;
         CHECK_EQ_U64(schway_run_frame(inst, &result), SCHWAY_STATUS_OK);
-        (void)result.lag;
-        (void)result.rumble[0];
-        (void)result.rumble[1];
+        CHECK_EQ_U64(result.lag, 1u);
+        CHECK_EQ_U64(result.rumble[0], 0u);
+        CHECK_EQ_U64(result.rumble[1], 0u);
 
         struct old_run_result {
             uint32_t size;

@@ -11,8 +11,8 @@ The runner loads no disc. A run without `--bios` or `--exe` shows the built-in t
 ## Synopsis
 
 ```text
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--hash-state] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-vram] [--hash-state]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
@@ -35,7 +35,7 @@ schwaystation-run --help | --version
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
 | `--hash-vram` | After the last frame, print the SHA-256 of all VRAM words as row-major little-endian RGB555 with bit 15 cleared. |
-| `--hash-state` | After the last frame and every other line, print the SHA-256 of the saved [machine state](#frame-hash). |
+| `--hash-state` | After the last frame, print the SHA-256 of the saved [machine state](#frame-hash). |
 | `--inputs FILE` | Parse and apply a bounded controller script before each frame latch, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
 | `--save-dir DIR` | Load and save the two memory cards under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
 | `--memcard-names MODE` | Use `basename` (default) or `serial` for the card filenames. Give it once. |
@@ -356,22 +356,25 @@ to such a device are dropped and its reads return 0; neither is a fault.
 frame 60 sha256 be3538480b252f5bcfe7cb5b876a71c72d3795621b4278e405af61c425c06d71
 ```
 
-The hash is SHA-256 over the frame's video description, then its pixels. The description is 13 unsigned 32-bit
-words, each stored low byte first: field, interlaced, vres, hres, dot_div, region, x1, y1, start_x, start_y,
-enabled, rgb24 and bpp. The pixels follow as the displayed rows from top to bottom, each pixel a 16-bit word
-stored low byte first, with no padding between rows. The hash is therefore the same on little-endian and
-big-endian hosts. The card changes every frame, so the frame number matters.
+The hash is SHA-256 over the frame's video description, then its native pixels. The description is 13 unsigned
+32-bit words, each stored low byte first: field, interlaced, vres, hres, dot_div, region, x1, y1, start_x,
+start_y, enabled, rgb24 and bpp. Pixel rows follow from top to bottom with no padding: 15-bit frames serialize
+each native word low byte first, while packed 24-bit frames hash their RGB bytes directly. Host color conversion,
+cropping, border placement and scaling do not enter this hash. The digest is therefore the same on little-endian
+and big-endian hosts. The card changes every frame, so the frame number matters.
 
 Until a GPU draws, every frame is the test card whatever the CPU, the GTE, DMA or the timers did, so the frame hash
-cannot show them. `--hash-state` prints one more line, after every other line the run prints. For example, the
-`gpu_motion.exe` fixture at frame 150 prints:
+cannot show them. `--hash-state` prints one line after the last frame. When combined with other reports, it appears
+after the frame hash and before the VRAM hash and lag count. For example, the `gpu_motion.exe` fixture at frame 150 prints:
 
 ```text
-state sha256 ab25eb56bade19baa1d3b3b85bb9f9d572061e8514f30f8d0450ab78e510977c
+state sha256 <64 lowercase hexadecimal digits>
 ```
 
-It is the SHA-256 of the state `schway_save_state` writes, without its 20-byte header, so it covers every register
-and counter the instance keeps. A state is the same bytes on every platform. A save that fails exits 1.
+It is the SHA-256 of the serialized machine state without its 20-byte header. It covers the fields needed to resume
+emulated execution, including the loaded BIOS identity, but excludes BIOS payload bytes, persistent card bytes and
+generations, output queues and the trace ring. The state bytes are the same on every platform. A save that fails
+exits 1.
 
 ## VRAM hash
 
@@ -387,9 +390,10 @@ used with `--hash` to report both the displayed-frame and whole-VRAM hashes.
 
 ## PNG output
 
-`--png N:FILE` writes frame N unscaled as an 8-bit RGB PNG. Each pixel goes through the same 15-bit to XRGB8888
-conversion the libretro core uses, with the X byte dropped. The runner builds the whole file in memory and writes
-it in one call; a file that cannot be written in full is removed and the runner exits 1.
+`--png N:FILE` writes frame N unscaled as an 8-bit RGB PNG. Native 15-bit words are widened to XRGB8888 with the
+mask bit dropped; packed 24-bit RGB bytes are passed through unchanged. Both follow the libretro core's host
+conversion, with the X byte dropped. The runner builds the whole file in memory and writes it in one call; a file
+that cannot be written in full is removed and the runner exits 1.
 
 ## Bench report
 

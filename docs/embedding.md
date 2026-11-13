@@ -42,7 +42,7 @@ The header compiles as C and as C++.
 
 ## Structs and sizes
 
-Every struct you pass starts with `uint32_t size`. Zero the whole struct with `memset`, then set `size`:
+Versioned input and output structs start with `uint32_t size`. Zero each one with `memset`, then set `size`:
 
 ```c
 schway_config cfg;
@@ -51,6 +51,7 @@ cfg.size = (uint32_t)sizeof cfg;
 ```
 
 The size tag lets a program built against one header run with a library built from another.
+`schway_span` is an unversioned read-only view with `data` and `size`; do not initialize it with a size tag.
 
 **Input structs** (`schway_config`, `schway_profile`, `schway_budget`, `schway_audio`, `schway_tty`):
 
@@ -226,7 +227,8 @@ power reset. `schway_get_fault` copies it into a `schway_fault`; with none latch
 every field is 0. `fault_present` in a run result tells you without the call.
 
 `device` says what the access reached, `width` is its size in bytes, `frame` and `ticks` are the time it was latched,
-`pc` and `opcode` the instruction, `addr` the address the access named, `line` and `dot` the beam position (0 until
+`pc` is the CPU instruction address; `opcode` is its instruction word except for `SCHWAY_FAULT_DMA`, where it is the
+value written to the DMA register. `addr` is the address the access named, `line` and `dot` the beam position (0 until
 the GPU keeps one) and `note` extra detail (the repeat count for `SCHWAY_FAULT_EXCEPTION_LOOP`, 0 otherwise).
 
 | Kind | Value | Meaning |
@@ -241,7 +243,7 @@ the GPU keeps one) and `note` extra detail (the repeat count for `SCHWAY_FAULT_E
 | `SCHWAY_FAULT_RESERVED_INSTRUCTION` | 7 | an encoding the CPU does not define |
 | `SCHWAY_FAULT_COP_UNUSABLE` | 8 | an instruction for coprocessor 1 or 3, which the console lacks |
 | `SCHWAY_FAULT_EXCEPTION_LOOP` | 9 | the same exception return address taken 1,000 times |
-| `SCHWAY_FAULT_DMA` | 10 | a DMA setup the model does not run: a channel other than OTC written with the reserved sync mode 3 and the start bit; `device` is `SCHWAY_DEVICE_DMA`, `addr` the channel's `CHCR`, `opcode` the value written and `pc` the writing instruction |
+| `SCHWAY_FAULT_DMA` | 10 | a DMA setup the model does not run: a channel other than OTC written with the reserved sync mode 3 and the start bit; `device` is `SCHWAY_DEVICE_DMA`, `addr` is the word-aligned physical address of that channel's `CHCR`, `opcode` is the raw value written and `pc` is the writing instruction address |
 
 | Device | Value | Device | Value | Device | Value |
 |--------|-------|--------|-------|--------|-------|
@@ -313,7 +315,8 @@ if (schway_probe_exe(bytes, n, &info) == SCHWAY_STATUS_OK) {
 ```
 
 `schway_probe_exe` checks a file and describes it without needing an instance; `schway_load_exe` runs the same checks
-and then copies the file's text segment into RAM at its address. Load after `schway_create` or a power reset and
+and then copies the file's text segment into RAM at its address. PS-EXE loading uses the core's built-in real-MIPS
+stub, so no BIOS is required. Load after `schway_create` or a power reset and
 before guest execution advances: a call after any guest ticks, after a frame has run, or after an executable or BIOS
 is already loaded returns `SCHWAY_STATUS_ERR_ARGUMENT`. A power reset erases an executable, so load it again after
 one. A refused file changes nothing. A `NULL` pointer or `n` of 0 returns `SCHWAY_STATUS_ERR_ARGUMENT`.
