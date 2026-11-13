@@ -1,6 +1,6 @@
-# Continuous integration. Every job runs the same `cmake --workflow --preset`
-# command as a local build, then checks that every test it expected ran. The
-# ruleset requires one check, `CI required`. docs/testing.md describes the jobs.
+# Continuous integration. Build jobs use the local CMake workflows and check that every
+# expected test ran. The GPU reference lane configures only its selected GPU tests.
+# The ruleset requires one check, `CI required`; docs/testing.md describes the jobs.
 # Every timeout below is provisional until this repository's own runs measure it.
 name: CI
 
@@ -83,6 +83,35 @@ jobs:
           { gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files" \
               --jq '.[] | .filename, (.previous_filename // empty)' || echo '(listing failed)'; } |
             sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
+
+  # Required renderer oracle: fetch the pinned captures and three source logs,
+  # then run only the GPU reference tests. The CPU vector corpus stays nightly.
+  gpu-reference:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10  # provisional until the merged plan's hosted run measures the lane.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || '' }}
+      - name: Configure the GPU reference inventory
+        run: >-
+          cmake -S . -B build/gpu-reference -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+          -DSCHWAYSTATION_INVENTORY=nightly -DSCHWAYSTATION_FIXTURES=OFF
+          -DSCHWAYSTATION_GPU_REFERENCE_ONLY=ON
+      - name: Build the runner and GPU judge
+        run: cmake --build build/gpu-reference --target schwaystation-run schwaystation-test-gpu-reference --parallel 2
+      - name: Run the pinned GPU oracles
+        run: >-
+          ctest --test-dir build/gpu-reference --output-on-failure --no-tests=error
+          --output-junit junit.xml -R '^gpu[.]reference[.]'
+      - name: Every GPU reference ran
+        run: >-
+          cmake -DJUNIT=build/gpu-reference/junit.xml -DINVENTORY=tests/inventory/nightly.txt
+          -DLABELS=gpu -P tests/cmake/check_junit.cmake
 
   # Build once in this run, then hand the digest-checked image to every build
   # consumer through a short-retention Actions artifact (never a cache).
@@ -754,7 +783,7 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, hygiene, title, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
+    needs: [changes, hygiene, title, gpu-reference, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor (roll-up); 2 x 4 s (CI required), slowest of 1 run, run 39455724329, provisional
     steps:

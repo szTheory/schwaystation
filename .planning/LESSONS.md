@@ -201,3 +201,13 @@ Symptom and reproduction: the first stable review claimed missing BIOS state bin
 Root cause / invariant: a diff base identifies changes, but every behavior claim and dependency read must use the frozen review revision. Cite exact file/blob identities for retained findings.
 Fix and evidence: corrected the same staged report, rejected the false finding without changing BIOS code, and proved the two retained defects through real callers before preparing fixes.
 Suggested check: verify snapshot fingerprints once and resolve all claimed code/dependencies at that snapshot; do not add a repository gate or duplicate full review.
+
+Lesson SW-LEGAL-001 (2026-11-13, phase4 upstream helper screening)
+Symptom and reproduction: a temporary `ps1-tests/common/dma.hpp` was identified as copied from GPL-2 Avocado. It was deleted before integration; no bytes were retained or applied.
+Root cause / invariant: a permissive repository licence does not clear every path in its tree. Copied expression remains excluded even when neighboring upstream tests and data are permissive.
+Fix and evidence: needed DMA constants were re-derived from this project's contract and vetted hardware references; the file path is now explicitly excluded in `PROVENANCE.md`.
+Applies when: admitting a file from an upstream hardware-test repository.
+Does not establish: permission to fetch, inspect, retain or use the excluded file, or to reuse code from other emulators.
+Suggested check: verify the exact file's provenance before retrieving or using it; record a known excluded path and do not revisit it.
+Sources: `PROVENANCE.md` section 2; `.planning/preparation/PSX-GPU-AND-GTE.md`.
+Status: reproduced
