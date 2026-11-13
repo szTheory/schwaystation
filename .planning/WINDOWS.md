@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 0
+open_count: 1
 waived_count: 3
 fixed_count: 0
-total_count: 3
-last_updated: 2026-11-12T13:40:18.081Z
+total_count: 4
+last_updated: 2026-11-13T22:11:13.643Z
 ---
 
 # Broken Windows Ledger
@@ -18,6 +18,7 @@ last_updated: 2026-11-12T13:40:18.081Z
 | 1 | 04 | deviation | .planning/phases/04-games-play-in-retroarch/04-14-PLAN.md |  | Task 2 added regression coverage after task 1 had already delivered the behavior, so no separate RED/GREEN production change was possible. | waived | Task 2 adds regression coverage for transport behavior required by task 1; the existing tracer had a genuine RED/GREEN cycle. Documented test-only sequencing exception, no unresolved defect or owner gate. | 2026-11-11T00:58:34.703Z | 2026-11-11T01:04:45.408Z |
 | 2 | 04 | deviation | .planning/phases/04-games-play-in-retroarch/04-24-PLAN.md |  | Resumed Task 1 judge/docs implementation and Task 2 expansion controls landed together after prior RED and partial schema/data GREEN commits; no second RED was claimed. | waived | Documented in 04-24 SUMMARY and STATE; verified implementation and checks are complete, and no source defect or owner gate remains. | 2026-11-12T03:50:26.230Z | 2026-11-12T03:50:30.829Z |
 | 3 | 04 | deviation | .planning/phases/04-games-play-in-retroarch/04-26-PLAN.md |  | Recovered tasks 1 and 2 were committed together after the valid RED evidence remained uncommitted in ignored scratch output; no RED commit was reconstructed. | waived | The summary documents the authentic RED evidence and combined recovered commit. All planned tests and final workflows passed; no product defect or owner action remains. | 2026-11-12T13:40:13.705Z | 2026-11-12T13:40:18.081Z |
+| 4 | 05 | stub | src/spu.c | 76 | Reset SPU event emits a zero stereo pair until planned voice and reverb synthesis lands. | open |  | 2026-11-13T22:11:13.643Z |  |
 
 ````json
 [
@@ -58,6 +59,19 @@ last_updated: 2026-11-12T13:40:18.081Z
     "reason": "The summary documents the authentic RED evidence and combined recovered commit. All planned tests and final workflows passed; no product defect or owner action remains.",
     "recorded_at": "2026-11-12T13:40:13.705Z",
     "resolved_at": "2026-11-12T13:40:18.081Z",
+    "milestone": "v1.0"
+  },
+  {
+    "id": 4,
+    "kind": "stub",
+    "phase": "05",
+    "file": "src/spu.c",
+    "line": 76,
+    "description": "Reset SPU event emits a zero stereo pair until planned voice and reverb synthesis lands.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-13T22:11:13.643Z",
+    "resolved_at": null,
     "milestone": "v1.0"
   }
 ]

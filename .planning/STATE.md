@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-01-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-last_updated: "2026-11-13T21:42:40.965Z"
+stopped_at: "Completed 05-02-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+last_updated: "2026-11-13T22:11:07.377Z"
 last_activity: 2026-11-13
 last_activity_desc: "Completed plan 05-01. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-state_head: 504d2b7f36e8331f8a51691862fb36dd50c7a016
+state_head: 8ac6a1457bd558845cea084d854abe031c3d3edb
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 145
-  completed_plans: 127
+  completed_plans: 128
   percent: 67
 current_plan: 1 of 19
 ---
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 2 of 19
+Plan: 3 of 19
 Status: Ready to execute
 Last activity: 2026-11-13 — Plan 05-01 completed. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
@@ -189,6 +189,7 @@ Progress: [███████░░░] 67%
 | Phase 04 P29 | not measured (checkpointed execution) | 2 tasks | 26 files |
 | Phase 04 P32 | not measured (checkpointed execution) | 2 tasks | 7 files |
 | Phase 05 P01 | 14 min | 2 tasks | 7 files |
+| Phase 05 P02 | 19 min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -459,6 +460,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Correct stale plan metadata to the actual tests/retroarch/verify.py comparator.
 - [Phase 04]: Exercise every included API v4 addition with a strict registered caller and retain frozen v1-v3 callers.
 - [Phase 04]: Document retail BIOS supply, the MIT OpenBIOS CI stand-in and distinct runner/libretro card naming behavior.
+- [Phase 05]: SPU sample production belongs to the scheduler and uses the existing public PCM ring.
+- [Phase 05]: SPU mutable state is fixed-size and embedded in each emulator instance.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -644,8 +647,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T21:42:40.768Z
-Stopped at: Completed 05-01-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Last session: 2026-11-13T22:11:06.996Z
+Stopped at: Completed 05-02-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
