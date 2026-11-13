@@ -95,14 +95,15 @@ endfunction()
 
 function(library_invoke root config ledger dat probe_config runner)
   if(ARGC GREATER 7)
-    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
         "LIBRARY_REAL_RUNNER=${ARGV6}" "LIBRARY_PROBE_LOG=${ARGV7}"
         sh "${SOURCE_ROOT}/scripts/library.sh"
         --test-root "${root}" --test-config "${config}" --test-ledger "${ledger}"
         --test-dat "${dat}" --test-probe-config "${probe_config}" --test-runner "${runner}"
       RESULT_VARIABLE library_rc OUTPUT_VARIABLE library_out ERROR_VARIABLE library_err)
   else()
-    execute_process(COMMAND sh "${SOURCE_ROOT}/scripts/library.sh"
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
+        sh "${SOURCE_ROOT}/scripts/library.sh"
         --test-root "${root}" --test-config "${config}" --test-ledger "${ledger}"
         --test-dat "${dat}" --test-probe-config "${probe_config}" --test-runner "${runner}"
       RESULT_VARIABLE library_rc OUTPUT_VARIABLE library_out ERROR_VARIABLE library_err)
