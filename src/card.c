@@ -8,7 +8,7 @@
 
 enum { CARD_IDLE, CARD_COMMAND, CARD_READ, CARD_ID, CARD_WRITE };
 
-static const char card1_error_pending[] = "card.slot1.error_pending";
+static const char card1_error_pending[] = "card.slot1.pending_error";
 static const char card1_phase[] = "card.slot1.phase";
 static const char card1_command[] = "card.slot1.command";
 static const char card1_read_step[] = "card.slot1.read_step";
@@ -18,7 +18,7 @@ static const char card1_invalid_sector[] = "card.slot1.invalid_sector";
 static const char card1_write_step[] = "card.slot1.write_step";
 static const char card1_write_bad_checksum[] = "card.slot1.write_bad_checksum";
 static const char card1_write_data[] = "card.slot1.write_data";
-static const char card2_error_pending[] = "card.slot2.error_pending";
+static const char card2_error_pending[] = "card.slot2.pending_error";
 static const char card2_phase[] = "card.slot2.phase";
 static const char card2_command[] = "card.slot2.command";
 static const char card2_read_step[] = "card.slot2.read_step";

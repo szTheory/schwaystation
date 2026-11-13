@@ -741,8 +741,8 @@ static void state_error_roundtrip(void)
                 CHECK(memcmp(image, card.data, SCHWAY_MEMCARD_SIZE) == 0);
                 CHECK_EQ_U64(card_generation(inst, slot), 1u);
 
-                const char *field = port == 0u ? "card.slot1.error_pending"
-                                               : "card.slot2.error_pending";
+                const char *field = port == 0u ? "card.slot1.pending_error"
+                                               : "card.slot2.pending_error";
                 reject_mutated_state(inst, inst, field, 0u, 2u);
                 reject_mutated_state(inst, inst, field, 0u, 1u);
             }
