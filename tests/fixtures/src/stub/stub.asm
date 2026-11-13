@@ -153,8 +153,53 @@ handler:
   jr k0
   nop
 
+spin:
+  j spin
+  nop
+
+; The putchar routines the A and B entries jump to. They use only k0 and k1, so every register the
+; caller holds survives. A call with another function number returns at once.
+call_a:
+  addiu k1, zero, 0x3C                   ; A(3Ch) putchar
+  bne t1, k1, call_return
+  lui k1, 0xBF80                         ; delay slot: the I/O region in KSEG1
+  sb a0, DEBUG_PORT(k1)
+call_return:
+  jr ra
+  nop
+call_b:
+  addiu k1, zero, 0x3D                   ; B(3Dh) putchar
+  bne t1, k1, call_return
+  lui k1, 0xBF80
+  sb a0, DEBUG_PORT(k1)
+  jr ra
+  nop
+
+; What the reset code copies to the vector: a jump to the handler body in ROM.
+vector_jump:
+  lui k0, handler >> 16
+  ori k0, k0, handler & 0xFFFF
+  jr k0
+  nop
+
+; What the reset code copies to 800000A0h: A and B jump to their ROM routines, C returns at once.
+entry_slots:
+  lui k0, call_a >> 16
+  ori k0, k0, call_a & 0xFFFF
+  jr k0
+  nop
+  lui k0, call_b >> 16
+  ori k0, k0, call_b & 0xFFFF
+  jr k0
+  nop
+  jr ra
+  nop
+  nop
+  nop
+
 ; The real clipping fixture calls SYS(01h) and SYS(02h) before drawing. The BIOS
 ; selector is in a0; dispatch only ordinary SYSCALL exceptions, not delay slots.
+; Keep this addition after entry_slots so the reset-installed A/B/C table stays stable.
 syscall_service:
   mfc0 k0, cause
   nop
@@ -207,48 +252,4 @@ syscall_return:
   addiu k0, k0, 4                       ; only non-delay-slot syscalls reach this return
   jr k0
   rfe
-
-spin:
-  j spin
-  nop
-
-; The putchar routines the A and B entries jump to. They use only k0 and k1, so every register the
-; caller holds survives. A call with another function number returns at once.
-call_a:
-  addiu k1, zero, 0x3C                   ; A(3Ch) putchar
-  bne t1, k1, call_return
-  lui k1, 0xBF80                         ; delay slot: the I/O region in KSEG1
-  sb a0, DEBUG_PORT(k1)
-call_return:
-  jr ra
-  nop
-call_b:
-  addiu k1, zero, 0x3D                   ; B(3Dh) putchar
-  bne t1, k1, call_return
-  lui k1, 0xBF80
-  sb a0, DEBUG_PORT(k1)
-  jr ra
-  nop
-
-; What the reset code copies to the vector: a jump to the handler body in ROM.
-vector_jump:
-  lui k0, handler >> 16
-  ori k0, k0, handler & 0xFFFF
-  jr k0
-  nop
-
-; What the reset code copies to 800000A0h: A and B jump to their ROM routines, C returns at once.
-entry_slots:
-  lui k0, call_a >> 16
-  ori k0, k0, call_a & 0xFFFF
-  jr k0
-  nop
-  lui k0, call_b >> 16
-  ori k0, k0, call_b & 0xFFFF
-  jr k0
-  nop
-  jr ra
-  nop
-  nop
-  nop
 .close
