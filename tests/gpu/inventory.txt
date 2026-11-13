@@ -18,6 +18,7 @@ gpu.dma.ready_budget	gpu,portable
 gpu.pixel.arithmetic	gpu,portable
 gpu.pixel.palette_wrap	gpu,portable
 gpu.pixel.textured_rectangle_mmio	gpu,portable
+gpu.reference.allowance_controls	gpu,portable
 gpu.reference.cli	gpu,portable
 gpu.reference.controls	gpu,portable
 gpu.reference.fetch_controls	gpu,portable

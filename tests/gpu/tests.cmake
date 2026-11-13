@@ -293,6 +293,12 @@ schway_add_test(NAME gpu.reference.quantization
   COMMAND schwaystation-test-gpu-reference quantization
   LABELS gpu portable TIMEOUT 30)
 
+# Fault prevented: source variants can broaden into tolerances, skip pixels, or go unused.
+schway_add_test(NAME gpu.reference.allowance_controls
+  COMMAND schwaystation-test-gpu-reference allowance_controls
+    ${PROJECT_SOURCE_DIR}/tests/gpu/allow.txt
+  LABELS gpu portable TIMEOUT 30)
+
 # Fault prevented: reference color order, mask handling, dimensions, or bad pixels drifting.
 schway_add_test(NAME gpu.reference.controls
   COMMAND ${CMAKE_COMMAND} -DCASE=controls -DUNIT=$<TARGET_FILE:schwaystation-test-gpu-reference>

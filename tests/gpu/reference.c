@@ -709,6 +709,88 @@ static void controls(void)
     free_fixture(&fixture);
 }
 
+static void allowance_controls(const char *allowance_path)
+{
+    static const char valid_policy[] =
+        "# case variant exact-use-count\n"
+        "lines zero-rgb3-cyan 64\n"
+        "transparency old-white-clear 447488\n";
+    static const char missing_variant[] = "lines zero-rgb3-cyan 64\n";
+    static const char wrong_count[] =
+        "lines zero-rgb3-cyan 63\ntransparency old-white-clear 447488\n";
+    static const char duplicate_variant[] =
+        "lines zero-rgb3-cyan 64\nlines zero-rgb3-cyan 64\n"
+        "transparency old-white-clear 447488\n";
+    static const char trailing_field[] =
+        "lines zero-rgb3-cyan 64 ignored\ntransparency old-white-clear 447488\n";
+    static const uint8_t changed_fixture[] = {0x53u, 0x43u, 0x48u, 0x57u};
+    reference_allowances allowances;
+    CHECK(read_allowance_policy(allowance_path));
+    CHECK(!read_allowance_policy(""));
+    CHECK(parse_allowance_policy((const uint8_t *)valid_policy, sizeof valid_policy - 1u));
+    CHECK(!parse_allowance_policy((const uint8_t *)missing_variant, sizeof missing_variant - 1u));
+    CHECK(!parse_allowance_policy((const uint8_t *)wrong_count, sizeof wrong_count - 1u));
+    CHECK(!parse_allowance_policy((const uint8_t *)duplicate_variant, sizeof duplicate_variant - 1u));
+    CHECK(!parse_allowance_policy((const uint8_t *)trailing_field, sizeof trailing_field - 1u));
+    CHECK(!reviewed_variant_fixture_matches("lines", changed_fixture, sizeof changed_fixture));
+    CHECK(!reviewed_variant_fixture_matches("transparency", changed_fixture,
+                                            sizeof changed_fixture));
+    CHECK(!reviewed_variant_fixture_matches("quad", changed_fixture, sizeof changed_fixture));
+
+    size_t line_index = (size_t)140u * VRAM_WIDTH + 150u;
+    uint16_t line_alternate = 0u;
+    CHECK(line_variant_word(line_index, &line_alternate));
+    uint32_t matched_allowance = ALLOWANCE_NONE;
+    CHECK(capture_allowance_matches("lines", line_index,
+                                    (uint16_t)(line_alternate ^ 1u), line_alternate, 1,
+                                    &matched_allowance));
+    CHECK(matched_allowance == ALLOWANCE_LINES_ZERO_RGB3);
+    CHECK(!capture_allowance_matches("lines", line_index,
+                                     (uint16_t)(line_alternate ^ 1u), line_alternate, 0,
+                                     &matched_allowance));
+    CHECK(!capture_allowance_matches("quad", line_index,
+                                     (uint16_t)(line_alternate ^ 1u), line_alternate, 1,
+                                     &matched_allowance));
+    CHECK(!capture_allowance_matches("lines", line_index + 1u,
+                                     (uint16_t)(line_alternate ^ 1u), line_alternate, 1,
+                                     &matched_allowance));
+    CHECK(!capture_allowance_matches("lines", line_index,
+                                     (uint16_t)(line_alternate ^ 1u),
+                                     (uint16_t)(line_alternate ^ 1u), 1,
+                                     &matched_allowance));
+
+    size_t semi_index = (size_t)140u * VRAM_WIDTH + 210u;
+    uint16_t semi_alternate = 0u;
+    CHECK(line_variant_word(semi_index, &semi_alternate));
+    CHECK(semi_alternate == 0x1CEFu);
+
+    size_t outside_index = 320u;
+    CHECK(capture_allowance_matches("transparency", outside_index, 0x7FFFu, 0u, 1,
+                                    &matched_allowance));
+    CHECK(matched_allowance == ALLOWANCE_TRANSPARENCY_OLD_CLEAR);
+    CHECK(!capture_allowance_matches("transparency", outside_index, 0x7FFFu, 0u, 0,
+                                     &matched_allowance));
+    size_t visible_index = (size_t)239u * VRAM_WIDTH + 319u;
+    CHECK(!capture_allowance_matches("transparency", visible_index, 0x7FFFu, 0u, 1,
+                                     &matched_allowance));
+    CHECK(!capture_allowance_matches("transparency", outside_index, 0x7FFFu, 1u, 1,
+                                     &matched_allowance));
+    CHECK(!capture_allowance_matches("quad", outside_index, 0x7FFFu, 0u, 0,
+                                     &matched_allowance));
+
+    memset(&allowances, 0, sizeof allowances);
+    CHECK(!allowance_usage_valid("lines", &allowances));
+    allowances.lines_used = LINE_VARIANT_SAMPLES;
+    CHECK(allowance_usage_valid("lines", &allowances));
+    allowances.lines_used--;
+    CHECK(!allowance_usage_valid("lines", &allowances));
+    memset(&allowances, 0, sizeof allowances);
+    allowances.transparency_used = TRANSPARENCY_VARIANT_SAMPLES;
+    CHECK(allowance_usage_valid("transparency", &allowances));
+    allowances.transparency_used--;
+    CHECK(!allowance_usage_valid("transparency", &allowances));
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 7 && strcmp(argv[1], "capture") == 0) {
@@ -720,9 +802,13 @@ int main(int argc, char **argv)
         }
         return compare_capture(argv[2], argv[3], argv[4], advance_limit, argv[6]);
     }
+    if (argc == 3 && strcmp(argv[1], "allowance_controls") == 0) {
+        allowance_controls(argv[2]);
+        return failures == 0u ? 0 : 1;
+    }
     if (argc != 2) {
         fprintf(stderr,
-                "usage: schwaystation-test-gpu-reference quantization|controls|capture CASE EXE RGB555LE ADVANCES ALLOW\n");
+                "usage: schwaystation-test-gpu-reference quantization|controls|allowance_controls ALLOW|capture CASE EXE RGB555LE ADVANCES ALLOW\n");
         return 2;
     }
     if (strcmp(argv[1], "quantization") == 0) {
