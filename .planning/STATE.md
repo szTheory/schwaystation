@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 54 of 58
+current_plan: 55 of 58
 status: executing
-stopped_at: Completed 04-58-PLAN.md
-last_updated: "2026-11-13T06:08:21.834Z"
+stopped_at: Completed 04-47-PLAN.md
+last_updated: "2026-11-13T08:14:03.455Z"
 last_activity: 2026-11-13
-last_activity_desc: 53 of 58 phase summaries; plan 58 completed repeated IRQ/state regressions and a source-derived 24-advance caller-progress witness. The 04-47 image comparison remains checkpointed; four later plans and final phase verification remain. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
-state_head: 94224f1abca6f3a8daa30e8b168fc94a1d4c362e
+last_activity_desc: "Plan 47 completed the exact build-158 GPU capture comparisons, reviewed source variants, and source-derived line/copy models; local CI and hygiene passed. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
+state_head: ac32819ece3ec893404fff33799c93dec794d15e
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 126
-  completed_plans: 121
+  completed_plans: 122
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 54 of 58
-Status: 53 summaries; five plans remain. Plan 58 completed IRQ/state validation and caller-progress evidence; the 04-47 eight-advance image comparison remains checkpointed and pixel differences remain unclassified.
-Last activity: 2026-11-13 — Completed 04-58 with 520/520 ordinary CI tests, five release checks, final hygiene 23/23 and focused post-label checks. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Current Plan: 55 of 58
+Status: 54 summaries; four plans remain (29, 31, 32, and 48). Plan 47 completed the GPU capture comparisons with the source-supported 24-advance overlap bound; Plan 48 and final Phase 04 verification remain.
+Last activity: 2026-11-13 — Completed 04-47 with all registered GPU captures matching, 524/524 ordinary CI tests, 5/5 release checks, and hygiene 23/23. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
 Progress: [█████░░░░░] 50%
 
@@ -182,6 +182,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P46 | 96 min | 2 tasks | 20 files |
 | Phase 04 P57 | 47min | 2 tasks | 6 files |
 | Phase 04 P58 | 86 min | 2 tasks | 22 files |
+| Phase 04 P47 | 125 min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -442,6 +443,9 @@ Recent decisions affecting current work:
 - [Phase 04]: An ignored local CMake user preset caps CTest at four jobs while tracked and hosted defaults remain unchanged.
 - [Phase 04]: 04-58: Keep the overlap image comparison at eight advances; the separate caller-progress witness uses a source-derived 24-advance allowance after eight advances completed 10,633 of 27,657 uploads.
 - [Phase 04]: 04-58: IRQ callback, acknowledgement, return and VSync progress do not establish pixel agreement; the 34,390 overlap image differences remain with checkpointed 04-47.
+- [Phase 04]: Exact GPU allowance variants are tied to the reviewed executable SHA-256 as well as their exact pixel rules and use counts.
+- [Phase 04]: Overlapping VRAM copies use bounded 16-word read batches as a capture-backed model; the selected batch size is not claimed as physical hardware width.
+- [Phase 04]: The rectangle and overlap comparisons use fixed 32- and 24-advance bounds supported by source work and caller-progress evidence.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -627,8 +631,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T06:08:21.553Z
-Stopped at: Completed 04-58-PLAN.md
+Last session: 2026-11-13T08:14:02.891Z
+Stopped at: Completed 04-47-PLAN.md
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 

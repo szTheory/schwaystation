@@ -1,6 +1,6 @@
 # Phase 04 Plan 47 Checkpoint
 
-Status: **incomplete**. Do not mark plan 47 complete or advance phase metadata. No SUMMARY, STATE, or ROADMAP update has been made.
+Status: **complete**. The final outcome is recorded in [04-47-SUMMARY.md](04-47-SUMMARY.md). This checkpoint preserves the earlier interim findings; its old eight-advance limit and unclassified image differences are superseded by the completed 24-advance comparison and exact capture results.
 
 Runtime: Codex/OpenGSD 1.20.0, `gpt-6-luna` xhigh. The phase branch is `phase/04-games-play-in-retroarch`.
 
@@ -15,7 +15,7 @@ Runtime: Codex/OpenGSD 1.20.0, `gpt-6-luna` xhigh. The phase branch is `phase/04
 
 ## Capture outcomes
 
-The focused nine-case nightly run completed at the initial source-derived bounds with no faults. After the raster correction, the three affected captures below were rerun unchanged at the same bounds and match exactly. Other initial observations remain pending classification or have a source-backed capture-state explanation:
+Historical capture outcomes at checkpoint time, before the final reviewed renderer and judge changes. See 04-47-SUMMARY.md for the completed results:
 
 | Case | Fixed advances | Result |
 |---|---:|---|
