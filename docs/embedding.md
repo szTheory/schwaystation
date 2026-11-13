@@ -540,8 +540,12 @@ schway_load_state(inst, buf, n);
 ```
 
 A state is the same bytes on every platform: a 20-byte header (magic, state format, total size, CRC-32 of the
-rest) and then every field, little-endian. `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if
-`size` is below `schway_state_size`. `schway_load_state` checks the whole state before it changes anything:
+rest) and then every field, little-endian. Format 5 includes the SPU registers, RAM, voices, transfer FIFO,
+capture and reverb history, and the next sample deadline. A format-4 state returns
+`SCHWAY_STATUS_ERR_STATE_VERSION`. The state format and behavior revision have changed; the public API and ABI
+remain unchanged.
+`schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
+`schway_load_state` checks the whole state before it changes anything:
 
 | Status | Meaning |
 |--------|---------|
@@ -550,7 +554,8 @@ rest) and then every field, little-endian. `schway_save_state` returns `SCHWAY_S
 | `SCHWAY_STATUS_ERR_STATE_CRC` | the bytes were changed |
 | `SCHWAY_STATUS_ERR_STATE_FIELD` | wrong size, a field out of range, or another region's state |
 
-A load empties the audio queue. Saving, loading and saving again gives the same bytes.
+A successful load restores the saved SPU sample phase, rebuilds derived deadlines, and empties the host-delivery
+audio queue. The queue is not part of a save state. Saving, loading and saving again gives the same bytes.
 
 The bus state includes the exact 16-bit SPU ATTR value written at `1F801DAAh`; loading a state restores that value.
 The emulator's power reset clears this latch to its deterministic zero model. This narrow control readback does not
