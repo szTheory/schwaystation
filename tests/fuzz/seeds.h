@@ -1,6 +1,5 @@
-/* The loader fuzz seeds, built in memory so no seed byte is committed. A seed
-   is a whole PS-EXE file; the replay and the nightly corpus both start from
-   these. */
+/* The loader corpus remains the default; GPU/SIO/card replays compile a small
+   subsystem corpus through the same interface. */
 #ifndef SCHWAYSTATION_FUZZ_SEEDS_H
 #define SCHWAYSTATION_FUZZ_SEEDS_H
 

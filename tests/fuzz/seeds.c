@@ -1,10 +1,37 @@
-/* The loader's seed inputs (seeds.h), each a table row built by seed_file.
-   Each row sits on one edge of the header rules in src/exe.c: a field one
-   below or one above a bound, a segment that wraps or leaves RAM, or code that
-   hammers the addresses the bus does not decode. The names are stable: they
-   become file names in the build directory. */
+/* The original loader seeds remain the default corpus. Subsystem replay targets
+   select a tiny bytecode corpus at compile time and use the same replay_main. */
 #include "seeds.h"
 
+#if defined(SCHWAY_FUZZ_GPU_SEEDS)
+static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}, {3u}, {4u}};
+static const char *const names[] = {"partial_packet", "wrap_transfer", "dma_packet", "span_extrema",
+                                    "reset_instance"};
+#elif defined(SCHWAY_FUZZ_SIO_SEEDS)
+static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}};
+static const char *const names[] = {"scheduled_ack", "deselect_pending", "empty_fifo"};
+#elif defined(SCHWAY_FUZZ_MEMCARD_SEEDS)
+static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}};
+static const char *const names[] = {"staged_write", "bad_checksum", "abort_write"};
+#endif
+
+#if defined(SCHWAY_FUZZ_GPU_SEEDS) || defined(SCHWAY_FUZZ_SIO_SEEDS) ||                            \
+    defined(SCHWAY_FUZZ_MEMCARD_SEEDS)
+uint32_t seeds_count(void)
+{
+    return (uint32_t)(sizeof corpus / sizeof corpus[0]);
+}
+
+const char *seeds_name(uint32_t i)
+{
+    return names[i];
+}
+
+size_t seeds_build(uint32_t i, uint8_t *buf)
+{
+    buf[0] = corpus[i][0];
+    return 1u;
+}
+#else
 #include <string.h>
 
 #define HEADER 0x800u
@@ -19,7 +46,8 @@ enum code {
     CODE_DEVICES, /* one read and write of each device window, then a jump back to the start */
     CODE_GAPS,    /* the same on addresses no device decodes */
     CODE_DMA,     /* arm DMA channels with hostile addresses and counts, then spin */
-    CODE_TIMERS,  /* arm the counters at target 0 with their interrupts on and no handler, then spin */
+    CODE_TIMERS,  /* arm the counters at target 0 with their interrupts on and no handler, then spin
+                   */
     CODE_GTE      /* enable the coprocessor and write all ones to every register, then spin */
 };
 
@@ -63,12 +91,10 @@ static const struct seed seeds[] = {
     {"pc0_unaligned", TEXT + 2u, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_SPIN},
     {"pc0_unmapped", 0xBFA00000u, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_SPIN},
     {"pc0_kseg2", 0xFFFE0000u, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_SPIN},
-    {"stack_at_ram_end", TEXT, TEXT, 0x800u, STACK_TOP - 0x10u, 0x10u, HEADER + 0x800u,
-     CODE_SPIN},
+    {"stack_at_ram_end", TEXT, TEXT, 0x800u, STACK_TOP - 0x10u, 0x10u, HEADER + 0x800u, CODE_SPIN},
     {"stack_over_ram", TEXT, TEXT, 0x800u, STACK_TOP - 0x10u, 0x11u, HEADER + 0x800u, CODE_SPIN},
     {"stack_kseg2", TEXT, TEXT, 0x800u, 0xC0000000u, 0x10u, HEADER + 0x800u, CODE_SPIN},
-    {"stack_size_wraps", TEXT, TEXT, 0x800u, 0x80000010u, 0xFFFFFFF0u, HEADER + 0x800u,
-     CODE_SPIN},
+    {"stack_size_wraps", TEXT, TEXT, 0x800u, 0x80000010u, 0xFFFFFFF0u, HEADER + 0x800u, CODE_SPIN},
     {"dma_self_ref_list", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
     {"dma_list_scratch", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
     {"dma_list_bios", TEXT, TEXT, 0x800u, 0u, 0u, HEADER + 0x800u, CODE_DMA},
@@ -111,13 +137,12 @@ static uint32_t op_j(uint32_t target)
    tail, the space between expansion 3 and the BIOS, past the BIOS, the top of
    the physical window, the mirror past it and KSEG2. */
 static const uint32_t device_windows[] = {
-    0xBF801000u, 0xBF801040u, 0xBF801070u, 0xBF801080u, 0xBF801100u, 0xBF801800u,
-    0xBF801810u, 0xBF801820u, 0xBF801C00u, 0xBFC00000u, 0xBF000000u, 0xBF802000u,
-    0xBFA00000u,
+    0xBF801000u, 0xBF801040u, 0xBF801070u, 0xBF801080u, 0xBF801100u, 0xBF801800u, 0xBF801810u,
+    0xBF801820u, 0xBF801C00u, 0xBFC00000u, 0xBF000000u, 0xBF802000u, 0xBFA00000u,
 };
 static const uint32_t gap_windows[] = {
-    0xBF800400u, 0xBF803000u, 0xBF900000u, 0xBFB00000u, 0xBFC80000u,
-    0xBFFFF000u, 0xC0000000u, 0xFFFE0000u,
+    0xBF800400u, 0xBF803000u, 0xBF900000u, 0xBFB00000u,
+    0xBFC80000u, 0xBFFFF000u, 0xC0000000u, 0xFFFE0000u,
 };
 
 /* Emits, for each window, a lui and then a read and a write of every width at
@@ -173,9 +198,9 @@ static size_t emit_spin(uint32_t *w, size_t n, uint32_t start)
 static size_t emit_dma(uint32_t *w, uint32_t start, uint32_t variant)
 {
     static const uint32_t rows[][5] = {
-        {2u, 2u, 0x00100000u, 0u, 0x01000401u}, {2u, 2u, 0x1F800000u, 0u, 0x01000401u},
-        {2u, 2u, 0x1FC00000u, 0u, 0x01000401u}, {2u, 2u, 0x1FA00000u, 0u, 0x01000401u},
-        {6u, 6u, 0x00FFFFFCu, 0u, 0x11000000u}, {6u, 6u, 0x00100000u, 0x10u, 0x11770703u},
+        {2u, 2u, 0x00100000u, 0u, 0x01000401u},          {2u, 2u, 0x1F800000u, 0u, 0x01000401u},
+        {2u, 2u, 0x1FC00000u, 0u, 0x01000401u},          {2u, 2u, 0x1FA00000u, 0u, 0x01000401u},
+        {6u, 6u, 0x00FFFFFCu, 0u, 0x11000000u},          {6u, 6u, 0x00100000u, 0x10u, 0x11770703u},
         {0u, 6u, 0x00100000u, 0xFFFFFFFFu, 0x11000001u},
     };
     const uint32_t *r = rows[variant];
@@ -271,10 +296,9 @@ size_t seeds_build(uint32_t i, uint8_t *buf)
         words[count++] = 0u;
     } else if (s->code == CODE_DEVICES) {
         count = emit_hammer(words, s->pc0, device_windows,
-                           sizeof device_windows / sizeof device_windows[0]);
+                            sizeof device_windows / sizeof device_windows[0]);
     } else if (s->code == CODE_GAPS) {
-        count = emit_hammer(words, s->pc0, gap_windows,
-                           sizeof gap_windows / sizeof gap_windows[0]);
+        count = emit_hammer(words, s->pc0, gap_windows, sizeof gap_windows / sizeof gap_windows[0]);
     } else if (s->code == CODE_DMA) {
         count = emit_dma(words, s->pc0, variant);
     } else if (s->code == CODE_TIMERS) {
@@ -287,3 +311,5 @@ size_t seeds_build(uint32_t i, uint8_t *buf)
     }
     return s->n;
 }
+
+#endif
