@@ -214,6 +214,60 @@ static void check_spu_event_entrypoint(void)
     schway_destroy(second);
 }
 
+static void check_bus_width_and_control_tick(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    if (inst == NULL) {
+        return;
+    }
+
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801C00u, 1u, 0x12u, &cycles), 0u);
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801C01u, 1u, 0x34u, &cycles), 0u);
+    CHECK_EQ_U64(inst->spu.voice[0].reg[0], 0u);
+    inst->ticks = SCHWAY__CYCLES_PER_PAIR;
+    schway__spu_event(inst, inst->ticks);
+    CHECK_EQ_U64(inst->spu.voice[0].reg[0], 0x12u);
+
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801C00u, 4u, 0x56781234u, &cycles), 0u);
+    inst->ticks = 2u * SCHWAY__CYCLES_PER_PAIR;
+    schway__spu_event(inst, inst->ticks);
+    CHECK_EQ_U64(inst->spu.voice[0].reg[0], 0x1234u);
+    CHECK_EQ_U64(inst->spu.voice[0].reg[1], 0x5678u);
+
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801DAAu, 2u, 0x0021u, &cycles), 0u);
+    uint32_t status = UINT32_MAX;
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_read(inst, 0xBF801DAEu, 2u, &status, &cycles), 0u);
+    CHECK_EQ_U64(status & 0x3Fu, 0u);
+    inst->ticks = 3u * SCHWAY__CYCLES_PER_PAIR;
+    schway__spu_event(inst, inst->ticks);
+    status = UINT32_MAX;
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_read(inst, 0xBF801DAEu, 2u, &status, &cycles), 0u);
+    CHECK_EQ_U64(status & 0x3Fu, 0x21u);
+
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801DAAu, 2u, 0x0040u, &cycles), 0u);
+    inst->ticks = 4u * SCHWAY__CYCLES_PER_PAIR;
+    schway__spu_event(inst, inst->ticks);
+    CHECK_EQ_U64(inst->spu.irq_enabled, 1u);
+    (void)schway__spu_ram_read(inst, 0u);
+    CHECK((inst->irq.stat & (1u << 9)) != 0u);
+
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801DAAu, 2u, 0u, &cycles), 0u);
+    inst->ticks = 5u * SCHWAY__CYCLES_PER_PAIR;
+    schway__spu_event(inst, inst->ticks);
+    CHECK_EQ_U64(inst->spu.irq_enabled, 0u);
+    CHECK_EQ_U64(inst->irq.stat & (1u << 9), 0u);
+    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], 0u);
+    schway_destroy(inst);
+}
+
 static uint64_t next_sample_deadline(uint64_t ticks)
 {
     return (ticks / SCHWAY__CYCLES_PER_PAIR + 1u) * SCHWAY__CYCLES_PER_PAIR;
@@ -373,6 +427,7 @@ int main(int argc, char **argv)
     check_split_run_boundaries();
     check_instance_owns_spu_ram();
     check_spu_event_entrypoint();
+    check_bus_width_and_control_tick();
     check_scheduled_split_runs();
     check_cpu_and_dma_deadlines();
     check_disabled_and_muted_deadlines();
