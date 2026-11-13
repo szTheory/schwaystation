@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
 current_plan: 58 of 58
-status: ready_for_verification
-stopped_at: Completed 04-32-PLAN.md; phase 4 execution stops before ship; runtime/model Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
-last_updated: "2026-11-13T10:23:16.883Z"
+status: completed
+stopped_at: Phase 4 verified; stopped before $gsd-ship 4 under AGENTS rule 9; Phase 5 not started
+last_updated: "2026-11-13T10:36:07Z"
 last_activity: 2026-11-13
-last_activity_desc: "Plans 48, 31, 29 and 32 closed against exact-head hosted CI; 58/58 plan summaries are recorded and phase verification is next. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
-state_head: 2f839fd29819d3d32a7ade8f0348db8fc6a1b1c5
+last_activity_desc: "Phase 4 verified with successful hosted CI; awaiting owner ship step. Runtime/model: Codex/OpenGSD 1.20.0, executor and verifier gpt-6-luna xhigh."
+state_head: b5be30d9c65e677b7656a90d021819c36bcd908b
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 126
   completed_plans: 126
-  percent: 50
+  percent: 67
 ---
 
 # Project State
@@ -30,17 +30,17 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 ## Current Position
 
-Phase: 04 (Games play in RetroArch) — EXECUTING
+Phase: 04 — Games play in RetroArch — VERIFIED
 Current Plan: 58 of 58
-Status: 54 summaries; four plans remain (29, 31, 32, and 48). Plan 47 completed the GPU capture comparisons with the source-supported 24-advance overlap bound; Plan 48 and final Phase 04 verification remain.
-Last activity: 2026-11-13 — Completed 04-47 with all registered GPU captures matching, 524/524 ordinary CI tests, 5/5 release checks, and hygiene 23/23. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Status: Verified; stopped before ship. No human verification remains. The owner acts next with `$gsd-ship 4`; Phase 5 has not started.
+Last activity: 2026-11-13 — All seven requirements and five roadmap criteria verified; exact-source hosted CI passed, including real RetroArch and eight-lane hash equality. See 04-VERIFICATION.md.
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 68
+- Total plans completed: 126
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -51,6 +51,7 @@ Progress: [█████░░░░░] 50%
 | 1 | 15 | - | - |
 | 02 | 27 | - | - |
 | 3 | 26 | - | - |
+| 4 | 58 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -643,19 +644,19 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-13T10:23:16.153Z
-Stopped at: Completed 04-32-PLAN.md; phase 4 execution stops before ship; runtime/model Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
+Stopped at: Phase 4 verified; before `$gsd-ship 4` (AGENTS rule 9). Owner acts next; Phase 5 is not started.
 Resume file: None
-Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
+Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 
-Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
+Phase 4 ship PR: not created; required boundary remains in force.
+Phase 3 ship PR: https://github.com/szTheory/schwaystation/pull/12
 Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8
 Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
 Phase 3 merged as PR #12; release PR #13 is green and merged. v0.3.0 is latest with 19 assets.
 Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
-Continue `/gsd-autonomous --from 4` with planning, execution, review and verification. Stop before phase-4 ship
-(AGENTS rule 9). Standing preferences are in `.planning/AUTONOMOUS.md`.
+Next: the owner invokes `$gsd-ship 4`. That step creates the PR, then normal auto-merge and release confirmation precede Phase 5. No routine UAT is required. Standing preferences are in `.planning/AUTONOMOUS.md`. Historical recovery notes below do not supersede this verified boundary.
 
 ### Independent local work during immutable CI (2026-11-12)
 
@@ -688,3 +689,11 @@ Codex primary / GPT-6 session integrated the prepared31 test-only candidate afte
 ### Phase 4 remaining-plan closure (2026-11-13)
 
 Plans48,31,29 and32 summaries are now recorded; phase progress is58/58 and the native state is ready for phase verification. Exact-head hosted run [43404686338](https://github.com/szTheory/schwaystation/actions/runs/43404686338) succeeded on `2f839fd29819d3d32a7ade8f0348db8fc6a1b1c5`, including the required GPU reference lane, Windows/native matrix, WASM, BE32 (492/492), ASan, RetroArch frames59/60 with an empty system directory, and the aggregate required check. Runtime/model for this closure: Codex/OpenGSD1.20.0, gpt-6-luna xhigh. Exact active duration across the checkpointed plans was not recoverable; summaries record that rather than estimate. The verifier owns the remaining goal-backward report. Stop after phase verification before phase4 ship or phase5.
+
+### Final Phase 4 verification boundary (2026-11-13)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor and verifier gpt-6-luna xhigh; primary GPT-6 session (exact model ID not exposed). All 58 summaries are present; native verification.status exits 0 with passed, no human items or gaps. Hosted run https://github.com/szTheory/schwaystation/actions/runs/43404686338 is completed/success on tested source 2f839fd; later changes are planning metadata only. Native phase.complete exits 0; the automatic Phase 5 pointer was restored to the required before-ship Phase 4 boundary.
+
+The phase-completion summary scanner emitted advisory missing-path warnings for historical temporary RED reports, upstream-only paths, moved completed todos, literal command strings and the historical compare.c name. These are not missing delivered behavior: the verifier checked every current plan artifact and the real target/caller wiring. Preserve the command evidence; do not add files, repeat broad suites or rewrite historical evidence to satisfy that heuristic.
+
+Efficiency corrections are durable in AUTONOMOUS.md: bring real oracles into the first runnable slices, batch independent prepared consumers before final CI, reuse reviewed source fingerprints, configure the focused GPU lane without the CPU corpus, and stop an obsolete known-failed CI tail after collecting useful results. All required coverage remains.
