@@ -364,7 +364,7 @@ Plans:
 - [x] 04-56-PLAN.md — Repair portable disc opens and provide real fixture inputs to selected sanitizer consumers
 
 **Wave 42**
-- [ ] 04-29-PLAN.md — Compare two BIOS-free content frames in real background RetroArch
+- [x] 04-29-PLAN.md — Compare two BIOS-free content frames in real background RetroArch
 
 **Wave 43**
 - [x] 04-30-PLAN.md — Compare canonical whole-VRAM output against independent known answers
@@ -382,13 +382,13 @@ Plans:
 - [x] 04-47-PLAN.md — Compare all remaining nine actual GPU image captures
 
 **Wave 48**
-- [ ] 04-48-PLAN.md — Judge the three real GPU hardware logs and run the required lane
+- [x] 04-48-PLAN.md — Judge the three real GPU hardware logs and run the required lane
 
 **Wave 49**
-- [ ] 04-31-PLAN.md — Replay hostile GPU, SIO and card inputs through bounded calls
+- [x] 04-31-PLAN.md — Replay hostile GPU, SIO and card inputs through bounded calls
 
 **Wave 50**
-- [ ] 04-32-PLAN.md — Reconcile API and hardware contracts, then verify the reviewed phase
+- [x] 04-32-PLAN.md — Reconcile API and hardware contracts, then verify the reviewed phase
 
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
@@ -432,6 +432,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 54/58 | In Progress | - |
+| 4. Games play in RetroArch | 58/58 | In Progress | - |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

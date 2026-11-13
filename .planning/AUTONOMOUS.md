@@ -57,6 +57,10 @@ does not remove that boundary. No routine owner UAT or redundant confirmation is
 
 For CI and CD efficiency, first measure critical-path time and duplicate work. Prefer removing redundant
 runs and serial bottlenecks over adding caches, concurrency or dependencies. Keep all required coverage.
+Batch ready fuzz/API/oracle work on one changed head, reuse fingerprinted review for unchanged files, and stop
+an obsolete known-failing CI tail before dispatching its repaired head. Capture shell results with `rc` or
+`task_rc` rather than zsh's read-only `status`; if a wrapper fails after all checks finish green, record that
+accurately instead of repeating the full suite for bookkeeping.
 
 For delegated research, write concise findings and verified pins to the assigned artifact early. When the
 remaining uncertainties are routine implementation probes, return them to the executor instead of delaying

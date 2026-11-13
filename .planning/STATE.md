@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 55 of 58
-status: executing
-stopped_at: Completed 04-47-PLAN.md
-last_updated: "2026-11-13T08:14:03.455Z"
+current_plan: 58 of 58
+status: ready_for_verification
+stopped_at: Completed 04-32-PLAN.md; phase 4 execution stops before ship; runtime/model Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
+last_updated: "2026-11-13T10:23:16.883Z"
 last_activity: 2026-11-13
-last_activity_desc: "Plan 47 completed the exact build-158 GPU capture comparisons, reviewed source variants, and source-derived line/copy models; local CI and hygiene passed. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
-state_head: ac32819ece3ec893404fff33799c93dec794d15e
+last_activity_desc: "Plans 48, 31, 29 and 32 closed against exact-head hosted CI; 58/58 plan summaries are recorded and phase verification is next. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
+state_head: 2f839fd29819d3d32a7ade8f0348db8fc6a1b1c5
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 126
-  completed_plans: 122
+  completed_plans: 126
   percent: 50
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 55 of 58
+Current Plan: 58 of 58
 Status: 54 summaries; four plans remain (29, 31, 32, and 48). Plan 47 completed the GPU capture comparisons with the source-supported 24-advance overlap bound; Plan 48 and final Phase 04 verification remain.
 Last activity: 2026-11-13 — Completed 04-47 with all registered GPU captures matching, 524/524 ordinary CI tests, 5/5 release checks, and hygiene 23/23. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
@@ -183,6 +183,10 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P57 | 47min | 2 tasks | 6 files |
 | Phase 04 P58 | 86 min | 2 tasks | 22 files |
 | Phase 04 P47 | 125 min | 2 tasks | 13 files |
+| Phase 04 P48 | not measured (checkpointed execution) | 2 tasks | 16 files |
+| Phase 04 P31 | not measured (checkpointed execution) | 2 tasks | 9 files |
+| Phase 04 P29 | not measured (checkpointed execution) | 2 tasks | 26 files |
+| Phase 04 P32 | not measured (checkpointed execution) | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -446,6 +450,13 @@ Recent decisions affecting current work:
 - [Phase 04]: Exact GPU allowance variants are tied to the reviewed executable SHA-256 as well as their exact pixel rules and use counts.
 - [Phase 04]: Overlapping VRAM copies use bounded 16-word read batches as a capture-backed model; the selected batch size is not claimed as physical hardware width.
 - [Phase 04]: The rectangle and overlap comparisons use fixed 32- and 24-advance bounds supported by source work and caller-progress evidence.
+- [Phase 04]: Keep all ten GPU captures and three real logs in a required exact-head hosted lane.
+- [Phase 04]: Use project-owned GPU contracts and vetted hardware references; exclude the forbidden GPL helper.
+- [Phase 04]: Extend the existing replay infrastructure with independent hostile-input state and memory assertions.
+- [Phase 04]: Use the existing hosted RetroArch driver to compare two distinct BIOS-free frames against runner references.
+- [Phase 04]: Correct stale plan metadata to the actual tests/retroarch/verify.py comparator.
+- [Phase 04]: Exercise every included API v4 addition with a strict registered caller and retain frozen v1-v3 callers.
+- [Phase 04]: Document retail BIOS supply, the MIT OpenBIOS CI stand-in and distinct runner/libretro card naming behavior.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -631,8 +642,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T08:14:02.891Z
-Stopped at: Completed 04-47-PLAN.md
+Last session: 2026-11-13T10:23:16.153Z
+Stopped at: Completed 04-32-PLAN.md; phase 4 execution stops before ship; runtime/model Codex/OpenGSD 1.20.0, gpt-6-luna xhigh
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 
@@ -672,4 +683,8 @@ Staged stable review was corrected: BIOS identity binding already exists; the in
 
 ### Independent hostile-input integration after58
 
-Codex primary / GPT-6 session integrated the prepared31 test-only candidate after58's terminal handoff; worker gpt-6-luna xhigh. The registered GPU/SIO/card plus unchanged loader cases pass with the full project warning flags.53/58 summaries remains unchanged;31 canonical acceptance waits48 and shared final evidence.47 remains the next canonical execution, with source-supported24-advance overlap completion allowance; the old8 image mismatch is historical. See04-31-CHECKPOINT.md for exact commands and pending hosted coverage.
+Codex primary / GPT-6 session integrated the prepared31 test-only candidate after58's terminal handoff; worker gpt-6-luna xhigh. The registered GPU/SIO/card plus unchanged loader cases pass with the full project warning flags. At that checkpoint 53/58 summaries remained and plan31 acceptance awaited plan48 and shared hosted evidence; that status was superseded by the closure below. See04-31-CHECKPOINT.md for the focused commands.
+
+### Phase 4 remaining-plan closure (2026-11-13)
+
+Plans48,31,29 and32 summaries are now recorded; phase progress is58/58 and the native state is ready for phase verification. Exact-head hosted run [43404686338](https://github.com/szTheory/schwaystation/actions/runs/43404686338) succeeded on `2f839fd29819d3d32a7ade8f0348db8fc6a1b1c5`, including the required GPU reference lane, Windows/native matrix, WASM, BE32 (492/492), ASan, RetroArch frames59/60 with an empty system directory, and the aggregate required check. Runtime/model for this closure: Codex/OpenGSD1.20.0, gpt-6-luna xhigh. Exact active duration across the checkpointed plans was not recoverable; summaries record that rather than estimate. The verifier owns the remaining goal-backward report. Stop after phase verification before phase4 ship or phase5.
