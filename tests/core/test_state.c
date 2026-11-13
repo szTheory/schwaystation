@@ -510,7 +510,7 @@ static void test_spu_state_continuation(void)
         uint32_t width, count;
     } expected_fields[] = {
         {"spu.ram", 1u, SCHWAY__SPU_RAM_SIZE},
-        {"spu.reg", 2u, 256u},
+        {"spu.reg", 2u, SCHWAY__SPU_REG_HALFWORDS},
         {"spu.voice.reg", 2u, SCHWAY__SPU_VOICE_COUNT * 8u},
         {"spu.voice.history", 2u, SCHWAY__SPU_VOICE_COUNT * 3u},
         {"spu.voice.sample_counter", 4u, SCHWAY__SPU_VOICE_COUNT},

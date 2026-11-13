@@ -6,6 +6,101 @@
 #include "internal.h"
 #include "state.h"
 
+#define SPU_REGISTER_BASE 0x1F801C00u
+#define SPU_REGISTER_END 0x1F801DFFu
+#define SPU_CURRENT_VOLUME_BASE 0x1F801E00u
+#define SPU_CURRENT_VOLUME_END 0x1F801E5Fu
+#define SPU_REGISTER_RAM_BASE 0x1F801E60u
+#define SPU_REGISTER_RAM_END 0x1F801E7Fu
+#define SPU_ATTR_ADDRESS 0x1F801DAAu
+#define SPU_IRQA_ADDRESS 0x1F801DA4u
+#define SPU_STATX_ADDRESS 0x1F801DAEu
+#define IRQ9_MASK (UINT32_C(1) << 9)
+
+uint32_t schway__spu_reg_supported(uint32_t address)
+{
+    address &= ~1u;
+    return (address >= SPU_REGISTER_BASE && address <= SPU_REGISTER_END) ||
+           (address >= SPU_CURRENT_VOLUME_BASE && address <= SPU_CURRENT_VOLUME_END) ||
+           (address >= SPU_REGISTER_RAM_BASE && address <= SPU_REGISTER_RAM_END);
+}
+
+static uint16_t spu_register_value(const schway *inst, uint32_t address)
+{
+    uint32_t aligned = address & ~1u;
+    if (!schway__spu_reg_supported(aligned)) {
+        return 0u;
+    }
+    uint32_t index = (aligned - SPU_REGISTER_BASE) >> 1;
+    if (aligned == SPU_STATX_ADDRESS) {
+        uint16_t attr = inst->spu.reg[(SPU_ATTR_ADDRESS - SPU_REGISTER_BASE) >> 1];
+        uint16_t value = (uint16_t)(attr & 0x003Fu);
+        value |= (uint16_t)((attr & 0x0020u) << 2);
+        if ((inst->irq.stat & IRQ9_MASK) != 0u) {
+            value |= 0x0040u;
+        }
+        return value;
+    }
+    return inst->spu.reg[index];
+}
+
+uint16_t schway__spu_reg_read(schway *inst, uint32_t address)
+{
+    return spu_register_value(inst, address);
+}
+
+uint16_t schway__spu_reg_peek(const schway *inst, uint32_t address)
+{
+    return spu_register_value(inst, address);
+}
+
+static void spu_apply_register_write(schway *inst, uint32_t address, uint16_t value)
+{
+    struct schway__spu *spu = &inst->spu;
+    uint32_t aligned = address & ~1u;
+    uint32_t index = (aligned - SPU_REGISTER_BASE) >> 1;
+    spu->reg[index] = value;
+
+    if (aligned < SPU_REGISTER_BASE + SCHWAY__SPU_VOICE_COUNT * 0x10u) {
+        uint32_t voice = (aligned - SPU_REGISTER_BASE) >> 4;
+        uint32_t reg = ((aligned - SPU_REGISTER_BASE) >> 1) & 7u;
+        spu->voice[voice].reg[reg] = value;
+    } else if (aligned == SPU_ATTR_ADDRESS) {
+        spu->irq_enabled = (value >> 6) & 1u;
+        if (spu->irq_enabled == 0u) {
+            schway__irq_write_stat(inst, 0u, IRQ9_MASK);
+        }
+    } else if (aligned == SPU_IRQA_ADDRESS) {
+        spu->irqa_addr = ((uint32_t)value << 3) & (SCHWAY__SPU_RAM_SIZE - 8u);
+    }
+}
+
+void schway__spu_reg_write(schway *inst, uint32_t address, uint16_t value)
+{
+    struct schway__spu *spu = &inst->spu;
+    uint32_t aligned = address & ~1u;
+    if (!schway__spu_reg_supported(aligned) || aligned == SPU_STATX_ADDRESS ||
+        (aligned >= SPU_CURRENT_VOLUME_BASE && aligned <= SPU_CURRENT_VOLUME_END)) {
+        return;
+    }
+    if (spu->pending_count < SCHWAY__SPU_PENDING_WRITES) {
+        uint32_t slot = spu->pending_count++;
+        spu->pending[slot].address = (uint16_t)(aligned - SPU_REGISTER_BASE);
+        spu->pending[slot].value = value;
+    }
+}
+
+static void spu_apply_pending_writes(schway *inst)
+{
+    struct schway__spu *spu = &inst->spu;
+    uint32_t count = spu->pending_count;
+    spu->pending_count = 0u;
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t address = SPU_REGISTER_BASE + spu->pending[i].address;
+        spu_apply_register_write(inst, address, spu->pending[i].value);
+    }
+}
+
 static void ram_check_irq(schway *inst, uint32_t address)
 {
     struct schway__spu *spu = &inst->spu;
@@ -74,6 +169,7 @@ void schway__spu_event(schway *inst, uint64_t now)
 {
     struct schway__spu *spu = &inst->spu;
     while (spu->next_tick <= now) {
+        spu_apply_pending_writes(inst);
         /* Later plans add voice and reverb output; a reset chip emits silence. */
         audio_push_pair(inst, 0, 0);
         if (spu->next_tick > SCHWAY__STATE_TICKS_MAX - SCHWAY__CYCLES_PER_PAIR) {
@@ -284,7 +380,7 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     }
 
     schway__state_u8_array(io, "spu.ram", spu->ram, SCHWAY__SPU_RAM_SIZE, 0u, UINT8_MAX);
-    schway__state_u16_array(io, "spu.reg", spu->reg, 256u, 0u, UINT16_MAX);
+    schway__state_u16_array(io, "spu.reg", spu->reg, SCHWAY__SPU_REG_HALFWORDS, 0u, UINT16_MAX);
     schway__state_u16_array(io, "spu.voice.reg", voice_reg, SCHWAY__SPU_VOICE_COUNT * 8u,
                             0u, UINT16_MAX);
     state_i16_array(io, "spu.voice.history", voice_history, SCHWAY__SPU_VOICE_COUNT * 3u);

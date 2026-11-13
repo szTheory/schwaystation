@@ -9,6 +9,7 @@
 
 #define SCHWAY__SPU_RAM_SIZE 0x80000u
 #define SCHWAY__SPU_VOICE_COUNT 24u
+#define SCHWAY__SPU_REG_HALFWORDS 320u
 #define SCHWAY__SPU_FIFO_HALFWORDS 32u
 #define SCHWAY__SPU_PENDING_WRITES 768u
 #define SCHWAY__SPU_REVERB_FIR_TAPS 39u
@@ -40,7 +41,7 @@ struct schway__spu_pending_write {
    it, and all cursors are byte offsets or fixed-width counts. */
 struct schway__spu {
     uint8_t ram[SCHWAY__SPU_RAM_SIZE];
-    uint16_t reg[256];
+    uint16_t reg[SCHWAY__SPU_REG_HALFWORDS];
     struct schway__spu_voice voice[SCHWAY__SPU_VOICE_COUNT];
     uint16_t transfer_fifo[SCHWAY__SPU_FIFO_HALFWORDS];
     uint32_t transfer_head;
@@ -69,6 +70,7 @@ void schway__spu_event(schway *inst, uint64_t now);
 uint16_t schway__spu_reg_read(schway *inst, uint32_t address);
 void schway__spu_reg_write(schway *inst, uint32_t address, uint16_t value);
 uint16_t schway__spu_reg_peek(const schway *inst, uint32_t address);
+uint32_t schway__spu_reg_supported(uint32_t address);
 
 uint16_t schway__spu_ram_read(schway *inst, uint32_t address);
 void schway__spu_ram_write(schway *inst, uint32_t address, uint16_t value);
