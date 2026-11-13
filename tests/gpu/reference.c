@@ -172,9 +172,9 @@ static int compare_reference_png(const uint16_t *words, size_t word_count,
         for (uint32_t x = 0u; x < VRAM_WIDTH; x++) {
             uint16_t word = (uint16_t)(words[(size_t)y * VRAM_WIDTH + x] & 0x7fffu);
             const uint8_t *pixel = row + 1u + (size_t)x * RGB_BYTES;
-            mismatches += (uint32_t)((pixel[0] >> 3) != (word & 31u));
-            mismatches += (uint32_t)((pixel[1] >> 3) != ((word >> 5) & 31u));
-            mismatches += (uint32_t)((pixel[2] >> 3) != ((word >> 10) & 31u));
+            mismatches += (uint32_t)(((uint32_t)pixel[0] >> 3u) != (word & 31u));
+            mismatches += (uint32_t)(((uint32_t)pixel[1] >> 3u) != ((word >> 5) & 31u));
+            mismatches += (uint32_t)(((uint32_t)pixel[2] >> 3u) != ((word >> 10) & 31u));
         }
     }
     free(raw);
@@ -346,7 +346,12 @@ static int parse_allowance_policy(const uint8_t *bytes, size_t size)
         char variant[64];
         char extra;
         unsigned long count = 0ul;
+#if defined(_MSC_VER)
+        if (sscanf_s(text, "%31s %63s %lu %c", case_name, (unsigned)sizeof(case_name),
+                     variant, (unsigned)sizeof(variant), &count, &extra, 1u) != 3) {
+#else
         if (sscanf(text, "%31s %63s %lu %c", case_name, variant, &count, &extra) != 3) {
+#endif
             return 0;
         }
         if (strcmp(case_name, "lines") == 0 && strcmp(variant, "zero-rgb3-cyan") == 0 &&
@@ -1290,26 +1295,31 @@ static int run_pinned_gpu_log(const char *name, const char *path)
 
 static int run_gpu_predicate_controls(void)
 {
-    char buffer[GPU_LOG_MAX_BYTES];
+    char *buffer = (char *)malloc(GPU_LOG_MAX_BYTES);
+    CHECK(buffer != NULL);
+    if (buffer == NULL) {
+        return 1;
+    }
     unsigned before = failures;
     for (size_t i = 0u; i < sizeof gpu_log_specs / sizeof gpu_log_specs[0]; i++) {
         const gpu_log_spec *spec = &gpu_log_specs[i];
-        size_t size = make_gpu_log_control(spec, buffer, sizeof buffer, 0u);
+        size_t size = make_gpu_log_control(spec, buffer, GPU_LOG_MAX_BYTES, 0u);
         CHECK(size != 0u);
         CHECK(gpu_log_matches(spec, (const uint8_t *)buffer, size, 0));
         if (i == 0u) {
-            size = make_gpu_log_control(spec, buffer, sizeof buffer, 2u);
+            size = make_gpu_log_control(spec, buffer, GPU_LOG_MAX_BYTES, 2u);
             CHECK(size != 0u && !gpu_log_matches(spec, (const uint8_t *)buffer, size, 0));
         } else if (i == 1u) {
-            size = make_gpu_log_control(spec, buffer, sizeof buffer, 1u);
+            size = make_gpu_log_control(spec, buffer, GPU_LOG_MAX_BYTES, 1u);
             CHECK(size != 0u && !gpu_log_matches(spec, (const uint8_t *)buffer, size, 0));
         } else {
-            size = make_gpu_log_control(spec, buffer, sizeof buffer, 3u);
+            size = make_gpu_log_control(spec, buffer, GPU_LOG_MAX_BYTES, 3u);
             CHECK(size != 0u && !gpu_log_matches(spec, (const uint8_t *)buffer, size, 0));
         }
-        size = make_gpu_log_control(spec, buffer, sizeof buffer, 4u);
+        size = make_gpu_log_control(spec, buffer, GPU_LOG_MAX_BYTES, 4u);
         CHECK(size != 0u && !gpu_log_matches(spec, (const uint8_t *)buffer, size, 0));
     }
+    free(buffer);
     size_t missing_size = 0u;
     CHECK(read_bounded_file("gpu-reference/does-not-exist/psx.log", GPU_LOG_MAX_BYTES,
                             &missing_size) == NULL);
