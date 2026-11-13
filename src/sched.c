@@ -16,8 +16,10 @@ uint64_t schway__sched_now(const schway *inst, uint32_t cycles)
    program. */
 void schway__sched_sync(schway *inst)
 {
+    schway__gpu_sync(inst, inst->ticks);
     inst->cpu.blk_tick = inst->ticks;
     inst->cpu.blk_cycle = inst->cpu.cycle;
+    schway__sched_recalc(inst);
 }
 
 /* The earliest deadline over the devices. It ends the running block at the
@@ -27,7 +29,15 @@ void schway__sched_recalc(schway *inst)
 {
     uint64_t dma = schway__dma_next(inst);
     uint64_t timers = schway__timers_next(inst);
+    uint64_t gpu = schway__gpu_next(inst);
+    uint64_t sio = schway__sio_next(inst);
     inst->sched.next = dma < timers ? dma : timers;
+    if (gpu < inst->sched.next) {
+        inst->sched.next = gpu;
+    }
+    if (sio < inst->sched.next) {
+        inst->sched.next = sio;
+    }
     inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
 }
 
@@ -37,11 +47,17 @@ void schway__sched_recalc(schway *inst)
 void schway__sched_run(schway *inst)
 {
     uint64_t now = inst->ticks;
+    if (schway__timers_next(inst) <= now) {
+        schway__timers_event(inst, now);
+    }
+    if (schway__gpu_next(inst) <= now) {
+        schway__gpu_event(inst, now);
+    }
     if (schway__dma_next(inst) <= now) {
         schway__dma_event(inst, now);
     }
-    if (schway__timers_next(inst) <= now) {
-        schway__timers_event(inst, now);
+    if (schway__sio_next(inst) <= now) {
+        schway__sio_event(inst, now);
     }
     schway__sched_recalc(inst);
 }

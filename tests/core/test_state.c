@@ -12,7 +12,7 @@
 #include "state.h"
 #include "../check.h"
 
-#define MAX_FIELDS 128u
+#define MAX_FIELDS 256u
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
@@ -92,6 +92,12 @@ static void run_to(schway *inst, uint64_t frame)
     while (inst->frame < frame) {
         CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
     }
+}
+
+static void bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t value)
+{
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, addr, width, value, &cycles), 0u);
 }
 
 static size_t save(const schway *inst, uint8_t *buf)
@@ -246,6 +252,37 @@ static void test_rejects(void)
             reseal(bad, n);
             expect_refused("region", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
         }
+    }
+
+    /* The architectural zero register and COP0's stored/derived bits cannot
+       be chosen by a state file, even when its checksum is valid. */
+    uint32_t cpu_r_at = 0u;
+    uint32_t cop0_at = 0u;
+    for (size_t i = 0u; i < nf && i < MAX_FIELDS; i++) {
+        if (strcmp(fields[i].name, "cpu.r") == 0) {
+            cpu_r_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "cop0.r") == 0) {
+            cop0_at = fields[i].offset;
+        }
+    }
+    CHECK(cpu_r_at >= SCHWAY__STATE_HEADER_SIZE);
+    CHECK(cop0_at >= SCHWAY__STATE_HEADER_SIZE);
+    if (cpu_r_at >= SCHWAY__STATE_HEADER_SIZE && cop0_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + cpu_r_at, 1u, 4u);
+        reseal(bad, n);
+        expect_refused("cpu.r0", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+
+        memcpy(bad, good, n);
+        put_le(bad + cop0_at + 12u * 4u, 0x00400040u, 4u);
+        reseal(bad, n);
+        expect_refused("cop0.SR reserved bit", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+
+        memcpy(bad, good, n);
+        put_le(bad + cop0_at + 13u * 4u, 0x00000400u, 4u);
+        reseal(bad, n);
+        expect_refused("cop0.CAUSE interrupt mismatch", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
     }
 
     size_t m = schway_state_size(target);
@@ -462,6 +499,7 @@ static void test_device_fields(void)
     src->dma.bcr[2] = 0x00040010u;
     src->dma.chcr[2] = 0x01000201u;
     src->dma.cur = 2u;
+    src->dma.phase[2] = 1u;
     src->dma.busy_until = src->ticks + 1000u;
     src->dma.dicr = 0x00A38000u;
     src->dma.crc[6] = 0xDEADBEEFu;
@@ -475,8 +513,14 @@ static void test_device_fields(void)
     src->timers.t[2].mode = 0x0001u;
     src->timers.t[2].paused = 1u;
     src->timers.t[2].hold = 2u;
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(src, 0xBF801DAAu, 2u, 0x0020u, &cycles), 0u);
+    CHECK_EQ_HEX(src->bus.spu_attr, 0x0020u);
     size_t n = save(src, good);
     schway *dst = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_HEX(dst->bus.spu_attr, 0u);
+    cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(dst, 0xBF801DAAu, 2u, 0x0010u, &cycles), 0u);
     CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
     CHECK(save(dst, after) == n && memcmp(good, after, n) == 0);
     CHECK_EQ_U64(dst->gte.ready, src->gte.ready);
@@ -484,6 +528,7 @@ static void test_device_fields(void)
     CHECK_EQ_HEX(dst->dma.chcr[2], 0x01000201u);
     CHECK_EQ_U64(dst->dma.cur, 2u);
     CHECK_EQ_HEX(dst->dma.crc[6], 0xDEADBEEFu);
+    CHECK_EQ_HEX(dst->bus.spu_attr, 0x0020u);
     CHECK_EQ_U64(dst->timers.t[1].value, 0x1234u);
     CHECK_EQ_U64(dst->timers.base, dst->ticks);
     src->timers.base = 12345u;
@@ -493,6 +538,10 @@ static void test_device_fields(void)
     uint32_t chcr3 = chcr2 + 4u;
     uint32_t dicr_at = offset_of(src, "dma.dicr");
     uint32_t cur_at = offset_of(src, "dma.cur");
+    uint32_t phase2_at = offset_of(src, "dma.phase") + 2u * 4u;
+    uint32_t phase3_at = phase2_at + 4u;
+    uint32_t busy_at = offset_of(src, "dma.busy_until");
+    uint32_t stall_at = offset_of(src, "dma.stall_until");
     const struct {
         const char *what;
         uint32_t at;
@@ -510,15 +559,75 @@ static void test_device_fields(void)
         reseal(bad, n);
         expect_refused(refused[i].what, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
     }
+    memcpy(bad, good, n);
+    put_le(bad + phase2_at, 6u, 4u);
+    reseal(bad, n);
+    expect_refused("DMA phase outside the engine states", dst, bad, n,
+                   SCHWAY_STATUS_ERR_STATE_FIELD);
+
+    /* A future CPU stall needs either a running unit or its completed unit
+       deadline; an unlinked stamp with no current DMA deadline is invalid. */
+    memcpy(bad, good, n);
+    put_le(bad + phase2_at, 0u, 4u);
+    put_le(bad + cur_at, SCHWAY__DMA_NONE, 4u);
+    put_le(bad + busy_at, 0u, 8u);
+    put_le(bad + stall_at, src->ticks + 1u, 8u);
+    reseal(bad, n);
+    expect_refused("DMA stall without a current channel", dst, bad, n,
+                   SCHWAY_STATUS_ERR_STATE_FIELD);
+
     /* The same current channel, started, loads. */
     memcpy(bad, good, n);
     put_le(bad + chcr3, 0x01000000u, 4u);
+    put_le(bad + phase2_at, 0u, 4u);
+    put_le(bad + phase3_at, 1u, 4u);
     put_le(bad + cur_at, 3u, 4u);
     reseal(bad, n);
     CHECK_EQ_U64(schway_load_state(dst, bad, n), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(dst->dma.cur, 3u);
+    CHECK_EQ_U64(schway_reset(src, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK_EQ_HEX(src->bus.spu_attr, 0u);
     schway_destroy(dst);
     schway_destroy(src);
+
+    /* A loaded ATTR latch, rather than a destination's prior value or a
+       duplicated DMA request level, supplies the next DMA4 block. */
+    schway *spu_src = make(SCHWAY_REGION_NTSC_U);
+    schway *spu_dst = make(SCHWAY_REGION_NTSC_U);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        bus_write(spu_src, 0x80001000u + i * 4u, 4u, 0xA5000000u + i);
+    }
+    bus_write(spu_src, 0xBF801DAAu, 2u, 0x0020u);
+    bus_write(spu_src, 0xBF8010F0u, 4u, 0x0FEDCBA9u);
+    bus_write(spu_src, 0xBF8010F4u, 4u, 0x00900000u);
+    bus_write(spu_src, 0xBF8010C0u, 4u, 0x1000u);
+    bus_write(spu_src, 0xBF8010C4u, 4u, (2u << 16) | 16u);
+    bus_write(spu_src, 0xBF8010C8u, 4u, 0x01000201u);
+    CHECK_EQ_U64(spu_src->dma.cur, 4u);
+    CHECK_EQ_U64(spu_src->dma.words[4], 16u);
+    CHECK_EQ_U64((spu_src->dma.dreq >> 4) & 1u, 0u);
+    size_t spu_n = save(spu_src, good);
+    bus_write(spu_dst, 0xBF801DAAu, 2u, 0x0010u);
+    CHECK_EQ_HEX(spu_dst->bus.spu_attr, 0x0010u);
+    CHECK_EQ_U64(schway_load_state(spu_dst, good, spu_n), SCHWAY_STATUS_OK);
+    CHECK_EQ_HEX(spu_dst->bus.spu_attr, 0x0020u);
+    CHECK_EQ_U64(spu_dst->dma.cur, 4u);
+    CHECK_EQ_U64(spu_dst->dma.words[4], 16u);
+    CHECK_EQ_U64(save(spu_dst, after), spu_n);
+    CHECK(memcmp(good, after, spu_n) == 0);
+    uint64_t first_end = spu_dst->dma.busy_until;
+    schway__dma_event(spu_dst, first_end);
+    CHECK_EQ_U64(spu_dst->dma.cur, 4u);
+    CHECK_EQ_U64(spu_dst->dma.words[4], 32u);
+    CHECK((spu_dst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    schway__dma_event(spu_dst, first_end + 76u);
+    CHECK_EQ_U64(spu_dst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(spu_dst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(spu_dst->dma.madr[4], 0x1080u);
+    CHECK_EQ_U64(spu_src->dma.words[4], 16u);
+    CHECK_EQ_HEX(spu_src->bus.spu_attr, 0x0020u);
+    schway_destroy(spu_dst);
+    schway_destroy(spu_src);
 }
 
 /* Accepted counter boundaries must either advance to another loadable state
@@ -618,8 +727,8 @@ static void test_cpu_fields(void)
     memset(&v, 0, sizeof v);
     v.size = (uint32_t)sizeof v;
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(v.state_format, 3u);
-    CHECK_EQ_U64(v.behaviour_revision, 3u);
+    CHECK_EQ_U64(v.state_format, 4u);
+    CHECK_EQ_U64(v.behaviour_revision, 4u);
 
     schway *inst = make(SCHWAY_REGION_NTSC_U);
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
@@ -673,6 +782,7 @@ static void test_cpu_fields(void)
     schway__irq_raise(inst, 2u);
     CHECK_EQ_U64(schway__irq_line(inst), 0u);
     inst->irq.mask = 0x4u;
+    inst->cpu.cop0.r[13] |= 1u << 10;
     CHECK_EQ_U64(schway__irq_line(inst), 1u);
     schway__irq_raise(inst, 11u);
     CHECK_EQ_HEX(inst->irq.stat, 0x4u);

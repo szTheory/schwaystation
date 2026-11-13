@@ -1,29 +1,35 @@
 /* schwaystation-run: the headless runner.
  *
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--hash-vram] [--png N:FILE]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--hash-vram] [--png N:FILE]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
+ *                     [--hash] [--hash-state]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
  *                     [--hash-state]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
- * Runs N frames (1 <= N <= 1,000,000) of one instance with no BIOS and no
- * disc, which shows the built-in test card. With --hash it prints, after the
- * last frame:
+ * A frame run without --bios or --exe shows the built-in test card. With
+ * --hash the runner prints, after the last frame:
  *
  *   frame <N> sha256 <64 lowercase hex digits>
  *
  * The hash is SHA-256 over the video metadata as 13 little-endian u32 words
  * (field, interlaced, vres, hres, dot_div, region, x1, y1, start_x, start_y,
  * enabled, rgb24, bpp), then the display rows top to bottom, each pixel as a
- * little-endian u16, with no padding (ARCHITECTURE section 7), so it does not
- * depend on the host's byte order.
+ * little-endian u16 (RGB555) or packed RGB byte triples (RGB24), with no
+ * padding (ARCHITECTURE section 7), so it does not depend on host byte order.
  *
  * --hash-state prints, after the frame line and every other line, the SHA-256 of the saved state
  * without its 20-byte header:
  *
  *   state sha256 <64 lowercase hex digits>
+ *
+ * --hash-vram prints the SHA-256 of all 1024x512 VRAM words after clearing bit 15 and serializing
+ * each word low byte first, in row-major order:
+ *
+ *   vram sha256 <64 lowercase hex digits>
  *
  * With no picture beyond the test card a frame hash cannot show what the CPU, the GTE, DMA or the
  * timers did; the state hash can, and it is the same on every platform.
@@ -39,6 +45,10 @@
  * --exe FILE loads a PS-EXE into the instance and runs it, 600 frames when
  * neither --frames nor --bench is given. --tty sets the profile's debug-port
  * flag and prints the guest's text, one "tty <line>" per line.
+ *
+ * --bios FILE loads an exactly 524288-byte BIOS image into the instance before
+ * reset. It prints the copied image's SHA-256 and digest-table flags, then runs
+ * it for 600 frames by default. Its file name does not determine recognition.
  *
  * --probe FILE prints the identity of a PS-EXE (probe.h) and runs nothing: no
  * instance is made and no frame runs. It is valid only alone.
@@ -71,10 +81,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "bench.h"
+#include "cards.h"
 #include "clock.h"
 #include "exit_status.h"
+#include "frame_hash.h"
+#include "inputs.h"
 #include "mailbox.h"
 #include "png.h"
 #include "probe.h"
@@ -84,7 +98,12 @@
 #include "sha256.h"
 #include "stop.h"
 #include "trace.h"
+#include "tty.h"
 #include "xrgb8888.h"
+
+#ifdef SCHWAY_RUN_TEST_HOOKS
+#include "internal.h"
+#endif
 
 /* The tests build a second runner with SCHWAY_RUN_RAISE_AT=N, which raises
    SIGTERM from inside frame N, to show the stop is clean. The installed
@@ -112,25 +131,35 @@ static void run_free(void *user, void *ptr, size_t size)
 }
 
 static const char synopsis[] =
-    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]\n"
-    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]\n"
+    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--png N:FILE]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--png N:FILE]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
+    "                         [--hash] [--hash-state]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
-    "                         [--hash] [--hash-state]\n"
-    "       schwaystation-run --probe FILE\n"
+    "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
+    "                         [--serial SERIAL] [--hash] [--hash-state]\n"
+    "       schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
     "  --frames N         run N frames (1 <= N <= 1000000)\n"
     "  --bench N          run N frames and report the time per frame\n"
     "  --hash             print the SHA-256 of the last frame\n"
+    "  --hash-vram        print the SHA-256 of row-major little-endian VRAM RGB555 with bit 15 cleared\n"
     "  --hash-state       print the SHA-256 of the saved machine state\n"
+    "  --inputs FILE     apply a validated controller script before each frame latch\n"
+    "  --save-dir DIR    import and save memory cards in this existing directory\n"
+    "  --memcard-names MODE  basename (default) or serial\n"
+    "  --serial SERIAL   use this validated serial as the card basename with serial mode\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
+    "  --bios FILE        load an exactly 524288-byte BIOS image and report its identity\n"
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
-    "  --tty              print the program's text as tty lines; needs --exe\n"
+    "  --tty              print guest text as tty lines; needs --exe or --bios\n"
     "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe\n"
     "  --trace first-fault  print the last 4096 trace records after a fault or a hang; needs --exe\n"
     "  --no-stop-on-fault   keep running after the program's first fault; needs --exe\n"
-    "  --probe FILE       print what a PS-EXE file is; runs nothing\n"
+    "  --probe FILE       print PS-EXE or disc metadata; runs nothing\n"
+    "  --metadata-ledger CSV and --metadata-dat DAT  reveal identity only on exact match\n"
     "  --help             print this text and the exit statuses\n"
     "  --version          print the version\n";
 
@@ -138,6 +167,93 @@ static int usage(const char *why)
 {
     fprintf(stderr, "schwaystation-run: %s\n%s", why, synopsis);
     return SCHWAY__EXIT_USAGE;
+}
+
+/* Read one exact-size BIOS image. The extra-byte probe bounds memory even for
+   a hostile file and distinguishes a valid 512 KiB image from a longer one. */
+static uint8_t *runner_read_bios_file(const char *path)
+{
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        schway__refuse_file(path, "cannot open");
+        return NULL;
+    }
+    uint8_t *bytes = (uint8_t *)malloc(SCHWAY_BIOS_SIZE);
+    if (bytes == NULL) {
+        (void)fclose(file);
+        fprintf(stderr, "schwaystation-run: out of memory\n");
+        return NULL;
+    }
+    size_t count = fread(bytes, 1u, SCHWAY_BIOS_SIZE, file);
+    int read_error = ferror(file);
+    int extra = EOF;
+    if (count == SCHWAY_BIOS_SIZE && !read_error) {
+        extra = fgetc(file);
+        read_error = ferror(file);
+    }
+    if (fclose(file) != 0) {
+        read_error = 1;
+    }
+    if (read_error) {
+        schway__refuse_file(path, "cannot read");
+        free(bytes);
+        return NULL;
+    }
+    if (count != SCHWAY_BIOS_SIZE || extra != EOF) {
+        schway__refuse_file(path, "BIOS must be exactly 524288 bytes");
+        free(bytes);
+        return NULL;
+    }
+    return bytes;
+}
+
+static const char *runner_bios_status_name(uint32_t status)
+{
+    return status == SCHWAY_BIOS_STATUS_RECOGNIZED ? "recognized" : "unknown";
+}
+
+static const char *runner_bios_region_name(uint32_t region)
+{
+    switch (region) {
+    case SCHWAY_REGION_NTSC_U:
+        return "ntsc-u";
+    case SCHWAY_REGION_NTSC_J:
+        return "ntsc-j";
+    case SCHWAY_REGION_PAL:
+        return "pal";
+    case SCHWAY_BIOS_REGION_ANY:
+        return "any";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *runner_bios_flags_name(uint32_t flags)
+{
+    if (flags == (SCHWAY_BIOS_INFO_LOADED | SCHWAY_BIOS_INFO_RECOGNIZED)) {
+        return "loaded,recognized";
+    }
+    if (flags == SCHWAY_BIOS_INFO_LOADED) {
+        return "loaded";
+    }
+    return "none";
+}
+
+static int runner_print_bios_info(const schway *inst)
+{
+    schway_bios_info info;
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    if (schway_get_bios_info(inst, &info) != SCHWAY_STATUS_OK) {
+        fprintf(stderr, "schwaystation-run: cannot read BIOS identity\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+    char sha256[65];
+    schway__sha256_hex(info.sha256, sha256);
+    printf("bios flags=%s status=%s region=%s sha256=%s\n",
+           runner_bios_flags_name(info.flags), runner_bios_status_name(info.status),
+           runner_bios_region_name(info.region), sha256);
+    return SCHWAY__EXIT_OK;
 }
 
 static void help(void)
@@ -210,10 +326,26 @@ typedef struct options {
     uint32_t frames;
     int bench; /* --bench N rather than --frames N */
     int hash;
+    int hash_vram; /* --hash-vram: canonical whole-VRAM RGB555 bytes */
     int hash_state; /* --hash-state: the SHA-256 of the saved state */
     uint32_t png_frame; /* 0 when no --png was given */
     const char *png_path;
+    const char *inputs; /* --inputs FILE, else NULL */
+    const char *save_dir; /* --save-dir DIR, else NULL */
+    const char *serial; /* --serial SERIAL when serial card naming is selected */
+    int serial_card_names; /* --memcard-names serial */
+    int memcard_names_set;
+    int region_set; /* --region was supplied */
     const char *probe; /* --probe FILE, else NULL */
+    const char *metadata_ledger;
+    const char *metadata_dat;
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    const char *test_ledger;
+    const char *test_dat;
+    const char *test_root;
+    const char *test_config;
+#endif
+    const char *bios;  /* --bios FILE, else NULL */
     const char *exe;   /* --exe FILE, else NULL */
     int tty;           /* --tty: debug-port flag and the tty lines */
     int stop_mailbox;  /* --stop-on mailbox */
@@ -221,6 +353,10 @@ typedef struct options {
     int keep_going;    /* --no-stop-on-fault */
     uint32_t region;
     int printed; /* --help or --version ran; nothing else to do */
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    int test_card_write;
+    int test_save_failure;
+#endif
 } options;
 
 /* Returns 0 when the options are valid, else 2 after a usage message. Any
@@ -252,8 +388,83 @@ static int parse_options(int argc, char **argv, options *o)
             i++;
         } else if (strcmp(arg, "--hash") == 0) {
             o->hash = 1;
+        } else if (strcmp(arg, "--hash-vram") == 0) {
+            if (o->hash_vram) {
+                return usage("give --hash-vram once");
+            }
+            o->hash_vram = 1;
         } else if (strcmp(arg, "--hash-state") == 0) {
             o->hash_state = 1;
+        } else if (strcmp(arg, "--inputs") == 0) {
+            if (o->inputs != NULL) {
+                return usage("give --inputs once");
+            }
+            if (value == NULL || value[0] == '-') {
+                return usage("--inputs needs a file");
+            }
+            o->inputs = value;
+            i++;
+        } else if (strcmp(arg, "--save-dir") == 0) {
+            if (o->save_dir != NULL) {
+                return usage("give --save-dir once");
+            }
+            if (value == NULL || value[0] == '\0' || value[0] == '-') {
+                return usage("--save-dir needs a directory");
+            }
+            o->save_dir = value;
+            i++;
+        } else if (strcmp(arg, "--memcard-names") == 0) {
+            if (o->memcard_names_set || value == NULL) {
+                return usage("give --memcard-names basename or serial once");
+            }
+            o->memcard_names_set = 1;
+            if (strcmp(value, "serial") == 0) {
+                o->serial_card_names = 1;
+            } else if (strcmp(value, "basename") != 0) {
+                return usage("--memcard-names needs basename or serial");
+            }
+            i++;
+        } else if (strcmp(arg, "--serial") == 0) {
+            if (o->serial != NULL) {
+                return usage("give --serial once");
+            }
+            if (value == NULL || value[0] == '\0' || value[0] == '-') {
+                return usage("--serial needs a value");
+            }
+            o->serial = value;
+            i++;
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        } else if (strcmp(arg, "--test-card-write") == 0) {
+            if (o->test_card_write != 0 || value == NULL) {
+                return usage("give --test-card-write once");
+            }
+            if (strcmp(value, "slot1") == 0) {
+                o->test_card_write = 1;
+            } else if (strcmp(value, "slot2") == 0) {
+                o->test_card_write = 2;
+            } else if (strcmp(value, "partial1") == 0) {
+                o->test_card_write = 3;
+            } else if (strcmp(value, "bad1") == 0) {
+                o->test_card_write = 4;
+            } else if (strcmp(value, "slot1_then_bad") == 0) {
+                o->test_card_write = 5;
+            } else {
+                return usage("--test-card-write needs a known card test mode");
+            }
+            i++;
+        } else if (strcmp(arg, "--test-save-failure") == 0) {
+            if (o->test_save_failure != 0 || value == NULL) {
+                return usage("give --test-save-failure once");
+            }
+            if (strcmp(value, "flush") == 0) {
+                o->test_save_failure = SCHWAY_HOST_CARD_TEST_FAILURE_FLUSH;
+            } else if (strcmp(value, "rename") == 0) {
+                o->test_save_failure = SCHWAY_HOST_CARD_TEST_FAILURE_RENAME;
+            } else {
+                return usage("--test-save-failure needs flush or rename");
+            }
+            i++;
+#endif
         } else if (strcmp(arg, "--png") == 0) {
             if (o->png_frame != 0u) {
                 return usage("give --png once");
@@ -272,6 +483,7 @@ static int parse_options(int argc, char **argv, options *o)
             } else {
                 return usage("--region needs ntsc-u, ntsc-j or pal");
             }
+            o->region_set = 1;
             i++;
         } else if (strcmp(arg, "--exe") == 0) {
             if (o->exe != NULL) {
@@ -281,6 +493,15 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("--exe needs a file");
             }
             o->exe = value;
+            i++;
+        } else if (strcmp(arg, "--bios") == 0) {
+            if (o->bios != NULL) {
+                return usage("give --bios once");
+            }
+            if (value == NULL || value[0] == '\0' || value[0] == '-') {
+                return usage("--bios needs a file");
+            }
+            o->bios = value;
             i++;
         } else if (strcmp(arg, "--tty") == 0) {
             o->tty = 1;
@@ -305,20 +526,86 @@ static int parse_options(int argc, char **argv, options *o)
         } else if (strcmp(arg, "--no-stop-on-fault") == 0) {
             o->keep_going = 1;
         } else if (strcmp(arg, "--probe") == 0) {
-            /* Alone, with one file name that is not an option. */
-            if (argc != 3 || value == NULL || value[0] == '-') {
-                return usage("--probe takes one file and no other argument");
+            if (o->probe != NULL || value == NULL || value[0] == '-') {
+                return usage("--probe needs one file");
             }
             o->probe = value;
-            return SCHWAY__EXIT_OK;
+            i++;
+        } else if (strcmp(arg, "--metadata-ledger") == 0 ||
+                   strcmp(arg, "--metadata-dat") == 0) {
+            const char **slot = strcmp(arg, "--metadata-ledger") == 0 ?
+                                &o->metadata_ledger : &o->metadata_dat;
+            if (*slot != NULL || value == NULL || value[0] == '-') {
+                return usage("--metadata-* takes one path once");
+            }
+            *slot = value;
+            i++;
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        } else if (strcmp(arg, "--test-ledger") == 0 ||
+                   strcmp(arg, "--test-dat") == 0 ||
+                   strcmp(arg, "--test-root") == 0 ||
+                   strcmp(arg, "--test-config") == 0) {
+            const char **slot = NULL;
+            if (strcmp(arg, "--test-ledger") == 0) slot = &o->test_ledger;
+            else if (strcmp(arg, "--test-dat") == 0) slot = &o->test_dat;
+            else if (strcmp(arg, "--test-root") == 0) slot = &o->test_root;
+            else slot = &o->test_config;
+            if (*slot != NULL || value == NULL || value[0] == '-') {
+                return usage("--test-* takes one path once");
+            }
+            *slot = value;
+            i++;
+#endif
         } else if (strcmp(arg, "--help") == 0 || strcmp(arg, "--version") == 0) {
             return usage("--help and --version take no other arguments");
         } else {
             return usage(arg[0] == '-' ? "unknown option" : "unexpected argument");
         }
     }
-    if (o->tty && o->exe == NULL) {
-        return usage("--tty needs --exe");
+    if (o->bios != NULL && o->exe != NULL) {
+        return usage("--bios and --exe cannot be used together");
+    }
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    if (o->probe != NULL) {
+        int any_test_input = o->test_ledger != NULL || o->test_dat != NULL ||
+                             o->test_root != NULL || o->test_config != NULL;
+        int all_test_inputs = o->test_ledger != NULL && o->test_dat != NULL &&
+                              o->test_root != NULL && o->test_config != NULL;
+        int any_metadata = o->metadata_ledger != NULL || o->metadata_dat != NULL;
+        int all_metadata = o->metadata_ledger != NULL && o->metadata_dat != NULL;
+        if ((any_test_input && !all_test_inputs) || (any_metadata && !all_metadata) ||
+            (any_test_input && any_metadata) || o->frames != 0u || o->bios != NULL ||
+            o->exe != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash ||
+            o->hash_state || o->hash_vram || o->bench || o->tty || o->stop_mailbox || o->trace ||
+            o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
+            o->region_set) {
+            return usage("--probe cannot be combined with run options or partial test metadata");
+        }
+        return SCHWAY__EXIT_OK;
+    }
+    if (o->test_ledger != NULL || o->test_dat != NULL || o->test_root != NULL || o->test_config != NULL) {
+        return usage("--test-* needs --probe");
+    }
+    if (o->metadata_ledger != NULL || o->metadata_dat != NULL) {
+        return usage("--metadata-* needs --probe");
+    }
+#else
+    if (o->probe != NULL) {
+        if ((o->metadata_ledger == NULL) != (o->metadata_dat == NULL) ||
+            o->frames != 0u || o->bios != NULL || o->exe != NULL || o->inputs != NULL ||
+            o->save_dir != NULL || o->hash || o->hash_state || o->hash_vram || o->bench || o->tty ||
+            o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
+            o->memcard_names_set || o->serial != NULL || o->region_set) {
+            return usage("--probe takes no other option");
+        }
+        return SCHWAY__EXIT_OK;
+    }
+    if (o->metadata_ledger != NULL || o->metadata_dat != NULL) {
+        return usage("--metadata-* needs --probe");
+    }
+#endif
+    if (o->tty && o->exe == NULL && o->bios == NULL) {
+        return usage("--tty needs --exe or --bios");
     }
     if (o->stop_mailbox && o->exe == NULL) {
         return usage("--stop-on needs --exe");
@@ -329,7 +616,18 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->keep_going && o->exe == NULL) {
         return usage("--no-stop-on-fault needs --exe");
     }
-    if (o->frames == 0u && o->exe != NULL) {
+    if (o->serial_card_names && (o->save_dir == NULL || o->serial == NULL)) {
+        return usage("--memcard-names serial needs --save-dir and --serial");
+    }
+    if (o->serial != NULL && !o->serial_card_names) {
+        return usage("--serial needs --memcard-names serial");
+    }
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    if ((o->test_card_write != 0 || o->test_save_failure != 0) && o->save_dir == NULL) {
+        return usage("card test options need --save-dir");
+    }
+#endif
+    if (o->frames == 0u && (o->exe != NULL || o->bios != NULL)) {
         o->frames = EXE_FRAMES_DEFAULT;
     }
     if (o->frames == 0u) {
@@ -341,14 +639,323 @@ static int parse_options(int argc, char **argv, options *o)
     return SCHWAY__EXIT_OK;
 }
 
-static void put_u32(schway__sha256 *s, uint32_t v)
+typedef struct runner_card_files {
+    char *path[2];
+    uint64_t saved_generation[2];
+    int ready;
+} runner_card_files;
+
+static void runner_cards_release(runner_card_files *cards)
 {
-    uint8_t b[4];
-    for (uint32_t i = 0; i < 4u; i++) {
-        b[i] = (uint8_t)(v >> (8u * i));
-    }
-    schway__sha256_update(s, b, sizeof b);
+    free(cards->path[0]);
+    free(cards->path[1]);
+    memset(cards, 0, sizeof *cards);
 }
+
+static int runner_card_basename(const options *opt, char out[64])
+{
+    const char *name = "schwaystation";
+    if (opt->serial_card_names) {
+        name = opt->serial;
+    } else if (opt->exe != NULL) {
+        name = opt->exe;
+        for (const char *p = opt->exe; *p != '\0'; p++) {
+            if (*p == '/' || *p == '\\') {
+                name = p + 1;
+            }
+        }
+        const char *dot = strrchr(name, '.');
+        if (dot != NULL && dot != name) {
+            size_t length = (size_t)(dot - name);
+            if (length == 0u || length >= 64u) {
+                return 0;
+            }
+            memcpy(out, name, length);
+            out[length] = '\0';
+            return 1;
+        }
+    }
+    size_t length = strlen(name);
+    if (length == 0u || length >= 64u) {
+        return 0;
+    }
+    memcpy(out, name, length + 1u);
+    return 1;
+}
+
+static void runner_card_lint(const char *path, const schway_host_card_lint *lint)
+{
+    if ((lint->flags & SCHWAY_HOST_CARD_LINT_BAD_HEADER) != 0u) {
+        fprintf(stderr, "schwaystation-run: card %s: missing MC header\n", path);
+    }
+    if ((lint->flags & SCHWAY_HOST_CARD_LINT_BAD_CHECKSUM) != 0u) {
+        fprintf(stderr, "schwaystation-run: card %s: %lu bad frame checksums\n", path,
+                (unsigned long)lint->bad_frame_checksums);
+    }
+}
+
+static int runner_cards_load(const options *opt, schway *inst, runner_card_files *cards)
+{
+    if (opt->save_dir == NULL) {
+        return SCHWAY__EXIT_OK;
+    }
+
+    char basename[64];
+    if (!runner_card_basename(opt, basename)) {
+        fprintf(stderr, "schwaystation-run: invalid card save basename\n");
+        return SCHWAY__EXIT_USAGE;
+    }
+    size_t directory_size = strlen(opt->save_dir);
+    size_t suffix_capacity = 1u + 63u + sizeof(".1.mcr");
+    if (directory_size > SIZE_MAX - suffix_capacity) {
+        fprintf(stderr, "schwaystation-run: card save path is too long\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+    size_t path_capacity = directory_size + suffix_capacity;
+    cards->path[0] = (char *)malloc(path_capacity);
+    cards->path[1] = (char *)malloc(path_capacity);
+    if (cards->path[0] == NULL || cards->path[1] == NULL) {
+        fprintf(stderr, "schwaystation-run: out of memory\n");
+        runner_cards_release(cards);
+        return SCHWAY__EXIT_FAILURE;
+    }
+    schway_host_card_status path_status = schway_host_card_paths_for_basename(
+        opt->save_dir, basename, cards->path[0], path_capacity, cards->path[1], path_capacity);
+    if (path_status != SCHWAY_HOST_CARD_OK) {
+        fprintf(stderr, "schwaystation-run: invalid card save path\n");
+        runner_cards_release(cards);
+        return path_status == SCHWAY_HOST_CARD_ERR_ARGUMENT ? SCHWAY__EXIT_USAGE
+                                                            : SCHWAY__EXIT_FAILURE;
+    }
+
+    for (uint32_t i = 0u; i < 2u; i++) {
+        uint32_t slot = i + 1u;
+        uint8_t *image = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+        if (image == NULL) {
+            fprintf(stderr, "schwaystation-run: out of memory\n");
+            runner_cards_release(cards);
+            return SCHWAY__EXIT_FAILURE;
+        }
+
+        errno = 0;
+        FILE *file = fopen(cards->path[i], "rb");
+        if (file == NULL && errno == ENOENT) {
+            free(image);
+            continue;
+        }
+        if (file == NULL) {
+            fprintf(stderr, "schwaystation-run: cannot read card file %s\n", cards->path[i]);
+            free(image);
+            runner_cards_release(cards);
+            return SCHWAY__EXIT_FAILURE;
+        }
+        if (fclose(file) != 0) {
+            fprintf(stderr, "schwaystation-run: cannot read card file %s\n", cards->path[i]);
+            free(image);
+            runner_cards_release(cards);
+            return SCHWAY__EXIT_FAILURE;
+        }
+
+        schway_host_card_lint lint;
+        memset(&lint, 0, sizeof lint);
+        schway_host_card_status import_status = schway_host_card_import_file(
+            cards->path[i], image, SCHWAY_MEMCARD_SIZE, &lint);
+        if (import_status != SCHWAY_HOST_CARD_OK) {
+            fprintf(stderr, "schwaystation-run: cannot import card file %s\n", cards->path[i]);
+            free(image);
+            runner_cards_release(cards);
+            return SCHWAY__EXIT_FAILURE;
+        }
+        runner_card_lint(cards->path[i], &lint);
+        schway_status status = schway_load_memcard(inst, slot, image, SCHWAY_MEMCARD_SIZE);
+        free(image);
+        if (status != SCHWAY_STATUS_OK ||
+            schway_memcard_generation(inst, slot, &cards->saved_generation[i]) != SCHWAY_STATUS_OK) {
+            fprintf(stderr, "schwaystation-run: cannot load card file %s\n", cards->path[i]);
+            runner_cards_release(cards);
+            return SCHWAY__EXIT_FAILURE;
+        }
+    }
+    cards->ready = 1;
+    return SCHWAY__EXIT_OK;
+}
+
+static int runner_cards_flush(const options *opt, schway *inst, runner_card_files *cards, int status)
+{
+    if (opt->save_dir == NULL || cards->ready == 0) {
+        return status;
+    }
+    for (uint32_t i = 0u; i < 2u; i++) {
+        uint32_t slot = i + 1u;
+        uint64_t generation = 0u;
+        if (schway_memcard_generation(inst, slot, &generation) != SCHWAY_STATUS_OK) {
+            fprintf(stderr, "schwaystation-run: cannot read card generation for slot %lu\n",
+                    (unsigned long)slot);
+            if (status == SCHWAY__EXIT_OK) {
+                status = SCHWAY__EXIT_FAILURE;
+            }
+            continue;
+        }
+        if (generation == cards->saved_generation[i]) {
+            continue;
+        }
+        schway_span span;
+        uint32_t memory = i == 0u ? SCHWAY_MEMORY_CARD1 : SCHWAY_MEMORY_CARD2;
+        if (schway_get_memory(inst, memory, &span) != SCHWAY_STATUS_OK ||
+            span.data == NULL || span.size != SCHWAY_MEMCARD_SIZE) {
+            fprintf(stderr, "schwaystation-run: cannot read card slot %lu\n", (unsigned long)slot);
+            if (status == SCHWAY__EXIT_OK) {
+                status = SCHWAY__EXIT_FAILURE;
+            }
+            continue;
+        }
+        schway_host_card_status save_status;
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        if (opt->test_save_failure != 0) {
+            save_status = schway_host_card_test_save_atomic(
+                cards->path[i], span.data, span.size,
+                (schway_host_card_test_failure)opt->test_save_failure);
+        } else
+#endif
+        {
+            save_status = schway_host_card_save_atomic(cards->path[i], span.data, span.size);
+        }
+        if (save_status != SCHWAY_HOST_CARD_OK) {
+            fprintf(stderr, "schwaystation-run: cannot save card file %s\n", cards->path[i]);
+            if (status == SCHWAY__EXIT_OK) {
+                status = SCHWAY__EXIT_FAILURE;
+            }
+            continue;
+        }
+        cards->saved_generation[i] = generation;
+    }
+    return status;
+}
+
+#ifdef SCHWAY_RUN_TEST_HOOKS
+enum {
+    SCHWAY__TEST_JOY_DATA = 0x1F801040u,
+    SCHWAY__TEST_JOY_MODE = 0x1F801048u,
+    SCHWAY__TEST_JOY_CTRL = 0x1F80104Au,
+    SCHWAY__TEST_JOY_BAUD = 0x1F80104Eu,
+    SCHWAY__TEST_I_STAT = 0x1F801070u,
+    SCHWAY__TEST_CARD_ACK = 1500u
+};
+
+static int runner_test_mmio_write(schway *inst, uint32_t address, uint32_t width, uint32_t value)
+{
+    uint32_t cycles = 0u;
+    return schway__bus_write(inst, address, width, value, &cycles) == 0u;
+}
+
+static int runner_test_mmio_read(schway *inst, uint32_t address, uint32_t width, uint32_t *value)
+{
+    uint32_t cycles = 0u;
+    return schway__bus_read(inst, address, width, value, &cycles) == 0u;
+}
+
+static int runner_test_advance(schway *inst, uint64_t tick)
+{
+    if (tick < inst->ticks) {
+        return 0;
+    }
+    inst->ticks = tick;
+    schway__sched_sync(inst);
+    schway__sched_run(inst);
+    return 1;
+}
+
+static int runner_test_transfer(schway *inst, uint8_t sent, uint32_t ack_ticks, uint8_t *received)
+{
+    uint64_t start = inst->ticks;
+    uint32_t port_bit = (inst->sio.ctrl & 0x2000u) != 0u ? 0x2000u : 0u;
+    uint32_t value = 0u;
+    if (!runner_test_mmio_write(inst, SCHWAY__TEST_JOY_DATA, 1u, sent) ||
+        !runner_test_advance(inst, start + 1088u) ||
+        !runner_test_mmio_read(inst, SCHWAY__TEST_JOY_DATA, 1u, &value)) {
+        return 0;
+    }
+    *received = (uint8_t)value;
+    if (ack_ticks == 0u) {
+        return 1;
+    }
+    if (inst->sio.ack_pending == 0u || inst->sio.ack_deadline != start + ack_ticks ||
+        !runner_test_advance(inst, start + ack_ticks) || inst->sio.ack_low == 0u ||
+        !runner_test_mmio_write(inst, SCHWAY__TEST_I_STAT, 4u, 0u) ||
+        !runner_test_mmio_write(inst, SCHWAY__TEST_JOY_CTRL, 2u, 0x1013u | port_bit) ||
+        !runner_test_advance(inst, start + ack_ticks + 68u) || inst->sio.ack_low != 0u ||
+        !runner_test_mmio_write(inst, SCHWAY__TEST_JOY_CTRL, 2u, 0x1003u | port_bit)) {
+        return 0;
+    }
+    return 1;
+}
+
+static int runner_test_card_write(schway *inst, uint32_t port, uint8_t seed, uint32_t mode,
+                                  uint8_t expected_flag)
+{
+    uint32_t port_bit = port == 0u ? 0u : 0x2000u;
+    uint8_t reply = 0u;
+    uint8_t data[128];
+    if (!runner_test_mmio_write(inst, SCHWAY__TEST_JOY_MODE, 2u, 0x000Cu) ||
+        !runner_test_mmio_write(inst, SCHWAY__TEST_JOY_BAUD, 2u, 0x0088u) ||
+        !runner_test_mmio_write(inst, SCHWAY__TEST_JOY_CTRL, 2u, 0x1003u | port_bit)) {
+        return 0;
+    }
+    if (!runner_test_transfer(inst, 0x81u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0xFFu ||
+        !runner_test_transfer(inst, 0x57u, SCHWAY__TEST_CARD_ACK, &reply) ||
+        reply != expected_flag ||
+        !runner_test_transfer(inst, 0u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0x5Au ||
+        !runner_test_transfer(inst, 0u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0x5Du ||
+        !runner_test_transfer(inst, 0u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0u ||
+        !runner_test_transfer(inst, 0u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0u ||
+        !runner_test_transfer(inst, 7u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0u) {
+        return 0;
+    }
+    for (uint32_t i = 0u; i < 128u; i++) {
+        data[i] = (uint8_t)(i * 29u + seed);
+    }
+    uint8_t checksum = 7u;
+    checksum ^= 0u;
+    for (uint32_t i = 0u; i < 128u; i++) {
+        if (mode == 3u && i == 32u) {
+            return 1;
+        }
+        if (!runner_test_transfer(inst, data[i], SCHWAY__TEST_CARD_ACK, &reply) || reply != 0u) {
+            return 0;
+        }
+        checksum ^= data[i];
+    }
+    uint8_t sent_checksum = mode == 4u ? (uint8_t)(checksum ^ 1u) : checksum;
+    if (!runner_test_transfer(inst, sent_checksum, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0u ||
+        !runner_test_transfer(inst, 0u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0x5Cu ||
+        !runner_test_transfer(inst, 0u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0x5Du ||
+        !runner_test_transfer(inst, 0u, 0u, &reply)) {
+        return 0;
+    }
+    return reply == (mode == 4u ? 0x4Eu : 0x47u);
+}
+
+static int runner_test_card_mode(schway *inst, int mode)
+{
+    if (mode == 1) {
+        return runner_test_card_write(inst, 0u, 0x31u, 1u, 0x08u);
+    }
+    if (mode == 2) {
+        return runner_test_card_write(inst, 1u, 0x62u, 1u, 0x08u);
+    }
+    if (mode == 3) {
+        return runner_test_card_write(inst, 0u, 0x31u, 3u, 0x08u);
+    }
+    if (mode == 4) {
+        return runner_test_card_write(inst, 0u, 0x62u, 4u, 0x08u);
+    }
+    if (mode == 5) {
+        return runner_test_card_write(inst, 0u, 0x31u, 1u, 0x08u) &&
+               runner_test_card_write(inst, 0u, 0x62u, 4u, 0u);
+    }
+    return 0;
+}
+#endif
 
 /* Prints the hash line for the frame just run. Returns the exit status. */
 static int print_hash(const schway *inst, uint32_t frames)
@@ -362,34 +969,11 @@ static int print_hash(const schway *inst, uint32_t frames)
                 schway_status_string(st));
         return SCHWAY__EXIT_FAILURE;
     }
-    if (v.bpp != 16u || v.width > 1024u) {
+    char hex[65];
+    if (!schway__runner_frame_hash(&v, hex)) {
         fprintf(stderr, "schwaystation-run: unexpected video format\n");
         return SCHWAY__EXIT_FAILURE;
     }
-    const uint32_t tuple[13] = {v.field,  v.interlaced, v.vres,    v.hres,    v.dot_div,
-                                v.region, v.x1,         v.y1,      v.start_x, v.start_y,
-                                v.enabled, v.rgb24,     v.bpp};
-    schway__sha256 s;
-    uint8_t digest[32];
-    char hex[65];
-    uint8_t row[2u * 1024u];
-    schway__sha256_init(&s);
-    for (size_t i = 0; i < sizeof tuple / sizeof tuple[0]; i++) {
-        put_u32(&s, tuple[i]);
-    }
-    /* Each row is serialised low byte first before hashing, so the result is
-       the same on a big-endian host. */
-    const uint8_t *base = (const uint8_t *)v.pixels;
-    for (uint32_t y = 0; y < v.height; y++) {
-        const uint16_t *src = (const uint16_t *)(const void *)(base + (size_t)y * v.pitch_bytes);
-        for (uint32_t x = 0; x < v.width; x++) {
-            row[2u * x] = (uint8_t)(src[x] & 0xFFu);
-            row[2u * x + 1u] = (uint8_t)(src[x] >> 8);
-        }
-        schway__sha256_update(&s, row, (size_t)v.width * 2u);
-    }
-    schway__sha256_final(&s, digest);
-    schway__sha256_hex(digest, hex);
     printf("frame %lu sha256 %s\n", (unsigned long)frames, hex);
     return SCHWAY__EXIT_OK;
 }
@@ -427,6 +1011,43 @@ static int print_state_hash(const schway *inst)
     return SCHWAY__EXIT_OK;
 }
 
+/* Hashes all native VRAM as row-major little-endian RGB555 words. Bit 15 is
+   the console mask/semi-transparency flag, not a colour channel. */
+static int print_vram_hash(const schway *inst)
+{
+    enum { VRAM_WORDS = 1024u * 512u, VRAM_BYTES = VRAM_WORDS * 2u };
+    schway_span span;
+    memset(&span, 0, sizeof span);
+    schway_status st = schway_get_vram(inst, &span);
+    if (st != SCHWAY_STATUS_OK || span.data == NULL || span.size != VRAM_BYTES) {
+        fprintf(stderr, "schwaystation-run: cannot read the complete VRAM span\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+
+    const uint16_t *words = (const uint16_t *)span.data;
+    schway__sha256 state;
+    uint8_t digest[32];
+    char hex[65];
+    uint8_t bytes[256];
+    schway__sha256_init(&state);
+    for (size_t base = 0u; base < VRAM_WORDS; base += sizeof bytes / 2u) {
+        size_t count = VRAM_WORDS - base;
+        if (count > sizeof bytes / 2u) {
+            count = sizeof bytes / 2u;
+        }
+        for (size_t i = 0u; i < count; i++) {
+            uint16_t word = (uint16_t)(words[base + i] & 0x7fffu);
+            bytes[2u * i] = (uint8_t)word;
+            bytes[2u * i + 1u] = (uint8_t)(word >> 8);
+        }
+        schway__sha256_update(&state, bytes, count * 2u);
+    }
+    schway__sha256_final(&state, digest);
+    schway__sha256_hex(digest, hex);
+    printf("vram sha256 %s\n", hex);
+    return SCHWAY__EXIT_OK;
+}
+
 /* Writes the frame just run to path as a PNG. The file is built in memory
    and written with one fwrite; a file that cannot be written in full is
    removed. Returns the exit status. */
@@ -441,8 +1062,12 @@ static int write_png(const schway *inst, const char *path)
                 schway_status_string(st));
         return SCHWAY__EXIT_FAILURE;
     }
+    if (!schway_host_video_valid(&v)) {
+        fprintf(stderr, "schwaystation-run: unexpected video format\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
     size_t size = schway__png_size(v.width, v.height);
-    if (v.bpp != 16u || v.width > 1024u || v.height > 512u || size == 0u) {
+    if (size == 0u) {
         fprintf(stderr, "schwaystation-run: unexpected video format\n");
         return SCHWAY__EXIT_FAILURE;
     }
@@ -455,19 +1080,25 @@ static int write_png(const schway *inst, const char *path)
         fprintf(stderr, "schwaystation-run: out of memory\n");
         status = SCHWAY__EXIT_FAILURE;
     } else {
-        schway_host_xrgb8888_frame(&v, xrgb, v.width);
-        for (size_t i = 0; i < count; i++) {
-            rgb[3u * i] = (uint8_t)(xrgb[i] >> 16);
-            rgb[3u * i + 1u] = (uint8_t)(xrgb[i] >> 8);
-            rgb[3u * i + 2u] = (uint8_t)xrgb[i];
+        size_t n = 0u;
+        if (schway_host_xrgb8888_frame(&v, xrgb, v.width)) {
+            for (size_t i = 0; i < count; i++) {
+                rgb[3u * i] = (uint8_t)(xrgb[i] >> 16);
+                rgb[3u * i + 1u] = (uint8_t)(xrgb[i] >> 8);
+                rgb[3u * i + 2u] = (uint8_t)xrgb[i];
+            }
+            n = schway__png_write(file, size, rgb, v.width, v.height);
         }
-        size_t n = schway__png_write(file, size, rgb, v.width, v.height);
+        if (n == 0u) {
+            fprintf(stderr, "schwaystation-run: unexpected video format\n");
+            status = SCHWAY__EXIT_FAILURE;
+        }
         FILE *f = n != 0u ? fopen(path, "wb") : NULL;
         int ok = f != NULL && fwrite(file, 1, n, f) == n;
         if (f != NULL && fclose(f) != 0) {
             ok = 0;
         }
-        if (!ok) {
+        if (n != 0u && !ok) {
             fprintf(stderr, "schwaystation-run: cannot write %s\n", path);
             if (f != NULL) {
                 (void)remove(path);
@@ -482,8 +1113,7 @@ static int write_png(const schway *inst, const char *path)
 }
 
 /* The guest's text, collected a line at a time. A line is the bytes up to a
-   0Ah, which is not part of it; bytes are printed as they came, with no
-   character-set conversion. */
+   0Ah, which is not part of it; other non-text bytes are replaced with '?'. */
 typedef struct tty_lines {
     uint8_t line[TTY_LINE_MAX];
     uint32_t len;
@@ -518,7 +1148,7 @@ static void tty_drain(schway *inst, tty_lines *t)
             if (t->len == TTY_LINE_MAX) {
                 tty_emit(t);
             }
-            t->line[t->len++] = bytes[i];
+            t->line[t->len++] = schway__runner_tty_byte(bytes[i]);
         }
     }
 }
@@ -619,11 +1249,46 @@ static void print_tail(const schway *inst)
    on the heap. Returns the exit status. */
 static int run(const options *opt)
 {
+    schway__input_movie movie;
+    memset(&movie, 0, sizeof movie);
+    if (opt->inputs != NULL) {
+        schway__inputs_error error;
+        memset(&error, 0, sizeof error);
+        schway__inputs_status input_status = schway__inputs_load(opt->inputs, &movie, &error);
+        if (input_status != SCHWAY__INPUTS_OK) {
+            if (input_status == SCHWAY__INPUTS_INVALID) {
+                fprintf(stderr, "schwaystation-run: invalid input movie");
+                if (error.line != 0u) {
+                    fprintf(stderr, " at line %lu", (unsigned long)error.line);
+                }
+                if (error.reason != NULL) {
+                    fprintf(stderr, ": %s", error.reason);
+                }
+                fputc('\n', stderr);
+                fputs(synopsis, stderr);
+                return SCHWAY__EXIT_USAGE;
+            }
+            fprintf(stderr, "schwaystation-run: %s\n",
+                    input_status == SCHWAY__INPUTS_MEMORY ? "out of memory" :
+                                                           "cannot read input movie");
+            return SCHWAY__EXIT_FAILURE;
+        }
+    }
+    uint8_t *bios = NULL;
+    if (opt->bios != NULL) {
+        bios = runner_read_bios_file(opt->bios);
+        if (bios == NULL) {
+            schway__inputs_release(&movie);
+            return SCHWAY__EXIT_FAILURE;
+        }
+    }
     uint8_t *exe = NULL;
     size_t exe_size = 0;
     if (opt->exe != NULL) {
         exe = schway__read_exe_file(opt->exe, &exe_size);
         if (exe == NULL) {
+            free(bios);
+            schway__inputs_release(&movie);
             return SCHWAY__EXIT_FAILURE;
         }
     }
@@ -632,7 +1297,9 @@ static int run(const options *opt)
         samples = (uint32_t *)malloc(schway__bench_bytes(opt->frames));
         if (samples == NULL) {
             fprintf(stderr, "schwaystation-run: out of memory\n");
+            free(bios);
             free(exe);
+            schway__inputs_release(&movie);
             return SCHWAY__EXIT_FAILURE;
         }
     }
@@ -647,12 +1314,17 @@ static int run(const options *opt)
         fprintf(stderr, "schwaystation-run: schway_create failed: %s\n",
                 schway_status_string(st));
         free(samples);
+        free(bios);
         free(exe);
+        schway__inputs_release(&movie);
         return SCHWAY__EXIT_FAILURE;
     }
     int status = SCHWAY__EXIT_OK;
+    runner_card_files card_files;
+    memset(&card_files, 0, sizeof card_files);
+    status = runner_cards_load(opt, inst, &card_files);
     /* The debug-port flag is set for --tty and for nothing else. */
-    if (opt->region != 0u || opt->tty) {
+    if (status == SCHWAY__EXIT_OK && (opt->region != 0u || opt->tty)) {
         schway_profile p;
         memset(&p, 0, sizeof p);
         p.size = (uint32_t)sizeof p;
@@ -665,6 +1337,15 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
         }
     }
+    if (status == SCHWAY__EXIT_OK && bios != NULL) {
+        st = schway_load_bios(inst, bios, SCHWAY_BIOS_SIZE);
+        if (st != SCHWAY_STATUS_OK) {
+            schway__refuse_file(opt->bios, schway_status_string(st));
+            status = SCHWAY__EXIT_FAILURE;
+        } else {
+            status = runner_print_bios_info(inst);
+        }
+    }
     if (status == SCHWAY__EXIT_OK && exe != NULL) {
         st = schway_load_exe(inst, exe, exe_size);
         if (st != SCHWAY_STATUS_OK) {
@@ -672,11 +1353,20 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
         }
     }
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    if (status == SCHWAY__EXIT_OK && opt->test_card_write != 0 &&
+        !runner_test_card_mode(inst, opt->test_card_write)) {
+        fprintf(stderr, "schwaystation-run: card test transaction failed\n");
+        status = SCHWAY__EXIT_FAILURE;
+    }
+#endif
+    free(bios);
     free(exe);
     tty_lines tty;
     tty.len = 0u;
     /* Only schway_run_frame is timed, not hashing or writing files. */
     uint32_t ran = 0;
+    uint32_t lag_frames = 0u;
     uint32_t exit_code = 0u; /* the byte the guest wrote to the exit port */
     int ended = 0;           /* the loop ended before the frame cap, by a stop of any kind */
     int faulted = 0;         /* the core stopped the run on the program's first fault */
@@ -686,7 +1376,20 @@ static int run(const options *opt)
     budget.max_cycles = UINT64_MAX;
     budget.flags = (opt->keep_going ? 0u : SCHWAY_RUN_STOP_ON_FAULT) |
                    (opt->trace ? SCHWAY_RUN_TRACE : 0u);
+    size_t input_cursor = 0u;
+    schway_input input_snapshot;
+    memset(&input_snapshot, 0, sizeof input_snapshot);
+    input_snapshot.size = (uint32_t)sizeof input_snapshot;
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
+        if (opt->inputs != NULL) {
+            st = schway__inputs_apply_frame(inst, &movie, &input_cursor, &input_snapshot, n);
+            if (st != SCHWAY_STATUS_OK) {
+                fprintf(stderr, "schwaystation-run: schway_set_input failed: %s\n",
+                        schway_status_string(st));
+                status = SCHWAY__EXIT_FAILURE;
+                break;
+            }
+        }
         uint64_t start_ns = opt->bench ? schway__clock_ns() : 0u;
         schway_run_result res;
         memset(&res, 0, sizeof res);
@@ -694,6 +1397,9 @@ static int run(const options *opt)
         st = opt->exe != NULL ? schway_run(inst, &budget, &res) : schway_run_frame(inst, &res);
         if (opt->bench) {
             samples[ran] = schway__bench_us(schway__clock_ns() - start_ns);
+        }
+        if (st == SCHWAY_STATUS_OK && opt->inputs != NULL && res.lag != 0u) {
+            lag_frames++;
         }
 #ifdef SCHWAY_RUN_RAISE_AT
         if (n == SCHWAY_RUN_RAISE_AT) {
@@ -776,14 +1482,23 @@ static int run(const options *opt)
     if (status == SCHWAY__EXIT_OK && opt->hash_state) {
         status = print_state_hash(inst);
     }
+    if (status == SCHWAY__EXIT_OK && opt->hash_vram) {
+        status = print_vram_hash(inst);
+    }
+    if (status == SCHWAY__EXIT_OK && opt->inputs != NULL) {
+        printf("lag frames=%lu\n", (unsigned long)lag_frames);
+    }
     if (status == SCHWAY__EXIT_OK && opt->bench) {
         char report[512];
         size_t len =
             schway__bench_format(report, sizeof report, samples, ran, schway__rss_max_kib());
         (void)fwrite(report, 1u, len, stdout);
     }
+    status = runner_cards_flush(opt, inst, &card_files, status);
+    runner_cards_release(&card_files);
     schway_destroy(inst);
     free(samples);
+    schway__inputs_release(&movie);
     return status;
 }
 
@@ -793,8 +1508,24 @@ int main(int argc, char **argv)
     memset(&opt, 0, sizeof opt);
     int status = parse_options(argc, argv, &opt);
     if (status == SCHWAY__EXIT_OK && opt.probe != NULL) {
-        status = schway__probe_print(stdout, opt.probe) == 0 ? SCHWAY__EXIT_OK
-                                                             : SCHWAY__EXIT_FAILURE;
+        schway__probe_metadata_inputs metadata = {
+            opt.metadata_ledger, opt.metadata_dat, NULL, NULL
+        };
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        if (opt.test_ledger != NULL) {
+            metadata.ledger = opt.test_ledger;
+            metadata.dat = opt.test_dat;
+            metadata.root = opt.test_root;
+            metadata.config = opt.test_config;
+        }
+        status = schway__probe_print(stdout, opt.probe,
+                                     metadata.ledger != NULL ? &metadata : NULL) == 0 ? SCHWAY__EXIT_OK
+                                                                                   : SCHWAY__EXIT_FAILURE;
+#else
+        status = schway__probe_print(stdout, opt.probe,
+                                     metadata.ledger != NULL ? &metadata : NULL) == 0 ? SCHWAY__EXIT_OK
+                                                                                   : SCHWAY__EXIT_FAILURE;
+#endif
     } else if (status == SCHWAY__EXIT_OK && !opt.printed) {
         schway__stop_install();
         status = run(&opt);

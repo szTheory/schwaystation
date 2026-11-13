@@ -2,7 +2,7 @@
 title: "Hosts and integration: libretro, RetroAchievements, RetroArch on Mac, runner + Playstead, automation, WASM"
 summary: "What every host needs from schwaystation (libretro adapter for a disc console, rcheevos hash and memory rules for PS1, RetroArch on Apple Silicon, schwaystation-run and Playstead's protocol, scripting and movies, WASM, the C API every host shares) and which milestone each piece lands in."
 read_when: "Building the libretro adapter or .info, the runner CLI, memory-card files, the RetroArch e2e job, a Playstead pin, scripting/Gym/TAS surfaces, the GDB or TTY seeds, or a web build."
-updated: 2026-10-19
+updated: 2026-11-13
 ---
 
 # Hosts and integration
@@ -78,7 +78,7 @@ Port subclasses (`RETRO_DEVICE_SUBCLASS`, L138), named as Beetle names them so R
 | Mouse | MOUSE 2 | SCPH-1030 | v2.0 |
 | Multitap | option `schwaystation_multitap_port1/2` | eight descriptors as Beetle's "User 1–8" | v2.0 | **Rec:** DualShock default, booting in analog mode, with the Beetle toggle combination (Start+Select+L1+L2+R1+R2 held one second) behind `schwaystation_analog_toggle` [HI.06]. **Alt:** digital default. **Would change if:** games that refuse analog mode at boot outnumber those that need it in the compatibility ledger.
 
-**Memory cards.** A card is 131,072 bytes (16 blocks of 8 KB, block 0 holding the header and directory frames); `.srm`/`.mcr`/`.mcd` files are the raw image, while DexDrive-style `.gme` files prepend an F40h-byte header and are an import converter's job (v5.0) [HI.12]. Beetle's `.srm` and Mednafen's `.mcr` are the same raw bytes; Beetle names slot 0 `<content>.srm` and slot 1 `<content>.1.mcr`, PCSX-ReARMed names slot 1 `pcsx-card2.mcd` shared by every game or `<serial>_1.mcd` by option, DuckStation (standalone) keeps per-game cards by title or serial [HI.06][HI.07]. **Rec (v1.0 saves in v2.0):** slot 0 = `RETRO_MEMORY_SAVE_RAM` (0, L509), 131,072 bytes, fixed from load to unload, so RetroArch writes `<content>.srm` and users keep every existing card by renaming; slot 1 = `<content>.1.mcr` written by the adapter in `GET_SAVE_DIRECTORY` (31, L1326), Beetle's exact layout, with an option for one shared card. `libretro_saves = "true"` only when the round trip is tested. **Alt:** both cards as files, SAVE_RAM empty. **Would change if:** RetroArch's save-on-exit proves lossy for a 128 KB span (it writes `.srm` on unload and at `autosave_interval` [HI.05]).
+**Memory cards.** A card is 131,072 bytes (16 blocks of 8 KB, block 0 holding the header and directory frames); `.srm`/`.mcr`/`.mcd` files are raw images, while DexDrive-style `.gme` files prepend an F40h-byte header [HI.12]. In this core, one-based card slot 1 is exposed through libretro `RETRO_MEMORY_SAVE_RAM` (interface id 0), so RetroArch owns its `<content>.srm` file. The adapter loads and persists slot 2 as `<content>.1.mcr`; the runner uses the same `.srm` and `.1.mcr` names. `schway_get_memory` returns read-only spans, `schway_load_memcard` imports raw bytes before execution, and `schway_memcard_generation` tracks completed guest writes. Card bytes and generation counters stay outside ordinary save states. The runner may use a basename or serial for both files; libretro uses the content basename and has no card naming or sharing option in this release. External core filenames remain as documented in [HI.06][HI.07].
 
 **Disc control.** `SET_DISK_CONTROL_EXT_INTERFACE` (58, L2032; struct L5455) from v1.0 for `m3u`: `set_initial_image`, `get_num_images`, `replace_image_index`, `get_image_path`, `get_image_label` (L5247–5409); eject = lid open as the CD-ROM controller reports it, insert = lid closed with a new TOC. `disk_control = "true"` in the `.info` as the four shipping cores declare [HI.02]. **Rec:** ext interface only (RetroArch 1.22.2 reports version ≥ 1). **Alt:** also the legacy interface 13. **Would change if:** a target frontend lacks the ext version.
 
@@ -87,9 +87,8 @@ Port subclasses (`RETRO_DEVICE_SUBCLASS`, L138), named as Beetle names them so R
 | Key | Values (default first) | In state hash | Lands |
 |---|---|---|---|
 | `schwaystation_region` | auto (disc licence string / serial prefix), ntsc-u, ntsc-j, pal (PCSX `region`) | yes | v1.0 |
-| `schwaystation_bios` | auto (region's canonical file, then any known digest), then one row per file found (PCSX `bios`) | yes | v1.0 |
+| `schwaystation_bios` | `none` (default), `scph5500.bin`, `scph5501.bin`, `scph5502.bin`; used only for no-content loads; PS-EXE content uses the stub | yes | v1.0 |
 | `schwaystation_analog_mode`, `schwaystation_analog_toggle` | analog, digital; disabled, enabled (Beetle `analog_toggle`) | no | v1.0 |
-| `schwaystation_memcard1` | per_game (`.1.mcr`), shared, none (Beetle `enable_memcard1`, `shared_memory_cards`) | no | v2.0 |
 | `schwaystation_tty` | off, on: BIOS putchar text to the log interface (27, L1243) | no | v1.0 |
 | `schwaystation_multitap_port1/2` | disabled, enabled | yes | v2.0 |
 | `schwaystation_boot` | full, fast (skip the BIOS shell; Beetle `skip_bios` warns about Saga Frontier and LibCrypt titles [HI.06]) | yes | v2.0 |
@@ -98,7 +97,7 @@ No CPU, GTE or GPU overclock option by design: `cpu_freq_scale`, `gte_overclock`
 
 **Serialize.** 0 and false until v3.0 (`savestate = "false"`); then a constant size per profile (2 MB RAM + 1 MB VRAM + 512 KB SPU RAM + 1 KB scratchpad + device state, about 3.6 MB plus the CD-ROM state) (derived), byte-wise little-endian, no `SET_SERIALIZATION_QUIRKS` (44, L1696). Rewind and run-ahead need determinism, netplay byte equality across platforms [HI.08].
 
-**Firmware** (`GET_SYSTEM_DIRECTORY` 9, L850). libretro's `System.dat` lists 20 PS1 BIOS images of 524,288 bytes: `scph1000`, `scph1001`, `scph1002`, `scph100`, `scph101`, `scph102A/B/C`, `scph3000`, `scph3500`, `scph5000`, `scph5500`, `scph5501`, `scph5502`, `scph5552`, `scph7001`, `scph7002`, `scph7003`, `scph7502`, `scph9002(7502)`, plus `psxonpsp660.bin` and `ps1_rom.bin` [HI.04]. The canonical trio and their md5: `scph5500.bin` 8dd7d5296a650fac7319bce665a6a53c (JP), `scph5501.bin` 490f666e1afb15b7362b406ed1cea246 (US), `scph5502.bin` 32736f17079d0b2b7024407c39bd3050 (EU); Beetle and DuckStation declare them `opt = "false"`, PCSX `opt = "true"` with an HLE fallback; Beetle/SwanStation add `psxonpsp660.bin` c53ca5908936d412331790f4426c6c33 and `ps1_rom.bin` 81bbe60ba7a3d1cea1d48c14cbcc647b as optional; DuckStation's notes say it "also supports No-Intro BIOS images" [HI.02][HI.04]. **Rec:** three required rows plus two optional in the `.info`; the loader looks up the region's canonical name, then any 512 KiB file in the system directory whose SHA-256 is in the vendored System.dat list (name-independent), logs the match, and refuses an unknown image unless `schwaystation_bios` names it. No HLE BIOS (a PCSX feature with documented compatibility cost [HI.06]). **Alt:** names only. **Would change if:** users keep No-Intro names, which the digest lookup already covers.
+**Firmware** (`GET_SYSTEM_DIRECTORY` 9, L850). The pinned libretro `System.dat` contains retail BIOS MD5 and paired SHA-1 facts. The core recognizes a loaded retail image by MD5; its associated SHA-1 remains source metadata. `schway_get_bios_info` always reports SHA-256 of the exact copied 512 KiB image, including unknown images and OpenBIOS. Recognition is independent of filename. The runner accepts any exact-size image and reports recognized or unknown. The libretro option selects `none` or one of the three canonical files `scph5500.bin`, `scph5501.bin` and `scph5502.bin`, and applies only to a no-content run; an exact-size selected file is loadable even if its digest is unknown. Bare PS-EXE content runs through the core stub and needs no BIOS. No HLE BIOS is used [HI.04].
 
 **`.info`.** `display_name "Sony - PlayStation (schwaystation)"`, `corename "schwaystation"`, `systemname "PlayStation"`, `systemid "playstation"`, `database "Sony - PlayStation"`, `manufacturer "Sony"`, `supported_extensions "cue|bin|img|iso|m3u|exe|psexe"` (`chd` appended only by a build with `SCHWAYSTATION_CHD`, v2.0), `license "MIT"`, `needs_fullpath "true"`, `disk_control "true"`, `hw_render "false"`, `load_subsystem "false"`, `cheats "true"`, `display_version` from `version.txt`, generated from `schwaystation_libretro.info.in` as muhtari does [HI.02][HI.08]. Each true claim maps to a guard test at configure time:
 
@@ -162,10 +161,10 @@ Exit statuses: one X-macro table (`exit_status.h` as in muhtari), printed by `--
 
 | Option | Meaning | Lands |
 |---|---|---|
-| `--bios FILE` | required for any content; SHA-256 printed and matched against the System.dat list | v1.0 |
-| `--disc FILE` / `--exe FILE` | cue/bin/img/iso/m3u (`chd` refused with exit 77 until v2.0), or a PS-X EXE run from the BIOS entry; none → test card | v1.0 |
+| `--bios FILE` | optional exact-size BIOS for a BIOS boot; prints recognition status and SHA-256 of the exact bytes | v1.0 |
+| `--exe FILE` | validated PS-X EXE, started by the core stub without a BIOS; no `--bios` or `--exe` → test card | v1.0 |
 | `--machine PROFILE`, `--region auto\|ntsc-u\|ntsc-j\|pal` | profile = revision + region (SCPH-1001, SCPH-5502, SCPH-101 ...) | v1.0 |
-| `--frames N`, `--hash N`, `--hash-audio`, `--png N:FILE`, `--bench N` | SHA-256 of native pixels (15-bit words or 24-bit bytes plus the mode tag); PCM SHA-256 per channel; PNG via the 8888 conversion; fps + p50/p90/p99/p99.9/max µs | v1.0 |
+| `--frames N`, `--hash`, `--hash-vram`, `--hash-state`, `--png N:FILE`, `--bench N` | frame SHA-256 of 13 metadata words plus native 15-bit LE words or packed 24-bit RGB bytes; VRAM SHA-256 with bit 15 cleared; serialized state-body SHA-256; PNG via host conversion; fps + p50/p90/p99/p99.9/max µs | v1.0 |
 | `--probe FILE` | fields below, no emulation; exit 0/77/1 | v1.0 |
 | `--trace first-fault` | stop at the first unmapped or misaligned access or reserved instruction and print it | v1.0 |
 | `--tty` | BIOS `putchar` (A(3Ch)/B(3Dh)) [HI.16] characters to stdout, lines prefixed `tty ` | v1.0 |
@@ -182,7 +181,7 @@ No window, config file, environment, stdin or network; invalid combinations exit
 
 **Mailbox protocol** (CONFORMANCE 4 defines it; fixtures built with armips or PSn00bSDK): the first 256 bytes of every own fixture image at `t_addr` = 80010000h: magic `SWMB`, protocol version, a status byte (80h running, 81h waiting for input, 00h done, FFh fault), record count, fixture id, CRC-32 over 10h..FFh, an optional exception-handler address, then up to 30 records {test id u16, flags u16, value u32}; the runner reads it with `peek` once per frame and, with `--stop-on mailbox`, exits 0 at status 00h when every record matches `tests/diag/expected.csv`, 1 on a record outside its row, 6 on FFh, 8 at the frame cap, printing `id=value` lines. TTY text from the same fixture (`--tty`) carries the explanation; both are plain stdout, so a CTest reads them with `grep`. RAM at `t_addr` is used because the stub kernel keeps the scratchpad top for its header copy and exception record (PSXDEV-EXTRACTS PX.68) (derived).
 
-**Save-dir layout** (`--save-dir DIR`): `DIR/<content basename>.srm` (card 0) and `DIR/<content basename>.1.mcr` (card 1), the RetroArch/Beetle names, so a directory moves between the runner and RetroArch unchanged; `--memcard-names serial` switches to `DIR/<serial>.srm` for libraries keyed by serial (multi-disc sets share one card that way, as DuckStation merges discs under one card [HI.07]). **Rec:** basename default. **Alt:** serial default. **Would change if:** Playstead keys its save artifacts by set, not by file.
+**Save-dir layout** (`--save-dir DIR`): `DIR/<content basename>.srm` for core slot 1 and `DIR/<content basename>.1.mcr` for core slot 2. These match the runner and RetroArch's card names; `--memcard-names serial --serial <serial>` switches the runner's basename so multi-disc sets can share both card files. Libretro uses the content basename and writes only slot 2 itself; RetroArch owns the `.srm` file for slot 1. **Rec:** basename default. **Alt:** serial default. **Would change if:** Playstead keys its save artifacts by set, not by file.
 
 **Playstead** (local checkout `f7a5c9ba293c`, accessed 2026-10-19) [HI.18]:
 
@@ -226,14 +225,16 @@ Playstead today plays only through a GUI adapter (mGBA `.app`); the runner is he
 ## 7. Multi-frontend ergonomics: the C API every host shares
 | Group | Surface (all size-tagged structs, `schway_status` returns) | Used by |
 |---|---|---|
-| Lifecycle | `schway_get_versions`, `schway_create(cfg, &inst)` (allocator hook, profile, RAM fill), `schway_destroy` | all |
-| Content | `schway_load_bios(bytes, n)`, `schway_open_disc(reader)` where `reader` is a sector callback + TOC (file reader provided in the library, browser reader in JS), `schway_load_exe(bytes, n)`, `schway_set_lid(open)`, `schway_swap_disc(reader)`, `schway_probe(reader, &info)` | runner, libretro, WASM, Playstead adapter |
-| Run | `schway_run_frame(inst, &io)` with `io.video` (native span + mode tag + geometry), `io.audio` (int16 stereo, capacity, count), `io.input[2]` (device type, buttons, axes), `io.rumble[2]` out; `schway_run(inst, budget, &stop)` returns one stop reason from the single enum `FRAME`, `BUDGET`, `AUDIO_FULL`, `HOOK` (breakpoint, mailbox, tty line, exit port), `FAULT`, `LID` (ARCHITECTURE 1, ENGINEERING 14) | all; debuggers |
-| Memory cards | `schway_memcard_span(slot)` (131,072 B, stable until destroy), `schway_memcard_generation(slot)` (bumps on write, drives flush timing) | libretro SAVE_RAM, runner, Playstead |
-| Inspection | `schway_peek`, register getters, VRAM span, counters, lag flag; `schway_state_visit(visitor)` (v3.0) serialises through one visitor so save/load/hash/size share code | runner, Python, GDB |
+| Lifecycle | `schway_get_versions`, `schway_create(cfg, &inst)` (allocator hook), `schway_set_profile`, `schway_reset`, `schway_destroy` | runner, libretro |
+| Content | `schway_probe_exe`, `schway_load_exe`, `schway_load_bios`, `schway_get_bios_info`; PS-EXE loads run through the core stub and do not need a BIOS | runner, libretro |
+| Run and input | `schway_run_frame(inst, result)`, `schway_run(inst, budget, result)`, `schway_set_input`; `result.stop` is one of `SCHWAY_STOP_FRAME`, `SCHWAY_STOP_BUDGET`, `SCHWAY_STOP_HOOK` or `SCHWAY_STOP_FAULT`; `result` also reports frame, ticks, exit code, fault presence, lag and per-port rumble | runner, libretro |
+| Video and audio | `schway_get_info`, `schway_get_video` (native 15-bit words or packed 24-bit RGB plus metadata), `schway_get_audio` | runner, libretro |
+| Memory | `schway_peek` (RAM or scratchpad only), `schway_get_vram`, `schway_get_memory` (read-only spans for RAM, scratchpad, VRAM, BIOS and both card slots) | runner, libretro |
+| Memory cards | `schway_load_memcard(slot, bytes, size)`, `schway_memcard_generation`; card bytes and generations are outside save states and file access belongs to each host | runner, libretro |
+| Diagnostics and state | `schway_get_fault`, `schway_get_tty`, `schway_get_trace`, `schway_state_size`, `schway_save_state`, `schway_load_state`, `schway_state_visit` | runner, libretro state callbacks |
 | Hooks | observer registration (§5), zero cost when unset | v5.0 |
 
-Hosts: `examples/sdl2/` (one file, ~300 lines: window, audio queue, game controller → DualShock, drag-and-drop cue, F-keys for lid and swap) proves the API outside libretro; a Playstead adapter later wraps the same calls behind its pin; the Python binding is ctypes over the same header. **ABI:** `SCHWAYSTATION_ABI_VERSION` integer in the header and in `schway_get_versions`; every struct starts with `uint32_t size` (muhtari's rule) so fields append without breaking older hosts; public symbols prefixed `schway_`, internals `schway__<module>_` (libretro option keys, file names and CMake names keep `schwaystation`; `abi.symbols` checks both), exported through a visibility map; behaviour revision (`behaviour_version`) separate from the ABI so hash-affecting fixes are visible to movies and Playstead's `core_version` provenance field [HI.08][HI.18].
+The current public API is revision 4. Every versioned input/output struct starts with `uint32_t size`; `schway_span` is the exception and carries a pointer plus its byte length. `schway_versions` reports the library version, compiled API version, ABI version, behavior revision and state format. The header's `SCHWAY_API_VERSION` is 4; `schway_run` returns `schway_status` and writes its stop code to `schway_run_result.stop`. Public symbols start with `schway_`; internal cross-file symbols start with `schway__<module>_` [HI.08][HI.18].
 
 ## 8. Feature → host or core
 | Feature | Owner | Core provides |

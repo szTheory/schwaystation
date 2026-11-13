@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "schwaystation.h"
 #include "internal.h"
 #include "../check.h"
@@ -84,7 +86,7 @@ static void stub_drift(const char *dir)
     char path[1024];
     int n = snprintf(path, sizeof path, "%s/stub.bin", dir);
     CHECK(n > 0 && (size_t)n < sizeof path);
-    FILE *f = fopen(path, "rb");
+    FILE *f = schway__test_open_file(path, "rb");
     if (f == NULL) {
         fprintf(stderr, "%s: cannot open\n", path);
         check_failures++;
@@ -136,7 +138,7 @@ static uint8_t *read_file(const char *dir, const char *name, size_t *n)
     char path[1024];
     int len = snprintf(path, sizeof path, "%s/%s", dir, name);
     CHECK(len > 0 && (size_t)len < sizeof path);
-    FILE *f = fopen(path, "rb");
+    FILE *f = schway__test_open_file(path, "rb");
     if (f == NULL) {
         fprintf(stderr, "%s: cannot open\n", path);
         exit(1);
@@ -444,6 +446,608 @@ static void registered_handler(const char *dir)
     free(exe);
 }
 
+static uint32_t mips_i(uint32_t op, uint32_t rs, uint32_t rt, int32_t imm)
+{
+    return (op << 26) | (rs << 21) | (rt << 16) | ((uint32_t)imm & 0xFFFFu);
+}
+
+static uint32_t mips_r(uint32_t rs, uint32_t rt, uint32_t rd, uint32_t fn)
+{
+    return (rs << 21) | (rt << 16) | (rd << 11) | fn;
+}
+
+static uint32_t mips_j(uint32_t op, uint32_t target)
+{
+    return (op << 26) | ((target >> 2) & 0x03FFFFFFu);
+}
+
+static void stub_irq_hook(void)
+{
+#define IRQ_ENTRY 0x80010400u
+    enum {
+        IRQ_ENTRY_WORD = 0xC0u
+    };
+    uint8_t exe[EXE_SIZE];
+    uint32_t code[256] = {0u};
+    size_t n = 0u;
+
+    /* The guest registers its own callback context with B0(19h). */
+    code[n++] = mips_i(0x0Fu, 0u, 4u, 0x8001); /* lui a0, 8001h */
+    code[n++] = mips_i(0x0Du, 4u, 4u, 0x0300); /* ori a0, a0, 300h */
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0x8000); /* lui t0, 8000h */
+    code[n++] = mips_i(0x0Du, 8u, 8u, 0x00B0); /* ori t0, t0, B0h */
+    code[n++] = mips_i(0x09u, 0u, 9u, 0x19);   /* addiu t1, zero, 19h */
+    code[n++] = mips_r(8u, 0u, 31u, 0x09u);    /* jalr ra, t0 */
+    code[n++] = 0u;                            /* nop: jalr delay slot */
+
+    /* Allow only IRQ0 at the controller, then give every caller register a
+       distinct value. The later polling loop uses k0 alone. */
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0xBF80); /* lui t0, BF80h */
+    code[n++] = mips_i(0x09u, 0u, 9u, 1);      /* addiu t1, zero, 1 */
+    code[n++] = mips_i(0x2Bu, 8u, 9u, 0x1074); /* sw t1, 1074h(t0) */
+    for (uint32_t reg = 1u; reg < 32u; reg++) {
+        if (reg != 26u) {
+            code[n++] = mips_i(0x09u, 0u, reg, (int32_t)(0x100u + reg));
+            /* addiu rN, zero, 100h+N; k0 is deliberately left available. */
+        }
+    }
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x1357); /* lui k0, 1357h */
+    code[n++] = mips_i(0x0Du, 26u, 26u, 0x9BDF); /* ori k0, k0, 9BDFh */
+    code[n++] = mips_r(26u, 0u, 0u, 0x11u);      /* mthi k0 */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x2468); /* lui k0, 2468h */
+    code[n++] = mips_i(0x0Du, 26u, 26u, 0xACE0); /* ori k0, k0, ACE0h */
+    code[n++] = mips_r(26u, 0u, 0u, 0x13u);      /* mtlo k0 */
+    code[n++] = 0u;                            /* nop: HI/LO setup spacing */
+    code[n++] = mips_i(0x0Du, 0u, 26u, 0x0401); /* ori k0, zero, IEc|IM2 */
+    code[n++] = (0x10u << 26) | (4u << 21) | (26u << 16) | (12u << 11); /* mtc0 k0, SR */
+    code[n++] = 0u;                            /* nop: COP0 write spacing */
+
+    size_t wait = n;
+    code[n++] = mips_i(4u, 0u, 0u, -1); /* wait: beq zero, zero, self */
+    code[n++] = 0u;                      /* nop: branch delay slot */
+
+    CHECK(n < IRQ_ENTRY_WORD);
+    while (n < IRQ_ENTRY_WORD) {
+        code[n++] = 0u;
+    }
+
+    /* The registered guest ISR snapshots its JmpBuf inputs, observes the
+       masked pending bit, acknowledges only IRQ0, and calls B0(17h). */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001); /* lui k0, 8001h */
+    code[n++] = mips_i(0x2Bu, 26u, 31u, 0x0350); /* sw ra, observed+0(k0) */
+    code[n++] = mips_i(0x2Bu, 26u, 2u, 0x0354);  /* sw v0, observed+4(k0) */
+    code[n++] = mips_i(0x2Bu, 26u, 29u, 0x0358); /* sw sp, observed+8(k0) */
+    code[n++] = mips_i(0x2Bu, 26u, 30u, 0x035C); /* sw fp, observed+12(k0) */
+    for (uint32_t reg = 16u; reg <= 23u; reg++) {
+        code[n++] = mips_i(0x2Bu, 26u, reg, (int32_t)(0x0360u + (reg - 16u) * 4u));
+        /* sw sN, observed+16h+4*N(k0) */
+    }
+    code[n++] = mips_i(0x2Bu, 26u, 28u, 0x0380); /* sw gp, observed+30h(k0) */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0xBF80); /* lui k0, BF80h */
+    code[n++] = mips_i(0x23u, 26u, 27u, 0x1070); /* lw k1, I_STAT(k0) */
+    code[n++] = mips_i(0x23u, 26u, 8u, 0x1074);  /* lw t0, I_MASK(k0) */
+    code[n++] = 0u;                             /* nop: load delay */
+    code[n++] = mips_r(27u, 8u, 27u, 0x24u);     /* and k1, k1, t0 */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001); /* lui k0, 8001h */
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x0384); /* sw k1, observed+34h(k0) */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0xBF80); /* lui k0, BF80h */
+    code[n++] = mips_i(0x09u, 0u, 27u, -2);     /* addiu k1, zero, -2 */
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x1070); /* sw k1, I_STAT(k0) */
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001); /* lui k0, 8001h */
+    code[n++] = mips_i(0x23u, 26u, 27u, 0x0340); /* lw k1, callback(k0) */
+    code[n++] = 0u;                             /* nop: load delay */
+    code[n++] = mips_i(0x09u, 27u, 27u, 1);     /* addiu k1, k1, 1 */
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x0340); /* sw k1, callback(k0) */
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0x8000);  /* lui t0, 8000h */
+    code[n++] = mips_i(0x0Du, 8u, 8u, 0x00B0);  /* ori t0, t0, B0h */
+    code[n++] = mips_i(0x09u, 0u, 9u, 0x17);    /* addiu t1, zero, 17h */
+    code[n++] = mips_r(8u, 0u, 31u, 0x09u);     /* jalr ra, t0 */
+    code[n++] = 0u;                             /* nop: jalr delay slot */
+    size_t isr_spin = n;
+    code[n++] = mips_j(2u, 0x80010100u + (uint32_t)isr_spin * 4u); /* j isr_spin */
+    code[n++] = 0u;                             /* nop: jump delay slot */
+
+    build_exe(exe, code, n, 0u);
+    const uint32_t jump_buffer[12] = {
+        IRQ_ENTRY, 0x801FF000u, 0x12345000u,
+        0x00001600u, 0x00001601u, 0x00001602u, 0x00001603u,
+        0x00001604u, 0x00001605u, 0x00001606u, 0x00001607u,
+        0x80012000u
+    };
+    for (size_t i = 0u; i < sizeof jump_buffer / sizeof jump_buffer[0]; i++) {
+        put32(exe + 0x800u + 0x300u + 4u * i, jump_buffer[i]);
+    }
+    put32(exe + 0x800u + 0x340u, 0u);
+
+    schway *inst = make();
+    load(inst, exe, sizeof exe);
+    schway_run_result r = run(inst, 10000u, 0u);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10340u), 0u);
+    const uint32_t wait_pc = 0x80010100u + (uint32_t)wait * 4u;
+    for (uint32_t step = 0u; step < 8u && inst->cpu.pc != wait_pc; step++) {
+        r = run(inst, 1u, 0u);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    }
+    const uint32_t interrupted_pc = inst->cpu.pc;
+    CHECK_EQ_HEX(interrupted_pc, wait_pc);
+    for (uint32_t reg = 1u; reg < 32u; reg++) {
+        if (reg != 26u) {
+            CHECK_EQ_HEX(inst->cpu.r[reg], 0x100u + reg);
+        }
+    }
+
+    /* The test host supplies only an IRQ-controller edge; CPU entry and all
+       hook work still run as guest instructions under schway_run. */
+    schway__irq_raise(inst, 1u);
+    schway__irq_raise(inst, 0u);
+    uint32_t saved_epc = 0u;
+    uint32_t was_stub = 0u;
+    uint32_t entered = 0u;
+    uint32_t returned = 0u;
+    for (uint32_t step = 0u; step < 4096u && returned == 0u; step++) {
+        r = run(inst, 1u, 0u);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        uint32_t pc = inst->cpu.pc;
+        uint32_t in_stub = (pc >= 0xBFC00000u &&
+                            pc < 0xBFC00000u + schway__stub_kernel_size) ||
+                           (pc >= 0x80000080u && pc < 0x800000D0u);
+        if (in_stub != 0u) {
+            was_stub = 1u;
+            entered = 1u;
+            saved_epc = inst->cpu.cop0.r[SCHWAY__COP0_EPC];
+        } else if (was_stub != 0u && entered != 0u && pc == saved_epc) {
+            returned = 1u;
+            was_stub = 0u;
+        }
+    }
+    CHECK_EQ_U64(entered, 1u);
+    CHECK_EQ_U64(returned, 1u);
+    CHECK_EQ_U64(le32(inst->bus.ram + 0x10340u), 1u);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10384u), 1u);
+    CHECK_EQ_U64(inst->irq.stat & 1u, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 2u, 2u);
+    CHECK_EQ_U64(inst->irq.mask & 1u, 1u);
+    CHECK_EQ_U64(le32(inst->bus.ram + 0x304u), 0u);
+    CHECK_EQ_HEX(saved_epc, wait_pc);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x398u), wait_pc);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[SCHWAY__COP0_EPC], wait_pc);
+    CHECK_EQ_HEX(inst->cpu.hi, 0x13579BDFu);
+    CHECK_EQ_HEX(inst->cpu.lo, 0x2468ACE0u);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[SCHWAY__COP0_SR], 0x0401u);
+    for (uint32_t reg = 1u; reg < 32u; reg++) {
+        if (reg != 26u) {
+            CHECK_EQ_HEX(inst->cpu.r[reg], 0x100u + reg);
+        }
+    }
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10350u), IRQ_ENTRY);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10354u), 1u);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10358u), jump_buffer[1]);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x1035Cu), jump_buffer[2]);
+    for (size_t i = 3u; i <= 10u; i++) {
+        CHECK_EQ_HEX(le32(inst->bus.ram + 0x10350u + 4u * (i + 1u)), jump_buffer[i]);
+    }
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x10380u), jump_buffer[11]);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    schway_destroy(inst);
+#undef IRQ_ENTRY
+}
+
+static const uint32_t IRQ_FIXTURE_ENTRY = 0x80010400u;
+static const uint32_t IRQ_FIXTURE_WAIT_LIMIT = 4096u;
+
+typedef struct irq_fixture {
+    uint8_t exe[EXE_SIZE];
+    uint32_t wait_pc;
+    uint32_t return_pc;
+} irq_fixture;
+
+/* A smaller shared guest for the repeated-return, live-state and exception
+   controls below. Its expected values are fixed by the guest, not read back
+   from the stub's private save area. */
+static void build_irq_fixture(irq_fixture *f)
+{
+    uint32_t code[256] = {0u};
+    size_t n = 0u;
+    code[n++] = mips_i(0x0Fu, 0u, 4u, 0x8001);
+    code[n++] = mips_i(0x0Du, 4u, 4u, 0x0300);
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0x8000);
+    code[n++] = mips_i(0x0Du, 8u, 8u, 0x00B0);
+    code[n++] = mips_i(0x09u, 0u, 9u, 0x19);
+    code[n++] = mips_r(8u, 0u, 31u, 0x09u);
+    code[n++] = 0u;
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0xBF80);
+    code[n++] = mips_i(0x09u, 0u, 9u, 1);
+    code[n++] = mips_i(0x2Bu, 8u, 9u, 0x1074);
+    for (uint32_t reg = 1u; reg < 32u; reg++) {
+        if (reg != 26u) {
+            code[n++] = mips_i(0x09u, 0u, reg, (int32_t)(0x100u + reg));
+        }
+    }
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x1357);
+    code[n++] = mips_i(0x0Du, 26u, 26u, 0x9BDF);
+    code[n++] = mips_r(26u, 0u, 0u, 0x11u);
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x2468);
+    code[n++] = mips_i(0x0Du, 26u, 26u, 0xACE0);
+    code[n++] = mips_r(26u, 0u, 0u, 0x13u);
+    code[n++] = 0u;
+    code[n++] = mips_i(0x0Du, 0u, 26u, 0x0401);
+    code[n++] = (0x10u << 26) | (4u << 21) | (26u << 16) | (12u << 11);
+    code[n++] = 0u;
+    size_t wait = n;
+    code[n++] = mips_i(4u, 0u, 0u, -1);
+    code[n++] = 0u;
+    while (n < 0xC0u) {
+        code[n++] = 0u;
+    }
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001);
+    code[n++] = mips_i(0x2Bu, 26u, 31u, 0x0350);
+    code[n++] = mips_i(0x2Bu, 26u, 2u, 0x0354);
+    code[n++] = mips_i(0x2Bu, 26u, 29u, 0x0358);
+    code[n++] = mips_i(0x2Bu, 26u, 30u, 0x035C);
+    for (uint32_t reg = 16u; reg <= 23u; reg++) {
+        code[n++] = mips_i(0x2Bu, 26u, reg, (int32_t)(0x0360u + (reg - 16u) * 4u));
+    }
+    code[n++] = mips_i(0x2Bu, 26u, 28u, 0x0380);
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0xBF80);
+    code[n++] = mips_i(0x23u, 26u, 27u, 0x1070);
+    code[n++] = mips_i(0x23u, 26u, 8u, 0x1074);
+    code[n++] = 0u;
+    code[n++] = mips_r(27u, 8u, 27u, 0x24u);
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001);
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x0384);
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0xBF80);
+    code[n++] = mips_i(0x09u, 0u, 27u, -2);
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x1070);
+    code[n++] = mips_i(0x0Fu, 0u, 26u, 0x8001);
+    code[n++] = mips_i(0x23u, 26u, 27u, 0x0340);
+    code[n++] = 0u;
+    code[n++] = mips_i(0x09u, 27u, 27u, 1);
+    code[n++] = mips_i(0x2Bu, 26u, 27u, 0x0340);
+    f->return_pc = 0x80010100u + (uint32_t)n * 4u;
+    code[n++] = mips_i(0x0Fu, 0u, 8u, 0x8000);
+    code[n++] = mips_i(0x0Du, 8u, 8u, 0x00B0);
+    code[n++] = mips_i(0x09u, 0u, 9u, 0x17);
+    code[n++] = mips_r(8u, 0u, 31u, 0x09u);
+    code[n++] = 0u;
+    size_t spin = n;
+    code[n++] = mips_j(2u, 0x80010100u + (uint32_t)spin * 4u);
+    code[n++] = 0u;
+    build_exe(f->exe, code, n, 0u);
+    f->wait_pc = 0x80010100u + (uint32_t)wait * 4u;
+    const uint32_t jump_buffer[12] = {
+        IRQ_FIXTURE_ENTRY, 0x801FF000u, 0x12345000u,
+        0x00001600u, 0x00001601u, 0x00001602u, 0x00001603u,
+        0x00001604u, 0x00001605u, 0x00001606u, 0x00001607u, 0x80012000u
+    };
+    for (size_t i = 0u; i < 12u; i++) {
+        put32(f->exe + 0xB00u + 4u * i, jump_buffer[i]);
+    }
+    put32(f->exe + 0xB40u, 0u);
+}
+
+static schway *irq_fixture_load(const irq_fixture *f)
+{
+    schway *inst = make();
+    load(inst, f->exe, sizeof f->exe);
+    return inst;
+}
+
+static void irq_fixture_wait(schway *inst, const irq_fixture *f)
+{
+    schway_run_result r = run(inst, 10000u, 0u);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    for (uint32_t step = 0u; step < 8u && inst->cpu.pc != f->wait_pc; step++) {
+        r = run(inst, 1u, 0u);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    }
+    CHECK_EQ_HEX(inst->cpu.pc, f->wait_pc);
+    CHECK_EQ_U64(le32(inst->bus.ram + 0x10340u), 0u);
+}
+
+static int irq_fixture_run_to_pc(schway *inst, uint32_t pc)
+{
+    for (uint32_t step = 0u; step < IRQ_FIXTURE_WAIT_LIMIT && inst->cpu.pc != pc; step++) {
+        schway_run_result r = run(inst, 1u, 0u);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    }
+    return inst->cpu.pc == pc;
+}
+
+static int irq_fixture_returned(schway *inst, const irq_fixture *f, uint32_t count)
+{
+    for (uint32_t step = 0u; step < IRQ_FIXTURE_WAIT_LIMIT; step++) {
+        if (inst->cpu.pc == f->wait_pc && le32(inst->bus.ram + 0x10340u) == count) {
+            return 1;
+        }
+        schway_run_result r = run(inst, 1u, 0u);
+        CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    }
+    return inst->cpu.pc == f->wait_pc && le32(inst->bus.ram + 0x10340u) == count;
+}
+
+static void irq_fixture_check_context(schway *inst, const irq_fixture *f)
+{
+    CHECK_EQ_HEX(inst->cpu.pc, f->wait_pc);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[SCHWAY__COP0_EPC], f->wait_pc);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[SCHWAY__COP0_SR], 0x0401u);
+    CHECK_EQ_HEX(inst->cpu.hi, 0x13579BDFu);
+    CHECK_EQ_HEX(inst->cpu.lo, 0x2468ACE0u);
+    for (uint32_t reg = 1u; reg < 32u; reg++) {
+        if (reg != 26u) {
+            CHECK_EQ_HEX(inst->cpu.r[reg], 0x100u + reg);
+        }
+    }
+}
+
+static uint8_t *irq_fixture_save(schway *inst, size_t *size)
+{
+    *size = schway_state_size(inst);
+    uint8_t *state = (uint8_t *)malloc(*size);
+    CHECK(state != NULL);
+    if (state == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(inst, state, *size), SCHWAY_STATUS_OK);
+    return state;
+}
+
+static schway *irq_fixture_load_state(const uint8_t *state, size_t size)
+{
+    schway *inst = make();
+    CHECK_EQ_U64(schway_load_state(inst, state, size), SCHWAY_STATUS_OK);
+    return inst;
+}
+
+static void irq_fixture_compare(schway *a, schway *b)
+{
+    CHECK_EQ_U64(le32(a->bus.ram + 0x10340u), le32(b->bus.ram + 0x10340u));
+    CHECK_EQ_U64(a->irq.stat, b->irq.stat);
+    CHECK_EQ_U64(a->irq.mask, b->irq.mask);
+    CHECK(memcmp(&a->cpu, &b->cpu, sizeof a->cpu) == 0);
+    CHECK(memcmp(a->bus.ram, b->bus.ram, sizeof a->bus.ram) == 0);
+    size_t a_size = 0u;
+    size_t b_size = 0u;
+    uint8_t *a_state = irq_fixture_save(a, &a_size);
+    uint8_t *b_state = irq_fixture_save(b, &b_size);
+    CHECK_EQ_U64(a_size, b_size);
+    CHECK(a_size == b_size && memcmp(a_state, b_state, a_size) == 0);
+    free(a_state);
+    free(b_state);
+}
+
+static void irq_fixture_write(schway *inst, uint32_t addr, uint32_t word)
+{
+    uint32_t cycles = 0u;
+    memset(inst->cpu.icache_valid, 0, sizeof inst->cpu.icache_valid);
+    CHECK_EQ_U64(schway__bus_write(inst, 0xA0000000u | (addr & 0x1FFFFFFFu), 4u, word, &cycles), 0u);
+}
+
+static void irq_fixture_expect_stop(schway *inst)
+{
+    schway_run_result r = run(inst, 10000u, 0u);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_U64(le32(inst->bus.ram + 0x10340u), 0u);
+}
+
+static void stub_irq_context(void)
+{
+    irq_fixture f;
+    build_irq_fixture(&f);
+    schway *inst = irq_fixture_load(&f);
+    irq_fixture_wait(inst, &f);
+    schway__irq_raise(inst, 1u);
+    schway__irq_raise(inst, 0u);
+    CHECK(irq_fixture_returned(inst, &f, 1u));
+    irq_fixture_check_context(inst, &f);
+    CHECK_EQ_U64(inst->irq.stat & 1u, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 2u, 2u);
+    schway__irq_raise(inst, 0u);
+    CHECK(irq_fixture_returned(inst, &f, 2u));
+    irq_fixture_check_context(inst, &f);
+    CHECK_EQ_U64(inst->irq.stat & 1u, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 2u, 2u);
+    schway_destroy(inst);
+}
+
+static void stub_irq_state(void)
+{
+    irq_fixture f;
+    build_irq_fixture(&f);
+    schway *source = irq_fixture_load(&f);
+    irq_fixture_wait(source, &f);
+    size_t registered_size = 0u;
+    uint8_t *registered = irq_fixture_save(source, &registered_size);
+    schway *straight = irq_fixture_load_state(registered, registered_size);
+    schway *resumed = irq_fixture_load_state(registered, registered_size);
+    free(registered);
+    schway_destroy(source);
+
+    schway__irq_raise(straight, 1u);
+    schway__irq_raise(straight, 0u);
+    CHECK(irq_fixture_run_to_pc(straight, f.return_pc));
+    CHECK_EQ_U64(le32(straight->bus.ram + 0x10384u), 1u);
+    CHECK_EQ_U64(le32(straight->bus.ram + 0x304u), 1u);
+    CHECK_EQ_U64(straight->irq.stat & 1u, 0u);
+    CHECK_EQ_U64(straight->irq.stat & 2u, 2u);
+    size_t active_size = 0u;
+    uint8_t *active = irq_fixture_save(straight, &active_size);
+    schway_destroy(resumed);
+    resumed = irq_fixture_load_state(active, active_size);
+    free(active);
+
+    CHECK(irq_fixture_returned(straight, &f, 1u));
+    CHECK(irq_fixture_returned(resumed, &f, 1u));
+    irq_fixture_compare(straight, resumed);
+    schway__irq_raise(straight, 0u);
+    schway__irq_raise(resumed, 0u);
+    CHECK(irq_fixture_returned(straight, &f, 2u));
+    CHECK(irq_fixture_returned(resumed, &f, 2u));
+    irq_fixture_compare(straight, resumed);
+
+    CHECK_EQ_U64(schway_reset(straight, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(le32(straight->bus.ram + 0x300u), 0u);
+    CHECK_EQ_U64(le32(straight->bus.ram + 0x304u), 0u);
+    schway_destroy(resumed);
+    schway_destroy(straight);
+}
+
+static void stub_irq_controls(void)
+{
+    irq_fixture f;
+    build_irq_fixture(&f);
+
+    for (uint32_t with_handler = 0u; with_handler < 2u; with_handler++) {
+        irq_fixture swmb = f;
+        memcpy(swmb.exe + 0x800u, "SWMB", 4u);
+        put32(swmb.exe + 0x80Cu, with_handler != 0u ? f.wait_pc : 0u);
+        schway *inst = irq_fixture_load(&swmb);
+        irq_fixture_wait(inst, &swmb);
+        schway__irq_raise(inst, 0u);
+        irq_fixture_expect_stop(inst);
+        CHECK_EQ_HEX(mailbox(inst)[MB_STATUS], 0xFFu);
+        CHECK_EQ_HEX(le32(inst->bus.ram + 0x10300u), IRQ_FIXTURE_ENTRY);
+        schway_destroy(inst);
+    }
+
+    /* Registered state is cleared on reset; clearing it in a live guest
+       provides the unregistered IRQ control without changing exception code. */
+    schway *inst = irq_fixture_load(&f);
+    irq_fixture_wait(inst, &f);
+    put32(inst->bus.ram + 0x300u, 0u);
+    schway__irq_raise(inst, 0u);
+    irq_fixture_expect_stop(inst);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x214u), f.wait_pc);
+    schway_destroy(inst);
+
+    /* BREAK, unsupported SYS and inactive B0(17h) remain stopped exceptions. */
+    inst = irq_fixture_load(&f);
+    irq_fixture_wait(inst, &f);
+    irq_fixture_write(inst, f.wait_pc, 0x0000000Du);
+    irq_fixture_expect_stop(inst);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x210u), 0x24u);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x214u), f.wait_pc);
+    schway_destroy(inst);
+
+    inst = irq_fixture_load(&f);
+    irq_fixture_wait(inst, &f);
+    irq_fixture_write(inst, f.wait_pc, mips_i(0x0Du, 0u, 4u, 3));
+    irq_fixture_write(inst, f.wait_pc + 4u, 0x0000000Cu);
+    irq_fixture_write(inst, f.wait_pc + 8u, mips_i(0x09u, 0u, 16u, 1));
+    irq_fixture_expect_stop(inst);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x210u), 0x20u);
+    CHECK_EQ_HEX(le32(inst->bus.ram + 0x214u), f.wait_pc + 4u);
+    CHECK_EQ_HEX(inst->cpu.r[16], 0x110u);
+    schway_destroy(inst);
+
+    inst = irq_fixture_load(&f);
+    irq_fixture_wait(inst, &f);
+    irq_fixture_write(inst, f.wait_pc, mips_i(0x0Fu, 0u, 8u, 0x8000));
+    irq_fixture_write(inst, f.wait_pc + 4u, mips_i(0x0Du, 8u, 8u, 0x00B0));
+    irq_fixture_write(inst, f.wait_pc + 8u, mips_i(0x09u, 0u, 9u, 0x17));
+    irq_fixture_write(inst, f.wait_pc + 12u, mips_r(8u, 0u, 31u, 0x09u));
+    irq_fixture_write(inst, f.wait_pc + 16u, 0u);
+    irq_fixture_write(inst, f.wait_pc + 20u, mips_i(0x09u, 0u, 16u, 1));
+    irq_fixture_expect_stop(inst);
+    CHECK_EQ_U64(le32(inst->bus.ram + 0x304u), 0u);
+    CHECK_EQ_HEX(inst->cpu.r[16], 0x110u);
+    schway_destroy(inst);
+}
+
+/* With no SWMB mailbox, the stub handles only BIOS SYS(01h) and SYS(02h):
+   EnterCriticalSection tests and clears the saved IEp/IM2 bits, ExitCriticalSection
+   sets them, and both return through RFE. A valid SWMB mailbox still takes the
+   existing registered-handler path first; any other service remains stopped.
+   Fault prevented: a real EXE's startup syscall being mistaken for an unhandled
+   exception, or the small compatibility path swallowing fixture exceptions. */
+static void stub_syscalls(void)
+{
+    const uint32_t code[] = {
+        0x34080401u, /* ori t0, zero, 0x0401: IEc and IM2 enabled */
+        0x40886000u, /* mtc0 t0, SR */
+        0x00000000u, /* COP0 write spacing */
+        0x34040001u, /* ori a0, zero, SYS(01h) */
+        0x0000000Cu, /* syscall */
+        0x00408021u, /* addu s0, v0, zero: save EnterCriticalSection result */
+        0x34025678u, /* ori v0, zero, 0x5678 */
+        0x34040002u, /* ori a0, zero, SYS(02h) */
+        0x0000000Cu, /* syscall */
+        0x00408821u, /* addu s1, v0, zero: SYS(02h) preserves v0 */
+        0x34080001u, /* ori t0, zero, IEc without IM2 */
+        0x40886000u, /* mtc0 t0, SR */
+        0x00000000u, /* COP0 write spacing */
+        0x34040001u, /* ori a0, zero, SYS(01h) */
+        0x0000000Cu, /* syscall */
+        0x00409021u, /* addu s2, v0, zero: only one saved bit was set */
+        0x1000FFFFu, /* beq zero, zero, self */
+        0x00000000u, /* delay slot */
+    };
+    uint8_t exe[EXE_SIZE];
+    build_exe(exe, code, sizeof code / sizeof code[0], 0u);
+    schway *inst = make();
+    load(inst, exe, sizeof exe);
+    schway_run_result r = run_frame(inst);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_HEX(inst->cpu.r[16], 1u);
+    CHECK_EQ_HEX(inst->cpu.r[17], 0x5678u);
+    CHECK_EQ_HEX(inst->cpu.r[18], 0u);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[SCHWAY__COP0_SR], 0u);
+    schway_destroy(inst);
+
+    /* A valid SWMB mailbox keeps its existing priority over SYS(01h). The
+       registered handler lives at 80010120h and loops without changing v0. */
+    const uint32_t mailbox_code[] = {
+        0x34021234u, /* ori v0, zero, 0x1234 */
+        0x34040001u, /* ori a0, zero, SYS(01h) */
+        0x0000000Cu, /* syscall */
+        0x1000FFFFu, /* not reached: beq zero, zero, self */
+        0x00000000u,
+        0x00000000u,
+        0x00000000u,
+        0x00000000u,
+        0x1000FFFFu, /* registered handler: beq zero, zero, self */
+        0x00000000u,
+    };
+    build_exe(exe, mailbox_code, sizeof mailbox_code / sizeof mailbox_code[0], 0x80010120u);
+    inst = make();
+    load(inst, exe, sizeof exe);
+    r = run_frame(inst);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    CHECK_EQ_HEX(le32(mailbox(inst) + MB_STATUS), 0xFFu);
+    CHECK_EQ_HEX(inst->cpu.r[2], 0x1234u);
+    CHECK(inst->cpu.pc == 0x80010120u || inst->cpu.pc == 0x80010124u);
+    check_exc_record(inst, 0x20u, 0x80010108u);
+    schway_destroy(inst);
+
+    /* An unknown service selector keeps the existing recorded-and-stopped
+       behavior when there is no registered image handler. */
+    const uint32_t unknown_code[] = {
+        0x34040003u, /* ori a0, zero, unsupported SYS(03h) */
+        0x0000000Cu, /* syscall */
+        0x1000FFFFu, /* caller continuation, which must not be reached */
+        0x00000000u,
+    };
+    build_exe(exe, unknown_code, sizeof unknown_code / sizeof unknown_code[0], 0u);
+    inst = make();
+    load(inst, exe, sizeof exe);
+    r = run_frame(inst);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    check_exc_record(inst, 0x20u, 0x80010104u);
+    CHECK(inst->cpu.pc >= 0xBFC00000u &&
+          inst->cpu.pc < 0xBFC00000u + schway__stub_kernel_size);
+    schway_destroy(inst);
+
+}
+
 /* A jump to the first address past the stub image is a bus error on the
    fetch: the first fault is an unmapped fetch of the BIOS at that address, the
    run reports FAULT under STOP_ON_FAULT with the program counter at the
@@ -741,11 +1345,126 @@ static void split_with_exe(const char *dir)
     schway_destroy(inst);
 }
 
+/* Copies the public frame view so later runs cannot change the saved image. */
+static size_t copy_motion_video(const schway *inst, uint32_t frame, uint8_t **copy)
+{
+    schway_video video;
+    memset(&video, 0, sizeof video);
+    video.size = (uint32_t)sizeof video;
+    CHECK_EQ_U64(schway_get_video(inst, &video), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(video.frame, frame);
+    CHECK_EQ_U64(video.width, 256u);
+    CHECK_EQ_U64(video.height, 240u);
+    CHECK_EQ_U64(video.pitch_bytes, 512u);
+    CHECK_EQ_U64(video.bpp, 16u);
+    CHECK_EQ_U64(video.dot_div, 10u);
+    CHECK_EQ_U64(video.region, SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(video.enabled, 1u);
+    CHECK_EQ_U64(video.rgb24, 0u);
+    size_t size = (size_t)video.pitch_bytes * video.height;
+    CHECK(video.pixels != NULL && size != 0u);
+    *copy = (uint8_t *)malloc(size);
+    if (*copy == NULL || video.pixels == NULL) {
+        exit(1);
+    }
+    memcpy(*copy, video.pixels, size);
+    return size;
+}
+
+static void check_motion_pixels(const uint8_t *pixels, uint32_t drawn)
+{
+    const uint16_t *words = (const uint16_t *)pixels;
+    for (uint32_t x = 0u; x < drawn; x++) {
+        CHECK_EQ_HEX(words[100u * 256u + x], 0x001Fu);
+    }
+    CHECK_EQ_HEX(words[100u * 256u + drawn], 0u);
+}
+
+/* The assembled program draws one new GP0 pixel per beam interrupt. Check the
+   visible pixels at three points and prove a frame-150 save can resume to the
+   same frame and complete state as straight execution.
+   Fault prevented: GPU commands that do not affect scan-out, a stationary
+   primitive, or VRAM/frame state lost by loading a saved state. */
+static void gpu_motion(const char *dir)
+{
+    size_t exe_size = 0u;
+    uint8_t *exe = read_file(dir, "gpu_motion.exe", &exe_size);
+    schway *straight = make();
+    load(straight, exe, exe_size);
+    free(exe);
+
+    uint8_t *frame60 = NULL;
+    uint8_t *frame120 = NULL;
+    uint8_t *frame180 = NULL;
+    size_t frame_size = 0u;
+    size_t state_size = schway_state_size(straight);
+    uint8_t *state150 = (uint8_t *)malloc(state_size);
+    if (state150 == NULL) {
+        exit(1);
+    }
+    for (uint32_t frame = 1u; frame <= 150u; frame++) {
+        schway_run_result result = run_frame(straight);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(result.frame, frame);
+        if (frame == 60u) {
+            frame_size = copy_motion_video(straight, frame, &frame60);
+        } else if (frame == 120u) {
+            CHECK_EQ_U64(copy_motion_video(straight, frame, &frame120), frame_size);
+        }
+    }
+    CHECK_EQ_U64(schway_save_state(straight, state150, state_size), SCHWAY_STATUS_OK);
+
+    schway *resumed = make();
+    CHECK_EQ_U64(schway_load_state(resumed, state150, state_size), SCHWAY_STATUS_OK);
+    for (uint32_t frame = 151u; frame <= 180u; frame++) {
+        schway_run_result result = run_frame(resumed);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(result.frame, frame);
+    }
+    size_t resumed_size = copy_motion_video(resumed, 180u, &frame180);
+
+    for (uint32_t frame = 151u; frame <= 180u; frame++) {
+        schway_run_result result = run_frame(straight);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(result.frame, frame);
+    }
+    uint8_t *straight180 = NULL;
+    CHECK_EQ_U64(copy_motion_video(straight, 180u, &straight180), resumed_size);
+    CHECK_EQ_HEX(straight->dma.madr[2], 0x001100Cu);
+    CHECK_EQ_HEX(straight->vram[100u][179u], 0x001Fu);
+    CHECK(memcmp(frame180, straight180, resumed_size) == 0);
+    CHECK(memcmp(frame60, frame120, frame_size) != 0);
+    CHECK(memcmp(frame120, frame180, frame_size) != 0);
+
+    uint8_t *straight_state = (uint8_t *)malloc(state_size);
+    uint8_t *resumed_state = (uint8_t *)malloc(state_size);
+    if (straight_state == NULL || resumed_state == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(straight, straight_state, state_size), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_save_state(resumed, resumed_state, state_size), SCHWAY_STATUS_OK);
+    CHECK(memcmp(straight_state, resumed_state, state_size) == 0);
+
+    check_motion_pixels(frame60, 60u);
+    check_motion_pixels(frame120, 120u);
+    check_motion_pixels(frame180, 180u);
+
+    free(straight_state);
+    free(resumed_state);
+    free(frame60);
+    free(frame120);
+    free(frame180);
+    free(straight180);
+    free(state150);
+    schway_destroy(resumed);
+    schway_destroy(straight);
+}
+
 /* The whole of a file of at most 1 MiB, NUL-terminated after its n bytes. */
 static uint8_t *read_whole(const char *path, size_t *n)
 {
     const size_t cap = (size_t)1u << 20;
-    FILE *f = fopen(path, "rb");
+    FILE *f = schway__test_open_file(path, "rb");
     if (f == NULL) {
         fprintf(stderr, "%s: cannot open\n", path);
         exit(1);
@@ -852,6 +1571,16 @@ int main(int argc, char **argv)
         default_handler(argv[2]);
     } else if (strcmp(c, "registered_handler") == 0 && argc == 3) {
         registered_handler(argv[2]);
+    } else if (strcmp(c, "stub_syscalls") == 0) {
+        stub_syscalls();
+    } else if (strcmp(c, "stub_irq_hook") == 0) {
+        stub_irq_hook();
+    } else if (strcmp(c, "stub_irq_context") == 0) {
+        stub_irq_context();
+    } else if (strcmp(c, "stub_irq_state") == 0) {
+        stub_irq_state();
+    } else if (strcmp(c, "stub_irq_controls") == 0) {
+        stub_irq_controls();
     } else if (strcmp(c, "past_stub") == 0) {
         past_stub();
     } else if (strcmp(c, "exit_port") == 0) {
@@ -864,6 +1593,8 @@ int main(int argc, char **argv)
         bounded();
     } else if (strcmp(c, "split_with_exe") == 0 && argc == 3) {
         split_with_exe(argv[2]);
+    } else if (strcmp(c, "gpu_motion") == 0 && argc == 3) {
+        gpu_motion(argv[2]);
     } else if (strcmp(c, "gte_vectors_guard") == 0 && argc == 4) {
         gte_vectors_guard(argv[2], argv[3]);
     } else {

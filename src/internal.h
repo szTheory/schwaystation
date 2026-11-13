@@ -8,19 +8,24 @@
 #include "schwaystation.h"
 #include "bus.h"
 #include "cpu.h"
+#include "gpu.h"
 #include "gte.h"
 #include "dma.h"
 #include "timers.h"
 #include "sched.h"
+#include "sio.h"
+#include "pad.h"
+#include "card.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 3u
-#define SCHWAY__STATE_FORMAT 3u
+#define SCHWAY__BEHAVIOUR_REVISION 4u
+#define SCHWAY__STATE_FORMAT 4u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
 #define SCHWAY__VRAM_H 512u
+#define SCHWAY__VIDEO_MAX_BYTES (SCHWAY__VRAM_W * SCHWAY__VRAM_H * 3u)
 
 /* One frame is an exact rational number of CPU cycles: num / den, with den
    the GPU clocks per frame (ARCHITECTURE section 1). The same den is the
@@ -133,14 +138,19 @@ struct schway {
     uint32_t audio_dropped; /* pairs lost since the last drain */
     int16_t audio[SCHWAY__AUDIO_RING_PAIRS][2];
     uint16_t vram[SCHWAY__VRAM_H][SCHWAY__VRAM_W];
+    uint8_t *video_scanout; /* Trailing derived host view; outside serialized machine state. */
     uint32_t profile_flags;     /* the profile's flags, bit 0 the debug port */
-    uint32_t exe_loaded;        /* 1 after a PS-EXE was side-loaded */
+    uint32_t exe_loaded;        /* 1 when BIOS or PS-EXE execution is enabled */
     struct schway__cpu cpu;
+    struct schway__gpu gpu;
     struct schway__gte gte;
     struct schway__bus bus;
     struct schway__irq irq;
     struct schway__dma dma;
     struct schway__timers timers;
+    struct schway__sio sio;
+    struct schway__pad pad;
+    struct schway__card card;
     struct schway__fault fault;
     /* Not saved: derived from the state, and rebuilt after a load. */
     struct schway__sched sched;
@@ -232,7 +242,17 @@ _Static_assert(offsetof(schway_run_result, frame) == 8, "run_result.frame");
 _Static_assert(offsetof(schway_run_result, ticks) == 16, "run_result.ticks");
 _Static_assert(offsetof(schway_run_result, exit_code) == 24, "run_result.exit_code");
 _Static_assert(offsetof(schway_run_result, fault_present) == 28, "run_result.fault_present");
-_Static_assert(sizeof(schway_run_result) == 32, "run_result size");
+_Static_assert(offsetof(schway_run_result, lag) == 32, "run_result.lag");
+_Static_assert(offsetof(schway_run_result, rumble) == 36, "run_result.rumble");
+_Static_assert(sizeof(schway_run_result) == 48, "run_result size");
+
+_Static_assert(offsetof(schway_input, size) == 0, "input.size");
+_Static_assert(offsetof(schway_input, device) == 4, "input.device");
+_Static_assert(offsetof(schway_input, buttons) == 12, "input.buttons");
+_Static_assert(offsetof(schway_input, axes) == 16, "input.axes");
+_Static_assert(offsetof(schway_input, analog_button) == 24, "input.analog_button");
+_Static_assert(offsetof(schway_input, reserved0) == 26, "input.reserved0");
+_Static_assert(sizeof(schway_input) == 28, "input size");
 
 _Static_assert(offsetof(schway_budget, size) == 0, "budget.size");
 _Static_assert(offsetof(schway_budget, flags) == 4, "budget.flags");
@@ -320,10 +340,12 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__PROFILE_SIZE_FIRST 8u /* a literal: appended fields leave it alone */
 #define SCHWAY__INFO_SIZE_FIRST 36u
 #define SCHWAY__RUN_RESULT_SIZE_FIRST 24u /* a literal: appended fields leave it alone */
+#define SCHWAY__INPUT_SIZE_FIRST ((uint32_t)sizeof(schway_input))
 #define SCHWAY__BUDGET_SIZE_FIRST 16u
 #define SCHWAY__VIDEO_SIZE_FIRST ((uint32_t)(80 + 2 * SCHWAY__P))
 #define SCHWAY__AUDIO_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__EXE_INFO_SIZE_FIRST 56u
+#define SCHWAY__BIOS_INFO_SIZE_FIRST 40u
 #define SCHWAY__FAULT_SIZE_FIRST 56u
 #define SCHWAY__TTY_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__TRACE_SIZE_FIRST 64u
@@ -331,12 +353,20 @@ _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
 _Static_assert(SCHWAY__INFO_SIZE_FIRST == sizeof(schway_info), "info first size");
+_Static_assert(SCHWAY__INPUT_SIZE_FIRST == sizeof(schway_input), "input first size");
 _Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == offsetof(schway_run_result, exit_code),
                "run_result first size");
 _Static_assert(SCHWAY__BUDGET_SIZE_FIRST == sizeof(schway_budget), "budget first size");
 _Static_assert(SCHWAY__VIDEO_SIZE_FIRST == sizeof(schway_video), "video first size");
 _Static_assert(SCHWAY__AUDIO_SIZE_FIRST == sizeof(schway_audio), "audio first size");
 _Static_assert(SCHWAY__EXE_INFO_SIZE_FIRST == sizeof(schway_exe_info), "exe_info first size");
+_Static_assert(SCHWAY__BIOS_INFO_SIZE_FIRST == offsetof(schway_bios_info, status),
+               "bios_info first size");
+_Static_assert(offsetof(schway_bios_info, flags) == 4, "bios_info.flags");
+_Static_assert(offsetof(schway_bios_info, sha256) == 8, "bios_info.sha256");
+_Static_assert(offsetof(schway_bios_info, status) == 40, "bios_info.status");
+_Static_assert(offsetof(schway_bios_info, region) == 44, "bios_info.region");
+_Static_assert(sizeof(schway_bios_info) == 48, "bios_info size");
 _Static_assert(SCHWAY__FAULT_SIZE_FIRST == sizeof(schway_fault), "fault first size");
 _Static_assert(SCHWAY__TTY_SIZE_FIRST == sizeof(schway_tty), "tty first size");
 _Static_assert(SCHWAY__TRACE_SIZE_FIRST == sizeof(schway_trace), "trace first size");
@@ -408,6 +438,8 @@ void schway__tty_push(schway *inst, uint8_t byte);
 
 /* Empties the audio ring and its dropped count. */
 void schway__frame_audio_clear(schway *inst);
+void schway__frame_gpu_wrap(schway *inst);
+void schway__frame_gpu_reset(schway *inst, uint64_t tick);
 
 /* CRC-32 as in Ethernet and PNG: reflected polynomial 0xEDB88320, initial
    value and final XOR 0xFFFFFFFF. Continue a running CRC by passing it back

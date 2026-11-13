@@ -3,6 +3,7 @@
 # Run as a script (cmake -DCASE=<case> ... -P tests.cmake), this file is one
 # runner check; include()d by tests/tests.cmake, it registers the tests.
 if(CMAKE_SCRIPT_MODE_FILE)
+  string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
   # Runs the runner with ARGN and fails unless it exits with code and its
   # merged output matches regex.
   function(expect_exit code regex)
@@ -69,6 +70,151 @@ if(CMAKE_SCRIPT_MODE_FILE)
     set(RUN ${HOOKED})
     expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash)
     expect_exit(0 "^frames 5\n.*max_rss_kib [0-9]+\n$" --bench 60)
+  elseif(CASE STREQUAL "cards_persistence")
+    set(RUN ${HOOKED})
+    string(REPEAT "[0-9a-f]" 64 digits)
+    set(card_dir "${OUT}/runner-cards-persistence")
+    file(MAKE_DIRECTORY "${card_dir}")
+    file(WRITE "${card_dir}/schwaystation.srm" "old-slot-one")
+    file(WRITE "${card_dir}/schwaystation.1.mcr" "old-slot-two")
+    file(SHA256 "${card_dir}/schwaystation.1.mcr" old_slot_two)
+    expect_exit(0 "frame 3 sha256 ${digits}" --frames 3 --hash --save-dir "${card_dir}"
+      --test-card-write slot1)
+    file(SIZE "${card_dir}/schwaystation.srm" slot_one_size)
+    file(READ "${card_dir}/schwaystation.srm" slot_one_sector HEX OFFSET 896 LIMIT 8)
+    file(SHA256 "${card_dir}/schwaystation.1.mcr" new_slot_two)
+    if(NOT slot_one_size EQUAL 131072 OR NOT slot_one_sector STREQUAL "314e6b88a5c2dffc" OR
+       NOT old_slot_two STREQUAL new_slot_two)
+      message(FATAL_ERROR "normal exit did not save only slot 1's completed card generation")
+    endif()
+  elseif(CASE STREQUAL "cards_sigterm")
+    set(RUN ${HOOKED})
+    string(REPEAT "[0-9a-f]" 64 digits)
+    set(card_dir "${OUT}/runner-cards-sigterm")
+    file(MAKE_DIRECTORY "${card_dir}")
+    file(WRITE "${card_dir}/schwaystation.srm" "unchanged-slot-one")
+    file(SHA256 "${card_dir}/schwaystation.srm" old_slot_one)
+    expect_exit(0 "frame 5 sha256 ${EXPECTED}" --frames 60 --hash --save-dir "${card_dir}"
+      --test-card-write slot2)
+    file(SIZE "${card_dir}/schwaystation.1.mcr" slot_two_size)
+    file(READ "${card_dir}/schwaystation.1.mcr" slot_two_sector HEX OFFSET 896 LIMIT 8)
+    file(SHA256 "${card_dir}/schwaystation.srm" new_slot_one)
+    if(NOT slot_two_size EQUAL 131072 OR NOT slot_two_sector STREQUAL "627f9cb9d6f3102d" OR
+       NOT old_slot_one STREQUAL new_slot_one)
+      message(FATAL_ERROR "SIGTERM did not flush only slot 2 after frame 5")
+    endif()
+  elseif(CASE STREQUAL "cards_controls")
+    set(RUN ${HOOKED})
+    string(REPEAT "[0-9a-f]" 64 digits)
+
+    # Missing cards begin as formatted blanks and stay absent until a game writes them.
+    set(missing_dir "${OUT}/runner-cards-missing")
+    file(MAKE_DIRECTORY "${missing_dir}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${missing_dir}")
+    if(EXISTS "${missing_dir}/schwaystation.srm" OR EXISTS "${missing_dir}/schwaystation.1.mcr")
+      message(FATAL_ERROR "an unchanged blank card was written")
+    endif()
+
+    # An imported short raw image is preserved byte-for-byte when its generation is unchanged.
+    set(unchanged_dir "${OUT}/runner-cards-unchanged")
+    file(MAKE_DIRECTORY "${unchanged_dir}")
+    file(WRITE "${unchanged_dir}/schwaystation.srm" "unchanged-short-card")
+    file(SHA256 "${unchanged_dir}/schwaystation.srm" old_unchanged)
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${unchanged_dir}")
+    file(SHA256 "${unchanged_dir}/schwaystation.srm" new_unchanged)
+    if(NOT old_unchanged STREQUAL new_unchanged OR EXISTS "${unchanged_dir}/schwaystation.1.mcr")
+      message(FATAL_ERROR "an unchanged short card was replaced or an absent slot was created")
+    endif()
+
+    # Empty imports fail before the first frame and leave the source untouched.
+    set(invalid_dir "${OUT}/runner-cards-invalid-import")
+    file(MAKE_DIRECTORY "${invalid_dir}")
+    file(WRITE "${invalid_dir}/schwaystation.srm" "")
+    file(SHA256 "${invalid_dir}/schwaystation.srm" old_invalid)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash --save-dir "${invalid_dir}"
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    file(SHA256 "${invalid_dir}/schwaystation.srm" new_invalid)
+    if(NOT rc STREQUAL "1" OR NOT err MATCHES "cannot import card file" OR
+       out MATCHES "frame 1 sha256" OR NOT old_invalid STREQUAL new_invalid)
+      message(FATAL_ERROR "an invalid card did not fail before execution and preserve its source\n${out}${err}")
+    endif()
+
+    # Half-transactions and rejected checksums cannot dirty a durable generation.
+    foreach(mode partial1 bad1)
+      set(preserve_dir "${OUT}/runner-cards-${mode}")
+      file(MAKE_DIRECTORY "${preserve_dir}")
+      file(WRITE "${preserve_dir}/schwaystation.srm" "durable-${mode}")
+      file(SHA256 "${preserve_dir}/schwaystation.srm" old_preserved)
+      expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${preserve_dir}"
+        --test-card-write "${mode}")
+      file(SHA256 "${preserve_dir}/schwaystation.srm" new_preserved)
+      if(NOT old_preserved STREQUAL new_preserved)
+        message(FATAL_ERROR "${mode} changed a card without a completed successful write")
+      endif()
+    endforeach()
+
+    # A successful slot 1 write followed by a rejected write flushes only the completed data.
+    set(rejected_after_success_dir "${OUT}/runner-cards-rejected-after-success")
+    file(MAKE_DIRECTORY "${rejected_after_success_dir}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${rejected_after_success_dir}"
+      --test-card-write slot1_then_bad)
+    file(SIZE "${rejected_after_success_dir}/schwaystation.srm" slot_one_size)
+    file(READ "${rejected_after_success_dir}/schwaystation.srm" slot_one_sector HEX OFFSET 896 LIMIT 8)
+    if(NOT slot_one_size EQUAL 131072 OR NOT slot_one_sector STREQUAL "314e6b88a5c2dffc" OR
+       EXISTS "${rejected_after_success_dir}/schwaystation.1.mcr")
+      message(FATAL_ERROR "a rejected write replaced completed data or dirtied the other slot")
+    endif()
+
+    # A slot 2 write must preserve slot 1 and create only slot 2.
+    set(slot_two_dir "${OUT}/runner-cards-slot-two")
+    file(MAKE_DIRECTORY "${slot_two_dir}")
+    file(WRITE "${slot_two_dir}/schwaystation.srm" "keep-slot-one")
+    file(SHA256 "${slot_two_dir}/schwaystation.srm" old_slot_one)
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${slot_two_dir}"
+      --test-card-write slot2)
+    file(SHA256 "${slot_two_dir}/schwaystation.srm" new_slot_one)
+    file(SIZE "${slot_two_dir}/schwaystation.1.mcr" slot_two_size)
+    file(READ "${slot_two_dir}/schwaystation.1.mcr" slot_two_sector HEX OFFSET 896 LIMIT 8)
+    if(NOT old_slot_one STREQUAL new_slot_one OR NOT slot_two_size EQUAL 131072 OR
+       NOT slot_two_sector STREQUAL "627f9cb9d6f3102d")
+      message(FATAL_ERROR "slot 2 persistence changed the wrong slot or saved incorrect data")
+    endif()
+
+    # Explicit serial naming creates only the serial card paths.
+    set(serial_dir "${OUT}/runner-cards-serial")
+    file(MAKE_DIRECTORY "${serial_dir}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${serial_dir}"
+      --memcard-names serial --serial SLUS_123.45 --test-card-write slot1)
+    if(NOT EXISTS "${serial_dir}/SLUS_123.45.srm" OR
+       EXISTS "${serial_dir}/schwaystation.srm")
+      message(FATAL_ERROR "serial card naming did not use the validated serial basename")
+    endif()
+
+    # A forced atomic replacement failure returns status 1, preserves the old card, and cleans its temp.
+    set(failed_save_dir "${OUT}/runner-cards-failed-save")
+    file(MAKE_DIRECTORY "${failed_save_dir}")
+    file(WRITE "${failed_save_dir}/schwaystation.srm" "durable-before-failure")
+    file(SHA256 "${failed_save_dir}/schwaystation.srm" old_save)
+    expect_exit(1 "cannot save card file" --frames 1 --save-dir "${failed_save_dir}"
+      --test-card-write slot1 --test-save-failure rename)
+    file(SHA256 "${failed_save_dir}/schwaystation.srm" new_save)
+    file(GLOB temporary_files "${failed_save_dir}/*.schwaystation.tmp.*")
+    if(NOT old_save STREQUAL new_save OR temporary_files)
+      message(FATAL_ERROR "a failed atomic replacement damaged the old card or left a temporary file")
+    endif()
+
+    # A missing save directory is not created and cannot produce a successful dirty-card exit.
+    set(no_directory "${OUT}/runner-cards-no-directory")
+    file(REMOVE_RECURSE "${no_directory}")
+    expect_exit(1 "cannot save card file" --frames 1 --save-dir "${no_directory}"
+      --test-card-write slot1)
+    if(EXISTS "${no_directory}")
+      message(FATAL_ERROR "the runner created a save directory that the caller did not provide")
+    endif()
+
+    # Invalid naming options are refused as usage errors before any run.
+    refuse(--serial SLUS_123.45)
+    refuse(--save-dir "${serial_dir}" --memcard-names serial --serial ../escape)
   elseif(CASE STREQUAL "hash_state")
     # One well-formed line, the same twice, and a different one a frame later. CMake regexes have no
     # {64}, so the sixty-four digits are repeated.
@@ -89,12 +235,117 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "the state hash is not stable for the same run or not different for another:\n"
         "${first}${second}${third}")
     endif()
+  elseif(CASE STREQUAL "inputs_script")
+    file(WRITE "${OUT}/runner-empty.inputs" "")
+    file(WRITE "${OUT}/runner-button.inputs" "2 p1=dualshock:X:128,128,128,128 p2=.\n")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    function(run_movie frames movie result_name)
+      set(movie_arg)
+      if(NOT movie STREQUAL "none")
+        set(movie_arg --inputs "${movie}")
+      endif()
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state ${movie_arg}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame ${frames} sha256 ${digits}" OR
+         NOT out MATCHES "state sha256 ${digits}")
+        message(FATAL_ERROR "--frames ${frames} input '${movie}': expected exit 0 and frame/state hashes, "
+          "got exit ${rc}\\n${out}${err}")
+      endif()
+      string(REGEX MATCH "frame ${frames} sha256 ([0-9a-f]+)" frame_line "${out}")
+      set(frame_hash "${CMAKE_MATCH_1}")
+      string(REGEX MATCH "state sha256 ([0-9a-f]+)" state_line "${out}")
+      set(state_hash "${CMAKE_MATCH_1}")
+      set(${result_name}_frame "${frame_hash}" PARENT_SCOPE)
+      set(${result_name}_state "${state_hash}" PARENT_SCOPE)
+      set(${result_name}_output "${out}" PARENT_SCOPE)
+    endfunction()
+    run_movie(1 none no_movie_before)
+    run_movie(1 "${OUT}/runner-button.inputs" event_before)
+    run_movie(2 none no_movie_after)
+    run_movie(2 "${OUT}/runner-empty.inputs" empty_movie)
+    run_movie(2 "${OUT}/runner-button.inputs" event_after)
+    run_movie(2 "${OUT}/runner-button.inputs" event_repeat)
+    if(NOT no_movie_before_frame STREQUAL event_before_frame OR
+       NOT no_movie_before_state STREQUAL event_before_state)
+      message(FATAL_ERROR "an input scheduled for frame 2 changed the frame-1 state")
+    endif()
+    if(NOT no_movie_after_frame STREQUAL empty_movie_frame OR
+       NOT no_movie_after_state STREQUAL empty_movie_state)
+      message(FATAL_ERROR "an empty input movie changed the no-input run")
+    endif()
+    if(NOT no_movie_after_frame STREQUAL event_after_frame)
+      message(FATAL_ERROR "input changed the content-free frame hash")
+    endif()
+    if(no_movie_after_state STREQUAL event_after_state)
+      message(FATAL_ERROR "the event-frame input did not change the saved latched state")
+    endif()
+    if(NOT event_after_output STREQUAL event_repeat_output)
+      message(FATAL_ERROR "replaying the same input movie changed its hashes")
+    endif()
+  elseif(CASE STREQUAL "inputs_controls")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    function(accept_input_movie name contents frames result_name)
+      set(path "${OUT}/runner-input-${name}.txt")
+      file(CONFIGURE OUTPUT "${path}" NEWLINE_STYLE UNIX CONTENT "${contents}")
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state --inputs "${path}"
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame ${frames} sha256 ${digits}" OR
+         NOT out MATCHES "state sha256 ${digits}")
+        message(FATAL_ERROR "valid input '${name}': expected exit 0 and frame/state hashes, "
+          "got exit ${rc}\n${out}${err}")
+      endif()
+      set(${result_name} "${out}" PARENT_SCOPE)
+    endfunction()
+    function(refuse_input_movie name contents)
+      set(path "${OUT}/runner-input-${name}.txt")
+      file(CONFIGURE OUTPUT "${path}" NEWLINE_STYLE UNIX CONTENT "${contents}")
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash --hash-state --inputs "${path}"
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "2" OR NOT out STREQUAL "" OR NOT err MATCHES "invalid input movie" OR
+         NOT err MATCHES "usage")
+        message(FATAL_ERROR "invalid input '${name}': expected bounded usage refusal before output, "
+          "got exit ${rc}\n${out}${err}")
+      endif()
+    endfunction()
+    string(CONCAT endpoints "# controller endpoints\r\n"
+      "1000000 p1=dualshock:.:0,255,0,255 p2=.\r\n"
+      "1 p1=dualshock:UDLRSsTOXQ1234<>M:0,255,0,255 p2=digital:UDLRSsTOXQ1234:128,128,128,128 # frame one\r\n")
+    accept_input_movie(endpoints "${endpoints}" 1 endpoints_output)
+    string(CONCAT duplicate "2 p1=dualshock:X:128,128,128,128 p2=.\n"
+      "2 p1=dualshock:X:128,128,128,128 p2=.\n")
+    accept_input_movie(duplicate "${duplicate}" 2 duplicate_output)
+    if(NOT duplicate_output MATCHES "frame 2 sha256 ${digits}")
+      message(FATAL_ERROR "an identical same-frame record was not accepted")
+    endif()
+    refuse_input_movie(frame_zero "0 p1=. p2=.\n")
+    refuse_input_movie(frame_over "1000001 p1=. p2=.\n")
+    refuse_input_movie(frame_overflow "4294967295 p1=. p2=.\n")
+    refuse_input_movie(port_zero "1 p0=. p2=.\n")
+    refuse_input_movie(port_three "1 p1=. p3=.\n")
+    refuse_input_movie(port_order "1 p2=. p1=.\n")
+    refuse_input_movie(device "1 p1=analog:.:128,128,128,128 p2=.\n")
+    refuse_input_movie(button_symbol "1 p1=digital:Z:128,128,128,128 p2=.\n")
+    refuse_input_movie(button_repeat "1 p1=digital:XX:128,128,128,128 p2=.\n")
+    string(ASCII 233 non_ascii)
+    refuse_input_movie(non_ascii "1 p1=digital:${non_ascii}:128,128,128,128 p2=.\n")
+    refuse_input_movie(axis_low "1 p1=dualshock:.:-1,128,128,128 p2=.\n")
+    refuse_input_movie(axis_high "1 p1=dualshock:.:256,128,128,128 p2=.\n")
+    refuse_input_movie(axis_encoding "1 p1=dualshock:.:1x,128,128,128 p2=.\n")
+    refuse_input_movie(missing_axis "1 p1=dualshock:.:128,128,128 p2=.\n")
+    string(CONCAT conflicting_frame "2 p1=dualshock:X:128,128,128,128 p2=.\n"
+      "2 p1=dualshock:.:128,128,128,128 p2=.\n")
+    refuse_input_movie(conflicting_frame "${conflicting_frame}")
+    string(CONCAT late_invalid "1 p1=dualshock:X:128,128,128,128 p2=.\n"
+      "2 p1=dualshock:.:999,128,128,128 p2=.\n")
+    refuse_input_movie(late_invalid "${late_invalid}")
+    refuse(--frames 1 --inputs)
+    refuse(--frames 1 --inputs "${OUT}/runner-input-endpoints.txt" --inputs "${OUT}/runner-input-endpoints.txt")
+    expect_exit(1 "cannot read input movie" --frames 1 --inputs "${OUT}/runner-input-missing.txt")
   elseif(CASE STREQUAL "no_args")
     refuse()
   elseif(CASE STREQUAL "unknown")
     # An option this release does not have, and --help or --version with
     # anything else.
-    refuse(--frames 1 --bios)
     refuse(--frames 1 --disc x.cue)
     refuse(--frames 1 --help)
     refuse(--version --frames 1)
@@ -124,10 +375,10 @@ if(CMAKE_SCRIPT_MODE_FILE)
     refuse(--no-stop-on-fault)
     refuse(--frames 1 --no-stop-on-fault)
   elseif(CASE STREQUAL "exe_missing")
-    # A file that is not there, or is not a PS-EXE, exits 1 naming the file
-    # and the reason; no frame runs.
-    expect_exit(1 "schwaystation-run: [^\n]*missing[.]exe: cannot (open|read)" --exe "${OUT}/missing.exe")
-    expect_exit(1 "schwaystation-run: [^\n]*tests[.]cmake: PS-EXE invalid" --exe "${CMAKE_CURRENT_LIST_FILE}"
+    # A file that is not there, or is not a PS-EXE, exits 1 with a generic
+    # reason; private file paths are not echoed and no frame runs.
+    expect_exit(1 "schwaystation-run: input: cannot (open|read)" --exe "${OUT}/missing.exe")
+    expect_exit(1 "schwaystation-run: input: PS-EXE invalid" --exe "${CMAKE_CURRENT_LIST_FILE}"
       --tty)
   elseif(CASE STREQUAL "positional")
     # This release loads no disc, so a file name is a usage error.
@@ -265,7 +516,9 @@ endforeach()
 add_executable(schwaystation-test-runner
   ${CMAKE_CURRENT_LIST_DIR}/test_png.c
   ${PROJECT_SOURCE_DIR}/runner/png.c
-  ${PROJECT_SOURCE_DIR}/runner/crc32.c)
+  ${PROJECT_SOURCE_DIR}/runner/crc32.c
+  ${PROJECT_SOURCE_DIR}/runner/frame_hash.c
+  ${PROJECT_SOURCE_DIR}/runner/sha256.c)
 target_include_directories(schwaystation-test-runner PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-runner PRIVATE schwaystation::schwaystation
   schwaystation-host)
@@ -285,13 +538,33 @@ schway_add_test(NAME runner.xrgb8888
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-runner> xrgb8888
   LABELS portable runner TIMEOUT 10)
 
+foreach(case rgb24 video_bounds native_hash)
+  schway_add_test(NAME runner.${case}
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-runner> ${case}
+    LABELS portable runner TIMEOUT 10)
+endforeach()
+
+string(REPLACE ";" "|" runner_emulator_bars "${CMAKE_CROSSCOMPILING_EMULATOR}")
 set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
-  "-DEMULATOR=${runner_emulator}")
+  "-DEMULATOR=${runner_emulator_bars}")
 
 # Fault prevented: a state hash that is unstable, malformed or blind to the frames run, so devices
 # a test-card frame cannot show are not compared across lanes.
 schway_add_test(NAME runner.hash_state
   COMMAND ${runner_check} -DCASE=hash_state -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: a movie applied after the frame latch, rejected after execution starts, or
+# changes the content-free frame instead of the serialized latched input state.
+schway_add_test(NAME runner.inputs.script
+  COMMAND ${runner_check} -DCASE=inputs_script -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: malformed frame, port, button, axis, ordering, or encoding values reaching the core.
+schway_add_test(NAME runner.inputs.controls
+  COMMAND ${runner_check} -DCASE=inputs_controls -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: the reference PNG the RetroArch screenshot is compared
@@ -325,11 +598,12 @@ set_target_properties(schwaystation-test-bench PROPERTIES
 schway_warnings(schwaystation-test-bench)
 
 add_executable(schwaystation-test-run-stop ${SCHWAYSTATION_RUNNER_SOURCES})
-target_include_directories(schwaystation-test-run-stop PRIVATE ${SCHWAYSTATION_RUNNER_INCLUDE})
+target_include_directories(schwaystation-test-run-stop PRIVATE ${SCHWAYSTATION_RUNNER_INCLUDE}
+  ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-run-stop PRIVATE schwaystation::schwaystation
   schwaystation-host)
 target_compile_definitions(schwaystation-test-run-stop PRIVATE _POSIX_C_SOURCE=200809L
-  SCHWAY_RUN_RAISE_AT=5)
+  SCHWAY_RUN_RAISE_AT=5 SCHWAY_RUN_TEST_HOOKS=1 SCHWAY_HOST_CARD_TESTING=1)
 set_target_properties(schwaystation-test-run-stop PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-run-stop)
@@ -341,6 +615,11 @@ set(bench_check ${runner_check} -DUNIT=$<TARGET_FILE:schwaystation-test-bench>)
 schway_add_test(NAME runner.bench.percentile
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-bench> percentile
   LABELS bench portable runner TIMEOUT 10)
+
+# Fault prevented: hostile guest terminal control bytes reaching the user's terminal.
+schway_add_test(NAME runner.tty_sanitize
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-bench> tty_sanitize
+  LABELS portable runner TIMEOUT 10)
 
 # Fault prevented: a bench report missing a line, out of order or not in
 # whole units, so a script reading it misreads the times.
@@ -360,6 +639,16 @@ schway_add_test(NAME runner.stop
   COMMAND ${bench_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
     -DEXPECTED=${SCHWAYSTATION_TESTCARD_SHA256_FRAME5} -DCASE=stop -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: completed card generations are not flushed on normal exit or after a clean
+# SIGTERM, or an unchanged slot is needlessly replaced.
+set(runner_cards_check ${runner_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
+  -DEXPECTED=${SCHWAYSTATION_TESTCARD_SHA256_FRAME5} -DOUT=${PROJECT_BINARY_DIR}/tests)
+foreach(case controls persistence sigterm)
+  schway_add_test(NAME runner.cards.${case}
+    COMMAND ${runner_cards_check} -DCASE=cards_${case} -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS portable runner TIMEOUT 60)
+endforeach()
 
 # Fault prevented: a runner that exits 0 after failing to write a file, or
 # calls a failure a usage error.

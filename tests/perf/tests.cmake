@@ -8,11 +8,12 @@
 # only in the CI perf job.
 if(CMAKE_SCRIPT_MODE_FILE STREQUAL CMAKE_CURRENT_LIST_FILE)
   set(today 2026-01-02)
+  set(fixture testcard)
 
   # Runs the gate in mode with ARGN; requires exit code and output matching regex.
   function(gate code mode regex)
     set(ENV{SCHWAYSTATION_PERF_MODE} ${mode})
-    set(CMD ${CMAKE_COMMAND} -DFIXTURE=testcard -DTODAY=${today} ${ARGN} -P "${SCRIPT}")
+    set(CMD ${CMAKE_COMMAND} -DFIXTURE=${fixture} -DTODAY=${today} ${ARGN} -P "${SCRIPT}")
     set(CODE ${code})
     set(REGEX "${regex}")
     include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../cmake/expect_fail.cmake)
@@ -52,6 +53,10 @@ if(CMAKE_SCRIPT_MODE_FILE STREQUAL CMAKE_CURRENT_LIST_FILE)
     # mode read as report.
     gate(1 report "perf: error BASE1" -DHEAD=1000000 -DBASE1= -DBASE2=1000000 ${empty})
     gate(1 "" "perf: error SCHWAYSTATION_PERF_MODE" -DHEAD=1000000 ${base} ${empty})
+  elseif(CASE STREQUAL "gpu_motion_slow")
+    # Fault prevented: a deliberately slower CPU/GPU workload accepted by its separate row.
+    set(fixture gpu_motion)
+    gate(1 gate "delta_bp=101 verdict=FAIL" -DHEAD=1010100 ${base} ${empty})
   else()
     message(FATAL_ERROR "perf tests: unknown CASE '${CASE}'")
   endif()
@@ -62,7 +67,7 @@ set(perf_dir ${CMAKE_BINARY_DIR}/perf)
 file(WRITE ${perf_dir}/empty.txt "# no exceptions\n")
 file(WRITE ${perf_dir}/current.txt "testcard 300 2026-02-01 a reviewed slowdown\n")
 file(WRITE ${perf_dir}/expired.txt "testcard 300 2026-01-01 a reviewed slowdown\n")
-foreach(case allowed identical missing no_base plus_1_00 plus_1_01 unstable)
+foreach(case allowed gpu_motion_slow identical missing no_base plus_1_00 plus_1_01 unstable)
   schway_add_test(NAME perf.gate.${case}
     COMMAND ${CMAKE_COMMAND} -DSCRIPT=${CMAKE_CURRENT_LIST_DIR}/../cmake/perf_compare.cmake
       -DDIR=${perf_dir} -DCASE=${case} -P ${CMAKE_CURRENT_LIST_FILE}

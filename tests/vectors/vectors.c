@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "schwaystation.h"
 #include "internal.h"
 
@@ -120,7 +122,7 @@ static uint32_t rd32(const uint8_t *p)
 /* The whole file, with a NUL after the last byte. */
 static uint8_t *read_file(const char *name, size_t *len)
 {
-    FILE *f = fopen(name, "rb");
+    FILE *f = schway__test_open_file(name, "rb");
     if (f == NULL) {
         return NULL;
     }

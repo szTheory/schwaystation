@@ -1,0 +1,53 @@
+# Phase 04 Plan 47 Checkpoint
+
+Status: **complete**. The final outcome is recorded in [04-47-SUMMARY.md](04-47-SUMMARY.md). This checkpoint preserves the earlier interim findings; its old eight-advance limit and unclassified image differences are superseded by the completed 24-advance comparison and exact capture results.
+
+Runtime: Codex/OpenGSD 1.20.0, `gpt-6-luna` xhigh. The phase branch is `phase/04-games-play-in-retroarch`.
+
+## Completed at this checkpoint
+
+- Generalized `cmake/GPUReferences.cmake` to select and stage the nine requested build-158 GPU cases from the already verified archive. The selected cases and CTest rows are byte-sorted; the existing PNG adapter and full-word RGB555 judge are reused. `tests/gpu/allow.txt` has no source-supported variants; no observed pixels were admitted.
+- Verified fetched executables, PNGs, and inspected caller sources belong to release tag `build-158`, commit `5f73d61b27a8d51269b54dde1c456d2d2f7dc865`. All nine case-source blobs match the earlier source pin. This identity check is required before using source progress or PCs to justify capture bounds.
+- Fixed GP0(01h) cache invalidation: PSX-SPX documents that it invalidates both texture and CLUT caches. The focused `gpu.transfer.cache_contract` test first failed the new CLUT refresh assertions against the old code, then passed after the minimal fix. The original `clut-cache` hardware image now passes at zero tolerance.
+- Kept the original captured pixels, fixed per-case bounds, and raw RGB decoding unchanged. The transparency source audit found that build-158 clears all VRAM and the current fill operation follows the documented fill model; it did not establish a fill defect.
+- Corrected triangle coverage/interpolation from the independently capture-backed integer-origin, signed 12.12 model. Directed regressions cover the captured top-edge decision, midpoint conversion, width-6 UV slope, clipping, winding, spans, and hostile coordinates. The original `quad`, `triangle`, and `uv-interpolation` captures now all match exactly at their original fixed bounds; their PNGs/goldens were not changed.
+- The source/capture identity lesson is durable: derive bounds and completion witnesses only after verifying the executable, PNG, and inspected guest source are from the same release (or proving byte-equivalent blobs). The release-tag source for build-158 is `5f73d61b27a8d51269b54dde1c456d2d2f7dc865`.
+
+## Capture outcomes
+
+Historical capture outcomes at checkpoint time, before the final reviewed renderer and judge changes. See 04-47-SUMMARY.md for the completed results:
+
+| Case | Fixed advances | Result |
+|---|---:|---|
+| lines | 1 | 135 differences; first index 21678, expected `0000`, actual `7fff` |
+| rectangles | 2 | 2,288 differences; first index 40, expected `2751`, actual `5398`; this first-pass state is not comparable to the capture |
+| transparency | 1 | 447,488 differences, exactly all pixels outside 320×240; expected white, actual black |
+| quad | 1 | exact match after integer-origin coverage correction |
+| triangle | 1 | exact match after integer-origin coverage and capture-backed 12.12 interpolation correction |
+| uv-interpolation | 2 | exact match after capture-backed 12.12 interpolation correction |
+| texture-overflow | 2 | exact match |
+| vram-to-vram-overlap | 8 | **capture completion still unestablished at the fixed image-comparison bound**; 34,390 observed differences cannot be classified |
+| clut-cache | 2 | exact match after the GP0(01h) fix |
+
+For overlap, no-fault tick progress alone is insufficient evidence of completion. Plan 04-58 implemented and tested the registered B0(19h)/B0(17h) IRQ0 hook path. Its separate one-shot progress witness found that eight advances completed 10,633 of the source's 27,657 individual 1×1 uploads, so 04-58 used a fixed 24-advance caller-progress allowance derived from the measured upload throughput plus the 147 VRAM-copy operations and VSync margin. At 24 advances, the verified build-158 guest completed all 27,657 uploads, all 147 copies (21 each at sizes 2, 8 and 15, 84 at size 16), then repeatedly read its VSync counter and serviced further IRQ0 callbacks. The first IRQ still records Cause `0x400`, EPC `0x8001103c`; each observed IRQ entered the registered JmpBuf RA, acknowledged `I_STAT` bit 0 in the guest callback, and returned to its interrupted PC. This proves caller progress, not pixel agreement. The separate GPU-reference image comparison remains fixed at eight advances; its 34,390 observed differences remain unclassified and owned by 04-47.
+
+The coordinator's independent read-only audit of `rectangles` found that build-158 clears to white once and then repeats its draw/VSync loop. At `(40,0)` the raw foreground is `2751`; the first mode-0 semi-transparent blend over white is `5398`, matching this core's observed first pass. The capture's mode anchors (`0=foreground`, `1=7fff`, `2=0000`, `3=7fff`) reflect converged repeated draws. This is a capture-state mismatch, not a proven renderer defect; establish a source-derived fixed repeat count or fixed-point endpoint after IRQ/VSync delivery, without frame hunting.
+
+The root's independent `triangle`, `quad`, and `uv-interpolation` models explain the original differences without changing any capture bytes: integer sample origins reproduce exact coverage for all three; the triangle and UV sources additionally support signed 12.12 vertex-anchored attribute slopes, truncation toward zero, and a half-unit bias before channel conversion. The selected C model reproduces all 524,288 words for each unchanged capture. Directed CTests for the changed contract passed 18/18, and `gpu.testcard.pixels` passed. These captures validate the model against these programs; they do not establish the GPU's physical internal precision for every input.
+
+The retained executable is `build/nightly/gpu-reference/gpu/rectangles/rectangles.exe`; expected raw words are `build/nightly/gpu-reference/rectangles-vram.rgb555le`. The first fixed run completed two advances (618,346 ticks) without a fault, but that bound stops before the repeated-draw fixed point represented by the capture.
+
+## Verification commands
+
+- `cmake --preset nightly` — exit 0.
+- `cmake --build --preset nightly --target schwaystation-run schwaystation-test-gpu-reference` — exit 0.
+- `ctest --test-dir build/nightly -R '^gpu\.reference\.(lines|rectangles|transparency|quad|triangle|uv-interpolation|texture-overflow|vram-to-vram-overlap|clut-cache)$' --no-tests=error --output-on-failure --parallel 4` — exit 8; one match, eight initial mismatches before the CLUT fix.
+- `ctest --test-dir build/ci -R '^gpu\.transfer\.cache_contract$' --output-on-failure` — exit 8 before the fix (the two new GP0(01h) CLUT assertions failed), then exit 0 after the fix.
+- `cmake --build --preset nightly --target schwaystation-test-gpu-reference` — exit 0 after the fix.
+- `ctest --test-dir build/nightly -R '^gpu\.reference\.clut-cache$' --output-on-failure` — exit 0 after the fix; exact captured image.
+- `ctest --test-dir build/ci -R '^gpu\.triangle\.(flat_packet|vertex_plane|gouraud_textured|texture_page_clut|clip_interpolation|flag_matrix|equal_gouraud|uv_negative_wrap|quad_attributes|split_state|hostile_slope|channel_midpoint|horizontal_spans|vertical_spans|clip_windows|extreme_coordinates|offscreen_rejection|instances)$' --no-tests=error --output-on-failure --parallel 4` — exit 0; 18 directed tests passed after the raster correction.
+- `ctest --test-dir build/nightly -R '^gpu\.reference\.(quad|triangle|uv-interpolation)$' --no-tests=error --output-on-failure --parallel 3` — exit 0; all three original captures match exactly at the unchanged bounds.
+- `ctest --test-dir build/ci -R '^gpu\.testcard\.pixels$' --no-tests=error --output-on-failure` — exit 0.
+- `git diff --check` — exit 0.
+
+No broad CI or hygiene workflow was run at this checkpoint. Those remain required after the final plan 47 source changes.

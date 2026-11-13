@@ -337,6 +337,54 @@ static void trap_bd(uint32_t word, uint32_t code)
 static void syscall_epc(void)
 {
     trap_epc(SYSCALL_WORD, 8u);
+
+    /* BIOS code may repair the return address, then revisit the same trap.
+       The real JR/RFE return to EPC + 4 is observable progress even though
+       the next exception has the same EPC and ExcCode. */
+    schway *inst = make();
+    inst->cpu.pc = CODE;
+    put(inst, CODE, SYSCALL_WORD);
+    put(inst, CODE + 4u, 0x08000000u | ((CODE >> 2) & 0x03FFFFFFu));
+    put(inst, CODE + 8u, NOP_WORD);
+    put(inst, VECTOR_RAM, MFC0_WORD(1u, SCHWAY__COP0_EPC));
+    put(inst, VECTOR_RAM + 4u, NOP_WORD);
+    put(inst, VECTOR_RAM + 8u, ITYPE(0x09u, 1u, 1u, 4u));
+    put(inst, VECTOR_RAM + 12u, JR_WORD(1u));
+    put(inst, VECTOR_RAM + 16u, RFE_WORD);
+    for (uint32_t i = 0u; i < 1001u; i++) {
+        next(inst); /* SYSCALL */
+        next(inst); /* MFC0 EPC */
+        next(inst); /* MFC0 delay slot */
+        next(inst); /* ADDIU EPC + 4 */
+        next(inst); /* JR */
+        next(inst); /* RFE in the return delay slot */
+        next(inst); /* jump back to the SYSCALL */
+        next(inst); /* branch delay slot */
+    }
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_HEX(inst->cpu.pc, CODE);
+    schway_destroy(inst);
+
+    /* Returning to EPC is not progress. Keep exercising the actual handler
+       path and retain the bounded-loop fault at the existing threshold. */
+    inst = make();
+    inst->cpu.pc = CODE;
+    put(inst, CODE, SYSCALL_WORD);
+    put(inst, VECTOR_RAM, MFC0_WORD(1u, SCHWAY__COP0_EPC));
+    put(inst, VECTOR_RAM + 4u, NOP_WORD);
+    put(inst, VECTOR_RAM + 8u, JR_WORD(1u));
+    put(inst, VECTOR_RAM + 12u, RFE_WORD);
+    for (uint32_t i = 0u; i < SCHWAY__EXC_LOOP_LIMIT; i++) {
+        next(inst); /* SYSCALL */
+        next(inst); /* MFC0 EPC */
+        next(inst); /* MFC0 delay slot */
+        next(inst); /* JR EPC */
+        next(inst); /* RFE in the return delay slot */
+    }
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_EXCEPTION_LOOP);
+    CHECK_EQ_U64(inst->fault.note, SCHWAY__EXC_LOOP_LIMIT);
+    CHECK_EQ_HEX(inst->cpu.pc, CODE);
+    schway_destroy(inst);
 }
 
 /* Fault prevented: a SYSCALL in a delay slot whose EPC names the slot, so the
@@ -459,6 +507,27 @@ static void ibe_unmapped_fetch(void)
     CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM);
     CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_UNMAPPED_FETCH);
     schway_destroy(inst);
+
+    /* User mode may fetch only from KUSEG. KSEG0, KSEG1 and the BIOS window
+       all raise a guest AdEL before touching the bus; the vector handler runs
+       in kernel mode and can accept each exception without a first fault. */
+    static const uint32_t forbidden[] = {0x80001000u, 0xA0001000u, 0xBFC00000u};
+    for (size_t i = 0u; i < sizeof forbidden / sizeof forbidden[0]; i++) {
+        inst = make();
+        put(inst, VECTOR_RAM, NOP_WORD);
+        inst->cpu.cop0.r[SCHWAY__COP0_SR] = 0x00000002u;
+        inst->cpu.cop0.r[SCHWAY__COP0_BADVADDR] = 0x0BADC0DEu;
+        step(inst, forbidden[i]);
+        CHECK_EQ_U64(exc_code(inst), 4u);
+        CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_EPC), forbidden[i]);
+        CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_BADVADDR), forbidden[i]);
+        CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        next(inst);
+        CHECK_EQ_HEX(inst->cpu.pc, VECTOR_RAM + 4u);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        schway_destroy(inst);
+    }
 }
 
 /* When an interrupt and an exception of the instruction itself fall on the same

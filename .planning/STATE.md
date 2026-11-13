@@ -2,20 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 4
+current_phase: 04
 current_phase_name: Games play in RetroArch
-status: planning
-stopped_at: Phase 3 complete, ready to plan Phase 4
-last_updated: "2026-11-10T14:56:33.076Z"
-last_activity: 2026-11-10
-last_activity_desc: "Phase 3 shipped as PR #12"
-state_head: 52cda5d7880e739ed824e3aa16e897cfa32ca13e
+current_plan: 58 of 58
+status: completed
+stopped_at: Phase 4 verified; stopped before $gsd-ship 4 under AGENTS rule 9; Phase 5 not started
+last_updated: "2026-11-13T14:04:55.325Z"
+last_activity: 2026-11-13
+last_activity_desc: "Phase 04 ship PR #14 created; auto-merge after required CI. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0."
+state_head: b1c9f21c117866bcc5891aa5c6bc720240a3e321
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 68
-  completed_plans: 68
-  percent: 33
+  completed_phases: 4
+  total_plans: 126
+  completed_plans: 126
+  percent: 67
 ---
 
 # Project State
@@ -25,21 +26,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 03 — The GTE matches the hardware cases; DMA and timers
+**Current focus:** Phase 04 — Games play in RetroArch
 
 ## Current Position
 
-Phase: 4 — Games play in RetroArch
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-10 -- Phase 3 shipped as PR #12
+Phase: 04 — Games play in RetroArch — VERIFIED
+Current Plan: 58 of 58
+Status: Verified; stopped before ship. No human verification remains. The owner acts next with `$gsd-ship 4`; Phase 5 has not started.
+Last activity: 2026-11-13 -- Phase 04 ship PR #14 created; auto-merge after required CI. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0.
 
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 68
+- Total plans completed: 126
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -50,6 +51,7 @@ Progress: [███░░░░░░░] 33%
 | 1 | 15 | - | - |
 | 02 | 27 | - | - |
 | 3 | 26 | - | - |
+| 4 | 58 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -128,6 +130,64 @@ Progress: [███░░░░░░░] 33%
 | Phase 03 P22 | 4min | 2 tasks | 10 files |
 | Phase 03 P23 | 6 min | 2 tasks | 7 files |
 | Phase 03 P25 | 7 min | 2 tasks | 32 files |
+| Phase 04 P01 | 16 min | 3 tasks | 14 files |
+| Phase 04 P02 | 32 min | 3 tasks | 13 files |
+| Phase 04 P03 | 47min | 2 tasks | 20 files |
+| Phase 04 P04 | 34min | 2 tasks | 6 files |
+| Phase 04 P05 | 39min | 2 tasks | 9 files |
+| Phase 04 P06 | 20min | 2 tasks | 8 files |
+| Phase 04 P07 | 24min | 2 tasks | 7 files |
+| Phase 04 P08 | 38min 51s+ (lower bound; includes restart gap) | 2 tasks | 13 files |
+| Phase 04 P09 | 59 min | 2 tasks | 23 files |
+| Phase 04 P10 | 16min | 2 tasks | 24 files |
+| Phase 04 P14 | 47min | 3 tasks | 17 files |
+| Phase 04 P11 | 100min | 2 tasks | 17 files |
+| Phase 04 P15 | 58min | 2 tasks | 11 files |
+| Phase 04 P12 | 74min+ | 2 tasks | 10 files |
+| Phase 04 P16 | 44 min | 2 tasks | 18 files |
+| Phase 04 P13 | 1h 11m | 2 tasks | 16 files |
+| Phase 04 P33 | 35min | 2 tasks | 9 files |
+| Phase 04 P34 | 28 min | 2 tasks | 8 files |
+| Phase 04 P17 | 23min | 2 tasks | 7 files |
+| Phase 04 P35 | 29min | 2 tasks | 6 files |
+| Phase 04 P18 | 27 min | 2 tasks | 7 files |
+| Phase 04 P36 | 41 min | 2 tasks | 7 files |
+| Phase 04 P19 | 29 min | 2 tasks | 5 files |
+| Phase 04 P20 | 40min | 2 tasks | 21 files |
+| Phase 04 P37 | 49min | 2 tasks | 6 files |
+| Phase 04 P38 | 51min | 2 tasks | 14 files |
+| Phase 04 P21 | 44min | 2 tasks | 9 files |
+| Phase 04 P22 | 106min | 2 tasks | 20 files |
+| Phase 04 P39 | 1h 15m | 2 tasks | 7 files |
+| Phase 04 P23 | 24 min | 2 tasks | 5 files |
+| Phase 04 P50 | 17 min | 2 tasks | 5 files |
+| Phase 04 P51 | 22min | 2 tasks | 10 files |
+| Phase 04 P52 | 18m 38s | 2 tasks | 9 files |
+| Phase 04 P53 | 45min | 2 tasks | 8 files |
+| Phase 04 P40 | 4h 28m | 2 tasks | 7 files |
+| Phase 04 P27 | at least 20 min (start unavailable after compaction) | 2 tasks | 8 files |
+| Phase 04 P24 | 35 min | 2 tasks | 11 files |
+| Phase 04 P41 | 23min | 2 tasks | 7 files |
+| Phase 04 P43 | 31min | 2 tasks | 5 files |
+| Phase 04 P25 | 37min | 2 tasks | 8 files |
+| Phase 04 P49 | 38min | 2 tasks | 7 files |
+| Phase 04 P42 | 40min | 2 tasks | 16 files |
+| Phase 04 P26 | 86min | 2 tasks | 11 files |
+| Phase 04 P28 | 92 min | 2 tasks | 5 files |
+| Phase 04 P44 | 50min | 2 tasks | 5 files |
+| Phase 04 P45 | 45min | 2 tasks | 11 files |
+| Phase 04 P54 | 40 min | 2 tasks | 7 files |
+| Phase 04 P55 | 17min | 2 tasks | 2 files |
+| Phase 04 P56 | 16 min | 2 tasks | 6 files |
+| Phase 04 P30 | at least 19 min; executor start unavailable after recovery | 2 tasks | 5 files |
+| Phase 04 P46 | 96 min | 2 tasks | 20 files |
+| Phase 04 P57 | 47min | 2 tasks | 6 files |
+| Phase 04 P58 | 86 min | 2 tasks | 22 files |
+| Phase 04 P47 | 125 min | 2 tasks | 13 files |
+| Phase 04 P48 | not measured (checkpointed execution) | 2 tasks | 16 files |
+| Phase 04 P31 | not measured (checkpointed execution) | 2 tasks | 9 files |
+| Phase 04 P29 | not measured (checkpointed execution) | 2 tasks | 26 files |
+| Phase 04 P32 | not measured (checkpointed execution) | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -261,15 +321,175 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-22: test and fixture comments cite docs/hardware pages and headings; the stub keeps PSX-SYSTEM sections 7 and 9
 - [Phase 03]: 03-23: the preparation sections that docs/hardware pages replace keep their headings, Sources rows and the C3 to C6 and 5.A choice paragraphs, with the corrections phase 3 found stated in each
 - [Phase 03]: 03-25: todos 016 and 017 bind to SEED-007 (no later first caller), 014 to the phase 4 System.dat plan; every phase-2 review finding is fixed (WR-06, IN-01) or deferred with one todo (025-029, 032-037)
+- [Phase 04]: GPU smoke cases reuse the existing core test executable; a GPU-specific executable belongs to its first behavior implementation plan.
+- [Phase 04]: SIO, card, compatibility, and built-input registration seams start with empty inventories until real behavior tests exist.
+- [Phase 04]: User-mode kernel fetches reuse the data-access permission check to raise guest AdEL before bus access.
+- [Phase 04]: Saved Cause.IP2 is validated against serialized I_STAT and I_MASK before state application.
+- [Phase 04]: An RFE return to a taken branch target past EPC resets the non-interrupt exception-loop count; same-EPC and interrupt paths retain it.
+- [Phase 04]: The bounded GPU word-entry path serves CPU MMIO and future DMA callers.
+- [Phase 04]: API v4 adds a read-only native VRAM span while preserving API v1-v3 callers.
+- [Phase 04]: GPU save-state validation checks candidate parser fields before applying state.
+- [Phase 04]: Copies process source and destination coordinates in row-major order, making overlap reads observe earlier writes in the same packet.
+- [Phase 04]: Texture and CLUT cache data is instance-owned and serialized; GP0(01h) clears texture entries and GP1(01h) invalidates the CLUT row.
+- [Phase 04]: Cache behavior is a deterministic model contract for rendering and is not described as hardware-measured.
+- [Phase 04]: Reserved texture depth three follows the direct fifteen-bit model and remains a documented model rule.
+- [Phase 04]: Primitive callers decide dither eligibility; rectangles and raw textured semi-transparent polygons do not acquire dither.
+- [Phase 04]: Blend width and truncation remain doc/derived until a hardware capture distinguishes the internal arithmetic.
+- [Phase 04]: Use 64-bit integer area and edge setup, normalize winding, and assign exact-edge samples with a top-left rule.
+- [Phase 04]: Reject offset-applied spans above 1023 by 511 before clipping; retain inclusive E3/E4 edges.
+- [Phase 04]: Split quads into triangles (1,2,3) then (2,3,4) and write each covered pixel immediately through the shared helper.
+- [Phase 04]: Store Gouraud and UV attributes as signed 32-bit 16.16 steps, using wider setup and wide evaluation when a step is unrepresentable.
+- [Phase 04]: Treat 16.16 rounding as the deterministic model; hardware precision awaits plan 30 pinned capture comparison.
+- [Phase 04]: Advance attributes from original geometry when clipping polygon spans.
+- [Phase 04]: Plan 04-08: GPU v0 uses additive profile flag value 4; default remains v2 and frozen API v1-v3 callers remain unchanged.
+- [Phase 04]: Plan 04-08: Odd-UV/odd-width rectangle sampling remains uncharacterized pending plan 30 pinned capture comparison.
+- [Phase 04]: GPU beam catch-up uses instance-owned rational carry and deadline scheduling; dot IRQs do not poll each dot or recurse into the scheduler.
+- [Phase 04]: Loaded-content frame completion is driven by beam wrap, while the reset-resistant public-call ceiling and no-content test-card path remain independent.
+- [Phase 04]: Keep no-content test-card scanout and pinned output separate from guest-programmed GPU scanout.
+- [Phase 04]: Use one bounded native video validator for runner hashing, PNG output, and host conversion.
+- [Phase 04]: Leave libretro dynamic geometry notifications and public runner documentation to plans 04-27 and 04-32.
+- [Phase 04]: Keep byte completion, pad ACK assertion, and ACK release at separate scheduler ticks; keep card timing distinct.
+- [Phase 04]: Store SIO and pad state per instance and serialize it through the existing visitor without changing API or state format revisions.
+- [Phase 04]: Leave GAME-03 partial until DualShock, card, host-input, and integrated gameplay plans complete their behavior.
+- [Phase 04]: Keep state format 4 and scalar nodes_done shape; store linked-list counts in each channel's remain slot.
+- [Phase 04]: Treat busy DMA sync-mode-3 rewrites as a derived fail-closed policy because console behavior is unmeasured.
+- [Phase 04]: Accept valid DMA phases 0 through 5 and reject only out-of-range phases and invalid cross-field links.
+- [Phase 04]: Keep the approved API at version 4 and preserve frozen v1-v3 callers while appending host input and result fields.
+- [Phase 04]: Keep pending host input outside save states; serialize frame-latched controller input and in-flight protocol state.
+- [Phase 04]: 04-12: Keep dot totals derived from documented beam rates and line lengths; correct CPU sampling cadence using the PAL /4 endpoint trace.
+- [Phase 04]: 04-12: Put GPU-motion frame and continuation-state hashes into the portable lane artifacts, including be32.
+- [Phase 04]: API v4 memory and card names remain additive under the unreleased v4 policy; frozen v1-v3 callers remain unchanged.
+- [Phase 04]: Card bytes and generations stay outside ordinary states; only in-flight card protocol state is serialized.
+- [Phase 04]: Card ACK and Read pause timing are deterministic model values, not new physical hardware measurements.
+- [Phase 04]: Measure gpu_motion against the same fixture at an explicit control commit; preserve the separate test-card ceiling.
+- [Phase 04]: Use frames 10 through 60 for gpu_motion after the original hosted Cachegrind window exceeded its job budget.
+- [Phase 04]: Keep all required CI lanes and retain a provisional five-minute perf-job timeout based on measured successful runs.
+- [Phase 04]: SIO card writes stage payload per slot and commit only at terminal 47h; failures and interruption preserve committed bytes and generation.
+- [Phase 04]: Keep the unreleased API, state format, and behavior revision at 4; preserve frozen v1-v3 callers.
+- [Phase 04]: Accept raw imports up to the fixed image size, pad the suffix with FFh, and reject all invalid or late imports before mutation.
+- [Phase 04]: Keep persistent card bytes and generations out of ordinary states while validating pending transport before state application.
+- [Phase 04]: Use exclusive sibling temp names and fail without mutation if all 64 candidates are occupied.
+- [Phase 04]: Card files remain host-owned; the core does not read files or resolve save paths.
+- [Phase 04]: Content basename is the default card save-name source; validated serial naming is optional.
+- [Phase 04]: Keep the runner's input-file I/O outside the emulator core and validate the entire script before execution.
+- [Phase 04]: Use one-based frame records with explicit digital or DualShock devices, documented button symbols, and left-X/left-Y/right-X/right-Y axes.
+- [Phase 04]: Keep API revision 4 and preserve the no-content frame hash; the saved state hash proves latched input reached the core.
+- [Phase 04]: Use the guest SIO0 path and GPUREAD mailbox records to prove that scheduled input changes actual counter pixels.
+- [Phase 04]: Poll every other VBlank so runner lag totals remain observable while mailbox peeks run each frame.
+- [Phase 04]: Default card basenames come from the executable content name, or schwaystation for a content-free run; serial naming requires the caller to provide a validated serial.
+- [Phase 04]: The runner saves a slot only after a successful card Write advances its generation; signal handlers only request a stop.
+- [Phase 04]: Save states store BIOS loaded state and SHA-256 identity, not BIOS bytes, and reject a different image before mutation.
+- [Phase 04]: Public SHA-256 image identity remains separate from the DAT-based retail recognition planned in 04-38.
+- [Phase 04]: Normalize formatted blank-card sector value A0h to visible slot counters 1 and 2, then increment each saved slot independently.
+- [Phase 04]: Wait for 117 guest VBlanks so the mailbox and selected frame-120 capture complete under the runner's 120-frame cap.
+- [Phase 04]: BIOS recognition matches the pinned DAT MD5 rows; SHA-1 remains metadata, public SHA-256 is independent, and unknown images stay loadable.
+- [Phase 04]: Keep firmware-size and content-marker checks inside the existing release firmware scanner gate.
+- [Phase 04]: Generate synthetic digest keys and content-marker samples only in build-directory fixtures.
+- [Phase 04]: Use the upstream-supported OPENBIOS_SHELL=shell target with pinned nugget source and Linux GCC; no custom standard-library overlay is needed.
+- [Phase 04]: Raise the be32 job timeout to seven minutes based on the expanded 433-test suite; the exact-head lane completed in 6m09s with all tests retained.
+- [Phase 04]: Keep OpenBIOS transfer in a one-day current-run artifact; consumers verify expected size and SHA-256 before use, with no cross-run cache or package/publication path.
+- [Phase 04]: Preserve distinct empty-input, repeated-held, and three-edge guest proofs at frame 300; reuse the existing one-edge pin instead of repeating a redundant guest run.
+- [Phase 04]: Runner BIOS recognition follows the image digest, never the filename; exact-size unknown images remain loadable.
+- [Phase 04]: The runner rejects simultaneous --bios and --exe selectors and preserves the BIOS-free PS-EXE stub-kernel path.
+- [Phase 04]: Synthetic BIOS fixtures are generated only under the build directory; actual OpenBIOS shell observation is deferred to plan 04-40.
+- [Phase 04]: Accept only source-identified width-one writes to physical 1F802041h as ignored POST status, preserving EXP2 gap faults and existing debug-port behavior.
+- [Phase 04]: Keep API, state and behavior revision 4; model only exact halfword ATTR readback as saved instance state.
+- [Phase 04]: Derive DMA4 RAM-to-device readiness from saved ATTR bits 5-4 equal to mode 2; keep manual DREQ credits independent.
+- [Phase 04]: Keep the deterministic sink, existing unit cost and serialized DMA fields; no new state layout or revision is needed.
+- [Phase 04]: Plan 04-53: save one GPU field-status phase because bit 13 retains its value after IRS is disabled; expose v2 bit 13 and mask v0.
+- [Phase 04]: Plan 04-53: preserve the fixed 263/314-line beam model and document unmodeled physical-field timing instead of claiming exact timeline parity.
+- [Phase 04]: Pin NTSC-U frame 240 because it is the earliest independently inspected frame with a clearly recognizable cube shell.
+- [Phase 04]: Make the shell test a CTest fixture setup for runner.hashes_file so tuple provenance is fresh in each run.
+- [Phase 04]: Require OpenBIOS only at consumer execution time and reuse the existing comparison helper for portable refusal controls.
+- [Phase 04]: Plan 04-27: default no-content loads keep the test card; selected BIOS images apply only to no-content boot, while PS-EXE content always uses the stub.
+- [Phase 04]: Plan 04-27: validate EXE structure before refusing valid late loads to preserve frozen API error statuses.
+- [Phase 04]: Compatibility rows use (serial, MD5, predicate) keys; fresh fixture rows and statuses must match in both directions.
+- [Phase 04]: Ratchet accepts an optional prior ledger; protected PR-base capture and artifact plumbing remain in plan 04-41.
+- [Phase 04]: Compatibility allowances identify behavior revision 4 and expire within an inclusive maximum 60-day window.
+- [Phase 04]: Resumed plan task-order deviation: remaining Task 1 judge/docs and Task 2 controls landed together after the preserved RED and partial GREEN commits; no second RED or history rewrite.
+- [Phase 04]: Protected compatibility baseline is selected from the exact pull-request base SHA; only both artifacts absent selects introduction.
+- [Phase 04]: Preserve the exact sparse base checkout in RUNNER_TEMP before head checkout so workspace cleanup cannot remove the protected judge.
+- [Phase 04]: Native libretro video uses the shared bounded converter for RGB555 and packed RGB24 before host callbacks.
+- [Phase 04]: SET_GEOMETRY is sent only when dimensions change, and SET_SYSTEM_AV_INFO only when the rate changes.
+- [Phase 04]: Plan 04-25 probes direct raw ISO9660 metadata only; CUE and track modes remain with 04-49.
+- [Phase 04]: Plan 04-25 reports boot and play as unavailable and never starts the core or submits sectors.
+- [Phase 04]: The synthetic track SHA-1 is computed independently by CMake; production identity reuses the existing MD5 implementation.
+- [Phase 04]: Keep CUE parsing in the runner's host-only probe; it does not execute a disc or add CD-ROM behavior.
+- [Phase 04]: Cap each CUE sheet at 64 KiB, tracks and total indexes at 99, relative FILE names at 255 bytes, and companion image bytes together at 1 GiB.
+- [Phase 04]: Preserve boot_status and play_status as unavailable because the probe only reports identity.
+- [Phase 04]: Expose a disc serial, boot MD5, physical track-1 SHA-1 and DAT title only for an exact passing metadata.identity ledger row.
+- [Phase 04]: Keep boot_status and play_status unknown; the probe does not execute a disc.
+- [Phase 04]: Use the pinned libretro-database PlayStation DAT only as an attributed title source; do not vendor it or add a package.
+- [Phase 04]: Keep test metadata arguments in a dedicated non-installed test runner and require an isolated root and marker file.
+- [Phase 04]: The local library and isolated tests share the production runner metadata lookup path.
+- [Phase 04]: Unknown and unlisted discs remain private, and boot/play remain unavailable until measured by a disc backend.
+- [Phase 04]: The approved Phase 4 repository-check ceiling is 2700 lines; plan 04-26 measures 2448 lines with all checks retained.
+- [Phase 04]: Keep libretro controller-family selection separate from the DualShock digital/analog wire protocol.
+- [Phase 04]: Use independent serialized-state references per controller family and prove full analog packet/axis behavior with a separate real guest.
+- [Phase 04]: Deliver both ports’ strong and weak rumble reports once per frame with exact scaling and lifecycle clearing.
+- [Phase 04]: The frontend owns card-one .srm writes; libretro exposes the stable SAVE_RAM span and does not write the file.
+- [Phase 04]: Card two uses GET_SAVE_DIRECTORY and the canonical content basename, with atomic persistence gated by a changed successful-write generation.
+- [Phase 04]: Memory descriptors map existing RAM and scratchpad spans with explicit aliases and are cleared with adapter lifetime.
+- [Phase 04]: Keep disk-control, cheats, save states, and subsystem claims false until their behavior exists.
+- [Phase 04]: Advertise PSEXE only after the shared loader passes a case-varied PSEXE fixture.
+- [Phase 04]: Back the input-descriptor claim with assertions for all mappings and their callback lifetime.
+- [Phase 04]: Preserve repository CI defaults and use an ignored four-job preset for local bounded verification.
+- [Phase 04]: Keep GAME-03, GAME-06 and GAME-07 acceptance pending until their full hosted/runtime evidence is available.
+- [Phase 04]: Validate the local OpenBIOS handoff, then place it at the test integration's expected binaryDir path before configuring a temporary workflow preset.
+- [Phase 04]: Use independently captured reference extents to poison movie active pixels; invalid extents retain full-buffer fallback.
+- [Phase 04]: Treat the byte reduction as measured work only; runtime improvement and timeout causality require hosted timing.
+- [Phase 04]: Use one file-local, NULL-initialized fopen_s/fopen helper at all five host disc-probe binary opens while preserving error behavior.
+- [Phase 04]: Keep fixture production available to selected ASan/fuzz libretro consumers while the selected inventory controls standalone test registration.
+- [Phase 04]: Hash all 1024x512 VRAM words after clearing bit 15 and serializing each word low byte first.
+- [Phase 04]: Keep the PNG reference decoder synthetic-only; extend it for indexed 4-bit and dynamic-DEFLATE captures before 04-46 runs its captured clipping oracle.
+- [Phase 04]: The selected capture adapter uses host Python standard-library features only and emits build-tree RGB555LE pixels for the ten pinned PNGs.
+- [Phase 04]: The clipping judge accepts a FRAME or a no-fault progressing BUDGET stop and compares the fixed whole-VRAM golden.
+- [Phase 04]: The test BIOS stub supports SYS(01h)/SYS(02h) with SWMB precedence and keeps reset-installed entry bytes stable.
+- [Phase 04]: An ignored local CMake user preset caps CTest at four jobs while tracked and hosted defaults remain unchanged.
+- [Phase 04]: 04-58: Keep the overlap image comparison at eight advances; the separate caller-progress witness uses a source-derived 24-advance allowance after eight advances completed 10,633 of 27,657 uploads.
+- [Phase 04]: 04-58: IRQ callback, acknowledgement, return and VSync progress do not establish pixel agreement; the 34,390 overlap image differences remain with checkpointed 04-47.
+- [Phase 04]: Exact GPU allowance variants are tied to the reviewed executable SHA-256 as well as their exact pixel rules and use counts.
+- [Phase 04]: Overlapping VRAM copies use bounded 16-word read batches as a capture-backed model; the selected batch size is not claimed as physical hardware width.
+- [Phase 04]: The rectangle and overlap comparisons use fixed 32- and 24-advance bounds supported by source work and caller-progress evidence.
+- [Phase 04]: Keep all ten GPU captures and three real logs in a required exact-head hosted lane.
+- [Phase 04]: Use project-owned GPU contracts and vetted hardware references; exclude the forbidden GPL helper.
+- [Phase 04]: Extend the existing replay infrastructure with independent hostile-input state and memory assertions.
+- [Phase 04]: Use the existing hosted RetroArch driver to compare two distinct BIOS-free frames against runner references.
+- [Phase 04]: Correct stale plan metadata to the actual tests/retroarch/verify.py comparator.
+- [Phase 04]: Exercise every included API v4 addition with a strict registered caller and retain frozen v1-v3 callers.
+- [Phase 04]: Document retail BIOS supply, the MIT OpenBIOS CI stand-in and distinct runner/libretro card naming behavior.
 
 ### Pending Todos
-
-22 pending tooling/seed todos live in `.planning/todos/pending/`. Ship owns the
-gate-budget ratchet (018, completed at ship); the next test-helper caller in phase 2 plan 1 owns
-WR-01 (023). The CI tail completed the Windows ARM64 timeout sample (024),
-using the observed 198 s overrun and 10 successful ARM64 samples. Existing todos
-retain their bound plans and seed dispositions.
-
+- [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
+- [2026-10-20] [general] "Port the release floor check (release.floor)" — [todo file](.planning/todos/pending/002-release-floor-gate.md)
+- [2026-10-20] [general] "Port the pins file check (policy.pins)" — [todo file](.planning/todos/pending/003-pins-gate.md)
+- [2026-10-20] [general] "Port the single version source check (release.single_version_source)" — [todo file](.planning/todos/pending/004-single-version-source-gate.md)
+- [2026-10-20] [general] "Port the notice checks (policy.notices and release.notices)" — [todo file](.planning/todos/pending/005-notices-gates.md)
+- [2026-10-20] [general] "Port the vendored-file digest check (libretro.vendored)" — [todo file](.planning/todos/pending/006-vendored-digest-gate.md)
+- [2026-10-20] [general] "Add the Dependabot configuration" — [todo file](.planning/todos/pending/010-dependabot-config.md)
+- [2026-10-20] [general] "Add the Dependabot auto-merge workflow" — [todo file](.planning/todos/pending/011-dependabot-automerge-workflow.md)
+- [2026-10-20] [general] "Port the Dependabot auto-merge decision check" — [todo file](.planning/todos/pending/012-dependabot-gate.md)
+- [2026-10-20] [general] "Port the test-only key check" — [todo file](.planning/todos/pending/014-no-test-entries-gate.md)
+- [2026-10-20] [general] "Add the weekly digest workflow" — [todo file](.planning/todos/pending/015-digest-workflow.md)
+- [2026-10-20] [general] "Add the formatting check (hygiene.format)" — [todo file](.planning/todos/pending/016-hygiene-format-gate.md)
+- [2026-10-20] [general] "Add the static analyzer check (hygiene.analyzer)" — [todo file](.planning/todos/pending/017-hygiene-analyzer-gate.md)
+- [2026-10-20] [general] "Teach a local actionlint run the runner labels and queue key the workflows use" — [todo file](.planning/todos/pending/021-actionlint-local-config.md)
+- [2026-10-20] [general] "Triage the one-off install.consumer.dll_crt failure on windows-x64" — [todo file](.planning/todos/pending/022-windows-dll-crt-consumer-flake.md)
+- [2026-11-10] [general] "Raise an address error for a user-mode instruction fetch outside KUSEG" — [todo file](.planning/todos/pending/025-user-mode-fetch-address-error.md)
+- [2026-11-10] [general] "Validate r0 and the COP0 registers when a state loads" — [todo file](.planning/todos/pending/026-state-load-cop0-and-r0-validation.md)
+- [2026-11-10] [general] "Keep a valid cached word when a later refill word bus-errors" — [todo file](.planning/todos/pending/027-icache-refill-bus-error-word.md)
+- [2026-11-10] [general] "Stop the exception-loop heuristic reporting a guest that makes progress" — [todo file](.planning/todos/pending/028-exception-loop-progress-heuristic.md)
+- [2026-11-10] [general] "Zero the vector harness case record and reject doubly covered store bytes" — [todo file](.planning/todos/pending/033-vector-harness-uninitialised-record.md)
+- [2026-11-10] [general] "Reject a long file stem in the SST slice tool" — [todo file](.planning/todos/pending/035-sst-slice-name-field.md)
+- [2026-11-10] [general] "Refuse schway_load_exe on an instance that has already run" — [todo file](.planning/todos/pending/036-load-exe-after-run.md)
+- [2026-11-10] [general] "Decide the bus contract for SWL and SWR and pin it with a test" — [todo file](.planning/todos/pending/037-swl-swr-single-bus-write.md)
+- [2026-11-10] [general] "Model the two-instruction write-to-use latency of MTC2, CTC2 and LWC2" — [todo file](.planning/todos/pending/038-gte-write-to-use-latency.md)
+- [2026-11-10] [general] "The DMA fault record uses addr and opcode like every other fault kind" — [todo file](.planning/todos/pending/042-dma-fault-record-fields.md)
+- [2026-11-10] [general] "Share the register-lane helpers" — [todo file](.planning/todos/pending/044-lane-helpers-shared.md)
+- [2026-11-10] [general] "Put the ISC permission text in the src/gte.c header" — [todo file](.planning/todos/pending/046-gte-file-header-notice.md)
+- [2026-11-10] [general] "Select the 40-clock CD-ROM DMA cost from the CD-ROM delay setting" — [todo file](.planning/todos/pending/047-cd-dma-40-clock-cost.md)
+- [2026-11-10] [general] "Split long GPU pixel test cases" — [todo file](.planning/todos/pending/048-split-gpu-pixel-test-cases.md)
+- [2026-11-11] [general] "Review runner and checkpoint repeats against existing frame and state output" — [todo file](.planning/todos/pending/049-review-runner-checkpoint-repeats.md)
 ### Blockers/Concerns
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
@@ -321,19 +541,159 @@ come from `AGENTS.md`.
 
 | 2026-11-10 | /gsd-ship 3; renewed /gsd-autonomous for remaining milestone | Codex, OpenGSD 1.20.0; inline shipping and hosted CI; next autonomous phase stops before ship | GPT-6 (session; exact model ID not exposed) |
 
+| 2026-11-10 | /gsd-discuss-phase 4 via /gsd-autonomous | Codex, OpenGSD 1.20.0; three parallel advisors and combined adversarial pass | GPT-6 (session; exact model ID not exposed); advisors gpt-6-luna at xhigh |
+
+| 2026-11-10 | /gsd-plan-phase 4 research | Codex, OpenGSD 1.20.0; independent researcher handoff recovered after a stalled write; pins rechecked by orchestrator | gpt-6-luna at xhigh; orchestrator GPT-6 (session) |
+
+| 2026-11-10 | /gsd-plan-phase 4 complete | Codex, OpenGSD 1.20.0; 32 plans, focused revision, independent check/recheck passed; literal command repair verified | planner gpt-6.1-sol high; checkers gpt-6-luna xhigh; orchestrator GPT-6 (session) |
+
+| 2026-11-10 | /gsd-execute-phase 4 via /gsd-autonomous | Codex, OpenGSD 1.20.0; sequential typed executors in approved shared checkout | gpt-6-luna xhigh; orchestrator GPT-6 (session) |
+| 2026-11-11 | /gsd-execute-plan 04-13 | Codex, OpenGSD 1.20.0; sequential executor with hosted workflow dispatch, fixes, and plan bookkeeping | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-02 | Codex, OpenGSD 1.20.0; sequential executor | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-03 | Codex, OpenGSD 1.20.0; sequential executor in shared checkout | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-04 | Codex, OpenGSD 1.20.0; sequential executor in shared checkout | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-05 | Codex, OpenGSD 1.20.0; sequential executor, review follow-up, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-06 | Codex, OpenGSD 1.20.0; sequential executor, flat polygon implementation, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-07 | Codex, OpenGSD 1.20.0; sequential executor, polygon interpolation tests, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-08 (recovered after daemon restart) | Codex, OpenGSD 1.20.0; sequential executor, line/polyline and rectangle spans, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-09 | Codex, OpenGSD 1.20.0; sequential executor, beam/timer integration, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-10 | Codex, OpenGSD 1.20.0; sequential executor, native GPU scanout and RGB24 runner conversion, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-14 | Codex, OpenGSD 1.20.0; sequential executor, scheduled SIO0 digital polling, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-11 | Codex, OpenGSD 1.20.0; sequential executor, GPU DMA2 integration, DMA validation, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-10 | /gsd-execute-phase 4 plan 04-15 | Codex, OpenGSD 1.20.0; sequential executor, input/rumble tracer CI, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-12 | Codex, OpenGSD 1.20.0; sequential executor, GPU-motion and beam-timing fixtures, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | Phase 04 execution-evidence replan at safe boundary | Codex, OpenGSD 1.20.0; planning-only sizing/dependency/source-coverage check, sequential/no worktrees | gpt-6.1-sol high |
+
+| 2026-11-11 | Phase 04 focused sizing-warning revision | Codex, OpenGSD 1.20.0; focused verification commands, preserved required oracle/hosted evidence | gpt-6.1-sol high |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-16 | Codex, OpenGSD 1.20.0; sequential executor in shared checkout; full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-33 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-34 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; card import/state validation, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-17 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; raw card host helper, focused and full CI, hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-35 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; legacy card wrappers, canonical save names, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-37 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; guest card persistence, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-21 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; firmware scanner and archive controls, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-22 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; pinned OpenBIOS output 524288 bytes/SHA-256 verified, digest corruption refused; CI run 43069874480 passed, including WASI and 433 be32 tests; local CI/hygiene passed | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-39 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; same-run OpenBIOS handoff with digest-checked consumers, corruption/missing refusal, local CI/hygiene, and exact-head hosted CI | gpt-6-luna xhigh |
+
+| 2026-11-11 | /gsd-execute-phase 4 plan 04-23 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; synthetic runner BIOS reset proof, CLI edge tests, local CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | Phase 04 source-owned POST boot-blocker re-slice | Codex, OpenGSD 1.20.0; pinned source/bus-width review, planning-only dependency and coverage update | gpt-6.1-sol high |
+
+| 2026-11-11 | /gsd-execute-plan 04-50 | Codex, OpenGSD 1.20.0; sequential executor, source-specific POST bus fix, RED/GREEN, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | Phase 04 source-owned ATTR first-caller planning | Codex, OpenGSD 1.20.0; minimal bus/reset/state ownership and primary-source review; planning-only ordering/coverage update | gpt-6.1-sol high |
+
+| 2026-11-11 | /gsd-execute-plan 04-51 | Codex, OpenGSD 1.20.0; sequential executor, exact ATTR readback with RED/GREEN, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | Phase 04 DMA4 first-caller planning | Codex, OpenGSD 1.20.0; actual DMA credit/ATTR/state/deadline review, planning-only source slice and ordering | gpt-6.1-sol high |
+
+| 2026-11-11 | /gsd-execute-plan 04-52 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; ATTR-derived DMA4 request path, RED/GREEN controls, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-11 | Phase 04 GPUSTAT first-caller planning | Codex, OpenGSD 1.20.0; current primary status evidence, approved minimal saved phase, planning-only ordering/coverage update | gpt-6.1-sol high |
+
+| 2026-11-11 | /gsd-execute-plan 04-53 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; GPUSTAT saved-phase latch, RED/GREEN, full CI and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-12 | /gsd-execute-plan 04-40 | Codex, OpenGSD 1.20.0; sequential executor in shared phase checkout; inspected shell frame 240, portable selector/refusal controls, full CI/hygiene and exact-head hosted CI | gpt-6-luna xhigh |
+
+| 2026-11-12 | /gsd-execute-plan 04-24 (incomplete checkpoint) | Codex, OpenGSD 1.20.0; sequential executor; measured ledger/schema GREEN subset, scratch ratchet/docs sizing and refusal controls; plan remains incomplete | GPT-6 (session; exact model ID not exposed) |
+| 2026-11-12 | /gsd-execute-plan 04-27 | Codex, OpenGSD 1.20.0; sequential executor; PS-EXE libretro loading, no-content BIOS selection, full CI and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | Phase 04 approved gate-budget implementation | Codex, OpenGSD 1.20.0; concrete 2300-line ceiling and approval record, no plan advance | GPT-6 (session; exact model ID not exposed) |
+| 2026-11-12 | /gsd-execute-plan 04-24 (resumed after approval) | Codex, OpenGSD 1.20.0; sequential shared-checkout execution; compatibility ratchet/docs, full CI and hygiene; preserved task-order deviation recorded | gpt-6-luna xhigh |
+| 2026-11-12 | /gsd-execute-plan 04-41 | Codex, OpenGSD 1.20.0; sequential executor; protected base judge and controls, full CI and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | /gsd-execute-plan 04-43 | Codex, OpenGSD 1.20.1; sequential executor in shared phase checkout; native RGB555/RGB24 adapter conversion, geometry/rate edge tests, full CI and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | /gsd-execute-plan 04-26 incomplete resource checkpoint | Codex/OpenGSD; complete library candidate and ordinary-mode/BIN proof preserved off-tree; no plan advance | executor gpt-6-luna xhigh; coordinator GPT-6 session |
+| 2026-11-12 | /gsd-execute-plan 04-26 resumed after approved budget update | Codex, OpenGSD 1.20.0; sequential shared checkout; applied candidate, focused library cases, full CI, hygiene and plan closeout | gpt-6-luna xhigh |
+| 2026-11-12 | Phase 04 complete-code budget approval implementation | Codex/OpenGSD; concrete 2700-line ceiling, preserved proposal and renewed efficiency authority; no plan advance | GPT-6 session |
+| 2026-11-12 | /gsd-execute-plan 04-28 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; per-port controller mapping, family-specific guest movies, analog DualShock and both-port rumble proof, full CI/release checks and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | /gsd-execute-plan 04-44 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; libretro card persistence and memory descriptors, full CI/release checks and hygiene | gpt-6-luna xhigh |
+| 2026-11-12 | /gsd-execute-plan 04-45 | Codex, OpenGSD 1.20.1; sequential shared-checkout execution; metadata truth guard, PSEXE host proof, input-descriptor assertions, bounded four-job CI/release checks, and hygiene | gpt-6-luna xhigh |
+
+| 2026-11-12 | Phase 04 source-owned hosted portability prerequisite planning | Codex, OpenGSD 1.20.0; 29 checkpoint preserved, two focused prerequisite plans, no execution advance | gpt-6.1-sol high |
+
+| 2026-11-12 | /gsd-execute-plan 04-54 | Codex/OpenGSD; sequential shared checkout; strict compiler portability, inventory-owned compatibility registration and emulator argument forwarding; 509/509 local CI tests, package/release 5/5; hygiene CTest log 23 passed with outer exit unrecorded; hosted acceptance pending | executor gpt-6-luna xhigh; planner gpt-6.1-sol high; checker gpt-6-luna xhigh |
+
+| 2026-11-12 | /gsd-execute-plan 04-55 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded movie active-pixel poison canaries, measured byte work, 509 CI tests, package/release 5/5, hygiene 23/23; hosted timing pending combined run | gpt-6-luna xhigh |
+
+| 2026-11-12 | /gsd-execute-plan 04-54 post-closeout follow-up | Codex/OpenGSD; sequential shared checkout; canonicalized drive-rooted CMake paths, retained `.exe` runner names and refusal controls; focused `compat.library` tests 2/2 passed; native Windows CI pending | gpt-6-luna xhigh |
+
+| 2026-11-12 | Phase 04 second hosted-run source prerequisite planning | Codex, OpenGSD 1.20.0; focused 04-56 and downstream DAG/checkpoint bookkeeping only; no execution advance or source/test run | gpt-6.1-sol high |
+
 ## Session Continuity
 
-Last session: 2026-11-10T08:23:44.047Z
-Stopped at: Phase 3 complete, ready to plan Phase 4
+Last session: 2026-11-13T10:23:16.153Z
+Stopped at: Phase 4 verified; before `$gsd-ship 4` (AGENTS rule 9). Owner acts next; Phase 5 is not started.
 Resume file: None
+Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 
-Ship PR: https://github.com/szTheory/schwaystation/pull/12 (phase 3)
+Phase 4 ship PR: not created; required boundary remains in force.
+Phase 3 ship PR: https://github.com/szTheory/schwaystation/pull/12
 Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8
 Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Next: `/gsd-ship 3` (PR title `feat: match the GTE hardware cases and add DMA and timers`), then from a shell
-`gh pr merge --auto --squash`, confirm a CI run on the head commit (the hosted asan, be32, wasm32, nofp, perf and
-eight-lane hash-equality jobs are confirmed there, not locally), and confirm the release pull request is green after the
-merge. Then `/gsd-discuss-phase 4`.
-After phase 3 shipping and release confirmation, continue `/gsd-autonomous --from 4`; stop at the next phase's pre-ship boundary (AGENTS rule 9). Standing preferences are in `.planning/AUTONOMOUS.md`.
+Phase 3 merged as PR #12; release PR #13 is green and merged. v0.3.0 is latest with 19 assets.
+Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
+Next: the owner invokes `$gsd-ship 4`. That step creates the PR, then normal auto-merge and release confirmation precede Phase 5. No routine UAT is required. Standing preferences are in `.planning/AUTONOMOUS.md`. Historical recovery notes below do not supersede this verified boundary.
+
+### Independent local work during immutable CI (2026-11-12)
+
+Codex coordinator / inherited parent model: plan29 explicitly acknowledged monitor-only ownership of run43321926969 at ea3ec542, with no active local command or source/shared metadata work. Plan30's edge to29 was sequencing only; its existing VRAM/runner/PNG interfaces and other prerequisites are complete, and its GPU inventory/runner-main/doc source paths do not overlap the monitor. Remove only that edge and run30 as the single local writer. Plan29 metadata closeout waits for the safe writer handoff; this old-head run does not verify30 or replace final current-source verification. Actual progress remains49/56 summaries until another terminal summary exists.
+
+### Hardware-reference writer handoff (2026-11-12)
+
+Codex coordinator / inherited parent model: plan30 returned terminal complete at3bdad2b; actual progress50/56 summaries, next ordinal51. Plan29 explicitly retains monitor-only ownership of the Windows diagnostic and /tmp findings with no local source/shared metadata writes. Plan46 is the sole local writer using the evidence-backed host-Python input-adapter/C per-word-comparison seam. Old dispatched CI/diagnostic heads do not verify46 or replace final current-source verification.
+
+### Remaining GPU capture writer handoff (2026-11-13)
+
+Codex coordinator / inherited parent model: plan46 returned terminal complete at eb93663; actual progress51/56 summaries, next ordinal52. Plan29 explicitly retains monitor-only ownership of targeted Windows run43345311739 at f502338 and has no active local command/source/shared metadata writes. Plan47 is the sole local writer using46's independently checked adapter and C word-comparison path, with per-guest source-supported fixed bounds. Old dispatched runs do not verify47 or replace final current-source verification.
+
+### Focused registered IRQ prerequisite application (2026-11-13)
+
+The source-owned first caller is the exact build-158 overlap program: IRQ0 interrupts upload before completion because its B0(19) hook is not dispatched. Independently checked plans57/58 split the measured45–60-minute implementation/validation scope into two25–30-minute forecasts. Context remains guest RAM; valid SWMB, unregistered exceptions, SYS1/2 and original reset-installed slots remain intact. Chain46→57→58→47→48→31→32 preserves all other dependencies and leaves47/29 incomplete. Actual physical summary count stays51; only denominator changes56→58. Stable production review is staged at8c3bdcb with a file fingerprint; its reported findings require disposition before final phase verification.
+
+### Daemon recovery after the registered IRQ tracer (2026-11-13)
+
+The previous agents ended at restart; current source commits and the interrupted57 summary were preserved. Native summary checks and source digest confirm the recorded7-case tracer result still belongs to this source. Native counters advanced once to52/58, next ordinal53; no completed source work was repeated. Root coordinates directly from here. Plan58 is the next sole writer, followed by47/48/31/32 and29 acceptance. Source review precedes final verification; stop before ship4.
+
+Both retained stable-review defects have real failing caller proofs and isolated native repair candidates. Card candidate: /private/tmp/phase4-card-fix/READY.md (two files, registered card regression, state/API compatibility checks). Region candidate: /private/tmp/phase4-region-fix (adapter, host regression and embedding prose; native lifecycle RED/GREEN and NTSC/PAL host checks passed). Fixed instance profiles survive reset, so the authorized region repair defers selection until next content load and says Reload content to apply; live input options remain live. No new API, allocation layer or content cache. Neither candidate is applied yet; review/check base fingerprints at the safe source handoff.
+
+Staged stable review was corrected: BIOS identity binding already exists; the initial claim read phase-start bus.c. Retained transient error04 and runtime region-loss claims have independent runtime RED. Fresh08 metadata, card bytes and generation stay receiver-owned. Final changed-source review remains required. The earlier local RetroArch LaunchServices denial remains a safety stop; no bypass or foreground test is authorized by recovery.
+
+### Independent hostile-input integration after58
+
+Codex primary / GPT-6 session integrated the prepared31 test-only candidate after58's terminal handoff; worker gpt-6-luna xhigh. The registered GPU/SIO/card plus unchanged loader cases pass with the full project warning flags. At that checkpoint 53/58 summaries remained and plan31 acceptance awaited plan48 and shared hosted evidence; that status was superseded by the closure below. See04-31-CHECKPOINT.md for the focused commands.
+
+### Phase 4 remaining-plan closure (2026-11-13)
+
+Plans48,31,29 and32 summaries are now recorded; phase progress is58/58 and the native state is ready for phase verification. Exact-head hosted run [43404686338](https://github.com/szTheory/schwaystation/actions/runs/43404686338) succeeded on `2f839fd29819d3d32a7ade8f0348db8fc6a1b1c5`, including the required GPU reference lane, Windows/native matrix, WASM, BE32 (492/492), ASan, RetroArch frames59/60 with an empty system directory, and the aggregate required check. Runtime/model for this closure: Codex/OpenGSD1.20.0, gpt-6-luna xhigh. Exact active duration across the checkpointed plans was not recoverable; summaries record that rather than estimate. The verifier owns the remaining goal-backward report. Stop after phase verification before phase4 ship or phase5.
+
+### Final Phase 4 verification boundary (2026-11-13)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor and verifier gpt-6-luna xhigh; primary GPT-6 session (exact model ID not exposed). All 58 summaries are present; native verification.status exits 0 with passed, no human items or gaps. Hosted run https://github.com/szTheory/schwaystation/actions/runs/43404686338 is completed/success on tested source 2f839fd; later changes are planning metadata only. Native phase.complete exits 0; the automatic Phase 5 pointer was restored to the required before-ship Phase 4 boundary.
+
+The phase-completion summary scanner emitted advisory missing-path warnings for historical temporary RED reports, upstream-only paths, moved completed todos, literal command strings and the historical compare.c name. These are not missing delivered behavior: the verifier checked every current plan artifact and the real target/caller wiring. Preserve the command evidence; do not add files, repeat broad suites or rewrite historical evidence to satisfy that heuristic.
+
+Efficiency corrections are durable in AUTONOMOUS.md: bring real oracles into the first runnable slices, batch independent prepared consumers before final CI, reuse reviewed source fingerprints, configure the focused GPU lane without the CPU corpus, and stop an obsolete known-failed CI tail after collecting useful results. All required coverage remains.

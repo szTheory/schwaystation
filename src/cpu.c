@@ -23,6 +23,14 @@ static const char name_irq_stamp[] = "cpu.irq_stamp";
 static const char name_icache_tag[] = "cpu.icache_tag";
 static const char name_icache_word[] = "cpu.icache_word";
 static const char name_icache_valid[] = "cpu.icache_valid";
+static const uint32_t state_sr_writable = 0xF04FFF3Fu;
+static const uint32_t state_cause_stored = 0xF000FF7Cu;
+
+static uint32_t state_word(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
+           ((uint32_t)p[3] << 24);
+}
 
 /* General registers, HI and LO are 0 and the program counter is the BIOS
    entry: the machine starts at BFC00000h (ARCHITECTURE section 7,
@@ -60,10 +68,23 @@ void schway__cpu_reset(schway *inst)
 uint64_t schway__cpu_state_io(struct schway__state_io *io, schway *inst)
 {
     struct schway__cpu *c = &inst->cpu;
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        uint32_t r0 = state_word(io->r);
+        schway__state_check(io, r0 == 0u);
+    }
     schway__state_u32_array(io, name_r, c->r, 32u, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_hi, &c->hi, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_lo, &c->lo, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_pc, &c->pc, 0u, UINT32_MAX);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        uint32_t sr = state_word(io->r + 12u * 4u);
+        uint32_t cause = state_word(io->r + 13u * 4u);
+        uint32_t prid = state_word(io->r + 15u * 4u);
+        schway__state_check(io, (sr & ~state_sr_writable) == 0u);
+        schway__state_check(io, (cause & ~state_cause_stored) == 0u);
+        schway__state_check(io, prid == 2u);
+        io->cpu_cause = cause;
+    }
     schway__state_u32_array(io, name_cop0, c->cop0.r, 32u, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_load_reg, &c->load_reg, 0u, SCHWAY__CPU_NO_LOAD);
     (void)schway__state_u32(io, name_load_value, &c->load_value, 0u, UINT32_MAX);
@@ -124,10 +145,13 @@ uint32_t schway__cpu_icache_fetch(schway *inst, uint32_t vaddr, uint32_t *word, 
     struct schway__fault held = inst->fault;
     for (uint32_t k = w + 1u; k < 4u; k++) {
         uint32_t sink = 0u;
-        if (schway__bus_fetch(inst, base + 4u * k, &c->icache_word[line][k], &sink) != 0) {
+        uint32_t refill = 0u;
+        if (schway__bus_fetch(inst, base + 4u * k, &refill, &sink) != 0) {
+            c->icache_valid[line] = (uint8_t)(c->icache_valid[line] & ~(1u << k));
             inst->fault = held;
             break;
         }
+        c->icache_word[line][k] = refill;
         c->icache_valid[line] = (uint8_t)(c->icache_valid[line] | (1u << k));
         *cycles += 1u;
     }
@@ -188,8 +212,8 @@ static void trace_push(schway *inst, uint32_t event, uint64_t cycle, uint32_t pc
    lets one instruction run before the next offer, so the loop always advances. */
 uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
 {
-    uint64_t room = inst->frame_end - inst->ticks;
-    uint64_t limit = cycles < room ? cycles : room;
+    uint64_t limit = cycles;
+    uint64_t starting_frame = inst->frame;
     uint64_t ran = 0u;
     uint32_t stop = SCHWAY_STOP_BUDGET;
     /* The copy is chosen here, once for the whole call. */
@@ -198,6 +222,10 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
     while (ran < limit) {
         if (inst->sched.next <= inst->ticks) {
             schway__sched_run(inst);
+            if (inst->frame != starting_frame) {
+                stop = SCHWAY_STOP_FRAME;
+                break;
+            }
         }
         uint64_t left = limit - ran;
         uint64_t until = inst->sched.next > inst->ticks ? inst->sched.next - inst->ticks : 1u;
@@ -218,6 +246,10 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
             inst->gte.ready = inst->gte.ready > wait ? inst->gte.ready - wait : 0u;
             ran += wait;
             schway__sched_sync(inst);
+            if (inst->frame != starting_frame) {
+                stop = SCHWAY_STOP_FRAME;
+                break;
+            }
             continue;
         }
         ran += block(inst, left < until ? left : until);
@@ -233,6 +265,10 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
         }
         if ((flags & SCHWAY_RUN_STOP_ON_FAULT) != 0u && inst->fault.kind != SCHWAY__FAULT_NONE) {
             stop = SCHWAY_STOP_FAULT;
+            break;
+        }
+        if (inst->frame != starting_frame) {
+            stop = SCHWAY_STOP_FRAME;
             break;
         }
     }

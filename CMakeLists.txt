@@ -78,16 +78,20 @@ endfunction()
 add_library(schwaystation_instance OBJECT
   src/instance.c
   src/frame.c)
+add_library(schwaystation_bios OBJECT src/bios.c)
 add_library(schwaystation_bus OBJECT
   src/bus.c
   src/irq.c)
 add_library(schwaystation_cpu OBJECT
   src/cpu.c
   src/cop0.c)
+add_library(schwaystation_gpu OBJECT src/gpu.c src/gpu_pixel.c src/gpu_triangle.c src/gpu_span.c)
 add_library(schwaystation_gte OBJECT src/gte.c)
 add_library(schwaystation_dma OBJECT src/dma.c)
 add_library(schwaystation_timers OBJECT src/timers.c)
 add_library(schwaystation_sched OBJECT src/sched.c)
+add_library(schwaystation_sio OBJECT src/sio.c src/pad.c)
+add_library(schwaystation_card OBJECT src/card.c)
 add_library(schwaystation_exe OBJECT
   src/exe.c
   src/stub_kernel.c)
@@ -95,25 +99,32 @@ add_library(schwaystation_testcard OBJECT src/testcard.c)
 add_library(schwaystation_state OBJECT
   src/state.c
   src/crc32.c)
+add_library(schwaystation_sha256 OBJECT runner/sha256.c runner/md5.c)
 add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_instance>
+  $<TARGET_OBJECTS:schwaystation_bios>
   $<TARGET_OBJECTS:schwaystation_bus>
   $<TARGET_OBJECTS:schwaystation_cpu>
+  $<TARGET_OBJECTS:schwaystation_gpu>
   $<TARGET_OBJECTS:schwaystation_gte>
   $<TARGET_OBJECTS:schwaystation_dma>
   $<TARGET_OBJECTS:schwaystation_timers>
   $<TARGET_OBJECTS:schwaystation_sched>
+  $<TARGET_OBJECTS:schwaystation_sio>
+  $<TARGET_OBJECTS:schwaystation_card>
   $<TARGET_OBJECTS:schwaystation_exe>
   $<TARGET_OBJECTS:schwaystation_testcard>
-  $<TARGET_OBJECTS:schwaystation_state>)
+  $<TARGET_OBJECTS:schwaystation_state>
+  $<TARGET_OBJECTS:schwaystation_sha256>)
 add_library(schwaystation::schwaystation ALIAS schwaystation)
 target_include_directories(schwaystation PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated>
   $<INSTALL_INTERFACE:include>)
-foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_bus
-    schwaystation_cpu schwaystation_gte schwaystation_dma schwaystation_timers
-    schwaystation_sched schwaystation_exe schwaystation_testcard schwaystation_state)
+target_include_directories(schwaystation_bios PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
+foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_bios schwaystation_sha256 schwaystation_bus
+    schwaystation_cpu schwaystation_gpu schwaystation_gte schwaystation_dma schwaystation_timers
+    schwaystation_sched schwaystation_sio schwaystation_card schwaystation_exe schwaystation_testcard schwaystation_state)
   schway_core_options(${core_target})
 endforeach()
 
@@ -150,7 +161,7 @@ endif()
 # the core's determinism boundary: nothing here is hashed. Built
 # position-independent and hidden, as the libretro module links them.
 if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
-  add_library(schwaystation-host STATIC host/xrgb8888.c)
+  add_library(schwaystation-host STATIC host/cards.c host/xrgb8888.c host/sha1.c)
   target_include_directories(schwaystation-host
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/host
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/generated)
@@ -158,6 +169,9 @@ if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
     C_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON)
   schway_warnings(schwaystation-host)
+  if(SCHWAYSTATION_BUILD_TESTS)
+    target_compile_definitions(schwaystation-host PRIVATE SCHWAY_HOST_CARD_TESTING=1)
+  endif()
 endif()
 if(SCHWAYSTATION_BUILD_RUNNER)
   add_subdirectory(runner)

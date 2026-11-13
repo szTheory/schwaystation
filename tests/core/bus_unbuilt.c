@@ -4,7 +4,8 @@
    error and a first fault in no device). Each class is also checked against
    the documented ranges, written out here independently of the decoder, so an
    address in two classes or none, or on the wrong side of an edge such as
-   1F80105Fh against 1F801060h, fails. Prints the three counts. */
+   1F80105Fh against 1F801060h, fails. SIO0's implemented registers are owned,
+   while the SIO1 window remains unbuilt. Prints the three counts. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,18 +18,34 @@
 enum { OWNED, UNBUILT, GAP };
 
 /* The documented map, as offsets in the page (docs/hardware/bus.md, Segments and the physical map):
-   memory control 000h-023h, RAM_SIZE 060h-063h, I_STAT and I_MASK 070h-077h,
-   the DMA registers 080h-0FFh and the timers 100h-12Fh are owned; SIO
-   040h-05Fh, CD-ROM 800h-803h, GPU 810h-817h, MDEC 820h-827h and SPU
-   C00h-FFFh are unbuilt. */
-static int expected(uint32_t off)
+   memory control 000h-023h, SIO0 040h-04Fh, RAM_SIZE 060h-063h, I_STAT and
+   I_MASK 070h-077h, the DMA registers 080h-0FFh and the timers 100h-12Fh are
+   owned; SIO1 050h-05Fh, CD-ROM 800h-803h, MDEC 820h-827h and SPU C00h-FFFh
+   are unbuilt except the exact halfword ATTR access at DAAh; the GPU owns
+   810h-817h. */
+static int register_access(uint32_t off, uint32_t base, uint32_t size, uint32_t width,
+                           uint32_t max_width)
 {
-    if (off <= 0x023u || (off >= 0x060u && off <= 0x063u) || (off >= 0x070u && off <= 0x077u) ||
-        (off >= 0x080u && off <= 0x12Fu)) {
+    return width <= max_width && off >= base && off + width <= base + size && off % width == 0u;
+}
+
+static int expected(uint32_t off, uint32_t width)
+{
+    if (off == 0xDAAu && width == 2u) {
         return OWNED;
     }
-    if ((off >= 0x040u && off <= 0x05Fu) || (off >= 0x800u && off <= 0x803u) ||
-        (off >= 0x810u && off <= 0x817u) || (off >= 0x820u && off <= 0x827u) || off >= 0xC00u) {
+    if (off == 0x040u || register_access(off, 0x044u, 4u, width, 4u) ||
+        register_access(off, 0x048u, 2u, width, 2u) ||
+        register_access(off, 0x04Au, 2u, width, 2u) ||
+        register_access(off, 0x04Eu, 2u, width, 2u)) {
+        return OWNED;
+    }
+    if (off <= 0x023u || (off >= 0x060u && off <= 0x063u) || (off >= 0x070u && off <= 0x077u) ||
+        (off >= 0x080u && off <= 0x12Fu) || (off >= 0x810u && off <= 0x817u)) {
+        return OWNED;
+    }
+    if ((off >= 0x050u && off <= 0x05Fu) || (off >= 0x800u && off <= 0x803u) ||
+        (off >= 0x820u && off <= 0x827u) || off >= 0xC00u) {
         return UNBUILT;
     }
     return GAP;
@@ -140,10 +157,10 @@ int main(void)
                     CHECK_EQ_U64(e.fault_kind, SCHWAY__FAULT_NONE);
                     CHECK(cycles != 0u);
                 }
-                if (cls != expected(off)) {
+                if (cls != expected(off, widths[w])) {
                     fprintf(stderr, "bus_unbuilt: 1F801%03X width %u %s is class %d, expected %d\n",
                             (unsigned)off, (unsigned)widths[w], wr != 0u ? "write" : "read", cls,
-                            expected(off));
+                            expected(off, widths[w]));
                     check_failures++;
                 }
                 totals[wr][cls]++;

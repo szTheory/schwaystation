@@ -2,7 +2,10 @@
 # Only the sources are tracked; no assembled image is ever committed.
 #
 # Run as a script (cmake -DCASE=<case> ... -P tests.cmake), this file is one
-# check; include()d by tests/tests.cmake, it builds armips and registers the tests.
+# check; include()d by tests/tests.cmake, it builds armips and registers tests only when
+# the selected inventory includes the fixtures directory.
+set(schway__pad_counter_no_press_hash "83358471dc7807f9a7b070097835835ff27fa73a3db1f8ad468e3ef5208317b1")
+set(schway__pad_counter_one_press_hash "cfcae1a726602580ac1741eb597c951cd3977f8f96a8df6be30c9ea50d9543b4")
 if(CMAKE_SCRIPT_MODE_FILE)
   if(CASE STREQUAL "header")
     # The magic, the size in whole sectors and the load size at 1Ch, from the bytes alone.
@@ -23,15 +26,14 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   elseif(CASE STREQUAL "probe")
     # The runner's --probe report for the image: the identity fields, the
-    # size and the achievement-hash MD5, each from an independent reading of
-    # the file (the image's text is its whole body, so the MD5 covers the file).
+    # size and non-identifying header fields. Bare executable identities and
+    # digests are withheld unless they join a disc metadata record.
     file(SIZE "${FILE}" size)
-    file(MD5 "${FILE}" md5)
     execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FILE}" RESULT_VARIABLE rc
       OUTPUT_VARIABLE out ERROR_VARIABLE out)
     set(want "format=exe" "serial=n/a" "licence_area=north_america" "region_guess=ntsc-u"
-      "exe_name=hello[.]exe" "exe_size=${size}" "pc0=0x80010100" "t_addr=0x80010000"
-      "rcheevos_md5=${md5}")
+      "exe_name=redacted" "exe_size=${size}" "pc0=0x80010100" "t_addr=0x80010000"
+      "rcheevos_md5=redacted" "sha256=redacted")
     if(NOT rc STREQUAL "0")
       message(FATAL_ERROR "schwaystation-run --probe ${FILE}: exit ${rc}\n${out}")
     endif()
@@ -40,6 +42,37 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "--probe report lacks ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "gpu_motion_hash")
+    string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+    set(args --exe "${IMAGE}" --frames "${FRAMES}")
+    if(NOT "${FRAME_HASH}" STREQUAL "")
+      list(APPEND args --hash)
+    endif()
+    if(NOT "${STATE_HASH}" STREQUAL "")
+      list(APPEND args --hash-state)
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" ${args} RESULT_VARIABLE rc
+      OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "gpu_motion runner ${args}: exit ${rc}\n${out}${err}")
+    endif()
+    if(NOT "${FRAME_HASH}" STREQUAL "" AND
+       NOT out MATCHES "(^|\n)frame ${FRAMES} sha256 ${FRAME_HASH}\n")
+      message(FATAL_ERROR "gpu_motion frame ${FRAMES} did not match its pinned hash:\n${out}")
+    endif()
+    if(NOT "${STATE_HASH}" STREQUAL "" AND NOT out MATCHES "(^|\n)state sha256 ${STATE_HASH}\n")
+      message(FATAL_ERROR "gpu_motion state at frame ${FRAMES} did not match its pinned hash:\n${out}")
+    endif()
+  elseif(CASE STREQUAL "gpu_motion_hash_negative")
+    string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+    execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=gpu_motion_hash -DFRAMES=60
+      -DFRAME_HASH=0000000000000000000000000000000000000000000000000000000000000000
+      -DSTATE_HASH= -DIMAGE=${IMAGE} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
+      -P ${CMAKE_CURRENT_LIST_FILE} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    if(rc STREQUAL "0" OR NOT out MATCHES "did not match its pinned hash")
+      message(FATAL_ERROR "the wrong gpu_motion hash was not rejected as a pin mismatch:\n${out}")
+    endif()
+    message(STATUS "gpu_motion wrong-hash control rejected the deliberate mismatch")
   elseif(CASE STREQUAL "tty")
     # The runner's --tty report for hello.exe: each of the two lines, from the
     # debug port and from the kernel's putchar, printed whole after the prefix.
@@ -72,6 +105,190 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "schwaystation-run ${args} printed no line ${line}:\n${out}")
       endif()
     endforeach()
+  elseif(CASE STREQUAL "memcard_roundtrip" OR CASE STREQUAL "memcard_controls")
+    file(REMOVE_RECURSE "${OUT}")
+    file(MAKE_DIRECTORY "${OUT}")
+    function(run_memcard_guest profile name directory out_hash)
+      set(capture "${directory}/${name}.txt")
+      execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=memcard_roundtrip
+          -DIMAGE=${IMAGE} -DFRAMES=120 -DPROFILE=${profile}
+          "-DFLAGS=--save-dir ${directory} --hash --png 120:${directory}/${name}.png"
+          -DCSV=${CSV} -DCAPTURE=${capture} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
+          -P ${CMAKE_CURRENT_LIST_FILE}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE judge_out ERROR_VARIABLE judge_err)
+      if(NOT rc STREQUAL "0")
+        message(FATAL_ERROR "memcard ${name} mailbox judge failed: ${judge_out}${judge_err}")
+      endif()
+      file(READ "${capture}" report)
+      if(report MATCHES "bad frame checksums")
+        message(FATAL_ERROR "memcard ${name} imported an invalid persisted frame:\n${report}")
+      endif()
+      string(REGEX MATCH "frame 120 sha256 ([0-9a-f]+)" frame_line "${report}")
+      if(frame_line STREQUAL "")
+        message(FATAL_ERROR "memcard ${name} did not print its frame-120 hash:\n${report}")
+      endif()
+      string(REGEX REPLACE ".*sha256 " "" frame_hash "${frame_line}")
+      if(name STREQUAL "first")
+        set(expected_hash "c532f85314c83a974466042df32a03ef7ce02ce8aea7c386843e44242d027a99")
+      elseif(name STREQUAL "second")
+        set(expected_hash "cd1c037ef800397a9c95eb23ebc5524710f55db2eca8e03c975f841f0e9232db")
+      elseif(name STREQUAL "missing")
+        set(expected_hash "c532f85314c83a974466042df32a03ef7ce02ce8aea7c386843e44242d027a99")
+      elseif(name STREQUAL "wrong")
+        set(expected_hash "543fbfefe1dd81b5e59def1ab73bd902bd13a93285f332f54664e1479e40e545")
+      endif()
+      if(DEFINED expected_hash AND NOT frame_hash STREQUAL expected_hash)
+        message(FATAL_ERROR "memcard ${name} frame-120 hash is ${frame_hash}, expected ${expected_hash}")
+      endif()
+      set(${out_hash} "${frame_hash}" PARENT_SCOPE)
+    endfunction()
+    function(check_memcard_value path value label)
+      if(NOT EXISTS "${path}")
+        message(FATAL_ERROR "${label} card image was not persisted: ${path}")
+      endif()
+      file(SIZE "${path}" card_size)
+      if(NOT card_size EQUAL 131072)
+        message(FATAL_ERROR "${label} card image has ${card_size} bytes, expected 131072")
+      endif()
+      file(READ "${path}" card_value LIMIT 1 OFFSET 128 HEX)
+      string(TOLOWER "${card_value}" card_value)
+      if(NOT card_value STREQUAL value)
+        message(FATAL_ERROR "${label} sector-1 counter is ${card_value}, expected ${value}")
+      endif()
+      file(READ "${path}" frame_checksum LIMIT 1 OFFSET 255 HEX)
+      string(TOLOWER "${frame_checksum}" frame_checksum)
+      if(NOT frame_checksum STREQUAL value)
+        message(FATAL_ERROR "${label} sector-1 frame checksum is ${frame_checksum}, expected ${value}")
+      endif()
+    endfunction()
+    if(CASE STREQUAL "memcard_roundtrip")
+      run_memcard_guest(first first "${OUT}" first_hash)
+      check_memcard_value("${OUT}/memcard_roundtrip.srm" "01" "first-process card 1")
+      check_memcard_value("${OUT}/memcard_roundtrip.1.mcr" "02" "first-process card 2")
+      run_memcard_guest(second second "${OUT}" second_hash)
+      check_memcard_value("${OUT}/memcard_roundtrip.srm" "02" "second-process card 1")
+      check_memcard_value("${OUT}/memcard_roundtrip.1.mcr" "03" "second-process card 2")
+      if(first_hash STREQUAL second_hash)
+        message(FATAL_ERROR "fresh card values 1/2 and 2/3 produced the same frame-120 hash")
+      endif()
+      message(STATUS "memcard frame-120 hashes: first=${first_hash} second=${second_hash}")
+    else()
+      file(MAKE_DIRECTORY "${OUT}/missing" "${OUT}/wrong")
+      run_memcard_guest(missing missing "${OUT}/missing" missing_hash)
+      check_memcard_value("${OUT}/missing/memcard_roundtrip.srm" "01" "missing-card control card 1")
+      check_memcard_value("${OUT}/missing/memcard_roundtrip.1.mcr" "02" "missing-card control card 2")
+      file(COPY_FILE "${OUT}/missing/memcard_roundtrip.1.mcr"
+        "${OUT}/wrong/memcard_roundtrip.srm")
+      run_memcard_guest(wrong wrong "${OUT}/wrong" wrong_hash)
+      check_memcard_value("${OUT}/wrong/memcard_roundtrip.srm" "03" "wrong-card control card 1")
+      check_memcard_value("${OUT}/wrong/memcard_roundtrip.1.mcr" "02" "wrong-card control card 2")
+      if(missing_hash STREQUAL wrong_hash)
+        message(FATAL_ERROR "missing and wrong card images produced the same frame-120 hash")
+      endif()
+      message(STATUS "memcard control frame-120 hashes: missing=${missing_hash} wrong=${wrong_hash}")
+    endif()
+  elseif(CASE STREQUAL "pad_counter_press60")
+    file(MAKE_DIRECTORY "${OUT}")
+    file(WRITE "${OUT}/pad-counter-none.inputs"
+      "1 p1=digital:.:128,128,128,128 p2=.\n")
+    file(WRITE "${OUT}/pad-counter-press60.inputs"
+      "1 p1=digital:.:128,128,128,128 p2=.\n60 p1=digital:X:128,128,128,128 p2=.\n61 p1=digital:.:128,128,128,128 p2=.\n")
+    foreach(scenario IN ITEMS none press60)
+      set(capture "${OUT}/pad-counter-${scenario}.txt")
+      execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge
+          -DFIXTURE=pad_counter_${scenario} -DIMAGE=${IMAGE} -DFRAMES=300 -DPROFILE=ntsc-u
+          "-DFLAGS=--inputs ${OUT}/pad-counter-${scenario}.inputs --hash"
+          -DCSV=${CSV} -DCAPTURE=${capture} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
+          -P ${CMAKE_CURRENT_LIST_FILE}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE judge_out ERROR_VARIABLE judge_err)
+      if(NOT rc STREQUAL "0")
+        message(FATAL_ERROR "pad_counter ${scenario} mailbox judge failed: ${judge_out}${judge_err}")
+      endif()
+      file(READ "${capture}" report)
+      if(NOT report MATCHES "(^|\n)lag frames=150(\n|$)")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report 150 lag frames across mailbox peeks:\n${report}")
+      endif()
+      string(REGEX MATCH "frame 300 sha256 [0-9a-f]+" frame_line "${report}")
+      if(frame_line STREQUAL "")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report its frame 300 hash:\n${report}")
+      endif()
+      string(REGEX REPLACE ".*sha256 ([0-9a-f]+)" "\\1" frame_hash "${frame_line}")
+      if(scenario STREQUAL "none")
+        set(expected_hash "${schway__pad_counter_no_press_hash}")
+      else()
+        set(expected_hash "${schway__pad_counter_one_press_hash}")
+      endif()
+      if(NOT frame_hash STREQUAL expected_hash)
+        message(FATAL_ERROR "pad_counter ${scenario} frame 300 hash did not match its pixel-checked pin")
+      endif()
+      set(pad_counter_hash_${scenario} "${frame_hash}")
+    endforeach()
+    if(pad_counter_hash_none STREQUAL pad_counter_hash_press60)
+      message(FATAL_ERROR "press@60 did not change the frame 300 hash")
+    endif()
+  elseif(CASE STREQUAL "pad_counter_movies")
+    string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
+    file(WRITE "${OUT}/pad-counter-empty.inputs" "")
+    file(WRITE "${OUT}/pad-counter-held.inputs"
+      "60 p1=digital:X:128,128,128,128 p2=.\n"
+      "120 p1=digital:X:128,128,128,128 p2=.\n"
+      "180 p1=digital:X:128,128,128,128 p2=.\n"
+      "240 p1=digital:X:128,128,128,128 p2=.\n")
+    file(WRITE "${OUT}/pad-counter-three_edges.inputs"
+      "180 p1=digital:X:128,128,128,128 p2=.\n"
+      "181 p1=digital:.:128,128,128,128 p2=.\n"
+      "60 p1=digital:X:128,128,128,128 p2=.\n"
+      "61 p1=digital:.:128,128,128,128 p2=.\n"
+      "120 p1=digital:X:128,128,128,128 p2=.\n"
+      "121 p1=digital:.:128,128,128,128 p2=.\n")
+    foreach(scenario IN ITEMS empty held three_edges)
+      set(fixture pad_counter_${scenario})
+      set(capture "${OUT}/pad-counter-movies-${scenario}.txt")
+      set(movie_flags "--inputs ${OUT}/pad-counter-${scenario}.inputs --hash")
+      if(scenario STREQUAL "three_edges")
+        string(APPEND movie_flags " --png 300:${OUT}/pad-counter-three_edges.png")
+      endif()
+      execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge
+          -DFIXTURE=${fixture} -DIMAGE=${IMAGE} -DFRAMES=300 -DPROFILE=ntsc-u
+          "-DFLAGS=${movie_flags}"
+          -DCSV=${CSV} -DCAPTURE=${capture} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
+          -P ${CMAKE_CURRENT_LIST_FILE}
+        RESULT_VARIABLE rc OUTPUT_VARIABLE judge_out ERROR_VARIABLE judge_err)
+      if(NOT rc STREQUAL "0")
+        message(FATAL_ERROR "pad_counter ${scenario} mailbox judge failed: ${judge_out}${judge_err}")
+      endif()
+      file(READ "${capture}" report)
+      if(NOT report MATCHES "(^|\n)lag frames=150(\n|$)")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report 150 lag frames across mailbox peeks:\n${report}")
+      endif()
+      string(REGEX MATCH "frame 300 sha256 ([0-9a-f]+)" frame_line "${report}")
+      if(frame_line STREQUAL "")
+        message(FATAL_ERROR "pad_counter ${scenario} did not report its frame 300 hash:\n${report}")
+      endif()
+      set(pad_counter_hash_${scenario} "${CMAKE_MATCH_1}")
+    endforeach()
+    if(NOT pad_counter_hash_empty STREQUAL schway__pad_counter_no_press_hash OR
+       NOT pad_counter_hash_held STREQUAL schway__pad_counter_one_press_hash OR
+       pad_counter_hash_empty STREQUAL pad_counter_hash_three_edges OR
+       pad_counter_hash_held STREQUAL pad_counter_hash_three_edges)
+      message(FATAL_ERROR "empty/held/three-edge movies produced unexpected frame-300 hashes")
+    endif()
+    function(refuse_pad_movie name contents expected_reason)
+      set(path "${OUT}/pad-counter-${name}-invalid.inputs")
+      file(WRITE "${path}" "${contents}")
+      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --frames 1
+          --stop-on mailbox --inputs "${path}"
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "2" OR NOT out STREQUAL "" OR
+         NOT err MATCHES "invalid input movie at line [0-9]+" OR NOT err MATCHES "${expected_reason}")
+        message(FATAL_ERROR "pad_counter invalid movie ${name} was not refused before guest output:\n${out}${err}")
+      endif()
+    endfunction()
+    refuse_pad_movie(ordering
+      "60 p1=digital:X:128,128,128,128 p2=.\n60 p1=digital:.:128,128,128,128 p2=.\n"
+      "conflicting records")
+    refuse_pad_movie(encoding "60 p1=digital:.:1x,128,128,128 p2=.\n"
+      "axis values must be decimal numbers")
   elseif(CASE STREQUAL "mailbox_judge")
     string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
     # Runs the fixture to its sealed mailbox and judges every record against the fixture's rows in CSV
@@ -86,21 +303,48 @@ if(CMAKE_SCRIPT_MODE_FILE)
     if(NOT DEFINED SHIFT)
       set(SHIFT 0)
     endif()
-    execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --stop-on mailbox --frames ${FRAMES}
-      ${flags} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    if(DEFINED FAKE_OUTPUT)
+      string(REPLACE "|" "\n" out "${FAKE_OUTPUT}")
+      set(rc 0)
+    else()
+      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${IMAGE}" --stop-on mailbox --frames ${FRAMES}
+        ${flags} RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE out)
+    endif()
+    if(DEFINED CAPTURE)
+      file(WRITE "${CAPTURE}" "${out}")
+    endif()
     set(errors "")
     if(NOT rc STREQUAL "0")
       list(APPEND errors "the runner exited ${rc}")
+    endif()
+    if(NOT out MATCHES "(^|\n)mailbox SWMB status=([0-9a-f][0-9a-f]) records=([0-9]+)\n")
+      list(APPEND errors "no mailbox header with status and record count")
+    else()
+      set(mailbox_status "${CMAKE_MATCH_2}")
+      set(mailbox_count "${CMAKE_MATCH_3}")
+      if(NOT mailbox_status STREQUAL "00")
+        list(APPEND errors "mailbox status is ${mailbox_status}, not 00")
+      endif()
     endif()
     if(NOT "${FAULT_KIND}" STREQUAL "" AND NOT out MATCHES "(^|\n)fault frame=[0-9]+ [^\n]* kind=${FAULT_KIND}\n")
       list(APPEND errors "no first-fault line with kind=${FAULT_KIND}")
     endif()
     string(REGEX MATCHALL "(^|\n)mailbox [0-9a-f]+=[0-9a-f]+" lines "${out}")
+    set(record_ids "")
+    list(LENGTH lines reported_records)
+    if(DEFINED mailbox_count AND NOT reported_records EQUAL mailbox_count)
+      list(APPEND errors "mailbox header says ${mailbox_count} records, output has ${reported_records}")
+    endif()
     foreach(line IN LISTS lines)
       string(REGEX REPLACE "^\n?mailbox ([0-9a-f]+)=([0-9a-f]+)$" "\\1;\\2" pair "${line}")
       list(GET pair 0 id_hex)
       list(GET pair 1 value)
       math(EXPR id "0x${id_hex}")
+      if(id IN_LIST record_ids)
+        list(APPEND errors "duplicate mailbox record ID ${id}")
+      else()
+        list(APPEND record_ids "${id}")
+      endif()
       set(record_${id} "${value}")
     endforeach()
     file(STRINGS "${CSV}" csv_lines)
@@ -294,6 +538,19 @@ schway__fixture(gte_vectors.exe gte_vectors.asm)
 set(schway__fixture_extra "")
 schway__fixture(dma_chain.exe dma_chain.asm)
 schway__fixture(timers_lines.exe timers_lines.asm)
+schway__fixture(gpu_motion.exe gpu_motion.asm)
+schway__fixture(pad_counter.exe pad_counter.asm)
+schway__fixture(memcard_roundtrip.exe memcard_roundtrip.asm)
+foreach(row IN ITEMS
+    "10|0|10" "8|1|8" "7|64|7" "5|2|5" "4|3|4" "10|0|5" "8|1|2" "4|3|1")
+  string(REPLACE "|" ";" fields "${row}")
+  list(GET fields 0 divisor)
+  list(GET fields 1 display_mode)
+  list(GET fields 2 window)
+  schway__fixture(timers_lines_d${divisor}_w${window}.exe timers_lines.asm
+    -definelabel TIMING 1 -definelabel DIVISOR ${divisor}
+    -definelabel DISPLAY_MODE ${display_mode} -definelabel WINDOW ${window})
+endforeach()
 set(schway__fault_kinds unmapped_read unmapped_write unmapped_fetch misaligned_read misaligned_write
   misaligned_fetch reserved_instruction cop_unusable exception_loop)
 set(schway__fault_index 1)
@@ -305,6 +562,10 @@ schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
 add_custom_target(schwaystation-fixtures ALL DEPENDS ${schway__fixture_outputs})
+
+if(NOT schway__include_fixture_tests)
+  return()
+endif()
 
 # Fault prevented: an assembled image whose header does not describe it, so
 # every fixture built from header.inc loads wrongly.
@@ -329,6 +590,44 @@ schway_add_test(NAME fixtures.hello.tty
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: input snapshots that do not reach scheduled guest SIO polls, the counter pixels,
+# the lag result or the frame-300 image.
+schway_add_test(NAME fixtures.pad_counter.press60
+  COMMAND ${CMAKE_COMMAND} -DCASE=pad_counter_press60 -DOUT=${PROJECT_BINARY_DIR}/tests
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/pad_counter.exe -DFRAMES=300
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 120)
+
+# Fault prevented: card writes that never survive a fresh runner process or are routed to the wrong slot.
+schway_add_test(NAME fixtures.memcard_roundtrip.persistence
+  COMMAND ${CMAKE_COMMAND} -DCASE=memcard_roundtrip -DOUT=${PROJECT_BINARY_DIR}/tests/memcard-roundtrip
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/memcard_roundtrip.exe
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 120)
+
+# Fault prevented: absent or wrong-slot card images that fail to change the guest's visible value.
+schway_add_test(NAME fixtures.memcard_roundtrip.controls
+  COMMAND ${CMAKE_COMMAND} -DCASE=memcard_controls -DOUT=${PROJECT_BINARY_DIR}/tests/memcard-controls
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/memcard_roundtrip.exe
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 180)
+
+# Fault prevented: repeated held snapshots count as extra edges, released presses are missed,
+# peeks clear lag, or malformed/conflicting movies reach guest execution.
+schway_add_test(NAME fixtures.pad_counter.movies
+  COMMAND ${CMAKE_COMMAND} -DCASE=pad_counter_movies -DOUT=${PROJECT_BINARY_DIR}/tests
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/pad_counter.exe -DFRAMES=300
+    -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+    -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 180)
 
 # Fault prevented: a runner that never reads the fixture's mailbox, or reads it wrongly: the sealed
 # mailbox of hello.exe ends the run with exit 0 and prints its records. The second test is the
@@ -411,11 +710,11 @@ schway_add_test(NAME fixtures.dma_chain
 # Fault prevented: a timer or vertical-blank interrupt that is right for one machine profile and wrong for
 # the other: timers_lines.exe takes the blanks through its own handler on the NTSC and the PAL machine, and
 # the rows of tests/diag/expected.csv for that profile (and the rows for every profile) judge its records.
-foreach(schway__profile ntsc_u pal)
+foreach(schway__profile ntsc_u ntsc_j pal)
   string(REPLACE "_" "-" schway__region ${schway__profile})
   schway_add_test(NAME fixtures.timers_lines.${schway__profile}
     COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines
-      -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=30
+      -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=120
       -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
       -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
       -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
@@ -426,7 +725,7 @@ foreach(schway__profile ntsc_u pal)
   # the rows moved up by one counter period (10000h) must fail naming both counters' records.
   string(REPLACE ";" "|" schway__judge_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
   set(schway__judge ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines
-    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=30 -DSHIFT=65536
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines.exe -DFRAMES=120 -DSHIFT=65536
     -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
     -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
     -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__judge_emulator}"
@@ -438,6 +737,56 @@ foreach(schway__profile ntsc_u pal)
       -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
     LABELS fixtures portable timers TIMEOUT 30)
 endforeach()
+
+foreach(schway__profile ntsc_u ntsc_j pal)
+  string(REPLACE "_" "-" schway__region ${schway__profile})
+  foreach(divisor IN ITEMS 10 8 7 5 4)
+    if(schway__profile STREQUAL "pal")
+      if(divisor EQUAL 10 OR divisor EQUAL 5)
+        set(window 5)
+      elseif(divisor EQUAL 8)
+        set(window 2)
+      elseif(divisor EQUAL 7)
+        set(window 7)
+      else()
+        set(window 1)
+      endif()
+    else()
+      set(window ${divisor})
+    endif()
+    set(fixture timers_lines_d${divisor}_w${window})
+    schway_add_test(NAME fixtures.timers_lines.${schway__profile}.div${divisor}
+      COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=${fixture}
+        -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/${fixture}.exe -DFRAMES=120
+        -DPROFILE=${schway__region} "-DFLAGS=--region ${schway__region}"
+        -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+        -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+        -P ${CMAKE_CURRENT_LIST_FILE}
+      LABELS fixtures portable timers TIMEOUT 60)
+  endforeach()
+endforeach()
+
+set(schway__timer_shift ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=timers_lines_d10_w10
+  -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/timers_lines_d10_w10.exe -DFRAMES=120 -DSHIFT=1
+  -DPROFILE=ntsc-u "-DFLAGS=--region ntsc-u" -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv
+  -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__judge_emulator}" -P ${CMAKE_CURRENT_LIST_FILE})
+string(REPLACE ";" "$<SEMICOLON>" schway__timer_shift "${schway__timer_shift}")
+schway_add_test(NAME fixtures.timers_lines.ntsc_u.div10.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__timer_shift}" -DCODE=1
+    "-DREGEX=dot_ticks: record 2 is.*lines_per_frame: record 3 is"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable timers TIMEOUT 60)
+
+set(schway__timer_duplicate ${CMAKE_COMMAND} -DCASE=mailbox_judge
+  "-DFAKE_OUTPUT=mailbox SWMB status=00 records=2|mailbox 0001=0000000d|mailbox 0001=0000000d"
+  -DFIXTURE=timers_lines_d10_w10 -DFRAMES=120 -DPROFILE=ntsc-u
+  -DCSV=${PROJECT_SOURCE_DIR}/tests/diag/expected.csv -P ${CMAKE_CURRENT_LIST_FILE})
+string(REPLACE ";" "$<SEMICOLON>" schway__timer_duplicate "${schway__timer_duplicate}")
+schway_add_test(NAME fixtures.timers_lines.mailbox_duplicate.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__timer_duplicate}" -DCODE=1
+    "-DREGEX=duplicate mailbox record ID 1"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable timers TIMEOUT 30)
 
 # Fault prevented: a first fault that the runner misses, mislabels or reports with a short tail. Each
 # fault.exe class runs more than 4,096 trace records of preamble, then faults once: exit 7, the fault line
@@ -534,6 +883,25 @@ schway_add_test(NAME fixtures.boot.registered_handler
   COMMAND schwaystation-test-boot registered_handler ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
 
+# Fault prevented: the pinned clipping program's BIOS critical-section calls
+# being treated as unknown exceptions, while SWMB and unsupported selectors
+# retain their existing exception behavior.
+schway_add_test(NAME fixtures.boot.stub_syscalls
+  COMMAND schwaystation-test-boot stub_syscalls
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.stub_irq_hook
+  COMMAND schwaystation-test-boot stub_irq_hook
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.stub_irq_context
+  COMMAND schwaystation-test-boot stub_irq_context
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.stub_irq_state
+  COMMAND schwaystation-test-boot stub_irq_state
+  LABELS fixtures portable TIMEOUT 30)
+schway_add_test(NAME fixtures.boot.stub_irq_controls
+  COMMAND schwaystation-test-boot stub_irq_controls
+  LABELS fixtures portable TIMEOUT 30)
+
 # Fault prevented: a runaway past the stub's image that slides on as no-operations.
 schway_add_test(NAME fixtures.boot.past_stub
   COMMAND schwaystation-test-boot past_stub
@@ -563,6 +931,48 @@ schway_add_test(NAME fixtures.boot.bounded
 schway_add_test(NAME fixtures.boot.split_with_exe
   COMMAND schwaystation-test-boot split_with_exe ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a real GP0/DMA primitive that fails to change visible
+# frames, or GPU VRAM and serialized state lost across a frame-150 resume.
+schway_add_test(NAME fixtures.gpu_motion
+  COMMAND schwaystation-test-boot gpu_motion ${SCHWAYSTATION_FIXTURES_DIR}
+  LABELS fixtures portable TIMEOUT 60)
+
+set(schway__motion_hashes
+  "60|20c3dcac8ba7b17ac4a6fd611164d1ca2c1aab03419f72c9ef58f04fe6d47042"
+  "120|f92191242105428b4345519f237979aaf0b50b33431ce945f209f03b1d47257d"
+  "180|29250a8d7c15cd85cd60c5dd5eeba71ed677de9c1dae7255721374f3081e3cc8")
+foreach(row IN LISTS schway__motion_hashes)
+  string(REPLACE "|" ";" fields "${row}")
+  list(GET fields 0 frame)
+  list(GET fields 1 hash)
+  schway_add_test(NAME fixtures.gpu_motion.hash.${frame}
+    COMMAND ${CMAKE_COMMAND} -DCASE=gpu_motion_hash -DFRAMES=${frame} -DFRAME_HASH=${hash}
+      -DSTATE_HASH= -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/gpu_motion.exe
+      -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS fixtures portable TIMEOUT 60)
+endforeach()
+foreach(row IN ITEMS
+    # The unreleased state revision now records each card slot's pending-error
+    # latch. At these frames both values are zero; the frame hashes stay fixed.
+    "150|3a7ba868f865632a56a75fcfc9e70258313af5b4b17051e766fc2f6faa47cc83"
+    "180|653cfd5f3fc834fc64eb9c8633a589047081c329263327242d5158a02eb2e489")
+  string(REPLACE "|" ";" fields "${row}")
+  list(GET fields 0 frame)
+  list(GET fields 1 hash)
+  schway_add_test(NAME fixtures.gpu_motion.state.${frame}
+    COMMAND ${CMAKE_COMMAND} -DCASE=gpu_motion_hash -DFRAMES=${frame} -DFRAME_HASH=
+      -DSTATE_HASH=${hash} -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/gpu_motion.exe
+      -DRUN=$<TARGET_FILE:schwaystation-run> "-DEMULATOR=${schway__probe_emulator}"
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS fixtures portable TIMEOUT 60)
+endforeach()
+schway_add_test(NAME fixtures.gpu_motion.hash.self_test
+  COMMAND ${CMAKE_COMMAND} -DCASE=gpu_motion_hash_negative
+    -DIMAGE=${SCHWAYSTATION_FIXTURES_DIR}/gpu_motion.exe -DRUN=$<TARGET_FILE:schwaystation-run>
+    "-DEMULATOR=${schway__probe_emulator}" -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS fixtures portable TIMEOUT 60)
 
 # Fault prevented: an expected value that drifted from the vector file it claims to come from: every
 # gte_vectors row is recomputed from tests/vectors/gte/ps1tests-1150.bin in C and compared with the CSV.

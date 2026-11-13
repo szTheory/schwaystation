@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 3
+#define SCHWAY_API_VERSION 4
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -42,6 +42,26 @@ typedef uint32_t schway_status;
 
 #define SCHWAY_SPACE_RAM 1u
 #define SCHWAY_SPACE_SCRATCHPAD 2u
+
+#define SCHWAY_MEMORY_RAM SCHWAY_SPACE_RAM
+#define SCHWAY_MEMORY_SCRATCHPAD SCHWAY_SPACE_SCRATCHPAD
+#define SCHWAY_MEMORY_VRAM 3u
+#define SCHWAY_MEMORY_BIOS 4u
+#define SCHWAY_MEMORY_CARD1 5u
+#define SCHWAY_MEMORY_CARD2 6u
+
+#define SCHWAY_CARD_SLOT_1 1u
+#define SCHWAY_CARD_SLOT_2 2u
+#define SCHWAY_MEMCARD_SIZE 131072u
+#define SCHWAY_BIOS_SIZE 524288u
+#define SCHWAY_BIOS_INFO_LOADED 1u
+#define SCHWAY_BIOS_INFO_RECOGNIZED 2u
+
+/* BIOS identity results. Status values are append-only. */
+#define SCHWAY_BIOS_STATUS_UNKNOWN 0u
+#define SCHWAY_BIOS_STATUS_RECOGNIZED 1u
+#define SCHWAY_BIOS_REGION_UNKNOWN 0u
+#define SCHWAY_BIOS_REGION_ANY 4u
 
 /* Kinds of the first-fault record. */
 #define SCHWAY_FAULT_NONE 0u
@@ -86,6 +106,11 @@ typedef uint32_t schway_status;
 #define SCHWAY_RESET_POWER 1u
 
 #define SCHWAY_PROFILE_DEBUG_PORT 1u
+#define SCHWAY_PROFILE_GPU_V0 4u
+
+#define SCHWAY_INPUT_DEVICE_NONE 0u
+#define SCHWAY_INPUT_DEVICE_DIGITAL 1u
+#define SCHWAY_INPUT_DEVICE_DUALSHOCK 2u
 
 #define SCHWAY_LICENCE_NONE 0u
 #define SCHWAY_LICENCE_JAPAN 1u
@@ -148,7 +173,18 @@ typedef struct schway_run_result {
     uint64_t ticks;
     uint32_t exit_code;
     uint32_t fault_present; /* 1 once a fault is latched */
+    uint32_t lag; /* 1 if the current frame has no completed pad poll */
+    uint32_t rumble[2]; /* per-port large << 8 | small */
 } schway_run_result;
+
+typedef struct schway_input {
+    uint32_t size;
+    uint32_t device[2]; /* SCHWAY_INPUT_DEVICE_* */
+    uint16_t buttons[2]; /* bit set means pressed; the serial reply is active low */
+    uint8_t axes[2][4]; /* right X, right Y, left X, left Y; centre is 128 */
+    uint8_t analog_button[2]; /* 0 released, 1 pressed */
+    uint16_t reserved0;
+} schway_input;
 
 typedef struct schway_budget {
     uint32_t size;
@@ -173,6 +209,20 @@ typedef struct schway_video {
     uint32_t x1, y1, start_x, start_y, enabled, rgb24;
     uint32_t reserved1;
 } schway_video;
+
+/* Read-only view of a contiguous byte span owned by an instance. */
+typedef struct schway_span {
+    const void *data;
+    size_t size; /* bytes */
+} schway_span;
+
+typedef struct schway_bios_info {
+    uint32_t size;
+    uint32_t flags; /* SCHWAY_BIOS_INFO_* */
+    uint8_t sha256[32];
+    uint32_t status; /* SCHWAY_BIOS_STATUS_* */
+    uint32_t region; /* SCHWAY_REGION_* or SCHWAY_BIOS_REGION_* */
+} schway_bios_info;
 
 typedef struct schway_audio {
     uint32_t size;
@@ -211,11 +261,18 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile);
 schway_status schway_reset(schway *inst, uint32_t kind); /* SCHWAY_RESET_* */
 schway_status schway_run_frame(schway *inst, schway_run_result *out); /* out may be NULL */
 schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_result *out);
+schway_status schway_set_input(schway *inst, const schway_input *input);
 schway_status schway_peek(const schway *inst, uint32_t space, uint32_t addr, uint32_t width,
                           uint32_t *value);
 schway_status schway_get_fault(const schway *inst, schway_fault *out);
 schway_status schway_get_info(const schway *inst, schway_info *out);
 schway_status schway_get_video(const schway *inst, schway_video *out);
+schway_status schway_get_vram(const schway *inst, schway_span *out);
+schway_status schway_get_memory(const schway *inst, uint32_t memory, schway_span *out);
+schway_status schway_load_bios(schway *inst, const void *bytes, size_t size);
+schway_status schway_get_bios_info(const schway *inst, schway_bios_info *out);
+schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes, size_t size);
+schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint64_t *out);
 schway_status schway_get_audio(schway *inst, schway_audio *io);
 schway_status schway_get_tty(schway *inst, schway_tty *io);
 schway_status schway_get_trace(const schway *inst, uint32_t index, schway_trace *out);

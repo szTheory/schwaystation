@@ -56,6 +56,8 @@ struct schway__state_io {
     const uint8_t *r;                 /* VALIDATE and APPLY cursor */
     size_t n;                         /* SIZE and RECORD: bytes counted so far */
     int bad;                          /* VALIDATE: a range or cross-field rule failed */
+    uint32_t cpu_cause;               /* VALIDATE: CAUSE bits carried to the IRQ fields */
+    uint32_t irq_stat, irq_mask;      /* VALIDATE: the saved interrupt registers */
     struct schway__state_field *rec;  /* RECORD: output, or NULL to only count */
     size_t rec_cap;                   /* RECORD: capacity of rec */
     size_t rec_n;                     /* RECORD: fields seen, which may exceed rec_cap */
@@ -258,6 +260,31 @@ static inline void schway__state_u8_array(struct schway__state_io *io, const cha
         }
         io->r += count;
         return;
+    }
+}
+
+/* A fixed byte identity is serialized and validated against the current
+   instance, but APPLY never replaces the receiver's identity. */
+static inline void schway__state_match_u8_array(struct schway__state_io *io, const char *name,
+                                                const uint8_t *bytes, uint32_t count)
+{
+    if (io->mode == SCHWAY__STATE_RECORD) {
+        schway__state_record_one(io, name, 1u, count, 0u, UINT8_MAX);
+        io->n += count;
+    } else if (io->mode == SCHWAY__STATE_SIZE) {
+        io->n += count;
+    } else if (io->mode == SCHWAY__STATE_VISIT) {
+        io->visitor(io->user, name, bytes, count, 1u);
+    } else if (io->mode == SCHWAY__STATE_WRITE) {
+        memcpy(io->w, bytes, count);
+        io->w += count;
+    } else if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t i = 0; i < count; i++) {
+            uint64_t value = schway__state_field_io(io, name, bytes[i], 1u, 0u, UINT8_MAX);
+            schway__state_check(io, value == bytes[i]);
+        }
+    } else if (io->mode == SCHWAY__STATE_APPLY) {
+        io->r += count;
     }
 }
 

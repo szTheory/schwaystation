@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "seeds.h"
 
 #ifndef SCHWAY_REPLAY_NAME
@@ -73,7 +75,7 @@ static long hex_decode(uint8_t *text, size_t length)
 
 static int replay_file(const char *path)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     long length;
     uint8_t *bytes;
     size_t n = strlen(path);
@@ -135,7 +137,7 @@ static uint32_t replay_seeds(const char *dir)
         }
         char path[1024];
         int len = snprintf(path, sizeof path, "%s/%s.exe", dir, seeds_name(i));
-        FILE *file = len > 0 && (size_t)len < sizeof path ? fopen(path, "wb") : NULL;
+        FILE *file = len > 0 && (size_t)len < sizeof path ? schway__test_open_file(path, "wb") : NULL;
         if (file == NULL || fwrite(buf, 1u, n, file) != n || fclose(file) != 0) {
             fprintf(stderr, SCHWAY_REPLAY_NAME ": cannot write seed %s/%s.exe\n", dir,
                     seeds_name(i));

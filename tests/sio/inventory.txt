@@ -1,0 +1,18 @@
+# Tests this directory registers: name<TAB>labels, sorted by name.
+sio.control.baud	portable,sio
+sio.digital.poll_irq	portable,sio
+sio.fifo.overrun	portable,sio
+sio.fifo.widths	portable,sio
+sio.irq.ack_order	portable,sio
+sio.pad.analog_button_edges	portable,sio
+sio.pad.config_commands	portable,sio
+sio.pad.final_no_ack	portable,sio
+sio.pad.independent_ports_instances	portable,sio
+sio.pad.input_latch	portable,sio
+sio.pad.old_rumble	portable,sio
+sio.pad.state_split_config	portable,sio
+sio.pad.watchdog_boundary	portable,sio
+sio.peek.pure	portable,sio
+sio.state.pending_ack	portable,sio
+sio.state.pending_byte	portable,sio
+sio.transport.abort	portable,sio

@@ -115,12 +115,34 @@ GPU and MDEC ports) cost one cycle, which is approximate. The SPU and the CD-ROM
 
 ## Devices not built yet
 
-The serial ports (`1F801040h`-`1F80105Fh`), the CD-ROM (`1F801800h`-`1F801803h`), the GPU
-(`1F801810h`-`1F801817h`), the MDEC (`1F801820h`-`1F801827h`) and the SPU (`1F801C00h`-`1F801FFFh`) are documented but
-not modelled. At any width a read returns 0 and a write is dropped, with no fault. Each access is counted per device in `unbuilt_n`, saturating at the
-largest 32-bit value, and the last one is kept as the device, address, width and program counter. Both are part of the
-state. A program that polls a register of one of these devices therefore spins with a count that grows and a last
-program counter that names the loop. A later release replaces each case with the device itself.
+The serial ports (`1F801040h`-`1F80105Fh`), the CD-ROM (`1F801800h`-`1F801803h`), the MDEC
+(`1F801820h`-`1F801827h`) and most of the SPU (`1F801C00h`-`1F801FFFh`) are documented but not modelled. For an
+unbuilt access at any width a read returns 0 and a write is dropped, with no fault. Each access is counted per device in
+`unbuilt_n`, saturating at the largest 32-bit value, and the last one is kept as the device, address, width and program
+counter. Both are part of the state. A program that polls an unbuilt register therefore spins with a count that grows
+and a last program counter that names the loop. A later release replaces each unbuilt case with the device itself.
+
+### SPU control readback
+
+The exact halfword at `1F801DAAh` is ATTR, a read/write control register whose bits 5-4 select the transfer mode. The
+bus stores and returns the raw 16-bit value for that exact access, retains the normal DEV4 port cost, and does not count
+it as unbuilt. This allows a caller to read back a control value such as `0020h`; it does not move SPU RAM, generate
+audio or implement other SPU register side effects. For this first caller, a write selecting transfer mode `0020h`
+also makes request-mode DMA4 RAM-to-device blocks persistently ready for the existing deterministic sink; the DMA
+page documents the modeled scheduling and its limits. Byte or word access at ATTR, and every other SPU access
+including the read-only status register STATX at `1F801DAEh`, keep the unbuilt zero-read/dropped-write behavior,
+accounting and DEV4 cost.
+
+The latch is instance state named `bus.spu_attr` and is serialized with other bus fields. A power reset sets it to zero
+as the emulator's deterministic reset model; this is not a hardware power-on-value claim. The [PSX-SPX SPU register
+notes](https://psx-spx.consoledev.net/soundprocessingunitspu/) distinguish ATTR from delayed STATX status. The
+pinned [MIT nugget ATTR definition](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/common/hardware/spu.h)
+and [modplayer poll](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/modplayer/modplayer.c)
+show the exact halfword write/read contract. The model implements only that readback contract, not SPU timing or audio.
+
+The GPU (`1F801810h`-`1F801817h`) is implemented by its own module. The rest of the I/O page is checked by
+`core.bus_unbuilt` at widths 1, 2 and 4 for reads and writes; the sweep requires every address to be owned, unbuilt or a
+gap, including edges such as `1F80105Fh` against `1F801060h`.
 
 The DMA registers (`1F801080h`-`1F8010FFh`) and the timers (`1F801100h`-`1F80112Fh`) belong to their own modules, not
 to this list: every address answers at every width with no fault and no unbuilt count, and the DMA and timer pages
@@ -133,20 +155,24 @@ access, so a running unit can hold the CPU. It does not tell it about a store, w
 write queue is full. The scratchpad and the cache-control word are not bus accesses that wait. Reading `I_STAT` first
 brings the timers up to the tick of that read, and writing it recomputes when a device next needs attention.
 
-The rest of the I/O page between and around those ranges is a gap. `core.bus_unbuilt` sweeps all of `1F801000h`-
-`1F801FFFh` at widths 1, 2 and 4, for reads and writes, and requires every address to be owned, unbuilt or a gap,
-including the edges such as `1F80105Fh` against `1F801060h`.
+The rest of the I/O page between and around those ranges is a gap.
 
 ## Expansion regions and the debug ports
 
 A read or fetch of the first (`1F000000h`-`1F7FFFFFh`) or third (`1FA00000h`-`1FBFFFFFh`) expansion region is a bus error
 naming it, because nothing is plugged in; a write is dropped and costs the port's write cost. Of the second region
-(`1F802000h`-`1F803FFFh`) only two addresses answer, and every other address is a bus error naming it.
+(`1F802000h`-`1F803FFFh`), two addresses are debug ports and one exact byte write is a modeled POST sink. Every other
+address is a bus error naming the region, and the POST address has only the byte-write behavior described below.
 
-| Address | Port |
+| Address | Modeled access |
 |---|---|
+| `1F802041h` | A byte write is accepted and ignored as an OpenBIOS POST status write; it is not stored or readable |
 | `1F802080h` | a byte written here is queued for the host to read as TTY output |
 | `1F802082h` | a byte written here is the exit code, and the guest has asked to stop |
+
+The POST write pays the normal EXP2 byte-write cost. Reads, wider accesses and neighboring addresses remain gaps. This
+narrow compatibility model follows the pinned [MIT nugget OpenBIOS register definition](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/common/hardware/hwregs.h)
+and [startup writes](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/openbios/main/main.c): the source defines `POST` as an 8-bit register at `BF802041h` and writes `0Fh`/`0Eh` before splash and boot. This is source-supported compatibility behavior, not a hardware measurement or evidence that the shell starts successfully.
 
 Both ports act only while the profile's debug-port flag is set, and only for a byte write; a wider write, or any
 access with the flag clear, answers and does nothing. A read returns 0. A retail profile leaves the flag clear. The
@@ -190,6 +216,16 @@ the one address bits 11:4 name and the word bits 3:2 (psx-spx CPU Specifications
   and restores SR and cache control, which leaves every line invalid. `bus.icache_isolation` runs that sequence.
 - The sources add that, with TAG clear, an isolated access reaches the scratchpad instead. The model does not do that:
   every isolated access goes to the instruction-cache arrays.
+
+## Partial stores
+
+`SWL` and `SWR` update the byte lanes their instruction names (psx-spx CPU
+Specifications, `SWL` and `SWR`). This core emits those lanes as the largest
+aligned 4-, 2- or 1-byte chunks, in increasing address order. Each chunk is a
+separate bus write and a separate write-queue entry. An uncached partial store
+therefore drains any queued write before each chunk, as for any KSEG1 access.
+The hardware documents the byte result but not the bus transaction widths; the
+chunk decomposition is the core's model, pinned by `bus.ram_word`.
 
 ## Write queue
 

@@ -6,9 +6,10 @@
 # The runner's sources, absolute, so the tests can build a second runner from
 # the same list.
 set(SCHWAYSTATION_RUNNER_SOURCES)
-foreach(src main.c bench.c clock.c crc32.c mailbox.c md5.c png.c probe.c rss.c sha256.c stop.c trace.c)
+foreach(src main.c bench.c clock.c crc32.c frame_hash.c inputs.c mailbox.c png.c probe.c rss.c stop.c trace.c)
   list(APPEND SCHWAYSTATION_RUNNER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${src})
 endforeach()
+list(APPEND SCHWAYSTATION_RUNNER_SOURCES ${PROJECT_SOURCE_DIR}/host/disc_probe.c)
 set(SCHWAYSTATION_RUNNER_SOURCES ${SCHWAYSTATION_RUNNER_SOURCES} PARENT_SCOPE)
 
 # The Git revision the build is configured from, for --version; "unknown"
@@ -37,3 +38,15 @@ target_link_libraries(schwaystation-run PRIVATE schwaystation::schwaystation sch
 target_compile_definitions(schwaystation-run PRIVATE _POSIX_C_SOURCE=200809L)
 schway_warnings(schwaystation-run)
 install(TARGETS schwaystation-run RUNTIME DESTINATION bin COMPONENT runner)
+
+if(SCHWAYSTATION_BUILD_TESTS)
+  add_executable(schwaystation-run-test ${SCHWAYSTATION_RUNNER_SOURCES})
+  target_include_directories(schwaystation-run-test PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}/generated ${PROJECT_SOURCE_DIR}/src)
+  target_link_libraries(schwaystation-run-test PRIVATE schwaystation::schwaystation schwaystation-host)
+  target_compile_definitions(schwaystation-run-test PRIVATE
+    _POSIX_C_SOURCE=200809L SCHWAY_RUN_TEST_HOOKS=1 SCHWAY_HOST_CARD_TESTING=1)
+  set_target_properties(schwaystation-run-test PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(schwaystation-run-test)
+endif()

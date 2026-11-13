@@ -1,0 +1,5 @@
+serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date
+fixture/gpu_motion,65c83347edb2a0d5a74e53d929142bb4,-,gpu_motion,ntsc-u,exe,frame@60=20c3dcac8ba7b17ac4a6fd611164d1ca2c1aab03419f72c9ef58f04fe6d47042,pass,fixtures.gpu_motion.hash.60:exit=0;core=59ad2c5d589b,2026-11-11
+fixture/pad_counter,8bd0ea92e968e43a0b8a7ea12ba5764e,-,pad_counter,ntsc-u,exe,frame@300=cfcae1a726602580ac1741eb597c951cd3977f8f96a8df6be30c9ea50d9543b4,pass,fixtures.pad_counter.press60:exit=0;core=59ad2c5d589b,2026-11-11
+fixture/memcard_roundtrip,5be739d3557ba03db984cd49ba6b03c3,-,memcard_roundtrip,ntsc-u,exe,frame@120=cd1c037ef800397a9c95eb23ebc5524710f55db2eca8e03c975f841f0e9232db,pass,fixtures.memcard_roundtrip.persistence:exit=0;core=59ad2c5d589b,2026-11-11
+fixture/openbios-shell,-,-,OpenBIOS shell,ntsc-u,bios,frame@240=df2704d7cf3f01ff70ab4534a443729bba77bf73e3488c836513f9f8b86a9372,pass,built.openbios.shell:exit=0;bios_sha256=92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8;core=5cc1dc2,2026-11-13

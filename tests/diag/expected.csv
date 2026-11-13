@@ -69,6 +69,104 @@ dma_chain,otc_time,*,10f4..1130,doc,psx-spx DMA channels timing OTC 1 clock per 
 timers_lines,vblank_count,ntsc-u,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so a run that ends on the 23rd blank counts 23
 timers_lines,div8_ticks,ntsc-u,15994d..15995e,doc,psx-spx Timers (counter 2 steps once per 8 system clocks) and the frame constants in src/internal.h (NTSC frame 405350378496/715909 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
 timers_lines,sysclk_ticks,ntsc-u,acca88..accacf,doc,psx-spx Timers (the system clock source counts every clock) and the frame constants in src/internal.h (NTSC frame 405350378496/715909 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines,vblank_count,ntsc-j,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so a run that ends on the 23rd blank counts 23
+timers_lines,div8_ticks,ntsc-j,15994d..15995e,doc,psx-spx Timers (counter 2 steps once per 8 system clocks) and the frame constants in src/internal.h (NTSC frame 405350378496/715909 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines,sysclk_ticks,ntsc-j,acca88..accacf,doc,psx-spx Timers (the system clock source counts every clock) and the frame constants in src/internal.h (NTSC frame 405350378496/715909 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
 timers_lines,vblank_count,pal,00000017,doc,psx-spx Interrupts: I_STAT bit 0 is the vertical blank raised once per frame so a run that ends on the 23rd blank counts 23
 timers_lines,div8_ticks,pal,19f8a2..19f8b3,doc,psx-spx Timers (counter 2 steps once per 8 system clocks) and the frame constants in src/internal.h (PAL frame 482961862656/709379 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
 timers_lines,sysclk_ticks,pal,cfc532..cfc579,doc,psx-spx Timers (the system clock source counts every clock) and the frame constants in src/internal.h (PAL frame 482961862656/709379 clocks) over 20 frames with the interrupt jitter derived in tests/fixtures/src/timers_lines.asm
+timers_lines_d10_w10,vblank_count,ntsc-u,0000000d,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 10 phase-restoring frames)
+timers_lines_d10_w10,dot_ticks,ntsc-u,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 10 phase-restoring frames)
+timers_lines_d10_w10,lines_per_frame,ntsc-u,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 10 phase-restoring frames)
+timers_lines_d10_w10,hblank_ticks,ntsc-u,00000a46,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 10 phase-restoring frames)
+timers_lines_d10_w10,vblank_count,ntsc-j,0000000d,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 10 phase-restoring frames)
+timers_lines_d10_w10,dot_ticks,ntsc-j,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 10 phase-restoring frames)
+timers_lines_d10_w10,lines_per_frame,ntsc-j,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 10 phase-restoring frames)
+timers_lines_d10_w10,hblank_ticks,ntsc-j,00000a46,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 10 phase-restoring frames)
+timers_lines_d10_w5,vblank_count,pal,00000008,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d10_w5,dot_ticks,pal,000828d6,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d10_w5,lines_per_frame,pal,0000013a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d10_w5,hblank_ticks,pal,00000622,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d4_w1,vblank_count,pal,00000004,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 1 phase-restoring frames)
+timers_lines_d4_w1,dot_ticks,pal,0004146b,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 1 phase-restoring frames)
+timers_lines_d4_w1,lines_per_frame,pal,0000013a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 1 phase-restoring frames)
+timers_lines_d4_w1,hblank_ticks,pal,0000013a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 1 phase-restoring frames)
+timers_lines_d4_w4,vblank_count,ntsc-u,00000007,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 4 phase-restoring frames)
+timers_lines_d4_w4,dot_ticks,ntsc-u,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 4 phase-restoring frames)
+timers_lines_d4_w4,lines_per_frame,ntsc-u,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 4 phase-restoring frames)
+timers_lines_d4_w4,hblank_ticks,ntsc-u,0000041c,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 4 phase-restoring frames)
+timers_lines_d4_w4,vblank_count,ntsc-j,00000007,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 4 phase-restoring frames)
+timers_lines_d4_w4,dot_ticks,ntsc-j,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 4 phase-restoring frames)
+timers_lines_d4_w4,lines_per_frame,ntsc-j,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 4 phase-restoring frames)
+timers_lines_d4_w4,hblank_ticks,ntsc-j,0000041c,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 4 phase-restoring frames)
+timers_lines_d5_w5,vblank_count,ntsc-u,00000008,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,dot_ticks,ntsc-u,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,lines_per_frame,ntsc-u,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,hblank_ticks,ntsc-u,00000523,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,vblank_count,ntsc-j,00000008,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,dot_ticks,ntsc-j,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,lines_per_frame,ntsc-j,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,hblank_ticks,ntsc-j,00000523,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,vblank_count,pal,00000008,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,dot_ticks,pal,001051ac,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,lines_per_frame,pal,0000013a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d5_w5,hblank_ticks,pal,00000622,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 5 phase-restoring frames)
+timers_lines_d7_w7,vblank_count,ntsc-u,0000000a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,dot_ticks,ntsc-u,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,lines_per_frame,ntsc-u,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,hblank_ticks,ntsc-u,00000731,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,vblank_count,ntsc-j,0000000a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,dot_ticks,ntsc-j,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,lines_per_frame,ntsc-j,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,hblank_ticks,ntsc-j,00000731,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,vblank_count,pal,0000000a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,dot_ticks,pal,001051ac,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,lines_per_frame,pal,0000013a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d7_w7,hblank_ticks,pal,00000896,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 7 phase-restoring frames)
+timers_lines_d8_w2,vblank_count,pal,00000005,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 2 phase-restoring frames)
+timers_lines_d8_w2,dot_ticks,pal,0004146b,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 2 phase-restoring frames)
+timers_lines_d8_w2,lines_per_frame,pal,0000013a,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 2 phase-restoring frames)
+timers_lines_d8_w2,hblank_ticks,pal,00000274,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 2 phase-restoring frames)
+timers_lines_d8_w8,vblank_count,ntsc-u,0000000b,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 8 phase-restoring frames)
+timers_lines_d8_w8,dot_ticks,ntsc-u,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 8 phase-restoring frames)
+timers_lines_d8_w8,lines_per_frame,ntsc-u,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 8 phase-restoring frames)
+timers_lines_d8_w8,hblank_ticks,ntsc-u,00000838,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 8 phase-restoring frames)
+timers_lines_d8_w8,vblank_count,ntsc-j,0000000b,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 8 phase-restoring frames)
+timers_lines_d8_w8,dot_ticks,ntsc-j,000db253,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 8 phase-restoring frames)
+timers_lines_d8_w8,lines_per_frame,ntsc-j,00000107,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 8 phase-restoring frames)
+timers_lines_d8_w8,hblank_ticks,ntsc-j,00000838,doc,docs/hardware/gpu.md Beam and timer timing and docs/hardware/timers.md Beam sources (derived over 8 phase-restoring frames)
+pad_counter_empty,presses,ntsc-u,00000000,doc,docs/hardware/sio.md empty input movie leaves Cross released
+pad_counter_empty,pixel0,ntsc-u,00000000,doc,docs/hardware/gpu.md no write reaches the counter origin
+pad_counter_empty,pixel_last,ntsc-u,00000000,doc,docs/hardware/gpu.md empty counter reads its origin for the last-pixel check
+pad_counter_held,presses,ntsc-u,00000001,doc,docs/hardware/sio.md repeated held snapshots produce one Cross rising edge
+pad_counter_held,pixel0,ntsc-u,0000001f,doc,docs/hardware/gpu.md first flat red RGB555 counter pixel
+pad_counter_held,pixel_last,ntsc-u,0000001f,doc,docs/hardware/gpu.md repeated held snapshots leave the one-pixel counter
+pad_counter_none,presses,ntsc-u,00000000,doc,docs/hardware/sio.md digital poll with no Cross input
+pad_counter_none,pixel0,ntsc-u,00000000,doc,docs/hardware/gpu.md one-pixel VRAM readback from untouched counter origin
+pad_counter_none,pixel_last,ntsc-u,00000000,doc,docs/hardware/gpu.md empty counter reads its origin for the last-pixel check
+pad_counter_press60,presses,ntsc-u,00000001,doc,docs/hardware/sio.md active-low Cross snapshot at frame 60
+pad_counter_press60,pixel0,ntsc-u,0000001f,doc,docs/hardware/gpu.md flat red RGB555 counter pixel after one Cross edge
+pad_counter_press60,pixel_last,ntsc-u,0000001f,doc,docs/hardware/gpu.md last pixel equals the first after one Cross edge
+pad_counter_three_edges,presses,ntsc-u,00000003,doc,docs/hardware/sio.md three released Cross presses at frames 60 120 and 180
+pad_counter_three_edges,pixel0,ntsc-u,0000001f,doc,docs/hardware/gpu.md first flat red RGB555 counter pixel
+pad_counter_three_edges,pixel_last,ntsc-u,0000001f,doc,docs/hardware/gpu.md third counter pixel is red after three edges
+memcard_roundtrip,card1,first,00000001,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,card2,first,00000002,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,pixel1,first,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel1_last,first,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel2_last,first,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,card1,second,00000002,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,card2,second,00000003,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,pixel1,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel1_last,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel2_last,second,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,card1,missing,00000001,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,card2,missing,00000002,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,pixel1,missing,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel1_last,missing,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel2_last,missing,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,card1,wrong,00000003,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,card2,wrong,00000002,doc,docs/hardware/sio.md Memory-card Read and GetID
+memcard_roundtrip,pixel1,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel1_last,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+memcard_roundtrip,pixel2_last,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline

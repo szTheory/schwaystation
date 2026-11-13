@@ -253,8 +253,12 @@ static void power_on(schway *inst)
     schway__gte_reset(&inst->gte);
     schway__bus_reset(inst);
     schway__irq_reset(inst);
+    schway__gpu_reset(inst);
     schway__dma_reset(inst);
     schway__timers_reset(inst);
+    schway__pad_reset(inst);
+    schway__sio_reset(inst);
+    schway__card_reset(inst);
     schway__sched_sync(inst);
     schway__sched_recalc(inst);
     /* With no BIOS image the BIOS window holds the stub kernel; a mapped
@@ -264,7 +268,7 @@ static void power_on(schway *inst)
         inst->bus.bios_size = schway__stub_kernel_size;
     }
     /* The profile, and its flags, survive a power reset. */
-    inst->exe_loaded = 0u;
+    inst->exe_loaded = inst->bus.bios_loaded;
     memset(&inst->fault, 0, sizeof inst->fault);
     memset(&inst->tty, 0, sizeof inst->tty);
     memset(&inst->trace, 0, sizeof inst->trace);
@@ -310,14 +314,17 @@ schway_status schway_create(const schway_config *cfg, schway **out)
     if (a.alloc == NULL || a.free == NULL) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-    schway *inst = (schway *)a.alloc(a.user, sizeof *inst);
+    size_t alloc_size = sizeof(schway) + (size_t)SCHWAY__VIDEO_MAX_BYTES;
+    schway *inst = (schway *)a.alloc(a.user, alloc_size);
     if (inst == NULL) {
         return SCHWAY_STATUS_ERR_NO_MEMORY;
     }
-    memset(inst, 0, sizeof *inst);
+    memset(inst, 0, alloc_size);
     inst->allocator = a;
-    inst->alloc_size = sizeof *inst;
+    inst->alloc_size = alloc_size;
+    inst->video_scanout = (uint8_t *)(void *)(inst + 1);
     inst->region = SCHWAY_REGION_NTSC_U;
+    schway__card_init(inst);
     power_on(inst);
     *out = inst;
     return SCHWAY_STATUS_OK;
@@ -345,7 +352,7 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     /* A caller whose struct ends before flags predates them: none set. */
     uint32_t flags = profile->size >= sizeof *profile ? profile->flags : 0u;
     if (profile->region < SCHWAY_REGION_NTSC_J || profile->region > SCHWAY_REGION_PAL ||
-        (flags & ~SCHWAY_PROFILE_DEBUG_PORT) != 0u) {
+        (flags & ~(SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0)) != 0u) {
         return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
     }
     if (inst->profile_locked) {
@@ -402,6 +409,77 @@ schway_status schway_get_info(const schway *inst, schway_info *out)
     info.sample_rate_den = 1u;
     info.region = inst->region;
     schway__instance_write_out(out, &info, (uint32_t)sizeof info);
+    return SCHWAY_STATUS_OK;
+}
+
+schway_status schway_get_vram(const schway *inst, schway_span *out)
+{
+    return schway_get_memory(inst, SCHWAY_MEMORY_VRAM, out);
+}
+
+schway_status schway_get_memory(const schway *inst, uint32_t memory, schway_span *out)
+{
+    if (inst == NULL || out == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_span span;
+    switch (memory) {
+    case SCHWAY_MEMORY_RAM:
+        span.data = inst->bus.ram;
+        span.size = sizeof inst->bus.ram;
+        break;
+    case SCHWAY_MEMORY_SCRATCHPAD:
+        span.data = inst->bus.scratch;
+        span.size = sizeof inst->bus.scratch;
+        break;
+    case SCHWAY_MEMORY_VRAM:
+        span.data = &inst->vram[0][0];
+        span.size = sizeof inst->vram;
+        break;
+    case SCHWAY_MEMORY_BIOS:
+        span.data = inst->bus.bios;
+        span.size = inst->bus.bios_size;
+        break;
+    case SCHWAY_MEMORY_CARD1:
+        span.data = inst->card.slot[0].bytes;
+        span.size = sizeof inst->card.slot[0].bytes;
+        break;
+    case SCHWAY_MEMORY_CARD2:
+        span.data = inst->card.slot[1].bytes;
+        span.size = sizeof inst->card.slot[1].bytes;
+        break;
+    default:
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    *out = span;
+    return SCHWAY_STATUS_OK;
+}
+
+schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes, size_t size)
+{
+    if (inst == NULL || bytes == NULL || size > SCHWAY_MEMCARD_SIZE ||
+        (slot != SCHWAY_CARD_SLOT_1 && slot != SCHWAY_CARD_SLOT_2) ||
+        inst->profile_locked != 0u || inst->frame != 0u || inst->ticks != 0u) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    uint32_t index = slot == SCHWAY_CARD_SLOT_1 ? 0u : 1u;
+    memmove(inst->card.slot[index].bytes, bytes, size);
+    if (size < SCHWAY_MEMCARD_SIZE) {
+        memset(inst->card.slot[index].bytes + size, 0xFF, SCHWAY_MEMCARD_SIZE - size);
+    }
+    inst->card.slot[index].generation = 0u;
+    schway__card_abort(inst, index);
+    return SCHWAY_STATUS_OK;
+}
+
+schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint64_t *out)
+{
+    if (inst == NULL || out == NULL ||
+        (slot != SCHWAY_CARD_SLOT_1 && slot != SCHWAY_CARD_SLOT_2)) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    uint32_t index = slot == SCHWAY_CARD_SLOT_1 ? 0u : 1u;
+    *out = inst->card.slot[index].generation;
     return SCHWAY_STATUS_OK;
 }
 

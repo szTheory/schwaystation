@@ -12,7 +12,10 @@ static const char name_scratch[] = "bus.scratch";
 static const char name_memctl[] = "bus.memctl";
 static const char name_ram_size[] = "bus.ram_size";
 static const char name_cache_ctrl[] = "bus.cache_ctrl";
+static const char name_spu_attr[] = "bus.spu_attr";
 static const char name_unbuilt_n[] = "bus.unbuilt_n";
+static const char name_bios_loaded[] = "bus.bios.loaded";
+static const char name_bios_sha256[] = "bus.bios.sha256";
 static const char name_last_dev[] = "bus.last_unbuilt.dev";
 static const char name_last_addr[] = "bus.last_unbuilt.addr";
 static const char name_last_width[] = "bus.last_unbuilt.width";
@@ -116,13 +119,14 @@ void schway__bus_reset(schway *inst)
     port_costs(b);
     b->ram_size = SCHWAY__RAM_SIZE_POWER_ON;
     b->cache_ctrl = 0u;
+    b->spu_attr = 0u;
     memset(b->unbuilt_n, 0, sizeof b->unbuilt_n);
     memset(b->last_unbuilt, 0, sizeof b->last_unbuilt);
 }
 
-/* The counters and the last access are state, and the host's BIOS is not.
-   The device and width of the last access are bounded, so a state never
-   names a device the build does not know. */
+/* The counters and the last access are state. BIOS bytes remain host-owned;
+   a state stores and validates only the loaded-image identity. The device and
+   width of the last access are bounded, so a state never names an unknown device. */
 void schway__bus_state_io(struct schway__state_io *io, schway *inst)
 {
     struct schway__bus *b = &inst->bus;
@@ -131,13 +135,22 @@ void schway__bus_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u32_array(io, name_memctl, b->memctl, SCHWAY__MEMCTL_REGS, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_ram_size, &b->ram_size, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_cache_ctrl, &b->cache_ctrl, 0u, UINT32_MAX);
+    schway__state_u16_array(io, name_spu_attr, &b->spu_attr, 1u, 0u, UINT16_MAX);
+    uint32_t bios_loaded = schway__state_u32(io, name_bios_loaded, &b->bios_loaded, 0u, 1u);
+    schway__state_check(io, bios_loaded == b->bios_loaded);
+    schway__state_match_u8_array(io, name_bios_sha256, b->bios_sha256,
+                                 (uint32_t)sizeof b->bios_sha256);
     schway__state_u32_array(io, name_unbuilt_n, b->unbuilt_n, SCHWAY__DEV_COUNT, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_last_dev, &b->last_unbuilt[0], 0u, SCHWAY__DEV_COUNT - 1u);
     (void)schway__state_u32(io, name_last_addr, &b->last_unbuilt[1], 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_last_width, &b->last_unbuilt[2], 0u, 4u);
     (void)schway__state_u32(io, name_last_pc, &b->last_unbuilt[3], 0u, UINT32_MAX);
-    (void)schway__state_u32(io, name_irq_stat, &inst->irq.stat, 0u, SCHWAY__IRQ_BITS);
-    (void)schway__state_u32(io, name_irq_mask, &inst->irq.mask, 0u, SCHWAY__IRQ_BITS);
+    uint32_t irq_stat = schway__state_u32(io, name_irq_stat, &inst->irq.stat, 0u, SCHWAY__IRQ_BITS);
+    uint32_t irq_mask = schway__state_u32(io, name_irq_mask, &inst->irq.mask, 0u, SCHWAY__IRQ_BITS);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        io->irq_stat = irq_stat;
+        io->irq_mask = irq_mask;
+    }
     /* The cost table is derived from the delay registers, so a load rebuilds it. */
     if (io->mode == SCHWAY__STATE_APPLY) {
         port_costs(b);
@@ -437,6 +450,12 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         break;
     case 0x04u:
     case 0x05u:
+        if (p >= 0x1F801040u && p < 0x1F801050u) {
+            if (schway__sio_io(inst, wr, p, width, value, cycles) != 0) {
+                return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
+            }
+            break;
+        }
         schway__bus_unbuilt(inst, SCHWAY__DEV_SIO, p, width, wr, v);
         break;
     case 0x06u:
@@ -458,7 +477,9 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
            is in the register a read returns, and what happened while a bit
            was set is behind a write that acknowledges it. */
         if ((p & 4u) == 0u) {
-            schway__timers_sync(inst, schway__sched_now(inst, *cycles));
+            uint64_t tick = schway__sched_now(inst, *cycles);
+            schway__gpu_sync(inst, tick);
+            schway__timers_sync(inst, tick);
         }
         if (wr == 0u) {
             *value = reg_get((p & 4u) != 0u ? inst->irq.mask : inst->irq.stat, p, width);
@@ -494,8 +515,10 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if ((p & 0x8u) != 0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_GPU, p, width, wr, v);
-        break;
+        if (schway__gpu_io(inst, wr, p, width, value, cycles) != 0) {
+            return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
+        }
+        return 0;
     case 0x82u:
         if ((p & 0x8u) != 0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
@@ -506,7 +529,21 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if (slot < 0xC0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, p, width, wr, v);
+        /* ATTR is a 16-bit control register; retain its exact halfword value
+           for read-after-write callers. No SPU transfer behavior is implied
+           (docs/hardware/bus.md, SPU control readback; PSX-SPX SCM.01). */
+        if (p == 0x1F801DAAu && width == 2u) {
+            if (wr != 0u) {
+                uint64_t tick = schway__sched_now(inst, *cycles);
+                schway__dma_event(inst, tick);
+                inst->bus.spu_attr = (uint16_t)v;
+                schway__dma_spu_control_changed(inst, tick);
+            } else {
+                *value = (uint32_t)inst->bus.spu_attr;
+            }
+        } else {
+            schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, p, width, wr, v);
+        }
         port = SCHWAY__PORT_SPU;
         break;
     }
@@ -539,17 +576,19 @@ static int bios_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, u
     return 0;
 }
 
-/* The debug ports of the second expansion region. They answer only while the
-   profile's debug-port flag is set, and are silently ignored otherwise:
-   1F802080h takes a byte for the TTY and 1F802082h an exit code. Every other
-   address of the region is a gap. */
+/* The second expansion region has two profile-controlled debug ports and one
+   source-identified POST byte sink; every other access is a gap. */
 static int exp2_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uint32_t width,
                        uint32_t *value, uint32_t *cycles)
 {
-    if (p != 0x1F802080u && p != 0x1F802082u) {
+    if (p == 0x1F802041u && kind == K_WRITE && width == 1u) {
+        /* OpenBIOS writes this byte before startup; this ignored compatibility
+           sink is documented with its pinned source in docs/hardware/bus.md. */
+    } else if (p != 0x1F802080u && p != 0x1F802082u) {
         return gap(inst, kind, SCHWAY__DEV_EXP2, addr, width);
     }
-    if (kind == K_WRITE && width == 1u && (inst->profile_flags & SCHWAY__PROFILE_DEBUG_PORT) != 0u) {
+    if (p != 0x1F802041u && kind == K_WRITE && width == 1u &&
+        (inst->profile_flags & SCHWAY__PROFILE_DEBUG_PORT) != 0u) {
         if (p == 0x1F802080u) {
             schway__tty_push(inst, (uint8_t)*value);
         } else {

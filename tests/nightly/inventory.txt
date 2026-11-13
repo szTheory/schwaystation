@@ -1,2 +1,15 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+gpu.reference.clipping	gpu,nightly,portable
+gpu.reference.clut-cache	gpu,nightly,portable
+gpu.reference.gp0-e1	gpu,nightly,portable
+gpu.reference.gpustat	gpu,nightly,portable
+gpu.reference.lines	gpu,nightly,portable
+gpu.reference.mask-bit	gpu,nightly,portable
+gpu.reference.quad	gpu,nightly,portable
+gpu.reference.rectangles	gpu,nightly,portable
+gpu.reference.texture-overflow	gpu,nightly,portable
+gpu.reference.transparency	gpu,nightly,portable
+gpu.reference.triangle	gpu,nightly,portable
+gpu.reference.uv-interpolation	gpu,nightly,portable
+gpu.reference.vram-to-vram-overlap	gpu,nightly,portable
 vectors.r3000.full	portable,vectors

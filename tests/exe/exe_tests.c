@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #include "schwaystation.h"
 #include "internal.h"
 #include "../check.h"
@@ -544,6 +546,10 @@ static void case_error_changes_nothing(void)
     CHECK_EQ_U64(schway_load_exe(inst, good, HEADER + 0x800u), SCHWAY_STATUS_OK);
     size_t n;
     uint8_t *before = snapshot(inst, &n);
+    CHECK_EQ_U64(schway_load_exe(inst, good, HEADER + 0x800u), SCHWAY_STATUS_ERR_ARGUMENT);
+    uint8_t *after_loaded = snapshot(inst, &n);
+    CHECK(memcmp(before, after_loaded, n) == 0);
+    free(after_loaded);
 
     struct hdr bad[6];
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
@@ -587,11 +593,30 @@ static void case_after_first_frame(void)
     struct hdr h = valid();
     uint8_t *b = build(&h, HEADER + 0x800u);
     schway *inst = make();
-    CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
+    schway_budget budget;
+    schway_run_result result;
+    memset(&budget, 0, sizeof budget);
+    budget.size = (uint32_t)sizeof budget;
+    budget.max_cycles = 32u;
+    memset(&result, 0, sizeof result);
+    result.size = (uint32_t)sizeof result;
+    CHECK_EQ_U64(schway_run(inst, &budget, &result), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK(inst->ticks != 0u);
+    CHECK_EQ_U64(inst->frame, 0u);
     size_t n;
     uint8_t *before = snapshot(inst, &n);
     CHECK_EQ_U64(schway_load_exe(inst, b, HEADER + 0x800u), SCHWAY_STATUS_ERR_ARGUMENT);
     uint8_t *after = snapshot(inst, &n);
+    CHECK(memcmp(before, after, n) == 0);
+    free(after);
+    free(before);
+    CHECK_EQ_U64(inst->exe_loaded, 0u);
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
+    before = snapshot(inst, &n);
+    CHECK_EQ_U64(schway_load_exe(inst, b, HEADER + 0x800u), SCHWAY_STATUS_ERR_ARGUMENT);
+    after = snapshot(inst, &n);
     CHECK(memcmp(before, after, n) == 0);
     free(after);
     free(before);
@@ -729,7 +754,7 @@ static void write_file(const char *dir, const char *name, const uint8_t *b, size
     if (snprintf(path, sizeof path, "%s/%s", dir, name) >= (int)sizeof path) {
         exit(1);
     }
-    FILE *f = fopen(path, "wb");
+    FILE *f = schway__test_open_file(path, "wb");
     if (f == NULL || (n != 0u && fwrite(b, 1u, n, f) != n) || fclose(f) != 0) {
         fprintf(stderr, "cannot write %s\n", path);
         exit(1);

@@ -29,6 +29,26 @@ schway_add_test(NAME fuzz.regress.exe
   COMMAND schwaystation-fuzz-exe-replay ${fuzz_regress}
   LABELS fuzz portable TIMEOUT 60)
 
+# Each subsystem replay uses the existing replay and seed interfaces, with a
+# compile-time corpus selected for that subsystem's real operations.
+foreach(subsystem IN ITEMS gpu sio memcard)
+  add_executable(schwaystation-fuzz-${subsystem}-replay
+    ${fuzz_dir}/${subsystem}.c ${fuzz_dir}/seeds.c)
+  string(TOUPPER ${subsystem} seed_mode)
+  target_compile_definitions(schwaystation-fuzz-${subsystem}-replay PRIVATE
+    SCHWAY_FUZZ_REPLAY SCHWAY_FUZZ_${seed_mode}_SEEDS)
+  target_include_directories(schwaystation-fuzz-${subsystem}-replay PRIVATE
+    ${PROJECT_SOURCE_DIR}/src)
+  target_link_libraries(schwaystation-fuzz-${subsystem}-replay PRIVATE schwaystation::schwaystation)
+  set_target_properties(schwaystation-fuzz-${subsystem}-replay PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(schwaystation-fuzz-${subsystem}-replay)
+  # Fault prevented: a hostile subsystem stream escapes its state or time bounds.
+  schway_add_test(NAME fuzz.regress.${subsystem}
+    COMMAND schwaystation-fuzz-${subsystem}-replay
+    LABELS fuzz portable TIMEOUT 60)
+endforeach()
+
 if(SCHWAYSTATION_FUZZ)
   # The libFuzzer binary keeps libFuzzer's main. The fuzz preset builds every
   # object with ASan, UBSan and coverage instrumentation, so the core's own

@@ -1,5 +1,10 @@
 # schwaystation
 
+Launch automated apps and tests in the background so the shared computer remains usable.
+Use the foreground only when the specific check requires it; explain why before activation and
+bound that interval. A timeout alone does not justify taking focus: diagnose background failures
+within the existing limits. This preference applies across projects and future sessions.
+
 A Sony PlayStation (PS1) emulator core in C. This repository ships three things: a C library, a headless
 command-line runner (`schwaystation-run`), and a libretro core (`schwaystation_libretro`). RetroArch or another
 host provides the window. One core covers every console revision (SCPH-1000 through SCPH-102 and the PS one) and
@@ -78,6 +83,17 @@ evidence. Lessons from the sibling emulators are in `.planning/LESSONS.md`; re-r
 
 Discuss, verify, CI and release steps read `.planning/AUTONOMOUS.md` for the owner's standing research,
 automation and efficiency preferences; autonomous authorization and phase boundaries are recorded there.
+
+## Recovery and local verification
+
+- During quiet-executor recovery, inspect attributable command/session evidence and a fresh repository snapshot first. New work in a fresh snapshot weighs against interruption; do not clean processes or take over based only on a missing status reply.
+- For temporary CMake workflow presets, keep `binaryDir` aligned with the test integration's expected handoff path. For later local reruns, reuse CI configure/build artifacts and override only test parallelism when preset rules permit.
+
+## Integration efficiency
+
+- Keep small related integration repairs within the existing owner and plan follow-up when the concrete implementation stays under 30 minutes. Create a new plan for material scope or size, not routine repair bookkeeping.
+- Check affected native configure graphs, compilers and targeted consumers before broad CI. Batch coherent portability, producer, timing and real-host integration fixes into one changed-head hosted run where practical; metadata-only edits do not justify a broad suite.
+- Tune provisional executor-chosen timeouts from attributed workload and measured runs without another owner approval. Preserve explicit owner limits, all cases and assertions, and distinguish a larger allowance from a speed improvement.
 
 ## GSD summaries
 

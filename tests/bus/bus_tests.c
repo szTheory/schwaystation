@@ -9,6 +9,10 @@
 #include "internal.h"
 #include "../check.h"
 
+#define STORE_PART_WORD(left, rs, rt)                                                               \
+    ((((left) != 0u ? 0x2Au : 0x2Eu) << 26) | ((rs) << 21) | ((rt) << 16))
+#define LOAD_WORD(rt, rs) (((0x23u) << 26) | ((rs) << 21) | ((rt) << 16))
+
 static void *test_alloc(void *user, size_t size)
 {
     (void)user;
@@ -53,6 +57,45 @@ static int wr(schway *inst, uint32_t addr, uint32_t width, uint32_t v)
 {
     uint32_t cycles = 0u;
     return schway__bus_write(inst, addr, width, v, &cycles);
+}
+
+static void cpu_code(schway *inst, uint32_t index, uint32_t word)
+{
+    uint32_t addr = 0x00001000u + index * 4u;
+    CHECK_EQ_U64(schway__bus_ram_word(inst, addr, &word, 1u), 0u);
+}
+
+static void cache_later_word_failure(void)
+{
+    schway *inst = make();
+    const uint32_t addr = 0x9F801070u; /* I_STAT, then I_MASK, then an I/O gap. */
+    const uint32_t p = addr & 0x1FFFFFFFu;
+    const uint32_t line = (p >> 4) & 0xFFu;
+    const uint32_t tag = p >> 12;
+    const uint32_t old_word = 0xA55A3CC3u;
+    uint32_t word = 0u;
+    uint32_t cycles = 0u;
+    inst->cpu.icache_tag[line] = tag;
+    inst->cpu.icache_valid[line] = 1u << 2;
+    inst->cpu.icache_word[line][2] = old_word;
+    CHECK_EQ_U64(schway__cpu_icache_fetch(inst, addr, &word, &cycles), 0u);
+    CHECK_EQ_U64(inst->cpu.icache_valid[line] & (1u << 2), 0u);
+    CHECK_EQ_HEX(inst->cpu.icache_word[line][2], old_word);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    drop(inst);
+}
+
+static uint32_t store_part_expected(uint32_t original, uint32_t value, uint32_t left,
+                                    uint32_t offset)
+{
+    for (uint32_t lane = 0u; lane < 4u; lane++) {
+        if ((left != 0u && lane <= offset) || (left == 0u && lane >= offset)) {
+            uint32_t source = left != 0u ? 3u - offset + lane : lane - offset;
+            uint32_t mask = 0xFFu << (8u * lane);
+            original = (original & ~mask) | (((value >> (8u * source)) & 0xFFu) << (8u * lane));
+        }
+    }
+    return original;
 }
 
 /* A word written through KSEG1 reads back through KUSEG, KSEG0 and every RAM
@@ -350,10 +393,83 @@ static void bios_window(void)
 }
 
 /* The expansion regions: reads of the first and third are bus errors naming
-   them and their writes are dropped; the second answers only its two debug
-   ports, and those act only while the profile's debug-port flag is set.
+   them and their writes are dropped; the second answers only the modeled POST
+   byte and its two debug ports. The debug ports act only while the profile's
+   debug-port flag is set.
    Fault prevented: an expansion read that returns data, a debug port that
-   writes with the flag clear, or a neighbour of a port that answers. */
+   writes with the flag clear, or a neighbouring gap that answers. */
+static void expect_exp2_fault(schway *inst, uint32_t kind, uint32_t addr, uint32_t width)
+{
+    clear_fault(inst);
+    uint32_t value = UINT32_MAX;
+    int result = kind == SCHWAY__FAULT_UNMAPPED_READ
+                     ? rd(inst, addr, width, &value)
+                     : wr(inst, addr, width, UINT32_MAX);
+    CHECK(result != 0);
+    CHECK_EQ_U64(inst->fault.kind, kind);
+    CHECK_EQ_U64(inst->fault.device, SCHWAY__DEV_EXP2);
+    CHECK_EQ_HEX(inst->fault.addr, addr);
+    CHECK_EQ_U64(inst->fault.width, width);
+    if (kind == SCHWAY__FAULT_UNMAPPED_READ) {
+        CHECK_EQ_U64(value, 0u);
+    }
+}
+
+/* Only an ignored byte write to OpenBIOS' POST address answers, including its
+   KSEG aliases and both profile-flag settings. It charges as EXP2, but does
+   not become a saved status, unbuilt device, TTY byte, exit request or fault.
+   Reads, wider accesses and neighboring bytes remain EXP2 gaps.
+   Fault prevented: accepting a larger POST range or mutating guest-visible
+   status while removing the startup fault. */
+static void exp2_post(void)
+{
+    static const uint32_t addresses[3] = {0x1F802041u, 0x9F802041u, 0xBF802041u};
+    static const uint32_t values[4] = {0u, 0x0Eu, 0x0Fu, 0xFFu};
+    static const uint32_t flags[2] = {0u, SCHWAY__PROFILE_DEBUG_PORT};
+
+    for (size_t f = 0u; f < sizeof flags / sizeof flags[0]; f++) {
+        schway *inst = make();
+        inst->profile_flags = flags[f];
+        uint32_t unbuilt_n[SCHWAY__DEV_COUNT];
+        uint32_t last_unbuilt[4];
+        struct schway__fault fault = inst->fault;
+        struct schway__tty tty = inst->tty;
+        memcpy(unbuilt_n, inst->bus.unbuilt_n, sizeof unbuilt_n);
+        memcpy(last_unbuilt, inst->bus.last_unbuilt, sizeof last_unbuilt);
+
+        for (size_t a = 0u; a < sizeof addresses / sizeof addresses[0]; a++) {
+            for (size_t v = 0u; v < sizeof values / sizeof values[0]; v++) {
+                uint32_t cycles = 0u;
+                CHECK_EQ_U64(schway__bus_write(inst, addresses[a], 1u, values[v], &cycles), 0u);
+                CHECK_EQ_U64(cycles, inst->bus.cost[SCHWAY__PORT_EXP2][3]);
+                CHECK(memcmp(unbuilt_n, inst->bus.unbuilt_n, sizeof unbuilt_n) == 0);
+                CHECK(memcmp(last_unbuilt, inst->bus.last_unbuilt, sizeof last_unbuilt) == 0);
+                CHECK(memcmp(&fault, &inst->fault, sizeof fault) == 0);
+                CHECK(memcmp(&tty, &inst->tty, sizeof tty) == 0);
+                CHECK_EQ_U64(inst->exit_pending, 0u);
+                CHECK_EQ_U64(inst->exit_code, 0u);
+            }
+        }
+
+        /* None of the byte values written above can be read back as status. */
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_READ, 0xBF802041u, 1u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_READ, 0xBF802041u, 2u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_READ, 0xBF802041u, 4u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0xBF802041u, 2u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0xBF802041u, 4u);
+
+        /* Direct bus widths deliberately bypass CPU alignment checks. These
+           aligned accesses cover POST; unaligned direct calls stay gaps too. */
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802040u, 2u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802040u, 4u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802041u, 2u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802041u, 4u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802040u, 1u);
+        expect_exp2_fault(inst, SCHWAY__FAULT_UNMAPPED_WRITE, 0x1F802042u, 1u);
+        drop(inst);
+    }
+}
+
 static void exp_regions(void)
 {
     schway *inst = make();
@@ -385,11 +501,11 @@ static void exp_regions(void)
     CHECK(rd(inst, 0xBFC80000u, 1u, &v) != 0);
     CHECK_EQ_U64(inst->fault.device, SCHWAY__DEV_UNMAPPED);
 
-    /* The second expansion region: every address but two is a gap. */
+    /* The second expansion region: only POST and the two debug ports answer. */
     clear_fault(inst);
     CHECK(rd(inst, 0xBF802000u, 1u, &v) != 0);
     CHECK_EQ_U64(inst->fault.device, SCHWAY__DEV_EXP2);
-    CHECK(wr(inst, 0xBF802041u, 1u, 1u) != 0);
+    CHECK(wr(inst, 0xBF802042u, 1u, 1u) != 0);
     CHECK(rd(inst, 0xBF802081u, 1u, &v) != 0);
     CHECK(rd(inst, 0xBF803FFFu, 1u, &v) != 0);
     clear_fault(inst);
@@ -656,6 +772,155 @@ static void ram_word(void)
     }
     CHECK_EQ_U64(inst->cpu.cycle, cycle0);
     CHECK_EQ_HEX(inst->dma.dicr, 0u);
+
+    /* SWL/SWR use the largest aligned 4/2/1-byte chunks, low lane first.
+       The lane result is fixed by the CPU instruction; exact MMIO chunk widths
+       below are the core's documented model because the cited hardware sources
+       do not specify the bus decomposition. */
+    static const uint32_t chunk_count[2][4] = {{1u, 2u, 1u, 1u}, {1u, 1u, 2u, 1u}};
+    static const uint32_t last_lane[2][4] = {{0u, 2u, 2u, 3u}, {0u, 0u, 2u, 0u}};
+    static const uint32_t last_width[2][4] = {{4u, 2u, 2u, 1u}, {1u, 2u, 1u, 4u}};
+    const uint32_t original = 0xAABBCCDDu;
+    const uint32_t value = 0x11223344u;
+    uint32_t code_index = 0u;
+    for (uint32_t left = 0u; left < 2u; left++) {
+        for (uint32_t off = 0u; off < 4u; off++) {
+            cpu_code(inst, code_index++, STORE_PART_WORD(left, 1u, 2u));
+        }
+    }
+    for (uint32_t left = 0u; left < 2u; left++) {
+        for (uint32_t off = 0u; off < 4u; off++) {
+            cpu_code(inst, code_index, STORE_PART_WORD(left, 1u, 2u));
+            cpu_code(inst, code_index + 1u, LOAD_WORD(3u, 1u));
+            code_index += 2u;
+        }
+    }
+    memset(inst->cpu.icache_valid, 0, sizeof inst->cpu.icache_valid);
+    code_index = 0u;
+    for (uint32_t left = 0u; left < 2u; left++) {
+        for (uint32_t off = 0u; off < 4u; off++) {
+            uint32_t word = original;
+            CHECK_EQ_U64(schway__bus_ram_word(inst, 0x00003000u, &word, 1u), 0u);
+            inst->cpu.r[1] = 0x80003000u + off;
+            inst->cpu.r[2] = value;
+            inst->cpu.pc = 0x80001000u + code_index * 4u;
+            schway__cpu_step_one(inst, NULL);
+            word = 0u;
+            CHECK_EQ_U64(schway__bus_ram_word(inst, 0x00003000u, &word, 0u), 0u);
+            CHECK_EQ_HEX(word, store_part_expected(original, value, left, off));
+            CHECK_EQ_U64(inst->cpu.wq_count, chunk_count[left][off]);
+            inst->cpu.wq_count = 0u;
+            code_index++;
+        }
+    }
+
+    /* The unbuilt MDEC register records every access's width, address and count.
+       A following CPU load from KSEG1 must drain the queued final store. */
+    for (uint32_t left = 0u; left < 2u; left++) {
+        for (uint32_t off = 0u; off < 4u; off++) {
+            uint32_t store_index = code_index;
+            inst->cpu.r[1] = 0xBF801820u + off;
+            inst->cpu.r[2] = value;
+            inst->cpu.wq_count = 0u;
+            uint32_t before_unbuilt = inst->bus.unbuilt_n[SCHWAY__DEV_MDEC];
+            inst->cpu.pc = 0x80001000u + store_index * 4u;
+            schway__cpu_step_one(inst, NULL);
+            CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_MDEC] - before_unbuilt,
+                         chunk_count[left][off]);
+            CHECK_EQ_U64(inst->bus.last_unbuilt[0], SCHWAY__DEV_MDEC);
+            CHECK_EQ_HEX(inst->bus.last_unbuilt[1], 0x1F801820u + last_lane[left][off]);
+            CHECK_EQ_U64(inst->bus.last_unbuilt[2], last_width[left][off]);
+            CHECK_EQ_HEX(inst->bus.last_unbuilt[3], 0x80001000u + store_index * 4u);
+            CHECK_EQ_U64(inst->cpu.wq_count, 1u);
+            inst->cpu.r[1] = 0xBF801820u;
+            inst->cpu.pc = 0x80001000u + (store_index + 1u) * 4u;
+            schway__cpu_step_one(inst, NULL);
+            CHECK_EQ_U64(inst->cpu.wq_count, 0u);
+            code_index += 2u;
+        }
+    }
+    cache_later_word_failure();
+    drop(inst);
+}
+
+/* ATTR is the one SPU control halfword whose stored value is read back. Its
+   transfer-mode bits must let the startup poll observe a DMA-write selection;
+   STATX, neighbouring registers and every unsupported width remain unbuilt.
+   Fault prevented: a read-after-write poll stuck at zero, shared instance
+   state, a widened ATTR decode, or a changed SPU port cost. */
+static void spu_attr(void)
+{
+    schway *inst = make();
+    schway *other = make();
+    uint32_t value = UINT32_MAX;
+    CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+
+    CHECK_EQ_U64(wr(inst, 0x1F801DAAu, 2u, 0u), 0u);
+    CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+    CHECK_EQ_U64(wr(inst, 0xBF801DAAu, 2u, 0x0020u), 0u);
+    static const uint32_t attr_aliases[] = {0x1F801DAAu, 0x9F801DAAu, 0xBF801DAAu};
+    for (size_t i = 0u; i < sizeof attr_aliases / sizeof attr_aliases[0]; i++) {
+        value = 0u;
+        CHECK_EQ_U64(rd(inst, attr_aliases[i], 2u, &value), 0u);
+        CHECK_EQ_HEX(value, 0x0020u);
+        CHECK_EQ_HEX(value & 0x0030u, 0x0020u);
+    }
+    CHECK_EQ_U64(wr(inst, 0x1F801DAAu, 2u, 0xFFFFu), 0u);
+    CHECK_EQ_U64(rd(inst, 0x9F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0xFFFFu);
+    CHECK_EQ_U64(wr(inst, 0x1F801DAAu, 2u, 0x0020u), 0u);
+    value = UINT32_MAX;
+    CHECK_EQ_U64(rd(other, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+    CHECK_EQ_U64(wr(other, 0x1F801DAAu, 2u, 0x1234u), 0u);
+    CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0x0020u);
+
+    const uint32_t before_unbuilt = inst->bus.unbuilt_n[SCHWAY__DEV_SPU];
+    CHECK_EQ_U64(before_unbuilt, 0u);
+    static const struct {
+        uint32_t addr;
+        uint32_t width;
+    } unsupported[] = {
+        {0x1F801DAAu, 1u},
+        {0x1F801DAAu, 4u},
+        {0x1F801DA8u, 4u},
+        {0x1F801DA8u, 2u},
+        {0x1F801DACu, 2u},
+        {0x1F801DAEu, 2u},
+    };
+    for (size_t i = 0u; i < sizeof unsupported / sizeof unsupported[0]; i++) {
+        uint32_t cycles = 7u;
+        uint32_t access_value = UINT32_MAX;
+        uint32_t cost_index = unsupported[i].width == 4u ? 2u : unsupported[i].width - 1u;
+        CHECK_EQ_U64(schway__bus_read(inst, unsupported[i].addr, unsupported[i].width,
+                                      &access_value, &cycles), 0u);
+        CHECK_EQ_HEX(access_value, 0u);
+        CHECK_EQ_U64(cycles, 7u + inst->bus.cost[SCHWAY__PORT_SPU][cost_index]);
+        CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], before_unbuilt + 2u * (uint32_t)i + 1u);
+
+        cycles = 11u;
+        CHECK_EQ_U64(schway__bus_write(inst, unsupported[i].addr, unsupported[i].width,
+                                       0xA5A55A5Au, &cycles), 0u);
+        CHECK_EQ_U64(cycles, 11u + inst->bus.cost[SCHWAY__PORT_SPU][3u + cost_index]);
+        CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], before_unbuilt + 2u * (uint32_t)(i + 1u));
+        value = 0u;
+        CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+        CHECK_EQ_HEX(value, 0x0020u);
+    }
+    CHECK_EQ_HEX(inst->bus.last_unbuilt[0], SCHWAY__DEV_SPU);
+    CHECK_EQ_HEX(inst->bus.last_unbuilt[1], 0x1F801DAEu);
+    CHECK_EQ_U64(inst->bus.last_unbuilt[2], 2u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    value = UINT32_MAX;
+    CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
+    CHECK_EQ_HEX(value, 0u);
+    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_SPU], 0u);
+    drop(other);
     drop(inst);
 }
 
@@ -670,6 +935,8 @@ int main(int argc, char **argv)
         ram_mirrors();
     } else if (strcmp(c, "ram_word") == 0) {
         ram_word();
+    } else if (strcmp(c, "spu_attr") == 0) {
+        spu_attr();
     } else if (strcmp(c, "memctl_costs") == 0) {
         memctl_costs();
     } else if (strcmp(c, "scratchpad") == 0) {
@@ -678,6 +945,8 @@ int main(int argc, char **argv)
         bios_window();
     } else if (strcmp(c, "exp_regions") == 0) {
         exp_regions();
+    } else if (strcmp(c, "exp2_post") == 0) {
+        exp2_post();
     } else if (strcmp(c, "kseg2") == 0) {
         kseg2();
     } else if (strcmp(c, "irq_edge") == 0) {

@@ -379,16 +379,15 @@ static void test_card_full_redraw(void)
 /* The display tuple after power-on: GP1(06h) X1 260h, X2 C60h, GP1(07h)
    Y1 10h, Y2 100h, divider 8 (psx-spx, GPU Display Control Commands), so
    width (((X2 - X1) / 8) + 2) & ~3 is 320 and height Y2 - Y1 is 240
-   (ARCHITECTURE section 4). */
+   (PSX-GPU-AND-GTE section four point five). */
 static void check_tuple(const schway *inst, uint32_t region, uint64_t frame)
 {
     schway_video v = video_of(inst);
     CHECK_EQ_U64(v.size, sizeof v);
     CHECK_EQ_U64(v.frame, frame);
-    CHECK(v.pixels == (const void *)&inst->vram[0][0]);
     CHECK_EQ_U64(v.width, 320);
     CHECK_EQ_U64(v.height, 240);
-    CHECK_EQ_U64(v.pitch_bytes, 2048);
+    CHECK_EQ_U64(v.pitch_bytes, 640);
     CHECK_EQ_U64(v.bpp, 16);
     CHECK_EQ_U64(v.field, 0);
     CHECK_EQ_U64(v.interlaced, 0);
@@ -402,6 +401,7 @@ static void check_tuple(const schway *inst, uint32_t region, uint64_t frame)
     CHECK_EQ_U64(v.start_y, 0);
     CHECK_EQ_U64(v.enabled, 1);
     CHECK_EQ_U64(v.rgb24, 0);
+    CHECK_EQ_HEX(*(const uint16_t *)v.pixels, inst->vram[0][0]);
     CHECK_EQ_U64(v.reserved0, 0);
     CHECK_EQ_U64(v.reserved1, 0);
     CHECK_EQ_HEX(inst->display.x2, 0xC60);

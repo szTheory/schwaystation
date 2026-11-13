@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: A test frame in RetroArch** - The library, runner and libretro core ship automatically, and a built-in test card hashes identically on eight lanes (verified 2026-10-29; ship PR #4)
 - [x] **Phase 2: The CPU matches the public vectors** - The R3000A, COP0, bus, memory control, I-cache and interrupts pass the vectors; PS-EXEs run under the own stub kernel (completed 2026-11-09)
 - [x] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests (completed 2026-11-10)
-- [ ] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch
+- [x] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch (completed 2026-11-13)
 - [ ] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro
 - [ ] **Phase 6: Discs and FMV** - CD-ROM with cue/bin, iso and m3u, XA, CD-DA, MDEC and disk control, and the own disc boots through OpenBIOS in RetroArch
 
@@ -231,7 +231,165 @@ Plans:
   4. OpenBIOS, built in CI from nugget at its pin, boots to its shell with a pinned frame hash that is the same on every platform that runs it. The compatibility ledger rejects any unratcheted regression. The local `library` preset, pointed at a fixture in a temporary directory, writes only `build/library/results.csv`.
   5. In the hosted RetroArch session, `pad_counter.exe` loads as content with no BIOS in `system/`. The picture changes between two `--max-frames` values, and each screenshot matches the runner's `--png` frame pixel for pixel.
 
-**Plans**: TBD
+**Plans**: 58
+**Wave 1**
+- [x] 04-01 — Build skeleton and an inventoried VRAM-to-frame tracer
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 04-02 — Correct the first GPU/firmware callers of CPU and partial-store contracts
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 04-03 — Decode CPU GPU commands into real VRAM and serialized GPU state
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 04-04 — Complete GPU transfer and cache semantics
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 04-05 — Render one textured pixel through the complete native pixel pipeline
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 04-06 — Rasterize flat triangles and quads with exact shared-edge coverage
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 04-07 — Interpolate Gouraud colors and affine texture coordinates
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 04-08 — Complete lines, polylines and rectangle span families
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 04-09 — Advance beam events and dot timers on exact derived deadlines
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 04-10 — Scan native display windows and convert packed RGB24 safely
+- [x] 04-14 — Schedule SIO0 bytes and digital-pad replies
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 04-11 — Run GPU DMA2 through busy/readiness deadlines and validated state
+- [x] 04-15 — Expose deterministic input and full DualShock configuration/rumble
+
+**Wave 12**
+- [x] 04-12-PLAN.md — Run moving GPU and exact line/dot fixtures through the runner
+- [x] 04-16-PLAN.md — Read both SIO cards through stable raw memory spans
+
+**Wave 13**
+- [x] 04-13-PLAN.md — Measure CPU-driven GPU performance and correct the first CI timeout caller
+- [x] 04-33-PLAN.md — Commit a staged SIO card write only on successful 47h
+
+**Wave 14**
+- [x] 04-34-PLAN.md — Validate card imports and pending transport atomically
+
+**Wave 15**
+- [x] 04-17-PLAN.md — Import raw cards and save them atomically in the host helper
+
+**Wave 16**
+- [x] 04-35-PLAN.md — Import legacy wrappers and enforce canonical save names
+
+**Wave 17**
+- [x] 04-18-PLAN.md — Apply validated input movies before the runner frame latch
+
+**Wave 18**
+- [x] 04-36-PLAN.md — Prove input edges, guest pixels and polling lag
+
+**Wave 19**
+- [x] 04-19-PLAN.md — Persist runner cards on normal and clean signal exits
+- [x] 04-20-PLAN.md — Execute copied BIOS bytes and report their SHA256 identity
+
+**Wave 20**
+- [x] 04-37-PLAN.md — Prove card values survive two fresh guest processes
+- [x] 04-38-PLAN.md — Recognize BIOS images from the pinned DAT digest rows
+
+**Wave 21**
+- [x] 04-21-PLAN.md — Scan release firmware and prove complete isolated-key rejection
+
+**Wave 22**
+- [x] 04-22-PLAN.md — Build pinned OpenBIOS on Linux and measure the output digest
+
+**Wave 23**
+- [x] 04-39-PLAN.md — Transfer checked OpenBIOS only within its build run
+
+**Wave 24**
+- [x] 04-23-PLAN.md — Load explicit BIOS files through the real runner reset path
+
+**Wave 25**
+- [x] 04-50-PLAN.md — Remove the concrete OpenBIOS startup fault at its diagnostic POST byte write, per D-16/D-23
+
+**Wave 26**
+- [x] 04-51-PLAN.md — Unblock the source-confirmed OpenBIOS ATTR read-after-write poll per D-16/D-23
+
+**Wave 27**
+- [x] 04-52-PLAN.md — Supply the concrete DMA4 request producer and continuation needed by the pinned OpenBIOS upload per D-16/D-23
+
+**Wave 28**
+- [x] 04-53-PLAN.md — Remove the missing GPUSTAT field-status blocker per D-16/D-23 using primary status semantics rather than the values one shell happens to need
+
+**Wave 29**
+- [x] 04-40-PLAN.md — Pin the inspected OpenBIOS shell across applicable lanes
+
+**Wave 30**
+- [x] 04-24-PLAN.md — Judge ten-column compatibility rows and generate fresh docs
+- [x] 04-27-PLAN.md — Load BIOS-free fullpath PS-EXEs in libretro
+
+**Wave 31**
+- [x] 04-41-PLAN.md — Run the compatibility judge copied from the actual PR base
+- [x] 04-43-PLAN.md — Notify libretro geometry and rate changes for native video
+
+**Wave 32**
+- [x] 04-25-PLAN.md — Probe one bounded ISO boot executable through runner identity
+
+**Wave 33**
+- [x] 04-49-PLAN.md — Resolve bounded CUE tracks and sector layouts into boot identity
+
+**Wave 34**
+- [x] 04-42-PLAN.md — Join full track metadata and reject hostile private inputs
+
+**Wave 35**
+- [x] 04-26-PLAN.md — Run the private library seam with meaningful and privacy controls
+
+**Wave 36**
+- [x] 04-28-PLAN.md — Map libretro controllers and both rumble motors
+
+**Wave 37**
+- [x] 04-44-PLAN.md — Persist libretro cards and resolve memory descriptor aliases
+
+**Wave 38**
+- [x] 04-45-PLAN.md — Guard only functional libretro metadata claims
+
+**Wave 39**
+- [x] 04-54-PLAN.md — Repair strict-compiler portability, inventory-owned compatibility registration and emulator forwarding
+
+**Wave 40**
+- [x] 04-55-PLAN.md — Remove unread movie-buffer fill work while preserving active-pixel canaries and every behavior check
+
+**Wave 41**
+- [x] 04-56-PLAN.md — Repair portable disc opens and provide real fixture inputs to selected sanitizer consumers
+
+**Wave 42**
+- [x] 04-29-PLAN.md — Compare two BIOS-free content frames in real background RetroArch
+
+**Wave 43**
+- [x] 04-30-PLAN.md — Compare canonical whole-VRAM output against independent known answers
+
+**Wave 44**
+- [x] 04-46-PLAN.md — Run the pinned clipping executable against its actual hardware capture
+
+**Wave 45**
+- [x] 04-57-PLAN.md — Deliver the registered VBlank hook and return through the guest CPU context
+
+**Wave 46**
+- [x] 04-58-PLAN.md — Validate IRQ context replay and real guest progress before resuming captures
+
+**Wave 47**
+- [x] 04-47-PLAN.md — Compare all remaining nine actual GPU image captures
+
+**Wave 48**
+- [x] 04-48-PLAN.md — Judge the three real GPU hardware logs and run the required lane
+
+**Wave 49**
+- [x] 04-31-PLAN.md — Replay hostile GPU, SIO and card inputs through bounded calls
+
+**Wave 50**
+- [x] 04-32-PLAN.md — Reconcile API and hardware contracts, then verify the reviewed phase
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
 
@@ -271,9 +429,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. A test frame in RetroArch | 15/15 | Ship PR #4 | 2026-10-29 |
+| 1. A test frame in RetroArch | 15/15 | Complete | 2026-10-29 |
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
-| 4. Games play in RetroArch | 0/TBD | Not started | - |
+| 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
 | 5. The sound matches the console | 0/TBD | Not started | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |

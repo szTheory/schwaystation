@@ -194,11 +194,11 @@ static void sr_mask(void)
     inst->cpu.r[1] = 0xFFFFFFFFu;
     run_word(inst, 0x80001000u, MTC0_WORD(1u, SCHWAY__COP0_SR));
     CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_SR), 0xF04FFF3Fu);
-    run_word(inst, 0x80001004u, MFC0_WORD(2u, SCHWAY__COP0_SR));
-    run_word(inst, 0x80001008u, 0u);
+    run_word(inst, 0x00001004u, MFC0_WORD(2u, SCHWAY__COP0_SR));
+    run_word(inst, 0x00001008u, 0u);
     CHECK_EQ_HEX(inst->cpu.r[2], 0xF04FFF3Fu);
     inst->cpu.r[1] = 0u;
-    run_word(inst, 0x8000100Cu, MTC0_WORD(1u, SCHWAY__COP0_SR));
+    run_word(inst, 0x0000100Cu, MTC0_WORD(1u, SCHWAY__COP0_SR));
     CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_SR), 0u);
     schway_destroy(inst);
 }
@@ -246,7 +246,7 @@ static void rfe(void)
     run_word(inst, 0x80001000u, RFE_WORD);
     CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_SR), 0x1040FF2Bu);
     CHECK_EQ_HEX(inst->cpu.pc, 0x80001004u);
-    run_word(inst, 0x80001004u, RFE_WORD);
+    run_word(inst, 0x00001004u, RFE_WORD);
     CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_SR), 0x1040FF2Au);
     schway_destroy(inst);
 }
@@ -272,7 +272,7 @@ static void ce_only_cpu(void)
     CHECK_EQ_U64((cop0(inst, SCHWAY__COP0_CAUSE) >> 28) & 3u, 3u);
     /* COP0 in user mode with CU0 clear: CpU, CE 0. */
     inst->cpu.cop0.r[SCHWAY__COP0_SR] = 0x00000002u;
-    run_word(inst, 0x8000100Cu, RFE_WORD);
+    run_word(inst, 0x0000100Cu, RFE_WORD);
     CHECK_EQ_U64(exc_code(inst), 0x0Bu);
     CHECK_EQ_U64((cop0(inst, SCHWAY__COP0_CAUSE) >> 28) & 3u, 0u);
     CHECK_EQ_HEX(cop0(inst, SCHWAY__COP0_BADVADDR), 0x0BADC0DEu);
@@ -421,7 +421,7 @@ static void no_fault_for_traps(void)
     run_word(inst, 0x80001008u, ADD_WORD(3u, 1u, 2u));
     CHECK_EQ_U64(exc_code(inst), 0x0Cu);
     inst->cpu.cop0.r[SCHWAY__COP0_SR] = 0x00000002u;
-    run_word(inst, 0x8000100Cu, MFC0_WORD(1u, SCHWAY__COP0_SR));
+    run_word(inst, 0x0000100Cu, MFC0_WORD(1u, SCHWAY__COP0_SR));
     CHECK_EQ_U64(exc_code(inst), 0x0Bu);
     CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
     schway_destroy(inst);

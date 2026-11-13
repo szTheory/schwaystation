@@ -636,13 +636,9 @@ static void load(schway *inst, const uint32_t *words, uint32_t n)
     CHECK_EQ_U64(schway_load_exe(inst, exe, sizeof exe), SCHWAY_STATUS_OK);
 }
 
-/* Fault prevented: a counter synchronised to the vertical blank that does not
-   see the blank the frame end produces, so that a reset at the blank never
-   happens and the counter just free-runs. A program sets counter 1 to the
-   system clock with synchronisation on and mode 1 (reset at the blank), then
-   spins to the frame end. Just after it the counter reads the cycles since the
-   frame end (0 at the end itself), not the cycles since the MODE write, which
-   were hundreds of thousands. */
+/* Fault prevented: a counter synchronised to vertical blank that ignores the
+   GPU's Y comparison and free-runs from its MODE write. The counter has reset
+   at a beam edge during the frame and continues to count the system clock. */
 static void case_t1_vblank_frame(void)
 {
     static const uint32_t program[] = {
@@ -661,11 +657,11 @@ static void case_t1_vblank_frame(void)
     CHECK_EQ_U64(schway_run_frame(inst, &r), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
     CHECK_EQ_HEX(rd32(inst, MODE(1u)) & 0x3FFu, 3u);
-    uint64_t end = inst->ticks;
-    CHECK_EQ_U64(rd32(inst, COUNT(1u)), 0u);
+    uint32_t after_blank = rd32(inst, COUNT(1u));
+    CHECK(after_blank > 0u);
+    CHECK(after_blank < schway__instance_frame_max(inst->region));
     (void)run(inst, 1000u);
-    CHECK(inst->ticks > end);
-    CHECK_EQ_U64(rd32(inst, COUNT(1u)), (inst->ticks - end) & 0xFFFFu);
+    CHECK_EQ_U64(rd32(inst, COUNT(1u)), (after_blank + 1000u) & 0xFFFFu);
     schway_destroy(inst);
 }
 
@@ -904,12 +900,9 @@ static void case_hblank_feed(void)
     schway_destroy(inst);
 }
 
-/* Fault prevented: an access to a counter that waits on a signal nothing
-   makes yet that is not counted for the footer or that is made a fault, a
-   counter that moves without its signal, a count at power-on or for the modes
-   that do not wait on the beam (system clock, vertical-blank sync, the
-   prescaler of counter 2), or a count that goes on after MODE is put back. */
-static void case_unfed_unbuilt(void)
+/* Fault prevented: timer accesses report an unbuilt device or fail to count
+   dots once the integrated GPU beam drives the counter. */
+static void case_beam_register_access(void)
 {
     schway *inst = make();
     uint32_t *n = &inst->bus.unbuilt_n[SCHWAY__DEV_TIMER];
@@ -920,38 +913,13 @@ static void case_unfed_unbuilt(void)
     }
     CHECK_EQ_U64(*n, 0u);
 
-    /* Counter 0 on the dot clock: the write, the poll and the target read are
-       three accesses, and the counter stays at 0 for any number of ticks. */
+    inst->gpu.display_mode = 1u;
+    inst->gpu.beam_tick = inst->ticks;
+    schway__sched_sync(inst);
     wr32(inst, MODE(0u), 0x100u);
-    CHECK_EQ_U64(*n, 1u);
-    CHECK_EQ_U64(at(inst, 1000u, COUNT(0u)), 0u);
-    CHECK_EQ_U64(*n, 2u);
-    (void)rd32(inst, TARGET(0u));
-    CHECK_EQ_U64(*n, 3u);
-    CHECK_EQ_U64(inst->bus.last_unbuilt[0], SCHWAY__DEV_TIMER);
-    CHECK_EQ_HEX(inst->bus.last_unbuilt[1], TARGET(0u));
-
-    /* Counter 0 with synchronisation on waits for the horizontal blank. */
-    wr32(inst, MODE(0u), 0x1u);
-    CHECK_EQ_U64(*n, 4u);
-
-    /* Counter 1 on the horizontal blank, and not on the vertical blank. */
-    wr32(inst, MODE(1u), 0x100u);
-    CHECK_EQ_U64(*n, 5u);
-    CHECK_EQ_U64(at(inst, 3000u, COUNT(1u)), 0u);
-    CHECK_EQ_U64(*n, 6u);
-    wr32(inst, MODE(1u), 0x3u);
-    CHECK_EQ_U64(*n, 6u);
-    wr32(inst, MODE(2u), 0x301u);
-    (void)rd32(inst, COUNT(2u));
-    CHECK_EQ_U64(*n, 6u);
-
-    /* Back on the system clock, nothing more is counted. */
-    wr32(inst, MODE(0u), 0x0u);
-    (void)rd32(inst, COUNT(0u));
-    wr32(inst, MODE(1u), 0x0u);
-    (void)rd32(inst, COUNT(1u));
-    CHECK_EQ_U64(*n, 6u);
+    advance_to(inst, 100u);
+    CHECK(rd32(inst, COUNT(0u)) > 0u);
+    CHECK_EQ_U64(*n, 0u);
     CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
     schway_destroy(inst);
 }
@@ -1108,7 +1076,7 @@ static const struct {
     {"t1_vblank_frame", case_t1_vblank_frame},
     {"t1_vblank_modes", case_t1_vblank_modes},
     {"t2_stop_modes", case_t2_stop_modes},
-    {"unfed_unbuilt", case_unfed_unbuilt},
+    {"beam_register_access", case_beam_register_access},
     {"target_period", case_target_period},
     {"wrap_no_dwell", case_wrap_no_dwell},
     {"write_hold", case_write_hold},

@@ -1,0 +1,263 @@
+{
+  "phase": "04",
+  "stage": "stable-production",
+  "phase_base": "abf58b394f0d1eac6416904f3b67c227d5e965f0",
+  "review_base": "8c3bdcb7aad20c4e8c5bb58d1974dc48b697f7d7",
+  "depth": "standard",
+  "files": [
+    {
+      "path": "host/cards.c",
+      "git_blob": "5644a63ae10e01b55ceec442b4c64f7ac4d31973",
+      "sha256": "5bcd421d1e5d177aceb7107dcf24127f32a94d05d065f42ff649d54dc462adaf",
+      "lines": 459,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/host/cards.c"
+    },
+    {
+      "path": "host/cards.h",
+      "git_blob": "0a0db694bdbe3da34435352f765118db49fe753b",
+      "sha256": "6a72dfc6d88ce72066796716ef124fe0af26ff6cc5f11df38366cdaa9786cd26",
+      "lines": 54,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/host/cards.h"
+    },
+    {
+      "path": "host/disc_probe.c",
+      "git_blob": "7433700aaa2882fe07022c218ae3dac413209d8b",
+      "sha256": "ed92f15713a38834a16711b52c8bba32ac065a3128f656c31bf36a5ad74e2849",
+      "lines": 1101,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/host/disc_probe.c"
+    },
+    {
+      "path": "host/disc_probe.h",
+      "git_blob": "9cd9d89c30a9540ca6a4143440e44e617f493662",
+      "sha256": "a25c21ac444932e90ec47c918a8963f1ba61f2dc973c9ac371a53bd244483352",
+      "lines": 41,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/host/disc_probe.h"
+    },
+    {
+      "path": "host/sha1.c",
+      "git_blob": "86acaf13a4ca5c1674d1fa9aaa4ef9cbf0dd0f7e",
+      "sha256": "fc2b66f49593757180124636db1cfdb75c92775371f281613a9eba86fe773b5d",
+      "lines": 121,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/host/sha1.c"
+    },
+    {
+      "path": "host/sha1.h",
+      "git_blob": "917a18b8aedff4956d769f10d350ca2543ec8fa4",
+      "sha256": "9534211a1c102d397780555d452ed03ea135f73880ade0c1f5a34bf5a4535596",
+      "lines": 20,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/host/sha1.h"
+    },
+    {
+      "path": "host/xrgb8888.c",
+      "git_blob": "b12d6d09e8b5356b1a03618cb46e7332b0f8196b",
+      "sha256": "cba8a75656efce2e00671f20d54fbf82d168b47a04ec88e091f937d370168f7a",
+      "lines": 71,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/host/xrgb8888.c"
+    },
+    {
+      "path": "host/xrgb8888.h",
+      "git_blob": "43476a522a2647cb648ec5420f771d76ee0682cd",
+      "sha256": "bf4066622a26bc220ebb94b760e55557e5e55d0d2ebc25988626b1bbb365d054",
+      "lines": 26,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/host/xrgb8888.h"
+    },
+    {
+      "path": "include/schwaystation.h",
+      "git_blob": "7ac10ed20276150fe5cd7dd9527e5783e60c6531",
+      "sha256": "5bc688d51bfb1da2f91a37c8210448a6d5c1ef9cd8e0d69e9eb0d37b6af13ccd",
+      "lines": 291,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/include/schwaystation.h"
+    },
+    {
+      "path": "libretro/CMakeLists.txt",
+      "git_blob": "83808de9ee3e2cbfcd71572b9c6c34a06d2fcc04",
+      "sha256": "80989702a8c236f68eec21313c1e59e8867f73909a1be0b578662a5585314907",
+      "lines": 51,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/libretro/CMakeLists.txt"
+    },
+    {
+      "path": "libretro/libretro.c",
+      "git_blob": "7e1f7e9e04c19da1aee397a5e5b4508d768342ca",
+      "sha256": "975ecf192c79c10de4f5ca2b019d6ff4f28c254176d1a71d3da9074507bd5f8b",
+      "lines": 1130,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/libretro/libretro.c"
+    },
+    {
+      "path": "libretro/schwaystation_libretro.info.in",
+      "git_blob": "82e2fd0c649566bfa2f4408d93a9d78153b947bd",
+      "sha256": "1ba4677803041f6d554fb41364df1b41947b78f03b88563554bb8a993eab7225",
+      "lines": 28,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/libretro/schwaystation_libretro.info.in"
+    },
+    {
+      "path": "runner/CMakeLists.txt",
+      "git_blob": "069aecb29e55013c37d1311b0d10c580513f71b4",
+      "sha256": "8ce1ee7d4685aa1879fbe6d729d7e5b339260fe36034a789650ad0c2129dbd21",
+      "lines": 52,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/CMakeLists.txt"
+    },
+    {
+      "path": "runner/exit_status.h",
+      "git_blob": "b912685e0bde9add9718ab8a221a9ceb52f2bc7f",
+      "sha256": "71c7aa5f6888246c8866f4994249f1640874ed3507529966825fab3cc9c0d3a1",
+      "lines": 25,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/exit_status.h"
+    },
+    {
+      "path": "runner/frame_hash.c",
+      "git_blob": "714f19bb1ea3e60ed142074f6dceda97e9cd9785",
+      "sha256": "1d45e1476be568ce3f325674fe351c61468385e0a0d0355e05cc1f077674e95e",
+      "lines": 51,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/frame_hash.c"
+    },
+    {
+      "path": "runner/frame_hash.h",
+      "git_blob": "52b7e3a7e398e2a923df64e55dd526bd2db3614f",
+      "sha256": "99d99aedb87fabbe246894e82e9bd3d285a0c570a7b43db7a99df0a4be036030",
+      "lines": 9,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/frame_hash.h"
+    },
+    {
+      "path": "runner/inputs.c",
+      "git_blob": "0712f7e651d4777e88aec5eabeb779645c3fcf96",
+      "sha256": "7994737abcb54188f95ca042aa103d58c764b9afee50866863458f8ec2d3a21c",
+      "lines": 440,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/inputs.c"
+    },
+    {
+      "path": "runner/inputs.h",
+      "git_blob": "52110d699d841a9b57a5954d40c8ab1b9618641c",
+      "sha256": "df71d681c6806f0a086534c51dfea2449682a817acf74ca6e5ad3d9b5b2c56a0",
+      "lines": 40,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/inputs.h"
+    },
+    {
+      "path": "runner/probe.c",
+      "git_blob": "85ad504d67b3806606b196232bd821ce4f02288a",
+      "sha256": "ff21cb7331d8ee8bd52f3337eaa1617af4037d1db4fefa0bbc09eacca564f43a",
+      "lines": 403,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/probe.c"
+    },
+    {
+      "path": "runner/probe.h",
+      "git_blob": "73a1759279ed56f9725c199c6760b6104e0c069c",
+      "sha256": "f78e201242944570cffd775805a8241e4802b266cb4357145ca1984f630e79da",
+      "lines": 35,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/probe.h"
+    },
+    {
+      "path": "runner/sha256.h",
+      "git_blob": "e25dcb90e77d54579f261f221a1211486dba6daa",
+      "sha256": "6806b407edc24b002b1e3616007e2b95dda0114b0b4a341bbb2eec37e444f80b",
+      "lines": 22,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/sha256.h"
+    },
+    {
+      "path": "runner/tty.h",
+      "git_blob": "b1f0bb198f35893df22d2102cb6c0ed7a6569a34",
+      "sha256": "e4c2f7a1503544978e34f102e0802c8f63c7636f0a41d6be4c7c6bcb1e4d207c",
+      "lines": 12,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/runner/tty.h"
+    },
+    {
+      "path": "src/bios.c",
+      "git_blob": "0356dc7c4f0c16a753d332b6bf5519ea5342b930",
+      "sha256": "21eb9fb135a10bccf9efe6336e4c659b09120a5cc5af9a2642adbfd75ec9a7c3",
+      "lines": 89,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/bios.c"
+    },
+    {
+      "path": "src/bios.h",
+      "git_blob": "f8e4549cf972c550b9a07d18315322b56195efbf",
+      "sha256": "6f5ca56939916b79622d118a608d063572276a544dc71ae44e517adfd6759438",
+      "lines": 11,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/bios.h"
+    },
+    {
+      "path": "src/bios_table.inc",
+      "git_blob": "e5e71d1ef5627cee87ab94098cdad91300c020d9",
+      "sha256": "82ac4da6f33e609854fe903ecca442a418b406fa363e95eaf977caa4b7d76855",
+      "lines": 103,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/bios_table.inc"
+    },
+    {
+      "path": "src/card.c",
+      "git_blob": "8fe83415134fd770d426791bbb5f89e2c506836c",
+      "sha256": "517805890f3e942010a041d833502bd09f6d130486576806ed58172b3f326e3c",
+      "lines": 413,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/card.c"
+    },
+    {
+      "path": "src/card.h",
+      "git_blob": "49a9d2385a3beb32ebc5838a9388270781dc9073",
+      "sha256": "b7a2973b0d7703c3c69e4d6530f12d3fda639765e48f1d475bbe3862fe049148",
+      "lines": 50,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/card.h"
+    },
+    {
+      "path": "src/exe.c",
+      "git_blob": "50a62ce9e85b51f419eaa35d621b22fa75aeb0d2",
+      "sha256": "728795e2218b74ed8661310ebc0d39bf0cf1bc3047f4112dbb17fa4de65c4b41",
+      "lines": 160,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/exe.c"
+    },
+    {
+      "path": "src/instance.c",
+      "git_blob": "c76c274d45ce999472f8cde71ebd8e353d87ccf8",
+      "sha256": "2944999af8aed6d4a1a41a00472aa370d75e2a310fabfd33aeccdca3d841155c",
+      "lines": 535,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/instance.c"
+    },
+    {
+      "path": "src/internal.h",
+      "git_blob": "a4f2a24b87e1b3f0c7bc076d6a2c5656310d716f",
+      "sha256": "2d945b724613495e1fbe81470bfdf9afb4fe06f844fb98bb11107b455621d04e",
+      "lines": 463,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/internal.h"
+    },
+    {
+      "path": "src/pad.c",
+      "git_blob": "a3ce445678aa043c4ec1d9a83c171b3160fa5758",
+      "sha256": "9696f2917e3865704e4ba7777494824f5d66268ec26b39e19ff548ef53414205",
+      "lines": 533,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/pad.c"
+    },
+    {
+      "path": "src/pad.h",
+      "git_blob": "e9cb2d29ba87a3d9c67732c832c50518a1d38702",
+      "sha256": "57dc461d37ddb3682743df2f32bc538732adcd9a4494e6290f6479a2300fa705",
+      "lines": 53,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/pad.h"
+    },
+    {
+      "path": "src/sio.c",
+      "git_blob": "b9c755c149057c911993f9952031ada08353fa2f",
+      "sha256": "b5d98ced7d1a3823def419b9ec96cbb2d193c4e5fa68d29b67ec5af5ab49ec2d",
+      "lines": 443,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/sio.c"
+    },
+    {
+      "path": "src/sio.h",
+      "git_blob": "4908d4fc4ec7a58ce5a077fbad234cc70f459d62",
+      "sha256": "7dd18913be680916864ece0cc804ec00332db471b144a1f0578495a5e2879e83",
+      "lines": 31,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/sio.h"
+    },
+    {
+      "path": "src/state.c",
+      "git_blob": "34e3b2a4b006a804ad2eb6cc1aa322f7c7057426",
+      "sha256": "c14bdefca8df4321a44b9fe275eb3246b2b095a90c60d5064928c7b618405263",
+      "lines": 259,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/state.c"
+    },
+    {
+      "path": "src/state.h",
+      "git_blob": "1c1d19c10fb06c0687081b1dd26a21b0255d51a2",
+      "sha256": "25749f2e400a15258ff9936b4fbe2970ed32003d90a4d5646c44ca0d3a3bec91",
+      "lines": 291,
+      "snapshot": "/private/tmp/phase4-review-stable/snapshot/src/state.h"
+    }
+  ],
+  "excluded": [],
+  "policy": "One staged phase review; later GPU/IRQ and changed-file deltas remain, no phase-wide completion claim."
+}

@@ -97,13 +97,16 @@ between legs of one run only).
 - Oracles that need a retail BIOS (DuckStation regtest, Mednafen, ares, MAME) run only in this preset.
 - Issue forms say: never attach disc images, BIOS files or memory-card dumps of commercial saves.
 
-## 5. BIOS digest table (the loader accepts any listed digest, whatever the file name)
-Firmware is identified by digest. The digests are facts and may be committed; the bytes may not. Names, sizes,
-MD5 and SHA-1 are the libretro `System.dat` rows at `12c21cf79f1e`, read raw on 2026-10-19 (tested) [AP.02];
-every image is 524,288 bytes. The libretro `.info` lists `scph5500.bin`, `scph5501.bin` and `scph5502.bin` as
-required and `psxonpsp660.bin` and `ps1_rom.bin` as optional; the loader first tries the region's canonical
-name, then any 512 KiB file in the directory whose digest is below, logs the match, and refuses an unknown image
-by name instead of guessing. The runner's `--bios` prints the digest it matched.
+## 5. BIOS recognition digests
+Firmware identity digests are facts and may be committed; BIOS bytes may not. Names, sizes, MD5 and SHA-1 below are
+the libretro `System.dat` rows at `12c21cf79f1e20eff6ac68b80875816c717d0a7a`, read raw on 2026-10-19 [AP.02]; the
+raw file's first-fetch SHA-256 is `57f83609a28122b0e5e0bfc6a1993a3b512580698be7dd2affb307913087544b`. Every listed
+image is 524,288 bytes. The core matches the MD5 facts and retains their paired SHA-1 values in `src/bios_table.inc`;
+it does not infer or match SHA-256 from the DAT. The API separately reports SHA-256 computed from every loaded
+exact-size image and returns recognition status and region only after an MD5 match. An image name alone does not
+establish identity.
+Unknown images and OpenBIOS remain loadable without a retail recognition result. The libretro `.info` lists
+`scph5500.bin`, `scph5501.bin` and `scph5502.bin` as required and `psxonpsp660.bin` and `ps1_rom.bin` as optional.
 
 | libretro name | Version, model (psx-spx) | Region | MD5 | SHA-1 |
 |---|---|---|---|---|
@@ -125,12 +128,12 @@ by name instead of guessing. The runner's `--bios` prints the digest it matched.
 | `psxonpsp660.bin` | PSP firmware 6.60 PS1 image, region-free | any | c53ca5908936d412331790f4426c6c33 | 96880d1ca92a016ff054be5159bb06fe03cb4e14 |
 | `ps1_rom.bin` | PS3 PS1 image, region-free | any | 81bbe60ba7a3d1cea1d48c14cbcc647b | c40146361eb8cf670b19fdc9759190257803cab7 |
 
-Not in `System.dat`, so not accepted by the loader until a public digest exists: 2.0a DTL-H1001, 2.1a/2.1e,
+Not in `System.dat`, so not recognized as retail by the current DAT table: 2.0a DTL-H1001, 2.1a/2.1e,
 2.2e SCPH-1002 and the DTL units, 2.2v SCPH-5903 (1 MB), 2.2d DTL-H1100, 4.0j SCPH-7000/9000, 4.1w SCPH-7000W,
-4.4a SCPH-101, and the Net Yaroze DTL-H3000 family (psx-spx CRC32 values in PSX-SYSTEM 7). No SHA-256 is
-recorded upstream; the first maintainer dump that matches both MD5 and SHA-1 records one here. The canonical
-name per region is `scph5500.bin` (J), `scph5501.bin` (U), `scph5502.bin` (E). OpenBIOS is not in this table:
-it is third-party MIT code identified by the digest in `tests/built/expected.txt`, never a Sony image.
+4.4a SCPH-101, and the Net Yaroze DTL-H3000 family (psx-spx CRC32 values in PSX-SYSTEM 7). They remain loadable
+when supplied as exact-size images, but the loader reports no retail match. The canonical name per region is
+`scph5500.bin` (J), `scph5501.bin` (U), `scph5502.bin` (E). OpenBIOS is not in this table: it is third-party MIT
+code identified by the digest in `tests/built/expected.txt`, never a Sony image.
 
 ## 6. How this is checked
 - `scripts/hygiene.sh` runs at pre-commit (`--staged`), at pre-push over all outgoing history (`--history`), and
@@ -177,7 +180,7 @@ copies. A fixture whose licence turns out wrong moves to section 3 in the same P
 | ID | Tier | Source (URL) | Pin or access date | Supports |
 |---|---|---|---|---|
 | AP.01 | T1 | github.com/szTheory/cogmaster `ASSET_POLICY.md`; github.com/szTheory/muhtari `ASSET_POLICY.md` | `abd950941e93`; `d698364b180d` | template and section structure |
-| AP.02 | T1 | github.com/libretro/libretro-database `dat/System.dat` L498 to L519, fetched raw with `gh api` and read here (tested); `LICENSE` CC BY-SA 4.0 (digests are facts) | `12c21cf79f1e` | section 5 names, sizes, MD5, SHA-1 |
+| AP.02 | T1 | github.com/libretro/libretro-database `dat/System.dat` L498 to L519, fetched raw with `gh api` and read here (tested); `LICENSE` CC BY-SA 4.0 (digests are facts) | commit `12c21cf79f1e20eff6ac68b80875816c717d0a7a`; raw file SHA-256 above | section 5 names, sizes, MD5, SHA-1 and runtime region recognition |
 | AP.03 | T1 | github.com/pcsx-redux/nugget `LICENSE` (MIT), `openbios/README.md`, `openbios/Makefile`, `.github/workflows/build.yml` | `9db6d88d23c4` | OpenBIOS build-in-CI disposition |
 | AP.04 | T1 | github.com/SingleStepTests/r3000 `LICENSE` (MIT), README, `transcode_json.py`, `v1/` tree sizes | `51e227447d0b` | sample and full-set dispositions, sizes |
 | AP.05 | T1 | github.com/JaCzekanski/ps1-tests `LICENSE` (MIT), README, `common.mk` (libpsn00b link), `gte/test-all/tests.c`, release `build-158` asset | `f727802fead1`; `build-158` | reference images and logs, GTE table, MPL bytes in executables |

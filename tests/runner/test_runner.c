@@ -6,6 +6,7 @@
 
 #include "../../runner/bench.h"
 #include "../../runner/stop.h"
+#include "../../runner/tty.h"
 #include "../check.h"
 
 static const uint32_t all_ppm[] = {500000u, 900000u, 990000u, 999000u, 999900u, 999990u, 1000000u};
@@ -127,10 +128,20 @@ static void stop(void)
     CHECK_EQ_U64(schway__stop_requested(), 1u);
 }
 
+static void tty_sanitize(void)
+{
+    CHECK_EQ_HEX(schway__runner_tty_byte(0x1Bu), '?');
+    CHECK_EQ_HEX(schway__runner_tty_byte('\r'), '?');
+    CHECK_EQ_HEX(schway__runner_tty_byte('\t'), '\t');
+    CHECK_EQ_HEX(schway__runner_tty_byte('A'), 'A');
+    CHECK_EQ_HEX(schway__runner_tty_byte(0x7Fu), '?');
+    CHECK_EQ_HEX(schway__runner_tty_byte(0x80u), '?');
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-bench percentile|bytes|format|stop\n");
+        fprintf(stderr, "usage: schwaystation-test-bench percentile|bytes|format|stop|tty_sanitize\n");
         return 2;
     }
     if (strcmp(argv[1], "percentile") == 0) {
@@ -141,6 +152,8 @@ int main(int argc, char **argv)
         format();
     } else if (strcmp(argv[1], "stop") == 0) {
         stop();
+    } else if (strcmp(argv[1], "tty_sanitize") == 0) {
+        tty_sanitize();
     } else {
         fprintf(stderr, "unknown case %s\n", argv[1]);
         return 2;

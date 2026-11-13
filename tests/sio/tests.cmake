@@ -1,0 +1,84 @@
+# SIO0 registers, scheduled byte replies and controller transactions.
+add_executable(schwaystation-test-sio ${CMAKE_CURRENT_LIST_DIR}/sio_tests.c)
+target_include_directories(schwaystation-test-sio PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-sio PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-sio PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-sio)
+
+add_executable(schwaystation-test-sio-pad ${CMAKE_CURRENT_LIST_DIR}/pad_tests.c)
+target_include_directories(schwaystation-test-sio-pad PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-sio-pad PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-sio-pad PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-sio-pad)
+
+schway_add_test(NAME sio.pad.input_latch
+  COMMAND schwaystation-test-sio-pad input_latch_and_rumble
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: DualShock command replies, selectors or staged actuator mappings change unexpectedly.
+schway_add_test(NAME sio.pad.config_commands
+  COMMAND schwaystation-test-sio-pad config_commands
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: the analog button toggles on a held level or through its configuration lock.
+schway_add_test(NAME sio.pad.analog_button_edges
+  COMMAND schwaystation-test-sio-pad analog_button_edges
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: the legacy 0140h motor command is lost or remains on after 0000h.
+schway_add_test(NAME sio.pad.old_rumble
+  COMMAND schwaystation-test-sio-pad old_rumble
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: the config watchdog expires early, late, or fails to lock rumble.
+schway_add_test(NAME sio.pad.watchdog_boundary
+  COMMAND schwaystation-test-sio-pad watchdog_boundary
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: split protocol data or an actuator map is lost across saved-state load.
+schway_add_test(NAME sio.pad.state_split_config
+  COMMAND schwaystation-test-sio-pad state_split_config
+  LABELS sio portable TIMEOUT 10)
+
+# Fault prevented: a byte reply or IRQ7 that precedes its baud or pad-ACK deadline,
+# a digital pad with the wrong handshake, or an ACK on the final byte.
+schway_add_test(NAME sio.digital.poll_irq
+  COMMAND schwaystation-test-sio digital_poll_irq
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: a restored in-flight byte or ACK moves its exact deadline
+# or raises IRQ7 more than once.
+schway_add_test(NAME sio.state.pending_byte
+  COMMAND schwaystation-test-sio state_pending_byte
+  LABELS sio portable TIMEOUT 10)
+schway_add_test(NAME sio.state.pending_ack
+  COMMAND schwaystation-test-sio state_pending_ack
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: reset or deselect leaves stale byte/ACK events in the scheduler.
+schway_add_test(NAME sio.transport.abort
+  COMMAND schwaystation-test-sio transport_abort
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: pad button state leaks between ports or core instances.
+schway_add_test(NAME sio.pad.independent_ports_instances
+  COMMAND schwaystation-test-sio independent_ports_instances
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: baud factors or character-length bits shift RX completion.
+schway_add_test(NAME sio.control.baud
+  COMMAND schwaystation-test-sio baud_character_length
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: data-register widths pop the wrong number of FIFO entries.
+schway_add_test(NAME sio.fifo.widths
+  COMMAND schwaystation-test-sio fifo_widths
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: FIFO overflow is unbounded, silent, or clears incorrectly.
+schway_add_test(NAME sio.fifo.overrun
+  COMMAND schwaystation-test-sio fifo_overrun
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: IRQ7 and JOY_STAT IRQ status lose their two-step clear ordering.
+schway_add_test(NAME sio.irq.ack_order
+  COMMAND schwaystation-test-sio irq_ack_order
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: a digital pad requests another ACK after its final reply byte.
+schway_add_test(NAME sio.pad.final_no_ack
+  COMMAND schwaystation-test-sio no_final_ack
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: peeking advances the device or consumes FIFO data.
+schway_add_test(NAME sio.peek.pure
+  COMMAND schwaystation-test-sio peek_pure
+  LABELS sio portable TIMEOUT 10)

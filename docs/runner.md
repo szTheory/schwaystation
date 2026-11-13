@@ -5,17 +5,19 @@ sound device or input device. It can print a frame hash, write a PNG and report 
 to check that a build produces the expected picture. It can run a PS-EXE file and print the text the program writes,
 and it can say what a PS-EXE file is without running it.
 
-This release loads no BIOS and no disc. Without `--exe` every run shows the built-in test card, described in
-[embedding.md](embedding.md#the-test-card). `--probe` reads one file and runs nothing.
+The runner loads no disc. A run without `--bios` or `--exe` shows the built-in test card, described in
+[embedding.md](embedding.md#the-test-card). `--probe` reads one PS-EXE or disc image and runs nothing.
 
 ## Synopsis
 
 ```text
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-vram] [--hash-state]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
-                  [--trace first-fault] [--no-stop-on-fault] [--hash] [--hash-state]
-schwaystation-run --probe FILE
+                  [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
+                  [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-vram] [--hash-state]
+schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]
 schwaystation-run --help | --version
 ```
 
@@ -25,23 +27,149 @@ schwaystation-run --help | --version
 |---|---|
 | `--frames N` | Run N frames, N from 1 to 1000000. Give either `--frames` or `--bench`, once. |
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
+| `--bios FILE` | Load an exactly 524288-byte BIOS image, report its digest identity, then run it. Without `--frames` or `--bench` the run is 600 frames. Give it once. See [BIOS images](#bios-images). |
 | `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
-| `--tty` | Print the program's text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe`. |
+| `--tty` | Print guest text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe` or `--bios`. |
 | `--stop-on mailbox` | End the run when the program's [mailbox](#mailbox) reports done or fault; a run that reaches the frame cap with neither is a [hang](#mailbox). Needs `--exe`. Give it once. |
 | `--trace first-fault` | After a [fault](#diagnostics) or a hang, print the last 4096 trace records as twelve-field lines. Needs `--exe`. Give it once. |
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
-| `--hash-state` | After the last frame and every other line, print the SHA-256 of the saved [machine state](#frame-hash). |
+| `--hash-vram` | After the last frame, print the SHA-256 of all VRAM words as row-major little-endian RGB555 with bit 15 cleared. |
+| `--hash-state` | After the last frame, print the SHA-256 of the saved [machine state](#frame-hash). |
+| `--inputs FILE` | Parse and apply a bounded controller script before each frame latch, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
+| `--save-dir DIR` | Load and save the two memory cards under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
+| `--memcard-names MODE` | Use `basename` (default) or `serial` for the card filenames. Give it once. |
+| `--serial SERIAL` | Use this safe serial basename with `--memcard-names serial`. A bare PS-EXE does not contain a disc serial, so the caller supplies it. |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
-| `--probe FILE` | Print what the PS-EXE file is, as `key=value` lines, and exit. See [Probe](#probe). Give it alone. |
+| `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it once. |
+| `--metadata-ledger CSV` and `--metadata-dat DAT` | Supply both bounded lookup files to `--probe`; identity is shown only after an exact DAT and passing-ledger match. |
 | `--region NAME` | `ntsc-u` (the default), `ntsc-j` or `pal`: the console's region and its video timing. |
 | `--help` | Print the usage text and the exit statuses. Give it alone. |
 | `--version` | Print the version and the Git revision the build was configured from. Give it alone. |
 
-Options may come in any order, except `--probe`, which takes no other option. Anything else on the command line is
-a usage error and nothing runs; that includes a file name that does not follow `--exe` or `--probe`, `--exe` twice
-or with `--probe`, `--tty`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything
-but `mailbox`, `--trace` with anything but `first-fault`, and any option this release does not have.
+Options may come in any order, except `--probe`, which takes no other option except the `--metadata-ledger` and
+`--metadata-dat` pair. Anything else on the command line is
+a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--exe` or `--probe`,
+`--bios` or `--exe` twice, `--bios` together with `--exe`, `--exe` with `--probe`, `--tty` without `--exe` or
+`--bios`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything but `mailbox`,
+`--trace` with anything but `first-fault`, `--serial` without serial naming, and any option this release does not have.
+
+## BIOS images
+
+`--bios FILE` accepts exactly 524288 bytes. A missing, unreadable, short or overlong file exits 1 before a frame runs.
+The runner copies the image into the emulator instance before reset, then prints its identity:
+
+```text
+bios flags=loaded,recognized status=recognized region=ntsc-u sha256=<64 lowercase hex digits>
+```
+
+Unknown exact-size images print `flags=loaded status=unknown region=unknown`; they remain loadable. Recognition and
+region come from the BIOS digest table, never from the filename. The SHA-256 identifies the exact bytes supplied.
+The repository does not include BIOS files. For example, a user can pass a BIOS file they already have:
+
+```sh
+schwaystation-run --bios ./bios.bin --frames 600 --tty
+```
+
+The checked OpenBIOS shell used by CI is an unknown image, so the runner reports the same unknown flags. The host
+chooses the image with `--bios` and the machine profile with `--region`; the portable shell check also boots the
+same checked image with the NTSC-J and PAL selectors. To inspect its 240th NTSC-U frame, use:
+
+```sh
+schwaystation-run --region ntsc-u --bios ./openbios.bin --frames 240 --hash --png 240:openbios-shell.png
+```
+
+That public development image is a one-day CI handoff, not part of a runner, library or libretro package. A matching
+digest identifies the supplied bytes independently of the path used to name them.
+
+Without `--frames` or `--bench`, the runner allows 600 frames for BIOS startup. `--tty` enables the debug ports and
+prints text or a nonzero exit-port result. `--stop-on mailbox`, `--trace first-fault` and `--no-stop-on-fault` remain
+PS-EXE options. The separate `--exe FILE` path continues to run without a BIOS file, using the core's stub kernel.
+
+## Input scripts
+
+`--inputs FILE` accepts ASCII text of at most 64 MiB and 1,000,000 records. Blank lines and `#` comments are
+allowed. Records may appear in any order; the runner sorts them by frame before playback. Each one-based record
+gives a complete snapshot for both ports:
+
+```text
+FRAME p1=DEVICE:BUTTONS:LX,LY,RX,RY p2=DEVICE:BUTTONS:LX,LY,RX,RY
+```
+
+Use `.` for a disconnected port. For a connected pad with no pressed buttons, use `DEVICE:.:LX,LY,RX,RY`.
+`DEVICE` is `digital` or `dualshock`. Button symbols may be combined in any order: `U`, `D`, `L`, `R` are the
+directions; `S` is Start and `s` is Select; `T`, `O`, `X`, `Q` are Triangle, Circle, Cross and Square; `1`, `2`,
+`3`, `4` are L1, R1, L2 and R2;
+`<` and `>` are L3 and R3. `M` holds the DualShock analog-mode button. Repeating a symbol is invalid. Axis values
+are decimal 0–255 in left-X, left-Y, right-X, right-Y order; 128 is the centre. A connected pad with no pressed
+buttons still includes its four axis values.
+
+For example, a Cross press on port 1 at frame 60, released at frame 61, is:
+
+```text
+60 p1=dualshock:X:128,128,128,128 p2=.
+61 p1=dualshock:.:128,128,128,128 p2=.
+```
+
+A snapshot remains active until a later record changes it. Repeated identical records for one frame are accepted;
+conflicting records for that frame are rejected. Frames must be from 1 to 1,000,000 and may exceed the run's
+`--frames` cap; later records are validated but not applied. The runner validates the whole file before it creates
+the core instance or runs a frame. A malformed record exits 2 with a bounded line-numbered error; an unreadable
+file or memory failure exits 1. The test-card frame hash remains unchanged by input, while `--hash-state` includes
+the latched controller state.
+
+With `--inputs`, the runner also prints `lag frames=N`. The count sums the core's per-frame result: a frame is lagged
+when the guest completes no controller poll through SIO0. Mailbox checks and other `schway_peek` reads are read-only
+and never count as a poll or clear one. The pad-counter fixture polls on alternating frames, then checks its mailbox
+after every frame; the 300-frame run reports 150 lagged frames.
+
+## Runner memory cards
+
+With `--save-dir DIR`, the runner imports both card files before loading and running the PS-EXE. By default it uses
+the executable filename without its final extension as the basename; a content-free run uses `schwaystation`.
+Slot 1 is `basename.srm` and slot 2 is `basename.1.mcr`. To share cards across a multi-disc set, pass
+`--memcard-names serial --serial SLUS-00001` (replace the example with the game's serial). The supplied serial is
+validated as a single filename component. The runner does not create DIR.
+
+Missing card files leave the core's formatted blank cards in place. Invalid or unreadable card files stop the run
+with status 1 before any frame is executed, and the source file is never rewritten during import. At exit, each
+slot is saved only when a successful card Write command completed and advanced that slot's generation. An
+unchanged slot is not replaced. Files are written through an exclusive sibling temporary, synced, and atomically
+replaced. A failed import or save returns status 1; a failed save preserves the previous destination. SIGINT or
+SIGTERM still finishes the current frame and flushes completed writes before returning status 0.
+
+The `memcard_roundtrip` fixture verifies this path with fresh runner processes. From an empty save directory,
+the first process reads and writes card 1 value 1 and independent card 2 value 2; a second process reads them
+back and writes 2 and 3. The frame-120 hashes must differ, and the guest mailbox checks the counters and red
+RGB555 pixels read back from VRAM. A control places the card-2 image under card 1's filename and verifies that
+the guest sees a different counter pair and frame hash from a missing-card run. Card images and PNGs are generated
+only in the build tree.
+
+## Shared host memory-card file behavior
+
+The shared host helper imports raw memory-card images from 1 to 131,072 bytes and pads short raw images with `FFh`
+in memory. It also imports these full-card wrappers by their header bytes:
+
+| Format | Required image | Card payload |
+|---|---:|---:|
+| DexDrive `.gme` | 131,072 bytes after a 3,904-byte header beginning `123-456-STD` and a NUL byte | offset `0F40h` |
+| VGS `.mem` or `.vgs` | 131,072 bytes after a 64-byte header beginning `VgsM` | offset 64 |
+| PlayStation Magazine `.psx` | 131,072 bytes after a 256-byte header beginning `PSV` | offset 256 |
+
+Wrapped images with a truncated payload, an invalid header or trailing bytes are rejected. PSP/Vita signed card
+formats are unsupported. Import reports lint flags for a missing `MC` header or bad frame checksums, but those
+warnings do not reject an otherwise valid image. Lint reads the imported bytes and never rewrites the source file.
+
+By default, per-game names use the content basename: slot 1 is `basename.srm`, and slot 2 is
+`basename.1.mcr`. A host may select serial naming instead, using the game serial as that basename so multi-disc
+sets share a card. The shared helper refuses path separators, unsupported filename characters, or more than 63
+characters; it builds both names under the supplied directory. The same basename in separate directories
+therefore produces separate save paths. Slot 2 does not use the stale `.2.mcr` spelling.
+
+Saving requires a complete 131,072-byte image. The helper writes a new sibling temporary file, flushes it, forces
+the file data to storage (`fsync` on POSIX and `_commit` on Windows), then atomically replaces the destination.
+Temporary names are opened exclusively, so an existing file is never overwritten. A write, flush or replacement
+failure returns an I/O error and leaves the previous destination in place.
 
 ## Examples
 
@@ -50,8 +178,11 @@ schwaystation-run --frames 60 --hash
 schwaystation-run --bench 600
 schwaystation-run --frames 60 --png 60:card.png
 schwaystation-run --region pal --frames 50 --hash
+schwaystation-run --frames 120 --inputs movie.txt --hash-state
 schwaystation-run --exe game.exe --tty
 schwaystation-run --exe game.exe --tty --stop-on mailbox
+schwaystation-run --exe game.exe --frames 300 --save-dir saves
+schwaystation-run --exe game.exe --frames 300 --save-dir saves --memcard-names serial --serial SLUS-00001
 schwaystation-run --exe game.exe --trace first-fault > fault.txt
 schwaystation-run --exe game.exe --no-stop-on-fault --frames 300
 schwaystation-run --exe game.exe --frames 300 --hash
@@ -225,27 +356,44 @@ to such a device are dropped and its reads return 0; neither is a fault.
 frame 60 sha256 be3538480b252f5bcfe7cb5b876a71c72d3795621b4278e405af61c425c06d71
 ```
 
-The hash is SHA-256 over the frame's video description, then its pixels. The description is 13 unsigned 32-bit
-words, each stored low byte first: field, interlaced, vres, hres, dot_div, region, x1, y1, start_x, start_y,
-enabled, rgb24 and bpp. The pixels follow as the displayed rows from top to bottom, each pixel a 16-bit word
-stored low byte first, with no padding between rows. The hash is therefore the same on little-endian and
-big-endian hosts. The card changes every frame, so the frame number matters.
+The hash is SHA-256 over the frame's video description, then its native pixels. The description is 13 unsigned
+32-bit words, each stored low byte first: field, interlaced, vres, hres, dot_div, region, x1, y1, start_x,
+start_y, enabled, rgb24 and bpp. Pixel rows follow from top to bottom with no padding: 15-bit frames serialize
+each native word low byte first, while packed 24-bit frames hash their RGB bytes directly. Host color conversion,
+cropping, border placement and scaling do not enter this hash. The digest is therefore the same on little-endian
+and big-endian hosts. The card changes every frame, so the frame number matters.
 
 Until a GPU draws, every frame is the test card whatever the CPU, the GTE, DMA or the timers did, so the frame hash
-cannot show them. `--hash-state` prints one more line, after every other line the run prints:
+cannot show them. `--hash-state` prints one line after the last frame. When combined with other reports, it appears
+after the frame hash and before the VRAM hash and lag count. For example, the `gpu_motion.exe` fixture at frame 150 prints:
 
 ```text
-state sha256 9c6fd5660fd9bb9fb3d50604a8c43827f9833d81db21ab3b024a0da754e5d8a6
+state sha256 <64 lowercase hexadecimal digits>
 ```
 
-It is the SHA-256 of the state `schway_save_state` writes, without its 20-byte header, so it covers every register
-and counter the instance keeps. A state is the same bytes on every platform. A save that fails exits 1.
+It is the SHA-256 of the serialized machine state without its 20-byte header. It covers the fields needed to resume
+emulated execution, including the loaded BIOS identity, but excludes BIOS payload bytes, persistent card bytes and
+generations, output queues and the trace ring. The state bytes are the same on every platform. A save that fails
+exits 1.
+
+## VRAM hash
+
+`--hash-vram` prints one line after the last frame:
+
+```text
+vram sha256 67222605a58edbac567cba036618e52bb4a3eb933c32006c891d06adbb035041
+```
+
+The SHA-256 input is all 1024x512 VRAM words in row-major order. Each word has bit 15 cleared and is serialized
+low byte first, so the digest is stable across host byte orders and ignores the non-color mask flag. It can be
+used with `--hash` to report both the displayed-frame and whole-VRAM hashes.
 
 ## PNG output
 
-`--png N:FILE` writes frame N unscaled as an 8-bit RGB PNG. Each pixel goes through the same 15-bit to XRGB8888
-conversion the libretro core uses, with the X byte dropped. The runner builds the whole file in memory and writes
-it in one call; a file that cannot be written in full is removed and the runner exits 1.
+`--png N:FILE` writes frame N unscaled as an 8-bit RGB PNG. Native 15-bit words are widened to XRGB8888 with the
+mask bit dropped; packed 24-bit RGB bytes are passed through unchanged. Both follow the libretro core's host
+conversion, with the X byte dropped. The runner builds the whole file in memory and writes it in one call; a file
+that cannot be written in full is removed and the runner exits 1.
 
 ## Bench report
 
@@ -282,41 +430,71 @@ shows that frame's time, and with fewer than 100,000 frames p99.999 is the maxim
 
 ## Probe
 
-`--probe FILE` reads the file, checks it with the core's PS-EXE validator and prints what it is. It makes no
-instance, loads nothing and runs no frame. The report is these lines, in this order, each `key=value`:
+`--probe FILE` reads a PS-EXE, a raw ISO9660 image, or a CUE sheet with its referenced BINARY files. It validates a
+disc's boot executable but does not create an emulator instance, submit sectors, or run a frame. Raw ISO images use
+2048-byte sectors. CUE sheets are at most 64 KiB with at most 99 tracks and indexes; each relative `FILE` name is at
+most 255 bytes and cannot escape the sheet's directory. Companion images together are capped at 1 GiB. Supported
+CUE layouts are `MODE1/2048`, `MODE1/2352`, `MODE2/2336`, `MODE2/2352` and `AUDIO`; timestamps range through
+`99:59:74`. ISO parsing is bounded to 64 descriptors, 64 KiB directories with 4096 records, 2047 bytes of
+`SYSTEM.CNF`, and 16 boot-path components of at most 63 bytes each. `.chd`, `.pbp`, `.ecm` and `.ccd` are refused
+as unsupported media. The probe never executes a disc. Boot and play status remain `unknown`.
+
+The output only reveals a disc identity when its serial, rcheevos MD5, first-track SHA-1, DAT title and passing
+`metadata.identity` ledger row all match. Otherwise its serial, names and digests are redacted. Bare PS-EXE names
+and digests are redacted because they have no disc metadata join. Probe errors use the generic label `input`; they
+do not echo a private path. Identity fields are:
 
 | Key | Value |
 |---|---|
-| `format` | `exe` |
-| `serial` | `n/a`: a bare executable has no disc serial |
-| `licence_area` | the market named by the licence text at offset 4Ch: `japan`, `europe`, `north_america` or `none` |
-| `region_guess` | `ntsc-j`, `pal` or `ntsc-u` for the three markets, `unknown` for `none` |
-| `exe_name` | the file's name without its directory, any byte outside printable ASCII shown as `?` |
-| `exe_size` | the file's size in bytes, in decimal |
-| `sha256` | SHA-256 of the whole file, 64 lowercase hex digits |
-| `rcheevos_md5` | the MD5 an achievement set is keyed on, 32 lowercase hex digits, see below |
-| `pc0`, `gp0` | the entry point and the initial global pointer |
-| `t_addr`, `t_size` | where the text loads and how many bytes it has |
-| `d_addr`, `d_size`, `b_addr`, `b_size` | the data and BSS fields, printed as the header holds them |
-| `s_addr`, `s_size` | the initial stack base and offset, zero when the header gives none |
-| `lint` | notes on a valid file, as bits: `0x1` the text lies in the low 64 KiB, `0x2` bytes follow the text |
+| `format` | `exe` for a bare file; `disc` for a raw ISO9660 image or CUE sheet |
+| `serial` | matched DAT serial; otherwise `redacted` |
+| `rcheevos_md5` | matched boot-executable MD5; otherwise `redacted` |
+| `track1_sha1` | matched physical first-track SHA-1; otherwise `redacted` |
+| `title` | matched DAT title; otherwise `unavailable` |
+| `metadata.identity` | `pass` only for the exact ledger/DAT join; otherwise `unknown` |
+| `metadata.identity_date` | ledger measurement date, present only when identity matches |
+| `boot_status`, `play_status` | both `unknown`; the probe never boots or plays a disc |
 
-The ten header values, from `pc0` to `s_size`, are printed as `0x` and eight hex digits, and so is `lint`.
+The boot MD5 follows the RetroAchievements rule: hash the canonical boot filename without its ISO version suffix,
+then the PS-EXE header and text bytes selected by the header. The SHA-1 covers the physical bytes of track 1,
+including sector headers for raw CUE tracks. The first data track can be later than track 1.
 
-`rcheevos_md5` is the MD5 of the file's first `t_size` + 0800h bytes, which is the header and the text. This is the
-rule RetroAchievements applies to a PS-EXE. A disc's hash also begins with the name of its boot file; a bare file
-has none, so nothing is added. A file longer than that, as a `lint` of `0x2` reports, hashes as if it were cut there.
+The `--metadata-ledger` and `--metadata-dat` inputs must be supplied together. Without both, disc identity fields
+remain redacted. Lookup inputs are bounded to 16 MiB with lines no longer than 4096 bytes. The documented title
+source is libretro-database's Redump Sony PlayStation DAT at commit
+[`12c21cf79f1e20eff6ac68b80875816c717d0a7a`](https://github.com/libretro/libretro-database/tree/12c21cf79f1e20eff6ac68b80875816c717d0a7a),
+`metadat/redump/Sony - PlayStation.dat`, under CC-BY-SA-4.0. The project and license are credited here; the DAT is
+not copied into the runner. The ten-column ledger accepts unquoted printable ASCII titles only, so a DAT entry
+with a comma, quote, escape or non-ASCII title remains unavailable. No package is required.
 
-The file must be a PS-EXE the core would load: the `PS-X EXE` signature, a header the validator accepts, and a size
-from 0800h to 0800h + 2 MiB. Otherwise nothing is printed on standard output and the runner prints one line to
-standard error and exits 1:
+The input must be a PS-EXE the core would load or a bounded, valid disc image. Otherwise nothing is printed on
+standard output and the runner prints one generic line to standard error and exits 1:
 
 ```text
-schwaystation-run: game.exe: PS-EXE invalid
+schwaystation-run: input: PS-EXE invalid
 ```
 
-The reason is `PS-EXE invalid` or `PS-EXE outside RAM` from the core, or `the file is empty`, `cannot open the
-file` or `cannot read the file`. `--probe` with any other option, with no file or with a second file exits 2.
+The reason is a validation or I/O result from the probe. `--probe` with any other option, with no file or with a
+second file exits 2. Its only optional arguments are the complete metadata pair documented above.
+
+## Local compatibility library
+
+Copy `.env.example` to the ignored `.env.local`, set `SCHWAYSTATION_DISC_DIR` and `SCHWAYSTATION_BIOS_DIR` to
+existing directories, then run `scripts/library.sh` from the repository root. The script parses those values as
+data; it never sources the file or evaluates shell expressions. It runs the separate `library` workflow, fetches
+and verifies the pinned Redump DAT if it is absent from the ignored build directory, and probes top-level CUE and ISO files
+plus standalone raw 2048-byte BIN files. A BIN referenced by a CUE `FILE` entry is treated as that sheet's
+companion and is not probed again as a standalone image. Each probe joins to the committed ten-column ledger and
+DAT. Matched identity rows report boot and play as `unknown`/`unavailable`; unlisted images produce only generic
+unknown rows without serials, names or hashes. Invalid supported images fail the scan and preserve the previous
+report. The report is written only to ignored `build/library/results.csv`.
+
+The local lookup uses `tests/compat/ledger.csv` and the DAT at `build/library/Sony - PlayStation.dat`. If the DAT
+is absent, it is fetched from libretro-database commit `12c21cf79f1e20eff6ac68b80875816c717d0a7a` and checked by
+SHA-256; an existing local DAT is reused. Boot and play remain unknown until a disc
+backend measures them. CI exercises the same host lookup code with isolated temporary DAT and ledger fixtures,
+never `.env.local` or owner content. Public compatibility documentation is regenerated from the committed ledger
+only.
 
 ## Stopping
 
@@ -330,7 +508,7 @@ signal that was already ignored when the runner started, as under `nohup`, stays
 
 ```text
   0  done     every frame ran, or SIGINT or SIGTERM ended the run after a whole frame
-  1  failure  a file could not be written or is not a valid PS-EXE, memory ran out or the core failed
+  1  failure  a file or card could not be read or written, a PS-EXE is invalid, memory ran out or the core failed
   2  usage    the command line is invalid, so nothing ran
   6  fixture  the fixture reported failure: mailbox status FFh, a mailbox CRC mismatch or an exit port byte not 00h
   7  fault    the first fault stopped the run

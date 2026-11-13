@@ -56,6 +56,139 @@
 .include "header.inc"
 .include "mailbox.inc"
 
+.ifndef TIMING
+.definelabel TIMING, 0
+.endif
+.if TIMING
+.definelabel TIMING_IO, 0xBF801000
+.definelabel TIMING_VECTOR, 0x80000080
+.definelabel TIMING_FIRST, 3
+.definelabel TIMING_LAST, TIMING_FIRST + WINDOW
+.definelabel TIMING_IRQS, 0x11             ; VBlank and Timer 0 wrap
+
+.org MB_BASE
+mailbox_header 9, 0
+
+.org PC0
+  mtc0 zero, sr
+  nop
+  nop
+  mtc0 zero, cause
+  li t0, timing_vector_jump
+  li t1, TIMING_VECTOR
+  lw t2, 0(t0)
+  lw t3, 4(t0)
+  lw t4, 8(t0)
+  lw t5, 12(t0)
+  sw t2, 0(t1)
+  sw t3, 4(t1)
+  sw t4, 8(t1)
+  sw t5, 12(t1)
+  li s0, TIMING_IO
+  move s1, zero                         ; VBlank events
+  move s2, zero                         ; Timer 0 wraps, including a pending wrap
+  move s3, zero                         ; dot count at the first sampled blank
+  move s4, zero                         ; HBlank count at the first sampled blank
+  move s5, zero                         ; dots in the phase-restoring window
+  move s6, zero                         ; HBlanks in the window
+  move s7, zero                         ; lines per frame
+  sw zero, 0x70(s0)
+  li t0, TIMING_IRQS
+  sw t0, 0x74(s0)
+  lui t0, 0x0800                         ; GP1(08h): choose the documented dot divider
+  ori t0, t0, DISPLAY_MODE
+  sw t0, 0x814(s0)
+  sw zero, 0x100(s0)
+  li t0, 0x0160                         ; Timer 0: free-running dot clock, repeat IRQ at FFFFh
+  sw t0, 0x104(s0)
+  sw zero, 0x110(s0)
+  li t0, 0x0100                         ; Timer 1: count every HBlank edge
+  sw t0, 0x114(s0)
+  li t0, 0x0401                         ; IEc and the interrupt-controller mask
+  mtc0 t0, sr
+timing_idle:
+  b timing_idle
+  nop
+
+timing_handler:
+timing_snapshot:
+  ; Keep the Timer 0 sample at one CPU endpoint offset. In PAL /4, an 8-cycle
+  ; offset advances 12 then 13 GPU clocks at the phase-restoring VBlank pair;
+  ; this two-read preamble makes both offsets 22 clocks. The ratio carry is
+  ; documented in docs/hardware/gpu.md and the trace evidence in docs/testing.md.
+  lw t8, 0x70(s0)                      ; first I_STAT read fixes the interrupt-handler cadence
+  lw t0, 0x70(s0)
+  lw t1, 0x100(s0)                      ; Timer 0 dot count
+  lw t2, 0x110(s0)                      ; Timer 1 HBlank count
+  lw t3, 0x70(s0)
+  nop
+  xor t4, t0, t3
+  andi t4, t4, TIMING_IRQS
+  bne t4, zero, timing_snapshot
+  nop
+  andi t4, t0, 0x10
+  srl t4, t4, 4
+  addu s2, s2, t4                       ; count a pending wrap before acknowledging it
+  andi t4, t0, TIMING_IRQS
+  nor t4, t4, zero
+  sw t4, 0x70(s0)
+  andi t4, t0, 1
+  beq t4, zero, timing_return
+  nop
+  addiu s1, s1, 1
+  sll t4, s2, 16
+  addu t4, t4, t1                       ; cumulative Timer 0 dots including wraps
+  li t5, TIMING_FIRST
+  bne s1, t5, timing_not_first
+  nop
+  move s3, t4
+  move s4, t2
+timing_not_first:
+  li t5, TIMING_LAST
+  bne s1, t5, timing_return
+  nop
+  subu s5, t4, s3                       ; dot total across a phase-restoring window
+  subu s6, t2, s4                       ; one HBlank edge per line
+  li t5, WINDOW
+  divu s6, t5
+  mflo s7
+  j timing_finish
+  nop
+timing_return:
+  mfc0 k0, epc
+  nop
+  jr k0
+  rfe
+
+timing_finish:
+  li t0, MB_BASE
+  li t1, 0x00010001
+  sw t1, MB_RECORDS(t0)
+  sw s1, MB_RECORDS + 4(t0)
+  li t1, 0x00010002
+  sw t1, MB_RECORDS + 8(t0)
+  sw s5, MB_RECORDS + 12(t0)
+  li t1, 0x00010003
+  sw t1, MB_RECORDS + 16(t0)
+  sw s7, MB_RECORDS + 20(t0)
+  li t1, 0x00010004
+  sw t1, MB_RECORDS + 24(t0)
+  sw s6, MB_RECORDS + 28(t0)
+  li t1, 4
+  sb t1, MB_COUNT(t0)
+  mailbox_seal
+timing_hang:
+  j timing_hang
+  nop
+
+timing_vector_jump:
+  lui k0, timing_handler >> 16
+  ori k0, k0, timing_handler & 0xFFFF
+  jr k0
+  nop
+.align 0x800
+SW_END:
+.else
 .definelabel IO, 0xBF801000             ; the I/O ports, uncached
 .definelabel VECTOR, 0x80000080         ; the general exception vector, kernel RAM
 .definelabel FIRST, 3                   ; the blank whose snapshot starts the window
@@ -180,4 +313,5 @@ vector_jump:
 
 .align 0x800
 SW_END:
+.endif
 .close

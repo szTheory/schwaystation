@@ -1,6 +1,6 @@
-# Continuous integration. Every job runs the same `cmake --workflow --preset`
-# command as a local build, then checks that every test it expected ran. The
-# ruleset requires one check, `CI required`. docs/testing.md describes the jobs.
+# Continuous integration. Build jobs use the local CMake workflows and check that every
+# expected test ran. The GPU reference lane configures only its selected GPU tests.
+# The ruleset requires one check, `CI required`; docs/testing.md describes the jobs.
 # Every timeout below is provisional until this repository's own runs measure it.
 name: CI
 
@@ -10,6 +10,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      control_ref:
+        description: "Optional commit with which to compare GPU-motion performance"
+        type: string
+        required: false
+        default: ""
   workflow_call:
     inputs:
       ref:
@@ -78,6 +84,78 @@ jobs:
               --jq '.[] | .filename, (.previous_filename // empty)' || echo '(listing failed)'; } |
             sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
 
+  # Required renderer oracle: fetch the pinned captures and three source logs,
+  # then run only the GPU reference tests. The CPU vector corpus stays nightly.
+  gpu-reference:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10  # provisional until the merged plan's hosted run measures the lane.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || '' }}
+      - name: Configure the GPU reference inventory
+        run: >-
+          cmake -S . -B build/gpu-reference -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+          -DSCHWAYSTATION_INVENTORY=nightly -DSCHWAYSTATION_FIXTURES=OFF
+          -DSCHWAYSTATION_GPU_REFERENCE_ONLY=ON
+      - name: Build the runner and GPU judge
+        run: cmake --build build/gpu-reference --target schwaystation-run schwaystation-test-gpu-reference --parallel 2
+      - name: Run the pinned GPU oracles
+        run: >-
+          ctest --test-dir build/gpu-reference --output-on-failure --no-tests=error
+          --output-junit junit.xml -R '^gpu[.]reference[.]'
+      - name: Every GPU reference ran
+        run: >-
+          cmake -DJUNIT=build/gpu-reference/junit.xml -DINVENTORY=tests/inventory/nightly.txt
+          -DLABELS=gpu -P tests/cmake/check_junit.cmake
+
+  # Build once in this run, then hand the digest-checked image to every build
+  # consumer through a short-retention Actions artifact (never a cache).
+  openbios:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 8  # 8-minute provisional bound until the producer has measured runs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || '' }}
+      - name: Build and verify pinned OpenBIOS
+        env:
+          OPENBIOS_PIN: 9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9
+        run: |
+          set -eu
+          source_dir="$RUNNER_TEMP/nugget"
+          archive_dir="$RUNNER_TEMP/openbios-archive"
+          toolchain_dir="$RUNNER_TEMP/openbios-toolchain"
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/pcsx-redux/nugget.git "$source_dir"
+          git -C "$source_dir" fetch --quiet --depth=1 origin "$OPENBIOS_PIN"
+          git -C "$source_dir" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$source_dir" rev-parse HEAD)" = "$OPENBIOS_PIN"
+          mkdir -p "$archive_dir" "$toolchain_dir" build/openbios
+          sh scripts/fetch-pin.sh gcc-mipsel-none-elf-linux "$archive_dir"
+          toolchain_zip=$(find "$archive_dir" -maxdepth 1 -type f -name '*.zip' -print -quit)
+          test -n "$toolchain_zip"
+          unzip -t "$toolchain_zip" > /dev/null
+          unzip -q "$toolchain_zip" -d "$toolchain_dir"
+          test -x "$toolchain_dir/bin/mipsel-none-elf-gcc"
+          PATH="$toolchain_dir/bin:$PATH" make -C "$source_dir/openbios" -j2 \
+            BUILD=Release BOARD=psx BOOT=rom OPENBIOS_SHELL=shell
+          cmake "-DOPENBIOS_INPUT=$source_dir/openbios/openbios.bin" \
+            -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+          cp "$source_dir/openbios/openbios.bin" build/openbios/openbios.bin
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: openbios-handoff
+          path: build/openbios/openbios.bin
+          retention-days: 1
+          if-no-files-found: error
+
   # The image has git and jq; configure finds them.
   hygiene:
     runs-on: ubuntu-26.04
@@ -115,7 +193,7 @@ jobs:
             sh scripts/check-title.sh "$title"
 
   build:
-    needs: changes
+    needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     name: build (${{ matrix.os }}-${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
@@ -132,9 +210,39 @@ jobs:
           - { runner: windows-11-arm, preset: ci-msvc, os: windows, arch: arm64 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          persist-credentials: false
+          repository: ${{ github.event.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: compat-base
+          sparse-checkout: |
+            scripts/compat-ratchet.sh
+            tests/cmake/compat-ratchet.cmake
+            tests/compat/ledger.csv
+          sparse-checkout-cone-mode: false
+      - name: Preserve protected base checkout for ratchet
+        if: github.event_name == 'pull_request'
+        env:
+          COMPAT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -eu
+          protected_base="$RUNNER_TEMP/compat-base"
+          cmake -E copy_directory "$GITHUB_WORKSPACE/compat-base" "$protected_base"
+          test "$(git -C "$protected_base" rev-parse --verify HEAD)" = "$COMPAT_BASE_SHA"
+          printf 'COMPAT_BASE_DIR=%s\n' "$protected_base" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openbios-handoff
+          path: build/${{ matrix.preset }}/openbios
+      - name: Verify run-local OpenBIOS before consumers
+        run: >-
+          cmake -DOPENBIOS_INPUT=build/${{ matrix.preset }}/openbios/openbios.bin
+          -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       # The MSVC developer environment for the runner's own architecture,
       # without a third-party action.
       - name: MSVC environment
@@ -146,6 +254,8 @@ jobs:
           cmd /c "`"$vs\VC\Auxiliary\Build\vcvarsall.bat`" $arch && set" |
             ForEach-Object { if ($_ -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" >> $env:GITHUB_ENV } }
       - name: Build, test, package
+        env:
+          COMPAT_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
         run: cmake --workflow --preset ${{ matrix.preset }}
       - name: Every test ran
         run: >-
@@ -178,17 +288,30 @@ jobs:
           name: hashes-${{ matrix.os }}-${{ matrix.arch }}
           path: build/${{ matrix.preset }}/hashes.txt
           if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.os == 'macos' && matrix.arch == 'arm64'
+        with:
+          name: pad-counter-fixture
+          path: build/${{ matrix.preset }}/fixtures/pad_counter.exe
+          retention-days: 1
+          if-no-files-found: error
 
   asan:
-    needs: changes
+    needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt); 2 x 28 s (asan), slowest of 5 runs, run 42722584020
+    timeout-minutes: 9  # Measured: run 43317211769 passed 405/405 in 4m06; movies took 2m32
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openbios-handoff
+          path: build/asan/openbios
+      - name: Verify run-local OpenBIOS before consumers
+        run: cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       # clang-21 is on the image; its sanitizer runtimes may not be.
       - name: Sanitizer runtimes
         run: dpkg -s libclang-rt-21-dev > /dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y libclang-rt-21-dev; }
@@ -204,7 +327,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: nofp (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 1  # 2 x 28 s (nofp ubuntu-26.04), slowest of 5 runs, run 42691517611
+    timeout-minutes: 3  # floor covers slow checkout/image startup; one-minute cancellations: runs 42840838785 and 42841474140
     strategy:
       fail-fast: false
       matrix:
@@ -221,15 +344,21 @@ jobs:
   # 32-bit big-endian PowerPC under qemu-ppc: label portable, and its
   # hashes.txt joins the comparison.
   be32:
-    needs: changes
+    needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt); 2 x 102 s (be32), slowest of 5 runs, run 42724296965
+    timeout-minutes: 45  # Provisional: run 43317211769 hit 25m at input.movies +15m03; CTest allows 240s x8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openbios-handoff
+          path: build/be32/openbios
+      - name: Verify run-local OpenBIOS before consumers
+        run: cmake -DOPENBIOS_INPUT=build/be32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       - name: Cross compiler and qemu-user
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-powerpc-linux-gnu g++-powerpc-linux-gnu qemu-user
       - run: cmake --workflow --preset be32
@@ -266,7 +395,7 @@ jobs:
 
   # The WebAssembly lane participates in the same required hash comparison.
   wasm32:
-    needs: changes
+    needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor (apt); 2 x 60 s (wasm32), slowest of 5 runs, run 42691517611
@@ -275,6 +404,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openbios-handoff
+          path: build/wasm32/openbios
+      - name: Verify run-local OpenBIOS before consumers
+        run: cmake -DOPENBIOS_INPUT=build/wasm32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
       - name: WASI sysroot and runtime
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends wasi-libc libclang-rt-21-dev-wasm32
@@ -300,7 +435,8 @@ jobs:
   # saying so. A range of frames is never accepted.
   retroarch:
     needs: [changes, build]
-    if: needs.changes.outputs.heavy == 'true'
+    # Keep the host result when another build leg fails; the required aggregate still fails.
+    if: ${{ !cancelled() && needs.changes.outputs.heavy == 'true' }}
     runs-on: macos-15
     timeout-minutes: 5  # 5-minute floor; 2 x 23 s (retroarch), slowest of 1 run, run 39455724329, provisional
     steps:
@@ -312,6 +448,10 @@ jobs:
         with:
           name: archives-macos-arm64
           path: build/archives
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pad-counter-fixture
+          path: build/fixtures
       - name: Core and runner from the build
         run: |
           unzip -q build/archives/schwaystation-libretro-macos-arm64.zip -d build/libretro
@@ -340,40 +480,72 @@ jobs:
             sips --deleteColorManagementProperties "$f.png" > /dev/null
             sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
           done
-          cc -std=c17 -O2 -Wall -Wextra -Werror -o compare ../../tests/retroarch/bmp.c ../../tests/retroarch/compare.c
-          ./compare runner.bmp shot.bmp | tee compare.txt
-          grep -q '^320x240, every pixel equal$' compare.txt
-      - name: The compare's negative control
-        working-directory: build/frames
+          python3 ../../tests/retroarch/verify.py compare runner.bmp shot.bmp 320 240
+          python3 ../../tests/retroarch/verify.py pixel-control shot.bmp 7 3
+          python3 ../../tests/retroarch/verify.py dimension-control shot.bmp 319 240
+      - name: Record and replay deterministic Cross input
         run: >-
-          cmake -DCOMPARE=./compare -DEXPECTED=shot.bmp -DBMP=runner.bmp -DFLIPPED=flipped.bmp
-          -P ../../tests/retroarch/flip.cmake
-      - name: RetroArch log
-        if: failure()
-        run: cat build/ra/retroarch.log || true
-      # Both PNGs, so a failed compare's frame counter can be read.
+          cmake -DRETROARCH=build/RetroArch.app/Contents/MacOS/RetroArch
+          -DCORE=build/libretro/cores/schwaystation_libretro.dylib -DINFO=build/libretro/info/schwaystation_libretro.info
+          -DTEMPLATE=tests/retroarch/test.cfg.in "-DRA_DIR=$PWD/build/ra-replay"
+          "-DSHOT=$PWD/build/frames/replay" -DPROBE_CONTENT=build/fixtures/pad_counter.exe -DFRAMES=60
+          -DVERIFY=tests/retroarch/verify.py -P tests/retroarch/run_retroarch.cmake
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: retroarch-replay-probe
+          path: |
+            build/ra-replay/probe.bsv
+            build/ra-replay/*.log
+            build/ra-replay/probe.cross.bsv
+          retention-days: 1
+          if-no-files-found: ignore
+      - name: Both RetroArch frames equal their runner references
+        working-directory: build/frames
+        run: |
+          printf '%s\n' '1 p1=digital:.:128,128,128,128 p2=.' \
+            '60 p1=digital:X:128,128,128,128 p2=.' > pad-counter.inputs
+          ../runner/bin/schwaystation-run --exe ../fixtures/pad_counter.exe --frames 59 \
+            --inputs pad-counter.inputs --png 59:runner59.png
+          ../runner/bin/schwaystation-run --exe ../fixtures/pad_counter.exe --frames 60 \
+            --inputs pad-counter.inputs --png 60:runner60.png
+          test -d ../ra-replay/system && test -z "$(find ../ra-replay/system -mindepth 1 -print -quit)"
+          for f in runner59 runner60 replay.59 replay.60; do
+            sips --deleteColorManagementProperties "$f.png" > /dev/null
+            sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
+          done
+          python3 ../../tests/retroarch/verify.py compare runner59.bmp replay.59.bmp 256 240
+          python3 ../../tests/retroarch/verify.py compare runner60.bmp replay.60.bmp 256 240
+          python3 ../../tests/retroarch/verify.py distinct replay.59.bmp replay.60.bmp
+      - name: RetroArch logs
         if: failure()
+        run: cat build/ra/*.log build/ra-replay/*.log || true
+      # Captures from both comparisons aid diagnosis.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: retroarch-frames
           path: build/frames/*.png
-          if-no-files-found: warn
+          retention-days: 1
+          if-no-files-found: ignore
 
-  # Cachegrind instructions per frame of the test card: the pull request's
-  # head commit against its merge base with the base branch, the base
-  # measured twice. The merge commit's first parent is not used: it is the
-  # base branch tip, which also counts commits that landed after the branch
-  # point. Direct runs only (a nested call passes ref). On workflow_dispatch
-  # it measures one commit three times: a control run for arming the gate.
+  # Cachegrind instructions per frame of the test card and gpu_motion: the
+  # pull request's head commit against its merge base with the base branch,
+  # the base measured twice. The merge commit's first parent is not used: it
+  # is the base branch tip, which also counts commits that landed after the
+  # branch point. Direct runs only (a nested call passes ref). A manual run
+  # without control_ref measures both fixtures three times; with control_ref
+  # it compares gpu_motion with that exact commit.
   perf:
     needs: changes
     if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt); 2 x 22 s (perf), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # 5-minute floor (apt); perf took 1m15 and 1m39 in runs 42984345515 and 42985306022, provisional
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
       EVENT: ${{ github.event_name }}
+      CONTROL_REF: ${{ inputs.control_ref || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -389,13 +561,28 @@ jobs:
       - name: Build the runner at head and base
         id: build
         run: |
+          cmake --preset ci
+          cmake --build build/ci --target fixtures/gpu_motion.exe
+          mkdir -p "$RUNNER_TEMP/perf"
+          cp build/ci/fixtures/gpu_motion.exe "$RUNNER_TEMP/perf/gpu_motion.exe"
           build() {
             (cd "$1" && cmake --workflow --preset perf) || return 1
-            mkdir -p "$2" && cp "$1/build/perf/schwaystation-run" "$2/schwaystation-run"
+            mkdir -p "$2" && cp "$1/build/perf/schwaystation-run" "$2/schwaystation-run" && \
+              cp "$RUNNER_TEMP/perf/gpu_motion.exe" "$2/gpu_motion.exe"
           }
           build . "$RUNNER_TEMP/perf/head"
           if [ "$EVENT" = workflow_dispatch ]; then
-            echo no_base=none >> "$GITHUB_OUTPUT"
+            if [ -z "$CONTROL_REF" ]; then
+              echo no_base=none >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [[ ! "$CONTROL_REF" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "${CONTROL_REF}^{commit}"; then
+              echo "perf: control_ref must be a full commit SHA available in this checkout" >&2
+              exit 2
+            fi
+            git worktree add --detach "$RUNNER_TEMP/base" "$CONTROL_REF"
+            build "$RUNNER_TEMP/base" "$RUNNER_TEMP/perf/base"
+            echo no_base=false >> "$GITHUB_OUTPUT"
             exit 0
           fi
           base=$(git merge-base "origin/$BASE_REF" "$HEAD_SHA")
@@ -413,49 +600,63 @@ jobs:
           NO_BASE: ${{ steps.build.outputs.no_base }}
         run: |
           valgrind=$(command -v valgrind)
-          # Ir of one run of the runner under $1 for $2 frames, from the
-          # summary line of Cachegrind's output; empty output is a failure.
+          # Ir of one runner/workload combination for the requested frames,
+          # from Cachegrind's summary line; empty output is a failure.
           ir() {
             rm -f "$RUNNER_TEMP/cg.out"
+            local args=(--frames "$3")
+            if [ "$2" = gpu_motion ]; then
+              args=(--exe "$1/gpu_motion.exe" --frames "$3")
+            fi
             env -i "$valgrind" --tool=cachegrind --cache-sim=no --cachegrind-out-file="$RUNNER_TEMP/cg.out" \
-              "$1/schwaystation-run" --frames "$2" > /dev/null 2>&1 || return 1
+              "$1/schwaystation-run" "${args[@]}" > /dev/null 2>&1 || return 1
             local v
             v=$(sed -n 's/^summary: *\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/cg.out")
             [ -n "$v" ] || return 1
             echo "$v"
           }
-          # Ir/frame = (Ir at 360 frames - Ir at 60) / 300, in integers.
+          # Keep testcard's established window; gpu_motion uses a 50-frame window for Cachegrind.
           per_frame() {
-            local a b
-            a=$(ir "$1" 60) || return 1
-            b=$(ir "$1" 360) || return 1
-            echo $(( (b - a) / 300 ))
+            local start=60 end=360 a b
+            if [ "$2" = gpu_motion ]; then
+              start=10
+              end=60
+            fi
+            a=$(ir "$1" "$2" "$start") || return 1
+            b=$(ir "$1" "$2" "$end") || return 1
+            echo $(( (b - a) / (end - start) ))
           }
-          head=$(per_frame "$RUNNER_TEMP/perf/head")
           if [ "$NO_BASE" = none ]; then
-            h2=$(per_frame "$RUNNER_TEMP/perf/head")
-            h3=$(per_frame "$RUNNER_TEMP/perf/head")
-            max=$head min=$head
-            for v in "$h2" "$h3"; do
-              if [ "$v" -gt "$max" ]; then max=$v; fi
-              if [ "$v" -lt "$min" ]; then min=$v; fi
+            for fixture in testcard gpu_motion; do
+              control=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+              control2=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+              control3=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+              max=$control min=$control
+              for v in "$control2" "$control3"; do
+                if [ "$v" -gt "$max" ]; then max=$v; fi
+                if [ "$v" -lt "$min" ]; then min=$v; fi
+              done
+              line="perf control $fixture runs=$control,$control2,$control3 spread=$((max - min))"
+              echo "$line"
+              echo "$line" >> "$GITHUB_STEP_SUMMARY"
             done
-            line="perf control testcard runs=$head,$h2,$h3 spread=$((max - min))"
-            echo "$line"
-            echo "$line" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          base1='' base2=''
-          if [ "$NO_BASE" = false ]; then
-            base1=$(per_frame "$RUNNER_TEMP/perf/base")
-            base2=$(per_frame "$RUNNER_TEMP/perf/base")
-          fi
+          fixtures=(testcard gpu_motion)
           rc=0
-          cmake -DFIXTURE=testcard "-DHEAD=$head" "-DBASE1=$base1" "-DBASE2=$base2" -DALLOW=tests/perf/allow.txt \
-            "-DTODAY=$(date -u +%Y-%m-%d)" "-DNO_BASE=$NO_BASE" \
-            -P tests/cmake/perf_compare.cmake > perf.txt 2>&1 || rc=$?
-          cat perf.txt
-          grep '^perf ' perf.txt >> "$GITHUB_STEP_SUMMARY" || true
+          for fixture in "${fixtures[@]}"; do
+            head=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+            base1='' base2=''
+            if [ "$NO_BASE" = false ]; then
+              base1=$(per_frame "$RUNNER_TEMP/perf/base" "$fixture") || exit 1
+              base2=$(per_frame "$RUNNER_TEMP/perf/base" "$fixture") || exit 1
+            fi
+            cmake "-DFIXTURE=$fixture" "-DHEAD=$head" "-DBASE1=$base1" "-DBASE2=$base2" -DALLOW=tests/perf/allow.txt \
+              "-DTODAY=$(date -u +%Y-%m-%d)" "-DNO_BASE=$NO_BASE" \
+              -P tests/cmake/perf_compare.cmake > perf.txt 2>&1 || rc=$?
+            cat perf.txt
+            grep '^perf ' perf.txt >> "$GITHUB_STEP_SUMMARY" || true
+          done
           exit "$rc"
 
   # Every publish step of a release, rehearsed with the release App's token on
@@ -582,7 +783,7 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, hygiene, title, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
+    needs: [changes, hygiene, title, gpu-reference, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor (roll-up); 2 x 4 s (CI required), slowest of 1 run, run 39455724329, provisional
     steps:

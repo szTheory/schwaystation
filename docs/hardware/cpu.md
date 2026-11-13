@@ -96,6 +96,17 @@ exception rules are in [cop0.md](cop0.md)).
 
 ## Instruction fetch
 
+With SR.KUc set, the CPU can fetch only from KUSEG. A fetch from KSEG0, KSEG1,
+KSEG2 or the BIOS window raises AdEL with BadVaddr equal to the program counter
+before reaching the bus. The exception is guest-visible and may be handled;
+it is not recorded as a first fault (psx-spx CPU Specifications, Privilege
+levels; docs/hardware/cop0.md, Address errors on the fetch).
+
+If a later word in an instruction-cache refill bus-errors, that word is marked
+invalid and its previous contents are preserved; the CPU restores the first
+fault record because those extra refill reads were not requested (docs/hardware/bus.md,
+Instruction cache).
+
 Each instruction is fetched at the program counter before it is decoded. A program counter that is not a multiple of 4 is
 an address error on the fetch (see Branches and jumps). Otherwise the fetch goes one of three ways, by segment
 (psx-spx CPU Specifications, Segments and I-cache):
@@ -258,7 +269,7 @@ a non-zero upper half in a value or address, a non-zero `r0`, and a branch flag 
 
 ## The stub kernel and kernel RAM
 
-With no BIOS from the host the core maps its own stub kernel, 620 bytes of MIPS at `BFC00000h` (see [bus.md](bus.md)),
+With no BIOS from the host the core maps its own stub kernel, 1,552 bytes of MIPS at `BFC00000h` (see [bus.md](bus.md)),
 and the CPU starts there. The stub is written for this project, holds no Sony byte and provides no kernel service
 beyond what is listed here. It uses only the addresses below, all in the low 64 KiB of RAM except the ROM, and the
 table keeps them disjoint:
@@ -271,7 +282,13 @@ table keeps them disjoint:
 | ROM after `BFC00180h` | the handler body, which uses only `k0` and `k1` |
 | `80000200h`-`8000020Fh` | the launch block: `pc0`, `gp0`, `s_addr`, `s_size`, written by `schway_load_exe` |
 | `80000210h`-`8000021Fh` | the exception record: Cause, EPC, BadVaddr, SR |
+| `80000300h`-`80000303h` | the guest's registered B0(19h) `JmpBuf` pointer |
+| `80000304h`-`80000307h` | the active-interrupt-context flag |
+| `80000310h`-`8000039Bh` | private saved interrupt context: r1-r31 (the k0 slot is reserved), HI, LO, SR and EPC |
 | `80010000h`-`800100FFh` | the mailbox of a loaded image |
+
+The `80000300h`-`800003BFh` range is reserved by this stub for its hook and context. A guest that loads an image into
+low RAM must keep its own data and code out of this private range; the loaded EXE fixtures start above `80010000h`.
 
 **Reset sequence.** The stub writes the memory-control values the retail boot code writes, clears `I_MASK` and
 `I_STAT`, copies the four-word vector to `80000080h`, clears SR.BEV, then reads the launch block. With no image loaded
@@ -286,10 +303,41 @@ returns. Any other function number returns at once, and so does `C0h`. The routi
 other register survives the call. With the profile's debug-port flag clear the store is ignored, and the byte goes
 nowhere.
 
+**The registered IRQ0 hook.** The stub implements the narrow `HookEntryInt`/`ReturnFromException` pair, B0(19h) and
+B0(17h), described in [PSX-SYSTEM.md](../../.planning/preparation/PSX-SYSTEM.md) (SYS.07). B0(19h) registers the
+guest-owned `JmpBuf` pointer from `a0`. Its words are `ra`/entry at offset 00h, `sp` at 04h, `fp` at 08h, `s0`-`s7`
+at 0Ch-28h and `gp` at 2Ch. A public PSn00bSDK v0.24 declaration was inspected only to confirm these interface
+offsets; no SDK implementation was copied (see [PROVENANCE.md](../../PROVENANCE.md), PV.15).
+
+For an IRQ0 with no valid `SWMB` mailbox, the stub saves r1-r31 except the scratch register `k0`, plus HI, LO, the
+exception SR and EPC, before loading the callback fields. It enters the registered address with `v0` = 1 and the
+registered stack and callee-saved registers. The guest callback reads `I_STAT` and `I_MASK` and acknowledges its own
+interrupt; the stub does not acknowledge it. Calling B0(17h) restores the saved CPU state and uses RFE to resume at
+the saved EPC itself. A valid `SWMB` mailbox keeps its existing priority. An unregistered IRQ0, B0(17h) with no
+active saved context, and unsupported BIOS services stop in the stub's bounded loop; nested exceptions are
+unsupported and do not replace the active saved context. This is one caller's hook path, not a general BIOS
+interrupt chain, and it adds no core fields or state version.
+
+Ordinary CI exercises the registered hook in `fixtures.boot.stub_irq_context`, `fixtures.boot.stub_irq_state`, and
+`fixtures.boot.stub_irq_controls`. These cover each supported interrupted register plus HI/LO/SR/EPC restoration,
+repeated callback and source-only acknowledgement, save/load before and during the live hook into independent
+instances, and mailbox/unsupported-service precedence. The retained build-158 overlap guest was also observed
+through 24 bounded advances: its registered hook returned through 23 IRQ0 callbacks while the guest completed its
+upload/copy loops and reached repeated reads of its VSync counter. This confirms the first caller's control flow;
+the GPU image comparison remains a separate test.
+
 **The default handler.** An exception writes Cause, EPC, BadVaddr and SR to the exception record. If the mailbox magic is
 there, the handler sets the mailbox word at `08h` to `000000FFh` (status FFh) and jumps to the address in the word at
 `0Ch` when that is not zero; otherwise, and with no mailbox, it stops in a loop. An image replaces the default by
 writing its own handler address to the mailbox, or its own code at `80000080h`.
+
+With no valid `SWMB` mailbox, the stub handles the two BIOS startup services used by the pinned clipping fixture:
+`SYS(01h)` (`EnterCriticalSection`) and `SYS(02h)` (`ExitCriticalSection`), selected by `a0` on a `SYSCALL` (PSX-SPX,
+[Kernel/BIOS](https://psx-spx.consoledev.net/kernelbios/), SYS.01/SYS.02; indexed in
+[PSX-SYSTEM.md](../../.planning/preparation/PSX-SYSTEM.md), SYS.07). The first returns 1 in `v0` only when saved `IEp`
+and `IM2` are both set, then clears those bits; the second sets them and leaves `v0` unchanged. Both return through
+`JR`/`RFE`. A valid mailbox retains priority, and other selectors, delay-slot syscalls and exceptions keep the recorded
+stop behavior; this is not a general BIOS implementation.
 
 **The mailbox.** A fixture image starts with 256 bytes at `80010000h` that the runner and the tests read:
 
@@ -334,12 +382,14 @@ core assumes under 1,024. A stop carries no overshoot in the state: the ticks an
 the ticks it reached, and the next call starts there. Running N cycles and then M therefore equals running N + M when N
 is a boundary the one-shot run passes through, which is where a run of the same budget stopped.
 
-**The end of a frame.** The run stops at the first boundary at or after the frame's end. A frame end passed inside an
-instruction completes at that instruction's end: `I_STAT` bit 0 is raised, the frame count rises, and the next frame
-ends where the exact cycle accumulator puts it, so the next frame is shorter by the overshoot and the cumulative
-ticks stay exact. The CPU takes interrupts from the vertical blank, the DMA and the timers: each raises its own `I_STAT` bit, CAUSE
-bit 10 follows `I_STAT` and `I_MASK`, and when SR allows it the CPU takes the interrupt as [cop0.md](cop0.md)
-(Interrupts) describes.
+**The end of a field.** Loaded content stops at the first instruction boundary after the GPU line counter wraps. The
+configured Y2 comparison raises `I_STAT` bit 0 and starts vertical blank; Y1 ends that blank. The field count advances
+at line wrap even when Y2 is out of range and raises no interrupt. GP1(00h) restarts the beam, but cannot move the
+maximum-field deadline fixed at the start of the current public call; if resets prevent a wrap, that call returns
+`SCHWAY_STOP_BUDGET` after at most one maximum regional field interval plus one instruction overrun. With no loaded
+program, the test-card frame timing remains the cycle accumulator's boundary. The CPU takes interrupts from vertical
+blank, DMA and timers: each raises its own `I_STAT` bit, CAUSE bit 10 follows `I_STAT` and `I_MASK`, and when SR allows
+it the CPU takes the interrupt as [cop0.md](cop0.md) (Interrupts) describes.
 
 **Stop reasons.**
 
@@ -388,10 +438,9 @@ can hold the bus for tens of thousands of cycles and charging that to a single i
 bound above. The part of a stall that crosses the end of a budget or of a frame stays in the state and the next call
 keeps waiting, so the overrun past any limit is still at most one instruction.
 
-**The frame end.** With a program loaded the frame end raises `I_STAT` bit 0 and also drives the vertical blank to the
-root counters, high and then low at the same tick, because there is no line machine yet to give the blank a width; the
-counters page covers what they do with it. With no program no counter is stepped and only an event that is already
-due runs.
+**The blank edges.** The GPU beam raises `I_STAT` bit 0 and drives Timer 1 at the configured Y2 line, then drives the
+counter again when the Y1 line ends vertical blank. A field wrap is independent of those programmable comparisons.
+The no-content test-card frame boundary does not synthesize a VBlank edge at its end.
 
 ## The trace
 

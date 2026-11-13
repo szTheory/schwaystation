@@ -42,9 +42,11 @@ struct schway__state_io;
 /* A struct of arrays, one entry per channel. madr, bcr and chcr are the raw
    registers. busy_until is the tick the current unit ends on and stall_until
    the tick the CPU is held until; phase and remain are the engine's step and
-   count for a channel (the blocks still to move in sync mode 1), nodes_done
-   the list nodes passed in the current step, dreq the latched request levels
-   (a bit per channel; a sync mode 1 block takes its channel's bit with it),
+   count for a channel (blocks in sync mode 1, list nodes in sync mode 2, or
+   words in a chopped burst), nodes_done the last list channel's node count,
+   dreq the explicit latched request credits (a bit per channel; a sync mode 1
+   block takes its channel's credit with it; DMA4 ATTR readiness is derived and
+   is not stored here),
    and words and crc what the stand-in sink for a channel has taken since
    power-on (a word count and a rolling CRC-32 over the words' little-endian
    bytes). */
@@ -100,5 +102,9 @@ uint32_t schway__dma_arbitrate(const schway *inst, uint32_t mask);
 
 /* A device's request line for channel ch changes to level. */
 void schway__dma_dreq(schway *inst, uint32_t ch, uint32_t level);
+
+/* The exact SPU ATTR halfword changed at bus tick now; wake any newly ready
+   DMA4 block without moving it ahead of a future completed-unit boundary. */
+void schway__dma_spu_control_changed(schway *inst, uint64_t now);
 
 #endif /* SCHWAYSTATION_DMA_H */

@@ -2,7 +2,7 @@
 title: "PSX-GPU-AND-GTE: GPU revisions, VRAM, GP0/GP1 commands, rasterisation rules, timing, display, GTE, oracles, output format"
 summary: "What gpu.c and gte.c must do: the v0/v2 GPU differences, VRAM addressing, every GPUSTAT bit, the GP0 primitive set with word counts, the exact dither matrix, blend and modulation formulas, mask bits, texture windows and CLUTs, the fill rules and size limits, video clocks and display geometry as rationals, FIFO and DMA behaviour, measured primitive costs, every GTE register, opcode, cycle count and flag, the UNR division, the oracles and their licences, the accuracy model, the v1 frame format, and the hooks later enhancements need."
 read_when: "Before writing or changing gpu.c, gte.c, the frame output path, GPU DMA, timers that use dotclock or hblank, or when a game's geometry, colours, blending, interlacing or GTE-driven culling diverges."
-updated: 2026-11-10
+updated: 2026-11-13
 ---
 
 # PSX-GPU-AND-GTE
@@ -55,7 +55,7 @@ Detection in the field: Perfect Assassin latches index 4 then index 7 and compar
 | 9 | DTD | dithering enabled |
 | 10 | DFE | drawing to display area allowed |
 | 11, 12 | PBW, PBC | force mask bit on write; skip masked pixels |
-| 13 | ODE2 | interlace field (always 1 when GP1(08h).5 = 0 on v2, always 0 on v0) |
+| 13 | ODE2 | saved interlace field phase on v2 (reset high, retained when IRS is disabled); always 0 on v0 [GPU.21] |
 | 14 | REV | v1 screen flip, nonfunctional on v2 |
 | 15 | TBY2 | tpage Y base bit 1 (2 MB) |
 | 16, 17-18 | HDS2, HDS | 368 select; 256/320/512/640 |
@@ -67,7 +67,14 @@ Detection in the field: Perfect Assassin latches index 4 then index 7 and compar
 | 27 | RFFL | VRAM-to-CPU data ready (GP0(C0h)) |
 | 28 | WFEP | ready for DMA block; cleared when a command and its parameters are received, but for polygons and lines cleared on the command word itself |
 | 29-30 | DMD | DMA direction |
-| 31 | ODE | odd line being drawn; changes per frame in 480-line mode, per line in 240-line mode, 0 during vblank |
+| 31 | ODE | drawing line phase; 0 outside displayed vertical lines, alternates per 480-line field and per line in 240-line mode [GPU.21] |
+
+The 2026-11-03 PSX-SPX probe update [GPU.21] supersedes the earlier bit-13 shortcut: v2 retains its last ODE2 value
+after IRS is disabled, while v0 reads zero. With IRS enabled ODE2 changes at the last scanline, independently of the
+programmable vblank edge. ODE is suppressed outside the programmed vertical display range; in effective 480-line
+interlace ODE and ODE2 have opposite phases, while effective 240-line modes use scanline parity. These are hardware
+status semantics; the core maps them onto its fixed beam model as documented in `docs/hardware/gpu.md` and does not
+claim the probe's alternating physical field lengths or early-vblank mode-entry exception.
 
 ## 2. Command sets
 **2.1 Ports.** GP0 1F801810h write = rendering and VRAM packets, read = GP0(C0h) data or GP1(10h) latch; GP1 1F801814h write = display control, read = GPUSTAT. GP0 has a 16-word FIFO; GP1 commands bypass it. DMA2 is equivalent to writing GP0 [GPU.01].
@@ -76,7 +83,7 @@ Detection in the field: Perfect Assassin latches index 4 then index 7 and compar
 
 | Code | Group | Bits (polygon / line / rectangle) | Words after the command word |
 |---|---|---|---|
-| 000 | misc | 00h NOP (no FIFO space), 01h clear texture cache, 02h fill, 03h unknown (takes FIFO space), 04h-1Eh NOP mirrors, 1Fh IRQ1 | fill: 2 |
+| 000 | misc | 00h NOP (no FIFO space), 01h clear texture and CLUT caches, 02h fill, 03h unknown (takes FIFO space), 04h-1Eh NOP mirrors, 1Fh IRQ1 | fill: 2 |
 | 001 | polygon | 24 TGE raw texture, 25 ABE semi-transparent, 26 TME textured, 27 VTX quad, 28 IIP gouraud | 3 or 4 vertices × (1 + IIP + TME) minus 1 (first colour is in the command word) |
 | 010 | line | 25 ABE, 27 PLL polyline, 28 IIP | 2 vertices × (1 + IIP) minus 1; polyline ends at a word with (w & F000F000h) == 50005000h |
 | 011 | rectangle | 24 TGE, 25 ABE, 26 TME, 27-28 SIZ 0 variable, 1 1x1, 2 8x8, 3 16x16 | 1 vertex + TME + (SIZ == 0) |
@@ -112,7 +119,7 @@ Vertex word: X bits 0-10 and Y bits 16-26 signed 11-bit (-1024..+1023), other bi
 | 10h-1Fh | latch internal register into GPUREAD: 2 texture window, 3 draw area TL, 4 BR, 5 offset, 7 version (v2 = 2), 8 = 0; others leave the latch | index bits 0-3 (v2) |
 | 0Bh | unknown; values 274h..7FFh crash the GPU | |
 
-Display width = `(((X2 - X1) / dots_per_pixel) + 2) & ~3`; height = Y2 - Y1 (doubled by the field when interlaced); nothing rounds the height. A far-too-large Y2 stops vblank IRQs. Chrono Cross shakes the screen with 07h; Pandemonium 2 uses an overscan width; PAL titles use erratic centring, so emulators auto-centre PAL [GPU.01].
+Display width = `(((X2 - X1) / dots_per_pixel) + 2) & ~3`; native field height = Y2 - Y1, including interlace; nothing rounds the height. A far-too-large Y2 stops vblank IRQs. Chrono Cross shakes the screen with 07h; Pandemonium 2 uses an overscan width; PAL titles use erratic centring, so emulators auto-centre PAL [GPU.01].
 
 ## 3. Rasterisation rules
 **3.1 Pixel pipeline order** (ares, agrees with psx-spx) [GPU.05][GPU.01]: fetch texel (4/8-bit through the CLUT, 15-bit direct); texel 0000h is discarded; raw or modulated; dither; read destination; blend if ABE and (untextured or texel bit 15 set); skip if destination bit 15 set and PBC; write with bit 15 = PBW | texel bit 15 (0 for untextured).
@@ -130,14 +137,14 @@ Applies to gouraud or modulated polygons, to all lines (even flat), never to rec
 
 **3.4 Modulation.** `out = (texel5 * colour8) >> 7` per channel with 80h = unity and 81h..FFh brighter, saturated to 1Fh (v2); v0 crops colour to 5 bits first (§1.1) [GPU.01][GPU.10]. ares: `min(255, (texel5 * colour8) >> 4)` in 8-bit space, equivalent [GPU.05].
 
-**3.5 Texture decode.** `u = (u & ~(maskX*8)) | ((offX & maskX)*8)`, same for v; 4-bit: halfword `vram[(v + TBY) & 511][(u/4 + TBX) & 1023]` nibble `u & 3`; 8-bit: byte `u & 1`; CLUT entry `vram[CLY][(CLX*16 + index) & 1023]`; 15-bit: `vram[(v + TBY) & 511][(u + TBX) & 1023]` [GPU.01][GPU.05]. UV are 8-bit, so a texture is at most 256x256; rectangles larger than 256 repeat the source [GPU.01]. Texture cache: 2 KB, 64x64 (4-bit), 32x64 (8-bit), 32x32 (15-bit) with 256 eight-byte entries per block and one entry per index; the CLUT cache survives between commands and is invalidated by a different CLUT address or GP1(01h). ps1-tests `clut-cache` shows the stale-cache effect [GPU.01][GPU.07].
+**3.5 Texture decode.** `u = (u & ~(maskX*8)) | ((offX & maskX)*8)`, same for v; 4-bit: halfword `vram[(v + TBY) & 511][(u/4 + TBX) & 1023]` nibble `u & 3`; 8-bit: byte `u & 1`; CLUT entry `vram[CLY][(CLX*16 + index) & 1023]`; 15-bit: `vram[(v + TBY) & 511][(u + TBX) & 1023]` [GPU.01][GPU.05]. UV are 8-bit, so a texture is at most 256x256; rectangles larger than 256 repeat the source [GPU.01]. Texture cache: 2 KB, 64x64 (4-bit), 32x64 (8-bit), 32x32 (15-bit) with 256 eight-byte entries per block and one entry per index; the CLUT cache survives between commands and is invalidated by a different CLUT address, GP0(01h), or GP1(01h). ps1-tests `clut-cache` shows the stale-cache effect [GPU.01][GPU.07].
 
 **3.6 Triangle rules** [GPU.01][GPU.05]
 - Quads are two triangles, vertices (1,2,3) then (2,3,4); vertex order does not matter for visibility (no GPU culling).
 - Polygons cover pixels up to but excluding the bottom-right edges; ares implements a top-left rule by biasing edge functions whose edge vector has `dx < 0 || (dx == 0 && dy < 0)` by -1 after making the triangle clockwise, and skips colinear (area 0) triangles.
 - Size rejection: a polygon or line whose vertices span more than 1023 horizontally or 511 vertically is not drawn at all (a line from Y -300 to +300 is dropped, -100 to +400 is drawn). ares tests `> 1024 || > 512` on the bounding box, a one-off difference to settle (§10). Rectangles are limited by the 10/9-bit size fields instead.
 - Clipping to the draw area is per pixel on hardware (whether clipped pixels cost time is unknown); draw offset is added before clipping.
-- Interpolation precision for colour and UV is not documented by psx-spx; ares uses floats from barycentric deltas, which is a bit-mismatch risk. ps1-tests `uv-interpolation` draws 256 quads of width 0..255 with a two-texel-wide UV span and `triangle` draws a gouraud triangle; their vram.png files are the arbiter for the stepper precision (§6).
+- Interpolation precision for colour and UV is not documented by psx-spx; the selected build-158 `triangle` and `uv-interpolation` VRAM captures match integer sample origins and vertex-anchored signed 12-bit fractional slopes truncated toward zero, with a half-unit bias before channel conversion. This is a capture-backed deterministic model, not a physical precision measurement. The `quad` capture independently confirms integer-origin coverage for flat polygons (§6).
 
 **3.7 Lines.** Bresenham-class: both end pixels are drawn (inclusive); coincident endpoints give a 1x1 pixel in the first vertex colour; always dithered; polylines chain each vertex to the previous one; the terminator sits in the first word of a vertex (the colour word for gouraud) [GPU.01]. ares steps `max(|dx|,|dy|)` times with 16.16 increments and draws no shaded lines yet; ps1-tests `lines` is the hardware image for every mode [GPU.05][GPU.07].
 
@@ -160,7 +167,7 @@ Applies to gouraud or modulated polygons, to all lines (even flat), never to rec
 | Dots per line | 341.3, 426.625, 487.5714, 682.6, 853.25 | 340.6, 425.75, 486.5714, 681.2, 851.5 |
 | Dotclocks (MHz) | 5.3693175, 6.7116469, 7.6704536, 10.738635, 13.4232938 | 5.3203425, 6.6504281, 7.6004893, 10.640685, 13.3008563 |
 
-A console always runs its region's crystal whatever GP1(08h).3 says, so the other mode drifts [GPU.01]. Timer 0 counts whole dots per line (fractions dropped, 425.75 rounds up); timer 1 counts hblanks, which also occur during vblank; the hblank and vblank of the timers are not exactly the video signal's [GPU.01][GPU.04]. ares models the line as `hblankStart = X2` then `htotal`, raises vblank at `vcounter == Y2` and lowers it at `Y1`, toggles the field at frame end, and reports GPUSTAT bit 31 as `!vblank && (interlace ? !field : vcounter & 1)` [GPU.05].
+A console always runs its region's crystal whatever GP1(08h).3 says, so the other mode drifts [GPU.01]. Timer 0 counts whole dots per line (fractions dropped, 425.75 rounds up); timer 1 counts hblanks, which also occur during vblank; the hblank and vblank of the timers are not exactly the video signal's [GPU.01][GPU.04]. The 2026 PSX-SPX status probes [GPU.21] report alternating physical interlaced field lengths and an early-vblank mode-entry exception. The core retains the fixed 263/314-line model from DEC.09/DEC.10; its deterministic phase entry and status edge therefore do not claim those exact physical timeline offsets.
 
 **4.2 FIFO and ready bits.** 16 words; GP0(00h), the NOP mirrors and E3h-E5h take no space; GP1 bypasses it. Bit 28 falls on the command word for polygons and lines, so DMA mode 2 must deliver a primitive's parameters in the same block [GPU.01]. ps1-tests `gpustat` passes a 12-case matrix (CPU, linked-list DMA, sync DMA with directions 1 and 2, before/during/after rendering) on hardware; its expectations are in its source [GPU.09].
 
@@ -182,7 +189,7 @@ ares converted these to clocks per pixel but disabled the model with the note th
 
 **Choice 4.A (GPU busy model).** Recommendation: v1 keeps a GPU clock budget per primitive: setup constant plus pixels × a per-class cost table seeded from the ares-derived column, charged after rendering the primitive at once; GPUSTAT bits 26 and 28 read 0 while the budget is unspent, DMA2 stalls on them, and the budget drains in GPU clocks on the master tick. Strongest alternative: instantaneous drawing with bits 26/28 always 1 (what ares ships). Would change if: a corpus title tears or skips frames because it polls bit 26 or chains DMA at a rate that only a cost model reproduces; or if a measured line and clipped-pixel table arrives, which replaces the seed values.
 
-**4.5 Mapping the display area to an image.** Source: GP1(05h) start X,Y in VRAM, width from GP1(06h) with the resolution's divider, height Y2-Y1 (×2 interlaced). ares subtracts a per-width nominal X1 (228h for 256, 260h otherwise) and nominal Y1 (10h NTSC 240, 20h PAL 256) to place the picture in a 640x512 canvas and draws black elsewhere [GPU.05]. Titles that move the window with 06h/07h (Chrono Cross) are reproduced only if the host honours the offset [GPU.01]. The wobble of vertices and the affine "swimming" of textures are real hardware: the GTE emits integer screen coordinates and the GPU interpolates UV linearly in screen space with no Z, so a native-resolution core must keep them [GPU.01][GPU.18].
+**4.5 Mapping the display area to an image.** Source: GP1(05h) start X,Y in VRAM, width from GP1(06h) with the resolution's divider, native field height Y2-Y1 (not doubled for interlace). ares subtracts a per-width nominal X1 (228h for 256, 260h otherwise) and nominal Y1 (10h NTSC 240, 20h PAL 256) to place the picture in a 640x512 canvas and draws black elsewhere [GPU.05]. Titles that move the window with 06h/07h (Chrono Cross) are reproduced only if the host honours the offset [GPU.01]. The wobble of vertices and the affine "swimming" of textures are real hardware: the GTE emits integer screen coordinates and the GPU interpolates UV linearly in screen space with no Z, so a native-resolution core must keep them [GPU.01][GPU.18].
 
 ## 5. GTE (COP2)
 
@@ -245,7 +252,7 @@ The hardware images in ps1-tests are 1024x512 PNGs of VRAM; a bit-exact comparis
 | Deinterlacing | the core emits fields with the field bit and line parity in metadata; a host weaves, bobs or line-doubles; v1 never merges fields itself |
 | CRT shaders | host side; the core provides native PAR (dot divider and region) in metadata |
 
-**Choice 8.A (v1 output frame).** Recommendation: the core delivers, per vblank, (a) a read-only view of the whole 1024x512 VRAM in native `uint16_t` (hash domain for ps1-tests), and (b) a display frame: width = `(((X2 - X1) / div) + 2) & ~3`, height = Y2 - Y1, one row per displayed line of the current field, pixels as `uint16_t` 0BBBBBGGGGGRRRRR in 15-bit mode and as packed 24-bit RGB rows of 3 bytes per pixel, straight from the VRAM bytes, in 24-bit mode (both lossless and one copy, so the frame hash is stable across hosts; the XRGB8888 conversion is the host's, HOSTS 1), with metadata {field, interlaced, vres 240/480, hres, dot divider, region, X1, Y1, display start, display enabled, 24-bit}. Display-off frames are all zero with the flag set. Interlaced output is field-sequential at the native 240-row height; the host doubles or weaves. The hash covers the display frame plus the metadata tuple, not the black border placement, which is a host decision following the ares nominal offsets (§4.5). Strongest alternative: a fixed 640x480 RGB888 canvas like ares. Would change if: the conformance harness needs sub-frame (mid-frame) captures, which would add a line-range capture API rather than change the format.
+**Choice 8.A (v1 output frame).** Recommendation: the core delivers, per vblank, (a) a read-only view of the whole 1024x512 VRAM in native `uint16_t` (hash domain for ps1-tests), and (b) a display frame: width = `(((X2 - X1) / div) + 2) & ~3`, native field height = Y2 - Y1 including interlace, one row per displayed line of the current field. Pixels are native `uint16_t` 0BBBBBGGGGGRRRRR words in 15-bit mode or packed RGB bytes (3 bytes per pixel) straight from VRAM in 24-bit mode. Metadata is {field, interlaced, vres 240/480, hres, dot divider, region, X1, Y1, display start, display enabled, 24-bit, bpp}. Display-off frames are all zero with the flag set. Host conversion, border placement, deinterlacing and scaling stay outside the native frame hash, which covers the metadata tuple followed by tightly packed native pixels. Strongest alternative: a fixed 640x480 RGB888 canvas like ares. Would change if: the conformance harness needs sub-frame (mid-frame) captures, which would add a line-range capture API rather than change the format.
 
 ## 9. Low-power considerations
 - 320x240 at 60 Hz is 4.6 Mpixel/s of display; typical scenes write a few hundred thousand polygon pixels per frame; a span-based integer rasteriser on a 1 GHz in-order ARM core or wasm32 spends well under a core on this, provided there is no per-pixel division or float conversion (derived from §4.4 throughput: the console itself peaks around 60 Mpixel/s on flat quads).
@@ -288,3 +295,4 @@ The hardware images in ps1-tests are 1024x512 PNGs of VRAM; a bit-exact comparis
 | GPU.18 | T4 | libretro.com/?p=45256 (Beetle PSX PGXP write-up) | accessed 2026-10-19 | wobble = integer vertices, warping = affine UV; PGXP needs both sub-pixel precision and perspective correction |
 | GPU.19 | T4 | en.wikipedia.org/wiki/PlayStation_technical_specifications | accessed 2026-10-19 | marketing fill rates (unverified) |
 | GPU.20 | T4 | tasvideos.org/Forum/Topics/20751 | accessed 2026-10-19 | Mednafen presents interlaced output as alternating fields in a 480-line buffer |
+| GPU.21 | T1, measured (published probe report) | psx-spx GPU status-register update, PR 234 | 519c8dbcc025467a6c80b02e61aafe3adcfa497b (2026-11-03) | v0/v2 ODE/ODE2 behavior, interlace retention, PAL probes and fixed-model confidence boundary |

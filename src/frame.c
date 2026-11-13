@@ -14,6 +14,28 @@ void schway__frame_audio_clear(schway *inst)
     memset(inst->audio, 0, sizeof inst->audio);
 }
 
+/* Loaded content counts a public frame when the GPU line counter wraps. */
+void schway__frame_gpu_wrap(schway *inst)
+{
+    if (inst->exe_loaded == 0u) {
+        return;
+    }
+    uint64_t num = schway__instance_frame_num(inst->region);
+    uint64_t den = schway__instance_frame_den(inst->region);
+    inst->frame++;
+    inst->tick_acc = (inst->tick_acc + num) % den;
+    inst->frame_end += (inst->tick_acc + num) / den;
+}
+
+/* Keep the saved-state horizon valid when GP1 restarts a guest's beam.
+   Each public call still keeps a separate, immutable deadline. */
+void schway__frame_gpu_reset(schway *inst, uint64_t tick)
+{
+    if (inst->exe_loaded != 0u) {
+        inst->frame_end = tick + schway__instance_frame_max(inst->region);
+    }
+}
+
 /* Queues n silent pairs; pairs that do not fit in the ring are dropped and
    counted. */
 static void audio_push_silence(schway *inst, uint32_t n)
@@ -30,20 +52,18 @@ static void audio_push_silence(schway *inst, uint32_t n)
     }
 }
 
-/* Moves the instance forward by at most limit cycles and never past the end
-   of the current frame, queueing one silent pair per 768-cycle boundary
-   crossed. Reaching frame_end completes the frame: the frame count rises, the
-   profile locks, the card is redrawn and the next frame's end is fixed from
-   the accumulator's remainder, so the cumulative ticks stay exact
-   (ARCHITECTURE sections 1 and 7). With no PS-EXE loaded no instruction runs,
-   so a stop at any cycle leaves the state a later stop would pass through and
-   N cycles then M equal N + M. With one loaded the CPU runs instead and stops
-   at the first instruction boundary at or after the limit or the frame's end,
+/* Moves the instance forward by at most limit cycles and queues one silent
+   pair per 768-cycle boundary crossed. No-content calls stop at the synthetic
+   frame_end and redraw the test card. Loaded content stops at the GPU field
+   wrap, with an independent maximum-field call bound so video resets cannot
+   hold a host call forever. With neither a BIOS nor PS-EXE loaded no guest
+   instruction runs, so a stop at any cycle leaves the state a later stop would
+   pass through and N cycles then M equal N + M. With a BIOS or PS-EXE loaded,
+   the CPU stops at the first instruction boundary at or after the limit or the field wrap,
    so the advance can pass either by the rest of one instruction, and N cycles
    then M equal N + M only where N is a boundary of the one-shot run; a frame
-   end passed inside an instruction completes at that instruction's end, and
-   the vertical sync that ends the frame raises I_STAT bit 0 first (psx-spx,
-   Interrupts) and the root counters are given the vertical blank. Refuses, with nothing changed, an advance that would leave the
+   wrap passed inside an instruction completes at that instruction's end.
+   Refuses, with nothing changed, an advance that would leave the
    save format's inclusive bounds (ARCHITECTURE section 5), with the longest
    instruction's cycles as margin when the CPU runs. Returns OK, with *done set
    when the frame completed and *stop the CPU's stop reason. */
@@ -51,23 +71,32 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
                              uint32_t *stop)
 {
     uint64_t room = inst->frame_end - inst->ticks;
-    uint64_t cycles = limit < room ? limit : room;
+    uint64_t max_field = schway__instance_frame_max(inst->region);
+    uint64_t cycles = limit;
+    if (inst->exe_loaded != 0u) {
+        cycles = cycles < max_field ? cycles : max_field;
+    } else {
+        cycles = cycles < room ? cycles : room;
+    }
     uint64_t before = inst->ticks;
+    uint64_t starting_frame = inst->frame;
     *stop = SCHWAY_STOP_BUDGET;
     if (inst->exe_loaded != 0u) {
         if (inst->ticks + cycles + SCHWAY__INSN_CYCLES_MAX > SCHWAY__STATE_TICKS_MAX ||
             inst->frame >= SCHWAY__STATE_FRAME_MAX) {
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
+        schway__pad_frame_start(inst);
         inst->profile_locked = 1u;
         *stop = schway__cpu_run(inst, cycles, flags);
-        *done = inst->ticks >= inst->frame_end;
+        *done = inst->frame != starting_frame;
     } else {
         *done = cycles == room;
         if (inst->ticks + cycles > SCHWAY__STATE_TICKS_MAX ||
             (*done && inst->frame >= SCHWAY__STATE_FRAME_MAX)) {
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
+        schway__pad_frame_start(inst);
         /* No program runs and no device is stepped; only an event already due
            runs, at its own deadline, and with none armed the loop is one
            compare. */
@@ -90,24 +119,24 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
     if (inst->sched.next <= inst->ticks) {
         schway__sched_run(inst);
     }
+    schway__pad_update_watchdog(inst, inst->ticks);
+    if (inst->exe_loaded != 0u) {
+        *done = inst->frame != starting_frame;
+    }
     /* One pair per 768-cycle boundary crossed. */
     audio_push_silence(inst, (uint32_t)(inst->ticks / SCHWAY__CYCLES_PER_PAIR -
                                         before / SCHWAY__CYCLES_PER_PAIR));
     inst->profile_locked = 1u;
-    if (*done) {
+    if (*done && inst->exe_loaded == 0u) {
         uint64_t num = schway__instance_frame_num(inst->region);
         uint64_t den = schway__instance_frame_den(inst->region);
-        if (inst->exe_loaded != 0u) {
-            /* The vertical blank has no width until a line machine exists, so
-               it goes high and low at the frame's end tick. */
-            schway__irq_raise(inst, 0u);
-            schway__timers_vblank(inst, inst->ticks, 1u);
-            schway__timers_vblank(inst, inst->ticks, 0u);
-        }
         inst->frame++;
         inst->tick_acc = (inst->tick_acc + num) % den;
         inst->frame_end += (inst->tick_acc + num) / den;
         schway__testcard_draw(&inst->vram[0][0], (uint32_t)inst->frame);
+    }
+    if (*done) {
+        schway__pad_frame_end(inst);
     }
     return SCHWAY_STATUS_OK;
 }
@@ -122,7 +151,36 @@ static void write_result(const schway *inst, schway_run_result *out, uint32_t st
     r.ticks = inst->ticks;
     r.exit_code = stop == SCHWAY_STOP_HOOK ? inst->exit_code : 0u;
     r.fault_present = inst->fault.kind != SCHWAY__FAULT_NONE;
+    r.lag = inst->pad.frame_polls == 0u ? 1u : 0u;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        r.rumble[port] = ((uint32_t)inst->pad.rumble_large[port] << 8) |
+                         inst->pad.rumble_small[port];
+    }
     schway__instance_write_out(out, &r, (uint32_t)sizeof r);
+}
+
+schway_status schway_set_input(schway *inst, const schway_input *input)
+{
+    if (inst == NULL || input == NULL) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    schway_status st = schway__instance_check_size(input, SCHWAY__INPUT_SIZE_FIRST,
+                                                    (uint32_t)sizeof *input);
+    if (st != SCHWAY_STATUS_OK) {
+        return st;
+    }
+    if (input->reserved0 != 0u) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    for (uint32_t port = 0u; port < 2u; port++) {
+        if (input->device[port] > SCHWAY_INPUT_DEVICE_DUALSHOCK ||
+            input->analog_button[port] > 1u) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+    }
+    memcpy(&inst->pad.pending_input, input, sizeof *input);
+    inst->pad.pending_valid = 1u;
+    return SCHWAY_STATUS_OK;
 }
 
 /* The result's stop reason: a hook or a fault the CPU stopped on, else the
@@ -198,8 +256,8 @@ schway_status schway_run(schway *inst, const schway_budget *budget, schway_run_r
     return SCHWAY_STATUS_OK;
 }
 
-/* Scan-out of the display area: width (((X2 - X1) / divider) + 2) & ~3 and
-   height Y2 - Y1, from VRAM at (start_x, start_y) (ARCHITECTURE section 4). */
+/* Scan-out of the display area uses native field height and packed rows
+   (PSX-GPU-AND-GTE sections four point five and eight point one). */
 schway_status schway_get_video(const schway *inst, schway_video *out)
 {
     if (inst == NULL || out == NULL) {
@@ -209,16 +267,17 @@ schway_status schway_get_video(const schway *inst, schway_video *out)
     if (st != SCHWAY_STATUS_OK) {
         return st;
     }
-    const struct schway__display *d = &inst->display;
+    struct schway__display display = inst->display;
+    if (inst->exe_loaded != 0u) {
+        schway__gpu_display(inst, &display);
+    }
+    const struct schway__display *d = &display;
     schway_video v;
     memset(&v, 0, sizeof v);
     v.size = out->size;
     v.frame = inst->frame;
-    v.pixels = &inst->vram[d->start_y][d->start_x];
-    v.width = (((d->x2 - d->x1) / d->dot_div) + 2u) & ~3u;
-    v.height = d->y2 - d->y1;
-    v.pitch_bytes = SCHWAY__VRAM_W * 2u;
-    v.bpp = 16u;
+    v.pixels = inst->video_scanout;
+    v.bpp = d->rgb24 != 0u ? 24u : 16u;
     v.field = d->field;
     v.interlaced = d->interlaced;
     v.vres = d->vres;
@@ -231,6 +290,46 @@ schway_status schway_get_video(const schway *inst, schway_video *out)
     v.start_y = d->start_y;
     v.enabled = d->enabled;
     v.rgb24 = d->rgb24;
+
+    if (d->dot_div != 0u && d->x2 >= d->x1 && d->y2 >= d->y1) {
+        uint32_t width = (((d->x2 - d->x1) / d->dot_div) + 2u) & ~3u;
+        uint32_t height = d->y2 - d->y1;
+        if (width != 0u && width <= SCHWAY__VRAM_W && height != 0u &&
+            height <= SCHWAY__VRAM_H) {
+            uint32_t bytes_per_pixel = d->rgb24 != 0u ? 3u : 2u;
+            v.width = width;
+            v.height = height;
+            v.pitch_bytes = width * bytes_per_pixel;
+
+            if (d->enabled == 0u) {
+                memset(inst->video_scanout, 0, (size_t)v.pitch_bytes * v.height);
+            } else if (d->rgb24 == 0u) {
+                for (uint32_t y = 0u; y < height; y++) {
+                    uint32_t source_y = (d->start_y + y) & (SCHWAY__VRAM_H - 1u);
+                    uint16_t *dst = (uint16_t *)(void *)(inst->video_scanout +
+                                                         (size_t)y * v.pitch_bytes);
+                    for (uint32_t x = 0u; x < width; x++) {
+                        uint32_t source_x = (d->start_x + x) & (SCHWAY__VRAM_W - 1u);
+                        dst[x] = inst->vram[source_y][source_x];
+                    }
+                }
+            } else {
+                for (uint32_t y = 0u; y < height; y++) {
+                    uint32_t source_y = (d->start_y + y) & (SCHWAY__VRAM_H - 1u);
+                    uint8_t *dst = inst->video_scanout + (size_t)y * v.pitch_bytes;
+                    for (uint32_t x = 0u; x < width; x++) {
+                        for (uint32_t channel = 0u; channel < 3u; channel++) {
+                            uint32_t byte_x = (d->start_x * 2u + x * 3u + channel) %
+                                              (SCHWAY__VRAM_W * 2u);
+                            uint16_t word = inst->vram[source_y][byte_x / 2u];
+                            dst[3u * x + channel] =
+                                (uint8_t)(word >> ((byte_x & 1u) * 8u));
+                        }
+                    }
+                }
+            }
+        }
+    }
     schway__instance_write_out(out, &v, (uint32_t)sizeof v);
     return SCHWAY_STATUS_OK;
 }

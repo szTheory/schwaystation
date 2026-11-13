@@ -1,3 +1,19 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+libretro.cards.controls	libretro,portable
+libretro.cards.persistence	libretro,portable
+libretro.content.lifecycle	libretro,portable
+libretro.content.no_bios	libretro,portable
+libretro.content.psexe	libretro,portable
 libretro.host	libretro,portable
 libretro.host.pal	libretro,portable
+libretro.info.claims	libretro,portable
+libretro.info.claims.self_test	libretro,portable
+libretro.input.controls	libretro,portable
+libretro.input.descriptors	libretro,portable
+libretro.input.movies	libretro,portable
+libretro.memory.aliases	libretro,portable
+libretro.memory.boundaries	libretro,portable
+libretro.rumble.controls	libretro,portable
+libretro.rumble.guest	libretro,portable
+libretro.video.geometry	libretro,portable
+libretro.video.geometry_edges	libretro,portable

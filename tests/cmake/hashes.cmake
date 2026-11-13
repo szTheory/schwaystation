@@ -1,12 +1,17 @@
 # The hashes every lane prints, and their comparison across lanes, run as
 #   cmake -DMODE=write -DRUN=<schwaystation-run> [-DEMULATOR=<list>] [-DFIXTURES=<dir>] -DOUT=<dir> -P hashes.cmake
 #   cmake -DMODE=compare -DFILES=<list> -DCOUNT=<n> -P hashes.cmake
+if(NOT CMAKE_SCRIPT_MODE_FILE)
+  return()
+endif()
+
 if(MODE STREQUAL "write")
   # Fault prevented: a lane's output silently not compared. Writes
   # <OUT>/hashes.txt, the file CI collects from every lane, in a fixed order:
   # four frame hashes, then the frame 5 PNG's digest, then one line per
   # assembled fixture file in FIXTURES (when given), sorted by name, so the
-  # eight lanes' fixture bytes are compared too, then the frame and state at frame 30 of four fixtures.
+  # eight lanes' fixture bytes are compared too, then device fixture hashes and
+  # the moving GPU fixture's frames and continuation state.
   set(lines "")
   foreach(case "ntsc-u;5" "ntsc-u;60" "ntsc-j;60" "pal;60")
     list(GET case 0 region)
@@ -28,6 +33,12 @@ if(MODE STREQUAL "write")
   endif()
   file(SHA256 "${OUT}/hashes-card.png" png)
   string(APPEND lines "ntsc-u png 5 sha256 ${png}\n")
+  set(openbios_tuple_file "${OUT}/openbios-shell-tuple.txt")
+  if(NOT EXISTS "${openbios_tuple_file}")
+    message(FATAL_ERROR "hashes: same-run OpenBIOS shell test did not produce its tuple")
+  endif()
+  file(READ "${openbios_tuple_file}" openbios_tuple)
+  string(APPEND lines "${openbios_tuple}")
   if(NOT "${FIXTURES}" STREQUAL "")
     file(GLOB names RELATIVE "${FIXTURES}" "${FIXTURES}/*")
     list(SORT names)
@@ -44,6 +55,26 @@ if(MODE STREQUAL "write")
       endif()
       string(APPEND lines "exe ${exe}.exe ${CMAKE_MATCH_1}\nexe ${exe}.exe ${CMAKE_MATCH_2}\n")
     endforeach()
+    foreach(frames IN ITEMS 60 120)
+      execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
+        --frames ${frames} --hash OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "^(frame ${frames} sha256 [0-9a-f]+)\n$")
+        message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames ${frames}: expected exit 0 and one hash line, got exit ${rc}\n${out}${err}")
+      endif()
+      string(APPEND lines "exe gpu_motion.exe ${CMAKE_MATCH_1}\n")
+    endforeach()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
+      --frames 150 --hash-state OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^state sha256 ([0-9a-f]+)\n$")
+      message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames 150 --hash-state: expected exit 0 and one state line, got exit ${rc}\n${out}${err}")
+    endif()
+    string(APPEND lines "exe gpu_motion.exe state 150 sha256 ${CMAKE_MATCH_1}\n")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
+      --frames 180 --hash --hash-state OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
+    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^frame 180 sha256 ([0-9a-f]+)\nstate sha256 ([0-9a-f]+)\n$")
+      message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames 180 --hash --hash-state: expected exit 0 and frame/state lines, got exit ${rc}\n${out}${err}")
+    endif()
+    string(APPEND lines "exe gpu_motion.exe frame 180 sha256 ${CMAKE_MATCH_1}\nexe gpu_motion.exe state 180 sha256 ${CMAKE_MATCH_2}\n")
   endif()
   # Unix newlines on every host: file(WRITE) writes CRLF on Windows.
   file(CONFIGURE OUTPUT "${OUT}/hashes.txt" NEWLINE_STYLE UNIX CONTENT "${lines}")

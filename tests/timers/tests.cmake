@@ -136,10 +136,10 @@ schway_add_test(NAME timers.source.hblank_feed
   COMMAND schwaystation-test-timers hblank_feed
   LABELS timers portable TIMEOUT 10)
 
-# Fault prevented: an access to a counter that waits on a signal nothing makes
-# yet that is not counted, is made a fault, or moves the counter anyway.
-schway_add_test(NAME timers.source.unfed_unbuilt
-  COMMAND schwaystation-test-timers unfed_unbuilt
+# Fault prevented: timer accesses remain valid when the dot source is driven
+# by the integrated GPU beam.
+schway_add_test(NAME timers.source.beam_register_access
+  COMMAND schwaystation-test-timers beam_register_access
   LABELS timers portable TIMEOUT 10)
 
 # Fault prevented: an off-by-one in the hold, the dwell, a landing or a

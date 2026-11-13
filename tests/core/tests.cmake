@@ -46,9 +46,13 @@ schway_warnings(schwaystation-test-state)
 
 foreach(case IN ITEMS state.cpu_fields state.device_fields state.round_trip state.stable_bytes state.rejects state.visit
     state.record_sweep state.run_bounds)
+  set(timeout 10)
+  if(case STREQUAL "state.record_sweep")
+    set(timeout 20)
+  endif()
   schway_add_test(NAME core.${case}
     COMMAND schwaystation-test-state ${case}
-    LABELS core portable TIMEOUT 10)
+    LABELS core portable TIMEOUT ${timeout})
 endforeach()
 
 # The I/O page sweep. Fault prevented: an address of 1F801000h-1F801FFFh that

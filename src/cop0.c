@@ -53,10 +53,10 @@ void schway__cop0_exception(schway *inst, uint32_t code, uint32_t epc, uint32_t 
     c->pc = (sr & SCHWAY__SR_BEV) != 0u ? SCHWAY__VECTOR_BEV : SCHWAY__VECTOR_RAM;
 
     /* The same EPC and ExcCode taken SCHWAY__EXC_LOOP_LIMIT times in a row
-       is a loop the guest cannot leave. An interrupt (ExcCode 0) is neither
-       counted nor does it break a run, and a different EPC or code starts a
-       new one. SYSCALL, BREAK and overflow count too: only a loop is a fault
-       (ARCHITECTURE section 6). */
+       without an RFE return past that EPC is a loop the guest cannot leave.
+       An interrupt (ExcCode 0) is neither counted nor does it break a run,
+       and a different EPC or code starts a new one. SYSCALL, BREAK and
+       overflow count too: only a loop is a fault (ARCHITECTURE section 6). */
     if (code != SCHWAY__EXC_INT) {
         if (c->exc_repeat != 0u && c->exc_epc == epc && c->exc_code == (code & 31u)) {
             if (c->exc_repeat != UINT32_MAX) {
@@ -185,7 +185,14 @@ uint32_t schway__cop0_mtc0(schway *inst, uint32_t rd, uint32_t value)
 void schway__cop0_rfe(schway *inst)
 {
     uint32_t *r = inst->cpu.cop0.r;
+    struct schway__cpu *c = &inst->cpu;
     uint32_t was = schway__cop0_irq_pending(inst);
+    /* A handler that returns through RFE to an address past the trapped EPC
+       has made progress, even if that address later raises the same exception. */
+    if (((r[SCHWAY__COP0_CAUSE] >> 2) & 31u) != SCHWAY__EXC_INT && c->exc_repeat != 0u &&
+        c->branch_slot != 0u && c->branch_take != 0u && c->branch_target > c->exc_epc) {
+        c->exc_repeat = 0u;
+    }
     inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
     r[SCHWAY__COP0_SR] = (r[SCHWAY__COP0_SR] & ~0xFu) | ((r[SCHWAY__COP0_SR] >> 2) & 0xFu);
     /* The restored IEc is looked at at once: a line that was held off by the

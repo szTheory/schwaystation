@@ -2,7 +2,7 @@
 title: "Conformance: vectors, fixtures, oracles, diagnostics and the compatibility ledger"
 summary: "Which PS1 vector sets and test programs schwaystation may use under which licence and disposition, the self-authored armips PS-EXE and mkpsxiso disc fixtures that are the primary v1.0 evidence, the RAM-mailbox and TTY protocol the runner reads, which released emulators act as headless oracles (PCSX-Redux with OpenBIOS in CI; DuckStation regtest, Mednafen and ares locally), the ledger keyed by Redump serial and hash with its ratchet, first-fault diagnostics, CI tiers and cost, fuzz targets, admission rules and the milestone map."
 read_when: "Admitting a vector set, test program or fixture; writing a fixture; building the runner's mailbox, TTY or first-fault code; adding a ledger row, an oracle lane or a CI tier; planning which evidence lands in which v1.0 phase."
-updated: 2026-11-10
+updated: 2026-11-12
 ---
 
 # Conformance, oracles and the compatibility ledger
@@ -117,28 +117,25 @@ Released binaries only; no copyleft or non-commercial source is opened [CF.16]. 
 - **Recommendation:** PCSX-Redux + OpenBIOS nightly on Linux x64 as the routine locator; DuckStation regtest, Mednafen and ares local. **Strongest alternative:** a libretro-host harness loading Beetle PSX or SwanStation from the libretro buildbot (both can use OpenBIOS per its COMPATIBILITY.md) for a second CI opinion. **Would change if:** the AppImage fails to run under Xvfb on ubuntu 26.04 twice, or PCSX-Redux's own GPU disagrees with ps1-tests PNGs on a case where we match hardware.
 
 ### 3.2 Compatibility ledger and ratchet
-`tests/compat/ledger.csv`: one header line, comma-separated, no field may contain a comma, quote or newline (a schema test enforces it).
+`tests/compat/ledger.csv` has exactly ten meaningful columns. A field may not contain a comma, quote or newline; the schema check rejects malformed headers, empty fields and duplicate derived keys.
 
 | Column | Meaning |
 |---|---|
-| `id` | the Redump serial (`SLUS-00067` form, from SYSTEM.CNF or the DAT) plus `/` plus the 32-hex rcheevos MD5 of the boot executable (PX.82, PX.86) [CF.22], computed by our own `--probe`; for own fixtures `fixture/<name>`; for built third-party programs `built/<name>` |
-| `track1_sha1` | SHA-1 of track 1 as the Redump DAT lists it, when known; `-` otherwise (identifies the exact dump without naming it) |
-| `title` | from the CC-BY-SA-4.0 libretro-database DAT with its notice in `THIRD-PARTY-NOTICES.md` (PX.81); fixture names otherwise; `unlisted` when absent, and then no hash is written (§3.3) |
-| `region` | `ntsc-u`, `ntsc-j`, `pal` (from the serial prefix and the PS-EXE region string) |
-| `media` | `cue-bin`, `chd` (v2.0; a v1.0 run records such a disc as `unsupported`, exit 77), `exe`, `multi-disc:n` |
-| `predicate` | `boots@F` (weak: display on, ≥ 2 distinct frames, CPU not stuck in an exception loop, no first fault), `frame@F=H`, `ram@F:$ADDR=VV`, `mailbox@F`, `audio@F=H`; prefix `movie:<file>/` for scripted input |
-| `status` | `pass`, `fail`, `unknown` (seed rows), `unsupported` (names the missing device: multitap, lightgun, PocketStation, link cable; exit 77), `skipped` (with a reason; never in CI tiers), `infrastructure_error` (harness or oracle broke; neither pass nor fail) |
-| `evidence` | 16-hex hash prefix, mailbox CRC, or run URL, plus the core commit (12 hex) |
-| `date` | ISO date of the last evaluation |
+| `serial` | Redump serial from the executable or DAT; `fixture/<name>` for project fixtures; `built/<name>` for built programs |
+| `md5` | 32-hex MD5 of the boot executable when measured; `-` when not applicable |
+| `track1_sha1` | Redump SHA-1 for track 1 when known; `-` otherwise |
+| `title` | DAT title for listed games, otherwise the fixture or built-program name |
+| `region` | `ntsc-u`, `ntsc-j`, `pal`, or `any` when the source does not identify a region |
+| `media` | The measured input type, including `exe` or `bios` for the current fixture rows |
+| `predicate` | The exact measured result, such as `boots@F`, `frame@F=H`, or a scripted-input frame predicate |
+| `status` | `pass`, `fail`, or `unknown`; the schema does not invent compatibility passes |
+| `evidence` | The registered test/fixture command, exit status, measured content hashes when applicable, and core revision |
+| `date` | ISO date of that measurement |
 
-Three example rows (hash values are placeholders until phase 3 pins them):
-```
-id,track1_sha1,title,region,media,predicate,status,evidence,date
-fixture/pad_counter,-,pad_counter.exe,ntsc-u,exe,movie:press60/frame@300=0000000000000000,unknown,-,2026-10-19
-built/nugget-gte,-,nugget tests gte,any,exe,tty:Synthesis: SUCCESS,unknown,-,2026-10-19
-SLUS-00000/00000000000000000000000000000000,<40-hex>,<title from the DAT>,ntsc-u,cue-bin,boots@1800,unknown,-,2026-10-19
-```
-- **Ratchet:** key = (`id`, `predicate`). Allowed transitions: `unknown` → anything, `fail` → `pass`, `pass` → `pass`. `pass` → anything else, or a changed hash on a passing `frame@`/`audio@` row, needs a dated line in `tests/compat/allow.txt` (`YYYY-MM-DD <id> <predicate> <reason> behaviour-rev=<n> expires=YYYY-MM-DD`) that names the behaviour-revision bump and expires within 60 days. CI fails when fresh results and the ledger disagree in either direction. **Protected baseline:** the ratchet job first checks out `github.event.pull_request.base.sha`, copies the ledger and `scripts/compat-ratchet.sh` to `$RUNNER_TEMP`, then checks out the PR, so a PR cannot loosen its own judge [CF.14]. Tier is not a column: rows whose id is in the manifest or `tests/built/expected.txt` run in CI; every other row is local. `docs/compatibility.md` is generated from the CSV (counts by status × region × media, then one row per title) and `policy.compat_doc_fresh` regenerates and compares.
+The combined key is `(serial, md5, predicate)`. The committed rows are the measured `gpu_motion`, `pad_counter`, `memcard_roundtrip`, and OpenBIOS shell results; they make no retail-game or hardware-oracle claim. A `pass` result whose predicate embeds a changed frame hash has a different key, so the previous passing row still requires an allowance.
+
+- **Ratchet:** allowed transitions are `unknown` to any status, `fail` to `pass`, and `pass` to `pass`. Other changes, including a removed prior pass, require a dated behavior-revision allowance in `tests/compat/allow.txt`; its inclusive validity window may not exceed 60 days. The judge compares candidate and fresh fixture keys and statuses in both directions, so missing, extra or disagreeing results fail. **Protected baseline:** each pull-request build checks out the exact `base.sha` before the head and passes that checkout and SHA to the wrapper. Only when both the ledger and shell judge are absent does the first-introduction path run; either one missing is malformed. When both exist, the wrapper copies the base shell judge, ledger and its CMake judge dependency into a temporary directory and runs that protected judge against candidate rows and fresh fixture results. Missing dependencies and mismatched checkout SHAs fail. The first-introduction judge requires independent code review before phase verification. Tier remains derived from the fixture manifest and built expectations, not another ledger field.
+- **Generated docs:** `docs/compatibility.md` is generated with byte-sorted status/region/media counts and title rows. Each title row includes confidence, its evidence and measurement date; `policy.compat_doc_fresh` checks committed output against regeneration and rejects stale docs and invalid fields.
 - **Recommendation:** the ten-column CSV with a generated doc. **Strongest alternative:** nesturbator's sorted TSV [CF.15]. **Would change if:** a DAT title keeps a comma (then TSV) or a dashboard consumer appears (emit JUnit too).
 
 ### 3.3 The local `library` preset

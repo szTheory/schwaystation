@@ -129,11 +129,14 @@ meant to take leaves nothing there:
 | coprocessor unusable on COP1 or COP3 | `cop_unusable` |
 | a reserved instruction | `reserved_instruction` |
 | a misaligned fetch | `misaligned_fetch` |
-| the same EPC and ExcCode 1,000 times in a row | `exception_loop`, with the count in its note |
+| the same EPC and ExcCode 1,000 times in a row without an observed handler return past EPC | `exception_loop`, with the count in its note |
 
-The loop counter counts consecutive exceptions with one EPC and one ExcCode, including `SYSCALL`, `BREAK` and overflow,
-since a handler that returns to the instruction that raised it never makes progress. A different EPC or ExcCode starts
-the count again, and an interrupt is neither counted nor does it break a run. The counter is part of the saved state.
+The loop counter counts repeated exceptions with one EPC and one ExcCode, including `SYSCALL`, `BREAK` and overflow.
+For a non-interrupt exception, an `RFE` in a taken branch delay slot clears it when the branch target is greater than the
+recorded EPC. That models a handler returning to the instruction after the one that trapped, even if the guest later
+reaches that same trap again. A return to EPC itself does not clear the count. A different EPC or ExcCode starts the
+count again, and an interrupt is neither counted nor does it break a run, including when its handler returns. The
+counter is part of the saved state.
 
 ## Interrupts
 

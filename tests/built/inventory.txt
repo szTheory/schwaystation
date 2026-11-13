@@ -1,0 +1,15 @@
+# Tests this directory registers: name<TAB>labels, sorted by name.
+built.bios.copy_edges	bios,portable
+built.bios.identity	bios,portable
+built.bios.identity_edges	bios,portable
+built.bios.runner	bios,portable,runner
+built.bios.runner_edges	bios,portable,runner
+built.bios.synthetic_rom	bios,portable
+built.bios.test_key_isolation	bios,portable
+built.openbios.digest	bios,portable
+built.openbios.digest_corrupt	bios,portable
+built.openbios.handoff	bios,portable
+built.openbios.handoff_corruption	bios,portable
+built.openbios.handoff_missing	bios,portable
+built.openbios.shell	bios,portable,runner
+built.openbios.shell_controls	bios,portable,runner

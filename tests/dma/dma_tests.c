@@ -67,6 +67,22 @@ static void wr32(schway *inst, uint32_t addr, uint32_t v)
     CHECK_EQ_U64(schway__bus_write(inst, addr, 4u, v, &cycles), 0u);
 }
 
+static void wr16(schway *inst, uint32_t addr, uint16_t v)
+{
+    uint32_t cycles = 0u;
+    schway__sched_sync(inst);
+    CHECK_EQ_U64(schway__bus_write(inst, addr, 2u, v, &cycles), 0u);
+}
+
+static void wr16_at(schway *inst, uint32_t addr, uint16_t v, uint64_t tick)
+{
+    uint64_t base = schway__sched_now(inst, 0u);
+    CHECK(tick >= base && tick - base < UINT32_MAX);
+    uint64_t delta = tick - base;
+    uint32_t cycles = delta == 0u ? 0u : (uint32_t)(delta + 1u);
+    CHECK_EQ_U64(schway__bus_write(inst, addr, 2u, v, &cycles), 0u);
+}
+
 static uint32_t rd32(schway *inst, uint32_t addr)
 {
     uint32_t cycles = 0u;
@@ -801,34 +817,36 @@ static uint32_t pattern_crc(uint32_t n, uint32_t seed)
     return crc;
 }
 
-/* Fault prevented: a burst that moves the wrong words to a device, forgets to
-   count or checksum them in the stand-in sink, leaves MADR where it was, or
-   forgets the completion flag and the interrupt. 256 words go from RAM to the
-   GPU channel. */
+/* Fault prevented: a burst that loses a GP0 upload, leaves MADR where it was,
+   or forgets the completion flag and interrupt. */
 static void case_sync0_gpu_sink(void)
 {
     schway *inst = make();
-    fill_ram(inst, 0x1000u, 256u, 0xA5000001u);
+    wr32(inst, 0x1F801814u, 0x04000001u);
+    wr32(inst, 0x1000u, 0xA0000000u);
+    wr32(inst, 0x1004u, (5u << 16) | 6u);
+    wr32(inst, 0x1008u, 0x00010002u);
+    wr32(inst, 0x100Cu, 0x7C1F03E0u);
     wr32(inst, DPCR, DPCR_ALL);
     wr32(inst, DICR, 0x00840000u);
     wr32(inst, MADR(2u), 0x1000u);
-    wr32(inst, BCR(2u), 256u);
+    wr32(inst, BCR(2u), 4u);
     uint64_t start = now_of(inst);
     wr32(inst, CHCR(2u), 0x11000001u);
     CHECK_EQ_U64(inst->dma.cur, 2u);
-    CHECK_EQ_U64(inst->dma.words[2], 256u);
-    CHECK_EQ_HEX(inst->dma.crc[2], pattern_crc(256u, 0xA5000001u));
-    CHECK_EQ_HEX(inst->dma.madr[2], 0x1400u);
-    CHECK_EQ_U64(inst->dma.busy_until - start, 272u);
+    CHECK_EQ_HEX(inst->vram[5][6], 0x03E0u);
+    CHECK_EQ_HEX(inst->vram[5][7], 0x7C1Fu);
+    CHECK_EQ_HEX(inst->dma.madr[2], 0x1010u);
+    CHECK_EQ_U64(inst->dma.busy_until - start, 5u);
     CHECK_EQ_U64(inst->dma.words[0] + inst->dma.words[1] + inst->dma.words[3], 0u);
-    (void)run(inst, 271u);
+    (void)run(inst, 4u);
     CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
     CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
     (void)run(inst, 2u);
     CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
     CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
     CHECK_EQ_HEX(rd32(inst, DICR), 0x84840000u);
-    CHECK_EQ_HEX(rd32(inst, MADR(2u)), 0x1400u);
+    CHECK_EQ_HEX(rd32(inst, MADR(2u)), 0x1010u);
     schway_destroy(inst);
 }
 
@@ -856,6 +874,61 @@ static void case_sync0_from_device(void)
         CHECK_EQ_HEX(ram_word(inst, a), moved ? 0u : filled);
     }
     CHECK_EQ_U64(inst->dma.words[3], 0u);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: DMA2 discarding GP0 words, losing a packet split across
+   linked-list nodes or a CPU continuation, returning zeros instead of VRAM,
+   or failing to request another sync-mode-1 block while its FIFO has room. */
+static void case_gpu_linked_list_readback(void)
+{
+    schway *inst = make();
+    schway *reference = make();
+    const uint32_t x = 12u;
+    const uint32_t y = 3u;
+    const uint32_t pixel = 0x7C1Fu;
+
+    wr32(inst, 0x1F801814u, 0x04000001u);
+    wr32(inst, 0x1000u, (2u << 24) | 0x1020u);
+    wr32(inst, 0x1004u, 0xA0000000u);
+    wr32(inst, 0x1008u, (y << 16) | x);
+    wr32(inst, 0x1020u, (2u << 24) | 0x00FFFFFFu);
+    wr32(inst, 0x1024u, 0x00010001u);
+    wr32(inst, 0x1028u, pixel);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, MADR(2u), 0x1000u);
+    wr32(inst, CHCR(2u), 0x01000401u);
+    (void)run(inst, 200u);
+
+    wr32(reference, 0x1F801810u, 0xA0000000u);
+    wr32(reference, 0x1F801810u, (y << 16) | x);
+    wr32(reference, 0x1F801810u, 0x00010001u);
+    wr32(reference, 0x1F801810u, pixel);
+    CHECK_EQ_HEX(inst->vram[y][x], pixel);
+    CHECK_EQ_HEX(inst->vram[y][x], reference->vram[y][x]);
+
+    /* CPU starts the packet; a one-block DMA continues its owed words. */
+    wr32(inst, 0x1F801810u, 0xA0000000u);
+    wr32(inst, 0x1F801810u, (4u << 16) | 20u);
+    wr32(inst, 0x2000u, 0x00010001u);
+    wr32(inst, 0x2004u, 0x03E0u);
+    wr32(inst, MADR(2u), 0x2000u);
+    wr32(inst, BCR(2u), 2u);
+    wr32(inst, CHCR(2u), 0x11000001u);
+    (void)run(inst, 100u);
+    CHECK_EQ_HEX(inst->vram[4u][20u], 0x03E0u);
+
+    /* GPU-to-RAM DMA returns the real packed GPUREAD word. */
+    wr32(inst, 0x1F801814u, 0x04000003u);
+    wr32(inst, 0x1F801810u, 0xC0000000u);
+    wr32(inst, 0x1F801810u, (y << 16) | x);
+    wr32(inst, 0x1F801810u, 0x00010001u);
+    wr32(inst, MADR(2u), 0x3000u);
+    wr32(inst, BCR(2u), 1u);
+    wr32(inst, CHCR(2u), 0x11000000u);
+    CHECK_EQ_HEX(ram_word(inst, 0x3000u), pixel);
+    CHECK_EQ_U64(inst->gpu.owed_words, 0u);
+    schway_destroy(reference);
     schway_destroy(inst);
 }
 
@@ -902,6 +975,71 @@ static void case_sync1_dreq_blocks(void)
     /* A request after the end starts nothing. */
     schway__dma_dreq(inst, 4u, 1u);
     CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: ATTR DMA-write mode failing to supply persistent readiness
+   for every request-mode block sent to the unbuilt SPU sink. The 48 words are
+   judged by source RAM pattern, address, block cost and final IRQ state. */
+static void case_spu_request_blocks(void)
+{
+    const uint32_t seed = 0x5A000001u;
+    schway *inst = make();
+    fill_ram(inst, 0x6000u, 48u, seed);
+    wr16(inst, 0x1F801DAAu, 0x0020u);
+    CHECK_EQ_HEX(inst->bus.spu_attr, 0x0020u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00900000u);
+    wr32(inst, MADR(4u), 0x6000u);
+    wr32(inst, BCR(4u), (3u << 16) | 16u);
+    uint64_t start = now_of(inst);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    wr16(inst, 0x1F801DAAu, 0x0020u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    CHECK_EQ_U64(inst->dma.busy_until - start, 76u);
+    CHECK((inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->dma.dicr & 0x01000000u, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+    CHECK_EQ_HEX(inst->dma.madr[4], 0x6040u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(16u, seed));
+    schway__dma_event(inst, start + 75u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    schway__dma_event(inst, start + 228u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 48u);
+    CHECK_EQ_HEX(inst->dma.madr[4], 0x60C0u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(48u, seed));
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(rd32(inst, DICR), 0x90900000u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    wr16(inst, 0x1F801DAAu, 0x0020u);
+    wr16(inst, 0x1F801DAAu, 0x0020u);
+    CHECK_EQ_U64(inst->dma.words[4], 48u);
+    CHECK_EQ_U64((inst->dma.dreq >> 4) & 1u, 0u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    schway_destroy(inst);
+
+    /* ATTR may become ready after an active transfer has already waited. */
+    inst = make();
+    fill_ram(inst, 0x7000u, 16u, seed);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00900000u);
+    wr32(inst, MADR(4u), 0x7000u);
+    wr32(inst, BCR(4u), (1u << 16) | 16u);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 0u);
+    uint64_t wake = now_of(inst);
+    wr16(inst, 0x1F801DAAu, 0x0020u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    CHECK_EQ_U64(inst->dma.busy_until - wake, 76u);
+    schway__dma_event(inst, wake + 76u);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(inst->dma.madr[4], 0x7040u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(16u, seed));
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
     schway_destroy(inst);
 }
 
@@ -1033,7 +1171,8 @@ static uint64_t run_to_node(schway *inst, uint32_t ch, uint32_t n)
 {
     uint64_t at = inst->ticks;
     for (uint32_t i = 0u; i < 100000u; i++) {
-        if (inst->dma.nodes_done >= n || (inst->dma.chcr[ch] & SCHWAY__DMA_CHCR_BUSY) == 0u) {
+        if (inst->dma.remain[ch] >= n ||
+            (inst->dma.chcr[ch] & SCHWAY__DMA_CHCR_BUSY) == 0u) {
             break;
         }
         (void)run(inst, 1u);
@@ -1043,55 +1182,91 @@ static uint64_t run_to_node(schway *inst, uint32_t ch, uint32_t n)
 
 /* Fault prevented: a list that sends its headers to the device, loses a node,
    follows the wrong address, ends on a header word instead of the marker's bit
-   23 or finishes without the flag and the interrupt. Three nodes of 2, 0 and 5
-   words reach the GPU channel's stand-in sink as 7 words with the checksum of
-   the words in list order, and MADR is left at the end marker. */
+   23 or finishes without the flag and interrupt. Three nodes of 2, 0 and 5
+   words carry one upload packet to VRAM, and MADR is left at the end marker. */
 static void case_list_walk(void)
 {
     schway *inst = make();
+    wr32(inst, 0x1F801814u, 0x04000001u);
     wr32(inst, 0x1000u, (2u << 24) | 0x1010u);
-    wr32(inst, 0x1004u, 0xA0000001u);
-    wr32(inst, 0x1008u, 0xA0000002u);
+    wr32(inst, 0x1004u, 0xA0000000u);
+    wr32(inst, 0x1008u, (8u << 16) | 7u);
     wr32(inst, 0x1010u, (0u << 24) | 0x1020u);
     wr32(inst, 0x1020u, (5u << 24) | 0x00FFFFFFu);
-    for (uint32_t i = 0u; i < 5u; i++) {
-        wr32(inst, 0x1024u + 4u * i, 0xB0000001u + i);
-    }
+    wr32(inst, 0x1024u, 0x00040002u);
+    wr32(inst, 0x1028u, 0x7C1F03E0u);
+    wr32(inst, 0x102Cu, 0x001F7FE0u);
+    wr32(inst, 0x1030u, 0x4210C210u);
+    wr32(inst, 0x1034u, 0x7FFF0000u);
     wr32(inst, DPCR, DPCR_ALL);
     wr32(inst, DICR, 0x00840000u);
     wr32(inst, MADR(2u), 0x1000u);
     wr32(inst, CHCR(2u), CHCR_LIST);
     /* The first node moved at the start; its header went nowhere. */
     CHECK_EQ_U64(inst->dma.cur, 2u);
-    CHECK_EQ_U64(inst->dma.nodes_done, 1u);
-    CHECK_EQ_U64(inst->dma.words[2], 2u);
+    CHECK_EQ_U64(inst->dma.remain[2], 1u);
     CHECK_EQ_HEX(inst->dma.madr[2], 0x1010u);
     (void)run_to_node(inst, 2u, 2u);
-    CHECK_EQ_U64(inst->dma.words[2], 2u);
     CHECK_EQ_HEX(inst->dma.madr[2], 0x1020u);
     (void)run_to_node(inst, 2u, 3u);
-    CHECK_EQ_U64(inst->dma.words[2], 7u);
     CHECK_EQ_HEX(inst->dma.madr[2], 0xFFFFFFu);
     CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
     CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
     (void)run(inst, 200u);
     CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
     CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
-    CHECK_EQ_U64(inst->dma.nodes_done, 3u);
-    CHECK_EQ_U64(inst->dma.words[2], 7u);
-    uint32_t crc = 0u;
-    static const uint32_t sent[7] = {0xA0000001u, 0xA0000002u, 0xB0000001u, 0xB0000002u,
-                                     0xB0000003u, 0xB0000004u, 0xB0000005u};
-    for (uint32_t i = 0u; i < 7u; i++) {
-        uint8_t b[4] = {(uint8_t)sent[i], (uint8_t)(sent[i] >> 8), (uint8_t)(sent[i] >> 16),
-                        (uint8_t)(sent[i] >> 24)};
-        crc = schway__crc32_update(crc, b, sizeof b);
-    }
-    CHECK_EQ_HEX(inst->dma.crc[2], crc);
+    CHECK_EQ_U64(inst->dma.remain[2], 0u);
+    CHECK_EQ_HEX(inst->vram[8][7], 0x03E0u);
+    CHECK_EQ_HEX(inst->vram[8][8], 0x7C1Fu);
+    CHECK_EQ_HEX(inst->vram[9][7], 0x7FE0u);
+    CHECK_EQ_HEX(inst->vram[9][8], 0x001Fu);
+    CHECK_EQ_HEX(inst->vram[10][7], 0xC210u);
+    CHECK_EQ_HEX(inst->vram[10][8], 0x4210u);
+    CHECK_EQ_HEX(inst->vram[11][7], 0x0000u);
+    CHECK_EQ_HEX(inst->vram[11][8], 0x7FFFu);
     CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
     CHECK_EQ_HEX(rd32(inst, DICR), 0x84840000u);
     CHECK_EQ_HEX(rd32(inst, MADR(2u)), 0xFFFFFFu);
     CHECK_EQ_HEX(rd32(inst, CHCR(2u)), 0x00000401u);
+    schway_destroy(inst);
+}
+
+/* Fault prevented: an interleaved walker resetting another channel's node
+   count, which would let a self-reference run past its own 1000h-node yield. */
+static void case_list_independent_yields(void)
+{
+    schway *inst = make();
+    /* Channel 1 outranks channel 2 so it can interrupt the first walk at the
+       boundary immediately before channel 2 reaches its yield. */
+    wr32(inst, DPCR, 0x00000980u);
+    wr32(inst, 0x3000u, 0x00003000u);
+    wr32(inst, 0x4000u, 0x00800000u);
+    wr32(inst, MADR(2u), 0x3000u);
+    wr32(inst, CHCR(2u), CHCR_LIST);
+    for (uint32_t i = 1u; i < SCHWAY__DMA_NODES_MAX - 1u; i++) {
+        schway__dma_event(inst, inst->dma.busy_until);
+        schway__dma_event(inst, inst->dma.busy_until);
+    }
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+
+    wr32(inst, MADR(1u), 0x4000u);
+    wr32(inst, CHCR(1u), CHCR_LIST);
+    uint64_t ch2_end = inst->dma.busy_until;
+    schway__dma_event(inst, ch2_end);
+    schway__dma_event(inst, inst->dma.busy_until);
+    CHECK_EQ_U64(inst->dma.cur, 1u);
+
+    uint64_t ch1_end = inst->dma.busy_until;
+    schway__dma_event(inst, ch1_end);
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+    ch2_end = inst->dma.busy_until;
+    uint64_t caught_up_to = ch2_end + 10u;
+    schway__dma_event(inst, caught_up_to);
+    CHECK_EQ_U64(inst->dma.cur, 2u);
+    CHECK_EQ_U64(inst->dma.busy_until, caught_up_to + 1u);
+    CHECK(schway__dma_next(inst) > caught_up_to);
+    CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->dma.chcr[1] & SCHWAY__DMA_CHCR_BUSY, 0u);
     schway_destroy(inst);
 }
 
@@ -1119,7 +1294,7 @@ static void case_list_empty(void)
         CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
         CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
         CHECK_EQ_U64(inst->dma.words[2], 0u);
-        CHECK_EQ_U64(inst->dma.nodes_done, form == 1u ? 2u : 1u);
+        CHECK_EQ_U64(inst->dma.remain[2], 0u);
         CHECK_EQ_HEX(rd32(inst, MADR(2u)), form == 1u ? 0xFFFFFFu : marker);
         CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
         CHECK_EQ_HEX(rd32(inst, DICR), 0x84840000u);
@@ -1168,16 +1343,16 @@ static void case_list_self_ref(void)
     for (uint32_t nodes = 1u; nodes <= 2u; nodes++) {
         schway *inst = make();
         start_loop_list(inst, nodes);
-        CHECK_EQ_U64(inst->dma.nodes_done, 1u);
+        CHECK_EQ_U64(inst->dma.remain[2], 1u);
         uint64_t far1 = now_of(inst) + 0x10000000u;
         schway__dma_event(inst, far1);
-        CHECK_EQ_HEX(inst->dma.nodes_done, 0x1000u);
+        CHECK_EQ_HEX(inst->dma.remain[2], 0x1000u);
         CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
         check_no_flag(inst);
         CHECK(schway__dma_next(inst) > far1);
         uint64_t far2 = far1 + 0x10000000u;
         schway__dma_event(inst, far2);
-        CHECK_EQ_HEX(inst->dma.nodes_done, 0x2000u);
+        CHECK_EQ_HEX(inst->dma.remain[2], 0x2000u);
         CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
         check_no_flag(inst);
         CHECK(schway__dma_next(inst) > far2);
@@ -1195,7 +1370,7 @@ static void case_list_self_ref(void)
         CHECK(r.ticks <= end + SCHWAY__DMA_BUSY_MAX);
         CHECK((inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY) != 0u);
         check_no_flag(inst);
-        CHECK(inst->dma.nodes_done > 0x2000u);
+        CHECK(inst->dma.remain[2] > 0x2000u);
         schway_destroy(inst);
     }
 }
@@ -1261,6 +1436,11 @@ static const uint32_t chop_rows[64] = {
 static uint64_t chopped_cycles(uint32_t dw, uint32_t cw)
 {
     schway *inst = make();
+    fill_ram(inst, 0x4000u, 2048u, 0u);
+    wr32(inst, 0x1F801814u, 0x04000001u);
+    wr32(inst, 0x4000u, 0xA0000000u);
+    wr32(inst, 0x4004u, 0u);
+    wr32(inst, 0x4008u, (5u << 16) | 818u);
     wr32(inst, DPCR, DPCR_ALL);
     wr32(inst, MADR(2u), 0x4000u);
     wr32(inst, BCR(2u), 2048u);
@@ -1272,7 +1452,11 @@ static uint64_t chopped_cycles(uint32_t dw, uint32_t cw)
         CHECK(t != UINT64_MAX);
         schway__dma_event(inst, t);
     }
-    CHECK_EQ_U64(inst->dma.words[2], 2048u);
+    CHECK_EQ_HEX(inst->vram[0][0], 0x0303u);
+    CHECK_EQ_HEX(inst->vram[0][1], 0x0303u);
+    CHECK_EQ_U64(inst->gpu.phase, SCHWAY__GPU_IDLE);
+    CHECK_EQ_U64(inst->gpu.owed_words, 0u);
+    CHECK_EQ_HEX(inst->dma.madr[2], 0x6000u);
     schway_destroy(inst);
     return t - start;
 }
@@ -1402,6 +1586,248 @@ static void check_state_round_trip(schway *inst)
     schway_destroy(other);
     free(a);
     free(b);
+}
+
+static void compare_states(const schway *left, const schway *right)
+{
+    size_t n = schway_state_size(left);
+    CHECK_EQ_U64(schway_state_size(right), n);
+    uint8_t *a = (uint8_t *)malloc(n);
+    uint8_t *b = (uint8_t *)malloc(n);
+    if (a == NULL || b == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(left, a, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_save_state(right, b, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(memcmp(a, b, n), 0);
+    free(a);
+    free(b);
+}
+
+static void spu_prepare(schway *inst, uint32_t madr, uint32_t blocks, uint32_t words,
+                        uint16_t attr, uint32_t dpcr)
+{
+    wr16(inst, 0x1F801DAAu, attr);
+    wr32(inst, DPCR, dpcr);
+    wr32(inst, DICR, 0x00900000u);
+    wr32(inst, MADR(4u), madr);
+    wr32(inst, BCR(4u), (blocks << 16) | words);
+}
+
+/* Fault prevented: a DMA4 request producer that moves on other ATTR modes,
+   wrong direction or a disabled channel; a stop or mode change that breaks an
+   atomic unit; a wake that bypasses a future read-ahead deadline; or a saved
+   waiting/in-flight state that differs from the same uninterrupted run. */
+static void case_spu_request_controls(void)
+{
+    static const uint16_t inactive_modes[] = {0xA000u, 0xA010u, 0xA030u};
+    const uint32_t seed = 0x4B000001u;
+    for (size_t i = 0u; i < sizeof inactive_modes / sizeof inactive_modes[0]; i++) {
+        schway *inst = make();
+        fill_ram(inst, 0x8000u, 16u, seed);
+        spu_prepare(inst, 0x8000u, 1u, 16u, inactive_modes[i], DPCR_ALL);
+        wr32(inst, CHCR(4u), 0x01000201u);
+        CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+        CHECK_EQ_U64(inst->dma.words[4], 0u);
+        inst->cpu.block_end = 0u;
+        schway__dma_bus_access(inst, now_of(inst));
+        CHECK_EQ_U64(inst->cpu.block_end & SCHWAY__BLOCK_EVENT, 0u);
+        schway_destroy(inst);
+    }
+
+    /* Direction-to-RAM is not automatically ready, while its explicit credit
+       still follows the manual sync-mode-1 path. */
+    schway *inst = make();
+    fill_ram(inst, 0x9000u, 16u, seed);
+    spu_prepare(inst, 0x9000u, 1u, 16u, 0x0020u, DPCR_ALL);
+    wr32(inst, CHCR(4u), 0x01000200u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 0u);
+    schway__dma_dreq(inst, 4u, 1u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_HEX(inst->dma.madr[4], 0x9040u);
+    CHECK_EQ_U64((inst->dma.dreq >> 4) & 1u, 0u);
+    CHECK_EQ_U64(ram_word(inst, 0x9000u), 0u);
+    schway_destroy(inst);
+
+    /* A disabled DPCR holds the request; enabling it wakes the existing work. */
+    inst = make();
+    fill_ram(inst, 0xA000u, 16u, seed);
+    spu_prepare(inst, 0xA000u, 1u, 16u, 0x0020u, 0x07654321u);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 0u);
+    wr32(inst, DPCR, DPCR_ALL);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    schway_destroy(inst);
+
+    /* A waiting channel stopped before its first unit never starts when ATTR
+       later changes; a stop during an atomic block takes effect at its end. */
+    inst = make();
+    fill_ram(inst, 0xB000u, 48u, seed);
+    spu_prepare(inst, 0xB000u, 3u, 16u, 0x0010u, DPCR_ALL);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    wr32(inst, CHCR(4u), 0u);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    wr16(inst, 0x1F801DAAu, 0x0020u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 0u);
+    schway_destroy(inst);
+
+    inst = make();
+    fill_ram(inst, 0xC000u, 48u, seed);
+    spu_prepare(inst, 0xC000u, 3u, 16u, 0x0020u, DPCR_ALL);
+    uint64_t start = now_of(inst);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    wr32(inst, CHCR(4u), 0u);
+    CHECK((inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->dma.phase[4], 5u);
+    check_state_round_trip(inst);
+    schway__dma_event(inst, start + 76u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+    check_state_round_trip(inst);
+    schway_destroy(inst);
+
+    /* ATTR deassertion cannot split the already moved block. Reasserting it
+       at the next block boundary starts exactly there, with no accumulated
+       request credit. */
+    schway *split = make();
+    fill_ram(split, 0xD000u, 48u, seed);
+    spu_prepare(split, 0xD000u, 3u, 16u, 0x0020u, DPCR_ALL);
+    start = now_of(split);
+    wr32(split, CHCR(4u), 0x01000201u);
+    wr16_at(split, 0x1F801DAAu, 0x0010u, start + 1u);
+    CHECK_EQ_U64(split->dma.words[4], 16u);
+    schway__dma_event(split, start + 75u);
+    CHECK_EQ_U64(split->dma.words[4], 16u);
+    schway__dma_event(split, start + 76u);
+    CHECK_EQ_U64(split->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(split->dma.words[4], 16u);
+    CHECK((split->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(split->dma.dicr & 0x10000000u, 0u);
+    check_state_round_trip(split);
+    wr16_at(split, 0x1F801DAAu, 0x0020u, start + 76u);
+    CHECK_EQ_U64(split->dma.cur, 4u);
+    CHECK_EQ_U64(split->dma.words[4], 32u);
+    CHECK_EQ_U64(split->dma.busy_until, start + 152u);
+    schway__dma_event(split, start + 152u);
+    CHECK_EQ_U64(split->dma.words[4], 48u);
+    CHECK_EQ_U64(split->dma.busy_until, start + 228u);
+    schway__dma_event(split, start + 228u);
+    CHECK_EQ_U64(split->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(split->dma.words[4], 48u);
+    CHECK_EQ_HEX(split->dma.crc[4], pattern_crc(48u, seed));
+    CHECK_EQ_U64(split->irq.stat & 8u, 8u);
+    schway_destroy(split);
+
+    /* A DMA-register read can finish one block ahead of the clock. Neither an
+       ATTR callback nor another request callback may start before that saved
+       boundary; at the boundary the manual credit starts one unit and ATTR
+       readiness continues the rest. */
+    inst = make();
+    fill_ram(inst, 0xE000u, 48u, seed);
+    spu_prepare(inst, 0xE000u, 3u, 16u, 0x0020u, DPCR_ALL);
+    start = now_of(inst);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    CHECK((rd32(inst, CHCR(4u)) & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.busy_until, start + 76u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    check_state_round_trip(inst);
+    wr16_at(inst, 0x1F801DAAu, 0x0020u, start + 1u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.busy_until, start + 76u);
+    schway__dma_dreq(inst, 4u, 1u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    CHECK_EQ_U64((inst->dma.dreq >> 4) & 1u, 1u);
+    schway__dma_event(inst, start + 75u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    schway__dma_event(inst, start + 76u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.words[4], 32u);
+    CHECK_EQ_U64(inst->dma.busy_until, start + 152u);
+    schway__dma_event(inst, start + 152u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.words[4], 48u);
+    schway__dma_event(inst, start + 228u);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(48u, seed));
+    schway_destroy(inst);
+
+    /* 757 independently judged blocks keep every unit at its existing 76
+       cycles, with the final sink write before (not at) final completion. */
+    inst = make();
+    const uint32_t words = 757u * 16u;
+    fill_ram(inst, 0x10000u, words, seed);
+    spu_prepare(inst, 0x10000u, 757u, 16u, 0x0020u, DPCR_ALL);
+    start = now_of(inst);
+    wr32(inst, CHCR(4u), 0x01000201u);
+    CHECK_EQ_U64(inst->dma.words[4], 16u);
+    CHECK_EQ_U64(inst->dma.busy_until - start, 76u);
+    schway__dma_event(inst, start + 57531u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.words[4], words);
+    CHECK_EQ_HEX(inst->dma.madr[4], 0x10000u + words * 4u);
+    CHECK_EQ_U64(inst->dma.busy_until, start + 57532u);
+    CHECK_EQ_HEX(inst->dma.crc[4], pattern_crc(words, seed));
+    CHECK((inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_U64(inst->dma.dicr & 0x10000000u, 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
+    schway__dma_event(inst, start + 57532u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_HEX(rd32(inst, DICR), 0x90900000u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    schway_destroy(inst);
+
+    /* Splitting event time does not change serialized output; the state helper
+       also checks that the complete engine remains loadable. */
+    split = make();
+    schway *whole = make();
+    fill_ram(split, 0x18000u, 48u, seed);
+    fill_ram(whole, 0x18000u, 48u, seed);
+    spu_prepare(split, 0x18000u, 3u, 16u, 0x0020u, DPCR_ALL);
+    spu_prepare(whole, 0x18000u, 3u, 16u, 0x0020u, DPCR_ALL);
+    start = now_of(split);
+    wr32(split, CHCR(4u), 0x01000201u);
+    wr32(whole, CHCR(4u), 0x01000201u);
+    schway__dma_event(split, start + 75u);
+    schway__dma_event(split, start + 152u);
+    schway__dma_event(split, start + 228u);
+    schway__dma_event(whole, start + 228u);
+    compare_states(split, whole);
+    check_state_round_trip(split);
+    check_state_round_trip(whole);
+    schway_destroy(whole);
+    schway_destroy(split);
+
+    /* Independent ATTR latches and readiness never leak across instances. */
+    schway *active = make();
+    schway *waiting = make();
+    fill_ram(active, 0x20000u, 16u, seed);
+    fill_ram(waiting, 0x20000u, 16u, seed);
+    spu_prepare(active, 0x20000u, 1u, 16u, 0x0020u, DPCR_ALL);
+    spu_prepare(waiting, 0x20000u, 1u, 16u, 0x0010u, DPCR_ALL);
+    start = now_of(active);
+    wr32(active, CHCR(4u), 0x01000201u);
+    wr32(waiting, CHCR(4u), 0x01000201u);
+    CHECK_EQ_U64(active->dma.words[4], 16u);
+    CHECK_EQ_U64(waiting->dma.words[4], 0u);
+    schway__dma_event(active, start + 76u);
+    CHECK_EQ_U64(active->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(waiting->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, SCHWAY__DMA_CHCR_BUSY);
+    CHECK_EQ_U64(waiting->dma.words[4], 0u);
+    CHECK_EQ_HEX(active->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(waiting->bus.spu_attr, 0x0010u);
+    schway_destroy(waiting);
+    schway_destroy(active);
 }
 
 /* All seven channels written with BCR = FFFFFFFFh in a mode they can run, in
@@ -1642,13 +2068,43 @@ static void case_fault_sync3(void)
     CHECK_EQ_HEX(f.addr, CHCR(2u));
 
     /* The same channel then takes a usable mode and moves its words. */
+    wr32(inst, 0x1F801814u, 0x04000001u);
+    wr32(inst, 0x1000u, 0xA0000000u);
+    wr32(inst, 0x1004u, (10u << 16) | 10u);
+    wr32(inst, 0x1008u, 0x00010001u);
+    wr32(inst, 0x100Cu, 0x00007C1Fu);
+    wr32(inst, BCR(2u), 4u);
     wr32(inst, CHCR(2u), 0x11000001u);
     CHECK_EQ_U64(inst->dma.cur, 2u);
-    CHECK_EQ_U64(inst->dma.words[2], 64u);
-    CHECK_EQ_HEX(inst->dma.crc[2], pattern_crc(64u, 0xB5000001u));
+    CHECK_EQ_HEX(inst->vram[10][10], 0x7C1Fu);
     (void)run(inst, 1000u);
     CHECK_EQ_U64(inst->dma.chcr[2] & SCHWAY__DMA_CHCR_BUSY, 0u);
     CHECK_EQ_U64(inst->irq.stat & 8u, 8u);
+    schway_destroy(inst);
+
+    /* Replacing a live transfer with reserved sync mode must fail closed.
+       The accepted model latches the write, lets only the current unit end,
+       then stops without completing or starting a reserved-mode transfer. */
+    inst = make();
+    fill_ram(inst, 0x5000u, 64u, 0x64000001u);
+    wr32(inst, DPCR, DPCR_ALL);
+    wr32(inst, DICR, 0x00900000u);
+    wr32(inst, MADR(4u), 0x5000u);
+    wr32(inst, BCR(4u), 64u);
+    wr32(inst, CHCR(4u), 0x11000001u);
+    uint64_t unit_end = inst->dma.busy_until;
+    wr32(inst, CHCR(4u), 0x11000601u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_DMA);
+    CHECK_EQ_HEX(inst->fault.addr, CHCR(4u));
+    CHECK_EQ_HEX(inst->fault.opcode, 0x11000601u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK_EQ_U64(inst->dma.busy_until, unit_end);
+    CHECK_EQ_HEX(inst->dma.chcr[4] & 0x600u, 0u);
+    schway__dma_event(inst, unit_end);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK_EQ_U64(inst->dma.dicr & (1u << 28), 0u);
+    CHECK_EQ_U64(inst->irq.stat & 8u, 0u);
     schway_destroy(inst);
 }
 
@@ -1758,10 +2214,14 @@ static const struct {
     {"chopping_band", case_chopping_band},
     {"list_cpu_band", case_list_cpu_band},
     {"list_walk", case_list_walk},
+    {"list_independent_yields", case_list_independent_yields},
     {"list_empty", case_list_empty},
     {"sync0_gpu_sink", case_sync0_gpu_sink},
+    {"gpu_linked_list_readback", case_gpu_linked_list_readback},
     {"sync0_from_device", case_sync0_from_device},
     {"sync1_dreq_blocks", case_sync1_dreq_blocks},
+    {"spu_request_blocks", case_spu_request_blocks},
+    {"spu_request_controls", case_spu_request_controls},
     {"sync1_no_dreq_no_stall", case_sync1_no_dreq_no_stall},
     {"costs_per_channel", case_costs_per_channel},
     {"dpcr_rearbitrate", case_dpcr_rearbitrate},

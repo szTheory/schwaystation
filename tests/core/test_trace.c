@@ -143,8 +143,47 @@ static void check_shape(const schway *inst, uint32_t n)
     }
 }
 
+/* Uncached data reaches the bus only after earlier queued stores drain.
+   Compare against the same cold-cache instruction with an empty queue, so
+   instruction fetch costs are measured independently of access timestamps. */
+static void check_uncached_data_clock(void)
+{
+    const uint32_t words[2] = {0x8D090000u, 0u};
+    for (uint32_t write = 0u; write < 2u; write++) {
+        uint64_t baseline_gap = 0u;
+        uint64_t baseline_ticks = 0u;
+        for (uint32_t queued = 0u; queued <= 4u; queued++) {
+            schway *inst = make();
+            uint32_t program[2] = {words[0], words[1]};
+            if (write != 0u) program[0] = 0xAD090000u;
+            load(inst, program, 2u);
+            inst->cpu.pc = TEXT;
+            inst->cpu.r[8] = 0xA0020000u;
+            inst->cpu.r[9] = 0x55u;
+            inst->cpu.wq_count = queued;
+            schway_run_result result = run(inst, 1u, SCHWAY_RUN_TRACE);
+            CHECK_EQ_U64(result.fault_present, 0u);
+            CHECK_EQ_U64(held(inst), 2u);
+            schway_trace instruction = get(inst, 0u);
+            schway_trace access = get(inst, 1u);
+            CHECK_EQ_U64(instruction.event, SCHWAY_TRACE_EXEC);
+            CHECK_EQ_U64(access.event, write != 0u ? SCHWAY_TRACE_WR : SCHWAY_TRACE_RD);
+            CHECK_EQ_HEX(access.addr, 0xA0020000u);
+            uint64_t gap = access.cycle - instruction.cycle;
+            if (queued == 0u) {
+                baseline_gap = gap;
+                baseline_ticks = result.ticks;
+            }
+            CHECK_EQ_U64(gap, baseline_gap + queued * 4u);
+            CHECK_EQ_U64(result.ticks, baseline_ticks + queued * 4u);
+            schway_destroy(inst);
+        }
+    }
+}
+
 static void case_exec_records(void)
 {
+    check_uncached_data_clock();
     CHECK(sizeof(struct schway__trace_rec) <= 32u);
     CHECK(sizeof(struct schway__trace_ring) <= RING * 32u + 64u);
     schway *inst = make();
@@ -424,8 +463,8 @@ static void case_irq(void)
         res = run(inst, 100000u, SCHWAY_RUN_TRACE);
     }
     CHECK_EQ_U64(res.frame, 1u);
-    /* The frame's end raised the interrupt; the next run takes it two
-       retirements later, so its record leads the vector's own instructions. */
+    /* The configured Y2 line raises VBlank before field wrap; the trace still
+       belongs to the field in which the guest enabled and observed the IRQ. */
     (void)run(inst, 300u, SCHWAY_RUN_TRACE);
     uint32_t n = held(inst);
     uint32_t at = n;
@@ -437,10 +476,9 @@ static void case_irq(void)
     CHECK(at < n);
     if (at < n) {
         schway_trace t = get(inst, at);
-        uint64_t start1 = UINT64_C(405350378496) / UINT64_C(715909);
         CHECK(t.pc == TEXT + 20u || t.pc == TEXT + 24u);
-        CHECK_EQ_U64(t.frame, 1u);
-        CHECK(t.cycle >= start1);
+        CHECK_EQ_U64(t.frame, 0u);
+        CHECK(t.cycle > 0u && t.cycle < UINT64_C(405350378496) / UINT64_C(715909));
         CHECK_EQ_U64(t.device, SCHWAY_DEVICE_NONE);
         CHECK((t.value & 0x400u) != 0u); /* CAUSE shows the hardware line */
         CHECK(at + 1u < n);

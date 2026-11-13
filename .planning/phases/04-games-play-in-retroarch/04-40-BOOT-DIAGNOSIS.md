@@ -1,0 +1,98 @@
+# 04-40 OpenBIOS boot diagnosis
+
+**Status:** The POST, ATTR readback, DMA4 request/continuation and GPUSTAT field-status fixes are complete in plans 04-50 through 04-53. The checked C-shell reaches an independently inspected cube frame at NTSC-U frame 240, and its native image hash is pinned in plan 04-40 tests. The shell selector/refusal controls and exact-head hosted portable verification both passed; this diagnosis records the observed frame and run evidence. Earlier black-frame evidence below records the resolved blocker.
+
+## Evidence
+
+- `gh run view 43083684528 --repo szTheory/schwaystation --json headSha,conclusion,workflowName,createdAt,url` and `gh run download 43083684528 --repo szTheory/schwaystation --name openbios-handoff --dir /private/tmp/schwaystation-openbios-43083684528` exited 0. This prior successful run is at `11a79aeebacc9734c2bc5a5295e1815cfeb15b38`, not the current head. The downloaded image is 524288 bytes and SHA-256 `92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8`.
+- `build/ci/schwaystation-run --bios /private/tmp/schwaystation-openbios-43083684528/openbios.bin --frames 60 --hash --hash-state --png 60:/private/tmp/schwaystation-openbios-60.png` exited 0. Its PNG SHA-256 was `4767ea2e534326eb1cb0c8b97500c9b5f8100afbfd4f5d6511a521ed96a3a623`; visual inspection showed a uniformly black 256x240 image.
+- The same runner command at `--frames 600` with `--tty` and `--png 600:/private/tmp/schwaystation-openbios-600.png` exited 0 and emitted 706707 blank `tty ` lines. At `--frames 1000`, it exited 0, emitted 1180520 blank `tty ` lines, and reported the same image hash as frame 60: `fe0084ed1daff80953abb18143fc3f573020edc1b2bc56654a8c7a5b6ca77ac0`. This CLI count is not the core video frame: public video metadata remained `frame=0`, `enabled=0`.
+- A temporary C diagnostic using the public API and `SCHWAY_RUN_TRACE` exited 0 when linked against `build/ci/libschwaystation.a`. The first-fault record was `UNMAPPED_WRITE` (`kind=2`, device EXP2) at tick `1917508`, PC `0xBFC000A8`, address `0xBF802041` (physical `0x1F802041`). The trace shows the executing instruction `0xA2022041` (`sb v0,0x2041(s0)`) with `v0=0x0F`. With stop-on-fault disabled, 1000 bounded `schway_run` calls completed with exit 0 but video stayed disabled, VRAM remained zero-filled, and the trace ended in zero/NOP instructions at `0x800004A8`–`0x800004D4`.
+- No BIOS bytes, screenshot, or raw TTY/trace log were added to the repository. The artifact and diagnostic outputs remain under `/private/tmp`.
+
+### Boot after the POST fix
+
+- `cmake --preset ci && cmake --build --preset ci --target schwaystation-run` exited 0 after plan 04-50. Running `build/ci/schwaystation-run --bios /private/tmp/schwaystation-openbios-43083684528/openbios.bin --frames 60 --tty --hash --hash-state --png 60:/private/tmp/schwaystation-openbios-postfixed-60.png` exited 0. The runner reported BIOS SHA-256 `92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8`, frame 60 hash `793f6a3459808ad68494aac85caf3d71afc6b8da7aeea21f612f3ec9140fc324`, and state hash `fcacfa83d34d63fccc088daa4c6968d98cdeb8e102c1d5a39325b0f931d052d`. The 640x239 PNG SHA-256 was `d54805b62ede706d1ef9b44538d714c4192c9b41ccd910b6550e24d77d768532`; independent visual inspection still showed a uniformly black frame. TTY output contained no blank-line flood. These values are diagnostics only; no shell hash is accepted.
+- A temporary public-API trace harness was compiled with `cc -Iinclude -Ibuild/ci/generated /private/tmp/schway_openbios_first_spu_read.c build/ci/libschwaystation.a -o /private/tmp/schway_openbios_first_spu_read` and run against the checked BIOS. The compile and run exited 0. Each `schway_run` used `SCHWAY_RUN_TRACE` with a 10,000-cycle budget. At the first SPU control poll, the trace showed frame 41: cycle 23,388,289 `rd pc=0x800332a4 addr=0x1F801DAA value=0`; cycle 23,388,323 `wr pc=0x800332b4 addr=0x1F801DAA value=0x20`; cycle 23,388,348 `rd pc=0x800332c4 addr=0x1F801DAA value=0`. The following instruction at `0x800332cc` is opcode `0x30C60030` (`andi a2,a2,0x30`), followed by a branch back to the load. The loop therefore keeps observing transfer-mode bits `0x00` after writing mode `0x20`.
+- After plan 04-51, `cmake --preset ci && cmake --build --preset ci --target schwaystation-run` exited 0. Running `build/ci/schwaystation-run --bios /private/tmp/schwaystation-openbios-43083684528/openbios.bin --frames 60 --tty --hash --hash-state --png 60:/private/tmp/schwaystation-openbios-attr-fixed-60.png` exited 0. It reported frame hash `793f6a3459808ad68494aac85caf3d71afc6b8da7aeea21f612f3ec9140fc324` and state hash `aadb0698b0cc136fde3352fbc353c16252c65fd8d3c419725f18c53e1396bfd8`. The 640x239 PNG SHA-256 was `d54805b62ede706d1ef9b44538d714c4192c9b41ccd910b6550e24d77d768532`; independent inspection showed it remained uniformly black, and TTY output contained no lines.
+- `cc -Iinclude -Ibuild/ci/generated -Isrc /private/tmp/schway_openbios_diag.c build/ci/libschwaystation.a -o /private/tmp/schway_openbios_diag && /private/tmp/schway_openbios_diag /private/tmp/schwaystation-openbios-43083684528/openbios.bin` exited 0 after 1,000 traced `schway_run` calls. It reported `fault_present=0`, video frame 998, `enabled=0`, and zero nonzero RGB555 pixels. The trace repeatedly loaded `0x1F8010C8` at PC `0x80033308` with value `0x01000201`.
+- The same diagnostic's per-instance DMA state was `DPCR=0x076F4321`, `CHCR[4]=0x01000201`, `BCR[4]=0x02F50010`, `MADR[4]=0x00037B3C`, `phase[4]=0`, `remain[4]=0`, `dreq=0`, `words[4]=0`, `cur=7`, and `busy_until=stall_until=0`; `spu_attr=0x8020`. DPCR has channel 4 enabled. BCR requests 757 blocks of 16 words, but no block has started. The channel remains marked active in CHCR while the engine correctly waits for DREQ4.
+
+## Source cause
+
+At the pinned MIT nugget source `9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9`, `openbios/main/main.c` writes `POST = 0x0f` and then `POST = 0x0e` before `drawSplashScreen()` and `bootThunk()` (lines 90–108). `common/hardware/hwregs.h` defines `POST` as `HW_U8(0xbf802041)` (line 69). The original runner trace matches that first startup write. Before plan 04-50, `src/bus.c` accepted only EXP2 debug ports `0x1F802080` and `0x1F802082`; the POST write was faulted as an EXP2 gap before shell startup.
+
+## Completed POST compatibility slice
+
+Plan 04-50 added only the ignored byte-write compatibility case for the OpenBIOS POST status address `0x1F802041`. It preserved faults for reads, wider accesses, and every other EXP2 gap, with bus regression coverage and pinned source documentation. This was not a new hardware measurement and did not change API, state, or behavior revisions.
+
+The POST case is complete. Plan 04-40 still needs its tracer, same-run portable lane, and refusal controls after the shell is independently inspected.
+
+## Source-owned plan handoff
+
+The planner rechecked the local bus dispatch and the two pinned upstream locations. Width is expressed in bytes, physical addresses are masked before EXP2 decode, and the current gap rejects POST before existing debug handling. These source-only commands exited 0:
+
+- `gh api 'repos/pcsx-redux/nugget/contents/common/hardware/hwregs.h?ref=9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9' --jq .content | base64 -d | rg -n 'POST|HW_U8'`
+- `gh api 'repos/pcsx-redux/nugget/contents/openbios/main/main.c?ref=9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9' --jq .content | base64 -d | sed -n '86,111p'`
+
+Plan 04-50 owns only the ignored POST byte write, normal EXP2 charge, and source/docs/regression controls. No shell hash was accepted there; wider/read/neighbor gaps and existing debug behavior remain preserved. No firmware bytes or raw logs are added.
+
+## Resolved boot blocker: SPU ATTR readback
+
+At the pinned nugget commit `9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9`, `common/hardware/spu.h` maps `SPU_CTRL` to `HW_U16(0x1f801daa)` and `SPU_STATUS` to `HW_U16(0x1f801dae)`. `modplayer/modplayer.c` is the first caller reached by the trace: `SPUInit` writes control values 0 and `0x8000`; `SPUUnMute` writes `0xc000`; `SPUUploadInstruments` sets the transfer address, writes DMA-write mode `0x20` through `SPU_CTRL`, and then loops on `(SPU_CTRL & 0x0030) != 0x0020` (pinned lines 117–138, 157–169). The trace’s `lhu`, `andi` mask `0x30`, and branch match this caller. Plan 04-51 now provides the exact ATTR halfword readback. That fix passes this poll but does not provide DMA requests, status mirroring, or SPU transfer behavior.
+
+The project’s pinned PSX-SPX source `6d7d1bc106a7`, section 1.5, and the [SPU register reference](https://psx-spx.consoledev.net/soundprocessingunitspu/) identify `0x1F801DAA` as ATTR, a read/write control register whose bits 5–4 select transfer mode. They identify `0x1F801DAE` as read-only STATX/SPUSTAT; mode bits 5–0 there reflect ATTR with a delay. Thus the observed loop reads ATTR, not SPUSTAT and not CD-ROM. The C-shell explicitly writes ATTR before this poll, so no hardware power-on ATTR value is needed for this caller. No SPU timing, audio output, or power-on-value claim follows from this trace.
+
+## Completed ATTR readback slice
+
+Plan 04-51 added an instance-owned halfword latch for exact ATTR accesses at physical `0x1F801DAA`, retaining unbuilt behavior for other SPU registers including STATX at `0x1F801DAE` and preserving revision 4. It added bus and state round-trip controls. The deterministic zero reset is an emulator model only, not a hardware power-on claim. It did not implement DMA requests, SPU RAM, timing, or audio.
+
+## Next boot blocker: DMA4 request line
+
+After the ATTR poll, the pinned `modplayer/modplayer.c` upload path sets `BCR[4]` to block size `0x10` words and the remaining block count, then writes `CHCR[4]=0x01000201` (lines 151–166). Its final loop waits for CHCR bit 24 to clear. The current trace matches that wait at `PC 0x80033308`, repeatedly reading `0x1F8010C8`. The state shows the channel enabled, active, and configured for 757 request-mode blocks of 16 words, while DREQ4 is low and the existing sink has received zero words.
+
+The project's DMA documentation states that sync mode 1 transfers exactly one BCR block per request-line raise; the engine consumes that request when the block begins and leaves the CPU running while it waits for another (`docs/hardware/dma.md`, “Sync mode 0, sync mode 1 and the request line”). The pinned PSX-SPX SPU reference says STATX bit 8 is the DMA-write request, and its SPU RAM DMA-write sequence starts DMA4 with block size `10h` and control `01000201h`. The core has no SPU module to raise DREQ4; the generic channel-4 sink only consumes words after a block starts. This explains the wait without attributing a defect to the already-tested generic DMA block engine.
+
+## Resolved DMA4 re-slice
+
+Plan 04-52 added ATTR-driven DMA4 request/continuation through the existing deterministic channel-4 sink, preserving cost semantics. It completed request, per-block continuation, completion, reset, channel/mode, instance, and state controls, and documented the modeled FIFO/request behavior. See [04-52-SUMMARY.md](04-52-SUMMARY.md). It did not add SPU audio, sample RAM, voices, or hardware-timing claims. The fix passed the DMA wait on this checked BIOS; actual shell and portable-lane acceptance remain open.
+
+## Historical shell blocker after DMA4 continuation
+
+The input remained the same supported C-shell image from the one-day `openbios-handoff` artifact, downloaded from successful run [43083684528](https://github.com/szTheory/schwaystation/actions/runs/43083684528). That run used an earlier head; it is usable for local boot diagnosis only. The image is exactly 524288 bytes with SHA-256 `92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8`. The pinned nugget revision remains `9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9`, built by the unchanged Linux GCC archive SHA-256 `228f031a25cf2687d8845fd1421f625bafc211fa27da428e458e80d030a726f8` with upstream's `OPENBIOS_SHELL=shell` option.
+
+After 04-52, `cmake --preset ci && cmake --build --preset ci --target schwaystation-run` exited 0. The actual runner command `build/ci/schwaystation-run --bios /private/tmp/schwaystation-openbios-43083684528/openbios.bin --frames 1000 --tty --hash --hash-state --png 1000:/private/tmp/schwaystation-openbios-dreq-fixed-1000.png` exited 0. It reported frame hash `93177d60b78e6e2dafab87bda350c82452295c6f8a86ffae6b11f3b5a6dec3b6` and state hash `9fd45b2a6e063a593dea0453e03c07cc75c2e24ea85e0adebb2988f9fda48728`; independent inspection of the PNG showed a uniformly black frame. These hashes remain diagnostic only.
+
+The temporary internal trace harness was compiled and run with exit 0:
+
+`cc -Iinclude -Ibuild/ci/generated -Isrc /private/tmp/schway_openbios_gpu_writes.c build/ci/libschwaystation.a -o /private/tmp/schway_openbios_gpu_writes && /private/tmp/schway_openbios_gpu_writes /private/tmp/schwaystation-openbios-43083684528/openbios.bin`
+
+At 10,000-cycle budgets it completed 4,572 bounded calls, reaching frame 80 and tick 45,463,492 without a fault. With the runner's `SCHWAY_PROFILE_DEBUG_PORT` flag enabled, its trace recorded one `pcsx_present` read at PC `0x80031620`, physical address `0x1F802080`, value `0`; it then recorded 87,223 GPUSTAT reads at PC `0x80031638`, with values `0x14CE0000` and `0x144E0000`. Both have GPUSTAT bits 31 and 13 clear. The observed GPU writes were GP1 display reset/mode/ranges/start, GP0 environment commands E3/E4/E5, and GP1 display enable; no primitive or fill command appeared in the captured trace. All 524,288 VRAM pixels remained zero. At the endpoint mode was `0x27`, display enabled, beam line 0, `I_STAT=1`, and VRAM remained zero. The CLI image and internal VRAM independently confirm that no recognizable frame was drawn.
+
+At the pinned nugget revision, [`shell/gpu.c::waitVSync`](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/shell/gpu.c#L62-L82) reads `pcsx_present()` and, when it is false, waits for alternating GPUSTAT bits 31 and 13. The same file defines the `pcsx_present` signature read at `0x1F802080`; the observed zero takes this fallback. [`shell/main.c::main`](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/shell/main.c#L390-L446) calls `waitVSync(1, idle)` before `flip()` and `render()`. The traced GPUSTAT read and the subsequent CD-ROM reads from `idle()` match this wait path; the first draw commands are therefore never issued.
+
+In `src/gpu.c`, `gpu_status()` never sets bit 31. It sets bit 13 only when display mode bit 5 is clear, so both bits remain zero in the shell's interlaced mode `0x27`. Preparation reference `.planning/preparation/PSX-GPU-AND-GTE.md`, section 1.3, defines bit 13 as ODE2 and bit 31 as ODE (odd line being drawn; frame-dependent in 480-line mode, line-dependent in 240-line mode, and zero during vertical blank). The display code already tracks field and beam position. This evidence isolates the defect to missing dynamic GPUSTAT field-status behavior; it does not support changing DMA4, CD-ROM, SPU, or the acceptance oracle.
+
+## Evidence that led to the 04-53 GPUSTAT fix
+
+Plan 04-53 implemented the field-status behavior using existing instance-owned display state, without adding saved state. It passed its regression and unchanged-BIOS recheck; see [04-53-SUMMARY.md](04-53-SUMMARY.md).
+
+## Inspected shell frame after 04-53
+
+The unchanged C-shell image from the earlier one-day handoff at [run 43083684528](https://github.com/szTheory/schwaystation/actions/runs/43083684528) remains exactly 524288 bytes with SHA-256 `92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8`. That prior run's firmware is used here only for local diagnosis; it is not current-head hosted acceptance.
+
+The selected command `build/ci/schwaystation-run --region ntsc-u --bios /private/tmp/schwaystation-openbios-43083684528/openbios.bin --frames 240 --tty --hash --png 240:/private/tmp/schway-openbios-actual-240.png` exited 0. It reported `bios flags=loaded status=unknown region=unknown sha256=92c2f6d5e6ff056bf2ba177f37246e5468b6164337935297cf7b22266af20cc8` and frame hash `4d1f0ff260e2cf065ae0b7add4ba60353b2b01241dda8325309b5398ba00acec`. I independently viewed the 640x239 PNG: the shell is drawing its rotating 3D cube on the teal background. Frame 120 is edge-on and frame 180 only partly shows the cube, so 240 is the earliest inspected clearly recognizable shell frame. The inspected PNG digest is `2dd216c41430d7f86b8023c31a0b0ac73daa65fd9bfac37cfe9ad284fbbe405c`.
+
+The same command produced no host `tty ` lines. At the pinned source revision, `shell/tty.c` defaults `g_installTTY` to zero and uses its dummy console; `shell/main.c`'s startup text uses RAM syscall A0/3F. The runner's `--tty` captures the separate debug-port text path, so no output is expected and this is not a boot failure.
+
+The temporary post-53 GPU trace at frame 80 reports 255 GPU writes, 132489 GPUSTAT reads, display enabled in mode `0x27`, and 307200 nonzero VRAM bytes at 640x239. It includes the shell's environment and polygon/fill command stream. This register/VRAM progression and the independently viewed image support the shell identification; the image and temporary trace remain outside the repository.
+
+Local checks after adding the tracer exited 0: `cmake --preset ci`, `cmake --build --preset ci --target schwaystation-run`, `ctest --test-dir build/ci -R '^built\.openbios\.shell$' --no-tests=error --output-on-failure` (1.01 s), and `runner.hashes_file` (2.39 s). The lane hash output contains the pinned tuple `openbios shell ntsc-u frame 240 sha256 4d1f0ff260e2cf065ae0b7add4ba60353b2b01241dda8325309b5398ba00acec`. The local build used a temporary copy of the earlier exact-digest handoff.
+
+## Hosted tracer verification
+
+`gh run view 43131466212 --json conclusion,headSha,status,url,event,headBranch` exited 0 for `workflow_dispatch` on `phase/04-games-play-in-retroarch`, exact head `852c1628304beb92194c30a359c29a8848a10396`; [run 43131466212](https://github.com/szTheory/schwaystation/actions/runs/43131466212) concluded success. The run-local OpenBIOS producer, six native build lanes, be32, WASI, ASAN, nofp, perf, RetroArch, hygiene, hash equality and required aggregate all passed. This validates the tracer commit; the newly added selector/refusal controls still require a fresh current-head run.
+
+## Final current-head hosted acceptance
+
+`gh run view 43133593393 --json status,conclusion,headSha,event,headBranch,url` exited 0 for `workflow_dispatch` on `phase/04-games-play-in-retroarch`, exact head `b7fa360b3967d9a7d91d136c14a608580a71f1e4`; [run 43133593393](https://github.com/szTheory/schwaystation/actions/runs/43133593393) concluded success. The run-local firmware producer, eight applicable consumer lanes, six native builds, WASI, be32, ASAN, nofp, perf, RetroArch, hygiene, hash equality and required aggregate all passed. The be32 job took 4m01s overall; `cmake --workflow --preset be32`, including the new one-frame NTSC-J/PAL controls, took 3m41s. Existing timeouts and the frame-300 movie assertions remain unchanged.

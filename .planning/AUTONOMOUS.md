@@ -28,6 +28,10 @@ it. Do not ask the owner a routine question.
 
 The goal is zero human verification. This is settled (rule 6); do not re-propose it or loop back to it.
 
+Launch automated apps and tests in the background under the standing preference in `AGENTS.md`.
+Headless CLI and hosted checks already avoid desktop activation. Apply this to local RetroArch
+checks as well; diagnose background failures before considering any foreground check.
+
 - Automate integration, end-to-end, smoke and seam checks, shifted left. A check goes into CI only when it
   catches a recurring regression (rule 6); a check with no recurring value is run once by the agent and recorded
   as a command and an exit status. Throwaway verification is fine.
@@ -53,3 +57,46 @@ does not remove that boundary. No routine owner UAT or redundant confirmation is
 
 For CI and CD efficiency, first measure critical-path time and duplicate work. Prefer removing redundant
 runs and serial bottlenecks over adding caches, concurrency or dependencies. Keep all required coverage.
+Batch ready fuzz/API/oracle work on one changed head, reuse fingerprinted review for unchanged files, and stop
+an obsolete known-failing CI tail before dispatching its repaired head. Capture shell results with `rc` or
+`task_rc` rather than zsh's read-only `status`; if a wrapper fails after all checks finish green, record that
+accurately instead of repeating the full suite for bookkeeping.
+
+For delegated research, write concise findings and verified pins to the assigned artifact early. When the
+remaining uncertainties are routine implementation probes, return them to the executor instead of delaying
+the whole phase. If a handoff stalls, recover existing evidence and artifacts before repeating any research.
+
+When editing plan commands that contain regex anchors such as `$'`, use literal patches or replacement
+callbacks: JavaScript replacement strings interpret `$'` as surrounding text and can corrupt task blocks.
+Before handing plans to a checker, use the existing failure-direction probe and one-shot balanced-tag/shell
+syntax checks. Keep these as workflow practice, not another repository gate.
+
+Execution should consume the existing context, research and predecessor interfaces instead of repeating broad
+research. Reopen a settled point only for a concrete missing fact or contradictory evidence. Keep required
+summary metadata and verification evidence, and avoid repeating the same outcome across prose sections.
+
+After adding rows to an exact test inventory, preserve its separators and sort the rows bytewise before
+configuring (for example, `LC_ALL=C sort -o FILE FILE`). Several phase-4 tracers first failed configuration
+only because their new rows were unsorted. This is an editing practice, not a new gate or test.
+
+Phase 4 API/state/behavior revision 4 is unreleased and is completed across its implementation slices. Preserve released/frozen API v1–v3 callers. Add concrete v4 fields and update affected interim v4 content-state goldens with evidence; these additions do not require another revision bump within this phase. Once revision 4 is released, the normal compatibility/version policy applies.
+
+The owner explicitly approved raising the Phase 4 repository-check ceiling to 2,700 lines after
+reviewing the complete 2,633-line library and host-claim proposal, including all counted control helpers.
+This supersedes older Phase 4 plan text naming 1,850 or 2,300. Preserve every named check, honest counting and
+the existing 300-line RetroArch limit; do not relocate or minify gate logic. Ratchet the actual counted
+total at ship. Plan 04-26 may resume from its verified patch without another budget question within this cap.
+The owner also renewed permission to apply measured low-hanging efficiency improvements while preserving
+coverage. Count the entire shipping gate and its negative/self-test helpers in resource proposals; the
+earlier prototype sample omitted a 164-line registered-control helper.
+
+Preserve passing commits when resuming a checkpointed plan. If TDD or task ordering was missed before the
+checkpoint, record the actual sequence in SUMMARY and STATE and continue from the verified HEAD. Do not amend,
+reset or split solely to make history appear ideal or to manufacture RED/GREEN timing; legitimate corrective
+history work remains available when the actual correction calls for it.
+
+On 2026-11-12 the owner explicitly requested faster implementation and process after prolonged Phase 4 integration. Keep small related repairs under the current plan/owner with focused checks and honest summary updates; split only material scope or work exceeding the existing 30-minute planning rule. Run affected native configure/compiler/target checks before broad CI, combine coherent changed-head fixes into one hosted run when practical, and do not repeat broad suites for metadata. Executor-chosen provisional test/job timeouts may be adjusted from attributed evidence without owner approval; actual owner caps and every required behavior check remain binding. Parallel read-only diagnosis may remove independent investigation from the source executor's critical path.
+
+The owner renewed the efficiency correction on2026-11-13 after the long integration run: scope a planning/checker dependency to the code/interfaces it actually governs, and keep independent already-authorized implementation moving while that review is read-only. Preserve exactly one local writer and phase code-review-before-final-verification; do not serialize unrelated ready work behind a draft review. Use retained agent-owned ci-j4/hygiene-j4 local overlays through Phase4 rather than recreate/delete perplan; tracked/hosted defaults remain unchanged.
+
+Future subsystem plans bring pinned real oracle programs/captures into the earliest runnable behavior slices. Do not defer all real-program integration to a tail after synthetic tests have codified assumptions. Wire fetch/decode early, run the applicable real case when its first caller works, keep every required case gating, and preserve asset rules. Reuse reproducible throwaway static arithmetic analysis to shorten hypotheses; it is not a new maintained harness or repository gate.

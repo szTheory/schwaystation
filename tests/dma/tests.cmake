@@ -106,9 +106,8 @@ schway_add_test(NAME dma.otc.read_sees_completion
   COMMAND schwaystation-test-dma otc_read_sees_completion
   LABELS dma portable TIMEOUT 30)
 
-# Fault prevented: a burst from RAM that moves the wrong words to a device,
-# forgets to count or checksum them in the stand-in sink, leaves MADR where it
-# was, or forgets the completion flag and the interrupt.
+# Fault prevented: a GPU upload burst from RAM that loses GP0 words, leaves MADR
+# wrong, or forgets the completion flag and interrupt.
 schway_add_test(NAME dma.sync0.gpu_sink
   COMMAND schwaystation-test-dma sync0_gpu_sink
   LABELS dma portable TIMEOUT 10)
@@ -124,6 +123,18 @@ schway_add_test(NAME dma.sync0.from_device
 schway_add_test(NAME dma.sync1.dreq_blocks
   COMMAND schwaystation-test-dma sync1_dreq_blocks
   LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: ATTR DMA-write readiness that is lost after the first block,
+# moves a wrong RAM pattern, or completes without the modeled cost and IRQ.
+schway_add_test(NAME dma.spu.request_blocks
+  COMMAND schwaystation-test-dma spu_request_blocks
+  LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: DMA4 mode, stop, state or read-ahead controls that grant an
+# extra block, bypass a deadline, or change the independently judged 757-block run.
+schway_add_test(NAME dma.spu.request_controls
+  COMMAND schwaystation-test-dma spu_request_controls
+  LABELS dma portable TIMEOUT 30)
 
 # Fault prevented: a channel waiting for its request line that holds the CPU
 # or slows a program reading RAM.
@@ -149,6 +160,12 @@ schway_add_test(NAME dma.dpcr.rearbitrate
 # bit 23, or finishes without the flag and the interrupt.
 schway_add_test(NAME dma.list.walk
   COMMAND schwaystation-test-dma list_walk
+  LABELS dma portable TIMEOUT 10)
+
+# Fault prevented: an interleaved list walker resetting another channel's
+# 1000h-node yield count.
+schway_add_test(NAME dma.list.independent_yields
+  COMMAND schwaystation-test-dma list_independent_yields
   LABELS dma portable TIMEOUT 10)
 
 # Fault prevented: a list whose first header ends it that walks on, or that
@@ -222,3 +239,9 @@ schway_add_test(NAME dma.read.chain_saves
 schway_add_test(NAME dma.stall.engines_decay
   COMMAND schwaystation-test-dma stall_decays_engines
   LABELS dma portable TIMEOUT 30)
+
+# Fault prevented: GPU DMA2 packet state diverging across linked-list nodes,
+# CPU continuation or readback, and sync mode 1 losing the GPU request line.
+schway_add_test(NAME dma.gpu.linked_list_readback
+  COMMAND schwaystation-test-dma gpu_linked_list_readback
+  LABELS dma portable TIMEOUT 10)

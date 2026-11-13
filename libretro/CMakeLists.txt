@@ -24,6 +24,21 @@ schway_warnings(schwaystation_libretro)
 configure_file(schwaystation_libretro.info.in
   ${CMAKE_CURRENT_BINARY_DIR}/schwaystation_libretro.info @ONLY)
 
+# Fault prevented: a functional .info claim can enable a host path without a
+# registered test exercising it.
+set(info_claims_script ${PROJECT_SOURCE_DIR}/tests/cmake/info_claims.cmake)
+set(info_claims_file ${CMAKE_CURRENT_BINARY_DIR}/schwaystation_libretro.info)
+set(info_claims_inventory ${PROJECT_SOURCE_DIR}/tests/libretro/inventory.txt)
+execute_process(
+  COMMAND ${CMAKE_COMMAND} -DINFO_FILE=${info_claims_file}
+    -DINVENTORY=${info_claims_inventory} -P ${info_claims_script}
+  RESULT_VARIABLE info_claims_result
+  OUTPUT_VARIABLE info_claims_out
+  ERROR_VARIABLE info_claims_err)
+if(NOT info_claims_result STREQUAL "0")
+  message(FATAL_ERROR "libretro .info claims guard failed: ${info_claims_out}${info_claims_err}")
+endif()
+
 # RetroArch's layout: the module in cores/, its information file in info/.
 # RUNTIME covers the Windows DLL. An embedding project installs nothing of
 # ours.
