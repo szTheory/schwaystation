@@ -22,6 +22,16 @@ foreach(row IN LISTS nightly_rows)
   endif()
 endforeach()
 
+include(${PROJECT_SOURCE_DIR}/cmake/GPUReferences.cmake)
+schway_add_gpu_reference_target()
+schway_prepare_gpu_reference_capture(clipping_exe clipping_png clipping_golden)
+
+# Fault prevented: the pinned clipping executable's complete VRAM differs from
+# its independently captured hardware reference at any RGB555 word.
+schway_add_test(NAME gpu.reference.clipping
+  COMMAND schwaystation-test-gpu-reference capture ${clipping_exe} ${clipping_golden}
+  LABELS gpu nightly portable TIMEOUT 120)
+
 add_executable(schwaystation-test-vectors ${PROJECT_SOURCE_DIR}/tests/vectors/vectors.c)
 target_include_directories(schwaystation-test-vectors PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-vectors PRIVATE schwaystation::schwaystation)

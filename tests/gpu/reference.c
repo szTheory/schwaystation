@@ -1,20 +1,23 @@
-/* Synthetic, independent checks for the canonical RGB555 VRAM/PNG judge.
-   This reader intentionally accepts the runner's RGB8, filter-0, stored-
-   DEFLATE PNG subset. Captured PNG inputs can extend the decoder without
-   changing the full-VRAM comparison below. */
+/* Synthetic RGB555 controls and a whole-VRAM comparison for pinned captures.
+   Python's bounded host adapter canonicalizes the capture; this file loads the
+   pinned program through the public API and compares every VRAM word. */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "schwaystation.h"
 #include "png.h"
+#include "test_open.h"
 
 enum {
     VRAM_WIDTH = 1024u,
     VRAM_HEIGHT = 512u,
     VRAM_WORDS = VRAM_WIDTH * VRAM_HEIGHT,
     RGB_BYTES = 3u,
-    MAX_PNG_BYTES = 2u * 1024u * 1024u
+    MAX_PNG_BYTES = 2u * 1024u * 1024u,
+    MAX_EXE_BYTES = 2u * 1024u * 1024u + 0x800u,
+    CAPTURE_RUN_ADVANCES = 1u
 };
 
 enum {
@@ -234,6 +237,173 @@ static void free_fixture(reference_fixture *fixture)
     memset(fixture, 0, sizeof *fixture);
 }
 
+static void *reference_alloc(void *user, size_t size)
+{
+    (void)user;
+    return malloc(size);
+}
+
+static void reference_free(void *user, void *ptr, size_t size)
+{
+    (void)user;
+    (void)size;
+    free(ptr);
+}
+
+static uint8_t *read_bounded_file(const char *path, size_t limit, size_t *size_out)
+{
+    FILE *file = schway__test_open_file(path, "rb");
+    if (file == NULL) {
+        return NULL;
+    }
+
+    if (fseek(file, 0L, SEEK_END) != 0) {
+        (void)fclose(file);
+        return NULL;
+    }
+    long file_size = ftell(file);
+    if (file_size < 0 || (uint64_t)file_size > (uint64_t)limit ||
+        fseek(file, 0L, SEEK_SET) != 0) {
+        (void)fclose(file);
+        return NULL;
+    }
+
+    size_t size = (size_t)file_size;
+    uint8_t *bytes = (uint8_t *)malloc(size == 0u ? 1u : size);
+    if (bytes == NULL) {
+        (void)fclose(file);
+        return NULL;
+    }
+    size_t count = fread(bytes, 1u, size, file);
+    int extra = fgetc(file);
+    int read_error = ferror(file);
+    int close_error = fclose(file);
+    if (count != size || extra != EOF || read_error != 0 || close_error != 0) {
+        free(bytes);
+        return NULL;
+    }
+    *size_out = size;
+    return bytes;
+}
+
+static uint16_t read_le16(const uint8_t *bytes)
+{
+    return (uint16_t)((uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8));
+}
+
+static int compare_capture(const char *exe_path, const char *golden_path)
+{
+    size_t exe_size = 0u;
+    size_t golden_size = 0u;
+    uint8_t *exe = read_bounded_file(exe_path, MAX_EXE_BYTES, &exe_size);
+    uint8_t *golden = read_bounded_file(golden_path, VRAM_WORDS * 2u, &golden_size);
+    schway *inst = NULL;
+    int exit_code = 2;
+
+    if (exe == NULL || exe_size == 0u) {
+        fprintf(stderr, "GPU_REFERENCE_INPUT_ERROR: cannot read bounded clipping executable\n");
+        goto cleanup;
+    }
+    if (golden == NULL || golden_size != VRAM_WORDS * 2u) {
+        fprintf(stderr, "GPU_REFERENCE_INPUT_ERROR: canonical VRAM file has the wrong length\n");
+        goto cleanup;
+    }
+
+    schway_config config;
+    memset(&config, 0, sizeof config);
+    config.size = (uint32_t)sizeof config;
+    config.allocator.alloc = reference_alloc;
+    config.allocator.free = reference_free;
+    schway_status status = schway_create(&config, &inst);
+    if (status != SCHWAY_STATUS_OK || inst == NULL) {
+        fprintf(stderr, "GPU_REFERENCE_CORE_ERROR: schway_create returned %s\n",
+                schway_status_string(status));
+        goto cleanup;
+    }
+
+    status = schway_load_exe(inst, exe, exe_size);
+    if (status != SCHWAY_STATUS_OK) {
+        fprintf(stderr, "GPU_REFERENCE_INPUT_ERROR: clipping executable was refused: %s\n",
+                schway_status_string(status));
+        goto cleanup;
+    }
+
+    uint64_t previous_frame = 0u;
+    uint64_t previous_ticks = 0u;
+    uint32_t last_stop = 0u;
+    for (uint32_t advance = 0u; advance < CAPTURE_RUN_ADVANCES; advance++) {
+        schway_run_result result;
+        memset(&result, 0, sizeof result);
+        result.size = (uint32_t)sizeof result;
+        status = schway_run_frame(inst, &result);
+        /* This program resets the GPU during video setup, then busy-waits in
+           BIOS VSync(0). The documented independent field bound may therefore
+           return BUDGET before a wrap; only FRAME and that bounded stop are
+           valid, and each call must make progress without a guest fault. */
+        if (status != SCHWAY_STATUS_OK ||
+            (result.stop != SCHWAY_STOP_FRAME && result.stop != SCHWAY_STOP_BUDGET) ||
+            result.frame < previous_frame ||
+            (result.stop == SCHWAY_STOP_FRAME && result.frame == previous_frame) ||
+            result.ticks <= previous_ticks || result.fault_present != 0u) {
+            fprintf(stderr,
+                    "GPU_REFERENCE_CORE_ERROR: bounded run %u stopped unexpectedly "
+                    "(stop=%u frame=%llu ticks=%llu fault=%u)\n",
+                    advance + 1u, result.stop, (unsigned long long)result.frame,
+                    (unsigned long long)result.ticks, result.fault_present);
+            goto cleanup;
+        }
+        previous_frame = result.frame;
+        previous_ticks = result.ticks;
+        last_stop = result.stop;
+    }
+
+    schway_span span;
+    memset(&span, 0, sizeof span);
+    status = schway_get_vram(inst, &span);
+    if (status != SCHWAY_STATUS_OK || span.data == NULL || span.size != VRAM_WORDS * 2u) {
+        fprintf(stderr, "GPU_REFERENCE_CORE_ERROR: complete VRAM span is unavailable\n");
+        goto cleanup;
+    }
+
+    const uint16_t *vram = (const uint16_t *)span.data;
+    uint32_t mismatches = 0u;
+    size_t first_mismatch = VRAM_WORDS;
+    uint16_t first_expected = 0u;
+    uint16_t first_actual = 0u;
+    for (size_t index = 0u; index < VRAM_WORDS; index++) {
+        uint16_t expected = read_le16(golden + index * 2u);
+        uint16_t actual = (uint16_t)(vram[index] & 0x7fffu);
+        if (actual != expected) {
+            if (mismatches == 0u) {
+                first_mismatch = index;
+                first_expected = expected;
+                first_actual = actual;
+            }
+            mismatches++;
+        }
+    }
+
+    if (mismatches != 0u) {
+        fprintf(stderr,
+                "GPU_REFERENCE_RASTER_MISMATCH: %u of %u words; first=%zu expected=%04x actual=%04x\n",
+                mismatches, VRAM_WORDS, first_mismatch, first_expected, first_actual);
+        exit_code = 1;
+        goto cleanup;
+    }
+
+    printf("GPU_REFERENCE_CAPTURE_MATCH: words=%u advances=%u stop=%s ticks=%llu tolerance=0\n",
+           VRAM_WORDS, CAPTURE_RUN_ADVANCES,
+           last_stop == SCHWAY_STOP_FRAME ? "frame" : "budget",
+           (unsigned long long)previous_ticks);
+    exit_code = 0;
+
+cleanup:
+    schway_destroy(inst);
+    free(exe);
+    free(golden);
+    return exit_code;
+}
+
 static void quantization(void)
 {
     reference_fixture fixture;
@@ -297,8 +467,12 @@ static void controls(void)
 
 int main(int argc, char **argv)
 {
+    if (argc == 4 && strcmp(argv[1], "capture") == 0) {
+        return compare_capture(argv[2], argv[3]);
+    }
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-gpu-reference quantization|controls\n");
+        fprintf(stderr,
+                "usage: schwaystation-test-gpu-reference quantization|controls|capture EXE RGB555LE\n");
         return 2;
     }
     if (strcmp(argv[1], "quantization") == 0) {

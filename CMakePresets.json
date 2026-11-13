@@ -128,7 +128,7 @@
     {
       "name": "nightly",
       "inherits": "base",
-      "$comment": "The full public vectors: registers only tests/nightly, and configure fails unless SCHWAYSTATION_SST_DIR holds the pinned files (pins.txt, r3000- rows).",
+      "$comment": "The full public vectors and pinned GPU capture: registers only tests/nightly, and configure fails unless SCHWAYSTATION_SST_DIR holds the pinned files (pins.txt, r3000- rows).",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -155,7 +155,7 @@
     { "name": "nofp", "configurePreset": "nofp" },
     { "name": "be32", "configurePreset": "be32" },
     { "name": "wasm32", "configurePreset": "wasm32" },
-    { "name": "nightly", "configurePreset": "nightly", "targets": ["schwaystation-test-vectors"] },
+    { "name": "nightly", "configurePreset": "nightly", "targets": ["schwaystation-run", "schwaystation-test-gpu-reference", "schwaystation-test-vectors"] },
     { "name": "perf", "configurePreset": "perf", "targets": ["schwaystation-run"] }
   ],
   "testPresets": [

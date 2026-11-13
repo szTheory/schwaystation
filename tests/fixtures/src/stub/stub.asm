@@ -121,6 +121,8 @@ enter_image:
 
 ; The general handler body. It uses only k0 and k1. It records Cause, EPC, BadVaddr and SR; then,
 ; if the mailbox is there, sets its status to FFh and jumps to the handler the image registered.
+; Without a valid mailbox, SYS(01h) and SYS(02h) implement EnterCriticalSection and
+; ExitCriticalSection (PSX-SYSTEM.md, SYS.07). Other services, delay-slot syscalls and exceptions stop in the loop.
 handler:
   mfc0 k0, cause
   lui k1, EXC_REC >> 16
@@ -139,8 +141,9 @@ handler:
   nop
   xori k0, k0, MB_MAGIC_LO               ; zero in the low half when the low half matches
   lui k1, MB_MAGIC_HI
-  bne k0, k1, spin                       ; not a mailbox
+  bne k0, k1, syscall_service            ; no mailbox: try the two supported BIOS services
   lui k1, MAILBOX >> 16                  ; delay slot: the mailbox again
+  ; A valid SWMB mailbox always keeps the fixture's existing exception behavior.
   ori k0, zero, 0xFF
   sw k0, MB_STATUS(k1)
   lw k0, MB_HANDLER(k1)
@@ -149,6 +152,61 @@ handler:
   nop
   jr k0
   nop
+
+; The real clipping fixture calls SYS(01h) and SYS(02h) before drawing. The BIOS
+; selector is in a0; dispatch only ordinary SYSCALL exceptions, not delay slots.
+syscall_service:
+  mfc0 k0, cause
+  nop
+  bltz k0, spin                           ; a set BD bit needs the original branch to be replayed
+  nop
+  andi k0, k0, 0x007C                    ; ExcCode must be SYS (08h)
+  ori k1, zero, 0x0020
+  bne k0, k1, spin
+  nop
+  ori k0, zero, 0x01
+  beq a0, k0, syscall_enter_critical
+  nop
+  ori k0, zero, 0x02
+  beq a0, k0, syscall_exit_critical
+  nop
+  j spin                                 ; unsupported BIOS services remain unhandled
+  nop
+
+; SYS(01h): return 1 iff saved IEp and IM2 are both set, then clear both.
+; Exception entry has already moved the caller's IEc into IEp; RFE restores it.
+syscall_enter_critical:
+  mfc0 k0, sr
+  nop
+  andi k1, k0, 0x0404
+  xori k1, k1, 0x0404
+  ori v0, zero, 0
+  bne k1, zero, enter_critical_clear
+  nop
+  ori v0, zero, 1
+enter_critical_clear:
+  lui k1, 0xFFFF
+  ori k1, k1, 0xFBFB                    ; preserve every SR bit except IEp and IM2
+  and k0, k0, k1
+  mtc0 k0, sr
+  nop
+  j syscall_return
+  nop
+
+; SYS(02h): set saved IEp and IM2 without changing v0; RFE restores caller IEc.
+syscall_exit_critical:
+  mfc0 k0, sr
+  nop
+  ori k0, k0, 0x0404
+  mtc0 k0, sr
+  nop
+
+syscall_return:
+  mfc0 k0, epc
+  nop
+  addiu k0, k0, 4                       ; only non-delay-slot syscalls reach this return
+  jr k0
+  rfe
 
 spin:
   j spin

@@ -302,6 +302,14 @@ there, the handler sets the mailbox word at `08h` to `000000FFh` (status FFh) an
 `0Ch` when that is not zero; otherwise, and with no mailbox, it stops in a loop. An image replaces the default by
 writing its own handler address to the mailbox, or its own code at `80000080h`.
 
+With no valid `SWMB` mailbox, the stub handles the two BIOS startup services used by the pinned clipping fixture:
+`SYS(01h)` (`EnterCriticalSection`) and `SYS(02h)` (`ExitCriticalSection`), selected by `a0` on a `SYSCALL` (PSX-SPX,
+[Kernel/BIOS](https://psx-spx.consoledev.net/kernelbios/), SYS.01/SYS.02; indexed in
+[PSX-SYSTEM.md](../../.planning/preparation/PSX-SYSTEM.md), SYS.07). The first returns 1 in `v0` only when saved `IEp`
+and `IM2` are both set, then clears those bits; the second sets them and leaves `v0` unchanged. Both return through
+`JR`/`RFE`. A valid mailbox retains priority, and other selectors, delay-slot syscalls and exceptions keep the recorded
+stop behavior; this is not a general BIOS implementation.
+
 **The mailbox.** A fixture image starts with 256 bytes at `80010000h` that the runner and the tests read:
 
 | Offset | Content |

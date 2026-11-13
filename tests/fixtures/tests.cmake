@@ -883,6 +883,13 @@ schway_add_test(NAME fixtures.boot.registered_handler
   COMMAND schwaystation-test-boot registered_handler ${SCHWAYSTATION_FIXTURES_DIR}
   LABELS fixtures portable TIMEOUT 30)
 
+# Fault prevented: the pinned clipping program's BIOS critical-section calls
+# being treated as unknown exceptions, while SWMB and unsupported selectors
+# retain their existing exception behavior.
+schway_add_test(NAME fixtures.boot.stub_syscalls
+  COMMAND schwaystation-test-boot stub_syscalls
+  LABELS fixtures portable TIMEOUT 30)
+
 # Fault prevented: a runaway past the stub's image that slides on as no-operations.
 schway_add_test(NAME fixtures.boot.past_stub
   COMMAND schwaystation-test-boot past_stub

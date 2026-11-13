@@ -84,15 +84,8 @@ set_target_properties(schwaystation-test-gpu-display PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-gpu-display)
 
-add_executable(schwaystation-test-gpu-reference
-  ${CMAKE_CURRENT_LIST_DIR}/reference.c
-  ${PROJECT_SOURCE_DIR}/runner/png.c
-  ${PROJECT_SOURCE_DIR}/runner/crc32.c)
-target_include_directories(schwaystation-test-gpu-reference PRIVATE ${PROJECT_SOURCE_DIR}/runner)
-target_link_libraries(schwaystation-test-gpu-reference PRIVATE schwaystation::schwaystation)
-set_target_properties(schwaystation-test-gpu-reference PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
-schway_warnings(schwaystation-test-gpu-reference)
+include(${PROJECT_SOURCE_DIR}/cmake/GPUReferences.cmake)
+schway_add_gpu_reference_target()
 
 # Fault prevented: GP1 mode dividers, display-window wrap, field height,
 # 24-bit packing, display-off output or malformed ranges drifting from scanout.

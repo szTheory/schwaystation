@@ -446,6 +446,91 @@ static void registered_handler(const char *dir)
     free(exe);
 }
 
+/* With no SWMB mailbox, the stub handles only BIOS SYS(01h) and SYS(02h):
+   EnterCriticalSection tests and clears the saved IEp/IM2 bits, ExitCriticalSection
+   sets them, and both return through RFE. A valid SWMB mailbox still takes the
+   existing registered-handler path first; any other service remains stopped.
+   Fault prevented: a real EXE's startup syscall being mistaken for an unhandled
+   exception, or the small compatibility path swallowing fixture exceptions. */
+static void stub_syscalls(void)
+{
+    const uint32_t code[] = {
+        0x34080401u, /* ori t0, zero, 0x0401: IEc and IM2 enabled */
+        0x40886000u, /* mtc0 t0, SR */
+        0x00000000u, /* COP0 write spacing */
+        0x34040001u, /* ori a0, zero, SYS(01h) */
+        0x0000000Cu, /* syscall */
+        0x00408021u, /* addu s0, v0, zero: save EnterCriticalSection result */
+        0x34025678u, /* ori v0, zero, 0x5678 */
+        0x34040002u, /* ori a0, zero, SYS(02h) */
+        0x0000000Cu, /* syscall */
+        0x00408821u, /* addu s1, v0, zero: SYS(02h) preserves v0 */
+        0x34080001u, /* ori t0, zero, IEc without IM2 */
+        0x40886000u, /* mtc0 t0, SR */
+        0x00000000u, /* COP0 write spacing */
+        0x34040001u, /* ori a0, zero, SYS(01h) */
+        0x0000000Cu, /* syscall */
+        0x00409021u, /* addu s2, v0, zero: only one saved bit was set */
+        0x1000FFFFu, /* beq zero, zero, self */
+        0x00000000u, /* delay slot */
+    };
+    uint8_t exe[EXE_SIZE];
+    build_exe(exe, code, sizeof code / sizeof code[0], 0u);
+    schway *inst = make();
+    load(inst, exe, sizeof exe);
+    schway_run_result r = run_frame(inst);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_HEX(inst->cpu.r[16], 1u);
+    CHECK_EQ_HEX(inst->cpu.r[17], 0x5678u);
+    CHECK_EQ_HEX(inst->cpu.r[18], 0u);
+    CHECK_EQ_HEX(inst->cpu.cop0.r[SCHWAY__COP0_SR], 0u);
+    schway_destroy(inst);
+
+    /* A valid SWMB mailbox keeps its existing priority over SYS(01h). The
+       registered handler lives at 80010120h and loops without changing v0. */
+    const uint32_t mailbox_code[] = {
+        0x34021234u, /* ori v0, zero, 0x1234 */
+        0x34040001u, /* ori a0, zero, SYS(01h) */
+        0x0000000Cu, /* syscall */
+        0x1000FFFFu, /* not reached: beq zero, zero, self */
+        0x00000000u,
+        0x00000000u,
+        0x00000000u,
+        0x00000000u,
+        0x1000FFFFu, /* registered handler: beq zero, zero, self */
+        0x00000000u,
+    };
+    build_exe(exe, mailbox_code, sizeof mailbox_code / sizeof mailbox_code[0], 0x80010120u);
+    inst = make();
+    load(inst, exe, sizeof exe);
+    r = run_frame(inst);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    CHECK_EQ_HEX(le32(mailbox(inst) + MB_STATUS), 0xFFu);
+    CHECK_EQ_HEX(inst->cpu.r[2], 0x1234u);
+    CHECK(inst->cpu.pc == 0x80010120u || inst->cpu.pc == 0x80010124u);
+    check_exc_record(inst, 0x20u, 0x80010108u);
+    schway_destroy(inst);
+
+    /* An unknown service selector keeps the existing recorded-and-stopped
+       behavior when there is no registered image handler. */
+    const uint32_t unknown_code[] = {
+        0x34040003u, /* ori a0, zero, unsupported SYS(03h) */
+        0x0000000Cu, /* syscall */
+        0x1000FFFFu, /* caller continuation, which must not be reached */
+        0x00000000u,
+    };
+    build_exe(exe, unknown_code, sizeof unknown_code / sizeof unknown_code[0], 0u);
+    inst = make();
+    load(inst, exe, sizeof exe);
+    r = run_frame(inst);
+    CHECK_EQ_U64(r.stop, SCHWAY_STOP_FRAME);
+    check_exc_record(inst, 0x20u, 0x80010104u);
+    CHECK(inst->cpu.pc >= 0xBFC00000u &&
+          inst->cpu.pc < 0xBFC00000u + schway__stub_kernel_size);
+    schway_destroy(inst);
+}
+
 /* A jump to the first address past the stub image is a bus error on the
    fetch: the first fault is an unmapped fetch of the BIOS at that address, the
    run reports FAULT under STOP_ON_FAULT with the program counter at the
@@ -969,6 +1054,8 @@ int main(int argc, char **argv)
         default_handler(argv[2]);
     } else if (strcmp(c, "registered_handler") == 0 && argc == 3) {
         registered_handler(argv[2]);
+    } else if (strcmp(c, "stub_syscalls") == 0) {
+        stub_syscalls();
     } else if (strcmp(c, "past_stub") == 0) {
         past_stub();
     } else if (strcmp(c, "exit_port") == 0) {
