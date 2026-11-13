@@ -40,7 +40,7 @@ key-files:
     - docs/testing.md
     - .planning/phases/04-games-play-in-retroarch/04-47-CHECKPOINT.md
 key-decisions:
-  - Keep the overlap image comparison at eight advances; use a separate fixed 24-advance caller-progress witness derived from measured uploads and the guest's copy/VSync work.
+  - Preserve the failed eight-advance image checkpoint as historical evidence; use the fixed source-derived 24-advance completion allowance for the caller witness and subsequent plan47 image comparison.
   - Update the interim v4 state and OpenBIOS frame pins only after isolated object controls attributed each changed hash to its reviewed source change.
 patterns-established:
   - Distinguish caller control-flow progress from GPU pixel agreement.
@@ -85,7 +85,7 @@ status: complete
 - Added real-CPU regressions for repeated IRQ0 callbacks, independent register/HI/LO/SR/EPC restoration, live-hook save/load replay, SWMB precedence, reset-cleared registration and bounded unsupported paths. The inactive B0(17h) regression exposed a guest branch that incorrectly returned without an active saved context; the stub now enters its existing bounded spin for that case.
 - Preserved the guest's ownership of `I_STAT` acknowledgement and verified that unrelated pending sources remain set. The hook enters through the registered JmpBuf, acknowledges IRQ0, returns to the interrupted EPC and continues guest work.
 - Observed the retained, identity-verified build-158 overlap executable with the public trace and peek APIs. At 24 bounded advances it completed all 27,657 one-pixel uploads, all 147 VRAM-copy packets (21 each at sizes 2, 8 and 15; 84 at size 16), then made 274,241 reads of the source-derived VSync counter and received nine further callbacks after entering that loop. All 23 observed IRQs returned to their interrupted PCs; the trace anchor remained present throughout.
-- Kept the independent image-comparison limit at eight advances. That earlier progress observation completed only 10,633 of 27,657 uploads, so the caller-progress allowance was corrected to 24 from observed per-advance work plus the known copy/VSync tail. This is progress evidence only; the 34,390 image differences remain unclassified in 04-47.
+- Preserved the earlier eight-advance image mismatch as historical evidence. That progress observation completed only 10,633 of 27,657 uploads, so the source-work allowance was corrected to 24 from observed per-advance work plus the known copy/VSync tail; plan47 uses that fixed completion allowance before judging the unchanged capture. This is progress evidence only; the 34,390 image differences remain unclassified in 04-47.
 - Applied the reviewed card pending-error state, explicit region reload and KSEG1 trace-timestamp fixes. Updated affected state and OpenBIOS pins only after controls isolated the causes; frame, audio and frozen API v1-v3 pins remain unchanged.
 
 ## Task Commits
