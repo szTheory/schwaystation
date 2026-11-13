@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-02-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-last_updated: "2026-11-13T22:11:07.377Z"
+stopped_at: "Completed 05-04-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+last_updated: "2026-11-13T22:54:38.227Z"
 last_activity: 2026-11-13
 last_activity_desc: "Completed plan 05-01. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-state_head: 8ac6a1457bd558845cea084d854abe031c3d3edb
+state_head: ba7b109e0aced9727e94a38d135dc01d74bf76a1
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 145
-  completed_plans: 128
+  completed_plans: 129
   percent: 67
 current_plan: 1 of 19
 ---
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 3 of 19
+Plan: 4 of 19
 Status: Ready to execute
 Last activity: 2026-11-13 — Plan 05-01 completed. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
@@ -190,6 +190,7 @@ Progress: [███████░░░] 67%
 | Phase 04 P32 | not measured (checkpointed execution) | 2 tasks | 7 files |
 | Phase 05 P01 | 14 min | 2 tasks | 7 files |
 | Phase 05 P02 | 19 min | 2 tasks | 8 files |
+| Phase 05 P04 | under 40 min (exact start unavailable) | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -462,6 +463,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Document retail BIOS supply, the MIT OpenBIOS CI stand-in and distinct runner/libretro card naming behavior.
 - [Phase 05]: SPU sample production belongs to the scheduler and uses the existing public PCM ring.
 - [Phase 05]: SPU mutable state is fixed-size and embedded in each emulator instance.
+- [Phase 05]: Use the public build-158 transfer executable as a fetch-only build asset, with archive and member digests checked before use.
+- [Phase 05]: Treat the seven exact transfer log lines as transfer, status, and timing evidence only; they do not provide a PCM oracle.
+- [Phase 05]: Accept only ordered one-to-one pass cases with exit code zero and the completion marker; allow CRLF and TTY prefixes.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -647,8 +651,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T22:11:06.996Z
-Stopped at: Completed 05-02-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Last session: 2026-11-13T22:54:38.018Z
+Stopped at: Completed 05-04-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
