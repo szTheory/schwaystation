@@ -783,7 +783,7 @@ static void test_run_bounds(void)
         size_t n = save(inst, good);
         size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
         CHECK(nf <= MAX_FIELDS);
-        uint32_t frame_at = 0u, ticks_at = 0u, acc_at = 0u, end_at = 0u;
+        uint32_t frame_at = 0u, ticks_at = 0u, acc_at = 0u, end_at = 0u, spu_next_at = 0u;
         uint64_t frame_max = 0u, ticks_max = 0u;
         for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
             if (strcmp(fields[i].name, "instance.frame") == 0) {
@@ -796,10 +796,14 @@ static void test_run_bounds(void)
                 acc_at = fields[i].offset;
             } else if (strcmp(fields[i].name, "instance.frame_end") == 0) {
                 end_at = fields[i].offset;
+            } else if (strcmp(fields[i].name, "spu.next_tick") == 0) {
+                spu_next_at = fields[i].offset;
             }
         }
-        CHECK(frame_at != 0u && ticks_at != 0u && acc_at != 0u && end_at != 0u);
-        if (frame_at == 0u || ticks_at == 0u || acc_at == 0u || end_at == 0u) {
+        CHECK(frame_at != 0u && ticks_at != 0u && acc_at != 0u && end_at != 0u &&
+              spu_next_at != 0u);
+        if (frame_at == 0u || ticks_at == 0u || acc_at == 0u || end_at == 0u ||
+            spu_next_at == 0u) {
             exit(1);
         }
         uint64_t den = schway__instance_frame_den(regions[k]);
@@ -819,6 +823,12 @@ static void test_run_bounds(void)
                 put_le(bad + acc_at, acc, 8u);
                 /* The frame that starts here ends one step on. */
                 put_le(bad + end_at, ticks[j] + step, 8u);
+                uint64_t next_spu_tick =
+                    ticks[j] >= ticks_max - SCHWAY__CYCLES_PER_PAIR
+                        ? UINT64_MAX
+                        : (ticks[j] - ticks[j] % SCHWAY__CYCLES_PER_PAIR) +
+                              SCHWAY__CYCLES_PER_PAIR;
+                put_le(bad + spu_next_at, next_spu_tick, 8u);
                 reseal(bad, n);
                 CHECK_EQ_U64(schway_load_state(inst, bad, n), SCHWAY_STATUS_OK);
                 memcpy(snapshot, inst, sizeof *snapshot);

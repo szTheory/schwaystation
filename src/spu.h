@@ -82,6 +82,6 @@ void schway__spu_voice_step(schway *inst, uint32_t voice);
 void schway__spu_envelope_step(schway *inst, uint32_t voice);
 void schway__spu_noise_step(schway *inst);
 void schway__spu_reverb_step(schway *inst);
-void schway__spu_state_io(struct schway__state_io *io, schway *inst);
+void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ticks);
 
 #endif /* SCHWAYSTATION_SPU_H */
