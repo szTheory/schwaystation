@@ -214,6 +214,92 @@ static void check_spu_event_entrypoint(void)
     schway_destroy(second);
 }
 
+static uint64_t next_sample_deadline(uint64_t ticks)
+{
+    return (ticks / SCHWAY__CYCLES_PER_PAIR + 1u) * SCHWAY__CYCLES_PER_PAIR;
+}
+
+static void check_scheduled_split_runs(void)
+{
+    schway *whole = make(SCHWAY_REGION_NTSC_U);
+    schway *split = make(SCHWAY_REGION_NTSC_U);
+    if (whole == NULL || split == NULL) {
+        schway_destroy(whole);
+        schway_destroy(split);
+        return;
+    }
+    schway_run_result result = run_cycles(whole, 1536u);
+    CHECK_EQ_U64(result.ticks, 1536u);
+    CHECK_EQ_U64(schway__spu_next(whole), 3u * SCHWAY__CYCLES_PER_PAIR);
+    schway_audio audio = drain(whole, AUDIO_RING_PAIRS);
+    CHECK_EQ_U64(audio.written, 2u);
+    int16_t whole_pcm[4] = {samples[0], samples[1], samples[2], samples[3]};
+
+    result = run_cycles(split, SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(result.ticks, SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(schway__spu_next(split), 2u * SCHWAY__CYCLES_PER_PAIR);
+    result = run_cycles(split, SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(result.ticks, 2u * SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(schway__spu_next(split), 3u * SCHWAY__CYCLES_PER_PAIR);
+    audio = drain(split, AUDIO_RING_PAIRS);
+    CHECK_EQ_U64(audio.written, 2u);
+    CHECK(memcmp(whole_pcm, samples, sizeof whole_pcm) == 0);
+    schway_destroy(whole);
+    schway_destroy(split);
+}
+
+static void check_cpu_and_dma_deadlines(void)
+{
+    schway *cpu = make(SCHWAY_REGION_NTSC_U);
+    if (cpu == NULL) {
+        return;
+    }
+    cpu->exe_loaded = 1u;
+    cpu->cpu.pc = 0x80000000u;
+    cpu->ticks = SCHWAY__CYCLES_PER_PAIR - 1u;
+    schway__sched_sync(cpu);
+    schway_run_result result = run_cycles(cpu, 1u);
+    CHECK(result.ticks >= SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(schway__spu_next(cpu), next_sample_deadline(result.ticks));
+    schway_audio audio = drain(cpu, AUDIO_RING_PAIRS);
+    CHECK_EQ_U64(audio.written, result.ticks / SCHWAY__CYCLES_PER_PAIR);
+    schway_destroy(cpu);
+
+    schway *dma = make(SCHWAY_REGION_NTSC_U);
+    if (dma == NULL) {
+        return;
+    }
+    dma->exe_loaded = 1u;
+    dma->ticks = SCHWAY__CYCLES_PER_PAIR - 1u;
+    dma->dma.stall_until = SCHWAY__CYCLES_PER_PAIR + 2u;
+    schway__sched_sync(dma);
+    result = run_cycles(dma, 1u);
+    CHECK_EQ_U64(result.ticks, SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(schway__spu_next(dma), 2u * SCHWAY__CYCLES_PER_PAIR);
+    audio = drain(dma, AUDIO_RING_PAIRS);
+    CHECK_EQ_U64(audio.written, 1u);
+    schway_destroy(dma);
+}
+
+static void check_disabled_and_muted_deadlines(void)
+{
+    const uint16_t attr[] = {0u, 0x8000u};
+    for (uint32_t i = 0u; i < sizeof attr / sizeof attr[0]; i++) {
+        schway *inst = make(SCHWAY_REGION_NTSC_U);
+        if (inst == NULL) {
+            return;
+        }
+        /* ATTR at 1F801DAA: disabled, then enabled with UNMUTE clear. */
+        inst->spu.reg[0xDDu] = attr[i];
+        schway_run_result result = run_cycles(inst, SCHWAY__CYCLES_PER_PAIR);
+        CHECK_EQ_U64(result.ticks, SCHWAY__CYCLES_PER_PAIR);
+        CHECK_EQ_U64(schway__spu_next(inst), 2u * SCHWAY__CYCLES_PER_PAIR);
+        schway_audio audio = drain(inst, AUDIO_RING_PAIRS);
+        CHECK_EQ_U64(audio.written, 1u);
+        schway_destroy(inst);
+    }
+}
+
 static void check_ring_partial_wrap_and_drops(void)
 {
     schway *inst = make(SCHWAY_REGION_PAL);
@@ -287,6 +373,9 @@ int main(int argc, char **argv)
     check_split_run_boundaries();
     check_instance_owns_spu_ram();
     check_spu_event_entrypoint();
+    check_scheduled_split_runs();
+    check_cpu_and_dma_deadlines();
+    check_disabled_and_muted_deadlines();
     check_ring_partial_wrap_and_drops();
     check_reset_and_load_clear_drain();
     CHECK_DONE();
