@@ -403,7 +403,52 @@ Plans:
   2. `ctest -L audio` passes on BRR, ADSR, noise, reverb, capture, IRQA and the transfer paths. The nightly lane reproduces the seven hardware pass lines of the ps1-tests `spu/memory-transfer` log.
   3. The libretro batch and single-sample audio paths deliver PCM equal to the runner's stream in `libretro.host`. RetroArch boots `spu_tone.exe` as content, and the idle SPU passes `core.no_busy_loop`.
 
-**Plans**: TBD
+**Plans**: 19 plans in 13 waves
+**Wave 1**
+- [ ] 05-01-PLAN.md — Trace a bounded frame into the public PCM drain
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 05-02-PLAN.md — Trace one SPU event through the existing PCM ring
+- [ ] 05-04-PLAN.md — Trace pinned assets through identity checks and seven-case parsing
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 05-16-PLAN.md — Trace the sample phase and chip storage through save/load
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 05-03-PLAN.md — Trace guest register writes through a scheduled SPU tick
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 05-05-PLAN.md — Trace one DMA4 upload through FIFO to SPU RAM and readback
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 05-06-PLAN.md — Trace one BRR block through interpolation into a voice sample
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 05-07-PLAN.md — Trace an envelope rate into scheduled audible PCM
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 05-08-PLAN.md — Trace the pinned noise schedule into an envelope-scaled sample
+- [ ] 05-11-PLAN.md — Trace authored BRR data through a stub-booted tone guest
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [ ] 05-09-PLAN.md — Trace an impulse through the two reverb FIR stages
+- [ ] 05-13-PLAN.md — Trace hostile transfer bytes through the production SPU and seed replay
+- [ ] 05-17-PLAN.md — Trace real tone PCM into the accumulated runner SHA-256
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [ ] 05-10-PLAN.md — Trace a Room feedback step from registers through RAM to wet PCM
+- [ ] 05-18-PLAN.md — Trace the CPU-free block-table path into complete PCM equality
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [ ] 05-12-PLAN.md — Trace one nonzero tone frame through runner and libretro batch delivery
+- [ ] 05-14-PLAN.md — Trace active voices, noise and feedback through state load
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [ ] 05-19-PLAN.md — Trace implemented SPU facts into maintained hardware references
+
+**Wave 13** *(blocked on Wave 12 completion)*
+- [ ] 05-15-PLAN.md — Trace frame-600 audio and ENVX predicates into lane equality
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
 

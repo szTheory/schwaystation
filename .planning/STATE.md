@@ -2,19 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 04
-current_phase_name: Games play in RetroArch
-current_plan: 58 of 58
-status: completed
+current_phase: 05
+current_phase_name: The sound matches the console
+current_plan: 0 of 19
+status: ready_to_execute
 stopped_at: Phase 5 planned; resuming execution after Phase 4 release confirmation
 last_updated: "2026-11-13T20:43:33Z"
 last_activity: 2026-11-13
 last_activity_desc: "Phase 5 execution resumes after confirming Phase 4 PR #14 and release PR #15 merged; required CI passed and the PR #17 follow-up is green. Runtime/model: Codex GPT-6 primary (exact model ID unavailable), OpenGSD 1.20.0; executor gpt-6-luna xhigh."
-state_head: 98e096144a5a88399faa0142fdbd5f2c62773c70
+state_head: 89173bd15a223a3d3afc1981c0f2576ba2f6fc28
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 126
+  total_plans: 145
   completed_plans: 126
   percent: 67
 ---
@@ -26,14 +26,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-29)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 04 shipped as v0.4.0; Phase 5 has not started.
+**Current focus:** Phase 05 — The sound matches the console
 
 ## Current Position
 
-Phase: 04 — Games play in RetroArch — SHIPPED
-Current Plan: 58 of 58
-Status: Phase 4 shipped as v0.4.0. Phase 5 has 19 planned plans and is resuming now that the Phase 4 release boundary is confirmed.
-Last activity: 2026-11-13 — Phase 5 execution resumed after confirming Phase 4 PR #14 and release PR #15 merged with green required CI; PR #17 follow-up also passed. Runtime/model: Codex GPT-6 primary (exact model ID unavailable), OpenGSD 1.20.0; executor gpt-6-luna xhigh.
+Phase: 05 (The sound matches the console) — READY TO EXECUTE
+Plan: 0 of 19
+Status: Ready to execute; Phase 4 shipped as v0.4.0 via PR #14 and release PR #15. Phase 5 execution resumes after confirmation that required CI passed and PR #17 follow-up is green.
+Last activity: 2026-11-13 — Phase 5 execution resumed. Runtime/model: Codex GPT-6 primary (exact model ID unavailable), OpenGSD 1.20.0; executor gpt-6-luna xhigh.
 
 Progress: [███████░░░] 67%
 
@@ -643,20 +643,20 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T18:30:16.903Z
-Stopped at: Phase 5 context gathered
+Last session: 2026-11-13T20:43:33Z
+Stopped at: Phase 5 execution resumed after Phase 4 release confirmation
 Resume file: .planning/phases/05-the-sound-matches-the-console/05-CONTEXT.md
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 
-Phase 4 ship PR: not created; required boundary remains in force.
+Phase 4 shipped as [PR #14](https://github.com/szTheory/schwaystation/pull/14); release [PR #15](https://github.com/szTheory/schwaystation/pull/15) merged with green required CI. PR #17's post-release CI follow-up is merged and green.
 Phase 3 ship PR: https://github.com/szTheory/schwaystation/pull/12
 Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8
 Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Phase 3 merged as PR #12; release PR #13 is green and merged. v0.3.0 is latest with 19 assets.
+Phase 3 merged as PR #12; release PR #13 is green and merged. Phase 4 release v0.4.0 is latest.
 Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
-Next: the owner invokes `$gsd-ship 4`. That step creates the PR, then normal auto-merge and release confirmation precede Phase 5. No routine UAT is required. Standing preferences are in `.planning/AUTONOMOUS.md`. Historical recovery notes below do not supersede this verified boundary.
+Next: continue `$gsd-execute-phase 5`. Phase 4 release confirmation is complete; no duplicate Phase 4 PR is needed. No routine UAT is required. Standing preferences are in `.planning/AUTONOMOUS.md`.
 
 ### Independent local work during immutable CI (2026-11-12)
 
