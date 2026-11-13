@@ -679,8 +679,84 @@ static void protocol_write_edges(void)
     protocol_write_repeated_and_truncated();
 }
 
+static uint8_t command_flag(schway *inst, uint8_t command)
+{
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    return transfer(inst, command, CARD_ACK);
+}
+
+static void restart_transport(schway *inst, uint32_t port)
+{
+    write_mmio(inst, JOY_CTRL, 2u, 0x1043u);
+    configure(inst, port);
+}
+
+static void state_error_roundtrip(void)
+{
+    static const uint8_t commands[] = {0x52u, 0x53u, 0x57u};
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (size_t command = 0u; command < sizeof commands; command++) {
+            schway *inst = make();
+            uint8_t *image = make_card(29u);
+            uint8_t payload[SCHWAY__CARD_SECTOR_SIZE];
+            make_write_data(payload, 53u);
+            uint32_t slot = port + 1u;
+            CHECK_EQ_U64(schway_load_memcard(inst, slot, image, SCHWAY_MEMCARD_SIZE),
+                         SCHWAY_STATUS_OK);
+            configure(inst, port);
+            size_t size = schway_state_size(inst);
+            uint8_t *clean = (uint8_t *)malloc(size);
+            uint8_t *pending = (uint8_t *)malloc(size);
+            CHECK(clean != NULL && pending != NULL);
+            if (clean != NULL && pending != NULL) {
+                CHECK_EQ_U64(schway_save_state(inst, clean, size), SCHWAY_STATUS_OK);
+                CHECK(write_preamble(inst, 0x08u));
+                CHECK_EQ_HEX(write_address(inst, 3u, CARD_ACK), 0u);
+                write_data(inst, payload, 0u, SCHWAY__CARD_SECTOR_SIZE);
+                write_finish(inst, (uint8_t)(write_checksum(3u, payload) ^ 1u), 0x4Eu);
+                CHECK_EQ_U64(card_generation(inst, slot), 0u);
+                CHECK_EQ_U64(schway_save_state(inst, pending, size), SCHWAY_STATUS_OK);
+
+                CHECK_EQ_U64(schway_load_state(inst, clean, size), SCHWAY_STATUS_OK);
+                CHECK_EQ_HEX(command_flag(inst, commands[command]), 0x08u);
+                restart_transport(inst, port);
+                CHECK_EQ_U64(schway_load_state(inst, pending, size), SCHWAY_STATUS_OK);
+                CHECK_EQ_HEX(command_flag(inst, commands[command]), 0x0Cu);
+                restart_transport(inst, port);
+                CHECK_EQ_HEX(command_flag(inst, commands[command]), 0x08u);
+                restart_transport(inst, port);
+
+                CHECK(write_success(inst, 3u, 0x08u, payload));
+                schway_span card;
+                uint32_t kind = port == 0u ? SCHWAY_MEMORY_CARD1 : SCHWAY_MEMORY_CARD2;
+                CHECK_EQ_U64(schway_get_memory(inst, kind, &card), SCHWAY_STATUS_OK);
+                memcpy(image, card.data, SCHWAY_MEMCARD_SIZE);
+                CHECK_EQ_U64(schway_load_state(inst, pending, size), SCHWAY_STATUS_OK);
+                CHECK_EQ_HEX(command_flag(inst, commands[command]), 0x04u);
+                CHECK(memcmp(image, card.data, SCHWAY_MEMCARD_SIZE) == 0);
+                CHECK_EQ_U64(card_generation(inst, slot), 1u);
+                restart_transport(inst, port);
+                CHECK_EQ_U64(schway_load_state(inst, clean, size), SCHWAY_STATUS_OK);
+                CHECK_EQ_HEX(command_flag(inst, commands[command]), 0u);
+                CHECK(memcmp(image, card.data, SCHWAY_MEMCARD_SIZE) == 0);
+                CHECK_EQ_U64(card_generation(inst, slot), 1u);
+
+                const char *field = port == 0u ? "card.slot1.error_pending"
+                                               : "card.slot2.error_pending";
+                reject_mutated_state(inst, inst, field, 0u, 2u);
+                reject_mutated_state(inst, inst, field, 0u, 1u);
+            }
+            free(pending);
+            free(clean);
+            free(image);
+            schway_destroy(inst);
+        }
+    }
+}
+
 static void state_import_atomic(void)
 {
+    state_error_roundtrip();
     uint8_t short_image[37];
     for (uint32_t i = 0u; i < sizeof short_image; i++) {
         short_image[i] = (uint8_t)(i * 7u + 3u);

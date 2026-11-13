@@ -8,6 +8,7 @@
 
 enum { CARD_IDLE, CARD_COMMAND, CARD_READ, CARD_ID, CARD_WRITE };
 
+static const char card1_error_pending[] = "card.slot1.error_pending";
 static const char card1_phase[] = "card.slot1.phase";
 static const char card1_command[] = "card.slot1.command";
 static const char card1_read_step[] = "card.slot1.read_step";
@@ -17,6 +18,7 @@ static const char card1_invalid_sector[] = "card.slot1.invalid_sector";
 static const char card1_write_step[] = "card.slot1.write_step";
 static const char card1_write_bad_checksum[] = "card.slot1.write_bad_checksum";
 static const char card1_write_data[] = "card.slot1.write_data";
+static const char card2_error_pending[] = "card.slot2.error_pending";
 static const char card2_phase[] = "card.slot2.phase";
 static const char card2_command[] = "card.slot2.command";
 static const char card2_read_step[] = "card.slot2.read_step";
@@ -173,13 +175,19 @@ void schway__card_abort(schway *inst, uint32_t port)
 }
 
 static void slot_state_io(struct schway__state_io *io, struct schway__card_slot *slot,
-                          const char *phase_name, const char *command_name,
+                          const char *error_name, const char *phase_name, const char *command_name,
                           const char *read_step_name, const char *sector_name,
                           const char *checksum_name, const char *invalid_sector_name,
                           const char *write_step_name, const char *write_bad_checksum_name,
                           const char *write_data_name)
 {
+    uint32_t current_error = (slot->flags >> 2) & 1u;
+    uint32_t error_pending = schway__state_u32(io, error_name, &current_error, 0u, 1u);
     uint32_t phase = schway__state_u32(io, phase_name, &slot->phase, CARD_IDLE, CARD_WRITE);
+    if (io->mode == SCHWAY__STATE_APPLY) {
+        /* Fresh-card metadata stays with the receiver; only the pending reply rewinds. */
+        slot->flags = (slot->flags & ~0x04u) | (error_pending << 2);
+    }
     uint32_t command = schway__state_u32(io, command_name, &slot->command, 0u, UINT8_MAX);
     uint32_t read_step = schway__state_u32(io, read_step_name, &slot->read_step, 0u, 137u);
     uint32_t sector = schway__state_u32(io, sector_name, &slot->sector, 0u, UINT16_MAX);
@@ -197,7 +205,8 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
     schway__state_u8_array(io, write_data_name, slot->write_data,
                            SCHWAY__CARD_SECTOR_SIZE, 0u, UINT8_MAX);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
-        schway__state_check(io, payload_valid != 0 &&
+        schway__state_check(io, (error_pending == 0u || phase <= CARD_COMMAND) &&
+                                    payload_valid != 0 &&
                                     protocol_fields_valid(phase, command, read_step, sector,
                                                           checksum, invalid_sector, write_step,
                                                           write_bad_checksum));
@@ -206,10 +215,10 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
 
 void schway__card_state_io(struct schway__state_io *io, schway *inst)
 {
-    slot_state_io(io, &inst->card.slot[0], card1_phase, card1_command, card1_read_step,
+    slot_state_io(io, &inst->card.slot[0], card1_error_pending, card1_phase, card1_command, card1_read_step,
                   card1_sector, card1_checksum, card1_invalid_sector, card1_write_step,
                   card1_write_bad_checksum, card1_write_data);
-    slot_state_io(io, &inst->card.slot[1], card2_phase, card2_command, card2_read_step,
+    slot_state_io(io, &inst->card.slot[1], card2_error_pending, card2_phase, card2_command, card2_read_step,
                   card2_sector, card2_checksum, card2_invalid_sector, card2_write_step,
                   card2_write_bad_checksum, card2_write_data);
 }
