@@ -55,5 +55,6 @@ gpu.triangle.quad_attributes	gpu,portable
 gpu.triangle.split_state	gpu,portable
 gpu.triangle.texture_page_clut	gpu,portable
 gpu.triangle.uv_negative_wrap	gpu,portable
+gpu.triangle.vertex_plane	gpu,portable
 gpu.triangle.vertical_spans	gpu,portable
 gpu.video.tuple	gpu,portable

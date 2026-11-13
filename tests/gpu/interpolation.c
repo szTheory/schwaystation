@@ -107,12 +107,12 @@ static void case_gouraud_textured(void)
     write_gp0(inst, vertex(1u, 9u));
     write_gp0(inst, uv(0u, 2u, 0u));
 
-    /* At (2,2), barycentric weights are 5/8, 3/16, 3/16 and U=1.5. */
+    /* At integer sample (2,2), the vertex-anchored 12-bit planes give U=1. */
     CHECK(inst->vram[2][64] == 0x3210u);
     CHECK((inst->gpu.draw_mode & 0x1FFu) == 1u);
-    CHECK(inst->vram[2][2] == 0x14B3u);
-    /* At (3,2), weights are 1/2, 5/16, 3/16 and U=2.5. */
-    CHECK(inst->vram[2][3] == 0x1400u);
+    CHECK(inst->vram[2][2] == 0x0C77u);
+    /* At integer sample (3,2), the vertex-anchored planes give U=2. */
+    CHECK(inst->vram[2][3] == 0x0C00u);
     schway_destroy(inst);
 }
 
@@ -156,8 +156,8 @@ static void case_clip_interpolation(void)
     draw_gouraud_untextured(clipped);
     draw_gouraud_untextured(full);
 
-    /* The clipped span starts at original geometry sample (3.5,2.5). */
-    CHECK(clipped->vram[2][3] == 0x0CA8u);
+    /* Clipping retains the original vertex anchor at integer sample (3,2). */
+    CHECK(clipped->vram[2][3] == 0x088Au);
     for (uint32_t y = 2u; y <= 6u; y++) {
         for (uint32_t x = 3u; x <= 6u; x++) {
             CHECK(clipped->vram[y][x] == full->vram[y][x]);
@@ -256,8 +256,8 @@ static void case_uv_negative_wrap(void)
         return;
     }
     draw_area(inst, 0u, 0u, 1023u, 511u);
-    inst->vram[2][143] = 0x7C00u;
-    inst->vram[2][111] = 0x03E0u;
+    inst->vram[2][159] = 0x7C00u;
+    inst->vram[2][127] = 0x03E0u;
     uint32_t page = 0x010Fu;
     write_gp0(inst, 0x250000FFu);
     write_gp0(inst, vertex(1u, 1u));
@@ -293,7 +293,7 @@ static void case_quad_attributes(void)
     draw_area(inst, 0u, 0u, 1023u, 511u);
     inst->vram[4][4] = 0x001Fu;
     draw_gouraud_quad(inst, vertex(8u, 8u));
-    CHECK(inst->vram[4][4] == 0x108Fu);
+    CHECK(inst->vram[4][4] == 0x0C70u);
 
     memset(inst->vram, 0, sizeof inst->vram);
     write_gp0(inst, 0xE1000000u);
@@ -305,7 +305,7 @@ static void case_quad_attributes(void)
     write_gp0(inst, vertex(1u, 8u));
     write_gp0(inst, 0x00808080u);
     write_gp0(inst, vertex(1u, 8u));
-    CHECK(inst->vram[2][2] == 0x0C69u);
+    CHECK(inst->vram[2][2] == 0x084Bu);
     schway_destroy(inst);
 }
 
@@ -376,12 +376,12 @@ static void case_hostile_slope(void)
     write_gp0(inst, 0x30000000u);
     write_gp0(inst, vertex(0x401u, 0x601u));
     write_gp0(inst, 0x00000000u);
-    write_gp0(inst, vertex(0x402u, 0x7F5u));
+    write_gp0(inst, vertex(0x404u, 0x7F5u));
     write_gp0(inst, 0x000000FFu);
     write_gp0(inst, vertex(0x401u, 0x602u));
-    CHECK(inst->vram[250][0] == 0x000Fu);
-    CHECK(inst->vram[249][0] == 0u);
-    CHECK(inst->vram[251][0] == 0u);
+    CHECK(inst->vram[167][1] == 0x000Au);
+    CHECK(inst->vram[166][1] == 0u);
+    CHECK(inst->vram[168][1] == 0u);
     schway_destroy(inst);
 }
 
@@ -400,6 +400,45 @@ static void case_channel_midpoint(void)
     write_gp0(inst, vertex(0u, 8u));
     /* At (1,2), half the barycentric weight belongs to channel 16: 15.5 truncates to 15. */
     CHECK(inst->vram[2][1] == 0x0001u);
+    schway_destroy(inst);
+}
+
+static void case_vertex_plane(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return;
+    }
+    draw_area(inst, 0u, 0u, 1023u, 511u);
+
+    write_gp0(inst, 0x3000000Fu);
+    write_gp0(inst, vertex(0u, 0u));
+    write_gp0(inst, 0x00000010u);
+    write_gp0(inst, vertex(8u, 0u));
+    write_gp0(inst, 0x00000010u);
+    write_gp0(inst, vertex(0u, 8u));
+    /* Integer sample (2,2) is 15.5; the capture-backed 12-bit plane rounds it to 16. */
+    CHECK(inst->vram[2][2] == 0x0002u);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    inst->vram[0][512] = 0x001Fu;
+    inst->vram[0][513] = 0x03E0u;
+    write_gp0(inst, 0x2C808080u);
+    write_gp0(inst, vertex(0u, 10u));
+    write_gp0(inst, uv(0u, 0u, 0u));
+    write_gp0(inst, vertex(6u, 10u));
+    write_gp0(inst, uv(1u, 0u, 0x0108u));
+    write_gp0(inst, vertex(0u, 11u));
+    write_gp0(inst, uv(0u, 0u, 0u));
+    write_gp0(inst, vertex(6u, 11u));
+    write_gp0(inst, uv(1u, 0u, 0u));
+    /* Truncated 12-bit U slope 682 yields four red texels then two green. */
+    for (uint32_t x = 0u; x < 4u; x++) {
+        CHECK(inst->vram[10][x] == 0x001Fu);
+    }
+    CHECK(inst->vram[10][4] == 0x03E0u);
+    CHECK(inst->vram[10][5] == 0x03E0u);
+    CHECK(inst->vram[10][6] == 0u);
     schway_destroy(inst);
 }
 
@@ -429,6 +468,8 @@ int main(int argc, char **argv)
         case_hostile_slope();
     } else if (strcmp(argv[1], "channel_midpoint") == 0) {
         case_channel_midpoint();
+    } else if (strcmp(argv[1], "vertex_plane") == 0) {
+        case_vertex_plane();
     } else {
         fprintf(stderr, "unknown GPU interpolation case: %s\n", argv[1]);
         return 2;

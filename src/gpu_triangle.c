@@ -1,11 +1,9 @@
 /* Integer polygon coverage and attribute interpolation follow docs/hardware/gpu.md#polygons. */
-#include <limits.h>
-
 #include "gpu.h"
 
 #include "internal.h"
 
-#define SCHWAY__GPU_ATTR_FRACTION_BITS 16u
+#define SCHWAY__GPU_ATTR_FRACTION_BITS 12u
 #define SCHWAY__GPU_ATTR_ONE (INT64_C(1) << SCHWAY__GPU_ATTR_FRACTION_BITS)
 #define SCHWAY__GPU_ATTR_COUNT 5u
 
@@ -27,12 +25,8 @@ struct schway__gpu_edge {
 };
 
 struct schway__gpu_plane {
-    int64_t area;
-    int64_t dx_numerator[SCHWAY__GPU_ATTR_COUNT];
-    int64_t dy_numerator[SCHWAY__GPU_ATTR_COUNT];
     int32_t step_x[SCHWAY__GPU_ATTR_COUNT];
     int32_t step_y[SCHWAY__GPU_ATTR_COUNT];
-    uint32_t steppers_valid;
 };
 
 static int32_t sign11(uint32_t value)
@@ -46,8 +40,8 @@ static int64_t edge_value(const struct schway__gpu_point *a,
 {
     int64_t dx = (int64_t)b->x - a->x;
     int64_t dy = (int64_t)b->y - a->y;
-    int64_t pixel_x = (int64_t)x * 2 + 1 - (int64_t)a->x * 2;
-    int64_t pixel_y = (int64_t)y * 2 + 1 - (int64_t)a->y * 2;
+    int64_t pixel_x = (int64_t)x * 2 - (int64_t)a->x * 2;
+    int64_t pixel_y = (int64_t)y * 2 - (int64_t)a->y * 2;
     return dx * pixel_y - dy * pixel_x;
 }
 
@@ -91,14 +85,6 @@ static uint32_t spans_allowed(const struct schway__gpu_point *points, uint32_t c
     return (int64_t)max_x - min_x <= 1023 && (int64_t)max_y - min_y <= 511;
 }
 
-static int64_t divide_rounded(int64_t numerator, int64_t denominator)
-{
-    if (numerator < 0) {
-        return -((-numerator + denominator / 2) / denominator);
-    }
-    return (numerator + denominator / 2) / denominator;
-}
-
 static int32_t vertex_attribute(const struct schway__gpu_vertex *vertex, uint32_t attribute)
 {
     if (attribute < 3u) {
@@ -107,19 +93,7 @@ static int32_t vertex_attribute(const struct schway__gpu_vertex *vertex, uint32_
     return (int32_t)((vertex->uv >> ((attribute - 3u) * 8u)) & 0xFFu);
 }
 
-static int32_t store_stepper(int64_t step, uint32_t *valid)
-{
-    if (step > INT32_MAX) {
-        *valid = 0u;
-        return INT32_MAX;
-    }
-    if (step < INT32_MIN) {
-        *valid = 0u;
-        return INT32_MIN;
-    }
-    return (int32_t)step;
-}
-
+/* Captured polygon planes use signed 12-bit slopes truncated toward zero (docs/hardware/gpu.md#polygons). */
 static void setup_plane(const struct schway__gpu_vertex *a,
                         const struct schway__gpu_vertex *b,
                         const struct schway__gpu_vertex *c, int64_t area,
@@ -129,33 +103,25 @@ static void setup_plane(const struct schway__gpu_vertex *a,
     int64_t ab_y = (int64_t)b->point.y - a->point.y;
     int64_t ac_x = (int64_t)c->point.x - a->point.x;
     int64_t ac_y = (int64_t)c->point.y - a->point.y;
-    plane->area = area;
-    plane->steppers_valid = 1u;
     for (uint32_t i = 0u; i < SCHWAY__GPU_ATTR_COUNT; i++) {
         int64_t delta_b = (int64_t)vertex_attribute(b, i) - vertex_attribute(a, i);
         int64_t delta_c = (int64_t)vertex_attribute(c, i) - vertex_attribute(a, i);
         int64_t dx = delta_b * ac_y - delta_c * ab_y;
         int64_t dy = ab_x * delta_c - ac_x * delta_b;
-        plane->dx_numerator[i] = dx;
-        plane->dy_numerator[i] = dy;
-        plane->step_x[i] = store_stepper(divide_rounded(dx * SCHWAY__GPU_ATTR_ONE, area),
-                                         &plane->steppers_valid);
-        plane->step_y[i] = store_stepper(divide_rounded(dy * SCHWAY__GPU_ATTR_ONE, area),
-                                         &plane->steppers_valid);
+        plane->step_x[i] = (int32_t)((dx * SCHWAY__GPU_ATTR_ONE) / area);
+        plane->step_y[i] = (int32_t)((dy * SCHWAY__GPU_ATTR_ONE) / area);
     }
 }
 
-static int64_t attribute_at_sample(const struct schway__gpu_vertex *a,
+static int64_t attribute_at_origin(const struct schway__gpu_vertex *a,
                                    const struct schway__gpu_plane *plane,
                                    uint32_t attribute, int32_t x, int32_t y)
 {
-    int64_t sample_x = (int64_t)x * 2 + 1 - (int64_t)a->point.x * 2;
-    int64_t sample_y = (int64_t)y * 2 + 1 - (int64_t)a->point.y * 2;
-    int64_t denominator = plane->area * 2;
-    int64_t numerator = (int64_t)vertex_attribute(a, attribute) * denominator +
-                        plane->dx_numerator[attribute] * sample_x +
-                        plane->dy_numerator[attribute] * sample_y;
-    return divide_rounded(numerator * SCHWAY__GPU_ATTR_ONE, denominator);
+    int64_t dx = (int64_t)x - a->point.x;
+    int64_t dy = (int64_t)y - a->point.y;
+    return (int64_t)vertex_attribute(a, attribute) * SCHWAY__GPU_ATTR_ONE +
+           (int64_t)plane->step_x[attribute] * dx +
+           (int64_t)plane->step_y[attribute] * dy;
 }
 
 static uint32_t attribute_channel(int64_t value)
@@ -166,7 +132,7 @@ static uint32_t attribute_channel(int64_t value)
     if (value >= INT64_C(255) * SCHWAY__GPU_ATTR_ONE) {
         return 255u;
     }
-    return (uint32_t)(value / SCHWAY__GPU_ATTR_ONE);
+    return (uint32_t)((value + SCHWAY__GPU_ATTR_ONE / 2) / SCHWAY__GPU_ATTR_ONE);
 }
 
 static uint32_t pixel_color(const int64_t values[SCHWAY__GPU_ATTR_COUNT])
@@ -243,7 +209,7 @@ static void render_triangle(schway *inst, struct schway__gpu_vertex a,
     int64_t row_ca = ca.value;
     int64_t row_values[SCHWAY__GPU_ATTR_COUNT];
     for (uint32_t i = 0u; i < SCHWAY__GPU_ATTR_COUNT; i++) {
-        row_values[i] = attribute_at_sample(&a, &plane, i, min_x, min_y);
+        row_values[i] = attribute_at_origin(&a, &plane, i, min_x, min_y);
     }
 
     for (int32_t y = min_y; y < max_y; y++) {
@@ -256,11 +222,6 @@ static void render_triangle(schway *inst, struct schway__gpu_vertex a,
         }
         for (int32_t x = min_x; x < max_x; x++) {
             if (value_ab >= 0 && value_bc >= 0 && value_ca >= 0) {
-                if (plane.steppers_valid == 0u) {
-                    for (uint32_t i = 0u; i < SCHWAY__GPU_ATTR_COUNT; i++) {
-                        values[i] = attribute_at_sample(&a, &plane, i, x, y);
-                    }
-                }
                 uint32_t color = pixel_color(values);
                 uint16_t texel = 0u;
                 if ((flags & SCHWAY__GPU_PIXEL_TEXTURED) != 0u) {
@@ -271,23 +232,15 @@ static void render_triangle(schway *inst, struct schway__gpu_vertex a,
             value_ab += ab.step_x;
             value_bc += bc.step_x;
             value_ca += ca.step_x;
-            if (plane.steppers_valid != 0u) {
-                for (uint32_t i = 0u; i < SCHWAY__GPU_ATTR_COUNT; i++) {
-                    values[i] += plane.step_x[i];
-                }
+            for (uint32_t i = 0u; i < SCHWAY__GPU_ATTR_COUNT; i++) {
+                values[i] += plane.step_x[i];
             }
         }
         row_ab += ab.step_y;
         row_bc += bc.step_y;
         row_ca += ca.step_y;
-        if (plane.steppers_valid != 0u) {
-            for (uint32_t i = 0u; i < SCHWAY__GPU_ATTR_COUNT; i++) {
-                row_values[i] += plane.step_y[i];
-            }
-        } else {
-            for (uint32_t i = 0u; i < SCHWAY__GPU_ATTR_COUNT; i++) {
-                row_values[i] = attribute_at_sample(&a, &plane, i, min_x, y + 1);
-            }
+        for (uint32_t i = 0u; i < SCHWAY__GPU_ATTR_COUNT; i++) {
+            row_values[i] += plane.step_y[i];
         }
     }
 }

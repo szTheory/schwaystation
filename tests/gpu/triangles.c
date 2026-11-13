@@ -90,7 +90,7 @@ static uint32_t in_right_triangle_footprint(uint32_t x, uint32_t y)
 {
     /* Independent hand-enumeration for (1,1),(5,1),(1,5), not a rasterizer. */
     static const uint8_t covered[4][4] = {
-        {1u, 1u, 1u, 0u}, {1u, 1u, 0u, 0u}, {1u, 0u, 0u, 0u}, {0u, 0u, 0u, 0u}};
+        {1u, 1u, 1u, 1u}, {1u, 1u, 1u, 0u}, {1u, 1u, 0u, 0u}, {1u, 0u, 0u, 0u}};
     if (x < 1u || x > 4u || y < 1u || y > 4u) {
         return 0u;
     }
@@ -126,19 +126,25 @@ static void case_flat_packet(void)
     }
 
     memset(inst->vram, 0, sizeof inst->vram);
-    const int32_t one_pixel[3][2] = {{0, 0}, {2, 0}, {0, 2}};
+    const int32_t one_pixel[3][2] = {{0, 0}, {1, 0}, {0, 1}};
     triangle(inst, 0x20u, 0x000000FFu, one_pixel);
     CHECK(inst->vram[0][0] == 0x001Fu);
     CHECK(inst->vram[0][1] == 0u);
     CHECK(inst->vram[1][0] == 0u);
     CHECK(inst->vram[1][1] == 0u);
 
-    /* This valid one-pixel footprint has area one and a 500-line vertex span. */
     memset(inst->vram, 0, sizeof inst->vram);
-    const int32_t narrow_one_pixel[3][2] = {{0, 0}, {1, 500}, {0, 1}};
-    triangle(inst, 0x20u, 0x000000FFu, narrow_one_pixel);
+    const int32_t captured_top_edge[3][2] = {{40, 223}, {280, 223}, {160, 16}};
+    triangle(inst, 0x20u, 0x000000FFu, captured_top_edge);
+    CHECK(inst->vram[17][159] == 0u);
+    CHECK(inst->vram[17][160] == 0x001Fu);
+
+    /* An area-one sliver still has a 500-line vertex span. */
+    memset(inst->vram, 0, sizeof inst->vram);
+    const int32_t narrow_sliver[3][2] = {{0, 0}, {1, 500}, {0, 1}};
+    triangle(inst, 0x20u, 0x000000FFu, narrow_sliver);
     for (uint32_t y = 0u; y <= 500u; y++) {
-        CHECK(inst->vram[y][0] == (y == 250u ? 0x001Fu : 0u));
+        CHECK(inst->vram[y][0] == (y == 1u ? 0x001Fu : 0u));
     }
 
     memset(inst->vram, 0, sizeof inst->vram);

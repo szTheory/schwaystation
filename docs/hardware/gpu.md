@@ -85,21 +85,21 @@ an inverted draw area produces no pixels. The renderer rejects the whole polygon
 exceeds 1023 horizontally or 511 vertically, before clipping to VRAM. A textured polygon takes its CLUT from the first
 vertex's UV word and updates only E1/GPUSTAT texture-page bits 0 through 8 from the second vertex's UV word.
 
-Triangles use widened integer edge equations sampled at pixel centers. Winding is normalized without culling, zero-area
+Triangles use widened integer edge equations sampled at integer pixel coordinates. Winding is normalized without culling, zero-area
 triangles draw nothing, and the top and left edges own samples exactly on an edge. Quads draw as triangles (1,2,3) then
 (2,3,4); this gives the shared diagonal to one triangle so immediate pixel writes neither leave a crack nor blend a
 shared pixel twice. Each triangle interpolates its vertex colors and UV coordinates over the original geometry, before
 draw-area clipping. Flat polygons reuse one color at all vertices; textured polygons use affine UV interpolation, and
 the pixel pipeline above handles raw/modulated color, dithering, transparency, and write masks.
 
-Color and UV planes use signed 16.16 steps. Setup products and division use 64-bit intermediates; step slopes are
-rounded to the nearest 16.16 value with ties away from zero, and each interpolated eight-bit channel or UV coordinate
-is truncated to an integer before pixel processing. The stored horizontal and vertical steps are 32-bit. When an
-extreme slope cannot fit that representation, the covered pixel is evaluated from the original vertices with the same
-widened integer plane arithmetic. This keeps hostile narrow triangles defined without changing the stored-step model.
-These precision and rounding choices are a deterministic core model: the GPU specification does not define its
-interpolation precision, and no hardware-precision measurement is claimed here. Gouraud or modulated polygon pixels
-are dither-eligible; flat untextured polygons are not. Raw textured semi-transparent polygons do not acquire dither.
+Color and UV planes use signed 12.12 steps anchored at each triangle's first vertex. Setup products and accumulation
+use 64-bit intermediates; signed slope division truncates toward zero. The existing polygon-span limit and eight-bit
+attributes keep each stored 32-bit slope in range. At a covered pixel, adding half a 12-bit unit and converting to an
+integer rounds the interpolated channel or UV coordinate to nearest; colors then pass through the pixel pipeline.
+These integer-origin and 12.12 rules match the selected build-158 triangle and UV captures. They define a deterministic
+core model: the GPU specification does not define its interpolation precision, and no physical precision measurement
+is claimed here. Gouraud or modulated polygon pixels are dither-eligible; flat untextured polygons are not. Raw textured
+semi-transparent polygons do not acquire dither.
 
 ## Lines and polylines
 
