@@ -318,6 +318,14 @@ active saved context, and unsupported BIOS services stop in the stub's bounded l
 unsupported and do not replace the active saved context. This is one caller's hook path, not a general BIOS
 interrupt chain, and it adds no core fields or state version.
 
+Ordinary CI exercises the registered hook in `fixtures.boot.stub_irq_context`, `fixtures.boot.stub_irq_state`, and
+`fixtures.boot.stub_irq_controls`. These cover each supported interrupted register plus HI/LO/SR/EPC restoration,
+repeated callback and source-only acknowledgement, save/load before and during the live hook into independent
+instances, and mailbox/unsupported-service precedence. The retained build-158 overlap guest was also observed
+through 24 bounded advances: its registered hook returned through 23 IRQ0 callbacks while the guest completed its
+upload/copy loops and reached repeated reads of its VSync counter. This confirms the first caller's control flow;
+the GPU image comparison remains a separate test.
+
 **The default handler.** An exception writes Cause, EPC, BadVaddr and SR to the exception record. If the mailbox magic is
 there, the handler sets the mailbox word at `08h` to `000000FFh` (status FFh) and jumps to the address in the word at
 `0Ch` when that is not zero; otherwise, and with no mailbox, it stops in a loop. An image replaces the default by

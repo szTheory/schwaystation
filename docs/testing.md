@@ -115,6 +115,11 @@ source-documented per-case color alternatives. The archive, executables, PNGs an
 only: none is committed, uploaded or packaged. A fetch or digest error is reported separately from a raster
 mismatch.
 
+The overlap case also has a separate one-shot IRQ progress witness. Its source-derived 24-advance budget completes
+all 27,657 individual 1×1 uploads and 147 VRAM-copy operations, then observes repeated reads of the guest's VSync
+counter followed by further IRQ0 callbacks. The original eight-advance image-comparison bound remains unchanged;
+the progress witness proves guest control flow and does not judge pixel agreement.
+
 ### The GTE, DMA and timer checks
 
 Three directories hold the checks of the geometry engine, the DMA controller and the root counters. Each has one
