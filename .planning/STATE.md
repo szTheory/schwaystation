@@ -4,18 +4,18 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 04
 current_phase_name: Games play in RetroArch
-current_plan: 53 of 58
+current_plan: 54 of 58
 status: executing
-stopped_at: Recovered completed IRQ tracer; expanded IRQ validation is next
-last_updated: "2026-11-13T04:37:24Z"
+stopped_at: Completed 04-58-PLAN.md
+last_updated: "2026-11-13T06:08:21.834Z"
 last_activity: 2026-11-13
-last_activity_desc: "52 of 58 phase summaries; recovered committed IRQ tracer and interrupted bookkeeping. Expanded IRQ validation, remaining captures, fixes and final verification pending."
-state_head: 5858e5cfc887d4cd9a246dde2abfc46f6be704c0
+last_activity_desc: 53 of 58 phase summaries; plan 58 completed repeated IRQ/state regressions and a source-derived 24-advance caller-progress witness. The 04-47 image comparison remains checkpointed; four later plans and final phase verification remain. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
+state_head: 94224f1abca6f3a8daa30e8b168fc94a1d4c362e
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 126
-  completed_plans: 120
+  completed_plans: 121
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 04 (Games play in RetroArch) — EXECUTING
-Current Plan: 53 of 58
-Status: 52 summaries; six plans remain. IRQ tracer 57 is complete; expanded validation 58 precedes checkpointed 47. Review fixes are prepared off-tree, not applied.
-Last activity: 2026-11-13 — Reconciled daemon-interrupted 57 completion from committed source, recorded focused checks and verified summary; no source or test rerun. Runtime/model: Codex/OpenGSD 1.20.0, GPT-6 session recovery; executor gpt-6-luna xhigh.
+Current Plan: 54 of 58
+Status: 53 summaries; five plans remain. Plan 58 completed IRQ/state validation and caller-progress evidence; the 04-47 eight-advance image comparison remains checkpointed and pixel differences remain unclassified.
+Last activity: 2026-11-13 — Completed 04-58 with 520/520 ordinary CI tests, five release checks, final hygiene 23/23 and focused post-label checks. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
 Progress: [█████░░░░░] 50%
 
@@ -181,6 +181,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04 P30 | at least 19 min; executor start unavailable after recovery | 2 tasks | 5 files |
 | Phase 04 P46 | 96 min | 2 tasks | 20 files |
 | Phase 04 P57 | 47min | 2 tasks | 6 files |
+| Phase 04 P58 | 86 min | 2 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -439,6 +440,8 @@ Recent decisions affecting current work:
 - [Phase 04]: The clipping judge accepts a FRAME or a no-fault progressing BUDGET stop and compares the fixed whole-VRAM golden.
 - [Phase 04]: The test BIOS stub supports SYS(01h)/SYS(02h) with SWMB precedence and keeps reset-installed entry bytes stable.
 - [Phase 04]: An ignored local CMake user preset caps CTest at four jobs while tracked and hosted defaults remain unchanged.
+- [Phase 04]: 04-58: Keep the overlap image comparison at eight advances; the separate caller-progress witness uses a source-derived 24-advance allowance after eight advances completed 10,633 of 27,657 uploads.
+- [Phase 04]: 04-58: IRQ callback, acknowledgement, return and VSync progress do not establish pixel agreement; the 34,390 overlap image differences remain with checkpointed 04-47.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -624,8 +627,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T04:37:24Z
-Stopped at: Recovery reconciled completed 04-57; continue 04-58, then 04-47. Prepared card/region fixes remain off-tree.
+Last session: 2026-11-13T06:08:21.553Z
+Stopped at: Completed 04-58-PLAN.md
 Resume file: None
 Checkpoint: .planning/phases/04-games-play-in-retroarch/04-29-CHECKPOINT.md
 
