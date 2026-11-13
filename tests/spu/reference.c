@@ -173,7 +173,8 @@ enum control_fault {
     CONTROL_MISSING,
     CONTROL_DUPLICATE,
     CONTROL_REORDERED,
-    CONTROL_FAILED
+    CONTROL_FAILED,
+    CONTROL_INCOMPLETE
 };
 
 static int append_bytes(char *buffer, size_t capacity, size_t *used,
@@ -188,23 +189,30 @@ static int append_bytes(char *buffer, size_t capacity, size_t *used,
 }
 
 static int append_control_line(char *buffer, size_t capacity, size_t *used,
-                               const char *line)
+                               const char *line, int tty_prefix, int crlf)
 {
     size_t length = strlen(line);
-    return append_bytes(buffer, capacity, used, line, length) &&
-           append_bytes(buffer, capacity, used, "\n", 1u);
+    const char *newline = crlf != 0 ? "\r\n" : "\n";
+    size_t newline_length = crlf != 0 ? 2u : 1u;
+    return (tty_prefix == 0 || length == 0u ||
+            append_bytes(buffer, capacity, used, "tty ", 4u)) &&
+           append_bytes(buffer, capacity, used, line, length) &&
+           append_bytes(buffer, capacity, used, newline, newline_length);
 }
 
-static size_t make_control_log(char *buffer, size_t capacity, enum control_fault fault)
+static size_t make_control_log(char *buffer, size_t capacity, enum control_fault fault,
+                               int tty_prefix, int crlf)
 {
     size_t used = 0u;
-    if (!append_control_line(buffer, capacity, &used, "spu/memory-transfer") ||
-        !append_control_line(buffer, capacity, &used, "Test SPU memory access using DMA and regular IO.") ||
-        !append_control_line(buffer, capacity, &used, "")) {
+    if (!append_control_line(buffer, capacity, &used, "spu/memory-transfer", tty_prefix, crlf) ||
+        !append_control_line(buffer, capacity, &used,
+                             "Test SPU memory access using DMA and regular IO.", tty_prefix, crlf) ||
+        !append_control_line(buffer, capacity, &used, "", tty_prefix, crlf)) {
         return 0u;
     }
     for (size_t i = 0u; i < MEMORY_TRANSFER_CASE_COUNT; i++) {
-        if (fault == CONTROL_MISSING && i + 1u == MEMORY_TRANSFER_CASE_COUNT) {
+        if ((fault == CONTROL_MISSING || fault == CONTROL_INCOMPLETE) &&
+            i + 1u == MEMORY_TRANSFER_CASE_COUNT) {
             continue;
         }
         size_t index = i;
@@ -214,17 +222,19 @@ static size_t make_control_log(char *buffer, size_t capacity, enum control_fault
             index = 1u - i;
         }
         if (fault == CONTROL_FAILED && i == 1u &&
-            !append_control_line(buffer, capacity, &used, "fail - testManualWriteToSpuRam")) {
+            !append_control_line(buffer, capacity, &used, "fail - testManualWriteToSpuRam",
+                                 tty_prefix, crlf)) {
             return 0u;
         }
         char line[96];
         int count = snprintf(line, sizeof line, "pass - %s", memory_transfer_cases[index]);
         if (count < 0 || (size_t)count >= sizeof line ||
-            !append_control_line(buffer, capacity, &used, line)) {
+            !append_control_line(buffer, capacity, &used, line, tty_prefix, crlf)) {
             return 0u;
         }
     }
-    if (!append_control_line(buffer, capacity, &used, "Done.")) {
+    if (fault != CONTROL_INCOMPLETE &&
+        !append_control_line(buffer, capacity, &used, "Done.", tty_prefix, crlf)) {
         return 0u;
     }
     return used;
@@ -244,11 +254,18 @@ static int run_predicate_controls(void)
         CONTROL_FAILED,
     };
     for (size_t i = 0u; i < sizeof rejected / sizeof rejected[0]; i++) {
-        size_t size = make_control_log(buffer, sizeof buffer, rejected[i]);
+        size_t size = make_control_log(buffer, sizeof buffer, rejected[i], 0, 0);
         CHECK(size != 0u && !memory_transfer_log_matches((const uint8_t *)buffer, size, 0));
     }
     static const uint8_t pcm_like[] = {0x00u, 0x80u, 0x00u, 0x80u};
     CHECK(!memory_transfer_log_matches(pcm_like, sizeof pcm_like, 0));
+
+    CHECK(!memory_transfer_log_matches((const uint8_t *)pinned_memory_transfer_log,
+                                       sizeof pinned_memory_transfer_log - 1u, 1));
+    size_t size = make_control_log(buffer, sizeof buffer, CONTROL_INCOMPLETE, 0, 0);
+    CHECK(size != 0u && !memory_transfer_log_matches((const uint8_t *)buffer, size, 0));
+    size = make_control_log(buffer, sizeof buffer, CONTROL_VALID, 1, 1);
+    CHECK(size != 0u && memory_transfer_log_matches((const uint8_t *)buffer, size, 0));
     CHECK_DONE();
 }
 
