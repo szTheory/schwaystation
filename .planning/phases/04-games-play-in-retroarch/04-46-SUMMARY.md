@@ -12,7 +12,8 @@ provides:
   - Fetch and PNG refusal controls, plus minimal startup BIOS syscall support in the test stub
 affects:
   - "Phase 4 GPU hardware-reference coverage"
-  - "04-48 remaining GPU captures and hardware logs"
+  - "04-47 remaining nine GPU captures"
+  - "04-48 GPU logs and required lane"
 actuals:
   tokens: 15557
   tasks: 2
@@ -107,7 +108,7 @@ coverage:
         ref: "cmake --workflow --preset ci-j4; 515 tests, package step, and five release checks"
         status: pass
       - kind: integration
-        ref: "cmake --workflow --preset hygiene-j4; 23 checks"
+        ref: "cmake --workflow --preset hygiene-j4; 23 checks; repository-check budget 2687/2700 lines"
         status: pass
     human_judgment: false
 runtime: "Codex/OpenGSD 1.20.0, gpt-6-luna xhigh"
@@ -199,7 +200,7 @@ None.
 
 ## Next Phase Readiness
 
-This plan completes only the clipping capture slice. GAME-01 remains pending until the remaining nine image references and the register/log cases are implemented and verified by the dependent GPU plan. The phase coordinator continues with the next planned work; no owner action is needed here.
+This plan completes only the clipping capture slice. GAME-01 remains pending until 04-47 verifies the remaining nine image references and 04-48 verifies the three GPU log cases and required lane. The phase coordinator continues with plan 52; no owner action is needed here.
 
 ## Known Stubs
 
