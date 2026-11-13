@@ -341,9 +341,13 @@ for both ports, including unchanged levels. Strong values scale the core's 0–2
 on and 0 for off. Reset and unload send zero to both effects on both ports. A frontend without a rumble interface
 continues to run normally.
 
+The Region option takes effect at content load. After changing it, reload content to apply the selection;
+the current game, memory spans, card data and timing remain intact until unload. Input options continue to
+apply on the next frame.
+
 The libretro adapter converts native 15-bit and packed 24-bit frames to XRGB8888 in its fixed maximum-size host
-buffer. It announces `SET_GEOMETRY` from `retro_run` only when frame dimensions change; `SET_SYSTEM_AV_INFO` is
-reserved for a region change that changes the reported rate. A malformed or out-of-range native frame is dropped
+buffer. It announces `SET_GEOMETRY` from `retro_run` only when frame dimensions change. The frontend reads the
+selected region's rate through `retro_get_system_av_info` after loading content. A malformed or out-of-range native frame is dropped
 before it changes geometry state or reaches the video callback.
 
 ### Libretro memory and cards

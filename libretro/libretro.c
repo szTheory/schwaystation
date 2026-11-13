@@ -68,14 +68,14 @@ static uint8_t lr_toggle_latched[2];
 static uint8_t lr_toggle_frames[2];
 
 /* The region option (HOSTS-AND-INTEGRATION section 1, Core options): the
-   machine profile's region, applied by recreating the instance, since a
-   profile is fixed once the first frame has run. The default comes first. */
+   machine profile's region, selected at content load. A running instance
+   keeps its profile and memory spans until unload. The default comes first. */
 #define LR_REGION_KEY "schwaystation_region"
 static struct retro_core_option_v2_definition lr_option_defs[] = {
     {LR_REGION_KEY,
-     "Region",
+     "Region (reload content)",
      NULL,
-     "The console's region. Changing it restarts the console.",
+     "The console's region. Reload content to apply a change.",
      NULL,
      NULL,
      {{"ntsc-u", "NTSC-U/C"}, {"ntsc-j", "NTSC-J"}, {"pal", "PAL"}, {NULL, NULL}},
@@ -114,7 +114,7 @@ static struct retro_core_option_v2_category lr_option_cats[] = {{NULL, NULL, NUL
 static struct retro_core_options_v2 lr_options = {lr_option_cats, lr_option_defs};
 /* The same option for a frontend without core options version 2 (L1021). */
 static struct retro_variable lr_variables[] = {
-    {LR_REGION_KEY, "Region; ntsc-u|ntsc-j|pal"},
+    {LR_REGION_KEY, "Region (reload content); ntsc-u|ntsc-j|pal"},
     {LR_BIOS_KEY, "BIOS for no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin"},
     {LR_ANALOG_MODE_KEY, "DualShock mode; analog|digital"},
     {LR_ANALOG_TOGGLE_KEY, "DualShock mode toggle; enabled|disabled"},
@@ -899,28 +899,13 @@ static void lr_audio(void)
     }
 }
 
-/* A changed region option (L1039) recreates the instance and tells the
-   frontend the new rate and geometry (L1370). Returns 0 when no instance
-   could be created. */
-static int lr_check_region(void)
+/* Input options apply live; region selection is read at the next content load. */
+static void lr_check_options(void)
 {
     bool updated = false;
-    struct retro_system_av_info av;
-    uint32_t region;
-    if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) || !updated) {
-        return 1;
+    if (env_cb != NULL && env_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated) {
+        lr_refresh_input_options();
     }
-    lr_refresh_input_options();
-    region = lr_option_region();
-    if (region == info.region) {
-        return 1;
-    }
-    if (!lr_create(region)) {
-        return 0;
-    }
-    retro_get_system_av_info(&av);
-    (void)env_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av);
-    return 1;
 }
 
 /* L8953: one frame. Input is polled once and not yet read. The display area
@@ -934,9 +919,10 @@ void retro_run(void)
     if (input_poll_cb != NULL) {
         input_poll_cb();
     }
-    if (inst == NULL || !lr_check_region()) {
+    if (inst == NULL) {
         return;
     }
+    lr_check_options();
     lr_queue_input();
     memset(&result, 0, sizeof result);
     result.size = (uint32_t)sizeof result;

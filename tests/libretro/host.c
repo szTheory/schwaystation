@@ -270,7 +270,7 @@ static void check_variables(const struct retro_variable *v)
         return;
     }
     check_string("variable key", v[0].key, "schwaystation_region");
-    check_string("variable value", v[0].value, "Region; ntsc-u|ntsc-j|pal");
+    check_string("variable value", v[0].value, "Region (reload content); ntsc-u|ntsc-j|pal");
     check_string("BIOS variable key", v[1].key, "schwaystation_bios");
     check_string("BIOS variable value",
                  v[1].value,
@@ -958,6 +958,69 @@ static int test_input_descriptors(void)
 
 /* Selected BIOS failures and rejected content leave the current serialized
    instance intact; a selected BIOS applies only to a no-content load. */
+static void content_region_reload(const char *exe_path)
+{
+    unsigned char prefix[0x810];
+    FILE *file = schway__test_open_file(exe_path, "rb");
+    CHECK(file != NULL);
+    if (file == NULL) {
+        return;
+    }
+    size_t count = fread(prefix, 1u, sizeof prefix, file);
+    CHECK_EQ_U64(fclose(file), 0u);
+    CHECK_EQ_U64(count, sizeof prefix);
+    if (count != sizeof prefix) {
+        return;
+    }
+    uint32_t address = ((uint32_t)prefix[0x18] | (uint32_t)prefix[0x19] << 8 |
+                        (uint32_t)prefix[0x1A] << 16 | (uint32_t)prefix[0x1B] << 24) &
+                       0x1FFFFFu;
+    CHECK(address <= 0x200000u - 16u);
+    if (address > 0x200000u - 16u) {
+        return;
+    }
+    const char *prior_option = option_value;
+    option_value = "ntsc-u";
+    option_updated = false;
+    struct retro_game_info game = {exe_path, NULL, 0u, NULL};
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    unsigned char *card = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    unsigned char *ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(card != NULL && ram != NULL);
+    if (card != NULL && ram != NULL) {
+        uintptr_t card_address = (uintptr_t)card;
+        uintptr_t ram_address = (uintptr_t)ram;
+        unsigned char marker = (unsigned char)(card[12345] ^ 0xA5u);
+        CHECK(memcmp(ram + address, prefix + 0x800u, 16u) == 0);
+        card[12345] = marker;
+        run_one();
+        unsigned old_av_calls = av_info_calls;
+        option_value = "pal";
+        option_updated = true;
+        run_one();
+        card = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+        ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+        CHECK(card != NULL && ram != NULL);
+        CHECK_EQ_U64((uintptr_t)card, card_address);
+        CHECK_EQ_U64((uintptr_t)ram, ram_address);
+        if (card != NULL && ram != NULL) {
+            CHECK_EQ_HEX(card[12345], marker);
+            CHECK(memcmp(ram + address, prefix + 0x800u, 16u) == 0);
+        }
+        CHECK_EQ_U64(p_get_region(), RETRO_REGION_NTSC);
+        CHECK_EQ_U64(av_info_calls, old_av_calls);
+        struct retro_system_av_info av;
+        p_get_system_av_info(&av);
+        check_av(&av, SCHWAY_REGION_NTSC_U);
+    }
+    p_unload_game();
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    CHECK_EQ_U64(p_get_region(), RETRO_REGION_PAL);
+    p_unload_game();
+    option_value = prior_option;
+    option_updated = false;
+}
+
 static void content_lifecycle(const char *exe_path, const char *directory)
 {
     char missing_bios[4096], short_bios[4096], valid_bios[4096];
@@ -1075,6 +1138,7 @@ static void content_lifecycle(const char *exe_path, const char *directory)
     p_unload_game();
     bios_option_value = "none";
     CHECK_EQ_U64(p_load_game(NULL), 1);
+    content_region_reload(exe_path);
 
 cleanup:
     free(state);
@@ -2980,7 +3044,7 @@ int main(int argc, char **argv)
     pal = !content_test && strcmp(argv[2], "pal") == 0;
     option_value = pal ? "pal" : "ntsc-u";
     region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
-    /* The region a changed option switches to, and both regions' pairs per
+    /* The region selected for the next load, and both regions' pairs per
        frame: 33,868,800 x 44,100 / (768 x 44,100) per second over the frame
        rate (HOSTS-AND-INTEGRATION section 1, AV fields). */
     other = pal ? SCHWAY_REGION_NTSC_J : SCHWAY_REGION_PAL;
@@ -3209,21 +3273,27 @@ int main(int argc, char **argv)
                       SCHWAY_INPUT_DEVICE_DIGITAL);
     CHECK_EQ_U64(av_info_calls, 0);
 
-    /* A new region recreates the instance from power-on and sends the new
-       AV info once. */
+    /* Region changes wait for the next load and leave this session intact. */
+    option_value = other == SCHWAY_REGION_PAL ? "pal" : "ntsc-j";
+    option_updated = true;
+    step_with_devices(ref, "frame with pending region selection", lo, SCHWAY_INPUT_DEVICE_DIGITAL,
+                      SCHWAY_INPUT_DEVICE_DIGITAL);
+    CHECK_EQ_U64(av_info_calls, 0);
+    CHECK_EQ_U64(p_get_region(), pal ? RETRO_REGION_PAL : RETRO_REGION_NTSC);
+    memset(&av, 0, sizeof av);
+    p_get_system_av_info(&av);
+    check_av(&av, region);
+    p_unload_game();
     schway_destroy(ref);
+    CHECK_EQ_U64(p_load_game(NULL), 1);
     ref = ref_create(other);
     CHECK(ref != NULL);
     if (ref == NULL) {
         module_close();
         return 1;
     }
-    option_value = other == SCHWAY_REGION_PAL ? "pal" : "ntsc-j";
-    option_updated = true;
-    step_with_devices(ref, "frame after a region change", other_lo, SCHWAY_INPUT_DEVICE_DIGITAL,
-                      SCHWAY_INPUT_DEVICE_DIGITAL);
-    CHECK_EQ_U64(av_info_calls, 1);
-    check_av(&av_info_sent, other);
+    step_with_devices(ref, "frame after reloading changed region", other_lo,
+                      SCHWAY_INPUT_DEVICE_DIGITAL, SCHWAY_INPUT_DEVICE_DIGITAL);
     CHECK_EQ_U64(p_get_region(), other == SCHWAY_REGION_PAL ? RETRO_REGION_PAL : RETRO_REGION_NTSC);
     memset(&av, 0, sizeof av);
     p_get_system_av_info(&av);
