@@ -12,7 +12,7 @@
 #include "state.h"
 #include "../check.h"
 
-#define MAX_FIELDS 256u
+#define MAX_FIELDS 512u
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
@@ -482,6 +482,140 @@ static uint32_t offset_of(const schway *inst, const char *name)
     return 0u;
 }
 
+static int field_record_matches(const schway *inst, const char *name, uint32_t width,
+                                uint32_t count)
+{
+    size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
+    if (nf > MAX_FIELDS) {
+        return 0;
+    }
+    for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
+        if (strcmp(fields[i].name, name) == 0) {
+            return fields[i].width == width && fields[i].count == count;
+        }
+    }
+    return 0;
+}
+
+static void test_spu_state_continuation(void)
+{
+    static const struct {
+        const char *name;
+        uint32_t width, count;
+    } expected_fields[] = {
+        {"spu.ram", 1u, SCHWAY__SPU_RAM_SIZE},
+        {"spu.reg", 2u, 256u},
+        {"spu.voice.reg", 2u, SCHWAY__SPU_VOICE_COUNT * 8u},
+        {"spu.voice.history", 2u, SCHWAY__SPU_VOICE_COUNT * 3u},
+        {"spu.voice.sample_counter", 4u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.envelope", 4u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.envelope_counter", 4u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.envelope_phase", 4u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.sample", 2u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.output", 2u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.sweep_level", 4u, SCHWAY__SPU_VOICE_COUNT * 2u},
+        {"spu.voice.sweep_counter", 4u, SCHWAY__SPU_VOICE_COUNT * 2u},
+        {"spu.transfer_fifo", 2u, SCHWAY__SPU_FIFO_HALFWORDS},
+        {"spu.transfer_head", 4u, 1u},
+        {"spu.transfer_count", 4u, 1u},
+        {"spu.pending.address", 2u, SCHWAY__SPU_PENDING_WRITES},
+        {"spu.pending.value", 2u, SCHWAY__SPU_PENDING_WRITES},
+        {"spu.pending_count", 4u, 1u},
+        {"spu.noise_phase", 4u, 1u},
+        {"spu.noise_lfsr", 2u, 1u},
+        {"spu.capture_cursor", 4u, 1u},
+        {"spu.reverb_fir", 2u, 2u * SCHWAY__SPU_REVERB_FIR_TAPS},
+        {"spu.reverb_work", 4u, 2u * SCHWAY__SPU_REVERB_WORK_WORDS},
+        {"spu.reverb_fir_cursor", 4u, 1u},
+        {"spu.reverb_work_cursor", 4u, 1u},
+        {"spu.reverb_address", 4u, 1u},
+        {"spu.main_sweep_level", 4u, 2u},
+        {"spu.main_sweep_counter", 4u, 2u},
+        {"spu.irqa_addr", 4u, 1u},
+        {"spu.irq_enabled", 4u, 1u},
+        {"spu.next_tick", 8u, 1u},
+    };
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    src->spu.ram[0] = 0x12u;
+    src->spu.ram[SCHWAY__SPU_RAM_SIZE - 1u] = 0x34u;
+    src->spu.reg[255] = 0x5678u;
+    src->spu.voice[0].history[2] = -123;
+    src->spu.voice[23].envelope = -456;
+    src->spu.voice[23].sample_counter = 789u;
+    src->spu.transfer_fifo[31] = 0x9ABCu;
+    src->spu.transfer_head = 7u;
+    src->spu.transfer_count = 3u;
+    src->spu.pending[0].address = 0x20u;
+    src->spu.pending[0].value = 0xABCDu;
+    src->spu.pending_count = 1u;
+    src->spu.noise_phase = 17u;
+    src->spu.noise_lfsr = 0x1234u;
+    src->spu.capture_cursor = 23u;
+    src->spu.reverb_fir[1][38] = -78;
+    src->spu.reverb_work[1][31] = -8765;
+    src->spu.reverb_fir_cursor = 17u;
+    src->spu.reverb_work_cursor = 21u;
+    src->spu.reverb_address = 0x2000u;
+    src->spu.main_sweep_level[0] = -900;
+    src->spu.main_sweep_counter[1] = 37u;
+    src->spu.irqa_addr = 0x4000u;
+    src->spu.irq_enabled = 1u;
+    src->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+    size_t n = save(src, good);
+    size_t missing_fields = 0u;
+    for (size_t i = 0; i < sizeof expected_fields / sizeof expected_fields[0]; i++) {
+        if (!field_record_matches(src, expected_fields[i].name, expected_fields[i].width,
+                                  expected_fields[i].count)) {
+            missing_fields++;
+        }
+    }
+    CHECK_EQ_U64(missing_fields, 0u);
+
+    /* A queued host sample is deliberately excluded from the state and must
+       be discarded when the saved machine resumes. */
+    schway__spu_event(dst, dst->spu.next_tick);
+    CHECK_EQ_U64(dst->audio_count, 1u);
+    CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(dst->audio_count, 0u);
+    CHECK_EQ_U64(dst->audio_head, 0u);
+    CHECK_EQ_U64(dst->spu.next_tick, src->spu.next_tick);
+    CHECK_EQ_U64(save(dst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+
+    struct visit_ctx c;
+    memset(&c, 0, sizeof c);
+    CHECK_EQ_U64(schway_state_visit(src, on_field, &c), SCHWAY_STATUS_OK);
+    CHECK(!c.bad_name && !c.bad_width && !c.overflow);
+    CHECK_EQ_U64(c.n, n - SCHWAY__STATE_HEADER_SIZE);
+    CHECK(c.n == n - SCHWAY__STATE_HEADER_SIZE &&
+          memcmp(stream, good + SCHWAY__STATE_HEADER_SIZE, c.n) == 0);
+
+    schway__spu_event(src, src->spu.next_tick);
+    schway__spu_event(dst, dst->spu.next_tick);
+    CHECK_EQ_U64(src->audio_count, 1u);
+    CHECK_EQ_U64(dst->audio_count, 1u);
+    int16_t src_pair[2] = {0, 0}, dst_pair[2] = {0, 0};
+    schway_audio src_audio, dst_audio;
+    memset(&src_audio, 0, sizeof src_audio);
+    memset(&dst_audio, 0, sizeof dst_audio);
+    src_audio.size = (uint32_t)sizeof src_audio;
+    src_audio.samples = src_pair;
+    src_audio.capacity = 1u;
+    dst_audio.size = (uint32_t)sizeof dst_audio;
+    dst_audio.samples = dst_pair;
+    dst_audio.capacity = 1u;
+    CHECK_EQ_U64(schway_get_audio(src, &src_audio), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_get_audio(dst, &dst_audio), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(src_audio.written, 1u);
+    CHECK_EQ_U64(dst_audio.written, 1u);
+    CHECK(memcmp(src_pair, dst_pair, sizeof src_pair) == 0);
+    CHECK_EQ_U64(src->spu.next_tick, 2u * SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(dst->spu.next_tick, src->spu.next_tick);
+    schway_destroy(dst);
+    schway_destroy(src);
+}
+
 /* The geometry engine, DMA and counter fields come back from a save and a
    load byte for byte; a timer's base tick is no part of the state; and a
    load refuses the DMA bits the hardware does not store and a current
@@ -628,6 +762,8 @@ static void test_device_fields(void)
     CHECK_EQ_HEX(spu_src->bus.spu_attr, 0x0020u);
     schway_destroy(spu_dst);
     schway_destroy(spu_src);
+
+    test_spu_state_continuation();
 }
 
 /* Accepted counter boundaries must either advance to another loadable state
