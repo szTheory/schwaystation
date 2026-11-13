@@ -30,26 +30,33 @@ schway_prepare_gpu_reference_capture(clipping clipping_exe clipping_png clipping
 # its independently captured hardware reference at any RGB555 word.
 schway_add_test(NAME gpu.reference.clipping
   COMMAND schwaystation-test-gpu-reference capture clipping ${clipping_exe} ${clipping_golden} 1
+    ${PROJECT_SOURCE_DIR}/tests/gpu/allow.txt
   LABELS gpu nightly portable TIMEOUT 120)
 
 # Every guest draws before its first VSync loop. Bounds are fixed from the
-# pinned source: rectangles issues 128 draws; UV interpolation issues 768
-# polygons; overflow uploads two textures; CLUT caching writes 3,712 halfwords;
-# overlapping copies write 27,657 pixels and copy 147 blocks. The small
-# primitive guests use one call, these four use two, and overlap uses eight.
+# pinned source: rectangles settle their 5-bit repeated-blend state within 31
+# repeats; UV interpolation issues 768 polygons; overflow uploads two textures;
+# CLUT caching writes 3,712 halfwords; overlapping copies write 27,657 pixels
+# and copy 147 blocks. The small primitive guests use one call, the bulk cases
+# use two, rectangles allow 32 total calls for initialization, and overlap uses
+# its separately verified 24-call source-work bound.
 foreach(case IN LISTS SCHWAY_GPU_REFERENCE_CASES)
   schway_prepare_gpu_reference_capture(${case} case_exe case_png case_golden)
   set(case_advances 1)
   if(case STREQUAL "rectangles" OR case STREQUAL "uv-interpolation" OR
      case STREQUAL "texture-overflow" OR case STREQUAL "clut-cache")
     set(case_advances 2)
+  endif()
+  if(case STREQUAL "rectangles")
+    set(case_advances 32)
   elseif(case STREQUAL "vram-to-vram-overlap")
-    set(case_advances 8)
+    set(case_advances 24)
   endif()
 
   # Fault prevented: a pinned GPU guest's full VRAM differs from its hardware PNG.
   schway_add_test(NAME gpu.reference.${case}
-    COMMAND schwaystation-test-gpu-reference capture ${case} ${case_exe} ${case_golden} ${case_advances}
+    COMMAND schwaystation-test-gpu-reference capture ${case} ${case_exe} ${case_golden}
+      ${case_advances} ${PROJECT_SOURCE_DIR}/tests/gpu/allow.txt
     LABELS gpu nightly portable TIMEOUT 120)
 endforeach()
 

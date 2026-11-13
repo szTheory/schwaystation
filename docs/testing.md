@@ -104,15 +104,24 @@ clipping, lines, rectangles, transparency, quad, triangle, UV interpolation, tex
 copies and CLUT caching. The host's Python standard library decodes the bounded capture formats into temporary
 little-endian RGB555 files; alpha is ignored and no color management, compositing or rescaling is applied.
 
-Each guest draws its reference image before its first `VSync(0)` wait. The judge uses fixed `schway_run_frame`
-call bounds derived from each pinned source: one call for clipping, lines, transparency, quad and triangle; two
-for rectangles (128 draw commands), UV interpolation (768 polygons), texture overflow (two texture uploads) and
-CLUT caching (3,712 uploaded halfwords); eight for overlapping VRAM copies (27,657 individual writes and 147
-copies). Every call must advance ticks without a fault. The
-judge accepts only the bounded `FRAME` or no-fault `BUDGET` stop, then compares all 524,288 VRAM words after
-clearing only bit 15. Every color word must match. `tests/gpu/allow.txt` has no entries because this corpus has no
-source-documented per-case color alternatives. The archive, executables, PNGs and decoded pixels are build inputs
-only: none is committed, uploaded or packaged. A fetch or digest error is reported separately from a raster
+Each guest draws before entering its `VSync(0)` loop. The judge uses fixed `schway_run_frame` bounds derived from
+the pinned sources: one call for clipping, lines, transparency, quad and triangle; two for UV interpolation (768
+polygons), texture overflow (two texture uploads), and CLUT caching (3,712 uploaded halfwords); 32 for rectangles;
+and 24 for overlapping VRAM copies (27,657 individual writes and 147 copies). The rectangle bound allows 31 fixed
+repeated-draw steps, the maximum needed for a monotone 5-bit blend recurrence, plus an initialization margin. It
+does not search for a matching frame. The overlap bound is separately supported by the guest-progress witness below.
+Every call must advance ticks without a fault. The judge accepts only the bounded `FRAME` or no-fault `BUDGET` stop,
+then compares all 524,288 VRAM words after clearing only bit 15.
+
+`tests/gpu/allow.txt` contains two exact source-variant rules, keyed to the pinned build-158 archive digest. The line
+rule permits only the 64 calculated samples at `(150+r,140+r)` and `(210+r,140+r)`, `r=0..31`, where the guest leaves
+its fourth Gouraud color unset; the allowance computes each RGB555 alternate from the zero-color packet, the
+documented dither matrix, and ABR0. The transparency rule permits only the 447,488 untouched words outside the
+320x240 drawing area to differ from captured white (`7fff`) to runtime black (`0000`). All other pixels still match
+exactly. The judge rejects wrong colors, nearby pixels, other cases, missing policy files, unused rules, and wrong
+variant counts. The archive, executables, PNGs and decoded pixels are build inputs only: none is committed, uploaded
+or packaged. The two alternatives also require the exact reviewed executable SHA-256 values in the judge; a replaced
+executable is rejected before an allowance can apply. A fetch or digest error is reported separately from a raster
 mismatch.
 
 The overlap case also has a separate one-shot IRQ progress witness. Its source-derived 24-advance budget completes

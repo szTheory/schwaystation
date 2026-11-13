@@ -144,6 +144,21 @@ function(schway_prepare_gpu_reference_capture case output_exe output_png output_
     message(FATAL_ERROR "GPU_REFERENCE_FETCH_ERROR: invalid ps1-tests archive digest length")
   endif()
 
+  file(STRINGS "${PROJECT_SOURCE_DIR}/tests/gpu/allow.txt" allowance_archive_rows
+    REGEX "^# archive-sha256 ")
+  list(LENGTH allowance_archive_rows allowance_archive_count)
+  if(NOT allowance_archive_count EQUAL 1)
+    message(FATAL_ERROR "GPU_REFERENCE_ALLOWANCE_ERROR: allow.txt must name one pinned archive digest")
+  endif()
+  list(GET allowance_archive_rows 0 allowance_archive_row)
+  if(NOT allowance_archive_row MATCHES "^# archive-sha256 ([0-9a-f]+)$")
+    message(FATAL_ERROR "GPU_REFERENCE_ALLOWANCE_ERROR: malformed archive digest in allow.txt")
+  endif()
+  set(allowance_archive_sha256 "${CMAKE_MATCH_1}")
+  if(NOT "${allowance_archive_sha256}" STREQUAL "${archive_sha256}")
+    message(FATAL_ERROR "GPU_REFERENCE_ALLOWANCE_ERROR: allow.txt is not keyed to the pinned archive")
+  endif()
+
   set(reference_dir "${PROJECT_BINARY_DIR}/gpu-reference")
   set(archive "${reference_dir}/ps1-tests-build-158-tests.zip")
   file(MAKE_DIRECTORY "${reference_dir}")

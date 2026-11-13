@@ -161,8 +161,16 @@ static void check_octant(schway *inst, int32_t x0, int32_t y0, int32_t x1, int32
 {
     memset(inst->vram, 0, sizeof inst->vram);
     flat_line(inst, x0, y0, x1, y1, 0x000000FFu);
-    for (uint32_t i = 0u; i < 5u; i++) {
-        CHECK(inst->vram[expected[i][1]][expected[i][0]] == 0x001Fu);
+    for (int32_t y = 16; y <= 24; y++) {
+        for (int32_t x = 16; x <= 24; x++) {
+            uint16_t wanted = 0u;
+            for (uint32_t i = 0u; i < 5u; i++) {
+                if (expected[i][0] == x && expected[i][1] == y) {
+                    wanted = 0x001Fu;
+                }
+            }
+            CHECK(inst->vram[y][x] == wanted);
+        }
     }
 }
 
@@ -170,12 +178,12 @@ static void case_polyline_packet(void)
 {
     static const int32_t octants[8][5][2] = {
         {{20, 20}, {21, 21}, {22, 21}, {23, 22}, {24, 22}},
-        {{20, 20}, {21, 19}, {22, 19}, {23, 18}, {24, 18}},
+        {{20, 20}, {21, 20}, {22, 19}, {23, 19}, {24, 18}},
         {{20, 20}, {19, 21}, {18, 21}, {17, 22}, {16, 22}},
-        {{20, 20}, {19, 19}, {18, 19}, {17, 18}, {16, 18}},
-        {{20, 20}, {21, 21}, {21, 22}, {22, 23}, {22, 24}},
+        {{20, 20}, {19, 20}, {18, 19}, {17, 19}, {16, 18}},
+        {{20, 20}, {20, 21}, {21, 22}, {21, 23}, {22, 24}},
         {{20, 20}, {19, 21}, {19, 22}, {18, 23}, {18, 24}},
-        {{20, 20}, {21, 19}, {21, 18}, {22, 17}, {22, 16}},
+        {{20, 20}, {20, 19}, {21, 18}, {21, 17}, {22, 16}},
         {{20, 20}, {19, 19}, {19, 18}, {18, 17}, {18, 16}}
     };
     static const int32_t endpoints[8][4] = {
@@ -200,6 +208,12 @@ static void case_polyline_packet(void)
     memset(inst->vram, 0, sizeof inst->vram);
     gouraud_line(inst, 60, 60, 0u, 62, 60, 0x000000FFu);
     CHECK(inst->vram[60][61] == 0x0010u);
+
+    memset(inst->vram, 0, sizeof inst->vram);
+    gouraud_line(inst, 80, 80, 0x0000002Fu, 82, 80, 0u);
+    CHECK(inst->vram[80][80] == 0x0005u);
+    CHECK(inst->vram[80][81] == 0x0003u);
+    CHECK(inst->vram[80][82] == 0u);
 
     memset(inst->vram, 0, sizeof inst->vram);
     write_gp0(inst, 0xE1000200u);

@@ -109,10 +109,15 @@ vertically, then clips each sample against the inclusive E3/E4 draw area before 
 helper. Lines are dither-eligible, including flat lines, when E1 dithering is enabled; ABE uses the same blend path
 as other untextured primitives.
 
-The line walk uses an integer major-axis error accumulator. Coordinates and each 8-bit Gouraud channel use nearest
-integer stepping with midpoint ties rounded away from the starting value; both endpoint values are exact. This is a
-deterministic model choice. PSX-SPX describes inclusive Bresenham-class lines but does not specify tie handling or
-channel precision, and no hardware arithmetic measurement is claimed here.
+The line walk uses an integer major-axis error accumulator and emits a sample when its minor-axis error reaches the
+major-axis step count. It starts the error at `steps / 2`, except for X-major lines with descending Y and Y-major lines
+with ascending X, which start at `(steps - 1) / 2`; this is the selected spatial midpoint rule (X-lower/Y-upper in
+screen coordinates). Each 8-bit Gouraud channel uses a 12.12 value initialized to `channel * 4096 + 2048` and advances
+by the signed, truncated step `(abs(end - start) * 4096) / steps`. Dropping the fractional bits rounds the stored
+12.12 sample to nearest, with ties toward the higher channel value; slope truncation means that sample need not be
+the exact rational midpoint. Both endpoints remain exact within the accepted 1023-step maximum. These are
+deterministic model choices supported by the pinned line capture, not measurements of physical GPU tie handling or
+channel precision. PSX-SPX describes inclusive Bresenham-class lines but leaves those details unspecified.
 
 Polylines retain only their current vertex, color, next Gouraud color, mode, and parser phase. Each received vertex
 can emit at most one bounded line segment. The terminator mask is checked only where the stream expects a vertex in
@@ -134,6 +139,17 @@ and the source notes in `.planning/preparation/PSX-GPU-AND-GTE.md`, sections two
 sides of each span limit, edge ownership, clipping, signed offsets, Gouraud/UV values, page/CLUT effects, polygon flags,
 negative gradients, and narrow hostile slopes. They also check clipping invariance and state-split determinism. The
 directed interpolation tests pin the core model; they do not claim to calibrate GPU arithmetic precision against hardware.
+
+## VRAM transfers
+
+GP0(80h) copies wrap source and destination coordinates independently in VRAM. This implementation reads each row in
+forward chunks of up to 16 words into a bounded local buffer, then writes that chunk forward. The overlap capture
+validates the supported 2-, 8-, 15-, and 16-word cases; it does not measure a unique physical buffer width. Wider rows
+continue in later chunks, and each later row reads the VRAM state left by earlier rows. E6 checks the destination's
+existing mask bit before applying the force-mask bit. The command and mask behavior follow PSX-SPX's
+[VRAM-to-VRAM blitting description](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/#vram-to-vram-blitting-command-4-100),
+and coordinate wrapping follows its [transfer wrapping notes](https://psx-spx.consoledev.net/graphicsprocessingunitgpu/#wrapping).
+The 16-word read chunk is a capture-backed deterministic model documented with the [GPU reference test](../testing.md#gpu-hardware-captures).
 
 ## Beam and timer timing
 

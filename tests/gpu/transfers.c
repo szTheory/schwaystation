@@ -323,8 +323,27 @@ static void test_copy_order(void)
     copy_rect(inst, 10u, 10u, 11u, 10u, 3u, 1u);
     CHECK(inst->vram[10][10] == 0x0011u);
     CHECK(inst->vram[10][11] == 0x0011u);
-    CHECK(inst->vram[10][12] == 0x0011u);
-    CHECK(inst->vram[10][13] == 0x0011u);
+    CHECK(inst->vram[10][12] == 0x0022u);
+    CHECK(inst->vram[10][13] == 0x0033u);
+
+    for (uint32_t col = 0u; col < 16u; col++) {
+        inst->vram[14][100u + col] = (uint16_t)(0x0100u + col);
+    }
+    copy_rect(inst, 100u, 14u, 101u, 14u, 16u, 1u);
+    CHECK(inst->vram[14][100] == 0x0100u);
+    for (uint32_t col = 0u; col < 16u; col++) {
+        CHECK(inst->vram[14][101u + col] == (uint16_t)(0x0100u + col));
+    }
+
+    for (uint32_t col = 0u; col < 17u; col++) {
+        inst->vram[15][200u + col] = (uint16_t)(col + 1u);
+    }
+    copy_rect(inst, 200u, 15u, 201u, 15u, 17u, 1u);
+    CHECK(inst->vram[15][200] == 1u);
+    for (uint32_t col = 0u; col < 16u; col++) {
+        CHECK(inst->vram[15][201u + col] == (uint16_t)(col + 1u));
+    }
+    CHECK(inst->vram[15][217] == 16u);
 
     inst->vram[12][10] = 0u;
     inst->vram[12][11] = 0x0044u;

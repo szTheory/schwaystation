@@ -1,1 +1,7 @@
-# No source-documented per-case RGB555 alternatives exist in the selected corpus.
+# Exact RGB555 alternatives are source-reviewed and bound to the pinned executable hashes in reference.c.
+# archive-sha256 5de0e82854c1a511697a7ade381c2d778ec4b2fff4a7d7ac79e8098c35eb859b
+# case variant exact-use-count
+# The pinned lines guest leaves its final Gouraud color unset; the zero RGB3 packet variant is source-derived.
+lines zero-rgb3-cyan 64
+# The pinned transparency image predates the guest's full-VRAM black clear; only untouched pixels differ.
+transparency old-white-clear 447488

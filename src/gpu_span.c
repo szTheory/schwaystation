@@ -26,12 +26,12 @@ static void color_step(uint32_t color, uint32_t end, uint32_t shift, uint32_t st
 {
     uint32_t first = (color >> shift) & 0xFFu;
     uint32_t last = (end >> shift) & 0xFFu;
-    *value = first;
-    uint32_t delta = first < last ? last - first : first - last;
+    *value = (first << 12) + 2048u;
+    uint32_t delta = (first < last ? last - first : first - last) << 12;
     *direction = first < last ? 1 : (first > last ? -1 : 0);
-    *error = steps / 2u;
+    *error = 0u;
     *step = steps == 0u ? 0u : delta / steps;
-    *remainder = steps == 0u ? 0u : delta % steps;
+    *remainder = 0u;
 }
 
 static void color_advance(uint32_t steps, uint32_t step, uint32_t remainder, int32_t direction,
@@ -100,10 +100,13 @@ void schway__gpu_line(schway *inst, uint32_t command, uint32_t position0, uint32
     int32_t x = x0;
     int32_t y = y0;
     uint32_t minor_error = steps / 2u;
+    if (steps != 0u && ((dx >= dy && sy < 0) || (dx < dy && sx > 0))) {
+        minor_error = (steps - 1u) / 2u;
+    }
     uint32_t minor_delta = dx > dy ? dy : dx;
     for (uint32_t i = 0u; i <= steps; i++) {
         if (x >= left && x <= right && y >= top && y <= bottom) {
-            uint32_t color = red | (green << 8) | (blue << 16);
+            uint32_t color = (red >> 12) | ((green >> 12) << 8) | ((blue >> 12) << 16);
             schway__gpu_pixel(inst, (uint32_t)x, (uint32_t)y, 0u, color, pixel_flags);
         }
         if (i == steps) {

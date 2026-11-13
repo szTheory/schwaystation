@@ -664,11 +664,12 @@ uint16_t schway__gpu_clut_read(schway *inst, uint32_t x, uint32_t y, uint32_t in
     return g->clut_cache[index];
 }
 
-/* GP0(80h) scans source and destination rows in order; each coordinate wraps
-   independently and E6 checks the old destination before forcing bit 15
-   (psx-spx, GPU Commands; .planning/preparation/PSX-GPU-AND-GTE.md, GP0 Commands). */
+/* The copy model reads each horizontal 16-word batch before writing it, then
+   advances rows forward. Coordinates wrap independently and E6 tests the old
+   destination before forcing bit 15 (docs/hardware/gpu.md, VRAM transfers). */
 static void copy_vram(schway *inst, uint32_t source, uint32_t destination, uint32_t size)
 {
+    enum { COPY_READ_BATCH = 16u };
     struct schway__gpu *g = &inst->gpu;
     uint32_t source_x = source & 0x3FFu;
     uint32_t source_y = (source >> 16) & 0x1FFu;
@@ -682,13 +683,22 @@ static void copy_vram(schway *inst, uint32_t source, uint32_t destination, uint3
     for (uint32_t row = 0u; row < height; row++) {
         uint32_t sy = (source_y + row) & 0x1FFu;
         uint32_t dy = (dest_y + row) & 0x1FFu;
-        for (uint32_t col = 0u; col < width; col++) {
-            uint32_t sx = (source_x + col) & 0x3FFu;
-            uint32_t dx = (dest_x + col) & 0x3FFu;
-            uint16_t color = inst->vram[sy][sx];
-            uint16_t old = inst->vram[dy][dx];
-            if (mask_allows_write(g, old)) {
-                inst->vram[dy][dx] = mask_write_value(g, color);
+        uint16_t row_buffer[COPY_READ_BATCH];
+        for (uint32_t start = 0u; start < width; start += COPY_READ_BATCH) {
+            uint32_t count = width - start;
+            if (count > COPY_READ_BATCH) {
+                count = COPY_READ_BATCH;
+            }
+            for (uint32_t offset = 0u; offset < count; offset++) {
+                uint32_t sx = (source_x + start + offset) & 0x3FFu;
+                row_buffer[offset] = inst->vram[sy][sx];
+            }
+            for (uint32_t offset = 0u; offset < count; offset++) {
+                uint32_t dx = (dest_x + start + offset) & 0x3FFu;
+                uint16_t old = inst->vram[dy][dx];
+                if (mask_allows_write(g, old)) {
+                    inst->vram[dy][dx] = mask_write_value(g, row_buffer[offset]);
+                }
             }
         }
     }
