@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-04-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-last_updated: "2026-11-13T22:54:38.227Z"
+stopped_at: "Completed 05-16-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+last_updated: "2026-11-13T23:29:07.849Z"
 last_activity: 2026-11-13
 last_activity_desc: "Completed plan 05-01. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-state_head: ba7b109e0aced9727e94a38d135dc01d74bf76a1
+state_head: 03306b2dca36b545faca673b2063d8c90bb6ef4e
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 145
-  completed_plans: 129
+  completed_plans: 130
   percent: 67
 current_plan: 1 of 19
 ---
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 4 of 19
+Plan: 5 of 19
 Status: Ready to execute
 Last activity: 2026-11-13 — Plan 05-01 completed. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
@@ -191,6 +191,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P01 | 14 min | 2 tasks | 7 files |
 | Phase 05 P02 | 19 min | 2 tasks | 8 files |
 | Phase 05 P04 | under 40 min (exact start unavailable) | 2 tasks | 7 files |
+| Phase 05 P16 | 26 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -466,6 +467,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Use the public build-158 transfer executable as a fetch-only build asset, with archive and member digests checked before use.
 - [Phase 05]: Treat the seven exact transfer log lines as transfer, status, and timing evidence only; they do not provide a PCM oracle.
 - [Phase 05]: Accept only ordered one-to-one pass cases with exit code zero and the completion marker; allow CRLF and TTY prefixes.
+- [Phase 05]: Pass saved scheduler ticks into the private SPU visitor to validate sample phase before applying decoded state.
+- [Phase 05]: Advance behavior revision and save-state format to 5, reject format-4 states, and preserve the public API and ABI.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -651,8 +654,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T22:54:38.018Z
-Stopped at: Completed 05-04-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Last session: 2026-11-13T23:29:07.502Z
+Stopped at: Completed 05-16-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
