@@ -101,7 +101,7 @@ coverage:
 
 The plan commit count and head range above are measured from the persisted plan ledger. The later metadata commit records this summary and state updates.
 
-## Verification
+## Commands and Evidence
 
 - `cmake --preset ci` — exit 0; configured and verified the pinned build-158 archive, executable member, and source log.
 - `cmake --build --preset ci --target schwaystation-test-spu-reference` — exit 0.
