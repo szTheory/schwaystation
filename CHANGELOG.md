@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/szTheory/schwaystation/compare/v0.3.0...v0.4.0) (2026-11-13)
+
+
+### Features
+
+* **phase-04:** games play in RetroArch ([#14](https://github.com/szTheory/schwaystation/issues/14)) ([8107033](https://github.com/szTheory/schwaystation/commit/81070335fa8bdc7807a689e13b2fc363b833b5e1))
+
 ## [0.3.0](https://github.com/szTheory/schwaystation/compare/v0.2.0...v0.3.0) (2026-11-10)
 
 
