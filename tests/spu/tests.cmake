@@ -50,6 +50,21 @@ schway_add_test(NAME spu.reverb
   COMMAND schwaystation-test-spu-reverb
   LABELS audio portable TIMEOUT 10)
 
+add_executable(schwaystation-test-spu-fixture ${CMAKE_CURRENT_LIST_DIR}/fixture.c)
+target_link_libraries(schwaystation-test-spu-fixture PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-spu-fixture PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-spu-fixture)
+add_dependencies(schwaystation-test-spu-fixture schwaystation-fixtures schwaystation-run)
+
+# Fault prevented: the CPU-free authored block path drifts from the guest PCM.
+schway_add_test(NAME spu.fixture
+  COMMAND schwaystation-test-spu-fixture
+    "${SCHWAYSTATION_FIXTURES_DIR}/spu_tone.exe"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/spu_blocks.inc"
+    "$<TARGET_FILE:schwaystation-run>"
+  LABELS audio portable TIMEOUT 120)
+
 include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
 schway_prepare_spu_reference_assets(
   spu_reference_dir spu_reference_exe spu_reference_log

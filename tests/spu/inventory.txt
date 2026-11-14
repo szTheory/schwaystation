@@ -1,5 +1,6 @@
 # Tests this directory registers: name<TAB>labels, lines sorted by name.
 spu.envelopes	audio,portable
+spu.fixture	audio,portable
 spu.model	audio,portable
 spu.noise	audio,portable
 spu.reference.controls	audio,portable
