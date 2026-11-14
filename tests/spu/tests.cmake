@@ -62,6 +62,7 @@ schway_add_test(NAME spu.fixture
   COMMAND schwaystation-test-spu-fixture
     "${SCHWAYSTATION_FIXTURES_DIR}/spu_tone.exe"
     "${PROJECT_SOURCE_DIR}/tests/fixtures/src/spu_blocks.inc"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/spu_tone.asm"
     "$<TARGET_FILE:schwaystation-run>"
   LABELS audio portable TIMEOUT 120)
 
