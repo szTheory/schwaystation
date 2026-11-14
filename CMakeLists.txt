@@ -92,7 +92,7 @@ add_library(schwaystation_timers OBJECT src/timers.c)
 add_library(schwaystation_sched OBJECT src/sched.c)
 add_library(schwaystation_sio OBJECT src/sio.c src/pad.c)
 add_library(schwaystation_card OBJECT src/card.c)
-add_library(schwaystation_spu OBJECT src/spu.c src/spu_voice.c)
+add_library(schwaystation_spu OBJECT src/spu.c src/spu_voice.c src/spu_envelope.c)
 add_library(schwaystation_exe OBJECT
   src/exe.c
   src/stub_kernel.c)

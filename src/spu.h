@@ -83,6 +83,8 @@ uint32_t schway__spu_dma_ready(const schway *inst, uint32_t direction);
 
 void schway__spu_voice_step(schway *inst, uint32_t voice);
 void schway__spu_envelope_step(schway *inst, uint32_t voice);
+void schway__spu_envelope_rate(uint32_t rate, uint32_t decreasing, int32_t *step,
+                               uint32_t *ticks);
 void schway__spu_noise_step(schway *inst);
 void schway__spu_reverb_step(schway *inst);
 void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ticks);
