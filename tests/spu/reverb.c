@@ -1,6 +1,7 @@
 /* Reverb resampler checks against an independent scalar convolution. */
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../../src/internal.h"
@@ -203,6 +204,148 @@ static void check_split_resume(void)
           "copied FIR history and phase resume identically");
 }
 
+#define TEST_SPU_REGISTER_BASE UINT32_C(0x1F801C00)
+#define TEST_SPU_ATTR UINT32_C(0x1F801DAA)
+#define TEST_SPU_NON UINT32_C(0x1F801D94)
+#define TEST_SPU_EON0 UINT32_C(0x1F801D98)
+#define TEST_SPU_EVOL_L UINT32_C(0x1F801D84)
+#define TEST_SPU_EVOL_R UINT32_C(0x1F801D86)
+#define TEST_SPU_VLIN UINT32_C(0x1F801DFC)
+#define TEST_SPU_VRIN UINT32_C(0x1F801DFE)
+#define TEST_SPU_MAIN_VOL_L UINT32_C(0x1F801D80)
+#define TEST_SPU_MAIN_VOL_R UINT32_C(0x1F801D82)
+
+static void *test_alloc(void *user, size_t size)
+{
+    (void)user;
+    return malloc(size);
+}
+
+static void test_free(void *user, void *ptr, size_t size)
+{
+    (void)user;
+    (void)size;
+    free(ptr);
+}
+
+static schway *make_reverb_instance(void)
+{
+    schway_config config;
+    schway_profile profile;
+    schway *inst = NULL;
+    memset(&config, 0, sizeof config);
+    config.size = (uint32_t)sizeof config;
+    config.allocator.alloc = test_alloc;
+    config.allocator.free = test_free;
+    if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL) {
+        return NULL;
+    }
+    memset(&profile, 0, sizeof profile);
+    profile.size = (uint32_t)sizeof profile;
+    profile.region = SCHWAY_REGION_NTSC_U;
+    if (schway_set_profile(inst, &profile) != SCHWAY_STATUS_OK) {
+        schway_destroy(inst);
+        return NULL;
+    }
+    return inst;
+}
+
+static uint32_t test_reg_index(uint32_t address)
+{
+    return (address - TEST_SPU_REGISTER_BASE) >> 1;
+}
+
+static void setup_reverb_impulse(schway *inst, uint16_t evol_left, uint16_t evol_right,
+                                 uint32_t wet_input)
+{
+    inst->spu.reg[test_reg_index(TEST_SPU_ATTR)] = 0xC000u;
+    inst->spu.reg[test_reg_index(TEST_SPU_NON)] = 1u;
+    inst->spu.reg[test_reg_index(TEST_SPU_EON0)] = wet_input != 0u ? 1u : 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_EVOL_L)] = evol_left;
+    inst->spu.reg[test_reg_index(TEST_SPU_EVOL_R)] = evol_right;
+    inst->spu.reg[test_reg_index(TEST_SPU_VLIN)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_VRIN)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_MAIN_VOL_L)] = 0x3FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_MAIN_VOL_R)] = 0x3FFFu;
+    inst->spu.noise_lfsr = 0x2000u;
+    inst->spu.noise_phase = 0u;
+    inst->spu.voice[0].envelope = 0x4000;
+    inst->spu.voice[0].reg[0] = 0x3FFFu;
+    inst->spu.voice[0].reg[1] = 0x1FFFu;
+}
+
+static void run_event_until(schway *inst, uint64_t cycle)
+{
+    inst->ticks = cycle;
+    schway__spu_event(inst, cycle);
+}
+
+static uint32_t capture_impulse_pcm(int16_t samples[96][2], uint16_t evol_left,
+                                    uint16_t evol_right, uint32_t wet_input, uint32_t split)
+{
+    schway *inst = make_reverb_instance();
+    if (inst == NULL) {
+        CHECK(0, "reverb PCM instance is created");
+        return 0u;
+    }
+    setup_reverb_impulse(inst, evol_left, evol_right, wet_input);
+    run_event_until(inst, SCHWAY__CYCLES_PER_PAIR);
+    inst->spu.reg[test_reg_index(TEST_SPU_EON0)] = 0u;
+    if (split != 0u) {
+        run_event_until(inst, UINT64_C(23) * SCHWAY__CYCLES_PER_PAIR);
+        run_event_until(inst, UINT64_C(51) * SCHWAY__CYCLES_PER_PAIR);
+    }
+    run_event_until(inst, UINT64_C(96) * SCHWAY__CYCLES_PER_PAIR);
+
+    schway_audio audio;
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = &samples[0][0];
+    audio.capacity = 96u;
+    CHECK(schway_get_audio(inst, &audio) == SCHWAY_STATUS_OK,
+          "scheduled reverb output drains through public PCM");
+    schway_destroy(inst);
+    return audio.written;
+}
+
+static void check_public_wet_return(void)
+{
+    int16_t dry[96][2] = {{0}};
+    int16_t wet_positive[96][2] = {{0}};
+    int16_t wet_negative[96][2] = {{0}};
+    int16_t wet_split[96][2] = {{0}};
+    int16_t off[96][2] = {{0}};
+    CHECK(capture_impulse_pcm(dry, 0x7FFFu, 0x7FFFu, 0u, 0u) == 96u,
+          "dry baseline produces 96 native PCM pairs");
+    CHECK(capture_impulse_pcm(wet_positive, 0x7FFFu, 0x7FFFu, 1u, 0u) == 96u,
+          "positive wet impulse produces 96 native PCM pairs");
+    CHECK(capture_impulse_pcm(wet_negative, 0x8001u, 0x8001u, 1u, 0u) == 96u,
+          "negative wet impulse produces 96 native PCM pairs");
+    CHECK(capture_impulse_pcm(wet_split, 0x7FFFu, 0x7FFFu, 1u, 1u) == 96u,
+          "split event dispatch produces 96 native PCM pairs");
+    CHECK(capture_impulse_pcm(off, 0u, 0u, 1u, 0u) == 96u,
+          "Off configuration produces 96 native PCM pairs");
+
+    uint32_t saw_wet = 0u;
+    uint32_t saw_asymmetric = 0u;
+    uint32_t saw_opposite_sign = 0u;
+    for (uint32_t tick = 0u; tick < 96u; tick++) {
+        int32_t positive_left = (int32_t)wet_positive[tick][0] - dry[tick][0];
+        int32_t positive_right = (int32_t)wet_positive[tick][1] - dry[tick][1];
+        int32_t negative_left = (int32_t)wet_negative[tick][0] - dry[tick][0];
+        saw_wet |= positive_left != 0 || positive_right != 0;
+        saw_asymmetric |= positive_left != positive_right;
+        saw_opposite_sign |= positive_left * negative_left < 0;
+    }
+    CHECK(saw_wet != 0u, "EON wet input reaches the public audio mix");
+    CHECK(saw_asymmetric != 0u, "left and right wet impulses remain distinct");
+    CHECK(saw_opposite_sign != 0u, "signed EVOL changes the wet return sign");
+    CHECK(memcmp(wet_positive, wet_split, sizeof wet_positive) == 0,
+          "reverb channel phase is stable across split scheduled runs");
+    CHECK(memcmp(dry, off, sizeof dry) == 0,
+          "zero EVOL Off configuration contributes no wet PCM");
+}
+
 int main(void)
 {
     compare_input_fir();
@@ -210,5 +353,6 @@ int main(void)
     check_centered_delay(0u);
     check_centered_delay(1u);
     check_split_resume();
+    check_public_wet_return();
     return failures == 0u ? 0 : 1;
 }
