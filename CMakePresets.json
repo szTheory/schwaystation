@@ -70,7 +70,7 @@
     {
       "name": "fuzz",
       "inherits": "base",
-      "$comment": "The loader fuzz target under clang-21 with ASan and UBSan. Its selected libretro consumers use generated fixtures, while the asan inventory omits standalone fixture tests. Only schwaystation-fuzz-exe links libFuzzer; every other object takes the coverage instrumentation of fuzzer-no-link. It has no test step: the nightly job runs the binary.",
+      "$comment": "The loader and SPU fuzz targets use clang-21 with ASan and UBSan. Selected libretro consumers use generated fixtures, while the asan inventory omits standalone fixture tests. Only the loader and SPU fuzz executables link libFuzzer; replay targets and other objects take fuzzer-no-link coverage instrumentation. The nightly job runs the loader campaign.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -151,7 +151,16 @@
     { "name": "ci-msvc", "configurePreset": "ci-msvc" },
     { "name": "hygiene", "configurePreset": "hygiene" },
     { "name": "asan", "configurePreset": "asan" },
-    { "name": "fuzz", "configurePreset": "fuzz", "targets": ["schwaystation-fuzz-exe", "schwaystation-fuzz-exe-replay"] },
+    {
+      "name": "fuzz",
+      "configurePreset": "fuzz",
+      "targets": [
+        "schwaystation-fuzz-exe",
+        "schwaystation-fuzz-exe-replay",
+        "schwaystation-fuzz-spu",
+        "schwaystation-fuzz-spu-replay"
+      ]
+    },
     { "name": "nofp", "configurePreset": "nofp" },
     { "name": "be32", "configurePreset": "be32" },
     { "name": "wasm32", "configurePreset": "wasm32" },
