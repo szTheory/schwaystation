@@ -114,6 +114,30 @@ static uint8_t *read_fixture(const char *directory, const char *name, size_t *si
     return bytes;
 }
 
+static uint32_t tone_word_le(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) | ((uint32_t)bytes[2] << 16) |
+           ((uint32_t)bytes[3] << 24);
+}
+
+static void check_tone_mailbox(const schway *inst, uint32_t count)
+{
+    const uint8_t *mb = inst->bus.ram + 0x10000u;
+    CHECK(memcmp(mb, "SWMB", 4u) == 0);
+    CHECK_EQ_U64(mb[8], 0u);
+    CHECK_EQ_U64(mb[9], 1u);
+    CHECK_EQ_U64(mb[10], count);
+    CHECK_EQ_HEX(tone_word_le(mb + 4u), schway__crc32_update(0u, mb + 0x10u, 0xF0u));
+}
+
+static uint32_t tone_record(const schway *inst, uint32_t n)
+{
+    const uint8_t *record = inst->bus.ram + 0x10000u + 0x10u + 8u * (n - 1u);
+    CHECK_EQ_U64((uint32_t)record[0] | ((uint32_t)record[1] << 8), n);
+    CHECK_EQ_U64((uint32_t)record[2] | ((uint32_t)record[3] << 8), 1u);
+    return tone_word_le(record + 4u);
+}
+
 /* The guest must boot through the stub, upload a BRR block by IO, key a voice,
    and produce nonzero asymmetric output through the public audio drain. */
 static void check_tone_fixture(const char *directory)
@@ -134,9 +158,10 @@ static void check_tone_fixture(const char *directory)
     free(exe);
 
     uint64_t previous_ticks = 0u;
+    uint64_t total_pairs = 0u;
     uint64_t left_energy = 0u;
     uint64_t right_energy = 0u;
-    for (uint32_t frame = 0u; frame < 3u; frame++) {
+    for (uint32_t frame = 0u; frame < 621u; frame++) {
         schway_run_result result = run_frame(inst);
         CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
         CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
@@ -145,6 +170,7 @@ static void check_tone_fixture(const char *directory)
         schway_audio audio = drain(inst, AUDIO_RING_PAIRS);
         CHECK_EQ_U64(audio.written, expected_pairs);
         CHECK_EQ_U64(audio.dropped, 0u);
+        total_pairs += audio.written;
         for (uint32_t pair = 0u; pair < audio.written; pair++) {
             int32_t left = samples[pair * 2u];
             int32_t right = samples[pair * 2u + 1u];
@@ -153,9 +179,18 @@ static void check_tone_fixture(const char *directory)
         }
         previous_ticks = result.ticks;
     }
+    CHECK_EQ_U64(total_pairs, previous_ticks / SCHWAY__CYCLES_PER_PAIR);
     CHECK(left_energy > 0u);
     CHECK(right_energy > 0u);
     CHECK(left_energy != right_energy);
+    CHECK_EQ_HEX(schway__spu_ram_peek(inst, 0x1000u), 0x0704u);
+    CHECK_EQ_HEX(schway__spu_ram_peek(inst, 0x2000u), 0x0704u);
+    CHECK_EQ_HEX(inst->spu.voice[0].reg[2], 0x1000u);
+    CHECK_EQ_HEX(inst->spu.voice[1].reg[2], 0x1800u);
+    check_tone_mailbox(inst, 3u);
+    CHECK_EQ_U64(tone_record(inst, 1u), 0x7FFFu);
+    CHECK_EQ_U64(tone_record(inst, 2u), 0x7FFFu);
+    CHECK_EQ_U64(tone_record(inst, 3u), 600u);
     schway_destroy(inst);
 }
 
