@@ -500,7 +500,9 @@ schway_get_audio(inst, &audio); /* audio.written pairs, left then right */
 Each frame queues one stereo pair for every 768 CPU cycles it ran: 737 or 738 pairs for NTSC, 886 or 887 for PAL,
 at 44,100 pairs per second. The queue holds 3,548 pairs, four of the longest frames; pairs that do not fit are
 dropped, and `dropped` reports how many since the last drain. Drain every frame. A drain with `capacity` 0 writes
-nothing and leaves the pairs queued; `samples` may be `NULL` only then. This release's audio is silent.
+nothing and leaves the pairs queued; `samples` may be `NULL` only then. The samples are signed 16-bit PCM from the
+SPU model and may be silent when no voices produce sound. The library does not open an audio device or resample;
+`schway_get_info` reports the native frame and sample-rate rationals.
 
 ## TTY
 
