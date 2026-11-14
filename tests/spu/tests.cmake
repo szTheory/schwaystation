@@ -31,6 +31,16 @@ schway_add_test(NAME spu.voices
   COMMAND schwaystation-test-spu-voices
   LABELS audio portable TIMEOUT 10)
 
+# Fault prevented: the pinned SPU noise slot schedule or LFSR sequence drifts.
+add_executable(schwaystation-test-spu-noise ${CMAKE_CURRENT_LIST_DIR}/noise.c)
+target_link_libraries(schwaystation-test-spu-noise PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-spu-noise PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-spu-noise)
+schway_add_test(NAME spu.noise
+  COMMAND schwaystation-test-spu-noise
+  LABELS audio portable TIMEOUT 10)
+
 include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
 schway_prepare_spu_reference_assets(
   spu_reference_dir spu_reference_exe spu_reference_log
