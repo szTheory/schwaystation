@@ -194,6 +194,84 @@ static void check_tone_fixture(const char *directory)
     schway_destroy(inst);
 }
 
+static void check_tone_state_continuation(const char *directory)
+{
+    size_t exe_size = 0u;
+    uint8_t *exe = read_fixture(directory, "spu_tone.exe", &exe_size);
+    CHECK(exe != NULL);
+    if (exe == NULL) {
+        return;
+    }
+
+    schway *source = make(SCHWAY_REGION_NTSC_U);
+    schway *loaded = make(SCHWAY_REGION_NTSC_U);
+    if (source == NULL || loaded == NULL) {
+        free(exe);
+        if (source != NULL) {
+            schway_destroy(source);
+        }
+        if (loaded != NULL) {
+            schway_destroy(loaded);
+        }
+        return;
+    }
+    CHECK_EQ_U64(schway_load_exe(source, exe, exe_size), SCHWAY_STATUS_OK);
+    free(exe);
+
+    for (uint32_t frame = 0u; frame < 120u; frame++) {
+        CHECK_EQ_U64(run_frame(source).stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(drain(source, AUDIO_RING_PAIRS).dropped, 0u);
+    }
+    CHECK(source->spu.voice[0].envelope != 0);
+    CHECK(source->spu.capture_cursor != 0u);
+
+    /* Exercise a pending noise-source write at the save boundary as well as
+       the fixture's live BRR voice and decoder history. */
+    schway__spu_reg_write(source, 0x1F801D94u, 1u);
+    size_t state_size = schway_state_size(source);
+    uint8_t *state = state_size == 0u ? NULL : (uint8_t *)malloc(state_size);
+    CHECK(state != NULL);
+    if (state != NULL) {
+        CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
+
+        schway__spu_event(loaded, loaded->spu.next_tick);
+        CHECK_EQ_U64(loaded->audio_count, 1u);
+        CHECK_EQ_U64(schway_load_state(loaded, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(loaded->audio_count, 0u);
+
+        uint64_t compared_pairs = 0u;
+        uint64_t pcm_energy = 0u;
+        int16_t source_pcm[2u * 887u];
+        int16_t loaded_pcm[2u * 887u];
+        for (uint32_t frame = 0u; frame < 90u; frame++) {
+            schway_run_result source_result = run_frame(source);
+            schway_run_result loaded_result = run_frame(loaded);
+            CHECK_EQ_U64(source_result.stop, SCHWAY_STOP_FRAME);
+            CHECK_EQ_U64(loaded_result.stop, SCHWAY_STOP_FRAME);
+            CHECK_EQ_U64(source_result.ticks, loaded_result.ticks);
+            schway_audio source_audio = drain(source, AUDIO_RING_PAIRS);
+            memcpy(source_pcm, samples, (size_t)source_audio.written * 2u * sizeof(int16_t));
+            schway_audio loaded_audio = drain(loaded, AUDIO_RING_PAIRS);
+            memcpy(loaded_pcm, samples, (size_t)loaded_audio.written * 2u * sizeof(int16_t));
+            CHECK_EQ_U64(source_audio.written, loaded_audio.written);
+            CHECK_EQ_U64(source_audio.dropped, 0u);
+            CHECK_EQ_U64(loaded_audio.dropped, 0u);
+            CHECK(memcmp(source_pcm, loaded_pcm,
+                         (size_t)source_audio.written * 2u * sizeof(int16_t)) == 0);
+            compared_pairs += source_audio.written;
+            for (uint32_t i = 0u; i < 2u * source_audio.written; i++) {
+                int32_t sample = source_pcm[i];
+                pcm_energy += (uint64_t)(sample < 0 ? -sample : sample);
+            }
+        }
+        CHECK(compared_pairs > 0u);
+        CHECK(pcm_energy > 0u);
+        free(state);
+    }
+    schway_destroy(loaded);
+    schway_destroy(source);
+}
+
 static void check_region_cadence(uint32_t region, uint64_t frame_num, uint64_t frame_den,
                                 uint32_t fps_num, uint32_t fps_den, uint32_t max_pairs,
                                 uint32_t short_pairs)
@@ -811,6 +889,7 @@ int main(int argc, char **argv)
         return 2;
     }
     check_tone_fixture(argv[1]);
+    check_tone_state_continuation(argv[1]);
     check_region_cadence(SCHWAY_REGION_NTSC_J, NTSC_FRAME_NUM, NTSC_FRAME_DEN,
                          53693175u, 897619u, 738u, 737u);
     check_region_cadence(SCHWAY_REGION_NTSC_U, NTSC_FRAME_NUM, NTSC_FRAME_DEN,

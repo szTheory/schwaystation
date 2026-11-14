@@ -100,6 +100,17 @@ static void bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
     CHECK_EQ_U64(schway__bus_write(inst, addr, width, value, &cycles), 0u);
 }
 
+static uint16_t spu_attr(const schway *inst)
+{
+    const uint32_t offset = 0x1F801DAAu - 0x1F801C00u;
+    for (uint32_t i = inst->spu.pending_count; i > 0u; i--) {
+        if (inst->spu.pending[i - 1u].address == offset) {
+            return inst->spu.pending[i - 1u].value;
+        }
+    }
+    return inst->spu.reg[offset >> 1];
+}
+
 static size_t save(const schway *inst, uint8_t *buf)
 {
     size_t n = schway_state_size(inst);
@@ -149,6 +160,11 @@ static void reseal(uint8_t *b, size_t size)
 static void expect_refused(const char *what, schway *inst, const uint8_t *b, size_t size,
                            schway_status want)
 {
+    uint32_t audio_head = inst->audio_head;
+    uint32_t audio_count = inst->audio_count;
+    uint32_t audio_dropped = inst->audio_dropped;
+    int16_t audio_before[SCHWAY__AUDIO_RING_PAIRS][2];
+    memcpy(audio_before, inst->audio, sizeof audio_before);
     size_t n = save(inst, before);
     schway_status got = schway_load_state(inst, b, size);
     if (got != want) {
@@ -157,6 +173,12 @@ static void expect_refused(const char *what, schway *inst, const uint8_t *b, siz
     }
     if (save(inst, after) != n || memcmp(before, after, n) != 0) {
         fprintf(stderr, "%s: a refused load changed the instance\n", what);
+        check_failures++;
+    }
+    if (inst->audio_head != audio_head || inst->audio_count != audio_count ||
+        inst->audio_dropped != audio_dropped ||
+        memcmp(audio_before, inst->audio, sizeof audio_before) != 0) {
+        fprintf(stderr, "%s: a refused load changed the host audio ring\n", what);
         check_failures++;
     }
 }
@@ -556,7 +578,9 @@ static void test_spu_state_continuation(void)
     src->spu.transfer_address = 0x1234u;
     src->spu.pending[0].address = 0x20u;
     src->spu.pending[0].value = 0xABCDu;
-    src->spu.pending_count = 1u;
+    src->spu.pending[1].address = 0x27Eu;
+    src->spu.pending[1].value = 0xBCDEu;
+    src->spu.pending_count = 2u;
     src->spu.noise_phase = 17u;
     src->spu.noise_lfsr = 0x1234u;
     src->spu.capture_cursor = 23u;
@@ -635,6 +659,8 @@ static void test_spu_invalid_states(void)
     schway *src = make(SCHWAY_REGION_NTSC_U);
     schway *dst = make(SCHWAY_REGION_NTSC_U);
     size_t n = save(src, good);
+    schway__spu_event(dst, dst->spu.next_tick);
+    CHECK_EQ_U64(dst->audio_count, 1u);
     const struct invalid_field invalid[] = {
         {"SPU transfer FIFO head", offset_of(src, "spu.transfer_head"), 4u,
          SCHWAY__SPU_FIFO_HALFWORDS},
@@ -645,6 +671,13 @@ static void test_spu_invalid_states(void)
         {"SPU transfer pointer alignment", offset_of(src, "spu.transfer_address"), 4u, 1u},
         {"SPU pending write count", offset_of(src, "spu.pending_count"), 4u,
          SCHWAY__SPU_PENDING_WRITES + 1u},
+        {"SPU pending address outside register image",
+         offset_of(src, "spu.pending.address"), 2u, UINT16_MAX},
+        {"SPU pending address alignment", offset_of(src, "spu.pending.address"), 2u, 1u},
+        {"SPU pending FIFO address", offset_of(src, "spu.pending.address"), 2u, 0x1A8u},
+        {"SPU pending current volume address", offset_of(src, "spu.pending.address"), 2u,
+         0x200u},
+        {"SPU pending STATX address", offset_of(src, "spu.pending.address"), 2u, 0x1AEu},
         {"SPU capture cursor", offset_of(src, "spu.capture_cursor"), 4u, 0x200u},
         {"SPU voice envelope phase", offset_of(src, "spu.voice.envelope_phase") +
                                           (SCHWAY__SPU_VOICE_COUNT - 1u) * 4u,
@@ -660,10 +693,19 @@ static void test_spu_invalid_states(void)
     };
     for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; i++) {
         memcpy(bad, good, n);
+        if (strncmp(invalid[i].name, "SPU pending ", 12u) == 0) {
+            put_le(bad + offset_of(src, "spu.pending_count"), 1u, 4u);
+        }
         put_le(bad + invalid[i].offset, invalid[i].value, invalid[i].width);
         reseal(bad, n);
         expect_refused(invalid[i].name, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
     }
+    memcpy(bad, good, n);
+    put_le(bad + offset_of(src, "spu.pending_count"), 18u, 4u);
+    put_le(bad + offset_of(src, "spu.pending.address") + 17u * 2u, UINT16_MAX, 2u);
+    reseal(bad, n);
+    expect_refused("SPU invalid address in later active slot", dst, bad, n,
+                   SCHWAY_STATUS_ERR_STATE_FIELD);
     schway_destroy(dst);
     schway_destroy(src);
 }
@@ -701,10 +743,10 @@ static void test_device_fields(void)
     src->timers.t[2].hold = 2u;
     uint32_t cycles = 0u;
     CHECK_EQ_U64(schway__bus_write(src, 0xBF801DAAu, 2u, 0x0020u, &cycles), 0u);
-    CHECK_EQ_HEX(src->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(spu_attr(src), 0x0020u);
     size_t n = save(src, good);
     schway *dst = make(SCHWAY_REGION_NTSC_U);
-    CHECK_EQ_HEX(dst->bus.spu_attr, 0u);
+    CHECK_EQ_HEX(spu_attr(dst), 0u);
     cycles = 0u;
     CHECK_EQ_U64(schway__bus_write(dst, 0xBF801DAAu, 2u, 0x0010u, &cycles), 0u);
     CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
@@ -714,7 +756,7 @@ static void test_device_fields(void)
     CHECK_EQ_HEX(dst->dma.chcr[2], 0x01000201u);
     CHECK_EQ_U64(dst->dma.cur, 2u);
     CHECK_EQ_HEX(dst->dma.crc[6], 0xDEADBEEFu);
-    CHECK_EQ_HEX(dst->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(spu_attr(dst), 0x0020u);
     CHECK_EQ_U64(dst->timers.t[1].value, 0x1234u);
     CHECK_EQ_U64(dst->timers.base, dst->ticks);
     src->timers.base = 12345u;
@@ -772,7 +814,7 @@ static void test_device_fields(void)
     CHECK_EQ_U64(schway_load_state(dst, bad, n), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(dst->dma.cur, 3u);
     CHECK_EQ_U64(schway_reset(src, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
-    CHECK_EQ_HEX(src->bus.spu_attr, 0u);
+    CHECK_EQ_HEX(spu_attr(src), 0u);
     schway_destroy(dst);
     schway_destroy(src);
 
@@ -794,9 +836,9 @@ static void test_device_fields(void)
     CHECK_EQ_U64((spu_src->dma.dreq >> 4) & 1u, 0u);
     size_t spu_n = save(spu_src, good);
     bus_write(spu_dst, 0xBF801DAAu, 2u, 0x0010u);
-    CHECK_EQ_HEX(spu_dst->bus.spu_attr, 0x0010u);
+    CHECK_EQ_HEX(spu_attr(spu_dst), 0x0010u);
     CHECK_EQ_U64(schway_load_state(spu_dst, good, spu_n), SCHWAY_STATUS_OK);
-    CHECK_EQ_HEX(spu_dst->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(spu_attr(spu_dst), 0x0020u);
     CHECK_EQ_U64(spu_dst->dma.cur, 4u);
     CHECK_EQ_U64(spu_dst->dma.words[4], 16u);
     CHECK_EQ_U64(save(spu_dst, after), spu_n);
@@ -804,14 +846,19 @@ static void test_device_fields(void)
     uint64_t first_end = spu_dst->dma.busy_until;
     schway__dma_event(spu_dst, first_end);
     CHECK_EQ_U64(spu_dst->dma.cur, 4u);
+    CHECK(spu_dst->dma.busy_until > first_end);
+    CHECK_EQ_U64(spu_dst->dma.words[4], 16u);
+    uint64_t second_start = spu_dst->dma.busy_until;
+    schway__dma_event(spu_dst, second_start);
     CHECK_EQ_U64(spu_dst->dma.words[4], 32u);
     CHECK((spu_dst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
-    schway__dma_event(spu_dst, first_end + 76u);
+    uint64_t second_end = spu_dst->dma.busy_until;
+    schway__dma_event(spu_dst, second_end);
     CHECK_EQ_U64(spu_dst->dma.cur, SCHWAY__DMA_NONE);
     CHECK_EQ_U64(spu_dst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
     CHECK_EQ_HEX(spu_dst->dma.madr[4], 0x1080u);
     CHECK_EQ_U64(spu_src->dma.words[4], 16u);
-    CHECK_EQ_HEX(spu_src->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(spu_attr(spu_src), 0x0020u);
     schway_destroy(spu_dst);
     schway_destroy(spu_src);
 
