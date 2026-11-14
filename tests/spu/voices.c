@@ -350,7 +350,7 @@ static uint32_t test_guest_upload_kon_to_public_pcm(void)
     failures += samples[2] == 0 || samples[3] == 0 || samples[2] == samples[3] ? 1u : 0u;
 
     const struct schway__spu_voice *voice = &inst->spu.voice[0];
-    int16_t raw = reference_interpolate(voice->history, voice->sample, 0x1000u);
+    int16_t raw = reference_interpolate(voice->history, voice->sample, 0u);
     int32_t env_sample = reference_sar((int32_t)raw * 0x7FFF, 15u);
     int32_t left_voice = reference_sar(env_sample * (int32_t)0x7FFEu, 15u);
     int32_t right_voice = reference_sar(env_sample * (int32_t)0x3FFEu, 15u);
@@ -368,6 +368,13 @@ static uint32_t test_guest_upload_kon_to_public_pcm(void)
     uint16_t endx = 0u;
     failures += mmio_read16(inst, SPU_ENDX, &endx);
     failures += (endx & 1u) != 0u ? 1u : 0u;
+    if (failures != 0u) {
+        printf("# MMIO path: failures=%u written=%u PCM=(%d,%d) expected=(%d,%d) "
+               "OUTX=%d ENVX=%d ENDX=%04X IRQ=%u\n",
+               failures, audio.written, samples[2], samples[3], expected_left, expected_right,
+               voice->output, voice->envelope,
+               (unsigned)endx, (unsigned)((inst->irq.stat >> 9) & 1u));
+    }
     schway_destroy(inst);
     return failures;
 }
@@ -404,13 +411,24 @@ static uint32_t test_all_voices_fetch_in_order(void)
         inst->spu.ram[block_address + 1u] = 0u;
         memset(&inst->spu.ram[block_address + 2u], (int)(nibble | (nibble << 4)), 14u);
     }
-    inst->spu.reg[(SPU_NON - SPU_MMIO_BASE) >> 1] = 2u;
-    run_voice_tick(inst);
     uint32_t failures = 0u;
+    failures += mmio_write16(inst, SPU_PMON, 0xFFFEu);
+    failures += mmio_write16(inst, SPU_PMON + 2u, 0x00FFu);
+    failures += mmio_write16(inst, SPU_NON, 2u);
+    run_voice_tick(inst);
     for (uint32_t i = 0; i < SCHWAY__SPU_VOICE_COUNT; i++) {
         int16_t expected = (int16_t)((int32_t)(i % 7u + 1u) * 4096);
         failures += inst->spu.voice[i].sample != expected ? 1u : 0u;
-        failures += (inst->spu.voice[i].sample_counter & UINT32_C(0x1FFFF)) != 0x1000u
+        uint32_t expected_phase = 0x1000u;
+        if (i != 0u) {
+            int32_t modulated = reference_sar(
+                0x1000 * ((int32_t)inst->spu.voice[i - 1u].output + 0x8000), 15u);
+            expected_phase = (uint32_t)modulated & 0xFFFFu;
+            if (expected_phase > 0x4000u) {
+                expected_phase = 0x4000u;
+            }
+        }
+        failures += (inst->spu.voice[i].sample_counter & UINT32_C(0x1FFFF)) != expected_phase
                         ? 1u
                         : 0u;
     }

@@ -13,6 +13,9 @@
 #define SPU_SAMPLES_PER_BLOCK 28u
 #define SPU_SAMPLE_PHASE_ONE 4096u
 #define SPU_BLOCK_PHASE (SPU_SAMPLES_PER_BLOCK * SPU_SAMPLE_PHASE_ONE)
+#define SPU_REGISTER_BASE 0x1F801C00u
+#define SPU_PMON_ADDRESS 0x1F801D90u
+#define SPU_ENDX_ADDRESS 0x1F801D9Cu
 
 /* sample_counter's low 17 bits hold block phase; its high five bits hold the
    last decoded sample index, with 31 marking a block that has not been read. */
@@ -91,6 +94,30 @@ static void spu_advance_block(struct schway__spu_voice *voice)
     voice->reg[3] = (uint16_t)(voice->reg[3] + 2u);
 }
 
+static void spu_set_endx(schway *inst, uint32_t voice_index)
+{
+    uint32_t index = ((SPU_ENDX_ADDRESS - SPU_REGISTER_BASE) >> 1) + (voice_index >> 4);
+    inst->spu.reg[index] = (uint16_t)(inst->spu.reg[index] |
+                                      (uint16_t)(1u << (voice_index & 15u)));
+}
+
+static uint32_t spu_modulated_pitch(const schway *inst, uint32_t voice_index,
+                                    uint32_t pitch)
+{
+    if (voice_index == 0u) {
+        return pitch;
+    }
+    uint32_t pmon_index = ((SPU_PMON_ADDRESS - SPU_REGISTER_BASE) >> 1) + (voice_index >> 4);
+    if ((inst->spu.reg[pmon_index] & (uint16_t)(1u << (voice_index & 15u))) == 0u) {
+        return pitch;
+    }
+
+    int32_t signed_pitch = pitch <= INT16_MAX ? (int32_t)pitch : (int32_t)pitch - 0x10000;
+    int32_t previous = (int32_t)inst->spu.voice[voice_index - 1u].output + 0x8000;
+    uint32_t step = (uint32_t)spu_sar32(signed_pitch * previous, 15u) & 0xFFFFu;
+    return step;
+}
+
 void schway__spu_voice_step(schway *inst, uint32_t voice_index)
 {
     if (voice_index >= SCHWAY__SPU_VOICE_COUNT) {
@@ -115,7 +142,7 @@ void schway__spu_voice_step(schway *inst, uint32_t voice_index)
     }
     voice->output = spu_interpolate(voice, phase);
 
-    uint32_t pitch = voice->reg[2];
+    uint32_t pitch = spu_modulated_pitch(inst, voice_index, voice->reg[2]);
     if (pitch > 0x4000u) {
         pitch = 0x4000u;
     }
@@ -128,7 +155,27 @@ void schway__spu_voice_step(schway *inst, uint32_t voice_index)
     phase += pitch;
     if (phase >= SPU_BLOCK_PHASE) {
         phase -= SPU_BLOCK_PHASE;
-        spu_advance_block(voice);
+        /* Read the block flags at the boundary so this access remains visible
+           to IRQA. Loop-start is captured in LSAX; loop-end updates ENDX and
+           either repeats there or mutes the voice. psx-spx SPU BRR flags, §1.2. */
+        uint8_t flags = (uint8_t)(schway__spu_ram_read(inst, block_address) >> 8);
+        if ((flags & 0x04u) != 0u) {
+            voice->reg[7] = (uint16_t)(block_address >> 3);
+        }
+        if ((flags & 0x01u) != 0u) {
+            spu_set_endx(inst, voice_index);
+            voice->reg[3] = voice->reg[7];
+            if ((flags & 0x02u) == 0u) {
+                voice->envelope = 0;
+                voice->envelope_phase = 4u;
+                voice->envelope_counter = 0u;
+                voice->reg[6] = 0u;
+                uint32_t envx_index = ((voice_index * 0x10u + 0x0Cu) >> 1);
+                inst->spu.reg[envx_index] = 0u;
+            }
+        } else {
+            spu_advance_block(voice);
+        }
         cursor = SPU_COUNTER_CURSOR_NONE;
     }
     voice->sample_counter = (cursor << SPU_COUNTER_CURSOR_SHIFT) | phase;
