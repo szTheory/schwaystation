@@ -18,6 +18,8 @@
 #define SPU_FIFO_ADDRESS 0x1F801DA8u
 #define SPU_RAM_CTRL_ADDRESS 0x1F801DACu
 #define SPU_STATX_ADDRESS 0x1F801DAEu
+#define SPU_DEV4_CONTROL_INDEX 5u
+#define SPU_DEV4_DMA_READ_CONTROL 0x220931E1u
 #define IRQ9_MASK (UINT32_C(1) << 9)
 
 uint32_t schway__spu_reg_supported(uint32_t address)
@@ -262,8 +264,9 @@ static uint16_t spu_dma_attr(const struct schway__spu *spu)
     return spu_pending_register_value(spu, SPU_ATTR_ADDRESS);
 }
 
-/* ATTR selects DMA4 direction and the 32-halfword FIFO accepts one 10h-word
-   request block when empty (PSX-SPX SPU transfers, preparation §1.5). */
+/* ATTR selects DMA4 direction. Request readiness comes from the SPU's DMA
+   mode and FIFO state; the channel engine inserts the timed request interval
+   between blocks (PSX-SPX SPU transfers, preparation §1.5). */
 uint32_t schway__spu_dma_ready(const schway *inst, uint32_t direction)
 {
     const struct schway__spu *spu = &inst->spu;
@@ -303,8 +306,12 @@ uint16_t schway__spu_dma_read(schway *inst)
     if (((spu_dma_attr(spu) >> 4) & 3u) != 3u) {
         return 0xFFFFu;
     }
-    uint16_t value = schway__spu_ram_read(inst, spu->transfer_address);
-    spu->transfer_address = (spu->transfer_address + 2u) & (SCHWAY__SPU_RAM_SIZE - 1u);
+    uint32_t address = spu->transfer_address;
+    uint16_t value = inst->bus.memctl[SPU_DEV4_CONTROL_INDEX] != SPU_DEV4_DMA_READ_CONTROL &&
+                             (address & 0x3Fu) == 0u
+                         ? UINT16_MAX
+                         : schway__spu_ram_read(inst, address);
+    spu->transfer_address = (address + 2u) & (SCHWAY__SPU_RAM_SIZE - 1u);
     return value;
 }
 
