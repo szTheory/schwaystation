@@ -187,8 +187,14 @@ static uint32_t test_first_block_trace(schway *inst)
     prepare_voice(inst, 0u, 0u, 0x77u, 0xFFu);
     run_voice_tick(inst);
     uint32_t failures = 0u;
+    if (inst->spu.voice[0].sample != 28672) {
+        printf("# first raw sample: %d\n", inst->spu.voice[0].sample);
+    }
+    if (inst->spu.voice[0].output != 4206) {
+        printf("# first interpolated sample: %d\n", inst->spu.voice[0].output);
+    }
     failures += inst->spu.voice[0].sample != 28672 ? 1u : 0u;
-    failures += inst->spu.voice[0].output != 4204 ? 1u : 0u;
+    failures += inst->spu.voice[0].output != 4206 ? 1u : 0u;
     return failures;
 }
 

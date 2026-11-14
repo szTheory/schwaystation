@@ -230,6 +230,9 @@ void schway__spu_reset(schway *inst)
     memset(&inst->spu, 0, sizeof inst->spu);
     inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
     inst->spu.noise_lfsr = 1u;
+    for (uint32_t i = 0u; i < SCHWAY__SPU_VOICE_COUNT; i++) {
+        inst->spu.voice[i].sample_counter = UINT32_C(31) << 27;
+    }
 }
 
 uint64_t schway__spu_next(const schway *inst)
@@ -345,7 +348,8 @@ void schway__spu_event(schway *inst, uint64_t now)
         spu_apply_pending_writes(inst);
         spu_manual_transfer_step(inst);
         spu_capture_step(inst);
-        /* Later plans add voice and reverb output; a reset chip emits silence. */
+        schway__spu_voice_step(inst, 0u);
+        /* The remaining voices and mixer follow in the next voice slice. */
         audio_push_pair(inst, 0, 0);
         if (spu->next_tick > SCHWAY__STATE_TICKS_MAX - SCHWAY__CYCLES_PER_PAIR) {
             spu->next_tick = UINT64_MAX;
