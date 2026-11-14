@@ -5,6 +5,7 @@
 
 #include "../../src/internal.h"
 
+/* Coefficient facts: .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md section 1.7. */
 static const int16_t reference_taps[SCHWAY__SPU_REVERB_FIR_TAPS] = {
     -1, 0, 2, 0, -10, 0, 35, 0, -103, 0, 266, 0, -616, 0, 1332, 0,
     -2960, 0, 10246, 16384, 10246, 0, -2960, 0, 1332, 0, -616, 0,
@@ -111,7 +112,7 @@ static void check_centered_delay(uint32_t channel)
     int32_t work_reference[SCHWAY__SPU_REVERB_WORK_WORDS] = {0};
     int16_t output[96] = {0};
     uint32_t input_cursor = 0u;
-    uint32_t work_cursor = SCHWAY__SPU_REVERB_WORK_WORDS - 1u;
+    uint32_t work_cursor = 0u;
     int64_t total = 0;
     int64_t moment = 0;
 
@@ -124,7 +125,6 @@ static void check_centered_delay(uint32_t channel)
         int16_t filtered = schway__spu_reverb_fir_sum(input_history, input_cursor);
         int16_t reference_filtered = reference_sum(input_reference, input_cursor);
         if (phase == channel) {
-            work_cursor = (work_cursor + 1u) % SCHWAY__SPU_REVERB_WORK_WORDS;
             work_history[work_cursor] = filtered;
             work_reference[work_cursor] = reference_filtered;
         }
@@ -135,10 +135,72 @@ static void check_centered_delay(uint32_t channel)
         total += output[tick];
         moment += (int64_t)tick * output[tick];
         input_cursor = (input_cursor + 1u) % SCHWAY__SPU_REVERB_FIR_TAPS;
+        if (phase == 1u) {
+            work_cursor = (work_cursor + 1u) % SCHWAY__SPU_REVERB_WORK_WORDS;
+        }
     }
 
     CHECK(total != 0, "unity wet path carries a measurable impulse");
     CHECK(moment == INT64_C(38) * total, "centered input and output filters align at 38 native samples");
+}
+
+struct filter_path {
+    int16_t input_history[2][SCHWAY__SPU_REVERB_FIR_TAPS];
+    int32_t work_history[2][SCHWAY__SPU_REVERB_WORK_WORDS];
+    uint32_t input_cursor;
+    uint32_t work_cursor;
+    uint32_t phase;
+};
+
+static void run_filter_path(struct filter_path *path, const int16_t left[96],
+                            const int16_t right[96], int16_t output[96][2],
+                            uint32_t start, uint32_t end)
+{
+    for (uint32_t tick = start; tick < end; tick++) {
+        schway__spu_reverb_fir_push(path->input_history[0], path->input_cursor, left[tick]);
+        schway__spu_reverb_fir_push(path->input_history[1], path->input_cursor, right[tick]);
+        int16_t filtered[2] = {schway__spu_reverb_fir_sum(path->input_history[0], path->input_cursor),
+                               schway__spu_reverb_fir_sum(path->input_history[1], path->input_cursor)};
+        path->work_history[path->phase][path->work_cursor] = filtered[path->phase];
+        output[tick][0] = schway__spu_reverb_fir_interpolate(
+            path->work_history[0], path->work_cursor, path->phase, 0u);
+        output[tick][1] = schway__spu_reverb_fir_interpolate(
+            path->work_history[1], path->work_cursor, path->phase, 1u);
+        path->input_cursor = (path->input_cursor + 1u) % SCHWAY__SPU_REVERB_FIR_TAPS;
+        if (path->phase == 1u) {
+            path->work_cursor = (path->work_cursor + 1u) % SCHWAY__SPU_REVERB_WORK_WORDS;
+        }
+        path->phase ^= 1u;
+    }
+}
+
+static void check_split_resume(void)
+{
+    struct filter_path whole;
+    struct filter_path split;
+    struct filter_path resumed;
+    int16_t left[96] = {0};
+    int16_t right[96] = {0};
+    int16_t whole_output[96][2] = {{0}};
+    int16_t split_output[96][2] = {{0}};
+    int16_t resumed_output[96][2] = {{0}};
+    memset(&whole, 0, sizeof whole);
+    memset(&split, 0, sizeof split);
+    left[0] = 12000;
+    for (uint32_t tick = 36u; tick < 80u; tick++) {
+        right[tick] = (tick & 1u) == 0u ? INT16_MAX : INT16_MIN;
+    }
+
+    run_filter_path(&whole, left, right, whole_output, 0u, 96u);
+    run_filter_path(&split, left, right, split_output, 0u, 47u);
+    memcpy(&resumed, &split, sizeof resumed);
+    memcpy(resumed_output, split_output, 47u * sizeof split_output[0]);
+    run_filter_path(&split, left, right, split_output, 47u, 96u);
+    run_filter_path(&resumed, left, right, resumed_output, 47u, 96u);
+    CHECK(memcmp(whole_output, split_output, sizeof whole_output) == 0,
+          "split FIR calls preserve history and alternating phase");
+    CHECK(memcmp(split_output, resumed_output, sizeof split_output) == 0,
+          "copied FIR history and phase resume identically");
 }
 
 int main(void)
@@ -147,5 +209,6 @@ int main(void)
     compare_output_polyphases();
     check_centered_delay(0u);
     check_centered_delay(1u);
+    check_split_resume();
     return failures == 0u ? 0 : 1;
 }
