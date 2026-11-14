@@ -652,6 +652,17 @@ static void state_i32_array(struct schway__state_io *io, const char *name, int32
     }
 }
 
+static uint32_t spu_pending_address_valid(uint16_t offset)
+{
+    uint32_t address = SPU_REGISTER_BASE + (uint32_t)offset;
+    return (offset & 1u) == 0u && offset < 2u * SCHWAY__SPU_REG_HALFWORDS &&
+                   schway__spu_reg_supported(address) != 0u && address != SPU_FIFO_ADDRESS &&
+                   address != SPU_STATX_ADDRESS &&
+                   (address < SPU_CURRENT_VOLUME_BASE || address > SPU_CURRENT_VOLUME_END)
+               ? 1u
+               : 0u;
+}
+
 void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ticks)
 {
     struct schway__spu *spu = &inst->spu;
@@ -678,6 +689,7 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     uint32_t irq_enabled = 0u, irqa_addr = 0u;
     uint16_t noise_lfsr = 0u;
     uint64_t next_tick = 0u;
+    const uint8_t *pending_address_wire = NULL;
 
     if (io->mode != SCHWAY__STATE_APPLY) {
         for (uint32_t i = 0; i < SCHWAY__SPU_VOICE_COUNT; i++) {
@@ -759,6 +771,9 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     transfer_address = schway__state_u32(io, "spu.transfer_address", &transfer_address, 0u,
                                           SCHWAY__SPU_RAM_SIZE - 2u);
     schway__state_check(io, (transfer_address & 1u) == 0u);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        pending_address_wire = io->r;
+    }
     schway__state_u16_array(io, "spu.pending.address", pending_address,
                             SCHWAY__SPU_PENDING_WRITES, 0u, UINT16_MAX);
     schway__state_u16_array(io, "spu.pending.value", pending_value,
@@ -793,6 +808,13 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
                                     transfer_count <= SCHWAY__SPU_FIFO_HALFWORDS &&
                                     transfer_address < SCHWAY__SPU_RAM_SIZE &&
                                     pending_count <= SCHWAY__SPU_PENDING_WRITES && phase_ok);
+        if (pending_count <= SCHWAY__SPU_PENDING_WRITES) {
+            for (uint32_t i = 0u; i < pending_count; i++) {
+                uint16_t offset = (uint16_t)(pending_address_wire[2u * i] |
+                                             ((uint16_t)pending_address_wire[2u * i + 1u] << 8));
+                schway__state_check(io, spu_pending_address_valid(offset) != 0u);
+            }
+        }
     }
     if (io->mode == SCHWAY__STATE_APPLY) {
         for (uint32_t i = 0; i < SCHWAY__SPU_VOICE_COUNT; i++) {
