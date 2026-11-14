@@ -89,7 +89,7 @@ status: complete
 
 The three task commits and plan head range above are measured from the persisted plan ledger. The final metadata commit follows this summary.
 
-## Verification
+## Commands and Evidence
 
 - RED command: `ctest --test-dir build/ci -R '^(spu\.model|dma\.spu\.request_blocks)$' --no-tests=error --output-on-failure --output-junit "$PWD/build/ci/tdd/05-05-task1-red.xml"` — exit 8. Both named tests ran; the DMA assertion found destination SPU RAM still zero instead of the source low halfword.
 - RED classifier: `gsd_run check tdd-red-evidence build/ci/tdd/05-05-task1-red.json --raw` — `RED_EVIDENCE_OK`. The target failed on the planned SPU RAM payload assertion; compilation and test discovery succeeded.
