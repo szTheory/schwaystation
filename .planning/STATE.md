@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-03-PLAN.md; 05-20 RED evidence is ready. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-last_updated: "2026-11-14T00:13:36.233Z"
+stopped_at: "Completed 05-20-PLAN.md at the requested plan boundary. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+last_updated: "2026-11-14T00:39:07.164Z"
 last_activity: 2026-11-14
 last_activity_desc: "Completed plan 05-03; 05-20 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-state_head: b22d3ff1b0f59641b2fc245ae0278a246d2151ad
+state_head: cff598330f318569c7682e536e12af8db5676154
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 146
-  completed_plans: 131
+  completed_plans: 132
   percent: 67
 current_plan: 6 of 20
 ---
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 6 of 20
+Plan: 7 of 20
 Status: Ready to execute
 Last activity: 2026-11-14 — Plan 05-03 completed; 05-20 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
@@ -193,6 +193,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P04 | under 40 min (exact start unavailable) | 2 tasks | 7 files |
 | Phase 05 P16 | 26 min | 2 tasks | 6 files |
 | Phase 05 P03 | 40min | 1 tasks | 8 files |
+| Phase 05 P20 | 20 min | 1 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -472,6 +473,9 @@ Recent decisions affecting current work:
 - [Phase 05]: Advance behavior revision and save-state format to 5, reject format-4 states, and preserve the public API and ABI.
 - [Phase 05]: Guest SPU register writes latch at the next scheduled sample tick; byte and word access order is explicit.
 - [Phase 05]: Manual FIFO, capture, and IRQA behavior is isolated in plan 05-20, and its consumers remain blocked until completion.
+- [Phase 05]: SPU FIFO accesses update the FIFO at bus-access time, while other register writes apply on the next sample tick.
+- [Phase 05]: ManualWrite transfers one halfword per sample with RAM_CTRL replication; DMA direction status reflects FIFO availability without adding DMA transfers.
+- [Phase 05]: Capture writes the planned zero inputs only while RAM_CTRL capture bits are active, and IRQ9 requires both enable bits.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -657,9 +661,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T00:13:35.904Z
-Stopped at: Completed 05-03-PLAN.md; 05-20 RED evidence is ready. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
-Resume file: 05-20-PLAN.md
+Last session: 2026-11-14T00:39:06.719Z
+Stopped at: Completed 05-20-PLAN.md at the requested plan boundary. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 
