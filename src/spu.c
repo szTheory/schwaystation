@@ -15,6 +15,7 @@
 #define SPU_ATTR_ADDRESS 0x1F801DAAu
 #define SPU_IRQA_ADDRESS 0x1F801DA4u
 #define SPU_TSA_ADDRESS 0x1F801DA6u
+#define SPU_ESA_ADDRESS 0x1F801DA2u
 #define SPU_FIFO_ADDRESS 0x1F801DA8u
 #define SPU_RAM_CTRL_ADDRESS 0x1F801DACu
 #define SPU_STATX_ADDRESS 0x1F801DAEu
@@ -192,6 +193,8 @@ static void spu_apply_register_write(schway *inst, uint32_t address, uint16_t va
         spu->irqa_addr = ((uint32_t)value << 3) & (SCHWAY__SPU_RAM_SIZE - 8u);
     } else if (aligned == SPU_TSA_ADDRESS) {
         spu->transfer_address = ((uint32_t)value << 3) & (SCHWAY__SPU_RAM_SIZE - 8u);
+    } else if (aligned == SPU_ESA_ADDRESS) {
+        spu->reverb_address = ((uint32_t)value << 3) & (SCHWAY__SPU_RAM_SIZE - 8u);
     }
 }
 

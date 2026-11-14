@@ -217,8 +217,21 @@ static void check_split_resume(void)
 #define TEST_SPU_COMB1 UINT32_C(0x1F801DC6)
 #define TEST_SPU_WALL UINT32_C(0x1F801DCE)
 #define TEST_SPU_LSAME UINT32_C(0x1F801DD4)
+#define TEST_SPU_RSAME UINT32_C(0x1F801DD6)
 #define TEST_SPU_LCOMB1 UINT32_C(0x1F801DD8)
+#define TEST_SPU_RCOMB1 UINT32_C(0x1F801DDA)
 #define TEST_SPU_LSAME_DELAY UINT32_C(0x1F801DE0)
+#define TEST_SPU_RSAME_DELAY UINT32_C(0x1F801DE2)
+#define TEST_SPU_LDIFF UINT32_C(0x1F801DE4)
+#define TEST_SPU_RDIFF UINT32_C(0x1F801DE6)
+#define TEST_SPU_LDIFF_DELAY UINT32_C(0x1F801DF0)
+#define TEST_SPU_RDIFF_DELAY UINT32_C(0x1F801DF2)
+#define TEST_SPU_APF1_VOLUME UINT32_C(0x1F801DD0)
+#define TEST_SPU_APF2_VOLUME UINT32_C(0x1F801DD2)
+#define TEST_SPU_LAPF1 UINT32_C(0x1F801DF4)
+#define TEST_SPU_RAPF1 UINT32_C(0x1F801DF6)
+#define TEST_SPU_LAPF2 UINT32_C(0x1F801DF8)
+#define TEST_SPU_RAPF2 UINT32_C(0x1F801DFA)
 #define TEST_SPU_MAIN_VOL_L UINT32_C(0x1F801D80)
 #define TEST_SPU_MAIN_VOL_R UINT32_C(0x1F801D82)
 
@@ -265,11 +278,30 @@ static uint32_t test_reg_index(uint32_t address)
 static void setup_reverb_impulse(schway *inst, uint16_t evol_left, uint16_t evol_right,
                                  uint32_t wet_input)
 {
-    inst->spu.reg[test_reg_index(TEST_SPU_ATTR)] = 0xC000u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ATTR)] = 0xC080u;
     inst->spu.reg[test_reg_index(TEST_SPU_NON)] = 1u;
     inst->spu.reg[test_reg_index(TEST_SPU_EON0)] = wet_input != 0u ? 1u : 0u;
     inst->spu.reg[test_reg_index(TEST_SPU_EVOL_L)] = evol_left;
     inst->spu.reg[test_reg_index(TEST_SPU_EVOL_R)] = evol_right;
+    inst->spu.reg[test_reg_index(TEST_SPU_IIR)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_COMB1)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_WALL)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LSAME)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_RSAME)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LCOMB1)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_RCOMB1)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LSAME_DELAY)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_RSAME_DELAY)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LDIFF)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_RDIFF)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LDIFF_DELAY)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_RDIFF_DELAY)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_APF1_VOLUME)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_APF2_VOLUME)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LAPF1)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_RAPF1)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LAPF2)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_RAPF2)] = 2u;
     inst->spu.reg[test_reg_index(TEST_SPU_VLIN)] = 0x7FFFu;
     inst->spu.reg[test_reg_index(TEST_SPU_VRIN)] = 0x7FFFu;
     inst->spu.reg[test_reg_index(TEST_SPU_MAIN_VOL_L)] = 0x3FFFu;
