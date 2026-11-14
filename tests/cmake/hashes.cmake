@@ -5,6 +5,14 @@ if(NOT CMAKE_SCRIPT_MODE_FILE)
   return()
 endif()
 
+macro(runner_checked label expected)
+  execute_process(COMMAND ${EMULATOR} "${RUN}" ${ARGN}
+    OUTPUT_VARIABLE output ERROR_VARIABLE error RESULT_VARIABLE rc)
+  if(NOT rc STREQUAL "0" OR (NOT "${expected}" STREQUAL "" AND NOT output MATCHES "${expected}"))
+    message(FATAL_ERROR "schwaystation-run ${label}: exit ${rc}; expected ${expected}\n${output}${error}")
+  endif()
+endmacro()
+
 if(MODE STREQUAL "write")
   # Fault prevented: a lane's output silently not compared. Writes
   # <OUT>/hashes.txt, the file CI collects from every lane, in a fixed order:
@@ -17,20 +25,11 @@ if(MODE STREQUAL "write")
     list(GET case 0 region)
     list(GET case 1 frames)
     set(args --frames ${frames} --hash --region ${region})
-    execute_process(COMMAND ${EMULATOR} "${RUN}" ${args}
-      OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
-    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^frame ${frames} sha256 [0-9a-f]+\n$")
-      message(FATAL_ERROR "schwaystation-run ${args}: expected exit 0 and one hash line, "
-        "got exit ${rc}\n${out}${err}")
-    endif()
-    string(APPEND lines "${region} ${out}")
+    runner_checked("${args}" "^frame ${frames} sha256 [0-9a-f]+\n$" ${args})
+    string(APPEND lines "${region} ${output}")
   endforeach()
   # The reference PNG is deterministic too, so its digest is compared as well.
-  execute_process(COMMAND ${EMULATOR} "${RUN}" --frames 5 --png "5:${OUT}/hashes-card.png"
-    OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
-  if(NOT rc STREQUAL "0")
-    message(FATAL_ERROR "schwaystation-run --frames 5 --png: exit ${rc}\n${out}${err}")
-  endif()
+  runner_checked("--frames 5 --png" "" --frames 5 --png "5:${OUT}/hashes-card.png")
   file(SHA256 "${OUT}/hashes-card.png" png)
   string(APPEND lines "ntsc-u png 5 sha256 ${png}\n")
   set(openbios_tuple_file "${OUT}/openbios-shell-tuple.txt")
@@ -48,33 +47,33 @@ if(MODE STREQUAL "write")
     endforeach()
     # The frame and state the programs ran, which differ between lanes if an instruction, device or the stub kernel does.
     foreach(exe hello gte_vectors dma_chain timers_lines)
-      execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/${exe}.exe" --frames 30 --hash --hash-state
-        OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
-      if(NOT rc STREQUAL "0" OR NOT out MATCHES "(frame 30 sha256 [0-9a-f]+)\n(state sha256 [0-9a-f]+)\n$")
-        message(FATAL_ERROR "schwaystation-run ${exe}.exe: expected exit 0 and the two hash lines, got exit ${rc}\n${out}${err}")
-      endif()
+      runner_checked("${exe}.exe" "(frame 30 sha256 [0-9a-f]+)\n(state sha256 [0-9a-f]+)\n$"
+        --exe "${FIXTURES}/${exe}.exe" --frames 30 --hash --hash-state)
       string(APPEND lines "exe ${exe}.exe ${CMAKE_MATCH_1}\nexe ${exe}.exe ${CMAKE_MATCH_2}\n")
     endforeach()
     foreach(frames IN ITEMS 60 120)
-      execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
-        --frames ${frames} --hash OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
-      if(NOT rc STREQUAL "0" OR NOT out MATCHES "^(frame ${frames} sha256 [0-9a-f]+)\n$")
-        message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames ${frames}: expected exit 0 and one hash line, got exit ${rc}\n${out}${err}")
-      endif()
+      runner_checked("gpu_motion.exe --frames ${frames}" "^(frame ${frames} sha256 [0-9a-f]+)\n$"
+        --exe "${FIXTURES}/gpu_motion.exe" --frames ${frames} --hash)
       string(APPEND lines "exe gpu_motion.exe ${CMAKE_MATCH_1}\n")
     endforeach()
-    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
-      --frames 150 --hash-state OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
-    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^state sha256 ([0-9a-f]+)\n$")
-      message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames 150 --hash-state: expected exit 0 and one state line, got exit ${rc}\n${out}${err}")
-    endif()
+    runner_checked("gpu_motion.exe --frames 150 --hash-state" "^state sha256 ([0-9a-f]+)\n$"
+      --exe "${FIXTURES}/gpu_motion.exe" --frames 150 --hash-state)
     string(APPEND lines "exe gpu_motion.exe state 150 sha256 ${CMAKE_MATCH_1}\n")
-    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${FIXTURES}/gpu_motion.exe"
-      --frames 180 --hash --hash-state OUTPUT_VARIABLE out ERROR_VARIABLE err RESULT_VARIABLE rc)
-    if(NOT rc STREQUAL "0" OR NOT out MATCHES "^frame 180 sha256 ([0-9a-f]+)\nstate sha256 ([0-9a-f]+)\n$")
-      message(FATAL_ERROR "schwaystation-run gpu_motion.exe --frames 180 --hash --hash-state: expected exit 0 and frame/state lines, got exit ${rc}\n${out}${err}")
-    endif()
+    runner_checked("gpu_motion.exe --frames 180 --hash --hash-state"
+      "^frame 180 sha256 ([0-9a-f]+)\nstate sha256 ([0-9a-f]+)\n$"
+      --exe "${FIXTURES}/gpu_motion.exe" --frames 180 --hash --hash-state)
     string(APPEND lines "exe gpu_motion.exe frame 180 sha256 ${CMAKE_MATCH_1}\nexe gpu_motion.exe state 180 sha256 ${CMAKE_MATCH_2}\n")
+
+    # The fixture test checks exact PCM length and predicate values; these rows make lane audio hashes comparable.
+    if(NOT EXISTS "${FIXTURES}/spu_tone.exe")
+      message(FATAL_ERROR "hashes: the built spu_tone fixture is missing")
+    endif()
+    string(REPEAT "[0-9a-f]" 64 digest_pattern)
+    foreach(region ntsc-j ntsc-u pal)
+      runner_checked("${region} spu_tone" "mailbox SWMB status=00 records=3\nmailbox 0001=[0-9a-f]+\nmailbox 0002=[0-9a-f]+\nmailbox 0003=[0-9a-f]+\nframe [0-9]+ sha256 [0-9a-f]+\naudio sha256 (${digest_pattern})"
+        --exe "${FIXTURES}/spu_tone.exe" --frames 620 --stop-on mailbox --hash --hash-audio --region "${region}")
+      string(APPEND lines "audio@600 spu_tone.exe ${region} sha256=${CMAKE_MATCH_1}\nmailbox@600 spu_tone.exe ${region}\n${output}")
+    endforeach()
   endif()
   # Unix newlines on every host: file(WRITE) writes CRLF on Windows.
   file(CONFIGURE OUTPUT "${OUT}/hashes.txt" NEWLINE_STYLE UNIX CONTENT "${lines}")

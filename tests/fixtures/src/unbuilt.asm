@@ -2,7 +2,7 @@
 ;
 ;   armips -strequ IMAGE <file> -equ MODE <0 or 1> unbuilt.asm
 ;
-;   MODE 0  writes the SPU's main volume left and the GPU's GP0, two devices not built, then seals the mailbox as done
+;   MODE 0  writes MDEC input (not modeled), then seals the mailbox as done
 ;   MODE 1  writes 1F801030h, which no device answers: a first fault
 ; Fault prevented: accesses to unbuilt devices that leave no sign, and a write to a gap that is dropped
 ; without a fault.
@@ -14,11 +14,8 @@ mailbox_header 6, 0
 
 .org PC0
 .if MODE == 0
-  li t0, 0xBF801D80                     ; SPU main volume left
-  li t1, 0x3FFF3FFF
-  sw t1, 0(t0)
-  li t0, 0xBF801810                     ; GPU GP0
-  li t1, 0xE1000000
+  li t0, 0xBF801820                     ; MDEC data
+  li t1, 0x12345678
   sw t1, 0(t0)
   mailbox_seal
 .else

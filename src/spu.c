@@ -665,22 +665,23 @@ static uint32_t spu_pending_address_valid(uint16_t offset)
 void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ticks)
 {
     struct schway__spu *spu = &inst->spu;
-    uint16_t voice_reg[SCHWAY__SPU_VOICE_COUNT * 8u];
-    int16_t voice_history[SCHWAY__SPU_VOICE_COUNT * 3u];
-    uint32_t voice_sample_counter[SCHWAY__SPU_VOICE_COUNT];
-    int32_t voice_envelope[SCHWAY__SPU_VOICE_COUNT];
-    uint32_t voice_envelope_counter[SCHWAY__SPU_VOICE_COUNT];
-    uint32_t voice_envelope_phase[SCHWAY__SPU_VOICE_COUNT];
-    int16_t voice_sample[SCHWAY__SPU_VOICE_COUNT];
-    int16_t voice_output[SCHWAY__SPU_VOICE_COUNT];
-    int32_t voice_sweep_level[SCHWAY__SPU_VOICE_COUNT * 2u];
-    uint32_t voice_sweep_counter[SCHWAY__SPU_VOICE_COUNT * 2u];
-    int32_t main_sweep_level[2];
-    uint32_t main_sweep_counter[2];
-    uint16_t pending_address[SCHWAY__SPU_PENDING_WRITES];
-    uint16_t pending_value[SCHWAY__SPU_PENDING_WRITES];
-    int16_t reverb_fir[2u * SCHWAY__SPU_REVERB_FIR_TAPS];
-    int32_t reverb_work[2u * SCHWAY__SPU_REVERB_WORK_WORDS];
+    struct schway__spu_state_scratch *scratch = &spu->state_scratch;
+    uint16_t *voice_reg = scratch->voice_reg;
+    int16_t *voice_history = scratch->voice_history;
+    uint32_t *voice_sample_counter = scratch->voice_sample_counter;
+    int32_t *voice_envelope = scratch->voice_envelope;
+    uint32_t *voice_envelope_counter = scratch->voice_envelope_counter;
+    uint32_t *voice_envelope_phase = scratch->voice_envelope_phase;
+    int16_t *voice_sample = scratch->voice_sample;
+    int16_t *voice_output = scratch->voice_output;
+    int32_t *voice_sweep_level = scratch->voice_sweep_level;
+    uint32_t *voice_sweep_counter = scratch->voice_sweep_counter;
+    int32_t *main_sweep_level = scratch->main_sweep_level;
+    uint32_t *main_sweep_counter = scratch->main_sweep_counter;
+    uint16_t *pending_address = scratch->pending_address;
+    uint16_t *pending_value = scratch->pending_value;
+    int16_t *reverb_fir = scratch->reverb_fir;
+    int32_t *reverb_work = scratch->reverb_work;
     uint32_t transfer_head = 0u, transfer_count = 0u, pending_count = 0u;
     uint32_t transfer_address = 0u;
     uint32_t noise_phase = 0u, capture_cursor = 0u;
@@ -690,7 +691,7 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     uint64_t next_tick = 0u;
     const uint8_t *pending_address_wire = NULL;
 
-    if (io->mode != SCHWAY__STATE_APPLY) {
+    if (io->mode == SCHWAY__STATE_WRITE || io->mode == SCHWAY__STATE_VISIT) {
         for (uint32_t i = 0; i < SCHWAY__SPU_VOICE_COUNT; i++) {
             const struct schway__spu_voice *voice = &spu->voice[i];
             for (uint32_t j = 0; j < 8u; j++) {

@@ -380,6 +380,12 @@ schway_add_test(NAME hygiene.timeout_comments
   COMMAND ${CMAKE_COMMAND} -DMODE=timeouts -DDIR=${CMAKE_SOURCE_DIR}/.github/workflows
     -P ${hygiene_scripts}/workflows.cmake
   LABELS hygiene TIMEOUT 30)
+
+# Fault prevented: sound acceptance jobs or their exact test inventories being disconnected.
+schway_add_test(NAME policy.spu_registration
+  COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR} -DCASE=spu_registration
+    -P ${hygiene_scripts}/workflows.cmake
+  LABELS hygiene policy TIMEOUT 30)
 set(hygiene_timeouts ${CMAKE_BINARY_DIR}/hygiene/timeouts_fixture)
 file(REMOVE_RECURSE ${hygiene_timeouts})
 string(REPEAT "1" 11 hygiene_run)

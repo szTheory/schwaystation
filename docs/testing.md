@@ -56,9 +56,14 @@ a different boundary; none is a complete silicon PCM oracle.
 | Hardware transfer cases | Nightly `spu.reference.memory_transfer` and the seven named pass lines from the pinned `ps1-tests` log | The named manual/DMA transfer, timing and control/status cases pass | SPU voice playback or a complete audio waveform |
 | Pinned noise facts | `spu.noise`; psx-spx update [`3717718f642ce2ca9ff590b65918fb3a46279cc4`](https://github.com/psx-spx/psx-spx.github.io/commit/3717718f642ce2ca9ff590b65918fb3a46279cc4) | The implemented shared LFSR, clock slots and capture signal match the cited source facts | A captured hardware noise waveform |
 | Reverb measurement constraints | `spu.reverb`; psx-spx SCPH-1001 measurement [`a37f2fec163e149f4e3e39599eb43c65c21181a8`](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8) | Delay, alternating channels and intermediate saturation constraints are checked | Exact per-stage rounding, which remains unresolved, or a complete hardware reverb waveform |
-| Deterministic model regressions | `spu.fixture`, `spu.reverb`, and runner audio-hash checks | Self-authored PCM digests and repeatable integer behavior; `spu.fixture` also compares a CPU-free authored BRR replay with the guest-produced PCM in each region | Independent hardware correctness; the audio golden is not part of the eight-lane `hashes.txt` comparison |
+| Deterministic model regressions | `spu.fixture`, `spu.reverb`, and runner audio-hash checks | Self-authored PCM digests and repeatable integer behavior; `spu.fixture` also compares exact PCM pair counts and a CPU-free authored BRR replay with the guest-produced PCM in each region | Independent hardware correctness; the audio digest is a regression, not a captured waveform |
 | Runner/libretro delivery | `libretro.host` | Batch and single-sample callback streams match the runner's drained PCM for NTSC-J, NTSC-U and PAL | Hardware correctness or RetroArch audio-device output |
-| Real-host smoke | Required hosted `retroarch` job in `.github/workflows/ci.yml` | The core's frame matches the runner and deterministic input replay reaches the expected frames | Audio: this is a video/input smoke check only |
+| Real-host smoke | Required hosted `retroarch` job in `.github/workflows/ci.yml` | The core's frame matches the runner, deterministic input replay reaches the expected frames, and `spu_tone.exe` boots under the stub with runner-matched video | Audio: this is a video/input smoke check only |
+
+Every CI lane adds the `spu_tone.exe` frame-600 audio digest and its completed mailbox records to `hashes.txt`.
+The existing eight-file equality step compares those rows along with each lane's fixture identity. `spu.fixture`
+checks the actual PCM pair count independently of the digest, and judges the two ENVX values and guest frame
+record; the lane artifact is not evidence of a captured hardware waveform.
 
 The project has no full silicon PCM waveform. `spu.fixture`'s SHA-256 and the reverb impulse digests are regression
 values from this implementation, not hardware captures. The `retroarch` CI smoke remains a recurring required hosted
@@ -584,9 +589,9 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `asan` | The `asan` preset; JUnit check without `abi` and `release`. | yes |
 | `nofp` | The `nofp` preset on both Linux legs. | yes |
 | `be32` | The `be32` preset (`portable` tests) and uploads `hashes-be32`. | yes |
-| `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt` must be byte-identical. | yes |
+| `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt`, including `spu_tone.exe` audio@600 and mailbox@600 rows, must be byte-identical. | yes |
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
-| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel at `320x240`. Pixel and wrong-dimension controls must fail. It also replays `pad_counter.exe` with Cross at guest frame 60; captures for guest frames 59 and 60 must differ and each must equal its runner PNG. | yes |
+| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel at `320x240`. Pixel and wrong-dimension controls must fail. It also boots `spu_tone.exe` as content and compares its video with the runner, then replays `pad_counter.exe` with Cross at guest frame 60; captures for guest frames 59 and 60 must differ and each must equal its runner PNG. | yes |
 | `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, compared with the merge base in gate mode on pull requests. Manual runs measure both fixtures three times or compare `gpu_motion` with an explicit control commit. | yes |
 | `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |

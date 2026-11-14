@@ -37,6 +37,27 @@ struct schway__spu_pending_write {
     uint16_t value;
 };
 
+/* Scratch arrays used to validate and apply the flattened state record. These
+   are instance-owned workspace, not emulated state and not serialized. */
+struct schway__spu_state_scratch {
+    uint16_t voice_reg[SCHWAY__SPU_VOICE_COUNT * 8u];
+    int16_t voice_history[SCHWAY__SPU_VOICE_COUNT * 3u];
+    uint32_t voice_sample_counter[SCHWAY__SPU_VOICE_COUNT];
+    int32_t voice_envelope[SCHWAY__SPU_VOICE_COUNT];
+    uint32_t voice_envelope_counter[SCHWAY__SPU_VOICE_COUNT];
+    uint32_t voice_envelope_phase[SCHWAY__SPU_VOICE_COUNT];
+    int16_t voice_sample[SCHWAY__SPU_VOICE_COUNT];
+    int16_t voice_output[SCHWAY__SPU_VOICE_COUNT];
+    int32_t voice_sweep_level[SCHWAY__SPU_VOICE_COUNT * 2u];
+    uint32_t voice_sweep_counter[SCHWAY__SPU_VOICE_COUNT * 2u];
+    int32_t main_sweep_level[2];
+    uint32_t main_sweep_counter[2];
+    uint16_t pending_address[SCHWAY__SPU_PENDING_WRITES];
+    uint16_t pending_value[SCHWAY__SPU_PENDING_WRITES];
+    int16_t reverb_fir[2u * SCHWAY__SPU_REVERB_FIR_TAPS];
+    int32_t reverb_work[2u * SCHWAY__SPU_REVERB_WORK_WORDS];
+};
+
 /* SPU RAM is little-endian guest storage. Reverb and capture buffers share
    it, and all cursors are byte offsets or fixed-width counts. */
 struct schway__spu {
@@ -62,6 +83,7 @@ struct schway__spu {
     uint32_t irqa_addr;
     uint32_t irq_enabled;
     uint64_t next_tick;
+    struct schway__spu_state_scratch state_scratch;
 };
 
 void schway__spu_reset(schway *inst);

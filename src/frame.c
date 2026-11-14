@@ -1,7 +1,7 @@
 /* schway_run_frame, schway_run, schway_get_video and schway_get_audio: every
    check first, then the work. A run advances the exact cycle accumulator,
-   queues the audio pairs and, at the frame boundary, redraws the test card
-   into VRAM. */
+   catches the SPU up at the public boundary, queues the audio pairs and, at
+   the frame boundary, redraws the test card into VRAM. */
 #include <string.h>
 
 #include "internal.h"
@@ -36,8 +36,9 @@ void schway__frame_gpu_reset(schway *inst, uint64_t tick)
     }
 }
 
-/* Moves the instance forward by at most limit cycles. The scheduled SPU queues
-   one pair per 768-cycle boundary crossed. No-content calls stop at the synthetic
+/* Moves the instance forward by at most limit cycles. The SPU queues one pair
+   per 768-cycle boundary crossed when caught up at bus accesses and the public
+   run boundary. No-content calls stop at the synthetic
    frame_end and redraw the test card. Loaded content stops at the GPU field
    wrap, with an independent maximum-field call bound so video resets cannot
    hold a host call forever. With neither a BIOS nor PS-EXE loaded no guest
@@ -102,6 +103,7 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
     if (inst->sched.next <= inst->ticks) {
         schway__sched_run(inst);
     }
+    schway__spu_event(inst, inst->ticks);
     schway__pad_update_watchdog(inst, inst->ticks);
     if (inst->exe_loaded != 0u) {
         *done = inst->frame != starting_frame;

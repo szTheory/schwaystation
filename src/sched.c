@@ -1,4 +1,6 @@
-/* The scheduler spine: the earliest deadline over the devices that keep time. */
+/* The scheduler spine: the earliest deadline over the devices that keep time.
+   The SPU catches up at bus accesses and run boundaries; sample ticks are not
+   CPU block deadlines. */
 #include "internal.h"
 
 /* The block clock: the tick the running block started on, plus the cycles the
@@ -31,16 +33,12 @@ void schway__sched_recalc(schway *inst)
     uint64_t timers = schway__timers_next(inst);
     uint64_t gpu = schway__gpu_next(inst);
     uint64_t sio = schway__sio_next(inst);
-    uint64_t spu = schway__spu_next(inst);
     inst->sched.next = dma < timers ? dma : timers;
     if (gpu < inst->sched.next) {
         inst->sched.next = gpu;
     }
     if (sio < inst->sched.next) {
         inst->sched.next = sio;
-    }
-    if (spu < inst->sched.next) {
-        inst->sched.next = spu;
     }
     inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
 }

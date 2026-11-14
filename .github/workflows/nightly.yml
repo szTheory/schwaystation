@@ -23,12 +23,17 @@ on:
   pull_request:
     paths:
       - .github/workflows/nightly.yml
+      - cmake/SPUReferences.cmake
+      - pins.txt
       - runner/bench.c
       - runner/bench.h
       - runner/clock.c
       - runner/clock.h
       - runner/rss.c
       - runner/rss.h
+      - tests/nightly/inventory.txt
+      - tests/nightly/tests.cmake
+      - tests/spu/reference.c
 
 permissions:
   contents: read

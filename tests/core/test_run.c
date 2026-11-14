@@ -202,6 +202,7 @@ static void test_budget_resume(void)
        them: PAL frames are at most 680,824 cycles. */
     uint32_t end_at = field_offset(b, "instance.frame_end");
     uint32_t ticks_at = field_offset(b, "instance.ticks");
+    uint32_t spu_tick_at = field_offset(b, "spu.next_tick");
     const uint64_t ticks = 300000u;
     const uint64_t ends[] = {ticks - 1u, ticks + 680825u};
     for (size_t i = 0; i < sizeof ends / sizeof ends[0]; i++) {
@@ -238,6 +239,7 @@ static void test_budget_resume(void)
     memcpy(ok, mid, na);
     put_le(ok + ticks_at, SCHWAY__STATE_TICKS_MAX - 5u, 8u);
     put_le(ok + end_at, SCHWAY__STATE_TICKS_MAX + 10u, 8u);
+    put_le(ok + spu_tick_at, UINT64_MAX, 8u);
     reseal(ok, na);
     CHECK_EQ_U64(schway_load_state(b, ok, na), SCHWAY_STATUS_OK);
     r = run(b, 5u, 0u);
