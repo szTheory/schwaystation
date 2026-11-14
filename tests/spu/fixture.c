@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../../src/internal.h"
+#include "../../runner/sha256.h"
 #include "schwaystation.h"
 
 #define FIXTURE_HOST_FRAMES 601u /* guest VBlank 600 completes on host frame 601 */
@@ -25,6 +26,9 @@ struct capture {
     uint64_t kon_tick;
     int16_t first_sample[2];
     int32_t first_envelope[2];
+    uint32_t mailbox_values[3];
+    uint32_t mailbox_count;
+    uint32_t mailbox_complete;
     uint32_t frame_count;
     uint32_t pairs;
     uint32_t error_stage;
@@ -33,6 +37,16 @@ struct capture {
 struct region_case {
     uint32_t region;
     const char *name;
+    const char *expectation_name;
+};
+
+struct profile_expectation {
+    uint32_t host_frames;
+    uint32_t pairs;
+    char digest[65];
+    uint32_t audio_seen;
+    uint32_t mailbox_values[3];
+    uint32_t mailbox_seen;
 };
 
 static uint32_t failures;
@@ -59,6 +73,305 @@ static void expect(uint32_t condition, const char *message)
     checks++;
     (void)printf("%s %u - %s\n", condition != 0u ? "ok" : "not ok", checks, message);
     failures += condition == 0u ? 1u : 0u;
+}
+
+static char *trim(char *text)
+{
+    while (*text == ' ' || *text == '\t') {
+        text++;
+    }
+    size_t length = strlen(text);
+    while (length != 0u && (text[length - 1u] == '\n' || text[length - 1u] == '\r' ||
+                            text[length - 1u] == ' ' || text[length - 1u] == '\t')) {
+        text[--length] = '\0';
+    }
+    return text;
+}
+
+static int profile_index(const char *name)
+{
+    if (strcmp(name, "ntsc-j") == 0) {
+        return 0;
+    }
+    if (strcmp(name, "ntsc-u") == 0) {
+        return 1;
+    }
+    if (strcmp(name, "pal") == 0) {
+        return 2;
+    }
+    return -1;
+}
+
+static uint32_t valid_sha256(const char *text)
+{
+    if (strlen(text) != 64u) {
+        return 0u;
+    }
+    for (uint32_t i = 0u; i < 64u; i++) {
+        if (!((text[i] >= '0' && text[i] <= '9') ||
+              (text[i] >= 'a' && text[i] <= 'f'))) {
+            return 0u;
+        }
+    }
+    return 1u;
+}
+
+static uint32_t parse_hex32(const char *text, uint32_t *value)
+{
+    if (strlen(text) != 8u) {
+        return 0u;
+    }
+    uint32_t result = 0u;
+    for (uint32_t i = 0u; i < 8u; i++) {
+        uint32_t digit;
+        if (text[i] >= '0' && text[i] <= '9') {
+            digit = (uint32_t)(text[i] - '0');
+        } else if (text[i] >= 'a' && text[i] <= 'f') {
+            digit = (uint32_t)(text[i] - 'a') + 10u;
+        } else if (text[i] >= 'A' && text[i] <= 'F') {
+            digit = (uint32_t)(text[i] - 'A') + 10u;
+        } else {
+            return 0u;
+        }
+        result = (result << 4) | digit;
+    }
+    *value = result;
+    return 1u;
+}
+
+static uint32_t parse_audio_expectations(const char *path,
+                                        struct profile_expectation expectations[3])
+{
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        return 0u;
+    }
+    memset(expectations, 0, sizeof(struct profile_expectation) * 3u);
+    char line[256];
+    uint32_t records = 0u;
+    uint32_t valid = 1u;
+    while (fgets(line, sizeof line, file) != NULL) {
+        char *text = trim(line);
+        if (*text == '\0' || *text == '#') {
+            continue;
+        }
+        char name[16] = {0};
+        char digest[65] = {0};
+        unsigned host_frames = 0u;
+        unsigned pairs = 0u;
+        int consumed = 0;
+        if (sscanf(text, "%15s %u %u %64s %n", name, &host_frames, &pairs,
+                   digest, &consumed) != 4 || consumed == 0 || *trim(text + consumed) != '\0') {
+            valid = 0u;
+            break;
+        }
+        int index = profile_index(name);
+        if (index < 0 || expectations[index].audio_seen != 0u || host_frames == 0u ||
+            pairs == 0u || valid_sha256(digest) == 0u) {
+            valid = 0u;
+            break;
+        }
+        expectations[index].host_frames = host_frames;
+        expectations[index].pairs = pairs;
+        memcpy(expectations[index].digest, digest, sizeof digest);
+        expectations[index].audio_seen = 1u;
+        records++;
+    }
+    (void)fclose(file);
+    return valid != 0u && records == 3u &&
+                   expectations[0].audio_seen != 0u && expectations[1].audio_seen != 0u &&
+                   expectations[2].audio_seen != 0u
+               ? 1u
+               : 0u;
+}
+
+static uint32_t parse_mailbox_expectations(const char *path,
+                                          struct profile_expectation expectations[3])
+{
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        return 0u;
+    }
+    char line[1024];
+    uint32_t records = 0u;
+    uint32_t valid = 1u;
+    while (fgets(line, sizeof line, file) != NULL) {
+        char *text = trim(line);
+        if (*text == '\0' || *text == '#') {
+            continue;
+        }
+        char *comma = strchr(text, ',');
+        if (comma == NULL) {
+            continue;
+        }
+        *comma = '\0';
+        if (strcmp(trim(text), "spu_tone") != 0) {
+            continue;
+        }
+        char *fields[6] = {trim(text), NULL, NULL, NULL, NULL, NULL};
+        char *cursor = comma + 1;
+        uint32_t malformed = 0u;
+        for (uint32_t field = 1u; field < 5u; field++) {
+            comma = strchr(cursor, ',');
+            if (comma == NULL) {
+                malformed = 1u;
+                break;
+            }
+            *comma = '\0';
+            fields[field] = trim(cursor);
+            cursor = comma + 1;
+        }
+        fields[5] = trim(cursor);
+        if (malformed != 0u) {
+            valid = 0u;
+            break;
+        }
+        int index = profile_index(fields[2]);
+        uint32_t slot;
+        if (index < 0 || strcmp(fields[4], "doc") != 0 ||
+            strstr(fields[5], "self-authored regression") == NULL ||
+            strstr(fields[5], "not a hardware waveform") == NULL) {
+            valid = 0u;
+            break;
+        }
+        if (strcmp(fields[1], "voice1_envx") == 0) {
+            slot = 0u;
+        } else if (strcmp(fields[1], "voice2_envx") == 0) {
+            slot = 1u;
+        } else if (strcmp(fields[1], "guest_vblank") == 0) {
+            slot = 2u;
+        } else {
+            valid = 0u;
+            break;
+        }
+        if ((expectations[index].mailbox_seen & (1u << slot)) != 0u ||
+            parse_hex32(fields[3], &expectations[index].mailbox_values[slot]) == 0u) {
+            valid = 0u;
+            break;
+        }
+        expectations[index].mailbox_seen |= 1u << slot;
+        records++;
+    }
+    (void)fclose(file);
+    return valid != 0u && records == 9u &&
+                   expectations[0].mailbox_seen == 7u && expectations[1].mailbox_seen == 7u &&
+                   expectations[2].mailbox_seen == 7u
+               ? 1u
+               : 0u;
+}
+
+static uint32_t audio_matches(uint32_t actual_pairs, const char *actual_digest,
+                              uint32_t expected_pairs, const char *expected_digest)
+{
+    return actual_pairs != 0u && expected_pairs != 0u && valid_sha256(actual_digest) != 0u &&
+                   valid_sha256(expected_digest) != 0u && actual_pairs == expected_pairs &&
+                   strcmp(actual_digest, expected_digest) == 0
+               ? 1u
+               : 0u;
+}
+
+static uint32_t audio_expectation_valid(const struct profile_expectation *expected)
+{
+    return expected->audio_seen != 0u && expected->host_frames != 0u &&
+                   expected->pairs != 0u && valid_sha256(expected->digest) != 0u
+               ? 1u
+               : 0u;
+}
+
+static uint32_t mailbox_expectation_valid(const struct profile_expectation *expected)
+{
+    return expected->mailbox_seen == 7u ? 1u : 0u;
+}
+
+static uint32_t audio_at_600_matches(uint32_t actual_frames, uint32_t actual_pairs,
+                                    const char *actual_digest,
+                                    const struct profile_expectation *expected)
+{
+    return audio_expectation_valid(expected) != 0u &&
+                   actual_frames == expected->host_frames &&
+                   audio_matches(actual_pairs, actual_digest,
+                                 expected->pairs, expected->digest) != 0u
+               ? 1u
+               : 0u;
+}
+
+static uint32_t mailbox_matches(const struct capture *capture,
+                                const struct profile_expectation *expected)
+{
+    if (capture->mailbox_complete == 0u || capture->mailbox_count != 3u ||
+        mailbox_expectation_valid(expected) == 0u) {
+        return 0u;
+    }
+    for (uint32_t i = 0u; i < 3u; i++) {
+        if (capture->mailbox_values[i] != expected->mailbox_values[i]) {
+            return 0u;
+        }
+    }
+    return 1u;
+}
+
+static void digest_audio(const int16_t *pcm, uint32_t pairs, char digest[65])
+{
+    schway__sha256 state;
+    uint8_t bytes[1024];
+    uint8_t output[32];
+    size_t used = 0u;
+    schway__sha256_init(&state);
+    for (uint32_t sample = 0u; sample < pairs * 2u; sample++) {
+        uint16_t value = (uint16_t)pcm[sample];
+        bytes[used++] = (uint8_t)value;
+        bytes[used++] = (uint8_t)(value >> 8);
+        if (used == sizeof bytes) {
+            schway__sha256_update(&state, bytes, used);
+            used = 0u;
+        }
+    }
+    if (used != 0u) {
+        schway__sha256_update(&state, bytes, used);
+    }
+    schway__sha256_final(&state, output);
+    schway__sha256_hex(output, digest);
+}
+
+static uint32_t read_le16(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8);
+}
+
+static uint32_t read_le32(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) |
+           ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
+}
+
+static uint32_t reference_mailbox_crc(const uint8_t *mailbox)
+{
+    uint32_t crc = UINT32_C(0xFFFFFFFF);
+    for (uint32_t offset = 0x10u; offset < 0x100u; offset++) {
+        crc ^= mailbox[offset];
+        for (uint32_t bit = 0u; bit < 8u; bit++) {
+            uint32_t mask = 0u - (crc & 1u);
+            crc = (crc >> 1) ^ (UINT32_C(0xEDB88320) & mask);
+        }
+    }
+    return ~crc;
+}
+
+static void capture_mailbox(const schway *inst, struct capture *capture)
+{
+    const uint8_t *mailbox = inst->bus.ram + 0x10000u;
+    uint32_t complete = memcmp(mailbox, "SWMB", 4u) == 0 && mailbox[8] == 0u &&
+                        mailbox[9] == 1u && mailbox[10] == 3u && mailbox[11] == 12u &&
+                        read_le32(mailbox + 4u) == reference_mailbox_crc(mailbox);
+    capture->mailbox_count = mailbox[10];
+    for (uint32_t record = 0u; record < 3u; record++) {
+        const uint8_t *entry = mailbox + 0x10u + 8u * record;
+        uint32_t id = read_le16(entry);
+        uint32_t flags = read_le16(entry + 2u);
+        capture->mailbox_values[record] = read_le32(entry + 4u);
+        complete &= id == record + 1u && flags == 1u;
+    }
+    capture->mailbox_complete = complete;
 }
 
 static schway *make_instance(uint32_t region)
@@ -338,10 +651,10 @@ static uint32_t capture_guest(const char *exe_path, uint32_t region,
             break;
         }
     }
+    capture_mailbox(inst, capture);
     uint32_t valid = capture->frame_count != 0u &&
                      capture->frame_count <= FIXTURE_HOST_FRAMES &&
-                     inst->bus.ram[0x10008u] == 0u && inst->bus.ram[0x10009u] == 1u &&
-                     inst->bus.ram[0x1000Au] == 3u && capture->pairs != 0u;
+                     capture->mailbox_complete != 0u && capture->pairs != 0u;
     uint32_t table_matches = 1u;
     for (uint32_t copy = 0u; copy < 2u; copy++) {
         uint32_t copy_base = copy == 0u ? 0x1000u : 0x2000u;
@@ -434,14 +747,16 @@ static uint32_t file_exists(const char *path)
 int main(int argc, char **argv)
 {
     static const struct region_case regions[] = {
-        {SCHWAY_REGION_NTSC_J, "NTSC-J"},
-        {SCHWAY_REGION_NTSC_U, "NTSC-U"},
-        {SCHWAY_REGION_PAL, "PAL"},
+        {SCHWAY_REGION_NTSC_J, "NTSC-J", "ntsc-j"},
+        {SCHWAY_REGION_NTSC_U, "NTSC-U", "ntsc-u"},
+        {SCHWAY_REGION_PAL, "PAL", "pal"},
     };
     uint8_t blocks[2][16] = {{0u}};
     struct spu_event events[128];
+    struct profile_expectation expectations[3];
     uint32_t event_count = 0u;
     uint16_t key_on = 0u;
+    memset(expectations, 0, sizeof expectations);
 
     (void)printf("TAP version 13\n");
     if (argc != 7) {
@@ -455,11 +770,43 @@ int main(int argc, char **argv)
     expect(parse_event_table(argv[3], events, 128u, &event_count, &key_on) == 0u,
            "the authored SPU register and key-on event table is read from the guest source");
     expect(file_exists(argv[4]), "the built runner is available");
-    expect(file_exists(argv[5]), "the audio@600 expectation table is present");
-    expect(file_exists(argv[6]), "the mailbox@600 expectation table is present");
+    uint32_t audio_expectations_loaded =
+        parse_audio_expectations(argv[5], expectations) != 0u;
+    expect(audio_expectations_loaded,
+           "audio@600 expectations contain complete frame, pair and digest records for all regions");
+    uint32_t mailbox_expectations_loaded =
+        parse_mailbox_expectations(argv[6], expectations) != 0u;
+    expect(mailbox_expectations_loaded,
+           "mailbox@600 expectations contain three self-authored records for all regions");
     expect(blocks[0][0] == 0x04u && blocks[0][1] == 0x07u &&
                blocks[1][0] == 0x04u && blocks[1][1] == 0x07u,
            "the source reader preserves both 16-byte BRR headers");
+
+    if (audio_expectations_loaded != 0u) {
+        const struct profile_expectation *expected = &expectations[0];
+        char wrong_digest[65];
+        memcpy(wrong_digest, expected->digest, sizeof wrong_digest);
+        wrong_digest[0] = wrong_digest[0] == '0' ? '1' : '0';
+        expect(audio_matches(expected->pairs, expected->digest,
+                             expected->pairs, wrong_digest) == 0u,
+               "a wrong audio digest is rejected");
+        expect(audio_matches(0u, expected->digest,
+                             expected->pairs, expected->digest) == 0u,
+               "a zero-sample audio stream is rejected");
+        expect(audio_matches(expected->pairs - 1u, expected->digest,
+                             expected->pairs, expected->digest) == 0u,
+               "a truncated audio stream is rejected");
+        struct profile_expectation incomplete = *expected;
+        incomplete.audio_seen = 0u;
+        expect(audio_expectation_valid(&incomplete) == 0u,
+               "an incomplete audio expectation is rejected");
+    }
+    if (mailbox_expectations_loaded != 0u) {
+        struct profile_expectation incomplete = expectations[0];
+        incomplete.mailbox_seen = 3u;
+        expect(mailbox_expectation_valid(&incomplete) == 0u,
+               "an incomplete mailbox expectation is rejected");
+    }
 
     for (uint32_t i = 0u; i < (uint32_t)(sizeof regions / sizeof regions[0]); i++) {
         struct capture capture;
@@ -495,6 +842,58 @@ int main(int argc, char **argv)
         expect(capture.first_envelope[0] == expected_attack &&
                    capture.first_envelope[1] == expected_attack,
                label);
+
+        char digest[65];
+        digest_audio(guest_pcm, capture.pairs, digest);
+        (void)printf("# %s audio@600 host-frames=%u pairs=%u sha256=%s ENVX=%08X,%08X,%08X\n",
+                     regions[i].name, capture.frame_count, capture.pairs, digest,
+                     capture.mailbox_values[0], capture.mailbox_values[1],
+                     capture.mailbox_values[2]);
+        struct profile_expectation *expected = &expectations[i];
+        uint32_t audio_matches_expected =
+            audio_at_600_matches(capture.frame_count, capture.pairs, digest, expected);
+        (void)snprintf(label, sizeof label,
+                       "%s audio@600 length and SHA-256 match the self-authored baseline",
+                       regions[i].name);
+        expect(audio_matches_expected, label);
+
+        char wrong_digest[65];
+        memcpy(wrong_digest, expected->digest, sizeof wrong_digest);
+        wrong_digest[0] = wrong_digest[0] == '0' ? '1' : '0';
+        (void)snprintf(label, sizeof label, "%s rejects a wrong audio digest",
+                       regions[i].name);
+        expect(audio_matches(capture.pairs, digest, expected->pairs, wrong_digest) == 0u,
+               label);
+        (void)snprintf(label, sizeof label, "%s rejects zero audio samples",
+                       regions[i].name);
+        expect(audio_matches(0u, digest, expected->pairs, expected->digest) == 0u,
+               label);
+        (void)snprintf(label, sizeof label, "%s rejects a truncated audio stream",
+                       regions[i].name);
+        expect(audio_matches(capture.pairs - 1u, digest, expected->pairs,
+                             expected->digest) == 0u,
+               label);
+
+        uint32_t mailbox_equal = mailbox_matches(&capture, expected);
+        (void)snprintf(label, sizeof label,
+                       "%s mailbox@600 status, CRC, records and ENVX match expectations",
+                       regions[i].name);
+        expect(mailbox_equal, label);
+        struct capture incomplete_mailbox = capture;
+        incomplete_mailbox.mailbox_complete = 0u;
+        (void)snprintf(label, sizeof label, "%s rejects an incomplete mailbox seal",
+                       regions[i].name);
+        expect(mailbox_matches(&incomplete_mailbox, expected) == 0u, label);
+        incomplete_mailbox = capture;
+        incomplete_mailbox.mailbox_count = 2u;
+        (void)snprintf(label, sizeof label, "%s rejects an incomplete mailbox record list",
+                       regions[i].name);
+        expect(mailbox_matches(&incomplete_mailbox, expected) == 0u, label);
+        struct profile_expectation wrong_envx = *expected;
+        wrong_envx.mailbox_values[0] ^= 1u;
+        (void)snprintf(label, sizeof label, "%s rejects a wrong ENVX expectation",
+                       regions[i].name);
+        expect(mailbox_matches(&capture, &wrong_envx) == 0u, label);
 
         uint32_t replay_pairs = 0u;
         uint32_t replayed = replay_cpu_free(regions[i].region, blocks, events, event_count,

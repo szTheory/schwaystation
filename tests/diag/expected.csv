@@ -1,4 +1,14 @@
 fixture,test,profile,expected,source,citation
+# spu_tone rows are self-authored model regression expectations, not hardware measurements or a hardware waveform.
+spu_tone,voice1_envx,ntsc-j,00007fff,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
+spu_tone,voice2_envx,ntsc-j,00007fff,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
+spu_tone,guest_vblank,ntsc-j,00000258,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
+spu_tone,voice1_envx,ntsc-u,00007fff,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
+spu_tone,voice2_envx,ntsc-u,00007fff,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
+spu_tone,guest_vblank,ntsc-u,00000258,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
+spu_tone,voice1_envx,pal,00007fff,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
+spu_tone,voice2_envx,pal,00007fff,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
+spu_tone,guest_vblank,pal,00000258,doc,tests/spu/expected.txt self-authored regression expectation; not a hardware waveform
 # The nth row of a fixture judges the mailbox record with id n, expected is a hex value or lo..hi. A line that starts with # is a comment.
 exc_matrix,syscall_cause,*,00000020,doc,psx-spx CPU Specifications: COP0 exception handling (ExcCode 08h Syscall with BD and BT clear)
 exc_matrix,syscall_epc,*,00000000,doc,psx-spx CPU Specifications: COP0 exception handling (EPC is the address of the SYSCALL itself)
