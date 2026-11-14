@@ -251,7 +251,7 @@ static void check_bus_width_and_control_tick(void)
     CHECK_EQ_U64(status & 0x3Fu, 0x21u);
 
     cycles = 0u;
-    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801DAAu, 2u, 0x0040u, &cycles), 0u);
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801DAAu, 2u, 0x8040u, &cycles), 0u);
     inst->ticks = 4u * SCHWAY__CYCLES_PER_PAIR;
     schway__spu_event(inst, inst->ticks);
     CHECK_EQ_U64(inst->spu.irq_enabled, 1u);
@@ -275,7 +275,7 @@ static void check_register_peek_is_pure(void)
         return;
     }
     uint32_t cycles = 0u;
-    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801DAAu, 2u, 0x0041u, &cycles), 0u);
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF801DAAu, 2u, 0x8041u, &cycles), 0u);
     inst->ticks = SCHWAY__CYCLES_PER_PAIR;
     schway__spu_event(inst, inst->ticks);
     (void)schway__spu_ram_read(inst, 0u);
@@ -285,13 +285,173 @@ static void check_register_peek_is_pure(void)
     uint32_t transfer_head = inst->spu.transfer_head;
     uint32_t transfer_count = inst->spu.transfer_count;
     uint32_t irq_stat = inst->irq.stat;
-    CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DAAu), 0x0041u);
+    CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DAAu), 0x8041u);
     CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x007Fu, 0x0041u);
     CHECK_EQ_U64(inst->spu.next_tick, next_tick);
     CHECK_EQ_U64(inst->spu.pending_count, pending_count);
     CHECK_EQ_U64(inst->spu.transfer_head, transfer_head);
     CHECK_EQ_U64(inst->spu.transfer_count, transfer_count);
     CHECK_EQ_U64(inst->irq.stat, irq_stat);
+    schway_destroy(inst);
+}
+
+static void spu_write16(schway *inst, uint32_t address, uint16_t value)
+{
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF800000u | address, 2u, value, &cycles), 0u);
+}
+
+static uint16_t spu_read16(schway *inst, uint32_t address)
+{
+    uint32_t value = UINT32_MAX;
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_read(inst, 0xBF800000u | address, 2u, &value, &cycles), 0u);
+    return (uint16_t)value;
+}
+
+static void spu_next_tick(schway *inst)
+{
+    uint64_t deadline = schway__spu_next(inst);
+    inst->ticks = deadline;
+    schway__spu_event(inst, deadline);
+}
+
+static void check_spu_enable_gates_irq(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    if (inst == NULL) {
+        return;
+    }
+
+    schway__spu_ram_write(inst, 0u, 0xCDEFu);
+    spu_write16(inst, 0x1F801DA4u, 0u);
+    spu_write16(inst, 0x1F801DAAu, 0x0040u);
+    spu_next_tick(inst);
+    (void)schway__spu_ram_read(inst, 0u);
+    CHECK_EQ_U64(inst->spu.irq_enabled, 0u);
+    CHECK_EQ_U64(inst->irq.stat & (1u << 9), 0u);
+
+    spu_write16(inst, 0x1F801DAAu, 0x8040u);
+    spu_next_tick(inst);
+    (void)schway__spu_ram_read(inst, 0u);
+    CHECK_EQ_U64(inst->spu.irq_enabled, 1u);
+    CHECK((inst->irq.stat & (1u << 9)) != 0u);
+
+    spu_write16(inst, 0x1F801DAAu, 0x8000u);
+    spu_next_tick(inst);
+    CHECK_EQ_U64(inst->irq.stat & (1u << 9), 0u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0u), 0xCDEFu);
+    schway_destroy(inst);
+}
+
+static void check_manual_fifo_and_ram_transfer(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    if (inst == NULL) {
+        return;
+    }
+
+    for (uint32_t i = 0u; i < SCHWAY__SPU_FIFO_HALFWORDS; i++) {
+        spu_write16(inst, 0x1F801DA8u, (uint16_t)(0x1000u + i));
+    }
+    spu_write16(inst, 0x1F801DA8u, 0xEEEEu);
+    CHECK_EQ_U64(inst->spu.transfer_count, SCHWAY__SPU_FIFO_HALFWORDS);
+    CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DA8u), 0x1000u);
+    CHECK_EQ_U64(inst->spu.transfer_count, SCHWAY__SPU_FIFO_HALFWORDS);
+    CHECK_EQ_U64(spu_read16(inst, 0x1F801DA8u), 0x1000u);
+    for (uint32_t i = 1u; i < SCHWAY__SPU_FIFO_HALFWORDS; i++) {
+        CHECK_EQ_U64(spu_read16(inst, 0x1F801DA8u), 0x1000u + i);
+    }
+    CHECK_EQ_U64(inst->spu.transfer_count, 0u);
+    CHECK_EQ_U64(spu_read16(inst, 0x1F801DA8u), 0u);
+
+    spu_write16(inst, 0x1F801DACu, 4u);
+    spu_write16(inst, 0x1F801DA6u, 0xFFFFu);
+    spu_write16(inst, 0x1F801DAAu, 0x8000u);
+    spu_next_tick(inst);
+    for (uint32_t i = 0u; i < SCHWAY__SPU_FIFO_HALFWORDS; i++) {
+        spu_write16(inst, 0x1F801DA8u, (uint16_t)(0xA000u + i));
+    }
+    spu_write16(inst, 0x1F801DAAu, 0x8010u);
+    spu_next_tick(inst);
+    CHECK((schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0400u) != 0u);
+    for (uint32_t i = 1u; i < SCHWAY__SPU_FIFO_HALFWORDS; i++) {
+        spu_next_tick(inst);
+    }
+    CHECK_EQ_U64(inst->spu.transfer_count, 0u);
+    CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0400u, 0u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0x7FFF8u), 0xA000u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0x7FFFEu), 0xA003u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0u), 0xA004u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0x0036u), 0xA01Fu);
+
+    const uint16_t ram_ctrl[] = {4u, 6u, 8u, 10u};
+    const uint32_t copies[] = {1u, 2u, 4u, 8u};
+    for (uint32_t mode = 0u; mode < 4u; mode++) {
+        uint32_t base = 0x10000u + mode * 0x100u;
+        spu_write16(inst, 0x1F801DAAu, 0x8000u);
+        spu_write16(inst, 0x1F801DACu, ram_ctrl[mode]);
+        spu_write16(inst, 0x1F801DA6u, (uint16_t)(base >> 3));
+        spu_next_tick(inst);
+        spu_write16(inst, 0x1F801DA8u, (uint16_t)(0xB000u + mode));
+        spu_write16(inst, 0x1F801DAAu, 0x8010u);
+        spu_next_tick(inst);
+        for (uint32_t copy = 0u; copy < copies[mode]; copy++) {
+            CHECK_EQ_U64(schway__spu_ram_peek(inst, base + copy * 2u), 0xB000u + mode);
+        }
+        CHECK_EQ_U64(schway__spu_ram_peek(inst, base + copies[mode] * 2u), 0u);
+    }
+
+    spu_write16(inst, 0x1F801DAAu, 0x8020u);
+    spu_next_tick(inst);
+    CHECK((schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0100u) != 0u);
+    for (uint32_t i = 0u; i < SCHWAY__SPU_FIFO_HALFWORDS; i++) {
+        spu_write16(inst, 0x1F801DA8u, (uint16_t)(0xC000u + i));
+    }
+    CHECK_EQ_U64(inst->spu.transfer_count, SCHWAY__SPU_FIFO_HALFWORDS);
+    CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0100u, 0u);
+    spu_write16(inst, 0x1F801DAAu, 0x8030u);
+    spu_next_tick(inst);
+    CHECK((schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0200u) != 0u);
+    schway_destroy(inst);
+}
+
+static void check_capture_gate_status_and_irqa(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    if (inst == NULL) {
+        return;
+    }
+
+    schway__spu_ram_write(inst, 0u, 0x1234u);
+    schway__spu_ram_write(inst, 0x400u, 0x2345u);
+    schway__spu_ram_write(inst, 0x800u, 0x3456u);
+    schway__spu_ram_write(inst, 0xC00u, 0x4567u);
+    spu_write16(inst, 0x1F801DA4u, 0u);
+    spu_write16(inst, 0x1F801DAAu, 0x8040u);
+    spu_write16(inst, 0x1F801DACu, 0u);
+    spu_next_tick(inst);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0u), 0x1234u);
+    CHECK_EQ_U64(inst->spu.capture_cursor, 0u);
+    CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0800u, 0u);
+
+    spu_write16(inst, 0x1F801DACu, 4u);
+    spu_next_tick(inst);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0u), 0u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0x400u), 0u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0x800u), 0u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0xC00u), 0u);
+    CHECK((inst->irq.stat & (1u << 9)) != 0u);
+    for (uint32_t i = 1u; i < 256u; i++) {
+        spu_next_tick(inst);
+    }
+    CHECK_EQ_U64(inst->spu.capture_cursor, 0x100u);
+    CHECK((schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0800u) != 0u);
+
+    spu_write16(inst, 0x1F801DAAu, 0x8000u);
+    spu_next_tick(inst);
+    CHECK_EQ_U64(inst->irq.stat & (1u << 9), 0u);
+    CHECK_EQ_U64(schway__spu_ram_peek(inst, 0x400u), 0u);
     schway_destroy(inst);
 }
 
@@ -456,6 +616,9 @@ int main(int argc, char **argv)
     check_spu_event_entrypoint();
     check_bus_width_and_control_tick();
     check_register_peek_is_pure();
+    check_spu_enable_gates_irq();
+    check_manual_fifo_and_ram_transfer();
+    check_capture_gate_status_and_irqa();
     check_scheduled_split_runs();
     check_cpu_and_dma_deadlines();
     check_disabled_and_muted_deadlines();
