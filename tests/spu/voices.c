@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../src/bus.h"
 #include "../../src/internal.h"
 
 #define TEST_UNDECODED (UINT32_C(31) << 27)
@@ -281,10 +282,250 @@ static uint32_t test_block_history_and_irq(schway *inst)
     return failures;
 }
 
+#define SPU_MMIO_BASE UINT32_C(0x1F801C00)
+#define SPU_ATTR UINT32_C(0x1F801DAA)
+#define SPU_IRQA UINT32_C(0x1F801DA4)
+#define SPU_TSA UINT32_C(0x1F801DA6)
+#define SPU_FIFO UINT32_C(0x1F801DA8)
+#define SPU_KON UINT32_C(0x1F801D88)
+#define SPU_KOFF UINT32_C(0x1F801D8C)
+#define SPU_PMON UINT32_C(0x1F801D90)
+#define SPU_NON UINT32_C(0x1F801D94)
+#define SPU_ENDX UINT32_C(0x1F801D9C)
+#define SPU_MAIN_VOL_L UINT32_C(0x1F801D80)
+#define SPU_MAIN_VOL_R UINT32_C(0x1F801D82)
+
+static uint32_t mmio_write16(schway *inst, uint32_t address, uint16_t value)
+{
+    uint32_t cycles = 0u;
+    return schway__bus_write(inst, address, 2u, value, &cycles) == 0 ? 0u : 1u;
+}
+
+static uint32_t mmio_read16(schway *inst, uint32_t address, uint16_t *value)
+{
+    uint32_t cycles = 0u;
+    uint32_t result = 0u;
+    if (schway__bus_read(inst, address, 2u, &result, &cycles) != 0) {
+        return 1u;
+    }
+    *value = (uint16_t)result;
+    return 0u;
+}
+
+static uint32_t test_guest_upload_kon_to_public_pcm(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return 1u;
+    }
+    uint32_t failures = 0u;
+    failures += mmio_write16(inst, SPU_ATTR, 0xC050u);
+    failures += mmio_write16(inst, SPU_TSA, 0x20u);
+    failures += mmio_write16(inst, SPU_IRQA, 0x20u);
+    failures += mmio_write16(inst, SPU_MMIO_BASE + 0x00u, 0x3FFFu);
+    failures += mmio_write16(inst, SPU_MMIO_BASE + 0x02u, 0x1FFFu);
+    failures += mmio_write16(inst, SPU_MMIO_BASE + 0x04u, 0x1000u);
+    failures += mmio_write16(inst, SPU_MMIO_BASE + 0x06u, 0x20u);
+    failures += mmio_write16(inst, SPU_MMIO_BASE + 0x08u, 0x7F00u);
+    failures += mmio_write16(inst, SPU_MAIN_VOL_L, 0x3FFFu);
+    failures += mmio_write16(inst, SPU_MAIN_VOL_R, 0x3FFFu);
+    const uint16_t block[8] = {0x0000u, 0x7777u, 0x7777u, 0x7777u,
+                               0x7777u, 0x7777u, 0x7777u, 0x7777u};
+    for (uint32_t i = 0; i < 8u; i++) {
+        failures += mmio_write16(inst, SPU_FIFO, block[i]);
+    }
+    failures += mmio_write16(inst, SPU_KON, 1u);
+    run_voice_tick(inst);
+    failures += mmio_write16(inst, SPU_MMIO_BASE + 0x0Cu, 0x7FFFu);
+    run_voice_tick(inst);
+
+    int16_t samples[4] = {0, 0, 0, 0};
+    schway_audio audio;
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = samples;
+    audio.capacity = 2u;
+    failures += schway_get_audio(inst, &audio) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += audio.written != 2u ? 1u : 0u;
+    failures += samples[2] == 0 || samples[3] == 0 || samples[2] == samples[3] ? 1u : 0u;
+
+    const struct schway__spu_voice *voice = &inst->spu.voice[0];
+    int16_t raw = reference_interpolate(voice->history, voice->sample, 0x1000u);
+    int32_t env_sample = reference_sar((int32_t)raw * 0x7FFF, 15u);
+    int32_t left_voice = reference_sar(env_sample * (int32_t)0x7FFEu, 15u);
+    int32_t right_voice = reference_sar(env_sample * (int32_t)0x3FFEu, 15u);
+    int16_t expected_left = reference_clamp16(
+        reference_sar(left_voice * (int32_t)0x7FFEu, 15u));
+    int16_t expected_right = reference_clamp16(
+        reference_sar(right_voice * (int32_t)0x7FFEu, 15u));
+    failures += samples[2] != expected_left || samples[3] != expected_right ? 1u : 0u;
+    failures += (inst->irq.stat & (UINT32_C(1) << 9)) == 0u ? 1u : 0u;
+
+    run_voice_tick(inst);
+    failures += mmio_write16(inst, SPU_KOFF, 1u);
+    run_voice_tick(inst);
+    failures += voice->envelope_phase != 4u ? 1u : 0u;
+    uint16_t endx = 0u;
+    failures += mmio_read16(inst, SPU_ENDX, &endx);
+    failures += (endx & 1u) != 0u ? 1u : 0u;
+    schway_destroy(inst);
+    return failures;
+}
+
+static void prepare_constant_voice(struct schway__spu_voice *voice, uint16_t pitch,
+                                   int16_t sample)
+{
+    memset(voice, 0, sizeof *voice);
+    voice->reg[2] = pitch;
+    voice->sample_counter = 0u;
+    voice->history[0] = sample;
+    voice->history[1] = sample;
+    voice->history[2] = sample;
+    voice->sample = sample;
+    voice->envelope = 0x7FFF;
+}
+
+static uint32_t test_all_voices_fetch_in_order(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return 1u;
+    }
+    inst->spu.irq_enabled = 1u;
+    inst->spu.irqa_addr = 0x110u;
+    for (uint32_t i = 0; i < SCHWAY__SPU_VOICE_COUNT; i++) {
+        uint32_t block_address = 0x100u + i * 0x10u;
+        uint32_t nibble = i % 7u + 1u;
+        struct schway__spu_voice *voice = &inst->spu.voice[i];
+        voice->reg[2] = 0x1000u;
+        voice->reg[3] = (uint16_t)(block_address >> 3);
+        voice->sample_counter = UINT32_C(31) << 27;
+        inst->spu.ram[block_address] = 0u;
+        inst->spu.ram[block_address + 1u] = 0u;
+        memset(&inst->spu.ram[block_address + 2u], (int)(nibble | (nibble << 4)), 14u);
+    }
+    inst->spu.reg[(SPU_NON - SPU_MMIO_BASE) >> 1] = 2u;
+    run_voice_tick(inst);
+    uint32_t failures = 0u;
+    for (uint32_t i = 0; i < SCHWAY__SPU_VOICE_COUNT; i++) {
+        int16_t expected = (int16_t)((int32_t)(i % 7u + 1u) * 4096);
+        failures += inst->spu.voice[i].sample != expected ? 1u : 0u;
+        failures += (inst->spu.voice[i].sample_counter & UINT32_C(0x1FFFF)) != 0x1000u
+                        ? 1u
+                        : 0u;
+    }
+    failures += (inst->irq.stat & (UINT32_C(1) << 9)) == 0u ? 1u : 0u;
+    schway_destroy(inst);
+    return failures;
+}
+
+static uint32_t test_pitch_modulation_and_pitch_limits(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return 1u;
+    }
+    prepare_constant_voice(&inst->spu.voice[0], 0x1000u, 16384);
+    prepare_constant_voice(&inst->spu.voice[1], 0x1000u, 1000);
+    prepare_constant_voice(&inst->spu.voice[2], 0u, 1000);
+    prepare_constant_voice(&inst->spu.voice[3], 0x5000u, 1000);
+    inst->spu.reg[(SPU_PMON - SPU_MMIO_BASE) >> 1] = 2u;
+    run_voice_tick(inst);
+
+    uint32_t failures = 0u;
+    int32_t modulated = reference_sar(
+        (int32_t)inst->spu.voice[1].reg[2] *
+            ((int32_t)inst->spu.voice[0].output + 0x8000),
+        15u);
+    uint32_t expected = (uint32_t)modulated & 0xFFFFu;
+    if (expected > 0x4000u) {
+        expected = 0x4000u;
+    }
+    failures += (inst->spu.voice[1].sample_counter & 0x1FFFFu) != expected ? 1u : 0u;
+    failures += inst->spu.voice[1].output == 0 ? 1u : 0u;
+    failures += (inst->spu.voice[2].sample_counter & 0x1FFFFu) != 0u ? 1u : 0u;
+    failures += inst->spu.voice[2].output != 0 ? 1u : 0u;
+    failures += (inst->spu.voice[3].sample_counter & 0x1FFFFu) != 0x4000u ? 1u : 0u;
+    schway_destroy(inst);
+    return failures;
+}
+
+static uint32_t test_loop_start_repeat_and_endx(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return 1u;
+    }
+    struct schway__spu_voice *voice = &inst->spu.voice[0];
+    voice->reg[2] = 0x1000u;
+    voice->reg[3] = 0x20u;
+    voice->sample_counter = UINT32_C(31) << 27;
+    voice->envelope_phase = 1u;
+    voice->envelope = 0x7FFF;
+    inst->spu.ram[0x100u] = 0u;
+    inst->spu.ram[0x101u] = 4u;
+    memset(&inst->spu.ram[0x102u], 0x11, 14u);
+    inst->spu.ram[0x110u] = 0u;
+    inst->spu.ram[0x111u] = 3u;
+    memset(&inst->spu.ram[0x112u], 0x22, 14u);
+    for (uint32_t i = 0; i < 56u; i++) {
+        run_voice_tick(inst);
+    }
+    uint32_t endx_index = (SPU_ENDX - SPU_MMIO_BASE) >> 1;
+    uint32_t failures = 0u;
+    failures += voice->reg[7] != 0x20u ? 1u : 0u;
+    failures += voice->reg[3] != 0x20u ? 1u : 0u;
+    failures += (inst->spu.reg[endx_index] & 1u) == 0u ? 1u : 0u;
+
+    inst->spu.ram[0x101u] = 1u;
+    for (uint32_t i = 0; i < 28u; i++) {
+        run_voice_tick(inst);
+    }
+    failures += voice->reg[3] != 0x20u ? 1u : 0u;
+    failures += voice->envelope_phase != 4u || voice->envelope != 0 ? 1u : 0u;
+    failures += (inst->spu.reg[endx_index] & 1u) == 0u ? 1u : 0u;
+    schway_destroy(inst);
+    return failures;
+}
+
+static uint32_t test_signed_stereo_mix_and_mute(void)
+{
+    schway *inst = make_instance();
+    if (inst == NULL) {
+        return 1u;
+    }
+    inst->spu.reg[(SPU_ATTR - SPU_MMIO_BASE) >> 1] = 0xC000u;
+    inst->spu.reg[(SPU_MAIN_VOL_L - SPU_MMIO_BASE) >> 1] = 0x3FFFu;
+    inst->spu.reg[(SPU_MAIN_VOL_R - SPU_MMIO_BASE) >> 1] = 0x3FFFu;
+    for (uint32_t i = 0; i < SCHWAY__SPU_VOICE_COUNT; i++) {
+        prepare_constant_voice(&inst->spu.voice[i], 0x1000u, INT16_MAX);
+        inst->spu.voice[i].reg[0] = 0x3FFFu;
+        inst->spu.voice[i].reg[1] = 0x4000u;
+    }
+    run_voice_tick(inst);
+    int16_t samples[4] = {0, 0, 0, 0};
+    schway_audio audio;
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = samples;
+    audio.capacity = 1u;
+    uint32_t failures = schway_get_audio(inst, &audio) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += audio.written != 1u ? 1u : 0u;
+    failures += samples[0] != INT16_MAX || samples[1] != INT16_MIN ? 1u : 0u;
+    failures += mmio_write16(inst, SPU_ATTR, 0x8000u);
+    run_voice_tick(inst);
+    memset(samples, 0, sizeof samples);
+    audio.capacity = 1u;
+    failures += schway_get_audio(inst, &audio) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += samples[0] != 0 || samples[1] != 0 ? 1u : 0u;
+    schway_destroy(inst);
+    return failures;
+}
+
 int main(void)
 {
     puts("TAP version 13");
-    puts("1..1");
+    puts("1..6");
     schway *inst = make_instance();
     if (inst == NULL) {
         puts("# instance creation failed");
@@ -303,8 +544,27 @@ int main(void)
         printf("# Gaussian/history mismatches: %u\n", gaussian_failures);
         printf("# block-boundary/IRQA mismatches: %u\n", history_failures);
     }
-    schway_destroy(inst);
     printf("%s 1 - BRR filters, histories and Gaussian interpolation match an independent integer reference\n",
            failures == 0u ? "ok" : "not ok");
-    return failures == 0u ? 0 : 1;
+
+    uint32_t guest_failures = test_guest_upload_kon_to_public_pcm();
+    uint32_t voices_failures = test_all_voices_fetch_in_order();
+    uint32_t pmon_failures = test_pitch_modulation_and_pitch_limits();
+    uint32_t loop_failures = test_loop_start_repeat_and_endx();
+    uint32_t mix_failures = test_signed_stereo_mix_and_mute();
+    printf("%s 2 - MMIO upload and KON produce checked stereo PCM through the public audio drain\n",
+           guest_failures == 0u ? "ok" : "not ok");
+    printf("%s 3 - all 24 voices fetch BRR data, including silent and noise-enabled voices\n",
+           voices_failures == 0u ? "ok" : "not ok");
+    printf("%s 4 - pitch modulation, zero pitch and clamped pitch follow the integer reference\n",
+           pmon_failures == 0u ? "ok" : "not ok");
+    printf("%s 5 - loop start, repeat, end mute and ENDX follow BRR flags\n",
+           loop_failures == 0u ? "ok" : "not ok");
+    printf("%s 6 - signed stereo volumes saturate deterministically and ATTR mute is silent\n",
+           mix_failures == 0u ? "ok" : "not ok");
+    schway_destroy(inst);
+    return failures + guest_failures + voices_failures + pmon_failures + loop_failures +
+                   mix_failures == 0u
+               ? 0
+               : 1;
 }
