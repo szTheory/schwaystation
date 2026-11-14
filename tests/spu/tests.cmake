@@ -11,6 +11,16 @@ schway_add_test(NAME spu.model
   COMMAND schwaystation-test-spu "${SCHWAYSTATION_FIXTURES_DIR}" "$<TARGET_FILE:schwaystation-run>"
   LABELS audio portable TIMEOUT 10)
 
+# Fault prevented: BRR samples fail to decode and reach Gaussian interpolation.
+add_executable(schwaystation-test-spu-voices ${CMAKE_CURRENT_LIST_DIR}/voices.c)
+target_link_libraries(schwaystation-test-spu-voices PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-spu-voices PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-spu-voices)
+schway_add_test(NAME spu.voices
+  COMMAND schwaystation-test-spu-voices
+  LABELS audio portable TIMEOUT 10)
+
 include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
 schway_prepare_spu_reference_assets(
   spu_reference_dir spu_reference_exe spu_reference_log
