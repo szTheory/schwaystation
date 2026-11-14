@@ -11,8 +11,11 @@
 #define SPU_ATTR UINT32_C(0x1F801DAA)
 #define SPU_NON UINT32_C(0x1F801D94)
 #define SPU_RAM_CTRL UINT32_C(0x1F801DAC)
+#define SPU_IRQA UINT32_C(0x1F801DA4)
 #define SPU_MAIN_VOL_L UINT32_C(0x1F801D80)
 #define SPU_MAIN_VOL_R UINT32_C(0x1F801D82)
+#define IRQ9_MASK (UINT32_C(1) << 9)
+#define TEST_UNDECODED (UINT32_C(31) << 27)
 
 static void *plain_alloc(void *user, size_t size)
 {
@@ -203,32 +206,102 @@ static uint32_t test_noise_capture_and_wrap(schway *inst)
     return failures;
 }
 
+static void reset_voice_fetches(schway *inst, uint16_t address_units)
+{
+    for (uint32_t i = 0u; i < SCHWAY__SPU_VOICE_COUNT; i++) {
+        memset(&inst->spu.voice[i], 0, sizeof inst->spu.voice[i]);
+        inst->spu.voice[i].reg[3] = address_units;
+        inst->spu.voice[i].sample_counter = TEST_UNDECODED;
+    }
+}
+
+static uint32_t test_silent_capture_and_irqa(schway *inst)
+{
+    uint32_t failures = 0u;
+    reset_noise(inst, 15u, 0u);
+    inst->spu.noise_lfsr = 0x2000u;
+    inst->spu.reg[reg_index(SPU_ATTR)] &= 0x7FFFu;
+    inst->spu.reg[reg_index(SPU_NON)] = 0x0005u;
+    inst->spu.reg[reg_index(SPU_RAM_CTRL)] = 4u;
+    inst->spu.voice[0].envelope = 0x4000;
+    inst->spu.voice[2].envelope = 0x6000;
+    inst->spu.capture_cursor = 0u;
+    inst->spu.irq_enabled = 0u;
+    inst->irq.stat &= ~IRQ9_MASK;
+    run_sample(inst);
+    failures += inst->spu.noise_lfsr != 0x4001u ? 1u : 0u;
+    failures += schway__spu_ram_peek(inst, 0x800u) != 8192u ? 1u : 0u;
+    failures += schway__spu_ram_peek(inst, 0xC00u) != 12288u ? 1u : 0u;
+    failures += (inst->irq.stat & IRQ9_MASK) != 0u ? 1u : 0u;
+
+    /* Muted, enabled voices still fetch guest RAM; unrelated IRQA misses. */
+    inst->spu.reg[reg_index(SPU_ATTR)] = 0x8040u;
+    inst->spu.irq_enabled = 1u;
+    inst->spu.reg[reg_index(SPU_RAM_CTRL)] = 0u;
+    inst->spu.irqa_addr = 0x4000u;
+    reset_voice_fetches(inst, 0x0800u);
+    run_sample(inst);
+    failures += (inst->irq.stat & IRQ9_MASK) == 0u ? 1u : 0u;
+    inst->irq.stat &= ~IRQ9_MASK;
+    inst->spu.irqa_addr = 0x5000u;
+    reset_voice_fetches(inst, 0x0800u);
+    run_sample(inst);
+    failures += (inst->irq.stat & IRQ9_MASK) != 0u ? 1u : 0u;
+
+    /* Capture writes use the same little-endian helper and can raise IRQA. */
+    inst->spu.irqa_addr = 0u;
+    inst->spu.reg[reg_index(SPU_RAM_CTRL)] = 4u;
+    inst->spu.capture_cursor = 0u;
+    reset_voice_fetches(inst, 0x0800u);
+    run_sample(inst);
+    failures += (inst->irq.stat & IRQ9_MASK) == 0u ? 1u : 0u;
+    inst->irq.stat &= ~IRQ9_MASK;
+    inst->spu.reg[reg_index(SPU_RAM_CTRL)] = 0u;
+    run_sample(inst);
+    failures += (inst->irq.stat & IRQ9_MASK) != 0u ? 1u : 0u;
+    failures += inst->spu.capture_cursor != 1u ? 1u : 0u;
+
+    /* ATTR bit 6 acknowledges, and the next capture access can refire. */
+    schway__spu_reg_write(inst, SPU_ATTR, 0x8000u);
+    run_sample(inst);
+    failures += (inst->irq.stat & IRQ9_MASK) != 0u ? 1u : 0u;
+    schway__spu_reg_write(inst, SPU_ATTR, 0x8040u);
+    inst->spu.reg[reg_index(SPU_RAM_CTRL)] = 4u;
+    inst->spu.irqa_addr = 0u;
+    inst->spu.capture_cursor = 0u;
+    run_sample(inst);
+    failures += (inst->irq.stat & IRQ9_MASK) == 0u ? 1u : 0u;
+    return failures;
+}
+
 int main(void)
 {
     puts("TAP version 13");
-    puts("1..6");
+    puts("1..7");
     schway *inst = make_instance();
     if (inst == NULL) {
         puts("not ok 1 - pinned noise schedule and capture behavior");
         return 1;
     }
-    uint32_t failures[6];
+    uint32_t failures[7];
     failures[0] = test_first_slot_matrix(inst);
     failures[1] = test_slot_masks(inst);
     failures[2] = test_long_gap_and_continuity(inst);
     failures[3] = test_lfsr_cycle(inst);
     failures[4] = test_noise_voice_selection(inst);
     failures[5] = test_noise_capture_and_wrap(inst);
-    static const char *names[6] = {
+    failures[6] = test_silent_capture_and_irqa(inst);
+    static const char *names[7] = {
         "all shift and step combinations clock the first slot at most once per sample",
         "step values select exactly the pinned eight-slot schedule",
         "long-period gaps and ATTR disable preserve LFSR and phase continuity",
         "the LFSR avoids FFFF and completes its 65535-clock sequence",
         "noise voices share the signed level through envelope and amplitude mixing",
         "capture rings receive scaled noise, wrap, and report the correct half",
+        "muted and disabled output retains capture, RAM_CTRL gating and IRQA behavior",
     };
     uint32_t total = 0u;
-    for (uint32_t i = 0u; i < 6u; i++) {
+    for (uint32_t i = 0u; i < 7u; i++) {
         printf("%s %u - %s\n", failures[i] == 0u ? "ok" : "not ok", i + 1u, names[i]);
         total += failures[i];
     }

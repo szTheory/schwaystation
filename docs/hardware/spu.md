@@ -44,11 +44,24 @@ rate 26 and phase-negative sweep behavior remain unresolved; this core follows t
 machine-profile switch. The SPU hardware notes and unresolved questions are indexed in
 `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` §1.4.
 
+## Noise
+
+All noise-enabled voices share one signed 16-bit LFSR. Each clock shifts left and inserts
+`b15 XOR b12 XOR b11 XOR b10 XOR 1`; `FFFFh` is not reached from the reset seed. ATTR shift sets a period of
+`20000h >> shift` output samples. The period is divided into eight slots; ATTR step 0–3 select respectively
+`0,2,4,6`; `0,1,2,4,6`; `0,1,2,4,5,6`; and `0,1,2,3,4,5,6`. The model clocks at most once in each sample,
+including at the shortest periods. Clearing ATTR bit 15 does not reset the shared LFSR or its phase. This schedule
+and the LFSR behavior follow the pinned psx-spx update at
+[commit `3717718f642ce2ca9ff590b65918fb3a46279cc4`](https://github.com/psx-spx/psx-spx.github.io/commit/3717718f642ce2ca9ff590b65918fb3a46279cc4); they are documented behavior, not a captured noise waveform.
+
 ## Capture and status
 
-The bounded capture model writes zero-valued CD-L, CD-R, voice 1, and voice 3 inputs to the four rings at `00000h`,
-`00400h`, `00800h`, and `00C00h`. Capture is suppressed when `RAM_CTRL` bits 2–3 are both clear. Its shared cursor
-advances once per tick through 200h halfwords; `STATX` bit 11 is set while writing the upper 100h halfwords.
+The four 400h-byte rings at `00000h`, `00400h`, `00800h`, and `00C00h` receive zero-valued Phase-5 CD-L/CD-R inputs
+and voice 1/3 samples after envelope scaling. In noise mode the voice capture value is the full signed LFSR level
+multiplied by ENVX and arithmetic-shifted by 15; it is not a one-bit signal. Capture is suppressed when `RAM_CTRL`
+bits 2–3 are both clear, but otherwise continues when ATTR disables or mutes audible output. The shared cursor
+advances once per tick through 200h halfwords; `STATX` bit 11 reports the upper half after the lower 100h samples.
+Capture writes use the same little-endian RAM helper as other SPU accesses, so matching `IRQA` can raise IRQ9.
 
 `STATX` (`1F801DAEh`) reports delayed `ATTR` bits 0–5 in bits 0–5, `ATTR` bit 5 again in bit 7, IRQ9 in bit 6,
 manual transfer busy in bit 10, and DMA request state in bits 8–9. DMAWrite requests data while the FIFO has room;
@@ -56,6 +69,7 @@ DMARead reports data while the FIFO is nonempty. Those request bits describe FIF
 not part of this model. IRQ9 is raised on a modeled RAM access matching `IRQA` only when both `ATTR` bit 15 (SPU
 Enable) and bit 6 (IRQ9 Enable) are set. Clearing bit 6 acknowledges the IRQ9 latch without changing RAM.
 
-The capture values and exact placement of multiple RAM accesses within one sample are not claimed as measured hardware
-waveforms. They are deterministic, tick-bounded inputs for later SPU work; the pinned memory-transfer program remains
-the hardware oracle for its named transfer cases.
+The documented noise capture scaling is implemented in the sample-granular model. The exact placement of multiple RAM
+accesses within one sample is not claimed as measured hardware timing; the pinned memory-transfer program remains the
+hardware oracle for its named transfer cases. Noise mode still performs the voice's modeled RAM fetches before sample
+selection, preserving their IRQA behavior when the voice is muted or its BRR output is inaudible.
