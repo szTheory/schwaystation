@@ -212,6 +212,13 @@ static void check_split_resume(void)
 #define TEST_SPU_EVOL_R UINT32_C(0x1F801D86)
 #define TEST_SPU_VLIN UINT32_C(0x1F801DFC)
 #define TEST_SPU_VRIN UINT32_C(0x1F801DFE)
+#define TEST_SPU_ESA UINT32_C(0x1F801DA2)
+#define TEST_SPU_IIR UINT32_C(0x1F801DC4)
+#define TEST_SPU_COMB1 UINT32_C(0x1F801DC6)
+#define TEST_SPU_WALL UINT32_C(0x1F801DCE)
+#define TEST_SPU_LSAME UINT32_C(0x1F801DD4)
+#define TEST_SPU_LCOMB1 UINT32_C(0x1F801DD8)
+#define TEST_SPU_LSAME_DELAY UINT32_C(0x1F801DE0)
 #define TEST_SPU_MAIN_VOL_L UINT32_C(0x1F801D80)
 #define TEST_SPU_MAIN_VOL_R UINT32_C(0x1F801D82)
 
@@ -356,6 +363,58 @@ static void check_public_wet_return(void)
           "zero EVOL Off configuration contributes no wet PCM");
 }
 
+static void check_feedback_ram_path(void)
+{
+    schway *inst = make_reverb_instance();
+    if (inst == NULL) {
+        CHECK(0, "reverb feedback instance is created");
+        return;
+    }
+
+    const uint32_t base = 0x0007FFF8u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ATTR)] = 0xC080u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ESA)] = (uint16_t)(base >> 3);
+    inst->spu.reg[test_reg_index(TEST_SPU_IIR)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_COMB1)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_WALL)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_LSAME)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LCOMB1)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LSAME_DELAY)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_VLIN)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_VRIN)] = 0x7FFFu;
+    inst->spu.reverb_address = base;
+    inst->spu.irqa_addr = base;
+    inst->spu.irq_enabled = 1u;
+
+    for (uint32_t tick = 0u; tick < 128u; tick++) {
+        int16_t return_left = 0;
+        int16_t return_right = 0;
+        inst->spu.next_tick = ((uint64_t)tick + 1u) * SCHWAY__CYCLES_PER_PAIR;
+        schway__spu_reverb_step(inst, tick == 0u ? 16000 : 0, 0,
+                                &return_left, &return_right);
+        CHECK(inst->spu.reverb_address >= base &&
+                  inst->spu.reverb_address <= SCHWAY__SPU_RAM_SIZE - 2u,
+              "reverb cursor wraps within the ESA work area");
+        for (uint32_t channel = 0u; channel < 2u; channel++) {
+            for (uint32_t index = 0u; index < SCHWAY__SPU_REVERB_WORK_WORDS; index++) {
+                int32_t stored = inst->spu.reverb_work[channel][index];
+                CHECK(stored >= INT16_MIN && stored <= INT16_MAX,
+                      "reverb work values stay within measured 16-bit saturation bounds");
+            }
+        }
+    }
+
+    uint32_t wrote_feedback = 0u;
+    for (uint32_t address = base; address < SCHWAY__SPU_RAM_SIZE; address += 2u) {
+        wrote_feedback |= schway__spu_ram_peek(inst, address) != 0u;
+    }
+    CHECK(wrote_feedback != 0u,
+          "wet impulse drives the register-selected feedback path into SPU RAM");
+    CHECK((schway__spu_reg_peek(inst, UINT32_C(0x1F801DAE)) & 0x0040u) != 0u,
+          "reverb work-buffer accesses check IRQA");
+    schway_destroy(inst);
+}
+
 int main(void)
 {
     compare_input_fir();
@@ -364,5 +423,6 @@ int main(void)
     check_centered_delay(1u);
     check_split_resume();
     check_public_wet_return();
+    check_feedback_ram_path();
     return failures == 0u ? 0 : 1;
 }
