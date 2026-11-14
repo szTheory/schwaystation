@@ -447,6 +447,36 @@ static void check_feedback_ram_path(void)
     schway_destroy(inst);
 }
 
+static void check_negative_iir_coefficient(void)
+{
+    schway *inst = make_reverb_instance();
+    if (inst == NULL) {
+        CHECK(0, "negative-IIR instance is created");
+        return;
+    }
+
+    const uint32_t base = 0x00002000u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ATTR)] = 0xC080u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ESA)] = (uint16_t)(base >> 3);
+    inst->spu.reg[test_reg_index(TEST_SPU_IIR)] = 0x8000u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LSAME)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LDIFF)] = 4u;
+    inst->spu.reg[test_reg_index(TEST_SPU_VLIN)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_VRIN)] = 0x7FFFu;
+    inst->spu.reverb_address = base;
+    inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+    inst->spu.reverb_fir[0][20] = 2000;
+    schway__spu_ram_write(inst, base, 200);
+
+    int16_t return_left = 0;
+    int16_t return_right = 0;
+    schway__spu_reverb_step(inst, 0, 0, &return_left, &return_right);
+    uint16_t stored = schway__spu_ram_peek(inst, base + 16u);
+    CHECK(stored == 600u,
+          "vIIR=-8000h negates the completed IIR result after adding the prior sample");
+    schway_destroy(inst);
+}
+
 int main(void)
 {
     compare_input_fir();
@@ -456,5 +486,6 @@ int main(void)
     check_split_resume();
     check_public_wet_return();
     check_feedback_ram_path();
+    check_negative_iir_coefficient();
     return failures == 0u ? 0 : 1;
 }
