@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: The CPU matches the public vectors** - The R3000A, COP0, bus, memory control, I-cache and interrupts pass the vectors; PS-EXEs run under the own stub kernel (completed 2026-11-09)
 - [x] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests (completed 2026-11-10)
 - [x] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch (completed 2026-11-13)
-- [ ] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro
+- [x] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro (completed 2026-11-14)
 - [ ] **Phase 6: Discs and FMV** - CD-ROM with cue/bin, iso and m3u, XA, CD-DA, MDEC and disk control, and the own disc boots through OpenBIOS in RetroArch
 
 ## Phase Details
@@ -403,7 +403,7 @@ Plans:
   2. `ctest -L audio` passes on BRR, ADSR, noise, reverb, capture, IRQA and the transfer paths. The nightly lane reproduces the seven hardware pass lines of the ps1-tests `spu/memory-transfer` log.
   3. The libretro batch and single-sample audio paths deliver PCM equal to the runner's stream in `libretro.host`. RetroArch boots `spu_tone.exe` as content, and the idle SPU passes `core.no_busy_loop`.
 
-**Plans**: 24/24 plans executed in 17 waves
+**Plans**: 24/24 plans complete in 17 waves
 **Wave 1**
 - [x] 05-01-PLAN.md — Trace a bounded frame into the public PCM drain
 
@@ -489,5 +489,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
-| 5. The sound matches the console | 24/24 | Verified; ready to ship | - |
+| 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
 | 6. Discs and FMV | 0/TBD | Not started | - |

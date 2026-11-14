@@ -2,45 +2,45 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 05
-current_phase_name: The sound matches the console
-status: verified
-stopped_at: "Phase 05 verification passed; stop before $gsd-ship 5; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed), gpt-6-luna xhigh"
-last_updated: "2026-11-14T13:19:17.195Z"
+current_phase: 6
+current_phase_name: Discs and FMV
+status: planning
+stopped_at: Phase 5 complete, ready to plan Phase 6
+last_updated: "2026-11-14T15:25:15.760Z"
 last_activity: 2026-11-14
-last_activity_desc: "Phase 05 verification passed; stop at the ship boundary. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed); gpt-6-luna xhigh."
-state_head: 1cefbb94e8490f76b939a6f0aa578c06d439c9bd
+last_activity_desc: Phase 5 complete, transitioned to Phase 6
+state_head: 76fc24050433d8a888b16ea4511ade31ce9e8b75
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 150
   completed_plans: 150
-  percent: 67
-current_plan: 24 of 24
+  percent: 83
+current_plan: Not started
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-29)
+See: .planning/PROJECT.md (updated 2026-11-14)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 05 — The sound matches the console
+**Current focus:** Phase 6 — Discs and FMV
 
 ## Current Position
 
-Phase: 05 (The sound matches the console) — VERIFIED; READY TO SHIP
-Plan: 24 of 24
-Status: Goal-backward verification passed; stop before `$gsd-ship 5`.
-Last activity: 2026-11-14 — Phase 05 verification passed with no gaps or owner checks. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed); gpt-6-luna xhigh.
+Phase: 6 — Discs and FMV
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-14 — Phase 5 complete, transitioned to Phase 6
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 146
+- Total plans completed: 150
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -52,7 +52,7 @@ Progress: [███████░░░] 67%
 | 02 | 27 | - | - |
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
-| 5 | 24 | 24 | - |
+| 5 | 24 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -706,11 +706,11 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T10:42:49.015Z
-Stopped at: Completed 05-19-PLAN.md; next 05-15; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)
+Last session: 2026-11-14T15:27:07Z
+Stopped at: Phase 5 complete; Phase 5 ship in progress
 Resume file: None
 
-Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
+Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
 Phase 4 shipped as [PR #14](https://github.com/szTheory/schwaystation/pull/14); release [PR #15](https://github.com/szTheory/schwaystation/pull/15) merged with green required CI. PR #17's post-release CI follow-up is merged and green.
 Phase 3 ship PR: https://github.com/szTheory/schwaystation/pull/12
