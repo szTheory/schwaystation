@@ -274,10 +274,18 @@ static void setup_reverb_impulse(schway *inst, uint16_t evol_left, uint16_t evol
     inst->spu.voice[0].reg[1] = 0x1FFFu;
 }
 
-static void run_event_until(schway *inst, uint64_t cycle)
+static void run_cycles(schway *inst, uint64_t cycles)
 {
-    inst->ticks = cycle;
-    schway__spu_event(inst, cycle);
+    schway_budget budget;
+    schway_run_result result;
+    memset(&budget, 0, sizeof budget);
+    budget.size = (uint32_t)sizeof budget;
+    budget.max_cycles = cycles;
+    memset(&result, 0, sizeof result);
+    result.size = (uint32_t)sizeof result;
+    CHECK(schway_run(inst, &budget, &result) == SCHWAY_STATUS_OK,
+          "public run advances the scheduled reverb path");
+    CHECK(result.stop == SCHWAY_STOP_BUDGET, "public run stops at its cycle budget");
 }
 
 static uint32_t capture_impulse_pcm(int16_t samples[96][2], uint16_t evol_left,
@@ -289,13 +297,15 @@ static uint32_t capture_impulse_pcm(int16_t samples[96][2], uint16_t evol_left,
         return 0u;
     }
     setup_reverb_impulse(inst, evol_left, evol_right, wet_input);
-    run_event_until(inst, SCHWAY__CYCLES_PER_PAIR);
+    run_cycles(inst, SCHWAY__CYCLES_PER_PAIR);
     inst->spu.reg[test_reg_index(TEST_SPU_EON0)] = 0u;
     if (split != 0u) {
-        run_event_until(inst, UINT64_C(23) * SCHWAY__CYCLES_PER_PAIR);
-        run_event_until(inst, UINT64_C(51) * SCHWAY__CYCLES_PER_PAIR);
+        run_cycles(inst, UINT64_C(22) * SCHWAY__CYCLES_PER_PAIR);
+        run_cycles(inst, UINT64_C(28) * SCHWAY__CYCLES_PER_PAIR);
+        run_cycles(inst, UINT64_C(45) * SCHWAY__CYCLES_PER_PAIR);
+    } else {
+        run_cycles(inst, UINT64_C(95) * SCHWAY__CYCLES_PER_PAIR);
     }
-    run_event_until(inst, UINT64_C(96) * SCHWAY__CYCLES_PER_PAIR);
 
     schway_audio audio;
     memset(&audio, 0, sizeof audio);
@@ -335,13 +345,13 @@ static void check_public_wet_return(void)
         int32_t negative_left = (int32_t)wet_negative[tick][0] - dry[tick][0];
         saw_wet |= positive_left != 0 || positive_right != 0;
         saw_asymmetric |= positive_left != positive_right;
-        saw_opposite_sign |= positive_left * negative_left < 0;
+        saw_opposite_sign |= (int64_t)positive_left * negative_left < 0;
     }
     CHECK(saw_wet != 0u, "EON wet input reaches the public audio mix");
     CHECK(saw_asymmetric != 0u, "left and right wet impulses remain distinct");
     CHECK(saw_opposite_sign != 0u, "signed EVOL changes the wet return sign");
     CHECK(memcmp(wet_positive, wet_split, sizeof wet_positive) == 0,
-          "reverb channel phase is stable across split scheduled runs");
+          "reverb channel phase is stable across split public run calls");
     CHECK(memcmp(dry, off, sizeof dry) == 0,
           "zero EVOL Off configuration contributes no wet PCM");
 }

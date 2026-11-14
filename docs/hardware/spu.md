@@ -73,3 +73,21 @@ The documented noise capture scaling is implemented in the sample-granular model
 accesses within one sample is not claimed as measured hardware timing; the pinned memory-transfer program remains the
 hardware oracle for its named transfer cases. Noise mode still performs the voice's modeled RAM fetches before sample
 selection, preserving their IRQA behavior when the voice is muted or its BRR output is inaudible.
+
+## Reverb resampling and mix
+
+Voice sums selected by EON enter the reverb path before the final main-volume stage. The reverb input uses the
+documented symmetric 39-tap integer FIR before its 22.05 kHz stage; the return uses the matching polyphase FIR
+to produce 44.1 kHz samples. The coefficients and channel-phase selection are in `src/spu_tables.inc` and
+`src/spu_reverb.c`; their fact source is `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` section 1.7.
+
+Left and right 22.05 kHz work alternates on successive native sample ticks. Each centered 39-tap filter adds
+19 native samples of delay, so the pair contributes 38 samples before the wet return is mixed. The SCPH-1001
+I2S measurement confirms that delay and the alternating-channel effect; it also finds intermediate 16-bit
+saturation, while the exact per-stage rounding positions remain unknown. See the public psx-spx measurement at
+[commit `a37f2fec163e149f4e3e39599eb43c65c21181a8`](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8).
+
+The current 22.05 kHz feedback seam forwards its input as a unity stage; the register-driven feedback network
+remains a separate part of the model. EVOL still scales the interpolated return; a zero EVOL setting therefore
+contributes no wet PCM. The regression checks treat these constraints as timing and signal-path evidence, not as a
+captured silicon preset waveform.

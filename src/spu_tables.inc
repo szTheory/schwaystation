@@ -1,4 +1,5 @@
 /* Factual interpolation weights from psx-spx at the pin cited in preparation §1.3. */
+#ifndef SCHWAY__SPU_REVERB_TABLES
 static const int16_t spu_gaussian[512] = {
     -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1,
@@ -65,3 +66,12 @@ static const int16_t spu_gaussian[512] = {
     0x593A, 0x5949, 0x5958, 0x5965, 0x5971, 0x597C, 0x5986, 0x598F,
     0x5997, 0x599E, 0x59A4, 0x59A9, 0x59AD, 0x59B0, 0x59B2, 0x59B3,
 };
+#endif
+
+#ifdef SCHWAY__SPU_REVERB_TABLES
+/* Coefficient facts: .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md section 1.7. */
+static const int16_t spu_reverb_fir_taps[39] = {
+    -1, 0, 2, 0, -10, 0, 35, 0, -103, 0, 266, 0, -616, 0, 1332, 0,
+    -2960, 0, 10246, 16384, 10246, 0, -2960, 0, 1332, 0, -616, 0,
+    266, 0, -103, 0, 35, 0, -10, 0, 2, 0, -1};
+#endif

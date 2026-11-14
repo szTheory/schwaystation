@@ -89,7 +89,8 @@ void schway__spu_envelope_rate(uint32_t rate, uint32_t decreasing, int32_t *step
                                uint32_t *ticks);
 void schway__spu_noise_step(schway *inst);
 int32_t schway__spu_noise_level(const schway *inst);
-void schway__spu_reverb_step(schway *inst);
+void schway__spu_reverb_step(schway *inst, int32_t wet_left, int32_t wet_right,
+                             int16_t *return_left, int16_t *return_right);
 void schway__spu_reverb_fir_push(int16_t history[SCHWAY__SPU_REVERB_FIR_TAPS],
                                  uint32_t cursor, int16_t sample);
 int16_t schway__spu_reverb_fir_sum(

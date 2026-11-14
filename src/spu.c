@@ -21,6 +21,8 @@
 #define SPU_KON_ADDRESS 0x1F801D88u
 #define SPU_KOFF_ADDRESS 0x1F801D8Cu
 #define SPU_NON_ADDRESS 0x1F801D94u
+#define SPU_EON0_ADDRESS 0x1F801D98u
+#define SPU_EON1_ADDRESS 0x1F801D9Au
 #define SPU_ENDX_ADDRESS 0x1F801D9Cu
 #define SPU_DEV4_CONTROL_INDEX 5u
 #define SPU_DEV4_DMA_READ_CONTROL 0x220931E1u
@@ -322,10 +324,26 @@ static void spu_mix_sample(schway *inst)
 {
     int32_t left = 0;
     int32_t right = 0;
+    int32_t wet_left = 0;
+    int32_t wet_right = 0;
+    uint16_t eon[2] = {
+        inst->spu.reg[(SPU_EON0_ADDRESS - SPU_REGISTER_BASE) >> 1],
+        inst->spu.reg[(SPU_EON1_ADDRESS - SPU_REGISTER_BASE) >> 1]};
     for (uint32_t voice = 0u; voice < SCHWAY__SPU_VOICE_COUNT; voice++) {
-        left += spu_mix_voice(&inst->spu.voice[voice], 0u);
-        right += spu_mix_voice(&inst->spu.voice[voice], 1u);
+        int16_t voice_left = spu_mix_voice(&inst->spu.voice[voice], 0u);
+        int16_t voice_right = spu_mix_voice(&inst->spu.voice[voice], 1u);
+        left += voice_left;
+        right += voice_right;
+        if ((eon[voice >> 4] & (uint16_t)(1u << (voice & 15u))) != 0u) {
+            wet_left += voice_left;
+            wet_right += voice_right;
+        }
     }
+    int16_t reverb_left = 0;
+    int16_t reverb_right = 0;
+    schway__spu_reverb_step(inst, wet_left, wet_right, &reverb_left, &reverb_right);
+    left += reverb_left;
+    right += reverb_right;
     uint16_t attr = inst->spu.reg[(SPU_ATTR_ADDRESS - SPU_REGISTER_BASE) >> 1];
     int16_t output_left = 0;
     int16_t output_right = 0;
