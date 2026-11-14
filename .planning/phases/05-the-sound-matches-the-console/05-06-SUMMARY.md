@@ -100,7 +100,7 @@ Task 1 used separate TDD commits: RED `d2baed7`, expanded RED `1fa2054`, and GRE
 - Expanded filter/nibble/shift and 256-phase checks also exited 1 on missing decoder behavior and were committed separately before production code.
 - The task verification command in `coverage` passed with exactly the `spu.voices` test selected.
 
-## Verification
+## Commands and Evidence
 
 - `cmake --preset ci && cmake --build --preset ci --target schwaystation-test-spu-voices && ctest --test-dir build/ci -R '^spu\.voices$' --no-tests=error --output-on-failure` — exit 0; focused BRR test passed.
 - `cmake --build --preset ci --target schwaystation-test-state && ctest --test-dir build/ci -R '^core\.state\.' --no-tests=error --output-on-failure` — exit 0; all eight existing state tests passed.
