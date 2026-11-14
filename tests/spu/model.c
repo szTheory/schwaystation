@@ -378,6 +378,42 @@ static void check_dma_fifo_ram_round_trip(void)
     schway_destroy(inst);
 }
 
+/* Fault prevented: DEV4's documented DMA-read insertion being ignored, or
+   the workaround value being read from anything other than memory-control
+   state. The SPU emits FFFFh at each 32-halfword boundary unless DEV4_CTRL
+   is set to 220931E1h (PSX-SPX, SPU transfers; preparation §1.5). */
+static void check_dma_read_dev4_control(void)
+{
+    const uint32_t base = 0x400u;
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    if (inst == NULL) {
+        return;
+    }
+
+    for (uint32_t i = 0u; i < 64u; i++) {
+        schway__spu_ram_write(inst, base + 2u * i, (uint16_t)(0x1200u + i));
+    }
+    spu_write16(inst, 0x1F801DA6u, (uint16_t)(base >> 3));
+    spu_write16(inst, 0x1F801DAAu, 0x0030u);
+    spu_next_tick(inst);
+
+    dma_reg_write(inst, 0x1F801014u, 0x220931E1u);
+    for (uint32_t i = 0u; i < 64u; i++) {
+        CHECK_EQ_HEX(schway__spu_dma_read(inst), 0x1200u + i);
+    }
+    CHECK_EQ_HEX(inst->spu.transfer_address, base + 128u);
+
+    spu_write16(inst, 0x1F801DA6u, (uint16_t)(base >> 3));
+    spu_next_tick(inst);
+    dma_reg_write(inst, 0x1F801014u, 0u);
+    for (uint32_t i = 0u; i < 64u; i++) {
+        uint16_t expected = (i % 32u) == 0u ? 0xFFFFu : (uint16_t)(0x1200u + i);
+        CHECK_EQ_HEX(schway__spu_dma_read(inst), expected);
+    }
+    CHECK_EQ_HEX(inst->spu.transfer_address, base + 128u);
+    schway_destroy(inst);
+}
+
 static void check_spu_enable_gates_irq(void)
 {
     schway *inst = make(SCHWAY_REGION_NTSC_U);
@@ -678,6 +714,7 @@ int main(int argc, char **argv)
     check_spu_enable_gates_irq();
     check_manual_fifo_and_ram_transfer();
     check_dma_fifo_ram_round_trip();
+    check_dma_read_dev4_control();
     check_capture_gate_status_and_irqa();
     check_scheduled_split_runs();
     check_cpu_and_dma_deadlines();
