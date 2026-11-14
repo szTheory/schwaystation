@@ -160,6 +160,9 @@ static uint32_t parse_audio_expectations(const char *path,
         unsigned host_frames = 0u;
         unsigned pairs = 0u;
         int consumed = 0;
+#if defined(_MSC_VER)
+#pragma warning(suppress : 4996)
+#endif
         if (sscanf(text, "%15s %u %u %64s %n", name, &host_frames, &pairs,
                    digest, &consumed) != 4 || consumed == 0 || *trim(text + consumed) != '\0') {
             valid = 0u;
@@ -432,6 +435,9 @@ static uint32_t parse_brr_table(const char *path, uint8_t blocks[2][16])
         }
         int flags = 0;
         int seed = 0;
+#if defined(_MSC_VER)
+#pragma warning(suppress : 4996)
+#endif
         if (count >= 2u || sscanf(text, "spu_brr_block %i, %i", &flags, &seed) != 2 ||
             flags < 0 || flags > UINT8_MAX || seed < 0 || seed > UINT8_MAX) {
             (void)fclose(file);
@@ -450,6 +456,19 @@ static uint32_t parse_brr_table(const char *path, uint8_t blocks[2][16])
     return count == 2u ? 0u : 1u;
 }
 
+static uint32_t parse_li_t0(const char *line, uint32_t *value)
+{
+    int immediate = 0;
+#if defined(_MSC_VER)
+#pragma warning(suppress : 4996)
+#endif
+    if (sscanf(line, " li t0, %i", &immediate) != 1) {
+        return 0u;
+    }
+    *value = (uint32_t)immediate;
+    return 1u;
+}
+
 static uint32_t parse_event_table(const char *path, struct spu_event *events,
                                   uint32_t capacity, uint32_t *event_count,
                                   uint16_t *key_on)
@@ -464,9 +483,7 @@ static uint32_t parse_event_table(const char *path, struct spu_event *events,
     uint32_t pending_t0 = 0u;
     uint32_t has_t0 = 0u;
     while (fgets(line, sizeof line, file) != NULL) {
-        int immediate = 0;
-        if (sscanf(line, " li t0, %i", &immediate) == 1) {
-            pending_t0 = (uint32_t)immediate;
+        if (parse_li_t0(line, &pending_t0) != 0u) {
             has_t0 = 1u;
         }
 
@@ -474,6 +491,9 @@ static uint32_t parse_event_table(const char *path, struct spu_event *events,
         char source[16] = {0};
         char base[16] = {0};
         unsigned offset = 0u;
+#if defined(_MSC_VER)
+#pragma warning(suppress : 4996)
+#endif
         if (sscanf(line, " %15s %15[^,], %x(%15[^)])", mnemonic, source, &offset, base) != 4 ||
             strcmp(mnemonic, "sh") != 0 || strcmp(base, "s1") != 0 || offset >= 0x200u) {
             continue;
