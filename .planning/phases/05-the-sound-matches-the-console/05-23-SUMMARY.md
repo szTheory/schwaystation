@@ -95,7 +95,7 @@ None - followed the settled SPU ATTR ownership and nightly test decisions.
 
 The plan uses `type: execute` with automatic tasks. Existing assertions were updated before the source cleanup. This refactor preserves observable behavior, and the CTest registration is configuration; neither has an honest behavior-failing pre-change assertion. No RED was claimed. The first Task 1 run used `schway__spu_reg_peek` for a pending ATTR value and failed; the check was corrected to use `schway__spu_dma_ready`, which observes the SPU's pending value.
 
-## Verification
+## Commands and Evidence
 
 - `cmake --preset ci && cmake --build --preset ci --target schwaystation-test-bus schwaystation-test-dma schwaystation-test-spu && ctest --test-dir build/ci -R '^(bus\.|dma\.spu\.|spu\.model$)' --no-tests=error --output-on-failure` - final run exit 0; all 23 selected tests passed.
 - `cmake -S . -B build/spu-reference -G Ninja -DSCHWAYSTATION_INVENTORY=nightly -DSCHWAYSTATION_GPU_REFERENCE_ONLY=ON -DSCHWAYSTATION_BUILD_LIBRETRO=OFF -DSCHWAYSTATION_FIXTURES=OFF && cmake --build build/spu-reference --target schwaystation-test-spu-reference && ctest --test-dir build/spu-reference -R '^spu\.reference\.memory_transfer$' --no-tests=error --output-on-failure` - exit 0; the full seven-case nightly guest passed 1/1.
