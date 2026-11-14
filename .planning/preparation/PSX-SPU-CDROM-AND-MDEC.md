@@ -48,90 +48,44 @@ PROVENANCE must record the two brief corrections (Avocado, Rustation) so no late
 
 ## 1. SPU
 ### 1.1 Time base and memory
-| Item | Fact | Source |
-|---|---|---|
-| Clock | CPU 33,868,800 Hz = 44,100 x 300h; one output sample every 768 CPU cycles | [SCM.01][SCM.04] |
-| Register map | 1F801C00-1D7F voices (8 halfwords each), 1D80-1D87 volumes, 1D88-1D9F voice flags, 1DA2-1DBF control, 1DC0-1DFF reverb, 1E00-1E5F per-voice current volumes, 1E60-1E7F and 1DA0/1DBC unused RAM-like | [SCM.01] |
-| Bus | 16-bit; 8-bit writes to odd addresses ignored, to even addresses executed as 16-bit; 32-bit writes occasionally lost on hardware (ps1-tests `spu/test` confirms) | [SCM.01][SCM.12] |
-| Write latency | values applied at the 44.1 kHz tick, so up to 300h cycles late; ATTR bits 0-5 appear in STATX bits 0-5 delayed | [SCM.01] |
-| RAM 512 KB | 00000-003FF CD-L capture, 00400-007FF CD-R, 00800-00BFF voice 1, 00C00-00FFF voice 3 (each 400h bytes = 200h samples), 01000 up ADPCM, top = reverb work area ending at 7FFFE | [SCM.01] |
-| RAM_CTRL 1F801DAC | must be 0004h (single 512 KB bank); other values double or octuple halfwords on write; capture IRQs and reverb need bits 2-3 set | [SCM.01] |
-| RAM timing | per 768-cycle frame: 24 voices x 3 RAM accesses, 4 capture writes, 14 reverb accesses, 8 cycles each = 720 cycles; order voice 1, CD-L, CD-R, V1, V3, reverb, voices 2-24 (logic-analyser capture) | [SCM.01] |
+The documented clock, register map, bus behavior, RAM map and measured RAM-slot schedule are sourced to [SCM.01] and [SCM.12]. The maintained implementation contract is [the SPU hardware guide](../../docs/hardware/spu.md#clock-registers-and-state). It describes the sample-granular scheduler model; it does not claim the measured sub-tick RAM-slot placement.
 
 ### 1.2 Voice registers and BRR blocks
-| Register (+10h x N) | Meaning | Source |
-|---|---|---|
-| C00/C02 VOLL/VOLR | bit15 = 0: volume/2 in bits 0-14 (-4000h..3FFFh); bit15 = 1: sweep (bit14 exp, bit13 decrease, bit12 phase negative, bits 6-2 shift, bits 1-0 step) | [SCM.01] |
-| C04 PITCH | 1000h = 44,100 Hz; step clamped to 4000h (176.4 kHz); 0 stops | [SCM.01] |
-| C06 SSA | start address in 8-byte units, copied to the current address on key on; never increments | [SCM.01] |
-| C08/C0A ADSR1/2 | see 1.4 | [SCM.01] |
-| C0C ENVX | current ADSR level 0..7FFFh, R/W; writing jumps the envelope; hardware overwrites on the next step | [SCM.01] |
-| C0E LSAX | repeat address; set by a Loop Start header or by software | [SCM.01] |
-| BRR block | 16 bytes: byte 0 shift (bits 0-3, 13-15 act as 9) and filter (bits 4-6, 0-4; ares clamps >4 to 4); byte 1 flags bit0 Loop End, bit1 Loop Repeat, bit2 Loop Start; 14 data bytes = 28 nibbles, low nibble first | [SCM.01][SCM.10] |
-| Flag codes | 0 continue; 1 End+Mute (jump to LSAX, set ENDX, release, env = 0); 2 same as 0; 3 End+Repeat (jump, set ENDX) | [SCM.01] |
-| Filter table | pos = {0, 60, 115, 98, 122}, neg = {0, 0, -52, -55, -60}; s = (nibble << 12 >> shift) + (old x pos + older x neg) >> 6, saturated to 16 bits (ares; psx-spx gives (+32)/64 for XA, same table minus entry 4) | [SCM.10][SCM.03] |
-| Pitch modulation | PMON bit x (x > 0): step = ((sext16(pitch) x (OUTX(x-1) + 8000h)) >> 15) & FFFFh, then clamp 4000h; glitchy above 7FFFh | [SCM.01] |
-| Counter | bits 12+ select the sample in the block (28 per block), bits 4-11 index the gaussian table | [SCM.01] |
+Voice registers, BRR decoding, pitch modulation, looping and current model behavior are in the hardware guide's [voice section](../../docs/hardware/spu.md#voice-playback). The register definitions and BRR facts remain pinned to [SCM.01] and [SCM.10]; the implementation is its own code.
 
 ### 1.3 Gaussian interpolation
-out = (g[FFh-i] x oldest + g[1FFh-i] x older + g[100h+i] x old + g[i] x new) >> 15 (each product shifted separately), i = counter bits 4-11; the 512-entry table is printed in full on psx-spx (first entries -1, ..., last 59B3h); the four taps sum to 7F7Fh..7F81h, so no overflow [SCM.01]. The table is checked in as `spu_gauss[512]` and a unit test asserts the per-index sum range.
+The 512-entry Gaussian fact table and interpolation behavior are summarized in the hardware guide's [voice section](../../docs/hardware/spu.md#voice-playback). The table values are cited facts from [SCM.01]; the three-sample cross-block history and decoder baseline are independently compared with ares at [SCM.10].
 
-**SPU-INTERP.** **Recommendation:** gaussian table interpolation exactly as above, with the three previous samples carried across blocks (ares keeps samples 25-27 of the prior block) [SCM.10]. **Strongest alternative:** linear or none (cheaper, audibly wrong on high pitch). **Would change if:** nothing; this is the hardware.
+**SPU-INTERP.** The selected baseline is Gaussian interpolation with three prior samples carried across blocks; see the guide and [SCM.10]. The checked-in table is a factual data table, not copied emulator code. There is no remaining implementation choice here.
 
 ### 1.4 ADSR and sweep envelopes
-
-The shipped baseline, register behavior, tests and open hardware questions are summarized in
-[the SPU hardware guide](../../docs/hardware/spu.md#adsr-and-volume-envelopes).
-| Field | Bits | Source |
-|---|---|---|
-| ADSR1 (C08) | 15 attack mode (0 lin, 1 exp), 14-10 attack shift, 9-8 attack step (+7..+4), 7-4 decay shift (exp decrease, step -8 fixed), 3-0 sustain level ((N+1) x 800h) | [SCM.01] |
-| ADSR2 (C0A) | 31 sustain mode, 30 sustain direction, 28-24 sustain shift, 23-22 sustain step, 21 release mode, 20-16 release shift (step -8 fixed) | [SCM.01] |
-
-Envelope step rule (psx-spx, confirmed by ares' table): `step = 7 - stepValue` (negated to -8..-5 when decreasing XOR phase-negative), `step <<= max(0, 11 - shift)`, `counterIncrement = 8000h >> max(0, shift - 11)`; each 44.1 kHz tick adds the increment and steps when bit 15 of the counter is set. Exponential increase above 6000h: shift < 10 step/4; shift >= 11 increment/4; else both /2. Exponential decrease: `step = step x level / 8000h`. Step value all ones (7Fh, or 1Fh for decay/release) never steps and never saturates. Levels clamp to 0..7FFFh (envelope) or -8000h..7FFFh (volume sweep) [SCM.01]. ares encodes the same as a 2 x 128 table: rate < 48 gives ticks = 1 and step shifted by 11 - rate/4; rate >= 48 gives ticks = 1 << (rate/4 - 11) [SCM.10]. Hardware shows rates above 26 misbehave (76h acts like 6Ah) and phase-negative sweep decreasing snaps to zero; Wipeout 3 depends on the all-ones no-step rule [SCM.01]. Key on clears ENDX, copies SSA, zeroes the level and history, starts attack; key off switches any phase to release; ENDX sets on Loop End [SCM.01][SCM.10]. Decay target = sustain level, release target 0 [SCM.10].
+The shipped register and integer baseline, tests, and open hardware questions are in [the ADSR and volume section](../../docs/hardware/spu.md#adsr-and-volume-envelopes). Primary behavior facts are [SCM.01]; the independent ares table comparison is [SCM.10]. Rates above 26 and phase-negative sweep behavior remain unresolved against direct hardware and must not become a profile switch.
 
 ### 1.5 Noise and control
-Noise is shared by all voices and uses the 16-bit LFSR `parity = b15 ^ b12 ^ b11 ^ b10 ^ 1`; the period is `20000h >> shift` output samples at 44.1 kHz. The eight-slot schedule from pinned update [SCM.27] is Step 0 `{0,2,4,6}`, Step 1 `{0,1,2,4,6}`, Step 2 `{0,1,2,4,5,6}`, Step 3 `{0,1,2,3,4,5,6}`. It clocks at most once per sample, including short periods; clearing ATTR bit 15 does not reset the LFSR or phase. In noise mode, voice 1 and 3 capture rings receive the full signed noise level multiplied by ENVX and arithmetic-shifted by 15, not a one-bit value [SCM.27]. The earlier decrementing-timer summary is superseded; do not implement both forms.
-
-| ATTR 1F801DAA | bit15 SPU enable, 14 unmute, 13-10 noise shift, 9-8 noise step, 7 reverb master, 6 IRQ9 enable (and acknowledge when 0), 5-4 transfer mode (0 stop, 1 manual write, 2 DMA write, 3 DMA read), 3/2 PIO/CD reverb, 1/0 PIO/CD input enable | [SCM.01] |
-|---|---|---|
-| STATX 1F801DAE | bit11 capture half, 10 transfer busy, 9 DMA read request, 8 DMA write request, 7 = ATTR.5, 6 IRQ flag, 5-0 = ATTR 5-0 delayed | [SCM.01] |
-| Transfer | TSA 1F801DA6 (address/8, latched to an internal incrementing pointer), FIFO 1F801DA8 (32 halfwords), DMA4 blocksize 10h; manual write needs Stop, address, FIFO, ManualWrite, wait busy; DMA read needs DEV4_CTRL 220931E1h or the data arrives with FFFFh inserted every 32 halfwords | [SCM.01] |
-| IRQ | IRQA 1F801DA4 (address/8); fires on any voice fetch (even silent voices, even noise mode), reverb access, capture writes (addresses 0..1FFh, about 86.13 Hz) and transfers; mid-block addresses miss sometimes; MGS, DDR, CTR, Um Jammer Lammy, Tron Bonne, NFS3 rely on it | [SCM.01] |
+The pinned noise schedule, shared LFSR and capture signal are summarized in the guide's [noise section](../../docs/hardware/spu.md#noise), sourced to the exact psx-spx update [SCM.27]. Control, FIFO/DMA4 and IRQ behavior are in its [transfer section](../../docs/hardware/spu.md#fifo-dma4-capture-and-irq9), sourced to [SCM.01] and [SCM.12]. The earlier decrementing-timer summary is superseded.
 
 ### 1.6 Capture buffers
-CD-L, CD-R, voice 1 and voice 3 are written every sample to the four 400h-byte rings regardless of ATTR enable or lid state; Phase-5 CD inputs are zero, while noise-mode voice captures use the full ENVX-scaled LFSR [SCM.01][SCM.27]. STATX bit 11 shows the capture half only when RAM_CTRL bits 2-3 are set [SCM.01]. Required by Crash Team Racing lip sync and Um Jammer Lammy [SCM.01]. The exact placement of these writes within the model's sample tick is documented behavior, not a new hardware measurement.
+Capture-buffer facts and the implementation's sample-granular behavior are in the hardware guide's [transfer section](../../docs/hardware/spu.md#fifo-dma4-capture-and-irq9), from [SCM.01] and [SCM.27]. Phase-5 CD-L/CD-R capture inputs are zero; the exact placement within one modeled tick remains an implementation rule, not a sub-tick hardware claim.
 
 ### 1.7 Reverb
-Registers 1F801DC0-1DFE in this order: dAPF1, dAPF2, vIIR, vCOMB1-4, vWALL, vAPF1, vAPF2, mLSAME, mRSAME, mLCOMB1, mRCOMB1, mLCOMB2, mRCOMB2, dLSAME, dRSAME, mLDIFF, mRDIFF, mLCOMB3, mRCOMB3, mLCOMB4, mRCOMB4, dLDIFF, dRDIFF, mLAPF1, mRAPF1, mLAPF2, mRAPF2, vLIN, vRIN; plus EVOLL/R (1D84/86), ESA (1DA2, base, writing also resets the current address), EON0/1 (1D98/9A) [SCM.01]. Addresses are in 8-byte units relative to the current buffer address, wrapped within ESA..7FFFEh; the buffer address advances by 2 per 22.05 kHz step: `addr = max(ESA, (addr + 2) & 7FFFEh)` [SCM.01]. The psx-spx formula is an algebraic baseline for each 22.05 kHz step, not a measured bit-level evaluation order [SCM.01][SCM.28]:
-```
-[mLSAME] = (Lin + [dLSAME]*vWALL - [mLSAME-2])*vIIR + [mLSAME-2]   ; same side, L and R
-[mLDIFF] = (Lin + [dRDIFF]*vWALL - [mLDIFF-2])*vIIR + [mLDIFF-2]   ; cross side
-Lout = vCOMB1*[mLCOMB1] + ... + vCOMB4*[mLCOMB4]
-Lout = Lout - vAPF1*[mLAPF1-dAPF1]; [mLAPF1] = Lout; Lout = Lout*vAPF1 + [mLAPF1-dAPF1]
-Lout = Lout - vAPF2*[mLAPF2-dAPF2]; [mLAPF2] = Lout; Lout = Lout*vAPF2 + [mLAPF2-dAPF2]
-LeftOutput = Lout*EVOLL
-```
-Hardware alternates left and right processing across 44.1 kHz ticks; input and output use centred 39-tap FIR filters for the 44.1 to 22.05 kHz conversion [SCM.01]. A SCPH-1001 digital-I2S measurement found 16-bit saturation inside the reverb datapath, measurable left/right alternation, and a combined 38-sample delay at 44.1 kHz. With those constraints matched, a Room-preset capture still differed by about 24 LSB mean on a wet-dominated channel; exact per-stage rounding and saturation positions remain unknown [SCM.28]. Treat the measurements as constraints for regression tests, not as a complete hardware waveform. vIIR = -8000h has a documented negation effect, while the measured vLIN/vRIN = -8000h behaves as ordinary -1.0 [SCM.01][SCM.28]. ATTR bit 7 = 0 suppresses IIR state writes (their computed results are discarded) and APF writes; each inhibited write is replaced by a read, and APF output reads still contribute to the return [SCM.01]. The register equation is implemented as a deterministic integer baseline with signed Q15 scaling, 16-bit saturation, wrap from ESA through 7FFFEh, and IRQA checks on each work-memory access. Exact per-stage rounding and saturation positions remain unresolved; the preset digests are local regression values, not hardware captures. ares implements the IIR stage as `((in*alpha >> 14) + ((1-alpha)*prev >> 14)) >> 1` with a special case for alpha = -8000h, a 20-tap half-band FIR on a 64-entry ring, and the same address wrap [SCM.10]. Ten examples are listed on psx-spx: nine active presets (Room, Studio S/M/L, Hall, Half Echo, Space Echo, Chaos Echo, Delay) and Reverb off, with their buffer sizes [SCM.01].
+The maintained integer baseline and its limits are in the guide's [reverb section](../../docs/hardware/spu.md#reverb). The psx-spx facts and FIR data are pinned in [SCM.01]; the SCPH-1001 measurement is pinned to exact commit [SCM.28]. It constrains 16-bit saturation, alternating channels and a 38-sample delay, but the exact per-stage rounding remains unknown. The measured Room-preset difference and local impulse digests are not a full hardware waveform.
 
 ### 1.8 Mixing and inputs
-Per voice: `Lvol = (ENVX x VOLXL) >> 15`, sample x ADSR level then x voice volume; the 24 voices sum, reverb return x EVOL, CD input x AVOLL/R (1DB0/1DB2, signed 16-bit), PIO input x BVOLL/R (1DB4/1DB6), then main volume MVOLL/R (1D80/82, same direct/sweep encoding as voice volumes) [SCM.01]. The CD-ROM decoder applies its own 2x2 matrix first (ATV0-3, 80h = unity, saturation works to double volume, "FFh,FFh,FFh,FFh" overflows) [SCM.02]; ares saturates each matrix term to 16 bits and lets the sum overflow [SCM.10]. Negative volumes invert phase [SCM.01].
-
-**SPU-MIX.** **Recommendation:** int32 accumulators; saturate to int16 at exactly the points the documentation names (each voice after volume, the reverb stored values, the CD matrix terms, the final left/right). **Strongest alternative:** saturate only at the output (fewer ops, wrong on loud mixes). **Would change if:** a hardware capture of the Chaos Echo preset shows the reverb overflowing where the model saturates.
+The current Phase-5 mixer contract is in the guide's [PCM section](../../docs/hardware/spu.md#pcm-output-and-evidence-limits): voice and reverb paths produce native signed 16-bit stereo, and the host owns resampling. CD-DA/XA and other CD audio inputs are not yet connected; Phase 6 owns those features. The CD controller's ATV matrix facts remain in §2 and [SCM.02].
 
 ### 1.9 Pitfalls and the SPU choices
-| Pitfall | Fact | Response |
-|---|---|---|
-| Key-on timing | KON applied at the next 44.1 kHz tick, not at the write; 32-bit KON writes may be lost on hardware | apply all flag writes at the tick; test both halfword orders |
-| Envelope precision | rates above 26 and phase-negative sweeps deviate from the documented baseline | implement the baseline, do not add a profile knob, and keep direct hardware behavior unresolved |
-| Reverb correctness | addressing is relative and wraps; left/right alternate ticks | implement the two-phase form, verify against presets with a self-authored impulse |
-| RAM read-back | DMA read inserts FFFFh unless DEV4_CTRL set; ps1-tests `memory-transfer` has 7 pass lines from hardware | run the test in CI; it is the only RAM oracle |
-| 8-bit writes | odd ignored, even widened | unit test |
+| Open point | Evidence or settled model rule |
+|---|---|
+| Envelope precision | Rates above 26 and phase-negative sweep behavior differ from the documented baseline; no direct-hardware resolution exists. See [ADSR guide](../../docs/hardware/spu.md#adsr-and-volume-envelopes) and [SCM.01]. |
+| Reverb precision | The measured reverb constraints are reproduced, but exact per-stage rounding remains unknown. See [reverb guide](../../docs/hardware/spu.md#reverb) and [SCM.28]. |
+| RAM read-back | The pinned transfer guest has seven named hardware pass lines. They cover those transfer cases only; see §5 and [SCM.12]. |
+| Sub-tick scheduling | The implementation uses one integer event per 768 CPU cycles and does not model the measured RAM-slot schedule. IRQ checks occur at each modeled access. |
 
-**SPU-MODEL.** **Recommendation:** one integer SPU tick per 768 CPU cycles (no sub-tick model), processing voices 1-24 then reverb in the hardware order of 1.1, with the IRQ check at each RAM access so streaming games see IRQs at the right sample. **Strongest alternative:** cycle-slot model following the 8-cycle RAM schedule (needed only for exact IRQ phase within a sample). **Would change if:** an IRQ-streaming title (MGS, DDR) desynchronises at sample granularity.
+**SPU-MODEL.** The scheduler runs one integer event every 768 CPU cycles. Its sample-granular order is documented in the hardware guide; it does not claim sub-tick IRQ or RAM-access timing. This is the settled Phase-5 model.
 
-**HASH.** **Recommendation:** the audio hash is SHA-256 over the int16 stereo stream the SPU emits at native 44,100 Hz after main volume and final saturation, before any host resampling, with the CD-DA/XA contribution included (it is mixed inside the SPU) and reverb included. One record per sample, no transition stream (the PSX output is already a fixed-rate PCM stream, unlike the PSG precedent) [SCM.21]. **Strongest alternative:** hash voice outputs pre-mix for finer fault localisation (costly, 24 x). **Would change if:** hashing costs more than 2 % in the runner.
+**HASH.** The runner's `--hash-audio` hashes the canonical little-endian stereo PCM drained through `schway_get_audio`; it fails if the drain reports lost samples. It hashes delivered native output, not an internal push-time tap. Phase-5 output contains the implemented voice and reverb paths; CD-DA/XA inputs remain future work. See [SCM.21] for the hash/output contract precedent.
 
-**OUT.** **Recommendation:** the core emits int16 stereo at 44,100 Hz, exactly `frame_cycles / 768` samples per frame with the remainder carried in an accumulator; the samples-per-frame rational is 527,799,972/715,909 = 737.244 for NTSC (263 × 3413 GPU clocks = 405,350,378,496/715,909 CPU cycles) and 628,856,592/709,379 = 886.489 for PAL (314 × 3406 clocks = 482,961,862,656/709,379 cycles) (derived from the exact clock ratios 715909/451584 and 709379/451584 of PSX-SYSTEM C1 and ARCHITECTURE 1, not from the 11/7 approximation [SCM.22]). The host resamples (section 6). **Strongest alternative:** core-side resampling to 48 kHz. **Would change if:** a host cannot resample (then add the sibling's Kaiser kernel as an optional stage).
+**OUT.** The core emits signed 16-bit stereo at 44,100 Hz on each 768-cycle tick. The host receives native PCM and performs any resampling. Frame sample counts vary by one as the scheduler carries fractional frame timing; see ARCHITECTURE §1 and §4.
 
 ## 2. CD-ROM controller
 ### 2.1 Ports and index model
@@ -272,8 +226,8 @@ Commands: MDEC(1) decode (bits 28-27 depth, 26 signed, 25 bit15, 15-0 parameter 
 
 ## 6. Determinism and A/V sync
 - Inputs to CD timing are the image bytes, the TOC and the command stream only; the sector clock is derived from the CPU cycle counter (451,584 >> speed), and seeks use the integer model of 2.4; the host's file latency never changes emulated time (the host may pre-read; the core blocks on `read_sector` only inside `schway_run`, so a slow host stalls the frame, never the drive) [SCM.02][SCM.10].
-- XA-ADPCM and CD-DA samples are produced by the CD side at exactly one sector per INT1 period and queued into the SPU's CD input at 44.1 kHz; the queue depth is bounded (two sectors) and underflow produces zeros, matching the hardware's silence on a missed sector.
-- Audio per frame: `schway_run` emits the frame's samples in one batch (737 or 738 NTSC, 886 or 887 PAL; 737.244 and 886.489 on average, derived) with the accumulator carried; never padded; state saves include the accumulator, the XA ring and six-step counter, the reverb address and the envelope counters.
+- Planned Phase-6 CD audio: XA-ADPCM and CD-DA will feed the SPU at 44.1 kHz through a bounded queue, with silence on underflow. This queue and those decoders are not implemented in Phase 5; see the current boundary in [the SPU hardware guide](../../docs/hardware/spu.md#pcm-output-and-evidence-limits).
+- Phase-5 audio per frame: `schway_run` emits the native samples produced by ticks inside the frame (737 or 738 NTSC, 886 or 887 PAL; 737.244 and 886.489 on average, derived) with the accumulator carried; samples are not padded. State saves the SPU histories and scheduling state, but not the host audio ring; a valid load clears that ring.
 - Resampling is the host's job (the libretro core reports 44,100 Hz and the exact field rate from PSX-SYSTEM so dynamic rate control absorbs the difference); handheld ports that need 48 kHz use the host's resampler or the optional kernel stage from OUT.
 
 **SYNC.** **Recommendation:** as above; frame boundary = the VBlank the GPU file defines; all three subsystems step on the CPU cycle counter with event scheduling (next SPU tick, next sector, next MDEC block), no per-cycle polling. **Strongest alternative:** run the SPU in 768-cycle slices from the scheduler only when audio is enabled (saves time with audio off, but IRQ-driven games need the SPU to run regardless). **Would change if:** profiling shows SPU time above 10 % of a frame on the wasm32 target.

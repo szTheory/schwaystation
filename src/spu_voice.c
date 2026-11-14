@@ -1,5 +1,5 @@
 /* One scheduled BRR voice decode and interpolator.
-   Hardware facts: .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md §§1.2–1.3. */
+   Hardware facts: docs/hardware/spu.md. */
 #include <stdint.h>
 
 #include "internal.h"
@@ -157,7 +157,7 @@ void schway__spu_voice_step(schway *inst, uint32_t voice_index)
         phase -= SPU_BLOCK_PHASE;
         /* Read the block flags at the boundary so this access remains visible
            to IRQA. Loop-start is captured in LSAX; loop-end updates ENDX and
-           either repeats there or mutes the voice. psx-spx SPU BRR flags, §1.2. */
+           either repeats there or mutes the voice; see the SPU hardware guide. */
         uint8_t flags = (uint8_t)(schway__spu_ram_read(inst, block_address) >> 8);
         if ((flags & 0x04u) != 0u) {
             voice->reg[7] = (uint16_t)(block_address >> 3);

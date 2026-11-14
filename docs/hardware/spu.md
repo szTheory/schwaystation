@@ -1,103 +1,123 @@
 # Sound processing unit
 
-The SPU is an instance-owned device clocked once per 768 CPU cycles (44.1 kHz). Its 512 KiB RAM is byte-addressed,
-little-endian, and wraps at `80000h`. Register writes other than the data FIFO take effect at the next SPU tick. The
-model keeps that sample-granular timing; it does not claim sub-tick ordering. Hardware facts and confidence are indexed
-in `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` §§1.1, 1.5–1.6.
+The SPU is an instance-owned integer device. It advances once every 768 CPU cycles, producing one signed stereo
+sample pair at 44,100 Hz. Its 512 KiB of RAM is little-endian and byte-addressed. The host receives samples through
+`schway_get_audio`; the core opens no audio device and performs no host-rate resampling. The documented baseline is
+summarized in `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` §1. Current behavior is implemented in
+[`src/spu.c`](../../src/spu.c), [`src/spu_voice.c`](../../src/spu_voice.c),
+[`src/spu_envelope.c`](../../src/spu_envelope.c), [`src/spu_noise.c`](../../src/spu_noise.c), and
+[`src/spu_reverb.c`](../../src/spu_reverb.c).
 
-## RAM transfers
+## Clock, registers and state
 
-`TSA` (`1F801DA6h`) is expressed in eight-byte units. A write latches its wrapped byte address into the transfer
-pointer. `FIFO` (`1F801DA8h`) holds up to 32 halfwords in order: writes to a full FIFO are ignored, reads from an empty
-FIFO return zero, and a normal read consumes one entry. A pure register peek returns the front entry without consuming
-it. FIFO accesses take effect when the bus access occurs; this preserves the data-port behavior while other register
-writes are delayed to the next sample tick.
+The scheduler advances one SPU event per 768 CPU cycles. Non-FIFO register writes are queued until an SPU event;
+FIFO reads and writes happen at the bus access. The implementation uses this sample-granular order: apply queued
+writes and drain pending manual-transfer entries, advance the shared noise clock; update voice 1's envelope, sample
+and volume; update voice 3's envelope; then capture the current voice 1/3 outputs before voice 3's sample step. Next,
+process voices 2–24 in order (voice 3's envelope was already updated), advance main volume sweeps, then mix and push
+the pair. The reverb's 22.05 kHz
+side alternates on successive native ticks. This order is the model's contract; it does not model sub-tick RAM slots.
 
-`ATTR` (`1F801DAAh`) bits 5–4 select Stop, ManualWrite, DMAWrite, or DMARead. In ManualWrite, one FIFO halfword is
-transferred per SPU tick. The byte pointer advances by two for every halfword written and wraps at the end of SPU RAM.
-`RAM_CTRL` (`1F801DACh`) values `4`, `6`, `8`, and `A` replicate each transferred halfword 1, 2, 4, and 8 times.
-Replication writes, capture writes, and modeled RAM reads all use the central little-endian helpers, which check the
-eight-byte IRQA range on every access. No DMA engine or manual-read path is implied by this slice.
+Each voice occupies eight halfwords in the `1F801C00h–1F801D7Fh` range. The remaining control registers include
+`KON`, `KOFF`, `PMON`, `NON`, `EON`, `ENDX`, `ATTR`, `STATX`, `TSA`, `FIFO`, `IRQA`, `ESA` and `RAM_CTRL`.
+`1F801E00h–1F801E5Eh` expose current voice volumes. Addresses and bit meanings follow the pinned psx-spx source
+listed in the preparation file; the model's current register paths are in `src/spu.c` and `src/spu_envelope.c`.
+
+The state visitor records SPU RAM, register values, voice registers and decoder history, sample phase, envelope and
+sweep counters, FIFO contents and cursors, queued register writes, noise phase/LFSR, capture position, reverb FIR and
+work histories, reverb cursors, transfer addresses, IRQ state and the next SPU tick. State format 5 validates these
+fields before applying them. The host audio ring is excluded and is cleared after a valid load; a refused load leaves
+the instance unchanged. See `src/spu.c` and `src/state.c`.
+
+## Voice playback
+
+There are 24 voices. `KON` starts the selected voice at its start address with cleared decoder history and an attack
+envelope; `KOFF` starts release. `PITCH` advances the 28-sample BRR block phase and is capped at `4000h`; zero
+produces silence. `PMON` uses the preceding voice's output to modulate the next voice's step. Loop-start records
+update `LSAX`; loop-end sets `ENDX` and either repeats at `LSAX` or ends the voice.
+
+A BRR block is 16 bytes: one header, one flag byte and 28 low-nibble-first signed samples. The fixed-point decoder
+uses the documented five predictor pairs, three carried history samples and signed 16-bit saturation. Reserved shift
+encodings map to 9 and filters above 4 are clamped to 4 in this baseline. Four taps from the 512-value Gaussian table
+interpolate the current sample; the table is in `src/spu_tables.inc`, and `tests/spu/voices.c` checks the table and
+decoder behavior. These tests establish the implemented baseline, not a captured silicon waveform. See psx-spx's
+[SPU description at the pinned preparation source](../../.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md#12-voice-registers-and-brr-blocks)
+and its Gaussian interpolation section.
 
 ## ADSR and volume envelopes
 
-`KON` starts a voice in attack at level zero; reaching `7FFFh` enters decay. Decay falls toward the sustain level
-`(N + 1) * 800h`, then sustain follows its selected direction and rate. `KOFF` moves any active voice into release;
-release ends at zero. The guest may write `ENVX` to jump the current level. Subsequent envelope ticks update both the
-level used by playback and the `ENVX` readback.
+Attack rises from zero to `7FFFh`, decay falls to `(sustain level + 1) * 800h`, sustain follows its selected direction
+and rate, and release falls to zero. `ENVX` may be written to set the current level and is updated by the envelope
+stepper. The integer baseline uses the documented step/shift and period rules; exponential decrease scales its step
+by the current level, and exponential attack adjusts step or period above `6000h`. All-ones rate encodings do not
+step. The 2-by-128 rate table is tested against an independent generator for the ares ISC source at
+[`9408cb43d494`](https://github.com/ares-emulator/ares/tree/9408cb43d494); that is a baseline comparison, not a
+hardware capture.
 
-The documented rate value combines a five-bit shift with a two-bit step. For rates below 48, the period is one
-sample and the signed step is shifted by `11 - shift`; from rate 48 onward the step is unshifted and the period is
-`1 << (shift - 11)` samples. Increasing steps are `+7` through `+4`; decreasing steps are `-8` through `-5`. An
-exponential decrease scales its step by the current level. An exponential increase above `6000h` quarters the step
-for shifts below 10, halves the step and doubles the interval at shift 10, or quadruples the interval at shift 11 and
-above. Levels clamp to the documented range. All-ones rate encodings do not step.
-
-Direct voice and main volumes are signed 15-bit values doubled to the sample scale. Sweep registers update separate
-left and right current-volume state, including phase-negative direction, and current voice volumes are readable at
-`1E00h` through `1E5Eh`. Muting suppresses the final PCM output while voice decoding, envelopes and volume sweeps keep
-advancing. The implementation uses a per-sample integer mixer and saturates each voice and the final stereo pair.
-
-The full 2-by-128 rate baseline is compared against an independent generator for the ares ISC implementation at
-`9408cb43d494`. This is baseline conformance, not a captured hardware envelope waveform. Hardware anomalies above
-rate 26 and phase-negative sweep behavior remain unresolved; this core follows the documented baseline without a
-machine-profile switch. The SPU hardware notes and unresolved questions are indexed in
-`.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` §1.4.
+Direct volume is signed 15-bit and doubled. Sweep registers retain separate left/right level and counter state,
+including the documented phase-negative bit. The rate behavior above 26 and phase-negative sweep edge cases remain
+unresolved without a direct hardware oracle. No machine-profile switch changes the baseline. Muting the final output
+does not stop voice decode, envelopes, volume sweeps, capture or RAM/IRQA work.
 
 ## Noise
 
-All noise-enabled voices share one signed 16-bit LFSR. Each clock shifts left and inserts
-`b15 XOR b12 XOR b11 XOR b10 XOR 1`; `FFFFh` is not reached from the reset seed. ATTR shift sets a period of
-`20000h >> shift` output samples. The period is divided into eight slots; ATTR step 0–3 select respectively
-`0,2,4,6`; `0,1,2,4,6`; `0,1,2,4,5,6`; and `0,1,2,3,4,5,6`. The model clocks at most once in each sample,
-including at the shortest periods. Clearing ATTR bit 15 does not reset the shared LFSR or its phase. This schedule
-and the LFSR behavior follow the pinned psx-spx update at
-[commit `3717718f642ce2ca9ff590b65918fb3a46279cc4`](https://github.com/psx-spx/psx-spx.github.io/commit/3717718f642ce2ca9ff590b65918fb3a46279cc4); they are documented behavior, not a captured noise waveform.
+All noise-selected voices share a signed 16-bit LFSR. Each clock shifts left and inserts
+`b15 XOR b12 XOR b11 XOR b10 XOR 1`. `ATTR` selects a period and one of four eight-slot schedules. The clock advances
+at most once during each sample, even when the shortest period places several slots in that window. Clearing the SPU
+enable bit does not reset the LFSR or its phase. The schedule and capture signal follow the exact public
+[psx-spx update](https://github.com/psx-spx/psx-spx.github.io/commit/3717718f642ce2ca9ff590b65918fb3a46279cc4).
+`tests/spu/noise.c` checks this sequence and slot schedule; it is not a hardware-captured noise waveform.
 
-## Capture and status
+## FIFO, DMA4, capture and IRQ9
 
-The four 400h-byte rings at `00000h`, `00400h`, `00800h`, and `00C00h` receive zero-valued Phase-5 CD-L/CD-R inputs
-and voice 1/3 samples after envelope scaling. In noise mode the voice capture value is the full signed LFSR level
-multiplied by ENVX and arithmetic-shifted by 15; it is not a one-bit signal. Capture is suppressed when `RAM_CTRL`
-bits 2–3 are both clear, but otherwise continues when ATTR disables or mutes audible output. The shared cursor
-advances once per tick through 200h halfwords; `STATX` bit 11 reports the upper half after the lower 100h samples.
-Capture writes use the same little-endian RAM helper as other SPU accesses, so matching `IRQA` can raise IRQ9.
+`TSA` (`1F801DA6h`) is in eight-byte units and sets the wrapped byte transfer pointer. `FIFO` (`1F801DA8h`) holds
+32 halfwords: a full-FIFO write is ignored, an empty-FIFO read returns zero, and an ordinary read consumes one word.
+A register peek returns the front word without consuming it. In ManualWrite mode, the next SPU event drains pending
+FIFO entries to SPU RAM. `RAM_CTRL` values `4`, `6`, `8` and `A` replicate each written halfword 1, 2, 4 or 8 times.
 
-`STATX` (`1F801DAEh`) reports delayed `ATTR` bits 0–5 in bits 0–5, `ATTR` bit 5 again in bit 7, IRQ9 in bit 6,
-manual transfer busy in bit 10, and DMA request state in bits 8–9. DMAWrite requests data while the FIFO has room;
-DMARead reports data while the FIFO is nonempty. Those request bits describe FIFO availability only; a DMA engine is
-not part of this model. IRQ9 is raised on a modeled RAM access matching `IRQA` only when both `ATTR` bit 15 (SPU
-Enable) and bit 6 (IRQ9 Enable) are set. Clearing bit 6 acknowledges the IRQ9 latch without changing RAM.
+DMA4 channel 4 is integrated with the shared FIFO. `ATTR` bits 5–4 choose stop, ManualWrite, DMAWrite or DMARead.
+For RAM-to-SPU DMA, the low halfword of each guest word is transferred first. The request path uses the selected
+`ATTR` mode and FIFO availability; sync-mode-1 blocks wait for the next SPU request deadline. For SPU-to-RAM DMA,
+the model returns `FFFFh` at each 32-halfword boundary unless `DEV4_CTRL` is `220931E1h`. The pinned
+`spu/memory-transfer` guest checks seven named transfer cases; its log proves only those cases. No manual-read path
+is modeled.
 
-The documented noise capture scaling is implemented in the sample-granular model. The exact placement of multiple RAM
-accesses within one sample is not claimed as measured hardware timing; the pinned memory-transfer program remains the
-hardware oracle for its named transfer cases. Noise mode still performs the voice's modeled RAM fetches before sample
-selection, preserving their IRQA behavior when the voice is muted or its BRR output is inaudible.
+Capture writes zero-valued Phase-5 CD-L/CD-R samples to `00000h` and `00400h`, and voice 1/3 values to `00800h` and
+`00C00h`. In noise mode the captured voice signal is the full signed LFSR value scaled by the voice envelope. The
+cursor advances through 200h halfwords and wraps. Capture is enabled by `RAM_CTRL` bits 2–3 and continues while the
+audible SPU output is disabled. CD audio inputs remain zero in Phase 5; CD-DA and XA are Phase 6 work.
 
-## Reverb resampling and mix
+`STATX` reports delayed `ATTR` control bits, IRQ9, manual-transfer busy, DMARead/DMAWrite FIFO availability, and the
+capture half. Every modeled SPU RAM read or write uses the shared little-endian helper. A matching eight-byte `IRQA`
+range raises IRQ9 only when SPU enable and IRQ9 enable are both set; clearing IRQ9 enable acknowledges the latch.
+The model checks IRQ at each modeled RAM access, but does not claim measured sub-tick access placement.
 
-Voice sums selected by EON enter the reverb path before the final main-volume stage. The reverb input uses the
-documented symmetric 39-tap integer FIR before its 22.05 kHz stage; the return uses the matching polyphase FIR
-to produce 44.1 kHz samples. The coefficients and channel-phase selection are in `src/spu_tables.inc` and
-`src/spu_reverb.c`; their fact source is `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` section 1.7.
+## Reverb
 
-Left and right 22.05 kHz work alternates on successive native sample ticks. Each centered 39-tap filter adds
-19 native samples of delay, so the pair contributes 38 samples before the wet return is mixed. The SCPH-1001
-I2S measurement confirms that delay and the alternating-channel effect; it also finds intermediate 16-bit
-saturation, while the exact per-stage rounding positions remain unknown. See the public psx-spx measurement at
-[commit `a37f2fec163e149f4e3e39599eb43c65c21181a8`](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8).
+EON-selected voice output enters a symmetric 39-tap fixed-point FIR before the 22.05 kHz feedback stage. Left and
+right work alternate on successive native ticks; the 39-tap input and output filters contribute 38 samples of total
+44.1 kHz delay. A SCPH-1001 digital-I2S measurement found that delay, the alternating channels and intermediate
+16-bit saturation. Its exact per-stage rounding positions remain unknown. See the public
+[psx-spx measurement](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8).
 
-The 22.05 kHz path reads the register-selected SAME and DIFF IIR delays, applies `vIIR` and `vWALL`, sums the four
-`vCOMB1`–`vCOMB4` taps, and then runs both APF stages using `dAPF1/2` and `vAPF1/2`. Signed register values use the
-documented Q15 scale. Intermediate stored values and comb/APF sums saturate to signed 16-bit in this deterministic
-baseline; exact hardware rounding and every saturation point remain unresolved. The documented `vIIR = -8000h`
-special case negates the completed IIR result, including the previous stored sample. The measured `vLIN/vRIN =
--8000h` case follows ordinary signed Q15 scaling.
+The deterministic baseline applies register-selected SAME/DIFF IIR delays, `vIIR`, `vWALL`, four comb taps and two
+all-pass stages, then scales the resampled return by EVOL. Signed register values use Q15 arithmetic with explicit
+rounding and 16-bit saturation at the implemented intermediate boundaries. The documented `vIIR = -8000h` case
+negates the completed IIR result; measured `vLIN/vRIN = -8000h` uses ordinary signed Q15 scaling. `ESA` selects the
+buffer base, work offsets wrap from that base through `7FFFEh`, and every work-memory access checks IRQA. With reverb
+disabled, the model preserves the documented read behavior while suppressing work-memory writes. `tests/spu/reverb.c`
+checks delay, alternating phases, constraints and local impulse digests. Those digests are regressions, not captured
+silicon output.
 
-ESA selects the start of the work buffer. Register offsets wrap from ESA through `7FFFEh`; the current cursor advances
-16 bytes for each alternating left/right pair. Every work-memory read and write uses the shared little-endian SPU RAM
-helpers, including IRQA range checks. With `ATTR` bit 7 clear, the IIR results are computed but their state writes are
-suppressed and discarded; APF writes are suppressed as well. Each inhibited write is replaced by a read, so it still
-checks IRQA. The comb/APF output path continues to read its selected locations, and APF output reads still contribute
-to the return. EVOL scales the interpolated return, so a zero EVOL setting contributes no wet PCM. The preset impulse
-digests are local regression baselines, not captured silicon waveforms.
+## PCM output and evidence limits
+
+Each native tick emits one interleaved signed 16-bit stereo pair. The mixer saturates each voice contribution, sums
+the dry and wet paths, applies the main left/right volumes when both SPU enable and unmute are set, then saturates the
+final pair. The bounded host ring is four PAL frames deep; `schway_get_audio` drains pairs to the caller. The runner
+hashes the drained PCM as canonical little-endian stereo bytes and fails if its drain reports lost samples. The host
+is responsible for any resampling.
+
+No full silicon PCM waveform is available in the pinned SPU test corpus. Transfer pass lines are hardware evidence
+for named transfer behavior; the noise/reverb measurements constrain particular facts; `spu_tone` and impulse
+digests are deterministic regressions; the CPU-free block replay checks guest/table equality; and `libretro.host`
+checks callback delivery against the runner. None of these alone establishes complete bit-exact hardware audio.

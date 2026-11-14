@@ -116,7 +116,7 @@ static int32_t reverb_signed16(uint16_t value)
 static int16_t reverb_scale(int16_t sample, uint16_t volume)
 {
     int32_t signed_volume = reverb_signed16(volume);
-    /* Signed Q15 -1.0 is ordinary negation here, including the measured
+    /* The signed Q15 full-scale negative coefficient is ordinary negation here, including the measured
        vLIN/vRIN case. The separate vIIR quirk is handled after its sum. */
     return reverb_clamp16(reverb_sar64((int64_t)sample * signed_volume, 15u));
 }

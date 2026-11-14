@@ -1,6 +1,5 @@
 /* The bounded SPU sample clock, RAM byte order and PCM ring producer.
-   Hardware references: .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md
-   sections 1.1 and 1.5–1.6. */
+   Hardware references: docs/hardware/spu.md. */
 #include <string.h>
 
 #include "internal.h"
@@ -396,7 +395,7 @@ static uint16_t spu_dma_attr(const struct schway__spu *spu)
 
 /* ATTR selects DMA4 direction. Request readiness comes from the SPU's DMA
    mode and FIFO state; the channel engine inserts the timed request interval
-   between blocks (PSX-SPX SPU transfers, preparation §1.5). */
+   between blocks (SPU transfer behavior in docs/hardware/spu.md). */
 uint32_t schway__spu_dma_ready(const schway *inst, uint32_t direction)
 {
     const struct schway__spu *spu = &inst->spu;
@@ -409,7 +408,7 @@ uint32_t schway__spu_dma_ready(const schway *inst, uint32_t direction)
 
 /* DMA4 writes each guest word to the FIFO low halfword first. The data enters
    SPU RAM at the active FIFO write rate; the DMA engine accounts for its
-   documented four-cycle-per-word cost (PSX-SPX SPU transfers, §1.5). */
+   documented four-cycle-per-word cost (SPU transfer behavior in docs/hardware/spu.md). */
 void schway__spu_dma_write(schway *inst, uint16_t value)
 {
     struct schway__spu *spu = &inst->spu;
@@ -429,7 +428,7 @@ void schway__spu_dma_write(schway *inst, uint16_t value)
 }
 
 /* DMA4 reads one little-endian halfword from SPU RAM and advances the same
-   transfer address used by manual writes (PSX-SPX SPU transfers, §1.5). */
+   transfer address used by manual writes (SPU transfer behavior in docs/hardware/spu.md). */
 uint16_t schway__spu_dma_read(schway *inst)
 {
     struct schway__spu *spu = &inst->spu;

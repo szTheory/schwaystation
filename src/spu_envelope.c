@@ -1,5 +1,5 @@
 /* Per-voice integer envelope step helper.
-   Hardware references: .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md §1.4. */
+   Hardware references: docs/hardware/spu.md. */
 #include <stddef.h>
 
 #include "internal.h"
