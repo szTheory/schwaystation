@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-08-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh"
-last_updated: "2026-11-14T05:15:57.947Z"
+stopped_at: "Completed 05-11-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh"
+last_updated: "2026-11-14T05:47:42.086Z"
 last_activity: 2026-11-14
-last_activity_desc: "Completed plan 05-08. Plan 05-11 is next in the active wave. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-state_head: 2e8076b966209072cac383c97fafcf52e8af8b59
+last_activity_desc: "Completed plan 05-11. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh."
+state_head: 824b59ca05e517f388b577c0d675900a7f31f41c
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 149
-  completed_plans: 139
+  completed_plans: 140
   percent: 67
-current_plan: 14 of 23
+current_plan: 15 of 23
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 14 of 23
+Plan: 15 of 23
 Status: Ready to execute
-Last activity: 2026-11-14 — Plan 05-08 completed; 05-11 is next in the active wave. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Last activity: 2026-11-14 — Plan 05-11 completed. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh.
 
 Progress: [███████░░░] 67%
 
@@ -201,6 +201,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P23 | 12 min | 2 tasks | 7 files |
 | Phase 05 P22 | 13m | 1 tasks | 2 files |
 | Phase 05 P08 | 28min | 2 tasks | 9 files |
+| Phase 05 P11 | 27min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -491,6 +492,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Use the documented integer ADSR and sweep baseline; treat the ares table as conformance data, not a hardware waveform.
 - [Phase 05]: Keep high-rate and phase-negative sweep behavior unresolved without a direct hardware capture; do not add a profile switch.
 - [Phase 05]: SPU voice expansion reuses existing serialized fields; no save-state visitor or size change was needed.
+- [Phase 05]: Keep the authored BRR fixture integer-generated and commit source plus manifest digest, not assembled bytes.
+- [Phase 05]: Measure actual voice levels from a sealed guest mailbox at frame 600.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -678,8 +681,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T05:15:57.328Z
-Stopped at: Completed 05-08-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh
+Last session: 2026-11-14T05:47:41.707Z
+Stopped at: Completed 05-11-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
