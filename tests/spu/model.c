@@ -1,5 +1,6 @@
 /* Public PCM delivery from a bounded run through schway_get_audio. */
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -81,6 +82,81 @@ static schway_run_result run_cycles(schway *inst, uint64_t cycles)
     result.size = (uint32_t)sizeof result;
     CHECK_EQ_U64(schway_run(inst, &budget, &result), SCHWAY_STATUS_OK);
     return result;
+}
+
+static uint8_t *read_fixture(const char *directory, const char *name, size_t *size)
+{
+    char path[1024];
+    int written = snprintf(path, sizeof path, "%s/%s", directory, name);
+    if (written < 0 || (size_t)written >= sizeof path) {
+        return NULL;
+    }
+    FILE *file = fopen(path, "rb");
+    if (file == NULL || fseek(file, 0, SEEK_END) != 0) {
+        if (file != NULL) {
+            fclose(file);
+        }
+        return NULL;
+    }
+    long length = ftell(file);
+    if (length <= 0 || fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return NULL;
+    }
+    uint8_t *bytes = (uint8_t *)malloc((size_t)length);
+    if (bytes == NULL || fread(bytes, 1u, (size_t)length, file) != (size_t)length) {
+        free(bytes);
+        fclose(file);
+        return NULL;
+    }
+    fclose(file);
+    *size = (size_t)length;
+    return bytes;
+}
+
+/* The guest must boot through the stub, upload a BRR block by IO, key a voice,
+   and produce nonzero asymmetric output through the public audio drain. */
+static void check_tone_fixture(const char *directory)
+{
+    size_t exe_size = 0u;
+    uint8_t *exe = read_fixture(directory, "spu_tone.exe", &exe_size);
+    CHECK(exe != NULL);
+    if (exe == NULL) {
+        return;
+    }
+
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    if (inst == NULL) {
+        free(exe);
+        return;
+    }
+    CHECK_EQ_U64(schway_load_exe(inst, exe, exe_size), SCHWAY_STATUS_OK);
+    free(exe);
+
+    uint64_t previous_ticks = 0u;
+    uint64_t left_energy = 0u;
+    uint64_t right_energy = 0u;
+    for (uint32_t frame = 0u; frame < 3u; frame++) {
+        schway_run_result result = run_frame(inst);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+        uint64_t expected_pairs = result.ticks / SCHWAY__CYCLES_PER_PAIR -
+                                  previous_ticks / SCHWAY__CYCLES_PER_PAIR;
+        schway_audio audio = drain(inst, AUDIO_RING_PAIRS);
+        CHECK_EQ_U64(audio.written, expected_pairs);
+        CHECK_EQ_U64(audio.dropped, 0u);
+        for (uint32_t pair = 0u; pair < audio.written; pair++) {
+            int32_t left = samples[pair * 2u];
+            int32_t right = samples[pair * 2u + 1u];
+            left_energy += (uint64_t)(left < 0 ? -left : left);
+            right_energy += (uint64_t)(right < 0 ? -right : right);
+        }
+        previous_ticks = result.ticks;
+    }
+    CHECK(left_energy > 0u);
+    CHECK(right_energy > 0u);
+    CHECK(left_energy != right_energy);
+    schway_destroy(inst);
 }
 
 static void check_region_cadence(uint32_t region, uint64_t frame_num, uint64_t frame_den,
@@ -699,7 +775,7 @@ int main(int argc, char **argv)
     if (argc != 3 || argv[1][0] == '\0' || argv[2][0] == '\0') {
         return 2;
     }
-    (void)argv;
+    check_tone_fixture(argv[1]);
     check_region_cadence(SCHWAY_REGION_NTSC_J, NTSC_FRAME_NUM, NTSC_FRAME_DEN,
                          53693175u, 897619u, 738u, 737u);
     check_region_cadence(SCHWAY_REGION_NTSC_U, NTSC_FRAME_NUM, NTSC_FRAME_DEN,
