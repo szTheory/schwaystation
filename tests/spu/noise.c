@@ -9,6 +9,10 @@
 
 #define SPU_REGISTER_BASE UINT32_C(0x1F801C00)
 #define SPU_ATTR UINT32_C(0x1F801DAA)
+#define SPU_NON UINT32_C(0x1F801D94)
+#define SPU_RAM_CTRL UINT32_C(0x1F801DAC)
+#define SPU_MAIN_VOL_L UINT32_C(0x1F801D80)
+#define SPU_MAIN_VOL_R UINT32_C(0x1F801D82)
 
 static void *plain_alloc(void *user, size_t size)
 {
@@ -52,27 +56,182 @@ static void run_sample(schway *inst)
     schway__spu_event(inst, deadline);
 }
 
+static uint16_t lfsr_clock(uint16_t value)
+{
+    uint16_t parity = (uint16_t)(((value >> 15) ^ (value >> 12) ^ (value >> 11) ^
+                                  (value >> 10) ^ 1u) & 1u);
+    return (uint16_t)((uint32_t)value * 2u + parity);
+}
+
+static uint32_t reg_index(uint32_t address)
+{
+    return (address - SPU_REGISTER_BASE) >> 1;
+}
+
+static void reset_noise(schway *inst, uint32_t shift, uint32_t step)
+{
+    inst->spu.noise_phase = 0u;
+    inst->spu.noise_lfsr = 1u;
+    inst->spu.reg[reg_index(SPU_ATTR)] =
+        (uint16_t)(0x8000u | (shift << 10) | (step << 8));
+}
+
+static uint32_t test_first_slot_matrix(schway *inst)
+{
+    uint32_t failures = 0u;
+    for (uint32_t shift = 0u; shift < 16u; shift++) {
+        for (uint32_t step = 0u; step < 4u; step++) {
+            reset_noise(inst, shift, step);
+            run_sample(inst);
+            failures += inst->spu.noise_lfsr != 3u ? 1u : 0u;
+        }
+    }
+    return failures;
+}
+
+static uint32_t test_slot_masks(schway *inst)
+{
+    static const uint8_t masks[4] = {0x55u, 0x57u, 0x77u, 0x7Fu};
+    const uint32_t period = 0x20000u;
+    uint32_t failures = 0u;
+    for (uint32_t step = 0u; step < 4u; step++) {
+        for (uint32_t slot = 0u; slot < 8u; slot++) {
+            reset_noise(inst, 0u, step);
+            inst->spu.noise_phase = (slot * period) / 8u;
+            run_sample(inst);
+            uint16_t expected = (masks[step] & (uint8_t)(1u << slot)) != 0u ? 3u : 1u;
+            failures += inst->spu.noise_lfsr != expected ? 1u : 0u;
+        }
+    }
+    return failures;
+}
+
+static uint32_t test_long_gap_and_continuity(schway *inst)
+{
+    uint32_t failures = 0u;
+    reset_noise(inst, 0u, 0u);
+    run_sample(inst);
+    inst->spu.noise_phase = 0x20000u / 4u - 1u;
+    run_sample(inst);
+    failures += inst->spu.noise_lfsr != 3u ? 1u : 0u;
+    run_sample(inst);
+    failures += inst->spu.noise_lfsr != 6u ? 1u : 0u;
+
+    reset_noise(inst, 15u, 0u);
+    run_sample(inst);
+    inst->spu.reg[reg_index(SPU_ATTR)] &= 0x7FFFu;
+    run_sample(inst);
+    failures += inst->spu.noise_lfsr != 6u ? 1u : 0u;
+    inst->spu.reg[reg_index(SPU_ATTR)] |= 0x8000u;
+    run_sample(inst);
+    failures += inst->spu.noise_lfsr != 12u ? 1u : 0u;
+    return failures;
+}
+
+static uint32_t test_lfsr_cycle(schway *inst)
+{
+    uint32_t failures = 0u;
+    reset_noise(inst, 15u, 0u);
+    uint16_t expected = inst->spu.noise_lfsr;
+    for (uint32_t i = 0u; i < 65535u; i++) {
+        expected = lfsr_clock(expected);
+        run_sample(inst);
+        failures += inst->spu.noise_lfsr == UINT16_MAX ? 1u : 0u;
+        failures += inst->spu.noise_lfsr != expected ? 1u : 0u;
+    }
+    failures += expected != 1u ? 1u : 0u;
+    failures += inst->spu.noise_lfsr != expected ? 1u : 0u;
+    return failures;
+}
+
+static uint32_t test_noise_voice_selection(schway *inst)
+{
+    uint32_t failures = 0u;
+    inst->audio_head = 0u;
+    inst->audio_count = 0u;
+    inst->audio_dropped = 0u;
+    reset_noise(inst, 15u, 0u);
+    inst->spu.noise_lfsr = 0x2000u;
+    inst->spu.reg[reg_index(SPU_ATTR)] |= 0x4000u;
+    inst->spu.reg[reg_index(SPU_NON)] = 0x0005u;
+    inst->spu.reg[reg_index(SPU_MAIN_VOL_L)] = 0x3FFFu;
+    inst->spu.reg[reg_index(SPU_MAIN_VOL_R)] = 0x3FFFu;
+    for (uint32_t i = 0u; i < 3u; i += 2u) {
+        inst->spu.voice[i].envelope = 0x4000;
+        inst->spu.voice[i].reg[0] = 0x3FFFu;
+        inst->spu.voice[i].reg[1] = 0x3FFFu;
+    }
+    run_sample(inst);
+    failures += inst->spu.voice[0].output != 0x4001 ? 1u : 0u;
+    failures += inst->spu.voice[2].output != 0x4001 ? 1u : 0u;
+    int16_t samples[2] = {0, 0};
+    schway_audio audio;
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = samples;
+    audio.capacity = 1u;
+    failures += schway_get_audio(inst, &audio) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += audio.written != 1u || samples[0] <= 0 || samples[1] != samples[0] ? 1u : 0u;
+    return failures;
+}
+
+static uint32_t test_noise_capture_and_wrap(schway *inst)
+{
+    uint32_t failures = 0u;
+    reset_noise(inst, 15u, 0u);
+    inst->spu.noise_lfsr = 0x2000u;
+    inst->spu.reg[reg_index(SPU_RAM_CTRL)] = 4u;
+    inst->spu.reg[reg_index(SPU_NON)] = 0x0005u;
+    inst->spu.voice[0].envelope = 0x4000;
+    inst->spu.voice[2].envelope = 0x6000;
+    run_sample(inst);
+    failures += schway__spu_ram_peek(inst, 0u) != 0u ? 1u : 0u;
+    failures += schway__spu_ram_peek(inst, 0x400u) != 0u ? 1u : 0u;
+    failures += schway__spu_ram_peek(inst, 0x800u) != 8192u ? 1u : 0u;
+    failures += schway__spu_ram_peek(inst, 0xC00u) != 12289u ? 1u : 0u;
+
+    for (uint32_t i = 1u; i < 256u; i++) {
+        run_sample(inst);
+    }
+    failures += inst->spu.capture_cursor != 0x100u ? 1u : 0u;
+    failures += (schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0800u) == 0u ? 1u : 0u;
+    for (uint32_t i = 256u; i < 512u; i++) {
+        run_sample(inst);
+    }
+    failures += inst->spu.capture_cursor != 0u ? 1u : 0u;
+    failures += (schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0800u) != 0u ? 1u : 0u;
+    return failures;
+}
+
 int main(void)
 {
     puts("TAP version 13");
-    puts("1..1");
+    puts("1..6");
     schway *inst = make_instance();
     if (inst == NULL) {
-        puts("not ok 1 - a scheduled noise clock shifts the shared LFSR");
+        puts("not ok 1 - pinned noise schedule and capture behavior");
         return 1;
     }
-
-    /* Shift 15 gives a four-sample period. Step 0 clocks at its first slot. */
-    uint32_t attr_index = (SPU_ATTR - SPU_REGISTER_BASE) >> 1;
-    inst->spu.reg[attr_index] = 0xBC00u;
-    inst->spu.noise_lfsr = 1u;
-    run_sample(inst);
-    uint32_t passed = inst->spu.noise_lfsr == 3u;
-    printf("%s 1 - a scheduled noise clock shifts the shared LFSR\n",
-           passed != 0u ? "ok" : "not ok");
-    if (passed == 0u) {
-        printf("# expected LFSR 3 after slot 0; got %u\n", inst->spu.noise_lfsr);
+    uint32_t failures[6];
+    failures[0] = test_first_slot_matrix(inst);
+    failures[1] = test_slot_masks(inst);
+    failures[2] = test_long_gap_and_continuity(inst);
+    failures[3] = test_lfsr_cycle(inst);
+    failures[4] = test_noise_voice_selection(inst);
+    failures[5] = test_noise_capture_and_wrap(inst);
+    static const char *names[6] = {
+        "all shift and step combinations clock the first slot at most once per sample",
+        "step values select exactly the pinned eight-slot schedule",
+        "long-period gaps and ATTR disable preserve LFSR and phase continuity",
+        "the LFSR avoids FFFF and completes its 65535-clock sequence",
+        "noise voices share the signed level through envelope and amplitude mixing",
+        "capture rings receive scaled noise, wrap, and report the correct half",
+    };
+    uint32_t total = 0u;
+    for (uint32_t i = 0u; i < 6u; i++) {
+        printf("%s %u - %s\n", failures[i] == 0u ? "ok" : "not ok", i + 1u, names[i]);
+        total += failures[i];
     }
     schway_destroy(inst);
-    return passed != 0u ? 0 : 1;
+    return total == 0u ? 0 : 1;
 }
