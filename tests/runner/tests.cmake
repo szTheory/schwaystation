@@ -222,27 +222,30 @@ if(CMAKE_SCRIPT_MODE_FILE)
 
     if(DEFINED FIXTURES)
       execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${FIXTURES}/spu_tone.exe"
-        --frames 600 --hash-audio RESULT_VARIABLE tone_rc OUTPUT_VARIABLE tone_out
-        ERROR_VARIABLE tone_err)
-      string(REGEX MATCH "audio sha256 ([0-9a-f]+)" tone_line "${tone_out}")
-      set(tone_hash "${CMAKE_MATCH_1}")
-      if(NOT tone_rc STREQUAL "0" OR tone_line STREQUAL "")
-        message(FATAL_ERROR "tone stream: expected exit 0 and an audio hash, got ${tone_rc}\n${tone_out}${tone_err}")
-      endif()
-
-      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${FIXTURES}/spu_tone.exe"
-        --frames 620 --stop-on mailbox --hash-audio RESULT_VARIABLE partial_rc OUTPUT_VARIABLE partial_out
+        --bench 620 --stop-on mailbox --hash-audio RESULT_VARIABLE partial_rc OUTPUT_VARIABLE partial_out
         ERROR_VARIABLE partial_err)
       string(REGEX MATCH "audio sha256 ([0-9a-f]+)" partial_line "${partial_out}")
       set(partial_hash "${CMAKE_MATCH_1}")
-      if(NOT partial_rc STREQUAL "0" OR partial_line STREQUAL "")
+      string(REGEX MATCH "frames ([0-9]+)" partial_frames_line "${partial_out}")
+      set(partial_frames "${CMAKE_MATCH_1}")
+      if(NOT partial_rc STREQUAL "0" OR partial_line STREQUAL "" OR partial_frames STREQUAL "")
         message(FATAL_ERROR "partial tone stream: expected exit 0 and an audio hash, got ${partial_rc}\n${partial_out}${partial_err}")
+      endif()
+
+      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${FIXTURES}/spu_tone.exe"
+        --frames "${partial_frames}" --hash-audio RESULT_VARIABLE tone_rc OUTPUT_VARIABLE tone_out
+        ERROR_VARIABLE tone_err)
+      string(REGEX MATCH "audio sha256 ([0-9a-f]+)" tone_line "${tone_out}")
+      set(tone_hash "${CMAKE_MATCH_1}")
+      set(tone_golden c07146eb20b62452e0dc86bac5bb26490cc130097e4a814ce24a28f3a34349f9)
+      if(NOT tone_rc STREQUAL "0" OR tone_line STREQUAL "" OR NOT tone_hash STREQUAL tone_golden)
+        message(FATAL_ERROR "tone stream: expected exit 0 and the pinned PCM hash, got ${tone_rc}\n${tone_out}${tone_err}")
       endif()
       if(NOT partial_hash STREQUAL tone_hash)
         message(FATAL_ERROR "mailbox stop changed the PCM prefix hash (${partial_hash} != ${tone_hash})")
       endif()
 
-      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 600 --hash-audio
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames "${partial_frames}" --hash-audio
         RESULT_VARIABLE silent_rc OUTPUT_VARIABLE silent_out ERROR_VARIABLE silent_err)
       string(REGEX MATCH "audio sha256 ([0-9a-f]+)" silent_line "${silent_out}")
       set(silent_hash "${CMAKE_MATCH_1}")

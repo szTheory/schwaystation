@@ -1,12 +1,12 @@
 /* schwaystation-run: the headless runner.
  *
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--hash-vram] [--png N:FILE]
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--hash-vram] [--png N:FILE]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
- *                     [--hash] [--hash-state]
+ *                     [--hash] [--hash-audio] [--hash-state]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
- *                     [--hash-state]
+ *                     [--hash-audio] [--hash-state]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
@@ -33,6 +33,9 @@
  *
  * With no picture beyond the test card a frame hash cannot show what the CPU, the GTE, DMA or the
  * timers did; the state hash can, and it is the same on every platform.
+ *
+ * --hash-audio prints one SHA-256 over every drained left/right sample, serialized as signed
+ * 16-bit little-endian values with no padding, through the last frame that ran.
  *
  * --png N:FILE writes frame N (1 <= N <= --frames) to FILE as an 8-bit RGB
  * PNG, each pixel converted by the shared XRGB8888 converter with the X byte
@@ -131,20 +134,21 @@ static void run_free(void *user, void *ptr, size_t size)
 }
 
 static const char synopsis[] =
-    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--png N:FILE]\n"
-    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--png N:FILE]\n"
+    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
-    "                         [--hash] [--hash-state]\n"
+    "                         [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
     "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
-    "                         [--serial SERIAL] [--hash] [--hash-state]\n"
+    "                         [--serial SERIAL] [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]\n"
     "       schwaystation-run --help | --version\n"
     "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
     "  --frames N         run N frames (1 <= N <= 1000000)\n"
     "  --bench N          run N frames and report the time per frame\n"
     "  --hash             print the SHA-256 of the last frame\n"
+    "  --hash-audio      print the SHA-256 of the native PCM stream through the last frame\n"
     "  --hash-vram        print the SHA-256 of row-major little-endian VRAM RGB555 with bit 15 cleared\n"
     "  --hash-state       print the SHA-256 of the saved machine state\n"
     "  --inputs FILE     apply a validated controller script before each frame latch\n"
@@ -326,6 +330,7 @@ typedef struct options {
     uint32_t frames;
     int bench; /* --bench N rather than --frames N */
     int hash;
+    int hash_audio; /* --hash-audio: accumulated canonical LE stereo PCM */
     int hash_vram; /* --hash-vram: canonical whole-VRAM RGB555 bytes */
     int hash_state; /* --hash-state: the SHA-256 of the saved state */
     uint32_t png_frame; /* 0 when no --png was given */
@@ -388,6 +393,11 @@ static int parse_options(int argc, char **argv, options *o)
             i++;
         } else if (strcmp(arg, "--hash") == 0) {
             o->hash = 1;
+        } else if (strcmp(arg, "--hash-audio") == 0) {
+            if (o->hash_audio) {
+                return usage("give --hash-audio once");
+            }
+            o->hash_audio = 1;
         } else if (strcmp(arg, "--hash-vram") == 0) {
             if (o->hash_vram) {
                 return usage("give --hash-vram once");
@@ -575,7 +585,7 @@ static int parse_options(int argc, char **argv, options *o)
         int all_metadata = o->metadata_ledger != NULL && o->metadata_dat != NULL;
         if ((any_test_input && !all_test_inputs) || (any_metadata && !all_metadata) ||
             (any_test_input && any_metadata) || o->frames != 0u || o->bios != NULL ||
-            o->exe != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash ||
+            o->exe != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash || o->hash_audio ||
             o->hash_state || o->hash_vram || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
             o->region_set) {
@@ -593,7 +603,7 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->probe != NULL) {
         if ((o->metadata_ledger == NULL) != (o->metadata_dat == NULL) ||
             o->frames != 0u || o->bios != NULL || o->exe != NULL || o->inputs != NULL ||
-            o->save_dir != NULL || o->hash || o->hash_state || o->hash_vram || o->bench || o->tty ||
+            o->save_dir != NULL || o->hash || o->hash_audio || o->hash_state || o->hash_vram || o->bench || o->tty ||
             o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
             o->memcard_names_set || o->serial != NULL || o->region_set) {
             return usage("--probe takes no other option");
@@ -975,6 +985,50 @@ static int print_hash(const schway *inst, uint32_t frames)
         return SCHWAY__EXIT_FAILURE;
     }
     printf("frame %lu sha256 %s\n", (unsigned long)frames, hex);
+    return SCHWAY__EXIT_OK;
+}
+
+/* One PAL frame can produce at most 887 native stereo pairs (docs/runner.md).
+   Drain once after each selected frame, then hash only the pairs actually written. */
+static int hash_audio_frame(schway *inst, schway__sha256 *state)
+{
+    enum { RUNNER_AUDIO_MAX_PAIRS = 887u };
+    int16_t samples[2u * RUNNER_AUDIO_MAX_PAIRS];
+    uint8_t bytes[4u * RUNNER_AUDIO_MAX_PAIRS];
+    schway_audio io;
+    memset(&io, 0, sizeof io);
+    io.size = (uint32_t)sizeof io;
+    io.samples = samples;
+    io.capacity = RUNNER_AUDIO_MAX_PAIRS;
+    schway_status st = schway_get_audio(inst, &io);
+    if (st != SCHWAY_STATUS_OK) {
+        fprintf(stderr, "schwaystation-run: schway_get_audio failed: %s\n",
+                schway_status_string(st));
+        return SCHWAY__EXIT_FAILURE;
+    }
+    if (io.written > io.capacity || io.dropped != 0u) {
+        fprintf(stderr, "schwaystation-run: audio drain lost or exceeded its bounded frame buffer\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+    for (uint32_t i = 0u; i < io.written; i++) {
+        uint16_t left = (uint16_t)samples[2u * i];
+        uint16_t right = (uint16_t)samples[2u * i + 1u];
+        bytes[4u * i] = (uint8_t)left;
+        bytes[4u * i + 1u] = (uint8_t)(left >> 8);
+        bytes[4u * i + 2u] = (uint8_t)right;
+        bytes[4u * i + 3u] = (uint8_t)(right >> 8);
+    }
+    schway__sha256_update(state, bytes, 4u * (size_t)io.written);
+    return SCHWAY__EXIT_OK;
+}
+
+static int print_audio_hash(schway__sha256 *state)
+{
+    uint8_t digest[32];
+    char hex[65];
+    schway__sha256_final(state, digest);
+    schway__sha256_hex(digest, hex);
+    printf("audio sha256 %s\n", hex);
     return SCHWAY__EXIT_OK;
 }
 
@@ -1380,6 +1434,10 @@ static int run(const options *opt)
     schway_input input_snapshot;
     memset(&input_snapshot, 0, sizeof input_snapshot);
     input_snapshot.size = (uint32_t)sizeof input_snapshot;
+    schway__sha256 audio_digest;
+    if (opt->hash_audio) {
+        schway__sha256_init(&audio_digest);
+    }
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
         if (opt->inputs != NULL) {
             st = schway__inputs_apply_frame(inst, &movie, &input_cursor, &input_snapshot, n);
@@ -1407,6 +1465,9 @@ static int run(const options *opt)
         }
 #endif
         ran = n;
+        if (st == SCHWAY_STATUS_OK && opt->hash_audio) {
+            status = hash_audio_frame(inst, &audio_digest);
+        }
         if (opt->tty) {
             tty_drain(inst, &tty);
         }
@@ -1478,6 +1539,9 @@ static int run(const options *opt)
     }
     if (status == SCHWAY__EXIT_OK && opt->hash) {
         status = print_hash(inst, ran);
+    }
+    if (status == SCHWAY__EXIT_OK && opt->hash_audio) {
+        status = print_audio_hash(&audio_digest);
     }
     if (status == SCHWAY__EXIT_OK && opt->hash_state) {
         status = print_state_hash(inst);
