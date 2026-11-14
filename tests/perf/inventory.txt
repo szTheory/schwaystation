@@ -6,4 +6,11 @@ perf.gate.missing	perf
 perf.gate.no_base	perf
 perf.gate.plus_1_00	perf
 perf.gate.plus_1_01	perf
+perf.gate.spu_idle_boundary	perf
+perf.gate.spu_idle_malformed	perf
+perf.gate.spu_idle_missing	perf
+perf.gate.spu_idle_mutated	perf
+perf.gate.spu_idle_nonzero	perf
+perf.gate.spu_idle_over	perf
+perf.gate.spu_idle_valid	perf
 perf.gate.unstable	perf

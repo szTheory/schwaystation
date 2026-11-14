@@ -21,8 +21,8 @@ static const char name_dreq[] = "dma.dreq";
 static const char name_words[] = "dma.words";
 static const char name_crc[] = "dma.crc";
 
-/* Engine phases: idle, a unit, request-mode blocks, a CPU gap, the next node/window,
-   or a unit marked to stop when it finishes. */
+/* Engine phases: idle, a unit, request-mode blocks, a CPU gap (also DMA4's
+   wait for the next SPU request), the next node/window, or stop-after-unit. */
 #define DMA_PH_IDLE 0u
 #define DMA_PH_UNIT 1u
 #define DMA_PH_BLOCKS 2u
@@ -231,7 +231,8 @@ static void dicr_set(schway *inst, uint32_t dicr)
 }
 
 /* A channel with a unit ready to run has bit 24 set and bit 28 where its mode
-   needs the start trigger. OTC and sync mode 0 need bit 28; sync mode 1 needs
+   needs the start trigger. OTC and sync mode 0 need bit 28, except DMA4's
+   sync-0 transfers as exercised by the SPU memory-transfer guest; sync mode 1 needs
    the device request line, except DMA4's derived ATTR-write readiness for
    RAM-to-SPU blocks; linked-list mode needs bit 24 and, for DMA2, an expired
    GPU busy deadline. A transfer whose CPU window is over waits for its next
@@ -248,8 +249,11 @@ static uint32_t dma_pending(const schway *inst, uint32_t ch)
     if (d->phase[ch] == DMA_PH_NEXT) {
         return ch != 2u || sync != 2u || schway__gpu_dma_ready(inst);
     }
-    if (ch == DMA_OTC || sync == 0u) {
+    if (ch == DMA_OTC) {
         return (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
+    }
+    if (sync == 0u) {
+        return ch == DMA_SPU || (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
     }
     if (sync == 2u) {
         return ch != 2u || schway__gpu_dma_ready(inst);
@@ -257,9 +261,11 @@ static uint32_t dma_pending(const schway *inst, uint32_t ch)
     if (sync != 1u) {
         return 0u;
     }
-    if (ch == DMA_SPU && (c & DMA_CHCR_FROM_RAM) != 0u &&
-        (inst->bus.spu_attr & 0x0030u) == 0x0020u) {
-        return 1u;
+    if (ch == DMA_SPU) {
+        return schway__spu_dma_ready(inst, (c & DMA_CHCR_FROM_RAM) != 0u) != 0u ||
+                       ((d->dreq >> ch) & 1u) != 0u
+                   ? 1u
+                   : 0u;
     }
     return ((d->dreq >> ch) & 1u) != 0u ? 1u : 0u;
 }
@@ -353,7 +359,10 @@ static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word, uint64_t
     case 3u: /* CD-ROM */
         return dma_stub_sink(inst, ch, word);
     case 4u: /* SPU */
-        return dma_stub_sink(inst, ch, word);
+        (void)dma_stub_sink(inst, ch, word);
+        schway__spu_dma_write(inst, (uint16_t)word);
+        schway__spu_dma_write(inst, (uint16_t)(word >> 16));
+        return 0u;
     case 5u: /* PIO */
         return dma_stub_sink(inst, ch, word);
     default:
@@ -376,7 +385,9 @@ static uint32_t dma_dev_read(schway *inst, uint32_t ch, uint32_t *word, uint64_t
     case 3u: /* CD-ROM */
         return dma_stub_source(word);
     case 4u: /* SPU */
-        return dma_stub_source(word);
+        *word = (uint32_t)schway__spu_dma_read(inst);
+        *word |= (uint32_t)schway__spu_dma_read(inst) << 16;
+        return 0u;
     case 5u: /* PIO */
         return dma_stub_source(word);
     default:
@@ -573,8 +584,19 @@ static void dma_finish(schway *inst, uint32_t ch, uint64_t t, uint64_t now)
                                : d->remain[ch] > 0u;
     if (more != 0u) {
         if (sync == 1u) {
-            d->phase[ch] = DMA_PH_BLOCKS;
-            d->cur = SCHWAY__DMA_NONE;
+            if (ch == DMA_SPU) {
+                uint64_t until = inst->spu.next_tick;
+                if (until <= t) {
+                    until = t + 1u;
+                }
+                d->phase[ch] = DMA_PH_GAP;
+                d->cur = ch;
+                d->busy_until = until;
+                d->stall_until = 0u;
+            } else {
+                d->phase[ch] = DMA_PH_BLOCKS;
+                d->cur = SCHWAY__DMA_NONE;
+            }
         } else {
             uint64_t until = t + dma_gap(d, ch);
             if (sync == 2u && d->remain[ch] % SCHWAY__DMA_NODES_MAX == 0u && until <= now) {
@@ -632,9 +654,11 @@ static void dma_run(schway *inst, uint64_t now, uint32_t start_next)
         uint64_t t = d->busy_until;
         uint32_t ch = d->cur;
         if (d->phase[ch] == DMA_PH_GAP) {
-            /* The CPU's window is over: the channel's next unit waits to be
-               picked, with the others, by the arbitration. */
-            d->phase[ch] = DMA_PH_NEXT;
+            /* A chopped/list window makes the next unit ready; SPU DMA4's
+               timed request gap returns to readiness checks at that tick. */
+            d->phase[ch] = ch == DMA_SPU && ((d->chcr[ch] >> 9) & 3u) == 1u
+                               ? DMA_PH_BLOCKS
+                               : DMA_PH_NEXT;
             d->cur = SCHWAY__DMA_NONE;
             d->stall_until = 0u;
         } else {
@@ -824,7 +848,7 @@ void schway__dma_dreq(schway *inst, uint32_t ch, uint32_t level)
 
 /* ATTR changes can make a waiting DMA4 block ready at this exact bus tick.
    Keep a unit completed ahead of the CPU clock at its saved boundary. The
-   level itself is derived from bus.spu_attr and is never stored in dreq. */
+   SPU owns the current and pending ATTR values; no ATTR mirror is stored in dreq. */
 void schway__dma_spu_control_changed(schway *inst, uint64_t now)
 {
     if (inst->dma.cur == SCHWAY__DMA_NONE && inst->dma.busy_until <= now) {

@@ -20,9 +20,9 @@ enum { OWNED, UNBUILT, GAP };
 /* The documented map, as offsets in the page (docs/hardware/bus.md, Segments and the physical map):
    memory control 000h-023h, SIO0 040h-04Fh, RAM_SIZE 060h-063h, I_STAT and
    I_MASK 070h-077h, the DMA registers 080h-0FFh and the timers 100h-12Fh are
-   owned; SIO1 050h-05Fh, CD-ROM 800h-803h, MDEC 820h-827h and SPU C00h-FFFh
-   are unbuilt except the exact halfword ATTR access at DAAh; the GPU owns
-   810h-817h. */
+   owned; SIO1 050h-05Fh, CD-ROM 800h-803h, MDEC 820h-827h and the unimplemented
+   SPU tail E80h-FFFh are unbuilt. SPU registers C00h-DFFh, current volumes
+   E00h-E5Fh and RAM-like E60h-E7Fh are owned; the GPU owns 810h-817h. */
 static int register_access(uint32_t off, uint32_t base, uint32_t size, uint32_t width,
                            uint32_t max_width)
 {
@@ -31,9 +31,6 @@ static int register_access(uint32_t off, uint32_t base, uint32_t size, uint32_t 
 
 static int expected(uint32_t off, uint32_t width)
 {
-    if (off == 0xDAAu && width == 2u) {
-        return OWNED;
-    }
     if (off == 0x040u || register_access(off, 0x044u, 4u, width, 4u) ||
         register_access(off, 0x048u, 2u, width, 2u) ||
         register_access(off, 0x04Au, 2u, width, 2u) ||
@@ -45,8 +42,17 @@ static int expected(uint32_t off, uint32_t width)
         return OWNED;
     }
     if ((off >= 0x050u && off <= 0x05Fu) || (off >= 0x800u && off <= 0x803u) ||
-        (off >= 0x820u && off <= 0x827u) || off >= 0xC00u) {
+        (off >= 0x820u && off <= 0x827u)) {
         return UNBUILT;
+    }
+    if (off >= 0xC00u) {
+        uint32_t first = off & ~1u;
+        uint32_t last = width == 4u ? (off + 2u) & ~1u : first;
+        int first_owned = (first >= 0xC00u && first <= 0xDFFu) ||
+                          (first >= 0xE00u && first <= 0xE7Eu);
+        int last_owned = (last >= 0xC00u && last <= 0xDFFu) ||
+                         (last >= 0xE00u && last <= 0xE7Eu);
+        return first_owned && last_owned ? OWNED : UNBUILT;
     }
     return GAP;
 }

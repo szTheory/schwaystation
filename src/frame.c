@@ -1,7 +1,7 @@
 /* schway_run_frame, schway_run, schway_get_video and schway_get_audio: every
    check first, then the work. A run advances the exact cycle accumulator,
-   queues the audio pairs and, at the frame boundary, redraws the test card
-   into VRAM. */
+   catches the SPU up at the public boundary, queues the audio pairs and, at
+   the frame boundary, redraws the test card into VRAM. */
 #include <string.h>
 
 #include "internal.h"
@@ -36,24 +36,9 @@ void schway__frame_gpu_reset(schway *inst, uint64_t tick)
     }
 }
 
-/* Queues n silent pairs; pairs that do not fit in the ring are dropped and
-   counted. */
-static void audio_push_silence(schway *inst, uint32_t n)
-{
-    for (uint32_t i = 0; i < n; i++) {
-        if (inst->audio_count == SCHWAY__AUDIO_RING_PAIRS) {
-            inst->audio_dropped++;
-            continue;
-        }
-        uint32_t slot = (inst->audio_head + inst->audio_count) % SCHWAY__AUDIO_RING_PAIRS;
-        inst->audio[slot][0] = 0;
-        inst->audio[slot][1] = 0;
-        inst->audio_count++;
-    }
-}
-
-/* Moves the instance forward by at most limit cycles and queues one silent
-   pair per 768-cycle boundary crossed. No-content calls stop at the synthetic
+/* Moves the instance forward by at most limit cycles. The SPU queues one pair
+   per 768-cycle boundary crossed when caught up at bus accesses and the public
+   run boundary. No-content calls stop at the synthetic
    frame_end and redraw the test card. Loaded content stops at the GPU field
    wrap, with an independent maximum-field call bound so video resets cannot
    hold a host call forever. With neither a BIOS nor PS-EXE loaded no guest
@@ -78,7 +63,6 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
     } else {
         cycles = cycles < room ? cycles : room;
     }
-    uint64_t before = inst->ticks;
     uint64_t starting_frame = inst->frame;
     *stop = SCHWAY_STOP_BUDGET;
     if (inst->exe_loaded != 0u) {
@@ -119,13 +103,11 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
     if (inst->sched.next <= inst->ticks) {
         schway__sched_run(inst);
     }
+    schway__spu_event(inst, inst->ticks);
     schway__pad_update_watchdog(inst, inst->ticks);
     if (inst->exe_loaded != 0u) {
         *done = inst->frame != starting_frame;
     }
-    /* One pair per 768-cycle boundary crossed. */
-    audio_push_silence(inst, (uint32_t)(inst->ticks / SCHWAY__CYCLES_PER_PAIR -
-                                        before / SCHWAY__CYCLES_PER_PAIR));
     inst->profile_locked = 1u;
     if (*done && inst->exe_loaded == 0u) {
         uint64_t num = schway__instance_frame_num(inst->region);

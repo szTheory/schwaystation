@@ -12,7 +12,6 @@ static const char name_scratch[] = "bus.scratch";
 static const char name_memctl[] = "bus.memctl";
 static const char name_ram_size[] = "bus.ram_size";
 static const char name_cache_ctrl[] = "bus.cache_ctrl";
-static const char name_spu_attr[] = "bus.spu_attr";
 static const char name_unbuilt_n[] = "bus.unbuilt_n";
 static const char name_bios_loaded[] = "bus.bios.loaded";
 static const char name_bios_sha256[] = "bus.bios.sha256";
@@ -119,7 +118,6 @@ void schway__bus_reset(schway *inst)
     port_costs(b);
     b->ram_size = SCHWAY__RAM_SIZE_POWER_ON;
     b->cache_ctrl = 0u;
-    b->spu_attr = 0u;
     memset(b->unbuilt_n, 0, sizeof b->unbuilt_n);
     memset(b->last_unbuilt, 0, sizeof b->last_unbuilt);
 }
@@ -135,7 +133,6 @@ void schway__bus_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u32_array(io, name_memctl, b->memctl, SCHWAY__MEMCTL_REGS, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_ram_size, &b->ram_size, 0u, UINT32_MAX);
     (void)schway__state_u32(io, name_cache_ctrl, &b->cache_ctrl, 0u, UINT32_MAX);
-    schway__state_u16_array(io, name_spu_attr, &b->spu_attr, 1u, 0u, UINT16_MAX);
     uint32_t bios_loaded = schway__state_u32(io, name_bios_loaded, &b->bios_loaded, 0u, 1u);
     schway__state_check(io, bios_loaded == b->bios_loaded);
     schway__state_match_u8_array(io, name_bios_sha256, b->bios_sha256,
@@ -401,6 +398,96 @@ static void charge_port(const struct schway__bus *b, uint32_t port, uint32_t kin
    ARCHITECTURE section 2, Costs). */
 #define IO_FLAT_COST 1u
 
+static void spu_catch_up(schway *inst, uint32_t *cycles)
+{
+    uint64_t tick = schway__sched_now(inst, *cycles);
+    if (schway__spu_next(inst) <= tick) {
+        schway__spu_event(inst, tick);
+    }
+}
+
+static uint32_t spu_write_halfword(schway *inst, uint32_t address, uint16_t value,
+                                   uint32_t *cycles)
+{
+    uint32_t aligned = address & ~1u;
+    if (!schway__spu_reg_supported(aligned)) {
+        return 0u;
+    }
+    spu_catch_up(inst, cycles);
+    if (aligned == 0x1F801DAAu) {
+        uint64_t tick = schway__sched_now(inst, *cycles);
+        schway__dma_event(inst, tick);
+        schway__spu_reg_write(inst, aligned, value);
+        schway__dma_spu_control_changed(inst, tick);
+        return 1u;
+    }
+    schway__spu_reg_write(inst, aligned, value);
+    return 1u;
+}
+
+static uint16_t spu_read_halfword(schway *inst, uint32_t address, uint32_t *cycles,
+                                  uint32_t *supported)
+{
+    uint32_t aligned = address & ~1u;
+    if (!schway__spu_reg_supported(aligned)) {
+        *supported = 0u;
+        return 0u;
+    }
+    *supported = 1u;
+    spu_catch_up(inst, cycles);
+    return schway__spu_reg_read(inst, aligned);
+}
+
+static void spu_io(schway *inst, uint32_t kind, uint32_t address, uint32_t width,
+                   uint32_t *value, uint32_t *cycles)
+{
+    uint32_t unbuilt = 0u;
+    if (kind == K_WRITE) {
+        if (width == 1u) {
+            if ((address & 1u) == 0u) {
+                unbuilt = spu_write_halfword(inst, address, (uint16_t)*value, cycles) == 0u;
+            } else if (!schway__spu_reg_supported(address)) {
+                unbuilt = 1u;
+            }
+            if (unbuilt != 0u) {
+                schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, address, width, 1u, *value);
+            }
+            return;
+        }
+        for (uint32_t offset = 0u; offset < width; offset += 2u) {
+            if (spu_write_halfword(inst, address + offset,
+                                   (uint16_t)(*value >> (offset * 8u)), cycles) == 0u) {
+                unbuilt = 1u;
+            }
+        }
+        if (unbuilt != 0u) {
+            schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, address, width, 1u, *value);
+        }
+        return;
+    }
+
+    uint32_t result = 0u;
+    if (width == 1u) {
+        uint32_t supported = 0u;
+        uint16_t halfword = spu_read_halfword(inst, address, cycles, &supported);
+        unbuilt = supported == 0u;
+        result = (halfword >> ((address & 1u) * 8u)) & 0xFFu;
+    } else {
+        for (uint32_t offset = 0u; offset < width; offset += 2u) {
+            uint32_t supported = 0u;
+            uint16_t halfword = spu_read_halfword(inst, address + offset, cycles, &supported);
+            if (supported == 0u) {
+                unbuilt = 1u;
+            }
+            result |= (uint32_t)halfword << (offset * 8u);
+        }
+    }
+    *value = result;
+    if (unbuilt != 0u) {
+        schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, address, width, 0u, 0u);
+    }
+}
+
 /* A memory-control register, by index into memctl: a write keeps the bits the
    register has, and a delay write or COM_DELAY write rebuilds the costs. */
 static void memctl_access(schway *inst, uint32_t kind, uint32_t idx, uint32_t addr, uint32_t width,
@@ -529,21 +616,7 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if (slot < 0xC0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
-        /* ATTR is a 16-bit control register; retain its exact halfword value
-           for read-after-write callers. No SPU transfer behavior is implied
-           (docs/hardware/bus.md, SPU control readback; PSX-SPX SCM.01). */
-        if (p == 0x1F801DAAu && width == 2u) {
-            if (wr != 0u) {
-                uint64_t tick = schway__sched_now(inst, *cycles);
-                schway__dma_event(inst, tick);
-                inst->bus.spu_attr = (uint16_t)v;
-                schway__dma_spu_control_changed(inst, tick);
-            } else {
-                *value = (uint32_t)inst->bus.spu_attr;
-            }
-        } else {
-            schway__bus_unbuilt(inst, SCHWAY__DEV_SPU, p, width, wr, v);
-        }
+        spu_io(inst, kind, p, width, value, cycles);
         port = SCHWAY__PORT_SPU;
         break;
     }

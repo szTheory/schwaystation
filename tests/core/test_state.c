@@ -12,7 +12,7 @@
 #include "state.h"
 #include "../check.h"
 
-#define MAX_FIELDS 256u
+#define MAX_FIELDS 512u
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
@@ -100,6 +100,17 @@ static void bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
     CHECK_EQ_U64(schway__bus_write(inst, addr, width, value, &cycles), 0u);
 }
 
+static uint16_t spu_attr(const schway *inst)
+{
+    const uint32_t offset = 0x1F801DAAu - 0x1F801C00u;
+    for (uint32_t i = inst->spu.pending_count; i > 0u; i--) {
+        if (inst->spu.pending[i - 1u].address == offset) {
+            return inst->spu.pending[i - 1u].value;
+        }
+    }
+    return inst->spu.reg[offset >> 1];
+}
+
 static size_t save(const schway *inst, uint8_t *buf)
 {
     size_t n = schway_state_size(inst);
@@ -149,6 +160,11 @@ static void reseal(uint8_t *b, size_t size)
 static void expect_refused(const char *what, schway *inst, const uint8_t *b, size_t size,
                            schway_status want)
 {
+    uint32_t audio_head = inst->audio_head;
+    uint32_t audio_count = inst->audio_count;
+    uint32_t audio_dropped = inst->audio_dropped;
+    int16_t audio_before[SCHWAY__AUDIO_RING_PAIRS][2];
+    memcpy(audio_before, inst->audio, sizeof audio_before);
     size_t n = save(inst, before);
     schway_status got = schway_load_state(inst, b, size);
     if (got != want) {
@@ -157,6 +173,12 @@ static void expect_refused(const char *what, schway *inst, const uint8_t *b, siz
     }
     if (save(inst, after) != n || memcmp(before, after, n) != 0) {
         fprintf(stderr, "%s: a refused load changed the instance\n", what);
+        check_failures++;
+    }
+    if (inst->audio_head != audio_head || inst->audio_count != audio_count ||
+        inst->audio_dropped != audio_dropped ||
+        memcmp(audio_before, inst->audio, sizeof audio_before) != 0) {
+        fprintf(stderr, "%s: a refused load changed the host audio ring\n", what);
         check_failures++;
     }
 }
@@ -220,6 +242,11 @@ static void test_rejects(void)
     memcpy(bad, good, n);
     bad[H_FORMAT] ^= 0x02u;
     expect_refused("format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
+
+    memcpy(bad, good, n);
+    put_le(bad + H_FORMAT, 4u, 4u);
+    expect_refused("released revision-4 state", target, bad, n,
+                   SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
     bad[H_TOTAL] ^= 0x01u;
@@ -389,6 +416,7 @@ static void test_record_sweep(void)
     schway *src = make(SCHWAY_REGION_NTSC_U);
     run_to(src, 60);
     size_t n = save(src, good);
+    CHECK(n <= 4u * 1024u * 1024u);
     schway *target = make(SCHWAY_REGION_NTSC_U);
     run_to(target, 5);
     size_t nf = schway__state_record(src, fields, MAX_FIELDS);
@@ -482,6 +510,206 @@ static uint32_t offset_of(const schway *inst, const char *name)
     return 0u;
 }
 
+static int field_record_matches(const schway *inst, const char *name, uint32_t width,
+                                uint32_t count)
+{
+    size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
+    if (nf > MAX_FIELDS) {
+        return 0;
+    }
+    for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
+        if (strcmp(fields[i].name, name) == 0) {
+            return fields[i].width == width && fields[i].count == count;
+        }
+    }
+    return 0;
+}
+
+static void test_spu_state_continuation(void)
+{
+    static const struct {
+        const char *name;
+        uint32_t width, count;
+    } expected_fields[] = {
+        {"spu.ram", 1u, SCHWAY__SPU_RAM_SIZE},
+        {"spu.reg", 2u, SCHWAY__SPU_REG_HALFWORDS},
+        {"spu.voice.reg", 2u, SCHWAY__SPU_VOICE_COUNT * 8u},
+        {"spu.voice.history", 2u, SCHWAY__SPU_VOICE_COUNT * 3u},
+        {"spu.voice.sample_counter", 4u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.envelope", 4u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.envelope_counter", 4u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.envelope_phase", 4u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.sample", 2u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.output", 2u, SCHWAY__SPU_VOICE_COUNT},
+        {"spu.voice.sweep_level", 4u, SCHWAY__SPU_VOICE_COUNT * 2u},
+        {"spu.voice.sweep_counter", 4u, SCHWAY__SPU_VOICE_COUNT * 2u},
+        {"spu.transfer_fifo", 2u, SCHWAY__SPU_FIFO_HALFWORDS},
+        {"spu.transfer_head", 4u, 1u},
+        {"spu.transfer_count", 4u, 1u},
+        {"spu.transfer_address", 4u, 1u},
+        {"spu.pending.address", 2u, SCHWAY__SPU_PENDING_WRITES},
+        {"spu.pending.value", 2u, SCHWAY__SPU_PENDING_WRITES},
+        {"spu.pending_count", 4u, 1u},
+        {"spu.noise_phase", 4u, 1u},
+        {"spu.noise_lfsr", 2u, 1u},
+        {"spu.capture_cursor", 4u, 1u},
+        {"spu.reverb_fir", 2u, 2u * SCHWAY__SPU_REVERB_FIR_TAPS},
+        {"spu.reverb_work", 4u, 2u * SCHWAY__SPU_REVERB_WORK_WORDS},
+        {"spu.reverb_fir_cursor", 4u, 1u},
+        {"spu.reverb_work_cursor", 4u, 1u},
+        {"spu.reverb_address", 4u, 1u},
+        {"spu.main_sweep_level", 4u, 2u},
+        {"spu.main_sweep_counter", 4u, 2u},
+        {"spu.irqa_addr", 4u, 1u},
+        {"spu.irq_enabled", 4u, 1u},
+        {"spu.next_tick", 8u, 1u},
+    };
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    src->spu.ram[0] = 0x12u;
+    src->spu.ram[SCHWAY__SPU_RAM_SIZE - 1u] = 0x34u;
+    src->spu.reg[255] = 0x5678u;
+    src->spu.voice[0].history[2] = -123;
+    src->spu.voice[23].envelope = -456;
+    src->spu.voice[23].sample_counter = 789u;
+    src->spu.transfer_fifo[31] = 0x9ABCu;
+    src->spu.transfer_head = 7u;
+    src->spu.transfer_count = 3u;
+    src->spu.transfer_address = 0x1234u;
+    src->spu.pending[0].address = 0x20u;
+    src->spu.pending[0].value = 0xABCDu;
+    src->spu.pending[1].address = 0x27Eu;
+    src->spu.pending[1].value = 0xBCDEu;
+    src->spu.pending_count = 2u;
+    src->spu.noise_phase = 17u;
+    src->spu.noise_lfsr = 0x1234u;
+    src->spu.capture_cursor = 23u;
+    src->spu.reverb_fir[1][38] = -78;
+    src->spu.reverb_work[1][31] = -8765;
+    src->spu.reverb_fir_cursor = 17u;
+    src->spu.reverb_work_cursor = 21u;
+    src->spu.reverb_address = 0x2000u;
+    src->spu.main_sweep_level[0] = -900;
+    src->spu.main_sweep_counter[1] = 37u;
+    src->spu.irqa_addr = 0x4000u;
+    src->spu.irq_enabled = 1u;
+    src->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+    size_t n = save(src, good);
+    size_t missing_fields = 0u;
+    for (size_t i = 0; i < sizeof expected_fields / sizeof expected_fields[0]; i++) {
+        if (!field_record_matches(src, expected_fields[i].name, expected_fields[i].width,
+                                  expected_fields[i].count)) {
+            missing_fields++;
+        }
+    }
+    CHECK_EQ_U64(missing_fields, 0u);
+
+    /* A queued host sample is deliberately excluded from the state and must
+       be discarded when the saved machine resumes. */
+    schway__spu_event(dst, dst->spu.next_tick);
+    CHECK_EQ_U64(dst->audio_count, 1u);
+    CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(dst->audio_count, 0u);
+    CHECK_EQ_U64(dst->audio_head, 0u);
+    CHECK_EQ_U64(dst->spu.next_tick, src->spu.next_tick);
+    CHECK_EQ_U64(save(dst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+
+    struct visit_ctx c;
+    memset(&c, 0, sizeof c);
+    CHECK_EQ_U64(schway_state_visit(src, on_field, &c), SCHWAY_STATUS_OK);
+    CHECK(!c.bad_name && !c.bad_width && !c.overflow);
+    CHECK_EQ_U64(c.n, n - SCHWAY__STATE_HEADER_SIZE);
+    CHECK(c.n == n - SCHWAY__STATE_HEADER_SIZE &&
+          memcmp(stream, good + SCHWAY__STATE_HEADER_SIZE, c.n) == 0);
+
+    schway__spu_event(src, src->spu.next_tick);
+    schway__spu_event(dst, dst->spu.next_tick);
+    CHECK_EQ_U64(src->audio_count, 1u);
+    CHECK_EQ_U64(dst->audio_count, 1u);
+    int16_t src_pair[2] = {0, 0}, dst_pair[2] = {0, 0};
+    schway_audio src_audio, dst_audio;
+    memset(&src_audio, 0, sizeof src_audio);
+    memset(&dst_audio, 0, sizeof dst_audio);
+    src_audio.size = (uint32_t)sizeof src_audio;
+    src_audio.samples = src_pair;
+    src_audio.capacity = 1u;
+    dst_audio.size = (uint32_t)sizeof dst_audio;
+    dst_audio.samples = dst_pair;
+    dst_audio.capacity = 1u;
+    CHECK_EQ_U64(schway_get_audio(src, &src_audio), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_get_audio(dst, &dst_audio), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(src_audio.written, 1u);
+    CHECK_EQ_U64(dst_audio.written, 1u);
+    CHECK(memcmp(src_pair, dst_pair, sizeof src_pair) == 0);
+    CHECK_EQ_U64(src->spu.next_tick, 2u * SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(dst->spu.next_tick, src->spu.next_tick);
+    schway_destroy(dst);
+    schway_destroy(src);
+}
+
+static void test_spu_invalid_states(void)
+{
+    struct invalid_field {
+        const char *name;
+        uint32_t offset;
+        uint32_t width;
+        uint64_t value;
+    };
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    size_t n = save(src, good);
+    schway__spu_event(dst, dst->spu.next_tick);
+    CHECK_EQ_U64(dst->audio_count, 1u);
+    const struct invalid_field invalid[] = {
+        {"SPU transfer FIFO head", offset_of(src, "spu.transfer_head"), 4u,
+         SCHWAY__SPU_FIFO_HALFWORDS},
+        {"SPU transfer FIFO count", offset_of(src, "spu.transfer_count"), 4u,
+         SCHWAY__SPU_FIFO_HALFWORDS + 1u},
+        {"SPU transfer pointer range", offset_of(src, "spu.transfer_address"), 4u,
+         SCHWAY__SPU_RAM_SIZE},
+        {"SPU transfer pointer alignment", offset_of(src, "spu.transfer_address"), 4u, 1u},
+        {"SPU pending write count", offset_of(src, "spu.pending_count"), 4u,
+         SCHWAY__SPU_PENDING_WRITES + 1u},
+        {"SPU pending address outside register image",
+         offset_of(src, "spu.pending.address"), 2u, UINT16_MAX},
+        {"SPU pending address alignment", offset_of(src, "spu.pending.address"), 2u, 1u},
+        {"SPU pending FIFO address", offset_of(src, "spu.pending.address"), 2u, 0x1A8u},
+        {"SPU pending current volume address", offset_of(src, "spu.pending.address"), 2u,
+         0x200u},
+        {"SPU pending STATX address", offset_of(src, "spu.pending.address"), 2u, 0x1AEu},
+        {"SPU capture cursor", offset_of(src, "spu.capture_cursor"), 4u, 0x200u},
+        {"SPU voice envelope phase", offset_of(src, "spu.voice.envelope_phase") +
+                                          (SCHWAY__SPU_VOICE_COUNT - 1u) * 4u,
+         4u, 5u},
+        {"SPU FIR cursor", offset_of(src, "spu.reverb_fir_cursor"), 4u,
+         SCHWAY__SPU_REVERB_FIR_TAPS},
+        {"SPU work cursor", offset_of(src, "spu.reverb_work_cursor"), 4u,
+         SCHWAY__SPU_REVERB_WORK_WORDS},
+        {"SPU noise LFSR", offset_of(src, "spu.noise_lfsr"), 2u, 0u},
+        {"SPU reverb address alignment", offset_of(src, "spu.reverb_address"), 4u, 1u},
+        {"SPU IRQA alignment", offset_of(src, "spu.irqa_addr"), 4u, 1u},
+        {"SPU sample phase", offset_of(src, "spu.next_tick"), 8u, 512u},
+    };
+    for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; i++) {
+        memcpy(bad, good, n);
+        if (strncmp(invalid[i].name, "SPU pending ", 12u) == 0) {
+            put_le(bad + offset_of(src, "spu.pending_count"), 1u, 4u);
+        }
+        put_le(bad + invalid[i].offset, invalid[i].value, invalid[i].width);
+        reseal(bad, n);
+        expect_refused(invalid[i].name, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    memcpy(bad, good, n);
+    put_le(bad + offset_of(src, "spu.pending_count"), 18u, 4u);
+    put_le(bad + offset_of(src, "spu.pending.address") + 17u * 2u, UINT16_MAX, 2u);
+    reseal(bad, n);
+    expect_refused("SPU invalid address in later active slot", dst, bad, n,
+                   SCHWAY_STATUS_ERR_STATE_FIELD);
+    schway_destroy(dst);
+    schway_destroy(src);
+}
+
 /* The geometry engine, DMA and counter fields come back from a save and a
    load byte for byte; a timer's base tick is no part of the state; and a
    load refuses the DMA bits the hardware does not store and a current
@@ -515,10 +743,10 @@ static void test_device_fields(void)
     src->timers.t[2].hold = 2u;
     uint32_t cycles = 0u;
     CHECK_EQ_U64(schway__bus_write(src, 0xBF801DAAu, 2u, 0x0020u, &cycles), 0u);
-    CHECK_EQ_HEX(src->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(spu_attr(src), 0x0020u);
     size_t n = save(src, good);
     schway *dst = make(SCHWAY_REGION_NTSC_U);
-    CHECK_EQ_HEX(dst->bus.spu_attr, 0u);
+    CHECK_EQ_HEX(spu_attr(dst), 0u);
     cycles = 0u;
     CHECK_EQ_U64(schway__bus_write(dst, 0xBF801DAAu, 2u, 0x0010u, &cycles), 0u);
     CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
@@ -528,7 +756,7 @@ static void test_device_fields(void)
     CHECK_EQ_HEX(dst->dma.chcr[2], 0x01000201u);
     CHECK_EQ_U64(dst->dma.cur, 2u);
     CHECK_EQ_HEX(dst->dma.crc[6], 0xDEADBEEFu);
-    CHECK_EQ_HEX(dst->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(spu_attr(dst), 0x0020u);
     CHECK_EQ_U64(dst->timers.t[1].value, 0x1234u);
     CHECK_EQ_U64(dst->timers.base, dst->ticks);
     src->timers.base = 12345u;
@@ -586,7 +814,7 @@ static void test_device_fields(void)
     CHECK_EQ_U64(schway_load_state(dst, bad, n), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(dst->dma.cur, 3u);
     CHECK_EQ_U64(schway_reset(src, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
-    CHECK_EQ_HEX(src->bus.spu_attr, 0u);
+    CHECK_EQ_HEX(spu_attr(src), 0u);
     schway_destroy(dst);
     schway_destroy(src);
 
@@ -608,9 +836,9 @@ static void test_device_fields(void)
     CHECK_EQ_U64((spu_src->dma.dreq >> 4) & 1u, 0u);
     size_t spu_n = save(spu_src, good);
     bus_write(spu_dst, 0xBF801DAAu, 2u, 0x0010u);
-    CHECK_EQ_HEX(spu_dst->bus.spu_attr, 0x0010u);
+    CHECK_EQ_HEX(spu_attr(spu_dst), 0x0010u);
     CHECK_EQ_U64(schway_load_state(spu_dst, good, spu_n), SCHWAY_STATUS_OK);
-    CHECK_EQ_HEX(spu_dst->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(spu_attr(spu_dst), 0x0020u);
     CHECK_EQ_U64(spu_dst->dma.cur, 4u);
     CHECK_EQ_U64(spu_dst->dma.words[4], 16u);
     CHECK_EQ_U64(save(spu_dst, after), spu_n);
@@ -618,16 +846,24 @@ static void test_device_fields(void)
     uint64_t first_end = spu_dst->dma.busy_until;
     schway__dma_event(spu_dst, first_end);
     CHECK_EQ_U64(spu_dst->dma.cur, 4u);
+    CHECK(spu_dst->dma.busy_until > first_end);
+    CHECK_EQ_U64(spu_dst->dma.words[4], 16u);
+    uint64_t second_start = spu_dst->dma.busy_until;
+    schway__dma_event(spu_dst, second_start);
     CHECK_EQ_U64(spu_dst->dma.words[4], 32u);
     CHECK((spu_dst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
-    schway__dma_event(spu_dst, first_end + 76u);
+    uint64_t second_end = spu_dst->dma.busy_until;
+    schway__dma_event(spu_dst, second_end);
     CHECK_EQ_U64(spu_dst->dma.cur, SCHWAY__DMA_NONE);
     CHECK_EQ_U64(spu_dst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
     CHECK_EQ_HEX(spu_dst->dma.madr[4], 0x1080u);
     CHECK_EQ_U64(spu_src->dma.words[4], 16u);
-    CHECK_EQ_HEX(spu_src->bus.spu_attr, 0x0020u);
+    CHECK_EQ_HEX(spu_attr(spu_src), 0x0020u);
     schway_destroy(spu_dst);
     schway_destroy(spu_src);
+
+    test_spu_state_continuation();
+    test_spu_invalid_states();
 }
 
 /* Accepted counter boundaries must either advance to another loadable state
@@ -647,7 +883,7 @@ static void test_run_bounds(void)
         size_t n = save(inst, good);
         size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
         CHECK(nf <= MAX_FIELDS);
-        uint32_t frame_at = 0u, ticks_at = 0u, acc_at = 0u, end_at = 0u;
+        uint32_t frame_at = 0u, ticks_at = 0u, acc_at = 0u, end_at = 0u, spu_next_at = 0u;
         uint64_t frame_max = 0u, ticks_max = 0u;
         for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
             if (strcmp(fields[i].name, "instance.frame") == 0) {
@@ -660,10 +896,14 @@ static void test_run_bounds(void)
                 acc_at = fields[i].offset;
             } else if (strcmp(fields[i].name, "instance.frame_end") == 0) {
                 end_at = fields[i].offset;
+            } else if (strcmp(fields[i].name, "spu.next_tick") == 0) {
+                spu_next_at = fields[i].offset;
             }
         }
-        CHECK(frame_at != 0u && ticks_at != 0u && acc_at != 0u && end_at != 0u);
-        if (frame_at == 0u || ticks_at == 0u || acc_at == 0u || end_at == 0u) {
+        CHECK(frame_at != 0u && ticks_at != 0u && acc_at != 0u && end_at != 0u &&
+              spu_next_at != 0u);
+        if (frame_at == 0u || ticks_at == 0u || acc_at == 0u || end_at == 0u ||
+            spu_next_at == 0u) {
             exit(1);
         }
         uint64_t den = schway__instance_frame_den(regions[k]);
@@ -683,6 +923,12 @@ static void test_run_bounds(void)
                 put_le(bad + acc_at, acc, 8u);
                 /* The frame that starts here ends one step on. */
                 put_le(bad + end_at, ticks[j] + step, 8u);
+                uint64_t next_spu_tick =
+                    ticks[j] >= ticks_max - SCHWAY__CYCLES_PER_PAIR
+                        ? UINT64_MAX
+                        : (ticks[j] - ticks[j] % SCHWAY__CYCLES_PER_PAIR) +
+                              SCHWAY__CYCLES_PER_PAIR;
+                put_le(bad + spu_next_at, next_spu_tick, 8u);
                 reseal(bad, n);
                 CHECK_EQ_U64(schway_load_state(inst, bad, n), SCHWAY_STATUS_OK);
                 memcpy(snapshot, inst, sizeof *snapshot);
@@ -727,8 +973,10 @@ static void test_cpu_fields(void)
     memset(&v, 0, sizeof v);
     v.size = (uint32_t)sizeof v;
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(v.state_format, 4u);
-    CHECK_EQ_U64(v.behaviour_revision, 4u);
+    CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
+    CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
+    CHECK_EQ_U64(v.state_format, 5u);
+    CHECK_EQ_U64(v.behaviour_revision, 5u);
 
     schway *inst = make(SCHWAY_REGION_NTSC_U);
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);

@@ -136,6 +136,12 @@ schway_add_test(NAME dma.spu.request_controls
   COMMAND schwaystation-test-dma spu_request_controls
   LABELS dma portable TIMEOUT 30)
 
+# Fault prevented: DMA4 sync-mode-0 transfers waiting forever for bit 28 even
+# though the pinned transfer guest starts them with bit 24 alone.
+schway_add_test(NAME dma.spu.sync0_start
+  COMMAND schwaystation-test-dma spu_sync0_starts_without_trigger
+  LABELS dma portable TIMEOUT 10)
+
 # Fault prevented: a channel waiting for its request line that holds the CPU
 # or slows a program reading RAM.
 schway_add_test(NAME dma.sync1.no_dreq_no_stall

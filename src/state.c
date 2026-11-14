@@ -114,6 +114,7 @@ static void body_io(struct schway__state_io *io, schway *inst)
     schway__pad_state_io(io, inst);
     schway__sio_state_io(io, inst, ticks);
     schway__card_state_io(io, inst);
+    schway__spu_state_io(io, inst, ticks);
 }
 
 /* The whole state, in the order the format fixes. */

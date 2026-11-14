@@ -1,0 +1,6 @@
+# audio@600 self-authored regression baselines; hashes cover signed PCM pairs serialized little-endian.
+# This is a model regression digest, not a captured hardware waveform.
+# region host_frames pairs sha256
+ntsc-j 601 443083 c07146eb20b62452e0dc86bac5bb26490cc130097e4a814ce24a28f3a34349f9
+ntsc-u 601 443083 c07146eb20b62452e0dc86bac5bb26490cc130097e4a814ce24a28f3a34349f9
+pal 600 531893 3d73ff884114ff112e7bf56cc63badcc0865c526d7efc5f78089c1720515253c

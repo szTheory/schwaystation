@@ -215,6 +215,75 @@ if(CMAKE_SCRIPT_MODE_FILE)
     # Invalid naming options are refused as usage errors before any run.
     refuse(--serial SLUS_123.45)
     refuse(--save-dir "${serial_dir}" --memcard-names serial --serial ../escape)
+  elseif(CASE STREQUAL "audio_failures")
+    set(RUN ${HOOKED})
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-audio --test-audio-failure
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "1" OR NOT err MATCHES "schway_get_audio failed")
+      message(FATAL_ERROR "audio drain failure: expected exit 1 and its error, got ${rc}\n${out}${err}")
+    endif()
+    refuse(--frames 1 --hash-audio --hash-audio)
+    if(DEFINED FIXTURES)
+      refuse(--probe "${FIXTURES}/spu_tone.exe" --hash-audio)
+    endif()
+
+    string(REPEAT "[0-9a-f]" 64 digits)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash --hash-audio --hash-state --hash-vram
+      RESULT_VARIABLE combined_rc OUTPUT_VARIABLE combined_out ERROR_VARIABLE combined_err)
+    string(REGEX MATCH "frame 1 sha256 ${digits}" frame_line "${combined_out}")
+    string(REGEX MATCH "audio sha256 ${digits}" audio_line "${combined_out}")
+    string(REGEX MATCH "state sha256 ${digits}" state_line "${combined_out}")
+    string(REGEX MATCH "vram sha256 ${digits}" vram_line "${combined_out}")
+    string(FIND "${combined_out}" "${frame_line}" frame_position)
+    string(FIND "${combined_out}" "${audio_line}" audio_position)
+    string(FIND "${combined_out}" "${state_line}" state_position)
+    string(FIND "${combined_out}" "${vram_line}" vram_position)
+    if(NOT combined_rc STREQUAL "0" OR frame_line STREQUAL "" OR audio_line STREQUAL "" OR
+       state_line STREQUAL "" OR vram_line STREQUAL "" OR audio_position LESS_EQUAL frame_position OR
+       state_position LESS_EQUAL audio_position OR vram_position LESS_EQUAL state_position)
+      message(FATAL_ERROR "combined hashes: expected four ordered digests and exit 0, got ${combined_rc}\n${combined_out}${combined_err}")
+    endif()
+  elseif(CASE STREQUAL "audio_hash")
+    unit(audio_hash)
+    set(silent_one_frame_hash 2b8443142803ae42226c9b3c4a1092587cb5edfa61308925ff5f55ff02bedc57)
+    expect_exit(0 "^audio sha256 ${silent_one_frame_hash}\n$" --frames 1 --hash-audio)
+
+    if(DEFINED FIXTURES)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${FIXTURES}/spu_tone.exe"
+        --bench 620 --stop-on mailbox --hash-audio RESULT_VARIABLE partial_rc OUTPUT_VARIABLE partial_out
+        ERROR_VARIABLE partial_err)
+      string(REGEX MATCH "audio sha256 ([0-9a-f]+)" partial_line "${partial_out}")
+      set(partial_hash "${CMAKE_MATCH_1}")
+      string(REGEX MATCH "frames ([0-9]+)" partial_frames_line "${partial_out}")
+      set(partial_frames "${CMAKE_MATCH_1}")
+      if(NOT partial_rc STREQUAL "0" OR partial_line STREQUAL "" OR partial_frames STREQUAL "")
+        message(FATAL_ERROR "partial tone stream: expected exit 0 and an audio hash, got ${partial_rc}\n${partial_out}${partial_err}")
+      endif()
+
+      execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${FIXTURES}/spu_tone.exe"
+        --frames "${partial_frames}" --hash-audio RESULT_VARIABLE tone_rc OUTPUT_VARIABLE tone_out
+        ERROR_VARIABLE tone_err)
+      string(REGEX MATCH "audio sha256 ([0-9a-f]+)" tone_line "${tone_out}")
+      set(tone_hash "${CMAKE_MATCH_1}")
+      set(tone_golden c07146eb20b62452e0dc86bac5bb26490cc130097e4a814ce24a28f3a34349f9)
+      if(NOT tone_rc STREQUAL "0" OR tone_line STREQUAL "" OR NOT tone_hash STREQUAL tone_golden)
+        message(FATAL_ERROR "tone stream: expected exit 0 and the pinned PCM hash, got ${tone_rc}\n${tone_out}${tone_err}")
+      endif()
+      if(NOT partial_hash STREQUAL tone_hash)
+        message(FATAL_ERROR "mailbox stop changed the PCM prefix hash (${partial_hash} != ${tone_hash})")
+      endif()
+
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames "${partial_frames}" --hash-audio
+        RESULT_VARIABLE silent_rc OUTPUT_VARIABLE silent_out ERROR_VARIABLE silent_err)
+      string(REGEX MATCH "audio sha256 ([0-9a-f]+)" silent_line "${silent_out}")
+      set(silent_hash "${CMAKE_MATCH_1}")
+      if(NOT silent_rc STREQUAL "0" OR silent_line STREQUAL "")
+        message(FATAL_ERROR "silent stream: expected exit 0 and an audio hash, got ${silent_rc}\n${silent_out}${silent_err}")
+      endif()
+      if(silent_hash STREQUAL tone_hash)
+        message(FATAL_ERROR "tone and silent runs produced the same PCM hash (${tone_hash})")
+      endif()
+    endif()
   elseif(CASE STREQUAL "hash_state")
     # One well-formed line, the same twice, and a different one a frame later. CMake regexes have no
     # {64}, so the sixty-four digits are repeated.
@@ -592,10 +661,21 @@ endforeach()
 add_executable(schwaystation-test-bench
   ${CMAKE_CURRENT_LIST_DIR}/test_runner.c
   ${PROJECT_SOURCE_DIR}/runner/bench.c
+  ${PROJECT_SOURCE_DIR}/runner/sha256.c
   ${PROJECT_SOURCE_DIR}/runner/stop.c)
 set_target_properties(schwaystation-test-bench PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-bench)
+
+# Fault prevented: an audio hash that omits PCM samples, depends on drain
+# partitioning, or treats a silent run as nonzero.
+set(runner_audio_check ${runner_check} -DUNIT=$<TARGET_FILE:schwaystation-test-bench>)
+if(SCHWAYSTATION_FIXTURES)
+  list(APPEND runner_audio_check -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures)
+endif()
+schway_add_test(NAME runner.audio.hash
+  COMMAND ${runner_audio_check} -DCASE=audio_hash -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 60)
 
 add_executable(schwaystation-test-run-stop ${SCHWAYSTATION_RUNNER_SOURCES})
 target_include_directories(schwaystation-test-run-stop PRIVATE ${SCHWAYSTATION_RUNNER_INCLUDE}
@@ -607,6 +687,13 @@ target_compile_definitions(schwaystation-test-run-stop PRIVATE _POSIX_C_SOURCE=2
 set_target_properties(schwaystation-test-run-stop PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-run-stop)
+
+# Fault prevented: the audio drain's failure is reported as success or a hash
+# mismatch, and invalid CLI combinations are mistaken for run failures.
+schway_add_test(NAME runner.audio.failures
+  COMMAND ${runner_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
+    -DCASE=audio_failures -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
 
 set(bench_check ${runner_check} -DUNIT=$<TARGET_FILE:schwaystation-test-bench>)
 

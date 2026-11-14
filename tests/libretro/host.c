@@ -10,11 +10,9 @@
  * swapped channel or byte order fails here. Each frame's audio must equal the
  * pairs the reference instance drains for that frame.
  *
- * ntsc-u: the host reports core options version 2, answers the region option
- * with ntsc-u and registers the batch audio callback. pal: the host has no
- * core options version, so the module must fall back to SET_VARIABLES; it
- * answers pal and registers only the single-sample callback. "Lnnn" is a
- * line of the vendored libretro.h. */
+ * audio-equality modes run batch or single callbacks for NTSC-J, NTSC-U and
+ * PAL. The regular ntsc-u and pal modes retain the options-version and legacy
+ * SET_VARIABLES checks. "Lnnn" is a line of the vendored libretro.h. */
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -170,6 +168,7 @@ static void resolve_all(void)
 /* ---- frontend callbacks: record what the core does ---- */
 
 static int pal; /* the mode: 0 ntsc-u, 1 pal */
+static int single_audio; /* selects the frontend's audio_sample fallback */
 static int no_game_calls, no_game_value;
 static int pixel_format_calls;
 static enum retro_pixel_format pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
@@ -209,6 +208,8 @@ static const char *analog_mode_value = "analog";
 static const char *analog_toggle_value = "enabled";
 static int rumble_available;
 static int rumble_axis_mode;
+static unsigned audio_tap_checks;
+static unsigned audio_tap_failures;
 struct rumble_event {
     unsigned port;
     enum retro_rumble_effect effect;
@@ -779,7 +780,7 @@ static void set_callbacks(void)
 {
     p_set_video_refresh(video);
     p_set_audio_sample(sample);
-    p_set_audio_sample_batch(pal ? NULL : batch);
+    p_set_audio_sample_batch(single_audio ? NULL : batch);
     p_set_input_poll(on_poll);
     p_set_input_state(input);
 }
@@ -807,6 +808,231 @@ static int test_path(char *path, size_t capacity, const char *directory, const c
 {
     int written = snprintf(path, capacity, "%s/%s", directory, name);
     return written > 0 && (size_t)written < capacity;
+}
+
+static int pcm_bytes_equal(const uint8_t *left, size_t left_size,
+                           const uint8_t *right, size_t right_size)
+{
+    return left_size == right_size && memcmp(left, right, left_size) == 0;
+}
+
+static void audio_expect(int condition, const char *message)
+{
+    audio_tap_checks++;
+    printf("%s %u - %s\n", condition ? "ok" : "not ok", audio_tap_checks, message);
+    audio_tap_failures += condition ? 0u : 1u;
+}
+
+static uint8_t *read_pcm_file(const char *path, size_t *size)
+{
+    FILE *file = fopen(path, "rb");
+    if (file == NULL || fseek(file, 0, SEEK_END) != 0) {
+        if (file != NULL) {
+            (void)fclose(file);
+        }
+        return NULL;
+    }
+    long length = ftell(file);
+    if (length <= 0 || fseek(file, 0, SEEK_SET) != 0) {
+        (void)fclose(file);
+        return NULL;
+    }
+    uint8_t *bytes = (uint8_t *)malloc((size_t)length);
+    if (bytes == NULL || fread(bytes, 1u, (size_t)length, file) != (size_t)length) {
+        free(bytes);
+        (void)fclose(file);
+        return NULL;
+    }
+    (void)fclose(file);
+    *size = (size_t)length;
+    return bytes;
+}
+
+static int test_audio_equality(const char *exe_path, const char *pcm_path, uint32_t region)
+{
+    size_t pcm_size = 0u;
+    uint8_t *runner_pcm = read_pcm_file(pcm_path, &pcm_size);
+    struct retro_system_av_info av;
+    struct retro_game_info game;
+    schway *audio_reference = ref_create(region);
+    schway_info info;
+    uint8_t callback_bytes[4u * MAX_PAIRS];
+    uint8_t first_frame[4u * MAX_PAIRS];
+    unsigned frames = region == SCHWAY_REGION_PAL ? 600u : 601u;
+    unsigned pairs_floor = region == SCHWAY_REGION_PAL ? 886u : 737u;
+    size_t offset = 0u;
+    size_t first_frame_bytes = 0u;
+    uint64_t total_pairs = 0u;
+    unsigned nonzero = 0u;
+    unsigned asymmetric = 0u;
+    unsigned saw_floor = 0u;
+    unsigned saw_ceil = 0u;
+    unsigned video_start = video_calls;
+    unsigned video_bad_start = video_bad;
+    unsigned pairs_valid = 1u;
+    unsigned stream_valid = 1u;
+
+    printf("TAP version 13\n");
+    audio_expect(runner_pcm != NULL, "runner PCM capture file is available");
+    if (runner_pcm == NULL) {
+        schway_destroy(audio_reference);
+        p_deinit();
+        module_close();
+        printf("1..%u\n", audio_tap_checks);
+        return 1;
+    }
+    audio_expect(pcm_size != 0u && (pcm_size % 4u) == 0u,
+                 "runner PCM contains complete non-empty stereo pairs");
+    memset(&game, 0, sizeof game);
+    game.path = exe_path;
+    audio_expect(p_load_game(&game), "fullpath tone executable loads through the libretro stub");
+    memset(&av, 0, sizeof av);
+    p_get_system_av_info(&av);
+    check_av(&av, region);
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    audio_expect(audio_reference != NULL &&
+                     schway_get_info(audio_reference, &info) == SCHWAY_STATUS_OK,
+                 "selected region exposes its core audio and frame rates");
+    if (audio_reference != NULL && info.fps_den != 0u && info.sample_rate_den != 0u) {
+        audio_expect(av.timing.fps == (double)info.fps_num / (double)info.fps_den &&
+                         av.timing.sample_rate == (double)info.sample_rate_num /
+                                                      (double)info.sample_rate_den,
+                     "libretro AV timing matches the core's native rates");
+    } else {
+        audio_expect(0, "core rates are available for AV cadence comparison");
+    }
+    p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+
+    for (unsigned frame_index = 0u; frame_index < frames; frame_index++) {
+        run_one();
+        if (got_pairs > MAX_PAIRS) {
+            pairs_valid = 0u;
+            continue;
+        }
+        pairs_valid &= got_pairs == pairs_floor || got_pairs == pairs_floor + 1u;
+        saw_floor |= got_pairs == pairs_floor;
+        saw_ceil |= got_pairs == pairs_floor + 1u;
+        total_pairs += got_pairs;
+        size_t frame_bytes = got_pairs * 4u;
+        if (offset > pcm_size || frame_bytes > pcm_size - offset) {
+            fprintf(stderr, "audio frame %u exceeds runner stream at byte %lu\n",
+                    frame_index + 1u, (unsigned long)offset);
+            stream_valid = 0u;
+            continue;
+        }
+        for (size_t pair = 0u; pair < got_pairs; pair++) {
+            uint16_t left = (uint16_t)got_audio[2u * pair];
+            uint16_t right = (uint16_t)got_audio[2u * pair + 1u];
+            callback_bytes[4u * pair] = (uint8_t)left;
+            callback_bytes[4u * pair + 1u] = (uint8_t)(left >> 8);
+            callback_bytes[4u * pair + 2u] = (uint8_t)right;
+            callback_bytes[4u * pair + 3u] = (uint8_t)(right >> 8);
+            nonzero |= left != 0u || right != 0u;
+            asymmetric |= left != right;
+        }
+        if (frame_index == 0u && frame_bytes <= sizeof first_frame) {
+            memcpy(first_frame, callback_bytes, frame_bytes);
+            first_frame_bytes = frame_bytes;
+        }
+        if (!pcm_bytes_equal(callback_bytes, frame_bytes, runner_pcm + offset, frame_bytes)) {
+            if (stream_valid != 0u) {
+                size_t byte = 0u;
+                while (byte < frame_bytes && callback_bytes[byte] == runner_pcm[offset + byte]) {
+                    byte++;
+                }
+                printf("# audio frame %u differs at stream byte %lu\n", frame_index + 1u,
+                       (unsigned long)(offset + byte));
+            }
+            stream_valid = 0u;
+        }
+        offset += frame_bytes;
+    }
+    audio_expect(pairs_valid != 0u, "every frame preserves the native region sample count");
+    audio_expect(saw_floor != 0u && saw_ceil != 0u,
+                 "remainder carry produces both native frame pair counts");
+    if (audio_reference != NULL && info.fps_num != 0u && info.sample_rate_den != 0u) {
+        uint64_t expected_numerator = (uint64_t)info.sample_rate_num * info.fps_den * frames;
+        uint64_t expected_denominator = (uint64_t)info.sample_rate_den * info.fps_num;
+        uint64_t expected_total = expected_numerator / expected_denominator;
+        audio_expect(total_pairs >= expected_total && total_pairs <= expected_total + 1u,
+                     "total callback pairs track the native AV cadence without drift");
+    } else {
+        audio_expect(0, "core rates are available for total cadence comparison");
+    }
+    audio_expect(video_calls - video_start == frames && video_bad == video_bad_start,
+                 "every audio frame has one valid video callback");
+    audio_expect(stream_valid && offset == pcm_size,
+                 "batch callback bytes and total length equal the runner stream");
+    audio_expect(nonzero != 0u, "tone callbacks contain nonzero PCM");
+    audio_expect(asymmetric != 0u, "tone callbacks preserve asymmetric stereo PCM");
+
+    if (pcm_size >= 4u) {
+        uint8_t *changed = (uint8_t *)malloc(pcm_size);
+        audio_expect(changed != NULL, "negative-control buffer allocation succeeds");
+        if (changed != NULL) {
+            memcpy(changed, runner_pcm, pcm_size);
+            changed[0] ^= 1u;
+            audio_expect(!pcm_bytes_equal(runner_pcm, pcm_size, changed, pcm_size),
+                         "a changed sample is detected");
+            audio_expect(!pcm_bytes_equal(runner_pcm, pcm_size, runner_pcm, pcm_size - 1u),
+                         "a missing tail byte is detected");
+            free(changed);
+        }
+    }
+
+    p_reset();
+    run_one();
+    unsigned reset_audio_nonzero = 0u;
+    for (size_t pair = 0u; pair < got_pairs && pair < MAX_PAIRS; pair++) {
+        reset_audio_nonzero |= got_audio[2u * pair] != 0 || got_audio[2u * pair + 1u] != 0;
+    }
+    audio_expect(reset_audio_nonzero == 0u,
+                 "power reset does not replay tone samples from the prior content frame");
+    memset(&av, 0, sizeof av);
+    p_get_system_av_info(&av);
+    audio_expect(av.timing.fps == (double)info.fps_num / (double)info.fps_den &&
+                     av.timing.sample_rate == (double)info.sample_rate_num /
+                                                  (double)info.sample_rate_den,
+                 "reset preserves the native AV rates");
+
+    p_unload_game();
+    audio_expect(p_load_game(&game), "tone content reloads after unload");
+    run_one();
+    audio_expect(first_frame_bytes != 0u && got_pairs * 4u == first_frame_bytes &&
+                     memcmp(got_audio, first_frame, first_frame_bytes) == 0,
+                 "content reload clears queued samples and delivers its first frame intact");
+    memset(&av, 0, sizeof av);
+    p_get_system_av_info(&av);
+    audio_expect(av.timing.fps == (double)info.fps_num / (double)info.fps_den &&
+                     av.timing.sample_rate == (double)info.sample_rate_num /
+                                                  (double)info.sample_rate_den,
+                 "content reload preserves the native AV rates");
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    free(runner_pcm);
+    schway_destroy(audio_reference);
+    printf("1..%u\n", audio_tap_checks);
+    return audio_tap_failures != 0u || check_failures != 0 ? 1 : 0;
+}
+
+static int valid_audio_region(const char *name)
+{
+    return strcmp(name, "ntsc-j") == 0 || strcmp(name, "ntsc-u") == 0 ||
+           strcmp(name, "pal") == 0;
+}
+
+static uint32_t audio_region(const char *name)
+{
+    if (strcmp(name, "ntsc-j") == 0) {
+        return SCHWAY_REGION_NTSC_J;
+    }
+    if (strcmp(name, "pal") == 0) {
+        return SCHWAY_REGION_PAL;
+    }
+    return SCHWAY_REGION_NTSC_U;
 }
 
 static int write_test_file(const char *path, const void *bytes, size_t size)
@@ -1807,6 +2033,12 @@ static int test_native_video_geometry_edges(const char *path)
             CHECK_EQ_U64(frame[0], expected_pixels[i]);
             CHECK_EQ_U64(geometry_calls, geometry_before + changed_dimensions);
             CHECK_EQ_U64(av_info_calls, 0u);
+            if (modes[i].interlaced != 0u) {
+                struct retro_system_av_info av;
+                memset(&av, 0, sizeof av);
+                p_get_system_av_info(&av);
+                check_av(&av, SCHWAY_REGION_NTSC_U);
+            }
         }
         if (changed_dimensions) {
             CHECK_EQ_U64(geometry_sent.base_width, modes[i].width);
@@ -3021,6 +3253,10 @@ int main(int argc, char **argv)
     size_t size;
     unsigned run, lo, other_lo;
     uint32_t region, other;
+    int audio_batch_mode = argc == 6 && strcmp(argv[2], "audio-equality-batch") == 0;
+    int audio_single_mode = argc == 6 && strcmp(argv[2], "audio-equality-single") == 0;
+    int audio_mode = audio_batch_mode || audio_single_mode;
+    uint32_t selected_audio_region = audio_mode ? audio_region(argv[3]) : SCHWAY_REGION_NTSC_U;
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
@@ -3036,12 +3272,14 @@ int main(int argc, char **argv)
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
-    if ((!content_mode && !psexe_mode && !input_descriptors_mode &&
+    if ((!audio_mode && !content_mode && !psexe_mode && !input_descriptors_mode &&
          !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
+        (audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
+                        argv[5][0] == '\0')) ||
         ((content_mode || psexe_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
           card_persistence_mode || card_controls_mode) &&
@@ -3050,20 +3288,23 @@ int main(int argc, char **argv)
          argv[4][0] == '\0')) {
         fprintf(stderr,
                 "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | "
-                "content-psexe <exe> <directory> | input-descriptors | "
+                "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
                 "card-controls <exe> <save-dir> | memory-aliases | memory-boundaries | "
                 "video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | "
                 "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
-    content_test = content_mode || psexe_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
+    content_test = audio_mode || content_mode || psexe_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
                    input_controls_mode || lifecycle_mode || card_persistence_mode ||
                    card_controls_mode;
     rumble_available = rumble_guest_mode || rumble_controls_mode;
-    pal = !content_test && strcmp(argv[2], "pal") == 0;
-    option_value = pal ? "pal" : "ntsc-u";
-    region = pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U;
+    pal = audio_mode ? selected_audio_region == SCHWAY_REGION_PAL
+                     : (!content_test && strcmp(argv[2], "pal") == 0);
+    single_audio = audio_mode ? audio_single_mode : pal;
+    option_value = audio_mode ? argv[3] : (pal ? "pal" : "ntsc-u");
+    region = audio_mode ? selected_audio_region
+                        : (pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U);
     /* The region selected for the next load, and both regions' pairs per
        frame: 33,868,800 x 44,100 / (768 x 44,100) per second over the frame
        rate (HOSTS-AND-INTEGRATION section 1, AV fields). */
@@ -3107,6 +3348,10 @@ int main(int argc, char **argv)
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
     set_callbacks();
+
+    if (audio_mode) {
+        return test_audio_equality(argv[4], argv[5], region);
+    }
 
     if (rumble_guest_mode) {
         return test_rumble_guest(argv[3]);

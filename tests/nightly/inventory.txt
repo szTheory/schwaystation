@@ -12,4 +12,5 @@ gpu.reference.transparency	gpu,nightly,portable
 gpu.reference.triangle	gpu,nightly,portable
 gpu.reference.uv-interpolation	gpu,nightly,portable
 gpu.reference.vram-to-vram-overlap	gpu,nightly,portable
+spu.reference.memory_transfer	audio,nightly,portable
 vectors.r3000.full	portable,vectors

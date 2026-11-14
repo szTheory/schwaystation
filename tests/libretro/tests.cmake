@@ -1,3 +1,53 @@
+# This file also drives the real runner from libretro.host. Script mode is
+# used by that one test so every guest executable goes through the configured
+# cross-compiling emulator and its status is checked before host comparison.
+if(CMAKE_SCRIPT_MODE_FILE AND DEFINED SCHWAY_LIBRETRO_AUDIO_TEST)
+  file(MAKE_DIRECTORY "${TEST_DIR}")
+  foreach(region IN ITEMS ntsc-j ntsc-u pal)
+    foreach(callback IN ITEMS batch single)
+      set(pcm_file "${TEST_DIR}/libretro-audio-${region}-${callback}.pcm")
+      file(REMOVE "${pcm_file}")
+      execute_process(
+        COMMAND ${EMULATOR} "${RUNNER}" --region "${region}" --exe "${FIXTURE}"
+          --frames "${FRAMES}" --stop-on mailbox --hash-audio --test-audio-file "${pcm_file}"
+        RESULT_VARIABLE runner_status OUTPUT_VARIABLE runner_out ERROR_VARIABLE runner_err)
+      if(NOT runner_status STREQUAL "0")
+        message(FATAL_ERROR "${region} ${callback} runner PCM capture failed (exit ${runner_status})\n${runner_out}\n${runner_err}")
+      endif()
+      if(NOT EXISTS "${pcm_file}")
+        message(FATAL_ERROR "${region} ${callback} runner reported success without writing PCM bytes")
+      endif()
+      file(SIZE "${pcm_file}" pcm_size)
+      math(EXPR pcm_remainder "${pcm_size} % 4")
+      if(pcm_size EQUAL 0 OR NOT pcm_remainder EQUAL 0)
+        message(FATAL_ERROR "${region} ${callback} runner PCM has invalid byte length ${pcm_size}")
+      endif()
+      file(SHA256 "${pcm_file}" pcm_sha256)
+      if(NOT runner_out MATCHES "audio sha256 ${pcm_sha256}")
+        message(FATAL_ERROR "${region} ${callback} runner PCM does not match --hash-audio output\n${runner_out}")
+      endif()
+
+      execute_process(
+        COMMAND ${EMULATOR} "${HOST}" "${MODULE}" "audio-equality-${callback}" "${region}"
+          "${FIXTURE}" "${pcm_file}"
+        RESULT_VARIABLE host_status OUTPUT_VARIABLE host_out ERROR_VARIABLE host_err)
+      if(NOT host_status STREQUAL "0")
+        message(FATAL_ERROR "libretro ${region} ${callback} PCM comparison failed (exit ${host_status})\n${host_out}\n${host_err}")
+      endif()
+      message("${host_out}")
+    endforeach()
+  endforeach()
+
+  execute_process(
+    COMMAND ${EMULATOR} "${HOST}" "${MODULE}" "${REGION}"
+    RESULT_VARIABLE baseline_status OUTPUT_VARIABLE baseline_out ERROR_VARIABLE baseline_err)
+  if(NOT baseline_status STREQUAL "0")
+    message(FATAL_ERROR "libretro host baseline failed (exit ${baseline_status})\n${baseline_out}\n${baseline_err}")
+  endif()
+  message("${baseline_out}")
+  return()
+endif()
+
 # The libretro core loaded in-process by a test host.
 
 # The in-process frontend. It links the library and the shared converter
@@ -12,6 +62,7 @@ set_target_properties(schwaystation-test-libretro-host PROPERTIES
 schway_warnings(schwaystation-test-libretro-host)
 add_dependencies(schwaystation-test-libretro-host schwaystation_libretro)
 add_dependencies(schwaystation-test-libretro-host schwaystation-fixtures)
+add_dependencies(schwaystation-test-libretro-host schwaystation-run-test)
 
 # Fault prevented: a generated .info file advertises a functional claim
 # without a gating registered inventory row.
@@ -34,15 +85,30 @@ schway_add_test(NAME libretro.info.claims.self_test
 # Fault prevented: the core RetroArch loads shows a frame, rate, geometry or
 # audio length other than the library's, needs content to start, loses its
 # region option, or resets or restores a state other than the library does.
-# ntsc-u answers core options version 2 and takes batch audio; pal answers no
-# options version and takes audio pair by pair.
+# The host integration checks both callback modes against runner PCM for each
+# region. The separate PAL baseline retains the legacy no-options check.
 foreach(case IN ITEMS "libretro.host;ntsc-u" "libretro.host.pal;pal")
   list(GET case 0 name)
   list(GET case 1 mode)
-  schway_add_test(NAME ${name}
-    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
-      $<TARGET_FILE:schwaystation_libretro> ${mode}
-    LABELS libretro portable TIMEOUT 60)
+  if(name STREQUAL "libretro.host")
+    string(REPLACE ";" "$<SEMICOLON>" libretro_audio_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+    schway_add_test(NAME ${name}
+      COMMAND ${CMAKE_COMMAND} -DSCHWAY_LIBRETRO_AUDIO_TEST=1
+        "-DEMULATOR=${libretro_audio_emulator}"
+        -DRUNNER=$<TARGET_FILE:schwaystation-run-test>
+        -DHOST=$<TARGET_FILE:schwaystation-test-libretro-host>
+        -DMODULE=$<TARGET_FILE:schwaystation_libretro>
+        -DREGION=${mode} -DFRAMES=610
+        -DFIXTURE=${PROJECT_BINARY_DIR}/fixtures/spu_tone.exe
+        -DTEST_DIR=${PROJECT_BINARY_DIR}/tests
+        -P ${CMAKE_CURRENT_LIST_FILE}
+      LABELS libretro portable TIMEOUT 120)
+  else()
+    schway_add_test(NAME ${name}
+      COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+        $<TARGET_FILE:schwaystation_libretro> ${mode}
+      LABELS libretro portable TIMEOUT 60)
+  endif()
 endforeach()
 
 # Fault prevented: a fullpath PS-EXE that cannot run with the built-in stub

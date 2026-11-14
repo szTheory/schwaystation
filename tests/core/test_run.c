@@ -9,6 +9,9 @@
 #include "schwaystation.h"
 #include "internal.h"
 #include "state.h"
+#include "bus.h"
+#include "dma.h"
+#include "spu.h"
 #include "../check.h"
 
 #define MAX_FIELDS 256u
@@ -199,6 +202,7 @@ static void test_budget_resume(void)
        them: PAL frames are at most 680,824 cycles. */
     uint32_t end_at = field_offset(b, "instance.frame_end");
     uint32_t ticks_at = field_offset(b, "instance.ticks");
+    uint32_t spu_tick_at = field_offset(b, "spu.next_tick");
     const uint64_t ticks = 300000u;
     const uint64_t ends[] = {ticks - 1u, ticks + 680825u};
     for (size_t i = 0; i < sizeof ends / sizeof ends[0]; i++) {
@@ -235,6 +239,7 @@ static void test_budget_resume(void)
     memcpy(ok, mid, na);
     put_le(ok + ticks_at, SCHWAY__STATE_TICKS_MAX - 5u, 8u);
     put_le(ok + end_at, SCHWAY__STATE_TICKS_MAX + 10u, 8u);
+    put_le(ok + spu_tick_at, UINT64_MAX, 8u);
     reseal(ok, na);
     CHECK_EQ_U64(schway_load_state(b, ok, na), SCHWAY_STATUS_OK);
     r = run(b, 5u, 0u);
@@ -480,9 +485,9 @@ static void test_peek_no_side_effects(void)
     if (snapshot == NULL) {
         exit(1);
     }
-    memcpy(snapshot, inst, sizeof *snapshot);
     size_t n0, n1;
     uint8_t *before = save(inst, &n0);
+    memcpy(snapshot, inst, sizeof *snapshot);
     uint32_t sum = 0u;
     for (uint32_t w = 1u; w <= 4u; w <<= 1) {
         for (uint32_t addr = 0u; addr < SCHWAY__RAM_SIZE; addr += w) {
@@ -878,6 +883,227 @@ static void check_edges(uint32_t region, int with_exe, uint32_t flags)
     }
 }
 
+#define SPU_BASE 0x1F801C00u
+#define SPU_ATTR (SPU_BASE + 0x1AAu)
+#define SPU_KON (SPU_BASE + 0x188u)
+#define DMA4_MADR 0x1F8010C0u
+#define DMA4_BCR 0x1F8010C4u
+#define DMA4_CHCR 0x1F8010C8u
+#define DMA_DPCR 0x1F8010F0u
+
+static void spu_write(schway *inst, uint32_t address, uint32_t width, uint32_t value)
+{
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, address, width, value, &cycles), 0u);
+}
+
+static void spu_deadline_is_future(const schway *inst)
+{
+    CHECK(inst->spu.next_tick == UINT64_MAX ||
+          (inst->spu.next_tick > inst->ticks &&
+           inst->spu.next_tick - inst->ticks <= SCHWAY__CYCLES_PER_PAIR));
+    CHECK(inst->sched.next > inst->ticks);
+}
+
+static void check_muted_voice(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    const uint32_t voice = SPU_BASE;
+    /* A looped, nonzero BRR block makes the voice decode and envelope advance
+       while the main volumes remain zero. */
+    schway__spu_ram_write(inst, 0u, 0x0377u);
+    for (uint32_t i = 1u; i < 8u; i++) {
+        schway__spu_ram_write(inst, 2u * i, 0x7777u);
+    }
+    spu_write(inst, voice, 2u, 0x3FFFu);
+    spu_write(inst, voice + 2u, 2u, 0x3FFFu);
+    spu_write(inst, voice + 4u, 2u, 0x1000u);
+    spu_write(inst, voice + 6u, 2u, 0u);
+    spu_write(inst, voice + 8u, 2u, 0x7F00u);
+    spu_write(inst, voice + 10u, 2u, 0x1FC0u);
+    spu_write(inst, SPU_BASE + 0x180u, 2u, 0u);
+    spu_write(inst, SPU_BASE + 0x182u, 2u, 0u);
+    spu_write(inst, SPU_ATTR, 2u, 0xC000u);
+    spu_write(inst, SPU_KON, 2u, 1u);
+    schway_run_result result = run(inst, 8u * SCHWAY__CYCLES_PER_PAIR, 0u);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(result.ticks, 8u * SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(inst->audio_count, 8u);
+    CHECK(inst->spu.voice[0].sample != 0 || inst->spu.voice[0].output != 0);
+    CHECK(inst->spu.voice[0].sample_counter != (UINT32_C(31) << 27));
+    spu_deadline_is_future(inst);
+    int16_t pcm[16];
+    schway_audio audio;
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = pcm;
+    audio.capacity = 8u;
+    CHECK_EQ_U64(schway_get_audio(inst, &audio), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(audio.written, 8u);
+    for (uint32_t i = 0u; i < 2u * audio.written; i++) {
+        CHECK_EQ_U64((uint16_t)pcm[i], 0u);
+    }
+    schway_destroy(inst);
+}
+
+static void check_dma_busy_bound(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    for (uint32_t i = 0u; i < 16u; i++) {
+        spu_write(inst, 0x80002000u + 4u * i, 4u, 0xA5000000u | i);
+    }
+    spu_write(inst, SPU_BASE + 0x1A6u, 2u, 0x20u);
+    spu_write(inst, SPU_ATTR, 2u, 0x0020u);
+    schway_run_result result = run(inst, SCHWAY__CYCLES_PER_PAIR, 0u);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(inst->ticks, SCHWAY__CYCLES_PER_PAIR);
+    spu_write(inst, DMA_DPCR, 4u, 0x0FEDCBA9u);
+    spu_write(inst, DMA4_MADR, 4u, 0x2000u);
+    spu_write(inst, DMA4_BCR, 4u, 0x00010010u);
+    spu_write(inst, DMA4_CHCR, 4u, 0x01000201u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    CHECK(inst->dma.busy_until > inst->ticks);
+    uint64_t before = inst->ticks;
+    result = run(inst, 32u, 0u);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK(result.ticks >= before);
+    CHECK(result.ticks - before <= 32u);
+    CHECK((inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK(inst->dma.busy_until > inst->ticks);
+    spu_deadline_is_future(inst);
+    schway_destroy(inst);
+}
+
+static void check_maximum_loaded_state(void)
+{
+    schway *source = make(SCHWAY_REGION_NTSC_U);
+    schway *loaded = make(SCHWAY_REGION_NTSC_U);
+    struct schway__spu *spu = &source->spu;
+    spu->transfer_head = SCHWAY__SPU_FIFO_HALFWORDS - 1u;
+    spu->transfer_count = SCHWAY__SPU_FIFO_HALFWORDS;
+    spu->transfer_address = SCHWAY__SPU_RAM_SIZE - 2u;
+    spu->pending_count = SCHWAY__SPU_PENDING_WRITES;
+    for (uint32_t i = 0u; i < SCHWAY__SPU_FIFO_HALFWORDS; i++) {
+        spu->transfer_fifo[i] = (uint16_t)(UINT16_MAX - i);
+    }
+    for (uint32_t i = 0u; i < SCHWAY__SPU_PENDING_WRITES; i++) {
+        spu->pending[i].address = 0x01A6u;
+        spu->pending[i].value = UINT16_MAX;
+    }
+    spu->noise_phase = 0x1FFFFu;
+    spu->noise_lfsr = UINT16_MAX;
+    spu->capture_cursor = 0x1FFu;
+    spu->reverb_fir_cursor = SCHWAY__SPU_REVERB_FIR_TAPS - 1u;
+    spu->reverb_work_cursor = SCHWAY__SPU_REVERB_WORK_WORDS - 1u;
+    spu->reverb_address = SCHWAY__SPU_RAM_SIZE - 8u;
+    spu->irqa_addr = SCHWAY__SPU_RAM_SIZE - 8u;
+    size_t size = 0u;
+    uint8_t *state = save(source, &size);
+    CHECK_EQ_U64(schway_load_state(loaded, state, size), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(loaded->spu.pending_count, SCHWAY__SPU_PENDING_WRITES);
+    CHECK_EQ_U64(loaded->spu.transfer_head, SCHWAY__SPU_FIFO_HALFWORDS - 1u);
+    CHECK_EQ_U64(loaded->spu.transfer_count, SCHWAY__SPU_FIFO_HALFWORDS);
+    uint64_t before = loaded->ticks;
+    schway_run_result result = run(loaded, SCHWAY__CYCLES_PER_PAIR, 0u);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(result.ticks - before, SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(loaded->spu.pending_count, 0u);
+    CHECK(loaded->spu.transfer_address < SCHWAY__SPU_RAM_SIZE);
+    spu_deadline_is_future(loaded);
+    free(state);
+    schway_destroy(loaded);
+    schway_destroy(source);
+}
+
+/* Fault prevented: a no-content frame that polls per CPU cycle instead of
+   advancing to scheduled sample deadlines, or an idle/muted/busy state that
+   escapes the public run bound. The PS1 SPU schedules one sample event every
+   768 CPU cycles (.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md section 1.1). */
+static void test_no_busy_loop(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(inst->spu.next_tick, SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(inst->audio_count, 0u);
+    schway_run_result result = run(inst, 0u, 0u);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(result.ticks, 0u);
+    CHECK_EQ_U64(inst->spu.next_tick, SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(inst->audio_count, 0u);
+
+    result = run(inst, SCHWAY__CYCLES_PER_PAIR - 1u, 0u);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(result.ticks, SCHWAY__CYCLES_PER_PAIR - 1u);
+    CHECK_EQ_U64(inst->audio_count, 0u);
+    result = run(inst, 1u, 0u);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(result.ticks, SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(inst->audio_count, 1u);
+    CHECK_EQ_U64(inst->spu.next_tick, 2u * SCHWAY__CYCLES_PER_PAIR);
+    result = run(inst, 2u * SCHWAY__CYCLES_PER_PAIR, 0u);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(result.ticks, 3u * SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(inst->audio_count, 3u);
+    CHECK_EQ_U64(inst->spu.next_tick, 4u * SCHWAY__CYCLES_PER_PAIR);
+    CHECK_EQ_U64(inst->audio_count, inst->ticks / SCHWAY__CYCLES_PER_PAIR);
+    spu_deadline_is_future(inst);
+    schway_destroy(inst);
+
+    check_muted_voice();
+    check_dma_busy_bound();
+    check_maximum_loaded_state();
+}
+
+static uint32_t perf_frames(int argc, char **argv)
+{
+    char *end = NULL;
+    unsigned long value;
+    if (argc != 3) {
+        fprintf(stderr, "schwaystation-test-run: SPU perf modes need a frame count\n");
+        exit(2);
+    }
+    value = strtoul(argv[2], &end, 10);
+    if (end == argv[2] || *end != '\0' || value == 0u || value > 1200u) {
+        fprintf(stderr, "schwaystation-test-run: invalid bounded frame count\n");
+        exit(2);
+    }
+    return (uint32_t)value;
+}
+
+/* Cachegrind control: same creation and exact rational frame-end arithmetic
+   as the public no-content frame path, without running any device event. */
+static void perf_spu_idle_control(uint32_t frames)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    uint64_t num = schway__instance_frame_num(inst->region);
+    uint64_t den = schway__instance_frame_den(inst->region);
+    for (uint32_t i = 0u; i < frames; i++) {
+        uint64_t end = inst->frame_end;
+        CHECK(end >= inst->ticks);
+        inst->ticks = end;
+        inst->frame++;
+        inst->tick_acc = (inst->tick_acc + num) % den;
+        inst->frame_end += (inst->tick_acc + num) / den;
+    }
+    CHECK_EQ_U64(inst->frame, frames);
+    schway_destroy(inst);
+}
+
+/* Cachegrind workload: real public idle frames, with no BIOS or guest code. */
+static void perf_spu_idle(uint32_t frames)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    for (uint32_t i = 0u; i < frames; i++) {
+        schway_run_result result;
+        memset(&result, 0, sizeof result);
+        result.size = (uint32_t)sizeof result;
+        CHECK_EQ_U64(schway_run_frame(inst, &result), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(result.frame, (uint64_t)i + 1u);
+    }
+    CHECK_EQ_U64(inst->frame, frames);
+    schway_destroy(inst);
+}
+
 /* Fault prevented: a device whose time depends on where a run was cut, so a
    host that runs in slices gets different timer interrupts, DMA or CPU
    registers than one that runs a whole span. Timer 2 on the system clock over 8
@@ -932,12 +1158,21 @@ static const struct {
     {"peek_no_side_effects", test_peek_no_side_effects},
     {"peek_rejects", test_peek_rejects},
     {"peek_values", test_peek_values},
+    {"no_busy_loop", test_no_busy_loop},
     {"split_devices", test_split_devices},
     {"split_equivalence", test_split_equivalence},
 };
 
 int main(int argc, char **argv)
 {
+    if (argc >= 2 && argc <= 3 && strcmp(argv[1], "spu_idle_control") == 0) {
+        perf_spu_idle_control(perf_frames(argc, argv));
+        CHECK_DONE();
+    }
+    if (argc >= 2 && argc <= 3 && strcmp(argv[1], "spu_idle") == 0) {
+        perf_spu_idle(perf_frames(argc, argv));
+        CHECK_DONE();
+    }
     if (argc != 2) {
         fprintf(stderr, "usage: schwaystation-test-run <case>\n");
         return 2;

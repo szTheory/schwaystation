@@ -292,7 +292,9 @@ jobs:
         if: matrix.os == 'macos' && matrix.arch == 'arm64'
         with:
           name: pad-counter-fixture
-          path: build/${{ matrix.preset }}/fixtures/pad_counter.exe
+          path: |
+            build/${{ matrix.preset }}/fixtures/pad_counter.exe
+            build/${{ matrix.preset }}/fixtures/spu_tone.exe
           retention-days: 1
           if-no-files-found: error
 
@@ -490,6 +492,13 @@ jobs:
           -DTEMPLATE=tests/retroarch/test.cfg.in "-DRA_DIR=$PWD/build/ra-replay"
           "-DSHOT=$PWD/build/frames/replay" -DPROBE_CONTENT=build/fixtures/pad_counter.exe -DFRAMES=60
           -DVERIFY=tests/retroarch/verify.py -P tests/retroarch/run_retroarch.cmake
+      - name: Boot spu_tone.exe under the stub
+        run: >-
+          cmake -DRETROARCH=build/RetroArch.app/Contents/MacOS/RetroArch
+          -DCORE=build/libretro/cores/schwaystation_libretro.dylib -DINFO=build/libretro/info/schwaystation_libretro.info
+          -DTEMPLATE=tests/retroarch/test.cfg.in "-DRA_DIR=$PWD/build/ra-spu-tone"
+          "-DSHOT=$PWD/build/frames/spu-tone" -DPROBE_CONTENT=build/fixtures/spu_tone.exe -DFRAMES=60
+          -DVERIFY=tests/retroarch/verify.py -P tests/retroarch/run_retroarch.cmake
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -498,6 +507,7 @@ jobs:
             build/ra-replay/probe.bsv
             build/ra-replay/*.log
             build/ra-replay/probe.cross.bsv
+            build/ra-spu-tone/*.log
           retention-days: 1
           if-no-files-found: ignore
       - name: Both RetroArch frames equal their runner references
@@ -517,9 +527,21 @@ jobs:
           python3 ../../tests/retroarch/verify.py compare runner59.bmp replay.59.bmp 256 240
           python3 ../../tests/retroarch/verify.py compare runner60.bmp replay.60.bmp 256 240
           python3 ../../tests/retroarch/verify.py distinct replay.59.bmp replay.60.bmp
+      - name: Tone video frames equal the runner
+        working-directory: build/frames
+        run: |
+          ../runner/bin/schwaystation-run --exe ../fixtures/spu_tone.exe --frames 59 --png 59:spu-tone-runner59.png
+          ../runner/bin/schwaystation-run --exe ../fixtures/spu_tone.exe --frames 60 --png 60:spu-tone-runner60.png
+          test -d ../ra-spu-tone/system && test -z "$(find ../ra-spu-tone/system -mindepth 1 -print -quit)"
+          for f in spu-tone-runner59 spu-tone-runner60 spu-tone.59 spu-tone.60; do
+            sips --deleteColorManagementProperties "$f.png" > /dev/null
+            sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
+          done
+          python3 ../../tests/retroarch/verify.py compare spu-tone-runner59.bmp spu-tone.59.bmp 256 240
+          python3 ../../tests/retroarch/verify.py compare spu-tone-runner60.bmp spu-tone.60.bmp 256 240
       - name: RetroArch logs
         if: failure()
-        run: cat build/ra/*.log build/ra-replay/*.log || true
+        run: cat build/ra/*.log build/ra-replay/*.log build/ra-spu-tone/*.log || true
       # Captures from both comparisons aid diagnosis.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -562,7 +584,7 @@ jobs:
         id: build
         run: |
           cmake --preset ci
-          cmake --build build/ci --target fixtures/gpu_motion.exe
+          cmake --build build/ci --target fixtures/gpu_motion.exe schwaystation-test-run
           mkdir -p "$RUNNER_TEMP/perf"
           cp build/ci/fixtures/gpu_motion.exe "$RUNNER_TEMP/perf/gpu_motion.exe"
           build() {
@@ -657,7 +679,12 @@ jobs:
             cat perf.txt
             grep '^perf ' perf.txt >> "$GITHUB_STEP_SUMMARY" || true
           done
-          exit "$rc"
+          spu_rc=0
+          cmake "-DVALGRIND=$valgrind" \
+            "-DUNIT=$GITHUB_WORKSPACE/build/ci/tests/schwaystation-test-run" \
+            "-DOUT=$RUNNER_TEMP/perf/spu_idle" -DCASE=spu_idle \
+            -P tests/perf/tests.cmake || spu_rc=$?
+          if [ "$rc" -ne 0 ] || [ "$spu_rc" -ne 0 ]; then exit 1; fi
 
   # Every publish step of a release, rehearsed with the release App's token on
   # a same-repository pull request that changes a release input, against a

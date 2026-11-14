@@ -2,45 +2,45 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 04
-current_phase_name: Games play in RetroArch
-current_plan: 58 of 58
-status: completed
-stopped_at: Phase 04 shipped as v0.4.0; Phase 5 not started
-last_updated: "2026-11-13T17:03:45Z"
-last_activity: 2026-11-13
-last_activity_desc: "Phase 04 shipped through PR #14 and release PR #15; v0.4.0 published and post-merge CI passed. Phase 5 not started. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0."
-state_head: 2959b100812540942de4f0f6499413925bd1cb1e
+current_phase: 6
+current_phase_name: Discs and FMV
+status: planning
+stopped_at: Phase 5 complete, ready to plan Phase 6
+last_updated: "2026-11-14T15:31:41.685Z"
+last_activity: 2026-11-14
+last_activity_desc: "Phase 05 shipped as PR #18"
+state_head: cf7b515fc9bce3f91d3905de0788e32151b38f99
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 126
-  completed_plans: 126
-  percent: 67
+  completed_phases: 5
+  total_plans: 150
+  completed_plans: 150
+  percent: 83
+current_plan: Not started
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-29)
+See: .planning/PROJECT.md (updated 2026-11-14)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 04 shipped as v0.4.0; Phase 5 has not started.
+**Current focus:** Phase 6 — Discs and FMV
 
 ## Current Position
 
-Phase: 04 — Games play in RetroArch — SHIPPED
-Current Plan: 58 of 58
-Status: Shipped as v0.4.0. Phase 5 has not started.
-Last activity: 2026-11-13 -- Phase 04 released through PR #14 and release PR #15; post-merge CI and artifact verification passed. Runtime/model: Codex, GPT-6 primary session (exact model ID unavailable), OpenGSD 1.20.0.
+Phase: 6 — Discs and FMV
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-14 -- Phase 05 shipped as PR #18
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 126
+- Total plans completed: 150
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -52,6 +52,7 @@ Progress: [███████░░░] 67%
 | 02 | 27 | - | - |
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
+| 5 | 24 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -77,6 +78,8 @@ Progress: [███████░░░] 67%
 | Phase 01 P13 | 5min | 3 tasks | 6 files |
 | Phase 01 P14 | 17min | 3 tasks | 0 files |
 | Phase 01 P15 | 50min | 3 tasks | 27 files |
+| Phase 05 P15 | ~2h30 wall across restart | 2 tasks | 19 files |
+| Phase 05 P24 | ~30min wall | 1 task | 4 files |
 | Phase 02 P01 | 2 min | 2 tasks | 15 files |
 | Phase 02 P02 | 4 min | 3 tasks | 16 files |
 | Phase 02 P03 | 6 min | 3 tasks | 8 files |
@@ -188,6 +191,27 @@ Progress: [███████░░░] 67%
 | Phase 04 P31 | not measured (checkpointed execution) | 2 tasks | 9 files |
 | Phase 04 P29 | not measured (checkpointed execution) | 2 tasks | 26 files |
 | Phase 04 P32 | not measured (checkpointed execution) | 2 tasks | 7 files |
+| Phase 05 P01 | 14 min | 2 tasks | 7 files |
+| Phase 05 P02 | 19 min | 2 tasks | 8 files |
+| Phase 05 P04 | under 40 min (exact start unavailable) | 2 tasks | 7 files |
+| Phase 05 P16 | 26 min | 2 tasks | 6 files |
+| Phase 05 P03 | 40min | 1 tasks | 8 files |
+| Phase 05 P20 | 20 min | 1 tasks | 6 files |
+| Phase 05 P05 | 44 min | 1 tasks | 13 files |
+| Phase 05 P06 | 43min | 1 tasks | 7 files |
+| Phase 05 P21 | 46 min | 1 tasks | 7 files |
+| Phase 05 P07 | 29min | 2 tasks | 9 files |
+| Phase 05 P23 | 12 min | 2 tasks | 7 files |
+| Phase 05 P22 | 13m | 1 tasks | 2 files |
+| Phase 05 P08 | 28min | 2 tasks | 9 files |
+| Phase 05 P11 | 27min | 2 tasks | 5 files |
+| Phase 05 P09 | at least 22 min | 2 tasks | 9 files |
+| Phase 05 P13 | at least 13 min | 2 tasks | 11 files |
+| Phase 05 P17 | 32min | 2 tasks | 5 files |
+| Phase 05 P10 | 31 min | 2 tasks | 5 files |
+| Phase 05 P18 | at least 36 min | 2 tasks | 5 files |
+| Phase 05 P12 | about 34 min wall | 2 tasks | 4 files |
+| Phase 05 P19 | about 30m wall across restart; exact active time unavailable | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -458,6 +482,41 @@ Recent decisions affecting current work:
 - [Phase 04]: Correct stale plan metadata to the actual tests/retroarch/verify.py comparator.
 - [Phase 04]: Exercise every included API v4 addition with a strict registered caller and retain frozen v1-v3 callers.
 - [Phase 04]: Document retail BIOS supply, the MIT OpenBIOS CI stand-in and distinct runner/libretro card naming behavior.
+- [Phase 05]: SPU sample production belongs to the scheduler and uses the existing public PCM ring.
+- [Phase 05]: SPU mutable state is fixed-size and embedded in each emulator instance.
+- [Phase 05]: Use the public build-158 transfer executable as a fetch-only build asset, with archive and member digests checked before use.
+- [Phase 05]: Treat the seven exact transfer log lines as transfer, status, and timing evidence only; they do not provide a PCM oracle.
+- [Phase 05]: Accept only ordered one-to-one pass cases with exit code zero and the completion marker; allow CRLF and TTY prefixes.
+- [Phase 05]: Pass saved scheduler ticks into the private SPU visitor to validate sample phase before applying decoded state.
+- [Phase 05]: Advance behavior revision and save-state format to 5, reject format-4 states, and preserve the public API and ABI.
+- [Phase 05]: Guest SPU register writes latch at the next scheduled sample tick; byte and word access order is explicit.
+- [Phase 05]: Manual FIFO, capture, and IRQA behavior is isolated in plan 05-20, and its consumers remain blocked until completion.
+- [Phase 05]: SPU FIFO accesses update the FIFO at bus-access time, while other register writes apply on the next sample tick.
+- [Phase 05]: ManualWrite transfers one halfword per sample with RAM_CTRL replication; DMA direction status reflects FIFO availability without adding DMA transfers.
+- [Phase 05]: Capture writes the planned zero inputs only while RAM_CTRL capture bits are active, and IRQ9 requires both enable bits.
+- [Phase 05]: DMA4 readiness observes the latest queued ATTR value while public status remains scheduled.
+- [Phase 05]: The own stub implements only literal and %s output for the pinned transfer guest A(3Fh) path.
+- [Phase 05]: Manual FIFO data drains at the scheduled transfer tick so the bounded guest transfer cases complete.
+- [Phase 05]: Move 24-voice ordering, loop/ENDX, PMON and stereo mixing to plan 05-22 so plan 05-06 remains one focused BRR interpolation tracer.
+- [Phase 05]: DMA4 sync-mode-0 starts from CHCR bit 24 alone, matching the pinned guest register writes; other DMA channels retain their bit-28 trigger requirement.
+- [Phase 05]: Use the documented integer ADSR and sweep baseline; treat the ares table as conformance data, not a hardware waveform.
+- [Phase 05]: Keep high-rate and phase-negative sweep behavior unresolved without a direct hardware capture; do not add a profile switch.
+- [Phase 05]: SPU voice expansion reuses existing serialized fields; no save-state visitor or size change was needed.
+- [Phase 05]: Keep the authored BRR fixture integer-generated and commit source plus manifest digest, not assembled bytes.
+- [Phase 05]: Measure actual voice levels from a sealed guest mailbox at frame 600.
+- [Phase 05]: Preserve a unity 22.05 kHz feedback seam in plan 05-09; plan 05-10 supplies the register-driven feedback network.
+- [Phase 05]: Describe the measured 38-sample FIR delay and signal path without claiming an exact silicon preset waveform.
+- [Phase 05]: Kept production SPU code unchanged because existing scheduled-sample behavior already met the new deterministic and bounded assertions.
+- [Phase 05]: Added the SPU fuzzer to the explicit fuzz preset target list and wired the existing hosted perf job to CASE=spu_idle.
+- [Phase 05]: Keep the hash at the native 44.1 kHz stereo PCM boundary before host processing.
+- [Phase 05]: Preserve SOUND-01 as pending until final Phase 5 verification.
+- [Phase 05]: Keep per-stage rounding and saturation placement unresolved; the implementation uses a deterministic integer baseline.
+- [Phase 05]: Treat the ten preset impulse digests as local regression values, not hardware waveform claims.
+- [Phase 05]: Leave SOUND-01 and SOUND-02 pending until final Phase 5 verification.
+- [Phase 05]: Store complete frame-600 PCM digests and lengths as self-authored regression baselines, not hardware waveform claims.
+- [Phase 05]: Require the sealed mailbox CRC, completion status and complete ordered records before judging frame-600 ENVX.
+- [Phase 05]: Keep SOUND-01 and SOUND-02 pending until final Phase 5 verification.
+- [Phase 05]: Treat docs/hardware/spu.md as the current Phase-5 SPU contract, preserving source pins, open precision questions and separate evidence claims. — The implementation is now the maintained contract; concise preparation pointers and evidence limits prevent stale behavior descriptions or unsupported PCM accuracy claims.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -641,22 +700,27 @@ come from `AGENTS.md`.
 
 | 2026-11-12 | Phase 04 second hosted-run source prerequisite planning | Codex, OpenGSD 1.20.0; focused 04-56 and downstream DAG/checkpoint bookkeeping only; no execution advance or source/test run | gpt-6.1-sol high |
 
+| 2026-11-14 | /gsd-execute-plan 05-06 | Codex, OpenGSD 1.20.0; sequential shared checkout; BRR tracer TDD GREEN and focused save-state continuation checks; full 24-voice/mixer task moved to 05-22 | GPT-6 session (exact model ID not exposed) |
+| 2026-11-14 | /gsd-execute-phase 5 plan 05-12 | Codex, OpenGSD 1.21.0; sequential shared checkout; test-only PCM capture, six region/callback comparisons, reset/reload/cadence/AV checks | GPT-6 session (exact model ID not exposed) |
+| 2026-11-14 | /gsd-execute-phase 5 plan 05-14 | Codex, OpenGSD 1.21.0; sequential shared checkout; active PCM save/load continuation, malformed queued SPU address rejection, atomic ring refusal, state/DMA/reverb/API checks | GPT-6 session (exact model ID not exposed) |
+
 ## Session Continuity
 
-Last session: 2026-11-13T10:23:16.153Z
-Stopped at: Phase 4 verified; before `$gsd-ship 4` (AGENTS rule 9). Owner acts next; Phase 5 is not started.
+Last session: 2026-11-14T15:27:07Z
+Stopped at: Phase 5 complete; Phase 5 ship in progress
 Resume file: None
-Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 
-Phase 4 ship PR: not created; required boundary remains in force.
+Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
+
+Phase 4 shipped as [PR #14](https://github.com/szTheory/schwaystation/pull/14); release [PR #15](https://github.com/szTheory/schwaystation/pull/15) merged with green required CI. PR #17's post-release CI follow-up is merged and green.
 Phase 3 ship PR: https://github.com/szTheory/schwaystation/pull/12
 Phase 2 ship PR: https://github.com/szTheory/schwaystation/pull/8
 Phase 1 ship PR: https://github.com/szTheory/schwaystation/pull/4
 CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
-Phase 3 merged as PR #12; release PR #13 is green and merged. v0.3.0 is latest with 19 assets.
+Phase 3 merged as PR #12; release PR #13 is green and merged. Phase 4 release v0.4.0 is latest.
 Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
-Next: the owner invokes `$gsd-ship 4`. That step creates the PR, then normal auto-merge and release confirmation precede Phase 5. No routine UAT is required. Standing preferences are in `.planning/AUTONOMOUS.md`. Historical recovery notes below do not supersede this verified boundary.
+Next: continue `$gsd-execute-phase 5`. Phase 4 release confirmation is complete; no duplicate Phase 4 PR is needed. No routine UAT is required. Standing preferences are in `.planning/AUTONOMOUS.md`.
 
 ### Independent local work during immutable CI (2026-11-12)
 
@@ -697,3 +761,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; executor and verifier gpt-6-luna xhigh; pri
 The phase-completion summary scanner emitted advisory missing-path warnings for historical temporary RED reports, upstream-only paths, moved completed todos, literal command strings and the historical compare.c name. These are not missing delivered behavior: the verifier checked every current plan artifact and the real target/caller wiring. Preserve the command evidence; do not add files, repeat broad suites or rewrite historical evidence to satisfy that heuristic.
 
 Efficiency corrections are durable in AUTONOMOUS.md: bring real oracles into the first runnable slices, batch independent prepared consumers before final CI, reuse reviewed source fingerprints, configure the focused GPU lane without the CPU corpus, and stop an obsolete known-failed CI tail after collecting useful results. All required coverage remains.
+
+### Phase 5 verification boundary (2026-11-14)
+
+Plans 05-15 and 05-24 are complete; all 24 plan summaries are present. Goal-backward verification passed 3/3 roadmap truths with no gaps or owner checks. Local CI passed 547/547 tests plus 5/5 release package checks; the explicit audio suite passed 10/10, libretro PCM and idle-SPU checks passed 2/2, and hygiene passed 24/24. The repository-check total is exactly 2688 lines. Code review found no issues. Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed), gpt-6-luna xhigh. The release PR, exact-head hosted CI/nightly/RetroArch run and green release PR remain for `$gsd-ship 5`; stop here, before Phase 6.
