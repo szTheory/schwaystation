@@ -116,8 +116,8 @@ static int32_t reverb_signed16(uint16_t value)
 static int16_t reverb_scale(int16_t sample, uint16_t volume)
 {
     int32_t signed_volume = reverb_signed16(volume);
-    /* Signed Q15 -1.0 is the documented vIIR negation case and the measured
-       ordinary -1.0 behavior for vLIN/vRIN. */
+    /* Signed Q15 -1.0 is ordinary negation here, including the measured
+       vLIN/vRIN case. The separate vIIR quirk is handled after its sum. */
     return reverb_clamp16(reverb_sar64((int64_t)sample * signed_volume, 15u));
 }
 
@@ -174,6 +174,11 @@ static int16_t reverb_iir(schway *inst, int16_t input, uint32_t delay_address,
        then add the old sample. These stages follow the algebraic psx-spx
        equation; their exact hardware rounding/saturation placement is unknown. */
     int16_t filtered = reverb_saturating_add(reverb_scale(excitation, coefficient), previous);
+    if (coefficient == 0x8000u) {
+        /* The documented -8000h IIR quirk negates the completed stored value,
+           including the prior-sample addition. */
+        filtered = reverb_clamp16(-(int32_t)filtered);
+    }
     reverb_write(inst, output_offset, filtered);
     return filtered;
 }

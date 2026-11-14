@@ -215,11 +215,17 @@ static void check_split_resume(void)
 #define TEST_SPU_ESA UINT32_C(0x1F801DA2)
 #define TEST_SPU_IIR UINT32_C(0x1F801DC4)
 #define TEST_SPU_COMB1 UINT32_C(0x1F801DC6)
+#define TEST_SPU_COMB2 UINT32_C(0x1F801DC8)
+#define TEST_SPU_COMB3 UINT32_C(0x1F801DCA)
+#define TEST_SPU_COMB4 UINT32_C(0x1F801DCC)
 #define TEST_SPU_WALL UINT32_C(0x1F801DCE)
 #define TEST_SPU_LSAME UINT32_C(0x1F801DD4)
 #define TEST_SPU_RSAME UINT32_C(0x1F801DD6)
 #define TEST_SPU_LCOMB1 UINT32_C(0x1F801DD8)
 #define TEST_SPU_RCOMB1 UINT32_C(0x1F801DDA)
+#define TEST_SPU_LCOMB2 UINT32_C(0x1F801DDC)
+#define TEST_SPU_RCOMB2 UINT32_C(0x1F801DDE)
+#define TEST_SPU_LCOMB4 UINT32_C(0x1F801DEC)
 #define TEST_SPU_LSAME_DELAY UINT32_C(0x1F801DE0)
 #define TEST_SPU_RSAME_DELAY UINT32_C(0x1F801DE2)
 #define TEST_SPU_LDIFF UINT32_C(0x1F801DE4)
@@ -232,8 +238,95 @@ static void check_split_resume(void)
 #define TEST_SPU_RAPF1 UINT32_C(0x1F801DF6)
 #define TEST_SPU_LAPF2 UINT32_C(0x1F801DF8)
 #define TEST_SPU_RAPF2 UINT32_C(0x1F801DFA)
+#define TEST_SPU_REVERB_BASE UINT32_C(0x1F801DC0)
+#define TEST_SPU_VAPF1 UINT32_C(0x1F801DD0)
+#define TEST_SPU_VAPF2 UINT32_C(0x1F801DD2)
+#define TEST_SPU_VCOMB1 UINT32_C(0x1F801DC6)
+#define TEST_SPU_VCOMB2 UINT32_C(0x1F801DC8)
+#define TEST_SPU_VCOMB3 UINT32_C(0x1F801DCA)
+#define TEST_SPU_VCOMB4 UINT32_C(0x1F801DCC)
+#define TEST_SPU_MLCOMB3 UINT32_C(0x1F801DE8)
+#define TEST_SPU_MLAPF1 UINT32_C(0x1F801DF4)
+#define TEST_SPU_MLAPF2 UINT32_C(0x1F801DF8)
+#define TEST_SPU_DAPF1 UINT32_C(0x1F801DC0)
+#define TEST_SPU_DAPF2 UINT32_C(0x1F801DC2)
+#define TEST_SPU_IRQA UINT32_C(0x1F801DA4)
+#define TEST_SPU_STATX UINT32_C(0x1F801DAE)
 #define TEST_SPU_MAIN_VOL_L UINT32_C(0x1F801D80)
 #define TEST_SPU_MAIN_VOL_R UINT32_C(0x1F801D82)
+
+/* Register vectors and buffer sizes from psx-spx SPU Reverb Examples, indexed
+   by .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md section 1.7. Digests are
+   local regression baselines, not captured hardware waveforms. */
+struct reverb_preset {
+    const char *name;
+    uint32_t size;
+    uint16_t registers[32];
+    uint64_t digest;
+};
+
+static const struct reverb_preset reverb_presets[] = {
+    {"Room", 0x26C0u,
+     {0x007Du, 0x005Bu, 0x6D80u, 0x54B8u, 0xBED0u, 0x0000u, 0x0000u, 0xBA80u,
+      0x5800u, 0x5300u, 0x04D6u, 0x0333u, 0x03F0u, 0x0227u, 0x0374u, 0x01EFu,
+      0x0334u, 0x01B5u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u,
+      0x0000u, 0x0000u, 0x01B4u, 0x0136u, 0x00B8u, 0x005Cu, 0x8000u, 0x8000u},
+     UINT64_C(0x6F67AAC5E772F379)},
+    {"Studio Small", 0x1F40u,
+     {0x0033u, 0x0025u, 0x70F0u, 0x4FA8u, 0xBCE0u, 0x4410u, 0xC0F0u, 0x9C00u,
+      0x5280u, 0x4EC0u, 0x03E4u, 0x031Bu, 0x03A4u, 0x02AFu, 0x0372u, 0x0266u,
+      0x031Cu, 0x025Du, 0x025Cu, 0x018Eu, 0x022Fu, 0x0135u, 0x01D2u, 0x00B7u,
+      0x018Fu, 0x00B5u, 0x00B4u, 0x0080u, 0x004Cu, 0x0026u, 0x8000u, 0x8000u},
+     UINT64_C(0x5F76DE497CE9BA10)},
+    {"Studio Medium", 0x4840u,
+     {0x00B1u, 0x007Fu, 0x70F0u, 0x4FA8u, 0xBCE0u, 0x4510u, 0xBEF0u, 0xB4C0u,
+      0x5280u, 0x4EC0u, 0x0904u, 0x076Bu, 0x0824u, 0x065Fu, 0x07A2u, 0x0616u,
+      0x076Cu, 0x05EDu, 0x05ECu, 0x042Eu, 0x050Fu, 0x0305u, 0x0462u, 0x02B7u,
+      0x042Fu, 0x0265u, 0x0264u, 0x01B2u, 0x0100u, 0x0080u, 0x8000u, 0x8000u},
+     UINT64_C(0xD3AA48A27516CBCA)},
+    {"Studio Large", 0x6FE0u,
+     {0x00E3u, 0x00A9u, 0x6F60u, 0x4FA8u, 0xBCE0u, 0x4510u, 0xBEF0u, 0xA680u,
+      0x5680u, 0x52C0u, 0x0DFBu, 0x0B58u, 0x0D09u, 0x0A3Cu, 0x0BD9u, 0x0973u,
+      0x0B59u, 0x08DAu, 0x08D9u, 0x05E9u, 0x07ECu, 0x04B0u, 0x06EFu, 0x03D2u,
+      0x05EAu, 0x031Du, 0x031Cu, 0x0238u, 0x0154u, 0x00AAu, 0x8000u, 0x8000u},
+     UINT64_C(0xD560055723FAEA2B)},
+    {"Hall", 0xADE0u,
+     {0x01A5u, 0x0139u, 0x6000u, 0x5000u, 0x4C00u, 0xB800u, 0xBC00u, 0xC000u,
+      0x6000u, 0x5C00u, 0x15BAu, 0x11BBu, 0x14C2u, 0x10BDu, 0x11BCu, 0x0DC1u,
+      0x11C0u, 0x0DC3u, 0x0DC0u, 0x09C1u, 0x0BC4u, 0x07C1u, 0x0A00u, 0x06CDu,
+      0x09C2u, 0x05C1u, 0x05C0u, 0x041Au, 0x0274u, 0x013Au, 0x8000u, 0x8000u},
+     UINT64_C(0xE74E03196E29C8FC)},
+    {"Half Echo", 0x3C00u,
+     {0x0017u, 0x0013u, 0x70F0u, 0x4FA8u, 0xBCE0u, 0x4510u, 0xBEF0u, 0x8500u,
+      0x5F80u, 0x54C0u, 0x0371u, 0x02AFu, 0x02E5u, 0x01DFu, 0x02B0u, 0x01D7u,
+      0x0358u, 0x026Au, 0x01D6u, 0x011Eu, 0x012Du, 0x00B1u, 0x011Fu, 0x0059u,
+      0x01A0u, 0x00E3u, 0x0058u, 0x0040u, 0x0028u, 0x0014u, 0x8000u, 0x8000u},
+     UINT64_C(0x6396FE43FD7A7F53)},
+    {"Space Echo", 0xF6C0u,
+     {0x033Du, 0x0231u, 0x7E00u, 0x5000u, 0xB400u, 0xB000u, 0x4C00u, 0xB000u,
+      0x6000u, 0x5400u, 0x1ED6u, 0x1A31u, 0x1D14u, 0x183Bu, 0x1BC2u, 0x16B2u,
+      0x1A32u, 0x15EFu, 0x15EEu, 0x1055u, 0x1334u, 0x0F2Du, 0x11F6u, 0x0C5Du,
+      0x1056u, 0x0AE1u, 0x0AE0u, 0x07A2u, 0x0464u, 0x0232u, 0x8000u, 0x8000u},
+     UINT64_C(0xD46A63C555D20A07)},
+    {"Chaos Echo", 0x18040u,
+     {0x0001u, 0x0001u, 0x7FFFu, 0x7FFFu, 0x0000u, 0x0000u, 0x0000u, 0x8100u,
+      0x0000u, 0x0000u, 0x1FFFu, 0x0FFFu, 0x1005u, 0x0005u, 0x0000u, 0x0000u,
+      0x1005u, 0x0005u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u,
+      0x0000u, 0x0000u, 0x1004u, 0x1002u, 0x0004u, 0x0002u, 0x8000u, 0x8000u},
+     UINT64_C(0x5F8029B5D6F4911F)},
+    {"Delay", 0x18040u,
+     {0x0001u, 0x0001u, 0x7FFFu, 0x7FFFu, 0x0000u, 0x0000u, 0x0000u, 0x0000u,
+      0x0000u, 0x0000u, 0x1FFFu, 0x0FFFu, 0x1005u, 0x0005u, 0x0000u, 0x0000u,
+      0x1005u, 0x0005u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u,
+      0x0000u, 0x0000u, 0x1004u, 0x1002u, 0x0004u, 0x0002u, 0x8000u, 0x8000u},
+     UINT64_C(0x42CC1BD9124DA5B5)},
+    {"Reverb off", 0x0010u,
+     {0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u,
+      0x0000u, 0x0000u, 0x0001u, 0x0001u, 0x0001u, 0x0001u, 0x0001u, 0x0001u,
+      0x0000u, 0x0000u, 0x0001u, 0x0001u, 0x0001u, 0x0001u, 0x0001u, 0x0001u,
+      0x0000u, 0x0000u, 0x0001u, 0x0001u, 0x0001u, 0x0001u, 0x0000u, 0x0000u},
+     UINT64_C(0x5966B6D8204FC425)},
+};
 
 static void *test_alloc(void *user, size_t size)
 {
@@ -477,6 +570,268 @@ static void check_negative_iir_coefficient(void)
     schway_destroy(inst);
 }
 
+static void check_measured_negative_one_input(void)
+{
+    schway *inst = make_reverb_instance();
+    if (inst == NULL) {
+        CHECK(0, "negative-one input instance is created");
+        return;
+    }
+    inst->spu.reg[test_reg_index(TEST_SPU_VLIN)] = 0x8000u;
+    inst->spu.reg[test_reg_index(TEST_SPU_VRIN)] = 0x8000u;
+    inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+    int16_t return_left = 0;
+    int16_t return_right = 0;
+    schway__spu_reverb_step(inst, 1000, -2000, &return_left, &return_right);
+    CHECK(inst->spu.reverb_fir[0][0] == -1000 &&
+              inst->spu.reverb_fir[1][0] == 2000,
+          "vLIN and vRIN=-8000h use ordinary signed -1.0 scaling");
+    schway_destroy(inst);
+}
+
+static void check_saturation_before_final_output(void)
+{
+    schway *inst = make_reverb_instance();
+    if (inst == NULL) {
+        CHECK(0, "peak-input reverb instance is created");
+        return;
+    }
+
+    const uint32_t base = 0x00004000u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ATTR)] = 0xC080u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ESA)] = (uint16_t)(base >> 3);
+    inst->spu.reg[test_reg_index(TEST_SPU_VCOMB1)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_VCOMB2)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_VCOMB3)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_LCOMB1)] = 1u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LCOMB2)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_MLCOMB3)] = 3u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LCOMB4)] = 4u;
+    inst->spu.reg[test_reg_index(TEST_SPU_VAPF1)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_VAPF2)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_MLAPF1)] = 0x0080u;
+    inst->spu.reg[test_reg_index(TEST_SPU_MLAPF2)] = 0x0090u;
+    inst->spu.reg[test_reg_index(TEST_SPU_DAPF1)] = 0x0080u;
+    inst->spu.reg[test_reg_index(TEST_SPU_DAPF2)] = 0x0090u;
+    inst->spu.reverb_address = base;
+    schway__spu_ram_write(inst, base + 8u, 30000u);
+    schway__spu_ram_write(inst, base + 16u, 30000u);
+    schway__spu_ram_write(inst, base + 24u, (uint16_t)(UINT32_C(0x10000) - 30000u));
+
+    int16_t return_left = 0;
+    int16_t return_right = 0;
+    inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+    schway__spu_reverb_step(inst, 0, 0, &return_left, &return_right);
+    int32_t stored = inst->spu.reverb_work[0][0];
+    CHECK(stored > 2000 && stored < 4000,
+          "comb saturation occurs before a later cancelling tap, not only at final output");
+    schway_destroy(inst);
+}
+
+static void check_write_disabled_output_and_irq(void)
+{
+    schway *inst = make_reverb_instance();
+    if (inst == NULL) {
+        CHECK(0, "write-disabled reverb instance is created");
+        return;
+    }
+
+    const uint32_t base = 0x00005000u;
+    uint8_t before[64];
+    inst->spu.reg[test_reg_index(TEST_SPU_ATTR)] = 0xC000u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ESA)] = (uint16_t)(base >> 3);
+    inst->spu.reg[test_reg_index(TEST_SPU_LAPF2)] = 2u;
+    inst->spu.reg[test_reg_index(TEST_SPU_DAPF2)] = 0u;
+    inst->spu.reg[test_reg_index(TEST_SPU_LSAME)] = 4u;
+    inst->spu.reverb_address = base;
+    schway__spu_ram_write(inst, base + 16u, 1234u);
+    schway__spu_ram_write(inst, base + 32u, (uint16_t)(int16_t)-4321);
+    memcpy(before, inst->spu.ram + base, sizeof before);
+    inst->spu.irqa_addr = base + 32u;
+    inst->spu.irq_enabled = 1u;
+    inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+
+    int16_t return_left = 0;
+    int16_t return_right = 0;
+    schway__spu_reverb_step(inst, 0, 0, &return_left, &return_right);
+    CHECK(inst->spu.reverb_work[0][0] == 1234,
+          "ATTR write-disable preserves the APF output read");
+    CHECK(memcmp(before, inst->spu.ram + base, sizeof before) == 0,
+          "ATTR write-disable substitutes reads without changing reverb RAM");
+    CHECK((schway__spu_reg_peek(inst, TEST_SPU_STATX) & 0x0040u) != 0u,
+          "an inhibited IIR state write becomes an IRQA-checked read");
+    schway_destroy(inst);
+}
+
+static void check_esa_write_resets_cursor(void)
+{
+    schway *inst = make_reverb_instance();
+    if (inst == NULL) {
+        CHECK(0, "ESA cursor instance is created");
+        return;
+    }
+
+    const uint32_t base = 0x00006000u;
+    inst->spu.reverb_address = 0x00002000u;
+    inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+    schway__spu_reg_write(inst, TEST_SPU_ESA, (uint16_t)(base >> 3));
+    run_cycles(inst, SCHWAY__CYCLES_PER_PAIR);
+    CHECK(inst->spu.reverb_address == base,
+          "writing ESA resets the current reverb work cursor");
+    schway_destroy(inst);
+}
+
+static void check_feedback_state_continuation(void)
+{
+    schway *source = make_reverb_instance();
+    schway *loaded = make_reverb_instance();
+    if (source == NULL || loaded == NULL) {
+        CHECK(0, "active-feedback state instances are created");
+        if (source != NULL) {
+            schway_destroy(source);
+        }
+        if (loaded != NULL) {
+            schway_destroy(loaded);
+        }
+        return;
+    }
+
+    setup_reverb_impulse(source, 0x7FFFu, 0x7FFFu, 1u);
+    run_cycles(source, UINT64_C(160) * SCHWAY__CYCLES_PER_PAIR);
+    uint32_t active_fir = 0u;
+    uint32_t active_work = 0u;
+    for (uint32_t channel = 0u; channel < 2u; channel++) {
+        for (uint32_t index = 0u; index < SCHWAY__SPU_REVERB_FIR_TAPS; index++) {
+            active_fir |= source->spu.reverb_fir[channel][index] != 0;
+        }
+        for (uint32_t index = 0u; index < SCHWAY__SPU_REVERB_WORK_WORDS; index++) {
+            active_work |= source->spu.reverb_work[channel][index] != 0;
+        }
+    }
+    CHECK(active_fir != 0u && active_work != 0u,
+          "save point contains populated input and output reverb histories");
+
+    size_t size = schway_state_size(source);
+    uint8_t *state = (uint8_t *)malloc(size);
+    uint8_t *source_after = (uint8_t *)malloc(size);
+    uint8_t *loaded_after = (uint8_t *)malloc(size);
+    int16_t source_pcm[96][2] = {{0}};
+    int16_t loaded_pcm[96][2] = {{0}};
+    if (state == NULL || source_after == NULL || loaded_after == NULL || size == 0u) {
+        CHECK(0, "active-feedback state buffers are allocated");
+        free(state);
+        free(source_after);
+        free(loaded_after);
+        schway_destroy(source);
+        schway_destroy(loaded);
+        return;
+    }
+    CHECK(schway_save_state(source, state, size) == SCHWAY_STATUS_OK,
+          "active feedback state saves");
+    CHECK(schway_load_state(loaded, state, size) == SCHWAY_STATUS_OK,
+          "active feedback state loads with complete histories");
+
+    schway_audio source_audio;
+    schway_audio loaded_audio;
+    memset(&source_audio, 0, sizeof source_audio);
+    memset(&loaded_audio, 0, sizeof loaded_audio);
+    source_audio.size = (uint32_t)sizeof source_audio;
+    source_audio.samples = &source_pcm[0][0];
+    source_audio.capacity = 96u;
+    loaded_audio.size = (uint32_t)sizeof loaded_audio;
+    loaded_audio.samples = &loaded_pcm[0][0];
+    loaded_audio.capacity = 96u;
+    CHECK(schway_get_audio(source, &source_audio) == SCHWAY_STATUS_OK,
+          "saved source queue drains before continuation comparison");
+    CHECK(schway_get_audio(loaded, &loaded_audio) == SCHWAY_STATUS_OK,
+          "loaded source queue drains before continuation comparison");
+
+    run_cycles(source, UINT64_C(96) * SCHWAY__CYCLES_PER_PAIR);
+    run_cycles(loaded, UINT64_C(96) * SCHWAY__CYCLES_PER_PAIR);
+    memset(&source_audio, 0, sizeof source_audio);
+    memset(&loaded_audio, 0, sizeof loaded_audio);
+    source_audio.size = (uint32_t)sizeof source_audio;
+    source_audio.samples = &source_pcm[0][0];
+    source_audio.capacity = 96u;
+    loaded_audio.size = (uint32_t)sizeof loaded_audio;
+    loaded_audio.samples = &loaded_pcm[0][0];
+    loaded_audio.capacity = 96u;
+    CHECK(schway_get_audio(source, &source_audio) == SCHWAY_STATUS_OK &&
+              schway_get_audio(loaded, &loaded_audio) == SCHWAY_STATUS_OK,
+          "continued public PCM drains from both states");
+    CHECK(source_audio.written == 96u && loaded_audio.written == 96u,
+          "continued state streams contain 96 PCM pairs");
+    CHECK(memcmp(source_pcm, loaded_pcm, sizeof source_pcm) == 0,
+          "active reverb PCM continues identically after save and load");
+    CHECK(schway_save_state(source, source_after, size) == SCHWAY_STATUS_OK &&
+              schway_save_state(loaded, loaded_after, size) == SCHWAY_STATUS_OK,
+          "both continued feedback states save");
+    CHECK(memcmp(source_after, loaded_after, size) == 0,
+          "full feedback memory and FIR histories resume byte-for-byte");
+
+    free(state);
+    free(source_after);
+    free(loaded_after);
+    schway_destroy(source);
+    schway_destroy(loaded);
+}
+
+static uint64_t capture_preset_digest(const struct reverb_preset *preset,
+                                      uint32_t *saw_output)
+{
+    schway *inst = make_reverb_instance();
+    if (inst == NULL) {
+        CHECK(0, "preset impulse instance is created");
+        return 0u;
+    }
+
+    uint32_t base = SCHWAY__SPU_RAM_SIZE - preset->size;
+    inst->spu.reg[test_reg_index(TEST_SPU_ATTR)] = 0xC080u;
+    inst->spu.reg[test_reg_index(TEST_SPU_ESA)] = (uint16_t)(base >> 3);
+    inst->spu.reg[test_reg_index(TEST_SPU_EVOL_L)] = 0x7FFFu;
+    inst->spu.reg[test_reg_index(TEST_SPU_EVOL_R)] = 0x7FFFu;
+    for (uint32_t i = 0u; i < 32u; i++) {
+        uint32_t address = TEST_SPU_REVERB_BASE + i * 2u;
+        inst->spu.reg[test_reg_index(address)] = preset->registers[i];
+    }
+    inst->spu.reverb_address = base;
+
+    uint64_t digest = UINT64_C(14695981039346656037);
+    *saw_output = 0u;
+    for (uint32_t tick = 0u; tick < 8400u; tick++) {
+        int16_t left = 0;
+        int16_t right = 0;
+        inst->spu.next_tick = ((uint64_t)tick + 1u) * SCHWAY__CYCLES_PER_PAIR;
+        schway__spu_reverb_step(inst, tick == 0u ? 30000 : 0,
+                                tick == 0u ? -28000 : 0, &left, &right);
+        *saw_output |= left != 0 || right != 0;
+        const uint16_t pair[2] = {(uint16_t)left, (uint16_t)right};
+        for (uint32_t channel = 0u; channel < 2u; channel++) {
+            digest = (digest ^ (uint8_t)pair[channel]) * UINT64_C(1099511628211);
+            digest = (digest ^ (uint8_t)(pair[channel] >> 8)) * UINT64_C(1099511628211);
+        }
+    }
+    schway_destroy(inst);
+    return digest;
+}
+
+static void check_preset_impulse_digests(void)
+{
+    const uint32_t count = (uint32_t)(sizeof reverb_presets / sizeof reverb_presets[0]);
+    CHECK(count == 10u, "psx-spx preset set has nine active modes and Reverb off");
+    for (uint32_t i = 0u; i < count; i++) {
+        uint32_t saw_output = 0u;
+        uint64_t digest = capture_preset_digest(&reverb_presets[i], &saw_output);
+        CHECK(digest == reverb_presets[i].digest,
+              "preset impulse remains stable as a local regression baseline");
+        if (strcmp(reverb_presets[i].name, "Reverb off") == 0) {
+            CHECK(saw_output == 0u, "Off preset contributes no reverb return");
+        } else {
+            CHECK(saw_output != 0u, "each active preset produces a deterministic impulse return");
+        }
+    }
+}
+
 int main(void)
 {
     compare_input_fir();
@@ -487,5 +842,11 @@ int main(void)
     check_public_wet_return();
     check_feedback_ram_path();
     check_negative_iir_coefficient();
+    check_measured_negative_one_input();
+    check_saturation_before_final_output();
+    check_write_disabled_output_and_irq();
+    check_esa_write_resets_cursor();
+    check_feedback_state_continuation();
+    check_preset_impulse_digests();
     return failures == 0u ? 0 : 1;
 }

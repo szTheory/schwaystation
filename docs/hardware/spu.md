@@ -87,7 +87,17 @@ I2S measurement confirms that delay and the alternating-channel effect; it also 
 saturation, while the exact per-stage rounding positions remain unknown. See the public psx-spx measurement at
 [commit `a37f2fec163e149f4e3e39599eb43c65c21181a8`](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8).
 
-The current 22.05 kHz feedback seam forwards its input as a unity stage; the register-driven feedback network
-remains a separate part of the model. EVOL still scales the interpolated return; a zero EVOL setting therefore
-contributes no wet PCM. The regression checks treat these constraints as timing and signal-path evidence, not as a
-captured silicon preset waveform.
+The 22.05 kHz path reads the register-selected SAME and DIFF IIR delays, applies `vIIR` and `vWALL`, sums the four
+`vCOMB1`–`vCOMB4` taps, and then runs both APF stages using `dAPF1/2` and `vAPF1/2`. Signed register values use the
+documented Q15 scale. Intermediate stored values and comb/APF sums saturate to signed 16-bit in this deterministic
+baseline; exact hardware rounding and every saturation point remain unresolved. The documented `vIIR = -8000h`
+special case negates the completed IIR result, including the previous stored sample. The measured `vLIN/vRIN =
+-8000h` case follows ordinary signed Q15 scaling.
+
+ESA selects the start of the work buffer. Register offsets wrap from ESA through `7FFFEh`; the current cursor advances
+16 bytes for each alternating left/right pair. Every work-memory read and write uses the shared little-endian SPU RAM
+helpers, including IRQA range checks. With `ATTR` bit 7 clear, the IIR results are computed but their state writes are
+suppressed and discarded; APF writes are suppressed as well. Each inhibited write is replaced by a read, so it still
+checks IRQA. The comb/APF output path continues to read its selected locations, and APF output reads still contribute
+to the return. EVOL scales the interpolated return, so a zero EVOL setting contributes no wet PCM. The preset impulse
+digests are local regression baselines, not captured silicon waveforms.
