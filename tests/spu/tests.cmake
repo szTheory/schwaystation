@@ -27,6 +27,10 @@ schway_add_test(NAME spu.reference.fetch_controls
     -P ${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake
   LABELS audio portable TIMEOUT 30)
 
+schway_add_test(NAME spu.reference.first_upload
+  COMMAND schwaystation-test-spu-reference memory-transfer --first-upload --assets "${spu_reference_dir}"
+  LABELS audio portable TIMEOUT 120)
+
 schway_add_test(NAME spu.reference.log
   COMMAND schwaystation-test-spu-reference log "${spu_reference_log}"
   LABELS audio portable TIMEOUT 10)
