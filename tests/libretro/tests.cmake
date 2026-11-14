@@ -1,3 +1,46 @@
+# This file also drives the real runner from libretro.host. Script mode is
+# used by that one test so every guest executable goes through the configured
+# cross-compiling emulator and its status is checked before host comparison.
+if(CMAKE_SCRIPT_MODE_FILE AND DEFINED SCHWAY_LIBRETRO_AUDIO_TEST)
+  file(REMOVE "${PCM_FILE}")
+  execute_process(
+    COMMAND ${EMULATOR} "${RUNNER}" --region "${REGION}" --exe "${FIXTURE}"
+      --frames "${FRAMES}" --stop-on mailbox --hash-audio --test-audio-file "${PCM_FILE}"
+    RESULT_VARIABLE runner_status OUTPUT_VARIABLE runner_out ERROR_VARIABLE runner_err)
+  if(NOT runner_status STREQUAL "0")
+    message(FATAL_ERROR "runner PCM capture failed (exit ${runner_status})\n${runner_out}\n${runner_err}")
+  endif()
+  if(NOT EXISTS "${PCM_FILE}")
+    message(FATAL_ERROR "runner reported success without writing PCM bytes")
+  endif()
+  file(SIZE "${PCM_FILE}" pcm_size)
+  math(EXPR pcm_remainder "${pcm_size} % 4")
+  if(pcm_size EQUAL 0 OR NOT pcm_remainder EQUAL 0)
+    message(FATAL_ERROR "runner PCM file has invalid byte length ${pcm_size}")
+  endif()
+  file(SHA256 "${PCM_FILE}" pcm_sha256)
+  if(NOT runner_out MATCHES "audio sha256 ${pcm_sha256}")
+    message(FATAL_ERROR "runner PCM file does not match --hash-audio output\n${runner_out}")
+  endif()
+
+  execute_process(
+    COMMAND ${EMULATOR} "${HOST}" "${MODULE}" audio-equality-batch "${REGION}"
+      "${FIXTURE}" "${PCM_FILE}"
+    RESULT_VARIABLE host_status OUTPUT_VARIABLE host_out ERROR_VARIABLE host_err)
+  if(NOT host_status STREQUAL "0")
+    message(FATAL_ERROR "libretro batch PCM comparison failed (exit ${host_status})\n${host_out}\n${host_err}")
+  endif()
+  message("${host_out}")
+  execute_process(
+    COMMAND ${EMULATOR} "${HOST}" "${MODULE}" "${REGION}"
+    RESULT_VARIABLE baseline_status OUTPUT_VARIABLE baseline_out ERROR_VARIABLE baseline_err)
+  if(NOT baseline_status STREQUAL "0")
+    message(FATAL_ERROR "libretro host baseline failed (exit ${baseline_status})\n${baseline_out}\n${baseline_err}")
+  endif()
+  message("${baseline_out}")
+  return()
+endif()
+
 # The libretro core loaded in-process by a test host.
 
 # The in-process frontend. It links the library and the shared converter
@@ -12,6 +55,7 @@ set_target_properties(schwaystation-test-libretro-host PROPERTIES
 schway_warnings(schwaystation-test-libretro-host)
 add_dependencies(schwaystation-test-libretro-host schwaystation_libretro)
 add_dependencies(schwaystation-test-libretro-host schwaystation-fixtures)
+add_dependencies(schwaystation-test-libretro-host schwaystation-run-test)
 
 # Fault prevented: a generated .info file advertises a functional claim
 # without a gating registered inventory row.
@@ -39,10 +83,25 @@ schway_add_test(NAME libretro.info.claims.self_test
 foreach(case IN ITEMS "libretro.host;ntsc-u" "libretro.host.pal;pal")
   list(GET case 0 name)
   list(GET case 1 mode)
-  schway_add_test(NAME ${name}
-    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
-      $<TARGET_FILE:schwaystation_libretro> ${mode}
-    LABELS libretro portable TIMEOUT 60)
+  if(name STREQUAL "libretro.host")
+    string(REPLACE ";" "$<SEMICOLON>" libretro_audio_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+    schway_add_test(NAME ${name}
+      COMMAND ${CMAKE_COMMAND} -DSCHWAY_LIBRETRO_AUDIO_TEST=1
+        "-DEMULATOR=${libretro_audio_emulator}"
+        -DRUNNER=$<TARGET_FILE:schwaystation-run-test>
+        -DHOST=$<TARGET_FILE:schwaystation-test-libretro-host>
+        -DMODULE=$<TARGET_FILE:schwaystation_libretro>
+        -DREGION=${mode} -DFRAMES=610
+        -DFIXTURE=${PROJECT_BINARY_DIR}/fixtures/spu_tone.exe
+        -DPCM_FILE=${PROJECT_BINARY_DIR}/tests/libretro-audio-ntsc-u.pcm
+        -P ${CMAKE_CURRENT_LIST_FILE}
+      LABELS libretro portable TIMEOUT 120)
+  else()
+    schway_add_test(NAME ${name}
+      COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+        $<TARGET_FILE:schwaystation_libretro> ${mode}
+      LABELS libretro portable TIMEOUT 60)
+  endif()
 endforeach()
 
 # Fault prevented: a fullpath PS-EXE that cannot run with the built-in stub
