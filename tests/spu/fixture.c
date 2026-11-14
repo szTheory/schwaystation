@@ -139,6 +139,20 @@ static uint32_t parse_hex32(const char *text, uint32_t *value)
     return 1u;
 }
 
+static int scan_audio_expectation_fields(const char *text, char *name, unsigned name_size,
+                                         unsigned *host_frames, unsigned *pairs, char *digest,
+                                         unsigned digest_size, int *consumed)
+{
+#if defined(_MSC_VER)
+    return sscanf_s(text, "%15s %u %u %64s %n", name, name_size, host_frames, pairs,
+                    digest, digest_size, consumed);
+#else
+    (void)name_size;
+    (void)digest_size;
+    return sscanf(text, "%15s %u %u %64s %n", name, host_frames, pairs, digest, consumed);
+#endif
+}
+
 static uint32_t parse_audio_expectations(const char *path,
                                         struct profile_expectation expectations[3])
 {
@@ -160,11 +174,10 @@ static uint32_t parse_audio_expectations(const char *path,
         unsigned host_frames = 0u;
         unsigned pairs = 0u;
         int consumed = 0;
-#if defined(_MSC_VER)
-#pragma warning(suppress : 4996)
-#endif
-        if (sscanf(text, "%15s %u %u %64s %n", name, &host_frames, &pairs,
-                   digest, &consumed) != 4 || consumed == 0 || *trim(text + consumed) != '\0') {
+        int parsed = scan_audio_expectation_fields(text, name, (unsigned)sizeof name,
+                                                   &host_frames, &pairs, digest,
+                                                   (unsigned)sizeof digest, &consumed);
+        if (parsed != 4 || consumed == 0 || *trim(text + consumed) != '\0') {
             valid = 0u;
             break;
         }
@@ -417,6 +430,15 @@ static uint32_t append_audio(schway *inst, int16_t *pcm, uint32_t *pairs)
     return 0u;
 }
 
+static int scan_brr_header(const char *text, int *flags, int *seed)
+{
+#if defined(_MSC_VER)
+    return sscanf_s(text, "spu_brr_block %i, %i", flags, seed);
+#else
+    return sscanf(text, "spu_brr_block %i, %i", flags, seed);
+#endif
+}
+
 static uint32_t parse_brr_table(const char *path, uint8_t blocks[2][16])
 {
     FILE *file = fopen(path, "rb");
@@ -435,10 +457,7 @@ static uint32_t parse_brr_table(const char *path, uint8_t blocks[2][16])
         }
         int flags = 0;
         int seed = 0;
-#if defined(_MSC_VER)
-#pragma warning(suppress : 4996)
-#endif
-        if (count >= 2u || sscanf(text, "spu_brr_block %i, %i", &flags, &seed) != 2 ||
+        if (count >= 2u || scan_brr_header(text, &flags, &seed) != 2 ||
             flags < 0 || flags > UINT8_MAX || seed < 0 || seed > UINT8_MAX) {
             (void)fclose(file);
             return 1u;
@@ -460,13 +479,26 @@ static uint32_t parse_li_t0(const char *line, uint32_t *value)
 {
     int immediate = 0;
 #if defined(_MSC_VER)
-#pragma warning(suppress : 4996)
+    int parsed = sscanf_s(line, " li t0, %i", &immediate);
+#else
+    int parsed = sscanf(line, " li t0, %i", &immediate);
 #endif
-    if (sscanf(line, " li t0, %i", &immediate) != 1) {
+    if (parsed != 1) {
         return 0u;
     }
     *value = (uint32_t)immediate;
     return 1u;
+}
+
+static int scan_spu_store_line(const char *line, char mnemonic[16], char source[16],
+                               unsigned *offset, char base[16])
+{
+#if defined(_MSC_VER)
+    return sscanf_s(line, " %15s %15[^,], %x(%15[^)])", mnemonic, 16u, source, 16u,
+                    offset, base, 16u);
+#else
+    return sscanf(line, " %15s %15[^,], %x(%15[^)])", mnemonic, source, offset, base);
+#endif
 }
 
 static uint32_t parse_event_table(const char *path, struct spu_event *events,
@@ -491,10 +523,7 @@ static uint32_t parse_event_table(const char *path, struct spu_event *events,
         char source[16] = {0};
         char base[16] = {0};
         unsigned offset = 0u;
-#if defined(_MSC_VER)
-#pragma warning(suppress : 4996)
-#endif
-        if (sscanf(line, " %15s %15[^,], %x(%15[^)])", mnemonic, source, &offset, base) != 4 ||
+        if (scan_spu_store_line(line, mnemonic, source, &offset, base) != 4 ||
             strcmp(mnemonic, "sh") != 0 || strcmp(base, "s1") != 0 || offset >= 0x200u) {
             continue;
         }

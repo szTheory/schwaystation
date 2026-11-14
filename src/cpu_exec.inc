@@ -1024,11 +1024,12 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
     struct schway__cpu *c = &inst->cpu;
     uint32_t page = c->pc >> 12;
     uint32_t fault = inst->fault.kind;
+    uint32_t idle_fast_path = inst->spu.idle_fast_path;
     uint64_t ran = 0u;
     c->block_end = 0u;
     c->blk_tick = inst->ticks;
     c->blk_cycle = c->cycle;
-    if (inst->spu.idle_fast_path == 0u) {
+    if (idle_fast_path == 0u) {
         for (uint32_t n = 0u; n < SCHWAY__BLOCK_MAX_INSNS; n++) {
             uint32_t slot = c->branch_slot;
             TRACE_BEGIN(began, 1u);
@@ -1058,7 +1059,7 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
         }
     }
     uint64_t tick = c->blk_tick + (c->cycle - c->blk_cycle);
-    if (inst->spu.idle_fast_path == 0u && inst->spu.next_tick <= tick) {
+    if (idle_fast_path != 0u && inst->spu.idle_fast_path == 0u && inst->spu.next_tick <= tick) {
         schway__spu_event(inst, tick);
     }
     inst->ticks += ran;
