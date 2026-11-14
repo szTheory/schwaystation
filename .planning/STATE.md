@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-09-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh"
-last_updated: "2026-11-14T06:30:21.976Z"
+stopped_at: "Completed 05-13-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh"
+last_updated: "2026-11-14T07:06:53.995Z"
 last_activity: 2026-11-14
 last_activity_desc: "Completed plan 05-11. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh."
-state_head: 6b0e7a6096c4054c157c13ae1212a3b7f8f8ee2c
+state_head: 1952b1a020fb3b19271a1bc2f7c08db3be12acb1
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 149
-  completed_plans: 141
+  completed_plans: 142
   percent: 67
 current_plan: 15 of 23
 ---
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 16 of 23
+Plan: 17 of 23
 Status: Ready to execute
 Last activity: 2026-11-14 — Plan 05-11 completed. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh.
 
@@ -203,6 +203,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P08 | 28min | 2 tasks | 9 files |
 | Phase 05 P11 | 27min | 2 tasks | 5 files |
 | Phase 05 P09 | at least 22 min | 2 tasks | 9 files |
+| Phase 05 P13 | at least 13 min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -497,6 +498,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Measure actual voice levels from a sealed guest mailbox at frame 600.
 - [Phase 05]: Preserve a unity 22.05 kHz feedback seam in plan 05-09; plan 05-10 supplies the register-driven feedback network.
 - [Phase 05]: Describe the measured 38-sample FIR delay and signal path without claiming an exact silicon preset waveform.
+- [Phase 05]: Kept production SPU code unchanged because existing scheduled-sample behavior already met the new deterministic and bounded assertions.
+- [Phase 05]: Added the SPU fuzzer to the explicit fuzz preset target list and wired the existing hosted perf job to CASE=spu_idle.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -684,8 +687,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T06:30:21.606Z
-Stopped at: Completed 05-09-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh
+Last session: 2026-11-14T07:06:53.670Z
+Stopped at: Completed 05-13-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
