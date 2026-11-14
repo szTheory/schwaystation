@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-11-14T01:30:41.655Z"
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-11-14T02:24:35.215Z"
 last_activity: 2026-11-14
-last_activity_desc: "Completed plan 05-05; 05-21 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-state_head: ab509b20e6a796ae1f06eb91a40af99644f28d1f
+last_activity_desc: "Completed plan 05-06; 05-21 is next. Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session (exact model ID not exposed)."
+state_head: 5c5c967ea50e32ac8540e85c579db643e0c78523
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 147
-  completed_plans: 133
+  total_plans: 148
+  completed_plans: 134
   percent: 67
-current_plan: 8 of 21
+current_plan: 9 of 22
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 8 of 21
+Plan: 9 of 22
 Status: Ready to execute
-Last activity: 2026-11-14 — Plan 05-05 completed; 05-21 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Last activity: 2026-11-14 — Plan 05-06 completed; 05-21 is next. Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session (exact model ID not exposed).
 
 Progress: [███████░░░] 67%
 
@@ -195,6 +195,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P03 | 40min | 1 tasks | 8 files |
 | Phase 05 P20 | 20 min | 1 tasks | 6 files |
 | Phase 05 P05 | 44 min | 1 tasks | 13 files |
+| Phase 05 P06 | 43min | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -480,6 +481,7 @@ Recent decisions affecting current work:
 - [Phase 05]: DMA4 readiness observes the latest queued ATTR value while public status remains scheduled.
 - [Phase 05]: The own stub implements only literal and %s output for the pinned transfer guest A(3Fh) path.
 - [Phase 05]: Manual FIFO data drains at the scheduled transfer tick so the bounded guest transfer cases complete.
+- [Phase 05]: Move 24-voice ordering, loop/ENDX, PMON and stereo mixing to plan 05-22 so plan 05-06 remains one focused BRR interpolation tracer.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -663,10 +665,12 @@ come from `AGENTS.md`.
 
 | 2026-11-12 | Phase 04 second hosted-run source prerequisite planning | Codex, OpenGSD 1.20.0; focused 04-56 and downstream DAG/checkpoint bookkeeping only; no execution advance or source/test run | gpt-6.1-sol high |
 
+| 2026-11-14 | /gsd-execute-plan 05-06 | Codex, OpenGSD 1.20.0; sequential shared checkout; BRR tracer TDD GREEN and focused save-state continuation checks; full 24-voice/mixer task moved to 05-22 | GPT-6 session (exact model ID not exposed) |
+
 ## Session Continuity
 
-Last session: 2026-11-14T01:30:40.973Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-11-14T02:24:33.893Z
+Stopped at: Completed 05-06-PLAN.md
 Resume file: .planning/phases/05-the-sound-matches-the-console/05-21-PLAN.md
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
