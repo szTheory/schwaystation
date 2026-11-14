@@ -485,9 +485,9 @@ static void test_peek_no_side_effects(void)
     if (snapshot == NULL) {
         exit(1);
     }
-    memcpy(snapshot, inst, sizeof *snapshot);
     size_t n0, n1;
     uint8_t *before = save(inst, &n0);
+    memcpy(snapshot, inst, sizeof *snapshot);
     uint32_t sum = 0u;
     for (uint32_t w = 1u; w <= 4u; w <<= 1) {
         for (uint32_t addr = 0u; addr < SCHWAY__RAM_SIZE; addr += w) {

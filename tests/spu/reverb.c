@@ -360,6 +360,7 @@ static schway *make_reverb_instance(void)
         schway_destroy(inst);
         return NULL;
     }
+    inst->spu.idle_fast_path = 0u;
     return inst;
 }
 

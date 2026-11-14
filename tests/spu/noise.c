@@ -49,6 +49,7 @@ static schway *make_instance(void)
         schway_destroy(inst);
         return NULL;
     }
+    inst->spu.idle_fast_path = 0u;
     return inst;
 }
 
@@ -57,6 +58,152 @@ static void run_sample(schway *inst)
     uint64_t deadline = schway__spu_next(inst);
     inst->ticks = deadline;
     schway__spu_event(inst, deadline);
+}
+
+static uint32_t test_states_equal(schway *left, schway *right)
+{
+    size_t size = schway_state_size(left);
+    if (size == 0u || size != schway_state_size(right)) {
+        return 0u;
+    }
+    uint8_t *left_state = (uint8_t *)malloc(size);
+    uint8_t *right_state = (uint8_t *)malloc(size);
+    if (left_state == NULL || right_state == NULL) {
+        free(left_state);
+        free(right_state);
+        return 0u;
+    }
+    uint32_t equal = schway_save_state(left, left_state, size) == SCHWAY_STATUS_OK &&
+                     schway_save_state(right, right_state, size) == SCHWAY_STATUS_OK &&
+                     memcmp(left_state, right_state, size) == 0;
+    free(left_state);
+    free(right_state);
+    return equal;
+}
+
+static uint32_t run_idle_frame_pair(schway *fast, schway *full)
+{
+    schway_run_result fast_result;
+    schway_run_result full_result;
+    memset(&fast_result, 0, sizeof fast_result);
+    memset(&full_result, 0, sizeof full_result);
+    fast_result.size = (uint32_t)sizeof fast_result;
+    full_result.size = (uint32_t)sizeof full_result;
+    uint32_t failures = 0u;
+    failures += schway_run_frame(fast, &fast_result) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += schway_run_frame(full, &full_result) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += fast_result.stop != SCHWAY_STOP_FRAME || full_result.stop != SCHWAY_STOP_FRAME ? 1u : 0u;
+    failures += fast_result.ticks != full_result.ticks ? 1u : 0u;
+    failures += test_states_equal(fast, full) == 0u ? 1u : 0u;
+
+    int16_t fast_samples[2u * SCHWAY__PAL_MAX_PAIRS];
+    int16_t full_samples[2u * SCHWAY__PAL_MAX_PAIRS];
+    schway_audio fast_audio;
+    schway_audio full_audio;
+    memset(&fast_audio, 0, sizeof fast_audio);
+    memset(&full_audio, 0, sizeof full_audio);
+    fast_audio.size = (uint32_t)sizeof fast_audio;
+    full_audio.size = (uint32_t)sizeof full_audio;
+    fast_audio.samples = fast_samples;
+    full_audio.samples = full_samples;
+    fast_audio.capacity = SCHWAY__PAL_MAX_PAIRS;
+    full_audio.capacity = SCHWAY__PAL_MAX_PAIRS;
+    failures += schway_get_audio(fast, &fast_audio) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += schway_get_audio(full, &full_audio) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += fast_audio.written != full_audio.written ? 1u : 0u;
+    failures += fast_audio.dropped != full_audio.dropped ? 1u : 0u;
+    if (fast_audio.written == full_audio.written) {
+        failures += memcmp(fast_samples, full_samples,
+                           (size_t)fast_audio.written * 2u * sizeof(fast_samples[0])) != 0
+                        ? 1u
+                        : 0u;
+    }
+    return failures;
+}
+
+static uint32_t test_idle_noise_jump(void)
+{
+    schway *fast = make_instance();
+    if (fast == NULL) {
+        return 1u;
+    }
+    fast->spu.idle_fast_path = 1u;
+    fast->spu.noise_phase = UINT32_C(0x7FFF);
+    schway *full = make_instance();
+    if (full == NULL) {
+        schway_destroy(fast);
+        return 1u;
+    }
+    full->spu.noise_phase = UINT32_C(0x7FFF);
+    uint64_t samples = UINT32_C(0x8000) + 2u;
+    for (uint64_t i = 0u; i < samples; i++) {
+        schway__spu_noise_step(full);
+    }
+    schway__spu_event(fast, samples * SCHWAY__CYCLES_PER_PAIR);
+    uint32_t failures = fast->spu.noise_phase != full->spu.noise_phase ? 1u : 0u;
+    failures += fast->spu.noise_lfsr != full->spu.noise_lfsr ? 1u : 0u;
+    schway_destroy(fast);
+    schway_destroy(full);
+    return failures;
+}
+
+static uint32_t test_idle_audio_ring(void)
+{
+    schway *fast = make_instance();
+    if (fast == NULL) {
+        return 1u;
+    }
+    fast->spu.idle_fast_path = 1u;
+    fast->audio_head = SCHWAY__AUDIO_RING_PAIRS - 3u;
+    uint64_t pairs = SCHWAY__AUDIO_RING_PAIRS + 29u;
+    schway__spu_event(fast, pairs * SCHWAY__CYCLES_PER_PAIR);
+    uint32_t failures = fast->audio_count != SCHWAY__AUDIO_RING_PAIRS ? 1u : 0u;
+    failures += fast->audio_dropped != 29u ? 1u : 0u;
+    int16_t ring_samples[2u * SCHWAY__AUDIO_RING_PAIRS];
+    schway_audio audio;
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = ring_samples;
+    audio.capacity = SCHWAY__AUDIO_RING_PAIRS;
+    failures += schway_get_audio(fast, &audio) != SCHWAY_STATUS_OK ? 1u : 0u;
+    failures += audio.written != SCHWAY__AUDIO_RING_PAIRS ? 1u : 0u;
+    failures += audio.dropped != 29u ? 1u : 0u;
+    for (uint32_t i = 0u; i < audio.written * 2u; i++) {
+        failures += ring_samples[i] != 0 ? 1u : 0u;
+    }
+    fast->audio_count = SCHWAY__AUDIO_RING_PAIRS - 1u;
+    fast->audio_dropped = UINT32_MAX - 1u;
+    schway__spu_event(fast, fast->spu.next_tick + 3u * SCHWAY__CYCLES_PER_PAIR);
+    failures += fast->audio_count != SCHWAY__AUDIO_RING_PAIRS ? 1u : 0u;
+    failures += fast->audio_dropped != UINT32_MAX ? 1u : 0u;
+    schway_destroy(fast);
+    return failures;
+}
+
+static uint32_t test_idle_fast_path(void)
+{
+    uint32_t failures = 0u;
+    schway *fast = make_instance();
+    schway *full = make_instance();
+    if (fast == NULL || full == NULL) {
+        schway_destroy(fast);
+        schway_destroy(full);
+        return 1u;
+    }
+    fast->spu.idle_fast_path = 1u;
+    failures += run_idle_frame_pair(fast, full);
+    failures += run_idle_frame_pair(fast, full);
+    failures += fast->spu.idle_fast_path != 1u ? 1u : 0u;
+
+    schway__spu_reg_write(fast, SPU_MAIN_VOL_L, 0x3FFFu);
+    schway__spu_reg_write(full, SPU_MAIN_VOL_L, 0x3FFFu);
+    failures += fast->spu.idle_fast_path != 0u ? 1u : 0u;
+    failures += run_idle_frame_pair(fast, full);
+    schway_destroy(fast);
+    schway_destroy(full);
+    failures += test_idle_noise_jump();
+    failures += test_idle_audio_ring();
+    return failures;
 }
 
 static uint16_t lfsr_clock(uint16_t value)
@@ -277,13 +424,13 @@ static uint32_t test_silent_capture_and_irqa(schway *inst)
 int main(void)
 {
     puts("TAP version 13");
-    puts("1..7");
+    puts("1..8");
     schway *inst = make_instance();
     if (inst == NULL) {
         puts("not ok 1 - pinned noise schedule and capture behavior");
         return 1;
     }
-    uint32_t failures[7];
+    uint32_t failures[8];
     failures[0] = test_first_slot_matrix(inst);
     failures[1] = test_slot_masks(inst);
     failures[2] = test_long_gap_and_continuity(inst);
@@ -291,7 +438,8 @@ int main(void)
     failures[4] = test_noise_voice_selection(inst);
     failures[5] = test_noise_capture_and_wrap(inst);
     failures[6] = test_silent_capture_and_irqa(inst);
-    static const char *names[7] = {
+    failures[7] = test_idle_fast_path();
+    static const char *names[8] = {
         "all shift and step combinations clock the first slot at most once per sample",
         "step values select exactly the pinned eight-slot schedule",
         "long-period gaps and ATTR disable preserve LFSR and phase continuity",
@@ -299,9 +447,10 @@ int main(void)
         "noise voices share the signed level through envelope and amplitude mixing",
         "capture rings receive scaled noise, wrap, and report the correct half",
         "muted and disabled output retains capture, RAM_CTRL gating and IRQA behavior",
+        "reset silence fast-forwards to the full event state and preserves PCM delivery",
     };
     uint32_t total = 0u;
-    for (uint32_t i = 0u; i < 7u; i++) {
+    for (uint32_t i = 0u; i < 8u; i++) {
         printf("%s %u - %s\n", failures[i] == 0u ? "ok" : "not ok", i + 1u, names[i]);
         total += failures[i];
     }

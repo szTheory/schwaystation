@@ -1,6 +1,4 @@
-/* The scheduler spine: the earliest deadline over the devices that keep time.
-   The SPU catches up at bus accesses and run boundaries; sample ticks are not
-   CPU block deadlines. */
+/* The scheduler spine: the earliest deadline over the devices that keep time. */
 #include "internal.h"
 
 /* The block clock: the tick the running block started on, plus the cycles the

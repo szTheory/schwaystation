@@ -580,7 +580,7 @@ static uint32_t append_guest_chunk(schway *inst, struct capture *capture)
 }
 
 static uint32_t capture_guest(const char *exe_path, uint32_t region,
-                              const uint8_t blocks[2][16], struct capture *capture)
+                              const uint8_t *blocks, struct capture *capture)
 {
     memset(capture, 0, sizeof *capture);
     uint8_t *exe = NULL;
@@ -662,8 +662,8 @@ static uint32_t capture_guest(const char *exe_path, uint32_t region,
             uint32_t block_base = copy_base + block * 16u;
             for (uint32_t word = 0u; word < 8u; word++) {
                 uint32_t actual = schway__spu_ram_peek(inst, block_base + word * 2u);
-                uint32_t expected = (uint32_t)blocks[block][word * 2u] |
-                                    ((uint32_t)blocks[block][word * 2u + 1u] << 8);
+                uint32_t expected = (uint32_t)blocks[block * 16u + word * 2u] |
+                                    ((uint32_t)blocks[block * 16u + word * 2u + 1u] << 8);
                 if (actual != expected) {
                     (void)printf("# table region=%u copy=%u block=%u word=%u actual=%04X expected=%04X\n",
                                  region, copy, block, word, actual, expected);
@@ -684,7 +684,7 @@ static uint32_t capture_guest(const char *exe_path, uint32_t region,
     return valid != 0u ? 0u : 1u;
 }
 
-static uint32_t replay_cpu_free(uint32_t region, const uint8_t blocks[2][16],
+static uint32_t replay_cpu_free(uint32_t region, const uint8_t *blocks,
                                 const struct spu_event *events, uint32_t event_count,
                                 uint16_t key_on, const struct capture *capture,
                                 uint32_t *pair_count)
@@ -698,8 +698,8 @@ static uint32_t replay_cpu_free(uint32_t region, const uint8_t blocks[2][16],
         for (uint32_t block = 0u; block < 2u; block++) {
             uint32_t block_base = copy_base + block * 16u;
             for (uint32_t word = 0u; word < 8u; word++) {
-                uint16_t value = (uint16_t)((uint16_t)blocks[block][word * 2u] |
-                                            ((uint16_t)blocks[block][word * 2u + 1u] << 8));
+                uint16_t value = (uint16_t)((uint16_t)blocks[block * 16u + word * 2u] |
+                                            ((uint16_t)blocks[block * 16u + word * 2u + 1u] << 8));
                 schway__spu_ram_write(inst, block_base + word * 2u, value);
             }
         }
@@ -810,7 +810,7 @@ int main(int argc, char **argv)
 
     for (uint32_t i = 0u; i < (uint32_t)(sizeof regions / sizeof regions[0]); i++) {
         struct capture capture;
-        uint32_t captured = capture_guest(argv[1], regions[i].region, blocks, &capture) == 0u;
+        uint32_t captured = capture_guest(argv[1], regions[i].region, &blocks[0][0], &capture) == 0u;
         char label[128];
         (void)snprintf(label, sizeof label, "%s guest reaches mailbox frame 600",
                        regions[i].name);
@@ -822,8 +822,8 @@ int main(int argc, char **argv)
             continue;
         }
 
-        int16_t expected_sample0 = reference_first_brr_sample(blocks[0]);
-        int16_t expected_sample1 = reference_first_brr_sample(blocks[1]);
+        int16_t expected_sample0 = reference_first_brr_sample(&blocks[0][0]);
+        int16_t expected_sample1 = reference_first_brr_sample(&blocks[1][0]);
         if (capture.first_sample[0] != expected_sample0 ||
             capture.first_sample[1] != expected_sample1) {
             (void)printf("# %s first BRR sample actual=(%d,%d) expected=(%d,%d)\n",
@@ -896,7 +896,7 @@ int main(int argc, char **argv)
         expect(mailbox_matches(&capture, &wrong_envx) == 0u, label);
 
         uint32_t replay_pairs = 0u;
-        uint32_t replayed = replay_cpu_free(regions[i].region, blocks, events, event_count,
+        uint32_t replayed = replay_cpu_free(regions[i].region, &blocks[0][0], events, event_count,
                                             key_on, &capture, &replay_pairs) == 0u;
         (void)snprintf(label, sizeof label, "%s CPU-free event loop completes from reset",
                        regions[i].name);

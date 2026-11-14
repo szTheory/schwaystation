@@ -35,6 +35,7 @@ static schway *make_instance(void)
     if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL) {
         return NULL;
     }
+    inst->spu.idle_fast_path = 0u;
     return inst;
 }
 

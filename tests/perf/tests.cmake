@@ -81,9 +81,14 @@ if(CMAKE_SCRIPT_MODE_FILE STREQUAL CMAKE_CURRENT_LIST_FILE)
     foreach(mode control idle)
       set(report "${OUT}/spu-${mode}.cachegrind")
       file(REMOVE "${report}")
+      if(mode STREQUAL "control")
+        set(case_name spu_idle_control)
+      else()
+        set(case_name spu_idle)
+      endif()
       execute_process(
         COMMAND "${VALGRIND}" --tool=cachegrind --cache-sim=no --error-exitcode=99
-          "--cachegrind-out-file=${report}" "${UNIT}" "spu_idle_${mode}" 1
+          "--cachegrind-out-file=${report}" "${UNIT}" "${case_name}" 1
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr)
       if(NOT "${status}" STREQUAL "0")
         message(FATAL_ERROR "perf: error SPU idle ${mode} producer exited ${status}: ${stderr}${stdout}")

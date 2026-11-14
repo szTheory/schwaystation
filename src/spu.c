@@ -28,6 +28,8 @@
 #define SPU_DEV4_DMA_READ_CONTROL 0x220931E1u
 #define IRQ9_MASK (UINT32_C(1) << 9)
 
+static void spu_disable_idle_fast_path(schway *inst);
+
 uint32_t schway__spu_reg_supported(uint32_t address)
 {
     address &= ~1u;
@@ -205,6 +207,7 @@ void schway__spu_reg_write(schway *inst, uint32_t address, uint16_t value)
         (aligned >= SPU_CURRENT_VOLUME_BASE && aligned <= SPU_CURRENT_VOLUME_END)) {
         return;
     }
+    spu_disable_idle_fast_path(inst);
     if (aligned == SPU_FIFO_ADDRESS) {
         spu_fifo_push(spu, value);
         return;
@@ -277,6 +280,128 @@ static void audio_push_pair(schway *inst, int16_t left, int16_t right)
     inst->audio[slot][0] = left;
     inst->audio[slot][1] = right;
     inst->audio_count++;
+}
+
+static uint32_t spu_lfsr_transform(const uint32_t columns[17], uint32_t value)
+{
+    uint32_t result = 0u;
+    for (uint32_t bit = 0u; bit < 17u; bit++) {
+        if ((value & (UINT32_C(1) << bit)) != 0u) {
+            result ^= columns[bit];
+        }
+    }
+    return result;
+}
+
+static uint16_t spu_lfsr_advance(uint16_t value, uint64_t steps)
+{
+    if (steps == 0u) {
+        return value;
+    }
+    uint32_t columns[17];
+    for (uint32_t bit = 0u; bit < 17u; bit++) {
+        uint32_t basis = UINT32_C(1) << bit;
+        uint32_t state = basis & UINT16_MAX;
+        uint32_t constant = basis >> 16;
+        uint32_t parity = (((state >> 15) ^ (state >> 12) ^ (state >> 11) ^
+                            (state >> 10) ^ constant) & 1u);
+        columns[bit] = (((state << 1) | parity) & UINT16_MAX) | (constant << 16);
+    }
+    uint32_t advanced = (uint32_t)value | (UINT32_C(1) << 16);
+    while (steps != 0u) {
+        if ((steps & 1u) != 0u) {
+            advanced = spu_lfsr_transform(columns, advanced);
+        }
+        steps >>= 1;
+        if (steps != 0u) {
+            uint32_t squared[17];
+            for (uint32_t bit = 0u; bit < 17u; bit++) {
+                squared[bit] = spu_lfsr_transform(columns, columns[bit]);
+            }
+            memcpy(columns, squared, sizeof columns);
+        }
+    }
+    return (uint16_t)advanced;
+}
+
+static void spu_audio_push_silence(schway *inst, uint64_t pairs)
+{
+    uint32_t available = SCHWAY__AUDIO_RING_PAIRS - inst->audio_count;
+    uint32_t written = pairs < available ? (uint32_t)pairs : available;
+    uint32_t slot = (inst->audio_head + inst->audio_count) % SCHWAY__AUDIO_RING_PAIRS;
+    uint32_t first = written;
+    if (first > SCHWAY__AUDIO_RING_PAIRS - slot) {
+        first = SCHWAY__AUDIO_RING_PAIRS - slot;
+    }
+    memset(&inst->audio[slot][0], 0, (size_t)first * 2u * sizeof(inst->audio[0][0]));
+    if (written > first) {
+        memset(&inst->audio[0][0], 0,
+               (size_t)(written - first) * 2u * sizeof(inst->audio[0][0]));
+    }
+    inst->audio_count += written;
+    uint64_t dropped = pairs - written;
+    uint64_t room = (uint64_t)UINT32_MAX - inst->audio_dropped;
+    inst->audio_dropped = dropped > room ? UINT32_MAX : inst->audio_dropped + (uint32_t)dropped;
+}
+
+/* A pristine reset remains silent until a stateful write changes its model.
+   Batched progress follows docs/hardware/spu.md: Noise, Reverb and PCM output. */
+static void spu_idle_advance(schway *inst, uint64_t now)
+{
+    struct schway__spu *spu = &inst->spu;
+    uint64_t first_tick = spu->next_tick;
+    uint64_t pairs = (now - first_tick) / SCHWAY__CYCLES_PER_PAIR + 1u;
+    uint32_t phase = spu->noise_phase;
+    uint64_t noise_clocks = 0u;
+    static const uint8_t noise_slots[4] = {0u, 2u, 4u, 6u};
+    for (uint32_t i = 0u; i < 4u; i++) {
+        uint32_t residue = (UINT32_C(0x20000) / 8u) * noise_slots[i];
+        uint32_t first = residue >= phase ? residue - phase :
+                                              UINT32_C(0x20000) - (phase - residue);
+        if ((uint64_t)first < pairs) {
+            noise_clocks += 1u + (pairs - 1u - first) / UINT32_C(0x20000);
+        }
+    }
+    spu->noise_lfsr = spu_lfsr_advance(spu->noise_lfsr, noise_clocks);
+    spu->noise_phase = (uint32_t)((phase + pairs % UINT32_C(0x20000)) % UINT32_C(0x20000));
+    if (first_tick == SCHWAY__CYCLES_PER_PAIR) {
+        for (uint32_t voice = 0u; voice < SCHWAY__SPU_VOICE_COUNT; voice++) {
+            spu->voice[voice].sample_counter = 0u;
+        }
+    }
+
+    uint64_t ordinal = first_tick / SCHWAY__CYCLES_PER_PAIR;
+    uint64_t phase_one_pairs = pairs / 2u;
+    if ((pairs & 1u) != 0u && (ordinal & 1u) == 0u) {
+        phase_one_pairs++;
+    }
+    spu->reverb_fir_cursor =
+        (uint32_t)((spu->reverb_fir_cursor + pairs % SCHWAY__SPU_REVERB_FIR_TAPS) %
+                   SCHWAY__SPU_REVERB_FIR_TAPS);
+    spu->reverb_work_cursor =
+        (uint32_t)((spu->reverb_work_cursor + phase_one_pairs % SCHWAY__SPU_REVERB_WORK_WORDS) %
+                   SCHWAY__SPU_REVERB_WORK_WORDS);
+    uint32_t reverb_steps = (uint32_t)(phase_one_pairs % (SCHWAY__SPU_RAM_SIZE / 16u));
+    spu->reverb_address =
+        (spu->reverb_address + reverb_steps * 16u) & (SCHWAY__SPU_RAM_SIZE - 8u);
+    spu_audio_push_silence(inst, pairs);
+
+    uint64_t last_tick = first_tick + (pairs - 1u) * SCHWAY__CYCLES_PER_PAIR;
+    if (last_tick > SCHWAY__STATE_TICKS_MAX - SCHWAY__CYCLES_PER_PAIR) {
+        spu->next_tick = UINT64_MAX;
+    } else {
+        spu->next_tick = last_tick + SCHWAY__CYCLES_PER_PAIR;
+    }
+}
+
+/* The first stateful SPU write ends the reset-silence shortcut. */
+static void spu_disable_idle_fast_path(schway *inst)
+{
+    if (inst->spu.idle_fast_path == 0u) {
+        return;
+    }
+    inst->spu.idle_fast_path = 0u;
+    inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
 }
 
 static int32_t spu_sar32(int32_t value, uint32_t shift)
@@ -360,6 +485,7 @@ void schway__spu_reset(schway *inst)
 {
     memset(&inst->spu, 0, sizeof inst->spu);
     inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+    inst->spu.idle_fast_path = 1u;
     inst->spu.noise_lfsr = 1u;
     for (uint32_t i = 0u; i < SCHWAY__SPU_VOICE_COUNT; i++) {
         inst->spu.voice[i].sample_counter = UINT32_C(31) << 27;
@@ -415,6 +541,7 @@ void schway__spu_dma_write(schway *inst, uint16_t value)
     if (((spu_dma_attr(spu) >> 4) & 3u) != 2u) {
         return;
     }
+    spu_disable_idle_fast_path(inst);
     spu_fifo_push(spu, value);
     uint32_t copies = spu_ram_replication(spu);
     while (spu->transfer_count != 0u) {
@@ -502,6 +629,10 @@ static void spu_select_noise_output(schway *inst, uint32_t voice)
 void schway__spu_event(schway *inst, uint64_t now)
 {
     struct schway__spu *spu = &inst->spu;
+    if (spu->idle_fast_path != 0u && spu->next_tick <= now) {
+        spu_idle_advance(inst, now);
+        return;
+    }
     while (spu->next_tick <= now) {
         spu_apply_pending_writes(inst);
         spu_manual_transfer_step(inst);
@@ -867,5 +998,6 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
         spu->irqa_addr = irqa_addr;
         spu->irq_enabled = irq_enabled;
         spu->next_tick = next_tick;
+        spu->idle_fast_path = 0u;
     }
 }

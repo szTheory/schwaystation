@@ -1418,7 +1418,13 @@ static int run(const options *opt)
     status = runner_cards_load(opt, inst, &card_files);
 #ifdef SCHWAY_RUN_TEST_HOOKS
     if (status == SCHWAY__EXIT_OK && opt->test_audio_file != NULL) {
+#ifdef _MSC_VER
+        if (fopen_s(&audio_capture, opt->test_audio_file, "wb") != 0) {
+            audio_capture = NULL;
+        }
+#else
         audio_capture = fopen(opt->test_audio_file, "wb");
+#endif
         if (audio_capture == NULL) {
             fprintf(stderr, "schwaystation-run: cannot open test audio capture\n");
             status = SCHWAY__EXIT_FAILURE;

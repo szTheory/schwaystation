@@ -815,6 +815,7 @@ static void check_disabled_and_muted_deadlines(void)
             return;
         }
         /* ATTR at 1F801DAA: disabled, then enabled with UNMUTE clear. */
+        inst->spu.idle_fast_path = 0u;
         inst->spu.reg[0xDDu] = attr[i];
         schway_run_result result = run_cycles(inst, SCHWAY__CYCLES_PER_PAIR);
         CHECK_EQ_U64(result.ticks, SCHWAY__CYCLES_PER_PAIR);

@@ -164,7 +164,7 @@
     { "name": "nofp", "configurePreset": "nofp" },
     { "name": "be32", "configurePreset": "be32" },
     { "name": "wasm32", "configurePreset": "wasm32" },
-    { "name": "nightly", "configurePreset": "nightly", "targets": ["schwaystation-run", "schwaystation-test-gpu-reference", "schwaystation-test-vectors"] },
+    { "name": "nightly", "configurePreset": "nightly", "targets": ["schwaystation-run", "schwaystation-test-gpu-reference", "schwaystation-test-spu-reference", "schwaystation-test-vectors"] },
     { "name": "perf", "configurePreset": "perf", "targets": ["schwaystation-run"] }
   ],
   "testPresets": [
