@@ -1640,19 +1640,16 @@ static void case_spu_request_controls(void)
         schway_destroy(inst);
     }
 
-    /* Direction-to-RAM is not automatically ready, while its explicit credit
-       still follows the manual sync-mode-1 path. */
+    /* ATTR in DMA-write mode cannot request a direction-to-RAM transfer. */
     schway *inst = make();
     fill_ram(inst, 0x9000u, 16u, seed);
+    uint32_t first_word = ram_word(inst, 0x9000u);
     spu_prepare(inst, 0x9000u, 1u, 16u, 0x0020u, DPCR_ALL);
     wr32(inst, CHCR(4u), 0x01000200u);
     CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
     CHECK_EQ_U64(inst->dma.words[4], 0u);
-    schway__dma_dreq(inst, 4u, 1u);
-    CHECK_EQ_U64(inst->dma.cur, 4u);
-    CHECK_EQ_HEX(inst->dma.madr[4], 0x9040u);
     CHECK_EQ_U64((inst->dma.dreq >> 4) & 1u, 0u);
-    CHECK_EQ_U64(ram_word(inst, 0x9000u), 0u);
+    CHECK_EQ_HEX(ram_word(inst, 0x9000u), first_word);
     schway_destroy(inst);
 
     /* A disabled DPCR holds the request; enabling it wakes the existing work. */

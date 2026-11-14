@@ -312,6 +312,8 @@ static uint16_t spu_read16(schway *inst, uint32_t address)
 static void spu_next_tick(schway *inst)
 {
     uint64_t deadline = schway__spu_next(inst);
+    inst->cpu.blk_tick = deadline;
+    inst->cpu.blk_cycle = inst->cpu.cycle;
     inst->ticks = deadline;
     schway__spu_event(inst, deadline);
 }
@@ -354,11 +356,15 @@ static void check_dma_fifo_ram_round_trip(void)
     spu_write16(inst, 0x1F801DA6u, 0x20u);
     spu_write16(inst, 0x1F801DAAu, 0x0030u);
     spu_next_tick(inst);
+    CHECK_EQ_HEX(schway__spu_reg_peek(inst, 0x1F801DAAu), 0x0030u);
+    CHECK_EQ_U64(schway__spu_dma_ready(inst, 0u), 1u);
     dma_reg_write(inst, 0x1F801014u, 0x220931E1u);
     dma_reg_write(inst, 0x1F8010F4u, 0x00900000u);
     dma_reg_write(inst, 0x1F8010C0u, 0x4000u);
     dma_reg_write(inst, 0x1F8010C4u, 0x00010010u);
     dma_reg_write(inst, 0x1F8010C8u, 0x01000200u);
+    CHECK_EQ_HEX(inst->dma.chcr[4], 0x01000200u);
+    CHECK_EQ_U64(schway__dma_arbitrate(inst, 1u << 4), 4u);
     CHECK_EQ_U64(inst->dma.cur, 4u);
     for (uint32_t i = 0u; i < 16u; i++) {
         uint32_t source = 0u;
@@ -430,10 +436,7 @@ static void check_manual_fifo_and_ram_transfer(void)
     }
     spu_write16(inst, 0x1F801DAAu, 0x8010u);
     spu_next_tick(inst);
-    CHECK((schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0400u) != 0u);
-    for (uint32_t i = 1u; i < SCHWAY__SPU_FIFO_HALFWORDS; i++) {
-        spu_next_tick(inst);
-    }
+    CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0400u, 0u);
     CHECK_EQ_U64(inst->spu.transfer_count, 0u);
     CHECK_EQ_U64(schway__spu_reg_peek(inst, 0x1F801DAEu) & 0x0400u, 0u);
     CHECK_EQ_U64(schway__spu_ram_peek(inst, 0x7FFF8u), 0xA000u);

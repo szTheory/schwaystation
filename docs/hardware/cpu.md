@@ -297,11 +297,11 @@ it jumps to `pc0`. The scratchpad is never touched. Between the reset code and `
 opcode that raises an exception, so a runaway that falls out of the reset code is recorded and never slides through
 no-operations.
 
-**Kernel calls.** The A and B entries jump to routines in ROM that implement one function, putchar: a call to `A0h`
-with `t1` = `3Ch`, or to `B0h` with `t1` = `3Dh`, stores the low byte of `a0` to the debug port at `1F802080h` and
-returns. Any other function number returns at once, and so does `C0h`. The routines use only `k0` and `k1`, so every
-other register survives the call. With the profile's debug-port flag clear the store is ignored, and the byte goes
-nowhere.
+**Kernel calls.** The A and B entries jump to routines in ROM. A(3Ch) and B(3Dh) putchar store the low byte of `a0`
+to the debug port at `1F802080h`. A(3Fh) printf supports literal text and `%s` arguments, the subset used by the
+pinned transfer guest; it sends the same bytes to that port. This bounded formatter is not a general BIOS printf.
+Any other function number returns at once, and so does C0h. With the profile's debug-port flag clear, the stores are
+ignored. The putchar routines use only `k0` and `k1`; the formatter uses caller-saved registers.
 
 **The registered IRQ0 hook.** The stub implements the narrow `HookEntryInt`/`ReturnFromException` pair, B0(19h) and
 B0(17h), described in [PSX-SYSTEM.md](../../.planning/preparation/PSX-SYSTEM.md) (SYS.07). B0(19h) registers the

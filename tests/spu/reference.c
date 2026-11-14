@@ -48,6 +48,19 @@ static const char pinned_memory_transfer_log[] =
     "pass - testControlBitsAreCopiedToStatusRegister\n"
     "Done.\n";
 
+static void *reference_alloc(void *user, size_t size)
+{
+    (void)user;
+    return malloc(size);
+}
+
+static void reference_free(void *user, void *ptr, size_t size)
+{
+    (void)user;
+    (void)size;
+    free(ptr);
+}
+
 static uint8_t *read_bounded_file(const char *path, size_t limit, size_t *size_out)
 {
     *size_out = 0u;
@@ -325,6 +338,9 @@ static int first_upload_progress(const uint8_t *bytes, size_t size)
             return -1;
         }
         matched++;
+        if (matched == FIRST_UPLOAD_CASE_COUNT) {
+            return 1;
+        }
     }
     return matched == FIRST_UPLOAD_CASE_COUNT ? 1 : 0;
 }
@@ -349,6 +365,8 @@ static int run_first_upload(const char *assets)
     schway_config config;
     memset(&config, 0, sizeof config);
     config.size = (uint32_t)sizeof config;
+    config.allocator.alloc = reference_alloc;
+    config.allocator.free = reference_free;
     schway *inst = NULL;
     schway_status status = schway_create(&config, &inst);
     if (status != SCHWAY_STATUS_OK || inst == NULL) {

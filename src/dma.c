@@ -257,9 +257,11 @@ static uint32_t dma_pending(const schway *inst, uint32_t ch)
     if (sync != 1u) {
         return 0u;
     }
-    if (ch == DMA_SPU && (c & DMA_CHCR_FROM_RAM) != 0u &&
-        (inst->bus.spu_attr & 0x0030u) == 0x0020u) {
-        return 1u;
+    if (ch == DMA_SPU) {
+        return schway__spu_dma_ready(inst, (c & DMA_CHCR_FROM_RAM) != 0u) != 0u ||
+                       ((d->dreq >> ch) & 1u) != 0u
+                   ? 1u
+                   : 0u;
     }
     return ((d->dreq >> ch) & 1u) != 0u ? 1u : 0u;
 }
@@ -353,7 +355,10 @@ static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word, uint64_t
     case 3u: /* CD-ROM */
         return dma_stub_sink(inst, ch, word);
     case 4u: /* SPU */
-        return dma_stub_sink(inst, ch, word);
+        (void)dma_stub_sink(inst, ch, word);
+        schway__spu_dma_write(inst, (uint16_t)word);
+        schway__spu_dma_write(inst, (uint16_t)(word >> 16));
+        return 0u;
     case 5u: /* PIO */
         return dma_stub_sink(inst, ch, word);
     default:
@@ -376,7 +381,9 @@ static uint32_t dma_dev_read(schway *inst, uint32_t ch, uint32_t *word, uint64_t
     case 3u: /* CD-ROM */
         return dma_stub_source(word);
     case 4u: /* SPU */
-        return dma_stub_source(word);
+        *word = (uint32_t)schway__spu_dma_read(inst);
+        *word |= (uint32_t)schway__spu_dma_read(inst) << 16;
+        return 0u;
     case 5u: /* PIO */
         return dma_stub_source(word);
     default:

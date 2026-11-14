@@ -57,6 +57,18 @@ static void spu_fifo_push(struct schway__spu *spu, uint16_t value)
     spu->transfer_count++;
 }
 
+static uint16_t spu_pending_register_value(const struct schway__spu *spu, uint32_t address)
+{
+    uint32_t offset = address - SPU_REGISTER_BASE;
+    uint16_t value = spu->reg[offset >> 1];
+    for (uint32_t i = spu->pending_count; i > 0u; i--) {
+        if (spu->pending[i - 1u].address == offset) {
+            return spu->pending[i - 1u].value;
+        }
+    }
+    return value;
+}
+
 static uint16_t spu_register_value(const schway *inst, uint32_t address)
 {
     uint32_t aligned = address & ~1u;
@@ -65,6 +77,9 @@ static uint16_t spu_register_value(const schway *inst, uint32_t address)
     }
     if (aligned == SPU_FIFO_ADDRESS) {
         return spu_fifo_peek(&inst->spu);
+    }
+    if (aligned == SPU_RAM_CTRL_ADDRESS) {
+        return spu_pending_register_value(&inst->spu, aligned);
     }
     uint32_t index = (aligned - SPU_REGISTER_BASE) >> 1;
     if (aligned == SPU_STATX_ADDRESS) {
@@ -76,9 +91,9 @@ static uint16_t spu_register_value(const schway *inst, uint32_t address)
         if (mode == 1u && inst->spu.transfer_count != 0u) {
             value |= 0x0400u;
         }
-        if (mode == 2u && inst->spu.transfer_count < SCHWAY__SPU_FIFO_HALFWORDS) {
+        if (mode == 2u && inst->spu.transfer_count == 0u) {
             value |= 0x0100u;
-        } else if (mode == 3u && inst->spu.transfer_count != 0u) {
+        } else if (mode == 3u) {
             value |= 0x0200u;
         }
         if ((ram_ctrl & 0x000Cu) != 0u && inst->spu.capture_cursor >= 0x100u) {
@@ -239,6 +254,57 @@ static uint32_t spu_ram_replication(const struct schway__spu *spu)
     }
 }
 
+static uint16_t spu_dma_attr(const struct schway__spu *spu)
+{
+    return spu_pending_register_value(spu, SPU_ATTR_ADDRESS);
+}
+
+/* ATTR selects DMA4 direction and the 32-halfword FIFO accepts one 10h-word
+   request block when empty (PSX-SPX SPU transfers, preparation §1.5). */
+uint32_t schway__spu_dma_ready(const schway *inst, uint32_t direction)
+{
+    const struct schway__spu *spu = &inst->spu;
+    uint32_t mode = (spu_dma_attr(spu) >> 4) & 3u;
+    if (direction != 0u) {
+        return mode == 2u && spu->transfer_count == 0u;
+    }
+    return mode == 3u;
+}
+
+/* DMA4 writes each guest word to the FIFO low halfword first. The data enters
+   SPU RAM at the active FIFO write rate; the DMA engine accounts for its
+   documented four-cycle-per-word cost (PSX-SPX SPU transfers, §1.5). */
+void schway__spu_dma_write(schway *inst, uint16_t value)
+{
+    struct schway__spu *spu = &inst->spu;
+    if (((spu_dma_attr(spu) >> 4) & 3u) != 2u) {
+        return;
+    }
+    spu_fifo_push(spu, value);
+    uint32_t copies = spu_ram_replication(spu);
+    while (spu->transfer_count != 0u) {
+        uint16_t data = spu_fifo_pop(spu);
+        for (uint32_t i = 0u; i < copies; i++) {
+            schway__spu_ram_write(inst, spu->transfer_address, data);
+            spu->transfer_address = (spu->transfer_address + 2u) &
+                                    (SCHWAY__SPU_RAM_SIZE - 1u);
+        }
+    }
+}
+
+/* DMA4 reads one little-endian halfword from SPU RAM and advances the same
+   transfer address used by manual writes (PSX-SPX SPU transfers, §1.5). */
+uint16_t schway__spu_dma_read(schway *inst)
+{
+    struct schway__spu *spu = &inst->spu;
+    if (((spu_dma_attr(spu) >> 4) & 3u) != 3u) {
+        return 0xFFFFu;
+    }
+    uint16_t value = schway__spu_ram_read(inst, spu->transfer_address);
+    spu->transfer_address = (spu->transfer_address + 2u) & (SCHWAY__SPU_RAM_SIZE - 1u);
+    return value;
+}
+
 static void spu_manual_transfer_step(schway *inst)
 {
     struct schway__spu *spu = &inst->spu;
@@ -246,11 +312,14 @@ static void spu_manual_transfer_step(schway *inst)
     if (((attr >> 4) & 3u) != 1u || spu->transfer_count == 0u) {
         return;
     }
-    uint16_t value = spu_fifo_pop(spu);
     uint32_t copies = spu_ram_replication(spu);
-    for (uint32_t i = 0u; i < copies; i++) {
-        schway__spu_ram_write(inst, spu->transfer_address, value);
-        spu->transfer_address = (spu->transfer_address + 2u) & (SCHWAY__SPU_RAM_SIZE - 1u);
+    while (spu->transfer_count != 0u) {
+        uint16_t value = spu_fifo_pop(spu);
+        for (uint32_t i = 0u; i < copies; i++) {
+            schway__spu_ram_write(inst, spu->transfer_address, value);
+            spu->transfer_address = (spu->transfer_address + 2u) &
+                                    (SCHWAY__SPU_RAM_SIZE - 1u);
+        }
     }
 }
 

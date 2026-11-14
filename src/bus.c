@@ -421,7 +421,9 @@ static uint32_t spu_write_halfword(schway *inst, uint32_t address, uint16_t valu
         uint64_t tick = schway__sched_now(inst, *cycles);
         schway__dma_event(inst, tick);
         inst->bus.spu_attr = value;
+        schway__spu_reg_write(inst, aligned, value);
         schway__dma_spu_control_changed(inst, tick);
+        return 1u;
     }
     schway__spu_reg_write(inst, aligned, value);
     return 1u;
