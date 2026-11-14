@@ -848,7 +848,7 @@ void schway__dma_dreq(schway *inst, uint32_t ch, uint32_t level)
 
 /* ATTR changes can make a waiting DMA4 block ready at this exact bus tick.
    Keep a unit completed ahead of the CPU clock at its saved boundary. The
-   level itself is derived from bus.spu_attr and is never stored in dreq. */
+   SPU owns the current and pending ATTR values; no ATTR mirror is stored in dreq. */
 void schway__dma_spu_control_changed(schway *inst, uint64_t now)
 {
     if (inst->dma.cur == SCHWAY__DMA_NONE && inst->dma.busy_until <= now) {

@@ -843,10 +843,10 @@ static void ram_word(void)
     drop(inst);
 }
 
-/* The SPU register map is chip-owned and ATTR's chip readback is delayed to
-   the next sample tick, while the DMA control mirror updates on the bus write.
-   Fault prevented: an unbuilt SPU register, a lost delayed ATTR value, a
-   shared latch, or a changed DEV4 access cost. */
+/* The SPU register map and its DMA control value are chip-owned, and ATTR's
+   chip readback is delayed to the next sample tick. Fault prevented: an
+   unbuilt SPU register, a lost delayed ATTR value, a shared latch, or a
+   changed DEV4 access cost. */
 static void advance_spu_tick(schway *inst)
 {
     inst->ticks = schway__spu_next(inst);
@@ -866,7 +866,7 @@ static void spu_attr(void)
     CHECK_EQ_U64(rd(inst, 0x1F801DAAu, 2u, &value), 0u);
     CHECK_EQ_HEX(value, 0u);
     CHECK_EQ_U64(wr(inst, 0xBF801DAAu, 2u, 0x0020u), 0u);
-    CHECK_EQ_HEX(inst->bus.spu_attr, 0x0020u);
+    CHECK_EQ_U64(schway__spu_dma_ready(inst, 1u), 1u);
     advance_spu_tick(inst);
     static const uint32_t attr_aliases[] = {0x1F801DAAu, 0x9F801DAAu, 0xBF801DAAu};
     for (size_t i = 0u; i < sizeof attr_aliases / sizeof attr_aliases[0]; i++) {

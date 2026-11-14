@@ -1015,7 +1015,7 @@ static void case_spu_request_blocks(void)
     schway *inst = make();
     fill_ram(inst, 0x6000u, 48u, seed);
     wr16(inst, 0x1F801DAAu, 0x0020u);
-    CHECK_EQ_HEX(inst->bus.spu_attr, 0x0020u);
+    CHECK_EQ_U64(schway__spu_dma_ready(inst, 1u), 1u);
     wr32(inst, DPCR, DPCR_ALL);
     wr32(inst, DICR, 0x00900000u);
     wr32(inst, MADR(4u), 0x6000u);
@@ -1935,8 +1935,8 @@ static void case_spu_request_controls(void)
     CHECK_EQ_U64(active->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
     CHECK_EQ_U64(waiting->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, SCHWAY__DMA_CHCR_BUSY);
     CHECK_EQ_U64(waiting->dma.words[4], 0u);
-    CHECK_EQ_HEX(active->bus.spu_attr, 0x0020u);
-    CHECK_EQ_HEX(waiting->bus.spu_attr, 0x0010u);
+    CHECK_EQ_U64(schway__spu_dma_ready(active, 1u), 1u);
+    CHECK_EQ_U64(schway__spu_dma_ready(waiting, 1u), 0u);
     schway_destroy(waiting);
     schway_destroy(active);
 }
