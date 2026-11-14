@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-18-PLAN.md; Runtime/model: Codex/OpenGSD, GPT-6 session (exact model ID not exposed)"
-last_updated: "2026-11-14T09:16:30Z"
+stopped_at: "Completed 05-12-PLAN.md; next is 05-14; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)"
+last_updated: "2026-11-14T09:50:40Z"
 last_activity: 2026-11-14
-last_activity_desc: "Completed plan 05-18. Runtime/model: Codex/OpenGSD; GPT-6 session (exact model ID not exposed)."
-state_head: ed528d3340b9f0944b30205df8d47d04ef91e023
+last_activity_desc: "Completed plan 05-12. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed)."
+state_head: c9fac3b77289723fde867bf2c3672671e84b9258
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 149
-  completed_plans: 145
+  completed_plans: 146
   percent: 67
-current_plan: 20 of 23
+current_plan: 21 of 23
 ---
 
 # Project State
@@ -31,16 +31,16 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 20 of 23
+Plan: 21 of 23
 Status: Ready to execute
-Last activity: 2026-11-14 — Plan 05-18 completed. Runtime/model: Codex/OpenGSD; GPT-6 session (exact model ID not exposed).
+Last activity: 2026-11-14 — Plan 05-12 completed. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed).
 
 Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 126
+- Total plans completed: 146
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -52,6 +52,7 @@ Progress: [███████░░░] 67%
 | 02 | 27 | - | - |
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
+| 5 | 20 | 23 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -207,6 +208,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P17 | 32min | 2 tasks | 5 files |
 | Phase 05 P10 | 31 min | 2 tasks | 5 files |
 | Phase 05 P18 | at least 36 min | 2 tasks | 5 files |
+| Phase 05 P12 | about 34 min wall | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -695,11 +697,12 @@ come from `AGENTS.md`.
 | 2026-11-12 | Phase 04 second hosted-run source prerequisite planning | Codex, OpenGSD 1.20.0; focused 04-56 and downstream DAG/checkpoint bookkeeping only; no execution advance or source/test run | gpt-6.1-sol high |
 
 | 2026-11-14 | /gsd-execute-plan 05-06 | Codex, OpenGSD 1.20.0; sequential shared checkout; BRR tracer TDD GREEN and focused save-state continuation checks; full 24-voice/mixer task moved to 05-22 | GPT-6 session (exact model ID not exposed) |
+| 2026-11-14 | /gsd-execute-phase 5 plan 05-12 | Codex, OpenGSD 1.21.0; sequential shared checkout; test-only PCM capture, six region/callback comparisons, reset/reload/cadence/AV checks | GPT-6 session (exact model ID not exposed) |
 
 ## Session Continuity
 
-Last session: 2026-11-14T09:13:59.671Z
-Stopped at: Completed 05-18-PLAN.md; Runtime/model: Codex/OpenGSD, GPT-6 session (exact model ID not exposed)
+Last session: 2026-11-14T09:50:40Z
+Stopped at: Completed 05-12-PLAN.md; next is 05-14; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
