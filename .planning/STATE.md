@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-21-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session (exact model ID not exposed)"
-last_updated: "2026-11-14T03:24:22.711Z"
+stopped_at: "Completed 05-07-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh"
+last_updated: "2026-11-14T03:56:58.995Z"
 last_activity: 2026-11-14
 last_activity_desc: "Completed plan 05-21; 05-23 is next. Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session (exact model ID not exposed)."
-state_head: 810e84db4df7af5d1cf796c24a72ea294e70ef81
+state_head: 68ee660b1dd35afa956e0f8b500b39deb3b8a490
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 149
-  completed_plans: 135
+  completed_plans: 136
   percent: 67
 current_plan: 10 of 23
 ---
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 10 of 23
+Plan: 11 of 23
 Status: Ready to execute
 Last activity: 2026-11-14 — Plan 05-21 completed; 05-23 is next. Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session (exact model ID not exposed).
 
@@ -197,6 +197,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P05 | 44 min | 1 tasks | 13 files |
 | Phase 05 P06 | 43min | 1 tasks | 7 files |
 | Phase 05 P21 | 46 min | 1 tasks | 7 files |
+| Phase 05 P07 | 29min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -484,6 +485,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Manual FIFO data drains at the scheduled transfer tick so the bounded guest transfer cases complete.
 - [Phase 05]: Move 24-voice ordering, loop/ENDX, PMON and stereo mixing to plan 05-22 so plan 05-06 remains one focused BRR interpolation tracer.
 - [Phase 05]: DMA4 sync-mode-0 starts from CHCR bit 24 alone, matching the pinned guest register writes; other DMA channels retain their bit-28 trigger requirement.
+- [Phase 05]: Use the documented integer ADSR and sweep baseline; treat the ares table as conformance data, not a hardware waveform.
+- [Phase 05]: Keep high-rate and phase-negative sweep behavior unresolved without a direct hardware capture; do not add a profile switch.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -671,9 +674,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T03:24:22.174Z
-Stopped at: Completed 05-21-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session (exact model ID not exposed)
-Resume file: .planning/phases/05-the-sound-matches-the-console/05-23-PLAN.md
+Last session: 2026-11-14T03:56:58.159Z
+Stopped at: Completed 05-07-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh
+Resume file: 05-08-PLAN.md
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 
