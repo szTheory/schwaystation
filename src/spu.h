@@ -46,6 +46,7 @@ struct schway__spu {
     uint16_t transfer_fifo[SCHWAY__SPU_FIFO_HALFWORDS];
     uint32_t transfer_head;
     uint32_t transfer_count;
+    uint32_t transfer_address;
     struct schway__spu_pending_write pending[SCHWAY__SPU_PENDING_WRITES];
     uint32_t pending_count;
     uint32_t noise_phase;

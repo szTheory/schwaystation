@@ -1,6 +1,6 @@
 /* The bounded SPU sample clock, RAM byte order and PCM ring producer.
    Hardware references: .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md
-   sections 1.1 and 1.5. */
+   sections 1.1 and 1.5–1.6. */
 #include <string.h>
 
 #include "internal.h"
@@ -14,6 +14,9 @@
 #define SPU_REGISTER_RAM_END 0x1F801E7Fu
 #define SPU_ATTR_ADDRESS 0x1F801DAAu
 #define SPU_IRQA_ADDRESS 0x1F801DA4u
+#define SPU_TSA_ADDRESS 0x1F801DA6u
+#define SPU_FIFO_ADDRESS 0x1F801DA8u
+#define SPU_RAM_CTRL_ADDRESS 0x1F801DACu
 #define SPU_STATX_ADDRESS 0x1F801DAEu
 #define IRQ9_MASK (UINT32_C(1) << 9)
 
@@ -25,17 +28,62 @@ uint32_t schway__spu_reg_supported(uint32_t address)
            (address >= SPU_REGISTER_RAM_BASE && address <= SPU_REGISTER_RAM_END);
 }
 
+static uint16_t spu_fifo_peek(const struct schway__spu *spu)
+{
+    if (spu->transfer_count == 0u) {
+        return 0u;
+    }
+    return spu->transfer_fifo[spu->transfer_head];
+}
+
+static uint16_t spu_fifo_pop(struct schway__spu *spu)
+{
+    if (spu->transfer_count == 0u) {
+        return 0u;
+    }
+    uint16_t value = spu_fifo_peek(spu);
+    spu->transfer_head = (spu->transfer_head + 1u) % SCHWAY__SPU_FIFO_HALFWORDS;
+    spu->transfer_count--;
+    return value;
+}
+
+static void spu_fifo_push(struct schway__spu *spu, uint16_t value)
+{
+    if (spu->transfer_count >= SCHWAY__SPU_FIFO_HALFWORDS) {
+        return;
+    }
+    uint32_t slot = (spu->transfer_head + spu->transfer_count) % SCHWAY__SPU_FIFO_HALFWORDS;
+    spu->transfer_fifo[slot] = value;
+    spu->transfer_count++;
+}
+
 static uint16_t spu_register_value(const schway *inst, uint32_t address)
 {
     uint32_t aligned = address & ~1u;
     if (!schway__spu_reg_supported(aligned)) {
         return 0u;
     }
+    if (aligned == SPU_FIFO_ADDRESS) {
+        return spu_fifo_peek(&inst->spu);
+    }
     uint32_t index = (aligned - SPU_REGISTER_BASE) >> 1;
     if (aligned == SPU_STATX_ADDRESS) {
         uint16_t attr = inst->spu.reg[(SPU_ATTR_ADDRESS - SPU_REGISTER_BASE) >> 1];
         uint16_t value = (uint16_t)(attr & 0x003Fu);
         value |= (uint16_t)((attr & 0x0020u) << 2);
+        uint16_t ram_ctrl = inst->spu.reg[(SPU_RAM_CTRL_ADDRESS - SPU_REGISTER_BASE) >> 1];
+        uint32_t mode = (attr >> 4) & 3u;
+        if (mode == 1u && inst->spu.transfer_count != 0u) {
+            value |= 0x0400u;
+        }
+        if (mode == 2u && inst->spu.transfer_count < SCHWAY__SPU_FIFO_HALFWORDS) {
+            value |= 0x0100u;
+        } else if (mode == 3u && inst->spu.transfer_count != 0u) {
+            value |= 0x0200u;
+        }
+        if ((ram_ctrl & 0x000Cu) != 0u && inst->spu.capture_cursor >= 0x100u) {
+            value |= 0x0800u;
+        }
         if ((inst->irq.stat & IRQ9_MASK) != 0u) {
             value |= 0x0040u;
         }
@@ -46,6 +94,9 @@ static uint16_t spu_register_value(const schway *inst, uint32_t address)
 
 uint16_t schway__spu_reg_read(schway *inst, uint32_t address)
 {
+    if ((address & ~1u) == SPU_FIFO_ADDRESS) {
+        return spu_fifo_pop(&inst->spu);
+    }
     return spu_register_value(inst, address);
 }
 
@@ -66,12 +117,14 @@ static void spu_apply_register_write(schway *inst, uint32_t address, uint16_t va
         uint32_t reg = ((aligned - SPU_REGISTER_BASE) >> 1) & 7u;
         spu->voice[voice].reg[reg] = value;
     } else if (aligned == SPU_ATTR_ADDRESS) {
-        spu->irq_enabled = (value >> 6) & 1u;
-        if (spu->irq_enabled == 0u) {
+        spu->irq_enabled = (value & 0x8040u) == 0x8040u;
+        if ((value & 0x0040u) == 0u) {
             schway__irq_write_stat(inst, 0u, IRQ9_MASK);
         }
     } else if (aligned == SPU_IRQA_ADDRESS) {
         spu->irqa_addr = ((uint32_t)value << 3) & (SCHWAY__SPU_RAM_SIZE - 8u);
+    } else if (aligned == SPU_TSA_ADDRESS) {
+        spu->transfer_address = ((uint32_t)value << 3) & (SCHWAY__SPU_RAM_SIZE - 8u);
     }
 }
 
@@ -81,6 +134,10 @@ void schway__spu_reg_write(schway *inst, uint32_t address, uint16_t value)
     uint32_t aligned = address & ~1u;
     if (!schway__spu_reg_supported(aligned) || aligned == SPU_STATX_ADDRESS ||
         (aligned >= SPU_CURRENT_VOLUME_BASE && aligned <= SPU_CURRENT_VOLUME_END)) {
+        return;
+    }
+    if (aligned == SPU_FIFO_ADDRESS) {
+        spu_fifo_push(spu, value);
         return;
     }
     if (spu->pending_count < SCHWAY__SPU_PENDING_WRITES) {
@@ -165,11 +222,60 @@ uint64_t schway__spu_next(const schway *inst)
     return inst->spu.next_tick;
 }
 
+static uint32_t spu_ram_replication(const struct schway__spu *spu)
+{
+    uint16_t ram_ctrl = spu->reg[(SPU_RAM_CTRL_ADDRESS - SPU_REGISTER_BASE) >> 1];
+    switch (ram_ctrl & 0x000Eu) {
+    case 0x0004u:
+        return 1u;
+    case 0x0006u:
+        return 2u;
+    case 0x0008u:
+        return 4u;
+    case 0x000Au:
+        return 8u;
+    default:
+        return 1u;
+    }
+}
+
+static void spu_manual_transfer_step(schway *inst)
+{
+    struct schway__spu *spu = &inst->spu;
+    uint16_t attr = spu->reg[(SPU_ATTR_ADDRESS - SPU_REGISTER_BASE) >> 1];
+    if (((attr >> 4) & 3u) != 1u || spu->transfer_count == 0u) {
+        return;
+    }
+    uint16_t value = spu_fifo_pop(spu);
+    uint32_t copies = spu_ram_replication(spu);
+    for (uint32_t i = 0u; i < copies; i++) {
+        schway__spu_ram_write(inst, spu->transfer_address, value);
+        spu->transfer_address = (spu->transfer_address + 2u) & (SCHWAY__SPU_RAM_SIZE - 1u);
+    }
+}
+
+static void spu_capture_step(schway *inst)
+{
+    struct schway__spu *spu = &inst->spu;
+    uint16_t ram_ctrl = spu->reg[(SPU_RAM_CTRL_ADDRESS - SPU_REGISTER_BASE) >> 1];
+    if ((ram_ctrl & 0x000Cu) == 0u) {
+        return;
+    }
+    uint32_t offset = spu->capture_cursor * 2u;
+    schway__spu_ram_write(inst, offset, 0u);
+    schway__spu_ram_write(inst, 0x400u + offset, 0u);
+    schway__spu_ram_write(inst, 0x800u + offset, 0u);
+    schway__spu_ram_write(inst, 0xC00u + offset, 0u);
+    spu->capture_cursor = (spu->capture_cursor + 1u) & 0x1FFu;
+}
+
 void schway__spu_event(schway *inst, uint64_t now)
 {
     struct schway__spu *spu = &inst->spu;
     while (spu->next_tick <= now) {
         spu_apply_pending_writes(inst);
+        spu_manual_transfer_step(inst);
+        spu_capture_step(inst);
         /* Later plans add voice and reverb output; a reset chip emits silence. */
         audio_push_pair(inst, 0, 0);
         if (spu->next_tick > SCHWAY__STATE_TICKS_MAX - SCHWAY__CYCLES_PER_PAIR) {
@@ -321,6 +427,7 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     int16_t reverb_fir[2u * SCHWAY__SPU_REVERB_FIR_TAPS];
     int32_t reverb_work[2u * SCHWAY__SPU_REVERB_WORK_WORDS];
     uint32_t transfer_head = 0u, transfer_count = 0u, pending_count = 0u;
+    uint32_t transfer_address = 0u;
     uint32_t noise_phase = 0u, capture_cursor = 0u;
     uint32_t reverb_fir_cursor = 0u, reverb_work_cursor = 0u, reverb_address = 0u;
     uint32_t irq_enabled = 0u, irqa_addr = 0u;
@@ -363,6 +470,7 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
         }
         transfer_head = spu->transfer_head;
         transfer_count = spu->transfer_count;
+        transfer_address = spu->transfer_address;
         pending_count = spu->pending_count;
         noise_phase = spu->noise_phase;
         noise_lfsr = spu->noise_lfsr;
@@ -403,6 +511,9 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
                                       SCHWAY__SPU_FIFO_HALFWORDS - 1u);
     transfer_count = schway__state_u32(io, "spu.transfer_count", &transfer_count, 0u,
                                        SCHWAY__SPU_FIFO_HALFWORDS);
+    transfer_address = schway__state_u32(io, "spu.transfer_address", &transfer_address, 0u,
+                                          SCHWAY__SPU_RAM_SIZE - 2u);
+    schway__state_check(io, (transfer_address & 1u) == 0u);
     schway__state_u16_array(io, "spu.pending.address", pending_address,
                             SCHWAY__SPU_PENDING_WRITES, 0u, UINT16_MAX);
     schway__state_u16_array(io, "spu.pending.value", pending_value,
@@ -435,6 +546,7 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
                               next_tick % SCHWAY__CYCLES_PER_PAIR == 0u);
         schway__state_check(io, transfer_head < SCHWAY__SPU_FIFO_HALFWORDS &&
                                     transfer_count <= SCHWAY__SPU_FIFO_HALFWORDS &&
+                                    transfer_address < SCHWAY__SPU_RAM_SIZE &&
                                     pending_count <= SCHWAY__SPU_PENDING_WRITES && phase_ok);
     }
     if (io->mode == SCHWAY__STATE_APPLY) {
@@ -473,6 +585,7 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
         }
         spu->transfer_head = transfer_head;
         spu->transfer_count = transfer_count;
+        spu->transfer_address = transfer_address;
         spu->pending_count = pending_count;
         spu->noise_phase = noise_phase;
         spu->noise_lfsr = noise_lfsr;

@@ -524,6 +524,7 @@ static void test_spu_state_continuation(void)
         {"spu.transfer_fifo", 2u, SCHWAY__SPU_FIFO_HALFWORDS},
         {"spu.transfer_head", 4u, 1u},
         {"spu.transfer_count", 4u, 1u},
+        {"spu.transfer_address", 4u, 1u},
         {"spu.pending.address", 2u, SCHWAY__SPU_PENDING_WRITES},
         {"spu.pending.value", 2u, SCHWAY__SPU_PENDING_WRITES},
         {"spu.pending_count", 4u, 1u},
@@ -552,6 +553,7 @@ static void test_spu_state_continuation(void)
     src->spu.transfer_fifo[31] = 0x9ABCu;
     src->spu.transfer_head = 7u;
     src->spu.transfer_count = 3u;
+    src->spu.transfer_address = 0x1234u;
     src->spu.pending[0].address = 0x20u;
     src->spu.pending[0].value = 0xABCDu;
     src->spu.pending_count = 1u;
@@ -638,6 +640,9 @@ static void test_spu_invalid_states(void)
          SCHWAY__SPU_FIFO_HALFWORDS},
         {"SPU transfer FIFO count", offset_of(src, "spu.transfer_count"), 4u,
          SCHWAY__SPU_FIFO_HALFWORDS + 1u},
+        {"SPU transfer pointer range", offset_of(src, "spu.transfer_address"), 4u,
+         SCHWAY__SPU_RAM_SIZE},
+        {"SPU transfer pointer alignment", offset_of(src, "spu.transfer_address"), 4u, 1u},
         {"SPU pending write count", offset_of(src, "spu.pending_count"), 4u,
          SCHWAY__SPU_PENDING_WRITES + 1u},
         {"SPU capture cursor", offset_of(src, "spu.capture_cursor"), 4u, 0x200u},
