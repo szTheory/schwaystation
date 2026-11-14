@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-12-PLAN.md; next is 05-14; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)"
-last_updated: "2026-11-14T09:50:40Z"
+stopped_at: "Completed 05-14-PLAN.md; next is 05-19; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)"
+last_updated: "2026-11-14T10:10:52Z"
 last_activity: 2026-11-14
-last_activity_desc: "Completed plan 05-12. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed)."
-state_head: c9fac3b77289723fde867bf2c3672671e84b9258
+last_activity_desc: "Completed plan 05-14. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed)."
+state_head: 6ff4ae1
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 149
-  completed_plans: 146
+  completed_plans: 147
   percent: 67
-current_plan: 21 of 23
+current_plan: 22 of 23
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 21 of 23
-Status: Ready to execute
-Last activity: 2026-11-14 — Plan 05-12 completed. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed).
+Plan: 22 of 23
+Status: Ready to execute 05-19
+Last activity: 2026-11-14 — Plan 05-14 completed. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed).
 
 Progress: [███████░░░] 67%
 
@@ -698,11 +698,12 @@ come from `AGENTS.md`.
 
 | 2026-11-14 | /gsd-execute-plan 05-06 | Codex, OpenGSD 1.20.0; sequential shared checkout; BRR tracer TDD GREEN and focused save-state continuation checks; full 24-voice/mixer task moved to 05-22 | GPT-6 session (exact model ID not exposed) |
 | 2026-11-14 | /gsd-execute-phase 5 plan 05-12 | Codex, OpenGSD 1.21.0; sequential shared checkout; test-only PCM capture, six region/callback comparisons, reset/reload/cadence/AV checks | GPT-6 session (exact model ID not exposed) |
+| 2026-11-14 | /gsd-execute-phase 5 plan 05-14 | Codex, OpenGSD 1.21.0; sequential shared checkout; active PCM save/load continuation, malformed queued SPU address rejection, atomic ring refusal, state/DMA/reverb/API checks | GPT-6 session (exact model ID not exposed) |
 
 ## Session Continuity
 
 Last session: 2026-11-14T09:50:40Z
-Stopped at: Completed 05-12-PLAN.md; next is 05-14; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)
+Stopped at: Completed 05-14-PLAN.md; next is 05-19; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
