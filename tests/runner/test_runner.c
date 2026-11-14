@@ -168,6 +168,15 @@ static void audio_hash(void)
     schway__sha256_final(&chunks, chunks_digest);
     CHECK(memcmp(whole_digest, chunks_digest, sizeof whole_digest) == 0);
     CHECK(strcmp(whole_hex, "31012b12fab553fe513bac93a604a48b6276e5e0720ef9298c6dba359002fc26") == 0);
+
+    schway__sha256 empty;
+    uint8_t empty_digest[32];
+    char empty_hex[65];
+    schway__sha256_init(&empty);
+    schway__sha256_update(&empty, NULL, 0u);
+    schway__sha256_final(&empty, empty_digest);
+    schway__sha256_hex(empty_digest, empty_hex);
+    CHECK(strcmp(empty_hex, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") == 0);
 }
 
 int main(int argc, char **argv)

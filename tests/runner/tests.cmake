@@ -215,6 +215,25 @@ if(CMAKE_SCRIPT_MODE_FILE)
     # Invalid naming options are refused as usage errors before any run.
     refuse(--serial SLUS_123.45)
     refuse(--save-dir "${serial_dir}" --memcard-names serial --serial ../escape)
+  elseif(CASE STREQUAL "audio_failures")
+    set(RUN ${HOOKED})
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-audio --test-audio-failure
+      RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+    if(NOT rc STREQUAL "1" OR NOT out MATCHES "schway_get_audio failed")
+      message(FATAL_ERROR "audio drain failure: expected exit 1 and its error, got ${rc}\n${out}${err}")
+    endif()
+    refuse(--frames 1 --hash-audio --hash-audio)
+    if(DEFINED FIXTURES)
+      refuse(--probe "${FIXTURES}/spu_tone.exe" --hash-audio)
+    endif()
+
+    string(REPEAT "[0-9a-f]" 64 digits)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash --hash-audio --hash-state --hash-vram
+      RESULT_VARIABLE combined_rc OUTPUT_VARIABLE combined_out ERROR_VARIABLE combined_err)
+    if(NOT combined_rc STREQUAL "0" OR
+       NOT combined_out MATCHES "^frame 1 sha256 ${digits}\\naudio sha256 ${digits}\\nstate sha256 ${digits}\\nvram sha256 ${digits}\\n$")
+      message(FATAL_ERROR "combined hashes: expected four ordered digests and exit 0, got ${combined_rc}\n${combined_out}${combined_err}")
+    endif()
   elseif(CASE STREQUAL "audio_hash")
     unit(audio_hash)
     set(silent_one_frame_hash 2b8443142803ae42226c9b3c4a1092587cb5edfa61308925ff5f55ff02bedc57)
@@ -659,6 +678,13 @@ target_compile_definitions(schwaystation-test-run-stop PRIVATE _POSIX_C_SOURCE=2
 set_target_properties(schwaystation-test-run-stop PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-run-stop)
+
+# Fault prevented: the audio drain's failure is reported as success or a hash
+# mismatch, and invalid CLI combinations are mistaken for run failures.
+schway_add_test(NAME runner.audio.failures
+  COMMAND ${runner_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
+    -DCASE=audio_failures -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
 
 set(bench_check ${runner_check} -DUNIT=$<TARGET_FILE:schwaystation-test-bench>)
 
