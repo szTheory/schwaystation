@@ -349,6 +349,7 @@ typedef struct options {
     const char *test_dat;
     const char *test_root;
     const char *test_config;
+    const char *test_audio_file;
 #endif
     const char *bios;  /* --bios FILE, else NULL */
     const char *exe;   /* --exe FILE, else NULL */
@@ -480,6 +481,13 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("give --test-audio-failure once");
             }
             o->test_audio_failure = 1;
+        } else if (strcmp(arg, "--test-audio-file") == 0) {
+            if (o->test_audio_file != NULL || value == NULL || value[0] == '\0' ||
+                value[0] == '-') {
+                return usage("give --test-audio-file a path once");
+            }
+            o->test_audio_file = value;
+            i++;
 #endif
         } else if (strcmp(arg, "--png") == 0) {
             if (o->png_frame != 0u) {
@@ -644,6 +652,9 @@ static int parse_options(int argc, char **argv, options *o)
     }
     if (o->test_audio_failure && !o->hash_audio) {
         return usage("--test-audio-failure needs --hash-audio");
+    }
+    if (o->test_audio_file != NULL && !o->hash_audio) {
+        return usage("--test-audio-file needs --hash-audio");
     }
 #endif
     if (o->frames == 0u && (o->exe != NULL || o->bios != NULL)) {
@@ -1001,7 +1012,7 @@ static int print_hash(const schway *inst, uint32_t frames)
    Drain once after each selected frame, then hash only the pairs actually written. */
 static int hash_audio_frame(schway *inst, schway__sha256 *state
 #ifdef SCHWAY_RUN_TEST_HOOKS
-                            , int force_failure
+                            , int force_failure, FILE *capture
 #endif
 )
 {
@@ -1037,6 +1048,13 @@ static int hash_audio_frame(schway *inst, schway__sha256 *state
         bytes[4u * i + 3u] = (uint8_t)(right >> 8);
     }
     schway__sha256_update(state, bytes, 4u * (size_t)io.written);
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    if (capture != NULL && fwrite(bytes, 1u, 4u * (size_t)io.written, capture) !=
+                               4u * (size_t)io.written) {
+        fprintf(stderr, "schwaystation-run: cannot write test audio capture\n");
+        return SCHWAY__EXIT_FAILURE;
+    }
+#endif
     return SCHWAY__EXIT_OK;
 }
 
@@ -1392,9 +1410,21 @@ static int run(const options *opt)
         return SCHWAY__EXIT_FAILURE;
     }
     int status = SCHWAY__EXIT_OK;
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    FILE *audio_capture = NULL;
+#endif
     runner_card_files card_files;
     memset(&card_files, 0, sizeof card_files);
     status = runner_cards_load(opt, inst, &card_files);
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    if (status == SCHWAY__EXIT_OK && opt->test_audio_file != NULL) {
+        audio_capture = fopen(opt->test_audio_file, "wb");
+        if (audio_capture == NULL) {
+            fprintf(stderr, "schwaystation-run: cannot open test audio capture\n");
+            status = SCHWAY__EXIT_FAILURE;
+        }
+    }
+#endif
     /* The debug-port flag is set for --tty and for nothing else. */
     if (status == SCHWAY__EXIT_OK && (opt->region != 0u || opt->tty)) {
         schway_profile p;
@@ -1485,7 +1515,8 @@ static int run(const options *opt)
         ran = n;
         if (st == SCHWAY_STATUS_OK && opt->hash_audio) {
 #ifdef SCHWAY_RUN_TEST_HOOKS
-            status = hash_audio_frame(inst, &audio_digest, opt->test_audio_failure);
+            status = hash_audio_frame(inst, &audio_digest, opt->test_audio_failure,
+                                      audio_capture);
 #else
             status = hash_audio_frame(inst, &audio_digest);
 #endif
@@ -1537,6 +1568,15 @@ static int run(const options *opt)
             break;
         }
     }
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    if (audio_capture != NULL) {
+        if (fclose(audio_capture) != 0 && status == SCHWAY__EXIT_OK) {
+            fprintf(stderr, "schwaystation-run: cannot close test audio capture\n");
+            status = SCHWAY__EXIT_FAILURE;
+        }
+        audio_capture = NULL;
+    }
+#endif
     /* No done or fault status by the frame cap is a hang. */
     if (status == SCHWAY__EXIT_OK && opt->stop_mailbox && !ended) {
         printf("hang frames=%lu pc=0x%08lx\n", (unsigned long)ran, (unsigned long)guest_pc(inst));
