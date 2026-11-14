@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-17-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh"
-last_updated: "2026-11-14T07:44:01.284Z"
+stopped_at: "Completed 05-10-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh"
+last_updated: "2026-11-14T08:25:12.914Z"
 last_activity: 2026-11-14
-last_activity_desc: "Completed plan 05-17. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh."
-state_head: 57df2459addd3063388c223896d072b277b7414c
+last_activity_desc: "Completed plan 05-10. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh."
+state_head: 46db53c9fa88628b535ecc5ed1066c8a013f2932
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 149
-  completed_plans: 143
+  completed_plans: 144
   percent: 67
-current_plan: 18 of 23
+current_plan: 19 of 23
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 18 of 23
+Plan: 19 of 23
 Status: Ready to execute
-Last activity: 2026-11-14 — Plan 05-17 completed. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh.
+Last activity: 2026-11-14 — Plan 05-10 completed. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh.
 
 Progress: [███████░░░] 67%
 
@@ -205,6 +205,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P09 | at least 22 min | 2 tasks | 9 files |
 | Phase 05 P13 | at least 13 min | 2 tasks | 11 files |
 | Phase 05 P17 | 32min | 2 tasks | 5 files |
+| Phase 05 P10 | 31 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -503,6 +504,9 @@ Recent decisions affecting current work:
 - [Phase 05]: Added the SPU fuzzer to the explicit fuzz preset target list and wired the existing hosted perf job to CASE=spu_idle.
 - [Phase 05]: Keep the hash at the native 44.1 kHz stereo PCM boundary before host processing.
 - [Phase 05]: Preserve SOUND-01 as pending until final Phase 5 verification.
+- [Phase 05]: Keep per-stage rounding and saturation placement unresolved; the implementation uses a deterministic integer baseline.
+- [Phase 05]: Treat the ten preset impulse digests as local regression values, not hardware waveform claims.
+- [Phase 05]: Leave SOUND-01 and SOUND-02 pending until final Phase 5 verification.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -690,8 +694,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T07:42:49.150Z
-Stopped at: Completed 05-17-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh
+Last session: 2026-11-14T08:25:12.490Z
+Stopped at: Completed 05-10-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
