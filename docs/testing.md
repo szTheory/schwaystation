@@ -39,12 +39,31 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
 | `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
-| `nightly` | All 55,000 public single-step vectors pass at their pin, ten GPU guests match captured whole-VRAM references, and three GPU log guests' source-defined register predicates pass. | `nightly` | `gpu.reference.*`, `vectors.r3000.full` |
+| `nightly` | All 55,000 public single-step vectors pass at their pin, ten GPU guests match captured whole-VRAM references, three GPU log guests' source-defined register predicates pass, and the pinned SPU transfer guest checks its seven named hardware cases. | `nightly` | `gpu.reference.*`, `vectors.r3000.full`, `spu.reference.memory_transfer` |
 | `perf` | A Release build for the instructions-per-frame job. Configure and build only. | `ci` | none |
 
 The `gte`, `dma` and `timers` directories are in the `ci`, `asan` and `wasm32` inventories, and `be32` runs their
 `portable` tests through `ci`. The `nofp`, `hygiene` and `nightly` inventories do not run them. Under `asan` the
 register sweeps of `gte` and `dma` (`gte.regs.sweep`, `dma.regs.sweep`) are the bounds proof.
+
+### SPU audio evidence
+
+The SPU test suite mixes source facts, hardware observations, model regressions and host-delivery checks. Each proves
+a different boundary; none is a complete silicon PCM oracle.
+
+| Evidence | Check or source | What it establishes | What it does not establish |
+|---|---|---|---|
+| Hardware transfer cases | Nightly `spu.reference.memory_transfer` and the seven named pass lines from the pinned `ps1-tests` log | The named manual/DMA transfer, timing and control/status cases pass | SPU voice playback or a complete audio waveform |
+| Pinned noise facts | `spu.noise`; psx-spx update [`3717718f642ce2ca9ff590b65918fb3a46279cc4`](https://github.com/psx-spx/psx-spx.github.io/commit/3717718f642ce2ca9ff590b65918fb3a46279cc4) | The implemented shared LFSR, clock slots and capture signal match the cited source facts | A captured hardware noise waveform |
+| Reverb measurement constraints | `spu.reverb`; psx-spx SCPH-1001 measurement [`a37f2fec163e149f4e3e39599eb43c65c21181a8`](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8) | Delay, alternating channels and intermediate saturation constraints are checked | Exact per-stage rounding, which remains unresolved, or a complete hardware reverb waveform |
+| Deterministic model regressions | `spu.fixture`, `spu.reverb`, and runner audio-hash checks | Self-authored PCM digests and repeatable integer behavior; `spu.fixture` also compares a CPU-free authored BRR replay with the guest-produced PCM in each region | Independent hardware correctness; the audio golden is not part of the eight-lane `hashes.txt` comparison |
+| Runner/libretro delivery | `libretro.host` | Batch and single-sample callback streams match the runner's drained PCM for NTSC-J, NTSC-U and PAL | Hardware correctness or RetroArch audio-device output |
+| Real-host smoke | Required hosted `retroarch` job in `.github/workflows/ci.yml` | The core's frame matches the runner and deterministic input replay reaches the expected frames | Audio: this is a video/input smoke check only |
+
+The project has no full silicon PCM waveform. `spu.fixture`'s SHA-256 and the reverb impulse digests are regression
+values from this implementation, not hardware captures. The `retroarch` CI smoke remains a recurring required hosted
+check. Local phase execution can confirm the workflow job and its registration; the run URL, conclusion and tested
+head are confirmed at ship after CI runs on the PR head.
 
 ### OpenBIOS handoff
 

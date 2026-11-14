@@ -94,7 +94,7 @@ VRAM, audio and state hashes must match on all eight lanes. The notice leaves in
 | R3000A CPU, COP0, bus, DMA, timers, interrupts | none: own code from the IDT R3000 manual, psx-spx and the r3000 vectors; ares `ps1/cpu`, `dma`, `timer`, `interrupt` and MAME `cpu/psx/{psx,dma,irq,rcnt}.cpp` are read for structure and cross-checks | | | lifting any table turns it into a seed row | | r3000 vectors every cycle; `exc_matrix`; nugget cpu, cop0, timers |
 | GTE | ares `ares/ps1/cpu/interpreter-gte.cpp` @`9408cb43d494` (ISC), the register file now and the numerics and commands as their plans land; MAME `gte.cpp` read for flag placement | ISC (file header MIT AND ISC) | ported to integer C: switch dispatch, no signed shifts, a struct-only interface, no single-precision factor and no non-integer word in a comment; the UNR table becomes a literal array | SPDX line at the top of `src/gte.c` and the notices section "ares GTE seed" | an own implementation (written from psx-spx and the hardware cases, not from the seed) passes a zero-diff differential against the seed over the 1,150 cases and the property test, with hashes equal on all eight lanes | ps1-tests 1150 cases; amidog nightly |
 | GPU rasteriser and display | own code from psx-spx and the ps1-tests images; ares `ps1/gpu` (top-left bias, dither and blend code) and MAME `video/psx.cpp` read; the derived cost column of GPU 4.4 is a fact table with its citation | | | an edge-function or stepper routine ported from ares becomes a seed row with notice | | ps1-tests GPU `vram.png` set; `gpu_motion` |
-| SPU, CD-ROM controller, XA, MDEC | own code from psx-spx; ares `ps1/spu`, `ps1/disc`, `ps1/mdec` and MAME `sound/spu.cpp`, `cpu/psx/mdec.cpp`, `mame/sony/psxcd.cpp` read for rounding order and the seek curve | | | the seek curve constants are facts; a ported envelope table or FIR becomes a seed row | | `spu_tone`, `disc_boot`; ps1-tests spu, cdrom, mdec logs and PNGs |
+| SPU, CD-ROM controller, XA, MDEC | own code from psx-spx; ares `ps1/spu`, `ps1/disc`, `ps1/mdec` and MAME `sound/spu.cpp`, `cpu/psx/mdec.cpp`, `mame/sony/psxcd.cpp` read for rounding order and the seek curve | | | BRR predictor coefficients, Gaussian weights and reverb FIR coefficients are cited factual data from psx-spx @`6d7d1bc106a7`, not copied algorithms; the envelope rate stepper is derived from the documented rule and compared with ares @`9408cb43d494`, with no ares code or table copied; seek constants are facts | | `spu_tone`, `spu.fixture`, `spu.noise`, `spu.reverb`; ps1-tests SPU transfer log |
 | SIO0, pads, memory cards | own code from psx-spx; ares `ps1/peripheral` and MAME `bus/psx/*` read for ack delays and the card phase machine | | | | | `pad_counter`, `memcard_roundtrip`; nugget memcard, rumble |
 | OpenBIOS (CI stand-in, never shipped) | pcsx-redux/nugget @`9db6d88d23c4` | MIT | nothing: built unmodified with pinned GCC 12.3.0 on Linux using `OPENBIOS_SHELL=shell`; its digest is in `tests/built/expected.txt` | notices section naming the pin and build flags | never; it is a stand-in, not core code | the `disc_boot` fixture and nugget `memcard-bios` |
 | Stub kernel | none: own armips source `tests/fixtures/src/stub/stub.asm`, committed as the array in `src/stub_kernel.c`; the assembled image is 1,700 bytes with sha256 `f1c39a367f91b1c21509c0a7512472750f3b97a4297963497b63200133496b3f` | MIT | SYS(01h)/SYS(02h) startup compatibility, one guest-owned B0(19h)/B0(17h) IRQ0 hook/return path, A(3Fh) literal/%s printf for the pinned transfer guest, no Sony bytes | generated C source digest in `tests/fixtures/manifest.txt`; assembled image size and digest in this record | n/a | every PS-EXE fixture |
@@ -163,18 +163,26 @@ documentation, changelogs, issue trackers, release notes and released binaries; 
   `psx-spx.htm` only where the edition marks a passage as his. The edition states it holds no licence from
   nocash and that parts were paraphrased from confidential Sony material, so: paraphrase only, no passage longer
   than a short phrase, register names and byte strings quoted at most, never `master` (unreviewed AI edits). A
-  table of constants printed there (the gaussian table, the UNR table, the XA zigzag filter, the reverb FIR, the
-  dither matrix) is re-derived from its generating formula where one is documented and asserted against the
-  printed values in a unit test; where no formula exists the values are restated as a cited fact table [PV.17].
+  table of constants printed there is a factual table, not an algorithm seed. The SPU Gaussian weights are
+  restated in `src/spu_tables.inc` and independently in `tests/spu/voices.c`; the BRR predictor pairs in
+  `src/spu_voice.c` are also factual constants. The 39-tap reverb FIR is restated in `src/spu_reverb.c` and
+  independently in `tests/spu/reverb.c`. These are cited facts from psx-spx @`6d7d1bc106a7` [PV.17], not copied
+  algorithms. The SPU noise-slot schedule in `src/spu_noise.c` and capture signal cite the exact public update
+  [`3717718f642ce2ca9ff590b65918fb3a46279cc4`](https://github.com/psx-spx/psx-spx.github.io/commit/3717718f642ce2ca9ff590b65918fb3a46279cc4); the reverb measurement facts cite
+  [`a37f2fec163e149f4e3e39599eb43c65c21181a8`](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8). The ADSR rate stepper is derived from the documented rule [PV.17] and compared against the independent [ares implementation at pin `9408cb43d494`](https://github.com/ares-emulator/ares/tree/9408cb43d494); no ares expression, table or code was copied.
+  The other printed tables in this repository (UNR, XA zigzag and dither) follow their source-specific notes and
+  tests; where a formula exists it is re-derived, otherwise values are recorded as cited facts.
 - **Sony and MIPS documents** (the IDT R3000 family manual, official SDK and hardware documentation where
   available as archived scans) are T1 facts in our own words with a citation; no scan enters the repository.
 - **Databases.** The libretro `System.dat` BIOS digests are facts (ASSET_POLICY 4). Ledger titles come from the
   CC-BY-SA-4.0 libretro-database Redump DAT with its notice; serials and the rcheevos MD5 are computed by our
   own probe. No DuckStation `gamedb.yaml` field is copied; no Redump DAT is redistributed. Behaviour never keys on
   a database row: a per-title hint is a profile default, never a hack.
-- **Measured constants** (clocks, line lengths, GTE cycle counts, CD response means, SPU RAM schedule) are facts
-  cited to the measurement and its method (PSXDEV-EXTRACTS 2). The nugget hardware-farm result files and the
-  ps1-tests logs are T1; an emulator's constant is T3 and marked so.
+- **Measured constants** (clocks, line lengths, GTE cycle counts, CD response means, SPU RAM schedule, and the
+  SCPH-1001 reverb delay/alternation/saturation constraints) are facts cited to the measurement and its method
+  (PSXDEV-EXTRACTS 2 and the reverb measurement commit above). The seven named `spu/memory-transfer` pass lines
+  are hardware evidence only for those cases (ps1-tests @`f727802fead1` [PV.05]); they do not establish a complete audio waveform. The nugget hardware-farm result files
+  and the ps1-tests logs are T1; an emulator's constant is T3 and marked so.
 - **Hash databases and hashes.** The only identities that leave the owner's machine are the Redump serial, the
   rcheevos MD5 and the Redump track SHA-1, all already public in RetroAchievements and Redump lists
   (CONFORMANCE 3.3).
