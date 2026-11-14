@@ -997,6 +997,11 @@ static void case_spu_request_blocks(void)
     wr16(inst, 0x1F801DAAu, 0x0020u);
     CHECK_EQ_U64(inst->dma.cur, 4u);
     CHECK_EQ_U64(inst->dma.words[4], 16u);
+    for (uint32_t i = 0u; i < 16u; i++) {
+        uint32_t word = ram_word(inst, 0x6000u + 4u * i);
+        CHECK_EQ_HEX(schway__spu_ram_peek(inst, 4u * i), (uint16_t)word);
+        CHECK_EQ_HEX(schway__spu_ram_peek(inst, 4u * i + 2u), (uint16_t)(word >> 16));
+    }
     CHECK_EQ_U64(inst->dma.busy_until - start, 76u);
     CHECK((inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY) != 0u);
     CHECK_EQ_U64(inst->dma.dicr & 0x01000000u, 0u);

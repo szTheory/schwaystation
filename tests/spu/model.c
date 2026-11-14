@@ -316,6 +316,62 @@ static void spu_next_tick(schway *inst)
     schway__spu_event(inst, deadline);
 }
 
+static void dma_reg_write(schway *inst, uint32_t address, uint32_t value)
+{
+    uint32_t cycles = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0xBF800000u | address, 4u, value, &cycles), 0u);
+}
+
+static void check_dma_fifo_ram_round_trip(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    if (inst == NULL) {
+        return;
+    }
+
+    for (uint32_t i = 0u; i < 64u; i++) {
+        inst->bus.ram[0x2000u + i] = (uint8_t)(i * 3u + 1u);
+    }
+    spu_write16(inst, 0x1F801DA6u, 0x20u);
+    spu_write16(inst, 0x1F801DAAu, 0x0020u);
+    spu_next_tick(inst);
+    dma_reg_write(inst, 0x1F8010F0u, 0x0FEDCBA9u);
+    dma_reg_write(inst, 0x1F8010F4u, 0x00900000u);
+    dma_reg_write(inst, 0x1F8010C0u, 0x2000u);
+    dma_reg_write(inst, 0x1F8010C4u, 0x00010010u);
+    dma_reg_write(inst, 0x1F8010C8u, 0x01000201u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    for (uint32_t i = 0u; i < 16u; i++) {
+        uint32_t source = 0u;
+        CHECK_EQ_U64(schway__bus_ram_word(inst, 0x2000u + 4u * i, &source, 0u), 0u);
+        CHECK_EQ_HEX(schway__spu_ram_peek(inst, 0x100u + 4u * i), (uint16_t)source);
+        CHECK_EQ_HEX(schway__spu_ram_peek(inst, 0x102u + 4u * i), (uint16_t)(source >> 16));
+    }
+    schway__dma_event(inst, inst->dma.busy_until);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    CHECK((inst->irq.stat & (1u << 3)) != 0u);
+
+    spu_write16(inst, 0x1F801DA6u, 0x20u);
+    spu_write16(inst, 0x1F801DAAu, 0x0030u);
+    spu_next_tick(inst);
+    dma_reg_write(inst, 0x1F801014u, 0x220931E1u);
+    dma_reg_write(inst, 0x1F8010F4u, 0x00900000u);
+    dma_reg_write(inst, 0x1F8010C0u, 0x4000u);
+    dma_reg_write(inst, 0x1F8010C4u, 0x00010010u);
+    dma_reg_write(inst, 0x1F8010C8u, 0x01000200u);
+    CHECK_EQ_U64(inst->dma.cur, 4u);
+    for (uint32_t i = 0u; i < 16u; i++) {
+        uint32_t source = 0u;
+        uint32_t copied = 0u;
+        CHECK_EQ_U64(schway__bus_ram_word(inst, 0x2000u + 4u * i, &source, 0u), 0u);
+        CHECK_EQ_U64(schway__bus_ram_word(inst, 0x4000u + 4u * i, &copied, 0u), 0u);
+        CHECK_EQ_HEX(copied, source);
+    }
+    schway__dma_event(inst, inst->dma.busy_until);
+    CHECK_EQ_U64(inst->dma.chcr[4] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    schway_destroy(inst);
+}
+
 static void check_spu_enable_gates_irq(void)
 {
     schway *inst = make(SCHWAY_REGION_NTSC_U);
@@ -618,6 +674,7 @@ int main(int argc, char **argv)
     check_register_peek_is_pure();
     check_spu_enable_gates_irq();
     check_manual_fifo_and_ram_transfer();
+    check_dma_fifo_ram_round_trip();
     check_capture_gate_status_and_irqa();
     check_scheduled_split_runs();
     check_cpu_and_dma_deadlines();
