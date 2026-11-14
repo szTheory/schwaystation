@@ -444,9 +444,9 @@ int main(int argc, char **argv)
     uint16_t key_on = 0u;
 
     (void)printf("TAP version 13\n");
-    if (argc != 5) {
+    if (argc != 7) {
         (void)fprintf(stderr,
-                      "usage: spu-fixture spu_tone.exe spu_blocks.inc spu_tone.asm schwaystation-run\n");
+                      "usage: spu-fixture spu_tone.exe spu_blocks.inc spu_tone.asm schwaystation-run audio-expected diag-expected\n");
         return 2;
     }
     expect(file_exists(argv[1]), "the built tone fixture is available");
@@ -455,6 +455,8 @@ int main(int argc, char **argv)
     expect(parse_event_table(argv[3], events, 128u, &event_count, &key_on) == 0u,
            "the authored SPU register and key-on event table is read from the guest source");
     expect(file_exists(argv[4]), "the built runner is available");
+    expect(file_exists(argv[5]), "the audio@600 expectation table is present");
+    expect(file_exists(argv[6]), "the mailbox@600 expectation table is present");
     expect(blocks[0][0] == 0x04u && blocks[0][1] == 0x07u &&
                blocks[1][0] == 0x04u && blocks[1][1] == 0x07u,
            "the source reader preserves both 16-byte BRR headers");

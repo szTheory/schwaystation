@@ -64,6 +64,8 @@ schway_add_test(NAME spu.fixture
     "${PROJECT_SOURCE_DIR}/tests/fixtures/src/spu_blocks.inc"
     "${PROJECT_SOURCE_DIR}/tests/fixtures/src/spu_tone.asm"
     "$<TARGET_FILE:schwaystation-run>"
+    "${PROJECT_SOURCE_DIR}/tests/spu/expected.txt"
+    "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
   LABELS audio portable TIMEOUT 120)
 
 include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
