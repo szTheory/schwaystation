@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-20-PLAN.md at the requested plan boundary. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-last_updated: "2026-11-14T00:39:07.164Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-11-14T01:30:41.655Z"
 last_activity: 2026-11-14
-last_activity_desc: "Completed plan 05-03; 05-20 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-state_head: cff598330f318569c7682e536e12af8db5676154
+last_activity_desc: "Completed plan 05-05; 05-21 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+state_head: ab509b20e6a796ae1f06eb91a40af99644f28d1f
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 146
-  completed_plans: 132
+  total_plans: 147
+  completed_plans: 133
   percent: 67
-current_plan: 6 of 20
+current_plan: 8 of 21
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 7 of 20
+Plan: 8 of 21
 Status: Ready to execute
-Last activity: 2026-11-14 — Plan 05-03 completed; 05-20 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Last activity: 2026-11-14 — Plan 05-05 completed; 05-21 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
 Progress: [███████░░░] 67%
 
@@ -194,6 +194,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P16 | 26 min | 2 tasks | 6 files |
 | Phase 05 P03 | 40min | 1 tasks | 8 files |
 | Phase 05 P20 | 20 min | 1 tasks | 6 files |
+| Phase 05 P05 | 44 min | 1 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -476,6 +477,9 @@ Recent decisions affecting current work:
 - [Phase 05]: SPU FIFO accesses update the FIFO at bus-access time, while other register writes apply on the next sample tick.
 - [Phase 05]: ManualWrite transfers one halfword per sample with RAM_CTRL replication; DMA direction status reflects FIFO availability without adding DMA transfers.
 - [Phase 05]: Capture writes the planned zero inputs only while RAM_CTRL capture bits are active, and IRQ9 requires both enable bits.
+- [Phase 05]: DMA4 readiness observes the latest queued ATTR value while public status remains scheduled.
+- [Phase 05]: The own stub implements only literal and %s output for the pinned transfer guest A(3Fh) path.
+- [Phase 05]: Manual FIFO data drains at the scheduled transfer tick so the bounded guest transfer cases complete.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -661,9 +665,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T00:39:06.719Z
-Stopped at: Completed 05-20-PLAN.md at the requested plan boundary. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
-Resume file: None
+Last session: 2026-11-14T01:30:40.973Z
+Stopped at: Completed 05-05-PLAN.md
+Resume file: .planning/phases/05-the-sound-matches-the-console/05-21-PLAN.md
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 

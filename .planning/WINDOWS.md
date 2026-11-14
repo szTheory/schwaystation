@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 1
+open_count: 2
 waived_count: 3
 fixed_count: 0
-total_count: 4
-last_updated: 2026-11-13T22:11:13.643Z
+total_count: 5
+last_updated: 2026-11-14T01:34:02.691Z
 ---
 
 # Broken Windows Ledger
@@ -19,6 +19,7 @@ last_updated: 2026-11-13T22:11:13.643Z
 | 2 | 04 | deviation | .planning/phases/04-games-play-in-retroarch/04-24-PLAN.md |  | Resumed Task 1 judge/docs implementation and Task 2 expansion controls landed together after prior RED and partial schema/data GREEN commits; no second RED was claimed. | waived | Documented in 04-24 SUMMARY and STATE; verified implementation and checks are complete, and no source defect or owner gate remains. | 2026-11-12T03:50:26.230Z | 2026-11-12T03:50:30.829Z |
 | 3 | 04 | deviation | .planning/phases/04-games-play-in-retroarch/04-26-PLAN.md |  | Recovered tasks 1 and 2 were committed together after the valid RED evidence remained uncommitted in ignored scratch output; no RED commit was reconstructed. | waived | The summary documents the authentic RED evidence and combined recovered commit. All planned tests and final workflows passed; no product defect or owner action remains. | 2026-11-12T13:40:13.705Z | 2026-11-12T13:40:18.081Z |
 | 4 | 05 | stub | src/spu.c | 76 | Reset SPU event emits a zero stereo pair until planned voice and reverb synthesis lands. | open |  | 2026-11-13T22:11:13.643Z |  |
+| 5 | 05 | deviation | .planning/phases/05-the-sound-matches-the-console/05-05-SUMMARY.md |  | Split remaining DMA4 timing, DEV4, seven-case comparator, and nightly work into plan 05-21 at the 30-minute target. | open |  | 2026-11-14T01:34:02.691Z |  |
 
 ````json
 [
@@ -71,6 +72,19 @@ last_updated: 2026-11-13T22:11:13.643Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-11-13T22:11:13.643Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 5,
+    "kind": "deviation",
+    "phase": "05",
+    "file": ".planning/phases/05-the-sound-matches-the-console/05-05-SUMMARY.md",
+    "line": null,
+    "description": "Split remaining DMA4 timing, DEV4, seven-case comparator, and nightly work into plan 05-21 at the 30-minute target.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-14T01:34:02.691Z",
     "resolved_at": null,
     "milestone": "v1.0"
   }
