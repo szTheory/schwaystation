@@ -41,6 +41,15 @@ schway_add_test(NAME spu.noise
   COMMAND schwaystation-test-spu-noise
   LABELS audio portable TIMEOUT 10)
 
+add_executable(schwaystation-test-spu-reverb ${CMAKE_CURRENT_LIST_DIR}/reverb.c)
+target_link_libraries(schwaystation-test-spu-reverb PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-spu-reverb PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-spu-reverb)
+schway_add_test(NAME spu.reverb
+  COMMAND schwaystation-test-spu-reverb
+  LABELS audio portable TIMEOUT 10)
+
 include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
 schway_prepare_spu_reference_assets(
   spu_reference_dir spu_reference_exe spu_reference_log
