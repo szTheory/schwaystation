@@ -403,7 +403,7 @@ Plans:
   2. `ctest -L audio` passes on BRR, ADSR, noise, reverb, capture, IRQA and the transfer paths. The nightly lane reproduces the seven hardware pass lines of the ps1-tests `spu/memory-transfer` log.
   3. The libretro batch and single-sample audio paths deliver PCM equal to the runner's stream in `libretro.host`. RetroArch boots `spu_tone.exe` as content, and the idle SPU passes `core.no_busy_loop`.
 
-**Plans**: 12/23 plans executed in 15 waves
+**Plans**: 13/23 plans executed in 15 waves
 **Wave 1**
 - [x] 05-01-PLAN.md — Trace a bounded frame into the public PCM drain
 
@@ -435,7 +435,7 @@ Plans:
 - [x] 05-22-PLAN.md — Expand BRR playback to 24 ordered voices, loop flags, PMON and stereo output
 
 **Wave 10** *(blocked on Wave 9 completion)*
-- [ ] 05-08-PLAN.md — Trace the pinned noise schedule into an envelope-scaled sample
+- [x] 05-08-PLAN.md — Trace the pinned noise schedule into an envelope-scaled sample
 - [ ] 05-11-PLAN.md — Trace authored BRR data through a stub-booted tone guest
 
 **Wave 11** *(blocked on Wave 10 completion)*
@@ -486,5 +486,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
-| 5. The sound matches the console | 12/23 | In Progress | - |
+| 5. The sound matches the console | 13/23 | In Progress | - |
 | 6. Discs and FMV | 0/TBD | Not started | - |
