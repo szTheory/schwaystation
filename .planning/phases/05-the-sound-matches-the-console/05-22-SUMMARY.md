@@ -85,7 +85,7 @@ plan_head_after: 2ca4e17e66e43e208f7e4bf86e57bf736c9bbc16
 - **RED:** `build/ci/tests/schwaystation-test-spu-voices` exited 1; `gsd_run check tdd-red-evidence` returned `RED_EVIDENCE_OK` for the loop-start/repeat/end-mute/ENDX assertion. The initial run also exposed a test-only out-of-bounds reference phase in the MMIO case, which was corrected during the task.
 - **GREEN:** The planned configure/build/CTest command exited 0. The `spu.voices` TAP target passed all six cases, and `spu.model` passed. The exact tracer verification was rerun after the GREEN commit and again passed 2/2 CTests.
 
-## Verification
+## Commands and Evidence
 
 - `cmake --preset ci && cmake --build --preset ci --target schwaystation-test-spu-voices schwaystation-test-spu && ctest --test-dir build/ci -R '^spu\.(voices|model)$' --no-tests=error --output-on-failure` - exit 0; 2/2 tests passed.
 - `git diff --check` - exit 0.
