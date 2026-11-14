@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
-status: executing
-stopped_at: "Completed 05-19-PLAN.md; next 05-15; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)"
-last_updated: "2026-11-14T10:43:00.661Z"
+status: verified
+stopped_at: "Phase 05 verification passed; stop before $gsd-ship 5; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed), gpt-6-luna xhigh"
+last_updated: "2026-11-14T13:19:17.195Z"
 last_activity: 2026-11-14
-last_activity_desc: "Completed plan 05-19; next 05-15. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed)."
-state_head: 5a4c7b0468a6cdc3802c1f79f0d238e97f894a17
+last_activity_desc: "Phase 05 verification passed; stop at the ship boundary. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed); gpt-6-luna xhigh."
+state_head: 1cefbb94e8490f76b939a6f0aa578c06d439c9bd
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 149
-  completed_plans: 148
+  total_plans: 150
+  completed_plans: 150
   percent: 67
-current_plan: 23 of 23
+current_plan: 24 of 24
 ---
 
 # Project State
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 
 ## Current Position
 
-Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 23 of 23
-Status: Ready to execute 05-15
-Last activity: 2026-11-14 — Plan 05-19 completed. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed).
+Phase: 05 (The sound matches the console) — VERIFIED; READY TO SHIP
+Plan: 24 of 24
+Status: Goal-backward verification passed; stop before `$gsd-ship 5`.
+Last activity: 2026-11-14 — Phase 05 verification passed with no gaps or owner checks. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed); gpt-6-luna xhigh.
 
 Progress: [███████░░░] 67%
 
@@ -52,7 +52,7 @@ Progress: [███████░░░] 67%
 | 02 | 27 | - | - |
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
-| 5 | 20 | 23 | - |
+| 5 | 24 | 24 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -78,6 +78,8 @@ Progress: [███████░░░] 67%
 | Phase 01 P13 | 5min | 3 tasks | 6 files |
 | Phase 01 P14 | 17min | 3 tasks | 0 files |
 | Phase 01 P15 | 50min | 3 tasks | 27 files |
+| Phase 05 P15 | ~2h30 wall across restart | 2 tasks | 19 files |
+| Phase 05 P24 | ~30min wall | 1 task | 4 files |
 | Phase 02 P01 | 2 min | 2 tasks | 15 files |
 | Phase 02 P02 | 4 min | 3 tasks | 16 files |
 | Phase 02 P03 | 6 min | 3 tasks | 8 files |
@@ -759,3 +761,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; executor and verifier gpt-6-luna xhigh; pri
 The phase-completion summary scanner emitted advisory missing-path warnings for historical temporary RED reports, upstream-only paths, moved completed todos, literal command strings and the historical compare.c name. These are not missing delivered behavior: the verifier checked every current plan artifact and the real target/caller wiring. Preserve the command evidence; do not add files, repeat broad suites or rewrite historical evidence to satisfy that heuristic.
 
 Efficiency corrections are durable in AUTONOMOUS.md: bring real oracles into the first runnable slices, batch independent prepared consumers before final CI, reuse reviewed source fingerprints, configure the focused GPU lane without the CPU corpus, and stop an obsolete known-failed CI tail after collecting useful results. All required coverage remains.
+
+### Phase 5 verification boundary (2026-11-14)
+
+Plans 05-15 and 05-24 are complete; all 24 plan summaries are present. Goal-backward verification passed 3/3 roadmap truths with no gaps or owner checks. Local CI passed 547/547 tests plus 5/5 release package checks; the explicit audio suite passed 10/10, libretro PCM and idle-SPU checks passed 2/2, and hygiene passed 24/24. The repository-check total is exactly 2688 lines. Code review found no issues. Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed), gpt-6-luna xhigh. The release PR, exact-head hosted CI/nightly/RetroArch run and green release PR remain for `$gsd-ship 5`; stop here, before Phase 6.
