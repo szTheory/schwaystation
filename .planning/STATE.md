@@ -6,10 +6,10 @@ current_phase: 6
 current_phase_name: Discs and FMV
 status: planning
 stopped_at: Phase 5 complete, ready to plan Phase 6
-last_updated: "2026-11-14T15:25:15.760Z"
+last_updated: "2026-11-14T15:31:41.685Z"
 last_activity: 2026-11-14
-last_activity_desc: Phase 5 complete, transitioned to Phase 6
-state_head: 76fc24050433d8a888b16ea4511ade31ce9e8b75
+last_activity_desc: "Phase 05 shipped as PR #18"
+state_head: cf7b515fc9bce3f91d3905de0788e32151b38f99
 progress:
   total_phases: 6
   completed_phases: 5
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-11-14)
 Phase: 6 — Discs and FMV
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-11-14 — Phase 5 complete, transitioned to Phase 6
+Last activity: 2026-11-14 -- Phase 05 shipped as PR #18
 
 Progress: [████████░░] 83%
 
