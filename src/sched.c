@@ -60,7 +60,7 @@ void schway__sched_run(schway *inst)
         schway__sio_event(inst, now);
     }
     if (schway__spu_next(inst) <= now) {
-        schway__spu_event(inst, now);
+        schway__spu_catch_up(inst, now);
     }
     schway__sched_recalc(inst);
 }

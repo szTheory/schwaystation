@@ -361,6 +361,7 @@ static schway *make_reverb_instance(void)
         return NULL;
     }
     inst->spu.idle_fast_path = 0u;
+    inst->spu.cpu_poll_tick = inst->spu.next_tick;
     return inst;
 }
 

@@ -401,6 +401,7 @@ static void spu_disable_idle_fast_path(schway *inst)
         return;
     }
     inst->spu.idle_fast_path = 0u;
+    inst->spu.cpu_poll_tick = inst->spu.next_tick;
     inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
 }
 
@@ -485,6 +486,7 @@ void schway__spu_reset(schway *inst)
 {
     memset(&inst->spu, 0, sizeof inst->spu);
     inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
+    inst->spu.cpu_poll_tick = UINT64_MAX;
     inst->spu.idle_fast_path = 1u;
     inst->spu.noise_lfsr = 1u;
     for (uint32_t i = 0u; i < SCHWAY__SPU_VOICE_COUNT; i++) {
@@ -629,10 +631,6 @@ static void spu_select_noise_output(schway *inst, uint32_t voice)
 void schway__spu_event(schway *inst, uint64_t now)
 {
     struct schway__spu *spu = &inst->spu;
-    if (spu->idle_fast_path != 0u && spu->next_tick <= now) {
-        spu_idle_advance(inst, now);
-        return;
-    }
     while (spu->next_tick <= now) {
         spu_apply_pending_writes(inst);
         spu_manual_transfer_step(inst);
@@ -658,6 +656,19 @@ void schway__spu_event(schway *inst, uint64_t now)
             break;
         }
         spu->next_tick += SCHWAY__CYCLES_PER_PAIR;
+    }
+    spu->cpu_poll_tick = spu->next_tick;
+}
+
+void schway__spu_catch_up(schway *inst, uint64_t now)
+{
+    if (inst->spu.next_tick > now) {
+        return;
+    }
+    if (inst->spu.idle_fast_path != 0u) {
+        spu_idle_advance(inst, now);
+    } else {
+        schway__spu_event(inst, now);
     }
 }
 
@@ -999,5 +1010,6 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
         spu->irq_enabled = irq_enabled;
         spu->next_tick = next_tick;
         spu->idle_fast_path = 0u;
+        spu->cpu_poll_tick = next_tick;
     }
 }

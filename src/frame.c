@@ -103,7 +103,7 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
     if (inst->sched.next <= inst->ticks) {
         schway__sched_run(inst);
     }
-    schway__spu_event(inst, inst->ticks);
+    schway__spu_catch_up(inst, inst->ticks);
     schway__pad_update_watchdog(inst, inst->ticks);
     if (inst->exe_loaded != 0u) {
         *done = inst->frame != starting_frame;

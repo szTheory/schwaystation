@@ -402,7 +402,7 @@ static void spu_catch_up(schway *inst, uint32_t *cycles)
 {
     uint64_t tick = schway__sched_now(inst, *cycles);
     if (schway__spu_next(inst) <= tick) {
-        schway__spu_event(inst, tick);
+        schway__spu_catch_up(inst, tick);
     }
 }
 

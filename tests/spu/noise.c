@@ -50,6 +50,7 @@ static schway *make_instance(void)
         return NULL;
     }
     inst->spu.idle_fast_path = 0u;
+    inst->spu.cpu_poll_tick = inst->spu.next_tick;
     return inst;
 }
 
@@ -128,6 +129,7 @@ static uint32_t test_idle_noise_jump(void)
         return 1u;
     }
     fast->spu.idle_fast_path = 1u;
+    fast->spu.cpu_poll_tick = UINT64_MAX;
     fast->spu.noise_phase = UINT32_C(0x7FFF);
     schway *full = make_instance();
     if (full == NULL) {
@@ -139,7 +141,7 @@ static uint32_t test_idle_noise_jump(void)
     for (uint64_t i = 0u; i < samples; i++) {
         schway__spu_noise_step(full);
     }
-    schway__spu_event(fast, samples * SCHWAY__CYCLES_PER_PAIR);
+    schway__spu_catch_up(fast, samples * SCHWAY__CYCLES_PER_PAIR);
     uint32_t failures = fast->spu.noise_phase != full->spu.noise_phase ? 1u : 0u;
     failures += fast->spu.noise_lfsr != full->spu.noise_lfsr ? 1u : 0u;
     schway_destroy(fast);
@@ -154,9 +156,10 @@ static uint32_t test_idle_audio_ring(void)
         return 1u;
     }
     fast->spu.idle_fast_path = 1u;
+    fast->spu.cpu_poll_tick = UINT64_MAX;
     fast->audio_head = SCHWAY__AUDIO_RING_PAIRS - 3u;
     uint64_t pairs = SCHWAY__AUDIO_RING_PAIRS + 29u;
-    schway__spu_event(fast, pairs * SCHWAY__CYCLES_PER_PAIR);
+    schway__spu_catch_up(fast, pairs * SCHWAY__CYCLES_PER_PAIR);
     uint32_t failures = fast->audio_count != SCHWAY__AUDIO_RING_PAIRS ? 1u : 0u;
     failures += fast->audio_dropped != 29u ? 1u : 0u;
     int16_t ring_samples[2u * SCHWAY__AUDIO_RING_PAIRS];
@@ -173,7 +176,7 @@ static uint32_t test_idle_audio_ring(void)
     }
     fast->audio_count = SCHWAY__AUDIO_RING_PAIRS - 1u;
     fast->audio_dropped = UINT32_MAX - 1u;
-    schway__spu_event(fast, fast->spu.next_tick + 3u * SCHWAY__CYCLES_PER_PAIR);
+    schway__spu_catch_up(fast, fast->spu.next_tick + 3u * SCHWAY__CYCLES_PER_PAIR);
     failures += fast->audio_count != SCHWAY__AUDIO_RING_PAIRS ? 1u : 0u;
     failures += fast->audio_dropped != UINT32_MAX ? 1u : 0u;
     schway_destroy(fast);
@@ -191,6 +194,7 @@ static uint32_t test_idle_fast_path(void)
         return 1u;
     }
     fast->spu.idle_fast_path = 1u;
+    fast->spu.cpu_poll_tick = UINT64_MAX;
     failures += run_idle_frame_pair(fast, full);
     failures += run_idle_frame_pair(fast, full);
     failures += fast->spu.idle_fast_path != 1u ? 1u : 0u;

@@ -1024,43 +1024,25 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
     struct schway__cpu *c = &inst->cpu;
     uint32_t page = c->pc >> 12;
     uint32_t fault = inst->fault.kind;
-    uint32_t idle_fast_path = inst->spu.idle_fast_path;
     uint64_t ran = 0u;
     c->block_end = 0u;
     c->blk_tick = inst->ticks;
     c->blk_cycle = c->cycle;
-    if (idle_fast_path == 0u) {
-        for (uint32_t n = 0u; n < SCHWAY__BLOCK_MAX_INSNS; n++) {
-            uint32_t slot = c->branch_slot;
-            TRACE_BEGIN(began, 1u);
-            ran += cpu_step(inst);
-            uint64_t tick = c->blk_tick + (c->cycle - c->blk_cycle);
-            if (inst->spu.next_tick <= tick) {
-                schway__spu_event(inst, tick);
-            }
-            if (slot != 0u || c->block_end != 0u || ran >= limit || (c->pc >> 12) != page ||
-                inst->exit_pending != 0u || inst->fault.kind != fault) {
-                /* The first fault, when this block latched it, ends the tail: its own
-                   record, from the fault record, on the cycle its instruction began. */
-                TRACE_FAULT(inst->fault.kind != fault, began);
-                break;
-            }
+    for (uint32_t n = 0u; n < SCHWAY__BLOCK_MAX_INSNS; n++) {
+        uint32_t slot = c->branch_slot;
+        TRACE_BEGIN(began, 1u);
+        ran += cpu_step(inst);
+        uint64_t tick = c->blk_tick + (c->cycle - c->blk_cycle);
+        if (inst->spu.cpu_poll_tick <= tick) {
+            schway__spu_event(inst, tick);
         }
-    } else {
-        for (uint32_t n = 0u; n < SCHWAY__BLOCK_MAX_INSNS; n++) {
-            uint32_t slot = c->branch_slot;
-            TRACE_BEGIN(began, 1u);
-            ran += cpu_step(inst);
-            if (slot != 0u || c->block_end != 0u || ran >= limit || (c->pc >> 12) != page ||
-                inst->exit_pending != 0u || inst->fault.kind != fault) {
-                TRACE_FAULT(inst->fault.kind != fault, began);
-                break;
-            }
+        if (slot != 0u || c->block_end != 0u || ran >= limit || (c->pc >> 12) != page ||
+            inst->exit_pending != 0u || inst->fault.kind != fault) {
+            /* The first fault, when this block latched it, ends the tail: its own
+               record, from the fault record, on the cycle its instruction began. */
+            TRACE_FAULT(inst->fault.kind != fault, began);
+            break;
         }
-    }
-    uint64_t tick = c->blk_tick + (c->cycle - c->blk_cycle);
-    if (idle_fast_path != 0u && inst->spu.idle_fast_path == 0u && inst->spu.next_tick <= tick) {
-        schway__spu_event(inst, tick);
     }
     inst->ticks += ran;
     return ran;
