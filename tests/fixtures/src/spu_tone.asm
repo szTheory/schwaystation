@@ -68,7 +68,7 @@ wait_io:
   sw t0, 0x814(s0)                     ; GP1(08h): 256x240 display mode
   li t0, 0x03000000
   sw t0, 0x814(s0)                     ; GP1(03h): display on
-  jal draw_checkerboard
+  jal draw_colour_bars
   nop
 
   sh zero, 0x184(s1)                   ; reverb output volume left
@@ -174,13 +174,13 @@ after_measure:
   b frame_wait
   nop
 
-draw_checkerboard:
+draw_colour_bars:
   li s2, 0
 draw_tile:
   andi t3, s2, 1
   bne t3, zero, draw_green
   nop
-  li t0, 0x600000FF                     ; alternating red and green 8x8 tiles
+  li t0, 0x600000FF                     ; alternating red and green vertical bars
   b draw_colour
   nop
 draw_green:
