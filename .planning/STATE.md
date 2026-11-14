@@ -5,11 +5,11 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-07-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh"
-last_updated: "2026-11-14T03:56:58.995Z"
+stopped_at: "Completed 05-07-PLAN.md; 05-23-PLAN.md is next in this wave; Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh"
+last_updated: "2026-11-14T03:57:51.425Z"
 last_activity: 2026-11-14
 last_activity_desc: "Completed plan 05-21; 05-23 is next. Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session (exact model ID not exposed)."
-state_head: 68ee660b1dd35afa956e0f8b500b39deb3b8a490
+state_head: cbac905b7ca3abd62ed2fd4a59c7f735386bbfc3
 progress:
   total_phases: 6
   completed_phases: 4
@@ -674,9 +674,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T03:56:58.159Z
-Stopped at: Completed 05-07-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh
-Resume file: 05-08-PLAN.md
+Last session: 2026-11-14T03:57:50.470Z
+Stopped at: Completed 05-07-PLAN.md; 05-23-PLAN.md is next in this wave; Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh
+Resume file: .planning/phases/05-the-sound-matches-the-console/05-23-PLAN.md
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 
