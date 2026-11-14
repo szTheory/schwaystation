@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-14-PLAN.md; next is 05-19; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)"
-last_updated: "2026-11-14T10:10:52Z"
+stopped_at: "Completed 05-19-PLAN.md; next 05-15; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)"
+last_updated: "2026-11-14T10:43:00.661Z"
 last_activity: 2026-11-14
-last_activity_desc: "Completed plan 05-14. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed)."
-state_head: 6ff4ae1
+last_activity_desc: "Completed plan 05-19; next 05-15. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed)."
+state_head: 5a4c7b0468a6cdc3802c1f79f0d238e97f894a17
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 149
-  completed_plans: 147
+  completed_plans: 148
   percent: 67
-current_plan: 22 of 23
+current_plan: 23 of 23
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 22 of 23
-Status: Ready to execute 05-19
-Last activity: 2026-11-14 — Plan 05-14 completed. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed).
+Plan: 23 of 23
+Status: Ready to execute 05-15
+Last activity: 2026-11-14 — Plan 05-19 completed. Runtime/model: Codex/OpenGSD 1.21.0; GPT-6 session (exact model ID not exposed).
 
 Progress: [███████░░░] 67%
 
@@ -209,6 +209,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P10 | 31 min | 2 tasks | 5 files |
 | Phase 05 P18 | at least 36 min | 2 tasks | 5 files |
 | Phase 05 P12 | about 34 min wall | 2 tasks | 4 files |
+| Phase 05 P19 | about 30m wall across restart; exact active time unavailable | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -513,6 +514,7 @@ Recent decisions affecting current work:
 - [Phase 05]: Store complete frame-600 PCM digests and lengths as self-authored regression baselines, not hardware waveform claims.
 - [Phase 05]: Require the sealed mailbox CRC, completion status and complete ordered records before judging frame-600 ENVX.
 - [Phase 05]: Keep SOUND-01 and SOUND-02 pending until final Phase 5 verification.
+- [Phase 05]: Treat docs/hardware/spu.md as the current Phase-5 SPU contract, preserving source pins, open precision questions and separate evidence claims. — The implementation is now the maintained contract; concise preparation pointers and evidence limits prevent stale behavior descriptions or unsupported PCM accuracy claims.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -702,8 +704,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T09:50:40Z
-Stopped at: Completed 05-14-PLAN.md; next is 05-19; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)
+Last session: 2026-11-14T10:42:49.015Z
+Stopped at: Completed 05-19-PLAN.md; next 05-15; Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed)
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
