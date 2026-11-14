@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-16-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-last_updated: "2026-11-13T23:29:07.849Z"
-last_activity: 2026-11-13
-last_activity_desc: "Completed plan 05-01. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
-state_head: 03306b2dca36b545faca673b2063d8c90bb6ef4e
+stopped_at: "Completed 05-03-PLAN.md; 05-20 RED evidence is ready. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+last_updated: "2026-11-14T00:13:36.233Z"
+last_activity: 2026-11-14
+last_activity_desc: "Completed plan 05-03; 05-20 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+state_head: b22d3ff1b0f59641b2fc245ae0278a246d2151ad
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 145
-  completed_plans: 130
+  total_plans: 146
+  completed_plans: 131
   percent: 67
-current_plan: 1 of 19
+current_plan: 6 of 20
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 5 of 19
+Plan: 6 of 20
 Status: Ready to execute
-Last activity: 2026-11-13 — Plan 05-01 completed. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Last activity: 2026-11-14 — Plan 05-03 completed; 05-20 is next. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 
 Progress: [███████░░░] 67%
 
@@ -192,6 +192,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P02 | 19 min | 2 tasks | 8 files |
 | Phase 05 P04 | under 40 min (exact start unavailable) | 2 tasks | 7 files |
 | Phase 05 P16 | 26 min | 2 tasks | 6 files |
+| Phase 05 P03 | 40min | 1 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -469,6 +470,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Accept only ordered one-to-one pass cases with exit code zero and the completion marker; allow CRLF and TTY prefixes.
 - [Phase 05]: Pass saved scheduler ticks into the private SPU visitor to validate sample phase before applying decoded state.
 - [Phase 05]: Advance behavior revision and save-state format to 5, reject format-4 states, and preserve the public API and ABI.
+- [Phase 05]: Guest SPU register writes latch at the next scheduled sample tick; byte and word access order is explicit.
+- [Phase 05]: Manual FIFO, capture, and IRQA behavior is isolated in plan 05-20, and its consumers remain blocked until completion.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -654,9 +657,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-13T23:29:07.502Z
-Stopped at: Completed 05-16-PLAN.md. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
-Resume file: None
+Last session: 2026-11-14T00:13:35.904Z
+Stopped at: Completed 05-03-PLAN.md; 05-20 RED evidence is ready. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
+Resume file: 05-20-PLAN.md
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
 
