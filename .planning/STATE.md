@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 05
 current_phase_name: The sound matches the console
 status: executing
-stopped_at: "Completed 05-11-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh"
-last_updated: "2026-11-14T05:47:42.086Z"
+stopped_at: "Completed 05-09-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh"
+last_updated: "2026-11-14T06:30:21.976Z"
 last_activity: 2026-11-14
 last_activity_desc: "Completed plan 05-11. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh."
-state_head: 824b59ca05e517f388b577c0d675900a7f31f41c
+state_head: 6b0e7a6096c4054c157c13ae1212a3b7f8f8ee2c
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 149
-  completed_plans: 140
+  completed_plans: 141
   percent: 67
 current_plan: 15 of 23
 ---
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-10-29)
 ## Current Position
 
 Phase: 05 (The sound matches the console) — EXECUTING
-Plan: 15 of 23
+Plan: 16 of 23
 Status: Ready to execute
 Last activity: 2026-11-14 — Plan 05-11 completed. Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh.
 
@@ -202,6 +202,7 @@ Progress: [███████░░░] 67%
 | Phase 05 P22 | 13m | 1 tasks | 2 files |
 | Phase 05 P08 | 28min | 2 tasks | 9 files |
 | Phase 05 P11 | 27min | 2 tasks | 5 files |
+| Phase 05 P09 | at least 22 min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -494,6 +495,8 @@ Recent decisions affecting current work:
 - [Phase 05]: SPU voice expansion reuses existing serialized fields; no save-state visitor or size change was needed.
 - [Phase 05]: Keep the authored BRR fixture integer-generated and commit source plus manifest digest, not assembled bytes.
 - [Phase 05]: Measure actual voice levels from a sealed guest mailbox at frame 600.
+- [Phase 05]: Preserve a unity 22.05 kHz feedback seam in plan 05-09; plan 05-10 supplies the register-driven feedback network.
+- [Phase 05]: Describe the measured 38-sample FIR delay and signal path without claiming an exact silicon preset waveform.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -681,8 +684,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T05:47:41.707Z
-Stopped at: Completed 05-11-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh
+Last session: 2026-11-14T06:30:21.606Z
+Stopped at: Completed 05-09-PLAN.md; Runtime/model: Codex/OpenGSD 1.21.0; gpt-6-luna xhigh
 Resume file: None
 
 Verification: .planning/phases/04-games-play-in-retroarch/04-VERIFICATION.md
