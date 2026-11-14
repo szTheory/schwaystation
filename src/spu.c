@@ -18,6 +18,9 @@
 #define SPU_FIFO_ADDRESS 0x1F801DA8u
 #define SPU_RAM_CTRL_ADDRESS 0x1F801DACu
 #define SPU_STATX_ADDRESS 0x1F801DAEu
+#define SPU_KON_ADDRESS 0x1F801D88u
+#define SPU_KOFF_ADDRESS 0x1F801D8Cu
+#define SPU_ENDX_ADDRESS 0x1F801D9Cu
 #define SPU_DEV4_CONTROL_INDEX 5u
 #define SPU_DEV4_DMA_READ_CONTROL 0x220931E1u
 #define IRQ9_MASK (UINT32_C(1) << 9)
@@ -133,10 +136,54 @@ static void spu_apply_register_write(schway *inst, uint32_t address, uint16_t va
         uint32_t voice = (aligned - SPU_REGISTER_BASE) >> 4;
         uint32_t reg = ((aligned - SPU_REGISTER_BASE) >> 1) & 7u;
         spu->voice[voice].reg[reg] = value;
+        if (reg == 6u) {
+            spu->voice[voice].envelope = value & 0x7FFFu;
+        }
     } else if (aligned == SPU_ATTR_ADDRESS) {
         spu->irq_enabled = (value & 0x8040u) == 0x8040u;
         if ((value & 0x0040u) == 0u) {
             schway__irq_write_stat(inst, 0u, IRQ9_MASK);
+        }
+    } else if (aligned == SPU_KON_ADDRESS || aligned == SPU_KON_ADDRESS + 2u) {
+        uint32_t first_voice = aligned == SPU_KON_ADDRESS ? 0u : 16u;
+        for (uint32_t bit = 0u; bit < 16u; bit++) {
+            if ((value & (uint16_t)(1u << bit)) == 0u) {
+                continue;
+            }
+            uint32_t voice_index = first_voice + bit;
+            if (voice_index >= SCHWAY__SPU_VOICE_COUNT) {
+                continue;
+            }
+            struct schway__spu_voice *voice = &spu->voice[voice_index];
+            voice->envelope = 0;
+            voice->envelope_counter = 0u;
+            voice->envelope_phase = 1u;
+            uint32_t ssa_index = (voice_index * 0x10u + 0x06u) >> 1;
+            voice->reg[3] = spu->reg[ssa_index];
+            voice->sample_counter = UINT32_C(31) << 27;
+            memset(voice->history, 0, sizeof voice->history);
+            voice->sample = 0;
+            voice->output = 0;
+            uint32_t envx_index = (voice_index * 0x10u + 0x0Cu) >> 1;
+            spu->reg[envx_index] = 0u;
+            voice->reg[6] = 0u;
+            uint32_t endx_index = ((SPU_ENDX_ADDRESS - SPU_REGISTER_BASE) >> 1) +
+                                  (voice_index >> 4);
+            spu->reg[endx_index] = (uint16_t)(spu->reg[endx_index] &
+                                             (uint16_t)~(uint16_t)(1u << (voice_index & 15u)));
+        }
+    } else if (aligned == SPU_KOFF_ADDRESS || aligned == SPU_KOFF_ADDRESS + 2u) {
+        uint32_t first_voice = aligned == SPU_KOFF_ADDRESS ? 0u : 16u;
+        for (uint32_t bit = 0u; bit < 16u; bit++) {
+            if ((value & (uint16_t)(1u << bit)) == 0u) {
+                continue;
+            }
+            uint32_t voice_index = first_voice + bit;
+            if (voice_index >= SCHWAY__SPU_VOICE_COUNT) {
+                continue;
+            }
+            spu->voice[voice_index].envelope_phase = 4u;
+            spu->voice[voice_index].envelope_counter = 0u;
         }
     } else if (aligned == SPU_IRQA_ADDRESS) {
         spu->irqa_addr = ((uint32_t)value << 3) & (SCHWAY__SPU_RAM_SIZE - 8u);
@@ -225,6 +272,67 @@ static void audio_push_pair(schway *inst, int16_t left, int16_t right)
     inst->audio[slot][0] = left;
     inst->audio[slot][1] = right;
     inst->audio_count++;
+}
+
+static int32_t spu_sar32(int32_t value, uint32_t shift)
+{
+    if (shift == 0u) {
+        return value;
+    }
+    int64_t divisor = INT64_C(1) << shift;
+    int64_t wide = value;
+    if (wide >= 0) {
+        return (int32_t)(wide / divisor);
+    }
+    return (int32_t)(-(((-wide) + divisor - 1) / divisor));
+}
+
+static int32_t spu_sar64(int64_t value, uint32_t shift)
+{
+    if (shift == 0u) {
+        return (int32_t)value;
+    }
+    int64_t divisor = INT64_C(1) << shift;
+    if (value >= 0) {
+        return (int32_t)(value / divisor);
+    }
+    return (int32_t)(-(((-value) + divisor - 1) / divisor));
+}
+
+static int16_t spu_clamp16(int32_t value)
+{
+    if (value > INT16_MAX) {
+        return INT16_MAX;
+    }
+    if (value < INT16_MIN) {
+        return INT16_MIN;
+    }
+    return (int16_t)value;
+}
+
+static int16_t spu_mix_voice(const struct schway__spu_voice *voice, uint32_t channel)
+{
+    int32_t envelope_sample = spu_sar32((int32_t)voice->output * voice->envelope, 15u);
+    int32_t volume_sample = spu_sar32(envelope_sample * voice->sweep_level[channel], 15u);
+    return spu_clamp16(volume_sample);
+}
+
+static void spu_mix_sample(schway *inst)
+{
+    int32_t left = 0;
+    int32_t right = 0;
+    for (uint32_t voice = 0u; voice < SCHWAY__SPU_VOICE_COUNT; voice++) {
+        left += spu_mix_voice(&inst->spu.voice[voice], 0u);
+        right += spu_mix_voice(&inst->spu.voice[voice], 1u);
+    }
+    uint16_t attr = inst->spu.reg[(SPU_ATTR_ADDRESS - SPU_REGISTER_BASE) >> 1];
+    int16_t output_left = 0;
+    int16_t output_right = 0;
+    if ((attr & 0xC000u) == 0xC000u) {
+        output_left = spu_clamp16(spu_sar64((int64_t)left * inst->spu.main_sweep_level[0], 15u));
+        output_right = spu_clamp16(spu_sar64((int64_t)right * inst->spu.main_sweep_level[1], 15u));
+    }
+    audio_push_pair(inst, output_left, output_right);
 }
 
 void schway__spu_reset(schway *inst)
@@ -354,10 +462,17 @@ void schway__spu_event(schway *inst, uint64_t now)
     while (spu->next_tick <= now) {
         spu_apply_pending_writes(inst);
         spu_manual_transfer_step(inst);
-        spu_capture_step(inst);
+        schway__spu_envelope_step(inst, 0u);
         schway__spu_voice_step(inst, 0u);
-        /* The remaining voices and mixer follow in the next voice slice. */
-        audio_push_pair(inst, 0, 0);
+        schway__spu_volume_step(inst, 0u);
+        spu_capture_step(inst);
+        for (uint32_t voice = 1u; voice < SCHWAY__SPU_VOICE_COUNT; voice++) {
+            schway__spu_envelope_step(inst, voice);
+            schway__spu_voice_step(inst, voice);
+            schway__spu_volume_step(inst, voice);
+        }
+        schway__spu_main_volume_step(inst);
+        spu_mix_sample(inst);
         if (spu->next_tick > SCHWAY__STATE_TICKS_MAX - SCHWAY__CYCLES_PER_PAIR) {
             spu->next_tick = UINT64_MAX;
             break;

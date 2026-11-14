@@ -19,6 +19,31 @@ transferred per SPU tick. The byte pointer advances by two for every halfword wr
 Replication writes, capture writes, and modeled RAM reads all use the central little-endian helpers, which check the
 eight-byte IRQA range on every access. No DMA engine or manual-read path is implied by this slice.
 
+## ADSR and volume envelopes
+
+`KON` starts a voice in attack at level zero; reaching `7FFFh` enters decay. Decay falls toward the sustain level
+`(N + 1) * 800h`, then sustain follows its selected direction and rate. `KOFF` moves any active voice into release;
+release ends at zero. The guest may write `ENVX` to jump the current level. Subsequent envelope ticks update both the
+level used by playback and the `ENVX` readback.
+
+The documented rate value combines a five-bit shift with a two-bit step. For rates below 48, the period is one
+sample and the signed step is shifted by `11 - shift`; from rate 48 onward the step is unshifted and the period is
+`1 << (shift - 11)` samples. Increasing steps are `+7` through `+4`; decreasing steps are `-8` through `-5`. An
+exponential decrease scales its step by the current level. An exponential increase above `6000h` quarters the step
+for shifts below 10, halves the step and doubles the interval at shift 10, or quadruples the interval at shift 11 and
+above. Levels clamp to the documented range. All-ones rate encodings do not step.
+
+Direct voice and main volumes are signed 15-bit values doubled to the sample scale. Sweep registers update separate
+left and right current-volume state, including phase-negative direction, and current voice volumes are readable at
+`1E00h` through `1E5Eh`. Muting suppresses the final PCM output while voice decoding, envelopes and volume sweeps keep
+advancing. The implementation uses a per-sample integer mixer and saturates each voice and the final stereo pair.
+
+The full 2-by-128 rate baseline is compared against an independent generator for the ares ISC implementation at
+`9408cb43d494`. This is baseline conformance, not a captured hardware envelope waveform. Hardware anomalies above
+rate 26 and phase-negative sweep behavior remain unresolved; this core follows the documented baseline without a
+machine-profile switch. The SPU hardware notes and unresolved questions are indexed in
+`.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` §1.4.
+
 ## Capture and status
 
 The bounded capture model writes zero-valued CD-L, CD-R, voice 1, and voice 3 inputs to the four rings at `00000h`,

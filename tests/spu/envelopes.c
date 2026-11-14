@@ -100,12 +100,31 @@ static uint32_t check_all_ones_do_not_step(void)
         return 1u;
     }
     struct schway__spu_voice *voice = &inst->spu.voice[0];
+    uint32_t failed = 0u;
     voice->envelope = 0x3456;
-    voice->envelope_counter = 0u;
+    voice->envelope_counter = 0x123u;
     voice->envelope_phase = 1u;
-    voice->reg[4] = 0xFF00u;
+    voice->reg[4] = 0x7F00u;
     schway__spu_envelope_step(inst, 0u);
-    uint32_t failed = voice->envelope != 0x3456 ? 1u : 0u;
+    failed += voice->envelope != 0x3456 || voice->envelope_counter != 0x123u;
+
+    voice->envelope_phase = 2u;
+    voice->envelope_counter = 0x123u;
+    voice->reg[4] = 0x00F0u;
+    schway__spu_envelope_step(inst, 0u);
+    failed += voice->envelope != 0x3456 || voice->envelope_counter != 0x123u;
+
+    voice->envelope_phase = 3u;
+    voice->envelope_counter = 0x123u;
+    voice->reg[5] = 0x3F00u;
+    schway__spu_envelope_step(inst, 0u);
+    failed += voice->envelope != 0x3456 || voice->envelope_counter != 0x123u;
+
+    voice->envelope_phase = 4u;
+    voice->envelope_counter = 0x123u;
+    voice->reg[5] = 0x001Fu;
+    schway__spu_envelope_step(inst, 0u);
+    failed += voice->envelope != 0x3456 || voice->envelope_counter != 0x123u;
     free(inst);
     return failed;
 }
@@ -152,8 +171,13 @@ static uint32_t check_threshold_step(uint32_t shift, uint32_t expected_ticks,
         }
         expected_level += step;
     }
+    uint32_t expected_counter = expected_ticks - (expected_calls % expected_ticks);
+    if (expected_counter == 0u) {
+        expected_counter = expected_ticks;
+    }
     threshold_level_after_tick = voice->envelope;
     uint32_t failed = (uint32_t)voice->envelope != expected_level ? 1u : 0u;
+    failed += voice->envelope_counter != expected_counter;
     free(inst);
     return failed;
 }
@@ -287,6 +311,21 @@ static uint32_t get_one_audio_pair(schway *inst, int16_t *left, int16_t *right)
     return 0u;
 }
 
+static uint32_t get_audio_pairs(schway *inst, int16_t *samples, uint32_t capacity,
+                                uint32_t *written)
+{
+    schway_audio audio;
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = samples;
+    audio.capacity = capacity;
+    if (schway_get_audio(inst, &audio) != SCHWAY_STATUS_OK) {
+        return 1u;
+    }
+    *written = audio.written;
+    return 0u;
+}
+
 static uint32_t check_public_pcm_and_mute(void)
 {
     schway *inst = make_instance();
@@ -294,11 +333,18 @@ static uint32_t check_public_pcm_and_mute(void)
         return 1u;
     }
     prepare_tone(inst, 0xC000u);
-    schway__spu_event(inst, 768u);
-    int16_t left = 0;
-    int16_t right = 0;
-    uint32_t failed = get_one_audio_pair(inst, &left, &right);
-    failed += left <= 0 || right >= 0;
+    for (uint32_t tick = 1u; tick <= 64u; tick++) {
+        schway__spu_event(inst, (uint64_t)tick * 768u);
+    }
+    int16_t samples[128] = {0};
+    uint32_t written = 0u;
+    uint32_t failed = get_audio_pairs(inst, samples, 64u, &written);
+    failed += written != 64u;
+    uint32_t signed_pair = 0u;
+    for (uint32_t i = 0u; i < written; i++) {
+        signed_pair |= samples[i * 2u] > 0 && samples[i * 2u + 1u] < 0 ? 1u : 0u;
+    }
+    failed += signed_pair == 0u;
     schway_destroy(inst);
 
     inst = make_instance();
@@ -306,9 +352,20 @@ static uint32_t check_public_pcm_and_mute(void)
         return failed + 1u;
     }
     prepare_tone(inst, 0x8000u);
+    struct schway__spu_voice *silent_voice = &inst->spu.voice[SCHWAY__SPU_VOICE_COUNT - 1u];
+    silent_voice->reg[2] = 0x1000u;
+    silent_voice->reg[3] = 0x0020u;
+    silent_voice->reg[4] = 0u;
+    silent_voice->envelope_phase = 1u;
+    silent_voice->envelope = 0;
+    silent_voice->sample_counter = UINT32_C(31) << 27;
     schway__spu_event(inst, 768u);
     failed += inst->spu.voice[0].sample == 0;
     failed += inst->spu.voice[0].envelope == 0;
+    failed += silent_voice->sample == 0;
+    failed += silent_voice->envelope == 0;
+    int16_t left = 0;
+    int16_t right = 0;
     failed += get_one_audio_pair(inst, &left, &right);
     failed += left != 0 || right != 0;
     schway_destroy(inst);
@@ -355,7 +412,7 @@ int main(void)
            middle_threshold_failures == 0u ? "ok" : "not ok");
     printf("%s 7 - shift eleven keeps the step and quadruples the interval above 6000h\n",
            slow_threshold_failures == 0u ? "ok" : "not ok");
-    printf("%s 8 - all-ones attack encoding does not step\n",
+    printf("%s 8 - all-ones ADSR rate encodings do not step in any phase\n",
            sentinel_failures == 0u ? "ok" : "not ok");
     printf("%s 9 - attack, decay and release transition at documented limits\n",
            phase_failures == 0u ? "ok" : "not ok");

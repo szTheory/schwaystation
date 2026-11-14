@@ -79,6 +79,9 @@ out = (g[FFh-i] x oldest + g[1FFh-i] x older + g[100h+i] x old + g[i] x new) >> 
 **SPU-INTERP.** **Recommendation:** gaussian table interpolation exactly as above, with the three previous samples carried across blocks (ares keeps samples 25-27 of the prior block) [SCM.10]. **Strongest alternative:** linear or none (cheaper, audibly wrong on high pitch). **Would change if:** nothing; this is the hardware.
 
 ### 1.4 ADSR and sweep envelopes
+
+The shipped baseline, register behavior, tests and open hardware questions are summarized in
+[the SPU hardware guide](../../docs/hardware/spu.md#adsr-and-volume-envelopes).
 | Field | Bits | Source |
 |---|---|---|
 | ADSR1 (C08) | 15 attack mode (0 lin, 1 exp), 14-10 attack shift, 9-8 attack step (+7..+4), 7-4 decay shift (exp decrease, step -8 fixed), 3-0 sustain level ((N+1) x 800h) | [SCM.01] |
@@ -119,7 +122,7 @@ Per voice: `Lvol = (ENVX x VOLXL) >> 15`, sample x ADSR level then x voice volum
 | Pitfall | Fact | Response |
 |---|---|---|
 | Key-on timing | KON applied at the next 44.1 kHz tick, not at the write; 32-bit KON writes may be lost on hardware | apply all flag writes at the tick; test both halfword orders |
-| Envelope precision | rates above 26 and phase-negative sweeps deviate from the formula | implement the formula, keep a profile knob for the 76h = 6Ah quirk, mark (untested) |
+| Envelope precision | rates above 26 and phase-negative sweeps deviate from the documented baseline | implement the baseline, do not add a profile knob, and keep direct hardware behavior unresolved |
 | Reverb correctness | addressing is relative and wraps; left/right alternate ticks | implement the two-phase form, verify against presets with a self-authored impulse |
 | RAM read-back | DMA read inserts FFFFh unless DEV4_CTRL set; ps1-tests `memory-transfer` has 7 pass lines from hardware | run the test in CI; it is the only RAM oracle |
 | 8-bit writes | odd ignored, even widened | unit test |
