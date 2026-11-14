@@ -88,6 +88,7 @@ void schway__spu_main_volume_step(schway *inst);
 void schway__spu_envelope_rate(uint32_t rate, uint32_t decreasing, int32_t *step,
                                uint32_t *ticks);
 void schway__spu_noise_step(schway *inst);
+int32_t schway__spu_noise_level(const schway *inst);
 void schway__spu_reverb_step(schway *inst);
 void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ticks);
 

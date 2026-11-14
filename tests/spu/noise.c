@@ -115,16 +115,16 @@ static uint32_t test_long_gap_and_continuity(schway *inst)
     run_sample(inst);
     failures += inst->spu.noise_lfsr != 3u ? 1u : 0u;
     run_sample(inst);
-    failures += inst->spu.noise_lfsr != 6u ? 1u : 0u;
+    failures += inst->spu.noise_lfsr != 7u ? 1u : 0u;
 
     reset_noise(inst, 15u, 0u);
     run_sample(inst);
     inst->spu.reg[reg_index(SPU_ATTR)] &= 0x7FFFu;
     run_sample(inst);
-    failures += inst->spu.noise_lfsr != 6u ? 1u : 0u;
+    failures += inst->spu.noise_lfsr != 7u ? 1u : 0u;
     inst->spu.reg[reg_index(SPU_ATTR)] |= 0x8000u;
     run_sample(inst);
-    failures += inst->spu.noise_lfsr != 12u ? 1u : 0u;
+    failures += inst->spu.noise_lfsr != 15u ? 1u : 0u;
     return failures;
 }
 
@@ -188,7 +188,7 @@ static uint32_t test_noise_capture_and_wrap(schway *inst)
     failures += schway__spu_ram_peek(inst, 0u) != 0u ? 1u : 0u;
     failures += schway__spu_ram_peek(inst, 0x400u) != 0u ? 1u : 0u;
     failures += schway__spu_ram_peek(inst, 0x800u) != 8192u ? 1u : 0u;
-    failures += schway__spu_ram_peek(inst, 0xC00u) != 12289u ? 1u : 0u;
+    failures += schway__spu_ram_peek(inst, 0xC00u) != 12288u ? 1u : 0u;
 
     for (uint32_t i = 1u; i < 256u; i++) {
         run_sample(inst);

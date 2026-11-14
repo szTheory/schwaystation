@@ -20,6 +20,7 @@
 #define SPU_STATX_ADDRESS 0x1F801DAEu
 #define SPU_KON_ADDRESS 0x1F801D88u
 #define SPU_KOFF_ADDRESS 0x1F801D8Cu
+#define SPU_NON_ADDRESS 0x1F801D94u
 #define SPU_ENDX_ADDRESS 0x1F801D9Cu
 #define SPU_DEV4_CONTROL_INDEX 5u
 #define SPU_DEV4_DMA_READ_CONTROL 0x220931E1u
@@ -451,9 +452,31 @@ static void spu_capture_step(schway *inst)
     uint32_t offset = spu->capture_cursor * 2u;
     schway__spu_ram_write(inst, offset, 0u);
     schway__spu_ram_write(inst, 0x400u + offset, 0u);
-    schway__spu_ram_write(inst, 0x800u + offset, 0u);
-    schway__spu_ram_write(inst, 0xC00u + offset, 0u);
+    int32_t voice1 = spu->voice[0].output;
+    int32_t voice3 = spu->voice[2].output;
+    uint32_t non_index = (SPU_NON_ADDRESS - SPU_REGISTER_BASE) >> 1;
+    uint16_t non0 = spu->reg[non_index];
+    if ((non0 & 1u) != 0u) {
+        voice1 = schway__spu_noise_level(inst);
+    }
+    if ((non0 & 4u) != 0u) {
+        voice3 = schway__spu_noise_level(inst);
+    }
+    voice1 = spu_clamp16(spu_sar32(voice1 * spu->voice[0].envelope, 15u));
+    voice3 = spu_clamp16(spu_sar32(voice3 * spu->voice[2].envelope, 15u));
+    schway__spu_ram_write(inst, 0x800u + offset, (uint16_t)voice1);
+    schway__spu_ram_write(inst, 0xC00u + offset, (uint16_t)voice3);
     spu->capture_cursor = (spu->capture_cursor + 1u) & 0x1FFu;
+}
+
+static void spu_select_noise_output(schway *inst, uint32_t voice)
+{
+    uint32_t non_index = (SPU_NON_ADDRESS - SPU_REGISTER_BASE) >> 1;
+    uint32_t word = non_index + voice / 16u;
+    uint32_t bit = voice & 15u;
+    if ((inst->spu.reg[word] & (uint16_t)(1u << bit)) != 0u) {
+        inst->spu.voice[voice].output = (int16_t)schway__spu_noise_level(inst);
+    }
 }
 
 void schway__spu_event(schway *inst, uint64_t now)
@@ -462,13 +485,19 @@ void schway__spu_event(schway *inst, uint64_t now)
     while (spu->next_tick <= now) {
         spu_apply_pending_writes(inst);
         spu_manual_transfer_step(inst);
+        schway__spu_noise_step(inst);
         schway__spu_envelope_step(inst, 0u);
         schway__spu_voice_step(inst, 0u);
+        spu_select_noise_output(inst, 0u);
         schway__spu_volume_step(inst, 0u);
+        schway__spu_envelope_step(inst, 2u);
         spu_capture_step(inst);
         for (uint32_t voice = 1u; voice < SCHWAY__SPU_VOICE_COUNT; voice++) {
-            schway__spu_envelope_step(inst, voice);
+            if (voice != 2u) {
+                schway__spu_envelope_step(inst, voice);
+            }
             schway__spu_voice_step(inst, voice);
+            spu_select_noise_output(inst, voice);
             schway__spu_volume_step(inst, voice);
         }
         schway__spu_main_volume_step(inst);
@@ -716,7 +745,7 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     pending_count = schway__state_u32(io, "spu.pending_count", &pending_count, 0u,
                                       SCHWAY__SPU_PENDING_WRITES);
     noise_phase = schway__state_u32(io, "spu.noise_phase", &noise_phase, 0u, 0x1FFFFu);
-    noise_lfsr = state_u16(io, "spu.noise_lfsr", &noise_lfsr, 1u, 0x7FFFu);
+    noise_lfsr = state_u16(io, "spu.noise_lfsr", &noise_lfsr, 1u, UINT16_MAX);
     capture_cursor = schway__state_u32(io, "spu.capture_cursor", &capture_cursor, 0u, 0x1FFu);
     state_i16_array(io, "spu.reverb_fir", reverb_fir, 2u * SCHWAY__SPU_REVERB_FIR_TAPS);
     state_i32_array(io, "spu.reverb_work", reverb_work, 2u * SCHWAY__SPU_REVERB_WORK_WORDS);
