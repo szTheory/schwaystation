@@ -562,7 +562,7 @@ jobs:
         id: build
         run: |
           cmake --preset ci
-          cmake --build build/ci --target fixtures/gpu_motion.exe
+          cmake --build build/ci --target fixtures/gpu_motion.exe schwaystation-test-run
           mkdir -p "$RUNNER_TEMP/perf"
           cp build/ci/fixtures/gpu_motion.exe "$RUNNER_TEMP/perf/gpu_motion.exe"
           build() {
@@ -657,7 +657,12 @@ jobs:
             cat perf.txt
             grep '^perf ' perf.txt >> "$GITHUB_STEP_SUMMARY" || true
           done
-          exit "$rc"
+          spu_rc=0
+          cmake "-DVALGRIND=$valgrind" \
+            "-DUNIT=$GITHUB_WORKSPACE/build/ci/tests/schwaystation-test-run" \
+            "-DOUT=$RUNNER_TEMP/perf/spu_idle" -DCASE=spu_idle \
+            -P tests/perf/tests.cmake || spu_rc=$?
+          if [ "$rc" -ne 0 ] || [ "$spu_rc" -ne 0 ]; then exit 1; fi
 
   # Every publish step of a release, rehearsed with the release App's token on
   # a same-repository pull request that changes a release input, against a
