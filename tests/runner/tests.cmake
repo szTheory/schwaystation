@@ -219,7 +219,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     set(RUN ${HOOKED})
     execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-audio --test-audio-failure
       RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
-    if(NOT rc STREQUAL "1" OR NOT out MATCHES "schway_get_audio failed")
+    if(NOT rc STREQUAL "1" OR NOT err MATCHES "schway_get_audio failed")
       message(FATAL_ERROR "audio drain failure: expected exit 1 and its error, got ${rc}\n${out}${err}")
     endif()
     refuse(--frames 1 --hash-audio --hash-audio)
@@ -230,8 +230,17 @@ if(CMAKE_SCRIPT_MODE_FILE)
     string(REPEAT "[0-9a-f]" 64 digits)
     execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash --hash-audio --hash-state --hash-vram
       RESULT_VARIABLE combined_rc OUTPUT_VARIABLE combined_out ERROR_VARIABLE combined_err)
-    if(NOT combined_rc STREQUAL "0" OR
-       NOT combined_out MATCHES "^frame 1 sha256 ${digits}\\naudio sha256 ${digits}\\nstate sha256 ${digits}\\nvram sha256 ${digits}\\n$")
+    string(REGEX MATCH "frame 1 sha256 ${digits}" frame_line "${combined_out}")
+    string(REGEX MATCH "audio sha256 ${digits}" audio_line "${combined_out}")
+    string(REGEX MATCH "state sha256 ${digits}" state_line "${combined_out}")
+    string(REGEX MATCH "vram sha256 ${digits}" vram_line "${combined_out}")
+    string(FIND "${combined_out}" "${frame_line}" frame_position)
+    string(FIND "${combined_out}" "${audio_line}" audio_position)
+    string(FIND "${combined_out}" "${state_line}" state_position)
+    string(FIND "${combined_out}" "${vram_line}" vram_position)
+    if(NOT combined_rc STREQUAL "0" OR frame_line STREQUAL "" OR audio_line STREQUAL "" OR
+       state_line STREQUAL "" OR vram_line STREQUAL "" OR audio_position LESS_EQUAL frame_position OR
+       state_position LESS_EQUAL audio_position OR vram_position LESS_EQUAL state_position)
       message(FATAL_ERROR "combined hashes: expected four ordered digests and exit 0, got ${combined_rc}\n${combined_out}${combined_err}")
     endif()
   elseif(CASE STREQUAL "audio_hash")

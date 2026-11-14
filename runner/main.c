@@ -361,6 +361,7 @@ typedef struct options {
 #ifdef SCHWAY_RUN_TEST_HOOKS
     int test_card_write;
     int test_save_failure;
+    int test_audio_failure;
 #endif
 } options;
 
@@ -474,6 +475,11 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("--test-save-failure needs flush or rename");
             }
             i++;
+        } else if (strcmp(arg, "--test-audio-failure") == 0) {
+            if (o->test_audio_failure) {
+                return usage("give --test-audio-failure once");
+            }
+            o->test_audio_failure = 1;
 #endif
         } else if (strcmp(arg, "--png") == 0) {
             if (o->png_frame != 0u) {
@@ -588,7 +594,7 @@ static int parse_options(int argc, char **argv, options *o)
             o->exe != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash || o->hash_audio ||
             o->hash_state || o->hash_vram || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
-            o->region_set) {
+            o->region_set || o->test_audio_failure) {
             return usage("--probe cannot be combined with run options or partial test metadata");
         }
         return SCHWAY__EXIT_OK;
@@ -635,6 +641,9 @@ static int parse_options(int argc, char **argv, options *o)
 #ifdef SCHWAY_RUN_TEST_HOOKS
     if ((o->test_card_write != 0 || o->test_save_failure != 0) && o->save_dir == NULL) {
         return usage("card test options need --save-dir");
+    }
+    if (o->test_audio_failure && !o->hash_audio) {
+        return usage("--test-audio-failure needs --hash-audio");
     }
 #endif
     if (o->frames == 0u && (o->exe != NULL || o->bios != NULL)) {
@@ -990,7 +999,11 @@ static int print_hash(const schway *inst, uint32_t frames)
 
 /* One PAL frame can produce at most 887 native stereo pairs (docs/runner.md).
    Drain once after each selected frame, then hash only the pairs actually written. */
-static int hash_audio_frame(schway *inst, schway__sha256 *state)
+static int hash_audio_frame(schway *inst, schway__sha256 *state
+#ifdef SCHWAY_RUN_TEST_HOOKS
+                            , int force_failure
+#endif
+)
 {
     enum { RUNNER_AUDIO_MAX_PAIRS = 887u };
     int16_t samples[2u * RUNNER_AUDIO_MAX_PAIRS];
@@ -998,6 +1011,11 @@ static int hash_audio_frame(schway *inst, schway__sha256 *state)
     schway_audio io;
     memset(&io, 0, sizeof io);
     io.size = (uint32_t)sizeof io;
+#ifdef SCHWAY_RUN_TEST_HOOKS
+    if (force_failure) {
+        io.size = 0u;
+    }
+#endif
     io.samples = samples;
     io.capacity = RUNNER_AUDIO_MAX_PAIRS;
     schway_status st = schway_get_audio(inst, &io);
@@ -1466,7 +1484,11 @@ static int run(const options *opt)
 #endif
         ran = n;
         if (st == SCHWAY_STATUS_OK && opt->hash_audio) {
+#ifdef SCHWAY_RUN_TEST_HOOKS
+            status = hash_audio_frame(inst, &audio_digest, opt->test_audio_failure);
+#else
             status = hash_audio_frame(inst, &audio_digest);
+#endif
         }
         if (opt->tty) {
             tty_drain(inst, &tty);
