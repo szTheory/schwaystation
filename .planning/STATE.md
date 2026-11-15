@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: Completed 06-07-PLAN.md
-last_updated: "2026-11-15T17:32:41.680Z"
+stopped_at: Completed 06-25-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; next sequential plan 06-04
+last_updated: "2026-11-15T17:54:14.417Z"
 last_activity: 2026-11-15
-last_activity_desc: Completed Phase 6 plan 06-07 out of order; 06-04 remains the sequential next plan
-state_head: 3a433960a0ec224792d0b9f2d1c622b7d70815dd
+state_head: 4b7815054f04c0b674d9877165f582f352226313
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 176
-  completed_plans: 154
+  completed_plans: 155
   percent: 83
 current_plan: 3
+last_activity_desc: "Completed Phase 6 plan 06-25 out of order; 06-04 remains the sequential next plan. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 Phase: 6 (Discs and FMV) — EXECUTING
 Plan: 4 of 26
 Status: Ready to execute
-Last activity: 2026-11-15 — Completed 06-03; next is 06-04
+Last activity: 2026-11-15
 
 Progress: [████████░░] 83%
 
@@ -216,6 +216,7 @@ Progress: [████████░░] 83%
 | Phase 06 P02 | 26min | 2 tasks | 7 files |
 | Phase 06 P03 | 18min | 2 tasks | 8 files |
 | Phase 06 P07 | not measured | 3 tasks | 10 files |
+| Phase 06 P25 | 14min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -531,6 +532,7 @@ Recent decisions affecting current work:
 - [Phase 06]: Keep ISO/cue parsing and all host file handles in a host-only provider; the emulated core receives sectors only through callbacks.
 - [Phase 06]: Model INDEX 00 as physical file content and PREGAP as synthetic silence, preserving their distinct sector offsets.
 - [Phase 06]: Reject unsupported image types with named planned-v2.0 results instead of partial format sniffing.
+- [Phase 06]: Keep the API v5 consumer public-header-only; core.disc_api owns internal attachment-state assertions.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -726,8 +728,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T17:32:41.457Z
-Stopped at: Completed 06-07-PLAN.md
+Last session: 2026-11-15T17:54:14.191Z
+Stopped at: Completed 06-25-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; next sequential plan 06-04
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
