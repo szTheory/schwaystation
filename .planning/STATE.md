@@ -5,11 +5,11 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: planning
-stopped_at: Phase 5 complete, ready to plan Phase 6
-last_updated: "2026-11-14T15:31:41.685Z"
+stopped_at: Phase 05 complete, ready to plan Phase 6
+last_updated: "2026-11-15T01:50:24.884Z"
 last_activity: 2026-11-14
-last_activity_desc: "Phase 05 shipped as PR #18"
-state_head: cf7b515fc9bce3f91d3905de0788e32151b38f99
+last_activity_desc: "Phase 05 shipped as PR #18; runtime Codex GPT-6; verifier and reviewer GPT-6 Luna xhigh; local CI 547/547, release 5/5, hygiene passed"
+state_head: 09be5f2cdbabfb7e003362b803b6037ba125fe6b
 progress:
   total_phases: 6
   completed_phases: 5
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-11-14)
 Phase: 6 — Discs and FMV
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-11-14 -- Phase 05 shipped as PR #18
+Last activity: 2026-11-14 -- Phase 05 shipped as PR #18; runtime Codex GPT-6; verifier and reviewer GPT-6 Luna xhigh; local CI 547/547, release 5/5, hygiene passed
 
 Progress: [████████░░] 83%
 
@@ -52,7 +52,7 @@ Progress: [████████░░] 83%
 | 02 | 27 | - | - |
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
-| 5 | 24 | - | - |
+| 05 | 24 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -707,7 +707,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-14T15:27:07Z
-Stopped at: Phase 5 complete; Phase 5 ship in progress
+Stopped at: Phase 05 complete, ready to plan Phase 6
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
