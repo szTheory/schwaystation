@@ -232,11 +232,11 @@ The current host probe already uses fixed bounds and fixed arrays as a safe pars
 | A1 | The existing runner/libretro build graph can consume the shared provider and source-pinned tools without a new package manager or runtime library. | Standard Stack / Architecture | Build wiring may need a small CMake adjustment; no behavior or policy choice depends on this. `[ASSUMED]` |
 | A2 | The existing byte-identical fixture build arrangement can be extended to one `disc_boot` image on all supported CI legs. | Architecture | If tool builds exceed existing CI budget, use the already pinned release zips on slow legs; do not commit the image. `[ASSUMED]` |
 
-## Open Questions
+## Open Questions (RESOLVED FOR PLANNING)
 
-1. The seek curve remains low confidence; no hardware capture establishes its shape. Preserve the selected deterministic model and its regression until new hardware evidence supports a change. `[CITED: .planning/preparation/DECISIONS.md open-question rows; .planning/phases/06-discs-and-fmv/06-CONTEXT.md]`
-2. The MDEC status log supplies status ordering but no cycle stamps. Use it to validate state transitions and use the selected block cost only for deterministic scheduling; do not claim the log proves timing. `[VERIFIED: GitHub API, ps1-tests@f727802fead1 mdec/step-by-step-log/psx.log; .planning/phases/06-discs-and-fmv/06-CONTEXT.md]`
-3. The exact double-speed CD-DA consumption behavior is a focused implementation test, not an owner decision or reason to reopen the chosen XA resampler. `[CITED: .planning/phases/06-discs-and-fmv/06-CONTEXT.md]`
+1. **[RESOLVED]** Implement the selected deterministic integer square-root seek baseline and retain its regression. The curve remains low confidence because no hardware capture establishes its shape; only new hardware evidence may justify changing the baseline. `[CITED: .planning/preparation/DECISIONS.md open-question rows; .planning/phases/06-discs-and-fmv/06-CONTEXT.md]`
+2. **[RESOLVED]** Use the selected 1,000-cycle-per-block MDEC cost as the deterministic scheduling baseline. The pinned status log validates transition order only because it has no cycle stamps; no plan may describe it as proof of block timing. `[VERIFIED: GitHub API, ps1-tests@f727802fead1 mdec/step-by-step-log/psx.log; .planning/phases/06-discs-and-fmv/06-CONTEXT.md]`
+3. **[RESOLVED]** At double speed, advance CD-DA source consumption at 2x while keeping native 44.1-kHz output cadence and a bounded output queue. Include the focused source-advance/rate probe; this is an implementation baseline and test, not an owner decision or a reason to reopen the selected XA resampler. `[CITED: .planning/phases/06-discs-and-fmv/06-CONTEXT.md]`
 
 No user decision is required by the evidence gathered. `[CITED: .planning/phases/06-discs-and-fmv/06-CONTEXT.md; .planning/AUTONOMOUS.md]`
 
