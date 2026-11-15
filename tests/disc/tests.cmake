@@ -1,6 +1,9 @@
 # Host-side disc provider behavior through the installed schway_disc callbacks.
-add_executable(schwaystation-test-disc-image ${CMAKE_CURRENT_LIST_DIR}/image.c)
-target_link_libraries(schwaystation-test-disc-image PRIVATE schwaystation_disc_image)
+add_executable(schwaystation-test-disc-image
+  ${CMAKE_CURRENT_LIST_DIR}/image.c
+  ${PROJECT_SOURCE_DIR}/host/disc_probe.c)
+target_link_libraries(schwaystation-test-disc-image PRIVATE
+  schwaystation_disc_image schwaystation-host)
 set_target_properties(schwaystation-test-disc-image PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-image)
@@ -18,4 +21,8 @@ endforeach()
 
 schway_add_test(NAME disc.playlist
   COMMAND schwaystation-test-disc-image playlist ${PROJECT_BINARY_DIR}/tests
+  LABELS disc portable TIMEOUT 20)
+
+schway_add_test(NAME disc.cnf
+  COMMAND schwaystation-test-disc-image cnf ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 20)

@@ -3,6 +3,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include "disc_image.h"
+#include "disc_probe.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,6 +90,107 @@ static int write_text(const char *path, const char *text, size_t size)
         return 0;
     }
     return fclose(file) == 0;
+}
+
+static void write_iso_u16_both(uint8_t *bytes, uint16_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8);
+    bytes[2] = (uint8_t)(value >> 8);
+    bytes[3] = (uint8_t)value;
+}
+
+static void write_iso_u32_both(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8);
+    bytes[2] = (uint8_t)(value >> 16);
+    bytes[3] = (uint8_t)(value >> 24);
+    bytes[4] = (uint8_t)(value >> 24);
+    bytes[5] = (uint8_t)(value >> 16);
+    bytes[6] = (uint8_t)(value >> 8);
+    bytes[7] = (uint8_t)value;
+}
+
+static size_t write_iso_record(uint8_t *bytes, uint32_t extent, uint32_t size,
+                               uint8_t flags, const uint8_t *name, size_t name_size)
+{
+    size_t record_size = 33u + name_size + ((name_size & 1u) == 0u ? 1u : 0u);
+    memset(bytes, 0, record_size);
+    bytes[0] = (uint8_t)record_size;
+    write_iso_u32_both(bytes + 2u, extent);
+    write_iso_u32_both(bytes + 10u, size);
+    bytes[25] = flags;
+    write_iso_u16_both(bytes + 28u, 1u);
+    bytes[32] = (uint8_t)name_size;
+    memcpy(bytes + 33u, name, name_size);
+    return record_size;
+}
+
+static int write_probe_iso(const char *path, const char *cnf, size_t cnf_size,
+                           const char *boot_file, int fallback)
+{
+    static const uint8_t dot[] = {0u};
+    static const uint8_t dotdot[] = {1u};
+    uint8_t *image = (uint8_t *)calloc(24u, 2048u);
+    uint8_t *pvd;
+    uint8_t *root;
+    size_t root_size = 0u;
+    FILE *file;
+    if (image == NULL) return 0;
+    pvd = image + 16u * 2048u;
+    pvd[0] = 1u;
+    memcpy(pvd + 1u, "CD001", 5u);
+    pvd[6] = 1u;
+    write_iso_u32_both(pvd + 80u, 24u);
+    write_iso_u16_both(pvd + 128u, 2048u);
+    (void)write_iso_record(pvd + 156u, 18u, 2048u, 2u, dot, sizeof dot);
+    uint8_t *terminator = image + 17u * 2048u;
+    terminator[0] = 255u;
+    memcpy(terminator + 1u, "CD001", 5u);
+    terminator[6] = 1u;
+
+    root = image + 18u * 2048u;
+    root_size += write_iso_record(root + root_size, 18u, 2048u, 2u, dot, sizeof dot);
+    root_size += write_iso_record(root + root_size, 18u, 2048u, 2u, dotdot, sizeof dotdot);
+    if (cnf != NULL) {
+        static const uint8_t name[] = "SYSTEM.CNF;1";
+        root_size += write_iso_record(root + root_size, 19u, (uint32_t)cnf_size,
+                                      0u, name, sizeof name - 1u);
+        if (cnf_size <= 2048u) memcpy(image + 19u * 2048u, cnf, cnf_size);
+    }
+    if (boot_file != NULL) {
+        size_t name_size = strlen(boot_file);
+        uint8_t name[64];
+        if (name_size + 2u >= sizeof name) {
+            free(image);
+            return 0;
+        }
+        memcpy(name, boot_file, name_size);
+        name[name_size++] = ';';
+        name[name_size++] = '1';
+        root_size += write_iso_record(root + root_size, 20u, 2048u, 0u,
+                                      name, name_size);
+        memset(image + 20u * 2048u, 0x5au, 2048u);
+    } else if (fallback != 0) {
+        static const uint8_t name[] = "PSX.EXE;1";
+        root_size += write_iso_record(root + root_size, 20u, 2048u, 0u,
+                                      name, sizeof name - 1u);
+        memset(image + 20u * 2048u, 0x5au, 2048u);
+    }
+    if (root_size > 2048u) {
+        free(image);
+        return 0;
+    }
+    file = fopen(path, "wb");
+    if (file == NULL) {
+        free(image);
+        return 0;
+    }
+    int ok = fwrite(image, 1u, 24u * 2048u, file) == 24u * 2048u;
+    if (fclose(file) != 0) ok = 0;
+    free(image);
+    return ok;
 }
 
 static int expect_open_status(const char *path, schway_disc_image_status expected,
@@ -385,6 +487,7 @@ static int test_cue_reject(const char *directory)
 {
     char cue_path[1024] = "";
     char child_path[1024] = "";
+    char playlist_path[1024] = "";
     char cue[8192];
     const char *test_case = "disc.image.cue_reject";
     const char *unsafe_names[] = {
@@ -394,7 +497,9 @@ static int test_cue_reject(const char *directory)
     int result = 0;
 
     CHECK(make_path(cue_path, directory, "schway-disc-image-invalid.cue") &&
-          make_path(child_path, directory, "invalid-child.bin"), "could not form reject test paths");
+          make_path(child_path, directory, "invalid-child.bin") &&
+          make_path(playlist_path, directory, "unsupported-entry.m3u"),
+          "could not form reject test paths");
     for (size_t i = 0u; i < sizeof unsafe_names / sizeof unsafe_names[0]; i++) {
         int size = snprintf(cue, sizeof cue,
                             "FILE \"%s\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n",
@@ -432,6 +537,12 @@ static int test_cue_reject(const char *directory)
           "could not create a partial-sector child");
     CHECK(expect_open_status(cue_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, 1u, NULL),
           "expected a child with a partial sector to be rejected before reads");
+    CHECK(write_text(cue_path,
+          "FILE \"unsupported.chd\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n",
+          sizeof "FILE \"unsupported.chd\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n" - 1u) &&
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
+                             "unsupported: CHD (planned v2.0)"),
+          "expected an unsupported cue child extension to be rejected consistently");
     (void)remove(cue_path);
     cue_path[0] = '\0';
     for (uint32_t i = 0u; i < 4u; i++) {
@@ -446,10 +557,15 @@ static int test_cue_reject(const char *directory)
               expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u, messages[i]),
               "expected unsupported media to name its planned v2.0 format");
     }
+    CHECK(write_text(playlist_path, "unsupported.chd\n", sizeof "unsupported.chd\n" - 1u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
+                             "unsupported: CHD (planned v2.0)"),
+          "expected an unsupported m3u entry extension to be rejected consistently");
 
 cleanup:
     if (cue_path[0] != '\0') (void)remove(cue_path);
     if (child_path[0] != '\0') (void)remove(child_path);
+    if (playlist_path[0] != '\0') (void)remove(playlist_path);
     return result;
 }
 
@@ -685,6 +801,9 @@ static int test_playlist(const char *directory)
     char playlist_path[1024] = "";
     char first_path[1024] = "";
     char second_path[1024] = "";
+    char outside_path[1024] = "";
+    char link_path[1024] = "";
+    char *bounded_text = NULL;
     const char *test_case = "disc.playlist";
     static const char playlist[] = "# Two images\r\n\r\n first.iso \r\nsecond.iso\n";
     schway_disc_image *image = NULL;
@@ -713,7 +832,8 @@ static int test_playlist(const char *directory)
           first_disc == schway_disc_image_disc(image),
           "expected index zero to expose the initial disc descriptor");
     CHECK(schway_disc_image_select(image, 1u, &second_disc) == SCHWAY_DISC_IMAGE_OK &&
-          second_disc != NULL && second_disc != first_disc,
+          second_disc != NULL && second_disc != first_disc &&
+          schway_disc_image_disc(image) == first_disc,
           "expected index one to prepare a distinct disc descriptor");
     CHECK(strcmp(schway_disc_image_label(image, 0u), "first.iso") == 0 &&
           strcmp(schway_disc_image_label(image, 1u), "second.iso") == 0 &&
@@ -731,11 +851,177 @@ static int test_playlist(const char *directory)
           sector[16] == 0x71u,
           "expected index one to read bytes from the second playlist image");
 
+    schway_disc_image_close(image);
+    image = NULL;
+    char entries[4096];
+    size_t used = 0u;
+    for (uint32_t i = 0u; i < SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT; i++) {
+        int written = snprintf(entries + used, sizeof entries - used, "first.iso\n");
+        CHECK(written > 0 && (size_t)written < sizeof entries - used,
+              "could not append a playlist entry at the 32-image boundary");
+        used += (size_t)written;
+    }
+    CHECK(write_text(playlist_path, entries, used), "could not write the 32-image playlist");
+    CHECK(schway_disc_image_open(playlist_path, &image, &error) == SCHWAY_DISC_IMAGE_OK &&
+          schway_disc_image_count(image) == SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT,
+          "expected exactly 32 playlist images to be accepted");
+    schway_disc_image_close(image);
+    image = NULL;
+    int written = snprintf(entries + used, sizeof entries - used, "first.iso\n");
+    CHECK(written > 0 && (size_t)written < sizeof entries - used,
+          "could not append the 33rd playlist entry");
+    used += (size_t)written;
+    CHECK(write_text(playlist_path, entries, used), "could not write the 33-image playlist");
+    for (uint32_t attempt = 0u; attempt < 40u; attempt++) {
+        memset(&error, 0, sizeof error);
+        CHECK(schway_disc_image_open(playlist_path, &image, &error) == SCHWAY_DISC_IMAGE_LIMIT &&
+              image == NULL && error.line == 33u && strstr(error.message, "BAD_M3U") != NULL,
+              "expected the 33rd entry to fail with bounded playlist diagnostics and cleanup");
+    }
+    char maximum_path[257];
+    memset(maximum_path, 'a', 251u);
+    memcpy(maximum_path + 251u, ".chd", 4u);
+    maximum_path[255] = '\n';
+    maximum_path[256] = '\0';
+    CHECK(write_text(playlist_path, maximum_path, 256u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
+                             "unsupported: CHD (planned v2.0)"),
+          "expected a 255-byte playlist path to reach consistent unsupported-type handling");
+    CHECK(write_text(playlist_path, "../outside.iso\n", sizeof "../outside.iso\n" - 1u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_BAD_M3U, 1u, NULL),
+          "expected parent traversal in a playlist entry to be rejected");
+    char long_entry[258];
+    memset(long_entry, 'a', sizeof long_entry - 1u);
+    long_entry[sizeof long_entry - 2u] = '\n';
+    long_entry[sizeof long_entry - 1u] = '\0';
+    CHECK(write_text(playlist_path, long_entry, sizeof long_entry - 1u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_BAD_M3U, 1u, NULL),
+          "expected a path longer than 255 bytes to be rejected");
+    bounded_text = (char *)malloc(65537u);
+    CHECK(bounded_text != NULL, "could not allocate bounded playlist text");
+    memset(bounded_text, '#', 65537u);
+    CHECK(write_text(playlist_path, bounded_text, 65536u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_BAD_M3U, 0u, NULL),
+          "expected a 64 KiB playlist to parse within its byte bound");
+    CHECK(write_text(playlist_path, bounded_text, 65537u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_LIMIT, 0u,
+                             "BAD_M3U LIMIT: playlist exceeds 64 KiB"),
+          "expected a playlist above 64 KiB to fail at the byte bound");
+    free(bounded_text);
+    bounded_text = NULL;
+    static const char recursive[] = "schway-disc-playlist-test.m3u\n";
+    CHECK(write_text(playlist_path, recursive, sizeof recursive - 1u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_BAD_M3U, 1u, NULL),
+          "expected recursive playlists to be rejected");
+    CHECK(make_path(outside_path, directory, "../schway-disc-playlist-outside.iso") &&
+          make_path(link_path, directory, "outside-link.iso") &&
+          write_pattern_file(outside_path, 16u, 2048u, 0x31u, 0) &&
+          make_symlink(outside_path, link_path) &&
+          write_text(playlist_path, "outside-link.iso\n", sizeof "outside-link.iso\n" - 1u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_BAD_M3U, 1u, NULL),
+          "expected a playlist symlink that resolves outside its directory to be rejected");
+
 cleanup:
+    free(bounded_text);
     schway_disc_image_close(image);
     if (playlist_path[0] != '\0') (void)remove(playlist_path);
     if (first_path[0] != '\0') (void)remove(first_path);
     if (second_path[0] != '\0') (void)remove(second_path);
+    if (link_path[0] != '\0') (void)remove(link_path);
+    if (outside_path[0] != '\0') (void)remove(outside_path);
+    return result;
+}
+
+static int test_cnf(const char *directory)
+{
+    char path[1024] = "";
+    static const char valid[] =
+        "BOOT = cdrom:\\SLUS_123.45;1\r\n"
+        "TCB = 64\r\n"
+        "EVENT = 256\r\n"
+        "STACK = 801FFF00h\r\n";
+    static const char unsafe_boot[] = "BOOT = CDROM:\\..\\SLUS_123.45;1\n";
+    static const char bad_tcb[] = "BOOT = CDROM:\\SLUS_123.45;1\nTCB = 65\n";
+    static const char bad_event[] = "BOOT = CDROM:\\SLUS_123.45;1\nEVENT = 257\n";
+    static const char bad_stack[] = "BOOT = CDROM:\\SLUS_123.45;1\nSTACK = 80300000h\n";
+    const char *test_case = "disc.cnf";
+    schway_disc_system_cnf metadata;
+    schway_disc_system_cnf before;
+    schway_host_disc_probe probe;
+    int result = 0;
+
+    CHECK(make_path(path, directory, "schway-disc-cnf-test.iso"),
+          "could not form CNF probe path");
+    memset(&metadata, 0, sizeof metadata);
+    CHECK(schway_disc_image_parse_system_cnf((const uint8_t *)valid, sizeof valid - 1u,
+                                              &metadata) == SCHWAY_DISC_IMAGE_OK,
+          "expected bounded ASCII boot and kernel metadata to parse");
+    CHECK(metadata.component_count == 1u && strcmp(metadata.boot_name, "SLUS_123.45") == 0 &&
+          metadata.present == (SCHWAY_DISC_SYSTEM_CNF_HAVE_TCB |
+                               SCHWAY_DISC_SYSTEM_CNF_HAVE_EVENT |
+                               SCHWAY_DISC_SYSTEM_CNF_HAVE_STACK) &&
+          metadata.tcb == 0x40u && metadata.event == 0x100u &&
+          metadata.stack == UINT32_C(0x801fff00),
+          "expected normalized boot name and bounded TCB/EVENT/STACK values");
+    before = metadata;
+    CHECK(schway_disc_image_parse_system_cnf((const uint8_t *)unsafe_boot,
+                                              sizeof unsafe_boot - 1u, &metadata) ==
+              SCHWAY_DISC_IMAGE_BAD_SYSCNF && memcmp(&metadata, &before, sizeof metadata) == 0,
+          "expected parent traversal to fail without changing metadata output");
+    CHECK(schway_disc_image_parse_system_cnf((const uint8_t *)bad_tcb, sizeof bad_tcb - 1u,
+                                              &metadata) == SCHWAY_DISC_IMAGE_BAD_SYSCNF &&
+          schway_disc_image_parse_system_cnf((const uint8_t *)bad_event, sizeof bad_event - 1u,
+                                              &metadata) == SCHWAY_DISC_IMAGE_BAD_SYSCNF &&
+          schway_disc_image_parse_system_cnf((const uint8_t *)bad_stack, sizeof bad_stack - 1u,
+                                              &metadata) == SCHWAY_DISC_IMAGE_BAD_SYSCNF,
+          "expected out-of-range TCB/EVENT/STACK values to fail");
+    uint8_t too_long[SCHWAY_DISC_SYSTEM_CNF_MAX_BYTES + 1u];
+    memset(too_long, 'A', sizeof too_long);
+    CHECK(schway_disc_image_parse_system_cnf(too_long, sizeof too_long, &metadata) ==
+              SCHWAY_DISC_IMAGE_BAD_SYSCNF,
+          "expected SYSTEM.CNF longer than 2,047 bytes to fail at the bound");
+
+    CHECK(write_probe_iso(path, valid, sizeof valid - 1u, "SLUS_123.45", 0),
+          "could not create valid metadata ISO");
+    memset(&probe, 0, sizeof probe);
+    schway_host_disc_probe_status probe_status = schway__disc_probe_image(path, &probe);
+    if (probe_status != SCHWAY_HOST_DISC_PROBE_OK ||
+        strcmp(probe.boot_name, "SLUS_123.45") != 0 ||
+        strcmp(probe.serial, "SLUS-12345") != 0 || probe.exe_size != 2048u) {
+        fprintf(stderr, "probe=%s boot='%s' serial='%s' size=%zu\n",
+                schway__disc_probe_status_string(probe_status), probe.boot_name,
+                probe.serial, probe.exe_size);
+    }
+    CHECK(probe_status == SCHWAY_HOST_DISC_PROBE_OK &&
+          strcmp(probe.boot_name, "SLUS_123.45") == 0 &&
+          strcmp(probe.serial, "SLUS-12345") == 0 && probe.exe_size == 2048u,
+          "expected the identity probe to use the shared parser and resolve its boot file");
+    schway__disc_probe_dispose(&probe);
+
+    CHECK(write_probe_iso(path, unsafe_boot, sizeof unsafe_boot - 1u, "SLUS_123.45", 0),
+          "could not create traversal CNF ISO");
+    memset(&probe, 0, sizeof probe);
+    memcpy(probe.boot_name, "preserve", sizeof "preserve");
+    CHECK(schway__disc_probe_image(path, &probe) == SCHWAY_HOST_DISC_PROBE_BAD_SYSTEM_CNF &&
+          strcmp(probe.boot_name, "preserve") == 0 && probe.exe_bytes == NULL,
+          "expected invalid CNF to preserve caller metadata and executable ownership");
+
+    CHECK(write_probe_iso(path, NULL, 0u, NULL, 1),
+          "could not create PSX.EXE fallback ISO");
+    memset(&probe, 0, sizeof probe);
+    CHECK(schway__disc_probe_image(path, &probe) == SCHWAY_HOST_DISC_PROBE_OK &&
+          strcmp(probe.boot_name, "PSX.EXE") == 0 && probe.exe_size == 2048u,
+          "expected missing SYSTEM.CNF to fall back to root PSX.EXE");
+    schway__disc_probe_dispose(&probe);
+    CHECK(write_probe_iso(path, NULL, 0u, NULL, 0),
+          "could not create ISO without boot metadata or fallback");
+    memset(&probe, 0, sizeof probe);
+    CHECK(schway__disc_probe_image(path, &probe) == SCHWAY_HOST_DISC_PROBE_NO_BOOT_EXE &&
+          probe.exe_bytes == NULL,
+          "expected missing SYSTEM.CNF and PSX.EXE to report NO_BOOT_EXE");
+
+cleanup:
+    (void)remove(path);
     return result;
 }
 
@@ -754,6 +1040,7 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "cue_index_limits") == 0) return test_cue_index_limits(argv[2]);
     if (strcmp(argv[1], "iso_limits") == 0) return test_iso_limits(argv[2]);
     if (strcmp(argv[1], "playlist") == 0) return test_playlist(argv[2]);
+    if (strcmp(argv[1], "cnf") == 0) return test_cnf(argv[2]);
     fprintf(stderr, "unknown disc image test case: %s\n", argv[1]);
     return 2;
 }

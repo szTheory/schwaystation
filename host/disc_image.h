@@ -112,7 +112,7 @@ static inline int schway__disc_image_cnf_component(const uint8_t *bytes, size_t 
 {
     size_t name_size = size;
     size_t version = size;
-    if (size == 0u || size >= SCHWAY_DISC_SYSTEM_CNF_COMPONENT_BYTES) return 0;
+    if (size == 0u) return 0;
     for (size_t i = 0u; i < size; i++) {
         unsigned char c = bytes[i];
         if (c == (unsigned char)';') {
@@ -132,10 +132,11 @@ static inline int schway__disc_image_cnf_component(const uint8_t *bytes, size_t 
             if (bytes[i] < (uint8_t)'0' || bytes[i] > (uint8_t)'9') return 0;
         }
     }
-    if (name_size == 0u || (name_size == 1u && bytes[0] == (uint8_t)'.') ||
+    if (name_size == 0u || name_size >= SCHWAY_DISC_SYSTEM_CNF_COMPONENT_BYTES ||
+        (name_size == 1u && bytes[0] == (uint8_t)'.') ||
         (name_size == 2u && bytes[0] == (uint8_t)'.' && bytes[1] == (uint8_t)'.')) return 0;
-    memcpy(out, bytes, size);
-    out[size] = '\0';
+    memcpy(out, bytes, name_size);
+    out[name_size] = '\0';
     *canonical_size = name_size;
     return 1;
 }

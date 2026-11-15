@@ -1074,6 +1074,12 @@ static schway_disc_image_status schway__disc_image_open_m3u(
                                                   line, "recursive playlists are not supported");
             goto done;
         }
+        if (schway__disc_image_path_is_unsupported(entry)) {
+            schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED, line,
+                                         schway__disc_image_unsupported_reason(entry));
+            status = SCHWAY_DISC_IMAGE_UNSUPPORTED;
+            goto done;
+        }
         char candidate[SCHWAY__DISC_IMAGE_PATH_CAP];
         char canonical[SCHWAY__DISC_IMAGE_PATH_CAP];
         if (!schway__disc_image_child_path(root, entry, candidate) ||
