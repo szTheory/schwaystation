@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 3
+open_count: 7
 waived_count: 4
 fixed_count: 0
-total_count: 7
-last_updated: 2026-11-15T16:16:59.252Z
+total_count: 11
+last_updated: 2026-11-15T16:42:47.169Z
 ---
 
 # Broken Windows Ledger
@@ -22,6 +22,10 @@ last_updated: 2026-11-15T16:16:59.252Z
 | 5 | 05 | deviation | .planning/phases/05-the-sound-matches-the-console/05-05-SUMMARY.md |  | Split remaining DMA4 timing, DEV4, seven-case comparator, and nightly work into plan 05-21 at the 30-minute target. | open |  | 2026-11-14T01:34:02.691Z |  |
 | 6 | 05 | stub | src/spu_reverb.c | 79 | The 22.05 kHz reverb feedback stage remains a unity pass-through seam; plan 05-10 replaces it with register-driven feedback. | open |  | 2026-11-14T06:29:30.694Z |  |
 | 7 | 06 | deviation | .planning/phases/06-discs-and-fmv/06-02-PLAN.md |  | Registered the test target before Task 1 RED because its required verification depended on Task 2 CMake wiring. | waived | Documented sequencing adjustment; the test wiring and required compatibility check passed, with no product defect or owner action. | 2026-11-15T16:16:55.624Z | 2026-11-15T16:16:59.252Z |
+| 8 | 06 | stub | src/cdrom.c | 180 | CD-ROM MMIO reads return zero and writes are ignored until Plans 06-04 and 06-05 add command and sector behavior. | open |  | 2026-11-15T16:42:46.664Z |  |
+| 9 | 06 | stub | src/mdec.c | 124 | MDEC MMIO reads return zero and writes are ignored until Plan 06-11 adds command and block behavior. | open |  | 2026-11-15T16:42:46.800Z |  |
+| 10 | 06 | stub | src/cdrom.c | 38 | The CD-ROM field visitor is not called by state.c until Plan 06-26 wires state integration. | open |  | 2026-11-15T16:42:46.984Z |  |
+| 11 | 06 | stub | src/mdec.c | 54 | The MDEC field visitor is not called by state.c until Plan 06-26 wires state integration. | open |  | 2026-11-15T16:42:47.169Z |  |
 
 ````json
 [
@@ -114,6 +118,58 @@ last_updated: 2026-11-15T16:16:59.252Z
     "reason": "Documented sequencing adjustment; the test wiring and required compatibility check passed, with no product defect or owner action.",
     "recorded_at": "2026-11-15T16:16:55.624Z",
     "resolved_at": "2026-11-15T16:16:59.252Z",
+    "milestone": "v1.0"
+  },
+  {
+    "id": 8,
+    "kind": "stub",
+    "phase": "06",
+    "file": "src/cdrom.c",
+    "line": 180,
+    "description": "CD-ROM MMIO reads return zero and writes are ignored until Plans 06-04 and 06-05 add command and sector behavior.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T16:42:46.664Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 9,
+    "kind": "stub",
+    "phase": "06",
+    "file": "src/mdec.c",
+    "line": 124,
+    "description": "MDEC MMIO reads return zero and writes are ignored until Plan 06-11 adds command and block behavior.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T16:42:46.800Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 10,
+    "kind": "stub",
+    "phase": "06",
+    "file": "src/cdrom.c",
+    "line": 38,
+    "description": "The CD-ROM field visitor is not called by state.c until Plan 06-26 wires state integration.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T16:42:46.984Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 11,
+    "kind": "stub",
+    "phase": "06",
+    "file": "src/mdec.c",
+    "line": 54,
+    "description": "The MDEC field visitor is not called by state.c until Plan 06-26 wires state integration.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T16:42:47.169Z",
+    "resolved_at": null,
     "milestone": "v1.0"
   }
 ]

@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-11-15T16:18:12.084Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-11-15T16:43:41.993Z"
 last_activity: 2026-11-15
-last_activity_desc: Completed Phase 6 plan 06-01; next is 06-02
-state_head: 93c065ccb1c962c9ea21555ce334a61bc85d3a4b
+last_activity_desc: Completed Phase 6 plan 06-03; next is 06-04
+state_head: f290366ee89eb59c7d405a16ef888a0933266c4b
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 176
-  completed_plans: 152
+  completed_plans: 153
   percent: 83
-current_plan: 2
+current_plan: 3
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Plan: 3 of 26
+Plan: 4 of 26
 Status: Ready to execute
-Last activity: 2026-11-15 — Phase 6 execution started
+Last activity: 2026-11-15 — Completed 06-03; next is 06-04
 
 Progress: [████████░░] 83%
 
@@ -214,6 +214,7 @@ Progress: [████████░░] 83%
 | Phase 05 P19 | about 30m wall across restart; exact active time unavailable | 2 tasks | 9 files |
 | Phase 06 P01 | 12m | 2 tasks | 8 files |
 | Phase 06 P02 | 26min | 2 tasks | 7 files |
+| Phase 06 P03 | 18min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -523,6 +524,9 @@ Recent decisions affecting current work:
 - [Phase 06]: Subsystem inventories remain empty until their behavior callers are implemented and registered.
 - [Phase 06]: Phase 6 API v5 installs the first disc once with schway_open_disc; replacements require an open lid and schway_swap_disc.
 - [Phase 06]: Host disc callbacks and checked TOC metadata are copied into non-serialized instance state; invalid metadata and closed-lid swaps validate before apply.
+- [Phase 06]: CD-ROM and MDEC state uses fixed per-instance buffers sized for the accepted algorithms.
+- [Phase 06]: Host disc callbacks and TOC metadata remain outside device state visitors.
+- [Phase 06]: Scheduler event ties follow timers, GPU, DMA, CD-ROM, SPU, SIO, MDEC.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -588,6 +592,7 @@ come from `AGENTS.md`.
 | 2026-11-15 | /gsd-plan-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; 26 plans, 19 waves; schema/structure, command/failure probes, decision and requirement coverage; post-planning gaps clear | GPT-6 session (exact model ID not exposed); planner gpt-6.1-sol high; researcher and checker gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-execute-plan 06-01 | Codex, OpenGSD 1.20.0; sequential shared checkout; subsystem skeleton and inventories; tracer 19/19 and policy 4/4; 12 min | gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-execute-plan 06-02 | Codex, OpenGSD 1.20.0; sequential shared checkout; disc callback API and API v1–v4 compatibility checks; 26 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-03 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded CD/MDEC state, reset/visitor contracts, MMIO and fixed-order scheduler integration; focused lane 8/8 after each task; 18 min | gpt-6-luna xhigh |
 | 2026-10-19 | /gsd-discuss-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-plan-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-execute-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
@@ -716,8 +721,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T16:16:47.356Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-11-15T16:43:41.628Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -783,3 +788,7 @@ Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-01 comp
 ### Phase 6 plan 06-02 execution (2026-11-15)
 
 Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-02 completed in 26 minutes with two task commits. API v5 host disc attachment, copied TOC validation, and closed-lid swap coverage landed; the focused disc API test and API v1-v4 compatibility checks passed. Phase 6 is at plan 3 of 26.
+
+### Phase 6 plan 06-03 execution (2026-11-15)
+
+Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-03 completed in 18 minutes with two task commits. Bounded instance-owned CD/MDEC state, POWER reset and field visitors landed; bus dispatch and scheduler deadlines were connected. The required configure/build plus no-busy-loop/scheduler command passed 8/8 after each task. No hosted URL applies to these local checks. The plan's task-level TDD tags had no new test files or direct behavior tests in scope; first CD/MDEC behavior callers and state serialization remain assigned to Plans 06-04/06-11/06-26. Phase 6 is at plan 4 of 26.
