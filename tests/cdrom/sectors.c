@@ -334,6 +334,30 @@ static void test_sector_timing_and_data(void)
     CHECK_EQ_HEX(sector_ram_word(inst, 0x4008u), 0x26252423u);
     CHECK_EQ_HEX(sector_ram_word(inst, 0x400Cu), 0x2A292827u);
     CHECK_EQ_U64(inst->cdrom.sector_offset, 19u);
+    sector_run(inst, 200u, &host);
+    sector_wr32(inst, DMA_MADR3, 0x4010u);
+    sector_wr32(inst, DMA_BCR3, 508u);
+    sector_wr32(inst, DMA_CHCR3, 0x11000000u);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x4FFCu), 0xF8F8F817u);
+    CHECK_EQ_U64(inst->cdrom.sector_offset, 2048u);
+    CHECK_EQ_U64(sector_rd8(inst, 2u), 0xF8u);
+    sector_run(inst, 13000u, &host);
+    CHECK_EQ_U64(inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY, 0u);
+
+    /* A no-buffer transfer stays idle until forced by CHCR bit 28; reset has
+       discarded the prior sector, so the forced tail read supplies zero. */
+    sector_wr8(inst, 0u, 1u);
+    sector_wr8(inst, 3u, 0x80u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 0u);
+    CHECK_EQ_U64(inst->cdrom.sector_offset, 0u);
+    sector_wr32(inst, DMA_MADR3, 0x5000u);
+    sector_wr32(inst, DMA_BCR3, 1u);
+    sector_wr32(inst, DMA_CHCR3, 0x01000000u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK((inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    sector_wr32(inst, DMA_CHCR3, 0u);
+    sector_wr32(inst, DMA_CHCR3, 0x11000000u);
+    CHECK_EQ_U64(sector_ram_word(inst, 0x5000u), 0u);
     schway_destroy(inst);
 }
 
