@@ -25,6 +25,8 @@
 #define SCHWAY__DISC_IMAGE_TRACK_LIMIT 99u
 #define SCHWAY__DISC_IMAGE_INDEX_LIMIT 99u
 #define SCHWAY__DISC_IMAGE_PATH_CAP 4096u
+#define SCHWAY__DISC_IMAGE_M3U_MAX_BYTES 65536u
+#define SCHWAY__DISC_IMAGE_M3U_ENTRY_MAX SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT
 
 typedef struct schway__disc_image_source {
     char name[SCHWAY__DISC_IMAGE_CUE_NAME_MAX + 1u];
@@ -62,6 +64,10 @@ typedef struct schway__disc_image_track {
 struct schway_disc_image {
     size_t source_count;
     size_t track_count;
+    size_t playlist_count;
+    char *path;
+    char label[SCHWAY__DISC_IMAGE_CUE_NAME_MAX + 1u];
+    schway_disc_image *playlist[SCHWAY__DISC_IMAGE_M3U_ENTRY_MAX];
     schway__disc_image_source sources[SCHWAY__DISC_IMAGE_TRACK_LIMIT];
     schway__disc_image_track tracks[SCHWAY__DISC_IMAGE_TRACK_LIMIT];
     schway_disc descriptor;
@@ -102,6 +108,14 @@ static int schway__disc_image_extension_is(const char *path, const char *extensi
         return 0;
     }
     return schway__disc_image_word_is(dot, extension);
+}
+
+static int schway__disc_image_path_is_unsupported(const char *path)
+{
+    return schway__disc_image_extension_is(path, ".chd") ||
+           schway__disc_image_extension_is(path, ".pbp") ||
+           schway__disc_image_extension_is(path, ".ecm") ||
+           schway__disc_image_extension_is(path, ".ccd");
 }
 
 static FILE *schway__disc_image_open_readonly(const char *path)
@@ -544,6 +558,36 @@ static int schway__disc_image_canonical_path(const char *path, char out[SCHWAY__
 #endif
 }
 
+static int schway__disc_image_store_path(schway_disc_image *image, const char *path)
+{
+    size_t size = strlen(path);
+    size_t label_start = 0u;
+    size_t label_size;
+    if (size == 0u || size >= SCHWAY__DISC_IMAGE_PATH_CAP) return 0;
+    image->path = (char *)malloc(size + 1u);
+    if (image->path == NULL) return 0;
+    memcpy(image->path, path, size + 1u);
+    for (size_t i = 0u; i < size; i++) {
+        if (path[i] == '/' || path[i] == '\\') label_start = i + 1u;
+    }
+    label_size = size - label_start;
+    if (label_size > SCHWAY__DISC_IMAGE_CUE_NAME_MAX) {
+        label_size = SCHWAY__DISC_IMAGE_CUE_NAME_MAX;
+    }
+    memcpy(image->label, path + label_start, label_size);
+    image->label[label_size] = '\0';
+    return 1;
+}
+
+static const char *schway__disc_image_unsupported_reason(const char *path)
+{
+    if (schway__disc_image_extension_is(path, ".chd")) return "unsupported: CHD (planned v2.0)";
+    if (schway__disc_image_extension_is(path, ".pbp")) return "unsupported: PBP (planned v2.0)";
+    if (schway__disc_image_extension_is(path, ".ecm")) return "unsupported: ECM (planned v2.0)";
+    if (schway__disc_image_extension_is(path, ".ccd")) return "unsupported: CCD (planned v2.0)";
+    return "unsupported disc image";
+}
+
 static int schway__disc_image_cue_directory(const char *cue_path,
                                              char out[SCHWAY__DISC_IMAGE_PATH_CAP])
 {
@@ -648,6 +692,12 @@ static schway_disc_image_status schway__disc_image_open_cue_children(
         schway__disc_image_source *source = &image->sources[i];
         char candidate[SCHWAY__DISC_IMAGE_PATH_CAP];
         char canonical[SCHWAY__DISC_IMAGE_PATH_CAP];
+        if (schway__disc_image_path_is_unsupported(source->name)) {
+            schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                                         source->line,
+                                         schway__disc_image_unsupported_reason(source->name));
+            return SCHWAY_DISC_IMAGE_UNSUPPORTED;
+        }
         if (!schway__disc_image_child_path(root, source->name, candidate) ||
             !schway__disc_image_canonical_path(candidate, canonical) ||
             !schway__disc_image_path_contained(root, canonical)) {
@@ -908,6 +958,153 @@ static schway_disc_image_status schway__disc_image_open_cue(
     return SCHWAY_DISC_IMAGE_OK;
 }
 
+static schway_disc_image_status schway__disc_image_m3u_error(
+    schway_disc_image_error *error, schway_disc_image_status status,
+    uint32_t line, const char *reason)
+{
+    char message[96];
+    const char *name = status == SCHWAY_DISC_IMAGE_LIMIT ? "BAD_M3U LIMIT" : "BAD_M3U";
+    if (line == 0u) (void)snprintf(message, sizeof message, "%s: %s", name, reason);
+    else (void)snprintf(message, sizeof message, "%s line %u: %s", name, line, reason);
+    schway__disc_image_error_set(error, status, line, message);
+    return status;
+}
+
+static schway_disc_image_status schway__disc_image_open_m3u(
+    const char *path, schway_disc_image *image, schway_disc_image_error *error)
+{
+    FILE *file = schway__disc_image_open_readonly(path);
+    char root[SCHWAY__DISC_IMAGE_PATH_CAP];
+    uint64_t file_size;
+    char *text = NULL;
+    schway_disc_image_status status = SCHWAY_DISC_IMAGE_OK;
+    if (file == NULL) {
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_IO, 0u,
+                                     "cannot open m3u playlist");
+        return SCHWAY_DISC_IMAGE_IO;
+    }
+    if (!schway__disc_image_file_size(file, &file_size)) {
+        (void)fclose(file);
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_IO, 0u,
+                                     "cannot size m3u playlist");
+        return SCHWAY_DISC_IMAGE_IO;
+    }
+    if (file_size > SCHWAY__DISC_IMAGE_M3U_MAX_BYTES) {
+        (void)fclose(file);
+        return schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_LIMIT, 0u,
+                                            "playlist exceeds 64 KiB");
+    }
+    if (file_size == 0u) {
+        (void)fclose(file);
+        return schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U, 0u,
+                                            "playlist has no entries");
+    }
+    text = (char *)malloc((size_t)file_size + 1u);
+    if (text == NULL) {
+        (void)fclose(file);
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_OUT_OF_MEMORY, 0u,
+                                     "out of memory reading m3u playlist");
+        return SCHWAY_DISC_IMAGE_OUT_OF_MEMORY;
+    }
+    int read_failed = fread(text, 1u, (size_t)file_size, file) != (size_t)file_size;
+    if (fclose(file) != 0) read_failed = 1;
+    if (read_failed) {
+        free(text);
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_IO, 0u,
+                                     "cannot read m3u playlist");
+        return SCHWAY_DISC_IMAGE_IO;
+    }
+    text[file_size] = '\0';
+    if (!schway__disc_image_cue_directory(path, root)) {
+        free(text);
+        return schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U, 1u,
+                                            "cannot resolve playlist directory");
+    }
+    size_t offset = 0u;
+    uint32_t line = 0u;
+    while (offset < (size_t)file_size) {
+        size_t start = offset;
+        size_t end;
+        size_t first;
+        size_t last;
+        line++;
+        while (offset < (size_t)file_size && text[offset] != '\n') offset++;
+        end = offset;
+        if (offset < (size_t)file_size) offset++;
+        if (end > start && text[end - 1u] == '\r') end--;
+        first = start;
+        last = end;
+        for (size_t i = start; i < end; i++) {
+            unsigned char c = (unsigned char)text[i];
+            if (c < 0x20u && c != (unsigned char)'\t') {
+                status = schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U,
+                                                      line, "non-text byte in playlist");
+                goto done;
+            }
+            if (c > 0x7eu) {
+                status = schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U,
+                                                      line, "playlist must be ASCII");
+                goto done;
+            }
+        }
+        while (first < last && (text[first] == ' ' || text[first] == '\t')) first++;
+        while (last > first && (text[last - 1u] == ' ' || text[last - 1u] == '\t')) last--;
+        if (first == last || text[first] == '#') continue;
+        if (last - first > SCHWAY__DISC_IMAGE_CUE_NAME_MAX) {
+            status = schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U,
+                                                  line, "image path exceeds 255 bytes");
+            goto done;
+        }
+        if (image->playlist_count >= SCHWAY__DISC_IMAGE_M3U_ENTRY_MAX) {
+            status = schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                                  line, "playlist exceeds 32 images");
+            goto done;
+        }
+        char entry[SCHWAY__DISC_IMAGE_CUE_NAME_MAX + 1u];
+        size_t entry_size = last - first;
+        memcpy(entry, text + first, entry_size);
+        entry[entry_size] = '\0';
+        if (!schway__disc_image_safe_name(entry)) {
+            status = schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U,
+                                                  line, "unsafe or invalid image path");
+            goto done;
+        }
+        if (schway__disc_image_extension_is(entry, ".m3u")) {
+            status = schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U,
+                                                  line, "recursive playlists are not supported");
+            goto done;
+        }
+        char candidate[SCHWAY__DISC_IMAGE_PATH_CAP];
+        char canonical[SCHWAY__DISC_IMAGE_PATH_CAP];
+        if (!schway__disc_image_child_path(root, entry, candidate) ||
+            !schway__disc_image_canonical_path(candidate, canonical) ||
+            !schway__disc_image_path_contained(root, canonical)) {
+            status = schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U,
+                                                  line, "missing or escaping image entry");
+            goto done;
+        }
+        schway_disc_image *child = NULL;
+        schway_disc_image_error child_error;
+        status = schway_disc_image_open(canonical, &child, &child_error);
+        if (status != SCHWAY_DISC_IMAGE_OK) {
+            if (error != NULL) {
+                *error = child_error;
+                error->line = line;
+            }
+            goto done;
+        }
+        image->playlist[image->playlist_count++] = child;
+    }
+    if (image->playlist_count == 0u) {
+        status = schway__disc_image_m3u_error(error, SCHWAY_DISC_IMAGE_BAD_M3U, 0u,
+                                              "playlist has no image entries");
+    }
+
+done:
+    free(text);
+    return status;
+}
+
 static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
                                                uint8_t sector[2352], uint8_t subcode[96])
 {
@@ -979,6 +1176,7 @@ schway_disc_image_status schway_disc_image_open(const char *path,
 {
     schway_disc_image *image;
     schway_disc_image_status status;
+    char canonical[SCHWAY__DISC_IMAGE_PATH_CAP];
     if (out == NULL || path == NULL || path[0] == '\0') {
         schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_BAD_ARGUMENT, 0u,
                                      "invalid disc image path or output");
@@ -989,31 +1187,22 @@ schway_disc_image_status schway_disc_image_open(const char *path,
         memset(error, 0, sizeof *error);
         error->size = (uint32_t)sizeof *error;
     }
-    if (schway__disc_image_extension_is(path, ".chd")) {
+    if (schway__disc_image_path_is_unsupported(path)) {
         schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u,
-                                     "unsupported: CHD (planned v2.0)");
-        return SCHWAY_DISC_IMAGE_UNSUPPORTED;
-    }
-    if (schway__disc_image_extension_is(path, ".pbp")) {
-        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u,
-                                     "unsupported: PBP (planned v2.0)");
-        return SCHWAY_DISC_IMAGE_UNSUPPORTED;
-    }
-    if (schway__disc_image_extension_is(path, ".ecm")) {
-        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u,
-                                     "unsupported: ECM (planned v2.0)");
-        return SCHWAY_DISC_IMAGE_UNSUPPORTED;
-    }
-    if (schway__disc_image_extension_is(path, ".ccd")) {
-        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u,
-                                     "unsupported: CCD (planned v2.0)");
+                                     schway__disc_image_unsupported_reason(path));
         return SCHWAY_DISC_IMAGE_UNSUPPORTED;
     }
     if (!schway__disc_image_extension_is(path, ".iso") &&
-        !schway__disc_image_extension_is(path, ".cue")) {
+        !schway__disc_image_extension_is(path, ".cue") &&
+        !schway__disc_image_extension_is(path, ".m3u")) {
         schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_BAD_IMAGE, 0u,
-                                     "expected a cue sheet or ISO image");
+                                     "expected a cue sheet, ISO image, or m3u playlist");
         return SCHWAY_DISC_IMAGE_BAD_IMAGE;
+    }
+    if (!schway__disc_image_canonical_path(path, canonical)) {
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_IO, 0u,
+                                     "cannot resolve disc image path");
+        return SCHWAY_DISC_IMAGE_IO;
     }
     image = (schway_disc_image *)calloc(1u, sizeof *image);
     if (image == NULL) {
@@ -1021,10 +1210,18 @@ schway_disc_image_status schway_disc_image_open(const char *path,
                                      "out of memory opening disc image");
         return SCHWAY_DISC_IMAGE_OUT_OF_MEMORY;
     }
-    if (schway__disc_image_extension_is(path, ".iso")) {
-        status = schway__disc_image_open_iso(path, image, error);
+    if (!schway__disc_image_store_path(image, canonical)) {
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_OUT_OF_MEMORY, 0u,
+                                     "out of memory storing disc image path");
+        schway_disc_image_close(image);
+        return SCHWAY_DISC_IMAGE_OUT_OF_MEMORY;
+    }
+    if (schway__disc_image_extension_is(canonical, ".iso")) {
+        status = schway__disc_image_open_iso(canonical, image, error);
+    } else if (schway__disc_image_extension_is(canonical, ".m3u")) {
+        status = schway__disc_image_open_m3u(canonical, image, error);
     } else {
-        status = schway__disc_image_open_cue(path, image, error);
+        status = schway__disc_image_open_cue(canonical, image, error);
     }
     if (status != SCHWAY_DISC_IMAGE_OK) {
         schway_disc_image_close(image);
@@ -1038,16 +1235,61 @@ schway_disc_image_status schway_disc_image_open(const char *path,
 void schway_disc_image_close(schway_disc_image *image)
 {
     if (image == NULL) return;
+    for (size_t i = 0u; i < image->playlist_count; i++) {
+        schway_disc_image_close(image->playlist[i]);
+    }
     for (size_t i = 0u; i < image->source_count; i++) {
         if (image->sources[i].file != NULL) (void)fclose(image->sources[i].file);
         free(image->sources[i].canonical_path);
     }
+    free(image->path);
     free(image);
 }
 
 const schway_disc *schway_disc_image_disc(const schway_disc_image *image)
 {
-    return image == NULL ? NULL : &image->descriptor;
+    if (image == NULL) return NULL;
+    if (image->playlist_count != 0u) return schway_disc_image_disc(image->playlist[0]);
+    return &image->descriptor;
+}
+
+uint32_t schway_disc_image_count(const schway_disc_image *image)
+{
+    if (image == NULL) return 0u;
+    return image->playlist_count != 0u ? (uint32_t)image->playlist_count : 1u;
+}
+
+schway_disc_image_status schway_disc_image_select(const schway_disc_image *image,
+                                                  uint32_t index,
+                                                  const schway_disc **out)
+{
+    if (out == NULL) return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
+    *out = NULL;
+    if (image == NULL) return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
+    if (image->playlist_count == 0u) {
+        if (index != 0u) return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
+        *out = &image->descriptor;
+        return SCHWAY_DISC_IMAGE_OK;
+    }
+    if (index >= image->playlist_count) return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
+    *out = schway_disc_image_disc(image->playlist[index]);
+    return *out == NULL ? SCHWAY_DISC_IMAGE_BAD_M3U : SCHWAY_DISC_IMAGE_OK;
+}
+
+const char *schway_disc_image_path(const schway_disc_image *image, uint32_t index)
+{
+    if (image == NULL) return NULL;
+    if (image->playlist_count == 0u) return index == 0u ? image->path : NULL;
+    if (index >= image->playlist_count) return NULL;
+    return schway_disc_image_path(image->playlist[index], 0u);
+}
+
+const char *schway_disc_image_label(const schway_disc_image *image, uint32_t index)
+{
+    if (image == NULL) return NULL;
+    if (image->playlist_count == 0u) return index == 0u ? image->label : NULL;
+    if (index >= image->playlist_count) return NULL;
+    return schway_disc_image_label(image->playlist[index], 0u);
 }
 
 const char *schway_disc_image_status_string(schway_disc_image_status status)
@@ -1061,6 +1303,8 @@ const char *schway_disc_image_status_string(schway_disc_image_status status)
     case SCHWAY_DISC_IMAGE_LIMIT: return "disc image exceeds limits";
     case SCHWAY_DISC_IMAGE_OUT_OF_MEMORY: return "out of memory";
     case SCHWAY_DISC_IMAGE_UNSUPPORTED: return "unsupported disc image";
+    case SCHWAY_DISC_IMAGE_BAD_M3U: return "BAD_M3U";
+    case SCHWAY_DISC_IMAGE_BAD_SYSCNF: return "BAD_SYSCNF";
     }
     return "unknown disc image status";
 }

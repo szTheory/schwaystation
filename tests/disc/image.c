@@ -689,6 +689,11 @@ static int test_playlist(const char *directory)
     static const char playlist[] = "# Two images\r\n\r\n first.iso \r\nsecond.iso\n";
     schway_disc_image *image = NULL;
     schway_disc_image_error error;
+    const schway_disc *first_disc = NULL;
+    const schway_disc *second_disc = NULL;
+    const schway_disc *invalid_disc = NULL;
+    uint8_t sector[2352];
+    uint8_t subcode[96];
     int result = 0;
 
     CHECK(make_path(playlist_path, directory, "schway-disc-playlist-test.m3u") &&
@@ -702,8 +707,29 @@ static int test_playlist(const char *directory)
     memset(&error, 0, sizeof error);
     CHECK(schway_disc_image_open(playlist_path, &image, &error) == SCHWAY_DISC_IMAGE_OK,
           "expected a bounded two-image m3u to open");
-    CHECK(schway_disc_image_disc(image) != NULL,
-          "expected the first playlist entry to expose a disc descriptor");
+    CHECK(schway_disc_image_count(image) == 2u,
+          "expected both playlist entries to be retained");
+    CHECK(schway_disc_image_select(image, 0u, &first_disc) == SCHWAY_DISC_IMAGE_OK &&
+          first_disc == schway_disc_image_disc(image),
+          "expected index zero to expose the initial disc descriptor");
+    CHECK(schway_disc_image_select(image, 1u, &second_disc) == SCHWAY_DISC_IMAGE_OK &&
+          second_disc != NULL && second_disc != first_disc,
+          "expected index one to prepare a distinct disc descriptor");
+    CHECK(strcmp(schway_disc_image_label(image, 0u), "first.iso") == 0 &&
+          strcmp(schway_disc_image_label(image, 1u), "second.iso") == 0 &&
+          schway_disc_image_path(image, 0u) != NULL &&
+          schway_disc_image_path(image, 1u) != NULL,
+          "expected bounded path and basename label metadata for each image");
+    CHECK(schway_disc_image_select(image, 2u, &invalid_disc) == SCHWAY_DISC_IMAGE_BAD_ARGUMENT &&
+          invalid_disc == NULL && schway_disc_image_disc(image) == first_disc,
+          "expected invalid selection to preserve the initial provider image");
+    CHECK(first_disc->read_sector(first_disc->user, 0u, sector, subcode) == 1u,
+          "expected the first selected image to read a sector");
+    CHECK(sector[16] == 0x11u,
+          "expected index zero to read bytes from the first playlist image");
+    CHECK(second_disc->read_sector(second_disc->user, 0u, sector, subcode) == 1u &&
+          sector[16] == 0x71u,
+          "expected index one to read bytes from the second playlist image");
 
 cleanup:
     schway_disc_image_close(image);
