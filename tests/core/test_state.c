@@ -244,8 +244,8 @@ static void test_rejects(void)
     expect_refused("format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
-    put_le(bad + H_FORMAT, 4u, 4u);
-    expect_refused("released revision-4 state", target, bad, n,
+    put_le(bad + H_FORMAT, 5u, 4u);
+    expect_refused("released revision-5 state", target, bad, n,
                    SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
@@ -606,7 +606,7 @@ static void seed_cdrom_mdec(schway *inst)
     inst->mdec.control = 3u;
     inst->mdec.command_active = 1u;
     inst->mdec.block_pending = 1u;
-    inst->mdec.block_deadline = 3000u;
+    inst->mdec.block_deadline = 900u;
 }
 
 static void test_cdrom_mdec_state(void)
@@ -668,7 +668,11 @@ static void test_cdrom_mdec_state(void)
     size_t n = save(src, good);
     CHECK_EQ_U64(save(dst, bad), n);
     CHECK(memcmp(good, bad, n) == 0);
+    memset(&dst->cdrom, 0, sizeof dst->cdrom);
+    memset(&dst->mdec, 0, sizeof dst->mdec);
     CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK(memcmp(&dst->cdrom, &src->cdrom, sizeof src->cdrom) == 0);
+    CHECK(memcmp(&dst->mdec, &src->mdec, sizeof src->mdec) == 0);
     CHECK_EQ_U64(dst->disc_host.callbacks.user, (uintptr_t)dst);
     CHECK(dst->disc_host.callbacks.read_sector == disc_read_b);
     CHECK_EQ_U64(dst->disc_host.attached, 1u);
@@ -1194,8 +1198,8 @@ static void test_cpu_fields(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 5u);
-    CHECK_EQ_U64(v.behaviour_revision, 5u);
+    CHECK_EQ_U64(v.state_format, 6u);
+    CHECK_EQ_U64(v.behaviour_revision, 6u);
 
     schway *inst = make(SCHWAY_REGION_NTSC_U);
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);

@@ -9,7 +9,7 @@
              instance.exe_loaded, the bus (RAM, scratchpad, memory control,
              unbuilt-device counters), irq, dma, the root counters and the
              first-fault record, digital pad, SIO0 transport and card protocol,
-             including staged write payloads
+             including staged write payloads, SPU, CD-ROM and MDEC machine state
    One field list drives every pass (state.h), so they cannot drift apart. A
    struct is never copied as a whole: padding, pointers and the allocator
    never reach the bytes. The audio ring is not saved; a load empties it.
@@ -115,6 +115,8 @@ static void body_io(struct schway__state_io *io, schway *inst)
     schway__sio_state_io(io, inst, ticks);
     schway__card_state_io(io, inst);
     schway__spu_state_io(io, inst, ticks);
+    schway__cdrom_state_io(io, inst, ticks);
+    schway__mdec_state_io(io, inst, ticks);
 }
 
 /* The whole state, in the order the format fixes. */
