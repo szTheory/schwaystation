@@ -75,8 +75,11 @@ static int test_iso_sector(const char *directory)
           "expected normalized MODE1 raw sync and header");
     CHECK(memcmp(sector + 16u, expected, sizeof expected) == 0,
           "expected the exact cooked sector payload at the raw user-data offset");
-    CHECK(sector[2064] == 0u && sector[2351] == 0u,
-          "expected deterministic normalized raw-sector tail");
+    CHECK(sector[2064] == 0xe7u && sector[2065] == 0x22u &&
+          sector[2066] == 0x16u && sector[2067] == 0xfeu &&
+          sector[2076] == 0xebu && sector[2077] == 0x0fu &&
+          sector[2351] == 0xeau,
+          "expected the MODE1 EDC and parity in the raw-sector trailer");
     CHECK(subcode[0] == 0u && subcode[95] == 0u,
           "expected absent subcode to be zero filled");
     memset(sector, 0xa5, sizeof sector);
