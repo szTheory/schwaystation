@@ -124,6 +124,14 @@ struct schway__trace_ring {
     uint32_t head, count;
 };
 
+/* Host callbacks and their checked TOC are not serialized device state. */
+struct schway__disc_host {
+    schway_disc callbacks;
+    schway_toc toc;
+    uint32_t attached;
+    uint32_t lid_open;
+};
+
 struct schway {
     schway_allocator allocator; /* the caller's, copied at create */
     size_t alloc_size;          /* the size given to alloc, given back to free */
@@ -161,6 +169,7 @@ struct schway {
     struct schway__trace_ring trace;
     uint32_t exit_pending;      /* the guest wrote the exit port */
     uint32_t exit_code;         /* the byte it wrote */
+    struct schway__disc_host disc_host;
 };
 
 /* Frame cycles per region, numerator and denominator. */
@@ -351,6 +360,9 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__FAULT_SIZE_FIRST 56u
 #define SCHWAY__TTY_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__TRACE_SIZE_FIRST 64u
+#define SCHWAY__DISC_TRACK_SIZE_FIRST ((uint32_t)sizeof(schway_disc_track))
+#define SCHWAY__TOC_SIZE_FIRST ((uint32_t)sizeof(schway_toc))
+#define SCHWAY__DISC_SIZE_FIRST ((uint32_t)sizeof(schway_disc))
 _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first size");
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
@@ -372,6 +384,26 @@ _Static_assert(sizeof(schway_bios_info) == 48, "bios_info size");
 _Static_assert(SCHWAY__FAULT_SIZE_FIRST == sizeof(schway_fault), "fault first size");
 _Static_assert(SCHWAY__TTY_SIZE_FIRST == sizeof(schway_tty), "tty first size");
 _Static_assert(SCHWAY__TRACE_SIZE_FIRST == sizeof(schway_trace), "trace first size");
+_Static_assert(SCHWAY__DISC_TRACK_SIZE_FIRST == sizeof(schway_disc_track), "disc track first size");
+_Static_assert(SCHWAY__TOC_SIZE_FIRST == sizeof(schway_toc), "toc first size");
+_Static_assert(SCHWAY__DISC_SIZE_FIRST == sizeof(schway_disc), "disc first size");
+_Static_assert(offsetof(schway_disc_track, type) == 4, "disc track.type");
+_Static_assert(offsetof(schway_disc_track, index0) == 8, "disc track.index0");
+_Static_assert(offsetof(schway_disc_track, index1) == 12, "disc track.index1");
+_Static_assert(offsetof(schway_disc_track, pregap) == 16, "disc track.pregap");
+_Static_assert(offsetof(schway_disc_track, leadout) == 20, "disc track.leadout");
+_Static_assert(offsetof(schway_disc_track, reserved0) == 24, "disc track.reserved0");
+_Static_assert(sizeof(schway_disc_track) == 28, "disc track size");
+_Static_assert(offsetof(schway_toc, track_count) == 4, "toc.track_count");
+_Static_assert(offsetof(schway_toc, reserved0) == 8, "toc.reserved0");
+_Static_assert(offsetof(schway_toc, tracks) == 12, "toc.tracks");
+_Static_assert(sizeof(schway_toc) == 12 + SCHWAY_DISC_MAX_TRACKS * sizeof(schway_disc_track), "toc size");
+_Static_assert(offsetof(schway_disc, reserved0) == 4, "disc.reserved0");
+_Static_assert(offsetof(schway_disc, user) == 8, "disc.user");
+_Static_assert(offsetof(schway_disc, read_sector) == 8 + SCHWAY__P, "disc.read_sector");
+_Static_assert(offsetof(schway_disc, toc) == 8 + 2 * SCHWAY__P, "disc.toc");
+_Static_assert(offsetof(schway_disc, bad_q) == 8 + 3 * SCHWAY__P, "disc.bad_q");
+_Static_assert(sizeof(schway_disc) == 8 + 4 * SCHWAY__P, "disc size");
 
 /* The public fault kinds and devices are the internal ones, number for number. */
 _Static_assert(SCHWAY_FAULT_NONE == SCHWAY__FAULT_NONE, "fault none");
