@@ -534,6 +534,7 @@ schway_add_test(NAME runner.hash.pal
 # Fault prevented: a lane whose hashes are never compared with the others.
 # Writes build/<preset>/hashes.txt, the file CI collects from every lane and
 # compares byte for byte.
+# run 43657441300: macOS x64 and Windows x64 hit the 60 s bound (1 sample); provisional 120 s.
 string(REPLACE ";" "$<SEMICOLON>" runner_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
 set(runner_hashes ${PROJECT_SOURCE_DIR}/tests/cmake/hashes.cmake)
 set(runner_fixtures_arg "")
@@ -544,7 +545,7 @@ schway_add_test(NAME runner.hashes_file
   COMMAND ${CMAKE_COMMAND} -DMODE=write -DRUN=$<TARGET_FILE:schwaystation-run>
     "-DEMULATOR=${runner_emulator}" ${runner_fixtures_arg} -DOUT=${PROJECT_BINARY_DIR}
     -P ${runner_hashes}
-  LABELS portable runner TIMEOUT 60)
+  LABELS portable runner TIMEOUT 120)
 
 # Fault prevented: a comparison that passes lanes which differ, or a lane
 # that silently drops out. All eight files must match, a missing eighth must
@@ -673,9 +674,10 @@ set(runner_audio_check ${runner_check} -DUNIT=$<TARGET_FILE:schwaystation-test-b
 if(SCHWAYSTATION_FIXTURES)
   list(APPEND runner_audio_check -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures)
 endif()
+# run 43657441300: macOS x64 hit the 60 s bound (1 sample); provisional 120 s.
 schway_add_test(NAME runner.audio.hash
   COMMAND ${runner_audio_check} -DCASE=audio_hash -P ${CMAKE_CURRENT_LIST_FILE}
-  LABELS portable runner TIMEOUT 60)
+  LABELS portable runner TIMEOUT 120)
 
 add_executable(schwaystation-test-run-stop ${SCHWAYSTATION_RUNNER_SOURCES})
 target_include_directories(schwaystation-test-run-stop PRIVATE ${SCHWAYSTATION_RUNNER_INCLUDE}

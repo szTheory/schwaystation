@@ -999,8 +999,37 @@ static int test_audio_equality(const char *exe_path, const char *pcm_path, uint3
     p_unload_game();
     audio_expect(p_load_game(&game), "tone content reloads after unload");
     run_one();
-    audio_expect(first_frame_bytes != 0u && got_pairs * 4u == first_frame_bytes &&
-                     memcmp(got_audio, first_frame, first_frame_bytes) == 0,
+    size_t reload_audio_bytes = got_pairs * 4u;
+    uint8_t reload_audio[4u * MAX_PAIRS];
+    size_t reload_pairs = got_pairs < MAX_PAIRS ? got_pairs : MAX_PAIRS;
+    for (size_t pair = 0u; pair < reload_pairs; pair++) {
+        uint16_t left = (uint16_t)got_audio[2u * pair];
+        uint16_t right = (uint16_t)got_audio[2u * pair + 1u];
+        reload_audio[4u * pair] = (uint8_t)left;
+        reload_audio[4u * pair + 1u] = (uint8_t)(left >> 8);
+        reload_audio[4u * pair + 2u] = (uint8_t)right;
+        reload_audio[4u * pair + 3u] = (uint8_t)(right >> 8);
+    }
+    int reload_audio_equal = got_pairs <= MAX_PAIRS && first_frame_bytes != 0u &&
+                             reload_audio_bytes == first_frame_bytes &&
+                             memcmp(reload_audio, first_frame, first_frame_bytes) == 0;
+    if (!reload_audio_equal) {
+        size_t compared = reload_audio_bytes < first_frame_bytes ? reload_audio_bytes
+                                                                 : first_frame_bytes;
+        size_t byte = 0u;
+        while (byte < compared && reload_audio[byte] == first_frame[byte]) {
+            byte++;
+        }
+        fprintf(stderr, "reload PCM: got %lu bytes, expected %lu; first difference at %lu",
+                (unsigned long)reload_audio_bytes, (unsigned long)first_frame_bytes,
+                (unsigned long)byte);
+        if (byte < compared) {
+            fprintf(stderr, " (got 0x%02x, expected 0x%02x)",
+                    reload_audio[byte], first_frame[byte]);
+        }
+        fputc('\n', stderr);
+    }
+    audio_expect(reload_audio_equal,
                  "content reload clears queued samples and delivers its first frame intact");
     memset(&av, 0, sizeof av);
     p_get_system_av_info(&av);

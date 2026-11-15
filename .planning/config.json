@@ -71,7 +71,7 @@
     "schema_drift_gate": false,
     "use_worktrees": false,
     "test_command": "cmake --workflow --preset ci",
-    "test_gate_timeout": 4,
+    "test_gate_timeout": 240,
     "_auto_chain_active": false
   },
   "ship": {

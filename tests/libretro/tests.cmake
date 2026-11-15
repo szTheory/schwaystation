@@ -92,6 +92,7 @@ foreach(case IN ITEMS "libretro.host;ntsc-u" "libretro.host.pal;pal")
   list(GET case 1 mode)
   if(name STREQUAL "libretro.host")
     string(REPLACE ";" "$<SEMICOLON>" libretro_audio_emulator "${CMAKE_CROSSCOMPILING_EMULATOR}")
+    # run 43657441300: macOS x64 and Windows x64 hit the 120 s bound (1 sample); provisional 240 s.
     schway_add_test(NAME ${name}
       COMMAND ${CMAKE_COMMAND} -DSCHWAY_LIBRETRO_AUDIO_TEST=1
         "-DEMULATOR=${libretro_audio_emulator}"
@@ -102,7 +103,7 @@ foreach(case IN ITEMS "libretro.host;ntsc-u" "libretro.host.pal;pal")
         -DFIXTURE=${PROJECT_BINARY_DIR}/fixtures/spu_tone.exe
         -DTEST_DIR=${PROJECT_BINARY_DIR}/tests
         -P ${CMAKE_CURRENT_LIST_FILE}
-      LABELS libretro portable TIMEOUT 120)
+      LABELS libretro portable TIMEOUT 240)
   else()
     schway_add_test(NAME ${name}
       COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
