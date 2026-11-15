@@ -812,10 +812,10 @@ expect_runner(fixtures.trace.criterion5 7 "(^|\n)fault frame="
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/fault_unmapped_read.exe --trace first-fault)
 
 # Fault prevented: accesses to devices that are not built yet that leave no sign of a program stuck on
-# one, and a write to a gap that is dropped without a fault. An MDEC write ends with exit 0 and an
+# one, and a write to a gap that is dropped without a fault. An SIO1 write ends with exit 0 and an
 # unbuilt line; a write to 1F801030h is a first fault.
 expect_runner(fixtures.unbuilt_footer 0
-  "(^|\n)unbuilt dev=mdec n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
+  "(^|\n)unbuilt dev=sio n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/unbuilt.exe --stop-on mailbox --frames 30)
 expect_runner(fixtures.gap_write 7 "(^|\n)fault frame=[0-9]+ [^\n]* kind=unmapped_write(\n|$)"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/gap_write.exe --frames 30)
