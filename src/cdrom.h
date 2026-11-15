@@ -31,6 +31,7 @@ struct schway__cdrom {
     uint32_t status, mode, file, channel, last_command;
     uint32_t motor_on, read_active, play_active, seek_active;
     uint32_t paused, muted, drive_speed, drive_speed_changed, unlock_enabled, unlock_step;
+    uint32_t bfrd, sector_int1_pending, read_s, sector_retry;
     uint32_t current_lba, target_lba;
     uint32_t sector_head, sector_count, sector_offset;
     uint8_t sector[SCHWAY__CDROM_SECTOR_CAP][SCHWAY__CDROM_SECTOR_BYTES];
@@ -57,5 +58,10 @@ void schway__cdrom_io(schway *inst, uint32_t wr, uint32_t address, uint32_t widt
 
 uint64_t schway__cdrom_next(const schway *inst);
 void schway__cdrom_event(schway *inst, uint64_t now);
+uint8_t schway__cdrom_sector_read(schway *inst);
+void schway__cdrom_sector_schedule(schway *inst, uint64_t now);
+void schway__cdrom_sector_event(schway *inst, uint64_t now);
+void schway__cdrom_sector_ack(schway *inst);
+void schway__cdrom_push_interrupt(schway *inst, uint8_t code);
 
 #endif /* SCHWAYSTATION_CDROM_H */

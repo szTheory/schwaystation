@@ -1,9 +1,8 @@
 # CD-ROM controller
 
-This page documents the deterministic command and register model in `src/cdrom.c`. It covers the four indexed
-register banks, FIFOs, command responses, timing, region answers and lid changes. Disc-sector acquisition and delivery
-are separate work; the ReadN/ReadS and Play commands here change controller state, while the later sector path supplies
-data and INT1 responses. All deadlines use CPU ticks, integer arithmetic and the instance scheduler.
+This page documents the deterministic command and register model in `src/cdrom.c` and `src/cdrom_sector.c`.
+It covers the indexed registers, FIFOs, sector timing, RDDATA delivery, command responses, region answers and lid changes.
+All deadlines use CPU ticks, integer arithmetic and the instance scheduler.
 
 ## Register banks and FIFOs
 
@@ -22,7 +21,8 @@ Byte, halfword and word accesses are split into byte lanes by the bus.
 | `1803 W` | HCHPCTL | HCLRCTL | ATV2 | ADPCTL |
 
 HSTS reports the selected bank in bits 0-1, parameter empty/write-ready in bits 3-4, result ready in bit 5, sector
-data request in bit 6 and controller busy in bit 7. Bit 2 (ADPBUSY) stays clear until XA decoding is connected. The
+data request in bit 6 when BFRD is enabled and unread data is available, and controller busy in bit 7. Bit 2
+(ADPBUSY) stays clear until XA decoding is connected. The
 parameter and result FIFOs each hold 16 bytes. Writes to a full parameter FIFO are ignored; empty result reads return
 zero. The circular result FIFO preserves unread bytes when new responses wrap around it.
 
@@ -106,8 +106,18 @@ each part still reports INT5/error `40h`. Once the sequence completes, ReadN/Rea
 disc, while GetID continues to report the image's licence answer.
 
 Opening the lid cancels active reads, play and seek, sets sticky ShellOpen and queues an unsolicited INT5 with error
-`08h`. Nop clears ShellOpen after the host closes the lid. Disc callbacks and TOC remain host-owned and are not part of
-save states; controller flags, FIFO contents and scheduled deadlines are serialized in state format 8.
+`08h`. Nop clears ShellOpen after the host closes the lid. ReadN/ReadS and Play request one sector per 451,584 cycles,
+halved at double speed. Host callbacks run only while a public run call advances the instance. The bounded eight-slot
+ring overwrites its oldest sector on overrun; RDDATA reads use the 800h or 924h window selected by Setmode, advance the
+oldest-sector cursor, and repeat the documented tail byte after a window is consumed. BFRD gates reads and DRQ status.
+At most one INT1 waits behind an already queued interrupt. ReadN retries a failed or malformed sector once; ReadS
+reports the failure immediately. A mismatched mode-2 file/channel filter retries once in ReadN and is skipped in ReadS.
+The mode-2 XA audio/realtime test runs before data selection, so accepted XA payloads do not reach RDDATA; decoder and
+audio output are connected by the later XA/SPU plans. Play accepts raw 2352-byte CD-DA sectors on audio tracks without
+requiring a data header. Supplied Q subcode is deinterleaved and checked for BCD fields and CRC; missing or invalid Q is
+synthesized from the TOC. `current_lba` follows valid Q position unless the host's `bad_q` callback marks that sector,
+in which case the previous good position remains visible. Disc callbacks and TOC remain host-owned and are not part of
+save states; controller flags, sector bytes, FIFO contents and scheduled deadlines are serialized in state format 9.
 
 ## Sources and confidence
 

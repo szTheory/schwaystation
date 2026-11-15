@@ -572,6 +572,10 @@ static void seed_cdrom(schway *inst)
     inst->cdrom.last_command = 0x19u;
     inst->cdrom.motor_on = 1u;
     inst->cdrom.read_active = 1u;
+    inst->cdrom.bfrd = 1u;
+    inst->cdrom.sector_int1_pending = 1u;
+    inst->cdrom.read_s = 1u;
+    inst->cdrom.sector_retry = 1u;
     inst->cdrom.current_lba = 123u;
     inst->cdrom.target_lba = 456u;
     inst->cdrom.sector_head = 2u;
@@ -638,6 +642,10 @@ static uint32_t cdrom_mdec_fields_match(schway *inst)
         {"cdrom.sector", 1u, SCHWAY__CDROM_SECTOR_CAP * SCHWAY__CDROM_SECTOR_BYTES},
         {"cdrom.sector_lba", 4u, SCHWAY__CDROM_SECTOR_CAP},
         {"cdrom.sector_size", 4u, SCHWAY__CDROM_SECTOR_CAP},
+        {"cdrom.bfrd", 4u, 1u},
+        {"cdrom.sector_int1_pending", 4u, 1u},
+        {"cdrom.read_s", 4u, 1u},
+        {"cdrom.sector_retry", 4u, 1u},
         {"cdrom.xa_history", 2u, 2u * SCHWAY__CDROM_XA_TAPS},
         {"cdrom.audio", 2u, 2u * SCHWAY__CDROM_AUDIO_CAP},
         {"cdrom.audio_head", 4u, 1u},
@@ -1233,8 +1241,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 8u);
-    CHECK_EQ_U64(v.behaviour_revision, 8u);
+    CHECK_EQ_U64(v.state_format, 9u);
+    CHECK_EQ_U64(v.behaviour_revision, 9u);
 }
 
 static void check_cpu_power_on(schway *inst)

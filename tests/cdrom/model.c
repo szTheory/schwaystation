@@ -955,6 +955,8 @@ static void test_region(void)
     test_mixed_track_seek();
 }
 
+int schway__cdrom_sector_test(const char *name);
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -970,6 +972,8 @@ int main(int argc, char **argv)
         test_bounds();
     } else if (strcmp(argv[1], "region") == 0) {
         test_region();
+    } else if (strcmp(argv[1], "sectors") == 0 || strcmp(argv[1], "delivery") == 0) {
+        return schway__cdrom_sector_test(argv[1]);
     } else {
         fprintf(stderr, "unknown CD-ROM case: %s\n", argv[1]);
         return 2;

@@ -22,8 +22,8 @@
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 8u
-#define SCHWAY__STATE_FORMAT 8u
+#define SCHWAY__BEHAVIOUR_REVISION 9u
+#define SCHWAY__STATE_FORMAT 9u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -139,6 +139,7 @@ struct schway {
     size_t alloc_size;          /* the size given to alloc, given back to free */
     uint32_t region;            /* SCHWAY_REGION_* */
     uint32_t profile_locked;    /* 1 after the first run_frame */
+    uint32_t run_active;        /* host callbacks may run only inside public run calls */
     uint64_t frame;             /* frames run since power-on */
     uint64_t ticks;             /* CPU cycles run since power-on */
     uint64_t tick_acc;          /* the frame accumulator's remainder at the frame's start, < den */

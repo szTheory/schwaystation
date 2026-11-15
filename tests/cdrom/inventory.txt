@@ -1,5 +1,7 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
 cdrom.bounds	disc,portable
 cdrom.command	disc,portable
+cdrom.delivery	disc,portable
 cdrom.region	disc,portable
+cdrom.sectors	disc,portable
 cdrom.timing	disc,portable

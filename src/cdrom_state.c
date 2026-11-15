@@ -85,6 +85,10 @@ static void cdrom_command_state_io(struct schway__state_io *io, struct schway__c
     (void)schway__state_u32(io, "cdrom.channel", &cd->channel, 0u, UINT8_MAX);
     (void)schway__state_u32(io, "cdrom.last_command", &cd->last_command, 0u, UINT8_MAX);
     uint32_t motor_on = schway__state_u32(io, "cdrom.motor_on", &cd->motor_on, 0u, 1u);
+    (void)schway__state_u32(io, "cdrom.bfrd", &cd->bfrd, 0u, 1u);
+    (void)schway__state_u32(io, "cdrom.sector_int1_pending", &cd->sector_int1_pending, 0u, 1u);
+    (void)schway__state_u32(io, "cdrom.read_s", &cd->read_s, 0u, 1u);
+    (void)schway__state_u32(io, "cdrom.sector_retry", &cd->sector_retry, 0u, 1u);
     values->read_active = schway__state_u32(io, "cdrom.read_active", &cd->read_active, 0u, 1u);
     values->play_active = schway__state_u32(io, "cdrom.play_active", &cd->play_active, 0u, 1u);
     values->seek_active = schway__state_u32(io, "cdrom.seek_active", &cd->seek_active, 0u, 1u);

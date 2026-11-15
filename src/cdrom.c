@@ -28,9 +28,8 @@ static uint8_t status_read(const struct schway__cdrom *cd)
     if (cd->result_count != 0u) {
         value |= 1u << 5;
     }
-    if (cd->sector_count != 0u && cd->sector_offset < SCHWAY__CDROM_SECTOR_BYTES) {
-        value |= 1u << 6;
-    }
+    if (cd->bfrd != 0u && cd->sector_count != 0u &&
+        cd->sector_offset < cd->sector_size[cd->sector_head]) value |= 1u << 6;
     if (cd->command_pending != 0u || cd->read_active != 0u || cd->play_active != 0u ||
         cd->seek_active != 0u) {
         value |= 1u << 7;
@@ -64,7 +63,7 @@ static void push_result(struct schway__cdrom *cd, uint8_t value)
     }
 }
 
-static void push_interrupt(schway *inst, uint8_t code)
+void schway__cdrom_push_interrupt(schway *inst, uint8_t code)
 {
     struct schway__cdrom *cd = &inst->cdrom;
     if (code >= 1u && code <= 5u && cd->interrupt_count < SCHWAY__CDROM_IRQ_CAP) {
@@ -84,6 +83,7 @@ static void acknowledge_interrupt(schway *inst, uint8_t value)
         cd->interrupt_head = (cd->interrupt_head + 1u) % SCHWAY__CDROM_IRQ_CAP;
         cd->interrupt_count--;
         update_irq(inst);
+        schway__cdrom_sector_ack(inst);
     }
 }
 
@@ -142,7 +142,7 @@ static void response(schway *inst, const uint8_t *bytes, uint32_t count, uint8_t
     for (uint32_t i = 0u; i < count; i++) {
         push_result(&inst->cdrom, bytes[i]);
     }
-    push_interrupt(inst, interrupt);
+    schway__cdrom_push_interrupt(inst, interrupt);
 }
 
 static void response_status(schway *inst, uint8_t interrupt)
@@ -575,7 +575,7 @@ static void begin_setloc(schway *inst)
     finish_command(cd);
 }
 
-static void begin_play(schway *inst)
+static void begin_play(schway *inst, uint64_t now)
 {
     struct schway__cdrom *cd = &inst->cdrom;
     uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
@@ -606,6 +606,7 @@ static void begin_play(schway *inst)
     cd->play_active = 1u;
     set_motor(cd, 1u);
     update_status_activity(cd);
+    schway__cdrom_sector_schedule(inst, now);
     response_status(inst, 3u);
     finish_command(cd);
 }
@@ -625,7 +626,7 @@ static void begin_scan(schway *inst)
     finish_command(cd);
 }
 
-static void begin_read(schway *inst)
+static void begin_read(schway *inst, uint64_t now)
 {
     struct schway__cdrom *cd = &inst->cdrom;
     uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
@@ -647,8 +648,11 @@ static void begin_read(schway *inst)
     cd->play_active = 0u;
     cancel_sector_event(cd);
     cd->read_active = 1u;
+    cd->read_s = cd->command == 0x1Bu;
+    cd->sector_retry = 0u;
     set_motor(cd, 1u);
     update_status_activity(cd);
+    schway__cdrom_sector_schedule(inst, now);
     response_status(inst, 3u);
     finish_command(cd);
 }
@@ -1015,9 +1019,9 @@ static void begin_command(schway *inst, uint64_t now)
     switch (inst->cdrom.command) {
     case 0x01u: begin_nop(inst); return;
     case 0x02u: begin_setloc(inst); return;
-    case 0x03u: begin_play(inst); return;
+    case 0x03u: begin_play(inst, now); return;
     case 0x04u: case 0x05u: begin_scan(inst); return;
-    case 0x06u: case 0x1Bu: begin_read(inst); return;
+    case 0x06u: case 0x1Bu: begin_read(inst, now); return;
     case 0x07u: begin_motor_on(inst, now); return;
     case 0x08u: begin_stop(inst, now); return;
     case 0x09u: begin_pause(inst, now); return;
@@ -1070,6 +1074,7 @@ void schway__cdrom_event(schway *inst, uint64_t now)
 {
     struct schway__cdrom *cd = &inst->cdrom;
     observe_lid(inst);
+    if (inst->run_active == 0u) return;
     if (cd->command_event != 0u && cd->command_deadline <= now) {
         cd->command_event = 0u;
         cd->command_deadline = 0u;
@@ -1080,8 +1085,7 @@ void schway__cdrom_event(schway *inst, uint64_t now)
         }
     }
     if (cd->sector_event != 0u && cd->sector_deadline <= now) {
-        cd->sector_event = 0u;
-        cd->sector_deadline = 0u;
+        schway__cdrom_sector_event(inst, now);
     }
     if (cd->seek_event != 0u && cd->seek_deadline <= now) {
         cd->seek_event = 0u;
@@ -1108,7 +1112,7 @@ uint8_t schway__cdrom_read(schway *inst, uint32_t address, uint64_t now)
     case 1u:
         return pop_result(cd);
     case 2u:
-        return 0u;
+        return schway__cdrom_sector_read(inst);
     case 3u:
         if ((cd->bank & 1u) == 0u) {
             return (uint8_t)cd->interrupt_mask;
@@ -1147,7 +1151,7 @@ void schway__cdrom_write(schway *inst, uint32_t address, uint8_t value, uint64_t
                 (cd->parameter_head + cd->parameter_count) % SCHWAY__CDROM_FIFO_CAP;
             cd->parameter[tail] = value;
             cd->parameter_count++;
-        }
+        } else if (offset == 3u) cd->bfrd = (value >> 7) & 1u;
         break;
     case 1u:
         if (offset == 2u) {

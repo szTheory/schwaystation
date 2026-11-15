@@ -1,5 +1,7 @@
 # CD-ROM register, command and deadline behavior through MMIO and the scheduler.
-add_executable(schwaystation-test-cdrom ${CMAKE_CURRENT_LIST_DIR}/model.c)
+add_executable(schwaystation-test-cdrom
+  ${CMAKE_CURRENT_LIST_DIR}/model.c
+  ${CMAKE_CURRENT_LIST_DIR}/sectors.c)
 target_include_directories(schwaystation-test-cdrom PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-cdrom PRIVATE schwaystation::schwaystation)
 set_target_properties(schwaystation-test-cdrom PROPERTIES
@@ -28,4 +30,16 @@ schway_add_test(NAME cdrom.region
 # not restore write readiness, or an empty result read returns a stale byte.
 schway_add_test(NAME cdrom.bounds
   COMMAND schwaystation-test-cdrom bounds
+  LABELS disc portable TIMEOUT 10)
+
+# Fault prevented: scheduled host callbacks, INT1 ordering or RDDATA contents
+# differ from the selected cycle and sector window contract.
+schway_add_test(NAME cdrom.sectors
+  COMMAND schwaystation-test-cdrom sectors
+  LABELS disc portable TIMEOUT 10)
+
+# Fault prevented: pending CD interrupts or a bad-Q marker corrupt the bounded
+# one-sector delivery state.
+schway_add_test(NAME cdrom.delivery
+  COMMAND schwaystation-test-cdrom delivery
   LABELS disc portable TIMEOUT 10)
