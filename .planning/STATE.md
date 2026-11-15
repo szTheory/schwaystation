@@ -6,10 +6,10 @@ current_phase: 6
 current_phase_name: Discs and FMV
 status: planning
 stopped_at: Phase 05 complete, ready to plan Phase 6
-last_updated: "2026-11-15T01:50:24.884Z"
+last_updated: "2026-11-15T02:28:21.511Z"
 last_activity: 2026-11-14
-last_activity_desc: "Phase 05 shipped as PR #18; runtime Codex GPT-6; verifier and reviewer GPT-6 Luna xhigh; local CI 547/547, release 5/5, hygiene passed"
-state_head: 09be5f2cdbabfb7e003362b803b6037ba125fe6b
+last_activity_desc: "Phase 05 shipped as PR #18; verification refreshed after CI timeout change (15-minute ASan limit provisional); runtime Codex GPT-6; reviewer/verifier GPT-6 Luna xhigh; local CI 547/547 and release 5/5"
+state_head: 49b0652f33d644db3f81903448b612b46f8813db
 progress:
   total_phases: 6
   completed_phases: 5
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-11-14)
 Phase: 6 — Discs and FMV
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-11-14 -- Phase 05 shipped as PR #18; runtime Codex GPT-6; verifier and reviewer GPT-6 Luna xhigh; local CI 547/547, release 5/5, hygiene passed
+Last activity: 2026-11-14 -- Phase 05 shipped as PR #18; verification refreshed after CI timeout change (15-minute ASan limit provisional); runtime Codex GPT-6; reviewer/verifier GPT-6 Luna xhigh; local CI 547/547 and release 5/5
 
 Progress: [████████░░] 83%
 

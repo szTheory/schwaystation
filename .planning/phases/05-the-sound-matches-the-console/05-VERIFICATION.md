@@ -1,11 +1,10 @@
 ---
 phase: 05-the-sound-matches-the-console
-verified: 2026-11-15T01:34:22Z
+verified: 2026-11-15T02:17:54Z
 status: passed
 score: 74/74 must-haves verified
 covered_files:
   - .github/workflows/ci.yml
-  - .github/workflows/nightly.yml
   - .planning/phases/05-the-sound-matches-the-console/05-01-PLAN.md
   - .planning/phases/05-the-sound-matches-the-console/05-01-SUMMARY.md
   - .planning/phases/05-the-sound-matches-the-console/05-02-PLAN.md
@@ -54,87 +53,16 @@ covered_files:
   - .planning/phases/05-the-sound-matches-the-console/05-23-SUMMARY.md
   - .planning/phases/05-the-sound-matches-the-console/05-24-PLAN.md
   - .planning/phases/05-the-sound-matches-the-console/05-24-SUMMARY.md
-  - ASSET_POLICY.md
-  - CMakeLists.txt
-  - CMakePresets.json
-  - PROVENANCE.md
-  - cmake/SPUReferences.cmake
-  - docs/embedding.md
-  - docs/hardware/bus.md
-  - docs/hardware/spu.md
-  - docs/runner.md
-  - docs/testing.md
-  - pins.txt
-  - runner/main.c
-  - src/bus.c
-  - src/bus.h
-  - src/cpu_exec.inc
-  - src/dma.c
-  - src/frame.c
-  - src/sched.c
-  - src/spu.c
-  - src/spu.h
-  - src/spu_envelope.c
-  - src/spu_noise.c
-  - src/spu_reverb.c
-  - src/spu_tables.inc
-  - src/spu_voice.c
-  - tests/bus/bus_tests.c
-  - tests/cmake/compat-controls.cmake
-  - tests/cmake/hashes.cmake
-  - tests/cmake/info_claims_self_test.cmake
-  - tests/cmake/workflows.cmake
-  - tests/core/bus_unbuilt.c
-  - tests/core/inventory.txt
-  - tests/core/test_run.c
-  - tests/core/test_state.c
-  - tests/core/tests.cmake
-  - tests/diag/expected.csv
-  - tests/dma/dma_tests.c
-  - tests/dma/inventory.txt
-  - tests/dma/tests.cmake
-  - tests/embed/CMakeLists.txt
-  - tests/fixtures/manifest.txt
-  - tests/fixtures/src/spu_blocks.inc
-  - tests/fixtures/src/spu_tone.asm
-  - tests/fixtures/src/stub/stub.asm
-  - tests/fixtures/src/unbuilt.asm
-  - tests/fixtures/tests.cmake
-  - tests/fuzz/inventory.txt
-  - tests/fuzz/seeds.c
-  - tests/fuzz/spu.c
-  - tests/fuzz/tests.cmake
-  - tests/hygiene/inventory.txt
-  - tests/hygiene/tests.cmake
-  - tests/inventory/asan.txt
-  - tests/inventory/ci.txt
-  - tests/inventory/wasm32.txt
-  - tests/libretro/host.c
-  - tests/libretro/tests.cmake
-  - tests/nightly/inventory.txt
-  - tests/nightly/tests.cmake
-  - tests/perf/inventory.txt
-  - tests/perf/tests.cmake
-  - tests/runner/inventory.txt
-  - tests/runner/test_runner.c
-  - tests/runner/tests.cmake
-  - tests/spu/envelopes.c
-  - tests/spu/expected.txt
-  - tests/spu/fixture.c
-  - tests/spu/inventory.txt
-  - tests/spu/model.c
-  - tests/spu/noise.c
-  - tests/spu/reference.c
-  - tests/spu/reverb.c
-  - tests/spu/tests.cmake
-  - tests/spu/voices.c
-  - tests/tests.cmake
-covered_digest: "v4:sha256:b3ab9fde7cc7e84a6a13ed0e7d278a2cb53d5167f5fb19f1b6dc1df0bf73abc9"
+covered_digest: "v4:sha256:f9b04ca818cceadb7677f6ab3185c53a1905311afb514975b8f223f5e884a313"
 behavior_unverified: 0
 overrides_applied: 0
+decision_coverage:
+  honored: 10
+  total: 10
+  not_honored: []
 re_verification:
   previous_status: passed
-  previous_score: 3/3
+  previous_score: 74/74
   gaps_closed: []
   gaps_remaining: []
   regressions: []
@@ -143,9 +71,9 @@ re_verification:
 # Phase 5: The sound matches the console — Verification Report
 
 **Phase Goal:** The SPU sounds as the console does: it matches the hardware logs, its audio hashes are identical on every platform including be32 and wasm32, and libretro delivers exactly the runner's audio stream.
-**Verified:** 2026-11-15T01:34:22Z
+**Verified:** 2026-11-15T02:17:54Z
 **Status:** passed
-**Re-verification:** Yes — refreshed after reviewed test fixes. The previous report had no gaps; this pass rechecked all roadmap and plan truths.
+**Re-verification:** Refreshed after the ASan timeout change and clean code review. All roadmap and plan truths were rechecked; the prior report had no unresolved gaps.
 
 ## Goal Achievement
 
@@ -153,141 +81,143 @@ re_verification:
 
 | # | Truth | Status | Evidence |
 |---|---|---|---|
-| 1 | The tone fixture hashes identical signed stereo PCM on all eight configured lanes; each frame has the required exact sample count, and CPU-free block replay equals guest PCM. | ✓ VERIFIED | Current full local CI passed 547/547 CTests and 5/5 release checks. The named spu.fixture check passed 51 assertions, including exact NTSC/PAL pair counts and guest/table PCM equality. The runner hash writer produces the three region streams; CI requires eight lane artifacts and byte-compares them. Current exact-head hosted lane results are still a ship-time check, per plan 05-15. |
-| 2 | Audio tests cover the scheduled SPU model and the nightly comparator checks the seven ordered hardware transfer cases. | ✓ VERIFIED | The audio tests are registered in tests/spu/tests.cmake. The comparator binds the executable and log to pins, rejects identity/parser mismatches, and runs the actual guest through Done. The prior nightly run passed on old head da80fc6798c0aef55fda529bfee2aadde9df5d89; the exact-head nightly run remains pending at ship. |
-| 3 | Libretro batch and single-sample callbacks deliver runner PCM, RetroArch boots the tone fixture, and the idle SPU stays bounded. | ✓ VERIFIED | The host integration writes runner PCM and compares callback samples for NTSC-J, NTSC-U and PAL. Current local CI passed; current be32 QEMU batch host test passed all 20 TAP checks. The old-head RetroArch job was green; the exact-head hosted job is pending at ship. core.no_busy_loop passed as a named test in 0.02 seconds. |
+| 1 | The tone fixture emits exact-length PCM and the same audio hash on all eight configured lanes; CPU-free block replay equals guest PCM. | ✓ VERIFIED | Current C code's supplied local CI evidence passed 547/547 CTests and 5/5 release checks; the focused fixture evidence covers exact NTSC/PAL pair counts and guest/table PCM equality. Hash writing checks the three regions and the CI job requires exactly eight uploaded lane files and byte-compares them. The exact-head hosted comparison remains a ship-time check, as plan 05-15 specifies. |
+| 2 | Audio tests cover the scheduled SPU model and the nightly comparator checks all seven ordered hardware transfer cases. | ✓ VERIFIED | Audio tests are registered in tests/spu/tests.cmake. The reference setup validates pinned executable/log identities; the comparator parses the ordered seven hardware pass lines and executes the transfer guest. Nightly workflow wiring is present. Current exact-head nightly execution remains pending at ship. |
+| 3 | Libretro batch and single-sample callbacks equal the runner PCM; hosted RetroArch boots the tone fixture; idle SPU work stays bounded. | ✓ VERIFIED | tests/libretro/host.c compares callback PCM against runner output in all three regions. The supplied focused be32 host run passed all 20 checks. core.no_busy_loop passed in the supplied local CI evidence. CI requires the content-based RetroArch smoke. Its exact-head hosted result remains pending at ship. |
 
 **Score:** 74/74 must-haves verified (0 present, behavior-unverified).
 
 ### Plan-Specific Must-Haves
 
-The phase plans add 71 truths to the three roadmap success criteria. All 24 plans' artifact declarations were checked with verify.artifacts: 61/61 artifacts exist and are substantive. The named tests and full local workflow exercise the implementations; the high-level links are traced below.
+The 24 plans add 71 observable truths to the three roadmap criteria: plans 05-01 through 05-23 declare three truths each, and 05-24 declares two. All were checked against the current source, test registrations, and supplied execution evidence. The artifact query passed all 61/61 declared artifacts as existing and substantive.
 
 | Plan | Additional truths verified | Status | Evidence |
 |---|---|---|---|
-| 05-01 | Real library-to-drain tracer; selected CI/sanitizer/wasm inventories; sample counts, ring semantics and rates | ✓ VERIFIED | tests/spu/model.c, test registration and exact inventories; full CI |
-| 05-02 | One scheduled stereo pair per 768 cycles; fixed-width instance state; public layout and rates | ✓ VERIFIED | sched.c schedules spu.c; frame.c drains the same ring; model and run tests |
-| 05-03 | Guest MMIO width/latch behavior; FIFO/IRQA access; peeks do not consume or acknowledge | ✓ VERIFIED | bus.c dispatches to chip-owned registers; spu model tests cover read/write and IRQ |
-| 05-04 | Pinned program/log identity; strict seven-case comparator; asset controls gate first consumers | ✓ VERIFIED | SPUReferences.cmake verifies pins/digests; reference controls and nightly registration |
-| 05-05 | DMA4 upload/readback; first four guest cases; bounded readiness/completion | ✓ VERIFIED | dma.c calls SPU FIFO helpers; DMA and first-upload tests |
-| 05-06 | BRR history/nibble decoding; Gaussian interpolation and cited 512-entry table | ✓ VERIFIED | spu_voice.c and spu_tables.inc; voice tests |
-| 05-07 | ADSR phases and volume sweeps; complete 2×128 rate table; edge rates/profile contract | ✓ VERIFIED | spu_envelope.c; envelope tests |
+| 05-01 | Real library-to-drain tracer; exact CI, sanitizer and wasm inventories; sample counts, ring semantics and rates | ✓ VERIFIED | tests/spu/model.c, tests/tests.cmake and exact inventories; supplied full local CI |
+| 05-02 | One scheduled stereo pair per 768 cycles; fixed-width instance-owned state; public layouts and AV rates | ✓ VERIFIED | sched.c schedules spu.c; spu.c generates PCM consumed by the frame ring; model/run tests |
+| 05-03 | Guest MMIO width and latch behavior; FIFO/IRQA access; peeks do not consume data or acknowledge IRQ | ✓ VERIFIED | bus.c dispatches to SPU register accessors; RAM helpers raise IRQ9; model and bus tests |
+| 05-04 | Pinned transfer guest/log identity; strict seven-case comparator; asset controls gate first callers | ✓ VERIFIED | SPUReferences.cmake checks pins and digests; reference.c validates the ordered log; nightly registration |
+| 05-05 | DMA4 upload/readback reaches SPU RAM; initial guest cases; deterministic bounded completion | ✓ VERIFIED | dma.c calls SPU DMA/FIFO helpers; DMA and reference tests |
+| 05-06 | BRR history/nibble decode and Gaussian interpolation use defined integer arithmetic and cited table | ✓ VERIFIED | spu_voice.c, spu_tables.inc and independently checked voice tests |
+| 05-07 | ADSR phases and volume sweeps; complete 2×128 rate table; edge rates and profile contract | ✓ VERIFIED | spu_envelope.c and baseline envelope tests |
 | 05-08 | Noise schedule; envelope-scaled capture and zero CD inputs; muted/silent IRQ behavior | ✓ VERIFIED | spu_noise.c and spu.c event path; noise/model tests |
-| 05-09 | 39-tap FIR; centered-filter delay; bounded integer resampling path | ✓ VERIFIED | spu_reverb.c and documented hardware behavior; reverb tests |
-| 05-10 | Room feedback updates RAM and wet output from registers; documented Room path | ✓ VERIFIED | spu_reverb.c is called from spu.c; reverb/model tests |
-| 05-11 | Authored BRR data is assembled into the actual tone guest; guest reaches mailbox and audio drain | ✓ VERIFIED | fixture source includes spu_blocks.inc; fixture build and spu.fixture |
-| 05-12 | Batch and single-sample host callbacks equal runner PCM in all regions | ✓ VERIFIED | tests/libretro/tests.cmake drives runner and host independently; local and be32 host results |
-| 05-13 | Hostile transfer bounds and SPU fuzz-seed replay; scheduler progress remains bounded | ✓ VERIFIED | tests/fuzz/spu.c and test_run.c are registered; full CI |
-| 05-14 | Active voices/noise/reverb state continues after load; invalid state remains atomic and size-bounded | ✓ VERIFIED | state visitor includes SPU fields; core state tests and full CI |
-| 05-15 | Eight hash artifacts and required tone-content RetroArch smoke; stop before ship for hosted evidence | ✓ VERIFIED | ci.yml has eight-artifact equality and content smoke; nightly.yml is wired; exact-head hosted check remains pending at ship |
-| 05-16 | Every SPU machine field uses the LE visitor; load restores phase and clears delivery buffers; compatibility/atomicity/size rules | ✓ VERIFIED | state.c calls the complete SPU visitor; core state tests and full CI |
-| 05-17 | Runner hashes canonical LE PCM after final mix; drains once; preserves CLI errors | ✓ VERIFIED | runner/main.c calls schway_get_audio once and hashes canonical samples; runner tests |
-| 05-18 | CPU-free table path equals guest PCM; frame-600 digest and ENVX predicates; bad expectations fail | ✓ VERIFIED | fixture.c reads block table and static expectations; spu.fixture passed 51 assertions |
-| 05-19 | Hardware documentation cites pins and implemented behavior; evidence categories remain distinct; precision limits remain explicit | ✓ VERIFIED | docs/hardware/spu.md, docs/testing.md and PROVENANCE.md state separate evidence boundaries |
-| 05-20 | Bounded FIFO/manual transfer; RAM_CTRL/capture controls; IRQA/STATX and Enable behavior | ✓ VERIFIED | spu.c and irq.c helpers; spu.model and transfer tests |
-| 05-21 | DMA4 directions and timing; DEV4 FFFFh behavior; pinned seven-case guest | ✓ VERIFIED | dma.c/spu.c path and tests; prior full guest summary is corroborated by current source and unchanged implementation |
-| 05-22 | Ordered 24-voice playback; KON/KOFF, loops, ENDX, PMON and stereo mix; silence/mute/overflow | ✓ VERIFIED | spu.c event calls voice/envelope paths; voice/model tests and full CI |
-| 05-23 | SPU owns ATTR; nightly runs the full pinned transfer guest; GPU nightly inventory remains | ✓ VERIFIED | bus mirror removed; dma reads SPU state; exact nightly inventory and CMake registration |
-| 05-24 | Phase registration and hash checks fit the 2688-line budget; existing workflow/inventory controls retained | ✓ VERIFIED | current workflow checks and full local CI; phase summaries record 2688-line check |
+| 05-09 | 39-tap FIR, centered-filter delay and bounded integer resampling | ✓ VERIFIED | spu_reverb.c, hardware documentation and reverb tests |
+| 05-10 | Room feedback updates RAM and wet output from registers | ✓ VERIFIED | spu_reverb.c is called from spu.c; reverb/model tests |
+| 05-11 | Authored BRR data reaches the tone guest, mailbox and audio drain | ✓ VERIFIED | fixture assembly includes the block data; fixture build and PCM test |
+| 05-12 | Batch and single-sample callbacks equal runner PCM in all regions | ✓ VERIFIED | libretro host test independently runs the core and compares output bytes |
+| 05-13 | Hostile transfer bounds and SPU fuzz-seed replay; scheduler progress remains bounded | ✓ VERIFIED | tests/fuzz/spu.c and test_run.c registration; supplied full local CI |
+| 05-14 | Active voices, noise and feedback continue after load; invalid state remains atomic and bounded | ✓ VERIFIED | state visitor includes SPU fields; core state tests and supplied full local CI |
+| 05-15 | Eight-lane frame-600 hashes and required tone-content smoke are wired; hosted evidence is confirmed at ship | ✓ VERIFIED | hashes.cmake and ci.yml enforce eight-file equality; nightly and RetroArch jobs are required. Plan explicitly reserves exact-head hosted results for ship. |
+| 05-16 | All SPU machine fields use the LE visitor; load restores phase and clears delivery buffers; state compatibility rules hold | ✓ VERIFIED | state.c calls the complete SPU visitor; core state tests |
+| 05-17 | Runner hashes canonical LE PCM after final mix, drains once and preserves CLI errors | ✓ VERIFIED | runner/main.c drains via schway_get_audio and hashes canonical samples; runner tests |
+| 05-18 | CPU-free table path equals guest PCM; frame-600 digest and ENVX predicates are checked | ✓ VERIFIED | fixture.c reads the authored block table and static expected predicates; supplied fixture evidence |
+| 05-19 | Hardware documentation cites sources and distinguishes hardware facts from model regressions | ✓ VERIFIED | docs/hardware/spu.md, docs/testing.md and PROVENANCE.md describe separate evidence limits |
+| 05-20 | Bounded FIFO/manual transfer, RAM_CTRL/capture, IRQA/STATX and Enable behavior | ✓ VERIFIED | spu.c, irq.c and registered transfer/model tests |
+| 05-21 | DMA4 directions/timing, DEV4 FFFFh behavior and complete pinned guest | ✓ VERIFIED | dma.c and spu.c transfer path; reference test; source implementation traced |
+| 05-22 | Ordered 24-voice playback, KON/KOFF, loops, ENDX, PMON and stereo mix | ✓ VERIFIED | spu.c schedules voice/envelope paths; voices/model tests |
+| 05-23 | SPU owns ATTR; nightly runs the full pinned transfer guest and retains GPU nightly inventory | ✓ VERIFIED | bus mirror is removed; DMA reads SPU-owned state; nightly CMake registration and inventory |
+| 05-24 | Workflow registration and lane hash checks fit the fixed 2688-line repository-check ceiling | ✓ VERIFIED | workflow/hash controls remain registered; supplied budget and workflow checks passed |
 
 ## Required Artifacts
 
 | Artifact group | Expected | Status | Details |
 |---|---|---|---|
-| SPU source and state | Scheduler, registers, DMA, voice/envelope/noise/reverb, state visitor and public PCM drain | ✓ VERIFIED | All source artifacts declared in 05-01 through 05-24 passed the verifier's existence and substance checks; tests are registered and full local CI passed. |
-| Audio and reference tests | Model, voice, envelope, noise, reverb, fixture replay, DMA guest comparator, fuzz and state tests | ✓ VERIFIED | 61/61 plan artifact declarations passed across 24 plans. No declaration was missing or a stub. |
-| Runner/libretro and workflows | Canonical PCM hash, callback equality, eight-lane artifact compare, nightly transfer and RetroArch tone smoke | ✓ VERIFIED | Implementations and CMake/workflow registrations are present. Exact-head hosted results remain a ship-time confirmation. |
-| Documentation and pins | Hardware behavior, test evidence boundaries, provenance and identity-pinned assets | ✓ VERIFIED | Digests and source identity are checked by SPUReferences.cmake; documentation explicitly limits the hardware claims. |
+| SPU, scheduler, bus and state | Scheduled integer chip model, register/DMA/IRQ path, voice/envelope/noise/reverb and state visitor | ✓ VERIFIED | Every declared artifact passed the 61-artifact existence/substance query; source links were traced to callers and registered tests. |
+| Audio and hardware-reference tests | Model, voice, ADSR, noise, reverb, fixture, DMA guest, fuzz and state coverage | ✓ VERIFIED | Tests are included in CMake inventories and CI selectors; supplied local run completed all 547 CTests. |
+| Runner, libretro and hosted workflows | Canonical PCM hash, callback equality, eight-lane comparison, nightly transfer and RetroArch tone content | ✓ VERIFIED | Current workflow wiring is present. The timeout and registration checks after the timeout edit both exited 0; hosted exact-head run is pending at ship. |
+| Documentation and pins | Hardware facts, claim limits, provenance and identity-pinned assets | ✓ VERIFIED | Source citations and digest validation are present in docs and SPUReferences.cmake. |
 
 ## Key Link Verification
 
 | From | To | Via | Status | Details |
 |---|---|---|---|---|
-| tests/tests.cmake and lane inventories | tests/spu/tests.cmake and tests/spu/inventory.txt | CMake include plus exact directory inventories | ✓ WIRED | The test directory is included and its entries are selected in the configured CI, sanitizer and wasm inventories. |
-| src/sched.c | src/spu.c | Scheduled SPU deadline | ✓ WIRED | The scheduler invokes schway__spu_event at the selected tick; catch-up processes due events without CPU polling. |
-| src/spu.c | src/frame.c and schway_get_audio | Instance PCM ring | ✓ WIRED | SPU events append stereo samples to instance state; the public getter drains that state. |
-| src/bus.c, src/dma.c | src/spu.c and src/irq.c | MMIO, DMA4 FIFO and IRQA helpers | ✓ WIRED | Bus dispatch and DMA readiness use SPU-owned state; IRQA raises IRQ9 through the IRQ helper. |
-| src/spu.c | voice, envelope, noise and reverb modules | Per-sample event calls | ✓ WIRED | The SPU event invokes each module in order; their tests are separately registered. |
-| pins.txt | cmake/SPUReferences.cmake and tests/spu/reference.c | Source identity, SHA-256 asset checks and bounded guest comparison | ✓ WIRED | Nightly registration runs the full comparator against pinned executable/log assets. |
-| runner/main.c and libretro/libretro.c | schway_get_audio | Runner drain/hash and libretro callback delivery | ✓ WIRED | Host tests compare the callback PCM against the runner PCM bytes. The focused be32 run exercised batch equality. |
-| tests/cmake/hashes.cmake | .github/workflows/ci.yml | Eight lane artifacts and exact COUNT=8 equality check | ✓ WIRED | CI builds/uploads artifacts, then the equality job downloads and compares them. |
-| .github/workflows/ci.yml | tests/retroarch/run_retroarch.cmake | Tone executable under stub, screenshot checked against runner | ✓ WIRED | Required recurring RetroArch smoke is content-based and video-only, as SOUND-02 specifies. |
+| tests/tests.cmake and lane inventories | tests/spu/tests.cmake and tests/spu/inventory.txt | CMake include and exact inventory selection | ✓ WIRED | SPU suite is included and selected in the CI, ASan and wasm inventories. |
+| src/sched.c | src/spu.c | Next-deadline scheduling | ✓ WIRED | Scheduler reads schway__spu_next and calls schway__spu_event when due. |
+| src/spu.c | src/frame.c public audio ring | Event output and frame drain | ✓ WIRED | SPU event steps chip modules, mixes stereo PCM, and feeds the instance delivery ring. |
+| src/bus.c and src/dma.c | src/spu.c and src/irq.c | MMIO, DMA4 FIFO and IRQA helpers | ✓ WIRED | Bus register dispatch and DMA readiness use SPU-owned state; RAM access raises IRQ9 through the IRQ helper. |
+| src/spu.c | voice, envelope, noise and reverb modules | Per-sample event calls | ✓ WIRED | The event invokes the chip modules in the scheduled sample path. |
+| pins.txt and SPUReferences.cmake | tests/spu/reference.c | Identity-checked guest and hardware log | ✓ WIRED | Pinned asset checks gate the comparator, which validates all seven ordered hardware pass lines. |
+| runner/main.c and libretro/libretro.c | schway_get_audio | Hashing and callback delivery | ✓ WIRED | Runner and callbacks consume the public drain; host tests compare PCM byte-for-byte. |
+| tests/cmake/hashes.cmake | .github/workflows/ci.yml | Eight lane artifact comparison | ✓ WIRED | CI uploads the lane files and the hash-equality job requires COUNT=8 before byte comparison. |
+| .github/workflows/nightly.yml | tests/nightly/tests.cmake | Hardware transfer execution | ✓ WIRED | Nightly CMake workflow registers the full reference guest test. |
+| .github/workflows/ci.yml | tests/retroarch/run_retroarch.cmake | Tone executable content smoke | ✓ WIRED | Required RetroArch job boots spu_tone.exe under the stub and compares deterministic video. |
 
-The generic key-link query did not recognize several CMake include relationships or C-symbol calls because it searches for direct text references. Plans 05-21 and 05-23 place key_links at the frontmatter top level, so the query reported no nested must_haves.key_links for those two plans. I traced those paths through the CMake registration and function calls above; none is disconnected.
+The generic key-link query directly recognized 3 of 40 nested links and did not recognize the remaining C-symbol/CMake edges by file-path text; plans 05-21 and 05-23 place links at top-level, outside the query's nested must_haves input. I manually traced these edges through the code and registrations above rather than treating the query's “Target not referenced” responses as proof of disconnection.
 
 ## Data-Flow Trace (Level 4)
 
-| Artifact | Data variable | Source | Produces real data | Status |
+| Artifact | Data | Source | Produces real data | Status |
 |---|---|---|---|---|
-| tests/cmake/hashes.cmake | audio digest rows | Built schwaystation-run executing spu_tone.exe for each region | Yes; output is captured from the runner | ✓ FLOWING |
-| tests/spu/fixture.c | guest and table PCM | Real guest execution and an independent CPU-free event/table path using the same source fixture | Yes; complete PCM pairs are compared | ✓ FLOWING |
-| runner/main.c | audio hash and PCM file | schway_get_audio from the active emulator instance | Yes; canonical signed stereo PCM is hashed after the final mix | ✓ FLOWING |
-| libretro/libretro.c | audio callback samples | schway_get_audio from the same core instance | Yes; batch and single callbacks are compared byte-for-byte with runner PCM | ✓ FLOWING |
-| tests/spu/reference.c | guest pass lines | Pinned transfer executable and pinned hardware log | Yes; identity is verified, then emulator guest output is compared in order | ✓ FLOWING |
+| tests/cmake/hashes.cmake | Frame-600 audio hash rows | Runner executing built spu_tone.exe for each region | Yes; captured from the real runner stream | ✓ FLOWING |
+| tests/spu/fixture.c | Guest and table PCM | Guest execution plus CPU-free event/table path using the authored fixture data | Yes; complete PCM is compared | ✓ FLOWING |
+| runner/main.c | Audio digest | schway_get_audio from the active instance | Yes; signed stereo PCM is encoded canonically and hashed after final mix | ✓ FLOWING |
+| libretro/libretro.c | Callback samples | schway_get_audio from the same core instance | Yes; host test compares batch/single samples against runner bytes | ✓ FLOWING |
+| tests/spu/reference.c | Hardware pass lines | Pinned executable and pinned hardware log | Yes; identities are checked before ordered guest output comparison | ✓ FLOWING |
 
 ## Behavioral Spot-Checks
 
-| Behavior | Command/evidence | Result | Status |
-|---|---|---|---|
-| Current local CI workflow | node "$HOME/.codex/gsd-core/bin/gsd-tools.cjs" run-with-timeout 240 -- bash -c 'cmake --workflow --preset ci' | Exit 0; 547/547 CTests and 5/5 release checks passed on current checkout | ✓ PASS |
-| Guest audio length and CPU-free PCM equality | ctest --test-dir build/ci -R '^spu\.fixture$' --no-tests=error --output-on-failure | Passed; 51 TAP assertions, 14.47 seconds | ✓ PASS |
-| Idle SPU bounded behavior | ctest --test-dir build/ci -R '^core\.no_busy_loop$' --no-tests=error --output-on-failure | Passed 1/1 in 0.02 seconds | ✓ PASS |
-| Big-endian libretro callback equality | docker exec schwaystation-phase5-be32-debug-20261114 qemu-ppc -L /usr/powerpc-linux-gnu build/be32/tests/schwaystation-test-libretro-host build/be32/libretro/schwaystation_libretro.so audio-equality-batch ntsc-j build/be32/fixtures/spu_tone.exe build/be32/tests/libretro-audio-ntsc-j-batch.pcm | Exit 0; all 20 TAP checks passed; temporary container has been removed | ✓ PASS |
-| Current exact-head hosted CI/nightly/RetroArch | Run at ship after pushing the current head | No current-head URL yet; not represented by the old-head run results below | PENDING SHIP |
+These results were supplied for this refresh. No tests were run during verification.
 
-The named spu.fixture test exceeded the verifier's preferred 10-second spot-check window but completed successfully; the full CI workflow was already supplied as current-checkout evidence and was not rerun here.
+| Behavior | Command | Result | Status |
+|---|---|---|---|
+| Current C code local CI | cmake --workflow --preset ci | Supplied exit 0 before the workflow-only timeout edit; 547/547 CTests and 5/5 release checks passed | ✓ PASS |
+| ASan timeout configuration after edit | cmake -DMODE=timeouts -DDIR=.github/workflows -P tests/cmake/workflows.cmake | Supplied exit 0 | ✓ PASS |
+| SPU job registration after edit | cmake -DROOT=. -DCASE=spu_registration -P tests/cmake/workflows.cmake | Supplied exit 0 | ✓ PASS |
+| Big-endian libretro batch equality | docker exec schwaystation-phase5-be32-debug-20261114 qemu-ppc -L /usr/powerpc-linux-gnu build/be32/tests/schwaystation-test-libretro-host build/be32/libretro/schwaystation_libretro.so audio-equality-batch ntsc-j build/be32/fixtures/spu_tone.exe build/be32/tests/libretro-audio-ntsc-j-batch.pcm | Supplied exit 0; all 20 TAP checks passed | ✓ PASS |
+| Exact-head hosted CI, nightly and RetroArch | Run after the timeout change is pushed; plan 05-15 confirms these at ship | Pending; older remote-head results are not current evidence | PENDING SHIP |
+
+The old 9-minute ASan cap was reached by [exact-head run 43665013436](https://github.com/szTheory/schwaystation/actions/runs/43665013436) before its 547-test suite completed. The new 15-minute allowance is explicitly provisional; that run supports raising the floor but does not prove 15 minutes is sufficient. The next exact-head hosted run must confirm the new cap. The refreshed code review at 2026-11-15T02:11:21Z covered the five changed test/workflow files and found zero issues.
 
 ## Probe Execution
 
-No plan declares a probe script, and no conventional scripts/*/tests/probe-*.sh exists. No probe was required.
+No plan declares a probe and no conventional scripts/*/tests/probe-*.sh file was found.
 
 ## Test Quality Audit
 
-| Test File | Linked Requirement | Active | Skipped | Circular | Assertion Level | Verdict |
-|---|---|---:|---:|---|---|---|
-| tests/spu/model.c and tests/spu/tests.cmake | SOUND-01 | Yes | 0 | No | Behavioral/value | PASS |
-| tests/spu/fixture.c and tests/spu/expected.txt | SOUND-01 | Yes | 0 | No; the pinned text is a self-authored model regression, not a hardware waveform | Behavioral/value | PASS with provenance limit |
-| tests/spu/reference.c and tests/nightly/tests.cmake | SOUND-01 | Yes | 0 | No; expected transfer lines come from identity-pinned hardware assets | Behavioral/value | PASS; old-head nightly only |
-| tests/libretro/host.c and tests/libretro/tests.cmake | SOUND-02 | Yes | 0 | No; runner and callbacks use separate code paths | Value/behavioral | PASS |
-| tests/cmake/hashes.cmake and ci.yml | SOUND-01 | Yes | 0 | No for the stated cross-lane consistency check; generated rows are outputs, not golden values | Value | PASS; exact-head hosted comparison pending |
+| Test group | Requirement | Disabled | Circular expected data | Assertion strength | Verdict |
+|---|---|---:|---|---|---|
+| SPU model, voice, envelope, noise, reverb and fixture | SOUND-01 | 0 | No self-generated expected values found | Behavioral/value | PASS |
+| Pinned transfer comparator | SOUND-01 | 0 | No; expected pass lines come from identity-pinned hardware log | Value/behavioral | PASS |
+| Runner/libretro host equality | SOUND-02 | 0 | No; runner and callbacks use separate paths | Byte/value | PASS |
+| Eight-lane hash comparison | SOUND-01 | 0 | No for the cross-lane consistency contract; outputs are lane artifacts, not a silicon golden | Value | PASS |
 
-Disabled-test scan found no skipped requirement-linked tests. No test writes its own expectation data from the implementation under test. The hash writer emits lane outputs for a separate equality job; it is not treated as a silicon reference.
+The static disabled-test scan found no skip/todo syntax in linked tests. No test-generated expectation data was found. The fixture digest is a self-authored model regression and is not represented as a hardware PCM capture.
 
 ## Requirements Coverage
 
 | Requirement | Source plans | Description | Status | Evidence |
 |---|---|---|---|---|
-| SOUND-01 | 05-01 through 05-24 | Scheduled integer SPU model and audio path, exact frame sample counts, independent CPU-free PCM replay, cross-lane audio hash comparison, and seven hardware transfer cases | ✓ SATISFIED | Current full local CI and spu.fixture passed; eight-lane and nightly jobs are wired. Exact-head hosted results are reserved for ship. |
-| SOUND-02 | 05-01, 05-02, 05-12, 05-14 through 05-16, 05-19, 05-24 | Libretro batch/single PCM equals runner stream; tone content boots in hosted RetroArch; idle SPU remains bounded | ✓ SATISFIED | Full local CI, current be32 QEMU callback test and core.no_busy_loop passed; required RetroArch job is wired. Exact-head hosted run remains pending at ship. |
+| SOUND-01 | 05-01 through 05-24 | Scheduled integer SPU/audio path, exact sample counts, CPU-free PCM replay, cross-lane hashes and seven hardware transfer cases | ✓ SATISFIED | Current source and test wiring verified; supplied full local CI passed. Cross-lane and nightly hosted results are reserved for exact-head ship checks by plan 05-15. |
+| SOUND-02 | 05-01, 05-02, 05-12, 05-14 through 05-16, 05-19, 05-24 | Libretro batch/single PCM equality, hosted tone-content smoke and bounded idle SPU | ✓ SATISFIED | Host integration and CI content wiring verified; supplied local and be32 evidence passed. Exact-head RetroArch result is reserved for ship. |
 
-All 10 trackable decisions in 05-CONTEXT.md are honored by the plans and implementation (10/10; decision-coverage query exit 0).
+All 10 trackable decisions in 05-CONTEXT.md are honored (10/10; decision-coverage query exit 0). No additional requirements mapped to Phase 5 were orphaned from the plans.
 
 ## Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |---|---:|---|---|---|
 
-No unreferenced TBD/FIXME/XXX markers, placeholder implementations, disabled linked tests, or blocking stubs were found in the phase files listed by the summaries. Code review of the latest test changes covered tests/libretro/host.c, tests/libretro/tests.cmake, tests/runner/tests.cmake and tests/spu/tests.cmake and reported zero findings.
+No unreferenced TBD/FIXME/XXX markers, placeholders, empty production implementations, or disabled linked tests were found. The refreshed review of .github/workflows/ci.yml, tests/libretro/host.c, tests/libretro/tests.cmake, tests/runner/tests.cmake and tests/spu/tests.cmake is clean with zero findings.
 
 ## Disconfirmation Notes
 
-- The phase title can sound like a claim of complete silicon waveform identity. The implemented measurable contract does not prove a full bit-exact hardware waveform: docs/hardware/spu.md explicitly says no full silicon PCM capture is available. The pinned hardware evidence covers the named transfer cases; tone and impulse digests are model regressions. This is consistent with the roadmap criteria and is not a code gap.
-- The audio@600 digest could be mistaken for an external hardware oracle. tests/spu/expected.txt labels it as self-authored and explicitly says it is not a captured hardware waveform; the independent CPU-free path checks fixture/table consistency.
-- The network fetch failure path in SPUReferences.cmake propagates a fatal diagnostic if scripts/fetch-pin.sh fails. The controls test checks malformed/corrupt identity cases, but no deterministic test injects a transport failure. This is an uncovered infrastructure error path, not a failure of the SPU contract.
+- The phase does not prove full silicon PCM waveform identity. docs/hardware/spu.md states that no full hardware PCM capture is available. The pinned hardware evidence covers the named transfer cases; tone digests are model regressions and cross-lane consistency checks.
+- tests/spu/expected.txt identifies the audio digest as self-authored, not a captured hardware waveform. CPU-free replay checks the fixture/event model against guest PCM.
+- SPUReferences.cmake propagates fetch failures with a fatal diagnostic. Controls cover malformed and corrupt identity cases; transport failure injection is not a recurring coverage requirement for this phase.
 
 ## Human Verification Required
 
-N/A — this is a core-library/infrastructure phase with no owner-facing UI or manual audio sign-off. Deterministic checks are automated. The exact-head CI, nightly transfer and RetroArch run URLs are confirmed at ship, as plan 05-15 and AGENTS.md require.
+N/A — this is a core-library/infrastructure phase with no owner-facing UI or manual audio sign-off. Exact-head hosted CI/nightly/RetroArch checks are automated ship checks required by plan 05-15; no owner UAT is needed.
 
 ## Gaps Summary
 
-No implementation gaps remain. Current local CI, the focused be32 callback test and named local checks pass; required CI/nightly/RetroArch wiring is present. The old-head nightly run was green, while the old-head CI run failed on host limits and a big-endian assertion that the reviewed fixes address. Neither old-head run is evidence for the current checkout. The exact-head hosted run URL and result remain the next ship-time confirmation.
+No implementation gaps were found. Current code/artifacts and all 24 plan contracts remain intact. Supplied local CI, the focused be32 callback run, and post-edit workflow checks passed. The ASan timeout is provisional rather than proven sufficient; exact-head hosted CI, nightly and RetroArch outcomes must be recorded at ship, as plan 05-15 explicitly requires.
 
 ### Decision Coverage
 
-All trackable CONTEXT.md decisions are reflected in the phase artifacts (10/10).
+All trackable CONTEXT.md decisions are reflected in phase artifacts (10/10).
 
 ---
-*Phase: 05-the-sound-matches-the-console*
-*Verified: 2026-11-15*
-*Verifier: the agent (gsd-verifier)*
+
+Verified: 2026-11-15T02:17:54Z
+Verifier: the agent (gsd-verifier)
