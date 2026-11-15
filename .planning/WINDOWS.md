@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 7
+open_count: 8
 waived_count: 4
 fixed_count: 0
-total_count: 11
-last_updated: 2026-11-15T16:42:47.169Z
+total_count: 12
+last_updated: 2026-11-15T21:08:31.964Z
 ---
 
 # Broken Windows Ledger
@@ -26,6 +26,7 @@ last_updated: 2026-11-15T16:42:47.169Z
 | 9 | 06 | stub | src/mdec.c | 124 | MDEC MMIO reads return zero and writes are ignored until Plan 06-11 adds command and block behavior. | open |  | 2026-11-15T16:42:46.800Z |  |
 | 10 | 06 | stub | src/cdrom.c | 38 | The CD-ROM field visitor is not called by state.c until Plan 06-26 wires state integration. | open |  | 2026-11-15T16:42:46.984Z |  |
 | 11 | 06 | stub | src/mdec.c | 54 | The MDEC field visitor is not called by state.c until Plan 06-26 wires state integration. | open |  | 2026-11-15T16:42:47.169Z |  |
+| 12 | 6 | stub | src/cdrom.c | 1083 | CD sector events clear the deadline; sector acquisition and INT1 delivery are deferred to Plan 06-05. | open |  | 2026-11-15T21:08:31.964Z |  |
 
 ````json
 [
@@ -169,6 +170,19 @@ last_updated: 2026-11-15T16:42:47.169Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-11-15T16:42:47.169Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 12,
+    "kind": "stub",
+    "phase": "6",
+    "file": "src/cdrom.c",
+    "line": 1083,
+    "description": "CD sector events clear the deadline; sector acquisition and INT1 delivery are deferred to Plan 06-05.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T21:08:31.964Z",
     "resolved_at": null,
     "milestone": "v1.0"
   }

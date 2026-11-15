@@ -5,15 +5,15 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: "Completed 06-26 out of order; next sequential plan remains 06-04. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
-last_updated: "2026-11-15T19:02:41.454Z"
+stopped_at: "Completed 06-04-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh."
+last_updated: "2026-11-15T21:08:56.125Z"
 last_activity: 2026-11-15
-state_head: a45acb09d70fa550db657dafa0d6166eea1f2f3b
+state_head: 336b82a0d4499a7a7beef41157900b6cdb582fcc
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 176
-  completed_plans: 157
+  completed_plans: 158
   percent: 83
 current_plan: 3
 last_activity_desc: "Completed Phase 6 plan 06-26 out of order; 06-04 remains the sequential next plan. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Plan: 4 of 26
+Plan: 5 of 26
 Status: Ready to execute
 Last activity: 2026-11-15
 
@@ -219,6 +219,7 @@ Progress: [████████░░] 83%
 | Phase 06 P25 | 14min | 2 tasks | 3 files |
 | Phase 06 P08 | 35m | 2 tasks | 7 files |
 | Phase 06 P26 | 20min | 2 tasks | 7 files |
+| Phase 06 P04 | 107min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -540,6 +541,9 @@ Recent decisions affecting current work:
 - [Phase 06]: Append CD-ROM and MDEC visitors after SPU and advance the state/behavior revision to 6.
 - [Phase 06]: Keep host callbacks and the external audio drain ring outside serialized machine state.
 - [Phase 06]: Use SIO1 for remaining unbuilt-device diagnostics after CD-ROM and MDEC become owned bus devices.
+- [Phase 06-discs-and-fmv]: Use cdrom.* selector and inventory names for the CD behavior lane.
+- [Phase 06-discs-and-fmv]: Keep CD sector acquisition and INT1 delivery in Plan 06-05.
+- [Phase 06-discs-and-fmv]: Serialize CD unlock, lock and licensed-profile state with the device.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -735,8 +739,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T19:02:41.194Z
-Stopped at: Completed 06-26 out of order; next sequential plan remains 06-04. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
+Last session: 2026-11-15T21:08:55.881Z
+Stopped at: Completed 06-04-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh.
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
