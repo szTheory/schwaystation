@@ -98,6 +98,16 @@ add_library(schwaystation_exe OBJECT
   src/exe.c
   src/stub_kernel.c)
 add_library(schwaystation_testcard OBJECT src/testcard.c)
+set(SCHWAYSTATION_DISC_OBJECTS)
+set(SCHWAYSTATION_DISC_SOURCES)
+if(PROJECT_IS_TOP_LEVEL)
+  include(cmake/DiscTargets.cmake)
+  list(APPEND SCHWAYSTATION_DISC_OBJECTS
+    $<TARGET_OBJECTS:schwaystation_cdrom>
+    $<TARGET_OBJECTS:schwaystation_mdec>)
+else()
+  list(APPEND SCHWAYSTATION_DISC_SOURCES src/cdrom.c src/mdec.c)
+endif()
 add_library(schwaystation_state OBJECT
   src/state.c
   src/crc32.c)
@@ -117,6 +127,8 @@ add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_spu>
   $<TARGET_OBJECTS:schwaystation_exe>
   $<TARGET_OBJECTS:schwaystation_testcard>
+  ${SCHWAYSTATION_DISC_OBJECTS}
+  ${SCHWAYSTATION_DISC_SOURCES}
   $<TARGET_OBJECTS:schwaystation_state>
   $<TARGET_OBJECTS:schwaystation_sha256>)
 add_library(schwaystation::schwaystation ALIAS schwaystation)
@@ -125,9 +137,14 @@ target_include_directories(schwaystation PUBLIC
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated>
   $<INSTALL_INTERFACE:include>)
 target_include_directories(schwaystation_bios PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
-foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_bios schwaystation_sha256 schwaystation_bus
-    schwaystation_cpu schwaystation_gpu schwaystation_gte schwaystation_dma schwaystation_timers
-    schwaystation_sched schwaystation_sio schwaystation_card schwaystation_spu schwaystation_exe schwaystation_testcard schwaystation_state)
+set(schway_core_targets schwaystation schwaystation_instance schwaystation_bios schwaystation_sha256 schwaystation_bus
+  schwaystation_cpu schwaystation_gpu schwaystation_gte schwaystation_dma schwaystation_timers
+  schwaystation_sched schwaystation_sio schwaystation_card schwaystation_spu schwaystation_exe
+  schwaystation_testcard schwaystation_state)
+if(PROJECT_IS_TOP_LEVEL)
+  list(APPEND schway_core_targets schwaystation_cdrom schwaystation_mdec)
+endif()
+foreach(core_target IN LISTS schway_core_targets)
   schway_core_options(${core_target})
 endforeach()
 
@@ -178,9 +195,11 @@ if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
 endif()
 if(SCHWAYSTATION_BUILD_RUNNER)
   add_subdirectory(runner)
+  target_link_libraries(schwaystation-run PRIVATE schwaystation_disc_image)
 endif()
 if(SCHWAYSTATION_BUILD_LIBRETRO)
   add_subdirectory(libretro)
+  target_link_libraries(schwaystation_libretro PRIVATE schwaystation_disc_image)
 endif()
 
 # Release archives, one per install component.
