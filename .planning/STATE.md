@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: Completed 06-08-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; next sequential plan 06-04
-last_updated: "2026-11-15T18:37:52.530Z"
+stopped_at: "Completed 06-26 out of order; next sequential plan remains 06-04. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
+last_updated: "2026-11-15T19:02:41.454Z"
 last_activity: 2026-11-15
-state_head: 38df10991370d7c22b352c7a4567808608207055
+state_head: a45acb09d70fa550db657dafa0d6166eea1f2f3b
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 176
-  completed_plans: 156
+  completed_plans: 157
   percent: 83
 current_plan: 3
-last_activity_desc: "Completed Phase 6 plan 06-08 out of order; 06-26 is next in wave 4, and 06-04 remains the sequential next plan. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+last_activity_desc: "Completed Phase 6 plan 06-26 out of order; 06-04 remains the sequential next plan. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -218,6 +218,7 @@ Progress: [████████░░] 83%
 | Phase 06 P07 | not measured | 3 tasks | 10 files |
 | Phase 06 P25 | 14min | 2 tasks | 3 files |
 | Phase 06 P08 | 35m | 2 tasks | 7 files |
+| Phase 06 P26 | 20min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -536,6 +537,9 @@ Recent decisions affecting current work:
 - [Phase 06]: Keep the API v5 consumer public-header-only; core.disc_api owns internal attachment-state assertions.
 - [Phase 06]: Playlist index selection prepares stable descriptors; the host alone chooses when to swap the active core disc.
 - [Phase 06]: Shared CNF boot-path components omit ISO version suffixes before directory lookup.
+- [Phase 06]: Append CD-ROM and MDEC visitors after SPU and advance the state/behavior revision to 6.
+- [Phase 06]: Keep host callbacks and the external audio drain ring outside serialized machine state.
+- [Phase 06]: Use SIO1 for remaining unbuilt-device diagnostics after CD-ROM and MDEC become owned bus devices.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -731,8 +735,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T18:37:52.296Z
-Stopped at: Completed 06-08-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; next sequential plan 06-04
+Last session: 2026-11-15T19:02:41.194Z
+Stopped at: Completed 06-26 out of order; next sequential plan remains 06-04. Runtime/model: Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -806,3 +810,7 @@ Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-03 comp
 ### Phase 6 plan 06-08 execution (2026-11-15)
 
 Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-08 completed in 35 minutes with three task commits. Bounded M3U selection and shared SYSTEM.CNF parsing landed with playlist/CNF tests and host-facing format documentation. The local disc suite passed 10/10, the ISO probe edge case passed, and inventory/hygiene checks passed; no hosted URL applies. The stale `runner.probe` selector matched no test, so the actual `compat.probe.iso_edges` test was run separately. Plan 06-26 is next in wave 4; 06-04 remains the sequential next plan.
+
+### Phase 6 plan 06-26 execution (2026-11-15)
+
+Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-26 completed in 20 minutes with four task commits. CD-ROM and MDEC visitors now participate in state format 6; the state suite passed 8/8 and the bus/unbuilt/gap fixture lane passed 3/3. The initial TDD seed used an invalid MDEC deadline and was corrected to the supported 900-cycle bound. No hosted URL applies. This out-of-order wave plan is complete; 06-04 remains the sequential next plan. Global DISC-01 and DISC-03 acceptance remain pending the later CD-ROM and MDEC behavior plans.
