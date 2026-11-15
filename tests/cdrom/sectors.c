@@ -322,10 +322,15 @@ static void test_sector_timing_and_data(void)
     sector_start_read(inst, &host);
     sector_run(inst, SECTOR_PERIOD, &host);
     CHECK_EQ_U64(host.reads, 1u);
+    sector_wr32(inst, DMA_DPCR, 0x0FEDCBA9u);
+    sector_wr32(inst, DMA_MADR3, 0x3000u);
+    sector_wr32(inst, DMA_BCR3, 1u);
+    sector_wr32(inst, DMA_CHCR3, 0x11000001u);
+    CHECK_EQ_U64(inst->cdrom.sector_offset, 0u);
+    sector_run(inst, 200u, &host);
     CHECK_EQ_U64(sector_rd8(inst, 2u), 0x18u);
     CHECK_EQ_U64(sector_rd8(inst, 2u), 0x19u);
     CHECK_EQ_U64(sector_rd8(inst, 2u), 0x1Au);
-    sector_wr32(inst, DMA_DPCR, 0x0FEDCBA9u);
     sector_wr32(inst, DMA_MADR3, 0x4000u);
     sector_wr32(inst, DMA_BCR3, 4u);
     sector_wr32(inst, DMA_CHCR3, 0x11000000u);
@@ -338,7 +343,7 @@ static void test_sector_timing_and_data(void)
     sector_wr32(inst, DMA_MADR3, 0x4010u);
     sector_wr32(inst, DMA_BCR3, 508u);
     sector_wr32(inst, DMA_CHCR3, 0x11000000u);
-    CHECK_EQ_HEX(sector_ram_word(inst, 0x4FFCu), 0xF8F8F817u);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x47FCu), 0xF8F8F817u);
     CHECK_EQ_U64(inst->cdrom.sector_offset, 2048u);
     CHECK_EQ_U64(sector_rd8(inst, 2u), 0xF8u);
     sector_run(inst, 13000u, &host);
