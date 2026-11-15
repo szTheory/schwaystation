@@ -275,7 +275,16 @@ static void case_state_next_derived(void)
     CHECK_EQ_U64(schway_save_state(inst, buf, n), SCHWAY_STATUS_OK);
     inst->sched.next = 1u;
     CHECK_EQ_U64(schway_load_state(inst, buf, n), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(inst->sched.next, schway__gpu_next(inst));
+    uint64_t next = schway__dma_next(inst);
+    uint64_t timers = schway__timers_next(inst);
+    uint64_t gpu = schway__gpu_next(inst);
+    uint64_t sio = schway__sio_next(inst);
+    uint64_t spu = inst->spu.idle_fast_path == 0u ? schway__spu_next(inst) : UINT64_MAX;
+    if (timers < next) next = timers;
+    if (gpu < next) next = gpu;
+    if (sio < next) next = sio;
+    if (spu < next) next = spu;
+    CHECK_EQ_U64(inst->sched.next, next);
     CHECK_EQ_U64(inst->cpu.blk_tick, inst->ticks);
     CHECK_EQ_U64(inst->cpu.blk_cycle, inst->cpu.cycle);
     free(buf);

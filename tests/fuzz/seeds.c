@@ -6,6 +6,9 @@
 static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}, {3u}, {4u}};
 static const char *const names[] = {"partial_packet", "wrap_transfer", "dma_packet", "span_extrema",
                                     "reset_instance"};
+#elif defined(SCHWAY_FUZZ_SPU_SEEDS)
+static const char *const names[] = {"fifo_wrap", "irqa_edges", "voice_noise", "reverb_edges",
+                                    "dma_transfer"};
 #elif defined(SCHWAY_FUZZ_SIO_SEEDS)
 static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}};
 static const char *const names[] = {"scheduled_ack", "deselect_pending", "empty_fifo"};
@@ -14,7 +17,72 @@ static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}};
 static const char *const names[] = {"staged_write", "bad_checksum", "abort_write"};
 #endif
 
-#if defined(SCHWAY_FUZZ_GPU_SEEDS) || defined(SCHWAY_FUZZ_SIO_SEEDS) ||                            \
+#if defined(SCHWAY_FUZZ_SPU_SEEDS)
+static size_t spu_record(uint8_t *buf, size_t at, uint8_t op, uint8_t selector, uint16_t value,
+                         uint8_t extra)
+{
+    buf[at] = op;
+    buf[at + 1u] = selector;
+    buf[at + 2u] = (uint8_t)value;
+    buf[at + 3u] = (uint8_t)(value >> 8);
+    buf[at + 4u] = extra;
+    return at + 5u;
+}
+
+uint32_t seeds_count(void)
+{
+    return (uint32_t)(sizeof names / sizeof names[0]);
+}
+
+const char *seeds_name(uint32_t i)
+{
+    return names[i];
+}
+
+size_t seeds_build(uint32_t i, uint8_t *buf)
+{
+    size_t n = 0u;
+    if (i == 0u) {
+        for (uint32_t k = 0u; k < 32u; k++) {
+            n = spu_record(buf, n, 1u, 0u, (uint16_t)k, 0u);
+        }
+        for (uint32_t k = 0u; k < 24u; k++) {
+            n = spu_record(buf, n, 2u, 0u, 0u, 0u);
+        }
+        for (uint32_t k = 0u; k < 24u; k++) {
+            n = spu_record(buf, n, 1u, 0u, (uint16_t)(0x8000u + k), 0u);
+        }
+        for (uint32_t k = 0u; k < 33u; k++) {
+            n = spu_record(buf, n, 2u, 0u, 0u, 0u);
+        }
+    } else if (i == 1u) {
+        n = spu_record(buf, n, 0u, 0xD2u, 0xFFFFu, 0u);
+        n = spu_record(buf, n, 0u, 0xD5u, 0x8050u, 0u);
+        n = spu_record(buf, n, 1u, 0xFFu, 0xFFFFu, 1u);
+        n = spu_record(buf, n, 4u, 0u, 0u, 3u);
+    } else if (i == 2u) {
+        n = spu_record(buf, n, 0u, 0x01u, 0x0FFFu, 0u);
+        n = spu_record(buf, n, 0u, 0x02u, 0xFFFFu, 0u);
+        n = spu_record(buf, n, 0u, 0x03u, 0xFFFFu, 0u);
+        n = spu_record(buf, n, 0u, 0x04u, 0xFFFFu, 0u);
+        n = spu_record(buf, n, 0u, 0xC4u, 0x0001u, 0u);
+        n = spu_record(buf, n, 0u, 0xCAu, 0xFFFFu, 0u);
+        n = spu_record(buf, n, 4u, 0u, 0u, 3u);
+        n = spu_record(buf, n, 0u, 0xC6u, 0x0001u, 0u);
+    } else if (i == 3u) {
+        for (uint32_t k = 0u; k < 16u; k++) {
+            n = spu_record(buf, n, 0u, (uint8_t)(0xE0u + k),
+                           (uint16_t)((k & 1u) != 0u ? 0xFFFFu : 0u), 0u);
+        }
+        n = spu_record(buf, n, 0u, 0xD5u, 0xC000u, 0u);
+        n = spu_record(buf, n, 4u, 0u, 0u, 3u);
+    } else {
+        n = spu_record(buf, n, 3u, 0xFFu, 0xFFFFu, 3u);
+        n = spu_record(buf, n, 4u, 0x00u, 0u, 3u);
+    }
+    return n;
+}
+#elif defined(SCHWAY_FUZZ_GPU_SEEDS) || defined(SCHWAY_FUZZ_SIO_SEEDS) ||                          \
     defined(SCHWAY_FUZZ_MEMCARD_SEEDS)
 uint32_t seeds_count(void)
 {

@@ -1,8 +1,10 @@
 # Committed binary fixtures: path<TAB>source<TAB>pin<TAB>licence<TAB>sha256<TAB>notice. scripts/hygiene.sh admits a binary only if listed here.
 tests/vectors/r3000/sst-sample.bin	SingleStepTests/r3000 v1, first 100 cases of each file	51e227447d0b	MIT	d6ef9a9ce978c487d2065c60c7312959a8bb6ddbd67b19c8465d1e28557d5ffc	THIRD-PARTY-NOTICES.md
-src/stub_kernel.c	tests/fixtures/src/stub/stub.asm	-	MIT	9e02c4232100caf30bf9cafd7a244c18afe8d7d56c18799adc476a5b0352033e	-
+src/stub_kernel.c	tests/fixtures/src/stub/stub.asm	-	MIT	745175ec67b65820b6800bc0efa1982605475672f985678dd1c93a505176392f	-
 tests/fixtures/src/gpu_motion.asm	schwaystation first-party fixture	-	MIT	c9af0565caa7a5786c270fde6aaf661faea346ed51f597294fc0d9e7bec7eb1f	-
 tests/fixtures/src/memcard_roundtrip.asm	schwaystation first-party fixture	-	MIT	9c8e9f07c963e3cb8c56a90fc56df8046ecb36f80f71e244d73c3da0a22ee8c0	-
 tests/fixtures/src/pad_counter.asm	schwaystation first-party fixture	-	MIT	8520b66e145ae33ae44b7a30c0c4886adc97f32a1afe7cce90032f107ffb3057	-
+tests/fixtures/src/spu_blocks.inc	schwaystation first-party fixture	-	MIT	e19b56c175af6d3e42776ac9e10ad039abcd9a41572217016246c41fa1807f5a	-
+tests/fixtures/src/spu_tone.asm	schwaystation first-party fixture	-	MIT	7e463379e683d35d4fe1472d7e50d40a2312ac4d0978dee12e23a0cc2026c772	-
 tests/vectors/gte/ps1tests-1150.bin	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	e8a0e61a57a6582ac53d39b941eeaa83b87498444a3ada915d9de73d313dd9c2	THIRD-PARTY-NOTICES.md
 tests/fixtures/src/gte_cases.inc	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	22d83f53a818096106543758c20c8cab3218255af740faff37ff403b6e581220	THIRD-PARTY-NOTICES.md

@@ -147,11 +147,58 @@ handler:
 ; caller holds survives. A call with another function number returns at once.
 call_a:
   addiu k1, zero, 0x3C                   ; A(3Ch) putchar
-  bne t1, k1, call_return
+  bne t1, k1, call_a_printf
   lui k1, 0xBF80                         ; delay slot: the I/O region in KSEG1
   sb a0, DEBUG_PORT(k1)
 call_return:
   jr ra
+  nop
+; PSX-SPX Kernel/BIOS TTY Console A(3Fh) is printf; the pinned transfer test
+; needs only literal strings and %s.
+; This narrow formatter keeps the stub bounded to the test's needed cases and
+; sends its output through the same profile-controlled debug port.
+call_a_printf:
+  ori k1, zero, 0x3F
+  bne t1, k1, call_return
+  nop
+  lui k1, 0xBF80
+  addu t2, a0, zero
+  addu t3, a1, zero
+printf_loop:
+  lbu t4, 0(t2)
+  nop
+  beq t4, zero, call_return
+  addiu t2, t2, 1
+  ori t5, zero, 0x25
+  bne t4, t5, printf_put
+  nop
+  lbu t4, 0(t2)
+  addiu t2, t2, 1
+  ori t5, zero, 0x73
+  bne t4, t5, printf_put_specifier
+  nop
+  addu t6, t3, zero
+printf_arg_loop:
+  lbu t4, 0(t6)
+  nop
+  beq t4, zero, printf_arg_done
+  addiu t6, t6, 1
+  sb t4, DEBUG_PORT(k1)
+  b printf_arg_loop
+  nop
+printf_arg_done:
+  addiu t3, t3, 4
+  b printf_loop
+  nop
+printf_put_specifier:
+  ori t5, zero, 0x25
+  sb t5, DEBUG_PORT(k1)
+  sb t4, DEBUG_PORT(k1)
+  b printf_loop
+  nop
+printf_put:
+  sb t4, DEBUG_PORT(k1)
+  b printf_loop
   nop
 call_b:
   addiu k1, zero, 0x3D                   ; B(3Dh) putchar

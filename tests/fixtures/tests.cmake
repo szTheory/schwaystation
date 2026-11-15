@@ -541,6 +541,9 @@ schway__fixture(timers_lines.exe timers_lines.asm)
 schway__fixture(gpu_motion.exe gpu_motion.asm)
 schway__fixture(pad_counter.exe pad_counter.asm)
 schway__fixture(memcard_roundtrip.exe memcard_roundtrip.asm)
+set(schway__fixture_extra ${schway__fixture_src}/spu_blocks.inc)
+schway__fixture(spu_tone.exe spu_tone.asm)
+set(schway__fixture_extra "")
 foreach(row IN ITEMS
     "10|0|10" "8|1|8" "7|64|7" "5|2|5" "4|3|4" "10|0|5" "8|1|2" "4|3|1")
   string(REPLACE "|" ";" fields "${row}")
@@ -809,10 +812,10 @@ expect_runner(fixtures.trace.criterion5 7 "(^|\n)fault frame="
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/fault_unmapped_read.exe --trace first-fault)
 
 # Fault prevented: accesses to devices that are not built yet that leave no sign of a program stuck on
-# one, and a write to a gap that is dropped without a fault. SPU and GPU writes end with exit 0 and an
+# one, and a write to a gap that is dropped without a fault. An MDEC write ends with exit 0 and an
 # unbuilt line; a write to 1F801030h is a first fault.
 expect_runner(fixtures.unbuilt_footer 0
-  "(^|\n)unbuilt dev=(gpu|spu) n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
+  "(^|\n)unbuilt dev=mdec n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/unbuilt.exe --stop-on mailbox --frames 30)
 expect_runner(fixtures.gap_write 7 "(^|\n)fault frame=[0-9]+ [^\n]* kind=unmapped_write(\n|$)"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/gap_write.exe --frames 30)
@@ -956,8 +959,8 @@ endforeach()
 foreach(row IN ITEMS
     # The unreleased state revision now records each card slot's pending-error
     # latch. At these frames both values are zero; the frame hashes stay fixed.
-    "150|3a7ba868f865632a56a75fcfc9e70258313af5b4b17051e766fc2f6faa47cc83"
-    "180|653cfd5f3fc834fc64eb9c8633a589047081c329263327242d5158a02eb2e489")
+    "150|876a3e8f0547dbffcc1b0667f5c5940c824da87afc08feca52c959a58eb244c8"
+    "180|8d7f83d6614aa42adfc7642b48b92c9ec71b40736bc8c9012fc0b1ff61e830ac")
   string(REPLACE "|" ";" fields "${row}")
   list(GET fields 0 frame)
   list(GET fields 1 hash)

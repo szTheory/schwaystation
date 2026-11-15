@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../../runner/bench.h"
+#include "../../runner/sha256.h"
 #include "../../runner/stop.h"
 #include "../../runner/tty.h"
 #include "../check.h"
@@ -138,10 +139,50 @@ static void tty_sanitize(void)
     CHECK_EQ_HEX(schway__runner_tty_byte(0x80u), '?');
 }
 
+/* A streamed hash must not depend on whether serialized PCM arrives as one
+   buffer or in per-frame chunks. Samples use explicit little-endian bytes. */
+static void audio_hash(void)
+{
+    const int16_t pairs[] = {0x1234, -2, 0, INT16_MIN, INT16_MAX, -1};
+    uint8_t bytes[sizeof pairs];
+    for (size_t i = 0u; i < sizeof pairs / sizeof pairs[0]; i++) {
+        uint16_t sample = (uint16_t)pairs[i];
+        bytes[2u * i] = (uint8_t)sample;
+        bytes[2u * i + 1u] = (uint8_t)(sample >> 8);
+    }
+
+    schway__sha256 whole;
+    schway__sha256 chunks;
+    uint8_t whole_digest[32];
+    uint8_t chunks_digest[32];
+    char whole_hex[65];
+    schway__sha256_init(&whole);
+    schway__sha256_update(&whole, bytes, sizeof bytes);
+    schway__sha256_final(&whole, whole_digest);
+    schway__sha256_hex(whole_digest, whole_hex);
+
+    schway__sha256_init(&chunks);
+    schway__sha256_update(&chunks, bytes, 3u);
+    schway__sha256_update(&chunks, bytes + 3u, 5u);
+    schway__sha256_update(&chunks, bytes + 8u, sizeof bytes - 8u);
+    schway__sha256_final(&chunks, chunks_digest);
+    CHECK(memcmp(whole_digest, chunks_digest, sizeof whole_digest) == 0);
+    CHECK(strcmp(whole_hex, "31012b12fab553fe513bac93a604a48b6276e5e0720ef9298c6dba359002fc26") == 0);
+
+    schway__sha256 empty;
+    uint8_t empty_digest[32];
+    char empty_hex[65];
+    schway__sha256_init(&empty);
+    schway__sha256_update(&empty, NULL, 0u);
+    schway__sha256_final(&empty, empty_digest);
+    schway__sha256_hex(empty_digest, empty_hex);
+    CHECK(strcmp(empty_hex, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") == 0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-bench percentile|bytes|format|stop|tty_sanitize\n");
+        fprintf(stderr, "usage: schwaystation-test-bench percentile|bytes|format|stop|tty_sanitize|audio_hash\n");
         return 2;
     }
     if (strcmp(argv[1], "percentile") == 0) {
@@ -154,6 +195,8 @@ int main(int argc, char **argv)
         stop();
     } else if (strcmp(argv[1], "tty_sanitize") == 0) {
         tty_sanitize();
+    } else if (strcmp(argv[1], "audio_hash") == 0) {
+        audio_hash();
     } else {
         fprintf(stderr, "unknown case %s\n", argv[1]);
         return 2;

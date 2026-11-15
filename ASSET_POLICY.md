@@ -74,7 +74,8 @@ between legs of one run only).
 |---|---|---|
 | OpenBIOS `openbios.bin` | built from pcsx-redux/nugget `9db6d88d23c4` with the pinned mipsel GCC on the Linux leg [AP.03] | 512 KiB binary (section 6 treats every 524,288-byte binary as a BIOS); third-party code is built, not stored |
 | nugget tests (about 60 PS-EXEs) | built from the same pin | MIT plus libcester and libgcc bytes; dozens of binaries; graded by their own success lines |
-| ps1-tests executables `tests.zip` | fetched at release `build-158` (6,613,816 bytes), digest recorded at first fetch [AP.05] | MPL-2.0 `libpsn00b` bytes; running needs no notice, redistributing would |
+| ps1-tests `spu/memory-transfer/memory-transfer.exe` | extracted from the pinned `build-158` `tests.zip` archive; member SHA-256 is in `pins.txt`; only under `build/<preset>/spu-reference` | 24,576-byte executable includes MPL-2.0 `libpsn00b` bytes; fetch-only, never committed, uploaded or shipped |
+| ps1-tests `spu/memory-transfer/psx.log` | fetched at public commit `f727802fead11f1daa7549285548392ef87749cb`; SHA-256 is in `pins.txt`; compared with the archive copy | MIT hardware log, build storage only; its seven transfer lines are not PCM evidence |
 | SingleStepTests/r3000 full set | fetched nightly at `51e227447d0b` (23,946,132 bytes) [AP.04] | size; the committed sample covers the per-PR tier |
 | Own mkpsxiso disc images (`disc_boot.bin/.cue` and the perf disc) | built from the committed XML, PS-EXE and generated audio with mkpsxiso v2.30 (tag `b6f9a25c8a96`, commit `54fb1644ed87`) | a disc image is hundreds of KB of fill sectors; rebuilt and hash-compared on every lane |
 | amidog psxtest_cpu, psxtest_cpx, psxtest_gte | fetched nightly at most, binary oracle; results read from VRAM text | no stated terms; CC BY-NC-SA wiki |

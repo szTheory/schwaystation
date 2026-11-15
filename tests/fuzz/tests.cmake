@@ -31,7 +31,7 @@ schway_add_test(NAME fuzz.regress.exe
 
 # Each subsystem replay uses the existing replay and seed interfaces, with a
 # compile-time corpus selected for that subsystem's real operations.
-foreach(subsystem IN ITEMS gpu sio memcard)
+foreach(subsystem IN ITEMS gpu sio memcard spu)
   add_executable(schwaystation-fuzz-${subsystem}-replay
     ${fuzz_dir}/${subsystem}.c ${fuzz_dir}/seeds.c)
   string(TOUPPER ${subsystem} seed_mode)
@@ -61,4 +61,13 @@ if(SCHWAYSTATION_FUZZ)
   set_target_properties(schwaystation-fuzz-exe PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
   schway_warnings(schwaystation-fuzz-exe)
+
+  add_executable(schwaystation-fuzz-spu ${fuzz_dir}/spu.c)
+  target_include_directories(schwaystation-fuzz-spu PRIVATE ${PROJECT_SOURCE_DIR}/src)
+  target_link_libraries(schwaystation-fuzz-spu PRIVATE schwaystation::schwaystation)
+  target_compile_options(schwaystation-fuzz-spu PRIVATE -fsanitize=fuzzer)
+  target_link_options(schwaystation-fuzz-spu PRIVATE -fsanitize=fuzzer)
+  set_target_properties(schwaystation-fuzz-spu PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(schwaystation-fuzz-spu)
 endif()

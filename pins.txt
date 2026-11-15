@@ -25,6 +25,17 @@ ps1-tests-gpu-captures build-158 https://github.com/JaCzekanski/ps1-tests/releas
 # gpustat's hardware log is absent from build-158; fetch this text source only at the public source commit.
 ps1-tests-gpu-gpustat-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/gpu/gpustat/psx.log 1ac340f7f505ab831b12d34a02624963e1e907873bd57f2fd50f09a9ed11eab3
 
+# SPU memory-transfer reference identity. The source commit answers 200 from GitHub's commits API.
+# Both listed source files are MIT under the repository LICENSE; neither is copied into schwaystation.
+# main.cpp includes common/dma.hpp, which remains excluded and was not fetched or inspected.
+# ps1-tests-source commit=f727802fead11f1daa7549285548392ef87749cb
+# ps1-tests-source-file path=spu/memory-transfer/Makefile blob-sha1=f439bfd2661a41e9ad57a3d8d93024473b506255 sha256=2464cf94874066a8596e8d9d733d32949d2f2ff01c0305dffcded0a7d744f851
+# ps1-tests-source-file path=spu/memory-transfer/main.cpp blob-sha1=4e3ba16b408bad8a3b006b03c8e05fde7b465c00 sha256=b7d9f51db953ee82df30e553c715f41222ae5ddc145625267c9c7da321c1b724
+# The build-158 archive uses the already pinned ps1-tests-gpu-captures row above.
+# Its executable contains MPL-2.0 libpsn00b bytes and is extracted to build storage only.
+# ps1-tests-release-member path=spu/memory-transfer/memory-transfer.exe release=build-158 sha256=9489f60d4ca6c7c8daca13e2551d21457971781d1b93d51947061e27df1fde36
+ps1-tests-spu-memory-transfer-log f727802fead11f1daa7549285548392ef87749cb https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/spu/memory-transfer/psx.log 415a79e5ed82a631eb35965766ff8d3c3e268c9f27262226d88507e5c3807cae
+
 # armips (MIT): assembles the PS-EXE fixtures; cmake/Armips.cmake downloads the archive and checks the digest.
 # The digest was measured on the commit archive named by the full SHA, not a short-SHA URL.
 armips 62adab4ef30d https://github.com/Kingcom/armips/archive/62adab4ef30da765f5cf22a451eb08a59c54dc8b.tar.gz f7a65102febb4811a336a06e6d93c7e84cc86548182d54e1b1b4e2bffe562f56

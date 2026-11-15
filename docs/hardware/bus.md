@@ -115,30 +115,15 @@ GPU and MDEC ports) cost one cycle, which is approximate. The SPU and the CD-ROM
 
 ## Devices not built yet
 
-The serial ports (`1F801040h`-`1F80105Fh`), the CD-ROM (`1F801800h`-`1F801803h`), the MDEC
-(`1F801820h`-`1F801827h`) and most of the SPU (`1F801C00h`-`1F801FFFh`) are documented but not modelled. For an
-unbuilt access at any width a read returns 0 and a write is dropped, with no fault. Each access is counted per device in
-`unbuilt_n`, saturating at the largest 32-bit value, and the last one is kept as the device, address, width and program
-counter. Both are part of the state. A program that polls an unbuilt register therefore spins with a count that grows
-and a last program counter that names the loop. A later release replaces each unbuilt case with the device itself.
+The serial ports (`1F801040h`-`1F80105Fh`), the CD-ROM (`1F801800h`-`1F801803h`) and the MDEC
+(`1F801820h`-`1F801827h`) are documented but not modelled. For an unbuilt access at any width a read returns 0 and a
+write is dropped, with no fault. Each access is counted per device in `unbuilt_n`, saturating at the largest 32-bit
+value, and the last one is kept as the device, address, width and program counter. Both are part of the state. A program
+that polls an unbuilt register therefore spins with a count that grows and a last program counter that names the loop.
 
-### SPU control readback
-
-The exact halfword at `1F801DAAh` is ATTR, a read/write control register whose bits 5-4 select the transfer mode. The
-bus stores and returns the raw 16-bit value for that exact access, retains the normal DEV4 port cost, and does not count
-it as unbuilt. This allows a caller to read back a control value such as `0020h`; it does not move SPU RAM, generate
-audio or implement other SPU register side effects. For this first caller, a write selecting transfer mode `0020h`
-also makes request-mode DMA4 RAM-to-device blocks persistently ready for the existing deterministic sink; the DMA
-page documents the modeled scheduling and its limits. Byte or word access at ATTR, and every other SPU access
-including the read-only status register STATX at `1F801DAEh`, keep the unbuilt zero-read/dropped-write behavior,
-accounting and DEV4 cost.
-
-The latch is instance state named `bus.spu_attr` and is serialized with other bus fields. A power reset sets it to zero
-as the emulator's deterministic reset model; this is not a hardware power-on-value claim. The [PSX-SPX SPU register
-notes](https://psx-spx.consoledev.net/soundprocessingunitspu/) distinguish ATTR from delayed STATX status. The
-pinned [MIT nugget ATTR definition](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/common/hardware/spu.h)
-and [modplayer poll](https://github.com/pcsx-redux/nugget/blob/9db6d88d23c4da7a39b1a4b9729f1e5fff80dec9/modplayer/modplayer.c)
-show the exact halfword write/read contract. The model implements only that readback contract, not SPU timing or audio.
+The SPU register window is routed through `src/spu.c`; its modeled transfer, capture, status and IRQ behavior is
+described in [the SPU hardware page](spu.md). Unsupported addresses in the SPU window retain the unbuilt
+zero-read/dropped-write behavior, accounting and DEV4 cost.
 
 The GPU (`1F801810h`-`1F801817h`) is implemented by its own module. The rest of the I/O page is checked by
 `core.bus_unbuilt` at widths 1, 2 and 4 for reads and writes; the sweep requires every address to be owned, unbuilt or a

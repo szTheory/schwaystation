@@ -34,15 +34,22 @@ function(replace_info name before after pattern)
     message(FATAL_ERROR "${name}: source .info does not contain expected field")
   endif()
   string(REPLACE "${before}" "${after}" changed "${base_info}")
-  set(path "${WORK}/${name}.info")
-  file(WRITE "${path}" "${changed}")
-  reject("${name}" "${path}" "${INVENTORY}" "${pattern}")
+  file(WRITE "${WORK}/${name}.info" "${changed}")
+  reject("${name}" "${WORK}/${name}.info" "${INVENTORY}" "${pattern}")
 endfunction()
 
 function(append_info name suffix pattern)
-  set(path "${WORK}/${name}.info")
-  file(WRITE "${path}" "${base_info}${suffix}")
-  reject("${name}" "${path}" "${INVENTORY}" "${pattern}")
+  file(WRITE "${WORK}/${name}.info" "${base_info}${suffix}")
+  reject("${name}" "${WORK}/${name}.info" "${INVENTORY}" "${pattern}")
+endfunction()
+
+function(reject_inventory_row name row pattern)
+  string(REPLACE "${row}" "" changed "${base_inventory}")
+  if(changed STREQUAL base_inventory)
+    message(FATAL_ERROR "self-test inventory lacks ${name} row")
+  endif()
+  file(WRITE "${WORK}/${name}.inventory" "${changed}")
+  reject("${name}" "${INFO_FILE}" "${WORK}/${name}.inventory" "${pattern}")
 endfunction()
 
 reject("missing arguments" "" "" "-DINFO_FILE is required")
@@ -61,24 +68,10 @@ replace_info("core-options refusal" "core_options = \"true\""
 replace_info("experimental refusal" "is_experimental = \"true\""
   "is_experimental = \"false\"" "keep experimental true until v2.0")
 
-string(REPLACE "libretro.input.descriptors\tlibretro,portable\n" ""
-  without_input "${base_inventory}")
-if(without_input STREQUAL base_inventory)
-  message(FATAL_ERROR "self-test inventory lacks libretro.input.descriptors row")
-endif()
-set(without_input_path "${WORK}/without-input.inventory")
-file(WRITE "${without_input_path}" "${without_input}")
-reject("ungrounded input claim" "${INFO_FILE}" "${without_input_path}"
+reject_inventory_row("ungrounded input claim" "libretro.input.descriptors\tlibretro,portable\n"
   "input_descriptors has no inventory test")
 
-string(REPLACE "libretro.memory.boundaries\tlibretro,portable\n" ""
-  without_memory "${base_inventory}")
-if(without_memory STREQUAL base_inventory)
-  message(FATAL_ERROR "self-test inventory lacks libretro.memory.boundaries row")
-endif()
-set(without_memory_path "${WORK}/without-memory.inventory")
-file(WRITE "${without_memory_path}" "${without_memory}")
-reject("ungrounded memory claim" "${INFO_FILE}" "${without_memory_path}"
+reject_inventory_row("ungrounded memory claim" "libretro.memory.boundaries\tlibretro,portable\n"
   "memory_descriptors has no inventory test")
 
 replace_info("disk control refusal" "disk_control = \"false\""
@@ -92,14 +85,7 @@ endforeach()
 append_info("ungrounded true claim" "camera = \"true\"\n"
   "no test mapping for true .info claim camera")
 
-string(REPLACE "libretro.content.no_bios\tlibretro,portable\n" ""
-  without_no_bios "${base_inventory}")
-if(without_no_bios STREQUAL base_inventory)
-  message(FATAL_ERROR "self-test inventory lacks libretro.content.no_bios row")
-endif()
-set(without_no_bios_path "${WORK}/without-no-bios.inventory")
-file(WRITE "${without_no_bios_path}" "${without_no_bios}")
-reject("shared EXE/fullpath mapping" "${INFO_FILE}" "${without_no_bios_path}"
+reject_inventory_row("shared EXE/fullpath mapping" "libretro.content.no_bios\tlibretro,portable\n"
   "supported_extensions has no inventory test")
 
 message(STATUS "info_claims_self_test: all 19 metadata refusal controls passed")

@@ -77,7 +77,6 @@ struct schway__bus {
     uint8_t cost[SCHWAY__PORT_COUNT][6];
     uint32_t ram_size;   /* RAM_SIZE, 1F801060h */
     uint32_t cache_ctrl; /* cache control, FFFE0130h */
-    uint16_t spu_attr;   /* Exact halfword ATTR control readback, saved as bus.spu_attr. */
     /* Accesses to devices not built yet, per device, and the last one: its
        device, address, width and the program counter. */
     uint32_t unbuilt_n[SCHWAY__DEV_COUNT];

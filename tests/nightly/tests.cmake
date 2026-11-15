@@ -75,6 +75,18 @@ foreach(case IN LISTS SCHWAY_GPU_REFERENCE_CASES)
     LABELS gpu nightly portable TIMEOUT 120)
 endforeach()
 
+include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
+schway_prepare_spu_reference_assets(
+  spu_reference_dir spu_reference_exe spu_reference_log
+  spu_reference_exe_sha256 spu_reference_log_sha256)
+schway_add_spu_reference_target("${spu_reference_exe_sha256}" "${spu_reference_log_sha256}")
+
+# Fault prevented: nightly omits any of the pinned memory-transfer guest's
+# seven hardware cases or skips the bounded end-to-end transfer check.
+schway_add_test(NAME spu.reference.memory_transfer
+  COMMAND schwaystation-test-spu-reference memory-transfer --full --assets "${spu_reference_dir}"
+  LABELS audio nightly portable TIMEOUT 120)
+
 add_executable(schwaystation-test-vectors ${PROJECT_SOURCE_DIR}/tests/vectors/vectors.c)
 target_include_directories(schwaystation-test-vectors PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-vectors PRIVATE schwaystation::schwaystation)

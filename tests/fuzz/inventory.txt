@@ -2,3 +2,4 @@ fuzz.regress.exe	fuzz,portable
 fuzz.regress.gpu	fuzz,portable
 fuzz.regress.memcard	fuzz,portable
 fuzz.regress.sio	fuzz,portable
+fuzz.regress.spu	fuzz,portable

@@ -29,6 +29,7 @@ dma.read.chain_saves	dma,portable
 dma.regs.sweep	dma,portable
 dma.spu.request_blocks	dma,portable
 dma.spu.request_controls	dma,portable
+dma.spu.sync0_start	dma,portable
 dma.stall.cpu_access	dma,portable
 dma.stall.engines_decay	dma,portable
 dma.stall.not_scratch	dma,portable

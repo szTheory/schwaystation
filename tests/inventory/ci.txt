@@ -1,7 +1,7 @@
 # Directories whose inventory.txt this preset registers, one per line; label subsets come from check_junit.cmake's LABELS and EXCLUDE.
 abi
-bus
 built
+bus
 card
 compat
 core
@@ -19,5 +19,6 @@ policy
 release
 runner
 sio
+spu
 timers
 vectors

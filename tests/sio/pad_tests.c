@@ -59,6 +59,7 @@ static void advance_to(schway *inst, uint64_t tick)
     inst->ticks = tick;
     schway__sched_sync(inst);
     schway__sched_run(inst);
+    schway__spu_catch_up(inst, inst->ticks);
 }
 
 static uint8_t exchange(schway *inst, uint8_t sent, int ack)

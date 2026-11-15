@@ -2,8 +2,8 @@
 
 `schwaystation-run` is the headless runner. It runs the emulator for a fixed number of frames with no window,
 sound device or input device. It can print a frame hash, write a PNG and report frame times. Scripts and CI use it
-to check that a build produces the expected picture. It can run a PS-EXE file and print the text the program writes,
-and it can say what a PS-EXE file is without running it.
+to check that a build produces the expected picture or native audio stream. It can run a PS-EXE file and print the
+text the program writes, and it can say what a PS-EXE file is without running it.
 
 The runner loads no disc. A run without `--bios` or `--exe` shows the built-in test card, described in
 [embedding.md](embedding.md#the-test-card). `--probe` reads one PS-EXE or disc image and runs nothing.
@@ -11,12 +11,12 @@ The runner loads no disc. A run without `--bios` or `--exe` shows the built-in t
 ## Synopsis
 
 ```text
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-vram] [--hash-state]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
-                  [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-vram] [--hash-state]
+                  [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
 schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]
 schwaystation-run --help | --version
 ```
@@ -34,6 +34,7 @@ schwaystation-run --help | --version
 | `--trace first-fault` | After a [fault](#diagnostics) or a hang, print the last 4096 trace records as twelve-field lines. Needs `--exe`. Give it once. |
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
+| `--hash-audio` | Print the SHA-256 of the native 44.1 kHz stereo PCM stream through the last frame that ran. |
 | `--hash-vram` | After the last frame, print the SHA-256 of all VRAM words as row-major little-endian RGB555 with bit 15 cleared. |
 | `--hash-state` | After the last frame, print the SHA-256 of the saved [machine state](#frame-hash). |
 | `--inputs FILE` | Parse and apply a bounded controller script before each frame latch, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
@@ -50,7 +51,7 @@ schwaystation-run --help | --version
 Options may come in any order, except `--probe`, which takes no other option except the `--metadata-ledger` and
 `--metadata-dat` pair. Anything else on the command line is
 a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--exe` or `--probe`,
-`--bios` or `--exe` twice, `--bios` together with `--exe`, `--exe` with `--probe`, `--tty` without `--exe` or
+`--bios` or `--exe` twice, `--hash-audio` twice, `--bios` together with `--exe`, `--exe` with `--probe`, `--tty` without `--exe` or
 `--bios`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything but `mailbox`,
 `--trace` with anything but `first-fault`, `--serial` without serial naming, and any option this release does not have.
 
@@ -242,7 +243,7 @@ status 0. Any other byte prints one line and ends the run with status 6:
 exit code=0x2a
 ```
 
-The text written before the exit is printed first. `--hash`, `--png` and `--bench` print nothing after an exit
+The text written before the exit is printed first. `--hash`, `--hash-audio`, `--png` and `--bench` print nothing after an exit
 with status 6. Without `--tty` the port is not decoded and the write has no effect.
 
 ## Mailbox
@@ -282,7 +283,7 @@ hang frames=600 pc=0x80010100
 ```
 
 A program that ends the run through the [exit port](#exit-port) first, or a SIGINT or SIGTERM, is not a hang. As
-after an exit port failure, `--hash` and `--bench` print nothing after status 6, 7 or 8.
+after an exit port failure, `--hash`, `--hash-audio` and `--bench` print nothing after status 6, 7 or 8.
 
 ## Diagnostics
 
@@ -365,7 +366,8 @@ and big-endian hosts. The card changes every frame, so the frame number matters.
 
 Until a GPU draws, every frame is the test card whatever the CPU, the GTE, DMA or the timers did, so the frame hash
 cannot show them. `--hash-state` prints one line after the last frame. When combined with other reports, it appears
-after the frame hash and before the VRAM hash and lag count. For example, the `gpu_motion.exe` fixture at frame 150 prints:
+after the frame and audio hashes and before the VRAM hash and lag count. For example, the `gpu_motion.exe` fixture
+at frame 150 prints:
 
 ```text
 state sha256 <64 lowercase hexadecimal digits>
@@ -375,6 +377,20 @@ It is the SHA-256 of the serialized machine state without its 20-byte header. It
 emulated execution, including the loaded BIOS identity, but excludes BIOS payload bytes, persistent card bytes and
 generations, output queues and the trace ring. The state bytes are the same on every platform. A save that fails
 exits 1.
+
+## Audio hash
+
+`--hash-audio` prints one line for the PCM samples actually produced by the run:
+
+```text
+audio sha256 <64 lowercase hexadecimal digits>
+```
+
+The runner drains the core's stereo pairs once after each frame and updates one SHA-256 over the full run. Each
+pair is serialized as left then right, each signed 16-bit sample in little-endian byte order, with no frame padding.
+The stream is native 44,100 Hz PCM after main volume and final saturation, before host processing or resampling. A
+signal or mailbox stop hashes only the frames that ran. A drain error or dropped sample exits 1 and prints no audio
+hash. When combined with other reports, the audio line follows the frame hash and precedes the state and VRAM hashes.
 
 ## VRAM hash
 
@@ -499,7 +515,7 @@ only.
 ## Stopping
 
 SIGINT (Ctrl+C) or SIGTERM ends the run after the frame in progress. That frame's PNG is still written,
-`--hash` prints the last frame that ran, and `--bench` reports the frames that ran. The exit status is 0. A
+`--hash` and `--hash-audio` report the last frame and PCM samples that ran, and `--bench` reports the frames that ran. The exit status is 0. A
 signal that was already ignored when the runner started, as under `nohup`, stays ignored.
 
 ## Exit status

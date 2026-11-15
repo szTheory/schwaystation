@@ -1013,13 +1013,12 @@ static uint32_t cpu_step(schway *inst)
    write, a write to I_STAT or I_MASK, a double fault), when the next
    instruction lies in another 4 KiB page, after 128 instructions, after the
    exit port was written, after an instruction that latched a first fault, and
-   at the first instruction boundary at or after limit cycles. The cycles are
-   added to inst->ticks once, at the end, so what the instructions did not
-   change, the state of the other devices, is as of the block's start
-   (docs/hardware/cop0.md, Interrupts). The block clock, blk_tick and blk_cycle, is set at
-   the start of every block, so a device access inside it reads its own tick
-   (schway__sched_now) and a fault latched in the block carries the tick its
-   instruction began on. */
+   at the first instruction boundary at or after limit cycles. SPU sample events
+   catch up at instruction boundaries, except while the reset-silence shortcut
+   batches them. The cycles are added to inst->ticks once, at the end. The block
+   clock, blk_tick and blk_cycle, is set at the start of every block, so a device
+   access inside it reads its own tick (schway__sched_now) and a fault latched
+   in the block carries the tick its instruction began on. */
 static uint64_t cpu_block(schway *inst, uint64_t limit)
 {
     struct schway__cpu *c = &inst->cpu;

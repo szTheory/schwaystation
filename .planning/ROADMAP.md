@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: The CPU matches the public vectors** - The R3000A, COP0, bus, memory control, I-cache and interrupts pass the vectors; PS-EXEs run under the own stub kernel (completed 2026-11-09)
 - [x] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests (completed 2026-11-10)
 - [x] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch (completed 2026-11-13)
-- [ ] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro
+- [x] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro (completed 2026-11-14)
 - [ ] **Phase 6: Discs and FMV** - CD-ROM with cue/bin, iso and m3u, XA, CD-DA, MDEC and disk control, and the own disc boots through OpenBIOS in RetroArch
 
 ## Phase Details
@@ -403,7 +403,63 @@ Plans:
   2. `ctest -L audio` passes on BRR, ADSR, noise, reverb, capture, IRQA and the transfer paths. The nightly lane reproduces the seven hardware pass lines of the ps1-tests `spu/memory-transfer` log.
   3. The libretro batch and single-sample audio paths deliver PCM equal to the runner's stream in `libretro.host`. RetroArch boots `spu_tone.exe` as content, and the idle SPU passes `core.no_busy_loop`.
 
-**Plans**: TBD
+**Plans**: 24/24 plans complete in 17 waves
+**Wave 1**
+- [x] 05-01-PLAN.md — Trace a bounded frame into the public PCM drain
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 05-02-PLAN.md — Trace one SPU event through the existing PCM ring
+- [x] 05-04-PLAN.md — Trace pinned assets through identity checks and seven-case parsing
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 05-16-PLAN.md — Trace the sample phase and chip storage through save/load
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 05-03-PLAN.md — Trace guest register writes through a scheduled SPU tick
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 05-20-PLAN.md — Complete bounded SPU FIFO, manual transfer, capture, and IRQA path
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 05-05-PLAN.md — Trace one DMA4 upload through FIFO to SPU RAM and readback
+
+**Wave 7** *(blocked on Wave 6 completion; execute these plans sequentially because they share SPU transfer state and tests)*
+- [x] 05-06-PLAN.md — Trace one BRR block through interpolation into a voice sample
+- [x] 05-21-PLAN.md — Trace bidirectional DMA4 timing, DEV4 behavior, and the full pinned guest check
+- [x] 05-23-PLAN.md — Remove the bus ATTR mirror and register the full transfer guest in nightly (depends on 05-21)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 05-07-PLAN.md — Trace an envelope rate into scheduled audible PCM
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 05-22-PLAN.md — Expand BRR playback to 24 ordered voices, loop flags, PMON and stereo output
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 05-08-PLAN.md — Trace the pinned noise schedule into an envelope-scaled sample
+- [x] 05-11-PLAN.md — Trace authored BRR data through a stub-booted tone guest
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 05-09-PLAN.md — Trace an impulse through the two reverb FIR stages
+- [x] 05-13-PLAN.md — Trace hostile transfer bytes through the production SPU and seed replay
+- [x] 05-17-PLAN.md — Trace real tone PCM into the accumulated runner SHA-256
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [x] 05-10-PLAN.md — Trace a Room feedback step from registers through RAM to wet PCM
+- [x] 05-18-PLAN.md — Trace the CPU-free block-table path into complete PCM equality
+
+**Wave 13** *(blocked on Wave 12 completion)*
+- [x] 05-12-PLAN.md — Trace real runner PCM through both libretro callbacks
+- [x] 05-14-PLAN.md — Trace active voices, noise and feedback through state load
+
+**Wave 14** *(blocked on Wave 13 completion)*
+- [x] 05-19-PLAN.md — Trace implemented SPU facts into maintained hardware references
+
+**Wave 16** *(Plan 05-19 prerequisite complete)*
+- [x] 05-24-PLAN.md — Refactor counted checks within the fixed repository-check ceiling
+
+**Wave 17** *(blocked on Wave 16 completion)*
+- [x] 05-15-PLAN.md — Trace frame-600 audio and ENVX predicates into lane equality
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
 
@@ -433,5 +489,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. The CPU matches the public vectors | 27/27 | Complete    | 2026-11-09 |
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
-| 5. The sound matches the console | 0/TBD | Not started | - |
+| 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
 | 6. Discs and FMV | 0/TBD | Not started | - |

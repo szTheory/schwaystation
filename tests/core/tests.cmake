@@ -94,6 +94,12 @@ schway_add_test(NAME core.run.split_devices
   COMMAND schwaystation-test-run split_devices
   LABELS core portable TIMEOUT 30)
 
+# Fault prevented: an idle, muted or DMA-busy SPU that is polled per CPU cycle,
+# overshoots a public budget, or leaves a legal loaded deadline behind.
+schway_add_test(NAME core.no_busy_loop
+  COMMAND schwaystation-test-run no_busy_loop
+  LABELS core portable TIMEOUT 10)
+
 # The trace ring. Fault prevented: a traced run that loses or misorders its
 # records, a ring that does not keep exactly the last 4,096, a fault that is not
 # the last record, an index past the end that answers, or tracing that changes

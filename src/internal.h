@@ -16,11 +16,12 @@
 #include "sio.h"
 #include "pad.h"
 #include "card.h"
+#include "spu.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 4u
-#define SCHWAY__STATE_FORMAT 4u
+#define SCHWAY__BEHAVIOUR_REVISION 5u
+#define SCHWAY__STATE_FORMAT 5u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -151,6 +152,7 @@ struct schway {
     struct schway__sio sio;
     struct schway__pad pad;
     struct schway__card card;
+    struct schway__spu spu;
     struct schway__fault fault;
     /* Not saved: derived from the state, and rebuilt after a load. */
     struct schway__sched sched;
