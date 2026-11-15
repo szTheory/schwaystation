@@ -1,1 +1,4 @@
-# Tests this directory registers: name<TAB>labels, sorted by name.
+# Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+disc.bounds	disc,portable
+disc.command	disc,portable
+disc.timing	disc,portable
