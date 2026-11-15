@@ -280,8 +280,7 @@ void schway__cdrom_sector_event(schway *inst, uint64_t now)
     uint32_t filter_match = (cd->mode & 0x08u) == 0u ||
                             (sector[16] == cd->file && sector[17] == cd->channel);
     if (xa_audio != 0u && (cd->mode & 0x40u) != 0u && filter_match != 0u) {
-        /* Plan 09 connects accepted XA payloads to the decoder; data must not
-           expose these audio bytes through RDDATA first. */
+        /* Accepted XA audio candidates do not enter the guest-visible data buffer. */
         cd->sector_retry = 0u;
         schway__cdrom_sector_schedule(inst, now);
         return;
