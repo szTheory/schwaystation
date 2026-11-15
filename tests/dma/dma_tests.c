@@ -22,6 +22,7 @@
 #define DPCR 0x1F8010F0u
 #define DICR 0x1F8010F4u
 #define ISTAT 0x1F801070u
+#define MEMCTL_CDROM 0x1F801018u
 
 /* DPCR with every channel's master enable set and the default priorities
    1 to 7 for channels 0 to 6 (reset value 07654321h plus the enables), and
@@ -1211,6 +1212,10 @@ static void case_costs_per_channel(void)
                                      0x11000000u, 0x11000001u, 0x11000000u};
     for (uint32_t ch = 0u; ch < 6u; ch++) {
         schway *inst = make();
+        if (ch == 3u) {
+            /* The BIOS CD-ROM timing setting selects 24 cycles per word. */
+            wr32(inst, MEMCTL_CDROM, 0x00020843u);
+        }
         wr32(inst, DPCR, DPCR_ALL);
         wr32(inst, MADR(ch), 0x4000u);
         wr32(inst, BCR(ch), 64u);
@@ -1231,6 +1236,25 @@ static void case_costs_per_channel(void)
     CHECK_EQ_U64(inst->dma.busy_until - start, 65536u * 24u + 4096u);
     CHECK(inst->dma.busy_until - start <= SCHWAY__DMA_BUSY_MAX);
     schway_destroy(inst);
+}
+
+/* Fault prevented: DMA3 using the BIOS rate for the game delay setting, or
+   reading a private test accessor instead of the guest-visible DEV5 register. */
+static void case_cdrom_costs(void)
+{
+    static const uint32_t setting[2] = {0x00020843u, 0x00020943u};
+    static const uint32_t rate[2] = {24u, 40u};
+    for (uint32_t i = 0u; i < 2u; i++) {
+        schway *inst = make();
+        wr32(inst, MEMCTL_CDROM, setting[i]);
+        wr32(inst, DPCR, DPCR_ALL);
+        wr32(inst, MADR(3u), 0x4000u);
+        wr32(inst, BCR(3u), 64u);
+        uint64_t start = now_of(inst);
+        wr32(inst, CHCR(3u), 0x11000000u);
+        CHECK_EQ_U64(inst->dma.busy_until - start, 64u * rate[i] + 4u);
+        schway_destroy(inst);
+    }
 }
 
 /* Fault prevented: a priority change in DPCR that does not take effect at the
@@ -2335,6 +2359,7 @@ static const struct {
     {"spu_request_controls", case_spu_request_controls},
     {"sync1_no_dreq_no_stall", case_sync1_no_dreq_no_stall},
     {"costs_per_channel", case_costs_per_channel},
+    {"cdrom_costs", case_cdrom_costs},
     {"dpcr_rearbitrate", case_dpcr_rearbitrate},
     {"otc_clear", case_otc_clear},
     {"dpcr_reset", case_dpcr_reset},

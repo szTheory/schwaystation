@@ -9,6 +9,10 @@
 #include "../check.h"
 
 #define CDROM 0x1F801800u
+#define DMA_DPCR 0x1F8010F0u
+#define DMA_MADR3 0x1F8010B0u
+#define DMA_BCR3 0x1F8010B4u
+#define DMA_CHCR3 0x1F8010B8u
 #define SECTOR_PERIOD 451584u
 
 int schway__cdrom_sector_test(const char *name);
@@ -156,6 +160,21 @@ static void sector_wr8(schway *inst, uint32_t offset, uint8_t value)
     CHECK_EQ_U64(schway__bus_write(inst, CDROM + offset, 1u, value, &cycles), 0u);
 }
 
+static void sector_wr32(schway *inst, uint32_t address, uint32_t value)
+{
+    uint32_t cycles = 0u;
+    schway__sched_sync(inst);
+    CHECK_EQ_U64(schway__bus_write(inst, address, 4u, value, &cycles), 0u);
+}
+
+static uint32_t sector_ram_word(const schway *inst, uint32_t address)
+{
+    return (uint32_t)inst->bus.ram[address] |
+           ((uint32_t)inst->bus.ram[address + 1u] << 8) |
+           ((uint32_t)inst->bus.ram[address + 2u] << 16) |
+           ((uint32_t)inst->bus.ram[address + 3u] << 24);
+}
+
 static void sector_bfrd(schway *inst, uint8_t value)
 {
     sector_wr8(inst, 0u, 0u);
@@ -294,6 +313,27 @@ static void test_sector_timing_and_data(void)
     }
     CHECK_EQ_U64(sector_rd8(inst, 2u), 0xF8u);
     CHECK_EQ_U64(inst->ticks, start + SECTOR_PERIOD);
+    schway_destroy(inst);
+
+    /* CPU RDDATA and DMA3 consume the callback-delivered sector from one
+       cursor; a partial CPU read leaves the next byte for DMA. */
+    inst = sector_make();
+    sector_attach(inst, &host);
+    sector_start_read(inst, &host);
+    sector_run(inst, SECTOR_PERIOD, &host);
+    CHECK_EQ_U64(host.reads, 1u);
+    CHECK_EQ_U64(sector_rd8(inst, 2u), 0x18u);
+    CHECK_EQ_U64(sector_rd8(inst, 2u), 0x19u);
+    CHECK_EQ_U64(sector_rd8(inst, 2u), 0x1Au);
+    sector_wr32(inst, DMA_DPCR, 0x0FEDCBA9u);
+    sector_wr32(inst, DMA_MADR3, 0x4000u);
+    sector_wr32(inst, DMA_BCR3, 4u);
+    sector_wr32(inst, DMA_CHCR3, 0x11000000u);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x4000u), 0x1E1D1C1Bu);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x4004u), 0x2221201Fu);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x4008u), 0x26252423u);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x400Cu), 0x2A292827u);
+    CHECK_EQ_U64(inst->cdrom.sector_offset, 19u);
     schway_destroy(inst);
 }
 
