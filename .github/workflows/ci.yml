@@ -197,7 +197,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: build (${{ matrix.os }}-${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 11  # 2 x 311 s (windows-x64 build), slowest of 5 runs across the six legs, run 42725764966
+    timeout-minutes: 15  # run 43670029646 hit 11m on macOS x64; run 43665013436 completed in 9m24
     strategy:
       fail-fast: false
       matrix:
