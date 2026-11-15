@@ -552,6 +552,87 @@ static int test_cue_limits(const char *directory)
           "expected all 99 tracks to have bounded absolute offsets");
     schway_disc_image_close(image);
     image = NULL;
+    CHECK(make_sparse_file(child_path, UINT64_C(1073741824)),
+          "could not create exact-cap sparse cue image");
+    written = snprintf(cue, 65537u,
+                       "FILE \"%s\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n",
+                       max_name);
+    CHECK(written > 0 && write_text(cue_path, cue, (size_t)written),
+          "could not write exact-cap cue sheet");
+    CHECK(schway_disc_image_open(cue_path, &image, &error) == SCHWAY_DISC_IMAGE_OK,
+          "expected a cue image exactly at the 1 GiB cap to be accepted");
+    schway_disc_image_close(image);
+    image = NULL;
+    CHECK(make_sparse_file(child_path, UINT64_C(1073741824) + 2048u) &&
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_LIMIT, 1u, NULL),
+          "expected cue image totals above 1 GiB to be rejected");
+
+cleanup:
+    schway_disc_image_close(image);
+    free(cue);
+    if (cue_path[0] != '\0') (void)remove(cue_path);
+    if (child_path[0] != '\0') (void)remove(child_path);
+    return result;
+}
+
+static int test_cue_index_limits(const char *directory)
+{
+    char cue_path[1024] = "";
+    char child_path[1024] = "";
+    char *cue = NULL;
+    const char *test_case = "disc.image.cue_index_limits";
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    schway_toc toc;
+    size_t used;
+    int written;
+    int result = 0;
+
+    CHECK(make_path(cue_path, directory, "schway-disc-image-index-limits.cue") &&
+          make_path(child_path, directory, "index-limits.bin"),
+          "could not form index-limit test paths");
+    cue = (char *)malloc(65537u);
+    CHECK(cue != NULL && write_pattern_file(child_path, 100u, 2048u, 0x29u, 0),
+          "could not create index-limit inputs");
+    written = snprintf(cue, 65537u,
+                       "FILE \"index-limits.bin\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n");
+    CHECK(written > 0, "could not start 99-index cue");
+    used = (size_t)written;
+    for (uint32_t index = 2u; index <= 99u; index++) {
+        uint32_t frame = index - 1u;
+        written = snprintf(cue + used, 65537u - used,
+                           "INDEX %02u 00:%02u:%02u\n", index, frame / 75u, frame % 75u);
+        CHECK(written > 0 && (size_t)written < 65537u - used,
+              "could not append the 99th index");
+        used += (size_t)written;
+    }
+    CHECK(write_text(cue_path, cue, used), "could not write 99-index cue");
+    memset(&error, 0, sizeof error);
+    CHECK(schway_disc_image_open(cue_path, &image, &error) == SCHWAY_DISC_IMAGE_OK,
+          "expected 99 indexes on one track to be accepted");
+    memset(&toc, 0, sizeof toc);
+    toc.size = (uint32_t)sizeof toc;
+    CHECK(schway_disc_image_disc(image)->toc(schway_disc_image_disc(image)->user, &toc) == 1u &&
+          toc.track_count == 1u && toc.tracks[0].leadout == 100u,
+          "expected the accepted index boundary to preserve the track TOC");
+    schway_disc_image_close(image);
+    image = NULL;
+
+    written = snprintf(cue, 65537u,
+                       "FILE \"index-limits.bin\" BINARY\nTRACK 01 MODE1/2048\nINDEX 00 00:00:00\nINDEX 01 00:00:01\n");
+    CHECK(written > 0, "could not start 100-index cue");
+    used = (size_t)written;
+    for (uint32_t index = 2u; index <= 99u; index++) {
+        uint32_t frame = index;
+        written = snprintf(cue + used, 65537u - used,
+                           "INDEX %02u 00:%02u:%02u\n", index, frame / 75u, frame % 75u);
+        CHECK(written > 0 && (size_t)written < 65537u - used,
+              "could not append a cue index");
+        used += (size_t)written;
+    }
+    CHECK(write_text(cue_path, cue, used) &&
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_BAD_CUE, 102u, NULL),
+          "expected the 100th index to be rejected with its line number");
 
 cleanup:
     schway_disc_image_close(image);
@@ -609,6 +690,7 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "cue_reject") == 0) return test_cue_reject(argv[2]);
     if (strcmp(argv[1], "cue_symlink") == 0) return test_cue_symlink(argv[2]);
     if (strcmp(argv[1], "cue_limits") == 0) return test_cue_limits(argv[2]);
+    if (strcmp(argv[1], "cue_index_limits") == 0) return test_cue_index_limits(argv[2]);
     if (strcmp(argv[1], "iso_limits") == 0) return test_iso_limits(argv[2]);
     fprintf(stderr, "unknown disc image test case: %s\n", argv[1]);
     return 2;

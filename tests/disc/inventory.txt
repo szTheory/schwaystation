@@ -1,4 +1,5 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
+disc.image.cue_index_limits	disc,portable
 disc.image.cue_limits	disc,portable
 disc.image.cue_modes	disc,portable
 disc.image.cue_pregap	disc,portable
