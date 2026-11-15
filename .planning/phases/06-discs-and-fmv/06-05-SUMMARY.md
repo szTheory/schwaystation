@@ -70,7 +70,7 @@ coverage:
         status: pass
     human_judgment: false
 metrics:
-  duration: "At least 58 minutes; exact executor start was not captured"
+  duration: "58m56s elapsed wall time to summary creation; active duration unavailable"
   completed: 2026-11-15
   status: complete
 ---
@@ -81,8 +81,8 @@ metrics:
 
 ## Performance
 
-- **Duration:** At least 58 minutes from the first durable plan timestamp; the executor start time was not captured, so exact active duration is unavailable.
-- **Started:** Earliest durable plan timestamp `2026-11-15T21:12:21Z` (`ea564f4` predecessor commit).
+- **Duration:** 58m56s elapsed wall time from the earliest durable marker to summary creation; exact active duration is unavailable because executor start and idle intervals were not captured.
+- **Started:** Earliest durable execution marker `2026-11-15T21:12:21Z` (`ea564f4` predecessor commit).
 - **Completed:** `2026-11-15T22:11:17Z` at summary creation; final metadata commit followed.
 - **Tasks:** 1
 - **Files modified:** 13 implementation, test, and hardware-documentation files; planning closeout files are committed separately.

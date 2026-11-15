@@ -5,10 +5,10 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: "Completed 06-05-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; active duration at least 58m, exact start unavailable."
-last_updated: "2026-11-15T22:14:34.276Z"
+stopped_at: "Completed 06-05-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; 58m56s elapsed wall time to summary creation, exact active duration unavailable."
+last_updated: "2026-11-15T22:21:41.471Z"
 last_activity: 2026-11-15
-state_head: 29d8ab736e2464e957d34908069fc3a8802e7096
+state_head: 983da808e06d35f3a4471d9debe2b580968c8323
 progress:
   total_phases: 6
   completed_phases: 5
@@ -220,7 +220,7 @@ Progress: [████████░░] 83%
 | Phase 06 P08 | 35m | 2 tasks | 7 files |
 | Phase 06 P26 | 20min | 2 tasks | 7 files |
 | Phase 06 P04 | 107min | 2 tasks | 20 files |
-| Phase 06 P05 | at least 58m; executor start was not captured | 1 task | 13 files |
+| Phase 06 P05 | 58m56s elapsed wall; active time unavailable | 1 task | 13 files |
 
 ## Accumulated Context
 
@@ -748,8 +748,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T22:14:34.041Z
-Stopped at: Completed 06-05-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; active duration at least 58m, exact start unavailable.
+Last session: 2026-11-15T22:21:41.232Z
+Stopped at: Completed 06-05-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; 58m56s elapsed wall time to summary creation, exact active duration unavailable.
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -830,4 +830,4 @@ Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-26 comp
 
 ### Phase 6 plan 06-05 execution (2026-11-15)
 
-Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Active duration is at least 58 minutes from the first durable execution timestamp; exact active duration is unavailable because the executor start was not captured. Sector acquisition, filtering, Q handling, RDDATA delivery and state coverage are committed; code review is clean. The final Plan 05 configure/build/selected CTest command passed (8 selected tests), and hygiene, inventory sort and `git diff --check` passed. The TDD RED command failed the new sector caller as expected (exit 8), and its corrected report classified `RED_EVIDENCE_OK`. No hosted run applies. DISC-01 remains pending aggregate Phase 6 acceptance; XA decoding/audio, DMA3 cursor/rates and disc-boot caller acceptance remain with Plans 06-09/06-10, 06-27 and their downstream callers. Plan 06-06 is next; Plan 06-27 remains sequential with DMA consumers.
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time from the earliest durable execution marker to summary creation was 58m56s; exact active duration is unavailable because executor start and idle intervals were not captured. Sector acquisition, filtering, Q handling, RDDATA delivery and state coverage are committed; code review is clean. The final Plan 05 configure/build/selected CTest command passed (8 selected tests), and hygiene, inventory sort and `git diff --check` passed. The TDD RED command failed the new sector caller as expected (exit 8), and its corrected report classified `RED_EVIDENCE_OK`. No hosted run applies. DISC-01 remains pending aggregate Phase 6 acceptance; XA decoding/audio, DMA3 cursor/rates and disc-boot caller acceptance remain with Plans 06-09/06-10, 06-27 and their downstream callers. Plan 06-06 is next; Plan 06-27 remains sequential with DMA consumers.
