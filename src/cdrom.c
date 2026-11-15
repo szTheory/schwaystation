@@ -1,12 +1,117 @@
-/* The bounded CD-ROM owner. Command and sector algorithms are layered on this
-   state by their first callers; this slice establishes the owned storage,
-   MMIO path and deadline contract (PSX-SPU-CDROM-AND-MDEC, sections 2.1-2.4). */
+/* CD-ROM registers and the first scheduled command response (PSX-SPU-CDROM-AND-MDEC,
+   sections 2.1-2.4). */
 #include <string.h>
 
 #include "internal.h"
 #include "state.h"
 
 #define SCHWAY__CDROM_EVENT_AHEAD UINT64_C(67737600)
+#define SCHWAY__CDROM_ACK_CYCLES UINT64_C(50000)
+
+#define SCHWAY__CDROM_IRQ2 2u
+
+static uint64_t deadline_after(uint64_t now, uint64_t delta)
+{
+    if (now > SCHWAY__STATE_TICKS_MAX - delta) {
+        return SCHWAY__STATE_TICKS_MAX;
+    }
+    return now + delta;
+}
+
+static uint8_t status_read(const struct schway__cdrom *cd)
+{
+    uint8_t value = (uint8_t)(cd->bank & 3u);
+    if (cd->parameter_count == 0u) {
+        value |= 1u << 3;
+    }
+    if (cd->parameter_count < SCHWAY__CDROM_FIFO_CAP) {
+        value |= 1u << 4;
+    }
+    if (cd->result_count != 0u) {
+        value |= 1u << 5;
+    }
+    if (cd->sector_count != 0u && cd->sector_offset < SCHWAY__CDROM_SECTOR_BYTES) {
+        value |= 1u << 6;
+    }
+    if (cd->command_pending != 0u || cd->read_active != 0u || cd->play_active != 0u ||
+        cd->seek_active != 0u) {
+        value |= 1u << 7;
+    }
+    return value;
+}
+
+static uint8_t current_interrupt(const struct schway__cdrom *cd)
+{
+    if (cd->interrupt_count == 0u) {
+        return 0u;
+    }
+    return cd->interrupt[cd->interrupt_head];
+}
+
+static void update_irq(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t code = current_interrupt(cd);
+    if (code >= 1u && code <= 5u && (cd->interrupt_mask & (1u << (code - 1u))) != 0u) {
+        schway__irq_raise(inst, SCHWAY__CDROM_IRQ2);
+    }
+}
+
+static void push_result(struct schway__cdrom *cd, uint8_t value)
+{
+    if (cd->result_count < SCHWAY__CDROM_FIFO_CAP) {
+        uint32_t tail = (cd->result_head + cd->result_count) % SCHWAY__CDROM_FIFO_CAP;
+        cd->result[tail] = value;
+        cd->result_count++;
+    }
+}
+
+static void push_interrupt(schway *inst, uint8_t code)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    if (code >= 1u && code <= 5u && cd->interrupt_count < SCHWAY__CDROM_IRQ_CAP) {
+        uint32_t tail = (cd->interrupt_head + cd->interrupt_count) % SCHWAY__CDROM_IRQ_CAP;
+        cd->interrupt[tail] = code;
+        cd->interrupt_count++;
+        update_irq(inst);
+    }
+}
+
+static void acknowledge_interrupt(schway *inst, uint8_t value)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t code = current_interrupt(cd);
+    if (code >= 1u && code <= 5u && (value & (1u << (code - 1u))) != 0u) {
+        cd->interrupt[cd->interrupt_head] = 0u;
+        cd->interrupt_head = (cd->interrupt_head + 1u) % SCHWAY__CDROM_IRQ_CAP;
+        cd->interrupt_count--;
+        update_irq(inst);
+    }
+}
+
+static uint8_t hint_status(const struct schway__cdrom *cd)
+{
+    uint8_t value = current_interrupt(cd) & 7u;
+    if (cd->result_count == 0u) {
+        value |= 1u << 3;
+    }
+    if (cd->parameter_count < SCHWAY__CDROM_FIFO_CAP) {
+        value |= 1u << 4;
+    }
+    return value | 0xE0u;
+}
+
+static uint8_t pop_result(struct schway__cdrom *cd)
+{
+    if (cd->result_count == 0u) {
+        return 0u;
+    }
+    uint8_t value = cd->result[cd->result_head];
+    cd->result[cd->result_head] = 0u;
+    cd->result_head = (cd->result_head + 1u) % SCHWAY__CDROM_FIFO_CAP;
+    cd->result_count--;
+    return value;
+}
 
 static void state_i16_array(struct schway__state_io *io, const char *name, int16_t *values,
                             uint32_t count)
@@ -59,6 +164,7 @@ void schway__cdrom_state_io(struct schway__state_io *io, schway *inst, uint64_t 
     uint32_t interrupt_count = schway__state_u32(io, "cdrom.interrupt_count",
                                                  &cd->interrupt_count, 0u,
                                                  SCHWAY__CDROM_IRQ_CAP);
+    (void)schway__state_u32(io, "cdrom.interrupt_mask", &cd->interrupt_mask, 0u, 0x1Fu);
     uint32_t command = schway__state_u32(io, "cdrom.command", &cd->command, 0u, UINT8_MAX);
     uint32_t command_pending = schway__state_u32(io, "cdrom.command_pending",
                                                 &cd->command_pending, 0u, 1u);
@@ -158,14 +264,21 @@ uint64_t schway__cdrom_next(const schway *inst)
     return next;
 }
 
-/* Clear every due phase so one event dispatch always advances the device's
-   deadline. Command effects are supplied by the command-model slice. */
 void schway__cdrom_event(schway *inst, uint64_t now)
 {
     struct schway__cdrom *cd = &inst->cdrom;
     if (cd->command_event != 0u && cd->command_deadline <= now) {
         cd->command_event = 0u;
         cd->command_deadline = 0u;
+        if (cd->command_pending != 0u) {
+            cd->command_pending = 0u;
+            cd->command = 0u;
+            if (cd->last_command == 0x01u && inst->disc_host.lid_open == 0u) {
+                cd->status &= (uint32_t)~(1u << 4);
+            }
+            push_result(cd, (uint8_t)cd->status);
+            push_interrupt(inst, 3u);
+        }
     }
     if (cd->sector_event != 0u && cd->sector_deadline <= now) {
         cd->sector_event = 0u;
@@ -182,8 +295,22 @@ uint8_t schway__cdrom_read(schway *inst, uint32_t address, uint64_t now)
     if (schway__cdrom_next(inst) <= now) {
         schway__cdrom_event(inst, now);
     }
-    (void)address;
-    return 0u;
+    struct schway__cdrom *cd = &inst->cdrom;
+    switch (address & 3u) {
+    case 0u:
+        return status_read(cd);
+    case 1u:
+        return pop_result(cd);
+    case 2u:
+        return 0u;
+    case 3u:
+        if ((cd->bank & 1u) == 0u) {
+            return (uint8_t)cd->interrupt_mask;
+        }
+        return hint_status(cd);
+    default:
+        return 0u;
+    }
 }
 
 void schway__cdrom_write(schway *inst, uint32_t address, uint8_t value, uint64_t now)
@@ -191,8 +318,48 @@ void schway__cdrom_write(schway *inst, uint32_t address, uint8_t value, uint64_t
     if (schway__cdrom_next(inst) <= now) {
         schway__cdrom_event(inst, now);
     }
-    (void)address;
-    (void)value;
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint32_t offset = address & 3u;
+    if (offset == 0u) {
+        cd->bank = value & 3u;
+        return;
+    }
+    switch (cd->bank) {
+    case 0u:
+        if (offset == 1u) {
+            if (cd->command_pending == 0u && cd->interrupt_count == 0u) {
+                cd->command = value;
+                cd->last_command = value;
+                cd->command_pending = 1u;
+                cd->command_event = 1u;
+                cd->command_deadline = deadline_after(now, SCHWAY__CDROM_ACK_CYCLES);
+            }
+        } else if (offset == 2u && cd->parameter_count < SCHWAY__CDROM_FIFO_CAP) {
+            uint32_t tail =
+                (cd->parameter_head + cd->parameter_count) % SCHWAY__CDROM_FIFO_CAP;
+            cd->parameter[tail] = value;
+            cd->parameter_count++;
+        }
+        break;
+    case 1u:
+        if (offset == 2u) {
+            cd->interrupt_mask = value & 0x1Fu;
+            update_irq(inst);
+        } else if (offset == 3u) {
+            acknowledge_interrupt(inst, value);
+            if ((value & (1u << 6)) != 0u) {
+                memset(cd->parameter, 0, sizeof cd->parameter);
+                cd->parameter_head = 0u;
+                cd->parameter_count = 0u;
+            }
+            if ((value & (1u << 7)) != 0u) {
+                schway__cdrom_reset(inst);
+            }
+        }
+        break;
+    default:
+        break;
+    }
 }
 
 void schway__cdrom_io(schway *inst, uint32_t wr, uint32_t address, uint32_t width,

@@ -107,11 +107,13 @@ static void test_command(void)
 {
     schway *inst = make();
     wr8(inst, 0u, 1u);
-    wr8(inst, 2u, 0x04u); /* Enable INT3. */
+    wr8(inst, 2u, 0u); /* Keep INT3 masked until its status is pending. */
     command(inst, 0x01u); /* Nop. */
     run_cycles(inst, 50000u);
 
     CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
+    CHECK_EQ_U64(rd32(inst, I_STAT) & (1u << 2), 0u);
+    wr8(inst, 2u, 0x04u); /* Enabling a pending INT3 raises IRQ2. */
     CHECK((rd32(inst, I_STAT) & (1u << 2)) != 0u);
     CHECK_EQ_U64(rd8(inst, 1u), 0u); /* Nop returns the current status. */
     acknowledge(inst, 3u);
@@ -152,6 +154,28 @@ static void test_bounds(void)
     wr8(inst, 0u, 0u);
     CHECK_EQ_U64(rd8(inst, 0u) & 0x18u, 0x18u);
     CHECK_EQ_U64(rd8(inst, 1u), 0u); /* Empty result reads are zero. */
+
+    for (uint32_t i = 0u; i < SCHWAY__CDROM_FIFO_CAP; i++) {
+        command(inst, 0x01u);
+        run_cycles(inst, 50000u);
+        acknowledge(inst, 3u);
+    }
+    CHECK_EQ_U64(inst->cdrom.result_count, SCHWAY__CDROM_FIFO_CAP);
+    for (uint32_t i = 0u; i < 10u; i++) {
+        CHECK_EQ_U64(rd8(inst, 1u), 0u);
+    }
+    CHECK_EQ_U64(inst->cdrom.result_head, 10u);
+    for (uint32_t i = 0u; i < 10u; i++) {
+        command(inst, 0x01u);
+        run_cycles(inst, 50000u);
+        acknowledge(inst, 3u);
+    }
+    CHECK_EQ_U64(inst->cdrom.result_count, SCHWAY__CDROM_FIFO_CAP);
+    for (uint32_t i = 0u; i < SCHWAY__CDROM_FIFO_CAP; i++) {
+        CHECK_EQ_U64(rd8(inst, 1u), 0u);
+    }
+    CHECK_EQ_U64(inst->cdrom.result_head, 10u);
+    CHECK_EQ_U64(inst->cdrom.result_count, 0u);
     schway_destroy(inst);
 }
 

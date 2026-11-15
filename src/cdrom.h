@@ -26,6 +26,7 @@ struct schway__cdrom {
     uint32_t parameter_head, parameter_count;
     uint32_t result_head, result_count;
     uint32_t interrupt_head, interrupt_count;
+    uint32_t interrupt_mask;
     uint32_t command, command_pending;
     uint32_t status, mode, file, channel, last_command;
     uint32_t motor_on, read_active, play_active, seek_active;

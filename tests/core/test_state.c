@@ -555,6 +555,7 @@ static void seed_cdrom_mdec(schway *inst)
     inst->cdrom.result_count = 1u;
     inst->cdrom.interrupt_head = 7u;
     inst->cdrom.interrupt_count = 1u;
+    inst->cdrom.interrupt_mask = 0x15u;
     inst->cdrom.command = 0x06u;
     inst->cdrom.command_pending = 1u;
     inst->cdrom.status = 0x20u;
@@ -1198,8 +1199,8 @@ static void test_cpu_fields(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 6u);
-    CHECK_EQ_U64(v.behaviour_revision, 6u);
+    CHECK_EQ_U64(v.state_format, 7u);
+    CHECK_EQ_U64(v.behaviour_revision, 7u);
 
     schway *inst = make(SCHWAY_REGION_NTSC_U);
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
