@@ -7,3 +7,4 @@ disc.image.cue_reject	disc,portable
 disc.image.cue_symlink	disc,portable
 disc.image.iso_limits	disc,portable
 disc.image.iso_sector	disc,portable
+disc.playlist	disc,portable

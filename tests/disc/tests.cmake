@@ -15,3 +15,7 @@ foreach(case cue_index_limits cue_limits cue_modes cue_pregap cue_reject cue_sym
     COMMAND schwaystation-test-disc-image ${case} ${PROJECT_BINARY_DIR}/tests
     LABELS disc portable TIMEOUT 20)
 endforeach()
+
+schway_add_test(NAME disc.playlist
+  COMMAND schwaystation-test-disc-image playlist ${PROJECT_BINARY_DIR}/tests
+  LABELS disc portable TIMEOUT 20)

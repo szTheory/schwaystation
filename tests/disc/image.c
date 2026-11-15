@@ -680,6 +680,39 @@ cleanup:
     return result;
 }
 
+static int test_playlist(const char *directory)
+{
+    char playlist_path[1024] = "";
+    char first_path[1024] = "";
+    char second_path[1024] = "";
+    const char *test_case = "disc.playlist";
+    static const char playlist[] = "# Two images\r\n\r\n first.iso \r\nsecond.iso\n";
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    int result = 0;
+
+    CHECK(make_path(playlist_path, directory, "schway-disc-playlist-test.m3u") &&
+          make_path(first_path, directory, "first.iso") &&
+          make_path(second_path, directory, "second.iso"),
+          "could not form playlist test paths");
+    CHECK(write_pattern_file(first_path, 16u, 2048u, 0x11u, 0) &&
+          write_pattern_file(second_path, 16u, 2048u, 0x71u, 0) &&
+          write_text(playlist_path, playlist, sizeof playlist - 1u),
+          "could not create playlist image inputs");
+    memset(&error, 0, sizeof error);
+    CHECK(schway_disc_image_open(playlist_path, &image, &error) == SCHWAY_DISC_IMAGE_OK,
+          "expected a bounded two-image m3u to open");
+    CHECK(schway_disc_image_disc(image) != NULL,
+          "expected the first playlist entry to expose a disc descriptor");
+
+cleanup:
+    schway_disc_image_close(image);
+    if (playlist_path[0] != '\0') (void)remove(playlist_path);
+    if (first_path[0] != '\0') (void)remove(first_path);
+    if (second_path[0] != '\0') (void)remove(second_path);
+    return result;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 3) {
@@ -694,6 +727,7 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "cue_limits") == 0) return test_cue_limits(argv[2]);
     if (strcmp(argv[1], "cue_index_limits") == 0) return test_cue_index_limits(argv[2]);
     if (strcmp(argv[1], "iso_limits") == 0) return test_iso_limits(argv[2]);
+    if (strcmp(argv[1], "playlist") == 0) return test_playlist(argv[2]);
     fprintf(stderr, "unknown disc image test case: %s\n", argv[1]);
     return 2;
 }
