@@ -2,7 +2,7 @@
 ;
 ;   armips -strequ IMAGE <file> -equ MODE <0 or 1> unbuilt.asm
 ;
-;   MODE 0  writes MDEC input (not modeled), then seals the mailbox as done
+;   MODE 0  writes SIO1 data (not modeled), then seals the mailbox as done
 ;   MODE 1  writes 1F801030h, which no device answers: a first fault
 ; Fault prevented: accesses to unbuilt devices that leave no sign, and a write to a gap that is dropped
 ; without a fault.
@@ -14,7 +14,7 @@ mailbox_header 6, 0
 
 .org PC0
 .if MODE == 0
-  li t0, 0xBF801820                     ; MDEC data
+  li t0, 0xBF801050                     ; SIO1 data
   li t1, 0x12345678
   sw t1, 0(t0)
   mailbox_seal
