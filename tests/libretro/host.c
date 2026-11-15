@@ -1025,7 +1025,7 @@ static int test_audio_equality(const char *exe_path, const char *pcm_path, uint3
                 (unsigned long)byte);
         if (byte < compared) {
             fprintf(stderr, " (got 0x%02x, expected 0x%02x)",
-                    reload_audio[byte], first_frame[byte]);
+                    (unsigned)reload_audio[byte], (unsigned)first_frame[byte]);
         }
         fputc('\n', stderr);
     }
