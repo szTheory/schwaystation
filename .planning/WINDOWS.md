@@ -1,10 +1,10 @@
 ---
 schema_version: 1
 open_count: 3
-waived_count: 3
+waived_count: 4
 fixed_count: 0
-total_count: 6
-last_updated: 2026-11-14T06:29:30.694Z
+total_count: 7
+last_updated: 2026-11-15T16:16:59.252Z
 ---
 
 # Broken Windows Ledger
@@ -21,6 +21,7 @@ last_updated: 2026-11-14T06:29:30.694Z
 | 4 | 05 | stub | src/spu.c | 76 | Reset SPU event emits a zero stereo pair until planned voice and reverb synthesis lands. | open |  | 2026-11-13T22:11:13.643Z |  |
 | 5 | 05 | deviation | .planning/phases/05-the-sound-matches-the-console/05-05-SUMMARY.md |  | Split remaining DMA4 timing, DEV4, seven-case comparator, and nightly work into plan 05-21 at the 30-minute target. | open |  | 2026-11-14T01:34:02.691Z |  |
 | 6 | 05 | stub | src/spu_reverb.c | 79 | The 22.05 kHz reverb feedback stage remains a unity pass-through seam; plan 05-10 replaces it with register-driven feedback. | open |  | 2026-11-14T06:29:30.694Z |  |
+| 7 | 06 | deviation | .planning/phases/06-discs-and-fmv/06-02-PLAN.md |  | Registered the test target before Task 1 RED because its required verification depended on Task 2 CMake wiring. | waived | Documented sequencing adjustment; the test wiring and required compatibility check passed, with no product defect or owner action. | 2026-11-15T16:16:55.624Z | 2026-11-15T16:16:59.252Z |
 
 ````json
 [
@@ -100,6 +101,19 @@ last_updated: 2026-11-14T06:29:30.694Z
     "reason": "",
     "recorded_at": "2026-11-14T06:29:30.694Z",
     "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "06",
+    "file": ".planning/phases/06-discs-and-fmv/06-02-PLAN.md",
+    "line": null,
+    "description": "Registered the test target before Task 1 RED because its required verification depended on Task 2 CMake wiring.",
+    "status": "waived",
+    "reason": "Documented sequencing adjustment; the test wiring and required compatibility check passed, with no product defect or owner action.",
+    "recorded_at": "2026-11-15T16:16:55.624Z",
+    "resolved_at": "2026-11-15T16:16:59.252Z",
     "milestone": "v1.0"
   }
 ]
