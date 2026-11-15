@@ -210,6 +210,16 @@ static void sector_run(schway *inst, uint64_t cycles, struct sector_host *host)
     host->callbacks_allowed = 0u;
 }
 
+static void sector_dma_event_at(schway *inst, uint64_t tick)
+{
+    if (tick > inst->ticks) {
+        inst->ticks = tick;
+        inst->cpu.blk_tick = tick;
+        inst->cpu.blk_cycle = inst->cpu.cycle;
+    }
+    schway__dma_event(inst, tick);
+}
+
 static void sector_param(schway *inst, uint8_t value)
 {
     sector_wr8(inst, 0u, 0u);
@@ -391,6 +401,32 @@ static void test_dma_waits_for_cd_data(void)
     sector_bfrd(inst, 1u);
     CHECK_EQ_U64(inst->dma.cur, 3u);
     CHECK_EQ_HEX(sector_ram_word(inst, 0x5000u), 0x1B1A1918u);
+    sector_run(inst, 100u, &host);
+    CHECK_EQ_U64(inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY, 0u);
+    schway_destroy(inst);
+
+    inst = sector_make();
+    sector_attach(inst, &host);
+    sector_start_read(inst, &host);
+    sector_run(inst, SECTOR_PERIOD, &host);
+    sector_wr32(inst, DMA_DPCR, 0x0FEDCBA9u);
+    inst->bus.ram[0x6004u] = 0xA5u;
+    sector_wr32(inst, DMA_MADR3, 0x6000u);
+    sector_wr32(inst, DMA_BCR3, 2u);
+    sector_wr32(inst, DMA_CHCR3, 0x11000100u);
+    CHECK_EQ_U64(inst->dma.cur, 3u);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x6000u), 0x1B1A1918u);
+    uint64_t first_end = inst->dma.busy_until;
+    sector_dma_event_at(inst, first_end);
+    sector_bfrd(inst, 0u);
+    uint64_t gap_end = inst->dma.busy_until;
+    sector_dma_event_at(inst, gap_end);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK((inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_HEX(inst->bus.ram[0x6004u], 0xA5u);
+    sector_bfrd(inst, 1u);
+    CHECK_EQ_U64(inst->dma.cur, 3u);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x6004u), 0x1F1E1D1Cu);
     sector_run(inst, 100u, &host);
     CHECK_EQ_U64(inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY, 0u);
     schway_destroy(inst);
