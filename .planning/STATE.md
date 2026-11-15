@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-status: planning
-stopped_at: Phase 6 discussed, ready to plan
-last_updated: "2026-11-15T15:28:06.078Z"
+status: executing
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-11-15T15:45:51.358Z"
 last_activity: 2026-11-15
-last_activity_desc: Phase 6 discussion complete; context and discussion log committed, ready to plan
-state_head: c36a8dd6164768048b77332d9f4e972fe925d158
+last_activity_desc: Phase 6 execution started
+state_head: 7ed3b5aa2dcae3f42e89ca5f523eefd28ba3f5f0
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 176
-  completed_plans: 150
+  completed_plans: 151
   percent: 83
 current_plan: Not started
 ---
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 
 ## Current Position
 
-Phase: 6 (Discs and FMV) — READY TO EXECUTE
-Plan: Not started
-Status: Context ready; ready to plan
-Last activity: 2026-11-15 -- Phase 6 discussion complete; context and discussion log committed
+Phase: 6 (Discs and FMV) — EXECUTING
+Plan: 2 of 26
+Status: Ready to execute
+Last activity: 2026-11-15 — Phase 6 execution started
 
 Progress: [████████░░] 83%
 
@@ -212,6 +212,7 @@ Progress: [████████░░] 83%
 | Phase 05 P18 | at least 36 min | 2 tasks | 5 files |
 | Phase 05 P12 | about 34 min wall | 2 tasks | 4 files |
 | Phase 05 P19 | about 30m wall across restart; exact active time unavailable | 2 tasks | 9 files |
+| Phase 06 P01 | 12m | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -517,6 +518,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Require the sealed mailbox CRC, completion status and complete ordered records before judging frame-600 ENVX.
 - [Phase 05]: Keep SOUND-01 and SOUND-02 pending until final Phase 5 verification.
 - [Phase 05]: Treat docs/hardware/spu.md as the current Phase-5 SPU contract, preserving source pins, open precision questions and separate evidence claims. — The implementation is now the maintained contract; concise preparation pointers and evidence limits prevent stale behavior descriptions or unsupported PCM accuracy claims.
+- [Phase 06]: Top-level builds expose CD-ROM and MDEC object targets; embedded builds compile their sources directly into the library to preserve the add_subdirectory target contract.
+- [Phase 06]: Subsystem inventories remain empty until their behavior callers are implemented and registered.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -708,8 +711,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T14:01:58Z
-Stopped at: Phase 6 discussed, ready to plan
+Last session: 2026-11-15T15:45:51.003Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -767,3 +770,7 @@ Efficiency corrections are durable in AUTONOMOUS.md: bring real oracles into the
 ### Phase 5 verification boundary (2026-11-14)
 
 Plans 05-15 and 05-24 are complete; all 24 plan summaries are present. Goal-backward verification passed 3/3 roadmap truths with no gaps or owner checks. Local CI passed 547/547 tests plus 5/5 release package checks; the explicit audio suite passed 10/10, libretro PCM and idle-SPU checks passed 2/2, and hygiene passed 24/24. The repository-check total is exactly 2688 lines. Code review found no issues. Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed), gpt-6-luna xhigh. The release PR, exact-head hosted CI/nightly/RetroArch run and green release PR remain for `$gsd-ship 5`; stop here, before Phase 6.
+
+### Phase 6 plan 06-01 execution (2026-11-15)
+
+Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-01 completed in 12 minutes with two task commits. Focused tracer checks passed 19/19 after preserving the embedding target contract; policy checks passed 4/4, and archive/link inspection confirmed host filesystem support stays outside the core archive. Phase 6 is at plan 2 of 26. DISC-01 through DISC-03 remain pending until their behavior plans complete; next is 06-02.
