@@ -302,7 +302,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 15 # run 43665013436 reached the old 9-minute limit before its 547-test suite completed
+    timeout-minutes: 20 # run 43667972798 reached 437/438 tests before the 15-minute cap; the final audio test was still running
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

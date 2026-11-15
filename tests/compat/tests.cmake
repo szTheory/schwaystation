@@ -1136,6 +1136,7 @@ schway_add_test(NAME compat.library.synthetic_result
   LABELS compat library portable TIMEOUT 30)
 
 # Fault prevented: malformed configuration, joins or inputs replacing a private report.
+# Windows ARM64 run 43667972798 reached the previous 60-second timeout; its other tests passed.
 schway_add_test(NAME compat.library.controls
   COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
     -DTEST_PROBE=$<TARGET_FILE:schwaystation-test-probe>
@@ -1147,7 +1148,7 @@ schway_add_test(NAME compat.library.controls
     "-DPRODUCTION_RUNNER_LAUNCHER=${schway__library_production_runner_launcher}"
     -DCASE=library_controls
     -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
-  LABELS compat library portable TIMEOUT 60)
+  LABELS compat library portable TIMEOUT 120)
 
 # Fault prevented: a raw ISO probe reporting a different synthetic boot identity.
 schway_add_test(NAME compat.probe.synthetic_identity
