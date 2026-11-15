@@ -1,11 +1,9 @@
-/* CD-ROM registers and the first scheduled command response (PSX-SPU-CDROM-AND-MDEC,
-   sections 2.1-2.4). */
+/* CD-ROM registers and command state (docs/hardware/cdrom.md). */
 #include <string.h>
 
 #include "internal.h"
 #include "state.h"
 
-#define SCHWAY__CDROM_EVENT_AHEAD UINT64_C(67737600)
 #define SCHWAY__CDROM_ACK_CYCLES UINT64_C(50000)
 
 #define SCHWAY__CDROM_IRQ2 2u
@@ -113,138 +111,942 @@ static uint8_t pop_result(struct schway__cdrom *cd)
     return value;
 }
 
-static void state_i16_array(struct schway__state_io *io, const char *name, int16_t *values,
-                            uint32_t count)
+static uint32_t bcd_valid(uint8_t value)
 {
-    uint16_t raw[SCHWAY__CDROM_XA_TAPS * 2u];
-    if (io->mode == SCHWAY__STATE_VISIT) {
-        io->visitor(io->user, name, values, count, 2u);
-        return;
-    }
-    for (uint32_t i = 0; i < count; i++) {
-        memcpy(&raw[i], &values[i], sizeof raw[i]);
-    }
-    schway__state_u16_array(io, name, raw, count, 0u, UINT16_MAX);
-    if (io->mode == SCHWAY__STATE_APPLY) {
-        for (uint32_t i = 0; i < count; i++) {
-            memcpy(&values[i], &raw[i], sizeof raw[i]);
-        }
+    return (value & 0x0Fu) <= 9u && (value >> 4) <= 9u;
+}
+
+static uint32_t bcd_value(uint8_t value)
+{
+    return ((uint32_t)(value >> 4) * 10u) + (value & 0x0Fu);
+}
+
+static uint8_t to_bcd(uint32_t value)
+{
+    value %= 100u;
+    return (uint8_t)(((value / 10u) << 4) | (value % 10u));
+}
+
+static void set_motor(struct schway__cdrom *cd, uint32_t on)
+{
+    cd->motor_on = on;
+    if (on != 0u) {
+        cd->status |= 1u << 1;
+    } else {
+        cd->status &= ~(1u << 1);
     }
 }
 
-void schway__cdrom_reset(schway *inst)
+static void response(schway *inst, const uint8_t *bytes, uint32_t count, uint8_t interrupt)
 {
-    memset(&inst->cdrom, 0, sizeof inst->cdrom);
+    for (uint32_t i = 0u; i < count; i++) {
+        push_result(&inst->cdrom, bytes[i]);
+    }
+    push_interrupt(inst, interrupt);
 }
 
-/* Every CD deadline is a CPU tick, bounded to two seconds ahead of the state
-   clock. Idle deadlines are zero and are ignored unless their event flag is
-   set. */
-void schway__cdrom_state_io(struct schway__state_io *io, schway *inst, uint64_t ticks)
+static void response_status(schway *inst, uint8_t interrupt)
+{
+    uint8_t status = (uint8_t)inst->cdrom.status;
+    response(inst, &status, 1u, interrupt);
+}
+
+static void finish_command(struct schway__cdrom *cd)
+{
+    cd->command = 0u;
+    cd->command_pending = 0u;
+    cd->command_event = 0u;
+    cd->command_deadline = 0u;
+}
+
+static void cancel_sector_event(struct schway__cdrom *cd)
+{
+    cd->sector_event = 0u;
+    cd->sector_deadline = 0u;
+}
+
+static void schedule_second(struct schway__cdrom *cd, uint64_t now, uint64_t delay)
+{
+    cd->command_pending = 2u;
+    cd->command_event = 1u;
+    cd->command_deadline = deadline_after(now, delay);
+}
+
+static void command_error(schway *inst, uint8_t error)
 {
     struct schway__cdrom *cd = &inst->cdrom;
-    schway__state_u8_array(io, "cdrom.parameter", cd->parameter, SCHWAY__CDROM_FIFO_CAP, 0u,
-                           UINT8_MAX);
-    schway__state_u8_array(io, "cdrom.result", cd->result, SCHWAY__CDROM_FIFO_CAP, 0u,
-                           UINT8_MAX);
-    schway__state_u8_array(io, "cdrom.interrupt", cd->interrupt, SCHWAY__CDROM_IRQ_CAP, 0u,
-                           5u);
-    uint32_t bank = schway__state_u32(io, "cdrom.bank", &cd->bank, 0u, 3u);
-    uint32_t parameter_head = schway__state_u32(io, "cdrom.parameter_head", &cd->parameter_head,
-                                                0u, SCHWAY__CDROM_FIFO_CAP - 1u);
-    uint32_t parameter_count = schway__state_u32(io, "cdrom.parameter_count",
-                                                 &cd->parameter_count, 0u,
-                                                 SCHWAY__CDROM_FIFO_CAP);
-    uint32_t result_head = schway__state_u32(io, "cdrom.result_head", &cd->result_head, 0u,
-                                             SCHWAY__CDROM_FIFO_CAP - 1u);
-    uint32_t result_count = schway__state_u32(io, "cdrom.result_count", &cd->result_count, 0u,
-                                              SCHWAY__CDROM_FIFO_CAP);
-    uint32_t interrupt_head = schway__state_u32(io, "cdrom.interrupt_head", &cd->interrupt_head,
-                                                0u, SCHWAY__CDROM_IRQ_CAP - 1u);
-    uint32_t interrupt_count = schway__state_u32(io, "cdrom.interrupt_count",
-                                                 &cd->interrupt_count, 0u,
-                                                 SCHWAY__CDROM_IRQ_CAP);
-    (void)schway__state_u32(io, "cdrom.interrupt_mask", &cd->interrupt_mask, 0u, 0x1Fu);
-    uint32_t command = schway__state_u32(io, "cdrom.command", &cd->command, 0u, UINT8_MAX);
-    uint32_t command_pending = schway__state_u32(io, "cdrom.command_pending",
-                                                &cd->command_pending, 0u, 1u);
-    (void)schway__state_u32(io, "cdrom.status", &cd->status, 0u, UINT8_MAX);
-    (void)schway__state_u32(io, "cdrom.mode", &cd->mode, 0u, UINT8_MAX);
-    (void)schway__state_u32(io, "cdrom.file", &cd->file, 0u, UINT8_MAX);
-    (void)schway__state_u32(io, "cdrom.channel", &cd->channel, 0u, UINT8_MAX);
-    (void)schway__state_u32(io, "cdrom.last_command", &cd->last_command, 0u, UINT8_MAX);
-    uint32_t motor_on = schway__state_u32(io, "cdrom.motor_on", &cd->motor_on, 0u, 1u);
-    uint32_t read_active = schway__state_u32(io, "cdrom.read_active", &cd->read_active, 0u, 1u);
-    uint32_t play_active = schway__state_u32(io, "cdrom.play_active", &cd->play_active, 0u, 1u);
-    uint32_t seek_active = schway__state_u32(io, "cdrom.seek_active", &cd->seek_active, 0u, 1u);
-    (void)schway__state_u32(io, "cdrom.current_lba", &cd->current_lba, 0u, UINT32_MAX);
-    (void)schway__state_u32(io, "cdrom.target_lba", &cd->target_lba, 0u, UINT32_MAX);
-    uint32_t sector_head = schway__state_u32(io, "cdrom.sector_head", &cd->sector_head, 0u,
-                                             SCHWAY__CDROM_SECTOR_CAP - 1u);
-    uint32_t sector_count = schway__state_u32(io, "cdrom.sector_count", &cd->sector_count, 0u,
-                                              SCHWAY__CDROM_SECTOR_CAP);
-    uint32_t sector_offset = schway__state_u32(io, "cdrom.sector_offset", &cd->sector_offset, 0u,
-                                               SCHWAY__CDROM_SECTOR_BYTES);
-    schway__state_u8_array(io, "cdrom.sector", &cd->sector[0][0],
-                           SCHWAY__CDROM_SECTOR_CAP * SCHWAY__CDROM_SECTOR_BYTES, 0u, UINT8_MAX);
-    schway__state_u32_array(io, "cdrom.sector_lba", cd->sector_lba, SCHWAY__CDROM_SECTOR_CAP,
-                            0u, UINT32_MAX);
-    schway__state_u32_array(io, "cdrom.sector_size", cd->sector_size, SCHWAY__CDROM_SECTOR_CAP,
-                            0u, SCHWAY__CDROM_SECTOR_BYTES);
-    state_i16_array(io, "cdrom.xa_history", &cd->xa_history[0][0], 2u * SCHWAY__CDROM_XA_TAPS);
-    uint32_t xa_phase = schway__state_u32(io, "cdrom.xa_phase", &cd->xa_phase, 0u, 5u);
-    schway__state_u16_array(io, "cdrom.audio", &cd->audio[0][0], 2u * SCHWAY__CDROM_AUDIO_CAP,
-                            0u, UINT16_MAX);
-    uint32_t audio_head = schway__state_u32(io, "cdrom.audio_head", &cd->audio_head, 0u,
-                                            SCHWAY__CDROM_AUDIO_CAP - 1u);
-    uint32_t audio_count = schway__state_u32(io, "cdrom.audio_count", &cd->audio_count, 0u,
-                                             SCHWAY__CDROM_AUDIO_CAP);
-    uint32_t command_event = schway__state_u32(io, "cdrom.command_event", &cd->command_event,
-                                               0u, 1u);
-    uint32_t sector_event = schway__state_u32(io, "cdrom.sector_event", &cd->sector_event, 0u,
-                                              1u);
-    uint32_t seek_event = schway__state_u32(io, "cdrom.seek_event", &cd->seek_event, 0u, 1u);
-    uint64_t command_deadline = schway__state_u64(io, "cdrom.command_deadline",
-                                                  &cd->command_deadline, 0u,
-                                                  SCHWAY__STATE_TICKS_MAX);
-    uint64_t sector_deadline = schway__state_u64(io, "cdrom.sector_deadline",
-                                                 &cd->sector_deadline, 0u,
-                                                 SCHWAY__STATE_TICKS_MAX);
-    uint64_t seek_deadline = schway__state_u64(io, "cdrom.seek_deadline", &cd->seek_deadline,
-                                               0u, SCHWAY__STATE_TICKS_MAX);
+    cd->status |= 1u;
+    uint8_t bytes[2] = {(uint8_t)cd->status, error};
+    response(inst, bytes, 2u, 5u);
+    finish_command(cd);
+}
 
-    uint64_t max = ticks > SCHWAY__STATE_TICKS_MAX - SCHWAY__CDROM_EVENT_AHEAD
-                       ? SCHWAY__STATE_TICKS_MAX
-                       : ticks + SCHWAY__CDROM_EVENT_AHEAD;
-    if (io->mode == SCHWAY__STATE_VALIDATE) {
-        schway__state_check(io, bank <= 3u);
-        schway__state_check(io, parameter_head < SCHWAY__CDROM_FIFO_CAP &&
-                                   parameter_count <= SCHWAY__CDROM_FIFO_CAP);
-        schway__state_check(io, result_head < SCHWAY__CDROM_FIFO_CAP &&
-                                   result_count <= SCHWAY__CDROM_FIFO_CAP);
-        schway__state_check(io, interrupt_head < SCHWAY__CDROM_IRQ_CAP &&
-                                   interrupt_count <= SCHWAY__CDROM_IRQ_CAP);
-        schway__state_check(io, sector_head < SCHWAY__CDROM_SECTOR_CAP &&
-                                   sector_count <= SCHWAY__CDROM_SECTOR_CAP &&
-                                   sector_offset <= SCHWAY__CDROM_SECTOR_BYTES);
-        schway__state_check(io, audio_head < SCHWAY__CDROM_AUDIO_CAP &&
-                                   audio_count <= SCHWAY__CDROM_AUDIO_CAP && xa_phase < 6u);
-        schway__state_check(io, command_pending == 0u || command != 0u);
-        schway__state_check(io, seek_active == 0u || motor_on != 0u);
-        schway__state_check(io, read_active == 0u || motor_on != 0u);
-        schway__state_check(io, !(read_active != 0u && play_active != 0u));
-        schway__state_check(io, command_event == 0u
-                                   ? command_deadline == 0u
-                                   : command_deadline >= ticks && command_deadline <= max);
-        schway__state_check(io, sector_event == 0u
-                                   ? sector_deadline == 0u
-                                   : sector_deadline >= ticks && sector_deadline <= max);
-        schway__state_check(io, seek_event == 0u
-                                   ? seek_deadline == 0u
-                                   : seek_deadline >= ticks && seek_deadline <= max);
-        schway__state_check(io, command_event == 0u || command_pending != 0u);
-        schway__state_check(io, sector_event == 0u || read_active != 0u || play_active != 0u);
-        schway__state_check(io, seek_event == 0u || seek_active != 0u);
+static void command_invalid(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    cd->status |= 1u;
+    const uint8_t bytes[2] = {0x11u, 0x40u};
+    response(inst, bytes, 2u, 5u);
+    finish_command(cd);
+}
+
+static void consume_parameters(struct schway__cdrom *cd, uint32_t count)
+{
+    for (uint32_t i = 0u; i < count; i++) {
+        cd->parameter[cd->parameter_head] = 0u;
+        cd->parameter_head = (cd->parameter_head + 1u) % SCHWAY__CDROM_FIFO_CAP;
+    }
+    cd->parameter_count -= count;
+    if (cd->parameter_count == 0u) {
+        cd->parameter_head = 0u;
+    }
+}
+
+static uint32_t parameters(struct schway__cdrom *cd, uint32_t minimum, uint32_t maximum,
+                           uint8_t values[SCHWAY__CDROM_FIFO_CAP])
+{
+    if (cd->parameter_count < minimum || cd->parameter_count > maximum) {
+        return 0u;
+    }
+    for (uint32_t i = 0u; i < cd->parameter_count; i++) {
+        values[i] = cd->parameter[(cd->parameter_head + i) % SCHWAY__CDROM_FIFO_CAP];
+    }
+    return 1u;
+}
+
+static uint32_t disc_type(const schway *inst)
+{
+    if (inst->disc_host.attached == 0u || inst->disc_host.toc.track_count == 0u) {
+        return 0u;
+    }
+    return inst->disc_host.toc.tracks[0].type;
+}
+
+static uint32_t disc_track_type_at(const schway *inst, uint32_t lba)
+{
+    if (inst->disc_host.attached == 0u || inst->disc_host.toc.track_count == 0u) {
+        return 0u;
+    }
+    uint64_t position = (uint64_t)lba + 150u;
+    for (uint32_t i = 0u; i < inst->disc_host.toc.track_count; i++) {
+        const schway_disc_track *track = &inst->disc_host.toc.tracks[i];
+        if (position >= track->index0 && position < track->leadout) {
+            return track->type;
+        }
+    }
+    return disc_type(inst);
+}
+
+static uint32_t disc_region_code(const schway *inst)
+{
+    if ((inst->profile_flags & SCHWAY_PROFILE_CD_LICENSED) != 0u) {
+        return inst->region;
+    }
+    if (inst->disc_host.attached == 0u) {
+        return 0u;
+    }
+
+    uint8_t sector[SCHWAY__CDROM_SECTOR_BYTES];
+    uint8_t subcode[96];
+    if (inst->disc_host.callbacks.read_sector(inst->disc_host.callbacks.user, 4u, sector,
+                                              subcode) == 0u) {
+        return 0u;
+    }
+    const uint8_t *license = &sector[0x38u];
+    if (memcmp(license, "Sony Computer Entertainment Inc.", 32u) == 0) {
+        return SCHWAY_REGION_NTSC_J;
+    }
+    if (memcmp(license, "Sony Computer Entertainment Amer", 32u) == 0) {
+        return SCHWAY_REGION_NTSC_U;
+    }
+    if (memcmp(license, "Sony Computer Entertainment Euro", 32u) == 0) {
+        return SCHWAY_REGION_PAL;
+    }
+    return 0u;
+}
+
+static uint8_t region_letter(uint32_t region)
+{
+    if (region == SCHWAY_REGION_NTSC_J) {
+        return (uint8_t)'I';
+    }
+    if (region == SCHWAY_REGION_NTSC_U) {
+        return (uint8_t)'A';
+    }
+    return (uint8_t)'E';
+}
+
+static uint32_t isqrt_u64(uint64_t value)
+{
+    uint64_t bit = UINT64_C(1) << 62;
+    uint64_t result = 0u;
+    while (bit > value) {
+        bit >>= 2;
+    }
+    while (bit != 0u) {
+        if (value >= result + bit) {
+            value -= result + bit;
+            result = (result >> 1) + bit;
+        } else {
+            result >>= 1;
+        }
+        bit >>= 2;
+    }
+    return (uint32_t)result;
+}
+
+static uint32_t seek_ticks(uint32_t from, uint32_t to)
+{
+    uint64_t a_lba = (uint64_t)from + 150u;
+    uint64_t b_lba = (uint64_t)to + 150u;
+    if (a_lba > UINT32_MAX) {
+        a_lba = UINT32_MAX;
+    }
+    if (b_lba > UINT32_MAX) {
+        b_lba = UINT32_MAX;
+    }
+    uint32_t a = isqrt_u64(a_lba << 32);
+    uint32_t b = isqrt_u64(b_lba << 32);
+    uint32_t radial = a > b ? a - b : b - a;
+    uint32_t distance = from > to ? from - to : to - from;
+    uint32_t radial_root = isqrt_u64((uint64_t)radial << 16);
+    uint64_t ticks_q16 = (UINT64_C(3) << 16) + radial / 5u +
+                         (UINT64_C(5) * radial_root) / 2u +
+                         (((uint64_t)distance << 16) / 60000u);
+    uint32_t ticks = (uint32_t)((ticks_q16 / 2u) >> 16);
+    if (ticks < 1u) {
+        ticks = 1u;
+    }
+    if (ticks > 150u) {
+        ticks = 150u;
+    }
+    return ticks;
+}
+
+static uint64_t seek_delay_cycles(const struct schway__cdrom *cd, uint32_t target)
+{
+    uint32_t ticks = seek_ticks(cd->current_lba, target);
+    uint64_t cycles = (uint64_t)ticks * UINT64_C(451584);
+    cycles = (cycles + cd->drive_speed - 1u) / cd->drive_speed;
+    cycles += (UINT64_C(3) * UINT64_C(451584) + cd->drive_speed - 1u) / cd->drive_speed;
+    if (cd->drive_speed_changed != 0u) {
+        cycles += (UINT64_C(80) * UINT64_C(451584) + cd->drive_speed - 1u) / cd->drive_speed;
+    }
+    return cycles;
+}
+
+static void update_status_activity(struct schway__cdrom *cd)
+{
+    cd->status &= ~((1u << 7) | (1u << 6) | (1u << 5));
+    if (cd->play_active != 0u) {
+        cd->status |= 1u << 7;
+    }
+    if (cd->seek_active != 0u) {
+        cd->status |= 1u << 6;
+    }
+    if (cd->read_active != 0u) {
+        cd->status |= 1u << 5;
+    }
+}
+
+static void observe_lid(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    if (inst->disc_host.lid_open == 0u || (cd->status & (1u << 4)) != 0u) {
+        return;
+    }
+    cd->status |= (1u << 4) | 1u;
+    cd->read_active = 0u;
+    cd->play_active = 0u;
+    cd->seek_active = 0u;
+    cd->command = 0u;
+    cd->command_pending = 0u;
+    cd->command_event = 0u;
+    cd->command_deadline = 0u;
+    cancel_sector_event(cd);
+    cd->seek_event = 0u;
+    cd->seek_deadline = 0u;
+    update_status_activity(cd);
+    uint8_t bytes[2] = {(uint8_t)cd->status, 0x08u};
+    response(inst, bytes, 2u, 5u);
+}
+
+void schway__cdrom_lid_changed(schway *inst)
+{
+    observe_lid(inst);
+}
+
+static void begin_seek(schway *inst, uint32_t position, uint64_t now, uint32_t play)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    cd->read_active = 0u;
+    cd->play_active = play;
+    cd->seek_active = 1u;
+    cd->target_lba = position;
+    if (play != 0u) {
+        cd->status |= 1u << 7;
+    }
+    update_status_activity(cd);
+    cd->seek_event = 1u;
+    cd->seek_deadline = deadline_after(now, seek_delay_cycles(cd, position));
+    cd->drive_speed_changed = 0u;
+    cancel_sector_event(cd);
+    cd->command_pending = 2u;
+}
+
+static void complete_get_id(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t bytes[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    uint32_t type = disc_type(inst);
+    uint32_t region = 0u;
+    if (inst->disc_host.lid_open == 0u && type != 0u && type != SCHWAY_DISC_TRACK_AUDIO) {
+        region = disc_region_code(inst);
+    }
+    uint32_t match = region == inst->region;
+    if (inst->disc_host.lid_open != 0u) {
+        bytes[0] = 0x11u;
+        bytes[1] = 0x80u;
+        response(inst, bytes, 8u, 5u);
+    } else if (type == 0u) {
+        bytes[0] = 0x08u;
+        bytes[1] = 0x40u;
+        response(inst, bytes, 8u, 5u);
+    } else if (type == SCHWAY_DISC_TRACK_AUDIO) {
+        bytes[0] = 0x0Au;
+        bytes[1] = 0x90u;
+        response(inst, bytes, 8u, 5u);
+    } else if (region == 0u && (inst->profile_flags & SCHWAY_PROFILE_CD_LICENSED) == 0u) {
+        bytes[0] = 0x0Au;
+        bytes[1] = 0x80u;
+        bytes[2] = type == SCHWAY_DISC_TRACK_MODE2 ? 0x20u : 0u;
+        response(inst, bytes, 8u, 5u);
+    } else if (match != 0u) {
+        bytes[0] = 0x02u;
+        bytes[2] = type == SCHWAY_DISC_TRACK_MODE2 ? 0x20u : 0u;
+        bytes[4] = 'S';
+        bytes[5] = 'C';
+        bytes[6] = 'E';
+        bytes[7] = region_letter(inst->region);
+        response(inst, bytes, 8u, 2u);
+    } else {
+        bytes[0] = 0x0Au;
+        bytes[1] = 0x80u;
+        bytes[2] = type == SCHWAY_DISC_TRACK_MODE2 ? 0x20u : 0u;
+        response(inst, bytes, 8u, 5u);
+    }
+    finish_command(cd);
+}
+
+static void complete_second_response(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    switch (cd->command) {
+    case 0x07u:
+    case 0x09u:
+    case 0x0Au:
+    case 0x16u:
+        response_status(inst, 2u);
+        finish_command(cd);
+        break;
+    case 0x15u:
+        if ((cd->status & (1u << 2)) != 0u) {
+            uint8_t error[2] = {(uint8_t)cd->status, 0x04u};
+            response(inst, error, 2u, 5u);
+        } else {
+            response_status(inst, 2u);
+        }
+        finish_command(cd);
+        break;
+    case 0x08u:
+        set_motor(cd, 0u);
+        response_status(inst, 2u);
+        finish_command(cd);
+        break;
+    case 0x1Au:
+        complete_get_id(inst);
+        break;
+    default:
+        response_status(inst, 2u);
+        finish_command(cd);
+        break;
+    }
+}
+
+static uint32_t command_parameters(schway *inst, uint8_t minimum, uint8_t maximum,
+                                   uint8_t values[SCHWAY__CDROM_FIFO_CAP])
+{
+    if (parameters(&inst->cdrom, minimum, maximum, values) == 0u) {
+        command_error(inst, 0x20u);
+        return 0u;
+    }
+    return 1u;
+}
+
+static uint32_t parameters_match(const struct schway__cdrom *cd, const char *expected,
+                                 uint32_t count)
+{
+    if (cd->parameter_count != count) {
+        return 0u;
+    }
+    for (uint32_t i = 0u; i < count; i++) {
+        if (cd->parameter[(cd->parameter_head + i) % SCHWAY__CDROM_FIFO_CAP] !=
+            (uint8_t)expected[i]) {
+            return 0u;
+        }
+    }
+    return 1u;
+}
+
+static void command_unlock(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    static const char licensed_by[] = "Licensed by";
+    static const char sony[] = "Sony";
+    static const char computer[] = "Computer";
+    static const char entertainment[] = "Entertainment";
+    static const char america[] = "of America";
+    static const char europe[] = "(Europe)";
+    uint32_t expected_command = UINT32_MAX;
+    const char *expected = "";
+    uint32_t count = 0u;
+
+    if ((inst->profile_flags & SCHWAY_PROFILE_CD_UNLOCK) != 0u &&
+        inst->region != SCHWAY_REGION_NTSC_J) {
+        switch (cd->unlock_step) {
+        case 0u: expected_command = 0x50u; break;
+        case 1u: expected_command = 0x51u; expected = licensed_by; count = 11u; break;
+        case 2u: expected_command = 0x52u; expected = sony; count = 4u; break;
+        case 3u: expected_command = 0x53u; expected = computer; count = 8u; break;
+        case 4u: expected_command = 0x54u; expected = entertainment; count = 13u; break;
+        case 5u:
+            expected_command = 0x55u;
+            expected = inst->region == SCHWAY_REGION_NTSC_U ? america : europe;
+            count = inst->region == SCHWAY_REGION_NTSC_U ? 10u : 8u;
+            break;
+        case 6u: expected_command = 0x56u; break;
+        default: break;
+        }
+    }
+
+    uint32_t valid = cd->command == expected_command &&
+                     parameters_match(cd, expected, count) != 0u;
+    if (valid != 0u) {
+        consume_parameters(cd, count);
+        cd->unlock_step++;
+        if (cd->command == 0x56u) {
+            cd->unlock_step = 0u;
+            cd->unlock_enabled = 1u;
+        }
+    } else {
+        cd->unlock_step = 0u;
+    }
+    command_invalid(inst);
+}
+
+
+static void begin_nop(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    if (inst->disc_host.lid_open == 0u) {
+        cd->status &= ~(1u << 4);
+    }
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_setloc(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 3u, 3u, p) == 0u) {
+        return;
+    }
+    if (!bcd_valid(p[0]) || !bcd_valid(p[1]) || !bcd_valid(p[2]) ||
+        bcd_value(p[1]) >= 60u || bcd_value(p[2]) >= 75u) {
+        command_error(inst, 0x10u);
+        return;
+    }
+    uint32_t target = (bcd_value(p[0]) * 60u + bcd_value(p[1])) * 75u + bcd_value(p[2]);
+    cd->target_lba = target > 150u ? target - 150u : 0u;
+    cd->status &= ~(1u << 3);
+    consume_parameters(cd, 3u);
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_play(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 1u, p) == 0u) {
+        return;
+    }
+    uint32_t pcount = cd->parameter_count;
+    if (pcount != 0u && !bcd_valid(p[0])) {
+        command_error(inst, 0x10u);
+        return;
+    }
+    if (disc_type(inst) == 0u || inst->disc_host.lid_open != 0u) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    if (pcount != 0u && bcd_value(p[0]) > inst->disc_host.toc.track_count) {
+        command_error(inst, 0x10u);
+        return;
+    }
+    if (pcount != 0u && bcd_value(p[0]) != 0u) {
+        uint32_t index1 = inst->disc_host.toc.tracks[bcd_value(p[0]) - 1u].index1;
+        cd->target_lba = index1 > 150u ? index1 - 150u : 0u;
+    }
+    consume_parameters(cd, pcount);
+    cd->paused = 0u;
+    cd->read_active = 0u;
+    cancel_sector_event(cd);
+    cd->play_active = 1u;
+    set_motor(cd, 1u);
+    update_status_activity(cd);
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_scan(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    if (cd->play_active == 0u) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_read(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    if (disc_type(inst) == 0u || inst->disc_host.lid_open != 0u) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    uint32_t region = disc_region_code(inst);
+    if ((inst->profile_flags & SCHWAY_PROFILE_CD_LICENSED) == 0u &&
+        (cd->mode & 1u) == 0u && (region == 0u || region != inst->region) &&
+        cd->unlock_enabled == 0u) {
+        command_error(inst, 0x40u);
+        return;
+    }
+    cd->paused = 0u;
+    cd->play_active = 0u;
+    cancel_sector_event(cd);
+    cd->read_active = 1u;
+    set_motor(cd, 1u);
+    update_status_activity(cd);
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_motor_on(schway *inst, uint64_t now)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    if (cd->motor_on != 0u) {
+        command_error(inst, 0x20u);
+        return;
+    }
+    if (disc_type(inst) == 0u || inst->disc_host.lid_open != 0u) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    set_motor(cd, 1u);
+    response_status(inst, 3u);
+    schedule_second(cd, now, UINT64_C(476000));
+}
+
+static void begin_stop(schway *inst, uint64_t now)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    cd->read_active = 0u;
+    cd->play_active = 0u;
+    cd->paused = 0u;
+    cancel_sector_event(cd);
+    cd->seek_active = 0u;
+    cd->seek_event = 0u;
+    cd->seek_deadline = 0u;
+    update_status_activity(cd);
+    response_status(inst, 3u);
+    uint64_t delay = cd->motor_on == 0u ? UINT64_C(0x1D7B) :
+                     cd->drive_speed == 1u ? UINT64_C(0xD38ACA) : UINT64_C(0x18A6076);
+    schedule_second(cd, now, delay);
+}
+
+static void begin_pause(schway *inst, uint64_t now)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    uint32_t was_paused = cd->paused;
+    cd->paused = 1u;
+    cd->read_active = 0u;
+    cd->play_active = 0u;
+    cancel_sector_event(cd);
+    update_status_activity(cd);
+    response_status(inst, 3u);
+    uint64_t delay = was_paused != 0u ? UINT64_C(7666) :
+                     UINT64_C(2170000) >> (cd->drive_speed - 1u);
+    schedule_second(cd, now, delay);
+}
+
+static void begin_init(schway *inst, uint64_t now)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    cd->mode = 0x20u;
+    cd->drive_speed_changed = cd->drive_speed != 1u;
+    cd->drive_speed = 1u;
+    cd->read_active = 0u;
+    cd->play_active = 0u;
+    cd->seek_active = 0u;
+    cd->paused = 0u;
+    cancel_sector_event(cd);
+    cd->seek_event = 0u;
+    cd->seek_deadline = 0u;
+    cd->sector_head = 0u;
+    cd->sector_count = 0u;
+    cd->sector_offset = 0u;
+    set_motor(cd, 1u);
+    update_status_activity(cd);
+    response_status(inst, 3u);
+    schedule_second(cd, now, UINT64_C(476000));
+}
+
+static void begin_mute(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    cd->muted = cd->command == 0x0Bu;
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_setfilter(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 2u, 2u, p) == 0u) {
+        return;
+    }
+    cd->file = p[0];
+    cd->channel = p[1];
+    consume_parameters(cd, 2u);
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_setmode(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 1u, 1u, p) == 0u) {
+        return;
+    }
+    cd->mode = p[0];
+    uint32_t target = (p[0] & 0x80u) != 0u ? 2u : 1u;
+    cd->drive_speed_changed = cd->drive_speed != target;
+    cd->drive_speed = target;
+    consume_parameters(cd, 1u);
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_getparam(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    uint8_t bytes[5] = {(uint8_t)cd->status, (uint8_t)cd->mode, 0u,
+                        (uint8_t)cd->file, (uint8_t)cd->channel};
+    if (command_parameters(inst, 0u, 0u, p) != 0u) {
+        response(inst, bytes, 5u, 3u);
+        finish_command(cd);
+    }
+}
+
+static void begin_getloc_l(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    uint8_t bytes[8];
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    if (cd->sector_count == 0u || cd->seek_active != 0u ||
+        disc_track_type_at(inst, cd->current_lba) == SCHWAY_DISC_TRACK_AUDIO) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    uint32_t newest = (cd->sector_head + cd->sector_count - 1u) % SCHWAY__CDROM_SECTOR_CAP;
+    for (uint32_t i = 0u; i < 8u; i++) {
+        bytes[i] = cd->sector[newest][12u + i];
+    }
+    response(inst, bytes, 8u, 3u);
+    finish_command(cd);
+}
+
+static void begin_getloc_p(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    uint8_t bytes[8];
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    if (disc_type(inst) == 0u) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    uint64_t position = (uint64_t)cd->current_lba + 150u;
+    uint32_t track_index = 0u;
+    for (uint32_t i = 0u; i < inst->disc_host.toc.track_count; i++) {
+        const schway_disc_track *track = &inst->disc_host.toc.tracks[i];
+        if (position >= track->index1 && position < track->leadout) {
+            track_index = i;
+            break;
+        }
+    }
+    const schway_disc_track *track = &inst->disc_host.toc.tracks[track_index];
+    uint64_t relative = position >= track->index1 ? position - track->index1 : 0u;
+    bytes[0] = to_bcd(track_index + 1u);
+    bytes[1] = 1u;
+    bytes[2] = to_bcd((uint32_t)(position / (60u * 75u)));
+    bytes[3] = to_bcd((uint32_t)((position / 75u) % 60u));
+    bytes[4] = to_bcd((uint32_t)(position % 75u));
+    bytes[5] = to_bcd((uint32_t)(relative / (60u * 75u)));
+    bytes[6] = to_bcd((uint32_t)((relative / 75u) % 60u));
+    bytes[7] = to_bcd((uint32_t)(relative % 75u));
+    response(inst, bytes, 8u, 3u);
+    finish_command(cd);
+}
+
+static void begin_setsession(schway *inst, uint64_t now)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 1u, 1u, p) == 0u) {
+        return;
+    }
+    if (p[0] == 0u) {
+        command_error(inst, 0x10u);
+        return;
+    }
+    consume_parameters(cd, 1u);
+    response_status(inst, 3u);
+    schedule_second(cd, now, UINT64_C(476000));
+}
+
+static void begin_gettn(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    uint8_t bytes[3] = {(uint8_t)cd->status, 1u,
+                        to_bcd(inst->disc_host.toc.track_count)};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    if (disc_type(inst) == 0u) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    response(inst, bytes, 3u, 3u);
+    finish_command(cd);
+}
+
+static void begin_gettd(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 1u, 1u, p) == 0u) {
+        return;
+    }
+    if (!bcd_valid(p[0]) || bcd_value(p[0]) > inst->disc_host.toc.track_count) {
+        command_error(inst, 0x10u);
+        return;
+    }
+    if (disc_type(inst) == 0u) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    uint32_t track_index = bcd_value(p[0]);
+    uint32_t target = track_index == 0u
+                          ? inst->disc_host.toc.tracks[inst->disc_host.toc.track_count - 1u].leadout
+                          : inst->disc_host.toc.tracks[track_index - 1u].index1;
+    uint64_t absolute = (uint64_t)target + 150u;
+    uint8_t bytes[3] = {(uint8_t)cd->status,
+                        to_bcd((uint32_t)(absolute / (60u * 75u))),
+                        to_bcd((uint32_t)((absolute / 75u) % 60u))};
+    consume_parameters(cd, 1u);
+    response(inst, bytes, 3u, 3u);
+    finish_command(cd);
+}
+
+static void begin_seek_command(schway *inst, uint64_t now)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    if (disc_type(inst) == 0u || inst->disc_host.lid_open != 0u) {
+        command_error(inst, 0x80u);
+        return;
+    }
+    cd->status &= ~(1u << 2);
+    cd->read_active = 0u;
+    cd->play_active = 0u;
+    cancel_sector_event(cd);
+    update_status_activity(cd);
+    uint32_t target = cd->command == 0x16u
+                          ? (cd->target_lba > 25u ? cd->target_lba - 25u : 0u)
+                          : cd->target_lba;
+    set_motor(cd, 1u);
+    response_status(inst, 3u);
+    if (cd->command == 0x15u && disc_track_type_at(inst, target) == SCHWAY_DISC_TRACK_AUDIO) {
+        cd->status |= 1u << 2;
+        schedule_second(cd, now, UINT64_C(67737600));
+        return;
+    }
+    begin_seek(inst, target, now, 0u);
+}
+
+static void begin_test(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    uint8_t bytes[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 1u, 1u, p) == 0u) {
+        return;
+    }
+    if (p[0] == 0x20u) {
+        bytes[0] = inst->region == SCHWAY_REGION_NTSC_J ? 0x96u : 0x97u;
+        bytes[1] = inst->region == SCHWAY_REGION_NTSC_J ? 0x09u : 0x01u;
+        bytes[2] = inst->region == SCHWAY_REGION_NTSC_J ? 0x12u : 0x10u;
+        bytes[3] = 0xC2u;
+        consume_parameters(cd, 1u);
+        response(inst, bytes, 4u, 3u);
+        finish_command(cd);
+        return;
+    }
+    if (p[0] == 0x22u) {
+        const char *region = inst->region == SCHWAY_REGION_NTSC_J ? "for Japan" :
+                             inst->region == SCHWAY_REGION_NTSC_U ? "for U/C" : "for Europe";
+        uint32_t count = inst->region == SCHWAY_REGION_NTSC_J ? 9u :
+                         inst->region == SCHWAY_REGION_NTSC_U ? 7u : 10u;
+        memcpy(bytes, region, count);
+        consume_parameters(cd, 1u);
+        response(inst, bytes, count, 3u);
+        finish_command(cd);
+        return;
+    }
+    command_invalid(inst);
+}
+
+static void begin_getid(schway *inst, uint64_t now)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) != 0u) {
+        response_status(inst, 3u);
+        schedule_second(cd, now, UINT64_C(0x4A00));
+    }
+}
+
+static void begin_reset(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    uint8_t p[SCHWAY__CDROM_FIFO_CAP] = {0u};
+    if (command_parameters(inst, 0u, 0u, p) == 0u) {
+        return;
+    }
+    cd->mode = 0x20u;
+    cd->drive_speed_changed = cd->drive_speed != 1u;
+    cd->drive_speed = 1u;
+    cd->unlock_enabled = 0u;
+    cd->unlock_step = 0u;
+    cd->status &= ~((1u << 2) | (1u << 3) | 1u);
+    cd->read_active = 0u;
+    cd->play_active = 0u;
+    cd->seek_active = 0u;
+    cd->seek_event = 0u;
+    cd->seek_deadline = 0u;
+    cancel_sector_event(cd);
+    cd->paused = 0u;
+    cd->sector_head = 0u;
+    cd->sector_count = 0u;
+    cd->sector_offset = 0u;
+    set_motor(cd, 0u);
+    update_status_activity(cd);
+    response_status(inst, 3u);
+    finish_command(cd);
+}
+
+static void begin_command(schway *inst, uint64_t now)
+{
+    switch (inst->cdrom.command) {
+    case 0x01u: begin_nop(inst); return;
+    case 0x02u: begin_setloc(inst); return;
+    case 0x03u: begin_play(inst); return;
+    case 0x04u: case 0x05u: begin_scan(inst); return;
+    case 0x06u: case 0x1Bu: begin_read(inst); return;
+    case 0x07u: begin_motor_on(inst, now); return;
+    case 0x08u: begin_stop(inst, now); return;
+    case 0x09u: begin_pause(inst, now); return;
+    case 0x0Au: begin_init(inst, now); return;
+    case 0x0Bu: case 0x0Cu: begin_mute(inst); return;
+    case 0x0Du: begin_setfilter(inst); return;
+    case 0x0Eu: begin_setmode(inst); return;
+    case 0x0Fu: begin_getparam(inst); return;
+    case 0x10u: begin_getloc_l(inst); return;
+    case 0x11u: begin_getloc_p(inst); return;
+    case 0x12u: begin_setsession(inst, now); return;
+    case 0x13u: begin_gettn(inst); return;
+    case 0x14u: begin_gettd(inst); return;
+    case 0x15u: case 0x16u: begin_seek_command(inst, now); return;
+    case 0x19u: begin_test(inst); return;
+    case 0x1Au: begin_getid(inst, now); return;
+    case 0x1Cu: begin_reset(inst); return;
+    case 0x50u: case 0x51u: case 0x52u: case 0x53u:
+    case 0x54u: case 0x55u: case 0x56u:
+        command_unlock(inst);
+        return;
+    case 0x57u:
+        inst->cdrom.unlock_enabled = 0u;
+        inst->cdrom.unlock_step = 0u;
+        command_invalid(inst);
+        return;
+    default:
+        command_invalid(inst);
+        return;
     }
 }
 
@@ -267,17 +1069,14 @@ uint64_t schway__cdrom_next(const schway *inst)
 void schway__cdrom_event(schway *inst, uint64_t now)
 {
     struct schway__cdrom *cd = &inst->cdrom;
+    observe_lid(inst);
     if (cd->command_event != 0u && cd->command_deadline <= now) {
         cd->command_event = 0u;
         cd->command_deadline = 0u;
-        if (cd->command_pending != 0u) {
-            cd->command_pending = 0u;
-            cd->command = 0u;
-            if (cd->last_command == 0x01u && inst->disc_host.lid_open == 0u) {
-                cd->status &= (uint32_t)~(1u << 4);
-            }
-            push_result(cd, (uint8_t)cd->status);
-            push_interrupt(inst, 3u);
+        if (cd->command_pending == 1u) {
+            begin_command(inst, now);
+        } else if (cd->command_pending == 2u) {
+            complete_second_response(inst);
         }
     }
     if (cd->sector_event != 0u && cd->sector_deadline <= now) {
@@ -287,11 +1086,18 @@ void schway__cdrom_event(schway *inst, uint64_t now)
     if (cd->seek_event != 0u && cd->seek_deadline <= now) {
         cd->seek_event = 0u;
         cd->seek_deadline = 0u;
+        cd->current_lba = cd->target_lba;
+        cd->seek_active = 0u;
+        update_status_activity(cd);
+        if (cd->command_pending == 2u && cd->command_event == 0u) {
+            complete_second_response(inst);
+        }
     }
 }
 
 uint8_t schway__cdrom_read(schway *inst, uint32_t address, uint64_t now)
 {
+    observe_lid(inst);
     if (schway__cdrom_next(inst) <= now) {
         schway__cdrom_event(inst, now);
     }
@@ -315,6 +1121,7 @@ uint8_t schway__cdrom_read(schway *inst, uint32_t address, uint64_t now)
 
 void schway__cdrom_write(schway *inst, uint32_t address, uint8_t value, uint64_t now)
 {
+    observe_lid(inst);
     if (schway__cdrom_next(inst) <= now) {
         schway__cdrom_event(inst, now);
     }
@@ -332,7 +1139,8 @@ void schway__cdrom_write(schway *inst, uint32_t address, uint8_t value, uint64_t
                 cd->last_command = value;
                 cd->command_pending = 1u;
                 cd->command_event = 1u;
-                cd->command_deadline = deadline_after(now, SCHWAY__CDROM_ACK_CYCLES);
+                cd->command_deadline = deadline_after(
+                    now, value == 0x1Cu ? UINT64_C(0x400000) : SCHWAY__CDROM_ACK_CYCLES);
             }
         } else if (offset == 2u && cd->parameter_count < SCHWAY__CDROM_FIFO_CAP) {
             uint32_t tail =

@@ -30,6 +30,7 @@ struct schway__cdrom {
     uint32_t command, command_pending;
     uint32_t status, mode, file, channel, last_command;
     uint32_t motor_on, read_active, play_active, seek_active;
+    uint32_t paused, muted, drive_speed, drive_speed_changed, unlock_enabled, unlock_step;
     uint32_t current_lba, target_lba;
     uint32_t sector_head, sector_count, sector_offset;
     uint8_t sector[SCHWAY__CDROM_SECTOR_CAP][SCHWAY__CDROM_SECTOR_BYTES];
@@ -44,6 +45,7 @@ struct schway__cdrom {
 };
 
 void schway__cdrom_reset(schway *inst);
+void schway__cdrom_lid_changed(schway *inst);
 void schway__cdrom_state_io(struct schway__state_io *io, schway *inst, uint64_t ticks);
 
 /* Read/write one byte at a CD-ROM port. The I/O wrapper preserves byte lanes

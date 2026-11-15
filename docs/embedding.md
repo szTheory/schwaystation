@@ -430,6 +430,9 @@ BIOS bytes are not included in ordinary save states. A state stores the loaded-i
 flags. A bit this version does not define returns `SCHWAY_STATUS_ERR_PROFILE_REJECTED`. The flags survive a power
 reset and lock with the region.
 
+- `SCHWAY_PROFILE_CD_LICENSED`: treat an attached data disc as licensed for the selected machine region. This is an
+  explicit host override for discs whose lead-in licence cannot be supplied through the sector callback.
+- `SCHWAY_PROFILE_CD_UNLOCK`: allow the modeled non-Japanese firmware unlock commands to accept a mismatched region.
 - `SCHWAY_PROFILE_DEBUG_PORT`: the guest's byte writes to the two debug ports (a TTY byte and an exit code) take effect.
   Retail hosts leave it clear, and then those writes do nothing.
 - `SCHWAY_PROFILE_GPU_V0`: select the early GPU v0 model, which lacks rectangle texture flips. The default is GPU v2.
@@ -581,10 +584,11 @@ an unknown one included, and never `NULL`.
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
 
-`SCHWAY_API_VERSION` is 4. A version only adds names, so a program built against an earlier header runs unchanged.
+`SCHWAY_API_VERSION` is 5. A version only adds names, so a program built against an earlier header runs unchanged.
 Version 3 added `SCHWAY_FAULT_DMA`; version 4 adds read-only `schway_span` memory views, card loading and card
-generation queries, plus copied BIOS loading and SHA-256 reporting. A program that switches on the fault kind should
-treat a value it does not know as a fault it cannot name.
+generation queries, plus copied BIOS loading and SHA-256 reporting. Version 5 adds the host-supplied disc and TOC
+callbacks, lid control, and disc swapping. A program that switches on the fault kind should treat a value it does not
+know as a fault it cannot name.
 
 ## The test card
 

@@ -2,10 +2,12 @@
 title: "PSX SPU, CD-ROM controller and MDEC: register models, timings, disc images, FMV path and the audio contract"
 summary: "Cited facts and settled choices for the three streaming subsystems: the 24-voice SPU (512 KB RAM, BRR ADPCM, ADSR step/shift rules, gaussian table, noise, reverb formula and 39-tap FIR, capture buffers, IRQ, DMA4, 768 cycles per sample), the CXD1199-family CD-ROM host interface (index model, command set, INT1-INT5, Setmode bits, measured response and seek timings, sector formats, XA-ADPCM, GetID by region, LibCrypt), disc image formats and the host disc-reader interface, the MDEC command set and fixed-point IDCT, the test and fixture plan, and the determinism and A/V sync model."
 read_when: "Before designing, implementing or testing spu.c, cdrom.c, cdxa.c, mdec.c, the disc-reader interface, the audio output contract, audio hashes, the fixture disc, or any CD timing."
-updated: 2026-11-13
+updated: 2026-11-15
 ---
 
 # PSX SPU, CD-ROM and MDEC
+
+The implemented CD-ROM register, command, timing and profile contract is documented in [the CD-ROM hardware page](../../docs/hardware/cdrom.md). This section retains the source notes and decision rationale used to choose that model.
 
 ## Where to look
 | Question | Section |
@@ -88,6 +90,8 @@ The current Phase-5 mixer contract is in the guide's [PCM section](../../docs/ha
 **OUT.** The core emits signed 16-bit stereo at 44,100 Hz on each 768-cycle tick. The host receives native PCM and performs any resampling. Frame sample counts vary by one as the scheduler carries fractional frame timing; see ARCHITECTURE §1 and §4.
 
 ## 2. CD-ROM controller
+
+For the implemented register, command and deterministic timing contract, see [the CD-ROM hardware page](../../docs/hardware/cdrom.md). The following sections retain cited source evidence and the decisions derived from it.
 ### 2.1 Ports and index model
 Four 8-bit registers 1F801800-1803 in four banks selected by writing bits 0-1 of 1800h [SCM.02]:
 | Bank | 1801 W | 1802 W | 1803 W | 1801 R | 1802 R | 1803 R |
@@ -124,7 +128,7 @@ HSTS (1800 R): bits 0-1 bank, 2 ADPBUSY, 3 PRMEMPT, 4 PRMWRDY, 5 RSLRRDY, 6 DRQS
 | 1A | GetID | INT3, INT2 or INT5 (8 bytes) | see 2.6 | [SCM.02] |
 | 1C | Reset | INT3 only | needs 1/8 s (400000h cycles) delay | [SCM.02] |
 | 1D/1E | GetQ/ReadTOC | INT3, INT2 | vC1 and up only; ReadTOC second response about 1 s | [SCM.02] |
-| 1F, 50-57 | VideoCD, Unlock | INT5 (11h, 40h) | SCPH-5903 and vC1+ non-Japanese only | [SCM.02] |
+| 1F, 50-56, 57 | VideoCD, Unlock, Lock | INT5 (11h, 40h) | Unlock is vC1+ non-Japanese; Lock restores the locked state and still returns INT5 | [SCM.02] |
 | others | | INT5 (11h, 40h); 58-5F crash the HC05 | parameters stay in the FIFO after INT5 | [SCM.02] |
 
 Status byte: bit7 Play, 6 Seek, 5 Read (at most one set; Gran Turismo waits for Read to rise, not Seek to fall), 4 ShellOpen (sticky until Nop), 3 IdError, 2 SeekError, 1 motor on, 0 Error [SCM.02]. Error bytes: 10h bad parameter, 20h wrong count, 40h invalid command, 80h cannot respond yet (no disc, TOC not read); 04h seek failed (second response); 08h lid opened (unsolicited INT5 with stat = 10h or 11h) [SCM.02]. Sub-CPU model: one flag each for pending INT2 and INT1, so at most one undelivered INT1; commands are not executed while any INT is pending [SCM.02].

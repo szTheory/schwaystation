@@ -90,7 +90,11 @@ schway_status schway_set_lid(schway *inst, uint32_t open)
     if (inst == NULL || open > 1u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
+    uint32_t changed = inst->disc_host.lid_open != open;
     inst->disc_host.lid_open = open;
+    if (changed != 0u && open != 0u) {
+        schway__cdrom_lid_changed(inst);
+    }
     return SCHWAY_STATUS_OK;
 }
 

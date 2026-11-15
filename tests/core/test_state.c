@@ -543,8 +543,9 @@ static uint32_t disc_read_b(void *user, uint32_t lba, uint8_t sector[2352], uint
     return 0u;
 }
 
-static void seed_cdrom_mdec(schway *inst)
+static void seed_cdrom(schway *inst)
 {
+    inst->profile_flags = SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_CD_UNLOCK;
     inst->cdrom.parameter[15] = 0xA1u;
     inst->cdrom.result[8] = 0xB2u;
     inst->cdrom.interrupt[7] = 4u;
@@ -556,6 +557,12 @@ static void seed_cdrom_mdec(schway *inst)
     inst->cdrom.interrupt_head = 7u;
     inst->cdrom.interrupt_count = 1u;
     inst->cdrom.interrupt_mask = 0x15u;
+    inst->cdrom.paused = 1u;
+    inst->cdrom.muted = 1u;
+    inst->cdrom.drive_speed = 2u;
+    inst->cdrom.drive_speed_changed = 1u;
+    inst->cdrom.unlock_enabled = 1u;
+    inst->cdrom.unlock_step = 6u;
     inst->cdrom.command = 0x06u;
     inst->cdrom.command_pending = 1u;
     inst->cdrom.status = 0x20u;
@@ -584,7 +591,10 @@ static void seed_cdrom_mdec(schway *inst)
     inst->cdrom.sector_event = 1u;
     inst->cdrom.command_deadline = 1000u;
     inst->cdrom.sector_deadline = 2000u;
+}
 
+static void seed_mdec(schway *inst)
+{
     inst->mdec.input[0] = 0x11223344u;
     inst->mdec.input[SCHWAY__MDEC_INPUT_WORDS - 1u] = 0x55667788u;
     inst->mdec.output[0] = 0x99AABBCCu;
@@ -610,7 +620,13 @@ static void seed_cdrom_mdec(schway *inst)
     inst->mdec.block_deadline = 900u;
 }
 
-static void test_cdrom_mdec_state(void)
+static void seed_cdrom_mdec(schway *inst)
+{
+    seed_cdrom(inst);
+    seed_mdec(inst);
+}
+
+static uint32_t cdrom_mdec_fields_match(schway *inst)
 {
     static const struct {
         const char *name;
@@ -641,32 +657,18 @@ static void test_cdrom_mdec_state(void)
         {"mdec.output_count", 4u, 1u},
         {"mdec.block_deadline", 8u, 1u},
     };
-    schway *src = make(SCHWAY_REGION_NTSC_U);
-    schway *dst = make(SCHWAY_REGION_NTSC_U);
-    seed_cdrom_mdec(src);
-    seed_cdrom_mdec(dst);
-    src->disc_host.callbacks.user = src;
-    src->disc_host.callbacks.read_sector = disc_read_a;
-    src->disc_host.attached = 1u;
-    dst->disc_host.callbacks.user = dst;
-    dst->disc_host.callbacks.read_sector = disc_read_b;
-    dst->disc_host.attached = 1u;
-
     size_t missing_fields = 0u;
     for (size_t i = 0; i < sizeof expected_fields / sizeof expected_fields[0]; i++) {
-        if (!field_record_matches(src, expected_fields[i].name, expected_fields[i].width,
+        if (!field_record_matches(inst, expected_fields[i].name, expected_fields[i].width,
                                   expected_fields[i].count)) {
             missing_fields++;
         }
     }
-    CHECK_EQ_U64(missing_fields, 0u);
-    if (missing_fields != 0u) {
-        schway_destroy(dst);
-        schway_destroy(src);
-        return;
-    }
+    return (uint32_t)missing_fields;
+}
 
-    size_t n = save(src, good);
+static void cdrom_mdec_round_trip(schway *src, schway *dst, size_t n)
+{
     CHECK_EQ_U64(save(dst, bad), n);
     CHECK(memcmp(good, bad, n) == 0);
     memset(&dst->cdrom, 0, sizeof dst->cdrom);
@@ -679,7 +681,10 @@ static void test_cdrom_mdec_state(void)
     CHECK_EQ_U64(dst->disc_host.attached, 1u);
     CHECK_EQ_U64(save(dst, after), n);
     CHECK(memcmp(good, after, n) == 0);
+}
 
+static void cdrom_mdec_reject_invalid(schway *src, schway *dst, size_t n)
+{
     const struct {
         const char *what;
         const char *field;
@@ -696,6 +701,9 @@ static void test_cdrom_mdec_state(void)
         {"CD sector FIFO count", "cdrom.sector_count", 0u,
          SCHWAY__CDROM_SECTOR_CAP + 1u, 4u},
         {"CD XA phase", "cdrom.xa_phase", 0u, 6u, 4u},
+        {"CD speed", "cdrom.drive_speed", 0u, 3u, 4u},
+        {"CD unlock state", "cdrom.unlock_enabled", 0u, 2u, 4u},
+        {"CD unlock step", "cdrom.unlock_step", 0u, 7u, 4u},
         {"CD event deadline", "cdrom.command_deadline", 0u,
          SCHWAY__STATE_TICKS_MAX, 8u},
         {"CD inactive seek deadline", "cdrom.seek_deadline", 0u, 1u, 8u},
@@ -713,7 +721,10 @@ static void test_cdrom_mdec_state(void)
         reseal(bad, n);
         expect_refused(invalid[i].what, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
     }
+}
 
+static void cdrom_mdec_run_events(schway *src, schway *dst, size_t n)
+{
     /* The events are crossed by one long budget or twelve shorter budgets;
        both paths must save the same machine state. */
     schway_budget budget;
@@ -736,14 +747,41 @@ static void test_cdrom_mdec_state(void)
     CHECK(memcmp(good, after, n) == 0);
     CHECK(dst->disc_host.callbacks.read_sector == disc_read_b);
     CHECK_EQ_U64(dst->disc_host.callbacks.user, (uintptr_t)dst);
+}
 
+static void cdrom_mdec_reset_state(schway *dst)
+{
     struct schway__cdrom zero_cd;
     struct schway__mdec zero_mdec;
     memset(&zero_cd, 0, sizeof zero_cd);
+    zero_cd.drive_speed = 1u;
     memset(&zero_mdec, 0, sizeof zero_mdec);
     CHECK_EQ_U64(schway_reset(dst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
     CHECK(memcmp(&dst->cdrom, &zero_cd, sizeof zero_cd) == 0);
     CHECK(memcmp(&dst->mdec, &zero_mdec, sizeof zero_mdec) == 0);
+}
+
+static void test_cdrom_mdec_state(void)
+{
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    seed_cdrom_mdec(src);
+    seed_cdrom_mdec(dst);
+    src->disc_host.callbacks.user = src;
+    src->disc_host.callbacks.read_sector = disc_read_a;
+    src->disc_host.attached = 1u;
+    dst->disc_host.callbacks.user = dst;
+    dst->disc_host.callbacks.read_sector = disc_read_b;
+    dst->disc_host.attached = 1u;
+    uint32_t missing_fields = cdrom_mdec_fields_match(src);
+    CHECK_EQ_U64(missing_fields, 0u);
+    if (missing_fields == 0u) {
+        size_t n = save(src, good);
+        cdrom_mdec_round_trip(src, dst, n);
+        cdrom_mdec_reject_invalid(src, dst, n);
+        cdrom_mdec_run_events(src, dst, n);
+        cdrom_mdec_reset_state(dst);
+    }
     schway_destroy(dst);
     schway_destroy(src);
 }
@@ -1187,11 +1225,7 @@ static void test_run_bounds(void)
     }
 }
 
-/* The cpu, bus and fault fields come back from a save, a power reset and a
-   load byte for byte, and the power-on values are the documented ones
-   (ARCHITECTURE section 7; docs/hardware/cop0.md, Registers). The TTY
-   ring is outside the state and a power reset empties it. */
-static void test_cpu_fields(void)
+static void check_public_versions(void)
 {
     schway_versions v;
     memset(&v, 0, sizeof v);
@@ -1199,10 +1233,12 @@ static void test_cpu_fields(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 7u);
-    CHECK_EQ_U64(v.behaviour_revision, 7u);
+    CHECK_EQ_U64(v.state_format, 8u);
+    CHECK_EQ_U64(v.behaviour_revision, 8u);
+}
 
-    schway *inst = make(SCHWAY_REGION_NTSC_U);
+static void check_cpu_power_on(schway *inst)
+{
     CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
     CHECK_EQ_HEX(inst->cpu.cop0.r[12], 0x00400000u);
     CHECK_EQ_U64(inst->cpu.cop0.r[15], 2u);
@@ -1213,7 +1249,10 @@ static void test_cpu_fields(void)
         CHECK_EQ_U64(inst->cpu.r[i], 0u);
     }
     CHECK_EQ_U64(inst->cpu.hi | inst->cpu.lo, 0u);
+}
 
+static void seed_cpu_bus_fields(schway *inst)
+{
     inst->cpu.r[5] = 0x12345678u;
     inst->cpu.hi = 0xCAFEF00Du;
     inst->cpu.pc = 0x80010000u;
@@ -1242,7 +1281,10 @@ static void test_cpu_fields(void)
     inst->bus.scratch[0x3FF] = 0x77u;
     inst->bus.memctl[8] = 0x0B88u;
     inst->bus.unbuilt_n[SCHWAY__DEV_GPU] = 3u;
+}
 
+static void seed_cpu_fault_irq(schway *inst)
+{
     /* The first fault wins; a later one changes nothing. */
     schway__fault_latch(inst, SCHWAY__FAULT_UNMAPPED_READ, SCHWAY__DEV_GPU, 4u, 0x80010000u,
                         0x8C220000u, 0x1F801814u);
@@ -1258,8 +1300,10 @@ static void test_cpu_fields(void)
     CHECK_EQ_U64(schway__irq_line(inst), 1u);
     schway__irq_raise(inst, 11u);
     CHECK_EQ_HEX(inst->irq.stat, 0x4u);
+}
 
-    /* The TTY ring keeps 4096 bytes in order and counts the ones it drops. */
+static void seed_cpu_tty(schway *inst)
+{
     for (uint32_t i = 0; i < 4097u; i++) {
         schway__tty_push(inst, (uint8_t)i);
     }
@@ -1267,15 +1311,10 @@ static void test_cpu_fields(void)
     CHECK_EQ_U64(inst->tty.dropped, 1u);
     CHECK_EQ_HEX(inst->tty.buf[255], 0xFFu);
     inst->exit_pending = 1u;
+}
 
-    size_t n = save(inst, good);
-    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(inst->cpu.r[5], 0u);
-    CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
-    CHECK_EQ_U64(inst->bus.ram[0x1234], 0u);
-    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
-    CHECK_EQ_U64(inst->tty.count | inst->tty.dropped | inst->exit_pending, 0u);
-    CHECK_EQ_U64(schway_load_state(inst, good, n), SCHWAY_STATUS_OK);
+static void check_cpu_loaded(schway *inst)
+{
     CHECK_EQ_HEX(inst->cpu.r[5], 0x12345678u);
     CHECK_EQ_HEX(inst->cpu.hi, 0xCAFEF00Du);
     CHECK_EQ_HEX(inst->cpu.pc, 0x80010000u);
@@ -1293,6 +1332,26 @@ static void test_cpu_fields(void)
     CHECK_EQ_HEX(inst->fault.addr, 0x1F801814u);
     CHECK_EQ_HEX(inst->irq.stat, 0x4u);
     CHECK_EQ_HEX(inst->irq.mask, 0x4u);
+}
+
+/* CPU, bus and fault state round-trip; reset restores power-on values. */
+static void test_cpu_fields(void)
+{
+    check_public_versions();
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    check_cpu_power_on(inst);
+    seed_cpu_bus_fields(inst);
+    seed_cpu_fault_irq(inst);
+    seed_cpu_tty(inst);
+    size_t n = save(inst, good);
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(inst->cpu.r[5], 0u);
+    CHECK_EQ_HEX(inst->cpu.pc, 0xBFC00000u);
+    CHECK_EQ_U64(inst->bus.ram[0x1234], 0u);
+    CHECK_EQ_U64(inst->fault.kind, SCHWAY__FAULT_NONE);
+    CHECK_EQ_U64(inst->tty.count | inst->tty.dropped | inst->exit_pending, 0u);
+    CHECK_EQ_U64(schway_load_state(inst, good, n), SCHWAY_STATUS_OK);
+    check_cpu_loaded(inst);
     CHECK_EQ_U64(save(inst, after), n);
     CHECK(memcmp(good, after, n) == 0);
     schway_destroy(inst);
