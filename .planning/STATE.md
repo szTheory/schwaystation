@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: "Completed 06-04-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh."
-last_updated: "2026-11-15T21:08:56.125Z"
+stopped_at: "Completed 06-05-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; active duration at least 58m, exact start unavailable."
+last_updated: "2026-11-15T22:14:34.276Z"
 last_activity: 2026-11-15
-state_head: 336b82a0d4499a7a7beef41157900b6cdb582fcc
+state_head: 29d8ab736e2464e957d34908069fc3a8802e7096
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 176
-  completed_plans: 158
+  total_plans: 177
+  completed_plans: 159
   percent: 83
-current_plan: 5
-last_activity_desc: "Completed Phase 6 plan 06-04; plan 06-05 is next. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+current_plan: 6
+last_activity_desc: "Completed Phase 6 plan 06-05; plan 06-06 is next. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Plan: 5 of 26
+Plan: 6 of 27
 Status: Ready to execute
 Last activity: 2026-11-15
 
@@ -220,6 +220,7 @@ Progress: [████████░░] 83%
 | Phase 06 P08 | 35m | 2 tasks | 7 files |
 | Phase 06 P26 | 20min | 2 tasks | 7 files |
 | Phase 06 P04 | 107min | 2 tasks | 20 files |
+| Phase 06 P05 | at least 58m; executor start was not captured | 1 task | 13 files |
 
 ## Accumulated Context
 
@@ -544,6 +545,10 @@ Recent decisions affecting current work:
 - [Phase 06-discs-and-fmv]: Use cdrom.* selector and inventory names for the CD behavior lane.
 - [Phase 06-discs-and-fmv]: Keep CD sector acquisition and INT1 delivery in Plan 06-05.
 - [Phase 06-discs-and-fmv]: Serialize CD unlock, lock and licensed-profile state with the device.
+- [Phase 6]: Serialize BFRD, ReadS selection, retry state, and deferred INT1; bump state format and behavior revision to 9.
+- [Phase 6]: Parse and CRC-check supplied interleaved Q; synthesize absent or invalid Q from the TOC while retaining the prior location on bad_q.
+- [Phase 6]: Select XA audio before guest data delivery; defer XA decoding and audio output to the later XA/SPU plans.
+- [Phase 6]: Keep DMA3 sector-cursor and 24/40-cycle transfer behavior in sequential Plan 06-27.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -743,8 +748,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T21:08:55.881Z
-Stopped at: Completed 06-04-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh.
+Last session: 2026-11-15T22:14:34.041Z
+Stopped at: Completed 06-05-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; active duration at least 58m, exact start unavailable.
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -822,3 +827,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-08 compl
 ### Phase 6 plan 06-26 execution (2026-11-15)
 
 Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-26 completed in 20 minutes with four task commits. CD-ROM and MDEC visitors now participate in state format 6; the state suite passed 8/8 and the bus/unbuilt/gap fixture lane passed 3/3. The initial TDD seed used an invalid MDEC deadline and was corrected to the supported 900-cycle bound. No hosted URL applies. This out-of-order wave plan is complete; 06-04 remains the sequential next plan. Global DISC-01 and DISC-03 acceptance remain pending the later CD-ROM and MDEC behavior plans.
+
+### Phase 6 plan 06-05 execution (2026-11-15)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Active duration is at least 58 minutes from the first durable execution timestamp; exact active duration is unavailable because the executor start was not captured. Sector acquisition, filtering, Q handling, RDDATA delivery and state coverage are committed; code review is clean. The final Plan 05 configure/build/selected CTest command passed (8 selected tests), and hygiene, inventory sort and `git diff --check` passed. The TDD RED command failed the new sector caller as expected (exit 8), and its corrected report classified `RED_EVIDENCE_OK`. No hosted run applies. DISC-01 remains pending aggregate Phase 6 acceptance; XA decoding/audio, DMA3 cursor/rates and disc-boot caller acceptance remain with Plans 06-09/06-10, 06-27 and their downstream callers. Plan 06-06 is next; Plan 06-27 remains sequential with DMA consumers.
