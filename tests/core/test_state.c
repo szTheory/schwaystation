@@ -525,6 +525,224 @@ static int field_record_matches(const schway *inst, const char *name, uint32_t w
     return 0;
 }
 
+static uint32_t disc_read_a(void *user, uint32_t lba, uint8_t sector[2352], uint8_t subcode[96])
+{
+    (void)user;
+    (void)lba;
+    (void)sector;
+    (void)subcode;
+    return 0u;
+}
+
+static uint32_t disc_read_b(void *user, uint32_t lba, uint8_t sector[2352], uint8_t subcode[96])
+{
+    (void)user;
+    (void)lba;
+    (void)sector;
+    (void)subcode;
+    return 0u;
+}
+
+static void seed_cdrom_mdec(schway *inst)
+{
+    inst->cdrom.parameter[15] = 0xA1u;
+    inst->cdrom.result[8] = 0xB2u;
+    inst->cdrom.interrupt[7] = 4u;
+    inst->cdrom.bank = 2u;
+    inst->cdrom.parameter_head = 15u;
+    inst->cdrom.parameter_count = 3u;
+    inst->cdrom.result_head = 8u;
+    inst->cdrom.result_count = 1u;
+    inst->cdrom.interrupt_head = 7u;
+    inst->cdrom.interrupt_count = 1u;
+    inst->cdrom.command = 0x06u;
+    inst->cdrom.command_pending = 1u;
+    inst->cdrom.status = 0x20u;
+    inst->cdrom.mode = 0x80u;
+    inst->cdrom.file = 3u;
+    inst->cdrom.channel = 4u;
+    inst->cdrom.last_command = 0x19u;
+    inst->cdrom.motor_on = 1u;
+    inst->cdrom.read_active = 1u;
+    inst->cdrom.current_lba = 123u;
+    inst->cdrom.target_lba = 456u;
+    inst->cdrom.sector_head = 2u;
+    inst->cdrom.sector_count = 1u;
+    inst->cdrom.sector_offset = 12u;
+    inst->cdrom.sector[2][0] = 0xC3u;
+    inst->cdrom.sector[2][SCHWAY__CDROM_SECTOR_BYTES - 1u] = 0xD4u;
+    inst->cdrom.sector_lba[2] = 123u;
+    inst->cdrom.sector_size[2] = 2048u;
+    inst->cdrom.xa_history[1][SCHWAY__CDROM_XA_TAPS - 1u] = -321;
+    inst->cdrom.xa_phase = 5u;
+    inst->cdrom.audio[1][0] = 0x1234u;
+    inst->cdrom.audio[1][1] = 0xFEDCu;
+    inst->cdrom.audio_head = 1u;
+    inst->cdrom.audio_count = 3u;
+    inst->cdrom.command_event = 1u;
+    inst->cdrom.sector_event = 1u;
+    inst->cdrom.command_deadline = 1000u;
+    inst->cdrom.sector_deadline = 2000u;
+
+    inst->mdec.input[0] = 0x11223344u;
+    inst->mdec.input[SCHWAY__MDEC_INPUT_WORDS - 1u] = 0x55667788u;
+    inst->mdec.output[0] = 0x99AABBCCu;
+    inst->mdec.output[SCHWAY__MDEC_OUTPUT_WORDS - 1u] = 0xDDEEFF00u;
+    inst->mdec.quant[SCHWAY__MDEC_TABLE_BYTES - 1u] = 0x5Au;
+    inst->mdec.scale[SCHWAY__MDEC_BLOCK_SAMPLES - 1u] = -123;
+    inst->mdec.block[0] = 456;
+    inst->mdec.work[SCHWAY__MDEC_BLOCK_SAMPLES - 1u] = -789;
+    inst->mdec.input_head = 1u;
+    inst->mdec.input_count = 2u;
+    inst->mdec.output_head = SCHWAY__MDEC_OUTPUT_WORDS - 1u;
+    inst->mdec.output_count = 3u;
+    inst->mdec.command = 0x38000000u;
+    inst->mdec.command_words = 17u;
+    inst->mdec.words_remaining = 9u;
+    inst->mdec.block_index = 4u;
+    inst->mdec.depth = 2u;
+    inst->mdec.signed_output = 1u;
+    inst->mdec.bit15 = 1u;
+    inst->mdec.control = 3u;
+    inst->mdec.command_active = 1u;
+    inst->mdec.block_pending = 1u;
+    inst->mdec.block_deadline = 3000u;
+}
+
+static void test_cdrom_mdec_state(void)
+{
+    static const struct {
+        const char *name;
+        uint32_t width, count;
+    } expected_fields[] = {
+        {"cdrom.parameter", 1u, SCHWAY__CDROM_FIFO_CAP},
+        {"cdrom.result", 1u, SCHWAY__CDROM_FIFO_CAP},
+        {"cdrom.interrupt", 1u, SCHWAY__CDROM_IRQ_CAP},
+        {"cdrom.sector", 1u, SCHWAY__CDROM_SECTOR_CAP * SCHWAY__CDROM_SECTOR_BYTES},
+        {"cdrom.sector_lba", 4u, SCHWAY__CDROM_SECTOR_CAP},
+        {"cdrom.sector_size", 4u, SCHWAY__CDROM_SECTOR_CAP},
+        {"cdrom.xa_history", 2u, 2u * SCHWAY__CDROM_XA_TAPS},
+        {"cdrom.audio", 2u, 2u * SCHWAY__CDROM_AUDIO_CAP},
+        {"cdrom.audio_head", 4u, 1u},
+        {"cdrom.audio_count", 4u, 1u},
+        {"cdrom.command_deadline", 8u, 1u},
+        {"cdrom.sector_deadline", 8u, 1u},
+        {"cdrom.seek_deadline", 8u, 1u},
+        {"mdec.input", 4u, SCHWAY__MDEC_INPUT_WORDS},
+        {"mdec.output", 4u, SCHWAY__MDEC_OUTPUT_WORDS},
+        {"mdec.quant", 1u, SCHWAY__MDEC_TABLE_BYTES},
+        {"mdec.scale", 2u, SCHWAY__MDEC_BLOCK_SAMPLES},
+        {"mdec.block", 2u, SCHWAY__MDEC_BLOCK_SAMPLES},
+        {"mdec.work", 4u, SCHWAY__MDEC_BLOCK_SAMPLES},
+        {"mdec.input_head", 4u, 1u},
+        {"mdec.input_count", 4u, 1u},
+        {"mdec.output_head", 4u, 1u},
+        {"mdec.output_count", 4u, 1u},
+        {"mdec.block_deadline", 8u, 1u},
+    };
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    seed_cdrom_mdec(src);
+    seed_cdrom_mdec(dst);
+    src->disc_host.callbacks.user = src;
+    src->disc_host.callbacks.read_sector = disc_read_a;
+    src->disc_host.attached = 1u;
+    dst->disc_host.callbacks.user = dst;
+    dst->disc_host.callbacks.read_sector = disc_read_b;
+    dst->disc_host.attached = 1u;
+
+    size_t missing_fields = 0u;
+    for (size_t i = 0; i < sizeof expected_fields / sizeof expected_fields[0]; i++) {
+        if (!field_record_matches(src, expected_fields[i].name, expected_fields[i].width,
+                                  expected_fields[i].count)) {
+            missing_fields++;
+        }
+    }
+    CHECK_EQ_U64(missing_fields, 0u);
+    if (missing_fields != 0u) {
+        schway_destroy(dst);
+        schway_destroy(src);
+        return;
+    }
+
+    size_t n = save(src, good);
+    CHECK_EQ_U64(save(dst, bad), n);
+    CHECK(memcmp(good, bad, n) == 0);
+    CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(dst->disc_host.callbacks.user, (uintptr_t)dst);
+    CHECK(dst->disc_host.callbacks.read_sector == disc_read_b);
+    CHECK_EQ_U64(dst->disc_host.attached, 1u);
+    CHECK_EQ_U64(save(dst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+
+    const struct {
+        const char *what;
+        const char *field;
+        uint32_t delta;
+        uint64_t value;
+        uint32_t width;
+    } invalid[] = {
+        {"CD parameter FIFO head", "cdrom.parameter_head", 0u,
+         SCHWAY__CDROM_FIFO_CAP, 4u},
+        {"CD result FIFO count", "cdrom.result_count", 0u,
+         SCHWAY__CDROM_FIFO_CAP + 1u, 4u},
+        {"CD interrupt FIFO head", "cdrom.interrupt_head", 0u,
+         SCHWAY__CDROM_IRQ_CAP, 4u},
+        {"CD sector FIFO count", "cdrom.sector_count", 0u,
+         SCHWAY__CDROM_SECTOR_CAP + 1u, 4u},
+        {"CD XA phase", "cdrom.xa_phase", 0u, 6u, 4u},
+        {"CD event deadline", "cdrom.command_deadline", 0u,
+         SCHWAY__STATE_TICKS_MAX, 8u},
+        {"CD inactive seek deadline", "cdrom.seek_deadline", 0u, 1u, 8u},
+        {"MDEC input FIFO head", "mdec.input_head", 0u,
+         SCHWAY__MDEC_INPUT_WORDS, 4u},
+        {"MDEC output FIFO count", "mdec.output_count", 0u,
+         SCHWAY__MDEC_OUTPUT_WORDS + 1u, 4u},
+        {"MDEC block index", "mdec.block_index", 0u, 6u, 4u},
+        {"MDEC block deadline", "mdec.block_deadline", 0u, 1001u, 8u},
+    };
+    for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; i++) {
+        memcpy(bad, good, n);
+        put_le(bad + offset_of(src, invalid[i].field) + invalid[i].delta,
+               invalid[i].value, invalid[i].width);
+        reseal(bad, n);
+        expect_refused(invalid[i].what, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+
+    /* The events are crossed by one long budget or twelve shorter budgets;
+       both paths must save the same machine state. */
+    schway_budget budget;
+    memset(&budget, 0, sizeof budget);
+    budget.size = (uint32_t)sizeof budget;
+    budget.max_cycles = 6000u;
+    schway_run_result result;
+    memset(&result, 0, sizeof result);
+    result.size = (uint32_t)sizeof result;
+    CHECK_EQ_U64(schway_run(src, &budget, &result), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(result.ticks, 6000u);
+    budget.max_cycles = 500u;
+    for (size_t i = 0; i < 12u; i++) {
+        CHECK_EQ_U64(schway_run(dst, &budget, &result), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+    }
+    CHECK_EQ_U64(save(src, good), n);
+    CHECK_EQ_U64(save(dst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+    CHECK(dst->disc_host.callbacks.read_sector == disc_read_b);
+    CHECK_EQ_U64(dst->disc_host.callbacks.user, (uintptr_t)dst);
+
+    struct schway__cdrom zero_cd;
+    struct schway__mdec zero_mdec;
+    memset(&zero_cd, 0, sizeof zero_cd);
+    memset(&zero_mdec, 0, sizeof zero_mdec);
+    CHECK_EQ_U64(schway_reset(dst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    CHECK(memcmp(&dst->cdrom, &zero_cd, sizeof zero_cd) == 0);
+    CHECK(memcmp(&dst->mdec, &zero_mdec, sizeof zero_mdec) == 0);
+    schway_destroy(dst);
+    schway_destroy(src);
+}
+
 static void test_spu_state_continuation(void)
 {
     static const struct {
@@ -864,6 +1082,7 @@ static void test_device_fields(void)
 
     test_spu_state_continuation();
     test_spu_invalid_states();
+    test_cdrom_mdec_state();
 }
 
 /* Accepted counter boundaries must either advance to another loadable state
