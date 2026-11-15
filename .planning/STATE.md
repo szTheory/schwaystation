@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: "Completed 06-05-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; 58m56s elapsed wall time to summary creation, exact active duration unavailable."
-last_updated: "2026-11-15T22:21:41.471Z"
+stopped_at: "Completed 06-27-PLAN.md; next 06-28-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh."
+last_updated: "2026-11-15T23:52:11.789Z"
 last_activity: 2026-11-15
-state_head: 983da808e06d35f3a4471d9debe2b580968c8323
+state_head: ff5922cfa4a675ecd08f32dd07e5ae94a998db36
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 177
-  completed_plans: 159
+  total_plans: 178
+  completed_plans: 160
   percent: 83
-current_plan: 6
-last_activity_desc: "Completed Phase 6 plan 06-05; plan 06-06 is next. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+current_plan: 28
+last_activity_desc: "Completed Plan 06-27 in 41m08s and split the chopped-window readiness edge into sequential Plan 06-28 before 06-06. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Plan: 6 of 27
+Plan: 28 of 28 (Wave 7 readiness follow-up before 06-06)
 Status: Ready to execute
 Last activity: 2026-11-15
 
@@ -221,6 +221,7 @@ Progress: [████████░░] 83%
 | Phase 06 P26 | 20min | 2 tasks | 7 files |
 | Phase 06 P04 | 107min | 2 tasks | 20 files |
 | Phase 06 P05 | 58m56s elapsed wall; active time unavailable | 1 task | 13 files |
+| Phase 06 P27 | 41m 08s | 1 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -549,6 +550,8 @@ Recent decisions affecting current work:
 - [Phase 6]: Parse and CRC-check supplied interleaved Q; synthesize absent or invalid Q from the TOC while retaining the prior location on bad_q.
 - [Phase 6]: Select XA audio before guest data delivery; defer XA decoding and audio output to the later XA/SPU plans.
 - [Phase 6]: Keep DMA3 sector-cursor and 24/40-cycle transfer behavior in sequential Plan 06-27.
+- [Phase 06]: DMA3 readiness requires CHCR trigger, BFRD and buffered sector data; CD-ROM uses no DREQ line.
+- [Phase 06]: Split chopped-window readiness into Plan 06-28 before the pinned Getloc caller.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -748,9 +751,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T22:21:41.232Z
-Stopped at: Completed 06-05-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; 58m56s elapsed wall time to summary creation, exact active duration unavailable.
-Resume file: None
+Last session: 2026-11-15T23:52:11.541Z
+Stopped at: Completed 06-27-PLAN.md; next 06-28-PLAN.md
+Resume file: .planning/phases/06-discs-and-fmv/06-28-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
