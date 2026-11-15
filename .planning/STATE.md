@@ -5,16 +5,16 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: Completed 06-03-PLAN.md
-last_updated: "2026-11-15T16:43:41.993Z"
+stopped_at: Completed 06-07-PLAN.md
+last_updated: "2026-11-15T17:32:41.680Z"
 last_activity: 2026-11-15
-last_activity_desc: Completed Phase 6 plan 06-03; next is 06-04
-state_head: f290366ee89eb59c7d405a16ef888a0933266c4b
+last_activity_desc: Completed Phase 6 plan 06-07 out of order; 06-04 remains the sequential next plan
+state_head: 3a433960a0ec224792d0b9f2d1c622b7d70815dd
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 176
-  completed_plans: 153
+  completed_plans: 154
   percent: 83
 current_plan: 3
 ---
@@ -215,6 +215,7 @@ Progress: [████████░░] 83%
 | Phase 06 P01 | 12m | 2 tasks | 8 files |
 | Phase 06 P02 | 26min | 2 tasks | 7 files |
 | Phase 06 P03 | 18min | 2 tasks | 8 files |
+| Phase 06 P07 | not measured | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -527,6 +528,9 @@ Recent decisions affecting current work:
 - [Phase 06]: CD-ROM and MDEC state uses fixed per-instance buffers sized for the accepted algorithms.
 - [Phase 06]: Host disc callbacks and TOC metadata remain outside device state visitors.
 - [Phase 06]: Scheduler event ties follow timers, GPU, DMA, CD-ROM, SPU, SIO, MDEC.
+- [Phase 06]: Keep ISO/cue parsing and all host file handles in a host-only provider; the emulated core receives sectors only through callbacks.
+- [Phase 06]: Model INDEX 00 as physical file content and PREGAP as synthetic silence, preserving their distinct sector offsets.
+- [Phase 06]: Reject unsupported image types with named planned-v2.0 results instead of partial format sniffing.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -593,6 +597,7 @@ come from `AGENTS.md`.
 | 2026-11-15 | /gsd-execute-plan 06-01 | Codex, OpenGSD 1.20.0; sequential shared checkout; subsystem skeleton and inventories; tracer 19/19 and policy 4/4; 12 min | gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-execute-plan 06-02 | Codex, OpenGSD 1.20.0; sequential shared checkout; disc callback API and API v1–v4 compatibility checks; 26 min | gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-execute-plan 06-03 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded CD/MDEC state, reset/visitor contracts, MMIO and fixed-order scheduler integration; focused lane 8/8 after each task; 18 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-07 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded ISO/cue provider, focused image tests 8/8, selected disc/policy checks 12/12; duration not measured | gpt-6-luna xhigh |
 | 2026-10-19 | /gsd-discuss-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-plan-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-execute-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
@@ -721,8 +726,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T16:43:41.628Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-11-15T17:32:41.457Z
+Stopped at: Completed 06-07-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md

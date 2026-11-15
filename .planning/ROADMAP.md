@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes, and the nightly lane matches the ps1-tests `mdec` references within the stated tolerance. The STR on `disc_boot` plays through DMA into the 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 3/26 plans executed
+**Plans**: 4/26 plans executed
 
 Plans:
 **Wave 1**
@@ -485,7 +485,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [x] 06-03-PLAN.md — Connect instance-owned devices to bus and scheduler
-- [ ] 06-07-PLAN.md — Serve cue/bin and ISO through one bounded host provider
+- [x] 06-07-PLAN.md — Serve cue/bin and ISO through one bounded host provider
 - [ ] 06-25-PLAN.md — Cover the public disc API with versioned consumers
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -556,4 +556,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
 | 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
-| 6. Discs and FMV | 3/26 | In Progress | - |
+| 6. Discs and FMV | 4/26 | In Progress | - |
