@@ -432,6 +432,8 @@ static int test_cue_reject(const char *directory)
           "could not create a partial-sector child");
     CHECK(expect_open_status(cue_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, 1u, NULL),
           "expected a child with a partial sector to be rejected before reads");
+    (void)remove(cue_path);
+    cue_path[0] = '\0';
     for (uint32_t i = 0u; i < 4u; i++) {
         static const char *extensions[] = {"chd", "pbp", "ecm", "ccd"};
         static const char *messages[] = {
