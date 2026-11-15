@@ -9,6 +9,18 @@ set_target_properties(schwaystation-test-core PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-core)
 
+# Fault prevented: a host disc whose metadata is not copied/validated or
+# whose sector callback escapes run calls.
+add_executable(schwaystation-test-disc-api ${CMAKE_CURRENT_LIST_DIR}/disc_api.c)
+target_include_directories(schwaystation-test-disc-api PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-disc-api PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-disc-api PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-api)
+schway_add_test(NAME core.disc_api
+  COMMAND schwaystation-test-disc-api
+  LABELS core portable TIMEOUT 10)
+
 # Fault prevented: a frame, a query or a state call that allocates after
 # create, which a host running a frame from an audio callback or a
 # fixed-memory target cannot accept.

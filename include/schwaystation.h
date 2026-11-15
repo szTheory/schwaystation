@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 4
+#define SCHWAY_API_VERSION 5
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -27,6 +27,7 @@ typedef uint32_t schway_status;
 #define SCHWAY_STATUS_ERR_STATE_FIELD 10u
 #define SCHWAY_STATUS_ERR_EXE_INVALID 11u
 #define SCHWAY_STATUS_ERR_EXE_RANGE 12u
+#define SCHWAY_STATUS_ERR_LID_CLOSED 13u
 
 #define SCHWAY_REGION_NTSC_J 1u
 #define SCHWAY_REGION_NTSC_U 2u
@@ -242,6 +243,39 @@ typedef struct schway_tty {
     uint32_t dropped;  /* out: bytes lost since the last drain */
 } schway_tty;
 
+#define SCHWAY_DISC_TRACK_AUDIO 1u
+#define SCHWAY_DISC_TRACK_MODE1 2u
+#define SCHWAY_DISC_TRACK_MODE2 3u
+#define SCHWAY_DISC_MAX_TRACKS 99u
+
+typedef struct schway_disc_track {
+    uint32_t size;
+    uint32_t type; /* SCHWAY_DISC_TRACK_* */
+    uint32_t index0, index1, pregap, leadout;
+    uint32_t reserved0;
+} schway_disc_track;
+
+typedef struct schway_toc {
+    uint32_t size;
+    uint32_t track_count;
+    uint32_t reserved0;
+    schway_disc_track tracks[SCHWAY_DISC_MAX_TRACKS];
+} schway_toc;
+
+typedef uint32_t (*schway_disc_read_sector_fn)(void *user, uint32_t lba,
+                                                uint8_t sector[2352], uint8_t subcode[96]);
+typedef uint32_t (*schway_disc_toc_fn)(void *user, schway_toc *out);
+typedef uint32_t (*schway_disc_bad_q_fn)(void *user, uint32_t lba);
+
+typedef struct schway_disc {
+    uint32_t size;
+    uint32_t reserved0;
+    void *user;
+    schway_disc_read_sector_fn read_sector;
+    schway_disc_toc_fn toc;
+    schway_disc_bad_q_fn bad_q; /* optional; returns 1 for a bad-Q entry */
+} schway_disc;
+
 typedef struct schway_trace {
     uint32_t size;
     uint32_t event; /* SCHWAY_TRACE_* */
@@ -273,6 +307,9 @@ schway_status schway_load_bios(schway *inst, const void *bytes, size_t size);
 schway_status schway_get_bios_info(const schway *inst, schway_bios_info *out);
 schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes, size_t size);
 schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint64_t *out);
+schway_status schway_open_disc(schway *inst, const schway_disc *disc);
+schway_status schway_set_lid(schway *inst, uint32_t open); /* 0 closed, 1 open */
+schway_status schway_swap_disc(schway *inst, const schway_disc *disc);
 schway_status schway_get_audio(schway *inst, schway_audio *io);
 schway_status schway_get_tty(schway *inst, schway_tty *io);
 schway_status schway_get_trace(const schway *inst, uint32_t index, schway_trace *out);

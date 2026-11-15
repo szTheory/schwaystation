@@ -77,7 +77,8 @@ endfunction()
 # is compiled once and a test can link the object that ships.
 add_library(schwaystation_instance OBJECT
   src/instance.c
-  src/frame.c)
+  src/frame.c
+  src/disc.c)
 add_library(schwaystation_bios OBJECT src/bios.c)
 add_library(schwaystation_bus OBJECT
   src/bus.c
