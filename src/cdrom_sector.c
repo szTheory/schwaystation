@@ -13,6 +13,12 @@ static uint64_t sector_deadline(uint64_t now, uint64_t delta)
     return now + delta;
 }
 
+void schway__cdrom_bfrd_set(schway *inst, uint8_t value, uint64_t now)
+{
+    inst->cdrom.bfrd = (value >> 7) & 1u;
+    if (inst->cdrom.bfrd != 0u) schway__dma_cdrom_ready(inst, now);
+}
+
 static uint32_t sector_bcd(uint8_t value, uint32_t maximum, uint32_t *out)
 {
     if ((value & 0x0Fu) > 9u || (value >> 4) > 9u) return 0u;
@@ -294,7 +300,10 @@ void schway__cdrom_sector_event(schway *inst, uint64_t now)
 
     if (cd->play_active != 0u) {
         if ((cd->mode & 0x04u) != 0u && (lba & 0x0Fu) == 0x0Fu) sector_interrupt(inst);
-        if (audio_track != 0u) sector_store(cd, sector, lba, SCHWAY__CDROM_SECTOR_BYTES);
+        if (audio_track != 0u) {
+            sector_store(cd, sector, lba, SCHWAY__CDROM_SECTOR_BYTES);
+            schway__dma_cdrom_ready(inst, now);
+        }
         cd->sector_retry = 0u;
         schway__cdrom_sector_schedule(inst, now);
         return;
@@ -313,6 +322,7 @@ void schway__cdrom_sector_event(schway *inst, uint64_t now)
     }
 
     sector_store(cd, sector, lba, (cd->mode & 0x20u) != 0u ? 2340u : 2048u);
+    schway__dma_cdrom_ready(inst, now);
     cd->sector_retry = 0u;
     sector_interrupt(inst);
     schway__cdrom_sector_schedule(inst, now);

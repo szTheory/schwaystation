@@ -61,6 +61,7 @@ void schway__cdrom_event(schway *inst, uint64_t now);
 uint8_t schway__cdrom_sector_read(schway *inst);
 void schway__cdrom_sector_schedule(schway *inst, uint64_t now);
 void schway__cdrom_sector_event(schway *inst, uint64_t now);
+void schway__cdrom_bfrd_set(schway *inst, uint8_t value, uint64_t now);
 void schway__cdrom_sector_ack(schway *inst);
 void schway__cdrom_push_interrupt(schway *inst, uint8_t code);
 

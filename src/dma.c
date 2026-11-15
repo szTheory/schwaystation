@@ -144,6 +144,7 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
    and waits (psx-spx, DMA Channels). */
 #define DMA_OTC 6u
 #define DMA_SPU 4u
+#define DMA_CDROM 3u
 /* phase of a channel: nothing running, its unit's words moved and the channel
    busy until busy_until, a sync mode 1 transfer between blocks (busy, no
    unit, remain blocks still to go, waiting for the next request), the CPU's
@@ -253,6 +254,10 @@ static uint32_t dma_pending(const schway *inst, uint32_t ch)
         return (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
     }
     if (sync == 0u) {
+        if (ch == DMA_CDROM &&
+            (inst->cdrom.bfrd == 0u || inst->cdrom.sector_count == 0u)) {
+            return 0u;
+        }
         return ch == DMA_SPU || (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
     }
     if (sync == 2u) {
@@ -544,6 +549,19 @@ static void dma_start(schway *inst, uint64_t t)
     }
     d->phase[ch] = DMA_PH_UNIT;
     d->busy_until = t + cost;
+}
+
+/* CD-ROM has no DREQ line (psx-spx DMA Channels, docs/hardware/dma.md): a
+   buffered RDDATA word makes a triggered DMA3 eligible when data is ready. */
+void schway__dma_cdrom_ready(schway *inst, uint64_t now)
+{
+    if (inst->cdrom.bfrd == 0u || inst->cdrom.sector_count == 0u) {
+        return;
+    }
+    if (inst->dma.cur == SCHWAY__DMA_NONE && inst->dma.busy_until <= now) {
+        dma_start(inst, now);
+    }
+    schway__sched_recalc(inst);
 }
 
 /* The cycles the CPU runs after a unit of ch that has more to follow: the

@@ -349,20 +349,50 @@ static void test_sector_timing_and_data(void)
     sector_run(inst, 13000u, &host);
     CHECK_EQ_U64(inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY, 0u);
 
-    /* A no-buffer transfer stays idle until forced by CHCR bit 28; reset has
-       discarded the prior sector, so the forced tail read supplies zero. */
+    /* A no-buffer transfer waits with CHCR busy and does not overwrite RAM. */
     sector_wr8(inst, 0u, 1u);
     sector_wr8(inst, 3u, 0x80u);
     CHECK_EQ_U64(inst->cdrom.sector_count, 0u);
     CHECK_EQ_U64(inst->cdrom.sector_offset, 0u);
+    sector_wr8(inst, 0u, 0u);
+    sector_wr8(inst, 3u, 0x80u);
+    inst->bus.ram[0x5000u] = 0xA5u;
     sector_wr32(inst, DMA_MADR3, 0x5000u);
     sector_wr32(inst, DMA_BCR3, 1u);
-    sector_wr32(inst, DMA_CHCR3, 0x01000000u);
+    sector_wr32(inst, DMA_CHCR3, 0x11000000u);
     CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
     CHECK((inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    CHECK_EQ_HEX(inst->bus.ram[0x5000u], 0xA5u);
     sector_wr32(inst, DMA_CHCR3, 0u);
+    schway_destroy(inst);
+}
+
+static void test_dma_waits_for_cd_data(void)
+{
+    schway *inst = sector_make();
+    struct sector_host host;
+    sector_attach(inst, &host);
+    sector_param(inst, 0u);
+    sector_param(inst, 2u);
+    sector_param(inst, 0u);
+    sector_command(inst, &host, 0x02u);
+    sector_bfrd(inst, 0u);
+    sector_command(inst, &host, 0x06u);
+    sector_wr32(inst, DMA_DPCR, 0x0FEDCBA9u);
+    sector_wr32(inst, DMA_MADR3, 0x5000u);
+    sector_wr32(inst, DMA_BCR3, 1u);
     sector_wr32(inst, DMA_CHCR3, 0x11000000u);
-    CHECK_EQ_U64(sector_ram_word(inst, 0x5000u), 0u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK((inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY) != 0u);
+    sector_run(inst, SECTOR_PERIOD, &host);
+    CHECK_EQ_U64(host.reads, 1u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    sector_bfrd(inst, 1u);
+    CHECK_EQ_U64(inst->dma.cur, 3u);
+    CHECK_EQ_HEX(sector_ram_word(inst, 0x5000u), 0x1B1A1918u);
+    sector_run(inst, 100u, &host);
+    CHECK_EQ_U64(inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY, 0u);
     schway_destroy(inst);
 }
 
@@ -510,6 +540,7 @@ int schway__cdrom_sector_test(const char *name)
 {
     if (strcmp(name, "sectors") == 0) {
         test_sector_timing_and_data();
+        test_dma_waits_for_cd_data();
         test_speed_overrun_and_bad_reads();
     } else if (strcmp(name, "delivery") == 0) {
         test_pending_interrupt_and_bad_q();

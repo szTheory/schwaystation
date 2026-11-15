@@ -1,5 +1,4 @@
-/* CD-ROM registers and command state (docs/hardware/cdrom.md). */
-#include <string.h>
+#include <string.h> /* CD-ROM registers and command state: docs/hardware/cdrom.md. */
 
 #include "internal.h"
 #include "state.h"
@@ -1151,7 +1150,7 @@ void schway__cdrom_write(schway *inst, uint32_t address, uint8_t value, uint64_t
                 (cd->parameter_head + cd->parameter_count) % SCHWAY__CDROM_FIFO_CAP;
             cd->parameter[tail] = value;
             cd->parameter_count++;
-        } else if (offset == 3u) cd->bfrd = (value >> 7) & 1u;
+        } else if (offset == 3u) schway__cdrom_bfrd_set(inst, value, now);
         break;
     case 1u:
         if (offset == 2u) {

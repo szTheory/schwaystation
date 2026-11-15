@@ -106,5 +106,6 @@ void schway__dma_dreq(schway *inst, uint32_t ch, uint32_t level);
 /* The exact SPU ATTR halfword changed at bus tick now; wake any newly ready
    DMA4 block without moving it ahead of a future completed-unit boundary. */
 void schway__dma_spu_control_changed(schway *inst, uint64_t now);
+void schway__dma_cdrom_ready(schway *inst, uint64_t now);
 
 #endif /* SCHWAYSTATION_DMA_H */

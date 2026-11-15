@@ -38,6 +38,13 @@ static void *test_alloc(void *user, size_t size)
     return malloc(size);
 }
 
+static void cdrom_ready(schway *inst)
+{
+    inst->cdrom.bfrd = 1u;
+    inst->cdrom.sector_count = 1u;
+    inst->cdrom.sector_size[0] = 2048u;
+}
+
 static void test_free(void *user, void *ptr, size_t size)
 {
     (void)user;
@@ -889,13 +896,13 @@ static void case_sync0_from_device(void)
     schway *inst = make();
     fill_ram(inst, 0x1FC0u, 32u, 0x11111111u);
     wr32(inst, DPCR, DPCR_ALL);
-    wr32(inst, MADR(3u), 0x2000u);
-    wr32(inst, BCR(3u), 8u);
+    wr32(inst, MADR(1u), 0x2000u);
+    wr32(inst, BCR(1u), 8u);
     uint64_t start = now_of(inst);
-    wr32(inst, CHCR(3u), 0x11000002u);
-    CHECK_EQ_U64(inst->dma.cur, 3u);
-    CHECK_EQ_U64(inst->dma.busy_until - start, 8u * 24u + 1u);
-    CHECK_EQ_HEX(inst->dma.madr[3], 0x1FE0u);
+    wr32(inst, CHCR(1u), 0x11000002u);
+    CHECK_EQ_U64(inst->dma.cur, 1u);
+    CHECK_EQ_U64(inst->dma.busy_until - start, 8u + 1u);
+    CHECK_EQ_HEX(inst->dma.madr[1], 0x1FE0u);
     for (uint32_t i = 0u; i < 32u; i++) {
         uint32_t a = 0x1FC0u + 4u * i;
         uint32_t filled = 0x11111111u + i * 0x01010101u;
@@ -1214,6 +1221,7 @@ static void case_costs_per_channel(void)
         schway *inst = make();
         if (ch == 3u) {
             /* The BIOS CD-ROM timing setting selects 24 cycles per word. */
+            cdrom_ready(inst);
             wr32(inst, MEMCTL_CDROM, 0x00020843u);
         }
         wr32(inst, DPCR, DPCR_ALL);
@@ -1228,6 +1236,7 @@ static void case_costs_per_channel(void)
     /* A word count of 0 is 10000h words: the CD-ROM's longest burst, within
        the bound the engine keeps on a unit. */
     schway *inst = make();
+    cdrom_ready(inst);
     wr32(inst, DPCR, DPCR_ALL);
     wr32(inst, MADR(3u), 0u);
     wr32(inst, BCR(3u), 0u);
@@ -1246,6 +1255,7 @@ static void case_cdrom_costs(void)
     static const uint32_t rate[2] = {24u, 40u};
     for (uint32_t i = 0u; i < 2u; i++) {
         schway *inst = make();
+        cdrom_ready(inst);
         wr32(inst, MEMCTL_CDROM, setting[i]);
         wr32(inst, DPCR, DPCR_ALL);
         wr32(inst, MADR(3u), 0x4000u);
@@ -2042,6 +2052,7 @@ static void case_preempt_carry(void)
     schway *both[2] = {whole, sliced};
     for (uint32_t i = 0u; i < 2u; i++) {
         schway *inst = both[i];
+        cdrom_ready(inst);
         wr32(inst, DPCR, DPCR_ALL);
         wr32(inst, DICR, 0x00FF0000u);
         wr32(inst, MADR(3u), 0x40000u);
@@ -2249,6 +2260,7 @@ static void case_fault_sync3(void)
 static void case_read_chain_saves(void)
 {
     schway *inst = make();
+    cdrom_ready(inst);
     wr32(inst, DPCR, DPCR_ALL);
     wr32(inst, DICR, 0x00FF0000u);
     wr32(inst, MADR(3u), 0x20000u);
