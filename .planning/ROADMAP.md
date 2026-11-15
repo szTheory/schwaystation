@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes, and the nightly lane matches the ps1-tests `mdec` references within the stated tolerance. The STR on `disc_boot` plays through DMA into the 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 8/26 plans executed
+**Plans**: 8/27 plans executed
 
 Plans:
 **Wave 1**
@@ -496,10 +496,11 @@ Plans:
 - [x] 06-04-PLAN.md — Implement CD commands and deterministic response timing
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 06-05-PLAN.md — Deliver sectors and connect DMA channel 3
+- [ ] 06-05-PLAN.md — Deliver sectors to firmware through the scheduled controller buffer
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 06-06-PLAN.md — Run the pinned CD timing and Getloc callers
+- [ ] 06-27-PLAN.md — Transfer CD sector words through DMA3 at both documented rates
 
 **Wave 8** *(blocked on Wave 7 completion)*
 - [ ] 06-09-PLAN.md — Decode and resample XA with integer arithmetic
