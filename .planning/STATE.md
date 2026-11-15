@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: Completed 06-25-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; next sequential plan 06-04
-last_updated: "2026-11-15T17:54:14.417Z"
+stopped_at: Completed 06-08-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; next sequential plan 06-04
+last_updated: "2026-11-15T18:37:52.530Z"
 last_activity: 2026-11-15
-state_head: 4b7815054f04c0b674d9877165f582f352226313
+state_head: 38df10991370d7c22b352c7a4567808608207055
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 176
-  completed_plans: 155
+  completed_plans: 156
   percent: 83
 current_plan: 3
-last_activity_desc: "Completed Phase 6 plan 06-25 out of order; 06-04 remains the sequential next plan. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+last_activity_desc: "Completed Phase 6 plan 06-08 out of order; 06-26 is next in wave 4, and 06-04 remains the sequential next plan. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -217,6 +217,7 @@ Progress: [████████░░] 83%
 | Phase 06 P03 | 18min | 2 tasks | 8 files |
 | Phase 06 P07 | not measured | 3 tasks | 10 files |
 | Phase 06 P25 | 14min | 2 tasks | 3 files |
+| Phase 06 P08 | 35m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -533,6 +534,8 @@ Recent decisions affecting current work:
 - [Phase 06]: Model INDEX 00 as physical file content and PREGAP as synthetic silence, preserving their distinct sector offsets.
 - [Phase 06]: Reject unsupported image types with named planned-v2.0 results instead of partial format sniffing.
 - [Phase 06]: Keep the API v5 consumer public-header-only; core.disc_api owns internal attachment-state assertions.
+- [Phase 06]: Playlist index selection prepares stable descriptors; the host alone chooses when to swap the active core disc.
+- [Phase 06]: Shared CNF boot-path components omit ISO version suffixes before directory lookup.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -728,8 +731,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T17:54:14.191Z
-Stopped at: Completed 06-25-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; next sequential plan 06-04
+Last session: 2026-11-15T18:37:52.296Z
+Stopped at: Completed 06-08-PLAN.md; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh; next sequential plan 06-04
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -799,3 +802,7 @@ Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-02 comp
 ### Phase 6 plan 06-03 execution (2026-11-15)
 
 Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-03 completed in 18 minutes with two task commits. Bounded instance-owned CD/MDEC state, POWER reset and field visitors landed; bus dispatch and scheduler deadlines were connected. The required configure/build plus no-busy-loop/scheduler command passed 8/8 after each task. No hosted URL applies to these local checks. The plan's task-level TDD tags had no new test files or direct behavior tests in scope; first CD/MDEC behavior callers and state serialization remain assigned to Plans 06-04/06-11/06-26. Phase 6 is at plan 4 of 26.
+
+### Phase 6 plan 06-08 execution (2026-11-15)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-08 completed in 35 minutes with three task commits. Bounded M3U selection and shared SYSTEM.CNF parsing landed with playlist/CNF tests and host-facing format documentation. The local disc suite passed 10/10, the ISO probe edge case passed, and inventory/hygiene checks passed; no hosted URL applies. The stale `runner.probe` selector matched no test, so the actual `compat.probe.iso_edges` test was run separately. Plan 06-26 is next in wave 4; 06-04 remains the sequential next plan.

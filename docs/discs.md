@@ -37,10 +37,10 @@ closes all children already opened when a later entry fails.
 
 ## SYSTEM.CNF metadata
 
-The image provider and identity probe use the same allocation-free parser. It
-accepts at most 2,047 ASCII bytes and requires one `BOOT = cdrom:\path;1`
-entry. Paths can have up to 16 safe components; each component and the
-canonical boot name are bounded to 63 characters. Empty, `.` and `..`
+The host disc API exposes the same allocation-free parser used by the identity
+probe. It accepts at most 2,047 ASCII bytes and requires one
+`BOOT = cdrom:\path;1` entry. Paths have at most 16 safe components. Each
+component and the canonical boot name are bounded to 63 characters. Empty, `.` and `..`
 components are rejected. Optional `TCB`, `EVENT`, and `STACK` fields are
 validated as integers: TCB is at most `0x40`, EVENT at most `0x100`, and STACK
 must address the 2 MiB RAM range through KUSEG, KSEG0, or KSEG1. Duplicate
