@@ -15,8 +15,8 @@ progress:
   total_plans: 176
   completed_plans: 158
   percent: 83
-current_plan: 3
-last_activity_desc: "Completed Phase 6 plan 06-26 out of order; 06-04 remains the sequential next plan. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+current_plan: 5
+last_activity_desc: "Completed Phase 6 plan 06-04; plan 06-05 is next. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -611,6 +611,10 @@ come from `AGENTS.md`.
 | 2026-11-15 | /gsd-execute-plan 06-02 | Codex, OpenGSD 1.20.0; sequential shared checkout; disc callback API and API v1–v4 compatibility checks; 26 min | gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-execute-plan 06-03 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded CD/MDEC state, reset/visitor contracts, MMIO and fixed-order scheduler integration; focused lane 8/8 after each task; 18 min | gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-execute-plan 06-07 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded ISO/cue provider, focused image tests 8/8, selected disc/policy checks 12/12; duration not measured | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-25 | Codex, OpenGSD 1.20.0; sequential shared checkout; versioned API v5 consumer and compatibility checks; 14 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-08 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded M3U and SYSTEM.CNF parsing; disc suite 10/10, probe, inventory and hygiene checks; 35 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-26 | Codex, OpenGSD 1.20.0; sequential shared checkout; CD-ROM/MDEC state serialization and fixture migration; state 8/8 and bus/unbuilt/gap checks 3/3; 20 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-04 | Codex, OpenGSD 1.20.0; sequential shared checkout; CD commands, response timing, region/licence/lid behavior; focused checks 13/13; 107 min | gpt-6-luna xhigh |
 | 2026-10-19 | /gsd-discuss-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-plan-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-execute-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
