@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-11-15T15:45:51.358Z"
+stopped_at: Completed 06-01-PLAN.md; next 06-02
+last_updated: "2026-11-15T15:48:46.108Z"
 last_activity: 2026-11-15
-last_activity_desc: Phase 6 execution started
-state_head: 7ed3b5aa2dcae3f42e89ca5f523eefd28ba3f5f0
+last_activity_desc: Completed Phase 6 plan 06-01; next is 06-02
+state_head: da88e532fa95b9382a9217e366e52dffb1b19b16
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 176
   completed_plans: 151
   percent: 83
-current_plan: Not started
+current_plan: 2
 ---
 
 # Project State
@@ -711,8 +711,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T15:45:51.003Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-11-15T15:48:45.664Z
+Stopped at: Completed 06-01-PLAN.md; next 06-02
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
