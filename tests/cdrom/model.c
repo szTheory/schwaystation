@@ -179,6 +179,25 @@ static void test_bounds(void)
     schway_destroy(inst);
 }
 
+static void test_region(void)
+{
+    schway *inst = make();
+    command(inst, 0x1Au); /* GetID with no installed disc. */
+    run_cycles(inst, 50000u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0u);
+    acknowledge(inst, 3u);
+
+    run_cycles(inst, 0x4A00u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 5u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x08u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x40u);
+    for (uint32_t i = 0u; i < 6u; i++) {
+        CHECK_EQ_U64(rd8(inst, 1u), 0u);
+    }
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -191,6 +210,8 @@ int main(int argc, char **argv)
         test_timing();
     } else if (strcmp(argv[1], "bounds") == 0) {
         test_bounds();
+    } else if (strcmp(argv[1], "region") == 0) {
+        test_region();
     } else {
         fprintf(stderr, "unknown CD-ROM case: %s\n", argv[1]);
         return 2;

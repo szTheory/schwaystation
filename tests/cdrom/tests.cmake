@@ -18,6 +18,11 @@ schway_add_test(NAME disc.timing
   COMMAND schwaystation-test-cdrom timing
   LABELS disc portable TIMEOUT 10)
 
+# Fault prevented: GetID does not return the documented no-disc INT5 response.
+schway_add_test(NAME disc.region
+  COMMAND schwaystation-test-cdrom region
+  LABELS disc portable TIMEOUT 10)
+
 # Fault prevented: parameter writes overflow the 16-byte FIFO, clearing it does
 # not restore write readiness, or an empty result read returns a stale byte.
 schway_add_test(NAME disc.bounds
