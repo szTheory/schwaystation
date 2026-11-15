@@ -349,7 +349,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 50  # Run 43676856221 hit 45m at 506/507; run 43674232311 passed in 34m (movies 9m38)
+    timeout-minutes: 60  # run 43684512997 hit 50m at movies +5m18; run 43674232311 movies 9m38
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
