@@ -270,7 +270,7 @@ The device side of a channel is two functions in `src/dma.c`, one for words goin
 from it, each a single `switch` on the channel with a case per channel. A case moves one word and returns the extra busy
 cycles the device asks for. DMA2 is connected to the GPU's shared GP0 packet and GPUREAD paths. DMA3 reads four
 consecutive bytes from the CD-ROM RDDATA path into each RAM word, sharing the sector cursor with CPU reads. DMA3 waits
-for BFRD and buffered sector data; CD-ROM readiness is separate from the generic DREQ lines. Other
+for BFRD and buffered sector data before every transfer window; CD-ROM readiness is separate from the generic DREQ lines. Other
 unbuilt devices use a stand-in in their case: the sink counts words in `dma.words` and folds their little-endian bytes
 into a per-channel CRC-32 in `dma.crc`, both kept in the state from power-on; the source supplies 0. The stand-ins ask
 for no extra cycles. There is no table of callbacks or function pointer in the state.

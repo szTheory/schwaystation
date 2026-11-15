@@ -247,6 +247,10 @@ static uint32_t dma_pending(const schway *inst, uint32_t ch)
     if ((c & SCHWAY__DMA_CHCR_BUSY) == 0u) {
         return 0u;
     }
+    if (ch == DMA_CDROM && sync == 0u &&
+        (inst->cdrom.bfrd == 0u || inst->cdrom.sector_count == 0u)) {
+        return 0u;
+    }
     if (d->phase[ch] == DMA_PH_NEXT) {
         return ch != 2u || sync != 2u || schway__gpu_dma_ready(inst);
     }
@@ -254,10 +258,6 @@ static uint32_t dma_pending(const schway *inst, uint32_t ch)
         return (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
     }
     if (sync == 0u) {
-        if (ch == DMA_CDROM &&
-            (inst->cdrom.bfrd == 0u || inst->cdrom.sector_count == 0u)) {
-            return 0u;
-        }
         return ch == DMA_SPU || (c & DMA_CHCR_TRIGGER) != 0u ? 1u : 0u;
     }
     if (sync == 2u) {
