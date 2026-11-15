@@ -21,7 +21,7 @@ Deliver DISC-01 through DISC-04: a cycle-driven CD-ROM controller; bounded host-
 ### Disc interface and supported images
 - Keep file access and hostile image parsing outside the deterministic core. The host supplies sectors and TOC through `schway_disc` callbacks, including lid, swap and bad-Q behavior; only run calls may request sectors.
 - Implement one shared host helper for cue/bin, ISO and m3u. Apply the hostile-input bounds and path containment rules in PER 7; refuse `.chd`, `.pbp`, `.ecm` and `.ccd` with the named unsupported-media status/message.
-- Add only the public disc API needed by these consumers, following DEC.91's per-phase API growth and keeping API v1-v4 callers covered. Use the owned fixture's `bad_q` data to exercise the callback without broadening the v1 image parser into a general SBI/LibCrypt feature.
+- Add only the public disc API needed by these consumers, following DEC.75's per-phase API growth and keeping API v1-v4 callers covered. Use the owned fixture's `bad_q` data to exercise the callback without broadening the v1 image parser into a general SBI/LibCrypt feature.
 - For m3u in libretro, use `SET_DISK_CONTROL_EXT_INTERFACE`: eject opens the lid, insert swaps the selected image and TOC, and a closed lid rejects `schway_swap_disc`. Do not add a second legacy control surface without a named requirement.
 
 ### XA and CD-DA audio
@@ -60,7 +60,7 @@ Deliver DISC-01 through DISC-04: a cycle-driven CD-ROM controller; bounded host-
 
 ### Hardware, architecture and host integration
 - `.planning/preparation/README.md` — topic index and source conventions.
-- `.planning/preparation/DECISIONS.md` DEC.42–48, DEC.91 and the Phase 6 open-question rows — settled disc, timing, fixture and public API policy.
+- `.planning/preparation/DECISIONS.md` DEC.42–48, DEC.75, DEC.91 and the Phase 6 open-question rows — settled disc, timing, fixture and public API policy.
 - `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` §§2–7 — CD controller, image formats, XA/CD-DA, MDEC, tests, determinism and evidence confidence.
 - `.planning/preparation/ARCHITECTURE.md` §§1–8 — scheduler, modules, API, I/O, state, DMA/device dependencies and hash definitions.
 - `.planning/preparation/CONFORMANCE.md` §§2–5 — owned fixtures, mailbox records, oracle pins, nightly tiers and fuzz targets.
