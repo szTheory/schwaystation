@@ -586,6 +586,8 @@ come from `AGENTS.md`.
 |------|------|---------|-------|
 | 2026-11-15 | /gsd-discuss-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; three read-only advisors and adversarial synthesis | GPT-6 session (exact model ID not exposed); advisors gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-plan-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; 26 plans, 19 waves; schema/structure, command/failure probes, decision and requirement coverage; post-planning gaps clear | GPT-6 session (exact model ID not exposed); planner gpt-6.1-sol high; researcher and checker gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-01 | Codex, OpenGSD 1.20.0; sequential shared checkout; subsystem skeleton and inventories; tracer 19/19 and policy 4/4; 12 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-02 | Codex, OpenGSD 1.20.0; sequential shared checkout; disc callback API and API v1–v4 compatibility checks; 26 min | gpt-6-luna xhigh |
 | 2026-10-19 | /gsd-discuss-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-plan-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-execute-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
