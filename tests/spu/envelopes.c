@@ -36,7 +36,7 @@ static schway *make_instance(void)
         return NULL;
     }
     inst->spu.idle_fast_path = 0u;
-    inst->spu.cpu_poll_tick = inst->spu.next_tick;
+    schway__sched_recalc(inst);
     return inst;
 }
 

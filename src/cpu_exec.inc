@@ -1032,10 +1032,6 @@ static uint64_t cpu_block(schway *inst, uint64_t limit)
         uint32_t slot = c->branch_slot;
         TRACE_BEGIN(began, 1u);
         ran += cpu_step(inst);
-        uint64_t tick = c->blk_tick + (c->cycle - c->blk_cycle);
-        if (inst->spu.cpu_poll_tick <= tick) {
-            schway__spu_event(inst, tick);
-        }
         if (slot != 0u || c->block_end != 0u || ran >= limit || (c->pc >> 12) != page ||
             inst->exit_pending != 0u || inst->fault.kind != fault) {
             /* The first fault, when this block latched it, ends the tail: its own

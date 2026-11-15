@@ -83,7 +83,6 @@ struct schway__spu {
     uint32_t irqa_addr;
     uint32_t irq_enabled;
     uint64_t next_tick;
-    uint64_t cpu_poll_tick; /* Derived CPU-loop deadline; UINT64_MAX during reset silence. */
     uint32_t idle_fast_path; /* Reset-only silence shortcut; cleared on first stateful write. */
     struct schway__spu_state_scratch state_scratch;
 };

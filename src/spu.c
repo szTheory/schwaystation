@@ -401,8 +401,7 @@ static void spu_disable_idle_fast_path(schway *inst)
         return;
     }
     inst->spu.idle_fast_path = 0u;
-    inst->spu.cpu_poll_tick = inst->spu.next_tick;
-    inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
+    schway__sched_recalc(inst);
 }
 
 static int32_t spu_sar32(int32_t value, uint32_t shift)
@@ -486,7 +485,6 @@ void schway__spu_reset(schway *inst)
 {
     memset(&inst->spu, 0, sizeof inst->spu);
     inst->spu.next_tick = SCHWAY__CYCLES_PER_PAIR;
-    inst->spu.cpu_poll_tick = UINT64_MAX;
     inst->spu.idle_fast_path = 1u;
     inst->spu.noise_lfsr = 1u;
     for (uint32_t i = 0u; i < SCHWAY__SPU_VOICE_COUNT; i++) {
@@ -657,7 +655,6 @@ void schway__spu_event(schway *inst, uint64_t now)
         }
         spu->next_tick += SCHWAY__CYCLES_PER_PAIR;
     }
-    spu->cpu_poll_tick = spu->next_tick;
 }
 
 void schway__spu_catch_up(schway *inst, uint64_t now)
@@ -1010,6 +1007,5 @@ void schway__spu_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
         spu->irq_enabled = irq_enabled;
         spu->next_tick = next_tick;
         spu->idle_fast_path = 0u;
-        spu->cpu_poll_tick = next_tick;
     }
 }

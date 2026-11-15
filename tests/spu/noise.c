@@ -50,7 +50,7 @@ static schway *make_instance(void)
         return NULL;
     }
     inst->spu.idle_fast_path = 0u;
-    inst->spu.cpu_poll_tick = inst->spu.next_tick;
+    schway__sched_recalc(inst);
     return inst;
 }
 
@@ -129,7 +129,7 @@ static uint32_t test_idle_noise_jump(void)
         return 1u;
     }
     fast->spu.idle_fast_path = 1u;
-    fast->spu.cpu_poll_tick = UINT64_MAX;
+    schway__sched_recalc(fast);
     fast->spu.noise_phase = UINT32_C(0x7FFF);
     schway *full = make_instance();
     if (full == NULL) {
@@ -156,7 +156,7 @@ static uint32_t test_idle_audio_ring(void)
         return 1u;
     }
     fast->spu.idle_fast_path = 1u;
-    fast->spu.cpu_poll_tick = UINT64_MAX;
+    schway__sched_recalc(fast);
     fast->audio_head = SCHWAY__AUDIO_RING_PAIRS - 3u;
     uint64_t pairs = SCHWAY__AUDIO_RING_PAIRS + 29u;
     schway__spu_catch_up(fast, pairs * SCHWAY__CYCLES_PER_PAIR);
@@ -194,7 +194,7 @@ static uint32_t test_idle_fast_path(void)
         return 1u;
     }
     fast->spu.idle_fast_path = 1u;
-    fast->spu.cpu_poll_tick = UINT64_MAX;
+    schway__sched_recalc(fast);
     failures += run_idle_frame_pair(fast, full);
     failures += run_idle_frame_pair(fast, full);
     failures += fast->spu.idle_fast_path != 1u ? 1u : 0u;
