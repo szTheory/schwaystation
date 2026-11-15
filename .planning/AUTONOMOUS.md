@@ -10,6 +10,12 @@ For every decision point, fan out subagents (for context-window efficiency) and 
 returns, then synthesize one coherent set of one-shot recommendations that fit the project goals, and follow
 it. Do not ask the owner a routine question.
 
+The owner explicitly authorizes auto-following the best-supported recommendations in autonomous discuss,
+including accepting the recommended answers in smart-discuss batches without a separate confirmation. Pause
+only when an unresolved choice materially changes scope, authority, risk, cost or a phase/milestone boundary,
+or when owner-only information is required. This is not general risk acceptance; explain the concrete choice
+before asking.
+
 - Consider each decision point through every relevant stakeholder and technical-role lens: security, product,
   software architecture, devops and CI, plus the domain's own specialties (CPU and bus design, DSP and audio,
   3D and 2D graphics, distributed systems, C and the build toolchain). Add design lenses (conventions,
