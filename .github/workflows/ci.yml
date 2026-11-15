@@ -349,7 +349,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 45  # Provisional: run 43317211769 hit 25m at input.movies +15m03; CTest allows 240s x8
+    timeout-minutes: 85  # run 43688529720 hit 60m at movies +11m37; CTest limit 32m (240s x8)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
