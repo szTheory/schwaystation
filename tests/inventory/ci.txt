@@ -7,6 +7,7 @@ compat
 core
 cpu
 dma
+disc
 exe
 fixtures
 fuzz
