@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/szTheory/schwaystation/compare/v0.4.0...v0.5.0) (2026-11-15)
+
+
+### Features
+
+* **spu:** match console audio across hosts ([#18](https://github.com/szTheory/schwaystation/issues/18)) ([2f21578](https://github.com/szTheory/schwaystation/commit/2f21578e20f3c39f38261b618f24d160e580b19a))
+
 ## [0.4.0](https://github.com/szTheory/schwaystation/compare/v0.3.0...v0.4.0) (2026-11-13)
 
 
