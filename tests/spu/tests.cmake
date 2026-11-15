@@ -7,10 +7,10 @@ schway_warnings(schwaystation-test-spu)
 
 # Fault prevented: frame audio count or stereo drain layout diverges from the
 # elapsed core cycles or the public 44.1 kHz contract.
-# run 43657441300: macOS x64 and Windows x64 hit the 30 s bound (1 sample); provisional 60 s.
+# run 43672826908: macOS x64 hit 60 s; run 43665013436 passed in 42.13 s. Raise to 120 s.
 schway_add_test(NAME spu.model
   COMMAND schwaystation-test-spu "${SCHWAYSTATION_FIXTURES_DIR}" "$<TARGET_FILE:schwaystation-run>"
-  LABELS audio portable TIMEOUT 60)
+  LABELS audio portable TIMEOUT 120)
 
 # Fault prevented: ADSR rate periods and steps diverge from the baseline table.
 add_executable(schwaystation-test-spu-envelopes ${CMAKE_CURRENT_LIST_DIR}/envelopes.c)
