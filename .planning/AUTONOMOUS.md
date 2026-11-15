@@ -48,12 +48,22 @@ anything larger as one todo (rule 7).
 
 ## Current authorization and boundaries
 
-The owner renewed autonomous authorization for the rest of milestone v1.0 on 2026-11-10 in Codex,
-including focused subagent fan-out for discussion, synthesis and an adversarial pass, and automation-first
-verification. Continue routine work inside the selected phase without acknowledgements. Finish phase 3
-shipping first, including hosted CI, auto-merge and release confirmation, then begin phase 4.
-AGENTS.md rule 9 still stops each later autonomous phase after verification and before ship; this renewal
-does not remove that boundary. No routine owner UAT or redundant confirmation is introduced.
+On 2026-11-15, the owner renewed autonomous authorization to finish milestone v1.0, starting with Phase 6.
+The discussion, verification and CI guidance above is standing policy: use focused role fan-out, primary
+sources, an adversarial pass and a synthesized best-supported recommendation; automate useful verification,
+run one-off checks once, and do not introduce routine owner UAT or duplicate checks.
+
+Ship each phase before advancing to the next. OpenGSD's `$gsd-autonomous` runs discuss → plan → execute →
+verify and, when all phases are complete, audit → complete → cleanup; it does not ship phases between
+verification and lifecycle. Therefore run each remaining phase with `$gsd-autonomous --from N --to N` so it
+stops after that phase's verification and skips milestone lifecycle, then run `$gsd-ship N` and confirm the PR
+is merged, main CI is green and the automatic release is published. After the final phase is shipped and
+released, run milestone audit, completion and cleanup. Do not run `$gsd-new-milestone` until the current
+milestone is complete, its release is published, main CI is green, and the working tree is clean.
+
+This 2026-11-15 authorization supersedes the 2026-11-10 note below AGENTS.md rule 9 that stopped autonomous
+work before ship. It does not authorize skipping a phase's verify or ship, bypassing repository rules, or
+crossing the milestone boundary. Ask only for identity-bound consent, owner-hardware checks, or a real blocker.
 
 For CI and CD efficiency, first measure critical-path time and duplicate work. Prefer removing redundant
 runs and serial bottlenecks over adding caches, concurrency or dependencies. Keep all required coverage.
