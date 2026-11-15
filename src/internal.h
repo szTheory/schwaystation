@@ -17,6 +17,8 @@
 #include "pad.h"
 #include "card.h"
 #include "spu.h"
+#include "cdrom.h"
+#include "mdec.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
@@ -161,6 +163,8 @@ struct schway {
     struct schway__pad pad;
     struct schway__card card;
     struct schway__spu spu;
+    struct schway__cdrom cdrom;
+    struct schway__mdec mdec;
     struct schway__fault fault;
     /* Not saved: derived from the state, and rebuilt after a load. */
     struct schway__sched sched;

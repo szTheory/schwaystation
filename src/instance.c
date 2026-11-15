@@ -260,6 +260,8 @@ static void power_on(schway *inst)
     schway__sio_reset(inst);
     schway__card_reset(inst);
     schway__spu_reset(inst);
+    schway__cdrom_reset(inst);
+    schway__mdec_reset(inst);
     schway__sched_sync(inst);
     schway__sched_recalc(inst);
     /* With no BIOS image the BIOS window holds the stub kernel; a mapped
