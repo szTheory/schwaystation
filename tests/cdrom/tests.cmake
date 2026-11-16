@@ -55,3 +55,15 @@ schway_warnings(schwaystation-test-cdxa)
 schway_add_test(NAME disc.xa
   COMMAND schwaystation-test-cdxa
   LABELS disc portable TIMEOUT 10)
+
+add_executable(schwaystation-test-cdrom-audio ${CMAKE_CURRENT_LIST_DIR}/audio.c)
+target_include_directories(schwaystation-test-cdrom-audio PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-cdrom-audio PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-cdrom-audio PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-cdrom-audio)
+
+# Fault prevented: queued CD-DA bypasses or drains outside the native SPU tick.
+schway_add_test(NAME disc.audio.cdda
+  COMMAND schwaystation-test-cdrom-audio cdda
+  LABELS disc portable TIMEOUT 10)
