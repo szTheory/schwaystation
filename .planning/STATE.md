@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 24 of 35
+current_plan: 24 of 36
 status: executing
-stopped_at: Completed 06-12 oracle/control slice; next 06-35-PLAN.md
-last_updated: "2026-11-16T09:37:22.944Z"
+stopped_at: Split 06-35 output-byte/status follow-up; continue bounded command-boundary repair
+last_updated: "2026-11-16T09:54:00Z"
 last_activity: 2026-11-16
 state_head: f974070b3d48677febf93b2b5bdddde4b13cac90
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 185
+  total_plans: 186
   completed_plans: 172
   percent: 83
-last_activity_desc: Plan 06-12 partial oracle/control slice closed; comparator controls pass, while 4-bit, 8-bit, and status guests remain failing before completion and gate 06-35. Runtime lower bound at least 1h26m55s; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh. Current next plan is 06-35; the complete 06-12 guest gate resumes afterward.
+last_activity_desc: Plan 06-35 split after the narrow 64-coefficient command-boundary regression passed but pinned 4/8-bit byte outputs and the status guest remained failing. Plan 06-36 owns exact bytes/status completion; all selectors remain gating. Current plan 24 of 36 is still 06-35; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 24 of 35
-Next plan file: 06-35-PLAN.md (Wave 9; 06-12 final oracle gate resumes afterward)
+Current Plan: 24 of 36
+Next plan file: 06-35-PLAN.md (Wave 9; 06-36 owns remaining byte/status fixes before the resumed 06-12 gate)
 Status: Ready to execute
 Last activity: 2026-11-16
 

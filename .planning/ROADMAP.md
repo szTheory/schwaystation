@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes, and the nightly lane matches the ps1-tests `mdec` references within the stated tolerance. The STR on `disc_boot` plays through DMA into the 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 22/35 plans executed
+**Plans**: 22/36 plans executed
 
 Plans:
 **Wave 1**
@@ -515,39 +515,42 @@ Plans:
 - [x] 06-10-PLAN.md — Feed CD-DA through the native SPU output
 - [x] 06-33-PLAN.md — Route decoded XA audio through the native SPU output
 - [x] 06-34-PLAN.md — Verify XA interleave filtering and mixed native audio sources
-- [x] 06-12-PLAN.md — Pin MDEC block/status guests and register byte/order comparator controls; guest completion awaits 06-35
-- [ ] 06-35-PLAN.md — Repair pinned MDEC DMA0 input/decode path and pass the full guest oracle gate
+- [x] 06-12-PLAN.md — Pin MDEC guests and comparator controls; full guest gate awaits 06-36
+- [ ] 06-35-PLAN.md — Complete pinned MDEC 64-coefficient input at command boundary
 
 **Wave 10** *(blocked on Wave 9 completion)*
-- [ ] 06-13-PLAN.md — Decode color MDEC frames and display the DMA result
+- [ ] 06-36-PLAN.md — Match pinned MDEC block bytes and complete the ordered status guest
 
 **Wave 11** *(blocked on Wave 10 completion)*
+- [ ] 06-13-PLAN.md — Decode color MDEC frames and display the DMA result
+
+**Wave 12** *(blocked on Wave 11 completion)*
 - [ ] 06-14-PLAN.md — Build reproducible owned disc assets with pinned tools
 - [ ] 06-21-PLAN.md — Validate active media state and idle-drive cost
 
-**Wave 12** *(blocked on Wave 11 completion)*
+**Wave 13** *(blocked on Wave 12 completion)*
 - [ ] 06-15-PLAN.md — Boot the owned disc and verify ReadN records
 
-**Wave 13** *(blocked on Wave 12 completion)*
+**Wave 14** *(blocked on Wave 13 completion)*
 - [ ] 06-16-PLAN.md — Play owned XA, CD-DA and STR end to end
 
-**Wave 14** *(blocked on Wave 13 completion)*
+**Wave 15** *(blocked on Wave 14 completion)*
 - [ ] 06-17-PLAN.md — Load disc media and lid scripts in the runner
 
-**Wave 15** *(blocked on Wave 14 completion)*
+**Wave 16** *(blocked on Wave 15 completion)*
 - [ ] 06-18-PLAN.md — Expose libretro extended disk control and disc PCM
 
-**Wave 16** *(blocked on Wave 15 completion)*
+**Wave 17** *(blocked on Wave 16 completion)*
 - [ ] 06-19-PLAN.md — Vendor the pinned independent disc MD5 oracle
 - [ ] 06-22-PLAN.md — Build the installed-library SDL example without shipping it
 
-**Wave 17** *(blocked on Wave 16 completion)*
+**Wave 18** *(blocked on Wave 17 completion)*
 - [ ] 06-20-PLAN.md — Replay hostile media seeds and register nightly fuzz targets
 
-**Wave 18** *(blocked on Wave 17 completion)*
+**Wave 19** *(blocked on Wave 18 completion)*
 - [ ] 06-23-PLAN.md — Integrate per-leg disc equality and background RetroArch smoke
 
-**Wave 19** *(blocked on Wave 18 completion)*
+**Wave 20** *(blocked on Wave 19 completion)*
 - [ ] 06-24-PLAN.md — Review and verify the complete disc phase
 
 **UI hint**: no
