@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 26 of 37
+current_plan: 27 of 38
 status: executing
-stopped_at: Completed 06-36-PLAN.md; next 06-37-PLAN.md
+stopped_at: Completed partial 06-37-PLAN.md; next 06-38-PLAN.md
 last_updated: "2026-11-16T11:13:44.186Z"
 last_activity: 2026-11-16
-state_head: a619a49a72011685858f05f87119bff0b8f55084
+state_head: d1f5f1ad84de8afe3eca1acf371af199ca01e0e9
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 187
-  completed_plans: 174
+  total_plans: 188
+  completed_plans: 175
   percent: 83
-last_activity_desc: "Closed partial Plan 06-36 after the DMA1 destination comparator and independent exact RED vectors were verified. Plan 06-37 owns production 4/8-bit arithmetic and ordered-status completion; DISC-03 remains partial. Runtime was at least 57m55s wall; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
+last_activity_desc: "Closed partial Plan 06-37 with MDEC command-status mirror coverage and safe diagnostics. Exact 4/8-bit output arithmetic and status guest remain gating in Plan 06-38; DISC-03 remains incomplete. Runtime at least 30m12s wall; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 26 of 37
-Next plan file: 06-37-PLAN.md (Wave 11; source-backed MDEC output arithmetic and ordered status completion)
+Current Plan: 27 of 38
+Next plan file: 06-38-PLAN.md (Wave 12; exact MDEC output arithmetic and ordered status guest)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -791,7 +791,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-16T11:13:43.967Z
-Stopped at: Completed 06-36-PLAN.md; next 06-37-PLAN.md
+Stopped at: Completed partial 06-37-PLAN.md; next 06-38-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
