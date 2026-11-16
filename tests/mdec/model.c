@@ -87,7 +87,7 @@ static void load_guest_quant(schway *inst, const uint8_t quant[SCHWAY__MDEC_BLOC
     }
 }
 
-static void case_guest_input(void)
+static void case_guest_input_modes(uint32_t depth_mask)
 {
     /* Captured from host RAM at 0x12000 while running the digest-pinned
        ps1-tests mdec/4bit/4bit.exe guest (build-158, commit
@@ -149,6 +149,9 @@ static void case_guest_input(void)
         CHECK_EQ_U64(nibble, nearest);
     }
     for (uint32_t depth = 0u; depth < 2u; depth++) {
+        if ((depth_mask & (1u << depth)) == 0u) {
+            continue;
+        }
         schway *inst = make();
         enable_dma(inst);
         load_guest_quant(inst, guest_quant);
@@ -170,6 +173,16 @@ static void case_guest_input(void)
         CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & (1u << 27), 1u << 27);
         schway_destroy(inst);
     }
+}
+
+static void case_guest_4bit(void)
+{
+    case_guest_input_modes(1u << 0u);
+}
+
+static void case_guest_input(void)
+{
+    case_guest_input_modes((1u << 0u) | (1u << 1u));
 }
 
 static void case_status(void)
@@ -595,6 +608,8 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "status") == 0) {
         case_status();
+    } else if (strcmp(argv[1], "guest_4bit") == 0) {
+        case_guest_4bit();
     } else if (strcmp(argv[1], "guest_input") == 0) {
         case_guest_input();
     } else if (strcmp(argv[1], "block") == 0) {

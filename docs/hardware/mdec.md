@@ -78,14 +78,19 @@ state so save/load preserves stream and backpressure progress.
 
 The `mdec/4bit` and `mdec/8bit` guests and their `psx.log` output dumps are
 pinned to ps1-tests commit `f727802fead11f1daa7549285548392ef87749cb`.
-Their expected bytes come from those independent logs. The reference test
-checks RAM at the digest-pinned guest buffer target recorded by
-`mdec_readDecodedDma(addr=...)`; it captures DMA1 starts separately as
-diagnostics. For these guests, the logged targets (`0x001ffe0c` and
-`0x001ffdec`) differ from the sole DMA1 starts (`0x001ffeb8` and `0x001ffe98`),
-so the relationship between the staging transfer and requested buffer remains
-unresolved. The guest TTY emits literal format placeholders for byte values,
-so that text is not used as the byte oracle. `[SCM.12]`
+Their expected bytes come from those independent logs. The pinned callers pass
+their stack buffers to `mdec_readDecodedDma`. In the pinned helper, that
+function writes the `data` pointer directly to the MDECout DMA1 MADR and has no
+CPU copy step. The log's address is from its hardware run, and the caller
+buffer is a stack local; the emulator run can place that buffer at a different
+address. The comparator parses and reports the pinned log target, captures and
+reports the emulated DMA1 start separately, and compares the independent log
+bytes at the emulated start. The pinned helper's direct-pointer path establishes
+that this DMA1 start is the emulated caller buffer; no CPU copy is involved.
+In the 4-bit guest, the bytes at that start match the log. The 8-bit arithmetic
+mismatch remains unresolved, so its reference selector stays red. The guest
+TTY emits literal format placeholders for byte values, so that text is not
+used as the byte oracle. `[SCM.12]`
 
 The pinned `mdec/step-by-step-log` guest is checked against the corresponding
 status log's ordered status, input and output events. Its TTY also leaves

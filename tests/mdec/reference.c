@@ -556,25 +556,42 @@ static int run_block_guest(const char *mode, const char *exe_path, const char *l
     free(exe);
     size_t output_size = strcmp(mode, "4bit") == 0 ? 32u : 64u;
     uint32_t row_bytes = strcmp(mode, "4bit") == 0 ? 4u : 8u;
-    uint32_t ram_address = UINT32_MAX;
+    uint32_t log_target_address = UINT32_MAX;
     uint8_t expected[64];
-    int valid = guest_complete != 0 && parse_output_target(log, log_size, &ram_address) &&
+    int valid = guest_complete != 0 && parse_output_target(log, log_size, &log_target_address) &&
                 find_bytes(tty, tty_size, strcmp(mode, "4bit") == 0 ? "mdec/4bit" : "mdec/8bit",
                            strcmp(mode, "4bit") == 0 ? sizeof "mdec/4bit" - 1u : sizeof "mdec/8bit" - 1u) != NULL &&
                 parse_expected_block(log, log_size, mode, row_bytes, expected, output_size);
-    if (valid != 0 && (ram_address > RAM_SIZE || output_size > RAM_SIZE - ram_address)) valid = 0;
-    if (valid != 0 && !block_bytes_match(inst->bus.ram + ram_address, expected, output_size)) {
-        const uint8_t *actual = inst->bus.ram + ram_address;
-        size_t mismatch = 0u;
-        while (mismatch < output_size && actual[mismatch] == expected[mismatch]) mismatch++;
-        fprintf(stderr, "MDEC_REFERENCE_OUTPUT_MISMATCH: mode=%s byte=%zu expected=%02x actual=%02x\n",
-                mode, mismatch, (unsigned)expected[mismatch], (unsigned)actual[mismatch]);
-        fputs("MDEC_REFERENCE_EXPECTED:", stderr);
-        for (size_t i = 0u; i < output_size; i++) fprintf(stderr, " %02x", expected[i]);
-        fputc('\n', stderr);
-        fputs("MDEC_REFERENCE_ACTUAL:", stderr);
-        for (size_t i = 0u; i < output_size; i++) fprintf(stderr, " %02x", actual[i]);
-        fputc('\n', stderr);
+    if (valid != 0 && (log_target_address > RAM_SIZE ||
+                       output_size > RAM_SIZE - log_target_address)) valid = 0;
+    /* SCM.12's pinned main.cpp uses a stack buffer, and common/mdec.cpp writes
+       its data pointer directly to DMA1 MADR. The log address is from the
+       hardware run; compare bytes at this emulated run's captured DMA1 start. */
+    uint32_t dma1_address = snapshot.dma1_madr;
+    int dma1_target_valid = valid != 0 && snapshot.dma1_started != 0u &&
+                            dma1_address <= RAM_SIZE && output_size <= RAM_SIZE - dma1_address;
+    int output_matches = dma1_target_valid != 0 &&
+                         block_bytes_match(inst->bus.ram + dma1_address, expected, output_size);
+    if (valid != 0 && (!dma1_target_valid || !output_matches)) {
+        if (!dma1_target_valid) {
+            fprintf(stderr,
+                    "MDEC_REFERENCE_DMA1_TARGET_ERROR: mode=%s log_target=%08x dma1_started=%u dma1_madr=%08x\n",
+                    mode, log_target_address, snapshot.dma1_started, snapshot.dma1_madr);
+        }
+        if (dma1_target_valid != 0 && !output_matches) {
+            const uint8_t *actual = inst->bus.ram + dma1_address;
+            size_t mismatch = 0u;
+            while (mismatch < output_size && actual[mismatch] == expected[mismatch]) mismatch++;
+            fprintf(stderr,
+                    "MDEC_REFERENCE_OUTPUT_MISMATCH: mode=%s byte=%zu expected=%02x actual=%02x\n",
+                    mode, mismatch, (unsigned)expected[mismatch], (unsigned)actual[mismatch]);
+            fputs("MDEC_REFERENCE_EXPECTED:", stderr);
+            for (size_t i = 0u; i < output_size; i++) fprintf(stderr, " %02x", expected[i]);
+            fputc('\n', stderr);
+            fputs("MDEC_REFERENCE_ACTUAL:", stderr);
+            for (size_t i = 0u; i < output_size; i++) fprintf(stderr, " %02x", actual[i]);
+            fputc('\n', stderr);
+        }
         fprintf(stderr,
                 "MDEC_REFERENCE_FINAL_STATE: ticks=%llu command=%08x active=%u pending=%u in=%u rem=%u out=%u dreq=%02x dma1=%08x/%08x/%08x remain=%u phase=%u\n",
                 (unsigned long long)inst->ticks, inst->mdec.command, inst->mdec.command_active,
@@ -585,7 +602,7 @@ static int run_block_guest(const char *mode, const char *exe_path, const char *l
         fprintf(stderr, "MDEC_REFERENCE_SNAPSHOT: valid=%u command=%08x depth=%u signed=%u out=%u dma1_start=%u/%08x/%08x/%08x pinned_target=%08x\n",
                 snapshot.valid, snapshot.command, snapshot.depth, snapshot.signed_output,
                 snapshot.output_count, snapshot.dma1_started, snapshot.dma1_madr,
-                snapshot.dma1_bcr, snapshot.dma1_chcr, ram_address);
+                snapshot.dma1_bcr, snapshot.dma1_chcr, log_target_address);
         fprintf(stderr, "MDEC_REFERENCE_DMA0_INPUT: started=%u madr=%08x bcr=%08x chcr=%08x words=%u",
                 snapshot.dma0_started, snapshot.dma0_madr, snapshot.dma0_bcr,
                 snapshot.dma0_chcr, snapshot.dma0_word_count);
@@ -640,8 +657,8 @@ static int run_block_guest(const char *mode, const char *exe_path, const char *l
             fprintf(stderr, "MDEC_REFERENCE_GUEST_NOTE: guest TTY reports a DMA read timeout; its format placeholders do not expose values\n");
     }
     if (valid != 0) {
-        printf("MDEC_REFERENCE_BLOCK_MATCH: mode=%s bytes=%zu guest=Done steps<=%u\n",
-               mode, output_size, (unsigned)GUEST_RUN_LIMIT);
+        printf("MDEC_REFERENCE_BLOCK_MATCH: mode=%s bytes=%zu log_target=%08x dma1_start=%08x guest=Done steps<=%u\n",
+               mode, output_size, log_target_address, dma1_address, (unsigned)GUEST_RUN_LIMIT);
     }
     free(tty);
     free(log);

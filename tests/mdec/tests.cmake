@@ -53,3 +53,9 @@ schway_add_test(NAME mdec.fifo
 schway_add_test(NAME mdec.guest_input
   COMMAND schwaystation-test-mdec guest_input
   LABELS mdec portable TIMEOUT 10)
+
+# Fault prevented: the unsigned 4-bit pinned vector or its nearest-nibble
+# relation to the pinned 8-bit fixture changes independently of the 8-bit run.
+schway_add_test(NAME mdec.guest_4bit
+  COMMAND schwaystation-test-mdec guest_4bit
+  LABELS mdec portable TIMEOUT 10)
