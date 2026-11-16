@@ -1,15 +1,10 @@
 ---
 phase: 06-discs-and-fmv
-reviewed: 2026-11-16T02:08:41Z
-depth: focused
-files_reviewed: 6
+reviewed: 2026-11-16T12:42:00Z
+depth: standard
+files_reviewed: 1
 files_reviewed_list:
-  - src/cdrom.c
-  - src/cdrom_sector.c
-  - src/cdrom.h
-  - tests/cdrom/model.c
-  - tests/cdrom/reference.c
-  - docs/hardware/cdrom.md
+  - tests/mdec/reference.c
 findings:
   critical: 0
   warning: 0
@@ -19,13 +14,23 @@ findings:
 status: clean
 ---
 
-# Phase 06: Focused Plan 29 Review
+# Phase 06: Code Review Report
 
-**Reviewed:** 2026-11-16T02:08:41Z
-**Depth:** focused
-**Files reviewed:** 6
+**Reviewed:** 2026-11-16T12:42:00Z
+**Depth:** standard
+**Files Reviewed:** 1
 **Status:** clean
 
-The narrowed Plan 29 changes have no actionable findings. BUSYSTS is checked before and after command acceptance, and the Nop/GetStat result remains exactly `0x42`. The model covers BFRD with an empty buffer, full 2,340-byte DMA transfer plus final MADR and cursor, cached header preservation after failed seek and both Getloc errors, successful SeekL recovery, and Reset clearing SeekError. Host controls assert exact GetlocL bytes and command/status values.
+## Summary
 
-The source still contains the reference-specific target-minus-five behavior pending Plan 06-30. Plan 29 does not accept that rule; Plan 06-30 removes it and owns the exact Q/GetlocP seek rows. No temporary trace diagnostics remain.
+Re-reviewed the guest instruction diagnostic after the previous finding. It now checks the bus device before reading RAM, translates the supported cached and uncached RAM aliases with the physical-address mask, bounds the word read, and prints `unavailable` for other mappings. No actionable issues found in this changed diagnostic path.
+
+## Narrative Findings (AI reviewer)
+
+All reviewed code meets the project conventions. No issues found.
+
+---
+
+_Reviewed: 2026-11-16T12:42:00Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
