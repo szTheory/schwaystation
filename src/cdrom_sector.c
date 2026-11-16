@@ -88,23 +88,47 @@ static uint16_t sector_q_crc(const uint8_t q[12])
     return (uint16_t)~crc;
 }
 
-static uint32_t sector_q_lba(const uint8_t q[12], uint32_t track_count, uint32_t *lba)
+static uint32_t sector_q_valid(const uint8_t q[12], uint32_t track_count)
 {
     uint32_t track, index, minute, second, frame;
-    if ((q[0] & 0x0Fu) != 1u || sector_bcd(q[1], 99u, &track) == 0u ||
-        track == 0u || track > track_count ||
-        sector_bcd(q[2], 99u, &index) == 0u || index > 1u || q[6] != 0u ||
+    if ((q[0] & 0x0Fu) != 1u || q[6] != 0u ||
+        (q[1] != 0xAAu && (sector_bcd(q[1], 99u, &track) == 0u ||
+                            (track == 0u ? q[2] != 0u
+                                         : track_count != 0u && track > track_count))) ||
+        sector_bcd(q[2], 99u, &index) == 0u || index > 1u ||
+        (q[1] == 0xAAu && index != 1u) ||
+        sector_bcd(q[3], 99u, &minute) == 0u ||
+        sector_bcd(q[4], 59u, &second) == 0u ||
+        sector_bcd(q[5], 74u, &frame) == 0u ||
         sector_bcd(q[7], 99u, &minute) == 0u ||
         sector_bcd(q[8], 59u, &second) == 0u ||
         sector_bcd(q[9], 74u, &frame) == 0u) {
         return 0u;
     }
     uint16_t crc = sector_q_crc(q);
-    if (q[10] != (uint8_t)(crc >> 8) || q[11] != (uint8_t)crc) return 0u;
+    return q[10] == (uint8_t)(crc >> 8) && q[11] == (uint8_t)crc;
+}
+
+static uint32_t sector_q_lba(const uint8_t q[12], uint32_t track_count, uint32_t *lba)
+{
+    uint32_t track, index, minute, second, frame;
+    if (q[1] == 0xAAu || sector_q_valid(q, track_count) == 0u ||
+        sector_bcd(q[1], 99u, &track) == 0u || track > track_count ||
+        sector_bcd(q[2], 99u, &index) == 0u ||
+        sector_bcd(q[7], 99u, &minute) == 0u ||
+        sector_bcd(q[8], 59u, &second) == 0u ||
+        sector_bcd(q[9], 74u, &frame) == 0u) {
+        return 0u;
+    }
     uint64_t absolute = (uint64_t)minute * 60u * 75u + (uint64_t)second * 75u + frame;
     if (absolute < 150u || absolute - 150u > UINT32_MAX) return 0u;
     *lba = (uint32_t)(absolute - 150u);
     return 1u;
+}
+
+uint32_t schway__cdrom_sector_q_valid(const schway *inst, const uint8_t q[12])
+{
+    return sector_q_valid(q, inst->disc_host.toc.track_count);
 }
 
 static void sector_make_q(const schway *inst, uint32_t lba, uint8_t q[12])
@@ -138,13 +162,14 @@ static void sector_make_q(const schway *inst, uint32_t lba, uint8_t q[12])
     q[11] = (uint8_t)crc;
 }
 
-static uint32_t sector_location(const schway *inst, uint32_t lba, const uint8_t subcode[96],
+static uint32_t sector_location(schway *inst, uint32_t lba, const uint8_t subcode[96],
                                 uint32_t *position)
 {
+    struct schway__cdrom *cd = &inst->cdrom;
     uint32_t track_index = 0u;
     if (sector_track(inst, lba, &track_index) == 0u) {
-        *position = lba;
-        return 0u;
+        *position = cd->current_lba;
+        return cd->q_record_valid;
     }
     uint8_t q[12] = {0u};
     uint32_t present = 0u;
@@ -152,10 +177,20 @@ static uint32_t sector_location(const schway *inst, uint32_t lba, const uint8_t 
         q[i / 8u] |= (uint8_t)(((subcode[i] >> 6) & 1u) << (7u - (i & 7u)));
         present |= (subcode[i] >> 6) & 1u;
     }
-    if (present != 0u && sector_q_lba(q, inst->disc_host.toc.track_count, position) != 0u) {
+    if (present != 0u && sector_q_valid(q, inst->disc_host.toc.track_count) != 0u) {
+        memcpy(cd->q_record, q, sizeof q);
+        cd->q_record_valid = 1u;
+        if (sector_q_lba(q, inst->disc_host.toc.track_count, position) != 0u) return 1u;
+        *position = lba;
+        return 1u;
+    }
+    if (cd->q_record_valid != 0u) {
+        *position = cd->current_lba;
         return 1u;
     }
     sector_make_q(inst, lba, q);
+    cd->q_record_valid = sector_q_valid(q, inst->disc_host.toc.track_count);
+    if (cd->q_record_valid != 0u) memcpy(cd->q_record, q, sizeof q);
     if (sector_q_lba(q, inst->disc_host.toc.track_count, position) != 0u) return 1u;
     *position = lba;
     return 0u;
@@ -290,8 +325,32 @@ void schway__cdrom_sector_seek(schway *inst)
         sector_is_well_formed(sector) == 0u) {
         return;
     }
+    uint32_t position = lba;
+    if (sector_location(inst, lba, subcode, &position) != 0u) cd->current_lba = position;
     /* GetlocL exposes the completed SeekL target header (PSX-SPU-CDROM-AND-MDEC.md §2.2, SCM.02; docs/hardware/cdrom.md#command-behavior). */
     sector_store(cd, sector, lba, SCHWAY__CDROM_SECTOR_BYTES);
+}
+
+void schway__cdrom_sector_getlocp(schway *inst, uint8_t bytes[8])
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    if (cd->q_record_valid == 0u) {
+        uint8_t q[12];
+        sector_make_q(inst, cd->current_lba, q);
+        if (sector_q_valid(q, inst->disc_host.toc.track_count) != 0u) {
+            memcpy(cd->q_record, q, sizeof q);
+            cd->q_record_valid = 1u;
+        }
+    }
+    const uint8_t *q = cd->q_record;
+    bytes[0] = q[1];
+    bytes[1] = q[2];
+    bytes[2] = q[7];
+    bytes[3] = q[8];
+    bytes[4] = q[9];
+    bytes[5] = q[3];
+    bytes[6] = q[4];
+    bytes[7] = q[5];
 }
 
 void schway__cdrom_sector_event(schway *inst, uint64_t now)

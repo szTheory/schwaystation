@@ -155,6 +155,22 @@ static void reseal(uint8_t *b, size_t size)
     put_le(b + H_BODY_CRC, crc, 4u);
 }
 
+static void reseal_q_record(uint8_t q[12])
+{
+    uint16_t crc = 0u;
+    for (uint32_t i = 0u; i < 10u; i++) {
+        crc ^= (uint16_t)q[i] << 8;
+        for (uint32_t bit = 0u; bit < 8u; bit++) {
+            uint32_t shifted = (uint32_t)crc << 1;
+            crc = (crc & 0x8000u) != 0u ? (uint16_t)(shifted ^ 0x1021u)
+                                        : (uint16_t)shifted;
+        }
+    }
+    crc = (uint16_t)~crc;
+    q[10] = (uint8_t)(crc >> 8);
+    q[11] = (uint8_t)crc;
+}
+
 /* Loads b into inst expecting want, and checks the instance saves the same
    bytes as before the call. */
 static void expect_refused(const char *what, schway *inst, const uint8_t *b, size_t size,
@@ -578,6 +594,12 @@ static void seed_cdrom(schway *inst)
     inst->cdrom.sector_retry = 1u;
     inst->cdrom.current_lba = 123u;
     inst->cdrom.target_lba = 456u;
+    const uint8_t q_record[12] = {
+        0x41u, 0x01u, 0x01u, 0x00u, 0x00u, 0x11u,
+        0x00u, 0x00u, 0x02u, 0x11u, 0x84u, 0x29u
+    };
+    memcpy(inst->cdrom.q_record, q_record, sizeof q_record);
+    inst->cdrom.q_record_valid = 1u;
     inst->cdrom.sector_head = 2u;
     inst->cdrom.sector_count = 1u;
     inst->cdrom.sector_offset = 12u;
@@ -714,6 +736,7 @@ static void cdrom_mdec_reject_invalid(schway *src, schway *dst, size_t n)
         {"CD speed", "cdrom.drive_speed", 0u, 3u, 4u},
         {"CD unlock state", "cdrom.unlock_enabled", 0u, 2u, 4u},
         {"CD unlock step", "cdrom.unlock_step", 0u, 7u, 4u},
+        {"CD Q record CRC", "cdrom.q_record", 10u, 0u, 1u},
         {"CD event deadline", "cdrom.command_deadline", 0u,
          SCHWAY__STATE_TICKS_MAX, 8u},
         {"CD inactive seek deadline", "cdrom.seek_deadline", 0u, 1u, 8u},
@@ -731,6 +754,17 @@ static void cdrom_mdec_reject_invalid(schway *src, schway *dst, size_t n)
         reseal(bad, n);
         expect_refused(invalid[i].what, dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
     }
+    size_t q_at = offset_of(src, "cdrom.q_record");
+    memcpy(bad, good, n);
+    bad[q_at + 7u] = 0xFAu;
+    reseal_q_record(bad + q_at);
+    reseal(bad, n);
+    expect_refused("CD Q record BCD", dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+    memcpy(bad, good, n);
+    bad[q_at + 1u] = 0x02u;
+    reseal_q_record(bad + q_at);
+    reseal(bad, n);
+    expect_refused("CD Q track outside TOC", dst, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
 }
 
 static void cdrom_mdec_run_events(schway *src, schway *dst, size_t n)
@@ -777,6 +811,8 @@ static void test_cdrom_mdec_state(void)
     schway *dst = make(SCHWAY_REGION_NTSC_U);
     seed_cdrom_mdec(src);
     seed_cdrom_mdec(dst);
+    src->disc_host.toc.track_count = 1u;
+    dst->disc_host.toc.track_count = 1u;
     src->disc_host.callbacks.user = src;
     src->disc_host.callbacks.read_sector = disc_read_a;
     src->disc_host.attached = 1u;

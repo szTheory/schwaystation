@@ -99,6 +99,22 @@ static void encode_q_subcode(const uint8_t q[12], uint8_t subcode[SUBCODE_BYTES]
     }
 }
 
+static void fixture_q_crc(uint8_t q[12])
+{
+    uint16_t crc = 0u;
+    for (uint32_t i = 0u; i < 10u; i++) {
+        crc ^= (uint16_t)q[i] << 8;
+        for (uint32_t bit = 0u; bit < 8u; bit++) {
+            uint32_t shifted = (uint32_t)crc << 1;
+            crc = (crc & 0x8000u) != 0u ? (uint16_t)(shifted ^ 0x1021u)
+                                        : (uint16_t)shifted;
+        }
+    }
+    crc = (uint16_t)~crc;
+    q[10] = (uint8_t)(crc >> 8);
+    q[11] = (uint8_t)crc;
+}
+
 static void *reference_alloc(void *user, size_t size)
 {
     (void)user;
@@ -211,6 +227,8 @@ static uint32_t make_sector(void *user, uint32_t lba, uint8_t sector[SECTOR_BYTE
         memcpy(q, fixture->q, sizeof q);
         memcpy(&sector[12], fixture->header, sizeof fixture->header);
         if (host->q_corruption == 1u) q[10] ^= 1u;
+        if (host->q_corruption == 3u) { q[1] = 0u; fixture_q_crc(q); }
+        if (host->q_corruption == 4u) { q[1] = 0x02u; fixture_q_crc(q); }
         encode_q_subcode(q, subcode, host->q_corruption);
     }
     return 1u;
@@ -885,7 +903,22 @@ static int q_fixture_controls(void)
             free(state);
         }
     }
-    for (uint32_t corruption = 1u; corruption <= 2u; corruption++) {
+    schway_destroy(inst);
+    inst = NULL;
+    if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL ||
+        !attach_disc(inst, &host) ||
+        !control_q_fixture(&host, inst, &q_fixtures[0], q_fixtures[0].getlocp, 0u)) {
+        schway_destroy(inst);
+        fputs("CD_REFERENCE_Q_STATE_ERROR: cannot seed last-good Q record\n", stderr);
+        return 0;
+    }
+    host.q_corruption = 1u;
+    if (!control_q_fixture(&host, inst, &q_fixtures[2], q_fixtures[0].getlocp, 0x02u)) {
+        schway_destroy(inst);
+        fputs("CD_REFERENCE_Q_STATE_ERROR: invalid Q replaced last-good record\n", stderr);
+        return 0;
+    }
+    for (uint32_t corruption = 1u; corruption <= 4u; corruption++) {
         schway_destroy(inst);
         inst = NULL;
         if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL ||
@@ -895,7 +928,12 @@ static int q_fixture_controls(void)
             return 0;
         }
         host.q_corruption = corruption;
-        if (!control_q_fixture(&host, inst, &q_fixtures[2], fallback_leadout, 0u)) {
+        const q_fixture *fixture = corruption == 3u ? &q_fixtures[1] : &q_fixtures[2];
+        static const uint8_t leadin_track00[8] = {
+            0x00u, 0x00u, 0x00u, 0x00u, 0x33u, 0x00u, 0x01u, 0x41u
+        };
+        const uint8_t *expected = corruption == 3u ? leadin_track00 : fallback_leadout;
+        if (!control_q_fixture(&host, inst, fixture, expected, 0u)) {
             schway_destroy(inst);
             return 0;
         }

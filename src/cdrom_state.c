@@ -74,7 +74,8 @@ struct schway__cdrom_state_values {
 };
 
 static void cdrom_command_state_io(struct schway__state_io *io, struct schway__cdrom *cd,
-                                  struct schway__cdrom_state_values *values)
+                                  struct schway__cdrom_state_values *values,
+                                  const schway *inst)
 {
     uint32_t command = schway__state_u32(io, "cdrom.command", &cd->command, 0u, UINT8_MAX);
     values->command_pending = schway__state_u32(io, "cdrom.command_pending",
@@ -100,12 +101,24 @@ static void cdrom_command_state_io(struct schway__state_io *io, struct schway__c
     (void)schway__state_u32(io, "cdrom.unlock_step", &cd->unlock_step, 0u, 6u);
     (void)schway__state_u32(io, "cdrom.current_lba", &cd->current_lba, 0u, UINT32_MAX);
     (void)schway__state_u32(io, "cdrom.target_lba", &cd->target_lba, 0u, UINT32_MAX);
+    uint8_t q_candidate[12];
+    uint8_t *q_bytes = cd->q_record;
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        memcpy(q_candidate, io->r, sizeof q_candidate);
+        q_bytes = q_candidate;
+    }
+    schway__state_u8_array(io, "cdrom.q_record", q_bytes, 12u, 0u, UINT8_MAX);
+    uint32_t q_record_valid = schway__state_u32(io, "cdrom.q_record_valid",
+                                                &cd->q_record_valid, 0u, 1u);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         schway__state_check(io, values->command_pending == 0u || command != 0u);
         schway__state_check(io, drive_speed == 1u || drive_speed == 2u);
         schway__state_check(io, values->seek_active == 0u || motor_on != 0u);
         schway__state_check(io, values->read_active == 0u || motor_on != 0u);
         schway__state_check(io, !(values->read_active != 0u && values->play_active != 0u));
+        schway__state_check(io, q_record_valid <= 1u);
+        schway__state_check(io, q_record_valid == 0u ||
+                                   schway__cdrom_sector_q_valid(inst, q_bytes) != 0u);
     }
 }
 
@@ -182,7 +195,7 @@ void schway__cdrom_state_io(struct schway__state_io *io, schway *inst, uint64_t 
     struct schway__cdrom *cd = &inst->cdrom;
     struct schway__cdrom_state_values values = {0u};
     cdrom_fifo_state_io(io, cd);
-    cdrom_command_state_io(io, cd, &values);
+    cdrom_command_state_io(io, cd, &values, inst);
     cdrom_buffer_state_io(io, cd);
     cdrom_event_state_io(io, cd, &values, ticks);
 }

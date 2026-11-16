@@ -56,7 +56,7 @@ SeekError, 1 for motor on and 0 for Error.
 | `0E Setmode` | Stores mode and speed, returns INT3 |
 | `0F Getparam` | Returns status, mode, zero, file and channel with INT3 |
 | `10 GetlocL` | Returns the newest buffered sector's eight-byte header at raw offset `0Ch`; errors if no sector is buffered, the medium is audio, a seek is active, or SeekError is set. A completed data-track seek requests its target sector through the host callback so the header is available immediately after SeekL completes |
-| `11 GetlocP` | Returns a deterministic track/index/MSF position from the current LBA; errors after a failed seek |
+| `11 GetlocP` | Returns the latest CRC-valid track/index/MSF Q record from host subcode; a TOC-derived record is used until one is available. Errors after a failed seek |
 | `12 Setsession` | Rejects session zero; other values return INT3 then INT2 |
 | `13 GetTN` | Returns status and first/last track numbers in BCD |
 | `14 GetTD` | Returns the selected track's index-1 MSF, or lead-out for track zero |
@@ -97,10 +97,9 @@ The seek model computes the radial term from the difference of Q16 square roots 
 cycles at 1x and half that at 2x. The maximum selected seek is 233 ticks at 1x, including the three-tick base and
 speed-change delay. It has no random component or wall-clock input.
 
-One pinned 1x Getloc run requested SeekL at `00:02:16`, then reported a GetlocL header at `00:02:16` and a
-GetlocP absolute position at `00:02:11`. The deterministic baseline keeps the requested target for the cached header
-and uses the observed five-sector-early position for GetlocP. This is one reference observation, not a general seek
-landing curve.
+Pinned Getloc observations keep the raw sector header separate from the Q position. The run at `00:02:16` reports a
+header at `00:02:16` and Q absolute position `00:02:11`; seeks at `00:00:30` and `74:00:00` report distinct lead-in
+and lead-out records. GetlocP uses each validated host Q record directly, without applying a general seek offset.
 
 ## Region, firmware, licence and lid
 
@@ -128,10 +127,12 @@ At most one INT1 waits behind an already queued interrupt. ReadN retries a faile
 reports the failure immediately. A mismatched mode-2 file/channel filter retries once in ReadN and is skipped in ReadS.
 The mode-2 XA audio/realtime test runs before data selection, so accepted XA payloads do not reach RDDATA; decoder and
 audio output are connected by the later XA/SPU plans. Play accepts raw 2352-byte CD-DA sectors on audio tracks without
-requiring a data header. Supplied Q subcode is deinterleaved and checked for BCD fields and CRC; missing or invalid Q is
-synthesized from the TOC. `current_lba` follows valid Q position unless the host's `bad_q` callback marks that sector,
+requiring a data header. Supplied Q subcode is deinterleaved and checked for BCD fields, TOC track range and CRC.
+Missing or invalid Q is synthesized from the TOC until a valid record exists; later missing or invalid records preserve
+the last good position. `current_lba` follows valid Q position unless the host's `bad_q` callback marks that sector,
 in which case the previous good position remains visible. Disc callbacks and TOC remain host-owned and are not part of
-save states; controller flags, sector bytes, FIFO contents and scheduled deadlines are serialized in state format 9.
+save states; controller flags, sector bytes, the latest validated 12-byte Q record, FIFO contents and scheduled
+deadlines are serialized in state format 10.
 
 ## Sources and confidence
 

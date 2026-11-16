@@ -545,9 +545,8 @@ schway_load_state(inst, buf, n);
 ```
 
 A state is the same bytes on every platform: a 20-byte header (magic, state format, total size, CRC-32 of the
-rest) and then every field, little-endian. Format 5 includes the SPU registers, RAM, voices, transfer FIFO,
-capture and reverb history, and the next sample deadline. A format-4 state returns
-`SCHWAY_STATUS_ERR_STATE_VERSION`. The state format and behavior revision have changed; the public API and ABI
+rest) and then every field, little-endian. Format 10 includes the instance's latest CD-ROM Q record alongside
+the controller and SPU state. A format-9 state returns `SCHWAY_STATUS_ERR_STATE_VERSION`; the public API and ABI
 remain unchanged.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:

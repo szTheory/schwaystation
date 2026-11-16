@@ -820,25 +820,7 @@ static void begin_getloc_p(schway *inst)
         command_error(inst, 0x80u);
         return;
     }
-    uint64_t position = (uint64_t)cd->current_lba + 150u;
-    uint32_t track_index = 0u;
-    for (uint32_t i = 0u; i < inst->disc_host.toc.track_count; i++) {
-        const schway_disc_track *track = &inst->disc_host.toc.tracks[i];
-        if (position >= track->index1 && position < track->leadout) {
-            track_index = i;
-            break;
-        }
-    }
-    const schway_disc_track *track = &inst->disc_host.toc.tracks[track_index];
-    uint64_t relative = position >= track->index1 ? position - track->index1 : 0u;
-    bytes[0] = to_bcd(track_index + 1u);
-    bytes[1] = 1u;
-    bytes[2] = to_bcd((uint32_t)(position / (60u * 75u)));
-    bytes[3] = to_bcd((uint32_t)((position / 75u) % 60u));
-    bytes[4] = to_bcd((uint32_t)(position % 75u));
-    bytes[5] = to_bcd((uint32_t)(relative / (60u * 75u)));
-    bytes[6] = to_bcd((uint32_t)((relative / 75u) % 60u));
-    bytes[7] = to_bcd((uint32_t)(relative % 75u));
+    schway__cdrom_sector_getlocp(inst, bytes);
     response(inst, bytes, 8u, 3u);
     finish_command(cd);
 }
@@ -1082,10 +1064,7 @@ void schway__cdrom_event(schway *inst, uint64_t now)
     if (cd->seek_event != 0u && cd->seek_deadline <= now) {
         cd->seek_event = 0u;
         cd->seek_deadline = 0u;
-        /* One pinned 1x reference seek landed five sectors early; GetlocL uses target_lba. */
-        cd->current_lba = cd->command == 0x15u && cd->drive_speed == 1u && cd->target_lba > 5u
-                              ? cd->target_lba - 5u
-                              : cd->target_lba;
+        cd->current_lba = cd->target_lba;
         cd->seek_active = 0u;
         update_status_activity(cd);
         if (cd->read_active != 0u) {

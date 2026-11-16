@@ -33,6 +33,8 @@ struct schway__cdrom {
     uint32_t paused, muted, drive_speed, drive_speed_changed, unlock_enabled, unlock_step;
     uint32_t bfrd, sector_int1_pending, read_s, sector_retry;
     uint32_t current_lba, target_lba;
+    uint8_t q_record[12];
+    uint32_t q_record_valid;
     uint32_t sector_head, sector_count, sector_offset;
     uint8_t sector[SCHWAY__CDROM_SECTOR_CAP][SCHWAY__CDROM_SECTOR_BYTES];
     uint32_t sector_lba[SCHWAY__CDROM_SECTOR_CAP];
@@ -65,6 +67,8 @@ uint32_t schway__cdrom_sector_track_type_at(const schway *inst, uint32_t lba);
 void schway__cdrom_sector_discard_seek_headers(schway *inst);
 void schway__cdrom_bfrd_set(schway *inst, uint8_t value, uint64_t now);
 void schway__cdrom_sector_seek(schway *inst);
+void schway__cdrom_sector_getlocp(schway *inst, uint8_t bytes[8]);
+uint32_t schway__cdrom_sector_q_valid(const schway *inst, const uint8_t q[12]);
 void schway__cdrom_sector_ack(schway *inst);
 void schway__cdrom_push_interrupt(schway *inst, uint8_t code);
 

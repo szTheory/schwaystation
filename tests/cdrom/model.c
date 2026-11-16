@@ -389,6 +389,12 @@ static void test_command_seek_position(void)
     acknowledge(inst, 2u);
     CHECK_EQ_U64(inst->cdrom.seek_active, 0u);
     CHECK_EQ_U64(host.reads, 1u);
+    CHECK_EQ_U64(inst->cdrom.q_record_valid, 1u);
+    CHECK_EQ_HEX(inst->cdrom.q_record[1], 0x01u);
+    CHECK_EQ_HEX(inst->cdrom.q_record[2], 0x01u);
+    CHECK_EQ_HEX(inst->cdrom.q_record[7], 0x00u);
+    CHECK_EQ_HEX(inst->cdrom.q_record[8], 0x02u);
+    CHECK_EQ_HEX(inst->cdrom.q_record[9], 0x00u);
     CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
     command(inst, 0x10u);
     run_cycles(inst, 50000u);
