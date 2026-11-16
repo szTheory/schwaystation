@@ -182,6 +182,15 @@ static void case_status(void)
     CHECK((read32(inst, MDEC_STATUS) & (1u << 28)) != 0u);
     write32(inst, MDEC_STATUS, 0x80000000u, 0u);
     CHECK_EQ_HEX(read32(inst, MDEC_STATUS), 0x80040000u);
+
+    /* MDEC(0) mirrors command bits 25-28 and 0-15 directly to STAT. */
+    write32(inst, MDEC_DATA, 0x2F000001u, 0u);
+    status = read32(inst, MDEC_STATUS);
+    CHECK((status & (0x0Fu << 23)) != 0u);
+    write32(inst, MDEC_DATA, 0x002003DDu, 0u);
+    status = read32(inst, MDEC_STATUS);
+    CHECK_EQ_HEX(status & (0x0Fu << 23), 0u);
+    CHECK_EQ_HEX(status & 0xFFFFu, 0x03DDu);
     schway_destroy(inst);
 }
 
