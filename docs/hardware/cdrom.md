@@ -87,10 +87,11 @@ fixed point was selected and do not claim that every console drive has identical
 | Reset response | `400000h` cycles | Published controller behavior (SCM.02) |
 
 The pinned timing source log records minimum, maximum and average bands. The release guest's TTY prints the row
-template with literal format placeholders, so the harness checks its ordered rows and measures host callback
-intervals separately against those source-log bands. It also verifies the selected 451,584-cycle 1x and
-225,792-cycle 2x periods as exact model values in unit tests. This does not claim that the fixed schedule
-reproduces an individual drive's timing distribution.
+template with literal format placeholders, so the harness checks its ordered rows and compares host callback
+intervals for consecutive LBA requests against those source-log bands. The host callback does not expose a read
+generation, so an adjacent-LBA restart is part of this observable interval definition; nonconsecutive LBA gaps are
+excluded. The harness also verifies the selected 451,584-cycle 1x and 225,792-cycle 2x periods as exact model values
+in unit tests. This does not claim that the fixed schedule reproduces an individual drive's timing distribution.
 
 The seek model computes the radial term from the difference of Q16 square roots of `LBA + 150`, then applies
 `floor(0.5 * (3 + 0.2*r + 2.5*sqrt(r) + distance/60000))`, clamped to 1-150 ticks. Tick conversion is 451,584 CPU

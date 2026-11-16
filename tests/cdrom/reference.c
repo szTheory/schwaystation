@@ -55,6 +55,7 @@ typedef struct disc_host {
     uint64_t last_tick;
     uint32_t interval_count[2];
     uint64_t intervals[2][512];
+    uint32_t interval_overflow[2];
     uint32_t q_corruption;
 } disc_host;
 
@@ -184,24 +185,33 @@ static uint8_t to_bcd(uint32_t value)
     return (uint8_t)(((value / 10u) << 4) | (value % 10u));
 }
 
+static void record_timing_interval(disc_host *host, uint32_t speed_index, uint64_t delta)
+{
+    if (host->interval_count[speed_index] < 512u) {
+        host->intervals[speed_index][host->interval_count[speed_index]++] = delta;
+    } else {
+        host->interval_overflow[speed_index] = 1u;
+    }
+}
+
 static uint32_t make_sector(void *user, uint32_t lba, uint8_t sector[SECTOR_BYTES],
                             uint8_t subcode[SUBCODE_BYTES])
 {
     disc_host *host = (disc_host *)user;
+    uint32_t previous_lba = host->last_lba;
+    uint32_t had_previous = host->reads != 0u;
     host->reads++;
-    host->last_lba = lba;
     if (host->in_run == 0u) host->callbacks_outside_run++;
     uint32_t speed = host->inst->cdrom.drive_speed;
     uint32_t speed_index = speed == 2u ? 1u : 0u;
-    uint32_t max_band = speed_index == 0u ? 470344u : 249744u;
-    if (host->last_tick != 0u && host->last_speed == speed &&
+    if (had_previous != 0u && previous_lba != UINT32_MAX && lba == previous_lba + 1u &&
+        host->last_tick != 0u && host->last_speed == speed &&
         host->last_read_active != 0u && host->inst->cdrom.read_active != 0u &&
         host->inst->ticks > host->last_tick) {
         uint64_t delta = host->inst->ticks - host->last_tick;
-        if (delta <= (uint64_t)max_band * 2u && host->interval_count[speed_index] < 512u) {
-            host->intervals[speed_index][host->interval_count[speed_index]++] = delta;
-        }
+        record_timing_interval(host, speed_index, delta);
     }
+    host->last_lba = lba;
     host->last_tick = host->inst->ticks;
     host->last_speed = speed;
     host->last_read_active = host->inst->cdrom.read_active;
@@ -343,6 +353,11 @@ static int timing_matches(const uint8_t *actual, size_t actual_size,
             actual_rows[i].average != selected) return 0;
     }
     for (size_t speed = 0u; speed < 2u; speed++) {
+        if (host->interval_overflow[speed] != 0u) {
+            fprintf(stderr, "CD_REFERENCE_TIMING_INTERVAL_ERROR: speed=%u sample buffer overflowed\n",
+                    speed == 0u ? 1u : 2u);
+            return 0;
+        }
         if (host->interval_count[speed] < 5u) {
             fprintf(stderr, "CD_REFERENCE_TIMING_INTERVAL_ERROR: speed=%u only %u samples\n",
                     speed == 0u ? 1u : 2u, host->interval_count[speed]);
@@ -366,6 +381,44 @@ static int timing_matches(const uint8_t *actual, size_t actual_size,
         }
     }
     return 1;
+}
+
+static int timing_interval_control(const uint8_t *actual, size_t actual_size,
+                                   const uint8_t *reference, size_t reference_size,
+                                   const disc_host *baseline, uint32_t lba,
+                                   uint32_t expect_sample)
+{
+    schway_config config;
+    memset(&config, 0, sizeof config);
+    config.size = (uint32_t)sizeof config;
+    config.allocator.alloc = reference_alloc;
+    config.allocator.free = reference_free;
+    schway *inst = NULL;
+    if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL) {
+        schway_destroy(inst);
+        return 0;
+    }
+    disc_host observed = *baseline;
+    observed.inst = inst;
+    observed.reads = 1u;
+    observed.last_tick = 1u;
+    observed.last_lba = 100u;
+    observed.last_speed = 1u;
+    observed.last_read_active = 1u;
+    inst->ticks = 1000000u;
+    inst->cdrom.drive_speed = 1u;
+    inst->cdrom.read_active = 1u;
+    uint8_t sector[SECTOR_BYTES];
+    uint8_t subcode[SUBCODE_BYTES];
+    (void)make_sector(&observed, lba, sector, subcode);
+    int matched = timing_matches(actual, actual_size, reference, reference_size, &observed);
+    int rejected = expect_sample != 0u
+                       ? observed.interval_count[0] == baseline->interval_count[0] + 1u &&
+                             observed.intervals[0][baseline->interval_count[0]] == 999999u &&
+                             !matched
+                       : observed.interval_count[0] == baseline->interval_count[0] && matched;
+    schway_destroy(inst);
+    return rejected;
 }
 
 static int append_tty(schway *inst, uint8_t *text, size_t *used)
@@ -986,14 +1039,22 @@ static int run_controls(const char *getloc_log_path)
     }
     static const uint8_t getloc_good[] = "GetStat -> 0x%02X\nGetlocL failed, IRQ = %d, status = 0x%02X\n";
     static const uint8_t getloc_reordered[] = "GetlocL failed, IRQ = %d, status = 0x%02X\nGetStat -> 0x%02X\n";
+    disc_host overflowed = host;
+    overflowed.interval_overflow[0] = 1u;
     if (!timing_matches((const uint8_t *)valid, valid_size,
                         (const uint8_t *)reference, ref_size, &host) ||
         timing_matches((const uint8_t *)shifted, shifted_size,
                        (const uint8_t *)reference, ref_size, &host) ||
         timing_matches((const uint8_t *)malformed, malformed_size,
                        (const uint8_t *)reference, ref_size, &host) ||
+        timing_matches((const uint8_t *)valid, valid_size,
+                       (const uint8_t *)reference, ref_size, &overflowed) ||
         !ordered_pair(getloc_good, sizeof getloc_good - 1u) ||
         ordered_pair(getloc_reordered, sizeof getloc_reordered - 1u) ||
+        !timing_interval_control((const uint8_t *)valid, valid_size,
+                                 (const uint8_t *)reference, ref_size, &host, 101u, 1u) ||
+        !timing_interval_control((const uint8_t *)valid, valid_size,
+                                 (const uint8_t *)reference, ref_size, &host, 16u, 0u) ||
         !getloc_byte_controls(getloc_log_path) || !q_fixture_controls()) {
         fputs("CD_REFERENCE_CONTROL_ERROR: malformed, shifted, or reordered data was accepted\n", stderr);
         return 1;
