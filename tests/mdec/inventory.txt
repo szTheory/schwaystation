@@ -4,3 +4,4 @@ mdec.bounds	mdec,portable
 mdec.fifo	mdec,portable
 mdec.status	mdec,portable
 mdec.stream	mdec,portable
+mdec.words	mdec,portable

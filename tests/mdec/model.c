@@ -1,6 +1,5 @@
 /* MDEC bus, block and status behavior through the instance-owned device. */
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -108,6 +107,9 @@ static void start_dma0(schway *inst, uint32_t base, uint32_t words)
     write32(inst, DMA_BASE + 8u, 0x01000201u, 0u);
     CHECK_EQ_U64(inst->dma.cur, 0u);
     schway__dma_event(inst, inst->dma.busy_until);
+    if (inst->ticks < inst->dma.busy_until) {
+        run_cycles(inst, inst->dma.busy_until - inst->ticks);
+    }
 }
 
 static void dma1_transfer(schway *inst, uint32_t base, uint32_t words)
@@ -121,6 +123,22 @@ static void dma1_transfer(schway *inst, uint32_t base, uint32_t words)
         schway__dma_event(inst, inst->dma.busy_until);
     }
     CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    if (inst->ticks < inst->dma.busy_until) {
+        run_cycles(inst, inst->dma.busy_until - inst->ticks);
+    }
+}
+
+static uint64_t raw_output_hash(const schway *inst, uint32_t words)
+{
+    uint64_t hash = UINT64_C(14695981039346656037);
+    for (uint32_t i = 0u; i < words; i++) {
+        uint32_t word = inst->mdec.output[(inst->mdec.output_head + i) %
+                                           SCHWAY__MDEC_OUTPUT_WORDS];
+        for (uint32_t byte = 0u; byte < 4u; byte++) {
+            hash = (hash ^ (uint8_t)(word >> (byte * 8u))) * UINT64_C(1099511628211);
+        }
+    }
+    return hash;
 }
 
 static void load_flat_tables(schway *inst)
@@ -184,6 +202,10 @@ static void case_block(void)
 
 static void case_sign_and_tables(void)
 {
+    static const uint64_t hashes[2][2] = {
+        {UINT64_C(0x188245F9DDF02DC5), UINT64_C(0x1D552C65238459C5)},
+        {UINT64_C(0xC9ACF7938CF08925), UINT64_C(0xBD5E5BAD6A568925)},
+    };
     for (uint32_t depth = 0u; depth < 2u; depth++) {
         for (uint32_t is_signed = 0u; is_signed < 2u; is_signed++) {
             schway *inst = make();
@@ -206,6 +228,16 @@ static void case_sign_and_tables(void)
             CHECK_EQ_U64(inst->mdec.output_count, words);
             for (uint32_t i = 0u; i < words; i++) {
                 CHECK_EQ_HEX(inst->mdec.output[i], expected);
+            }
+            CHECK_EQ_HEX(raw_output_hash(inst, words), hashes[depth][is_signed]);
+            uint32_t destination = 0x1800u + (depth * 2u + is_signed) * 0x100u;
+            dma1_transfer(inst, destination, words);
+            CHECK_EQ_U64(inst->mdec.output_count, 0u);
+            CHECK_EQ_U64(inst->dma.madr[1], destination + words * 4u);
+            for (uint32_t i = 0u; i < words; i++) {
+                uint32_t value = 0u;
+                CHECK_EQ_U64(schway__bus_ram_word(inst, destination + i * 4u, &value, 0u), 0u);
+                CHECK_EQ_HEX(value, expected);
             }
             schway_destroy(inst);
         }
@@ -362,6 +394,8 @@ int main(int argc, char **argv)
         case_block();
         case_sign_and_tables();
     } else if (strcmp(argv[1], "sign_tables") == 0) {
+        case_sign_and_tables();
+    } else if (strcmp(argv[1], "words") == 0) {
         case_sign_and_tables();
     } else if (strcmp(argv[1], "bounds") == 0) {
         case_bounds_and_reset();

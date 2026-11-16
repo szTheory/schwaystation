@@ -633,6 +633,7 @@ static void seed_mdec(schway *inst)
     inst->mdec.work[SCHWAY__MDEC_BLOCK_SAMPLES - 1u] = -789;
     inst->mdec.input_head = 1u;
     inst->mdec.input_count = 2u;
+    inst->mdec.input_half = 1u;
     inst->mdec.output_head = SCHWAY__MDEC_OUTPUT_WORDS - 1u;
     inst->mdec.output_count = 3u;
     inst->mdec.command = 0x38000000u;
@@ -642,7 +643,7 @@ static void seed_mdec(schway *inst)
     inst->mdec.depth = 2u;
     inst->mdec.signed_output = 1u;
     inst->mdec.bit15 = 1u;
-    inst->mdec.control = 3u;
+    inst->mdec.control = (1u << 30) | (1u << 29);
     inst->mdec.command_active = 1u;
     inst->mdec.block_pending = 1u;
     inst->mdec.block_deadline = 900u;
@@ -688,6 +689,7 @@ static uint32_t cdrom_mdec_fields_match(schway *inst)
         {"mdec.work", 4u, SCHWAY__MDEC_BLOCK_SAMPLES},
         {"mdec.input_head", 4u, 1u},
         {"mdec.input_count", 4u, 1u},
+        {"mdec.input_half", 4u, 1u},
         {"mdec.output_head", 4u, 1u},
         {"mdec.output_count", 4u, 1u},
         {"mdec.block_deadline", 8u, 1u},
@@ -745,6 +747,8 @@ static void cdrom_mdec_reject_invalid(schway *src, schway *dst, size_t n)
         {"CD inactive seek deadline", "cdrom.seek_deadline", 0u, 1u, 8u},
         {"MDEC input FIFO head", "mdec.input_head", 0u,
          SCHWAY__MDEC_INPUT_WORDS, 4u},
+        {"MDEC input halfword selector", "mdec.input_half", 0u, 2u, 4u},
+        {"MDEC DMA control", "mdec.control", 0u, 0x10000000u, 4u},
         {"MDEC output FIFO count", "mdec.output_count", 0u,
          SCHWAY__MDEC_OUTPUT_WORDS + 1u, 4u},
         {"MDEC block index", "mdec.block_index", 0u, 6u, 4u},

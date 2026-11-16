@@ -24,6 +24,12 @@ schway_add_test(NAME mdec.bounds
   COMMAND schwaystation-test-mdec bounds
   LABELS mdec portable TIMEOUT 10)
 
+# Fault prevented: nonzero mono pixels pack incorrectly in raw output or DMA1
+# writes a different word order or ending MADR in RAM.
+schway_add_test(NAME mdec.words
+  COMMAND schwaystation-test-mdec words
+  LABELS mdec portable TIMEOUT 10)
+
 # Fault prevented: an EOB at an odd halfword boundary discards the next block
 # or a save/load loses the retained DC before its next scheduled decode.
 schway_add_test(NAME mdec.stream

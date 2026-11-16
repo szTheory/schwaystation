@@ -1,6 +1,5 @@
-/* The bounded MDEC owner. Block decode is supplied by its first callers; this
-   slice establishes storage, MMIO and the deterministic block deadline
-   contract (PSX-SPU-CDROM-AND-MDEC, section 4). */
+/* The bounded MDEC owner decodes coefficient blocks and publishes DMA output
+   on deterministic deadlines (PSX-SPU-CDROM-AND-MDEC, section 4). */
 #include <limits.h>
 #include <string.h>
 
@@ -8,6 +7,10 @@
 #include "state.h"
 
 #define SCHWAY__MDEC_BLOCK_CYCLES 1000u
+#define SCHWAY__MDEC_STATUS_ADDR 0x1F801824u
+#define SCHWAY__MDEC_DATA_ADDR 0x1F801820u
+#define SCHWAY__MDEC_DMA_IN_ENABLE (1u << 30)
+#define SCHWAY__MDEC_DMA_OUT_ENABLE (1u << 29)
 
 static void state_i16_array(struct schway__state_io *io, const char *name, int16_t *values,
                             uint32_t count)
@@ -85,7 +88,7 @@ void schway__mdec_state_io(struct schway__state_io *io, schway *inst, uint64_t t
     uint32_t depth = schway__state_u32(io, "mdec.depth", &mdec->depth, 0u, 3u);
     (void)schway__state_u32(io, "mdec.signed_output", &mdec->signed_output, 0u, 1u);
     (void)schway__state_u32(io, "mdec.bit15", &mdec->bit15, 0u, 1u);
-    (void)schway__state_u32(io, "mdec.control", &mdec->control, 0u, 3u);
+    uint32_t control = schway__state_u32(io, "mdec.control", &mdec->control, 0u, UINT32_MAX);
     uint32_t command_active = schway__state_u32(io, "mdec.command_active",
                                                 &mdec->command_active, 0u, 1u);
     uint32_t block_pending = schway__state_u32(io, "mdec.block_pending", &mdec->block_pending,
@@ -107,9 +110,15 @@ void schway__mdec_state_io(struct schway__state_io *io, schway *inst, uint64_t t
         schway__state_check(io, command_words <= 0xFFFFu && words_remaining <= 0xFFFFu);
         schway__state_check(io, command_active == 0u || command_words != 0u ||
                                    words_remaining != 0u);
+        schway__state_check(io, (control & ~(SCHWAY__MDEC_DMA_IN_ENABLE |
+                                             SCHWAY__MDEC_DMA_OUT_ENABLE)) == 0u);
+        uint32_t output_words = depth == 0u ? 8u : 16u;
         schway__state_check(io, block_pending == 0u
                                    ? block_deadline == 0u
-                                   : block_deadline >= ticks && block_deadline <= max);
+                                   : (block_deadline == 0u
+                                          ? depth <= 1u &&
+                                                output_count > SCHWAY__MDEC_OUTPUT_WORDS - output_words
+                                          : block_deadline >= ticks && block_deadline <= max));
     }
 }
 
@@ -120,11 +129,6 @@ static const uint8_t mdec_zigzag[64] = {
     35u, 42u, 49u, 56u, 57u, 50u, 43u, 36u, 29u, 22u, 15u, 23u, 30u, 37u, 44u, 51u,
     58u, 59u, 52u, 45u, 38u, 31u, 39u, 46u, 53u, 60u, 61u, 54u, 47u, 55u, 62u, 63u,
 };
-
-#define SCHWAY__MDEC_STATUS_ADDR 0x1F801824u
-#define SCHWAY__MDEC_DATA_ADDR 0x1F801820u
-#define SCHWAY__MDEC_DMA_IN_ENABLE (1u << 30)
-#define SCHWAY__MDEC_DMA_OUT_ENABLE (1u << 29)
 
 static int32_t mdec_signed10(uint32_t value)
 {
@@ -355,6 +359,34 @@ static void mdec_publish_block(schway *inst)
     }
 }
 
+static int mdec_block_fits(const struct schway__mdec *mdec)
+{
+    return mdec_output_words(mdec) <= SCHWAY__MDEC_OUTPUT_WORDS - mdec->output_count;
+}
+
+static void mdec_complete_block(schway *inst, uint64_t now)
+{
+    struct schway__mdec *mdec = &inst->mdec;
+    mdec_publish_block(inst);
+    mdec->block_pending = 0u;
+    mdec->block_deadline = 0u;
+    if (mdec->input_count != 0u) {
+        mdec_try_decode(inst, now);
+    } else if (mdec->words_remaining == 0u) {
+        mdec->command_active = 0u;
+        mdec->block_index = 4u;
+    }
+    mdec_update_requests(inst);
+}
+
+static void mdec_resume_waiting_block(schway *inst, uint64_t now)
+{
+    struct schway__mdec *mdec = &inst->mdec;
+    if (mdec->block_pending != 0u && mdec->block_deadline == 0u && mdec_block_fits(mdec)) {
+        mdec_complete_block(inst, now);
+    }
+}
+
 static void mdec_set_table_word(struct schway__mdec *mdec, uint32_t value)
 {
     uint32_t index = mdec->command_words - mdec->words_remaining;
@@ -435,27 +467,22 @@ static uint32_t mdec_status(const schway *inst)
 
 uint64_t schway__mdec_next(const schway *inst)
 {
-    return inst->mdec.block_pending != 0u ? inst->mdec.block_deadline : UINT64_MAX;
+    return inst->mdec.block_pending != 0u && inst->mdec.block_deadline != 0u
+               ? inst->mdec.block_deadline
+               : UINT64_MAX;
 }
 
 void schway__mdec_event(schway *inst, uint64_t now)
 {
     struct schway__mdec *mdec = &inst->mdec;
-    if (mdec->block_pending != 0u && mdec->block_deadline <= now) {
-        mdec->block_pending = 0u;
-        mdec->block_deadline = 0u;
-        mdec_publish_block(inst);
-        if (mdec->output_count == 0u) {
-            mdec_abort_block(inst);
+    if (mdec->block_pending != 0u && mdec->block_deadline != 0u &&
+        mdec->block_deadline <= now) {
+        if (!mdec_block_fits(mdec)) {
+            mdec->block_deadline = 0u;
+            mdec_update_requests(inst);
             return;
         }
-        if (mdec->input_count != 0u) {
-            mdec_try_decode(inst, now);
-        } else if (mdec->words_remaining == 0u) {
-            mdec->command_active = 0u;
-            mdec->block_index = 4u;
-        }
-        mdec_update_requests(inst);
+        mdec_complete_block(inst, now);
     }
 }
 
@@ -473,6 +500,7 @@ uint32_t schway__mdec_read(schway *inst, uint32_t address, uint64_t now)
         value = mdec->output[mdec->output_head];
         mdec->output_head = (mdec->output_head + 1u) % SCHWAY__MDEC_OUTPUT_WORDS;
         mdec->output_count--;
+        mdec_resume_waiting_block(inst, now);
         mdec_update_requests(inst);
     }
     return value;
