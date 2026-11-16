@@ -191,6 +191,11 @@ static void case_status(void)
     status = read32(inst, MDEC_STATUS);
     CHECK_EQ_HEX(status & (0x0Fu << 23), 0u);
     CHECK_EQ_HEX(status & 0xFFFFu, 0x03DDu);
+    write32(inst, MDEC_DATA, 0x2F000000u, 0u);
+    write32(inst, MDEC_DATA, 0x800003DDu, 0u);
+    status = read32(inst, MDEC_STATUS);
+    CHECK_EQ_HEX(status & (0x0Fu << 23), 0u);
+    CHECK_EQ_HEX(status & 0xFFFFu, 0x03DDu);
     schway_destroy(inst);
 }
 
