@@ -7,25 +7,30 @@
 set(SCHWAYSTATION_SST_DIR "" CACHE PATH "Directory of the fetched pinned vector files, NAME.json.bin each")
 option(SCHWAYSTATION_GPU_REFERENCE_ONLY "Configure only GPU references without fetching CPU vectors" OFF)
 set(SCHWAYSTATION_MEDIA_REFERENCE_ONLY "" CACHE STRING
-  "Configure only one media reference lane (currently: cdrom)")
-set_property(CACHE SCHWAYSTATION_MEDIA_REFERENCE_ONLY PROPERTY STRINGS "" cdrom)
+  "Configure only one media reference lane (cdrom or mdec)")
+set_property(CACHE SCHWAYSTATION_MEDIA_REFERENCE_ONLY PROPERTY STRINGS "" cdrom mdec)
 if(NOT SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "" AND
-   NOT SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "cdrom")
-  message(FATAL_ERROR "nightly: SCHWAYSTATION_MEDIA_REFERENCE_ONLY must be empty or cdrom")
+   NOT SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "cdrom" AND
+   NOT SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "mdec")
+  message(FATAL_ERROR "nightly: SCHWAYSTATION_MEDIA_REFERENCE_ONLY must be empty, cdrom or mdec")
 endif()
 set(cdrom_reference_only FALSE)
 if(SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "cdrom")
   set(cdrom_reference_only TRUE)
 endif()
+set(mdec_reference_only FALSE)
+if(SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "mdec")
+  set(mdec_reference_only TRUE)
+endif()
 if(SCHWAYSTATION_SST_DIR STREQUAL "")
-  if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY AND NOT cdrom_reference_only)
+  if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY AND NOT cdrom_reference_only AND NOT mdec_reference_only)
     message(FATAL_ERROR "nightly: set SCHWAYSTATION_SST_DIR to the directory of the fetched pinned blobs")
   endif()
   set(nightly_sst_dir "${PROJECT_BINARY_DIR}/sst")
 else()
   get_filename_component(nightly_sst_dir "${SCHWAYSTATION_SST_DIR}" ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
 endif()
-if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY AND NOT cdrom_reference_only)
+if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY AND NOT cdrom_reference_only AND NOT mdec_reference_only)
   file(STRINGS ${PROJECT_SOURCE_DIR}/pins.txt nightly_rows REGEX "^r3000-")
   if(NOT nightly_rows)
     message(FATAL_ERROR "nightly: pins.txt has no r3000- rows")
@@ -40,10 +45,10 @@ if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY AND NOT cdrom_reference_only)
   endforeach()
 endif()
 
-if(cdrom_reference_only)
-  # Keep the full nightly inventory registered while this focused tree configures
-  # only the selected CD assets and target. Unselected tests still fail normally
-  # if someone runs them without their missing executable/assets.
+if(cdrom_reference_only OR mdec_reference_only)
+  # Keep the full nightly inventory registered while a focused media tree
+  # configures only the selected assets and target. Unselected tests still fail
+  # normally if run without their missing executable/assets.
   foreach(case IN ITEMS gp0-e1 gpustat mask-bit)
     schway_add_test(NAME gpu.reference.${case}
       COMMAND schwaystation-test-gpu-reference log ${case} ${PROJECT_BINARY_DIR}/gpu-reference/${case}/psx.log
@@ -112,7 +117,7 @@ foreach(case IN LISTS SCHWAY_GPU_REFERENCE_CASES)
 endforeach()
 endif()
 
-if(cdrom_reference_only)
+if(cdrom_reference_only OR mdec_reference_only)
   schway_add_test(NAME spu.reference.memory_transfer
     COMMAND schwaystation-test-spu-reference memory-transfer --full --assets
       "${PROJECT_BINARY_DIR}/spu-reference"
@@ -147,11 +152,67 @@ schway_add_test(NAME vectors.r3000.full
     --prefix-of ${vectors_dir}/sst-sample.bin --expect 55000 --allow ${vectors_dir}/allow.txt
   LABELS portable vectors TIMEOUT 120)
 
-include(${PROJECT_SOURCE_DIR}/cmake/CDReferences.cmake)
-schway_prepare_cd_reference_assets(
-  cd_reference_dir cd_timing_exe cd_timing_log cd_getloc_exe cd_getloc_log
-  cd_timing_exe_sha cd_getloc_exe_sha cd_timing_log_sha cd_getloc_log_sha)
-schway_add_cd_reference_target(
-  "${cd_timing_exe_sha}" "${cd_getloc_exe_sha}" "${cd_timing_log_sha}" "${cd_getloc_log_sha}")
-schway_register_cd_reference_tests(
-  "${cd_timing_exe}" "${cd_timing_log}" "${cd_getloc_exe}" "${cd_getloc_log}")
+if(cdrom_reference_only)
+  include(${PROJECT_SOURCE_DIR}/cmake/CDReferences.cmake)
+  schway_prepare_cd_reference_assets(
+    cd_reference_dir cd_timing_exe cd_timing_log cd_getloc_exe cd_getloc_log
+    cd_timing_exe_sha cd_getloc_exe_sha cd_timing_log_sha cd_getloc_log_sha)
+  schway_add_cd_reference_target(
+    "${cd_timing_exe_sha}" "${cd_getloc_exe_sha}" "${cd_timing_log_sha}" "${cd_getloc_log_sha}")
+  schway_register_cd_reference_tests(
+    "${cd_timing_exe}" "${cd_timing_log}" "${cd_getloc_exe}" "${cd_getloc_log}")
+elseif(mdec_reference_only)
+  foreach(case IN ITEMS timing getloc)
+    schway_add_test(NAME cdrom.reference.${case}
+      COMMAND schwaystation-test-cdrom-reference ${case}
+        "${PROJECT_BINARY_DIR}/cdrom-reference/${case}.exe"
+        "${PROJECT_BINARY_DIR}/cdrom-reference/${case}.log"
+      LABELS disc nightly portable TIMEOUT 120)
+  endforeach()
+  schway_add_test(NAME cdrom.reference.controls
+    COMMAND schwaystation-test-cdrom-reference controls
+      "${PROJECT_BINARY_DIR}/cdrom-reference/getloc.log"
+    LABELS disc nightly portable TIMEOUT 30)
+else()
+  include(${PROJECT_SOURCE_DIR}/cmake/CDReferences.cmake)
+  schway_prepare_cd_reference_assets(
+    cd_reference_dir cd_timing_exe cd_timing_log cd_getloc_exe cd_getloc_log
+    cd_timing_exe_sha cd_getloc_exe_sha cd_timing_log_sha cd_getloc_log_sha)
+  schway_add_cd_reference_target(
+    "${cd_timing_exe_sha}" "${cd_getloc_exe_sha}" "${cd_timing_log_sha}" "${cd_getloc_log_sha}")
+  schway_register_cd_reference_tests(
+    "${cd_timing_exe}" "${cd_timing_log}" "${cd_getloc_exe}" "${cd_getloc_log}")
+endif()
+
+if(cdrom_reference_only)
+  foreach(mode IN ITEMS 4bit 8bit)
+    schway_add_test(NAME mdec.reference.${mode}
+      COMMAND schwaystation-test-mdec-reference ${mode}
+        "${PROJECT_BINARY_DIR}/mdec-reference/${mode}.exe"
+        "${PROJECT_BINARY_DIR}/mdec-reference/${mode}.log"
+      LABELS mdec nightly portable TIMEOUT 120)
+  endforeach()
+  schway_add_test(NAME mdec.reference.status
+    COMMAND schwaystation-test-mdec-reference status
+      "${PROJECT_BINARY_DIR}/mdec-reference/status.exe"
+      "${PROJECT_BINARY_DIR}/mdec-reference/status.log"
+    LABELS mdec nightly portable TIMEOUT 120)
+  schway_add_test(NAME mdec.reference.controls
+    COMMAND schwaystation-test-mdec-reference controls
+      "${PROJECT_BINARY_DIR}/mdec-reference/4bit.log"
+      "${PROJECT_BINARY_DIR}/mdec-reference/8bit.log"
+      "${PROJECT_BINARY_DIR}/mdec-reference/status.log"
+    LABELS mdec nightly portable TIMEOUT 30)
+else()
+  include(${PROJECT_SOURCE_DIR}/cmake/MDECReferences.cmake)
+  schway_prepare_mdec_reference_assets(
+    mdec_reference_dir mdec_4bit_exe mdec_4bit_log mdec_8bit_exe mdec_8bit_log
+    mdec_status_exe mdec_status_log mdec_4bit_exe_sha mdec_8bit_exe_sha
+    mdec_status_exe_sha mdec_4bit_log_sha mdec_8bit_log_sha mdec_status_log_sha)
+  schway_add_mdec_reference_target(
+    "${mdec_4bit_exe_sha}" "${mdec_8bit_exe_sha}" "${mdec_status_exe_sha}"
+    "${mdec_4bit_log_sha}" "${mdec_8bit_log_sha}" "${mdec_status_log_sha}")
+  schway_register_mdec_reference_tests(
+    "${mdec_4bit_exe}" "${mdec_4bit_log}" "${mdec_8bit_exe}" "${mdec_8bit_log}"
+    "${mdec_status_exe}" "${mdec_status_log}")
+endif()

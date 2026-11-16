@@ -59,3 +59,18 @@ retry if the whole block does not fit; DMA1 reads resume it as soon as enough
 space opens. This prevents dropping a block and avoids a same-tick scheduler
 loop. State format 12 stores the input halfword cursor and this pending-block
 state so save/load preserves stream and backpressure progress.
+
+## Pinned first-caller references
+
+The `mdec/4bit` and `mdec/8bit` guests and their `psx.log` output dumps are
+pinned to ps1-tests commit `f727802fead11f1daa7549285548392ef87749cb`.
+Their expected bytes come from those independent logs; the reference test runs
+each actual guest and compares the DMA1 destination RAM against every logged
+byte. The guest TTY emits literal format placeholders for these byte values,
+so that text is not used as the byte oracle. `[SCM.12]`
+
+The pinned `mdec/step-by-step-log` guest is checked against the corresponding
+status log's ordered status, input and output events. Its TTY also leaves
+formatted values as placeholders, and the log has no cycle stamps. The model
+tests verify status bits directly; neither this ordering check nor the
+unstamped log measures the 1,000-cycle scheduling baseline. `[SCM.12]`
