@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
+current_plan: 15 of 30
 status: executing
-stopped_at: Completed 06-30-PLAN.md; next execute 06-06-PLAN.md
-last_updated: "2026-11-16T02:54:47.113Z"
+stopped_at: Completed 06-06-PLAN.md
+last_updated: "2026-11-16T03:23:53.556Z"
 last_activity: 2026-11-16
-state_head: c93c94c6757c06cdb3d3e4728526dd66e696a265
+state_head: 2d93859a3213f3f75025beb615f4f6dff6837f50
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 180
-  completed_plans: 163
+  completed_plans: 164
   percent: 83
-current_plan: 6
-last_activity_desc: "Completed Plan 06-30 with exact pinned Q/GetlocP rows and state validation; DISC-01 remains partial until Plan 06-06's full gate. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+last_activity_desc: "Completed Plan 06-06's pinned timing/Getloc gate; next is Wave 8 Plan 06-09. DISC-01 remains pending aggregate Phase 6 acceptance. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,7 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Plan: 06-06 of 30 plans (Wave 7 final timing/Getloc gate)
+Current Plan: 15 of 30
+Next plan file: 06-09-PLAN.md (Wave 8)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -225,6 +226,7 @@ Progress: [████████░░] 83%
 | Phase 06 P28 | 6m | 1 tasks | 3 files |
 | Phase 6 P29 | at least 1h29m57s wall lower bound | 2 tasks | 14 files |
 | Phase 6 P30 | 37m+ | 2 tasks | 10 files |
+| Phase 06 P06 | >=2h35m20s wall lower bound | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -561,6 +563,9 @@ Recent decisions affecting current work:
 - [Phase 6]: GetlocP returns the latest CRC-valid host Q record; synthesize a TOC record only before a valid record exists.
 - [Phase 6]: Preserve the last valid Q record across absent or invalid host subcode.
 - [Phase 6]: Pinned seek rows are separate fixtures; no general target offset applies.
+- [Phase 06]: Keep fixed 451,584/225,792-cycle schedule assertions separate from the pinned drive timing bands.
+- [Phase 06]: Treat positive same-speed, read-active intervals between consecutive LBA callbacks as timing samples; exclude nonconsecutive LBA gaps and reject buffer overflow.
+- [Phase 06]: Keep DISC-01 pending until the remaining Phase 6 media, fuzz, and integration acceptance is complete.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -760,9 +765,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T02:54:46.843Z
-Stopped at: Completed 06-30-PLAN.md; next execute 06-06-PLAN.md
-Resume file: None
+Last session: 2026-11-16T03:23:53.293Z
+Stopped at: Completed 06-06-PLAN.md
+Resume file: 06-09-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
@@ -851,3 +856,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time is at 
 ### Phase 6 plan 06-30 execution (2026-11-16)
 
 Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time is at least 37m36s from the 02:17:11Z start marker through the 02:54:47Z closeout preparation; final metadata commit follows. Source review added last-good Q preservation and validation of serialized candidate bytes. Native CD-ROM/state checks passed 10/10 and the pinned reference guest/controls passed 2/2. The three pinned rows, malformed-Q handling, TOC track range and state continuation are covered. DISC-01 remains partial pending Plan 06-06's full timing/Getloc gate; Plan 06-06 is next.
+
+### Phase 6 plan 06-06 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. The execution chain lasted at least 2h35m20s from Plan 06-29's 00:43:26Z durable marker through Plan 06 closeout preparation; the original Plan 06 start and active time were not captured. The final CD-only configure/build/reference gate passed 3/3. Focused review cleared the comparator and pin/fetch logic before the final gate. Timing comparisons retain all eligible consecutive-LBA samples, reject overflow, and disclose that adjacent-LBA restarts are included. DISC-01 remains pending aggregate Phase 6 acceptance; Wave 8 Plan 06-09 is next. No hosted run URL applies.
