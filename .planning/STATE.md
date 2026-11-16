@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 29 of 39
+current_plan: 30 of 39
 status: executing
-stopped_at: Completed 06-39-PLAN.md; next 06-13-PLAN.md
-last_updated: "2026-11-16T14:05:00Z"
+stopped_at: Completed 06-13-PLAN.md slice; next 06-14-PLAN.md
+last_updated: "2026-11-16T19:00:00Z"
 last_activity: 2026-11-16
 state_head: f070353
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 177
+  completed_plans: 178
   percent: 84
 last_activity_desc: "Completed 06-39: proved pinned helper sends its stack buffer directly to DMA1, verified standalone and pinned unsigned 4-bit output, and retained red 8-bit/status gates. DISC-03 remains incomplete. Runtime about 27m wall. Codex/OpenGSD 1.20.0, root GPT-6 (session model id unavailable), reviewer gpt-6-luna xhigh."
 ---
@@ -31,12 +31,12 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 29 of 39
-Next plan file: 06-13-PLAN.md (Wave 14; color MDEC frame decode and DMA result display)
+Current Plan: 30 of 39
+Next plan file: 06-14-PLAN.md (Wave 15; pinned media tools and owned disc fixtures)
 Status: Ready to execute
 Last activity: 2026-11-16
 
-Progress: [████████░░] 83%
+Progress: [████████░░] 84%
 
 ## Performance Metrics
 
@@ -791,8 +791,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T14:05:00Z
-Stopped at: Completed 06-39-PLAN.md; next 06-13-PLAN.md
+Last session: 2026-11-16T18:57:07Z
+Stopped at: Plan 06-13 bounded slice closed; no complete public frame/movie oracle pair was found.
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -805,7 +805,7 @@ CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
 Phase 3 merged as PR #12; release PR #13 is green and merged. Phase 4 release v0.4.0 is latest.
 Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
-Next: continue `$gsd-plan-phase 6`. The Phase 6 context and discussion log are committed; no owner decision is pending. Standing preferences are in `.planning/AUTONOMOUS.md`.
+Next: continue `$gsd-autonomous --from 6 --to 6` with Plan 06-14's pinned disc-media tools and authored recipes. A complete independently captured frame/movie pair was not found; do not wait on owner hardware. The owner has a real PS1 and capture card but no time for capture now. Standing preferences are in `.planning/AUTONOMOUS.md`.
 
 ### Independent local work during immutable CI (2026-11-12)
 
@@ -898,3 +898,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall lower bound
 ### Phase 6 plan 06-12 oracle/control slice (2026-11-16)
 
 Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. The original execution marker is 08:10:43Z; split metadata was recorded at 09:28:28Z, giving a wall lower bound of at least 1h18m; exact active time is unavailable. The pinned 4/8-bit guest and status logs are resolved at public commit `f727802fead11f1daa7549285548392ef87749cb`; reference executables remain in build storage. The harness has independent byte/status comparators and mutation controls. The 4-bit guest reached the caller but the core consumed DMA0 command `0x20000020` from MADR `0x12000`, BCR `0x00010020`, CHCR `0x01000201`, then became idle with no output while the guest polled `0x80040000`; DMA1 remained unarmed. Keep DISC-03 partial. Plan 06-35 owns the bounded production repair and full passing reference gate; the exact Plan 06-12 gate resumes afterward.
+
+### Phase 6 plan 06-13 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID not exposed). Exact active time was not tracked; bounded local checks and follow-up closed at 18:57:07Z. Both MDEC target builds passed. Seven targeted color/display/FIFO/bounds/vector/4-bit checks passed; full `mdec.*` was 10/11 because `mdec.guest_input` still reports 12 exact 8-bit word differences. Reference asset and mutation controls passed 2/2; all four frame/movie callers failed fast on exhausted input, and all six reference cases took 0.64s. The frame stream has 296 macroblocks for 300 requested; movie frame one has 162 for 240 requested. Public hardware records cover compact color points and 19 of 20 frame strips but do not provide a complete frame/movie pair. Code review retained two warnings: incomplete image references and no raw guest-output hash. The latter is deferred in seed SEED-261116-mrh for Plan 06-16's first complete owned STR caller. DISC-03 remains pending; no hosted URL applies. No long suite or emulator process is running.

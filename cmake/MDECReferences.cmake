@@ -213,3 +213,179 @@ function(schway_register_mdec_reference_tests exe_4bit log_4bit exe_8bit log_8bi
     COMMAND schwaystation-test-mdec-reference controls "${log_4bit}" "${log_8bit}" "${log_status}"
     LABELS mdec nightly portable TIMEOUT 30)
 endfunction()
+
+function(schway_prepare_mdec_color_reference_assets output_dir output_exes output_pngs
+         output_exe_sha256s output_png_sha256s output_scene_sha256s)
+  file(STRINGS "${PROJECT_SOURCE_DIR}/pins.txt" source_rows
+    REGEX "^# ps1-tests-source commit=")
+  list(LENGTH source_rows source_count)
+  if(NOT source_count EQUAL 1 OR NOT source_rows MATCHES
+     "^# ps1-tests-source commit=f727802fead11f1daa7549285548392ef87749cb$")
+    message(FATAL_ERROR "MDEC_COLOR_REFERENCE_PIN_ERROR: source commit identity is absent or changed")
+  endif()
+
+  set(reference_dir "${PROJECT_BINARY_DIR}/mdec-reference/color")
+  file(MAKE_DIRECTORY "${reference_dir}/canonical")
+  schway__mdec_reference_pin(ps1-tests-gpu-captures build-158 archive_url archive_sha256)
+  set(shared_archive "${PROJECT_SOURCE_DIR}/build/nightly/gpu-reference/ps1-tests-build-158-tests.zip")
+  if(EXISTS "${shared_archive}")
+    schway__mdec_reference_verify_file("${shared_archive}" "${archive_sha256}" "build-158 archive")
+    set(archive "${shared_archive}")
+  else()
+    schway__mdec_reference_fetch_pin(ps1-tests-gpu-captures build-158
+      "${reference_dir}/archive" archive ignored_archive_sha256)
+  endif()
+  if(NOT archive)
+    set(archive "${reference_dir}/archive/tests.zip")
+  endif()
+  file(SIZE "${archive}" archive_size)
+  if(NOT archive_size EQUAL 6613816)
+    message(FATAL_ERROR "MDEC_COLOR_REFERENCE_ARCHIVE_ERROR: build-158 tests.zip has an unexpected size")
+  endif()
+
+  set(members
+    mdec/frame/frame-15bit.exe
+    mdec/frame/frame-24bit.exe
+    mdec/movie/movie-15bit.exe
+    mdec/movie/movie-24bit.exe
+    mdec/frame/vram-15bit.png
+    mdec/frame/vram-24bit.png
+    mdec/movie/vram-15bit.png
+    mdec/movie/vram-24bit.png)
+  set(member_sha256s "")
+  set(member_sizes "")
+  foreach(member IN LISTS members)
+    schway__mdec_reference_member("${member}" member_sha256 member_size)
+    list(APPEND member_sha256s "${member_sha256}")
+    list(APPEND member_sizes "${member_size}")
+  endforeach()
+  file(ARCHIVE_EXTRACT INPUT "${archive}" DESTINATION "${reference_dir}"
+    PATTERNS ${members})
+
+  set(exe_relpaths
+    mdec/frame/frame-15bit.exe
+    mdec/frame/frame-24bit.exe
+    mdec/movie/movie-15bit.exe
+    mdec/movie/movie-24bit.exe)
+  set(png_relpaths
+    mdec/frame/vram-15bit.png
+    mdec/frame/vram-24bit.png
+    mdec/movie/vram-15bit.png
+    mdec/movie/vram-24bit.png)
+  set(exes "")
+  set(exe_sha256s "")
+  foreach(index RANGE 0 3)
+    list(GET exe_relpaths ${index} relpath)
+    list(GET member_sha256s ${index} expected_sha256)
+    list(GET member_sizes ${index} expected_size)
+    set(path "${reference_dir}/${relpath}")
+    schway__mdec_reference_verify_file("${path}" "${expected_sha256}" "${relpath}")
+    file(SIZE "${path}" actual_size)
+    if(NOT actual_size EQUAL "${expected_size}")
+      message(FATAL_ERROR "MDEC_COLOR_REFERENCE_ARCHIVE_ERROR: ${relpath} has an unexpected size")
+    endif()
+    list(APPEND exes "${path}")
+    list(APPEND exe_sha256s "${expected_sha256}")
+  endforeach()
+
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  set(pngs "")
+  set(png_sha256s "")
+  foreach(index RANGE 0 3)
+    list(GET png_relpaths ${index} relpath)
+    math(EXPR member_index "${index} + 4")
+    list(GET member_sha256s ${member_index} expected_sha256)
+    list(GET member_sizes ${member_index} expected_size)
+    set(png_path "${reference_dir}/${relpath}")
+    schway__mdec_reference_verify_file("${png_path}" "${expected_sha256}" "${relpath}")
+    file(SIZE "${png_path}" actual_size)
+    if(NOT actual_size EQUAL "${expected_size}")
+      message(FATAL_ERROR "MDEC_COLOR_REFERENCE_ARCHIVE_ERROR: ${relpath} has an unexpected size")
+    endif()
+    string(REPLACE "/" "-" canonical_name "${relpath}")
+    string(REPLACE ".png" ".rgb555le" canonical_name "${canonical_name}")
+    set(canonical_path "${reference_dir}/canonical/${canonical_name}")
+    execute_process(
+      COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/gpu/reference_png.py"
+        decode "${png_path}" "${canonical_path}"
+      RESULT_VARIABLE decode_result
+      OUTPUT_VARIABLE decode_output
+      ERROR_VARIABLE decode_error)
+    if(NOT decode_result STREQUAL "0")
+      message(FATAL_ERROR "MDEC_COLOR_REFERENCE_PNG_ERROR: ${relpath}: ${decode_output}${decode_error}")
+    endif()
+    file(SHA256 "${canonical_path}" canonical_sha256)
+    list(APPEND pngs "${canonical_path}")
+    list(APPEND png_sha256s "${canonical_sha256}")
+  endforeach()
+  list(GET png_sha256s 0 frame_scene_sha256)
+  list(GET png_sha256s 2 movie_scene_sha256)
+  set(scene_sha256s "${frame_scene_sha256};${frame_scene_sha256};${movie_scene_sha256};${movie_scene_sha256}")
+
+  set(${output_dir} "${reference_dir}" PARENT_SCOPE)
+  set(${output_exes} "${exes}" PARENT_SCOPE)
+  set(${output_pngs} "${pngs}" PARENT_SCOPE)
+  set(${output_exe_sha256s} "${exe_sha256s}" PARENT_SCOPE)
+  set(${output_png_sha256s} "${png_sha256s}" PARENT_SCOPE)
+  set(${output_scene_sha256s} "${scene_sha256s}" PARENT_SCOPE)
+endfunction()
+
+function(schway_add_mdec_color_reference_support exe_sha256s png_sha256s scene_sha256s)
+  if(NOT TARGET schwaystation-test-mdec-reference)
+    message(FATAL_ERROR "MDEC_COLOR_REFERENCE_TARGET_ERROR: create the MDEC reference runner first")
+  endif()
+  target_sources(schwaystation-test-mdec-reference PRIVATE
+    "${PROJECT_SOURCE_DIR}/tests/mdec/color_reference.c")
+  set(cases frame15 frame24 movie15 movie24)
+  foreach(index RANGE 0 3)
+    list(GET exe_sha256s ${index} exe_sha256)
+    list(GET png_sha256s ${index} png_sha256)
+    list(GET scene_sha256s ${index} scene_sha256)
+    list(GET cases ${index} case)
+    string(TOUPPER "${case}" case_upper)
+    target_compile_definitions(schwaystation-test-mdec-reference PRIVATE
+      "SCHWAY_MDEC_${case_upper}_EXE_SHA256=\"${exe_sha256}\"")
+    target_compile_definitions(schwaystation-test-mdec-reference PRIVATE
+      "SCHWAY_MDEC_${case_upper}_VRAM_SHA256=\"${png_sha256}\"")
+    if(case STREQUAL "frame15")
+      target_compile_definitions(schwaystation-test-mdec-reference PRIVATE
+        "SCHWAY_MDEC_FRAME_SCENE_SHA256=\"${scene_sha256}\"")
+    elseif(case STREQUAL "movie15")
+      target_compile_definitions(schwaystation-test-mdec-reference PRIVATE
+        "SCHWAY_MDEC_MOVIE_SCENE_SHA256=\"${scene_sha256}\"")
+    endif()
+  endforeach()
+endfunction()
+
+function(schway_register_mdec_color_reference_tests reference_dir exes pngs)
+  if(NOT TARGET schwaystation-test-mdec-reference)
+    message(FATAL_ERROR "MDEC_COLOR_REFERENCE_TARGET_ERROR: create the MDEC reference runner first")
+  endif()
+  set(asset_args "")
+  list(APPEND asset_args ${exes} ${pngs})
+  schway_add_test(NAME mdec.reference.color_assets
+    COMMAND schwaystation-test-mdec-reference color-assets ${asset_args}
+    LABELS mdec nightly portable TIMEOUT 20)
+  set_tests_properties(mdec.reference.color_assets PROPERTIES
+    FIXTURES_SETUP mdec_color_reference_assets)
+  schway_add_test(NAME mdec.reference.color_controls
+    COMMAND schwaystation-test-mdec-reference color-controls
+    LABELS mdec nightly portable TIMEOUT 10)
+
+  set(cases frame15 frame24 movie15 movie24)
+  set(scene_pngs "")
+  list(GET pngs 0 frame_scene)
+  list(GET pngs 2 movie_scene)
+  list(APPEND scene_pngs "${frame_scene}" "${frame_scene}" "${movie_scene}" "${movie_scene}")
+  foreach(index RANGE 0 3)
+    list(GET cases ${index} case)
+    list(GET exes ${index} exe)
+    list(GET pngs ${index} vram_png)
+    list(GET scene_pngs ${index} scene_png)
+    schway_add_test(NAME mdec.reference.${case}
+      COMMAND schwaystation-test-mdec-reference color ${case} "${exe}" "${vram_png}" "${scene_png}"
+      LABELS mdec nightly portable TIMEOUT 180)
+    set_tests_properties(mdec.reference.${case} PROPERTIES
+      FIXTURES_REQUIRED mdec_color_reference_assets)
+  endforeach()
+endfunction()

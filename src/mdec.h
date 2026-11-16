@@ -22,10 +22,14 @@ struct schway__mdec {
     int16_t scale[SCHWAY__MDEC_BLOCK_SAMPLES];
     int16_t block[SCHWAY__MDEC_BLOCK_SAMPLES];
     int32_t work[SCHWAY__MDEC_BLOCK_SAMPLES];
+    int16_t chroma_cr[SCHWAY__MDEC_BLOCK_SAMPLES];
+    int16_t chroma_cb[SCHWAY__MDEC_BLOCK_SAMPLES];
+    uint8_t color_stage[8u * 8u * 3u];
     uint32_t input_head, input_count, input_half;
     uint32_t output_head, output_count;
     uint32_t command, command_words, words_remaining;
     uint32_t block_index, depth, signed_output, bit15;
+    uint32_t parse_scan, parse_qscale, parse_have_dc;
     uint32_t control, command_active, block_pending;
     uint64_t block_deadline;
 };

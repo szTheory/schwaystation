@@ -215,4 +215,14 @@ else()
   schway_register_mdec_reference_tests(
     "${mdec_4bit_exe}" "${mdec_4bit_log}" "${mdec_8bit_exe}" "${mdec_8bit_log}"
     "${mdec_status_exe}" "${mdec_status_log}")
+  schway_prepare_mdec_color_reference_assets(
+    mdec_color_reference_dir mdec_color_reference_exes mdec_color_reference_pngs
+    mdec_color_reference_exe_sha256s mdec_color_reference_png_sha256s
+    mdec_color_reference_scene_sha256s)
+  schway_add_mdec_color_reference_support(
+    "${mdec_color_reference_exe_sha256s}" "${mdec_color_reference_png_sha256s}"
+    "${mdec_color_reference_scene_sha256s}")
+  schway_register_mdec_color_reference_tests(
+    "${mdec_color_reference_dir}" "${mdec_color_reference_exes}"
+    "${mdec_color_reference_pngs}")
 endif()

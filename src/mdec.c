@@ -70,6 +70,10 @@ void schway__mdec_state_io(struct schway__state_io *io, schway *inst, uint64_t t
     state_i16_array(io, "mdec.scale", mdec->scale, SCHWAY__MDEC_BLOCK_SAMPLES);
     state_i16_array(io, "mdec.block", mdec->block, SCHWAY__MDEC_BLOCK_SAMPLES);
     state_i32_array(io, "mdec.work", mdec->work, SCHWAY__MDEC_BLOCK_SAMPLES);
+    state_i16_array(io, "mdec.chroma_cr", mdec->chroma_cr, SCHWAY__MDEC_BLOCK_SAMPLES);
+    state_i16_array(io, "mdec.chroma_cb", mdec->chroma_cb, SCHWAY__MDEC_BLOCK_SAMPLES);
+    schway__state_u8_array(io, "mdec.color_stage", mdec->color_stage,
+                           (uint32_t)sizeof mdec->color_stage, 0u, UINT8_MAX);
     uint32_t input_head = schway__state_u32(io, "mdec.input_head", &mdec->input_head, 0u,
                                             SCHWAY__MDEC_INPUT_WORDS - 1u);
     uint32_t input_count = schway__state_u32(io, "mdec.input_count", &mdec->input_count, 0u,
@@ -86,6 +90,11 @@ void schway__mdec_state_io(struct schway__state_io *io, schway *inst, uint64_t t
                                                  &mdec->words_remaining, 0u, 0xFFFFu);
     uint32_t block_index = schway__state_u32(io, "mdec.block_index", &mdec->block_index, 0u, 5u);
     uint32_t depth = schway__state_u32(io, "mdec.depth", &mdec->depth, 0u, 3u);
+    uint32_t parse_scan = schway__state_u32(io, "mdec.parse_scan", &mdec->parse_scan, 0u, 63u);
+    uint32_t parse_qscale = schway__state_u32(io, "mdec.parse_qscale", &mdec->parse_qscale,
+                                               0u, 63u);
+    uint32_t parse_have_dc = schway__state_u32(io, "mdec.parse_have_dc",
+                                               &mdec->parse_have_dc, 0u, 1u);
     (void)schway__state_u32(io, "mdec.signed_output", &mdec->signed_output, 0u, 1u);
     (void)schway__state_u32(io, "mdec.bit15", &mdec->bit15, 0u, 1u);
     uint32_t control = schway__state_u32(io, "mdec.control", &mdec->control, 0u, UINT32_MAX);
@@ -107,17 +116,25 @@ void schway__mdec_state_io(struct schway__state_io *io, schway *inst, uint64_t t
         schway__state_check(io, output_head < SCHWAY__MDEC_OUTPUT_WORDS &&
                                    output_count <= SCHWAY__MDEC_OUTPUT_WORDS);
         schway__state_check(io, block_index <= 5u && depth <= 3u);
+        schway__state_check(io, parse_scan <= 63u && parse_qscale <= 63u && parse_have_dc <= 1u);
+        schway__state_check(io, parse_have_dc != 0u ||
+                                   (parse_scan == 0u && parse_qscale == 0u));
+        schway__state_check(io, parse_have_dc == 0u ||
+                                   (command_active != 0u && block_pending == 0u));
         schway__state_check(io, command_words <= 0xFFFFu && words_remaining <= 0xFFFFu);
         schway__state_check(io, command_active == 0u || command_words != 0u ||
                                    words_remaining != 0u);
         schway__state_check(io, (control & ~(SCHWAY__MDEC_DMA_IN_ENABLE |
                                              SCHWAY__MDEC_DMA_OUT_ENABLE)) == 0u);
-        uint32_t output_words = depth == 0u ? 8u : 16u;
+        uint32_t output_words = depth == 0u ? 8u : depth == 1u ? 16u :
+                                depth == 2u && (block_index == 1u || block_index == 3u) ? 96u :
+                                depth == 3u && block_index < 4u ? 32u : 0u;
+        uint32_t output_block_fits = output_words == 0u ||
+                                     output_count <= SCHWAY__MDEC_OUTPUT_WORDS - output_words;
         schway__state_check(io, block_pending == 0u
                                    ? block_deadline == 0u
                                    : (block_deadline == 0u
-                                          ? depth <= 1u &&
-                                                output_count > SCHWAY__MDEC_OUTPUT_WORDS - output_words
+                                          ? output_words != 0u && output_block_fits == 0u
                                           : block_deadline >= ticks && block_deadline <= max));
     }
 }
@@ -166,6 +183,17 @@ static int32_t mdec_clip8(int64_t value)
     return (int32_t)value;
 }
 
+static int32_t mdec_clip9(int64_t value)
+{
+    value %= 512;
+    if (value >= 256) {
+        value -= 512;
+    } else if (value < -256) {
+        value += 512;
+    }
+    return (int32_t)value;
+}
+
 static int64_t mdec_floor_div(int64_t value, int64_t divisor)
 {
     if (value >= 0) {
@@ -179,7 +207,7 @@ static uint32_t mdec_input_request(const schway *inst)
     const struct schway__mdec *mdec = &inst->mdec;
     return (mdec->control & SCHWAY__MDEC_DMA_IN_ENABLE) != 0u &&
                    mdec->command_active != 0u && mdec->block_pending == 0u &&
-                   mdec->input_count < SCHWAY__MDEC_INPUT_WORDS
+                   mdec->input_count == 0u
                ? 1u
                : 0u;
 }
@@ -217,6 +245,9 @@ static void mdec_abort_block(schway *inst)
     mdec->command_active = 0u;
     mdec->words_remaining = 0u;
     mdec->block_index = 4u;
+    mdec->parse_scan = 0u;
+    mdec->parse_qscale = 0u;
+    mdec->parse_have_dc = 0u;
     mdec_update_requests(inst);
 }
 
@@ -237,12 +268,7 @@ static void mdec_idct(struct schway__mdec *mdec, const int16_t coefficients[64])
             for (uint32_t z = 0u; z < 8u; z++) {
                 sum += (int64_t)mdec->work[y + z * 8u] * mdec->scale[x + z * 8u];
             }
-            int64_t value = mdec_floor_div(sum + 0x8000, 0x10000);
-            if (value > 255) {
-                value = 255;
-            } else if (value < -256) {
-                value = -256;
-            }
+            int64_t value = mdec_clip9(mdec_floor_div(sum + 0x8000, 0x10000));
             mdec->block[y * 8u + x] = (int16_t)mdec_clip8(value);
         }
     }
@@ -255,27 +281,28 @@ static int mdec_finish_block(schway *inst, const int16_t coefficients[64],
     mdec_input_consume(mdec, consumed_words);
     mdec->input_half = next_half;
     mdec_idct(mdec, coefficients);
+    mdec->parse_scan = 0u;
+    mdec->parse_qscale = 0u;
+    mdec->parse_have_dc = 0u;
     if (now > UINT64_MAX - SCHWAY__MDEC_BLOCK_CYCLES) {
         mdec_abort_block(inst);
         return -1;
     }
-    mdec->block_index = 0u;
+    if (mdec->depth < 2u) {
+        mdec->block_index = 0u;
+    }
     mdec->block_pending = 1u;
     mdec->block_deadline = now + SCHWAY__MDEC_BLOCK_CYCLES;
     mdec_update_requests(inst);
     return 1;
 }
 
-/* Read one bounded block from the input FIFO. The pinned 32-word mono caller
-   may end exactly after coefficient 63 without EOB; other exhausted commands
-   and a full FIFO are malformed and are discarded. */
+/* Continue one block across bounded FIFO refills. The parser consumes complete
+   input words after saving coefficient state, so a legal dense block never
+   needs to fit in the 32-word FIFO. */
 static int mdec_parse_block(schway *inst, uint64_t now)
 {
     struct schway__mdec *mdec = &inst->mdec;
-    int16_t coefficients[SCHWAY__MDEC_BLOCK_SAMPLES] = {0};
-    uint32_t scan = 0u;
-    uint32_t have_dc = 0u;
-    uint32_t qscale = 0u;
 
     for (uint32_t word_index = 0u; word_index < mdec->input_count; word_index++) {
         uint32_t fifo_index = (mdec->input_head + word_index) % SCHWAY__MDEC_INPUT_WORDS;
@@ -283,44 +310,68 @@ static int mdec_parse_block(schway *inst, uint64_t now)
         uint32_t first_half = word_index == 0u ? mdec->input_half : 0u;
         for (uint32_t half = first_half; half < 2u; half++) {
             uint32_t value = half == 0u ? word & 0xFFFFu : word >> 16;
-            if (have_dc == 0u && value == 0xFE00u) {
+            if (mdec->parse_have_dc == 0u && value == 0xFE00u) {
                 continue;
             }
-            if (have_dc == 0u) {
-                qscale = value >> 10;
+            if (mdec->parse_have_dc == 0u) {
+                memset(mdec->block, 0, sizeof mdec->block);
+                mdec->parse_qscale = value >> 10;
                 int32_t dc = mdec_signed10(value);
-                int64_t dequant = qscale == 0u ? (int64_t)dc * 2
-                                                : (int64_t)dc * mdec->quant[0];
-                coefficients[0] = mdec_clip11(dequant);
-                have_dc = 1u;
+                uint32_t quant_offset = mdec->depth >= 2u && mdec->block_index >= 4u ? 64u : 0u;
+                int64_t dequant = mdec->parse_qscale == 0u ? (int64_t)dc * 2
+                                                            : (int64_t)dc * mdec->quant[quant_offset];
+                mdec->block[0] = mdec_clip11(dequant);
+                mdec->parse_have_dc = 1u;
                 continue;
             }
             if (value == 0xFE00u) {
-                return mdec_finish_block(inst, coefficients,
+                return mdec_finish_block(inst, mdec->block,
                                          word_index + (half == 0u ? 0u : 1u),
                                          half == 0u ? 1u : 0u, now);
             }
-            uint32_t next = scan + ((value >> 10) & 0x3Fu) + 1u;
+            uint32_t next = mdec->parse_scan + ((value >> 10) & 0x3Fu) + 1u;
             if (next >= SCHWAY__MDEC_BLOCK_SAMPLES) {
-                mdec_abort_block(inst);
-                return -1;
+                /* A run that reaches the end of the 64 coefficients closes
+                   the block; ares uses the same rule for real MDEC streams. */
+                return mdec_finish_block(inst, mdec->block,
+                                         word_index + (half == 0u ? 0u : 1u),
+                                         half == 0u ? 1u : 0u, now);
             }
             int32_t ac = mdec_signed10(value);
-            int64_t dequant = (int64_t)ac * mdec->quant[next] * qscale;
-            coefficients[mdec_zigzag[next]] = mdec_clip11((dequant + 4) / 8);
-            scan = next;
+            uint32_t quant_offset = mdec->depth >= 2u && mdec->block_index >= 4u ? 64u : 0u;
+            uint32_t coefficient = next;
+            int64_t dequant;
+            if (mdec->parse_qscale == 0u) {
+                /* Zero-scale blocks bypass quantization and zigzag (MDEC guide, Commands and input). */
+                dequant = (int64_t)ac * 2;
+            } else {
+                coefficient = mdec_zigzag[next];
+                dequant = (int64_t)ac * mdec->quant[quant_offset + next] *
+                          mdec->parse_qscale;
+                dequant = (dequant + 4) / 8;
+            }
+            mdec->block[coefficient] = mdec_clip11(dequant);
+            mdec->parse_scan = next;
         }
     }
 
-    /* This final 32-word command boundary completes the pinned 4-bit guest's
-       64 coefficients without an explicit FE00 halfword. */
-    if (mdec->command_words == 32u && mdec->words_remaining == 0u && have_dc != 0u &&
-        scan == 63u) {
-        return mdec_finish_block(inst, coefficients, mdec->input_count, 0u, now);
+    /* The pinned mono caller ends exactly after coefficient 63 without EOB. */
+    if (mdec->command_words == 32u && mdec->words_remaining == 0u &&
+        mdec->parse_have_dc != 0u && mdec->parse_scan == 63u) {
+        return mdec_finish_block(inst, mdec->block, mdec->input_count, 0u, now);
     }
-    if (mdec->input_count >= SCHWAY__MDEC_INPUT_WORDS || mdec->words_remaining == 0u) {
-        mdec_abort_block(inst);
-        return -1;
+    uint32_t consumed_words = mdec->input_count;
+    mdec_input_consume(mdec, consumed_words);
+    mdec->input_half = 0u;
+    if (mdec->words_remaining == 0u) {
+        if (mdec->parse_have_dc != 0u) {
+            mdec_abort_block(inst);
+            return -1;
+        }
+        mdec->command_active = 0u;
+        mdec->block_index = 4u;
+        mdec_update_requests(inst);
+        return 1;
     }
     return 0;
 }
@@ -329,7 +380,8 @@ static void mdec_try_decode(schway *inst, uint64_t now)
 {
     struct schway__mdec *mdec = &inst->mdec;
     if (mdec->command_active == 0u || mdec->block_pending != 0u || mdec->input_count == 0u ||
-        mdec->depth > 1u) {
+        mdec->depth > 3u ||
+        (mdec->depth >= 2u && mdec->block_index == 4u && mdec->output_count != 0u)) {
         return;
     }
     (void)mdec_parse_block(inst, now);
@@ -337,7 +389,16 @@ static void mdec_try_decode(schway *inst, uint64_t now)
 
 static uint32_t mdec_output_words(const struct schway__mdec *mdec)
 {
-    return mdec->depth == 0u ? 8u : 16u;
+    if (mdec->depth == 0u) {
+        return 8u;
+    }
+    if (mdec->depth == 1u) {
+        return 16u;
+    }
+    if (mdec->depth == 2u) {
+        return mdec->block_index == 1u || mdec->block_index == 3u ? 96u : 0u;
+    }
+    return mdec->block_index < 4u ? 32u : 0u;
 }
 
 static uint32_t mdec_pixel(const struct schway__mdec *mdec, uint32_t pixel)
@@ -350,9 +411,140 @@ static uint32_t mdec_pixel(const struct schway__mdec *mdec, uint32_t pixel)
     return value;
 }
 
+/* MDEC color conversion uses signed 8-bit Y, Cr and Cb samples, clips each
+   channel to -128..127, then XORs bit 7 for unsigned output (PSX-SPU-CDROM-
+   AND-MDEC, section 4). Coefficients are the locked Q16 values from that
+   section; integer floor division keeps negative products portable. */
+static void mdec_color_pixel(const struct schway__mdec *mdec, uint32_t block,
+                             uint32_t x, uint32_t y, uint8_t rgb[3])
+{
+    uint32_t block_x = (block & 1u) * 8u;
+    uint32_t block_y = (block >> 1u) * 8u;
+    uint32_t chroma_index = ((block_y + y) / 2u) * 8u + (block_x + x) / 2u;
+    int32_t luminance = mdec->block[y * 8u + x];
+    int32_t cr = mdec->chroma_cr[chroma_index];
+    int32_t cb = mdec->chroma_cb[chroma_index];
+    int64_t red = luminance + mdec_floor_div((int64_t)cr * 91881, 65536);
+    int64_t green = luminance - mdec_floor_div((int64_t)cb * 22524, 65536) -
+                    mdec_floor_div((int64_t)cr * 46811, 65536);
+    int64_t blue = luminance + mdec_floor_div((int64_t)cb * 116130, 65536);
+    rgb[0] = (uint8_t)mdec_clip8(red);
+    rgb[1] = (uint8_t)mdec_clip8(green);
+    rgb[2] = (uint8_t)mdec_clip8(blue);
+    if (mdec->signed_output == 0u) {
+        rgb[0] ^= 0x80u;
+        rgb[1] ^= 0x80u;
+        rgb[2] ^= 0x80u;
+    }
+}
+
+static uint32_t mdec_color_pixel_15(const struct schway__mdec *mdec, uint32_t block,
+                                    uint32_t x, uint32_t y)
+{
+    uint32_t block_x = (block & 1u) * 8u;
+    uint32_t block_y = (block >> 1u) * 8u;
+    uint32_t chroma_index = ((block_y + y) / 2u) * 8u + (block_x + x) / 2u;
+    int32_t luminance = mdec->block[y * 8u + x];
+    int32_t cr = mdec->chroma_cr[chroma_index];
+    int32_t cb = mdec->chroma_cb[chroma_index];
+    int32_t red = mdec_clip8(luminance + mdec_floor_div((int64_t)cr * 91881, 65536));
+    int32_t green = mdec_clip8(luminance - mdec_floor_div((int64_t)cb * 22524, 65536) -
+                               mdec_floor_div((int64_t)cr * 46811, 65536));
+    int32_t blue = mdec_clip8(luminance + mdec_floor_div((int64_t)cb * 116130, 65536));
+    uint32_t pixel = mdec->bit15 << 15u;
+    uint32_t channels[3] = {(uint8_t)red, (uint8_t)green, (uint8_t)blue};
+    if (mdec->signed_output == 0u) {
+        channels[0] ^= 0x80u;
+        channels[1] ^= 0x80u;
+        channels[2] ^= 0x80u;
+    }
+    for (uint32_t channel = 0u; channel < 3u; channel++) {
+        pixel |= (channels[channel] >> 3u) << (channel * 5u);
+    }
+    return pixel;
+}
+
+static void mdec_output_byte(struct schway__mdec *mdec, uint32_t byte_offset, uint8_t value)
+{
+    uint32_t logical_byte = mdec->output_count * 4u + byte_offset;
+    uint32_t index = (mdec->output_head + logical_byte / 4u) % SCHWAY__MDEC_OUTPUT_WORDS;
+    uint32_t shift = (logical_byte & 3u) * 8u;
+    uint32_t mask = UINT32_C(0xFF) << shift;
+    mdec->output[index] = (mdec->output[index] & ~mask) | ((uint32_t)value << shift);
+}
+
+static void mdec_stage_color_block(struct schway__mdec *mdec)
+{
+    for (uint32_t y = 0u; y < 8u; y++) {
+        for (uint32_t x = 0u; x < 8u; x++) {
+            uint8_t rgb[3];
+            mdec_color_pixel(mdec, mdec->block_index, x, y, rgb);
+            uint32_t offset = (y * 8u + x) * 3u;
+            mdec->color_stage[offset] = rgb[0];
+            mdec->color_stage[offset + 1u] = rgb[1];
+            mdec->color_stage[offset + 2u] = rgb[2];
+        }
+    }
+}
+
+static void mdec_publish_15bit_block(struct schway__mdec *mdec)
+{
+    uint32_t byte_offset = 0u;
+    for (uint32_t y = 0u; y < 8u; y++) {
+        for (uint32_t x = 0u; x < 8u; x++) {
+            uint32_t pixel_word = mdec_color_pixel_15(mdec, mdec->block_index, x, y);
+            uint16_t pixel = (uint16_t)pixel_word;
+            mdec_output_byte(mdec, byte_offset++, (uint8_t)pixel);
+            mdec_output_byte(mdec, byte_offset++, (uint8_t)(pixel >> 8u));
+        }
+    }
+    mdec->output_count += 32u;
+}
+
+/* The 24-bit stream is packed as an 8-row, 16-pixel strip. Y1/Y2 and Y3/Y4
+   are interleaved by row so DMA1 can feed a native GPU image upload directly
+   (PSX-SPU-CDROM-AND-MDEC, section 4). */
+static void mdec_publish_24bit_pair(struct schway__mdec *mdec)
+{
+    for (uint32_t y = 0u; y < 8u; y++) {
+        for (uint32_t side = 0u; side < 2u; side++) {
+            for (uint32_t x = 0u; x < 8u; x++) {
+                uint8_t rgb[3];
+                uint32_t pixel_offset = (y * 8u + x) * 3u;
+                if (side == 0u) {
+                    rgb[0] = mdec->color_stage[pixel_offset];
+                    rgb[1] = mdec->color_stage[pixel_offset + 1u];
+                    rgb[2] = mdec->color_stage[pixel_offset + 2u];
+                } else {
+                    mdec_color_pixel(mdec, mdec->block_index, x, y, rgb);
+                }
+                uint32_t row_pixel = y * 16u + side * 8u + x;
+                for (uint32_t channel = 0u; channel < 3u; channel++) {
+                    mdec_output_byte(mdec, row_pixel * 3u + channel, rgb[channel]);
+                }
+            }
+        }
+    }
+    mdec->output_count += 96u;
+}
+
 static void mdec_publish_block(schway *inst)
 {
     struct schway__mdec *mdec = &inst->mdec;
+    if (mdec->depth >= 2u) {
+        if (mdec->block_index == 4u) {
+            memcpy(mdec->chroma_cr, mdec->block, sizeof mdec->chroma_cr);
+        } else if (mdec->block_index == 5u) {
+            memcpy(mdec->chroma_cb, mdec->block, sizeof mdec->chroma_cb);
+        } else if (mdec->depth == 3u) {
+            mdec_publish_15bit_block(mdec);
+        } else if ((mdec->block_index & 1u) == 0u) {
+            mdec_stage_color_block(mdec);
+        } else {
+            mdec_publish_24bit_pair(mdec);
+        }
+        return;
+    }
     uint32_t words = mdec_output_words(mdec);
     if (words > SCHWAY__MDEC_OUTPUT_WORDS - mdec->output_count) {
         return;
@@ -394,6 +586,17 @@ static void mdec_complete_block(schway *inst, uint64_t now)
     mdec_publish_block(inst);
     mdec->block_pending = 0u;
     mdec->block_deadline = 0u;
+    if (mdec->depth >= 2u) {
+        if (mdec->block_index == 4u) {
+            mdec->block_index = 5u;
+        } else if (mdec->block_index == 5u) {
+            mdec->block_index = 0u;
+        } else if (mdec->block_index == 3u) {
+            mdec->block_index = 4u;
+        } else {
+            mdec->block_index++;
+        }
+    }
     if (mdec->input_count != 0u) {
         mdec_try_decode(inst, now);
     } else if (mdec->words_remaining == 0u) {
@@ -444,6 +647,9 @@ static void mdec_start_command(schway *inst, uint32_t command)
     mdec->words_remaining = 0u;
     mdec->block_index = 4u;
     mdec->command_active = 0u;
+    mdec->parse_scan = 0u;
+    mdec->parse_qscale = 0u;
+    mdec->parse_have_dc = 0u;
     /* Command mirror fields follow the STAT behavior in docs/hardware/mdec.md. */
     mdec->depth = (command >> 27) & 3u;
     mdec->signed_output = (command >> 26) & 1u;
@@ -451,8 +657,10 @@ static void mdec_start_command(schway *inst, uint32_t command)
     if (opcode == 1u) {
         mdec->command_words = command & 0xFFFFu;
         mdec->words_remaining = mdec->command_words;
-        mdec->command_active = mdec->command_words != 0u && mdec->depth <= 1u ? 1u : 0u;
-        mdec->block_index = mdec->command_active != 0u ? 0u : 4u;
+        mdec->command_active = mdec->command_words != 0u && mdec->depth <= 3u ? 1u : 0u;
+        mdec->block_index = mdec->command_active != 0u
+                                ? (mdec->depth >= 2u ? 4u : 0u)
+                                : 4u;
     } else if (opcode == 2u || opcode == 3u) {
         mdec->command_words = opcode == 2u ? (((command & 1u) != 0u) ? 32u : 16u) : 32u;
         mdec->words_remaining = mdec->command_words;
@@ -529,6 +737,9 @@ uint32_t schway__mdec_read(schway *inst, uint32_t address, uint64_t now)
         mdec->output_head = (mdec->output_head + 1u) % SCHWAY__MDEC_OUTPUT_WORDS;
         mdec->output_count--;
         mdec_resume_waiting_block(inst, now);
+        if (mdec->output_count == 0u && mdec->block_pending == 0u) {
+            mdec_try_decode(inst, now);
+        }
         mdec_update_requests(inst);
     }
     return value;

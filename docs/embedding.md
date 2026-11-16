@@ -545,12 +545,13 @@ schway_load_state(inst, buf, n);
 ```
 
 A state is the same bytes on every platform: a 20-byte header (magic, state format, total size, CRC-32 of the
-rest) and then every field, little-endian. Format 14 includes the CD-ROM controller, validated Q record, pending
-and applied ATV matrices, XA-ADPCM predictor history, resampler history, both bounded CD input queues, and the
-MDEC input halfword cursor alongside the SPU state.
-The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. A format-13 state
-returns `SCHWAY_STATUS_ERR_STATE_VERSION`; the public API and ABI remain unchanged. The behavior revision is 14
-because accepted XA sectors now feed native SPU output through the bounded mixer.
+rest) and then every field, little-endian. Format 16 includes the CD-ROM controller, validated Q record, pending
+and applied ATV matrices, XA-ADPCM predictor history, resampler history, both bounded CD input queues, the MDEC
+input halfword cursor, resumable coefficient scan, decoded color planes and staged color output alongside the SPU state.
+The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. A format-15 state
+returns `SCHWAY_STATUS_ERR_STATE_VERSION`; the public API and ABI remain unchanged. The behavior revision is 16
+because MDEC color decoding now produces 15-bit and packed 24-bit output through the DMA display path, and dense
+blocks resume across bounded input FIFO refills.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:
 

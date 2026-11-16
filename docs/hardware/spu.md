@@ -25,7 +25,7 @@ listed in the preparation file; the model's current register paths are in `src/s
 
 The state visitor records SPU RAM, register values, voice registers and decoder history, sample phase, envelope and
 sweep counters, FIFO contents and cursors, queued register writes, noise phase/LFSR, capture position, reverb FIR and
-work histories, reverb cursors, transfer addresses, IRQ state and the next SPU tick. State format 14 validates these
+work histories, reverb cursors, transfer addresses, IRQ state and the next SPU tick. State format 16 validates these
 fields before applying them. The host audio ring is excluded and is cleared after a valid load; a refused load leaves
 the instance unchanged. See `src/spu.c` and `src/state.c`.
 

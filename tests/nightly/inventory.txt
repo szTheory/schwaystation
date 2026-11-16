@@ -17,7 +17,13 @@ gpu.reference.uv-interpolation	gpu,nightly,portable
 gpu.reference.vram-to-vram-overlap	gpu,nightly,portable
 mdec.reference.4bit	mdec,nightly,portable
 mdec.reference.8bit	mdec,nightly,portable
+mdec.reference.color_assets	mdec,nightly,portable
+mdec.reference.color_controls	mdec,nightly,portable
 mdec.reference.controls	mdec,nightly,portable
+mdec.reference.frame15	mdec,nightly,portable
+mdec.reference.frame24	mdec,nightly,portable
+mdec.reference.movie15	mdec,nightly,portable
+mdec.reference.movie24	mdec,nightly,portable
 mdec.reference.status	mdec,nightly,portable
 spu.reference.memory_transfer	audio,nightly,portable
 vectors.r3000.full	portable,vectors

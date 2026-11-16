@@ -171,7 +171,7 @@ the last good position. `current_lba` follows valid Q position unless the host's
 in which case the previous good position remains visible. Disc callbacks and TOC remain host-owned and are not part of
 save states; controller flags, sector bytes, the latest validated 12-byte Q record, FIFO contents and scheduled
 deadlines, ATV staging and active values, CDDA and XA queue contents, XA predictor history and resampler history are
-serialized in state format 14.
+serialized in state format 16.
 
 ## Sources and confidence
 

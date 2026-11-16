@@ -857,8 +857,12 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
                    reordered_rejected && dropped_rejected ? 0 : 1;
 }
 
+int schway_mdec_color_reference_run(int argc, char **argv);
+
 int main(int argc, char **argv)
 {
+    if (argc >= 2 && (strncmp(argv[1], "color", 5u) == 0))
+        return schway_mdec_color_reference_run(argc, argv);
     if (argc == 4 && (strcmp(argv[1], "4bit") == 0 || strcmp(argv[1], "8bit") == 0))
         return run_block_guest(argv[1], argv[2], argv[3]);
     if (argc == 4 && strcmp(argv[1], "status") == 0)

@@ -22,8 +22,8 @@
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 14u
-#define SCHWAY__STATE_FORMAT 14u
+#define SCHWAY__BEHAVIOUR_REVISION 16u
+#define SCHWAY__STATE_FORMAT 16u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u

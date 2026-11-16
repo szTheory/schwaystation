@@ -24,6 +24,18 @@ schway_add_test(NAME mdec.bounds
   COMMAND schwaystation-test-mdec bounds
   LABELS mdec portable TIMEOUT 10)
 
+# Fault prevented: color components decode in Cr,Cb,Y1-Y4 order, signed and
+# unsigned channel packing changes, or the 15-bit bit15 flag is lost.
+schway_add_test(NAME mdec.color
+  COMMAND schwaystation-test-mdec color
+  LABELS mdec portable TIMEOUT 10)
+
+# Fault prevented: decoded color output fails to cross DMA0, DMA1, DMA2 and
+# the existing native scanout in RGB555 and RGB24 modes.
+schway_add_test(NAME mdec.display
+  COMMAND schwaystation-test-mdec display
+  LABELS mdec portable TIMEOUT 10)
+
 # Fault prevented: nonzero mono pixels pack incorrectly in raw output or DMA1
 # writes a different word order or ending MADR in RAM.
 schway_add_test(NAME mdec.words

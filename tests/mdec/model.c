@@ -11,6 +11,8 @@
 #define MDEC_DATA 0x1F801820u
 #define DMA_BASE 0x1F801080u
 #define DMA_DPCR 0x1F8010F0u
+#define GPU_GP0 0x1F801810u
+#define GPU_GP1 0x1F801814u
 
 static void *test_alloc(void *user, size_t size)
 {
@@ -307,6 +309,358 @@ static void decode_words(schway *inst, uint32_t command, const uint32_t *input,
     CHECK_EQ_U64(inst->mdec.output_count, output_words);
 }
 
+static uint32_t color_dc_word(int32_t dc)
+{
+    return UINT32_C(0xFE000000) | ((uint32_t)dc & 0x3FFu);
+}
+
+static uint32_t ram_word(schway *inst, uint32_t address)
+{
+    uint32_t value = 0u;
+    CHECK_EQ_U64(schway__bus_ram_word(inst, address, &value, 0u), 0u);
+    return value;
+}
+
+static uint64_t ram_hash(const schway *inst, uint32_t address, uint32_t words)
+{
+    uint64_t hash = UINT64_C(14695981039346656037);
+    for (uint32_t i = 0u; i < words; i++) {
+        uint32_t at = address + i * 4u;
+        uint32_t word = (uint32_t)inst->bus.ram[at] |
+                        ((uint32_t)inst->bus.ram[at + 1u] << 8u) |
+                        ((uint32_t)inst->bus.ram[at + 2u] << 16u) |
+                        ((uint32_t)inst->bus.ram[at + 3u] << 24u);
+        for (uint32_t byte = 0u; byte < 4u; byte++) {
+            hash = (hash ^ (uint8_t)(word >> (byte * 8u))) * UINT64_C(1099511628211);
+        }
+    }
+    return hash;
+}
+
+static uint64_t decode_color_macroblock_with_scale(schway *inst, uint32_t depth,
+                                                   uint32_t signed_output, uint32_t bit15,
+                                                   int32_t cr, int32_t cb, const int32_t y[4],
+                                                   const int16_t *scale,
+                                                   uint32_t input_address,
+                                                   uint32_t output_address)
+{
+    uint32_t blocks[6] = {color_dc_word(cr), color_dc_word(cb), color_dc_word(y[0]),
+                          color_dc_word(y[1]), color_dc_word(y[2]), color_dc_word(y[3])};
+    uint32_t command = 0x20000006u | (depth << 27u) | (signed_output << 26u) |
+                       (bit15 << 25u);
+    uint32_t output_words = depth == 2u ? 192u : 128u;
+    enable_dma(inst);
+    load_flat_tables(inst);
+    if (scale != NULL) {
+        load_scale_table(inst, scale);
+    }
+    write32(inst, MDEC_DATA, command, 0u);
+    for (uint32_t i = 0u; i < 6u; i++) {
+        write_ram(inst, input_address + i * 4u, blocks[i]);
+    }
+    start_dma0(inst, input_address, 6u);
+    run_cycles(inst, 10000u);
+    CHECK_EQ_U64(inst->mdec.command_active, 0u);
+    CHECK_EQ_U64(inst->mdec.block_pending, 0u);
+    CHECK_EQ_U64(inst->mdec.output_count, output_words);
+    uint64_t raw_hash = raw_output_hash(inst, output_words);
+    dma1_transfer(inst, output_address, output_words);
+    CHECK_EQ_U64(inst->mdec.output_count, 0u);
+    CHECK_EQ_U64(ram_hash(inst, output_address, output_words), raw_hash);
+    return raw_hash;
+}
+
+static uint64_t decode_color_macroblock(schway *inst, uint32_t depth, uint32_t signed_output,
+                                        uint32_t bit15, int32_t cr, int32_t cb,
+                                        const int32_t y[4], uint32_t input_address,
+                                        uint32_t output_address)
+{
+    return decode_color_macroblock_with_scale(inst, depth, signed_output, bit15, cr, cb, y,
+                                              NULL, input_address, output_address);
+}
+
+static void mdec_to_gpu_dma2(schway *inst, uint32_t source, uint32_t words,
+                             uint32_t image_words_wide, uint32_t height, uint32_t mode)
+{
+    write32(inst, GPU_GP1, 0x03000000u, 0u);
+    write32(inst, GPU_GP1, 0x05000000u, 0u);
+    write32(inst, GPU_GP1, 0x060E4064u, 0u); /* 16-pixel window at dot divider 8. */
+    write32(inst, GPU_GP1, 0x07004000u, 0u); /* 16 scan lines. */
+    write32(inst, GPU_GP1, 0x08000000u | mode, 0u);
+    write32(inst, GPU_GP1, 0x04000002u, 0u); /* DMA direction: CPU to GP0. */
+    write32(inst, GPU_GP0, 0xA0000000u, 0u);
+    write32(inst, GPU_GP0, 0u, 0u);
+    write32(inst, GPU_GP0, (height << 16u) | image_words_wide, 0u);
+    write32(inst, DMA_BASE + 0x20u, source, 0u);
+    write32(inst, DMA_BASE + 0x24u, ((words / 16u) << 16u) | 16u, 0u);
+    write32(inst, DMA_BASE + 0x28u, 0x01000201u, 0u);
+    for (uint32_t i = 0u; i < words * 4u + 32u && inst->dma.cur != SCHWAY__DMA_NONE; i++) {
+        schway__dma_event(inst, inst->dma.busy_until);
+    }
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+}
+
+static void swizzle_15bit_macroblock(schway *inst, uint32_t source, uint32_t destination)
+{
+    for (uint32_t y = 0u; y < 16u; y++) {
+        for (uint32_t x = 0u; x < 16u; x++) {
+            uint32_t block = (y / 8u) * 2u + x / 8u;
+            uint32_t source_pixel = block * 64u + (y % 8u) * 8u + x % 8u;
+            uint32_t word = ram_word(inst, source + (source_pixel / 2u) * 4u);
+            uint16_t pixel = (uint16_t)(word >> ((source_pixel & 1u) * 16u));
+            uint32_t output_pixel = y * 16u + x;
+            uint32_t address = destination + (output_pixel / 2u) * 4u;
+            uint32_t old = ram_word(inst, address);
+            uint32_t shift = (output_pixel & 1u) * 16u;
+            write_ram(inst, address, (old & ~(UINT32_C(0xFFFF) << shift)) |
+                                     ((uint32_t)pixel << shift));
+        }
+    }
+}
+
+static void build_long_color_stream(uint32_t words[38])
+{
+    uint16_t halves[76];
+    for (uint32_t i = 0u; i < 76u; i++) {
+        halves[i] = 0xFE00u;
+    }
+    uint32_t half = 0u;
+    halves[half++] = 0x0420u; /* qscale 1, DC 32 */
+    for (uint32_t i = 0u; i < 63u; i++) {
+        halves[half++] = 0x0001u; /* one nonzero AC at each remaining coefficient */
+    }
+    halves[half++] = 0xFE00u;
+    for (uint32_t block = 1u; block < 6u; block++) {
+        halves[half++] = 0x0420u;
+        halves[half++] = 0xFE00u;
+    }
+    CHECK_EQ_U64(half, 75u);
+    for (uint32_t i = 0u; i < 38u; i++) {
+        words[i] = halves[i * 2u] | ((uint32_t)halves[i * 2u + 1u] << 16u);
+    }
+}
+
+static uint64_t finish_long_color_stream(schway *inst, uint32_t input_address,
+                                         uint32_t output_address)
+{
+    start_dma0(inst, input_address + 32u * 4u, 6u);
+    run_cycles(inst, 20000u);
+    CHECK_EQ_U64(inst->mdec.output_count, 192u);
+    uint64_t hash = raw_output_hash(inst, 192u);
+    dma1_transfer(inst, output_address, 192u);
+    CHECK_EQ_U64(inst->mdec.output_count, 0u);
+    CHECK_EQ_U64(inst->mdec.command_active, 0u);
+    return hash;
+}
+
+static void case_color_streaming(void)
+{
+    const uint32_t input_address = 0x5000u;
+    const uint32_t output_address = 0x6000u;
+    uint32_t words[38];
+    build_long_color_stream(words);
+
+    schway *continuous = make();
+    schway *resumed = make();
+    CHECK(continuous != NULL && resumed != NULL);
+    if (continuous == NULL || resumed == NULL) {
+        schway_destroy(continuous);
+        schway_destroy(resumed);
+        return;
+    }
+
+    schway *instances[2] = {continuous, resumed};
+    for (uint32_t instance = 0u; instance < 2u; instance++) {
+        schway *inst = instances[instance];
+        enable_dma(inst);
+        load_flat_tables(inst);
+        for (uint32_t i = 0u; i < 38u; i++) {
+            write_ram(inst, input_address + i * 4u, words[i]);
+        }
+        write32(inst, MDEC_DATA, 0x30000026u, 0u);
+        start_dma0(inst, input_address, 32u);
+        CHECK_EQ_U64(inst->mdec.command_active, 1u);
+        CHECK_EQ_U64(inst->mdec.words_remaining, 6u);
+        CHECK_EQ_U64(inst->mdec.input_count, 0u);
+        CHECK_EQ_U64(inst->mdec.block_pending, 0u);
+        CHECK_EQ_U64(inst->mdec.parse_have_dc, 1u);
+        CHECK_EQ_U64(inst->mdec.parse_scan, 63u);
+    }
+
+    size_t state_size = schway_state_size(continuous);
+    uint8_t *state = (uint8_t *)malloc(state_size);
+    CHECK(state != NULL);
+    if (state != NULL) {
+        CHECK_EQ_U64(schway_save_state(continuous, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(resumed, state, state_size), SCHWAY_STATUS_OK);
+        free(state);
+    }
+
+    uint64_t continuous_hash = finish_long_color_stream(continuous, input_address,
+                                                       output_address);
+    uint64_t resumed_hash = finish_long_color_stream(resumed, input_address,
+                                                     output_address);
+    CHECK_EQ_U64(continuous_hash, resumed_hash);
+    for (uint32_t i = 0u; i < 192u; i++) {
+        CHECK_EQ_U64(ram_word(continuous, output_address + i * 4u),
+                     ram_word(resumed, output_address + i * 4u));
+    }
+    schway_destroy(continuous);
+    schway_destroy(resumed);
+}
+
+static void case_color(void)
+{
+    static const int32_t y[4] = {240, 320, 400, 480};
+    static const uint16_t signed_pixels[4] = {0xA080u, 0xA4C1u, 0xA8E2u, 0xAD03u};
+    static const uint16_t unsigned_pixels[4] = {0xE290u, 0xE6D1u, 0xEAF2u, 0xEF13u};
+    uint64_t standard_hash = 0u;
+    for (uint32_t signed_output = 0u; signed_output < 2u; signed_output++) {
+        schway *inst = make();
+        CHECK(inst != NULL);
+        if (inst == NULL) return;
+        uint32_t output = 0x3000u;
+        uint64_t raw_hash = decode_color_macroblock(inst, 3u, signed_output, 1u, -160, 160, y,
+                                                    0x1000u, output);
+        if (signed_output != 0u) {
+            standard_hash = raw_hash;
+        }
+        for (uint32_t block = 0u; block < 4u; block++) {
+            uint32_t expected = (uint32_t)(signed_output != 0u ? signed_pixels[block]
+                                                                : unsigned_pixels[block]);
+            expected |= expected << 16u;
+            CHECK_EQ_HEX(ram_word(inst, output + block * 32u * 4u), expected);
+            CHECK_EQ_HEX(ram_word(inst, output + (block * 32u + 31u) * 4u), expected);
+        }
+        uint32_t reordered = 0x4000u;
+        swizzle_15bit_macroblock(inst, output, reordered);
+        CHECK(ram_hash(inst, reordered, 128u) != raw_hash);
+        uint32_t gpu_mode = 0x01u;
+        mdec_to_gpu_dma2(inst, reordered, 128u, 16u, 16u, gpu_mode);
+        inst->exe_loaded = 1u;
+        schway_video video;
+        memset(&video, 0, sizeof video);
+        video.size = (uint32_t)sizeof video;
+        CHECK_EQ_U64(schway_get_video(inst, &video), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(video.width, 16u);
+        CHECK_EQ_U64(video.height, 16u);
+        const uint16_t *pixels = (const uint16_t *)video.pixels;
+        for (uint32_t yy = 0u; yy < 16u; yy++) {
+            for (uint32_t xx = 0u; xx < 16u; xx++) {
+                uint32_t block = (yy / 8u) * 2u + xx / 8u;
+                uint16_t expected = signed_output != 0u ? signed_pixels[block]
+                                                       : unsigned_pixels[block];
+                expected |= 0x8000u;
+                CHECK_EQ_HEX(pixels[yy * 16u + xx], expected);
+            }
+        }
+        schway_destroy(inst);
+    }
+
+    schway *scaled = make();
+    CHECK(scaled != NULL);
+    if (scaled != NULL) {
+        int16_t scale[SCHWAY__MDEC_BLOCK_SAMPLES];
+        for (uint32_t i = 0u; i < SCHWAY__MDEC_BLOCK_SAMPLES; i++) {
+            scale[i] = (i & 1u) == 0u ? 0x4000 : 0x2000;
+        }
+        uint64_t scaled_hash = decode_color_macroblock_with_scale(
+            scaled, 3u, 1u, 1u, -160, 160, y, scale, 0x1000u, 0x3000u);
+        CHECK(scaled_hash != standard_hash);
+        uint32_t chroma_varies = 0u;
+        for (uint32_t i = 1u; i < SCHWAY__MDEC_BLOCK_SAMPLES; i++) {
+            chroma_varies |= (uint32_t)(scaled->mdec.chroma_cr[i] !=
+                                        scaled->mdec.chroma_cr[0]);
+        }
+        CHECK(chroma_varies != 0u);
+        schway_destroy(scaled);
+    }
+
+    schway *zero_scale_ac = make();
+    CHECK(zero_scale_ac != NULL);
+    if (zero_scale_ac != NULL) {
+        int16_t scale[SCHWAY__MDEC_BLOCK_SAMPLES] = {0};
+        for (uint32_t i = 0u; i < 8u; i++) {
+            scale[i + i * 8u] = 0x4000;
+        }
+        enable_dma(zero_scale_ac);
+        load_flat_tables(zero_scale_ac);
+        load_scale_table(zero_scale_ac, scale);
+        write32(zero_scale_ac, MDEC_DATA, 0x28000002u, 0u);
+        write_ram(zero_scale_ac, 0x1000u, 0x04280000u); /* DC 0, run 1, AC +40. */
+        write_ram(zero_scale_ac, 0x1004u, 0xFE00FE00u);
+        start_dma0(zero_scale_ac, 0x1000u, 2u);
+        run_cycles(zero_scale_ac, 2000u);
+        CHECK_EQ_U64(zero_scale_ac->mdec.output_count, 16u);
+        CHECK_EQ_U64(zero_scale_ac->mdec.block[2], 5u);
+        CHECK_EQ_HEX(zero_scale_ac->mdec.output[0], 0x80858080u);
+        for (uint32_t i = 1u; i < 16u; i++) {
+            CHECK_EQ_HEX(zero_scale_ac->mdec.output[i], 0x80808080u);
+        }
+        schway_destroy(zero_scale_ac);
+    }
+
+    schway *extreme = make();
+    CHECK(extreme != NULL);
+    if (extreme != NULL) {
+        const int32_t max_y[4] = {511, 511, -512, -512};
+        uint32_t output = 0x3000u;
+        (void)decode_color_macroblock(extreme, 2u, 1u, 0u, 511, -512, max_y,
+                                      0x1000u, output);
+        CHECK_EQ_U64(extreme->mdec.output_count, 0u);
+        CHECK_EQ_U64(extreme->mdec.chroma_cr[0], 64u);
+        CHECK(extreme->mdec.chroma_cb[0] == -64);
+        CHECK(extreme->mdec.block[0] == -64);
+        CHECK_EQ_HEX(ram_word(extreme, output), 0x7FCE297Fu);
+        CHECK_EQ_HEX(ram_word(extreme, output + 8u * 16u * 3u), 0x1980A919u);
+        schway_destroy(extreme);
+    }
+
+    schway *incomplete = make();
+    CHECK(incomplete != NULL);
+    if (incomplete != NULL) {
+        enable_dma(incomplete);
+        load_flat_tables(incomplete);
+        write32(incomplete, MDEC_DATA, 0x30000001u, 0u);
+        write32(incomplete, MDEC_DATA, 0x000000A0u, 0u); /* DC, missing EOB. */
+        CHECK_EQ_U64(incomplete->mdec.command_active, 0u);
+        CHECK_EQ_U64(incomplete->mdec.block_pending, 0u);
+        CHECK_EQ_U64(incomplete->mdec.output_count, 0u);
+        write32(incomplete, MDEC_STATUS, 0x80000000u, 0u);
+        run_cycles(incomplete, 1000u);
+        CHECK_EQ_U64(incomplete->mdec.output_count, 0u);
+        CHECK_EQ_U64(incomplete->mdec.block_pending, 0u);
+        schway_destroy(incomplete);
+    }
+
+    case_color_streaming();
+}
+
+static void case_display(void)
+{
+    schway *inst = make();
+    CHECK(inst != NULL);
+    if (inst == NULL) return;
+    static const int32_t y[4] = {160, 160, 160, 160};
+    (void)decode_color_macroblock(inst, 2u, 0u, 0u, 0, 0, y, 0x1000u, 0x3000u);
+    mdec_to_gpu_dma2(inst, 0x3000u, 192u, 24u, 16u, 0x11u);
+    inst->exe_loaded = 1u;
+    schway_video video;
+    memset(&video, 0, sizeof video);
+    video.size = (uint32_t)sizeof video;
+    CHECK_EQ_U64(schway_get_video(inst, &video), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(video.width, 16u);
+    CHECK_EQ_U64(video.height, 16u);
+    CHECK_EQ_U64(video.bpp, 24u);
+    CHECK_EQ_U64(video.rgb24, 1u);
+    CHECK_EQ_U64(video.pitch_bytes, 48u);
+    const uint8_t *pixels = (const uint8_t *)video.pixels;
+    for (uint32_t i = 0u; i < 16u * 16u * 3u; i++) {
+        CHECK_EQ_U64(pixels[i], 148u);
+    }
+    schway_destroy(inst);
+}
+
 static void case_vectors(void)
 {
     static const int16_t scale_columns[8] = {0x7FFF, 0x6000, 0x4000, 0x2000,
@@ -356,6 +710,41 @@ static void case_vectors(void)
             CHECK_EQ_HEX(inst->mdec.output[word], endpoint_words[i]);
         }
         schway_destroy(inst);
+    }
+
+    schway *clip9 = make();
+    CHECK(clip9 != NULL);
+    if (clip9 != NULL) {
+        uint16_t dense_halfwords[66];
+        uint32_t dense_words[33];
+        uint8_t quant[SCHWAY__MDEC_BLOCK_SAMPLES];
+        int16_t scale[SCHWAY__MDEC_BLOCK_SAMPLES];
+        dense_halfwords[0] = 0xFC05u;
+        for (uint32_t i = 1u; i < 64u; i++) {
+            dense_halfwords[i] = 0x0002u;
+        }
+        dense_halfwords[64] = 0xFE00u;
+        dense_halfwords[65] = 0xFE00u;
+        for (uint32_t i = 0u; i < 33u; i++) {
+            dense_words[i] = dense_halfwords[i * 2u] |
+                             ((uint32_t)dense_halfwords[i * 2u + 1u] << 16u);
+            write_ram(clip9, 0x2000u + i * 4u, dense_words[i]);
+        }
+        memset(quant, 0xFF, sizeof quant);
+        for (uint32_t i = 0u; i < SCHWAY__MDEC_BLOCK_SAMPLES; i++) {
+            scale[i] = 0x7FFF;
+        }
+        enable_dma(clip9);
+        load_guest_quant(clip9, quant);
+        load_scale_table(clip9, scale);
+        write32(clip9, MDEC_DATA, 0x20000021u, 0u);
+        start_dma0(clip9, 0x2000u, 33u);
+        run_cycles(clip9, 2000u);
+        CHECK_EQ_U64(clip9->mdec.output_count, 8u);
+        for (uint32_t i = 0u; i < SCHWAY__MDEC_BLOCK_SAMPLES; i++) {
+            CHECK_EQ_U64((uint32_t)(int32_t)clip9->mdec.block[i], (uint32_t)-16);
+        }
+        schway_destroy(clip9);
     }
 
     schway *plain = make();
@@ -467,7 +856,7 @@ static void case_bounds_and_reset(void)
     schway *bad = make();
     enable_dma(bad);
     uint32_t bad_input = 0x1000u;
-    write_ram(bad, bad_input, 0xFFFFFFFFu);
+    write_ram(bad, bad_input, 0x000000A0u); /* Truncated DC and AC data. */
     write32(bad, MDEC_DATA, 0x24000001u, 0u);
     start_dma0(bad, bad_input, 1u);
     CHECK_EQ_U64(bad->mdec.block_pending, 0u);
@@ -608,6 +997,10 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "status") == 0) {
         case_status();
+    } else if (strcmp(argv[1], "color") == 0) {
+        case_color();
+    } else if (strcmp(argv[1], "display") == 0) {
+        case_display();
     } else if (strcmp(argv[1], "guest_4bit") == 0) {
         case_guest_4bit();
     } else if (strcmp(argv[1], "guest_input") == 0) {
