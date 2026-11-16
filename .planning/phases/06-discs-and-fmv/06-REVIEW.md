@@ -1,12 +1,13 @@
 ---
 phase: 06-discs-and-fmv
-reviewed: 2026-11-16T13:03:44Z
+reviewed: 2026-11-16T13:53:50Z
 depth: standard
-files_reviewed: 4
+files_reviewed: 5
 files_reviewed_list:
-  - src/mdec.c
-  - tests/mdec/model.c
   - tests/mdec/reference.c
+  - tests/mdec/model.c
+  - tests/mdec/tests.cmake
+  - tests/mdec/inventory.txt
   - docs/hardware/mdec.md
 findings:
   critical: 0
@@ -19,30 +20,31 @@ status: issues_found
 
 # Phase 06: Code Review Report
 
-**Reviewed:** 2026-11-16T13:03:44Z
+**Reviewed:** 2026-11-16T13:53:50Z
 
 **Depth:** standard
 
-**Files Reviewed:** 4
+**Files Reviewed:** 5
 
 **Status:** issues_found
 
 ## Summary
 
-The changed conversion and expected-byte paths were checked against the pinned 4-bit and 8-bit log bytes. One documentation mismatch remains: the hardware page describes a DMA1 destination comparison, while the reference comparator now checks the guest buffer address parsed from the digest-verified log.
+The direct DMA1 caller contract is represented truthfully: the pinned helper writes its caller buffer pointer to DMA1 MADR without a CPU copy, and the comparator checks that normalized target separately from the RAM bytes. The current core's differing DMA1 start is reported as a contract failure; it is not described as evidence of staging. One warning remains in the pinned status oracle: it compares a collapsed sequence of event kinds rather than the records themselves. Tests were not run, per the review assignment.
 
 ## Narrative Findings (AI reviewer)
 
 ## Warnings
 
-### WR-01: Documentation names the wrong RAM buffer checked by the guest comparator
+### WR-01: Status guest oracle discards event identity and status-read count
 
-**File:** `docs/hardware/mdec.md:81-83`
-**Issue:** The page says the reference test compares the "DMA1 destination RAM" with the logged bytes. In `tests/mdec/reference.c:561-566`, the comparator instead parses the `mdec_readDecodedDma(addr=...)` address from the pinned log and checks RAM at that address; the DMA1 start captured at `tests/mdec/reference.c:585-588` is diagnostic only. The recorded DMA1 starts (`0x001ffeb8`/`0x001ffe98`) differ from the logged guest buffer targets (`0x001ffe0c`/`0x001ffdec`), so the documentation currently overstates what address the test validates.
-**Fix:** Describe the check as comparing the guest buffer at the digest-verified `mdec_readDecodedDma` target, and state separately whether DMA1's direct destination is asserted or only reported diagnostically.
+**File:** `tests/mdec/reference.c:686-710`
+**Severity:** WARNING
+**Issue:** `collect_status_events` stores only event kinds and collapses consecutive events of the same kind. It accepts any status-read count of at least 100, and `status_order_matches` compares only the collapsed kind sequence. As a result, the pinned status selector can accept a run with missing or extra status reads, or different status/input/output values, whenever the remaining event-kind transitions match. This establishes event-class order, not an ordered match to the pinned records.
+**Fix:** Preserve one parsed entry per event and compare exact event counts and order against the pinned log. Where TTY lines contain format placeholders, compare their expected status/data payloads against the guest's traced MDEC bus accesses rather than dropping payload identity.
 
 ---
 
-_Reviewed: 2026-11-16T13:03:44Z_
-_Reviewer: the agent (gsd-code-reviewer)_
+_Reviewed: 2026-11-16T13:53:50Z_  
+_Reviewer: the agent (gsd-code-reviewer)_  
 _Depth: standard_
