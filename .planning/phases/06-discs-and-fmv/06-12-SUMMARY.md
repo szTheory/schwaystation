@@ -124,7 +124,7 @@ None.
 
 ## Next Phase Readiness
 
-The pinned oracle harness and negative controls are reproducible. Plan 06-35 is next and owns the production repair; afterward, rerun all four selectors as the exact Plan 06-12 full gate. DISC-03 remains incomplete until that gate passes.
+The pinned oracle harness and negative controls are reproducible. Plan 06-39 is next and owns the output-target contract and 4-bit candidate verification; afterward, rerun all four selectors as the exact Plan 06-12 full gate. DISC-03 remains incomplete until that gate passes.
 
 ---
 *Phase: 06-discs-and-fmv*
