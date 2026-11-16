@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 20 of 34
+current_plan: 21 of 34
 status: executing
-stopped_at: Executing 06-33-PLAN.md; 06-34 preserves mixed-source acceptance before audio consumers
-last_updated: "2026-11-16T06:16:10.504Z"
+stopped_at: Completed 06-33-PLAN.md; next 06-34-PLAN.md
+last_updated: "2026-11-16T07:52:58.397Z"
 last_activity: 2026-11-16
-state_head: dfaa5711ad799a41e41b7432710c36c65f3c0453
+state_head: e1ef7c79391840dd9b349723f5d76b35cea52e05
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 184
-  completed_plans: 169
+  completed_plans: 170
   percent: 83
-last_activity_desc: "Plan 06-33 XA route, serialized ring and cadence controls are in progress. Mixed XA/CDDA/voice/reverb and file/channel mismatch controls split to dependent 06-34 at the 30-minute bound. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+last_activity_desc: "Plan 06-33 XA route, state format 14 and cadence/tie controls passed 12/12 focused tests; wall lower bound at least 1h22m. Plan 06-34 owns voice/reverb and file/channel mismatch controls. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 20 of 34
-Next plan file: 06-33-PLAN.md (Wave 9)
+Current Plan: 21 of 34
+Next plan file: 06-34-PLAN.md (Wave 9)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -232,6 +232,7 @@ Progress: [████████░░] 83%
 | Phase 6 P31 | at least 31m | 2 tasks | 9 files |
 | Phase 6 P32 | at least 7m34s | 1 tasks | 4 files |
 | Phase 6 P10 | at least 49m47s wall lower bound | 1 tasks | 21 files |
+| Phase 6 P33 | at least 1h22m00s wall lower bound | 1 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -581,6 +582,8 @@ Recent decisions affecting current work:
 - [Phase 6]: Keep CDDA storage bounded to 1,176 stereo pairs and drop newest pairs on overrun.
 - [Phase 6]: Apply staged ATV coefficients atomically and serialize pending and active matrices.
 - [Phase 6]: Split the unstarted XA mixing task into dependent Plan 06-33 at the 30-minute bound.
+- [Phase 6]: Keep XA in a 9,409-pair serialized ring (9,408 frames plus one tied-event reserve) separate from the 1,176-pair CDDA queue.
+- [Phase 6]: Keep voice/reverb mixture and mode-enabled file/channel rejection in dependent Plan 06-34; Plan 06-12 MDEC work remains independent.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -780,8 +783,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T06:15:12.060Z
-Stopped at: Completed 06-10-PLAN.md; next 06-33-PLAN.md
+Last session: 2026-11-16T07:52:58.145Z
+Stopped at: Completed 06-33-PLAN.md; next 06-34-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -879,3 +882,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. The execution ch
 ### Phase 6 plan 06-09 execution (2026-11-16)
 
 Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time from the 03:29:33Z start through closeout preparation at 04:01:32Z is 31m59s; the exact Plan 09 configure/build/decoder gate completed at 03:57:33Z (28 minutes after start). The post-review exact gate passed `disc.xa` 1/1; the focused decoder and state controls passed 6/6. XA predictor and resampler histories are instance-owned and serialized; state format/behavior revision advanced to 11. No hosted URL applies. DISC-01 remains pending aggregate acceptance; DISC-02 remains pending the later XA/SPU caller integration. Plan 06-11 is next.
+
+### Phase 6 plan 06-33 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall lower bound is at least 1h22m from the first durable RED report at 06:29:28Z through summary preparation at 07:51:28Z; the plan started earlier and exact active time is unavailable. The accepted XA sector route, separate 9,409-pair serialized ring, native cadence and equal-deadline reserve passed the focused review and 12/12 configure/build/state/audio/SPU gate. State format and behavior revision are 14. DISC-02 remains partial: XA/CDDA/voice/reverb mixing and the mode-enabled file/channel mismatch control continue in 06-34. The MDEC-only 06-12 plan remains independent; 06-34 is next.
