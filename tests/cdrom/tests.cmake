@@ -67,3 +67,8 @@ schway_warnings(schwaystation-test-cdrom-audio)
 schway_add_test(NAME disc.audio.cdda
   COMMAND schwaystation-test-cdrom-audio cdda
   LABELS disc portable TIMEOUT 10)
+
+# Fault prevented: accepted XA sectors fail to produce native-rate CD audio.
+schway_add_test(NAME disc.audio.xa
+  COMMAND schwaystation-test-cdrom-audio xa
+  LABELS disc portable TIMEOUT 10)

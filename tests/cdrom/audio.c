@@ -47,7 +47,26 @@ struct audio_disc {
     schway_toc toc;
     uint32_t reads;
     uint32_t last_lba;
+    uint32_t xa;
 };
+
+static void audio_make_xa_sector(uint8_t sector[SCHWAY__CDROM_SECTOR_BYTES])
+{
+    memset(sector, 0, SCHWAY__CDROM_SECTOR_BYTES);
+    memset(&sector[1], 0xFF, 10u);
+    sector[15] = 2u;
+    sector[16] = 1u;
+    sector[17] = 2u;
+    sector[18] = 0x6Cu;
+    sector[19] = 1u;
+    memcpy(&sector[20], &sector[16], 4u);
+    for (uint32_t portion = 0u; portion < 18u; portion++) {
+        uint8_t *chunk = &sector[24u + portion * 128u];
+        memcpy(chunk, &chunk[4], 4u);
+        memcpy(&chunk[12], &chunk[8], 4u);
+        memset(&chunk[16], 0x11, 112u);
+    }
+}
 
 static uint32_t audio_read_sector(void *user, uint32_t lba, uint8_t sector[2352],
                                   uint8_t subcode[96])
@@ -55,6 +74,11 @@ static uint32_t audio_read_sector(void *user, uint32_t lba, uint8_t sector[2352]
     struct audio_disc *disc = (struct audio_disc *)user;
     disc->reads++;
     disc->last_lba = lba;
+    if (disc->xa != 0u) {
+        audio_make_xa_sector(sector);
+        memset(subcode, 0, 96u);
+        return 1u;
+    }
     for (uint32_t frame = 0u; frame < 588u; frame++) {
         uint32_t offset = frame * 4u;
         uint16_t left = (uint16_t)(0x1234u + lba);
@@ -74,13 +98,13 @@ static uint32_t audio_read_toc(void *user, schway_toc *toc)
     return 1u;
 }
 
-static void audio_attach_disc(schway *inst, struct audio_disc *host)
+static void audio_attach_disc_type(schway *inst, struct audio_disc *host, uint32_t track_type)
 {
     memset(host, 0, sizeof *host);
     host->toc.size = (uint32_t)sizeof host->toc;
     host->toc.track_count = 1u;
     host->toc.tracks[0].size = (uint32_t)sizeof host->toc.tracks[0];
-    host->toc.tracks[0].type = SCHWAY_DISC_TRACK_AUDIO;
+    host->toc.tracks[0].type = track_type;
     host->toc.tracks[0].index0 = 150u;
     host->toc.tracks[0].index1 = 150u;
     host->toc.tracks[0].leadout = 10000u;
@@ -91,6 +115,17 @@ static void audio_attach_disc(schway *inst, struct audio_disc *host)
     disc.read_sector = audio_read_sector;
     disc.toc = audio_read_toc;
     CHECK_EQ_U64(schway_open_disc(inst, &disc), SCHWAY_STATUS_OK);
+}
+
+static void audio_attach_disc(schway *inst, struct audio_disc *host)
+{
+    audio_attach_disc_type(inst, host, SCHWAY_DISC_TRACK_AUDIO);
+}
+
+static void audio_attach_xa_disc(schway *inst, struct audio_disc *host)
+{
+    audio_attach_disc_type(inst, host, SCHWAY_DISC_TRACK_MODE2);
+    host->xa = 1u;
 }
 
 static void audio_run_cycles(schway *inst, uint64_t cycles)
@@ -268,13 +303,49 @@ static void cdda_two_speed_probe(void)
     cdda_two_speed_overrun_drops_newest();
 }
 
+static void xa_sector_reaches_native_audio(void)
+{
+    schway *inst = audio_make();
+    struct audio_disc host;
+    audio_attach_xa_disc(inst, &host);
+    inst->cdrom.mode = 0x40u;
+    inst->cdrom.read_active = 1u;
+    inst->cdrom.motor_on = 1u;
+    inst->cdrom.drive_speed = 2u;
+    inst->spu.reg[(SPU_ATTR - 0x1F801C00u) >> 1] = 0x0001u;
+    inst->spu.reg[(SPU_AVOLL - 0x1F801C00u) >> 1] = 0x7FFFu;
+    inst->spu.reg[(SPU_AVOLR - 0x1F801C00u) >> 1] = 0x7FFFu;
+    schway__cdrom_sector_schedule(inst, 0u);
+
+    audio_run_cycles(inst, CDDA_SECTOR_CYCLES / 2u);
+    CHECK_EQ_U64(host.reads, 1u);
+    CHECK_EQ_U64(host.last_lba, 0u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 0u);
+    for (uint32_t tick = 0u; tick < 64u; tick++) {
+        schway__spu_event(inst, inst->spu.next_tick);
+    }
+    uint32_t nonzero = 0u;
+    for (uint32_t i = 0u; i < inst->audio_count; i++) {
+        uint32_t slot = (inst->audio_head + i) % SCHWAY__AUDIO_RING_PAIRS;
+        if (inst->audio[slot][0] != 0 || inst->audio[slot][1] != 0) {
+            nonzero = 1u;
+        }
+    }
+    CHECK_EQ_U64(nonzero, 1u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
-    if (argc != 2 || strcmp(argv[1], "cdda") != 0) {
+    if (argc != 2 || (strcmp(argv[1], "cdda") != 0 && strcmp(argv[1], "xa") != 0)) {
         return 2;
     }
-    cdda_queue_drains_at_native_tick();
-    cdda_atv_applies_atomically_and_clips();
-    cdda_two_speed_probe();
+    if (strcmp(argv[1], "cdda") == 0) {
+        cdda_queue_drains_at_native_tick();
+        cdda_atv_applies_atomically_and_clips();
+        cdda_two_speed_probe();
+    } else {
+        xa_sector_reaches_native_audio();
+    }
     return check_failures == 0 ? 0 : 1;
 }

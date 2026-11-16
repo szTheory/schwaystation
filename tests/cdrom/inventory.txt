@@ -6,4 +6,5 @@ cdrom.region	disc,portable
 cdrom.sectors	disc,portable
 cdrom.timing	disc,portable
 disc.audio.cdda	disc,portable
+disc.audio.xa	disc,portable
 disc.xa	disc,portable
