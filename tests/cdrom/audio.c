@@ -14,6 +14,33 @@
 #define SPU_AVOLL 0x1F801DB0u
 #define SPU_AVOLR 0x1F801DB2u
 #define SPU_RAM_CTRL 0x1F801DACu
+#define SPU_NON 0x1F801D94u
+#define SPU_EON0 0x1F801D98u
+#define SPU_EVOL_L 0x1F801D84u
+#define SPU_EVOL_R 0x1F801D86u
+#define SPU_MAIN_VOL_L 0x1F801D80u
+#define SPU_MAIN_VOL_R 0x1F801D82u
+#define SPU_IIR 0x1F801DC4u
+#define SPU_COMB1 0x1F801DC6u
+#define SPU_WALL 0x1F801DCEu
+#define SPU_LSAME 0x1F801DD4u
+#define SPU_RSAME 0x1F801DD6u
+#define SPU_LCOMB1 0x1F801DD8u
+#define SPU_RCOMB1 0x1F801DDAu
+#define SPU_LDIFF 0x1F801DE4u
+#define SPU_RDIFF 0x1F801DE6u
+#define SPU_LSAME_DELAY 0x1F801DE0u
+#define SPU_RSAME_DELAY 0x1F801DE2u
+#define SPU_LDIFF_DELAY 0x1F801DF0u
+#define SPU_RDIFF_DELAY 0x1F801DF2u
+#define SPU_APF1_VOLUME 0x1F801DD0u
+#define SPU_APF2_VOLUME 0x1F801DD2u
+#define SPU_LAPF1 0x1F801DF4u
+#define SPU_RAPF1 0x1F801DF6u
+#define SPU_LAPF2 0x1F801DF8u
+#define SPU_RAPF2 0x1F801DFAu
+#define SPU_VLIN 0x1F801DFCu
+#define SPU_VRIN 0x1F801DFEu
 #define CDDA_SECTOR_CYCLES UINT64_C(451584)
 
 static void *audio_alloc(void *user, size_t size)
@@ -186,6 +213,11 @@ static uint16_t read_cd_audio_word(const schway *inst, uint32_t pair, uint32_t c
 {
     uint32_t slot = (inst->cdrom.audio_head + pair) % SCHWAY__CDROM_AUDIO_CAP;
     return inst->cdrom.audio[slot][channel];
+}
+
+static uint32_t audio_spu_reg_index(uint32_t address)
+{
+    return (address - 0x1F801C00u) >> 1;
 }
 
 static void cdda_queue_drains_at_native_tick(void)
@@ -495,6 +527,34 @@ static void xa_filter_and_mute_controls(void)
     schway_destroy(muted);
 }
 
+static void xa_file_channel_mismatch_retries_then_skips(void)
+{
+    schway *inst = audio_make();
+    struct audio_disc host;
+    xa_prepare_read(inst, &host, 0u, 1u);
+    inst->cdrom.mode = 0x48u;
+    inst->cdrom.file = 9u;
+    inst->cdrom.channel = 2u;
+
+    audio_run_cycles(inst, CDDA_SECTOR_CYCLES / 2u);
+    CHECK_EQ_U64(host.reads, 1u);
+    CHECK_EQ_U64(host.xa_reads, 1u);
+    CHECK_EQ_U64(inst->cdrom.xa_audio_count, 0u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 0u);
+    CHECK_EQ_U64(inst->cdrom.sector_retry, 1u);
+    CHECK_EQ_U64(inst->cdrom.target_lba, 0u);
+
+    audio_run_cycles(inst, CDDA_SECTOR_CYCLES / 2u);
+    CHECK_EQ_U64(host.reads, 2u);
+    CHECK_EQ_U64(host.xa_reads, 2u);
+    CHECK_EQ_U64(host.last_lba, 0u);
+    CHECK_EQ_U64(inst->cdrom.xa_audio_count, 0u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 0u);
+    CHECK_EQ_U64(inst->cdrom.sector_retry, 0u);
+    CHECK_EQ_U64(inst->cdrom.target_lba, 1u);
+    schway_destroy(inst);
+}
+
 static void xa_reset_lid_and_instance_controls(void)
 {
     schway *first = audio_make();
@@ -539,6 +599,87 @@ static void xa_and_cdda_mix_at_native_tick(void)
     schway_destroy(inst);
 }
 
+static void xa_setup_voice_reverb(schway *inst, uint32_t send_cd)
+{
+    inst->spu.reg[audio_spu_reg_index(SPU_ATTR)] = (uint16_t)(0xC081u | (send_cd != 0u ? 4u : 0u));
+    inst->spu.reg[audio_spu_reg_index(SPU_NON)] = 1u;
+    inst->spu.reg[audio_spu_reg_index(SPU_EON0)] = 1u;
+    inst->spu.reg[audio_spu_reg_index(SPU_EVOL_L)] = 0x7FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_EVOL_R)] = 0x7FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_IIR)] = 0x7FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_COMB1)] = 0x7FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_WALL)] = 0u;
+    inst->spu.reg[audio_spu_reg_index(SPU_LSAME)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_RSAME)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_LCOMB1)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_RCOMB1)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_LSAME_DELAY)] = 0u;
+    inst->spu.reg[audio_spu_reg_index(SPU_RSAME_DELAY)] = 0u;
+    inst->spu.reg[audio_spu_reg_index(SPU_LDIFF)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_RDIFF)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_LDIFF_DELAY)] = 0u;
+    inst->spu.reg[audio_spu_reg_index(SPU_RDIFF_DELAY)] = 0u;
+    inst->spu.reg[audio_spu_reg_index(SPU_APF1_VOLUME)] = 0u;
+    inst->spu.reg[audio_spu_reg_index(SPU_APF2_VOLUME)] = 0u;
+    inst->spu.reg[audio_spu_reg_index(SPU_LAPF1)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_RAPF1)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_LAPF2)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_RAPF2)] = 2u;
+    inst->spu.reg[audio_spu_reg_index(SPU_VLIN)] = 0x7FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_VRIN)] = 0x7FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_MAIN_VOL_L)] = 0x3FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_MAIN_VOL_R)] = 0x3FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_AVOLL)] = 0x7FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_AVOLR)] = 0x7FFFu;
+    inst->spu.reg[audio_spu_reg_index(SPU_RAM_CTRL)] = 4u;
+    inst->spu.noise_lfsr = 0x2000u;
+    inst->spu.noise_phase = 0u;
+    inst->spu.voice[0].envelope = 0x4000;
+    inst->spu.voice[0].reg[0] = 0x3FFFu;
+    inst->spu.voice[0].reg[1] = 0x3FFFu;
+}
+
+static void xa_cdda_voice_reverb_mix_at_native_tick(void)
+{
+    schway *direct = audio_make();
+    schway *wet = audio_make();
+    xa_setup_voice_reverb(direct, 0u);
+    xa_setup_voice_reverb(wet, 1u);
+    schway *instances[2] = {direct, wet};
+    for (uint32_t i = 0u; i < 2u; i++) {
+        schway__cdrom_audio_push(instances[i], 1200, -2400);
+        schway__cdrom_xa_audio_push(instances[i], 2400, 4800);
+        schway__spu_event(instances[i], instances[i]->spu.next_tick);
+    }
+
+    CHECK_EQ_U64(direct->cdrom.audio_count, 0u);
+    CHECK_EQ_U64(direct->cdrom.xa_audio_count, 0u);
+    CHECK_EQ_U64(wet->cdrom.audio_count, 0u);
+    CHECK_EQ_U64(wet->cdrom.xa_audio_count, 0u);
+    CHECK(direct->spu.voice[0].output != 0 && wet->spu.voice[0].output != 0);
+    CHECK_EQ_U64(schway__spu_ram_peek(wet, 0u), 3600u);
+    CHECK_EQ_U64(schway__spu_ram_peek(wet, 0x400u), 2400u);
+    CHECK(memcmp(direct->spu.reverb_fir, wet->spu.reverb_fir,
+                 sizeof direct->spu.reverb_fir) != 0);
+
+    for (uint32_t i = 0u; i < 2u; i++) {
+        for (uint32_t tick = 1u; tick < 96u; tick++) {
+            schway__spu_event(instances[i], instances[i]->spu.next_tick);
+        }
+    }
+
+    uint32_t differs = 0u;
+    for (uint32_t pair = 0u; pair < 96u; pair++) {
+        uint32_t direct_slot = (direct->audio_head + pair) % SCHWAY__AUDIO_RING_PAIRS;
+        uint32_t wet_slot = (wet->audio_head + pair) % SCHWAY__AUDIO_RING_PAIRS;
+        differs |= direct->audio[direct_slot][0] != wet->audio[wet_slot][0] ||
+                   direct->audio[direct_slot][1] != wet->audio[wet_slot][1];
+    }
+    CHECK_EQ_U64(differs, 1u);
+    schway_destroy(wet);
+    schway_destroy(direct);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2 || (strcmp(argv[1], "cdda") != 0 && strcmp(argv[1], "xa") != 0 &&
@@ -553,9 +694,11 @@ int main(int argc, char **argv)
         xa_sector_reaches_native_audio();
         xa_interleave_and_boundary_capacity();
         xa_filter_and_mute_controls();
+        xa_file_channel_mismatch_retries_then_skips();
         xa_reset_lid_and_instance_controls();
     } else {
         xa_and_cdda_mix_at_native_tick();
+        xa_cdda_voice_reverb_mix_at_native_tick();
     }
     return check_failures == 0 ? 0 : 1;
 }
