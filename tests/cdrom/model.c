@@ -54,6 +54,14 @@ static uint32_t read_sector(void *user, uint32_t lba, uint8_t sector[2352],
     disc->reads++;
     memset(sector, 0, 2352u);
     memset(subcode, 0, 96u);
+    memset(&sector[1], 0xFF, 10u);
+    sector[15] = 2u;
+    sector[16] = 1u;
+    sector[17] = 2u;
+    sector[18] = 8u;
+    sector[20] = 1u;
+    sector[21] = 2u;
+    sector[22] = 8u;
     if (lba == 4u && disc->license != NULL) {
         (void)memcpy(&sector[56], disc->license, 32u);
     }
@@ -370,6 +378,15 @@ static void test_command_seek_position(void)
     (void)rd8(inst, 1u);
     acknowledge(inst, 2u);
     CHECK_EQ_U64(inst->cdrom.seek_active, 0u);
+    CHECK_EQ_U64(host.reads, 1u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
+    command(inst, 0x10u);
+    run_cycles(inst, 50000u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
+    for (uint32_t i = 0u; i < 3u; i++) (void)rd8(inst, 1u);
+    CHECK_EQ_U64(rd8(inst, 1u), 2u);
+    for (uint32_t i = 0u; i < 4u; i++) (void)rd8(inst, 1u);
+    acknowledge(inst, 3u);
     command(inst, 0x11u);
     run_cycles(inst, 50000u);
     CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
@@ -379,6 +396,42 @@ static void test_command_seek_position(void)
         (void)rd8(inst, 1u);
     }
     acknowledge(inst, 3u);
+    schway_destroy(inst);
+}
+
+static void test_command_read_seeks_to_setloc(void)
+{
+    struct test_disc host;
+    schway *inst = make_pal_data_disc(&host);
+    profile(inst, SCHWAY_REGION_PAL, SCHWAY_PROFILE_CD_LICENSED);
+    param(inst, 0x40u);
+    param(inst, 0u);
+    param(inst, 0x16u);
+    command(inst, 0x02u);
+    expect_first_ack(inst);
+    CHECK_EQ_U64(inst->cdrom.target_lba, 179866u);
+    command(inst, 0x06u);
+    expect_first_ack(inst);
+    CHECK_EQ_U64(inst->cdrom.read_active, 1u);
+    CHECK_EQ_U64(inst->cdrom.seek_active, 1u);
+    CHECK_EQ_U64(inst->cdrom.seek_event, 1u);
+    CHECK_EQ_U64(inst->cdrom.sector_event, 0u);
+    CHECK_EQ_U64(inst->cdrom.status & 0x62u, 0x42u);
+    uint64_t delay = inst->cdrom.seek_deadline - inst->ticks;
+    run_cycles(inst, delay);
+    CHECK_EQ_U64(inst->cdrom.seek_active, 0u);
+    CHECK_EQ_U64(inst->cdrom.read_active, 1u);
+    CHECK_EQ_U64(inst->cdrom.status & 0x62u, 0x22u);
+    CHECK_EQ_U64(inst->cdrom.sector_event, 1u);
+    CHECK_EQ_U64(host.reads, 0u);
+    run_cycles(inst, 451584u);
+    CHECK_EQ_U64(host.reads, 1u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
+    CHECK_EQ_U64(inst->cdrom.sector_lba[inst->cdrom.sector_head], 179866u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 1u);
+    wr8(inst, 0u, 0u);
+    wr8(inst, 3u, 0x80u);
+    CHECK_EQ_U64(rd8(inst, 0u) & 0xC0u, 0x40u);
     schway_destroy(inst);
 }
 
@@ -467,6 +520,7 @@ static void test_command_matrix(void)
     test_command_settings();
     test_command_media();
     test_command_seek_position();
+    test_command_read_seeks_to_setloc();
     test_command_getlocl_far_seek();
     test_command_stop_reset();
 }

@@ -23,6 +23,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/nightly.yml
+      - cmake/CDReferences.cmake
       - cmake/SPUReferences.cmake
       - pins.txt
       - runner/bench.c
@@ -31,6 +32,7 @@ on:
       - runner/clock.h
       - runner/rss.c
       - runner/rss.h
+      - tests/cdrom/reference.c
       - tests/nightly/inventory.txt
       - tests/nightly/tests.cmake
       - tests/spu/reference.c

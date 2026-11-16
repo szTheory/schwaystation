@@ -36,6 +36,17 @@ ps1-tests-gpu-gpustat-log f727802fead1 https://raw.githubusercontent.com/JaCzeka
 # ps1-tests-release-member path=spu/memory-transfer/memory-transfer.exe release=build-158 sha256=9489f60d4ca6c7c8daca13e2551d21457971781d1b93d51947061e27df1fde36
 ps1-tests-spu-memory-transfer-log f727802fead11f1daa7549285548392ef87749cb https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/spu/memory-transfer/psx.log 415a79e5ed82a631eb35965766ff8d3c3e268c9f27262226d88507e5c3807cae
 
+# CD timing and Getloc evidence from the same pinned source/release. Logs are fetched separately
+# and checked against both the source commit and archive member; executables remain build-only.
+# ps1-tests-source-file path=cdrom/timing/Makefile blob-sha1=e3dc04dc4de82cf89b172789b8f5149b49b4bcf5 sha256=0cc2d5d78a7d91ae701b466c51f879ef3ec7975c39a62e6d0f8bd93fc65d64b8
+# ps1-tests-source-file path=cdrom/timing/main.cpp blob-sha1=fb82173d964c111358e3542f1fe38ab35a9e3485 sha256=e3e527ceeab21b6248889c44e85320f4eb5be9179337f3695b94f8a8eccf5e8d
+# ps1-tests-source-file path=cdrom/getloc/Makefile blob-sha1=6e2d153132fe51c7ae7a9f08c6bee7cb692cd87d sha256=23a9fc36b61af43a4866964a4e1b9549b9d0dcc9ecc7cd03a922bdcc231a3406
+# ps1-tests-source-file path=cdrom/getloc/main.cpp blob-sha1=319c3b0d6129367d6c056ea232c573e855589e35 sha256=aa4bcc62aa1e211ea0a821cdbf6d7384cc74d87a264f9af97f5a3fd391273046
+# ps1-tests-release-member path=cdrom/timing/timing.exe release=build-158 sha256=500cecd3b2afac6f533c980142067838198ac2d45e8e801cfcc8d4dcd08b0f2d size=16384
+# ps1-tests-release-member path=cdrom/getloc/getloc.exe release=build-158 sha256=ce1e2904caa1569a9d90036c037d50cf63698dbd156cbe6a5d274b8ae3b0c7dc size=16384
+ps1-tests-cdrom-timing-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/cdrom/timing/psx.log 074c20b1090962b6e8c7d331f664027600b557f2f24c6dafefc4575e230e9162
+ps1-tests-cdrom-getloc-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/cdrom/getloc/psx.log d47fa03daa4e9b80d47ef8f8ede4c7ad480800708010db741176648efdb1cc7e
+
 # armips (MIT): assembles the PS-EXE fixtures; cmake/Armips.cmake downloads the archive and checks the digest.
 # The digest was measured on the commit archive named by the full SHA, not a short-SHA URL.
 armips 62adab4ef30d https://github.com/Kingcom/armips/archive/62adab4ef30da765f5cf22a451eb08a59c54dc8b.tar.gz f7a65102febb4811a336a06e6d93c7e84cc86548182d54e1b1b4e2bffe562f56

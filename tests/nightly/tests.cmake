@@ -6,15 +6,26 @@
 # SCHWAYSTATION_SST_DIR lacks; fetch them with the commands in pins.txt.
 set(SCHWAYSTATION_SST_DIR "" CACHE PATH "Directory of the fetched pinned vector files, NAME.json.bin each")
 option(SCHWAYSTATION_GPU_REFERENCE_ONLY "Configure only GPU references without fetching CPU vectors" OFF)
+set(SCHWAYSTATION_MEDIA_REFERENCE_ONLY "" CACHE STRING
+  "Configure only one media reference lane (currently: cdrom)")
+set_property(CACHE SCHWAYSTATION_MEDIA_REFERENCE_ONLY PROPERTY STRINGS "" cdrom)
+if(NOT SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "" AND
+   NOT SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "cdrom")
+  message(FATAL_ERROR "nightly: SCHWAYSTATION_MEDIA_REFERENCE_ONLY must be empty or cdrom")
+endif()
+set(cdrom_reference_only FALSE)
+if(SCHWAYSTATION_MEDIA_REFERENCE_ONLY STREQUAL "cdrom")
+  set(cdrom_reference_only TRUE)
+endif()
 if(SCHWAYSTATION_SST_DIR STREQUAL "")
-  if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY)
+  if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY AND NOT cdrom_reference_only)
     message(FATAL_ERROR "nightly: set SCHWAYSTATION_SST_DIR to the directory of the fetched pinned blobs")
   endif()
   set(nightly_sst_dir "${PROJECT_BINARY_DIR}/sst")
 else()
   get_filename_component(nightly_sst_dir "${SCHWAYSTATION_SST_DIR}" ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
 endif()
-if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY)
+if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY AND NOT cdrom_reference_only)
   file(STRINGS ${PROJECT_SOURCE_DIR}/pins.txt nightly_rows REGEX "^r3000-")
   if(NOT nightly_rows)
     message(FATAL_ERROR "nightly: pins.txt has no r3000- rows")
@@ -29,9 +40,34 @@ if(NOT SCHWAYSTATION_GPU_REFERENCE_ONLY)
   endforeach()
 endif()
 
-include(${PROJECT_SOURCE_DIR}/cmake/GPUReferences.cmake)
-schway_add_gpu_reference_target()
-schway_prepare_gpu_reference_capture(clipping clipping_exe clipping_png clipping_golden)
+if(cdrom_reference_only)
+  # Keep the full nightly inventory registered while this focused tree configures
+  # only the selected CD assets and target. Unselected tests still fail normally
+  # if someone runs them without their missing executable/assets.
+  foreach(case IN ITEMS gp0-e1 gpustat mask-bit)
+    schway_add_test(NAME gpu.reference.${case}
+      COMMAND schwaystation-test-gpu-reference log ${case} ${PROJECT_BINARY_DIR}/gpu-reference/${case}/psx.log
+      LABELS gpu nightly portable TIMEOUT 30)
+  endforeach()
+  schway_add_test(NAME gpu.reference.clipping
+    COMMAND schwaystation-test-gpu-reference capture clipping
+      ${PROJECT_BINARY_DIR}/gpu-reference/gpu/clipping/clipping.exe
+      ${PROJECT_BINARY_DIR}/gpu-reference/clipping-vram.rgb555le 1
+      ${PROJECT_SOURCE_DIR}/tests/gpu/allow.txt
+    LABELS gpu nightly portable TIMEOUT 120)
+  foreach(case IN ITEMS clut-cache lines quad rectangles texture-overflow transparency triangle
+                        uv-interpolation vram-to-vram-overlap)
+    schway_add_test(NAME gpu.reference.${case}
+      COMMAND schwaystation-test-gpu-reference capture ${case}
+        ${PROJECT_BINARY_DIR}/gpu-reference/gpu/${case}/${case}.exe
+        ${PROJECT_BINARY_DIR}/gpu-reference/${case}-vram.rgb555le 1
+        ${PROJECT_SOURCE_DIR}/tests/gpu/allow.txt
+      LABELS gpu nightly portable TIMEOUT 120)
+  endforeach()
+else()
+  include(${PROJECT_SOURCE_DIR}/cmake/GPUReferences.cmake)
+  schway_add_gpu_reference_target()
+  schway_prepare_gpu_reference_capture(clipping clipping_exe clipping_png clipping_golden)
 
 # The log guests' source-defined MMIO predicates are judged against their real ordered hardware pass logs.
 foreach(case IN ITEMS gp0-e1 gpustat mask-bit)
@@ -74,18 +110,26 @@ foreach(case IN LISTS SCHWAY_GPU_REFERENCE_CASES)
       ${case_advances} ${PROJECT_SOURCE_DIR}/tests/gpu/allow.txt
     LABELS gpu nightly portable TIMEOUT 120)
 endforeach()
+endif()
 
-include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
-schway_prepare_spu_reference_assets(
-  spu_reference_dir spu_reference_exe spu_reference_log
-  spu_reference_exe_sha256 spu_reference_log_sha256)
-schway_add_spu_reference_target("${spu_reference_exe_sha256}" "${spu_reference_log_sha256}")
+if(cdrom_reference_only)
+  schway_add_test(NAME spu.reference.memory_transfer
+    COMMAND schwaystation-test-spu-reference memory-transfer --full --assets
+      "${PROJECT_BINARY_DIR}/spu-reference"
+    LABELS audio nightly portable TIMEOUT 120)
+else()
+  include(${PROJECT_SOURCE_DIR}/cmake/SPUReferences.cmake)
+  schway_prepare_spu_reference_assets(
+    spu_reference_dir spu_reference_exe spu_reference_log
+    spu_reference_exe_sha256 spu_reference_log_sha256)
+  schway_add_spu_reference_target("${spu_reference_exe_sha256}" "${spu_reference_log_sha256}")
 
-# Fault prevented: nightly omits any of the pinned memory-transfer guest's
-# seven hardware cases or skips the bounded end-to-end transfer check.
-schway_add_test(NAME spu.reference.memory_transfer
-  COMMAND schwaystation-test-spu-reference memory-transfer --full --assets "${spu_reference_dir}"
-  LABELS audio nightly portable TIMEOUT 120)
+  # Fault prevented: nightly omits any of the pinned memory-transfer guest's
+  # seven hardware cases or skips the bounded end-to-end transfer check.
+  schway_add_test(NAME spu.reference.memory_transfer
+    COMMAND schwaystation-test-spu-reference memory-transfer --full --assets "${spu_reference_dir}"
+    LABELS audio nightly portable TIMEOUT 120)
+endif()
 
 add_executable(schwaystation-test-vectors ${PROJECT_SOURCE_DIR}/tests/vectors/vectors.c)
 target_include_directories(schwaystation-test-vectors PRIVATE ${PROJECT_SOURCE_DIR}/src)
@@ -102,3 +146,12 @@ schway_add_test(NAME vectors.r3000.full
   COMMAND schwaystation-test-vectors --upstream ${nightly_sst_dir}
     --prefix-of ${vectors_dir}/sst-sample.bin --expect 55000 --allow ${vectors_dir}/allow.txt
   LABELS portable vectors TIMEOUT 120)
+
+include(${PROJECT_SOURCE_DIR}/cmake/CDReferences.cmake)
+schway_prepare_cd_reference_assets(
+  cd_reference_dir cd_timing_exe cd_timing_log cd_getloc_exe cd_getloc_log
+  cd_timing_exe_sha cd_getloc_exe_sha cd_timing_log_sha cd_getloc_log_sha)
+schway_add_cd_reference_target(
+  "${cd_timing_exe_sha}" "${cd_getloc_exe_sha}" "${cd_timing_log_sha}" "${cd_getloc_log_sha}")
+schway_register_cd_reference_tests(
+  "${cd_timing_exe}" "${cd_timing_log}" "${cd_getloc_exe}" "${cd_getloc_log}")

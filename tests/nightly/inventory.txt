@@ -1,4 +1,7 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+cdrom.reference.controls	disc,nightly,portable
+cdrom.reference.getloc	disc,nightly,portable
+cdrom.reference.timing	disc,nightly,portable
 gpu.reference.clipping	gpu,nightly,portable
 gpu.reference.clut-cache	gpu,nightly,portable
 gpu.reference.gp0-e1	gpu,nightly,portable
