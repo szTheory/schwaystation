@@ -1,21 +1,14 @@
 ---
 phase: 06-discs-and-fmv
-reviewed: 2026-11-15T21:58:34Z
-depth: standard
-files_reviewed: 13
+reviewed: 2026-11-16T02:08:41Z
+depth: focused
+files_reviewed: 6
 files_reviewed_list:
   - src/cdrom.c
   - src/cdrom_sector.c
   - src/cdrom.h
-  - src/cdrom_state.c
-  - src/frame.c
-  - src/internal.h
-  - cmake/DiscTargets.cmake
-  - tests/cdrom/sectors.c
   - tests/cdrom/model.c
-  - tests/cdrom/tests.cmake
-  - tests/cdrom/inventory.txt
-  - tests/core/test_state.c
+  - tests/cdrom/reference.c
   - docs/hardware/cdrom.md
 findings:
   critical: 0
@@ -26,23 +19,13 @@ findings:
 status: clean
 ---
 
-# Phase 06: Code Review Report
+# Phase 06: Focused Plan 29 Review
 
-**Reviewed:** 2026-11-15T21:58:34Z  
-**Depth:** standard  
-**Files Reviewed:** 13  
+**Reviewed:** 2026-11-16T02:08:41Z
+**Depth:** focused
+**Files reviewed:** 6
 **Status:** clean
 
-## Summary
+The narrowed Plan 29 changes have no actionable findings. BUSYSTS is checked before and after command acceptance, and the Nop/GetStat result remains exactly `0x42`. The model covers BFRD with an empty buffer, full 2,340-byte DMA transfer plus final MADR and cursor, cached header preservation after failed seek and both Getloc errors, successful SeekL recovery, and Reset clearing SeekError. Host controls assert exact GetlocL bytes and command/status values.
 
-Re-reviewed the sector path after the fixes. The TOC selects the audio-track path before data-header validation; XA audio candidates and file/channel filtering are decided before RDDATA storage; ReadN retries a failed sector once while ReadS fails immediately; valid Q is deinterleaved and CRC checked, with TOC-derived Q as fallback; and an owned bad-Q marker leaves `current_lba` unchanged.
-
-## Narrative Findings (AI reviewer)
-
-No remaining actionable findings in the reviewed scope.
-
----
-
-_Reviewed: 2026-11-15T21:58:34Z_  
-_Reviewer: the agent (gsd-code-reviewer)_  
-_Depth: standard_
+The source still contains the reference-specific target-minus-five behavior pending Plan 06-30. Plan 29 does not accept that rule; Plan 06-30 removes it and owns the exact Q/GetlocP seek rows. No temporary trace diagnostics remain.

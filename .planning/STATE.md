@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: "Added 06-29 ReadN/IRQ follow-up ahead of 06-06 final guest gate; execute 06-29, then resume 06-06. Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh."
-last_updated: "2026-11-16T00:43:26Z"
+stopped_at: Completed 06-29-PLAN.md; next 06-30-PLAN.md
+last_updated: "2026-11-16T02:13:51.801Z"
 last_activity: 2026-11-15
-state_head: 20894035cc3162358f4ca3bbd05420d8efc7780e
+state_head: a299e5ca5b96b1a2be16e2822167f5cfb7f41f82
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 179
-  completed_plans: 161
+  total_plans: 180
+  completed_plans: 162
   percent: 83
-current_plan: 29
-last_activity_desc: "Added dependent Plan 06-29 after the pinned caller trace isolated an HSTS bit-7 wait that prevents DMA3 from starting; Plan 06-06 resumes after 06-29. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+current_plan: 30
+last_activity_desc: "Completed Plan 06-29 with partial DISC-01 ReadN/HSTS/DMA3 coverage; next execute Plan 06-30, then resume 06-06. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Plan: 29 of 29 (Wave 7 ReadN status follow-up; resume 06-06 afterward)
+Plan: 30 of 30 (Wave 7 ReadN/HSTS caller; then exact Q/GetlocP follow-up 06-30 before resuming 06-06)
 Status: Ready to execute
 Last activity: 2026-11-15
 
@@ -223,6 +223,7 @@ Progress: [████████░░] 83%
 | Phase 06 P05 | 58m56s elapsed wall; active time unavailable | 1 task | 13 files |
 | Phase 06 P27 | 41m 08s | 1 tasks | 11 files |
 | Phase 06 P28 | 6m | 1 tasks | 3 files |
+| Phase 6 P29 | at least 1h29m57s wall lower bound | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -554,6 +555,8 @@ Recent decisions affecting current work:
 - [Phase 06]: DMA3 readiness requires CHCR trigger, BFRD and buffered sector data; CD-ROM uses no DREQ line.
 - [Phase 06]: Split chopped-window readiness into Plan 06-28 before the pinned Getloc caller.
 - [Phase 06]: Recheck CD BFRD and buffered-sector readiness before every chopped DMA3 window.
+- [Phase 6]: BUSYSTS tracks command acceptance independently from active CD drive status.
+- [Phase 6]: Pinned raw Q/GetlocP seek rows move to dependent Plan 06-30 because their offsets differ.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -753,9 +756,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T00:00:30.339Z
-Stopped at: Completed 06-28-PLAN.md; next 06-06-PLAN.md
-Resume file: .planning/phases/06-discs-and-fmv/06-06-PLAN.md
+Last session: 2026-11-16T02:13:51.541Z
+Stopped at: Completed 06-29-PLAN.md; next 06-30-PLAN.md
+Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
@@ -836,3 +839,7 @@ Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-26 comp
 ### Phase 6 plan 06-05 execution (2026-11-15)
 
 Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time from the earliest durable execution marker to summary creation was 58m56s; exact active duration is unavailable because executor start and idle intervals were not captured. Sector acquisition, filtering, Q handling, RDDATA delivery and state coverage are committed; code review is clean. The final Plan 05 configure/build/selected CTest command passed (8 selected tests), and hygiene, inventory sort and `git diff --check` passed. The TDD RED command failed the new sector caller as expected (exit 8), and its corrected report classified `RED_EVIDENCE_OK`. No hosted run applies. DISC-01 remains pending aggregate Phase 6 acceptance; XA decoding/audio, DMA3 cursor/rates and disc-boot caller acceptance remain with Plans 06-09/06-10, 06-27 and their downstream callers. Plan 06-06 is next; Plan 06-27 remains sequential with DMA consumers.
+
+### Phase 6 plan 06-29 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time is at least 1h31m23s from the earliest durable execution marker at 00:43:26Z through final gate closeout at 02:14:49Z; total runtime is longer, and active time was not measured. The post-review native command passed 2/2 tests and the pinned reference command passed 2/2, including the unchanged Getloc caller; focused code review is clean. ReadN BUSYSTS now clears on command acceptance, and full DMA3/status/GetlocL controls pass. DISC-01 remains partial: Plan 06-30 owns raw Q/GetlocP rows, then Plan 06-06 runs the full timing/Getloc gate. No hosted URL applies.
