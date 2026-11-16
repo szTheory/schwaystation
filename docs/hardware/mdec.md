@@ -17,10 +17,15 @@ DMA0 writes input words; CPU writes to the data port use the same FIFO path.
 
 A block starts with a signed 10-bit DC value and a six-bit quantization scale.
 The following run-length words carry a six-bit zero run and signed 10-bit AC
-value in zigzag order. The decoder applies the quantization table, clips
-coefficients to 11 bits, and requires `FE00h` as end-of-block. `FE00h` before a
-DC value is padding. Parsing is bounded by the 64-coefficient block and the
-command input count; malformed runs or an exhausted command abort the block.
+value in zigzag order. The decoder applies the quantization table and clips
+coefficients to 11 bits. Blocks normally end with `FE00h`; `FE00h` before a DC
+value is padding. One bounded first-caller exception is recorded from the
+pinned ps1-tests `mdec/4bit` guest: its 32-word decode command ends after
+coefficient 63 with no EOB, and the completed 64-coefficient block is published
+at that command boundary ([SCM.12], guest pin and member digest in `pins.txt`).
+This is an observed caller case, not general acceptance of missing EOBs.
+Parsing remains bounded by the 64-coefficient block and command input count;
+malformed runs or an exhausted command with an incomplete block abort.
 When EOB is in a word's low half, the high half remains queued for the next
 block, including across save and load.
 

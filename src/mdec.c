@@ -248,8 +248,27 @@ static void mdec_idct(struct schway__mdec *mdec, const int16_t coefficients[64])
     }
 }
 
-/* Read one bounded block from the input FIFO. A full FIFO or an exhausted
-   command without EOB is malformed and is discarded. */
+static int mdec_finish_block(schway *inst, const int16_t coefficients[64],
+                             uint32_t consumed_words, uint32_t next_half, uint64_t now)
+{
+    struct schway__mdec *mdec = &inst->mdec;
+    mdec_input_consume(mdec, consumed_words);
+    mdec->input_half = next_half;
+    mdec_idct(mdec, coefficients);
+    if (now > UINT64_MAX - SCHWAY__MDEC_BLOCK_CYCLES) {
+        mdec_abort_block(inst);
+        return -1;
+    }
+    mdec->block_index = 0u;
+    mdec->block_pending = 1u;
+    mdec->block_deadline = now + SCHWAY__MDEC_BLOCK_CYCLES;
+    mdec_update_requests(inst);
+    return 1;
+}
+
+/* Read one bounded block from the input FIFO. The pinned 32-word mono caller
+   may end exactly after coefficient 63 without EOB; other exhausted commands
+   and a full FIFO are malformed and are discarded. */
 static int mdec_parse_block(schway *inst, uint64_t now)
 {
     struct schway__mdec *mdec = &inst->mdec;
@@ -277,18 +296,9 @@ static int mdec_parse_block(schway *inst, uint64_t now)
                 continue;
             }
             if (value == 0xFE00u) {
-                mdec_input_consume(mdec, word_index + (half == 0u ? 0u : 1u));
-                mdec->input_half = half == 0u ? 1u : 0u;
-                mdec_idct(mdec, coefficients);
-                if (now > UINT64_MAX - SCHWAY__MDEC_BLOCK_CYCLES) {
-                    mdec_abort_block(inst);
-                    return -1;
-                }
-                mdec->block_index = 0u;
-                mdec->block_pending = 1u;
-                mdec->block_deadline = now + SCHWAY__MDEC_BLOCK_CYCLES;
-                mdec_update_requests(inst);
-                return 1;
+                return mdec_finish_block(inst, coefficients,
+                                         word_index + (half == 0u ? 0u : 1u),
+                                         half == 0u ? 1u : 0u, now);
             }
             uint32_t next = scan + ((value >> 10) & 0x3Fu) + 1u;
             if (next >= SCHWAY__MDEC_BLOCK_SAMPLES) {
@@ -302,6 +312,12 @@ static int mdec_parse_block(schway *inst, uint64_t now)
         }
     }
 
+    /* This final 32-word command boundary completes the pinned 4-bit guest's
+       64 coefficients without an explicit FE00 halfword. */
+    if (mdec->command_words == 32u && mdec->words_remaining == 0u && have_dc != 0u &&
+        scan == 63u) {
+        return mdec_finish_block(inst, coefficients, mdec->input_count, 0u, now);
+    }
     if (mdec->input_count >= SCHWAY__MDEC_INPUT_WORDS || mdec->words_remaining == 0u) {
         mdec_abort_block(inst);
         return -1;
