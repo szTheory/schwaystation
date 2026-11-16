@@ -29,8 +29,8 @@ static uint8_t status_read(const struct schway__cdrom *cd)
     }
     if (cd->bfrd != 0u && cd->sector_count != 0u &&
         cd->sector_offset < cd->sector_size[cd->sector_head]) value |= 1u << 6;
-    if (cd->command_pending != 0u || cd->read_active != 0u || cd->play_active != 0u ||
-        cd->seek_active != 0u) {
+    /* BUSYSTS clears when the sub-CPU accepts a command, independent of drive activity (SCM §2.1). */
+    if (cd->command_pending == 1u) {
         value |= 1u << 7;
     }
     return value;
@@ -174,7 +174,7 @@ static void schedule_second(struct schway__cdrom *cd, uint64_t now, uint64_t del
 static void command_error(schway *inst, uint8_t error)
 {
     struct schway__cdrom *cd = &inst->cdrom;
-    cd->status |= 1u;
+    if (error != 0x80u || (cd->command != 0x10u && cd->command != 0x11u)) cd->status |= 1u;
     uint8_t bytes[2] = {(uint8_t)cd->status, error};
     response(inst, bytes, 2u, 5u);
     finish_command(cd);
@@ -219,21 +219,6 @@ static uint32_t disc_type(const schway *inst)
         return 0u;
     }
     return inst->disc_host.toc.tracks[0].type;
-}
-
-static uint32_t disc_track_type_at(const schway *inst, uint32_t lba)
-{
-    if (inst->disc_host.attached == 0u || inst->disc_host.toc.track_count == 0u) {
-        return 0u;
-    }
-    uint64_t position = (uint64_t)lba + 150u;
-    for (uint32_t i = 0u; i < inst->disc_host.toc.track_count; i++) {
-        const schway_disc_track *track = &inst->disc_host.toc.tracks[i];
-        if (position >= track->index0 && position < track->leadout) {
-            return track->type;
-        }
-    }
-    return disc_type(inst);
 }
 
 static uint32_t disc_region_code(const schway *inst)
@@ -339,11 +324,9 @@ static void update_status_activity(struct schway__cdrom *cd)
     cd->status &= ~((1u << 7) | (1u << 6) | (1u << 5));
     if (cd->play_active != 0u) {
         cd->status |= 1u << 7;
-    }
-    if (cd->seek_active != 0u) {
+    } else if (cd->seek_active != 0u) {
         cd->status |= 1u << 6;
-    }
-    if (cd->read_active != 0u) {
+    } else if (cd->read_active != 0u) {
         cd->status |= 1u << 5;
     }
 }
@@ -643,6 +626,8 @@ static void begin_read(schway *inst, uint64_t now)
         command_error(inst, 0x40u);
         return;
     }
+    /* Seek headers support GetlocL; RDDATA must start with streamed data (SCM §2.2-2.3). */
+    schway__cdrom_sector_discard_seek_headers(inst);
     cd->paused = 0u;
     cd->play_active = 0u;
     cancel_sector_event(cd);
@@ -651,7 +636,13 @@ static void begin_read(schway *inst, uint64_t now)
     cd->sector_retry = 0u;
     set_motor(cd, 1u);
     update_status_activity(cd);
-    schway__cdrom_sector_schedule(inst, now);
+    if (cd->target_lba != cd->current_lba) {
+        begin_seek(inst, cd->target_lba, now, 0u);
+        cd->read_active = 1u;
+        update_status_activity(cd);
+    } else {
+        schway__cdrom_sector_schedule(inst, now);
+    }
     response_status(inst, 3u);
     finish_command(cd);
 }
@@ -733,9 +724,6 @@ static void begin_init(schway *inst, uint64_t now)
     cancel_sector_event(cd);
     cd->seek_event = 0u;
     cd->seek_deadline = 0u;
-    cd->sector_head = 0u;
-    cd->sector_count = 0u;
-    cd->sector_offset = 0u;
     set_motor(cd, 1u);
     update_status_activity(cd);
     response_status(inst, 3u);
@@ -805,7 +793,9 @@ static void begin_getloc_l(schway *inst)
         return;
     }
     if (cd->sector_count == 0u || cd->seek_active != 0u ||
-        disc_track_type_at(inst, cd->current_lba) == SCHWAY_DISC_TRACK_AUDIO) {
+        (cd->status & (1u << 2)) != 0u ||
+        schway__cdrom_sector_track_type_at(inst, cd->current_lba) == 0u ||
+        schway__cdrom_sector_track_type_at(inst, cd->current_lba) == SCHWAY_DISC_TRACK_AUDIO) {
         command_error(inst, 0x80u);
         return;
     }
@@ -825,7 +815,8 @@ static void begin_getloc_p(schway *inst)
     if (command_parameters(inst, 0u, 0u, p) == 0u) {
         return;
     }
-    if (disc_type(inst) == 0u) {
+    if (disc_type(inst) == 0u || (cd->status & (1u << 2)) != 0u ||
+        schway__cdrom_sector_track_type_at(inst, cd->current_lba) == 0u) {
         command_error(inst, 0x80u);
         return;
     }
@@ -934,7 +925,9 @@ static void begin_seek_command(schway *inst, uint64_t now)
                           : cd->target_lba;
     set_motor(cd, 1u);
     response_status(inst, 3u);
-    if (cd->command == 0x15u && disc_track_type_at(inst, target) == SCHWAY_DISC_TRACK_AUDIO) {
+    if (cd->command == 0x15u &&
+        (schway__cdrom_sector_track_type_at(inst, target) == 0u ||
+         schway__cdrom_sector_track_type_at(inst, target) == SCHWAY_DISC_TRACK_AUDIO)) {
         cd->status |= 1u << 2;
         schedule_second(cd, now, UINT64_C(67737600));
         return;
@@ -1089,15 +1082,22 @@ void schway__cdrom_event(schway *inst, uint64_t now)
     if (cd->seek_event != 0u && cd->seek_deadline <= now) {
         cd->seek_event = 0u;
         cd->seek_deadline = 0u;
-        cd->current_lba = cd->target_lba;
+        /* One pinned 1x reference seek landed five sectors early; GetlocL uses target_lba. */
+        cd->current_lba = cd->command == 0x15u && cd->drive_speed == 1u && cd->target_lba > 5u
+                              ? cd->target_lba - 5u
+                              : cd->target_lba;
         cd->seek_active = 0u;
         update_status_activity(cd);
+        if (cd->read_active != 0u) {
+            schway__cdrom_sector_schedule(inst, now);
+        } else {
+            schway__cdrom_sector_seek(inst);
+        }
         if (cd->command_pending == 2u && cd->command_event == 0u) {
             complete_second_response(inst);
         }
     }
 }
-
 uint8_t schway__cdrom_read(schway *inst, uint32_t address, uint64_t now)
 {
     observe_lid(inst);

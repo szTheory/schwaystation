@@ -175,6 +175,16 @@ static void run_cycles(schway *inst, uint64_t cycles)
     }
 }
 
+static void fire_command_event(schway *inst)
+{
+    uint64_t deadline = inst->cdrom.command_deadline;
+    CHECK_EQ_U64(inst->cdrom.command_event, 1u);
+    CHECK(deadline != 0u);
+    inst->run_active = 1u;
+    schway__cdrom_event(inst, deadline);
+    inst->run_active = 0u;
+}
+
 static uint8_t hint_status(schway *inst)
 {
     wr8(inst, 0u, 1u);
@@ -435,6 +445,161 @@ static void test_command_read_seeks_to_setloc(void)
     schway_destroy(inst);
 }
 
+static void test_readn_status_acceptance(void)
+{
+    struct test_disc host;
+    schway *inst = make_pal_data_disc(&host);
+    param(inst, 0u);
+    param(inst, 2u);
+    param(inst, 0x16u);
+    command(inst, 0x02u);
+    expect_first_ack(inst);
+    command(inst, 0x06u);
+    CHECK_EQ_U64(rd8(inst, 0u) & 0x80u, 0x80u);
+    run_cycles(inst, 50000u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x42u);
+    acknowledge(inst, 3u);
+    CHECK_EQ_U64(rd8(inst, 0u) & 0x80u, 0u);
+    command(inst, 0x01u);
+    run_cycles(inst, 50000u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x42u);
+    acknowledge(inst, 3u);
+    schway_destroy(inst);
+}
+
+static void test_read_discards_only_seek_header(void)
+{
+    struct test_disc host;
+    schway *inst = make_pal_data_disc(&host);
+    inst->cdrom.current_lba = 16u;
+    inst->cdrom.sector_head = 7u;
+    inst->cdrom.sector_count = 3u;
+    inst->cdrom.sector_offset = 2u;
+    inst->cdrom.sector_lba[7] = 15u;
+    inst->cdrom.sector_size[7] = 2048u;
+    inst->cdrom.sector[7][0] = 0xA1u;
+    inst->cdrom.sector_lba[0] = 16u;
+    inst->cdrom.sector_size[0] = SCHWAY__CDROM_SECTOR_BYTES;
+    inst->cdrom.sector[0][0] = 0xB2u;
+    inst->cdrom.sector_lba[1] = 17u;
+    inst->cdrom.sector_size[1] = 2048u;
+    inst->cdrom.sector[1][0] = 0xC3u;
+
+    schway__cdrom_sector_discard_seek_headers(inst);
+    CHECK_EQ_U64(inst->cdrom.sector_head, 7u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 2u);
+    CHECK_EQ_U64(inst->cdrom.sector_offset, 2u);
+    CHECK_EQ_U64(inst->cdrom.sector_lba[7], 15u);
+    CHECK_EQ_U64(inst->cdrom.sector[7][0], 0xA1u);
+    CHECK_EQ_U64(inst->cdrom.sector_lba[0], 17u);
+    CHECK_EQ_U64(inst->cdrom.sector_size[0], 2048u);
+    CHECK_EQ_U64(inst->cdrom.sector[0][0], 0xC3u);
+    schway_destroy(inst);
+}
+
+static void test_getloc_rejects_seek_error(void)
+{
+    struct test_disc host;
+    schway *inst = make_pal_data_disc(&host);
+    param(inst, 0u);
+    param(inst, 2u);
+    param(inst, 0x16u);
+    command(inst, 0x02u);
+    expect_first_ack(inst);
+    command(inst, 0x15u);
+    expect_first_ack(inst);
+    uint64_t delay = inst->cdrom.seek_deadline - inst->ticks;
+    run_cycles(inst, delay);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 2u);
+    (void)rd8(inst, 1u);
+    acknowledge(inst, 2u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
+    uint8_t cached_header[8];
+    memcpy(cached_header, &inst->cdrom.sector[inst->cdrom.sector_head][12], sizeof cached_header);
+
+    inst->disc_host.toc.tracks[1].leadout = 335000u;
+    param(inst, 0x74u);
+    param(inst, 0x30u);
+    param(inst, 0u);
+    command(inst, 0x02u);
+    expect_first_ack(inst);
+    command(inst, 0x15u);
+    expect_first_ack(inst);
+    fire_command_event(inst);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 5u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x06u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x04u);
+    acknowledge(inst, 5u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
+    CHECK_EQ_U64(inst->cdrom.sector_lba[inst->cdrom.sector_head], 16u);
+    CHECK(memcmp(cached_header, &inst->cdrom.sector[inst->cdrom.sector_head][12],
+                 sizeof cached_header) == 0);
+
+    command(inst, 0x10u);
+    run_cycles(inst, 50000u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 5u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x06u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x80u);
+    acknowledge(inst, 5u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
+    CHECK_EQ_U64(inst->cdrom.sector_lba[inst->cdrom.sector_head], 16u);
+    CHECK(memcmp(cached_header, &inst->cdrom.sector[inst->cdrom.sector_head][12],
+                 sizeof cached_header) == 0);
+    command(inst, 0x11u);
+    run_cycles(inst, 50000u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 5u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x06u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x80u);
+    acknowledge(inst, 5u);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
+    CHECK_EQ_U64(inst->cdrom.sector_lba[inst->cdrom.sector_head], 16u);
+    CHECK(memcmp(cached_header, &inst->cdrom.sector[inst->cdrom.sector_head][12],
+                 sizeof cached_header) == 0);
+
+    param(inst, 0u);
+    param(inst, 2u);
+    param(inst, 0x16u);
+    command(inst, 0x02u);
+    expect_first_ack(inst);
+    command(inst, 0x15u);
+    run_cycles(inst, 50000u);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x02u);
+    acknowledge(inst, 3u);
+    CHECK_EQ_U64(inst->cdrom.status & (1u << 2), 0u);
+    schway_destroy(inst);
+}
+
+static void test_seek_error_reset(void)
+{
+    struct test_disc host;
+    schway *inst = make_pal_data_disc(&host);
+    inst->disc_host.toc.tracks[1].leadout = 335000u;
+    param(inst, 0x74u);
+    param(inst, 0x30u);
+    param(inst, 0u);
+    command(inst, 0x02u);
+    expect_first_ack(inst);
+    command(inst, 0x15u);
+    expect_first_ack(inst);
+    fire_command_event(inst);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 5u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x06u);
+    CHECK_EQ_U64(rd8(inst, 1u), 0x04u);
+    acknowledge(inst, 5u);
+    CHECK((inst->cdrom.status & (1u << 2)) != 0u);
+
+    command(inst, 0x1Cu);
+    fire_command_event(inst);
+    CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
+    CHECK((inst->cdrom.status & (1u << 2)) == 0u);
+    (void)rd8(inst, 1u);
+    acknowledge(inst, 3u);
+    schway_destroy(inst);
+}
+
 static void test_command_getlocl_far_seek(void)
 {
     struct test_disc host;
@@ -521,6 +686,10 @@ static void test_command_matrix(void)
     test_command_media();
     test_command_seek_position();
     test_command_read_seeks_to_setloc();
+    test_readn_status_acceptance();
+    test_read_discards_only_seek_header();
+    test_getloc_rejects_seek_error();
+    test_seek_error_reset();
     test_command_getlocl_far_seek();
     test_command_stop_reset();
 }

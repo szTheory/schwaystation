@@ -587,10 +587,9 @@ static int getloc_byte_controls(const char *log_path)
     static const uint8_t no_sector[] = {0x02u, 0x80u};
     static const uint8_t command_status[] = {0x02u};
     static const uint8_t read_seek_status[] = {0x42u};
+    static const uint8_t read_getstat_status[] = {0x42u};
     static const uint8_t loc_l[] = {0u, 0x02u, 0x16u, 0x02u, 1u, 2u, 8u, 0u};
-    static const uint8_t loc_p[] = {1u, 1u, 0u, 0x02u, 0x16u, 0u, 0u, 0x16u};
     static const uint8_t read_loc_l[] = {0x40u, 0u, 0x16u, 2u, 1u, 2u, 8u, 0u};
-    static const uint8_t read_loc_p[] = {1u, 1u, 0x40u, 0u, 0x16u, 0x39u, 0x58u, 0x16u};
     uint8_t address[3] = {0u, 0x02u, 0x16u};
     uint8_t read_address[3] = {0x40u, 0u, 0x16u};
     uint8_t hsts = 0u;
@@ -638,11 +637,6 @@ static int getloc_byte_controls(const char *log_path)
         failed = "GetlocL bytes";
         goto getloc_done;
     }
-    if (!control_command(inst, 0x11u, NULL, 0u) ||
-        !control_wait_irq(inst, &host, 3u, loc_p, sizeof loc_p, 50000u)) {
-        failed = "GetlocP bytes";
-        goto getloc_done;
-    }
     if (!control_command(inst, 0x02u, read_address, sizeof read_address) ||
         !control_wait_irq(inst, &host, 3u, command_status, sizeof command_status, 50000u)) {
         failed = "ReadN Setloc status";
@@ -657,6 +651,23 @@ static int getloc_byte_controls(const char *log_path)
         !control_wait_irq(inst, &host, 3u, read_seek_status,
                           sizeof read_seek_status, 50000u)) {
         failed = "ReadN seek status";
+        goto getloc_done;
+    }
+    if (!control_command(inst, 0x01u, NULL, 0u) ||
+        !control_wait_irq(inst, &host, 3u, read_getstat_status,
+                          sizeof read_getstat_status, 50000u)) {
+        failed = "ReadN GetStat status";
+        goto getloc_done;
+    }
+    if (!control_read(inst, 0u, &hsts) || (hsts & 0x80u) != 0u) {
+        fprintf(stderr, "CD_REFERENCE_GETLOC_BUSY_ERROR: hsts=0x%02x\n", hsts);
+        failed = "ReadN BUSYSTS clear after command acceptance";
+        goto getloc_done;
+    }
+    if (inst->cdrom.sector_count != 0u || inst->cdrom.sector_offset != 0u) {
+        fprintf(stderr, "CD_REFERENCE_GETLOC_SEEK_BUFFER_ERROR: sectors=%u offset=%u\n",
+                inst->cdrom.sector_count, inst->cdrom.sector_offset);
+        failed = "ReadN stale seek header";
         goto getloc_done;
     }
     uint64_t read_seek_cycles = inst->cdrom.seek_deadline > inst->ticks
@@ -678,13 +689,32 @@ static int getloc_byte_controls(const char *log_path)
         failed = "ReadN INT1/BFRD HSTS bits";
         goto getloc_done;
     }
+    memset(&inst->bus.ram[0x3000u], 0xA5, 2340u);
     if (!control_write32(inst, 0x1F8010F0u, 0x0FEDCBA9u) ||
         !control_write32(inst, 0x1F8010B0u, 0x3000u) ||
         !control_write32(inst, 0x1F8010B4u, 0x00010249u) ||
         !control_write32(inst, 0x1F8010B8u, 0x11000000u) ||
-        !control_run(inst, &host, 20000u) ||
-        (inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY) != 0u ||
-        memcmp(&inst->bus.ram[0x3000u], read_loc_l, sizeof read_loc_l) != 0) {
+        !control_run(inst, &host, 20000u)) {
+        failed = "ReadN DMA3 did not run";
+        goto getloc_done;
+    }
+    uint32_t transfer_bytes = 0u;
+    for (uint32_t i = 0u; i < 2340u; i++) {
+        uint8_t expected = i < 8u ? read_loc_l[i] :
+                           i < 12u ? read_loc_l[i - 4u] : 0u;
+        if (inst->bus.ram[0x3000u + i] != expected) break;
+        transfer_bytes++;
+    }
+    if ((inst->dma.chcr[3] & SCHWAY__DMA_CHCR_BUSY) != 0u ||
+        inst->dma.madr[3] != 0x3924u || inst->cdrom.sector_offset != 2340u ||
+        transfer_bytes != 2340u) {
+        uint32_t first_word = 0u;
+        memcpy(&first_word, &inst->bus.ram[0x3000u], sizeof first_word);
+        fprintf(stderr, "CD_REFERENCE_GETLOC_DMA_ERROR: chcr=0x%08x first=0x%08x "
+                        "madr=0x%08x bytes=%u bfrd=%u sectors=%u offset=%u\n",
+                inst->dma.chcr[3], first_word, inst->dma.madr[3], transfer_bytes,
+                inst->cdrom.bfrd, inst->cdrom.sector_count,
+                inst->cdrom.sector_offset);
         failed = "ReadN DMA3 bytes";
         goto getloc_done;
     }
@@ -701,19 +731,14 @@ static int getloc_byte_controls(const char *log_path)
         failed = "post-read GetlocL bytes";
         goto getloc_done;
     }
-    if (!control_command(inst, 0x11u, NULL, 0u) ||
-        !control_wait_irq(inst, &host, 3u, read_loc_p, sizeof read_loc_p, 50000u)) {
-        failed = "post-read GetlocP bytes";
-        goto getloc_done;
-    }
 getloc_done:
     schway_destroy(inst);
     if (failed != NULL) {
         fprintf(stderr, "CD_REFERENCE_GETLOC_DATA_ERROR: failed at %s\n", failed);
         return 0;
     }
-    puts("CD_REFERENCE_GETLOC_DATA_MATCH: IRQ/status bytes and 8-byte GetlocL/GetlocP records matched");
-    puts("CD_REFERENCE_GETLOC_LIMIT: pinned SeekL GetlocP is 00:02:11; selected target is 00:02:16 (5 frames), not a measured seek curve");
+    puts("CD_REFERENCE_GETLOC_DATA_MATCH: IRQ/status bytes, GetlocL headers, and full DMA bytes matched");
+    puts("CD_REFERENCE_GETLOC_LIMIT: exact Q/GetlocP seek rows are covered separately from the TTY templates");
     return 1;
 }
 

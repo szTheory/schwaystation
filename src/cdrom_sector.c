@@ -44,6 +44,36 @@ static uint32_t sector_track(const schway *inst, uint32_t lba, uint32_t *track_i
     return 0u;
 }
 
+uint32_t schway__cdrom_sector_track_type_at(const schway *inst, uint32_t lba)
+{
+    uint32_t track_index = 0u;
+    return inst->disc_host.attached != 0u ? sector_track(inst, lba, &track_index) : 0u;
+}
+
+/* Remove raw data-track seek headers while preserving streamed sector slots. */
+void schway__cdrom_sector_discard_seek_headers(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    for (uint32_t i = 0u; i < cd->sector_count;) {
+        uint32_t slot = (cd->sector_head + i) % SCHWAY__CDROM_SECTOR_CAP;
+        uint32_t type = schway__cdrom_sector_track_type_at(inst, cd->sector_lba[slot]);
+        if (cd->sector_size[slot] != SCHWAY__CDROM_SECTOR_BYTES || type == 0u ||
+            type == SCHWAY_DISC_TRACK_AUDIO) {
+            i++;
+            continue;
+        }
+        for (uint32_t j = i; j + 1u < cd->sector_count; j++) {
+            uint32_t dst = (cd->sector_head + j) % SCHWAY__CDROM_SECTOR_CAP;
+            uint32_t src = (cd->sector_head + j + 1u) % SCHWAY__CDROM_SECTOR_CAP;
+            memcpy(cd->sector[dst], cd->sector[src], SCHWAY__CDROM_SECTOR_BYTES);
+            cd->sector_lba[dst] = cd->sector_lba[src];
+            cd->sector_size[dst] = cd->sector_size[src];
+        }
+        cd->sector_count--;
+        if (i == 0u) cd->sector_offset = 0u;
+    }
+}
+
 static uint16_t sector_q_crc(const uint8_t q[12])
 {
     uint16_t crc = 0u;
@@ -237,6 +267,31 @@ static void sector_store(struct schway__cdrom *cd, const uint8_t sector[2352], u
     cd->sector_lba[tail] = lba;
     cd->sector_size[tail] = size;
     cd->sector_count++;
+}
+
+void schway__cdrom_sector_seek(schway *inst)
+{
+    struct schway__cdrom *cd = &inst->cdrom;
+    if (inst->run_active == 0u || inst->disc_host.attached == 0u ||
+        inst->disc_host.lid_open != 0u || inst->disc_host.callbacks.read_sector == NULL) {
+        return;
+    }
+    uint32_t lba = cd->target_lba;
+    uint32_t track_index = 0u;
+    uint32_t track_type = sector_track(inst, lba, &track_index);
+    (void)track_index;
+    if (track_type == 0u || track_type == SCHWAY_DISC_TRACK_AUDIO) {
+        return;
+    }
+    uint8_t sector[SCHWAY__CDROM_SECTOR_BYTES] = {0u};
+    uint8_t subcode[96] = {0u};
+    if (inst->disc_host.callbacks.read_sector(inst->disc_host.callbacks.user, lba,
+                                              sector, subcode) == 0u ||
+        sector_is_well_formed(sector) == 0u) {
+        return;
+    }
+    /* GetlocL exposes the completed SeekL target header (PSX-SPU-CDROM-AND-MDEC.md §2.2, SCM.02; docs/hardware/cdrom.md#command-behavior). */
+    sector_store(cd, sector, lba, SCHWAY__CDROM_SECTOR_BYTES);
 }
 
 void schway__cdrom_sector_event(schway *inst, uint64_t now)

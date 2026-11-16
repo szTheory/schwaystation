@@ -366,6 +366,8 @@ static void test_sector_timing_and_data(void)
     CHECK_EQ_U64(inst->cdrom.sector_offset, 0u);
     sector_wr8(inst, 0u, 0u);
     sector_wr8(inst, 3u, 0x80u);
+    CHECK_EQ_U64(inst->cdrom.bfrd, 1u);
+    CHECK_EQ_U64(sector_rd8(inst, 0u) & 0x40u, 0u);
     inst->bus.ram[0x5000u] = 0xA5u;
     sector_wr32(inst, DMA_MADR3, 0x5000u);
     sector_wr32(inst, DMA_BCR3, 1u);

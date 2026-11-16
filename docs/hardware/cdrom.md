@@ -21,8 +21,9 @@ Byte, halfword and word accesses are split into byte lanes by the bus.
 | `1803 W` | HCHPCTL | HCLRCTL | ATV2 | ADPCTL |
 
 HSTS reports the selected bank in bits 0-1, parameter empty/write-ready in bits 3-4, result ready in bit 5, sector
-data request in bit 6 when BFRD is enabled and unread data is available, and controller busy in bit 7. Bit 2
-(ADPBUSY) stays clear until XA decoding is connected. The
+data request in bit 6 when BFRD is enabled and unread data is available, and command-transfer busy in bit 7. BUSYSTS
+is set after a command write until the sub-CPU accepts it; it can clear while the separate status byte still reports
+Seek or Read. Bit 2 (ADPBUSY) stays clear until XA decoding is connected. The
 parameter and result FIFOs each hold 16 bytes. Writes to a full parameter FIFO are ignored; empty result reads return
 zero. The circular result FIFO preserves unread bytes when new responses wrap around it.
 
@@ -45,7 +46,7 @@ SeekError, 1 for motor on and 0 for Error.
 | `02 Setloc` | Validates BCD minute, second and frame; records the target LBA and returns INT3 |
 | `03 Play` | Optional BCD track parameter selects the TOC track; zero continues from the current position |
 | `04/05 Forward/Backward` | INT3 while playing; otherwise INT5 with error `80h` |
-| `06 ReadN`, `1B ReadS` | Starts Read and returns INT3; no disc or a region rejection returns INT5 (unlicensed read status `03h`, error `40h`) |
+| `06 ReadN`, `1B ReadS` | Starts Read and returns INT3; if Setloc differs from the current position, the drive seeks before delivering sectors. No disc or a region rejection returns INT5 (unlicensed read status `03h`, error `40h`) |
 | `07 MotorOn` | Starts the motor, returns INT3, then status and INT2 |
 | `08 Stop` | Stops Read/Play/Seek, returns INT3, then status and INT2 |
 | `09 Pause` | Stops Read/Play, returns INT3, then status and INT2 |
@@ -54,8 +55,8 @@ SeekError, 1 for motor on and 0 for Error.
 | `0D Setfilter` | Stores file and channel bytes and returns INT3 |
 | `0E Setmode` | Stores mode and speed, returns INT3 |
 | `0F Getparam` | Returns status, mode, zero, file and channel with INT3 |
-| `10 GetlocL` | Returns the newest buffered sector's eight-byte header at raw offset `0Ch`; errors if no sector is buffered, the medium is audio, or a seek is active |
-| `11 GetlocP` | Returns a deterministic track/index/MSF position from the current LBA |
+| `10 GetlocL` | Returns the newest buffered sector's eight-byte header at raw offset `0Ch`; errors if no sector is buffered, the medium is audio, a seek is active, or SeekError is set. A completed data-track seek requests its target sector through the host callback so the header is available immediately after SeekL completes |
+| `11 GetlocP` | Returns a deterministic track/index/MSF position from the current LBA; errors after a failed seek |
 | `12 Setsession` | Rejects session zero; other values return INT3 then INT2 |
 | `13 GetTN` | Returns status and first/last track numbers in BCD |
 | `14 GetTD` | Returns the selected track's index-1 MSF, or lead-out for track zero |
@@ -85,10 +86,21 @@ fixed point was selected and do not claim that every console drive has identical
 | Seek | Integer Q16 square-root model, 1-150 ticks, plus 3 ticks; 80 more ticks after a speed change; scale by 1x/2x | Inferred from ares' published formula (SCM.10); low confidence because no hardware seek curve is recorded |
 | Reset response | `400000h` cycles | Published controller behavior (SCM.02) |
 
+The pinned timing source log records minimum, maximum and average bands. The release guest's TTY prints the row
+template with literal format placeholders, so the harness checks its ordered rows and measures host callback
+intervals separately against those source-log bands. It also verifies the selected 451,584-cycle 1x and
+225,792-cycle 2x periods as exact model values in unit tests. This does not claim that the fixed schedule
+reproduces an individual drive's timing distribution.
+
 The seek model computes the radial term from the difference of Q16 square roots of `LBA + 150`, then applies
 `floor(0.5 * (3 + 0.2*r + 2.5*sqrt(r) + distance/60000))`, clamped to 1-150 ticks. Tick conversion is 451,584 CPU
 cycles at 1x and half that at 2x. The maximum selected seek is 233 ticks at 1x, including the three-tick base and
 speed-change delay. It has no random component or wall-clock input.
+
+One pinned 1x Getloc run requested SeekL at `00:02:16`, then reported a GetlocL header at `00:02:16` and a
+GetlocP absolute position at `00:02:11`. The deterministic baseline keeps the requested target for the cached header
+and uses the observed five-sector-early position for GetlocP. This is one reference observation, not a general seek
+landing curve.
 
 ## Region, firmware, licence and lid
 
@@ -110,6 +122,8 @@ Opening the lid cancels active reads, play and seek, sets sticky ShellOpen and q
 halved at double speed. Host callbacks run only while a public run call advances the instance. The bounded eight-slot
 ring overwrites its oldest sector on overrun; RDDATA reads use the 800h or 924h window selected by Setmode, advance the
 oldest-sector cursor, and repeat the documented tail byte after a window is consumed. BFRD gates reads and DRQ status.
+Starting ReadN/ReadS discards a raw target sector cached for GetlocL, so the first RDDATA bytes come from a sector
+delivered by the active read.
 At most one INT1 waits behind an already queued interrupt. ReadN retries a failed or malformed sector once; ReadS
 reports the failure immediately. A mismatched mode-2 file/channel filter retries once in ReadN and is skipped in ReadS.
 The mode-2 XA audio/realtime test runs before data selection, so accepted XA payloads do not reach RDDATA; decoder and
