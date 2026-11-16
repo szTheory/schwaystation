@@ -137,6 +137,7 @@ static void cdrom_buffer_state_io(struct schway__state_io *io, struct schway__cd
     schway__state_u32_array(io, "cdrom.sector_size", cd->sector_size, SCHWAY__CDROM_SECTOR_CAP,
                             0u, SCHWAY__CDROM_SECTOR_BYTES);
     state_i16_array(io, "cdrom.xa_history", &cd->xa_history[0][0], 2u * SCHWAY__CDROM_XA_TAPS);
+    state_i16_array(io, "cdrom.xa_adpcm_history", &cd->xa_adpcm_history[0][0], 4u);
     uint32_t xa_phase = schway__state_u32(io, "cdrom.xa_phase", &cd->xa_phase, 0u, 5u);
     schway__state_u16_array(io, "cdrom.audio", &cd->audio[0][0], 2u * SCHWAY__CDROM_AUDIO_CAP,
                             0u, UINT16_MAX);

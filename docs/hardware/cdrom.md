@@ -1,6 +1,7 @@
 # CD-ROM controller
 
-This page documents the deterministic command and register model in `src/cdrom.c` and `src/cdrom_sector.c`.
+This page documents the deterministic command and register model in `src/cdrom.c`, `src/cdrom_sector.c` and
+`src/cdxa.c`.
 It covers the indexed registers, FIFOs, sector timing, RDDATA delivery, command responses, region answers and lid changes.
 All deadlines use CPU ticks, integer arithmetic and the instance scheduler.
 
@@ -23,7 +24,7 @@ Byte, halfword and word accesses are split into byte lanes by the bus.
 HSTS reports the selected bank in bits 0-1, parameter empty/write-ready in bits 3-4, result ready in bit 5, sector
 data request in bit 6 when BFRD is enabled and unread data is available, and command-transfer busy in bit 7. BUSYSTS
 is set after a command write until the sub-CPU accepts it; it can clear while the separate status byte still reports
-Seek or Read. Bit 2 (ADPBUSY) stays clear until XA decoding is connected. The
+Seek or Read. Bit 2 (ADPBUSY) stays clear until XA decoding is called by the sector path. The
 parameter and result FIFOs each hold 16 bytes. Writes to a full parameter FIFO are ignored; empty result reads return
 zero. The circular result FIFO preserves unread bytes when new responses wrap around it.
 
@@ -102,6 +103,30 @@ Pinned Getloc observations keep the raw sector header separate from the Q positi
 header at `00:02:16` and Q absolute position `00:02:11`; seeks at `00:00:30` and `74:00:00` report distinct lead-in
 and lead-out records. GetlocP uses each validated host Q record directly, without applying a general seek offset.
 
+## XA-ADPCM decode and resampling
+
+The decoder accepts a complete 2,352-byte raw Mode2/Form2 audio sector. It checks the sync/mode bytes, matching
+subheaders, audio and Form2 flags, supported coding fields, and the repeated 16-byte XA portion headers. Each sector
+contains 18 portions of 128 bytes and produces bounded stereo PCM at the encoded 37.8 or 18.9 kHz rate. Mono input
+is copied to both output channels. Reserved channel, sample-width and coding values, nonzero portion-header reserved
+bits, and XA emphasis are rejected before decoder state changes. The emphasis formula remains unknown, and no known
+PSX game uses XA emphasis.
+
+The four XA predictor pairs are `(0,0)`, `(60,0)`, `(115,-52)` and `(98,-55)`. A signed 4-bit sample is expanded by
+4,096 before its shift; a signed 8-bit sample is expanded by 256. Shift values 13-15 use shift 9. Each sample adds
+`(old * positive + older * negative + 32) / 64` and saturates to signed 16-bit. Division truncates toward zero for the
+predictor; the 8-bit right shift uses explicit sign-preserving floor division. Two predictor samples per channel carry
+across portions and sectors, and reset clears them.
+
+The resampler keeps 29 input samples per channel and applies the seven documented Q15 tap columns in
+[`src/cdxa.c`](../../src/cdxa.c), sourced from [psx-spx CDROM Format, XA-ADPCM interpolation](https://psx-spx.consoledev.net/cdromformat/).
+It emits seven samples after each six decoded samples. At 18.9 kHz, it duplicates each decoded input sample before
+filtering. Its six-step phase starts at zero and, like both histories, is instance state. The chosen integer baseline
+divides the signed tap sum by 32,768 with truncation toward zero, then saturates to signed 16-bit. The source notes
+small rounding mismatches and a possible two-stage hardware implementation; without a hardware capture, these exact
+rounding and phase choices are deterministic behavior, not proof of a silicon waveform. The decoded samples are not
+yet connected to the SPU audio queue; the later XA/SPU integration plans own that path.
+
 ## Region, firmware, licence and lid
 
 The machine profile region selects the default controller identity. Test `20h` returns the vC2 marker and the date
@@ -126,14 +151,15 @@ Starting ReadN/ReadS discards a raw target sector cached for GetlocL, so the fir
 delivered by the active read.
 At most one INT1 waits behind an already queued interrupt. ReadN retries a failed or malformed sector once; ReadS
 reports the failure immediately. A mismatched mode-2 file/channel filter retries once in ReadN and is skipped in ReadS.
-The mode-2 XA audio/realtime test runs before data selection, so accepted XA payloads do not reach RDDATA; decoder and
-audio output are connected by the later XA/SPU plans. Play accepts raw 2352-byte CD-DA sectors on audio tracks without
+The mode-2 XA audio/realtime test runs before data selection, so accepted XA payloads do not reach RDDATA; the decoder
+is implemented, while its sector caller and SPU audio output are connected by later XA/SPU plans. Play accepts raw
+2352-byte CD-DA sectors on audio tracks without
 requiring a data header. Supplied Q subcode is deinterleaved and checked for BCD fields, TOC track range and CRC.
 Missing or invalid Q is synthesized from the TOC until a valid record exists; later missing or invalid records preserve
 the last good position. `current_lba` follows valid Q position unless the host's `bad_q` callback marks that sector,
 in which case the previous good position remains visible. Disc callbacks and TOC remain host-owned and are not part of
 save states; controller flags, sector bytes, the latest validated 12-byte Q record, FIFO contents and scheduled
-deadlines are serialized in state format 10.
+deadlines, XA predictor history and resampler history are serialized in state format 11.
 
 ## Sources and confidence
 

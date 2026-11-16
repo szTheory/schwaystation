@@ -40,6 +40,7 @@ struct schway__cdrom {
     uint32_t sector_lba[SCHWAY__CDROM_SECTOR_CAP];
     uint32_t sector_size[SCHWAY__CDROM_SECTOR_CAP];
     int16_t xa_history[2][SCHWAY__CDROM_XA_TAPS];
+    int16_t xa_adpcm_history[2][2];
     uint32_t xa_phase;
     uint16_t audio[SCHWAY__CDROM_AUDIO_CAP][2];
     uint32_t audio_head, audio_count;
