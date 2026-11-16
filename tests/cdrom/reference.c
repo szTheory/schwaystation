@@ -55,7 +55,49 @@ typedef struct disc_host {
     uint64_t last_tick;
     uint32_t interval_count[2];
     uint64_t intervals[2][512];
+    uint32_t q_corruption;
 } disc_host;
+
+typedef struct q_fixture {
+    uint32_t lba;
+    uint8_t setloc[3];
+    uint8_t header[3];
+    uint8_t q[12];
+    uint8_t getlocp[8];
+} q_fixture;
+
+static const q_fixture q_fixtures[] = {
+    {16u, {0x00u, 0x02u, 0x16u}, {0x00u, 0x02u, 0x16u},
+     {0x41u, 0x01u, 0x01u, 0x00u, 0x00u, 0x11u, 0x00u, 0x00u, 0x02u, 0x11u,
+      0x84u, 0x29u},
+     {0x01u, 0x01u, 0x00u, 0x02u, 0x11u, 0x00u, 0x00u, 0x11u}},
+    {0u, {0x00u, 0x00u, 0x30u}, {0x00u, 0x00u, 0x29u},
+     {0x41u, 0x01u, 0x00u, 0x00u, 0x01u, 0x41u, 0x00u, 0x00u, 0x00u, 0x33u,
+      0xF1u, 0x2Au},
+     {0x01u, 0x00u, 0x00u, 0x00u, 0x33u, 0x00u, 0x01u, 0x41u}},
+    {332850u, {0x74u, 0x00u, 0x00u}, {0x73u, 0x59u, 0x74u},
+     {0x41u, 0xAAu, 0x01u, 0x03u, 0x34u, 0x62u, 0x00u, 0x74u, 0x00u, 0x03u,
+      0xCAu, 0xFEu},
+     {0xAAu, 0x01u, 0x74u, 0x00u, 0x03u, 0x03u, 0x34u, 0x62u}}
+};
+
+static const q_fixture *q_fixture_for_lba(uint32_t lba)
+{
+    for (size_t i = 0u; i < sizeof q_fixtures / sizeof q_fixtures[0]; i++) {
+        if (q_fixtures[i].lba == lba) return &q_fixtures[i];
+    }
+    return NULL;
+}
+
+static void encode_q_subcode(const uint8_t q[12], uint8_t subcode[SUBCODE_BYTES],
+                             uint32_t corruption)
+{
+    for (uint32_t bit = 0u; bit < 96u; bit++) {
+        uint32_t source = corruption == 2u ? (bit + 1u) % 96u : bit;
+        uint8_t value = (uint8_t)((q[source / 8u] >> (7u - (source & 7u))) & 1u);
+        subcode[bit] = (uint8_t)(value << 6);
+    }
+}
 
 static void *reference_alloc(void *user, size_t size)
 {
@@ -163,6 +205,14 @@ static uint32_t make_sector(void *user, uint32_t lba, uint8_t sector[SECTOR_BYTE
     sector[21] = 2u;
     sector[22] = 8u;
     sector[23] = 0u;
+    const q_fixture *fixture = q_fixture_for_lba(lba);
+    if (fixture != NULL) {
+        uint8_t q[12];
+        memcpy(q, fixture->q, sizeof q);
+        memcpy(&sector[12], fixture->header, sizeof fixture->header);
+        if (host->q_corruption == 1u) q[10] ^= 1u;
+        encode_q_subcode(q, subcode, host->q_corruption);
+    }
     return 1u;
 }
 
@@ -742,6 +792,119 @@ getloc_done:
     return 1;
 }
 
+static int control_q_fixture(disc_host *host, schway *inst, const q_fixture *fixture,
+                             const uint8_t *expected_q, uint8_t setloc_value)
+{
+    static const uint8_t seek_status[] = {0x02u};
+    uint8_t setloc_status[] = {setloc_value};
+    uint8_t expected_header[8] = {fixture->header[0], fixture->header[1], fixture->header[2],
+                                  2u, 1u, 2u, 8u, 0u};
+    if (!control_command(inst, 0x02u, fixture->setloc, sizeof fixture->setloc) ||
+        !control_wait_irq(inst, host, 3u, setloc_status, sizeof setloc_status, 50000u)) {
+        fputs("CD_REFERENCE_Q_SEEK_ERROR: Setloc response mismatch\n", stderr);
+        return 0;
+    }
+    if (!control_command(inst, 0x15u, NULL, 0u) ||
+        !control_wait_irq(inst, host, 3u, seek_status, sizeof seek_status, 50000u)) {
+        fputs("CD_REFERENCE_Q_SEEK_ERROR: SeekL initial response mismatch\n", stderr);
+        return 0;
+    }
+    uint64_t cycles = inst->cdrom.seek_deadline > inst->ticks
+                          ? inst->cdrom.seek_deadline - inst->ticks : 0u;
+    if (cycles == 0u || !control_run(inst, host, cycles) ||
+        !control_wait_irq(inst, host, 2u, seek_status, sizeof seek_status, 0u) ||
+        host->last_lba != fixture->lba || host->callbacks_outside_run != 0u) {
+        fprintf(stderr, "CD_REFERENCE_Q_SEEK_ERROR: completion lba=%u expected=%u outside=%u\n",
+                host->last_lba, fixture->lba, host->callbacks_outside_run);
+        return 0;
+    }
+    if (!control_command(inst, 0x10u, NULL, 0u) ||
+        !control_wait_irq(inst, host, 3u, expected_header, sizeof expected_header, 50000u)) {
+        fputs("CD_REFERENCE_Q_GETLOCL_ERROR: target header mismatch\n", stderr);
+        return 0;
+    }
+    if (!control_command(inst, 0x11u, NULL, 0u) ||
+        !control_wait_irq(inst, host, 3u, expected_q, 8u, 50000u)) {
+        fprintf(stderr, "CD_REFERENCE_Q_GETLOCP_ERROR: lba=%u Q fields mismatch\n", fixture->lba);
+        return 0;
+    }
+    return 1;
+}
+
+static int q_fixture_controls(void)
+{
+    static const uint8_t fallback_leadout[8] = {
+        0x01u, 0x01u, 0x74u, 0x00u, 0x00u, 0x73u, 0x58u, 0x00u
+    };
+    schway_config config;
+    memset(&config, 0, sizeof config);
+    config.size = (uint32_t)sizeof config;
+    config.allocator.alloc = reference_alloc;
+    config.allocator.free = reference_free;
+    schway *inst = NULL;
+    disc_host host;
+    if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL ||
+        !attach_disc(inst, &host)) {
+        schway_destroy(inst);
+        fputs("CD_REFERENCE_Q_CORE_ERROR: cannot create the Q controls\n", stderr);
+        return 0;
+    }
+    for (size_t i = 0u; i < sizeof q_fixtures / sizeof q_fixtures[0]; i++) {
+        if (i != 0u) {
+            schway_destroy(inst);
+            inst = NULL;
+            if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL ||
+                !attach_disc(inst, &host)) {
+                schway_destroy(inst);
+                fputs("CD_REFERENCE_Q_CORE_ERROR: cannot isolate Q fixture\n", stderr);
+                return 0;
+            }
+        }
+        if (!control_q_fixture(&host, inst, &q_fixtures[i], q_fixtures[i].getlocp, 0u)) {
+            schway_destroy(inst);
+            return 0;
+        }
+        if (i == 2u) {
+            size_t state_size = schway_state_size(inst);
+            uint8_t *state = (uint8_t *)malloc(state_size);
+            if (state == NULL || schway_save_state(inst, state, state_size) != SCHWAY_STATUS_OK) {
+                free(state);
+                schway_destroy(inst);
+                fputs("CD_REFERENCE_Q_STATE_ERROR: cannot save the current Q record\n", stderr);
+                return 0;
+            }
+            if (!control_q_fixture(&host, inst, &q_fixtures[0], q_fixtures[0].getlocp, 0x02u) ||
+                schway_load_state(inst, state, state_size) != SCHWAY_STATUS_OK ||
+                !control_command(inst, 0x11u, NULL, 0u) ||
+                !control_wait_irq(inst, &host, 3u, q_fixtures[2].getlocp, 8u, 50000u)) {
+                free(state);
+                schway_destroy(inst);
+                fputs("CD_REFERENCE_Q_STATE_ERROR: saved Q record did not survive restore\n", stderr);
+                return 0;
+            }
+            free(state);
+        }
+    }
+    for (uint32_t corruption = 1u; corruption <= 2u; corruption++) {
+        schway_destroy(inst);
+        inst = NULL;
+        if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL ||
+            !attach_disc(inst, &host)) {
+            schway_destroy(inst);
+            fputs("CD_REFERENCE_Q_CORE_ERROR: cannot recreate invalid-Q control\n", stderr);
+            return 0;
+        }
+        host.q_corruption = corruption;
+        if (!control_q_fixture(&host, inst, &q_fixtures[2], fallback_leadout, 0u)) {
+            schway_destroy(inst);
+            return 0;
+        }
+    }
+    schway_destroy(inst);
+    puts("CD_REFERENCE_Q_MATCH: three pinned rows, malformed-Q fallback, and state restore matched");
+    return 1;
+}
+
 static int run_controls(const char *getloc_log_path)
 {
     char reference[2048];
@@ -793,7 +956,7 @@ static int run_controls(const char *getloc_log_path)
                        (const uint8_t *)reference, ref_size, &host) ||
         !ordered_pair(getloc_good, sizeof getloc_good - 1u) ||
         ordered_pair(getloc_reordered, sizeof getloc_reordered - 1u) ||
-        !getloc_byte_controls(getloc_log_path)) {
+        !getloc_byte_controls(getloc_log_path) || !q_fixture_controls()) {
         fputs("CD_REFERENCE_CONTROL_ERROR: malformed, shifted, or reordered data was accepted\n", stderr);
         return 1;
     }

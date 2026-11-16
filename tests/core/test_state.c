@@ -640,6 +640,8 @@ static uint32_t cdrom_mdec_fields_match(schway *inst)
         {"cdrom.result", 1u, SCHWAY__CDROM_FIFO_CAP},
         {"cdrom.interrupt", 1u, SCHWAY__CDROM_IRQ_CAP},
         {"cdrom.sector", 1u, SCHWAY__CDROM_SECTOR_CAP * SCHWAY__CDROM_SECTOR_BYTES},
+        {"cdrom.q_record", 1u, 12u},
+        {"cdrom.q_record_valid", 4u, 1u},
         {"cdrom.sector_lba", 4u, SCHWAY__CDROM_SECTOR_CAP},
         {"cdrom.sector_size", 4u, SCHWAY__CDROM_SECTOR_CAP},
         {"cdrom.bfrd", 4u, 1u},
@@ -1241,8 +1243,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 9u);
-    CHECK_EQ_U64(v.behaviour_revision, 9u);
+    CHECK_EQ_U64(v.state_format, 10u);
+    CHECK_EQ_U64(v.behaviour_revision, 10u);
 }
 
 static void check_cpu_power_on(schway *inst)
