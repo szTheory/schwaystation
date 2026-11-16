@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes, and the nightly lane matches the ps1-tests `mdec` references within the stated tolerance. The STR on `disc_boot` plays through DMA into the 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 25/38 plans executed
+**Plans**: 26/39 plans executed
 
 Plans:
 **Wave 1**
@@ -515,7 +515,7 @@ Plans:
 - [x] 06-10-PLAN.md — Feed CD-DA through the native SPU output
 - [x] 06-33-PLAN.md — Route decoded XA audio through the native SPU output
 - [x] 06-34-PLAN.md — Verify XA interleave filtering and mixed native audio sources
-- [x] 06-12-PLAN.md — Pin MDEC guests and comparator controls; full guest gate awaits 06-38
+- [x] 06-12-PLAN.md — Pin MDEC guests and comparator controls; full guest gate awaits 06-39
 - [x] 06-35-PLAN.md — Complete pinned MDEC 64-coefficient input at command boundary
 
 **Wave 10** *(blocked on Wave 9 completion)*
@@ -525,38 +525,41 @@ Plans:
 - [x] 06-37-PLAN.md — Mirror MDEC command fields into status; exact output/status guests remain unresolved
 
 **Wave 12** *(blocked on Wave 11 completion)*
-- [ ] 06-38-PLAN.md — Resolve exact MDEC output arithmetic and ordered status guest under the unchanged run cap
+- [x] 06-38-PLAN.md — Partial: record unsigned 4-bit candidate and isolate DMA1-start versus pinned guest-buffer target; 8-bit/status remain unresolved
 
 **Wave 13** *(blocked on Wave 12 completion)*
-- [ ] 06-13-PLAN.md — Decode color MDEC frames and display the DMA result
+- [ ] 06-39-PLAN.md — Resolve the pinned guest-buffer versus DMA1 output-target contract; verify the 4-bit candidate and corrected model fixture while retaining 8-bit/status gates
 
 **Wave 14** *(blocked on Wave 13 completion)*
+- [ ] 06-13-PLAN.md — Decode color MDEC frames and display the DMA result
+
+**Wave 15** *(blocked on Wave 14 completion)*
 - [ ] 06-14-PLAN.md — Build reproducible owned disc assets with pinned tools
 - [ ] 06-21-PLAN.md — Validate active media state and idle-drive cost
 
-**Wave 15** *(blocked on Wave 14 completion)*
+**Wave 16** *(blocked on Wave 15 completion)*
 - [ ] 06-15-PLAN.md — Boot the owned disc and verify ReadN records
 
-**Wave 16** *(blocked on Wave 15 completion)*
+**Wave 17** *(blocked on Wave 16 completion)*
 - [ ] 06-16-PLAN.md — Play owned XA, CD-DA and STR end to end
 
-**Wave 17** *(blocked on Wave 16 completion)*
+**Wave 18** *(blocked on Wave 17 completion)*
 - [ ] 06-17-PLAN.md — Load disc media and lid scripts in the runner
 
-**Wave 18** *(blocked on Wave 17 completion)*
+**Wave 19** *(blocked on Wave 18 completion)*
 - [ ] 06-18-PLAN.md — Expose libretro extended disk control and disc PCM
 
-**Wave 19** *(blocked on Wave 18 completion)*
+**Wave 20** *(blocked on Wave 19 completion)*
 - [ ] 06-19-PLAN.md — Vendor the pinned independent disc MD5 oracle
 - [ ] 06-22-PLAN.md — Build the installed-library SDL example without shipping it
 
-**Wave 20** *(blocked on Wave 19 completion)*
+**Wave 21** *(blocked on Wave 20 completion)*
 - [ ] 06-20-PLAN.md — Replay hostile media seeds and register nightly fuzz targets
 
-**Wave 21** *(blocked on Wave 20 completion)*
+**Wave 22** *(blocked on Wave 21 completion)*
 - [ ] 06-23-PLAN.md — Integrate per-leg disc equality and background RetroArch smoke
 
-**Wave 22** *(blocked on Wave 21 completion)*
+**Wave 23** *(blocked on Wave 22 completion)*
 - [ ] 06-24-PLAN.md — Review and verify the complete disc phase
 
 **UI hint**: no
@@ -574,4 +577,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
 | 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
-| 6. Discs and FMV | 25/38 | In Progress | - |
+| 6. Discs and FMV | 26/39 | In Progress | - |

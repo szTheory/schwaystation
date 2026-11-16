@@ -364,7 +364,15 @@ static void mdec_publish_block(schway *inst)
             uint32_t pixel = word_index * pixels + i;
             uint32_t value = mdec_pixel(mdec, pixel);
             if (mdec->depth == 0u) {
-                word |= ((value >> 4) & 0x0Fu) << (4u * i);
+                if (mdec->signed_output == 0u) {
+                    value = (value + 8u) >> 4u;
+                    if (value > 15u) {
+                        value = 15u;
+                    }
+                } else {
+                    value = (value >> 4u) & 0x0Fu;
+                }
+                word |= value << (4u * i);
             } else {
                 word |= value << (8u * i);
             }

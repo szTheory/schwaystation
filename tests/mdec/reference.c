@@ -46,19 +46,36 @@ typedef struct status_events {
     size_t output_count;
 } status_events;
 
+typedef struct dma_trace_write {
+    uint64_t cycle;
+    uint32_t pc;
+    uint32_t addr;
+    uint32_t value;
+} dma_trace_write;
+
 typedef struct mdec_guest_snapshot {
     uint32_t valid;
     uint32_t command;
     uint32_t depth;
     uint32_t signed_output;
     uint32_t output_count;
+    uint32_t dma0_started;
+    uint32_t dma0_madr;
+    uint32_t dma0_bcr;
+    uint32_t dma0_chcr;
+    uint32_t dma0_word_count;
+    uint32_t dma0_words[32];
     uint32_t dma1_started;
     uint32_t dma1_madr;
     uint32_t dma1_bcr;
     uint32_t dma1_chcr;
+    uint32_t dma1_write_count;
+    dma_trace_write dma1_writes[32];
     uint32_t trace_head_seen;
     uint32_t trace_count_seen;
     uint32_t trace_initialized;
+    uint32_t last_dma0_madr;
+    uint32_t last_dma0_bcr;
     uint32_t last_dma_madr;
     uint32_t last_dma_bcr;
     uint8_t quant[SCHWAY__MDEC_TABLE_BYTES];
@@ -85,7 +102,6 @@ static void capture_mdec_snapshot(mdec_guest_snapshot *snapshot, const schway *i
 
 static void capture_dma1_start(mdec_guest_snapshot *snapshot, const schway *inst)
 {
-    if (snapshot->dma1_started != 0u) return;
     const struct schway__trace_ring *trace = &inst->trace;
     uint32_t scan_start = 0u;
     uint32_t scan_count = trace->count;
@@ -112,7 +128,36 @@ static void capture_dma1_start(mdec_guest_snapshot *snapshot, const schway *inst
         const struct schway__trace_rec *rec =
             &trace->rec[(trace->head + i) % SCHWAY__TRACE_CAP];
         if (SCHWAY__TRACE_EVENT(rec->meta) != SCHWAY_TRACE_WR) continue;
-        if (rec->addr == 0x1F801090u) {
+        if (rec->addr >= 0x1F801090u && rec->addr <= 0x1F80109Bu &&
+            snapshot->dma1_write_count < 32u) {
+            dma_trace_write *write = &snapshot->dma1_writes[snapshot->dma1_write_count++];
+            write->cycle = rec->cycle;
+            write->pc = rec->pc;
+            write->addr = rec->addr;
+            write->value = rec->value;
+        }
+        if (rec->addr == 0x1F801080u) {
+            snapshot->last_dma0_madr = rec->value & SCHWAY__DMA_MADR_MASK;
+        } else if (rec->addr == 0x1F801084u) {
+            snapshot->last_dma0_bcr = rec->value;
+        } else if (rec->addr == 0x1F801088u && (rec->value & 0x01000000u) != 0u &&
+                   snapshot->dma0_started == 0u) {
+            snapshot->dma0_started = 1u;
+            snapshot->dma0_madr = snapshot->last_dma0_madr;
+            snapshot->dma0_bcr = snapshot->last_dma0_bcr;
+            snapshot->dma0_chcr = rec->value;
+            uint32_t words = snapshot->dma0_bcr & 0xFFFFu;
+            if (words <= 32u && snapshot->dma0_madr <= RAM_SIZE - words * 4u) {
+                snapshot->dma0_word_count = words;
+                for (uint32_t word = 0u; word < words; word++) {
+                    uint32_t at = snapshot->dma0_madr + word * 4u;
+                    snapshot->dma0_words[word] = (uint32_t)inst->bus.ram[at] |
+                        ((uint32_t)inst->bus.ram[at + 1u] << 8) |
+                        ((uint32_t)inst->bus.ram[at + 2u] << 16) |
+                        ((uint32_t)inst->bus.ram[at + 3u] << 24);
+                }
+            }
+        } else if (rec->addr == 0x1F801090u) {
             snapshot->last_dma_madr = rec->value & SCHWAY__DMA_MADR_MASK;
         } else if (rec->addr == 0x1F801094u) {
             snapshot->last_dma_bcr = rec->value;
@@ -122,7 +167,6 @@ static void capture_dma1_start(mdec_guest_snapshot *snapshot, const schway *inst
             snapshot->dma1_madr = snapshot->last_dma_madr;
             snapshot->dma1_bcr = snapshot->last_dma_bcr;
             snapshot->dma1_chcr = rec->value;
-            break;
         }
     }
     snapshot->trace_head_seen = trace->head;
@@ -438,6 +482,29 @@ static int parse_expected_block(const uint8_t *log, size_t log_size,
     return row == BLOCK_ROWS && used == output_size;
 }
 
+static int parse_output_target(const uint8_t *log, size_t log_size, uint32_t *address_out)
+{
+    static const char marker[] = "mdec_readDecodedDma(addr=0x";
+    const uint8_t *found = find_bytes(log, log_size, marker, sizeof marker - 1u);
+    if (found == NULL) return 0;
+    size_t offset = (size_t)(found - log);
+    if (log_size - offset < sizeof marker - 1u + 8u) return 0;
+    const uint8_t *digits = found + sizeof marker - 1u;
+    uint32_t address = 0u;
+    for (uint32_t i = 0u; i < 8u; i++) {
+        uint8_t value = digits[i];
+        uint32_t nibble;
+        if (value >= '0' && value <= '9') nibble = (uint32_t)(value - '0');
+        else if (value >= 'a' && value <= 'f') nibble = (uint32_t)(value - 'a') + 10u;
+        else if (value >= 'A' && value <= 'F') nibble = (uint32_t)(value - 'A') + 10u;
+        else return 0;
+        address = (address << 4u) | nibble;
+    }
+    if (address < 0x80000000u || address > 0x9FFFFFFFu) return 0;
+    *address_out = address & SCHWAY__DMA_MADR_MASK;
+    return 1;
+}
+
 static int block_bytes_match(const uint8_t *actual, const uint8_t *expected, size_t size)
 {
     return actual != NULL && expected != NULL && size != 0u && memcmp(actual, expected, size) == 0;
@@ -489,9 +556,9 @@ static int run_block_guest(const char *mode, const char *exe_path, const char *l
     free(exe);
     size_t output_size = strcmp(mode, "4bit") == 0 ? 32u : 64u;
     uint32_t row_bytes = strcmp(mode, "4bit") == 0 ? 4u : 8u;
-    uint32_t ram_address = snapshot.dma1_started != 0u ? snapshot.dma1_madr : UINT32_MAX;
+    uint32_t ram_address = UINT32_MAX;
     uint8_t expected[64];
-    int valid = guest_complete != 0 &&
+    int valid = guest_complete != 0 && parse_output_target(log, log_size, &ram_address) &&
                 find_bytes(tty, tty_size, strcmp(mode, "4bit") == 0 ? "mdec/4bit" : "mdec/8bit",
                            strcmp(mode, "4bit") == 0 ? sizeof "mdec/4bit" - 1u : sizeof "mdec/8bit" - 1u) != NULL &&
                 parse_expected_block(log, log_size, mode, row_bytes, expected, output_size);
@@ -515,10 +582,21 @@ static int run_block_guest(const char *mode, const char *exe_path, const char *l
                 inst->mdec.output_count, inst->dma.dreq, inst->dma.chcr[1],
                 inst->dma.madr[1], inst->dma.bcr[1], inst->dma.remain[1],
                 inst->dma.phase[1]);
-        fprintf(stderr, "MDEC_REFERENCE_SNAPSHOT: valid=%u command=%08x depth=%u signed=%u out=%u dma1=%u/%08x/%08x/%08x\n",
+        fprintf(stderr, "MDEC_REFERENCE_SNAPSHOT: valid=%u command=%08x depth=%u signed=%u out=%u dma1_start=%u/%08x/%08x/%08x pinned_target=%08x\n",
                 snapshot.valid, snapshot.command, snapshot.depth, snapshot.signed_output,
                 snapshot.output_count, snapshot.dma1_started, snapshot.dma1_madr,
-                snapshot.dma1_bcr, snapshot.dma1_chcr);
+                snapshot.dma1_bcr, snapshot.dma1_chcr, ram_address);
+        fprintf(stderr, "MDEC_REFERENCE_DMA0_INPUT: started=%u madr=%08x bcr=%08x chcr=%08x words=%u",
+                snapshot.dma0_started, snapshot.dma0_madr, snapshot.dma0_bcr,
+                snapshot.dma0_chcr, snapshot.dma0_word_count);
+        for (uint32_t i = 0u; i < snapshot.dma0_word_count; i++)
+            fprintf(stderr, " %08x", snapshot.dma0_words[i]);
+        fputc('\n', stderr);
+        for (uint32_t i = 0u; i < snapshot.dma1_write_count; i++) {
+            const dma_trace_write *write = &snapshot.dma1_writes[i];
+            fprintf(stderr, "MDEC_REFERENCE_DMA1_REG: %llu pc=%08x addr=%08x value=%08x\n",
+                    (unsigned long long)write->cycle, write->pc, write->addr, write->value);
+        }
         fputs("MDEC_REFERENCE_FIFO:", stderr);
         for (uint32_t i = 0u; i < snapshot.output_count; i++)
             fprintf(stderr, " %08x", snapshot.output[i]);

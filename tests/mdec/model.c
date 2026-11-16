@@ -136,9 +136,18 @@ static void case_guest_input(void)
          0x021FFF00u, 0x0230F231u, 0x11333441u},
         {0x00FFFF00u, 0x0004FFFFu, 0xEDEFECC9u, 0x00F2FCEF,
          0xE8FADBD5u, 0x00FFE8FEu, 0xEFECF3B7u, 0x00E3FFEBu,
-         0xF5FFFB00u, 0x0003FFF2u, 0xFF050000u, 0x1A08FFFCu,
-         0x1E280F00u, 0x232A05FFu, 0x40381000u, 0x16323229u},
+         0xF5FFFB00u, 0x0003FFF2u, 0xFCFF0500u, 0x001A08FFu,
+         0xFF1E280Fu, 0x00232A05u, 0x29403810u, 0x0F163232u},
     };
+    for (uint32_t pixel = 0u; pixel < 64u; pixel++) {
+        uint32_t byte = (expected[1][pixel / 4u] >> ((pixel % 4u) * 8u)) & 0xFFu;
+        uint32_t nearest = (byte + 8u) >> 4u;
+        if (nearest > 15u) {
+            nearest = 15u;
+        }
+        uint32_t nibble = (expected[0][pixel / 8u] >> ((pixel % 8u) * 4u)) & 0x0Fu;
+        CHECK_EQ_U64(nibble, nearest);
+    }
     for (uint32_t depth = 0u; depth < 2u; depth++) {
         schway *inst = make();
         enable_dma(inst);

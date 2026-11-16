@@ -42,9 +42,14 @@ range. This is the deterministic implementation rule. The hardware source
 describes the two-pass transform but does not settle its exact rounding.
 
 Mono samples are clipped to 8 bits. Unsigned output flips bit 7 of each sample;
-signed output keeps the signed byte. Four-bit output stores each sample's high
-nibble, least-significant pixel first, with eight pixels in each 32-bit FIFO
-word. Eight-bit output stores four pixels per word in little-endian order.
+signed output keeps the signed byte. For unsigned 4-bit output, the pinned
+`mdec/4bit` and `mdec/8bit` hardware logs show each 4-bit pixel equals the
+nearest 4-bit level of the corresponding 8-bit pixel, using `min(15, (value +
+8) >> 4)` ([SCM.12], log member digests in `pins.txt`). This is an observed
+cross-mode hardware result; psx-spx does not specify the rounding rule. Signed
+4-bit output retains the existing high-nibble conversion. Four-bit output
+stores the least-significant pixel first, with eight pixels in each 32-bit
+FIFO word. Eight-bit output stores four pixels per word in little-endian order.
 DMA1 drains the FIFO into consecutive RAM words and advances MADR by four bytes
 per word. The registered `mdec.words` control hashes raw FIFO words before DMA1
 and separately checks the RAM words and final MADR afterward.
@@ -73,9 +78,13 @@ state so save/load preserves stream and backpressure progress.
 
 The `mdec/4bit` and `mdec/8bit` guests and their `psx.log` output dumps are
 pinned to ps1-tests commit `f727802fead11f1daa7549285548392ef87749cb`.
-Their expected bytes come from those independent logs; the reference test runs
-each actual guest and compares the DMA1 destination RAM against every logged
-byte. The guest TTY emits literal format placeholders for these byte values,
+Their expected bytes come from those independent logs. The reference test
+checks RAM at the digest-pinned guest buffer target recorded by
+`mdec_readDecodedDma(addr=...)`; it captures DMA1 starts separately as
+diagnostics. For these guests, the logged targets (`0x001ffe0c` and
+`0x001ffdec`) differ from the sole DMA1 starts (`0x001ffeb8` and `0x001ffe98`),
+so the relationship between the staging transfer and requested buffer remains
+unresolved. The guest TTY emits literal format placeholders for byte values,
 so that text is not used as the byte oracle. `[SCM.12]`
 
 The pinned `mdec/step-by-step-log` guest is checked against the corresponding
