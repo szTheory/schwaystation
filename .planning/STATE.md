@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 20 of 33
+current_plan: 20 of 34
 status: executing
-stopped_at: Completed 06-10-PLAN.md; next 06-33-PLAN.md
+stopped_at: Executing 06-33-PLAN.md; 06-34 preserves mixed-source acceptance before audio consumers
 last_updated: "2026-11-16T06:16:10.504Z"
 last_activity: 2026-11-16
 state_head: dfaa5711ad799a41e41b7432710c36c65f3c0453
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 183
+  total_plans: 184
   completed_plans: 169
   percent: 83
-last_activity_desc: "Plan 06-10 CDDA slice passed focused review and 9/9 tests; at least 49m47s wall lower bound. XA integration moved to dependent Plan 06-33. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
+last_activity_desc: "Plan 06-33 XA route, serialized ring and cadence controls are in progress. Mixed XA/CDDA/voice/reverb and file/channel mismatch controls split to dependent 06-34 at the 30-minute bound. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 20 of 33
+Current Plan: 20 of 34
 Next plan file: 06-33-PLAN.md (Wave 9)
 Status: Ready to execute
 Last activity: 2026-11-16

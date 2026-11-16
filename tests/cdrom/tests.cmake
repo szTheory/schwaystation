@@ -72,3 +72,8 @@ schway_add_test(NAME disc.audio.cdda
 schway_add_test(NAME disc.audio.xa
   COMMAND schwaystation-test-cdrom-audio xa
   LABELS disc portable TIMEOUT 10)
+
+# Fault prevented: XA and CDDA source samples fail to mix on one native tick.
+schway_add_test(NAME disc.audio.combined
+  COMMAND schwaystation-test-cdrom-audio combined
+  LABELS disc portable TIMEOUT 10)

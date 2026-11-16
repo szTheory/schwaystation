@@ -454,14 +454,14 @@ static int16_t spu_mix_voice(const struct schway__spu_voice *voice, uint32_t cha
     return spu_clamp16(volume_sample);
 }
 
-static int32_t spu_cd_input(int16_t sample, uint16_t raw_volume)
+static int32_t spu_cd_input(int32_t sample, uint16_t raw_volume)
 {
     int32_t volume = raw_volume < 0x8000u ? (int32_t)raw_volume
                                          : (int32_t)raw_volume - 0x10000;
     return spu_sar64((int64_t)sample * volume, 15u);
 }
 
-static void spu_mix_sample(schway *inst, int16_t cd_left, int16_t cd_right)
+static void spu_mix_sample(schway *inst, int32_t cd_left, int32_t cd_right)
 {
     int32_t left = 0;
     int32_t right = 0;
@@ -620,7 +620,7 @@ static void spu_manual_transfer_step(schway *inst)
     }
 }
 
-static void spu_capture_step(schway *inst, int16_t cd_left, int16_t cd_right)
+static void spu_capture_step(schway *inst, int32_t cd_left, int32_t cd_right)
 {
     struct schway__spu *spu = &inst->spu;
     uint16_t ram_ctrl = spu->reg[(SPU_RAM_CTRL_ADDRESS - SPU_REGISTER_BASE) >> 1];
@@ -628,8 +628,8 @@ static void spu_capture_step(schway *inst, int16_t cd_left, int16_t cd_right)
         return;
     }
     uint32_t offset = spu->capture_cursor * 2u;
-    schway__spu_ram_write(inst, offset, (uint16_t)cd_left);
-    schway__spu_ram_write(inst, 0x400u + offset, (uint16_t)cd_right);
+    schway__spu_ram_write(inst, offset, (uint16_t)spu_clamp16(cd_left));
+    schway__spu_ram_write(inst, 0x400u + offset, (uint16_t)spu_clamp16(cd_right));
     int32_t voice1 = spu->voice[0].output;
     int32_t voice3 = spu->voice[2].output;
     uint32_t non_index = (SPU_NON_ADDRESS - SPU_REGISTER_BASE) >> 1;
@@ -669,9 +669,14 @@ void schway__spu_event(schway *inst, uint64_t now)
         spu_select_noise_output(inst, 0u);
         schway__spu_volume_step(inst, 0u);
         schway__spu_envelope_step(inst, 2u);
-        int16_t cd_left = 0;
-        int16_t cd_right = 0;
-        schway__cdrom_audio_pop(inst, &cd_left, &cd_right);
+        int16_t cdda_left = 0;
+        int16_t cdda_right = 0;
+        int16_t xa_left = 0;
+        int16_t xa_right = 0;
+        schway__cdrom_audio_pop(inst, &cdda_left, &cdda_right);
+        schway__cdrom_xa_audio_pop(inst, &xa_left, &xa_right);
+        int32_t cd_left = (int32_t)cdda_left + xa_left;
+        int32_t cd_right = (int32_t)cdda_right + xa_right;
         spu_capture_step(inst, cd_left, cd_right);
         for (uint32_t voice = 1u; voice < SCHWAY__SPU_VOICE_COUNT; voice++) {
             if (voice != 2u) {

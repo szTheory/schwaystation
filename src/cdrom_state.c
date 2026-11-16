@@ -151,12 +151,20 @@ static void cdrom_buffer_state_io(struct schway__state_io *io, struct schway__cd
                                             SCHWAY__CDROM_AUDIO_CAP - 1u);
     uint32_t audio_count = schway__state_u32(io, "cdrom.audio_count", &cd->audio_count, 0u,
                                              SCHWAY__CDROM_AUDIO_LIMIT);
+    schway__state_u16_array(io, "cdrom.xa_audio", &cd->xa_audio[0][0],
+                            2u * SCHWAY__CDROM_XA_AUDIO_CAP, 0u, UINT16_MAX);
+    uint32_t xa_audio_head = schway__state_u32(io, "cdrom.xa_audio_head", &cd->xa_audio_head,
+                                               0u, SCHWAY__CDROM_XA_AUDIO_CAP - 1u);
+    uint32_t xa_audio_count = schway__state_u32(io, "cdrom.xa_audio_count", &cd->xa_audio_count,
+                                                0u, SCHWAY__CDROM_XA_AUDIO_CAP);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         schway__state_check(io, sector_head < SCHWAY__CDROM_SECTOR_CAP &&
                                    sector_count <= SCHWAY__CDROM_SECTOR_CAP &&
                                    sector_offset <= SCHWAY__CDROM_SECTOR_BYTES);
         schway__state_check(io, audio_head < SCHWAY__CDROM_AUDIO_CAP &&
-                                   audio_count <= SCHWAY__CDROM_AUDIO_LIMIT && xa_phase < 6u);
+                                   audio_count <= SCHWAY__CDROM_AUDIO_LIMIT && xa_phase < 6u &&
+                                   xa_audio_head < SCHWAY__CDROM_XA_AUDIO_CAP &&
+                                   xa_audio_count <= SCHWAY__CDROM_XA_AUDIO_CAP);
     }
 }
 

@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "internal.h"
+#include "cdxa.h"
 
 #define SCHWAY__CDROM_SECTOR_PERIOD UINT64_C(451584)
 
@@ -400,10 +401,18 @@ void schway__cdrom_sector_event(schway *inst, uint64_t now)
     uint32_t filter_match = (cd->mode & 0x08u) == 0u ||
                             (sector[16] == cd->file && sector[17] == cd->channel);
     if (xa_audio != 0u && (cd->mode & 0x40u) != 0u && filter_match != 0u) {
-        /* Accepted XA audio candidates do not enter the guest-visible data buffer. */
-        cd->sector_retry = 0u;
-        schway__cdrom_sector_schedule(inst, now);
-        return;
+        uint32_t decoded_frames = 0u;
+        if (schway__cdxa_decode(inst, sector, SCHWAY__CDROM_SECTOR_BYTES,
+                                inst->xa_decode_scratch,
+                                SCHWAY__CDXA_MAX_OUTPUT_FRAMES, &decoded_frames) != 0u) {
+            for (uint32_t frame = 0u; frame < decoded_frames; frame++) {
+                schway__cdrom_xa_audio_push(inst, inst->xa_decode_scratch[2u * frame],
+                                            inst->xa_decode_scratch[2u * frame + 1u]);
+            }
+            cd->sector_retry = 0u;
+            schway__cdrom_sector_schedule(inst, now);
+            return;
+        }
     }
 
     if (mode2 != 0u && (sector[18] & 0x08u) == 0u) {

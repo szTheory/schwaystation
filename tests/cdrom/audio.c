@@ -5,6 +5,7 @@
 
 #include "internal.h"
 #include "cdrom.h"
+#include "cdxa.h"
 #include "spu.h"
 #include "../check.h"
 
@@ -48,24 +49,39 @@ struct audio_disc {
     uint32_t reads;
     uint32_t last_lba;
     uint32_t xa;
+    uint32_t xa_every;
+    uint32_t xa_reads;
+    uint8_t xa_file, xa_channel, xa_submode, xa_coding, xa_sample;
 };
 
-static void audio_make_xa_sector(uint8_t sector[SCHWAY__CDROM_SECTOR_BYTES])
+static void audio_make_xa_sector(uint8_t sector[SCHWAY__CDROM_SECTOR_BYTES],
+                                 const struct audio_disc *disc)
+{
+    memset(sector, 0, SCHWAY__CDROM_SECTOR_BYTES);
+    memset(&sector[1], 0xFF, 10u);
+    sector[15] = 2u;
+    sector[16] = disc->xa_file;
+    sector[17] = disc->xa_channel;
+    sector[18] = disc->xa_submode;
+    sector[19] = disc->xa_coding;
+    memcpy(&sector[20], &sector[16], 4u);
+    for (uint32_t portion = 0u; portion < 18u; portion++) {
+        uint8_t *chunk = &sector[24u + portion * 128u];
+        memcpy(chunk, &chunk[4], 4u);
+        memcpy(&chunk[12], &chunk[8], 4u);
+        memset(&chunk[16], disc->xa_sample, 112u);
+    }
+}
+
+static void audio_make_data_sector(uint8_t sector[SCHWAY__CDROM_SECTOR_BYTES])
 {
     memset(sector, 0, SCHWAY__CDROM_SECTOR_BYTES);
     memset(&sector[1], 0xFF, 10u);
     sector[15] = 2u;
     sector[16] = 1u;
     sector[17] = 2u;
-    sector[18] = 0x6Cu;
-    sector[19] = 1u;
+    sector[18] = 0x08u;
     memcpy(&sector[20], &sector[16], 4u);
-    for (uint32_t portion = 0u; portion < 18u; portion++) {
-        uint8_t *chunk = &sector[24u + portion * 128u];
-        memcpy(chunk, &chunk[4], 4u);
-        memcpy(&chunk[12], &chunk[8], 4u);
-        memset(&chunk[16], 0x11, 112u);
-    }
 }
 
 static uint32_t audio_read_sector(void *user, uint32_t lba, uint8_t sector[2352],
@@ -74,8 +90,15 @@ static uint32_t audio_read_sector(void *user, uint32_t lba, uint8_t sector[2352]
     struct audio_disc *disc = (struct audio_disc *)user;
     disc->reads++;
     disc->last_lba = lba;
+    if (disc->xa != 0u &&
+        (disc->xa_every == 0u || (lba % disc->xa_every) == 0u)) {
+        audio_make_xa_sector(sector, disc);
+        disc->xa_reads++;
+        memset(subcode, 0, 96u);
+        return 1u;
+    }
     if (disc->xa != 0u) {
-        audio_make_xa_sector(sector);
+        audio_make_data_sector(sector);
         memset(subcode, 0, 96u);
         return 1u;
     }
@@ -126,6 +149,11 @@ static void audio_attach_xa_disc(schway *inst, struct audio_disc *host)
 {
     audio_attach_disc_type(inst, host, SCHWAY_DISC_TRACK_MODE2);
     host->xa = 1u;
+    host->xa_file = 1u;
+    host->xa_channel = 2u;
+    host->xa_submode = 0x6Cu;
+    host->xa_coding = 1u;
+    host->xa_sample = 0x11u;
 }
 
 static void audio_run_cycles(schway *inst, uint64_t cycles)
@@ -319,8 +347,11 @@ static void xa_sector_reaches_native_audio(void)
 
     audio_run_cycles(inst, CDDA_SECTOR_CYCLES / 2u);
     CHECK_EQ_U64(host.reads, 1u);
+    CHECK_EQ_U64(host.xa_reads, 1u);
     CHECK_EQ_U64(host.last_lba, 0u);
     CHECK_EQ_U64(inst->cdrom.sector_count, 0u);
+    CHECK(inst->cdrom.xa_audio_count != 0u);
+    CHECK(inst->cdrom.xa_adpcm_history[0][0] != 0);
     for (uint32_t tick = 0u; tick < 64u; tick++) {
         schway__spu_event(inst, inst->spu.next_tick);
     }
@@ -335,17 +366,196 @@ static void xa_sector_reaches_native_audio(void)
     schway_destroy(inst);
 }
 
+static void audio_drain_host_output(schway *inst)
+{
+    int16_t samples[SCHWAY__AUDIO_RING_PAIRS][2];
+    schway_audio audio;
+    memset(&audio, 0, sizeof audio);
+    audio.size = (uint32_t)sizeof audio;
+    audio.samples = &samples[0][0];
+    audio.capacity = SCHWAY__AUDIO_RING_PAIRS;
+    CHECK_EQ_U64(schway_get_audio(inst, &audio), SCHWAY_STATUS_OK);
+}
+
+static void xa_prepare_read(schway *inst, struct audio_disc *host, uint32_t every,
+                            uint8_t coding)
+{
+    audio_attach_xa_disc(inst, host);
+    host->xa_every = every;
+    host->xa_coding = coding;
+    inst->cdrom.mode = 0x40u;
+    inst->cdrom.read_active = 1u;
+    inst->cdrom.motor_on = 1u;
+    inst->cdrom.drive_speed = 2u;
+    inst->spu.reg[(SPU_ATTR - 0x1F801C00u) >> 1] = 0x0001u;
+    inst->spu.reg[(SPU_AVOLL - 0x1F801C00u) >> 1] = 0x7FFFu;
+    inst->spu.reg[(SPU_AVOLR - 0x1F801C00u) >> 1] = 0x7FFFu;
+    schway__cdrom_sector_schedule(inst, 0u);
+}
+
+static void xa_interleaved_cadence(uint32_t coding, uint32_t interleave,
+                                   uint32_t packet_frames)
+{
+    schway *inst = audio_make();
+    struct audio_disc host;
+    xa_prepare_read(inst, &host, interleave, (uint8_t)coding);
+    uint64_t period = CDDA_SECTOR_CYCLES / 2u;
+    uint32_t xa_reads = 0u;
+    for (uint32_t sector = 0u; sector <= interleave; sector++) {
+        uint32_t pending = inst->cdrom.xa_audio_count;
+        audio_run_cycles(inst, period);
+        if (host.xa_reads != xa_reads) {
+            xa_reads = host.xa_reads;
+            CHECK_EQ_U64(xa_reads, sector == 0u ? 1u : 2u);
+            CHECK_EQ_U64(inst->cdrom.xa_audio_count,
+                         pending + packet_frames -
+                             (sector == 0u ? (uint32_t)(period / 768u) : 1u));
+        } else {
+            CHECK_EQ_U64(inst->cdrom.xa_audio_count,
+                         pending > period / 768u ? pending - (uint32_t)(period / 768u) : 0u);
+        }
+        audio_drain_host_output(inst);
+    }
+    CHECK_EQ_U64(host.reads, interleave + 1u);
+    CHECK_EQ_U64(host.xa_reads, 2u);
+    CHECK(inst->cdrom.xa_audio_count <= SCHWAY__CDROM_XA_AUDIO_CAP);
+    schway_destroy(inst);
+}
+
+static void xa_interleave_and_boundary_capacity(void)
+{
+    xa_interleaved_cadence(1u, 8u, 2352u);
+    xa_interleaved_cadence(4u, 32u, SCHWAY__CDXA_MAX_OUTPUT_FRAMES);
+
+    schway *inst = audio_make();
+    struct audio_disc host;
+    xa_prepare_read(inst, &host, 0u, 4u);
+    uint64_t deadline = inst->cdrom.sector_deadline;
+    schway__cdrom_xa_audio_push(inst, 123, -456);
+    inst->spu.next_tick = deadline;
+    inst->run_active = 1u;
+    inst->ticks = deadline;
+    schway__sched_run(inst);
+    CHECK_EQ_U64(host.xa_reads, 1u);
+    CHECK_EQ_U64(inst->cdrom.xa_audio_head, 1u);
+    CHECK_EQ_U64(inst->cdrom.xa_audio_count, SCHWAY__CDXA_MAX_OUTPUT_FRAMES);
+    uint32_t last = (inst->cdrom.xa_audio_head + inst->cdrom.xa_audio_count - 1u) %
+                    SCHWAY__CDROM_XA_AUDIO_CAP;
+    CHECK_EQ_U64(inst->cdrom.xa_audio[last][0],
+                 (uint16_t)inst->xa_decode_scratch[2u * (SCHWAY__CDXA_MAX_OUTPUT_FRAMES - 1u)]);
+    CHECK_EQ_U64(inst->cdrom.xa_audio[last][1],
+                 (uint16_t)inst->xa_decode_scratch[2u * (SCHWAY__CDXA_MAX_OUTPUT_FRAMES - 1u) + 1u]);
+    schway_destroy(inst);
+}
+
+static void xa_filter_and_mute_controls(void)
+{
+    schway *accepted = audio_make();
+    struct audio_disc accepted_host;
+    xa_prepare_read(accepted, &accepted_host, 0u, 1u);
+    accepted->cdrom.mode = 0x48u;
+    accepted->cdrom.file = 1u;
+    accepted->cdrom.channel = 2u;
+    audio_run_cycles(accepted, CDDA_SECTOR_CYCLES / 2u);
+    CHECK_EQ_U64(accepted_host.xa_reads, 1u);
+    CHECK(accepted->cdrom.xa_audio_count != 0u);
+    CHECK_EQ_U64(accepted->cdrom.sector_count, 0u);
+    schway_destroy(accepted);
+
+    schway *rejected = audio_make();
+    struct audio_disc rejected_host;
+    xa_prepare_read(rejected, &rejected_host, 0u, 1u);
+    rejected->cdrom.mode = 0u;
+    audio_run_cycles(rejected, CDDA_SECTOR_CYCLES / 2u);
+    CHECK_EQ_U64(rejected_host.xa_reads, 1u);
+    CHECK_EQ_U64(rejected->cdrom.xa_audio_count, 0u);
+    CHECK_EQ_U64(rejected->cdrom.sector_count, 1u);
+    schway_destroy(rejected);
+
+    schway *muted = audio_make();
+    struct audio_disc muted_host;
+    xa_prepare_read(muted, &muted_host, 0u, 1u);
+    muted->cdrom.muted = 1u;
+    muted->spu.reg[(SPU_RAM_CTRL - 0x1F801C00u) >> 1] = 0x0004u;
+    audio_run_cycles(muted, CDDA_SECTOR_CYCLES / 2u);
+    uint32_t captured = 0u;
+    uint32_t audible = 0u;
+    for (uint32_t i = 0u; i < muted->audio_count; i++) {
+        uint32_t slot = (muted->audio_head + i) % SCHWAY__AUDIO_RING_PAIRS;
+        if (muted->audio[slot][0] != 0 || muted->audio[slot][1] != 0) audible = 1u;
+    }
+    for (uint32_t pair = 0u; pair < muted->spu.capture_cursor; pair++) {
+        if (schway__spu_ram_peek(muted, pair * 2u) != 0u ||
+            schway__spu_ram_peek(muted, 0x400u + pair * 2u) != 0u) captured = 1u;
+    }
+    CHECK_EQ_U64(audible, 0u);
+    CHECK_EQ_U64(captured, 1u);
+    CHECK(muted->cdrom.xa_adpcm_history[0][0] != 0);
+    CHECK(muted->cdrom.xa_audio_count != 0u);
+    schway_destroy(muted);
+}
+
+static void xa_reset_lid_and_instance_controls(void)
+{
+    schway *first = audio_make();
+    schway *second = audio_make();
+    struct audio_disc first_host, second_host;
+    xa_prepare_read(first, &first_host, 0u, 1u);
+    xa_prepare_read(second, &second_host, 0u, 1u);
+    second_host.xa_sample = 0x22u;
+    audio_run_cycles(first, CDDA_SECTOR_CYCLES / 2u);
+    audio_run_cycles(second, CDDA_SECTOR_CYCLES / 2u);
+    CHECK(first->cdrom.xa_adpcm_history[0][0] != second->cdrom.xa_adpcm_history[0][0]);
+    CHECK(first->cdrom.xa_audio_count != 0u && second->cdrom.xa_audio_count != 0u);
+
+    schway__cdrom_audio_push(first, 100, 200);
+    schway__cdrom_reset(first);
+    CHECK_EQ_U64(first->cdrom.audio_count, 0u);
+    CHECK_EQ_U64(first->cdrom.xa_audio_count, 0u);
+    CHECK_EQ_U64(first->cdrom.xa_audio_head, 0u);
+
+    schway__cdrom_audio_push(second, 100, 200);
+    second->disc_host.lid_open = 1u;
+    schway__cdrom_lid_changed(second);
+    CHECK_EQ_U64(second->cdrom.audio_count, 0u);
+    CHECK_EQ_U64(second->cdrom.xa_audio_count, 0u);
+    schway_destroy(second);
+    schway_destroy(first);
+}
+
+static void xa_and_cdda_mix_at_native_tick(void)
+{
+    schway *inst = audio_make();
+    schway__cdrom_audio_push(inst, 1200, -2400);
+    schway__cdrom_xa_audio_push(inst, 2400, 4800);
+    inst->spu.reg[(SPU_ATTR - 0x1F801C00u) >> 1] = 0x0001u;
+    inst->spu.reg[(SPU_AVOLL - 0x1F801C00u) >> 1] = 0x7FFFu;
+    inst->spu.reg[(SPU_AVOLR - 0x1F801C00u) >> 1] = 0x7FFFu;
+    schway__spu_event(inst, inst->spu.next_tick);
+    CHECK_EQ_U64(inst->cdrom.audio_count, 0u);
+    CHECK_EQ_U64(inst->cdrom.xa_audio_count, 0u);
+    CHECK_EQ_U64((uint16_t)inst->audio[inst->audio_head][0], 3599u);
+    CHECK_EQ_U64((uint16_t)inst->audio[inst->audio_head][1], 2399u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
-    if (argc != 2 || (strcmp(argv[1], "cdda") != 0 && strcmp(argv[1], "xa") != 0)) {
+    if (argc != 2 || (strcmp(argv[1], "cdda") != 0 && strcmp(argv[1], "xa") != 0 &&
+                      strcmp(argv[1], "combined") != 0)) {
         return 2;
     }
     if (strcmp(argv[1], "cdda") == 0) {
         cdda_queue_drains_at_native_tick();
         cdda_atv_applies_atomically_and_clips();
         cdda_two_speed_probe();
-    } else {
+    } else if (strcmp(argv[1], "xa") == 0) {
         xa_sector_reaches_native_audio();
+        xa_interleave_and_boundary_capacity();
+        xa_filter_and_mute_controls();
+        xa_reset_lid_and_instance_controls();
+    } else {
+        xa_and_cdda_mix_at_native_tick();
     }
     return check_failures == 0 ? 0 : 1;
 }

@@ -350,6 +350,8 @@ static void observe_lid(schway *inst)
     cd->seek_deadline = 0u;
     cd->audio_head = 0u;
     cd->audio_count = 0u;
+    cd->xa_audio_head = 0u;
+    cd->xa_audio_count = 0u;
     update_status_activity(cd);
     uint8_t bytes[2] = {(uint8_t)cd->status, 0x08u};
     response(inst, bytes, 2u, 5u);

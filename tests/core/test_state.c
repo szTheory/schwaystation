@@ -619,6 +619,10 @@ static void seed_cdrom(schway *inst)
     inst->cdrom.audio[1][1] = 0xFEDCu;
     inst->cdrom.audio_head = 1u;
     inst->cdrom.audio_count = 3u;
+    inst->cdrom.xa_audio[1][0] = 0x2468u;
+    inst->cdrom.xa_audio[1][1] = 0xFEDCu;
+    inst->cdrom.xa_audio_head = 1u;
+    inst->cdrom.xa_audio_count = 3u;
     schway__spu_cd_audio_active(inst);
     inst->cdrom.command_event = 1u;
     inst->cdrom.sector_event = 1u;
@@ -685,6 +689,9 @@ static uint32_t cdrom_mdec_fields_match(schway *inst)
         {"cdrom.audio", 2u, 2u * SCHWAY__CDROM_AUDIO_CAP},
         {"cdrom.audio_head", 4u, 1u},
         {"cdrom.audio_count", 4u, 1u},
+        {"cdrom.xa_audio", 2u, 2u * SCHWAY__CDROM_XA_AUDIO_CAP},
+        {"cdrom.xa_audio_head", 4u, 1u},
+        {"cdrom.xa_audio_count", 4u, 1u},
         {"cdrom.command_deadline", 8u, 1u},
         {"cdrom.sector_deadline", 8u, 1u},
         {"cdrom.seek_deadline", 8u, 1u},
@@ -747,6 +754,8 @@ static void cdrom_mdec_reject_invalid(schway *src, schway *dst, size_t n)
         {"CD XA phase", "cdrom.xa_phase", 0u, 6u, 4u},
         {"CD audio queue count", "cdrom.audio_count", 0u,
          SCHWAY__CDROM_AUDIO_LIMIT + 1u, 4u},
+        {"CD XA queue count", "cdrom.xa_audio_count", 0u,
+         SCHWAY__CDROM_XA_AUDIO_CAP + 1u, 4u},
         {"CD speed", "cdrom.drive_speed", 0u, 3u, 4u},
         {"CD unlock state", "cdrom.unlock_enabled", 0u, 2u, 4u},
         {"CD unlock step", "cdrom.unlock_step", 0u, 7u, 4u},
@@ -1300,8 +1309,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 13u);
-    CHECK_EQ_U64(v.behaviour_revision, 13u);
+    CHECK_EQ_U64(v.state_format, 14u);
+    CHECK_EQ_U64(v.behaviour_revision, 14u);
 }
 
 static void check_cpu_power_on(schway *inst)

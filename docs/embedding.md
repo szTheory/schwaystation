@@ -545,12 +545,12 @@ schway_load_state(inst, buf, n);
 ```
 
 A state is the same bytes on every platform: a 20-byte header (magic, state format, total size, CRC-32 of the
-rest) and then every field, little-endian. Format 13 includes the CD-ROM controller, validated Q record, pending
-and applied ATV matrices, XA-ADPCM predictor history, resampler history, and the MDEC input halfword cursor
-alongside the SPU state.
-The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. A format-12 state
-returns `SCHWAY_STATUS_ERR_STATE_VERSION`; the public API and ABI remain unchanged. The behavior revision is 13
-because the CDDA mixer and applied ATV matrix add emulated audio output behavior.
+rest) and then every field, little-endian. Format 14 includes the CD-ROM controller, validated Q record, pending
+and applied ATV matrices, XA-ADPCM predictor history, resampler history, both bounded CD input queues, and the
+MDEC input halfword cursor alongside the SPU state.
+The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. A format-13 state
+returns `SCHWAY_STATUS_ERR_STATE_VERSION`; the public API and ABI remain unchanged. The behavior revision is 14
+because accepted XA sectors now feed native SPU output through the bounded mixer.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:
 
@@ -561,8 +561,9 @@ because the CDDA mixer and applied ATV matrix add emulated audio output behavior
 | `SCHWAY_STATUS_ERR_STATE_CRC` | the bytes were changed |
 | `SCHWAY_STATUS_ERR_STATE_FIELD` | wrong size, a field out of range, or another region's state |
 
-A successful load restores the saved SPU sample phase, rebuilds derived deadlines, and empties the host-delivery
-audio queue. The queue is not part of a save state. Saving, loading and saving again gives the same bytes.
+A successful load restores the saved SPU sample phase and CD input queues, rebuilds derived deadlines, and empties
+the host-delivery PCM ring. That output ring is not part of a save state. Saving, loading and saving again gives the
+same bytes.
 
 The bus state includes the exact 16-bit SPU ATTR value written at `1F801DAAh`; loading a state restores that value.
 The emulator's power reset clears this latch to its deterministic zero model. This narrow control readback does not

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "schwaystation.h"
+#include "cdxa.h"
 
 struct schway__state_io;
 
@@ -17,6 +18,7 @@ struct schway__state_io;
 #define SCHWAY__CDROM_SECTOR_BYTES 2352u
 #define SCHWAY__CDROM_AUDIO_CAP 2048u
 #define SCHWAY__CDROM_AUDIO_LIMIT (2u * 588u)
+#define SCHWAY__CDROM_XA_AUDIO_CAP (SCHWAY__CDXA_MAX_OUTPUT_FRAMES + 1u)
 #define SCHWAY__CDROM_XA_TAPS 29u
 
 struct schway__cdrom {
@@ -46,6 +48,8 @@ struct schway__cdrom {
     uint32_t xa_phase;
     uint16_t audio[SCHWAY__CDROM_AUDIO_CAP][2];
     uint32_t audio_head, audio_count;
+    uint16_t xa_audio[SCHWAY__CDROM_XA_AUDIO_CAP][2];
+    uint32_t xa_audio_head, xa_audio_count;
     uint32_t command_event, sector_event, seek_event;
     uint64_t command_deadline, sector_deadline, seek_deadline;
 };
@@ -69,6 +73,8 @@ void schway__cdrom_sector_event(schway *inst, uint64_t now);
 void schway__cdrom_audio_push(schway *inst, int16_t left, int16_t right);
 void schway__cdrom_audio_pop(schway *inst, int16_t *left, int16_t *right);
 void schway__cdrom_audio_cdda_sector(schway *inst, const uint8_t *sector);
+void schway__cdrom_xa_audio_push(schway *inst, int16_t left, int16_t right);
+void schway__cdrom_xa_audio_pop(schway *inst, int16_t *left, int16_t *right);
 uint32_t schway__cdrom_sector_track_type_at(const schway *inst, uint32_t lba);
 void schway__cdrom_sector_discard_seek_headers(schway *inst);
 void schway__cdrom_bfrd_set(schway *inst, uint8_t value, uint64_t now);

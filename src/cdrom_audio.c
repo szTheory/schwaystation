@@ -40,21 +40,50 @@ void schway__cdrom_audio_push(schway *inst, int16_t left, int16_t right)
     schway__spu_cd_audio_active(inst);
 }
 
-void schway__cdrom_audio_pop(schway *inst, int16_t *left, int16_t *right)
+void schway__cdrom_xa_audio_push(schway *inst, int16_t left, int16_t right)
 {
     struct schway__cdrom *cd = &inst->cdrom;
-    *left = 0;
-    *right = 0;
-    if (cd->audio_count == 0u) {
+    if (cd->xa_audio_count >= SCHWAY__CDROM_XA_AUDIO_CAP) {
         return;
     }
-    uint32_t head = cd->audio_head;
-    uint16_t raw_left = cd->audio[head][0];
-    uint16_t raw_right = cd->audio[head][1];
+    int32_t output_left = cdrom_sar((int64_t)left * cd->atv_active[0], 7u) +
+                          cdrom_sar((int64_t)right * cd->atv_active[3], 7u);
+    int32_t output_right = cdrom_sar((int64_t)left * cd->atv_active[1], 7u) +
+                           cdrom_sar((int64_t)right * cd->atv_active[2], 7u);
+    uint32_t slot = (cd->xa_audio_head + cd->xa_audio_count) % SCHWAY__CDROM_XA_AUDIO_CAP;
+    cd->xa_audio[slot][0] = (uint16_t)cdrom_clamp16(output_left);
+    cd->xa_audio[slot][1] = (uint16_t)cdrom_clamp16(output_right);
+    cd->xa_audio_count++;
+    schway__spu_cd_audio_active(inst);
+}
+
+static void cdrom_audio_pop(uint16_t (*audio)[2], uint32_t capacity, uint32_t *head,
+                            uint32_t *count, int16_t *left, int16_t *right)
+{
+    *left = 0;
+    *right = 0;
+    if (*count == 0u) {
+        return;
+    }
+    uint32_t slot = *head;
+    uint16_t raw_left = audio[slot][0];
+    uint16_t raw_right = audio[slot][1];
     *left = raw_left < 0x8000u ? (int16_t)raw_left : (int16_t)((int32_t)raw_left - 0x10000);
     *right = raw_right < 0x8000u ? (int16_t)raw_right : (int16_t)((int32_t)raw_right - 0x10000);
-    cd->audio_head = (head + 1u) % SCHWAY__CDROM_AUDIO_CAP;
-    cd->audio_count--;
+    *head = (slot + 1u) % capacity;
+    (*count)--;
+}
+
+void schway__cdrom_audio_pop(schway *inst, int16_t *left, int16_t *right)
+{
+    cdrom_audio_pop(inst->cdrom.audio, SCHWAY__CDROM_AUDIO_CAP,
+                    &inst->cdrom.audio_head, &inst->cdrom.audio_count, left, right);
+}
+
+void schway__cdrom_xa_audio_pop(schway *inst, int16_t *left, int16_t *right)
+{
+    cdrom_audio_pop(inst->cdrom.xa_audio, SCHWAY__CDROM_XA_AUDIO_CAP,
+                    &inst->cdrom.xa_audio_head, &inst->cdrom.xa_audio_count, left, right);
 }
 
 void schway__cdrom_audio_cdda_sector(schway *inst, const uint8_t *sector)

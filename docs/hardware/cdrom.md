@@ -22,10 +22,14 @@ Byte, halfword and word accesses are split into byte lanes by the bus.
 | `1803 W` | HCHPCTL | HCLRCTL | ATV2 | ADPCTL |
 
 ATV0-ATV3 writes stage an 8-bit matrix; ADPCTL bit 5 applies all four staged values together. The reset matrix is
-`80h,00h,80h,00h` (normal stereo). The active matrix feeds the bounded CD audio queue; a full queue drops new
-samples, and underflow at the SPU sample tick supplies silence. The sample queue holds at most two CDDA sectors
-(1,176 stereo pairs) and is serialized with the controller state. CDDA sectors are read at the selected drive speed
-and feed the fixed native 44,100-Hz SPU sample clock; CDDA/XA volumes follow ATV then SPU AVOL [SCM.02][SCM.03].
+`80h,00h,80h,00h` (normal stereo). The active matrix feeds bounded CD input rings; a full ring drops new samples,
+and underflow at the SPU sample tick supplies silence. The CDDA ring holds two sectors (1,176 stereo pairs). The
+separate XA ring holds one maximum decoded sector packet plus one equal-deadline reserve pair (9,409 pairs). The
+tested 1/8 high-rate stereo and 1/32 low-rate mono interleaves drain that packet at the native sample cadence,
+including the CD-ROM-before-SPU tie.
+Both rings are serialized with the controller state. CDDA sectors are read at the selected drive speed and XA packet
+cadence follows its interleave; both feed the fixed native 44,100-Hz SPU sample clock. CDDA/XA volumes follow ATV
+then SPU AVOL [SCM.02][SCM.03].
 
 HSTS reports the selected bank in bits 0-1, parameter empty/write-ready in bits 3-4, result ready in bit 5, sector
 data request in bit 6 when BFRD is enabled and unread data is available, and command-transfer busy in bit 7. BUSYSTS
@@ -157,16 +161,17 @@ Starting ReadN/ReadS discards a raw target sector cached for GetlocL, so the fir
 delivered by the active read.
 At most one INT1 waits behind an already queued interrupt. ReadN retries a failed or malformed sector once; ReadS
 reports the failure immediately. A mismatched mode-2 file/channel filter retries once in ReadN and is skipped in ReadS.
-The mode-2 XA audio/realtime test runs before data selection, so accepted XA payloads do not reach RDDATA; the decoder
-is implemented, while its sector caller and SPU audio output are connected by later XA/SPU plans. Play accepts raw
+The mode-2 XA audio/realtime test runs before data selection, so accepted XA payloads do not reach RDDATA. A sector
+that passes the mode, audio/realtime, and optional file/channel filter is decoded into the XA ring before data
+selection. Rejected or malformed candidates follow the existing data-selection, retry or skip rules. Play accepts raw
 2352-byte CD-DA sectors on audio tracks without
 requiring a data header. Supplied Q subcode is deinterleaved and checked for BCD fields, TOC track range and CRC.
 Missing or invalid Q is synthesized from the TOC until a valid record exists; later missing or invalid records preserve
 the last good position. `current_lba` follows valid Q position unless the host's `bad_q` callback marks that sector,
 in which case the previous good position remains visible. Disc callbacks and TOC remain host-owned and are not part of
 save states; controller flags, sector bytes, the latest validated 12-byte Q record, FIFO contents and scheduled
-deadlines, ATV staging and active values, CDDA queue contents, XA predictor history and resampler history are
-serialized in state format 13.
+deadlines, ATV staging and active values, CDDA and XA queue contents, XA predictor history and resampler history are
+serialized in state format 14.
 
 ## Sources and confidence
 

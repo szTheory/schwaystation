@@ -22,8 +22,8 @@
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 13u
-#define SCHWAY__STATE_FORMAT 13u
+#define SCHWAY__BEHAVIOUR_REVISION 14u
+#define SCHWAY__STATE_FORMAT 14u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -158,6 +158,7 @@ struct schway {
     struct schway__gte gte;
     struct schway__bus bus;
     struct schway__irq irq;
+    int16_t xa_decode_scratch[SCHWAY__CDXA_MAX_OUTPUT_FRAMES * 2u];
     struct schway__dma dma;
     struct schway__timers timers;
     struct schway__sio sio;
