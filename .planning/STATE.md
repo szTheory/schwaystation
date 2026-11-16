@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 19 of 32
+current_plan: 20 of 33
 status: executing
-stopped_at: Completed 06-32-PLAN.md; next 06-10-PLAN.md
-last_updated: "2026-11-16T05:31:42.188Z"
+stopped_at: Completed 06-10-PLAN.md; next 06-33-PLAN.md
+last_updated: "2026-11-16T06:16:10.504Z"
 last_activity: 2026-11-16
-state_head: 5034d3213068c6d73837ff6a89a588c8755181fc
+state_head: dfaa5711ad799a41e41b7432710c36c65f3c0453
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 182
-  completed_plans: 168
+  total_plans: 183
+  completed_plans: 169
   percent: 83
-last_activity_desc: "Completed Plan 06-32's nonuniform MDEC packing, clipping and FE00-padding vectors in at least 7m; its post-review focused gate passed 2/2. DISC-03 remains partial pending Plan 06-10 audio integration and Plan 06-12's pinned guests. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+last_activity_desc: "Plan 06-10 CDDA slice passed focused review and 9/9 tests; at least 49m47s wall lower bound. XA integration moved to dependent Plan 06-33. Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 19 of 32
-Next plan file: 06-10-PLAN.md (Wave 9)
+Current Plan: 20 of 33
+Next plan file: 06-33-PLAN.md (Wave 9)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -231,6 +231,7 @@ Progress: [████████░░] 83%
 | Phase 06 P11 | 39m 33s | 2 tasks | 7 files |
 | Phase 6 P31 | at least 31m | 2 tasks | 9 files |
 | Phase 6 P32 | at least 7m34s | 1 tasks | 4 files |
+| Phase 6 P10 | at least 49m47s wall lower bound | 1 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -577,6 +578,9 @@ Recent decisions affecting current work:
 - [Phase 06]: Plan 06-31 completes the mono stream, FIFO backpressure, raw layout and documentation controls before Plan 06-12.
 - [Phase 6]: Keep the completed MDEC stream/backpressure scope closed and move missing pixel-order, clipping, and FE00-padding vectors to dependent Plan 06-32; DISC-03 remains partial.
 - [Phase 6]: Add nonuniform AC, signed endpoint clipping, and FE00 pre-DC vectors before the pinned MDEC guest caller.
+- [Phase 6]: Keep CDDA storage bounded to 1,176 stereo pairs and drop newest pairs on overrun.
+- [Phase 6]: Apply staged ATV coefficients atomically and serialize pending and active matrices.
+- [Phase 6]: Split the unstarted XA mixing task into dependent Plan 06-33 at the 30-minute bound.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -776,8 +780,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T05:31:41.927Z
-Stopped at: Completed 06-32-PLAN.md; next 06-10-PLAN.md
+Last session: 2026-11-16T06:15:12.060Z
+Stopped at: Completed 06-10-PLAN.md; next 06-33-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
