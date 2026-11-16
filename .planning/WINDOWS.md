@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 8
+open_count: 9
 waived_count: 4
 fixed_count: 0
-total_count: 12
-last_updated: 2026-11-15T21:08:31.964Z
+total_count: 13
+last_updated: 2026-11-16T05:22:27.956Z
 ---
 
 # Broken Windows Ledger
@@ -27,6 +27,7 @@ last_updated: 2026-11-15T21:08:31.964Z
 | 10 | 06 | stub | src/cdrom.c | 38 | The CD-ROM field visitor is not called by state.c until Plan 06-26 wires state integration. | open |  | 2026-11-15T16:42:46.984Z |  |
 | 11 | 06 | stub | src/mdec.c | 54 | The MDEC field visitor is not called by state.c until Plan 06-26 wires state integration. | open |  | 2026-11-15T16:42:47.169Z |  |
 | 12 | 6 | stub | src/cdrom.c | 1083 | CD sector events clear the deadline; sector acquisition and INT1 delivery are deferred to Plan 06-05. | open |  | 2026-11-15T21:08:31.964Z |  |
+| 13 | 6 | deviation | .planning/phases/06-discs-and-fmv/06-31-SUMMARY.md | 70 | MDEC pixel-order, clipping, and FE00-padding vectors moved to dependent Plan 06-32 after Plan 06-31 crossed 30 minutes. | open |  | 2026-11-16T05:22:27.956Z |  |
 
 ````json
 [
@@ -183,6 +184,19 @@ last_updated: 2026-11-15T21:08:31.964Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-11-15T21:08:31.964Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 13,
+    "kind": "deviation",
+    "phase": "6",
+    "file": ".planning/phases/06-discs-and-fmv/06-31-SUMMARY.md",
+    "line": 70,
+    "description": "MDEC pixel-order, clipping, and FE00-padding vectors moved to dependent Plan 06-32 after Plan 06-31 crossed 30 minutes.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-16T05:22:27.956Z",
     "resolved_at": null,
     "milestone": "v1.0"
   }
