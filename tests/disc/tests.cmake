@@ -1,4 +1,16 @@
 # Host-side disc provider behavior through the installed schway_disc callbacks.
+add_executable(schwaystation-test-disc-fixture
+  ${PROJECT_SOURCE_DIR}/tests/disc/fixture.c)
+target_include_directories(schwaystation-test-disc-fixture PRIVATE
+  ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_SOURCE_DIR}/runner
+  ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(schwaystation-test-disc-fixture PRIVATE
+  schwaystation schwaystation_disc_image)
+set_target_properties(schwaystation-test-disc-fixture PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-fixture)
+
 add_executable(schwaystation-test-disc-image
   ${CMAKE_CURRENT_LIST_DIR}/image.c
   ${PROJECT_SOURCE_DIR}/host/disc_probe.c)
@@ -26,3 +38,21 @@ schway_add_test(NAME disc.playlist
 schway_add_test(NAME disc.cnf
   COMMAND schwaystation-test-disc-image cnf ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 20)
+
+schway_add_test(NAME disc.fixture.boot
+  COMMAND schwaystation-test-disc-fixture boot
+    "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+    "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+    "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+  LABELS disc portable TIMEOUT 180)
+
+schway_add_test(NAME disc.fixture.read
+  COMMAND schwaystation-test-disc-fixture read
+    "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+    "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+    "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+  LABELS disc portable TIMEOUT 300)

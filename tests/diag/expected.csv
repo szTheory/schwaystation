@@ -180,3 +180,11 @@ memcard_roundtrip,card2,wrong,00000002,doc,docs/hardware/sio.md Memory-card Read
 memcard_roundtrip,pixel1,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
 memcard_roundtrip,pixel1_last,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
 memcard_roundtrip,pixel2_last,wrong,0000001f,doc,docs/hardware/gpu.md Pixel pipeline
+disc_boot,1,*,424f4f54,doc,tests/fixtures/src/disc_boot.asm records the BIOS handoff marker
+disc_boot,2,*,00020102,doc,docs/hardware/cdrom.md GetTN returns status and BCD first and last tracks
+disc_boot,3,*,00020002,doc,docs/hardware/cdrom.md GetTD track 1 starts at LBA zero plus the 150-frame lead-in
+disc_boot,4,*,00040002,doc,docs/hardware/cdrom.md GetTD track 2 uses the generated TOC index-1 position
+disc_boot,5,*,00200002,doc,docs/hardware/cdrom.md Licensed GetID returns status flags and disc type
+disc_boot,6,*,41454353,doc,docs/hardware/cdrom.md NTSC-U licensed GetID returns the SCEA region string
+disc_boot,7,*,00000010,doc,tests/fixtures/src/disc_boot.asm records its sixteen-sector ReadN transfer
+disc_boot,8,*,011ffca6,doc,tools/gen_disc.py generated sectors 32 through 47 and tests/disc/fixture.c CRC-32

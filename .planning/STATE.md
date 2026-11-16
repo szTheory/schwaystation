@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 30 of 39
+current_plan: 31 of 39
 status: executing
-stopped_at: Completed 06-21-PLAN.md; next 06-15-PLAN.md
-last_updated: "2026-11-16T21:13:53Z"
+stopped_at: Completed 06-15-PLAN.md; next 06-16-PLAN.md
+last_updated: "2026-11-16T23:13:24Z"
 last_activity: 2026-11-16
-state_head: 5613c8e
+state_head: f7f128b
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 180
-  percent: 95
-last_activity_desc: "Completed Plan 06-21 after resuming a long pause. API v6 now binds save-state media to a host-supplied identity; mismatch and unavailable identity fail before mutation, and callback-free state operations are tested. Idle CD scheduling has focused bounds and a hosted Cachegrind allowance measured against the same public no-disc frame path. Focused checks passed 16/16; synthetic perf checks passed 19/19; workflow wiring passed; repository-check code is 2699/2700 lines. Public SCPH-5501 seek and MDEC captures are documented. Real Cachegrind measurement awaits hosted CI. Active runtime was not tracked. Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable)."
+  completed_plans: 181
+  percent: 96
+last_activity_desc: "Completed Plan 06-15: OpenBIOS boots the owned disc guest; GetTN/GetTD/GetID and a sixteen-sector ReadN DMA3 transfer match source-derived expectations, with SBI callbacks and deterministic state/input replay. Corrected the zero-based TOC lookup and added a pre-emulation Mode 2 sanity check. Built a second image with its audio track start shifted by 75 sectors for the later playlist plan. Configure/build and focused disc tests passed; the fast BIOS digest matches. Public SCPH-5501 GetID/GetTN/GetTD records are documented. Prior execution included a 22-hour pause; active runtime is not tracked. Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable)."
 ---
 
 # Project State
@@ -31,17 +31,17 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 29 of 39
-Next plan file: 06-21-PLAN.md (Wave 15; media state and idle-drive cost)
+Current Plan: 31 of 39
+Next plan file: 06-16-PLAN.md
 Status: Ready to execute
 Last activity: 2026-11-16
 
-Progress: [████████░░] 84%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 179
+- Total plans completed: 181
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -54,7 +54,7 @@ Progress: [████████░░] 84%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 29 | 39 | - |
+| 06 | 31 | 39 | - |
 
 **Recent Trend:**
 - Last 5 plans: -

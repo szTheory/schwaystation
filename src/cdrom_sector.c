@@ -34,7 +34,9 @@ static uint8_t sector_to_bcd(uint32_t value)
 
 static uint32_t sector_track(const schway *inst, uint32_t lba, uint32_t *track_index)
 {
-    uint64_t position = (uint64_t)lba + 150u;
+    /* TOC index and lead-out values are zero-based LBAs. Setloc removes the
+       150-frame MSF lead-in before a seek reaches this lookup (docs/hardware/cdrom.md). */
+    uint64_t position = lba;
     for (uint32_t i = 0u; i < inst->disc_host.toc.track_count; i++) {
         const schway_disc_track *track = &inst->disc_host.toc.tracks[i];
         if (position >= track->index0 && position < track->leadout) {

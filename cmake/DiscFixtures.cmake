@@ -47,10 +47,23 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/fixtures")
 configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/disc_boot.xml"
   "${PROJECT_BINARY_DIR}/fixtures/disc_boot.xml" COPYONLY)
+configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/disc_boot_playlist.xml"
+  "${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.xml" COPYONLY)
 configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.cnf"
   "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF" COPYONLY)
 configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
   "${PROJECT_BINARY_DIR}/fixtures/disc_boot.sbi" COPYONLY)
+
+set(schway__disc_guest "${PROJECT_BINARY_DIR}/fixtures/disc_boot.exe")
+add_custom_command(OUTPUT "${schway__disc_guest}"
+  COMMAND "${SCHWAYSTATION_ARMIPS}" -strequ IMAGE "${schway__disc_guest}" disc_boot.asm
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/tests/fixtures/src"
+  DEPENDS schwaystation-armips
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.asm"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/header.inc"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/mailbox.inc"
+  COMMENT "armips disc_boot.asm"
+  VERBATIM)
 
 if(NOT "$ENV{SCHWAYSTATION_DISC_MEDIA_DIR}" STREQUAL "")
   set(schway__disc_media_source "$ENV{SCHWAYSTATION_DISC_MEDIA_DIR}")
@@ -76,9 +89,9 @@ add_custom_command(OUTPUT "${schway__disc_bin}"
   COMMAND "${SCHWAYSTATION_MKPSXISO}" -q -y -o "${schway__disc_bin}" disc_boot.xml
   COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
     --split-image "${schway__disc_bin}" --cue "${schway__disc_cue}"
-    --cd-da "${schway__disc_media_dir}/cdda.wav"
+    --cd-da "${schway__disc_media_dir}/cdda.wav" --xml disc_boot.xml
   WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/fixtures"
-  DEPENDS schwaystation-mkpsxiso schwaystation-fixtures
+  DEPENDS schwaystation-mkpsxiso schwaystation-fixtures "${schway__disc_guest}"
     "${PROJECT_BINARY_DIR}/fixtures/disc_boot.xml"
     "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF"
     "${PROJECT_BINARY_DIR}/fixtures/hello.exe"
@@ -86,4 +99,25 @@ add_custom_command(OUTPUT "${schway__disc_bin}"
     "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
   COMMENT "Build the owned disc fixture"
   VERBATIM)
-add_custom_target(schwaystation-disc-fixtures ALL DEPENDS "${schway__disc_bin}")
+# A distinct TOC is build-only seed data for the later two-disc playlist case.
+set(schway__disc_playlist_bin "${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.bin")
+set(schway__disc_playlist_cue "${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.cue")
+add_custom_command(OUTPUT "${schway__disc_playlist_bin}"
+  BYPRODUCTS "${schway__disc_playlist_cue}"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist_track02.bin"
+  COMMAND "${SCHWAYSTATION_MKPSXISO}" -q -y -o "${schway__disc_playlist_bin}"
+    disc_boot_playlist.xml
+  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
+    --split-image "${schway__disc_playlist_bin}" --cue "${schway__disc_playlist_cue}"
+    --cd-da "${schway__disc_media_dir}/cdda.wav" --xml disc_boot_playlist.xml
+  WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/fixtures"
+  DEPENDS schwaystation-mkpsxiso schwaystation-fixtures "${schway__disc_guest}"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.xml"
+    "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF"
+    "${PROJECT_BINARY_DIR}/fixtures/hello.exe"
+    "${schway__disc_media_dir}/media.sha256"
+    "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
+  COMMENT "Build the alternate-TOC playlist fixture"
+  VERBATIM)
+add_custom_target(schwaystation-disc-fixtures ALL DEPENDS
+  "${schway__disc_bin}" "${schway__disc_playlist_bin}")

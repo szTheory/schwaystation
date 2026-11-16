@@ -149,6 +149,12 @@ jobs:
           cmake "-DOPENBIOS_INPUT=$source_dir/openbios/openbios.bin" \
             -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
           cp "$source_dir/openbios/openbios.bin" build/openbios/openbios.bin
+          PATH="$toolchain_dir/bin:$PATH" make -C "$source_dir/openbios" clean
+          PATH="$toolchain_dir/bin:$PATH" make -C "$source_dir/openbios" -j2 \
+            BUILD=Release BOARD=psx BOOT=rom OPENBIOS_SHELL=shell BOOT_MODE=fast
+          cmake "-DOPENBIOS_INPUT=$source_dir/openbios/openbios.bin" \
+            -DEXPECTED_FILE=tests/built/fast-expected.txt -P cmake/OpenBIOS.cmake
+          cp "$source_dir/openbios/openbios.bin" build/openbios/openbios-fast.bin
       - name: Build pinned media encoder and generate owned media
         run: |
           set -eu
@@ -161,7 +167,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: openbios-handoff
-          path: build/openbios/openbios.bin
+          path: build/openbios/
           retention-days: 1
           if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -259,9 +265,11 @@ jobs:
           name: disc-media-handoff
           path: build/${{ matrix.preset }}/disc-media
       - name: Verify run-local OpenBIOS before consumers
-        run: >-
-          cmake -DOPENBIOS_INPUT=build/${{ matrix.preset }}/openbios/openbios.bin
-          -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+        run: |
+          cmake -DOPENBIOS_INPUT=build/${{ matrix.preset }}/openbios/openbios.bin \
+            -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+          cmake -DOPENBIOS_INPUT=build/${{ matrix.preset }}/openbios/openbios-fast.bin \
+            -DEXPECTED_FILE=tests/built/fast-expected.txt -P cmake/OpenBIOS.cmake
       # The MSVC developer environment for the runner's own architecture,
       # without a third-party action.
       - name: MSVC environment
@@ -337,7 +345,9 @@ jobs:
           name: disc-media-handoff
           path: build/asan/disc-media
       - name: Verify run-local OpenBIOS before consumers
-        run: cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+        run: |
+          cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+          cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios-fast.bin -DEXPECTED_FILE=tests/built/fast-expected.txt -P cmake/OpenBIOS.cmake
       # clang-21 is on the image; its sanitizer runtimes may not be.
       - name: Sanitizer runtimes
         run: dpkg -s libclang-rt-21-dev > /dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y libclang-rt-21-dev; }
@@ -391,7 +401,9 @@ jobs:
           name: disc-media-handoff
           path: build/be32/disc-media
       - name: Verify run-local OpenBIOS before consumers
-        run: cmake -DOPENBIOS_INPUT=build/be32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+        run: |
+          cmake -DOPENBIOS_INPUT=build/be32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+          cmake -DOPENBIOS_INPUT=build/be32/openbios/openbios-fast.bin -DEXPECTED_FILE=tests/built/fast-expected.txt -P cmake/OpenBIOS.cmake
       - name: Cross compiler and qemu-user
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-powerpc-linux-gnu g++-powerpc-linux-gnu qemu-user
       - name: Build and test
@@ -449,7 +461,9 @@ jobs:
           name: disc-media-handoff
           path: build/wasm32/disc-media
       - name: Verify run-local OpenBIOS before consumers
-        run: cmake -DOPENBIOS_INPUT=build/wasm32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+        run: |
+          cmake -DOPENBIOS_INPUT=build/wasm32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
+          cmake -DOPENBIOS_INPUT=build/wasm32/openbios/openbios-fast.bin -DEXPECTED_FILE=tests/built/fast-expected.txt -P cmake/OpenBIOS.cmake
       - name: WASI sysroot and runtime
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends wasi-libc libclang-rt-21-dev-wasm32

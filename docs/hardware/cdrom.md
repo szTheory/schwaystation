@@ -78,6 +78,9 @@ SeekError, 1 for motor on and 0 for Error.
 | `50h`-`56h` unlock | Ordered payload sequence; each command returns INT5/error `40h`; supported only by the non-Japanese unlock profile |
 | `57 Lock` | Clears the unlocked state; INT5 with status `11h` and error `40h` |
 
+Host TOC index and lead-out positions are zero-based LBAs. Setloc removes the 150-frame MSF lead-in when it
+records an LBA; track lookup uses that LBA directly, and adds the lead-in only when returning MSF values.
+
 MotorOn uses a fixed 476,000-cycle completion delay. Init uses the same 476,000-cycle second-response delay. Stop uses
 `D38ACAh` cycles at 1x, `18A6076h` at 2x, or `1D7Bh` when already stopped. These Stop values are the published
 controller averages, held fixed for determinism; they are not per-drive measurements. Other commands use the fixed

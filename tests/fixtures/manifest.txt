@@ -7,7 +7,9 @@ tests/fixtures/src/pad_counter.asm	schwaystation first-party fixture	-	MIT	8520b
 tests/fixtures/src/unbuilt.asm	schwaystation first-party fixture	-	MIT	9d73c6dedc765baf8720ee3feaea80ba49253fe37806ff4603780c8e372f39b2	-
 tests/fixtures/src/spu_blocks.inc	schwaystation first-party fixture	-	MIT	e19b56c175af6d3e42776ac9e10ad039abcd9a41572217016246c41fa1807f5a	-
 tests/fixtures/src/spu_tone.asm	schwaystation first-party fixture	-	MIT	7e463379e683d35d4fe1472d7e50d40a2312ac4d0978dee12e23a0cc2026c772	-
-tests/fixtures/disc_boot.xml	schwaystation first-party fixture	-	MIT	7a34d0ef74d72edb35650b03073b57d95521453116c8ec0576a4a6bb1768203c	-
+tests/fixtures/disc_boot.xml	schwaystation first-party fixture	-	MIT	f49dc2c9a8ef20e96dabab412c96e728caf8a24343c66ce29de159d48aa1297e	-
+tests/fixtures/disc_boot_playlist.xml	schwaystation first-party fixture	-	MIT	a0158b3d2e122e5ffa6bac33499bfadd6b5f8c0aa940c2757ce711b8a551a771	-
+tests/fixtures/src/disc_boot.asm	schwaystation first-party fixture	-	MIT	f9402503e6fdc0a0d463669864ad595c181da70484ee73659242f643056e6344	-
 tests/fixtures/src/disc_boot.cnf	schwaystation first-party fixture	-	MIT	a3a9b3b4fa6a886b3704102fa9f641706f7a117cd6996c80e8846d8a32930a26	-
 tests/fixtures/src/disc_boot.sbi	schwaystation first-party fixture	-	MIT	8d80422239e2f6a211d7cfe0fb257543370f0c373fc973b1e550848e93bbeb90	-
 tests/vectors/gte/ps1tests-1150.bin	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	e8a0e61a57a6582ac53d39b941eeaa83b87498444a3ada915d9de73d313dd9c2	THIRD-PARTY-NOTICES.md
