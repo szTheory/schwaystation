@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 23 of 35
+current_plan: 24 of 35
 status: executing
 stopped_at: Completed 06-12 oracle/control slice; next 06-35-PLAN.md
-last_updated: "2026-11-16T09:28:28Z"
+last_updated: "2026-11-16T09:37:22.944Z"
 last_activity: 2026-11-16
-state_head: eff7a031757c7130caff5935e9927f04f7180540
+state_head: f974070b3d48677febf93b2b5bdddde4b13cac90
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 185
   completed_plans: 172
   percent: 83
-last_activity_desc: Plan 06-12 pinned MDEC oracle/control slice registered; comparator controls pass, while pinned block/status guests expose a production decode mismatch assigned to 06-35. Runtime lower bound at least 1h18m through split metadata; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
+last_activity_desc: Plan 06-12 partial oracle/control slice closed; comparator controls pass, while 4-bit, 8-bit, and status guests remain failing before completion and gate 06-35. Runtime lower bound at least 1h26m55s; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh. Current next plan is 06-35; the complete 06-12 guest gate resumes afterward.
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 23 of 35
+Current Plan: 24 of 35
 Next plan file: 06-35-PLAN.md (Wave 9; 06-12 final oracle gate resumes afterward)
 Status: Ready to execute
 Last activity: 2026-11-16
@@ -234,6 +234,7 @@ Progress: [████████░░] 83%
 | Phase 6 P10 | at least 49m47s wall lower bound | 1 tasks | 21 files |
 | Phase 6 P33 | at least 1h22m00s wall lower bound | 1 tasks | 20 files |
 | Phase 06 P34 | at least 10m48s wall lower bound | 1 tasks | 1 files |
+| Phase 06 P12 | at least 1h24m18s wall; active time unavailable | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -586,6 +587,7 @@ Recent decisions affecting current work:
 - [Phase 6]: Keep XA in a 9,409-pair serialized ring (9,408 frames plus one tied-event reserve) separate from the 1,176-pair CDDA queue.
 - [Phase 6]: Keep voice/reverb mixture and mode-enabled file/channel rejection in dependent Plan 06-34; Plan 06-12 MDEC work remains independent.
 - [Phase 06]: The existing XA filter and native mixer paths satisfy the mode-enabled mismatch and XA/CDDA/voice/reverb controls; retain this slice as test-only.
+- [Phase 06]: Keep the pinned MDEC guest selectors gating and assign the production DMA0 input/decode mismatch to dependent Plan 06-35.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -785,7 +787,7 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T09:28:28Z
+Last session: 2026-11-16T09:37:22.721Z
 Stopped at: Completed 06-12 oracle/control slice; next 06-35-PLAN.md
 Resume file: None
 
