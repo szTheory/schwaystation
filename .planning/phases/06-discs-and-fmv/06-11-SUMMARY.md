@@ -68,7 +68,7 @@ status: complete
 1. **Task 1: Decode one block through command ports and DMA0/1** — `c9c87f2` (test), `e155b29` (feat)
 2. **Task 2: Register the first MDEC caller and baseline status checks** — included with `c9c87f2` and `e155b29`
 
-The final planning/summary commit is recorded after the state updates.
+**Plan metadata:** `2711e9c` (docs: complete monochrome MDEC baseline plan)
 
 ## Verification Evidence
 
@@ -124,3 +124,4 @@ Plan 06-31 is now the dependent Wave 8 follow-up, and Plan 06-12 depends on it. 
 
 - Summary file exists at the required path.
 - Task commits `c9c87f2` and `e155b29` are ancestors of HEAD.
+- Plan metadata commit `2711e9c` is an ancestor of HEAD.
