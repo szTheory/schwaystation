@@ -29,3 +29,9 @@ schway_add_test(NAME mdec.bounds
 schway_add_test(NAME mdec.stream
   COMMAND schwaystation-test-mdec stream
   LABELS mdec portable TIMEOUT 10)
+
+# Fault prevented: a completed block is lost when DMA1 must drain a nearly
+# full output FIFO; the waiting block and no-deadline state also round-trip.
+schway_add_test(NAME mdec.fifo
+  COMMAND schwaystation-test-mdec fifo
+  LABELS mdec portable TIMEOUT 10)

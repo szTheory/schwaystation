@@ -110,6 +110,19 @@ static void start_dma0(schway *inst, uint32_t base, uint32_t words)
     schway__dma_event(inst, inst->dma.busy_until);
 }
 
+static void dma1_transfer(schway *inst, uint32_t base, uint32_t words)
+{
+    write32(inst, DMA_BASE + 0x10u, base, 0u);
+    write32(inst, DMA_BASE + 0x14u, (1u << 16) | words, 0u);
+    write32(inst, DMA_BASE + 0x18u, 0x01000200u, 0u);
+    CHECK_EQ_U64(inst->dma.cur, 1u);
+    uint32_t limit = words * 4u + 32u;
+    for (uint32_t i = 0u; i < limit && inst->dma.cur != SCHWAY__DMA_NONE; i++) {
+        schway__dma_event(inst, inst->dma.busy_until);
+    }
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+}
+
 static void load_flat_tables(schway *inst)
 {
     write32(inst, MDEC_DATA, 0x40000001u, 0u);
@@ -279,6 +292,65 @@ static void case_stream(void)
     schway_destroy(inst);
 }
 
+static void case_fifo(void)
+{
+    schway *inst = make();
+    enable_dma(inst);
+    load_flat_tables(inst);
+    write32(inst, MDEC_DATA, 0x2C00000Du, 0u);
+    for (uint32_t i = 0u; i < 12u; i++) {
+        write32(inst, MDEC_DATA, 0xFE000000u, 0u);
+    }
+    write32(inst, MDEC_DATA, 0xFE0000A0u, 0u);
+    for (uint32_t i = 0u; i < 12u; i++) {
+        run_cycles(inst, 1000u);
+        CHECK_EQ_U64(inst->mdec.output_count, (i + 1u) * 16u);
+    }
+    CHECK_EQ_U64(inst->mdec.output_count, SCHWAY__MDEC_OUTPUT_WORDS);
+    CHECK_EQ_U64(inst->mdec.block_pending, 1u);
+    CHECK_EQ_U64(inst->mdec.block_deadline, 13000u);
+
+    dma1_transfer(inst, 0x2000u, 1u);
+    CHECK_EQ_U64(inst->mdec.output_count, SCHWAY__MDEC_OUTPUT_WORDS - 1u);
+    run_cycles(inst, 1000u);
+    CHECK_EQ_U64(inst->mdec.block_pending, 1u);
+    CHECK_EQ_U64(inst->mdec.block_deadline, 0u);
+    CHECK_EQ_U64(schway__mdec_next(inst), UINT64_MAX);
+    if (inst->mdec.block_pending == 0u || inst->mdec.block_deadline != 0u) {
+        schway_destroy(inst);
+        return;
+    }
+
+    size_t state_size = schway_state_size(inst);
+    uint8_t *state = (uint8_t *)malloc(state_size);
+    CHECK(state != NULL);
+    if (state == NULL) {
+        schway_destroy(inst);
+        return;
+    }
+    CHECK_EQ_U64(schway_save_state(inst, state, state_size), SCHWAY_STATUS_OK);
+    schway *restored = make();
+    CHECK_EQ_U64(schway_load_state(restored, state, state_size), SCHWAY_STATUS_OK);
+    free(state);
+    schway_destroy(inst);
+    inst = restored;
+    CHECK_EQ_U64(inst->mdec.block_pending, 1u);
+    CHECK_EQ_U64(inst->mdec.block_deadline, 0u);
+    dma1_transfer(inst, 0x3000u, 15u);
+    CHECK_EQ_U64(inst->mdec.output_count, SCHWAY__MDEC_OUTPUT_WORDS);
+    CHECK_EQ_U64(inst->mdec.block_pending, 0u);
+    if (inst->mdec.output_count != SCHWAY__MDEC_OUTPUT_WORDS) {
+        schway_destroy(inst);
+        return;
+    }
+    dma1_transfer(inst, 0x4000u, SCHWAY__MDEC_OUTPUT_WORDS);
+    CHECK_EQ_U64(inst->mdec.output_count, 0u);
+    uint32_t last = 0u;
+    CHECK_EQ_U64(schway__bus_ram_word(inst, 0x4000u + 191u * 4u, &last, 0u), 0u);
+    CHECK_EQ_HEX(last, 0x14141414u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -295,6 +367,8 @@ int main(int argc, char **argv)
         case_bounds_and_reset();
     } else if (strcmp(argv[1], "stream") == 0) {
         case_stream();
+    } else if (strcmp(argv[1], "fifo") == 0) {
+        case_fifo();
     } else {
         return 2;
     }
