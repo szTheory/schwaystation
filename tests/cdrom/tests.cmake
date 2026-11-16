@@ -43,3 +43,15 @@ schway_add_test(NAME cdrom.sectors
 schway_add_test(NAME cdrom.delivery
   COMMAND schwaystation-test-cdrom delivery
   LABELS disc portable TIMEOUT 10)
+
+add_executable(schwaystation-test-cdxa ${CMAKE_CURRENT_LIST_DIR}/xa.c)
+target_include_directories(schwaystation-test-cdxa PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-cdxa PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-cdxa PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-cdxa)
+
+# Fault prevented: XA Form2 bytes, ADPCM predictors or output sample count drift.
+schway_add_test(NAME disc.xa
+  COMMAND schwaystation-test-cdxa
+  LABELS disc portable TIMEOUT 10)
