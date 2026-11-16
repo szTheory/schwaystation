@@ -72,6 +72,41 @@ static void run_cycles(schway *inst, uint64_t cycles)
     CHECK_EQ_U64(schway_run(inst, &budget, &result), SCHWAY_STATUS_OK);
 }
 
+static void enable_dma(schway *inst);
+static void start_dma0(schway *inst, uint32_t base, uint32_t words);
+
+static void case_guest_input(void)
+{
+    /* Captured from host RAM at 0x12000 while running the digest-pinned
+       ps1-tests mdec/4bit/4bit.exe guest (build-158, commit
+       f727802fead11f1daa7549285548392ef87749cb, SHA-256
+       c9fc7caab7c8bcd19ec96cd703309fd176ca0ac266ab927d0c3fecc32f811944).
+       It contains a DC plus 63 AC values and ends at coefficient 63, without
+       an explicit FE00 EOB halfword. */
+    static const uint32_t guest_input[32] = {
+        0x0074041Eu, 0x039300BDu, 0x032B0024u, 0x03F90015u, 0x03DA03E9u, 0x03FE03EEu,
+        0x003F002Bu, 0x03FE03C0u, 0x03FE03BEu, 0x03FD03CAu, 0x03F303F3u, 0x000703FDu,
+        0x000003D7u, 0x03F503E0u, 0x00020005u, 0x000703ECu, 0x0008000Cu, 0x03F703FEu,
+        0x03F903FFu, 0x03DD0001u, 0x000903D8u, 0x00010016u, 0x03CA0013u, 0x03FA0004u,
+        0x03FE03FCu, 0x00090000u, 0x0006000Fu, 0x03FC03FEu, 0x03FA03F2u, 0x000803F6u,
+        0x001503FAu, 0x03F50001u,
+    };
+    schway *inst = make();
+    enable_dma(inst);
+    write32(inst, MDEC_DATA, 0x20000020u, 0u);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        write_ram(inst, 0x12000u + i * 4u, guest_input[i]);
+    }
+    start_dma0(inst, 0x12000u, 32u);
+    run_cycles(inst, 4096u);
+    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+    CHECK_EQ_HEX(inst->dma.madr[0], 0x12080u);
+    CHECK_EQ_U64(inst->mdec.output_count, 8u);
+    CHECK_EQ_U64(inst->dma.dreq & (1u << 1), 1u << 1);
+    CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & (1u << 27), 1u << 27);
+    schway_destroy(inst);
+}
+
 static void case_status(void)
 {
     schway *inst = make();
@@ -481,6 +516,8 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "status") == 0) {
         case_status();
+    } else if (strcmp(argv[1], "guest_input") == 0) {
+        case_guest_input();
     } else if (strcmp(argv[1], "block") == 0) {
         case_block();
         case_sign_and_tables();

@@ -47,3 +47,9 @@ schway_add_test(NAME mdec.vectors
 schway_add_test(NAME mdec.fifo
   COMMAND schwaystation-test-mdec fifo
   LABELS mdec portable TIMEOUT 10)
+
+# Fault prevented: the pinned 4-bit guest's 32-word DMA0 coefficient stream
+# fails to publish its completed block when the bounded command ends without EOB.
+schway_add_test(NAME mdec.guest_input
+  COMMAND schwaystation-test-mdec guest_input
+  LABELS mdec portable TIMEOUT 10)

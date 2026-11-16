@@ -2,6 +2,7 @@
 mdec.block	mdec,portable
 mdec.bounds	mdec,portable
 mdec.fifo	mdec,portable
+mdec.guest_input	mdec,portable
 mdec.status	mdec,portable
 mdec.stream	mdec,portable
 mdec.vectors	mdec,portable

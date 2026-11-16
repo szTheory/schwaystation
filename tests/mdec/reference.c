@@ -214,6 +214,18 @@ static int run_guest(const uint8_t *exe, size_t exe_size,
                 inst->mdec.words_remaining, inst->mdec.output_count,
                 inst->dma.chcr[0], inst->dma.madr[0], inst->dma.bcr[0],
                 inst->dma.chcr[1], inst->dma.madr[1], inst->dma.bcr[1], inst->dma.dreq);
+        if (inst->mdec.command == 0x20000020u && inst->dma.madr[0] == 0x00012080u) {
+            fputs("MDEC_REFERENCE_DMA0_SOURCE: 00012000", stderr);
+            for (uint32_t i = 0u; i < 32u; i++) {
+                uint32_t at = 0x00012000u + i * 4u;
+                uint32_t word = (uint32_t)inst->bus.ram[at] |
+                                ((uint32_t)inst->bus.ram[at + 1u] << 8) |
+                                ((uint32_t)inst->bus.ram[at + 2u] << 16) |
+                                ((uint32_t)inst->bus.ram[at + 3u] << 24);
+                fprintf(stderr, " %08x", word);
+            }
+            fputc('\n', stderr);
+        }
         uint32_t last_status = UINT32_MAX;
         for (uint32_t i = 0u; i < inst->trace.count; i++) {
             const struct schway__trace_rec *rec =
