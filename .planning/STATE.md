@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: "Completed 06-27-PLAN.md; next 06-28-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh."
-last_updated: "2026-11-15T23:52:11.789Z"
+stopped_at: "Completed 06-28-PLAN.md; next 06-06-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh."
+last_updated: "2026-11-16T00:00:30.583Z"
 last_activity: 2026-11-15
-state_head: ff5922cfa4a675ecd08f32dd07e5ae94a998db36
+state_head: 20894035cc3162358f4ca3bbd05420d8efc7780e
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 178
-  completed_plans: 160
+  completed_plans: 161
   percent: 83
-current_plan: 28
-last_activity_desc: "Completed Plan 06-27 in 41m08s and split the chopped-window readiness edge into sequential Plan 06-28 before 06-06. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+current_plan: 6
+last_activity_desc: "Completed Plan 06-28 in 6m and resumed Plan 06-06 after the DMA3 chopped-window readiness fix. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Plan: 28 of 28 (Wave 7 readiness follow-up before 06-06)
+Plan: 6 of 28 (Wave 7 DMA3 readiness complete; resume 06-06)
 Status: Ready to execute
 Last activity: 2026-11-15
 
@@ -222,6 +222,7 @@ Progress: [████████░░] 83%
 | Phase 06 P04 | 107min | 2 tasks | 20 files |
 | Phase 06 P05 | 58m56s elapsed wall; active time unavailable | 1 task | 13 files |
 | Phase 06 P27 | 41m 08s | 1 tasks | 11 files |
+| Phase 06 P28 | 6m | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -552,6 +553,7 @@ Recent decisions affecting current work:
 - [Phase 6]: Keep DMA3 sector-cursor and 24/40-cycle transfer behavior in sequential Plan 06-27.
 - [Phase 06]: DMA3 readiness requires CHCR trigger, BFRD and buffered sector data; CD-ROM uses no DREQ line.
 - [Phase 06]: Split chopped-window readiness into Plan 06-28 before the pinned Getloc caller.
+- [Phase 06]: Recheck CD BFRD and buffered-sector readiness before every chopped DMA3 window.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -751,9 +753,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-15T23:52:11.541Z
-Stopped at: Completed 06-27-PLAN.md; next 06-28-PLAN.md
-Resume file: .planning/phases/06-discs-and-fmv/06-28-PLAN.md
+Last session: 2026-11-16T00:00:30.339Z
+Stopped at: Completed 06-28-PLAN.md; next 06-06-PLAN.md
+Resume file: .planning/phases/06-discs-and-fmv/06-06-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
