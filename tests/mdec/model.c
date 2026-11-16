@@ -159,6 +159,97 @@ static void load_flat_tables(schway *inst)
     }
 }
 
+static void load_scale_table(schway *inst, const int16_t scale[SCHWAY__MDEC_BLOCK_SAMPLES])
+{
+    write32(inst, MDEC_DATA, 0x60000000u, 0u);
+    for (uint32_t i = 0u; i < SCHWAY__MDEC_BLOCK_SAMPLES / 2u; i++) {
+        uint32_t word = (uint16_t)scale[i * 2u] |
+                        ((uint32_t)(uint16_t)scale[i * 2u + 1u] << 16);
+        write32(inst, MDEC_DATA, word, 0u);
+    }
+}
+
+static void decode_words(schway *inst, uint32_t command, const uint32_t *input,
+                         uint32_t input_words, uint32_t output_words)
+{
+    write32(inst, MDEC_DATA, command, 0u);
+    for (uint32_t i = 0u; i < input_words; i++) {
+        write32(inst, MDEC_DATA, input[i], 0u);
+    }
+    run_cycles(inst, 1000u);
+    CHECK_EQ_U64(inst->mdec.output_count, output_words);
+}
+
+static void case_vectors(void)
+{
+    static const int16_t scale_columns[8] = {0x7FFF, 0x6000, 0x4000, 0x2000,
+                                             0x1000, 0, 0, 0};
+    static const uint32_t packed4[8] = {0x00000122u, 0x00000111u, 0x00000011u,
+                                        0u, 0u, 0u, 0u, 0u};
+    static const uint32_t packed8[16] = {
+        0x0B15202Au, 0x00000005u, 0x0810181Fu, 0x00000004u,
+        0x050B1015u, 0x00000003u, 0x0305080Au, 0x00000001u,
+        0x01030405u, 0x00000001u, 0u, 0u, 0u, 0u, 0u, 0u,
+    };
+    int16_t patterned[SCHWAY__MDEC_BLOCK_SAMPLES];
+    for (uint32_t z = 0u; z < 8u; z++) {
+        for (uint32_t x = 0u; x < 8u; x++) {
+            patterned[x + z * 8u] = scale_columns[x];
+        }
+    }
+    const uint32_t ac_input[2] = {0x004004A0u, 0x0000FE00u};
+    for (uint32_t depth = 0u; depth < 2u; depth++) {
+        schway *inst = make();
+        enable_dma(inst);
+        load_flat_tables(inst);
+        load_scale_table(inst, patterned);
+        decode_words(inst, 0x24000002u | (depth << 27), ac_input, 2u,
+                     depth == 0u ? 8u : 16u);
+        const uint32_t *expected = depth == 0u ? packed4 : packed8;
+        uint32_t words = depth == 0u ? 8u : 16u;
+        for (uint32_t i = 0u; i < words; i++) {
+            CHECK_EQ_HEX(inst->mdec.output[i], expected[i]);
+        }
+        schway_destroy(inst);
+    }
+
+    int16_t saturating[SCHWAY__MDEC_BLOCK_SAMPLES];
+    for (uint32_t i = 0u; i < SCHWAY__MDEC_BLOCK_SAMPLES; i++) {
+        saturating[i] = 0x7FFF;
+    }
+    const uint32_t endpoints[2] = {0xFE0001FFu, 0xFE000200u};
+    const uint32_t endpoint_words[2] = {0x7F7F7F7Fu, 0x80808080u};
+    for (uint32_t i = 0u; i < 2u; i++) {
+        schway *inst = make();
+        enable_dma(inst);
+        load_flat_tables(inst);
+        load_scale_table(inst, saturating);
+        decode_words(inst, 0x2C000001u, &endpoints[i], 1u, 16u);
+        for (uint32_t word = 0u; word < 16u; word++) {
+            CHECK_EQ_HEX(inst->mdec.output[word], endpoint_words[i]);
+        }
+        schway_destroy(inst);
+    }
+
+    schway *plain = make();
+    schway *padded = make();
+    enable_dma(plain);
+    enable_dma(padded);
+    load_flat_tables(plain);
+    load_flat_tables(padded);
+    const uint32_t plain_input[1] = {0xFE0000A0u};
+    const uint32_t padded_input[2] = {0x00A0FE00u, 0xFE00FE00u};
+    decode_words(plain, 0x24000001u, plain_input, 1u, 8u);
+    decode_words(padded, 0x24000002u, padded_input, 2u, 8u);
+    for (uint32_t i = 0u; i < 8u; i++) {
+        CHECK_EQ_HEX(plain->mdec.output[i], 0x11111111u);
+        CHECK_EQ_HEX(padded->mdec.output[i], plain->mdec.output[i]);
+    }
+    CHECK_EQ_HEX(raw_output_hash(padded, 8u), raw_output_hash(plain, 8u));
+    schway_destroy(plain);
+    schway_destroy(padded);
+}
+
 static void case_block(void)
 {
     for (uint32_t depth = 0u; depth < 2u; depth++) {
@@ -397,6 +488,8 @@ int main(int argc, char **argv)
         case_sign_and_tables();
     } else if (strcmp(argv[1], "words") == 0) {
         case_sign_and_tables();
+    } else if (strcmp(argv[1], "vectors") == 0) {
+        case_vectors();
     } else if (strcmp(argv[1], "bounds") == 0) {
         case_bounds_and_reset();
     } else if (strcmp(argv[1], "stream") == 0) {

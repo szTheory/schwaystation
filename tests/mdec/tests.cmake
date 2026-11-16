@@ -36,6 +36,12 @@ schway_add_test(NAME mdec.stream
   COMMAND schwaystation-test-mdec stream
   LABELS mdec portable TIMEOUT 10)
 
+# Fault prevented: nonuniform pixels reverse nibble/byte order, clipping loses
+# either signed endpoint, or FE00 padding before DC is treated as coefficients.
+schway_add_test(NAME mdec.vectors
+  COMMAND schwaystation-test-mdec vectors
+  LABELS mdec portable TIMEOUT 10)
+
 # Fault prevented: a completed block is lost when DMA1 must drain a nearly
 # full output FIFO; the waiting block and no-deadline state also round-trip.
 schway_add_test(NAME mdec.fifo

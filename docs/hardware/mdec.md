@@ -40,6 +40,10 @@ DMA1 drains the FIFO into consecutive RAM words and advances MADR by four bytes
 per word. The registered `mdec.words` control hashes raw FIFO words before DMA1
 and separately checks the RAM words and final MADR afterward.
 
+The `mdec.vectors` control adds nonuniform AC output words to detect pixel
+ordering changes, checks positive and negative signed clipping endpoints, and
+compares a block preceded by `FE00h` padding with its unpadded equivalent.
+
 ## Readiness and timing
 
 Status bit 31 reports an empty output FIFO, bit 30 a full input FIFO, bit 29 a
