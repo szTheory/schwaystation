@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 18 of 32
+current_plan: 19 of 32
 status: executing
-stopped_at: Completed 06-31-PLAN.md; next 06-32-PLAN.md
-last_updated: "2026-11-16T05:23:13.429Z"
+stopped_at: Completed 06-32-PLAN.md; next 06-10-PLAN.md
+last_updated: "2026-11-16T05:31:42.188Z"
 last_activity: 2026-11-16
-state_head: f0de9b36475ecafefd247881eb782090d3dc6780
+state_head: 5034d3213068c6d73837ff6a89a588c8755181fc
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 182
-  completed_plans: 167
+  completed_plans: 168
   percent: 83
-last_activity_desc: "Completed Plan 06-31's MDEC cursor, FIFO backpressure, raw output and DMA1 controls in at least 31m; its post-review focused gate passed 14/14. DISC-03 remains partial pending Plan 06-32's pixel-order/clipping/padding vectors and Plan 06-12's pinned guests. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+last_activity_desc: "Completed Plan 06-32's nonuniform MDEC packing, clipping and FE00-padding vectors in at least 7m; its post-review focused gate passed 2/2. DISC-03 remains partial pending Plan 06-10 audio integration and Plan 06-12's pinned guests. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 18 of 32
-Next plan file: 06-32-PLAN.md (Wave 8)
+Current Plan: 19 of 32
+Next plan file: 06-10-PLAN.md (Wave 9)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -230,6 +230,7 @@ Progress: [████████░░] 83%
 | Phase 6 P09 | 32m | 2 tasks | 13 files |
 | Phase 06 P11 | 39m 33s | 2 tasks | 7 files |
 | Phase 6 P31 | at least 31m | 2 tasks | 9 files |
+| Phase 6 P32 | at least 7m34s | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -575,6 +576,7 @@ Recent decisions affecting current work:
 - [Phase 06]: MDEC single-block availability uses a selected 1,000-cycle baseline; the unstamped reference log does not measure cycles.
 - [Phase 06]: Plan 06-31 completes the mono stream, FIFO backpressure, raw layout and documentation controls before Plan 06-12.
 - [Phase 6]: Keep the completed MDEC stream/backpressure scope closed and move missing pixel-order, clipping, and FE00-padding vectors to dependent Plan 06-32; DISC-03 remains partial.
+- [Phase 6]: Add nonuniform AC, signed endpoint clipping, and FE00 pre-DC vectors before the pinned MDEC guest caller.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -774,8 +776,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T05:23:13.076Z
-Stopped at: Completed 06-31-PLAN.md; next 06-32-PLAN.md
+Last session: 2026-11-16T05:31:41.927Z
+Stopped at: Completed 06-32-PLAN.md; next 06-10-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md

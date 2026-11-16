@@ -67,7 +67,7 @@ The first DMA1 restart control exposed a test-clock issue: the harness completed
 
 ## Deviations and remaining acceptance
 
-Plan 06-31 exceeded its 30-minute execution bound. Its completed cursor, backpressure, state, raw-output, DMA1, and timing-documentation scope is closed here. Focused review found that the flat raw vectors do not prove pixel ordering, and no registered vector explicitly asserts output clipping or `FE00h` padding before DC. These acceptance items remain pending in dependent Plan 06-32; DISC-03 remains partial until those controls and the pinned guest checks pass.
+Plan 06-31 exceeded its 30-minute execution bound. Its completed cursor, backpressure, state, raw-output, DMA1, and timing-documentation scope is closed here. Focused review found that the flat raw vectors did not prove pixel ordering, and no registered vector explicitly asserted output clipping or `FE00h` padding before DC. Dependent Plan 06-32 adds those controls. DISC-03 remains partial until the pinned guest checks and downstream integration pass.
 
 ## Self-Check: PASSED
 
