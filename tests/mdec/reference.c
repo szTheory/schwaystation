@@ -320,17 +320,27 @@ static int run_guest(const uint8_t *exe, size_t exe_size,
                 inst->mdec.words_remaining, inst->mdec.output_count,
                 inst->dma.chcr[0], inst->dma.madr[0], inst->dma.bcr[0],
                 inst->dma.chcr[1], inst->dma.madr[1], inst->dma.bcr[1], inst->dma.dreq);
-        uint32_t pc_phys = inst->cpu.pc & 0x001FFFFFu;
         uint32_t pc_word = 0u;
-        if (pc_phys <= RAM_SIZE - sizeof pc_word) {
-            pc_word = (uint32_t)inst->bus.ram[pc_phys] |
-                      ((uint32_t)inst->bus.ram[pc_phys + 1u] << 8) |
-                      ((uint32_t)inst->bus.ram[pc_phys + 2u] << 16) |
-                      ((uint32_t)inst->bus.ram[pc_phys + 3u] << 24);
+        uint32_t pc_word_available = 0u;
+        if (schway__bus_device(inst->cpu.pc) == SCHWAY__DEV_RAM) {
+            uint32_t pc_phys = inst->cpu.pc & 0x1FFFFFFFu;
+            if (pc_phys <= RAM_SIZE - sizeof pc_word) {
+                pc_word = (uint32_t)inst->bus.ram[pc_phys] |
+                          ((uint32_t)inst->bus.ram[pc_phys + 1u] << 8) |
+                          ((uint32_t)inst->bus.ram[pc_phys + 2u] << 16) |
+                          ((uint32_t)inst->bus.ram[pc_phys + 3u] << 24);
+                pc_word_available = 1u;
+            }
         }
-        fprintf(stderr,
-                "MDEC_REFERENCE_CPU_PATH: a0=%08x v0=%08x ra=%08x insn=%08x\n",
-                inst->cpu.r[4], inst->cpu.r[2], inst->cpu.r[31], pc_word);
+        if (pc_word_available != 0u) {
+            fprintf(stderr,
+                    "MDEC_REFERENCE_CPU_PATH: a0=%08x v0=%08x ra=%08x insn=%08x\n",
+                    inst->cpu.r[4], inst->cpu.r[2], inst->cpu.r[31], pc_word);
+        } else {
+            fprintf(stderr,
+                    "MDEC_REFERENCE_CPU_PATH: a0=%08x v0=%08x ra=%08x insn=unavailable\n",
+                    inst->cpu.r[4], inst->cpu.r[2], inst->cpu.r[31]);
+        }
         if ((inst->mdec.command == 0x20000020u || inst->mdec.command == 0x28000020u) &&
             inst->dma.madr[0] == 0x00012080u) {
             fprintf(stderr, "MDEC_REFERENCE_DMA0_SOURCE: command=%08x 00012000",
