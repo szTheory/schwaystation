@@ -17,3 +17,9 @@ schway_add_test(NAME mdec.status
 schway_add_test(NAME mdec.block
   COMMAND schwaystation-test-mdec block
   LABELS mdec portable TIMEOUT 10)
+
+# Fault prevented: malformed RLE input can overrun the coefficient block or a
+# reset leaves a scheduled block/DMA request able to publish stale output.
+schway_add_test(NAME mdec.bounds
+  COMMAND schwaystation-test-mdec bounds
+  LABELS mdec portable TIMEOUT 10)

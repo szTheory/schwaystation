@@ -1,3 +1,4 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
 mdec.block	mdec,portable
+mdec.bounds	mdec,portable
 mdec.status	mdec,portable

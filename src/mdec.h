@@ -39,6 +39,8 @@ uint32_t schway__mdec_read(schway *inst, uint32_t address, uint64_t now);
 void schway__mdec_write(schway *inst, uint32_t address, uint32_t value, uint64_t now);
 void schway__mdec_io(schway *inst, uint32_t wr, uint32_t address, uint32_t width,
                      uint32_t *value, uint32_t *cycles);
+void schway__mdec_dma_write(schway *inst, uint32_t word, uint64_t now);
+uint32_t schway__mdec_dma_read(schway *inst, uint64_t now);
 
 uint64_t schway__mdec_next(const schway *inst);
 void schway__mdec_event(schway *inst, uint64_t now);

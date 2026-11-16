@@ -66,7 +66,54 @@ static void case_status(void)
     schway *inst = make();
     CHECK_EQ_HEX(read32(inst, MDEC_STATUS), 0x80040000u);
     CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_MDEC], 0u);
+    write32(inst, MDEC_STATUS, 0x60000000u, 0u);
+    write32(inst, MDEC_DATA, 0x24000001u, 0u);
+    uint32_t status = read32(inst, MDEC_STATUS);
+    CHECK((status & (1u << 28)) != 0u);
+    CHECK((status & (1u << 27)) == 0u);
+    CHECK((status & (1u << 29)) != 0u);
+    write32(inst, MDEC_STATUS, 0u, 0u);
+    status = read32(inst, MDEC_STATUS);
+    CHECK((status & (1u << 28)) == 0u);
+    CHECK((status & (1u << 29)) != 0u);
+    write32(inst, MDEC_STATUS, 0x60000000u, 0u);
+    CHECK((read32(inst, MDEC_STATUS) & (1u << 28)) != 0u);
+    write32(inst, MDEC_STATUS, 0x80000000u, 0u);
+    CHECK_EQ_HEX(read32(inst, MDEC_STATUS), 0x80040000u);
     schway_destroy(inst);
+}
+
+static void enable_dma(schway *inst)
+{
+    write32(inst, MDEC_STATUS, 0x60000000u, 0u);
+    write32(inst, DMA_DPCR, 0x0FEDCBA9u, 0u);
+}
+
+static void start_dma0(schway *inst, uint32_t base, uint32_t words)
+{
+    write32(inst, DMA_BASE, base, 0u);
+    write32(inst, DMA_BASE + 4u, (1u << 16) | words, 0u);
+    write32(inst, DMA_BASE + 8u, 0x01000201u, 0u);
+    CHECK_EQ_U64(inst->dma.cur, 0u);
+    schway__dma_event(inst, inst->dma.busy_until);
+}
+
+static void load_flat_tables(schway *inst)
+{
+    write32(inst, MDEC_DATA, 0x40000001u, 0u);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        write32(inst, MDEC_DATA, 0x01010101u, 0u);
+    }
+    for (uint32_t i = 0u; i < SCHWAY__MDEC_TABLE_BYTES; i++) {
+        CHECK_EQ_U64(inst->mdec.quant[i], 1u);
+    }
+    write32(inst, MDEC_DATA, 0x60000000u, 0u);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        write32(inst, MDEC_DATA, 0x40004000u, 0u);
+    }
+    for (uint32_t i = 0u; i < SCHWAY__MDEC_BLOCK_SAMPLES; i++) {
+        CHECK_EQ_U64(inst->mdec.scale[i], 0x4000u);
+    }
 }
 
 static void case_block(void)
@@ -77,7 +124,7 @@ static void case_block(void)
         uint32_t base = 0x100u + depth * 0x100u;
         write_ram(inst, base, 0xFE000000u);
         write32(inst, MDEC_STATUS, 0x60000000u, 0u);
-        write32(inst, MDEC_DATA, 0x2C000001u | (depth << 27), 0u);
+        write32(inst, MDEC_DATA, 0x24000001u | (depth << 27), 0u);
         write32(inst, DMA_DPCR, 0x0FEDCBA9u, 0u);
         write32(inst, DMA_BASE, base, 0u);
         write32(inst, DMA_BASE + 4u, (1u << 16) | 1u, 0u);
@@ -110,6 +157,68 @@ static void case_block(void)
     }
 }
 
+static void case_sign_and_tables(void)
+{
+    for (uint32_t depth = 0u; depth < 2u; depth++) {
+        for (uint32_t is_signed = 0u; is_signed < 2u; is_signed++) {
+            schway *inst = make();
+            enable_dma(inst);
+            load_flat_tables(inst);
+            uint32_t base = 0x800u;
+            uint32_t words = depth == 0u ? 8u : 16u;
+            uint32_t expected = depth == 0u
+                                    ? (is_signed != 0u ? 0x11111111u : 0x99999999u)
+                                    : (is_signed != 0u ? 0x14141414u : 0x94949494u);
+            write_ram(inst, base, 0xFE0000A0u);
+            uint32_t command = 0x20000001u | (depth << 27) | (is_signed << 26);
+            write32(inst, MDEC_DATA, command, 0u);
+            start_dma0(inst, base, 1u);
+            uint64_t deadline = inst->mdec.block_deadline;
+            CHECK_EQ_U64(deadline, 1000u);
+            CHECK_EQ_U64(schway__mdec_read(inst, MDEC_STATUS, deadline - 1u) & 0x80000000u,
+                         0x80000000u);
+            CHECK_EQ_U64(schway__mdec_read(inst, MDEC_STATUS, deadline) & 0x80000000u, 0u);
+            CHECK_EQ_U64(inst->mdec.output_count, words);
+            for (uint32_t i = 0u; i < words; i++) {
+                CHECK_EQ_HEX(inst->mdec.output[i], expected);
+            }
+            schway_destroy(inst);
+        }
+    }
+}
+
+static void case_bounds_and_reset(void)
+{
+    schway *bad = make();
+    enable_dma(bad);
+    uint32_t bad_input = 0x1000u;
+    write_ram(bad, bad_input, 0xFFFFFFFFu);
+    write32(bad, MDEC_DATA, 0x24000001u, 0u);
+    start_dma0(bad, bad_input, 1u);
+    CHECK_EQ_U64(bad->mdec.block_pending, 0u);
+    CHECK_EQ_U64(bad->mdec.command_active, 0u);
+    CHECK_EQ_U64(bad->mdec.output_count, 0u);
+    CHECK_EQ_U64(schway__mdec_next(bad), UINT64_MAX);
+    schway_destroy(bad);
+
+    schway *reset = make();
+    enable_dma(reset);
+    uint32_t input = 0x1100u;
+    write_ram(reset, input, 0xFE000000u);
+    write32(reset, MDEC_DATA, 0x24000001u, 0u);
+    start_dma0(reset, input, 1u);
+    CHECK_EQ_U64(reset->mdec.block_pending, 1u);
+    uint64_t deadline = reset->mdec.block_deadline;
+    write32(reset, MDEC_STATUS, 0x80000000u, 0u);
+    CHECK_EQ_U64(reset->mdec.block_pending, 0u);
+    CHECK_EQ_U64(reset->mdec.output_count, 0u);
+    CHECK_EQ_U64(schway__mdec_next(reset), UINT64_MAX);
+    schway__mdec_event(reset, deadline + 1u);
+    CHECK_EQ_U64(reset->mdec.output_count, 0u);
+    CHECK((reset->dma.dreq & 3u) == 0u);
+    schway_destroy(reset);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -119,6 +228,11 @@ int main(int argc, char **argv)
         case_status();
     } else if (strcmp(argv[1], "block") == 0) {
         case_block();
+        case_sign_and_tables();
+    } else if (strcmp(argv[1], "sign_tables") == 0) {
+        case_sign_and_tables();
+    } else if (strcmp(argv[1], "bounds") == 0) {
+        case_bounds_and_reset();
     } else {
         return 2;
     }

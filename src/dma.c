@@ -355,8 +355,11 @@ static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word, uint64_t
 {
     switch (ch) {
     case 0u: /* MDEC in */
-        return dma_stub_sink(inst, ch, word);
+        schway__mdec_dma_write(inst, word, tick);
+        return 0u;
     case 1u: /* MDEC out */
+        /* The MDEC output channel is device-to-RAM; preserve the generic
+           sink for a direction the device does not use. */
         return dma_stub_sink(inst, ch, word);
     case 2u: /* GPU */
         schway__gpu_dma_write(inst, word, tick);
@@ -384,7 +387,8 @@ static uint32_t dma_dev_read(schway *inst, uint32_t ch, uint32_t *word, uint64_t
     case 0u: /* MDEC in */
         return dma_stub_source(word);
     case 1u: /* MDEC out */
-        return dma_stub_source(word);
+        *word = schway__mdec_dma_read(inst, tick);
+        return 0u;
     case 2u: /* GPU */
         *word = schway__gpu_dma_read(inst, tick);
         return 0u;
