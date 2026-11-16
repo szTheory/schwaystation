@@ -78,7 +78,7 @@ coverage:
         ref: "git diff --check; exit 0. Code review WR-01 reported that documentation called the checked buffer a DMA1 destination; the hardware page now says the comparator reads the digest-pinned guest target and records DMA1 starts separately. The target relationship remains unresolved."
         status: partial
     human_judgment: false
-duration: "at least 1h03m07s wall through closeout; active work stopped at the 30m bound"
+duration: "at least 1h04m21s wall through final metadata commit; active work stopped at the 30m bound"
 completed: 2026-11-16
 status: complete
 ---
@@ -89,7 +89,7 @@ Captured identical pinned inputs and transform state, found an all-pixel cross-m
 
 ## Performance
 
-- Duration: At least 1h03m07s wall from 2026-11-16T12:34:17Z through this closeout; active work stopped at the 30-minute bound and the remaining wall time includes the required review hold.
+- Duration: At least 1h04m21s wall from 2026-11-16T12:34:17Z through the final metadata commit; active work stopped at the 30-minute bound and the remaining wall time includes the required review hold.
 - Runtime/model: Codex/OpenGSD 1.20.0; gpt-6-luna xhigh.
 - Tasks: One partial implementation slice; plan acceptance is incomplete.
 - Commits: One measured Plan38 task commit before the summary.
