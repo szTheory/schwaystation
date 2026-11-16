@@ -22,8 +22,8 @@
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 16u
-#define SCHWAY__STATE_FORMAT 16u
+#define SCHWAY__BEHAVIOUR_REVISION 17u
+#define SCHWAY__STATE_FORMAT 17u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -132,6 +132,8 @@ struct schway__disc_host {
     schway_toc toc;
     uint32_t attached;
     uint32_t lid_open;
+    uint32_t identity_valid;
+    uint8_t identity_sha256[32];
 };
 
 struct schway {
@@ -368,7 +370,7 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__TRACE_SIZE_FIRST 64u
 #define SCHWAY__DISC_TRACK_SIZE_FIRST ((uint32_t)sizeof(schway_disc_track))
 #define SCHWAY__TOC_SIZE_FIRST ((uint32_t)sizeof(schway_toc))
-#define SCHWAY__DISC_SIZE_FIRST ((uint32_t)sizeof(schway_disc))
+#define SCHWAY__DISC_SIZE_FIRST ((uint32_t)offsetof(schway_disc, identity_size))
 _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first size");
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
@@ -392,7 +394,7 @@ _Static_assert(SCHWAY__TTY_SIZE_FIRST == sizeof(schway_tty), "tty first size");
 _Static_assert(SCHWAY__TRACE_SIZE_FIRST == sizeof(schway_trace), "trace first size");
 _Static_assert(SCHWAY__DISC_TRACK_SIZE_FIRST == sizeof(schway_disc_track), "disc track first size");
 _Static_assert(SCHWAY__TOC_SIZE_FIRST == sizeof(schway_toc), "toc first size");
-_Static_assert(SCHWAY__DISC_SIZE_FIRST == sizeof(schway_disc), "disc first size");
+_Static_assert(SCHWAY__DISC_SIZE_FIRST == 8 + 4 * SCHWAY__P, "disc first size");
 _Static_assert(offsetof(schway_disc_track, type) == 4, "disc track.type");
 _Static_assert(offsetof(schway_disc_track, index0) == 8, "disc track.index0");
 _Static_assert(offsetof(schway_disc_track, index1) == 12, "disc track.index1");
@@ -409,7 +411,11 @@ _Static_assert(offsetof(schway_disc, user) == 8, "disc.user");
 _Static_assert(offsetof(schway_disc, read_sector) == 8 + SCHWAY__P, "disc.read_sector");
 _Static_assert(offsetof(schway_disc, toc) == 8 + 2 * SCHWAY__P, "disc.toc");
 _Static_assert(offsetof(schway_disc, bad_q) == 8 + 3 * SCHWAY__P, "disc.bad_q");
-_Static_assert(sizeof(schway_disc) == 8 + 4 * SCHWAY__P, "disc size");
+_Static_assert(offsetof(schway_disc, identity_size) == 8 + 4 * SCHWAY__P, "disc.identity_size");
+_Static_assert(offsetof(schway_disc, reserved1) == 12 + 4 * SCHWAY__P, "disc.reserved1");
+_Static_assert(offsetof(schway_disc, identity_sha256) == 16 + 4 * SCHWAY__P,
+               "disc.identity_sha256");
+_Static_assert(sizeof(schway_disc) == 48 + 4 * SCHWAY__P, "disc size");
 
 /* The public fault kinds and devices are the internal ones, number for number. */
 _Static_assert(SCHWAY_FAULT_NONE == SCHWAY__FAULT_NONE, "fault none");

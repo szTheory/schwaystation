@@ -88,17 +88,21 @@ compares a block preceded by `FE00h` padding with its unpadded equivalent.
 Status bit 31 reports an empty output FIFO, bit 30 a full input FIFO, bit 29 a
 command or block in progress, bit 28 DMA0 readiness, and bit 27 DMA1 readiness.
 The decoder makes output available at a selected 1,000-cycle block deadline;
-the model test checks status immediately before and at that boundary. The
-pinned ps1-tests step log records status ordering but contains no cycle stamps,
-so 1,000 cycles is an implementation baseline informed by the cited ares
-comment, not a measured hardware timing result.
+the model test checks status immediately before and at that boundary. A public
+SCPH-5501 status/decode capture measures DMA0-start to DMA1-completion at
+947-1,007 cycles for one block, 3,534-3,609 cycles for six blocks and
+12,780-12,825 cycles for 24 blocks, at both 4-bit and 8-bit output. These are
+whole-transfer measurements for the capture's streams, not an isolated
+per-block deadline, so the selected 1,000-cycle implementation baseline is
+retained without claiming it reproduces the complete hardware throughput. The
+pinned ps1-tests step log still has no cycle stamps.
 
 The input FIFO holds 32 words; parser state preserves the current coefficient
 scan and block across refills, even when one block is denser than the FIFO. The
 output FIFO holds 192 words. A completed block waits with no scheduled
 retry if the whole block does not fit; DMA1 reads resume it as soon as enough
 space opens. This prevents dropping a block and avoids a same-tick scheduler
-loop. State format 16 stores the input halfword cursor and partial coefficient
+loop. State format 17 stores the input halfword cursor and partial coefficient
 scan, pending-block state, decoded Cr/Cb planes and the staged 24-bit luma
 block so save/load preserves stream and backpressure progress.
 
@@ -125,3 +129,9 @@ status log's ordered status, input and output events. Its TTY also leaves
 formatted values as placeholders, and the log has no cycle stamps. The model
 tests verify status bits directly; neither this ordering check nor the
 unstamped log measures the 1,000-cycle scheduling baseline. `[SCM.12]`
+
+The separate public [MDEC Output](https://psx.wiki/tests/mdecout/) capture on an
+SCPH-5501 reports whole-output and per-macroblock CRCs for a single block,
+four-macroblock step stream and frame stream. It is another hardware reference
+for decode bytes; the pinned first-caller logs remain the automated oracle in
+this repository.

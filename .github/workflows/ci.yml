@@ -725,7 +725,12 @@ jobs:
             "-DUNIT=$GITHUB_WORKSPACE/build/ci/tests/schwaystation-test-run" \
             "-DOUT=$RUNNER_TEMP/perf/spu_idle" -DCASE=spu_idle \
             -P tests/perf/tests.cmake || spu_rc=$?
-          if [ "$rc" -ne 0 ] || [ "$spu_rc" -ne 0 ]; then exit 1; fi
+          cd_rc=0
+          cmake "-DVALGRIND=$valgrind" \
+            "-DUNIT=$GITHUB_WORKSPACE/build/ci/tests/schwaystation-test-run" \
+            "-DOUT=$RUNNER_TEMP/perf/cd_idle" -DCASE=cd_idle \
+            -P tests/perf/tests.cmake || cd_rc=$?
+          if [ "$rc" -ne 0 ] || [ "$spu_rc" -ne 0 ] || [ "$cd_rc" -ne 0 ]; then exit 1; fi
 
   # Every publish step of a release, rehearsed with the release App's token on
   # a same-repository pull request that changes a release input, against a

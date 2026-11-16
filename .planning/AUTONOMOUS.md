@@ -78,6 +78,11 @@ an obsolete known-failing CI tail before dispatching its repaired head. Capture 
 `task_rc` rather than zsh's read-only `status`; if a wrapper fails after all checks finish green, record that
 accurately instead of repeating the full suite for bookkeeping.
 
+Before a long test, build, emulation or hosted run, do the cheapest relevant consistency check first: verify
+inputs and decoded output counts, command selectors and workflow wiring, inventories, or budget totals. Use
+that preflight to catch a structural mismatch before spending time on the full run; maintain it as a gate only
+when it prevents a recurring fault.
+
 For delegated research, write concise findings and verified pins to the assigned artifact early. When the
 remaining uncertainties are routine implementation probes, return them to the executor instead of delaying
 the whole phase. If a handoff stalls, recover existing evidence and artifacts before repeating any research.

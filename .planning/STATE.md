@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 29 of 39
+current_plan: 30 of 39
 status: executing
-stopped_at: Completed 06-14-PLAN.md; next 06-21-PLAN.md
-last_updated: "2026-11-16T20:19:51Z"
+stopped_at: Completed 06-21-PLAN.md; next 06-15-PLAN.md
+last_updated: "2026-11-16T21:13:53Z"
 last_activity: 2026-11-16
-state_head: f070353
+state_head: 5613c8e
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 179
-  percent: 84
-last_activity_desc: "Completed plan 06-14 after a resumed-session pause. Pinned media source-cache invalidation, the Ninja Windows tool path, and MSVC compile/link options were corrected; all fixture-building CI lanes now consume the verified media artifact. Local disc fixture and producer builds passed; focused pin/probe/budget checks passed 5/5 and hygiene passed 24/24. DISC-02 runtime acceptance remains pending. Wall and active time were not attributable across the session boundary. Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), reviewer gpt-6-luna xhigh."
+  completed_plans: 180
+  percent: 95
+last_activity_desc: "Completed Plan 06-21 after resuming a long pause. API v6 now binds save-state media to a host-supplied identity; mismatch and unavailable identity fail before mutation, and callback-free state operations are tested. Idle CD scheduling has focused bounds and a hosted Cachegrind allowance measured against the same public no-disc frame path. Focused checks passed 16/16; synthetic perf checks passed 19/19; workflow wiring passed; repository-check code is 2699/2700 lines. Public SCPH-5501 seek and MDEC captures are documented. Real Cachegrind measurement awaits hosted CI. Active runtime was not tracked. Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable)."
 ---
 
 # Project State
@@ -908,3 +908,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID not e
 ### Phase 6 plan 06-14 execution (2026-11-16)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable), review gpt-6-luna xhigh. Execution resumed after a 22-hour pause; active time was not attributable. Pinned source-cache invalidation, Ninja Windows output path, MSVC floating-point/link options, and fixture media downloads/emulator invocation in all relevant CI lanes were corrected. The local disc target and pinned producer script built successfully; focused pin, media-corruption, probe and budget checks passed 5/5; hygiene passed 24/24 in 38 seconds. The gate total is 2698/2700 lines. DISC-02 runtime acceptance remains open until downstream boot/playback and hosted matrix checks. No owner hardware run or hosted URL applies. Plan 06-21 is next in Wave 15.
+
+### Phase 6 plan 06-21 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable). Active duration was not tracked after the resumed-session pause. API v6 binds save states to a host-supplied disc identity; different or unavailable media is rejected before apply, legacy descriptor prefixes remain valid for emulation, and callback-free save/load behavior is covered. The no-busy-loop and focused state/API/CD suite passed 16/16; the synthetic perf lane passed 19/19. Workflow wiring checks now require both SPU and CD Cachegrind jobs; direct workflow check passed. Repository-check code is 2699/2700 lines. Public SCPH-5501 seek and MDEC capture data are recorded in the hardware pages; they do not settle XA interpolation rounding. Local Valgrind was unavailable, so real idle-CD instruction measurement awaits hosted perf CI. DISC-01/03/04 remain partial pending their downstream callers; no owner hardware run is scheduled. Next is Plan 06-15, whose fixture must supply the host-owned identity. No hosted URL applies yet.

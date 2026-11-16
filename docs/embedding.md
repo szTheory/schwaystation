@@ -534,6 +534,16 @@ are not text-decoded or line-split, and the core never prints them.
 The ring is not part of the machine state: it is outside `schway_save_state`, `schway_state_visit` and every hash, a
 load leaves it as it is, and a power reset empties it.
 
+## Disc providers
+
+`schway_disc` supplies a sector callback, TOC callback and optional bad-Q callback. The core copies this
+size-tagged descriptor and TOC; it calls sector and bad-Q callbacks only while `schway_run_frame` or `schway_run`
+advances the instance. API v6 appends `identity_size` and `identity_sha256`: set the size to 32 and provide the
+SHA-256 identity formed from the first 16 data sectors plus the disc serial. Leave both fields zero when that
+identity is unavailable. An older descriptor size remains valid for running media, but save/load with an attached
+disc lacking an identity returns `SCHWAY_STATUS_ERR_STATE_DISC`. Loading a state with another disc, or with no disc
+attached, returns the same status without changing the instance.
+
 ## Save states
 
 ```c
@@ -545,13 +555,14 @@ schway_load_state(inst, buf, n);
 ```
 
 A state is the same bytes on every platform: a 20-byte header (magic, state format, total size, CRC-32 of the
-rest) and then every field, little-endian. Format 16 includes the CD-ROM controller, validated Q record, pending
+rest) and then every field, little-endian. Format 17 includes the CD-ROM controller, validated Q record, pending
 and applied ATV matrices, XA-ADPCM predictor history, resampler history, both bounded CD input queues, the MDEC
 input halfword cursor, resumable coefficient scan, decoded color planes and staged color output alongside the SPU state.
-The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. A format-15 state
-returns `SCHWAY_STATUS_ERR_STATE_VERSION`; the public API and ABI remain unchanged. The behavior revision is 16
-because MDEC color decoding now produces 15-bit and packed 24-bit output through the DMA display path, and dense
-blocks resume across bounded input FIFO refills.
+It also records the host-supplied disc identity for validation; callback pointers and file handles stay outside the
+state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. A format-16
+state returns `SCHWAY_STATUS_ERR_STATE_VERSION`. API v6 appends disc identity to the size-tagged descriptor; the
+behavior revision is 17 because state loads now reject a missing or different attached-disc identity before
+applying fields.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:
 
@@ -561,6 +572,7 @@ blocks resume across bounded input FIFO refills.
 | `SCHWAY_STATUS_ERR_STATE_VERSION` | another state format |
 | `SCHWAY_STATUS_ERR_STATE_CRC` | the bytes were changed |
 | `SCHWAY_STATUS_ERR_STATE_FIELD` | wrong size, a field out of range, or another region's state |
+| `SCHWAY_STATUS_ERR_STATE_DISC` | the state and currently attached disc have different or unavailable identities |
 
 A successful load restores the saved SPU sample phase and CD input queues, rebuilds derived deadlines, and empties
 the host-delivery PCM ring. That output ring is not part of a save state. Saving, loading and saving again gives the

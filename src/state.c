@@ -107,6 +107,8 @@ static void body_io(struct schway__state_io *io, schway *inst)
                                                 SCHWAY_PROFILE_GPU_V0 |
                                                 SCHWAY_PROFILE_CD_UNLOCK)) == 0u);
     (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
+    schway__state_disc_identity_io(io, &inst->disc_host.identity_valid,
+                                   inst->disc_host.identity_sha256);
     schway__bus_state_io(io, inst);
     schway__state_check(io, ((io->cpu_cause & 0x00000400u) != 0u) ==
                                 ((io->irq_stat & io->irq_mask & SCHWAY__IRQ_BITS) != 0u));
@@ -194,6 +196,9 @@ schway_status schway_save_state(const schway *inst, void *buf, size_t size)
     if (inst == NULL || buf == NULL) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
+    if (inst->disc_host.attached != 0u && inst->disc_host.identity_valid == 0u) {
+        return SCHWAY_STATUS_ERR_STATE_DISC;
+    }
     size_t need = schway_state_size(inst);
     if (size < need) {
         return SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL;
@@ -229,6 +234,9 @@ schway_status schway_load_state(schway *inst, const void *buf, size_t size)
     if (get_u32(b + H_BODY_CRC) != body_crc(b, size)) {
         return SCHWAY_STATUS_ERR_STATE_CRC;
     }
+    if (inst->disc_host.attached != 0u && inst->disc_host.identity_valid == 0u) {
+        return SCHWAY_STATUS_ERR_STATE_DISC;
+    }
     /* VALIDATE walks the same fields over the same bytes that APPLY reads
        and writes nothing, so a refused state has changed nothing. */
     struct schway__state_io io;
@@ -238,6 +246,9 @@ schway_status schway_load_state(schway *inst, const void *buf, size_t size)
     state_io(&io, inst, (uint32_t)need);
     if (io.bad) {
         return SCHWAY_STATUS_ERR_STATE_FIELD;
+    }
+    if (io.disc_mismatch != 0) {
+        return SCHWAY_STATUS_ERR_STATE_DISC;
     }
     /* APPLY cannot fail. */
     io.mode = SCHWAY__STATE_APPLY;

@@ -1015,10 +1015,77 @@ static void check_maximum_loaded_state(void)
     schway_destroy(source);
 }
 
-/* Fault prevented: a no-content frame that polls per CPU cycle instead of
-   advancing to scheduled sample deadlines, or an idle/muted/busy state that
-   escapes the public run bound. The PS1 SPU schedules one sample event every
-   768 CPU cycles (.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md section 1.1). */
+struct idle_cd_host {
+    schway_toc toc;
+    uint32_t reads;
+    uint32_t toc_calls;
+};
+
+static uint32_t idle_cd_read(void *user, uint32_t lba, uint8_t sector[2352],
+                             uint8_t subcode[96])
+{
+    struct idle_cd_host *host = (struct idle_cd_host *)user;
+    (void)lba;
+    host->reads++;
+    memset(sector, 0, 2352u);
+    memset(subcode, 0, 96u);
+    return 1u;
+}
+
+static uint32_t idle_cd_toc(void *user, schway_toc *out)
+{
+    struct idle_cd_host *host = (struct idle_cd_host *)user;
+    host->toc_calls++;
+    memcpy(out, &host->toc, sizeof *out);
+    return 1u;
+}
+
+static void idle_cd_attach(schway *inst, struct idle_cd_host *host)
+{
+    memset(host, 0, sizeof *host);
+    host->toc.size = (uint32_t)sizeof host->toc;
+    host->toc.track_count = 1u;
+    host->toc.tracks[0].size = (uint32_t)sizeof host->toc.tracks[0];
+    host->toc.tracks[0].type = SCHWAY_DISC_TRACK_MODE2;
+    host->toc.tracks[0].index0 = 150u;
+    host->toc.tracks[0].index1 = 150u;
+    host->toc.tracks[0].leadout = 1000u;
+    schway_disc disc;
+    memset(&disc, 0, sizeof disc);
+    disc.size = (uint32_t)sizeof disc;
+    disc.user = host;
+    disc.read_sector = idle_cd_read;
+    disc.toc = idle_cd_toc;
+    CHECK_EQ_U64(schway_open_disc(inst, &disc), SCHWAY_STATUS_OK);
+}
+
+static void check_idle_cd(uint32_t lid_open)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    struct idle_cd_host host;
+    idle_cd_attach(inst, &host);
+    if (lid_open != 0u) CHECK_EQ_U64(schway_set_lid(inst, 1u), SCHWAY_STATUS_OK);
+    schway__sched_recalc(inst);
+    CHECK_EQ_U64(host.toc_calls, 1u);
+    CHECK_EQ_U64(host.reads, 0u);
+    CHECK(schway__cdrom_next(inst) > inst->ticks);
+    CHECK(schway__mdec_next(inst) > inst->ticks);
+    CHECK(inst->sched.next > inst->ticks);
+    for (uint32_t i = 0u; i < 2u; i++) {
+        schway_run_result result = run(inst, 5000u, 0u);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_BUDGET);
+        CHECK_EQ_U64(result.ticks, (uint64_t)(i + 1u) * 5000u);
+        CHECK(schway__cdrom_next(inst) > inst->ticks);
+        CHECK(schway__mdec_next(inst) > inst->ticks);
+        CHECK(inst->sched.next > inst->ticks);
+        CHECK_EQ_U64(host.reads, 0u);
+    }
+    schway_destroy(inst);
+}
+
+/* Fault prevented: idle CD/lid-open and empty MDEC create current-tick loops,
+   host reads with no guest request, or a no-content frame polls per cycle
+   instead of advancing to scheduled deadlines. */
 static void test_no_busy_loop(void)
 {
     schway *inst = make(SCHWAY_REGION_NTSC_U);
@@ -1051,6 +1118,8 @@ static void test_no_busy_loop(void)
     check_muted_voice();
     check_dma_busy_bound();
     check_maximum_loaded_state();
+    check_idle_cd(0u);
+    check_idle_cd(1u);
 }
 
 static uint32_t perf_frames(int argc, char **argv)
@@ -1058,7 +1127,7 @@ static uint32_t perf_frames(int argc, char **argv)
     char *end = NULL;
     unsigned long value;
     if (argc != 3) {
-        fprintf(stderr, "schwaystation-test-run: SPU perf modes need a frame count\n");
+        fprintf(stderr, "schwaystation-test-run: idle perf modes need a frame count\n");
         exit(2);
     }
     value = strtoul(argv[2], &end, 10);
@@ -1067,6 +1136,19 @@ static uint32_t perf_frames(int argc, char **argv)
         exit(2);
     }
     return (uint32_t)value;
+}
+
+static void perf_public_idle_frames(schway *inst, uint32_t frames)
+{
+    for (uint32_t i = 0u; i < frames; i++) {
+        schway_run_result result;
+        memset(&result, 0, sizeof result);
+        result.size = (uint32_t)sizeof result;
+        CHECK_EQ_U64(schway_run_frame(inst, &result), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
+        CHECK_EQ_U64(result.frame, (uint64_t)i + 1u);
+    }
+    CHECK_EQ_U64(inst->frame, frames);
 }
 
 /* Cachegrind control: same creation and exact rational frame-end arithmetic
@@ -1092,15 +1174,25 @@ static void perf_spu_idle_control(uint32_t frames)
 static void perf_spu_idle(uint32_t frames)
 {
     schway *inst = make(SCHWAY_REGION_NTSC_U);
-    for (uint32_t i = 0u; i < frames; i++) {
-        schway_run_result result;
-        memset(&result, 0, sizeof result);
-        result.size = (uint32_t)sizeof result;
-        CHECK_EQ_U64(schway_run_frame(inst, &result), SCHWAY_STATUS_OK);
-        CHECK_EQ_U64(result.stop, SCHWAY_STOP_FRAME);
-        CHECK_EQ_U64(result.frame, (uint64_t)i + 1u);
-    }
-    CHECK_EQ_U64(inst->frame, frames);
+    perf_public_idle_frames(inst, frames);
+    schway_destroy(inst);
+}
+
+/* Control: the same public no-content frame path without an attached drive. */
+static void perf_cd_idle_control(uint32_t frames)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    perf_public_idle_frames(inst, frames);
+    schway_destroy(inst);
+}
+
+static void perf_cd_idle(uint32_t frames)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    struct idle_cd_host host;
+    idle_cd_attach(inst, &host);
+    perf_public_idle_frames(inst, frames);
+    CHECK_EQ_U64(host.reads, 0u);
     schway_destroy(inst);
 }
 
@@ -1171,6 +1263,14 @@ int main(int argc, char **argv)
     }
     if (argc >= 2 && argc <= 3 && strcmp(argv[1], "spu_idle") == 0) {
         perf_spu_idle(perf_frames(argc, argv));
+        CHECK_DONE();
+    }
+    if (argc >= 2 && argc <= 3 && strcmp(argv[1], "cd_idle_control") == 0) {
+        perf_cd_idle_control(perf_frames(argc, argv));
+        CHECK_DONE();
+    }
+    if (argc >= 2 && argc <= 3 && strcmp(argv[1], "cd_idle") == 0) {
+        perf_cd_idle(perf_frames(argc, argv));
         CHECK_DONE();
     }
     if (argc != 2) {

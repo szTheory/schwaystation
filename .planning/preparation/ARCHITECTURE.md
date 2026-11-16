@@ -2,7 +2,7 @@
 title: "Architecture: time base, modules and bus, public C API, I/O contracts, state, observability, execution engine, GPU and audio pipelines, build order, conflicts"
 summary: "The technical spine of the schwaystation core: one CPU-cycle timeline with a lazy event scheduler, the module and register-owner map, the schway_ C API with its contracts and stop reasons, the video, audio, input, disc and memory-card contracts, the fixed-size visitor state, counters and first fault, the determinism rules and the three hash definitions, the interpreter written for a cached interpreter and JIT seed, the span rasteriser, the SPU/CD/MDEC pipeline, the four v1.0 phases, the Ir budgets, and every conflict between the preparation files with its settled answer."
 read_when: "Before planning or writing core, runner or libretro code; before adding a module, API call, profile field, hash or stop reason; whenever two preparation files disagree."
-updated: 2026-11-10
+updated: 2026-11-16
 ---
 
 # schwaystation architecture
@@ -99,7 +99,7 @@ Dependency direction, no cycles: `instance → cpu → {cop0, gte, bus}`; `bus �
 | `schway_load_bios(inst, bytes, n, schway_bios_info*)` | exactly 524,288 bytes, or the own stub kernel (2 KiB, recognised by its magic); SHA-256 reported and matched against the vendored digest table (name-independent); unknown digests accepted with `BIOS_UNKNOWN` flag; OpenBIOS is a known digest; bytes copied; no HLE [ARCH.01 C7][ARCH.09 §1] |
 | `schway_probe_exe(bytes, n, schway_exe_info*)` | pure: header fields, lint flags, region marker; never emulates |
 | `schway_load_exe(inst, bytes, n)` | validated per [ARCH.04 §7] then staged; applied at the 80030000h hook under a kernel, or at reset under the stub kernel with SP from `s_addr + s_size` or 801FFF00h when 0 [ARCH.01 C7][ARCH.06 PX.68] |
-| `schway_open_disc(inst, const schway_disc*)`; `schway_set_lid(inst, open)`; `schway_swap_disc(inst, const schway_disc*)` | the core keeps the callback struct by value and calls it only inside `run_frame`/`run`; `swap_disc` requires the lid open; the TOC is read once at open; disc identity (SHA-256 of the first 16 data sectors plus serial) is recorded for state validation [ARCH.03 DISC-IF][ARCH.04 §5] |
+| `schway_open_disc(inst, const schway_disc*)`; `schway_set_lid(inst, open)`; `schway_swap_disc(inst, const schway_disc*)` | the core keeps the callback struct by value and calls sector/bad-Q callbacks only inside `run_frame`/`run`; `swap_disc` requires the lid open; the TOC is read once at open; API v6 appends a host-supplied SHA-256 identity (first 16 data sectors plus serial), recorded and validated before state apply; older descriptor sizes remain valid for running media but cannot save/load while attached without that identity [ARCH.03 DISC-IF][ARCH.04 §5] |
 | `schway_load_memcard(inst, slot, bytes, n)`; `schway_get_memory(inst, kind, schway_span*)`; `schway_memcard_generation(inst, slot)` | raw 131,072 bytes (shorter padded FFh, headered formats are the host's conversion); spans RAM, SCRATCHPAD, VRAM, SPU_RAM, BIOS (read-only), CARD1, CARD2, fixed from load to destroy; generation +1 per completed Write ending 47h [ARCH.04 §3.6] |
 | `schway_reset(inst, kind)` | POWER applies the §7 power-on table and `ram_fill`; RESET keeps RAM, scratchpad, VRAM and SPU RAM [ARCH.01 C9] |
 | `schway_set_input(inst, const schway_input*)` | latched at the next frame start (§1); device per port {NONE, DIGITAL, DUALSHOCK}, buttons, four axes, analog button, lid is not here |
@@ -164,7 +164,7 @@ typedef struct { uint32_t size; uint32_t present, kind, device, width; uint64_t 
 - **Layout.** The instance is one struct of fixed-size plain-integer sub-structs (no pointers, no bit-fields); the state body is the visitor's byte-wise little-endian walk of those fields, not a memcpy [ARCH.11][ARCH.04 §4].
 - **Visitor.** One function per struct runs as SIZE, WRITE, VALIDATE then APPLY, plus RECORD, which emits every field's bounds so a test can sweep out-of-range values; VALIDATE walks everything first so APPLY cannot fail; pointers and FIFO indexes are re-derived after APPLY [ARCH.10 §7]. Exists from P1 (the test card round-trips); format frozen in v3.0 [ARCH.04 §8].
 - **Public visitor.** `schway_state_visit(inst, visitor, user)` calls `visitor(user, const char *path, uint32_t kind, void *bytes, uint32_t n)` once per field in WRITE order with a dotted path (`gpu.vram`, `cpu.r[3]`, `cdrom.int_queue`); hosts use it for field-level diffs and partial hashes; the core's own save, load, size and hash paths are the same walk with four internal modes, so a field cannot exist in one and not the other.
-- **Header**, 64 bytes: 8-byte magic; u16 format version; u16 header size; u32 total size; u32 behaviour revision; u32 API version; u32 packed profile; 16-byte disc identity prefix; u32 BIOS digest prefix; u32 body CRC-32; u64 frame; u64 ticks; u32 flags (WITH_CARDS); 4 reserved. A state with another disc identity loads only with `ERR_STATE_DISC` overridden by a flag; ticks ≤ 2^62.
+- **Header**, 20 bytes: 8-byte magic; u32 state format; u32 total size; u32 CRC-32 of the body. API, profile, BIOS and media matching data live in visited body fields rather than a header prefix. API v6 adds `disc.identity_valid` and the host-supplied 32-byte `disc.identity_sha256`; validation compares them before APPLY, and a missing or different identity returns `ERR_STATE_DISC`. Ticks ≤ 2^62.
 
 | Module | Contributes (bytes, derived) |
 |---|---|
@@ -179,7 +179,7 @@ typedef struct { uint32_t size; uint32_t present, kind, device, width; uint64_t 
 | total | ≈ 3.72 MB; ≈ 3.98 MB with cards; `state.bytes` ceiling 4,194,304 [ARCH.08 §14] |
 
 - **No stored deadline.** The table above no longer lists `next_deadline`: it is derived from the devices (section 1) and recomputed after a load. The timers save their value as of `ticks` with no base tick, so the hash does not depend on when a catch-up ran.
-- **CD and disc-swap state.** The disc bytes are never inside the state; the state holds the disc identity, the disc index (m3u position, supplied by the host at `open_disc`), the lid flag, the TOC digest and every byte the controller already fetched (sector buffer, ring). On load the host must have the same disc open or `ERR_STATE_DISC` is returned before any byte applies.
+- **CD and disc-swap state.** Disc bytes, callbacks, TOC and file handles are never inside the state. The state holds the host-supplied disc identity and every byte the controller already fetched (sector buffer, ring), plus the controller's lid and command state. On load the host must have the same identified disc open or `ERR_STATE_DISC` is returned before any byte applies.
 - Not saved: host input not yet latched, hooks, trace ring, caller buffers and the host audio ring. A valid state load clears that ring; hosts handle any audio already drained or dropped before the load.
 
 ## 6. Observability

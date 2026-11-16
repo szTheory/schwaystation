@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 5
+#define SCHWAY_API_VERSION 6
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -28,6 +28,7 @@ typedef uint32_t schway_status;
 #define SCHWAY_STATUS_ERR_EXE_INVALID 11u
 #define SCHWAY_STATUS_ERR_EXE_RANGE 12u
 #define SCHWAY_STATUS_ERR_LID_CLOSED 13u
+#define SCHWAY_STATUS_ERR_STATE_DISC 14u
 
 #define SCHWAY_REGION_NTSC_J 1u
 #define SCHWAY_REGION_NTSC_U 2u
@@ -276,6 +277,9 @@ typedef struct schway_disc {
     schway_disc_read_sector_fn read_sector;
     schway_disc_toc_fn toc;
     schway_disc_bad_q_fn bad_q; /* optional; returns 1 for a bad-Q entry */
+    uint32_t identity_size; /* 0 if unavailable, otherwise 32 */
+    uint32_t reserved1;
+    uint8_t identity_sha256[32]; /* first 16 data sectors plus serial */
 } schway_disc;
 
 typedef struct schway_trace {

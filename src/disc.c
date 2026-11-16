@@ -14,11 +14,23 @@ static schway_status disc_prepare(const schway_disc *disc, schway_disc *callback
     if (status != SCHWAY_STATUS_OK) {
         return status;
     }
-    if (disc->reserved0 != 0u || disc->read_sector == NULL || disc->toc == NULL) {
+    if (disc->size != SCHWAY__DISC_SIZE_FIRST && disc->size < sizeof *disc) {
+        return SCHWAY_STATUS_ERR_STRUCT_SIZE;
+    }
+    memset(callbacks, 0, sizeof *callbacks);
+    size_t copy_size = disc->size < sizeof *callbacks ? disc->size : sizeof *callbacks;
+    memcpy(callbacks, disc, copy_size);
+    if (callbacks->reserved0 != 0u || callbacks->read_sector == NULL ||
+        callbacks->toc == NULL || callbacks->reserved1 != 0u ||
+        (callbacks->identity_size != 0u && callbacks->identity_size != 32u)) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-
-    *callbacks = *disc;
+    if (callbacks->identity_size == 0u) {
+        uint8_t zero_identity[sizeof callbacks->identity_sha256] = {0u};
+        if (memcmp(callbacks->identity_sha256, zero_identity, sizeof zero_identity) != 0) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+    }
     memset(toc, 0, sizeof *toc);
     toc->size = (uint32_t)sizeof *toc;
     if (callbacks->toc(callbacks->user, toc) == 0u) {
@@ -65,6 +77,9 @@ static void disc_apply(schway *inst, const schway_disc *callbacks, const schway_
     inst->disc_host.callbacks = *callbacks;
     inst->disc_host.toc = *toc;
     inst->disc_host.attached = 1u;
+    inst->disc_host.identity_valid = callbacks->identity_size == 32u;
+    memcpy(inst->disc_host.identity_sha256, callbacks->identity_sha256,
+           sizeof inst->disc_host.identity_sha256);
 }
 
 schway_status schway_open_disc(schway *inst, const schway_disc *disc)

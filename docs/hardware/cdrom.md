@@ -94,7 +94,7 @@ fixed point was selected and do not claim that every console drive has identical
 | Init completion | 476,000 cycles after ACK | Selected from the ps1-tests completion average 476,300 (SCM.12, medium confidence) |
 | GetID answer | `4A00h` cycles after ACK | Published controller average (SCM.02, medium confidence) |
 | Pause completion | 2,170,000 cycles at 1x; half at 2x; 7,666 when already paused | Fixed DEC.44 baseline from published averages; tests pin both speeds and the short repeated case |
-| Seek | Integer Q16 square-root model, 1-150 ticks, plus 3 ticks; 80 more ticks after a speed change; scale by 1x/2x | Inferred from ares' published formula (SCM.10); low confidence because no hardware seek curve is recorded |
+| Seek | Integer Q16 square-root model, 1-150 ticks, plus 3 ticks; 80 more ticks after a speed change; scale by 1x/2x | Deterministic approximation; a public SCPH-5501 capture records noisy, nonmonotonic seek times and does not define one portable curve |
 | Reset response | `400000h` cycles | Published controller behavior (SCM.02) |
 
 The pinned timing source log records minimum, maximum and average bands. The release guest's TTY prints the row
@@ -108,6 +108,13 @@ The seek model computes the radial term from the difference of Q16 square roots 
 `floor(0.5 * (3 + 0.2*r + 2.5*sqrt(r) + distance/60000))`, clamped to 1-150 ticks. Tick conversion is 451,584 CPU
 cycles at 1x and half that at 2x. The maximum selected seek is 233 ticks at 1x, including the three-tick base and
 speed-change delay. It has no random component or wall-clock input.
+
+A public SCPH-5501 capture with Ridge Racer (USA) shows why this stays an approximation: SeekL from sector 22 took
+78-79 ms for 40 sectors at double speed, versus 89-97 ms for 300 sectors; at single speed those ranges were 312-313
+ms and 108-123 ms. Repeated 456-sector seeks also fell into separated timing groups. The three-run capture confirms
+nonmonotonic, drive-state-dependent timing, but does not provide a portable fixed mapping for every console revision.
+The selected deterministic model therefore remains unchanged; these hardware values are not presented as emulator
+accuracy. [Public SCPH-5501 seek capture](https://psx.wiki/tests/cd-rom-seek-timing/)
 
 Pinned Getloc observations keep the raw sector header separate from the Q position. The run at `00:02:16` reports a
 header at `00:02:16` and Q absolute position `00:02:11`; seeks at `00:00:30` and `74:00:00` report distinct lead-in
@@ -133,9 +140,10 @@ The resampler keeps 29 input samples per channel and applies the seven documente
 It emits seven samples after each six decoded samples. At 18.9 kHz, it duplicates each decoded input sample before
 filtering. Its six-step phase starts at zero and, like both histories, is instance state. The chosen integer baseline
 divides the signed tap sum by 32,768 with truncation toward zero, then saturates to signed 16-bit. The source notes
-small rounding mismatches and a possible two-stage hardware implementation; without a hardware capture, these exact
-rounding and phase choices are deterministic behavior, not proof of a silicon waveform. The decoded samples are not
-yet connected to the SPU audio queue; the later XA/SPU integration plans own that path.
+small rounding mismatches and a possible two-stage hardware implementation. The public hardware captures reviewed
+for this phase cover CD seek and MDEC but do not provide sample-level XA output that distinguishes the rounding or
+phase choices. The current values are deterministic behavior, not proof of a silicon waveform; decoded samples feed
+the fixed native SPU sample clock through the bounded XA queue.
 
 ## Region, firmware, licence and lid
 
@@ -168,10 +176,16 @@ selection. Rejected or malformed candidates follow the existing data-selection, 
 requiring a data header. Supplied Q subcode is deinterleaved and checked for BCD fields, TOC track range and CRC.
 Missing or invalid Q is synthesized from the TOC until a valid record exists; later missing or invalid records preserve
 the last good position. `current_lba` follows valid Q position unless the host's `bad_q` callback marks that sector,
-in which case the previous good position remains visible. Disc callbacks and TOC remain host-owned and are not part of
-save states; controller flags, sector bytes, the latest validated 12-byte Q record, FIFO contents and scheduled
-deadlines, ATV staging and active values, CDDA and XA queue contents, XA predictor history and resampler history are
-serialized in state format 16.
+in which case the previous good position remains visible. Disc callbacks, TOC and the file handle remain host-owned
+and are not part of save states; the host-supplied SHA-256 disc identity is matched before state apply. Controller
+flags, sector bytes, the latest validated 12-byte Q record, FIFO contents and scheduled deadlines, ATV staging and
+active values, CDDA and XA queue contents, XA predictor history and resampler history are serialized in state format
+17.
+
+An attached idle drive has a Cachegrind budget of at most 250,000 additional
+instructions per NTSC frame over the same frame path without drive events. The
+hosted perf job measures this with a synthetic TOC and a sector callback that
+must remain unused while idle.
 
 ## Sources and confidence
 
@@ -180,7 +194,7 @@ serialized in state format 16.
   SCM.02 (psx-spx) and SCM.12 (ps1-tests).
 - ACK, Init, Pause and INT1 choices are recorded in [DEC.44](../../.planning/preparation/DECISIONS.md); region,
   firmware and unlock choices are in [DEC.45](../../.planning/preparation/DECISIONS.md).
-- The integer seek formula is an adaptation of ares' model (SCM.10), with low confidence pending the plan's fixture
-  timing capture on hardware.
+- The integer seek formula is an adaptation of ares' model (SCM.10). The public [SCPH-5501 seek capture](https://psx.wiki/tests/cd-rom-seek-timing/)
+  records real timing ranges, but one drive and disc do not identify a portable deterministic curve.
 - The sector-4 licence line supplies a profile-region comparison, but does not decode the SCEx lead-in wobble. The
   licensed profile override is the deterministic host input when that line is unavailable.

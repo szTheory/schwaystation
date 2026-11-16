@@ -22,6 +22,7 @@ if(CASE STREQUAL "spu_registration")
   yaml_job_has(.github/workflows/ci.yml retroarch
     "name: pad-counter-fixture.*PROBE_CONTENT=build/fixtures/spu_tone\\.exe.*run_retroarch\\.cmake.*--exe ../fixtures/spu_tone\\.exe --frames 59.*ra-spu-tone/system.*verify\\.py compare spu-tone-runner59\\.bmp spu-tone\\.59\\.bmp 256 240.*verify\\.py compare spu-tone-runner60\\.bmp spu-tone\\.60\\.bmp 256 240")
   yaml_job_has(.github/workflows/ci.yml perf "CASE=spu_idle")
+  yaml_job_has(.github/workflows/ci.yml perf "CASE=cd_idle")
   yaml_job_has(.github/workflows/ci.yml be32 "INVENTORY=tests/inventory/ci\\.txt" "LABELS=portable")
   yaml_job_has(.github/workflows/ci.yml wasm32 "INVENTORY=tests/inventory/wasm32\\.txt" "LABELS=portable")
   yaml_job_has(.github/workflows/nightly.yml vectors-full "cmake --workflow --preset nightly"

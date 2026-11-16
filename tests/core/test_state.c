@@ -678,6 +678,8 @@ static uint32_t cdrom_mdec_fields_match(schway *inst)
         {"cdrom.q_record_valid", 4u, 1u},
         {"cdrom.atv_pending", 1u, 4u},
         {"cdrom.atv_active", 1u, 4u},
+        {"disc.identity_valid", 4u, 1u},
+        {"disc.identity_sha256", 1u, 32u},
         {"cdrom.sector_lba", 4u, SCHWAY__CDROM_SECTOR_CAP},
         {"cdrom.sector_size", 4u, SCHWAY__CDROM_SECTOR_CAP},
         {"cdrom.bfrd", 4u, 1u},
@@ -846,9 +848,14 @@ static void test_cdrom_mdec_state(void)
     src->disc_host.callbacks.user = src;
     src->disc_host.callbacks.read_sector = disc_read_a;
     src->disc_host.attached = 1u;
+    src->disc_host.identity_valid = 1u;
+    memset(src->disc_host.identity_sha256, 0x4Du, sizeof src->disc_host.identity_sha256);
     dst->disc_host.callbacks.user = dst;
     dst->disc_host.callbacks.read_sector = disc_read_b;
     dst->disc_host.attached = 1u;
+    dst->disc_host.identity_valid = 1u;
+    memcpy(dst->disc_host.identity_sha256, src->disc_host.identity_sha256,
+           sizeof dst->disc_host.identity_sha256);
     uint32_t missing_fields = cdrom_mdec_fields_match(src);
     CHECK_EQ_U64(missing_fields, 0u);
     if (missing_fields == 0u) {
@@ -1309,8 +1316,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 16u);
-    CHECK_EQ_U64(v.behaviour_revision, 16u);
+    CHECK_EQ_U64(v.state_format, 17u);
+    CHECK_EQ_U64(v.behaviour_revision, 17u);
 }
 
 static void check_cpu_power_on(schway *inst)

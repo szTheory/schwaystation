@@ -56,6 +56,7 @@ struct schway__state_io {
     const uint8_t *r;                 /* VALIDATE and APPLY cursor */
     size_t n;                         /* SIZE and RECORD: bytes counted so far */
     int bad;                          /* VALIDATE: a range or cross-field rule failed */
+    int disc_mismatch;                /* VALIDATE: host disc identity differs */
     uint32_t cpu_cause;               /* VALIDATE: CAUSE bits carried to the IRQ fields */
     uint32_t irq_stat, irq_mask;      /* VALIDATE: the saved interrupt registers */
     struct schway__state_field *rec;  /* RECORD: output, or NULL to only count */
@@ -285,6 +286,44 @@ static inline void schway__state_match_u8_array(struct schway__state_io *io, con
         }
     } else if (io->mode == SCHWAY__STATE_APPLY) {
         io->r += count;
+    }
+}
+
+/* The host identity is serialized for matching but never applied to the
+   receiving instance. Callbacks and host handles remain outside the bytes. */
+static inline void schway__state_disc_identity_io(struct schway__state_io *io,
+                                                  const uint32_t *valid,
+                                                  const uint8_t identity[32])
+{
+    static const char name_valid[] = "disc.identity_valid";
+    static const char name_sha256[] = "disc.identity_sha256";
+    if (io->mode == SCHWAY__STATE_VISIT) {
+        io->visitor(io->user, name_valid, valid, 1u, 4u);
+    } else {
+        uint32_t saved =
+            (uint32_t)schway__state_field_io(io, name_valid, *valid, 4u, 0u, 1u);
+        if (io->mode == SCHWAY__STATE_VALIDATE && saved <= 1u && saved != *valid) {
+            io->disc_mismatch = 1;
+        }
+    }
+    if (io->mode == SCHWAY__STATE_RECORD) {
+        schway__state_record_one(io, name_sha256, 1u, 32u, 0u, UINT8_MAX);
+        io->n += 32u;
+    } else if (io->mode == SCHWAY__STATE_SIZE) {
+        io->n += 32u;
+    } else if (io->mode == SCHWAY__STATE_VISIT) {
+        io->visitor(io->user, name_sha256, identity, 32u, 1u);
+    } else if (io->mode == SCHWAY__STATE_WRITE) {
+        memcpy(io->w, identity, 32u);
+        io->w += 32u;
+    } else if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t i = 0u; i < 32u; i++) {
+            uint64_t saved = schway__state_field_io(io, name_sha256, identity[i], 1u, 0u,
+                                                     UINT8_MAX);
+            if (saved != identity[i]) io->disc_mismatch = 1;
+        }
+    } else if (io->mode == SCHWAY__STATE_APPLY) {
+        io->r += 32u;
     }
 }
 
