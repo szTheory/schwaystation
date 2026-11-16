@@ -70,6 +70,9 @@ output/availability behavior), and existing hash/workflow/inventory adaptations.
 faults within one absolute ceiling, not per-file quotas; actual code must fit the ceiling.
 All new checks must address those named faults, retain existing coverage, and stay in the counted set.
 No minification, relocation out of the counted set or speculative unnamed gate is used to meet the limit.
+Phase 6 retains the 2,700-line ceiling; `policy.fixture_budget` prevents an owned disc image or boot executable
+from exceeding its stated byte cap. Its CMake script is counted in that ceiling and the actual total is
+ratcheted down at Phase 6 ship.
 
 ### The sound matches the console
 

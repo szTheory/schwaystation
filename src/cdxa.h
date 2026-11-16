@@ -16,7 +16,7 @@ uint32_t schway__cdxa_decode_adpcm(schway *inst, const uint8_t *sector, uint32_t
                                    int16_t *decoded, uint32_t decoded_capacity,
                                    uint32_t *decoded_frames, uint32_t *low_rate);
 
-/* Resample decoded stereo input to 44.1 kHz, retaining filter history in inst. */
+/* Resample decoded stereo input to the PCM output rate, retaining filter history in inst. */
 uint32_t schway__cdxa_resample(schway *inst, const int16_t *decoded,
                                uint32_t decoded_frames, uint32_t low_rate,
                                int16_t *output, uint32_t output_capacity,

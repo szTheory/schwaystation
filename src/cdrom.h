@@ -10,8 +10,7 @@
 struct schway__state_io;
 
 /* The controller has 16-byte parameter/result FIFOs. Its internal sector
-   buffer is eight raw sectors; all limits follow PSX-SPU-CDROM-AND-MDEC, 2.1
-   and 2.3. */
+   buffer is eight raw sectors; all limits follow the pinned CD-ROM hardware record (SCM.02). */
 #define SCHWAY__CDROM_FIFO_CAP 16u
 #define SCHWAY__CDROM_IRQ_CAP 8u
 #define SCHWAY__CDROM_SECTOR_CAP 8u

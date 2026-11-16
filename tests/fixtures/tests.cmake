@@ -565,6 +565,7 @@ schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
 add_custom_target(schwaystation-fixtures ALL DEPENDS ${schway__fixture_outputs})
+include(${PROJECT_SOURCE_DIR}/cmake/DiscFixtures.cmake)
 
 if(NOT schway__include_fixture_tests)
   return()
@@ -833,6 +834,37 @@ schway_add_test(NAME fixtures.armips_pin.self_test
   COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__pin_cmd}" -DCODE=1 "-DREGEX=armips:.*SHA-256"
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a wrong build-tool archive digest accepted after a cached download.
+string(REPEAT 0 64 schway__bad_disc_digest)
+set(schway__disc_pin_cmd ${CMAKE_COMMAND}
+  -DINPUT=${PROJECT_BINARY_DIR}/pins/mkpsxiso/mkpsxiso.tar.gz
+  -DSHA256=${schway__bad_disc_digest} -P ${PROJECT_SOURCE_DIR}/cmake/Mkpsxiso.cmake)
+string(REPLACE ";" "$<SEMICOLON>" schway__disc_pin_cmd "${schway__disc_pin_cmd}")
+schway_add_test(NAME fixtures.disc.pin.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__disc_pin_cmd}" -DCODE=1
+    "-DREGEX=mkpsxiso: archive SHA-256 mismatch" -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable TIMEOUT 10)
+
+# Fault prevented: a corrupted media artifact accepted by a platform build.
+set(schway__media_pin_cmd ${CMAKE_COMMAND}
+  -DMEDIA_DIR=${schway__disc_media_dir} -DTEST_ROOT=${PROJECT_BINARY_DIR}/tests/disc-media-pin
+  -P ${PROJECT_SOURCE_DIR}/cmake/DiscFixtures.cmake)
+string(REPLACE ";" "$<SEMICOLON>" schway__media_pin_cmd "${schway__media_pin_cmd}")
+schway_add_test(NAME fixtures.disc.media_pin.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__media_pin_cmd}" -DCODE=1
+    "-DREGEX=disc fixtures: run artifact digest mismatch for xa[.]xa"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable TIMEOUT 10)
+
+# Fault prevented: a generated cue whose data track cannot expose valid ISO boot metadata.
+set(schway__disc_probe_cmd ${CMAKE_CROSSCOMPILING_EMULATOR}
+  $<TARGET_FILE:schwaystation-run> --probe ${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue)
+string(REPLACE ";" "$<SEMICOLON>" schway__disc_probe_cmd "${schway__disc_probe_cmd}")
+schway_add_test(NAME fixtures.disc.probe
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__disc_probe_cmd}" -DCODE=0 -DREGEX=format=disc
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable TIMEOUT 10)
 
 # The stub kernel in the core, white-box: the test sees src/ to read the committed array.
 add_executable(schwaystation-test-boot ${CMAKE_CURRENT_LIST_DIR}/boot_tests.c)

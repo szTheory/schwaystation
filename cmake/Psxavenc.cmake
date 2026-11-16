@@ -1,0 +1,163 @@
+# Build-only pinned psxavenc. Include mode adds a native target for local builds;
+# script mode builds it on the Ubuntu media producer and writes to OUTPUT.
+if(CMAKE_SCRIPT_MODE_FILE)
+  get_filename_component(schway__project_root "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+  foreach(var OUTPUT BUILD_ROOT)
+    if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+      message(FATAL_ERROR "psxavenc: -D${var} is required")
+    endif()
+  endforeach()
+else()
+  set(schway__project_root "${PROJECT_SOURCE_DIR}")
+endif()
+
+file(STRINGS "${schway__project_root}/pins.txt" schway__psxavenc_rows REGEX "^psxavenc ")
+list(LENGTH schway__psxavenc_rows schway__psxavenc_count)
+if(NOT schway__psxavenc_count EQUAL 1)
+  message(FATAL_ERROR "psxavenc: pins.txt needs exactly one psxavenc row")
+endif()
+string(REPLACE " " ";" schway__psxavenc_row "${schway__psxavenc_rows}")
+list(GET schway__psxavenc_row 2 schway__psxavenc_url)
+list(GET schway__psxavenc_row 3 schway__psxavenc_sha256)
+list(GET schway__psxavenc_row 1 schway__psxavenc_commit)
+if(NOT schway__psxavenc_url MATCHES "/archive/${schway__psxavenc_commit}[.]tar[.]gz$")
+  message(FATAL_ERROR "psxavenc: pin URL does not name its commit")
+endif()
+
+if(CMAKE_SCRIPT_MODE_FILE)
+  set(schway__psxavenc_root "${BUILD_ROOT}")
+else()
+  set(schway__psxavenc_root "${PROJECT_BINARY_DIR}/pins/psxavenc")
+endif()
+file(MAKE_DIRECTORY "${schway__psxavenc_root}")
+set(schway__psxavenc_archive "${schway__psxavenc_root}/source.tar.gz")
+set(schway__psxavenc_have FALSE)
+if(EXISTS "${schway__psxavenc_archive}")
+  file(SHA256 "${schway__psxavenc_archive}" schway__psxavenc_actual)
+  if(schway__psxavenc_actual STREQUAL schway__psxavenc_sha256)
+    set(schway__psxavenc_have TRUE)
+  endif()
+endif()
+if(NOT schway__psxavenc_have)
+  file(DOWNLOAD "${schway__psxavenc_url}" "${schway__psxavenc_archive}"
+    EXPECTED_HASH SHA256=${schway__psxavenc_sha256} STATUS schway__psxavenc_status)
+  list(GET schway__psxavenc_status 0 schway__psxavenc_code)
+  if(NOT schway__psxavenc_code EQUAL 0)
+    file(REMOVE "${schway__psxavenc_archive}")
+    message(FATAL_ERROR "psxavenc: pinned source download failed: ${schway__psxavenc_status}")
+  endif()
+endif()
+set(schway__psxavenc_extract_root "${schway__psxavenc_root}/source")
+set(schway__psxavenc_source_pin "${schway__psxavenc_root}/source-pin-sha256")
+file(GLOB schway__psxavenc_roots LIST_DIRECTORIES TRUE
+  "${schway__psxavenc_extract_root}/psxavenc-*")
+set(schway__psxavenc_source_valid FALSE)
+if(EXISTS "${schway__psxavenc_source_pin}")
+  file(READ "${schway__psxavenc_source_pin}" schway__psxavenc_extracted_sha256)
+  string(STRIP "${schway__psxavenc_extracted_sha256}" schway__psxavenc_extracted_sha256)
+  list(LENGTH schway__psxavenc_roots schway__psxavenc_root_count)
+  if(schway__psxavenc_extracted_sha256 STREQUAL schway__psxavenc_sha256
+      AND schway__psxavenc_root_count EQUAL 1)
+    list(GET schway__psxavenc_roots 0 schway__psxavenc_source_candidate)
+    if(EXISTS "${schway__psxavenc_source_candidate}/psxavenc/main.c")
+      set(schway__psxavenc_source_valid TRUE)
+      set(schway__psxavenc_source "${schway__psxavenc_source_candidate}")
+    endif()
+  endif()
+endif()
+if(NOT schway__psxavenc_source_valid)
+  file(REMOVE_RECURSE "${schway__psxavenc_extract_root}" "${schway__psxavenc_source_pin}")
+  file(MAKE_DIRECTORY "${schway__psxavenc_extract_root}")
+  file(ARCHIVE_EXTRACT INPUT "${schway__psxavenc_archive}" DESTINATION "${schway__psxavenc_extract_root}")
+  file(GLOB schway__psxavenc_roots LIST_DIRECTORIES TRUE
+    "${schway__psxavenc_extract_root}/psxavenc-*")
+  list(LENGTH schway__psxavenc_roots schway__psxavenc_root_count)
+  if(NOT schway__psxavenc_root_count EQUAL 1)
+    message(FATAL_ERROR "psxavenc: pinned archive has an unexpected root layout")
+  endif()
+  list(GET schway__psxavenc_roots 0 schway__psxavenc_source)
+  if(NOT EXISTS "${schway__psxavenc_source}/psxavenc/main.c")
+    message(FATAL_ERROR "psxavenc: pinned archive is missing psxavenc/main.c")
+  endif()
+  file(WRITE "${schway__psxavenc_source_pin}" "${schway__psxavenc_sha256}\n")
+endif()
+string(SUBSTRING "${schway__psxavenc_commit}" 0 12 schway__psxavenc_version)
+set(schway__psxavenc_generated "${schway__psxavenc_root}/generated")
+file(MAKE_DIRECTORY "${schway__psxavenc_generated}")
+file(WRITE "${schway__psxavenc_generated}/config.h" "#define VERSION \"${schway__psxavenc_version}\"\n")
+
+if(CMAKE_SCRIPT_MODE_FILE)
+  set(schway__psxavenc_project "${BUILD_ROOT}/project")
+  file(MAKE_DIRECTORY "${schway__psxavenc_project}")
+  file(WRITE "${schway__psxavenc_project}/CMakeLists.txt" [=[
+cmake_minimum_required(VERSION 3.25)
+project(psxavenc LANGUAGES C)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil libswresample libswscale)
+add_executable(psxavenc
+  "${PSXAVENC_SOURCE_DIR}/libpsxav/adpcm.c"
+  "${PSXAVENC_SOURCE_DIR}/libpsxav/cdrom.c"
+  "${PSXAVENC_SOURCE_DIR}/psxavenc/args.c"
+  "${PSXAVENC_SOURCE_DIR}/psxavenc/decoding.c"
+  "${PSXAVENC_SOURCE_DIR}/psxavenc/filefmt.c"
+  "${PSXAVENC_SOURCE_DIR}/psxavenc/main.c"
+  "${PSXAVENC_SOURCE_DIR}/psxavenc/mdec.c")
+target_include_directories(psxavenc PRIVATE "${PSXAVENC_SOURCE_DIR}/libpsxav" "${PSXAVENC_SOURCE_DIR}/psxavenc")
+target_include_directories(psxavenc PRIVATE "${PSXAVENC_GENERATED_DIR}")
+target_compile_definitions(psxavenc PRIVATE _POSIX_C_SOURCE=201112L)
+if(MSVC)
+  target_compile_options(psxavenc PRIVATE /fp:fast)
+else()
+  target_compile_options(psxavenc PRIVATE -ffast-math)
+endif()
+target_link_libraries(psxavenc PRIVATE PkgConfig::FFMPEG)
+if(NOT MSVC)
+  target_link_libraries(psxavenc PRIVATE m)
+endif()
+set_target_properties(psxavenc PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PSXAVENC_OUTPUT_DIR}")
+foreach(config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+  set_property(TARGET psxavenc PROPERTY "RUNTIME_OUTPUT_DIRECTORY_${config}" "${PSXAVENC_OUTPUT_DIR}")
+endforeach()
+]=])
+  execute_process(COMMAND "${CMAKE_COMMAND}" -S "${schway__psxavenc_project}" -B "${BUILD_ROOT}/build"
+      "-DPSXAVENC_SOURCE_DIR=${schway__psxavenc_source}" "-DPSXAVENC_OUTPUT_DIR=${OUTPUT}"
+      "-DPSXAVENC_GENERATED_DIR=${schway__psxavenc_generated}"
+      -DCMAKE_BUILD_TYPE=Release RESULT_VARIABLE schway__psxavenc_rc)
+  if(NOT schway__psxavenc_rc EQUAL 0)
+    message(FATAL_ERROR "psxavenc: CMake configure failed (${schway__psxavenc_rc})")
+  endif()
+  execute_process(COMMAND "${CMAKE_COMMAND}" --build "${BUILD_ROOT}/build" --config Release --parallel 2
+    RESULT_VARIABLE schway__psxavenc_rc)
+  if(NOT schway__psxavenc_rc EQUAL 0 OR NOT EXISTS "${OUTPUT}/psxavenc")
+    message(FATAL_ERROR "psxavenc: build failed (${schway__psxavenc_rc})")
+  endif()
+  return()
+endif()
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil libswresample libswscale)
+add_executable(schwaystation-psxavenc EXCLUDE_FROM_ALL
+  "${schway__psxavenc_source}/libpsxav/adpcm.c"
+  "${schway__psxavenc_source}/libpsxav/cdrom.c"
+  "${schway__psxavenc_source}/psxavenc/args.c"
+  "${schway__psxavenc_source}/psxavenc/decoding.c"
+  "${schway__psxavenc_source}/psxavenc/filefmt.c"
+  "${schway__psxavenc_source}/psxavenc/main.c"
+  "${schway__psxavenc_source}/psxavenc/mdec.c")
+target_include_directories(schwaystation-psxavenc PRIVATE
+  "${schway__psxavenc_source}/libpsxav" "${schway__psxavenc_source}/psxavenc"
+  "${schway__psxavenc_generated}")
+target_compile_definitions(schwaystation-psxavenc PRIVATE _POSIX_C_SOURCE=201112L)
+if(MSVC)
+  target_compile_options(schwaystation-psxavenc PRIVATE /fp:fast)
+else()
+  target_compile_options(schwaystation-psxavenc PRIVATE -ffast-math)
+endif()
+target_link_libraries(schwaystation-psxavenc PRIVATE PkgConfig::FFMPEG)
+if(NOT MSVC)
+  target_link_libraries(schwaystation-psxavenc PRIVATE m)
+endif()
+set_target_properties(schwaystation-psxavenc PROPERTIES
+  OUTPUT_NAME psxavenc RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/pins/psxavenc-bin")

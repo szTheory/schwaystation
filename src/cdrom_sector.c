@@ -328,7 +328,7 @@ void schway__cdrom_sector_seek(schway *inst)
     }
     uint32_t position = lba;
     if (sector_location(inst, lba, subcode, &position) != 0u) cd->current_lba = position;
-    /* GetlocL exposes the completed SeekL target header (PSX-SPU-CDROM-AND-MDEC.md §2.2, SCM.02; docs/hardware/cdrom.md#command-behavior). */
+    /* GetlocL exposes the completed SeekL target header (SCM.02; docs/hardware/cdrom.md#command-behavior). */
     sector_store(cd, sector, lba, SCHWAY__CDROM_SECTOR_BYTES);
 }
 

@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 30 of 39
+current_plan: 29 of 39
 status: executing
-stopped_at: Completed 06-13-PLAN.md slice; next 06-14-PLAN.md
-last_updated: "2026-11-16T19:00:00Z"
+stopped_at: Completed 06-14-PLAN.md; next 06-21-PLAN.md
+last_updated: "2026-11-16T20:19:51Z"
 last_activity: 2026-11-16
 state_head: f070353
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 178
+  completed_plans: 179
   percent: 84
-last_activity_desc: "Completed 06-39: proved pinned helper sends its stack buffer directly to DMA1, verified standalone and pinned unsigned 4-bit output, and retained red 8-bit/status gates. DISC-03 remains incomplete. Runtime about 27m wall. Codex/OpenGSD 1.20.0, root GPT-6 (session model id unavailable), reviewer gpt-6-luna xhigh."
+last_activity_desc: "Completed plan 06-14 after a resumed-session pause. Pinned media source-cache invalidation, the Ninja Windows tool path, and MSVC compile/link options were corrected; all fixture-building CI lanes now consume the verified media artifact. Local disc fixture and producer builds passed; focused pin/probe/budget checks passed 5/5 and hygiene passed 24/24. DISC-02 runtime acceptance remains pending. Wall and active time were not attributable across the session boundary. Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), reviewer gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 30 of 39
-Next plan file: 06-14-PLAN.md (Wave 15; pinned media tools and owned disc fixtures)
+Current Plan: 29 of 39
+Next plan file: 06-21-PLAN.md (Wave 15; media state and idle-drive cost)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -41,9 +41,9 @@ Progress: [████████░░] 84%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 150
-- Average duration: -
-- Total execution time: 0.0 hours
+- Total plans completed: 179
+- Average duration: Not measured
+- Total execution time: Not measured (active time is not tracked consistently)
 
 **By Phase:**
 
@@ -54,6 +54,7 @@ Progress: [████████░░] 84%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
+| 06 | 29 | 39 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -238,6 +239,7 @@ Progress: [████████░░] 84%
 | Phase 6 P35 | at least 30m55s wall | 2 tasks | 24 files |
 | Phase 6 P36 | at least 57m55s wall | 1 tasks | 20 files |
 | Phase 6 P38 | at least 1h00m19s wall; active work capped at 30m | 1 partial task | 20 files |
+| Phase 6 P14 | elapsed wall time spanned a 22-hour pause/resume; active time unavailable | 2 tasks | 28 files |
 
 ## Accumulated Context
 
@@ -902,3 +904,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. The original exe
 ### Phase 6 plan 06-13 execution (2026-11-16)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID not exposed). Exact active time was not tracked; bounded local checks and follow-up closed at 18:57:07Z. Both MDEC target builds passed. Seven targeted color/display/FIFO/bounds/vector/4-bit checks passed; full `mdec.*` was 10/11 because `mdec.guest_input` still reports 12 exact 8-bit word differences. Reference asset and mutation controls passed 2/2; all four frame/movie callers failed fast on exhausted input, and all six reference cases took 0.64s. The frame stream has 296 macroblocks for 300 requested; movie frame one has 162 for 240 requested. Public hardware records cover compact color points and 19 of 20 frame strips but do not provide a complete frame/movie pair. Code review retained two warnings: incomplete image references and no raw guest-output hash. The latter is deferred in seed SEED-261116-mrh for Plan 06-16's first complete owned STR caller. DISC-03 remains pending; no hosted URL applies. No long suite or emulator process is running.
+
+### Phase 6 plan 06-14 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable), review gpt-6-luna xhigh. Execution resumed after a 22-hour pause; active time was not attributable. Pinned source-cache invalidation, Ninja Windows output path, MSVC floating-point/link options, and fixture media downloads/emulator invocation in all relevant CI lanes were corrected. The local disc target and pinned producer script built successfully; focused pin, media-corruption, probe and budget checks passed 5/5; hygiene passed 24/24 in 38 seconds. The gate total is 2698/2700 lines. DISC-02 runtime acceptance remains open until downstream boot/playback and hosted matrix checks. No owner hardware run or hosted URL applies. Plan 06-21 is next in Wave 15.

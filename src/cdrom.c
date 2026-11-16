@@ -29,7 +29,7 @@ static uint8_t status_read(const struct schway__cdrom *cd)
     }
     if (cd->bfrd != 0u && cd->sector_count != 0u &&
         cd->sector_offset < cd->sector_size[cd->sector_head]) value |= 1u << 6;
-    /* BUSYSTS clears when the sub-CPU accepts a command, independent of drive activity (SCM §2.1). */
+    /* BUSYSTS clears when the sub-CPU accepts a command, independent of drive activity (SCM.02). */
     if (cd->command_pending == 1u) {
         value |= 1u << 7;
     }
@@ -630,7 +630,7 @@ static void begin_read(schway *inst, uint64_t now)
         command_error(inst, 0x40u);
         return;
     }
-    /* Seek headers support GetlocL; RDDATA must start with streamed data (SCM §2.2-2.3). */
+    /* Seek headers support GetlocL; RDDATA must start with streamed data (SCM.02). */
     schway__cdrom_sector_discard_seek_headers(inst);
     cd->paused = 0u;
     cd->play_active = 0u;

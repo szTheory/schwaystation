@@ -120,3 +120,5 @@ Future subsystem plans bring pinned real oracle programs/captures into the earli
 The owner has a real PlayStation and capture card, but has no time for a hardware capture right now. Search public hardware records and use small automated checks first; do not assume an owner run is scheduled. If a hardware-only result still blocks acceptance later, ask once with the exact test and a bounded capture procedure.
 
 For compressed media references, count decoded units from the pinned input and compare them with the guest's requested output before starting a long emulation run. Keep full-output acceptance unchanged; report insufficient source coverage as an asset problem, not a decoder pass.
+
+Before compiling pinned media tools, verify the archive digest, expected build files, submodule closure, exact-pin licences and input coverage. If a tool needs native libraries unavailable on every matrix leg, build it once on an existing compatible producer, publish a one-run artifact, and make every consumer validate its digest before continuing. Keep full disc construction and acceptance on every leg.

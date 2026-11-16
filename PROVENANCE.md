@@ -130,6 +130,13 @@ and no upstream source or helper was copied. Only the seven hardware case names 
 are used. The build-158 `memory-transfer.exe` is fetched by the archive digest, checked by its member
 SHA-256, and kept under build storage only; its MPL-2.0 runtime bytes are not redistributed.
 
+The disc-fixture build uses mkpsxiso v2.30 at the source and submodule pins in `pins.txt` only as a
+build tool (GPL-2; excluded from source deliverables and release archives). Its build-only dependencies
+are tinyxml2 (Zlib), miniaudio (public domain/MIT), ghc/filesystem (Boost), and ThreadPool (Zlib), each
+at its pinned commit. psxavenc at its pinned commit is Zlib and is also build-only. Their notices and
+license files stay under ignored `build/` storage; committed fixture recipes and media samples are
+first-party.
+
 **(c) Release archives.** From the first release, the library, runner and libretro zips each hold `LICENSE` and
 `THIRD-PARTY-NOTICES.md` at the root. In phase 1 the check is `release.archive_contents` (CMake `-P`), run by
 `cmake --workflow --preset ci` and on every leg; it fails when a zip lacks either file. `release.notices` (a
