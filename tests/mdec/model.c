@@ -1,0 +1,126 @@
+/* MDEC bus, block and status behavior through the instance-owned device. */
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "schwaystation.h"
+#include "internal.h"
+#include "../check.h"
+
+#define MDEC_STATUS 0x1F801824u
+#define MDEC_DATA 0x1F801820u
+#define DMA_BASE 0x1F801080u
+#define DMA_DPCR 0x1F8010F0u
+
+static void *test_alloc(void *user, size_t size)
+{
+    (void)user;
+    return malloc(size);
+}
+
+static void test_free(void *user, void *ptr, size_t size)
+{
+    (void)user;
+    (void)size;
+    free(ptr);
+}
+
+static schway *make(void)
+{
+    schway_config cfg;
+    memset(&cfg, 0, sizeof cfg);
+    cfg.size = (uint32_t)sizeof cfg;
+    cfg.allocator.alloc = test_alloc;
+    cfg.allocator.free = test_free;
+    schway *inst = NULL;
+    CHECK_EQ_U64(schway_create(&cfg, &inst), SCHWAY_STATUS_OK);
+    if (inst == NULL) {
+        exit(1);
+    }
+    return inst;
+}
+
+static uint32_t read32(schway *inst, uint32_t address)
+{
+    uint32_t cycles = 0u;
+    uint32_t value = 0u;
+    schway__sched_sync(inst);
+    CHECK_EQ_U64(schway__bus_read(inst, address, 4u, &value, &cycles), 0u);
+    return value;
+}
+
+static void write32(schway *inst, uint32_t address, uint32_t value, uint32_t cycles)
+{
+    schway__sched_sync(inst);
+    CHECK_EQ_U64(schway__bus_write(inst, address, 4u, value, &cycles), 0u);
+}
+
+static void write_ram(schway *inst, uint32_t address, uint32_t value)
+{
+    CHECK_EQ_U64(schway__bus_ram_word(inst, address, &value, 1u), 0u);
+}
+
+static void case_status(void)
+{
+    schway *inst = make();
+    CHECK_EQ_HEX(read32(inst, MDEC_STATUS), 0x80040000u);
+    CHECK_EQ_U64(inst->bus.unbuilt_n[SCHWAY__DEV_MDEC], 0u);
+    schway_destroy(inst);
+}
+
+static void case_block(void)
+{
+    for (uint32_t depth = 0u; depth < 2u; depth++) {
+        schway *inst = make();
+        uint32_t output_words = depth == 0u ? 8u : 16u;
+        uint32_t base = 0x100u + depth * 0x100u;
+        write_ram(inst, base, 0xFE000000u);
+        write32(inst, MDEC_STATUS, 0x60000000u, 0u);
+        write32(inst, MDEC_DATA, 0x2C000001u | (depth << 27), 0u);
+        write32(inst, DMA_DPCR, 0x0FEDCBA9u, 0u);
+        write32(inst, DMA_BASE, base, 0u);
+        write32(inst, DMA_BASE + 4u, (1u << 16) | 1u, 0u);
+        write32(inst, DMA_BASE + 8u, 0x01000201u, 0u);
+        CHECK_EQ_U64(inst->dma.cur, 0u);
+        schway__dma_event(inst, inst->dma.busy_until);
+        CHECK_EQ_U64(inst->mdec.block_pending, 1u);
+        uint64_t deadline = inst->mdec.block_deadline;
+        CHECK(deadline >= 1000u);
+        CHECK_EQ_U64(schway__mdec_read(inst, MDEC_STATUS, deadline - 1u) & 0x80000000u,
+                     0x80000000u);
+        CHECK_EQ_U64(schway__mdec_read(inst, MDEC_STATUS, deadline) & 0x80000000u, 0u);
+        CHECK_EQ_U64(inst->mdec.output_count, output_words);
+        for (uint32_t i = 0u; i < output_words; i++) {
+            CHECK_EQ_U64(inst->mdec.output[i], 0u);
+        }
+        write32(inst, DMA_BASE + 0x10u, base + 0x400u, (uint32_t)deadline);
+        write32(inst, DMA_BASE + 0x14u, (1u << 16) | output_words, (uint32_t)deadline);
+        write32(inst, DMA_BASE + 0x18u, 0x01000200u, (uint32_t)deadline);
+        CHECK_EQ_U64(inst->dma.cur, 1u);
+        schway__dma_event(inst, inst->dma.busy_until);
+        CHECK_EQ_U64(inst->mdec.output_count, 0u);
+        CHECK_EQ_U64(inst->dma.madr[1], base + 0x400u + output_words * 4u);
+        for (uint32_t i = 0u; i < output_words; i++) {
+            uint32_t value = 1u;
+            CHECK_EQ_U64(schway__bus_ram_word(inst, base + 0x400u + i * 4u, &value, 0u), 0u);
+            CHECK_EQ_U64(value, 0u);
+        }
+        schway_destroy(inst);
+    }
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 2) {
+        return 2;
+    }
+    if (strcmp(argv[1], "status") == 0) {
+        case_status();
+    } else if (strcmp(argv[1], "block") == 0) {
+        case_block();
+    } else {
+        return 2;
+    }
+    CHECK_DONE();
+}
