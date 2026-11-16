@@ -1282,8 +1282,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 11u);
-    CHECK_EQ_U64(v.behaviour_revision, 11u);
+    CHECK_EQ_U64(v.state_format, 12u);
+    CHECK_EQ_U64(v.behaviour_revision, 12u);
 }
 
 static void check_cpu_power_on(schway *inst)

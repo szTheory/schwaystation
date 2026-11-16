@@ -23,3 +23,9 @@ schway_add_test(NAME mdec.block
 schway_add_test(NAME mdec.bounds
   COMMAND schwaystation-test-mdec bounds
   LABELS mdec portable TIMEOUT 10)
+
+# Fault prevented: an EOB at an odd halfword boundary discards the next block
+# or a save/load loses the retained DC before its next scheduled decode.
+schway_add_test(NAME mdec.stream
+  COMMAND schwaystation-test-mdec stream
+  LABELS mdec portable TIMEOUT 10)

@@ -61,6 +61,18 @@ static void write_ram(schway *inst, uint32_t address, uint32_t value)
     CHECK_EQ_U64(schway__bus_ram_word(inst, address, &value, 1u), 0u);
 }
 
+static void run_cycles(schway *inst, uint64_t cycles)
+{
+    schway_budget budget;
+    memset(&budget, 0, sizeof budget);
+    budget.size = (uint32_t)sizeof budget;
+    budget.max_cycles = cycles;
+    schway_run_result result;
+    memset(&result, 0, sizeof result);
+    result.size = (uint32_t)sizeof result;
+    CHECK_EQ_U64(schway_run(inst, &budget, &result), SCHWAY_STATUS_OK);
+}
+
 static void case_status(void)
 {
     schway *inst = make();
@@ -219,6 +231,54 @@ static void case_bounds_and_reset(void)
     schway_destroy(reset);
 }
 
+static void case_stream(void)
+{
+    schway *inst = make();
+    load_flat_tables(inst);
+    write32(inst, MDEC_DATA, 0x2C000005u, 0u);
+    write32(inst, MDEC_DATA, 0xFE000000u, 0u);
+    write32(inst, MDEC_DATA, 0x000000A0u, 0u);
+    write32(inst, MDEC_DATA, 0x0050FE00u, 0u);
+    write32(inst, MDEC_DATA, 0x00A0FE00u, 0u);
+    write32(inst, MDEC_DATA, 0xFE000000u, 0u);
+    CHECK_EQ_U64(inst->mdec.block_deadline, 1000u);
+    run_cycles(inst, 1000u);
+    CHECK_EQ_U64(inst->mdec.output_count, 16u);
+    for (uint32_t i = 0u; i < 16u; i++) {
+        CHECK_EQ_HEX(inst->mdec.output[i], 0u);
+    }
+
+    size_t state_size = schway_state_size(inst);
+    uint8_t *state = (uint8_t *)malloc(state_size);
+    CHECK(state != NULL);
+    if (state == NULL) {
+        schway_destroy(inst);
+        return;
+    }
+    CHECK_EQ_U64(schway_save_state(inst, state, state_size), SCHWAY_STATUS_OK);
+    schway *restored = make();
+    CHECK_EQ_U64(schway_load_state(restored, state, state_size), SCHWAY_STATUS_OK);
+    free(state);
+    schway_destroy(inst);
+    inst = restored;
+
+    run_cycles(inst, 1000u);
+    CHECK_EQ_U64(inst->mdec.output_count, 32u);
+    for (uint32_t i = 16u; i < 32u; i++) {
+        CHECK_EQ_HEX(inst->mdec.output[i], 0x14141414u);
+    }
+    CHECK_EQ_U64(schway__mdec_next(inst), 3000u);
+
+    run_cycles(inst, 1000u);
+    CHECK_EQ_U64(inst->mdec.output_count, 48u);
+    for (uint32_t i = 32u; i < 48u; i++) {
+        CHECK_EQ_HEX(inst->mdec.output[i], 0x0A0A0A0Au);
+    }
+    CHECK_EQ_U64(inst->mdec.block_pending, 1u);
+    CHECK_EQ_U64(inst->mdec.block_deadline, 4000u);
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -233,6 +293,8 @@ int main(int argc, char **argv)
         case_sign_and_tables();
     } else if (strcmp(argv[1], "bounds") == 0) {
         case_bounds_and_reset();
+    } else if (strcmp(argv[1], "stream") == 0) {
+        case_stream();
     } else {
         return 2;
     }

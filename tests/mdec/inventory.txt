@@ -2,3 +2,4 @@
 mdec.block	mdec,portable
 mdec.bounds	mdec,portable
 mdec.status	mdec,portable
+mdec.stream	mdec,portable
