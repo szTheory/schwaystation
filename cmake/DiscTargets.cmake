@@ -1,6 +1,7 @@
 # Production targets for the CD-ROM controller, MDEC, and host-side disc images.
 # The core modules ship in the library; the image helper remains host-only.
-add_library(schwaystation_cdrom OBJECT src/cdrom.c src/cdrom_sector.c src/cdrom_state.c src/cdxa.c)
+add_library(schwaystation_cdrom OBJECT src/cdrom.c src/cdrom_audio.c src/cdrom_sector.c
+  src/cdrom_state.c src/cdxa.c)
 add_library(schwaystation_mdec OBJECT src/mdec.c)
 
 if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)

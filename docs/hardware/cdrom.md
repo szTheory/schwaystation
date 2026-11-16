@@ -1,7 +1,7 @@
 # CD-ROM controller
 
-This page documents the deterministic command and register model in `src/cdrom.c`, `src/cdrom_sector.c` and
-`src/cdxa.c`.
+This page documents the deterministic command and register model in `src/cdrom.c`, `src/cdrom_audio.c`,
+`src/cdrom_sector.c` and `src/cdxa.c`.
 It covers the indexed registers, FIFOs, sector timing, RDDATA delivery, command responses, region answers and lid changes.
 All deadlines use CPU ticks, integer arithmetic and the instance scheduler.
 
@@ -20,6 +20,12 @@ Byte, halfword and word accesses are split into byte lanes by the bus.
 | `1802 W` | PARAMETER | HINTMSK | ATV0 | ATV1 |
 | `1803 R` | HINTMSK | HINTSTS | HINTMSK | HINTSTS |
 | `1803 W` | HCHPCTL | HCLRCTL | ATV2 | ADPCTL |
+
+ATV0-ATV3 writes stage an 8-bit matrix; ADPCTL bit 5 applies all four staged values together. The reset matrix is
+`80h,00h,80h,00h` (normal stereo). The active matrix feeds the bounded CD audio queue; a full queue drops new
+samples, and underflow at the SPU sample tick supplies silence. The sample queue holds at most two CDDA sectors
+(1,176 stereo pairs) and is serialized with the controller state. CDDA sectors are read at the selected drive speed
+and feed the fixed native 44,100-Hz SPU sample clock; CDDA/XA volumes follow ATV then SPU AVOL [SCM.02][SCM.03].
 
 HSTS reports the selected bank in bits 0-1, parameter empty/write-ready in bits 3-4, result ready in bit 5, sector
 data request in bit 6 when BFRD is enabled and unread data is available, and command-transfer busy in bit 7. BUSYSTS
@@ -159,7 +165,8 @@ Missing or invalid Q is synthesized from the TOC until a valid record exists; la
 the last good position. `current_lba` follows valid Q position unless the host's `bad_q` callback marks that sector,
 in which case the previous good position remains visible. Disc callbacks and TOC remain host-owned and are not part of
 save states; controller flags, sector bytes, the latest validated 12-byte Q record, FIFO contents and scheduled
-deadlines, XA predictor history and resampler history are serialized in state format 11.
+deadlines, ATV staging and active values, CDDA queue contents, XA predictor history and resampler history are
+serialized in state format 13.
 
 ## Sources and confidence
 

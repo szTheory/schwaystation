@@ -29,6 +29,10 @@ void schway__cdrom_reset(schway *inst)
 {
     memset(&inst->cdrom, 0, sizeof inst->cdrom);
     inst->cdrom.drive_speed = 1u;
+    inst->cdrom.atv_active[0] = 0x80u;
+    inst->cdrom.atv_active[2] = 0x80u;
+    inst->cdrom.atv_pending[0] = 0x80u;
+    inst->cdrom.atv_pending[2] = 0x80u;
 }
 
 static void cdrom_fifo_state_io(struct schway__state_io *io, struct schway__cdrom *cd)
@@ -101,6 +105,8 @@ static void cdrom_command_state_io(struct schway__state_io *io, struct schway__c
     (void)schway__state_u32(io, "cdrom.unlock_step", &cd->unlock_step, 0u, 6u);
     (void)schway__state_u32(io, "cdrom.current_lba", &cd->current_lba, 0u, UINT32_MAX);
     (void)schway__state_u32(io, "cdrom.target_lba", &cd->target_lba, 0u, UINT32_MAX);
+    schway__state_u8_array(io, "cdrom.atv_pending", cd->atv_pending, 4u, 0u, UINT8_MAX);
+    schway__state_u8_array(io, "cdrom.atv_active", cd->atv_active, 4u, 0u, UINT8_MAX);
     uint8_t q_candidate[12];
     uint8_t *q_bytes = cd->q_record;
     if (io->mode == SCHWAY__STATE_VALIDATE) {
@@ -144,13 +150,13 @@ static void cdrom_buffer_state_io(struct schway__state_io *io, struct schway__cd
     uint32_t audio_head = schway__state_u32(io, "cdrom.audio_head", &cd->audio_head, 0u,
                                             SCHWAY__CDROM_AUDIO_CAP - 1u);
     uint32_t audio_count = schway__state_u32(io, "cdrom.audio_count", &cd->audio_count, 0u,
-                                             SCHWAY__CDROM_AUDIO_CAP);
+                                             SCHWAY__CDROM_AUDIO_LIMIT);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         schway__state_check(io, sector_head < SCHWAY__CDROM_SECTOR_CAP &&
                                    sector_count <= SCHWAY__CDROM_SECTOR_CAP &&
                                    sector_offset <= SCHWAY__CDROM_SECTOR_BYTES);
         schway__state_check(io, audio_head < SCHWAY__CDROM_AUDIO_CAP &&
-                                   audio_count <= SCHWAY__CDROM_AUDIO_CAP && xa_phase < 6u);
+                                   audio_count <= SCHWAY__CDROM_AUDIO_LIMIT && xa_phase < 6u);
     }
 }
 

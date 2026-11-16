@@ -348,6 +348,8 @@ static void observe_lid(schway *inst)
     cancel_sector_event(cd);
     cd->seek_event = 0u;
     cd->seek_deadline = 0u;
+    cd->audio_head = 0u;
+    cd->audio_count = 0u;
     update_status_activity(cd);
     uint8_t bytes[2] = {(uint8_t)cd->status, 0x08u};
     response(inst, bytes, 2u, 5u);
@@ -1145,6 +1147,22 @@ void schway__cdrom_write(schway *inst, uint32_t address, uint8_t value, uint64_t
             if ((value & (1u << 7)) != 0u) {
                 schway__cdrom_reset(inst);
             }
+        }
+        break;
+    case 2u:
+        if (offset == 2u) {
+            cd->atv_pending[0] = value;
+        } else if (offset == 3u) {
+            cd->atv_pending[1] = value;
+        }
+        break;
+    case 3u:
+        if (offset == 1u) {
+            cd->atv_pending[2] = value;
+        } else if (offset == 2u) {
+            cd->atv_pending[3] = value;
+        } else if (offset == 3u && (value & 0x20u) != 0u) {
+            memcpy(cd->atv_active, cd->atv_pending, sizeof cd->atv_active);
         }
         break;
     default:

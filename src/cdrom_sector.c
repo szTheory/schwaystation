@@ -415,6 +415,7 @@ void schway__cdrom_sector_event(schway *inst, uint64_t now)
     if (cd->play_active != 0u) {
         if ((cd->mode & 0x04u) != 0u && (lba & 0x0Fu) == 0x0Fu) sector_interrupt(inst);
         if (audio_track != 0u) {
+            schway__cdrom_audio_cdda_sector(inst, sector);
             sector_store(cd, sector, lba, SCHWAY__CDROM_SECTOR_BYTES);
             schway__dma_cdrom_ready(inst, now);
         }

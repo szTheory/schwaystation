@@ -91,6 +91,7 @@ void schway__spu_reset(schway *inst);
 uint64_t schway__spu_next(const schway *inst);
 void schway__spu_event(schway *inst, uint64_t now);
 void schway__spu_catch_up(schway *inst, uint64_t now);
+void schway__spu_cd_audio_active(schway *inst);
 
 uint16_t schway__spu_reg_read(schway *inst, uint32_t address);
 void schway__spu_reg_write(schway *inst, uint32_t address, uint16_t value);

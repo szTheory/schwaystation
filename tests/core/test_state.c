@@ -594,6 +594,10 @@ static void seed_cdrom(schway *inst)
     inst->cdrom.sector_retry = 1u;
     inst->cdrom.current_lba = 123u;
     inst->cdrom.target_lba = 456u;
+    const uint8_t atv_pending[4] = {0x10u, 0x20u, 0x30u, 0x40u};
+    const uint8_t atv_active[4] = {0x50u, 0x60u, 0x70u, 0x80u};
+    memcpy(inst->cdrom.atv_pending, atv_pending, sizeof atv_pending);
+    memcpy(inst->cdrom.atv_active, atv_active, sizeof atv_active);
     const uint8_t q_record[12] = {
         0x41u, 0x01u, 0x01u, 0x00u, 0x00u, 0x11u,
         0x00u, 0x00u, 0x02u, 0x11u, 0x84u, 0x29u
@@ -615,6 +619,7 @@ static void seed_cdrom(schway *inst)
     inst->cdrom.audio[1][1] = 0xFEDCu;
     inst->cdrom.audio_head = 1u;
     inst->cdrom.audio_count = 3u;
+    schway__spu_cd_audio_active(inst);
     inst->cdrom.command_event = 1u;
     inst->cdrom.sector_event = 1u;
     inst->cdrom.command_deadline = 1000u;
@@ -667,6 +672,8 @@ static uint32_t cdrom_mdec_fields_match(schway *inst)
         {"cdrom.sector", 1u, SCHWAY__CDROM_SECTOR_CAP * SCHWAY__CDROM_SECTOR_BYTES},
         {"cdrom.q_record", 1u, 12u},
         {"cdrom.q_record_valid", 4u, 1u},
+        {"cdrom.atv_pending", 1u, 4u},
+        {"cdrom.atv_active", 1u, 4u},
         {"cdrom.sector_lba", 4u, SCHWAY__CDROM_SECTOR_CAP},
         {"cdrom.sector_size", 4u, SCHWAY__CDROM_SECTOR_CAP},
         {"cdrom.bfrd", 4u, 1u},
@@ -738,6 +745,8 @@ static void cdrom_mdec_reject_invalid(schway *src, schway *dst, size_t n)
         {"CD sector FIFO count", "cdrom.sector_count", 0u,
          SCHWAY__CDROM_SECTOR_CAP + 1u, 4u},
         {"CD XA phase", "cdrom.xa_phase", 0u, 6u, 4u},
+        {"CD audio queue count", "cdrom.audio_count", 0u,
+         SCHWAY__CDROM_AUDIO_LIMIT + 1u, 4u},
         {"CD speed", "cdrom.drive_speed", 0u, 3u, 4u},
         {"CD unlock state", "cdrom.unlock_enabled", 0u, 2u, 4u},
         {"CD unlock step", "cdrom.unlock_step", 0u, 7u, 4u},
@@ -806,6 +815,10 @@ static void cdrom_mdec_reset_state(schway *dst)
     struct schway__mdec zero_mdec;
     memset(&zero_cd, 0, sizeof zero_cd);
     zero_cd.drive_speed = 1u;
+    zero_cd.atv_active[0] = 0x80u;
+    zero_cd.atv_active[2] = 0x80u;
+    zero_cd.atv_pending[0] = 0x80u;
+    zero_cd.atv_pending[2] = 0x80u;
     memset(&zero_mdec, 0, sizeof zero_mdec);
     zero_mdec.block_index = 4u;
     CHECK_EQ_U64(schway_reset(dst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
@@ -1287,8 +1300,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 12u);
-    CHECK_EQ_U64(v.behaviour_revision, 12u);
+    CHECK_EQ_U64(v.state_format, 13u);
+    CHECK_EQ_U64(v.behaviour_revision, 13u);
 }
 
 static void check_cpu_power_on(schway *inst)

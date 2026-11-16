@@ -16,6 +16,7 @@ struct schway__state_io;
 #define SCHWAY__CDROM_SECTOR_CAP 8u
 #define SCHWAY__CDROM_SECTOR_BYTES 2352u
 #define SCHWAY__CDROM_AUDIO_CAP 2048u
+#define SCHWAY__CDROM_AUDIO_LIMIT (2u * 588u)
 #define SCHWAY__CDROM_XA_TAPS 29u
 
 struct schway__cdrom {
@@ -33,6 +34,7 @@ struct schway__cdrom {
     uint32_t paused, muted, drive_speed, drive_speed_changed, unlock_enabled, unlock_step;
     uint32_t bfrd, sector_int1_pending, read_s, sector_retry;
     uint32_t current_lba, target_lba;
+    uint8_t atv_pending[4], atv_active[4];
     uint8_t q_record[12];
     uint32_t q_record_valid;
     uint32_t sector_head, sector_count, sector_offset;
@@ -64,6 +66,9 @@ void schway__cdrom_event(schway *inst, uint64_t now);
 uint8_t schway__cdrom_sector_read(schway *inst);
 void schway__cdrom_sector_schedule(schway *inst, uint64_t now);
 void schway__cdrom_sector_event(schway *inst, uint64_t now);
+void schway__cdrom_audio_push(schway *inst, int16_t left, int16_t right);
+void schway__cdrom_audio_pop(schway *inst, int16_t *left, int16_t *right);
+void schway__cdrom_audio_cdda_sector(schway *inst, const uint8_t *sector);
 uint32_t schway__cdrom_sector_track_type_at(const schway *inst, uint32_t lba);
 void schway__cdrom_sector_discard_seek_headers(schway *inst);
 void schway__cdrom_bfrd_set(schway *inst, uint8_t value, uint64_t now);

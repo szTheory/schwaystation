@@ -107,7 +107,7 @@ if(PROJECT_IS_TOP_LEVEL)
     $<TARGET_OBJECTS:schwaystation_cdrom>
     $<TARGET_OBJECTS:schwaystation_mdec>)
 else()
-  list(APPEND SCHWAYSTATION_DISC_SOURCES src/cdrom.c src/cdrom_state.c src/mdec.c)
+  list(APPEND SCHWAYSTATION_DISC_SOURCES src/cdrom.c src/cdrom_audio.c src/cdrom_state.c src/mdec.c)
 endif()
 add_library(schwaystation_state OBJECT
   src/state.c
