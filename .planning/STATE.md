@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 22 of 34
+current_plan: 23 of 35
 status: executing
-stopped_at: Completed 06-34-PLAN.md; next 06-12-PLAN.md
-last_updated: "2026-11-16T08:09:58.752Z"
+stopped_at: Completed 06-12 oracle/control slice; next 06-35-PLAN.md
+last_updated: "2026-11-16T09:28:28Z"
 last_activity: 2026-11-16
 state_head: eff7a031757c7130caff5935e9927f04f7180540
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 184
-  completed_plans: 171
+  total_plans: 185
+  completed_plans: 172
   percent: 83
-last_activity_desc: Plan 06-34 mismatch and XA/CDDA/voice/reverb controls passed the 12-test focused gate; DISC-02 remains partial pending owned-disc integration. Runtime lower bound at least 10m48s; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
+last_activity_desc: Plan 06-12 pinned MDEC oracle/control slice registered; comparator controls pass, while pinned block/status guests expose a production decode mismatch assigned to 06-35. Runtime lower bound at least 1h18m through split metadata; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 22 of 34
-Next plan file: 06-12-PLAN.md (Wave 9)
+Current Plan: 23 of 35
+Next plan file: 06-35-PLAN.md (Wave 9; 06-12 final oracle gate resumes afterward)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -785,8 +785,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T08:09:58.491Z
-Stopped at: Completed 06-34-PLAN.md; next 06-12-PLAN.md
+Last session: 2026-11-16T09:28:28Z
+Stopped at: Completed 06-12 oracle/control slice; next 06-35-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -888,3 +888,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time from t
 ### Phase 6 plan 06-33 execution (2026-11-16)
 
 Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall lower bound is at least 1h22m from the first durable RED report at 06:29:28Z through summary preparation at 07:51:28Z; the plan started earlier and exact active time is unavailable. The accepted XA sector route, separate 9,409-pair serialized ring, native cadence and equal-deadline reserve passed the focused review and 12/12 configure/build/state/audio/SPU gate. State format and behavior revision are 14. DISC-02 remains partial: XA/CDDA/voice/reverb mixing and the mode-enabled file/channel mismatch control continue in 06-34. The MDEC-only 06-12 plan remains independent; 06-34 is next.
+
+### Phase 6 plan 06-12 oracle/control slice (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. The original execution marker is 08:10:43Z; split metadata was recorded at 09:28:28Z, giving a wall lower bound of at least 1h18m; exact active time is unavailable. The pinned 4/8-bit guest and status logs are resolved at public commit `f727802fead11f1daa7549285548392ef87749cb`; reference executables remain in build storage. The harness has independent byte/status comparators and mutation controls. The 4-bit guest reached the caller but the core consumed DMA0 command `0x20000020` from MADR `0x12000`, BCR `0x00010020`, CHCR `0x01000201`, then became idle with no output while the guest polled `0x80040000`; DMA1 remained unarmed. Keep DISC-03 partial. Plan 06-35 owns the bounded production repair and full passing reference gate; the exact Plan 06-12 gate resumes afterward.

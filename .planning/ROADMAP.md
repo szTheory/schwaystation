@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes, and the nightly lane matches the ps1-tests `mdec` references within the stated tolerance. The STR on `disc_boot` plays through DMA into the 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 21/34 plans executed
+**Plans**: 22/35 plans executed
 
 Plans:
 **Wave 1**
@@ -515,7 +515,8 @@ Plans:
 - [x] 06-10-PLAN.md — Feed CD-DA through the native SPU output
 - [x] 06-33-PLAN.md — Route decoded XA audio through the native SPU output
 - [x] 06-34-PLAN.md — Verify XA interleave filtering and mixed native audio sources
-- [ ] 06-12-PLAN.md — Run exact pinned MDEC block and status oracles
+- [x] 06-12-PLAN.md — Pin MDEC block/status guests and register byte/order comparator controls; guest completion awaits 06-35
+- [ ] 06-35-PLAN.md — Repair pinned MDEC DMA0 input/decode path and pass the full guest oracle gate
 
 **Wave 10** *(blocked on Wave 9 completion)*
 - [ ] 06-13-PLAN.md — Decode color MDEC frames and display the DMA result
