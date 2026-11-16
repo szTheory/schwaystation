@@ -5,18 +5,18 @@ milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
 status: executing
-stopped_at: "Completed 06-28-PLAN.md; next 06-06-PLAN.md; Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh."
-last_updated: "2026-11-16T00:00:30.583Z"
+stopped_at: "Added 06-29 ReadN/IRQ follow-up ahead of 06-06 final guest gate; execute 06-29, then resume 06-06. Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh."
+last_updated: "2026-11-16T00:43:26Z"
 last_activity: 2026-11-15
 state_head: 20894035cc3162358f4ca3bbd05420d8efc7780e
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 178
+  total_plans: 179
   completed_plans: 161
   percent: 83
-current_plan: 6
-last_activity_desc: "Completed Plan 06-28 in 6m and resumed Plan 06-06 after the DMA3 chopped-window readiness fix. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
+current_plan: 29
+last_activity_desc: "Added dependent Plan 06-29 after the pinned caller trace isolated an HSTS bit-7 wait that prevents DMA3 from starting; Plan 06-06 resumes after 06-29. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Plan: 6 of 28 (Wave 7 DMA3 readiness complete; resume 06-06)
+Plan: 29 of 29 (Wave 7 ReadN status follow-up; resume 06-06 afterward)
 Status: Ready to execute
 Last activity: 2026-11-15
 
