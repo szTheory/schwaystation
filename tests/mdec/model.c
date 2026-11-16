@@ -74,6 +74,18 @@ static void run_cycles(schway *inst, uint64_t cycles)
 
 static void enable_dma(schway *inst);
 static void start_dma0(schway *inst, uint32_t base, uint32_t words);
+static void load_scale_table(schway *inst, const int16_t scale[SCHWAY__MDEC_BLOCK_SAMPLES]);
+
+static void load_guest_quant(schway *inst, const uint8_t quant[SCHWAY__MDEC_BLOCK_SAMPLES])
+{
+    write32(inst, MDEC_DATA, 0x40000000u, 0u);
+    for (uint32_t i = 0u; i < SCHWAY__MDEC_BLOCK_SAMPLES / 4u; i++) {
+        uint32_t word = quant[i * 4u] | ((uint32_t)quant[i * 4u + 1u] << 8) |
+                        ((uint32_t)quant[i * 4u + 2u] << 16) |
+                        ((uint32_t)quant[i * 4u + 3u] << 24);
+        write32(inst, MDEC_DATA, word, 0u);
+    }
+}
 
 static void case_guest_input(void)
 {
@@ -91,20 +103,64 @@ static void case_guest_input(void)
         0x03FE03FCu, 0x00090000u, 0x0006000Fu, 0x03FC03FEu, 0x03FA03F2u, 0x000803F6u,
         0x001503FAu, 0x03F50001u,
     };
-    schway *inst = make();
-    enable_dma(inst);
-    write32(inst, MDEC_DATA, 0x20000020u, 0u);
-    for (uint32_t i = 0u; i < 32u; i++) {
-        write_ram(inst, 0x12000u + i * 4u, guest_input[i]);
+    static const uint8_t guest_quant[64] = {
+        0x02u, 0x10u, 0x10u, 0x13u, 0x10u, 0x13u, 0x16u, 0x16u,
+        0x16u, 0x16u, 0x16u, 0x16u, 0x1Au, 0x18u, 0x1Au, 0x1Bu,
+        0x1Bu, 0x1Bu, 0x1Au, 0x1Au, 0x1Au, 0x1Au, 0x1Bu, 0x1Bu,
+        0x1Bu, 0x1Du, 0x1Du, 0x1Du, 0x22u, 0x22u, 0x22u, 0x1Du,
+        0x1Du, 0x1Du, 0x1Bu, 0x1Bu, 0x1Du, 0x1Du, 0x20u, 0x20u,
+        0x22u, 0x22u, 0x25u, 0x26u, 0x25u, 0x23u, 0x23u, 0x22u,
+        0x23u, 0x26u, 0x26u, 0x28u, 0x28u, 0x28u, 0x30u, 0x30u,
+        0x2Eu, 0x2Eu, 0x38u, 0x38u, 0x3Au, 0x45u, 0x45u, 0x53u,
+    };
+    static const int16_t guest_scale[SCHWAY__MDEC_BLOCK_SAMPLES] = {
+        0x5A82, 0x5A82, 0x5A82, 0x5A82, 0x5A82, 0x5A82, 0x5A82, 0x5A82,
+        0x7D8A, 0x6A6D, 0x471C, 0x18F8, (int16_t)0xE707, (int16_t)0xB8E3,
+        (int16_t)0x9592, (int16_t)0x8275, 0x7641, 0x30FB, (int16_t)0xCF04,
+        (int16_t)0x89BE, (int16_t)0x89BE, (int16_t)0xCF04, 0x30FB, 0x7641,
+        0x6A6D, (int16_t)0xE707, (int16_t)0x8275, (int16_t)0xB8E3, 0x471C,
+        0x7D8A, 0x18F8, (int16_t)0x9592, 0x5A82, (int16_t)0xA57D,
+        (int16_t)0xA57D, 0x5A82, 0x5A82, (int16_t)0xA57D, (int16_t)0xA57D,
+        0x5A82, 0x471C, (int16_t)0x8275, 0x18F8, 0x6A6D, (int16_t)0x9592,
+        (int16_t)0xE707, 0x7D8A, (int16_t)0xB8E3, 0x30FB, (int16_t)0x89BE,
+        0x7641, (int16_t)0xCF04, (int16_t)0xCF04, 0x7641, (int16_t)0x89BE,
+        0x30FB, 0x18F8, (int16_t)0xB8E3, 0x6A6D, (int16_t)0x8275, 0x7D8A,
+        (int16_t)0x9592, 0x471C, (int16_t)0xE707,
+    };
+    /* Pinned RAM expectations from psx.log members: 4-bit SHA-256
+       58c470e75f321ad361ee6b4600450970fa1f1f063d055b8501863438f56c7e75,
+       8-bit SHA-256 d8b19a8e8cb23d65c0f267e148097d1d78a19400d180173791a1ce0e23cdb7d9
+       (pins.txt). These bytes are independent of the decoder under test. */
+    static const uint32_t expected[2][16] = {
+        {0x00FF0FF0u, 0x0FFFFFFDu, 0x0FFFFFEDu, 0x0EFFFFFBu, 0x00FFFFF0u,
+         0x021FFF00u, 0x0230F231u, 0x11333441u},
+        {0x00FFFF00u, 0x0004FFFFu, 0xEDEFECC9u, 0x00F2FCEF,
+         0xE8FADBD5u, 0x00FFE8FEu, 0xEFECF3B7u, 0x00E3FFEBu,
+         0xF5FFFB00u, 0x0003FFF2u, 0xFF050000u, 0x1A08FFFCu,
+         0x1E280F00u, 0x232A05FFu, 0x40381000u, 0x16323229u},
+    };
+    for (uint32_t depth = 0u; depth < 2u; depth++) {
+        schway *inst = make();
+        enable_dma(inst);
+        load_guest_quant(inst, guest_quant);
+        load_scale_table(inst, guest_scale);
+        write32(inst, MDEC_DATA, 0x20000020u | (depth << 27), 0u);
+        for (uint32_t i = 0u; i < 32u; i++) {
+            write_ram(inst, 0x12000u + i * 4u, guest_input[i]);
+        }
+        start_dma0(inst, 0x12000u, 32u);
+        run_cycles(inst, 4096u);
+        uint32_t output_words = depth == 0u ? 8u : 16u;
+        CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+        CHECK_EQ_HEX(inst->dma.madr[0], 0x12080u);
+        CHECK_EQ_U64(inst->mdec.output_count, output_words);
+        for (uint32_t i = 0u; i < output_words; i++) {
+            CHECK_EQ_HEX(inst->mdec.output[i], expected[depth][i]);
+        }
+        CHECK_EQ_U64(inst->dma.dreq & (1u << 1), 1u << 1);
+        CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & (1u << 27), 1u << 27);
+        schway_destroy(inst);
     }
-    start_dma0(inst, 0x12000u, 32u);
-    run_cycles(inst, 4096u);
-    CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
-    CHECK_EQ_HEX(inst->dma.madr[0], 0x12080u);
-    CHECK_EQ_U64(inst->mdec.output_count, 8u);
-    CHECK_EQ_U64(inst->dma.dreq & (1u << 1), 1u << 1);
-    CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & (1u << 27), 1u << 27);
-    schway_destroy(inst);
 }
 
 static void case_status(void)
