@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 24 of 36
+current_plan: 25 of 36
 status: executing
-stopped_at: Split 06-35 output-byte/status follow-up; continue bounded command-boundary repair
-last_updated: "2026-11-16T09:54:00Z"
+stopped_at: Completed 06-35-PLAN.md; next 06-36-PLAN.md
+last_updated: "2026-11-16T10:14:03.114Z"
 last_activity: 2026-11-16
-state_head: f974070b3d48677febf93b2b5bdddde4b13cac90
+state_head: 8c829fd7179e4c3ff37a0ab3bb55b2c1cf78cc94
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 186
-  completed_plans: 172
+  completed_plans: 173
   percent: 83
-last_activity_desc: Plan 06-35 split after the narrow 64-coefficient command-boundary regression passed but pinned 4/8-bit byte outputs and the status guest remained failing. Plan 06-36 owns exact bytes/status completion; all selectors remain gating. Current plan 24 of 36 is still 06-35; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
+last_activity_desc: Closed bounded Plan 06-35 after the exact 32-word command-boundary parser regression and the 56-test MDEC/DMA/state gate passed. Pinned 4/8-bit output bytes and status completion remain failing and gating in Plan 06-36. Runtime was at least 30m55s wall; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 24 of 36
-Next plan file: 06-35-PLAN.md (Wave 9; 06-36 owns remaining byte/status fixes before the resumed 06-12 gate)
+Current Plan: 25 of 36
+Next plan file: 06-36-PLAN.md (Wave 10; exact MDEC output bytes and status guest completion)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -235,6 +235,7 @@ Progress: [████████░░] 83%
 | Phase 6 P33 | at least 1h22m00s wall lower bound | 1 tasks | 20 files |
 | Phase 06 P34 | at least 10m48s wall lower bound | 1 tasks | 1 files |
 | Phase 06 P12 | at least 1h24m18s wall; active time unavailable | 2 tasks | 12 files |
+| Phase 6 P35 | at least 30m55s wall | 2 tasks | 24 files |
 
 ## Accumulated Context
 
@@ -787,8 +788,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T09:37:22.721Z
-Stopped at: Completed 06-12 oracle/control slice; next 06-35-PLAN.md
+Last session: 2026-11-16T10:14:02.895Z
+Stopped at: Completed 06-35-PLAN.md; next 06-36-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
