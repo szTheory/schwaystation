@@ -528,7 +528,7 @@ Plans:
 - [x] 06-38-PLAN.md — Partial: record unsigned 4-bit candidate and isolate DMA1-start versus pinned guest-buffer target; 8-bit/status remain unresolved
 
 **Wave 13** *(blocked on Wave 12 completion)*
-- [ ] 06-39-PLAN.md — Resolve the pinned guest-buffer versus DMA1 output-target contract; verify the 4-bit candidate and corrected model fixture while retaining 8-bit/status gates
+- [x] 06-39-PLAN.md — Prove direct DMA1 caller path across separate stack addresses; verify 4-bit model and pinned guest while retaining 8-bit/status gates
 
 **Wave 14** *(blocked on Wave 13 completion)*
 - [ ] 06-13-PLAN.md — Decode color MDEC frames and display the DMA result

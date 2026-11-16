@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 28 of 39
+current_plan: 29 of 39
 status: executing
-stopped_at: Completed partial 06-38-PLAN.md; next 06-39-PLAN.md
-last_updated: "2026-11-16T13:38:38Z"
+stopped_at: Completed 06-39-PLAN.md; next 06-13-PLAN.md
+last_updated: "2026-11-16T14:05:00Z"
 last_activity: 2026-11-16
-state_head: 48143b51c185e15145deba022c2817c666e390d6
+state_head: f070353
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 176
-  percent: 83
-last_activity_desc: "Closed partial Plan 06-38 with an unverified unsigned 4-bit candidate, exact 4/8-bit caller target evidence, and a 06-39 follow-up. 8-bit output and ordered-status guest remain gating; DISC-03 remains incomplete. Runtime at least 1h04m21s wall including review hold; active work stopped at 30m. Codex/OpenGSD 1.20.0, gpt-6-luna xhigh."
+  completed_plans: 177
+  percent: 84
+last_activity_desc: "Completed 06-39: proved pinned helper sends its stack buffer directly to DMA1, verified standalone and pinned unsigned 4-bit output, and retained red 8-bit/status gates. DISC-03 remains incomplete. Runtime about 27m wall. Codex/OpenGSD 1.20.0, root GPT-6 (session model id unavailable), reviewer gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 28 of 39
-Next plan file: 06-39-PLAN.md (Wave 13; guest-buffer/DMA1 target contract and unsigned 4-bit verification)
+Current Plan: 29 of 39
+Next plan file: 06-13-PLAN.md (Wave 14; color MDEC frame decode and DMA result display)
 Status: Ready to execute
 Last activity: 2026-11-16
 
@@ -791,8 +791,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T13:38:38Z
-Stopped at: Completed partial 06-38-PLAN.md; next 06-39-PLAN.md
+Last session: 2026-11-16T14:05:00Z
+Stopped at: Completed 06-39-PLAN.md; next 06-13-PLAN.md
 Resume file: None
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
