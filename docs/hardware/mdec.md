@@ -14,6 +14,10 @@ and the number of following input words. Command 2 loads luma and optional
 chroma quantization tables; command 3 loads 64 signed scale-table halfwords.
 The implemented mono path uses command 1, the luma table, and the scale table.
 DMA0 writes input words; CPU writes to the data port use the same FIFO path.
+Command bits 28-25 are mirrored into STAT bits 26-23 for all commands. MDEC(0)
+and invalid commands 4-7 also copy command bits 15-0 directly into STAT bits
+15-0 without applying the decode command's remaining-word minus-one rule
+([SCM.04]).
 
 A block starts with a signed 10-bit DC value and a six-bit quantization scale.
 The following run-length words carry a six-bit zero run and signed 10-bit AC

@@ -436,10 +436,11 @@ static void mdec_start_command(schway *inst, uint32_t command)
     mdec->words_remaining = 0u;
     mdec->block_index = 4u;
     mdec->command_active = 0u;
+    /* Command mirror fields follow the STAT behavior in docs/hardware/mdec.md. */
+    mdec->depth = (command >> 27) & 3u;
+    mdec->signed_output = (command >> 26) & 1u;
+    mdec->bit15 = (command >> 25) & 1u;
     if (opcode == 1u) {
-        mdec->depth = (command >> 27) & 3u;
-        mdec->signed_output = (command >> 26) & 1u;
-        mdec->bit15 = (command >> 25) & 1u;
         mdec->command_words = command & 0xFFFFu;
         mdec->words_remaining = mdec->command_words;
         mdec->command_active = mdec->command_words != 0u && mdec->depth <= 1u ? 1u : 0u;
@@ -475,7 +476,10 @@ static uint32_t mdec_status(const schway *inst)
     status |= (mdec->signed_output & 1u) << 24;
     status |= (mdec->bit15 & 1u) << 23;
     status |= (mdec->block_index & 7u) << 16;
-    if (mdec->words_remaining != 0u) {
+    uint32_t opcode = mdec->command >> 29;
+    if (opcode == 0u || opcode >= 4u) {
+        status |= mdec->command & 0xFFFFu;
+    } else if (mdec->words_remaining != 0u) {
         status |= (mdec->words_remaining - 1u) & 0xFFFFu;
     }
     return status;

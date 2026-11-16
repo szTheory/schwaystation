@@ -295,8 +295,23 @@ static int run_guest(const uint8_t *exe, size_t exe_size,
         }
     }
     if (complete == 0) {
+        size_t status_lines = 0u;
+        size_t input_lines = 0u;
+        size_t output_lines = 0u;
+        size_t tty_at = 0u;
+        size_t line_size = 0u;
+        const uint8_t *line = NULL;
+        while ((line = next_line(tty_text, tty_size, &tty_at, &line_size)) != NULL) {
+            strip_tty_prefix(&line, &line_size);
+            if (line_starts(line, line_size, "==== MDEC_STATUS:")) status_lines++;
+            else if (line_starts(line, line_size, "MDEC_DATA <-")) input_lines++;
+            else if (line_starts(line, line_size, "MDEC_DATA ->")) output_lines++;
+        }
         fprintf(stderr, "MDEC_REFERENCE_GUEST_ERROR: no Done marker within %u x %u-cycle run steps (tty-bytes=%zu)\n",
                 (unsigned)GUEST_RUN_LIMIT, (unsigned)GUEST_RUN_CYCLES, tty_size);
+        fprintf(stderr,
+                "MDEC_REFERENCE_GUEST_EVENTS: status=%zu input=%zu output=%zu\n",
+                status_lines, input_lines, output_lines);
         fprintf(stderr,
                 "MDEC_REFERENCE_GUEST_STATE: pc=%08x ticks=%llu mdec=%08x active=%u pending=%u deadline=%llu in=%u rem=%u out=%u dma0=%08x/%08x/%08x dma1=%08x/%08x/%08x dreq=%02x\n",
                 inst->cpu.pc, (unsigned long long)inst->ticks, inst->mdec.command,
@@ -305,6 +320,16 @@ static int run_guest(const uint8_t *exe, size_t exe_size,
                 inst->mdec.words_remaining, inst->mdec.output_count,
                 inst->dma.chcr[0], inst->dma.madr[0], inst->dma.bcr[0],
                 inst->dma.chcr[1], inst->dma.madr[1], inst->dma.bcr[1], inst->dma.dreq);
+        uint32_t pc_phys = inst->cpu.pc & 0x001FFFFFu;
+        uint32_t pc_word = (uint32_t)inst->bus.ram[pc_phys] |
+                           ((uint32_t)inst->bus.ram[pc_phys + 1u] << 8) |
+                           ((uint32_t)inst->bus.ram[pc_phys + 2u] << 16) |
+                           ((uint32_t)inst->bus.ram[pc_phys + 3u] << 24);
+        uint32_t final_mdec_status = schway__mdec_read(inst, 0x1F801824u, inst->ticks);
+        fprintf(stderr,
+                "MDEC_REFERENCE_CPU_PATH: a0=%08x v0=%08x ra=%08x insn=%08x stat=%08x\n",
+                inst->cpu.r[4], inst->cpu.r[2], inst->cpu.r[31], pc_word,
+                final_mdec_status);
         if ((inst->mdec.command == 0x20000020u || inst->mdec.command == 0x28000020u) &&
             inst->dma.madr[0] == 0x00012080u) {
             fprintf(stderr, "MDEC_REFERENCE_DMA0_SOURCE: command=%08x 00012000",
