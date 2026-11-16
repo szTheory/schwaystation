@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 16 of 30
+current_plan: 17 of 31
 status: executing
-stopped_at: Completed 06-09-PLAN.md
-last_updated: "2026-11-16T04:00:56.819Z"
+stopped_at: Completed 06-11-PLAN.md
+last_updated: "2026-11-16T04:44:20.067Z"
 last_activity: 2026-11-16
-state_head: cf29b03ca11ee840ae195c374d979d5797ab74f7
+state_head: e155b2906f723520a021f8562362ca45fea9da2c
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 180
-  completed_plans: 165
+  total_plans: 181
+  completed_plans: 166
   percent: 83
-last_activity_desc: "Completed Wave 8 Plan 06-09's XA decode/resampler gate; next is Plan 06-11. DISC-01 remains pending aggregate Phase 6 acceptance, and DISC-02 remains pending XA/SPU integration. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh; closeout wall time 32 minutes."
+last_activity_desc: "Completed Plan 06-11's monochrome MDEC DMA baseline in 39m33s; its exact post-review gate passed 43/43. DISC-03 remains partial pending Plan 06-31's stream/FIFO controls and Plan 06-12's pinned guests. Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh."
 ---
 
 # Project State
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 16 of 30
-Next plan file: 06-11-PLAN.md (Wave 8)
+Current Plan: 17 of 31
+Next plan file: 06-31-PLAN.md (Wave 8)
 Status: Ready to execute
-Last activity: 2026-11-15
+Last activity: 2026-11-16
 
 Progress: [████████░░] 83%
 
@@ -228,6 +228,7 @@ Progress: [████████░░] 83%
 | Phase 6 P30 | 37m+ | 2 tasks | 10 files |
 | Phase 06 P06 | >=2h35m20s wall lower bound | 2 tasks | 11 files |
 | Phase 6 P09 | 32m | 2 tasks | 13 files |
+| Phase 06 P11 | 39m 33s | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -570,6 +571,8 @@ Recent decisions affecting current work:
 - [Phase 6]: Keep XA predictor history separate from resampler history so low-rate duplication does not alter ADPCM chronology.
 - [Phase 6]: Use the cited Q15 tap table with deterministic integer truncation; this does not claim silicon waveform proof.
 - [Phase 6]: Reject XA emphasis and reserved coding/header values until their effects are defined.
+- [Phase 06]: MDEC single-block availability uses a selected 1,000-cycle baseline; the unstamped reference log does not measure cycles.
+- [Phase 06]: Plan 06-31 completes the mono stream, FIFO backpressure, raw layout and documentation controls before Plan 06-12.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -769,9 +772,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T04:00:56.530Z
-Stopped at: Completed 06-09-PLAN.md
-Resume file: None
+Last session: 2026-11-16T04:44:19.757Z
+Stopped at: Completed 06-11-PLAN.md
+Resume file: 06-31-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
