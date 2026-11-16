@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 25 of 36
+current_plan: 25 of 37
 status: executing
-stopped_at: Completed 06-35-PLAN.md; next 06-36-PLAN.md
+stopped_at: Plan 06-36 split recorded; finish its partial closeout, then execute 06-37
 last_updated: "2026-11-16T10:14:03.114Z"
 last_activity: 2026-11-16
 state_head: 8c829fd7179e4c3ff37a0ab3bb55b2c1cf78cc94
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 186
+  total_plans: 187
   completed_plans: 173
   percent: 83
-last_activity_desc: Closed bounded Plan 06-35 after the exact 32-word command-boundary parser regression and the 56-test MDEC/DMA/state gate passed. Pinned 4/8-bit output bytes and status completion remain failing and gating in Plan 06-36. Runtime was at least 30m55s wall; Codex/OpenGSD 1.20.0, gpt-6-luna xhigh.
+last_activity_desc: Split Plan 06-36 at its 30-minute bound: it owns the DMA1 destination comparator correction and exact model RED vectors; Plan 06-37 owns production 4/8-bit arithmetic and ordered-status completion. DISC-03 remains partial.
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 25 of 36
-Next plan file: 06-36-PLAN.md (Wave 10; exact MDEC output bytes and status guest completion)
+Current Plan: 25 of 37
+Next plan file: 06-36-PLAN.md (Wave 10; MDEC DMA1 destination and exact RED harness)
 Status: Ready to execute
 Last activity: 2026-11-16
 
