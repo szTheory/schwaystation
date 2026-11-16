@@ -803,6 +803,7 @@ static void cdrom_mdec_reset_state(schway *dst)
     memset(&zero_cd, 0, sizeof zero_cd);
     zero_cd.drive_speed = 1u;
     memset(&zero_mdec, 0, sizeof zero_mdec);
+    zero_mdec.block_index = 4u;
     CHECK_EQ_U64(schway_reset(dst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
     CHECK(memcmp(&dst->cdrom, &zero_cd, sizeof zero_cd) == 0);
     CHECK(memcmp(&dst->mdec, &zero_mdec, sizeof zero_mdec) == 0);

@@ -22,7 +22,7 @@ struct schway__mdec {
     int16_t scale[SCHWAY__MDEC_BLOCK_SAMPLES];
     int16_t block[SCHWAY__MDEC_BLOCK_SAMPLES];
     int32_t work[SCHWAY__MDEC_BLOCK_SAMPLES];
-    uint32_t input_head, input_count;
+    uint32_t input_head, input_count, input_half;
     uint32_t output_head, output_count;
     uint32_t command, command_words, words_remaining;
     uint32_t block_index, depth, signed_output, bit15;

@@ -71,6 +71,7 @@ void schway__mdec_state_io(struct schway__state_io *io, schway *inst, uint64_t t
                                             SCHWAY__MDEC_INPUT_WORDS - 1u);
     uint32_t input_count = schway__state_u32(io, "mdec.input_count", &mdec->input_count, 0u,
                                              SCHWAY__MDEC_INPUT_WORDS);
+    uint32_t input_half = schway__state_u32(io, "mdec.input_half", &mdec->input_half, 0u, 1u);
     uint32_t output_head = schway__state_u32(io, "mdec.output_head", &mdec->output_head, 0u,
                                              SCHWAY__MDEC_OUTPUT_WORDS - 1u);
     uint32_t output_count = schway__state_u32(io, "mdec.output_count", &mdec->output_count, 0u,
@@ -98,7 +99,8 @@ void schway__mdec_state_io(struct schway__state_io *io, schway *inst, uint64_t t
 
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         schway__state_check(io, input_head < SCHWAY__MDEC_INPUT_WORDS &&
-                                   input_count <= SCHWAY__MDEC_INPUT_WORDS);
+                                   input_count <= SCHWAY__MDEC_INPUT_WORDS && input_half <= 1u &&
+                                   (input_count != 0u || input_half == 0u));
         schway__state_check(io, output_head < SCHWAY__MDEC_OUTPUT_WORDS &&
                                    output_count <= SCHWAY__MDEC_OUTPUT_WORDS);
         schway__state_check(io, block_index <= 5u && depth <= 3u);
@@ -207,6 +209,7 @@ static void mdec_abort_block(schway *inst)
     struct schway__mdec *mdec = &inst->mdec;
     mdec->input_head = 0u;
     mdec->input_count = 0u;
+    mdec->input_half = 0u;
     mdec->command_active = 0u;
     mdec->words_remaining = 0u;
     mdec->block_index = 4u;
@@ -254,7 +257,8 @@ static int mdec_parse_block(schway *inst, uint64_t now)
     for (uint32_t word_index = 0u; word_index < mdec->input_count; word_index++) {
         uint32_t fifo_index = (mdec->input_head + word_index) % SCHWAY__MDEC_INPUT_WORDS;
         uint32_t word = mdec->input[fifo_index];
-        for (uint32_t half = 0u; half < 2u; half++) {
+        uint32_t first_half = word_index == 0u ? mdec->input_half : 0u;
+        for (uint32_t half = first_half; half < 2u; half++) {
             uint32_t value = half == 0u ? word & 0xFFFFu : word >> 16;
             if (have_dc == 0u && value == 0xFE00u) {
                 continue;
@@ -269,7 +273,8 @@ static int mdec_parse_block(schway *inst, uint64_t now)
                 continue;
             }
             if (value == 0xFE00u) {
-                mdec_input_consume(mdec, word_index + 1u);
+                mdec_input_consume(mdec, word_index + (half == 0u ? 0u : 1u));
+                mdec->input_half = half == 0u ? 1u : 0u;
                 mdec_idct(mdec, coefficients);
                 if (now > UINT64_MAX - SCHWAY__MDEC_BLOCK_CYCLES) {
                     mdec_abort_block(inst);
@@ -378,6 +383,7 @@ static void mdec_start_command(schway *inst, uint32_t command)
     mdec->command = command;
     mdec->input_head = 0u;
     mdec->input_count = 0u;
+    mdec->input_half = 0u;
     mdec->command_words = 0u;
     mdec->words_remaining = 0u;
     mdec->block_index = 4u;
