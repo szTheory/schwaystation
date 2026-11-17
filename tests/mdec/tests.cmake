@@ -73,6 +73,12 @@ schway_add_test(NAME mdec.guest_4bit
   COMMAND schwaystation-test-mdec guest_4bit
   LABELS mdec portable TIMEOUT 10)
 
+# Fault prevented: the deterministic 8-bit regression selector is accidentally
+# omitted while replacing the hardware conformance comparison.
+schway_add_test(NAME mdec.guest_8bit_regression
+  COMMAND schwaystation-test-mdec guest_8bit_regression
+  LABELS mdec portable TIMEOUT 10)
+
 # Fault prevented: a compressed input source ends in a partial MDEC block or
 # malformed halfword span is treated as a complete mono block.
 schway_add_test(NAME mdec.input_coverage

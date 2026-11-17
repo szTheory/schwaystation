@@ -200,6 +200,11 @@ static void case_guest_4bit(void)
     case_guest_input_modes(1u << 0u);
 }
 
+static void case_guest_8bit_regression(void)
+{
+    case_guest_input_modes(1u << 1u);
+}
+
 static void case_guest_input(void)
 {
     case_guest_input_modes((1u << 0u) | (1u << 1u));
@@ -1080,6 +1085,8 @@ int main(int argc, char **argv)
         case_display();
     } else if (strcmp(argv[1], "guest_4bit") == 0) {
         case_guest_4bit();
+    } else if (strcmp(argv[1], "guest_8bit_regression") == 0) {
+        case_guest_8bit_regression();
     } else if (strcmp(argv[1], "guest_input") == 0) {
         case_guest_input();
     } else if (strcmp(argv[1], "input_coverage") == 0) {
