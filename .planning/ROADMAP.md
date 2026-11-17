@@ -471,10 +471,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `ctest -L disc` passes the CD-ROM controller's cycle timings, delivery order, sector buffer, GetID and lid behaviour, and the nightly lane matches the ps1-tests `cdrom/timing` and `getloc` logs.
   2. The mkpsxiso `disc_boot` image, built on every leg, boots through OpenBIOS from `SYSTEM.CNF`. It reads its sectors, plays the XA and CD-DA tracks, and its pinned `boots`, `mailbox`, `audio` and `frame` values are identical on every platform that runs it. `.chd`, `.pbp`, `.ecm` and `.ccd` are refused with exit 77 and a named message, and the rcheevos disc MD5 matches.
-  3. `ctest -L mdec` passes deterministic integer MDEC decoding with exact pinned 4-bit hardware coverage, a separately named 8-bit implementation regression, direct status/colour/FIFO/packing/bounds controls, and a compressed-unit preflight. Incomplete external frame/movie inputs are identified as insufficient assets, not decoder passes; exact 8-bit and full-image hardware conformance are not claimed. The complete owned STR on `disc_boot` plays through DMA into the native 24-bit display.
+  3. `ctest -L mdec` passes deterministic integer MDEC decoding with exact pinned 4-bit hardware coverage, a separately named 8-bit implementation regression, direct status/colour/FIFO/packing/bounds controls, and a compressed-unit preflight. The pinned frame (300 macroblocks) and movie first frame (240 macroblocks) have complete source coverage, while their full guest output/conformance remains unresolved; the frame display diagnostic fails the existing pixel comparison, and movie DMA1 has no matching capture. Exact 8-bit and full-image hardware conformance are not claimed. The complete owned STR on `disc_boot` plays through DMA into the native 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 39/45 plans accepted; two recorded gap summaries remain pending the approved successor tranche
+**Plans**: 42/45 plans accepted; the two recorded gap summaries remain pending exact-head hosted acceptance
 
 Plans:
 **Wave 1**
@@ -565,9 +565,9 @@ Plans:
 **Approved MDEC successor tranche** *(local waves 1–6; owner-approved 2026-11-17)*
 - [x] 06-40-PLAN.md — Record the approved deterministic MDEC claim and evidence limits
 - [x] 06-41-PLAN.md — Add a distinct deterministic 8-bit regression while retaining exact 4-bit coverage
-- [ ] 06-42-PLAN.md — Guard compressed inputs and classify insufficient assets/status budget
-- [ ] 06-43-PLAN.md — Register the exact surviving main-CI and nightly selectors
-- [ ] 06-44-PLAN.md — Review changes and run complete local acceptance
+- [x] 06-42-PLAN.md — Guard compressed inputs and classify source coverage/status budget
+- [x] 06-43-PLAN.md — Register the exact surviving main-CI and nightly selectors
+- [x] 06-44-PLAN.md — Review changes and run complete local acceptance
 - [ ] 06-45-PLAN.md — Verify pre-ship hosted acceptance and record ship-only checks
 
 **UI hint**: no
@@ -585,4 +585,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
 | 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
-| 6. Discs and FMV | 39/45 | In Progress | - |
+| 6. Discs and FMV | 42/45 | In Progress | - |

@@ -213,21 +213,21 @@ Sources: `PROVENANCE.md` section 2; `.planning/preparation/PSX-GPU-AND-GTE.md`.
 Status: reproduced
 
 Lesson SW-ORACLE-002 (2026-11-16, Phase 6 MDEC image references)
-Symptom and reproduction: all four pinned frame/movie callers exhausted their MDEC input before completing the requested frame. The frame stream has 296 complete macroblocks for 300 requested; movie frame one has 162 for 240. The release `sunset.mdec` and pinned `sunset.h` are byte-identical, so extraction did not truncate the frame input. Asset and mutation controls passed, while the four caller checks failed in 0.64 seconds total.
-Root cause / invariant: a matching source pin and image digest prove identity, not that the encoded stream covers the guest's requested output. Verify source coverage against the caller before treating a long guest run as useful.
-Fix and evidence: count complete blocks and compare against frame dimensions before lengthy emulation. In this run the count exposed unusable references immediately; the guest tests confirmed the same input-exhaustion boundary. Do not accept partial display or fabricate output to fill the gap.
+Symptom and reproduction: the first decoder-progress probe reported 296/300 frame macroblocks and 162/240 movie macroblocks, and that progress was incorrectly described as incomplete source coverage. The bounded structural scanner later proved the pinned source spans contain all 1,800 frame blocks/300 macroblocks and all 1,440 movie first-frame blocks/240 macroblocks. All four guests consume the source but do not establish full output; frame output fails the existing image comparison and movie DMA1 remains stalled.
+Root cause / invariant: decoder output progress is not compressed-source coverage. Independently count source units, produced/read units and guest completion; source completeness does not establish correct decoding or hardware fidelity.
+Fix and evidence: retain source preflight as a cheap gating control, replace the false incomplete-asset explanation, and keep full frame/movie conformance outside the approved v1.0 claim until output can be supported. Do not accept partial display, treat a stall as a hardware match, or fabricate output to fill the gap.
 Applies when: admitting compressed media or hardware image references with a bounded guest caller.
 Does not establish: decoder conformance, validity of the PNG capture for another input, or permission to change the locked acceptance oracle.
-Suggested check: add a cheap source-coverage preflight before expensive host/emulator runs, while keeping the full caller test gating.
+Suggested check: add a cheap source-coverage preflight before expensive host/emulator runs, then compare source units against produced output and report those outcomes separately. Keep only acceptance tests supported by the approved product claim.
 Sources: `.planning/phases/06-discs-and-fmv/06-13-REVIEW.md`; pinned source/release records in `pins.txt`.
-Status: reproduced
+Status: reproduced; original source-shortfall diagnosis corrected 2026-11-17
 
 Lesson SW-ORACLE-003 (2026-11-16, Phase 6 MDEC color)
 Symptom and reproduction: the first quick probe used qscale zero, quant entries of one and a flat scale table, unlike the SCPH-5501 `followup/06FMD.txt` setup (qscale one, quant entries of four, standard scale table). Its apparent color mismatches were invalid. A corrected short probe matched several 24-bit/15-bit points, but 24-bit neutral `Y=127` remained one step high and `Cr=-256, Cb=-64, Y=0` differed in 15-bit output (`0x2380` versus recorded `0x27A0`). Other points also differed.
 Root cause / invariant: a hardware vector is only useful when command flags, qscale, quant table and IDCT scale match the recorded setup. Synthetic self-consistency does not establish hardware color rounding.
-Fix and evidence: no arithmetic change was retained. Direct fractional 15-bit rounding matched one corrected hardware point but broke the existing synthetic color expectations, so it was reverted. The corrected color formula still passes `mdec.color`; hardware-only rounding remains unresolved. The incomplete frame/movie references remain a separate blocker.
+Fix and evidence: no arithmetic change was retained. Direct fractional 15-bit rounding matched one corrected hardware point but broke the existing synthetic color expectations, so it was reverted. The corrected color formula still passes `mdec.color`; hardware-only rounding remains unresolved. The complete frame/movie inputs have separate unresolved guest-output and DMA completion results, not source-coverage failures.
 Applies when: reproducing fixed-input/output hardware logs with a short local probe.
 Does not establish: a complete frame/movie reference, exact hardware IDCT behavior for arbitrary coefficients, or permission to replace the pinned image oracle.
-Suggested check: copy every logged setting into the probe before comparing outputs; check setup and a small vector first, then use full-frame guests only after stream coverage is verified.
+Suggested check: copy every logged setting into the probe before comparing outputs; check setup and a small vector first. Verify source coverage before guests, then treat full-frame results as fidelity evidence only when guest progress and oracle bytes align.
 Sources: `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` section 4 [SCM.29][SCM.30].
 Status: reproduced

@@ -71,6 +71,11 @@ This 2026-11-15 authorization supersedes the 2026-11-10 note below AGENTS.md rul
 work before ship. It does not authorize skipping a phase's verify or ship, bypassing repository rules, or
 crossing the milestone boundary. Ask only for identity-bound consent, owner-hardware checks, or a real blocker.
 
+On 2026-11-17, the owner renewed authorization to continue without routine consultation through Phase 6's
+release and the v1.0 milestone audit, completion and cleanup. No owner capture is available or planned. This
+extends the stop-at-verification boundary in AGENTS.md rule 9 for this run only; keep every named acceptance
+gate, do not alter DISC-03 or its cycle cap to force a pass, and do not start v2.0 under this authorization.
+
 For CI and CD efficiency, first measure critical-path time and duplicate work. Prefer removing redundant
 runs and serial bottlenecks over adding caches, concurrency or dependencies. Keep all required coverage.
 Batch ready fuzz/API/oracle work on one changed head, reuse fingerprinted review for unchanged files, and stop
@@ -122,8 +127,24 @@ The owner renewed the efficiency correction on2026-11-13 after the long integrat
 
 Future subsystem plans bring pinned real oracle programs/captures into the earliest runnable behavior slices. Do not defer all real-program integration to a tail after synthetic tests have codified assumptions. Wire fetch/decode early, run the applicable real case when its first caller works, keep every required case gating, and preserve asset rules. Reuse reproducible throwaway static arithmetic analysis to shorten hypotheses; it is not a new maintained harness or repository gate.
 
-The owner has a real PlayStation and capture card, but has no time for a hardware capture right now. Search public hardware records and use small automated checks first; do not assume an owner run is scheduled. If a hardware-only result still blocks acceptance later, ask once with the exact test and a bounded capture procedure.
+The owner has a real PlayStation and capture card, but says a hardware capture will not be available anytime soon. Do not plan Phase 6 work around an owner capture or ask for one again. Search public hardware records, record any unresolved evidence gap, and keep advancing independent work. Revisit owner hardware only if a future scope decision truly requires it.
 
-For compressed media references, count decoded units from the pinned input and compare them with the guest's requested output before starting a long emulation run. Keep full-output acceptance unchanged; report insufficient source coverage as an asset problem, not a decoder pass.
+For compressed media references, count source units from the pinned input and compare them with both the caller's request and the guest's produced output before starting a long emulation run. Source completeness, decode progress, guest completion and hardware fidelity are separate facts. Report each one accurately; complete source coverage is not a decoder or conformance pass.
 
 Before compiling pinned media tools, verify the archive digest, expected build files, submodule closure, exact-pin licences and input coverage. If a tool needs native libraries unavailable on every matrix leg, build it once on an existing compatible producer, publish a one-run artifact, and make every consumer validate its digest before continuing. Keep full disc construction and acceptance on every leg.
+
+On 2026-11-17 the owner explicitly approved the Phase 6 unblock proposal in
+`.planning/phases/06-discs-and-fmv/06-UNBLOCK-PROPOSAL.md`. This supersedes the earlier instruction to preserve
+the exact 8-bit/full-image MDEC acceptance gates, only to the following scope: v1.0 claims deterministic integer
+MDEC decoding with the available verified hardware coverage, not full 8-bit or full-frame/movie hardware
+conformance. Preserve the exact 4-bit guest and direct model controls, the complete owned `disc_boot` STR
+integration path, and all other named requirements. Do not fit a `±2` tolerance, change expected hardware bytes,
+change the 4,915,200-cycle cap, or synthesize missing compressed input from output images. Remove or replace the
+unfinishable 8-bit, ordered-status-guest, and full frame/movie conformance selectors with useful passing
+gating checks only as specified by the successor plan; retain their pins and discrepancies as evidence for the
+later measured-accuracy horizon. The frame and first movie inputs are complete (300 and 240 macroblocks); their
+guest output/completion remains unresolved, and the frame display probe fails the existing pixel comparison.
+Keep the compressed-unit coverage preflight before media execution. Continue
+through Phase 6 review, the remaining local and hosted gates, ship, and the v1.0 audit/completion/cleanup under the
+existing authorization. This approval does not authorize starting v2.0 before v1.0 is complete or published and
+does not claim hardware accuracy beyond the retained evidence.

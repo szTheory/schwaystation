@@ -6,7 +6,7 @@ tags: [mdec, acceptance, evidence, documentation]
 requires: []
 provides:
   - "Owner-approved v1.0 MDEC acceptance scope recorded across requirements, decisions, roadmap, context and hardware/testing docs."
-  - "Known hardware mismatches, incomplete input counts and status-budget limit recorded without claiming decoder passes."
+  - "Known hardware mismatches, complete source counts, guest-output limits and status-budget limit recorded without claiming decoder passes."
 affects: ["Phase 6 successor plans 06-41 through 06-45", MDEC, docs/testing]
 actuals:
   tokens: 5858
@@ -36,7 +36,7 @@ key-decisions:
   - "Keep DISC-03 and 06-23/24 acceptance pending until successor local and hosted gates are complete."
 patterns-established:
   - "MDEC hardware bytes remain evidence; implementation-only baselines are named separately."
-  - "Incomplete or over-budget assets are classified before emulation and never counted as decoder passes."
+  - "Source coverage, decoder output progress, guest completion and hardware fidelity are recorded as distinct facts."
 requirements-completed: []
 coverage:
   - id: D1
@@ -47,15 +47,15 @@ coverage:
         ref: "git diff --check origin/main -- .planning/REQUIREMENTS.md .planning/preparation/DECISIONS.md .planning/ROADMAP.md .planning/phases/06-discs-and-fmv/06-CONTEXT.md; git diff --check origin/main -- .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md docs/hardware/mdec.md docs/testing.md"
         status: pass
       - kind: other
-        ref: "Agent cross-check of approved scope, original hardware bytes, 16-pixel discrepancy, status cap, incomplete source counts, and successor selector names"
+        ref: "Agent cross-check of approved scope, original hardware bytes, 16-pixel discrepancy, status cap, complete source spans, and successor selector names"
         status: pass
     human_judgment: false
   - id: D2
-    description: "Pending 06-23/24 acceptance is assigned to 06-44/45; future selector registration is assigned to 06-43 and is not described as already passing."
+    description: "Pending 06-23/24 acceptance remains assigned to 06-44/45; selector registration and focused MDEC checks are complete in 06-43."
     requirement: DISC-03
     verification:
       - kind: other
-        ref: "Scoped documentation diff review against 06-40-PLAN.md"
+        ref: "Scoped documentation diff review against 06-40-PLAN.md and 06-43 selector results"
         status: pass
     human_judgment: false
 duration: 19min
@@ -65,7 +65,7 @@ status: complete
 
 # Phase 6 Plan 06-40: Record Approved MDEC Scope Summary
 
-**The MDEC documentation now distinguishes exact 4-bit hardware evidence, an 8-bit implementation regression, direct model controls, and incomplete or over-budget inputs.**
+**The MDEC documentation distinguishes exact 4-bit hardware evidence, an 8-bit implementation regression, direct model controls, complete compressed inputs, unresolved guest output and the status budget.**
 
 ## Performance
 
@@ -77,7 +77,7 @@ status: complete
 ## Accomplishments
 
 - Updated DISC-03, DEC.33's acceptance note, Phase 6 roadmap/context and hardware/testing references to reflect the owner-approved v1.0 scope.
-- Preserved the pinned 4-bit hardware check and original 8-bit expected bytes; documented the 16-pixel 8-bit mismatch, 7,680,000-cycle status request against the 4,915,200 cap, and incomplete 296/300 and 162/240-plus-five-block sources.
+- Preserved the pinned 4-bit hardware check and original 8-bit expected bytes; documented the 16-pixel 8-bit mismatch and 7,680,000-cycle status request against the 4,915,200 cap. The earlier 296/162 values are corrected as decoder output progress; the pinned source spans are complete at 300 and 240 macroblocks.
 - Kept DISC-03 and the 06-23/24 acceptance pending, with selector registration assigned to 06-43 and final local/hosted acceptance to 06-44/45.
 
 ## Verification Evidence
@@ -88,6 +88,13 @@ status: complete
 | `git diff --check origin/main -- .planning/preparation/PSX-SPU-CDROM-AND-MDEC.md docs/hardware/mdec.md docs/testing.md && cmake --list-presets` | 0 | under 0.1s | Scoped Task 2 check passed; available configure presets were listed. |
 
 These were documentation consistency and preset-discovery checks, not decoder or phase acceptance tests. No hosted run URL applies. No source test suite was run by this documentation plan.
+
+## Factual correction (2026-11-17)
+
+The source scanner later established that the pinned frame and movie first-frame inputs are complete at 300 and
+240 macroblocks. The earlier 296/162 values were decoder output progress, not incomplete compressed inputs.
+The acceptance supersession and selected limited v1.0 claim remain unchanged; Plan 06-43 records the failed full
+guest output paths separately and registers source-coverage selectors instead of full-image conformance.
 
 ## Task Commits
 

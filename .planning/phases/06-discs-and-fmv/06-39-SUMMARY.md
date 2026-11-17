@@ -112,3 +112,7 @@ The 8-bit arithmetic mismatch and ordered-status guest remain gating failures. T
 ## Runtime
 
 Codex/OpenGSD 1.20.0; root model GPT-6 (session model id unavailable), code-review agent gpt-6-luna xhigh. Wall time from plan resume to closeout: about 27 minutes.
+
+## Hardware-backed status counter follow-up (2026-11-17)
+
+The SCPH-5501 status/decode capture confirms that the low 16-bit parameter counter wraps to `FFFFh` after a nonempty decode or table command consumes its final word. `src/mdec.c` now models that terminal value; the existing `mdec.status` selector checks full `8004FFFFh` after both table command forms and `FFFFh` while decode output is pending. The focused status test passes. This does not resolve the exact 8-bit output mismatch or change the preserved status guest cycle bound, so DISC-03 remains incomplete.

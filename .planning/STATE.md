@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 42 of 45 (MDEC acceptance and evidence scope)
+current_plan: 45 of 45 (hosted acceptance and ship)
 status: in_progress
-stopped_at: Completed 06-41-PLAN.md
-last_updated: "2026-11-17T19:23:53.370Z"
+stopped_at: Completed 06-44-PLAN.md
+last_updated: "2026-11-17T21:09:20Z"
 last_activity: 2026-11-17
-state_head: 8a0f4573f28fa7dbd851f0e01c079517c36e8155
+state_head: e47a14adef201ce900a67e280abff45bfab198f8
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 195
-  completed_plans: 191
+  completed_plans: 194
   percent: 83
-last_activity_desc: "Plan 06-41 is complete. Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; 35m31s wall from the 18:46:31Z execution marker to closeout preparation, active time not measured. The main MDEC label passed 12/12; the pinned-reference no-emulation controls passed 1/1; inventory and scoped whitespace checks passed. Six task commits are present, with seven commits measured from the plan base including the reviewed continuation-plan commit. No compressed pinned reference guest ran: the in-process source guard is next in 06-42, and selector registration is in 06-43. The 8-bit regression remains local model/reference comparator coverage, not hardware conformance. DISC-03, 06-23/24 acceptance and 06-45 hosted/ship checks remain pending. Next is 06-42."
+last_activity_desc: "Plan 06-44 completed on the phase branch. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); active time is not tracked. Cheap consistency checks passed before final acceptance. The reviewed source fingerprint is recorded in 06-REVIEW.md and matches the local verification snapshot. Full CI passed 611/611 plus release lane 5/5; hygiene passed 24/24; disc 25/25; main-CI MDEC 12/12; five media fuzz replays; nightly MDEC references 12/12; and CD-ROM references 3/3. Main-CI, nightly, MDEC-only and CD-ROM-only CTest JSON matched their exact inventory names and labels, and the CD-ROM-only configuration prepared no MDEC assets. The two selector-review warnings were resolved. Local acceptance is complete; hosted exact-head CI/nightly, background RetroArch comparison, ship, merge and release remain pending Plan 06-45. Exact 8-bit and full frame/movie hardware output remain explicitly unproved under the approved v1.0 scope. Next is Plan 06-45."
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — owner-approved successor scope in progress
-Current Plan: 42 of 45 (MDEC acceptance and evidence scope)
-Next plan file: 06-42-PLAN.md, followed by sequential successors 06-43 through 06-45
-Status: The owner approved deterministic MDEC with available verified hardware coverage. Exact 8-bit and complete external frame/movie hardware conformance remain unproved; prior 06-23/24 acceptance is pending successor verification. Phase release is not complete.
+Current Plan: 45 of 45 (hosted acceptance and ship)
+Next plan file: 06-45-PLAN.md
+Status: Plans 06-42 through 06-44 are complete. Deterministic MDEC with available verified hardware coverage is in scope; exact 8-bit and complete external frame/movie hardware conformance remain unproved. Local acceptance is complete; exact-head hosted CI/nightly and RetroArch acceptance, phase ship/release and milestone completion remain pending.
 Last activity: 2026-11-17
 
 Progress: [████████░░] 83%
@@ -41,7 +41,7 @@ Progress: [████████░░] 83%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 187
+- Total plans completed: 194
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -54,7 +54,7 @@ Progress: [████████░░] 83%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 37 | 45 | - |
+| 06 | 42 | 45 | - |
 
 **Recent Trend:**
 - Last 5 plans: -

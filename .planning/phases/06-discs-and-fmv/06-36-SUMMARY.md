@@ -146,4 +146,3 @@ Plan 06-37 is ready to address the production arithmetic and ordered status call
 - **Semantic assessment:** The failures are actual arithmetic/output differences. The first 8-bit mismatch is `0x0005ffff` versus independently pinned `0x0004ffff`; production changes remain deferred to Plan 06-37.
 
 ## Self-Check: PASSED
-
