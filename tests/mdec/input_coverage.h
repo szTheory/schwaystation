@@ -9,7 +9,8 @@ enum {
     SCHWAY__MDEC_COVERAGE_COMPLETE = 0u,
     SCHWAY__MDEC_COVERAGE_INCOMPLETE = 1u,
     SCHWAY__MDEC_COVERAGE_MALFORMED = 2u,
-    SCHWAY__MDEC_INPUT_MAX_BYTES = 262144u
+    SCHWAY__MDEC_INPUT_MAX_BYTES = 262144u,
+    SCHWAY__MDEC_BLOCKS_PER_COLOR_MACROBLOCK = 6u
 };
 
 typedef struct schway__mdec_coverage {
@@ -47,6 +48,8 @@ static inline uint32_t schway__mdec_input_coverage_scan(const uint8_t *bytes, si
     if (coverage != NULL) {
         coverage->complete_blocks = 0u;
         coverage->trailing_coefficients = 0u;
+        coverage->complete_macroblocks = 0u;
+        coverage->trailing_blocks = 0u;
     }
     if (coverage == NULL || (bytes == NULL && size != 0u) ||
         size > SCHWAY__MDEC_INPUT_MAX_BYTES || (size & 1u) != 0u) {
@@ -81,6 +84,10 @@ static inline uint32_t schway__mdec_input_coverage_scan(const uint8_t *bytes, si
             coefficients = 0u;
         }
     }
+    coverage->complete_macroblocks = coverage->complete_blocks /
+                                     SCHWAY__MDEC_BLOCKS_PER_COLOR_MACROBLOCK;
+    coverage->trailing_blocks = coverage->complete_blocks %
+                                SCHWAY__MDEC_BLOCKS_PER_COLOR_MACROBLOCK;
     if (block_active != 0u) {
         coverage->trailing_coefficients = coefficients;
         return SCHWAY__MDEC_COVERAGE_INCOMPLETE;

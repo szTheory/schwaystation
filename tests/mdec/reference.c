@@ -31,12 +31,82 @@
 
 enum {
     REFERENCE_LOG_LIMIT = 150000u,
-    REFERENCE_EXE_LIMIT = 1024u * 1024u,
+    REFERENCE_EXE_LIMIT = 2u * 1024u * 1024u,
     GUEST_TTY_LIMIT = 256u * 1024u,
     GUEST_RUN_LIMIT = 19200u,
     GUEST_RUN_CYCLES = 256u,
     BLOCK_ROWS = 8u,
-    RAM_SIZE = 2u * 1024u * 1024u
+    RAM_SIZE = 2u * 1024u * 1024u,
+    PSX_EXE_HEADER_SIZE = 0x800u,
+    MONO_INPUT_FILE_OFFSET = 0x2800u,
+    MONO_INPUT_BYTES = 128u,
+    MONO_INPUT_BLOCKS = 1u,
+    FRAME_INPUT_OFFSET_15BIT = 0x3B98u,
+    FRAME_INPUT_OFFSET_24BIT = 0x3BACu,
+    FRAME_INPUT_BYTES = 56960u,
+    FRAME_INPUT_BLOCKS = 1800u,
+    FRAME_INPUT_MACROBLOCKS = 300u,
+    MOVIE_INPUT_FILE_OFFSET = 0x2800u,
+    MOVIE_INPUT_BYTES = 0x1A80u,
+    MOVIE_INPUT_BLOCKS = 1440u,
+    MOVIE_INPUT_MACROBLOCKS = 240u,
+    REFERENCE_PATH_LIMIT = 4096u
+};
+
+#define PSX_EXE_LOAD_ADDRESS UINT32_C(0x80010000)
+#define MONO_INPUT_RAM_ADDRESS UINT32_C(0x80012000)
+#define FRAME_INPUT_RAM_15BIT UINT32_C(0x80013398)
+#define FRAME_INPUT_RAM_24BIT UINT32_C(0x800133AC)
+#define MOVIE_INPUT_RAM_ADDRESS UINT32_C(0x80012000)
+
+/* The mono span is the pinned 32-word DMA0 input in model.c. The frame span
+   is mdec/frame/sunset.h (SHA-256 8b2709d066c48aaefa3fdf46c2a46aa76f145146e50d80a1cdf1f7c9f5aafc24),
+   declared as 56,960 bytes by the pinned caller. Its unique matches are at
+   frame-15bit.exe file offset 0x3b98 and frame-24bit.exe 0x3bac. The movie
+   span is frames[0] = {0, 0x1a80} from mdec/movie/bad_apple.h (SHA-256
+   6fa61ccc9185da9ccf92694c77ef79a51628def75981fd29dcc0b8e03820b10c); it
+   uniquely matches both movie EXEs at file offset 0x2800. All four payloads
+   load at 0x80010000, so each file offset maps to load-address + offset -
+   0x800. The full source-span digests are checked below; the frame and movie
+   spans contain 1,800/1,440 complete blocks (300/240 six-block macroblocks).
+   The 296/162 counts in earlier run diagnostics were decoder output progress,
+   not source coverage. */
+#define MONO_INPUT_SHA256 "90131ca6e84b008df68fb6a14f5572fd9d553cbeffa8cda29115ef025d9b3e24"
+#define FRAME_INPUT_SHA256 "155c87fd5dcc2c90b300ad3590cf21491a555d219b79366f5f73672ded50108a"
+#define MOVIE_INPUT_SHA256 "b54127891197749f982081414ee726de19ef6cc6d75e08246337ad5ed11401c0"
+
+typedef struct mdec_input_source {
+    const char *name;
+    const char *relative_path;
+    const char *exe_sha256;
+    uint32_t ram_address;
+    uint32_t file_offset;
+    size_t byte_count;
+    const char *input_sha256;
+    uint32_t complete_blocks;
+    uint32_t complete_macroblocks;
+    uint32_t trailing_blocks;
+} mdec_input_source;
+
+static const mdec_input_source mdec_input_sources[] = {
+    {"mono-4bit", "mdec/4bit/4bit.exe", SCHWAY_MDEC_4BIT_EXE_SHA256,
+     MONO_INPUT_RAM_ADDRESS, MONO_INPUT_FILE_OFFSET, MONO_INPUT_BYTES,
+     MONO_INPUT_SHA256, MONO_INPUT_BLOCKS, 0u, 1u},
+    {"mono-8bit", "mdec/8bit/8bit.exe", SCHWAY_MDEC_8BIT_EXE_SHA256,
+     MONO_INPUT_RAM_ADDRESS, MONO_INPUT_FILE_OFFSET, MONO_INPUT_BYTES,
+     MONO_INPUT_SHA256, MONO_INPUT_BLOCKS, 0u, 1u},
+    {"frame15", "color/mdec/frame/frame-15bit.exe", SCHWAY_MDEC_FRAME15_EXE_SHA256,
+     FRAME_INPUT_RAM_15BIT, FRAME_INPUT_OFFSET_15BIT, FRAME_INPUT_BYTES,
+     FRAME_INPUT_SHA256, FRAME_INPUT_BLOCKS, FRAME_INPUT_MACROBLOCKS, 0u},
+    {"frame24", "color/mdec/frame/frame-24bit.exe", SCHWAY_MDEC_FRAME24_EXE_SHA256,
+     FRAME_INPUT_RAM_24BIT, FRAME_INPUT_OFFSET_24BIT, FRAME_INPUT_BYTES,
+     FRAME_INPUT_SHA256, FRAME_INPUT_BLOCKS, FRAME_INPUT_MACROBLOCKS, 0u},
+    {"movie15", "color/mdec/movie/movie-15bit.exe", SCHWAY_MDEC_MOVIE15_EXE_SHA256,
+     MOVIE_INPUT_RAM_ADDRESS, MOVIE_INPUT_FILE_OFFSET, MOVIE_INPUT_BYTES,
+     MOVIE_INPUT_SHA256, MOVIE_INPUT_BLOCKS, MOVIE_INPUT_MACROBLOCKS, 0u},
+    {"movie24", "color/mdec/movie/movie-24bit.exe", SCHWAY_MDEC_MOVIE24_EXE_SHA256,
+     MOVIE_INPUT_RAM_ADDRESS, MOVIE_INPUT_FILE_OFFSET, MOVIE_INPUT_BYTES,
+     MOVIE_INPUT_SHA256, MOVIE_INPUT_BLOCKS, MOVIE_INPUT_MACROBLOCKS, 0u}
 };
 
 typedef struct status_events {
@@ -227,6 +297,74 @@ static int digest_matches(const uint8_t *bytes, size_t size, const char *expecte
     schway__sha256_final(&hash, digest);
     schway__sha256_hex(digest, hex);
     return strcmp(hex, expected) == 0;
+}
+
+static uint32_t read_le32(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) |
+           ((uint32_t)bytes[2] << 16u) | ((uint32_t)bytes[3] << 24u);
+}
+
+static uint32_t count_span_matches(const uint8_t *bytes, size_t size,
+                                   const uint8_t *span, size_t span_size)
+{
+    if (bytes == NULL || span == NULL || span_size == 0u || span_size > size) return 0u;
+    size_t anchor_size = span_size < 16u ? span_size : 16u;
+    size_t suffix_offset = span_size - anchor_size;
+    uint32_t matches = 0u;
+    for (size_t at = 0u; at <= size - span_size; at++) {
+        if (memcmp(bytes + at, span, anchor_size) != 0 ||
+            memcmp(bytes + at + suffix_offset, span + suffix_offset, anchor_size) != 0) {
+            continue;
+        }
+        if (memcmp(bytes + at, span, span_size) == 0) {
+            matches++;
+            if (matches > 1u) return matches;
+        }
+    }
+    return matches;
+}
+
+static int input_source_matches(const uint8_t *exe, size_t exe_size,
+                                const mdec_input_source *source,
+                                schway__mdec_coverage *coverage_out)
+{
+    if (exe == NULL || source == NULL || coverage_out == NULL ||
+        exe_size < PSX_EXE_HEADER_SIZE ||
+        !digest_matches(exe, exe_size, source->exe_sha256) ||
+        memcmp(exe, "PS-X EXE", sizeof "PS-X EXE" - 1u) != 0) {
+        return 0;
+    }
+
+    uint32_t load_address = read_le32(exe + 0x18u);
+    uint32_t payload_size_u32 = read_le32(exe + 0x1Cu);
+    size_t payload_size = exe_size - PSX_EXE_HEADER_SIZE;
+    uint64_t mapped_end = (uint64_t)load_address + payload_size_u32;
+    uint64_t source_end = (uint64_t)source->ram_address + source->byte_count;
+    if (load_address != PSX_EXE_LOAD_ADDRESS || (size_t)payload_size_u32 != payload_size ||
+        source->ram_address < load_address || source_end > mapped_end) {
+        return 0;
+    }
+
+    size_t file_offset = (size_t)PSX_EXE_HEADER_SIZE +
+                         (size_t)(source->ram_address - load_address);
+    if (file_offset != source->file_offset || file_offset > exe_size ||
+        source->byte_count > exe_size - file_offset) {
+        return 0;
+    }
+    const uint8_t *input_bytes = exe + file_offset;
+    if (!digest_matches(input_bytes, source->byte_count, source->input_sha256) ||
+        count_span_matches(exe, exe_size, input_bytes, source->byte_count) != 1u) {
+        return 0;
+    }
+
+    uint32_t status = schway__mdec_input_coverage_scan(input_bytes,
+                                                       source->byte_count, coverage_out);
+    return status == SCHWAY__MDEC_COVERAGE_COMPLETE &&
+           coverage_out->complete_blocks == source->complete_blocks &&
+           coverage_out->trailing_coefficients == 0u &&
+           coverage_out->complete_macroblocks == source->complete_macroblocks &&
+           coverage_out->trailing_blocks == source->trailing_blocks;
 }
 
 static const uint8_t *find_bytes(const uint8_t *bytes, size_t size,
@@ -544,6 +682,46 @@ static const char *log_digest_for(const char *mode)
     return SCHWAY_MDEC_STATUS_LOG_SHA256;
 }
 
+static const mdec_input_source *mono_source_for_mode(const char *mode)
+{
+    if (strcmp(mode, "4bit") == 0) return &mdec_input_sources[0];
+    if (strcmp(mode, "8bit") == 0 || strcmp(mode, "8bit-regression") == 0)
+        return &mdec_input_sources[1];
+    return NULL;
+}
+
+static int run_input_preflight(const char *asset_root)
+{
+    for (size_t i = 0u; i < sizeof mdec_input_sources / sizeof mdec_input_sources[0]; i++) {
+        const mdec_input_source *source = &mdec_input_sources[i];
+        char path[REFERENCE_PATH_LIMIT];
+        int path_size = snprintf(path, sizeof path, "%s/%s", asset_root, source->relative_path);
+        if (path_size < 0 || (size_t)path_size >= sizeof path) {
+            fprintf(stderr, "MDEC_INPUT_PREFLIGHT_ERROR: asset path is too long for %s\n",
+                    source->name);
+            return 2;
+        }
+        size_t exe_size = 0u;
+        uint8_t *exe = read_bounded(path, REFERENCE_EXE_LIMIT, &exe_size);
+        schway__mdec_coverage coverage;
+        memset(&coverage, 0, sizeof coverage);
+        if (exe == NULL || !input_source_matches(exe, exe_size, source, &coverage)) {
+            fprintf(stderr,
+                    "MDEC_INPUT_PREFLIGHT_ERROR: %s pin, PS-X load map, span digest, or block count mismatch\n",
+                    source->name);
+            free(exe);
+            return 1;
+        }
+        printf("MDEC_INPUT_SPAN_OK: asset=%s file_offset=%08x ram=%08x bytes=%zu blocks=%u macroblocks=%u trailing_blocks=%u span_sha256=%s\n",
+               source->name, source->file_offset, source->ram_address, source->byte_count,
+               coverage.complete_blocks, coverage.complete_macroblocks,
+               coverage.trailing_blocks, source->input_sha256);
+        free(exe);
+    }
+    puts("MDEC_INPUT_PREFLIGHT_OK: six pinned spans and declared units verified; no guest was run");
+    return 0;
+}
+
 static int run_block_guest(const char *mode, const char *exe_path, const char *log_path)
 {
     size_t exe_size = 0u;
@@ -558,6 +736,21 @@ static int run_block_guest(const char *mode, const char *exe_path, const char *l
         free(log);
         return 2;
     }
+    const mdec_input_source *input_source = mono_source_for_mode(mode);
+    schway__mdec_coverage input_coverage;
+    memset(&input_coverage, 0, sizeof input_coverage);
+    if (input_source == NULL || !input_source_matches(exe, exe_size, input_source,
+                                                       &input_coverage)) {
+        fprintf(stderr,
+                "MDEC_INPUT_GUARD_ERROR: %s pinned mono input is not a complete mapped block span\n",
+                mode);
+        free(exe);
+        free(log);
+        return 2;
+    }
+    printf("MDEC_INPUT_GUARD_OK: mode=%s file_offset=%08x ram=%08x bytes=%zu blocks=%u\n",
+           mode, input_source->file_offset, input_source->ram_address,
+           input_source->byte_count, input_coverage.complete_blocks);
     uint8_t *tty = NULL;
     size_t tty_size = 0u;
     schway *inst = NULL;
@@ -896,6 +1089,8 @@ int main(int argc, char **argv)
 {
     if (argc >= 2 && (strncmp(argv[1], "color", 5u) == 0))
         return schway_mdec_color_reference_run(argc, argv);
+    if (argc == 3 && strcmp(argv[1], "input-preflight") == 0)
+        return run_input_preflight(argv[2]);
     if (argc == 4 && (strcmp(argv[1], "4bit") == 0 || strcmp(argv[1], "8bit") == 0 ||
                       strcmp(argv[1], "8bit-regression") == 0))
         return run_block_guest(argv[1], argv[2], argv[3]);
@@ -903,6 +1098,6 @@ int main(int argc, char **argv)
         return run_status_guest(argv[2], argv[3]);
     if (argc == 5 && strcmp(argv[1], "controls") == 0)
         return run_negative_controls(argv[2], argv[3], argv[4]);
-    fprintf(stderr, "MDEC_REFERENCE_USAGE_ERROR: expected 4bit|8bit|8bit-regression|status EXE LOG or controls LOG4 LOG8 STATUS_LOG\n");
+    fprintf(stderr, "MDEC_REFERENCE_USAGE_ERROR: expected input-preflight ASSET_ROOT, 4bit|8bit|8bit-regression|status EXE LOG, or controls LOG4 LOG8 STATUS_LOG\n");
     return 2;
 }
