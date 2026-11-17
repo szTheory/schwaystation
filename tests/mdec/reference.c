@@ -8,6 +8,7 @@
 #include "schwaystation.h"
 #include "sha256.h"
 #include "internal.h"
+#include "input_coverage.h"
 
 #ifndef SCHWAY_MDEC_4BIT_EXE_SHA256
 #error "CMake must bind the pinned 4-bit guest digest"
@@ -510,6 +511,13 @@ static int block_bytes_match(const uint8_t *actual, const uint8_t *expected, siz
     return actual != NULL && expected != NULL && size != 0u && memcmp(actual, expected, size) == 0;
 }
 
+static int regression_bytes_match(const uint8_t *actual, size_t size)
+{
+    return actual != NULL && size == sizeof schway__mdec_8bit_regression_bytes &&
+           memcmp(actual, schway__mdec_8bit_regression_bytes,
+                  sizeof schway__mdec_8bit_regression_bytes) == 0;
+}
+
 static uint32_t find_ram_bytes(const uint8_t *ram, size_t size, const uint8_t *bytes,
                                size_t byte_count)
 {
@@ -523,14 +531,16 @@ static uint32_t find_ram_bytes(const uint8_t *ram, size_t size, const uint8_t *b
 static const char *exe_digest_for(const char *mode)
 {
     if (strcmp(mode, "4bit") == 0) return SCHWAY_MDEC_4BIT_EXE_SHA256;
-    if (strcmp(mode, "8bit") == 0) return SCHWAY_MDEC_8BIT_EXE_SHA256;
+    if (strcmp(mode, "8bit") == 0 || strcmp(mode, "8bit-regression") == 0)
+        return SCHWAY_MDEC_8BIT_EXE_SHA256;
     return SCHWAY_MDEC_STATUS_EXE_SHA256;
 }
 
 static const char *log_digest_for(const char *mode)
 {
     if (strcmp(mode, "4bit") == 0) return SCHWAY_MDEC_4BIT_LOG_SHA256;
-    if (strcmp(mode, "8bit") == 0) return SCHWAY_MDEC_8BIT_LOG_SHA256;
+    if (strcmp(mode, "8bit") == 0 || strcmp(mode, "8bit-regression") == 0)
+        return SCHWAY_MDEC_8BIT_LOG_SHA256;
     return SCHWAY_MDEC_STATUS_LOG_SHA256;
 }
 
@@ -554,14 +564,21 @@ static int run_block_guest(const char *mode, const char *exe_path, const char *l
     mdec_guest_snapshot snapshot;
     int guest_complete = run_guest(exe, exe_size, &tty, &tty_size, &inst, &snapshot);
     free(exe);
-    size_t output_size = strcmp(mode, "4bit") == 0 ? 32u : 64u;
-    uint32_t row_bytes = strcmp(mode, "4bit") == 0 ? 4u : 8u;
+    int is_4bit = strcmp(mode, "4bit") == 0;
+    int is_regression = strcmp(mode, "8bit-regression") == 0;
+    size_t output_size = is_4bit != 0 ? 32u : 64u;
+    uint32_t row_bytes = is_4bit != 0 ? 4u : 8u;
     uint32_t log_target_address = UINT32_MAX;
-    uint8_t expected[64];
+    uint8_t hardware_expected[64];
+    const uint8_t *expected = is_regression != 0
+                                  ? schway__mdec_8bit_regression_bytes
+                                  : hardware_expected;
+    const char *log_mode = is_4bit != 0 ? "4bit" : "8bit";
     int valid = guest_complete != 0 && parse_output_target(log, log_size, &log_target_address) &&
-                find_bytes(tty, tty_size, strcmp(mode, "4bit") == 0 ? "mdec/4bit" : "mdec/8bit",
-                           strcmp(mode, "4bit") == 0 ? sizeof "mdec/4bit" - 1u : sizeof "mdec/8bit" - 1u) != NULL &&
-                parse_expected_block(log, log_size, mode, row_bytes, expected, output_size);
+                find_bytes(tty, tty_size, is_4bit != 0 ? "mdec/4bit" : "mdec/8bit",
+                           is_4bit != 0 ? sizeof "mdec/4bit" - 1u : sizeof "mdec/8bit" - 1u) != NULL &&
+                parse_expected_block(log, log_size, log_mode, row_bytes, hardware_expected,
+                                     output_size);
     if (valid != 0 && (log_target_address > RAM_SIZE ||
                        output_size > RAM_SIZE - log_target_address)) valid = 0;
     /* SCM.12's pinned main.cpp uses a stack buffer, and common/mdec.cpp writes
@@ -571,7 +588,10 @@ static int run_block_guest(const char *mode, const char *exe_path, const char *l
     int dma1_target_valid = valid != 0 && snapshot.dma1_started != 0u &&
                             dma1_address <= RAM_SIZE && output_size <= RAM_SIZE - dma1_address;
     int output_matches = dma1_target_valid != 0 &&
-                         block_bytes_match(inst->bus.ram + dma1_address, expected, output_size);
+                         (is_regression != 0
+                              ? regression_bytes_match(inst->bus.ram + dma1_address, output_size)
+                              : block_bytes_match(inst->bus.ram + dma1_address, expected,
+                                                  output_size));
     if (valid != 0 && (!dma1_target_valid || !output_matches)) {
         if (!dma1_target_valid) {
             fprintf(stderr,
@@ -823,6 +843,7 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
         return 2;
     }
     uint8_t mutated[64];
+    uint8_t mutated_regression[sizeof schway__mdec_8bit_regression_bytes];
     uint8_t expected4[32];
     uint8_t expected8[64];
     int block4_parsed = parse_expected_block(log4, log4_size, "4bit", 4u, expected4, sizeof expected4);
@@ -834,6 +855,13 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
     mutated[0] ^= 1u;
     int corrupted_block_rejected = block4_parsed != 0 &&
                                    !block_bytes_match(mutated, expected4, sizeof expected4);
+    memcpy(mutated_regression, schway__mdec_8bit_regression_bytes,
+           sizeof mutated_regression);
+    mutated_regression[0] ^= 1u;
+    int regression_mutation_rejected =
+        regression_bytes_match(schway__mdec_8bit_regression_bytes,
+                               sizeof schway__mdec_8bit_regression_bytes) &&
+        !regression_bytes_match(mutated_regression, sizeof mutated_regression);
     uint8_t *mutated_status = (uint8_t *)malloc(status_size);
     size_t mutated_status_size = 0u;
     int reordered_rejected = mutated_status != NULL &&
@@ -847,18 +875,18 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
                            !status_order_matches(status, status_size,
                                                  mutated_status, mutated_status_size);
     if (block4_parsed == 0 || block8_parsed == 0 || !regression_identity_mapped ||
-        !corrupted_block_rejected ||
+        !corrupted_block_rejected || !regression_mutation_rejected ||
         !reordered_rejected || !dropped_rejected) {
         fprintf(stderr, "MDEC_REFERENCE_CONTROL_ERROR: regression identity or byte/order control failed\n");
     } else {
-        printf("MDEC_REFERENCE_CONTROLS_OK: one-byte output mutation and reordered/dropped status events rejected\n");
+        printf("MDEC_REFERENCE_CONTROLS_OK: hardware log parse, one-byte output mutations and reordered/dropped status events checked\n");
     }
     free(mutated_status);
     free(log4);
     free(log8);
     free(status);
     return block4_parsed != 0 && block8_parsed != 0 && regression_identity_mapped &&
-                   corrupted_block_rejected &&
+                   corrupted_block_rejected && regression_mutation_rejected &&
                    reordered_rejected && dropped_rejected ? 0 : 1;
 }
 
@@ -868,12 +896,13 @@ int main(int argc, char **argv)
 {
     if (argc >= 2 && (strncmp(argv[1], "color", 5u) == 0))
         return schway_mdec_color_reference_run(argc, argv);
-    if (argc == 4 && (strcmp(argv[1], "4bit") == 0 || strcmp(argv[1], "8bit") == 0))
+    if (argc == 4 && (strcmp(argv[1], "4bit") == 0 || strcmp(argv[1], "8bit") == 0 ||
+                      strcmp(argv[1], "8bit-regression") == 0))
         return run_block_guest(argv[1], argv[2], argv[3]);
     if (argc == 4 && strcmp(argv[1], "status") == 0)
         return run_status_guest(argv[2], argv[3]);
     if (argc == 5 && strcmp(argv[1], "controls") == 0)
         return run_negative_controls(argv[2], argv[3], argv[4]);
-    fprintf(stderr, "MDEC_REFERENCE_USAGE_ERROR: expected 4bit|8bit|status EXE LOG or controls LOG4 LOG8 STATUS_LOG\n");
+    fprintf(stderr, "MDEC_REFERENCE_USAGE_ERROR: expected 4bit|8bit|8bit-regression|status EXE LOG or controls LOG4 LOG8 STATUS_LOG\n");
     return 2;
 }
