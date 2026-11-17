@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 31 of 39
+current_plan: 33 of 39
 status: executing
-stopped_at: Completed 06-15-PLAN.md; next 06-16-PLAN.md
-last_updated: "2026-11-16T23:13:24Z"
-last_activity: 2026-11-16
+stopped_at: Completed 06-16-PLAN.md; next 06-17-PLAN.md
+last_updated: "2026-11-17T01:29:36Z"
+last_activity: 2026-11-17
 state_head: f7f128b
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 181
+  completed_plans: 182
   percent: 96
-last_activity_desc: "Completed Plan 06-15: OpenBIOS boots the owned disc guest; GetTN/GetTD/GetID and a sixteen-sector ReadN DMA3 transfer match source-derived expectations, with SBI callbacks and deterministic state/input replay. Corrected the zero-based TOC lookup and added a pre-emulation Mode 2 sanity check. Built a second image with its audio track start shifted by 75 sectors for the later playlist plan. Configure/build and focused disc tests passed; the fast BIOS digest matches. Public SCPH-5501 GetID/GetTN/GetTD records are documented. Prior execution included a 22-hour pause; active runtime is not tracked. Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable)."
+last_activity_desc: "Completed Plan 06-16: generated XA/CD-DA/STR media preflight passes; the primary two-track disc is 522144 bytes under the 512 KiB cap. The owned guest produces nonzero native PCM from decoded XA/CD-DA queues and a deterministic RGB24 frame through STR→MDEC→GPU DMA; the final boot/read/audio/FMV lane passed 4/4. A pre-commit hygiene scan matched the original pin-key labels, so they were renamed with hyphens; the affected audio/FMV tests then passed 2/2. Inline review is clean. Continue with Plan 06-17. The owner reported over 22 hours elapsed during this autonomous run; active runtime was not measured. Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable). No hardware capture or hosted run URL applies."
 ---
 
 # Project State
@@ -31,17 +31,17 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 31 of 39
-Next plan file: 06-16-PLAN.md
+Current Plan: 33 of 39
+Next plan file: 06-17-PLAN.md
 Status: Ready to execute
 Last activity: 2026-11-16
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 82%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 181
+- Total plans completed: 182
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -912,3 +912,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unava
 ### Phase 6 plan 06-21 execution (2026-11-16)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable). Active duration was not tracked after the resumed-session pause. API v6 binds save states to a host-supplied disc identity; different or unavailable media is rejected before apply, legacy descriptor prefixes remain valid for emulation, and callback-free save/load behavior is covered. The no-busy-loop and focused state/API/CD suite passed 16/16; the synthetic perf lane passed 19/19. Workflow wiring checks now require both SPU and CD Cachegrind jobs; direct workflow check passed. Repository-check code is 2699/2700 lines. Public SCPH-5501 seek and MDEC capture data are recorded in the hardware pages; they do not settle XA interpolation rounding. Local Valgrind was unavailable, so real idle-CD instruction measurement awaits hosted perf CI. DISC-01/03/04 remain partial pending their downstream callers; no owner hardware run is scheduled. Next is Plan 06-15, whose fixture must supply the host-owned identity. No hosted URL applies yet.
+
+### Phase 6 plan 06-16 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); inline code review. The owner reported over 22 hours elapsed during the autonomous run; active runtime was not measured reliably. The cheap media-geometry preflight passed before final tests. The primary two-track fixture build enforces the 512 KiB cap at 522,144 bytes; reducing XA to three complete sectors shifts the authored CD-DA and STR extents, and the guest seeks their resulting LBA 214 and 54 positions. The post-review `ctest --test-dir build/ci -R '^disc\\.fixture' --no-tests=error --output-on-failure` passed 4/4 in 22.47 seconds. The pre-commit hygiene scan caught symbol-based pin labels; hyphenated labels passed the affected audio/FMV tests 2/2. The one-off record command passed and produced PCM/frame pins; no physical PlayStation capture or hosted URL is claimed. DISC-02/03 remain partial pending runner, libretro, oracle, fuzz and hosted matrix callers. Plan 06-17 is next.

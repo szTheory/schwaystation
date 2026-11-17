@@ -1,3 +1,5 @@
+set(schway__disc_gen_script "${CMAKE_CURRENT_LIST_DIR}/../tools/gen_disc.py")
+
 function(schway__disc_verify_media directory)
   set(manifest "${directory}/media.sha256")
   if(NOT EXISTS "${manifest}")
@@ -25,6 +27,16 @@ function(schway__disc_verify_media directory)
       message(FATAL_ERROR "disc fixtures: run artifact digest mismatch for ${name}")
     endif()
   endforeach()
+  if(NOT CMAKE_SCRIPT_MODE_FILE)
+    execute_process(
+      COMMAND "${Python3_EXECUTABLE}" "${schway__disc_gen_script}" --check-media "${directory}"
+      RESULT_VARIABLE coverage_result
+      OUTPUT_VARIABLE coverage_output
+      ERROR_VARIABLE coverage_error)
+    if(NOT coverage_result EQUAL 0)
+      message(FATAL_ERROR "disc fixtures: media coverage check failed: ${coverage_output}${coverage_error}")
+    endif()
+  endif()
 endfunction()
 
 if(CMAKE_SCRIPT_MODE_FILE)
@@ -90,6 +102,7 @@ add_custom_command(OUTPUT "${schway__disc_bin}"
   COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
     --split-image "${schway__disc_bin}" --cue "${schway__disc_cue}"
     --cd-da "${schway__disc_media_dir}/cdda.wav" --xml disc_boot.xml
+    --max-image-bytes 524288
   WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/fixtures"
   DEPENDS schwaystation-mkpsxiso schwaystation-fixtures "${schway__disc_guest}"
     "${PROJECT_BINARY_DIR}/fixtures/disc_boot.xml"

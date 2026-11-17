@@ -11,6 +11,12 @@
 .definelabel DMA3_CHCR, 0xBF8010B8
 .definelabel DATA_BUFFER, 0x80040000
 .definelabel DATA_BYTES, 32768
+.definelabel STR_BUFFER, 0x80050000
+.definelabel MDEC_INPUT_BUFFER, 0x80060000
+.definelabel MDEC_INPUT_BYTES, 128
+.definelabel MDEC_OUTPUT_BUFFER, 0x80061000
+.definelabel STR_LBA_FRAME_BCD, 0x54
+.definelabel STR_SECTOR_COUNT, 10
 
 .org MB_BASE
 mailbox_header 21, 0
@@ -18,6 +24,15 @@ mailbox_header 21, 0
 .org PC0
   li s0, CDROM
   li s1, MB_BASE
+
+  ; Enable the SPU CD input and both output channels at full volume.
+  li t0, 0xBF801DB0
+  li t1, 0x7FFF
+  sh t1, 0(t0)
+  sh t1, 2(t0)
+  li t0, 0xBF801DAA
+  li t1, 0xC001
+  sh t1, 0(t0)
 
   ; This first record proves the guest actually ran after the BIOS handoff.
   li t0, 0x00010001
@@ -216,8 +231,334 @@ dma_wait:
   lbu t0, 1(s0)
   jal cd_ack3
   nop
+  ; Pause also queues a delayed INT2; consume it before issuing another command.
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack2
+  nop
   sb zero, 0(s0)
   sb zero, 3(s0)
+
+  ; Play three authored XA sectors from LBA 51 through 53 via the CD filter and SPU queue.
+  sb zero, 0(s0)
+  li t0, 0x48
+  sb t0, 2(s0)
+  li t0, 0x0E
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+
+  li t0, 7
+  sb t0, 2(s0)
+  li t0, 3
+  sb t0, 2(s0)
+  li t0, 0x0D
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+
+  sb zero, 0(s0)
+  sb zero, 2(s0)
+  li t0, 2
+  sb t0, 2(s0)
+  li t0, 0x51
+  sb t0, 2(s0)
+  li t0, 0x02
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+
+  li t0, 0x06
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+  ; Leave enough cycles for the seek and the first authored XA packets.
+  li t1, 1500000
+xa_wait:
+  addiu t1, t1, -1
+  bne t1, zero, xa_wait
+  nop
+  sb zero, 0(s0)
+  li t0, 0x09
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack2
+  nop
+
+  ; Setloc to the generated track's INDEX 1 (LBA 214), then Play from that point.
+  ; This skips its two-second pregap while still exercising CD-DA sector playback.
+  sb zero, 0(s0)
+  li t0, 1
+  sb t0, 2(s0)
+  li t0, 0x0E
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+
+  sb zero, 0(s0)
+  sb zero, 2(s0)
+  li t0, 4
+  sb t0, 2(s0)
+  li t0, 0x64
+  sb t0, 2(s0)
+  li t0, 0x02
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+
+  li t0, 0
+  sb t0, 2(s0)
+  li t0, 0x03
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+  ; Let the generated CD-DA tone supply its complete sector sequence.
+  li t1, 1210000
+cdda_wait:
+  addiu t1, t1, -1
+  bne t1, zero, cdda_wait
+  nop
+  sb zero, 0(s0)
+  li t0, 0x09
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack2
+  nop
+
+  ; CD-DA playback leaves its last eight raw sectors in RDDATA. Drain those
+  ; queued sectors before reading STR data, or DMA3 would consume stale audio.
+  li t3, 0xBF801000
+  li t0, 0x80
+  sb t0, 3(s0)
+  li t0, STR_BUFFER
+  sw t0, 0x0B0(t3)
+  li t0, 4704
+  sw t0, 0x0B4(t3)
+  li t0, 0x11000000
+  sw t0, 0x0B8(t3)
+cdda_drain_wait:
+  lw t0, 0x0B8(t3)
+  nop
+  lui t1, 0x0100
+  and t0, t0, t1
+  bne t0, zero, cdda_drain_wait
+  nop
+  sb zero, 3(s0)
+
+  ; Read and DMA every STR chunk to RAM before stripping the 20h-byte headers.
+  sb zero, 0(s0)
+  li t0, 0
+  sb t0, 2(s0)
+  li t0, 0x0E
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+
+  sb zero, 0(s0)
+  sb zero, 2(s0)
+  li t0, 2
+  sb t0, 2(s0)
+  ; MOVIE.STR begins at LBA 54; Setloc takes BCD MSF, including the 150-sector offset.
+  li t0, STR_LBA_FRAME_BCD
+  sb t0, 2(s0)
+  li t0, 0x02
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+
+  li t0, 0x80
+  sb t0, 3(s0)
+  li t0, 0x06
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+  li t3, 0xBF801000
+  move s7, zero
+str_read_sector:
+  jal cd_wait
+  nop
+  li t0, 1
+  bne v0, t0, str_read_sector
+  nop
+  li t0, STR_BUFFER
+  sll t1, s7, 11
+  addu t0, t0, t1
+  sw t0, 0x0B0(t3)
+  li t0, 512
+  sw t0, 0x0B4(t3)
+  li t0, 0x11000000
+  sw t0, 0x0B8(t3)
+str_dma_wait:
+  lw t0, 0x0B8(t3)
+  nop
+  lui t1, 0x0100
+  and t0, t0, t1
+  bne t0, zero, str_dma_wait
+  nop
+  jal cd_ack1
+  nop
+  addiu s7, s7, 1
+  slti t0, s7, STR_SECTOR_COUNT
+  bne t0, zero, str_read_sector
+  nop
+
+  ; Stop ReadN and consume both responses before decoding the captured frame.
+  sb zero, 0(s0)
+  li t0, 0x09
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack2
+  nop
+  sb zero, 0(s0)
+  sb zero, 3(s0)
+
+  ; Demux the frame size from the first STR header and copy its declared stream.
+  ; The authored bitstream fits one 32-word input block.
+  li s2, STR_BUFFER
+  lw s4, 12(s2)
+  nop
+  beq s4, zero, str_invalid
+  nop
+  li t0, MDEC_INPUT_BYTES
+  sltu t1, t0, s4
+  bne t1, zero, str_invalid
+  nop
+  andi t1, s4, 3
+  bne t1, zero, str_invalid
+  nop
+  addiu s3, s2, 32
+  li s2, MDEC_INPUT_BUFFER
+  srl s5, s4, 2
+str_copy_words:
+  lw t0, 0(s3)
+  addiu s3, s3, 4
+  sw t0, 0(s2)
+  addiu s2, s2, 4
+  addiu s5, s5, -1
+  bne s5, zero, str_copy_words
+  nop
+  li t0, 0xFE00FE00
+  li t1, MDEC_INPUT_BUFFER + MDEC_INPUT_BYTES
+mdec_input_pad:
+  sw t0, 0(s2)
+  addiu s2, s2, 4
+  bne s2, t1, mdec_input_pad
+  nop
+
+  ; Decode one 16x16 RGB24 macroblock through DMA0 and DMA1.
+  li t0, 0xBF801824
+  li t1, 0x60000000
+  sw t1, 0(t0)
+  li t0, 0xBF801820
+  li t1, 0x38000020
+  sw t1, 0(t0)
+  li t3, 0xBF801000
+  li t0, MDEC_OUTPUT_BUFFER
+  sw t0, 0x090(t3)
+  li t0, 0x000100C0
+  sw t0, 0x094(t3)
+  li t0, 0x01000200
+  sw t0, 0x098(t3)
+  li t0, MDEC_INPUT_BUFFER
+  sw t0, 0x080(t3)
+  li t0, 0x00010020
+  sw t0, 0x084(t3)
+  li t0, 0x01000201
+  sw t0, 0x088(t3)
+mdec_dma_wait:
+  lw t0, 0x088(t3)
+  lw t1, 0x098(t3)
+  nop
+  lui t2, 0x0100
+  and t0, t0, t2
+  and t1, t1, t2
+  or t0, t0, t1
+  bne t0, zero, mdec_dma_wait
+  nop
+
+  ; Set a 16x16 native RGB24 display and upload the decoded pixels via DMA2.
+  li t0, 0x04000002
+  sw t0, 0x814(t3)
+  li t0, 0x05000000
+  sw t0, 0x814(t3)
+  li t0, 0x06080000
+  sw t0, 0x814(t3)
+  li t0, 0x07004000
+  sw t0, 0x814(t3)
+  li t0, 0x08000011
+  sw t0, 0x814(t3)
+  li t0, 0x03000000
+  sw t0, 0x814(t3)
+  li t0, 0xA0000000
+  sw t0, 0x810(t3)
+  sw zero, 0x810(t3)
+  li t0, 0x00100018
+  sw t0, 0x810(t3)
+  li t0, MDEC_OUTPUT_BUFFER
+  sw t0, 0x0A0(t3)
+  li t0, 0x00C00001
+  sw t0, 0x0A4(t3)
+  li t0, 0x01000201
+  sw t0, 0x0A8(t3)
+gpu_dma_wait:
+  lw t0, 0x0A8(t3)
+  nop
+  lui t1, 0x0100
+  and t0, t0, t1
+  bne t0, zero, gpu_dma_wait
+  nop
 
   ; Guest CRC-32/IEEE over the 32 KiB DMA result. The host recomputes this
   ; from the generated image and also compares every transferred byte.
@@ -258,6 +599,13 @@ crc_next:
   mailbox_seal
 hang:
   j hang
+  nop
+
+str_invalid:
+  li t0, 0xFF
+  sb t0, MB_STATUS(s1)
+str_invalid_hang:
+  j str_invalid_hang
   nop
 
 ; Poll the current controller interrupt in index bank one. The host frame cap

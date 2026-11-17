@@ -48,6 +48,24 @@ schway_add_test(NAME disc.fixture.boot
     "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
   LABELS disc portable TIMEOUT 180)
 
+schway_add_test(NAME disc.fixture.audio
+  COMMAND schwaystation-test-disc-fixture audio
+    "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+    "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+    "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+  LABELS disc portable TIMEOUT 300)
+
+schway_add_test(NAME disc.fixture.fmv
+  COMMAND schwaystation-test-disc-fixture fmv
+    "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+    "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+    "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+  LABELS disc portable TIMEOUT 300)
+
 schway_add_test(NAME disc.fixture.read
   COMMAND schwaystation-test-disc-fixture read
     "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
