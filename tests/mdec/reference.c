@@ -827,6 +827,9 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
     uint8_t expected8[64];
     int block4_parsed = parse_expected_block(log4, log4_size, "4bit", 4u, expected4, sizeof expected4);
     int block8_parsed = parse_expected_block(log8, log8_size, "8bit", 8u, expected8, sizeof expected8);
+    int regression_identity_mapped =
+        strcmp(exe_digest_for("8bit-regression"), SCHWAY_MDEC_8BIT_EXE_SHA256) == 0 &&
+        strcmp(log_digest_for("8bit-regression"), SCHWAY_MDEC_8BIT_LOG_SHA256) == 0;
     memcpy(mutated, expected4, sizeof expected4);
     mutated[0] ^= 1u;
     int corrupted_block_rejected = block4_parsed != 0 &&
@@ -843,9 +846,10 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
                                                 status_size, &mutated_status_size) &&
                            !status_order_matches(status, status_size,
                                                  mutated_status, mutated_status_size);
-    if (block4_parsed == 0 || block8_parsed == 0 || !corrupted_block_rejected ||
+    if (block4_parsed == 0 || block8_parsed == 0 || !regression_identity_mapped ||
+        !corrupted_block_rejected ||
         !reordered_rejected || !dropped_rejected) {
-        fprintf(stderr, "MDEC_REFERENCE_CONTROL_ERROR: byte/order negative control was accepted\n");
+        fprintf(stderr, "MDEC_REFERENCE_CONTROL_ERROR: regression identity or byte/order control failed\n");
     } else {
         printf("MDEC_REFERENCE_CONTROLS_OK: one-byte output mutation and reordered/dropped status events rejected\n");
     }
@@ -853,7 +857,8 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
     free(log4);
     free(log8);
     free(status);
-    return block4_parsed != 0 && block8_parsed != 0 && corrupted_block_rejected &&
+    return block4_parsed != 0 && block8_parsed != 0 && regression_identity_mapped &&
+                   corrupted_block_rejected &&
                    reordered_rejected && dropped_rejected ? 0 : 1;
 }
 
