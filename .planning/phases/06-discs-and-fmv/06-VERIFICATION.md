@@ -195,3 +195,23 @@ external frame/movie conformance selectors with gating source-coverage selectors
 the execution/output limitations as evidence. Do not change arithmetic, hardware expected bytes or the fixed
 4,915,200-cycle cap. Plans 06-43 and 06-44 completed selector synchronization and local acceptance. Plan 06-45
 owns exact-head hosted acceptance, ship and release checks; no owner capture or further approval is needed.
+
+## Plan 06-45 portability repair preflight (2026-11-17)
+
+The first repaired hosted run exposed a cluster of independent environment and wiring failures. The focused review
+found no additional code defect after the 16×16 workflow assertion was corrected. Cheap preflights passed before
+the full local workflow: `python3 -m json.tool CMakePresets.json >/dev/null` (exit 0),
+`cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` (exit 0), and
+`git diff --check origin/main -- . ':!tests/probe/rc_hash_disc.c'` (exit 0).
+
+Local verification on the reviewed portability repair snapshot:
+
+- `ctest --test-dir build/ci --output-on-failure -R 'core\.state\.(device_fields|record_sweep)|disc\.(image\..*|fixture\..*|xa)'` — exit 0, 15/15 affected tests passed.
+- `cmake --workflow --preset ci` — exit 0; 612/612 tests and the release workflow's 5/5 checks passed. Total test wall time was 72.32 seconds; release checks took 1.12 seconds.
+- `cmake --workflow --preset hygiene` — exit 0; 23/23 checks passed, including the full-tree scan in 38.77 seconds.
+- `git diff --check` — exit 0.
+
+No local WASI compile is claimed: this checkout lacks clang-21/wasm-ld, and the existing `build/wasm32` directory
+contains only a CMake cache without a generated Ninja build. The exact-head hosted wasm32 lane remains required.
+Hosted CI, Nightly, and the background RetroArch `disc_boot` comparison also remain pending for the pushed reviewed
+head. These are unresolved checks, not waivers or passes; the 4-bit oracle and owned disc acceptance remain intact.

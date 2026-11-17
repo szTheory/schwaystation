@@ -383,8 +383,9 @@ static uint32_t reference_resample(const int16_t *input, uint32_t frames,
 static uint32_t compare_resampler(const int16_t *input, uint32_t frames, uint32_t low_rate)
 {
     schway *inst = make();
-    int16_t actual[SCHWAY__CDXA_MAX_OUTPUT_FRAMES * 2u];
-    int16_t expected[SCHWAY__CDXA_MAX_OUTPUT_FRAMES * 2u];
+    /* Keep the maximum-size outputs off the small default WASI stack. */
+    static int16_t actual[SCHWAY__CDXA_MAX_OUTPUT_FRAMES * 2u];
+    static int16_t expected[SCHWAY__CDXA_MAX_OUTPUT_FRAMES * 2u];
     uint32_t actual_frames = 0u;
     uint32_t expected_frames = reference_resample(input, frames, low_rate, expected);
     CHECK_EQ_U64(schway__cdxa_resample(inst, input, frames, low_rate, actual,

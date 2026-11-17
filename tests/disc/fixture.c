@@ -10,6 +10,7 @@
 #include "disc_image.h"
 #include "internal.h"
 #include "sha256.h"
+#include "../test_open.h"
 
 #define DISC_LBA_FIRST 32u
 #define DISC_SECTOR_COUNT 16u
@@ -66,7 +67,7 @@ static void fixture_free(void *user, void *ptr, size_t size)
 
 static uint8_t *read_file(const char *path, size_t *size)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     if (file == NULL || fseek(file, 0L, SEEK_END) != 0) {
         if (file != NULL) (void)fclose(file);
         return NULL;
@@ -153,7 +154,7 @@ static int identity_for_disc(struct fixture_disc *host, schway_disc *disc)
 
 static int expected_bios_digest(const char *path, uint8_t expected[32])
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     char hex[66];
     if (file == NULL) return 0;
     int ok = fgets(hex, (int)sizeof hex, file) != NULL && fclose(file) == 0;
@@ -161,7 +162,11 @@ static int expected_bios_digest(const char *path, uint8_t expected[32])
     hex[64] = '\0';
     for (uint32_t i = 0u; i < 32u; i++) {
         unsigned int value = 0u;
+#if defined(_MSC_VER)
+        if (sscanf_s(hex + i * 2u, "%2x", &value) != 1) return 0;
+#else
         if (sscanf(hex + i * 2u, "%2x", &value) != 1) return 0;
+#endif
         expected[i] = (uint8_t)value;
     }
     return 1;
@@ -343,7 +348,7 @@ static uint32_t read_le32(const uint8_t *bytes)
 
 static int load_expected_records(const char *path, uint32_t expected[8])
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     if (file == NULL) return 0;
     char line[1024];
     uint32_t seen = 0u;
@@ -407,7 +412,7 @@ static int copy_hash(const char *value, char output[65])
 
 static int load_expected_av(const char *path, struct av_expectations *expected)
 {
-    FILE *file = fopen(path, "rb");
+    FILE *file = schway__test_open_file(path, "rb");
     if (file == NULL) return 0;
     memset(expected, 0, sizeof *expected);
     char line[1024];
@@ -985,7 +990,7 @@ static int run_av_case(const char *mode, const char *bios_path,
             char mailbox_press[65];
             digest_mailbox(none_mailbox, mailbox_none);
             digest_mailbox(press_mailbox, mailbox_press);
-            FILE *capture_file = fopen(predicate_path, "wb");
+            FILE *capture_file = schway__test_open_file(predicate_path, "wb");
             int wrote = capture_file != NULL &&
                 fprintf(capture_file,
                         "boots@600 disc_boot none pass\n"

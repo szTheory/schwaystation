@@ -14,6 +14,7 @@
 #include <windows.h>
 #else
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #define SCHWAY__DISC_IMAGE_MAX_BYTES UINT64_C(1073741824)
@@ -547,6 +548,36 @@ static int schway__disc_image_canonical_path(const char *path, char out[SCHWAY__
                                        FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
     (void)CloseHandle(handle);
     return length != 0u && length < SCHWAY__DISC_IMAGE_PATH_CAP;
+#elif defined(__wasi__)
+    /* WASI filesystem calls resolve paths relative to preopened directories.
+       realpath's readlink calls therefore need a path relative to the guest CWD. */
+    char cwd[SCHWAY__DISC_IMAGE_PATH_CAP];
+    if (getcwd(cwd, sizeof cwd) == NULL) return 0;
+    size_t cwd_size = strlen(cwd);
+    if (path[0] == '/') {
+        if (cwd_size == 1u && cwd[0] == '/') {
+            path++;
+        } else {
+            if (strncmp(path, cwd, cwd_size) != 0 ||
+                (path[cwd_size] != '/' && path[cwd_size] != '\0')) return 0;
+            path += cwd_size;
+        }
+        while (*path == '/') path++;
+        if (*path == '\0') path = ".";
+    }
+    char *resolved = realpath(path, NULL);
+    if (resolved == NULL) return 0;
+    /* Keep the provider inside the directory granted to the WASI guest. */
+    if (strncmp(resolved, cwd, cwd_size) != 0 ||
+        (resolved[cwd_size] != '/' && resolved[cwd_size] != '\0')) {
+        free(resolved);
+        return 0;
+    }
+    size_t length = strlen(resolved);
+    int fits = length < SCHWAY__DISC_IMAGE_PATH_CAP;
+    if (fits) memcpy(out, resolved, length + 1u);
+    free(resolved);
+    return fits;
 #else
     char *resolved = realpath(path, NULL);
     if (resolved == NULL) return 0;

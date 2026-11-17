@@ -60,7 +60,8 @@ foreach(case IN ITEMS state.cpu_fields state.device_fields state.round_trip stat
     state.record_sweep state.run_bounds)
   set(timeout 10)
   if(case STREQUAL "state.record_sweep")
-    set(timeout 20)
+    # This state-wide sweep exceeds 20 seconds on the hosted Intel macOS lane.
+    set(timeout 60)
   endif()
   schway_add_test(NAME core.${case}
     COMMAND schwaystation-test-state ${case}

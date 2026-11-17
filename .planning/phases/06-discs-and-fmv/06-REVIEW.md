@@ -429,7 +429,7 @@ build/mdec-reference/quant-probe 200 > build/mdec-reference/quant-probe-200.out`
 **Reviewed:** 2026-11-17
 **Depth:** standard
 **Scope:** `include/schwaystation.h`, `src/cdrom.c`, `src/cdrom_sector.c`, `tests/cdrom/reference.c`, `tests/cdrom/model.c`, `tests/cdrom/sectors.c`, `tests/cdrom/audio.c`, and `tests/fuzz/cdrom.c`
-**Status:** issues_found; one warning
+**Status:** no open findings after the WR-11 re-review
 
 ### Summary
 
@@ -579,6 +579,66 @@ _Depth: standard_
 `tests/nightly/tests.cmake` now registers all 12 MDEC names with `mdec,nightly,portable` labels in the CD-ROM-only branch using placeholders; that branch does not load `MDECReferences.cmake` or prepare MDEC assets. Normal nightly and MDEC-only use the full asset preparation and real test registration path. The selector names and labels match by inspection; the orchestrator will validate the revised configuration.
 
 Both findings are closed. This disposition is a source/documentation review only.
+
+---
+
+_Reviewed: 2026-11-17_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
+## Portability Repair Batch Review Addendum (2026-11-17)
+
+**Reviewed:** 2026-11-17
+**Depth:** standard
+**Scope:** `host/disc_image.c`, `CMakePresets.json`, `.github/workflows/ci.yml`, `tests/disc/image.c`, `tests/disc/fixture.c`, `tests/core/test_state.c`, `tests/cdrom/xa.c`, `tests/core/tests.cmake`, plus the related selector assertion in `tests/cmake/workflows.cmake`
+**Status:** issues_found; one warning
+
+### Summary
+
+Reviewed the WASI canonical-path conversion and containment boundary, relative symlink escape cases, MSVC file-open/scan wrappers, stack storage changes, record-sweep timeout and RetroArch image comparison against their existing assertions and phase requirements. The path-resolution change retains the cue/playlist directory check after canonicalization, and the test portability changes preserve their file and state assertions. No source security or behavior defect was found in these changes. One adjacent workflow-consistency assertion still expects the old screenshot dimensions and will reject the updated CI command. No tests were run, as requested.
+
+### Warnings
+
+#### WR-11: Workflow consistency check still expects 320×240 for the disc screenshot
+
+**File:** `tests/cmake/workflows.cmake:23`
+**Severity:** WARNING
+**Issue:** The selector check's regex still requires `verify.py compare disc-runner.bmp disc.bmp 320 240`, but the CI job now compares the owned disc's 16×16 native frame at `.github/workflows/ci.yml:632`. The `disc_registration`/`spu_registration` workflow check therefore rejects the current CI wiring even though it matches the owned fixture's 16×16 frame contract.
+**Fix:** Change the expected dimensions in the regex to `16 16` so the consistency check tracks the CI comparison and its native-frame contract.
+
+No tests were run and no source files were modified during this review.
+
+---
+
+_Reviewed: 2026-11-17_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
+### WR-11 Re-review (2026-11-17)
+
+**Disposition:** Resolved by inspection. No tests run, as requested.
+
+`tests/cmake/workflows.cmake:23` now expects `disc-runner.bmp disc.bmp 16 16`, matching the command at `.github/workflows/ci.yml:632`. The owned disc fixture independently requires a 16×16, 24-bit RGB frame at `tests/disc/fixture.c:559-562`, so the updated assertion preserves the intended dimension check.
+
+WR-11 is closed. This disposition is a source review only.
+
+## Portability Repair Batch Local Verification and Fingerprint (2026-11-17)
+
+Fingerprint of the changed non-planning source set after the reviewed portability repairs: `39051aca8abcc6ed68a340f3f1b69e84081723e9c6d0af3a1b19267e9bc98c4d` (159 files). This includes the complete changed source set from the prior Phase 6 review plus the portability repair batch. The related selector correction was re-reviewed above. The fingerprint command was:
+
+```sh
+python3 -c 'import hashlib,pathlib,subprocess; tracked=subprocess.check_output(["git","diff","--name-only","origin/main"],text=True).splitlines(); untracked=subprocess.check_output(["git","ls-files","--others","--exclude-standard"],text=True).splitlines(); paths=sorted(p for p in set(tracked+untracked) if not p.startswith(".planning/")); h=hashlib.sha256(); [(h.update(p.encode()+b"\0"),h.update(pathlib.Path(p).read_bytes())) for p in paths]; print(f"{h.hexdigest()}  {len(paths)} changed non-planning files")'
+```
+
+The focused portability review and this verification snapshot include:
+
+- `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` — exit 0; the hosted disc comparison and its workflow assertion agree on 16×16.
+- `ctest --test-dir build/ci --output-on-failure -R 'core\.state\.(device_fields|record_sweep)|disc\.(image\..*|fixture\..*|xa)'` — exit 0, 15/15 affected native tests passed.
+- `cmake --workflow --preset ci` — exit 0; 612/612 tests and release checks 5/5 passed.
+- `cmake --workflow --preset hygiene` — exit 0; 23/23 checks passed.
+- `python3 -m json.tool CMakePresets.json >/dev/null`, `git diff --check`, and `git diff --check origin/main -- . ':!tests/probe/rc_hash_disc.c'` — each exit 0.
+
+The local checkout lacks the project’s clang-21 WASI toolchain and the existing `build/wasm32` directory has no generated Ninja build. No local wasm compile is claimed; the exact-head hosted wasm32 lane remains required. Hosted acceptance and the background RetroArch disc check are also pending for the pushed head.
 
 ---
 

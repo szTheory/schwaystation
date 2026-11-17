@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../test_open.h"
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -33,7 +35,7 @@
 
 static int write_iso(const char *path)
 {
-    FILE *file = fopen(path, "wb");
+    FILE *file = schway__test_open_file(path, "wb");
     uint8_t sector[2048];
     if (file == NULL) return 0;
     for (uint32_t lba = 0u; lba < 16u; lba++) {
@@ -65,7 +67,7 @@ static void pattern_sector(uint8_t *sector, uint32_t sector_bytes, uint32_t lba,
 static int write_pattern_file(const char *path, uint32_t sectors, uint32_t sector_bytes,
                               uint8_t seed, int append)
 {
-    FILE *file = fopen(path, append != 0 ? "ab" : "wb");
+    FILE *file = schway__test_open_file(path, append != 0 ? "ab" : "wb");
     uint8_t sector[2352];
     if (file == NULL || sector_bytes > sizeof sector) {
         if (file != NULL) (void)fclose(file);
@@ -83,7 +85,7 @@ static int write_pattern_file(const char *path, uint32_t sectors, uint32_t secto
 
 static int write_text(const char *path, const char *text, size_t size)
 {
-    FILE *file = fopen(path, "wb");
+    FILE *file = schway__test_open_file(path, "wb");
     if (file == NULL) return 0;
     if (fwrite(text, 1u, size, file) != size) {
         (void)fclose(file);
@@ -182,7 +184,7 @@ static int write_probe_iso(const char *path, const char *cnf, size_t cnf_size,
         free(image);
         return 0;
     }
-    file = fopen(path, "wb");
+    file = schway__test_open_file(path, "wb");
     if (file == NULL) {
         free(image);
         return 0;
@@ -585,7 +587,8 @@ static int test_cue_symlink(const char *directory)
           make_path(outside_path, directory, "outside-disc-image.bin"),
           "could not form symlink-escape paths");
     CHECK(write_pattern_file(outside_path, 16u, 2048u, 0x44u, 0) &&
-          make_symlink(outside_path, link_path) && write_text(cue_path, cue, sizeof cue - 1u),
+          make_symlink("../outside-disc-image.bin", link_path) &&
+          write_text(cue_path, cue, sizeof cue - 1u),
           "could not create symlink-escape input");
     CHECK(expect_open_status(cue_path, SCHWAY_DISC_IMAGE_BAD_CUE, 1u, NULL),
           "expected a canonical child path outside the cue directory to be rejected");
@@ -916,7 +919,7 @@ static int test_playlist(const char *directory)
     CHECK(make_path(outside_path, directory, "../schway-disc-playlist-outside.iso") &&
           make_path(link_path, directory, "outside-link.iso") &&
           write_pattern_file(outside_path, 16u, 2048u, 0x31u, 0) &&
-          make_symlink(outside_path, link_path) &&
+          make_symlink("../schway-disc-playlist-outside.iso", link_path) &&
           write_text(playlist_path, "outside-link.iso\n", sizeof "outside-link.iso\n" - 1u) &&
           expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_BAD_M3U, 1u, NULL),
           "expected a playlist symlink that resolves outside its directory to be rejected");

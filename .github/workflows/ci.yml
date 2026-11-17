@@ -628,7 +628,8 @@ jobs:
             sips --deleteColorManagementProperties "$f.png" > /dev/null
             sips -s format bmp "$f.png" --out "$f.bmp" > /dev/null
           done
-          python3 ../../tests/retroarch/verify.py compare disc-runner.bmp disc.bmp 320 240
+          # The owned disc guest exposes its 16x16 native RGB24 frame here.
+          python3 ../../tests/retroarch/verify.py compare disc-runner.bmp disc.bmp 16 16
       - name: RetroArch logs
         if: failure()
         run: cat build/ra/*.log build/ra-replay/*.log build/ra-spu-tone/*.log build/ra-disc/*.log || true

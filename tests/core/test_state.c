@@ -729,7 +729,7 @@ static void cdrom_mdec_round_trip(schway *src, schway *dst, size_t n)
     CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
     CHECK(memcmp(&dst->cdrom, &src->cdrom, sizeof src->cdrom) == 0);
     CHECK(memcmp(&dst->mdec, &src->mdec, sizeof src->mdec) == 0);
-    CHECK_EQ_U64(dst->disc_host.callbacks.user, (uintptr_t)dst);
+    CHECK(dst->disc_host.callbacks.user == (void *)dst);
     CHECK(dst->disc_host.callbacks.read_sector == disc_read_b);
     CHECK_EQ_U64(dst->disc_host.attached, 1u);
     CHECK_EQ_U64(save(dst, after), n);
@@ -817,13 +817,14 @@ static void cdrom_mdec_run_events(schway *src, schway *dst, size_t n)
     CHECK_EQ_U64(save(dst, after), n);
     CHECK(memcmp(good, after, n) == 0);
     CHECK(dst->disc_host.callbacks.read_sector == disc_read_b);
-    CHECK_EQ_U64(dst->disc_host.callbacks.user, (uintptr_t)dst);
+    CHECK(dst->disc_host.callbacks.user == (void *)dst);
 }
 
 static void cdrom_mdec_reset_state(schway *dst)
 {
-    struct schway__cdrom zero_cd;
-    struct schway__mdec zero_mdec;
+    /* The device structs are larger than the default WASI process stack. */
+    static struct schway__cdrom zero_cd;
+    static struct schway__mdec zero_mdec;
     memset(&zero_cd, 0, sizeof zero_cd);
     zero_cd.drive_speed = 1u;
     zero_cd.atv_active[0] = 0x80u;
