@@ -142,6 +142,23 @@ static void case_guest_input_modes(uint32_t depth_mask)
          0xF5FFFB00u, 0x0003FFF2u, 0xFCFF0500u, 0x001A08FFu,
          0xFF1E280Fu, 0x00232A05u, 0x29403810u, 0x0F163232u},
     };
+    uint8_t input_bytes[sizeof guest_input];
+    for (uint32_t word = 0u; word < 32u; word++) {
+        for (uint32_t byte = 0u; byte < 4u; byte++) {
+            input_bytes[word * 4u + byte] = (uint8_t)(guest_input[word] >> (byte * 8u));
+        }
+    }
+    schway__mdec_coverage input_coverage;
+    memset(&input_coverage, 0, sizeof input_coverage);
+    uint32_t input_status = schway__mdec_input_coverage_scan(
+        input_bytes, sizeof input_bytes, &input_coverage);
+    if (input_status != SCHWAY__MDEC_COVERAGE_COMPLETE ||
+        input_coverage.complete_blocks != 1u || input_coverage.trailing_coefficients != 0u) {
+        CHECK_EQ_U64(input_status, SCHWAY__MDEC_COVERAGE_COMPLETE);
+        CHECK_EQ_U64(input_coverage.complete_blocks, 1u);
+        CHECK_EQ_U64(input_coverage.trailing_coefficients, 0u);
+        return;
+    }
     for (uint32_t pixel = 0u; pixel < 64u; pixel++) {
         uint32_t byte = (expected[1][pixel / 4u] >> ((pixel % 4u) * 8u)) & 0xFFu;
         uint32_t nearest = (byte + 8u) >> 4u;
@@ -210,6 +227,14 @@ static void case_input_coverage(void)
     static const uint8_t odd_size[] = {0u};
     CHECK_EQ_U64(schway__mdec_input_coverage_scan(odd_size, sizeof odd_size, &coverage),
                  SCHWAY__MDEC_COVERAGE_MALFORMED);
+    CHECK_EQ_U64(coverage.complete_blocks, 0u);
+    CHECK_EQ_U64(coverage.trailing_coefficients, 0u);
+
+    memset(&coverage, 0, sizeof coverage);
+    CHECK_EQ_U64(schway__mdec_input_coverage_scan(NULL, 0u, &coverage),
+                 SCHWAY__MDEC_COVERAGE_INCOMPLETE);
+    CHECK_EQ_U64(coverage.complete_blocks, 0u);
+    CHECK_EQ_U64(coverage.trailing_coefficients, 0u);
 }
 
 static void case_status(void)
