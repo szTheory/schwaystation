@@ -132,3 +132,15 @@ void schway__md5_hex(const uint8_t digest[16], char hex[33])
     }
     hex[32] = '\0';
 }
+
+void schway__md5_disc_identity(const char *boot_name, const uint8_t *file,
+                               uint32_t hash_len, char hex[33])
+{
+    schway__md5 state;
+    uint8_t digest[16];
+    schway__md5_init(&state);
+    schway__md5_update(&state, boot_name, strlen(boot_name));
+    schway__md5_update(&state, file, hash_len);
+    schway__md5_final(&state, digest);
+    schway__md5_hex(digest, hex);
+}

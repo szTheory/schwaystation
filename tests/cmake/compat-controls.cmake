@@ -16,7 +16,6 @@ set(row_unknown "${serial},${md5},-,Control,ntsc-u,exe,${predicate},unknown,fixt
 set(today "2026-11-11")
 set(empty_allow "${work}/empty.allow")
 file(WRITE "${empty_allow}" "# temporary test allowances\n")
-
 function(write_ledger path rows)
   file(WRITE "${path}" "${header}\n${rows}\n")
 endfunction()
@@ -27,12 +26,10 @@ function(expect_exit name expected)
     message(FATAL_ERROR "${name}: expected ${expected}, got ${result}")
   endif()
 endfunction()
-
 function(expect_judge name candidate fresh prior allow expected)
   expect_exit("${name}" "${expected}" "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA= sh
     "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${candidate}" "${fresh}" "${prior}" "${allow}" "${today}")
 endfunction()
-
 function(judge_rows name candidate_row fresh_row prior_row prior allow expected)
   if(NOT "${prior}" STREQUAL "" AND NOT "${prior_row}" STREQUAL "")
     write_ledger("${prior}" "${prior_row}")
@@ -46,7 +43,6 @@ function(expect_doc name ledger output mode expected)
   expect_exit("compatibility docs ${name}" "${expected}" "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA= sh
     "${SOURCE_ROOT}/scripts/compat-doc.sh" "${ledger}" "${output}" "${mode}")
 endfunction()
-
 if(CASE STREQUAL "ratchet")
   set(base "${work}/base.csv")
   set(candidate "${work}/candidate.csv")
@@ -69,9 +65,7 @@ if(CASE STREQUAL "ratchet")
   judge_rows("expired allowance rejected" "${row_fail}" "${row_fail}" "" "${base}" "${allow}" FALSE)
   file(WRITE "${allow}" "2026-09-12 ${serial} ${md5} ${predicate} behavior-rev=3 expires=2026-11-11 wrong revision\n")
   judge_rows("wrong behavior revision rejected" "${row_fail}" "${row_fail}" "" "${base}" "${allow}" FALSE)
-
   judge_rows("removed prior pass rejected" "${other}" "${other}" "${row_pass}" "${base}" "${empty_allow}" FALSE)
-
   judge_rows("missing fresh row rejected" "${row_pass}" "${other}" "" "" "${empty_allow}" FALSE)
   judge_rows("extra fresh row rejected" "${row_pass}" "${row_pass}\n${other}" "" "" "${empty_allow}" FALSE)
   judge_rows("fresh status disagreement rejected" "${row_pass}" "${row_fail}" "" "" "${empty_allow}" FALSE)
@@ -81,7 +75,6 @@ if(CASE STREQUAL "ratchet")
   judge_rows("changed passing frame hash rejected" "${changed_pass}" "${changed_pass}" "${row_pass}" "${base}" "${empty_allow}" FALSE)
   file(WRITE "${allow}" "2026-09-12 ${serial} ${md5} ${predicate} behavior-rev=4 expires=2026-11-11 approved measured correction\n")
   judge_rows("changed frame hash allowance" "${changed_pass}" "${changed_pass}" "" "${base}" "${allow}" TRUE)
-
   write_ledger("${candidate}" "${row_pass}\n${row_pass}")
   expect_judge("duplicate key rejected" "${candidate}" "${fresh}" "" "${empty_allow}" FALSE)
   write_ledger("${candidate}" "${serial},${md5},-,Bad,Comma,ntsc-u,exe,${predicate},pass,evidence,2026-11-11")

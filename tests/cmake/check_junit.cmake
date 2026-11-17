@@ -8,7 +8,6 @@ foreach(var JUNIT INVENTORY)
 endforeach()
 include(${CMAKE_CURRENT_LIST_DIR}/inventory.cmake)
 schway_inventory_union("${INVENTORY}" "${CMAKE_CURRENT_LIST_DIR}/.." lines)
-
 # One list element per testcase, after neutralising list syntax.
 file(READ "${JUNIT}" xml)
 string(REPLACE ";" "," xml "${xml}")
@@ -26,7 +25,6 @@ foreach(case IN LISTS cases)
     string(APPEND bad "\n  ${name}: failed, errored or did not run")
   endif()
 endforeach()
-
 set(selected 0)
 foreach(line IN LISTS lines)
   string(REGEX MATCH "^([^\t]+)\t(.*)$" unused "${line}")

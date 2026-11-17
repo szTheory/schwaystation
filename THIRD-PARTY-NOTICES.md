@@ -129,6 +129,40 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## rcheevos disc hash reference
+
+- **Applies to:** `tests/probe/rc_hash_disc.c`
+- **Upstream:** https://github.com/RetroAchievements/rcheevos, file `src/hash/rc_hash_disc.c` at commit
+  `dfdc64ea035c34aa168cf13bbda72b71ca4eba1e`. The upstream repository LICENSE at this pin covers the file;
+  `rc_hash_disc.c` has no separate license header.
+- **SHA-256:** `03c25f0a834006ab8dbb4bebc83f6ccb7500d1e2d15ea36e8ff8a30641c80444`
+- **Changes:** none. The file is vendored unmodified and compiled only into the disc-hash CTest.
+- **Licence:** MIT
+
+```
+MIT License
+
+Copyright (c) 2018 RetroAchievements.org
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## SingleStepTests/r3000 vectors
 
 - **Applies to:** `tests/vectors/r3000/sst-sample.bin`

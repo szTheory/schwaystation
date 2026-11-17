@@ -99,19 +99,6 @@ static const char *region_guess(uint32_t area)
     }
 }
 
-/* The achievement-hash rule prepends the boot name before executable bytes. */
-static void rcheevos_disc_md5(const char *boot_name, const uint8_t *file,
-                              uint32_t hash_len, char hex[33])
-{
-    schway__md5 m;
-    uint8_t digest[16];
-    schway__md5_init(&m);
-    schway__md5_update(&m, boot_name, (uint32_t)strlen(boot_name));
-    schway__md5_update(&m, file, hash_len);
-    schway__md5_final(&m, digest);
-    schway__md5_hex(digest, hex);
-}
-
 static int path_inside(const char *root, const char *path)
 {
     size_t size = strlen(root);
@@ -402,7 +389,7 @@ int schway__probe_print(FILE *out, const char *path,
         char track_sha1_hex[41];
         char title[256] = "";
         char date[11] = "";
-        rcheevos_disc_md5(disc.boot_name, disc.exe_bytes, disc_info.hash_len, md5_hex);
+        schway__md5_disc_identity(disc.boot_name, disc.exe_bytes, disc_info.hash_len, md5_hex);
         int identity_match = metadata_identity(metadata, path, &disc, md5_hex,
                                                track_sha1_hex, title, date);
         fputs("format=disc\n", out);

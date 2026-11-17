@@ -21,6 +21,32 @@ set_target_properties(schwaystation-test-disc-image PROPERTIES
 schway_warnings(schwaystation-test-disc-image)
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 
+add_executable(schwaystation-test-disc-hash
+  ${PROJECT_SOURCE_DIR}/tests/probe/disc_hash.c
+  ${PROJECT_SOURCE_DIR}/tests/probe/rc_hash_disc.c
+  ${PROJECT_SOURCE_DIR}/runner/md5.c
+  ${PROJECT_SOURCE_DIR}/host/disc_probe.c)
+if(MSVC)
+  set_source_files_properties(${PROJECT_SOURCE_DIR}/tests/probe/rc_hash_disc.c
+    PROPERTIES COMPILE_OPTIONS /w)
+else()
+  set_source_files_properties(${PROJECT_SOURCE_DIR}/tests/probe/rc_hash_disc.c
+    PROPERTIES COMPILE_OPTIONS -w)
+endif()
+target_include_directories(schwaystation-test-disc-hash PRIVATE
+  ${PROJECT_SOURCE_DIR}/host
+  ${PROJECT_SOURCE_DIR}/include
+  ${PROJECT_SOURCE_DIR}/runner)
+target_link_libraries(schwaystation-test-disc-hash PRIVATE
+  schwaystation::schwaystation schwaystation-host schwaystation_disc_image)
+set_target_properties(schwaystation-test-disc-hash PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-hash)
+
+schway_add_test(NAME disc.hash
+  COMMAND schwaystation-test-disc-hash ${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue
+  LABELS disc portable TIMEOUT 30)
+
 schway_add_test(NAME disc.image.iso_sector
   COMMAND schwaystation-test-disc-image iso_sector ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 10)

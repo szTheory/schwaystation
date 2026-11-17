@@ -10,7 +10,6 @@ endforeach()
 file(MAKE_DIRECTORY "${WORK}")
 file(READ "${INFO_FILE}" base_info)
 file(READ "${INVENTORY}" base_inventory)
-
 function(reject name info inventory pattern)
   set(args)
   if(NOT "${info}" STREQUAL "")
@@ -37,12 +36,10 @@ function(replace_info name before after pattern)
   file(WRITE "${WORK}/${name}.info" "${changed}")
   reject("${name}" "${WORK}/${name}.info" "${INVENTORY}" "${pattern}")
 endfunction()
-
 function(append_info name suffix pattern)
   file(WRITE "${WORK}/${name}.info" "${base_info}${suffix}")
   reject("${name}" "${WORK}/${name}.info" "${INVENTORY}" "${pattern}")
 endfunction()
-
 function(reject_inventory_row name row pattern)
   string(REPLACE "${row}" "" changed "${base_inventory}")
   if(changed STREQUAL base_inventory)
@@ -67,10 +64,8 @@ replace_info("core-options refusal" "core_options = \"true\""
   "core_options = \"false\"" "core_options must stay true")
 replace_info("experimental refusal" "is_experimental = \"true\""
   "is_experimental = \"false\"" "keep experimental true until v2.0")
-
 reject_inventory_row("ungrounded input claim" "libretro.input.descriptors\tlibretro,portable\n"
   "input_descriptors has no inventory test")
-
 reject_inventory_row("ungrounded memory claim" "libretro.memory.boundaries\tlibretro,portable\n"
   "memory_descriptors has no inventory test")
 
@@ -85,7 +80,6 @@ foreach(unsupported IN ITEMS savestate cheats load_subsystem)
 endforeach()
 append_info("ungrounded true claim" "camera = \"true\"\n"
   "no test mapping for true .info claim camera")
-
 reject_inventory_row("shared EXE/fullpath mapping" "libretro.content.no_bios\tlibretro,portable\n"
   "supported_extensions has no inventory test")
 

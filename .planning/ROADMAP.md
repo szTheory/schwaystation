@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes, and the nightly lane matches the ps1-tests `mdec` references within the stated tolerance. The STR on `disc_boot` plays through DMA into the 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 34/39 plans executed
+**Plans**: 35/39 plans executed
 
 Plans:
 **Wave 1**
@@ -550,7 +550,7 @@ Plans:
 - [x] 06-18-PLAN.md — Expose libretro extended disk control and disc PCM
 
 **Wave 20** *(blocked on Wave 19 completion)*
-- [ ] 06-19-PLAN.md — Vendor the pinned independent disc MD5 oracle
+- [x] 06-19-PLAN.md — Vendor the pinned independent disc MD5 oracle
 - [ ] 06-22-PLAN.md — Build the installed-library SDL example without shipping it
 
 **Wave 21** *(blocked on Wave 20 completion)*

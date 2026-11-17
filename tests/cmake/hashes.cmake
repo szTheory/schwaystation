@@ -12,7 +12,6 @@ macro(runner_checked label expected)
     message(FATAL_ERROR "schwaystation-run ${label}: exit ${rc}; expected ${expected}\n${output}${error}")
   endif()
 endmacro()
-
 if(MODE STREQUAL "write")
   # Fault prevented: a lane's output silently not compared. Writes
   # <OUT>/hashes.txt, the file CI collects from every lane, in a fixed order:
@@ -63,7 +62,6 @@ if(MODE STREQUAL "write")
       "^frame 180 sha256 ([0-9a-f]+)\nstate sha256 ([0-9a-f]+)\n$"
       --exe "${FIXTURES}/gpu_motion.exe" --frames 180 --hash --hash-state)
     string(APPEND lines "exe gpu_motion.exe frame 180 sha256 ${CMAKE_MATCH_1}\nexe gpu_motion.exe state 180 sha256 ${CMAKE_MATCH_2}\n")
-
     # The fixture test checks exact PCM length and predicate values; these rows make lane audio hashes comparable.
     if(NOT EXISTS "${FIXTURES}/spu_tone.exe")
       message(FATAL_ERROR "hashes: the built spu_tone fixture is missing")

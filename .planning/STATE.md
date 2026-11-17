@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 35 of 39
+current_plan: 36 of 39
 status: executing
-stopped_at: Completed 06-18-PLAN.md; next 06-19-PLAN.md
-last_updated: "2026-11-17T03:30:00Z"
+stopped_at: Completed 06-19-PLAN.md; next 06-22-PLAN.md
+last_updated: "2026-11-17T04:19:17Z"
 last_activity: 2026-11-17
 state_head: 1342864
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 184
-  percent: 97
-last_activity_desc: "Completed Plan 06-18: libretro disc control, no-media removal, and XA/CD-DA PCM parity are covered. The clean review's no-media finding was fixed and verified through a guest GetTN error. Cheap selector, inventory, manifest, and budget checks preceded the final run; the four-test host filter passed 4/4 in 39.95 seconds, info-claim controls passed 2/2, and repository checks are at 2700/2700 lines. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), standard gsd-code-reviewer; active time is unavailable across the reported 22-hour pause. No physical capture or hosted run URL applies. Continue with Plan 06-19."
+  completed_plans: 185
+  percent: 98
+last_activity_desc: "Completed Plan 06-19: the pinned MIT rcheevos PS1 hash oracle matches the production runner identity on owned disc data and changes under executable mutation; the vendored digest negative control rejects altered bytes. Review findings on license wording and an unused shim were fixed. Cheap selector, inventory, digest and 2699/2700-line budget checks preceded the focused build; the post-review disc/probe/vendor filter passed 4/4. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), standard gsd-code-reviewer gpt-6-luna xhigh; active time was not reliably measured after the owner-reported 22-hour pause. No physical capture or hosted run URL applies. Continue with Plan 06-22."
 ---
 
 # Project State
@@ -31,12 +31,12 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 35 of 39
-Next plan file: 06-19-PLAN.md
+Current Plan: 36 of 39
+Next plan file: 06-22-PLAN.md
 Status: Ready to execute
 Last activity: 2026-11-17
 
-Progress: [█████████░] 87%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -54,7 +54,7 @@ Progress: [█████████░] 87%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 34 | 39 | - |
+| 06 | 35 | 39 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
