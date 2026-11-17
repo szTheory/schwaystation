@@ -188,7 +188,7 @@ disc_boot,5,*,00200002,doc,docs/hardware/cdrom.md Licensed GetID returns status 
 disc_boot,6,*,41454353,doc,docs/hardware/cdrom.md NTSC-U licensed GetID returns the SCEA region string
 disc_boot,7,*,00000010,doc,tests/fixtures/src/disc_boot.asm records its sixteen-sector ReadN transfer
 disc_boot,8,*,011ffca6,doc,tools/gen_disc.py generated sectors 32 through 47 and tests/disc/fixture.c CRC-32
-disc_boot,audio-900.none,ntsc-u,0bafcc0656c54eeca8e4012915ef6f875f219cf7d6c3b8a19e930706a5701d79,doc,tests/disc/fixture.c public PCM regression over owned generated media; not a hardware capture
+disc_boot,audio-900.none,ntsc-u,86118af63bb275c607d666c7bda9c3f7ebaa2360b67b327dba565e4c1a2ffb28,doc,tests/disc/fixture.c INDEX 01 playback after zero-based TOC correction; generated media, not a hardware capture
 disc_boot,frame-900.none,ntsc-u,12f05a7a951a57be6b3348b7ce469049bde78325f952f771928cc9ff35bf0850,doc,tests/disc/fixture.c native RGB24 regression over owned generated media; not a hardware capture
-disc_boot,audio-900.press300,ntsc-u,0bafcc0656c54eeca8e4012915ef6f875f219cf7d6c3b8a19e930706a5701d79,doc,tests/disc/fixture.c public PCM regression over owned generated media; not a hardware capture
+disc_boot,audio-900.press300,ntsc-u,86118af63bb275c607d666c7bda9c3f7ebaa2360b67b327dba565e4c1a2ffb28,doc,tests/disc/fixture.c INDEX 01 playback after zero-based TOC correction; generated media, not a hardware capture
 disc_boot,frame-900.press300,ntsc-u,12f05a7a951a57be6b3348b7ce469049bde78325f952f771928cc9ff35bf0850,doc,tests/disc/fixture.c native RGB24 regression over owned generated media; not a hardware capture

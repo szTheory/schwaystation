@@ -432,16 +432,19 @@ BIOS bytes are not included in ordinary save states. A state stores the loaded-i
 
 ## Profile flags
 
-`schway_profile.flags` is the second profile field, after `region`. A caller whose struct ends before it gets no
-flags. A bit this version does not define returns `SCHWAY_STATUS_ERR_PROFILE_REJECTED`. The flags survive a power
-reset and lock with the region.
+`schway_profile.flags` follows `region`; it carries `SCHWAY_PROFILE_DEBUG_PORT` and `SCHWAY_PROFILE_GPU_V0`.
+API version 7 appends `disc_flags` after `flags` for the two disc overrides. The original 12-byte API v6 profile
+keeps its former flags mask, including both CD overrides; a size-16 profile uses `flags` for debug/GPU settings
+and `disc_flags` for CD settings. A caller whose struct ends before a field gets zero for that field. Unknown bits
+in either field return `SCHWAY_STATUS_ERR_PROFILE_REJECTED`. Both fields survive a power reset and lock with the
+region.
 
-- `SCHWAY_PROFILE_CD_LICENSED`: treat an attached data disc as licensed for the selected machine region. This is an
+- `schway_profile.disc_flags` with `SCHWAY_PROFILE_CD_LICENSED`: treat an attached data disc as licensed for the selected machine region. This is an
   explicit host override for discs whose lead-in licence cannot be supplied through the sector callback.
-- `SCHWAY_PROFILE_CD_UNLOCK`: allow the modeled non-Japanese firmware unlock commands to accept a mismatched region.
-- `SCHWAY_PROFILE_DEBUG_PORT`: the guest's byte writes to the two debug ports (a TTY byte and an exit code) take effect.
+- `schway_profile.disc_flags` with `SCHWAY_PROFILE_CD_UNLOCK`: allow the modeled non-Japanese firmware unlock commands to accept a mismatched region.
+- `schway_profile.flags` with `SCHWAY_PROFILE_DEBUG_PORT`: the guest's byte writes to the two debug ports (a TTY byte and an exit code) take effect.
   Retail hosts leave it clear, and then those writes do nothing.
-- `SCHWAY_PROFILE_GPU_V0`: select the early GPU v0 model, which lacks rectangle texture flips. The default is GPU v2.
+- `schway_profile.flags` with `SCHWAY_PROFILE_GPU_V0`: select the early GPU v0 model, which lacks rectangle texture flips. The default is GPU v2.
 
 ## Video
 
@@ -542,13 +545,20 @@ load leaves it as it is, and a power reset empties it.
 
 ## Disc providers
 
-`schway_disc` supplies a sector callback, TOC callback and optional bad-Q callback. The core copies this
-size-tagged descriptor and TOC; it calls sector and bad-Q callbacks only while `schway_run_frame` or `schway_run`
-advances the instance. API v6 appends `identity_size` and `identity_sha256`: set the size to 32 and provide the
+`schway_disc` supplies callbacks of type `schway_disc_read_sector_fn`, `schway_disc_toc_fn` and optional
+`schway_disc_bad_q_fn`. The core copies this size-tagged descriptor and TOC; it calls sector and bad-Q callbacks
+only while `schway_run_frame` or `schway_run` advances the instance. A `schway_toc` holds up to
+`SCHWAY_DISC_MAX_TRACKS` `schway_disc_track` entries, each classified by `SCHWAY_DISC_TRACK_AUDIO`,
+`SCHWAY_DISC_TRACK_MODE1` or `SCHWAY_DISC_TRACK_MODE2`. API v6 appends `identity_size` and `identity_sha256`:
+set the size to 32 and provide the
 SHA-256 identity formed from the first 16 data sectors plus the disc serial. Leave both fields zero when that
 identity is unavailable. An older descriptor size remains valid for running media, but save/load with an attached
 disc lacking an identity returns `SCHWAY_STATUS_ERR_STATE_DISC`. Loading a state with another disc, or with no disc
 attached, returns the same status without changing the instance.
+
+Attach initial media with `schway_open_disc`. `schway_set_lid` takes 1 to open and 0 to close the lid;
+`schway_swap_disc` returns `SCHWAY_STATUS_ERR_LID_CLOSED` unless the lid is open. An empty TOC removes the current
+media while leaving the lid open, so the host can close an empty tray and the guest observes no disc.
 
 Callback function pointers and `user` remain host-owned even though the descriptor and TOC are copied. Keep each
 provider and any file handles it uses alive while an instance can call its callbacks. Destroy the instance before
@@ -610,10 +620,11 @@ an unknown one included, and never `NULL`.
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
 
-`SCHWAY_API_VERSION` is 5. A version only adds names, so a program built against an earlier header runs unchanged.
-Version 3 added `SCHWAY_FAULT_DMA`; version 4 adds read-only `schway_span` memory views, card loading and card
-generation queries, plus copied BIOS loading and SHA-256 reporting. Version 5 adds the host-supplied disc and TOC
-callbacks, lid control, and disc swapping. A program that switches on the fault kind should treat a value it does not
+`SCHWAY_API_VERSION` is 7. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
+Version 3 added `SCHWAY_FAULT_DMA`; version 4 added read-only `schway_span` memory views, card loading and card
+generation queries, plus copied BIOS loading and SHA-256 reporting. Version 5 added the host-supplied disc and TOC
+callbacks, lid control, and disc swapping; version 6 appended disc identity; version 7 appended `disc_flags` to
+`schway_profile`. A program that switches on the fault kind should treat a value it does not
 know as a fault it cannot name.
 
 ## The test card

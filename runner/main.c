@@ -1509,8 +1509,8 @@ static int run(const options *opt)
         memset(&p, 0, sizeof p);
         p.size = (uint32_t)sizeof p;
         p.region = opt->region != 0u ? opt->region : SCHWAY_REGION_NTSC_U;
-        p.flags = (opt->tty ? SCHWAY_PROFILE_DEBUG_PORT : 0u) |
-                  (opt->disc != NULL ? SCHWAY_PROFILE_CD_LICENSED : 0u);
+        p.flags = opt->tty ? SCHWAY_PROFILE_DEBUG_PORT : 0u;
+        p.disc_flags = opt->disc != NULL ? SCHWAY_PROFILE_CD_LICENSED : 0u;
         st = schway_set_profile(inst, &p);
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: schway_set_profile failed: %s\n",

@@ -184,7 +184,7 @@ int main(int argc, char **argv)
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = SCHWAY_REGION_NTSC_U;
-    profile.flags = SCHWAY_PROFILE_CD_LICENSED;
+    profile.disc_flags = SCHWAY_PROFILE_CD_LICENSED;
     status = schway_set_profile(instance, &profile);
     if (status == SCHWAY_STATUS_OK) status = schway_load_bios(instance, bios, EXAMPLE_BIOS_BYTES);
     free(bios);

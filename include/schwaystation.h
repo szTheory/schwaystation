@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 6
+#define SCHWAY_API_VERSION 7
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -150,7 +150,8 @@ typedef struct schway_versions {
 typedef struct schway_profile {
     uint32_t size;
     uint32_t region; /* SCHWAY_REGION_* */
-    uint32_t flags;  /* SCHWAY_PROFILE_* bits */
+    uint32_t flags;  /* SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0 */
+    uint32_t disc_flags; /* SCHWAY_PROFILE_CD_* bits */
 } schway_profile;
 
 typedef struct schway_exe_info {
@@ -254,7 +255,7 @@ typedef struct schway_tty {
 typedef struct schway_disc_track {
     uint32_t size;
     uint32_t type; /* SCHWAY_DISC_TRACK_* */
-    uint32_t index0, index1, pregap, leadout;
+    uint32_t index0, index1, pregap, leadout; /* zero-based LBAs */
     uint32_t reserved0;
 } schway_disc_track;
 

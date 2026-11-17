@@ -80,6 +80,8 @@ SeekError, 1 for motor on and 0 for Error.
 
 Host TOC index and lead-out positions are zero-based LBAs. Setloc removes the 150-frame MSF lead-in when it
 records an LBA; track lookup uses that LBA directly, and adds the lead-in only when returning MSF values.
+When TOC `index0` is earlier than `index1`, synthesized Q uses index 00 in that pregap and its relative MSF
+counts down to zero at index 1 [SCM.03].
 
 MotorOn uses a fixed 476,000-cycle completion delay. Init uses the same 476,000-cycle second-response delay. Stop uses
 `D38ACAh` cycles at 1x, `18A6076h` at 2x, or `1D7Bh` when already stopped. These Stop values are the published
@@ -156,10 +158,11 @@ These are selected profile defaults, not an exposed firmware-version field.
 
 GetID compares the machine region with the licence line at offset `20h` in raw sector 4's data area (raw offset `38h`).
 This sector check supplies the region; it is separate from the physical SCEx lead-in wobble, which the host callback does
-not expose. `SCHWAY_PROFILE_CD_LICENSED` is an explicit host override that treats a data disc as licensed for the
-selected profile region. A matching Mode2 disc returns INT2 with `02 00 20 00 SCEx`; a matching Mode1 disc returns
+not expose. `SCHWAY_PROFILE_CD_LICENSED` in `schway_profile.disc_flags` is an explicit host override that treats a
+data disc as licensed for the selected profile region. A matching Mode2 disc returns INT2 with `02 00 20 00 SCEx`; a matching Mode1 disc returns
 `02 00 00 00 SCEx`. No disc, audio media, an unmarked data disc and a mismatched region return the documented INT5
-response classes. `SCHWAY_PROFILE_CD_UNLOCK` enables the ordered `50h`-`56h` unlock sequence on non-Japanese profiles;
+response classes. `SCHWAY_PROFILE_CD_UNLOCK` in `schway_profile.disc_flags` enables the ordered `50h`-`56h` unlock
+sequence on non-Japanese profiles;
 each part still reports INT5/error `40h`. Once the sequence completes, ReadN/ReadS can read an unlicensed or mismatched
 disc, while GetID continues to report the image's licence answer.
 

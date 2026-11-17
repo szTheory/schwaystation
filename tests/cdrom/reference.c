@@ -30,7 +30,7 @@ enum {
     REFERENCE_ROWS = 10u,
     SECTOR_BYTES = 2352u,
     SUBCODE_BYTES = 96u,
-    DISC_LEADOUT = 333150u
+    DISC_LEADOUT = 333000u
 };
 
 typedef struct timing_row {
@@ -251,7 +251,7 @@ static uint32_t get_toc(void *user, schway_toc *out)
     return 1u;
 }
 
-static int attach_disc(schway *inst, disc_host *host)
+static int attach_disc_with_pregap(schway *inst, disc_host *host, uint32_t pregap)
 {
     memset(host, 0, sizeof *host);
     host->inst = inst;
@@ -259,8 +259,9 @@ static int attach_disc(schway *inst, disc_host *host)
     host->toc.track_count = 1u;
     host->toc.tracks[0].size = (uint32_t)sizeof host->toc.tracks[0];
     host->toc.tracks[0].type = SCHWAY_DISC_TRACK_MODE2;
-    host->toc.tracks[0].index0 = 150u;
-    host->toc.tracks[0].index1 = 150u;
+    host->toc.tracks[0].index0 = 0u;
+    host->toc.tracks[0].index1 = pregap;
+    host->toc.tracks[0].pregap = pregap;
     host->toc.tracks[0].leadout = DISC_LEADOUT;
     schway_disc disc;
     memset(&disc, 0, sizeof disc);
@@ -268,13 +269,21 @@ static int attach_disc(schway *inst, disc_host *host)
     disc.user = host;
     disc.read_sector = make_sector;
     disc.toc = get_toc;
+    disc.identity_size = (uint32_t)sizeof disc.identity_sha256;
+    memset(disc.identity_sha256, 0xA5, sizeof disc.identity_sha256);
     if (schway_open_disc(inst, &disc) != SCHWAY_STATUS_OK) return 0;
     schway_profile profile;
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = SCHWAY_REGION_NTSC_U;
-    profile.flags = SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_CD_LICENSED;
+    profile.flags = SCHWAY_PROFILE_DEBUG_PORT;
+    profile.disc_flags = SCHWAY_PROFILE_CD_LICENSED;
     return schway_set_profile(inst, &profile) == SCHWAY_STATUS_OK;
+}
+
+static int attach_disc(schway *inst, disc_host *host)
+{
+    return attach_disc_with_pregap(inst, host, 0u);
 }
 
 static int line_value(const uint8_t *line, size_t length, const char *prefix,
@@ -703,7 +712,7 @@ static int getloc_byte_controls(const char *log_path)
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = SCHWAY_REGION_NTSC_U;
-    profile.flags = SCHWAY_PROFILE_CD_LICENSED;
+    profile.disc_flags = SCHWAY_PROFILE_CD_LICENSED;
     static const uint8_t init_status[] = {0x02u};
     static const uint8_t no_sector[] = {0x02u, 0x80u};
     static const uint8_t command_status[] = {0x02u};
@@ -902,6 +911,43 @@ static int control_q_fixture(disc_host *host, schway *inst, const q_fixture *fix
     return 1;
 }
 
+static int pregap_q_controls(void)
+{
+    static const q_fixture fixtures[] = {
+        {1u, {0x00u, 0x02u, 0x01u}, {0x00u, 0x02u, 0x01u}, {0u},
+         {0x01u, 0x00u, 0x00u, 0x02u, 0x01u, 0x00u, 0x01u, 0x74u}},
+        {149u, {0x00u, 0x03u, 0x74u}, {0x00u, 0x03u, 0x74u}, {0u},
+         {0x01u, 0x00u, 0x00u, 0x03u, 0x74u, 0x00u, 0x00u, 0x01u}},
+        {150u, {0x00u, 0x04u, 0x00u}, {0x00u, 0x04u, 0x00u}, {0u},
+         {0x01u, 0x01u, 0x00u, 0x04u, 0x00u, 0x00u, 0x00u, 0x00u}}
+    };
+    schway_config config;
+    memset(&config, 0, sizeof config);
+    config.size = (uint32_t)sizeof config;
+    config.allocator.alloc = reference_alloc;
+    config.allocator.free = reference_free;
+    schway *inst = NULL;
+    disc_host host;
+    if (schway_create(&config, &inst) != SCHWAY_STATUS_OK || inst == NULL ||
+        !attach_disc_with_pregap(inst, &host, 150u)) {
+        schway_destroy(inst);
+        fputs("CD_REFERENCE_Q_PREGAP_ERROR: cannot create the pregap controls\n", stderr);
+        return 0;
+    }
+    for (size_t i = 0u; i < sizeof fixtures / sizeof fixtures[0]; i++) {
+        uint8_t setloc_status = i == 0u ? 0u : 0x02u;
+        if (!control_q_fixture(&host, inst, &fixtures[i], fixtures[i].getlocp,
+                               setloc_status)) {
+            schway_destroy(inst);
+            fputs("CD_REFERENCE_Q_PREGAP_ERROR: synthesized index or relative time mismatch\n",
+                  stderr);
+            return 0;
+        }
+    }
+    schway_destroy(inst);
+    return 1;
+}
+
 static int q_fixture_controls(void)
 {
     static const uint8_t fallback_leadout[8] = {
@@ -1055,7 +1101,8 @@ static int run_controls(const char *getloc_log_path)
                                  (const uint8_t *)reference, ref_size, &host, 101u, 1u) ||
         !timing_interval_control((const uint8_t *)valid, valid_size,
                                  (const uint8_t *)reference, ref_size, &host, 16u, 0u) ||
-        !getloc_byte_controls(getloc_log_path) || !q_fixture_controls()) {
+        !getloc_byte_controls(getloc_log_path) || !q_fixture_controls() ||
+        !pregap_q_controls()) {
         fputs("CD_REFERENCE_CONTROL_ERROR: malformed, shifted, or reordered data was accepted\n", stderr);
         return 1;
     }

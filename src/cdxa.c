@@ -309,7 +309,7 @@ uint32_t schway__cdxa_decode(schway *inst, const uint8_t *sector, uint32_t lengt
                              int16_t *output, uint32_t output_capacity,
                              uint32_t *output_count)
 {
-    int16_t decoded[SCHWAY__CDXA_MAX_DECODED_FRAMES * 2u];
+    int16_t *decoded;
     uint32_t decoded_count = 0u;
     uint32_t low_rate = 0u;
     uint32_t actual_count = 0u;
@@ -321,6 +321,7 @@ uint32_t schway__cdxa_decode(schway *inst, const uint8_t *sector, uint32_t lengt
         cdxa_format(sector, length, &format) == 0u) {
         return 0u;
     }
+    decoded = inst->xa_adpcm_scratch;
     uint32_t expected_count = resampled_count(inst, decoded_frames(&format), format.low_rate);
     if (expected_count > output_capacity) {
         return 0u;

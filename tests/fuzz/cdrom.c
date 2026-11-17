@@ -74,8 +74,8 @@ static uint32_t read_toc(void *user, schway_toc *out)
     out->track_count = 1u;
     out->tracks[0].size = (uint32_t)sizeof out->tracks[0];
     out->tracks[0].type = SCHWAY_DISC_TRACK_MODE2;
-    out->tracks[0].index0 = 150u;
-    out->tracks[0].index1 = 150u;
+    out->tracks[0].index0 = 0u;
+    out->tracks[0].index1 = 0u;
     out->tracks[0].leadout = 1000000u;
     return 1u;
 }

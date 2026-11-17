@@ -200,15 +200,29 @@ endfunction()
 
 function(schway_register_mdec_reference_tests exe_4bit log_4bit exe_8bit log_8bit
          exe_status log_status)
+  schway_add_test(NAME mdec.reference.input_preflight
+    COMMAND schwaystation-test-mdec-reference input-preflight
+      "${PROJECT_BINARY_DIR}/mdec-reference"
+    LABELS mdec nightly portable TIMEOUT 10)
+  set_tests_properties(mdec.reference.input_preflight PROPERTIES
+    FIXTURES_SETUP mdec_reference_input_preflight)
+
   schway_add_test(NAME mdec.reference.4bit
     COMMAND schwaystation-test-mdec-reference 4bit "${exe_4bit}" "${log_4bit}"
     LABELS mdec nightly portable TIMEOUT 120)
-  schway_add_test(NAME mdec.reference.8bit
-    COMMAND schwaystation-test-mdec-reference 8bit "${exe_8bit}" "${log_8bit}"
+  set_tests_properties(mdec.reference.4bit PROPERTIES
+    FIXTURES_REQUIRED mdec_reference_input_preflight)
+  schway_add_test(NAME mdec.reference.8bit_regression
+    COMMAND schwaystation-test-mdec-reference 8bit-regression "${exe_8bit}" "${log_8bit}"
     LABELS mdec nightly portable TIMEOUT 120)
-  schway_add_test(NAME mdec.reference.status
-    COMMAND schwaystation-test-mdec-reference status "${exe_status}" "${log_status}"
-    LABELS mdec nightly portable TIMEOUT 120)
+  set_tests_properties(mdec.reference.8bit_regression PROPERTIES
+    FIXTURES_REQUIRED mdec_reference_input_preflight)
+  schway_add_test(NAME mdec.reference.status_budget
+    COMMAND schwaystation-test-mdec-reference status-budget "${exe_status}" "${log_status}"
+    LABELS mdec nightly portable TIMEOUT 10)
+  schway_add_test(NAME mdec.reference.coverage_controls
+    COMMAND schwaystation-test-mdec-reference coverage-controls
+    LABELS mdec nightly portable TIMEOUT 10)
   schway_add_test(NAME mdec.reference.controls
     COMMAND schwaystation-test-mdec-reference controls "${log_4bit}" "${log_8bit}" "${log_status}"
     LABELS mdec nightly portable TIMEOUT 30)
@@ -382,10 +396,10 @@ function(schway_register_mdec_color_reference_tests reference_dir exes pngs)
     list(GET exes ${index} exe)
     list(GET pngs ${index} vram_png)
     list(GET scene_pngs ${index} scene_png)
-    schway_add_test(NAME mdec.reference.${case}
-      COMMAND schwaystation-test-mdec-reference color ${case} "${exe}" "${vram_png}" "${scene_png}"
-      LABELS mdec nightly portable TIMEOUT 180)
-    set_tests_properties(mdec.reference.${case} PROPERTIES
-      FIXTURES_REQUIRED mdec_color_reference_assets)
+    schway_add_test(NAME mdec.reference.coverage_${case}
+      COMMAND schwaystation-test-mdec-reference color-coverage ${case} "${exe}"
+      LABELS mdec nightly portable TIMEOUT 10)
+    set_tests_properties(mdec.reference.coverage_${case} PROPERTIES
+      FIXTURES_REQUIRED "mdec_color_reference_assets;mdec_reference_input_preflight")
   endforeach()
 endfunction()

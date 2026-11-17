@@ -55,15 +55,21 @@ existing direct status, colour, FIFO, packing, bounds and display model checks.
 The original 8-bit hardware bytes remain pinned evidence; their 16-pixel
 mismatch is not reclassified as a passing hardware comparison. The status guest
 requests 7,680,000 delay cycles against the fixed 4,915,200-cycle cap. Compressed
-input preflight identifies the frame source's 296/300 macroblocks and the
-movie's first frame's 162/240 plus five complete blocks as insufficient assets,
-not decoder passes. Exact 8-bit hardware rounding and full external frame/movie
-conformance are not claimed. The complete owned `disc_boot` STR route and raw
+input preflight verifies the complete frame source (300 macroblocks) and movie
+first frame (240 macroblocks). Earlier 296/162 counts were decoder output
+progress, not source coverage. Their full guest output remains unresolved; the
+frame display probe fails the existing pixel comparison, while movie DMA1 has
+no corresponding hardware capture. Exact 8-bit rounding and full external
+frame/movie conformance are not claimed. The complete owned `disc_boot` STR route and raw
 MDEC hash before DMA1 reordering remain required.
 
-Plan 06-43 owns registration of these successor selectors; until then, the
-names below describe the approved target inventory, not checks already run or
-passing. Main-CI MDEC gates retain the direct model controls and exact 4-bit
+Plan 06-43 registered these selectors. The MDEC model label passed 12/12, the
+nightly MDEC reference label passed 12/12, and the same 12 MDEC name/label rows
+were checked in normal nightly, MDEC-only and CD-ROM-only configurations. The
+CD-ROM-only configuration keeps placeholder registrations and does not fetch
+the unselected MDEC corpus. Plan 06-44 still owns the full local acceptance and
+Plan 06-45 owns hosted acceptance; DISC-03 remains pending until those gates
+pass. Main-CI MDEC gates retain the direct model controls and exact 4-bit
 guest while adding `mdec.input_coverage` and `mdec.guest_8bit_regression`.
 Nightly media checks retain `mdec.reference.4bit`,
 `mdec.reference.8bit_regression`, `mdec.reference.color_assets`,
@@ -74,8 +80,8 @@ image selectors become `mdec.reference.coverage_frame15`,
 `mdec.reference.input_preflight`, `mdec.reference.coverage_controls` and
 `mdec.reference.status_budget`. The model inventory keeps `mdec.status`,
 `mdec.bounds`, `mdec.color`, `mdec.display`, `mdec.fifo`, `mdec.stream`,
-`mdec.vectors` and `mdec.words`; changes to registration and selected test runs
-belong to the successor plans. DISC-03 remains pending through plan 06-45.
+`mdec.vectors` and `mdec.words`. Full external frame/movie output is not
+claimed; the complete owned STR integration remains required.
 
 ### SPU audio evidence
 

@@ -286,7 +286,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endfunction()
     refuse_pad_movie(ordering
       "60 p1=digital:X:128,128,128,128 p2=.\n60 p1=digital:.:128,128,128,128 p2=.\n"
-      "conflicting records")
+      "conflicting input records")
     refuse_pad_movie(encoding "60 p1=digital:.:1x,128,128,128 p2=.\n"
       "axis values must be decimal numbers")
   elseif(CASE STREQUAL "mailbox_judge")
@@ -991,8 +991,8 @@ endforeach()
 foreach(row IN ITEMS
     # The unreleased state revision now records each card slot's pending-error
     # latch. At these frames both values are zero; the frame hashes stay fixed.
-    "150|876a3e8f0547dbffcc1b0667f5c5940c824da87afc08feca52c959a58eb244c8"
-    "180|8d7f83d6614aa42adfc7642b48b92c9ec71b40736bc8c9012fc0b1ff61e830ac")
+    "150|bf69904d540267001c6ab569a42c87621a5bcd498eb5f195f5d92b3141c87196"
+    "180|6dfc72baf728cfe462219fb9389644002e83dff323acb78f5777f909f5d0f7f9")
   string(REPLACE "|" ";" fields "${row}")
   list(GET fields 0 frame)
   list(GET fields 1 hash)

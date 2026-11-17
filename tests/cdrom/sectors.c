@@ -130,8 +130,8 @@ static void sector_attach_type(schway *inst, struct sector_host *host, uint32_t 
     host->toc.track_count = 1u;
     host->toc.tracks[0].size = (uint32_t)sizeof host->toc.tracks[0];
     host->toc.tracks[0].type = track_type;
-    host->toc.tracks[0].index0 = 150u;
-    host->toc.tracks[0].index1 = 150u;
+    host->toc.tracks[0].index0 = 0u;
+    host->toc.tracks[0].index1 = 0u;
     host->toc.tracks[0].leadout = 10000u;
     schway_disc disc;
     memset(&disc, 0, sizeof disc);
@@ -145,7 +145,7 @@ static void sector_attach_type(schway *inst, struct sector_host *host, uint32_t 
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = SCHWAY_REGION_NTSC_U;
-    profile.flags = SCHWAY_PROFILE_CD_LICENSED;
+    profile.disc_flags = SCHWAY_PROFILE_CD_LICENSED;
     CHECK_EQ_U64(schway_set_profile(inst, &profile), SCHWAY_STATUS_OK);
 }
 

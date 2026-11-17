@@ -485,7 +485,7 @@ For m3u it reports the playlist entry count and withholds per-disc identity fiel
 disc's boot executable but does not create an emulator instance, submit sectors, or run a frame. Raw ISO images use
 2048-byte sectors. CUE sheets are at most 64 KiB with at most 99 tracks and indexes; each relative `FILE` name is at
 most 255 bytes and cannot escape the sheet's directory. Companion images together are capped at 1 GiB. Supported
-CUE layouts are `MODE1/2048`, `MODE1/2352`, `MODE2/2336`, `MODE2/2352` and `AUDIO`; timestamps range through
+CUE layouts are `MODE1/2048`, `MODE2/2352` and `AUDIO`; unsupported track modes are refused. Timestamps range through
 `99:59:74`. ISO parsing is bounded to 64 descriptors, 64 KiB directories with 4096 records, 2047 bytes of
 `SYSTEM.CNF`, and 16 boot-path components of at most 63 bytes each. `.chd`, `.pbp`, `.ecm` and `.ccd` are refused
 as unsupported media with exit status 77. The probe never executes a disc. Boot and play status remain `unknown`.

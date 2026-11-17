@@ -185,24 +185,64 @@ else()
 endif()
 
 if(cdrom_reference_only)
-  foreach(mode IN ITEMS 4bit 8bit)
-    schway_add_test(NAME mdec.reference.${mode}
-      COMMAND schwaystation-test-mdec-reference ${mode}
-        "${PROJECT_BINARY_DIR}/mdec-reference/${mode}.exe"
-        "${PROJECT_BINARY_DIR}/mdec-reference/${mode}.log"
-      LABELS mdec nightly portable TIMEOUT 120)
-  endforeach()
-  schway_add_test(NAME mdec.reference.status
-    COMMAND schwaystation-test-mdec-reference status
-      "${PROJECT_BINARY_DIR}/mdec-reference/status.exe"
-      "${PROJECT_BINARY_DIR}/mdec-reference/status.log"
+  # Keep the MDEC names/labels in the full nightly inventory without fetching
+  # or extracting an unselected MDEC corpus in the CD-ROM-only configuration.
+  set(mdec_placeholder "${PROJECT_BINARY_DIR}/mdec-reference")
+  schway_add_test(NAME mdec.reference.input_preflight
+    COMMAND schwaystation-test-mdec-reference input-preflight "${mdec_placeholder}"
+    LABELS mdec nightly portable TIMEOUT 10)
+  set_tests_properties(mdec.reference.input_preflight PROPERTIES
+    FIXTURES_SETUP mdec_reference_input_preflight)
+  schway_add_test(NAME mdec.reference.4bit
+    COMMAND schwaystation-test-mdec-reference 4bit
+      "${mdec_placeholder}/mdec/4bit/4bit.exe" "${mdec_placeholder}/mdec/4bit/psx.log"
     LABELS mdec nightly portable TIMEOUT 120)
+  set_tests_properties(mdec.reference.4bit PROPERTIES
+    FIXTURES_REQUIRED mdec_reference_input_preflight)
+  schway_add_test(NAME mdec.reference.8bit_regression
+    COMMAND schwaystation-test-mdec-reference 8bit-regression
+      "${mdec_placeholder}/mdec/8bit/8bit.exe" "${mdec_placeholder}/mdec/8bit/psx.log"
+    LABELS mdec nightly portable TIMEOUT 120)
+  set_tests_properties(mdec.reference.8bit_regression PROPERTIES
+    FIXTURES_REQUIRED mdec_reference_input_preflight)
+  schway_add_test(NAME mdec.reference.status_budget
+    COMMAND schwaystation-test-mdec-reference status-budget
+      "${mdec_placeholder}/mdec/step-by-step-log/step-by-step-log.exe"
+      "${mdec_placeholder}/mdec/step-by-step-log/psx.log"
+    LABELS mdec nightly portable TIMEOUT 10)
+  schway_add_test(NAME mdec.reference.coverage_controls
+    COMMAND schwaystation-test-mdec-reference coverage-controls
+    LABELS mdec nightly portable TIMEOUT 10)
   schway_add_test(NAME mdec.reference.controls
     COMMAND schwaystation-test-mdec-reference controls
-      "${PROJECT_BINARY_DIR}/mdec-reference/4bit.log"
-      "${PROJECT_BINARY_DIR}/mdec-reference/8bit.log"
-      "${PROJECT_BINARY_DIR}/mdec-reference/status.log"
+      "${mdec_placeholder}/mdec/4bit/psx.log"
+      "${mdec_placeholder}/mdec/8bit/psx.log"
+      "${mdec_placeholder}/mdec/step-by-step-log/psx.log"
     LABELS mdec nightly portable TIMEOUT 30)
+  schway_add_test(NAME mdec.reference.color_assets
+    COMMAND schwaystation-test-mdec-reference color-assets
+      "${mdec_placeholder}/color/mdec/frame/frame-15bit.exe"
+      "${mdec_placeholder}/color/mdec/frame/frame-24bit.exe"
+      "${mdec_placeholder}/color/mdec/movie/movie-15bit.exe"
+      "${mdec_placeholder}/color/mdec/movie/movie-24bit.exe"
+      "${mdec_placeholder}/color/mdec/frame/vram-15bit.png"
+      "${mdec_placeholder}/color/mdec/frame/vram-24bit.png"
+      "${mdec_placeholder}/color/mdec/movie/vram-15bit.png"
+      "${mdec_placeholder}/color/mdec/movie/vram-24bit.png"
+    LABELS mdec nightly portable TIMEOUT 20)
+  set_tests_properties(mdec.reference.color_assets PROPERTIES
+    FIXTURES_SETUP mdec_color_reference_assets)
+  schway_add_test(NAME mdec.reference.color_controls
+    COMMAND schwaystation-test-mdec-reference color-controls
+    LABELS mdec nightly portable TIMEOUT 10)
+  foreach(case IN ITEMS frame15 frame24 movie15 movie24)
+    schway_add_test(NAME mdec.reference.coverage_${case}
+      COMMAND schwaystation-test-mdec-reference color-coverage ${case}
+        "${mdec_placeholder}/color/mdec/${case}/${case}.exe"
+      LABELS mdec nightly portable TIMEOUT 10)
+    set_tests_properties(mdec.reference.coverage_${case} PROPERTIES
+      FIXTURES_REQUIRED "mdec_color_reference_assets;mdec_reference_input_preflight")
+  endforeach()
 else()
   include(${PROJECT_SOURCE_DIR}/cmake/MDECReferences.cmake)
   schway_prepare_mdec_reference_assets(

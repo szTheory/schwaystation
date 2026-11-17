@@ -352,18 +352,23 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     if (st != SCHWAY_STATUS_OK) {
         return st;
     }
-    /* A caller whose struct ends before flags predates them: none set. */
-    uint32_t flags = profile->size >= sizeof *profile ? profile->flags : 0u;
+    /* Disc overrides were appended so released callers keep the old flags mask. */
+    uint32_t flags = profile->size >= SCHWAY__PROFILE_SIZE_FLAGS ? profile->flags : 0u;
+    uint32_t disc_flags = profile->size >= SCHWAY__PROFILE_SIZE_DISC_FLAGS ? profile->disc_flags : 0u;
+    uint32_t allowed_flags = SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0;
+    if (profile->size < SCHWAY__PROFILE_SIZE_DISC_FLAGS) {
+        allowed_flags |= SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_CD_UNLOCK;
+    }
     if (profile->region < SCHWAY_REGION_NTSC_J || profile->region > SCHWAY_REGION_PAL ||
-        (flags & ~(SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_GPU_V0 |
-                   SCHWAY_PROFILE_CD_UNLOCK)) != 0u) {
+        (flags & ~allowed_flags) != 0u ||
+        (disc_flags & ~(SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_CD_UNLOCK)) != 0u) {
         return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
     }
     if (inst->profile_locked) {
         return SCHWAY_STATUS_ERR_PROFILE_LOCKED;
     }
     inst->region = profile->region;
-    inst->profile_flags = flags;
+    inst->profile_flags = flags | disc_flags;
     /* The first frame is the region's; nothing has run before the first
        frame locks the profile. */
     if (inst->ticks == 0u) {

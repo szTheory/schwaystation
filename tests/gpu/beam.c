@@ -51,7 +51,7 @@ static schway *make_instance(uint32_t region, uint32_t flags)
     if (inst == NULL) {
         return NULL;
     }
-    schway_profile profile = {(uint32_t)sizeof profile, region, flags};
+    schway_profile profile = {(uint32_t)sizeof profile, region, flags, 0u};
     CHECK(schway_set_profile(inst, &profile) == SCHWAY_STATUS_OK);
     return inst;
 }
@@ -820,14 +820,18 @@ static void test_equal_timer_beam_dma(void)
 
 static uint32_t state_offset(const schway *inst, const char *name)
 {
-    struct schway__state_field fields[MAX_FIELDS];
-    size_t count = schway__state_record(inst, fields, MAX_FIELDS);
-    CHECK(count <= MAX_FIELDS);
-    for (size_t i = 0u; i < count && i < MAX_FIELDS; i++) {
+    size_t count = schway__state_record(inst, NULL, 0u);
+    struct schway__state_field *fields = (struct schway__state_field *)malloc(count * sizeof *fields);
+    if (fields == NULL) exit(1);
+    CHECK(schway__state_record(inst, fields, count) == count);
+    for (size_t i = 0u; i < count; i++) {
         if (strcmp(fields[i].name, name) == 0) {
-            return fields[i].offset;
+            uint32_t offset = fields[i].offset;
+            free(fields);
+            return offset;
         }
     }
+    free(fields);
     CHECK(0);
     return 0u;
 }

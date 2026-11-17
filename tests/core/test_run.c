@@ -79,14 +79,18 @@ static void reseal(uint8_t *b, size_t size)
 
 static uint32_t field_offset(const schway *inst, const char *name)
 {
-    struct schway__state_field fields[MAX_FIELDS];
-    size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
-    CHECK(nf <= MAX_FIELDS);
-    for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
+    size_t nf = schway__state_record(inst, NULL, 0u);
+    struct schway__state_field *fields = (struct schway__state_field *)malloc(nf * sizeof *fields);
+    if (fields == NULL) exit(1);
+    CHECK_EQ_U64(schway__state_record(inst, fields, nf), nf);
+    for (size_t i = 0; i < nf; i++) {
         if (strcmp(fields[i].name, name) == 0) {
-            return fields[i].offset;
+            uint32_t offset = fields[i].offset;
+            free(fields);
+            return offset;
         }
     }
+    free(fields);
     CHECK(0 && "state field not found");
     exit(1);
 }
@@ -762,14 +766,17 @@ static void run_to(schway *inst, uint64_t target)
 /* The name of the state field the byte at offset off belongs to. */
 static const char *field_at(const schway *inst, size_t off)
 {
-    struct schway__state_field fields[MAX_FIELDS];
-    size_t nf = schway__state_record(inst, fields, MAX_FIELDS);
+    size_t nf = schway__state_record(inst, NULL, 0u);
+    struct schway__state_field *fields = (struct schway__state_field *)malloc(nf * sizeof *fields);
+    if (fields == NULL) exit(1);
+    CHECK_EQ_U64(schway__state_record(inst, fields, nf), nf);
     const char *name = "header";
-    for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
+    for (size_t i = 0; i < nf; i++) {
         if (fields[i].offset <= off) {
             name = fields[i].name;
         }
     }
+    free(fields);
     return name;
 }
 

@@ -682,6 +682,7 @@ set(runner_hashes ${PROJECT_SOURCE_DIR}/tests/cmake/hashes.cmake)
 set(runner_fixtures_arg "")
 if(SCHWAYSTATION_FIXTURES)
   set(runner_fixtures_arg -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures)
+  cmake_language(DEFER CALL set_property TEST runner.hashes_file APPEND PROPERTY FIXTURES_REQUIRED disc_fmv_predicates)
 endif()
 schway_add_test(NAME runner.hashes_file
   COMMAND ${CMAKE_COMMAND} -DMODE=write -DRUN=$<TARGET_FILE:schwaystation-run>

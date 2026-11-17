@@ -193,7 +193,8 @@ static schway *fixture_create(const char *bios_path, const uint8_t expected_dige
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = SCHWAY_REGION_NTSC_U;
-    profile.flags = SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_DEBUG_PORT;
+    profile.flags = SCHWAY_PROFILE_DEBUG_PORT;
+    profile.disc_flags = SCHWAY_PROFILE_CD_LICENSED;
     status = schway_set_profile(inst, &profile);
     if (status == SCHWAY_STATUS_OK) status = schway_load_bios(inst, bios, bios_size);
     free(bios);
@@ -535,6 +536,16 @@ static void digest_frame(const uint8_t pixels[AV_FRAME_BYTES], char digest[65])
     schway__sha256_hex(output, digest);
 }
 
+static void digest_mailbox(const uint8_t mailbox[MAILBOX_SIZE], char digest[65])
+{
+    uint8_t output[32];
+    schway__sha256 hash;
+    schway__sha256_init(&hash);
+    schway__sha256_update(&hash, mailbox, MAILBOX_SIZE);
+    schway__sha256_final(&hash, output);
+    schway__sha256_hex(output, digest);
+}
+
 static int capture_frame(schway *inst, uint8_t pixels[AV_FRAME_BYTES])
 {
     schway_video video;
@@ -818,7 +829,8 @@ static int run_av_variant(const char *bios_path, const uint8_t digest[32],
                           const uint32_t expected_records[8],
                           const uint8_t expected_data[DISC_DATA_BYTES], uint32_t expected_crc,
                           uint32_t press_frame, uint32_t check_split,
-                          struct audio_capture *capture, uint8_t pixels[AV_FRAME_BYTES])
+                          struct audio_capture *capture, uint8_t pixels[AV_FRAME_BYTES],
+                          uint8_t mailbox_copy[MAILBOX_SIZE])
 {
     schway *inst = fixture_create(bios_path, digest, disc);
     if (inst == NULL) return 0;
@@ -894,6 +906,7 @@ static int run_av_variant(const char *bios_path, const uint8_t digest[32],
             ok = 0;
         }
     }
+    if (ok != 0) memcpy(mailbox_copy, mailbox, MAILBOX_SIZE);
 
 cleanup:
     audio_capture_free(&replay_capture);
@@ -918,7 +931,7 @@ static int audio_sector_coverage(const struct fixture_disc *host)
 static int run_av_case(const char *mode, const char *bios_path,
                        const uint8_t digest[32], const schway_disc *disc,
                        struct fixture_disc *host, const uint32_t expected_records[8],
-                       const struct av_expectations *expected)
+                       const struct av_expectations *expected, const char *predicate_path)
 {
     uint8_t expected_data[DISC_DATA_BYTES];
     uint32_t expected_crc = 0u;
@@ -930,13 +943,17 @@ static int run_av_case(const char *mode, const char *bios_path,
     struct audio_capture press;
     memset(&none, 0, sizeof none);
     memset(&press, 0, sizeof press);
+    uint8_t none_mailbox[MAILBOX_SIZE];
+    uint8_t press_mailbox[MAILBOX_SIZE];
     uint8_t none_pixels[AV_FRAME_BYTES];
     uint8_t press_pixels[AV_FRAME_BYTES];
     int ok = run_av_variant(bios_path, digest, disc, host, expected_records,
-                            expected_data, expected_crc, 0u, 1u, &none, none_pixels);
+                            expected_data, expected_crc, 0u, 1u, &none, none_pixels,
+                            none_mailbox);
     if (ok != 0) {
         ok = run_av_variant(bios_path, digest, disc, host, expected_records,
-                            expected_data, expected_crc, 300u, 0u, &press, press_pixels);
+                            expected_data, expected_crc, 300u, 0u, &press, press_pixels,
+                            press_mailbox);
     }
     if (ok != 0) {
         char audio_none[65];
@@ -963,6 +980,30 @@ static int run_av_case(const char *mode, const char *bios_path,
             fprintf(stderr, "disc fixture: RGB24 frame regression pin changed\n");
             ok = 0;
         }
+        if (ok != 0 && predicate_path != NULL && predicate_path[0] != '\0') {
+            char mailbox_none[65];
+            char mailbox_press[65];
+            digest_mailbox(none_mailbox, mailbox_none);
+            digest_mailbox(press_mailbox, mailbox_press);
+            FILE *capture_file = fopen(predicate_path, "wb");
+            int wrote = capture_file != NULL &&
+                fprintf(capture_file,
+                        "boots@600 disc_boot none pass\n"
+                        "mailbox@900 disc_boot none sha256=%s\n"
+                        "audio@900 disc_boot none sha256=%s\n"
+                        "frame@900 disc_boot none sha256=%s\n"
+                        "boots@600 disc_boot press@300 pass\n"
+                        "mailbox@900 disc_boot press@300 sha256=%s\n"
+                        "audio@900 disc_boot press@300 sha256=%s\n"
+                        "frame@900 disc_boot press@300 sha256=%s\n",
+                        mailbox_none, audio_none, frame_none,
+                        mailbox_press, audio_press, frame_press) >= 0;
+            int closed = capture_file != NULL && fclose(capture_file) == 0;
+            if (wrote == 0 || closed == 0) {
+                fprintf(stderr, "disc fixture: could not write per-leg predicate hashes\n");
+                ok = 0;
+            }
+        }
     }
     audio_capture_free(&none);
     audio_capture_free(&press);
@@ -971,10 +1012,11 @@ static int run_av_case(const char *mode, const char *bios_path,
 
 int main(int argc, char **argv)
 {
-    if (argc != 7 || (strcmp(argv[1], "boot") != 0 && strcmp(argv[1], "read") != 0 &&
+    if ((argc != 7 && !(argc == 8 && strcmp(argv[1], "fmv") == 0)) ||
+        (strcmp(argv[1], "boot") != 0 && strcmp(argv[1], "read") != 0 &&
                       strcmp(argv[1], "audio") != 0 && strcmp(argv[1], "fmv") != 0 &&
                       strcmp(argv[1], "record") != 0)) {
-        fprintf(stderr, "usage: schwaystation-test-disc-fixture boot|read|audio|fmv|record BIOS EXPECTED CUE SBI CSV\n");
+        fprintf(stderr, "usage: schwaystation-test-disc-fixture boot|read|audio|fmv|record BIOS EXPECTED CUE SBI CSV [PREDICATES]\n");
         return 2;
     }
     uint32_t expected_records[8] = {0u};
@@ -1038,7 +1080,7 @@ int main(int argc, char **argv)
         ok = run_read_case(argv[2], expected_digest, &disc, &host, expected_records);
     } else {
         ok = run_av_case(argv[1], argv[2], expected_digest, &disc, &host,
-                         expected_records, &expected_av);
+                         expected_records, &expected_av, argc == 8 ? argv[7] : NULL);
     }
     if (host.outside_run_calls != 0u) {
         fprintf(stderr, "disc fixture: %u host callbacks ran outside a core run\n",

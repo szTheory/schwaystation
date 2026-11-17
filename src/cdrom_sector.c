@@ -142,8 +142,14 @@ static void sector_make_q(const schway *inst, uint32_t lba, uint8_t q[12])
     const schway_disc_track *track = track_index < inst->disc_host.toc.track_count
                                          ? &inst->disc_host.toc.tracks[track_index]
                                          : NULL;
-    uint64_t relative = track != NULL && absolute >= track->index1
-                            ? absolute - track->index1 : 0u;
+    uint32_t index = 1u;
+    uint64_t relative = 0u;
+    if (track != NULL && lba < track->index1) {
+        index = 0u;
+        relative = (uint64_t)track->index1 - lba;
+    } else if (track != NULL) {
+        relative = (uint64_t)lba - track->index1;
+    }
     uint32_t am = (uint32_t)(absolute / (60u * 75u));
     uint32_t as = (uint32_t)((absolute / 75u) % 60u);
     uint32_t af = (uint32_t)(absolute % 75u);
@@ -153,7 +159,7 @@ static void sector_make_q(const schway *inst, uint32_t lba, uint8_t q[12])
     memset(q, 0, 12u);
     q[0] = type == SCHWAY_DISC_TRACK_AUDIO ? 0x01u : 0x41u;
     q[1] = sector_to_bcd(track_index + 1u);
-    q[2] = 1u;
+    q[2] = sector_to_bcd(index);
     q[3] = sector_to_bcd(rm);
     q[4] = sector_to_bcd(rs);
     q[5] = sector_to_bcd(rf);
@@ -191,12 +197,8 @@ static uint32_t sector_location(schway *inst, uint32_t lba, const uint8_t subcod
         *position = cd->current_lba;
         return 1u;
     }
-    sector_make_q(inst, lba, q);
-    cd->q_record_valid = sector_q_valid(q, inst->disc_host.toc.track_count);
-    if (cd->q_record_valid != 0u) memcpy(cd->q_record, q, sizeof q);
-    if (sector_q_lba(q, inst->disc_host.toc.track_count, position) != 0u) return 1u;
     *position = lba;
-    return 0u;
+    return 1u;
 }
 
 static void sector_pop_oldest(struct schway__cdrom *cd)
@@ -337,15 +339,9 @@ void schway__cdrom_sector_seek(schway *inst)
 void schway__cdrom_sector_getlocp(schway *inst, uint8_t bytes[8])
 {
     struct schway__cdrom *cd = &inst->cdrom;
-    if (cd->q_record_valid == 0u) {
-        uint8_t q[12];
-        sector_make_q(inst, cd->current_lba, q);
-        if (sector_q_valid(q, inst->disc_host.toc.track_count) != 0u) {
-            memcpy(cd->q_record, q, sizeof q);
-            cd->q_record_valid = 1u;
-        }
-    }
-    const uint8_t *q = cd->q_record;
+    uint8_t fallback[12];
+    if (cd->q_record_valid == 0u) sector_make_q(inst, cd->current_lba, fallback);
+    const uint8_t *q = cd->q_record_valid != 0u ? cd->q_record : fallback;
     bytes[0] = q[1];
     bytes[1] = q[2];
     bytes[2] = q[7];

@@ -232,7 +232,8 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
         sector_size = 2336u;
         data_offset = 8u;
         mode2 = 1;
-    } else if (strcmp(mode, "cue_2048") != 0 && !track99) {
+    } else if (strcmp(mode, "cue_2048") != 0 &&
+               strcmp(mode, "cue_2048_unlisted") != 0 && !track99) {
         return 1;
     }
 
@@ -264,6 +265,7 @@ static int make_cue_fixture(const char *cue_path, const char *mode)
     }
     if (fclose(source) != 0) failed = 1;
     source = NULL;
+    if (strcmp(mode, "cue_2048_unlisted") == 0) iso[sizeof iso - 1u] = 0x5Au;
 
     if (track99) {
         uint8_t audio_sector[2352] = {0};
@@ -504,6 +506,7 @@ int main(int argc, char **argv)
         return strcmp(hex, vectors[2]) == 0 ? 0 : 1;
     }
     if (argc == 3 && (strcmp(argv[1], "cue_2048") == 0 ||
+                      strcmp(argv[1], "cue_2048_unlisted") == 0 ||
                       strcmp(argv[1], "cue_mode1_2352") == 0 ||
                       strcmp(argv[1], "cue_mode2_2352") == 0 ||
                       strcmp(argv[1], "cue_mode2_2336") == 0 ||
@@ -521,7 +524,7 @@ int main(int argc, char **argv)
                       strcmp(argv[1], "truncated") != 0 &&
                       strcmp(argv[1], "overlap") != 0 &&
                       strcmp(argv[1], "loop") != 0)) {
-        (void)fprintf(stderr, "usage: schwaystation-test-probe <synthetic|fallback|missing|bad_extent|traversal|truncated|overlap|loop|cue_2048|cue_mode1_2352|cue_mode2_2352|cue_mode2_2336|cue_track99> <image>\n");
+        (void)fprintf(stderr, "usage: schwaystation-test-probe <synthetic|fallback|missing|bad_extent|traversal|truncated|overlap|loop|cue_2048|cue_2048_unlisted|cue_mode1_2352|cue_mode2_2352|cue_mode2_2336|cue_track99> <image>\n");
         return 2;
     }
     return make_synthetic_iso(argv[2], argv[1]);

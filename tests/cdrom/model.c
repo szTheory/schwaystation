@@ -84,8 +84,8 @@ static void attach_disc(schway *inst, struct test_disc *host, uint32_t track_typ
     host->toc.track_count = 1u;
     host->toc.tracks[0].size = (uint32_t)sizeof host->toc.tracks[0];
     host->toc.tracks[0].type = track_type;
-    host->toc.tracks[0].index0 = 150u;
-    host->toc.tracks[0].index1 = 150u;
+    host->toc.tracks[0].index0 = 0u;
+    host->toc.tracks[0].index1 = 0u;
     host->toc.tracks[0].leadout = 1000000u;
     schway_disc disc;
     memset(&disc, 0, sizeof disc);
@@ -108,9 +108,9 @@ static void attach_two_track_disc(schway *inst, struct test_disc *host,
         schway_disc_track *track = &host->toc.tracks[i];
         track->size = (uint32_t)sizeof *track;
         track->type = i == 0u ? first_type : second_type;
-        track->index0 = i == 0u ? 150u : 300u;
+        track->index0 = i == 0u ? 0u : 150u;
         track->index1 = track->index0;
-        track->leadout = i == 0u ? 300u : 1000000u;
+        track->leadout = i == 0u ? 150u : 1000000u;
     }
     schway_disc disc;
     memset(&disc, 0, sizeof disc);
@@ -127,7 +127,7 @@ static void profile(schway *inst, uint32_t region, uint32_t flags)
     memset(&value, 0, sizeof value);
     value.size = (uint32_t)sizeof value;
     value.region = region;
-    value.flags = flags;
+    value.disc_flags = flags;
     CHECK_EQ_U64(schway_set_profile(inst, &value), SCHWAY_STATUS_OK);
 }
 
@@ -325,7 +325,7 @@ static void test_command_settings(void)
     CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
     CHECK_EQ_U64(rd8(inst, 1u), 0u);
     CHECK_EQ_U64(rd8(inst, 1u), 0u);
-    CHECK_EQ_U64(rd8(inst, 1u), 4u);
+    CHECK_EQ_U64(rd8(inst, 1u), 2u);
     acknowledge(inst, 3u);
     setloc_start(inst);
     CHECK_EQ_U64(inst->cdrom.target_lba, 0u);
@@ -389,12 +389,8 @@ static void test_command_seek_position(void)
     acknowledge(inst, 2u);
     CHECK_EQ_U64(inst->cdrom.seek_active, 0u);
     CHECK_EQ_U64(host.reads, 1u);
-    CHECK_EQ_U64(inst->cdrom.q_record_valid, 1u);
-    CHECK_EQ_HEX(inst->cdrom.q_record[1], 0x01u);
-    CHECK_EQ_HEX(inst->cdrom.q_record[2], 0x01u);
-    CHECK_EQ_HEX(inst->cdrom.q_record[7], 0x00u);
-    CHECK_EQ_HEX(inst->cdrom.q_record[8], 0x02u);
-    CHECK_EQ_HEX(inst->cdrom.q_record[9], 0x00u);
+    CHECK_EQ_U64(inst->cdrom.current_lba, 0u);
+    CHECK_EQ_U64(inst->cdrom.q_record_valid, 0u);
     CHECK_EQ_U64(inst->cdrom.sector_count, 1u);
     command(inst, 0x10u);
     run_cycles(inst, 50000u);

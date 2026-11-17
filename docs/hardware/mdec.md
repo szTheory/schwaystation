@@ -152,10 +152,17 @@ status, colour, FIFO, packing and bounds; the selected transform and 1,000-cycle
 block baseline remain deterministic implementation rules.
 
 The pinned status guest requests 7,680,000 delay cycles, while the guest's fixed
-execution cap is 4,915,200 cycles. The frame source contains 296 of 300
-macroblocks; the movie's first frame contains 162 of 240 and five complete
-additional blocks. The status budget and compressed-input preflight classify
-these limitations without running an over-budget or incomplete input as a
-decoder pass. Exact 8-bit hardware rounding and complete external frame/movie
-conformance remain unproved. The complete owned STR path through `disc_boot`
+execution cap is 4,915,200 cycles. The frame source is complete at 56,960 bytes,
+1,800 blocks and 300 macroblocks. The movie's first frame is complete at 6,784
+bytes, 1,440 blocks and 240 macroblocks. Earlier 296/162 counts were decoded
+output progress, not source coverage. The four pinned guests consume their
+source but do not establish full output or hardware conformance. A bounded
+frame display diagnostic fails the existing pixel comparison; the public
+[SCPH-5501 capture](https://psx.wiki/tests/mdec-status-decode-timing/) shows
+the pinned CPU reader waiting after its final requested word, but its adapted
+PIO harness does not prove matching emulator pixels. The movie uses DMA1 and
+has no corresponding capture. Nightly coverage selectors verify these pinned
+source spans without claiming full guest output. Exact 8-bit hardware rounding
+and complete external frame/movie conformance remain unproved. The complete
+owned STR path through `disc_boot`
 and the raw-output hash before DMA1 reordering remain part of phase acceptance.

@@ -583,7 +583,7 @@ static void begin_play(schway *inst, uint64_t now)
     }
     if (pcount != 0u && bcd_value(p[0]) != 0u) {
         uint32_t index1 = inst->disc_host.toc.tracks[bcd_value(p[0]) - 1u].index1;
-        cd->target_lba = index1 > 150u ? index1 - 150u : 0u;
+        cd->target_lba = index1;
     }
     consume_parameters(cd, pcount);
     cd->paused = 0u;

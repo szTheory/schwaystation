@@ -138,8 +138,10 @@ void schway__md5_disc_identity(const char *boot_name, const uint8_t *file,
 {
     schway__md5 state;
     uint8_t digest[16];
+    size_t name_size = 0u;
     schway__md5_init(&state);
-    schway__md5_update(&state, boot_name, strlen(boot_name));
+    while (name_size < 64u && boot_name[name_size] != '\0') name_size++;
+    schway__md5_update(&state, boot_name, name_size);
     schway__md5_update(&state, file, hash_len);
     schway__md5_final(&state, digest);
     schway__md5_hex(digest, hex);

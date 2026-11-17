@@ -70,7 +70,7 @@
     {
       "name": "fuzz",
       "inherits": "base",
-      "$comment": "The loader and SPU fuzz targets use clang-21 with ASan and UBSan. Selected libretro consumers use generated fixtures, while the asan inventory omits standalone fixture tests. Only the loader and SPU fuzz executables link libFuzzer; replay targets and other objects take fuzzer-no-link coverage instrumentation. The nightly job runs the loader campaign.",
+      "$comment": "The loader, SPU and five media fuzz targets use clang-21 with ASan and UBSan. Selected libretro consumers use generated fixtures; the asan inventory omits standalone fixture tests. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage. Nightly runs six bounded campaigns.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -158,13 +158,23 @@
         "schwaystation-fuzz-exe",
         "schwaystation-fuzz-exe-replay",
         "schwaystation-fuzz-spu",
-        "schwaystation-fuzz-spu-replay"
+        "schwaystation-fuzz-spu-replay",
+        "schwaystation-fuzz-cue",
+        "schwaystation-fuzz-cue-replay",
+        "schwaystation-fuzz-cnf",
+        "schwaystation-fuzz-cnf-replay",
+        "schwaystation-fuzz-m3u",
+        "schwaystation-fuzz-m3u-replay",
+        "schwaystation-fuzz-cdrom",
+        "schwaystation-fuzz-cdrom-replay",
+        "schwaystation-fuzz-mdec",
+        "schwaystation-fuzz-mdec-replay"
       ]
     },
     { "name": "nofp", "configurePreset": "nofp" },
     { "name": "be32", "configurePreset": "be32" },
     { "name": "wasm32", "configurePreset": "wasm32" },
-    { "name": "nightly", "configurePreset": "nightly", "targets": ["schwaystation-run", "schwaystation-test-gpu-reference", "schwaystation-test-spu-reference", "schwaystation-test-vectors"] },
+    { "name": "nightly", "configurePreset": "nightly", "targets": ["schwaystation-run", "schwaystation-test-gpu-reference", "schwaystation-test-spu-reference", "schwaystation-test-vectors", "schwaystation-test-cdrom-reference", "schwaystation-test-mdec-reference"] },
     { "name": "perf", "configurePreset": "perf", "targets": ["schwaystation-run"] }
   ],
   "testPresets": [

@@ -90,7 +90,10 @@ schway_add_test(NAME disc.fixture.fmv
     "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue"
     "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
     "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+    "${PROJECT_BINARY_DIR}/disc/predicates.txt"
   LABELS disc portable TIMEOUT 300)
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/disc")
+set_tests_properties(disc.fixture.fmv PROPERTIES FIXTURES_SETUP disc_fmv_predicates)
 
 schway_add_test(NAME disc.fixture.read
   COMMAND schwaystation-test-disc-fixture read

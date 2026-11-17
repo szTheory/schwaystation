@@ -695,7 +695,9 @@ static uint32_t mdec_status(const schway *inst)
     uint32_t opcode = mdec->command >> 29;
     if (opcode == 0u || opcode >= 4u) {
         status |= mdec->command & 0xFFFFu;
-    } else if (mdec->words_remaining != 0u) {
+    } else if (mdec->command_words != 0u) {
+        /* The hardware exposes the parameter counter minus one, including
+           0xFFFF after a nonempty command consumes its final word (SCM.30). */
         status |= (mdec->words_remaining - 1u) & 0xFFFFu;
     }
     return status;

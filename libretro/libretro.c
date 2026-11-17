@@ -753,7 +753,7 @@ static void lr_unload(void)
 
 /* Creates the one instance with the given region; 0 on failure, with
    nothing held. */
-static int lr_create(uint32_t region, uint32_t profile_flags)
+static int lr_create(uint32_t region, uint32_t disc_flags)
 {
     schway_config cfg;
     schway_profile profile;
@@ -766,7 +766,7 @@ static int lr_create(uint32_t region, uint32_t profile_flags)
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = region;
-    profile.flags = profile_flags;
+    profile.disc_flags = disc_flags;
     info.size = (uint32_t)sizeof info;
     if (schway_create(&cfg, &inst) != SCHWAY_STATUS_OK) {
         inst = NULL;

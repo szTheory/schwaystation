@@ -382,8 +382,8 @@ schway_add_test(NAME hygiene.timeout_comments
   LABELS hygiene TIMEOUT 30)
 
 # Fault prevented: sound acceptance jobs or their exact test inventories being disconnected.
-schway_add_test(NAME policy.spu_registration
-  COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR} -DCASE=spu_registration
+schway_add_test(NAME policy.media_registration
+  COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR} -DCASE=disc_registration
     -P ${hygiene_scripts}/workflows.cmake
   LABELS hygiene policy TIMEOUT 30)
 set(hygiene_timeouts ${CMAKE_BINARY_DIR}/hygiene/timeouts_fixture)

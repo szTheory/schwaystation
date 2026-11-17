@@ -155,8 +155,8 @@ static void audio_attach_disc_type(schway *inst, struct audio_disc *host, uint32
     host->toc.track_count = 1u;
     host->toc.tracks[0].size = (uint32_t)sizeof host->toc.tracks[0];
     host->toc.tracks[0].type = track_type;
-    host->toc.tracks[0].index0 = 150u;
-    host->toc.tracks[0].index1 = 150u;
+    host->toc.tracks[0].index0 = 0u;
+    host->toc.tracks[0].index1 = 0u;
     host->toc.tracks[0].leadout = 10000u;
     schway_disc disc;
     memset(&disc, 0, sizeof disc);
