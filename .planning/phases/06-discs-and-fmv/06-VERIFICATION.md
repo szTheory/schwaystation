@@ -1,31 +1,43 @@
 ---
 phase: 06-discs-and-fmv
 status: local_pass_hosted_pending
-verified: 2026-11-17T21:03:09Z
-source: reviewed uncommitted worktree on phase/06-discs-and-fmv; non-planning source fingerprint e3b37688944e0d076f56914547cd2718743e4df6e6e2d3d7d533e6f0a4424752
+verified: 2026-11-17T21:43:00Z
+source: reviewed repair batch committed on phase/06-discs-and-fmv; non-planning source fingerprint afea1856461f5c3dedc1cac56196d333cb062259a76365d69a7ed25c33c3a6fe
 ---
 
 # Phase 6 verification
 
-The revised Phase 6 contract has passed local acceptance on the reviewed worktree. Phase 6 is **not fully verified** until exact-head hosted acceptance and the ship checks in Plan 06-45 pass. The retained evidence does not claim exact 8-bit hardware output or full frame/movie hardware conformance: the inputs are complete, while the frame/movie guest output remains unresolved. These limitations are explicit in the approved v1.0 claim.
+The revised Phase 6 contract has passed local acceptance on the reviewed repair snapshot. Phase 6 is **not fully verified** until exact-head hosted acceptance and the ship checks in Plan 06-45 pass. The retained evidence does not claim exact 8-bit hardware output or full frame/movie hardware conformance: the inputs are complete, while the frame/movie guest output remains unresolved. These limitations are explicit in the approved v1.0 claim.
 
 ## Current local acceptance (2026-11-17)
 
-The source fingerprint in this file's front matter matches the reviewed snapshot recorded in `06-REVIEW.md`. Source and test files did not change after that review; only planning, state and evidence bookkeeping followed. Cheap checks ran before the full workflows.
+The source fingerprint in this file's front matter matches the repaired snapshot recorded in `06-REVIEW.md`. Source and test files did not change after that repair-batch review; only planning, state and evidence bookkeeping followed. Cheap checks ran before the full workflows.
 
 | Gate | Command and result | Status |
 |---|---|---|
-| Cheap consistency checks | `git diff --check origin/main -- . ':!tests/probe/rc_hash_disc.c'`; sorted MDEC/nightly inventories; `cmake -DROOT=. -DCASE=disc_registration -P tests/cmake/workflows.cmake`; `cmake --list-presets`; each exited 0. | Pass |
-| Complete CI and release lane | `cmake --workflow --preset ci`; exit 0, 611/611 tests passed and `ci-release` 5/5 passed. The first final attempt caught a modified byte in immutable `tests/probe/rc_hash_disc.c`; its exact original bytes were restored, `libretro.vendored` passed 1/1, and the complete workflow passed on the restored snapshot. | Pass |
-| Complete hygiene lane | `cmake --workflow --preset hygiene`; exit 0, 24/24. | Pass |
+| Cheap consistency checks | `PKG_CONFIG_LIBDIR=/private/tmp/schwaystation-empty-pkgconfig cmake --preset ci` (exit 0, no FFmpeg package visible); `python3 tests/fixtures/media_generator.py tools/gen_disc.py` (exit 0, no source-tree bytecode cache); sorted fixture/hygiene inventories; `cmake -DROOT=. -DCASE=disc_registration -P tests/cmake/workflows.cmake`; `git diff --check origin/main -- . ':!tests/probe/rc_hash_disc.c'`; all exited 0. | Pass |
+| Generated-media determinism | Built `schwaystation-disc-media` with the lazy pinned encoder; exit 0. Two independent media-generation commands exited 0, reported XA/CD-DA/STR coverage, and byte comparisons of `cdda.wav`, `movie.str`, `xa.xa` and `media.sha256` matched. | Pass |
+| Complete CI and release lane | `cmake --workflow --preset ci`; exit 0, 612/612 tests passed and `ci-release` 5/5 passed. This includes the deterministic XA-normalization regression, MDEC prototype build, owned disc boot/FMVs and platform test inventory. | Pass |
+| Complete hygiene lane | `cmake --workflow --preset hygiene`; final exit 0, 23/23. The first attempt failed because the Python synthetic test created `tools/__pycache__/gen_disc.cpython-314.pyc`; the test now disables bytecode output, the generated cache was removed, and the full workflow passed with one repository tree scan. | Pass |
 | Disc and owned-media path | `ctest --test-dir build/ci -L disc --no-tests=error --output-on-failure`; exit 0, 25/25. The complete CI run also passed owned disc boot/FMVs, runner hashes, libretro disk control/host checks, frozen API callers and the built SDL example. | Pass |
-| Main-CI MDEC | `ctest --test-dir build/ci -L mdec --no-tests=error --output-on-failure`; exit 0, 12/12, including exact pinned 4-bit, separate 8-bit regression, direct controls and source coverage. | Pass |
-| Media fuzz replays | `ctest --test-dir build/ci -R '^fuzz[.]regress[.](cue|cnf|m3u|cdrom|mdec)$' --no-tests=error --output-on-failure`; exit 0, 5/5. | Pass |
+| Main-CI MDEC | The full workflow passed 12/12 MDEC selectors, including exact pinned 4-bit, separate 8-bit regression, direct controls and source coverage. | Pass |
+| Media fuzz replays | The full workflow passed all five media fuzz replay selectors. | Pass |
 | Nightly MDEC references | `ctest --test-dir build/mdec-reference -L mdec --no-tests=error --output-on-failure`; exit 0, 12/12. The producer-written JUnit inventory check passed and confirmed each selected test ran once. | Pass |
 | CD-ROM references | `cmake --build build/cdrom-reference --target schwaystation-test-cdrom-reference`; exit 0. `ctest --test-dir build/cdrom-reference -R '^cdrom[.]reference[.](timing|getloc|controls)$' --no-tests=error --output-on-failure`; exit 0, 3/3. The producer-written JUnit inventory check passed. | Pass |
 | Reference registration parity | Nightly, MDEC-only and CD-ROM-only CTest JSON comparisons each matched all 12 MDEC selector names and labels. CD-ROM-only configuration also confirmed it did not prepare the unselected MDEC corpus. Main-CI inventory and existing workflow matcher checks passed. | Pass |
 
 These results close the local portion of the previously pending 06-23/24 acceptance. Their hosted RetroArch, exact-head nightly and release checks remain pending Plan 06-45; the phase is not complete and must not be shipped until those checks pass.
+
+## Initial hosted failure and repair (2026-11-17)
+
+The first workflow-dispatch batch was run on `15061b2c8ab8766f2e235f8270d10989675c30f9` and did not pass acceptance:
+
+| Workflow | Run | Observed failures |
+|---|---|---|
+| CI | [44177128399](https://github.com/szTheory/schwaystation/actions/runs/44177128399) | OpenBIOS media generation rejected XA sector 0's nondeterministic coding byte; `perf` could not configure without FFmpeg despite not building media; two identical full-tree hygiene scans timed out at 60 seconds. |
+| Nightly | [44177128259](https://github.com/szTheory/schwaystation/actions/runs/44177128259) | `fuzz` and `bench-wasm32` hit the same eager FFmpeg configure dependency; GCC's full vector build found the MDEC cross-file helper missing a shared prototype. |
+
+These run results are retained as failed attempts, not passes. The repair batch committed at `a621c081703e77bc5a9791d6e2dd7e642b283334` addresses those causes. Exact-head hosted retries and the hosted RetroArch disc comparison are still pending; there is no owner action or hardware capture required.
 
 ## Earlier diagnostic evidence (historical)
 

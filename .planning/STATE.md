@@ -6,17 +6,17 @@ current_phase: 6
 current_phase_name: Discs and FMV
 current_plan: 45 of 45 (hosted acceptance and ship)
 status: in_progress
-stopped_at: Completed 06-44-PLAN.md
-last_updated: "2026-11-17T21:09:20Z"
+stopped_at: "06-45 reviewed repair batch committed; hosted acceptance pending"
+last_updated: "2026-11-17T21:46:00Z"
 last_activity: 2026-11-17
-state_head: e47a14adef201ce900a67e280abff45bfab198f8
+state_head: a621c081703e77bc5a9791d6e2dd7e642b283334
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 195
   completed_plans: 194
   percent: 83
-last_activity_desc: "Plan 06-44 completed on the phase branch. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); active time is not tracked. Cheap consistency checks passed before final acceptance. The reviewed source fingerprint is recorded in 06-REVIEW.md and matches the local verification snapshot. Full CI passed 611/611 plus release lane 5/5; hygiene passed 24/24; disc 25/25; main-CI MDEC 12/12; five media fuzz replays; nightly MDEC references 12/12; and CD-ROM references 3/3. Main-CI, nightly, MDEC-only and CD-ROM-only CTest JSON matched their exact inventory names and labels, and the CD-ROM-only configuration prepared no MDEC assets. The two selector-review warnings were resolved. Local acceptance is complete; hosted exact-head CI/nightly, background RetroArch comparison, ship, merge and release remain pending Plan 06-45. Exact 8-bit and full frame/movie hardware output remain explicitly unproved under the approved v1.0 scope. Next is Plan 06-45."
+last_activity_desc: "Plan 06-45 repair batch reviewed and committed at a621c081703e77bc5a9791d6e2dd7e642b283334. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); active time is not tracked. Prior exact-head hosted runs 44177128399 and 44177128259 on 15061b2 failed: encoder setup required FFmpeg during unrelated configure jobs, XA media had a stack-dependent coding byte, GCC found a missing shared prototype, and two duplicate hygiene tree scans timed out. The repair keeps media encoder build lazy, normalizes only the requested XA coding bytes with strict duplicate and sector validation plus a deterministic synthetic test, adds the shared test prototype, and removes one redundant full-tree scan. Reviewed source fingerprint and local evidence are recorded in 06-REVIEW.md. Empty-pkg-config CI configure passed; two generated media sets matched byte for byte; full CI passed 612/612 plus release lane 5/5; hygiene passed 23/23 after a first run exposed and then fixed the synthetic test's pycache side effect. Exact-head hosted retries, background RetroArch comparison, ship, merge and release remain pending. Exact 8-bit and full frame/movie hardware output remain explicitly unproved under the approved v1.0 scope. Next: push this reviewed snapshot and dispatch CI/Nightly once."
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 Phase: 6 (Discs and FMV) — owner-approved successor scope in progress
 Current Plan: 45 of 45 (hosted acceptance and ship)
 Next plan file: 06-45-PLAN.md
-Status: Plans 06-42 through 06-44 are complete. Deterministic MDEC with available verified hardware coverage is in scope; exact 8-bit and complete external frame/movie hardware conformance remain unproved. Local acceptance is complete; exact-head hosted CI/nightly and RetroArch acceptance, phase ship/release and milestone completion remain pending.
+Status: Plans 06-42 through 06-44 are complete. The Plan 06-45 repair batch is reviewed and locally accepted. Deterministic MDEC with available verified hardware coverage is in scope; exact 8-bit and complete external frame/movie hardware conformance remain unproved. Hosted retries on the repaired head, RetroArch acceptance, phase ship/release and milestone completion remain pending.
 Last activity: 2026-11-17
 
 Progress: [████████░░] 83%
