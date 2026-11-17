@@ -449,7 +449,6 @@ Reviewed the zero-based TOC migration through Play(track), Setloc/GetTD MSF conv
 _Reviewed: 2026-11-17_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
-
 ## Plan 45 Repair-Batch Review and Local Verification (2026-11-17)
 
 The hosted failures on the prior head were reviewed and addressed in one repair batch: media-tool setup is lazy,
@@ -639,6 +638,38 @@ The focused portability review and this verification snapshot include:
 - `python3 -m json.tool CMakePresets.json >/dev/null`, `git diff --check`, and `git diff --check origin/main -- . ':!tests/probe/rc_hash_disc.c'` — each exit 0.
 
 The local checkout lacks the project’s clang-21 WASI toolchain and the existing `build/wasm32` directory has no generated Ninja build. No local wasm compile is claimed; the exact-head hosted wasm32 lane remains required. Hosted acceptance and the background RetroArch disc check are also pending for the pushed head.
+
+---
+
+_Reviewed: 2026-11-17_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
+## Plan 06-45 Hosted Portability Repair Review (2026-11-17)
+
+**Reviewed:** 2026-11-17T23:29:00Z
+**Depth:** standard
+**Scope:** WASI test path mapping and canonical containment, root-level CUE child-path regression, MSVC MDEC fixture constants, repository gate reductions, and the exact current Plan 06-45 diff
+**Status:** no open findings
+
+The old exact-head CI run showed three relevant failures: 29 wasm32 tests could not reach build-tree test inputs, and both Windows MSVC legs treated C4310 signed-coefficient casts in the MDEC reference fixture as errors. Nightly was green. The repaired WASI runner preopens the build tree at guest `/` and source at `/source`, maps CTest absolute path arguments while preserving argv boundaries, and leaves Wasmtime's host-side module path untouched. Canonical disc paths now accept nested files beneath a guest-root CUE while rejecting the separate `/source` mount from that root; a new `disc.image.cue_root_child` integration case writes a root CUE with a nested track, and is registered in the portable inventory. MDEC values now use equivalent negative `int16_t` constants. The three repository-gate refactors retain their comparisons, expected exit classes, signatures, privacy scans and byte-count checks. No assertion, acceptance selector, or fixed line limit was weakened.
+
+The final source review found no open finding. The new regression case is mapped to guest `/` by the emulator and removes its created files/directory on completion. The repository gate remains exactly 2,700 lines; the new C integration test does not enter the gate's counted file set.
+
+Fingerprint of the current changed non-planning files: `363519a22300c55518ebb4ad054c050795d76f14839ec1e7428cbf65ca0449e7` (161 files). It is computed from tracked and untracked non-planning file contents relative to `origin/main`, sorted by path, using the command recorded in the previous fingerprint sections.
+
+Local evidence on this reviewed snapshot:
+
+- `git diff --check origin/main -- . ':!tests/probe/rc_hash_disc.c'` — exit 0.
+- `cmake -DROOT=. -DCASE=disc_registration -P tests/cmake/workflows.cmake` — exit 0; hosted and inventory wiring connected.
+- `LC_ALL=C sort -c tests/disc/inventory.txt`, separate `bash -n` checks for `scripts/wasm-test-emulator.sh` and `scripts/hygiene.sh`, and JSON parsing of `CMakePresets.json` — each exit 0.
+- The fake-runtime argv probe covered paths containing spaces and apostrophes, exact binary root, binary descendants, source descendants and a lookalike prefix — exit 0 with all argument boundaries preserved.
+- `cmake -DROOT=. -DLIMIT=2700 '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -P tests/cmake/line_budget.cmake` — exit 0 at exactly 2,700 lines.
+- `ctest --test-dir build/ci -R '^disc\.image\.cue_root_child$' --output-on-failure` — exit 0, 1/1.
+- `cmake --workflow --preset ci` — exit 0, 613/613 tests and `ci-release` 5/5.
+- `cmake --workflow --preset hygiene` — exit 0, 23/23.
+
+Local WASI compilation remains unavailable because the pinned clang-21/wasm-ld toolchain is absent. Exact-head hosted CI/Nightly and background RetroArch acceptance are required to confirm the platform fix on the runner. The prior Nightly run is green at the previous head; the previous CI run failed only in the diagnosed wasm32 and Windows legs, while its RetroArch comparison passed. Neither old-head result is credited to this repaired snapshot.
 
 ---
 

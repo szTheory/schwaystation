@@ -567,9 +567,10 @@ static int schway__disc_image_canonical_path(const char *path, char out[SCHWAY__
     }
     char *resolved = realpath(path, NULL);
     if (resolved == NULL) return 0;
-    /* Keep the provider inside the directory granted to the WASI guest. */
-    if (strncmp(resolved, cwd, cwd_size) != 0 ||
-        (resolved[cwd_size] != '/' && resolved[cwd_size] != '\0')) {
+    /* realpath succeeds only through the filesystem capabilities Wasmtime preopened. */
+    if ((cwd_size == 1u && cwd[0] == '/') ? resolved[0] != '/' :
+        (strncmp(resolved, cwd, cwd_size) != 0 ||
+         (resolved[cwd_size] != '/' && resolved[cwd_size] != '\0'))) {
         free(resolved);
         return 0;
     }
@@ -651,6 +652,18 @@ static int schway__disc_image_path_contained(const char *root, const char *candi
 {
     size_t root_size = strlen(root);
     if (strlen(candidate) < root_size) return 0;
+    if (root_size == 1u && root[0] == '/') {
+        if (candidate[0] != '/' || candidate[1] == '\0') return 0;
+#ifdef __wasi__
+        /* The build tree is guest /; /source is a separate preopen. */
+        size_t source_root_size = sizeof "/source" - 1u;
+        if (strncmp(candidate, "/source", source_root_size) == 0 &&
+            (candidate[source_root_size] == '/' || candidate[source_root_size] == '\0')) {
+            return 0;
+        }
+#endif
+        return 1;
+    }
     for (size_t i = 0u; i < root_size; i++) {
         unsigned char left = (unsigned char)root[i];
         unsigned char right = (unsigned char)candidate[i];

@@ -408,6 +408,46 @@ cleanup:
     return result;
 }
 
+static int test_cue_root_child(const char *directory)
+{
+    char child_directory[1024] = "";
+    char cue_path[1024] = "";
+    char track_path[1024] = "";
+    static const char cue[] =
+        "FILE \"schwaystation-cue-root-child/track.bin\" BINARY\n"
+        "TRACK 01 MODE1/2048\n"
+        "INDEX 01 00:00:00\n";
+    const char *test_case = "disc.image.cue_root_child";
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    int result = 0;
+
+    CHECK(make_path(child_directory, directory, "schwaystation-cue-root-child") &&
+          make_path(cue_path, directory, "schwaystation-cue-root.cue") &&
+          make_path(track_path, child_directory, "track.bin"),
+          "could not form root-level cue child paths");
+    CHECK(make_directory(child_directory) &&
+          write_pattern_file(track_path, 16u, 2048u, 0x31u, 0) &&
+          write_text(cue_path, cue, sizeof cue - 1u),
+          "could not create root-level cue child inputs");
+    memset(&error, 0, sizeof error);
+    CHECK(schway_disc_image_open(cue_path, &image, &error) == SCHWAY_DISC_IMAGE_OK,
+          "expected a root-level cue to open its nested track");
+
+cleanup:
+    schway_disc_image_close(image);
+    if (cue_path[0] != '\0') (void)remove(cue_path);
+    if (track_path[0] != '\0') (void)remove(track_path);
+    if (child_directory[0] != '\0') {
+#ifdef _WIN32
+        (void)_rmdir(child_directory);
+#else
+        (void)rmdir(child_directory);
+#endif
+    }
+    return result;
+}
+
 static int test_cue_pregap(const char *directory)
 {
     char cue_path[1024] = "";
@@ -1036,6 +1076,7 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "iso_sector") == 0) return test_iso_sector(argv[2]);
     if (strcmp(argv[1], "cue_modes") == 0) return test_cue_modes(argv[2]);
+    if (strcmp(argv[1], "cue_root_child") == 0) return test_cue_root_child(argv[2]);
     if (strcmp(argv[1], "cue_pregap") == 0) return test_cue_pregap(argv[2]);
     if (strcmp(argv[1], "cue_reject") == 0) return test_cue_reject(argv[2]);
     if (strcmp(argv[1], "cue_symlink") == 0) return test_cue_symlink(argv[2]);

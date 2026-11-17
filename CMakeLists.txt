@@ -233,9 +233,16 @@ set(SCHWAYSTATION_INVENTORY ${inventory} CACHE STRING "Test inventory selection 
 # Fault prevented: every wasm32 test failing on a missing runtime, with a
 # message that does not say where the runtime comes from.
 if(SCHWAYSTATION_BUILD_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "WASI")
-  list(GET CMAKE_CROSSCOMPILING_EMULATOR 0 emulator)
-  if(NOT EXISTS "${emulator}")
-    message(FATAL_ERROR "wasm32: the test runtime '${emulator}' is missing; fetch it with\n"
+  list(LENGTH CMAKE_CROSSCOMPILING_EMULATOR emulator_length)
+  if(emulator_length LESS 4)
+    message(FATAL_ERROR "wasm32: the test emulator must include its wrapper, runtime, source tree and build tree")
+  endif()
+  list(GET CMAKE_CROSSCOMPILING_EMULATOR 0 emulator_wrapper)
+  list(GET CMAKE_CROSSCOMPILING_EMULATOR 1 emulator_runtime)
+  if(NOT EXISTS "${emulator_wrapper}")
+    message(FATAL_ERROR "wasm32: the test emulator wrapper '${emulator_wrapper}' is missing")
+  elseif(NOT EXISTS "${emulator_runtime}")
+    message(FATAL_ERROR "wasm32: the test runtime '${emulator_runtime}' is missing; fetch it with\n"
       "  scripts/fetch-pin.sh wasmtime-<arch>-linux build/pins/wasmtime")
   endif()
 endif()

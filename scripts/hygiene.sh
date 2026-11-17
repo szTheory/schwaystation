@@ -28,6 +28,11 @@ BIOS_SIZE=524288
 CARD_SIZE=131072
 # True if some line of stdin matches $1 and not $2.
 leaks() { grep -I -E -e "$1" | grep -v -E -e "$2" | grep -q .; }
+leaks_stream() {
+  leak_pattern=$1 leak_allow=$2
+  shift 2
+  "$@" | leaks "$leak_pattern" "$leak_allow"
+}
 in_manifest() { [ -f "$MANIFEST" ] && awk -v p="$1" '$1 == p { f = 1 } END { exit !f }' "$MANIFEST"; }
 # Prints $2 bytes of stdin from offset $1 as hex, reading no further than that.
 hex_at() { head -c $(($1 + $2)) | tail -c "$2" | od -An -tx1 | tr -d ' \n'; }
@@ -72,8 +77,8 @@ check_file() {
   if [ "$size" != 0 ] && ! $2 "$1" 2>/dev/null | grep -I -q '' && ! in_manifest "$1"; then
     found 'binary file not in manifest' "$1"
   fi
-  if $2 "$1" 2>/dev/null | leaks "$HOME_PATH" "$HOME_OK"; then found 'home directory path' "$1"; fi
-  if $2 "$1" 2>/dev/null | leaks "$EMAIL" "$EMAIL_OK"; then found 'email address' "$1"; fi
+  leaks_stream "$HOME_PATH" "$HOME_OK" "$2" "$1" 2>/dev/null && found 'home directory path' "$1"
+  leaks_stream "$EMAIL" "$EMAIL_OK" "$2" "$1" 2>/dev/null && found 'email address' "$1"
   if printf '%s\n' "$1" | grep -q -E -e "$CODE_PATH" && $2 "$1" 2>/dev/null | grep -q -I -E -e "$GPL_TEXT"; then
     found 'GPL licence text in code' "$1"
   fi
@@ -122,19 +127,11 @@ case $mode in
   --history)
     [ $# -gt 0 ] || set -- --all
     for c in $(git rev-list "$@"); do
-      if git grep -I -h -E -e "$HOME_PATH" "$c" -- . ":!$SELF" 2>/dev/null | grep -v -E -e "$HOME_OK" | grep -q .; then
-        found 'home directory path' "commit $c"
-      fi
-      if git grep -I -h -E -e "$EMAIL" "$c" -- . ":!$SELF" 2>/dev/null | grep -v -E -e "$EMAIL_OK" | grep -q .; then
-        found 'email address' "commit $c"
-      fi
+      leaks_stream "$HOME_PATH" "$HOME_OK" git grep -I -h -E -e "$HOME_PATH" "$c" -- . ":!$SELF" 2>/dev/null && found 'home directory path' "commit $c"
+      leaks_stream "$EMAIL" "$EMAIL_OK" git grep -I -h -E -e "$EMAIL" "$c" -- . ":!$SELF" 2>/dev/null && found 'email address' "commit $c"
       # A squash merge copies the pull request's title and body into the message.
-      if git log -1 --format=%B "$c" | leaks "$HOME_PATH" "$HOME_OK"; then
-        found 'home directory path' "message of $c"
-      fi
-      if git log -1 --format=%B "$c" | leaks "$EMAIL" "$EMAIL_OK"; then
-        found 'email address' "message of $c"
-      fi
+      leaks_stream "$HOME_PATH" "$HOME_OK" git log -1 --format=%B "$c" && found 'home directory path' "message of $c"
+      leaks_stream "$EMAIL" "$EMAIL_OK" git log -1 --format=%B "$c" && found 'email address' "message of $c"
       # --numstat shows a binary file's line counts as "-".
       for b in $(git diff-tree -r --root --no-commit-id --numstat "$c" |
         awk -F '\t' '$1 == "-" && $2 == "-" { print $3 }'); do
