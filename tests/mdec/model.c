@@ -6,6 +6,7 @@
 #include "schwaystation.h"
 #include "internal.h"
 #include "../check.h"
+#include "input_coverage.h"
 
 #define MDEC_STATUS 0x1F801824u
 #define MDEC_DATA 0x1F801820u
@@ -187,6 +188,30 @@ static void case_guest_input(void)
     case_guest_input_modes((1u << 0u) | (1u << 1u));
 }
 
+static void case_input_coverage(void)
+{
+    /* This zero-run control has one DC and 63 AC values, so one mono block is
+       complete at the declared command boundary without an EOB halfword. */
+    static const uint8_t complete[128] = {0};
+    schway__mdec_coverage coverage;
+    memset(&coverage, 0, sizeof coverage);
+    CHECK_EQ_U64(schway__mdec_input_coverage_scan(complete, sizeof complete, &coverage),
+                 SCHWAY__MDEC_COVERAGE_COMPLETE);
+    CHECK_EQ_U64(coverage.complete_blocks, 1u);
+    CHECK_EQ_U64(coverage.trailing_coefficients, 0u);
+
+    static const uint8_t truncated[] = {0u, 0u};
+    memset(&coverage, 0, sizeof coverage);
+    CHECK_EQ_U64(schway__mdec_input_coverage_scan(truncated, sizeof truncated, &coverage),
+                 SCHWAY__MDEC_COVERAGE_INCOMPLETE);
+    CHECK_EQ_U64(coverage.complete_blocks, 0u);
+    CHECK_EQ_U64(coverage.trailing_coefficients, 1u);
+
+    static const uint8_t odd_size[] = {0u};
+    CHECK_EQ_U64(schway__mdec_input_coverage_scan(odd_size, sizeof odd_size, &coverage),
+                 SCHWAY__MDEC_COVERAGE_MALFORMED);
+}
+
 static void case_status(void)
 {
     schway *inst = make();
@@ -220,6 +245,33 @@ static void case_status(void)
     status = read32(inst, MDEC_STATUS);
     CHECK_EQ_HEX(status & (0x0Fu << 23), 0u);
     CHECK_EQ_HEX(status & 0xFFFFu, 0x03DDu);
+
+    /* A nonempty table command reports parameter-count minus one and wraps
+       to 0xFFFF after the final input word, as in the SCPH-5501 capture. */
+    write32(inst, MDEC_DATA, 0x40000000u, 0u);
+    CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & 0xFFFFu, 0x000Fu);
+    for (uint32_t i = 0u; i < 16u; i++) {
+        write32(inst, MDEC_DATA, 0x01010101u, 0u);
+    }
+    CHECK_EQ_HEX(read32(inst, MDEC_STATUS), 0x8004FFFFu);
+
+    /* MDEC(3) has a fixed 32-word parameter count and the same terminal
+       counter value. */
+    write32(inst, MDEC_DATA, 0x60000000u, 0u);
+    CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & 0xFFFFu, 0x001Fu);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        write32(inst, MDEC_DATA, 0x5A827D8Au, 0u);
+    }
+    CHECK_EQ_HEX(read32(inst, MDEC_STATUS), 0x8004FFFFu);
+
+    /* The decode counter reaches 0xFFFF as soon as all declared input words
+       arrive, while block output is still pending. */
+    write32(inst, MDEC_DATA, 0x28000001u, 0u);
+    CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & 0xFFFFu, 0u);
+    write32(inst, MDEC_DATA, 0xFE000000u, 0u);
+    status = read32(inst, MDEC_STATUS);
+    CHECK_EQ_HEX(status & 0xFFFFu, 0xFFFFu);
+    CHECK((status & (1u << 29)) != 0u);
     schway_destroy(inst);
 }
 
@@ -1005,6 +1057,8 @@ int main(int argc, char **argv)
         case_guest_4bit();
     } else if (strcmp(argv[1], "guest_input") == 0) {
         case_guest_input();
+    } else if (strcmp(argv[1], "input_coverage") == 0) {
+        case_input_coverage();
     } else if (strcmp(argv[1], "block") == 0) {
         case_block();
         case_sign_and_tables();

@@ -6,8 +6,9 @@ set_target_properties(schwaystation-test-mdec PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-mdec)
 
-# Fault prevented: reset status and the empty/full/DREQ status bits drift from
-# the documented MDEC port behavior or the bus still routes it as unbuilt.
+# Fault prevented: reset status, empty/full/DREQ bits, or the completed-command
+# parameter counter drift from documented MDEC behavior, or the bus still routes
+# the device as unbuilt.
 schway_add_test(NAME mdec.status
   COMMAND schwaystation-test-mdec status
   LABELS mdec portable TIMEOUT 10)
@@ -70,4 +71,10 @@ schway_add_test(NAME mdec.guest_input
 # relation to the pinned 8-bit fixture changes independently of the 8-bit run.
 schway_add_test(NAME mdec.guest_4bit
   COMMAND schwaystation-test-mdec guest_4bit
+  LABELS mdec portable TIMEOUT 10)
+
+# Fault prevented: a compressed input source ends in a partial MDEC block or
+# malformed halfword span is treated as a complete mono block.
+schway_add_test(NAME mdec.input_coverage
+  COMMAND schwaystation-test-mdec input_coverage
   LABELS mdec portable TIMEOUT 10)
