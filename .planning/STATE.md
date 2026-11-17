@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 38 of 39
-status: executing
-stopped_at: Completed 06-20-PLAN.md; next 06-23-PLAN.md
-last_updated: "2026-11-17T05:07:00Z"
+current_plan: 41 of 45 (MDEC acceptance and evidence scope)
+status: in_progress
+stopped_at: Completed 06-40-PLAN.md; 06-41 is next
+last_updated: "2026-11-17T18:39:20.478Z"
 last_activity: 2026-11-17
-state_head: 2cf1296
+state_head: b6fd4aa32e2b65ed85afeab74e96bf177c2acc88
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 189
-  completed_plans: 187
-  percent: 99
-last_activity_desc: "Completed Plan 06-20: added five bounded production replay harnesses for hostile CUE, CNF, M3U, CD-ROM and MDEC input. The focused 11-test replay/fixture selection, hygiene, sorted inventory, and 2,700-line gate passed; a temporary broken input bound was rejected and restored. LibFuzzer campaign linking was unavailable locally because this Mac lacks the Clang runtime; Plan 06-23 owns hosted campaign wiring and execution. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); wall interval was about 35 minutes and active time was not tracked reliably. No hosted run URL or physical capture is claimed. Continue with Plan 06-23."
+  total_plans: 195
+  completed_plans: 190
+  percent: 83
+last_activity_desc: "Plan 06-40 is complete. Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna; 19m27s wall. Task commits: 0131b31 and b6fd4aa. The scoped Task 1 and Task 2 `git diff --check origin/main` commands exited 0; Task 2 also ran `cmake --list-presets` successfully. No decoder suite was run by this documentation plan. The pre-edit global `git diff --check origin/main` failure is recorded in 06-40-SUMMARY: 28 existing EOF blank-line findings and trailing whitespace at tests/probe/rc_hash_disc.c:565,568; cleanup is assigned to 06-44. DISC-03 and 06-23/24 acceptance remain pending; 06-45 hosted and ship-only checks remain pending. Next is 06-41."
 ---
 
 # Project State
@@ -30,13 +30,13 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 
 ## Current Position
 
-Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 38 of 39
-Next plan file: 06-23-PLAN.md
-Status: Ready to execute
+Phase: 6 (Discs and FMV) — owner-approved successor scope in progress
+Current Plan: 41 of 45 (MDEC acceptance and evidence scope)
+Next plan file: 06-41-PLAN.md, followed by sequential successors 06-42 through 06-45
+Status: The owner approved deterministic MDEC with available verified hardware coverage. Exact 8-bit and complete external frame/movie hardware conformance remain unproved; prior 06-23/24 acceptance is pending successor verification. Phase release is not complete.
 Last activity: 2026-11-17
 
-Progress: [█████████░] 95%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -54,7 +54,7 @@ Progress: [█████████░] 95%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 37 | 39 | - |
+| 06 | 37 | 45 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -243,6 +243,7 @@ Progress: [█████████░] 95%
 | Phase 06 P17 | not measured (continued after 22-hour pause) | 2 tasks | 12 files |
 | Phase 06 P18 | at least 1h09m wall from prior state checkpoint; active time unavailable | 2 tasks | 14 files |
 | Phase 06 P20 | about 32m wall from 04:35 UTC checkpoint; active time unavailable | 3 tasks | 9 files |
+| Phase 6 P40 | 19m27s | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -597,6 +598,8 @@ Recent decisions affecting current work:
 - [Phase 06]: The existing XA filter and native mixer paths satisfy the mode-enabled mismatch and XA/CDDA/voice/reverb controls; retain this slice as test-only.
 - [Phase 06]: Keep the pinned MDEC guest selectors gating and assign the production DMA0 input/decode mismatch to dependent Plan 06-35.
 - [Phase 6]: Split Plan 06-36 after its 30-minute bound: it closes the DMA1 destination harness and exact RED vectors; Plan 06-37 owns the source-backed 4/8-bit arithmetic and ordered status repair.
+- [Phase 6]: Keep the v1.0 MDEC acceptance claim limited to deterministic decoding with available verified evidence; preserve the original hardware arrays, arithmetic, cycle cap and owned disc_boot path.
+- [Phase 6]: Keep DISC-03 and 06-23/24 acceptance pending until successor registration and final local/hosted acceptance in 06-43 through 06-45.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -796,9 +799,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-16T18:57:07Z
-Stopped at: Plan 06-13 bounded slice closed; no complete public frame/movie oracle pair was found.
-Resume file: None
+Last session: 2026-11-17T18:39:20.097Z
+Stopped at: Completed 06-40-PLAN.md; 06-41 is next
+Resume file: .planning/phases/06-discs-and-fmv/06-41-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
@@ -935,3 +938,15 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unava
 ### Phase 6 plan 06-22 execution (2026-11-17)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable). The optional SDL2 example compiles from the installed library package and reuses existing host disc/pixel helpers without adding SDL2 to product targets. The first package configure found the build-tree config shadowing the installed one; the corrected command supplies the installed `schwaystation_DIR`, and the final example build passed. CI builds it only on Linux x64, using Ubuntu's SDL2 compatibility development package if the hosted image lacks `sdl2.pc`. Actionlint passed when ignoring its outdated Ubuntu 26.04 label list. The app was not launched and hosted verification remains for ship. The 2699-line repository gate is unchanged; no owner hardware capture or hosted URL applies. Plan 06-20 is next.
+
+### Phase 6 plan 06-23 independent local integration (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer gpt-6-luna xhigh. Active duration was not measured. The earlier Getloc pass came from a stale binary; fresh builds reproduced the failure. The actual test fixture used 150-based TOC values against the documented zero-based-LBA contract. Production track selection and synthetic Q generation now follow the contract, including INDEX 00 pregap countdown; the review's WR-08 was fixed and re-reviewed. Focused CI CD/controller/XA/runner/fuzz checks passed 19/19 in 12.28s, nightly timing/Getloc/control references passed 3/3 in 2.29s, and runner hash/libretro integration plus fixture producers passed 4/4 (libretro host 39.12s). No full media suite was repeated. DISC-03 remains open: the pinned 8-bit selector differs at byte 6 and the status guest exceeds its preserved cycle bound. Public searches found no replacement full-output oracle; the owner says capture is not available anytime soon, so none is planned or requested. Hosted all-leg and background RetroArch acceptance remain outstanding; no hosted URL applies. No phase verification or ship claim.
+
+### Phase 6 plans 06-23/06-24 final verification (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); final source review by gsd-code-reviewer gpt-6-luna xhigh. Active duration was not measured. The current diff review found no open source findings after correcting API v6 compatibility and updating all runner/libretro/example disc-flag call sites. The reviewed-source `cmake --workflow --preset ci` configured and built successfully, then exited 8 with 609/610 tests passing; only `mdec.guest_input` failed. Direct `ctest -L disc` passed 25/25 in 11.48s; `ctest -L mdec` was 10/11 and confirms 12 pinned output-word mismatches; `cmake --workflow --preset hygiene` passed 24/24. The exact 8-bit mismatch remains byte 6 (expected 04, actual 05), while the status guest's 7.68M requested delay cycles exceed its unchanged 4.9152M cap. No expected data, MDEC contract, selector or cap changed. Hosted CI/nightly/fuzz/RetroArch checks remain pending without a URL. Phase 6 verification is `gaps_found`; no ship, PR or milestone completion is claimed. The owner capture is unavailable and will not be requested. Next action is new primary MDEC evidence or an evidence-backed production correction; no next phase or v2.0 is authorized by this run.
+
+### Phase 6 MDEC completed-command status follow-up (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); independent MDEC math, hardware-source and cycle-budget reviews. Active duration was not measured. The public SCPH-5501 status capture shows `8004FFFFh` after full table loads and `2204FFFFh` after all decode input is consumed while output remains unread. `mdec_status` previously left the low counter at zero; it now reports the documented minus-one wrap for nonempty MDEC(1/2/3) commands. The focused status test checks MDEC(2) and MDEC(3) through exact `8004FFFFh`, and decode input exhaustion to `FFFFh` while a block is pending. `cmake --build --preset ci --target schwaystation-test-mdec` and `ctest --test-dir build/ci -R '^mdec\\.status$' --no-tests=error --output-on-failure` passed. The full MDEC label passed 10/11; only the exact 8-bit vector remains red. The post-fix `cmake --workflow --preset ci` exited 8 with 609/610 tests passing in 66.57 seconds, only `mdec.guest_input` failed. Rebuilt nightly MDEC reference tests passed 4-bit and controls; 8-bit still differs at byte 6 (expected 04, actual 05). Two independent reviews confirmed identical pinned 4/8-bit input/tables and that the permitted ares arithmetic matches the current implementation; no source-backed alternative removed the differences. The full status guest still requests 7.68M delay cycles against the unchanged 4.9152M cap, and this status-register fix does not change that. The final `cmake --workflow --preset hygiene` passed 24/24 in 39.77 seconds. DISC-03 remains incomplete; no phase ship, hosted URL, owner capture, next phase or v2.0 work is claimed.
