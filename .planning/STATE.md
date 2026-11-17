@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 41 of 45 (MDEC acceptance and evidence scope)
+current_plan: 42 of 45 (MDEC acceptance and evidence scope)
 status: in_progress
-stopped_at: Completed 06-40-PLAN.md; 06-41 is next
-last_updated: "2026-11-17T18:39:20.478Z"
+stopped_at: Completed 06-41-PLAN.md
+last_updated: "2026-11-17T19:23:53.370Z"
 last_activity: 2026-11-17
-state_head: b6fd4aa32e2b65ed85afeab74e96bf177c2acc88
+state_head: 8a0f4573f28fa7dbd851f0e01c079517c36e8155
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 195
-  completed_plans: 190
+  completed_plans: 191
   percent: 83
-last_activity_desc: "Plan 06-40 is complete. Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna; 19m27s wall. Task commits: 0131b31 and b6fd4aa. The scoped Task 1 and Task 2 `git diff --check origin/main` commands exited 0; Task 2 also ran `cmake --list-presets` successfully. No decoder suite was run by this documentation plan. The pre-edit global `git diff --check origin/main` failure is recorded in 06-40-SUMMARY: 28 existing EOF blank-line findings and trailing whitespace at tests/probe/rc_hash_disc.c:565,568; cleanup is assigned to 06-44. DISC-03 and 06-23/24 acceptance remain pending; 06-45 hosted and ship-only checks remain pending. Next is 06-41."
+last_activity_desc: "Plan 06-41 is complete. Runtime/model: Codex/OpenGSD 1.20.0, executor gpt-6-luna xhigh; 35m31s wall from the 18:46:31Z execution marker to closeout preparation, active time not measured. The main MDEC label passed 12/12; the pinned-reference no-emulation controls passed 1/1; inventory and scoped whitespace checks passed. Six task commits are present, with seven commits measured from the plan base including the reviewed continuation-plan commit. No compressed pinned reference guest ran: the in-process source guard is next in 06-42, and selector registration is in 06-43. The 8-bit regression remains local model/reference comparator coverage, not hardware conformance. DISC-03, 06-23/24 acceptance and 06-45 hosted/ship checks remain pending. Next is 06-42."
 ---
 
 # Project State
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — owner-approved successor scope in progress
-Current Plan: 41 of 45 (MDEC acceptance and evidence scope)
-Next plan file: 06-41-PLAN.md, followed by sequential successors 06-42 through 06-45
+Current Plan: 42 of 45 (MDEC acceptance and evidence scope)
+Next plan file: 06-42-PLAN.md, followed by sequential successors 06-43 through 06-45
 Status: The owner approved deterministic MDEC with available verified hardware coverage. Exact 8-bit and complete external frame/movie hardware conformance remain unproved; prior 06-23/24 acceptance is pending successor verification. Phase release is not complete.
 Last activity: 2026-11-17
 
@@ -244,6 +244,7 @@ Progress: [████████░░] 83%
 | Phase 06 P18 | at least 1h09m wall from prior state checkpoint; active time unavailable | 2 tasks | 14 files |
 | Phase 06 P20 | about 32m wall from 04:35 UTC checkpoint; active time unavailable | 3 tasks | 9 files |
 | Phase 6 P40 | 19m27s | 2 tasks | 7 files |
+| Phase 6 P41 | 36min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -600,6 +601,8 @@ Recent decisions affecting current work:
 - [Phase 6]: Split Plan 06-36 after its 30-minute bound: it closes the DMA1 destination harness and exact RED vectors; Plan 06-37 owns the source-backed 4/8-bit arithmetic and ordered status repair.
 - [Phase 6]: Keep the v1.0 MDEC acceptance claim limited to deterministic decoding with available verified evidence; preserve the original hardware arrays, arithmetic, cycle cap and owned disc_boot path.
 - [Phase 6]: Keep DISC-03 and 06-23/24 acceptance pending until successor registration and final local/hosted acceptance in 06-43 through 06-45.
+- [Phase 6]: Preserve the pinned 8-bit hardware log and bytes as evidence; compare deterministic model/reference regression output to its separately named frozen baseline.
+- [Phase 6]: Do not run compressed pinned reference guests until Plan 06-42 installs the in-process source guard; Plan 06-43 owns selector registration.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -799,9 +802,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-17T18:39:20.097Z
-Stopped at: Completed 06-40-PLAN.md; 06-41 is next
-Resume file: .planning/phases/06-discs-and-fmv/06-41-PLAN.md
+Last session: 2026-11-17T19:23:53.046Z
+Stopped at: Completed 06-41-PLAN.md
+Resume file: .planning/phases/06-discs-and-fmv/06-42-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 

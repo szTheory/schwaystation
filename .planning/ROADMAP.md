@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes deterministic integer MDEC decoding with exact pinned 4-bit hardware coverage, a separately named 8-bit implementation regression, direct status/colour/FIFO/packing/bounds controls, and a compressed-unit preflight. Incomplete external frame/movie inputs are identified as insufficient assets, not decoder passes; exact 8-bit and full-image hardware conformance are not claimed. The complete owned STR on `disc_boot` plays through DMA into the native 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 38/45 plans accepted; two recorded gap summaries remain pending the approved successor tranche
+**Plans**: 39/45 plans accepted; two recorded gap summaries remain pending the approved successor tranche
 
 Plans:
 **Wave 1**
@@ -564,7 +564,7 @@ Plans:
 
 **Approved MDEC successor tranche** *(local waves 1–6; owner-approved 2026-11-17)*
 - [x] 06-40-PLAN.md — Record the approved deterministic MDEC claim and evidence limits
-- [ ] 06-41-PLAN.md — Add a distinct deterministic 8-bit regression while retaining exact 4-bit coverage
+- [x] 06-41-PLAN.md — Add a distinct deterministic 8-bit regression while retaining exact 4-bit coverage
 - [ ] 06-42-PLAN.md — Guard compressed inputs and classify insufficient assets/status budget
 - [ ] 06-43-PLAN.md — Register the exact surviving main-CI and nightly selectors
 - [ ] 06-44-PLAN.md — Review changes and run complete local acceptance
@@ -585,4 +585,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
 | 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
-| 6. Discs and FMV | 38/45 | In Progress | - |
+| 6. Discs and FMV | 39/45 | In Progress | - |
