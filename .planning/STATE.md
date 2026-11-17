@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 33 of 39
+current_plan: 34 of 39
 status: executing
-stopped_at: Completed 06-16-PLAN.md; next 06-17-PLAN.md
-last_updated: "2026-11-17T01:29:36Z"
+stopped_at: Completed 06-17-PLAN.md; next 06-18-PLAN.md
+last_updated: "2026-11-17T02:20:29Z"
 last_activity: 2026-11-17
-state_head: f7f128b
+state_head: c30fc79
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 182
-  percent: 96
-last_activity_desc: "Completed Plan 06-16: generated XA/CD-DA/STR media preflight passes; the primary two-track disc is 522144 bytes under the 512 KiB cap. The owned guest produces nonzero native PCM from decoded XA/CD-DA queues and a deterministic RGB24 frame through STR→MDEC→GPU DMA; the final boot/read/audio/FMV lane passed 4/4. A pre-commit hygiene scan matched the original pin-key labels, so they were renamed with hyphens; the affected audio/FMV tests then passed 2/2. Inline review is clean. Continue with Plan 06-17. The owner reported over 22 hours elapsed during this autonomous run; active runtime was not measured. Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable). No hardware capture or hosted run URL applies."
+  completed_plans: 183
+  percent: 97
+last_activity_desc: "Completed Plan 06-17: runner CUE/M3U boot, ISO attachment, unsupported-media probe behavior and frame-indexed input swaps are covered. Cheap diff/inventory/configure checks passed before the build; the final focused runner selector passed 16/16 in 2.46 seconds. Review fixes cover disc state-hash refusal, readable nested CUE unsupported media, and a frame-300 test that had stopped at frame 274. Standard review is clean. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), standard gsd-code-reviewer; active time across the reported 22-hour pause was not measured. No hardware capture or hosted run URL applies. Continue with Plan 06-18."
 ---
 
 # Project State
@@ -31,17 +31,17 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 33 of 39
-Next plan file: 06-17-PLAN.md
+Current Plan: 34 of 39
+Next plan file: 06-18-PLAN.md
 Status: Ready to execute
-Last activity: 2026-11-16
+Last activity: 2026-11-17
 
-Progress: [████████░░] 82%
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 182
+- Total plans completed: 183
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -54,7 +54,7 @@ Progress: [████████░░] 82%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 31 | 39 | - |
+| 06 | 33 | 39 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -240,6 +240,7 @@ Progress: [████████░░] 82%
 | Phase 6 P36 | at least 57m55s wall | 1 tasks | 20 files |
 | Phase 6 P38 | at least 1h00m19s wall; active work capped at 30m | 1 partial task | 20 files |
 | Phase 6 P14 | elapsed wall time spanned a 22-hour pause/resume; active time unavailable | 2 tasks | 28 files |
+| Phase 06 P17 | not measured (continued after 22-hour pause) | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -916,3 +917,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unava
 ### Phase 6 plan 06-16 execution (2026-11-17)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); inline code review. The owner reported over 22 hours elapsed during the autonomous run; active runtime was not measured reliably. The cheap media-geometry preflight passed before final tests. The primary two-track fixture build enforces the 512 KiB cap at 522,144 bytes; reducing XA to three complete sectors shifts the authored CD-DA and STR extents, and the guest seeks their resulting LBA 214 and 54 positions. The post-review `ctest --test-dir build/ci -R '^disc\\.fixture' --no-tests=error --output-on-failure` passed 4/4 in 22.47 seconds. The pre-commit hygiene scan caught symbol-based pin labels; hyphenated labels passed the affected audio/FMV tests 2/2. The one-off record command passed and produced PCM/frame pins; no physical PlayStation capture or hosted URL is claimed. DISC-02/03 remain partial pending runner, libretro, oracle, fuzz and hosted matrix callers. Plan 06-17 is next.
+
+### Phase 6 plan 06-17 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer. Active time was not tracked reliably across the owner's reported 22-hour pause. Cheap diff/inventory checks and CMake configure passed before builds. The runner now boots the owned CUE and M3U images through OpenBIOS, attaches ISO, rejects direct and nested unsupported media, and applies frame-indexed pad/lid/swap controls. Standard review caught and fixed a disc `--hash-state` usage mismatch, a CUE probe extension bypass, and a frame-300 control test that had stopped at frame 274; the final review is clean. `cmake --preset ci`, the runner target build, and the focused runner CTest selector passed; final selector result was 16/16 in 2.46 seconds. No physical PlayStation capture or hosted run URL applies. Plan 06-18 is next.

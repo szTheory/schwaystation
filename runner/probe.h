@@ -28,7 +28,7 @@ void schway__refuse_file(const char *path, const char *why);
    out, one key=value line per field. Returns 0 on success. When the file is
    unreadable, empty or not a valid PS-EXE it prints
    "schwaystation-run: input: <reason>" to standard error, prints nothing to
-   out and returns 1. No instance is created. */
+   out and returns 1 (77 for unsupported media). No instance is created. */
 int schway__probe_print(FILE *out, const char *path,
                         const schway__probe_metadata_inputs *metadata);
 

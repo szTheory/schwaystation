@@ -8,6 +8,8 @@
 #include <string.h>
 
 #include "md5.h"
+#include "disc_image.h"
+#include "exit_status.h"
 #include "schwaystation.h"
 #include "sha1.h"
 #include "disc_probe.h"
@@ -41,6 +43,30 @@ static void refuse(const char *path, const char *why)
     fputs("schwaystation-run: ", stderr);
     put_text(stderr, path);
     fprintf(stderr, ": %s\n", why);
+}
+
+static int suffix_is(const char *path, const char *suffix)
+{
+    if (path == NULL) return 0;
+    size_t path_size = strlen(path);
+    size_t suffix_size = strlen(suffix);
+    if (path_size < suffix_size) return 0;
+    const char *tail = path + path_size - suffix_size;
+    for (size_t i = 0u; i < suffix_size; i++) {
+        unsigned char value = (unsigned char)tail[i];
+        if (value >= (unsigned char)'A' && value <= (unsigned char)'Z') {
+            value = (unsigned char)(value - (unsigned char)'A' + (unsigned char)'a');
+        }
+        if (value != (unsigned char)suffix[i]) return 0;
+    }
+    return 1;
+}
+
+static int provider_path(const char *path)
+{
+    if (path == NULL) return 0;
+    return suffix_is(path, ".cue") || suffix_is(path, ".m3u") || suffix_is(path, ".chd") ||
+           suffix_is(path, ".pbp") || suffix_is(path, ".ecm") || suffix_is(path, ".ccd");
 }
 
 /* The licence text names the console's market (psx-spx, "PSX EXE Format");
@@ -328,6 +354,34 @@ void schway__refuse_file(const char *path, const char *why)
 int schway__probe_print(FILE *out, const char *path,
                         const schway__probe_metadata_inputs *metadata)
 {
+    if (provider_path(path)) {
+        schway_disc_image *image = NULL;
+        schway_disc_image_error image_error;
+        memset(&image_error, 0, sizeof image_error);
+        schway_disc_image_status image_status =
+            schway_disc_image_open(path, &image, &image_error);
+        if (image_status == SCHWAY_DISC_IMAGE_UNSUPPORTED) {
+            refuse("input", image_error.message);
+            schway_disc_image_close(image);
+            return SCHWAY__EXIT_UNSUPPORTED;
+        }
+        if (image_status != SCHWAY_DISC_IMAGE_OK) {
+            refuse("input", image_error.message[0] != '\0' ? image_error.message :
+                   schway_disc_image_status_string(image_status));
+            schway_disc_image_close(image);
+            return 1;
+        }
+        if (suffix_is(path, ".m3u")) {
+            fprintf(out, "format=disc\nplaylist_count=%lu\n"
+                         "serial=redacted\nrcheevos_md5=redacted\ntrack1_sha1=redacted\n"
+                         "boot_name=redacted\nsha256=redacted\ntitle=unavailable\n"
+                         "metadata.identity=unknown\nboot_status=unknown\nplay_status=unknown\n",
+                    (unsigned long)schway_disc_image_count(image));
+            schway_disc_image_close(image);
+            return ferror(out) == 0 ? 0 : 1;
+        }
+        schway_disc_image_close(image);
+    }
     schway_host_disc_probe disc;
     schway_host_disc_probe_status disc_status = schway__disc_probe_image(path, &disc);
     if (disc_status != SCHWAY_HOST_DISC_PROBE_NOT_ISO) {

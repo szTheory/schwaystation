@@ -43,10 +43,21 @@ if(SCHWAYSTATION_BUILD_TESTS)
   add_executable(schwaystation-run-test ${SCHWAYSTATION_RUNNER_SOURCES})
   target_include_directories(schwaystation-run-test PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/generated ${PROJECT_SOURCE_DIR}/src)
-  target_link_libraries(schwaystation-run-test PRIVATE schwaystation::schwaystation schwaystation-host)
+  target_link_libraries(schwaystation-run-test PRIVATE schwaystation::schwaystation
+    schwaystation-host schwaystation_disc_image)
   target_compile_definitions(schwaystation-run-test PRIVATE
     _POSIX_C_SOURCE=200809L SCHWAY_RUN_TEST_HOOKS=1 SCHWAY_HOST_CARD_TESTING=1)
   set_target_properties(schwaystation-run-test PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
   schway_warnings(schwaystation-run-test)
+
+  add_executable(schwaystation-test-runner-disc
+    ${PROJECT_SOURCE_DIR}/tests/runner/disc.c ${PROJECT_SOURCE_DIR}/runner/inputs.c)
+  target_include_directories(schwaystation-test-runner-disc PRIVATE
+    ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/runner)
+  target_link_libraries(schwaystation-test-runner-disc PRIVATE
+    schwaystation::schwaystation schwaystation_disc_image)
+  set_target_properties(schwaystation-test-runner-disc PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(schwaystation-test-runner-disc)
 endif()

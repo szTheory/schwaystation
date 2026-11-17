@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes, and the nightly lane matches the ps1-tests `mdec` references within the stated tolerance. The STR on `disc_boot` plays through DMA into the 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 32/39 plans executed
+**Plans**: 33/39 plans executed
 
 Plans:
 **Wave 1**
@@ -544,7 +544,7 @@ Plans:
 - [x] 06-16-PLAN.md — Play owned XA, CD-DA and STR end to end
 
 **Wave 18** *(blocked on Wave 17 completion)*
-- [ ] 06-17-PLAN.md — Load disc media and lid scripts in the runner
+- [x] 06-17-PLAN.md — Load disc media and lid scripts in the runner
 
 **Wave 19** *(blocked on Wave 18 completion)*
 - [ ] 06-18-PLAN.md — Expose libretro extended disk control and disc PCM

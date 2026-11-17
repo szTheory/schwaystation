@@ -8,9 +8,19 @@
 
 #define SCHWAY__INPUTS_MAX_FRAME 1000000u
 
+typedef struct schway_disc_image schway_disc_image;
+
+typedef enum schway__input_event_kind {
+    SCHWAY__INPUT_EVENT_INPUT,
+    SCHWAY__INPUT_EVENT_LID,
+    SCHWAY__INPUT_EVENT_DISC
+} schway__input_event_kind;
+
 typedef struct schway__input_event {
     uint32_t frame;
     uint32_t line;
+    uint32_t kind;
+    uint32_t value;
     schway_input input;
 } schway__input_event;
 
@@ -33,8 +43,12 @@ typedef struct schway__inputs_error {
 
 schway__inputs_status schway__inputs_load(const char *path, schway__input_movie *movie,
                                           schway__inputs_error *error);
+schway__inputs_status schway__inputs_validate_disc_controls(const schway__input_movie *movie,
+                                                              uint32_t disc_count,
+                                                              schway__inputs_error *error);
 schway_status schway__inputs_apply_frame(schway *inst, const schway__input_movie *movie,
-                                         size_t *cursor, schway_input *snapshot, uint32_t frame);
+                                         size_t *cursor, schway_input *snapshot, uint32_t frame,
+                                         const schway_disc_image *disc_image);
 void schway__inputs_release(schway__input_movie *movie);
 
 #endif /* SCHWAYSTATION_RUNNER_INPUTS_H */

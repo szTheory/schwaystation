@@ -4,13 +4,15 @@
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
  *                     [--hash] [--hash-audio] [--hash-state]
+ *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N]
+ *                     [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
  *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
  *                     [--hash-audio] [--hash-state]
  *   schwaystation-run --probe FILE
  *   schwaystation-run --help | --version
  *
- * A frame run without --bios or --exe shows the built-in test card. With
+ * A frame run without --bios, --exe or --disc shows the built-in test card. With
  * --hash the runner prints, after the last frame:
  *
  *   frame <N> sha256 <64 lowercase hex digits>
@@ -53,6 +55,9 @@
  * reset. It prints the copied image's SHA-256 and digest-table flags, then runs
  * it for 600 frames by default. Its file name does not determine recognition.
  *
+ * --disc FILE attaches a cue sheet, ISO image or m3u playlist before the first
+ * BIOS frame. The provider stays alive until the instance is destroyed.
+ *
  * --probe FILE prints the identity of a PS-EXE (probe.h) and runs nothing: no
  * instance is made and no frame runs. It is valid only alone.
  *
@@ -89,6 +94,7 @@
 #include "bench.h"
 #include "cards.h"
 #include "clock.h"
+#include "disc_image.h"
 #include "exit_status.h"
 #include "frame_hash.h"
 #include "inputs.h"
@@ -138,6 +144,8 @@ static const char synopsis[] =
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
     "                         [--hash] [--hash-audio] [--hash-state]\n"
+    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N | --bench N] [--tty]\n"
+    "                         [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]\n"
     "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
     "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
@@ -152,14 +160,16 @@ static const char synopsis[] =
     "  --hash-vram        print the SHA-256 of row-major little-endian VRAM RGB555 with bit 15 cleared\n"
     "  --hash-state       print the SHA-256 of the saved machine state\n"
     "  --inputs FILE     apply a validated controller script before each frame latch\n"
+    "                    records may also use 'N lid=open', 'N disc=INDEX', 'N lid=closed'\n"
     "  --save-dir DIR    import and save memory cards in this existing directory\n"
     "  --memcard-names MODE  basename (default) or serial\n"
     "  --serial SERIAL   use this validated serial as the card basename with serial mode\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --bios FILE        load an exactly 524288-byte BIOS image and report its identity\n"
+    "  --disc FILE        attach a cue sheet, ISO image or m3u playlist (needs --bios)\n"
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
     "  --tty              print guest text as tty lines; needs --exe or --bios\n"
-    "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe\n"
+    "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe or --disc\n"
     "  --trace first-fault  print the last 4096 trace records after a fault or a hang; needs --exe\n"
     "  --no-stop-on-fault   keep running after the program's first fault; needs --exe\n"
     "  --probe FILE       print PS-EXE or disc metadata; runs nothing\n"
@@ -352,6 +362,7 @@ typedef struct options {
     const char *test_audio_file;
 #endif
     const char *bios;  /* --bios FILE, else NULL */
+    const char *disc;  /* --disc FILE, else NULL */
     const char *exe;   /* --exe FILE, else NULL */
     int tty;           /* --tty: debug-port flag and the tty lines */
     int stop_mailbox;  /* --stop-on mailbox */
@@ -527,6 +538,15 @@ static int parse_options(int argc, char **argv, options *o)
             }
             o->bios = value;
             i++;
+        } else if (strcmp(arg, "--disc") == 0) {
+            if (o->disc != NULL) {
+                return usage("give --disc once");
+            }
+            if (value == NULL || value[0] == '\0' || value[0] == '-') {
+                return usage("--disc needs a file");
+            }
+            o->disc = value;
+            i++;
         } else if (strcmp(arg, "--tty") == 0) {
             o->tty = 1;
         } else if (strcmp(arg, "--stop-on") == 0) {
@@ -589,6 +609,15 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->bios != NULL && o->exe != NULL) {
         return usage("--bios and --exe cannot be used together");
     }
+    if (o->disc != NULL && o->bios == NULL) {
+        return usage("--disc needs --bios");
+    }
+    if (o->disc != NULL && o->exe != NULL) {
+        return usage("--disc cannot be used with --exe");
+    }
+    if (o->disc != NULL && o->hash_state) {
+        return usage("--hash-state is unavailable with --disc");
+    }
 #ifdef SCHWAY_RUN_TEST_HOOKS
     if (o->probe != NULL) {
         int any_test_input = o->test_ledger != NULL || o->test_dat != NULL ||
@@ -599,7 +628,7 @@ static int parse_options(int argc, char **argv, options *o)
         int all_metadata = o->metadata_ledger != NULL && o->metadata_dat != NULL;
         if ((any_test_input && !all_test_inputs) || (any_metadata && !all_metadata) ||
             (any_test_input && any_metadata) || o->frames != 0u || o->bios != NULL ||
-            o->exe != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash || o->hash_audio ||
+            o->exe != NULL || o->disc != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash || o->hash_audio ||
             o->hash_state || o->hash_vram || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
             o->region_set || o->test_audio_failure) {
@@ -616,7 +645,7 @@ static int parse_options(int argc, char **argv, options *o)
 #else
     if (o->probe != NULL) {
         if ((o->metadata_ledger == NULL) != (o->metadata_dat == NULL) ||
-            o->frames != 0u || o->bios != NULL || o->exe != NULL || o->inputs != NULL ||
+            o->frames != 0u || o->bios != NULL || o->exe != NULL || o->disc != NULL || o->inputs != NULL ||
             o->save_dir != NULL || o->hash || o->hash_audio || o->hash_state || o->hash_vram || o->bench || o->tty ||
             o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
             o->memcard_names_set || o->serial != NULL || o->region_set) {
@@ -631,8 +660,8 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->tty && o->exe == NULL && o->bios == NULL) {
         return usage("--tty needs --exe or --bios");
     }
-    if (o->stop_mailbox && o->exe == NULL) {
-        return usage("--stop-on needs --exe");
+    if (o->stop_mailbox && o->exe == NULL && o->disc == NULL) {
+        return usage("--stop-on needs --exe or --disc");
     }
     if (o->trace && o->exe == NULL) {
         return usage("--trace needs --exe");
@@ -1393,6 +1422,48 @@ static int run(const options *opt)
             return SCHWAY__EXIT_FAILURE;
         }
     }
+    schway_disc_image *disc_image = NULL;
+    uint32_t disc_count = 0u;
+    if (opt->disc != NULL) {
+        schway_disc_image_error error;
+        memset(&error, 0, sizeof error);
+        schway_disc_image_status image_status =
+            schway_disc_image_open(opt->disc, &disc_image, &error);
+        if (image_status != SCHWAY_DISC_IMAGE_OK) {
+            fprintf(stderr, "schwaystation-run: disc: %s",
+                    error.message[0] != '\0' ? error.message :
+                    schway_disc_image_status_string(image_status));
+            if (error.line != 0u) {
+                fprintf(stderr, " at line %lu", (unsigned long)error.line);
+            }
+            fputc('\n', stderr);
+            free(samples);
+            free(bios);
+            free(exe);
+            schway__inputs_release(&movie);
+            return image_status == SCHWAY_DISC_IMAGE_UNSUPPORTED ?
+                   SCHWAY__EXIT_UNSUPPORTED : SCHWAY__EXIT_FAILURE;
+        }
+        disc_count = schway_disc_image_count(disc_image);
+    }
+    if (opt->inputs != NULL) {
+        schway__inputs_error error;
+        schway__inputs_status input_status =
+            schway__inputs_validate_disc_controls(&movie, disc_count, &error);
+        if (input_status != SCHWAY__INPUTS_OK) {
+            fprintf(stderr, "schwaystation-run: invalid input movie");
+            if (error.line != 0u) fprintf(stderr, " at line %lu", (unsigned long)error.line);
+            if (error.reason != NULL) fprintf(stderr, ": %s", error.reason);
+            fputc('\n', stderr);
+            fputs(synopsis, stderr);
+            schway_disc_image_close(disc_image);
+            free(samples);
+            free(bios);
+            free(exe);
+            schway__inputs_release(&movie);
+            return SCHWAY__EXIT_USAGE;
+        }
+    }
     schway_config cfg;
     memset(&cfg, 0, sizeof cfg);
     cfg.size = (uint32_t)sizeof cfg;
@@ -1406,6 +1477,7 @@ static int run(const options *opt)
         free(samples);
         free(bios);
         free(exe);
+        schway_disc_image_close(disc_image);
         schway__inputs_release(&movie);
         return SCHWAY__EXIT_FAILURE;
     }
@@ -1432,12 +1504,13 @@ static int run(const options *opt)
     }
 #endif
     /* The debug-port flag is set for --tty and for nothing else. */
-    if (status == SCHWAY__EXIT_OK && (opt->region != 0u || opt->tty)) {
+    if (status == SCHWAY__EXIT_OK && (opt->region != 0u || opt->tty || opt->disc != NULL)) {
         schway_profile p;
         memset(&p, 0, sizeof p);
         p.size = (uint32_t)sizeof p;
         p.region = opt->region != 0u ? opt->region : SCHWAY_REGION_NTSC_U;
-        p.flags = opt->tty ? SCHWAY_PROFILE_DEBUG_PORT : 0u;
+        p.flags = (opt->tty ? SCHWAY_PROFILE_DEBUG_PORT : 0u) |
+                  (opt->disc != NULL ? SCHWAY_PROFILE_CD_LICENSED : 0u);
         st = schway_set_profile(inst, &p);
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: schway_set_profile failed: %s\n",
@@ -1452,6 +1525,20 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
         } else {
             status = runner_print_bios_info(inst);
+        }
+    }
+    if (status == SCHWAY__EXIT_OK && disc_image != NULL) {
+        const schway_disc *disc = schway_disc_image_disc(disc_image);
+        if (disc == NULL) {
+            fprintf(stderr, "schwaystation-run: disc provider returned no initial image\n");
+            status = SCHWAY__EXIT_FAILURE;
+        } else {
+            st = schway_open_disc(inst, disc);
+            if (st != SCHWAY_STATUS_OK) {
+                fprintf(stderr, "schwaystation-run: schway_open_disc failed: %s\n",
+                        schway_status_string(st));
+                status = SCHWAY__EXIT_FAILURE;
+            }
         }
     }
     if (status == SCHWAY__EXIT_OK && exe != NULL) {
@@ -1494,9 +1581,10 @@ static int run(const options *opt)
     }
     for (uint32_t n = 1; n <= opt->frames && status == SCHWAY__EXIT_OK; n++) {
         if (opt->inputs != NULL) {
-            st = schway__inputs_apply_frame(inst, &movie, &input_cursor, &input_snapshot, n);
+            st = schway__inputs_apply_frame(inst, &movie, &input_cursor, &input_snapshot, n,
+                                            disc_image);
             if (st != SCHWAY_STATUS_OK) {
-                fprintf(stderr, "schwaystation-run: schway_set_input failed: %s\n",
+                fprintf(stderr, "schwaystation-run: applying input event failed: %s\n",
                         schway_status_string(st));
                 status = SCHWAY__EXIT_FAILURE;
                 break;
@@ -1629,6 +1717,7 @@ static int run(const options *opt)
     status = runner_cards_flush(opt, inst, &card_files, status);
     runner_cards_release(&card_files);
     schway_destroy(inst);
+    schway_disc_image_close(disc_image);
     free(samples);
     schway__inputs_release(&movie);
     return status;
@@ -1651,12 +1740,10 @@ int main(int argc, char **argv)
             metadata.config = opt.test_config;
         }
         status = schway__probe_print(stdout, opt.probe,
-                                     metadata.ledger != NULL ? &metadata : NULL) == 0 ? SCHWAY__EXIT_OK
-                                                                                   : SCHWAY__EXIT_FAILURE;
+                                     metadata.ledger != NULL ? &metadata : NULL);
 #else
         status = schway__probe_print(stdout, opt.probe,
-                                     metadata.ledger != NULL ? &metadata : NULL) == 0 ? SCHWAY__EXIT_OK
-                                                                                   : SCHWAY__EXIT_FAILURE;
+                                     metadata.ledger != NULL ? &metadata : NULL);
 #endif
     } else if (status == SCHWAY__EXIT_OK && !opt.printed) {
         schway__stop_install();

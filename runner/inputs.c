@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "disc_image.h"
+
 #define INPUTS_FILE_MAX_BYTES (64u * 1024u * 1024u)
 #define INPUTS_RECORDS_MAX 1000000u
 
@@ -200,8 +202,8 @@ static int line(char *text, uint32_t number, schway__input_event *event, int *pr
         *present = 0;
         return 1;
     }
-    if (count != 3u) {
-        *reason = "each record needs a frame, p1, and p2";
+    if (count < 2u || count > 3u) {
+        *reason = "each record needs a frame and one input or disc control";
         return 0;
     }
     uint32_t frame = 0u;
@@ -212,6 +214,28 @@ static int line(char *text, uint32_t number, schway__input_event *event, int *pr
     memset(event, 0, sizeof *event);
     event->frame = frame;
     event->line = number;
+    if (count == 2u) {
+        if (strcmp(fields[1], "lid=open") == 0) {
+            event->kind = SCHWAY__INPUT_EVENT_LID;
+            event->value = 1u;
+        } else if (strcmp(fields[1], "lid=closed") == 0) {
+            event->kind = SCHWAY__INPUT_EVENT_LID;
+            event->value = 0u;
+        } else if (strncmp(fields[1], "disc=", 5u) == 0 &&
+                   decimal(fields[1] + 5u, UINT32_MAX, &event->value)) {
+            event->kind = SCHWAY__INPUT_EVENT_DISC;
+        } else {
+            *reason = "control must be lid=open, lid=closed, or disc=N";
+            return 0;
+        }
+        *present = 1;
+        return 1;
+    }
+    if (strncmp(fields[1], "p1=", 3u) != 0 || strncmp(fields[2], "p2=", 3u) != 0) {
+        *reason = "each input record needs p1 and p2; controls use one operation";
+        return 0;
+    }
+    event->kind = SCHWAY__INPUT_EVENT_INPUT;
     event->input.size = (uint32_t)sizeof event->input;
     for (uint32_t index = 0u; index < 2u; index++) {
         for (size_t axis = 0u; axis < 4u; axis++) {
@@ -245,7 +269,8 @@ static int event_order(const void *left, const void *right)
 {
     const schway__input_event *a = (const schway__input_event *)left;
     const schway__input_event *b = (const schway__input_event *)right;
-    return a->frame < b->frame ? -1 : a->frame > b->frame ? 1 : 0;
+    if (a->frame != b->frame) return a->frame < b->frame ? -1 : 1;
+    return a->line < b->line ? -1 : a->line > b->line ? 1 : 0;
 }
 
 static int ascii(const char *text, size_t size, uint32_t *line_number, const char **reason)
@@ -400,34 +425,88 @@ schway__inputs_status schway__inputs_load(const char *path, schway__input_movie 
     if (count > 1u) {
         qsort(events, count, sizeof *events, event_order);
     }
-    size_t unique = 0u;
+    uint32_t checked_frame = 0u;
+    size_t previous_input = SIZE_MAX;
     for (size_t i = 0u; i < count; i++) {
-        if (unique != 0u && events[unique - 1u].frame == events[i].frame) {
-            if (!same_input(&events[unique - 1u].input, &events[i].input)) {
-                set_error(error, events[i].line, "conflicting records for the same frame");
-                free(events);
-                return SCHWAY__INPUTS_INVALID;
-            }
-            continue;
+        if (i == 0u || events[i].frame != checked_frame) {
+            checked_frame = events[i].frame;
+            previous_input = SIZE_MAX;
         }
-        events[unique++] = events[i];
+        if (events[i].kind != SCHWAY__INPUT_EVENT_INPUT) continue;
+        if (previous_input != SIZE_MAX &&
+            !same_input(&events[previous_input].input, &events[i].input)) {
+            set_error(error, events[i].line, "conflicting input records for the same frame");
+            free(events);
+            return SCHWAY__INPUTS_INVALID;
+        }
+        previous_input = i;
     }
     movie->events = events;
-    movie->count = unique;
+    movie->count = count;
+    set_error(error, 0u, NULL);
+    return SCHWAY__INPUTS_OK;
+}
+
+schway__inputs_status schway__inputs_validate_disc_controls(const schway__input_movie *movie,
+                                                              uint32_t disc_count,
+                                                              schway__inputs_error *error)
+{
+    if (movie == NULL || (movie->count != 0u && movie->events == NULL)) {
+        set_error(error, 0u, "invalid movie argument");
+        return SCHWAY__INPUTS_INVALID;
+    }
+    uint32_t lid_open = 0u;
+    for (size_t i = 0u; i < movie->count; i++) {
+        const schway__input_event *event = &movie->events[i];
+        if (event->kind == SCHWAY__INPUT_EVENT_LID) {
+            lid_open = event->value;
+        } else if (event->kind == SCHWAY__INPUT_EVENT_DISC) {
+            if (disc_count == 0u) {
+                set_error(error, event->line, "disc=N control needs --disc media");
+                return SCHWAY__INPUTS_INVALID;
+            }
+            if (event->value >= disc_count) {
+                set_error(error, event->line, "disc index is outside the installed playlist");
+                return SCHWAY__INPUTS_INVALID;
+            }
+            if (lid_open == 0u) {
+                set_error(error, event->line, "disc swap requires lid=open");
+                return SCHWAY__INPUTS_INVALID;
+            }
+        } else if (event->kind != SCHWAY__INPUT_EVENT_INPUT) {
+            set_error(error, event->line, "unknown input event");
+            return SCHWAY__INPUTS_INVALID;
+        }
+    }
     set_error(error, 0u, NULL);
     return SCHWAY__INPUTS_OK;
 }
 
 schway_status schway__inputs_apply_frame(schway *inst, const schway__input_movie *movie,
-                                         size_t *cursor, schway_input *snapshot, uint32_t frame)
+                                         size_t *cursor, schway_input *snapshot, uint32_t frame,
+                                         const schway_disc_image *disc_image)
 {
-    int changed = 0;
     while (*cursor < movie->count && movie->events[*cursor].frame <= frame) {
-        *snapshot = movie->events[*cursor].input;
+        const schway__input_event *event = &movie->events[*cursor];
         (*cursor)++;
-        changed = 1;
+        if (event->kind == SCHWAY__INPUT_EVENT_INPUT) {
+            *snapshot = event->input;
+            schway_status status = schway_set_input(inst, snapshot);
+            if (status != SCHWAY_STATUS_OK) return status;
+        } else if (event->kind == SCHWAY__INPUT_EVENT_LID) {
+            schway_status status = schway_set_lid(inst, event->value);
+            if (status != SCHWAY_STATUS_OK) return status;
+        } else if (event->kind == SCHWAY__INPUT_EVENT_DISC) {
+            const schway_disc *disc = NULL;
+            if (schway_disc_image_select(disc_image, event->value, &disc) != SCHWAY_DISC_IMAGE_OK ||
+                disc == NULL) {
+                return SCHWAY_STATUS_ERR_ARGUMENT;
+            }
+            schway_status status = schway_swap_disc(inst, disc);
+            if (status != SCHWAY_STATUS_OK) return status;
+        }
     }
-    return changed != 0 ? schway_set_input(inst, snapshot) : SCHWAY_STATUS_OK;
+    return SCHWAY_STATUS_OK;
 }
 
 void schway__inputs_release(schway__input_movie *movie)
