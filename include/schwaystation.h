@@ -315,7 +315,7 @@ schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes
 schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint64_t *out);
 schway_status schway_open_disc(schway *inst, const schway_disc *disc);
 schway_status schway_set_lid(schway *inst, uint32_t open); /* 0 closed, 1 open */
-schway_status schway_swap_disc(schway *inst, const schway_disc *disc);
+schway_status schway_swap_disc(schway *inst, const schway_disc *disc); /* empty TOC removes media */
 schway_status schway_get_audio(schway *inst, schway_audio *io);
 schway_status schway_get_tty(schway *inst, schway_tty *io);
 schway_status schway_get_trace(const schway *inst, uint32_t index, schway_trace *out);

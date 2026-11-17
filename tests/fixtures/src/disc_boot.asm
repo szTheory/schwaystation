@@ -15,6 +15,7 @@
 .definelabel MDEC_INPUT_BUFFER, 0x80060000
 .definelabel MDEC_INPUT_BYTES, 128
 .definelabel MDEC_OUTPUT_BUFFER, 0x80061000
+.definelabel HOST_CONTROL, 0x80070000
 .definelabel STR_LBA_FRAME_BCD, 0x54
 .definelabel STR_SECTOR_COUNT, 10
 
@@ -597,8 +598,119 @@ crc_next:
   li t0, 8
   sb t0, MB_COUNT(s1)
   mailbox_seal
-hang:
-  j hang
+
+  ; The host integration can open the tray after this mailbox completes.
+  ; Record the actual INT5 response and re-query the live TOC into unused RAM.
+  li t0, 1
+  sb t0, 0(s0)
+control_wait_int5:
+  lbu t0, 3(s0)
+  nop
+  andi t0, t0, 7
+  li t1, 5
+  bne t0, t1, control_wait_int5
+  nop
+  li t0, HOST_CONTROL
+  sw t1, 0(t0)
+  sb zero, 0(s0)
+  lbu t2, 1(s0)
+  lbu t2, 1(s0)
+  li v0, 5
+  jal cd_ack
+  nop
+
+  ; A closed tray's next NOP response clears the lid-open status bit.
+  sb zero, 0(s0)
+  li t0, 0x01
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+
+  ; GetTN records the track range after the tray closes.
+  sb zero, 0(s0)
+  li t0, 0x13
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  lbu t1, 1(s0)
+  lbu t2, 1(s0)
+  sll t1, t1, 8
+  sll t2, t2, 16
+  or t0, t0, t1
+  or t0, t0, t2
+  li t1, HOST_CONTROL
+  sw t0, 4(t1)
+  jal cd_ack3
+  nop
+
+  ; GetTD for track two records the changed playlist member's INDEX 1.
+  sb zero, 0(s0)
+  li t0, 2
+  sb t0, 2(s0)
+  li t0, 0x14
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  lbu t1, 1(s0)
+  lbu t2, 1(s0)
+  sll t1, t1, 8
+  sll t2, t2, 16
+  or t0, t0, t1
+  or t0, t0, t2
+  li t1, HOST_CONTROL
+  sw t0, 8(t1)
+  jal cd_ack3
+  nop
+
+  ; The host can open the tray a second time and remove the selected image.
+  li t0, 1
+  sb t0, 0(s0)
+control_wait_remove_int5:
+  lbu t0, 3(s0)
+  nop
+  andi t0, t0, 7
+  li t1, 5
+  bne t0, t1, control_wait_remove_int5
+  nop
+  li t0, HOST_CONTROL
+  sw t1, 12(t0)
+  sb zero, 0(s0)
+  lbu t2, 1(s0)
+  lbu t2, 1(s0)
+  li v0, 5
+  jal cd_ack
+  nop
+
+  ; Once the host closes an empty tray, GetTN returns INT5/error 80h.
+  sb zero, 0(s0)
+  li t0, 0x01
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  jal cd_ack3
+  nop
+  sb zero, 0(s0)
+  li t0, 0x13
+  sb t0, 1(s0)
+  jal cd_wait
+  nop
+  lbu t0, 1(s0)
+  lbu t1, 1(s0)
+  nop
+  sll t1, t1, 8
+  or t0, t0, t1
+  li t1, HOST_CONTROL
+  sw t0, 16(t1)
+  jal cd_ack3
+  nop
+control_hang:
+  j control_hang
   nop
 
 str_invalid:

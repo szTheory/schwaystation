@@ -4,7 +4,7 @@
 #include "internal.h"
 
 static schway_status disc_prepare(const schway_disc *disc, schway_disc *callbacks,
-                                 schway_toc *toc)
+                                 schway_toc *toc, uint32_t allow_empty_toc)
 {
     if (disc == NULL || callbacks == NULL || toc == NULL) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
@@ -39,7 +39,8 @@ static schway_status disc_prepare(const schway_disc *disc, schway_disc *callback
     if (toc->size != sizeof *toc || toc->reserved0 != 0u) {
         return SCHWAY_STATUS_ERR_STRUCT_SIZE;
     }
-    if (toc->track_count == 0u || toc->track_count > SCHWAY_DISC_MAX_TRACKS) {
+    if (toc->track_count > SCHWAY_DISC_MAX_TRACKS ||
+        (toc->track_count == 0u && allow_empty_toc == 0u)) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
 
@@ -92,7 +93,7 @@ schway_status schway_open_disc(schway *inst, const schway_disc *disc)
     }
     schway_disc callbacks;
     schway_toc toc;
-    schway_status status = disc_prepare(disc, &callbacks, &toc);
+    schway_status status = disc_prepare(disc, &callbacks, &toc, 0u);
     if (status != SCHWAY_STATUS_OK) {
         return status;
     }
@@ -123,9 +124,15 @@ schway_status schway_swap_disc(schway *inst, const schway_disc *disc)
     }
     schway_disc callbacks;
     schway_toc toc;
-    schway_status status = disc_prepare(disc, &callbacks, &toc);
+    schway_status status = disc_prepare(disc, &callbacks, &toc, 1u);
     if (status != SCHWAY_STATUS_OK) {
         return status;
+    }
+    if (toc.track_count == 0u) {
+        uint32_t lid_open = inst->disc_host.lid_open;
+        memset(&inst->disc_host, 0, sizeof inst->disc_host);
+        inst->disc_host.lid_open = lid_open;
+        return SCHWAY_STATUS_OK;
     }
     disc_apply(inst, &callbacks, &toc);
     return SCHWAY_STATUS_OK;

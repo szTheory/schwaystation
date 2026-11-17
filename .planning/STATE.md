@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 34 of 39
+current_plan: 35 of 39
 status: executing
-stopped_at: Completed 06-17-PLAN.md; next 06-18-PLAN.md
-last_updated: "2026-11-17T02:20:29Z"
+stopped_at: Completed 06-18-PLAN.md; next 06-19-PLAN.md
+last_updated: "2026-11-17T03:30:00Z"
 last_activity: 2026-11-17
-state_head: c30fc79
+state_head: 1342864
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 183
+  completed_plans: 184
   percent: 97
-last_activity_desc: "Completed Plan 06-17: runner CUE/M3U boot, ISO attachment, unsupported-media probe behavior and frame-indexed input swaps are covered. Cheap diff/inventory/configure checks passed before the build; the final focused runner selector passed 16/16 in 2.46 seconds. Review fixes cover disc state-hash refusal, readable nested CUE unsupported media, and a frame-300 test that had stopped at frame 274. Standard review is clean. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), standard gsd-code-reviewer; active time across the reported 22-hour pause was not measured. No hardware capture or hosted run URL applies. Continue with Plan 06-18."
+last_activity_desc: "Completed Plan 06-18: libretro disc control, no-media removal, and XA/CD-DA PCM parity are covered. The clean review's no-media finding was fixed and verified through a guest GetTN error. Cheap selector, inventory, manifest, and budget checks preceded the final run; the four-test host filter passed 4/4 in 39.95 seconds, info-claim controls passed 2/2, and repository checks are at 2700/2700 lines. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), standard gsd-code-reviewer; active time is unavailable across the reported 22-hour pause. No physical capture or hosted run URL applies. Continue with Plan 06-19."
 ---
 
 # Project State
@@ -31,17 +31,17 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 34 of 39
-Next plan file: 06-18-PLAN.md
+Current Plan: 35 of 39
+Next plan file: 06-19-PLAN.md
 Status: Ready to execute
 Last activity: 2026-11-17
 
-Progress: [█████████░] 85%
+Progress: [█████████░] 87%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 183
+- Total plans completed: 184
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -54,7 +54,7 @@ Progress: [█████████░] 85%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 33 | 39 | - |
+| 06 | 34 | 39 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -241,6 +241,7 @@ Progress: [█████████░] 85%
 | Phase 6 P38 | at least 1h00m19s wall; active work capped at 30m | 1 partial task | 20 files |
 | Phase 6 P14 | elapsed wall time spanned a 22-hour pause/resume; active time unavailable | 2 tasks | 28 files |
 | Phase 06 P17 | not measured (continued after 22-hour pause) | 2 tasks | 12 files |
+| Phase 06 P18 | at least 1h09m wall from prior state checkpoint; active time unavailable | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -921,3 +922,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unava
 ### Phase 6 plan 06-17 execution (2026-11-17)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer. Active time was not tracked reliably across the owner's reported 22-hour pause. Cheap diff/inventory checks and CMake configure passed before builds. The runner now boots the owned CUE and M3U images through OpenBIOS, attaches ISO, rejects direct and nested unsupported media, and applies frame-indexed pad/lid/swap controls. Standard review caught and fixed a disc `--hash-state` usage mismatch, a CUE probe extension bypass, and a frame-300 control test that had stopped at frame 274; the final review is clean. `cmake --preset ci`, the runner target build, and the focused runner CTest selector passed; final selector result was 16/16 in 2.46 seconds. No physical PlayStation capture or hosted run URL applies. Plan 06-18 is next.
+
+### Phase 6 plan 06-18 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer. Active time was not measured reliably; the wall interval from the prior state checkpoint through final verification was about 1h09m and includes review and test waits. Libretro now loads CUE/ISO/M3U with the system BIOS, exposes extended disk control, removes media through an empty TOC while the tray is open, and proves the no-media GetTN error with the guest. Runner and libretro PCM match byte-for-byte for the combined XA/CD-DA fixture in batch and single callbacks for NTSC-U and PAL. The review's no-media blocker was fixed and re-reviewed clean. Cheap checks caught startup cadence assumptions, stale extension assertions, a 2-line repository-gate overage, and a brittle negative-control matcher before closeout; all were corrected without broad reruns. The final libretro host selector passed 4/4 in 39.95 seconds; core disc API and info-claim controls passed 2/2 each. Repository-check code is exactly 2700/2700 lines. No physical capture or hosted URL applies. Plan 06-19 is next.

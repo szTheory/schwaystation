@@ -85,6 +85,8 @@ static schway_disc make_disc(struct disc_test_host *host)
     disc.read_sector = read_sector;
     disc.toc = read_toc;
     disc.bad_q = bad_q;
+    disc.identity_size = (uint32_t)sizeof disc.identity_sha256;
+    memset(disc.identity_sha256, 0xA5, sizeof disc.identity_sha256);
     return disc;
 }
 
@@ -240,6 +242,23 @@ int main(void)
     CHECK_EQ_U64(second.toc_calls, 2u);
     CHECK(inst->disc_host.callbacks.user == &second);
     CHECK_EQ_U64(inst->disc_host.toc.tracks[0].leadout, 1000u);
+
+    struct disc_test_host empty = {0u, 0u, 0u, {0}};
+    make_toc(&empty, 0u);
+    schway_disc empty_disc = make_disc(&empty);
+    CHECK_EQ_U64(schway_swap_disc(inst, &empty_disc), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(empty.toc_calls, 1u);
+    CHECK_EQ_U64(inst->disc_host.attached, 0u);
+    CHECK_EQ_U64(inst->disc_host.lid_open, 1u);
+    CHECK_EQ_U64(inst->disc_host.identity_valid, 0u);
+    CHECK(inst->disc_host.callbacks.read_sector == NULL);
+    CHECK_EQ_U64(inst->disc_host.toc.track_count, 0u);
+    CHECK_EQ_U64(schway_set_lid(inst, 0u), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(inst->disc_host.lid_open, 0u);
+    CHECK_EQ_U64(schway_set_lid(inst, 1u), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_swap_disc(inst, &second_disc), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(inst->disc_host.attached, 1u);
+    CHECK(inst->disc_host.callbacks.user == &second);
     CHECK_EQ_U64(schway_set_lid(inst, 0u), SCHWAY_STATUS_OK);
 
     host_before = inst->disc_host;

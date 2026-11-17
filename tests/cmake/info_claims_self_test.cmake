@@ -74,10 +74,11 @@ reject_inventory_row("ungrounded input claim" "libretro.input.descriptors\tlibre
 reject_inventory_row("ungrounded memory claim" "libretro.memory.boundaries\tlibretro,portable\n"
   "memory_descriptors has no inventory test")
 
-replace_info("disk control refusal" "disk_control = \"false\""
-  "disk_control = \"true\"" "unsupported disk_control claim must remain false")
-replace_info("extension refusal" "supported_extensions = \"exe|psexe\""
-  "supported_extensions = \"exe|cue\"" "only PS-EXE extensions are supported")
+reject_inventory_row("ungrounded disk control" "libretro.host.disc_control\tlibretro,portable\n"
+  "supported_extensions has no inventory test")
+replace_info("extension refusal" "supported_extensions = \"exe|psexe|cue|iso|m3u\""
+  "supported_extensions = \"exe|cue\""
+  "disc formats require full extensions")
 foreach(unsupported IN ITEMS savestate cheats load_subsystem)
   replace_info("unsupported ${unsupported}" "${unsupported} = \"false\""
     "${unsupported} = \"true\"" "unsupported ${unsupported} claim must remain false")

@@ -32,6 +32,7 @@
 #include "../check.h"
 #include "libretro.h"
 #include "schwaystation.h"
+#include "disc_image.h"
 #include "xrgb8888.h"
 
 #define MAX_W 640u
@@ -194,6 +195,9 @@ static int input_controls_chord_enabled;
 static unsigned input_poll_calls, input_state_calls;
 static unsigned controller_info_calls, input_descriptor_calls;
 static const struct retro_input_descriptor *published_input_descriptors;
+static struct retro_disk_control_ext_callback disk_control;
+static unsigned disk_control_set_calls;
+static unsigned disk_control_unregister_calls;
 static const char *bios_option_value = "none";
 static const char *system_directory;
 static const char *save_directory;
@@ -275,7 +279,7 @@ static void check_variables(const struct retro_variable *v)
     check_string("BIOS variable key", v[1].key, "schwaystation_bios");
     check_string("BIOS variable value",
                  v[1].value,
-                 "BIOS for no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin");
+                 "BIOS for discs and no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin");
     check_string("analog mode variable key", v[2].key, "schwaystation_analog_mode");
     check_string("analog mode variable value", v[2].value, "DualShock mode; analog|digital");
     check_string("analog toggle variable key", v[3].key, "schwaystation_analog_toggle");
@@ -414,6 +418,15 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         return true;
     case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
         check_input_descriptors((const struct retro_input_descriptor *)data);
+        return true;
+    case RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE:
+        disk_control_set_calls++;
+        if (data == NULL) {
+            memset(&disk_control, 0, sizeof disk_control);
+            disk_control_unregister_calls++;
+        } else {
+            disk_control = *(const struct retro_disk_control_ext_callback *)data;
+        }
         return true;
     case RETRO_ENVIRONMENT_GET_VARIABLE: {
         struct retro_variable *var = (struct retro_variable *)data;
@@ -1167,7 +1180,7 @@ static int test_content_psexe(const char *exe_path, const char *directory)
     }
     memset(&sys, 0, sizeof sys);
     p_get_system_info(&sys);
-    check_string("valid_extensions", sys.valid_extensions, "exe|psexe");
+    check_string("valid_extensions", sys.valid_extensions, "exe|psexe|cue|iso|m3u");
     memset(&game, 0, sizeof game);
     game.path = psexe_path;
     CHECK_EQ_U64(p_load_game(&game), 1u);
@@ -2144,6 +2157,453 @@ static uint32_t load_le32(const unsigned char *bytes)
 {
     return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) | ((uint32_t)bytes[2] << 16) |
            ((uint32_t)bytes[3] << 24);
+}
+
+static uint8_t disc_to_bcd(uint32_t value)
+{
+    value %= 100u;
+    return (uint8_t)(((value / 10u) << 4) | (value % 10u));
+}
+
+static uint32_t disc_gettd_for_path(const char *path)
+{
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    schway_toc toc;
+    uint32_t result = 0u;
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    if (schway_disc_image_open(path, &image, &error) == SCHWAY_DISC_IMAGE_OK && image != NULL) {
+        const schway_disc *disc = schway_disc_image_disc(image);
+        memset(&toc, 0, sizeof toc);
+        toc.size = (uint32_t)sizeof toc;
+        if (disc != NULL && disc->toc != NULL && disc->toc(disc->user, &toc) != 0u &&
+            toc.track_count >= 2u) {
+            uint64_t absolute = (uint64_t)toc.tracks[1].index1 + 150u;
+            uint32_t minute = (uint32_t)(absolute / (60u * 75u));
+            uint32_t second = (uint32_t)((absolute / 75u) % 60u);
+            result = UINT32_C(0x02) | ((uint32_t)disc_to_bcd(minute) << 8) |
+                     ((uint32_t)disc_to_bcd(second) << 16);
+        }
+    }
+    schway_disc_image_close(image);
+    return result;
+}
+
+static uint32_t guest_mailbox_record(const unsigned char *ram, unsigned id)
+{
+    const unsigned char *mailbox = ram + 0x10000u;
+    unsigned count = mailbox[0x0Au];
+    for (unsigned i = 0u; i < count && i < 30u; i++) {
+        const unsigned char *record = mailbox + 0x10u + (size_t)i * 8u;
+        if (load_le32(record) == (UINT32_C(0x00010000) | id)) {
+            return load_le32(record + 4u);
+        }
+    }
+    return 0u;
+}
+
+static int test_disc_control(const char *playlist_path, const char *second_path,
+                             const char *bios_directory)
+{
+    struct retro_game_info game;
+    schway_disc_image *second_image = NULL;
+    schway_disc_image_error image_error;
+    char expected_first[4096];
+    char expected_second[4096];
+    char path[4096];
+    char label[256];
+    unsigned char *ram;
+    uint32_t expected_first_toc, expected_second_toc;
+    size_t path_length;
+    const char *canonical_first;
+
+    CHECK(disk_control_set_calls != 0u);
+    CHECK(disk_control.set_eject_state != NULL);
+    CHECK(disk_control.get_eject_state != NULL);
+    CHECK(disk_control.get_image_index != NULL);
+    CHECK(disk_control.set_image_index != NULL);
+    CHECK(disk_control.get_num_images != NULL);
+    CHECK(disk_control.replace_image_index != NULL);
+    CHECK(disk_control.add_image_index != NULL);
+    CHECK(disk_control.set_initial_image != NULL);
+    CHECK(disk_control.get_image_path != NULL);
+    CHECK(disk_control.get_image_label != NULL);
+    if (check_failures != 0) {
+        return 1;
+    }
+
+    memset(&image_error, 0, sizeof image_error);
+    image_error.size = (uint32_t)sizeof image_error;
+    CHECK_EQ_U64(schway_disc_image_open(playlist_path, &second_image, &image_error),
+                 SCHWAY_DISC_IMAGE_OK);
+    CHECK(second_image != NULL);
+    if (second_image == NULL) {
+        return 1;
+    }
+    canonical_first = schway_disc_image_path(second_image, 0u);
+    CHECK(canonical_first != NULL);
+    path_length = canonical_first != NULL ? strlen(canonical_first) : 0u;
+    CHECK(path_length < sizeof expected_first);
+    if (canonical_first == NULL || path_length >= sizeof expected_first) {
+        schway_disc_image_close(second_image);
+        return 1;
+    }
+    memcpy(expected_first, canonical_first, path_length + 1u);
+    schway_disc_image_close(second_image);
+    second_image = NULL;
+
+    memset(&image_error, 0, sizeof image_error);
+    image_error.size = (uint32_t)sizeof image_error;
+    CHECK_EQ_U64(schway_disc_image_open(second_path, &second_image, &image_error),
+                 SCHWAY_DISC_IMAGE_OK);
+    CHECK(second_image != NULL);
+    if (second_image == NULL) {
+        return 1;
+    }
+    const char *canonical_second = schway_disc_image_path(second_image, 0u);
+    CHECK(canonical_second != NULL);
+    path_length = canonical_second != NULL ? strlen(canonical_second) : 0u;
+    CHECK(path_length < sizeof expected_second);
+    if (canonical_second == NULL || path_length >= sizeof expected_second) {
+        schway_disc_image_close(second_image);
+        return 1;
+    }
+    memcpy(expected_second, canonical_second, path_length + 1u);
+    schway_disc_image_close(second_image);
+    second_image = NULL;
+    expected_first_toc = disc_gettd_for_path(playlist_path);
+    expected_second_toc = disc_gettd_for_path(second_path);
+    CHECK(expected_first_toc != 0u);
+    CHECK(expected_second_toc != 0u);
+    CHECK(expected_first_toc != expected_second_toc);
+
+    system_directory = bios_directory;
+    bios_option_value = "none";
+    CHECK(disk_control.set_initial_image(1u, expected_second));
+    CHECK(!disk_control.set_initial_image(SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT, expected_second));
+    CHECK(!disk_control.set_initial_image(0u, NULL));
+    CHECK_EQ_U64(disk_control.get_num_images(), 0u);
+    CHECK_EQ_U64(disk_control.get_image_index(), 0u);
+    memset(&game, 0, sizeof game);
+    game.path = playlist_path;
+    CHECK(p_load_game(&game));
+    CHECK_EQ_U64(disk_control.get_num_images(), 2u);
+    CHECK_EQ_U64(disk_control.get_image_index(), 1u);
+    CHECK(!disk_control.get_eject_state());
+
+    memset(path, 0xA5, sizeof path);
+    CHECK(disk_control.get_image_path(1u, path, sizeof path));
+    CHECK(strcmp(path, expected_second) == 0);
+    CHECK(disk_control.get_image_label(1u, label, sizeof label));
+    CHECK(label[0] != '\0');
+    memset(path, 0xA5, sizeof path);
+    CHECK(disk_control.get_image_path(1u, path, 5u));
+    CHECK(path[4] == '\0');
+    CHECK(strncmp(path, expected_second, 4u) == 0);
+    CHECK(!disk_control.get_image_path(2u, path, sizeof path));
+    CHECK(!disk_control.get_image_path(1u, NULL, sizeof path));
+    CHECK(!disk_control.get_image_path(1u, path, 0u));
+    CHECK(!disk_control.get_image_label(2u, label, sizeof label));
+    CHECK(!disk_control.get_image_label(1u, NULL, sizeof label));
+    CHECK(!disk_control.get_image_label(1u, label, 0u));
+    CHECK(!disk_control.set_image_index(0u));
+    CHECK_EQ_U64(disk_control.get_image_index(), 1u);
+    CHECK(disk_control.set_eject_state(false));
+    CHECK(!disk_control.get_eject_state());
+
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 2u * 1024u * 1024u);
+    if (ram == NULL) {
+        p_unload_game();
+        schway_disc_image_close(second_image);
+        return 1;
+    }
+    unsigned frame_index = 0u;
+    for (; frame_index < 1200u; frame_index++) {
+        run_one();
+        ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+        if (ram != NULL && memcmp(ram + 0x10000u, "SWMB", 4u) == 0 &&
+            ram[0x10008u] == 0u) {
+            break;
+        }
+    }
+    CHECK(frame_index < 1200u);
+    if (frame_index >= 1200u || ram == NULL) {
+        p_unload_game();
+        schway_disc_image_close(second_image);
+        return 1;
+    }
+    CHECK_EQ_HEX(guest_mailbox_record(ram, 2u), UINT32_C(0x00020102));
+    CHECK_EQ_HEX(guest_mailbox_record(ram, 4u), expected_second_toc);
+
+    CHECK(disk_control.set_eject_state(true));
+    CHECK(disk_control.get_eject_state());
+    CHECK(disk_control.set_eject_state(true));
+    CHECK_EQ_U64(disk_control.get_image_index(), 1u);
+    CHECK(disk_control.add_image_index());
+    CHECK_EQ_U64(disk_control.get_num_images(), 3u);
+    CHECK(!disk_control.set_image_index(2u));
+    CHECK(disk_control.replace_image_index(2u, &(struct retro_game_info){.path = expected_first}));
+    CHECK(disk_control.get_image_path(2u, path, sizeof path));
+    CHECK(strcmp(path, expected_second) != 0);
+    CHECK(!disk_control.replace_image_index(2u,
+                                             &(struct retro_game_info){.path = "missing.cue"}));
+    CHECK(disk_control.replace_image_index(2u, NULL));
+    CHECK_EQ_U64(disk_control.get_num_images(), 2u);
+    CHECK(!disk_control.replace_image_index(9u, &(struct retro_game_info){.path = second_path}));
+    CHECK(!disk_control.replace_image_index(1u,
+                                             &(struct retro_game_info){.path = "missing.cue"}));
+    CHECK(disk_control.get_image_path(1u, path, sizeof path));
+    CHECK(strcmp(path, expected_second) == 0);
+    CHECK(disk_control.replace_image_index(1u, &(struct retro_game_info){.path = expected_first}));
+    CHECK(disk_control.get_image_path(1u, path, sizeof path));
+    CHECK(strcmp(path, expected_first) == 0);
+    CHECK(disk_control.set_image_index(0u));
+    CHECK_EQ_U64(disk_control.get_image_index(), 0u);
+    CHECK(disk_control.set_eject_state(false));
+    CHECK(!disk_control.get_eject_state());
+    CHECK(!disk_control.set_image_index(1u));
+    CHECK_EQ_U64(disk_control.get_image_index(), 0u);
+    CHECK(!disk_control.replace_image_index(0u, &(struct retro_game_info){.path = second_path}));
+    CHECK(disk_control.get_image_path(0u, path, sizeof path));
+    CHECK(strcmp(path, expected_second) != 0);
+
+    for (frame_index = 0u; frame_index < 180u; frame_index++) {
+        run_one();
+        ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+        if (ram != NULL && load_le32(ram + 0x70000u) == 5u &&
+            (load_le32(ram + 0x70008u) & UINT32_C(0xFFFFFF00)) ==
+                (expected_first_toc & UINT32_C(0xFFFFFF00))) {
+            break;
+        }
+    }
+    CHECK(frame_index < 180u);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        CHECK_EQ_U64(load_le32(ram + 0x70000u), 5u);
+        CHECK_EQ_HEX(load_le32(ram + 0x70004u) & UINT32_C(0xFFFFFF00),
+                     UINT32_C(0x00020100));
+        CHECK_EQ_HEX(load_le32(ram + 0x70008u) & UINT32_C(0xFFFFFF00),
+                     expected_first_toc & UINT32_C(0xFFFFFF00));
+    }
+
+    unsigned no_media_index = disk_control.get_num_images();
+    CHECK(disk_control.set_eject_state(true));
+    CHECK(disk_control.set_image_index(no_media_index));
+    CHECK_EQ_U64(disk_control.get_image_index(), disk_control.get_num_images());
+    CHECK(disk_control.get_eject_state());
+    CHECK(disk_control.set_eject_state(false));
+    CHECK(!disk_control.get_eject_state());
+    for (frame_index = 0u; frame_index < 180u; frame_index++) {
+        run_one();
+        ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+        if (ram != NULL && load_le32(ram + 0x7000Cu) == 5u &&
+            ((load_le32(ram + 0x70010u) >> 8) & 0xFFu) == 0x80u) {
+            break;
+        }
+    }
+    CHECK(frame_index < 180u);
+    CHECK(ram != NULL);
+    if (ram != NULL) {
+        CHECK_EQ_U64(load_le32(ram + 0x7000Cu), 5u);
+        CHECK_EQ_HEX((load_le32(ram + 0x70010u) >> 8) & 0xFFu, 0x80u);
+    }
+
+    CHECK(disk_control.set_initial_image(1u, expected_first));
+    p_unload_game();
+    CHECK_EQ_U64(disk_control.get_num_images(), 0u);
+    CHECK(p_load_game(&game));
+    CHECK_EQ_U64(disk_control.get_image_index(), 0u);
+    CHECK(disk_control.get_eject_state() == false);
+    p_unload_game();
+    p_deinit();
+    CHECK(disk_control_unregister_calls != 0u);
+    CHECK(disk_control.set_eject_state == NULL);
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static int test_disc_audio_equality(const char *playlist_path, const char *pcm_path,
+                                   const char *bios_directory, uint32_t region)
+{
+    size_t pcm_size = 0u;
+    uint8_t *runner_pcm = read_pcm_file(pcm_path, &pcm_size);
+    struct retro_system_av_info av;
+    struct retro_game_info game;
+    schway *audio_reference = ref_create(region);
+    schway_info info;
+    uint8_t callback_bytes[4u * MAX_PAIRS];
+    uint8_t first_frame[4u * MAX_PAIRS];
+    size_t offset = 0u;
+    size_t first_frame_bytes = 0u;
+    uint64_t steady_pairs = 0u;
+    unsigned frames = 0u;
+    unsigned steady_frames = 0u;
+    unsigned nonzero = 0u;
+    unsigned saw_floor = 0u;
+    unsigned saw_ceil = 0u;
+    unsigned pairs_valid = 1u;
+    unsigned stream_valid = 1u;
+    const unsigned steady_start_frame = 16u;
+    unsigned floor_pairs = region == SCHWAY_REGION_PAL ? 886u : 737u;
+    unsigned video_start = video_calls;
+    unsigned video_bad_start = video_bad;
+
+    printf("TAP version 13\n");
+    audio_expect(runner_pcm != NULL, "runner disc PCM capture is available");
+    if (runner_pcm == NULL) {
+        schway_destroy(audio_reference);
+        p_deinit();
+        module_close();
+        printf("1..%u\n", audio_tap_checks);
+        return 1;
+    }
+    audio_expect(pcm_size != 0u && (pcm_size % 4u) == 0u,
+                 "runner disc PCM contains complete stereo pairs");
+    system_directory = bios_directory;
+    memset(&game, 0, sizeof game);
+    game.path = playlist_path;
+    audio_expect(p_load_game(&game), "M3U content loads with the checked system BIOS");
+    memset(&av, 0, sizeof av);
+    p_get_system_av_info(&av);
+    check_av(&av, region);
+    memset(&info, 0, sizeof info);
+    info.size = (uint32_t)sizeof info;
+    audio_expect(audio_reference != NULL &&
+                     schway_get_info(audio_reference, &info) == SCHWAY_STATUS_OK,
+                 "selected region exposes native disc audio rates");
+    if (audio_reference != NULL && info.fps_den != 0u && info.sample_rate_den != 0u) {
+        audio_expect(av.timing.fps == (double)info.fps_num / (double)info.fps_den &&
+                         av.timing.sample_rate == (double)info.sample_rate_num /
+                                                      (double)info.sample_rate_den,
+                     "libretro disc AV timing matches the core's native rates");
+    } else {
+        audio_expect(0, "core rates are available for disc AV cadence comparison");
+    }
+    p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+
+    while (frames < 1200u) {
+        run_one();
+        frames++;
+        if (got_pairs > MAX_PAIRS) {
+            pairs_valid = 0u;
+            continue;
+        }
+        /* BIOS video-mode setup can split a sample frame across early public
+           calls; exact PCM parity above still covers those startup callbacks. */
+        if (frames > steady_start_frame) {
+            if (got_pairs != floor_pairs && got_pairs != floor_pairs + 1u) {
+                fprintf(stderr, "disc steady audio frame %u delivered %lu pairs\n", frames,
+                        (unsigned long)got_pairs);
+                pairs_valid = 0u;
+            }
+            saw_floor |= got_pairs == floor_pairs;
+            saw_ceil |= got_pairs == floor_pairs + 1u;
+            steady_pairs += got_pairs;
+            steady_frames++;
+        }
+        size_t frame_bytes = got_pairs * 4u;
+        if (offset > pcm_size || frame_bytes > pcm_size - offset) {
+            fprintf(stderr, "disc audio frame %u exceeds runner stream at byte %lu\n", frames,
+                    (unsigned long)offset);
+            stream_valid = 0u;
+        } else {
+            for (size_t pair = 0u; pair < got_pairs; pair++) {
+                uint16_t left = (uint16_t)got_audio[2u * pair];
+                uint16_t right = (uint16_t)got_audio[2u * pair + 1u];
+                callback_bytes[4u * pair] = (uint8_t)left;
+                callback_bytes[4u * pair + 1u] = (uint8_t)(left >> 8);
+                callback_bytes[4u * pair + 2u] = (uint8_t)right;
+                callback_bytes[4u * pair + 3u] = (uint8_t)(right >> 8);
+                nonzero |= left != 0u || right != 0u;
+            }
+            if (frames == 1u && frame_bytes <= sizeof first_frame) {
+                memcpy(first_frame, callback_bytes, frame_bytes);
+                first_frame_bytes = frame_bytes;
+            }
+            if (!pcm_bytes_equal(callback_bytes, frame_bytes, runner_pcm + offset,
+                                 frame_bytes)) {
+                if (stream_valid != 0u) {
+                    size_t byte = 0u;
+                    while (byte < frame_bytes && callback_bytes[byte] == runner_pcm[offset + byte]) {
+                        byte++;
+                    }
+                    printf("# disc audio frame %u differs at stream byte %lu\n", frames,
+                           (unsigned long)(offset + byte));
+                }
+                stream_valid = 0u;
+            }
+            offset += frame_bytes;
+        }
+        unsigned char *ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+        if (ram != NULL && memcmp(ram + 0x10000u, "SWMB", 4u) == 0 &&
+            ram[0x10008u] == 0u) {
+            break;
+        }
+    }
+    audio_expect(frames < 1200u, "disc guest seals its mailbox within the frame bound");
+    audio_expect(pairs_valid != 0u && steady_frames != 0u,
+                 "steady disc callbacks keep the native region pair count per frame");
+    audio_expect(saw_floor != 0u && saw_ceil != 0u,
+                 "steady disc audio cadence exercises both sides of the region sample remainder");
+    if (audio_reference != NULL && info.fps_num != 0u && info.sample_rate_den != 0u) {
+        uint64_t numerator = (uint64_t)info.sample_rate_num * info.fps_den * steady_frames;
+        uint64_t denominator = (uint64_t)info.sample_rate_den * info.fps_num;
+        uint64_t expected = numerator / denominator;
+        audio_expect(steady_pairs + 1u >= expected && steady_pairs <= expected + 1u,
+                     "steady disc pair total follows native AV cadence without drift");
+    } else {
+        audio_expect(0, "core rates are available for total disc cadence comparison");
+    }
+    audio_expect(video_calls - video_start == frames && video_bad == video_bad_start,
+                 "every disc audio frame has one valid video callback");
+    audio_expect(stream_valid && offset == pcm_size,
+                 "batch or single callback PCM exactly equals the runner stream");
+    audio_expect(nonzero != 0u, "the XA and CD-DA fixture produces audible PCM");
+
+    p_reset();
+    run_one();
+    unsigned reset_nonzero = 0u;
+    for (size_t pair = 0u; pair < got_pairs && pair < MAX_PAIRS; pair++) {
+        reset_nonzero |= got_audio[2u * pair] != 0 || got_audio[2u * pair + 1u] != 0;
+    }
+    audio_expect(reset_nonzero == 0u, "power reset clears queued disc PCM");
+
+    p_unload_game();
+    audio_expect(p_load_game(&game), "disc content reloads after unload");
+    run_one();
+    size_t reload_bytes = got_pairs <= MAX_PAIRS ? got_pairs * 4u : sizeof callback_bytes + 1u;
+    for (size_t pair = 0u; pair < got_pairs && pair < MAX_PAIRS; pair++) {
+        uint16_t left = (uint16_t)got_audio[2u * pair];
+        uint16_t right = (uint16_t)got_audio[2u * pair + 1u];
+        callback_bytes[4u * pair] = (uint8_t)left;
+        callback_bytes[4u * pair + 1u] = (uint8_t)(left >> 8);
+        callback_bytes[4u * pair + 2u] = (uint8_t)right;
+        callback_bytes[4u * pair + 3u] = (uint8_t)(right >> 8);
+    }
+    audio_expect(first_frame_bytes != 0u && reload_bytes == first_frame_bytes &&
+                     memcmp(callback_bytes, first_frame, first_frame_bytes) == 0,
+                 "disc reload delivers its first PCM frame intact");
+
+    p_set_audio_sample(NULL);
+    p_set_audio_sample_batch(NULL);
+    run_one();
+    audio_expect(got_pairs == 0u, "muted frontend receives no disc sample callbacks");
+    p_set_audio_sample(sample);
+    p_set_audio_sample_batch(single_audio ? NULL : batch);
+    run_one();
+    audio_expect(got_pairs != 0u && got_pairs <= floor_pairs + 1u,
+                 "disc sample callbacks resume after mute");
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    free(runner_pcm);
+    schway_destroy(audio_reference);
+    printf("1..%u\n", audio_tap_checks);
+    return audio_tap_failures != 0u || check_failures != 0 ? 1 : 0;
 }
 
 static void visit_input_state(void *user, const char *name, const void *data, uint32_t count,
@@ -3285,8 +3745,14 @@ int main(int argc, char **argv)
     int audio_batch_mode = argc == 6 && strcmp(argv[2], "audio-equality-batch") == 0;
     int audio_single_mode = argc == 6 && strcmp(argv[2], "audio-equality-single") == 0;
     int audio_mode = audio_batch_mode || audio_single_mode;
-    uint32_t selected_audio_region = audio_mode ? audio_region(argv[3]) : SCHWAY_REGION_NTSC_U;
+    int disc_audio_batch_mode = argc == 7 && strcmp(argv[2], "disc-audio-equality-batch") == 0;
+    int disc_audio_single_mode = argc == 7 && strcmp(argv[2], "disc-audio-equality-single") == 0;
+    int disc_audio_mode = disc_audio_batch_mode || disc_audio_single_mode;
+    uint32_t selected_audio_region = audio_mode || disc_audio_mode
+                                         ? audio_region(argv[3])
+                                         : SCHWAY_REGION_NTSC_U;
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
+    int disc_control_mode = argc == 6 && strcmp(argv[2], "disc-control") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
@@ -3301,7 +3767,7 @@ int main(int argc, char **argv)
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
-    if ((!audio_mode && !content_mode && !psexe_mode && !input_descriptors_mode &&
+    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !psexe_mode && !input_descriptors_mode &&
          !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
@@ -3309,14 +3775,19 @@ int main(int argc, char **argv)
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         (audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
                         argv[5][0] == '\0')) ||
-        ((content_mode || psexe_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
+        (disc_audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
+                             argv[5][0] == '\0' || argv[6][0] == '\0')) ||
+        ((content_mode || disc_control_mode || psexe_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
           card_persistence_mode || card_controls_mode) &&
          argv[3][0] == '\0') ||
+        (disc_control_mode && (argv[4][0] == '\0' || argv[5][0] == '\0')) ||
         ((psexe_mode || lifecycle_mode || card_persistence_mode || card_controls_mode) &&
          argv[4][0] == '\0')) {
         fprintf(stderr,
                 "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | "
+                "disc-control <m3u> <second-cue> <bios-directory> | "
+                "disc-audio-equality-batch|disc-audio-equality-single <region> <m3u> <pcm> <bios-directory> | "
                 "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
                 "card-controls <exe> <save-dir> | memory-aliases | memory-boundaries | "
@@ -3324,16 +3795,19 @@ int main(int argc, char **argv)
                 "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
-    content_test = audio_mode || content_mode || psexe_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
+    content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || psexe_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
                    input_controls_mode || lifecycle_mode || card_persistence_mode ||
                    card_controls_mode;
     rumble_available = rumble_guest_mode || rumble_controls_mode;
-    pal = audio_mode ? selected_audio_region == SCHWAY_REGION_PAL
-                     : (!content_test && strcmp(argv[2], "pal") == 0);
-    single_audio = audio_mode ? audio_single_mode : pal;
-    option_value = audio_mode ? argv[3] : (pal ? "pal" : "ntsc-u");
-    region = audio_mode ? selected_audio_region
-                        : (pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U);
+    pal = audio_mode || disc_audio_mode
+              ? selected_audio_region == SCHWAY_REGION_PAL
+              : (!content_test && strcmp(argv[2], "pal") == 0);
+    single_audio = audio_mode || disc_audio_mode
+                       ? audio_single_mode || disc_audio_single_mode
+                       : pal;
+    option_value = audio_mode || disc_audio_mode ? argv[3] : (pal ? "pal" : "ntsc-u");
+    region = audio_mode || disc_audio_mode ? selected_audio_region
+                                            : (pal ? SCHWAY_REGION_PAL : SCHWAY_REGION_NTSC_U);
     /* The region selected for the next load, and both regions' pairs per
        frame: 33,868,800 x 44,100 / (768 x 44,100) per second over the frame
        rate (HOSTS-AND-INTEGRATION section 1, AV fields). */
@@ -3372,7 +3846,7 @@ int main(int argc, char **argv)
     check_string("library_name", sys.library_name, "schwaystation");
     check_string("library_version", sys.library_version, version);
     if (!content_test) {
-        check_string("valid_extensions", sys.valid_extensions, "exe|psexe");
+        check_string("valid_extensions", sys.valid_extensions, "exe|psexe|cue|iso|m3u");
     }
     CHECK_EQ_U64(sys.need_fullpath, 1);
     CHECK_EQ_U64(sys.block_extract, 1);
@@ -3380,6 +3854,14 @@ int main(int argc, char **argv)
 
     if (audio_mode) {
         return test_audio_equality(argv[4], argv[5], region);
+    }
+
+    if (disc_audio_mode) {
+        return test_disc_audio_equality(argv[4], argv[5], argv[6], region);
+    }
+
+    if (disc_control_mode) {
+        return test_disc_control(argv[3], argv[4], argv[5]);
     }
 
     if (rumble_guest_mode) {
@@ -3448,7 +3930,7 @@ int main(int argc, char **argv)
             module_close();
             CHECK_DONE();
         }
-        check_string("valid_extensions", sys.valid_extensions, "exe|psexe");
+        check_string("valid_extensions", sys.valid_extensions, "exe|psexe|cue|iso|m3u");
         for (run = 1u; run <= 60u; run++) {
             run_one();
             if (frame_h > 100u && frame_w != 0u && frame[(size_t)100u * frame_w] == 0x00FF0000u) {

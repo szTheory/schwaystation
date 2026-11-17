@@ -1,3 +1,45 @@
+# This file also drives the runner and libretro host for XA/CD-DA PCM parity.
+if(CMAKE_SCRIPT_MODE_FILE AND DEFINED SCHWAY_LIBRETRO_DISC_AUDIO_TEST)
+  file(MAKE_DIRECTORY "${TEST_DIR}")
+  foreach(region IN ITEMS ntsc-u pal)
+    set(pcm_file "${TEST_DIR}/libretro-disc-audio-${region}.pcm")
+    file(REMOVE "${pcm_file}")
+    execute_process(
+      COMMAND ${EMULATOR} "${RUNNER}" --region "${region}" --bios "${BIOS}"
+        --disc "${PLAYLIST}" --frames 1200 --stop-on mailbox --hash-audio
+        --test-audio-file "${pcm_file}"
+      RESULT_VARIABLE runner_status OUTPUT_VARIABLE runner_out ERROR_VARIABLE runner_err)
+    if(NOT runner_status STREQUAL "0" OR NOT runner_out MATCHES "mailbox SWMB status=00")
+      message(FATAL_ERROR "${region} runner disc audio capture failed (exit ${runner_status})\n${runner_out}\n${runner_err}")
+    endif()
+    if(NOT EXISTS "${pcm_file}")
+      message(FATAL_ERROR "${region} runner reported success without writing disc PCM bytes")
+    endif()
+    file(SIZE "${pcm_file}" pcm_size)
+    math(EXPR pcm_remainder "${pcm_size} % 4")
+    if(pcm_size EQUAL 0 OR NOT pcm_remainder EQUAL 0)
+      message(FATAL_ERROR "${region} runner disc PCM has invalid byte length ${pcm_size}")
+    endif()
+    file(SHA256 "${pcm_file}" pcm_sha256)
+    if(NOT runner_out MATCHES "audio sha256 ${pcm_sha256}")
+      message(FATAL_ERROR "${region} runner disc PCM differs from its audio hash\n${runner_out}")
+    endif()
+
+    foreach(callback IN ITEMS batch single)
+      execute_process(
+        COMMAND ${EMULATOR} "${HOST}" "${MODULE}"
+          "disc-audio-equality-${callback}" "${region}" "${PLAYLIST}" "${pcm_file}"
+          "${BIOS_DIRECTORY}"
+        RESULT_VARIABLE host_status OUTPUT_VARIABLE host_out ERROR_VARIABLE host_err)
+      if(NOT host_status STREQUAL "0")
+        message(FATAL_ERROR "libretro ${region} ${callback} disc PCM comparison failed (exit ${host_status})\n${host_out}\n${host_err}")
+      endif()
+      message("${host_out}")
+    endforeach()
+  endforeach()
+  return()
+endif()
+
 # This file also drives the real runner from libretro.host. Script mode is
 # used by that one test so every guest executable goes through the configured
 # cross-compiling emulator and its status is checked before host comparison.
@@ -56,13 +98,16 @@ endif()
 add_executable(schwaystation-test-libretro-host ${CMAKE_CURRENT_LIST_DIR}/host.c)
 target_include_directories(schwaystation-test-libretro-host PRIVATE ${PROJECT_SOURCE_DIR}/libretro)
 target_link_libraries(schwaystation-test-libretro-host PRIVATE schwaystation::schwaystation
-  schwaystation-host ${CMAKE_DL_LIBS})
+  schwaystation-host schwaystation_disc_image ${CMAKE_DL_LIBS})
 set_target_properties(schwaystation-test-libretro-host PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-libretro-host)
 add_dependencies(schwaystation-test-libretro-host schwaystation_libretro)
 add_dependencies(schwaystation-test-libretro-host schwaystation-fixtures)
 add_dependencies(schwaystation-test-libretro-host schwaystation-run-test)
+if(TARGET schwaystation-disc-fixtures)
+  add_dependencies(schwaystation-test-libretro-host schwaystation-disc-fixtures)
+endif()
 
 # Fault prevented: a generated .info file advertises a functional claim
 # without a gating registered inventory row.
@@ -111,6 +156,45 @@ foreach(case IN ITEMS "libretro.host;ntsc-u" "libretro.host.pal;pal")
       LABELS libretro portable TIMEOUT 60)
   endif()
 endforeach()
+
+# Fault prevented: disk callbacks report success without changing the live
+# guest's CD-ROM interrupt and subsequent TOC responses.
+schway_add_test(NAME libretro.host.disc_control
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> disc-control
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.cue
+    ${PROJECT_BINARY_DIR}/openbios
+  LABELS libretro portable TIMEOUT 240)
+
+# Fault prevented: the libretro core changes disc XA/CD-DA samples, callback
+# batching, or NTSC/PAL frame cadence relative to the runner.
+string(REPLACE ";" "$<SEMICOLON>" libretro_disc_audio_emulator
+  "${CMAKE_CROSSCOMPILING_EMULATOR}")
+schway_add_test(NAME libretro.host.disc_audio
+  COMMAND ${CMAKE_COMMAND} -DSCHWAY_LIBRETRO_DISC_AUDIO_TEST=1
+    "-DEMULATOR=${libretro_disc_audio_emulator}"
+    -DRUNNER=$<TARGET_FILE:schwaystation-run-test>
+    -DHOST=$<TARGET_FILE:schwaystation-test-libretro-host>
+    -DMODULE=$<TARGET_FILE:schwaystation_libretro>
+    -DPLAYLIST=${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u
+    -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DBIOS_DIRECTORY=${PROJECT_BINARY_DIR}/openbios
+    -DTEST_DIR=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS libretro portable TIMEOUT 240)
+
+# These Plan 19 lanes are registered now so the exact inventory is guarded
+# before the checker is implemented by its first caller.
+schway_add_test(NAME libretro.vendored
+  COMMAND ${CMAKE_COMMAND} -DCASE=check -DROOT=${PROJECT_SOURCE_DIR}
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/vendored.cmake
+  LABELS libretro portable TIMEOUT 30)
+schway_add_test(NAME libretro.vendored.self_test
+  COMMAND ${CMAKE_COMMAND} -DCASE=self_test -DROOT=${PROJECT_SOURCE_DIR}
+    -DWORK=${PROJECT_BINARY_DIR}/tests/libretro/vendored-self-test
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/vendored.cmake
+  LABELS libretro portable TIMEOUT 30)
 
 # Fault prevented: a fullpath PS-EXE that cannot run with the built-in stub
 # kernel, or whose SIO input never changes the guest's independently known GPU pixel.

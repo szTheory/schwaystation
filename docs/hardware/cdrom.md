@@ -183,7 +183,9 @@ in which case the previous good position remains visible. Disc callbacks, TOC an
 and are not part of save states; the host-supplied SHA-256 disc identity is matched before state apply. Controller
 flags, sector bytes, the latest validated 12-byte Q record, FIFO contents and scheduled deadlines, ATV staging and
 active values, CDDA and XA queue contents, XA predictor history and resampler history are serialized in state format
-17.
+17. While the tray is open, `schway_swap_disc` accepts a valid empty TOC to remove the medium; this clears the cached
+TOC, callback pointers and identity while leaving the tray open. The host can then close the empty tray, and commands
+such as GetTN report no media.
 
 An attached idle drive has a Cachegrind budget of at most 250,000 additional
 instructions per NTSC frame over the same frame path without drive events. The
