@@ -40,6 +40,12 @@ PKG_CONFIG_PATH=<unzipped directory>/lib/pkgconfig cc app.c $(pkg-config --cflag
 
 The header compiles as C and as C++.
 
+## Optional SDL2 host
+
+[`examples/sdl2/README.md`](../examples/sdl2/README.md) builds a small host against the installed CMake package.
+SDL2 supplies the window, audio device and keyboard input; the example supplies the host-side disc image provider.
+It is source support for the example only and is not installed or included in release archives.
+
 ## Structs and sizes
 
 Versioned input and output structs start with `uint32_t size`. Zero each one with `memset`, then set `size`:
@@ -543,6 +549,10 @@ SHA-256 identity formed from the first 16 data sectors plus the disc serial. Lea
 identity is unavailable. An older descriptor size remains valid for running media, but save/load with an attached
 disc lacking an identity returns `SCHWAY_STATUS_ERR_STATE_DISC`. Loading a state with another disc, or with no disc
 attached, returns the same status without changing the instance.
+
+Callback function pointers and `user` remain host-owned even though the descriptor and TOC are copied. Keep each
+provider and any file handles it uses alive while an instance can call its callbacks. Destroy the instance before
+closing its active provider; after a successful disc swap, the newly attached provider must remain alive too.
 
 ## Save states
 

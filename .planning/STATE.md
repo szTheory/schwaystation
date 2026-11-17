@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 36 of 39
+current_plan: 37 of 39
 status: executing
-stopped_at: Completed 06-19-PLAN.md; next 06-22-PLAN.md
-last_updated: "2026-11-17T04:19:17Z"
+stopped_at: Completed 06-22-PLAN.md; next 06-20-PLAN.md
+last_updated: "2026-11-17T04:35:16Z"
 last_activity: 2026-11-17
-state_head: 1342864
+state_head: 2cf1296
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 185
+  completed_plans: 186
   percent: 98
-last_activity_desc: "Completed Plan 06-19: the pinned MIT rcheevos PS1 hash oracle matches the production runner identity on owned disc data and changes under executable mutation; the vendored digest negative control rejects altered bytes. Review findings on license wording and an unused shim were fixed. Cheap selector, inventory, digest and 2699/2700-line budget checks preceded the focused build; the post-review disc/probe/vendor filter passed 4/4. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), standard gsd-code-reviewer gpt-6-luna xhigh; active time was not reliably measured after the owner-reported 22-hour pause. No physical capture or hosted run URL applies. Continue with Plan 06-22."
+last_activity_desc: "Completed Plan 06-22: added an optional SDL2 host against the installed CMake package, reusing the existing disc and pixel helpers and keeping device/window code outside deliverables. The installed-package build exposed a generated-config collision at the prefix root; specifying schwaystation_DIR selected the installed config, and the example compiled. CI builds it on Linux x64, installing Ubuntu's system SDL2-compat package only if pkg-config cannot find SDL2. Actionlint passed after ignoring its stale ubuntu-26.04 label diagnostics. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); active time was not tracked reliably. The app was not launched and no hosted CI run or physical capture is claimed. Continue with Plan 06-20."
 ---
 
 # Project State
@@ -31,12 +31,12 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 36 of 39
-Next plan file: 06-22-PLAN.md
+Current Plan: 37 of 39
+Next plan file: 06-20-PLAN.md
 Status: Ready to execute
 Last activity: 2026-11-17
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -54,7 +54,7 @@ Progress: [█████████░] 90%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 35 | 39 | - |
+| 06 | 36 | 39 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -926,3 +926,11 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unava
 ### Phase 6 plan 06-18 execution (2026-11-17)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer. Active time was not measured reliably; the wall interval from the prior state checkpoint through final verification was about 1h09m and includes review and test waits. Libretro now loads CUE/ISO/M3U with the system BIOS, exposes extended disk control, removes media through an empty TOC while the tray is open, and proves the no-media GetTN error with the guest. Runner and libretro PCM match byte-for-byte for the combined XA/CD-DA fixture in batch and single callbacks for NTSC-U and PAL. The review's no-media blocker was fixed and re-reviewed clean. Cheap checks caught startup cadence assumptions, stale extension assertions, a 2-line repository-gate overage, and a brittle negative-control matcher before closeout; all were corrected without broad reruns. The final libretro host selector passed 4/4 in 39.95 seconds; core disc API and info-claim controls passed 2/2 each. Repository-check code is exactly 2700/2700 lines. No physical capture or hosted URL applies. Plan 06-19 is next.
+
+### Phase 6 plan 06-19 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer gpt-6-luna xhigh. Active time was not reliably measured after the owner-reported 22-hour pause. The pinned MIT rcheevos PlayStation hash source is tested against production runner identity on provider-owned disc bytes; executable mutation changes both results. The vendored digest negative control rejects changed bytes. Review findings about license wording and a dead shim were fixed; the post-review disc/probe/vendor filter passed 4/4. Cheap selectors, sorted inventory, digest and 2699/2700-line budget checks preceded the focused build. No physical capture or hosted URL applies. Plan 06-22 is next.
+
+### Phase 6 plan 06-22 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable). The optional SDL2 example compiles from the installed library package and reuses existing host disc/pixel helpers without adding SDL2 to product targets. The first package configure found the build-tree config shadowing the installed one; the corrected command supplies the installed `schwaystation_DIR`, and the final example build passed. CI builds it only on Linux x64, using Ubuntu's SDL2 compatibility development package if the hosted image lacks `sdl2.pc`. Actionlint passed when ignoring its outdated Ubuntu 26.04 label list. The app was not launched and hosted verification remains for ship. The 2699-line repository gate is unchanged; no owner hardware capture or hosted URL applies. Plan 06-20 is next.

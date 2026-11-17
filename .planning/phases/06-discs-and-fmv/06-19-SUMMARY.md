@@ -24,7 +24,7 @@ coverage:
 metrics:
   duration: "Active time not reliably measured; execution resumed after the owner-reported 22-hour pause."
   tasks: 3
-  files: 16
+  files: 27
   runtime: "Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer using gpt-6-luna xhigh."
 completed: 2026-11-17
 status: complete

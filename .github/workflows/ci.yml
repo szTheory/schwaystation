@@ -293,6 +293,21 @@ jobs:
         run: >-
           cmake -DJUNIT=build/${{ matrix.preset }}/junit-release.xml -DINVENTORY=tests/inventory/ci.txt
           -DLABELS=release -P tests/cmake/check_junit.cmake
+      # Compile the optional host once against this job's installed library;
+      # it is not run or packaged. SDL2 comes from the runner or its OS repo.
+      - name: Build the installed-library SDL2 example
+        if: matrix.os == 'linux' && matrix.arch == 'x64'
+        run: |
+          set -eu
+          if ! pkg-config --exists sdl2; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends pkg-config libsdl2-compat-dev
+          fi
+          cmake --install build/${{ matrix.preset }} --prefix build/${{ matrix.preset }} --component library
+          cmake -S examples/sdl2 -B build/example-sdl2 \
+            -DCMAKE_PREFIX_PATH="$PWD/build/${{ matrix.preset }}" \
+            -Dschwaystation_DIR="$PWD/build/${{ matrix.preset }}/lib/cmake/schwaystation"
+          cmake --build build/example-sdl2 --parallel 2
       # The README line installs this leg's own libretro zip after checking
       # its checksum, and refuses a copy with one byte flipped.
       - name: README install line
