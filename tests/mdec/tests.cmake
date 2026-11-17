@@ -61,20 +61,14 @@ schway_add_test(NAME mdec.fifo
   COMMAND schwaystation-test-mdec fifo
   LABELS mdec portable TIMEOUT 10)
 
-# Fault prevented: the pinned 4-bit guest's 32-word DMA0 coefficient stream
-# fails to publish its completed block when the bounded command ends without EOB.
-schway_add_test(NAME mdec.guest_input
-  COMMAND schwaystation-test-mdec guest_input
-  LABELS mdec portable TIMEOUT 10)
-
 # Fault prevented: the unsigned 4-bit pinned vector or its nearest-nibble
 # relation to the pinned 8-bit fixture changes independently of the 8-bit run.
 schway_add_test(NAME mdec.guest_4bit
   COMMAND schwaystation-test-mdec guest_4bit
   LABELS mdec portable TIMEOUT 10)
 
-# Fault prevented: the deterministic 8-bit regression selector is accidentally
-# omitted while replacing the hardware conformance comparison.
+# Fault prevented: the unchanged integer decoder's deterministic 8-bit output
+# changes across FIFO output and the scheduled DMA1 RAM transfer.
 schway_add_test(NAME mdec.guest_8bit_regression
   COMMAND schwaystation-test-mdec guest_8bit_regression
   LABELS mdec portable TIMEOUT 10)

@@ -77,7 +77,15 @@ static void run_cycles(schway *inst, uint64_t cycles)
 
 static void enable_dma(schway *inst);
 static void start_dma0(schway *inst, uint32_t base, uint32_t words);
+static void dma1_transfer(schway *inst, uint32_t base, uint32_t words);
 static void load_scale_table(schway *inst, const int16_t scale[SCHWAY__MDEC_BLOCK_SAMPLES]);
+
+static int mdec_8bit_regression_matches(const uint8_t *actual, size_t size)
+{
+    return size == sizeof schway__mdec_8bit_regression_bytes &&
+           memcmp(actual, schway__mdec_8bit_regression_bytes,
+                  sizeof schway__mdec_8bit_regression_bytes) == 0;
+}
 
 static void load_guest_quant(schway *inst, const uint8_t quant[SCHWAY__MDEC_BLOCK_SAMPLES])
 {
@@ -168,30 +176,76 @@ static void case_guest_input_modes(uint32_t depth_mask)
         uint32_t nibble = (expected[0][pixel / 8u] >> ((pixel % 8u) * 4u)) & 0x0Fu;
         CHECK_EQ_U64(nibble, nearest);
     }
+    if ((depth_mask & (1u << 1u)) != 0u) {
+        uint8_t mutated_baseline[sizeof schway__mdec_8bit_regression_bytes];
+        memcpy(mutated_baseline, schway__mdec_8bit_regression_bytes,
+               sizeof mutated_baseline);
+        mutated_baseline[0] ^= 1u;
+        CHECK_EQ_U64(mdec_8bit_regression_matches(schway__mdec_8bit_regression_bytes,
+                                                   sizeof schway__mdec_8bit_regression_bytes), 1u);
+        CHECK_EQ_U64(mdec_8bit_regression_matches(mutated_baseline,
+                                                   sizeof mutated_baseline), 0u);
+    }
     for (uint32_t depth = 0u; depth < 2u; depth++) {
         if ((depth_mask & (1u << depth)) == 0u) {
             continue;
         }
-        schway *inst = make();
-        enable_dma(inst);
-        load_guest_quant(inst, guest_quant);
-        load_scale_table(inst, guest_scale);
-        write32(inst, MDEC_DATA, 0x20000020u | (depth << 27), 0u);
-        for (uint32_t i = 0u; i < 32u; i++) {
-            write_ram(inst, 0x12000u + i * 4u, guest_input[i]);
+        uint32_t run_count = depth == 0u ? 1u : 2u;
+        for (uint32_t run = 0u; run < run_count; run++) {
+            schway *inst = make();
+            enable_dma(inst);
+            load_guest_quant(inst, guest_quant);
+            load_scale_table(inst, guest_scale);
+            write32(inst, MDEC_DATA, 0x20000020u | (depth << 27), 0u);
+            for (uint32_t i = 0u; i < 32u; i++) {
+                write_ram(inst, 0x12000u + i * 4u, guest_input[i]);
+            }
+            start_dma0(inst, 0x12000u, 32u);
+            if (run == 0u) {
+                run_cycles(inst, 4096u);
+            } else {
+                run_cycles(inst, 512u);
+                run_cycles(inst, 3584u);
+            }
+            uint32_t output_words = depth == 0u ? 8u : 16u;
+            CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
+            CHECK_EQ_HEX(inst->dma.madr[0], 0x12080u);
+            CHECK_EQ_U64(inst->mdec.input_count, 0u);
+            CHECK_EQ_U64(inst->mdec.words_remaining, 0u);
+            CHECK_EQ_U64(inst->mdec.output_count, output_words);
+            if (depth == 0u) {
+                for (uint32_t i = 0u; i < output_words; i++) {
+                    CHECK_EQ_HEX(inst->mdec.output[i], expected[0][i]);
+                }
+            } else {
+                uint8_t raw_fifo[sizeof schway__mdec_8bit_regression_bytes];
+                for (uint32_t word = 0u; word < output_words; word++) {
+                    uint32_t value = inst->mdec.output[(inst->mdec.output_head + word) %
+                                                        SCHWAY__MDEC_OUTPUT_WORDS];
+                    for (uint32_t byte = 0u; byte < 4u; byte++) {
+                        raw_fifo[word * 4u + byte] = (uint8_t)(value >> (byte * 8u));
+                    }
+                }
+                CHECK_EQ_U64(inst->dma.dreq & (1u << 1), 1u << 1);
+                CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & (1u << 27), 1u << 27);
+                CHECK_EQ_U64(mdec_8bit_regression_matches(raw_fifo, sizeof raw_fifo), 1u);
+                dma1_transfer(inst, 0x13000u, output_words);
+                CHECK_EQ_U64(inst->mdec.output_count, 0u);
+                CHECK_EQ_HEX(inst->dma.madr[1], 0x13040u);
+                for (uint32_t word = 0u; word < output_words; word++) {
+                    uint32_t actual_word = 0u;
+                    uint32_t expected_word =
+                        (uint32_t)schway__mdec_8bit_regression_bytes[word * 4u] |
+                        ((uint32_t)schway__mdec_8bit_regression_bytes[word * 4u + 1u] << 8u) |
+                        ((uint32_t)schway__mdec_8bit_regression_bytes[word * 4u + 2u] << 16u) |
+                        ((uint32_t)schway__mdec_8bit_regression_bytes[word * 4u + 3u] << 24u);
+                    CHECK_EQ_U64(schway__bus_ram_word(inst, 0x13000u + word * 4u,
+                                                       &actual_word, 0u), 0u);
+                    CHECK_EQ_HEX(actual_word, expected_word);
+                }
+            }
+            schway_destroy(inst);
         }
-        start_dma0(inst, 0x12000u, 32u);
-        run_cycles(inst, 4096u);
-        uint32_t output_words = depth == 0u ? 8u : 16u;
-        CHECK_EQ_U64(inst->dma.cur, SCHWAY__DMA_NONE);
-        CHECK_EQ_HEX(inst->dma.madr[0], 0x12080u);
-        CHECK_EQ_U64(inst->mdec.output_count, output_words);
-        for (uint32_t i = 0u; i < output_words; i++) {
-            CHECK_EQ_HEX(inst->mdec.output[i], expected[depth][i]);
-        }
-        CHECK_EQ_U64(inst->dma.dreq & (1u << 1), 1u << 1);
-        CHECK_EQ_HEX(read32(inst, MDEC_STATUS) & (1u << 27), 1u << 27);
-        schway_destroy(inst);
     }
 }
 
@@ -203,11 +257,6 @@ static void case_guest_4bit(void)
 static void case_guest_8bit_regression(void)
 {
     case_guest_input_modes(1u << 1u);
-}
-
-static void case_guest_input(void)
-{
-    case_guest_input_modes((1u << 0u) | (1u << 1u));
 }
 
 static void case_input_coverage(void)
@@ -1087,8 +1136,6 @@ int main(int argc, char **argv)
         case_guest_4bit();
     } else if (strcmp(argv[1], "guest_8bit_regression") == 0) {
         case_guest_8bit_regression();
-    } else if (strcmp(argv[1], "guest_input") == 0) {
-        case_guest_input();
     } else if (strcmp(argv[1], "input_coverage") == 0) {
         case_input_coverage();
     } else if (strcmp(argv[1], "block") == 0) {

@@ -6,7 +6,6 @@ mdec.display	mdec,portable
 mdec.fifo	mdec,portable
 mdec.guest_4bit	mdec,portable
 mdec.guest_8bit_regression	mdec,portable
-mdec.guest_input	mdec,portable
 mdec.input_coverage	mdec,portable
 mdec.status	mdec,portable
 mdec.stream	mdec,portable
