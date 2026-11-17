@@ -50,6 +50,9 @@ enum {
     MOVIE_INPUT_BYTES = 0x1A80u,
     MOVIE_INPUT_BLOCKS = 1440u,
     MOVIE_INPUT_MACROBLOCKS = 240u,
+    STATUS_DELAY_CYCLES = 10000u,
+    STATUS_INPUT_EVENTS = 256u,
+    STATUS_OUTPUT_EVENTS = 512u,
     REFERENCE_PATH_LIMIT = 4096u
 };
 
@@ -329,9 +332,9 @@ static int coverage_matches_source(const mdec_input_source *source,
                                    const schway__mdec_coverage *coverage)
 {
     return source != NULL && coverage != NULL &&
-           coverage->complete_blocks >= source->complete_blocks &&
+           coverage->complete_blocks == source->complete_blocks &&
            coverage->trailing_coefficients == 0u &&
-           coverage->complete_macroblocks >= source->complete_macroblocks &&
+           coverage->complete_macroblocks == source->complete_macroblocks &&
            coverage->trailing_blocks == source->trailing_blocks;
 }
 
@@ -372,6 +375,19 @@ static int input_source_matches(const uint8_t *exe, size_t exe_size,
                                                        source->byte_count, coverage_out);
     return status == SCHWAY__MDEC_COVERAGE_COMPLETE &&
            coverage_matches_source(source, coverage_out);
+}
+
+int schway__mdec_reference_color_input_guard(const char *name, const uint8_t *exe,
+                                             size_t exe_size,
+                                             schway__mdec_coverage *coverage_out)
+{
+    if (name == NULL) return 0;
+    for (size_t i = 2u; i < sizeof mdec_input_sources / sizeof mdec_input_sources[0]; i++) {
+        if (strcmp(name, mdec_input_sources[i].name) == 0) {
+            return input_source_matches(exe, exe_size, &mdec_input_sources[i], coverage_out);
+        }
+    }
+    return 0;
 }
 
 static int run_coverage_controls(void)
@@ -745,6 +761,8 @@ static const mdec_input_source *mono_source_for_mode(const char *mode)
     return NULL;
 }
 
+static int run_status_budget(const char *exe_path, const char *log_path);
+
 static int run_input_preflight(const char *asset_root)
 {
     for (size_t i = 0u; i < sizeof mdec_input_sources / sizeof mdec_input_sources[0]; i++) {
@@ -773,7 +791,22 @@ static int run_input_preflight(const char *asset_root)
                coverage.trailing_blocks, source->input_sha256);
         free(exe);
     }
-    puts("MDEC_INPUT_PREFLIGHT_OK: six pinned spans and declared units verified; no guest was run");
+    char status_exe_path[REFERENCE_PATH_LIMIT];
+    char status_log_path[REFERENCE_PATH_LIMIT];
+    int status_exe_path_size = snprintf(status_exe_path, sizeof status_exe_path,
+                                        "%s/%s", asset_root,
+                                        "mdec/step-by-step-log/step-by-step-log.exe");
+    int status_log_path_size = snprintf(status_log_path, sizeof status_log_path,
+                                        "%s/%s", asset_root,
+                                        "mdec/step-by-step-log/psx.log");
+    if (status_exe_path_size < 0 || (size_t)status_exe_path_size >= sizeof status_exe_path ||
+        status_log_path_size < 0 || (size_t)status_log_path_size >= sizeof status_log_path) {
+        fprintf(stderr, "MDEC_INPUT_PREFLIGHT_ERROR: status-budget asset path is too long\n");
+        return 2;
+    }
+    int budget_result = run_status_budget(status_exe_path, status_log_path);
+    if (budget_result != 0) return budget_result;
+    puts("MDEC_INPUT_PREFLIGHT_OK: six pinned spans and status budget verified; no guest was run");
     return 0;
 }
 
@@ -982,6 +1015,50 @@ static int status_order_matches(const uint8_t *expected, size_t expected_size,
     return 1;
 }
 
+static int run_status_budget(const char *exe_path, const char *log_path)
+{
+    size_t exe_size = 0u;
+    size_t log_size = 0u;
+    uint8_t *exe = read_bounded(exe_path, REFERENCE_EXE_LIMIT, &exe_size);
+    uint8_t *log = read_bounded(log_path, REFERENCE_LOG_LIMIT, &log_size);
+    if (exe == NULL || log == NULL ||
+        !digest_matches(exe, exe_size, SCHWAY_MDEC_STATUS_EXE_SHA256) ||
+        !digest_matches(log, log_size, SCHWAY_MDEC_STATUS_LOG_SHA256)) {
+        fprintf(stderr, "MDEC_STATUS_BUDGET_ERROR: pinned guest or log is missing or changed\n");
+        free(exe);
+        free(log);
+        return 2;
+    }
+
+    status_events events;
+    int event_counts_valid = collect_status_events(log, log_size, &events) != 0 &&
+                             events.input_count == STATUS_INPUT_EVENTS &&
+                             events.output_count == STATUS_OUTPUT_EVENTS;
+    /* The pinned mdec/step-by-step-log/main.cpp delays 10,000 cycles after
+       each input write and output read via common/delay.c; the log has no
+       timing stamps. This is a requested-cycle lower bound, not a measured
+       emulator execution time. */
+    uint64_t requested_cycles =
+        ((uint64_t)events.input_count + (uint64_t)events.output_count) *
+        (uint64_t)STATUS_DELAY_CYCLES;
+    uint64_t cap_cycles = (uint64_t)GUEST_RUN_LIMIT * (uint64_t)GUEST_RUN_CYCLES;
+    if (!event_counts_valid || requested_cycles <= cap_cycles) {
+        fprintf(stderr,
+                "MDEC_STATUS_BUDGET_ERROR: event counts or over-budget arithmetic changed\n");
+        free(exe);
+        free(log);
+        return 1;
+    }
+    printf("MDEC_STATUS_BUDGET_OK: status=%zu input=%zu output=%zu delay=%u requested_cycles=%llu cap=%llu over=%llu\n",
+           events.status_count, events.input_count, events.output_count,
+           (unsigned)STATUS_DELAY_CYCLES, (unsigned long long)requested_cycles,
+           (unsigned long long)cap_cycles,
+           (unsigned long long)(requested_cycles - cap_cycles));
+    free(exe);
+    free(log);
+    return 0;
+}
+
 static int run_status_guest(const char *exe_path, const char *log_path)
 {
     size_t exe_size = 0u;
@@ -1151,6 +1228,8 @@ int main(int argc, char **argv)
         return run_coverage_controls() ? 0 : 1;
     if (argc == 3 && strcmp(argv[1], "input-preflight") == 0)
         return run_input_preflight(argv[2]);
+    if (argc == 4 && strcmp(argv[1], "status-budget") == 0)
+        return run_status_budget(argv[2], argv[3]);
     if (argc == 4 && (strcmp(argv[1], "4bit") == 0 || strcmp(argv[1], "8bit") == 0 ||
                       strcmp(argv[1], "8bit-regression") == 0))
         return run_block_guest(argv[1], argv[2], argv[3]);
@@ -1158,6 +1237,6 @@ int main(int argc, char **argv)
         return run_status_guest(argv[2], argv[3]);
     if (argc == 5 && strcmp(argv[1], "controls") == 0)
         return run_negative_controls(argv[2], argv[3], argv[4]);
-    fprintf(stderr, "MDEC_REFERENCE_USAGE_ERROR: expected input-preflight ASSET_ROOT, 4bit|8bit|8bit-regression|status EXE LOG, or controls LOG4 LOG8 STATUS_LOG\n");
+    fprintf(stderr, "MDEC_REFERENCE_USAGE_ERROR: expected input-preflight ASSET_ROOT, coverage-controls, status-budget EXE LOG, 4bit|8bit|8bit-regression|status EXE LOG, or controls LOG4 LOG8 STATUS_LOG\n");
     return 2;
 }

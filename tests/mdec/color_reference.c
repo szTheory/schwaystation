@@ -8,8 +8,12 @@
 #include "schwaystation.h"
 #include "sha256.h"
 #include "internal.h"
+#include "input_coverage.h"
 
 int schway_mdec_color_reference_run(int argc, char **argv);
+int schway__mdec_reference_color_input_guard(const char *name, const uint8_t *exe,
+                                             size_t exe_size,
+                                             schway__mdec_coverage *coverage_out);
 
 #ifndef SCHWAY_MDEC_FRAME15_EXE_SHA256
 #error "CMake must bind the pinned MDEC frame guest digests"
@@ -324,6 +328,22 @@ static int run_color_guest(const color_case *test_case, const char *exe_path,
         return 2;
     }
 
+    schway__mdec_coverage input_coverage;
+    memset(&input_coverage, 0, sizeof input_coverage);
+    if (!schway__mdec_reference_color_input_guard(test_case->name, exe, exe_size,
+                                                   &input_coverage)) {
+        fprintf(stderr,
+                "MDEC_COLOR_INPUT_GUARD_ERROR: %s pinned source span is not uniquely mapped or complete\n",
+                test_case->name);
+        free(exe);
+        free(vram_expected);
+        free(scene_expected);
+        return 2;
+    }
+    printf("MDEC_COLOR_INPUT_GUARD_OK: mode=%s blocks=%u macroblocks=%u trailing_blocks=%u\n",
+           test_case->name, input_coverage.complete_blocks,
+           input_coverage.complete_macroblocks, input_coverage.trailing_blocks);
+
     schway_config config;
     memset(&config, 0, sizeof config);
     config.size = (uint32_t)sizeof config;
@@ -568,17 +588,45 @@ static int run_color_guest(const color_case *test_case, const char *exe_path,
     return 0;
 }
 
+static int run_color_coverage(const char *name, const char *exe_path)
+{
+    const color_case *test_case = find_color_case(name);
+    if (test_case == NULL) return 2;
+    size_t exe_size = 0u;
+    uint8_t *exe = read_bounded_file(exe_path, COLOR_REFERENCE_FILE_LIMIT, &exe_size);
+    schway__mdec_coverage coverage;
+    memset(&coverage, 0, sizeof coverage);
+    int valid = exe != NULL && digest_matches(exe, exe_size, test_case->exe_sha256) &&
+                schway__mdec_reference_color_input_guard(test_case->name, exe, exe_size,
+                                                          &coverage);
+    uint32_t requested_macroblocks = test_case->movie != 0u ? 240u : 300u;
+    if (!valid || coverage.complete_macroblocks != requested_macroblocks ||
+        coverage.trailing_blocks != 0u || coverage.trailing_coefficients != 0u) {
+        fprintf(stderr, "MDEC_COLOR_COVERAGE_ERROR: %s pinned source coverage changed\n",
+                test_case->name);
+        free(exe);
+        return 1;
+    }
+    printf("MDEC_COLOR_SOURCE_COVERAGE_OK: mode=%s blocks=%u macroblocks=%u requested=%u trailing_blocks=%u\n",
+           test_case->name, coverage.complete_blocks, coverage.complete_macroblocks,
+           requested_macroblocks, coverage.trailing_blocks);
+    free(exe);
+    return 0;
+}
+
 int schway_mdec_color_reference_run(int argc, char **argv)
 {
     if (argc == 10 && strcmp(argv[1], "color-assets") == 0)
         return color_asset_check(argc, argv);
     if (argc == 2 && strcmp(argv[1], "color-controls") == 0) return color_controls();
+    if (argc == 4 && strcmp(argv[1], "color-coverage") == 0)
+        return run_color_coverage(argv[2], argv[3]);
     if (argc == 6 && strcmp(argv[1], "color") == 0) {
         const color_case *test_case = find_color_case(argv[2]);
         if (test_case != NULL)
             return run_color_guest(test_case, argv[3], argv[4], argv[5]);
     }
     fprintf(stderr,
-            "MDEC_COLOR_USAGE_ERROR: expected color CASE EXE VRAM_RGB555LE SCENE_RGB555LE, color-assets EXE4 EXE8 EXEM15 EXEM24 PNG4 PNG8 PNGM15 PNGM24, or color-controls\n");
+            "MDEC_COLOR_USAGE_ERROR: expected color CASE EXE VRAM_RGB555LE SCENE_RGB555LE, color-coverage CASE EXE, color-assets EXE4 EXE8 EXEM15 EXEM24 PNG4 PNG8 PNGM15 PNGM24, or color-controls\n");
     return 2;
 }
