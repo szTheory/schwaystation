@@ -554,7 +554,7 @@ Plans:
 - [x] 06-22-PLAN.md — Build the installed-library SDL example without shipping it
 
 **Wave 21** *(blocked on Wave 20 completion)*
-- [ ] 06-20-PLAN.md — Replay hostile media seeds and register nightly fuzz targets
+- [x] 06-20-PLAN.md — Replay hostile media seeds and register nightly fuzz targets
 
 **Wave 22** *(blocked on Wave 21 completion)*
 - [ ] 06-23-PLAN.md — Integrate per-leg disc equality and background RetroArch smoke
@@ -577,4 +577,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
 | 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
-| 6. Discs and FMV | 26/39 | In Progress | - |
+| 6. Discs and FMV | 37/39 | In Progress | - |

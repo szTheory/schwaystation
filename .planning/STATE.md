@@ -4,19 +4,19 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 current_phase: 6
 current_phase_name: Discs and FMV
-current_plan: 37 of 39
+current_plan: 38 of 39
 status: executing
-stopped_at: Completed 06-22-PLAN.md; next 06-20-PLAN.md
-last_updated: "2026-11-17T04:35:16Z"
+stopped_at: Completed 06-20-PLAN.md; next 06-23-PLAN.md
+last_updated: "2026-11-17T05:07:00Z"
 last_activity: 2026-11-17
 state_head: 2cf1296
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 189
-  completed_plans: 186
-  percent: 98
-last_activity_desc: "Completed Plan 06-22: added an optional SDL2 host against the installed CMake package, reusing the existing disc and pixel helpers and keeping device/window code outside deliverables. The installed-package build exposed a generated-config collision at the prefix root; specifying schwaystation_DIR selected the installed config, and the example compiled. CI builds it on Linux x64, installing Ubuntu's system SDL2-compat package only if pkg-config cannot find SDL2. Actionlint passed after ignoring its stale ubuntu-26.04 label diagnostics. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); active time was not tracked reliably. The app was not launched and no hosted CI run or physical capture is claimed. Continue with Plan 06-20."
+  completed_plans: 187
+  percent: 99
+last_activity_desc: "Completed Plan 06-20: added five bounded production replay harnesses for hostile CUE, CNF, M3U, CD-ROM and MDEC input. The focused 11-test replay/fixture selection, hygiene, sorted inventory, and 2,700-line gate passed; a temporary broken input bound was rejected and restored. LibFuzzer campaign linking was unavailable locally because this Mac lacks the Clang runtime; Plan 06-23 owns hosted campaign wiring and execution. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); wall interval was about 35 minutes and active time was not tracked reliably. No hosted run URL or physical capture is claimed. Continue with Plan 06-23."
 ---
 
 # Project State
@@ -31,17 +31,17 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 ## Current Position
 
 Phase: 6 (Discs and FMV) — EXECUTING
-Current Plan: 37 of 39
-Next plan file: 06-20-PLAN.md
+Current Plan: 38 of 39
+Next plan file: 06-23-PLAN.md
 Status: Ready to execute
 Last activity: 2026-11-17
 
-Progress: [█████████░] 92%
+Progress: [█████████░] 95%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 184
+- Total plans completed: 187
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -54,7 +54,7 @@ Progress: [█████████░] 92%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 36 | 39 | - |
+| 06 | 37 | 39 | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -242,6 +242,7 @@ Progress: [█████████░] 92%
 | Phase 6 P14 | elapsed wall time spanned a 22-hour pause/resume; active time unavailable | 2 tasks | 28 files |
 | Phase 06 P17 | not measured (continued after 22-hour pause) | 2 tasks | 12 files |
 | Phase 06 P18 | at least 1h09m wall from prior state checkpoint; active time unavailable | 2 tasks | 14 files |
+| Phase 06 P20 | about 32m wall from 04:35 UTC checkpoint; active time unavailable | 3 tasks | 9 files |
 
 ## Accumulated Context
 
