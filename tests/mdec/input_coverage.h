@@ -15,6 +15,8 @@ enum {
 typedef struct schway__mdec_coverage {
     uint32_t complete_blocks;
     uint32_t trailing_coefficients;
+    uint32_t complete_macroblocks;
+    uint32_t trailing_blocks;
 } schway__mdec_coverage;
 
 /* Regression-only 8-bit implementation bytes reconstructed from the pinned

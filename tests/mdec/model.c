@@ -270,6 +270,43 @@ static void case_input_coverage(void)
                  SCHWAY__MDEC_COVERAGE_COMPLETE);
     CHECK_EQ_U64(coverage.complete_blocks, 1u);
     CHECK_EQ_U64(coverage.trailing_coefficients, 0u);
+    CHECK_EQ_U64(coverage.complete_macroblocks, 0u);
+    CHECK_EQ_U64(coverage.trailing_blocks, 1u);
+
+    /* Six independently complete blocks form one color macroblock. */
+    static const uint8_t complete_color_unit[24] = {
+        0u, 0u, 0u, 0xFEu, 0u, 0u, 0u, 0xFEu,
+        0u, 0u, 0u, 0xFEu, 0u, 0u, 0u, 0xFEu,
+        0u, 0u, 0u, 0xFEu, 0u, 0u, 0u, 0xFEu
+    };
+    memset(&coverage, 0, sizeof coverage);
+    CHECK_EQ_U64(schway__mdec_input_coverage_scan(complete_color_unit,
+                                                   sizeof complete_color_unit, &coverage),
+                 SCHWAY__MDEC_COVERAGE_COMPLETE);
+    CHECK_EQ_U64(coverage.complete_blocks, 6u);
+    CHECK_EQ_U64(coverage.complete_macroblocks, 1u);
+    CHECK_EQ_U64(coverage.trailing_blocks, 0u);
+
+    /* A structurally valid five-block prefix is not a complete color unit. */
+    memset(&coverage, 0, sizeof coverage);
+    CHECK_EQ_U64(schway__mdec_input_coverage_scan(complete_color_unit,
+                                                   sizeof complete_color_unit - 4u, &coverage),
+                 SCHWAY__MDEC_COVERAGE_COMPLETE);
+    CHECK_EQ_U64(coverage.complete_blocks, 5u);
+    CHECK_EQ_U64(coverage.complete_macroblocks, 0u);
+    CHECK_EQ_U64(coverage.trailing_blocks, 5u);
+
+    /* FE00 padding and the next DC halfword must survive the block boundary. */
+    static const uint8_t padded_blocks[] = {
+        0x00u, 0xFEu, 0x00u, 0x00u, 0x00u, 0xFEu,
+        0x00u, 0x00u, 0x00u, 0xFEu
+    };
+    memset(&coverage, 0, sizeof coverage);
+    CHECK_EQ_U64(schway__mdec_input_coverage_scan(padded_blocks, sizeof padded_blocks,
+                                                   &coverage),
+                 SCHWAY__MDEC_COVERAGE_COMPLETE);
+    CHECK_EQ_U64(coverage.complete_blocks, 2u);
+    CHECK_EQ_U64(coverage.trailing_blocks, 2u);
 
     static const uint8_t truncated[] = {0u, 0u};
     memset(&coverage, 0, sizeof coverage);
@@ -279,10 +316,14 @@ static void case_input_coverage(void)
     CHECK_EQ_U64(coverage.trailing_coefficients, 1u);
 
     static const uint8_t odd_size[] = {0u};
+    coverage.complete_macroblocks = 17u;
+    coverage.trailing_blocks = 8u;
     CHECK_EQ_U64(schway__mdec_input_coverage_scan(odd_size, sizeof odd_size, &coverage),
                  SCHWAY__MDEC_COVERAGE_MALFORMED);
     CHECK_EQ_U64(coverage.complete_blocks, 0u);
     CHECK_EQ_U64(coverage.trailing_coefficients, 0u);
+    CHECK_EQ_U64(coverage.complete_macroblocks, 0u);
+    CHECK_EQ_U64(coverage.trailing_blocks, 0u);
 
     memset(&coverage, 0, sizeof coverage);
     CHECK_EQ_U64(schway__mdec_input_coverage_scan(NULL, 0u, &coverage),
