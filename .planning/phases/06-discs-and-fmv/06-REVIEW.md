@@ -196,6 +196,83 @@ _Reviewed: 2026-11-17T07:12:31Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
 
+## Plan 45 Corrective-Changes Review Addendum
+
+**Reviewed:** 2026-11-17T21:31:16Z
+**Scope:** Current working-tree changes in the Phase 6 hosted-failure repair batch
+**Files reviewed:** 7
+**Status:** issues_found
+
+### Summary
+
+Reviewed the lazy psxavenc build graph, XA coding-byte normalization, shared MDEC prototype, and hygiene selector removal against the project rules and current call sites. No blocker was found. The pinned encoder source ORs coding flags into an uninitialized sector buffer; the normalization writes the requested value after retaining the duplicate-byte check. The PSX-SPX coding-info table confirms that stereo 37.8 kHz 4-bit audio is value `01h` ([CD-ROM XA subheader](https://psx-spx.consoledev.net/dev/ps1/cdr/cdromformat/), lines 963–977). A small test gap remains for the new normalization, and one guide still names the removed selector.
+
+### Warnings
+
+#### WR-08: XA normalization has no deterministic regression test
+
+**Severity:** WARNING
+**File:** `tools/gen_disc.py:120-144`
+**Disposition:** Tooling seed under AGENTS.md rule 7.
+**Issue:** The generator normalizes the pinned encoder's uninitialized coding byte, but there is no deterministic test that feeds this helper a sector with a noncanonical yet duplicated coding byte and asserts that both copies become `01h`. The producer workflow exercises real encoding, but the original failure depends on stack contents; a future removal or breakage of normalization could pass on a run where those bytes happen to equal `01h`.
+**Fix:** Add a small synthetic-sector check for a duplicated arbitrary coding byte becoming `01h`, while confirming mismatched duplicate bytes still fail. Keep the integration producer gate as-is.
+
+### Info
+
+#### IN-01: Asset policy names a removed hygiene selector
+
+**Severity:** INFO
+**File:** `ASSET_POLICY.md:154`
+**Issue:** The registered `hygiene.no_bios_bytes` test was removed because it duplicated the full-tree scan, but the asset policy still describes that test as scanning every tracked file. The scan is now covered by `hygiene.tree`, with `hygiene.no_bios_bytes.self_test` as its focused negative control.
+**Fix:** Update the guide to name `hygiene.tree` and the focused self-test.
+
+---
+
+_Reviewed: 2026-11-17T21:31:16Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
+## Plan 45 Follow-up Review Addendum
+
+**Reviewed:** 2026-11-17T21:35:14Z
+**Scope:** Synthetic XA normalization test and hygiene selector-reference updates
+**Status:** issues_found
+
+### Summary
+
+The new `fixtures.disc.media_normalize` test directly exercises the helper with a duplicated noncanonical coding byte (`0xF5`), verifies only the two coding bytes change to `0x01`, and verifies mismatched copies fail without changing the file. Its `fixtures,portable` labels and bytewise inventory placement are correct. The prior stale selector references were removed from both documents. One remaining doc phrase points readers to the wrong self-test selector.
+
+### Info
+
+#### IN-02: Asset policy attributes the XA controls to the tree self-test
+
+**Severity:** INFO
+**File:** `ASSET_POLICY.md:154-155`
+**Issue:** The sentence says `hygiene.tree`'s self-test covers BIOS-by-size and executable-by-content. Those controls are in `hygiene.no_bios_bytes.self_test`; `hygiene.tree.self_test` exercises path/address detection.
+**Fix:** Name `hygiene.no_bios_bytes.self_test` explicitly for the BIOS/executable controls.
+
+---
+
+_Reviewed: 2026-11-17T21:35:14Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
+## Plan 45 Python Cache Review Addendum
+
+**Reviewed:** 2026-11-17T21:39:45Z
+**Scope:** `sys.dont_write_bytecode` before loading the generator in the synthetic fixture test
+**Status:** clean
+
+### Summary
+
+The setting at `tests/fixtures/media_generator.py:10` runs before `exec_module`, so Python's source loader does not write a `.pyc` under `tools/__pycache__`. This prevents the test from dirtying the repository while preserving the in-process test of the actual generator module. No issue found; no tests run during this review.
+
+---
+
+_Reviewed: 2026-11-17T21:39:45Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
 ### Candidate verification update
 
 The upper-13-bit arithmetic candidate and its isolated test were reverted after the focused 40-test local selection
@@ -372,6 +449,37 @@ Reviewed the zero-based TOC migration through Play(track), Setloc/GetTD MSF conv
 _Reviewed: 2026-11-17_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
+
+## Plan 45 Repair-Batch Review and Local Verification (2026-11-17)
+
+The hosted failures on the prior head were reviewed and addressed in one repair batch: media-tool setup is lazy,
+the pinned encoder's uninitialized XA coding byte is normalized without weakening subheader validation, the MDEC
+cross-file test helper has a shared prototype, and the duplicate hygiene full-tree scan is removed. The review
+found no blocker in these changes. The synthetic XA regression test now covers arbitrary duplicated coding
+bytes, byte preservation, and mismatched-copy rejection. The policy and requirement text name the active hygiene
+selectors and their actual negative controls. A first hygiene run exposed a Python bytecode cache side effect;
+the test now disables bytecode writes before dynamically loading the generator, and the tree is clean.
+
+Fingerprint of the complete changed non-planning source set reviewed and locally verified: `afea1856461f5c3dedc1cac56196d333cb062259a76365d69a7ed25c33c3a6fe` (159 files). This includes the earlier
+Plan 06-44 source snapshot and this repair batch, with `tests/fixtures/media_generator.py` newly included.
+
+```sh
+python3 -c 'import hashlib,pathlib,subprocess; tracked=subprocess.check_output(["git","diff","--name-only","origin/main"],text=True).splitlines(); untracked=subprocess.check_output(["git","ls-files","--others","--exclude-standard"],text=True).splitlines(); paths=sorted(p for p in set(tracked+untracked) if not p.startswith(".planning/")); h=hashlib.sha256(); [(h.update(p.encode()+b"\0"),h.update(pathlib.Path(p).read_bytes())) for p in paths]; print(f"{h.hexdigest()}  {len(paths)} changed non-planning files")'
+```
+
+Local evidence on this reviewed snapshot:
+
+- `PKG_CONFIG_LIBDIR=/private/tmp/schwaystation-empty-pkgconfig cmake --preset ci` — exit 0, configure and generate completed without FFmpeg packages visible.
+- `cmake --build build/ci --target schwaystation-disc-media --parallel 2` — exit 0; the lazy pinned encoder built and generated media with full coverage.
+- Two independent `tools/gen_disc.py --output-dir ... --encoder build/ci/pins/psxavenc-bin/psxavenc` runs — both exit 0; byte comparisons of `cdda.wav`, `movie.str`, `xa.xa` and `media.sha256` matched.
+- `python3 tests/fixtures/media_generator.py tools/gen_disc.py` — exit 0; the test's `sys.dont_write_bytecode` guard leaves no `tools/__pycache__`.
+- `cmake --workflow --preset ci` — exit 0; 612/612 tests and the release lane 5/5 passed.
+- `cmake --workflow --preset hygiene` — final exit 0; 23/23 passed. The first attempt failed only because the synthetic test generated `tools/__pycache__/gen_disc.cpython-314.pyc`; after the test-only fix, the rerun passed with the original full-tree scan retained once.
+- `cmake -DROOT=. -DCASE=disc_registration -P tests/cmake/workflows.cmake`, bytewise inventory checks and `git diff --check origin/main -- . ':!tests/probe/rc_hash_disc.c'` — all exit 0.
+
+This review and local result do not establish hosted acceptance. The failed prior hosted runs remain historical
+evidence; exact-head CI/Nightly, hosted RetroArch, and the PR-only ship checks still need to pass on the pushed
+repair head.
 
 ## Plan 06-44 Reviewed-Source Fingerprint
 

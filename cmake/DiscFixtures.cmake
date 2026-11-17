@@ -82,12 +82,21 @@ if(NOT "$ENV{SCHWAYSTATION_DISC_MEDIA_DIR}" STREQUAL "")
   schway__disc_verify_media("${schway__disc_media_source}")
   file(COPY "${schway__disc_media_source}/" DESTINATION "${schway__disc_media_dir}")
 else()
-  include("${PROJECT_SOURCE_DIR}/cmake/Psxavenc.cmake")
+  set(schway__psxavenc "${PROJECT_BINARY_DIR}/pins/psxavenc-bin/psxavenc${CMAKE_EXECUTABLE_SUFFIX}")
+  add_custom_command(OUTPUT "${schway__psxavenc}"
+    COMMAND "${CMAKE_COMMAND}"
+      "-DOUTPUT=${PROJECT_BINARY_DIR}/pins/psxavenc-bin"
+      "-DBUILD_ROOT=${PROJECT_BINARY_DIR}/pins/psxavenc"
+      "-DEXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+      -P "${PROJECT_SOURCE_DIR}/cmake/Psxavenc.cmake"
+    DEPENDS "${PROJECT_SOURCE_DIR}/cmake/Psxavenc.cmake" "${PROJECT_SOURCE_DIR}/pins.txt"
+    COMMENT "Build pinned psxavenc"
+    VERBATIM)
   add_custom_command(OUTPUT "${schway__disc_media_dir}/media.sha256"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${schway__disc_media_dir}"
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
-      --output-dir "${schway__disc_media_dir}" --encoder "$<TARGET_FILE:schwaystation-psxavenc>"
-    DEPENDS schwaystation-psxavenc "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
+      --output-dir "${schway__disc_media_dir}" --encoder "${schway__psxavenc}"
+    DEPENDS "${schway__psxavenc}" "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
     COMMENT "Encode deterministic disc media"
     VERBATIM)
   add_custom_target(schwaystation-disc-media DEPENDS "${schway__disc_media_dir}/media.sha256")

@@ -20,6 +20,10 @@ typedef struct schway__mdec_coverage {
     uint32_t trailing_blocks;
 } schway__mdec_coverage;
 
+int schway__mdec_reference_color_input_guard(const char *name, const uint8_t *exe,
+                                             size_t exe_size,
+                                             schway__mdec_coverage *coverage_out);
+
 /* Regression-only 8-bit implementation bytes reconstructed from the pinned
    mono guest, quant and scale data in model.c. Acquisition command:
    `ctest --test-dir build/ci -R '^mdec[.]guest_input$' --no-tests=error

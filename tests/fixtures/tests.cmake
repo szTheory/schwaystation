@@ -857,6 +857,12 @@ schway_add_test(NAME fixtures.disc.media_pin.self_test
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS fixtures portable TIMEOUT 10)
 
+# Fault prevented: a stack-dependent encoder coding byte passing only by chance.
+schway_add_test(NAME fixtures.disc.media_normalize
+  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/fixtures/media_generator.py"
+    "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
+  LABELS fixtures portable TIMEOUT 10)
+
 # Fault prevented: a generated cue whose data track cannot expose valid ISO boot metadata.
 set(schway__disc_probe_cmd ${CMAKE_CROSSCOMPILING_EMULATOR}
   $<TARGET_FILE:schwaystation-run> --probe ${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue)

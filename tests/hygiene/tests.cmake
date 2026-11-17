@@ -79,13 +79,10 @@ schway_add_test(NAME hygiene.tree.self_test
   LABELS hygiene TIMEOUT 60)
 
 # Fault prevented: a BIOS dump or a PlayStation executable entering the tree
-# under a neutral name. The self test's throwaway repository holds a
-# 524288-byte file of NUL bytes and a file whose first 8 bytes are decoded
-# here from the executable signature's hex in scripts/hygiene.sh, so no
+# under a neutral name. The tree scan above detects both; its self test's
+# throwaway repository holds a 524288-byte file of NUL bytes and a file whose
+# first 8 bytes are decoded here from scripts/hygiene.sh's signature, so no
 # tracked file holds either.
-schway_add_test(NAME hygiene.no_bios_bytes
-  COMMAND ${SCHWAYSTATION_SH} ${CMAKE_SOURCE_DIR}/scripts/hygiene.sh --tree
-  LABELS hygiene TIMEOUT 60)
 set(hygiene_bios ${CMAKE_BINARY_DIR}/hygiene/bios_fixture)
 schway__hygiene_repo(${hygiene_bios})
 execute_process(COMMAND ${SCHWAYSTATION_SH} -c "dd if=/dev/zero of=\"$1/blob.dat\" bs=1024 count=512 2>/dev/null"

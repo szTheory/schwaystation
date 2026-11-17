@@ -117,6 +117,22 @@ def validate_media_coverage(directory):
     print(f"disc media coverage: XA={xa_frames}, CD-DA={cdda_frames}, STR={len(frames)} frames")
 
 
+def normalize_generated_xa_coding(path):
+    xa = bytearray(path.read_bytes())
+    if not xa or len(xa) % XA_SECTOR_BYTES:
+        raise ValueError("XA input does not contain complete 2336-byte sectors")
+    for offset in range(0, len(xa), XA_SECTOR_BYTES):
+        first_coding = offset + 3
+        second_coding = offset + 7
+        if xa[first_coding] != xa[second_coding]:
+            raise ValueError("XA encoder emitted different duplicate coding bytes")
+        # The pinned raw-XA encoder ORs the requested mode into an
+        # uninitialized byte. This fixture requests 37.8 kHz stereo 4-bit.
+        xa[first_coding] = 1
+        xa[second_coding] = 1
+    path.write_bytes(xa)
+
+
 def encode(encoder, output):
     xa_input = output / "xa.wav"
     ppm_input = output / "frame.ppm"
@@ -125,6 +141,7 @@ def encode(encoder, output):
     write_ppm(ppm_input)
     subprocess.run([encoder, "-q", "-t", "xa", "-f", "37800", "-c", "2", "-b", "4",
                     "-F", "7", "-C", "3", str(xa_input), str(output / "xa.xa")], check=True)
+    normalize_generated_xa_coding(output / "xa.xa")
     subprocess.run([encoder, "-q", "-t", "strv", "-v", "v2", "-s", "16x16",
                     str(ppm_input), str(output / "movie.str")], check=True)
     xa_input.unlink()

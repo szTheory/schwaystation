@@ -11,9 +11,6 @@
 #include "input_coverage.h"
 
 int schway_mdec_color_reference_run(int argc, char **argv);
-int schway__mdec_reference_color_input_guard(const char *name, const uint8_t *exe,
-                                             size_t exe_size,
-                                             schway__mdec_coverage *coverage_out);
 
 #ifndef SCHWAY_MDEC_FRAME15_EXE_SHA256
 #error "CMake must bind the pinned MDEC frame guest digests"
