@@ -325,6 +325,16 @@ static uint32_t count_span_matches(const uint8_t *bytes, size_t size,
     return matches;
 }
 
+static int coverage_matches_source(const mdec_input_source *source,
+                                   const schway__mdec_coverage *coverage)
+{
+    return source != NULL && coverage != NULL &&
+           coverage->complete_blocks >= source->complete_blocks &&
+           coverage->trailing_coefficients == 0u &&
+           coverage->complete_macroblocks >= source->complete_macroblocks &&
+           coverage->trailing_blocks == source->trailing_blocks;
+}
+
 static int input_source_matches(const uint8_t *exe, size_t exe_size,
                                 const mdec_input_source *source,
                                 schway__mdec_coverage *coverage_out)
@@ -361,10 +371,55 @@ static int input_source_matches(const uint8_t *exe, size_t exe_size,
     uint32_t status = schway__mdec_input_coverage_scan(input_bytes,
                                                        source->byte_count, coverage_out);
     return status == SCHWAY__MDEC_COVERAGE_COMPLETE &&
-           coverage_out->complete_blocks == source->complete_blocks &&
-           coverage_out->trailing_coefficients == 0u &&
-           coverage_out->complete_macroblocks == source->complete_macroblocks &&
-           coverage_out->trailing_blocks == source->trailing_blocks;
+           coverage_matches_source(source, coverage_out);
+}
+
+static int run_coverage_controls(void)
+{
+    static const uint8_t one_color_unit[24] = {
+        0u, 0u, 0u, 0xFEu, 0u, 0u, 0u, 0xFEu,
+        0u, 0u, 0u, 0xFEu, 0u, 0u, 0u, 0xFEu,
+        0u, 0u, 0u, 0xFEu, 0u, 0u, 0u, 0xFEu
+    };
+    static const uint8_t truncated[] = {0u, 0u};
+    static const uint8_t odd[] = {0u};
+    schway__mdec_coverage coverage;
+    memset(&coverage, 0, sizeof coverage);
+    uint32_t complete_status = schway__mdec_input_coverage_scan(
+        one_color_unit, sizeof one_color_unit, &coverage);
+    mdec_input_source expected;
+    memset(&expected, 0, sizeof expected);
+    expected.complete_blocks = 6u;
+    expected.complete_macroblocks = 1u;
+    int complete_matches = complete_status == SCHWAY__MDEC_COVERAGE_COMPLETE &&
+                           coverage_matches_source(&expected, &coverage);
+    expected.complete_macroblocks = 0u;
+    int request_count_mutation_rejected = !coverage_matches_source(&expected, &coverage);
+
+    memset(&coverage, 0, sizeof coverage);
+    uint32_t truncated_status = schway__mdec_input_coverage_scan(
+        truncated, sizeof truncated, &coverage);
+    int truncated_rejected = truncated_status == SCHWAY__MDEC_COVERAGE_INCOMPLETE &&
+                             coverage.complete_blocks == 0u &&
+                             coverage.trailing_coefficients == 1u;
+    coverage.complete_blocks = 9u;
+    coverage.trailing_coefficients = 9u;
+    coverage.complete_macroblocks = 9u;
+    coverage.trailing_blocks = 9u;
+    uint32_t malformed_status = schway__mdec_input_coverage_scan(odd, sizeof odd, &coverage);
+    int malformed_cleared = malformed_status == SCHWAY__MDEC_COVERAGE_MALFORMED &&
+                             coverage.complete_blocks == 0u &&
+                             coverage.trailing_coefficients == 0u &&
+                             coverage.complete_macroblocks == 0u &&
+                             coverage.trailing_blocks == 0u;
+    if (!complete_matches || !request_count_mutation_rejected || !truncated_rejected ||
+        !malformed_cleared) {
+        fprintf(stderr,
+                "MDEC_COVERAGE_CONTROL_ERROR: complete, truncated, malformed, or request-count control failed\n");
+        return 0;
+    }
+    puts("MDEC_COVERAGE_CONTROLS_OK: six-block grouping, truncation, malformed reset and request-count mutation checked");
+    return 1;
 }
 
 static const uint8_t *find_bytes(const uint8_t *bytes, size_t size,
@@ -1044,6 +1099,7 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
     int regression_identity_mapped =
         strcmp(exe_digest_for("8bit-regression"), SCHWAY_MDEC_8BIT_EXE_SHA256) == 0 &&
         strcmp(log_digest_for("8bit-regression"), SCHWAY_MDEC_8BIT_LOG_SHA256) == 0;
+    int coverage_controls_pass = run_coverage_controls();
     memcpy(mutated, expected4, sizeof expected4);
     mutated[0] ^= 1u;
     int corrupted_block_rejected = block4_parsed != 0 &&
@@ -1068,6 +1124,7 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
                            !status_order_matches(status, status_size,
                                                  mutated_status, mutated_status_size);
     if (block4_parsed == 0 || block8_parsed == 0 || !regression_identity_mapped ||
+        !coverage_controls_pass ||
         !corrupted_block_rejected || !regression_mutation_rejected ||
         !reordered_rejected || !dropped_rejected) {
         fprintf(stderr, "MDEC_REFERENCE_CONTROL_ERROR: regression identity or byte/order control failed\n");
@@ -1079,6 +1136,7 @@ static int run_negative_controls(const char *log_4bit_path, const char *log_8bit
     free(log8);
     free(status);
     return block4_parsed != 0 && block8_parsed != 0 && regression_identity_mapped &&
+                   coverage_controls_pass &&
                    corrupted_block_rejected && regression_mutation_rejected &&
                    reordered_rejected && dropped_rejected ? 0 : 1;
 }
@@ -1089,6 +1147,8 @@ int main(int argc, char **argv)
 {
     if (argc >= 2 && (strncmp(argv[1], "color", 5u) == 0))
         return schway_mdec_color_reference_run(argc, argv);
+    if (argc == 2 && strcmp(argv[1], "coverage-controls") == 0)
+        return run_coverage_controls() ? 0 : 1;
     if (argc == 3 && strcmp(argv[1], "input-preflight") == 0)
         return run_input_preflight(argv[2]);
     if (argc == 4 && (strcmp(argv[1], "4bit") == 0 || strcmp(argv[1], "8bit") == 0 ||
