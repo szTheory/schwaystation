@@ -87,6 +87,10 @@ compares a block preceded by `FE00h` padding with its unpadded equivalent.
 
 Status bit 31 reports an empty output FIFO, bit 30 a full input FIFO, bit 29 a
 command or block in progress, bit 28 DMA0 readiness, and bit 27 DMA1 readiness.
+For nonempty MDEC(1), MDEC(2), and MDEC(3) commands, bits 15-0 report the
+remaining parameter-word count minus one. Once the final parameter is consumed,
+the field wraps to `0xFFFF` until another command starts; the SCPH-5501 capture
+records this after both a table load and a decode input stream ([SCM.30]).
 The decoder makes output available at a selected 1,000-cycle block deadline;
 the model test checks status immediately before and at that boundary. A public
 SCPH-5501 status/decode capture measures DMA0-start to DMA1-completion at
@@ -135,3 +139,23 @@ SCPH-5501 reports whole-output and per-macroblock CRCs for a single block,
 four-macroblock step stream and frame stream. It is another hardware reference
 for decode bytes; the pinned first-caller logs remain the automated oracle in
 this repository.
+
+## Acceptance evidence and limits
+
+The v1.0 claim is deterministic integer decoding with the available verified
+coverage. The pinned `mdec/4bit` guest remains an exact hardware check. The
+pinned `mdec/8bit` expected bytes and log remain unchanged evidence: 16 pixels
+differ, with 15 off by one 8-bit level and one off by two. The separately named
+8-bit implementation regression uses a frozen baseline from this implementation
+and does not replace or rewrite those hardware bytes. Direct model checks cover
+status, colour, FIFO, packing and bounds; the selected transform and 1,000-cycle
+block baseline remain deterministic implementation rules.
+
+The pinned status guest requests 7,680,000 delay cycles, while the guest's fixed
+execution cap is 4,915,200 cycles. The frame source contains 296 of 300
+macroblocks; the movie's first frame contains 162 of 240 and five complete
+additional blocks. The status budget and compressed-input preflight classify
+these limitations without running an over-budget or incomplete input as a
+decoder pass. Exact 8-bit hardware rounding and complete external frame/movie
+conformance remain unproved. The complete owned STR path through `disc_boot`
+and the raw-output hash before DMA1 reordering remain part of phase acceptance.

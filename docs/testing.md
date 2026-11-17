@@ -35,16 +35,47 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `ci-msvc` | The same with MSVC and the static C runtime. | `ci` | all but `release` |
 | `hygiene` | The repository is clean: tree scan, BIOS and executable bytes, the integer-only text scan, titles, the publish script, the workflow's timeouts and action pins, and the gate-line and end-to-end budgets. | `hygiene` | `hygiene` |
 | `asan` | No memory or undefined-behaviour fault, with clang-21's AddressSanitizer and UndefinedBehaviorSanitizer; any finding stops the test. | `ci` | all but `abi` and `release`, whose binary-shape checks the instrumentation changes |
-| `fuzz` | The loader's libFuzzer target and its replay build with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binary. | `asan` | none |
+| `fuzz` | The executable loader plus five disc/MDEC parser campaigns and replay targets, built with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binaries. | `asan` | none |
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
 | `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
-| `nightly` | All 55,000 public single-step vectors pass at their pin, ten GPU guests match captured whole-VRAM references, three GPU log guests' source-defined register predicates pass, and the pinned SPU transfer guest checks its seven named hardware cases. | `nightly` | `gpu.reference.*`, `vectors.r3000.full`, `spu.reference.memory_transfer` |
+| `nightly` | Runs all 55,000 public single-step vectors, ten GPU capture references, three GPU log predicates, the pinned SPU transfer guest, and CD-ROM/MDEC references. The recorded MDEC 8-bit and status hardware comparisons remain unresolved, so DISC-03 is unaccepted pending the approved successor checks and final acceptance. | `nightly` | `gpu.reference.*`, `vectors.r3000.full`, `spu.reference.memory_transfer`, `cdrom.reference.*`, `mdec.reference.*` |
 | `perf` | A Release build for the instructions-per-frame job. Configure and build only. | `ci` | none |
 
 The `gte`, `dma` and `timers` directories are in the `ci`, `asan` and `wasm32` inventories, and `be32` runs their
 `portable` tests through `ci`. The `nofp`, `hygiene` and `nightly` inventories do not run them. Under `asan` the
 register sweeps of `gte` and `dma` (`gte.regs.sweep`, `dma.regs.sweep`) are the bounds proof.
+
+### MDEC acceptance and successor selectors
+
+Phase 6 accepts deterministic integer decoding with the available verified
+coverage: exact pinned `mdec.guest_4bit`, a separately named
+`mdec.guest_8bit_regression` against a frozen implementation baseline, and the
+existing direct status, colour, FIFO, packing, bounds and display model checks.
+The original 8-bit hardware bytes remain pinned evidence; their 16-pixel
+mismatch is not reclassified as a passing hardware comparison. The status guest
+requests 7,680,000 delay cycles against the fixed 4,915,200-cycle cap. Compressed
+input preflight identifies the frame source's 296/300 macroblocks and the
+movie's first frame's 162/240 plus five complete blocks as insufficient assets,
+not decoder passes. Exact 8-bit hardware rounding and full external frame/movie
+conformance are not claimed. The complete owned `disc_boot` STR route and raw
+MDEC hash before DMA1 reordering remain required.
+
+Plan 06-43 owns registration of these successor selectors; until then, the
+names below describe the approved target inventory, not checks already run or
+passing. Main-CI MDEC gates retain the direct model controls and exact 4-bit
+guest while adding `mdec.input_coverage` and `mdec.guest_8bit_regression`.
+Nightly media checks retain `mdec.reference.4bit`,
+`mdec.reference.8bit_regression`, `mdec.reference.color_assets`,
+`mdec.reference.color_controls` and `mdec.reference.controls`; the old full
+image selectors become `mdec.reference.coverage_frame15`,
+`mdec.reference.coverage_frame24`, `mdec.reference.coverage_movie15` and
+`mdec.reference.coverage_movie24`. The preflight and budget controls are
+`mdec.reference.input_preflight`, `mdec.reference.coverage_controls` and
+`mdec.reference.status_budget`. The model inventory keeps `mdec.status`,
+`mdec.bounds`, `mdec.color`, `mdec.display`, `mdec.fifo`, `mdec.stream`,
+`mdec.vectors` and `mdec.words`; changes to registration and selected test runs
+belong to the successor plans. DISC-03 remains pending through plan 06-45.
 
 ### SPU audio evidence
 
@@ -117,7 +148,7 @@ names each by its git blob SHA-1 (`r3000-<NAME>` rows). Fetch a file with
 `SCHWAYSTATION_SST_DIR` lacks, so the lane never skips. The harness's `--upstream DIR --prefix-of SAMPLE` reads
 them and fails unless the first records of each equal the committed sample. The `vectors-full` job in
 `nightly.yml` does this on a schedule; it reports through the nightly issue and is not part of `CI required`. The
-workflow's other jobs, the benches and the loader fuzz campaign below, report the same way and also sit outside
+workflow's other jobs, the benches and the six bounded fuzz campaigns below, report the same way and also sit outside
 `CI required`.
 
 ### GPU hardware references
@@ -223,8 +254,9 @@ observed output.
 `hashes.txt` carries frame 30 and state hashes for `hello`, `gte_vectors`, `dma_chain` and `timers_lines`. It also carries
 `gpu_motion.exe` frame hashes at 60, 120 and 180 and state hashes at 150 and 180. This fixture draws moving pixels
 through GP0 and DMA2, so its frame digest covers rendered output; its saved-state digests cover the VRAM and GPU state
-needed to continue after frame 150. `hash-equality` compares every row across all eight lanes, including the portable
-be32 lane.
+needed to continue after frame 150. `hash-equality` compares every row across all eight lanes, including generated
+media-file digests and the owned-disc predicates (boot at frame 600; mailbox, audio and frame at frame 900 for both
+no-input and Cross-input runs), as well as the portable be32 lane.
 
 ### The vectors harness
 
@@ -251,7 +283,7 @@ what the vectors record: a misaligned halfword or word access is compared by the
 unaligned loads and stores (LWL, LWR, SWL, SWR) by the set of bytes they cover. `vectors.r3000.sample` runs the sample on
 every lane; `vectors.r3000.full` runs all 55,000 cases in the `nightly` lane.
 
-### The loader fuzz target
+### Fuzz targets
 
 `tests/fuzz/exe.c` is the target. Each input is a whole PS-X EXE file: it is probed and loaded into a power-reset
 instance, and the probe and the load must agree, a refused file must change no RAM byte, an accepted one only the
@@ -262,9 +294,11 @@ device decodes), so no seed byte is committed.
 
 `fuzz.regress.exe` replays every seed and every `tests/fuzz/regress/*.hex` through `schwaystation-fuzz-exe-replay`,
 which has no fuzzing engine and so runs on every leg, `be32` and `wasm32` included. It gates like any other test.
-The campaign is the report-only half: the `fuzz` job in `nightly.yml` builds the `fuzz` preset, writes the seeds with
-`schwaystation-fuzz-exe-replay --write DIR`, and runs `schwaystation-fuzz-exe` for 60 seconds with
-`-max_len=2099200`. A crash fails the job, which opens or updates the nightly issue and blocks nothing.
+The loader campaign is the report-only half: the `fuzz` job in `nightly.yml` writes the seeds with
+`schwaystation-fuzz-exe-replay --write DIR`, checks their count, and runs `schwaystation-fuzz-exe` for 60 seconds
+with `-max_len=2099200`. It also checks seed counts before running five 60-second campaigns: CUE (5 seeds,
+`-max_len=65536`), CNF (5, `4096`), M3U (7, `65536`), CD-ROM (15, `16384`) and MDEC (6, `262144`). A crash
+fails the job, which opens or updates the nightly issue and blocks nothing.
 
 To keep a crasher, minimise it (`schwaystation-fuzz-exe -minimize_crash=1 -runs=100000 FILE`), commit it as
 `tests/fuzz/regress/<name>.hex` (hexadecimal text; whitespace and `#` comments are skipped) with its fix, and add its
@@ -589,9 +623,9 @@ it with a commit. Each job runs the same workflow preset a contributor runs, the
 | `asan` | The `asan` preset; JUnit check without `abi` and `release`. | yes |
 | `nofp` | The `nofp` preset on both Linux legs. | yes |
 | `be32` | The `be32` preset (`portable` tests) and uploads `hashes-be32`. | yes |
-| `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt`, including `spu_tone.exe` audio@600 and mailbox@600 rows, must be byte-identical. | yes |
+| `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt`, including generated media digests and OpenBIOS and owned-disc predicate rows, must be byte-identical. | yes |
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
-| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel at `320x240`. Pixel and wrong-dimension controls must fail. It also boots `spu_tone.exe` as content and compares its video with the runner, then replays `pad_counter.exe` with Cross at guest frame 60; captures for guest frames 59 and 60 must differ and each must equal its runner PNG. | yes |
+| `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel at `320x240`. Pixel and wrong-dimension controls must fail. It boots `spu_tone.exe` and `disc_boot.cue` and compares their frame captures with the runner, including the disc at frame 900; it also replays `pad_counter.exe` with Cross at guest frame 60, where captures for frames 59 and 60 must differ and each must equal its runner PNG. | yes |
 | `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, compared with the merge base in gate mode on pull requests. Manual runs measure both fixtures three times or compare `gpu_motion` with an explicit control commit. | yes |
 | `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
@@ -616,9 +650,10 @@ commit with a `# v` comment.
 
 **A red retroarch job.** The job prints RetroArch's verbose logs and uploads `retroarch-frames` after success or
 failure for one day, holding
-`shot.png` and `runner.png` for the no-content comparison plus both content captures and runner references. The
-step output names the first differing pixel or geometry. The one-day `retroarch-replay-probe` artifact contains
-the raw same-run BSV, its guarded Cross variant, and the isolated record/playback logs; it is diagnostic input,
+`shot.png` and `runner.png` for the no-content comparison plus all content captures and runner references, including
+the frame-900 disc/runner pair. The step output names the first differing pixel or geometry. The one-day
+`retroarch-replay-probe` artifact contains the raw same-run BSV, its guarded Cross variant, and the isolated
+record/playback, tone and disc logs; it is diagnostic input,
 not a release archive.
 Download the artifact with `gh run download <run id> -n retroarch-frames` and open both images. A size difference
 means the core reported another geometry; a whole-image difference with the same layout usually means RetroArch's
