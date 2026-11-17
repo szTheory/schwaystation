@@ -6,17 +6,17 @@ current_phase: 6
 current_phase_name: Discs and FMV
 current_plan: 45 of 45 (hosted acceptance and ship)
 status: in_progress
-stopped_at: "06-45 reviewed repair batch committed; hosted acceptance pending"
-last_updated: "2026-11-17T21:46:00Z"
+stopped_at: "06-45 repair commit 1f7984c created; push and exact-head hosted acceptance next"
+last_updated: "2026-11-17T23:35:24Z"
 last_activity: 2026-11-17
-state_head: a621c081703e77bc5a9791d6e2dd7e642b283334
+state_head: 1f7984c
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 195
   completed_plans: 194
   percent: 83
-last_activity_desc: "Plan 06-45 repair batch reviewed and committed at a621c081703e77bc5a9791d6e2dd7e642b283334. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); active time is not tracked. Prior exact-head hosted runs 44177128399 and 44177128259 on 15061b2 failed: encoder setup required FFmpeg during unrelated configure jobs, XA media had a stack-dependent coding byte, GCC found a missing shared prototype, and two duplicate hygiene tree scans timed out. The repair keeps media encoder build lazy, normalizes only the requested XA coding bytes with strict duplicate and sector validation plus a deterministic synthetic test, adds the shared test prototype, and removes one redundant full-tree scan. Reviewed source fingerprint and local evidence are recorded in 06-REVIEW.md. Empty-pkg-config CI configure passed; two generated media sets matched byte for byte; full CI passed 612/612 plus release lane 5/5; hygiene passed 23/23 after a first run exposed and then fixed the synthetic test's pycache side effect. Exact-head hosted retries, background RetroArch comparison, ship, merge and release remain pending. Exact 8-bit and full frame/movie hardware output remain explicitly unproved under the approved v1.0 scope. Next: push this reviewed snapshot and dispatch CI/Nightly once."
+last_activity_desc: "Plan 06-45 portability repair was reviewed and committed as 1f7984c on phase/06-discs-and-fmv. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); focused review by gsd-code-reviewer; active time is not tracked. The current non-planning source fingerprint is 363519a22300c55518ebb4ad054c050795d76f14839ec1e7428cbf65ca0449e7 (161 files). Cheap preflights passed, including the fixed 2,700-line gate, the root-level CUE test passed 1/1, full local CI passed 613/613 plus ci-release 5/5, and hygiene passed 23/23. Review and local evidence are in 06-REVIEW.md and 06-VERIFICATION.md. Prior exact-head CI 44190163682 failed on old SHA b5209 only in wasm32 path mapping and Windows MSVC C4310; Nightly 44190163638 passed and old-head RetroArch acceptance passed. These do not count for 1f7984c. Local WASI compilation is unavailable because clang-21/wasm-ld are absent. Next: push the reviewed source and state, dispatch exactly one CI/Nightly batch for that head, then inspect each required lane and hosted RetroArch result. Exact 8-bit and complete frame/movie hardware output remain unproved under the approved v1.0 scope."
 ---
 
 # Project State
