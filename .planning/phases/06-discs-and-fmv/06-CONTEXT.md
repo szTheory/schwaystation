@@ -30,8 +30,9 @@ Deliver DISC-01 through DISC-04: a cycle-driven CD-ROM controller; bounded host-
 - Test XA and CD-DA independently and together. Resolve routine playback details such as double-speed CD-DA consumption in focused tests; do not reopen the selected resampler without a hardware capture that supports the alternative.
 
 ### MDEC, fixture and evidence
-- Use DEC.33's integer two-pass IDCT, int16 Q14 scale table, Q16 color coefficients and 1,000-cycle block cost baseline. Hash raw MDEC output before DMA1 reordering; require exact 4-bit/8-bit reference blocks and the documented ±1 per-channel frame/movie tolerance.
-- Wire the FMV path through CD DMA3 → RAM → MDEC DMA0 → RAM via DMA1 → GPU DMA2, then verify native 24-bit display output. Fetch and run each pinned real oracle as soon as its first caller works; keep direct block tests as fast arithmetic and malformed-input checks, not a replacement for hardware references.
+- Use DEC.33's integer two-pass IDCT, int16 Q14 scale table, Q16 color coefficients and 1,000-cycle block cost baseline. Hash raw MDEC output before DMA1 reordering; preserve exact pinned 4-bit hardware coverage and a separate deterministic 8-bit regression, plus direct status/color/FIFO/packing/bounds checks. Run the compressed-unit coverage preflight before media execution. Keep the complete owned `disc_boot` STR path in scope.
+- **Owner-approved supersession (2026-11-17):** v1.0 claims deterministic integer MDEC decoding with the available verified hardware coverage, not exact 8-bit rounding or full external `frame`/`movie` conformance. Preserve the original expected 8-bit hardware bytes, pins and discrepancy as evidence. The status guest requests 7,680,000 delay cycles against the fixed 4,915,200-cycle cap; the frame source has 296/300 macroblocks and the movie's first frame has 162/240 plus five complete blocks. Those incomplete sources are asset-coverage failures, not decoder passes. Do not widen tolerance, alter expected hardware data or arithmetic, raise the cap, or synthesize compressed tails from images. The owner capture is unavailable and not planned for this phase.
+- Wire the FMV path through CD DMA3 → RAM → MDEC DMA0 → RAM via DMA1 → GPU DMA2, then verify native 24-bit display output. Fetch and run each complete, budget-compatible pinned real oracle as soon as its first caller works; keep direct block tests as fast arithmetic and malformed-input checks, not a replacement for hardware references. Apply the owner-approved MDEC input-coverage boundary above before any compressed guest.
 - Build `disc_boot` in the build tree from owned sources with mkpsxiso. Keep it under the 512 KiB build cap, keep its generated image out of git and release archives, and include no BIOS, Sony licence material or commercial bytes.
 - Keep every behavior test in the exact inventory and CI; reserve pinned ps1-tests reference comparisons for their intended nightly lane. The hosted RetroArch smoke runs in the background and compares its image with the runner's output.
 
@@ -107,7 +108,7 @@ Deliver DISC-01 through DISC-04: a cycle-driven CD-ROM controller; bounded host-
 <specifics>
 ## Specific Ideas
 
-Use the pinned `ps1-tests` CD timing/getloc, MDEC block/frame/movie and status-log cases at the earliest runnable caller. Compare direct output and full CD→DMA→MDEC→GPU behavior separately so a self-authored synthetic test cannot substitute for the external reference. `disc_boot` uses the own `SYSTEM.CNF`/PS-EXE, generated XA and CD-DA, short STR, cue and SBI callback data.
+Use pinned `ps1-tests` cases at the earliest runnable caller when their inputs and budgets permit. Keep the exact 4-bit guest and direct model checks; run a bounded source-unit preflight before any compressed MDEC guest. Preserve the 8-bit hardware log and the status/frame/movie input shortfalls, but replace unfinishable or incomplete guest selectors with regression/coverage assertions that do not claim hardware conformance. Compare direct output and the complete owned CD→DMA→MDEC→GPU path separately. `disc_boot` uses the own `SYSTEM.CNF`/PS-EXE, generated XA and CD-DA, short STR, cue and SBI callback data.
 
 </specifics>
 
