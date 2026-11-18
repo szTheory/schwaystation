@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 7
 current_phase_name: Faster and more trustworthy CI
-current_plan: 1
-status: planning
-stopped_at: Phase 7 planning complete; Plan 07-01 is ready to execute.
-last_updated: "2026-11-18T18:30:44.632Z"
+current_plan: 2
+status: executing
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-11-18T18:46:28.698Z"
 last_activity: 2026-11-18
-last_activity_desc: Phase 7 plans passed independent review; execution is next
-state_head: 64b3c8434a7901a79131da7389bd45409e6eae3a
+last_activity_desc: Plan 07-01 implemented and verified locally
+state_head: c110aba6e280ae6e99c99e7fd4130cec2c3ae8fc
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 10
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -30,11 +30,19 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 
 ## Current Position
 
-Phase: 7 (Faster and more trustworthy CI) — READY TO EXECUTE
-Current Plan: 1
+Phase: 7 (Faster and more trustworthy CI) — IN PROGRESS
+Current Plan: 2
 Total Plans in Phase: 10
-Status: Ready to execute
-Last Activity: 2026-11-18 — Phase context and research complete; ten plans passed independent review
+Status: In progress
+Last Activity: 2026-11-18 — Plan 07-01 implemented and verified locally
+
+### Phase 7 execution (2026-11-18)
+
+Runtime/model: Codex, OpenGSD CLI 1.20.0, inherited GPT-6 session model (exact deployed ID unavailable).
+Plan 07-01 added five active native CI cases for triage, lesson uniqueness, quality bounds and changed-path routing.
+The existing hygiene checks passed at 3,133 of 3,200 repository-check lines and 300 of 300 RetroArch test lines.
+Review the remaining gate-code footprint before adding new live producers. The weekly triage workflow,
+CI measurements and measured quality registry still require later plans.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -257,6 +265,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 06 P20 | about 32m wall from 04:35 UTC checkpoint; active time unavailable | 3 tasks | 9 files |
 | Phase 6 P40 | 19m27s | 2 tasks | 7 files |
 | Phase 6 P41 | 36min | 2 tasks | 5 files |
+| Phase 07 P01 | 11min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -615,6 +624,8 @@ Recent decisions affecting current work:
 - [Phase 6]: Keep DISC-03 and 06-23/24 acceptance pending until successor registration and final local/hosted acceptance in 06-43 through 06-45.
 - [Phase 6]: Preserve the pinned 8-bit hardware log and bytes as evidence; compare deterministic model/reference regression output to its separately named frozen baseline.
 - [Phase 6]: Do not run compressed pinned reference guests until Plan 06-42 installs the in-process source guard; Plan 06-43 owns selector registration.
+- [Phase 07]: Redact path text through its next quote or boundary to protect path components containing spaces.
+- [Phase 07]: Compare decimal digit strings exactly so rounding cannot admit a value just above a large integer bound.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -856,9 +867,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-18
-Stopped at: v2.0 roadmap creation complete. Phase 7 discussion is next.
-Resume file: .planning/ROADMAP.md
+Last session: 2026-11-18T18:46:28.666Z
+Stopped at: Completed 07-01-PLAN.md
+Resume file: None
 
 ### v1.0 session history
 
