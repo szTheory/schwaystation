@@ -2,7 +2,7 @@
 phase: 06-discs-and-fmv
 status: local_pass_hosted_pending
 verified: 2026-11-18T00:42:02Z
-source: reviewed Plan 06-45 Windows CUE follow-up; non-planning source fingerprint 7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801dfe00f48 (162 files)
+source: reviewed Plan 06-45 generated-playlist normalization at commit 28683ebe4c9940c95d539b5c18733c139f940ffa; prior non-planning source fingerprint 7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801dfe00f48
 ---
 
 # Phase 6 verification
@@ -309,4 +309,7 @@ The follow-up normalizes this generated playlist with `file(CONFIGURE ... NEWLIN
 review found no issue; see `06-45-REVIEW.md`. `cmake --preset ci` passed, the generated playlist SHA-256 now
 matches the be32 artifact (`722ce2c1c07b9c90102dd872faea02e306617c5604cdf331ad7a7dc2df3509b8`), and
 `ctest --test-dir build/ci -R '^runner\\.disc\\.api$' --no-tests=error --output-on-failure` passed 1/1. This
-new follow-up still needs its exact-head hosted CI and Nightly runs before verification or shipping.
+new follow-up commit `28683ebe4c9940c95d539b5c18733c139f940ffa` is pushed. Exact-head CI run
+[44218206100](https://github.com/szTheory/schwaystation/actions/runs/44218206100) is queued and Nightly run
+[44218205653](https://github.com/szTheory/schwaystation/actions/runs/44218205653) is running. Inspect each
+applicable lane before Phase 6 verification or shipping.

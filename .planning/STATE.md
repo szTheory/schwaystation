@@ -6,17 +6,17 @@ current_phase: 6
 current_phase_name: Discs and FMV
 current_plan: 45 of 45 (hosted acceptance and ship)
 status: in_progress
-stopped_at: "06-45 exact-head hash comparison found Windows-generated M3U newline divergence; normalization is locally reviewed and the new hosted rerun is next"
-last_updated: "2026-11-18T01:43:47Z"
+stopped_at: "06-45 exact-head CI 44218206100 and Nightly 44218205653 running on 28683ebe"
+last_updated: "2026-11-18T01:47:12Z"
 last_activity: 2026-11-18
-state_head: ec10043e2926fceec21b7745a467033fa87e919f
+state_head: 28683ebe4c9940c95d539b5c18733c139f940ffa
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 195
   completed_plans: 194
   percent: 83
-last_activity_desc: "Plan 06-45 follow-up commit ec10043 is pushed to phase/06-discs-and-fmv. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); reviews by gsd-code-reviewer, no findings; active time not tracked. Source fingerprint 7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801dfe00f48 (162 files) passed focused local CUE/playlist/probe checks and the 2,700-line gate. Nightly 44210060292 passed. CI 44210060285 passed every applicable build and test lane, including be32, but the final hash comparison found a Windows CRLF versus Linux LF difference in generated disc_boot_runner.m3u. Root cause is reproduced; tests/runner/tests.cmake now writes that fixture with explicit UNIX newlines. The reviewer found no issue, cmake --preset ci passed, runner.disc.api passed 1/1, and the generated playlist SHA-256 matches the be32 artifact. Hygiene passed 23/23. The current fix and updated records are uncommitted; exact-head CI and Nightly reruns are required before verification and ship. Earlier exact 8-bit and full frame/movie hardware output remain unproved under the approved v1.0 scope."
+last_activity_desc: "Plan 06-45 generated-playlist normalization is committed and pushed as 28683ebe4c9940c95d539b5c18733c139f940ffa. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); independent gsd-code-reviewer found no issue; active time not tracked. On the preceding source commit ec10043, Nightly 44210060292 passed. CI 44210060285 passed every applicable build/test lane, including be32, but final hash equality found only generated disc_boot_runner.m3u line endings differed between Windows (CRLF) and Linux (LF). The root cause is reproduced and fixed with explicit UNIX newlines. On 28683ebe, cmake --preset ci passed; the generated playlist SHA-256 matches the be32 artifact; runner.disc.api passed 1/1; and hygiene passed 23/23. Exact-head CI 44218206100 (https://github.com/szTheory/schwaystation/actions/runs/44218206100) and Nightly 44218205653 (https://github.com/szTheory/schwaystation/actions/runs/44218205653) are running on 28683ebe. Inspect every applicable lane, then complete Phase 6 verification and ship only if all pass. Earlier exact 8-bit and full frame/movie hardware output remain unproved under the approved v1.0 scope."
 ---
 
 # Project State
