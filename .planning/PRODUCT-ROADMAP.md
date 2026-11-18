@@ -35,10 +35,10 @@ CD-DA, the MDEC, disk control, the own disc fixture booting through OpenBIOS, ha
 
 ## Active: v2.0 "The whole library" (SEED-001)
 
-CHD through libchdr, PBP, ECM, CCD and SBI/LibCrypt; the multitap, GunCon and Justifier, mouse, neGcon and Jogcon;
-PocketStation as card storage; per-game cards by serial and the libretro save round trip; PAL and every revision
-profile over the whole ledger (13,407 Redump entries, 3,573 multi-disc entries across 568 titles, about 100
-LibCrypt PAL titles); GameShark strings and `--patch` for ROM hackers; the `.info` drops `is_experimental`.
+CHD through libchdr, PBP, ECM, CCD and SBI/LibCrypt; multitap, GunCon and Justifier, mouse, neGcon, Jogcon and
+Dual Analog flight mode; PocketStation storage; per-game cards by serial and the libretro save round trip; PAL and
+every revision profile over the compatibility ledger; opt-in BIOS-shell fast boot; GameShark strings and `--patch`
+for ROM hackers; bounded MDEC edge cases; and a measured gate for dropping `.info`'s `is_experimental` flag.
 **Trigger:** v1.0 shipped; the owner approved this scope on 2026-11-18. **Why next:** what collectors and players
 notice first after the core plays; CHD is the format most frontend libraries already hold. Opens with SEED-007.
 The browser page (SEED-008) was weighed at this boundary and remains outside this milestone.

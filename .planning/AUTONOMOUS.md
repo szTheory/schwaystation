@@ -1,4 +1,4 @@
-# Autonomous runs for milestone v1.0
+# Autonomous runs for milestone v2.0 — The whole library
 
 The owner runs the rest of milestone v1.0 with `/gsd-autonomous` (AGENTS.md rule 9). This file holds the
 standing guidance for the two steps that need the most judgement. Every discuss and verify step reads it,

@@ -20,7 +20,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-18)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** v1.0 complete; no next milestone is active
+**Current focus:** v2.0 requirements and roadmap for The whole library
 
 ## Current Position
 

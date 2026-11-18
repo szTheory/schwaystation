@@ -34,13 +34,15 @@ save workflows, machine profiles, and ROM-hacker support.
 
 **Target features:**
 - CHD, PBP, ECM and CCD media, plus SBI/LibCrypt support behind the existing host-supplied disc boundary.
-- Multitap, light guns, mouse, neGcon, Jogcon and PocketStation storage behavior.
+- Multitap, light guns, mouse, neGcon, Jogcon, Dual Analog flight mode and PocketStation storage behavior.
 - Per-game memory cards, card import/export formats and the libretro save round trip.
-- PAL timing and console/GPU revision profiles across the compatibility ledger.
-- GameShark strings, runner patch support, broader ledger coverage and removal of the experimental metadata only when supported.
+- PAL timing and console/GPU revision profiles across the compatibility ledger, plus opt-in BIOS-shell fast boot.
+- GameShark strings, runner patch support, bounded MDEC edge cases, broader ledger coverage and removal of the experimental metadata only when supported.
 - A first-phase pipeline and documentation tune-up, including the triage digest, CI-efficiency report and measured `quality.json` ratchets.
 
 Save states, movies, browser UI, measured-accuracy campaigns, JITs and visual enhancements remain outside v2.0.
+The MDEC edge work stays within the v1.0 evidence boundary: exact 8-bit hardware output and full-frame/movie
+conformance are not claims of this milestone.
 
 ## Requirements
 

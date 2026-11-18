@@ -12,7 +12,7 @@ v2.0 extends the existing deterministic C17 PlayStation library, headless runner
 
 Start with the required SEED-007 tune-up to measure CI cost, quality, and documentation freshness before the larger feature work. Then stabilize content identity and card persistence, add media providers with bounded format-specific fixtures, implement protection and peripheral protocols, and expand profiles and the compatibility ledger as evidence arrives. Do not infer playability from parsing or from a Redump inventory. Risks concentrate in hostile container sizes, losing CD track/subchannel semantics, incorrect LibCrypt bad-Q behavior, state/hash drift, and license closure. Use cheap source, count, boundary, and protocol preflights before expensive builds and guest runs; retain them as CI gates only when they prevent a named recurring fault.
 
-This is a breadth milestone, not a measured-accuracy or presentation milestone. The accepted v1.0 boundary still excludes proven exact 8-bit MDEC output and complete external frame/movie conformance. v2.0 must not claim those results. Seed-derived fast boot and MDEC-edge scope are not present in the active PROJECT target list or the feature list; requirements must explicitly include or defer them. Save states, movies, and the browser remain outside v2.0.
+This is a breadth milestone, not a measured-accuracy or presentation milestone. The accepted v1.0 boundary still excludes proven exact 8-bit MDEC output and complete external frame/movie conformance. v2.0 must not claim those results. The owner approved the full SEED-001 direction; its fast boot and Dual Analog flight-mode items are included, along with targeted MDEC edge checks that preserve the accepted evidence boundary. Save states, movies, and the browser remain outside v2.0.
 
 ## Key Findings
 
@@ -71,9 +71,9 @@ Ledger rows should accrue with the feature that produces the evidence, rather th
 
 ### Scope reconciliation before roadmap lock
 
-- **Fast boot:** SEED-001 names a fast boot option, but the active PROJECT target list and researched feature table do not define it. Requirements should explicitly include or defer it. If included, state the observable behavior and prove it does not introduce HLE, BIOS bytes, a timing-changing shortcut, or host-dependent output.
-- **MDEC edge cases:** the feature research flags seed-derived MDEC edge scope, but active v2.0 targets do not name an MDEC expansion. The accepted v1.0 boundary explicitly leaves exact 8-bit MDEC output and full external frame/movie conformance unproven. Do not add a broad MDEC accuracy phase or replace its acceptance oracle under v2.0. If a narrowly defined edge case is retained, tie it to a new, supported requirement and report compressed-source coverage, decoder output, guest completion, and image result separately. A cheap source-coverage check must precede expensive guest/emulator runs; source coverage alone is not output conformance.
-- **Dual Analog flight mode:** SEED-001 names it, while FEATURES.md does not make it a table-stakes row. Give it an explicit requirement or an explicit deferral.
+- **Fast boot:** included as the existing documented, opt-in BIOS-shell skip at the kernel hand-off. It stays off by default, still requires user-supplied BIOS boot, and does not add HLE or alter emulated timing.
+- **MDEC edge cases:** included as bounded edge-case behavior and regression coverage from supported FMV inputs. Keep exact 4-bit output and the separate deterministic 8-bit regression; do not change expected hardware bytes, cycle cap, or the v1.0 acceptance boundary. Report compressed-source coverage, decoder output, guest completion, and image result separately. Run the cheap source-count preflight before an expensive guest run; source coverage alone is not output conformance.
+- **Dual Analog flight mode:** included as a named SIO peripheral behavior from the approved seed, with its own protocol/input tests.
 - **Out-of-scope boundary:** browser UI, save states, movies, measured-accuracy campaigns, JITs, and visual enhancements remain outside v2.0. No phase should silently absorb them.
 
 ## Research Flags
