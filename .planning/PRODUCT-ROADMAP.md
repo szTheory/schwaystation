@@ -33,15 +33,15 @@ own dumps, the compatibility ledger; (5) sound plays in RetroArch: the SPU again
 audio equal to the runner's stream; (6) discs and FMV: the CD-ROM controller with cue/bin, iso and m3u, XA and
 CD-DA, the MDEC, disk control, the own disc fixture booting through OpenBIOS, hashes identical on every platform. Requirements: [archived v1.0 requirements](milestones/v1.0-REQUIREMENTS.md). Evidence: [milestone audit](milestones/v1.0-MILESTONE-AUDIT.md). Exact 8-bit MDEC output and complete external frame/movie conformance remain unproven under the accepted v1.0 scope.
 
-## Near: v2.0 "The whole library" (SEED-001)
+## Active: v2.0 "The whole library" (SEED-001)
 
 CHD through libchdr, PBP, ECM, CCD and SBI/LibCrypt; the multitap, GunCon and Justifier, mouse, neGcon and Jogcon;
 PocketStation as card storage; per-game cards by serial and the libretro save round trip; PAL and every revision
 profile over the whole ledger (13,407 Redump entries, 3,573 multi-disc entries across 568 titles, about 100
 LibCrypt PAL titles); GameShark strings and `--patch` for ROM hackers; the `.info` drops `is_experimental`.
-**Trigger:** v1.0 shipped. This is future direction only; no next milestone is active. **Why next:** what collectors and players notice first after the core plays; the owner's
-disc collection becomes the ratchet's input; CHD is the format most frontend libraries already hold. Opens with
-SEED-007. **Weighed at the same boundary:** the browser page (SEED-008), which the owner ranks highly.
+**Trigger:** v1.0 shipped; the owner approved this scope on 2026-11-18. **Why next:** what collectors and players
+notice first after the core plays; CHD is the format most frontend libraries already hold. Opens with SEED-007.
+The browser page (SEED-008) was weighed at this boundary and remains outside this milestone.
 
 ## Mid: v3.0 "States and movies" (SEED-002), v4.0 "Measured accuracy" (SEED-003)
 
@@ -64,6 +64,7 @@ port target; each seed names its own.
 ## Decision log
 
 | 2026-11-18 | Completed v1.0 and refreshed the shipped/future boundary; v2.0 remains a seed, not an active milestone | Six phases and 195 plans are archived; future scope is not authorized by this closeout. |
+| 2026-11-18 | Owner approved v2.0 “The whole library” as the next milestone; SEED-001 is promoted and mandatory SEED-007 opens the sequence | v1.0 is released and main CI is green; browser UI remains outside this milestone. |
 
 | Date | Change | Why |
 |---|---|---|

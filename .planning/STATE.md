@@ -1,21 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.0
-current_phase: 06
-current_phase_name: Discs and FMV
-status: Awaiting next milestone
-stopped_at: Milestone v1.0 complete and archived
-last_updated: "2026-11-18T14:17:23.502Z"
+milestone: v2.0
+milestone_name: The whole library
+status: planning
+last_updated: "2026-11-18T16:21:11.913Z"
 last_activity: 2026-11-18
-last_activity_desc: Completed quick task 261118-bvm: skip heavyweight main-push CI for planning-only changes
-state_head: 11c9789a5e13c7851acf5030bcb28710f6cf90f8
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 195
-  completed_plans: 195
-  percent: 100
-milestone_name: PlayStation games play with sound in RetroArch
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -29,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 
 ## Current Position
 
-Milestone: v1.0 complete and archived
-Phase: 06 — Discs and FMV (verified)
+Phase: Not started (defining requirements)
 Plan: —
-Status: No active milestone
-Last activity: 2026-11-18 — Completed quick task 261118-bvm: skip heavyweight main-push CI for planning-only changes
+Status: Defining requirements
+Last activity: 2026-11-18 — Milestone v2.0 started
+
 
 ## Performance Metrics
 
