@@ -122,8 +122,11 @@ The four task commits were measured from `plan_head_before` to `plan_head_after`
 | PR #25 squash merge | Merged at `79d43a94ec585030fe84012892de1d344fb34b6e` | [PR #25](https://github.com/szTheory/schwaystation/pull/25) |
 | Main CI on merge commit `79d43a94ec585030fe84012892de1d344fb34b6e` | Exit 0 from run inspection; run existed and was in progress at summary update | [Main CI run](https://github.com/szTheory/schwaystation/actions/runs/44335613581) |
 | Release workflow on merge commit `79d43a94ec585030fe84012892de1d344fb34b6e` | Exit 0; release-please passed; no release PR was opened for this CI-only change | [Release workflow](https://github.com/szTheory/schwaystation/actions/runs/44335613799) |
+| PR #26 planning-only summary update | Exit 0; `changes`, hygiene and the required roll-up passed; all heavy jobs skipped | [PR #26 CI](https://github.com/szTheory/schwaystation/actions/runs/44336511258) |
+| Main CI on planning-only merge commit `7e210222791fa9adfa50dc5b07349efaabacad72` | Exit 0; `changes`, hygiene and the required roll-up passed; all heavy jobs skipped | [Fast main-push CI](https://github.com/szTheory/schwaystation/actions/runs/44336756139) |
+| Release workflow on planning-only merge commit `7e210222791fa9adfa50dc5b07349efaabacad72` | Exit 0; release-please passed | [Release workflow](https://github.com/szTheory/schwaystation/actions/runs/44336756281) |
 
-The PR CI run exercised the full workflow on the change commit. The merge commit has a CI run in progress; the release-please workflow succeeded and correctly opened no release PR for this CI-only change. The `act` dry run does not execute the tests or substitute for hosted matrix, artifact, or RetroArch evidence.
+The full PR CI run passed on the implementation commit. Its first main push still runs the full matrix because it changes workflow, test and documentation paths; the separate planning-only PR and resulting main push both passed with all heavy jobs skipped. The `act` dry run does not execute tests or substitute for hosted matrix, artifact, or RetroArch evidence.
 
 ## Decisions Made
 
@@ -142,7 +145,7 @@ The existing path classifier remains the single authority for whether a diff is 
 
 ## Next Step
 
-The change is merged. Its PR CI and release-please workflow passed; the merge commit's main CI run was still in progress when recorded. Planning-only pushes now keep the PR and main checks on the fast route, while any uncertain diff or source/release change continues through the full matrix.
+The change is merged and the planning-only fast route has passed on both PR and main events. Continue with the next GSD phase; source, release, uncertain or incomplete diffs continue through the full matrix.
 
 ---
 *Quick task: 261118-bvm*
