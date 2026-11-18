@@ -1,0 +1,73 @@
+cmake_minimum_required(VERSION 3.25)
+if(CMAKE_HOST_WIN32)
+  find_package(Git QUIET)
+  if(Git_FOUND)
+    get_filename_component(git_bin "${GIT_EXECUTABLE}" DIRECTORY)
+    set(git_usr_bin "${git_bin}/../usr/bin" "${git_bin}/../../usr/bin")
+  endif()
+endif()
+find_program(SH sh PATHS ${git_usr_bin} REQUIRED)
+find_program(JQ jq PATHS ${git_usr_bin} REQUIRED)
+set(ENV{TRIAGE_JQ} "${JQ}")
+file(MAKE_DIRECTORY "${BIN}")
+set(report "${ROOT}/scripts/triage-report.sh")
+set(date 2026-11-18T00:00:00Z)
+set(private_posix "/Use")
+string(APPEND private_posix "rs/HOMECANARY/file")
+set(private_windows [=[C:\\Use]=])
+string(APPEND private_windows [=[rs\\DRIVECANARY\\file]=])
+string(REPEAT a1 20 private_hash)
+set(private_mail "MAILCANARY@")
+string(APPEND private_mail "hidden.invalid")
+set(issue [=[{"number":1,"title":"Question \"quoted\"; $(data) @private_posix@ @private_windows@ \u001b]0;OSCCANARY\u0007\u001b[31m\u001b[0m\u202e\u0085 @private_mail@ @private_hash@ \\\\UNCCANARY\\share /tmp/TEMPCANARY x",
+  "labels":[{"name":"bug"}],"created_at":"@date@","updated_at":"@date@","body":"BODYCANARY","user":{"login":"ACTORCANARY"}}]=])
+string(CONFIGURE "${issue}" issue @ONLY)
+file(WRITE "${BIN}/issues.json" "[${issue},{\"number\":2,\"pull_request\":{},\"title\":\"PRCANARY\"}]")
+file(WRITE "${BIN}/runs.json" "{\"ci\":{\"workflow_runs\":[{\"id\":3,\"name\":\"RUNNAMECANARY\",\"head_sha\":\"SHA_CANARY\",\"status\":\"completed\",\"conclusion\":\"success\",\"updated_at\":\"${date}\"}]},\"release\":{\"workflow_runs\":[]},\"nightly\":{\"workflow_runs\":[]}}")
+
+function(transform issues runs predicate)
+  execute_process(COMMAND "${SH}" "${report}" "${issues}" "${runs}"
+    WORKING_DIRECTORY "${BIN}" RESULT_VARIABLE rc OUTPUT_VARIABLE result ERROR_VARIABLE err)
+  if(NOT rc STREQUAL "0")
+    message(FATAL_ERROR "ci.triage: valid metadata did not produce an artifact (${rc}): ${err}")
+  endif()
+  file(WRITE "${BIN}/result.json" "${result}")
+  execute_process(COMMAND "${JQ}" -es "length == 1 and (.[0] | (${predicate}))" result.json
+    WORKING_DIRECTORY "${BIN}" RESULT_VARIABLE rc OUTPUT_QUIET)
+  if(NOT rc STREQUAL "0" OR result MATCHES "CANARY|${private_hash}")
+    message(FATAL_ERROR "ci.triage: artifact failed its schema, bounds or privacy assertion")
+  endif()
+  set(artifact "${result}" PARENT_SCOPE)
+endfunction()
+
+set(schema [=[keys == ["issues","issues_truncated","schema_version","workflows"] and
+  .schema_version == 1 and (.workflows | map(.workflow) == ["ci","release","nightly"] and
+  all(.[]; keys == ["conclusion","run_id","status","updated_at","workflow"]))]=])
+set(check [=[.issues_truncated == false and (.issues | length == 1 and
+  (.[0] | keys == ["created_at","id","labels","title","updated_at"] and .id == 1 and
+  .labels == ["bug"] and (.title | startswith("Question \"quoted\"; $(data)")))) and
+  .workflows[0].run_id == 3 and .workflows[0].status == "completed" and
+  .workflows[0].conclusion == "success" and
+  all(.workflows[1:][]; .run_id == null and .status == null and .conclusion == null and .updated_at == null)]=])
+transform(issues.json runs.json "${schema} and ${check}")
+set(first "${artifact}")
+transform(issues.json runs.json "${schema} and ${check}")
+if(NOT artifact STREQUAL first)
+  message(FATAL_ERROR "ci.triage: identical input did not produce a stable artifact")
+endif()
+file(WRITE "${BIN}/empty.json" "[]")
+transform(empty.json runs.json "${schema} and .issues == [] and .issues_truncated == false")
+string(REPEAT z 200 long)
+string(REPEAT "{\"name\":\"${long}\"}," 8 labels)
+set(row "{\"number\":4,\"title\":\"${long}\",\"labels\":[${labels}{\"name\":\"last\"}],\"created_at\":\"${date}\",\"updated_at\":\"${date}\"}")
+string(REPEAT "${row}," 100 rows)
+file(WRITE "${BIN}/cap.json" "[${rows}${row}]")
+transform(cap.json runs.json ".issues_truncated == true and (.issues | length == 100 and all(.[]; (.title | length == 160) and (.labels | length == 8 and all(.[]; length == 48))))")
+foreach(bad "{" "{}" "[] []" "[{}]" "[${row},null]")
+  file(WRITE "${BIN}/bad.json" "${bad}")
+  execute_process(COMMAND "${SH}" "${report}" bad.json runs.json WORKING_DIRECTORY "${BIN}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE result ERROR_VARIABLE err)
+  if(rc STREQUAL "0" OR NOT result STREQUAL "" OR NOT err MATCHES "invalid.*metadata")
+    message(FATAL_ERROR "ci.triage: malformed metadata did not fail without an artifact")
+  endif()
+endforeach()

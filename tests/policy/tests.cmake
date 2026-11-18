@@ -1,6 +1,12 @@
 # Repository policy: no skipped tests, documentation budgets, the PASS_REGEX exit-status rule.
 set(policy_scripts ${CMAKE_CURRENT_LIST_DIR}/../cmake)
 
+# Fault prevented: publishing unbounded or private metadata from the GitHub API.
+schway_add_test(NAME ci.triage
+  COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -DBIN=${PROJECT_BINARY_DIR}/policy/triage
+    -P ${policy_scripts}/triage_controls.cmake
+  LABELS policy TIMEOUT 30)
+
 schway_add_test(NAME policy.no_skip
   COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -P ${policy_scripts}/no_skip.cmake
   LABELS policy TIMEOUT 10)
