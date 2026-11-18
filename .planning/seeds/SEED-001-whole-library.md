@@ -5,6 +5,10 @@ planted: 2026-10-19
 planted_during: preparation, before milestone v1.0
 trigger_when: milestone v1.0 has shipped (PlayStation games play with sound in RetroArch) and the next milestone is about which discs, formats and peripherals work
 scope: large
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-001: The whole library plays: every format, every peripheral, saves and every region (v2.0)

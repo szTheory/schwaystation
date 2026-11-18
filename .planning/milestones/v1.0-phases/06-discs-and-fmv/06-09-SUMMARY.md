@@ -34,7 +34,8 @@ coverage:
     requirement: DISC-02
     verification:
       kind: unit
-      ref: "cmake --preset ci && cmake --build --preset ci --target schwaystation-test-cdxa && ctest --test-dir build/ci -R '^disc\.xa$' --no-tests=error --output-on-failure (exit 0)"
+      ref: >-
+        cmake --preset ci && cmake --build --preset ci --target schwaystation-test-cdxa && ctest --test-dir build/ci -R '^disc\.xa$' --no-tests=error --output-on-failure (exit 0)
       status: pass
     human_judgment: false
 metrics:

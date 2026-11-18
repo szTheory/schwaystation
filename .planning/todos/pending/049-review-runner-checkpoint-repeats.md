@@ -5,6 +5,9 @@ priority: P2
 source: "Phase 04 plan 04-22 bounded CI review"
 created: 2026-11-11
 theme: ci
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

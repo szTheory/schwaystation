@@ -5,6 +5,10 @@ planted: 2026-11-18
 planted_during: milestone v1.0 closeout, Phase 1 verification refresh
 trigger_when: when the tracked-tree firmware scan, release archive scan, or their path enumeration is next changed
 scope: small
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-261118-8b0: Make firmware-scan path enumeration fail closed

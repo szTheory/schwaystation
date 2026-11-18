@@ -5,6 +5,9 @@ priority: P2
 source: "phase 01, plan 01-15 (a seed gate deferred under D-25 and AGENTS rule 7)"
 created: 2026-10-20
 theme: release
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

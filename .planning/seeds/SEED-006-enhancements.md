@@ -5,6 +5,10 @@ planted: 2026-10-19
 planted_during: preparation, before milestone v1.0
 trigger_when: v1.0 has shipped with the native frame hashed on every lane, and players ask for internal resolution, PGXP-style precision, widescreen, texture filtering or true colour
 scope: large
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-006: Enhancements: internal resolution, PGXP, widescreen, texture filtering, true colour, CRT host helpers

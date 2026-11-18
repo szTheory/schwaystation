@@ -5,6 +5,10 @@ planted: 2026-11-16
 planted_during: milestone v1.0, Phase 6
 trigger_when: when the MDEC ordered-status reference is next used to claim exact event matching
 scope: unknown
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-261116-osn: Preserve full MDEC status oracle records

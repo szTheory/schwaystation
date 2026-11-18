@@ -5,6 +5,10 @@ planted: 2026-10-19
 planted_during: preparation, before milestone v1.0
 trigger_when: every milestone after the first, as its first phase
 scope: small
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-007: Each milestone starts with a faster, more trustworthy pipeline and docs that match the release

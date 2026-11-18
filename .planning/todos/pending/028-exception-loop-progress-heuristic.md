@@ -6,6 +6,9 @@ source: "phase 02 code review, finding WR-04"
 created: 2026-11-10
 theme: cpu
 bound_step: "phase 4, the first plan that edits src/cop0.c"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

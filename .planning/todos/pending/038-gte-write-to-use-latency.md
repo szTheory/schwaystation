@@ -6,6 +6,9 @@ source: "phase 03 discussion, decision on GTE stall rules (a deviation)"
 created: 2026-11-10
 theme: gte
 bound_step: "SEED-003 (measured accuracy), the nearest seed"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

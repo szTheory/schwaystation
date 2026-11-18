@@ -5,31 +5,40 @@
 A Sony PlayStation (PS1) emulator core written in C17: a small MIT-licensed library, a headless runner
 (`schwaystation-run`) for tests, automation and frontends such as Playstead, and a libretro core for RetroArch. One
 core covers every console revision from the SCPH-1000 to the SCPH-102 PS one and the NTSC-J, NTSC-U/C and PAL
-regions as machine profiles. It is for host builders who want an embeddable, deterministic core; players who want
-the console's timing, sound and saves; homebrew developers and ROM hackers who want TTY, inspection and tooling;
-speedrunners, TAS authors and AI researchers who need frame-exact, reproducible runs; and porters who need an
-integer-only core that runs on handhelds and in the browser. The owner tries every release on a Mac in RetroArch
-and has a large collection of physical PS1 discs.
+regions as machine profiles. The v1.0 milestone delivers a deterministic CPU, GPU, SPU and CD path, host-supplied
+disc sectors, the runner and libretro host, and an owned disc that boots through OpenBIOS in RetroArch.
 
 ## Core Value
 
 PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C
 library that any host can embed.
 
+## Current State
+
+The v1.0 GSD milestone completed on 2026-11-18 across six phases and 195 plans. Phase releases through the disc
+and FMV work are merged; the automatic release workflow published v0.6.0. The library, runner and libretro core
+build and pass the hosted platform, deterministic hash, RetroArch and media checks recorded in the milestone
+archive. This is a completed v1.0 project milestone, not a claim of full PlayStation library compatibility or
+complete hardware conformance. In particular, exact 8-bit MDEC output and complete external frame/movie output
+remain unproven under the accepted v1.0 scope. The detailed discrepancy and evidence are in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md).
+
+No next milestone is active. Later work remains in the dormant seeds and product roadmap until a new milestone is
+explicitly started.
+
 ## Requirements
 
 ### Validated
 
-- ✓ Phase 1: the embeddable library, runner and libretro core produce a moving built-in test card with equal hashes on all eight lanes; real RetroArch frame delivery, checked installation, package consumers and the complete release rehearsal pass. Verification: 2026-10-29, run 40929433476; production publication is confirmed at ship.
-- ✓ Phase 5: the SPU matches the pinned hardware transfer logs, produces deterministic audio across all lanes, and libretro delivers the runner's PCM stream. Verification: 2026-11-14, 24/24 plans and 3/3 truths passed; exact-head hosted CI, nightly and RetroArch results are confirmed at ship.
+- ✓ Phase 1: release pipeline, deterministic test frame, library API, runner and RetroArch integration — v1.0.
+- ✓ Phase 2: R3000A, COP0, bus, memory, I-cache, interrupts, PS-EXE loading and diagnostics — v1.0.
+- ✓ Phase 3: GTE public hardware cases, DMA channels and root counters — v1.0.
+- ✓ Phase 4: GPU, display modes, pads, memory cards, OpenBIOS and compatibility ledger — v1.0.
+- ✓ Phase 5: deterministic SPU audio, pinned memory-transfer logs and runner/libretro PCM parity — v1.0.
+- ✓ Phase 6: CD-ROM images, XA, CD-DA, MDEC within the approved evidence scope, owned disc boot and disk control — v1.0.
 
 ### Active
 
-- [ ] Ship the verified phase-1 delivery path: merge its pull request and confirm the automatic release and latest-download install, then complete the separate CI tail before phase 2.
-- [ ] The R3000A matches the public vectors before any game runs, with COP0 exceptions, bus decode, memory control, the I-cache and interrupt registers, PS-EXE loading under the own stub kernel with armips-built fixtures, the probe and the first-fault trace.
-- [ ] The GTE matches the hardware-captured cases, and the seven DMA channels and three root counters pass register-level tests and their fixture records.
-- [ ] PlayStation games play in RetroArch: the GPU rasteriser and display modes, DualShock and digital pads with rumble, memory cards, self-authored fixtures that prove play, OpenBIOS booting to its shell, and a compatibility ledger that only ratchets up, with a local `library` preset for the user's own dumps, proven in CI against a fixture in a temporary directory.
-- [ ] Discs and FMV: the CD-ROM controller with cue/bin, iso and m3u, XA and CD-DA, the MDEC, disk control, and the own disc fixture booting through OpenBIOS in RetroArch.
+No active milestone requirements. v1.0 is complete; planning the next milestone is intentionally deferred.
 
 ### Out of Scope
 
@@ -81,20 +90,20 @@ library that any host can embed.
 
 | Decision | Rationale | Outcome |
 |---|---|---|
-| One core; console revisions and regions as machine profiles (`region`, `board` with derived GPU, SPU and CD firmware); v2 GPU and vC2 CD firmware default | Hardware differs by board; tests need fixed values; the region decides the video clock and the SCEx answer | Pending |
-| The tick is one CPU cycle at 33,868,800 Hz; the GPU clock comes from an exact ratio accumulator; the SPU steps every 768 ticks; a CD sector every 451,584 ticks; no floating point anywhere | Every documented edge is an integer on this lattice; no small LCM with the GPU clock exists | SPU timing verified in Phase 5 |
-| A frame runs from vsync to vsync; `schway_run_frame` and `schway_run` return a stop reason and never sleep | Lowest input latency; bounded calls; handheld and browser hosts drive pacing | Pending |
-| The R3000A and the GTE are finished against vectors before any game: the SingleStepTests/r3000 sample per PR, the full set nightly, the 1150 ps1-tests GTE cases transcoded into an own vector file | Siblings that grew CPUs from game traces stalled; the GTE cases are hardware-captured | Pending |
-| v1 is an interpreter written to the fast-path constraints; the cached interpreter and JIT are seeds behind `core.exec_mode_equivalence` | A faster core must hash identically on all eight lanes before it ships | Pending |
-| Self-authored armips PS-EXE fixtures and one mkpsxiso disc with a RAM mailbox judged by `expected.csv` are the primary evidence | Licence-clear, byte-identical builds, oracles that cannot be fooled | Pending |
-| ares (ISC), MAME's BSD-3 device files, nugget with OpenBIOS (MIT), ps1-tests and the r3000 set (MIT) may be read; DuckStation, Mednafen, Beetle, ReARMed, Redux core, Avocado and Rustation never | MIT licence protection; two names the brief called MIT were GPL at the pin | Pending |
-| A retail BIOS is user-supplied only, recognised by digest; OpenBIOS is built in CI as the stand-in; an own stub kernel boots every PS-EXE fixture; no HLE | Firmware copyright; HLE is the top compatibility complaint | Pending |
-| Video is the native display frame in GPU encoding with a metadata tuple plus a read-only VRAM view; conversion, borders and deinterlacing are host helpers outside the hash | Lossless and host-independent; ps1-tests compare whole VRAM | Pending |
-| Audio is int16 stereo at 44,100 Hz with exactly `frame_cycles / 768` samples per frame; the hash is over that stream before any host resampling | Mixer-independent determinism | Verified in Phase 5; runner and libretro PCM match |
-| The core never opens files: the host supplies `schway_disc` sector callbacks; an in-repo MIT helper parses cue/bin, iso and m3u; CHD, PBP and ECM are v2.0 | Hostile parsing stays out of the deterministic core; browser hosts serve sectors themselves | Pending |
-| Nothing speed-changing exists: no CPU, GTE or GPU clock scale, no CD speedup; enhancements never enter the hashed path | rcheevos restricts such options; speedrun boards forbid them; accuracy complaints about PGXP and overclock | Pending |
-| Every phase ends in an automated release; phase 1 is the content-free walking skeleton ported from cogmaster and muhtari at public pins | Sibling velocity evidence | Pending |
-| Cachegrind Ir/frame on three fixtures as the only per-PR speed gate; proportional gates; real-host e2e at most 300 lines; pins public and fetched with `gh api`; pre-seeded GSD bootstrap, interactive, one step per session | Wall-clock tails are noise on shared runners; two siblings stalled on their own machinery; a sibling lost six plans to an unpushed pin | Pending |
+| One core; console revisions and regions as machine profiles (`region`, `board` with derived GPU, SPU and CD firmware); v2 GPU and vC2 CD firmware default | Hardware differs by board; tests need fixed values; the region decides the video clock and the SCEx answer | ✓ v1.0: region and board profiles are implemented and exercised. |
+| The tick is one CPU cycle at 33,868,800 Hz; the GPU clock comes from an exact ratio accumulator; the SPU steps every 768 ticks; a CD sector every 451,584 ticks; no floating point anywhere | Every documented edge is an integer on this lattice; no small LCM with the GPU clock exists | ✓ v1.0: integer timing, regional sample cadence and cross-platform hashes pass. |
+| A frame runs from vsync to vsync; `schway_run_frame` and `schway_run` return a stop reason and never sleep | Lowest input latency; bounded calls; handheld and browser hosts drive pacing | ✓ v1.0: bounded frame/run calls and stop-reason contracts pass. |
+| The R3000A and the GTE are finished against vectors before any game: the SingleStepTests/r3000 sample per PR, the full set nightly, the 1150 ps1-tests GTE cases transcoded into an own vector file | Siblings that grew CPUs from game traces stalled; the GTE cases are hardware-captured | ✓ Phases 2–3: public CPU vectors and hardware GTE cases pass. |
+| v1 is an interpreter written to the fast-path constraints; the cached interpreter and JIT are seeds behind `core.exec_mode_equivalence` | A faster core must hash identically on all eight lanes before it ships | ✓ v1.0 interpreter shipped; cached interpreter/JIT remain deferred. |
+| Self-authored armips PS-EXE fixtures and one mkpsxiso disc with a RAM mailbox judged by `expected.csv` are the primary evidence | Licence-clear, byte-identical builds, oracles that cannot be fooled | ✓ v1.0: PS-EXE and owned disc fixtures, RAM mailboxes and host runs are integrated. |
+| ares (ISC), MAME's BSD-3 device files, nugget with OpenBIOS (MIT), ps1-tests and the r3000 set (MIT) may be read; DuckStation, Mednafen, Beetle, ReARMed, Redux core, Avocado and Rustation never | MIT licence protection; two names the brief called MIT were GPL at the pin | ✓ Provenance and policy gates enforce permissive reuse and the prohibited-source rule. |
+| A retail BIOS is user-supplied only, recognised by digest; OpenBIOS is built in CI as the stand-in; an own stub kernel boots every PS-EXE fixture; no HLE | Firmware copyright; HLE is the top compatibility complaint | ✓ v1.0: BIOS digest recognition, CI OpenBIOS and own stub paths pass; no proprietary bytes committed. |
+| Video is the native display frame in GPU encoding with a metadata tuple plus a read-only VRAM view; conversion, borders and deinterlacing are host helpers outside the hash | Lossless and host-independent; ps1-tests compare whole VRAM | ✓ v1.0: native frames and host conversion are deterministic; GPU references pass. |
+| Audio is int16 stereo at 44,100 Hz with exactly `frame_cycles / 768` samples per frame; the hash is over that stream before any host resampling | Mixer-independent determinism | ✓ v1.0: hardware transfer logs, cross-platform hashes and runner/libretro PCM parity pass. |
+| The core never opens files: the host supplies `schway_disc` sector callbacks; an in-repo MIT helper parses cue/bin, iso and m3u; CHD, PBP and ECM are v2.0 | Hostile parsing stays out of the deterministic core; browser hosts serve sectors themselves | ✓ v1.0: host callbacks and cue/bin, ISO and M3U parsing pass; CHD/PBP/ECM remain deferred. |
+| Nothing speed-changing exists: no CPU, GTE or GPU clock scale, no CD speedup; enhancements never enter the hashed path | rcheevos restricts such options; speedrun boards forbid them; accuracy complaints about PGXP and overclock | ✓ v1.0: no speed-changing option or enhancement enters the hashed path. |
+| Every phase ends in an automated release; phase 1 is the content-free walking skeleton ported from cogmaster and muhtari at public pins | Sibling velocity evidence | ✓ Six phase PRs merged; the automatic release workflow published v0.6.0. |
+| Cachegrind Ir/frame on three fixtures as the only per-PR speed gate; proportional gates; real-host e2e at most 300 lines; pins public and fetched with `gh api`; pre-seeded GSD bootstrap, interactive, one step per session | Wall-clock tails are noise on shared runners; two siblings stalled on their own machinery; a sibling lost six plans to an unpushed pin | ✓ v1.0: performance/policy checks passed, real-host e2e stayed within cap and source pins remained public. |
 
 The full list with sources is `.planning/preparation/DECISIONS.md`.
 
@@ -111,4 +120,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-11-15 after Phase 5 release*
+*Last updated: 2026-11-18 after v1.0 milestone completion*

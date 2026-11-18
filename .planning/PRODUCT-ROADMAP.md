@@ -2,7 +2,7 @@
 title: "Product roadmap (rolling)"
 summary: "Immediate / Near / Mid / Long direction for schwaystation with the evidence and promotion trigger for each horizon; ROADMAP.md is the execution contract, seeds hold the source narratives."
 read_when: "At every new-milestone and complete-milestone step, and when a finding changes priorities."
-updated: 2026-10-19
+updated: 2026-11-18
 ---
 
 # Product roadmap (rolling)
@@ -19,7 +19,7 @@ alternatives, and moves only owner-approved scope into Immediate. The file is sn
 `milestones/vX.Y-PRODUCT-ROADMAP.md` at close. Future horizons stay less detailed than the current one.
 SEED-007 (the tune-up) opens every milestone after the first.
 
-## Immediate: v1.0 "PlayStation games play with sound in RetroArch" (committed)
+## Shipped: v1.0 "PlayStation games play with sound in RetroArch" (completed 2026-11-18)
 
 Six phases, each merged by one pull request and released automatically: (1) a test frame in RetroArch with the
 whole delivery path (library, runner, libretro core, six-platform CI, big-endian and wasm32 lanes, attested
@@ -31,8 +31,7 @@ RetroArch: the GPU rasteriser and display modes, the DualShock and digital pad w
 self-authored fixtures with boot-to-play checks, OpenBIOS booting to its shell in CI, a local preset for the user's
 own dumps, the compatibility ledger; (5) sound plays in RetroArch: the SPU against the hardware logs and libretro
 audio equal to the runner's stream; (6) discs and FMV: the CD-ROM controller with cue/bin, iso and m3u, XA and
-CD-DA, the MDEC, disk control, the own disc fixture booting through OpenBIOS, hashes identical on every platform. Requirements: `.planning/REQUIREMENTS.md` v1.
-Evidence: `.planning/research/SUMMARY.md`.
+CD-DA, the MDEC, disk control, the own disc fixture booting through OpenBIOS, hashes identical on every platform. Requirements: [archived v1.0 requirements](milestones/v1.0-REQUIREMENTS.md). Evidence: [milestone audit](milestones/v1.0-MILESTONE-AUDIT.md). Exact 8-bit MDEC output and complete external frame/movie conformance remain unproven under the accepted v1.0 scope.
 
 ## Near: v2.0 "The whole library" (SEED-001)
 
@@ -40,7 +39,7 @@ CHD through libchdr, PBP, ECM, CCD and SBI/LibCrypt; the multitap, GunCon and Ju
 PocketStation as card storage; per-game cards by serial and the libretro save round trip; PAL and every revision
 profile over the whole ledger (13,407 Redump entries, 3,573 multi-disc entries across 568 titles, about 100
 LibCrypt PAL titles); GameShark strings and `--patch` for ROM hackers; the `.info` drops `is_experimental`.
-**Trigger:** v1.0 shipped. **Why next:** what collectors and players notice first after the core plays; the owner's
+**Trigger:** v1.0 shipped. This is future direction only; no next milestone is active. **Why next:** what collectors and players notice first after the core plays; the owner's
 disc collection becomes the ratchet's input; CHD is the format most frontend libraries already hold. Opens with
 SEED-007. **Weighed at the same boundary:** the browser page (SEED-008), which the owner ranks highly.
 
@@ -63,6 +62,8 @@ the hashed path; the WebAssembly page. **Triggers:** a user ask, a met instructi
 port target; each seed names its own.
 
 ## Decision log
+
+| 2026-11-18 | Completed v1.0 and refreshed the shipped/future boundary; v2.0 remains a seed, not an active milestone | Six phases and 195 plans are archived; future scope is not authorized by this closeout. |
 
 | Date | Change | Why |
 |---|---|---|

@@ -42,7 +42,8 @@ coverage:
     requirement: DISC-03
     verification:
       - kind: unit
-        ref: "cmake --preset ci; cmake --build --preset ci --target schwaystation-test-mdec; ctest --test-dir build/ci -R '^mdec\.status$' --no-tests=error --output-on-failure; exit 0"
+        ref: >-
+          cmake --preset ci; cmake --build --preset ci --target schwaystation-test-mdec; ctest --test-dir build/ci -R '^mdec\.status$' --no-tests=error --output-on-failure; exit 0
         status: pass
     human_judgment: false
   - id: MDEC-EXACT-OUTPUT

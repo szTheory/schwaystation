@@ -5,6 +5,10 @@ planted: 2026-11-16
 planted_during: milestone v1.0, Phase 6, Plan 13 review
 trigger_when: Plan 06-16 supplies a complete owned STR frame through the MDEC caller
 scope: tests/mdec/color_reference.c and tests/disc/fixture.c
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-261116-mrh: Hash real guest MDEC output before DMA1
