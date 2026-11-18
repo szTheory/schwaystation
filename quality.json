@@ -1,0 +1,22 @@
+{
+  "ir_per_frame": {
+    "testcard": {"floor": 1619573, "ceiling": 1619573},
+    "gpu_motion": {"floor": 137752334, "ceiling": 137752334}
+  },
+  "size": {
+    "wasm": {"unbounded": true}
+  },
+  "state": {
+    "bytes": {"floor": 3755020, "ceiling": 3755020}
+  },
+  "ci": {
+    "critical_path_s": {
+      "floor": 2249,
+      "ceiling": 3293,
+      "workload_sha256": "316f86729c5129fc618ae0acf71014a5b18784d9e7a4f6c03ff067d0b4326ed8"
+    }
+  },
+  "reasons": [
+    "2026-11-18: the original repository-check cap was 3200 lines; Plan 01 measured 3133 and estimated 90-135 lines for remaining triage, routing, and quality controls, supporting a 3300 cap. After Plan 06 the measured total was 3299, while Plans 07-08 still required an estimated 370-500 counted lines. The corrected temporary cap is 3900, which covers the 500-line upper estimate plus 100 lines of headroom; Plan 10 ratchets it to the actual shipping total. Evidence: .planning/phases/07-faster-and-more-trustworthy-ci/07-01-SUMMARY.md and both dated decisions in .planning/phases/07-faster-and-more-trustworthy-ci/07-CONTEXT.md."
+  ]
+}

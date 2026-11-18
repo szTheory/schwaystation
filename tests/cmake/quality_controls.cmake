@@ -6,13 +6,15 @@ string(REPEAT ab 32 hash)
 set(registry [=[
 {
   "ir_per_frame": {"testcard": {"floor": 10, "ceiling": 20}, "gpu_motion": {"floor": 10, "ceiling": 20}},
-  "size": {"wasm": {"floor": 10, "ceiling": 20}},
+  "size": {"wasm": {"unbounded": true, "measurement": 20}},
   "state": {"bytes": {"floor": 10, "ceiling": 20}},
-  "ci": {"critical_path_s": {"floor": 10, "ceiling": 20, "workload_sha256": "@hash@"}}
+  "ci": {"critical_path_s": {"floor": 10, "ceiling": 20, "workload_sha256": "@hash@"}},
+  "reasons": ["2026-11-18 quality budget decision"]
 }
 ]=])
 string(CONFIGURE "${registry}" registry @ONLY)
 file(WRITE "${quality_file}" "${registry}")
+find_program(SH sh REQUIRED)
 
 function(compare metric expected)
   set(args "-DQUALITY=${quality_file}")
@@ -29,7 +31,7 @@ function(compare metric expected)
 endfunction()
 
 compare(registry "")
-foreach(metric ir_per_frame.testcard ir_per_frame.gpu_motion size.wasm state.bytes ci.critical_path_s)
+foreach(metric ir_per_frame.testcard ir_per_frame.gpu_motion state.bytes ci.critical_path_s)
   compare("${metric}" "" -DMEASURED=10)
   compare("${metric}" "" -DMEASURED=20)
   compare("${metric}" "floor" -DMEASURED=9)
@@ -40,8 +42,18 @@ foreach(metric ir_per_frame.testcard ir_per_frame.gpu_motion size.wasm state.byt
   compare("${metric}" "measurement|measured")
 endforeach()
 
-string(REPEAT "w" 20 bytes)
-file(WRITE "${BIN}/wasm.bin" "${bytes}")
+string(REPEAT "w" 16 bytes)
+execute_process(COMMAND "${SH}" -c "printf '\\000asm%s' \"$1\" > \"$2\"" sh
+    "${bytes}" "${BIN}/wasm.bin" RESULT_VARIABLE wasm_fixture_rc)
+if(NOT wasm_fixture_rc STREQUAL "0")
+  message(FATAL_ERROR "quality_controls: could not create a real Wasm magic fixture")
+endif()
+compare(size.wasm "" "-DARTIFACT=${BIN}/wasm.bin")
+string(JSON bounded_size REMOVE "${registry}" size wasm unbounded)
+string(JSON bounded_size REMOVE "${bounded_size}" size wasm measurement)
+string(JSON bounded_size SET "${bounded_size}" size wasm floor 10)
+string(JSON bounded_size SET "${bounded_size}" size wasm ceiling 20)
+file(WRITE "${quality_file}" "${bounded_size}")
 compare(size.wasm "" "-DARTIFACT=${BIN}/wasm.bin")
 file(APPEND "${BIN}/wasm.bin" "w")
 compare(size.wasm "ceiling" "-DARTIFACT=${BIN}/wasm.bin")
@@ -73,6 +85,85 @@ compare(state.bytes "floor.*ceiling" -DMEASURED=20)
 string(JSON extra SET "${registry}" unwanted 1)
 file(WRITE "${quality_file}" "${extra}")
 compare(registry "unexpected")
+string(JSON bad_reasons SET "${registry}" reasons [["not an array"]])
+file(WRITE "${quality_file}" "${bad_reasons}")
+compare(registry "reasons")
+string(JSON bad_reasons SET "${registry}" reasons [=[[]]=])
+file(WRITE "${quality_file}" "${bad_reasons}")
+compare(registry "reasons")
+string(JSON bad_reasons SET "${registry}" reasons [=[[1]]=])
+file(WRITE "${quality_file}" "${bad_reasons}")
+compare(registry "reasons entries")
+string(JSON bad_reasons SET "${registry}" reasons [=[[" "]]=])
+file(WRITE "${quality_file}" "${bad_reasons}")
+compare(registry "reasons entries")
 string(JSON invalid_hash SET "${registry}" ci critical_path_s workload_sha256 [["invalid"]])
 file(WRITE "${quality_file}" "${invalid_hash}")
 compare(ci.critical_path_s "workload_sha256" -DMEASURED=10)
+
+file(READ "${ROOT}/quality.json" checked_registry)
+string(JSON checked_reason ERROR_VARIABLE reason_error GET "${checked_registry}" reasons 0)
+if(NOT reason_error STREQUAL "NOTFOUND" OR NOT checked_reason MATCHES "^2026-11-18.*07-01-SUMMARY[.]md.*07-CONTEXT[.]md")
+  message(FATAL_ERROR "quality_controls: checked-in registry is missing its dated, sourced budget rationale")
+endif()
+file(WRITE "${quality_file}" "${registry}")
+
+function(extract_block begin_marker end_marker output)
+  set(found_begin FALSE)
+  set(found_end FALSE)
+  set(block "")
+  file(STRINGS "${ROOT}/.github/workflows/ci.yml" workflow_lines)
+  foreach(line IN LISTS workflow_lines)
+    if(line MATCHES "${begin_marker}")
+      if(found_begin)
+        message(FATAL_ERROR "quality_controls: duplicate ${begin_marker}")
+      endif()
+      set(found_begin TRUE)
+    elseif(line MATCHES "${end_marker}")
+      if(NOT found_begin OR found_end)
+        message(FATAL_ERROR "quality_controls: misplaced ${end_marker}")
+      endif()
+      set(found_end TRUE)
+    elseif(found_begin AND NOT found_end)
+      string(REGEX REPLACE "^          " "" line "${line}")
+      string(APPEND block "${line}\n")
+    endif()
+  endforeach()
+  if(NOT found_begin OR NOT found_end OR block STREQUAL "")
+    message(FATAL_ERROR "quality_controls: missing ${begin_marker}/${end_marker} production block")
+  endif()
+  set("${output}" "${block}" PARENT_SCOPE)
+endfunction()
+
+extract_block(QUALITY_PERF_COMPARE_BEGIN QUALITY_PERF_COMPARE_END perf_block)
+if(NOT perf_block MATCHES "head=\\$\\(per_frame" OR NOT perf_block MATCHES "MEASURED=\\$head" OR
+   NOT perf_block MATCHES "tests/cmake/quality[.]cmake")
+  message(FATAL_ERROR "quality_controls: Cachegrind measurement is disconnected from its comparator")
+endif()
+set(perf_script "${BIN}/perf-check.sh")
+set(perf_stub [=[set -eu
+fixture=$1
+rc=0
+per_frame() { printf '%s\n' "$PERF_MEASURED"; }
+]=])
+file(WRITE "${perf_script}" "${perf_stub}${perf_block}test \"$rc\" -eq 0\n")
+function(perf_case fixture measured expected)
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PERF_MEASURED=${measured}" "RUNNER_TEMP=${BIN}"
+      "QUALITY_FILE=${quality_file}"
+      "${SH}" "${perf_script}" "${fixture}"
+    WORKING_DIRECTORY "${ROOT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(expected STREQUAL "pass")
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "quality_controls: ${fixture} production comparator rejected its baseline: ${out}${err}")
+    endif()
+  elseif(rc STREQUAL "0" OR NOT "${out}${err}" MATCHES "${expected}")
+    message(FATAL_ERROR "quality_controls: ${fixture} production comparator accepted invalid measurement ${measured}")
+  endif()
+endfunction()
+foreach(fixture testcard gpu_motion)
+  string(JSON ceiling GET "${registry}" ir_per_frame ${fixture} ceiling)
+  math(EXPR over "${ceiling} + 1")
+  perf_case("${fixture}" "${ceiling}" pass)
+  perf_case("${fixture}" "" "measurement must be a positive integer")
+  perf_case("${fixture}" "${over}" "above ceiling")
+endforeach()

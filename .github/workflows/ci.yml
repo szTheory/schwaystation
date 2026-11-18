@@ -897,7 +897,10 @@ jobs:
           fixtures=(testcard gpu_motion)
           rc=0
           for fixture in "${fixtures[@]}"; do
+            # QUALITY_PERF_COMPARE_BEGIN
             head=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+            cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" "-DMETRIC=ir_per_frame.$fixture" "-DMEASURED=$head" -P tests/cmake/quality.cmake || rc=$?
+            # QUALITY_PERF_COMPARE_END
             base1='' base2=''
             if [ "$NO_BASE" = false ]; then
               base1=$(per_frame "$RUNNER_TEMP/perf/base" "$fixture") || exit 1
