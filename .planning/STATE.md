@@ -6,17 +6,17 @@ current_phase: 6
 current_phase_name: Discs and FMV
 current_plan: 45 of 45 (hosted acceptance and ship)
 status: in_progress
-stopped_at: "06-45 Windows CUE follow-up reviewed and locally passed; commit, push and dispatch new exact-head CI/Nightly"
-last_updated: "2026-11-18T00:42:02Z"
+stopped_at: "06-45 exact-head hash comparison found Windows-generated M3U newline divergence; normalization is locally reviewed and the new hosted rerun is next"
+last_updated: "2026-11-18T01:43:47Z"
 last_activity: 2026-11-18
-state_head: 40b95cb21ec4030d6b81cbc72ec7a3ad3d1f751a
+state_head: ec10043e2926fceec21b7745a467033fa87e919f
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 195
   completed_plans: 194
   percent: 83
-last_activity_desc: "Plan 06-45 follow-up on phase/06-discs-and-fmv; Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable), gsd-code-reviewer; active time not tracked. Latest non-planning source fingerprint is 7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801dfe00f48 (162 files). Windows CUE child paths now normalize separators for extended paths; review is clean. Cheap checks and line budget 2700/2700 passed; changed native targets built; focused CUE/playlist/probe tests passed 4/4. On prior source fingerprint 8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be, exact-head Nightly 44206684588 passed (30/30 inventory tests once, six bounded fuzz campaigns and all benchmark jobs). CI 44206684317 identified the same two Windows CUE failures in x64 and arm64; WASI, ASan, other completed platform legs, performance, GPU reference, and the 900-frame RetroArch image comparison passed. The run's long be32 tail was cancelled only after those deterministic Windows failures made its result unusable; it does not count as acceptance. Latest follow-up source has only focused local checks; full exact-head CI/Nightly remain required. Review and evidence are in 06-45-REVIEW.md and 06-VERIFICATION.md. Next: commit and push this reviewed snapshot, run one current-head CI/Nightly batch, inspect all required lanes, then verify and ship if every gate passes. Exact 8-bit and full frame/movie hardware output remain unproved under the approved v1.0 scope."
+last_activity_desc: "Plan 06-45 follow-up commit ec10043 is pushed to phase/06-discs-and-fmv. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); reviews by gsd-code-reviewer, no findings; active time not tracked. Source fingerprint 7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801dfe00f48 (162 files) passed focused local CUE/playlist/probe checks and the 2,700-line gate. Nightly 44210060292 passed. CI 44210060285 passed every applicable build and test lane, including be32, but the final hash comparison found a Windows CRLF versus Linux LF difference in generated disc_boot_runner.m3u. Root cause is reproduced; tests/runner/tests.cmake now writes that fixture with explicit UNIX newlines. The reviewer found no issue, cmake --preset ci passed, runner.disc.api passed 1/1, and the generated playlist SHA-256 matches the be32 artifact. Hygiene passed 23/23. The current fix and updated records are uncommitted; exact-head CI and Nightly reruns are required before verification and ship. Earlier exact 8-bit and full frame/movie hardware output remain unproved under the approved v1.0 scope."
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 Phase: 6 (Discs and FMV) — owner-approved successor scope in progress
 Current Plan: 45 of 45 (hosted acceptance and ship)
 Next plan file: 06-45-PLAN.md
-Status: Plans 06-42 through 06-44 are complete. The Plan 06-45 repair batch is reviewed and locally accepted. Deterministic MDEC with available verified hardware coverage is in scope; exact 8-bit and complete external frame/movie hardware conformance remain unproved. Hosted retries on the repaired head, RetroArch acceptance, phase ship/release and milestone completion remain pending.
+Status: Plans 06-42 through 06-44 are complete. Plan 06-45 has a reviewed generated-playlist newline fix after exact-head hash comparison exposed Windows/LF byte divergence. Nightly, all CI build/test lanes, local targeted checks and hygiene passed for their respective heads; the fixed head still needs exact-head CI and Nightly, then final verification and ship. Deterministic MDEC with available verified hardware coverage is in scope; exact 8-bit and complete external frame/movie hardware conformance remain unproved.
 Last activity: 2026-11-17
 
 Progress: [████████░░] 83%
@@ -953,3 +953,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unava
 ### Phase 6 MDEC completed-command status follow-up (2026-11-17)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); independent MDEC math, hardware-source and cycle-budget reviews. Active duration was not measured. The public SCPH-5501 status capture shows `8004FFFFh` after full table loads and `2204FFFFh` after all decode input is consumed while output remains unread. `mdec_status` previously left the low counter at zero; it now reports the documented minus-one wrap for nonempty MDEC(1/2/3) commands. The focused status test checks MDEC(2) and MDEC(3) through exact `8004FFFFh`, and decode input exhaustion to `FFFFh` while a block is pending. `cmake --build --preset ci --target schwaystation-test-mdec` and `ctest --test-dir build/ci -R '^mdec\\.status$' --no-tests=error --output-on-failure` passed. The full MDEC label passed 10/11; only the exact 8-bit vector remains red. The post-fix `cmake --workflow --preset ci` exited 8 with 609/610 tests passing in 66.57 seconds, only `mdec.guest_input` failed. Rebuilt nightly MDEC reference tests passed 4-bit and controls; 8-bit still differs at byte 6 (expected 04, actual 05). Two independent reviews confirmed identical pinned 4/8-bit input/tables and that the permitted ares arithmetic matches the current implementation; no source-backed alternative removed the differences. The full status guest still requests 7.68M delay cycles against the unchanged 4.9152M cap, and this status-register fix does not change that. The final `cmake --workflow --preset hygiene` passed 24/24 in 39.77 seconds. DISC-03 remains incomplete; no phase ship, hosted URL, owner capture, next phase or v2.0 work is claimed.
+
+### Phase 6 plan 06-45 generated-playlist hash repair (2026-11-18)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); independent gsd-code-reviewer. Exact-head Nightly run 44210060292 passed; CI run 44210060285 passed all lanes including be32 but failed only the final hash-equality job. Artifact comparison isolated the difference to `disc_boot_runner.m3u`: Windows `file(WRITE)` emitted CRLF and Linux emitted LF. Changed its CMake producer to `file(CONFIGURE ... NEWLINE_STYLE UNIX)`. The reviewer found no issue. `cmake --preset ci` passed; the regenerated playlist hash matches the be32 artifact (`722ce2c1c07b9c90102dd872faea02e306617c5604cdf331ad7a7dc2df3509b8`), and `runner.disc.api` passed 1/1. Current source changes still need exact-head hosted CI and Nightly; no verification or ship claim is made.

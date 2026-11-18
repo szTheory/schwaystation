@@ -1,8 +1,8 @@
 ---
 phase: 06-discs-and-fmv
-reviewed: 2026-11-18T00:34:51Z
+reviewed: 2026-11-18T01:43:47Z
 depth: standard
-files_reviewed: 7
+files_reviewed: 8
 files_reviewed_list:
   - host/disc_image.c
   - scripts/wasm-test-emulator.sh
@@ -11,6 +11,7 @@ files_reviewed_list:
   - tests/disc/image.c
   - CMakePresets.json
   - tests/compat/tests.cmake
+  - tests/runner/tests.cmake
 findings:
   critical: 0
   warning: 0
@@ -22,18 +23,28 @@ status: clean
 
 # Phase 06: Code Review Report
 
-**Reviewed:** 2026-11-18T00:34:51Z
+**Reviewed:** 2026-11-18T01:43:47Z
 **Depth:** standard
-**Files Reviewed:** 6
+**Files Reviewed:** 8
 **Status:** clean
 
 ## Summary
 
-Reviewed the repair against the reported hosted failures, including the follow-up Windows path change. No actionable correctness, security, or quality finding was confirmed. No tests were run, as requested; hosted WASI and Windows runtime confirmation remains required on the final repair head.
+Reviewed the repair against the reported hosted failures, including the follow-up Windows path and generated M3U newline changes. No actionable correctness, security, or quality finding was confirmed. The original repair review did not run tests; the targeted local and hosted results are recorded in `06-VERIFICATION.md`.
 
 ## Narrative Findings (AI reviewer)
 
 No findings.
+
+## Cross-platform generated M3U newline follow-up (2026-11-18)
+
+**Scope:** `tests/runner/tests.cmake`
+**Result:** no findings
+
+The generated playlist content contains no CMake placeholders, so `file(CONFIGURE)` does not alter its entries.
+`NEWLINE_STYLE UNIX` matches the normalization already used for cross-platform hash manifests, preventing the
+Windows-native newline conversion from changing the fixture digest. The project minimum is CMake 3.25. No
+additional dependency or runtime behavior is introduced.
 
 ## Windows CUE Child Path Follow-up Review (2026-11-18)
 

@@ -186,6 +186,16 @@ Suggested check: keep byte-exact marker producers explicitly LF and exercise CRL
 Sources: [Windows diagnostic run](https://github.com/szTheory/schwaystation/actions/runs/43329257561).
 Status: reproduced
 
+Lesson SW-TEST-002 (2026-11-18, Phase 6 generated playlist hash)
+Symptom and reproduction: exact-head CI run [44210060285](https://github.com/szTheory/schwaystation/actions/runs/44210060285) passed all build and test lanes but failed the final cross-platform hash comparison. Downloading and diffing the be32 and Windows arm64 hash artifacts isolated the only mismatch to `disc_boot_runner.m3u`.
+Root cause / invariant: CMake `file(WRITE)` preserves platform-native newlines on Windows. A generated text fixture included in byte-for-byte cross-platform hashes must specify its newline style explicitly.
+Fix and evidence: generate the playlist with `file(CONFIGURE ... NEWLINE_STYLE UNIX)`. The local generated hash now matches be32 exactly, and `runner.disc.api` passes. A code review found no issue; the fixed exact-head workflow rerun is pending.
+Applies when: generated text fixtures are hashed, archived, or compared across operating systems.
+Does not establish: a production media-path defect or a need to normalize arbitrary user-supplied playlist files.
+Suggested check: when a cross-platform byte comparison fails, diff the exact artifact payloads first, then inspect fixture generation and newline bytes before rerunning the long matrix.
+Sources: [exact-head CI run 44210060285](https://github.com/szTheory/schwaystation/actions/runs/44210060285); `.planning/phases/06-discs-and-fmv/06-45-REVIEW.md`.
+Status: reproduced
+
 
 Lesson SW-ORACLE-001 (2026-11-13, phase4 real GPU captures)
 Symptom and reproduction: synthetic GPU tests encoded stale CLUT invalidation and half-pixel assumptions; the pinned programs contradicted them. The GP0 cache regression failed before the documented fix, then the original CLUT capture passed. Original triangle/quad/UV captures passed after the independently modeled raster correction atcf9f287.

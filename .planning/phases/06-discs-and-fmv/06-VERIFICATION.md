@@ -298,6 +298,15 @@ On current fingerprint `7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801
 - `ctest --test-dir build/ci -R '^(disc\.image\.cue_root_child|disc\.image\.cue_limits|disc\.playlist|compat\.probe\.cue_edges)$' --output-on-failure`
   — exit 0, 4/4.
 
-This follow-up has not yet passed the full local workflow or any hosted workflow. The next action is to commit and
-push it, run one full CI and Nightly batch against its exact head, then close Phase 6 verification and ship only
-if every applicable gate passes.
+This follow-up is pushed as `ec10043e2926fceec21b7745a467033fa87e919f`. Exact-head Nightly run
+[44210060292](https://github.com/szTheory/schwaystation/actions/runs/44210060292) passed. Exact-head CI run
+[44210060285](https://github.com/szTheory/schwaystation/actions/runs/44210060285) passed all build, portability,
+runtime, test-inventory, release, RetroArch and be32 lanes, but its final eight-platform hash comparison failed.
+The differing entry was the generated `disc_boot_runner.m3u`: Windows `file(WRITE)` emitted CRLF while the other
+lanes emitted LF. Its playlist entries were identical; the difference was only generated fixture line endings.
+
+The follow-up normalizes this generated playlist with `file(CONFIGURE ... NEWLINE_STYLE UNIX)`. The independent
+review found no issue; see `06-45-REVIEW.md`. `cmake --preset ci` passed, the generated playlist SHA-256 now
+matches the be32 artifact (`722ce2c1c07b9c90102dd872faea02e306617c5604cdf331ad7a7dc2df3509b8`), and
+`ctest --test-dir build/ci -R '^runner\\.disc\\.api$' --no-tests=error --output-on-failure` passed 1/1. This
+new follow-up still needs its exact-head hosted CI and Nightly runs before verification or shipping.

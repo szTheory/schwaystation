@@ -762,7 +762,10 @@ set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
   "-DEMULATOR=${runner_emulator_bars}")
 
 set(runner_disc_playlist ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u)
-file(WRITE "${runner_disc_playlist}" "disc_boot.cue\ndisc_boot_playlist.cue\n")
+# Fault prevented: a platform-native newline changes a generated fixture hash
+# between CI lanes even though each lane parses the same playlist entries.
+file(CONFIGURE OUTPUT "${runner_disc_playlist}" CONTENT "disc_boot.cue\ndisc_boot_playlist.cue\n"
+  NEWLINE_STYLE UNIX)
 set(runner_disc_input_script ${PROJECT_BINARY_DIR}/tests/runner-disc-controls.inputs)
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/tests")
 file(WRITE "${runner_disc_input_script}"
