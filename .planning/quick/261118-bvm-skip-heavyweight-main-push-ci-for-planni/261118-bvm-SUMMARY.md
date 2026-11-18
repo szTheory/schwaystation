@@ -11,7 +11,7 @@ affects: [CI, hygiene, testing-docs]
 actuals:
   tokens: 3986
   tasks: 2
-  commits: 3
+  commits: 4
 plan_head_before: 01c42a87b6ec47ef4a2711dcffb7eb2c07ff084d
 plan_head_after: 11c9789a5e13c7851acf5030bcb28710f6cf90f8
 tech-stack:
@@ -58,7 +58,7 @@ coverage:
         ref: "actionlint exact project command; exit 0"
         status: pass
     human_judgment: false
-duration: 33min
+duration: 1h42m
 completed: 2026-11-18
 status: complete
 runtime-model: Codex / OpenGSD 1.21.0; primary GPT-6 submodel not exposed
@@ -70,9 +70,9 @@ runtime-model: Codex / OpenGSD 1.21.0; primary GPT-6 submodel not exposed
 
 ## Performance
 
-- **Duration:** about 33 minutes
+- **Duration:** about 1 hour 42 minutes including hosted CI and merge
 - **Started:** 2026-11-18T13:44:14Z
-- **Completed:** 2026-11-18 (local verification finished before the pending hosted PR run)
+- **Completed:** 2026-11-18T15:26:11Z (PR merged after hosted CI)
 - **Tasks:** 2
 - **Implementation files modified:** 3
 - **Runtime/model:** Codex / OpenGSD 1.21.0; primary GPT-6 submodel not exposed
@@ -118,8 +118,12 @@ The four task commits were measured from `plan_head_before` to `plan_head_after`
 | `cmake --preset hygiene` then `ctest --test-dir build/hygiene -R '^ci[.]classify$|^policy[.]gate_budget$|^hygiene[.]tree$' --no-tests=error --output-on-failure` | Exit 0; all three passed after the fail-closed PR listing correction |
 | `ctest --test-dir build/hygiene -R '^ci[.]classify$|^policy[.]gate_budget$' --no-tests=error --output-on-failure` | Exit 0 after final fixture-path quoting and PR API failure control |
 | `act --dryrun --container-architecture linux/arm64 --action-cache-path /private/tmp/schwaystation-act-cache -P ubuntu-26.04=catthehacker/ubuntu:act-latest -j changes -W .github/workflows/ci.yml` | Exit 0 after the final workflow edit; structure only |
+| PR #25 CI on `6fef860565c15768375980ac6e178a4b4fa763ee` | Exit 0; full platform, sanitizer, BE32, performance, rehearsal and RetroArch checks passed; BE32 took 1h5m14s | [Hosted PR CI](https://github.com/szTheory/schwaystation/actions/runs/44322945842) |
+| PR #25 squash merge | Merged at `79d43a94ec585030fe84012892de1d344fb34b6e` | [PR #25](https://github.com/szTheory/schwaystation/pull/25) |
+| Main CI on merge commit `79d43a94ec585030fe84012892de1d344fb34b6e` | Exit 0 from run inspection; run existed and was in progress at summary update | [Main CI run](https://github.com/szTheory/schwaystation/actions/runs/44335613581) |
+| Release workflow on merge commit `79d43a94ec585030fe84012892de1d344fb34b6e` | Exit 0; release-please passed; no release PR was opened for this CI-only change | [Release workflow](https://github.com/szTheory/schwaystation/actions/runs/44335613799) |
 
-No hosted run URL exists yet: the orchestrator owns opening the PR and confirming the required PR, `main`, and release checks. The `act` dry run does not execute the tests or substitute for hosted matrix, artifact, or RetroArch evidence.
+The PR CI run exercised the full workflow on the change commit. The merge commit has a CI run in progress; the release-please workflow succeeded and correctly opened no release PR for this CI-only change. The `act` dry run does not execute the tests or substitute for hosted matrix, artifact, or RetroArch evidence.
 
 ## Decisions Made
 
@@ -138,7 +142,7 @@ The existing path classifier remains the single authority for whether a diff is 
 
 ## Next Step
 
-The implementation is ready for the orchestrator to open the planned Conventional Commit CI PR, arm squash auto-merge, and verify the hosted PR, `main`, and release runs.
+The change is merged. Its PR CI and release-please workflow passed; the merge commit's main CI run was still in progress when recorded. Planning-only pushes now keep the PR and main checks on the fast route, while any uncertain diff or source/release change continues through the full matrix.
 
 ---
 *Quick task: 261118-bvm*
@@ -147,5 +151,5 @@ The implementation is ready for the orchestrator to open the planned Conventiona
 ## Self-Check: PASSED
 
 - Summary file exists and contains the required requirements and coverage records.
-- All three task commits are ancestors of `HEAD`; measured plan commit count is 3.
+- All four task commits are ancestors of `HEAD`; measured plan commit count is 4.
 - `git diff --check` passes, and the quick-plan directory contains no home-directory paths.
