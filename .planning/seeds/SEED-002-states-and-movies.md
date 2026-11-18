@@ -5,6 +5,10 @@ planted: 2026-10-19
 planted_during: preparation, before milestone v1.0
 trigger_when: milestone v2.0 has shipped and players, speedrunners or Playstead ask for save states, rewind, run-ahead or input movies
 scope: large
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-002: States, rewind, run-ahead and movies (v3.0)

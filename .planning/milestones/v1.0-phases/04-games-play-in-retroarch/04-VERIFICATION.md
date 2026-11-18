@@ -1,6 +1,6 @@
 ---
 phase: 04-games-play-in-retroarch
-verified: 2026-11-13T10:33:38Z
+verified: 2026-11-18T11:25:13Z
 status: passed
 score: 199/199 must-haves verified
 covered_files:
@@ -306,7 +306,7 @@ covered_files:
   - "tests/timers/tests.cmake"
   - "tests/timers/timer_tests.c"
   - "tests/vectors/vectors.c"
-covered_digest: "v4:sha256:77725021761b9112ef295350ad34844da2956b3597e8a2dbdf9df3ff6748e887"
+covered_digest: "v4:sha256:2cce4f32194ed95374b66fe188a3454680acb34245dc6979186ae0e76288fe91"
 behavior_unverified: 0
 overrides_applied: 0
 ---
@@ -315,9 +315,9 @@ overrides_applied: 0
 
 **Phase Goal:** PlayStation programs play in RetroArch, with the GPU rasteriser and display modes, digital and DualShock pads with rumble, memory cards that persist across runs, OpenBIOS booting to its shell, and a compatibility ledger that only ratchets up.
 
-**Verified:** 2026-11-13 10:33:38 UTC
+**Verified:** 2026-11-18 11:25:13 UTC
 **Status:** passed
-**Re-verification:** No — no prior 04-VERIFICATION.md exists.
+**Verification refresh:** The previous report passed with no recorded gaps. This refresh reviewed all 58 plans and summaries, all five roadmap success criteria, all seven GAME requirements, and the current hosted evidence.
 
 ## Goal Achievement
 
@@ -325,17 +325,17 @@ overrides_applied: 0
 
 | # | Truth | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | GPU rendering matches the named reference images and register logs; motion frames are distinct and portable; scan-out geometry follows display-mode changes. | VERIFIED | Exact-head gpu-reference job ran all 13 registered GPU cases. Hash-equality passed across native, WASM, and BE32 outputs. Evidence is wired through tests/gpu/tests.cmake, tests/nightly/tests.cmake, tests/gpu/beam.c, and tests/gpu/display.c. |
-| 2 | Input changes guest play; three presses count exactly three; DualShock rumble is reported per frame; the libretro-host frame equals the runner frame. | VERIFIED | Registered fixture and libretro tests assert movie edges/counts, per-frame motors, and runner/host equality through tests/fixtures/tests.cmake and tests/libretro/tests.cmake; the exact-head CI lanes passed. |
-| 3 | Memory-card writes persist through a fresh runner process, while missing-card and wrong-card controls differ. | VERIFIED | tests/fixtures/tests.cmake starts independent runner processes using the same save directory and checks card values, frame hashes, and refusal controls. Card spans and host persistence are implemented in src/card.c and host/cards.c. |
-| 4 | OpenBIOS boots to its shell with a pinned hash; compatibility rejects unratcheted regressions; the fixture library run writes only the expected results file. | VERIFIED | The OpenBIOS job validates its pinned image and hands the run-local build to consumers; shell hashes compare across applicable lanes. Compatibility and temporary-library checks are registered in tests/compat/tests.cmake and passed in the current run. |
-| 5 | Hosted RetroArch loads pad_counter.exe with an empty system directory; frames 59 and 60 differ, and each screenshot matches its runner PNG pixel-for-pixel. | VERIFIED | RetroArch job 131818379067 passed using pinned RetroArch 1.22.2. Logs confirm empty system directory, content execution, and both exact screenshot-to-runner comparisons. tests/retroarch/run_retroarch.cmake and tests/retroarch/verify.py total 299 lines against the 300-line ceiling. |
+| 1 | GPU rendering matches the named reference images and register logs; motion frames are distinct and portable; scan-out geometry follows display-mode changes. | VERIFIED | CI run 44253419074 independently passed all 13 GPU-reference cases and hash equality across platform outputs. Nightly run 44233700921's `vectors-full` job also passed CTest 30/30, including all 13 `gpu.reference.*` cases; its JUnit inventory check confirms every case ran once ([primary job log](https://github.com/szTheory/schwaystation/actions/runs/44233700921/jobs/134564625732)). |
+| 2 | Input changes guest play; three presses count exactly three; DualShock rumble is reported per frame; the libretro-host frame equals the runner frame. | VERIFIED | Registered fixture and libretro tests assert movie edges/counts, per-frame motors, and runner/host equality through tests/fixtures/tests.cmake and tests/libretro/tests.cmake; CI run 44253419074 passed on the tested source tree. |
+| 3 | Memory-card writes persist through a fresh runner process, while missing-card and wrong-card controls differ. | VERIFIED | tests/fixtures/tests.cmake starts independent runner processes using the same save directory and checks card values, frame hashes, and refusal controls. Card spans and host persistence are implemented in src/card.c and host/cards.c; CI run 44253419074 passed. |
+| 4 | OpenBIOS boots to its shell with a pinned hash; compatibility rejects unratcheted regressions; the fixture library run writes only the expected results file. | VERIFIED | The OpenBIOS job validates its pinned image and hands the run-local build to consumers; shell hashes compare across applicable lanes. Compatibility and temporary-library checks are registered in tests/compat/tests.cmake and passed in CI run 44253419074. |
+| 5 | Hosted RetroArch loads pad_counter.exe with an empty system directory; frames 59 and 60 differ, and each screenshot matches its runner PNG pixel-for-pixel. | VERIFIED | The RetroArch job in CI run 44253419074 passed using pinned RetroArch 1.22.2. Logs confirm an empty system directory, content execution, and both exact screenshot-to-runner comparisons. The harness remains within its 300-line ceiling. |
 
 **Score:** 199/199 truths verified: the five roadmap criteria and 194 plan-specific must-have truths; zero behavior-unverified truths.
 
 ### Plan Must-Haves
 
-All 58 plans’ artifacts passed the native verifier: 442/442. Their behavior claims were traced to actual implementations, consumers, registered test inventories, and the successful exact-head workflow below; no must-have required owner UAT.
+All 58 plans and summaries were reviewed. The native artifact verifier passed 442/442 declared artifacts. Their behavior claims map to implementations, consumers, registered test inventories, and hosted CI evidence below; no must-have requires owner UAT.
 
 ## Required Artifacts
 
@@ -373,13 +373,16 @@ The native key-link matcher found 8 of 91 declared links by literal text. The un
 
 | Behavior | Command / run evidence | Result | Status |
 | --- | --- | --- | --- |
-| Required workflow and platform suite | Run 43404686338 on source HEAD 2f839fd29819d3d32a7ade8f0348db8fc6a1b1c5; hosted cmake --workflow --preset ci lanes | All required jobs succeeded; aggregate CI required job 131825214695 passed. Workflow-dispatch-only rehearsal and cleanup jobs were skipped as expected. | PASS |
-| GPU references | gpu-reference job 131816075623 | 13/13 registered cases passed once each. | PASS |
-| Platform regressions | Current native, ASan, WASM, and BE32 test jobs | Passed; BE32 ran 492 tests and WASM ran 460 tests, with inventory-completion checks succeeding. | PASS |
-| OpenBIOS and deterministic output | OpenBIOS job 131816075638; hash-equality job 131825151336 | Pinned firmware, shell hashes, and cross-lane comparison passed. | PASS |
-| Real-host RetroArch | Job 131818379067, run 43404686338 | Empty system directory; frames 59 and 60 are distinct and both pixel-equal their runner PNG references. | PASS |
+| Current hosted CI and platform suite | Run 44253419074, source commit 15525817dda76ff6c4695e5fe1b6188c85e35dfd, tree 058ac8996b00488ce9bd79092b4b750ae4d33214 | All six platform CI/test legs, BE32, wasm32, hash equality, GPU reference, OpenBIOS, and RetroArch jobs passed. The tested tree matches current `origin/main`; the working branch contains planning-only changes in this scope. | PASS |
+| GPU references | `gpu-reference` job in run 44253419074 | 13/13 named GPU reference cases passed, including pinned image comparisons and register/log assertions. | PASS |
+| Input, card, compatibility and fixtures | Registered CTest inventories in run 44253419074 | Hosted test legs passed; existing test wiring covers movie inputs, rumble, fresh-process card persistence and refusal controls, compatibility ratchets, and fixture output isolation. | PASS |
+| OpenBIOS and deterministic output | Jobs in run 44253419074 | Pinned firmware validation, shell hashes and cross-platform hash equality passed. | PASS |
+| Real-host RetroArch | RetroArch job in run 44253419074 | Empty system directory; frames 59 and 60 are distinct and both pixel-equal their runner PNG references. | PASS |
+| Scheduled Nightly scope | [Nightly `vectors-full` job 134564625732](https://github.com/szTheory/schwaystation/actions/runs/44233700921/jobs/134564625732) | CTest 30/30 passed, including all 13 `gpu.reference.*` cases, `spu.reference.memory_transfer`, 3 CD-ROM references, and 12 MDEC references; JUnit inventory check confirms all 30 ran once. The Nightly run's fuzz and benchmark jobs also passed. | PASS |
 
-Run URL: https://github.com/szTheory/schwaystation/actions/runs/43404686338. Its terminal conclusion is success on the exact source HEAD. The later metadata-only commit b5be30d9c65e677b7656a90d021819c36bcd908b added the final summaries without changing the tested source, tests, or workflow.
+CI run URL: https://github.com/szTheory/schwaystation/actions/runs/44253419074. Its source tree is identical to current `origin/main`, and the Phase 4 source/test/workflow paths have no working-tree delta. Nightly run 44233700921's GPU references are verified from its `vectors-full` primary job log: https://github.com/szTheory/schwaystation/actions/runs/44233700921/jobs/134564625732.
+
+**GPU evidence:** Both the scheduled Nightly `vectors-full` job and the dedicated `gpu-reference` CI job cover the 13 named GPU oracle cases. The CI job is configured with `SCHWAYSTATION_INVENTORY=nightly` and validates the nightly GPU inventory; the Nightly job log separately confirms all 30 inventory cases ran exactly once.
 
 ## Decision Coverage
 
@@ -391,7 +394,7 @@ Run URL: https://github.com/szTheory/schwaystation/actions/runs/43404686338. Its
 
 | Requirement | Source plans | Status | Evidence |
 | --- | --- | --- | --- |
-| GAME-01 | 03–08, 11–12, 30–31, 46–48 | SATISFIED | Full GPU pipeline and fixtures; 13/13 real reference cases and portable hash comparison. |
+| GAME-01 | 03–08, 11–12, 30–31, 46–48 | SATISFIED | Full GPU pipeline and fixtures; all 13 reference cases passed in both `gpu-reference` CI and Nightly `vectors-full`; the Nightly job's JUnit inventory check confirms 30/30 cases ran once ([job log](https://github.com/szTheory/schwaystation/actions/runs/44233700921/jobs/134564625732)). |
 | GAME-02 | 09–12, 27, 43 | SATISFIED | Beam, timing, scan-out, metadata, and libretro geometry tests passed across required lanes. |
 | GAME-03 | 14–15, 18, 28, 31 | SATISFIED | Digital/DualShock protocol, movie edges, rumble, replay and host/runner tests passed. |
 | GAME-04 | 16–17, 19, 28, 31 | SATISFIED | Stable spans, atomic host save and fresh-process round trip/refusal fixtures passed. |
@@ -421,6 +424,6 @@ None. All five roadmap criteria, seven phase requirements, and 194 plan-specific
 
 ---
 
-_Verified: 2026-11-13 10:33:38 UTC_
+_Verified: 2026-11-18 11:25:13 UTC_
 _Verifier: the gsd-verifier agent_
 

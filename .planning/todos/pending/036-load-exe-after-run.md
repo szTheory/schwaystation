@@ -6,6 +6,9 @@ source: "phase 02 code review, finding IN-06"
 created: 2026-11-10
 theme: api
 bound_step: "phase 4, the first plan that edits src/exe.c (the adapter's PS-EXE content path)"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

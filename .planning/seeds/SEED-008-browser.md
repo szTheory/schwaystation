@@ -5,6 +5,10 @@ planted: 2026-10-19
 planted_during: preparation, before milestone v1.0
 trigger_when: milestone v1.0 has shipped (weigh it against v2.0 at that new-milestone step), or the owner asks for a web build sooner
 scope: medium
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-008: schwaystation in the browser: an efficient WebAssembly build

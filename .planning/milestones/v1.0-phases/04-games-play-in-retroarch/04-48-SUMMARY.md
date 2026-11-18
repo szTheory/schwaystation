@@ -39,7 +39,8 @@ key-decisions:
   - "Use only project-owned GPU contracts and vetted hardware references for DMA predicates; exclude the forbidden GPL helper."
 patterns-established:
   - "Run real captured GPU oracles in the focused required lane, with synthetic controls remaining gating in ordinary CI."
-requirements-completed: []
+requirements-completed:
+  - GAME-01
 coverage:
   - id: D1
     description: Ten GPU captures and three ordered hardware-log predicates pass in the required hosted lane.

@@ -2,40 +2,37 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 06
-current_plan: Not started
-status: completed
-stopped_at: "Phase 06 verified and complete; ship PR #22, confirm the v1.0 release, then refresh stale prior-phase reports and close out the milestone."
-last_updated: "2026-11-18T05:44:13.631Z"
+status: Awaiting next milestone
+stopped_at: Milestone v1.0 complete and archived
+last_updated: "2026-11-18T12:45:21.214Z"
 last_activity: 2026-11-18
-last_activity_desc: "Phase 06 goal-backward verification passed. Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; GSD reviewer/verifier configured as gpt-6-luna (xhigh). Exact-head CI 44233701039 and Nightly 44233700921 passed; CI covered 613 tests, BE32 570 tests, RetroArch 900 frames with pixel-equal output. phase.complete emitted 12 artifact-scan warnings, confirmed to be shell command strings misread as files. Next: ship PR #22, confirm main CI and release, refresh stale Phases 1–5, then audit, complete and clean up v1.0."
-state_head: 2c0d3527bb82f63ad5e585b2b5a328e7d8b4eeb0
+last_activity_desc: Milestone v1.0 completed and archived
+state_head: 49a0d091aeb938e3d9882d1893e8488b45369214
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 195
   completed_plans: 195
   percent: 100
+current_phase: 06
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-15)
+See: .planning/PROJECT.md (updated 2026-11-18)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 06 — Discs and FMV
+**Current focus:** v1.0 complete; no next milestone is active
 
 ## Current Position
 
-Phase: 06
-Current Plan: Not started
-Next plan file: 06-45-PLAN.md
-Status: All phases complete
-Last activity: 2026-11-18 — Phase 06 complete
-
-Progress: [██████████] 100%
+Milestone: v1.0 complete and archived
+Phase: 06 — Discs and FMV (verified)
+Plan: —
+Status: No active milestone
+Last activity: 2026-11-18 — v1.0 closeout complete
 
 ## Performance Metrics
 
@@ -48,10 +45,10 @@ Progress: [██████████] 100%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 | 15 | - | - |
+| 01 | 15 | - | - |
 | 02 | 27 | - | - |
-| 3 | 26 | - | - |
-| 4 | 58 | - | - |
+| 03 | 26 | - | - |
+| 04 | 58 | - | - |
 | 05 | 24 | - | - |
 | 06 | 45 | - | - |
 
@@ -643,15 +640,55 @@ Recent decisions affecting current work:
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 261029-ldd | Complete the phase-1 CI tail on phase/01-ci-tail | 2026-10-29 | 37a029b | [261029-ldd-complete-the-phase-1-ci-tail](./quick/261029-ldd-complete-the-phase-1-ci-tail/) |
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close, most recent first:
+Items acknowledged and deferred at milestone close, most recent first. Acknowledgment does not resolve an item; its original pending or dormant status remains in its source ledger. Changed items can resurface at a later audit.
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
-| *(none)* | | | | |
+| seeds | SEED-001 | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-002 | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-003 | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-004 | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-005 | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-006 | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-007 | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-008 | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-261116-mrh | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-261116-osn | dormant | 2026-11-18 | v1.0 |
+| seeds | SEED-261118-8b0 | dormant | 2026-11-18 | v1.0 |
+| todos | 001-ci-required-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 002-release-floor-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 003-pins-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 004-single-version-source-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 005-notices-gates.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 006-vendored-digest-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 010-dependabot-config.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 011-dependabot-automerge-workflow.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 012-dependabot-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 014-no-test-entries-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 015-digest-workflow.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 016-hygiene-format-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 017-hygiene-analyzer-gate.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 021-actionlint-local-config.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 022-windows-dll-crt-consumer-flake.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 025-user-mode-fetch-address-error.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 026-state-load-cop0-and-r0-validation.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 027-icache-refill-bus-error-word.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 028-exception-loop-progress-heuristic.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 033-vector-harness-uninitialised-record.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 035-sst-slice-name-field.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 036-load-exe-after-run.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 037-swl-swr-single-bus-write.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 038-gte-write-to-use-latency.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 044-lane-helpers-shared.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 046-gte-file-header-notice.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 047-cd-dma-40-clock-cost.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 048-split-gpu-pixel-test-cases.md | (presence-only) | 2026-11-18 | v1.0 |
+| todos | 049-review-runner-checkpoint-repeats.md | (presence-only) | 2026-11-18 | v1.0 |
+| deferred_items | 01/deferred-items.md: AppleClang Debug abi.undefined for memcpy_chk and memset_chk; ci Release passes; fix belongs with a future core-options or ABI-gate change | acknowledged | 2026-11-18 | v1.0 |
+| deferred_items | 04/deferred-items.md: local actionlint does not recognize existing ubuntu-26.04 runner labels; hosted workflow passes with only those warnings ignored | acknowledged | 2026-11-18 | v1.0 |
 
 ## Runtime Log
 
@@ -663,6 +700,7 @@ come from `AGENTS.md`.
 
 | Date | Step | Runtime | Model |
 |------|------|---------|-------|
+| 2026-11-18 | v1.0 audit, completion and cleanup | Codex/OpenGSD 1.20.0; reused exact-tree hosted CI; no local long suite rerun | Primary GPT-6 session (exact model ID unavailable); integration checker gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-discuss-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; three read-only advisors and adversarial synthesis | GPT-6 session (exact model ID not exposed); advisors gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-plan-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; 26 plans, 19 waves; schema/structure, command/failure probes, decision and requirement coverage; post-planning gaps clear | GPT-6 session (exact model ID not exposed); planner gpt-6.1-sol high; researcher and checker gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-execute-plan 06-01 | Codex, OpenGSD 1.20.0; sequential shared checkout; subsystem skeleton and inventories; tracer 19/19 and policy 4/4; 12 min | gpt-6-luna xhigh |
@@ -802,7 +840,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-17T19:23:53.046Z
-Stopped at: Phase 06 complete — all phases complete
+Stopped at: Phase 05 complete — all phases complete
 Resume file: .planning/phases/06-discs-and-fmv/06-42-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
@@ -956,3 +994,36 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unava
 ### Phase 6 plan 06-45 generated-playlist hash repair (2026-11-18)
 
 Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); independent gsd-code-reviewer. Exact-head Nightly run 44210060292 passed; CI run 44210060285 passed all lanes including be32 but failed only the final hash-equality job. Artifact comparison isolated the difference to `disc_boot_runner.m3u`: Windows `file(WRITE)` emitted CRLF and Linux emitted LF. Changed its CMake producer to `file(CONFIGURE ... NEWLINE_STYLE UNIX)`. The reviewer found no issue. `cmake --preset ci` passed; the regenerated playlist hash matches the be32 artifact (`722ce2c1c07b9c90102dd872faea02e306617c5604cdf331ad7a7dc2df3509b8`), and `runner.disc.api` passed 1/1. Current source changes still need exact-head hosted CI and Nightly; no verification or ship claim is made.
+
+## v1.0 stale-verification refreshes
+
+### Phase 01 — verification refresh (2026-11-18)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-verifier gpt-6-luna xhigh; gsd-code-reviewer gpt-6-luna xhigh. Refreshed `01-VERIFICATION.md` through the execute-phase stale-report route; all five roadmap criteria and FRAME-01–09 passed. No local tests were rerun. Reused `cmake --workflow --preset ci` (exit 0) and `cmake --workflow --preset be32` (exit 0) from [release-PR CI run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074), whose tree matches current `main`; the [main CI run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502) also passed. Release artifact validation and install-line checks passed in [release run 44262491280](https://github.com/szTheory/schwaystation/actions/runs/44262491280). `phase.complete` warnings were shell commands embedded in historical summaries misread as filenames; no source files were missing. The Phase 1 review also found a latent filename-separator bypass in the test-only firmware scanner; the current tracked tree contains no semicolon/newline paths, the release scan passed, and the deferred tooling work is captured in seed `SEED-261118-8b0` per project policy.
+
+### Phase 02 — verification refresh (2026-11-18)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-verifier gpt-6-luna xhigh; gsd-code-reviewer gpt-6-luna xhigh. Refreshed `02-VERIFICATION.md`; all five roadmap criteria and CPU-01–05 passed. No local tests were rerun. Reused the all-platform [release-PR CI run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074), whose source tree matches current `main`, plus successful `vectors-full` and `fuzz` jobs from [nightly run 44233700921](https://github.com/szTheory/schwaystation/actions/runs/44233700921); the CPU/vector/fuzz source files exercised are unchanged. Code review found no new source/test delta or findings. The exception-loop false-positive remains a non-blocking historical advisory. `phase.complete` warnings were command examples embedded in historical summaries misread as missing files; no source files were missing.
+
+### Phase 03 — verification refresh (2026-11-18)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-verifier gpt-6-luna xhigh; gsd-code-reviewer gpt-6-luna xhigh. Refreshed `03-VERIFICATION.md`; all three roadmap criteria and GTE-01–03 passed. No local tests were rerun. Reused the all-platform [release-PR CI run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074) on the exact current source tree; the GTE/DMA/timer code and tests are unchanged. The existing Phase 03 review/disposition remain valid; fixed findings have regression tests and remaining findings are tracked as todos. The 40-clock CD-ROM cost deferral remains documented. `phase.complete` warnings were historical shell commands and path expressions misread as missing files; no source files were missing.
+
+### Phase 04 — verification refresh (2026-11-18)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-verifier gpt-6-luna xhigh; gsd-code-reviewer gpt-6-luna xhigh. Refreshed `04-VERIFICATION.md`; all seven roadmap criteria and GAME-01–07 passed (199/199 must-haves). No local tests were rerun. Reused the all-platform [release-PR CI run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074) on the exact current source tree: six platform legs, OpenBIOS, hash equality, RetroArch pad-control pixel comparison, and all 13 GPU reference cases passed. The Phase 6 nightly [run 44233700921](https://github.com/szTheory/schwaystation/actions/runs/44233700921) did not run GPU reference cases; that placement is recorded accurately in the report. Existing review findings remain disposed; this branch adds no source/test changes. `phase.complete` warnings were historical commands, scratch paths and removed intermediate files misread as missing source; no shipped source was missing.
+
+### Phase 05 — verification refresh (2026-11-18)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-verifier gpt-6-luna xhigh; gsd-code-reviewer gpt-6-luna xhigh. Refreshed `05-VERIFICATION.md`; all three roadmap criteria, SOUND-01/02 and 74/74 must-haves passed. No local tests were rerun. Reused the all-platform [release-PR CI run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074) on the exact current source tree, including audio hashes, platform lanes and libretro/RetroArch checks. [Nightly run 44233700921](https://github.com/szTheory/schwaystation/actions/runs/44233700921) passed 30/30 tests and its log explicitly records `spu.reference.memory_transfer` passing; the relevant SPU, comparator, fixture, pin and inventory files are unchanged since that run. The existing Phase 05 review remains valid; the only stale input was later CI workflow wiring, which retains the SPU gates. `phase.complete` flagged one test command embedded in a historical summary as a missing file; no source files were missing.
+
+## Operator Next Steps
+
+- Start the next milestone with $gsd-new-milestone
+
+
+### v1.0 milestone closeout (2026-11-18)
+
+All six phase verification reports passed; milestone audit found 30/30 requirements, 30/30 integration paths and 7/7 flows, with accepted MDEC conformance limits and non-blocking follow-ups recorded in `.planning/milestones/v1.0-MILESTONE-AUDIT.md`. The closeout scanner found 29 pending todos, 11 dormant seeds and two existing deferred notes. All 42 were acknowledged as deferred, not marked resolved; the details are listed in the Deferred Items table above. The phase trees and one completed quick task are archived under `.planning/milestones/v1.0-phases/` and `.planning/milestones/v1.0-quick/`.
+
+Hosted evidence reused: [release-PR CI run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074), [nightly full-vector job 134564625732](https://github.com/szTheory/schwaystation/actions/runs/44233700921/jobs/134564625732), and [v0.6.0 release run 44262491280](https://github.com/szTheory/schwaystation/actions/runs/44262491280). Planning-only edits received `git diff --check`; no implementation tests were added or rerun.

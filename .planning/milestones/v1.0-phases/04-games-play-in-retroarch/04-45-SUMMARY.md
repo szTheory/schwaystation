@@ -48,7 +48,8 @@ key-decisions:
   - Preserve the repository CI preset; use a temporary ignored four-job preset for local full-workflow evidence.
 patterns-established:
   - A true functional .info capability must map to a registered inventory case and an observed behavior check.
-requirements-completed: []
+requirements-completed:
+  - GAME-07
 coverage:
   - id: D1
     description: Functional metadata claims are validated at configure time and reject ungrounded true claims.

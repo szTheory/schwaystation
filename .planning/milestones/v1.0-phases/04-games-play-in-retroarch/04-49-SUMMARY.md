@@ -40,7 +40,8 @@ key-decisions:
   - "Preserve boot_status and play_status as unavailable because the probe only reports identity."
 patterns-established:
   - "Equivalent 2048, 2352 and 2336-byte CUE data layouts use the same ISO identity reader."
-requirements-completed: []
+requirements-completed:
+  - GAME-06
 coverage:
   - id: cue-identity
     description: "Supported CUE/BIN sector layouts and track 99 preserve the established synthetic boot identity."

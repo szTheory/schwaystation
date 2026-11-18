@@ -33,7 +33,8 @@ key-decisions:
   - "Send geometry callbacks only for dimension changes and AV-info callbacks only for rate changes."
 patterns-established:
   - "Native video acceptance tests use generated first-party PS-EXEs with independently checked pixels."
-requirements-completed: []
+requirements-completed:
+  - GAME-02
 coverage:
   - id: D1
     description: "The libretro adapter converts native RGB555 and packed RGB24 frames and reports dimensions and rate changes at the appropriate callbacks."

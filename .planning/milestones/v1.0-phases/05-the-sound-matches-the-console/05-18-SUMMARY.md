@@ -50,7 +50,8 @@ coverage:
     requirement: SOUND-01
     verification:
       kind: unit
-      ref: "cmake --preset ci && cmake --build --preset ci --target schwaystation-test-spu-fixture && ctest --test-dir build/ci -R '^spu\.fixture$' --no-tests=error --output-on-failure"
+      ref: >-
+        cmake --preset ci && cmake --build --preset ci --target schwaystation-test-spu-fixture && ctest --test-dir build/ci -R '^spu\.fixture$' --no-tests=error --output-on-failure
       status: pass
     human_judgment: false
   - id: D2
@@ -58,7 +59,8 @@ coverage:
     requirement: SOUND-01
     verification:
       kind: unit
-      ref: "cmake --preset ci && cmake --build --preset ci --target schwaystation-test-spu-fixture && ctest --test-dir build/ci -R '^spu\.fixture$' --no-tests=error --output-on-failure"
+      ref: >-
+        cmake --preset ci && cmake --build --preset ci --target schwaystation-test-spu-fixture && ctest --test-dir build/ci -R '^spu\.fixture$' --no-tests=error --output-on-failure
       status: pass
     human_judgment: false
 duration: "at least 36 min"

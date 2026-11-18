@@ -6,6 +6,9 @@ source: "phase 02 code review, finding WR-02"
 created: 2026-11-10
 theme: state
 bound_step: "phase 4, the first plan that edits src/cpu.c or the CPU part of the state walk"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

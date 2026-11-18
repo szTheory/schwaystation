@@ -6,3 +6,4 @@
   (Release) passes. Two possible fixes: a `-D_FORTIFY_SOURCE=0` core option, or the two names on the Darwin
   helper row of `tests/cmake/abi.cmake`. This belongs to the plan that next edits `schway_core_options` or
   `tests/cmake/abi.cmake`.
+  status: acknowledged

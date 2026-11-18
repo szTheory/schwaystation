@@ -6,6 +6,9 @@ source: "phase 02 code review, finding IN-03"
 created: 2026-11-10
 theme: tooling
 bound_step: "SEED-007 (the v1.0 milestone tune-up); a tooling seed, not phase work"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

@@ -273,7 +273,7 @@ covered_files:
   - "tests/tests.cmake"
   - "tests/util/rc_compat.h"
   - "tools/gen_disc.py"
-covered_digest: "v4:sha256:3a77bba5f9698753ce3f95c29535d90b51ed36958be9992196996dcbf80e23d2"
+covered_digest: "v4:sha256:d6d3716523bb705570d574842eed980282c4c30266dbbc1f54de069350e5f3c8"
 ---
 
 # Phase 6 verification

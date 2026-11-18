@@ -2,7 +2,7 @@
 title: "Prompt coverage"
 summary: "Every ask in the owner's kickoff prompt (2026-10-19) mapped to the file and section that answers it, with a status; and where the owner's constraints and preparation's recommendations differ."
 read_when: "At kickoff review and at every milestone close; when the owner asks whether something was forgotten."
-updated: 2026-10-19
+updated: 2026-11-18
 ---
 
 # Prompt coverage
@@ -42,8 +42,8 @@ Rows are never renumbered or deleted; new asks take the next number.
 | 23 | Recurring CI/CD efficiency audits baked in | ENGINEERING 12; SEED-007 | Partial | Ir/frame, header and README budgets in v1.0; `quality.json`, the digest and both audits from the v2.0 tune-up (SEED-007) |
 | 24 | Recurring weakest-quality-dimension reviews baked in | ENGINEERING 12; SEED-007 | Partial | Ir/frame, header and README budgets in v1.0; `quality.json`, the digest and both audits from the v2.0 tune-up (SEED-007) |
 | 25 | Verification shifted left and automated; only the truly necessary handed to the owner; recorded so it never loops back | AGENTS rule 6; DEC.101; GSD-HANDOFF 3 | Documented | settled, never re-proposed |
-| 26 | Stop after each GSD phase so the owner can check and switch models | AGENTS rule 9; GSD-HANDOFF 3, 5, 6; `scripts/hygiene.sh` stop policy; DEC.98 | Documented | |
-| 27 | Releases the owner can download and try on a Mac through some frontend (Playstead not ready) | HOSTS 3 (RetroArch Metal); README install line; DEC.70 | Documented | test frame v1.0 ph1; games ph3; sound ph4 |
+| 26 | Stop after each GSD phase so the owner can check and switch models | AGENTS rule 9; GSD-HANDOFF 3, 5, 6; `scripts/hygiene.sh` stop policy; DEC.98 | Documented | v1.0 autonomous authorization ran through phase 6 release and closeout; future milestone policy remains in AGENTS rule 9 |
+| 27 | Releases the owner can download and try on a Mac through some frontend (Playstead not ready) | HOSTS 3 (RetroArch Metal); README install line; DEC.70 | Documented | test frame v1.0 ph1; games ph4; sound ph5; discs and FMV ph6 |
 | 28 | The owner's physical discs as test input | ASSET_POLICY 4; CONFORMANCE 3.3 (local `library` preset); DEC.83 | Documented | local only, from v1.0 ph3; never in CI |
 | 29 | Speedrunning | DEC.08, DEC.44 (no speed changes); ECO 3.2; HOSTS 5; DEC.66 (lag frames); SEED-002 | Partial | lag count in the runner v1.0; movies v3.0 |
 | 30 | Machine/AI-assisted speedruns and TAS | ECO 3.3; HOSTS 5; SEED-002, SEED-004 | Later | v3.0 movies, v5.0 tools |
@@ -82,5 +82,4 @@ Rows are never renumbered or deleted; new asks take the next number.
 
 ## 3. Keeping this file true
 Refresh at kickoff review and at each milestone close. A new owner ask takes the next number. A row moves from
-Later to Documented only when its seed is promoted and the work is planned. Requirement traceability in
-`REQUIREMENTS.md` does not replace this check: it covers requirements, this covers asks.
+Later to Documented only when its seed is promoted and the work is planned. Requirement traceability in the archived v1.0 requirements file does not replace this check: it covers requirements, this covers asks. Future requirements will be created at an authorized milestone kickoff.

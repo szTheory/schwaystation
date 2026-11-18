@@ -6,6 +6,9 @@ source: "phase 03 verification, advisory note"
 created: 2026-11-10
 theme: dma
 bound_step: "phase 6, the first plan that builds the CD-ROM device end of DMA channel 3"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

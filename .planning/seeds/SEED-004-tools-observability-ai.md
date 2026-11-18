@@ -5,6 +5,10 @@ planted: 2026-10-19
 planted_during: preparation, before milestone v1.0
 trigger_when: states and movies exist (SEED-002) and a homebrew developer, ROM hacker, TAS author or AI user asks for hooks, a GDB stub, a debugger view, Python bindings or a Gymnasium environment
 scope: medium
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
+  status: dormant
 ---
 
 # SEED-004: Tools: hooks, GDB stub, debugger views, ROM-hacker aids, Python and Gymnasium, Lua on demand (v5.0)

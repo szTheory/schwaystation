@@ -59,7 +59,7 @@ coverage:
         ref: ASan and fuzz configure with Apple Clang overrides; producer and libretro host build; content.no_bios and cards.persistence pass
         status: pass
       - kind: other
-        ref: CTest JSON inventory comparison: CI 74 fixtures/18 libretro, ASan 0/18, fuzz 0/18
+        ref: "CTest JSON inventory comparison: CI 74 fixtures/18 libretro, ASan 0/18, fuzz 0/18"
         status: pass
       - kind: integration
         ref: cmake --workflow --preset ci-local-4; 509 CI tests and 5 release tests pass; packages produced

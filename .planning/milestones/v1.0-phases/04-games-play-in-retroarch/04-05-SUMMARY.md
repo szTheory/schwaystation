@@ -72,7 +72,8 @@ coverage:
         ref: "gpu.pixel.textured_rectangle_mmio in cmake --workflow --preset ci (exit 0)"
         status: pass
       - kind: integration
-        ref: "ctest --test-dir build/ci -R '^gpu\.pixel\.(arithmetic|palette_wrap|textured_rectangle_mmio)$' --no-tests=error --output-on-failure (exit 0; 3 tests)"
+        ref: >-
+          ctest --test-dir build/ci -R '^gpu\.pixel\.(arithmetic|palette_wrap|textured_rectangle_mmio)$' --no-tests=error --output-on-failure (exit 0; 3 tests)
         status: pass
     human_judgment: false
   - id: D2

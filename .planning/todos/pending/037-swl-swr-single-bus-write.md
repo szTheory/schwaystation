@@ -6,6 +6,9 @@ source: "phase 02 code review, finding IN-07"
 created: 2026-11-10
 theme: bus
 bound_step: "phase 4, the first plan that adds a width-sensitive GPU register or edits the store path in src/cpu_exec.inc"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal

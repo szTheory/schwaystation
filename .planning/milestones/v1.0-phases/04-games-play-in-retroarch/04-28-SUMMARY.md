@@ -37,7 +37,8 @@ key-decisions:
 patterns-established:
   - "Controller movie comparisons retain separate serialized-state references for each controller family."
   - "Guest SIO transactions and independent core references verify host-visible rumble rather than interface registration alone."
-requirements-completed: []
+requirements-completed:
+  - GAME-03
 coverage:
   - id: D1
     description: Per-port device selection, defaults, absent input callback, analog option and frame-60 toggle behavior.

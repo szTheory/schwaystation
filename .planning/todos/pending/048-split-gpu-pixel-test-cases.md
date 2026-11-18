@@ -6,6 +6,9 @@ source: "phase 04 code review, standards finding on test case size"
 created: 2026-11-10
 theme: cleanup
 bound_step: "SEED-007, the tune-up that opens the next milestone"
+audit_acknowledged:
+  milestone: v1.0
+  at: 2026-11-18
 ---
 
 ## Goal
