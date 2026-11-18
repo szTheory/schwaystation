@@ -178,44 +178,159 @@ schway_add_test(NAME ci.title.self_test
 # list wholly under .planning/, both names of a rename included, from a pull
 # request of at most 3000 files, the most the files API lists;
 # release_inputs=true for any of the five release inputs and for any list
-# that cannot be trusted.
+# that cannot be trusted. The route controls below execute the marked shell
+# block from ci.yml itself, so this test covers event wiring as well as paths.
+file(READ ${CMAKE_SOURCE_DIR}/.github/workflows/ci.yml hygiene_ci_workflow)
+string(FIND "${hygiene_ci_workflow}" "# CI_CLASSIFIER_TEST_BEGIN\n" hygiene_ci_start)
+string(FIND "${hygiene_ci_workflow}" "\n          # CI_CLASSIFIER_TEST_END" hygiene_ci_end)
+if(hygiene_ci_start EQUAL -1 OR hygiene_ci_end EQUAL -1 OR hygiene_ci_end LESS hygiene_ci_start)
+  message(FATAL_ERROR "ci.classify: missing workflow shell markers")
+endif()
+string(LENGTH "# CI_CLASSIFIER_TEST_BEGIN\n" hygiene_ci_marker_length)
+math(EXPR hygiene_ci_start "${hygiene_ci_start} + ${hygiene_ci_marker_length}")
+math(EXPR hygiene_ci_length "${hygiene_ci_end} - ${hygiene_ci_start}")
+string(SUBSTRING "${hygiene_ci_workflow}" ${hygiene_ci_start} ${hygiene_ci_length} hygiene_ci_step)
+string(REPLACE "\n          " "\n" hygiene_ci_step "${hygiene_ci_step}")
+string(SUBSTRING "${hygiene_ci_step}" 10 -1 hygiene_ci_step)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/hygiene)
+set(hygiene_ci_script ${CMAKE_BINARY_DIR}/hygiene/classifier-step.sh)
+file(WRITE ${hygiene_ci_script} "#!/bin/bash\nset -euo pipefail\n${hygiene_ci_step}\n")
 set(hygiene_classify [=[
-script=$1
+workflow=$1
+source_root=$2
+fixture_root=$3
 n=0
-check() {
-  got=$(printf '%b' "$3" | sh "$script" "${4-2}" | tr '\n' ' ')
-  if [ "$got" != "heavy=$1 release_inputs=$2 " ]
-  then
+check_paths() {
+  got=$(printf '%b' "$3" | sh "$source_root/scripts/classify-changes.sh" "${4-2}" | tr '\n' ' ')
+  if [ "$got" != "heavy=$1 release_inputs=$2 " ]; then
     echo "ci.classify: want heavy=$1 release_inputs=$2, got $got for: $3"
     exit 1
   fi
   n=$((n + 1))
 }
-check true false '.planning/STATE.md\nsrc/core.c\n'
-check true false 'src/core.c\n.planning/core.c\n'
-check true true ''
-check true true '\n\n'
-check true false '(listing failed)\n'
-check true false '.planning-notes/a.md\n'
-check true false 'docs/.planning/a.md\n'
-check false false '.planning/STATE.md\n.planning/phases/01/a.md\n'
-check false false '.planning/STATE.md'
-check false false '.planning/STATE.md\n' 3000
-check true true '.planning/STATE.md\n' 3001
-check true true '.planning/STATE.md\n' ''
-check true true '.planning/STATE.md\n' 'x'
-check true true '.github/workflows/release.yml\n'
-check true true '.github/workflows/ci.yml\n'
-check true true 'src/core.c\nscripts/publish.sh\n'
-check true true 'release-please-config.json\n'
-check true true 'cmake/packaging.cmake\n'
-check true true 'scripts/publish.sh\nscripts/release.sh\n'
-check true false 'scripts/publish.sh.orig\ndocs/release.yml\n'
-check false false '.planning/STATE.md\n' 1
+check_route() {
+  name=$1 want=$2 event=$3 ref=$4 number=$5 call_ref=$6 before=$7 after=$8 checkout=$9
+  git -C "$runner" fetch -q --no-tags --depth=1 origin "$checkout"
+  git -C "$runner" checkout -q --detach "$checkout"
+  : > "$output"
+  got=$(EVENT="$event" REF="$ref" NUMBER="$number" CALL_REF="$call_ref" \
+    BEFORE="$before" AFTER="$after" CHANGED=1 GITHUB_WORKSPACE="$runner" \
+    GITHUB_REPOSITORY=fixture/project GITHUB_OUTPUT="$output" GH_TOKEN=test-token \
+    PATH="$bin:$PATH" bash -e -o pipefail "$workflow")
+  output_got=$(tr '\n' ' ' < "$output")
+  if [ "$output_got" != "$want" ]; then
+    echo "ci.classify: $name wanted $want, got $output_got"
+    echo "workflow stdout: $got"
+    exit 1
+  fi
+  n=$((n + 1))
+}
+check_paths true false '.planning/STATE.md\nsrc/core.c\n'
+check_paths true false 'src/core.c\n.planning/core.c\n'
+check_paths true true ''
+check_paths true true '\n\n'
+check_paths true false '(listing failed)\n'
+check_paths true false '.planning-notes/a.md\n'
+check_paths true false 'docs/.planning/a.md\n'
+check_paths false false '.planning/STATE.md\n.planning/phases/01/a.md\n'
+check_paths false false '.planning/STATE.md'
+check_paths false false '.planning/STATE.md\n' 3000
+check_paths true true '.planning/STATE.md\n' 3001
+check_paths true true '.planning/STATE.md\n' ''
+check_paths true true '.planning/STATE.md\n' 'x'
+check_paths true true '.github/workflows/release.yml\n'
+check_paths true true '.github/workflows/ci.yml\n'
+check_paths true true 'src/core.c\nscripts/publish.sh\n'
+check_paths true true 'release-please-config.json\n'
+check_paths true true 'cmake/packaging.cmake\n'
+check_paths true true 'scripts/publish.sh\nscripts/release.sh\n'
+check_paths true false 'scripts/publish.sh.orig\ndocs/release.yml\n'
+check_paths false false '.planning/STATE.md\n' 1
+
+rm -rf "$fixture_root"
+mkdir -p "$fixture_root/repo/.planning" "$fixture_root/bin"
+remote=$fixture_root/origin.git
+repo=$fixture_root/repo
+runner=$fixture_root/runner
+output=$fixture_root/output
+git init -q --bare "$remote"
+git --git-dir="$remote" symbolic-ref HEAD refs/heads/main
+git init -q "$repo"
+git -C "$repo" checkout -q -b main
+git -C "$repo" remote add origin "$remote"
+git -C "$repo" config user.name CI
+git -C "$repo" config user.email ci@users.noreply.github.com
+mkdir -p "$repo/scripts"
+cp "$source_root/scripts/classify-changes.sh" "$repo/scripts/classify-changes.sh"
+printf '%s\n' 'rename seed' > "$repo/.planning/rename.txt"
+commit() {
+  git -C "$repo" add -A
+  git -C "$repo" -c user.name=CI -c user.email=ci@users.noreply.github.com commit -qm "$1"
+  git -C "$repo" rev-parse HEAD
+}
+base=$(commit base)
+printf '%s\n' 'planning state' > "$repo/.planning/STATE.md"
+planning=$(commit planning)
+mkdir -p "$repo/src"
+printf '%s\n' 'source' > "$repo/src/core.c"
+source=$(commit source)
+mv "$repo/.planning/rename.txt" "$repo/src/rename.txt"
+planning_to_source=$(commit planning-to-source-rename)
+printf '%s\n' 'rename seed' > "$repo/src/moved.txt"
+source_seed=$(commit source-rename-seed)
+mv "$repo/src/moved.txt" "$repo/.planning/moved.txt"
+source_to_planning=$(commit source-to-planning-rename)
+mkdir -p "$repo/.github/workflows"
+printf '%s\n' 'release' > "$repo/.github/workflows/release.yml"
+release=$(commit release-input)
+weird=$(printf '.planning/innocent\nsrc/escaped.c')
+mkdir -p "$(dirname "$repo/$weird")"
+printf '%s\n' 'quoted path' > "$repo/$weird"
+special=$(commit special-path)
+mkdir -p "$repo/.planning/many"
+i=1
+while [ "$i" -le 3001 ]; do
+  : > "$repo/.planning/many/$i"
+  i=$((i + 1))
+done
+oversize=$(commit oversize)
+git -C "$repo" push -q origin main
+git clone -q --depth 1 "file://$remote" "$runner"
+
+printf '%s\n' '#!/bin/sh' '[ "${GH_LIST_FAIL-}" = 1 ] && exit 1' \
+  "printf '%s\\n' '.planning/STATE.md'" > "$fixture_root/bin/gh"
+chmod +x "$fixture_root/bin/gh"
+bin=$fixture_root/bin
+
+check_route main-planning 'heavy=false release_inputs=false ' push refs/heads/main '' '' "$base" "$planning" "$planning"
+check_route main-source 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$planning" "$source" "$source"
+check_route rename-planning-to-source 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$planning" "$planning_to_source" "$planning_to_source"
+check_route rename-source-to-planning 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$source_seed" "$source_to_planning" "$source_to_planning"
+check_route release-input 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$source_to_planning" "$release" "$release"
+check_route quoted-path 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$release" "$special" "$special"
+check_route over-limit 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$special" "$oversize" "$oversize"
+check_route empty-diff 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$planning" "$planning" "$planning"
+check_route missing-before 'heavy=true release_inputs=true ' push refs/heads/main '' '' '' "$planning" "$planning"
+check_route malformed-before 'heavy=true release_inputs=true ' push refs/heads/main '' '' x "$planning" "$planning"
+check_route zero-before 'heavy=true release_inputs=true ' push refs/heads/main '' '' 0000000000000000000000000000000000000000 "$planning" "$planning"
+check_route unavailable-before 'heavy=true release_inputs=true ' push refs/heads/main '' '' 1111111111111111111111111111111111111111 "$planning" "$planning"
+check_route missing-after 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$base" '' "$planning"
+check_route malformed-after 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$base" x "$planning"
+check_route zero-after 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$base" 0000000000000000000000000000000000000000 "$planning"
+check_route mismatch 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$base" "$source" "$planning"
+check_route release-call 'heavy=true release_inputs=true ' workflow_call '' '' "$planning" "$base" "$planning"
+check_route manual 'heavy=true release_inputs=true ' workflow_dispatch refs/heads/main '' '' "$planning" "$planning" "$planning"
+check_route non-main-push 'heavy=true release_inputs=true ' push refs/heads/feature '' '' "$planning" "$planning" "$planning"
+check_route pr-planning 'heavy=false release_inputs=false ' pull_request refs/pull/1/merge 1 '' '' '' "$planning"
+if GH_LIST_FAIL=1 check_route pr-listing-failure 'heavy=true release_inputs=true ' pull_request refs/pull/1/merge 1 '' '' '' "$planning"; then
+  echo "ci.classify: failed PR listing unexpectedly skipped heavy jobs"
+  exit 1
+fi
 echo "ci.classify: $n lists"
 ]=])
 schway_add_test(NAME ci.classify
-  COMMAND ${SCHWAYSTATION_SH} -c "${hygiene_classify}" sh ${CMAKE_SOURCE_DIR}/scripts/classify-changes.sh
+  COMMAND ${SCHWAYSTATION_SH} -c "${hygiene_classify}" sh ${hygiene_ci_script}
+    ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/hygiene/ci-classifier
   LABELS hygiene TIMEOUT 30)
 
 # Fault prevented: a release with a missing or extra archive, or a SHA256SUMS

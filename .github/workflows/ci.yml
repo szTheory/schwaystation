@@ -75,7 +75,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NUMBER: ${{ github.event.pull_request.number }}
           CHANGED: ${{ github.event.pull_request.changed_files }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          CALL_REF: ${{ inputs.ref || '' }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
+          # CI_CLASSIFIER_TEST_BEGIN
           if [ -z "$NUMBER" ]; then
             printf 'heavy=true\nrelease_inputs=true\n' | tee -a "$GITHUB_OUTPUT"
             exit 0
@@ -83,6 +90,7 @@ jobs:
           { gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files" \
               --jq '.[] | .filename, (.previous_filename // empty)' || echo '(listing failed)'; } |
             sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
+          # CI_CLASSIFIER_TEST_END
 
   # Required renderer oracle: fetch the pinned captures and three source logs,
   # then run only the GPU reference tests. The CPU vector corpus stays nightly.
