@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/szTheory/schwaystation/compare/v0.5.0...v0.6.0) (2026-11-18)
+
+
+### Features
+
+* **discs:** add disc boot, XA/CD-DA, MDEC and disk control ([#22](https://github.com/szTheory/schwaystation/issues/22)) ([e6683e9](https://github.com/szTheory/schwaystation/commit/e6683e9f44a37c5b37a7f3f8e9a5f0529f3f84ce))
+
 ## [0.5.0](https://github.com/szTheory/schwaystation/compare/v0.4.0...v0.5.0) (2026-11-15)
 
 
