@@ -56,7 +56,7 @@ jobs:
   # release_inputs=true when a path the release pipeline reads changed.
   changes:
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 17 s (changes), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 11 s (2 samples), changes; [run 44336756139](https://github.com/szTheory/schwaystation/actions/runs/44336756139), provisional
     permissions:
       contents: read
       pull-requests: read
@@ -217,7 +217,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 10  # provisional until the merged plan's hosted run measures the lane.
+    timeout-minutes: 5  # 5-minute floor; 2 x 41 s = 2 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -246,7 +246,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 12  # provisional bound for OpenBIOS, the pinned encoder and run-local media.
+    timeout-minutes: 5  # 5-minute floor; 2 x 35 s = 2 min (2 samples); [run 44307395327](https://github.com/szTheory/schwaystation/actions/runs/44307395327), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -307,7 +307,7 @@ jobs:
   # The image has git and jq; configure finds them.
   hygiene:
     runs-on: ubuntu-26.04
-    timeout-minutes: 2  # 2 x 31 s (hygiene), slowest of 5 runs, run 42725764966
+    timeout-minutes: 3  # 2 x 62 s = 3 min (2 samples); [run 44336756139](https://github.com/szTheory/schwaystation/actions/runs/44336756139), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -322,7 +322,7 @@ jobs:
   title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 7 s (title), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # provisional; 0 comparable samples, use the next ordinary successful or failed attempt.
     permissions:
       contents: read
       pull-requests: read
@@ -345,7 +345,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: build (${{ matrix.os }}-${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15  # run 43670029646 hit 11m on macOS x64; run 43665013436 completed in 9m24
+    timeout-minutes: 30  # 2 x 872 s = 30 min (2 samples); slowest build matrix leg macos-x64; [run 44307395327](https://github.com/szTheory/schwaystation/actions/runs/44307395327), provisional
     strategy:
       fail-fast: false
       matrix:
@@ -472,7 +472,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 30 # run 44227999810 hit 20m at test 496/497; libretro.input.movies was active
+    timeout-minutes: 38 # 2 x 1120 s = 38 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -508,7 +508,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: nofp (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 3  # floor covers slow checkout/image startup; one-minute cancellations: runs 42840838785 and 42841474140
+    timeout-minutes: 3  # 3-minute floor; 2 x 27 s = 1 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     strategy:
       fail-fast: false
       matrix:
@@ -528,7 +528,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 85  # run 43688529720 hit 60m at movies +11m37; CTest limit 32m (240s x8)
+    timeout-minutes: 109 # 2 x 3243 s = 109 min (2 samples), slowest be32; [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -568,7 +568,7 @@ jobs:
     needs: [changes, build, be32, wasm32]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 5 s (hash-equality), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 8 s = 1 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -588,7 +588,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt); 2 x 60 s (wasm32), slowest of 5 runs, run 42691517611
+    timeout-minutes: 9  # 5-minute setup floor; 2 x 244 s = 9 min (2 samples); [run 44307395327](https://github.com/szTheory/schwaystation/actions/runs/44307395327), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -636,7 +636,7 @@ jobs:
     # Keep the host result when another build leg fails; the required aggregate still fails.
     if: ${{ !cancelled() && needs.changes.outputs.heavy == 'true' && needs.openbios.result == 'success' }}
     runs-on: macos-15
-    timeout-minutes: 15  # provisional for local disc build plus the existing hosted smoke cases
+    timeout-minutes: 5  # 5-minute floor; 2 x 101 s = 4 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -792,7 +792,7 @@ jobs:
     needs: changes
     if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 12  # run 44232810416 hit 5m while apt was still downloading valgrind; prior perf runs took 1m15 and 1m39
+    timeout-minutes: 5  # 5-minute floor; 2 x 108 s = 4 min (1 sample); [run 44218206100](https://github.com/szTheory/schwaystation/actions/runs/44218206100), provisional
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
@@ -935,7 +935,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.changes.outputs.release_inputs == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 13  # 2 x 386 s (rehearsal), slowest of 5 runs, run 42691517611
+    timeout-minutes: 13  # provisional; 0 comparable samples, use the next ordinary successful or failed attempt.
     permissions:
       contents: write
       id-token: write
@@ -1017,7 +1017,7 @@ jobs:
     needs: rehearsal
     if: always() && needs.rehearsal.result != 'skipped'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (API); 2 x 9 s (cleanup), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # 5-minute floor; provisional, 0 comparable samples; use the next ordinary successful or failed attempt.
     permissions:
       contents: write
     steps:
@@ -1047,7 +1047,7 @@ jobs:
     if: always()
     needs: [changes, hygiene, title, gpu-reference, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (roll-up); 2 x 4 s (CI required), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 1  # 1-minute setup floor; 2 x 3 s (2 samples); [run 44337684558](https://github.com/szTheory/schwaystation/actions/runs/44337684558), provisional
     steps:
       - name: Every job succeeded or was skipped as allowed
         env:
