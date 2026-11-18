@@ -632,8 +632,9 @@ cmake --workflow --preset hygiene
 ```
 
 `ci.classify` extracts and runs the actual `changes` shell block against local Git fixtures, including push endpoint,
-rename, unusual-path, failure, release-call, manual-run and pull-request controls. The gate-budget check catches
-growth in the counted repository-check files. If Docker and `act` are already installed, an optional job-scoped dry
+rename, unusual-path, failure, release-call, manual-run and pull-request controls. A failed pull-request file listing
+keeps both heavy CI and release rehearsal enabled. The gate-budget check catches growth in the counted repository-check
+files. If Docker and `act` are already installed, an optional job-scoped dry
 run can check workflow wiring with an explicit platform mapping and a writable temporary action cache:
 
 ```sh

@@ -180,7 +180,7 @@ schway_add_test(NAME ci.title.self_test
 # release_inputs=true for any of the five release inputs and for any list
 # that cannot be trusted. The route controls below execute the marked shell
 # block from ci.yml itself, so this test covers event wiring as well as paths.
-file(READ ${CMAKE_SOURCE_DIR}/.github/workflows/ci.yml hygiene_ci_workflow)
+file(READ "${CMAKE_SOURCE_DIR}/.github/workflows/ci.yml" hygiene_ci_workflow)
 string(FIND "${hygiene_ci_workflow}" "# CI_CLASSIFIER_TEST_BEGIN\n" hygiene_ci_start)
 string(FIND "${hygiene_ci_workflow}" "\n          # CI_CLASSIFIER_TEST_END" hygiene_ci_end)
 if(hygiene_ci_start EQUAL -1 OR hygiene_ci_end EQUAL -1 OR hygiene_ci_end LESS hygiene_ci_start)
@@ -192,9 +192,9 @@ math(EXPR hygiene_ci_length "${hygiene_ci_end} - ${hygiene_ci_start}")
 string(SUBSTRING "${hygiene_ci_workflow}" ${hygiene_ci_start} ${hygiene_ci_length} hygiene_ci_step)
 string(REPLACE "\n          " "\n" hygiene_ci_step "${hygiene_ci_step}")
 string(SUBSTRING "${hygiene_ci_step}" 10 -1 hygiene_ci_step)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/hygiene)
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/hygiene")
 set(hygiene_ci_script ${CMAKE_BINARY_DIR}/hygiene/classifier-step.sh)
-file(WRITE ${hygiene_ci_script} "#!/bin/bash\nset -euo pipefail\n${hygiene_ci_step}\n")
+file(WRITE "${hygiene_ci_script}" "#!/bin/bash\nset -euo pipefail\n${hygiene_ci_step}\n")
 set(hygiene_classify [=[
 workflow=$1
 source_root=$2
@@ -331,12 +331,12 @@ check_route release-call 'heavy=true release_inputs=true ' workflow_call '' '' "
 check_route manual 'heavy=true release_inputs=true ' workflow_dispatch refs/heads/main '' '' "$planning" "$planning" "$planning"
 check_route non-main-push 'heavy=true release_inputs=true ' push refs/heads/feature '' '' "$planning" "$planning" "$planning"
 check_route pr-planning 'heavy=false release_inputs=false ' pull_request refs/pull/1/merge 1 '' '' '' "$planning"
-check_route pr-listing-failure 'heavy=true release_inputs=false ' pull_request refs/pull/1/merge 1 '' '' '' "$planning" '' 1
+check_route pr-listing-failure 'heavy=true release_inputs=true ' pull_request refs/pull/1/merge 1 '' '' '' "$planning" '' 1
 echo "ci.classify: $n lists"
 ]=])
 schway_add_test(NAME ci.classify
-  COMMAND ${SCHWAYSTATION_SH} -c "${hygiene_classify}" sh ${hygiene_ci_script}
-    ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/hygiene/ci-classifier
+  COMMAND ${SCHWAYSTATION_SH} -c "${hygiene_classify}" sh "${hygiene_ci_script}"
+    "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/hygiene/ci-classifier"
   LABELS hygiene TIMEOUT 30)
 
 # Fault prevented: a release with a missing or extra archive, or a SHA256SUMS

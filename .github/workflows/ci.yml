@@ -86,9 +86,12 @@ jobs:
             printf 'heavy=true\nrelease_inputs=true\n' | tee -a "$GITHUB_OUTPUT"
           }
           if [ -n "$NUMBER" ]; then
-            { gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files" \
-                --jq '.[] | .filename, (.previous_filename // empty)' || echo '(listing failed)'; } |
-              sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
+            if ! changed_paths=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files" \
+              --jq '.[] | .filename, (.previous_filename // empty)'); then
+              fail_closed
+              exit 0
+            fi
+            printf '%s\n' "$changed_paths" | sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ "$EVENT" != push ] || [ "$REF" != refs/heads/main ] || [ -n "$CALL_REF" ]; then
