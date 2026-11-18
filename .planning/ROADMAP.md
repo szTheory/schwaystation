@@ -35,7 +35,35 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
   4. The checked-in `quality.json` baselines cover instructions per frame, Wasm size, state bytes and comparable CI critical-path time. CI enforces the applicable bounds, and the lesson uniqueness check rejects both duplicate identities and duplicate lesson text.
   5. Maintainers can trace current settings, pin and runner checks, device and documentation budgets, install instructions, and roadmap and prompt coverage to evidence. The tune-up records why any measured pin, cache or runner change was made.
 
-**Plans**: TBD
+**Plans**: 10 plans
+
+Plans:
+**Wave 1**
+- [ ] 07-01-PLAN.md — Register gating triage, lesson and measured-bound controls
+- [ ] 07-02-PLAN.md — Audit comparable CI runs, flakiness and timeouts
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 07-03-PLAN.md — Measure quality inputs and audit settings, runners and pins
+- [ ] 07-05-PLAN.md — Publish the sanitized weekly triage artifact
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 07-04-PLAN.md — Score quality dimensions and choose one improvement
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 07-06-PLAN.md — Avoid repeat release-metadata PR work and apply measured timeouts
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 07-07-PLAN.md — Enforce instruction, Wasm and serialized-state bounds
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 07-08-PLAN.md — Enforce measured CI critical-path time
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 07-09-PLAN.md — Refresh installation, maintainer guidance and coverage records
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 07-10-PLAN.md — Assemble focused review, verification and release evidence
+
 **UI hint**: no
 **Canonical refs:** `.planning/seeds/SEED-007-milestone-tune-up.md`, `.planning/preparation/ENGINEERING.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/PROMPT-COVERAGE.md`, `.planning/AUTONOMOUS.md`
 
@@ -175,7 +203,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 7. Faster and more trustworthy CI | 0/TBD | Not started | - |
+| 7. Faster and more trustworthy CI | 0/10 | Planned | - |
 | 8. Per-game card saves | 0/TBD | Not started | - |
 | 9. CHD disc images | 0/TBD | Not started | - |
 | 10. PBP disc images | 0/TBD | Not started | - |
