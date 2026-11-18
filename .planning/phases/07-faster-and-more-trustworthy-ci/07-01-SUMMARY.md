@@ -26,7 +26,7 @@ key-files:
 key-decisions:
   - Redact path text through its next quote or boundary to protect path components containing spaces.
   - Compare decimal digit strings exactly so rounding cannot admit a value just above a large integer bound.
-requirements-completed: [TUNE-01, TUNE-02, TUNE-05]
+requirements-completed: []
 coverage:
   - id: D1
     description: The production triage transform emits only bounded, sanitized metadata or fails without output.
