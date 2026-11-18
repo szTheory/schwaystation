@@ -28,7 +28,7 @@ This is a breadth milestone, not a measured-accuracy or presentation milestone. 
 
 **Table stakes:** CHD v5, supported PBP variants, ECM, CCD/IMG/SUB, SBI/LibCrypt, region and board/GPU profiles, per-game cards with raw and approved wrapper import/export, libretro SaveRAM round-trip, GameShark strings, runner PPF/BPS patching, and capability metadata that changes only after the ledger criterion passes.
 
-**Differentiators in the approved direction:** multitap and tap cards; GunCon and Justifier; mouse, neGcon, and Jogcon; PocketStation storage compatibility. These are serial protocols or storage behavior, not physical-device or full PocketStation emulation. The scope also calls for Dual Analog flight mode; make sure it is represented in requirements because the feature research does not cover it explicitly.
+**Differentiators in the approved direction:** multitap and tap cards; GunCon and Justifier; mouse, neGcon, Jogcon and Dual Analog flight mode; PocketStation storage compatibility. These are serial protocols or storage behavior, not physical-device or full PocketStation emulation. Dual Analog is included explicitly in v2.0 requirements even though the feature survey did not cover it separately.
 
 **Keep bounded or defer:** PBP support should name the tested unencrypted PSISO layout; PGD-encrypted payloads and undocumented audio/multi-disc variants need evidence before inclusion. Keep full PocketStation CPU/BIOS/LCD/RTC/IrDA behavior, adjacent media formats, cheat databases/UIs, physical devices, and unbounded scans out of scope. A 13,407-entry DAT is an inventory, not evidence that every disc was booted or mapped to each board.
 
@@ -69,9 +69,9 @@ The following is an ordering recommendation, not a claim that all title/profile 
 
 Ledger rows should accrue with the feature that produces the evidence, rather than being deferred to a large final sweep. A final compatibility review can compare the protected denominator and determine whether stable metadata is justified; it must not claim exhaustive DAT playability or a board × region × media cross-product without runs.
 
-### Scope reconciliation before roadmap lock
+### Approved scope and acceptance boundary
 
-- **Fast boot:** included as the existing documented, opt-in BIOS-shell skip at the kernel hand-off. It stays off by default, still requires user-supplied BIOS boot, and does not add HLE or alter emulated timing.
+- **Fast boot:** included as the existing documented, opt-in BIOS-shell skip at the kernel hand-off. It stays off by default, still requires the user-supplied BIOS, and does not add HLE or alter emulated timing.
 - **MDEC edge cases:** included as bounded edge-case behavior and regression coverage from supported FMV inputs. Keep exact 4-bit output and the separate deterministic 8-bit regression; do not change expected hardware bytes, cycle cap, or the v1.0 acceptance boundary. Report compressed-source coverage, decoder output, guest completion, and image result separately. Run the cheap source-count preflight before an expensive guest run; source coverage alone is not output conformance.
 - **Dual Analog flight mode:** included as a named SIO peripheral behavior from the approved seed, with its own protocol/input tests.
 - **Out-of-scope boundary:** browser UI, save states, movies, measured-accuracy campaigns, JITs, and visual enhancements remain outside v2.0. No phase should silently absorb them.
@@ -87,7 +87,7 @@ Ledger rows should accrue with the feature that produces the evidence, rather th
 | Area | Confidence | Notes |
 |---|---|---|
 | Stack | **High** for the project boundary and audited libchdr pin; **medium-high** for dependency/license closure | Exact source pins and license components are identified. Re-audit if the pin or build options change. |
-| Features | **Medium** | Project scope and libretro contracts are clear. PBP variants, Jogcon semantics, GameShark edge rules, exact compatibility threshold, Dual Analog coverage, and fast-boot/MDEC scope need decisions. |
+| Features | **Medium** | Project scope and libretro contracts are clear. PBP variants, Jogcon semantics, GameShark edge rules and the exact board/profile matrix need phase-level evidence. Fast boot, bounded MDEC work, Dual Analog and the conditional compatibility-metadata threshold are resolved in the requirements. |
 | Architecture | **High** for host/core, API, and state boundaries; **medium** for undocumented devices/profiles | Existing interfaces are inspected. New format layouts, lightgun sensing, and some profile combinations need evidence. |
 | Pitfalls | **Medium-high** | Resource, licensing, determinism, ledger, and CI risks are well grounded. Format prevalence and title-specific behavior remain less certain. |
 
@@ -96,11 +96,11 @@ Ledger rows should accrue with the feature that produces the evidence, rather th
 ### Gaps to Address
 
 - Define PBP support and playlist/sidecar precedence, ECM indexing, and SBI lookup across CUE/CCD/CHD and multi-disc sets.
-- Choose per-game identity and card key behavior for multi-disc titles, unknown serials, tap slots, and libretro card 2 flush lifecycle.
+- Validate the requirements' per-game identity fallback and card key behavior for multi-disc titles, unknown serials, tap slots, and libretro card 2 flush lifecycle against the existing host/API seams.
 - Name supported Jogcon and GameShark behavior; settle mouse deltas and lightgun input fallback in the public API.
 - Specify which board × region tuples and representative titles the ledger actually covers. The DAT provides no board mapping.
-- Set a numeric ledger pass threshold and resolve whether stable .info omits is_experimental or sets it false.
-- Resolve fast boot, MDEC-edge, and Dual Analog scope explicitly before roadmap lock; keep the accepted MDEC evidence boundary intact.
+- Keep the required-capability matrix small, explicit and evidence-backed; `is_experimental` becomes false only at 100% required-row pass, otherwise it remains true.
+- Keep fast boot opt-in and MDEC work bounded to the documented accepted v1.0 evidence boundary; do not expand into a measured-accuracy campaign.
 - Define equivalent-input fingerprints for quality and CI comparisons; decide cache or parallelism changes only after measurement.
 
 ## Sources
