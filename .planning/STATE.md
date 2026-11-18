@@ -6,17 +6,17 @@ current_phase: 6
 current_phase_name: Discs and FMV
 current_plan: 45 of 45 (hosted acceptance and ship)
 status: in_progress
-stopped_at: "06-45 repair commit 1f7984c created; push and exact-head hosted acceptance next"
-last_updated: "2026-11-17T23:35:24Z"
-last_activity: 2026-11-17
-state_head: 1f7984c
+stopped_at: "06-45 reviewed local repair ready to commit and dispatch exact-head CI/Nightly"
+last_updated: "2026-11-18T00:15:31Z"
+last_activity: 2026-11-18
+state_head: 83284d63d97c944704839cdf835b4b09c1177bd4
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 195
   completed_plans: 194
   percent: 83
-last_activity_desc: "Plan 06-45 portability repair was reviewed and committed as 1f7984c on phase/06-discs-and-fmv. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); focused review by gsd-code-reviewer; active time is not tracked. The current non-planning source fingerprint is 363519a22300c55518ebb4ad054c050795d76f14839ec1e7428cbf65ca0449e7 (161 files). Cheap preflights passed, including the fixed 2,700-line gate, the root-level CUE test passed 1/1, full local CI passed 613/613 plus ci-release 5/5, and hygiene passed 23/23. Review and local evidence are in 06-REVIEW.md and 06-VERIFICATION.md. Prior exact-head CI 44190163682 failed on old SHA b5209 only in wasm32 path mapping and Windows MSVC C4310; Nightly 44190163638 passed and old-head RetroArch acceptance passed. These do not count for 1f7984c. Local WASI compilation is unavailable because clang-21/wasm-ld are absent. Next: push the reviewed source and state, dispatch exactly one CI/Nightly batch for that head, then inspect each required lane and hosted RetroArch result. Exact 8-bit and complete frame/movie hardware output remain unproved under the approved v1.0 scope."
+last_activity_desc: "Plan 06-45 repair on phase/06-discs-and-fmv. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); final focused source review by gsd-code-reviewer, no findings; active time not tracked. Current non-planning source fingerprint: 8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be (162 files). Cheap checks passed, including argv mapping, path syntax, CMake wiring, diff whitespace, sorted inventory and the fixed 2,700-line gate. Changed targets built; seven WASI/Windows-related local selectors passed; full local CI passed 613/613 plus ci-release 5/5; hygiene passed 23/23. Previous exact-head CI 44200814535 and Nightly 44200818543 completed on parent 83284d6: Nightly passed, CI failed in wasm32 and Windows x64/arm64. Those results are diagnostic only and do not count for this repair. WASI runtime and Windows confirmation require hosted CI because the local pinned WASI compiler is absent. Review is in 06-45-REVIEW.md; commands and limitations are in 06-VERIFICATION.md. Next: commit and push this reviewed snapshot, dispatch one CI and Nightly batch on that exact head, inspect all required jobs and RetroArch output, then verify and ship if they pass. Exact 8-bit and full frame/movie hardware output remain unproved under approved v1.0 scope."
 ---
 
 # Project State

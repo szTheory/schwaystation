@@ -628,6 +628,9 @@ static int schway__disc_image_cue_directory(const char *cue_path,
 #ifdef _WIN32
     const char *backslash = strrchr(cue_path, '\\');
     if (backslash != NULL && (slash == NULL || backslash > slash)) slash = backslash;
+    const char separator = '\\';
+#else
+    const char separator = '/';
 #endif
     size_t size;
     if (slash == NULL) {
@@ -642,7 +645,7 @@ static int schway__disc_image_cue_directory(const char *cue_path,
     size = strlen(out);
     if (size == 0u || (out[size - 1u] != '/' && out[size - 1u] != '\\')) {
         if (size + 1u >= SCHWAY__DISC_IMAGE_PATH_CAP) return 0;
-        out[size++] = '/';
+        out[size++] = separator;
         out[size] = '\0';
     }
     return 1;

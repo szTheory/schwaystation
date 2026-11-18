@@ -651,6 +651,7 @@ static int test_cue_limits(const char *directory)
 {
     char cue_path[1024] = "";
     char child_path[1024] = "";
+    char child_io_path[1024] = "";
     char max_name[256];
     char *cue = NULL;
     size_t cue_length;
@@ -665,7 +666,18 @@ static int test_cue_limits(const char *directory)
     max_name[sizeof max_name - 1u] = '\0';
     CHECK(make_path(cue_path, directory, "schway-disc-image-limit.cue") &&
           make_path(child_path, directory, max_name), "could not form limit test paths");
-    CHECK(write_pattern_file(child_path, 16u, 2048u, 0x19u, 0),
+#ifdef _WIN32
+    int child_io_size = snprintf(child_io_path, sizeof child_io_path, "\\\\?\\%s", child_path);
+    CHECK(child_io_size > 0 && (size_t)child_io_size < sizeof child_io_path,
+          "could not form an extended-length child path");
+    for (size_t i = 4u; child_io_path[i] != '\0'; i++) {
+        if (child_io_path[i] == '/') child_io_path[i] = '\\';
+    }
+#else
+    CHECK(snprintf(child_io_path, sizeof child_io_path, "%s", child_path) > 0,
+          "could not copy the child path");
+#endif
+    CHECK(write_pattern_file(child_io_path, 16u, 2048u, 0x19u, 0),
           "could not create the 255-byte child filename");
     cue_length = strlen(max_name) + 96u;
     cue = (char *)malloc(65537u);
@@ -701,8 +713,8 @@ static int test_cue_limits(const char *directory)
               "could not append maximum-track cue line");
         used += (size_t)written;
     }
-    CHECK(write_pattern_file(child_path, 16u, 2048u, 0x19u, 0) &&
-          write_pattern_file(child_path, 98u, 2352u, 0x39u, 1) &&
+    CHECK(write_pattern_file(child_io_path, 16u, 2048u, 0x19u, 0) &&
+          write_pattern_file(child_io_path, 98u, 2352u, 0x39u, 1) &&
           write_text(cue_path, cue, used), "could not create 99-track inputs");
     CHECK(schway_disc_image_open(cue_path, &image, &error) == SCHWAY_DISC_IMAGE_OK,
           "expected the 99-track boundary to be accepted");
@@ -713,7 +725,7 @@ static int test_cue_limits(const char *directory)
           "expected all 99 tracks to have bounded absolute offsets");
     schway_disc_image_close(image);
     image = NULL;
-    CHECK(make_sparse_file(child_path, UINT64_C(1073741824)),
+    CHECK(make_sparse_file(child_io_path, UINT64_C(1073741824)),
           "could not create exact-cap sparse cue image");
     written = snprintf(cue, 65537u,
                        "FILE \"%s\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n",
@@ -724,7 +736,7 @@ static int test_cue_limits(const char *directory)
           "expected a cue image exactly at the 1 GiB cap to be accepted");
     schway_disc_image_close(image);
     image = NULL;
-    CHECK(make_sparse_file(child_path, UINT64_C(1073741824) + 2048u) &&
+    CHECK(make_sparse_file(child_io_path, UINT64_C(1073741824) + 2048u) &&
           expect_open_status(cue_path, SCHWAY_DISC_IMAGE_LIMIT, 1u, NULL),
           "expected cue image totals above 1 GiB to be rejected");
 
@@ -732,7 +744,11 @@ cleanup:
     schway_disc_image_close(image);
     free(cue);
     if (cue_path[0] != '\0') (void)remove(cue_path);
-    if (child_path[0] != '\0') (void)remove(child_path);
+#ifdef _WIN32
+    if (child_io_path[0] != '\0') (void)DeleteFileA(child_io_path);
+#else
+    if (child_io_path[0] != '\0') (void)remove(child_io_path);
+#endif
     return result;
 }
 

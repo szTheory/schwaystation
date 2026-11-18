@@ -114,7 +114,7 @@
     {
       "name": "wasm32",
       "inherits": "base",
-      "$comment": "The test emulator exposes only the build tree at guest / and source tree at /source; its wrapper maps host test paths into that namespace. SCHWAYSTATION_TIMEOUT_SCALE 5: under wasmtime the seed's 40 shared tests took 4.3 times as long as on the Linux x64 leg in total (its run 39336389305).",
+      "$comment": "The test emulator exposes only the build tree at guest / and source tree at /source; its wrapper maps host test paths into that namespace and pins guest cwd to /. SCHWAYSTATION_TIMEOUT_SCALE 5: under wasmtime the seed's 40 shared tests took 4.3 times as long as on the Linux x64 leg in total (its run 39336389305).",
       "toolchainFile": "${sourceDir}/cmake/toolchains/wasm32-wasi.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",

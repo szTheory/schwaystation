@@ -1,8 +1,8 @@
 ---
 phase: 06-discs-and-fmv
 status: local_pass_hosted_pending
-verified: 2026-11-17T23:30:09Z
-source: reviewed Plan 06-45 repair batch; non-planning source fingerprint 363519a22300c55518ebb4ad054c050795d76f14839ec1e7428cbf65ca0449e7 (161 files)
+verified: 2026-11-18T00:15:31Z
+source: reviewed Plan 06-45 WASI/Windows repair; non-planning source fingerprint 8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be (162 files)
 ---
 
 # Phase 6 verification
@@ -11,7 +11,7 @@ The revised Phase 6 contract and Plan 06-45 repair snapshot have passed local ac
 
 ## Current local acceptance (2026-11-17)
 
-The source fingerprint in this file's front matter matches the final Plan 06-45 review addendum in `06-REVIEW.md`. Review preceded local verification; only planning and evidence bookkeeping followed. Cheap checks ran before the full workflows.
+The source fingerprint in this file's front matter matches the final Plan 06-45 review in `06-45-REVIEW.md`. Review preceded local verification; only planning and evidence bookkeeping followed. Cheap checks ran before the full workflows.
 
 | Gate | Command and result | Status |
 |---|---|---|
@@ -219,3 +219,38 @@ No local WASI compile is claimed: this checkout lacks clang-21/wasm-ld, and the 
 contains only a CMake cache without a generated Ninja build. The exact-head hosted wasm32 lane remains required.
 Hosted CI, Nightly, and the background RetroArch `disc_boot` comparison also remain pending for the pushed reviewed
 head. These are unresolved checks, not waivers or passes; the 4-bit oracle and owned disc acceptance remain intact.
+
+## Plan 06-45 WASI and Windows repair follow-up (2026-11-18)
+
+The previous hosted batch completed on parent `83284d63d97c944704839cdf835b4b09c1177bd4`. CI run
+[44200814535](https://github.com/szTheory/schwaystation/actions/runs/44200814535) failed only in `wasm32`,
+`build (windows-x64)` and `build (windows-arm64)`; its other applicable jobs passed. Nightly run
+[44200818543](https://github.com/szTheory/schwaystation/actions/runs/44200818543) passed, including the complete
+`vectors-full` inventory check and all six bounded fuzz campaigns. These are old-head diagnostic results, not
+acceptance of the repair below.
+
+The failure logs identified three runtime causes: WASI preopens lacked an explicit guest working directory, CTest
+output arguments used the WASI `N:path` form that the wrapper did not translate, and probe/test stack frames could
+exceed the 64 KiB wasm-ld default. CUE/M3U replay targets also embedded the host build directory. On Windows,
+canonical CUE paths appended `/` to `\\?\` extended paths, and the 255-character child fixture exceeded MAX_PATH.
+The current reviewed repair pins Wasmtime's guest cwd to `/`, maps both prefixed and ordinary paths while preserving
+unmatched argument bytes, gives the WASI link a bounded 128 KiB stack, uses guest-visible replay paths, selects
+the native Windows separator, and uses an extended path for the long-name fixture. The full details and no-finding
+review are in `06-45-REVIEW.md`.
+
+Local evidence on fingerprint `8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be` (162 changed
+non-planning files):
+
+- `git diff --check origin/main -- . ':!tests/probe/rc_hash_disc.c'`, shell syntax, CMake preset JSON parse,
+  sorted disc inventory, workflow wiring check, and the repository gate at exactly 2,700 lines all exited 0.
+- The fake Wasmtime argv probe passed for binary/source roots, descendants, numeric `N:` prefixes, unmatched paths,
+  and build/source roots containing spaces.
+- Changed native targets compiled; the focused CTest selector passed 7/7 for CUE modes, long-name limits, CUE child
+  containment, playlist, CNF and CUE/M3U replay.
+- `cmake --workflow --preset ci` exited 0 (613/613 tests and `ci-release` 5/5); `cmake --workflow --preset hygiene`
+  exited 0 (23/23).
+
+Hosted results for this reviewed fingerprint are still required. Local WASI compilation is unavailable because
+the pinned clang-21/wasm-ld toolchain is absent. Current-host RetroArch `disc_boot` and runner image comparison,
+all workflow-dispatch CI lanes, and the Nightly inventory/fuzz run must pass on the pushed exact head. Phase 6
+verification and ship remain pending.
