@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 07
 current_phase_name: Faster and more trustworthy CI
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Completed 07-05-PLAN.md; runtime Codex/OpenGSD 1.20.0; executor gpt-6-luna
-last_updated: "2026-11-18T22:09:58.524Z"
+stopped_at: Completed 07-06-PLAN.md
+last_updated: "2026-11-18T23:00:27.265Z"
 last_activity: 2026-11-18
-last_activity_desc: Completed Plan 07-05; Plan 07-06 is next
-state_head: 6079c6c1ce3b108167bdddec2d9f5efd79a3875d
+last_activity_desc: Completed Plan 07-06; Plan 07-07 is next
+state_head: 0c9c2783b4596e4c34bb4a334d0a3b420daa7c3e
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 10
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 ## Current Position
 
 Phase: 07 (Faster and more trustworthy CI) — EXECUTING
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 10
 Status: Ready to execute
-Last activity: 2026-11-18 — Plan 07-05 completed; Plan 07-06 is next
+Last activity: 2026-11-18 — Plan 07-06 completed; Plan 07-07 is next
 
 ### Phase 7 execution (2026-11-18)
 
@@ -70,6 +70,8 @@ test passed, along with the pin, timeout-comment and gate-budget checks. The sco
 wiring check. No hosted artifact run was made; the phase-level TUNE-01 requirement stays pending until ship
 confirms that the merged workflow uploads its single seven-day artifact. This is deferred evidence, not an owner
 verification task. Plan 07-06 is next.
+
+Plan 07-06 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. The exact release App metadata PR route now requires a matching event and fresh REST bot identity plus stable, complete pagination; focused classifier and production route checks passed. Sampled job timeouts follow the linked Plan 02 runs and retain setup floors; unsampled jobs remain provisional. The repository-check gate is 3,299/3,300. The scoped `act --dryrun` parsed the CI changes route without executing actions. No hosted CI was started; TUNE-02/03 remain Pending until ship compares the next automatic release PR with run 44253419074. Plan duration was 40 minutes; RED, GREEN, and timeout commits are recorded in `07-06-SUMMARY.md`. Plan 07-07 is next.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -296,6 +298,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 07 P03 | 44min | 3 tasks | 6 files |
 | Phase 07 P04 | 8min | 2 tasks | 2 files |
 | Phase 07 P05 | 35min | 2 tasks | 3 files |
+| Phase 07 P06 | 40min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -663,6 +666,8 @@ Recent decisions affecting current work:
 - [Phase 07]: Keep compatibility statements limited to the four passing fixture rows; do not imply commercial-game coverage.
 - [Phase 07]: Bound open-issue collection to one 100-result page and set issues_truncated when that cap is reached.
 - [Phase 07]: Grant the triage job only actions, contents, and issues read scopes.
+- [Phase 07]: Require fresh release App identity and stable paginated metadata before the generated-only PR fast route.
+- [Phase 07]: Keep unsampled workflow timeouts provisional and TUNE-02/03 pending until the hosted release PR comparison at ship.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -904,8 +909,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-18T22:09:58.497Z
-Stopped at: Completed 07-05-PLAN.md; runtime Codex/OpenGSD 1.20.0; executor gpt-6-luna
+Last session: 2026-11-18T23:00:27.235Z
+Stopped at: Completed 07-06-PLAN.md
 Resume file: None
 
 ### v1.0 session history
@@ -1088,7 +1093,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 7 autonomously from Plan 07-06. Complete its remaining plans, code review and automated verification; at ship, dispatch triage and confirm its artifact, then confirm merged main CI and the automatic release before starting Phase 8.
+- Continue Phase 7 autonomously from Plan 07-07. Complete its remaining plans, code review and automated verification; at ship, dispatch triage and confirm its artifact, compare the automatic release PR with run 44253419074, then confirm merged main CI and the release before starting Phase 8.
 
 ### v2.0 roadmap creation (2026-11-18)
 
