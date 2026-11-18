@@ -420,6 +420,20 @@ jobs:
         run: >-
           cmake -DJUNIT=build/${{ matrix.preset }}/junit-release.xml -DINVENTORY=tests/inventory/ci.txt
           -DLABELS=release -P tests/cmake/check_junit.cmake
+      - name: Measure stable state serialization
+        if: matrix.os == 'linux' && matrix.arch == 'x64'
+        run: |
+          set -eu
+          # QUALITY_STATE_BYTES_BEGIN
+          state_output=$("${STATE_TEST_BINARY:-build/ci/tests/schwaystation-test-state}" state.stable_bytes)
+          printf '%s\n' "$state_output"
+          state_count=$(printf '%s\n' "$state_output" | grep -c '^state_bytes=' || true)
+          if [ "$state_count" -ne 1 ]; then printf '%s\n' 'quality: state_bytes must occur exactly once' >&2; exit 1; fi
+          state_line=$(printf '%s\n' "$state_output" | grep '^state_bytes=')
+          state_bytes=${state_line#state_bytes=}
+          case "$state_bytes" in ''|0|0*|*[!0123456789]*) printf '%s\n' 'quality: state_bytes must be a positive integer' >&2; exit 1;; esac
+          cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=state.bytes "-DMEASURED=$state_bytes" -P tests/cmake/quality.cmake
+          # QUALITY_STATE_BYTES_END
       # Compile the optional host once against this job's installed library;
       # it is not run or packaged. SDL2 comes from the runner or its OS repo.
       - name: Build the installed-library SDL2 example
@@ -618,6 +632,11 @@ jobs:
         run: >-
           cmake -DJUNIT=build/wasm32/junit.xml -DINVENTORY=tests/inventory/wasm32.txt
           -DLABELS=portable -P tests/cmake/check_junit.cmake
+      - name: Measure linked WASI module
+        run: |
+          # QUALITY_WASM_COMPARE_BEGIN
+          cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=size.wasm "-DARTIFACT=${WASM_MODULE:-build/wasm32/schwaystation-run}" -P tests/cmake/quality.cmake
+          # QUALITY_WASM_COMPARE_END
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hashes-wasm32

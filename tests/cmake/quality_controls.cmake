@@ -217,6 +217,7 @@ case "${STATE_CASE:-valid}" in
   *) exit 99 ;;
 esac
 ]=])
+file(CHMOD "${state_binary}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
 set(state_setup "set -eu\n")
 run_block(state-valid "${state_block}" "${state_setup}" pass "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=valid")
 run_block(state-missing "${state_block}" "${state_setup}" "state_bytes" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=missing")
