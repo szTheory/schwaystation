@@ -1,4 +1,5 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+ci.classify_policy	policy
 ci.triage	policy
 docs.api_names	policy,portable
 docs.api_names.self_test	policy,portable
@@ -9,3 +10,4 @@ policy.lessons_unique.self_test	policy
 policy.no_skip	policy
 policy.no_skip.self_test	policy
 policy.pass_regex_status.self_test	policy,portable
+policy.quality_metrics	policy
