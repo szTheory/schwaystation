@@ -19,11 +19,15 @@ string(APPEND private_windows [=[rs\\DRIVECANARY\\file]=])
 string(REPEAT a1 20 private_hash)
 set(private_mail "MAILCANARY@")
 string(APPEND private_mail "hidden.invalid")
-set(issue [=[{"number":1,"title":"Question \"quoted\"; $(data) @private_posix@ @private_windows@ \u001b]0;OSCCANARY\u0007\u001b[31m\u001b[0m\u202e\u0085 @private_mail@ @private_hash@ \\\\UNCCANARY\\share /tmp/TEMPCANARY x",
-  "labels":[{"name":"bug"}],"created_at":"@date@","updated_at":"@date@","body":"BODYCANARY","user":{"login":"ACTORCANARY"}}]=])
+set(issue [=[{"number":1,"title":"Question \"quoted\"; $(data) \u001b]0;OSCCANARY\u0007\u001b[31m\u001b[0m\u202e\u0085",
+  "labels":[{"name":"bug"},{"name":"@private_posix@"},{"name":"@private_windows@ SpaceDRIVECANARY"},
+  {"name":"@private_mail@"},{"name":"@private_hash@"},{"name":"\\\\UNCCANARY\\share"},
+  {"name":"/tmp/TEMPCANARY"},{"name":"https://hidden.invalid/URLCANARY"}],
+  "created_at":"@date@","updated_at":"@date@","body":"BODYCANARY","user":{"login":"ACTORCANARY"}}]=])
 string(CONFIGURE "${issue}" issue @ONLY)
 file(WRITE "${BIN}/issues.json" "[${issue},{\"number\":2,\"pull_request\":{},\"title\":\"PRCANARY\"}]")
 file(WRITE "${BIN}/runs.json" "{\"ci\":{\"workflow_runs\":[{\"id\":3,\"name\":\"RUNNAMECANARY\",\"head_sha\":\"SHA_CANARY\",\"status\":\"completed\",\"conclusion\":\"success\",\"updated_at\":\"${date}\"}]},\"release\":{\"workflow_runs\":[]},\"nightly\":{\"workflow_runs\":[]}}")
+file(WRITE "${BIN}/no-runs.json" "{\"ci\":{\"workflow_runs\":[]},\"release\":{\"workflow_runs\":[]},\"nightly\":{\"workflow_runs\":[]}}")
 
 function(transform issues runs predicate)
   execute_process(COMMAND "${SH}" "${report}" "${issues}" "${runs}"
@@ -45,7 +49,8 @@ set(schema [=[keys == ["issues","issues_truncated","schema_version","workflows"]
   all(.[]; keys == ["conclusion","run_id","status","updated_at","workflow"]))]=])
 set(check [=[.issues_truncated == false and (.issues | length == 1 and
   (.[0] | keys == ["created_at","id","labels","title","updated_at"] and .id == 1 and
-  .labels == ["bug"] and (.title | startswith("Question \"quoted\"; $(data)")))) and
+  .labels[0] == "bug" and (.labels | length == 8) and
+  (.title | startswith("Question \"quoted\"; $(data)") and (test("[\\p{Cc}\\p{Cf}]") | not)))) and
   .workflows[0].run_id == 3 and .workflows[0].status == "completed" and
   .workflows[0].conclusion == "success" and
   all(.workflows[1:][]; .run_id == null and .status == null and .conclusion == null and .updated_at == null)]=])
@@ -56,18 +61,25 @@ if(NOT artifact STREQUAL first)
   message(FATAL_ERROR "ci.triage: identical input did not produce a stable artifact")
 endif()
 file(WRITE "${BIN}/empty.json" "[]")
-transform(empty.json runs.json "${schema} and .issues == [] and .issues_truncated == false")
+transform(empty.json no-runs.json "${schema} and .issues == [] and .issues_truncated == false and all(.workflows[]; .run_id == null and .status == null and .conclusion == null and .updated_at == null)")
 string(REPEAT z 200 long)
 string(REPEAT "{\"name\":\"${long}\"}," 8 labels)
 set(row "{\"number\":4,\"title\":\"${long}\",\"labels\":[${labels}{\"name\":\"last\"}],\"created_at\":\"${date}\",\"updated_at\":\"${date}\"}")
 string(REPEAT "${row}," 100 rows)
 file(WRITE "${BIN}/cap.json" "[${rows}${row}]")
 transform(cap.json runs.json ".issues_truncated == true and (.issues | length == 100 and all(.[]; (.title | length == 160) and (.labels | length == 8 and all(.[]; length == 48))))")
-foreach(bad "{" "{}" "[] []" "[{}]" "[${row},null]")
-  file(WRITE "${BIN}/bad.json" "${bad}")
-  execute_process(COMMAND "${SH}" "${report}" bad.json runs.json WORKING_DIRECTORY "${BIN}"
+function(reject issues runs)
+  execute_process(COMMAND "${SH}" "${report}" "${issues}" "${runs}" WORKING_DIRECTORY "${BIN}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE result ERROR_VARIABLE err)
   if(rc STREQUAL "0" OR NOT result STREQUAL "" OR NOT err MATCHES "invalid.*metadata")
     message(FATAL_ERROR "ci.triage: malformed metadata did not fail without an artifact")
   endif()
+endfunction()
+foreach(bad "{" "{}" "[] []" "[{}]" "[${row},null]")
+  file(WRITE "${BIN}/bad.json" "${bad}")
+  reject(bad.json runs.json)
 endforeach()
+file(READ "${BIN}/runs.json" invalid_run)
+string(REPLACE "\"completed\"" "\"unrecognized\"" invalid_run "${invalid_run}")
+file(WRITE "${BIN}/bad-run.json" "${invalid_run}")
+reject(issues.json bad-run.json)
