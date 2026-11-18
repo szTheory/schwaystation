@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 7
 current_phase_name: Faster and more trustworthy CI
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-11-18T18:46:28.698Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-11-18T20:07:41Z"
 last_activity: 2026-11-18
-last_activity_desc: Plan 07-01 implemented and verified locally
-state_head: c110aba6e280ae6e99c99e7fd4130cec2c3ae8fc
+last_activity_desc: Plan 07-02 published bounded CI fingerprints, critical paths and timeout evidence
+state_head: 0119cbb
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 10
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -31,18 +31,24 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 ## Current Position
 
 Phase: 7 (Faster and more trustworthy CI) — IN PROGRESS
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 10
 Status: In progress
-Last Activity: 2026-11-18 — Plan 07-01 implemented and verified locally
+Last Activity: 2026-11-18 — Plan 07-02 CI history report completed and validated
 
 ### Phase 7 execution (2026-11-18)
 
-Runtime/model: Codex, OpenGSD CLI 1.20.0, inherited GPT-6 session model (exact deployed ID unavailable).
-Plan 07-01 added five active native CI cases for triage, lesson uniqueness, quality bounds and changed-path routing.
-The existing hygiene checks passed at 3,133 of 3,200 repository-check lines and 300 of 300 RetroArch test lines.
-Review the remaining gate-code footprint before adding new live producers. The weekly triage workflow,
-CI measurements and measured quality registry still require later plans.
+Runtime/model: Codex/OpenGSD CLI 1.20.0; inherited GPT-6 session (exact deployed ID unavailable). Plan 07-02
+used the same inherited model at xhigh effort. Wall elapsed was about 55 minutes from the planning commit through
+the completed report; active time was not measured.
+Plan 07-01 added five native CI policy cases. Its historical gate count was 3,133/3,200 lines and 300/300
+RetroArch lines; the reviewed 3,300-line ceiling is recorded in the plan and will be applied by Plan 03 before
+more counted gate code is added.
+Plan 07-02 captured 40 workflow runs, all 40 attempt job pages and 573 jobs. Exact-head filtering yielded 25
+usable completed runs across 20 workload groups. The report includes the Release reusable-workflow path,
+failure-log classifications, timeout formulas and explicit unknowns; its one-shot validator passed, including
+missing-section and wrong-arithmetic controls. The actual release-App PR comparison and timeout application
+remain with later plans. Plan 07-03 is next.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -55,7 +61,7 @@ Discussion used the existing 40-run CI evidence. BE32 remained the critical path
 skips heavy PR tests only for a verified release App PR with the exact metadata file list and event head. All
 main and actual release checks remain. Plans cover TUNE-01 through TUNE-06 in ten plans/eight waves. Independent
 plan review passed after correcting one shell-command quote. No tests or workflows ran during planning. Plan
-07-01 is next.
+07-03 is next after completed Plans 07-01 and 07-02.
 
 
 ## Performance Metrics
@@ -1051,7 +1057,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Start Phase 7 with `$gsd-autonomous --from 7 --to 7`, beginning with discussion of the SEED-007 tune-up. Review before verification, then use `$gsd-ship 7` and confirm merge, green main CI and the automatic release before Phase 8.
+- Continue Phase 7 autonomously from Plan 07-03. Complete its remaining plans, code review and automated verification, then ship the phase and confirm the merged main CI and automatic release before starting Phase 8.
 
 ### v2.0 roadmap creation (2026-11-18)
 
