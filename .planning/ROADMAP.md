@@ -43,11 +43,11 @@ Plans:
 - [ ] 07-02-PLAN.md — Audit comparable CI runs, flakiness and timeouts
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 07-03-PLAN.md — Measure quality inputs and audit settings, runners and pins
-- [ ] 07-05-PLAN.md — Publish the sanitized weekly triage artifact
+- [ ] 07-03-PLAN.md — Apply the revised gate cap, measure quality inputs and audit settings, runners and pins
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 07-04-PLAN.md — Score quality dimensions and choose one improvement
+- [ ] 07-05-PLAN.md — Publish the sanitized weekly triage artifact
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 07-06-PLAN.md — Avoid repeat release-metadata PR work and apply measured timeouts
@@ -199,7 +199,7 @@ Plans:
 
 ## Progress
 
-Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the 3,200-line outer repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
+Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the 3,300-line outer repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|

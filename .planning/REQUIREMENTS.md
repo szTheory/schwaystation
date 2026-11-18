@@ -9,7 +9,9 @@ v2.0 grows library breadth through the existing library, headless runner and lib
 
 The pinned 13,407-entry Redump DAT is an inventory and source for ledger titles, not evidence that every entry boots or that every board, region and format combination works. Untested titles and combinations remain explicitly `unknown`. No v2.0 claim upgrades the accepted v1.0 MDEC evidence: exact 8-bit hardware output and full external frame/movie conformance remain unproven.
 
-Repository-check code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githooks/*`) stays at or below **3,200 total lines in every v2 phase**, measured with the phase's declared inventory and ratcheted down to the measured total at ship. This gives the required tune-up room over v1.0's 2,700-line ceiling while keeping repository machinery bounded. The real-host RetroArch test code remains at or below 300 lines total. Every retained gate names the recurring fault it prevents. Before long builds, guest runs or hosted workflows, run a relevant inexpensive input/count/inventory/selector/budget preflight.
+Repository-check code (`scripts/*.sh`, `tests/cmake/*.cmake`, `.githooks/*`) stays at or below **3,300 total lines in every v2 phase**, measured with the phase's declared inventory and ratcheted down to the measured total at ship. On 2026-11-18, Phase 7 measured 3,133 lines after Plan 01. The independent review estimated 90–135 additional lines for the remaining required production-path and negative controls. The original cap left 67 lines. The revised cap leaves 32 lines above the upper estimate of 3,268. [Plan 01 measurement](phases/07-faster-and-more-trustworthy-ci/07-01-SUMMARY.md), [budget decision](phases/07-faster-and-more-trustworthy-ci/07-CONTEXT.md).
+
+The real-host RetroArch test code remains at or below **300 lines total**. Every retained gate names the recurring fault it prevents. Before long builds, guest runs or hosted workflows, run a relevant inexpensive input/count/inventory/selector/budget preflight.
 
 ## v2 Requirements
 

@@ -21,8 +21,8 @@
 - Prefer a small built-in shell/JQ implementation over adding a runtime dependency or general-purpose report service. Add focused positive and hostile-input controls.
 
 ### Quality, docs, and dependencies
-- Keep one checked-in `quality.json` with only the required measured ceilings/floors: instructions per frame, Wasm bytes, serialized state bytes, and comparable CI critical-path seconds. Ratchet to measurements, not older hypotheses. Reuse CMake `string(JSON)` and negative controls; do not introduce a dashboard, duplicated budgets, or Actionlint dependency.
-- Check lesson uniqueness by both identity and normalized lesson text, with a negative control. Preserve and verify the current 3,200-line repository-gate ceiling and 300-line RetroArch test ceiling; each new gate must prevent a named recurring fault.
+- Keep one checked-in `quality.json` with the required measured ceilings and floors for instructions per frame, Wasm bytes, serialized state bytes, and comparable CI critical-path seconds. The dated implementation adjustment adds the reason for the repository-check cap change to `reasons[]`. Reuse CMake `string(JSON)` and negative controls.
+- Check lesson uniqueness by both identity and normalized lesson text, with a negative control. Apply the 3,300-line repository-check ceiling from the dated [budget decision](07-CONTEXT.md#repository-check-cap-adjustment-on-2026-11-18), ratchet it to the measured total at ship and maintain the 300-line RetroArch ceiling. Each new gate must prevent a named recurring fault.
 - Score all seven dimensions with direct evidence links, then implement and verify exactly one evidence-backed improvement in the lowest-scoring dimension. Do not select the improvement before scoring.
 - Check repository settings with the existing `scripts/apply-repo-settings.sh --check`, current Dependabot major updates, runner images, and named tool pins. Add a minimal grouped Dependabot configuration for GitHub Actions if evidence confirms the absent config is the weakest upgrade-path item; do not enable auto-merge.
 - Refresh only documentation shown stale by code/settings changes, including README install guidance, device/size budgets, roadmap, and prompt-coverage records. Keep detailed evidence in phase artifacts and user-facing README concise.
@@ -70,7 +70,7 @@ For CI time reduction, keep all post-merge main CI and release validation. The e
 - Preserve the three deliverables (C library, headless runner, libretro core), deterministic integer-only core, and host-supplied files; this phase has no reason to alter emulator behavior.
 - Reuse permissively licensed material only. Keep the repository free of BIOS, disc, executable, card, state, personal-path, email, and identity bytes outside the approved fixture manifest.
 - Every behavior change needs a test in the CI workflow; all tests gate. Use automation first and no owner hardware verification for this internal CI phase.
-- Repository-check code is only CMake `-P` or POSIX shell, bounded by the phase's absolute gate-code limit (3,200 lines for v2.0); the total RetroArch test code remains no more than 300 lines. Name the fault each gate prevents.
+- Repository-check code is only CMake `-P` or POSIX shell, bounded by the 3,300-line milestone ceiling and ratcheted to the measured total at ship. The total RetroArch test code remains no more than 300 lines. Name the fault each gate prevents.
 - Review code before final verification. Keep code-review tooling findings as seeds, and do not introduce a third review-fix round without new evidence.
 - Avoid new ceremony, privileged OS checks, or self-metered time limits. Keep changes within the authorized v2.0 scope and stop only at real owner/identity/phase boundaries.
 - Commit phase work on its `phase/NN-slug` branch, never on `main`; preserve the existing uncommitted config edit. Record runtime/model in STATE at each GSD step.

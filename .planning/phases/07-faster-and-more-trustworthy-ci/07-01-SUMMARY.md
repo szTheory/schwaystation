@@ -82,7 +82,7 @@ status: complete
 
 # Phase 07 Plan 01 — CI policy controls
 
-The native CI preset runs production-path tests for sanitized triage, lesson uniqueness, exact inclusive quality bounds and changed-path routing. The outer line checks measured **3,133 of 3,200** repository-check lines and **300 of 300** RetroArch test lines. Subsequent plans have **67 repository-check lines** available under the current cap.
+The native CI preset runs production-path tests for sanitized triage, lesson uniqueness, exact inclusive quality bounds and changed-path routing. At completion the outer line checks measured **3,133 of 3,200** repository-check lines and **300 of 300** RetroArch test lines. The cap then left **67 lines**. The later 3,300-line decision gives Plan 03 ownership of the cap update before the remaining implementation. [Dated budget decision](07-CONTEXT.md#repository-check-cap-adjustment-on-2026-11-18)
 
 ## Verification
 
