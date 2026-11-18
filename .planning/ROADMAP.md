@@ -35,7 +35,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
   4. The checked-in `quality.json` baselines cover instructions per frame, Wasm size, state bytes and comparable CI critical-path time. CI enforces the applicable bounds, and the lesson uniqueness check rejects both duplicate identities and duplicate lesson text.
   5. Maintainers can trace current settings, pin and runner checks, device and documentation budgets, install instructions, and roadmap and prompt coverage to evidence. The tune-up records why any measured pin, cache or runner change was made.
 
-**Plans**: 4/10 plans executed
+**Plans**: 5/10 plans executed
 
 Plans:
 **Wave 1**
@@ -47,7 +47,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [x] 07-04-PLAN.md — Score quality dimensions and choose one improvement
-- [ ] 07-05-PLAN.md — Publish the sanitized weekly triage artifact
+- [x] 07-05-PLAN.md — Publish the sanitized weekly triage artifact
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 07-06-PLAN.md — Avoid repeat release-metadata PR work and apply measured timeouts
@@ -203,7 +203,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 7. Faster and more trustworthy CI | 4/10 | In Progress | - |
+| 7. Faster and more trustworthy CI | 5/10 | In Progress | - |
 | 8. Per-game card saves | 0/TBD | Not started | - |
 | 9. CHD disc images | 0/TBD | Not started | - |
 | 10. PBP disc images | 0/TBD | Not started | - |
