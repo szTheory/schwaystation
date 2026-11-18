@@ -10,8 +10,9 @@ find_program(SH sh PATHS ${git_usr_bin} REQUIRED)
 file(MAKE_DIRECTORY "${BIN}")
 
 function(route name count paths heavy release)
+  set(mode "${ARGV5}")
   file(CONFIGURE OUTPUT "${BIN}/paths.txt" CONTENT "${paths}" @ONLY NEWLINE_STYLE UNIX)
-  execute_process(COMMAND "${SH}" "${ROOT}/scripts/classify-changes.sh" "${count}"
+  execute_process(COMMAND "${SH}" "${ROOT}/scripts/classify-changes.sh" "${count}" "${mode}"
     INPUT_FILE "${BIN}/paths.txt" RESULT_VARIABLE rc OUTPUT_VARIABLE result ERROR_VARIABLE err)
   if(NOT rc STREQUAL "0" OR NOT result MATCHES "(^|\n)heavy=${heavy}(\r?\n|$)" OR
      NOT result MATCHES "(^|\n)release_inputs=${release}(\r?\n|$)")
@@ -25,3 +26,8 @@ route(release 1 ".github/workflows/release.yml\n" true true)
 route(empty 1 "" true true)
 route(oversize 3001 ".planning/STATE.md\n" true true)
 route(bad-count invalid ".planning/STATE.md\n" true true)
+route(release-metadata 3 ".release-please-manifest.json\nCHANGELOG.md\nversion.txt\n" false false release-metadata)
+route(release-metadata-partial 2 ".release-please-manifest.json\nCHANGELOG.md\n" true false release-metadata)
+route(release-metadata-duplicate 3 ".release-please-manifest.json\nCHANGELOG.md\nCHANGELOG.md\n" true false release-metadata)
+route(release-metadata-extra 4 ".release-please-manifest.json\nCHANGELOG.md\nversion.txt\n.planning/STATE.md\n" true false release-metadata)
+route(release-metadata-release-input 4 ".release-please-manifest.json\nCHANGELOG.md\nversion.txt\n.github/workflows/release.yml\n" true true release-metadata)
