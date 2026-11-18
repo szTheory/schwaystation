@@ -1,8 +1,9 @@
 # Autonomous runs for milestone v2.0 — The whole library
 
-The owner runs the rest of milestone v1.0 with `/gsd-autonomous` (AGENTS.md rule 9). This file holds the
-standing guidance for the two steps that need the most judgement. Every discuss and verify step reads it,
-autonomous or not, and follows it without asking.
+The owner authorized autonomous work through milestone v2.0, starting at Phase 7, with each phase shipped before
+the next and the milestone audit, completion and cleanup at the end (AGENTS.md rule 9). This file holds the
+standing guidance for the steps that need the most judgement. Every discuss and verify step reads it, autonomous
+or not, and follows it without asking.
 
 ## Discuss steps: fan out, synthesize, follow
 
