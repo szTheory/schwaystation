@@ -1,20 +1,21 @@
 ---
 gsd_state_version: "1.0"
 milestone: v1.0
-milestone_name: PlayStation games play with sound in RetroArch
+current_phase: 06
+current_phase_name: Discs and FMV
 status: Awaiting next milestone
 stopped_at: Milestone v1.0 complete and archived
-last_updated: "2026-11-18T12:45:21.214Z"
+last_updated: "2026-11-18T14:17:23.502Z"
 last_activity: 2026-11-18
-last_activity_desc: Milestone v1.0 completed and archived
-state_head: 49a0d091aeb938e3d9882d1893e8488b45369214
+last_activity_desc: Completed quick task 261118-bvm: skip heavyweight main-push CI for planning-only changes
+state_head: 11c9789a5e13c7851acf5030bcb28710f6cf90f8
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 195
   completed_plans: 195
   percent: 100
-current_phase: 06
+milestone_name: PlayStation games play with sound in RetroArch
 ---
 
 # Project State
@@ -32,7 +33,7 @@ Milestone: v1.0 complete and archived
 Phase: 06 — Discs and FMV (verified)
 Plan: —
 Status: No active milestone
-Last activity: 2026-11-18 — v1.0 closeout complete
+Last activity: 2026-11-18 — Completed quick task 261118-bvm: skip heavyweight main-push CI for planning-only changes
 
 ## Performance Metrics
 
@@ -640,6 +641,7 @@ Recent decisions affecting current work:
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 261118-bvm | Skip heavyweight main-push CI for planning-only changes | 2026-11-18 | 11c9789 | [261118-bvm-skip-heavyweight-main-push-ci-for-planni](./quick/261118-bvm-skip-heavyweight-main-push-ci-for-planni/) |
 
 ## Deferred Items
 
