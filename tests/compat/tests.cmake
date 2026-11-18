@@ -769,10 +769,11 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_cue_edges")
     endif()
     set(probe_args)
     if(WIN32 AND mode STREQUAL "cue_name_255")
+      # This fixture intentionally omits the track; reaching child lookup proves the name parsed.
       execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${cue}"
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
-      if(rc STREQUAL "0" OR NOT err MATCHES "cannot read CUE track file")
-        message(FATAL_ERROR "255-byte CUE name was rejected before the Windows path limit: ${rc}: ${out}${err}")
+      if(rc STREQUAL "0" OR NOT err MATCHES "BAD_CUE line 1: missing or escaping FILE child")
+        message(FATAL_ERROR "255-byte CUE name did not reach missing-track validation: ${rc}: ${out}${err}")
       endif()
       continue()
     endif()

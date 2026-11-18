@@ -1,17 +1,17 @@
 ---
 phase: 06-discs-and-fmv
 status: local_pass_hosted_pending
-verified: 2026-11-18T00:15:31Z
-source: reviewed Plan 06-45 WASI/Windows repair; non-planning source fingerprint 8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be (162 files)
+verified: 2026-11-18T00:42:02Z
+source: reviewed Plan 06-45 Windows CUE follow-up; non-planning source fingerprint 7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801dfe00f48 (162 files)
 ---
 
 # Phase 6 verification
 
-The revised Phase 6 contract and Plan 06-45 repair snapshot have passed local acceptance on the reviewed source fingerprint above. Phase 6 is **not fully verified** until exact-head hosted acceptance and the ship checks in Plan 06-45 pass. The retained evidence does not claim exact 8-bit hardware output or full frame/movie hardware conformance: the inputs are complete, while the frame/movie guest output remains unresolved. These limitations are explicit in the approved v1.0 claim.
+The full local CI and hygiene workflows passed on the preceding reviewed fingerprint `8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be`. The follow-up fingerprint in this report has a clean review and passed its changed-target build and four focused selectors. Phase 6 is **not fully verified** until current-head hosted acceptance and the ship checks in Plan 06-45 pass. The retained evidence does not claim exact 8-bit hardware output or full frame/movie hardware conformance: the inputs are complete, while the frame/movie guest output remains unresolved. These limitations are explicit in the approved v1.0 claim.
 
-## Current local acceptance (2026-11-17)
+## Full local acceptance before the Windows follow-up (2026-11-17)
 
-The source fingerprint in this file's front matter matches the final Plan 06-45 review in `06-45-REVIEW.md`. Review preceded local verification; only planning and evidence bookkeeping followed. Cheap checks ran before the full workflows.
+These complete workflow results are for fingerprint `8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be`, recorded in the earlier Plan 06-45 repair review. The later Windows follow-up has its own review and targeted local evidence below. Cheap checks preceded the full workflows.
 
 | Gate | Command and result | Status |
 |---|---|---|
@@ -254,3 +254,50 @@ Hosted results for this reviewed fingerprint are still required. Local WASI comp
 the pinned clang-21/wasm-ld toolchain is absent. Current-host RetroArch `disc_boot` and runner image comparison,
 all workflow-dispatch CI lanes, and the Nightly inventory/fuzz run must pass on the pushed exact head. Phase 6
 verification and ship remain pending.
+
+## Plan 06-45 exact-head portability diagnostic (2026-11-18)
+
+The diagnostic batch ran on commit `40b95cb21ec4030d6b81cbc72ec7a3ad3d1f751a`, source fingerprint
+`8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be`:
+
+- Nightly run [44206684588](https://github.com/szTheory/schwaystation/actions/runs/44206684588) —
+  `gh run view 44206684588 --exit-status`, exit 0. `vectors-full` passed 30/30 tests and
+  `check_junit` confirmed all 30 inventory entries ran once. It covered the 13 GPU, 12 MDEC, 3 CD-ROM,
+  one audio and one vector selectors, plus all six existing bounded fuzz campaigns (`exe`, `cue`, `cnf`,
+  `m3u`, `cdrom`, `mdec`). Fuzz seed preflights and campaigns passed; each campaign retained its 60-second
+  bound. All four benchmark jobs passed.
+- CI run [44206684317](https://github.com/szTheory/schwaystation/actions/runs/44206684317) — both Windows
+  architectures failed the same selectors: `disc.image.cue_root_child` could not open a nested CUE track,
+  and `compat.probe.cue_edges` expected the old diagnostic for a fixture with no companion. The first failure
+  occurs because CUE names normalize to `/`, which Windows does not normalize after the root becomes a
+  `\\?\` extended path. The second is an outdated assertion: the 255-byte filename is accepted and lookup
+  reaches the intentionally missing child, yielding `BAD_CUE line 1: missing or escaping FILE child`.
+- The completed applicable lanes on that CI head passed: WASI, Linux x64/arm64, macOS x64/arm64, ASan, nofp,
+  performance, GPU references, and the hosted RetroArch job. RetroArch used the CI OpenBIOS and owned
+  `disc_boot.cue`, ran 900 frames, and `schwaystation-run --frames 900 --png 900:disc-runner.png` produced a
+  16x16 frame whose every pixel matched the RetroArch capture. These results are diagnostic for the previous
+  source; the follow-up needs its own exact-head run.
+- After both deterministic Windows failures were logged and the other completed results were captured, the
+  obsolete run was stopped with `gh run cancel 44206684317` (exit 0). The 19-minute be32 tail and dependent
+  aggregate/hash checks therefore do not count. The cancellation prevents spending more time on a head that
+  cannot pass and that must be rerun after the Windows correction.
+
+## Plan 06-45 Windows CUE follow-up local acceptance (2026-11-18)
+
+The reviewed follow-up changes the Windows candidate path to turn relative `/` separators into `\` only under
+`_WIN32`. Canonicalization and root containment still run after path construction. The Windows-only 255-byte
+compatibility assertion now checks the post-parse missing-child error; `disc.image.cue_limits` separately opens
+an actual 255-byte child using an extended path. Review found no issue; see `06-45-REVIEW.md`.
+
+On current fingerprint `7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801dfe00f48`:
+
+- Cheap diff, preset JSON, inventory sorting, workflow wiring and 2,700-line gate checks passed; the line gate
+  remained exactly 2,700.
+- `cmake --build build/ci --parallel 8 --target schwaystation-test-disc-image schwaystation-test-probe schwaystation-run-test`
+  — exit 0.
+- `ctest --test-dir build/ci -R '^(disc\.image\.cue_root_child|disc\.image\.cue_limits|disc\.playlist|compat\.probe\.cue_edges)$' --output-on-failure`
+  — exit 0, 4/4.
+
+This follow-up has not yet passed the full local workflow or any hosted workflow. The next action is to commit and
+push it, run one full CI and Nightly batch against its exact head, then close Phase 6 verification and ship only
+if every applicable gate passes.

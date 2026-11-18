@@ -688,7 +688,14 @@ static int schway__disc_image_child_path(const char *root, const char *name,
     size_t name_size = strlen(name);
     if (root_size > SCHWAY__DISC_IMAGE_PATH_CAP - name_size - 1u) return 0;
     memcpy(out, root, root_size);
+#ifdef _WIN32
+    for (size_t i = 0u; i < name_size; i++) {
+        out[root_size + i] = name[i] == '/' ? '\\' : name[i];
+    }
+    out[root_size + name_size] = '\0';
+#else
     memcpy(out + root_size, name, name_size + 1u);
+#endif
     return 1;
 }
 
