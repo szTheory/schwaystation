@@ -6,17 +6,17 @@ current_phase: 6
 current_phase_name: Discs and FMV
 current_plan: 45 of 45 (hosted acceptance and ship)
 status: in_progress
-stopped_at: "06-45 exact-head CI 44218206100 and Nightly 44218205653 running on 28683ebe"
-last_updated: "2026-11-18T01:47:12Z"
+stopped_at: "Phase 6 verification passed; run authorized ship 6, then verify merge and release before milestone closeout"
+last_updated: "2026-11-18T03:01:11Z"
 last_activity: 2026-11-18
-state_head: 28683ebe4c9940c95d539b5c18733c139f940ffa
+state_head: ce30dc104378e924ecc14b0f554bf35dbf0ffe19
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 195
-  completed_plans: 194
-  percent: 83
-last_activity_desc: "Plan 06-45 generated-playlist normalization is committed and pushed as 28683ebe4c9940c95d539b5c18733c139f940ffa. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); independent gsd-code-reviewer found no issue; active time not tracked. On the preceding source commit ec10043, Nightly 44210060292 passed. CI 44210060285 passed every applicable build/test lane, including be32, but final hash equality found only generated disc_boot_runner.m3u line endings differed between Windows (CRLF) and Linux (LF). The root cause is reproduced and fixed with explicit UNIX newlines. On 28683ebe, cmake --preset ci passed; the generated playlist SHA-256 matches the be32 artifact; runner.disc.api passed 1/1; and hygiene passed 23/23. Exact-head CI 44218206100 (https://github.com/szTheory/schwaystation/actions/runs/44218206100) and Nightly 44218205653 (https://github.com/szTheory/schwaystation/actions/runs/44218205653) are running on 28683ebe. Inspect every applicable lane, then complete Phase 6 verification and ship only if all pass. Earlier exact 8-bit and full frame/movie hardware output remain unproved under the approved v1.0 scope."
+  completed_plans: 195
+  percent: 100
+last_activity_desc: "Plan 06-45 completed and Phase 6 goal-backward verification passed. Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); independent gsd-code-reviewer found no issue and gsd-verifier returned PASS. Source commit 28683ebe4c9940c95d539b5c18733c139f940ffa passed exact-head CI 44218206100 and Nightly 44218205653. All applicable CI lanes passed, including 613 tests and five release tests on Linux x64/Windows x64/Windows arm64, both Windows path regressions, be32, performance, ASan, WASI, RetroArch, hash equality and aggregate. Eight platform hash manifests compare byte-identically. Nightly vectors passed 30/30 once, all six bounded fuzz campaigns and all four benchmark jobs passed. RetroArch ran the owned disc for 900 frames and the 16x16 frame matched every pixel. The generated Windows M3U newline discrepancy was fixed by explicit UNIX output; local runner.disc.api passed 1/1 and hygiene passed 23/23 at the 2,700-line budget. Exact 8-bit hardware and full frame/movie output remain unproved under the approved v1.0 scope. Next: run authorized $gsd-ship 6, verify merge/release, then finish the v1.0 milestone audit and archive."
 ---
 
 # Project State
@@ -33,15 +33,15 @@ See: .planning/PROJECT.md (updated 2026-11-15)
 Phase: 6 (Discs and FMV) — owner-approved successor scope in progress
 Current Plan: 45 of 45 (hosted acceptance and ship)
 Next plan file: 06-45-PLAN.md
-Status: Plans 06-42 through 06-44 are complete. Plan 06-45 has a reviewed generated-playlist newline fix after exact-head hash comparison exposed Windows/LF byte divergence. Nightly, all CI build/test lanes, local targeted checks and hygiene passed for their respective heads; the fixed head still needs exact-head CI and Nightly, then final verification and ship. Deterministic MDEC with available verified hardware coverage is in scope; exact 8-bit and complete external frame/movie hardware conformance remain unproved.
-Last activity: 2026-11-17
+Status: Plans 06-42 through 06-45 are accepted. Exact-head CI and Nightly pass on source commit 28683ebe; Phase 6 goal-backward verification passes. The branch is ready for authorized ship, merge and release checks. Deterministic MDEC with available verified hardware coverage is in scope; exact 8-bit and complete external frame/movie hardware conformance remain unproved.
+Last activity: 2026-11-18
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 194
+- Total plans completed: 195
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 

@@ -26,7 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests (completed 2026-11-10)
 - [x] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch (completed 2026-11-13)
 - [x] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro (completed 2026-11-14)
-- [ ] **Phase 6: Discs and FMV** - CD-ROM with cue/bin, iso and m3u, XA, CD-DA, MDEC and disk control, and the own disc boots through OpenBIOS in RetroArch
+- [x] **Phase 6: Discs and FMV** - CD-ROM with cue/bin, iso and m3u, XA, CD-DA, MDEC and disk control, and the own disc boots through OpenBIOS in RetroArch (completed 2026-11-18)
 
 ## Phase Details
 
@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes deterministic integer MDEC decoding with exact pinned 4-bit hardware coverage, a separately named 8-bit implementation regression, direct status/colour/FIFO/packing/bounds controls, and a compressed-unit preflight. The pinned frame (300 macroblocks) and movie first frame (240 macroblocks) have complete source coverage, while their full guest output/conformance remains unresolved; the frame display diagnostic fails the existing pixel comparison, and movie DMA1 has no matching capture. Exact 8-bit and full-image hardware conformance are not claimed. The complete owned STR on `disc_boot` plays through DMA into the native 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 42/45 plans accepted; the two recorded gap summaries remain pending exact-head hosted acceptance
+**Plans**: 45/45 plans accepted. Exact-head CI, Nightly and RetroArch acceptance passed on 2026-11-18. The v1.0 claim preserves the documented 8-bit and frame/movie output limits; the authorized ship and release steps follow.
 
 Plans:
 **Wave 1**
@@ -557,10 +557,10 @@ Plans:
 - [x] 06-20-PLAN.md — Replay hostile media seeds and register nightly fuzz targets
 
 **Wave 22** *(blocked on Wave 21 completion)*
-- [ ] 06-23-PLAN.md — Integrate per-leg disc equality and background RetroArch smoke
+- [x] 06-23-PLAN.md — Integrate per-leg disc equality and background RetroArch smoke
 
 **Wave 23** *(blocked on Wave 22 completion)*
-- [ ] 06-24-PLAN.md — Review and verify the complete disc phase
+- [x] 06-24-PLAN.md — Review and verify the complete disc phase
 
 **Approved MDEC successor tranche** *(local waves 1–6; owner-approved 2026-11-17)*
 - [x] 06-40-PLAN.md — Record the approved deterministic MDEC claim and evidence limits
@@ -568,7 +568,7 @@ Plans:
 - [x] 06-42-PLAN.md — Guard compressed inputs and classify source coverage/status budget
 - [x] 06-43-PLAN.md — Register the exact surviving main-CI and nightly selectors
 - [x] 06-44-PLAN.md — Review changes and run complete local acceptance
-- [ ] 06-45-PLAN.md — Verify pre-ship hosted acceptance and record ship-only checks
+- [x] 06-45-PLAN.md — Verify pre-ship hosted acceptance and record ship-only checks
 
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
@@ -585,4 +585,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
 | 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
-| 6. Discs and FMV | 42/45 | In Progress | - |
+| 6. Discs and FMV | 45/45 | Complete | 2026-11-18 |

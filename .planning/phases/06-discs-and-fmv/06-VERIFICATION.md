@@ -1,13 +1,267 @@
 ---
 phase: 06-discs-and-fmv
-status: local_pass_hosted_pending
-verified: 2026-11-18T00:42:02Z
-source: reviewed Plan 06-45 generated-playlist normalization at commit 28683ebe4c9940c95d539b5c18733c139f940ffa; prior non-planning source fingerprint 7a0306104ffd096a13cbdb2b51634aba48a6c6fd9da101a8e6a20801dfe00f48
+status: passed
+verified: 2026-11-18T03:01:11Z
+source: "verified against source commit 28683ebe4c9940c95d539b5c18733c139f940ffa; finalized planning-only worktree head ce30dc104378e924ecc14b0f554bf35dbf0ffe19; CI 44218206100 and Nightly 44218205653"
+covered_files:
+  - ".github/workflows/ci.yml"
+  - ".github/workflows/nightly.yml"
+  - ".planning/phases/06-discs-and-fmv/06-01-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-01-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-02-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-02-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-03-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-03-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-04-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-04-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-05-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-05-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-06-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-06-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-07-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-07-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-08-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-08-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-09-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-09-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-10-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-10-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-11-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-11-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-12-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-12-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-13-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-13-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-14-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-14-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-15-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-15-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-16-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-16-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-17-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-17-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-18-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-18-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-19-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-19-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-20-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-20-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-21-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-21-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-22-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-22-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-23-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-23-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-24-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-24-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-25-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-25-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-26-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-26-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-27-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-27-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-28-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-28-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-29-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-29-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-30-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-30-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-31-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-31-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-32-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-32-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-33-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-33-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-34-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-34-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-35-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-35-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-36-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-36-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-37-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-37-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-38-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-38-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-39-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-39-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-40-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-40-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-41-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-41-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-42-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-42-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-43-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-43-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-44-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-44-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-45-PLAN.md"
+  - ".planning/phases/06-discs-and-fmv/06-45-SUMMARY.md"
+  - "ASSET_POLICY.md"
+  - "CMakeLists.txt"
+  - "CMakePresets.json"
+  - "PROVENANCE.md"
+  - "THIRD-PARTY-NOTICES.md"
+  - "cmake/CDReferences.cmake"
+  - "cmake/DiscFixtures.cmake"
+  - "cmake/DiscTargets.cmake"
+  - "cmake/MDECReferences.cmake"
+  - "cmake/Mkpsxiso.cmake"
+  - "cmake/Psxavenc.cmake"
+  - "cmake/toolchains/wasm32-wasi.cmake"
+  - "docs/discs.md"
+  - "docs/embedding.md"
+  - "docs/hardware/cdrom.md"
+  - "docs/hardware/dma.md"
+  - "docs/hardware/mdec.md"
+  - "docs/hardware/spu.md"
+  - "docs/libretro.md"
+  - "docs/runner.md"
+  - "docs/testing.md"
+  - "examples/sdl2/CMakeLists.txt"
+  - "examples/sdl2/README.md"
+  - "examples/sdl2/main.c"
+  - "host/disc_image.c"
+  - "host/disc_image.h"
+  - "host/disc_probe.c"
+  - "include/schwaystation.h"
+  - "libretro/libretro.c"
+  - "libretro/schwaystation_libretro.info.in"
+  - "pins.txt"
+  - "runner/CMakeLists.txt"
+  - "runner/exit_status.h"
+  - "runner/inputs.c"
+  - "runner/inputs.h"
+  - "runner/main.c"
+  - "runner/md5.c"
+  - "runner/md5.h"
+  - "runner/probe.c"
+  - "runner/probe.h"
+  - "scripts/hygiene.sh"
+  - "scripts/wasm-test-emulator.sh"
+  - "src/bus.c"
+  - "src/cdrom.c"
+  - "src/cdrom.h"
+  - "src/cdrom_audio.c"
+  - "src/cdrom_sector.c"
+  - "src/cdrom_state.c"
+  - "src/cdxa.c"
+  - "src/cdxa.h"
+  - "src/disc.c"
+  - "src/dma.c"
+  - "src/dma.h"
+  - "src/frame.c"
+  - "src/instance.c"
+  - "src/internal.h"
+  - "src/mdec.c"
+  - "src/mdec.h"
+  - "src/sched.c"
+  - "src/spu.c"
+  - "src/spu.h"
+  - "src/state.c"
+  - "src/state.h"
+  - "tests/abi/inventory.txt"
+  - "tests/abi/tests.cmake"
+  - "tests/api/v4.c"
+  - "tests/api/v5.c"
+  - "tests/api/v6.c"
+  - "tests/api/v7.c"
+  - "tests/built/fast-expected.txt"
+  - "tests/bus/bus_tests.c"
+  - "tests/cdrom/audio.c"
+  - "tests/cdrom/inventory.txt"
+  - "tests/cdrom/model.c"
+  - "tests/cdrom/reference.c"
+  - "tests/cdrom/sectors.c"
+  - "tests/cdrom/tests.cmake"
+  - "tests/cdrom/xa.c"
+  - "tests/cmake/check_junit.cmake"
+  - "tests/cmake/compat-controls.cmake"
+  - "tests/cmake/compat-ratchet.cmake"
+  - "tests/cmake/expect_fail.cmake"
+  - "tests/cmake/firmware_scan.cmake"
+  - "tests/cmake/fixture_budget.cmake"
+  - "tests/cmake/hashes.cmake"
+  - "tests/cmake/info_claims.cmake"
+  - "tests/cmake/info_claims_self_test.cmake"
+  - "tests/cmake/vendored.cmake"
+  - "tests/cmake/workflows.cmake"
+  - "tests/compat/probe_tests.c"
+  - "tests/compat/tests.cmake"
+  - "tests/core/bus_unbuilt.c"
+  - "tests/core/disc_api.c"
+  - "tests/core/inventory.txt"
+  - "tests/core/test_run.c"
+  - "tests/core/test_state.c"
+  - "tests/core/tests.cmake"
+  - "tests/diag/expected.csv"
+  - "tests/disc/fixture.c"
+  - "tests/disc/image.c"
+  - "tests/disc/inventory.txt"
+  - "tests/disc/tests.cmake"
+  - "tests/dma/dma_tests.c"
+  - "tests/dma/inventory.txt"
+  - "tests/dma/tests.cmake"
+  - "tests/exe/exe_tests.c"
+  - "tests/fixtures/disc_boot.xml"
+  - "tests/fixtures/disc_boot_playlist.xml"
+  - "tests/fixtures/inventory.txt"
+  - "tests/fixtures/manifest.txt"
+  - "tests/fixtures/media_generator.py"
+  - "tests/fixtures/src/disc_boot.asm"
+  - "tests/fixtures/src/disc_boot.cnf"
+  - "tests/fixtures/src/disc_boot.sbi"
+  - "tests/fixtures/src/unbuilt.asm"
+  - "tests/fixtures/tests.cmake"
+  - "tests/fuzz/cdrom.c"
+  - "tests/fuzz/cnf.c"
+  - "tests/fuzz/cue.c"
+  - "tests/fuzz/inventory.txt"
+  - "tests/fuzz/m3u.c"
+  - "tests/fuzz/mdec.c"
+  - "tests/fuzz/seeds.c"
+  - "tests/fuzz/seeds.h"
+  - "tests/fuzz/tests.cmake"
+  - "tests/gpu/beam.c"
+  - "tests/gpu/reference_png.py"
+  - "tests/gpu/spans.c"
+  - "tests/hygiene/inventory.txt"
+  - "tests/hygiene/tests.cmake"
+  - "tests/inventory/asan.txt"
+  - "tests/inventory/ci.txt"
+  - "tests/inventory/wasm32.txt"
+  - "tests/libretro/host.c"
+  - "tests/libretro/inventory.txt"
+  - "tests/libretro/tests.cmake"
+  - "tests/mdec/color_reference.c"
+  - "tests/mdec/input_coverage.h"
+  - "tests/mdec/inventory.txt"
+  - "tests/mdec/model.c"
+  - "tests/mdec/reference.c"
+  - "tests/mdec/tests.cmake"
+  - "tests/nightly/inventory.txt"
+  - "tests/nightly/tests.cmake"
+  - "tests/perf/inventory.txt"
+  - "tests/perf/tests.cmake"
+  - "tests/policy/inventory.txt"
+  - "tests/policy/tests.cmake"
+  - "tests/probe/disc_hash.c"
+  - "tests/probe/rc_hash.h"
+  - "tests/probe/rc_hash_compat.h"
+  - "tests/probe/rc_hash_disc.c"
+  - "tests/probe/rc_hash_internal.h"
+  - "tests/retroarch/run_retroarch.cmake"
+  - "tests/runner/disc.c"
+  - "tests/runner/inventory.txt"
+  - "tests/runner/tests.cmake"
+  - "tests/tests.cmake"
+  - "tests/util/rc_compat.h"
+  - "tools/gen_disc.py"
+covered_digest: "v4:sha256:e981b8bd44ed9ae90e5b156d295fba2b47eba632af2b0a96495ad5a5f9526712"
 ---
 
 # Phase 6 verification
 
-The full local CI and hygiene workflows passed on the preceding reviewed fingerprint `8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be`. The follow-up fingerprint in this report has a clean review and passed its changed-target build and four focused selectors. Phase 6 is **not fully verified** until current-head hosted acceptance and the ship checks in Plan 06-45 pass. The retained evidence does not claim exact 8-bit hardware output or full frame/movie hardware conformance: the inputs are complete, while the frame/movie guest output remains unresolved. These limitations are explicit in the approved v1.0 claim.
+Phase 6 passed goal-backward verification on 2026-11-18. The current source commit `28683ebe4c9940c95d539b5c18733c139f940ffa` passed exact-head hosted CI and Nightly; the branch head adds only planning evidence. Requirement traceability for DISC-01 through DISC-04 is recorded in `.planning/REQUIREMENTS.md`. PR-only rehearsal and cleanup remain ship checks. The approved v1.0 claim does not establish exact 8-bit hardware output or complete frame/movie output conformance: source inputs are complete, while full guest output remains unresolved.
 
 ## Full local acceptance before the Windows follow-up (2026-11-17)
 
@@ -26,7 +280,7 @@ These complete workflow results are for fingerprint `8f808b5f4d9654ace04bd0ae1c1
 | CD-ROM references | `cmake --build build/cdrom-reference --target schwaystation-test-cdrom-reference`; exit 0. `ctest --test-dir build/cdrom-reference -R '^cdrom[.]reference[.](timing|getloc|controls)$' --no-tests=error --output-on-failure`; exit 0, 3/3. The producer-written JUnit inventory check passed. | Pass |
 | Reference registration parity | Nightly, MDEC-only and CD-ROM-only CTest JSON comparisons each matched all 12 MDEC selector names and labels. CD-ROM-only configuration also confirmed it did not prepare the unselected MDEC corpus. Main-CI inventory and existing workflow matcher checks passed. | Pass |
 
-These results close the local portion of the previously pending 06-23/24 acceptance. Their hosted RetroArch, exact-head nightly and release checks remain pending Plan 06-45; the phase is not complete and must not be shipped until those checks pass.
+These results closed the local portion of the previously pending 06-23/24 acceptance. At that point, hosted RetroArch and exact-head workflow acceptance were pending Plan 06-45. The final exact-head results below pass those gates; PR-only rehearsal and cleanup remain assigned to ship.
 
 ## Initial hosted failure and repair (2026-11-17)
 
@@ -309,7 +563,38 @@ The follow-up normalizes this generated playlist with `file(CONFIGURE ... NEWLIN
 review found no issue; see `06-45-REVIEW.md`. `cmake --preset ci` passed, the generated playlist SHA-256 now
 matches the be32 artifact (`722ce2c1c07b9c90102dd872faea02e306617c5604cdf331ad7a7dc2df3509b8`), and
 `ctest --test-dir build/ci -R '^runner\\.disc\\.api$' --no-tests=error --output-on-failure` passed 1/1. This
-new follow-up commit `28683ebe4c9940c95d539b5c18733c139f940ffa` is pushed. Exact-head CI run
-[44218206100](https://github.com/szTheory/schwaystation/actions/runs/44218206100) is queued and Nightly run
-[44218205653](https://github.com/szTheory/schwaystation/actions/runs/44218205653) is running. Inspect each
-applicable lane before Phase 6 verification or shipping.
+new follow-up commit `28683ebe4c9940c95d539b5c18733c139f940ffa` is pushed. Its exact-head results are recorded
+below.
+
+## Current-source exact-head acceptance (2026-11-18)
+
+The hosted runs tested source commit `28683ebe4c9940c95d539b5c18733c139f940ffa`. Branch head `ce30dc104378e924ecc14b0f554bf35dbf0ffe19` adds only planning evidence; no source changed after the hosted run.
+
+- `gh run view 44218206100 --exit-status` — exit 0. Exact-head CI
+  [44218206100](https://github.com/szTheory/schwaystation/actions/runs/44218206100) completed successfully; `CI required`
+  and `hash-equality` passed. Applicable lanes passed: Linux x64/arm64, Windows x64/arm64, macOS x64/arm64,
+  wasm32, big-endian, both no-float lanes, ASan, performance, GPU reference, OpenBIOS, hygiene and RetroArch.
+  The manual-dispatch-inapplicable title job was skipped; PR-only rehearsal and cleanup remain ship checks.
+- The Linux x64, Windows x64 and Windows arm64 build logs each show `check_junit` passed 613 CI tests once and
+  all five release tests once. Both Windows logs show `disc.image.cue_root_child` and `compat.probe.cue_edges`
+  passing. Linux x64 configured and built the installed-library SDL2 example; it was not run or packaged.
+- The be32 hash artifact was downloaded from this run and compared against the other seven current-run
+  manifests with `diff -q`; Windows x64/arm64, Linux x64/arm64, macOS x64/arm64 and wasm32 all match be32.
+  The manifest contains the `disc_boot` `boots@600`, `mailbox@900`, `audio@900` and `frame@900` predicates for
+  both `none` and `press@300`; both boot predicates pass, and the 900-frame mailbox/audio/frame hashes match.
+- The hosted RetroArch job completed successfully. It booted the owned `disc_boot.cue` with the CI OpenBIOS,
+  ran 900 frames, then compared the runner frame with the RetroArch capture: `16x16, every pixel equal`.
+- `gh run view 44218205653 --exit-status` — exit 0. Exact-head Nightly
+  [44218205653](https://github.com/szTheory/schwaystation/actions/runs/44218205653) passed. `vectors-full` passed
+  30/30 and its JUnit check confirmed 30 tests ran once each. The six bounded fuzz campaigns (`exe`, `cue`,
+  `cnf`, `m3u`, `cdrom`, `mdec`) and their seed preflights passed. Each fuzzer used `-max_total_time=60`; logs
+  show about 61 seconds of wall time including startup. All four benchmark jobs passed.
+- On the source-fix worktree, `git diff --check`, `cmake --preset ci`, and
+  `ctest --test-dir build/ci -R '^runner\\.disc\\.api$' --no-tests=error --output-on-failure` passed; the focused
+  test passed 1/1. `cmake --workflow --preset hygiene` exited 0 with 23/23 tests; `policy.gate_budget` passed at
+  the existing 2,700-line ceiling. The generated playlist's SHA-256 is
+  `722ce2c1c07b9c90102dd872faea02e306617c5604cdf331ad7a7dc2df3509b8`, matching all eight run artifacts.
+
+These results close the hosted Phase 6 acceptance under the approved v1.0 scope. The evidence supports the exact
+4-bit guest case and the separate deterministic 8-bit regression baseline; it does not establish exact 8-bit
+hardware output or complete frame/movie output conformance. PR-only rehearsal/cleanup remain pending for ship.
