@@ -167,3 +167,59 @@ foreach(fixture testcard gpu_motion)
   perf_case("${fixture}" "" "measurement must be a positive integer")
   perf_case("${fixture}" "${over}" "above ceiling")
 endforeach()
+
+function(run_block name block setup expected)
+  set(script "${BIN}/${name}.sh")
+  file(WRITE "${script}" "${setup}${block}")
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env ${ARGN} "${SH}" "${script}"
+    WORKING_DIRECTORY "${ROOT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  if(expected STREQUAL "pass")
+    if(NOT rc STREQUAL "0")
+      message(FATAL_ERROR "quality_controls: ${name} production block failed: ${out}${err}")
+    endif()
+  elseif(rc STREQUAL "0" OR NOT "${out}${err}" MATCHES "${expected}")
+    message(FATAL_ERROR "quality_controls: ${name} production block accepted a missing, malformed, or over-bound value")
+  endif()
+endfunction()
+
+extract_block(QUALITY_WASM_COMPARE_BEGIN QUALITY_WASM_COMPARE_END wasm_block)
+if(NOT wasm_block MATCHES "ARTIFACT=.*WASM_MODULE" OR
+   NOT wasm_block MATCHES "build/wasm32/schwaystation-run" OR NOT wasm_block MATCHES "quality[.]cmake")
+  message(FATAL_ERROR "quality_controls: linked WASI module is disconnected from the comparator")
+endif()
+set(wasm_setup "set -eu\n")
+run_block(wasm-unbounded "${wasm_block}" "${wasm_setup}" pass "QUALITY_FILE=${quality_file}" "WASM_MODULE=${BIN}/wasm.bin")
+run_block(wasm-missing "${wasm_block}" "${wasm_setup}" "artifact" "QUALITY_FILE=${quality_file}" "WASM_MODULE=${BIN}/missing.wasm")
+file(WRITE "${BIN}/not-wasm" "not a module")
+run_block(wasm-magic "${wasm_block}" "${wasm_setup}" "WebAssembly module" "QUALITY_FILE=${quality_file}" "WASM_MODULE=${BIN}/not-wasm")
+string(JSON bounded_wasm REMOVE "${registry}" size wasm unbounded)
+string(JSON bounded_wasm REMOVE "${bounded_wasm}" size wasm measurement)
+string(JSON bounded_wasm SET "${bounded_wasm}" size wasm floor 1)
+string(JSON bounded_wasm SET "${bounded_wasm}" size wasm ceiling 20)
+file(WRITE "${quality_file}" "${bounded_wasm}")
+file(COPY_FILE "${BIN}/wasm.bin" "${BIN}/wasm-over.bin")
+file(APPEND "${BIN}/wasm-over.bin" "w")
+run_block(wasm-over "${wasm_block}" "${wasm_setup}" "above ceiling" "QUALITY_FILE=${quality_file}" "WASM_MODULE=${BIN}/wasm-over.bin")
+
+extract_block(QUALITY_STATE_BYTES_BEGIN QUALITY_STATE_BYTES_END state_block)
+if(NOT state_block MATCHES "state[.]stable_bytes" OR NOT state_block MATCHES "MEASURED=\\$state_bytes" OR
+   NOT state_block MATCHES "quality[.]cmake")
+  message(FATAL_ERROR "quality_controls: stable_bytes output is disconnected from the comparator")
+endif()
+set(state_binary "${BIN}/state-test.sh")
+file(WRITE "${state_binary}" [=[#!/bin/sh
+case "${STATE_CASE:-valid}" in
+  valid) printf '%s\n' 'state_bytes=20' ;;
+  missing) printf '%s\n' 'test complete' ;;
+  malformed) printf '%s\n' 'state_bytes=bad' ;;
+  duplicate) printf '%s\n' 'state_bytes=20' 'state_bytes=20' ;;
+  over) printf '%s\n' 'state_bytes=21' ;;
+  *) exit 99 ;;
+esac
+]=])
+set(state_setup "set -eu\n")
+run_block(state-valid "${state_block}" "${state_setup}" pass "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=valid")
+run_block(state-missing "${state_block}" "${state_setup}" "state_bytes" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=missing")
+run_block(state-malformed "${state_block}" "${state_setup}" "state_bytes" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=malformed")
+run_block(state-duplicate "${state_block}" "${state_setup}" "state_bytes" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=duplicate")
+run_block(state-over "${state_block}" "${state_setup}" "above ceiling" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=over")
