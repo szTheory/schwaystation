@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
 status: planning
-last_updated: "2026-11-18T16:21:11.913Z"
+last_updated: "2026-11-18"
 last_activity: 2026-11-18
 progress:
-  total_phases: 0
+  total_phases: 10
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-18)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** v2.0 requirements and roadmap for The whole library
+**Current focus:** Phase 7, Faster and more trustworthy CI, opening v2.0 The whole library.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 7 of 16 (Faster and more trustworthy CI)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-11-18 — Milestone v2.0 started
+Status: Ready to discuss
+Last activity: 2026-11-18 — v2.0 roadmap created with all 34 requirements mapped to phases 7–16
 
 
 ## Performance Metrics
@@ -836,9 +836,13 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-17T19:23:53.046Z
-Stopped at: Phase 05 complete — all phases complete
-Resume file: .planning/phases/06-discs-and-fmv/06-42-PLAN.md
+Last session: 2026-11-18
+Stopped at: v2.0 roadmap creation complete. Phase 7 discussion is next.
+Resume file: .planning/ROADMAP.md
+
+### v1.0 session history
+
+The archived Phase 6 resume point was `milestones/v1.0-phases/06-discs-and-fmv/06-42-PLAN.md`.
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
@@ -850,7 +854,7 @@ CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
 Phase 3 merged as PR #12; release PR #13 is green and merged. Phase 4 release v0.4.0 is latest.
 Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
-Next: continue `$gsd-autonomous --from 6 --to 6` with Plan 06-14's pinned disc-media tools and authored recipes. A complete independently captured frame/movie pair was not found; do not wait on owner hardware. The owner has a real PS1 and capture card but no time for capture now. Standing preferences are in `.planning/AUTONOMOUS.md`.
+The v1.0 audit records the limits of the available frame and movie evidence. The owner capture remains unavailable. See `.planning/AUTONOMOUS.md` for standing preferences.
 
 ### Independent local work during immutable CI (2026-11-12)
 
@@ -1016,7 +1020,11 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Start the next milestone with $gsd-new-milestone
+- Start Phase 7 with `$gsd-autonomous --from 7 --to 7`, beginning with discussion of the SEED-007 tune-up. Review before verification, then use `$gsd-ship 7` and confirm merge, green main CI and the automatic release before Phase 8.
+
+### v2.0 roadmap creation (2026-11-18)
+
+Runtime/model: Codex, OpenGSD 1.20.0, gsd-roadmapper gpt-6.2-sol high. The approved milestone has 10 phases and 34 requirements. Phase 9 establishes the shared media controls and feature-ledger checks with the first provider. Later feature phases record their own evidence. Phase 16 reconciles the pinned DAT inventory and gates libretro metadata on the required-capability matrix. The v1.0 MDEC evidence boundary and the standing 300-line real-host limit carry forward. No implementation or phase verification is claimed here.
 
 
 ### v1.0 milestone closeout (2026-11-18)

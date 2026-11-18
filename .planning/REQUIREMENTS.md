@@ -82,18 +82,46 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 
 | Requirement | Phase | Status |
 |---|---|---|
-| TUNE-01–TUNE-06 | Pending roadmapping | Pending |
-| SAVE-01–SAVE-05 | Pending roadmapping | Pending |
-| MEDIA-01–MEDIA-02, CHD-01, PBP-01, ECM-01, CCD-01, CRYPT-01 | Pending roadmapping | Pending |
-| PROFILE-01–PROFILE-02, BOOT-01, MDEC-01 | Pending roadmapping | Pending |
-| SIO-01–SIO-05, GUN-01–GUN-02 | Pending roadmapping | Pending |
-| PATCH-01, CHEAT-01, COMPAT-01–COMPAT-03 | Pending roadmapping | Pending |
+| TUNE-01 | Phase 7 | Pending |
+| TUNE-02 | Phase 7 | Pending |
+| TUNE-03 | Phase 7 | Pending |
+| TUNE-04 | Phase 7 | Pending |
+| TUNE-05 | Phase 7 | Pending |
+| TUNE-06 | Phase 7 | Pending |
+| SAVE-01 | Phase 8 | Pending |
+| SAVE-02 | Phase 8 | Pending |
+| SAVE-03 | Phase 8 | Pending |
+| SAVE-04 | Phase 8 | Pending |
+| SAVE-05 | Phase 8 | Pending |
+| MEDIA-01 | Phase 9 | Pending |
+| MEDIA-02 | Phase 9 | Pending |
+| CHD-01 | Phase 9 | Pending |
+| COMPAT-02 | Phase 9 | Pending |
+| PBP-01 | Phase 10 | Pending |
+| ECM-01 | Phase 11 | Pending |
+| CCD-01 | Phase 11 | Pending |
+| CRYPT-01 | Phase 12 | Pending |
+| PROFILE-01 | Phase 13 | Pending |
+| PROFILE-02 | Phase 13 | Pending |
+| BOOT-01 | Phase 13 | Pending |
+| MDEC-01 | Phase 13 | Pending |
+| SIO-01 | Phase 14 | Pending |
+| SIO-02 | Phase 14 | Pending |
+| SIO-03 | Phase 14 | Pending |
+| SIO-04 | Phase 14 | Pending |
+| GUN-01 | Phase 15 | Pending |
+| GUN-02 | Phase 15 | Pending |
+| SIO-05 | Phase 15 | Pending |
+| PATCH-01 | Phase 16 | Pending |
+| CHEAT-01 | Phase 16 | Pending |
+| COMPAT-01 | Phase 16 | Pending |
+| COMPAT-03 | Phase 16 | Pending |
 
 **Coverage:**
 - v2 requirements: 34
-- Mapped to phases: pending roadmapping
-- Unmapped: pending roadmapping
+- Mapped to phases: 34
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-11-18*
-*Last updated: 2026-11-18 after v2.0 scope reconciliation*
+*Last updated: 2026-11-18 after roadmap mapping*
