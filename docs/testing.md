@@ -620,9 +620,33 @@ contention rather than a core failure. Both no-fp legs passed again in the final
 `.github/workflows/ci.yml` runs on every pull request, every push to `main`, by hand, and when `release.yml` calls
 it with a commit. Each job runs the same workflow preset a contributor runs, then the JUnit check above.
 
+### Fast feedback for workflow changes
+
+For classifier or workflow edits, run the small local checks before the whole hygiene workflow:
+
+```sh
+cmake --preset hygiene
+ctest --test-dir build/hygiene -R '^ci[.]classify$|^policy[.]gate_budget$' --no-tests=error --output-on-failure
+actionlint -shellcheck= -pyflakes= -ignore 'label "ubuntu-26\.04(-arm)?" is unknown' -ignore 'unexpected key "queue" for "concurrency" section' .github/workflows/ci.yml .github/workflows/release.yml .github/workflows/nightly.yml
+cmake --workflow --preset hygiene
+```
+
+`ci.classify` extracts and runs the actual `changes` shell block against local Git fixtures, including push endpoint,
+rename, unusual-path, failure, release-call, manual-run and pull-request controls. The gate-budget check catches
+growth in the counted repository-check files. If Docker and `act` are already installed, an optional job-scoped dry
+run can check workflow wiring with an explicit platform mapping and a writable temporary action cache:
+
+```sh
+act --dryrun --container-architecture linux/arm64 --action-cache-path /tmp/schwaystation-act-cache \
+  -P ubuntu-26.04=catthehacker/ubuntu:act-latest -j changes -W .github/workflows/ci.yml
+```
+
+The dry run does not execute the job's tests or prove GitHub-hosted matrix, artifact or RetroArch behavior. It does
+not replace the required hosted checks on the pull request and resulting `main` commit.
+
 | Job | What it runs | Required |
 |---|---|---|
-| `changes` | Lists the pull request's files. `heavy=false` only when every path is under `.planning/`; then the build jobs skip. | yes |
+| `changes` | Lists PR paths, or diffs the exact before/after commits for a direct `main` push with rename detection disabled. `heavy=false` only for a complete, non-empty, bounded list entirely under `.planning/`; uncertain inputs, manual runs and release workflow calls keep the heavy matrix. | yes |
 | `hygiene` | The `hygiene` preset and its JUnit check. | yes |
 | `title` | `scripts/check-title.sh` on the pull request's live title and body (pull requests only). | yes |
 | `build` | The `ci` preset on `ubuntu-26.04`, `ubuntu-26.04-arm`, `macos-15` and `macos-15-intel`, `ci-msvc` on `windows-2025` and `windows-11-arm`. Pull requests also check out the exact base SHA's compatibility files before the head; the ratchet runs the copied base judge against same-run fixture results. Both JUnit checks (all but `release`, then `release`), the README install line and its flipped-byte control on macOS arm64, then uploads `archives-<os>-<arch>` (the three zips and `commit.txt`) and `hashes-<os>-<arch>`. | yes |
