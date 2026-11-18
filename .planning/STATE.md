@@ -6,17 +6,17 @@ current_phase: 6
 current_phase_name: Discs and FMV
 current_plan: 45 of 45 (hosted acceptance and ship)
 status: in_progress
-stopped_at: "06-45 reviewed local repair ready to commit and dispatch exact-head CI/Nightly"
-last_updated: "2026-11-18T00:15:31Z"
+stopped_at: "06-45 source repair 10d03f6 committed; update state, push and dispatch exact-head CI/Nightly"
+last_updated: "2026-11-18T00:17:00Z"
 last_activity: 2026-11-18
-state_head: 83284d63d97c944704839cdf835b4b09c1177bd4
+state_head: 10d03f6
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 195
   completed_plans: 194
   percent: 83
-last_activity_desc: "Plan 06-45 repair on phase/06-discs-and-fmv. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); final focused source review by gsd-code-reviewer, no findings; active time not tracked. Current non-planning source fingerprint: 8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be (162 files). Cheap checks passed, including argv mapping, path syntax, CMake wiring, diff whitespace, sorted inventory and the fixed 2,700-line gate. Changed targets built; seven WASI/Windows-related local selectors passed; full local CI passed 613/613 plus ci-release 5/5; hygiene passed 23/23. Previous exact-head CI 44200814535 and Nightly 44200818543 completed on parent 83284d6: Nightly passed, CI failed in wasm32 and Windows x64/arm64. Those results are diagnostic only and do not count for this repair. WASI runtime and Windows confirmation require hosted CI because the local pinned WASI compiler is absent. Review is in 06-45-REVIEW.md; commands and limitations are in 06-VERIFICATION.md. Next: commit and push this reviewed snapshot, dispatch one CI and Nightly batch on that exact head, inspect all required jobs and RetroArch output, then verify and ship if they pass. Exact 8-bit and full frame/movie hardware output remain unproved under approved v1.0 scope."
+last_activity_desc: "Plan 06-45 repair commit 10d03f6 is on phase/06-discs-and-fmv. Runtime/model: Codex/OpenGSD 1.20.0, primary GPT-6 session (exact model ID unavailable); final focused source review by gsd-code-reviewer, no findings; active time not tracked. Current non-planning source fingerprint: 8f808b5f4d9654ace04bd0ae1c1b0099180f1ddface0e5e4e9eff32a2af660be (162 files). Cheap checks passed, including argv mapping, path syntax, CMake wiring, diff whitespace, sorted inventory and the fixed 2,700-line gate. Changed targets built; seven WASI/Windows-related local selectors passed; full local CI passed 613/613 plus ci-release 5/5; hygiene passed 23/23. Previous exact-head CI 44200814535 and Nightly 44200818543 completed on parent 83284d6: Nightly passed, CI failed in wasm32 and Windows x64/arm64. Those results are diagnostic only and do not count for this repair. WASI runtime and Windows confirmation require hosted CI because the local pinned WASI compiler is absent. Review is in 06-45-REVIEW.md; commands and limitations are in 06-VERIFICATION.md. Next: commit this state update, push the reviewed snapshot, dispatch one CI and Nightly batch on that head, inspect all required jobs and RetroArch output, then verify and ship if they pass. Exact 8-bit and full frame/movie hardware output remain unproved under approved v1.0 scope."
 ---
 
 # Project State
