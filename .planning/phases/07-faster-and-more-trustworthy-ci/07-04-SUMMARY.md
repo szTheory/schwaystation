@@ -131,4 +131,3 @@ Plan 07-04's review and selected correction are ready for Phase 7's later eviden
 ## Self-Check: PASSED
 
 The summary, quality review, and updated README exist; task commits `dc137dc` and `e8f3cf1` are reachable from HEAD. `verify-summary` found the created review file and both task commits.
-
