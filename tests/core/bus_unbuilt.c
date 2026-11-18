@@ -19,10 +19,10 @@ enum { OWNED, UNBUILT, GAP };
 
 /* The documented map, as offsets in the page (docs/hardware/bus.md, Segments and the physical map):
    memory control 000h-023h, SIO0 040h-04Fh, RAM_SIZE 060h-063h, I_STAT and
-   I_MASK 070h-077h, the DMA registers 080h-0FFh and the timers 100h-12Fh are
-   owned; SIO1 050h-05Fh, CD-ROM 800h-803h, MDEC 820h-827h and the unimplemented
-   SPU tail E80h-FFFh are unbuilt. SPU registers C00h-DFFh, current volumes
-   E00h-E5Fh and RAM-like E60h-E7Fh are owned; the GPU owns 810h-817h. */
+   I_MASK 070h-077h, DMA 080h-0FFh, timers 100h-12Fh, CD-ROM 800h-803h,
+   GPU 810h-817h and MDEC 820h-827h are owned. SIO1 050h-05Fh and the
+   unimplemented SPU tail E80h-FFFh remain unbuilt. SPU registers C00h-DFFh,
+   current volumes E00h-E5Fh and RAM-like E60h-E7Fh are owned. */
 static int register_access(uint32_t off, uint32_t base, uint32_t size, uint32_t width,
                            uint32_t max_width)
 {
@@ -38,11 +38,11 @@ static int expected(uint32_t off, uint32_t width)
         return OWNED;
     }
     if (off <= 0x023u || (off >= 0x060u && off <= 0x063u) || (off >= 0x070u && off <= 0x077u) ||
-        (off >= 0x080u && off <= 0x12Fu) || (off >= 0x810u && off <= 0x817u)) {
+        (off >= 0x080u && off <= 0x12Fu) || (off >= 0x800u && off <= 0x803u) ||
+        (off >= 0x810u && off <= 0x817u) || (off >= 0x820u && off <= 0x827u)) {
         return OWNED;
     }
-    if ((off >= 0x050u && off <= 0x05Fu) || (off >= 0x800u && off <= 0x803u) ||
-        (off >= 0x820u && off <= 0x827u)) {
+    if (off >= 0x050u && off <= 0x05Fu) {
         return UNBUILT;
     }
     if (off >= 0xC00u) {

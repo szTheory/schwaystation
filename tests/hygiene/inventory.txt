@@ -3,7 +3,6 @@
 ci.classify	hygiene
 ci.title	hygiene
 ci.title.self_test	hygiene
-hygiene.no_bios_bytes	hygiene
 hygiene.no_bios_bytes.self_test	hygiene
 hygiene.no_float	hygiene
 hygiene.no_float.self_test	hygiene
@@ -17,10 +16,10 @@ policy.e2e_budget	hygiene,policy
 policy.e2e_budget.self_test	hygiene,policy
 policy.gate_budget	hygiene,policy
 policy.gate_budget.self_test	hygiene,policy
+policy.media_registration	hygiene,policy
 policy.notices	hygiene,policy
 policy.notices.self_test	hygiene,policy
 policy.publish_ref	hygiene,policy
 policy.publish_set	hygiene,policy
 policy.publish_set.self_test	hygiene,policy
 policy.publish_signer	hygiene,policy
-policy.spu_registration	hygiene,policy

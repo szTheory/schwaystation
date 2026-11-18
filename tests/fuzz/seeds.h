@@ -6,9 +6,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* One byte past the largest file the loader accepts (0800h + 2 MiB), the
-   room seeds_build may fill. */
+/* The room seeds_build may fill for its selected campaign. */
+#if defined(SCHWAY_FUZZ_CUE_SEEDS) || defined(SCHWAY_FUZZ_M3U_SEEDS)
+#define SEEDS_SIZE_MAX (64u * 1024u)
+#elif defined(SCHWAY_FUZZ_CNF_SEEDS)
+#define SEEDS_SIZE_MAX 4096u
+#elif defined(SCHWAY_FUZZ_CDROM_SEEDS)
+#define SEEDS_SIZE_MAX (16u * 1024u)
+#elif defined(SCHWAY_FUZZ_MDEC_SEEDS)
+#define SEEDS_SIZE_MAX (256u * 1024u)
+#else
+/* One byte past the largest executable accepted by the loader. */
 #define SEEDS_SIZE_MAX 0x200801u
+#endif
 
 uint32_t seeds_count(void);
 

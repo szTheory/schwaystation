@@ -1,4 +1,7 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
+cdrom.reference.controls	disc,nightly,portable
+cdrom.reference.getloc	disc,nightly,portable
+cdrom.reference.timing	disc,nightly,portable
 gpu.reference.clipping	gpu,nightly,portable
 gpu.reference.clut-cache	gpu,nightly,portable
 gpu.reference.gp0-e1	gpu,nightly,portable
@@ -12,5 +15,17 @@ gpu.reference.transparency	gpu,nightly,portable
 gpu.reference.triangle	gpu,nightly,portable
 gpu.reference.uv-interpolation	gpu,nightly,portable
 gpu.reference.vram-to-vram-overlap	gpu,nightly,portable
+mdec.reference.4bit	mdec,nightly,portable
+mdec.reference.8bit_regression	mdec,nightly,portable
+mdec.reference.color_assets	mdec,nightly,portable
+mdec.reference.color_controls	mdec,nightly,portable
+mdec.reference.controls	mdec,nightly,portable
+mdec.reference.coverage_controls	mdec,nightly,portable
+mdec.reference.coverage_frame15	mdec,nightly,portable
+mdec.reference.coverage_frame24	mdec,nightly,portable
+mdec.reference.coverage_movie15	mdec,nightly,portable
+mdec.reference.coverage_movie24	mdec,nightly,portable
+mdec.reference.input_preflight	mdec,nightly,portable
+mdec.reference.status_budget	mdec,nightly,portable
 spu.reference.memory_transfer	audio,nightly,portable
 vectors.r3000.full	portable,vectors

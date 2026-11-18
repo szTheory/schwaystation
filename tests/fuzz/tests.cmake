@@ -1,7 +1,6 @@
-# The loader fuzz target. Every lane registers the replay below; the fuzz
-# preset (SCHWAYSTATION_FUZZ, clang-21) also builds the libFuzzer binary, which
-# registers no test of its own.
-option(SCHWAYSTATION_FUZZ "Build the libFuzzer target of the executable loader" OFF)
+# Every lane registers replay binaries; the fuzz preset (SCHWAYSTATION_FUZZ,
+# clang-21) also builds the libFuzzer campaigns, which register no tests.
+option(SCHWAYSTATION_FUZZ "Build libFuzzer campaigns" OFF)
 set(fuzz_dir ${CMAKE_CURRENT_LIST_DIR})
 
 # schwaystation-fuzz-exe-replay runs exe.c's invariants over the in-memory
@@ -49,6 +48,41 @@ foreach(subsystem IN ITEMS gpu sio memcard spu)
     LABELS fuzz portable TIMEOUT 60)
 endforeach()
 
+# The new hostile-media targets call the actual host parsers or core devices.
+# CUE and M3U receive build-owned working directories containing only their
+# small, fixed media child, so fuzzed paths cannot name arbitrary host files.
+foreach(subsystem IN ITEMS cue cnf m3u cdrom mdec)
+  string(TOUPPER ${subsystem} seed_mode)
+  set(replay_target schwaystation-fuzz-${subsystem}-replay)
+  add_executable(${replay_target} ${fuzz_dir}/${subsystem}.c ${fuzz_dir}/seeds.c)
+  target_compile_definitions(${replay_target} PRIVATE
+    SCHWAY_FUZZ_REPLAY SCHWAY_FUZZ_${seed_mode}_SEEDS)
+  set_target_properties(${replay_target} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  if(subsystem STREQUAL "cue" OR subsystem STREQUAL "m3u")
+    set(work_dir "${PROJECT_BINARY_DIR}/tests/fuzz-work/${subsystem}")
+    file(MAKE_DIRECTORY "${work_dir}")
+    set(guest_work_dir "${work_dir}")
+    if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+      set(guest_work_dir "/tests/fuzz-work/${subsystem}")
+    endif()
+    target_compile_definitions(${replay_target} PRIVATE
+      "SCHWAY_FUZZ_WORK_DIR=\"${guest_work_dir}\"")
+    target_link_libraries(${replay_target} PRIVATE schwaystation_disc_image)
+  elseif(subsystem STREQUAL "cnf")
+    target_include_directories(${replay_target} PRIVATE ${PROJECT_SOURCE_DIR}/host)
+    target_link_libraries(${replay_target} PRIVATE schwaystation_disc_image)
+  else()
+    target_include_directories(${replay_target} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(${replay_target} PRIVATE schwaystation::schwaystation)
+  endif()
+  schway_warnings(${replay_target})
+  # Fault prevented: hostile media commands or paths escape their bounded parser/device state.
+  schway_add_test(NAME fuzz.regress.${subsystem}
+    COMMAND ${replay_target}
+    LABELS fuzz portable TIMEOUT 60)
+endforeach()
+
 if(SCHWAYSTATION_FUZZ)
   # The libFuzzer binary keeps libFuzzer's main. The fuzz preset builds every
   # object with ASan, UBSan and coverage instrumentation, so the core's own
@@ -70,4 +104,31 @@ if(SCHWAYSTATION_FUZZ)
   set_target_properties(schwaystation-fuzz-spu PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
   schway_warnings(schwaystation-fuzz-spu)
+
+  foreach(subsystem IN ITEMS cue cnf m3u cdrom mdec)
+    set(target schwaystation-fuzz-${subsystem})
+    add_executable(${target} ${fuzz_dir}/${subsystem}.c)
+    if(subsystem STREQUAL "cue" OR subsystem STREQUAL "m3u")
+      set(work_dir "${PROJECT_BINARY_DIR}/tests/fuzz-work/${subsystem}")
+      file(MAKE_DIRECTORY "${work_dir}")
+      set(guest_work_dir "${work_dir}")
+      if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+        set(guest_work_dir "/tests/fuzz-work/${subsystem}")
+      endif()
+      target_compile_definitions(${target} PRIVATE
+        "SCHWAY_FUZZ_WORK_DIR=\"${guest_work_dir}\"")
+      target_link_libraries(${target} PRIVATE schwaystation_disc_image)
+    elseif(subsystem STREQUAL "cnf")
+      target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/host)
+      target_link_libraries(${target} PRIVATE schwaystation_disc_image)
+    else()
+      target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+      target_link_libraries(${target} PRIVATE schwaystation::schwaystation)
+    endif()
+    target_compile_options(${target} PRIVATE -fsanitize=fuzzer)
+    target_link_options(${target} PRIVATE -fsanitize=fuzzer)
+    set_target_properties(${target} PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+    schway_warnings(${target})
+  endforeach()
 endif()

@@ -1,0 +1,3 @@
+BOOT = cdrom:\SWAY.EXE;1
+TCB = 4
+EVENT = 10

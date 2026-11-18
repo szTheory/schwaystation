@@ -133,7 +133,7 @@ def _parse_chunks(data):
     width, height, depth, color_type, compression, filter_method, interlace = ihdr
     if width == 0 or height == 0:
         _invalid("PNG dimensions must be nonzero")
-    if (depth, color_type) not in {(8, 2), (8, 6), (4, 3), (8, 3)}:
+    if (depth, color_type) not in {(8, 0), (8, 2), (8, 6), (4, 3), (8, 3)}:
         _invalid("PNG bit depth and color type are outside the selected corpus")
     if compression != 0 or filter_method != 0 or interlace != 0:
         _invalid("PNG compression, filter, or interlace method is unsupported")
@@ -154,7 +154,7 @@ def decode_png(data, expected_dimensions=(WIDTH, HEIGHT)):
     if width > WIDTH or height > HEIGHT:
         _invalid("PNG dimensions exceed the VRAM bound")
 
-    channel_count = {2: 3, 3: 1, 6: 4}[color_type]
+    channel_count = {0: 1, 2: 3, 3: 1, 6: 4}[color_type]
     bits_per_pixel = channel_count * depth
     row_bytes = (width * bits_per_pixel + 7) // 8
     expected_raw_size = height * (row_bytes + 1)
@@ -213,7 +213,9 @@ def decode_png(data, expected_dimensions=(WIDTH, HEIGHT)):
     canonical = bytearray()
     for row in rows:
         for x in range(width):
-            if color_type == 2:
+            if color_type == 0:
+                red = green = blue = row[x]
+            elif color_type == 2:
                 pixel = x * 3
                 red, green, blue = row[pixel : pixel + 3]
             elif color_type == 6:
@@ -296,7 +298,7 @@ def _build_png(
     compressed_override=None,
     invalid_filter_row=None,
 ):
-    channels = {2: 3, 3: 1, 6: 4}[color_type]
+    channels = {0: 1, 2: 3, 3: 1, 6: 4}[color_type]
     bytes_per_pixel = max(1, (channels * depth + 7) // 8)
     raw = bytearray()
     previous = bytes((width * channels * depth + 7) // 8)
@@ -377,6 +379,18 @@ def run_self_tests():
     rgb_png = _build_png(5, 5, 8, 2, rgb_rows, (0, 1, 2, 3, 4))
     decoded, alpha = decode_png(rgb_png, (5, 5))
     assert decoded == _expected_from_rgb_rows(rgb_rows, 5)
+    assert alpha is None
+
+    gray_rows = tuple(bytes((x * 41 + y * 73) & 0xFF for x in range(5)) for y in range(5))
+    gray_png = _build_png(5, 5, 8, 0, gray_rows, (0, 1, 2, 3, 4))
+    gray_decoded, alpha = decode_png(gray_png, (5, 5))
+    gray_expected = bytearray()
+    for row in gray_rows:
+        for gray in row:
+            gray5 = gray >> 3
+            word = gray5 | (gray5 << 5) | (gray5 << 10)
+            gray_expected.extend((word & 0xFF, word >> 8))
+    assert gray_decoded == bytes(gray_expected)
     assert alpha is None
 
     changed_rows = _rgb_rows(5, 5, first_red=247)

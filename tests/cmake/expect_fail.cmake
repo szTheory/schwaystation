@@ -13,7 +13,6 @@ if("$ENV{ASAN_OPTIONS}" STREQUAL "")
 else()
   set(ENV{ASAN_OPTIONS} "$ENV{ASAN_OPTIONS}:detect_leaks=0")
 endif()
-
 # Naming one variable for both pipes merges them in the order produced.
 execute_process(COMMAND ${CMD} RESULT_VARIABLE rc
   OUTPUT_VARIABLE out ERROR_VARIABLE out)

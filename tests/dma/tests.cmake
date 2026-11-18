@@ -118,6 +118,12 @@ schway_add_test(NAME dma.sync0.from_device
   COMMAND schwaystation-test-dma sync0_from_device
   LABELS dma portable TIMEOUT 10)
 
+# Fault prevented: DMA3 ignoring the documented 24/40-cycle selections made
+# by guest writes to the CD-ROM delay/size register.
+schway_add_test(NAME dma.cdrom.costs
+  COMMAND schwaystation-test-dma cdrom_costs
+  LABELS dma portable TIMEOUT 10)
+
 # Fault prevented: sync mode 1 that moves every block on one request, loses
 # the block count or the address, or finishes without the flag.
 schway_add_test(NAME dma.sync1.dreq_blocks

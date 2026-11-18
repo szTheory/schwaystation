@@ -130,6 +130,13 @@ and no upstream source or helper was copied. Only the seven hardware case names 
 are used. The build-158 `memory-transfer.exe` is fetched by the archive digest, checked by its member
 SHA-256, and kept under build storage only; its MPL-2.0 runtime bytes are not redistributed.
 
+The disc-fixture build uses mkpsxiso v2.30 at the source and submodule pins in `pins.txt` only as a
+build tool (GPL-2; excluded from source deliverables and release archives). Its build-only dependencies
+are tinyxml2 (Zlib), miniaudio (public domain/MIT), ghc/filesystem (Boost), and ThreadPool (Zlib), each
+at its pinned commit. psxavenc at its pinned commit is Zlib and is also build-only. Their notices and
+license files stay under ignored `build/` storage; committed fixture recipes and media samples are
+first-party.
+
 **(c) Release archives.** From the first release, the library, runner and libretro zips each hold `LICENSE` and
 `THIRD-PARTY-NOTICES.md` at the root. In phase 1 the check is `release.archive_contents` (CMake `-P`), run by
 `cmake --workflow --preset ci` and on every leg; it fails when a zip lacks either file. `release.notices` (a
@@ -189,15 +196,16 @@ documentation, changelogs, issue trackers, release notes and released binaries; 
 
 ## 8. Vendored files
 Vendored files are never edited. Each file's SHA-256 is recorded in this table when it is vendored, and each
-notice lives in `THIRD-PARTY-NOTICES.md`. The CTest `libretro.vendored` that re-checks these digests is deferred, a todo bound to the next phase that vendors a file.
+notice lives in `THIRD-PARTY-NOTICES.md`. The CTest `libretro.vendored` checks these digests, and its self-test
+proves a changed file is rejected.
 The table is filled in v1.0 phase 1 with `libretro/libretro.h` and in v2.0 with libchdr and its three
-dependencies; `rc_hash_disc.c` joins when the probe CTest lands.
+dependencies; phase 6 adds `rc_hash_disc.c` for the independent disc-hash probe.
 
 | File | Upstream | Upstream path | Commit | Licence | SHA-256 |
 |---|---|---|---|---|---|
 | `libretro/libretro.h` | https://github.com/libretro/libretro-common | `include/libretro.h` | `a3194c18ba65ef89734e1898a2f61403c255d368` | MIT | `036ddffc995ad116c3081ca0a7515d09c2a116f3483e4f5012fe0c29a885da76` |
 | `third_party/libchdr/**` (v2.0, `SCHWAYSTATION_CHD`) | https://github.com/rtissera/libchdr | whole tree minus tests | `47d794151b2b` | BSD-3-Clause; deps public domain, MIT, BSD-3 | recorded at vendoring |
-| `tests/probe/rc_hash_disc.c` | https://github.com/RetroAchievements/rcheevos | `src/hash/rc_hash_disc.c` | `dfdc64ea035c` | MIT | recorded at vendoring |
+| `tests/probe/rc_hash_disc.c` | https://github.com/RetroAchievements/rcheevos | `src/hash/rc_hash_disc.c` | `dfdc64ea035c34aa168cf13bbda72b71ca4eba1e` | MIT | `03c25f0a834006ab8dbb4bebc83f6ccb7500d1e2d15ea36e8ff8a30641c80444` |
 
 ## 9. What this file does not do
 It keeps the project's own licence clean. It is not legal advice, and it is no defence against a rights holder's

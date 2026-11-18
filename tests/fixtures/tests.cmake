@@ -286,7 +286,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endfunction()
     refuse_pad_movie(ordering
       "60 p1=digital:X:128,128,128,128 p2=.\n60 p1=digital:.:128,128,128,128 p2=.\n"
-      "conflicting records")
+      "conflicting input records")
     refuse_pad_movie(encoding "60 p1=digital:.:1x,128,128,128 p2=.\n"
       "axis values must be decimal numbers")
   elseif(CASE STREQUAL "mailbox_judge")
@@ -565,6 +565,7 @@ schway__fixture(stub.bin stub/stub.asm)
 
 get_property(schway__fixture_outputs GLOBAL PROPERTY SCHWAY__FIXTURE_OUTPUTS)
 add_custom_target(schwaystation-fixtures ALL DEPENDS ${schway__fixture_outputs})
+include(${PROJECT_SOURCE_DIR}/cmake/DiscFixtures.cmake)
 
 if(NOT schway__include_fixture_tests)
   return()
@@ -812,10 +813,10 @@ expect_runner(fixtures.trace.criterion5 7 "(^|\n)fault frame="
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/fault_unmapped_read.exe --trace first-fault)
 
 # Fault prevented: accesses to devices that are not built yet that leave no sign of a program stuck on
-# one, and a write to a gap that is dropped without a fault. An MDEC write ends with exit 0 and an
+# one, and a write to a gap that is dropped without a fault. An SIO1 write ends with exit 0 and an
 # unbuilt line; a write to 1F801030h is a first fault.
 expect_runner(fixtures.unbuilt_footer 0
-  "(^|\n)unbuilt dev=mdec n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
+  "(^|\n)unbuilt dev=sio n=[0-9]+ last_pc=0x${schway__hex8}(\n|$)"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/unbuilt.exe --stop-on mailbox --frames 30)
 expect_runner(fixtures.gap_write 7 "(^|\n)fault frame=[0-9]+ [^\n]* kind=unmapped_write(\n|$)"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/gap_write.exe --frames 30)
@@ -833,6 +834,43 @@ schway_add_test(NAME fixtures.armips_pin.self_test
   COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__pin_cmd}" -DCODE=1 "-DREGEX=armips:.*SHA-256"
     -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
   LABELS fixtures portable TIMEOUT 30)
+
+# Fault prevented: a wrong build-tool archive digest accepted after a cached download.
+string(REPEAT 0 64 schway__bad_disc_digest)
+set(schway__disc_pin_cmd ${CMAKE_COMMAND}
+  -DINPUT=${PROJECT_BINARY_DIR}/pins/mkpsxiso/mkpsxiso.tar.gz
+  -DSHA256=${schway__bad_disc_digest} -P ${PROJECT_SOURCE_DIR}/cmake/Mkpsxiso.cmake)
+string(REPLACE ";" "$<SEMICOLON>" schway__disc_pin_cmd "${schway__disc_pin_cmd}")
+schway_add_test(NAME fixtures.disc.pin.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__disc_pin_cmd}" -DCODE=1
+    "-DREGEX=mkpsxiso: archive SHA-256 mismatch" -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable TIMEOUT 10)
+
+# Fault prevented: a corrupted media artifact accepted by a platform build.
+set(schway__media_pin_cmd ${CMAKE_COMMAND}
+  -DMEDIA_DIR=${schway__disc_media_dir} -DTEST_ROOT=${PROJECT_BINARY_DIR}/tests/disc-media-pin
+  -P ${PROJECT_SOURCE_DIR}/cmake/DiscFixtures.cmake)
+string(REPLACE ";" "$<SEMICOLON>" schway__media_pin_cmd "${schway__media_pin_cmd}")
+schway_add_test(NAME fixtures.disc.media_pin.self_test
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__media_pin_cmd}" -DCODE=1
+    "-DREGEX=disc fixtures: run artifact digest mismatch for xa[.]xa"
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable TIMEOUT 10)
+
+# Fault prevented: a stack-dependent encoder coding byte passing only by chance.
+schway_add_test(NAME fixtures.disc.media_normalize
+  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/fixtures/media_generator.py"
+    "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
+  LABELS fixtures portable TIMEOUT 10)
+
+# Fault prevented: a generated cue whose data track cannot expose valid ISO boot metadata.
+set(schway__disc_probe_cmd ${CMAKE_CROSSCOMPILING_EMULATOR}
+  $<TARGET_FILE:schwaystation-run> --probe ${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue)
+string(REPLACE ";" "$<SEMICOLON>" schway__disc_probe_cmd "${schway__disc_probe_cmd}")
+schway_add_test(NAME fixtures.disc.probe
+  COMMAND ${CMAKE_COMMAND} "-DCMD=${schway__disc_probe_cmd}" -DCODE=0 -DREGEX=format=disc
+    -P ${PROJECT_SOURCE_DIR}/tests/cmake/expect_fail.cmake
+  LABELS fixtures portable TIMEOUT 10)
 
 # The stub kernel in the core, white-box: the test sees src/ to read the committed array.
 add_executable(schwaystation-test-boot ${CMAKE_CURRENT_LIST_DIR}/boot_tests.c)
@@ -959,8 +997,8 @@ endforeach()
 foreach(row IN ITEMS
     # The unreleased state revision now records each card slot's pending-error
     # latch. At these frames both values are zero; the frame hashes stay fixed.
-    "150|876a3e8f0547dbffcc1b0667f5c5940c824da87afc08feca52c959a58eb244c8"
-    "180|8d7f83d6614aa42adfc7642b48b92c9ec71b40736bc8c9012fc0b1ff61e830ac")
+    "150|bf69904d540267001c6ab569a42c87621a5bcd498eb5f195f5d92b3141c87196"
+    "180|6dfc72baf728cfe462219fb9389644002e83dff323acb78f5777f909f5d0f7f9")
   string(REPLACE "|" ";" fields "${row}")
   list(GET fields 0 frame)
   list(GET fields 1 hash)

@@ -20,6 +20,7 @@
 #include "libretro.h"
 #include "schwaystation.h"
 #include "cards.h"
+#include "disc_image.h"
 #include "xrgb8888.h"
 
 /* The largest display the GPU scans out: 640 dots by 480 lines NTSC or 576
@@ -31,6 +32,8 @@
 #define LR_EXE_HEADER 0x800u
 #define LR_EXE_MAX_BYTES (LR_EXE_HEADER + 2u * 1024u * 1024u)
 #define LR_CARD_PATH_CAP 4096u
+#define LR_DISC_PATH_CAP 4096u
+#define LR_DISC_LIMIT SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT
 #define LR_MEMORY_DESCRIPTOR_COUNT 6u
 #define LR_BIOS_KEY "schwaystation_bios"
 #define LR_ANALOG_MODE_KEY "schwaystation_analog_mode"
@@ -56,6 +59,13 @@ static int16_t *samples;
 static unsigned geometry_width, geometry_height;
 static char lr_card2_path[LR_CARD_PATH_CAP];
 static uint64_t lr_card2_saved_generation;
+static schway_disc_image *lr_discs[LR_DISC_LIMIT];
+static unsigned lr_disc_count;
+static unsigned lr_disc_index = LR_DISC_LIMIT;
+static unsigned lr_disc_initial_index;
+static char lr_disc_initial_path[LR_DISC_PATH_CAP];
+static int lr_disc_initial_valid;
+static int lr_disc_ejected;
 static struct retro_memory_descriptor lr_memory_descriptors[LR_MEMORY_DESCRIPTOR_COUNT];
 static struct retro_memory_map lr_memory_map;
 static int lr_memory_map_registered;
@@ -66,6 +76,370 @@ static uint8_t lr_analog_toggle_enabled = 1u;
 static uint8_t lr_mode_pulse_pending[2];
 static uint8_t lr_toggle_latched[2];
 static uint8_t lr_toggle_frames[2];
+
+static uint32_t lr_disc_read_sector(void *user, uint32_t lba, uint8_t raw[2352],
+                                   uint8_t subcode[96]);
+static uint32_t lr_disc_read_toc(void *user, schway_toc *out);
+static uint32_t lr_disc_read_empty_toc(void *user, schway_toc *out);
+static uint32_t lr_disc_read_bad_q(void *user, uint32_t lba);
+static bool RETRO_CALLCONV lr_disk_set_eject_state(bool ejected);
+static bool RETRO_CALLCONV lr_disk_get_eject_state(void);
+static unsigned RETRO_CALLCONV lr_disk_get_image_index(void);
+static bool RETRO_CALLCONV lr_disk_set_image_index(unsigned index);
+static unsigned RETRO_CALLCONV lr_disk_get_num_images(void);
+static bool RETRO_CALLCONV lr_disk_replace_image_index(
+    unsigned index, const struct retro_game_info *game);
+static bool RETRO_CALLCONV lr_disk_add_image_index(void);
+static bool RETRO_CALLCONV lr_disk_set_initial_image(unsigned index, const char *path);
+static bool RETRO_CALLCONV lr_disk_get_image_path(unsigned index, char *path, size_t length);
+static bool RETRO_CALLCONV lr_disk_get_image_label(unsigned index, char *label, size_t length);
+
+static struct retro_disk_control_ext_callback lr_disk_control = {
+    lr_disk_set_eject_state,
+    lr_disk_get_eject_state,
+    lr_disk_get_image_index,
+    lr_disk_set_image_index,
+    lr_disk_get_num_images,
+    lr_disk_replace_image_index,
+    lr_disk_add_image_index,
+    lr_disk_set_initial_image,
+    lr_disk_get_image_path,
+    lr_disk_get_image_label,
+};
+
+static void lr_disc_close_all(void)
+{
+    for (unsigned i = 0u; i < lr_disc_count; i++) {
+        schway_disc_image_close(lr_discs[i]);
+        lr_discs[i] = NULL;
+    }
+    lr_disc_count = 0u;
+    lr_disc_index = LR_DISC_LIMIT;
+    lr_disc_ejected = 0;
+}
+
+static void lr_disc_close_set(schway_disc_image **images, unsigned count)
+{
+    if (images == NULL) {
+        return;
+    }
+    for (unsigned i = 0u; i < count; i++) {
+        schway_disc_image_close(images[i]);
+        images[i] = NULL;
+    }
+}
+
+static const schway_disc *lr_disc_selected(void)
+{
+    if (lr_disc_index >= lr_disc_count || lr_discs[lr_disc_index] == NULL) {
+        return NULL;
+    }
+    return schway_disc_image_disc(lr_discs[lr_disc_index]);
+}
+
+static uint32_t lr_disc_read_sector(void *user, uint32_t lba, uint8_t raw[2352],
+                                   uint8_t subcode[96])
+{
+    const schway_disc *disc = lr_disc_selected();
+    (void)user;
+    return disc != NULL && disc->read_sector != NULL
+               ? disc->read_sector(disc->user, lba, raw, subcode)
+               : 0u;
+}
+
+static uint32_t lr_disc_read_toc(void *user, schway_toc *out)
+{
+    const schway_disc *disc = lr_disc_selected();
+    (void)user;
+    return disc != NULL && disc->toc != NULL ? disc->toc(disc->user, out) : 0u;
+}
+
+static uint32_t lr_disc_read_empty_toc(void *user, schway_toc *out)
+{
+    (void)user;
+    if (out == NULL) {
+        return 0u;
+    }
+    memset(out, 0, sizeof *out);
+    out->size = (uint32_t)sizeof *out;
+    return 1u;
+}
+
+static uint32_t lr_disc_read_bad_q(void *user, uint32_t lba)
+{
+    const schway_disc *disc = lr_disc_selected();
+    (void)user;
+    return disc != NULL && disc->bad_q != NULL ? disc->bad_q(disc->user, lba) : 0u;
+}
+
+static int lr_disc_make_descriptor(unsigned index, schway_disc *out)
+{
+    const schway_disc *source;
+    if (out == NULL || index >= lr_disc_count || lr_discs[index] == NULL) {
+        return 0;
+    }
+    source = schway_disc_image_disc(lr_discs[index]);
+    if (source == NULL) {
+        return 0;
+    }
+    memset(out, 0, sizeof *out);
+    out->size = (uint32_t)sizeof *out;
+    out->user = NULL;
+    out->read_sector = lr_disc_read_sector;
+    out->toc = lr_disc_read_toc;
+    out->bad_q = source->bad_q != NULL ? lr_disc_read_bad_q : NULL;
+    out->identity_size = source->identity_size;
+    if (source->identity_size == sizeof out->identity_sha256) {
+        memcpy(out->identity_sha256, source->identity_sha256, sizeof out->identity_sha256);
+    }
+    return 1;
+}
+
+static int lr_disc_remove_selected(void)
+{
+    schway_disc empty;
+    if (inst == NULL) {
+        return 0;
+    }
+    memset(&empty, 0, sizeof empty);
+    empty.size = (uint32_t)sizeof empty;
+    empty.read_sector = lr_disc_read_sector;
+    empty.toc = lr_disc_read_empty_toc;
+    return schway_swap_disc(inst, &empty) == SCHWAY_STATUS_OK;
+}
+
+static int lr_disc_path_supported(const char *path)
+{
+    const char *extension = path != NULL ? strrchr(path, '.') : NULL;
+    if (extension == NULL) {
+        return 0;
+    }
+    size_t length = strlen(extension);
+    return (length == 4u && (extension[1] == 'c' || extension[1] == 'C') &&
+            (extension[2] == 'u' || extension[2] == 'U') &&
+            (extension[3] == 'e' || extension[3] == 'E')) ||
+           (length == 4u && (extension[1] == 'i' || extension[1] == 'I') &&
+            (extension[2] == 's' || extension[2] == 'S') &&
+            (extension[3] == 'o' || extension[3] == 'O')) ||
+           (length == 4u && (extension[1] == 'm' || extension[1] == 'M') &&
+            (extension[2] == '3') && (extension[3] == 'u' || extension[3] == 'U'));
+}
+
+static schway_disc_image *lr_disc_open_one(const char *path)
+{
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    if (path == NULL || schway_disc_image_open(path, &image, &error) != SCHWAY_DISC_IMAGE_OK ||
+        image == NULL || schway_disc_image_count(image) != 1u) {
+        schway_disc_image_close(image);
+        return NULL;
+    }
+    return image;
+}
+
+static int lr_disc_open_set(const char *path, schway_disc_image **images, unsigned *count)
+{
+    schway_disc_image *root = NULL;
+    schway_disc_image_error error;
+    unsigned opened = 0u;
+    int ok = 0;
+
+    if (path == NULL || images == NULL || count == NULL) {
+        return 0;
+    }
+    memset(images, 0, LR_DISC_LIMIT * sizeof images[0]);
+    *count = 0u;
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    if (schway_disc_image_open(path, &root, &error) != SCHWAY_DISC_IMAGE_OK || root == NULL) {
+        goto done;
+    }
+    unsigned image_count = schway_disc_image_count(root);
+    if (image_count == 0u || image_count > LR_DISC_LIMIT) {
+        goto done;
+    }
+    for (unsigned i = 0u; i < image_count; i++) {
+        const char *image_path = schway_disc_image_path(root, i);
+        if (image_path == NULL || (images[i] = lr_disc_open_one(image_path)) == NULL) {
+            goto done;
+        }
+        opened++;
+    }
+    *count = image_count;
+    ok = 1;
+
+done:
+    schway_disc_image_close(root);
+    if (!ok) {
+        lr_disc_close_set(images, opened);
+        *count = 0u;
+    }
+    return ok;
+}
+
+static int lr_disc_copy_text(const char *source, char *destination, size_t length)
+{
+    if (source == NULL || destination == NULL || length == 0u) {
+        return 0;
+    }
+    size_t source_length = strlen(source);
+    size_t copied = source_length < length - 1u ? source_length : length - 1u;
+    if (copied != 0u) {
+        memcpy(destination, source, copied);
+    }
+    destination[copied] = '\0';
+    return 1;
+}
+
+static bool RETRO_CALLCONV lr_disk_set_eject_state(bool ejected)
+{
+    if (inst == NULL) {
+        return false;
+    }
+    if (lr_disc_ejected == (ejected ? 1 : 0)) {
+        return true;
+    }
+    if (ejected) {
+        if (schway_set_lid(inst, 1u) != SCHWAY_STATUS_OK) {
+            return false;
+        }
+        lr_disc_ejected = 1;
+        return true;
+    }
+    if (schway_set_lid(inst, 0u) != SCHWAY_STATUS_OK) {
+        return false;
+    }
+    lr_disc_ejected = 0;
+    return true;
+}
+
+static bool RETRO_CALLCONV lr_disk_get_eject_state(void)
+{
+    return lr_disc_ejected != 0;
+}
+
+static unsigned RETRO_CALLCONV lr_disk_get_image_index(void)
+{
+    return lr_disc_index < lr_disc_count ? lr_disc_index : lr_disc_count;
+}
+
+static bool RETRO_CALLCONV lr_disk_set_image_index(unsigned index)
+{
+    if (inst == NULL || lr_disc_ejected == 0) {
+        return false;
+    }
+    if (index >= lr_disc_count) {
+        if (!lr_disc_remove_selected()) {
+            return false;
+        }
+        lr_disc_index = LR_DISC_LIMIT;
+        return true;
+    }
+    if (lr_discs[index] == NULL) {
+        return false;
+    }
+    if (index == lr_disc_index) {
+        return true;
+    }
+    unsigned previous = lr_disc_index;
+    schway_disc disc;
+    lr_disc_index = index;
+    int prepared = lr_disc_make_descriptor(index, &disc);
+    if (!prepared || schway_swap_disc(inst, &disc) != SCHWAY_STATUS_OK) {
+        lr_disc_index = previous;
+        return false;
+    }
+    return true;
+}
+
+static unsigned RETRO_CALLCONV lr_disk_get_num_images(void)
+{
+    return lr_disc_count;
+}
+
+static bool RETRO_CALLCONV lr_disk_replace_image_index(
+    unsigned index, const struct retro_game_info *game)
+{
+    schway_disc_image *replacement;
+    schway_disc_image *previous;
+    schway_disc disc;
+    if (inst == NULL || lr_disc_ejected == 0 || index >= lr_disc_count) {
+        return false;
+    }
+    if (game == NULL) {
+        if (lr_disc_index == index) {
+            if (!lr_disc_remove_selected()) {
+                return false;
+            }
+            lr_disc_index = LR_DISC_LIMIT;
+        } else if (lr_disc_index < lr_disc_count && lr_disc_index > index) {
+            lr_disc_index--;
+        }
+        schway_disc_image_close(lr_discs[index]);
+        for (unsigned i = index; i + 1u < lr_disc_count; i++) {
+            lr_discs[i] = lr_discs[i + 1u];
+        }
+        lr_disc_count--;
+        lr_discs[lr_disc_count] = NULL;
+        return true;
+    }
+    if (game->path == NULL || !lr_disc_path_supported(game->path)) {
+        return false;
+    }
+    replacement = lr_disc_open_one(game->path);
+    if (replacement == NULL) {
+        return false;
+    }
+    previous = lr_discs[index];
+    lr_discs[index] = replacement;
+    if (lr_disc_index == index &&
+        (!lr_disc_make_descriptor(index, &disc) || schway_swap_disc(inst, &disc) != SCHWAY_STATUS_OK)) {
+        lr_discs[index] = previous;
+        schway_disc_image_close(replacement);
+        return false;
+    }
+    schway_disc_image_close(previous);
+    return true;
+}
+
+static bool RETRO_CALLCONV lr_disk_add_image_index(void)
+{
+    if (inst == NULL || lr_disc_ejected == 0 || lr_disc_count >= LR_DISC_LIMIT) {
+        return false;
+    }
+    lr_discs[lr_disc_count++] = NULL;
+    return true;
+}
+
+static bool RETRO_CALLCONV lr_disk_set_initial_image(unsigned index, const char *path)
+{
+    if (path == NULL || path[0] == '\0' || index >= LR_DISC_LIMIT ||
+        strlen(path) >= sizeof lr_disc_initial_path) {
+        return false;
+    }
+    memcpy(lr_disc_initial_path, path, strlen(path) + 1u);
+    lr_disc_initial_index = index;
+    lr_disc_initial_valid = 1;
+    return true;
+}
+
+static bool RETRO_CALLCONV lr_disk_get_image_path(unsigned index, char *path, size_t length)
+{
+    if (index >= lr_disc_count || lr_discs[index] == NULL) {
+        return false;
+    }
+    return lr_disc_copy_text(schway_disc_image_path(lr_discs[index], 0u), path, length) != 0;
+}
+
+static bool RETRO_CALLCONV lr_disk_get_image_label(unsigned index, char *label, size_t length)
+{
+    if (index >= lr_disc_count || lr_discs[index] == NULL) {
+        return false;
+    }
+    return lr_disc_copy_text(schway_disc_image_label(lr_discs[index], 0u), label, length) != 0;
+}
 
 /* The region option (HOSTS-AND-INTEGRATION section 1, Core options): the
    machine profile's region, selected at content load. A running instance
@@ -81,9 +455,9 @@ static struct retro_core_option_v2_definition lr_option_defs[] = {
      {{"ntsc-u", "NTSC-U/C"}, {"ntsc-j", "NTSC-J"}, {"pal", "PAL"}, {NULL, NULL}},
      "ntsc-u"},
     {LR_BIOS_KEY,
-     "BIOS for no-content runs",
+     "BIOS for discs and no-content runs",
      NULL,
-     "Optional file relative to system/. Missing or invalid files refuse this load. PS-EXE content uses the stub.",
+     "Optional file relative to system/. Discs default to openbios-fast.bin. Missing or invalid files refuse this load. PS-EXE content uses the stub.",
      NULL,
      NULL,
      {{"none", "Built-in test card"},
@@ -115,7 +489,7 @@ static struct retro_core_options_v2 lr_options = {lr_option_cats, lr_option_defs
 /* The same option for a frontend without core options version 2 (L1021). */
 static struct retro_variable lr_variables[] = {
     {LR_REGION_KEY, "Region (reload content); ntsc-u|ntsc-j|pal"},
-    {LR_BIOS_KEY, "BIOS for no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin"},
+    {LR_BIOS_KEY, "BIOS for discs and no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin"},
     {LR_ANALOG_MODE_KEY, "DualShock mode; analog|digital"},
     {LR_ANALOG_TOGGLE_KEY, "DualShock mode toggle; enabled|disabled"},
     {NULL, NULL},
@@ -365,6 +739,7 @@ static void lr_unload(void)
     }
     schway_destroy(inst);
     inst = NULL;
+    lr_disc_close_all();
     free(pixels);
     pixels = NULL;
     free(samples);
@@ -378,7 +753,7 @@ static void lr_unload(void)
 
 /* Creates the one instance with the given region; 0 on failure, with
    nothing held. */
-static int lr_create(uint32_t region)
+static int lr_create(uint32_t region, uint32_t disc_flags)
 {
     schway_config cfg;
     schway_profile profile;
@@ -391,6 +766,7 @@ static int lr_create(uint32_t region)
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = region;
+    profile.disc_flags = disc_flags;
     info.size = (uint32_t)sizeof info;
     if (schway_create(&cfg, &inst) != SCHWAY_STATUS_OK) {
         inst = NULL;
@@ -780,12 +1156,18 @@ void retro_set_input_state(retro_input_state_t cb)
 void retro_init(void)
 {
     lr_acquire_rumble();
+    if (env_cb != NULL) {
+        (void)env_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE, &lr_disk_control);
+    }
 }
 
 /* L8866: release everything and reset every static; the module may be
    initialised again. */
 void retro_deinit(void)
 {
+    if (env_cb != NULL) {
+        (void)env_cb(RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE, NULL);
+    }
     lr_unload();
     memset(&lr_rumble, 0, sizeof lr_rumble);
     lr_controller_devices[0] = RETRO_DEVICE_ANALOG;
@@ -795,6 +1177,9 @@ void retro_deinit(void)
     memset(lr_mode_pulse_pending, 0, sizeof lr_mode_pulse_pending);
     memset(lr_toggle_latched, 0, sizeof lr_toggle_latched);
     memset(lr_toggle_frames, 0, sizeof lr_toggle_frames);
+    lr_disc_initial_valid = 0;
+    lr_disc_initial_index = 0u;
+    lr_disc_initial_path[0] = '\0';
     env_cb = NULL;
     video_cb = NULL;
     audio_cb = NULL;
@@ -808,8 +1193,8 @@ unsigned retro_api_version(void)
     return RETRO_API_VERSION;
 }
 
-/* L8886: PS-EXEs use a fullpath host read. Disc images remain unsupported and
-   archives are not extracted. */
+/* L8886: PS-EXEs use a bounded fullpath host read. Disc images use the shared
+   cue/ISO/M3U provider; archives are not extracted. */
 void retro_get_system_info(struct retro_system_info *sys)
 {
     if (sys == NULL) {
@@ -818,7 +1203,7 @@ void retro_get_system_info(struct retro_system_info *sys)
     memset(sys, 0, sizeof *sys);
     sys->library_name = "schwaystation";
     sys->library_version = SCHWAYSTATION_LIBRETRO_VERSION;
-    sys->valid_extensions = "exe|psexe";
+    sys->valid_extensions = "exe|psexe|cue|iso|m3u";
     sys->need_fullpath = true;
     sys->block_extract = true;
 }
@@ -1001,8 +1386,11 @@ bool retro_load_game(const struct retro_game_info *game)
     schway_exe_info exe_info;
     uint8_t *bios = NULL;
     size_t bios_size = 0u;
+    schway_disc_image *prepared_discs[LR_DISC_LIMIT] = {NULL};
+    unsigned prepared_count = 0u;
     char card2_path[LR_CARD_PATH_CAP];
     int have_card2_path = 0;
+    int disc_mode = 0;
 
     card2_path[0] = '\0';
 
@@ -1010,20 +1398,34 @@ bool retro_load_game(const struct retro_game_info *game)
     lr_refresh_input_options();
 
     if (game != NULL) {
-        if (!lr_is_exe_path(game->path)) {
+        if (lr_is_exe_path(game->path)) {
+            exe = lr_read_exe(game->path, &exe_size);
+            if (exe == NULL) {
+                return false;
+            }
+            memset(&exe_info, 0, sizeof exe_info);
+            exe_info.size = (uint32_t)sizeof exe_info;
+            if (schway_probe_exe(exe, exe_size, &exe_info) != SCHWAY_STATUS_OK) {
+                free(exe);
+                return false;
+            }
+            have_card2_path = lr_card2_path_for_game(game, card2_path);
+        } else if (lr_disc_path_supported(game->path)) {
+            const char *bios_name = lr_option_bios();
+            if (strcmp(bios_name, "none") == 0) {
+                bios_name = "openbios-fast.bin";
+            }
+            bios = lr_read_bios(bios_name, &bios_size);
+            if (bios == NULL || !lr_disc_open_set(game->path, prepared_discs,
+                                                   &prepared_count)) {
+                free(bios);
+                lr_disc_close_set(prepared_discs, prepared_count);
+                return false;
+            }
+            disc_mode = 1;
+        } else {
             return false;
         }
-        exe = lr_read_exe(game->path, &exe_size);
-        if (exe == NULL) {
-            return false;
-        }
-        memset(&exe_info, 0, sizeof exe_info);
-        exe_info.size = (uint32_t)sizeof exe_info;
-        if (schway_probe_exe(exe, exe_size, &exe_info) != SCHWAY_STATUS_OK) {
-            free(exe);
-            return false;
-        }
-        have_card2_path = lr_card2_path_for_game(game, card2_path);
     } else {
         const char *bios_name = lr_option_bios();
         if (strcmp(bios_name, "none") != 0) {
@@ -1036,17 +1438,50 @@ bool retro_load_game(const struct retro_game_info *game)
     if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &format)) {
         free(exe);
         free(bios);
+        lr_disc_close_set(prepared_discs, prepared_count);
         return false;
     }
-    if (!lr_create(lr_option_region())) {
+    if (!lr_create(lr_option_region(), disc_mode != 0 ? SCHWAY_PROFILE_CD_LICENSED : 0u)) {
         free(exe);
         free(bios);
+        lr_disc_close_set(prepared_discs, prepared_count);
         return false;
     }
     if (have_card2_path) {
         lr_card2_load(card2_path);
     }
-    if (game != NULL) {
+    if (disc_mode) {
+        schway_status status = schway_load_bios(inst, bios, bios_size);
+        free(bios);
+        if (status != SCHWAY_STATUS_OK) {
+            lr_disc_close_set(prepared_discs, prepared_count);
+            lr_unload();
+            return false;
+        }
+        lr_disc_count = prepared_count;
+        prepared_count = 0u;
+        for (unsigned i = 0u; i < lr_disc_count; i++) {
+            lr_discs[i] = prepared_discs[i];
+            prepared_discs[i] = NULL;
+        }
+        unsigned initial = 0u;
+        if (lr_disc_initial_valid != 0 && lr_disc_initial_index < lr_disc_count) {
+            const char *initial_path = schway_disc_image_path(
+                lr_discs[lr_disc_initial_index], 0u);
+            if (initial_path != NULL && strcmp(initial_path, lr_disc_initial_path) == 0) {
+                initial = lr_disc_initial_index;
+            }
+        }
+        lr_disc_initial_valid = 0;
+        lr_disc_initial_path[0] = '\0';
+        lr_disc_index = initial;
+        schway_disc initial_disc;
+        if (!lr_disc_make_descriptor(initial, &initial_disc) ||
+            schway_open_disc(inst, &initial_disc) != SCHWAY_STATUS_OK) {
+            lr_unload();
+            return false;
+        }
+    } else if (game != NULL) {
         schway_status status = schway_load_exe(inst, exe, exe_size);
         free(exe);
         if (status != SCHWAY_STATUS_OK) {
@@ -1061,6 +1496,7 @@ bool retro_load_game(const struct retro_game_info *game)
             return false;
         }
     }
+    lr_disc_close_set(prepared_discs, prepared_count);
     lr_memory_map_register();
     return true;
 }

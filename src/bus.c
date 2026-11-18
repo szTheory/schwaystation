@@ -515,8 +515,8 @@ static void memctl_access(schway *inst, uint32_t kind, uint32_t idx, uint32_t ad
 }
 
 /* One access to the I/O page at physical address p. Documented devices not
-   built yet are one switch case each (they read 0 and drop writes); the holes
-   between registers are bus errors. */
+   built yet are one switch case each; the holes between registers are bus
+   errors. */
 static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uint32_t width,
                      uint32_t *value, uint32_t *cycles)
 {
@@ -595,7 +595,7 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if ((p & 0xCu) != 0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_CDROM, p, width, wr, v);
+        schway__cdrom_io(inst, wr, p, width, value, cycles);
         port = SCHWAY__PORT_CDROM;
         break;
     case 0x81u:
@@ -610,7 +610,7 @@ static int io_access(schway *inst, uint32_t kind, uint32_t addr, uint32_t p, uin
         if ((p & 0x8u) != 0u) {
             return gap(inst, kind, SCHWAY__DEV_UNMAPPED, addr, width);
         }
-        schway__bus_unbuilt(inst, SCHWAY__DEV_MDEC, p, width, wr, v);
+        schway__mdec_io(inst, wr, p, width, value, cycles);
         break;
     default:
         if (slot < 0xC0u) {

@@ -17,11 +17,13 @@
 #include "pad.h"
 #include "card.h"
 #include "spu.h"
+#include "cdrom.h"
+#include "mdec.h"
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 5u
-#define SCHWAY__STATE_FORMAT 5u
+#define SCHWAY__BEHAVIOUR_REVISION 17u
+#define SCHWAY__STATE_FORMAT 17u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -124,11 +126,22 @@ struct schway__trace_ring {
     uint32_t head, count;
 };
 
+/* Host callbacks and their checked TOC are not serialized device state. */
+struct schway__disc_host {
+    schway_disc callbacks;
+    schway_toc toc;
+    uint32_t attached;
+    uint32_t lid_open;
+    uint32_t identity_valid;
+    uint8_t identity_sha256[32];
+};
+
 struct schway {
     schway_allocator allocator; /* the caller's, copied at create */
     size_t alloc_size;          /* the size given to alloc, given back to free */
     uint32_t region;            /* SCHWAY_REGION_* */
     uint32_t profile_locked;    /* 1 after the first run_frame */
+    uint32_t run_active;        /* host callbacks may run only inside public run calls */
     uint64_t frame;             /* frames run since power-on */
     uint64_t ticks;             /* CPU cycles run since power-on */
     uint64_t tick_acc;          /* the frame accumulator's remainder at the frame's start, < den */
@@ -147,12 +160,16 @@ struct schway {
     struct schway__gte gte;
     struct schway__bus bus;
     struct schway__irq irq;
+    int16_t xa_decode_scratch[SCHWAY__CDXA_MAX_OUTPUT_FRAMES * 2u];
+    int16_t xa_adpcm_scratch[SCHWAY__CDXA_MAX_DECODED_FRAMES * 2u]; /* derived decode workspace */
     struct schway__dma dma;
     struct schway__timers timers;
     struct schway__sio sio;
     struct schway__pad pad;
     struct schway__card card;
     struct schway__spu spu;
+    struct schway__cdrom cdrom;
+    struct schway__mdec mdec;
     struct schway__fault fault;
     /* Not saved: derived from the state, and rebuilt after a load. */
     struct schway__sched sched;
@@ -161,6 +178,7 @@ struct schway {
     struct schway__trace_ring trace;
     uint32_t exit_pending;      /* the guest wrote the exit port */
     uint32_t exit_code;         /* the byte it wrote */
+    struct schway__disc_host disc_host;
 };
 
 /* Frame cycles per region, numerator and denominator. */
@@ -208,7 +226,8 @@ _Static_assert(sizeof(schway_versions) == 32, "versions size");
 _Static_assert(offsetof(schway_profile, size) == 0, "profile.size");
 _Static_assert(offsetof(schway_profile, region) == 4, "profile.region");
 _Static_assert(offsetof(schway_profile, flags) == 8, "profile.flags");
-_Static_assert(sizeof(schway_profile) == 12, "profile size");
+_Static_assert(offsetof(schway_profile, disc_flags) == 12, "profile.disc_flags");
+_Static_assert(sizeof(schway_profile) == 16, "profile size");
 _Static_assert(SCHWAY__PROFILE_DEBUG_PORT == SCHWAY_PROFILE_DEBUG_PORT, "debug port flag");
 
 _Static_assert(offsetof(schway_exe_info, size) == 0, "exe_info.size");
@@ -340,6 +359,8 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__CONFIG_SIZE_FIRST ((uint32_t)(8 + 3 * SCHWAY__P))
 #define SCHWAY__VERSIONS_SIZE_FIRST 32u
 #define SCHWAY__PROFILE_SIZE_FIRST 8u /* a literal: appended fields leave it alone */
+#define SCHWAY__PROFILE_SIZE_FLAGS 12u /* flags ended the released v4 profile */
+#define SCHWAY__PROFILE_SIZE_DISC_FLAGS 16u /* appended in API v7 */
 #define SCHWAY__INFO_SIZE_FIRST 36u
 #define SCHWAY__RUN_RESULT_SIZE_FIRST 24u /* a literal: appended fields leave it alone */
 #define SCHWAY__INPUT_SIZE_FIRST ((uint32_t)sizeof(schway_input))
@@ -351,9 +372,14 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__FAULT_SIZE_FIRST 56u
 #define SCHWAY__TTY_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
 #define SCHWAY__TRACE_SIZE_FIRST 64u
+#define SCHWAY__DISC_TRACK_SIZE_FIRST ((uint32_t)sizeof(schway_disc_track))
+#define SCHWAY__TOC_SIZE_FIRST ((uint32_t)sizeof(schway_toc))
+#define SCHWAY__DISC_SIZE_FIRST ((uint32_t)offsetof(schway_disc, identity_size))
 _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first size");
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
+_Static_assert(SCHWAY__PROFILE_SIZE_FLAGS == offsetof(schway_profile, disc_flags), "profile flags size");
+_Static_assert(SCHWAY__PROFILE_SIZE_DISC_FLAGS == sizeof(schway_profile), "profile disc flags size");
 _Static_assert(SCHWAY__INFO_SIZE_FIRST == sizeof(schway_info), "info first size");
 _Static_assert(SCHWAY__INPUT_SIZE_FIRST == sizeof(schway_input), "input first size");
 _Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == offsetof(schway_run_result, exit_code),
@@ -372,6 +398,30 @@ _Static_assert(sizeof(schway_bios_info) == 48, "bios_info size");
 _Static_assert(SCHWAY__FAULT_SIZE_FIRST == sizeof(schway_fault), "fault first size");
 _Static_assert(SCHWAY__TTY_SIZE_FIRST == sizeof(schway_tty), "tty first size");
 _Static_assert(SCHWAY__TRACE_SIZE_FIRST == sizeof(schway_trace), "trace first size");
+_Static_assert(SCHWAY__DISC_TRACK_SIZE_FIRST == sizeof(schway_disc_track), "disc track first size");
+_Static_assert(SCHWAY__TOC_SIZE_FIRST == sizeof(schway_toc), "toc first size");
+_Static_assert(SCHWAY__DISC_SIZE_FIRST == 8 + 4 * SCHWAY__P, "disc first size");
+_Static_assert(offsetof(schway_disc_track, type) == 4, "disc track.type");
+_Static_assert(offsetof(schway_disc_track, index0) == 8, "disc track.index0");
+_Static_assert(offsetof(schway_disc_track, index1) == 12, "disc track.index1");
+_Static_assert(offsetof(schway_disc_track, pregap) == 16, "disc track.pregap");
+_Static_assert(offsetof(schway_disc_track, leadout) == 20, "disc track.leadout");
+_Static_assert(offsetof(schway_disc_track, reserved0) == 24, "disc track.reserved0");
+_Static_assert(sizeof(schway_disc_track) == 28, "disc track size");
+_Static_assert(offsetof(schway_toc, track_count) == 4, "toc.track_count");
+_Static_assert(offsetof(schway_toc, reserved0) == 8, "toc.reserved0");
+_Static_assert(offsetof(schway_toc, tracks) == 12, "toc.tracks");
+_Static_assert(sizeof(schway_toc) == 12 + SCHWAY_DISC_MAX_TRACKS * sizeof(schway_disc_track), "toc size");
+_Static_assert(offsetof(schway_disc, reserved0) == 4, "disc.reserved0");
+_Static_assert(offsetof(schway_disc, user) == 8, "disc.user");
+_Static_assert(offsetof(schway_disc, read_sector) == 8 + SCHWAY__P, "disc.read_sector");
+_Static_assert(offsetof(schway_disc, toc) == 8 + 2 * SCHWAY__P, "disc.toc");
+_Static_assert(offsetof(schway_disc, bad_q) == 8 + 3 * SCHWAY__P, "disc.bad_q");
+_Static_assert(offsetof(schway_disc, identity_size) == 8 + 4 * SCHWAY__P, "disc.identity_size");
+_Static_assert(offsetof(schway_disc, reserved1) == 12 + 4 * SCHWAY__P, "disc.reserved1");
+_Static_assert(offsetof(schway_disc, identity_sha256) == 16 + 4 * SCHWAY__P,
+               "disc.identity_sha256");
+_Static_assert(sizeof(schway_disc) == 48 + 4 * SCHWAY__P, "disc size");
 
 /* The public fault kinds and devices are the internal ones, number for number. */
 _Static_assert(SCHWAY_FAULT_NONE == SCHWAY__FAULT_NONE, "fault none");

@@ -33,7 +33,149 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   endfunction()
 
-  if(CASE STREQUAL "bench_format")
+  if(CASE STREQUAL "disc_load")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${FIXTURES}/disc_boot.cue"
+        --frames 1 --hash-state
+      RESULT_VARIABLE state_rc OUTPUT_VARIABLE state_out ERROR_VARIABLE state_err)
+    string(FIND "${state_err}" "--hash-state is unavailable with --disc" state_message)
+    if(NOT state_rc STREQUAL "2" OR state_message EQUAL -1 OR
+       state_out MATCHES "frame [0-9]+ sha256")
+      message(FATAL_ERROR "disc --hash-state must be rejected before running, got exit ${state_rc}\n"
+        "${state_out}${state_err}")
+    endif()
+    function(run_disc path result_name)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${path}"
+          --frames 1200 --stop-on mailbox --hash
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "mailbox SWMB status=00" OR
+         NOT out MATCHES "frame [0-9]+ sha256 ${digits}")
+        message(FATAL_ERROR "BIOS disc run ${path}: expected a sealed guest mailbox and hashes, "
+          "got exit ${rc}\n${out}${err}")
+      endif()
+      set(${result_name} "${out}" PARENT_SCOPE)
+    endfunction()
+    run_disc("${FIXTURES}/disc_boot.cue" cue_output)
+    run_disc("${FIXTURES}/disc_boot_runner.m3u" playlist_output)
+    string(REPEAT "S" 32768 cooked_iso)
+    file(WRITE "${OUT}/runner-disc-valid.iso" "${cooked_iso}")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${OUT}/runner-disc-valid.iso"
+        --frames 1 --hash
+      RESULT_VARIABLE iso_rc OUTPUT_VARIABLE iso_out ERROR_VARIABLE iso_err)
+    if(NOT iso_rc STREQUAL "0" OR NOT iso_out MATCHES "frame 1 sha256 ${digits}")
+      message(FATAL_ERROR "BIOS cooked ISO attach failed: exit ${iso_rc}\n${iso_out}${iso_err}")
+    endif()
+    file(WRITE "${OUT}/runner-disc-missing-bios.bin" "missing")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${OUT}/runner-disc-no-bios.bin"
+        --disc "${FIXTURES}/disc_boot.cue" --frames 1
+      RESULT_VARIABLE missing_rc OUTPUT_VARIABLE missing_out ERROR_VARIABLE missing_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${OUT}/runner-disc-missing-bios.bin"
+        --disc "${FIXTURES}/disc_boot.cue" --frames 1
+      RESULT_VARIABLE short_rc OUTPUT_VARIABLE short_out ERROR_VARIABLE short_err)
+    if(NOT missing_rc STREQUAL "1" OR NOT missing_err MATCHES "cannot open" OR
+       NOT short_rc STREQUAL "1" OR NOT short_err MATCHES "BIOS must be exactly 524288 bytes" OR
+       missing_out MATCHES "frame [0-9]+ sha256" OR short_out MATCHES "frame [0-9]+ sha256")
+      message(FATAL_ERROR "missing/short BIOS was not refused before the first frame:\n"
+        "missing: ${missing_rc}\n${missing_out}${missing_err}\nshort: ${short_rc}\n${short_out}${short_err}")
+    endif()
+  elseif(CASE STREQUAL "disc_probe")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot.cue"
+      RESULT_VARIABLE cue_rc OUTPUT_VARIABLE cue_out ERROR_VARIABLE cue_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot_runner.m3u"
+      RESULT_VARIABLE playlist_rc OUTPUT_VARIABLE playlist_out ERROR_VARIABLE playlist_err)
+    if(NOT cue_rc STREQUAL "0" OR NOT cue_out MATCHES "format=disc" OR
+       NOT playlist_rc STREQUAL "0" OR NOT playlist_out MATCHES "format=disc" OR
+       NOT playlist_out MATCHES "playlist_count=2")
+      message(FATAL_ERROR "disc probe failed:\nCUE ${cue_rc}\n${cue_out}${cue_err}\n"
+        "playlist ${playlist_rc}\n${playlist_out}${playlist_err}")
+    endif()
+  elseif(CASE STREQUAL "disc_unsupported")
+    file(MAKE_DIRECTORY "${OUT}/runner-disc-unsupported")
+    set(root "${OUT}/runner-disc-unsupported")
+    file(COPY_FILE "${FIXTURES}/disc_boot.bin" "${root}/unsupported.ecm")
+    file(WRITE "${root}/nested-ecm.cue"
+      "FILE \"unsupported.ecm\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
+    file(WRITE "${root}/nested-ccd.cue"
+      "FILE \"unsupported.ccd\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
+    file(WRITE "${root}/nested-chd.m3u" "unsupported.chd\n")
+    file(WRITE "${root}/nested-pbp.m3u" "unsupported.pbp\n")
+    foreach(kind IN ITEMS CHD PBP ECM CCD)
+      string(TOLOWER "${kind}" lower)
+      set(want "unsupported: ${kind} (planned v2.0)")
+      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/unsupported.${lower}"
+          --frames 1
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      string(FIND "${err}" "${want}" found)
+      if(NOT rc STREQUAL "77" OR found EQUAL -1)
+        message(FATAL_ERROR "direct ${kind} input expected exit 77 with its named status, got ${rc}\n${out}${err}")
+      endif()
+      execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${root}/unsupported.${lower}"
+        RESULT_VARIABLE probe_rc OUTPUT_VARIABLE probe_out ERROR_VARIABLE probe_err)
+      string(FIND "${probe_err}" "${want}" probe_found)
+      if(NOT probe_rc STREQUAL "77" OR probe_found EQUAL -1)
+        message(FATAL_ERROR "probe ${kind} expected exit 77 with its named status, got ${probe_rc}\n"
+          "${probe_out}${probe_err}")
+      endif()
+    endforeach()
+    foreach(row IN ITEMS "nested-ecm.cue|ECM" "nested-ccd.cue|CCD"
+        "nested-chd.m3u|CHD" "nested-pbp.m3u|PBP")
+      string(REPLACE "|" ";" fields "${row}")
+      list(GET fields 0 child)
+      list(GET fields 1 kind)
+      set(want "unsupported: ${kind} (planned v2.0)")
+      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/${child}"
+          --frames 1
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      string(FIND "${err}" "${want}" found)
+      if(NOT rc STREQUAL "77" OR found EQUAL -1)
+        message(FATAL_ERROR "nested ${kind} input expected exit 77 with its named status, got ${rc}\n${out}${err}")
+      endif()
+    endforeach()
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${root}/nested-ecm.cue"
+      RESULT_VARIABLE cue_probe_rc OUTPUT_VARIABLE cue_probe_out ERROR_VARIABLE cue_probe_err)
+    string(FIND "${cue_probe_err}" "unsupported: ECM (planned v2.0)" cue_probe_message)
+    if(NOT cue_probe_rc STREQUAL "77" OR cue_probe_message EQUAL -1)
+      message(FATAL_ERROR "probe of CUE with readable nested ECM must name unsupported format and exit 77, got "
+        "${cue_probe_rc}\n${cue_probe_out}${cue_probe_err}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/missing.iso" --frames 1
+      RESULT_VARIABLE io_rc OUTPUT_VARIABLE io_out ERROR_VARIABLE io_err)
+    if(NOT io_rc STREQUAL "1" OR io_err MATCHES "unsupported:")
+      message(FATAL_ERROR "missing ISO must stay an infrastructure error, got ${io_rc}\n${io_out}${io_err}")
+    endif()
+  elseif(CASE STREQUAL "inputs_disc_controls")
+    string(REPEAT "[0-9a-f]" 64 digits)
+    function(run_control_movie movie result_name)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${FIXTURES}/disc_boot_runner.m3u"
+          --frames 360 --hash --inputs "${movie}"
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame 360 sha256 ${digits}" OR
+         NOT out MATCHES "lag frames=360")
+        message(FATAL_ERROR "disc control movie ${movie} failed: exit ${rc}\n${out}${err}")
+      endif()
+      set(${result_name} "${out}" PARENT_SCOPE)
+    endfunction()
+    run_control_movie("${INPUTS}" pressed)
+    run_control_movie("${INPUTS}" repeated)
+    if(NOT pressed STREQUAL repeated)
+      message(FATAL_ERROR "frame-300 pad edge and ordered disc controls changed the repeated run output")
+    endif()
+    file(WRITE "${OUT}/runner-disc-closed-swap.inputs" "1 disc=1\n")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${FIXTURES}/disc_boot_runner.m3u"
+        --frames 1 --inputs "${OUT}/runner-disc-closed-swap.inputs"
+      RESULT_VARIABLE closed_rc OUTPUT_VARIABLE closed_out ERROR_VARIABLE closed_err)
+    file(WRITE "${OUT}/runner-disc-range.inputs" "1 lid=open\n1 disc=2\n")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${FIXTURES}/disc_boot_runner.m3u"
+        --frames 1 --inputs "${OUT}/runner-disc-range.inputs"
+      RESULT_VARIABLE range_rc OUTPUT_VARIABLE range_out ERROR_VARIABLE range_err)
+    if(NOT closed_rc STREQUAL "2" OR NOT closed_out STREQUAL "" OR
+       NOT closed_err MATCHES "disc swap requires lid=open" OR
+       NOT range_rc STREQUAL "2" OR NOT range_out STREQUAL "" OR
+       NOT range_err MATCHES "outside the installed playlist")
+      message(FATAL_ERROR "invalid disc controls were not rejected before execution:\n"
+        "closed: ${closed_rc}\n${closed_out}${closed_err}\nrange: ${range_rc}\n${range_out}${range_err}")
+    endif()
+  elseif(CASE STREQUAL "bench_format")
     # The report's text from fixed samples, then the runner's own report:
     # every line present, in order, as a whole number. Times are never
     # compared, as they vary from run to run.
@@ -540,6 +682,7 @@ set(runner_hashes ${PROJECT_SOURCE_DIR}/tests/cmake/hashes.cmake)
 set(runner_fixtures_arg "")
 if(SCHWAYSTATION_FIXTURES)
   set(runner_fixtures_arg -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures)
+  cmake_language(DEFER CALL set_property TEST runner.hashes_file APPEND PROPERTY FIXTURES_REQUIRED disc_fmv_predicates)
 endif()
 schway_add_test(NAME runner.hashes_file
   COMMAND ${CMAKE_COMMAND} -DMODE=write -DRUN=$<TARGET_FILE:schwaystation-run>
@@ -618,6 +761,50 @@ string(REPLACE ";" "|" runner_emulator_bars "${CMAKE_CROSSCOMPILING_EMULATOR}")
 set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
   "-DEMULATOR=${runner_emulator_bars}")
 
+set(runner_disc_playlist ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u)
+# Fault prevented: a platform-native newline changes a generated fixture hash
+# between CI lanes even though each lane parses the same playlist entries.
+file(CONFIGURE OUTPUT "${runner_disc_playlist}" CONTENT "disc_boot.cue\ndisc_boot_playlist.cue\n"
+  NEWLINE_STYLE UNIX)
+set(runner_disc_input_script ${PROJECT_BINARY_DIR}/tests/runner-disc-controls.inputs)
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/tests")
+file(WRITE "${runner_disc_input_script}"
+  "300 p1=digital:X:128,128,128,128 p2=.\n300 lid=open\n300 disc=1\n300 lid=closed\n")
+if(TARGET schwaystation-disc-fixtures)
+  add_dependencies(schwaystation-test-runner-disc schwaystation-disc-fixtures)
+endif()
+
+# The API probe proves a closed-lid rejection leaves the copied host TOC intact,
+# and that an open-lid swap installs the second provider descriptor.
+schway_add_test(NAME runner.disc.api
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-runner-disc>
+    ${runner_disc_playlist}
+  LABELS portable runner TIMEOUT 15)
+
+# Fault prevented: frame-indexed script application that skips the selected boundary or fails to
+# apply the controller edge, eject, playlist selection, or final lid close.
+schway_add_test(NAME runner.inputs.disc_apply
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-runner-disc>
+    ${runner_disc_playlist} ${runner_disc_input_script}
+  LABELS portable runner TIMEOUT 15)
+
+schway_add_test(NAME runner.disc.load
+  COMMAND ${runner_check} -DCASE=disc_load -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 180)
+
+schway_add_test(NAME runner.disc.probe
+  COMMAND ${runner_check} -DCASE=disc_probe -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
+schway_add_test(NAME runner.disc.unsupported
+  COMMAND ${runner_check} -DCASE=disc_unsupported -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
 # Fault prevented: a state hash that is unstable, malformed or blind to the frames run, so devices
 # a test-card frame cannot show are not compared across lanes.
 schway_add_test(NAME runner.hash_state
@@ -636,6 +823,13 @@ schway_add_test(NAME runner.inputs.controls
   COMMAND ${runner_check} -DCASE=inputs_controls -DOUT=${PROJECT_BINARY_DIR}/tests
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
+
+schway_add_test(NAME runner.inputs.disc_controls
+  COMMAND ${runner_check} -DCASE=inputs_disc_controls -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DINPUTS=${runner_disc_input_script}
+    -DOUT=${PROJECT_BINARY_DIR}/tests
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 300)
 
 # Fault prevented: the reference PNG the RetroArch screenshot is compared
 # with changes bytes (converter, layout or encoder) while the frame hash
@@ -683,7 +877,7 @@ add_executable(schwaystation-test-run-stop ${SCHWAYSTATION_RUNNER_SOURCES})
 target_include_directories(schwaystation-test-run-stop PRIVATE ${SCHWAYSTATION_RUNNER_INCLUDE}
   ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(schwaystation-test-run-stop PRIVATE schwaystation::schwaystation
-  schwaystation-host)
+  schwaystation-host schwaystation_disc_image)
 target_compile_definitions(schwaystation-test-run-stop PRIVATE _POSIX_C_SOURCE=200809L
   SCHWAY_RUN_RAISE_AT=5 SCHWAY_RUN_TEST_HOOKS=1 SCHWAY_HOST_CARD_TESTING=1)
 set_target_properties(schwaystation-test-run-stop PROPERTIES

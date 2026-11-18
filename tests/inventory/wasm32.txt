@@ -4,8 +4,10 @@ abi
 built
 bus
 card
+cdrom
 core
 cpu
+disc
 dma
 exe
 fixtures
@@ -13,6 +15,7 @@ fuzz
 gpu
 gte
 install
+mdec
 perf
 policy
 release

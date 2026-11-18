@@ -42,6 +42,13 @@ schway_add_test(NAME docs.budgets
   COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -P ${policy_scripts}/budgets.cmake
   LABELS policy TIMEOUT 10)
 
+# Fault prevented: an oversized generated disc or boot executable entering a fixture.
+schway_add_test(NAME policy.fixture_budget
+  COMMAND ${CMAKE_COMMAND} -DIMAGE=${PROJECT_BINARY_DIR}/fixtures/disc_boot.bin
+    -DAUDIO=${PROJECT_BINARY_DIR}/fixtures/disc_boot_track02.bin
+    -DEXE=${PROJECT_BINARY_DIR}/fixtures/hello.exe -P ${PROJECT_SOURCE_DIR}/tests/cmake/fixture_budget.cmake
+  LABELS policy portable TIMEOUT 10)
+
 # Fault prevented: a public name hosts cannot find in the embedding guide, or a
 # guide naming a removed name. The self test checks a copy of the header with one
 # more function and expects that function named as undocumented.

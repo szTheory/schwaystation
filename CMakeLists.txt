@@ -77,7 +77,8 @@ endfunction()
 # is compiled once and a test can link the object that ships.
 add_library(schwaystation_instance OBJECT
   src/instance.c
-  src/frame.c)
+  src/frame.c
+  src/disc.c)
 add_library(schwaystation_bios OBJECT src/bios.c)
 add_library(schwaystation_bus OBJECT
   src/bus.c
@@ -98,6 +99,17 @@ add_library(schwaystation_exe OBJECT
   src/exe.c
   src/stub_kernel.c)
 add_library(schwaystation_testcard OBJECT src/testcard.c)
+set(SCHWAYSTATION_DISC_OBJECTS)
+set(SCHWAYSTATION_DISC_SOURCES)
+if(PROJECT_IS_TOP_LEVEL)
+  include(cmake/DiscTargets.cmake)
+  list(APPEND SCHWAYSTATION_DISC_OBJECTS
+    $<TARGET_OBJECTS:schwaystation_cdrom>
+    $<TARGET_OBJECTS:schwaystation_mdec>)
+else()
+  list(APPEND SCHWAYSTATION_DISC_SOURCES src/cdrom.c src/cdrom_audio.c src/cdrom_sector.c
+    src/cdrom_state.c src/cdxa.c src/mdec.c)
+endif()
 add_library(schwaystation_state OBJECT
   src/state.c
   src/crc32.c)
@@ -117,6 +129,8 @@ add_library(schwaystation STATIC
   $<TARGET_OBJECTS:schwaystation_spu>
   $<TARGET_OBJECTS:schwaystation_exe>
   $<TARGET_OBJECTS:schwaystation_testcard>
+  ${SCHWAYSTATION_DISC_OBJECTS}
+  ${SCHWAYSTATION_DISC_SOURCES}
   $<TARGET_OBJECTS:schwaystation_state>
   $<TARGET_OBJECTS:schwaystation_sha256>)
 add_library(schwaystation::schwaystation ALIAS schwaystation)
@@ -125,9 +139,14 @@ target_include_directories(schwaystation PUBLIC
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated>
   $<INSTALL_INTERFACE:include>)
 target_include_directories(schwaystation_bios PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/runner)
-foreach(core_target IN ITEMS schwaystation schwaystation_instance schwaystation_bios schwaystation_sha256 schwaystation_bus
-    schwaystation_cpu schwaystation_gpu schwaystation_gte schwaystation_dma schwaystation_timers
-    schwaystation_sched schwaystation_sio schwaystation_card schwaystation_spu schwaystation_exe schwaystation_testcard schwaystation_state)
+set(schway_core_targets schwaystation schwaystation_instance schwaystation_bios schwaystation_sha256 schwaystation_bus
+  schwaystation_cpu schwaystation_gpu schwaystation_gte schwaystation_dma schwaystation_timers
+  schwaystation_sched schwaystation_sio schwaystation_card schwaystation_spu schwaystation_exe
+  schwaystation_testcard schwaystation_state)
+if(PROJECT_IS_TOP_LEVEL)
+  list(APPEND schway_core_targets schwaystation_cdrom schwaystation_mdec)
+endif()
+foreach(core_target IN LISTS schway_core_targets)
   schway_core_options(${core_target})
 endforeach()
 
@@ -178,9 +197,11 @@ if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
 endif()
 if(SCHWAYSTATION_BUILD_RUNNER)
   add_subdirectory(runner)
+  target_link_libraries(schwaystation-run PRIVATE schwaystation_disc_image)
 endif()
 if(SCHWAYSTATION_BUILD_LIBRETRO)
   add_subdirectory(libretro)
+  target_link_libraries(schwaystation_libretro PRIVATE schwaystation_disc_image)
 endif()
 
 # Release archives, one per install component.
@@ -212,9 +233,16 @@ set(SCHWAYSTATION_INVENTORY ${inventory} CACHE STRING "Test inventory selection 
 # Fault prevented: every wasm32 test failing on a missing runtime, with a
 # message that does not say where the runtime comes from.
 if(SCHWAYSTATION_BUILD_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "WASI")
-  list(GET CMAKE_CROSSCOMPILING_EMULATOR 0 emulator)
-  if(NOT EXISTS "${emulator}")
-    message(FATAL_ERROR "wasm32: the test runtime '${emulator}' is missing; fetch it with\n"
+  list(LENGTH CMAKE_CROSSCOMPILING_EMULATOR emulator_length)
+  if(emulator_length LESS 4)
+    message(FATAL_ERROR "wasm32: the test emulator must include its wrapper, runtime, source tree and build tree")
+  endif()
+  list(GET CMAKE_CROSSCOMPILING_EMULATOR 0 emulator_wrapper)
+  list(GET CMAKE_CROSSCOMPILING_EMULATOR 1 emulator_runtime)
+  if(NOT EXISTS "${emulator_wrapper}")
+    message(FATAL_ERROR "wasm32: the test emulator wrapper '${emulator_wrapper}' is missing")
+  elseif(NOT EXISTS "${emulator_runtime}")
+    message(FATAL_ERROR "wasm32: the test runtime '${emulator_runtime}' is missing; fetch it with\n"
       "  scripts/fetch-pin.sh wasmtime-<arch>-linux build/pins/wasmtime")
   endif()
 endif()

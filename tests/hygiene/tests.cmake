@@ -3,10 +3,10 @@ set(hygiene_scripts ${CMAKE_CURRENT_LIST_DIR}/../cmake)
 
 # Fault prevented: repository-check code growing past its budget. Every line
 # of the shell scripts, the CMake check scripts and the hooks counts, at most
-# 2688, the measured Phase 4 total at ship; the self test counts a 10-line fixture against a limit of 9.
+# 2700, the approved absolute ceiling; Phase 6 ratchets to its measured total at ship.
 schway_add_test(NAME policy.gate_budget
   COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}
-    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=2688
+    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=2700
     -P ${hygiene_scripts}/line_budget.cmake
   LABELS hygiene policy TIMEOUT 30)
 set(hygiene_budget ${CMAKE_BINARY_DIR}/hygiene/line_budget_fixture)
@@ -79,13 +79,10 @@ schway_add_test(NAME hygiene.tree.self_test
   LABELS hygiene TIMEOUT 60)
 
 # Fault prevented: a BIOS dump or a PlayStation executable entering the tree
-# under a neutral name. The self test's throwaway repository holds a
-# 524288-byte file of NUL bytes and a file whose first 8 bytes are decoded
-# here from the executable signature's hex in scripts/hygiene.sh, so no
+# under a neutral name. The tree scan above detects both; its self test's
+# throwaway repository holds a 524288-byte file of NUL bytes and a file whose
+# first 8 bytes are decoded here from scripts/hygiene.sh's signature, so no
 # tracked file holds either.
-schway_add_test(NAME hygiene.no_bios_bytes
-  COMMAND ${SCHWAYSTATION_SH} ${CMAKE_SOURCE_DIR}/scripts/hygiene.sh --tree
-  LABELS hygiene TIMEOUT 60)
 set(hygiene_bios ${CMAKE_BINARY_DIR}/hygiene/bios_fixture)
 schway__hygiene_repo(${hygiene_bios})
 execute_process(COMMAND ${SCHWAYSTATION_SH} -c "dd if=/dev/zero of=\"$1/blob.dat\" bs=1024 count=512 2>/dev/null"
@@ -382,8 +379,8 @@ schway_add_test(NAME hygiene.timeout_comments
   LABELS hygiene TIMEOUT 30)
 
 # Fault prevented: sound acceptance jobs or their exact test inventories being disconnected.
-schway_add_test(NAME policy.spu_registration
-  COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR} -DCASE=spu_registration
+schway_add_test(NAME policy.media_registration
+  COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR} -DCASE=disc_registration
     -P ${hygiene_scripts}/workflows.cmake
   LABELS hygiene policy TIMEOUT 30)
 set(hygiene_timeouts ${CMAKE_BINARY_DIR}/hygiene/timeouts_fixture)

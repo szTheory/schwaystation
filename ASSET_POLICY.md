@@ -151,9 +151,10 @@ code identified by the digest in `tests/built/expected.txt`, never a Sony image.
 - `release.firmware_scan` (v1.0 phase 1) hashes every member of every release zip and every tracked binary (MD5,
   SHA-1, SHA-256) and fails on any section 5 digest, any 524,288-byte member, any `PS-X EXE` or `CD001` signature,
   and any 32-byte window of the Sony licence string compared as hex. A synthetic PS-EXE is its negative control.
-- `hygiene.no_bios_bytes` scans every tracked file for the BIOS signatures as hex; `local.firmware_window_scan`
-  (local only, planned) fails if any 32-byte window of a dump in `SCHWAYSTATION_BIOS_DIR`, with at least 8
-  distinct byte values, appears in a built core, runner or libretro module.
+- `hygiene.tree` scans every tracked file for prohibited media; `hygiene.no_bios_bytes.self_test` exercises
+  BIOS-by-size and PlayStation-executable-by-content detection. `local.firmware_window_scan` (local only,
+  planned) fails if any 32-byte window of a dump in `SCHWAYSTATION_BIOS_DIR`, with at least 8 distinct byte
+  values, appears in a built core, runner or libretro module.
 - Fetched and built programs are admitted by digest only: the first fetch records the SHA-256 of the archive and
   of each file inside; a later fetch that differs is an `infrastructure_error`, and a pin bump is a PR
   (CONFORMANCE 7).

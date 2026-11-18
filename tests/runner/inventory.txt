@@ -9,6 +9,10 @@ runner.bench.percentile	bench,portable,runner
 runner.cards.controls	portable,runner
 runner.cards.persistence	portable,runner
 runner.cards.sigterm	portable,runner
+runner.disc.api	portable,runner
+runner.disc.load	portable,runner
+runner.disc.probe	portable,runner
+runner.disc.unsupported	portable,runner
 runner.exe.missing	portable,runner
 runner.exit.failure	portable,runner
 runner.exit_table	portable,runner
@@ -23,6 +27,8 @@ runner.hashes_compare.count.self_test	runner
 runner.hashes_compare.eight	runner
 runner.hashes_file	portable,runner
 runner.inputs.controls	portable,runner
+runner.inputs.disc_apply	portable,runner
+runner.inputs.disc_controls	portable,runner
 runner.inputs.script	portable,runner
 runner.native_hash	portable,runner
 runner.png	portable,runner

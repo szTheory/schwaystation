@@ -5,7 +5,8 @@
 #define SCHWAYSTATION_RUNNER_EXIT_STATUS_H
 
 enum { SCHWAY__EXIT_OK = 0, SCHWAY__EXIT_FAILURE = 1, SCHWAY__EXIT_USAGE = 2,
-       SCHWAY__EXIT_FIXTURE = 6, SCHWAY__EXIT_FAULT = 7, SCHWAY__EXIT_HANG = 8 };
+       SCHWAY__EXIT_FIXTURE = 6, SCHWAY__EXIT_FAULT = 7, SCHWAY__EXIT_HANG = 8,
+       SCHWAY__EXIT_UNSUPPORTED = 77 };
 
 typedef struct schway__exit_status {
     int code;
@@ -20,6 +21,7 @@ static const schway__exit_status schway__exit_statuses[] = {
     {SCHWAY__EXIT_FIXTURE, "fixture", "the fixture reported failure: mailbox status FFh, a mailbox CRC mismatch or an exit port byte not 00h"},
     {SCHWAY__EXIT_FAULT, "fault", "the first fault stopped the run"},
     {SCHWAY__EXIT_HANG, "hang", "--stop-on mailbox saw no done or fault status by the frame cap"},
+    {SCHWAY__EXIT_UNSUPPORTED, "unsupported", "the requested media format is not supported"},
 };
 
 #endif /* SCHWAYSTATION_RUNNER_EXIT_STATUS_H */

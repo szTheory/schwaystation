@@ -1,8 +1,234 @@
-/* The original loader seeds remain the default corpus. Subsystem replay targets
-   select a tiny bytecode corpus at compile time and use the same replay_main. */
+/* Each replay selects its bounded corpus at compile time and uses the same
+   replay_main interface. */
 #include "seeds.h"
 
-#if defined(SCHWAY_FUZZ_GPU_SEEDS)
+#if defined(SCHWAY_FUZZ_CUE_SEEDS) || defined(SCHWAY_FUZZ_CNF_SEEDS) || \
+    defined(SCHWAY_FUZZ_M3U_SEEDS) || defined(SCHWAY_FUZZ_CDROM_SEEDS) || \
+    defined(SCHWAY_FUZZ_MDEC_SEEDS)
+#include <string.h>
+
+#if defined(SCHWAY_FUZZ_CUE_SEEDS)
+static const char *const names[] = {"valid_track", "path_escape", "maximum_cue_text",
+                                    "maximum_child_name", "oversized_child_name"};
+
+uint32_t seeds_count(void)
+{
+    return (uint32_t)(sizeof names / sizeof names[0]);
+}
+
+const char *seeds_name(uint32_t i)
+{
+    return names[i];
+}
+
+size_t seeds_build(uint32_t i, uint8_t *buf)
+{
+    static const char valid[] = "FILE \"track.bin\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n";
+    static const char escape[] = "FILE \"../outside.bin\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n";
+    static const char prefix[] = "FILE \"";
+    static const char suffix[] = "\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n";
+    if (i == 0u) {
+        memcpy(buf, valid, sizeof valid - 1u);
+        return sizeof valid - 1u;
+    }
+    if (i == 1u) {
+        memcpy(buf, escape, sizeof escape - 1u);
+        return sizeof escape - 1u;
+    }
+    if (i == 2u) {
+        memset(buf, '#', SEEDS_SIZE_MAX);
+        buf[0] = '#';
+        return SEEDS_SIZE_MAX;
+    }
+    size_t at = 0u;
+    size_t name_length = i == 3u ? 255u : 256u;
+    memcpy(buf + at, prefix, sizeof prefix - 1u);
+    at += sizeof prefix - 1u;
+    size_t base_length = name_length - 4u;
+    memset(buf + at, 'a', base_length);
+    at += base_length;
+    memcpy(buf + at, ".bin", 4u);
+    at += 4u;
+    memcpy(buf + at, suffix, sizeof suffix - 1u);
+    at += sizeof suffix - 1u;
+    return at;
+}
+#elif defined(SCHWAY_FUZZ_CNF_SEEDS)
+#include "disc_image.h"
+
+static const char *const names[] = {"valid_limits", "unsafe_boot_path", "malformed_number",
+                                    "parser_maximum", "harness_maximum"};
+
+uint32_t seeds_count(void)
+{
+    return (uint32_t)(sizeof names / sizeof names[0]);
+}
+
+const char *seeds_name(uint32_t i)
+{
+    return names[i];
+}
+
+size_t seeds_build(uint32_t i, uint8_t *buf)
+{
+    static const char valid[] = "BOOT = cdrom:\\SLUS_123.45;1\r\nTCB = 64\r\nEVENT = 256\r\nSTACK = 801FFF00h\r\n";
+    static const char escape[] = "BOOT = CDROM:\\..\\SLUS_123.45;1\n";
+    static const char bad_number[] = "BOOT = cdrom:\\SLUS_123.45;1\nTCB = 4294967296\n";
+    if (i == 0u || i == 1u || i == 2u) {
+        const char *text = i == 0u ? valid : i == 1u ? escape : bad_number;
+        size_t size = strlen(text);
+        memcpy(buf, text, size);
+        return size;
+    }
+    size_t size = i == 3u ? SCHWAY_DISC_SYSTEM_CNF_MAX_BYTES + 1u : SEEDS_SIZE_MAX;
+    memset(buf, ' ', size);
+    return size;
+}
+#elif defined(SCHWAY_FUZZ_M3U_SEEDS)
+static const char *const names[] = {"single_disc", "path_escape", "cycle", "thirty_two_entries",
+                                    "thirty_three_entries", "maximum_path", "oversized_path"};
+
+uint32_t seeds_count(void)
+{
+    return (uint32_t)(sizeof names / sizeof names[0]);
+}
+
+const char *seeds_name(uint32_t i)
+{
+    return names[i];
+}
+
+size_t seeds_build(uint32_t i, uint8_t *buf)
+{
+    static const char *const fixed[] = {"disc.iso\n", "../outside.iso\n", "input.m3u\n"};
+    if (i < 3u) {
+        size_t size = strlen(fixed[i]);
+        memcpy(buf, fixed[i], size);
+        return size;
+    }
+    if (i == 3u || i == 4u) {
+        uint32_t count = i == 3u ? 32u : 33u;
+        size_t at = 0u;
+        for (uint32_t n = 0u; n < count; n++) {
+            memcpy(buf + at, "disc.iso\n", 9u);
+            at += 9u;
+        }
+        return at;
+    }
+    size_t at = 0u;
+    size_t name_length = i == 5u ? 255u : 256u;
+    memset(buf, 'a', name_length - 4u);
+    at += name_length - 4u;
+    memcpy(buf + at, ".iso\n", 5u);
+    at += 5u;
+    return at;
+}
+#elif defined(SCHWAY_FUZZ_CDROM_SEEDS)
+static const char *const names[] = {
+    "parameter_fifo_overflow", "reserved_commands_00", "reserved_commands_01",
+    "reserved_commands_02", "reserved_commands_03", "reserved_commands_04",
+    "reserved_commands_05", "reserved_commands_06", "reserved_commands_07",
+    "reserved_commands_08", "reserved_commands_09", "reserved_commands_10",
+    "reserved_commands_11", "reserved_commands_12", "lid_reset_mix",
+};
+
+uint32_t seeds_count(void)
+{
+    return (uint32_t)(sizeof names / sizeof names[0]);
+}
+
+const char *seeds_name(uint32_t i)
+{
+    return names[i];
+}
+
+static size_t cdrom_record(uint8_t *buf, size_t at, uint8_t action, uint8_t a, uint8_t b, uint8_t c)
+{
+    buf[at] = action;
+    buf[at + 1u] = a;
+    buf[at + 2u] = b;
+    buf[at + 3u] = c;
+    return at + 4u;
+}
+
+size_t seeds_build(uint32_t i, uint8_t *buf)
+{
+    size_t at = 0u;
+    if (i == 0u) {
+        for (uint32_t n = 0u; n < 20u; n++) {
+            at = cdrom_record(buf, at, 0u, 19u, (uint8_t)n, (uint8_t)~n);
+        }
+    } else if (i < 14u) {
+        uint32_t first = (i - 1u) * 20u;
+        uint32_t end = first + 20u;
+        if (end > 256u) end = 256u;
+        for (uint32_t command = first; command < end; command++) {
+            at = cdrom_record(buf, at, 1u, (uint8_t)command, (uint8_t)(command * 3u),
+                              (uint8_t)(command * 7u));
+        }
+    } else {
+        static const uint8_t records[][4] = {
+            {1u, 0x02u, 0x00u, 0x00u}, {1u, 0x06u, 0x00u, 0x00u}, {2u, 0xFFu, 0xFFu, 0u},
+            {3u, 1u, 0u, 0u},          {1u, 0x1Fu, 0u, 0u},       {3u, 0u, 0u, 0u},
+            {4u, 0u, 0u, 0u},          {5u, 0x20u, 0xAAu, 0x55u}, {6u, 0u, 0u, 0u},
+        };
+        memcpy(buf, records, sizeof records);
+        at = sizeof records;
+    }
+    return at;
+}
+#elif defined(SCHWAY_FUZZ_MDEC_SEEDS)
+static const char *const names[] = {"quant_table_truncated", "scale_table_truncated", "rle_run_overflow",
+                                    "truncated_block", "fifo_refill", "eob_block"};
+
+uint32_t seeds_count(void)
+{
+    return (uint32_t)(sizeof names / sizeof names[0]);
+}
+
+const char *seeds_name(uint32_t i)
+{
+    return names[i];
+}
+
+static size_t mdec_word(uint8_t *buf, size_t at, uint32_t word)
+{
+    buf[at] = (uint8_t)word;
+    buf[at + 1u] = (uint8_t)(word >> 8);
+    buf[at + 2u] = (uint8_t)(word >> 16);
+    buf[at + 3u] = (uint8_t)(word >> 24);
+    return at + 4u;
+}
+
+size_t seeds_build(uint32_t i, uint8_t *buf)
+{
+    size_t at = 0u;
+    if (i == 0u) {
+        at = mdec_word(buf, at, 0x40000001u);
+        at = mdec_word(buf, at, UINT32_MAX);
+    } else if (i == 1u) {
+        at = mdec_word(buf, at, 0x60000000u);
+        at = mdec_word(buf, at, UINT32_MAX);
+    } else if (i == 2u) {
+        at = mdec_word(buf, at, 0x20000001u);
+        at = mdec_word(buf, at, 0xFC010001u);
+    } else if (i == 3u) {
+        at = mdec_word(buf, at, 0x20000001u);
+        at = mdec_word(buf, at, 0x000000A0u);
+    } else if (i == 4u) {
+        at = mdec_word(buf, at, 0x2000FFFFu);
+        for (uint32_t n = 0u; n < 64u; n++) {
+            at = mdec_word(buf, at, n % 2u == 0u ? 0xFE0000A0u : UINT32_MAX);
+        }
+    } else {
+        at = mdec_word(buf, at, 0x20000002u);
+        at = mdec_word(buf, at, 0x000000A0u);
+        at = mdec_word(buf, at, 0x0000FE00u);
+    }
+    return at;
+}
+#endif
+#elif defined(SCHWAY_FUZZ_GPU_SEEDS)
 static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}, {3u}, {4u}};
 static const char *const names[] = {"partial_packet", "wrap_transfer", "dma_packet", "span_extrema",
                                     "reset_instance"};
@@ -17,7 +243,11 @@ static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}};
 static const char *const names[] = {"staged_write", "bad_checksum", "abort_write"};
 #endif
 
-#if defined(SCHWAY_FUZZ_SPU_SEEDS)
+#if defined(SCHWAY_FUZZ_CUE_SEEDS) || defined(SCHWAY_FUZZ_CNF_SEEDS) || \
+    defined(SCHWAY_FUZZ_M3U_SEEDS) || defined(SCHWAY_FUZZ_CDROM_SEEDS) || \
+    defined(SCHWAY_FUZZ_MDEC_SEEDS)
+/* The new campaign-specific seed interfaces are defined above. */
+#elif defined(SCHWAY_FUZZ_SPU_SEEDS)
 static size_t spu_record(uint8_t *buf, size_t at, uint8_t op, uint8_t selector, uint16_t value,
                          uint8_t extra)
 {

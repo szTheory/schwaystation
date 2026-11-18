@@ -75,7 +75,7 @@ library that any host can embed.
 - **Privacy**: public repository; no personal paths, names, disc names or e-mail addresses; noreply commit identity; hygiene checks every commit.
 - **Verification**: automation-first; the owner is asked only for identity-bound consent or a run on their own hardware.
 - **Delivery**: each phase is one branch and one pull request into a green `main`, released automatically; the release pull request is never held.
-- **Process**: autonomous/chained steps are authorized; stop after each phase's verify, before ship; no invented ceremony (`AGENTS.md` rules 8 and 9).
+- **Process**: autonomous milestone work is authorized. Run remaining phases through verification one at a time with `$gsd-autonomous --from N --to N`, then `$gsd-ship N` and confirm merge, green main CI and the automatic release before advancing. After the final phase release, audit, complete and clean up the milestone. Do not start `$gsd-new-milestone` until the release is published, main CI is green and the working tree is clean. See `.planning/AUTONOMOUS.md`; no invented ceremony (`AGENTS.md` rules 8 and 9).
 
 ## Key Decisions
 
@@ -111,4 +111,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-11-14 after Phase 5 completion*
+*Last updated: 2026-11-15 after Phase 5 release*

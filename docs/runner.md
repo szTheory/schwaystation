@@ -5,7 +5,8 @@ sound device or input device. It can print a frame hash, write a PNG and report 
 to check that a build produces the expected picture or native audio stream. It can run a PS-EXE file and print the
 text the program writes, and it can say what a PS-EXE file is without running it.
 
-The runner loads no disc. A run without `--bios` or `--exe` shows the built-in test card, described in
+The runner loads cue/bin, ISO and m3u media through the shared host provider. A run without `--bios`, `--disc` or
+`--exe` shows the built-in test card, described in
 [embedding.md](embedding.md#the-test-card). `--probe` reads one PS-EXE or disc image and runs nothing.
 
 ## Synopsis
@@ -13,7 +14,9 @@ The runner loads no disc. A run without `--bios` or `--exe` shows the built-in t
 ```text
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-audio] [--hash-state]
+schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N | --bench N] [--tty]
+                  [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
 schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
                   [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
@@ -28,16 +31,17 @@ schwaystation-run --help | --version
 | `--frames N` | Run N frames, N from 1 to 1000000. Give either `--frames` or `--bench`, once. |
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
 | `--bios FILE` | Load an exactly 524288-byte BIOS image, report its digest identity, then run it. Without `--frames` or `--bench` the run is 600 frames. Give it once. See [BIOS images](#bios-images). |
+| `--disc FILE` | Attach a cue sheet, ISO image or m3u playlist to a BIOS run. A `.cue` names its BINARY track files; an `.m3u` selects initial disc 0. Needs `--bios`. Give it once. |
 | `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
 | `--tty` | Print guest text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe` or `--bios`. |
-| `--stop-on mailbox` | End the run when the program's [mailbox](#mailbox) reports done or fault; a run that reaches the frame cap with neither is a [hang](#mailbox). Needs `--exe`. Give it once. |
+| `--stop-on mailbox` | End the run when the program's [mailbox](#mailbox) reports done or fault; a run that reaches the frame cap with neither is a [hang](#mailbox). Needs `--exe` or `--disc`. Give it once. |
 | `--trace first-fault` | After a [fault](#diagnostics) or a hang, print the last 4096 trace records as twelve-field lines. Needs `--exe`. Give it once. |
 | `--no-stop-on-fault` | Keep running after the program's first fault instead of stopping at it. Needs `--exe`. |
 | `--hash` | After the last frame, print the SHA-256 of its picture. |
 | `--hash-audio` | Print the SHA-256 of the native 44.1 kHz stereo PCM stream through the last frame that ran. |
 | `--hash-vram` | After the last frame, print the SHA-256 of all VRAM words as row-major little-endian RGB555 with bit 15 cleared. |
-| `--hash-state` | After the last frame, print the SHA-256 of the saved [machine state](#frame-hash). |
-| `--inputs FILE` | Parse and apply a bounded controller script before each frame latch, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
+| `--hash-state` | After the last frame, print the SHA-256 of the saved [machine state](#frame-hash). Unavailable with `--disc`. |
+| `--inputs FILE` | Parse and apply bounded controller and disc controls at frame boundaries, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
 | `--save-dir DIR` | Load and save the two memory cards under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
 | `--memcard-names MODE` | Use `basename` (default) or `serial` for the card filenames. Give it once. |
 | `--serial SERIAL` | Use this safe serial basename with `--memcard-names serial`. A bare PS-EXE does not contain a disc serial, so the caller supplies it. |
@@ -50,10 +54,11 @@ schwaystation-run --help | --version
 
 Options may come in any order, except `--probe`, which takes no other option except the `--metadata-ledger` and
 `--metadata-dat` pair. Anything else on the command line is
-a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--exe` or `--probe`,
-`--bios` or `--exe` twice, `--hash-audio` twice, `--bios` together with `--exe`, `--exe` with `--probe`, `--tty` without `--exe` or
+a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--disc`, `--exe` or `--probe`,
+`--bios`, `--disc` or `--exe` twice, `--hash-audio` twice, `--bios` together with `--exe`, `--disc` without `--bios`, `--exe` with `--probe`, `--tty` without `--exe` or
 `--bios`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything but `mailbox`,
-`--trace` with anything but `first-fault`, `--serial` without serial naming, and any option this release does not have.
+`--trace` with anything but `first-fault`, `--hash-state` with `--disc`, `--serial` without serial naming, and any option
+this release does not have.
 
 ## BIOS images
 
@@ -84,14 +89,28 @@ That public development image is a one-day CI handoff, not part of a runner, lib
 digest identifies the supplied bytes independently of the path used to name them.
 
 Without `--frames` or `--bench`, the runner allows 600 frames for BIOS startup. `--tty` enables the debug ports and
-prints text or a nonzero exit-port result. `--stop-on mailbox`, `--trace first-fault` and `--no-stop-on-fault` remain
-PS-EXE options. The separate `--exe FILE` path continues to run without a BIOS file, using the core's stub kernel.
+prints text or a nonzero exit-port result. `--stop-on mailbox` works with PS-EXE and disc runs; `--trace first-fault`
+and `--no-stop-on-fault` need `--exe`. The separate `--exe FILE` path continues to run without a BIOS file, using the
+core's stub kernel.
+
+## Running a disc
+
+Pass both a BIOS and supported image. The runner keeps the shared host provider open while the core may request
+sectors, then closes it after destroying the instance. It never extracts or side-loads the disc's boot executable:
+
+```sh
+schwaystation-run --bios ./openbios.bin --disc ./game.cue --frames 900 --stop-on mailbox --hash
+```
+
+`.cue` sheets may reference supported BINARY files. `.iso` images use cooked 2048-byte sectors. An `.m3u` playlist
+starts at entry 0. `.chd`, `.pbp`, `.ecm` and `.ccd` return status 77 with the format named; unreadable or malformed
+supported media and missing or invalid BIOS files return status 1.
 
 ## Input scripts
 
 `--inputs FILE` accepts ASCII text of at most 64 MiB and 1,000,000 records. Blank lines and `#` comments are
-allowed. Records may appear in any order; the runner sorts them by frame before playback. Each one-based record
-gives a complete snapshot for both ports:
+allowed. Records may appear in any order; the runner applies them by frame and preserves source-line order within a
+frame. Each one-based controller record gives a complete snapshot for both ports:
 
 ```text
 FRAME p1=DEVICE:BUTTONS:LX,LY,RX,RY p2=DEVICE:BUTTONS:LX,LY,RX,RY
@@ -112,8 +131,22 @@ For example, a Cross press on port 1 at frame 60, released at frame 61, is:
 61 p1=dualshock:.:128,128,128,128 p2=.
 ```
 
-A snapshot remains active until a later record changes it. Repeated identical records for one frame are accepted;
-conflicting records for that frame are rejected. Frames must be from 1 to 1,000,000 and may exceed the run's
+With `--disc`, a script can also control the lid and select an m3u entry. Disc indices start at 0. Open the lid
+before selecting another image, then close it explicitly:
+
+```text
+300 p1=digital:X:128,128,128,128 p2=.
+300 lid=open
+300 disc=1
+300 lid=closed
+```
+
+The complete script, including playlist indices and lid ordering, is validated before the core instance is created.
+In particular, a closed-lid swap is rejected before any frame runs.
+
+A snapshot remains active until a later controller record changes it. Repeated identical controller records for one
+frame are accepted; conflicting controller records for that frame are rejected. Frames must be from 1 to 1,000,000 and
+may exceed the run's
 `--frames` cap; later records are validated but not applied. The runner validates the whole file before it creates
 the core instance or runs a frame. A malformed record exits 2 with a bounded line-numbered error; an unreadable
 file or memory failure exits 1. The test-card frame hash remains unchanged by input, while `--hash-state` includes
@@ -187,6 +220,7 @@ schwaystation-run --exe game.exe --frames 300 --save-dir saves --memcard-names s
 schwaystation-run --exe game.exe --trace first-fault > fault.txt
 schwaystation-run --exe game.exe --no-stop-on-fault --frames 300
 schwaystation-run --exe game.exe --frames 300 --hash
+schwaystation-run --bios ./openbios.bin --disc game.m3u --frames 900 --stop-on mailbox --hash
 schwaystation-run --probe game.exe
 schwaystation-run --help
 schwaystation-run --version
@@ -446,14 +480,15 @@ shows that frame's time, and with fewer than 100,000 frames p99.999 is the maxim
 
 ## Probe
 
-`--probe FILE` reads a PS-EXE, a raw ISO9660 image, or a CUE sheet with its referenced BINARY files. It validates a
+`--probe FILE` reads a PS-EXE, a raw ISO9660 image, a CUE sheet with its referenced BINARY files, or an m3u playlist.
+For m3u it reports the playlist entry count and withholds per-disc identity fields. It validates a
 disc's boot executable but does not create an emulator instance, submit sectors, or run a frame. Raw ISO images use
 2048-byte sectors. CUE sheets are at most 64 KiB with at most 99 tracks and indexes; each relative `FILE` name is at
 most 255 bytes and cannot escape the sheet's directory. Companion images together are capped at 1 GiB. Supported
-CUE layouts are `MODE1/2048`, `MODE1/2352`, `MODE2/2336`, `MODE2/2352` and `AUDIO`; timestamps range through
+CUE layouts are `MODE1/2048`, `MODE2/2352` and `AUDIO`; unsupported track modes are refused. Timestamps range through
 `99:59:74`. ISO parsing is bounded to 64 descriptors, 64 KiB directories with 4096 records, 2047 bytes of
 `SYSTEM.CNF`, and 16 boot-path components of at most 63 bytes each. `.chd`, `.pbp`, `.ecm` and `.ccd` are refused
-as unsupported media. The probe never executes a disc. Boot and play status remain `unknown`.
+as unsupported media with exit status 77. The probe never executes a disc. Boot and play status remain `unknown`.
 
 The output only reveals a disc identity when its serial, rcheevos MD5, first-track SHA-1, DAT title and passing
 `metadata.identity` ledger row all match. Otherwise its serial, names and digests are redacted. Bare PS-EXE names
@@ -462,7 +497,7 @@ do not echo a private path. Identity fields are:
 
 | Key | Value |
 |---|---|
-| `format` | `exe` for a bare file; `disc` for a raw ISO9660 image or CUE sheet |
+| `format` | `exe` for a bare file; `disc` for an ISO9660 image, CUE sheet or m3u playlist |
 | `serial` | matched DAT serial; otherwise `redacted` |
 | `rcheevos_md5` | matched boot-executable MD5; otherwise `redacted` |
 | `track1_sha1` | matched physical first-track SHA-1; otherwise `redacted` |
@@ -529,6 +564,7 @@ signal that was already ignored when the runner started, as under `nohup`, stays
   6  fixture  the fixture reported failure: mailbox status FFh, a mailbox CRC mismatch or an exit port byte not 00h
   7  fault    the first fault stopped the run
   8  hang     --stop-on mailbox saw no done or fault status by the frame cap
+  77  unsupported  the requested media format is not supported
 ```
 
 Errors and usage messages go to standard error. Standard output holds only the results described above.

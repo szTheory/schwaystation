@@ -40,6 +40,12 @@ PKG_CONFIG_PATH=<unzipped directory>/lib/pkgconfig cc app.c $(pkg-config --cflag
 
 The header compiles as C and as C++.
 
+## Optional SDL2 host
+
+[`examples/sdl2/README.md`](../examples/sdl2/README.md) builds a small host against the installed CMake package.
+SDL2 supplies the window, audio device and keyboard input; the example supplies the host-side disc image provider.
+It is source support for the example only and is not installed or included in release archives.
+
 ## Structs and sizes
 
 Versioned input and output structs start with `uint32_t size`. Zero each one with `memset`, then set `size`:
@@ -426,13 +432,19 @@ BIOS bytes are not included in ordinary save states. A state stores the loaded-i
 
 ## Profile flags
 
-`schway_profile.flags` is the second profile field, after `region`. A caller whose struct ends before it gets no
-flags. A bit this version does not define returns `SCHWAY_STATUS_ERR_PROFILE_REJECTED`. The flags survive a power
-reset and lock with the region.
+`schway_profile.flags` follows `region`; it carries `SCHWAY_PROFILE_DEBUG_PORT` and `SCHWAY_PROFILE_GPU_V0`.
+API version 7 appends `disc_flags` after `flags` for the two disc overrides. The original 12-byte API v6 profile
+keeps its former flags mask, including both CD overrides; a size-16 profile uses `flags` for debug/GPU settings
+and `disc_flags` for CD settings. A caller whose struct ends before a field gets zero for that field. Unknown bits
+in either field return `SCHWAY_STATUS_ERR_PROFILE_REJECTED`. Both fields survive a power reset and lock with the
+region.
 
-- `SCHWAY_PROFILE_DEBUG_PORT`: the guest's byte writes to the two debug ports (a TTY byte and an exit code) take effect.
+- `schway_profile.disc_flags` with `SCHWAY_PROFILE_CD_LICENSED`: treat an attached data disc as licensed for the selected machine region. This is an
+  explicit host override for discs whose lead-in licence cannot be supplied through the sector callback.
+- `schway_profile.disc_flags` with `SCHWAY_PROFILE_CD_UNLOCK`: allow the modeled non-Japanese firmware unlock commands to accept a mismatched region.
+- `schway_profile.flags` with `SCHWAY_PROFILE_DEBUG_PORT`: the guest's byte writes to the two debug ports (a TTY byte and an exit code) take effect.
   Retail hosts leave it clear, and then those writes do nothing.
-- `SCHWAY_PROFILE_GPU_V0`: select the early GPU v0 model, which lacks rectangle texture flips. The default is GPU v2.
+- `schway_profile.flags` with `SCHWAY_PROFILE_GPU_V0`: select the early GPU v0 model, which lacks rectangle texture flips. The default is GPU v2.
 
 ## Video
 
@@ -531,6 +543,27 @@ are not text-decoded or line-split, and the core never prints them.
 The ring is not part of the machine state: it is outside `schway_save_state`, `schway_state_visit` and every hash, a
 load leaves it as it is, and a power reset empties it.
 
+## Disc providers
+
+`schway_disc` supplies callbacks of type `schway_disc_read_sector_fn`, `schway_disc_toc_fn` and optional
+`schway_disc_bad_q_fn`. The core copies this size-tagged descriptor and TOC; it calls sector and bad-Q callbacks
+only while `schway_run_frame` or `schway_run` advances the instance. A `schway_toc` holds up to
+`SCHWAY_DISC_MAX_TRACKS` `schway_disc_track` entries, each classified by `SCHWAY_DISC_TRACK_AUDIO`,
+`SCHWAY_DISC_TRACK_MODE1` or `SCHWAY_DISC_TRACK_MODE2`. API v6 appends `identity_size` and `identity_sha256`:
+set the size to 32 and provide the
+SHA-256 identity formed from the first 16 data sectors plus the disc serial. Leave both fields zero when that
+identity is unavailable. An older descriptor size remains valid for running media, but save/load with an attached
+disc lacking an identity returns `SCHWAY_STATUS_ERR_STATE_DISC`. Loading a state with another disc, or with no disc
+attached, returns the same status without changing the instance.
+
+Attach initial media with `schway_open_disc`. `schway_set_lid` takes 1 to open and 0 to close the lid;
+`schway_swap_disc` returns `SCHWAY_STATUS_ERR_LID_CLOSED` unless the lid is open. An empty TOC removes the current
+media while leaving the lid open, so the host can close an empty tray and the guest observes no disc.
+
+Callback function pointers and `user` remain host-owned even though the descriptor and TOC are copied. Keep each
+provider and any file handles it uses alive while an instance can call its callbacks. Destroy the instance before
+closing its active provider; after a successful disc swap, the newly attached provider must remain alive too.
+
 ## Save states
 
 ```c
@@ -542,10 +575,14 @@ schway_load_state(inst, buf, n);
 ```
 
 A state is the same bytes on every platform: a 20-byte header (magic, state format, total size, CRC-32 of the
-rest) and then every field, little-endian. Format 5 includes the SPU registers, RAM, voices, transfer FIFO,
-capture and reverb history, and the next sample deadline. A format-4 state returns
-`SCHWAY_STATUS_ERR_STATE_VERSION`. The state format and behavior revision have changed; the public API and ABI
-remain unchanged.
+rest) and then every field, little-endian. Format 17 includes the CD-ROM controller, validated Q record, pending
+and applied ATV matrices, XA-ADPCM predictor history, resampler history, both bounded CD input queues, the MDEC
+input halfword cursor, resumable coefficient scan, decoded color planes and staged color output alongside the SPU state.
+It also records the host-supplied disc identity for validation; callback pointers and file handles stay outside the
+state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. A format-16
+state returns `SCHWAY_STATUS_ERR_STATE_VERSION`. API v6 appends disc identity to the size-tagged descriptor; the
+behavior revision is 17 because state loads now reject a missing or different attached-disc identity before
+applying fields.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:
 
@@ -555,9 +592,11 @@ remain unchanged.
 | `SCHWAY_STATUS_ERR_STATE_VERSION` | another state format |
 | `SCHWAY_STATUS_ERR_STATE_CRC` | the bytes were changed |
 | `SCHWAY_STATUS_ERR_STATE_FIELD` | wrong size, a field out of range, or another region's state |
+| `SCHWAY_STATUS_ERR_STATE_DISC` | the state and currently attached disc have different or unavailable identities |
 
-A successful load restores the saved SPU sample phase, rebuilds derived deadlines, and empties the host-delivery
-audio queue. The queue is not part of a save state. Saving, loading and saving again gives the same bytes.
+A successful load restores the saved SPU sample phase and CD input queues, rebuilds derived deadlines, and empties
+the host-delivery PCM ring. That output ring is not part of a save state. Saving, loading and saving again gives the
+same bytes.
 
 The bus state includes the exact 16-bit SPU ATTR value written at `1F801DAAh`; loading a state restores that value.
 The emulator's power reset clears this latch to its deterministic zero model. This narrow control readback does not
@@ -581,10 +620,12 @@ an unknown one included, and never `NULL`.
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
 
-`SCHWAY_API_VERSION` is 4. A version only adds names, so a program built against an earlier header runs unchanged.
-Version 3 added `SCHWAY_FAULT_DMA`; version 4 adds read-only `schway_span` memory views, card loading and card
-generation queries, plus copied BIOS loading and SHA-256 reporting. A program that switches on the fault kind should
-treat a value it does not know as a fault it cannot name.
+`SCHWAY_API_VERSION` is 7. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
+Version 3 added `SCHWAY_FAULT_DMA`; version 4 added read-only `schway_span` memory views, card loading and card
+generation queries, plus copied BIOS loading and SHA-256 reporting. Version 5 added the host-supplied disc and TOC
+callbacks, lid control, and disc swapping; version 6 appended disc identity; version 7 appended `disc_flags` to
+`schway_profile`. A program that switches on the fault kind should treat a value it does not
+know as a fault it cannot name.
 
 ## The test card
 

@@ -36,9 +36,67 @@ ps1-tests-gpu-gpustat-log f727802fead1 https://raw.githubusercontent.com/JaCzeka
 # ps1-tests-release-member path=spu/memory-transfer/memory-transfer.exe release=build-158 sha256=9489f60d4ca6c7c8daca13e2551d21457971781d1b93d51947061e27df1fde36
 ps1-tests-spu-memory-transfer-log f727802fead11f1daa7549285548392ef87749cb https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/spu/memory-transfer/psx.log 415a79e5ed82a631eb35965766ff8d3c3e268c9f27262226d88507e5c3807cae
 
+# CD timing and Getloc evidence from the same pinned source/release. Logs are fetched separately
+# and checked against both the source commit and archive member; executables remain build-only.
+# ps1-tests-source-file path=cdrom/timing/Makefile blob-sha1=e3dc04dc4de82cf89b172789b8f5149b49b4bcf5 sha256=0cc2d5d78a7d91ae701b466c51f879ef3ec7975c39a62e6d0f8bd93fc65d64b8
+# ps1-tests-source-file path=cdrom/timing/main.cpp blob-sha1=fb82173d964c111358e3542f1fe38ab35a9e3485 sha256=e3e527ceeab21b6248889c44e85320f4eb5be9179337f3695b94f8a8eccf5e8d
+# ps1-tests-source-file path=cdrom/getloc/Makefile blob-sha1=6e2d153132fe51c7ae7a9f08c6bee7cb692cd87d sha256=23a9fc36b61af43a4866964a4e1b9549b9d0dcc9ecc7cd03a922bdcc231a3406
+# ps1-tests-source-file path=cdrom/getloc/main.cpp blob-sha1=319c3b0d6129367d6c056ea232c573e855589e35 sha256=aa4bcc62aa1e211ea0a821cdbf6d7384cc74d87a264f9af97f5a3fd391273046
+# ps1-tests-release-member path=cdrom/timing/timing.exe release=build-158 sha256=500cecd3b2afac6f533c980142067838198ac2d45e8e801cfcc8d4dcd08b0f2d size=16384
+# ps1-tests-release-member path=cdrom/getloc/getloc.exe release=build-158 sha256=ce1e2904caa1569a9d90036c037d50cf63698dbd156cbe6a5d274b8ae3b0c7dc size=16384
+ps1-tests-cdrom-timing-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/cdrom/timing/psx.log 074c20b1090962b6e8c7d331f664027600b557f2f24c6dafefc4575e230e9162
+ps1-tests-cdrom-getloc-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/cdrom/getloc/psx.log d47fa03daa4e9b80d47ef8f8ede4c7ad480800708010db741176648efdb1cc7e
+
+# MDEC first-caller guests and independent hardware output/status records from build-158.
+# The executables are inputs; the pinned source logs contain expected 4/8-bit RAM bytes and status order.
+# The step-by-step log has no cycle stamps and is not timing evidence.
+# ps1-tests-source-file path=mdec/4bit/psx.log blob-sha1=b418d8f37675bb166c2aaa63048a92172f8106b6 sha256=58c470e75f321ad361ee6b4600450970fa1f1f063d055b8501863438f56c7e75
+# ps1-tests-source-file path=mdec/8bit/psx.log blob-sha1=4676b1d2ff74aea394d8db52317e56cdb8a5162e sha256=d8b19a8e8cb23d65c0f267e148097d1d78a19400d180173791a1ce0e23cdb7d9
+# ps1-tests-source-file path=mdec/step-by-step-log/psx.log blob-sha1=6c6a7f218241ed64d0a9fb94db037472abb5140e sha256=33879b76df9a56f8b116711630cf2f6c527299fef4ed4a806766ca52a3359800
+# ps1-tests-release-member path=mdec/4bit/4bit.exe release=build-158 sha256=c9fc7caab7c8bcd19ec96cd703309fd176ca0ac266ab927d0c3fecc32f811944 size=12288
+# ps1-tests-release-member path=mdec/4bit/psx.log release=build-158 sha256=58c470e75f321ad361ee6b4600450970fa1f1f063d055b8501863438f56c7e75 size=622
+# ps1-tests-release-member path=mdec/8bit/8bit.exe release=build-158 sha256=f797c81a08a3ce46045c5652be7ebbafa96f48480d91245a97ec20fef7fb9e0f size=12288
+# ps1-tests-release-member path=mdec/8bit/psx.log release=build-158 sha256=d8b19a8e8cb23d65c0f267e148097d1d78a19400d180173791a1ce0e23cdb7d9 size=718
+# ps1-tests-release-member path=mdec/step-by-step-log/step-by-step-log.exe release=build-158 sha256=88abf5aabea1dae83f1aeda7f71147737d11cd73bf8f79d7ec25ad4ba59217ec size=18432
+# ps1-tests-release-member path=mdec/step-by-step-log/psx.log release=build-158 sha256=33879b76df9a56f8b116711630cf2f6c527299fef4ed4a806766ca52a3359800 size=126646
+ps1-tests-mdec-4bit-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/mdec/4bit/psx.log 58c470e75f321ad361ee6b4600450970fa1f1f063d055b8501863438f56c7e75
+ps1-tests-mdec-8bit-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/mdec/8bit/psx.log d8b19a8e8cb23d65c0f267e148097d1d78a19400d180173791a1ce0e23cdb7d9
+ps1-tests-mdec-status-log f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/mdec/step-by-step-log/psx.log 33879b76df9a56f8b116711630cf2f6c527299fef4ed4a806766ca52a3359800
+
+# Color MDEC first-frame callers and build-158 VRAM captures. Source records establish the
+# movie patches and caller dimensions; executable and image bytes remain build-only references.
+# ps1-tests-source-file path=mdec/frame/Makefile blob-sha1=79b7447674e46361967d873da50d35e45b6304ff sha256=758a7d7bab4b891bfe0e1280828a0315a3cab56b3cfb5a8c8d3ac1c0920a8902
+# ps1-tests-source-file path=mdec/frame/main.cpp blob-sha1=c07c5ce64bdcd03eec799b13b80013af7692262c sha256=519e7bf236b86aed5a3e02d876505b985c2621793847c4a91a3b2fdb22fadd9a
+# ps1-tests-source-file path=mdec/frame/sunset.h blob-sha1=591e9e886b2c706b4406aeebd80cf8d19be5d67d sha256=8b2709d066c48aaefa3fdf46c2a46aa76f145146e50d80a1cdf1f7c9f5aafc24
+# ps1-tests-source-file path=mdec/movie/main.cpp blob-sha1=51aaf6f4b44684083721281ac37c12423528dac2 sha256=5522fd3b241b965a361db55bf7dc2b3ff66eee8a6a5ee31bd61d828a5729d85d
+# ps1-tests-source-file path=mdec/movie/bad_apple.h blob-sha1=cea69b67f2d51704cdf67418b6e9f85819e5958e sha256=6fa61ccc9185da9ccf92694c77ef79a51628def75981fd29dcc0b8e03820b10c
+# ps1-tests-release-member path=mdec/frame/frame-15bit.exe release=build-158 sha256=c5de1d619760102e71fedf98f29bf83f0a637dd456e684a8f6292fa70ad1d253 size=73728
+# ps1-tests-release-member path=mdec/frame/frame-24bit.exe release=build-158 sha256=9d85fa3b7880cf3d246ab92fbf22af59dda870b76decb57c0320e5f128770426 size=73728
+# ps1-tests-release-member path=mdec/frame/vram-15bit.png release=build-158 sha256=67d834d9bb0a125ee84a0799e0e5ea490ab77a1d780aa790499d57595866f3f0 size=48437
+# ps1-tests-release-member path=mdec/frame/vram-24bit.png release=build-158 sha256=0862485930318a753e8925f969602318bc6585901c905052a5daba26652e1e95 size=149895
+# ps1-tests-release-member path=mdec/movie/movie-15bit.exe release=build-158 sha256=9a6029c25b78586c93879969744ef85a850558e0612067af718e70c4c94ea31d size=1869824
+# ps1-tests-release-member path=mdec/movie/movie-24bit.exe release=build-158 sha256=b4c75175c8ceae32f831cdc0d64329c2317690b38e8836cdc5915ea8bf198c99 size=1869824
+# ps1-tests-release-member path=mdec/movie/vram-15bit.png release=build-158 sha256=6d60227a23004cc7e8e4e01a13a830eb0d10002aa9a0d6fdc653c767ff05289e size=5437
+# ps1-tests-release-member path=mdec/movie/vram-24bit.png release=build-158 sha256=1a262af49832a3265f04bd70d547329e05ad60753c8da05429a25b05dabe81e8 size=17262
+ps1-tests-mdec-frame-makefile f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/mdec/frame/Makefile 758a7d7bab4b891bfe0e1280828a0315a3cab56b3cfb5a8c8d3ac1c0920a8902
+ps1-tests-mdec-frame-source f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/mdec/frame/main.cpp 519e7bf236b86aed5a3e02d876505b985c2621793847c4a91a3b2fdb22fadd9a
+ps1-tests-mdec-frame-sunset f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/mdec/frame/sunset.h 8b2709d066c48aaefa3fdf46c2a46aa76f145146e50d80a1cdf1f7c9f5aafc24
+ps1-tests-mdec-movie-source f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/mdec/movie/main.cpp 5522fd3b241b965a361db55bf7dc2b3ff66eee8a6a5ee31bd61d828a5729d85d
+ps1-tests-mdec-movie-data f727802fead1 https://raw.githubusercontent.com/JaCzekanski/ps1-tests/f727802fead11f1daa7549285548392ef87749cb/mdec/movie/bad_apple.h 6fa61ccc9185da9ccf92694c77ef79a51628def75981fd29dcc0b8e03820b10c
+
 # armips (MIT): assembles the PS-EXE fixtures; cmake/Armips.cmake downloads the archive and checks the digest.
 # The digest was measured on the commit archive named by the full SHA, not a short-SHA URL.
 armips 62adab4ef30d https://github.com/Kingcom/armips/archive/62adab4ef30da765f5cf22a451eb08a59c54dc8b.tar.gz f7a65102febb4811a336a06e6d93c7e84cc86548182d54e1b1b4e2bffe562f56
+
+# Build-only disc media tools. mkpsxiso's source archive contains gitlinks, so its required
+# permissive submodules are pinned and fetched separately; FLAC is disabled (mkpsxiso is the only target).
+# psxavenc is built once by the Ubuntu media producer and its output is handed to each platform leg.
+mkpsxiso 54fb1644ed8741223583e2dcda358b75a205e214 https://github.com/Lameguy64/mkpsxiso/archive/refs/tags/v2.30.tar.gz b44778180d239a586c13762322a1f4b9692c787db8772790ddd2fa255a75d9e0
+mkpsxiso-tinyxml2 3dcad8e3c38e7091ae3771bf63020027f91715ce https://github.com/leethomason/tinyxml2/archive/3dcad8e3c38e7091ae3771bf63020027f91715ce.tar.gz f683db3d28be7c999df8c45f469466ca562eae42368e69797ed0caa705cef324
+mkpsxiso-miniaudio 9634bedb5b5a2ca38c1ee7108a9358a4e233f14d https://github.com/mackron/miniaudio/archive/9634bedb5b5a2ca38c1ee7108a9358a4e233f14d.tar.gz 1a3a79b80fc6f0b0cc155e28b954a598e0ddfa2db64e2afa8466be88c476fa55
+mkpsxiso-filesystem 0e72911ba0f37f3eb883b181b855a5f4eb046ca1 https://github.com/gulrak/filesystem/archive/0e72911ba0f37f3eb883b181b855a5f4eb046ca1.tar.gz 1d15c3458696bcc731c4878e68fb6bc10fed6d7809517cec766d5b088cdd2f60
+mkpsxiso-threadpool 251db61ff3e3c7b16436c9936c53e6f68ff07720 https://github.com/log4cplus/ThreadPool/archive/251db61ff3e3c7b16436c9936c53e6f68ff07720.tar.gz 29e171a4cbcdb8de9f4141c1d09d3d3c4827b8b775c7712ce8ce63ed26a1dc96
+psxavenc bdc24e897ed09d2fd3d64cdbadc625b0673c76db https://github.com/spicyjpeg/psxavenc/archive/bdc24e897ed09d2fd3d64cdbadc625b0673c76db.tar.gz 622ede1e67d5f3f0228672aa62b8575a2b2d8c745ec7b6c484f31f8f5be3e4b0
 
 # SingleStepTests r3000 vectors at 51e227447d0b: one row per upstream file, name pin blob-sha1 size (unlike the
 # download rows above, name version url sha256). Fetch each with `gh api repos/SingleStepTests/r3000/git/blobs/<sha>

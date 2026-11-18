@@ -186,6 +186,16 @@ Suggested check: keep byte-exact marker producers explicitly LF and exercise CRL
 Sources: [Windows diagnostic run](https://github.com/szTheory/schwaystation/actions/runs/43329257561).
 Status: reproduced
 
+Lesson SW-TEST-002 (2026-11-18, Phase 6 generated playlist hash)
+Symptom and reproduction: exact-head CI run [44210060285](https://github.com/szTheory/schwaystation/actions/runs/44210060285) passed all build and test lanes but failed the final cross-platform hash comparison. Downloading and diffing the be32 and Windows arm64 hash artifacts isolated the only mismatch to `disc_boot_runner.m3u`.
+Root cause / invariant: CMake `file(WRITE)` preserves platform-native newlines on Windows. A generated text fixture included in byte-for-byte cross-platform hashes must specify its newline style explicitly.
+Fix and evidence: generate the playlist with `file(CONFIGURE ... NEWLINE_STYLE UNIX)`. The local generated hash now matches be32 exactly, and `runner.disc.api` passes. A code review found no issue; the fixed exact-head workflow rerun is pending.
+Applies when: generated text fixtures are hashed, archived, or compared across operating systems.
+Does not establish: a production media-path defect or a need to normalize arbitrary user-supplied playlist files.
+Suggested check: when a cross-platform byte comparison fails, diff the exact artifact payloads first, then inspect fixture generation and newline bytes before rerunning the long matrix.
+Sources: [exact-head CI run 44210060285](https://github.com/szTheory/schwaystation/actions/runs/44210060285); `.planning/phases/06-discs-and-fmv/06-45-REVIEW.md`.
+Status: reproduced
+
 
 Lesson SW-ORACLE-001 (2026-11-13, phase4 real GPU captures)
 Symptom and reproduction: synthetic GPU tests encoded stale CLUT invalidation and half-pixel assumptions; the pinned programs contradicted them. The GP0 cache regression failed before the documented fix, then the original CLUT capture passed. Original triangle/quad/UV captures passed after the independently modeled raster correction atcf9f287.
@@ -210,4 +220,24 @@ Applies when: admitting a file from an upstream hardware-test repository.
 Does not establish: permission to fetch, inspect, retain or use the excluded file, or to reuse code from other emulators.
 Suggested check: verify the exact file's provenance before retrieving or using it; record a known excluded path and do not revisit it.
 Sources: `PROVENANCE.md` section 2; `.planning/preparation/PSX-GPU-AND-GTE.md`.
+Status: reproduced
+
+Lesson SW-ORACLE-002 (2026-11-16, Phase 6 MDEC image references)
+Symptom and reproduction: the first decoder-progress probe reported 296/300 frame macroblocks and 162/240 movie macroblocks, and that progress was incorrectly described as incomplete source coverage. The bounded structural scanner later proved the pinned source spans contain all 1,800 frame blocks/300 macroblocks and all 1,440 movie first-frame blocks/240 macroblocks. All four guests consume the source but do not establish full output; frame output fails the existing image comparison and movie DMA1 remains stalled.
+Root cause / invariant: decoder output progress is not compressed-source coverage. Independently count source units, produced/read units and guest completion; source completeness does not establish correct decoding or hardware fidelity.
+Fix and evidence: retain source preflight as a cheap gating control, replace the false incomplete-asset explanation, and keep full frame/movie conformance outside the approved v1.0 claim until output can be supported. Do not accept partial display, treat a stall as a hardware match, or fabricate output to fill the gap.
+Applies when: admitting compressed media or hardware image references with a bounded guest caller.
+Does not establish: decoder conformance, validity of the PNG capture for another input, or permission to change the locked acceptance oracle.
+Suggested check: add a cheap source-coverage preflight before expensive host/emulator runs, then compare source units against produced output and report those outcomes separately. Keep only acceptance tests supported by the approved product claim.
+Sources: `.planning/phases/06-discs-and-fmv/06-13-REVIEW.md`; pinned source/release records in `pins.txt`.
+Status: reproduced; original source-shortfall diagnosis corrected 2026-11-17
+
+Lesson SW-ORACLE-003 (2026-11-16, Phase 6 MDEC color)
+Symptom and reproduction: the first quick probe used qscale zero, quant entries of one and a flat scale table, unlike the SCPH-5501 `followup/06FMD.txt` setup (qscale one, quant entries of four, standard scale table). Its apparent color mismatches were invalid. A corrected short probe matched several 24-bit/15-bit points, but 24-bit neutral `Y=127` remained one step high and `Cr=-256, Cb=-64, Y=0` differed in 15-bit output (`0x2380` versus recorded `0x27A0`). Other points also differed.
+Root cause / invariant: a hardware vector is only useful when command flags, qscale, quant table and IDCT scale match the recorded setup. Synthetic self-consistency does not establish hardware color rounding.
+Fix and evidence: no arithmetic change was retained. Direct fractional 15-bit rounding matched one corrected hardware point but broke the existing synthetic color expectations, so it was reverted. The corrected color formula still passes `mdec.color`; hardware-only rounding remains unresolved. The complete frame/movie inputs have separate unresolved guest-output and DMA completion results, not source-coverage failures.
+Applies when: reproducing fixed-input/output hardware logs with a short local probe.
+Does not establish: a complete frame/movie reference, exact hardware IDCT behavior for arbitrary coefficients, or permission to replace the pinned image oracle.
+Suggested check: copy every logged setting into the probe before comparing outputs; check setup and a small vector first. Verify source coverage before guests, then treat full-frame results as fidelity evidence only when guest progress and oracle bytes align.
+Sources: `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` section 4 [SCM.29][SCM.30].
 Status: reproduced

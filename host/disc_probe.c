@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "disc_image.h"
 #include "sha1.h"
 
 #define SCHWAY__ISO_SECTOR_SIZE 2048u
@@ -14,9 +15,9 @@
 #define SCHWAY__ISO_DESCRIPTOR_LIMIT 64u
 #define SCHWAY__ISO_DIRECTORY_MAX 65536u
 #define SCHWAY__ISO_RECORD_LIMIT 4096u
-#define SCHWAY__ISO_PATH_COMPONENTS 16u
+#define SCHWAY__ISO_PATH_COMPONENTS SCHWAY_DISC_SYSTEM_CNF_COMPONENT_LIMIT
 #define SCHWAY__ISO_EXE_MAX 0x200800u
-#define SCHWAY__SYSTEM_CNF_MAX 2047u
+#define SCHWAY__SYSTEM_CNF_MAX SCHWAY_DISC_SYSTEM_CNF_MAX_BYTES
 #define SCHWAY__CUE_MAX_BYTES 65536u
 #define SCHWAY__CUE_NAME_MAX 255u
 #define SCHWAY__CUE_TRACK_LIMIT 99u
@@ -291,99 +292,6 @@ static schway__iso_find_status schway__iso_find_in_directory(
     return SCHWAY__ISO_FIND_MISSING;
 }
 
-static int schway__iso_safe_component(const char *bytes, size_t size)
-{
-    if (size == 0u || size > 63u || (size == 1u && bytes[0] == '.') ||
-        (size == 2u && bytes[0] == '.' && bytes[1] == '.')) {
-        return 0;
-    }
-    for (size_t i = 0u; i < size; i++) {
-        unsigned char c = (unsigned char)bytes[i];
-        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-              (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' || c == ';')) {
-            return 0;
-        }
-    }
-    if (bytes[size - 1u] == ';') {
-        return 0;
-    }
-    return 1;
-}
-
-static int schway__iso_parse_system_cnf(const uint8_t *bytes, size_t size,
-                                         char components[SCHWAY__ISO_PATH_COMPONENTS][64],
-                                         size_t *component_count)
-{
-    size_t line = 0u;
-    const char *value = NULL;
-    size_t value_size = 0u;
-    *component_count = 0u;
-    for (size_t i = 0u; i < size; i++) {
-        uint8_t c = bytes[i];
-        if ((c < 0x20u && c != (uint8_t)'\r' && c != (uint8_t)'\n' && c != (uint8_t)'\t') || c > 0x7Eu) {
-            return -1;
-        }
-    }
-    while (line < size) {
-        size_t end = line;
-        size_t first;
-        size_t last;
-        while (end < size && bytes[end] != (uint8_t)'\r' && bytes[end] != (uint8_t)'\n') {
-            end++;
-        }
-        first = line;
-        last = end;
-        while (first < last && (bytes[first] == (uint8_t)' ' || bytes[first] == (uint8_t)'\t')) first++;
-        while (last > first && (bytes[last - 1u] == (uint8_t)' ' || bytes[last - 1u] == (uint8_t)'\t')) last--;
-        if (last - first >= 4u && schway__iso_ascii_upper(bytes[first]) == 'B' &&
-            schway__iso_ascii_upper(bytes[first + 1u]) == 'O' &&
-            schway__iso_ascii_upper(bytes[first + 2u]) == 'O' &&
-            schway__iso_ascii_upper(bytes[first + 3u]) == 'T') {
-            size_t p = first + 4u;
-            while (p < last && (bytes[p] == (uint8_t)' ' || bytes[p] == (uint8_t)'\t')) p++;
-            if (p < last && bytes[p] == (uint8_t)'=') {
-                p++;
-                while (p < last && (bytes[p] == (uint8_t)' ' || bytes[p] == (uint8_t)'\t')) p++;
-                if (value != NULL || p == last) return -1;
-                value = (const char *)bytes + p;
-                value_size = last - p;
-                for (size_t arg = 0u; arg < value_size; arg++) {
-                    if (value[arg] == ' ' || value[arg] == '\t') {
-                        value_size = arg;
-                        break;
-                    }
-                }
-            }
-        }
-        line = end;
-        while (line < size && (bytes[line] == (uint8_t)'\r' || bytes[line] == (uint8_t)'\n')) line++;
-    }
-    if (value == NULL || value_size < 7u || schway__iso_ascii_upper((unsigned char)value[0]) != 'C' ||
-        schway__iso_ascii_upper((unsigned char)value[1]) != 'D' || schway__iso_ascii_upper((unsigned char)value[2]) != 'R' ||
-        schway__iso_ascii_upper((unsigned char)value[3]) != 'O' || schway__iso_ascii_upper((unsigned char)value[4]) != 'M' ||
-        value[5] != ':') {
-        return -1;
-    }
-    size_t pos = 6u;
-    if (value[pos] == '/' || value[pos] == '\\') pos++;
-    while (pos < value_size) {
-        size_t end = pos;
-        size_t component_size;
-        while (end < value_size && value[end] != '/' && value[end] != '\\') end++;
-        component_size = schway__iso_name_size((const uint8_t *)value + pos, end - pos);
-        if (!schway__iso_safe_component(value + pos, component_size) ||
-            *component_count >= SCHWAY__ISO_PATH_COMPONENTS) {
-            return -1;
-        }
-        memcpy(components[*component_count], value + pos, component_size);
-        components[*component_count][component_size] = '\0';
-        (*component_count)++;
-        pos = end + 1u;
-        if (end == value_size) break;
-    }
-    return *component_count == 0u ? -1 : 1;
-}
-
 static schway__iso_find_status schway__iso_resolve_boot(
     const schway__iso_source *source, uint32_t volume_sectors,
     const schway__iso_record *root,
@@ -493,8 +401,7 @@ static schway_host_disc_probe_status schway__iso_process(
     schway__iso_find_status found = schway__iso_find_in_directory(
         source, volume_sectors, &root, "SYSTEM.CNF", &system_cnf);
     schway__iso_record boot;
-    char components[SCHWAY__ISO_PATH_COMPONENTS][64];
-    size_t component_count = 0u;
+    schway_disc_system_cnf cnf;
     if (found == SCHWAY__ISO_FIND_MEMORY) return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
     if (found == SCHWAY__ISO_FIND_BAD) return SCHWAY_HOST_DISC_PROBE_BAD_ISO;
     if (found == SCHWAY__ISO_FIND_MISSING) {
@@ -510,24 +417,15 @@ static schway_host_disc_probe_status schway__iso_process(
         uint8_t system_bytes[SCHWAY__SYSTEM_CNF_MAX];
         if (!schway__iso_read_at(source, (uint64_t)system_cnf.extent * SCHWAY__ISO_SECTOR_SIZE,
                                  system_bytes, system_cnf.size)) return SCHWAY_HOST_DISC_PROBE_BAD_ISO;
-        int parse_status = schway__iso_parse_system_cnf(system_bytes, system_cnf.size,
-                                                        components, &component_count);
-        if (parse_status < 0) return SCHWAY_HOST_DISC_PROBE_BAD_SYSTEM_CNF;
-        for (size_t i = 0u; i + 1u < component_count; i++) {
-            if (strlen(components[i]) > 63u) return SCHWAY_HOST_DISC_PROBE_BAD_BOOT_PATH;
-        }
-        found = schway__iso_resolve_boot(source, volume_sectors, &root, components,
-                                         component_count, &boot);
+        if (schway_disc_image_parse_system_cnf(system_bytes, system_cnf.size, &cnf) !=
+            SCHWAY_DISC_IMAGE_OK) return SCHWAY_HOST_DISC_PROBE_BAD_SYSTEM_CNF;
+        found = schway__iso_resolve_boot(source, volume_sectors, &root, cnf.components,
+                                         cnf.component_count, &boot);
         if (found == SCHWAY__ISO_FIND_MEMORY) return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
         if (found == SCHWAY__ISO_FIND_MISSING) return SCHWAY_HOST_DISC_PROBE_NO_BOOT_EXE;
         if (found == SCHWAY__ISO_FIND_BAD) return SCHWAY_HOST_DISC_PROBE_BAD_ISO;
         if (found != SCHWAY__ISO_FIND_OK) return SCHWAY_HOST_DISC_PROBE_BAD_BOOT_PATH;
-        const char *last = components[component_count - 1u];
-        size_t last_size = strlen(last);
-        size_t canonical_size = schway__iso_name_size((const uint8_t *)last, last_size);
-        if (canonical_size == 0u || canonical_size > 63u) return SCHWAY_HOST_DISC_PROBE_BAD_BOOT_PATH;
-        memcpy(result->boot_name, last, canonical_size);
-        result->boot_name[canonical_size] = '\0';
+        memcpy(result->boot_name, cnf.boot_name, sizeof result->boot_name);
     }
     (void)schway__iso_make_identity(result->boot_name, result->serial);
     return schway__iso_read_exe(source, &boot, result);

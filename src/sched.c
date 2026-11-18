@@ -32,6 +32,8 @@ void schway__sched_recalc(schway *inst)
     uint64_t gpu = schway__gpu_next(inst);
     uint64_t sio = schway__sio_next(inst);
     uint64_t spu = schway__spu_next(inst);
+    uint64_t cdrom = schway__cdrom_next(inst);
+    uint64_t mdec = schway__mdec_next(inst);
     inst->sched.next = dma < timers ? dma : timers;
     if (gpu < inst->sched.next) {
         inst->sched.next = gpu;
@@ -39,15 +41,21 @@ void schway__sched_recalc(schway *inst)
     if (sio < inst->sched.next) {
         inst->sched.next = sio;
     }
+    if (cdrom < inst->sched.next) {
+        inst->sched.next = cdrom;
+    }
     if (inst->spu.idle_fast_path == 0u && spu < inst->sched.next) {
         inst->sched.next = spu;
+    }
+    if (mdec < inst->sched.next) {
+        inst->sched.next = mdec;
     }
     inst->cpu.block_end |= SCHWAY__BLOCK_EVENT;
 }
 
-/* Runs each device whose deadline is due, once, then recomputes the deadline. A
-   device that is still due after its event is not run again in this call, so
-   the runner always returns. */
+/* Runs each device whose deadline is due, once, in the fixed tie order from
+   ARCHITECTURE section 1, then recomputes the deadline. A device that is still
+   due after its event is not run again in this call, so the runner returns. */
 void schway__sched_run(schway *inst)
 {
     uint64_t now = inst->ticks;
@@ -60,11 +68,17 @@ void schway__sched_run(schway *inst)
     if (schway__dma_next(inst) <= now) {
         schway__dma_event(inst, now);
     }
-    if (schway__sio_next(inst) <= now) {
-        schway__sio_event(inst, now);
+    if (schway__cdrom_next(inst) <= now) {
+        schway__cdrom_event(inst, now);
     }
     if (schway__spu_next(inst) <= now && inst->spu.idle_fast_path == 0u) {
         schway__spu_event(inst, now);
+    }
+    if (schway__sio_next(inst) <= now) {
+        schway__sio_event(inst, now);
+    }
+    if (schway__mdec_next(inst) <= now) {
+        schway__mdec_event(inst, now);
     }
     schway__sched_recalc(inst);
 }

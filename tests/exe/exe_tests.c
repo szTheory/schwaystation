@@ -644,8 +644,8 @@ static void case_profile_flags(void)
     CHECK_EQ_U64(schway__bus_write(inst, 0x1F802080u, 1u, 'A', &cycles), 0);
     CHECK_EQ_U64(inst->tty.count, 1u);
 
-    /* Unknown bits, alone or with the known one, change nothing. */
-    static const uint32_t unknown[] = {2u, 3u, 0x80000000u, 0xFFFFFFFEu};
+    /* Unknown bits in the legacy flags field, alone or with the known one, change nothing. */
+    static const uint32_t unknown[] = {2u, 3u, 8u, 0x80000000u, 0xFFFFFFFEu};
     for (size_t i = 0; i < sizeof unknown / sizeof unknown[0]; i++) {
         p.flags = unknown[i];
         p.region = SCHWAY_REGION_PAL;

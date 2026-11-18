@@ -3,9 +3,11 @@ abi
 built
 bus
 card
+cdrom
 compat
 core
 cpu
+disc
 dma
 exe
 fixtures
@@ -14,6 +16,7 @@ gpu
 gte
 install
 libretro
+mdec
 perf
 policy
 release

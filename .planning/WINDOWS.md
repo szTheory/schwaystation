@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 3
-waived_count: 3
-fixed_count: 0
-total_count: 6
-last_updated: 2026-11-14T06:29:30.694Z
+open_count: 9
+waived_count: 4
+fixed_count: 1
+total_count: 14
+last_updated: 2026-11-16T09:38:06.684Z
 ---
 
 # Broken Windows Ledger
@@ -21,6 +21,14 @@ last_updated: 2026-11-14T06:29:30.694Z
 | 4 | 05 | stub | src/spu.c | 76 | Reset SPU event emits a zero stereo pair until planned voice and reverb synthesis lands. | open |  | 2026-11-13T22:11:13.643Z |  |
 | 5 | 05 | deviation | .planning/phases/05-the-sound-matches-the-console/05-05-SUMMARY.md |  | Split remaining DMA4 timing, DEV4, seven-case comparator, and nightly work into plan 05-21 at the 30-minute target. | open |  | 2026-11-14T01:34:02.691Z |  |
 | 6 | 05 | stub | src/spu_reverb.c | 79 | The 22.05 kHz reverb feedback stage remains a unity pass-through seam; plan 05-10 replaces it with register-driven feedback. | open |  | 2026-11-14T06:29:30.694Z |  |
+| 7 | 06 | deviation | .planning/phases/06-discs-and-fmv/06-02-PLAN.md |  | Registered the test target before Task 1 RED because its required verification depended on Task 2 CMake wiring. | waived | Documented sequencing adjustment; the test wiring and required compatibility check passed, with no product defect or owner action. | 2026-11-15T16:16:55.624Z | 2026-11-15T16:16:59.252Z |
+| 8 | 06 | stub | src/cdrom.c | 180 | CD-ROM MMIO reads return zero and writes are ignored until Plans 06-04 and 06-05 add command and sector behavior. | open |  | 2026-11-15T16:42:46.664Z |  |
+| 9 | 06 | stub | src/mdec.c | 124 | MDEC MMIO reads return zero and writes are ignored until Plan 06-11 adds command and block behavior. | open |  | 2026-11-15T16:42:46.800Z |  |
+| 10 | 06 | stub | src/cdrom.c | 38 | The CD-ROM field visitor is not called by state.c until Plan 06-26 wires state integration. | open |  | 2026-11-15T16:42:46.984Z |  |
+| 11 | 06 | stub | src/mdec.c | 54 | The MDEC field visitor is not called by state.c until Plan 06-26 wires state integration. | open |  | 2026-11-15T16:42:47.169Z |  |
+| 12 | 6 | stub | src/cdrom.c | 1083 | CD sector events clear the deadline; sector acquisition and INT1 delivery are deferred to Plan 06-05. | open |  | 2026-11-15T21:08:31.964Z |  |
+| 13 | 6 | deviation | .planning/phases/06-discs-and-fmv/06-31-SUMMARY.md | 70 | MDEC pixel-order, clipping, and FE00-padding vectors moved to dependent Plan 06-32 after Plan 06-31 crossed 30 minutes. | fixed |  | 2026-11-16T05:22:27.956Z | 2026-11-16T05:30:45.909Z |
+| 14 | 06 | deviation | .planning/phases/06-discs-and-fmv/06-12-PLAN.md |  | Plan 06-12 was split at the 30-minute boundary after its real MDEC guests exposed a production DMA0 decode mismatch; Plan 06-35 preserves and owns the repair and full gating oracle. | open |  | 2026-11-16T09:38:06.684Z |  |
 
 ````json
 [
@@ -99,6 +107,110 @@ last_updated: 2026-11-14T06:29:30.694Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-11-14T06:29:30.694Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "06",
+    "file": ".planning/phases/06-discs-and-fmv/06-02-PLAN.md",
+    "line": null,
+    "description": "Registered the test target before Task 1 RED because its required verification depended on Task 2 CMake wiring.",
+    "status": "waived",
+    "reason": "Documented sequencing adjustment; the test wiring and required compatibility check passed, with no product defect or owner action.",
+    "recorded_at": "2026-11-15T16:16:55.624Z",
+    "resolved_at": "2026-11-15T16:16:59.252Z",
+    "milestone": "v1.0"
+  },
+  {
+    "id": 8,
+    "kind": "stub",
+    "phase": "06",
+    "file": "src/cdrom.c",
+    "line": 180,
+    "description": "CD-ROM MMIO reads return zero and writes are ignored until Plans 06-04 and 06-05 add command and sector behavior.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T16:42:46.664Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 9,
+    "kind": "stub",
+    "phase": "06",
+    "file": "src/mdec.c",
+    "line": 124,
+    "description": "MDEC MMIO reads return zero and writes are ignored until Plan 06-11 adds command and block behavior.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T16:42:46.800Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 10,
+    "kind": "stub",
+    "phase": "06",
+    "file": "src/cdrom.c",
+    "line": 38,
+    "description": "The CD-ROM field visitor is not called by state.c until Plan 06-26 wires state integration.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T16:42:46.984Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 11,
+    "kind": "stub",
+    "phase": "06",
+    "file": "src/mdec.c",
+    "line": 54,
+    "description": "The MDEC field visitor is not called by state.c until Plan 06-26 wires state integration.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T16:42:47.169Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 12,
+    "kind": "stub",
+    "phase": "6",
+    "file": "src/cdrom.c",
+    "line": 1083,
+    "description": "CD sector events clear the deadline; sector acquisition and INT1 delivery are deferred to Plan 06-05.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-15T21:08:31.964Z",
+    "resolved_at": null,
+    "milestone": "v1.0"
+  },
+  {
+    "id": 13,
+    "kind": "deviation",
+    "phase": "6",
+    "file": ".planning/phases/06-discs-and-fmv/06-31-SUMMARY.md",
+    "line": 70,
+    "description": "MDEC pixel-order, clipping, and FE00-padding vectors moved to dependent Plan 06-32 after Plan 06-31 crossed 30 minutes.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-16T05:22:27.956Z",
+    "resolved_at": "2026-11-16T05:30:45.909Z",
+    "milestone": "v1.0"
+  },
+  {
+    "id": 14,
+    "kind": "deviation",
+    "phase": "06",
+    "file": ".planning/phases/06-discs-and-fmv/06-12-PLAN.md",
+    "line": null,
+    "description": "Plan 06-12 was split at the 30-minute boundary after its real MDEC guests exposed a production DMA0 decode mismatch; Plan 06-35 preserves and owns the repair and full gating oracle.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-16T09:38:06.684Z",
     "resolved_at": null,
     "milestone": "v1.0"
   }

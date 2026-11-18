@@ -10,6 +10,12 @@ For every decision point, fan out subagents (for context-window efficiency) and 
 returns, then synthesize one coherent set of one-shot recommendations that fit the project goals, and follow
 it. Do not ask the owner a routine question.
 
+The owner explicitly authorizes auto-following the best-supported recommendations in autonomous discuss,
+including accepting the recommended answers in smart-discuss batches without a separate confirmation. Pause
+only when an unresolved choice materially changes scope, authority, risk, cost or a phase/milestone boundary,
+or when owner-only information is required. This is not general risk acceptance; explain the concrete choice
+before asking.
+
 - Consider each decision point through every relevant stakeholder and technical-role lens: security, product,
   software architecture, devops and CI, plus the domain's own specialties (CPU and bus design, DSP and audio,
   3D and 2D graphics, distributed systems, C and the build toolchain). Add design lenses (conventions,
@@ -48,12 +54,27 @@ anything larger as one todo (rule 7).
 
 ## Current authorization and boundaries
 
-The owner renewed autonomous authorization for the rest of milestone v1.0 on 2026-11-10 in Codex,
-including focused subagent fan-out for discussion, synthesis and an adversarial pass, and automation-first
-verification. Continue routine work inside the selected phase without acknowledgements. Finish phase 3
-shipping first, including hosted CI, auto-merge and release confirmation, then begin phase 4.
-AGENTS.md rule 9 still stops each later autonomous phase after verification and before ship; this renewal
-does not remove that boundary. No routine owner UAT or redundant confirmation is introduced.
+On 2026-11-15, the owner renewed autonomous authorization to finish milestone v1.0, starting with Phase 6.
+The discussion, verification and CI guidance above is standing policy: use focused role fan-out, primary
+sources, an adversarial pass and a synthesized best-supported recommendation; automate useful verification,
+run one-off checks once, and do not introduce routine owner UAT or duplicate checks.
+
+Ship each phase before advancing to the next. OpenGSD's `$gsd-autonomous` runs discuss → plan → execute →
+verify and, when all phases are complete, audit → complete → cleanup; it does not ship phases between
+verification and lifecycle. Therefore run each remaining phase with `$gsd-autonomous --from N --to N` so it
+stops after that phase's verification and skips milestone lifecycle, then run `$gsd-ship N` and confirm the PR
+is merged, main CI is green and the automatic release is published. After the final phase is shipped and
+released, run milestone audit, completion and cleanup. Do not run `$gsd-new-milestone` until the current
+milestone is complete, its release is published, main CI is green, and the working tree is clean.
+
+This 2026-11-15 authorization supersedes the 2026-11-10 note below AGENTS.md rule 9 that stopped autonomous
+work before ship. It does not authorize skipping a phase's verify or ship, bypassing repository rules, or
+crossing the milestone boundary. Ask only for identity-bound consent, owner-hardware checks, or a real blocker.
+
+On 2026-11-17, the owner renewed authorization to continue without routine consultation through Phase 6's
+release and the v1.0 milestone audit, completion and cleanup. No owner capture is available or planned. This
+extends the stop-at-verification boundary in AGENTS.md rule 9 for this run only; keep every named acceptance
+gate, do not alter DISC-03 or its cycle cap to force a pass, and do not start v2.0 under this authorization.
 
 For CI and CD efficiency, first measure critical-path time and duplicate work. Prefer removing redundant
 runs and serial bottlenecks over adding caches, concurrency or dependencies. Keep all required coverage.
@@ -61,6 +82,11 @@ Batch ready fuzz/API/oracle work on one changed head, reuse fingerprinted review
 an obsolete known-failing CI tail before dispatching its repaired head. Capture shell results with `rc` or
 `task_rc` rather than zsh's read-only `status`; if a wrapper fails after all checks finish green, record that
 accurately instead of repeating the full suite for bookkeeping.
+
+Before a long test, build, emulation or hosted run, do the cheapest relevant consistency check first: verify
+inputs and decoded output counts, command selectors and workflow wiring, inventories, or budget totals. Use
+that preflight to catch a structural mismatch before spending time on the full run; maintain it as a gate only
+when it prevents a recurring fault.
 
 For delegated research, write concise findings and verified pins to the assigned artifact early. When the
 remaining uncertainties are routine implementation probes, return them to the executor instead of delaying
@@ -100,3 +126,25 @@ On 2026-11-12 the owner explicitly requested faster implementation and process a
 The owner renewed the efficiency correction on2026-11-13 after the long integration run: scope a planning/checker dependency to the code/interfaces it actually governs, and keep independent already-authorized implementation moving while that review is read-only. Preserve exactly one local writer and phase code-review-before-final-verification; do not serialize unrelated ready work behind a draft review. Use retained agent-owned ci-j4/hygiene-j4 local overlays through Phase4 rather than recreate/delete perplan; tracked/hosted defaults remain unchanged.
 
 Future subsystem plans bring pinned real oracle programs/captures into the earliest runnable behavior slices. Do not defer all real-program integration to a tail after synthetic tests have codified assumptions. Wire fetch/decode early, run the applicable real case when its first caller works, keep every required case gating, and preserve asset rules. Reuse reproducible throwaway static arithmetic analysis to shorten hypotheses; it is not a new maintained harness or repository gate.
+
+The owner has a real PlayStation and capture card, but says a hardware capture will not be available anytime soon. Do not plan Phase 6 work around an owner capture or ask for one again. Search public hardware records, record any unresolved evidence gap, and keep advancing independent work. Revisit owner hardware only if a future scope decision truly requires it.
+
+For compressed media references, count source units from the pinned input and compare them with both the caller's request and the guest's produced output before starting a long emulation run. Source completeness, decode progress, guest completion and hardware fidelity are separate facts. Report each one accurately; complete source coverage is not a decoder or conformance pass.
+
+Before compiling pinned media tools, verify the archive digest, expected build files, submodule closure, exact-pin licences and input coverage. If a tool needs native libraries unavailable on every matrix leg, build it once on an existing compatible producer, publish a one-run artifact, and make every consumer validate its digest before continuing. Keep full disc construction and acceptance on every leg.
+
+On 2026-11-17 the owner explicitly approved the Phase 6 unblock proposal in
+`.planning/phases/06-discs-and-fmv/06-UNBLOCK-PROPOSAL.md`. This supersedes the earlier instruction to preserve
+the exact 8-bit/full-image MDEC acceptance gates, only to the following scope: v1.0 claims deterministic integer
+MDEC decoding with the available verified hardware coverage, not full 8-bit or full-frame/movie hardware
+conformance. Preserve the exact 4-bit guest and direct model controls, the complete owned `disc_boot` STR
+integration path, and all other named requirements. Do not fit a `±2` tolerance, change expected hardware bytes,
+change the 4,915,200-cycle cap, or synthesize missing compressed input from output images. Remove or replace the
+unfinishable 8-bit, ordered-status-guest, and full frame/movie conformance selectors with useful passing
+gating checks only as specified by the successor plan; retain their pins and discrepancies as evidence for the
+later measured-accuracy horizon. The frame and first movie inputs are complete (300 and 240 macroblocks); their
+guest output/completion remains unresolved, and the frame display probe fails the existing pixel comparison.
+Keep the compressed-unit coverage preflight before media execution. Continue
+through Phase 6 review, the remaining local and hosted gates, ship, and the v1.0 audit/completion/cleanup under the
+existing authorization. This approval does not authorize starting v2.0 before v1.0 is complete or published and
+does not claim hardware accuracy beyond the retained evidence.

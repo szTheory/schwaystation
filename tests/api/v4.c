@@ -57,7 +57,7 @@ int main(void)
     CHECK_EQ_U64(schway_create(&cfg, &inst), SCHWAY_STATUS_OK);
     if (inst != NULL) {
         CHECK_EQ_U64(SCHWAY_PROFILE_GPU_V0, 4u);
-        schway_profile profile = {sizeof profile, SCHWAY_REGION_NTSC_U, SCHWAY_PROFILE_GPU_V0};
+        schway_profile profile = {sizeof profile, SCHWAY_REGION_NTSC_U, SCHWAY_PROFILE_GPU_V0, 0u};
         CHECK_EQ_U64(schway_set_profile(inst, &profile), SCHWAY_STATUS_OK);
         schway_span first;
         schway_span second;

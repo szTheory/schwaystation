@@ -2,47 +2,47 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 6
-current_phase_name: Discs and FMV
-status: planning
-stopped_at: Phase 05 complete, ready to plan Phase 6
-last_updated: "2026-11-15T02:28:21.511Z"
-last_activity: 2026-11-14
-last_activity_desc: "Phase 05 shipped as PR #18; verification refreshed after CI timeout change (15-minute ASan limit provisional); runtime Codex GPT-6; reviewer/verifier GPT-6 Luna xhigh; local CI 547/547 and release 5/5"
-state_head: 49b0652f33d644db3f81903448b612b46f8813db
+current_phase: 06
+current_plan: Not started
+status: completed
+stopped_at: "Phase 06 verified and complete; ship PR #22, confirm the v1.0 release, then refresh stale prior-phase reports and close out the milestone."
+last_updated: "2026-11-18T05:44:13.631Z"
+last_activity: 2026-11-18
+last_activity_desc: "Phase 06 goal-backward verification passed. Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; GSD reviewer/verifier configured as gpt-6-luna (xhigh). Exact-head CI 44233701039 and Nightly 44233700921 passed; CI covered 613 tests, BE32 570 tests, RetroArch 900 frames with pixel-equal output. phase.complete emitted 12 artifact-scan warnings, confirmed to be shell command strings misread as files. Next: ship PR #22, confirm main CI and release, refresh stale Phases 1–5, then audit, complete and clean up v1.0."
+state_head: 2c0d3527bb82f63ad5e585b2b5a328e7d8b4eeb0
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 150
-  completed_plans: 150
-  percent: 83
-current_plan: Not started
+  completed_phases: 6
+  total_plans: 195
+  completed_plans: 195
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-14)
+See: .planning/PROJECT.md (updated 2026-11-15)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 6 — Discs and FMV
+**Current focus:** Phase 06 — Discs and FMV
 
 ## Current Position
 
-Phase: 6 — Discs and FMV
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-14 -- Phase 05 shipped as PR #18; verification refreshed after CI timeout change (15-minute ASan limit provisional); runtime Codex GPT-6; reviewer/verifier GPT-6 Luna xhigh; local CI 547/547 and release 5/5
+Phase: 06
+Current Plan: Not started
+Next plan file: 06-45-PLAN.md
+Status: All phases complete
+Last activity: 2026-11-18 — Phase 06 complete
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 150
-- Average duration: -
-- Total execution time: 0.0 hours
+- Total plans completed: 195
+- Average duration: Not measured
+- Total execution time: Not measured (active time is not tracked consistently)
 
 **By Phase:**
 
@@ -53,6 +53,7 @@ Progress: [████████░░] 83%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
+| 06 | 45 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -212,6 +213,37 @@ Progress: [████████░░] 83%
 | Phase 05 P18 | at least 36 min | 2 tasks | 5 files |
 | Phase 05 P12 | about 34 min wall | 2 tasks | 4 files |
 | Phase 05 P19 | about 30m wall across restart; exact active time unavailable | 2 tasks | 9 files |
+| Phase 06 P01 | 12m | 2 tasks | 8 files |
+| Phase 06 P02 | 26min | 2 tasks | 7 files |
+| Phase 06 P03 | 18min | 2 tasks | 8 files |
+| Phase 06 P07 | not measured | 3 tasks | 10 files |
+| Phase 06 P25 | 14min | 2 tasks | 3 files |
+| Phase 06 P08 | 35m | 2 tasks | 7 files |
+| Phase 06 P26 | 20min | 2 tasks | 7 files |
+| Phase 06 P04 | 107min | 2 tasks | 20 files |
+| Phase 06 P05 | 58m56s elapsed wall; active time unavailable | 1 task | 13 files |
+| Phase 06 P27 | 41m 08s | 1 tasks | 11 files |
+| Phase 06 P28 | 6m | 1 tasks | 3 files |
+| Phase 6 P29 | at least 1h29m57s wall lower bound | 2 tasks | 14 files |
+| Phase 6 P30 | 37m+ | 2 tasks | 10 files |
+| Phase 06 P06 | >=2h35m20s wall lower bound | 2 tasks | 11 files |
+| Phase 6 P09 | 32m | 2 tasks | 13 files |
+| Phase 06 P11 | 39m 33s | 2 tasks | 7 files |
+| Phase 6 P31 | at least 31m | 2 tasks | 9 files |
+| Phase 6 P32 | at least 7m34s | 1 tasks | 4 files |
+| Phase 6 P10 | at least 49m47s wall lower bound | 1 tasks | 21 files |
+| Phase 6 P33 | at least 1h22m00s wall lower bound | 1 tasks | 20 files |
+| Phase 06 P34 | at least 10m48s wall lower bound | 1 tasks | 1 files |
+| Phase 06 P12 | at least 1h24m18s wall; active time unavailable | 2 tasks | 12 files |
+| Phase 6 P35 | at least 30m55s wall | 2 tasks | 24 files |
+| Phase 6 P36 | at least 57m55s wall | 1 tasks | 20 files |
+| Phase 6 P38 | at least 1h00m19s wall; active work capped at 30m | 1 partial task | 20 files |
+| Phase 6 P14 | elapsed wall time spanned a 22-hour pause/resume; active time unavailable | 2 tasks | 28 files |
+| Phase 06 P17 | not measured (continued after 22-hour pause) | 2 tasks | 12 files |
+| Phase 06 P18 | at least 1h09m wall from prior state checkpoint; active time unavailable | 2 tasks | 14 files |
+| Phase 06 P20 | about 32m wall from 04:35 UTC checkpoint; active time unavailable | 3 tasks | 9 files |
+| Phase 6 P40 | 19m27s | 2 tasks | 7 files |
+| Phase 6 P41 | 36min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -517,6 +549,59 @@ Recent decisions affecting current work:
 - [Phase 05]: Require the sealed mailbox CRC, completion status and complete ordered records before judging frame-600 ENVX.
 - [Phase 05]: Keep SOUND-01 and SOUND-02 pending until final Phase 5 verification.
 - [Phase 05]: Treat docs/hardware/spu.md as the current Phase-5 SPU contract, preserving source pins, open precision questions and separate evidence claims. — The implementation is now the maintained contract; concise preparation pointers and evidence limits prevent stale behavior descriptions or unsupported PCM accuracy claims.
+- [Phase 06]: Top-level builds expose CD-ROM and MDEC object targets; embedded builds compile their sources directly into the library to preserve the add_subdirectory target contract.
+- [Phase 06]: Subsystem inventories remain empty until their behavior callers are implemented and registered.
+- [Phase 06]: Phase 6 API v5 installs the first disc once with schway_open_disc; replacements require an open lid and schway_swap_disc.
+- [Phase 06]: Host disc callbacks and checked TOC metadata are copied into non-serialized instance state; invalid metadata and closed-lid swaps validate before apply.
+- [Phase 06]: CD-ROM and MDEC state uses fixed per-instance buffers sized for the accepted algorithms.
+- [Phase 06]: Host disc callbacks and TOC metadata remain outside device state visitors.
+- [Phase 06]: Scheduler event ties follow timers, GPU, DMA, CD-ROM, SPU, SIO, MDEC.
+- [Phase 06]: Keep ISO/cue parsing and all host file handles in a host-only provider; the emulated core receives sectors only through callbacks.
+- [Phase 06]: Model INDEX 00 as physical file content and PREGAP as synthetic silence, preserving their distinct sector offsets.
+- [Phase 06]: Reject unsupported image types with named planned-v2.0 results instead of partial format sniffing.
+- [Phase 06]: Keep the API v5 consumer public-header-only; core.disc_api owns internal attachment-state assertions.
+- [Phase 06]: Playlist index selection prepares stable descriptors; the host alone chooses when to swap the active core disc.
+- [Phase 06]: Shared CNF boot-path components omit ISO version suffixes before directory lookup.
+- [Phase 06]: Append CD-ROM and MDEC visitors after SPU and advance the state/behavior revision to 6.
+- [Phase 06]: Keep host callbacks and the external audio drain ring outside serialized machine state.
+- [Phase 06]: Use SIO1 for remaining unbuilt-device diagnostics after CD-ROM and MDEC become owned bus devices.
+- [Phase 06-discs-and-fmv]: Use cdrom.* selector and inventory names for the CD behavior lane.
+- [Phase 06-discs-and-fmv]: Keep CD sector acquisition and INT1 delivery in Plan 06-05.
+- [Phase 06-discs-and-fmv]: Serialize CD unlock, lock and licensed-profile state with the device.
+- [Phase 6]: Serialize BFRD, ReadS selection, retry state, and deferred INT1; bump state format and behavior revision to 9.
+- [Phase 6]: Parse and CRC-check supplied interleaved Q; synthesize absent or invalid Q from the TOC while retaining the prior location on bad_q.
+- [Phase 6]: Select XA audio before guest data delivery; defer XA decoding and audio output to the later XA/SPU plans.
+- [Phase 6]: Keep DMA3 sector-cursor and 24/40-cycle transfer behavior in sequential Plan 06-27.
+- [Phase 06]: DMA3 readiness requires CHCR trigger, BFRD and buffered sector data; CD-ROM uses no DREQ line.
+- [Phase 06]: Split chopped-window readiness into Plan 06-28 before the pinned Getloc caller.
+- [Phase 06]: Recheck CD BFRD and buffered-sector readiness before every chopped DMA3 window.
+- [Phase 6]: BUSYSTS tracks command acceptance independently from active CD drive status.
+- [Phase 6]: Pinned raw Q/GetlocP seek rows move to dependent Plan 06-30 because their offsets differ.
+- [Phase 6]: GetlocP returns the latest CRC-valid host Q record; synthesize a TOC record only before a valid record exists.
+- [Phase 6]: Preserve the last valid Q record across absent or invalid host subcode.
+- [Phase 6]: Pinned seek rows are separate fixtures; no general target offset applies.
+- [Phase 06]: Keep fixed 451,584/225,792-cycle schedule assertions separate from the pinned drive timing bands.
+- [Phase 06]: Treat positive same-speed, read-active intervals between consecutive LBA callbacks as timing samples; exclude nonconsecutive LBA gaps and reject buffer overflow.
+- [Phase 06]: Keep DISC-01 pending until the remaining Phase 6 media, fuzz, and integration acceptance is complete.
+- [Phase 6]: Keep XA predictor history separate from resampler history so low-rate duplication does not alter ADPCM chronology.
+- [Phase 6]: Use the cited Q15 tap table with deterministic integer truncation; this does not claim silicon waveform proof.
+- [Phase 6]: Reject XA emphasis and reserved coding/header values until their effects are defined.
+- [Phase 06]: MDEC single-block availability uses a selected 1,000-cycle baseline; the unstamped reference log does not measure cycles.
+- [Phase 06]: Plan 06-31 completes the mono stream, FIFO backpressure, raw layout and documentation controls before Plan 06-12.
+- [Phase 6]: Keep the completed MDEC stream/backpressure scope closed and move missing pixel-order, clipping, and FE00-padding vectors to dependent Plan 06-32; DISC-03 remains partial.
+- [Phase 6]: Add nonuniform AC, signed endpoint clipping, and FE00 pre-DC vectors before the pinned MDEC guest caller.
+- [Phase 6]: Keep CDDA storage bounded to 1,176 stereo pairs and drop newest pairs on overrun.
+- [Phase 6]: Apply staged ATV coefficients atomically and serialize pending and active matrices.
+- [Phase 6]: Split the unstarted XA mixing task into dependent Plan 06-33 at the 30-minute bound.
+- [Phase 6]: Keep XA in a 9,409-pair serialized ring (9,408 frames plus one tied-event reserve) separate from the 1,176-pair CDDA queue.
+- [Phase 6]: Keep voice/reverb mixture and mode-enabled file/channel rejection in dependent Plan 06-34; Plan 06-12 MDEC work remains independent.
+- [Phase 06]: The existing XA filter and native mixer paths satisfy the mode-enabled mismatch and XA/CDDA/voice/reverb controls; retain this slice as test-only.
+- [Phase 06]: Keep the pinned MDEC guest selectors gating and assign the production DMA0 input/decode mismatch to dependent Plan 06-35.
+- [Phase 6]: Split Plan 06-36 after its 30-minute bound: it closes the DMA1 destination harness and exact RED vectors; Plan 06-37 owns the source-backed 4/8-bit arithmetic and ordered status repair.
+- [Phase 6]: Keep the v1.0 MDEC acceptance claim limited to deterministic decoding with available verified evidence; preserve the original hardware arrays, arithmetic, cycle cap and owned disc_boot path.
+- [Phase 6]: Keep DISC-03 and 06-23/24 acceptance pending until successor registration and final local/hosted acceptance in 06-43 through 06-45.
+- [Phase 6]: Preserve the pinned 8-bit hardware log and bytes as evidence; compare deterministic model/reference regression output to its separately named frozen baseline.
+- [Phase 6]: Do not run compressed pinned reference guests until Plan 06-42 installs the in-process source guard; Plan 06-43 owns selector registration.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -578,6 +663,16 @@ come from `AGENTS.md`.
 
 | Date | Step | Runtime | Model |
 |------|------|---------|-------|
+| 2026-11-15 | /gsd-discuss-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; three read-only advisors and adversarial synthesis | GPT-6 session (exact model ID not exposed); advisors gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-plan-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; 26 plans, 19 waves; schema/structure, command/failure probes, decision and requirement coverage; post-planning gaps clear | GPT-6 session (exact model ID not exposed); planner gpt-6.1-sol high; researcher and checker gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-01 | Codex, OpenGSD 1.20.0; sequential shared checkout; subsystem skeleton and inventories; tracer 19/19 and policy 4/4; 12 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-02 | Codex, OpenGSD 1.20.0; sequential shared checkout; disc callback API and API v1–v4 compatibility checks; 26 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-03 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded CD/MDEC state, reset/visitor contracts, MMIO and fixed-order scheduler integration; focused lane 8/8 after each task; 18 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-07 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded ISO/cue provider, focused image tests 8/8, selected disc/policy checks 12/12; duration not measured | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-25 | Codex, OpenGSD 1.20.0; sequential shared checkout; versioned API v5 consumer and compatibility checks; 14 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-08 | Codex, OpenGSD 1.20.0; sequential shared checkout; bounded M3U and SYSTEM.CNF parsing; disc suite 10/10, probe, inventory and hygiene checks; 35 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-26 | Codex, OpenGSD 1.20.0; sequential shared checkout; CD-ROM/MDEC state serialization and fixture migration; state 8/8 and bus/unbuilt/gap checks 3/3; 20 min | gpt-6-luna xhigh |
+| 2026-11-15 | /gsd-execute-plan 06-04 | Codex, OpenGSD 1.20.0; sequential shared checkout; CD commands, response timing, region/licence/lid behavior; focused checks 13/13; 107 min | gpt-6-luna xhigh |
 | 2026-10-19 | /gsd-discuss-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-plan-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
 | 2026-10-19 | /gsd-execute-phase 1 | Claude Code, OpenGSD 1.18.0 | claude-opus-5-5 |
@@ -706,9 +801,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-14T15:27:07Z
-Stopped at: Phase 05 complete, ready to plan Phase 6
-Resume file: None
+Last session: 2026-11-17T19:23:53.046Z
+Stopped at: Phase 06 complete — all phases complete
+Resume file: .planning/phases/06-discs-and-fmv/06-42-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
@@ -720,7 +815,7 @@ CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
 Phase 3 merged as PR #12; release PR #13 is green and merged. Phase 4 release v0.4.0 is latest.
 Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
-Next: continue `$gsd-execute-phase 5`. Phase 4 release confirmation is complete; no duplicate Phase 4 PR is needed. No routine UAT is required. Standing preferences are in `.planning/AUTONOMOUS.md`.
+Next: continue `$gsd-autonomous --from 6 --to 6` with Plan 06-14's pinned disc-media tools and authored recipes. A complete independently captured frame/movie pair was not found; do not wait on owner hardware. The owner has a real PS1 and capture card but no time for capture now. Standing preferences are in `.planning/AUTONOMOUS.md`.
 
 ### Independent local work during immutable CI (2026-11-12)
 
@@ -765,3 +860,99 @@ Efficiency corrections are durable in AUTONOMOUS.md: bring real oracles into the
 ### Phase 5 verification boundary (2026-11-14)
 
 Plans 05-15 and 05-24 are complete; all 24 plan summaries are present. Goal-backward verification passed 3/3 roadmap truths with no gaps or owner checks. Local CI passed 547/547 tests plus 5/5 release package checks; the explicit audio suite passed 10/10, libretro PCM and idle-SPU checks passed 2/2, and hygiene passed 24/24. The repository-check total is exactly 2688 lines. Code review found no issues. Runtime/model: Codex/OpenGSD 1.21.0, GPT-6 session (exact model ID not exposed), gpt-6-luna xhigh. The release PR, exact-head hosted CI/nightly/RetroArch run and green release PR remain for `$gsd-ship 5`; stop here, before Phase 6.
+
+### Phase 6 plan 06-01 execution (2026-11-15)
+
+Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-01 completed in 12 minutes with two task commits. Focused tracer checks passed 19/19 after preserving the embedding target contract; policy checks passed 4/4, and archive/link inspection confirmed host filesystem support stays outside the core archive. Phase 6 is at plan 2 of 26. DISC-01 through DISC-03 remain pending until their behavior plans complete; next is 06-02.
+
+### Phase 6 plan 06-02 execution (2026-11-15)
+
+Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-02 completed in 26 minutes with two task commits. API v5 host disc attachment, copied TOC validation, and closed-lid swap coverage landed; the focused disc API test and API v1-v4 compatibility checks passed. Phase 6 is at plan 3 of 26.
+
+### Phase 6 plan 06-03 execution (2026-11-15)
+
+Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-03 completed in 18 minutes with two task commits. Bounded instance-owned CD/MDEC state, POWER reset and field visitors landed; bus dispatch and scheduler deadlines were connected. The required configure/build plus no-busy-loop/scheduler command passed 8/8 after each task. No hosted URL applies to these local checks. The plan's task-level TDD tags had no new test files or direct behavior tests in scope; first CD/MDEC behavior callers and state serialization remain assigned to Plans 06-04/06-11/06-26. Phase 6 is at plan 4 of 26.
+
+### Phase 6 plan 06-08 execution (2026-11-15)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-08 completed in 35 minutes with three task commits. Bounded M3U selection and shared SYSTEM.CNF parsing landed with playlist/CNF tests and host-facing format documentation. The local disc suite passed 10/10, the ISO probe edge case passed, and inventory/hygiene checks passed; no hosted URL applies. The stale `runner.probe` selector matched no test, so the actual `compat.probe.iso_edges` test was run separately. Plan 06-26 is next in wave 4; 06-04 remains the sequential next plan.
+
+### Phase 6 plan 06-26 execution (2026-11-15)
+
+Runtime/model: Codex, OpenGSD 1.20.0; executor gpt-6-luna xhigh. Plan 06-26 completed in 20 minutes with four task commits. CD-ROM and MDEC visitors now participate in state format 6; the state suite passed 8/8 and the bus/unbuilt/gap fixture lane passed 3/3. The initial TDD seed used an invalid MDEC deadline and was corrected to the supported 900-cycle bound. No hosted URL applies. This out-of-order wave plan is complete; 06-04 remains the sequential next plan. Global DISC-01 and DISC-03 acceptance remain pending the later CD-ROM and MDEC behavior plans.
+
+### Phase 6 plan 06-05 execution (2026-11-15)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time from the earliest durable execution marker to summary creation was 58m56s; exact active duration is unavailable because executor start and idle intervals were not captured. Sector acquisition, filtering, Q handling, RDDATA delivery and state coverage are committed; code review is clean. The final Plan 05 configure/build/selected CTest command passed (8 selected tests), and hygiene, inventory sort and `git diff --check` passed. The TDD RED command failed the new sector caller as expected (exit 8), and its corrected report classified `RED_EVIDENCE_OK`. No hosted run applies. DISC-01 remains pending aggregate Phase 6 acceptance; XA decoding/audio, DMA3 cursor/rates and disc-boot caller acceptance remain with Plans 06-09/06-10, 06-27 and their downstream callers. Plan 06-06 is next; Plan 06-27 remains sequential with DMA consumers.
+
+### Phase 6 plan 06-29 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time is at least 1h31m23s from the earliest durable execution marker at 00:43:26Z through final gate closeout at 02:14:49Z; total runtime is longer, and active time was not measured. The post-review native command passed 2/2 tests and the pinned reference command passed 2/2, including the unchanged Getloc caller; focused code review is clean. ReadN BUSYSTS now clears on command acceptance, and full DMA3/status/GetlocL controls pass. DISC-01 remains partial: Plan 06-30 owns raw Q/GetlocP rows, then Plan 06-06 runs the full timing/Getloc gate. No hosted URL applies.
+
+### Phase 6 plan 06-30 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time is at least 37m36s from the 02:17:11Z start marker through the 02:54:47Z closeout preparation; final metadata commit follows. Source review added last-good Q preservation and validation of serialized candidate bytes. Native CD-ROM/state checks passed 10/10 and the pinned reference guest/controls passed 2/2. The three pinned rows, malformed-Q handling, TOC track range and state continuation are covered. DISC-01 remains partial pending Plan 06-06's full timing/Getloc gate; Plan 06-06 is next.
+
+### Phase 6 plan 06-06 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. The execution chain lasted at least 2h35m20s from Plan 06-29's 00:43:26Z durable marker through Plan 06 closeout preparation; the original Plan 06 start and active time were not captured. The final CD-only configure/build/reference gate passed 3/3. Focused review cleared the comparator and pin/fetch logic before the final gate. Timing comparisons retain all eligible consecutive-LBA samples, reject overflow, and disclose that adjacent-LBA restarts are included. DISC-01 remains pending aggregate Phase 6 acceptance; Wave 8 Plan 06-09 is next. No hosted run URL applies.
+
+### Phase 6 plan 06-09 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall time from the 03:29:33Z start through closeout preparation at 04:01:32Z is 31m59s; the exact Plan 09 configure/build/decoder gate completed at 03:57:33Z (28 minutes after start). The post-review exact gate passed `disc.xa` 1/1; the focused decoder and state controls passed 6/6. XA predictor and resampler histories are instance-owned and serialized; state format/behavior revision advanced to 11. No hosted URL applies. DISC-01 remains pending aggregate acceptance; DISC-02 remains pending the later XA/SPU caller integration. Plan 06-11 is next.
+
+### Phase 6 plan 06-33 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Wall lower bound is at least 1h22m from the first durable RED report at 06:29:28Z through summary preparation at 07:51:28Z; the plan started earlier and exact active time is unavailable. The accepted XA sector route, separate 9,409-pair serialized ring, native cadence and equal-deadline reserve passed the focused review and 12/12 configure/build/state/audio/SPU gate. State format and behavior revision are 14. DISC-02 remains partial: XA/CDDA/voice/reverb mixing and the mode-enabled file/channel mismatch control continue in 06-34. The MDEC-only 06-12 plan remains independent; 06-34 is next.
+
+### Phase 6 plan 06-12 oracle/control slice (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. The original execution marker is 08:10:43Z; split metadata was recorded at 09:28:28Z, giving a wall lower bound of at least 1h18m; exact active time is unavailable. The pinned 4/8-bit guest and status logs are resolved at public commit `f727802fead11f1daa7549285548392ef87749cb`; reference executables remain in build storage. The harness has independent byte/status comparators and mutation controls. The 4-bit guest reached the caller but the core consumed DMA0 command `0x20000020` from MADR `0x12000`, BCR `0x00010020`, CHCR `0x01000201`, then became idle with no output while the guest polled `0x80040000`; DMA1 remained unarmed. Keep DISC-03 partial. Plan 06-35 owns the bounded production repair and full passing reference gate; the exact Plan 06-12 gate resumes afterward.
+
+### Phase 6 plan 06-13 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID not exposed). Exact active time was not tracked; bounded local checks and follow-up closed at 18:57:07Z. Both MDEC target builds passed. Seven targeted color/display/FIFO/bounds/vector/4-bit checks passed; full `mdec.*` was 10/11 because `mdec.guest_input` still reports 12 exact 8-bit word differences. Reference asset and mutation controls passed 2/2; all four frame/movie callers failed fast on exhausted input, and all six reference cases took 0.64s. The frame stream has 296 macroblocks for 300 requested; movie frame one has 162 for 240 requested. Public hardware records cover compact color points and 19 of 20 frame strips but do not provide a complete frame/movie pair. Code review retained two warnings: incomplete image references and no raw guest-output hash. The latter is deferred in seed SEED-261116-mrh for Plan 06-16's first complete owned STR caller. DISC-03 remains pending; no hosted URL applies. No long suite or emulator process is running.
+
+### Phase 6 plan 06-14 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable), review gpt-6-luna xhigh. Execution resumed after a 22-hour pause; active time was not attributable. Pinned source-cache invalidation, Ninja Windows output path, MSVC floating-point/link options, and fixture media downloads/emulator invocation in all relevant CI lanes were corrected. The local disc target and pinned producer script built successfully; focused pin, media-corruption, probe and budget checks passed 5/5; hygiene passed 24/24 in 38 seconds. The gate total is 2698/2700 lines. DISC-02 runtime acceptance remains open until downstream boot/playback and hosted matrix checks. No owner hardware run or hosted URL applies. Plan 06-21 is next in Wave 15.
+
+### Phase 6 plan 06-21 execution (2026-11-16)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable). Active duration was not tracked after the resumed-session pause. API v6 binds save states to a host-supplied disc identity; different or unavailable media is rejected before apply, legacy descriptor prefixes remain valid for emulation, and callback-free save/load behavior is covered. The no-busy-loop and focused state/API/CD suite passed 16/16; the synthetic perf lane passed 19/19. Workflow wiring checks now require both SPU and CD Cachegrind jobs; direct workflow check passed. Repository-check code is 2699/2700 lines. Public SCPH-5501 seek and MDEC capture data are recorded in the hardware pages; they do not settle XA interpolation rounding. Local Valgrind was unavailable, so real idle-CD instruction measurement awaits hosted perf CI. DISC-01/03/04 remain partial pending their downstream callers; no owner hardware run is scheduled. Next is Plan 06-15, whose fixture must supply the host-owned identity. No hosted URL applies yet.
+
+### Phase 6 plan 06-16 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); inline code review. The owner reported over 22 hours elapsed during the autonomous run; active runtime was not measured reliably. The cheap media-geometry preflight passed before final tests. The primary two-track fixture build enforces the 512 KiB cap at 522,144 bytes; reducing XA to three complete sectors shifts the authored CD-DA and STR extents, and the guest seeks their resulting LBA 214 and 54 positions. The post-review `ctest --test-dir build/ci -R '^disc\\.fixture' --no-tests=error --output-on-failure` passed 4/4 in 22.47 seconds. The pre-commit hygiene scan caught symbol-based pin labels; hyphenated labels passed the affected audio/FMV tests 2/2. The one-off record command passed and produced PCM/frame pins; no physical PlayStation capture or hosted URL is claimed. DISC-02/03 remain partial pending runner, libretro, oracle, fuzz and hosted matrix callers. Plan 06-17 is next.
+
+### Phase 6 plan 06-17 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer. Active time was not tracked reliably across the owner's reported 22-hour pause. Cheap diff/inventory checks and CMake configure passed before builds. The runner now boots the owned CUE and M3U images through OpenBIOS, attaches ISO, rejects direct and nested unsupported media, and applies frame-indexed pad/lid/swap controls. Standard review caught and fixed a disc `--hash-state` usage mismatch, a CUE probe extension bypass, and a frame-300 control test that had stopped at frame 274; the final review is clean. `cmake --preset ci`, the runner target build, and the focused runner CTest selector passed; final selector result was 16/16 in 2.46 seconds. No physical PlayStation capture or hosted run URL applies. Plan 06-18 is next.
+
+### Phase 6 plan 06-18 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer. Active time was not measured reliably; the wall interval from the prior state checkpoint through final verification was about 1h09m and includes review and test waits. Libretro now loads CUE/ISO/M3U with the system BIOS, exposes extended disk control, removes media through an empty TOC while the tray is open, and proves the no-media GetTN error with the guest. Runner and libretro PCM match byte-for-byte for the combined XA/CD-DA fixture in batch and single callbacks for NTSC-U and PAL. The review's no-media blocker was fixed and re-reviewed clean. Cheap checks caught startup cadence assumptions, stale extension assertions, a 2-line repository-gate overage, and a brittle negative-control matcher before closeout; all were corrected without broad reruns. The final libretro host selector passed 4/4 in 39.95 seconds; core disc API and info-claim controls passed 2/2 each. Repository-check code is exactly 2700/2700 lines. No physical capture or hosted URL applies. Plan 06-19 is next.
+
+### Phase 6 plan 06-19 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer gpt-6-luna xhigh. Active time was not reliably measured after the owner-reported 22-hour pause. The pinned MIT rcheevos PlayStation hash source is tested against production runner identity on provider-owned disc bytes; executable mutation changes both results. The vendored digest negative control rejects changed bytes. Review findings about license wording and a dead shim were fixed; the post-review disc/probe/vendor filter passed 4/4. Cheap selectors, sorted inventory, digest and 2699/2700-line budget checks preceded the focused build. No physical capture or hosted URL applies. Plan 06-22 is next.
+
+### Phase 6 plan 06-22 execution (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable). The optional SDL2 example compiles from the installed library package and reuses existing host disc/pixel helpers without adding SDL2 to product targets. The first package configure found the build-tree config shadowing the installed one; the corrected command supplies the installed `schwaystation_DIR`, and the final example build passed. CI builds it only on Linux x64, using Ubuntu's SDL2 compatibility development package if the hosted image lacks `sdl2.pc`. Actionlint passed when ignoring its outdated Ubuntu 26.04 label list. The app was not launched and hosted verification remains for ship. The 2699-line repository gate is unchanged; no owner hardware capture or hosted URL applies. Plan 06-20 is next.
+
+### Phase 6 plan 06-23 independent local integration (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); standard gsd-code-reviewer gpt-6-luna xhigh. Active duration was not measured. The earlier Getloc pass came from a stale binary; fresh builds reproduced the failure. The actual test fixture used 150-based TOC values against the documented zero-based-LBA contract. Production track selection and synthetic Q generation now follow the contract, including INDEX 00 pregap countdown; the review's WR-08 was fixed and re-reviewed. Focused CI CD/controller/XA/runner/fuzz checks passed 19/19 in 12.28s, nightly timing/Getloc/control references passed 3/3 in 2.29s, and runner hash/libretro integration plus fixture producers passed 4/4 (libretro host 39.12s). No full media suite was repeated. DISC-03 remains open: the pinned 8-bit selector differs at byte 6 and the status guest exceeds its preserved cycle bound. Public searches found no replacement full-output oracle; the owner says capture is not available anytime soon, so none is planned or requested. Hosted all-leg and background RetroArch acceptance remain outstanding; no hosted URL applies. No phase verification or ship claim.
+
+### Phase 6 plans 06-23/06-24 final verification (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); final source review by gsd-code-reviewer gpt-6-luna xhigh. Active duration was not measured. The current diff review found no open source findings after correcting API v6 compatibility and updating all runner/libretro/example disc-flag call sites. The reviewed-source `cmake --workflow --preset ci` configured and built successfully, then exited 8 with 609/610 tests passing; only `mdec.guest_input` failed. Direct `ctest -L disc` passed 25/25 in 11.48s; `ctest -L mdec` was 10/11 and confirms 12 pinned output-word mismatches; `cmake --workflow --preset hygiene` passed 24/24. The exact 8-bit mismatch remains byte 6 (expected 04, actual 05), while the status guest's 7.68M requested delay cycles exceed its unchanged 4.9152M cap. No expected data, MDEC contract, selector or cap changed. Hosted CI/nightly/fuzz/RetroArch checks remain pending without a URL. Phase 6 verification is `gaps_found`; no ship, PR or milestone completion is claimed. The owner capture is unavailable and will not be requested. Next action is new primary MDEC evidence or an evidence-backed production correction; no next phase or v2.0 is authorized by this run.
+
+### Phase 6 MDEC completed-command status follow-up (2026-11-17)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); independent MDEC math, hardware-source and cycle-budget reviews. Active duration was not measured. The public SCPH-5501 status capture shows `8004FFFFh` after full table loads and `2204FFFFh` after all decode input is consumed while output remains unread. `mdec_status` previously left the low counter at zero; it now reports the documented minus-one wrap for nonempty MDEC(1/2/3) commands. The focused status test checks MDEC(2) and MDEC(3) through exact `8004FFFFh`, and decode input exhaustion to `FFFFh` while a block is pending. `cmake --build --preset ci --target schwaystation-test-mdec` and `ctest --test-dir build/ci -R '^mdec\\.status$' --no-tests=error --output-on-failure` passed. The full MDEC label passed 10/11; only the exact 8-bit vector remains red. The post-fix `cmake --workflow --preset ci` exited 8 with 609/610 tests passing in 66.57 seconds, only `mdec.guest_input` failed. Rebuilt nightly MDEC reference tests passed 4-bit and controls; 8-bit still differs at byte 6 (expected 04, actual 05). Two independent reviews confirmed identical pinned 4/8-bit input/tables and that the permitted ares arithmetic matches the current implementation; no source-backed alternative removed the differences. The full status guest still requests 7.68M delay cycles against the unchanged 4.9152M cap, and this status-register fix does not change that. The final `cmake --workflow --preset hygiene` passed 24/24 in 39.77 seconds. DISC-03 remains incomplete; no phase ship, hosted URL, owner capture, next phase or v2.0 work is claimed.
+
+### Phase 6 plan 06-45 generated-playlist hash repair (2026-11-18)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); independent gsd-code-reviewer. Exact-head Nightly run 44210060292 passed; CI run 44210060285 passed all lanes including be32 but failed only the final hash-equality job. Artifact comparison isolated the difference to `disc_boot_runner.m3u`: Windows `file(WRITE)` emitted CRLF and Linux emitted LF. Changed its CMake producer to `file(CONFIGURE ... NEWLINE_STYLE UNIX)`. The reviewer found no issue. `cmake --preset ci` passed; the regenerated playlist hash matches the be32 artifact (`722ce2c1c07b9c90102dd872faea02e306617c5604cdf331ad7a7dc2df3509b8`), and `runner.disc.api` passed 1/1. Current source changes still need exact-head hosted CI and Nightly; no verification or ship claim is made.

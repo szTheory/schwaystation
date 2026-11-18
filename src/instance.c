@@ -260,6 +260,8 @@ static void power_on(schway *inst)
     schway__sio_reset(inst);
     schway__card_reset(inst);
     schway__spu_reset(inst);
+    schway__cdrom_reset(inst);
+    schway__mdec_reset(inst);
     schway__sched_sync(inst);
     schway__sched_recalc(inst);
     /* With no BIOS image the BIOS window holds the stub kernel; a mapped
@@ -350,17 +352,23 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     if (st != SCHWAY_STATUS_OK) {
         return st;
     }
-    /* A caller whose struct ends before flags predates them: none set. */
-    uint32_t flags = profile->size >= sizeof *profile ? profile->flags : 0u;
+    /* Disc overrides were appended so released callers keep the old flags mask. */
+    uint32_t flags = profile->size >= SCHWAY__PROFILE_SIZE_FLAGS ? profile->flags : 0u;
+    uint32_t disc_flags = profile->size >= SCHWAY__PROFILE_SIZE_DISC_FLAGS ? profile->disc_flags : 0u;
+    uint32_t allowed_flags = SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0;
+    if (profile->size < SCHWAY__PROFILE_SIZE_DISC_FLAGS) {
+        allowed_flags |= SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_CD_UNLOCK;
+    }
     if (profile->region < SCHWAY_REGION_NTSC_J || profile->region > SCHWAY_REGION_PAL ||
-        (flags & ~(SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0)) != 0u) {
+        (flags & ~allowed_flags) != 0u ||
+        (disc_flags & ~(SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_CD_UNLOCK)) != 0u) {
         return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
     }
     if (inst->profile_locked) {
         return SCHWAY_STATUS_ERR_PROFILE_LOCKED;
     }
     inst->region = profile->region;
-    inst->profile_flags = flags;
+    inst->profile_flags = flags | disc_flags;
     /* The first frame is the region's; nothing has run before the first
        frame locks the profile. */
     if (inst->ticks == 0u) {
@@ -497,6 +505,7 @@ static const char text_state_magic[] = "not a state";
 static const char text_state_version[] = "state format not supported";
 static const char text_state_crc[] = "state checksum mismatch";
 static const char text_state_field[] = "state field out of range";
+static const char text_state_disc[] = "state disc identity mismatch";
 static const char text_exe_invalid[] = "PS-EXE invalid";
 static const char text_exe_range[] = "PS-EXE outside RAM";
 static const char text_unknown[] = "unknown status";
@@ -526,6 +535,8 @@ const char *schway_status_string(schway_status status)
         return text_state_crc;
     case SCHWAY_STATUS_ERR_STATE_FIELD:
         return text_state_field;
+    case SCHWAY_STATUS_ERR_STATE_DISC:
+        return text_state_disc;
     case SCHWAY_STATUS_ERR_EXE_INVALID:
         return text_exe_invalid;
     case SCHWAY_STATUS_ERR_EXE_RANGE:

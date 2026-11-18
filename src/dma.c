@@ -144,6 +144,7 @@ void schway__dma_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
    and waits (psx-spx, DMA Channels). */
 #define DMA_OTC 6u
 #define DMA_SPU 4u
+#define DMA_CDROM 3u
 /* phase of a channel: nothing running, its unit's words moved and the channel
    busy until busy_until, a sync mode 1 transfer between blocks (busy, no
    unit, remain blocks still to go, waiting for the next request), the CPU's
@@ -246,6 +247,10 @@ static uint32_t dma_pending(const schway *inst, uint32_t ch)
     if ((c & SCHWAY__DMA_CHCR_BUSY) == 0u) {
         return 0u;
     }
+    if (ch == DMA_CDROM && sync == 0u &&
+        (inst->cdrom.bfrd == 0u || inst->cdrom.sector_count == 0u)) {
+        return 0u;
+    }
     if (d->phase[ch] == DMA_PH_NEXT) {
         return ch != 2u || sync != 2u || schway__gpu_dma_ready(inst);
     }
@@ -297,14 +302,14 @@ uint32_t schway__dma_arbitrate(const schway *inst, uint32_t mask)
 
 /* Clocks per word on the device side (psx-spx, DMA Channels, DMA Transfer
    Rates). */
-static uint32_t dma_word_cycles(uint32_t ch)
+static uint32_t dma_word_cycles(const schway *inst, uint32_t ch)
 {
     switch (ch) {
     case 3u:
-        /* The BIOS default of 24; most games write the delay setting that
-           makes it 40. The CD-ROM device end chooses between them when it
-           is built, so nothing here reads the delay register. */
-        return 24u;
+        /* The documented DEV5 settings 00020843h and 00020943h select the
+           BIOS 24-cycle and game 40-cycle CD-ROM DMA rates respectively
+           (psx-spx, Memory Control and DMA Channels). */
+        return inst->bus.memctl[6] == 0x00020943u ? 40u : 24u;
     case 4u:
         return 4u;
     case 5u:
@@ -317,9 +322,9 @@ static uint32_t dma_word_cycles(uint32_t ch)
 /* The cycles a unit of n words takes: each word on the device's rate, plus one
    cycle per 16 words for the DRAM row address (psx-spx, DMA Channels, DRAM
    Hyper Page mode). At one cycle per word this is ceil(n * 17 / 16). */
-static uint64_t dma_cost(uint32_t ch, uint32_t n)
+static uint64_t dma_cost(const schway *inst, uint32_t ch, uint32_t n)
 {
-    return (uint64_t)n * dma_word_cycles(ch) + (n + 15u) / 16u;
+    return (uint64_t)n * dma_word_cycles(inst, ch) + (n + 15u) / 16u;
 }
 
 /* The stand-in for a device that is not built: the sink counts the words and
@@ -350,14 +355,18 @@ static uint32_t dma_dev_write(schway *inst, uint32_t ch, uint32_t word, uint64_t
 {
     switch (ch) {
     case 0u: /* MDEC in */
-        return dma_stub_sink(inst, ch, word);
+        schway__mdec_dma_write(inst, word, tick);
+        return 0u;
     case 1u: /* MDEC out */
+        /* The MDEC output channel is device-to-RAM; preserve the generic
+           sink for a direction the device does not use. */
         return dma_stub_sink(inst, ch, word);
     case 2u: /* GPU */
         schway__gpu_dma_write(inst, word, tick);
         return 0u;
     case 3u: /* CD-ROM */
-        return dma_stub_sink(inst, ch, word);
+        (void)word;
+        return 0u;
     case 4u: /* SPU */
         (void)dma_stub_sink(inst, ch, word);
         schway__spu_dma_write(inst, (uint16_t)word);
@@ -378,12 +387,17 @@ static uint32_t dma_dev_read(schway *inst, uint32_t ch, uint32_t *word, uint64_t
     case 0u: /* MDEC in */
         return dma_stub_source(word);
     case 1u: /* MDEC out */
-        return dma_stub_source(word);
+        *word = schway__mdec_dma_read(inst, tick);
+        return 0u;
     case 2u: /* GPU */
         *word = schway__gpu_dma_read(inst, tick);
         return 0u;
-    case 3u: /* CD-ROM */
-        return dma_stub_source(word);
+    case 3u: /* CD-ROM: four RDDATA bytes share the CPU's sector cursor. */
+        *word = 0u;
+        for (uint32_t i = 0u; i < 4u; i++) {
+            *word |= (uint32_t)schway__cdrom_sector_read(inst) << (8u * i);
+        }
+        return 0u;
     case 4u: /* SPU */
         *word = (uint32_t)schway__spu_dma_read(inst);
         *word |= (uint32_t)schway__spu_dma_read(inst) << 16;
@@ -446,7 +460,7 @@ static uint64_t dma_list_node(schway *inst, uint32_t ch, uint64_t tick)
         extra += dma_dev_write(inst, ch, word, tick);
     }
     d->madr[ch] = next;
-    return DMA_NODE_OVERHEAD + dma_cost(ch, count) + extra;
+    return DMA_NODE_OVERHEAD + dma_cost(inst, ch, count) + extra;
 }
 
 /* OTC writes BCR words (0 means 10000h) from MADR downward: each word is the
@@ -471,7 +485,7 @@ static uint64_t dma_otc_unit(schway *inst)
         (void)schway__bus_ram_word(inst, addr, &word, 1u);
         addr = prev;
     }
-    return dma_cost(DMA_OTC, n);
+    return dma_cost(inst, DMA_OTC, n);
 }
 
 /* Starts the unit of the channel that goes next, at tick t. Bit 28 is cleared
@@ -509,7 +523,7 @@ static void dma_start(schway *inst, uint64_t t)
             d->remain[ch]--;
         }
         d->dreq &= ~(UINT32_C(1) << ch);
-        cost = dma_cost(ch, n) + DMA_BLOCK_OVERHEAD + dma_move(inst, ch, n, t);
+        cost = dma_cost(inst, ch, n) + DMA_BLOCK_OVERHEAD + dma_move(inst, ch, n, t);
     } else if (((d->chcr[ch] >> 9) & 3u) == 2u) {
         /* Linked list: one node per unit. remain tracks each channel's count
            without changing the frozen format-4 nodes_done field shape. */
@@ -531,14 +545,27 @@ static void dma_start(schway *inst, uint64_t t)
             window = d->remain[ch];
         }
         d->remain[ch] -= window;
-        cost = dma_cost(ch, window) + DMA_WINDOW_OVERHEAD + dma_move(inst, ch, window, t);
+        cost = dma_cost(inst, ch, window) + DMA_WINDOW_OVERHEAD + dma_move(inst, ch, window, t);
     } else {
         /* Sync mode 0: one burst of BCR's low half words. */
         d->remain[ch] = 0u;
-        cost = dma_cost(ch, n) + dma_move(inst, ch, n, t);
+        cost = dma_cost(inst, ch, n) + dma_move(inst, ch, n, t);
     }
     d->phase[ch] = DMA_PH_UNIT;
     d->busy_until = t + cost;
+}
+
+/* CD-ROM has no DREQ line (psx-spx DMA Channels, docs/hardware/dma.md): a
+   buffered RDDATA word makes a triggered DMA3 eligible when data is ready. */
+void schway__dma_cdrom_ready(schway *inst, uint64_t now)
+{
+    if (inst->cdrom.bfrd == 0u || inst->cdrom.sector_count == 0u) {
+        return;
+    }
+    if (inst->dma.cur == SCHWAY__DMA_NONE && inst->dma.busy_until <= now) {
+        dma_start(inst, now);
+    }
+    schway__sched_recalc(inst);
 }
 
 /* The cycles the CPU runs after a unit of ch that has more to follow: the

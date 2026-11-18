@@ -13,6 +13,10 @@ fixtures.boot.stub_irq_controls	fixtures,portable
 fixtures.boot.stub_irq_hook	fixtures,portable
 fixtures.boot.stub_irq_state	fixtures,portable
 fixtures.boot.stub_syscalls	fixtures,portable
+fixtures.disc.media_normalize	fixtures,portable
+fixtures.disc.media_pin.self_test	fixtures,portable
+fixtures.disc.pin.self_test	fixtures,portable
+fixtures.disc.probe	fixtures,portable
 fixtures.dma_chain	dma,fixtures,portable
 fixtures.exc_matrix	fixtures,portable
 fixtures.exit_port	fixtures,portable

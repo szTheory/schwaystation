@@ -4,7 +4,13 @@ src/stub_kernel.c	tests/fixtures/src/stub/stub.asm	-	MIT	745175ec67b65820b6800bc
 tests/fixtures/src/gpu_motion.asm	schwaystation first-party fixture	-	MIT	c9af0565caa7a5786c270fde6aaf661faea346ed51f597294fc0d9e7bec7eb1f	-
 tests/fixtures/src/memcard_roundtrip.asm	schwaystation first-party fixture	-	MIT	9c8e9f07c963e3cb8c56a90fc56df8046ecb36f80f71e244d73c3da0a22ee8c0	-
 tests/fixtures/src/pad_counter.asm	schwaystation first-party fixture	-	MIT	8520b66e145ae33ae44b7a30c0c4886adc97f32a1afe7cce90032f107ffb3057	-
+tests/fixtures/src/unbuilt.asm	schwaystation first-party fixture	-	MIT	9d73c6dedc765baf8720ee3feaea80ba49253fe37806ff4603780c8e372f39b2	-
 tests/fixtures/src/spu_blocks.inc	schwaystation first-party fixture	-	MIT	e19b56c175af6d3e42776ac9e10ad039abcd9a41572217016246c41fa1807f5a	-
 tests/fixtures/src/spu_tone.asm	schwaystation first-party fixture	-	MIT	7e463379e683d35d4fe1472d7e50d40a2312ac4d0978dee12e23a0cc2026c772	-
+tests/fixtures/disc_boot.xml	schwaystation first-party fixture	-	MIT	f49dc2c9a8ef20e96dabab412c96e728caf8a24343c66ce29de159d48aa1297e	-
+tests/fixtures/disc_boot_playlist.xml	schwaystation first-party fixture	-	MIT	a0158b3d2e122e5ffa6bac33499bfadd6b5f8c0aa940c2757ce711b8a551a771	-
+tests/fixtures/src/disc_boot.asm	schwaystation first-party fixture	-	MIT	d95be45fa5430014b119ebdd2a7e6603ceefaeccf52058b1cb3b8baa0a6b344d	-
+tests/fixtures/src/disc_boot.cnf	schwaystation first-party fixture	-	MIT	a3a9b3b4fa6a886b3704102fa9f641706f7a117cd6996c80e8846d8a32930a26	-
+tests/fixtures/src/disc_boot.sbi	schwaystation first-party fixture	-	MIT	8d80422239e2f6a211d7cfe0fb257543370f0c373fc973b1e550848e93bbeb90	-
 tests/vectors/gte/ps1tests-1150.bin	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	e8a0e61a57a6582ac53d39b941eeaa83b87498444a3ada915d9de73d313dd9c2	THIRD-PARTY-NOTICES.md
 tests/fixtures/src/gte_cases.inc	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	22d83f53a818096106543758c20c8cab3218255af740faff37ff403b6e581220	THIRD-PARTY-NOTICES.md

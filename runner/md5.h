@@ -19,4 +19,8 @@ void schway__md5_final(schway__md5 *s, uint8_t digest[16]);
 /* Writes the digest as 32 lowercase hex digits and a terminating NUL. */
 void schway__md5_hex(const uint8_t digest[16], char hex[33]);
 
+/* rcheevos PlayStation identity: boot filename followed by executable bytes. */
+void schway__md5_disc_identity(const char *boot_name, const uint8_t *file,
+                               uint32_t hash_len, char hex[33]);
+
 #endif /* SCHWAYSTATION_RUNNER_MD5_H */

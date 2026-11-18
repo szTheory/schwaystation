@@ -25,7 +25,7 @@ listed in the preparation file; the model's current register paths are in `src/s
 
 The state visitor records SPU RAM, register values, voice registers and decoder history, sample phase, envelope and
 sweep counters, FIFO contents and cursors, queued register writes, noise phase/LFSR, capture position, reverb FIR and
-work histories, reverb cursors, transfer addresses, IRQ state and the next SPU tick. State format 5 validates these
+work histories, reverb cursors, transfer addresses, IRQ state and the next SPU tick. State format 17 validates these
 fields before applying them. The host audio ring is excluded and is cleared after a valid load; a refused load leaves
 the instance unchanged. See `src/spu.c` and `src/state.c`.
 
@@ -82,10 +82,20 @@ the model returns `FFFFh` at each 32-halfword boundary unless `DEV4_CTRL` is `22
 `spu/memory-transfer` guest checks seven named transfer cases; its log proves only those cases. No manual-read path
 is modeled.
 
-Capture writes zero-valued Phase-5 CD-L/CD-R samples to `00000h` and `00400h`, and voice 1/3 values to `00800h` and
-`00C00h`. In noise mode the captured voice signal is the full signed LFSR value scaled by the voice envelope. The
-cursor advances through 200h halfwords and wraps. Capture is enabled by `RAM_CTRL` bits 2–3 and continues while the
-audible SPU output is disabled. CD audio inputs remain zero in Phase 5; CD-DA and XA are Phase 6 work.
+Capture writes the current CD-L/CD-R inputs to `00000h` and `00400h`, and voice 1/3 values to `00800h` and `00C00h`.
+CD samples are captured after the CD ATV matrix and before SPU AVOL. In noise mode the captured voice signal is the
+full signed LFSR value scaled by the voice envelope. The cursor advances through 200h halfwords and wraps. Capture is
+enabled by `RAM_CTRL` bits 2–3 and continues while output is muted. The cursor and RAM bytes are state fields.
+
+CD-DA samples are decoded from 2352-byte sectors as little-endian L/R pairs and pass through the CD-ROM ATV matrix
+before entering the bounded two-sector queue. Accepted XA sectors are decoded and resampled before entering a
+separate ring sized for one maximum sector packet plus one equal-deadline reserve pair. This pair lets a sector event enqueue its full packet before the same-deadline SPU tick drains the older sample. On each native 768-cycle tick the
+SPU consumes one pair from each nonempty ring and sums them in signed 32-bit space; queue underflow supplies silence
+and overflow drops new pairs. SPU `AVOLL`/`AVOLR` scale the combined CD input independently of main voice volume.
+`ATTR` bit 0 enables the direct CD input and bit 2 sends it through reverb. The current mixer does not consult the
+global SPU enable or mute bits for CD input. CD-ROM Mute gates its audible mix while queued samples continue to drain
+and capture. The `ATTR` roles follow the public [psx-spx SPU guide](https://psx-spx.consoledev.net/soundprocessingunitspu/)
+and the controller notes in `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`.
 
 `STATX` reports delayed `ATTR` control bits, IRQ9, manual-transfer busy, DMARead/DMAWrite FIFO availability, and the
 capture half. Every modeled SPU RAM read or write uses the shared little-endian helper. A matching eight-byte `IRQA`
@@ -112,8 +122,9 @@ silicon output.
 ## PCM output and evidence limits
 
 Each native tick emits one interleaved signed 16-bit stereo pair. The mixer saturates each voice contribution, sums
-the dry and wet paths, applies the main left/right volumes when both SPU enable and unmute are set, then saturates the
-final pair. The bounded host ring is four PAL frames deep; `schway_get_audio` drains pairs to the caller. The runner
+the dry and wet paths, applies the main left/right volumes when both SPU enable and unmute are set, then adds the
+independently AVOL-scaled CD input and saturates the final pair. The bounded host ring is four PAL frames deep;
+`schway_get_audio` drains pairs to the caller. The runner
 hashes the drained PCM as canonical little-endian stereo bytes and fails if its drain reports lost samples. The host
 is responsible for any resampling.
 

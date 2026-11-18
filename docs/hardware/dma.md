@@ -3,7 +3,7 @@
 The DMA controller moves blocks of words between main RAM and the devices without the CPU: seven channels, a priority
 register, an interrupt register, and a hold on the CPU's bus accesses while a transfer runs. This page covers the
 engine in `src/dma.c`: the registers and the bits they store, how the next channel is chosen, how a transfer is modelled
-in time, OTC (which builds an ordering table in RAM), the block modes and the device ends of the other six channels,
+in time, OTC (which builds an ordering table in RAM), the block modes and the device ends,
 chopping, linked lists and the guard that keeps a looping list from hanging a run, the cost of a word, what holds the CPU
 and what does not, how hostile programs stay bounded, and the sources. Everything is integer arithmetic and behaves the
 same on every platform. The bus side, the block clock and
@@ -167,8 +167,9 @@ line is high again and arbitration picks the channel. A channel that waits for t
 the CPU, whatever its `CHCR` says. The last block ends the transfer: the flag and the interrupt follow as for any unit,
 and not before. A raise of the line while another unit runs is picked up at that unit's end.
 
-The line is a latched level per channel, set by `schway__dma_dreq`; the devices call it as they are built. The reserved
-mode has no unit: see [the fault for an unusable mode](#the-fault-for-an-unusable-mode).
+The line is a latched level per channel, set by `schway__dma_dreq`; the devices call it as they are built. CD-ROM does
+not assert DMA3 DREQ: its documented transfer is sync mode 0 with CHCR bit 28 set. The reserved mode has no unit: see
+[the fault for an unusable mode](#the-fault-for-an-unusable-mode).
 
 The current SPU compatibility slice derives persistent readiness for channel 4 from the saved `ATTR` latch: a write
 to the exact halfword whose bits 5-4 select mode `2` makes a busy sync-mode-1 RAM-to-device transfer ready for another block. It does
@@ -267,10 +268,12 @@ reserved mode with the start bit and so latches the DMA fault; it runs under the
 
 The device side of a channel is two functions in `src/dma.c`, one for words going to the device and one for words coming
 from it, each a single `switch` on the channel with a case per channel. A case moves one word and returns the extra busy
-cycles the device asks for. DMA2 is connected to the GPU's shared GP0 packet and GPUREAD paths. Other unbuilt devices
-use a stand-in in their case: the sink counts words in `dma.words` and folds their little-endian bytes into a per-channel
-CRC-32 in `dma.crc`, both kept in the state from power-on; the source supplies 0. The stand-ins ask for no extra cycles.
-There is no table of callbacks or function pointer in the state.
+cycles the device asks for. DMA2 is connected to the GPU's shared GP0 packet and GPUREAD paths. DMA3 reads four
+consecutive bytes from the CD-ROM RDDATA path into each RAM word, sharing the sector cursor with CPU reads. DMA3 waits
+for BFRD and buffered sector data before every transfer window; CD-ROM readiness is separate from the generic DREQ lines. Other
+unbuilt devices use a stand-in in their case: the sink counts words in `dma.words` and folds their little-endian bytes
+into a per-channel CRC-32 in `dma.crc`, both kept in the state from power-on; the source supplies 0. The stand-ins ask
+for no extra cycles. There is no table of callbacks or function pointer in the state.
 
 ## Costs
 
@@ -278,7 +281,7 @@ There is no table of callbacks or function pointer in the state.
 |---|---|---|
 | MDEC in, MDEC out, GPU and OTC, per word | 1 | `doc` |
 | SPU, per word | 4 | `doc` |
-| CD-ROM, per word | 24 | `doc` |
+| CD-ROM, per word | 24 or 40 | `doc` |
 | PIO, per word | 20 | `doc` |
 | RAM side, per 16 words | 1 | `doc` |
 | sync mode 1, per block | 11 | `derived` |
@@ -292,9 +295,9 @@ mode" section (17 cycles per 16 words). A unit of `n` words takes `n * rate + ce
 are fitted to rows of public hardware logs and are labelled `derived`: a fitted figure is evidence that the model fits the log, not
 evidence of the hardware. Tests pin the documented rows exactly and the fitted ones by their formula.
 
-The CD-ROM row is the BIOS default, 24 cycles per word. Most games write the delay setting that makes it 40 (the same
-page); that cost is not modelled yet, and the CD-ROM device end selects 40 from that setting when it is built. Nothing
-in the engine reads the delay register. The slowest unit the engine bounds is 10000h words at 40 cycles.
+The CD-ROM BIOS setting is 24 cycles per word; the common DEV5 delay/size values `00020843h` and `00020943h` select
+24 and 40 respectively (psx-spx, Memory Control and DMA Channels). Each word keeps the same one-cycle-per-16-words
+RAM cost. The slowest unit the engine bounds is 10000h words at 40 cycles.
 
 ## What holds the CPU
 
@@ -318,7 +321,8 @@ against the tick of the access, so a read that comes after the unit's end waits 
 
 ## Not built yet
 
-The devices behind channels 0 to 5 come with later stages. Every write to
+Channels 0, 1 and 5 retain stand-in device endpoints. DMA3 transfers the CD-ROM sector buffer to RAM, while GPU and
+SPU use their device paths. Every write to
 a busy channel's `CHCR` other than the word 0, and the behaviour of bit 29, are not modelled.
 
 ## Sources

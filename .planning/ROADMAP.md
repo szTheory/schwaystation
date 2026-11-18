@@ -26,7 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: The GTE matches the hardware cases; DMA and timers** - The GTE passes the 1,150 hardware cases; seven DMA channels and three root counters pass register-level tests (completed 2026-11-10)
 - [x] **Phase 4: Games play in RetroArch** - GPU, display modes, pads with rumble, memory cards, OpenBIOS and the compatibility ledger make fixtures playable in RetroArch (completed 2026-11-13)
 - [x] **Phase 5: The sound matches the console** - The SPU matches the hardware logs, and audio hashes are identical on every lane and in libretro (completed 2026-11-14)
-- [ ] **Phase 6: Discs and FMV** - CD-ROM with cue/bin, iso and m3u, XA, CD-DA, MDEC and disk control, and the own disc boots through OpenBIOS in RetroArch
+- [x] **Phase 6: Discs and FMV** - CD-ROM with cue/bin, iso and m3u, XA, CD-DA, MDEC and disk control, and the own disc boots through OpenBIOS in RetroArch (completed 2026-11-18)
 
 ## Phase Details
 
@@ -471,10 +471,105 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `ctest -L disc` passes the CD-ROM controller's cycle timings, delivery order, sector buffer, GetID and lid behaviour, and the nightly lane matches the ps1-tests `cdrom/timing` and `getloc` logs.
   2. The mkpsxiso `disc_boot` image, built on every leg, boots through OpenBIOS from `SYSTEM.CNF`. It reads its sectors, plays the XA and CD-DA tracks, and its pinned `boots`, `mailbox`, `audio` and `frame` values are identical on every platform that runs it. `.chd`, `.pbp`, `.ecm` and `.ccd` are refused with exit 77 and a named message, and the rcheevos disc MD5 matches.
-  3. `ctest -L mdec` passes, and the nightly lane matches the ps1-tests `mdec` references within the stated tolerance. The STR on `disc_boot` plays through DMA into the 24-bit display.
+  3. `ctest -L mdec` passes deterministic integer MDEC decoding with exact pinned 4-bit hardware coverage, a separately named 8-bit implementation regression, direct status/colour/FIFO/packing/bounds controls, and a compressed-unit preflight. The pinned frame (300 macroblocks) and movie first frame (240 macroblocks) have complete source coverage, while their full guest output/conformance remains unresolved; the frame display diagnostic fails the existing pixel comparison, and movie DMA1 has no matching capture. Exact 8-bit and full-image hardware conformance are not claimed. The complete owned STR on `disc_boot` plays through DMA into the native 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: TBD
+**Plans**: 45/45 plans complete accepted. Exact-head CI, Nightly and RetroArch acceptance passed on 2026-11-18. The v1.0 claim preserves the documented 8-bit and frame/movie output limits; the authorized ship and release steps follow.
+
+Plans:
+**Wave 1**
+- [x] 06-01-PLAN.md — Build and inventory the disc subsystem skeleton
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 06-02-PLAN.md — Add the consumer-minimal disc callback API
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 06-03-PLAN.md — Connect instance-owned devices to bus and scheduler
+- [x] 06-07-PLAN.md — Serve cue/bin and ISO through one bounded host provider
+- [x] 06-25-PLAN.md — Cover the public disc API with versioned consumers
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 06-08-PLAN.md — Parse bounded playlists and SYSTEM.CNF
+- [x] 06-26-PLAN.md — Serialize new devices and migrate obsolete unbuilt checks
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 06-04-PLAN.md — Implement CD commands and deterministic response timing
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 06-05-PLAN.md — Deliver sectors to firmware through the scheduled controller buffer
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 06-27-PLAN.md — Transfer CD sector words through DMA3 at both documented rates
+- [x] 06-28-PLAN.md — Preserve CD readiness at chopped DMA3 window boundaries
+- [x] 06-29-PLAN.md — Correct ReadN HSTS readiness and verify the pinned DMA3 caller
+- [x] 06-30-PLAN.md — Preserve raw Q positions for exact GetlocP seek rows
+- [x] 06-06-PLAN.md — Run the pinned CD timing and Getloc callers
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 06-09-PLAN.md — Decode and resample XA with integer arithmetic
+- [x] 06-11-PLAN.md — Decode monochrome MDEC blocks through DMA
+- [x] 06-31-PLAN.md — Capture nonzero monochrome output and DMA1 layout controls
+- [x] 06-32-PLAN.md — Cover MDEC pixel order, clipping and padding vectors
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 06-10-PLAN.md — Feed CD-DA through the native SPU output
+- [x] 06-33-PLAN.md — Route decoded XA audio through the native SPU output
+- [x] 06-34-PLAN.md — Verify XA interleave filtering and mixed native audio sources
+- [x] 06-12-PLAN.md — Pin MDEC guests and comparator controls; full guest gate awaits 06-39
+- [x] 06-35-PLAN.md — Complete pinned MDEC 64-coefficient input at command boundary
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 06-36-PLAN.md — Correct DMA1 destination observation and capture exact output RED vectors
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 06-37-PLAN.md — Mirror MDEC command fields into status; exact output/status guests remain unresolved
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [x] 06-38-PLAN.md — Partial: record unsigned 4-bit candidate and isolate DMA1-start versus pinned guest-buffer target; 8-bit/status remain unresolved
+
+**Wave 13** *(blocked on Wave 12 completion)*
+- [x] 06-39-PLAN.md — Prove direct DMA1 caller path across separate stack addresses; verify 4-bit model and pinned guest while retaining 8-bit/status gates
+
+**Wave 14** *(blocked on Wave 13 completion)*
+- [x] 06-13-PLAN.md — Decode color MDEC frames and display the DMA result
+
+**Wave 15** *(blocked on Wave 14 completion)*
+- [x] 06-14-PLAN.md — Build reproducible owned disc assets with pinned tools
+- [x] 06-21-PLAN.md — Validate active media state and idle-drive cost
+
+**Wave 16** *(blocked on Wave 15 completion)*
+- [x] 06-15-PLAN.md — Boot the owned disc and verify ReadN records
+
+**Wave 17** *(blocked on Wave 16 completion)*
+- [x] 06-16-PLAN.md — Play owned XA, CD-DA and STR end to end
+
+**Wave 18** *(blocked on Wave 17 completion)*
+- [x] 06-17-PLAN.md — Load disc media and lid scripts in the runner
+
+**Wave 19** *(blocked on Wave 18 completion)*
+- [x] 06-18-PLAN.md — Expose libretro extended disk control and disc PCM
+
+**Wave 20** *(blocked on Wave 19 completion)*
+- [x] 06-19-PLAN.md — Vendor the pinned independent disc MD5 oracle
+- [x] 06-22-PLAN.md — Build the installed-library SDL example without shipping it
+
+**Wave 21** *(blocked on Wave 20 completion)*
+- [x] 06-20-PLAN.md — Replay hostile media seeds and register nightly fuzz targets
+
+**Wave 22** *(blocked on Wave 21 completion)*
+- [x] 06-23-PLAN.md — Integrate per-leg disc equality and background RetroArch smoke
+
+**Wave 23** *(blocked on Wave 22 completion)*
+- [x] 06-24-PLAN.md — Review and verify the complete disc phase
+
+**Approved MDEC successor tranche** *(local waves 1–6; owner-approved 2026-11-17)*
+- [x] 06-40-PLAN.md — Record the approved deterministic MDEC claim and evidence limits
+- [x] 06-41-PLAN.md — Add a distinct deterministic 8-bit regression while retaining exact 4-bit coverage
+- [x] 06-42-PLAN.md — Guard compressed inputs and classify source coverage/status budget
+- [x] 06-43-PLAN.md — Register the exact surviving main-CI and nightly selectors
+- [x] 06-44-PLAN.md — Review changes and run complete local acceptance
+- [x] 06-45-PLAN.md — Verify pre-ship hosted acceptance and record ship-only checks
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
 
@@ -490,4 +585,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. The GTE matches the hardware cases; DMA and timers | 26/26 | Complete    | 2026-11-10 |
 | 4. Games play in RetroArch | 58/58 | Complete    | 2026-11-13 |
 | 5. The sound matches the console | 24/24 | Complete    | 2026-11-14 |
-| 6. Discs and FMV | 0/TBD | Not started | - |
+| 6. Discs and FMV | 45/45 | Complete | 2026-11-18 |

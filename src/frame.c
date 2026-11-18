@@ -65,9 +65,11 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
     }
     uint64_t starting_frame = inst->frame;
     *stop = SCHWAY_STOP_BUDGET;
+    inst->run_active = 1u;
     if (inst->exe_loaded != 0u) {
         if (inst->ticks + cycles + SCHWAY__INSN_CYCLES_MAX > SCHWAY__STATE_TICKS_MAX ||
             inst->frame >= SCHWAY__STATE_FRAME_MAX) {
+            inst->run_active = 0u;
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
         schway__pad_frame_start(inst);
@@ -78,6 +80,7 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
         *done = cycles == room;
         if (inst->ticks + cycles > SCHWAY__STATE_TICKS_MAX ||
             (*done && inst->frame >= SCHWAY__STATE_FRAME_MAX)) {
+            inst->run_active = 0u;
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
         schway__pad_frame_start(inst);
@@ -120,6 +123,7 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
     if (*done) {
         schway__pad_frame_end(inst);
     }
+    inst->run_active = 0u;
     return SCHWAY_STATUS_OK;
 }
 
