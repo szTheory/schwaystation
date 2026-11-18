@@ -4,10 +4,10 @@ milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
 status: Awaiting next milestone
 stopped_at: Milestone v1.0 complete and archived
-last_updated: "2026-11-18T12:36:18.950Z"
+last_updated: "2026-11-18T12:45:21.214Z"
 last_activity: 2026-11-18
 last_activity_desc: Milestone v1.0 completed and archived
-state_head: 25876072008a1c9baa676843389bfda878b9a212
+state_head: 49a0d091aeb938e3d9882d1893e8488b45369214
 progress:
   total_phases: 6
   completed_phases: 6
