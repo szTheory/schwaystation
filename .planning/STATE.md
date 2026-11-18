@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 07
 current_phase_name: Faster and more trustworthy CI
-current_plan: 4
+current_plan: 5
 status: executing
-stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-11-18T20:56:26.617Z"
+stopped_at: Completed 07-04-PLAN.md
+last_updated: "2026-11-18T21:18:10.562Z"
 last_activity: 2026-11-18
 last_activity_desc: Completed Plan 07-03 baseline and settings audit
-state_head: 991dae7203a6dd22e7bbc62cc79690ec0360e552
+state_head: e8f3cf18f943f71f77fcef2f57c991068bce1e5f
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 10
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 ## Current Position
 
 Phase: 07 (Faster and more trustworthy CI) — EXECUTING
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 10
 Status: Executing
-Last activity: 2026-11-18 — Plan 07-03 completed; Plan 07-04 is ready
+Last activity: 2026-11-18 — Plan 07-04 completed; Plan 07-05 is next
 
 ### Phase 7 execution (2026-11-18)
 
@@ -53,7 +53,16 @@ Plan 07-03 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; exe
 effort. The repository-check budget is now 3,300 lines with 3,133 counted; the independent RetroArch budget
 remains 300/300. Cachegrind and serialized-state baselines are recorded, while WASI module size remains unmeasured
 until its focused Ubuntu producer check. The settings audit found no drift, and the evidence-based runner/pin
-review is recorded in the plan artifacts. TUNE-05 and TUNE-06 stay phase-pending; Plan 07-04 is next.
+review is recorded in the plan artifacts.
+
+Plan 07-04 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna at xhigh
+effort. All seven quality dimensions were scored before selecting one change. Documentation/README tied with
+upgrade path at 2; the review selected the false README BIOS/disc status claim for its direct user impact and
+left Dependabot, CI routing, pins and runner labels unchanged. The README now describes the documented PS-X EXE
+and BIOS/CUE/ISO/M3U paths and limits compatibility evidence to fixtures. Its obsolete-claim check and diff
+check passed, as did the workflow pin check (57 active uses). Existing CI/performance run evidence is linked in
+the review; no new hosted run or full suite was started. The phase-level TUNE-04 and TUNE-06 requirements remain
+pending because their GSD readiness check is blocked by remaining phase work. Plan 07-05 is next.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -278,6 +287,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 6 P41 | 36min | 2 tasks | 5 files |
 | Phase 07 P01 | 11min | 3 tasks | 9 files |
 | Phase 07 P03 | 44min | 3 tasks | 6 files |
+| Phase 07 P04 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -641,6 +651,8 @@ Recent decisions affecting current work:
 - [Phase 07]: Keep the repository-check budget at 3300 and the separate RetroArch budget at 300 through the Phase 7 ship ratchet.
 - [Phase 07]: Withhold the WASI module size bound until the focused Release target measurement runs with the Ubuntu 26 WASI toolchain.
 - [Phase 07]: Keep current settings, action pins, and runner labels where evidence did not justify changes; review Wasmtime 48.0.9 in the normal pin-update step using new upstream asset digests.
+- [Phase 07]: Documentation and upgrade path tied at 2; selected the README correction because it resolves a false current capability claim with immediate user impact.
+- [Phase 07]: Keep compatibility statements limited to the four passing fixture rows; do not imply commercial-game coverage.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -882,8 +894,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-18T20:56:26.591Z
-Stopped at: Completed 07-03-PLAN.md
+Last session: 2026-11-18T21:18:10.534Z
+Stopped at: Completed 07-04-PLAN.md
 Resume file: None
 
 ### v1.0 session history
