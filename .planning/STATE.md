@@ -2,21 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.0
 milestone_name: PlayStation games play with sound in RetroArch
-current_phase: 6
-current_phase_name: Discs and FMV
-current_plan: 45 of 45 (hosted acceptance and ship)
-status: in_progress
-stopped_at: "Phase 6 verification passed; run authorized ship 6, then verify merge and release before milestone closeout"
-last_updated: "2026-11-18T03:01:11Z"
+current_phase: 06
+current_plan: Not started
+status: completed
+stopped_at: "Phase 06 verified and complete; ship PR #22, confirm the v1.0 release, then refresh stale prior-phase reports and close out the milestone."
+last_updated: "2026-11-18T05:44:13.631Z"
 last_activity: 2026-11-18
-state_head: ce30dc104378e924ecc14b0f554bf35dbf0ffe19
+last_activity_desc: "Phase 06 goal-backward verification passed. Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; GSD reviewer/verifier configured as gpt-6-luna (xhigh). Exact-head CI 44233701039 and Nightly 44233700921 passed; CI covered 613 tests, BE32 570 tests, RetroArch 900 frames with pixel-equal output. phase.complete emitted 12 artifact-scan warnings, confirmed to be shell command strings misread as files. Next: ship PR #22, confirm main CI and release, refresh stale Phases 1–5, then audit, complete and clean up v1.0."
+state_head: 2c0d3527bb82f63ad5e585b2b5a328e7d8b4eeb0
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 195
   completed_plans: 195
   percent: 100
-last_activity_desc: "Plan 06-45 completed and Phase 6 goal-backward verification passed. Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 session (exact model ID unavailable); independent gsd-code-reviewer found no issue and gsd-verifier returned PASS. Source commit 28683ebe4c9940c95d539b5c18733c139f940ffa passed exact-head CI 44218206100 and Nightly 44218205653. All applicable CI lanes passed, including 613 tests and five release tests on Linux x64/Windows x64/Windows arm64, both Windows path regressions, be32, performance, ASan, WASI, RetroArch, hash equality and aggregate. Eight platform hash manifests compare byte-identically. Nightly vectors passed 30/30 once, all six bounded fuzz campaigns and all four benchmark jobs passed. RetroArch ran the owned disc for 900 frames and the 16x16 frame matched every pixel. The generated Windows M3U newline discrepancy was fixed by explicit UNIX output; local runner.disc.api passed 1/1 and hygiene passed 23/23 at the 2,700-line budget. Exact 8-bit hardware and full frame/movie output remain unproved under the approved v1.0 scope. Next: run authorized $gsd-ship 6, verify merge/release, then finish the v1.0 milestone audit and archive."
 ---
 
 # Project State
@@ -26,15 +25,15 @@ last_activity_desc: "Plan 06-45 completed and Phase 6 goal-backward verification
 See: .planning/PROJECT.md (updated 2026-11-15)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 6 — Discs and FMV
+**Current focus:** Phase 06 — Discs and FMV
 
 ## Current Position
 
-Phase: 6 (Discs and FMV) — owner-approved successor scope in progress
-Current Plan: 45 of 45 (hosted acceptance and ship)
+Phase: 06
+Current Plan: Not started
 Next plan file: 06-45-PLAN.md
-Status: Plans 06-42 through 06-45 are accepted. Exact-head CI and Nightly pass on source commit 28683ebe; Phase 6 goal-backward verification passes. The branch is ready for authorized ship, merge and release checks. Deterministic MDEC with available verified hardware coverage is in scope; exact 8-bit and complete external frame/movie hardware conformance remain unproved.
-Last activity: 2026-11-18
+Status: All phases complete
+Last activity: 2026-11-18 — Phase 06 complete
 
 Progress: [██████████] 100%
 
@@ -54,7 +53,7 @@ Progress: [██████████] 100%
 | 3 | 26 | - | - |
 | 4 | 58 | - | - |
 | 05 | 24 | - | - |
-| 06 | 42 | 45 | - |
+| 06 | 45 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -803,7 +802,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-17T19:23:53.046Z
-Stopped at: Completed 06-41-PLAN.md
+Stopped at: Phase 06 complete — all phases complete
 Resume file: .planning/phases/06-discs-and-fmv/06-42-PLAN.md
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md

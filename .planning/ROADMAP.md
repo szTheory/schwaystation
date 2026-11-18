@@ -474,7 +474,7 @@ Plans:
   3. `ctest -L mdec` passes deterministic integer MDEC decoding with exact pinned 4-bit hardware coverage, a separately named 8-bit implementation regression, direct status/colour/FIFO/packing/bounds controls, and a compressed-unit preflight. The pinned frame (300 macroblocks) and movie first frame (240 macroblocks) have complete source coverage, while their full guest output/conformance remains unresolved; the frame display diagnostic fails the existing pixel comparison, and movie DMA1 has no matching capture. Exact 8-bit and full-image hardware conformance are not claimed. The complete owned STR on `disc_boot` plays through DMA into the native 24-bit display.
   4. Disk control works. Swapping images in a two-image m3u changes the TOC in `libretro.host` and raises INT5 on eject, and `schway_swap_disc` with the lid closed returns `ERR_LID_CLOSED`. The hosted RetroArch session boots `disc_boot` through the CI-built OpenBIOS, and its screenshot matches the runner's `--png` frame.
 
-**Plans**: 45/45 plans accepted. Exact-head CI, Nightly and RetroArch acceptance passed on 2026-11-18. The v1.0 claim preserves the documented 8-bit and frame/movie output limits; the authorized ship and release steps follow.
+**Plans**: 45/45 plans complete accepted. Exact-head CI, Nightly and RetroArch acceptance passed on 2026-11-18. The v1.0 claim preserves the documented 8-bit and frame/movie output limits; the authorized ship and release steps follow.
 
 Plans:
 **Wave 1**

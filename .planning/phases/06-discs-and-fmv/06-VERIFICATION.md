@@ -1,8 +1,23 @@
 ---
 phase: 06-discs-and-fmv
 status: passed
-verified: 2026-11-18T03:01:11Z
-source: "verified against source commit 28683ebe4c9940c95d539b5c18733c139f940ffa; finalized planning-only worktree head ce30dc104378e924ecc14b0f554bf35dbf0ffe19; CI 44218206100 and Nightly 44218205653"
+verified: 2026-11-18T05:42:15Z
+source: "verified against code head 7d24bed34eb11dce8e223eefb40fb2098e41a095; planning-only workspace HEAD 2c0d3527bb82f63ad5e585b2b5a328e7d8b4eeb0; CI 44233701039 and Nightly 44233700921"
+score: "4/4 roadmap success criteria verified"
+overrides_applied: 3
+overrides:
+  - must_have: "The unchanged pinned 4-bit and 8-bit guests match every expected DMA1 byte under an independently justified arithmetic rule."
+    reason: "The owner-approved v1.0 scope verifies the exact pinned 4-bit guest and retains a separate deterministic 8-bit regression baseline; exact 8-bit hardware output remains unproved and is not claimed."
+    accepted_by: "owner"
+    accepted_at: "2026-11-17"
+  - must_have: "Frame/movie images are compared with pinned hardware references at ±1/channel."
+    reason: "The owner-approved v1.0 scope requires complete frame/movie source preflights, but does not claim complete hardware image output conformance; that mismatch remains documented."
+    accepted_by: "owner"
+    accepted_at: "2026-11-17"
+  - must_have: "The unchanged ordered-status guest reaches Done under the existing run bound and matches its pinned event order."
+    reason: "The owner-approved successor scope retains the fixed cycle cap and bounded status-budget/input coverage checks; the pinned guest's completion assertion remains unresolved and is not required for v1.0."
+    accepted_by: "owner"
+    accepted_at: "2026-11-17"
 covered_files:
   - ".github/workflows/ci.yml"
   - ".github/workflows/nightly.yml"
@@ -96,6 +111,8 @@ covered_files:
   - ".planning/phases/06-discs-and-fmv/06-44-SUMMARY.md"
   - ".planning/phases/06-discs-and-fmv/06-45-PLAN.md"
   - ".planning/phases/06-discs-and-fmv/06-45-SUMMARY.md"
+  - ".planning/phases/06-discs-and-fmv/06-REVIEW-DISPOSITION.md"
+  - ".planning/phases/06-discs-and-fmv/06-REVIEW.md"
   - "ASSET_POLICY.md"
   - "CMakeLists.txt"
   - "CMakePresets.json"
@@ -256,12 +273,12 @@ covered_files:
   - "tests/tests.cmake"
   - "tests/util/rc_compat.h"
   - "tools/gen_disc.py"
-covered_digest: "v4:sha256:e981b8bd44ed9ae90e5b156d295fba2b47eba632af2b0a96495ad5a5f9526712"
+covered_digest: "v4:sha256:3a77bba5f9698753ce3f95c29535d90b51ed36958be9992196996dcbf80e23d2"
 ---
 
 # Phase 6 verification
 
-Phase 6 passed goal-backward verification on 2026-11-18. The current source commit `28683ebe4c9940c95d539b5c18733c139f940ffa` passed exact-head hosted CI and Nightly; the branch head adds only planning evidence. Requirement traceability for DISC-01 through DISC-04 is recorded in `.planning/REQUIREMENTS.md`. PR-only rehearsal and cleanup remain ship checks. The approved v1.0 claim does not establish exact 8-bit hardware output or complete frame/movie output conformance: source inputs are complete, while full guest output remains unresolved.
+Phase 6 passed goal-backward verification on 2026-11-18 against code head `7d24bed34eb11dce8e223eefb40fb2098e41a095`. The finalized workspace HEAD `2c0d3527bb82f63ad5e585b2b5a328e7d8b4eeb0` adds review/planning evidence only; no code changed after the hosted run. Exact-head CI and Nightly both passed on the code head. DISC-01 through DISC-04 are marked Complete in `.planning/REQUIREMENTS.md`. This verdict uses the approved v1.0 MDEC scope: exact pinned 4-bit guest coverage, a separate deterministic 8-bit regression, direct model controls, and complete source preflights. It does not claim exact 8-bit hardware output or complete frame/movie output conformance. PR-only merge and release checks remain for ship.
 
 ## Full local acceptance before the Windows follow-up (2026-11-17)
 
@@ -566,7 +583,7 @@ matches the be32 artifact (`722ce2c1c07b9c90102dd872faea02e306617c5604cdf331ad7a
 new follow-up commit `28683ebe4c9940c95d539b5c18733c139f940ffa` is pushed. Its exact-head results are recorded
 below.
 
-## Current-source exact-head acceptance (2026-11-18)
+## Earlier exact-head acceptance on source 28683ebe (historical, 2026-11-18)
 
 The hosted runs tested source commit `28683ebe4c9940c95d539b5c18733c139f940ffa`. Branch head `ce30dc104378e924ecc14b0f554bf35dbf0ffe19` adds only planning evidence; no source changed after the hosted run.
 
@@ -598,3 +615,23 @@ The hosted runs tested source commit `28683ebe4c9940c95d539b5c18733c139f940ffa`.
 These results close the hosted Phase 6 acceptance under the approved v1.0 scope. The evidence supports the exact
 4-bit guest case and the separate deterministic 8-bit regression baseline; it does not establish exact 8-bit
 hardware output or complete frame/movie output conformance. PR-only rehearsal/cleanup remain pending for ship.
+
+## Final goal-backward verification on code head 7d24bed (2026-11-18)
+
+The hosted runs tested `7d24bed34eb11dce8e223eefb40fb2098e41a095`. The current workspace HEAD is
+`2c0d3527bb82f63ad5e585b2b5a328e7d8b4eeb0`; its changes relative to the tested source are review/planning
+artifacts. The only code change since source commit `28683ebe4c9940c95d539b5c18733c139f940ffa` is the CI timeout
+adjustment, reviewed in `06-REVIEW.md` and exercised by these exact-head runs.
+
+| # | Roadmap truth / requirement | Status | Evidence |
+|---|---|---|---|
+| 1 | DISC-01: CD-ROM timing, delivery order, sector buffer, GetID/lid behavior, and pinned timing/Getloc references | VERIFIED | Exact-head CI run [44233701039](https://github.com/szTheory/schwaystation/actions/runs/44233701039) passed; Linux x64 ran all 613 CI tests once and BE32 ran all 570 portable CI tests once. Exact-head Nightly [44233700921](https://github.com/szTheory/schwaystation/actions/runs/44233700921) passed; `vectors-full` ran 30/30 once, including the CD-ROM timing/Getloc controls, and the bounded fuzz job passed. |
+| 2 | DISC-02: CUE/BIN, ISO and M3U support, named unsupported-format errors, owned `disc_boot`, and cross-platform hashes | VERIFIED | Exact-head CI and `hash-equality` passed. The current run passed all eight platform hash manifests; the owned fixture tests exercise boot, sector, audio and frame predicates. |
+| 3 | DISC-03: deterministic integer MDEC with exact 4-bit coverage, separate deterministic 8-bit regression, direct controls, complete source preflights, and owned STR display | VERIFIED | CI and Nightly passed. `mdec.guest_4bit` compares the pinned 4-bit output; `mdec.guest_8bit_regression` compares a separate frozen baseline. The preflight verifies 56,960 bytes/1,800 blocks/300 macroblocks for the frame and 6,784 bytes/1,440 blocks/240 macroblocks for the movie input. Full frame/movie output and exact 8-bit hardware conformance remain unresolved and are not claimed. |
+| 4 | DISC-04: two-image disk control, TOC/INT5 behavior, closed-lid rejection, and hosted RetroArch frame equality | VERIFIED | `libretro.host` passed in CI. The hosted RetroArch job in CI ran the owned disc for 900 frames; its 16×16 capture comparison reported `every pixel equal` against the runner output. |
+
+The two earlier gap summaries for Plans 06-23 and 06-24 remain historical snapshots. Plan 06-45 records the later exact-head acceptance that closed those hosted gaps. Requirements traceability is complete: all four DISC requirements are marked Complete. No owner hardware capture or UAT is required for this v1.0 scope. The PR rehearsal, merge and release remain ship-time checks.
+
+### Approved scope overrides for superseded plan truths
+
+The owner-approved successor scope on 2026-11-17 supersedes earlier plan-level acceptance that required exact 8-bit hardware output, exact frame/movie image conformance, or completion of the ordered status guest within the fixed cycle cap. The replacement checks preserve the pinned 4-bit case, frozen 8-bit regression, direct controls, bounded status-budget calculation, and full frame/movie source coverage. Original pins, mismatch evidence, and the unchanged cap are retained. These are intentional overrides, not claims that the superseded hardware expectations passed.
