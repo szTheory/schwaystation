@@ -2,6 +2,7 @@
 title: "Triage the one-off install.consumer.dll_crt failure on windows-x64"
 status: pending
 priority: P2
+resolves_phase: 7
 source: "phase 01, plan 01-15"
 created: 2026-10-20
 theme: install

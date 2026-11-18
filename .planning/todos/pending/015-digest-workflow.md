@@ -2,6 +2,7 @@
 title: "Add the weekly digest workflow"
 status: pending
 priority: P2
+resolves_phase: 7
 source: "phase 01, plan 01-15 (a seed gate deferred under D-25 and AGENTS rule 7)"
 created: 2026-10-20
 theme: ci
@@ -12,7 +13,7 @@ audit_acknowledged:
 
 ## Goal
 
-A scheduled `digest.yml` workflow writes one weekly issue summarising CI and nightly results, open nightly issues and pending Dependabot pull requests.
+A scheduled `digest.yml` workflow creates a sanitized weekly artifact summarising open project issues and recent CI status. It does not post issues, comments or messages.
 
 ## Context
 
@@ -23,5 +24,6 @@ A scheduled `digest.yml` workflow writes one weekly issue summarising CI and nig
 
 ## Acceptance Criteria
 
-- The check or file lands in the v1.0 milestone tune-up (SEED-007), in the plan named above, with a test that `cmake --workflow --preset ci` or `cmake --workflow --preset hygiene` runs.
+- The workflow runs on its schedule and produces the read-only artifact with a test that `cmake --workflow --preset ci` or `cmake --workflow --preset hygiene` runs.
+- The workflow has no write permission for issues or pull requests, sends no messages and sanitizes untrusted issue/run text before it enters the artifact.
 - It names the fault it prevents, and no planning ID appears in the code it adds.
