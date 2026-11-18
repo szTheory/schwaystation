@@ -13,16 +13,35 @@ paths=0
 heavy=false
 release=false
 unknown=false
+fast=false
+metadata=true
+manifest=false
+changelog=false
+version=false
 case ${1-} in
   '' | *[!0-9]*) unknown=true ;;
   *) [ "$1" -le 3000 ] || unknown=true ;;
+esac
+case ${2-} in
+  '') ;;
+  release-metadata) fast=true ;;
+  *) unknown=true ;;
 esac
 while IFS= read -r path || [ -n "$path" ]; do
   [ -n "$path" ] || continue
   paths=$((paths + 1))
   case "$path" in
-    .planning/*) ;;
-    *) heavy=true ;;
+    .release-please-manifest.json | CHANGELOG.md | version.txt)
+      if [ "$fast" = true ]; then
+        case "$path" in
+          .release-please-manifest.json) [ "$manifest" = false ] || metadata=false; manifest=true ;;
+          CHANGELOG.md) [ "$changelog" = false ] || metadata=false; changelog=true ;;
+          version.txt) [ "$version" = false ] || metadata=false; version=true ;;
+        esac
+      else heavy=true
+      fi ;;
+    .planning/*) metadata=false ;;
+    *) heavy=true; metadata=false ;;
   esac
   case "$path" in
     .github/workflows/release.yml | .github/workflows/ci.yml | scripts/publish.sh | \
@@ -33,6 +52,14 @@ done
 if [ "$unknown" = true ]; then
   heavy=true
   release=true
+elif [ "$fast" = true ]; then
+  if [ "$metadata" = true ] && [ "$paths" -eq 3 ] && [ "$1" -eq 3 ] && \
+    [ "$manifest" = true ] && [ "$changelog" = true ] && [ "$version" = true ]; then
+    heavy=false
+    release=false
+  else
+    heavy=true
+  fi
 fi
 echo "heavy=$heavy"
 echo "release_inputs=$release"

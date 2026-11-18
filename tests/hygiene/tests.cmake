@@ -434,7 +434,7 @@ set_release_pr
 REST_TYPE=User GH_MODE=wrong-bot-type
 pr_route wrong-bot-type 'heavy=true release_inputs=true '
 set_release_pr
-PR_HEAD_SHA=cccccccccccccccccccccccccccccccccccccccc GH_MODE=event-head-mismatch
+PR_HEAD_SHA=cccccccccccccccccccccccccccccccccccccccc REST_HEAD_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GH_MODE=event-head-mismatch
 pr_route event-head-mismatch 'heavy=true release_inputs=true '
 set_release_pr
 GH_MODE=moving-head
@@ -461,7 +461,7 @@ set_release_pr
 PR_CHANGED=3001 REST_CHANGED=3001 GH_MODE=oversize
 pr_route oversize-file-list 'heavy=true release_inputs=true '
 set_release_pr
-REST_CHANGED=4 GH_MODE=partial-list
+PR_CHANGED=4 REST_CHANGED=4 GH_MODE=partial-list
 pr_route partial-file-list 'heavy=true release_inputs=true '
 set_release_pr
 PR_CHANGED=2 GH_MODE=event-count-mismatch
@@ -482,7 +482,7 @@ set_release_pr
 GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"added"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"}]' GH_MODE=added-file
 pr_route added-metadata-file 'heavy=true release_inputs=false '
 set_release_pr
-GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"deleted"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"}]' GH_MODE=deleted-file
+GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"removed"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"}]' GH_MODE=deleted-file
 pr_route deleted-metadata-file 'heavy=true release_inputs=false '
 set_release_pr
 PR_CHANGED=4 GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"modified"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"},{"filename":".planning/STATE.md","status":"modified"}]' GH_MODE=extra-planning
