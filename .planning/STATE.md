@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 7
+current_phase: 07
 current_phase_name: Faster and more trustworthy CI
-current_plan: 3
+current_plan: 4
 status: executing
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-11-18T20:07:41Z"
+stopped_at: Completed 07-03-PLAN.md
+last_updated: "2026-11-18T20:56:26.617Z"
 last_activity: 2026-11-18
-last_activity_desc: Plan 07-02 published bounded CI fingerprints, critical paths and timeout evidence
-state_head: 0119cbb
+last_activity_desc: Completed Plan 07-03 baseline and settings audit
+state_head: 991dae7203a6dd22e7bbc62cc79690ec0360e552
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 10
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-18)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 7, Faster and more trustworthy CI, opening v2.0 The whole library.
+**Current focus:** Phase 07 — Faster and more trustworthy CI
 
 ## Current Position
 
-Phase: 7 (Faster and more trustworthy CI) — IN PROGRESS
-Current Plan: 3
+Phase: 07 (Faster and more trustworthy CI) — EXECUTING
+Current Plan: 4
 Total Plans in Phase: 10
-Status: In progress
-Last Activity: 2026-11-18 — Plan 07-02 CI history report completed and validated
+Status: Executing
+Last activity: 2026-11-18 — Plan 07-03 completed; Plan 07-04 is ready
 
 ### Phase 7 execution (2026-11-18)
 
@@ -48,7 +48,12 @@ Plan 07-02 captured 40 workflow runs, all 40 attempt job pages and 573 jobs. Exa
 usable completed runs across 20 workload groups. The report includes the Release reusable-workflow path,
 failure-log classifications, timeout formulas and explicit unknowns; its one-shot validator passed, including
 missing-section and wrong-arithmetic controls. The actual release-App PR comparison and timeout application
-remain with later plans. Plan 07-03 is next.
+remain with later plans.
+Plan 07-03 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna at xhigh
+effort. The repository-check budget is now 3,300 lines with 3,133 counted; the independent RetroArch budget
+remains 300/300. Cachegrind and serialized-state baselines are recorded, while WASI module size remains unmeasured
+until its focused Ubuntu producer check. The settings audit found no drift, and the evidence-based runner/pin
+review is recorded in the plan artifacts. TUNE-05 and TUNE-06 stay phase-pending; Plan 07-04 is next.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -272,6 +277,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 6 P40 | 19m27s | 2 tasks | 7 files |
 | Phase 6 P41 | 36min | 2 tasks | 5 files |
 | Phase 07 P01 | 11min | 3 tasks | 9 files |
+| Phase 07 P03 | 44min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -632,6 +638,9 @@ Recent decisions affecting current work:
 - [Phase 6]: Do not run compressed pinned reference guests until Plan 06-42 installs the in-process source guard; Plan 06-43 owns selector registration.
 - [Phase 07]: Redact path text through its next quote or boundary to protect path components containing spaces.
 - [Phase 07]: Compare decimal digit strings exactly so rounding cannot admit a value just above a large integer bound.
+- [Phase 07]: Keep the repository-check budget at 3300 and the separate RetroArch budget at 300 through the Phase 7 ship ratchet.
+- [Phase 07]: Withhold the WASI module size bound until the focused Release target measurement runs with the Ubuntu 26 WASI toolchain.
+- [Phase 07]: Keep current settings, action pins, and runner labels where evidence did not justify changes; review Wasmtime 48.0.9 in the normal pin-update step using new upstream asset digests.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -873,8 +882,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-18T18:46:28.666Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-11-18T20:56:26.591Z
+Stopped at: Completed 07-03-PLAN.md
 Resume file: None
 
 ### v1.0 session history
