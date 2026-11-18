@@ -1,152 +1,117 @@
-# Project Research Summary
+---
+title: "Research summary: schwaystation v2.0 — The whole library"
+summary: "Synthesis of the v2.0 stack, feature, architecture, and risk research for roadmap creation."
+updated: 2026-11-18
+---
 
-**Project:** schwaystation
-**Domain:** Sony PlayStation (PS1) emulator core in C (embeddable library, headless runner, libretro core)
-**Researched:** 2026-10-19
-**Confidence:** HIGH for structure, stack, delivery and the CPU and GTE plan; MEDIUM for several timing constants (GPU clocks per line, CD seek and INT1 period, per-primitive GPU cost, MDEC block cost, ADSR edges) that are inferred from emulators rather than measured (named, cited and testable; see Gaps)
+# Research Summary
 
 ## Executive Summary
 
-schwaystation is the owner's seventh emulator and inherits a proven shape: a deterministic, integer-only C17 core
-with a headless runner and a libretro adapter, shipped by an automated pipeline from the first phase. The PlayStation
-is five to ten times the size of the 8-bit siblings (an R3000A with load delays and an I-cache, the GTE, a GPU
-rasteriser, an SPU with reverb and ADPCM, a CD-ROM controller with a seek model, the MDEC, SIO, DMA and timers), so
-one core with console revisions and regions as machine profiles covers the family. Four facts make this console
-cheaper than its size suggests: an MIT per-instruction R3000 vector corpus (SingleStepTests, 55 files), 1,150
-hardware-captured GTE cases and VRAM-image references under MIT (ps1-tests), a maintained MIT kernel (OpenBIOS in
-nugget) that stands in for the retail BIOS in CI, and permissive references that may be read (ares, ISC; MAME's
-BSD-3 device files). The libretro Redump DAT lists 13,407 discs; the slot is a permissive, embeddable core with
-published hashes and a ledger, which no PS1 emulator offers today.
+v2.0 extends the existing deterministic C17 PlayStation library, headless runner, and libretro core so more of the game library works through the same three deliverables. The research recommends keeping file parsing, decompression, persistence, and patch handling in host helpers; the core continues to receive BIOS, sectors, and integer input through its existing boundaries. Keep new hardware behavior in small per-device C modules and per-instance state. The only new runtime code dependency recommended is an optional, default-off, BSD-3-Clause libchdr build for CHD, plus MIT-licensed miniz source so PBP remains available when CHD is disabled.
 
-The sibling evidence is equally clear about what to avoid: growing the CPU from game traces, self-invented
-verification ceremony, real-host test harnesses that outgrow the emulator, release qualification deferred to
-milestone end, and fixture provenance on the critical path. Every rule that came from those failures is in
-`AGENTS.md`, and every lesson is a ledger row in `.planning/LESSONS.md`.
+Start with the required SEED-007 tune-up to measure CI cost, quality, and documentation freshness before the larger feature work. Then stabilize content identity and card persistence, add media providers with bounded format-specific fixtures, implement protection and peripheral protocols, and expand profiles and the compatibility ledger as evidence arrives. Do not infer playability from parsing or from a Redump inventory. Risks concentrate in hostile container sizes, losing CD track/subchannel semantics, incorrect LibCrypt bad-Q behavior, state/hash drift, and license closure. Use cheap source, count, boundary, and protocol preflights before expensive builds and guest runs; retain them as CI gates only when they prevent a named recurring fault.
+
+This is a breadth milestone, not a measured-accuracy or presentation milestone. The accepted v1.0 boundary still excludes proven exact 8-bit MDEC output and complete external frame/movie conformance. v2.0 must not claim those results. Seed-derived fast boot and MDEC-edge scope are not present in the active PROJECT target list or the feature list; requirements must explicitly include or defer them. Save states, movies, and the browser remain outside v2.0.
 
 ## Key Findings
 
-### Recommended Stack
-See `STACK.md`; details, pins and the rule → check table in `.planning/preparation/ENGINEERING.md`.
+### Stack
 
-### Expected Features
-v1.0: the delivery path with a test card in RetroArch; the R3000A and GTE against the public vectors with COP0,
-bus, DMA, timers and interrupts; PlayStation games playing in RetroArch with the GPU, DualShock, memory cards,
-OpenBIOS, self-authored fixtures and a compatibility ledger; the SPU, CD-ROM with cue/bin, iso and m3u, XA, CD-DA
-and MDEC. Later: CHD, PBP, ECM, LibCrypt, multitap, guns, PocketStation storage, per-game cards, PAL and every
-revision over the ledger (v2.0); states, rewind, run-ahead, movies, Playstead continuation (v3.0);
-hardware-measured accuracy (v4.0); hooks, a GDB stub, Python and Gymnasium (v5.0); the cached interpreter, JIT,
-handheld and console lanes and the buildbot (v6.0); enhancements outside the hashed path (SEED-006); the browser
-page (SEED-008).
+- Keep the v1 C17, CMake/CTest, libretro, host-supplied sector, and deterministic hash contracts. No floating point, file access, or environment access enters the core.
+- Use libchdr v0.3.0 at the approved public pin as an optional static host-side CHD backend behind SCHWAYSTATION_CHD=ON, default OFF. Enable raw sectors/subcode and CRC checking; preserve all applicable license notices. Do not select GPL-2 Zstandard terms or libchdr's optional C++ micro-flac path.
+- Vendor only the miniz 3.1.2 inflater source needed for PBP, independently of the CHD option, so PBP has no system-zlib requirement. Include its MIT notice in all archives. Keep ECM, CCD/SUB, SBI, cards, patches, cheats, and controller protocols in bounded in-tree C modules.
+- For SEED-007, use existing CMake string(JSON), POSIX shell, and GitHub CLI. Keep tool pins unless a measured comparison justifies an update. Do not add Python, Node, a dashboard, cache service, or a package manager; measure compile share and critical path before deciding on caching.
+- Tradeoff: vendoring a small inflater and optional CHD closure adds source and notice maintenance, but avoids platform-specific codec dependencies and keeps the core/API unchanged.
 
-### Architecture Approach
-One `uint64_t` tick per CPU cycle at 33,868,800 Hz; the GPU clock comes from an exact ratio accumulator; the CPU
-drives the bus and devices catch up lazily on one deadline; a frame runs from vsync to vsync with input latched
-there; the GPU renders immediately into VRAM on a line-granular state machine with a busy budget; video is the
-native display frame in GPU encoding plus a metadata tuple and a read-only VRAM view; audio is int16 stereo at
-44,100 Hz with an exact rational sample count per frame; the CD-ROM is a command FSM in cycles over host-supplied
-sector callbacks; state is a four-pass visitor over fixed-size integer structs; observability is always-on counters
-plus a first-fault record. Details in `.planning/preparation/ARCHITECTURE.md`.
+### Features
 
-**Major components:**
-1. **Core library** (`schwaystation`, prefix `schway_`): instance and test card, cpu, cop0, gte, bus, dma, timers, irq, gpu, spu, cdrom and cdxa, mdec, sio and pad, card, exe and bios (stub kernel), state; plus the MIT `host/disc_image` helper outside the determinism boundary.
-2. **Runner** (`schwaystation-run`): frames, frame and audio hashes, PNG, probe, mailbox and TTY, first-fault trace, input scripts, save dir, bench; the automation and Playstead surface.
-3. **libretro core**: the adapter over the library with the Beetle RetroPad map, BIOS names, option keys, XRGB8888, batch audio, disk control and memory descriptors.
+**Table stakes:** CHD v5, supported PBP variants, ECM, CCD/IMG/SUB, SBI/LibCrypt, region and board/GPU profiles, per-game cards with raw and approved wrapper import/export, libretro SaveRAM round-trip, GameShark strings, runner PPF/BPS patching, and capability metadata that changes only after the ledger criterion passes.
 
-### Critical Pitfalls
-1. Growing the CPU opcode by opcode from game traces instead of the vectors (three siblings repeated it; the R3000A and GTE finish against vectors first).
-2. Real-host e2e and verification machinery that outgrows the emulator (10k test lines, no `src/` change).
-3. Deferring releases to a milestone-end qualification phase (eight phases merged unpublished).
-4. Fixture and toolchain provenance on the critical path; hence armips and mkpsxiso pinned by digest, own fixtures, OpenBIOS built in CI, no Sony bytes anywhere.
+**Differentiators in the approved direction:** multitap and tap cards; GunCon and Justifier; mouse, neGcon, and Jogcon; PocketStation storage compatibility. These are serial protocols or storage behavior, not physical-device or full PocketStation emulation. The scope also calls for Dual Analog flight mode; make sure it is represented in requirements because the feature research does not cover it explicitly.
+
+**Keep bounded or defer:** PBP support should name the tested unencrypted PSISO layout; PGD-encrypted payloads and undocumented audio/multi-disc variants need evidence before inclusion. Keep full PocketStation CPU/BIOS/LCD/RTC/IrDA behavior, adjacent media formats, cheat databases/UIs, physical devices, and unbounded scans out of scope. A 13,407-entry DAT is an inventory, not evidence that every disc was booted or mapped to each board.
+
+### Architecture
+
+- Normalize every supported disc into the existing schway_disc contract: raw sector, TOC, subcode, identity, and optional bad-Q status. Keep format parsing, paths, overlays, and I/O in host/; do not teach the core about containers or files.
+- Preserve append-only, size-tagged public input/profile structures. Resolve region separately from board revision; add only profile fields with a real consumer. Include behavior-affecting profile, disc, patch, cheat, and protocol state in instance validation, serialization, and hashes as applicable.
+- Keep byte timing and protocol state in SIO0 and small device modules. Host adapters translate controls into frame-latched integer input. Gun behavior needs a deterministic GPU beam/brightness query; input-coordinate availability varies by frontend.
+- Keep card bytes and emulated serial behavior in the instance; host helpers validate wrappers, name files, load before the first frame, and flush changes. Decide multi-disc/set identity and slot naming before per-game persistence. Preserve card 1 as libretro SAVE_RAM; manage additional cards in the save directory.
+- Apply PPF/BPS after media decoding as host-side overlays. GameShark text parsing stays host-side, but deterministic writes need a narrow explicit core API; never mutate the read-only memory span.
+- Treat the compatibility ledger as evidence, with pinned identities and explicit pass/unknown outcomes. Add rows with each feature; only the final measured threshold can support stable .info metadata claims.
+
+### Pitfalls and Prevention
+
+1. **Hostile media sizes, offsets, and paths:** checked arithmetic and strict limits must precede allocation or decode. Confine CCD companion paths. Count tracks/sectors and read track boundaries plus the final LBA before a long guest run.
+2. **Losing track or subchannel meaning:** preserve audio, pregap/index, leadout, sector type, and subcode through each provider. Test representative sectors and Q at boundaries; a bad Q is not a failed data-sector read.
+3. **Misimplementing LibCrypt:** bind SBI to the selected disc and LBA map, model bad-Q independently from sector payload, and verify the previous-good-position/GetlocP response before protected-title runs.
+4. **License or build-closure mistakes:** audit the exact pinned source tree and per-file notices, use only the BSD-3 option for Zstandard, keep default builds offline, and verify the actual release archive's notices.
+5. **Nondeterminism and persistence drift:** keep region and board distinct, and validate split-run, save/load/continue, and cross-lane state/hash behavior for new timing/profile fields. Test card import non-mutation, two-slot independence, and fresh-process persistence; do not use save-state tests as a persistence substitute.
+6. **Misleading quality or compatibility claims:** compare equivalent workload/toolchain fingerprints, protect ledger denominators, and leave metrics descriptive until baselines match. Treat issue/log text as untrusted and redact private data from the digest.
 
 ## Implications for Roadmap
 
-Milestone heading for ROADMAP.md: `## v1.0 PlayStation games play with sound in RetroArch`. Six phases. Merging each one publishes a release.
+The following is an ordering recommendation, not a claim that all title/profile combinations are understood. Each feature phase should add its focused fixtures and ledger evidence. Reuse the current host/core seams and keep phases small enough to release independently.
 
-### Phase 1: A test frame in RetroArch
-**Rationale:** Ship the whole delivery path before any emulation exists, so every later phase ends in a release by merging; the test card proves the frame contract on eight lanes with no BIOS and no disc.
-**Delivers:** The library with its public header, test card and state visitor, `schwaystation-run` with hashes and bench, the libretro core, six-platform CI plus `be32` and `wasm32` lanes, hygiene and policy gates with negative controls, release-please with the App token, the rehearsal, 18 attested archives, the README install line, the hosted RetroArch screenshot compare, installed and embedded consumers, the Ir/frame measurement.
-**Addresses:** FRAME-01 to FRAME-09
-**UI hint**: no
-**Canonical refs:** `.planning/preparation/ENGINEERING.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `PROVENANCE.md`
+| Suggested phase | Delivers and dependencies | Rationale, cost, and main guard |
+|---|---|---|
+| **1. SEED-007 tune-up** | Weekly triage digest, measured CI-efficiency report, quality.json ratchets, policy.lessons_unique, refreshed pins/docs/device budgets. No feature dependency. | Mandatory first: establishes comparable baselines before v2.0 adds CI load. **Medium cost.** Use existing tools; report matched workloads, keep the digest read-only, and measure before changing caching or parallelism. |
+| **2. Content identity and card lifecycle** | Stable single-disc, multi-disc, and unknown-identity policy; raw and .gme/.mem/.psx import/export; per-game cards; libretro SaveRAM/fresh-load round trip; PocketStation storage only. | Establishes the identity and persistence contract reused by new media and multitap cards. **Medium cost.** Keep bytes lossless and host-owned; test two slots, malformed-import non-mutation, atomic flush, and a fresh process. |
+| **3. CHD provider** | Optional CHD v1–v5 backend through schway_disc, fixture parity, feature-gated .info extension. | CHD is the high-demand format and its provider exercises the media contract. **High cost.** Requires pinned license closure, bounded allocation/metadata, and a sub-512 KiB fixture with equivalent sectors and hashes before considering default-on support. |
+| **4. PBP provider** | Bounded PSISO directory/TOC and DEFLATE sectors for the explicitly supported variant matrix. | Separate because layout, encryption, audio, and multi-disc behavior are the least settled. **High cost / highest format uncertainty.** Use miniz independently; reject unsupported PGD and undocumented variants instead of inferring support. |
+| **5. ECM and CCD/IMG/SUB providers** | Indexed or bounded-decoded ECM sectors; CCD track metadata and IMG/SUB reads. | Completes the named disc formats after the common provider and identity seams are proven. **Medium-high cost.** Never rescan the whole ECM stream for every LBA; validate paths, track/pregap data, subcode, and first/last sector. |
+| **6. SBI and LibCrypt** | Sidecar-to-disc binding, bad-Q callback use, previous-good GetlocP behavior, protected-title predicates. | Depends on stable selected-disc identity and media TOCs. **High cost.** Keep Q validity separate from payload delivery and prove a short CD command sequence before any long title run. |
+| **7. PAL and board/GPU profiles** | Explicit legal region/board tuples, documented per-revision behavior, profile-specific ledger rows. | Independent of media codec work and should not be inferred from a title serial or from the Redump DAT. **High cost.** Test each declared tuple and hash/state inclusion; claim only behaviors with evidence. |
+| **8. Non-gun SIO peripherals** | Multitap on both ports, tap-addressed cards, mouse, neGcon, Jogcon, and the seed's Dual Analog flight mode. | Depends on the append-only frame-input seam and card slot mapping. **Medium-high cost.** Keep device byte counts, ACK/IRQ timing, config, abort, and empty-slot behavior in protocol vectors before game tests. |
+| **9. Light guns** | GunCon and Justifier with host input mapping, beam timing, brightness threshold, and interrupt behavior. | Separate because these depend on GPU sensing and timer behavior, not only a new SIO report. **High cost / host-dependent.** Test synthetic bright/dark/offscreen/edge coordinates; document frontends without lightgun input. |
+| **10. ROM-hacker support and capability closeout** | PPF1/2/3 and BPS overlays, bounded GameShark parsing with an explicit deterministic core write seam, final ledger threshold review, stable .info metadata only if it passes. | The patches need the completed media representation; cheats need a real, narrow RAM-write consumer. **High cost.** Validate source identity/CRCs and immutable inputs, reject unsafe codes, and do not drop experimental status until the numeric criterion and metadata semantics are settled. |
 
-### Phase 2: The CPU matches the public vectors
-**Rationale:** Public vectors judge the R3000A on its own before any other chip exists; COP0 exceptions, bus decode, memory control, the I-cache, interrupt registers and PS-EXE loading under the stub kernel come with it, and the first-fault trace makes every later stall diagnosable.
-**Delivers:** An own interpreter (load and branch delays, mul/div stamps, I-cache, write queue, exception path) matching the committed SingleStepTests sample with the full set nightly; `exc_matrix` under the own stub kernel; armips built on every leg assembling every fixture; bus decode, memory-control costs, I-cache, scratchpad and I_STAT/I_MASK; `--probe`, `--tty`, `--trace first-fault`; the loader fuzz target.
-**Addresses:** CPU-01 to CPU-05
-**UI hint**: no
-**Canonical refs:** `.planning/preparation/PSX-SYSTEM.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/PSXDEV-EXTRACTS.md`
+Ledger rows should accrue with the feature that produces the evidence, rather than being deferred to a large final sweep. A final compatibility review can compare the protected denominator and determine whether stable metadata is justified; it must not claim exhaustive DAT playability or a board × region × media cross-product without runs.
 
-### Phase 3: The GTE matches the hardware cases; DMA and timers
-**Rationale:** The GTE has its own hardware-captured oracle and DMA and timers are register-level devices that every later chip depends on; landing them as one phase keeps phase 2 small and gives the GPU, SPU and CD-ROM a proven transfer and timing base.
-**Delivers:** The GTE against the transcoded 1,150-case table with the UNR table, flags, cycle counts and a property test; the `gte_vectors` fixture; the seven DMA channels with DPCR/DICR, costs, chopping, the linked-list guard, MADR wrap and OTC; the three root counters with sync modes, targets and IRQ modes; the `timers_lines` sysclk, sysclk/8 and vblank-count records.
-**Addresses:** GTE-01 to GTE-03
-**Uses:** the stub kernel and armips fixtures from Phase 2
-**UI hint**: no
-**Canonical refs:** `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/PSX-SYSTEM.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/PSXDEV-EXTRACTS.md`
+### Scope reconciliation before roadmap lock
 
-### Phase 4: Games play in RetroArch
-**Rationale:** With the CPU, GTE, DMA and timers proven, the GPU, pads and memory cards turn fixtures into playable games; OpenBIOS boots to its shell in CI and the ledger starts ratcheting, with a local preset for the user's own dumps.
-**Delivers:** The rasteriser against ps1-tests VRAM references; display modes with the metadata tuple; DMA2 lists and the busy budget; timers on dot and hblank; cycle-scheduled SIO0 with the digital pad and DualShock and rumble; memory-card spans with atomic runner writes and fresh-process continuation; the `gpu_motion`, `pad_counter` and `memcard_roundtrip` fixtures and the `timers_lines` dot and hblank records; OpenBIOS built in CI; the ledger and generated compatibility page; the local `library` preset; one integrated RetroArch session.
-**Addresses:** GAME-01 to GAME-07
-**Uses:** the first-fault trace, the stub kernel and the fixtures from Phases 2 and 3
-**UI hint**: no
-**Canonical refs:** `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
+- **Fast boot:** SEED-001 names a fast boot option, but the active PROJECT target list and researched feature table do not define it. Requirements should explicitly include or defer it. If included, state the observable behavior and prove it does not introduce HLE, BIOS bytes, a timing-changing shortcut, or host-dependent output.
+- **MDEC edge cases:** the feature research flags seed-derived MDEC edge scope, but active v2.0 targets do not name an MDEC expansion. The accepted v1.0 boundary explicitly leaves exact 8-bit MDEC output and full external frame/movie conformance unproven. Do not add a broad MDEC accuracy phase or replace its acceptance oracle under v2.0. If a narrowly defined edge case is retained, tie it to a new, supported requirement and report compressed-source coverage, decoder output, guest completion, and image result separately. A cheap source-coverage check must precede expensive guest/emulator runs; source coverage alone is not output conformance.
+- **Dual Analog flight mode:** SEED-001 names it, while FEATURES.md does not make it a table-stakes row. Give it an explicit requirement or an explicit deferral.
+- **Out-of-scope boundary:** browser UI, save states, movies, measured-accuracy campaigns, JITs, and visual enhancements remain outside v2.0. No phase should silently absorb them.
 
-### Phase 5: The sound matches the console
-**Rationale:** The SPU's oracles (the ps1-tests SPU logs and an own tone fixture) need only a running EXE, so sound lands before discs; audio equality is proven in-process, and the hosted RetroArch session proves video only.
-**Delivers:** The SPU with ADSR, reverb, noise, capture buffers and transfer paths; the `spu_tone` fixture; audio hashes identical on every lane with an exact sample count per frame; libretro batch and single-sample audio equal to the runner's stream in `libretro.host`; the idle SPU under `core.no_busy_loop`.
-**Addresses:** SOUND-01 to SOUND-02
-**Uses:** DMA4 from Phase 3 and the GAME-07 content path from Phase 4
-**UI hint**: no
-**Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
+## Research Flags
 
-### Phase 6: Discs and FMV
-**Rationale:** Discs last, because their oracles (the ps1-tests CD-ROM and MDEC logs, the own disc booting through OpenBIOS) need a playing game with sound, and because the disc path is the one host-side parser of v1.0.
-**Delivers:** The CD-ROM FSM with documented timings, GetID and the lid; cue/bin, iso and m3u parsing with fuzz targets; XA and CD-DA through the ATV matrix; the MDEC against the ps1-tests references; the `disc_boot` fixture built by mkpsxiso and booted through OpenBIOS; the rcheevos disc MD5 check; disk control with m3u swap; a hosted RetroArch session booting `disc_boot`; the SDL2 example host.
-**Addresses:** DISC-01 to DISC-04
-**UI hint**: no
-**Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`
+**Plan-phase research recommended:** CHD dependency/source closure and target memory behavior; supported PBP variants; ECM random-access/index strategy; CCD path and subcode cases; SBI/LibCrypt title sequences; board/profile behavior; SIO timing and device-specific input mapping; GPU beam/brightness support; GameShark code matrix and explicit write API; the final numeric compatibility threshold and .info semantics. Recheck mutable upstream facts at the implementation pin.
 
-### Phase Ordering Rationale
-Delivery first so nothing is ever unreleased; the CPU against exhaustive vectors before any chip that depends on
-it; the GTE, DMA and timers next, each with its own register-level or hardware-captured oracle; video, input and
-saves together because one integrated play check proves all three; sound before discs because the SPU's evidence
-needs only a running EXE; discs and FMV last because their evidence needs a playing game with sound. Each phase
-opens with a tracer plan through every layer before widening, and plans that do not share a test inventory run in
-parallel waves (opcode groups; bus and irq; gte, dma and timers; rasteriser, sio and card; spu voices and reverb;
-cdrom and mdec).
-
-### Research Flags
-Phases likely needing deeper research during planning: Phase 4 (GPU blend width, size rejection and stepper
-precision settled by the named ps1-tests images; GPU clocks per line through `timers_lines`; the adapter's
-stub-kernel path for PS-EXE content in RetroArch), Phase 6 (the CD seek model and INT1 period; whether OpenBIOS
-boots the own mkpsxiso disc without licence data; the PCSX-Redux AppImage under Xvfb). Phases with standard
-patterns: Phase 1 (cogmaster's and muhtari's pipeline, renamed), Phase 2 (the vectors harness pattern from muhtari
-and cogmaster), Phase 3 (the same pattern over the GTE table), Phase 5 (in-process audio equality, no hosted capture).
+**Patterns already well documented:** CMake JSON and shell/GitHub CLI reporting for the tune-up; the existing schway_disc/size-tagged API boundary; libretro SaveRAM and controller API contracts; per-instance deterministic state and cross-lane hashes. These can skip broad survey research, but still need phase-specific acceptance decisions and tests.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |---|---|---|
-| Stack | HIGH | Sibling-proven; dated facts re-verified 2026-10-19 |
-| Features | HIGH | Library counts from the libretro Redump DAT; complaints mapped from docs, issue trackers and forums |
-| Architecture | HIGH | Exact cycle lattice; API conventions held three sibling milestones; every preparation conflict settled in ARCHITECTURE 13 |
-| Pitfalls | HIGH | Drawn from six siblings' histories, with revisions |
-| Timing constants | MEDIUM | GPU clocks per line, CD seek and INT1 period, GPU per-primitive cost, MDEC block cost, ADSR edges and XA rounding are emulator inferences; fixtures and v4.0 hardware runs settle them |
+| Stack | **High** for the project boundary and audited libchdr pin; **medium-high** for dependency/license closure | Exact source pins and license components are identified. Re-audit if the pin or build options change. |
+| Features | **Medium** | Project scope and libretro contracts are clear. PBP variants, Jogcon semantics, GameShark edge rules, exact compatibility threshold, Dual Analog coverage, and fast-boot/MDEC scope need decisions. |
+| Architecture | **High** for host/core, API, and state boundaries; **medium** for undocumented devices/profiles | Existing interfaces are inspected. New format layouts, lightgun sensing, and some profile combinations need evidence. |
+| Pitfalls | **Medium-high** | Resource, licensing, determinism, ledger, and CI risks are well grounded. Format prevalence and title-specific behavior remain less certain. |
 
-**Overall confidence:** HIGH
+**Overall: MEDIUM-HIGH.** The implementation shape and project constraints are strong; evidence for several user-visible edge cases remains incomplete.
 
 ### Gaps to Address
-- GPU clocks per line (3413/3406 vs 3412.5/3405.02), the CD seek model and INT1 period, per-primitive GPU cost, MDEC block cost, ADSR edge rates, XA resampler rounding, blend channel width, the 1023/1024 size boundary, stepper precision, hblank and vblank edges, interrupt latency, GTE flag chaining in MVMVA, memory-control timing and DMA per-word costs, reverb rounding (DECISIONS open questions): settled by the named fixtures and ps1-tests images in Phases 2 to 6, then hardware in v4.0.
-- The licence-string check, the kernel state at Exec, the scph5000 digest and GPU v0 behaviour: local runs with the owner's BIOS or ledger evidence.
-- Whether OpenBIOS boots the own mkpsxiso disc without licence data and whether the stub kernel runs nugget tests unmodified: first build in Phase 2 (stub) and Phase 6 (disc).
-- The interlaced rate report and audio drift in RetroArch, the rcheevos path for a bare EXE, Playstead multi-file binding: Phases 4 to 6 and a Playstead decision.
-- Microsecond frame budgets and device MIPS, `be32` and `wasm32` per-PR cost, the ppc32 libgcc multiply and wasmtime instruction-count stability: measured in Phase 1.
-- Whether the PCSX-Redux AppImage runs under Xvfb on ubuntu-26.04 and which build id to pin: the first nightly oracle run; Dependabot `vars` and the App's `workflows: write` need: the first Dependabot PR; GSD 1.18.0's stale `gaps_found` routing: the first occurrence; which console, loader and capture path the owner has: asked at Phase 4 at the earliest.
+
+- Define PBP support and playlist/sidecar precedence, ECM indexing, and SBI lookup across CUE/CCD/CHD and multi-disc sets.
+- Choose per-game identity and card key behavior for multi-disc titles, unknown serials, tap slots, and libretro card 2 flush lifecycle.
+- Name supported Jogcon and GameShark behavior; settle mouse deltas and lightgun input fallback in the public API.
+- Specify which board × region tuples and representative titles the ledger actually covers. The DAT provides no board mapping.
+- Set a numeric ledger pass threshold and resolve whether stable .info omits is_experimental or sets it false.
+- Resolve fast boot, MDEC-edge, and Dual Analog scope explicitly before roadmap lock; keep the accepted MDEC evidence boundary intact.
+- Define equivalent-input fingerprints for quality and CI comparisons; decide cache or parallelism changes only after measurement.
 
 ## Sources
-Tiered and pinned in each preparation file's Sources table; the index is `.planning/preparation/BRIEF.md`.
+
+Sources below are aggregated from the four research documents and the required project scope. Format references are evidence for described behavior, not licenses to copy code. Any implementation seed must also pass the project's exact-path provenance checks; prohibited emulator sources remain unopened and unused.
+
+- Project scope and decisions: [PROJECT.md](../PROJECT.md), [PRODUCT-ROADMAP.md](../PRODUCT-ROADMAP.md), [SEED-001](../seeds/SEED-001-whole-library.md), [SEED-007](../seeds/SEED-007-milestone-tune-up.md), [preparation index](../preparation/README.md), [LESSONS.md](../LESSONS.md), and the settled architecture/host/provenance documents in .planning/preparation/.
+- CHD: [libchdr v0.3.0 release](https://github.com/rtissera/libchdr/releases/tag/v0.3.0), [approved source tree](https://github.com/rtissera/libchdr/tree/47d794151b2b64f6aba60304e6480f4f5a2bc24b), and its pinned [CMake options](https://github.com/rtissera/libchdr/blob/47d794151b2b64f6aba60304e6480f4f5a2bc24b/CMakeLists.txt), [BSD-3 license](https://github.com/rtissera/libchdr/blob/47d794151b2b64f6aba60304e6480f4f5a2bc24b/LICENSE.txt), [MAME-derived chd.h notice](https://github.com/rtissera/libchdr/blob/47d794151b2b64f6aba60304e6480f4f5a2bc24b/include/libchdr/chd.h), and [Zstandard BSD-3 text](https://github.com/facebook/zstd/blob/v1.5.7/LICENSE). The exact miniz, LZMA, and dr_flac notices are linked in STACK.md.
+- Media and device facts: the project-pinned [PSX-SPX disc-image notes](https://psx-spx.consoledev.net/dev/ps1/cdr/cdromfileformats/diskimages/), [CD-ROM/LibCrypt notes](https://psx-spx.consoledev.net/dev/ps1/cdr/cdromformat/), [controller and card notes](https://psx-spx.consoledev.net/controllersandmemorycards/), and [PocketStation notes](https://psx-spx.consoledev.net/pocketstation/); these are curated, partly reverse-engineered references and require fixture validation.
+- Host contracts: pinned [libretro API header](https://github.com/libretro/libretro-common/blob/a3194c18ba65/include/libretro.h), official [RetroArch input-controller guide](https://docs.libretro.com/guides/input-controller-drivers/), and the [libretro .info example](https://github.com/libretro/libretro-super/blob/master/dist/info/00_example_libretro.info).
+- Patches, inventory, and reporting: reviewed [PPF3 developer text](https://github.com/meunierd/ppf/blob/4f24f8c784fa/ppfdev/PPF3.txt); pinned [Redump DAT snapshot](https://github.com/libretro/libretro-database/blob/12c21cf79f1e/metadat/redump/Sony%20-%20PlayStation.dat) (inventory only); [CMake string(JSON) documentation](https://cmake.org/cmake/help/v3.25/command/string.html#json); [GitHub CLI API manual](https://cli.github.com/manual/gh_api); and [GitHub Actions concurrency documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency).
 
 ---
-*Research completed: 2026-10-19*
-*Ready for roadmap: yes*
+*Research synthesis completed: 2026-11-18.*
