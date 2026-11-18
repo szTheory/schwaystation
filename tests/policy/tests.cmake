@@ -7,6 +7,16 @@ schway_add_test(NAME ci.triage
     -P ${policy_scripts}/triage_controls.cmake
   LABELS policy TIMEOUT 30)
 
+# Fault prevented: repeated lesson IDs or prose hiding distinct findings in the ledger.
+schway_add_test(NAME policy.lessons_unique
+  COMMAND ${CMAKE_COMMAND} -DLEDGER=${PROJECT_SOURCE_DIR}/.planning/LESSONS.md
+    -P ${policy_scripts}/lessons_unique.cmake
+  LABELS policy TIMEOUT 10)
+schway_add_test(NAME policy.lessons_unique.self_test
+  COMMAND ${CMAKE_COMMAND} -DSELF_TEST=${PROJECT_BINARY_DIR}/policy/lessons
+    -P ${policy_scripts}/lessons_unique.cmake
+  LABELS policy TIMEOUT 10)
+
 schway_add_test(NAME policy.no_skip
   COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -P ${policy_scripts}/no_skip.cmake
   LABELS policy TIMEOUT 10)

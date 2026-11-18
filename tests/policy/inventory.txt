@@ -4,6 +4,8 @@ docs.api_names	policy,portable
 docs.api_names.self_test	policy,portable
 docs.budgets	policy
 policy.fixture_budget	policy,portable
+policy.lessons_unique	policy
+policy.lessons_unique.self_test	policy
 policy.no_skip	policy
 policy.no_skip.self_test	policy
 policy.pass_regex_status.self_test	policy,portable
