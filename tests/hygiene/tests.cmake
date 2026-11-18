@@ -210,13 +210,15 @@ check_paths() {
 }
 check_route() {
   name=$1 want=$2 event=$3 ref=$4 number=$5 call_ref=$6 before=$7 after=$8 checkout=$9
+  route_path=${10:-$bin}
+  gh_fail=${11:-}
   git -C "$runner" fetch -q --no-tags --depth=1 origin "$checkout"
   git -C "$runner" checkout -q --detach "$checkout"
   : > "$output"
-  got=$(EVENT="$event" REF="$ref" NUMBER="$number" CALL_REF="$call_ref" \
+  got=$(cd "$runner" && EVENT="$event" REF="$ref" NUMBER="$number" CALL_REF="$call_ref" \
     BEFORE="$before" AFTER="$after" CHANGED=1 GITHUB_WORKSPACE="$runner" \
-    GITHUB_REPOSITORY=fixture/project GITHUB_OUTPUT="$output" GH_TOKEN=test-token \
-    PATH="$bin:$PATH" bash -e -o pipefail "$workflow")
+    GITHUB_REPOSITORY=fixture/project GITHUB_OUTPUT="$output" GH_TOKEN=test-token GH_LIST_FAIL="$gh_fail" \
+    PATH="$route_path:$PATH" bash -e -o pipefail "$workflow")
   output_got=$(tr '\n' ' ' < "$output")
   if [ "$output_got" != "$want" ]; then
     echo "ci.classify: $name wanted $want, got $output_got"
@@ -301,6 +303,12 @@ printf '%s\n' '#!/bin/sh' '[ "${GH_LIST_FAIL-}" = 1 ] && exit 1' \
   "printf '%s\\n' '.planning/STATE.md'" > "$fixture_root/bin/gh"
 chmod +x "$fixture_root/bin/gh"
 bin=$fixture_root/bin
+git_path=$fixture_root/diff-failure
+mkdir -p "$git_path"
+real_git=$(command -v git)
+printf '%s\n' '#!/bin/sh' 'for arg do' '  [ "$arg" = diff ] && exit 1' 'done' \
+  "exec $real_git \"\$@\"" > "$git_path/git"
+chmod +x "$git_path/git"
 
 check_route main-planning 'heavy=false release_inputs=false ' push refs/heads/main '' '' "$base" "$planning" "$planning"
 check_route main-source 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$planning" "$source" "$source"
@@ -308,6 +316,7 @@ check_route rename-planning-to-source 'heavy=true release_inputs=false ' push re
 check_route rename-source-to-planning 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$source_seed" "$source_to_planning" "$source_to_planning"
 check_route release-input 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$source_to_planning" "$release" "$release"
 check_route quoted-path 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$release" "$special" "$special"
+check_route diff-failure 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$base" "$planning" "$planning" "$git_path"
 check_route over-limit 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$special" "$oversize" "$oversize"
 check_route empty-diff 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$planning" "$planning" "$planning"
 check_route missing-before 'heavy=true release_inputs=true ' push refs/heads/main '' '' '' "$planning" "$planning"
@@ -318,14 +327,11 @@ check_route missing-after 'heavy=true release_inputs=true ' push refs/heads/main
 check_route malformed-after 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$base" x "$planning"
 check_route zero-after 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$base" 0000000000000000000000000000000000000000 "$planning"
 check_route mismatch 'heavy=true release_inputs=true ' push refs/heads/main '' '' "$base" "$source" "$planning"
-check_route release-call 'heavy=true release_inputs=true ' workflow_call '' '' "$planning" "$base" "$planning"
+check_route release-call 'heavy=true release_inputs=true ' workflow_call '' '' "$base" '' '' "$planning"
 check_route manual 'heavy=true release_inputs=true ' workflow_dispatch refs/heads/main '' '' "$planning" "$planning" "$planning"
 check_route non-main-push 'heavy=true release_inputs=true ' push refs/heads/feature '' '' "$planning" "$planning" "$planning"
 check_route pr-planning 'heavy=false release_inputs=false ' pull_request refs/pull/1/merge 1 '' '' '' "$planning"
-if GH_LIST_FAIL=1 check_route pr-listing-failure 'heavy=true release_inputs=true ' pull_request refs/pull/1/merge 1 '' '' '' "$planning"; then
-  echo "ci.classify: failed PR listing unexpectedly skipped heavy jobs"
-  exit 1
-fi
+check_route pr-listing-failure 'heavy=true release_inputs=false ' pull_request refs/pull/1/merge 1 '' '' '' "$planning" '' 1
 echo "ci.classify: $n lists"
 ]=])
 schway_add_test(NAME ci.classify

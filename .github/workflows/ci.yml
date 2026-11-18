@@ -51,8 +51,8 @@ defaults:
     shell: bash
 
 jobs:
-  # heavy=false only for a pull request whose every changed path, old and new
-  # name, is under .planning/; then the heavy jobs are skipped.
+  # heavy=false only for a pull request or direct main push whose complete
+  # changed-path list is non-empty and entirely under .planning/.
   # release_inputs=true when a path the release pipeline reads changed.
   changes:
     runs-on: ubuntu-26.04
@@ -79,17 +79,69 @@ jobs:
           REF: ${{ github.ref }}
           CALL_REF: ${{ inputs.ref || '' }}
           BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
-          GITHUB_WORKSPACE: ${{ github.workspace }}
+          AFTER: ${{ github.event.after }}
         run: |
           # CI_CLASSIFIER_TEST_BEGIN
-          if [ -z "$NUMBER" ]; then
+          fail_closed() {
             printf 'heavy=true\nrelease_inputs=true\n' | tee -a "$GITHUB_OUTPUT"
+          }
+          if [ -n "$NUMBER" ]; then
+            { gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files" \
+                --jq '.[] | .filename, (.previous_filename // empty)' || echo '(listing failed)'; } |
+              sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
             exit 0
           fi
-          { gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files" \
-              --jq '.[] | .filename, (.previous_filename // empty)' || echo '(listing failed)'; } |
-            sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
+          if [ "$EVENT" != push ] || [ "$REF" != refs/heads/main ] || [ -n "$CALL_REF" ]; then
+            fail_closed
+            exit 0
+          fi
+          is_commit_id() {
+            [ "${#1}" -eq 40 ] && case "$1" in
+              *[!0123456789abcdef]* | 0000000000000000000000000000000000000000) return 1 ;;
+              *) return 0 ;;
+            esac
+          }
+          if ! is_commit_id "$BEFORE" || ! is_commit_id "$AFTER"; then
+            fail_closed
+            exit 0
+          fi
+          checked_out=$(git -C "$GITHUB_WORKSPACE" rev-parse --verify HEAD 2>/dev/null) || {
+            fail_closed
+            exit 0
+          }
+          if [ "$checked_out" != "$AFTER" ]; then
+            fail_closed
+            exit 0
+          fi
+          if ! git -C "$GITHUB_WORKSPACE" cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n') || {
+              fail_closed
+              exit 0
+            }
+            if ! git -C "$GITHUB_WORKSPACE" -c "http.extraheader=AUTHORIZATION: basic $auth" \
+              fetch --no-tags --depth=1 origin "$BEFORE" >/dev/null 2>&1; then
+              fail_closed
+              exit 0
+            fi
+          fi
+          if ! paths=$(git -C "$GITHUB_WORKSPACE" -c core.quotePath=true \
+            diff --no-renames --name-only "$BEFORE" "$AFTER" --); then
+            fail_closed
+            exit 0
+          fi
+          if [ -z "$paths" ]; then
+            fail_closed
+            exit 0
+          fi
+          count=$(printf '%s\n' "$paths" | wc -l | tr -d '[:space:]')
+          case "$count" in
+            '' | *[!0123456789]*) fail_closed; exit 0 ;;
+          esac
+          if [ "$count" -gt 3000 ]; then
+            fail_closed
+            exit 0
+          fi
+          printf '%s\n' "$paths" | sh scripts/classify-changes.sh "$count" | tee -a "$GITHUB_OUTPUT"
           # CI_CLASSIFIER_TEST_END
 
   # Required renderer oracle: fetch the pinned captures and three source logs,
