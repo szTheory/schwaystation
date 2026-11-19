@@ -227,25 +227,22 @@ run_block(state-malformed "${state_block}" "${state_setup}" "state_bytes" "QUALI
 run_block(state-duplicate "${state_block}" "${state_setup}" "state_bytes" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=duplicate")
 run_block(state-over "${state_block}" "${state_setup}" "above ceiling" "QUALITY_FILE=${quality_file}" "STATE_TEST_BINARY=${state_binary}" "STATE_CASE=over")
 
-# The critical-path checker accepts only a complete, successful, exact-attempt
-# Actions projection and fingerprints just the files that can change CI work.
+# Fault prevented: incomplete Actions data or a fingerprint that omits CI-work-changing inputs.
 find_program(JQ jq REQUIRED)
 execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${ROOT}"
   RESULT_VARIABLE head_rc OUTPUT_VARIABLE head_sha OUTPUT_STRIP_TRAILING_WHITESPACE)
 if(NOT head_rc STREQUAL "0")
   message(FATAL_ERROR "quality_controls: could not resolve the CI fixture head")
 endif()
-set(pr_head_sha "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+string(SHA1 pr_head_sha "${head_sha} pull request fixture")
 if(pr_head_sha STREQUAL head_sha)
   message(FATAL_ERROR "quality_controls: PR head fixture must differ from merge SHA")
 endif()
 set(input_root "${BIN}/ci-inputs")
 file(MAKE_DIRECTORY "${input_root}")
-set(workload_files "${ROOT}/.github/workflows/ci.yml" "${ROOT}/CMakeLists.txt" "${ROOT}/CMakePresets.json"
-  "${ROOT}/cmake/SchwaystationTests.cmake" "${ROOT}/tests/policy/tests.cmake" "${ROOT}/tests/fixtures/manifest.txt"
-  "${ROOT}/tests/fixtures/inventory.txt" "${ROOT}/tests/cmake/quality.cmake"
-  "${ROOT}/tests/cmake/lessons_unique.cmake" "${ROOT}/pins.txt"
-  "${ROOT}/scripts/fetch-pin.sh" "${ROOT}/scripts/ci-critical-path.sh")
+set(workload_files "${ROOT}/.github/workflows/ci.yml" "${ROOT}/CMakeLists.txt" "${ROOT}/CMakePresets.json" "${ROOT}/cmake/SchwaystationTests.cmake"
+  "${ROOT}/tests/policy/tests.cmake" "${ROOT}/tests/fixtures/manifest.txt" "${ROOT}/tests/fixtures/inventory.txt" "${ROOT}/tests/cmake/quality.cmake"
+  "${ROOT}/tests/cmake/lessons_unique.cmake" "${ROOT}/pins.txt" "${ROOT}/scripts/fetch-pin.sh" "${ROOT}/scripts/ci-critical-path.sh")
 foreach(source IN LISTS workload_files)
   file(RELATIVE_PATH relative "${ROOT}" "${source}")
   get_filename_component(parent "${input_root}/${relative}" DIRECTORY)
@@ -255,18 +252,15 @@ endforeach()
 file(MAKE_DIRECTORY "${input_root}/src")
 file(WRITE "${input_root}/src/product.c" "int product_source;\n")
 
-set(job_specs
-  "changes|ubuntu-26.04|01|success" "hygiene|ubuntu-26.04|04|success"
-  "title|ubuntu-26.04|01|success" "gpu-reference|ubuntu-26.04|02|success"
-  "openbios|ubuntu-26.04|02|success" "build (linux-x64)|ubuntu-26.04|04|success"
-  "build (linux-arm64)|ubuntu-26.04-arm|03|success" "build (macos-arm64)|macos-15|04|success"
-  "build (macos-x64)|macos-15-intel|04|success" "build (windows-x64)|windows-2025|03|success"
-  "build (windows-arm64)|windows-11-arm|03|success" "asan|ubuntu-26.04|05|success"
-  "nofp (ubuntu-26.04)|ubuntu-26.04|03|success" "nofp (ubuntu-26.04-arm)|ubuntu-26.04-arm|02|success"
-  "be32|ubuntu-26.04|06|success" "wasm32|ubuntu-26.04|03|success"
-  "hash-equality|ubuntu-26.04|02|success" "retroarch|macos-15|03|success"
-  "perf|ubuntu-26.04|03|success" "rehearsal|ubuntu-26.04|00|skipped"
+set(job_specs "changes|ubuntu-26.04|01|success" "hygiene|ubuntu-26.04|04|success" "title|ubuntu-26.04|01|success" "gpu-reference|ubuntu-26.04|02|success"
+  "openbios|ubuntu-26.04|02|success" "build (linux-x64)|ubuntu-26.04|04|success" "build (linux-arm64)|ubuntu-26.04-arm|03|success" "build (macos-arm64)|macos-15|04|success"
+  "build (macos-x64)|macos-15-intel|04|success" "build (windows-x64)|windows-2025|03|success" "build (windows-arm64)|windows-11-arm|03|success" "asan|ubuntu-26.04|05|success"
+  "nofp (ubuntu-26.04)|ubuntu-26.04|03|success" "nofp (ubuntu-26.04-arm)|ubuntu-26.04-arm|02|success" "be32|ubuntu-26.04|06|success" "wasm32|ubuntu-26.04|03|success"
+  "hash-equality|ubuntu-26.04|02|success" "retroarch|macos-15|03|success" "perf|ubuntu-26.04|03|success" "rehearsal|ubuntu-26.04|00|skipped"
   "cleanup|ubuntu-26.04|00|skipped" "CI required|ubuntu-26.04|02|success")
+set(job_template [=[{"id":@id@,"run_id":123,"run_attempt":2,"head_sha":"@pr_head_sha@",
+"head_branch":"phase/07-test","name":"@name@","labels":["@runner@"],"status":"completed",
+"conclusion":"@conclusion@","started_at":"2026-11-18T00:00:00Z","completed_at":"2026-11-18T00:00:@finish@Z"}]=])
 function(make_jobs over_mode output)
   set(jobs "[]")
   set(index 0)
@@ -277,20 +271,13 @@ function(make_jobs over_mode output)
     list(GET parts 1 runner)
     list(GET parts 2 finish)
     list(GET parts 3 conclusion)
-    if(over_mode AND name STREQUAL "build (macos-x64)")
+    if(ARGV2 AND name MATCHES "^(rehearsal|cleanup)$")
+      set(finish 03)
+      set(conclusion success)
+    elseif(over_mode AND name STREQUAL "build (macos-x64)")
       set(finish 30)
     endif()
-    string(JSON job SET "{}" id ${id})
-    string(JSON job SET "${job}" run_id 123)
-    string(JSON job SET "${job}" run_attempt 2)
-    string(JSON job SET "${job}" head_sha "\"${pr_head_sha}\"")
-    string(JSON job SET "${job}" head_branch "\"phase/07-test\"")
-    string(JSON job SET "${job}" name "\"${name}\"")
-    string(JSON job SET "${job}" labels "[\"${runner}\"]")
-    string(JSON job SET "${job}" status "\"completed\"")
-    string(JSON job SET "${job}" conclusion "\"${conclusion}\"")
-    string(JSON job SET "${job}" started_at "\"2026-11-18T00:00:00Z\"")
-    string(JSON job SET "${job}" completed_at "\"2026-11-18T00:00:${finish}Z\"")
+    string(CONFIGURE "${job_template}" job @ONLY)
     if(name STREQUAL "CI required")
       string(JSON job SET "${job}" status "\"in_progress\"")
       string(JSON job SET "${job}" conclusion null)
@@ -307,40 +294,35 @@ function(make_jobs over_mode output)
 endfunction()
 make_jobs(FALSE good_pages)
 make_jobs(TRUE over_pages)
+make_jobs(FALSE release_pages true)
 set(jobs_file "${BIN}/ci-jobs.json")
 set(timing_script "${ROOT}/scripts/ci-critical-path.sh")
-function(timing_case name pages expected)
-  set(release_inputs false)
-  if(ARGC GREATER 3)
-    set(release_inputs "${ARGV3}")
-  endif()
+function(timing_case name pages expected testing input_override quality_path release_inputs)
   file(WRITE "${jobs_file}" "${pages}\n")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env
       "GITHUB_SHA=${head_sha}" "GITHUB_PR_HEAD_SHA=${pr_head_sha}"
       "GITHUB_RUN_ID=123" "GITHUB_RUN_ATTEMPT=2"
       "GITHUB_EVENT_NAME=pull_request" "GITHUB_HEAD_REF=phase/07-test"
       "CI_HEAVY=true" "CI_CALLED=false" "CI_RELEASE_INPUTS=${release_inputs}"
-      "CI_JOBS_FILE=${jobs_file}" "CI_INPUT_ROOT=${input_root}" "CI_TESTING=true"
-      "QUALITY_FILE=${quality_file}" "SH=${SH}"
+      "CI_JOBS_FILE=${jobs_file}" "CI_INPUT_ROOT=${input_override}" "CI_TESTING=${testing}"
+      "QUALITY_FILE=${quality_path}" "SH=${SH}"
       "${SH}" "${timing_script}" "${jobs_file}"
     WORKING_DIRECTORY "${ROOT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
-  if(expected STREQUAL "pass")
-    if(NOT rc STREQUAL "0" OR NOT "${out}${err}" MATCHES "comparable workload passed")
-      message(FATAL_ERROR "quality_controls: ${name} timing check failed: ${out}${err}")
-    endif()
-  elseif(expected STREQUAL "unbaselined")
-    if(NOT rc STREQUAL "0" OR NOT "${out}${err}" MATCHES "unbaselined")
-      message(FATAL_ERROR "quality_controls: ${name} did not report an unbaselined measurement: ${out}${err}")
-    endif()
-  elseif(rc STREQUAL "fail" OR NOT "${out}${err}" MATCHES "${expected}")
-    message(FATAL_ERROR "quality_controls: ${name} accepted invalid CI timing data: ${out}${err}")
+  if((expected STREQUAL "pass" AND (NOT rc STREQUAL "0" OR NOT "${out}${err}" MATCHES "comparable workload passed")) OR
+     (expected STREQUAL "unbaselined" AND (NOT rc STREQUAL "0" OR NOT "${out}${err}" MATCHES "unbaselined")) OR
+     (NOT expected MATCHES "^(pass|unbaselined)$" AND (rc STREQUAL "0" OR NOT "${out}${err}" MATCHES "${expected}")))
+    message(FATAL_ERROR "quality_controls: ${name} timing result was unexpected: ${out}${err}")
   endif()
-  set("${name}_rc" "${rc}" PARENT_SCOPE)
+  if(expected STREQUAL "unbaselined" AND DEFINED fingerprint AND
+     (NOT "${out}${err}" MATCHES "fingerprint=[0-9a-f]+" OR "${out}${err}" MATCHES "fingerprint=${fingerprint}"))
+    message(FATAL_ERROR "quality_controls: ${name} workload fingerprint did not change")
+  endif()
   set("${name}_out" "${out}${err}" PARENT_SCOPE)
 endfunction()
-
+string(JSON baseline_pages SET "${good_pages}" 0 jobs 5 completed_at "\"2026-11-18T00:45:00Z\"")
+timing_case(checked_pr_baseline "${baseline_pages}" pass false "" "${ROOT}/quality.json" false)
 file(WRITE "${quality_file}" "${registry}")
-timing_case(unbaselined "${good_pages}" unbaselined)
+timing_case(unbaselined "${good_pages}" unbaselined true "${input_root}" "${quality_file}" false)
 if(NOT "${unbaselined_out}" MATCHES "fingerprint=([0-9a-f]+)")
   message(FATAL_ERROR "quality_controls: no workload fingerprint in the unbaselined result")
 endif()
@@ -348,61 +330,42 @@ set(fingerprint "${CMAKE_MATCH_1}")
 string(JSON matched_registry SET "${registry}" ci critical_path_s workload_sha256 "\"${fingerprint}\"")
 file(WRITE "${quality_file}" "${matched_registry}")
 file(APPEND "${input_root}/src/product.c" "int another_product_source;\n")
-timing_case(matching "${good_pages}" pass)
-set(release_pages "${good_pages}")
-foreach(index 18 19)
-  string(JSON release_pages SET "${release_pages}" 0 jobs ${index} status "\"completed\"")
-  string(JSON release_pages SET "${release_pages}" 0 jobs ${index} conclusion "\"success\"")
-  string(JSON release_pages SET "${release_pages}" 0 jobs ${index} completed_at "\"2026-11-18T00:00:03Z\"")
-endforeach()
-timing_case(release_input_route "${release_pages}" unbaselined true)
-if(NOT "${release_input_route_out}" MATCHES "fingerprint=([0-9a-f]+)")
-  message(FATAL_ERROR "quality_controls: release-input route produced no workload fingerprint")
-endif()
-if(CMAKE_MATCH_1 STREQUAL fingerprint)
-  message(FATAL_ERROR "quality_controls: release-input route shared the ordinary PR fingerprint")
-endif()
-set(lessons_fixture "${input_root}/tests/cmake/lessons_unique.cmake")
-file(READ "${lessons_fixture}" changed_lessons)
+timing_case(matching "${good_pages}" pass true "${input_root}" "${quality_file}" false)
+timing_case(release_input_route "${release_pages}" unbaselined true "${input_root}" "${quality_file}" true)
+timing_case(over_bound "${over_pages}" "above ceiling" true "${input_root}" "${quality_file}" false)
+set(changed_pages "${good_pages}")
+string(JSON changed_pages SET "${changed_pages}" 0 jobs 6 labels "[\"runner-new\"]")
+timing_case(changed_runner "${changed_pages}" unbaselined true "${input_root}" "${quality_file}" false)
+file(READ "${input_root}/.github/workflows/ci.yml" changed_workflow)
+string(REPLACE "ubuntu-26.04" "ubuntu-26.04-test" changed_workflow "${changed_workflow}")
+file(WRITE "${input_root}/.github/workflows/ci.yml" "${changed_workflow}")
+timing_case(changed_workflow "${good_pages}" unbaselined true "${input_root}" "${quality_file}" false)
+file(COPY_FILE "${ROOT}/.github/workflows/ci.yml" "${input_root}/.github/workflows/ci.yml")
+file(APPEND "${input_root}/pins.txt" "fixture-pin test abcdef0\n")
+timing_case(changed_pins "${good_pages}" unbaselined true "${input_root}" "${quality_file}" false)
+file(COPY_FILE "${ROOT}/pins.txt" "${input_root}/pins.txt")
+file(READ "${input_root}/tests/cmake/lessons_unique.cmake" changed_lessons)
 set(lessons_original "${changed_lessons}")
 string(REPLACE "## Imported lessons, first batch" "## Imported lessons, changed fixture" changed_lessons "${changed_lessons}")
 if(changed_lessons STREQUAL lessons_original)
   message(FATAL_ERROR "quality_controls: imported lesson bracket fixture was not present")
 endif()
-file(WRITE "${lessons_fixture}" "${changed_lessons}")
-timing_case(changed_bracket_comment "${good_pages}" unbaselined)
-if(NOT "${changed_bracket_comment_out}" MATCHES "fingerprint=([0-9a-f]+)")
-  message(FATAL_ERROR "quality_controls: bracket data change produced no workload fingerprint")
-endif()
-if(CMAKE_MATCH_1 STREQUAL fingerprint)
-  message(FATAL_ERROR "quality_controls: CMake bracket data did not change the workload fingerprint")
-endif()
-file(COPY_FILE "${ROOT}/tests/cmake/lessons_unique.cmake" "${lessons_fixture}")
-timing_case(over_bound "${over_pages}" "above ceiling")
-set(changed_pages "${good_pages}")
-string(JSON changed_pages SET "${changed_pages}" 0 jobs 6 labels "[\"runner-new\"]")
-timing_case(changed_runner "${changed_pages}" unbaselined)
-file(READ "${input_root}/.github/workflows/ci.yml" changed_workflow)
-string(REPLACE "ubuntu-26.04" "ubuntu-26.04-test" changed_workflow "${changed_workflow}")
-file(WRITE "${input_root}/.github/workflows/ci.yml" "${changed_workflow}")
-timing_case(changed_workflow "${good_pages}" unbaselined)
-file(COPY_FILE "${ROOT}/.github/workflows/ci.yml" "${input_root}/.github/workflows/ci.yml")
-file(APPEND "${input_root}/pins.txt" "fixture-pin test abcdef0\n")
-timing_case(changed_pins "${good_pages}" unbaselined)
-file(COPY_FILE "${ROOT}/pins.txt" "${input_root}/pins.txt")
+file(WRITE "${input_root}/tests/cmake/lessons_unique.cmake" "${changed_lessons}")
+timing_case(changed_bracket_comment "${good_pages}" unbaselined true "${input_root}" "${quality_file}" false)
+file(COPY_FILE "${ROOT}/tests/cmake/lessons_unique.cmake" "${input_root}/tests/cmake/lessons_unique.cmake")
 
 string(JSON missing_job REMOVE "${good_pages}" 0 jobs 15)
 string(JSON missing_job SET "${missing_job}" 0 total_count 21)
-timing_case(missing_required_job "${missing_job}" "required job")
+timing_case(missing_required_job "${missing_job}" "required job" true "${input_root}" "${quality_file}" false)
 string(JSON stale_job SET "${good_pages}" 0 jobs 0 run_attempt 1)
 string(JSON stale_job SET "${stale_job}" 0 jobs 0 head_sha "\"0000000000000000000000000000000000000000\"")
-timing_case(stale_attempt "${stale_job}" "stale|attempt")
+timing_case(stale_attempt "${stale_job}" "stale|attempt" true "${input_root}" "${quality_file}" false)
 string(JSON duplicate_job SET "${good_pages}" 0 jobs 1 id 1000)
-timing_case(duplicate_job "${duplicate_job}" "malformed|duplicate")
+timing_case(duplicate_job "${duplicate_job}" "malformed|duplicate" true "${input_root}" "${quality_file}" false)
 string(JSON bad_time SET "${good_pages}" 0 jobs 0 completed_at "\"not-a-date\"")
-timing_case(invalid_timestamp "${bad_time}" "timestamp")
+timing_case(invalid_timestamp "${bad_time}" "timestamp" true "${input_root}" "${quality_file}" false)
 string(JSON incomplete_page SET "${good_pages}" 0 total_count 99)
-timing_case(incomplete_pages "${incomplete_page}" "pagination")
+timing_case(incomplete_pages "${incomplete_page}" "pagination" true "${input_root}" "${quality_file}" false)
 # Execute the marked production roll-up and timing shell with a stub gh CLI.
 extract_block(QUALITY_CI_ROLLUP_BEGIN QUALITY_CI_ROLLUP_END rollup_block)
 extract_block(QUALITY_CI_TIMING_BEGIN QUALITY_CI_TIMING_END live_timing_block)
@@ -430,11 +393,7 @@ set(needs_success "{\"changes\":{\"result\":\"success\"},\"hygiene\":{\"result\"
 set(needs_release_success "{\"changes\":{\"result\":\"success\"},\"hygiene\":{\"result\":\"success\"},\"title\":{\"result\":\"success\"},\"openbios\":{\"result\":\"success\"},\"build\":{\"result\":\"success\"},\"rehearsal\":{\"result\":\"success\"},\"cleanup\":{\"result\":\"success\"}}")
 set(needs_failed "{\"changes\":{\"result\":\"success\"},\"hygiene\":{\"result\":\"success\"},\"title\":{\"result\":\"success\"},\"openbios\":{\"result\":\"failure\"},\"build\":{\"result\":\"success\"}}")
 set(needs_skipped "{\"changes\":{\"result\":\"success\"},\"hygiene\":{\"result\":\"success\"},\"title\":{\"result\":\"skipped\"},\"gpu-reference\":{\"result\":\"skipped\"},\"build\":{\"result\":\"skipped\"},\"perf\":{\"result\":\"skipped\"},\"rehearsal\":{\"result\":\"skipped\"},\"cleanup\":{\"result\":\"skipped\"}}")
-function(gate_case name pages needs expected)
-  set(release_inputs false)
-  if(ARGC GREATER 4)
-    set(release_inputs "${ARGV4}")
-  endif()
+function(gate_case name pages needs expected release_inputs)
   file(WRITE "${BIN}/gh-pages.json" "${pages}\n")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${stub_bin}:$ENV{PATH}" "GH_PAGES=${BIN}/gh-pages.json" "GH_CAPTURE=${BIN}/gh-capture" "NEEDS=${needs}" "EVENT=pull_request" "HEAVY=true" "CALLED=false" "RELEASE_INPUTS=${release_inputs}" "GITHUB_REPOSITORY=owner/repo" "GITHUB_SHA=${head_sha}" "GITHUB_PR_HEAD_SHA=${pr_head_sha}" "GITHUB_RUN_ID=123" "GITHUB_RUN_ATTEMPT=2" "GITHUB_EVENT_NAME=pull_request" "GITHUB_HEAD_REF=phase/07-test" "RUNNER_TEMP=${BIN}" "CI_HEAVY=true" "CI_CALLED=false" "CI_RELEASE_INPUTS=${release_inputs}" "CI_INPUT_ROOT=${input_root}" "CI_TESTING=true" "QUALITY_FILE=${quality_file}" "${SH}" "${gate_script}" WORKING_DIRECTORY "${ROOT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if((expected STREQUAL "pass" OR expected STREQUAL "unbaselined") AND NOT rc STREQUAL "0")
