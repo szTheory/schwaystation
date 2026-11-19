@@ -1059,6 +1059,7 @@ static void protocol_pocketstation_storage(void)
 {
     static const uint8_t short_data[8] = {0x91u, 0x82u, 0x73u, 0x64u, 0x55u, 0x46u, 0x37u, 0x28u};
     uint8_t large_data[SCHWAY__CARD_POCKET_TRANSFER_MAX];
+    uint8_t untouched[sizeof short_data];
     schway *inst = make();
     configure(inst, 0u);
     for (uint32_t i = 0u; i < sizeof large_data; i++) {
@@ -1099,6 +1100,7 @@ static void protocol_pocketstation_storage(void)
     CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
     CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Bu, 0xFFFFFFFFu, 4u, 0u), 0xFFu);
 
+    memcpy(untouched, &inst->card.slot[0].bytes[0x400u], sizeof untouched);
     generation = card_generation(inst, SCHWAY_CARD_SLOT_1);
     CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Cu, 0x08000400u, 8u, CARD_ACK), 8u);
     for (uint32_t i = 0u; i < 3u; i++) {
@@ -1106,14 +1108,15 @@ static void protocol_pocketstation_storage(void)
     }
     schway__card_abort(inst, 0u);
     CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation);
-    CHECK(memcmp(&inst->card.slot[0].bytes[0x400u], short_data, 3u) != 0);
+    CHECK(memcmp(&inst->card.slot[0].bytes[0x400u], untouched, sizeof untouched) == 0);
+    memcpy(untouched, &inst->card.slot[0].bytes[0x400u], sizeof untouched);
     CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Cu, 0x08000400u, 4u, CARD_ACK), 4u);
     for (uint32_t i = 0u; i < 4u; i++) {
         CHECK_EQ_HEX(transfer(inst, short_data[i], CARD_ACK), 0u);
     }
     CHECK_EQ_HEX(transfer(inst, 1u, 0u), 0xFFu);
     CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation);
-    CHECK(memcmp(&inst->card.slot[0].bytes[0x400u], short_data, 4u) != 0);
+    CHECK(memcmp(&inst->card.slot[0].bytes[0x400u], untouched, sizeof untouched) == 0);
 
     /* Focused probe: PSX-SPX leaves directory integer byte order unstated.
        LE 0x4000 bytes and link 0x0006 form blocks 1 -> 7; BE is invalid. */
