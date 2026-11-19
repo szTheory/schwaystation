@@ -4,6 +4,7 @@
    little-endian in visit order. The test also sees src/, for the header
    size, the field record and the CRC. */
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -238,6 +239,7 @@ static void test_stable_bytes(void)
     CHECK_EQ_U64(schway_load_state(inst, good, n), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(save(inst, after), n);
     CHECK(memcmp(good, after, n) == 0);
+    printf("state_bytes=%zu\n", n);
     schway_destroy(inst);
 }
 

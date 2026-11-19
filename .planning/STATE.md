@@ -1,44 +1,155 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.0
-current_phase: 06
-current_phase_name: Discs and FMV
-status: Awaiting next milestone
-stopped_at: Milestone v1.0 complete and archived
-last_updated: "2026-11-18T14:17:23.502Z"
-last_activity: 2026-11-18
-last_activity_desc: Completed quick task 261118-bvm: skip heavyweight main-push CI for planning-only changes
-state_head: 11c9789a5e13c7851acf5030bcb28710f6cf90f8
+milestone: v2.0
+milestone_name: The whole library
+current_phase: 8
+current_phase_name: Per-game card saves
+current_plan: Not started
+status: planning
+stopped_at: Phase 7 verified; finish its ship evidence before planning Phase 8
+last_updated: "2026-11-19T05:17:08Z"
+last_activity: 2026-11-19
+last_activity_desc: Phase 7 correction passed focused local checks; exact-head hosted verification and release remain before Phase 8 planning
+state_head: f5f5ea6640392a7ba447f83b07122bf19fe5ff49
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 195
-  completed_plans: 195
-  percent: 100
-milestone_name: PlayStation games play with sound in RetroArch
+  total_phases: 10
+  completed_phases: 1
+  total_plans: 10
+  completed_plans: 10
+  percent: 10
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-18)
+See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** v1.0 complete; no next milestone is active
+**Current focus:** Phase 08 — Per-game card saves
 
 ## Current Position
 
-Milestone: v1.0 complete and archived
-Phase: 06 — Discs and FMV (verified)
-Plan: —
-Status: No active milestone
-Last activity: 2026-11-18 — Completed quick task 261118-bvm: skip heavyweight main-push CI for planning-only changes
+Phase: 8 — Per-game card saves
+Current Plan: Not started
+Total Plans in Phase: 10
+Status: Ready to plan
+Last activity: 2026-11-19 — Phase 7 verification passed; ship it before Phase 8 planning
+
+### Phase 7 execution (2026-11-18–19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; inherited GPT-6 session (exact deployed ID unavailable). Plan 07-02
+used the same inherited model at xhigh effort. Wall elapsed was about 55 minutes from the planning commit through
+the completed report; active time was not measured.
+Plan 07-01 added five native CI policy cases. Its historical gate count was 3,133/3,200 lines and 300/300
+RetroArch lines; the reviewed 3,300-line ceiling is recorded in the plan and will be applied by Plan 03 before
+more counted gate code is added.
+Plan 07-02 captured 40 workflow runs, all 40 attempt job pages and 573 jobs. Exact-head filtering yielded 25
+usable completed runs across 20 workload groups. The report includes the Release reusable-workflow path,
+failure-log classifications, timeout formulas and explicit unknowns; its one-shot validator passed, including
+missing-section and wrong-arithmetic controls. The actual release-App PR comparison and timeout application
+remain with later plans.
+Plan 07-03 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna at xhigh
+effort. The repository-check budget is now 3,300 lines with 3,133 counted; the independent RetroArch budget
+remains 300/300. Cachegrind and serialized-state baselines are recorded, while WASI module size remains unmeasured
+until its focused Ubuntu producer check. The settings audit found no drift, and the evidence-based runner/pin
+review is recorded in the plan artifacts.
+
+Plan 07-04 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna at xhigh
+effort. All seven quality dimensions were scored before selecting one change. Documentation/README tied with
+upgrade path at 2; the review selected the false README BIOS/disc status claim for its direct user impact and
+left Dependabot, CI routing, pins and runner labels unchanged. The README now describes the documented PS-X EXE
+and BIOS/CUE/ISO/M3U paths and limits compatibility evidence to fixtures. Its obsolete-claim check and diff
+check passed, as did the workflow pin check (57 active uses). Existing CI/performance run evidence is linked in
+the review; no new hosted run or full suite was started. The phase-level TUNE-04 and TUNE-06 requirements remain
+pending because their GSD readiness check is blocked by remaining phase work.
+
+Plan 07-05 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. The bounded
+collector, hostile-input controls and read-only weekly/manual workflow are complete. The focused `ci.triage`
+test passed, along with the pin, timeout-comment and gate-budget checks. The scoped `act --dryrun` passed its
+wiring check. No hosted artifact run was made; the phase-level TUNE-01 requirement stays pending until ship
+confirms that the merged workflow uploads its single seven-day artifact. This is deferred evidence, not an owner
+verification task. Plan 07-06 is next.
+
+Plan 07-06 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. The exact release App metadata PR route now requires a matching event and fresh REST bot identity plus stable, complete pagination; focused classifier and production route checks passed. Sampled job timeouts follow the linked Plan 02 runs and retain setup floors; unsampled jobs remain provisional. The repository-check gate is 3,299/3,300. The scoped `act --dryrun` parsed the CI changes route without executing actions. No hosted CI was started; TUNE-02/03 remain Pending until ship compares the next automatic release PR with run 44253419074. Plan duration was 40 minutes; RED, GREEN, and timeout commits are recorded in `07-06-SUMMARY.md`. Plan 07-07 followed.
+
+### Phase 7 Plan 07-07 preflight and recovery (2026-11-18)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh; read-only budget review gpt-6-luna xhigh. Before source edits, `policy.gate_budget` confirmed 3,299 counted lines against 3,300. Plans 05–06 had used 166 lines since Plan 01, 31 above the earlier estimate; review estimated 370–500 more for Plans 07–08. Corrected the temporary absolute ceiling to 3,900 (3,299 current + 500 upper estimate + 100 headroom), retained all counted globs and assertions, and confirmed `policy.gate_budget` passes at the new value. Plans 09–10 add no counted files; Plan 10 still ratchets to the measured ship total.
+
+The local machine has no clang-21/WASI sysroot or configured `build/wasm32` graph. Read-only inspection of prior Ubuntu 26 run 44253419074 found only the `hashes-wasm32` artifact, not the linked module, so no real Wasm size could be recovered. The size bound remains withheld until an actual focused Release WASI build reports it. An initial `act` preflight hit its image-selection prompt; a noninteractive dry run parsed only the `changes` dependency and did not execute the `wasm32` job. No source files or hosted runs were changed or started. `.planning/config.json` remains a pre-existing user edit and is excluded from commits.
+
+Plan 07-07 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The single `quality.json` registry now sends real Cachegrind measurements, linked WASI module bytes, and actual stable-state bytes through the shared comparator while retaining the original relative performance gate. Task 2 followed RED/GREEN commits; focused CTests passed, and the actual state output measured 3,755,020 bytes. The repository-check budget is 3,509/3,900. TUNE-05 remains Pending until the Ubuntu 26 WASI Release lane measures the module and a bound is added at ship. The historical artifact contained only hashes; two isolated toolchain setup attempts failed before CMake/build (package resolution and container tar ENOSYS), so local emulation was stopped. No hosted CI, guest test or whole suite was run. Plan duration was 43 minutes; task commits are recorded in `07-07-SUMMARY.md`. Plan 07-08 is next.
+
+Plan 07-08 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The exact-attempt timing helper and `CI required` production path are complete. The focused CI selectors passed 2/2; hygiene, pin, timeout-comment, and gate-budget selectors passed 3/3; the duplicate-ID control passed in a 24.30-second focused rerun. The repository-check budget is 3,890/3,900 lines. Historical replay exited 0 across 40 run rows and 573 job records. The test-first failure was observed while the helper was absent, but no durable RED report or exit-status record was retained; no classifier result is claimed. Two Plan 07-08 commits are `931e055` and `577ef3d`; `bf84ae2` is the prior Plan 07-07 gate-budget closeout, and the full execution-start range contains three commits. No hosted Phase PR measurement was made; both the matching critical-path measurement and actual WASI module size/bound remain for ship. `.planning/config.json` was preserved. Plan duration was approximately 58 minutes; Plan 07-09 is next.
+
+Plan 07-09 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. Maintainer and testing docs, engineering, product roadmap, prompt coverage, and the upgrade audit now reflect current workflow sources and measured baselines; README installation remains unchanged and is backed by existing release run 44262491280. `git diff --check HEAD`, the docs byte budget, the repository gate budget (3,890/3,900), and the RetroArch budget (300/300) passed. ARCHITECTURE §10 now records the owned `disc_boot` DMA3 → RAM → DMA0 → MDEC → DMA1 → RAM → DMA2 → native 24-bit display path, with Phase 6 Plan 06-16 and DISC-03 citations; it explicitly leaves full decoded output and external frame/movie hardware conformance unproven. Device MIPS remain assumptions and `gpu_motion` exceeds each provisional low-power budget. This plan's TUNE-04 and TUNE-06 deliverables are complete; phase-level readiness remains pending on the remaining work. TUNE-01 still needs a post-merge triage artifact run; TUNE-02/03 need the release-App comparison; TUNE-05 still needs the matching release-PR timing and actual Ubuntu 26 WASI module size before setting that bound. No new hosted workflow was started. Plan range `98d0b9c..11a1251` contains two commits: `b9a4ecd` (bounded plan revision) and `11a1251` (documentation/evidence). Plan duration was about 27 minutes wall elapsed; exact start and active time were not captured across handoff. Plan 07-10 is next.
+
+Plan 07-10 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The focused serialized CI selector passed 5/5 at the 60-second quality timeout (39.17 seconds total; 38.61 seconds for `policy.quality_metrics`); after the final 80-second cap was registered, the isolated `policy.quality_metrics` selector passed 1/1 in 28.26 seconds total (28.25 seconds for the test). The repository-check budget passes at 3,890/3,890 and the separate RetroArch budget at 300/300; focused hygiene checks passed 5/5. The repository-root producer command `cmake -DROOT="$PWD" -DBIN="$PWD/build/ci/policy/quality" -P tests/cmake/quality_controls.cmake` exited 0 in about 25 seconds. The proposed release title and release-please strategy checks passed. The timeout changes are measured headroom, not a speedup; test cases and assertions were preserved. Plan range `501a1a1..ff767a2` contains three commits: `ed5a86b` (30→60 evidence-based plan revision), `4b8c14b` (60→80 revision after the 38.61-second run), and `ff767a2` (test and evidence changes). No phase review, final verification, hosted workflow, PR, merge, release, or triage dispatch was run. The matched release-App comparison, Ubuntu 26 WASI size, and post-merge artifact remain pending for ship. Next: independent phase-level code review, then final automated verification; Phase 7 remains in progress.
+
+### Phase 7 review fixes and verification (2026-11-19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; gsd-code-reviewer, gsd-code-fixer, and gsd-verifier gpt-6-luna xhigh; primary session model ID unavailable. Independent review found one critical PR timing SHA defect and four fingerprint/registry warnings. Fixes added focused regression controls and preserved existing production-gate cases. A second review prevented applying the historical push/main timing interval to the PR route without matching hosted evidence; the stored push interval remains tied to its original fingerprint and the current PR route is explicitly unbaselined. Final code review is clean in `07-REVIEW.md`.
+
+The review fixes raised the counted repository checks from 3,890 to 3,900; the registered limit then matched 3,900. The separate RetroArch count remains 300/300. The post-review `policy.quality_metrics` selector passed 1/1 in 37.22 seconds. After `cmake --preset hygiene` refreshed the stale generated test registration, `ctest --preset hygiene --no-tests=error -R '^(policy[.](action_pins|e2e_budget|gate_budget)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1` passed 4/4 in 0.03 seconds. The verifier also passed locally automatable CI behavior controls 4/4, no-skip controls 2/2, and all 10 plan artifact queries. Under the infrastructure-phase verifier rule, `07-VERIFICATION.md` records `passed` (5/5 pre-ship implementation and data-flow truths; 0 behavior-unverified) with no owner UAT. The first ship run later measured the WASI module, and its Windows timing failures are recorded below. A report-path preflight caught and corrected an extension typo before transition; all 51 covered files now exist and the refreshed fingerprint passes. Phase completion emitted only non-blocking warnings for command examples misread as missing files; no implementation artifacts are missing.
+
+### Phase 7 ship preflight follow-up (2026-11-19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; primary GPT-6 session (exact deployed model ID unavailable); read-only
+code review gpt-6-luna xhigh. PR #28's first hosted attempt on `8a3a502ab4dd3a47fe906e7976a33680a71b8584`
+measured the linked Ubuntu 26.04 WASI module at 595,820 bytes. Both Windows jobs exposed the same CRLF parsing
+failure in `policy.quality_metrics`; 617/618 tests passed on each, and the required jobs were not green. The PR
+Nightly fuzz job also hit the five-minute timeout; a matching successful historical fuzz job took 7m03, so the
+workflow now allows 15 minutes (twice that run, rounded up). The initial PR run was canceled after the known
+Windows failures and WASI measurement were captured. Read-only review supports the corrective diff, including a
+595,820-byte exact WASI bound and a one-line CRLF normalization; the repository-check cap is now 3,901 lines.
+`jq`/CMake quality-schema validation, the 3,901/3,901 repository budget, 300/300 RetroArch budget, workflow timeout
+comments and selector inventory all passed as cheap preflights. The serialized `policy.quality_metrics` test then
+passed 1/1 in 30.27 seconds; the four focused hygiene tests passed 4/4 in 0.03 seconds. The final diff check passed.
+A new exact-head hosted CI/Nightly run and the release are still required. Phase 8 planning remains stopped until
+Phase 7 is shipped, merged, green on main, and released.
+
+The next exact-head CI attempt used commit `4d389aef0a58ceadc8e010a15559852bbbe237f4` (run 44464772297). It
+reproduced a second Windows-only path issue in `policy.quality_metrics`: CMake passed a native `D:/.../quality.json`
+path, but the timing helper recognized only POSIX absolute paths and prefixed the Windows drive path with the
+repository root. The arm64 Windows lane completed successfully; x64 failed at this registry read and the run was
+canceled once the known required failure was confirmed. This is new platform evidence beyond the CRLF failure.
+Independent follow-up review confirmed the one-line case pattern now recognizes drive-rooted and POSIX absolute
+paths while still rooting relative paths. After review, local preflights passed (`sh -n`, `git diff --check`, CI
+and hygiene configure); `policy.quality_metrics` passed 1/1 in 35.45 seconds, and gate, E2E, action-pin and
+timeout-comment controls passed 4/4 in 0.03 seconds. At that checkpoint, the branch held the one-line correction;
+commit 57501d4 and its hosted run follow below. Successful CI, PR timing and release evidence remained pending.
+Runtime/model: Codex/OpenGSD CLI
+1.20.0; primary GPT-6 session (deployed ID unavailable); follow-up read-only reviewer gpt-6-luna xhigh.
+
+Exact-head run 44466369143 on commit `57501d46bf5b102e448e0436e7f28fc888cbe136` then passed `policy.quality_metrics`
+on Windows x64 in 38.51 seconds but Windows ARM64 timed out at 80.02 seconds; the other 617/618 tests in its
+matrix job passed. The run was canceled once this single known failure was captured; its failed aggregate is not
+a phase pass. Matching Nightly run 44466369199 completed successfully on that head, including fuzz. The
+assertion-heavy quality control launches many CMake checks, so a read-only review approved a provisional 180s
+CTest allowance without removing coverage. After `cmake --preset ci` reconfigured the selector, the local
+serialized test passed 1/1 in 29.36 seconds. The next exact-head Windows ARM64 lane must establish its actual
+completion time; the 180s allowance is not yet validated there. Runtime/model: Codex/OpenGSD CLI 1.20.0; primary
+GPT-6 session (deployed ID unavailable); follow-up read-only reviewer gpt-6-luna xhigh.
+
+### Phase 7 discussion and planning (2026-11-18)
+
+Runtime/model: Codex, OpenGSD 1.21.0; primary GPT-6 session (exact deployed model ID not exposed). Phase researcher
+and initial CI/security/quality advisors inherited the Codex model (exact ID not exposed); planner used
+gpt-6.2-sol high and independent plan checker used gpt-6.2-sol xhigh.
+
+Discussion used the existing 40-run CI evidence. BE32 remained the critical path (64m52s on run 44322945842 and
+72m18s on run 44335613581); release PR #23 spent 60m21s there for generated metadata alone. The safe candidate
+skips heavy PR tests only for a verified release App PR with the exact metadata file list and event head. All
+main and actual release checks remain. Plans cover TUNE-01 through TUNE-06 in ten plans/eight waves. Independent
+plan review passed after correcting one shell-command quote. No tests or workflows ran during planning. Plan
+07-03 is next after completed Plans 07-01 and 07-02.
+
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 195
+- Total plans completed: 205
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -52,6 +163,7 @@ Last activity: 2026-11-18 — Completed quick task 261118-bvm: skip heavyweight 
 | 04 | 58 | - | - |
 | 05 | 24 | - | - |
 | 06 | 45 | - | - |
+| 7 | 10 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -242,6 +354,15 @@ Last activity: 2026-11-18 — Completed quick task 261118-bvm: skip heavyweight 
 | Phase 06 P20 | about 32m wall from 04:35 UTC checkpoint; active time unavailable | 3 tasks | 9 files |
 | Phase 6 P40 | 19m27s | 2 tasks | 7 files |
 | Phase 6 P41 | 36min | 2 tasks | 5 files |
+| Phase 07 P01 | 11min | 3 tasks | 9 files |
+| Phase 07 P03 | 44min | 3 tasks | 6 files |
+| Phase 07 P04 | 8min | 2 tasks | 2 files |
+| Phase 07 P05 | 35min | 2 tasks | 3 files |
+| Phase 07 P06 | 40min | 2 tasks | 6 files |
+| Phase 07 P07 | 43min | 2 tasks | 14 files |
+| Phase 07 P08 | 58min | 2 tasks | 4 files |
+| Phase 07 P09 | 27 min | 2 tasks | 12 files |
+| Phase 07 P10 | not captured across handoffs | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -600,6 +721,26 @@ Recent decisions affecting current work:
 - [Phase 6]: Keep DISC-03 and 06-23/24 acceptance pending until successor registration and final local/hosted acceptance in 06-43 through 06-45.
 - [Phase 6]: Preserve the pinned 8-bit hardware log and bytes as evidence; compare deterministic model/reference regression output to its separately named frozen baseline.
 - [Phase 6]: Do not run compressed pinned reference guests until Plan 06-42 installs the in-process source guard; Plan 06-43 owns selector registration.
+- [Phase 07]: Redact path text through its next quote or boundary to protect path components containing spaces.
+- [Phase 07]: Compare decimal digit strings exactly so rounding cannot admit a value just above a large integer bound.
+- [Phase 07]: Correct the temporary repository-check budget to 3900 after measured Plan 05–06 growth and the remaining Plan 07–08 control estimates; retain the separate RetroArch budget at 300 and ratchet to the actual total at ship.
+- [Phase 07]: Withhold the WASI module size bound until the focused Release target measurement runs with the Ubuntu 26 WASI toolchain.
+- [Phase 07]: Keep current settings, action pins, and runner labels where evidence did not justify changes; review Wasmtime 48.0.9 in the normal pin-update step using new upstream asset digests.
+- [Phase 07]: Documentation and upgrade path tied at 2; selected the README correction because it resolves a false current capability claim with immediate user impact.
+- [Phase 07]: Keep compatibility statements limited to the four passing fixture rows; do not imply commercial-game coverage.
+- [Phase 07]: Bound open-issue collection to one 100-result page and set issues_truncated when that cap is reached.
+- [Phase 07]: Grant the triage job only actions, contents, and issues read scopes.
+- [Phase 07]: Require fresh release App identity and stable paginated metadata before the generated-only PR fast route.
+- [Phase 07]: Keep unsampled workflow timeouts provisional and TUNE-02/03 pending until the hosted release PR comparison at ship.
+- [Phase 07]: Keep size.wasm measured but unbounded until the focused Ubuntu 26 Release build produces the actual module size.
+- [Phase 07]: Feed measured Cachegrind instruction counts to the shared bound comparator while preserving the existing base and relative gate.
+- [Phase 07]: CI timing compares completed current-attempt dependency paths only when the workload fingerprint matches; changed fingerprints remain explicitly unbaselined.
+- [Phase 07]: Keep the in-progress CI required job out of elapsed-path arithmetic; final matching PR measurement remains ship evidence.
+- [Phase 07]: The README install command remains unchanged because it still matches the automated install control and attributable release evidence.
+- [Phase 07]: The actual WASI runner module remains unmeasured; size.wasm stays unbounded until the Release module is directly measured.
+- [Phase 07]: Device MIPS remain assumptions; the measured gpu_motion workload exceeds provisional low-power budgets and stays a named SEED-005 follow-up.
+- [Phase 07]: Use an 80-second policy.quality_metrics timeout from the 38.61-second serialized measurement; this adds headroom and is not a speedup.
+- [Phase 07]: Keep matched release-App timing, triage artifact, actual WASI module size, release, and hosted verification explicitly pending until ship.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -632,10 +773,14 @@ Recent decisions affecting current work:
 - [2026-11-10] [general] "Select the 40-clock CD-ROM DMA cost from the CD-ROM delay setting" — [todo file](.planning/todos/pending/047-cd-dma-40-clock-cost.md)
 - [2026-11-10] [general] "Split long GPU pixel test cases" — [todo file](.planning/todos/pending/048-split-gpu-pixel-test-cases.md)
 - [2026-11-11] [general] "Review runner and checkpoint repeats against existing frame and state output" — [todo file](.planning/todos/pending/049-review-runner-checkpoint-repeats.md)
+- [Phase 07]: Keep historical push timing bounds tied to their workload fingerprint; the PR route remains unbaselined until exact-head hosted runs prove comparability.
+- [Phase 07]: Keep `size.wasm` unbounded until the linked Ubuntu 26 Release module is measured; set the bound only from its actual byte count.
+- [Phase 07]: Infrastructure verification with zero behavior-unverified invariants has no owner UAT; hosted delivery checks are recorded as ship evidence.
 ### Blockers/Concerns
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
+- [Phase 7]: Complete hosted ship evidence (exact-head PR CI and timing, release-App comparison, WASI byte count and bound, triage artifact, and post-merge release checks) before Phase 8 planning.
 
 ### Quick Tasks Completed
 
@@ -841,9 +986,13 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-17T19:23:53.046Z
-Stopped at: Phase 05 complete — all phases complete
-Resume file: .planning/phases/06-discs-and-fmv/06-42-PLAN.md
+Last session: 2026-11-19T04:34:08.919Z
+Stopped at: Phase 7 verified; finish ship evidence before Phase 8 planning
+Resume file: None
+
+### v1.0 session history
+
+The archived Phase 6 resume point was `milestones/v1.0-phases/06-discs-and-fmv/06-42-PLAN.md`.
 
 Verification: .planning/phases/05-the-sound-matches-the-console/05-VERIFICATION.md
 
@@ -855,7 +1004,7 @@ CI tail PR: https://github.com/szTheory/schwaystation/pull/6
 
 Phase 3 merged as PR #12; release PR #13 is green and merged. Phase 4 release v0.4.0 is latest.
 Final download/install checks: https://github.com/szTheory/schwaystation/actions/runs/42841474140
-Next: continue `$gsd-autonomous --from 6 --to 6` with Plan 06-14's pinned disc-media tools and authored recipes. A complete independently captured frame/movie pair was not found; do not wait on owner hardware. The owner has a real PS1 and capture card but no time for capture now. Standing preferences are in `.planning/AUTONOMOUS.md`.
+The v1.0 audit records the limits of the available frame and movie evidence. The owner capture remains unavailable. See `.planning/AUTONOMOUS.md` for standing preferences.
 
 ### Independent local work during immutable CI (2026-11-12)
 
@@ -1021,7 +1170,11 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Start the next milestone with $gsd-new-milestone
+- Complete Phase 7 ship evidence: verify the corrected Windows timing parser, 595,820-byte WASI bound and 15-minute fuzz timeout on the exact hosted head; measure final-head PR timing, verify the triage artifact, compare the automatic release PR with run 44253419074, then confirm green merged-main CI and the published release before starting Phase 8. No owner UAT is needed.
+
+### v2.0 roadmap creation (2026-11-18)
+
+Runtime/model: Codex, OpenGSD 1.20.0, gsd-roadmapper gpt-6.2-sol high. The approved milestone has 10 phases and 34 requirements. Phase 9 establishes the shared media controls and feature-ledger checks with the first provider. Later feature phases record their own evidence. Phase 16 reconciles the pinned DAT inventory and gates libretro metadata on the required-capability matrix. The v1.0 MDEC evidence boundary and the standing 300-line real-host limit carry forward. No implementation or phase verification is claimed here.
 
 
 ### v1.0 milestone closeout (2026-11-18)

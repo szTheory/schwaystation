@@ -2,6 +2,7 @@
 title: "Review runner and checkpoint repeats against existing frame and state output"
 status: pending
 priority: P2
+resolves_phase: 7
 source: "Phase 04 plan 04-22 bounded CI review"
 created: 2026-11-11
 theme: ci

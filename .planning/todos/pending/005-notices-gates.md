@@ -2,6 +2,7 @@
 title: "Port the notice checks (policy.notices and release.notices)"
 status: pending
 priority: P2
+resolves_phase: 9
 source: "phase 01, plan 01-15 (a seed gate deferred under D-25 and AGENTS rule 7)"
 created: 2026-10-20
 theme: policy

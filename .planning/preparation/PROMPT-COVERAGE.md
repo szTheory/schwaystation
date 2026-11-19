@@ -27,28 +27,28 @@ Rows are never renumbered or deleted; new asks take the next number.
 | 8 | Correct; address what people dislike about other emulators | ECO 2 (C.NN, G.NN); CONFORMANCE 1 to 3; SYS 10, GPU 7, SCM 7 (confidence tables) | Documented | |
 | 9 | Best-practice C, CMake, CI, with an adversarial fan-out per decision point through every stakeholder lens | ENGINEERING 2 to 4; BRIEF (fan-out method); DECISIONS; DEC.106 | Documented | discuss runs the fan-out again per phase |
 | 10 | Code that is a joy to read, educational, KISS, YAGNI, ponytail.dev | AGENTS Style; ENGINEERING 10; DEC.90 | Documented | |
-| 11 | Baselines in every measurable dimension, ratcheted to diminishing returns | ENGINEERING 8 (`quality.json`); CONFORMANCE 3.2 (ledger ratchet); DEC.86 | Partial | Ir/frame, header and README budgets in v1.0; `quality.json`, the digest and both audits from the v2.0 tune-up (SEED-007) |
+| 11 | Baselines in every measurable dimension, ratcheted to diminishing returns | ENGINEERING 8 (`quality.json`); CONFORMANCE 3.2 (ledger ratchet); DEC.86 | Partial | Phase 7 records repeatable Ir/frame and state bytes plus comparable CI bounds; linked WASI module bytes remain unmeasured. See `07-BASELINES.md`. |
 | 12 | Hardware documentation with provenance, primary sources first, a RAG-friendly second brain in .planning | BRIEF (tiers, pins, markers); README (index); SYS, GPU, SCM, PER, PX; PROVENANCE 7 | Documented | facts graduate to `docs/hardware/<chip>.md` as subsystems land (ENGINEERING 11) |
 | 13 | Development velocity as fast as possible | GSD-HANDOFF 1 to 3; LESSONS XFER-001, 002, 068, 083, 094; DEC.06, DEC.07, DEC.99, DEC.107 | Documented | phase 1 ports cogmaster at a public pin |
 | 14 | Telemetry without overhead, optional | ARCHITECTURE 6 (counters, first fault, hooks); DEC.24 (traced loop only when hooks are installed); ECO 2 G.05 (no network telemetry) | Documented | hooks ABI v5.0 (SEED-004) |
 | 15 | Great day-0/1/2 DX, easy adoption, docs never stale, self-documenting code | ENGINEERING 11, 12; HOSTS 1, 4, 7; DEC.89 | Documented | |
 | 16 | Property-based testing, fuzzing, safe with hostile input | ENGINEERING 3; PER 7; CONFORMANCE 6; AGENTS rule 4; DEC.46, DEC.81 | Documented | fuzz targets report-only until green (AGENTS rule 8) |
-| 17 | Fast CI and builds | ENGINEERING 4; DEC.79; SEED-007 | Documented | |
+| 17 | Fast CI and builds | ENGINEERING 4; DEC.79; SEED-007 | Documented | Exact-attempt timing now measures the current CI DAG; comparable historical full-CI pushes take 2,249–3,293 seconds. The release-App PR comparison remains for ship. See `07-CI-EFFICIENCY.md`. |
 | 18 | Ship early and often; automated releases | AGENTS rule 10; ENGINEERING 5; DEC.06, DEC.87 | Documented | every phase a release; first one v1.0 ph1 |
 | 19 | Always PRs, green main, triage at every step, auto-merge and auto-release with zero human verification where possible | AGENTS rules 6, 10; ENGINEERING 5 to 7; `scripts/apply-repo-settings.sh`; DEC.88 | Documented | |
 | 20 | 12-factor secrets (`.env.local` locally, Actions secrets in CI) | ENGINEERING 13; `.env.example`; GSD-HANDOFF 7; DEC.95 | Documented | |
 | 21 | Rolling near/mid/long roadmap revised at every milestone | `.planning/PRODUCT-ROADMAP.md`; seeds; GSD-HANDOFF 4; DEC.05 | Documented | |
 | 22 | Performance stress testing to p99.999 on critical flows, folded into CI | ENGINEERING 8 (nightly `bench` tails over 300,000 frames; per-PR Ir gate); DEC.85 | Documented | |
-| 23 | Recurring CI/CD efficiency audits baked in | ENGINEERING 12; SEED-007 | Partial | Ir/frame, header and README budgets in v1.0; `quality.json`, the digest and both audits from the v2.0 tune-up (SEED-007) |
-| 24 | Recurring weakest-quality-dimension reviews baked in | ENGINEERING 12; SEED-007 | Partial | Ir/frame, header and README budgets in v1.0; `quality.json`, the digest and both audits from the v2.0 tune-up (SEED-007) |
+| 23 | Recurring CI/CD efficiency audits baked in | ENGINEERING 12; SEED-007 | Partial | Phase 7 captures an attributable CI efficiency report and current-attempt measurement path; the real release-App comparison is pending ship. |
+| 24 | Recurring weakest-quality-dimension reviews baked in | ENGINEERING 12; SEED-007 | Partial | Phase 7 scored all seven dimensions and verified its selected README correction; recurring milestone reviews remain in SEED-007. See `07-QUALITY-REVIEW.md`. |
 | 25 | Verification shifted left and automated; only the truly necessary handed to the owner; recorded so it never loops back | AGENTS rule 6; DEC.101; GSD-HANDOFF 3 | Documented | settled, never re-proposed |
-| 26 | Stop after each GSD phase so the owner can check and switch models | AGENTS rule 9; GSD-HANDOFF 3, 5, 6; `scripts/hygiene.sh` stop policy; DEC.98 | Documented | v1.0 autonomous authorization ran through phase 6 release and closeout; future milestone policy remains in AGENTS rule 9 |
-| 27 | Releases the owner can download and try on a Mac through some frontend (Playstead not ready) | HOSTS 3 (RetroArch Metal); README install line; DEC.70 | Documented | test frame v1.0 ph1; games ph4; sound ph5; discs and FMV ph6 |
+| 26 | Stop after each GSD phase so the owner can check and switch models | AGENTS rule 9; GSD-HANDOFF 3, 5, 6; `scripts/hygiene.sh` stop policy; DEC.98 | Documented | v1.0 and the authorized v2.0 autonomous run follow the phase-boundary stop; rule 9 retains the release/ship boundary |
+| 27 | Releases the owner can download and try on a Mac through some frontend (Playstead not ready) | HOSTS 3 (RetroArch Metal); README install line; DEC.70 | Documented | v1.0 capability milestones; current README install line matches the release-line control and linked `install-line-latest` evidence (run 44262491280) |
 | 28 | The owner's physical discs as test input | ASSET_POLICY 4; CONFORMANCE 3.3 (local `library` preset); DEC.83 | Documented | local only, from v1.0 ph3; never in CI |
 | 29 | Speedrunning | DEC.08, DEC.44 (no speed changes); ECO 3.2; HOSTS 5; DEC.66 (lag frames); SEED-002 | Partial | lag count in the runner v1.0; movies v3.0 |
 | 30 | Machine/AI-assisted speedruns and TAS | ECO 3.3; HOSTS 5; SEED-002, SEED-004 | Later | v3.0 movies, v5.0 tools |
 | 31 | AI playthroughs | ECO 3.4; HOSTS 5 (Gymnasium order); SEED-004 | Later | v5.0 |
-| 32 | Portable to low-power devices (DS, PSP, handhelds) | ECO 4; ENGINEERING 9, 14; GPU 9; SEED-005 | Partial | be32 and wasm32 lanes v1.0; device budgets are ratchet inputs; console lanes v6.0 |
+| 32 | Portable to low-power devices (DS, PSP, handhelds) | ECO 4; ENGINEERING 9, 14; GPU 9; SEED-005 | Partial | be32/wasm32 establish portability checks; assumed device MIPS remain unmeasured and `gpu_motion` exceeds each provisional budget. Cached interpreter and device runs remain in SEED-005. |
 | 33 | Consistent frame rate, no stutter, low latency | ARCHITECTURE 1 (bounded run); DEC.11 (input at vblank); HOSTS 1, 3; ENGINEERING 8; ECO 2 C.04, C.09, G.02 | Documented | |
 | 34 | Great interface design for integration ergonomics | ARCHITECTURE 3; HOSTS 7; DEC.75 | Documented | consumer-minimal API growth per phase |
 | 35 | All regions | SYS 8; DEC.04, DEC.17; ECO 2 C.12 | Documented | three region profiles v1.0; PAL and LibCrypt titles over the ledger v2.0 (SEED-001) |
@@ -61,8 +61,8 @@ Rows are never renumbered or deleted; new asks take the next number.
 | 42 | What people like and dislike about emulators in general | ECO 1.3, 2 | Documented | |
 | 43 | Strangler-fig reuse of permissive code | PROVENANCE 4; AGENTS rule 1; DEC.52, DEC.53 | Documented | |
 | 44 | Best-in-class in every quality lens, not a generic emulator | ECO 6; DECISIONS; ENGINEERING 12; PRODUCT-ROADMAP | Documented | |
-| 45 | Power efficiency and battery life on handhelds | ENGINEERING 14; ECO 4; GPU 9; SEED-005 | Partial | measured in the nightly bench from v1.0; device runs v6.0 |
-| 46 | Efficient use in the browser through WebAssembly | ENGINEERING 14; HOSTS 6; DEC.73, DEC.96; SEED-008 | Partial | wasm32 hash lane v1.0 ph1; the page after v1.0 |
+| 45 | Power efficiency and battery life on handhelds | ENGINEERING 14; ECO 4; GPU 9; SEED-005 | Partial | deterministic Ir/frame is measured, but no handheld power or device-speed result exists; target runs and cached interpreter remain in SEED-005 |
+| 46 | Efficient use in the browser through WebAssembly | ENGINEERING 14; HOSTS 6; DEC.73, DEC.96; SEED-008 | Partial | wasm32 verifies hash equality under Wasmtime; Chrome performance and linked module size are unmeasured; the browser page remains SEED-008 |
 | 47 | A GSD second brain the owner can reference with a gsd new command | this directory; README; GSD-HANDOFF 2 (the `/gsd-new-project` resume text) | Documented | |
 | 48 | Keep all documentation current as the project evolves | README "Keeping it current"; ENGINEERING 11, 12 (docs freshness loop); DEC.89 | Documented | PROMPT-COVERAGE and PRODUCT-ROADMAP refreshed at each milestone close |
 

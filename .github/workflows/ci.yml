@@ -56,7 +56,7 @@ jobs:
   # release_inputs=true when a path the release pipeline reads changed.
   changes:
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 17 s (changes), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 11 s (2 samples), changes; [run 44336756139](https://github.com/szTheory/schwaystation/actions/runs/44336756139), provisional
     permissions:
       contents: read
       pull-requests: read
@@ -75,6 +75,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NUMBER: ${{ github.event.pull_request.number }}
           CHANGED: ${{ github.event.pull_request.changed_files }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
           CALL_REF: ${{ inputs.ref || '' }}
@@ -85,25 +93,81 @@ jobs:
           fail_closed() {
             printf 'heavy=true\nrelease_inputs=true\n' | tee -a "$GITHUB_OUTPUT"
           }
-          if [ -n "$NUMBER" ]; then
-            if ! changed_paths=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files" \
-              --jq '.[] | .filename, (.previous_filename // empty)'); then
-              fail_closed
-              exit 0
-            fi
-            printf '%s\n' "$changed_paths" | sh scripts/classify-changes.sh "$CHANGED" | tee -a "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ "$EVENT" != push ] || [ "$REF" != refs/heads/main ] || [ -n "$CALL_REF" ]; then
-            fail_closed
-            exit 0
-          fi
           is_commit_id() {
             [ "${#1}" -eq 40 ] && case "$1" in
               *[!0123456789abcdef]* | 0000000000000000000000000000000000000000) return 1 ;;
               *) return 0 ;;
             esac
           }
+          valid_file_count() {
+            case "$1" in '' | *[!0123456789]*) return 1 ;; esac
+            [ "$1" -gt 0 ] && [ "$1" -le 3000 ]
+          }
+          pr_metadata() {
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$NUMBER" | jq -ce '{number:.number,login:(.user.login // ""),type:(.user.type // ""),head_ref:(.head.ref // ""),head_sha:(.head.sha // ""),head_repo:(.head.repo.full_name // ""),base_ref:(.base.ref // ""),base_sha:(.base.sha // ""),base_repo:(.base.repo.full_name // ""),changed_files:.changed_files}'
+          }
+          pr_matches_event() {
+            printf '%s\n' "$1" | jq -e --argjson number "$NUMBER" --arg login "$PR_AUTHOR" \
+              --arg type "$PR_AUTHOR_TYPE" --arg href "$PR_HEAD_REF" --arg hsha "$PR_HEAD_SHA" \
+              --arg hrepo "$PR_HEAD_REPO" --arg bref "$PR_BASE_REF" --arg bsha "$PR_BASE_SHA" \
+              --arg brepo "$PR_BASE_REPO" --argjson changed "$CHANGED" \
+              '.number == $number and .login == $login and .type == $type and .head_ref == $href and .head_sha == $hsha and .head_repo == $hrepo and .base_ref == $bref and .base_sha == $bsha and .base_repo == $brepo and .changed_files == $changed' >/dev/null
+          }
+          if [ -n "$NUMBER" ]; then
+            if ! valid_file_count "$CHANGED" || ! is_commit_id "$PR_HEAD_SHA" || ! is_commit_id "$PR_BASE_SHA"; then
+              fail_closed
+              exit 0
+            fi
+            if ! pr_before=$(pr_metadata) || ! pr_matches_event "$pr_before"; then
+              fail_closed
+              exit 0
+            fi
+            if ! files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/files?per_page=100" | jq -s -ce 'if length > 0 and all(.[]; type == "array") then add else error("incomplete pages") end'); then
+              fail_closed
+              exit 0
+            fi
+            if ! file_count=$(printf '%s\n' "$files" | jq -er '
+              def safe_path:
+                type == "string" and length > 0 and length <= 4096 and
+                (startswith("/") | not) and (contains("\\") | not) and
+                (explode | all(.[]; . >= 32 and (. < 127 or . > 159))) and
+                (split("/") | all(.[]; . != "" and . != "." and . != ".."));
+              if type != "array" or length == 0 or length > 3000 then error("file count") else
+                if all(.[]; . as $f |
+                  ($f.filename | safe_path) and
+                  ($f.status as $s | ($s | type) == "string" and (["added","removed","modified","renamed","copied","changed","unchanged"] | index($s) != null)) and
+                  ($f.previous_filename == null or ($f.previous_filename | safe_path)) and
+                  ($f.status != "renamed" or ($f.previous_filename | type) == "string"))
+                  then length as $n | ([.[].filename] | unique | length) as $unique |
+                    if $n == $unique then $n else error("duplicate filename") end
+                  else error("untrusted path record") end
+              end'); then
+              fail_closed
+              exit 0
+            fi
+            if [ "$file_count" -ne "$CHANGED" ] || ! valid_file_count "$file_count"; then
+              fail_closed
+              exit 0
+            fi
+            if ! pr_after=$(pr_metadata) || [ "$pr_before" != "$pr_after" ] || ! pr_matches_event "$pr_after"; then
+              fail_closed
+              exit 0
+            fi
+            release_metadata=
+            if [ "$PR_AUTHOR" = 'schwaystation-release[bot]' ] && [ "$PR_AUTHOR_TYPE" = Bot ] && \
+              [ "$PR_HEAD_REF" = release-please--branches--main ] && [ "$PR_BASE_REF" = main ] && \
+              [ "$PR_HEAD_REPO" = "$GITHUB_REPOSITORY" ] && [ "$PR_BASE_REPO" = "$GITHUB_REPOSITORY" ] && \
+              jq -e 'length == 3 and all(.[]; .status == "modified" and .previous_filename == null) and ([.[].filename] | sort) == [".release-please-manifest.json","CHANGELOG.md","version.txt"]' <<< "$files" >/dev/null; then
+              release_metadata=release-metadata
+            fi
+            paths=$(jq -r '.[] | .filename, (.previous_filename // empty)' <<< "$files")
+            printf '%s\n' "$paths" | sh scripts/classify-changes.sh "$file_count" "$release_metadata" | tee -a "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$EVENT" != push ] || [ "$REF" != refs/heads/main ] || [ -n "$CALL_REF" ]; then
+            fail_closed
+            exit 0
+          fi
           if ! is_commit_id "$BEFORE" || ! is_commit_id "$AFTER"; then
             fail_closed
             exit 0
@@ -153,7 +217,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 10  # provisional until the merged plan's hosted run measures the lane.
+    timeout-minutes: 5  # 5-minute floor; 2 x 41 s = 2 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -182,7 +246,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 12  # provisional bound for OpenBIOS, the pinned encoder and run-local media.
+    timeout-minutes: 5  # 5-minute floor; 2 x 35 s = 2 min (2 samples); [run 44307395327](https://github.com/szTheory/schwaystation/actions/runs/44307395327), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -243,7 +307,7 @@ jobs:
   # The image has git and jq; configure finds them.
   hygiene:
     runs-on: ubuntu-26.04
-    timeout-minutes: 2  # 2 x 31 s (hygiene), slowest of 5 runs, run 42725764966
+    timeout-minutes: 3  # 2 x 62 s = 3 min (2 samples); [run 44336756139](https://github.com/szTheory/schwaystation/actions/runs/44336756139), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -258,7 +322,7 @@ jobs:
   title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 7 s (title), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # provisional; 0 comparable samples, use the next ordinary successful or failed attempt.
     permissions:
       contents: read
       pull-requests: read
@@ -281,7 +345,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: build (${{ matrix.os }}-${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15  # run 43670029646 hit 11m on macOS x64; run 43665013436 completed in 9m24
+    timeout-minutes: 30  # 2 x 872 s = 30 min (2 samples); slowest build matrix leg macos-x64; [run 44307395327](https://github.com/szTheory/schwaystation/actions/runs/44307395327), provisional
     strategy:
       fail-fast: false
       matrix:
@@ -356,6 +420,20 @@ jobs:
         run: >-
           cmake -DJUNIT=build/${{ matrix.preset }}/junit-release.xml -DINVENTORY=tests/inventory/ci.txt
           -DLABELS=release -P tests/cmake/check_junit.cmake
+      - name: Measure stable state serialization
+        if: matrix.os == 'linux' && matrix.arch == 'x64'
+        run: |
+          set -eu
+          # QUALITY_STATE_BYTES_BEGIN
+          state_output=$("${STATE_TEST_BINARY:-build/ci/tests/schwaystation-test-state}" state.stable_bytes)
+          printf '%s\n' "$state_output"
+          state_count=$(printf '%s\n' "$state_output" | grep -c '^state_bytes=' || true)
+          if [ "$state_count" -ne 1 ]; then printf '%s\n' 'quality: state_bytes must occur exactly once' >&2; exit 1; fi
+          state_line=$(printf '%s\n' "$state_output" | grep '^state_bytes=')
+          state_bytes=${state_line#state_bytes=}
+          case "$state_bytes" in ''|0|0*|*[!0123456789]*) printf '%s\n' 'quality: state_bytes must be a positive integer' >&2; exit 1;; esac
+          cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=state.bytes "-DMEASURED=$state_bytes" -P tests/cmake/quality.cmake
+          # QUALITY_STATE_BYTES_END
       # Compile the optional host once against this job's installed library;
       # it is not run or packaged. SDL2 comes from the runner or its OS repo.
       - name: Build the installed-library SDL2 example
@@ -408,7 +486,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 30 # run 44227999810 hit 20m at test 496/497; libretro.input.movies was active
+    timeout-minutes: 38 # 2 x 1120 s = 38 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -444,7 +522,7 @@ jobs:
     if: needs.changes.outputs.heavy == 'true'
     name: nofp (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 3  # floor covers slow checkout/image startup; one-minute cancellations: runs 42840838785 and 42841474140
+    timeout-minutes: 3  # 3-minute floor; 2 x 27 s = 1 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     strategy:
       fail-fast: false
       matrix:
@@ -464,7 +542,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 85  # run 43688529720 hit 60m at movies +11m37; CTest limit 32m (240s x8)
+    timeout-minutes: 109 # 2 x 3243 s = 109 min (2 samples), slowest be32; [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -504,7 +582,7 @@ jobs:
     needs: [changes, build, be32, wasm32]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 5 s (hash-equality), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # 5-minute floor; 2 x 8 s = 1 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -524,7 +602,7 @@ jobs:
     needs: [changes, openbios]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (apt); 2 x 60 s (wasm32), slowest of 5 runs, run 42691517611
+    timeout-minutes: 9  # 5-minute setup floor; 2 x 244 s = 9 min (2 samples); [run 44307395327](https://github.com/szTheory/schwaystation/actions/runs/44307395327), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -554,6 +632,11 @@ jobs:
         run: >-
           cmake -DJUNIT=build/wasm32/junit.xml -DINVENTORY=tests/inventory/wasm32.txt
           -DLABELS=portable -P tests/cmake/check_junit.cmake
+      - name: Measure linked WASI module
+        run: |
+          # QUALITY_WASM_COMPARE_BEGIN
+          cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=size.wasm "-DARTIFACT=${WASM_MODULE:-build/wasm32/schwaystation-run}" -P tests/cmake/quality.cmake
+          # QUALITY_WASM_COMPARE_END
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hashes-wasm32
@@ -572,7 +655,7 @@ jobs:
     # Keep the host result when another build leg fails; the required aggregate still fails.
     if: ${{ !cancelled() && needs.changes.outputs.heavy == 'true' && needs.openbios.result == 'success' }}
     runs-on: macos-15
-    timeout-minutes: 15  # provisional for local disc build plus the existing hosted smoke cases
+    timeout-minutes: 5  # 5-minute floor; 2 x 101 s = 4 min (2 samples); [run 44253375502](https://github.com/szTheory/schwaystation/actions/runs/44253375502), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -728,7 +811,7 @@ jobs:
     needs: changes
     if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 12  # run 44232810416 hit 5m while apt was still downloading valgrind; prior perf runs took 1m15 and 1m39
+    timeout-minutes: 5  # 5-minute floor; 2 x 108 s = 4 min (1 sample); [run 44218206100](https://github.com/szTheory/schwaystation/actions/runs/44218206100), provisional
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
@@ -833,7 +916,10 @@ jobs:
           fixtures=(testcard gpu_motion)
           rc=0
           for fixture in "${fixtures[@]}"; do
+            # QUALITY_PERF_COMPARE_BEGIN
             head=$(per_frame "$RUNNER_TEMP/perf/head" "$fixture") || exit 1
+            cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" "-DMETRIC=ir_per_frame.$fixture" "-DMEASURED=$head" -P tests/cmake/quality.cmake || rc=$?
+            # QUALITY_PERF_COMPARE_END
             base1='' base2=''
             if [ "$NO_BASE" = false ]; then
               base1=$(per_frame "$RUNNER_TEMP/perf/base" "$fixture") || exit 1
@@ -871,7 +957,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.changes.outputs.release_inputs == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 13  # 2 x 386 s (rehearsal), slowest of 5 runs, run 42691517611
+    timeout-minutes: 13  # provisional; 0 comparable samples, use the next ordinary successful or failed attempt.
     permissions:
       contents: write
       id-token: write
@@ -953,7 +1039,7 @@ jobs:
     needs: rehearsal
     if: always() && needs.rehearsal.result != 'skipped'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (API); 2 x 9 s (cleanup), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 5  # 5-minute floor; provisional, 0 comparable samples; use the next ordinary successful or failed attempt.
     permissions:
       contents: write
     steps:
@@ -981,9 +1067,12 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, hygiene, title, gpu-reference, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
+    needs: [changes, hygiene, title, gpu-reference, openbios, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor (roll-up); 2 x 4 s (CI required), slowest of 1 run, run 39455724329, provisional
+    timeout-minutes: 1  # 1-minute setup floor; 2 x 3 s (2 samples); [run 44337684558](https://github.com/szTheory/schwaystation/actions/runs/44337684558), provisional
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Every job succeeded or was skipped as allowed
         env:
@@ -993,6 +1082,8 @@ jobs:
           CALLED: ${{ inputs.ref && 'true' || 'false' }}
           RELEASE_INPUTS: ${{ needs.changes.outputs.release_inputs }}
         run: |
+          # QUALITY_CI_ROLLUP_BEGIN
+          set -e
           echo "$NEEDS" | jq -e --arg event "$EVENT" --arg heavy "$HEAVY" --arg called "$CALLED" --arg release_inputs "$RELEASE_INPUTS" 'to_entries | all(
             .value.result == "success"
             or (.key == "title" and .value.result == "skipped" and $event != "pull_request")
@@ -1000,3 +1091,36 @@ jobs:
             or ((.key | IN("rehearsal", "cleanup")) and .value.result == "skipped"
               and ($release_inputs != "true" or $event != "pull_request" or $called == "true"))
             or ($heavy == "false" and .value.result == "skipped" and (.key | IN("changes", "hygiene", "title") | not)))'
+          # QUALITY_CI_ROLLUP_END
+      - name: Checkout exact CI revision
+        if: github.event_name == 'pull_request' && needs.changes.outputs.heavy == 'true' && !inputs.ref
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Compare current-attempt critical path
+        if: github.event_name == 'pull_request' && needs.changes.outputs.heavy == 'true' && !inputs.ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_HEAVY: ${{ needs.changes.outputs.heavy }}
+          CI_CALLED: ${{ inputs.ref && 'true' || 'false' }}
+          CI_RELEASE_INPUTS: ${{ needs.changes.outputs.release_inputs }}
+          GITHUB_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          QUALITY_FILE: quality.json
+        run: |
+          # QUALITY_CI_TIMING_BEGIN
+          set -eu
+          endpoint="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100"
+          jobs_file="$RUNNER_TEMP/ci-jobs-pages.json"
+          complete=false
+          for attempt in 1 2; do
+            if gh api --paginate --slurp "$endpoint" > "$jobs_file" &&
+              jq -e 'type == "array" and length > 0 and (.[0].total_count as $total | ($total | type == "number") and all(.[]; .total_count == $total and (.jobs | type == "array")) and ([.[].jobs[]] | length == $total))' "$jobs_file" >/dev/null; then
+              complete=true
+              break
+            fi
+            [ "$attempt" -eq 2 ] || sleep 2
+          done
+          [ "$complete" = true ] || { echo "Actions attempt jobs are incomplete after the bounded consistency retry" >&2; exit 1; }
+          CI_JOBS_FILE="$jobs_file" scripts/ci-critical-path.sh
+          # QUALITY_CI_TIMING_END

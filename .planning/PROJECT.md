@@ -22,8 +22,28 @@ archive. This is a completed v1.0 project milestone, not a claim of full PlaySta
 complete hardware conformance. In particular, exact 8-bit MDEC output and complete external frame/movie output
 remain unproven under the accepted v1.0 scope. The detailed discrepancy and evidence are in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md).
 
-No next milestone is active. Later work remains in the dormant seeds and product roadmap until a new milestone is
-explicitly started.
+Milestone v2.0, “The whole library,” is now active. It expands disc-format and LibCrypt support, peripherals and
+save compatibility, region and revision coverage, ROM-hacker patches and cheats, and the compatibility ledger.
+Phase 7's pipeline tune-up is implemented and verified; its hosted release evidence is being completed before
+Phase 8 starts. The v1.0 limits in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md) remain
+explicit; v2.0 does not claim the unresolved MDEC or full-frame/movie hardware conformance.
+
+## Current Milestone: v2.0 The whole library
+
+**Goal:** Make more of the PlayStation library playable through common disc formats, protection data, peripherals,
+save workflows, machine profiles, and ROM-hacker support.
+
+**Target features:**
+- CHD, PBP, ECM and CCD media, plus SBI/LibCrypt support behind the existing host-supplied disc boundary.
+- Multitap, light guns, mouse, neGcon, Jogcon, Dual Analog flight mode and PocketStation storage behavior.
+- Per-game memory cards, card import/export formats and the libretro save round trip.
+- PAL timing and console/GPU revision profiles across the compatibility ledger, plus opt-in BIOS-shell fast boot.
+- GameShark strings, runner patch support, bounded MDEC edge cases, broader ledger coverage and removal of the experimental metadata only when supported.
+- A first-phase pipeline and documentation tune-up, including the triage digest, CI-efficiency report and measured `quality.json` ratchets.
+
+Save states, movies, browser UI, measured-accuracy campaigns, JITs and visual enhancements remain outside v2.0.
+The MDEC edge work stays within the v1.0 evidence boundary: exact 8-bit hardware output and full-frame/movie
+conformance are not claims of this milestone.
 
 ## Requirements
 
@@ -35,10 +55,11 @@ explicitly started.
 - ✓ Phase 4: GPU, display modes, pads, memory cards, OpenBIOS and compatibility ledger — v1.0.
 - ✓ Phase 5: deterministic SPU audio, pinned memory-transfer logs and runner/libretro PCM parity — v1.0.
 - ✓ Phase 6: CD-ROM images, XA, CD-DA, MDEC within the approved evidence scope, owned disc boot and disk control — v1.0.
+- ✓ Phase 7: weekly triage, measured CI/quality controls and maintainer guidance — v2.0; hosted ship evidence is tracked in the phase report.
 
 ### Active
 
-No active milestone requirements. v1.0 is complete; planning the next milestone is intentionally deferred.
+- v2.0: The whole library — scoped in `.planning/REQUIREMENTS.md` and mapped in `.planning/ROADMAP.md`.
 
 ### Out of Scope
 
@@ -48,7 +69,7 @@ No active milestone requirements. v1.0 is complete; planning the next milestone 
 - GPL, LGPL, non-commercial or unlicensed code; MIT licence (`PROVENANCE.md`).
 - Enhancement modes in the hashed path (internal resolution, PGXP, widescreen, texture filtering, true colour) and any overclock or CD-speed hack that changes timing; the native frame is the product.
 - Signed macOS builds; a Developer ID certificate puts a legal name in artifacts.
-- Later milestones: the whole library (CHD, PBP, ECM, LibCrypt, multitap, guns, PocketStation storage), states and movies, measured accuracy, tools, ports with a cached interpreter and JIT, enhancements and the browser page are seeds in `.planning/seeds/` and horizons in `.planning/PRODUCT-ROADMAP.md`.
+- Later milestones: states and movies, measured accuracy, tools, ports with a cached interpreter and JIT, enhancements and the browser page remain seeds in `.planning/seeds/` and horizons in `.planning/PRODUCT-ROADMAP.md`.
 
 ## Context
 
@@ -104,6 +125,7 @@ No active milestone requirements. v1.0 is complete; planning the next milestone 
 | Nothing speed-changing exists: no CPU, GTE or GPU clock scale, no CD speedup; enhancements never enter the hashed path | rcheevos restricts such options; speedrun boards forbid them; accuracy complaints about PGXP and overclock | ✓ v1.0: no speed-changing option or enhancement enters the hashed path. |
 | Every phase ends in an automated release; phase 1 is the content-free walking skeleton ported from cogmaster and muhtari at public pins | Sibling velocity evidence | ✓ Six phase PRs merged; the automatic release workflow published v0.6.0. |
 | Cachegrind Ir/frame on three fixtures as the only per-PR speed gate; proportional gates; real-host e2e at most 300 lines; pins public and fetched with `gh api`; pre-seeded GSD bootstrap, interactive, one step per session | Wall-clock tails are noise on shared runners; two siblings stalled on their own machinery; a sibling lost six plans to an unpushed pin | ✓ v1.0: performance/policy checks passed, real-host e2e stayed within cap and source pins remained public. |
+| v2.0 expands playable library breadth while keeping the deterministic core, permissive reuse policy and host-owned I/O boundaries | The owner approved the whole-library direction; the browser and save-state directions remain later milestones | — v2.0: requirements and verification are pending. |
 
 The full list with sources is `.planning/preparation/DECISIONS.md`.
 
@@ -120,4 +142,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-11-18 after v1.0 milestone completion*
+*Last updated: 2026-11-19 after Phase 7 verification*

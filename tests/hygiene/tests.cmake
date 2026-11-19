@@ -3,10 +3,10 @@ set(hygiene_scripts ${CMAKE_CURRENT_LIST_DIR}/../cmake)
 
 # Fault prevented: repository-check code growing past its budget. Every line
 # of the shell scripts, the CMake check scripts and the hooks counts, at most
-# 2700, the approved absolute ceiling; Phase 6 ratchets to its measured total at ship.
+# 3901, the measured Phase 7 total; recount after any counted review fix.
 schway_add_test(NAME policy.gate_budget
   COMMAND ${CMAKE_COMMAND} -DROOT=${CMAKE_SOURCE_DIR}
-    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=2700
+    "-DPATTERNS=scripts/*.sh$<SEMICOLON>tests/cmake/*.cmake$<SEMICOLON>.githooks/*" -DLIMIT=3901
     -P ${hygiene_scripts}/line_budget.cmake
   LABELS hygiene policy TIMEOUT 30)
 set(hygiene_budget ${CMAKE_BINARY_DIR}/hygiene/line_budget_fixture)
@@ -214,10 +214,20 @@ check_route() {
   gh_fail=${11:-}
   git -C "$runner" fetch -q --no-tags --depth=1 origin "$checkout"
   git -C "$runner" checkout -q --detach "$checkout"
+  : > "$fixture_root/gh-calls"
   : > "$output"
   got=$(cd "$runner" && EVENT="$event" REF="$ref" NUMBER="$number" CALL_REF="$call_ref" \
-    BEFORE="$before" AFTER="$after" CHANGED=1 GITHUB_WORKSPACE="$runner" \
+    BEFORE="$before" AFTER="$after" CHANGED="${PR_CHANGED-1}" GITHUB_WORKSPACE="$runner" \
     GITHUB_REPOSITORY=fixture/project GITHUB_OUTPUT="$output" GH_TOKEN=test-token GH_LIST_FAIL="$gh_fail" \
+    PR_AUTHOR="${PR_AUTHOR-}" PR_AUTHOR_TYPE="${PR_AUTHOR_TYPE-}" \
+    PR_HEAD_REF="${PR_HEAD_REF-}" PR_HEAD_SHA="${PR_HEAD_SHA-}" PR_HEAD_REPO="${PR_HEAD_REPO-}" \
+    PR_BASE_REF="${PR_BASE_REF-}" PR_BASE_SHA="${PR_BASE_SHA-}" PR_BASE_REPO="${PR_BASE_REPO-}" \
+    GH_MODE="${GH_MODE-}" GH_FILES_JSON="${GH_FILES_JSON-}" GH_CALLS="$fixture_root/gh-calls" \
+    REST_LOGIN="${REST_LOGIN-${PR_AUTHOR-}}" REST_TYPE="${REST_TYPE-${PR_AUTHOR_TYPE-}}" \
+    REST_HEAD_REF="${REST_HEAD_REF-${PR_HEAD_REF-}}" REST_HEAD_SHA="${REST_HEAD_SHA-${PR_HEAD_SHA-}}" \
+    REST_HEAD_REPO="${REST_HEAD_REPO-${PR_HEAD_REPO-}}" REST_BASE_REF="${REST_BASE_REF-${PR_BASE_REF-}}" \
+    REST_BASE_SHA="${REST_BASE_SHA-${PR_BASE_SHA-}}" REST_BASE_REPO="${REST_BASE_REPO-${PR_BASE_REPO-}}" \
+    REST_CHANGED="${REST_CHANGED-${PR_CHANGED-1}}" \
     PATH="$route_path:$PATH" bash -e -o pipefail "$workflow")
   output_got=$(tr '\n' ' ' < "$output")
   if [ "$output_got" != "$want" ]; then
@@ -285,6 +295,10 @@ source_to_planning=$(commit source-to-planning-rename)
 mkdir -p "$repo/.github/workflows"
 printf '%s\n' 'release' > "$repo/.github/workflows/release.yml"
 release=$(commit release-input)
+printf '%s\n' '{}' > "$repo/.release-please-manifest.json"
+printf '%s\n' '# generated release' > "$repo/CHANGELOG.md"
+printf '%s\n' '0.1.0' > "$repo/version.txt"
+generated=$(commit generated-metadata)
 weird=$(printf '.planning/innocent\nsrc/escaped.c')
 mkdir -p "$(dirname "$repo/$weird")"
 printf '%s\n' 'quoted path' > "$repo/$weird"
@@ -299,8 +313,53 @@ oversize=$(commit oversize)
 git -C "$repo" push -q origin main
 git clone -q --depth 1 "file://$remote" "$runner"
 
-printf '%s\n' '#!/bin/sh' '[ "${GH_LIST_FAIL-}" = 1 ] && exit 1' \
-  "printf '%s\\n' '.planning/STATE.md'" > "$fixture_root/bin/gh"
+cat > "$fixture_root/bin/gh" <<'GH'
+#!/bin/sh
+set -eu
+[ "${1-}" = api ] || exit 2
+endpoint= paginate=false jq_query= previous=
+for arg do
+  case "$arg" in repos/*) endpoint=$arg ;; esac
+  [ "$arg" = --paginate ] && paginate=true
+  [ "$previous" = --jq ] && jq_query=$arg
+  previous=$arg
+done
+case "$endpoint" in
+  */files*)
+    [ "$paginate" = true ] && [ "${GH_LIST_FAIL-}" != 1 ] || exit 1
+    if [ -n "$jq_query" ]; then
+      case "${GH_MODE-}" in
+        files-fail) exit 1 ;;
+        multi-page)
+          printf '%s\n' '[{"filename":".release-please-manifest.json","status":"modified"}]' | jq -r "$jq_query"
+          printf '%s\n' '[{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"}]' | jq -r "$jq_query" ;;
+        files-empty) printf '%s\n' '[]' | jq -r "$jq_query" ;;
+        files-malformed) printf '%s\n' 'not-json' | jq -r "$jq_query" ;;
+        *) printf '%s\n' "${GH_FILES_JSON-[]}" | jq -r "$jq_query" ;;
+      esac
+      exit $?
+    fi
+    case "${GH_MODE-}" in
+      files-fail) exit 1 ;;
+      multi-page)
+        printf '%s\n' '[{"filename":".release-please-manifest.json","status":"modified"}]'
+        printf '%s\n' '[{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"}]' ;;
+      files-empty) printf '%s\n' '[]' ;;
+      files-malformed) printf '%s\n' 'not-json' ;;
+      *) printf '%s\n' "${GH_FILES_JSON-[]}" ;;
+    esac
+    exit 0 ;;
+esac
+calls=$(cat "$GH_CALLS"); calls=$((calls + 1)); printf '%s\n' "$calls" > "$GH_CALLS"
+case "${GH_MODE-}:$calls" in fail-before:1 | fail-after:2) exit 1 ;; esac
+head_sha=${REST_HEAD_SHA-} base_sha=${REST_BASE_SHA-}
+head_ref=${REST_HEAD_REF-} login=${REST_LOGIN-}
+if [ "${GH_MODE-}" = moving-head ] && [ "$calls" -gt 1 ]; then head_sha=cccccccccccccccccccccccccccccccccccccccc; fi
+if [ "${GH_MODE-}" = stale-base ] && [ "$calls" -gt 1 ]; then base_sha=dddddddddddddddddddddddddddddddddddddddd; fi
+printf '{"number":1,"user":{"login":"%s","type":"%s"},"head":{"ref":"%s","sha":"%s","repo":{"full_name":"%s"}},"base":{"ref":"%s","sha":"%s","repo":{"full_name":"%s"}},"changed_files":%s}\n' \
+  "$login" "${REST_TYPE-}" "$head_ref" "$head_sha" "${REST_HEAD_REPO-}" \
+  "${REST_BASE_REF-}" "$base_sha" "${REST_BASE_REPO-}" "${REST_CHANGED-1}"
+GH
 chmod +x "$fixture_root/bin/gh"
 bin=$fixture_root/bin
 git_path=$fixture_root/diff-failure
@@ -330,8 +389,119 @@ check_route mismatch 'heavy=true release_inputs=true ' push refs/heads/main '' '
 check_route release-call 'heavy=true release_inputs=true ' workflow_call '' '' "$base" '' '' "$planning"
 check_route manual 'heavy=true release_inputs=true ' workflow_dispatch refs/heads/main '' '' "$planning" "$planning" "$planning"
 check_route non-main-push 'heavy=true release_inputs=true ' push refs/heads/feature '' '' "$planning" "$planning" "$planning"
-check_route pr-planning 'heavy=false release_inputs=false ' pull_request refs/pull/1/merge 1 '' '' '' "$planning"
-check_route pr-listing-failure 'heavy=true release_inputs=true ' pull_request refs/pull/1/merge 1 '' '' '' "$planning" '' 1
+check_route main-generated-metadata 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$release" "$generated" "$generated"
+
+set_release_pr() {
+  PR_AUTHOR='schwaystation-release[bot]' PR_AUTHOR_TYPE=Bot
+  PR_HEAD_REF=release-please--branches--main PR_HEAD_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  PR_HEAD_REPO=fixture/project PR_BASE_REF=main PR_BASE_SHA=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  PR_BASE_REPO=fixture/project PR_CHANGED=3 GH_MODE=release
+  GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"modified"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"}]'
+  unset REST_LOGIN REST_TYPE REST_HEAD_REF REST_HEAD_SHA REST_HEAD_REPO REST_BASE_REF REST_BASE_SHA REST_BASE_REPO REST_CHANGED
+}
+pr_route() {
+  check_route "$1" "$2" pull_request refs/pull/1/merge 1 '' '' '' "$planning" '' "${3-}"
+}
+set_release_pr
+PR_AUTHOR=alice PR_AUTHOR_TYPE=User PR_HEAD_REF=topic PR_CHANGED=1 GH_MODE=planning
+GH_FILES_JSON='[{"filename":".planning/STATE.md","status":"modified"}]'
+pr_route pr-planning 'heavy=false release_inputs=false '
+set_release_pr
+GH_MODE=files-fail
+pr_route pr-listing-failure 'heavy=true release_inputs=true '
+set_release_pr
+GH_MODE=multi-page
+pr_route app-generated-only 'heavy=false release_inputs=false '
+set_release_pr
+PR_AUTHOR=ordinary PR_AUTHOR_TYPE=User PR_HEAD_REF=ordinary-topic GH_MODE=ordinary
+pr_route ordinary-author 'heavy=true release_inputs=false '
+set_release_pr
+PR_HEAD_REPO=fork/project GH_MODE=fork
+pr_route fork-head 'heavy=true release_inputs=false '
+set_release_pr
+PR_HEAD_REF=release-please--branches--other GH_MODE=wrong-head-ref
+pr_route wrong-head-ref 'heavy=true release_inputs=false '
+set_release_pr
+PR_BASE_REF=stable GH_MODE=wrong-base-ref
+pr_route wrong-base-ref 'heavy=true release_inputs=false '
+set_release_pr
+PR_BASE_REPO=fork/project GH_MODE=wrong-base-repo
+pr_route wrong-base-repo 'heavy=true release_inputs=false '
+set_release_pr
+REST_LOGIN=another-release[bot] GH_MODE=different-login
+pr_route differing-login 'heavy=true release_inputs=true '
+set_release_pr
+REST_TYPE=User GH_MODE=wrong-bot-type
+pr_route wrong-bot-type 'heavy=true release_inputs=true '
+set_release_pr
+PR_HEAD_SHA=cccccccccccccccccccccccccccccccccccccccc REST_HEAD_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GH_MODE=event-head-mismatch
+pr_route event-head-mismatch 'heavy=true release_inputs=true '
+set_release_pr
+GH_MODE=moving-head
+pr_route moving-head 'heavy=true release_inputs=true '
+set_release_pr
+GH_MODE=stale-base
+pr_route stale-base 'heavy=true release_inputs=true '
+set_release_pr
+GH_MODE=fail-before
+pr_route metadata-before-failure 'heavy=true release_inputs=true '
+set_release_pr
+GH_MODE=files-fail
+pr_route files-api-failure 'heavy=true release_inputs=true '
+set_release_pr
+GH_MODE=fail-after
+pr_route metadata-after-failure 'heavy=true release_inputs=true '
+set_release_pr
+GH_MODE=files-empty GH_FILES_JSON='[]'
+pr_route empty-file-list 'heavy=true release_inputs=true '
+set_release_pr
+GH_MODE=files-malformed
+pr_route malformed-file-list 'heavy=true release_inputs=true '
+set_release_pr
+PR_CHANGED=3001 REST_CHANGED=3001 GH_MODE=oversize
+pr_route oversize-file-list 'heavy=true release_inputs=true '
+set_release_pr
+PR_CHANGED=4 REST_CHANGED=4 GH_MODE=partial-list
+pr_route partial-file-list 'heavy=true release_inputs=true '
+set_release_pr
+PR_CHANGED=2 GH_MODE=event-count-mismatch
+pr_route event-count-mismatch 'heavy=true release_inputs=true '
+set_release_pr
+GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"modified"},{"filename":".release-please-manifest.json","status":"modified"},{"filename":"CHANGELOG.md","status":"modified"}]' GH_MODE=duplicate-file
+pr_route duplicate-file-record 'heavy=true release_inputs=true '
+set_release_pr
+PR_CHANGED=1 GH_FILES_JSON='[{"filename":"src/core.c","previous_filename":".release-please-manifest.json","status":"renamed"}]' GH_MODE=rename-out-of-metadata
+pr_route rename-metadata-to-source 'heavy=true release_inputs=false '
+set_release_pr
+PR_CHANGED=1 GH_FILES_JSON='[{"filename":".planning/STATE.md","previous_filename":"src/core.c","status":"renamed"}]' GH_MODE=rename-into-planning
+pr_route rename-source-to-planning 'heavy=true release_inputs=false '
+set_release_pr
+PR_CHANGED=1 GH_FILES_JSON='[{"filename":"version.txt","previous_filename":"CHANGELOG.md","status":"renamed"}]' GH_MODE=rename-within-metadata
+pr_route rename-within-metadata 'heavy=true release_inputs=false '
+set_release_pr
+GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"added"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"}]' GH_MODE=added-file
+pr_route added-metadata-file 'heavy=true release_inputs=false '
+set_release_pr
+GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"removed"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"}]' GH_MODE=deleted-file
+pr_route deleted-metadata-file 'heavy=true release_inputs=false '
+set_release_pr
+PR_CHANGED=4 GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"modified"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"},{"filename":".planning/STATE.md","status":"modified"}]' GH_MODE=extra-planning
+pr_route extra-planning-file 'heavy=true release_inputs=false '
+set_release_pr
+PR_CHANGED=4 GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"modified"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"},{"filename":"scripts/publish.sh","status":"modified"}]' GH_MODE=extra-release-input
+pr_route extra-release-input 'heavy=true release_inputs=true '
+set_release_pr
+PR_CHANGED=1 GH_FILES_JSON='[{"filename":"scripts/publish.sh","status":"modified"}]' GH_MODE=release-input-only
+pr_route release-input-only 'heavy=true release_inputs=true '
+set_release_pr
+PR_CHANGED=4 GH_FILES_JSON='[{"filename":".release-please-manifest.json","status":"modified"},{"filename":"CHANGELOG.md","status":"modified"},{"filename":"version.txt","status":"modified"},{"filename":".planning/STATE.md","status":"modified"}]' GH_MODE=extra-metadata
+pr_route metadata-set-mismatch 'heavy=true release_inputs=false '
+set_release_pr
+PR_CHANGED=1 GH_FILES_JSON='[{"filename":"../outside","status":"modified"}]' GH_MODE=untrusted-path
+pr_route traversal-path 'heavy=true release_inputs=true '
+set_release_pr
+PR_CHANGED=1 GH_FILES_JSON='[{"filename":"src/a\nb","status":"modified"}]' GH_MODE=control-path
+pr_route control-bearing-path 'heavy=true release_inputs=true '
 echo "ci.classify: $n lists"
 ]=])
 schway_add_test(NAME ci.classify

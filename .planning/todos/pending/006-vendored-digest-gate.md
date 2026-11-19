@@ -2,6 +2,7 @@
 title: "Port the vendored-file digest check (libretro.vendored)"
 status: pending
 priority: P2
+resolves_phase: 10
 source: "phase 01, plan 01-15 (a seed gate deferred under D-25 and AGENTS rule 7)"
 created: 2026-10-20
 theme: libretro

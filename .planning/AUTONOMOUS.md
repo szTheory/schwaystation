@@ -1,8 +1,9 @@
-# Autonomous runs for milestone v1.0
+# Autonomous runs for milestone v2.0 — The whole library
 
-The owner runs the rest of milestone v1.0 with `/gsd-autonomous` (AGENTS.md rule 9). This file holds the
-standing guidance for the two steps that need the most judgement. Every discuss and verify step reads it,
-autonomous or not, and follows it without asking.
+The owner authorized autonomous work through milestone v2.0, starting at Phase 7, with each phase shipped before
+the next and the milestone audit, completion and cleanup at the end (AGENTS.md rule 9). This file holds the
+standing guidance for the steps that need the most judgement. Every discuss and verify step reads it, autonomous
+or not, and follows it without asking.
 
 ## Discuss steps: fan out, synthesize, follow
 
@@ -75,6 +76,15 @@ On 2026-11-17, the owner renewed authorization to continue without routine consu
 release and the v1.0 milestone audit, completion and cleanup. No owner capture is available or planned. This
 extends the stop-at-verification boundary in AGENTS.md rule 9 for this run only; keep every named acceptance
 gate, do not alter DISC-03 or its cycle cap to force a pass, and do not start v2.0 under this authorization.
+
+On 2026-11-18, after v1.0 was released and main CI passed, the owner approved milestone v2.0, “The whole
+library,” based on SEED-001. SEED-007 is required as its first phase. This supersedes the v1.0-only authorization
+above and its “do not start v2.0” boundary. The owner's standing request is to continue autonomously through v2.0
+research, requirements, roadmap, each phase's discuss → plan → execute → review → verify → ship cycle, then the
+milestone audit, completion and cleanup. Keep to the approved SEED-001 scope; the browser page, states and movies,
+and measured-accuracy campaign stay out of v2.0. Follow the branch, release, security, privacy, determinism and
+verification rules. Pause only for a material scope change, identity-bound consent, owner-hardware action or a
+concrete external blocker. Do not plan or ask for a new hardware capture; none is available soon.
 
 For CI and CD efficiency, first measure critical-path time and duplicate work. Prefer removing redundant
 runs and serial bottlenecks over adding caches, concurrency or dependencies. Keep all required coverage.
