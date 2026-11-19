@@ -579,11 +579,34 @@ schway_host_card_status schway_host_card_save_atomic(const char *path, const voi
     return schway__host_cards_save_atomic(path, bytes, size, SCHWAY__HOST_CARD_FAILURE_NONE);
 }
 
+schway_host_card_status schway_host_card_export_atomic(const char *path, const void *bytes,
+                                                        size_t size,
+                                                        schway_host_card_format format)
+{
+    (void)path;
+    (void)bytes;
+    (void)size;
+    (void)format;
+    return SCHWAY_HOST_CARD_ERR_IO;
+}
+
 #if defined(SCHWAY_HOST_CARD_TESTING)
 schway_host_card_status schway_host_card_test_save_atomic(const char *path, const void *bytes,
                                                            size_t size,
                                                            schway_host_card_test_failure failure)
 {
     return schway__host_cards_save_atomic(path, bytes, size, (int)failure);
+}
+
+schway_host_card_status schway_host_card_test_export_atomic(
+    const char *path, const void *bytes, size_t size, schway_host_card_format format,
+    schway_host_card_test_failure failure)
+{
+    (void)path;
+    (void)bytes;
+    (void)size;
+    (void)format;
+    (void)failure;
+    return SCHWAY_HOST_CARD_ERR_IO;
 }
 #endif

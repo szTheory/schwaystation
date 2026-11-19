@@ -148,6 +148,13 @@ static void make_valid_card(uint8_t *bytes)
     }
 }
 
+static void make_asymmetric_card(uint8_t *bytes)
+{
+    for (size_t i = 0u; i < SCHWAY_MEMCARD_SIZE; i++) {
+        bytes[i] = (uint8_t)((i * 37u) ^ (i >> 3u) ^ (i >> 7u));
+    }
+}
+
 static void expect_import_refusal(const char *path, schway_host_card_status expected_status,
                                   const void *source, size_t source_size,
                                   uint8_t *out, schway_host_card_lint *lint,
@@ -265,6 +272,62 @@ static void wrappers(void)
         CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
         CHECK_EQ_U64(lint.flags, 0u);
     }
+
+    /* Header fields and directory copies are sourced from PSX-SPX's pinned Memory Card Images table. */
+    make_asymmetric_card(card);
+    status = schway_host_card_export_atomic(gme_path, card, SCHWAY_MEMCARD_SIZE,
+                                            SCHWAY_HOST_CARD_FORMAT_GME);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    size_t exported_size = 0u;
+    CHECK(read_file(gme_path, wrapped, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE,
+                    &exported_size));
+    CHECK_EQ_U64(exported_size, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
+    CHECK(memcmp(wrapped, "123-456-STD\0", 12u) == 0);
+    CHECK(memcmp(wrapped + 0x10u, "\0\0\1\0\1", 5u) == 0);
+    for (size_t sector = 0u; sector < 16u; sector++) {
+        CHECK_EQ_HEX(wrapped[0x15u + sector], card[sector * 128u]);
+        CHECK_EQ_HEX(wrapped[0x25u + sector], card[sector * 128u + 8u]);
+    }
+    CHECK(all_bytes_are(wrapped + 0x40u, 0xF00u, 0u));
+    CHECK(memcmp(wrapped + GME_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE) == 0);
+    status = schway_host_card_import_file(gme_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
+
+    status = schway_host_card_export_atomic(vgs_path, card, SCHWAY_MEMCARD_SIZE,
+                                            SCHWAY_HOST_CARD_FORMAT_VGS);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(read_file(vgs_path, wrapped, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE,
+                    &exported_size));
+    CHECK_EQ_U64(exported_size, (size_t)VGS_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
+    CHECK(memcmp(wrapped, "VgsM", 4u) == 0);
+    CHECK(memcmp(wrapped + VGS_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE) == 0);
+    status = schway_host_card_import_file(vgs_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
+
+    status = schway_host_card_export_atomic(psx_path, card, SCHWAY_MEMCARD_SIZE,
+                                            SCHWAY_HOST_CARD_FORMAT_PSV);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(read_file(psx_path, wrapped, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE,
+                    &exported_size));
+    CHECK_EQ_U64(exported_size, (size_t)PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
+    CHECK(memcmp(wrapped, "PSV", 3u) == 0);
+    CHECK(memcmp(wrapped + PSX_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE) == 0);
+    status = schway_host_card_import_file(psx_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
+
+    status = schway_host_card_export_atomic(gme_path, card, SCHWAY_MEMCARD_SIZE,
+                                            SCHWAY_HOST_CARD_FORMAT_RAW);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(read_file(gme_path, wrapped, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE,
+                    &exported_size));
+    CHECK_EQ_U64(exported_size, SCHWAY_MEMCARD_SIZE);
+    CHECK(memcmp(wrapped, card, SCHWAY_MEMCARD_SIZE) == 0);
+    status = schway_host_card_import_file(gme_path, out, SCHWAY_MEMCARD_SIZE, &lint);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(memcmp(out, card, SCHWAY_MEMCARD_SIZE) == 0);
 
     CHECK(schway_host_card_paths_for_basename(first_directory, "game",
                                               content_slot1, sizeof content_slot1,
@@ -719,6 +782,8 @@ cleanup:
 
 static void atomic_failures(void)
 {
+    enum { GME_HEADER_SIZE = 0x0F40 };
+    const size_t gme_size = (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE;
     char first_directory[TEMP_PATH_CAP] = {0};
     char second_directory[TEMP_PATH_CAP] = {0};
     char exact_source[TEMP_PATH_CAP] = {0};
@@ -727,6 +792,7 @@ static void atomic_failures(void)
     char missing_source[TEMP_PATH_CAP] = {0};
     char first_destination[TEMP_PATH_CAP] = {0};
     char second_destination[TEMP_PATH_CAP] = {0};
+    char wrapped_destination[TEMP_PATH_CAP] = {0};
     char temporary[TEMP_PATH_CAP] = {0};
     uint8_t marker = 0xD2u;
     uint8_t *first = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
@@ -734,6 +800,8 @@ static void atomic_failures(void)
     uint8_t *oversized = (uint8_t *)malloc((size_t)SCHWAY_MEMCARD_SIZE + 1u);
     uint8_t *out = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
     uint8_t *readback = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *wrapped_previous = (uint8_t *)malloc(gme_size);
+    uint8_t *wrapped_readback = (uint8_t *)malloc(gme_size);
     int made_first_directory = 0;
     int made_second_directory = 0;
     int have_exact_source = 0;
@@ -742,9 +810,12 @@ static void atomic_failures(void)
     int have_first_destination = 0;
     int have_second_destination = 0;
     int have_temp_marker = 0;
+    int have_wrapped_destination = 0;
 
-    CHECK(first != NULL && second != NULL && oversized != NULL && out != NULL && readback != NULL);
-    if (first == NULL || second == NULL || oversized == NULL || out == NULL || readback == NULL) {
+    CHECK(first != NULL && second != NULL && oversized != NULL && out != NULL && readback != NULL &&
+          wrapped_previous != NULL && wrapped_readback != NULL);
+    if (first == NULL || second == NULL || oversized == NULL || out == NULL || readback == NULL ||
+        wrapped_previous == NULL || wrapped_readback == NULL) {
         goto cleanup;
     }
     made_first_directory = create_work_directory(first_directory, sizeof first_directory);
@@ -757,7 +828,8 @@ static void atomic_failures(void)
         !set_path(oversized_source, sizeof oversized_source, first_directory, "oversized.raw") ||
         !set_path(missing_source, sizeof missing_source, first_directory, "missing.raw") ||
         !set_path(first_destination, sizeof first_destination, first_directory, "save.mcr") ||
-        !set_path(second_destination, sizeof second_destination, second_directory, "save.mcr")) {
+        !set_path(second_destination, sizeof second_destination, second_directory, "save.mcr") ||
+        !set_path(wrapped_destination, sizeof wrapped_destination, first_directory, "wrapped.gme")) {
         CHECK(0);
         goto cleanup;
     }
@@ -847,6 +919,36 @@ static void atomic_failures(void)
         CHECK(file_exists(temporary) == 0);
     }
 
+    status = schway_host_card_export_atomic(wrapped_destination, first, SCHWAY_MEMCARD_SIZE,
+                                            SCHWAY_HOST_CARD_FORMAT_GME);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    have_wrapped_destination = status == SCHWAY_HOST_CARD_OK;
+    size_t wrapped_size = 0u;
+    CHECK(read_file(wrapped_destination, wrapped_previous, gme_size, &wrapped_size));
+    CHECK_EQ_U64(wrapped_size, gme_size);
+
+    status = schway_host_card_test_export_atomic(
+        wrapped_destination, second, SCHWAY_MEMCARD_SIZE, SCHWAY_HOST_CARD_FORMAT_GME,
+        SCHWAY_HOST_CARD_TEST_FAILURE_FLUSH);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_IO);
+    check_file_unchanged(wrapped_destination, wrapped_previous, gme_size,
+                         wrapped_readback, gme_size);
+    for (unsigned i = 0u; i < TEMP_CANDIDATES; i++) {
+        CHECK(set_temp_path(temporary, sizeof temporary, wrapped_destination, i));
+        CHECK(file_exists(temporary) == 0);
+    }
+
+    status = schway_host_card_test_export_atomic(
+        wrapped_destination, second, SCHWAY_MEMCARD_SIZE, SCHWAY_HOST_CARD_FORMAT_GME,
+        SCHWAY_HOST_CARD_TEST_FAILURE_RENAME);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_IO);
+    check_file_unchanged(wrapped_destination, wrapped_previous, gme_size,
+                         wrapped_readback, gme_size);
+    for (unsigned i = 0u; i < TEMP_CANDIDATES; i++) {
+        CHECK(set_temp_path(temporary, sizeof temporary, wrapped_destination, i));
+        CHECK(file_exists(temporary) == 0);
+    }
+
 cleanup:
     if (have_temp_marker) {
         (void)remove(temporary);
@@ -866,6 +968,9 @@ cleanup:
     if (have_second_destination) {
         (void)remove(second_destination);
     }
+    if (have_wrapped_destination) {
+        (void)remove(wrapped_destination);
+    }
     if (made_second_directory) {
         (void)remove_directory(second_directory);
     }
@@ -873,6 +978,8 @@ cleanup:
         (void)remove_directory(first_directory);
     }
     free(readback);
+    free(wrapped_readback);
+    free(wrapped_previous);
     free(out);
     free(oversized);
     free(second);
