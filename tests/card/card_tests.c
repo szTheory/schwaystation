@@ -1134,6 +1134,10 @@ static void state_pocketstation_metadata(void)
         reject_mutated_state(source, target, "card.slot1.pocket_index", 0u, 16u);
         reject_mutated_state(source, target, "card.slot1.pocket_flags", 0u, 16u);
         reject_mutated_state(source, target, "card.slot1.command", 0u, 0x57u);
+        reject_mutated_state(source, target, "card.slot1.pocket_address", 0u, 0x08000000u);
+        reject_mutated_state(source, target, "card.slot1.pocket_length", 0u, 0x81u);
+        reject_mutated_state(source, target, "card.slot1.pocket_step", 0u, 1u);
+        reject_mutated_state(source, target, "card.slot1.pocket_payload", 0u, 0xA5u);
         free(state);
     }
     schway_destroy(target);

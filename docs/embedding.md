@@ -575,14 +575,17 @@ schway_load_state(inst, buf, n);
 ```
 
 A state is the same bytes on every platform: a 20-byte header (magic, state format, total size, CRC-32 of the
-rest) and then every field, little-endian. Format 17 includes the CD-ROM controller, validated Q record, pending
+rest) and then every field, little-endian. Format 18 includes the CD-ROM controller, validated Q record, pending
 and applied ATV matrices, XA-ADPCM predictor history, resampler history, both bounded CD input queues, the MDEC
 input halfword cursor, resumable coefficient scan, decoded color planes and staged color output alongside the SPU state.
+It also stores each card slot's PocketStation selection, flags and in-flight command parameters, plus bounded reserved
+storage-transfer fields (a 32-bit address, length and progress capped at 128 bytes, and a 128-byte payload). Storage
+transfer fields remain zero until their first caller is implemented; card bytes and generation counters stay with the
+receiving instance across state loads.
 It also records the host-supplied disc identity for validation; callback pointers and file handles stay outside the
-state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. A format-16
-state returns `SCHWAY_STATUS_ERR_STATE_VERSION`. API v6 appends disc identity to the size-tagged descriptor; the
-behavior revision is 17 because state loads now reject a missing or different attached-disc identity before
-applying fields.
+state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. Format-16 and
+format-17 states return `SCHWAY_STATUS_ERR_STATE_VERSION`. API v6 appends disc identity to the size-tagged descriptor;
+the behavior revision is 18 because PocketStation command behavior and serialized state fields changed.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:
 

@@ -21,6 +21,10 @@ static const char card1_write_data[] = "card.slot1.write_data";
 static const char card1_pocket_index[] = "card.slot1.pocket_index";
 static const char card1_pocket_flags[] = "card.slot1.pocket_flags";
 static const char card1_pocket_data[] = "card.slot1.pocket_data";
+static const char card1_pocket_address[] = "card.slot1.pocket_address";
+static const char card1_pocket_length[] = "card.slot1.pocket_length";
+static const char card1_pocket_step[] = "card.slot1.pocket_step";
+static const char card1_pocket_payload[] = "card.slot1.pocket_payload";
 static const char card2_error_pending[] = "card.slot2.pending_error";
 static const char card2_phase[] = "card.slot2.phase";
 static const char card2_command[] = "card.slot2.command";
@@ -34,6 +38,10 @@ static const char card2_write_data[] = "card.slot2.write_data";
 static const char card2_pocket_index[] = "card.slot2.pocket_index";
 static const char card2_pocket_flags[] = "card.slot2.pocket_flags";
 static const char card2_pocket_data[] = "card.slot2.pocket_data";
+static const char card2_pocket_address[] = "card.slot2.pocket_address";
+static const char card2_pocket_length[] = "card.slot2.pocket_length";
+static const char card2_pocket_step[] = "card.slot2.pocket_step";
+static const char card2_pocket_payload[] = "card.slot2.pocket_payload";
 
 static void reset_slot_protocol(struct schway__card_slot *slot)
 {
@@ -47,6 +55,10 @@ static void reset_slot_protocol(struct schway__card_slot *slot)
     slot->write_bad_checksum = 0u;
     memset(slot->write_data, 0, sizeof slot->write_data);
     memset(slot->pocket_data, 0, sizeof slot->pocket_data);
+    slot->pocket_address = 0u;
+    slot->pocket_length = 0u;
+    slot->pocket_step = 0u;
+    memset(slot->pocket_payload, 0, sizeof slot->pocket_payload);
 }
 
 static uint8_t frame_checksum(const uint8_t *frame)
@@ -108,6 +120,19 @@ static int pocket_payload_valid(const struct schway__state_io *io, uint32_t phas
     int valid = 1;
     for (uint32_t i = 0u; i < 6u; i++) {
         if (i >= count && data[i] != 0u) {
+            valid = 0;
+        }
+    }
+    return valid;
+}
+
+static int pocket_transfer_payload_valid(const struct schway__state_io *io,
+                                         uint32_t address, uint32_t length, uint32_t step)
+{
+    const uint8_t *data = io->r;
+    int valid = address == 0u && length == 0u && step == 0u;
+    for (uint32_t i = 0u; i < SCHWAY__CARD_POCKET_TRANSFER_MAX; i++) {
+        if (data[i] != 0u) {
             valid = 0;
         }
     }
@@ -236,7 +261,9 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
                           const char *checksum_name, const char *invalid_sector_name,
                           const char *write_step_name, const char *write_bad_checksum_name,
                           const char *write_data_name, const char *pocket_index_name,
-                          const char *pocket_flags_name, const char *pocket_data_name)
+                          const char *pocket_flags_name, const char *pocket_data_name,
+                          const char *pocket_address_name, const char *pocket_length_name,
+                          const char *pocket_step_name, const char *pocket_payload_name)
 {
     uint32_t current_error = (slot->flags >> 2) & 1u;
     uint32_t error_pending = schway__state_u32(io, error_name, &current_error, 0u, 1u);
@@ -247,6 +274,12 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
     }
     uint32_t pocket_index = schway__state_u32(io, pocket_index_name, &slot->pocket_index, 0u, 15u);
     uint32_t pocket_flags = schway__state_u32(io, pocket_flags_name, &slot->pocket_flags, 0u, 15u);
+    uint32_t pocket_address =
+        schway__state_u32(io, pocket_address_name, &slot->pocket_address, 0u, UINT32_MAX);
+    uint32_t pocket_length = schway__state_u32(io, pocket_length_name, &slot->pocket_length,
+                                                0u, SCHWAY__CARD_POCKET_TRANSFER_MAX);
+    uint32_t pocket_step = schway__state_u32(io, pocket_step_name, &slot->pocket_step,
+                                              0u, SCHWAY__CARD_POCKET_TRANSFER_MAX);
     uint32_t command = schway__state_u32(io, command_name, &slot->command, 0u, UINT8_MAX);
     uint32_t read_step = schway__state_u32(io, read_step_name, &slot->read_step, 0u, 137u);
     uint32_t sector = schway__state_u32(io, sector_name, &slot->sector, 0u, UINT16_MAX);
@@ -269,9 +302,17 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
     }
     schway__state_u8_array(io, pocket_data_name, slot->pocket_data,
                            6u, 0u, UINT8_MAX);
+    int transfer_valid = 1;
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        transfer_valid = pocket_transfer_payload_valid(io, pocket_address, pocket_length,
+                                                        pocket_step);
+    }
+    schway__state_u8_array(io, pocket_payload_name, slot->pocket_payload,
+                           SCHWAY__CARD_POCKET_TRANSFER_MAX, 0u, UINT8_MAX);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         schway__state_check(io, (error_pending == 0u || phase <= CARD_COMMAND) &&
                                     payload_valid != 0 && pocket_valid != 0 &&
+                                    transfer_valid != 0 && pocket_step <= pocket_length &&
                                     pocket_index <= 15u && pocket_flags <= 15u &&
                                     protocol_fields_valid(phase, command, read_step, sector,
                                                           checksum, invalid_sector, write_step,
@@ -284,11 +325,13 @@ void schway__card_state_io(struct schway__state_io *io, schway *inst)
     slot_state_io(io, &inst->card.slot[0], card1_error_pending, card1_phase, card1_command, card1_read_step,
                   card1_sector, card1_checksum, card1_invalid_sector, card1_write_step,
                   card1_write_bad_checksum, card1_write_data, card1_pocket_index,
-                  card1_pocket_flags, card1_pocket_data);
+                  card1_pocket_flags, card1_pocket_data, card1_pocket_address,
+                  card1_pocket_length, card1_pocket_step, card1_pocket_payload);
     slot_state_io(io, &inst->card.slot[1], card2_error_pending, card2_phase, card2_command, card2_read_step,
                   card2_sector, card2_checksum, card2_invalid_sector, card2_write_step,
                   card2_write_bad_checksum, card2_write_data, card2_pocket_index,
-                  card2_pocket_flags, card2_pocket_data);
+                  card2_pocket_flags, card2_pocket_data, card2_pocket_address,
+                  card2_pocket_length, card2_pocket_step, card2_pocket_payload);
 }
 
 static uint32_t begin_command(struct schway__card_slot *slot, uint8_t sent, uint8_t *received)
