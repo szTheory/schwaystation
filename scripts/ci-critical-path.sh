@@ -163,7 +163,9 @@ while IFS= read -r path; do
     *.json) jq -cS . "$source" > "$normalized" || fail "invalid JSON workload input: $path";;
     scripts/*.sh)
       awk 'substr($0, 1, 2) == "#!" { print; next } /^[[:space:]]*#/ { next } { sub(/[[:space:]]+$/, ""); if (length) print }' "$source" > "$normalized";;
-    *.cmake|*.txt|*/CMakeLists.txt|CMakeLists.txt)
+    *.cmake|*/CMakeLists.txt|CMakeLists.txt)
+      cat "$source" > "$normalized";;
+    *.txt)
       sed -e '/^[[:space:]]*#/d' -e 's/[[:space:]]*$//' -e '/^$/d' "$source" > "$normalized";;
     *) sed -e 's/\r$//' -e 's/[[:space:]]*$//' -e '/^$/d' "$source" > "$normalized";;
   esac
