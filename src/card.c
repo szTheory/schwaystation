@@ -170,11 +170,15 @@ static int pocket_map_byte(const struct schway__card_slot *slot, uint32_t index,
     return 0;
 }
 
-static int pocket_range_valid(const struct schway__card_slot *slot, uint32_t index,
-                              uint32_t address, uint32_t length)
+static int pocket_transfer_valid(const struct schway__card_slot *slot, uint32_t index,
+                                 uint32_t command, uint32_t address, uint32_t length)
 {
     uint64_t end = (uint64_t)address + length;
     if (length > SCHWAY__CARD_POCKET_TRANSFER_MAX || end > UINT32_MAX + (uint64_t)1u) {
+        return 0;
+    }
+    /* PSX-SPX PocketStation FUNC 01h: writes over two bytes need word alignment. */
+    if (command == 0x5Cu && length > 2u && (address & 3u) != 0u) {
         return 0;
     }
     if (length != 0u && !pocket_map_byte(slot, index, (uint32_t)(end - 1u), NULL)) {
@@ -272,7 +276,7 @@ static int pocket_transfer_payload_valid(const struct schway__state_io *io,
     int valid = 1;
     if (active != 0 && read_step >= 8u) {
         valid = length <= SCHWAY__CARD_POCKET_TRANSFER_MAX && step <= length &&
-                read_step == 8u + step && pocket_range_valid(slot, index, address, length);
+                read_step == 8u + step && pocket_transfer_valid(slot, index, command, address, length);
     } else {
         valid = address == 0u && length == 0u && step == 0u;
     }
@@ -626,8 +630,7 @@ static uint32_t pocket_byte(struct schway__card_slot *slot, uint8_t sent, uint8_
             if (length > SCHWAY__CARD_POCKET_TRANSFER_MAX) {
                 length = SCHWAY__CARD_POCKET_TRANSFER_MAX;
             }
-            if (!pocket_range_valid(slot, slot->pocket_index, address, length) ||
-                (slot->command == 0x5Cu && length > 2u && (address & 3u) != 0u)) {
+            if (!pocket_transfer_valid(slot, slot->pocket_index, slot->command, address, length)) {
                 *received = 0xFFu;
                 reset_slot_protocol(slot);
                 return SCHWAY__CARD_BYTE_NO_ACK;
@@ -659,9 +662,8 @@ static uint32_t pocket_byte(struct schway__card_slot *slot, uint8_t sent, uint8_
             }
             slot->pocket_step++;
         } else {
-            if (sent != 0u || !pocket_range_valid(slot, slot->pocket_index,
-                                                  slot->pocket_address,
-                                                  slot->pocket_length)) {
+            if (sent != 0u || !pocket_transfer_valid(slot, slot->pocket_index, slot->command,
+                                                     slot->pocket_address, slot->pocket_length)) {
                 *received = 0xFFu;
                 reset_slot_protocol(slot);
                 return SCHWAY__CARD_BYTE_NO_ACK;

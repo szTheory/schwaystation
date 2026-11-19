@@ -87,6 +87,7 @@ status: complete
 ## Performance
 
 - **Duration:** 40 min 52 sec
+- **Executor wall time:** 50 min 57 sec, including startup and summary checks.
 - **Started:** 2026-11-19T15:24:16Z
 - **Completed:** 2026-11-19T16:05:08Z
 - **Runtime/model:** Codex, GPT-6 (the exact model identifier was not exposed)
@@ -141,6 +142,14 @@ None - the plan was executed as written.
 
 - The first abort-control assertion targeted card byte 0x200, which is a directory frame initialized to A0h. The guest was corrected to use untouched file data at 0x2000; the final real-host fixture then passed.
 - No remaining issues or blockers.
+
+## Wave Integration
+
+Snapshot validation and live transfers now share the FUNC 01h write-alignment check. The regression verifies that restoring a pending unaligned write leaves card bytes and generation intact.
+
+- `ctest --preset ci --no-tests=error -R '^card[.]state[.]pocketstation_metadata$' --output-on-failure` reproduced the accepted invalid snapshot, exit 8 in 0.22 sec.
+- `cmake --build --preset ci --target schwaystation-test-card schwaystation-fixtures schwaystation-run` passed, exit 0 in 0.29 sec.
+- `ctest --preset ci --no-tests=error -R '^(card[.](protocol|state)[.].*|fixtures[.]pocketstation_storage)$' --output-on-failure` passed, exit 0 in 0.58 sec.
 
 ## User Setup Required
 

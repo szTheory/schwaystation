@@ -1300,6 +1300,14 @@ static void state_pocketstation_storage_restore(void)
                      SCHWAY_STATUS_ERR_STATE_FIELD);
         CHECK(memcmp(bad_target, bad_before, sizeof *bad_target) == 0);
         CHECK_EQ_U64(card_generation(bad_target, SCHWAY_CARD_SLOT_1), 7u);
+
+        /* The same write alignment applies when restoring pending bytes. */
+        source->card.slot[0].pocket_address++;
+        CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size),
+                     SCHWAY_STATUS_ERR_STATE_FIELD);
+        CHECK(memcmp(target->card.slot[0].bytes, target_before, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 5u);
     }
     free(bad_before);
     free(source_before);
