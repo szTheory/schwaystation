@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 8
 current_phase_name: Per-game card saves
-current_plan: 5
+current_plan: 8
 status: executing
-stopped_at: Completed 08-03-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
-last_updated: "2026-11-19T15:08:00.353Z"
+stopped_at: Completed 08-07-PLAN.md; Codex/OpenGSD CLI 1.20.0, GPT-6 agent (exact deployed ID unavailable); wall at least 318 min from earliest retained edit, active time unknown
+last_updated: "2026-11-19T17:45:05.107Z"
 last_activity: 2026-11-19
-last_activity_desc: "Phase 8 execution started: Codex gpt-6-luna; using the configured single-writer path because worktree isolation is disabled and no fork base is configured."
-state_head: a8abb369e3403c6ac0787b0b265a9b05ac0b78e4
+last_activity_desc: "Completed Phase 8 Plan 08-07; Codex GPT-6 session with single-writer execution, using the configured branch because worktree isolation is disabled."
+state_head: d8bcc7993d9ec89a36d0b674c989f5c05aec38ee
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 20
-  completed_plans: 14
+  completed_plans: 17
   percent: 10
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 8 (Per-game card saves) — EXECUTING
-Current Plan: 5
+Current Plan: 8
 Total Plans in Phase: 10
 Status: Ready to execute
-Last activity: 2026-11-19 — Phase 8 execution started
+Last activity: 2026-11-19 — Plan 08-07 completed; Plan 08-08 is next
 
 ### Phase 8 Plan 08-02 execution (2026-11-19)
 
@@ -382,6 +382,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 08 P02 | 33m | 3 tasks | 3 files |
 | Phase 08 P04 | 37 min | 3 tasks | 10 files |
 | Phase 08 P03 | 39min | 2 tasks | 6 files |
+| Phase 8 P7 | at least 318 min; active time unknown | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1012,8 +1013,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T15:08:00.116Z
-Stopped at: Completed 08-03-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
+Last session: 2026-11-19T17:45:05.039Z
+Stopped at: Completed 08-07-PLAN.md; Codex/OpenGSD CLI 1.20.0, GPT-6 agent (exact deployed ID unavailable); wall at least 318 min from earliest retained edit, active time unknown
 Resume file: None
 
 ### v1.0 session history
