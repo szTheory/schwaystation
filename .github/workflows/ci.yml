@@ -1067,9 +1067,12 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, hygiene, title, gpu-reference, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
+    needs: [changes, hygiene, title, gpu-reference, openbios, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]
     runs-on: ubuntu-26.04
     timeout-minutes: 1  # 1-minute setup floor; 2 x 3 s (2 samples); [run 44337684558](https://github.com/szTheory/schwaystation/actions/runs/44337684558), provisional
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Every job succeeded or was skipped as allowed
         env:
@@ -1079,6 +1082,8 @@ jobs:
           CALLED: ${{ inputs.ref && 'true' || 'false' }}
           RELEASE_INPUTS: ${{ needs.changes.outputs.release_inputs }}
         run: |
+          # QUALITY_CI_ROLLUP_BEGIN
+          set -e
           echo "$NEEDS" | jq -e --arg event "$EVENT" --arg heavy "$HEAVY" --arg called "$CALLED" --arg release_inputs "$RELEASE_INPUTS" 'to_entries | all(
             .value.result == "success"
             or (.key == "title" and .value.result == "skipped" and $event != "pull_request")
@@ -1086,3 +1091,35 @@ jobs:
             or ((.key | IN("rehearsal", "cleanup")) and .value.result == "skipped"
               and ($release_inputs != "true" or $event != "pull_request" or $called == "true"))
             or ($heavy == "false" and .value.result == "skipped" and (.key | IN("changes", "hygiene", "title") | not)))'
+          # QUALITY_CI_ROLLUP_END
+      - name: Checkout exact CI revision
+        if: github.event_name == 'pull_request' && needs.changes.outputs.heavy == 'true' && !inputs.ref
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Compare current-attempt critical path
+        if: github.event_name == 'pull_request' && needs.changes.outputs.heavy == 'true' && !inputs.ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_HEAVY: ${{ needs.changes.outputs.heavy }}
+          CI_CALLED: ${{ inputs.ref && 'true' || 'false' }}
+          CI_RELEASE_INPUTS: ${{ needs.changes.outputs.release_inputs }}
+          QUALITY_FILE: quality.json
+        run: |
+          # QUALITY_CI_TIMING_BEGIN
+          set -eu
+          endpoint="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100"
+          jobs_file="$RUNNER_TEMP/ci-jobs-pages.json"
+          complete=false
+          for attempt in 1 2; do
+            if gh api --paginate --slurp "$endpoint" > "$jobs_file" &&
+              jq -e 'type == "array" and length > 0 and (.[0].total_count as $total | ($total | type == "number") and all(.[]; .total_count == $total and (.jobs | type == "array")) and ([.[].jobs[]] | length == $total))' "$jobs_file" >/dev/null; then
+              complete=true
+              break
+            fi
+            [ "$attempt" -eq 2 ] || sleep 2
+          done
+          [ "$complete" = true ] || { echo "Actions attempt jobs are incomplete after the bounded consistency retry" >&2; exit 1; }
+          CI_JOBS_FILE="$jobs_file" scripts/ci-critical-path.sh
+          # QUALITY_CI_TIMING_END
