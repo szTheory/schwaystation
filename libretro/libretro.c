@@ -94,8 +94,14 @@ static bool RETRO_CALLCONV lr_disk_set_initial_image(unsigned index, const char 
 static bool RETRO_CALLCONV lr_disk_get_image_path(unsigned index, char *path, size_t length);
 static bool RETRO_CALLCONV lr_disk_get_image_label(unsigned index, char *label, size_t length);
 #if defined(SCHWAYSTATION_LIBRETRO_TESTING)
-const uint8_t *RETRO_CALLCONV schway__libretro_test_card2_data(size_t *size);
-const char *RETRO_CALLCONV schway__libretro_test_card2_path(void);
+#if defined(_WIN32)
+#define SCHWAYSTATION_TEST_EXPORT __declspec(dllexport)
+#else
+#define SCHWAYSTATION_TEST_EXPORT __attribute__((visibility("default")))
+#endif
+SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
+schway__libretro_test_card2_data(size_t *size);
+SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void);
 #endif
 
 static struct retro_disk_control_ext_callback lr_disk_control = {
@@ -1566,11 +1572,6 @@ size_t retro_get_memory_size(unsigned id)
 }
 
 #if defined(SCHWAYSTATION_LIBRETRO_TESTING)
-#if defined(_WIN32)
-#define SCHWAYSTATION_TEST_EXPORT __declspec(dllexport)
-#else
-#define SCHWAYSTATION_TEST_EXPORT __attribute__((visibility("default")))
-#endif
 SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
 schway__libretro_test_card2_data(size_t *size)
 {
