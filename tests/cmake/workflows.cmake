@@ -25,6 +25,9 @@ if(CASE STREQUAL "spu_registration" OR CASE STREQUAL "disc_registration")
   yaml_job_has(.github/workflows/ci.yml retroarch
     "Required RetroArch guests exist.*memcard_roundtrip\\.exe.*RetroArch saves and resumes both cards.*ra-cards.*PROBE_CONTENT=build/fixtures/memcard_roundtrip\\.exe.*MODE=cards")
   yaml_job_has(.github/workflows/ci.yml perf "CASE=spu_idle" "CASE=cd_idle")
+  yaml_job_has(.github/workflows/ci.yml perf "github.event_name == 'pull_request'" "workflow_dispatch.*inputs[.]control_ref != ''")
+  yaml_job_has(.github/workflows/ci.yml perf "timeout-minutes: 10.*run 44600162797.*run 44218206100")
+  yaml_job_has(.github/workflows/ci.yml build "name: Stable state size preflight.*cmake --build build/ci --target schwaystation-test-state.*QUALITY_STATE_BYTES_BEGIN.*name: Build, test, package.*cmake --workflow --preset")
   yaml_job_has(.github/workflows/ci.yml be32 "INVENTORY=tests/inventory/ci\\.txt" "LABELS=portable")
   yaml_job_has(.github/workflows/ci.yml wasm32 "INVENTORY=tests/inventory/wasm32\\.txt" "LABELS=portable")
   yaml_job_has(.github/workflows/nightly.yml vectors-full "cmake --workflow --preset nightly"

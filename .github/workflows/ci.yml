@@ -407,6 +407,24 @@ jobs:
           $arch = if ($env:RUNNER_ARCH -eq 'ARM64') { 'arm64' } else { 'x64' }
           cmd /c "`"$vs\VC\Auxiliary\Build\vcvarsall.bat`" $arch && set" |
             ForEach-Object { if ($_ -match '^([^=]+)=(.*)$') { "$($Matches[1])=$($Matches[2])" >> $env:GITHUB_ENV } }
+      - name: Stable state size preflight
+        if: matrix.os == 'linux' && matrix.arch == 'x64'
+        env:
+          SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/${{ matrix.preset }}/disc-media
+        run: |
+          set -eu
+          cmake --preset ci
+          cmake --build build/ci --target schwaystation-test-state
+          # QUALITY_STATE_BYTES_BEGIN
+          state_output=$("${STATE_TEST_BINARY:-build/ci/tests/schwaystation-test-state}" state.stable_bytes)
+          printf '%s\n' "$state_output"
+          state_count=$(printf '%s\n' "$state_output" | grep -c '^state_bytes=' || true)
+          if [ "$state_count" -ne 1 ]; then printf '%s\n' 'quality: state_bytes must occur exactly once' >&2; exit 1; fi
+          state_line=$(printf '%s\n' "$state_output" | grep '^state_bytes=')
+          state_bytes=${state_line#state_bytes=}
+          case "$state_bytes" in ''|0|0*|*[!0123456789]*) printf '%s\n' 'quality: state_bytes must be a positive integer' >&2; exit 1;; esac
+          cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=state.bytes "-DMEASURED=$state_bytes" -P tests/cmake/quality.cmake
+          # QUALITY_STATE_BYTES_END
       - name: Build, test, package
         env:
           COMPAT_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
@@ -420,20 +438,6 @@ jobs:
         run: >-
           cmake -DJUNIT=build/${{ matrix.preset }}/junit-release.xml -DINVENTORY=tests/inventory/ci.txt
           -DLABELS=release -P tests/cmake/check_junit.cmake
-      - name: Measure stable state serialization
-        if: matrix.os == 'linux' && matrix.arch == 'x64'
-        run: |
-          set -eu
-          # QUALITY_STATE_BYTES_BEGIN
-          state_output=$("${STATE_TEST_BINARY:-build/ci/tests/schwaystation-test-state}" state.stable_bytes)
-          printf '%s\n' "$state_output"
-          state_count=$(printf '%s\n' "$state_output" | grep -c '^state_bytes=' || true)
-          if [ "$state_count" -ne 1 ]; then printf '%s\n' 'quality: state_bytes must occur exactly once' >&2; exit 1; fi
-          state_line=$(printf '%s\n' "$state_output" | grep '^state_bytes=')
-          state_bytes=${state_line#state_bytes=}
-          case "$state_bytes" in ''|0|0*|*[!0123456789]*) printf '%s\n' 'quality: state_bytes must be a positive integer' >&2; exit 1;; esac
-          cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=state.bytes "-DMEASURED=$state_bytes" -P tests/cmake/quality.cmake
-          # QUALITY_STATE_BYTES_END
       # Compile the optional host once against this job's installed library;
       # it is not run or packaged. SDL2 comes from the runner or its OS repo.
       - name: Build the installed-library SDL2 example
@@ -819,14 +823,13 @@ jobs:
   # pull request's head commit against its merge base with the base branch,
   # the base measured twice. The merge commit's first parent is not used: it
   # is the base branch tip, which also counts commits that landed after the
-  # branch point. Direct runs only (a nested call passes ref). A manual run
-  # without control_ref measures both fixtures three times; with control_ref
-  # it compares gpu_motion with that exact commit.
+  # branch point. Direct runs only (a nested call passes ref). Manual runs
+  # measure only when control_ref supplies a comparison commit.
   perf:
     needs: changes
-    if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !inputs.ref && needs.changes.outputs.heavy == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.control_ref != '')) }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 108 s = 4 min (1 sample); [run 44218206100](https://github.com/szTheory/schwaystation/actions/runs/44218206100), provisional
+    timeout-minutes: 10  # 10-minute allowance; run 44600162797 spent 5 min installing valgrind before timeout; last successful total was 108 s in run 44218206100, provisional
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
