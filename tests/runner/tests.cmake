@@ -426,7 +426,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     file(COPY_FILE "${identity_a_slot2}" "${identity_dir}/identity-a-slot2.backup")
     file(WRITE "${identity_a_slot2}" "")
     file(SHA256 "${identity_a_slot1}" identity_a_slot1_before_refusal)
-    execute_process(COMMAND ${RUN} --exe "${identity_a_exe}" --frames 120 --stop-on mailbox
+    execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${identity_a_exe}" --frames 120 --stop-on mailbox
         --save-dir "${identity_dir}" --memcard-names serial
       RESULT_VARIABLE refused_rc OUTPUT_VARIABLE refused_out ERROR_VARIABLE refused_err)
     file(SHA256 "${identity_a_slot1}" identity_a_slot1_after_refusal)
@@ -440,7 +440,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     # A forced rename failure on the selected identity preserves both stored slots.
     file(SHA256 "${identity_a_slot1}" identity_a_slot1_before_failure)
     file(SHA256 "${identity_a_slot2}" identity_a_slot2_before_failure)
-    execute_process(COMMAND ${RUN} --exe "${identity_a_exe}" --frames 1 --save-dir "${identity_dir}"
+    execute_process(COMMAND ${EMULATOR} ${RUN} --exe "${identity_a_exe}" --frames 1 --save-dir "${identity_dir}"
         --memcard-names serial --test-card-write slot1 --test-save-failure rename
       RESULT_VARIABLE failed_rc OUTPUT_VARIABLE failed_out ERROR_VARIABLE failed_err)
     file(SHA256 "${identity_a_slot1}" identity_a_slot1_after_failure)
