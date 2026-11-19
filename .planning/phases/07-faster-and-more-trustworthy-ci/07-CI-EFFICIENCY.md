@@ -193,6 +193,10 @@ The Actions job API exposes runner labels and start/end timestamps, not host CPU
 
 The after measurement is pending until the actual release-App PR after the metadata-only CI routing change is merged. Record its exact PR head and merge revision, generated file list, full required-check parity, run/job URLs, slowest job and critical path; compare against run 44253419074 only after confirming the same generated metadata workload. The real post-merge Release run and automatic release must remain covered.
 
+| Comparison cohort | Before observation | After observation |
+| --- | --- | --- |
+| Release App PR #23 with generated metadata only | [run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074) is the baseline anchor; the PR contained exactly `.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`, and `be32` took 60:21. Its merge-ref SHA was not retained, so this is supporting context, not an exact workload-fingerprint comparison or timeout sample. | **Pending ship.** Record the automatic release-App PR's head and merge revision, complete stable three-file list, allowed skips and required-check parity, slowest job, critical path, and run/job URLs. Compare only after confirming the generated workload matches; no after measurement or speedup is claimed here. |
+
 | Command | Exit | Evidence |
 | --- | ---: | --- |
 | `gh api` run-list GET, `per_page=40` | 0 | One 40-record response; Actions URLs in inventory above. |

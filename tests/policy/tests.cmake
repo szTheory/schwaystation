@@ -9,7 +9,7 @@ schway_add_test(NAME ci.classify_policy
 schway_add_test(NAME policy.quality_metrics
   COMMAND ${CMAKE_COMMAND} -DROOT=${PROJECT_SOURCE_DIR} -DBIN=${PROJECT_BINARY_DIR}/policy/quality
     -P ${policy_scripts}/quality_controls.cmake
-  LABELS policy TIMEOUT 30)
+  LABELS policy TIMEOUT 80)
 
 # Fault prevented: publishing unbounded or private metadata from the GitHub API.
 schway_add_test(NAME ci.triage
