@@ -10,7 +10,7 @@ endforeach()
 file(MAKE_DIRECTORY "${WORK}")
 file(READ "${INFO_FILE}" base_info)
 file(READ "${INVENTORY}" base_inventory)
-function(reject name info inventory pattern)
+function(check name info inventory code pattern)
   set(args)
   if(NOT "${info}" STREQUAL "")
     list(APPEND args "-DINFO_FILE=${info}")
@@ -19,11 +19,11 @@ function(reject name info inventory pattern)
     list(APPEND args "-DINVENTORY=${inventory}")
   endif()
   set(command "${CMAKE_COMMAND};${args};-P;${CHECKER}")
-  execute_process(COMMAND "${CMAKE_COMMAND}" "-DCMD=${command}" -DCODE=1
+  execute_process(COMMAND "${CMAKE_COMMAND}" "-DCMD=${command}" "-DCODE=${code}"
     "-DREGEX=${pattern}" -P "${EXPECT_FAIL}"
     RESULT_VARIABLE result OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if(NOT result STREQUAL "0")
-    message(FATAL_ERROR "${name}: expected refusal matching ${pattern}; got ${result}: ${out}${err}")
+    message(FATAL_ERROR "${name}: expected checker exit ${code} matching ${pattern}; got ${result}: ${out}${err}")
   endif()
 endfunction()
 
@@ -34,11 +34,11 @@ function(replace_info name before after pattern)
   endif()
   string(REPLACE "${before}" "${after}" changed "${base_info}")
   file(WRITE "${WORK}/${name}.info" "${changed}")
-  reject("${name}" "${WORK}/${name}.info" "${INVENTORY}" "${pattern}")
+  check("${name}" "${WORK}/${name}.info" "${INVENTORY}" 1 "${pattern}")
 endfunction()
 function(append_info name suffix pattern)
   file(WRITE "${WORK}/${name}.info" "${base_info}${suffix}")
-  reject("${name}" "${WORK}/${name}.info" "${INVENTORY}" "${pattern}")
+  check("${name}" "${WORK}/${name}.info" "${INVENTORY}" 1 "${pattern}")
 endfunction()
 function(reject_inventory_row name row pattern)
   string(REPLACE "${row}" "" changed "${base_inventory}")
@@ -46,41 +46,36 @@ function(reject_inventory_row name row pattern)
     message(FATAL_ERROR "self-test inventory lacks ${name} row")
   endif()
   file(WRITE "${WORK}/${name}.inventory" "${changed}")
-  reject("${name}" "${INFO_FILE}" "${WORK}/${name}.inventory" "${pattern}")
+  check("${name}" "${INFO_FILE}" "${WORK}/${name}.inventory" 1 "${pattern}")
 endfunction()
 
-reject("missing arguments" "" "" "-DINFO_FILE is required")
-reject("missing inventory argument" "${INFO_FILE}" "" "-DINVENTORY is required")
-reject("missing metadata file" "${WORK}/absent.info" "${INVENTORY}" "INFO_FILE does not exist")
-reject("missing inventory file" "${INFO_FILE}" "${WORK}/absent.inventory" "INVENTORY does not exist")
+check("missing arguments" "" "" 1 "-DINFO_FILE is required")
+check("missing inventory argument" "${INFO_FILE}" "" 1 "-DINVENTORY is required")
+check("missing metadata file" "${WORK}/absent.info" "${INVENTORY}" 1 "INFO_FILE does not exist")
+check("missing inventory file" "${INFO_FILE}" "${WORK}/absent.inventory" 1 "INVENTORY does not exist")
 replace_info("missing required key" "core_options = \"true\"\n" "" "missing .info key core_options")
-append_info("duplicate required key" "supports_no_game = \"true\"\n"
-  "duplicate .info key supports_no_game")
-replace_info("malformed input claim" "input_descriptors = \"true\""
-  "input_descriptors = \"yes\"" "input_descriptors must be a boolean string")
-replace_info("no-game refusal" "supports_no_game = \"true\""
-  "supports_no_game = \"false\"" "supports_no_game must stay true")
-replace_info("core-options refusal" "core_options = \"true\""
-  "core_options = \"false\"" "core_options must stay true")
-replace_info("experimental refusal" "is_experimental = \"true\""
-  "is_experimental = \"false\"" "keep experimental true until v2.0")
-reject_inventory_row("ungrounded input claim" "libretro.input.descriptors\tlibretro,portable\n"
-  "input_descriptors has no inventory test")
-reject_inventory_row("ungrounded memory claim" "libretro.memory.boundaries\tlibretro,portable\n"
-  "memory_descriptors has no inventory test")
+append_info("duplicate required key" "supports_no_game = \"true\"\n" "duplicate .info key supports_no_game")
+replace_info("malformed input claim" "input_descriptors = \"true\"" "input_descriptors = \"yes\"" "input_descriptors must be a boolean string")
+replace_info("no-game refusal" "supports_no_game = \"true\"" "supports_no_game = \"false\"" "supports_no_game must stay true")
+replace_info("core-options refusal" "core_options = \"true\"" "core_options = \"false\"" "core_options must stay true")
+replace_info("experimental refusal" "is_experimental = \"true\"" "is_experimental = \"false\"" "keep experimental true until v2.0")
+reject_inventory_row("ungrounded input claim" "libretro.input.descriptors\tlibretro,portable\n" "input_descriptors has no inventory test")
+reject_inventory_row("ungrounded memory claim" "libretro.memory.boundaries\tlibretro,portable\n" "memory_descriptors has no inventory test")
 
-reject_inventory_row("ungrounded disk control" "libretro.host.disc_control\tlibretro,portable\n"
-  "supported_extensions has no inventory test")
-replace_info("extension refusal" "supported_extensions = \"exe|psexe|cue|iso|m3u\""
-  "supported_extensions = \"exe|cue\""
-  "disc formats require full extensions")
+reject_inventory_row("ungrounded disk control" "libretro.host.disc_control\tlibretro,portable\n" "supported_extensions has no inventory test")
+replace_info("extension refusal" "supported_extensions = \"exe|psexe|cue|iso|m3u\"" "supported_extensions = \"exe|cue\"" "disc formats require full extensions")
 foreach(unsupported IN ITEMS savestate cheats load_subsystem)
-  replace_info("unsupported ${unsupported}" "${unsupported} = \"false\""
-    "${unsupported} = \"true\"" "unsupported ${unsupported} claim must remain false")
+  replace_info("unsupported ${unsupported}" "${unsupported} = \"false\"" "${unsupported} = \"true\"" "unsupported ${unsupported} claim must remain false")
 endforeach()
-append_info("ungrounded true claim" "camera = \"true\"\n"
-  "no test mapping for true .info claim camera")
-reject_inventory_row("shared EXE/fullpath mapping" "libretro.content.no_bios\tlibretro,portable\n"
-  "supported_extensions has no inventory test")
+append_info("ungrounded true claim" "camera = \"true\"\n" "no test mapping for true .info claim camera")
+reject_inventory_row("shared EXE/fullpath mapping" "libretro.content.no_bios\tlibretro,portable\n" "supported_extensions has no inventory test")
+replace_info("malformed save claim" "libretro_saves = \"false\"" "libretro_saves = \"yes\"" "libretro_saves must be a boolean string")
 
-message(STATUS "info_claims_self_test: all 19 metadata refusal controls passed")
+string(REPLACE "libretro_saves = \"false\"" "libretro_saves = \"true\"" save_info "${base_info}")
+file(WRITE "${WORK}/save-claim.info" "${save_info}")
+check("grounded save claim" "${WORK}/save-claim.info" "${INVENTORY}" 0 "true functional claims map")
+set(INFO_FILE "${WORK}/save-claim.info")
+reject_inventory_row("ungrounded card persistence" "libretro.cards.persistence\tlibretro,portable\n" "libretro_saves has no inventory test")
+reject_inventory_row("ungrounded card controls" "libretro.cards.controls\tlibretro,portable\n" "libretro_saves has no inventory test")
+
+message(STATUS "info_claims_self_test: all 22 metadata refusal controls and the synthetic save claim passed")
