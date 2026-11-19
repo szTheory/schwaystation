@@ -70,6 +70,138 @@ static uint8_t frame_checksum(const uint8_t *frame)
     return checksum;
 }
 
+static uint32_t pocket_le16(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8);
+}
+
+static uint32_t pocket_le32(const uint8_t *bytes)
+{
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) |
+           ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
+}
+
+static int pocket_file_chain(const struct schway__card_slot *slot, uint32_t index,
+                             uint8_t blocks[15], uint32_t *block_count,
+                             uint32_t *file_size)
+{
+    uint32_t visited = 0u;
+    uint32_t block = index;
+    const uint8_t *first = NULL;
+    uint32_t count = 0u;
+    if (index == 0u || index > 15u) {
+        return 0;
+    }
+    for (;;) {
+        const uint8_t *directory;
+        uint32_t next;
+        uint8_t expected_state;
+        if (block == 0u || block > 15u || count >= 15u ||
+            (visited & (1u << block)) != 0u) {
+            return 0;
+        }
+        visited |= 1u << block;
+        directory = &slot->bytes[(size_t)block * SCHWAY__CARD_SECTOR_SIZE];
+        if (frame_checksum(directory) != directory[127]) {
+            return 0;
+        }
+        if (count == 0u) {
+            uint32_t size;
+            first = directory;
+            size = pocket_le32(&directory[4]);
+            if (size < 0x2000u || size > 0x1E000u || (size & 0x1FFFu) != 0u) {
+                return 0;
+            }
+            *file_size = size;
+            *block_count = size / 0x2000u;
+        }
+        expected_state = count == 0u ? 0x51u : 0x52u;
+        if (count + 1u == *block_count) {
+            expected_state = count == 0u ? 0x51u : 0x53u;
+        }
+        if (directory[0] != expected_state) {
+            return 0;
+        }
+        blocks[count++] = (uint8_t)block;
+        next = pocket_le16(&directory[8]);
+        if (count == *block_count) {
+            if (next != 0xFFFFu) {
+                return 0;
+            }
+            return first != NULL;
+        }
+        if (next == 0xFFFFu || next > 14u) {
+            return 0;
+        }
+        block = next + 1u;
+    }
+}
+
+static int pocket_map_byte(const struct schway__card_slot *slot, uint32_t index,
+                           uint32_t address, uint32_t *offset)
+{
+    if (address >= 0x08000000u && address <= 0x08FFFFFFu) {
+        uint32_t physical = address & 0x1FFFFu;
+        if (offset == NULL) {
+            return 1;
+        }
+        *offset = physical;
+        return 1;
+    }
+    if (address >= 0x02000000u && address < 0x02020000u) {
+        uint8_t blocks[15];
+        uint32_t block_count = 0u;
+        uint32_t file_size = 0u;
+        uint32_t file_offset = address - 0x02000000u;
+        if (file_offset >= 0x20000u ||
+            !pocket_file_chain(slot, index, blocks, &block_count, &file_size) ||
+            file_offset >= file_size) {
+            return 0;
+        }
+        if (offset != NULL) {
+            uint32_t block_number = file_offset / 0x2000u;
+            if (block_number >= block_count) {
+                return 0;
+            }
+            *offset = (uint32_t)blocks[block_number] * 0x2000u + (file_offset & 0x1FFFu);
+        }
+        return 1;
+    }
+    return 0;
+}
+
+static int pocket_range_valid(const struct schway__card_slot *slot, uint32_t index,
+                              uint32_t address, uint32_t length)
+{
+    uint64_t end = (uint64_t)address + length;
+    if (length > SCHWAY__CARD_POCKET_TRANSFER_MAX || end > UINT32_MAX + (uint64_t)1u) {
+        return 0;
+    }
+    if (length != 0u && !pocket_map_byte(slot, index, (uint32_t)(end - 1u), NULL)) {
+        return 0;
+    }
+    if (length == 0u && !pocket_map_byte(slot, index, address, NULL)) {
+        return 0;
+    }
+    if (address >= 0x08000000u && address <= 0x08FFFFFFu) {
+        if (end > 0x09000000u || ((address & 0x1FFFFu) + length) > 0x20000u) {
+            return 0;
+        }
+    } else if (address >= 0x02000000u && address < 0x02020000u) {
+        if (end > 0x02020000u) {
+            return 0;
+        }
+    } else {
+        return 0;
+    }
+    for (uint32_t i = 0u; i < length; i++) {
+        if (!pocket_map_byte(slot, index, address + i, NULL)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int pending_payload_valid(const struct schway__state_io *io, uint32_t phase,
                                 uint32_t sector, uint32_t checksum, uint32_t write_step)
 {
@@ -106,6 +238,9 @@ static uint32_t pocket_data_count(uint32_t command, uint32_t read_step)
     if (command == 0x59u) {
         return read_step - 1u;
     }
+    if ((command == 0x5Bu || command == 0x5Cu) && read_step >= 3u && read_step <= 7u) {
+        return read_step - 2u;
+    }
     if (command == 0x5Du || command == 0x5Eu || command == 0x5Fu) {
         return read_step - 1u;
     }
@@ -127,12 +262,23 @@ static int pocket_payload_valid(const struct schway__state_io *io, uint32_t phas
 }
 
 static int pocket_transfer_payload_valid(const struct schway__state_io *io,
+                                         const struct schway__card_slot *slot,
+                                         uint32_t phase, uint32_t command,
+                                         uint32_t read_step, uint32_t index,
                                          uint32_t address, uint32_t length, uint32_t step)
 {
     const uint8_t *data = io->r;
-    int valid = address == 0u && length == 0u && step == 0u;
+    int active = phase == CARD_POCKET && (command == 0x5Bu || command == 0x5Cu);
+    int valid = 1;
+    if (active != 0 && read_step >= 8u) {
+        valid = length <= SCHWAY__CARD_POCKET_TRANSFER_MAX && step <= length &&
+                read_step == 8u + step && pocket_range_valid(slot, index, address, length);
+    } else {
+        valid = address == 0u && length == 0u && step == 0u;
+    }
     for (uint32_t i = 0u; i < SCHWAY__CARD_POCKET_TRANSFER_MAX; i++) {
-        if (data[i] != 0u) {
+        int staged = active != 0 && command == 0x5Cu && read_step >= 8u && i < step;
+        if (staged == 0 && data[i] != 0u) {
             valid = 0;
         }
     }
@@ -145,6 +291,8 @@ static int pocket_phase_valid(uint32_t command, uint32_t read_step)
     case 0x58u: return read_step <= 2u;
     case 0x59u: return read_step <= 6u;
     case 0x5Au: return read_step <= 18u;
+    case 0x5Bu:
+    case 0x5Cu: return read_step <= 136u;
     case 0x5Du: return read_step <= 3u;
     case 0x5Eu: return read_step <= 3u;
     case 0x5Fu: return read_step <= 1u;
@@ -304,8 +452,9 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
                            6u, 0u, UINT8_MAX);
     int transfer_valid = 1;
     if (io->mode == SCHWAY__STATE_VALIDATE) {
-        transfer_valid = pocket_transfer_payload_valid(io, pocket_address, pocket_length,
-                                                        pocket_step);
+        transfer_valid = pocket_transfer_payload_valid(io, slot, phase, command, read_step,
+                                                        pocket_index, pocket_address,
+                                                        pocket_length, pocket_step);
     }
     schway__state_u8_array(io, pocket_payload_name, slot->pocket_payload,
                            SCHWAY__CARD_POCKET_TRANSFER_MAX, 0u, UINT8_MAX);
@@ -361,7 +510,8 @@ static uint32_t begin_command(struct schway__card_slot *slot, uint8_t sent, uint
         slot->flags &= ~0x04u;
         return SCHWAY__CARD_BYTE_ACK;
     }
-    if (sent == 0x58u || sent == 0x59u || sent == 0x5Au || sent == 0x5Du ||
+    if (sent == 0x58u || sent == 0x59u || sent == 0x5Au || sent == 0x5Bu ||
+        sent == 0x5Cu || sent == 0x5Du ||
         sent == 0x5Eu || sent == 0x5Fu) {
         slot->phase = CARD_POCKET;
         *received = (uint8_t)slot->flags;
@@ -439,6 +589,100 @@ static uint32_t pocket_byte(struct schway__card_slot *slot, uint8_t sent, uint8_
             *received = date_time[step - 11u];
         }
         if (step == 18u) {
+            reset_slot_protocol(slot);
+            return SCHWAY__CARD_BYTE_NO_ACK;
+        }
+        slot->read_step++;
+        return SCHWAY__CARD_BYTE_ACK;
+    }
+    if (slot->command == 0x5Bu || slot->command == 0x5Cu) {
+        if (step == 0u) {
+            if (sent != 0x01u) {
+                *received = 0xFFu;
+                reset_slot_protocol(slot);
+                return SCHWAY__CARD_BYTE_NO_ACK;
+            }
+            *received = 0xFFu;
+        } else if (step == 1u) {
+            if (sent != 0u) {
+                *received = 0xFFu;
+                reset_slot_protocol(slot);
+                return SCHWAY__CARD_BYTE_NO_ACK;
+            }
+            *received = 0x05u;
+        } else if (step >= 2u && step <= 6u) {
+            slot->pocket_data[step - 2u] = sent;
+            *received = 0u;
+        } else if (step == 7u) {
+            uint32_t address;
+            uint32_t length;
+            if (sent != 0u) {
+                *received = 0xFFu;
+                reset_slot_protocol(slot);
+                return SCHWAY__CARD_BYTE_NO_ACK;
+            }
+            address = pocket_le32(slot->pocket_data);
+            length = slot->pocket_data[4];
+            if (length > SCHWAY__CARD_POCKET_TRANSFER_MAX) {
+                length = SCHWAY__CARD_POCKET_TRANSFER_MAX;
+            }
+            if (!pocket_range_valid(slot, slot->pocket_index, address, length) ||
+                (slot->command == 0x5Cu && length > 2u && (address & 3u) != 0u)) {
+                *received = 0xFFu;
+                reset_slot_protocol(slot);
+                return SCHWAY__CARD_BYTE_NO_ACK;
+            }
+            slot->pocket_address = address;
+            slot->pocket_length = length;
+            slot->pocket_step = 0u;
+            memset(slot->pocket_data, 0, sizeof slot->pocket_data);
+            memset(slot->pocket_payload, 0, sizeof slot->pocket_payload);
+            *received = (uint8_t)length;
+        } else if (slot->pocket_step < slot->pocket_length) {
+            uint32_t offset;
+            if (!pocket_map_byte(slot, slot->pocket_index,
+                                 slot->pocket_address + slot->pocket_step, &offset)) {
+                *received = 0xFFu;
+                reset_slot_protocol(slot);
+                return SCHWAY__CARD_BYTE_NO_ACK;
+            }
+            if (slot->command == 0x5Bu) {
+                if (sent != 0u) {
+                    *received = 0xFFu;
+                    reset_slot_protocol(slot);
+                    return SCHWAY__CARD_BYTE_NO_ACK;
+                }
+                *received = slot->bytes[offset];
+            } else {
+                slot->pocket_payload[slot->pocket_step] = sent;
+                *received = 0u;
+            }
+            slot->pocket_step++;
+        } else {
+            if (sent != 0u || !pocket_range_valid(slot, slot->pocket_index,
+                                                  slot->pocket_address,
+                                                  slot->pocket_length)) {
+                *received = 0xFFu;
+                reset_slot_protocol(slot);
+                return SCHWAY__CARD_BYTE_NO_ACK;
+            }
+            if (slot->command == 0x5Cu && slot->pocket_length != 0u) {
+                uint32_t offsets[SCHWAY__CARD_POCKET_TRANSFER_MAX];
+                for (uint32_t i = 0u; i < slot->pocket_length; i++) {
+                    if (!pocket_map_byte(slot, slot->pocket_index,
+                                         slot->pocket_address + i, &offsets[i])) {
+                        *received = 0xFFu;
+                        reset_slot_protocol(slot);
+                        return SCHWAY__CARD_BYTE_NO_ACK;
+                    }
+                }
+                for (uint32_t i = 0u; i < slot->pocket_length; i++) {
+                    slot->bytes[offsets[i]] = slot->pocket_payload[i];
+                }
+                slot->generation++;
+                slot->flags &= ~0x08u;
+            }
+            *received = 0xFFu;
             reset_slot_protocol(slot);
             return SCHWAY__CARD_BYTE_NO_ACK;
         }
