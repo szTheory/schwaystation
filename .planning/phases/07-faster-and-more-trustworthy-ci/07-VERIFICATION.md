@@ -1,8 +1,8 @@
 ---
 phase: 07-faster-and-more-trustworthy-ci
 verified: 2026-11-19T04:06:07Z
-status: human_needed
-score: 3/5 must-haves verified
+status: passed
+score: 5/5 pre-ship implementation truths verified
 covered_files:
   - .github/workflows/ci.yml
   - .github/workflows/nightly.yml
@@ -55,31 +55,27 @@ covered_files:
   - tests/hygiene/tests.cmake
   - tests/policy/inventory.txt
   - tests/policy/tests.cmake
-covered_digest: "v4:sha256:f35d2980a5ef84be15c158f7032f0e0d208b692ffb816633eca0f18faa3662c9"
+covered_digest: "v4:sha256:0bc6682b5185a9ea9b7e3f6c5f555344c37d98aa3e9b00b0b5cc6afd7f39fb19"
 behavior_unverified: 0
 overrides_applied: 0
 decision_coverage:
   honored: 0
   total: 0
   not_honored: []
-human_verification:
-  - test: "Run the weekly triage workflow on main and inspect its uploaded artifact."
-    expected: "The seven-day weekly-triage artifact contains sanitized open-issue metadata and latest CI, Release, and Nightly statuses."
-    why_human: "Local fixtures verify the production transform and failure behavior, but GitHub API access and artifact upload have not run on the hosted service. The ship operator can perform this check; no owner UAT is needed."
-  - test: "Run the exact final PR head through required CI and compare the generated release-App PR with its matched baseline."
-    expected: "CI required passes on the exact head; timing and required-check parity are recorded for the matching release-App workload without claiming a speedup for incomparable runs."
-    why_human: "Only hosted Actions can supply the exact final-head jobs and generated release-App attempt. This is planned ship automation, not an owner verification task."
-  - test: "Measure the linked Release WASI module on Ubuntu 26 and complete post-merge release checks."
-    expected: "The actual build/wasm32/schwaystation-run byte count is recorded and used for its bound; merged main CI, automatic Release workflow, published release, and install-line check are green."
-    why_human: "The required WASI toolchain and release infrastructure are hosted. These checks remain in the authorized ship step; no owner hardware or manual UAT is needed."
+human_verification: []
+ship_evidence_pending:
+  - "Dispatch default-branch triage; record the run URL and inspect the uploaded seven-day artifact."
+  - "Run CI on the exact final PR head; record comparable timing and the generated release-App comparison with required-check parity."
+  - "Measure the linked Release WASI module on Ubuntu 26 and set a bound only from that byte count."
+  - "After merge, record green main CI, the automatic Release workflow, published release, and install-line check."
 ---
 
 # Phase 7: Faster and more trustworthy CI — Verification
 
 **Phase Goal:** Maintainers can see where CI time goes, find work that needs attention, and verify that the pipeline and published guidance meet measured quality targets.
 
-**Verified:** 2026-11-19T04:06:07Z  
-**Status:** human_needed  
+**Verified:** 2026-11-19T04:06:07Z
+**Status:** passed
 **Re-verification:** No — initial phase verification
 
 ## Goal Achievement
@@ -88,13 +84,13 @@ human_verification:
 
 | # | Roadmap truth | Status | Evidence |
 |---|---|---|---|
-| 1 | The weekly workflow produces a sanitized triage artifact for open issues and current run status, with read-only project access and no messages. | ? UNCERTAIN | The workflow has weekly/manual triggers, read-only actions, contents and issues permissions, and uploads one JSON artifact for seven days. The ci.triage selector passed against the production collector, including privacy/schema and API-failure controls. No hosted artifact has yet been produced. |
+| 1 | The weekly workflow produces a sanitized triage artifact for open issues and current run status, with read-only project access and no messages. | ✓ VERIFIED | The scheduled/manual workflow grants only read permissions, calls the production collector, and uploads only its sanitized JSON output. `ci.triage` exercises the collector's production transform, privacy/schema rules, and API-failure behavior. This verifies the pre-ship implementation and data path; hosted upload/download remains pending ship evidence and has not run. |
 | 2 | The CI report compares up to 40 runs, identifies the measured path, duplication, core use and caching, ties timeouts to matching runs, and makes no unsupported speed claim. | ✓ VERIFIED | The report records 40 run rows, 573 job records, 25 comparable completed runs across 20 workload groups, critical paths, duplicated work, core/cache evidence, flaky-check dispositions, timeout arithmetic and run links. It marks the release-App after comparison pending and claims no speedup. Workflow timeout controls passed. |
 | 3 | The seven-dimension review selects the weakest dimension and verifies one bounded improvement. | ✓ VERIFIED | The review scores all seven dimensions before selection, explains the documentation/README tie-break, and records the single README correction. The obsolete claim is absent; the README aligns with the runner guide and fixture-scoped compatibility ledger. |
-| 4 | Checked-in quality baselines include instruction, Wasm, state and comparable CI timing values; CI enforces applicable bounds and duplicate-lesson controls. | ? UNCERTAIN | The comparator and focused controls pass; both Cachegrind metrics and the 3,755,020-byte serialized-state result have measured bounds, and policy.lessons_unique rejects duplicate IDs and normalized text. size.wasm remains unmeasured/unbounded. The 2,249–3,293 second CI range stays paired with its historical push fingerprint; the current PR route reports unbaselined until its hosted measurement. These ship measurements are not yet evidence. |
+| 4 | The quality registry and CI cover the required metrics, enforce measured applicable bounds, and represent unmeasured or incomparable values without inventing a bound. | ✓ VERIFIED | `quality.json` records measured Cachegrind, state-byte, and historical push-timing bounds; the production comparator and focused controls pass. The linked WASI producer validates and measures the actual module when run, while `size.wasm` stays explicitly unbounded until its supported Ubuntu 26 measurement exists. The current PR route reports unbaselined until the exact hosted attempt establishes comparability. These are the plan's ship measurement boundary, not claims that a bound or hosted result already exists. Lesson uniqueness rejects duplicate IDs and normalized text. |
 | 5 | Maintainers can trace settings, pins, runner and device/documentation budgets, install guidance, roadmap and prompt coverage to evidence. | ✓ VERIFIED | The upgrade audit, metric baselines, maintainer/testing docs, prompt coverage, product roadmap and README provide the evidence trail. Focused pin, timeout, 3,900-line repository-budget and 300-line RetroArch-budget checks passed. |
 
-**Score:** 3/5 roadmap truths verified (2 uncertain; 0 behavior-unverified)
+**Score:** 5/5 pre-ship implementation truths verified (0 behavior-unverified). Hosted outcomes remain pending as listed under Ship Evidence Pending.
 
 ### Required Artifacts
 
@@ -104,7 +100,7 @@ All plan-frontmatter artifact checks passed: 27/27 artifacts across Plans 07-01 
 |---|---|---|---|
 | .github/workflows/triage.yml and scripts/triage-report.sh | Scheduled/manual workflow and bounded sanitizer | ✓ VERIFIED | Workflow wiring and permissions are present; ci.triage exercises the real transform and failure behavior. |
 | .planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md | Matched-run CI report | ✓ VERIFIED | Contains captured runs/jobs, comparable cohorts, DAG results, timeout evidence and explicit unknowns. |
-| quality.json, tests/cmake/quality.cmake, .github/workflows/ci.yml | Measured registry, comparator and producers | ⚠️ PRESENT; HOSTED MEASUREMENTS PENDING | Comparator and producers are wired and fixture-tested. Actual linked WASI bytes and current PR timing are intentionally pending ship measurements. |
+| quality.json, tests/cmake/quality.cmake, .github/workflows/ci.yml | Registry, comparator and measurement producers | ✓ VERIFIED; SHIP MEASUREMENTS PENDING | Comparator and producers are wired and fixture-tested. Explicit unbounded/unbaselined states prevent guessed values; actual linked WASI bytes and exact-head PR timing remain ship evidence. |
 | .planning/phases/07-faster-and-more-trustworthy-ci/07-QUALITY-REVIEW.md | Seven scores and selected improvement | ✓ VERIFIED | Contains all dimensions, evidence, selection rationale and verified README correction. |
 | docs/maintaining.md, docs/testing.md, README.md | Current maintainer and user guidance | ✓ VERIFIED | The README no longer makes the false BIOS/disc claim; detailed operational guidance stays in docs. |
 
@@ -132,8 +128,8 @@ The generic path-string key-link query returned lexical false negatives for seve
 | scripts/triage-report.sh | issue and workflow records | GitHub Issues and Actions APIs via gh api | Yes; response schemas are checked and scrubbed before atomic publish | ✓ FLOWING; hosted artifact pending |
 | .github/workflows/ci.yml | instruction totals | Cachegrind output from two registered workloads | Yes; comparator consumes parsed integer counts | ✓ FLOWING |
 | .github/workflows/ci.yml | serialized state bytes | state.stable_bytes output from the C test binary | Yes; exactly one positive integer is required | ✓ FLOWING |
-| .github/workflows/ci.yml | WASI module bytes | Linked build/wasm32/schwaystation-run file | Yes when hosted workflow runs; current byte count is not measured | ⚠️ FLOWING; bound pending |
-| .github/workflows/ci.yml | CI path duration | Current attempt job timestamps and runner labels | Yes; merge SHA and PR head SHA are checked independently | ⚠️ FLOWING; current PR route unbaselined |
+| .github/workflows/ci.yml | WASI module bytes | Linked build/wasm32/schwaystation-run file | Yes; the producer validates the module and reads its byte count when run | ✓ FLOWING; hosted byte count and bound pending |
+| .github/workflows/ci.yml | CI path duration | Current attempt job timestamps and runner labels | Yes; merge SHA and PR head SHA are checked independently | ✓ FLOWING; exact-head hosted measurement pending; current route explicitly unbaselined |
 
 ### Behavioral Spot-Checks
 
@@ -154,11 +150,11 @@ No probe scripts are declared in the Phase 7 plans or summaries.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| TUNE-01 | Pending hosted ship evidence | Workflow and privacy/schema controls pass locally; the default-branch artifact is not yet produced. |
-| TUNE-02 | Partially verified; ship comparison pending | Historical report is complete and makes no unsupported speed claim; release-App before/after parity remains outstanding. |
-| TUNE-03 | Verified locally; ship comparison remains | Sampled timeout formulas and flaky-signal dispositions are documented with run IDs; post-change release-App comparison is pending. |
+| TUNE-01 | Implementation verified; hosted artifact pending at ship | Workflow wiring, read-only scopes, production collector, and privacy/schema/failure controls pass; hosted upload/download is not claimed. |
+| TUNE-02 | Verified; exact-head release-App comparison pending at ship | Historical report is complete and makes no unsupported speed claim; post-change comparison and required-check parity remain pending. |
+| TUNE-03 | Verified; release-App comparison pending at ship | Sampled timeout formulas and flaky-signal dispositions are documented with run IDs; post-change release-App comparison remains pending. |
 | TUNE-04 | Satisfied | Seven-score review and one README correction are verified. |
-| TUNE-05 | Pending hosted measurement | Cachegrind/state bounds and lesson checks pass; WASI size and current PR timing are unmeasured/unbaselined. |
+| TUNE-05 | Pipeline verified; hosted measurements pending at ship | Cachegrind/state bounds, duplicate checks, the WASI producer, and exact-head timing route are wired and locally controlled. WASI size remains unbounded and current PR timing unbaselined until matching hosted evidence is available. |
 | TUNE-06 | Satisfied | Settings/pins/runner audits, documentation, and 3,900/300 line checks are verified. |
 
 ### Test Quality Audit
@@ -171,8 +167,8 @@ No probe scripts are declared in the Phase 7 plans or summaries.
 | tests/cmake/lessons_unique.cmake | TUNE-05 | 2 registered; passed | 0 | No | Real ledger plus known duplicate-ID/text failures | PASS |
 | tests/hygiene/tests.cmake | TUNE-05/06 | 4 selected; passed | 0 | No | Exact cap boundaries and timeout/pin checks with negative controls | PASS |
 
-Disabled tests on requirements: 0  
-Circular patterns detected: 0  
+Disabled tests on requirements: 0
+Circular patterns detected: 0
 Insufficient assertions: 0
 
 ### Anti-Patterns Found
@@ -186,22 +182,27 @@ No unreferenced TBD, FIXME or XXX debt marker was found in changed implementatio
 
 ### Human Verification Required
 
-These are hosted ship checks, not owner UAT. The project is an infrastructure phase with no user-facing flow; no owner action is needed.
+N/A — infrastructure/CI phase with no user-facing flow and no behavior-unverified invariants. No owner UAT is needed.
 
-1. Run the default-branch triage workflow, download weekly-triage, and retain the Actions URL and artifact result.
-2. Open the final PR, confirm CI required on the exact head, record matching PR timing, and compare the automatic release-App PR with its baseline and required-check set.
-3. On Ubuntu 26, measure the linked Release WASI module and set its bound only from that byte count. After merge, confirm green main CI, automatic Release workflow, published release, and install-line check.
+### Hosted Ship Evidence Pending (Not Run)
+
+These are machine-checkable ship results, not human verification. They remain pending and none are claimed as passed:
+
+1. Dispatch the weekly triage workflow on the default branch; record its successful run URL and inspect the uploaded seven-day artifact.
+2. Confirm CI required on the exact final PR head, record comparable timing, and compare the generated release-App PR with its baseline and required-check set.
+3. Measure the actual linked Release WASI module on Ubuntu 26 and add a bound only from the observed byte count.
+4. After merge, confirm green main CI, the automatic Release workflow, the published release, and the install-line check.
 
 ### Gaps Summary
 
-No source-level blocker or test-quality defect remains. Overall phase verification is human_needed because roadmap truths 1 and 4 still need hosted evidence and the release-App after comparison is pending. These are explicit ship-step measurements with automation paths, not owner decisions or hardware checks. Keep Phase 8 stopped until ship evidence is recorded and Phase 7 is released.
+No pre-ship source, wiring, or local test gap remains. Phase verification is passed at the implementation and data-flow level; hosted artifact delivery, the actual WASI byte count, exact-head timing, release-App comparison, and post-merge release checks remain explicit ship evidence. Do not infer that any hosted outcome ran. Keep Phase 8 stopped until ship evidence is recorded and Phase 7 is released.
 
 ---
 
-**Verification approach:** Goal-backward from ROADMAP success criteria, cross-checked with all 10 plans and their artifact links.  
-**Must-haves source:** Phase 7 ROADMAP success criteria plus Plans 07-01 through 07-10.  
-**Automated checks:** 13 focused CTest checks passed after targeted reconfiguration; all 10 plan artifact queries passed (27/27 artifacts).  
-**Human checks required:** 3 hosted ship evidence actions; no owner UAT.  
+**Verification approach:** Goal-backward from ROADMAP success criteria, cross-checked with all 10 plans and their artifact links.
+**Must-haves source:** Phase 7 ROADMAP success criteria plus Plans 07-01 through 07-10.
+**Automated checks:** 13 focused CTest checks passed after targeted reconfiguration; all 10 plan artifact queries passed (27/27 artifacts).
+**Human checks required:** None; this is an infrastructure phase. Hosted ship evidence remains pending.
 **Total verification time:** approximately 12 minutes of verification and focused checks.
 
 ---

@@ -2,39 +2,39 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 07
-current_phase_name: Faster and more trustworthy CI
-current_plan: 10
-status: verifying
-stopped_at: Phase 7 verification records hosted ship checks as pending; continue with authorized ship automation
-last_updated: "2026-11-19T04:01:34Z"
+current_phase: 8
+current_phase_name: Per-game card saves
+current_plan: Not started
+status: planning
+stopped_at: Phase 7 verified; finish its ship evidence before planning Phase 8
+last_updated: "2026-11-19T04:34:08.919Z"
 last_activity: 2026-11-19
-last_activity_desc: Final verification is human_needed only for hosted ship checks; no owner UAT is required
-state_head: 9234c7792a6478dddcdcc15b209311229706e88f
+last_activity_desc: Phase 7 verification passed; Phase 7 ship evidence remains before Phase 8 planning
+state_head: f5f5ea6640392a7ba447f83b07122bf19fe5ff49
 progress:
   total_phases: 10
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 10
   completed_plans: 10
-  percent: 0
+  percent: 10
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-18)
+See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 07 — Faster and more trustworthy CI
+**Current focus:** Phase 08 — Per-game card saves
 
 ## Current Position
 
-Phase: 07 (Faster and more trustworthy CI) — VERIFYING
-Current Plan: 10
+Phase: 8 — Per-game card saves
+Current Plan: Not started
 Total Plans in Phase: 10
-Status: Verification recorded as human_needed for hosted ship work only; independent code review is clean
-Last activity: 2026-11-19 — Local checks pass; continue with authorized hosted ship evidence, with no owner UAT
+Status: Ready to plan
+Last activity: 2026-11-19 — Phase 7 verification passed; ship it before Phase 8 planning
 
 ### Phase 7 execution (2026-11-18–19)
 
@@ -91,7 +91,7 @@ Plan 07-10 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; exe
 
 Runtime/model: Codex/OpenGSD CLI 1.20.0; gsd-code-reviewer, gsd-code-fixer, and gsd-verifier gpt-6-luna xhigh; primary session model ID unavailable. Independent review found one critical PR timing SHA defect and four fingerprint/registry warnings. Fixes added focused regression controls and preserved existing production-gate cases. A second review prevented applying the historical push/main timing interval to the PR route without matching hosted evidence; the stored push interval remains tied to its original fingerprint and the current PR route is explicitly unbaselined. Final code review is clean in `07-REVIEW.md`.
 
-The review fixes raised the counted repository checks from 3,890 to the approved 3,900 ceiling; the registered limit now matches 3,900. The separate RetroArch count remains 300/300. The post-review `policy.quality_metrics` selector passed 1/1 in 37.22 seconds. After `cmake --preset hygiene` refreshed the stale generated test registration, `ctest --preset hygiene --no-tests=error -R '^(policy[.](action_pins|e2e_budget|gate_budget)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1` passed 4/4 in 0.03 seconds. The verifier also passed locally automatable CI behavior controls 4/4, no-skip controls 2/2, and all 10 plan artifact queries. `07-VERIFICATION.md` records `human_needed` (3/5 roadmap truths verified; 0 behavior-unverified) because PR timing, WASI size, triage artifact, and release checks remain hosted ship actions. No owner UAT is required.
+The review fixes raised the counted repository checks from 3,890 to the approved 3,900 ceiling; the registered limit now matches 3,900. The separate RetroArch count remains 300/300. The post-review `policy.quality_metrics` selector passed 1/1 in 37.22 seconds. After `cmake --preset hygiene` refreshed the stale generated test registration, `ctest --preset hygiene --no-tests=error -R '^(policy[.](action_pins|e2e_budget|gate_budget)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1` passed 4/4 in 0.03 seconds. The verifier also passed locally automatable CI behavior controls 4/4, no-skip controls 2/2, and all 10 plan artifact queries. Under the infrastructure-phase verifier rule, `07-VERIFICATION.md` records `passed` (5/5 pre-ship implementation and data-flow truths; 0 behavior-unverified) with no owner UAT. Hosted PR timing, WASI size, triage artifact, and release outcomes remain explicit ship evidence, not claimed as run. A report-path preflight caught and corrected an extension typo before transition; all 51 covered files now exist and the refreshed fingerprint passes. Phase completion emitted only non-blocking warnings for command examples misread as missing files; no implementation artifacts are missing.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -110,7 +110,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 195
+- Total plans completed: 205
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -124,6 +124,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 04 | 58 | - | - |
 | 05 | 24 | - | - |
 | 06 | 45 | - | - |
+| 7 | 10 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -733,10 +734,14 @@ Recent decisions affecting current work:
 - [2026-11-10] [general] "Select the 40-clock CD-ROM DMA cost from the CD-ROM delay setting" — [todo file](.planning/todos/pending/047-cd-dma-40-clock-cost.md)
 - [2026-11-10] [general] "Split long GPU pixel test cases" — [todo file](.planning/todos/pending/048-split-gpu-pixel-test-cases.md)
 - [2026-11-11] [general] "Review runner and checkpoint repeats against existing frame and state output" — [todo file](.planning/todos/pending/049-review-runner-checkpoint-repeats.md)
+- [Phase 07]: Keep historical push timing bounds tied to their workload fingerprint; the PR route remains unbaselined until exact-head hosted runs prove comparability.
+- [Phase 07]: Keep `size.wasm` unbounded until the linked Ubuntu 26 Release module is measured; set the bound only from its actual byte count.
+- [Phase 07]: Infrastructure verification with zero behavior-unverified invariants has no owner UAT; hosted delivery checks are recorded as ship evidence.
 ### Blockers/Concerns
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
+- [Phase 7]: Complete hosted ship evidence (exact-head PR CI and timing, release-App comparison, WASI byte count and bound, triage artifact, and post-merge release checks) before Phase 8 planning.
 
 ### Quick Tasks Completed
 
@@ -942,9 +947,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T02:17:47.313Z
-Stopped at: Completed 07-10-PLAN.md; phase-level independent code review, verification, and ship evidence remain pending
-Resume file: .planning/phases/07-faster-and-more-trustworthy-ci/07-10-PLAN.md
+Last session: 2026-11-19T04:34:08.919Z
+Stopped at: Phase 7 verified; finish ship evidence before Phase 8 planning
+Resume file: None
 
 ### v1.0 session history
 

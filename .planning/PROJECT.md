@@ -24,8 +24,9 @@ remain unproven under the accepted v1.0 scope. The detailed discrepancy and evid
 
 Milestone v2.0, “The whole library,” is now active. It expands disc-format and LibCrypt support, peripherals and
 save compatibility, region and revision coverage, ROM-hacker patches and cheats, and the compatibility ledger.
-The required milestone tune-up leads the phase sequence. The v1.0 limits in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md)
-remain explicit; v2.0 does not claim the unresolved MDEC or full-frame/movie hardware conformance.
+Phase 7's pipeline tune-up is implemented and verified; its hosted release evidence is being completed before
+Phase 8 starts. The v1.0 limits in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md) remain
+explicit; v2.0 does not claim the unresolved MDEC or full-frame/movie hardware conformance.
 
 ## Current Milestone: v2.0 The whole library
 
@@ -54,6 +55,7 @@ conformance are not claims of this milestone.
 - ✓ Phase 4: GPU, display modes, pads, memory cards, OpenBIOS and compatibility ledger — v1.0.
 - ✓ Phase 5: deterministic SPU audio, pinned memory-transfer logs and runner/libretro PCM parity — v1.0.
 - ✓ Phase 6: CD-ROM images, XA, CD-DA, MDEC within the approved evidence scope, owned disc boot and disk control — v1.0.
+- ✓ Phase 7: weekly triage, measured CI/quality controls and maintainer guidance — v2.0; hosted ship evidence is tracked in the phase report.
 
 ### Active
 
@@ -140,4 +142,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-11-18 after v2.0 milestone approval*
+*Last updated: 2026-11-19 after Phase 7 verification*

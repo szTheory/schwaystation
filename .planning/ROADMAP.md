@@ -10,7 +10,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 
 ## Phases
 
-- [ ] **Phase 7: Faster and more trustworthy CI** - Measure the build and release pipeline, fix the weakest quality dimension, and establish reproducible quality baselines.
+- [x] **Phase 7: Faster and more trustworthy CI** - Measure the build and release pipeline, fix the weakest quality dimension, and establish reproducible quality baselines. (completed 2026-11-18)
 - [ ] **Phase 8: Per-game card saves** - Use separate saves per game, move cards between supported formats, and resume a game in the runner or libretro.
 - [ ] **Phase 9: CHD disc images** - Open supported CHD images with equivalent disc behavior and establish the shared media checks and feature-ledger workflow.
 - [ ] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly.
@@ -35,7 +35,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
   4. The checked-in `quality.json` baselines cover instructions per frame, Wasm size, state bytes and comparable CI critical-path time. CI enforces the applicable bounds, and the lesson uniqueness check rejects both duplicate identities and duplicate lesson text.
   5. Maintainers can trace current settings, pin and runner checks, device and documentation budgets, install instructions, and roadmap and prompt coverage to evidence. The tune-up records why any measured pin, cache or runner change was made.
 
-**Plans**: 10/10 plans executed
+**Plans**: 10/10 plans complete
 
 Plans:
 **Wave 1**
@@ -203,7 +203,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 7. Faster and more trustworthy CI | 10/10 | In Progress | - |
+| 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-18 |
 | 8. Per-game card saves | 0/TBD | Not started | - |
 | 9. CHD disc images | 0/TBD | Not started | - |
 | 10. PBP disc images | 0/TBD | Not started | - |

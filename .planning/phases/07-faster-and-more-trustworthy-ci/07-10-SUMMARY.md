@@ -185,12 +185,12 @@ machine-checkable ship evidence, not owner UAT.
 
 ## Deferred to ship
 
-Final verification is recorded in `07-VERIFICATION.md` as `human_needed` (3/5 roadmap truths verified; 0
-behavior-unverified) because the remaining checks require hosted ship automation. No owner UAT is required.
-Hosted changed-head CI, exact generated release-App comparison and required-check parity, green main CI,
-published release, post-merge triage artifact, final PR timing range, and actual Ubuntu 26 WASI module byte count
-remain pending. No PR was pushed or edited, and no hosted workflow, merge, or triage dispatch was started. Keep
-the phase in progress and do not start Phase 8 until required release evidence is complete.
+Final verification now records `passed` (5/5 implementation and data-flow truths; 0 behavior-unverified).
+The initial `human_needed` classification was corrected under the infrastructure-phase verifier rule: these
+checks are automated ship evidence, not owner UAT. Hosted changed-head CI, the generated release-App comparison
+and required-check parity, green main CI, the published release, the default-branch triage artifact, final PR
+timing, and the actual Ubuntu 26 WASI module byte count and bound remain pending. None is claimed as run. The
+phase remains in progress until ship evidence is complete; Phase 8 stays stopped.
 
 ## Deviations from plan
 

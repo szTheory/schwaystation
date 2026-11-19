@@ -17,12 +17,12 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 
 ### Pipeline, quality and documentation tune-up (SEED-007)
 
-- [ ] **TUNE-01**: A scheduled weekly triage job creates a read-only artifact from open project issues and the latest run status; it does not post comments or messages, and it sanitizes untrusted issue/log text and removes private paths and identifiers before publication.
-- [ ] **TUNE-02**: A CI-efficiency report compares up to the latest 40 runs with matching workflow, matrix and workload fingerprints; it identifies critical-path jobs, duplicated work, flaky checks, core usage and caching evidence. Any optimization retains required checks and states its measured before/after result; if runs are not comparable, the report says so and does not infer a speedup.
-- [ ] **TUNE-03**: The report records the slowest job and its run ID, reviews every flaky test by naming the stronger signal that replaces it or fixing the cause, and derives job timeouts as twice the slowest matching run with the evidence run ID beside each value.
-- [ ] **TUNE-04**: A linked 1–5 review covers performance, CI/CD, ease of use, architecture, documentation/README, upgrade path and compatibility breadth; the phase makes one evidence-backed improvement to the weakest dimension and verifies its stated result.
-- [ ] **TUNE-05**: `quality.json` records the existing Ir/frame, wasm size, serialized-state bytes and CI critical-path measurements, with CI enforcing checked-in ceilings/floors ratcheted to measured values; `policy.lessons_unique` rejects duplicate lesson identities or duplicate lesson text and has a negative control.
-- [ ] **TUNE-06**: The phase checks repository settings, Dependabot majors, runner images and the existing tool pins; refreshes affected maintainer/hardware docs, README install guidance, size budgets, roadmap and prompt-coverage records; and records which items were unchanged with evidence. No pin, cache or runner change is made without a measured reason.
+- [x] **TUNE-01**: A scheduled weekly triage job creates a read-only artifact from open project issues and the latest run status; it does not post comments or messages, and it sanitizes untrusted issue/log text and removes private paths and identifiers before publication.
+- [x] **TUNE-02**: A CI-efficiency report compares up to the latest 40 runs with matching workflow, matrix and workload fingerprints; it identifies critical-path jobs, duplicated work, flaky checks, core usage and caching evidence. Any optimization retains required checks and states its measured before/after result; if runs are not comparable, the report says so and does not infer a speedup.
+- [x] **TUNE-03**: The report records the slowest job and its run ID, reviews every flaky test by naming the stronger signal that replaces it or fixing the cause, and derives job timeouts as twice the slowest matching run with the evidence run ID beside each value.
+- [x] **TUNE-04**: A linked 1–5 review covers performance, CI/CD, ease of use, architecture, documentation/README, upgrade path and compatibility breadth; the phase makes one evidence-backed improvement to the weakest dimension and verifies its stated result.
+- [x] **TUNE-05**: `quality.json` records the existing Ir/frame, wasm size, serialized-state bytes and CI critical-path measurements, with CI enforcing checked-in ceilings/floors ratcheted to measured values; `policy.lessons_unique` rejects duplicate lesson identities or duplicate lesson text and has a negative control.
+- [x] **TUNE-06**: The phase checks repository settings, Dependabot majors, runner images and the existing tool pins; refreshes affected maintainer/hardware docs, README install guidance, size budgets, roadmap and prompt-coverage records; and records which items were unchanged with evidence. No pin, cache or runner change is made without a measured reason.
 
 ### Content identity and card lifecycle
 
@@ -84,12 +84,12 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 
 | Requirement | Phase | Status |
 |---|---|---|
-| TUNE-01 | Phase 7 | Pending |
-| TUNE-02 | Phase 7 | Pending |
-| TUNE-03 | Phase 7 | Pending |
-| TUNE-04 | Phase 7 | Pending |
-| TUNE-05 | Phase 7 | Pending |
-| TUNE-06 | Phase 7 | Pending |
+| TUNE-01 | Phase 7 | Complete |
+| TUNE-02 | Phase 7 | Complete |
+| TUNE-03 | Phase 7 | Complete |
+| TUNE-04 | Phase 7 | Complete |
+| TUNE-05 | Phase 7 | Complete |
+| TUNE-06 | Phase 7 | Complete |
 | SAVE-01 | Phase 8 | Pending |
 | SAVE-02 | Phase 8 | Pending |
 | SAVE-03 | Phase 8 | Pending |
