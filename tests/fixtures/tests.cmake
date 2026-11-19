@@ -110,9 +110,10 @@ if(CMAKE_SCRIPT_MODE_FILE)
     file(MAKE_DIRECTORY "${OUT}")
     function(run_memcard_guest profile name directory out_hash)
       set(capture "${directory}/${name}.txt")
+      string(JOIN " " extra_flags ${ARGN})
       execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=memcard_roundtrip
           -DIMAGE=${IMAGE} -DFRAMES=120 -DPROFILE=${profile}
-          "-DFLAGS=--save-dir ${directory} --hash --png 120:${directory}/${name}.png"
+          "-DFLAGS=--save-dir ${directory} ${extra_flags} --hash --png 120:${directory}/${name}.png"
           -DCSV=${CSV} -DCAPTURE=${capture} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
           -P ${CMAKE_CURRENT_LIST_FILE}
         RESULT_VARIABLE rc OUTPUT_VARIABLE judge_out ERROR_VARIABLE judge_err)
@@ -172,6 +173,29 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "fresh card values 1/2 and 2/3 produced the same frame-120 hash")
       endif()
       message(STATUS "memcard frame-120 hashes: first=${first_hash} second=${second_hash}")
+      set(literal_dir "${OUT}/literal")
+      file(MAKE_DIRECTORY "${literal_dir}")
+      run_memcard_guest(first literal-first "${literal_dir}" first_literal_hash
+        --memcard-names serial --serial sLuS_123.45)
+      check_memcard_value("${literal_dir}/sLuS_123.45.srm" "01" "first-process literal card 1")
+      check_memcard_value("${literal_dir}/sLuS_123.45.1.mcr" "02" "first-process literal card 2")
+      run_memcard_guest(second literal-second "${literal_dir}" second_literal_hash
+        --memcard-names serial --serial sLuS_123.45)
+      check_memcard_value("${literal_dir}/sLuS_123.45.srm" "02" "second-process literal card 1")
+      check_memcard_value("${literal_dir}/sLuS_123.45.1.mcr" "03" "second-process literal card 2")
+      file(GLOB literal_card_files LIST_DIRECTORIES FALSE
+        "${literal_dir}/*.srm" "${literal_dir}/*.mcr")
+      set(expected_literal_card_files
+        "${literal_dir}/sLuS_123.45.srm" "${literal_dir}/sLuS_123.45.1.mcr")
+      list(SORT literal_card_files)
+      list(SORT expected_literal_card_files)
+      if(NOT literal_card_files STREQUAL expected_literal_card_files)
+        message(FATAL_ERROR "literal serial produced card files ${literal_card_files}, expected ${expected_literal_card_files}")
+      endif()
+      if(first_literal_hash STREQUAL second_literal_hash)
+        message(FATAL_ERROR "literal card values 1/2 and 2/3 produced the same frame-120 hash")
+      endif()
+      message(STATUS "literal memcard frame-120 hashes: first=${first_literal_hash} second=${second_literal_hash}")
     else()
       file(MAKE_DIRECTORY "${OUT}/missing" "${OUT}/wrong")
       run_memcard_guest(missing missing "${OUT}/missing" missing_hash)
