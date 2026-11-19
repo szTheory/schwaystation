@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 8
 current_phase_name: Per-game card saves
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed 08-01-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
-last_updated: "2026-11-19T13:01:20.540Z"
+stopped_at: Completed 08-02-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
+last_updated: "2026-11-19T13:41:32.839Z"
 last_activity: 2026-11-19
 last_activity_desc: "Phase 8 execution started: Codex gpt-6-luna; using the configured single-writer path because worktree isolation is disabled and no fork base is configured."
-state_head: 38ad4bb1c0e3a33e866daffa58eaacf845ccda03
+state_head: 6f5b94cb247dc6634f4169ba1135b7c52ad42829
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 20
-  completed_plans: 11
+  completed_plans: 12
   percent: 10
 ---
 
@@ -31,10 +31,14 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 8 (Per-game card saves) — EXECUTING
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 10
 Status: Ready to execute
 Last activity: 2026-11-19 — Phase 8 execution started
+
+### Phase 8 Plan 08-02 execution (2026-11-19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. Completed three tasks in 33 minutes with six atomic task commits. The focused card-file selectors passed 3/3, 4/4, and 1/1. Wrapper fields were checked against the pinned public PSX-SPX source before implementation. SAVE-02 is complete; SAVE-01, SAVE-03, and SAVE-04 were already complete. No hosted run applies. Plan 08-03 is next.
 
 ### Phase 7 execution (2026-11-18–19)
 
@@ -375,6 +379,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 07 P09 | 27 min | 2 tasks | 12 files |
 | Phase 07 P10 | not captured across handoffs | 2 tasks | 9 files |
 | Phase 8 P1 | 74m | 3 tasks | 6 files |
+| Phase 08 P02 | 33m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1001,8 +1006,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T13:01:20.501Z
-Stopped at: Completed 08-01-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
+Last session: 2026-11-19T13:41:32.777Z
+Stopped at: Completed 08-02-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
 Resume file: None
 
 ### v1.0 session history
