@@ -625,19 +625,23 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends wasi-libc libclang-rt-21-dev-wasm32
           scripts/fetch-pin.sh wasmtime-x86_64-linux build/pins/wasmtime
-      - name: Build and test
+      - name: Configure and build
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/wasm32/disc-media
-        run: cmake --workflow --preset wasm32
-      - name: Every test ran
-        run: >-
-          cmake -DJUNIT=build/wasm32/junit.xml -DINVENTORY=tests/inventory/wasm32.txt
-          -DLABELS=portable -P tests/cmake/check_junit.cmake
+        run: cmake --workflow --preset wasm32-build
       - name: Measure linked WASI module
         run: |
           # QUALITY_WASM_COMPARE_BEGIN
           cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=size.wasm "-DARTIFACT=${WASM_MODULE:-build/wasm32/schwaystation-run}" -P tests/cmake/quality.cmake
           # QUALITY_WASM_COMPARE_END
+      - name: WASI persistence preflight
+        run: ctest --preset wasm32-preflight --output-on-failure
+      - name: Portable tests
+        run: ctest --preset wasm32 --output-on-failure
+      - name: Every test ran
+        run: >-
+          cmake -DJUNIT=build/wasm32/junit.xml -DINVENTORY=tests/inventory/wasm32.txt
+          -DLABELS=portable -P tests/cmake/check_junit.cmake
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hashes-wasm32

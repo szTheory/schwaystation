@@ -26,7 +26,9 @@ which reconfigures, rather than `ctest` alone.
 
 ## Lanes
 
-Each lane is one workflow preset, `cmake --workflow --preset <name>`, building into `build/<name>`.
+Most lanes are one workflow preset, `cmake --workflow --preset <name>`, building into `build/<name>`. The hosted
+WASI lane splits configure/build from test execution so it can measure the linked module and run a focused card
+persistence preflight before the longer portable suite.
 
 | Preset | What it proves | Inventory | Tests run |
 |---|---|---|---|
@@ -38,7 +40,7 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `fuzz` | The executable loader plus five disc/MDEC parser campaigns and replay targets, built with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binaries. | `asan` | none |
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
-| `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
+| `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. CI runs `cmake --workflow --preset wasm32-build`, measures the linked module, then runs `ctest --preset wasm32-preflight` and the full `ctest --preset wasm32` suite. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
 | `nightly` | Runs all 55,000 public single-step vectors, ten GPU capture references, three GPU log predicates, the pinned SPU transfer guest, and CD-ROM/MDEC references. The recorded MDEC 8-bit and status hardware comparisons remain unresolved, so DISC-03 is unaccepted pending the approved successor checks and final acceptance. | `nightly` | `gpu.reference.*`, `vectors.r3000.full`, `spu.reference.memory_transfer`, `cdrom.reference.*`, `mdec.reference.*` |
 | `perf` | A Release build for the instructions-per-frame job. Configure and build only. | `ci` | none |
 
@@ -598,18 +600,19 @@ no `perf` preset. An empty or non-numeric measurement is an input error, never a
 
 The current absolute measurements and their producer identities are recorded in [`quality.json`](../quality.json)
 and [the Phase 7 baseline](../.planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md): test-card Ir is
-1,619,573 per frame, `gpu_motion` is 137,752,334, and serialized state is 3,755,020 bytes including its header.
-The linked WASI module size remains unbounded because no actual module size has been recorded. The exact CI
-critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
+1,619,573 per frame, `gpu_motion` is 137,752,334, serialized state is 3,755,020 bytes including its header,
+and the linked Release WASI module is 608,540 bytes, measured on [Phase 8 CI run 44597715729](https://github.com/szTheory/schwaystation/actions/runs/44597715729/job/135820879050).
+The exact CI critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
 fingerprint; see the [matching cohort and DAG](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
 
 CI measures these through different live producers: the `perf` job checks the current fixture instructions;
-the Linux x64 build reads `state.stable_bytes`; the WASI lane measures the linked `schwaystation-run` module; and
+the Linux x64 build reads `state.stable_bytes`; the WASI lane measures the linked `schwaystation-run` module
+immediately after build and before its preflight and full portable suite; and
 `CI required` derives the longest completed dependency path from the exact current Actions attempt. A timing
 comparison uses the dependency-path seconds only when the workload fingerprint matches the baseline. A changed
 fingerprint is reported as unbaselined; planning-only runs, main pushes and the full Release DAG are not that
 comparison. The in-progress `CI required` job is excluded from its own timing sample because it has no completion
-timestamp yet. The Phase 7 PR timing and actual WASI module size remain pending for ship.
+timestamp yet. The Phase 7 PR timing remains pending for ship.
 
 **Gate mode.** CI sets `SCHWAYSTATION_PERF_MODE` to `gate`: `FAIL`, `UNSTABLE` and `NO_BASE` exit 1. The script
 also accepts `report`, which prints the verdict and exits 0; bad input always fails. A manual run without inputs

@@ -399,6 +399,14 @@
       ]
     },
     {
+      "name": "wasm32-build",
+      "$comment": "Build separately so CI can measure the linked module before starting the portable test suite.",
+      "steps": [
+        { "type": "configure", "name": "wasm32" },
+        { "type": "build", "name": "wasm32" }
+      ]
+    },
+    {
       "name": "nightly",
       "steps": [
         { "type": "configure", "name": "nightly" },
