@@ -556,12 +556,18 @@ The ROM is neither committed, uploaded, nor reused across runs.
 each `docs/*.md` and `docs/*/*.md` page under 61,440 bytes, each strictly below its limit, and names every file at or over it with
 its size. Run it by hand with `cmake -DROOT=. -P tests/cmake/budgets.cmake`.
 
-**Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` (hygiene lane) counts
-every line of `scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*` against a fixed limit set in
-`tests/hygiene/tests.cmake`; the limit is an absolute line count. Phase 3 closed at 1513 lines. Phase 4's approved
-pre-ship ceiling was 2700 lines; its measured ship total is 2688 lines, and the gate now uses that ratcheted limit.
-A gate that does not fit replaces or folds an older one. Check the total with
-`cat scripts/*.sh tests/cmake/*.cmake .githooks/* | wc -l`. Gate logic stays in those files: it is not moved
+**Gate code.** Repository-check code is CMake `-P` scripts or POSIX sh. `policy.gate_budget` counts every line of
+`scripts/*.sh`, `tests/cmake/*.cmake` and `.githooks/*`; the Phase 7 temporary ceiling is 3,900 lines, with 3,890
+currently counted. `policy.e2e_budget` keeps all `tests/retroarch/*` at or below 300 lines; the current total is
+300. Phase 7 ratchets the first limit to the measured ship total. Run the existing count preflight from the repo
+root:
+
+```sh
+cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3900 -P tests/cmake/line_budget.cmake
+cmake -DROOT=. -DPATTERNS=tests/retroarch/* -DLIMIT=300 -P tests/cmake/line_budget.cmake
+```
+
+A gate that does not fit replaces or folds an older one. Gate logic stays in the counted files; it is not moved
 into `tests/<dir>/tests.cmake`, `cmake/` or workflow YAML to fit.
 
 **End-to-end code.** Everything under `tests/retroarch` stays within 300 lines in total; `policy.e2e_budget`
@@ -584,6 +590,21 @@ perf gpu_motion head=<n> base=<n> delta_bp=<n> verdict=PASS
 than that or more than the allow file permits; `UNSTABLE` the two base measurements differ; `NO_BASE` the base has
 no `perf` preset. An empty or non-numeric measurement is an input error, never a pass.
 
+The current absolute measurements and their producer identities are recorded in [`quality.json`](../quality.json)
+and [the Phase 7 baseline](../.planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md): test-card Ir is
+1,619,573 per frame, `gpu_motion` is 137,752,334, and serialized state is 3,755,020 bytes including its header.
+The linked WASI module size remains unbounded because no actual module size has been recorded. The exact CI
+critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
+fingerprint; see the [matching cohort and DAG](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
+
+CI measures these through different live producers: the `perf` job checks the current fixture instructions;
+the Linux x64 build reads `state.stable_bytes`; the WASI lane measures the linked `schwaystation-run` module; and
+`CI required` derives the longest completed dependency path from the exact current Actions attempt. A timing
+comparison uses the dependency-path seconds only when the workload fingerprint matches the baseline. A changed
+fingerprint is reported as unbaselined; planning-only runs, main pushes and the full Release DAG are not that
+comparison. The in-progress `CI required` job is excluded from its own timing sample because it has no completion
+timestamp yet. The Phase 7 PR timing and actual WASI module size remain pending for ship.
+
 **Gate mode.** CI sets `SCHWAYSTATION_PERF_MODE` to `gate`: `FAIL`, `UNSTABLE` and `NO_BASE` exit 1. The script
 also accepts `report`, which prints the verdict and exits 0; bad input always fails. A manual run without inputs
 measures both fixtures three times and reports their spread. A manual run with `control_ref` set to a full commit
@@ -600,6 +621,7 @@ perf gpu_motion head=137678369 base=137678369 delta_bp=0 verdict=PASS
 
 The `perf` job took 1m39; `be32` was the slowest required job at 4m20, and the complete workflow took 4m48. The
 comparison is at [Actions run 42985306022](https://github.com/szTheory/schwaystation/actions/runs/42985306022).
+These are historical gate-arming controls, not the current absolute Ir/frame measurements above.
 
 **Exceptions.** A pull request that must be slower adds a line to `tests/perf/allow.txt`:
 `<fixture> <max % × 100> <expiry YYYY-MM-DD> <reason>`. It raises that fixture's limit through its expiry, at most
@@ -626,7 +648,7 @@ For classifier or workflow edits, run the small local checks before the whole hy
 
 ```sh
 cmake --preset hygiene
-ctest --test-dir build/hygiene -R '^ci[.]classify$|^policy[.]gate_budget$' --no-tests=error --output-on-failure
+ctest --test-dir build/hygiene -R '^ci[.](classify|classify_policy)$|^policy[.]gate_budget$' --no-tests=error --output-on-failure
 actionlint -shellcheck= -pyflakes= -ignore 'label "ubuntu-26\.04(-arm)?" is unknown' -ignore 'unexpected key "queue" for "concurrency" section' .github/workflows/ci.yml .github/workflows/release.yml .github/workflows/nightly.yml
 cmake --workflow --preset hygiene
 ```
@@ -647,34 +669,30 @@ not replace the required hosted checks on the pull request and resulting `main` 
 
 | Job | What it runs | Required |
 |---|---|---|
-| `changes` | Lists PR paths, or diffs the exact before/after commits for a direct `main` push with rename detection disabled. `heavy=false` only for a complete, non-empty, bounded list entirely under `.planning/`; uncertain inputs, manual runs and release workflow calls keep the heavy matrix. | yes |
+| `changes` | Lists PR paths, or diffs exact before/after commits for direct `main` pushes. `heavy=false` for a complete, bounded planning-only change, or only for the verified release App PR whose stable, complete file list is exactly the three modified paths `.release-please-manifest.json`, `CHANGELOG.md` and `version.txt`. The release route checks event and fresh REST identity, same-repository refs, SHAs, count and file-list stability; uncertainty takes the heavy route. | yes |
 | `hygiene` | The `hygiene` preset and its JUnit check. | yes |
 | `title` | `scripts/check-title.sh` on the pull request's live title and body (pull requests only). | yes |
-| `build` | The `ci` preset on `ubuntu-26.04`, `ubuntu-26.04-arm`, `macos-15` and `macos-15-intel`, `ci-msvc` on `windows-2025` and `windows-11-arm`. Pull requests also check out the exact base SHA's compatibility files before the head; the ratchet runs the copied base judge against same-run fixture results. Both JUnit checks (all but `release`, then `release`), the README install line and its flipped-byte control on macOS arm64, then uploads `archives-<os>-<arch>` (the three zips and `commit.txt`) and `hashes-<os>-<arch>`. | yes |
+| `gpu-reference` | The selected pinned GPU oracle tests on Ubuntu; JUnit checks the exact GPU inventory. | yes |
+| `openbios` | Builds and digest-checks run-local OpenBIOS and disc-media handoffs consumed by the platform jobs. | yes |
+| `build` | The `ci` preset on `ubuntu-26.04`, `ubuntu-26.04-arm`, `macos-15` and `macos-15-intel`, `ci-msvc` on `windows-2025` and `windows-11-arm`. Pull requests also check out exact base compatibility files for the ratchet. Runs both JUnit checks, measures serialized state on Linux x64, runs the README installer and flipped-byte control on macOS arm64, then uploads archives and hashes. | yes |
 | `asan` | The `asan` preset; JUnit check without `abi` and `release`. | yes |
 | `nofp` | The `nofp` preset on both Linux legs. | yes |
 | `be32` | The `be32` preset (`portable` tests) and uploads `hashes-be32`. | yes |
 | `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt`, including generated media digests and OpenBIOS and owned-disc predicate rows, must be byte-identical. | yes |
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
 | `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel at `320x240`. Pixel and wrong-dimension controls must fail. It boots `spu_tone.exe` and `disc_boot.cue` and compares their frame captures with the runner, including the disc at frame 900; it also replays `pad_counter.exe` with Cross at guest frame 60, where captures for frames 59 and 60 must differ and each must equal its runner PNG. | yes |
-| `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, compared with the merge base in gate mode on pull requests. Manual runs measure both fixtures three times or compare `gpu_motion` with an explicit control commit. | yes |
+| `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, checked against `quality.json` and compared with the merge base in gate mode on pull requests. Manual runs measure both fixtures three times or compare `gpu_motion` with an explicit control commit. | yes |
 | `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
-| `CI required` | The one check the ruleset requires. It passes only when every job above succeeded or was skipped as allowed: heavy jobs when `heavy=false`, `title` and `perf` outside pull requests, `perf` in a call from `release.yml`, and rehearsal jobs when publication is not applicable. | the check |
+| `CI required` | The one ruleset check. It requires the full listed job roll-up to succeed, allowing only the documented skips for planning-only changes, non-PR title/perf, nested release calls, and inapplicable rehearsal/cleanup. On full heavy uncalled PRs it then reads the complete exact-attempt Actions jobs page and checks the comparable critical path against `quality.json`. | the check |
 
-`wasm32` became required after a successful run on `main`. Timeouts are twice the slowest successful duration
-measured in this repository's own runs (5 minutes at least for network-bound and roll-up jobs); the shared build
-timeout also covers an observed Windows ARM64 overrun. ASan has a 15-minute provisional job bound after run
-43309540398 reached its old 5-minute cap at test 404 of 405, with `libretro.input.movies` active for 3m22s.
-BE32 has a 25-minute provisional bound after the same run reached its old 15-minute cap at test 475 of 476, with
-`libretro.input.movies` active for 7m54s. Earlier BE32 movie cases were also much slower than their x64 counterparts.
-These bounds allow the remaining current workload to finish; neither lane has yet established a complete duration.
-`libretro.input.movies` is serial with a 240-second base CTest timeout (scaled by each lane as usual); runs
-43271212007 and 43292417084 reached its former 120-second limit. The longer bound and serialization preserve every
-movie and assertion and are provisional; they do not claim a speedup or prove why earlier runs were slow. Each timeout names its evidence run and stays marked
-`provisional` while fewer than 10 samples exist; `hygiene.timeout_comments` fails a `timeout-minutes` line that
-names neither a run nor `provisional`, and `policy.action_pins` fails a `uses:` line that is not a full 40-hex
-commit with a `# v` comment.
+`wasm32` became required after a successful run on `main`. Each workflow job timeout is derived from twice the
+slowest matching successful or failed duration, rounded up to minutes, with its established setup floor; the
+workflow comment names the extremal run and sample count. Values stay marked `provisional` below ten matching
+samples. For example, the current `asan` and `be32` bounds are 38 and 109 minutes, respectively, and remain
+provisional; the complete per-job source cohort and formulas are in the [CI efficiency report](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
+`hygiene.timeout_comments` checks the evidence comment, and `policy.action_pins` checks that every action uses a
+full 40-hex commit with a `# v` comment.
 
 **Downloads.** `pins.txt` lists every download CI makes (wasmtime and the RetroArch DMG) with its SHA-256;
 `scripts/fetch-pin.sh NAME DEST` refuses a file whose digest differs.

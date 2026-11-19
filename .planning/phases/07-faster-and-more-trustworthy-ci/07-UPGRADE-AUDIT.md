@@ -71,3 +71,27 @@ The run API provides the labels, not an immutable hosted-image digest. The relea
 | `git diff --check HEAD` | 0 | This audit document has no whitespace errors. |
 
 No full test suite or hosted workflow was run for this audit. The only plan-specific hosted evidence reused here is the successful full-CI run linked above.
+
+## Plan 07-09 documentation and quality follow-up
+
+The README install invocation is unchanged: it still matches `tests/cmake/install_line.cmake` and the latest-release
+URL contract. The existing successful install-line job in [release run 44262491280](https://github.com/szTheory/schwaystation/actions/runs/44262491280)
+is attributable prior evidence; no new release, hosted workflow, or PR timing run was started for this review.
+
+The Phase 7 documents now describe the active `triage.yml` Saturday/manual artifact route, exact-attempt `CI required`
+timing, measured quality producers, timeout formula, and current gate/RetroArch budgets. The current gate count is
+3,890/3,900 lines and the RetroArch harness is 300/300; the existing preflight commands are in `docs/testing.md`.
+The matching historical CI push cohort, current Cachegrind/state measurements, and unmeasured WASI module are
+recorded in [07-BASELINES.md](07-BASELINES.md); release-PR timing and actual WASI module bytes remain pending for
+ship. No measurement is inferred from a hash artifact.
+
+The changed scope affects CI policy and documentation, not emulated CPU/GPU/MDEC behavior. The existing hardware
+pages `docs/hardware/cpu.md`, `gpu.md`, and `mdec.md` remain applicable to their current implementation; their
+claims continue to point to the primary references indexed in `.planning/preparation/README.md` (ARCH.01–03 and
+the Phase 6 conformance records). The stale owned STR-route summary is corrected in
+`.planning/preparation/ARCHITECTURE.md` §10 using the archived Plan 06-16 summary and DISC-03. That integration
+evidence explicitly does not prove complete external frame/movie conformance or hardware fidelity.
+
+Repository settings, action/tool pins, runner labels, device-facing docs, and the README install line remain
+unchanged for the reasons and evidence recorded above. No new phase lesson was added; the existing
+[LESSONS.md](../../LESSONS.md) ledger remains the source for inbound lessons.

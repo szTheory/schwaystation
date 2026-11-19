@@ -15,14 +15,18 @@ Nobody tags or uploads by hand. `.github/workflows/release.yml` runs on every pu
 2. The `release-please` job mints a token for the release App, then opens or updates the release pull request,
    which edits only `version.txt`, `.release-please-manifest.json` and `CHANGELOG.md`. When it creates that pull
    request, the same job turns on squash auto-merge for it with the App's token.
-3. The release pull request runs CI like any other, because the App opened it. GitHub merges it, as the App, once
-   `CI required` passes.
+3. The release pull request runs CI. The `changes` job skips the heavy matrix only when fresh REST metadata
+   confirms the release App identity and refs, the complete paginated file list is stable, and its exact three
+   modified paths are the generated release metadata. Any mismatch or uncertainty takes the heavy path. The
+   `CI required` roll-up still runs; see [the CI route and roll-up](testing.md#ci-jobs). GitHub merges the PR as
+   the App once `CI required` passes.
 4. That merge's push runs `release.yml` again. release-please now tags the merge commit and creates a draft
    release. The manifest starts at `0.0.0`, which counts as no release, so the first release is 0.1.0 whatever the
    commit types.
 5. `release-ci` runs the whole of `ci.yml` on the release's commit, the `sha` release-please reports, never the
-   commit that started the run. Its permissions are the union of every job's in `ci.yml`, the rehearsal's
-   included: widen them when a `ci.yml` job asks for more, or GitHub refuses to start the call.
+   commit that started the run. Its permissions are the union of every job's in `ci.yml`, including `actions: read`
+   for the exact-attempt CI timing check and the rehearsal permissions: widen them when a `ci.yml` job asks for
+   more, or GitHub refuses to start the call.
 6. `publish` runs `scripts/publish.sh` on the draft, found by its release ID, because a draft cannot be looked up
    by its tag:
    - `prepare`: exactly the 18 zips, every build leg's recorded commit equal to the release commit, `SHA256SUMS`;
@@ -169,22 +173,30 @@ Two more jobs in the same workflow report through the same issue and are not par
 replays all 55,000 public CPU vectors at their pin, and `fuzz` runs the loader's fuzz target for 60 seconds. Both are
 described in [testing.md](testing.md#the-full-vectors); a red one is a finding to fix, not a block on a merge.
 
-## After the first release
+## Phase-1 CI tail (complete)
 
-One `ci:` pull request completes the first release's CI tail before the next phase starts:
-
-- **Arm the instructions-per-frame gate.** Run `ci.yml` by hand twice (`gh workflow run ci.yml --ref main`); each
-  `perf` job measures one commit three times and prints `spread=`. When both runs print `spread=0`, set
-  `SCHWAYSTATION_PERF_MODE: gate` in `ci.yml`. From then on a pull request fails above +1.00 % per fixture, and an
-  accepted rise is a dated line in `tests/perf/allow.txt`.
-- **Promote wasm32.** Once `wasm32` has a green record on `main`, add it to `CI required`'s needs and its
-  `hashes.txt` to `hash-equality`'s comparison, which then counts eight files.
-
-Both changes are active. The controls on the v0.1.0 commit are
+The first-release follow-up has already armed the instructions-per-frame gate and made wasm32 required in the
+eight-file hash comparison. There is no remaining setup command. The control runs on the v0.1.0 commit were
 [40939706087](https://github.com/szTheory/schwaystation/actions/runs/40939706087) and
 [40939709809](https://github.com/szTheory/schwaystation/actions/runs/40939709809); each measures the same commit
 three times with zero spread. wasm32's successful `main` run is
 [40935782754](https://github.com/szTheory/schwaystation/actions/runs/40935782754).
+
+## Weekly triage artifact
+
+`.github/workflows/triage.yml` runs Saturdays at 05:17 UTC and supports manual dispatch. Its read-only collector
+filters pull requests from the issues response and publishes only bounded, sanitized issue metadata plus the
+latest CI, Release and Nightly status. It does not include issue bodies, authors, logs, branches or commit SHAs,
+and it does not post messages. The `weekly-triage` artifact contains `triage.json` and expires after seven days.
+
+List recent runs and download one artifact with:
+
+```sh
+gh run list --workflow triage.yml --limit 10
+gh run download <run-id> -n weekly-triage
+```
+
+To start a run manually, use `gh workflow run triage.yml --ref main`; the artifact appears after that run completes.
 
 ## Pinned downloads
 
