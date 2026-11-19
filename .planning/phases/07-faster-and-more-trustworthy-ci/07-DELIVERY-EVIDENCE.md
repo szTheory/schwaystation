@@ -13,7 +13,9 @@ ceiling. `quality.json` parsed and recorded current testcard, gpu_motion, state 
 explicitly unbounded. The workflow source links the Cachegrind, state, WASI module and current-attempt CI outputs
 to the shared comparator. The triage workflow and its fixture-based privacy/schema controls are present.
 
-The hygiene `policy.gate_budget` registration is now ratcheted to the measured 3,890 lines. The separate
+At the Plan 10 handoff, the hygiene `policy.gate_budget` registration was ratcheted to 3,890 lines. The
+independent review fixes added required regression coverage; the count then reached the approved 3,900-line
+ceiling, so the registration was carried forward to the new measured total as Plan 10 directs. The separate
 `policy.e2e_budget` limit remains 300. No case or assertion was removed or weakened.
 
 | Command | Exit | Result |
@@ -30,6 +32,8 @@ The hygiene `policy.gate_budget` registration is now ratcheted to the measured 3
 | `ctest --preset hygiene --no-tests=error -R '^(ci[.]classify|policy[.](gate_budget|e2e_budget|action_pins)|hygiene[.]timeout_comments)$' --output-on-failure` | 0 | 5/5 passed, including the ratcheted gate and action-pin controls. |
 | `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3890 -P tests/cmake/line_budget.cmake` | 0 | Repository-check total is 3,890/3,890 lines. |
 | `cmake -DROOT=. '-DPATTERNS=tests/retroarch/*' -DLIMIT=300 -P tests/cmake/line_budget.cmake` | 0 | RetroArch test total is 300/300 lines. |
+| `ctest --preset ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1` | 0 | Post-review selector passed 1/1 in 37.22 seconds with the checked-in push baseline preserved and PR timing explicitly unbaselined. |
+| `cmake --preset hygiene`, then focused CTest for gate budget, E2E budget, action pins, and timeout comments | 0 | Refreshed the stale generated 3,890-line registration; the four selected checks passed, confirming 3,900/3,900 and 300/300. |
 | `sh scripts/check-title.sh 'feat: publish the weekly triage artifact' < build/phase07/pr-body.md` | 0 | Proposed title/body pass the local Conventional Commit and no-CI-skip checks. The body file is ignored build output. |
 | `jq -e '.packages["."].["release-type"] == "simple"' release-please-config.json` | 0 | The unscoped `feat:` title uses the configured release-please simple strategy and is release-affecting. |
 | `git diff --check HEAD` | 0 | No whitespace errors in the scoped work. |
@@ -52,6 +56,21 @@ the real generated release-App PR's before/after timing and required-check parit
 remains 2: `.github/dependabot.yml` is absent, so there is no grouped Actions update configuration to parse and no
 auto-merge workflow is active. No updater, auto-merge, pin, cache or runner change was added.
 
+## Independent review and verification follow-up
+
+The first independent review found a PR head/merge SHA mismatch, stale or incomplete workload fingerprints, and
+quality-registry floor validation gaps. The fixes preserve existing production gate cases and add focused
+regressions. A second review found that the push/main timing range must not be applied to the different PR
+route; the final review is clean after that range was restored to its original push fingerprint. The production
+PR timing result remains explicitly unbaselined until ship provides matching hosted measurements. The synthetic
+controls prove the production route wiring and comparator behavior, not real PR timing comparability.
+
+The final local `policy.quality_metrics` selector passed 1/1 in 37.22 seconds. After `cmake --preset hygiene`
+refreshed its stale generated test registration, the four focused hygiene checks passed, with the repository
+gate at exactly 3,900 lines and the RetroArch budget at 300. The verifier also confirmed the plan artifacts,
+workflow markers, selector inventory and locally automatable behavior. Its report records hosted acceptance
+items as pending ship evidence, not as passed or as owner UAT.
+
 ## Requirement status and ship-only evidence
 
 | Requirement | Local or historical result | Remaining evidence and locator |
@@ -60,7 +79,7 @@ auto-merge workflow is active. No updater, auto-merge, pin, cache or runner chan
 | TUNE-02 | The [CI report](07-CI-EFFICIENCY.md) captures 40 workflow runs, 573 job records, comparable workload groups and the original critical path. Production release-route and exact-attempt timing controls pass locally. | Compare the real generated release-App PR against the explicitly qualified baseline below; include required-check parity, the matching final PR head, path list, slowest job, critical path and run/job URLs. No speedup is claimed before that comparison. |
 | TUNE-03 | The report links sampled timeout formulas to their extremal run IDs and reviewed all captured failures; it found no confirmed same-workload flaky test. | Complete the post-change release-App comparison at ship and preserve the current timeout provenance. The baseline sample remains small and its unsampled jobs remain provisional. |
 | TUNE-04 | Plan 04's selected README correction passed its obsolete-claim and diff checks; see [Plan 04 summary](07-04-SUMMARY.md) and [quality review](07-QUALITY-REVIEW.md). | No additional change is selected in Plan 10. Phase readiness and final requirement audit still occur after independent review. |
-| TUNE-05 | `policy.quality_metrics`, `policy.lessons_unique`, and its duplicate negative control pass in the focused CI selector. The current registry records both Ir/frame fixtures, 3,755,020 state bytes, and the historical comparable CI range. | Measure the actual Release `build/wasm32/schwaystation-run` module on Ubuntu 26 and set `size.wasm` only from those bytes. The linked WASI module size remains unmeasured and unbounded. A matching hosted PR critical-path measurement also remains for ship. |
+| TUNE-05 | `policy.quality_metrics`, `policy.lessons_unique`, and its duplicate negative control pass in focused CI. The registry records both Ir/frame fixtures, 3,755,020 state bytes, and the historical push/main CI range bound to its original fingerprint. The production PR route is intentionally unbaselined. | Measure the actual Release `build/wasm32/schwaystation-run` module on Ubuntu 26 before setting `size.wasm`. Measure matching final-head PR timing attempts before setting a PR-route range; do not reuse the push/main interval without evidence. |
 | TUNE-06 | The [upgrade audit](07-UPGRADE-AUDIT.md), docs byte budget, settings/pin checks and prior install-line evidence record unchanged items. The README invocation still matches `tests/cmake/install_line.cmake` and the successful install-line-latest check in [release run 44262491280](https://github.com/szTheory/schwaystation/actions/runs/44262491280). | Confirm the remaining phase evidence after the reviewed final head and real release. Hardware pages stay unchanged because this phase changes CI policy and documentation rather than emulator behavior. |
 
 ## Release-App comparison row
@@ -74,7 +93,7 @@ auto-merge workflow is active. No updater, auto-merge, pin, cache or runner chan
 After independent code review and final local verification, the authorized ship operator must:
 
 1. Run the installed GSD ship flow for the phase, then apply the verified final title `feat: publish the weekly triage artifact` once and wait for successful `CI required` on the exact final SHA.
-2. Capture one broad CI run on that changed head with all required jobs and only established conditional skips; record the PR head SHA and run URL.
+2. Capture a broad CI run on that changed head with all required jobs and only established conditional skips. It should report the current PR workload as unbaselined against the distinct push/main fingerprint; record the PR head SHA, measured path, fingerprint and run/job URL. Gather matching PR attempts before setting a PR timing range, then confirm the comparator on the updated final head.
 3. Merge only after those checks, then record green main CI and the generated release-App PR's successful checks. Verify the real Release workflow, published release, and `install-line-latest` result.
 4. Complete the release-App comparison row above and record one successful default-branch triage artifact with its run URL.
 5. Measure the actual linked WASI module on the supported Ubuntu 26 lane before adding a size bound; keep all unmeasured or incomparable values explicitly pending.

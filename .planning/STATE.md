@@ -6,11 +6,11 @@ current_phase: 07
 current_phase_name: Faster and more trustworthy CI
 current_plan: 10
 status: verifying
-stopped_at: Completed 07-10-PLAN.md; phase-level independent code review, verification, and ship evidence remain pending
-last_updated: "2026-11-19T02:17:47.343Z"
+stopped_at: Phase 7 verification records hosted ship checks as pending; continue with authorized ship automation
+last_updated: "2026-11-19T04:01:34Z"
 last_activity: 2026-11-19
-last_activity_desc: Plan 07-10 evidence is complete; independent phase code review comes next, then final verification; hosted release evidence remains for ship
-state_head: ff767a23b28e1af1719348e917870b0a25f3f7bd
+last_activity_desc: Final verification is human_needed only for hosted ship checks; no owner UAT is required
+state_head: 9234c7792a6478dddcdcc15b209311229706e88f
 progress:
   total_phases: 10
   completed_phases: 0
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 
 ## Current Position
 
-Phase: 07 (Faster and more trustworthy CI) — EXECUTING
+Phase: 07 (Faster and more trustworthy CI) — VERIFYING
 Current Plan: 10
 Total Plans in Phase: 10
-Status: Ready for phase-level independent code review
-Last activity: 2026-11-19 — Plan 07-10 evidence is complete; review and final verification remain before ship
+Status: Verification recorded as human_needed for hosted ship work only; independent code review is clean
+Last activity: 2026-11-19 — Local checks pass; continue with authorized hosted ship evidence, with no owner UAT
 
 ### Phase 7 execution (2026-11-18–19)
 
@@ -86,6 +86,12 @@ Plan 07-08 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; exe
 Plan 07-09 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. Maintainer and testing docs, engineering, product roadmap, prompt coverage, and the upgrade audit now reflect current workflow sources and measured baselines; README installation remains unchanged and is backed by existing release run 44262491280. `git diff --check HEAD`, the docs byte budget, the repository gate budget (3,890/3,900), and the RetroArch budget (300/300) passed. ARCHITECTURE §10 now records the owned `disc_boot` DMA3 → RAM → DMA0 → MDEC → DMA1 → RAM → DMA2 → native 24-bit display path, with Phase 6 Plan 06-16 and DISC-03 citations; it explicitly leaves full decoded output and external frame/movie hardware conformance unproven. Device MIPS remain assumptions and `gpu_motion` exceeds each provisional low-power budget. This plan's TUNE-04 and TUNE-06 deliverables are complete; phase-level readiness remains pending on the remaining work. TUNE-01 still needs a post-merge triage artifact run; TUNE-02/03 need the release-App comparison; TUNE-05 still needs the matching release-PR timing and actual Ubuntu 26 WASI module size before setting that bound. No new hosted workflow was started. Plan range `98d0b9c..11a1251` contains two commits: `b9a4ecd` (bounded plan revision) and `11a1251` (documentation/evidence). Plan duration was about 27 minutes wall elapsed; exact start and active time were not captured across handoff. Plan 07-10 is next.
 
 Plan 07-10 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The focused serialized CI selector passed 5/5 at the 60-second quality timeout (39.17 seconds total; 38.61 seconds for `policy.quality_metrics`); after the final 80-second cap was registered, the isolated `policy.quality_metrics` selector passed 1/1 in 28.26 seconds total (28.25 seconds for the test). The repository-check budget passes at 3,890/3,890 and the separate RetroArch budget at 300/300; focused hygiene checks passed 5/5. The repository-root producer command `cmake -DROOT="$PWD" -DBIN="$PWD/build/ci/policy/quality" -P tests/cmake/quality_controls.cmake` exited 0 in about 25 seconds. The proposed release title and release-please strategy checks passed. The timeout changes are measured headroom, not a speedup; test cases and assertions were preserved. Plan range `501a1a1..ff767a2` contains three commits: `ed5a86b` (30→60 evidence-based plan revision), `4b8c14b` (60→80 revision after the 38.61-second run), and `ff767a2` (test and evidence changes). No phase review, final verification, hosted workflow, PR, merge, release, or triage dispatch was run. The matched release-App comparison, Ubuntu 26 WASI size, and post-merge artifact remain pending for ship. Next: independent phase-level code review, then final automated verification; Phase 7 remains in progress.
+
+### Phase 7 review fixes and verification (2026-11-19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; gsd-code-reviewer, gsd-code-fixer, and gsd-verifier gpt-6-luna xhigh; primary session model ID unavailable. Independent review found one critical PR timing SHA defect and four fingerprint/registry warnings. Fixes added focused regression controls and preserved existing production-gate cases. A second review prevented applying the historical push/main timing interval to the PR route without matching hosted evidence; the stored push interval remains tied to its original fingerprint and the current PR route is explicitly unbaselined. Final code review is clean in `07-REVIEW.md`.
+
+The review fixes raised the counted repository checks from 3,890 to the approved 3,900 ceiling; the registered limit now matches 3,900. The separate RetroArch count remains 300/300. The post-review `policy.quality_metrics` selector passed 1/1 in 37.22 seconds. After `cmake --preset hygiene` refreshed the stale generated test registration, `ctest --preset hygiene --no-tests=error -R '^(policy[.](action_pins|e2e_budget|gate_budget)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1` passed 4/4 in 0.03 seconds. The verifier also passed locally automatable CI behavior controls 4/4, no-skip controls 2/2, and all 10 plan artifact queries. `07-VERIFICATION.md` records `human_needed` (3/5 roadmap truths verified; 0 behavior-unverified) because PR timing, WASI size, triage artifact, and release checks remain hosted ship actions. No owner UAT is required.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -1120,7 +1126,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Complete Phase 7's independent code review, then final automated verification. At ship, measure the WASI module before setting its bound, verify the triage artifact, compare the automatic release PR with run 44253419074, and confirm green merged-main CI and the release before starting Phase 8.
+- Complete Phase 7 ship evidence: measure final-head PR timing and the actual Ubuntu 26 WASI module, verify the triage artifact, compare the automatic release PR with run 44253419074, then confirm green merged-main CI and the published release before starting Phase 8. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 

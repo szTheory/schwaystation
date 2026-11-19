@@ -60,11 +60,14 @@ coverage:
         status: unknown
     human_judgment: false
   - id: C2
-    description: Repository-check and RetroArch budgets are measured and preserved at their ratcheted limits.
+    description: Repository-check and RetroArch budgets are measured and preserved at their ratcheted limits; review fixes fit the approved ceiling.
     requirement: TUNE-06
     verification:
       - kind: integration
         ref: "cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3890 -P tests/cmake/line_budget.cmake (exit 0; 3,890/3,890); cmake -DROOT=. '-DPATTERNS=tests/retroarch/*' -DLIMIT=300 -P tests/cmake/line_budget.cmake (exit 0; 300/300)"
+        status: pass
+      - kind: integration
+        ref: "cmake --preset hygiene; ctest --preset hygiene --no-tests=error -R '^(policy[.](action_pins|e2e_budget|gate_budget)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1 (exit 0; after review fixes, 3,900/3,900 and 300/300)"
         status: pass
     human_judgment: false
   - id: C3
@@ -95,25 +98,28 @@ coverage:
         status: pass
     human_judgment: false
   - id: C6
-    description: Quality producer and lesson-uniqueness controls pass, with actual WASI module size explicitly unmeasured.
+    description: Quality producer and lesson-uniqueness controls pass; PR timing stays unbaselined pending hosted evidence, and WASI size is unmeasured.
     requirement: TUNE-05
     verification:
       - kind: integration
         ref: "Serialized five-test CI selector passed 5/5; isolated ctest --preset ci --parallel 1 --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure passed 1/1 in 28.26s total (28.25s test) at the 80s timeout"
+        status: pass
+      - kind: integration
+        ref: "ctest --preset ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1 (exit 0; post-review regressions passed 1/1 in 37.22s; PR route remains unbaselined against the push/main range)"
         status: pass
       - kind: other
         ref: "07-DELIVERY-EVIDENCE.md: Ubuntu 26 Release WASI module byte count and size.wasm bound are pending for ship"
         status: unknown
     human_judgment: false
   - id: C7
-    description: Ship title checks and the release-please strategy are verified; independent review, phase verification, and hosted release evidence remain ahead.
+    description: Ship title checks and release-please strategy are verified; code review is clean and hosted acceptance evidence remains pending for ship.
     requirement: TUNE-06
     verification:
       - kind: integration
         ref: "sh scripts/check-title.sh 'feat: publish the weekly triage artifact' < build/phase07/pr-body.md (exit 0); jq -e '.packages[\".\"].[\"release-type\"] == \"simple\"' release-please-config.json (exit 0)"
         status: pass
       - kind: other
-        ref: "07-DELIVERY-EVIDENCE.md: no phase-level independent review, final verification, hosted run, merge, release, or post-merge artifact is claimed"
+        ref: "07-REVIEW.md is clean; 07-VERIFICATION.md records hosted run, merge, release, WASI, and post-merge artifact evidence as pending for ship"
         status: unknown
     human_judgment: false
 metrics:
@@ -124,7 +130,7 @@ status: complete
 
 # Phase 7 Plan 10: CI and release evidence handoff Summary
 
-**Focused CI and hygiene controls pass with a ratcheted 3,890-line gate and measured 80-second quality-test timeout; phase review and ship evidence remain pending.**
+**Plan 10's focused CI and hygiene controls passed with a measured 80-second quality-test timeout; post-review fixes carried the repository gate from 3,890 to 3,900 lines, and hosted ship evidence remains pending.**
 
 ## Performance
 
@@ -162,9 +168,29 @@ The 30-to-60 and 60-to-80 timeout changes followed the measured 29.69- and 38.61
 
 The full plan range is `501a1a1..ff767a2` (3 commits). The two timeout refinements were bounded evidence updates; Plan 10 still ends at the ship handoff.
 
-## Deferred to phase review and ship
+## Phase review and verification follow-up
 
-Independent phase-level code review and final automated verification have not run yet. Hosted changed-head CI, exact generated release-App comparison and required-check parity, green main CI, published release, post-merge triage artifact, and the actual Ubuntu 26 WASI module byte count remain pending. No PR was pushed or edited, and no hosted workflow, merge, or triage dispatch was started. Keep the phase in progress and do not start Phase 8 until required release evidence is complete.
+The independent code review found one critical CI timing issue and four warnings. The fixes updated PR head SHA
+validation, included release-input and CMake bracket data in workload fingerprints, required floors for bounded
+metrics, and added regressions. A follow-up review found that the historical push/main interval could not be
+applied to the PR route without hosted evidence. That range remains attached to its original push fingerprint,
+and the production PR control requires an explicit unbaselined result. The final review is clean.
+
+Review fixes retained existing production-gate cases and brought the counted repository checks to 3,900 lines,
+the approved ceiling. The hygiene registration was carried forward to 3,900; the separate RetroArch budget
+remains 300. The post-review `policy.quality_metrics` selector passed 1/1 in 37.22 seconds. After reconfiguring
+the existing hygiene preset to refresh a stale generated 3,890 registration, the focused budget, pin and timeout
+selector passed 4/4 in 0.03 seconds. TUNE-01, TUNE-02/03 and the remaining TUNE-05 measurements are
+machine-checkable ship evidence, not owner UAT.
+
+## Deferred to ship
+
+Final verification is recorded in `07-VERIFICATION.md` as `human_needed` (3/5 roadmap truths verified; 0
+behavior-unverified) because the remaining checks require hosted ship automation. No owner UAT is required.
+Hosted changed-head CI, exact generated release-App comparison and required-check parity, green main CI,
+published release, post-merge triage artifact, final PR timing range, and actual Ubuntu 26 WASI module byte count
+remain pending. No PR was pushed or edited, and no hosted workflow, merge, or triage dispatch was started. Keep
+the phase in progress and do not start Phase 8 until required release evidence is complete.
 
 ## Deviations from plan
 
