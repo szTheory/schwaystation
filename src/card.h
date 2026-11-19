@@ -26,6 +26,8 @@ struct schway__card_slot {
     uint8_t bytes[SCHWAY__CARD_SIZE];
     uint64_t generation;
     uint32_t flags;
+    uint32_t pocket_index;
+    uint32_t pocket_flags;
     uint32_t phase;
     uint32_t command;
     uint32_t read_step;
@@ -35,6 +37,7 @@ struct schway__card_slot {
     uint32_t write_step;
     uint32_t write_bad_checksum;
     uint8_t write_data[SCHWAY__CARD_SECTOR_SIZE];
+    uint8_t pocket_data[6];
 };
 
 struct schway__card {

@@ -1001,6 +1001,7 @@ static void protocol_pocketstation_metadata(void)
     pocket_set_index(inst, 3u, 0x12345678u, 0u);
     pocket_metadata(inst, 3u, 0u);
     pocket_set_index(inst, 0xFFFFu, 0u, 3u);
+    pocket_set_index(inst, 0x0010u, 0u, 3u);
     pocket_set_index(inst, 0xFFFEu, 0u, 3u);
 
     CHECK_EQ_HEX(command_flag(inst, 0x5Eu), 0x08u);
@@ -1012,19 +1013,34 @@ static void protocol_pocketstation_metadata(void)
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x01u);
     CHECK_EQ_HEX(transfer(inst, 1u, 0u), 0u);
 
+    CHECK_EQ_HEX(command_flag(inst, 0x5Eu), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x03u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 1u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 1u);
+    CHECK_EQ_HEX(transfer(inst, 2u, 0u), 0u);
+    CHECK_EQ_HEX(command_flag(inst, 0x5Fu), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x01u);
+    CHECK_EQ_HEX(transfer(inst, 2u, 0u), 1u);
+    pocket_metadata(inst, 3u, 0x0Bu);
+
     CHECK_EQ_HEX(command_flag(inst, 0x5Du), 0x08u);
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x03u);
     CHECK_EQ_HEX(transfer(inst, 0x12u, CARD_ACK), 0u);
     CHECK_EQ_HEX(transfer(inst, 0x34u, CARD_ACK), 0u);
     CHECK_EQ_HEX(transfer(inst, 0x56u, 0u), 0u);
-    pocket_metadata(inst, 3u, 0x03u);
+    pocket_metadata(inst, 3u, 0x0Bu);
 
     configure(inst, 1u);
     pocket_metadata(inst, 0u, 0u);
     pocket_set_index(inst, 4u, 0u, 0u);
     configure(inst, 0u);
-    pocket_metadata(inst, 3u, 0x03u);
+    pocket_metadata(inst, 3u, 0x0Bu);
     get_id(inst);
+
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x5Bu, 0u), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x5Cu, 0u), 0xFFu);
 
     CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
     CHECK_EQ_HEX(transfer(inst, 0x59u, CARD_ACK), 0x08u);
@@ -1034,7 +1050,7 @@ static void protocol_pocketstation_metadata(void)
     CHECK_EQ_HEX(transfer(inst, 0xAAu, CARD_ACK), 0u);
     restart_transport(inst, 0u);
     configure(inst, 0u);
-    pocket_metadata(inst, 3u, 0x03u);
+    pocket_metadata(inst, 3u, 0x0Bu);
 
     schway_destroy(inst);
 }
