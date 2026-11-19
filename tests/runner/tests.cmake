@@ -332,6 +332,20 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "serial card naming did not use the validated serial basename")
     endif()
 
+    # A validated PS-EXE with a complete serial-shaped source stem selects its
+    # normalized identity automatically when serial naming is opted in.
+    set(exe_serial_dir "${OUT}/runner-cards-exe-serial")
+    file(MAKE_DIRECTORY "${exe_serial_dir}")
+    set(serial_exe "${OUT}/sLuS_123.45.EXE")
+    file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${serial_exe}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${exe_serial_dir}"
+      --memcard-names serial --exe "${serial_exe}" --test-card-write slot1)
+    if(NOT EXISTS "${exe_serial_dir}/SLUS-12345.srm" OR
+       EXISTS "${exe_serial_dir}/sLuS_123.45.srm" OR
+       EXISTS "${exe_serial_dir}/schwaystation.srm")
+      message(FATAL_ERROR "PS-EXE serial naming did not normalize the complete source stem")
+    endif()
+
     # A forced atomic replacement failure returns status 1, preserves the old card, and cleans its temp.
     set(failed_save_dir "${OUT}/runner-cards-failed-save")
     file(MAKE_DIRECTORY "${failed_save_dir}")
@@ -926,7 +940,8 @@ schway_add_test(NAME runner.stop
 # Fault prevented: completed card generations are not flushed on normal exit or after a clean
 # SIGTERM, or an unchanged slot is needlessly replaced.
 set(runner_cards_check ${runner_check} -DHOOKED=$<TARGET_FILE:schwaystation-test-run-stop>
-  -DEXPECTED=${SCHWAYSTATION_TESTCARD_SHA256_FRAME5} -DOUT=${PROJECT_BINARY_DIR}/tests)
+  -DEXPECTED=${SCHWAYSTATION_TESTCARD_SHA256_FRAME5} -DOUT=${PROJECT_BINARY_DIR}/tests
+  -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures)
 foreach(case controls persistence sigterm)
   schway_add_test(NAME runner.cards.${case}
     COMMAND ${runner_cards_check} -DCASE=cards_${case} -P ${CMAKE_CURRENT_LIST_FILE}
