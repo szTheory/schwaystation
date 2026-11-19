@@ -1052,6 +1052,8 @@ static void protocol_pocketstation_metadata(void)
     configure(inst, 0u);
     pocket_metadata(inst, 3u, 0x0Bu);
 
+    CHECK_EQ_HEX(command_flag(inst, 0x5Bu), 0x08u);
+
     schway_destroy(inst);
 }
 
