@@ -44,6 +44,10 @@ schway_host_card_status schway_host_card_paths_for_basename(const char *director
                                                              const char *basename,
                                                              char *slot1, size_t slot1_size,
                                                              char *slot2, size_t slot2_size);
+schway_host_card_status schway__host_card_paths_for_identity(const char *directory,
+                                                              const char *identity,
+                                                              char *slot1, size_t slot1_size,
+                                                              char *slot2, size_t slot2_size);
 schway_host_card_status schway_host_card_save_atomic(const char *path, const void *bytes,
                                                       size_t size);
 schway_host_card_status schway_host_card_export_atomic(const char *path, const void *bytes,

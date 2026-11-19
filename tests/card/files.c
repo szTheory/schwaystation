@@ -174,6 +174,97 @@ static void expect_import_refusal(const char *path, schway_host_card_status expe
     }
 }
 
+static void identity_paths(const char *directory)
+{
+    char slot1[TEMP_PATH_CAP];
+    char slot2[TEMP_PATH_CAP];
+    char serial_63[64];
+    char long_serial[65];
+    char digest_one[70];
+    char digest_two[70];
+    char invalid_digest[70];
+    char digest_slot1[TEMP_PATH_CAP];
+    char digest_slot2[TEMP_PATH_CAP];
+    char expected_slot1[TEMP_PATH_CAP];
+    char expected_slot2[TEMP_PATH_CAP];
+    char identity_name[80];
+    schway_host_card_status status;
+
+    memset(serial_63, 'A', sizeof serial_63 - 1u);
+    serial_63[sizeof serial_63 - 1u] = '\0';
+    status = schway_host_card_paths_for_basename(directory, serial_63,
+                                                 slot1, sizeof slot1,
+                                                 slot2, sizeof slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(snprintf(identity_name, sizeof identity_name, "%s.srm", serial_63) > 0);
+    CHECK(set_path(expected_slot1, sizeof expected_slot1, directory, identity_name));
+    CHECK(strcmp(slot1, expected_slot1) == 0);
+    CHECK(snprintf(identity_name, sizeof identity_name, "%s.1.mcr", serial_63) > 0);
+    CHECK(set_path(expected_slot2, sizeof expected_slot2, directory, identity_name));
+    CHECK(strcmp(slot2, expected_slot2) == 0);
+
+    memcpy(digest_one, "sgi1-", 5u);
+    memcpy(digest_two, "sgi1-", 5u);
+    memcpy(invalid_digest, "sgi1-", 5u);
+    static const char hex[] = "0123456789abcdef";
+    for (size_t i = 0u; i < 64u; i++) {
+        digest_one[5u + i] = hex[i % (sizeof hex - 1u)];
+        digest_two[5u + i] = hex[(i + 7u) % (sizeof hex - 1u)];
+        invalid_digest[5u + i] = (char)'g';
+    }
+    digest_one[69] = '\0';
+    digest_two[69] = '\0';
+    invalid_digest[69] = '\0';
+
+    status = schway__host_card_paths_for_identity(directory, digest_one,
+                                                  slot1, sizeof slot1,
+                                                  slot2, sizeof slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(snprintf(identity_name, sizeof identity_name, "%s.srm", digest_one) > 0);
+    CHECK(set_path(expected_slot1, sizeof expected_slot1, directory, identity_name));
+    CHECK(strcmp(slot1, expected_slot1) == 0);
+    CHECK(snprintf(identity_name, sizeof identity_name, "%s.1.mcr", digest_one) > 0);
+    CHECK(set_path(expected_slot2, sizeof expected_slot2, directory, identity_name));
+    CHECK(strcmp(slot2, expected_slot2) == 0);
+
+    status = schway__host_card_paths_for_identity(directory, digest_two,
+                                                  digest_slot1, sizeof digest_slot1,
+                                                  digest_slot2, sizeof digest_slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(strcmp(slot1, digest_slot1) != 0 && strcmp(slot2, digest_slot2) != 0);
+
+    memset(slot1, 'Q', sizeof slot1);
+    memset(slot2, 'R', sizeof slot2);
+    status = schway__host_card_paths_for_identity(directory, invalid_digest,
+                                                  slot1, sizeof slot1,
+                                                  slot2, sizeof slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)slot1, sizeof slot1, (uint8_t)'Q'));
+    CHECK(all_bytes_are((const uint8_t *)slot2, sizeof slot2, (uint8_t)'R'));
+
+    status = schway__host_card_paths_for_identity(directory, digest_one,
+                                                  slot1, 1u, slot2, sizeof slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are((const uint8_t *)slot1, sizeof slot1, (uint8_t)'Q'));
+    CHECK(all_bytes_are((const uint8_t *)slot2, sizeof slot2, (uint8_t)'R'));
+    status = schway__host_card_paths_for_identity(directory, digest_one,
+                                                  slot1, sizeof slot1, slot2, 1u);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are((const uint8_t *)slot1, sizeof slot1, (uint8_t)'Q'));
+    CHECK(all_bytes_are((const uint8_t *)slot2, sizeof slot2, (uint8_t)'R'));
+
+    memset(long_serial, 'A', sizeof long_serial - 1u);
+    long_serial[sizeof long_serial - 1u] = '\0';
+    memset(slot1, 'Q', sizeof slot1);
+    memset(slot2, 'R', sizeof slot2);
+    status = schway__host_card_paths_for_identity(directory, long_serial,
+                                                  slot1, sizeof slot1,
+                                                  slot2, sizeof slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)slot1, sizeof slot1, (uint8_t)'Q'));
+    CHECK(all_bytes_are((const uint8_t *)slot2, sizeof slot2, (uint8_t)'R'));
+}
+
 static void wrappers(void)
 {
     enum { GME_HEADER_SIZE = 0x0F40, VGS_HEADER_SIZE = 64, PSX_HEADER_SIZE = 256 };
@@ -336,6 +427,7 @@ static void wrappers(void)
     CHECK(set_path(expected_slot2, sizeof expected_slot2, first_directory, "game.1.mcr"));
     CHECK(strcmp(content_slot1, expected_slot1) == 0);
     CHECK(strcmp(content_slot2, expected_slot2) == 0);
+    identity_paths(first_directory);
 
     CHECK(schway_host_card_paths_for_basename(first_directory, "SLUS_123.45",
                                               first_slot1, sizeof first_slot1,

@@ -447,16 +447,12 @@ static void schway__host_cards_write_name(char *out, const char *directory,
     memcpy(out + offset, suffix, suffix_size);
 }
 
-schway_host_card_status schway_host_card_paths_for_basename(const char *directory,
-                                                             const char *basename,
-                                                             char *slot1, size_t slot1_size,
-                                                             char *slot2, size_t slot2_size)
+static schway_host_card_status schway__host_cards_paths_for_component(
+    const char *directory, const char *component, size_t component_size,
+    char *slot1, size_t slot1_size, char *slot2, size_t slot2_size)
 {
-    if (directory == NULL || slot1 == NULL || slot2 == NULL || slot1 == slot2) {
-        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
-    }
-    size_t basename_size = 0u;
-    if (!schway__host_cards_basename_length(basename, &basename_size)) {
+    if (directory == NULL || component == NULL || slot1 == NULL || slot2 == NULL ||
+        slot1 == slot2) {
         return SCHWAY_HOST_CARD_ERR_ARGUMENT;
     }
 
@@ -468,9 +464,9 @@ schway_host_card_status schway_host_card_paths_for_basename(const char *director
             : 0u;
     size_t slot1_required = 0u;
     size_t slot2_required = 0u;
-    if (!schway__host_cards_name_size(directory_size, separator_size, basename_size,
+    if (!schway__host_cards_name_size(directory_size, separator_size, component_size,
                                        sizeof(".srm"), &slot1_required) ||
-        !schway__host_cards_name_size(directory_size, separator_size, basename_size,
+        !schway__host_cards_name_size(directory_size, separator_size, component_size,
                                        sizeof(".1.mcr"), &slot2_required)) {
         return SCHWAY_HOST_CARD_ERR_SIZE;
     }
@@ -479,10 +475,51 @@ schway_host_card_status schway_host_card_paths_for_basename(const char *director
     }
 
     schway__host_cards_write_name(slot1, directory, directory_size, separator_size,
-                                  basename, basename_size, ".srm", sizeof(".srm"));
+                                  component, component_size, ".srm", sizeof(".srm"));
     schway__host_cards_write_name(slot2, directory, directory_size, separator_size,
-                                  basename, basename_size, ".1.mcr", sizeof(".1.mcr"));
+                                  component, component_size, ".1.mcr", sizeof(".1.mcr"));
     return SCHWAY_HOST_CARD_OK;
+}
+
+schway_host_card_status schway_host_card_paths_for_basename(const char *directory,
+                                                             const char *basename,
+                                                             char *slot1, size_t slot1_size,
+                                                             char *slot2, size_t slot2_size)
+{
+    size_t basename_size = 0u;
+    if (!schway__host_cards_basename_length(basename, &basename_size)) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    return schway__host_cards_paths_for_component(directory, basename, basename_size,
+                                                 slot1, slot1_size, slot2, slot2_size);
+}
+
+schway_host_card_status schway__host_card_paths_for_identity(const char *directory,
+                                                              const char *identity,
+                                                              char *slot1, size_t slot1_size,
+                                                              char *slot2, size_t slot2_size)
+{
+    static const char digest_prefix[] = "sgi1-";
+    if (identity == NULL) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    if (strncmp(identity, digest_prefix, sizeof(digest_prefix) - 1u) != 0) {
+        return schway_host_card_paths_for_basename(directory, identity,
+                                                  slot1, slot1_size, slot2, slot2_size);
+    }
+
+    size_t identity_size = strlen(identity);
+    if (identity_size != sizeof(digest_prefix) - 1u + 64u) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    for (size_t i = sizeof(digest_prefix) - 1u; i < identity_size; i++) {
+        char value = identity[i];
+        if (!((value >= '0' && value <= '9') || (value >= 'a' && value <= 'f'))) {
+            return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+        }
+    }
+    return schway__host_cards_paths_for_component(directory, identity, identity_size,
+                                                 slot1, slot1_size, slot2, slot2_size);
 }
 
 static schway_host_card_status schway__host_cards_publish_atomic(
