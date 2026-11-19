@@ -131,7 +131,14 @@ static void schway__host_cards_lint(const uint8_t *bytes, schway_host_card_lint 
 
 static schway_host_card_status schway__host_cards_open_read(const char *path, FILE **file)
 {
+#if defined(_MSC_VER)
+    int open_error = fopen_s(file, path, "rb");
+    if (open_error != 0) {
+        errno = open_error;
+    }
+#else
     *file = fopen(path, "rb");
+#endif
     if (*file != NULL) {
         return SCHWAY_HOST_CARD_OK;
     }
