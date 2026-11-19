@@ -1515,6 +1515,7 @@ static int test_card_controls(const char *exe_path, const char *directory)
     char card_one[4096], card_two[4096], backup_card[4096];
     char missing_directory[4096], missing_card_two[4096];
     char blocker[4096];
+    static const unsigned char rejected_image[] = {'V', 'g', 's', 'M'};
     struct retro_game_info game;
     unsigned char *baseline = (unsigned char *)malloc(SCHWAY_MEMCARD_SIZE);
     unsigned char wrong_image = 0x5Au;
@@ -1568,16 +1569,29 @@ static int test_card_controls(const char *exe_path, const char *directory)
     }
     check_card_file_equal(card_two, baseline);
 
-    /* A wrong-sized card is ignored; the guest can replace it with a fresh card. */
-    CHECK(write_test_file(card_two, &wrong_image, sizeof wrong_image));
+    /* A truncated recognized wrapper is refused and remains untouched even
+       when the guest writes to the live card and unloads. */
+    CHECK(write_test_file(card_two, rejected_image, sizeof rejected_image));
     loaded = p_load_game(&game) ? 1 : 0;
     CHECK(loaded);
     for (unsigned frame_index = 0u; loaded && frame_index < 120u; frame_index++) {
         run_one();
     }
     p_unload_game();
-    check_card_file_value(card_two, 2);
-    CHECK(read_card_file(card_two, baseline));
+    {
+        unsigned char actual[sizeof rejected_image + 1u];
+        FILE *rejected = schway__test_open_file(card_two, "rb");
+        CHECK(rejected != NULL);
+        if (rejected != NULL) {
+            size_t count = fread(actual, 1u, sizeof actual, rejected);
+            CHECK_EQ_U64(count, sizeof rejected_image);
+            if (count >= sizeof rejected_image) {
+                CHECK(memcmp(actual, rejected_image, sizeof rejected_image) == 0);
+            }
+            CHECK_EQ_U64(fclose(rejected), 0u);
+        }
+    }
+    CHECK(write_test_file(card_two, baseline, SCHWAY_MEMCARD_SIZE));
 
     /* Exhaust the helper's exclusive temporary names. Atomic failure must
        leave the previous complete card untouched. */
