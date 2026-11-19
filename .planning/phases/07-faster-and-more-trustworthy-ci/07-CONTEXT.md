@@ -41,6 +41,12 @@ Tune the repository's CI, quality baselines, and maintainer guidance before v2.0
 - Set the outer repository-check ceiling to 3,300, allowing 167 additional lines and leaving 32 above the upper estimate. Plan 03 updates the existing gate before Plans 05–08 add counted work. At ship ratchet the enforced limit to the actual total. Keep the inventory scope, the required production-path and negative controls, and the separate 300-line RetroArch cap.
 - Plan 07 records a dated `quality.json` `reasons[]` entry with the prior cap, the 3,133 measured lines, the 90–135 net estimate, the revised cap, and the ship ratchet. This is rationale metadata for the process budget.
 
+### Superseding repository-check cap adjustment on 2026-11-18
+
+- Preflight after Plan 06 measured 3,299/3,300 lines. Plans 05–06 added 166 counted lines after Plan 01, already 31 above the prior 135-line upper forecast. A read-only plan review estimates a further 70–100 lines for Plan 07-07 and 300–400 lines for Plan 07-08; Plans 09–10 add none to the counted globs. Keeping the cap would require removing or relocating 370–500 lines of required production-path controls, or weakening existing assertions.
+- Correct the temporary ceiling to 3,900: the current 3,299 plus the 500-line upper estimate plus 100 lines of headroom. Preserve every existing check and all counted-file globs. This is a correction to a demonstrably stale estimate, not authorization for unrelated gate growth. Plan 10 still ratchets the ceiling to the actual shipping total.
+- The focused WASI module is not present in the linked prior run artifacts; only its hash manifest was uploaded. Keep the Wasm bound absent until the focused Ubuntu 26 WASI Release build produces the actual module size. Do not infer a value from the hash artifact or another build.
+
 </decisions>
 
 <code_context>

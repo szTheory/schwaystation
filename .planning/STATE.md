@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 07
 current_phase_name: Faster and more trustworthy CI
-current_plan: 7
+current_plan: 8
 status: executing
-stopped_at: Completed 07-06-PLAN.md
-last_updated: "2026-11-18T23:00:27.265Z"
+stopped_at: Completed 07-07-PLAN.md
+last_updated: "2026-11-19T00:03:27.686Z"
 last_activity: 2026-11-18
-last_activity_desc: Completed Plan 07-06; Plan 07-07 is next
-state_head: 0c9c2783b4596e4c34bb4a334d0a3b420daa7c3e
+last_activity_desc: Completed Plan 07-07; Plan 07-08 is next; the WASI size bound remains for ship measurement
+state_head: 102558fe7fa07dd52c2ef54c5f97f3a6c32deab2
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 ## Current Position
 
 Phase: 07 (Faster and more trustworthy CI) — EXECUTING
-Current Plan: 7
+Current Plan: 8
 Total Plans in Phase: 10
 Status: Ready to execute
-Last activity: 2026-11-18 — Plan 07-06 completed; Plan 07-07 is next
+Last activity: 2026-11-18 — Plan 07-07 completed; Plan 07-08 is next, with the WASI size bound reserved for ship measurement
 
 ### Phase 7 execution (2026-11-18)
 
@@ -71,7 +71,15 @@ wiring check. No hosted artifact run was made; the phase-level TUNE-01 requireme
 confirms that the merged workflow uploads its single seven-day artifact. This is deferred evidence, not an owner
 verification task. Plan 07-06 is next.
 
-Plan 07-06 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. The exact release App metadata PR route now requires a matching event and fresh REST bot identity plus stable, complete pagination; focused classifier and production route checks passed. Sampled job timeouts follow the linked Plan 02 runs and retain setup floors; unsampled jobs remain provisional. The repository-check gate is 3,299/3,300. The scoped `act --dryrun` parsed the CI changes route without executing actions. No hosted CI was started; TUNE-02/03 remain Pending until ship compares the next automatic release PR with run 44253419074. Plan duration was 40 minutes; RED, GREEN, and timeout commits are recorded in `07-06-SUMMARY.md`. Plan 07-07 is next.
+Plan 07-06 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. The exact release App metadata PR route now requires a matching event and fresh REST bot identity plus stable, complete pagination; focused classifier and production route checks passed. Sampled job timeouts follow the linked Plan 02 runs and retain setup floors; unsampled jobs remain provisional. The repository-check gate is 3,299/3,300. The scoped `act --dryrun` parsed the CI changes route without executing actions. No hosted CI was started; TUNE-02/03 remain Pending until ship compares the next automatic release PR with run 44253419074. Plan duration was 40 minutes; RED, GREEN, and timeout commits are recorded in `07-06-SUMMARY.md`. Plan 07-07 followed.
+
+### Phase 7 Plan 07-07 preflight and recovery (2026-11-18)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh; read-only budget review gpt-6-luna xhigh. Before source edits, `policy.gate_budget` confirmed 3,299 counted lines against 3,300. Plans 05–06 had used 166 lines since Plan 01, 31 above the earlier estimate; review estimated 370–500 more for Plans 07–08. Corrected the temporary absolute ceiling to 3,900 (3,299 current + 500 upper estimate + 100 headroom), retained all counted globs and assertions, and confirmed `policy.gate_budget` passes at the new value. Plans 09–10 add no counted files; Plan 10 still ratchets to the measured ship total.
+
+The local machine has no clang-21/WASI sysroot or configured `build/wasm32` graph. Read-only inspection of prior Ubuntu 26 run 44253419074 found only the `hashes-wasm32` artifact, not the linked module, so no real Wasm size could be recovered. The size bound remains withheld until an actual focused Release WASI build reports it. An initial `act` preflight hit its image-selection prompt; a noninteractive dry run parsed only the `changes` dependency and did not execute the `wasm32` job. No source files or hosted runs were changed or started. `.planning/config.json` remains a pre-existing user edit and is excluded from commits.
+
+Plan 07-07 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The single `quality.json` registry now sends real Cachegrind measurements, linked WASI module bytes, and actual stable-state bytes through the shared comparator while retaining the original relative performance gate. Task 2 followed RED/GREEN commits; focused CTests passed, and the actual state output measured 3,755,020 bytes. The repository-check budget is 3,509/3,900. TUNE-05 remains Pending until the Ubuntu 26 WASI Release lane measures the module and a bound is added at ship. The historical artifact contained only hashes; two isolated toolchain setup attempts failed before CMake/build (package resolution and container tar ENOSYS), so local emulation was stopped. No hosted CI, guest test or whole suite was run. Plan duration was 43 minutes; task commits are recorded in `07-07-SUMMARY.md`. Plan 07-08 is next.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -299,6 +307,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 07 P04 | 8min | 2 tasks | 2 files |
 | Phase 07 P05 | 35min | 2 tasks | 3 files |
 | Phase 07 P06 | 40min | 2 tasks | 6 files |
+| Phase 07 P07 | 43min | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -659,7 +668,7 @@ Recent decisions affecting current work:
 - [Phase 6]: Do not run compressed pinned reference guests until Plan 06-42 installs the in-process source guard; Plan 06-43 owns selector registration.
 - [Phase 07]: Redact path text through its next quote or boundary to protect path components containing spaces.
 - [Phase 07]: Compare decimal digit strings exactly so rounding cannot admit a value just above a large integer bound.
-- [Phase 07]: Keep the repository-check budget at 3300 and the separate RetroArch budget at 300 through the Phase 7 ship ratchet.
+- [Phase 07]: Correct the temporary repository-check budget to 3900 after measured Plan 05–06 growth and the remaining Plan 07–08 control estimates; retain the separate RetroArch budget at 300 and ratchet to the actual total at ship.
 - [Phase 07]: Withhold the WASI module size bound until the focused Release target measurement runs with the Ubuntu 26 WASI toolchain.
 - [Phase 07]: Keep current settings, action pins, and runner labels where evidence did not justify changes; review Wasmtime 48.0.9 in the normal pin-update step using new upstream asset digests.
 - [Phase 07]: Documentation and upgrade path tied at 2; selected the README correction because it resolves a false current capability claim with immediate user impact.
@@ -668,6 +677,8 @@ Recent decisions affecting current work:
 - [Phase 07]: Grant the triage job only actions, contents, and issues read scopes.
 - [Phase 07]: Require fresh release App identity and stable paginated metadata before the generated-only PR fast route.
 - [Phase 07]: Keep unsampled workflow timeouts provisional and TUNE-02/03 pending until the hosted release PR comparison at ship.
+- [Phase 07]: Keep size.wasm measured but unbounded until the focused Ubuntu 26 Release build produces the actual module size.
+- [Phase 07]: Feed measured Cachegrind instruction counts to the shared bound comparator while preserving the existing base and relative gate.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -909,8 +920,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-18T23:00:27.235Z
-Stopped at: Completed 07-06-PLAN.md
+Last session: 2026-11-19T00:03:27.656Z
+Stopped at: Completed 07-07-PLAN.md
 Resume file: None
 
 ### v1.0 session history
@@ -1093,7 +1104,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 7 autonomously from Plan 07-07. Complete its remaining plans, code review and automated verification; at ship, dispatch triage and confirm its artifact, compare the automatic release PR with run 44253419074, then confirm merged main CI and the release before starting Phase 8.
+- Continue Phase 7 autonomously from Plan 07-08. Complete its remaining plans, code review and automated verification; at ship, measure the WASI module and add its bound, dispatch triage and confirm its artifact, compare the automatic release PR with run 44253419074, then confirm merged main CI and the release before starting Phase 8.
 
 ### v2.0 roadmap creation (2026-11-18)
 

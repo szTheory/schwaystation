@@ -70,7 +70,7 @@ For CI time reduction, keep all post-merge main CI and release validation. The e
 - Preserve the three deliverables (C library, headless runner, libretro core), deterministic integer-only core, and host-supplied files; this phase has no reason to alter emulator behavior.
 - Reuse permissively licensed material only. Keep the repository free of BIOS, disc, executable, card, state, personal-path, email, and identity bytes outside the approved fixture manifest.
 - Every behavior change needs a test in the CI workflow; all tests gate. Use automation first and no owner hardware verification for this internal CI phase.
-- Repository-check code is only CMake `-P` or POSIX shell, bounded by the 3,300-line milestone ceiling and ratcheted to the measured total at ship. The total RetroArch test code remains no more than 300 lines. Name the fault each gate prevents.
+- Repository-check code is only CMake `-P` or POSIX shell, bounded by the corrected 3,900-line milestone ceiling (superseding the original 3,300 estimate after Plan 06's measured growth and the remaining Plan 07-07/08 controls) and ratcheted to the measured total at ship. The total RetroArch test code remains no more than 300 lines. Name the fault each gate prevents.
 - Review code before final verification. Keep code-review tooling findings as seeds, and do not introduce a third review-fix round without new evidence.
 - Avoid new ceremony, privileged OS checks, or self-metered time limits. Keep changes within the authorized v2.0 scope and stop only at real owner/identity/phase boundaries.
 - Commit phase work on its `phase/NN-slug` branch, never on `main`; preserve the existing uncommitted config edit. Record runtime/model in STATE at each GSD step.

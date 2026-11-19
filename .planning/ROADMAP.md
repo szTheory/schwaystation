@@ -35,7 +35,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
   4. The checked-in `quality.json` baselines cover instructions per frame, Wasm size, state bytes and comparable CI critical-path time. CI enforces the applicable bounds, and the lesson uniqueness check rejects both duplicate identities and duplicate lesson text.
   5. Maintainers can trace current settings, pin and runner checks, device and documentation budgets, install instructions, and roadmap and prompt coverage to evidence. The tune-up records why any measured pin, cache or runner change was made.
 
-**Plans**: 6/10 plans executed
+**Plans**: 7/10 plans executed
 
 Plans:
 **Wave 1**
@@ -53,7 +53,7 @@ Plans:
 - [x] 07-06-PLAN.md — Avoid repeat release-metadata PR work and apply measured timeouts
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 07-07-PLAN.md — Enforce instruction, Wasm and serialized-state bounds
+- [x] 07-07-PLAN.md — Enforce instruction, Wasm and serialized-state bounds
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 07-08-PLAN.md — Enforce measured CI critical-path time
@@ -199,11 +199,11 @@ Plans:
 
 ## Progress
 
-Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the 3,300-line outer repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
+Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the 3,900-line outer repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 7. Faster and more trustworthy CI | 6/10 | In Progress | - |
+| 7. Faster and more trustworthy CI | 7/10 | In Progress | - |
 | 8. Per-game card saves | 0/TBD | Not started | - |
 | 9. CHD disc images | 0/TBD | Not started | - |
 | 10. PBP disc images | 0/TBD | Not started | - |
