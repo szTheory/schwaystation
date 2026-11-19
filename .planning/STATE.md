@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 8
 current_phase_name: Per-game card saves
-current_plan: 4
+current_plan: 5
 status: executing
-stopped_at: Completed 08-04-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
-last_updated: "2026-11-19T14:27:47.350Z"
+stopped_at: Completed 08-03-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
+last_updated: "2026-11-19T15:08:00.353Z"
 last_activity: 2026-11-19
 last_activity_desc: "Phase 8 execution started: Codex gpt-6-luna; using the configured single-writer path because worktree isolation is disabled and no fork base is configured."
-state_head: 68ed0a6fe37d5a471337ee16c01dca28374f75a2
+state_head: a8abb369e3403c6ac0787b0b265a9b05ac0b78e4
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 20
-  completed_plans: 13
+  completed_plans: 14
   percent: 10
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 8 (Per-game card saves) — EXECUTING
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 10
 Status: Ready to execute
 Last activity: 2026-11-19 — Phase 8 execution started
@@ -381,6 +381,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 8 P1 | 74m | 3 tasks | 6 files |
 | Phase 08 P02 | 33m | 3 tasks | 3 files |
 | Phase 08 P04 | 37 min | 3 tasks | 10 files |
+| Phase 08 P03 | 39min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -764,6 +765,8 @@ Recent decisions affecting current work:
 - [Phase 8]: Use a standard card ID guest as the reusable transport base for later PocketStation transfers.
 - [Phase 08]: Directory entry size occupies bytes 4–7 in the pinned source, but its byte order is unspecified; preserve a focused probe for the first 08-06 storage caller.
 - [Phase 08]: Keep existing DEC.60 ACK scheduling where PSX-SPX gives no command-specific delay; fixed BCD and unsupported storage commands are deterministic bounds, not RTC or PocketStation CPU emulation.
+- [Phase 08]: Resolve one save identity from a complete PS-EXE stem or the framed full-image digest; explicit serial overrides remain literal.
+- [Phase 08]: Keep runner auto-identity opt-in and preserve libretro frontend-based card filenames.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1009,8 +1012,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T14:27:47.218Z
-Stopped at: Completed 08-04-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
+Last session: 2026-11-19T15:08:00.116Z
+Stopped at: Completed 08-03-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
 Resume file: None
 
 ### v1.0 session history

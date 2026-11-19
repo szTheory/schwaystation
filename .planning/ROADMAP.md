@@ -79,11 +79,11 @@ Plans:
   4. The libretro host exposes and reloads card 1 via `RETRO_MEMORY_SAVE_RAM`, passes the in-process and fresh-process hosted RetroArch round trips, keeps additional slots separate in the host save directory, and advertises the save capability once verified.
   5. A guest using documented PocketStation storage commands from `58h` onward can write and read its card data.
 
-**Plans**: 3/10 plans executed
+**Plans**: 4/10 plans executed
 Plans:
 - [x] 08-01-PLAN.md — Prove the existing card path and register Phase 8 checks
 - [x] 08-02-PLAN.md — Validate and atomically export complete cards
-- [ ] 08-03-PLAN.md — Resolve executable save-game identities and prove two-slot isolation
+- [x] 08-03-PLAN.md — Resolve executable save-game identities and prove two-slot isolation
 - [x] 08-04-PLAN.md — Pin PocketStation transcripts and implement card metadata
 - [ ] 08-05-PLAN.md — Persist independent libretro cards for every supported content entry
 - [ ] 08-06-PLAN.md — Round-trip PocketStation storage through a real guest
@@ -215,7 +215,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
 | 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
-| 8. Per-game card saves | 3/10 | Planning | - |
+| 8. Per-game card saves | 4/10 | Planning | - |
 | 9. CHD disc images | 0/TBD | Not started | - |
 | 10. PBP disc images | 0/TBD | Not started | - |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |
