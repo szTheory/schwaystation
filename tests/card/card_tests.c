@@ -1055,6 +1055,93 @@ static void protocol_pocketstation_metadata(void)
     schway_destroy(inst);
 }
 
+static void state_pocketstation_metadata(void)
+{
+    uint8_t *source_image = make_card(19u);
+    uint8_t *target_image = make_card(83u);
+    schway *source = make();
+    schway *target = make();
+    CHECK_EQ_U64(schway_load_memcard(source, SCHWAY_CARD_SLOT_1, source_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_memcard(target, SCHWAY_CARD_SLOT_1, target_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+
+    configure(source, 0u);
+    pocket_set_index(source, 3u, 0u, 0u);
+    CHECK_EQ_HEX(command_flag(source, 0x5Eu), 0x08u);
+    CHECK_EQ_HEX(transfer(source, 0u, CARD_ACK), 0x03u);
+    CHECK_EQ_HEX(transfer(source, 1u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(source, 1u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(source, 0u, 0u), 0u);
+    CHECK_EQ_HEX(command_flag(source, 0x5Fu), 0x08u);
+    CHECK_EQ_HEX(transfer(source, 0u, CARD_ACK), 0x01u);
+    CHECK_EQ_HEX(transfer(source, 1u, 0u), 0u);
+
+    CHECK_EQ_HEX(command_flag(source, 0x59u), 0x08u);
+    CHECK_EQ_HEX(transfer(source, 0u, CARD_ACK), 0x06u);
+    CHECK_EQ_HEX(transfer(source, 0u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(source, 7u, CARD_ACK), 3u);
+    CHECK_EQ_HEX(transfer(source, 0xAAu, CARD_ACK), 0u);
+
+    size_t field_count = schway__state_record(source, NULL, 0u);
+    struct schway__state_field *fields =
+        (struct schway__state_field *)calloc(field_count, sizeof *fields);
+    CHECK(fields != NULL);
+    if (fields != NULL) {
+        CHECK_EQ_U64(schway__state_record(source, fields, field_count), field_count);
+        const char *reserved[] = {
+            "card.slot1.pocket_address", "card.slot1.pocket_length",
+            "card.slot1.pocket_step", "card.slot1.pocket_payload"
+        };
+        for (uint32_t wanted = 0u; wanted < sizeof reserved / sizeof reserved[0]; wanted++) {
+            int found = 0;
+            for (size_t i = 0u; i < field_count; i++) {
+                if (strcmp(fields[i].name, reserved[wanted]) == 0) {
+                    found = 1;
+                    break;
+                }
+            }
+            CHECK(found);
+        }
+        free(fields);
+    }
+
+    size_t state_size = schway_state_size(source);
+    uint8_t *state = (uint8_t *)malloc(state_size);
+    CHECK(state != NULL);
+    if (state != NULL) {
+        CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(target->card.slot[0].pocket_index, 3u);
+        CHECK_EQ_U64(target->card.slot[0].pocket_flags, 0x0Bu);
+        CHECK_EQ_U64(target->card.slot[0].phase, source->card.slot[0].phase);
+        CHECK_EQ_U64(target->card.slot[0].read_step, source->card.slot[0].read_step);
+        CHECK_EQ_U64(target->card.slot[0].pocket_data[2], 0xAAu);
+
+        schway_span target_card;
+        CHECK_EQ_U64(schway_get_memory(target, SCHWAY_MEMORY_CARD1, &target_card),
+                     SCHWAY_STATUS_OK);
+        CHECK(memcmp(target_card.data, target_image, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 0u);
+
+        CHECK_EQ_HEX(transfer(target, 0xBBu, CARD_ACK), 0u);
+        CHECK_EQ_HEX(transfer(target, 0xCCu, CARD_ACK), 0u);
+        CHECK_EQ_HEX(transfer(target, 0xDDu, 0u), 0u);
+        CHECK_EQ_U64(target->card.slot[0].pocket_index, 7u);
+        CHECK(memcmp(target_card.data, target_image, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 0u);
+
+        reject_mutated_state(source, target, "card.slot1.pocket_index", 0u, 16u);
+        reject_mutated_state(source, target, "card.slot1.pocket_flags", 0u, 16u);
+        reject_mutated_state(source, target, "card.slot1.command", 0u, 0x57u);
+        free(state);
+    }
+    schway_destroy(target);
+    schway_destroy(source);
+    free(target_image);
+    free(source_image);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -1074,6 +1161,8 @@ int main(int argc, char **argv)
         state_import_atomic();
     } else if (strcmp(argv[1], "state_pending_edges") == 0) {
         state_pending_edges();
+    } else if (strcmp(argv[1], "state_pocketstation_metadata") == 0) {
+        state_pocketstation_metadata();
     } else {
         return 2;
     }

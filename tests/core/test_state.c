@@ -262,6 +262,10 @@ static void test_rejects(void)
     expect_refused("format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
+    put_le(bad + H_FORMAT, 17u, 4u);
+    expect_refused("format 17", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
+
+    memcpy(bad, good, n);
     put_le(bad + H_FORMAT, 5u, 4u);
     expect_refused("released revision-5 state", target, bad, n,
                    SCHWAY_STATUS_ERR_STATE_VERSION);
@@ -1319,8 +1323,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 17u);
-    CHECK_EQ_U64(v.behaviour_revision, 17u);
+    CHECK_EQ_U64(v.state_format, 18u);
+    CHECK_EQ_U64(v.behaviour_revision, 18u);
 }
 
 static void check_cpu_power_on(schway *inst)

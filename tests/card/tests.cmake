@@ -53,6 +53,11 @@ schway_add_test(NAME card.state.pending_edges
   COMMAND schwaystation-test-card state_pending_edges
   LABELS card portable TIMEOUT 10)
 
+# Fault prevented: PocketStation transport loads cannot resume safely or roll back receiver media.
+schway_add_test(NAME card.state.pocketstation_metadata
+  COMMAND schwaystation-test-card state_pocketstation_metadata
+  LABELS card portable TIMEOUT 10)
+
 # Fault prevented: raw card imports rewrite their source or atomic saves expose partial data.
 schway_add_test(NAME card.files.atomic_roundtrip
   COMMAND schwaystation-test-card-files atomic_roundtrip
