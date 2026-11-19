@@ -456,6 +456,15 @@ static void wrapper_edges(void)
     expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input, gme_size,
                           out, &lint, snapshot, input_capacity + 1u);
 
+    memset(input, 0, GME_HEADER_SIZE);
+    memcpy(input, "123-456-STD", 11u);
+    memcpy(input + 0x10u, "\0\0\1\0\1", 5u);
+    input[0x12u] = 0u;
+    memcpy(input + GME_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
+    CHECK(write_file(source_path, input, gme_size));
+    expect_import_refusal(source_path, SCHWAY_HOST_CARD_ERR_SIZE, input, gme_size,
+                          out, &lint, snapshot, input_capacity + 1u);
+
     memset(input, 0, VGS_HEADER_SIZE);
     memcpy(input, "VgsM", 4u);
     memcpy(input + VGS_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
