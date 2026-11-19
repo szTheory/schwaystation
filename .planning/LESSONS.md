@@ -2,7 +2,7 @@
 title: "Lesson exchange"
 summary: "Lessons imported from the owner's sibling emulators (hypotheses until reproduced here) and the template for exporting this project's lessons."
 read_when: "At every discuss step, at each phase or milestone boundary, when a sibling lesson might apply, or when the owner asks to export lessons."
-updated: 2026-11-12
+updated: 2026-11-19
 ---
 
 # Lesson exchange
@@ -240,4 +240,23 @@ Applies when: reproducing fixed-input/output hardware logs with a short local pr
 Does not establish: a complete frame/movie reference, exact hardware IDCT behavior for arbitrary coefficients, or permission to replace the pinned image oracle.
 Suggested check: copy every logged setting into the probe before comparing outputs; check setup and a small vector first. Verify source coverage before guests, then treat full-frame results as fidelity evidence only when guest progress and oracle bytes align.
 Sources: `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md` section 4 [SCM.29][SCM.30].
+Status: reproduced
+
+Lesson SW-CI-001 (2026-11-19, Phase 7 hosted CI retry)
+Symptom and reproduction: Main CI's first run on release commit `af64484f388eddf67c615673b98edd6ccb5dae4c`
+timed out three macOS x64 tests after 871.79 seconds of CTest time. The Release workflow ran the same commit's
+same macOS x64 suite successfully in 307.20 seconds; rerunning only the failed main path then passed in about
+7m24, including hash equality and RetroArch. The full main and Release matrices also both ran on that commit.
+Root cause / invariant: hosted runner throughput can vary sharply, and exact-SHA full workflows can duplicate
+runner cost while overlapping. A slow attempt alone does not show a test regression or a wall-clock bottleneck.
+Fix and evidence: compare the exact test inventory, same-SHA job results and attributable runner timings before
+changing caps; retry only the failed path when matching evidence shows a runner anomaly. Keep required main and
+release checks until a safe artifact-reuse design proves it preserves both. Main CI [44477155668](https://github.com/szTheory/schwaystation/actions/runs/44477155668)
+and Release [44477155670](https://github.com/szTheory/schwaystation/actions/runs/44477155670) passed.
+Applies when: a hosted suite has timeouts or CI and release workflows repeat an exact source revision.
+Does not establish: that every timeout is infrastructure noise, that concurrent runs reduce elapsed wall time,
+or that a matrix can be skipped without preserving its check and package guarantees.
+Suggested check: before a long retry, confirm selector/inventory parity, compare same-SHA job outputs and timings,
+then rerun only the attributable failed path; bind larger cross-workflow reuse research to the next workflow-editing plan.
+Sources: `.planning/phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md`; `.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md`.
 Status: reproduced

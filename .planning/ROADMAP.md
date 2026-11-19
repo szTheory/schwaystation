@@ -203,8 +203,8 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-18 |
-| 8. Per-game card saves | 0/TBD | Not started | - |
+| 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
+| 8. Per-game card saves | 0/TBD | Planning | - |
 | 9. CHD disc images | 0/TBD | Not started | - |
 | 10. PBP disc images | 0/TBD | Not started | - |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |

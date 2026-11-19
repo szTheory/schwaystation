@@ -191,11 +191,24 @@ The Actions job API exposes runner labels and start/end timestamps, not host CPU
 
 ## Before/after slot and verification commands
 
-The after measurement is pending until the actual release-App PR after the metadata-only CI routing change is merged. Record its exact PR head and merge revision, generated file list, full required-check parity, run/job URLs, slowest job and critical path; compare against run 44253419074 only after confirming the same generated metadata workload. The real post-merge Release run and automatic release must remain covered.
+The ship comparison below records the automatic release-App PR, its exact generated file list, required-check
+parity, run URL, and observed duration. The baseline's merge-ref SHA was not retained, so matching paths alone
+do not establish an exact workload fingerprint and no speedup is inferred. Main CI and the real Release run
+remain separately covered.
 
 | Comparison cohort | Before observation | After observation |
 | --- | --- | --- |
-| Release App PR #23 with generated metadata only | [run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074) is the baseline anchor; the PR contained exactly `.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`, and `be32` took 60:21. Its merge-ref SHA was not retained, so this is supporting context, not an exact workload-fingerprint comparison or timeout sample. | **Pending ship.** Record the automatic release-App PR's head and merge revision, complete stable three-file list, allowed skips and required-check parity, slowest job, critical path, and run/job URLs. Compare only after confirming the generated workload matches; no after measurement or speedup is claimed here. |
+| Release App PR with generated metadata only | [Run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074) is the baseline anchor; it contained exactly `.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`, and `be32` took 60:21. Its merge-ref SHA was not retained, so this remains supporting context, not an exact workload-fingerprint comparison or timeout sample. | [PR #29](https://github.com/szTheory/schwaystation/pull/29) contained the same exact three paths. [Run 44476990492](https://github.com/szTheory/schwaystation/actions/runs/44476990492) passed `CI required` in about 70s with the established heavy-matrix skips. Matching path lists and the expected route were observed, but the baseline SHA is missing; no exact fingerprint match or speedup is claimed. |
+
+## Same-commit workflow duplication observed at ship
+
+Main push CI and the Release workflow's reusable CI both ran their full matrices on release commit
+`af64484f388eddf67c615673b98edd6ccb5dae4c`. This consumes duplicate runner minutes, but the runs overlapped,
+so their duration does not show a wall-clock penalty. The main required check and exact-release-SHA package
+verification both passed. Reusing fingerprinted artifacts across these workflows is a larger design change;
+measure whether all required checks and release archive validation can remain intact before proposing it. The
+single follow-up is [todo 050](../../todos/pending/050-release-ci-artifact-reuse.md), for the Phase 9 plan that
+first edits a CI or release workflow.
 
 | Command | Exit | Evidence |
 | --- | ---: | --- |

@@ -49,15 +49,15 @@ requirements-completed:
   - TUNE-06
 coverage:
   - id: C1
-    description: Production CI policy selectors pass locally with all cases retained.
+    description: Production CI policy selectors passed locally, and the sanitized default-branch triage artifact was uploaded and inspected.
     requirement: TUNE-01
     verification:
       - kind: integration
         ref: "ctest --preset ci --parallel 1 --no-tests=error -R '^(ci[.](classify_policy|triage)|policy[.](quality_metrics|lessons_unique([.]self_test)?))$' --output-on-failure (exit 0; 5/5 in 39.17s at the 60s metric timeout)"
         status: pass
       - kind: other
-        ref: "07-DELIVERY-EVIDENCE.md: post-merge default-branch triage artifact and Actions URL remain pending for ship"
-        status: unknown
+        ref: "07-DELIVERY-EVIDENCE.md: default-branch triage run 44486437761 uploaded a schema-valid artifact with zero open issues and no truncation"
+        status: pass
     human_judgment: false
   - id: C2
     description: Repository-check and RetroArch budgets are measured and preserved at their ratcheted limits; review fixes fit the approved ceiling.
@@ -71,12 +71,12 @@ coverage:
         status: pass
     human_judgment: false
   - id: C3
-    description: Historical CI evidence is retained with explicit comparability limits and a concrete after-run locator.
+    description: Historical CI evidence and the release-App after route are recorded with explicit comparability limits and required-check parity.
     requirement: TUNE-02
     verification:
       - kind: other
-        ref: "07-CI-EFFICIENCY.md: run 44253419074 is a qualified baseline anchor, while the matched generated release-App run, required-check parity, and run/job URLs remain pending for ship"
-        status: unknown
+        ref: "07-CI-EFFICIENCY.md: PR #29 run 44476990492 passed CI required on the exact three-file route; baseline merge SHA is unavailable, so no exact fingerprint or speedup is claimed"
+        status: pass
     human_judgment: false
   - id: C4
     description: Timeout provenance and the release-App comparison limitations are recorded without claiming a speedup.
@@ -86,8 +86,8 @@ coverage:
         ref: "07-DELIVERY-EVIDENCE.md records the 29.69s and 38.61s serialized observations, the final 80s cap, and the qualified baseline run 44253419074"
         status: pass
       - kind: other
-        ref: "Exact changed-head release-App comparison remains pending for ship"
-        status: unknown
+        ref: "07-DELIVERY-EVIDENCE.md: Windows ARM64 quality control completed in 116.03s under the 180s cap; main macOS retry was limited to the failed path after exact-SHA comparison"
+        status: pass
     human_judgment: false
   - id: C5
     description: The single README correction selected in Plan 07-04 remains verified, with no second improvement selected.
@@ -98,7 +98,7 @@ coverage:
         status: pass
     human_judgment: false
   - id: C6
-    description: Quality producer and lesson-uniqueness controls pass; PR timing stays unbaselined pending hosted evidence, and the measured WASI size bound awaits exact-head confirmation.
+    description: Quality producer and lesson-uniqueness controls pass; final-head CI confirmed the measured WASI bound while incomparable PR timing stays unbaselined.
     requirement: TUNE-05
     verification:
       - kind: integration
@@ -108,19 +108,19 @@ coverage:
         ref: "ctest --preset ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1 (exit 0; post-review regressions passed 1/1 in 37.22s; PR route remains unbaselined against the push/main range)"
         status: pass
       - kind: other
-        ref: "07-DELIVERY-EVIDENCE.md: Ubuntu 26 measured the module at 595820 bytes; the checked-in bound awaits exact-head confirmation"
-        status: unknown
+        ref: "07-DELIVERY-EVIDENCE.md: Ubuntu 26 measured 595820 bytes and final-head PR CI passed the checked-in bound; the PR timing route remains explicitly unbaselined against push/main"
+        status: pass
     human_judgment: false
   - id: C7
-    description: Ship title checks and release-please strategy are verified; code review is clean and hosted acceptance evidence remains pending for ship.
+    description: Ship title checks, review and hosted acceptance evidence are complete; the published release passed its install-line check.
     requirement: TUNE-06
     verification:
       - kind: integration
         ref: "sh scripts/check-title.sh 'feat: publish the weekly triage artifact' < build/phase07/pr-body.md (exit 0); jq -e '.packages[\".\"].[\"release-type\"] == \"simple\"' release-please-config.json (exit 0)"
         status: pass
       - kind: other
-        ref: "07-REVIEW.md is clean; 07-VERIFICATION.md records hosted run, merge, release, WASI, and post-merge artifact evidence as pending for ship"
-        status: unknown
+        ref: "07-VERIFICATION.md records exact-head CI, merge, v0.7.0 release, install-line-latest, WASI and triage-artifact results"
+        status: pass
     human_judgment: false
 metrics:
   duration: "Not captured across executor and commit handoffs"
@@ -130,7 +130,7 @@ status: complete
 
 # Phase 7 Plan 10: CI and release evidence handoff Summary
 
-**Plan 10's focused CI and hygiene controls passed with a measured 80-second quality-test timeout; post-review fixes carried the repository gate from 3,890 to 3,900 lines, and the later Windows timing portability fix brings the current measured gate to 3,901. Hosted exact-head verification remains pending.**
+**Plan 10's focused CI and hygiene controls passed with measured timeout headroom; hosted exact-head CI confirmed the 595,820-byte WASI bound, the phase merged and released as v0.7.0, and the default-branch triage artifact passed inspection.**
 
 ## Performance
 
@@ -184,15 +184,15 @@ the existing hygiene preset to refresh a stale generated 3,890 registration, the
 selector passed 4/4 in 0.03 seconds. TUNE-01, TUNE-02/03 and the remaining TUNE-05 measurements are
 machine-checkable ship evidence, not owner UAT.
 
-## Deferred to ship
+## Deferred to ship at the Plan 10 handoff (historical; closed below)
 
-Final verification now records `passed` (5/5 implementation and data-flow truths; 0 behavior-unverified).
+At the Plan 10 handoff, final verification recorded `passed` (5/5 implementation and data-flow truths; 0 behavior-unverified).
 The initial `human_needed` classification was corrected under the infrastructure-phase verifier rule: these
 checks are automated ship evidence, not owner UAT. The first PR attempt measured the Ubuntu 26 WASI module at
 595,820 bytes, but did not verify a checked-in bound; its Windows timing tests failed and it was canceled. The
 corrected exact-head CI, generated release-App comparison and required-check parity, green main CI, published
-release, default-branch triage artifact, and final PR timing remain pending. None is claimed as complete. The
-phase remains in progress until ship evidence is complete; Phase 8 stays stopped.
+release, default-branch triage artifact, and final PR timing remained pending at that checkpoint. The final
+ship record below closes these items.
 
 The exact-head run on `4d389aef0a58ceadc8e010a15559852bbbe237f4` failed in Windows x64 because the timing script
 prefixed CMake's `D:/...` absolute registry path with the repository root; Windows arm64 passed that attempt.
@@ -202,7 +202,18 @@ and focused hygiene controls (4/4 in 0.03 seconds) then passed. This correction 
 head, Windows x64 then passed the quality test in 38.51 seconds but Windows ARM64 timed out at 80 seconds while
 the other 617 tests passed; the matching Nightly run passed. The CI run was canceled after the known failure.
 Following new timing evidence, review approved a 180-second provisional CTest cap. The reconfigured local test
-passed 1/1 in 29.36 seconds. A passing exact-head Windows ARM64 test and broad CI/Nightly remain pending.
+passed 1/1 in 29.36 seconds. A passing exact-head Windows ARM64 test and broad CI/Nightly remained pending then.
+
+## Final ship closeout (2026-11-19)
+
+Phase PR #28's exact final head passed CI in run 44468099352 and Nightly in run 44468099361. Windows ARM64
+completed `policy.quality_metrics` in 116.03 seconds under the 180-second timeout. The automatic release PR #29
+contained the exact three generated metadata files and passed `CI required` in run 44476990492; its baseline
+merge-ref SHA is unavailable, so no exact fingerprint comparison or speedup is asserted. PR #29 merged as
+`af64484f388eddf67c615673b98edd6ccb5dae4c`; main CI, the automatic v0.7.0 Release, all 19 assets, and
+`install-line-latest` passed. Default-branch triage run 44486437761 uploaded a schema-valid artifact with zero
+open issues and no truncation. Full URLs and the bounded comparison details are in
+[07-DELIVERY-EVIDENCE.md](07-DELIVERY-EVIDENCE.md).
 
 ## Deviations from plan
 

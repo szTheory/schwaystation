@@ -6,11 +6,11 @@ current_phase: 8
 current_phase_name: Per-game card saves
 current_plan: Not started
 status: planning
-stopped_at: Phase 7 verified; finish its ship evidence before planning Phase 8
-last_updated: "2026-11-19T05:17:08Z"
+stopped_at: Phase 8 autonomous discussion in progress
+last_updated: "2026-11-19T08:51:38.399Z"
 last_activity: 2026-11-19
-last_activity_desc: Phase 7 correction passed focused local checks; exact-head hosted verification and release remain before Phase 8 planning
-state_head: f5f5ea6640392a7ba447f83b07122bf19fe5ff49
+last_activity_desc: Phase 7 v0.7.0 release and main CI are complete; Phase 8 discussion is underway
+state_head: af64484f388eddf67c615673b98edd6ccb5dae4c
 progress:
   total_phases: 10
   completed_phases: 1
@@ -34,7 +34,7 @@ Phase: 8 — Per-game card saves
 Current Plan: Not started
 Total Plans in Phase: 10
 Status: Ready to plan
-Last activity: 2026-11-19 — Phase 7 verification passed; ship it before Phase 8 planning
+Last activity: 2026-11-19 — Phase 7 release, main CI and triage artifact passed; Phase 8 discussion is underway
 
 ### Phase 7 execution (2026-11-18–19)
 
@@ -131,6 +131,17 @@ CTest allowance without removing coverage. After `cmake --preset ci` reconfigure
 serialized test passed 1/1 in 29.36 seconds. The next exact-head Windows ARM64 lane must establish its actual
 completion time; the 180s allowance is not yet validated there. Runtime/model: Codex/OpenGSD CLI 1.20.0; primary
 GPT-6 session (deployed ID unavailable); follow-up read-only reviewer gpt-6-luna xhigh.
+
+### Phase 7 ship closeout (2026-11-19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; primary GPT-6 model ID unavailable. Phase PR #28 exact-head CI run
+44468099352 and Nightly run 44468099361 passed. Windows ARM64 completed the quality control in 116.03 seconds
+under the 180-second cap. Release PR #29 merged as `af64484f388eddf67c615673b98edd6ccb5dae4c`; main CI passed
+after a targeted retry of an anomalously slow macOS x64 path. Release run 44477155670 published v0.7.0 with 19
+assets and passed the latest-install check. Triage run 44486437761 uploaded a valid artifact with zero open
+issues and no truncation. Release-App baseline SHA limitations and same-commit duplicated runner cost are
+documented in `07-DELIVERY-EVIDENCE.md` and `07-CI-EFFICIENCY.md`; the safe-reuse investigation is bound to a
+Phase 9 workflow-editing plan in todo 050. Phase 7 ship evidence is complete; no owner UAT is needed.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -780,7 +791,7 @@ Recent decisions affecting current work:
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
-- [Phase 7]: Complete hosted ship evidence (exact-head PR CI and timing, release-App comparison, WASI byte count and bound, triage artifact, and post-merge release checks) before Phase 8 planning.
+- [Phase 7]: Closed; hosted verification, main CI, release v0.7.0 and triage artifact passed. Follow-up efficiency investigation is in todo 050, bound to Phase 9.
 
 ### Quick Tasks Completed
 
@@ -986,8 +997,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T04:34:08.919Z
-Stopped at: Phase 7 verified; finish ship evidence before Phase 8 planning
+Last session: 2026-11-19T08:28:16Z
+Stopped at: Phase 8 autonomous discussion in progress
 Resume file: None
 
 ### v1.0 session history
@@ -1170,7 +1181,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Complete Phase 7 ship evidence: verify the corrected Windows timing parser, 595,820-byte WASI bound and 15-minute fuzz timeout on the exact hosted head; measure final-head PR timing, verify the triage artifact, compare the automatic release PR with run 44253419074, then confirm green merged-main CI and the published release before starting Phase 8. No owner UAT is needed.
+- Continue Phase 8 per-game card saves through autonomous discussion, planning, execution, review, verification and ship. Run cheap input and inventory checks before long suites, then confirm the merge, green main CI and automatic release before Phase 9. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
