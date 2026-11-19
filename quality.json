@@ -13,10 +13,11 @@
     "critical_path_s": {
       "floor": 2249,
       "ceiling": 3293,
-      "workload_sha256": "316f86729c5129fc618ae0acf71014a5b18784d9e7a4f6c03ff067d0b4326ed8"
+      "workload_sha256": "30d541a043c3f33723be17f771e6214b872f3cdf6e9e74cbbb1bff463c4800e9"
     }
   },
   "reasons": [
-    "2026-11-18: the original repository-check cap was 3200 lines; Plan 01 measured 3133 and estimated 90-135 lines for remaining triage, routing, and quality controls, supporting a 3300 cap. After Plan 06 the measured total was 3299, while Plans 07-08 still required an estimated 370-500 counted lines. The corrected temporary cap is 3900, which covers the 500-line upper estimate plus 100 lines of headroom; Plan 10 ratchets it to the actual shipping total. Evidence: .planning/phases/07-faster-and-more-trustworthy-ci/07-01-SUMMARY.md and both dated decisions in .planning/phases/07-faster-and-more-trustworthy-ci/07-CONTEXT.md."
+    "2026-11-18: the original repository-check cap was 3200 lines; Plan 01 measured 3133 and estimated 90-135 lines for remaining triage, routing, and quality controls, supporting a 3300 cap. After Plan 06 the measured total was 3299, while Plans 07-08 still required an estimated 370-500 counted lines. The corrected temporary cap is 3900, which covers the 500-line upper estimate plus 100 lines of headroom; Plan 10 ratchets it to the actual shipping total. Evidence: .planning/phases/07-faster-and-more-trustworthy-ci/07-01-SUMMARY.md and both dated decisions in .planning/phases/07-faster-and-more-trustworthy-ci/07-CONTEXT.md.",
+    "2026-11-18: workload_sha256 now matches the production pull_request/non-main source projection; quality.json is excluded from that projection. The synthetic production control exercises the recorded 2249-3293-second interval, while the exact final-head hosted PR run confirms runtime comparability at ship."
   ]
 }
