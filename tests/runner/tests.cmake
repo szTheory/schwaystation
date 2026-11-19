@@ -213,6 +213,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash)
     expect_exit(0 "^frames 5\n.*max_rss_kib [0-9]+\n$" --bench 60)
   elseif(CASE STREQUAL "cards_persistence")
+    set(NORMAL_RUN ${RUN})
     set(RUN ${HOOKED})
     string(REPEAT "[0-9a-f]" 64 digits)
     set(card_dir "${OUT}/runner-cards-persistence")
@@ -235,13 +236,14 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "runner card fixture path was not provided")
     endif()
     set(identity_dir "${OUT}/runner-cards-identities")
+    file(REMOVE_RECURSE "${identity_dir}")
     file(MAKE_DIRECTORY "${identity_dir}")
     set(identity_a_exe "${OUT}/sLuS_123.45.exe")
     set(identity_b_exe "${OUT}/SLUS_123.46.exe")
     file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${identity_a_exe}")
     file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${identity_b_exe}")
     function(run_identity_guest image label)
-      execute_process(COMMAND ${RUN} --exe "${image}" --frames 120 --stop-on mailbox
+      execute_process(COMMAND ${NORMAL_RUN} --exe "${image}" --frames 120 --stop-on mailbox
           --save-dir "${identity_dir}" --memcard-names serial
         RESULT_VARIABLE identity_rc OUTPUT_VARIABLE identity_out ERROR_VARIABLE identity_err)
       if(NOT identity_rc STREQUAL "0" OR NOT identity_out MATCHES "mailbox SWMB status=00")
@@ -292,6 +294,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
 
     # A rejected second-slot import cannot change the first complete file.
+    file(COPY_FILE "${identity_a_slot2}" "${identity_dir}/identity-a-slot2.backup")
     file(WRITE "${identity_a_slot2}" "")
     file(SHA256 "${identity_a_slot1}" identity_a_slot1_before_refusal)
     execute_process(COMMAND ${RUN} --exe "${identity_a_exe}" --frames 120 --stop-on mailbox
@@ -302,7 +305,8 @@ if(CMAKE_SCRIPT_MODE_FILE)
        NOT identity_a_slot1_before_refusal STREQUAL identity_a_slot1_after_refusal)
       message(FATAL_ERROR "refused automatic identity import changed an existing complete file: ${refused_out}${refused_err}")
     endif()
-    file(REMOVE "${identity_a_slot2}")
+    file(COPY_FILE "${identity_dir}/identity-a-slot2.backup" "${identity_a_slot2}")
+    file(REMOVE "${identity_dir}/identity-a-slot2.backup")
 
     # A forced rename failure on the selected identity preserves both stored slots.
     file(SHA256 "${identity_a_slot1}" identity_a_slot1_before_failure)
@@ -443,20 +447,34 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "PS-EXE serial naming did not normalize the complete source stem")
     endif()
 
+    # The documented three-letter LSP prefix keeps the same serial grammar.
+    set(lsp_serial_dir "${OUT}/runner-cards-lsp-serial")
+    file(REMOVE_RECURSE "${lsp_serial_dir}")
+    file(MAKE_DIRECTORY "${lsp_serial_dir}")
+    set(lsp_exe "${OUT}/LSP_123.45.exe")
+    file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${lsp_exe}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${lsp_serial_dir}"
+      --memcard-names serial --exe "${lsp_exe}" --test-card-write slot1)
+    if(NOT EXISTS "${lsp_serial_dir}/LSP-12345.srm")
+      message(FATAL_ERROR "three-letter LSP serial prefix was not normalized")
+    endif()
+
     # An explicit override remains literal even when its prefix is reserved for
     # automatic digest identities.
     set(literal_identity_dir "${OUT}/runner-cards-literal-identity")
     file(MAKE_DIRECTORY "${literal_identity_dir}")
     expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${literal_identity_dir}"
       --memcard-names serial --serial sGi1-literal --exe "${serial_exe}" --test-card-write slot1)
-    if(NOT EXISTS "${literal_identity_dir}/sGi1-literal.srm" OR
-       EXISTS "${literal_identity_dir}/SGI1-LITERAL.srm")
+    file(GLOB literal_identity_files LIST_DIRECTORIES FALSE "${literal_identity_dir}/*.srm")
+    set(expected_literal_identity_files "${literal_identity_dir}/sGi1-literal.srm")
+    if(NOT literal_identity_files STREQUAL expected_literal_identity_files)
       message(FATAL_ERROR "literal serial override was normalized or treated as an automatic digest")
     endif()
 
     # A serial-shaped-but-invalid source stem falls back to a framed digest of
     # all executable bytes; moving the same bytes cannot change that identity.
     set(digest_dir "${OUT}/runner-cards-exe-digest")
+    file(REMOVE_RECURSE "${digest_dir}")
     file(MAKE_DIRECTORY "${digest_dir}" "${OUT}/renamed")
     set(homebrew_exe "${OUT}/homebrew.exe")
     set(invalid_serial_exe "${OUT}/renamed/slus_123.4.exe")
@@ -514,6 +532,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     # Invalid naming options are refused as usage errors before any run.
     refuse(--serial SLUS_123.45)
     refuse(--save-dir "${serial_dir}" --memcard-names serial --serial ../escape)
+    refuse(--save-dir "${serial_dir}" --memcard-names serial)
   elseif(CASE STREQUAL "audio_failures")
     set(RUN ${HOOKED})
     execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-audio --test-audio-failure
