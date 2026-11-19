@@ -43,8 +43,8 @@ schwaystation-run --help | --version
 | `--hash-state` | After the last frame, print the SHA-256 of the saved [machine state](#frame-hash). Unavailable with `--disc`. |
 | `--inputs FILE` | Parse and apply bounded controller and disc controls at frame boundaries, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
 | `--save-dir DIR` | Load and save the two memory cards under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
-| `--memcard-names MODE` | Use `basename` (default) or opt into `serial` naming for both card files. Give it once. |
-| `--serial SERIAL` | Keep this literal, validated card basename with `--memcard-names serial`. It overrides executable-name extraction and hashing. |
+| `--memcard-names MODE` | Use `basename` (default) or opt into `serial` naming for both card files from an executable or the first disc member. Give it once. |
+| `--serial SERIAL` | Keep this literal, validated card basename with `--memcard-names serial`. It overrides serial extraction and content hashing. |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it once. |
 | `--metadata-ledger CSV` and `--metadata-dat DAT` | Supply both bounded lookup files to `--probe`; identity is shown only after an exact DAT and passing-ledger match. |
@@ -164,22 +164,38 @@ With `--save-dir DIR`, the runner validates and loads the selected content, then
 execution. By default it uses
 the executable filename without its final extension as the basename; a content-free run uses `schwaystation`.
 Slot 1 is `basename.srm` and slot 2 is `basename.1.mcr`. To share cards across a multi-disc set, pass
-`--memcard-names serial` with a standalone PS-EXE. The runner takes a serial only from the complete source filename
-stem: four ASCII letters (or the documented three-letter `LSP` prefix), `_` or `-`, three digits, a dot, and two
-digits, optionally followed by `.exe`. For example, `slus_123.45.exe` becomes `SLUS-12345`. It does not search an
-arbitrary substring or use the executable's licence text.
+`--memcard-names serial` with a standalone PS-EXE or a disc image/playlist. The runner takes an executable serial
+only from the complete source filename stem: four ASCII letters (or the documented three-letter `LSP` prefix),
+`_` or `-`, three digits, a dot, and two digits, optionally followed by `.exe`. For example,
+`slus_123.45.exe` becomes `SLUS-12345`. It does not search an arbitrary substring or use the executable's licence
+text.
 
 An explicit `--serial SERIAL` takes precedence and preserves the supplied case and characters. It follows the
 legacy 1–63 character filename-component validator: ASCII letters, digits, `_`, `-` and `.`, with an alphanumeric
-first character. This override bypasses extraction and hashing, so existing literal save names remain stable. Disc
-and content-free runs still need this explicit override in serial mode. The runner does not create DIR.
+first character. This override bypasses extraction and hashing, so existing literal save names remain stable. A
+content-free run still needs this explicit override in serial mode. The runner does not create DIR.
+
+For a disc or playlist, the runner probes only the first declared member for a boot serial. A valid first-member
+serial wins; later members do not override it. If that first member has no valid serial, the runner hashes the
+entire declared media set even when a later member has a serial. The card identity is resolved once before card
+paths are applied and stays fixed when the input movie changes discs.
 
 When a standalone executable filename has no complete valid serial, the runner names it with `sgi1-` followed by
 64 lowercase SHA-256 hex digits. The hash input is framed as the ASCII bytes `schwaystation-save-game-identity`,
 version byte `01`, media-kind byte `01` (PS-EXE), the executable byte length as an eight-byte little-endian
-integer, then every validated PS-EXE byte. Accepted trailing bytes are included; the source path is excluded. The
-versioned digest namespace cannot match a normalized serial, and the shared path helper accepts only the complete
-`sgi1-` plus 64-hex grammar. Both slots use the single identity resolved for the run.
+integer, then every validated PS-EXE byte. Accepted trailing bytes are included; the source path is excluded.
+
+When the first disc member has no valid serial, the runner names the card with `sgi2-` followed by 64 lowercase
+SHA-256 hex digits. The hash uses the same domain with version byte `02`, media-kind byte `02` for one standalone
+image or `03` for an M3U, and the declared member count as a four-byte little-endian integer. It then frames each
+member's ordered track count and each track's type, index 0, index 1, pregap and leadout as four-byte
+little-endian integers, followed by every provider sector in `[index0, leadout)`: all 2,352 sector bytes and the
+96 subcode bytes returned by the provider. A one-entry M3U remains distinct from a standalone image. Paths,
+playlist spelling and container padding are excluded; member order, track layout and sector contents are included.
+This reads the full declared media set at startup, so the cost scales with its sector count. A sector read error
+aborts identity resolution before either card path is applied. The `sgi1-` and `sgi2-` digest namespaces cannot
+match normalized serials, and the shared path helper accepts only their complete 64-hex forms. Both slots use the
+single identity resolved for the run.
 
 Libretro keeps its frontend content-basename policy: the frontend owns card 1 through `RETRO_MEMORY_SAVE_RAM`,
 and card 2 uses the frontend save directory. Runner serial naming does not affect libretro filenames.
@@ -228,7 +244,7 @@ At the shared host seam, checked exports support raw, DexDrive `.gme`, VGS `.mem
 images. Each wrapper keeps the same 131,072 card bytes and uses the atomic publisher. The runner's normal save path
 continues to write raw `.srm` and `.1.mcr` files; it does not choose an export wrapper by extension. A refused card
 import or failed publication prints the affected path, returns status 1, and preserves any previous complete file.
-An invalid literal identity or serial mode without its required source/override is a usage error with status 2.
+An invalid literal identity or serial mode without an executable, disc or literal override is a usage error with status 2.
 
 ## Examples
 

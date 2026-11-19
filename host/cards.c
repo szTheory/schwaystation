@@ -499,20 +499,26 @@ schway_host_card_status schway__host_card_paths_for_identity(const char *directo
                                                               char *slot1, size_t slot1_size,
                                                               char *slot2, size_t slot2_size)
 {
-    static const char digest_prefix[] = "sgi1-";
+    static const char digest_v1_prefix[] = "sgi1-";
+    static const char digest_v2_prefix[] = "sgi2-";
     if (identity == NULL) {
         return SCHWAY_HOST_CARD_ERR_ARGUMENT;
     }
-    if (strncmp(identity, digest_prefix, sizeof(digest_prefix) - 1u) != 0) {
+    size_t prefix_size;
+    if (strncmp(identity, digest_v1_prefix, sizeof(digest_v1_prefix) - 1u) == 0) {
+        prefix_size = sizeof(digest_v1_prefix) - 1u;
+    } else if (strncmp(identity, digest_v2_prefix, sizeof(digest_v2_prefix) - 1u) == 0) {
+        prefix_size = sizeof(digest_v2_prefix) - 1u;
+    } else {
         return schway_host_card_paths_for_basename(directory, identity,
                                                   slot1, slot1_size, slot2, slot2_size);
     }
 
     size_t identity_size = strlen(identity);
-    if (identity_size != sizeof(digest_prefix) - 1u + 64u) {
+    if (identity_size != prefix_size + 64u) {
         return SCHWAY_HOST_CARD_ERR_ARGUMENT;
     }
-    for (size_t i = sizeof(digest_prefix) - 1u; i < identity_size; i++) {
+    for (size_t i = prefix_size; i < identity_size; i++) {
         char value = identity[i];
         if (!((value >= '0' && value <= '9') || (value >= 'a' && value <= 'f'))) {
             return SCHWAY_HOST_CARD_ERR_ARGUMENT;

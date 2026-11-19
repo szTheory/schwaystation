@@ -35,6 +35,135 @@ if(CMAKE_SCRIPT_MODE_FILE)
 
   if(CASE STREQUAL "disc_load")
     string(REPEAT "[0-9a-f]" 64 digits)
+    if(NOT DEFINED HOOKED)
+      message(FATAL_ERROR "runner disc identity test runner was not provided")
+    endif()
+    set(NORMAL_RUN ${RUN})
+    set(RUN ${HOOKED})
+    function(run_disc_identity image save_dir result_name)
+      file(REMOVE_RECURSE "${save_dir}")
+      file(MAKE_DIRECTORY "${save_dir}")
+      set(input_args)
+      if(ARGC GREATER 3)
+        set(input_args --inputs "${ARGV3}")
+      endif()
+      foreach(slot IN ITEMS slot1 slot2)
+        execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${image}"
+            --frames 1 ${input_args} --save-dir "${save_dir}" --memcard-names serial
+            --test-card-write "${slot}"
+          RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+        if(NOT rc STREQUAL "0")
+          message(FATAL_ERROR "disc identity failed for ${image} slot ${slot}: exit ${rc}\n${out}${err}")
+        endif()
+      endforeach()
+      file(GLOB cards LIST_DIRECTORIES FALSE "${save_dir}/*.srm" "${save_dir}/*.mcr")
+      list(LENGTH cards card_count)
+      if(NOT card_count EQUAL 2)
+        message(FATAL_ERROR "disc identity should use one shared basename for both slots: ${cards}")
+      endif()
+      set(slot1_name "")
+      set(slot2_name "")
+      foreach(card IN LISTS cards)
+        get_filename_component(card "${card}" NAME)
+        if(card MATCHES "[.]srm$")
+          set(slot1_name "${card}")
+        elseif(card MATCHES "[.]1[.]mcr$")
+          set(slot2_name "${card}")
+        endif()
+      endforeach()
+      string(REGEX REPLACE "[.]srm$" "" slot1_stem "${slot1_name}")
+      string(REGEX REPLACE "[.]1[.]mcr$" "" slot2_stem "${slot2_name}")
+      if(slot1_name STREQUAL "" OR NOT slot1_stem STREQUAL slot2_stem)
+        message(FATAL_ERROR "the two card slots did not share an identity: ${cards}")
+      endif()
+      set(${result_name} "${slot1_name}" PARENT_SCOPE)
+    endfunction()
+    run_disc_identity("${FIXTURES}/disc_boot.cue" "${OUT}/runner-disc-identities" base_card)
+    if(NOT base_card MATCHES "^sgi2-${digits}[.]srm$")
+      message(FATAL_ERROR "missing/invalid first-disc serial should use the v2 full-content digest: ${base_card}")
+    endif()
+
+    set(moved_dir "${OUT}/runner-disc-identity-moved")
+    file(REMOVE_RECURSE "${moved_dir}")
+    file(MAKE_DIRECTORY "${moved_dir}")
+    file(COPY_FILE "${FIXTURES}/disc_boot.bin" "${moved_dir}/renamed-data.bin")
+    file(COPY_FILE "${FIXTURES}/disc_boot_track02.bin" "${moved_dir}/renamed-audio.bin")
+    file(WRITE "${moved_dir}/renamed.cue"
+      "FILE \"renamed-data.bin\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n"
+      "FILE \"renamed-audio.bin\" BINARY\nTRACK 02 AUDIO\nINDEX 00 00:00:00\nINDEX 01 00:02:00\n")
+    run_disc_identity("${moved_dir}/renamed.cue" "${OUT}/runner-disc-identity-moved-cards" moved_card)
+    if(NOT moved_card STREQUAL base_card)
+      message(FATAL_ERROR "moving and renaming equivalent disc files changed identity: ${base_card} vs ${moved_card}")
+    endif()
+
+    set(playlist_dir "${OUT}/runner-disc-identity-playlist")
+    file(REMOVE_RECURSE "${playlist_dir}")
+    file(MAKE_DIRECTORY "${playlist_dir}")
+    foreach(file IN ITEMS disc_boot.cue disc_boot.bin disc_boot_track02.bin
+        disc_boot_playlist.cue disc_boot_playlist.bin disc_boot_playlist_track02.bin)
+      file(COPY_FILE "${FIXTURES}/${file}" "${playlist_dir}/${file}")
+    endforeach()
+    file(WRITE "${playlist_dir}/identity.m3u" "disc_boot.cue\ndisc_boot_playlist.cue\n")
+    run_disc_identity("${playlist_dir}/identity.m3u" "${OUT}/runner-disc-identity-playlist-cards" playlist_card)
+    if(NOT playlist_card MATCHES "^sgi2-${digits}[.]srm$")
+      message(FATAL_ERROR "later valid serial replaced the missing first serial instead of hashing the playlist: ${playlist_card}")
+    endif()
+    file(WRITE "${playlist_dir}/spaced.m3u" "  disc_boot.cue  \n\tdisc_boot_playlist.cue  \n")
+    run_disc_identity("${playlist_dir}/spaced.m3u" "${OUT}/runner-disc-identity-spaced-cards" spaced_card)
+    if(NOT spaced_card STREQUAL playlist_card)
+      message(FATAL_ERROR "M3U whitespace changed the content identity: ${playlist_card} vs ${spaced_card}")
+    endif()
+    file(WRITE "${playlist_dir}/identity-swap.inputs" "1 lid=open\n1 disc=1\n1 lid=closed\n")
+    run_disc_identity("${playlist_dir}/identity.m3u" "${OUT}/runner-disc-identity-swap-cards"
+      swapped_card "${playlist_dir}/identity-swap.inputs")
+    if(NOT swapped_card STREQUAL playlist_card)
+      message(FATAL_ERROR "swapping discs changed the frozen card identity: ${playlist_card} vs ${swapped_card}")
+    endif()
+    file(WRITE "${playlist_dir}/one-member.m3u" "disc_boot.cue\n")
+    run_disc_identity("${playlist_dir}/one-member.m3u" "${OUT}/runner-disc-identity-one-member-cards" one_member_card)
+    if(one_member_card STREQUAL base_card OR one_member_card STREQUAL playlist_card)
+      message(FATAL_ERROR "standalone, one-member playlist and two-member playlist domains collided")
+    endif()
+    file(WRITE "${playlist_dir}/serial-first.m3u" "disc_boot_playlist.cue\ndisc_boot.cue\n")
+    run_disc_identity("${playlist_dir}/serial-first.m3u" "${OUT}/runner-disc-identity-serial-cards" serial_card)
+    if(NOT serial_card STREQUAL "SLUS-12346.srm")
+      message(FATAL_ERROR "the valid first-member serial did not win over later members: ${serial_card}")
+    endif()
+    file(COPY_FILE "${playlist_dir}/disc_boot_playlist_track02.bin"
+      "${playlist_dir}/changed-audio.bin")
+    if(NOT DEFINED PYTHON3 OR PYTHON3 STREQUAL "")
+      message(FATAL_ERROR "runner disc identity test needs the configured Python 3 executable")
+    endif()
+    execute_process(COMMAND "${PYTHON3}" -c
+        "from pathlib import Path; import sys; p=Path(sys.argv[1]); b=bytearray(p.read_bytes()); b[-1] ^= 1; p.write_bytes(b)"
+        "${playlist_dir}/changed-audio.bin"
+      RESULT_VARIABLE patch_audio_rc OUTPUT_VARIABLE patch_audio_out ERROR_VARIABLE patch_audio_err)
+    if(NOT patch_audio_rc STREQUAL "0")
+      message(FATAL_ERROR "could not alter the late audio sector for the identity test: ${patch_audio_out}${patch_audio_err}")
+    endif()
+    file(COPY_FILE "${playlist_dir}/changed-audio.bin" "${playlist_dir}/disc_boot_playlist_track02.bin")
+    run_disc_identity("${playlist_dir}/identity.m3u" "${OUT}/runner-disc-identity-changed-cards" changed_card)
+    if(changed_card STREQUAL playlist_card)
+      message(FATAL_ERROR "changing the late audio sector did not change playlist identity")
+    endif()
+
+    set(failed_identity_dir "${OUT}/runner-disc-identities-failed")
+    file(REMOVE_RECURSE "${failed_identity_dir}")
+    file(MAKE_DIRECTORY "${failed_identity_dir}")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${FIXTURES}/disc_boot.cue"
+        --frames 1 --save-dir "${failed_identity_dir}" --memcard-names serial
+        --test-disc-identity-read-failure
+      RESULT_VARIABLE failed_identity_rc OUTPUT_VARIABLE failed_identity_out
+      ERROR_VARIABLE failed_identity_err)
+    file(GLOB failed_identity_cards LIST_DIRECTORIES FALSE
+      "${failed_identity_dir}/*.srm" "${failed_identity_dir}/*.mcr")
+    if(NOT failed_identity_rc STREQUAL "1" OR
+       NOT failed_identity_err MATCHES "cannot read disc for card identity" OR
+       failed_identity_cards)
+      message(FATAL_ERROR "disc identity sector failure published card paths: ${failed_identity_rc}\n"
+        "${failed_identity_cards}\n${failed_identity_out}${failed_identity_err}")
+    endif()
+    set(RUN ${NORMAL_RUN})
     execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${FIXTURES}/disc_boot.cue"
         --frames 1 --hash-state
       RESULT_VARIABLE state_rc OUTPUT_VARIABLE state_out ERROR_VARIABLE state_err)
@@ -967,6 +1096,7 @@ schway_add_test(NAME runner.inputs.disc_apply
 schway_add_test(NAME runner.disc.load
   COMMAND ${runner_check} -DCASE=disc_load -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
     -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
+    -DHOOKED=$<TARGET_FILE:schwaystation-run-test> -DPYTHON3=${Python3_EXECUTABLE}
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 180)
 

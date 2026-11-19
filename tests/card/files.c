@@ -182,6 +182,7 @@ static void identity_paths(const char *directory)
     char long_serial[65];
     char digest_one[70];
     char digest_two[70];
+    char digest_v2[70];
     char invalid_digest[70];
     char digest_slot1[TEMP_PATH_CAP];
     char digest_slot2[TEMP_PATH_CAP];
@@ -205,15 +206,18 @@ static void identity_paths(const char *directory)
 
     memcpy(digest_one, "sgi1-", 5u);
     memcpy(digest_two, "sgi1-", 5u);
+    memcpy(digest_v2, "sgi2-", 5u);
     memcpy(invalid_digest, "sgi1-", 5u);
     static const char hex[] = "0123456789abcdef";
     for (size_t i = 0u; i < 64u; i++) {
         digest_one[5u + i] = hex[i % (sizeof hex - 1u)];
         digest_two[5u + i] = hex[(i + 7u) % (sizeof hex - 1u)];
+        digest_v2[5u + i] = hex[(i + 11u) % (sizeof hex - 1u)];
         invalid_digest[5u + i] = (char)'g';
     }
     digest_one[69] = '\0';
     digest_two[69] = '\0';
+    digest_v2[69] = '\0';
     invalid_digest[69] = '\0';
 
     status = schway__host_card_paths_for_identity(directory, digest_one,
@@ -224,6 +228,17 @@ static void identity_paths(const char *directory)
     CHECK(set_path(expected_slot1, sizeof expected_slot1, directory, identity_name));
     CHECK(strcmp(slot1, expected_slot1) == 0);
     CHECK(snprintf(identity_name, sizeof identity_name, "%s.1.mcr", digest_one) > 0);
+    CHECK(set_path(expected_slot2, sizeof expected_slot2, directory, identity_name));
+    CHECK(strcmp(slot2, expected_slot2) == 0);
+
+    status = schway__host_card_paths_for_identity(directory, digest_v2,
+                                                  slot1, sizeof slot1,
+                                                  slot2, sizeof slot2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    CHECK(snprintf(identity_name, sizeof identity_name, "%s.srm", digest_v2) > 0);
+    CHECK(set_path(expected_slot1, sizeof expected_slot1, directory, identity_name));
+    CHECK(strcmp(slot1, expected_slot1) == 0);
+    CHECK(snprintf(identity_name, sizeof identity_name, "%s.1.mcr", digest_v2) > 0);
     CHECK(set_path(expected_slot2, sizeof expected_slot2, directory, identity_name));
     CHECK(strcmp(slot2, expected_slot2) == 0);
 

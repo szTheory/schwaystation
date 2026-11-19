@@ -5,8 +5,8 @@
       volume_set="SCHWAY_PLAYLIST" publisher="SCHWAYSTATION" data_preparer="SCHWAYSTATION"
       copyright="FIRST_PARTY" creation_date="2026010100000000" modification_date="2026010100000000" />
     <directory_tree>
-      <file name="SYSTEM.CNF" source="SYSTEM.CNF" type="data" date="20260101000000" />
-      <file name="SWAY.EXE" source="disc_boot.exe" type="data" date="20260101000000" />
+      <file name="SYSTEM.CNF" source="SYSTEM.CNF.playlist" type="data" date="20260101000000" />
+      <file name="SLUS_123.46" source="disc_boot.exe" type="data" date="20260101000000" />
       <file name="XA.XA" source="media/xa.xa" type="xa" date="20260101000000" />
       <file name="MOVIE.STR" source="media/movie.str" type="str" date="20260101000000" />
     </directory_tree>
