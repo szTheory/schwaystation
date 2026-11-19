@@ -1025,10 +1025,10 @@ foreach(row IN LISTS schway__motion_hashes)
     LABELS fixtures portable TIMEOUT 60)
 endforeach()
 foreach(row IN ITEMS
-    # The unreleased state revision now records each card slot's pending-error
-    # latch. At these frames both values are zero; the frame hashes stay fixed.
-    "150|bf69904d540267001c6ab569a42c87621a5bcd498eb5f195f5d92b3141c87196"
-    "180|6dfc72baf728cfe462219fb9389644002e83dff323acb78f5777f909f5d0f7f9")
+    # Format 18 records each card slot's pending-error latch. Reproduced on two
+    # independent native build directories; frame hashes are unchanged.
+    "150|d6bef00aeadcaf9ae91354e316dcecb6c1ccbc7be74e59ba777d4496cb950ace"
+    "180|9e06757cdd4f4d233ec23c331a0e466b1c44339ef7f5d72fc82a2cc9ea529873")
   string(REPLACE "|" ";" fields "${row}")
   list(GET fields 0 frame)
   list(GET fields 1 hash)
