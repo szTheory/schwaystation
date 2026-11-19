@@ -6,11 +6,11 @@ current_phase: 8
 current_phase_name: Per-game card saves
 current_plan: Not started
 status: planning
-stopped_at: Phase 8 autonomous discussion in progress
-last_updated: "2026-11-19T08:51:38.399Z"
+stopped_at: Phase 8 discussion captured; planning next
+last_updated: "2026-11-19T09:53:40.081Z"
 last_activity: 2026-11-19
-last_activity_desc: Phase 7 v0.7.0 release and main CI are complete; Phase 8 discussion is underway
-state_head: af64484f388eddf67c615673b98edd6ccb5dae4c
+last_activity_desc: "Phase 8 context and discussion captured. Runtime/model: Codex/OpenGSD CLI 1.20.0; primary model ID unavailable; advisor gpt-6-luna xhigh and assumptions analyzer gpt-6.2-sol high; architecture scout model ID unavailable."
+state_head: e41631ce13ab074ff2701c0192bc304dd9c56130
 progress:
   total_phases: 10
   completed_phases: 1
@@ -997,9 +997,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T08:28:16Z
-Stopped at: Phase 8 autonomous discussion in progress
-Resume file: None
+Last session: 2026-11-19T09:53:39.826Z
+Stopped at: Phase 8 discussion captured; planning next
+Resume file: .planning/phases/08-per-game-card-saves/08-CONTEXT.md
 
 ### v1.0 session history
 
