@@ -4,19 +4,19 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 07
 current_phase_name: Faster and more trustworthy CI
-current_plan: 9
+current_plan: 10
 status: executing
-stopped_at: Completed 07-08-PLAN.md
-last_updated: "2026-11-19T01:15:08.905Z"
+stopped_at: Completed 07-09-PLAN.md
+last_updated: "2026-11-19T01:45:21.421Z"
 last_activity: 2026-11-19
-last_activity_desc: Completed Plan 07-08; Plan 07-09 is next; hosted critical-path and WASI-size measurements remain for ship
-state_head: 577ef3d95c543feb01adbbb947cd0db80700500d
+last_activity_desc: Completed Plan 07-09; Plan 07-10 is next; hosted triage, release-PR timing, and WASI-size evidence remain for ship
+state_head: 11a1251261e0c71fc0ce03702632aa27ffe08a21
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 10
-  completed_plans: 8
-  percent: 80
+  completed_plans: 9
+  percent: 90
 ---
 
 # Project State
@@ -31,12 +31,12 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 ## Current Position
 
 Phase: 07 (Faster and more trustworthy CI) — EXECUTING
-Current Plan: 9
+Current Plan: 10
 Total Plans in Phase: 10
 Status: Ready to execute
-Last activity: 2026-11-19 — Plan 07-08 completed; Plan 07-09 is next, with hosted critical-path and WASI-size measurements reserved for ship
+Last activity: 2026-11-19 — Plan 07-09 completed; Plan 07-10 is next, with hosted triage, release-PR timing and WASI-size evidence reserved for ship
 
-### Phase 7 execution (2026-11-18)
+### Phase 7 execution (2026-11-18–19)
 
 Runtime/model: Codex/OpenGSD CLI 1.20.0; inherited GPT-6 session (exact deployed ID unavailable). Plan 07-02
 used the same inherited model at xhigh effort. Wall elapsed was about 55 minutes from the planning commit through
@@ -82,6 +82,8 @@ The local machine has no clang-21/WASI sysroot or configured `build/wasm32` grap
 Plan 07-07 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The single `quality.json` registry now sends real Cachegrind measurements, linked WASI module bytes, and actual stable-state bytes through the shared comparator while retaining the original relative performance gate. Task 2 followed RED/GREEN commits; focused CTests passed, and the actual state output measured 3,755,020 bytes. The repository-check budget is 3,509/3,900. TUNE-05 remains Pending until the Ubuntu 26 WASI Release lane measures the module and a bound is added at ship. The historical artifact contained only hashes; two isolated toolchain setup attempts failed before CMake/build (package resolution and container tar ENOSYS), so local emulation was stopped. No hosted CI, guest test or whole suite was run. Plan duration was 43 minutes; task commits are recorded in `07-07-SUMMARY.md`. Plan 07-08 is next.
 
 Plan 07-08 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The exact-attempt timing helper and `CI required` production path are complete. The focused CI selectors passed 2/2; hygiene, pin, timeout-comment, and gate-budget selectors passed 3/3; the duplicate-ID control passed in a 24.30-second focused rerun. The repository-check budget is 3,890/3,900 lines. Historical replay exited 0 across 40 run rows and 573 job records. The test-first failure was observed while the helper was absent, but no durable RED report or exit-status record was retained; no classifier result is claimed. Two Plan 07-08 commits are `931e055` and `577ef3d`; `bf84ae2` is the prior Plan 07-07 gate-budget closeout, and the full execution-start range contains three commits. No hosted Phase PR measurement was made; both the matching critical-path measurement and actual WASI module size/bound remain for ship. `.planning/config.json` was preserved. Plan duration was approximately 58 minutes; Plan 07-09 is next.
+
+Plan 07-09 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. Maintainer and testing docs, engineering, product roadmap, prompt coverage, and the upgrade audit now reflect current workflow sources and measured baselines; README installation remains unchanged and is backed by existing release run 44262491280. `git diff --check HEAD`, the docs byte budget, the repository gate budget (3,890/3,900), and the RetroArch budget (300/300) passed. ARCHITECTURE §10 now records the owned `disc_boot` DMA3 → RAM → DMA0 → MDEC → DMA1 → RAM → DMA2 → native 24-bit display path, with Phase 6 Plan 06-16 and DISC-03 citations; it explicitly leaves full decoded output and external frame/movie hardware conformance unproven. Device MIPS remain assumptions and `gpu_motion` exceeds each provisional low-power budget. This plan's TUNE-04 and TUNE-06 deliverables are complete; phase-level readiness remains pending on the remaining work. TUNE-01 still needs a post-merge triage artifact run; TUNE-02/03 need the release-App comparison; TUNE-05 still needs the matching release-PR timing and actual Ubuntu 26 WASI module size before setting that bound. No new hosted workflow was started. Plan range `98d0b9c..11a1251` contains two commits: `b9a4ecd` (bounded plan revision) and `11a1251` (documentation/evidence). Plan duration was about 27 minutes wall elapsed; exact start and active time were not captured across handoff. Plan 07-10 is next.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -311,6 +313,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 07 P06 | 40min | 2 tasks | 6 files |
 | Phase 07 P07 | 43min | 2 tasks | 14 files |
 | Phase 07 P08 | 58min | 2 tasks | 4 files |
+| Phase 07 P09 | 27 min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -684,6 +687,9 @@ Recent decisions affecting current work:
 - [Phase 07]: Feed measured Cachegrind instruction counts to the shared bound comparator while preserving the existing base and relative gate.
 - [Phase 07]: CI timing compares completed current-attempt dependency paths only when the workload fingerprint matches; changed fingerprints remain explicitly unbaselined.
 - [Phase 07]: Keep the in-progress CI required job out of elapsed-path arithmetic; final matching PR measurement remains ship evidence.
+- [Phase 07]: The README install command remains unchanged because it still matches the automated install control and attributable release evidence.
+- [Phase 07]: The actual WASI runner module remains unmeasured; size.wasm stays unbounded until the Release module is directly measured.
+- [Phase 07]: Device MIPS remain assumptions; the measured gpu_motion workload exceeds provisional low-power budgets and stays a named SEED-005 follow-up.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -925,9 +931,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T01:15:08.874Z
-Stopped at: Completed 07-08-PLAN.md
-Resume file: None
+Last session: 2026-11-19T01:45:21.389Z
+Stopped at: Completed 07-09-PLAN.md
+Resume file: .planning/phases/07-faster-and-more-trustworthy-ci/07-10-PLAN.md
 
 ### v1.0 session history
 
