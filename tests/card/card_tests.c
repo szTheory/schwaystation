@@ -957,12 +957,96 @@ static void state_pending_edges(void)
     free(source_image);
 }
 
+static void pocket_metadata(schway *inst, uint16_t index, uint8_t com_flags)
+{
+    uint8_t expected[18] = {
+        (uint8_t)(index >> 8), (uint8_t)index,
+        (uint8_t)(com_flags & 1u), (uint8_t)((com_flags >> 1) & 1u),
+        (uint8_t)((com_flags >> 3) & 1u), (uint8_t)((com_flags >> 2) & 1u),
+        0u, 0u, 0u, 0u, 1u, 1u, 0x99u, 0x19u, 0u, 0u, 0u, 1u
+    };
+    CHECK_EQ_HEX(command_flag(inst, 0x5Au), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x12u);
+    for (uint32_t i = 0u; i < sizeof expected; i++) {
+        uint32_t ack = i + 1u == sizeof expected ? 0u : CARD_ACK;
+        CHECK_EQ_HEX(transfer(inst, 0u, ack), expected[i]);
+    }
+}
+
+static void pocket_set_index(schway *inst, uint16_t index, uint32_t parameter,
+                             uint16_t old_index)
+{
+    CHECK_EQ_HEX(command_flag(inst, 0x59u), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x06u);
+    CHECK_EQ_HEX(transfer(inst, (uint8_t)(index >> 8), CARD_ACK),
+                 (uint8_t)(old_index >> 8));
+    CHECK_EQ_HEX(transfer(inst, (uint8_t)index, CARD_ACK), (uint8_t)old_index);
+    for (uint32_t i = 0u; i < 4u; i++) {
+        uint32_t ack = i == 3u ? 0u : CARD_ACK;
+        CHECK_EQ_HEX(transfer(inst, (uint8_t)(parameter >> (8u * i)), ack), 0u);
+    }
+}
+
+static void protocol_pocketstation_metadata(void)
+{
+    schway *inst = make();
+    configure(inst, 0u);
+
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x58u, CARD_ACK), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x02u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x01u);
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0x01u);
+
+    pocket_set_index(inst, 3u, 0x12345678u, 0u);
+    pocket_metadata(inst, 3u, 0u);
+    pocket_set_index(inst, 0xFFFFu, 0u, 3u);
+    pocket_set_index(inst, 0xFFFEu, 0u, 3u);
+
+    CHECK_EQ_HEX(command_flag(inst, 0x5Eu), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x03u);
+    CHECK_EQ_HEX(transfer(inst, 1u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 1u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0u);
+    CHECK_EQ_HEX(command_flag(inst, 0x5Fu), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x01u);
+    CHECK_EQ_HEX(transfer(inst, 1u, 0u), 0u);
+
+    CHECK_EQ_HEX(command_flag(inst, 0x5Du), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x03u);
+    CHECK_EQ_HEX(transfer(inst, 0x12u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0x34u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0x56u, 0u), 0u);
+    pocket_metadata(inst, 3u, 0x03u);
+
+    configure(inst, 1u);
+    pocket_metadata(inst, 0u, 0u);
+    pocket_set_index(inst, 4u, 0u, 0u);
+    configure(inst, 0u);
+    pocket_metadata(inst, 3u, 0x03u);
+    get_id(inst);
+
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x59u, CARD_ACK), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x06u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 7u, CARD_ACK), 3u);
+    CHECK_EQ_HEX(transfer(inst, 0xAAu, CARD_ACK), 0u);
+    restart_transport(inst, 0u);
+    configure(inst, 0u);
+    pocket_metadata(inst, 3u, 0x03u);
+
+    schway_destroy(inst);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
         return 2;
     }
-    if (strcmp(argv[1], "protocol_read") == 0) {
+    if (strcmp(argv[1], "protocol_pocketstation_metadata") == 0) {
+        protocol_pocketstation_metadata();
+    } else if (strcmp(argv[1], "protocol_read") == 0) {
         protocol_read();
     } else if (strcmp(argv[1], "protocol_read_edges") == 0) {
         protocol_read_edges();
