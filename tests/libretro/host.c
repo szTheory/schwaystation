@@ -16,10 +16,13 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <direct.h>
 #else
 #include <dlfcn.h>
+#include <sys/stat.h>
 #endif
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -829,6 +832,16 @@ static int test_path(char *path, size_t capacity, const char *directory, const c
     return written > 0 && (size_t)written < capacity;
 }
 
+static int make_test_directory(const char *path)
+{
+#ifdef _WIN32
+    int result = _mkdir(path);
+#else
+    int result = mkdir(path, 0700);
+#endif
+    return result == 0 || errno == EEXIST;
+}
+
 static int pcm_bytes_equal(const uint8_t *left, size_t left_size,
                            const uint8_t *right, size_t right_size)
 {
@@ -1474,44 +1487,191 @@ static void check_card_file_equal(const char *path, const unsigned char *expecte
 static int test_card_persistence(const char *exe_path, const char *directory)
 {
     char card_one[4096], card_two[4096];
+    char no_injection_directory[4096], no_injection_card_one[4096];
+    char no_injection_card_two[4096];
     struct retro_game_info game;
+    unsigned char *saved_card_one = (unsigned char *)malloc(SCHWAY_MEMCARD_SIZE);
+    unsigned char *saved_card_two = (unsigned char *)malloc(SCHWAY_MEMCARD_SIZE);
+    unsigned char *saved_control_card_one = (unsigned char *)malloc(SCHWAY_MEMCARD_SIZE);
+    void *save_ram;
+    const uint8_t *card_two_data;
+    const char *card_two_path;
+    size_t card_two_size;
+    int initialized = 1;
+    int loaded = 0;
 
+    CHECK(saved_card_one != NULL);
+    CHECK(saved_card_two != NULL);
+    CHECK(saved_control_card_one != NULL);
     CHECK(test_path(card_one, sizeof card_one, directory, "memcard_roundtrip.srm"));
     CHECK(test_path(card_two, sizeof card_two, directory, "memcard_roundtrip.1.mcr"));
+    CHECK(test_path(no_injection_directory, sizeof no_injection_directory, directory,
+                    "libretro-card-no-injection"));
+    CHECK(test_path(no_injection_card_one, sizeof no_injection_card_one, no_injection_directory,
+                    "memcard_roundtrip.srm"));
+    CHECK(test_path(no_injection_card_two, sizeof no_injection_card_two, no_injection_directory,
+                    "memcard_roundtrip.1.mcr"));
     if (check_failures != 0) {
-        return 1;
+        goto cleanup;
     }
+    CHECK(make_test_directory(no_injection_directory));
     (void)remove(card_one);
     (void)remove(card_two);
+    (void)remove(no_injection_card_one);
+    (void)remove(no_injection_card_two);
     save_directory = directory;
+    save_directory_available = 1;
     memset(&game, 0, sizeof game);
     game.path = exe_path;
 
-    for (unsigned pass = 0u; pass < 2u; pass++) {
-        void *save_ram;
-        CHECK_EQ_U64(p_load_game(&game), 1u);
-        save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
-        CHECK(save_ram != NULL);
-        CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 131072u);
-        CHECK(memory_map_calls > 0u);
-        CHECK(memory_descriptor_count > 0u);
-        for (unsigned frame_index = 0u; frame_index < 120u; frame_index++) {
-            run_one();
-        }
-        CHECK(p_get_memory_data(RETRO_MEMORY_SAVE_RAM) == save_ram);
-        p_unload_game();
-        CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 0u);
-        check_card_file_value(card_two, pass == 0u ? 2 : 3);
-        {
-            FILE *card_one_file = schway__test_open_file(card_one, "rb");
-            CHECK(card_one_file == NULL);
-            if (card_one_file != NULL) {
-                (void)fclose(card_one_file);
-            }
-        }
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (!loaded) {
+        goto cleanup;
     }
+    save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    CHECK(save_ram != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), SCHWAY_MEMCARD_SIZE);
+    CHECK(memory_map_calls > 0u);
+    CHECK(memory_descriptor_count > 0u);
+    if (save_ram == NULL || p_get_memory_size(RETRO_MEMORY_SAVE_RAM) != SCHWAY_MEMCARD_SIZE) {
+        goto cleanup;
+    }
+    for (unsigned frame_index = 0u; frame_index < 120u; frame_index++) {
+        run_one();
+    }
+    CHECK(p_get_memory_data(RETRO_MEMORY_SAVE_RAM) == save_ram);
+    CHECK_EQ_U64(((const uint8_t *)save_ram)[128u], 1u);
+    card_two_data = p_test_card2_data(&card_two_size);
+    CHECK(card_two_data != NULL);
+    CHECK_EQ_U64(card_two_size, SCHWAY_MEMCARD_SIZE);
+    if (card_two_data != NULL && card_two_size == SCHWAY_MEMCARD_SIZE) {
+        CHECK_EQ_U64(card_two_data[128u], 2u);
+    }
+    CHECK(write_test_file(card_one, save_ram, SCHWAY_MEMCARD_SIZE));
+    CHECK(read_card_file(card_one, saved_card_one));
+    CHECK_EQ_U64(saved_card_one[128u], 1u);
+    p_unload_game();
+    loaded = 0;
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), 0u);
+    CHECK(read_card_file(card_two, saved_card_two));
+    CHECK_EQ_U64(saved_card_two[128u], 2u);
+    check_card_file_value(card_two, 2);
+
+    /* The next load is a fresh emulator instance; the frontend restores all
+       bytes from its own card-1 file before the guest gets its first frame. */
     p_deinit();
+    initialized = 0;
+    p_set_environment(env);
+    p_init();
+    initialized = 1;
+    set_callbacks();
+    CHECK(read_card_file(card_one, saved_card_one));
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (!loaded) {
+        goto cleanup;
+    }
+    save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    CHECK(save_ram != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), SCHWAY_MEMCARD_SIZE);
+    if (save_ram == NULL || p_get_memory_size(RETRO_MEMORY_SAVE_RAM) != SCHWAY_MEMCARD_SIZE) {
+        goto cleanup;
+    }
+    memcpy(save_ram, saved_card_one, SCHWAY_MEMCARD_SIZE);
+    CHECK_EQ_U64(((const uint8_t *)save_ram)[128u], 1u);
+    card_two_data = p_test_card2_data(&card_two_size);
+    card_two_path = p_test_card2_path();
+    CHECK(card_two_data != NULL);
+    CHECK_EQ_U64(card_two_size, SCHWAY_MEMCARD_SIZE);
+    CHECK(card_two_path != NULL);
+    if (card_two_data != NULL && card_two_size == SCHWAY_MEMCARD_SIZE) {
+        CHECK_EQ_U64(card_two_data[128u], 2u);
+    }
+    CHECK(card_two_path != NULL && strcmp(card_two_path, card_two) == 0);
+    for (unsigned frame_index = 0u; frame_index < 120u; frame_index++) {
+        run_one();
+    }
+    CHECK_EQ_U64(((const uint8_t *)save_ram)[128u], 2u);
+    card_two_data = p_test_card2_data(&card_two_size);
+    CHECK(card_two_data != NULL);
+    CHECK_EQ_U64(card_two_size, SCHWAY_MEMCARD_SIZE);
+    if (card_two_data != NULL && card_two_size == SCHWAY_MEMCARD_SIZE) {
+        CHECK_EQ_U64(card_two_data[128u], 3u);
+    }
+    CHECK(write_test_file(card_one, save_ram, SCHWAY_MEMCARD_SIZE));
+    p_unload_game();
+    loaded = 0;
+    CHECK(read_card_file(card_one, saved_card_one));
+    CHECK_EQ_U64(saved_card_one[128u], 2u);
+    CHECK(read_card_file(card_two, saved_card_two));
+    CHECK_EQ_U64(saved_card_two[128u], 3u);
+
+    /* Copy both frontend saves to an isolated directory, then omit card-1
+       reinjection. Card 1 must start fresh while card 2 still resumes. */
+    CHECK(copy_test_file(card_one, no_injection_card_one));
+    CHECK(copy_test_file(card_two, no_injection_card_two));
+    CHECK(read_card_file(no_injection_card_one, saved_control_card_one));
+    CHECK_EQ_U64(saved_control_card_one[128u], 2u);
+    CHECK(read_card_file(no_injection_card_two, saved_card_two));
+    CHECK_EQ_U64(saved_card_two[128u], 3u);
+
+    p_deinit();
+    initialized = 0;
+    p_set_environment(env);
+    p_init();
+    initialized = 1;
+    set_callbacks();
+    save_directory = no_injection_directory;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (!loaded) {
+        goto cleanup;
+    }
+    save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    CHECK(save_ram != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), SCHWAY_MEMCARD_SIZE);
+    if (save_ram == NULL || p_get_memory_size(RETRO_MEMORY_SAVE_RAM) != SCHWAY_MEMCARD_SIZE) {
+        goto cleanup;
+    }
+    card_two_data = p_test_card2_data(&card_two_size);
+    card_two_path = p_test_card2_path();
+    CHECK(card_two_data != NULL);
+    CHECK_EQ_U64(card_two_size, SCHWAY_MEMCARD_SIZE);
+    CHECK(card_two_path != NULL && strcmp(card_two_path, no_injection_card_two) == 0);
+    if (card_two_data != NULL && card_two_size == SCHWAY_MEMCARD_SIZE) {
+        CHECK_EQ_U64(card_two_data[128u], 3u);
+    }
+    for (unsigned frame_index = 0u; frame_index < 120u; frame_index++) {
+        run_one();
+    }
+    CHECK_EQ_U64(((const uint8_t *)save_ram)[128u], 1u);
+    card_two_data = p_test_card2_data(&card_two_size);
+    CHECK(card_two_data != NULL);
+    CHECK_EQ_U64(card_two_size, SCHWAY_MEMCARD_SIZE);
+    if (card_two_data != NULL && card_two_size == SCHWAY_MEMCARD_SIZE) {
+        CHECK_EQ_U64(card_two_data[128u], 4u);
+    }
+    p_unload_game();
+    loaded = 0;
+    CHECK(read_card_file(no_injection_card_one, saved_control_card_one));
+    CHECK_EQ_U64(saved_control_card_one[128u], 2u);
+    CHECK(read_card_file(no_injection_card_two, saved_card_two));
+    CHECK_EQ_U64(saved_card_two[128u], 4u);
+    p_deinit();
+    initialized = 0;
+
+cleanup:
+    if (loaded) {
+        p_unload_game();
+    }
+    if (initialized) {
+        p_deinit();
+    }
     module_close();
+    free(saved_card_one);
+    free(saved_card_two);
+    free(saved_control_card_one);
     return check_failures != 0 ? 1 : 0;
 }
 
