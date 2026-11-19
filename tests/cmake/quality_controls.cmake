@@ -108,6 +108,7 @@ string(JSON checked_reason ERROR_VARIABLE reason_error GET "${checked_registry}"
 if(NOT reason_error STREQUAL "NOTFOUND" OR NOT checked_reason MATCHES "^2026-11-18.*07-01-SUMMARY[.]md.*07-CONTEXT[.]md")
   message(FATAL_ERROR "quality_controls: checked-in registry is missing its dated, sourced budget rationale")
 endif()
+string(JSON fingerprint GET "${checked_registry}" ci critical_path_s workload_sha256)
 file(WRITE "${quality_file}" "${registry}")
 
 function(extract_block begin_marker end_marker output)
@@ -319,8 +320,7 @@ function(timing_case name pages expected testing input_override quality_path rel
   endif()
   set("${name}_out" "${out}${err}" PARENT_SCOPE)
 endfunction()
-string(JSON baseline_pages SET "${good_pages}" 0 jobs 5 completed_at "\"2026-11-18T00:45:00Z\"")
-timing_case(checked_pr_baseline "${baseline_pages}" pass false "" "${ROOT}/quality.json" false)
+timing_case(checked_pr_baseline "${good_pages}" unbaselined false "" "${ROOT}/quality.json" false)
 file(WRITE "${quality_file}" "${registry}")
 timing_case(unbaselined "${good_pages}" unbaselined true "${input_root}" "${quality_file}" false)
 if(NOT "${unbaselined_out}" MATCHES "fingerprint=([0-9a-f]+)")
