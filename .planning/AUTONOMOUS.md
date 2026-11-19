@@ -100,6 +100,10 @@ inputs and decoded output counts, command selectors and workflow/artifact wiring
 and budget totals. Use that preflight to catch a structural mismatch before spending time on the full run; keep
 it as a permanent gate only when it prevents a recurring fault. Record measured phase/task duration and the
 observed bottleneck in the phase evidence so later estimates and CI changes use actuals rather than guesses.
+Before expensive hosted CI, use `act` for workflow jobs the local host can reproduce when that adds coverage
+beyond the existing local suite; use `act --dryrun` for routing checks. Record the hosted-only runners,
+artifacts, permissions and integrations it cannot establish, and keep their hosted gates required. Avoid
+repeating an equivalent green local suite solely to exercise `act`.
 
 For delegated research, write concise findings and verified pins to the assigned artifact early. When the
 remaining uncertainties are routine implementation probes, return them to the executor instead of delaying

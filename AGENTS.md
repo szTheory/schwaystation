@@ -105,6 +105,9 @@ automation and efficiency preferences; autonomous authorization and phase bounda
 - Before a long build, suite, emulation or hosted run, run the cheapest relevant consistency checks first:
   inputs and expected output counts, selectors and workflow wiring, sorted inventories, fixtures and budget
   totals. Reuse existing checks; add a permanent preflight only when it prevents a recurring fault.
+- Before expensive hosted CI, use `act` to run workflow jobs locally when the host can reproduce them and that
+  adds coverage beyond the existing local suite. Use `act --dryrun` for routing checks. Record hosted-only
+  runners, artifacts, permissions and integrations that `act` cannot establish; keep their hosted gates required.
 - Apply small, evidence-backed efficiency fixes within the authorized scope. Measure before/after when possible;
   record larger work as one todo bound to the phase that first needs it. Capture each run as its command, exit
   status and URL; do not repeat a green full suite for bookkeeping.
