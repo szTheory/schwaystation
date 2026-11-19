@@ -5,7 +5,10 @@ fail() { printf '%s\n' "ci timing: $*" >&2; exit 1; }
 pages=${1:-${CI_JOBS_FILE:-}}
 [ -n "$pages" ] && [ -f "$pages" ] || fail "missing paginated Actions jobs JSON"
 [ -n "${GITHUB_SHA:-}" ] && [ -n "${GITHUB_RUN_ID:-}" ] && [ -n "${GITHUB_RUN_ATTEMPT:-}" ] || fail "missing current run identity"
+[ -n "${GITHUB_PR_HEAD_SHA:-}" ] || fail "missing pull request head SHA"
 case "$GITHUB_SHA" in *[!0-9a-f]*|'') fail "invalid current commit SHA";; esac
+case "$GITHUB_PR_HEAD_SHA" in *[!0-9a-f]*|'') fail "invalid pull request head SHA";; esac
+[ "${#GITHUB_PR_HEAD_SHA}" -eq 40 ] || fail "invalid pull request head SHA"
 case "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT" in *[!0-9:]*|:*|*:) fail "invalid run attempt identity";; esac
 [ "${GITHUB_EVENT_NAME:-}" = pull_request ] || fail "timing applies only to pull requests"
 [ "${CI_HEAVY:-}" = true ] && [ "${CI_CALLED:-}" = false ] || fail "timing applies only to full, uncalled CI"
@@ -22,7 +25,7 @@ elif [ -n "${CI_INPUT_ROOT:-}" ]; then
   fail "test-only workload input override is disabled"
 fi
 
-jq -e --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" --arg sha "$GITHUB_SHA" \
+jq -e --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" --arg head "$GITHUB_PR_HEAD_SHA" \
   --arg branch "$GITHUB_HEAD_REF" '
   . as $pages | ($pages[0].total_count) as $total |
   ($pages | type == "array" and length > 0) and ($total | type == "number") and
@@ -32,7 +35,7 @@ jq -e --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" --arg sha "
     ($jobs | map(.id) | unique | length) == ($jobs | length) and
     ($jobs | map(.name) | unique | length) == ($jobs | length) and
     all($jobs[]; ((.run_id | tostring) == $run) and ((.run_attempt | tostring) == $attempt)
-      and (.head_sha | type == "string" and length == 40) and .head_sha == $sha
+      and (.head_sha | type == "string" and length == 40) and .head_sha == $head
       and (.head_branch == $branch)
       and (.labels | type == "array" and length > 0 and all(.[]; type == "string" and length > 0))) and
     ($jobs | map(.head_sha) | unique | length) == 1)

@@ -235,6 +235,10 @@ execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${ROOT}"
 if(NOT head_rc STREQUAL "0")
   message(FATAL_ERROR "quality_controls: could not resolve the CI fixture head")
 endif()
+set(pr_head_sha "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+if(pr_head_sha STREQUAL head_sha)
+  message(FATAL_ERROR "quality_controls: PR head fixture must differ from merge SHA")
+endif()
 set(input_root "${BIN}/ci-inputs")
 file(MAKE_DIRECTORY "${input_root}")
 set(workload_files "${ROOT}/.github/workflows/ci.yml" "${ROOT}/CMakeLists.txt" "${ROOT}/CMakePresets.json"
@@ -278,7 +282,7 @@ function(make_jobs over_mode output)
     string(JSON job SET "{}" id ${id})
     string(JSON job SET "${job}" run_id 123)
     string(JSON job SET "${job}" run_attempt 2)
-    string(JSON job SET "${job}" head_sha "\"${head_sha}\"")
+    string(JSON job SET "${job}" head_sha "\"${pr_head_sha}\"")
     string(JSON job SET "${job}" head_branch "\"phase/07-test\"")
     string(JSON job SET "${job}" name "\"${name}\"")
     string(JSON job SET "${job}" labels "[\"${runner}\"]")
@@ -307,7 +311,8 @@ set(timing_script "${ROOT}/scripts/ci-critical-path.sh")
 function(timing_case name pages expected)
   file(WRITE "${jobs_file}" "${pages}\n")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env
-      "GITHUB_SHA=${head_sha}" "GITHUB_RUN_ID=123" "GITHUB_RUN_ATTEMPT=2"
+      "GITHUB_SHA=${head_sha}" "GITHUB_PR_HEAD_SHA=${pr_head_sha}"
+      "GITHUB_RUN_ID=123" "GITHUB_RUN_ATTEMPT=2"
       "GITHUB_EVENT_NAME=pull_request" "GITHUB_HEAD_REF=phase/07-test"
       "CI_HEAVY=true" "CI_CALLED=false" "CI_RELEASE_INPUTS=false"
       "CI_JOBS_FILE=${jobs_file}" "CI_INPUT_ROOT=${input_root}" "CI_TESTING=true"
@@ -369,7 +374,7 @@ extract_block(QUALITY_CI_ROLLUP_BEGIN QUALITY_CI_ROLLUP_END rollup_block)
 extract_block(QUALITY_CI_TIMING_BEGIN QUALITY_CI_TIMING_END live_timing_block)
 file(READ "${ROOT}/.github/workflows/ci.yml" ci_workflow)
 file(READ "${ROOT}/.github/workflows/release.yml" release_workflow)
-foreach(required_text "needs: [changes, hygiene, title, gpu-reference, openbios, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]" "actions: read\n      contents: read" "ref: \${{ github.sha }}" "persist-credentials: false" "if: github.event_name == 'pull_request' && needs.changes.outputs.heavy == 'true' && !inputs.ref" "attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" "scripts/ci-critical-path.sh")
+foreach(required_text "needs: [changes, hygiene, title, gpu-reference, openbios, build, asan, nofp, be32, wasm32, hash-equality, retroarch, perf, rehearsal, cleanup]" "actions: read\n      contents: read" "ref: \${{ github.sha }}" "persist-credentials: false" "if: github.event_name == 'pull_request' && needs.changes.outputs.heavy == 'true' && !inputs.ref" "GITHUB_PR_HEAD_SHA: \${{ github.event.pull_request.head.sha }}" "attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" "scripts/ci-critical-path.sh")
   string(FIND "${ci_workflow}" "${required_text}" found)
   if(found EQUAL -1)
     message(FATAL_ERROR "quality_controls: production CI workflow lost ${required_text}")
@@ -392,7 +397,7 @@ set(needs_failed "{\"changes\":{\"result\":\"success\"},\"hygiene\":{\"result\":
 set(needs_skipped "{\"changes\":{\"result\":\"success\"},\"hygiene\":{\"result\":\"success\"},\"title\":{\"result\":\"skipped\"},\"gpu-reference\":{\"result\":\"skipped\"},\"build\":{\"result\":\"skipped\"},\"perf\":{\"result\":\"skipped\"},\"rehearsal\":{\"result\":\"skipped\"},\"cleanup\":{\"result\":\"skipped\"}}")
 function(gate_case name pages needs expected)
   file(WRITE "${BIN}/gh-pages.json" "${pages}\n")
-  execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${stub_bin}:$ENV{PATH}" "GH_PAGES=${BIN}/gh-pages.json" "GH_CAPTURE=${BIN}/gh-capture" "NEEDS=${needs}" "EVENT=pull_request" "HEAVY=true" "CALLED=false" "RELEASE_INPUTS=false" "GITHUB_REPOSITORY=owner/repo" "GITHUB_SHA=${head_sha}" "GITHUB_RUN_ID=123" "GITHUB_RUN_ATTEMPT=2" "GITHUB_EVENT_NAME=pull_request" "GITHUB_HEAD_REF=phase/07-test" "RUNNER_TEMP=${BIN}" "CI_HEAVY=true" "CI_CALLED=false" "CI_RELEASE_INPUTS=false" "CI_INPUT_ROOT=${input_root}" "CI_TESTING=true" "QUALITY_FILE=${quality_file}" "${SH}" "${gate_script}" WORKING_DIRECTORY "${ROOT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=${stub_bin}:$ENV{PATH}" "GH_PAGES=${BIN}/gh-pages.json" "GH_CAPTURE=${BIN}/gh-capture" "NEEDS=${needs}" "EVENT=pull_request" "HEAVY=true" "CALLED=false" "RELEASE_INPUTS=false" "GITHUB_REPOSITORY=owner/repo" "GITHUB_SHA=${head_sha}" "GITHUB_PR_HEAD_SHA=${pr_head_sha}" "GITHUB_RUN_ID=123" "GITHUB_RUN_ATTEMPT=2" "GITHUB_EVENT_NAME=pull_request" "GITHUB_HEAD_REF=phase/07-test" "RUNNER_TEMP=${BIN}" "CI_HEAVY=true" "CI_CALLED=false" "CI_RELEASE_INPUTS=false" "CI_INPUT_ROOT=${input_root}" "CI_TESTING=true" "QUALITY_FILE=${quality_file}" "${SH}" "${gate_script}" WORKING_DIRECTORY "${ROOT}" RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if((expected STREQUAL "pass" OR expected STREQUAL "unbaselined") AND NOT rc STREQUAL "0")
     message(FATAL_ERROR "quality_controls: ${name} required job failed: ${out}${err}")
   elseif(expected STREQUAL "pass" AND NOT "${out}${err}" MATCHES "comparable workload passed")

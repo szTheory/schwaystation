@@ -1105,6 +1105,7 @@ jobs:
           CI_HEAVY: ${{ needs.changes.outputs.heavy }}
           CI_CALLED: ${{ inputs.ref && 'true' || 'false' }}
           CI_RELEASE_INPUTS: ${{ needs.changes.outputs.release_inputs }}
+          GITHUB_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           QUALITY_FILE: quality.json
         run: |
           # QUALITY_CI_TIMING_BEGIN
