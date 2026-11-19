@@ -1,16 +1,25 @@
 ---
 phase: 08-per-game-card-saves
-reviewed: 2026-11-19T16:20:37Z
+reviewed: 2026-11-19T22:38:51Z
 depth: standard
-files_reviewed: 7
+files_reviewed: 16
 files_reviewed_list:
+  - .github/workflows/ci.yml
+  - CMakePresets.json
+  - docs/testing.md
+  - host/cards.c
   - libretro/libretro.c
+  - libretro/schwaystation_libretro.info.in
+  - quality.json
   - src/card.c
   - tests/card/card_tests.c
+  - tests/cmake/info_claims_self_test.cmake
+  - tests/cmake/workflows.cmake
   - tests/fixtures/manifest.txt
   - tests/fixtures/src/pocketstation_storage.asm
   - tests/libretro/host.c
   - tests/libretro/tests.cmake
+  - tests/runner/tests.cmake
 findings:
   critical: 0
   warning: 0
@@ -22,14 +31,14 @@ status: clean
 
 # Phase 08: Code Review Report
 
-**Reviewed:** 2026-11-19T16:20:37Z
+**Reviewed:** 2026-11-19T22:38:51Z
 **Depth:** standard
-**Files Reviewed:** 7
+**Files Reviewed:** 16
 **Status:** clean
 
 ## Summary
 
-Reviewed the Phase 8 plan 08-05 and 08-06 changes from `08f0f724447eef0cfd157cb9d4b00a862091e9d8` through `HEAD`. The libretro card 2 lifecycle, bounded PocketStation address mapping, write staging, state validation, guest transcript, and release-only symbol wiring showed no confirmed implementation defect. The initial review found one test assertion gap; it was fixed and verified below.
+The original review at 16:20 covered the Phase 8 plan 08-05 and 08-06 changes, including the libretro card 2 lifecycle, bounded PocketStation address mapping, write staging, state validation, guest transcript, and release-only symbol wiring. It found one test assertion gap; that was fixed and verified below. The current Plan 08-10 review is recorded separately at the end of this report.
 
 ## Resolved warning
 
@@ -49,5 +58,50 @@ Reviewed the Phase 8 plan 08-05 and 08-06 changes from `08f0f724447eef0cfd157cb9
 ---
 
 _Reviewed: 2026-11-19T16:20:37Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
+## Plan 08-10 claim update review
+
+**Reviewed:** 2026-11-19T21:37:45Z
+**Commits:** `5789c16`, `d4463e7`
+**Files reviewed:** `tests/cmake/info_claims_self_test.cmake`, `libretro/schwaystation_libretro.info.in`
+
+The self-test now derives the existing save-claim line from the generated metadata, so its malformed-value case and its grounded and missing-inventory cases continue to run when the shipped claim is true. The production checker maps a true `libretro_saves` value to both registered persistence and control tests, and the test inventory contains both rows. The template change is limited to the claim enabled after the fresh-process evidence. No confirmed issues found in this scope.
+
+## Plan 08-10 findings
+
+None.
+
+---
+
+_Reviewed: 2026-11-19T21:37:45Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
+## Plan 08-10 CI workflow and test-portability review
+
+**Reviewed:** 2026-11-19T22:37:03Z
+**Base:** `9bbac37` through `f52ef90`
+**Files reviewed:** `.github/workflows/ci.yml`, `CMakePresets.json`, `host/cards.c`, `libretro/libretro.c`, `quality.json`, `tests/cmake/workflows.cmake`, `tests/runner/tests.cmake`, `docs/testing.md`
+
+The early state-size and WASI persistence preflights preserve the full test inventory; the manual perf skip is limited to report-only dispatches without a comparison ref; the Windows file-opening change preserves the existing not-found versus I/O result; and the runner test commands now consistently use the configured cross-compiling emulator. No other confirmed issues found in these changes.
+
+## Resolved warning
+
+### WR-02: Maintainer guide reports the obsolete serialized-state size
+
+**Severity:** WARNING
+**File:** `docs/testing.md:603`
+**Issue:** The guide reports 3,755,020 serialized bytes, but `quality.json` now sets `state.bytes` to 3,755,328 and records that as the current producer measurement. This presents a stale baseline to maintainers investigating the metric gate.
+**Resolution:** The guide now reports 3,755,328 bytes, matching the current producer measurement in `quality.json`.
+
+## Resolution verification (2026-11-19)
+
+- Compared the parsed state byte count from `docs/testing.md` with both `quality.json` bounds; exit 0 (`3755328` equals both values).
+
+---
+
+_Reviewed: 2026-11-19T22:38:51Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_

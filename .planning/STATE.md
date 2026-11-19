@@ -6,16 +6,16 @@ current_phase: 8
 current_phase_name: Per-game card saves
 current_plan: 10
 status: executing
-stopped_at: Completed 08-09-PLAN.md
-last_updated: "2026-11-19T18:47:21.889Z"
+stopped_at: Completed 08-10-PLAN.md; phase review and verification follow
+last_updated: "2026-11-19T22:31:22Z"
 last_activity: 2026-11-19
-last_activity_desc: Completed Phase 8 Plan 08-09; Plan 08-10 is next.
-state_head: 6e45e1e92388195ba051cc3684951966002b3a83
+last_activity_desc: Completed Phase 8 Plan 08-10; both exact-head save proofs passed, phase closeout remains.
+state_head: d0c0bb18067a21b100a75b2818b3a1f25610049a
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 20
-  completed_plans: 19
+  completed_plans: 20
   percent: 10
 ---
 
@@ -33,8 +33,23 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 Phase: 8 (Per-game card saves) — EXECUTING
 Current Plan: 10
 Total Plans in Phase: 10
-Status: Ready to execute
-Last activity: 2026-11-19 — Completed Phase 8 Plan 08-09; Plan 08-10 is next.
+Status: Plan execution complete; phase review and verification follow
+Last activity: 2026-11-19 — Plan 08-10 passed its exact-head hosted runs; phase closeout follows.
+
+### Phase 8 Plan 08-10 execution (2026-11-19)
+
+Runtime/model: Codex/OpenGSD session; GPT-6, exact deployed model and CLI minor version unavailable. The plan
+spanned at least 224 minutes from the 18:47 STATE checkpoint through the second exact-head CI roll-up; active
+time was not measured. The local integrated workflow passed 621/621 CTests and 5/5 release checks before the
+final one-line workflow-test consolidation. Exact-head CI run 44604545904 then passed on the claim-false head
+`f52ef90b7653c1f172f3141a85080751e6a306c5`; its required RetroArch card step verified two 120-frame launches
+and counters `01/02` then `02/03` for two 131,072-byte card files. After enabling the claim, the focused local
+selectors passed 4/4 and run 44618451958 passed the full required matrix on
+`d4463e798bcb23b3b059a6844908616e526a9b20`, including the same fresh-process proof, hash equality and required
+roll-up. BE32 took about 76 minutes in the first run and 65m39s in the second. The true-claim self-test was
+updated to derive its baseline from generated metadata after its first run exposed the old hardcoded-false
+assumption. Both full run links and artifacts are recorded in `08-10-SUMMARY.md`; review and phase verification
+are the remaining closeout steps.
 
 ### Phase 8 Plan 08-02 execution (2026-11-19)
 
