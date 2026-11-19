@@ -79,7 +79,7 @@ Plans:
   4. The libretro host exposes and reloads card 1 via `RETRO_MEMORY_SAVE_RAM`, passes the in-process and fresh-process hosted RetroArch round trips, keeps additional slots separate in the host save directory, and advertises the save capability once verified.
   5. A guest using documented PocketStation storage commands from `58h` onward can write and read its card data.
 
-**Plans**: 7/10 plans executed
+**Plans**: 9/10 plans executed
 Plans:
 - [x] 08-01-PLAN.md — Prove the existing card path and register Phase 8 checks
 - [x] 08-02-PLAN.md — Validate and atomically export complete cards
@@ -88,8 +88,8 @@ Plans:
 - [x] 08-05-PLAN.md — Persist independent libretro cards for every supported content entry
 - [x] 08-06-PLAN.md — Round-trip PocketStation storage through a real guest
 - [x] 08-07-PLAN.md — Wire the two-process RetroArch card test
-- [ ] 08-08-PLAN.md — Freeze runner save-game identity across declared disc swaps
-- [ ] 08-09-PLAN.md — Check the integrated state and save evidence before hosted release claims
+- [x] 08-08-PLAN.md — Freeze runner save-game identity across declared disc swaps
+- [x] 08-09-PLAN.md — Check the integrated state and save evidence before hosted release claims
 - [ ] 08-10-PLAN.md — Prove RetroArch save continuation and enable the verified claim
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`
@@ -215,7 +215,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
 | 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
-| 8. Per-game card saves | 7/10 | In Progress | - |
+| 8. Per-game card saves | 9/10 | In Progress | - |
 | 9. CHD disc images | 0/TBD | Not started | - |
 | 10. PBP disc images | 0/TBD | Not started | - |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |
