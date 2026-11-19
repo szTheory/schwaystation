@@ -32,6 +32,8 @@
 #define SCHWAY_HOST_CARD_GME_HEADER_SIZE 0x0F40u
 #define SCHWAY_HOST_CARD_VGS_HEADER_SIZE 64u
 #define SCHWAY_HOST_CARD_PSX_HEADER_SIZE 256u
+#define SCHWAY_HOST_CARD_SAVE_BLOCK_SIZE 8192u
+#define SCHWAY_HOST_CARD_SAVE_BLOCK_COUNT 15u
 #define SCHWAY_HOST_CARD_BASENAME_CAP 64u
 #define SCHWAY__HOST_CARD_FAILURE_NONE 0
 #define SCHWAY__HOST_CARD_FAILURE_FLUSH 1
@@ -127,6 +129,106 @@ static void schway__host_cards_lint(const uint8_t *bytes, schway_host_card_lint 
     *lint = result;
 }
 
+static schway_host_card_status schway__host_cards_open_read(const char *path, FILE **file)
+{
+    *file = fopen(path, "rb");
+    if (*file != NULL) {
+        return SCHWAY_HOST_CARD_OK;
+    }
+    return errno == ENOENT ? SCHWAY_HOST_CARD_ERR_NOT_FOUND : SCHWAY_HOST_CARD_ERR_IO;
+}
+
+static int schway__host_cards_finish_read(FILE *file, int *extra)
+{
+    int read_error = ferror(file);
+    *extra = EOF;
+    if (!read_error) {
+        *extra = fgetc(file);
+    }
+    int trailing_error = ferror(file);
+    int close_error = fclose(file);
+    return !read_error && !trailing_error && close_error == 0;
+}
+
+static int schway__host_cards_extension_is(const char *path, const char *extension)
+{
+    const char *name = path;
+    for (const char *cursor = path; *cursor != '\0'; cursor++) {
+        if (*cursor == '/' || *cursor == '\\') {
+            name = cursor + 1;
+        }
+    }
+    const char *dot = strrchr(name, '.');
+    if (dot == NULL) {
+        return 0;
+    }
+    dot++;
+    size_t extension_size = strlen(extension);
+    if (strlen(dot) != extension_size) {
+        return 0;
+    }
+    for (size_t i = 0u; i < extension_size; i++) {
+        char value = dot[i];
+        if (value >= 'A' && value <= 'Z') {
+            value = (char)(value + ('a' - 'A'));
+        }
+        if (value != extension[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int schway__host_cards_partial_signature(const uint8_t *bytes, size_t size,
+                                                const char *signature,
+                                                size_t signature_size)
+{
+    return size != 0u && size < signature_size && memcmp(bytes, signature, size) == 0;
+}
+
+static int schway__host_cards_ascii_field_terminated(const uint8_t *bytes, size_t size,
+                                                      int require_nonempty)
+{
+    for (size_t i = 0u; i < size; i++) {
+        if (bytes[i] == 0u) {
+            return !require_nonempty || i != 0u;
+        }
+        if (bytes[i] < 0x20u || bytes[i] > 0x7Eu) {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+static int schway__host_cards_save_blocks_valid(size_t image_size, size_t header_size)
+{
+    if (image_size < header_size) {
+        return 0;
+    }
+    size_t payload_size = image_size - header_size;
+    return payload_size >= SCHWAY_HOST_CARD_SAVE_BLOCK_SIZE &&
+           payload_size <= SCHWAY_HOST_CARD_SAVE_BLOCK_SIZE * SCHWAY_HOST_CARD_SAVE_BLOCK_COUNT &&
+           payload_size % SCHWAY_HOST_CARD_SAVE_BLOCK_SIZE == 0u;
+}
+
+static int schway__host_cards_xploder_save(const char *path, const uint8_t *bytes, size_t size)
+{
+    const size_t header_size = 54u;
+    return schway__host_cards_extension_is(path, "psx") &&
+           schway__host_cards_save_blocks_valid(size, header_size) &&
+           schway__host_cards_ascii_field_terminated(bytes, 21u, 1) &&
+           schway__host_cards_ascii_field_terminated(bytes + 21u, 33u, 0) &&
+           bytes[header_size] == (uint8_t)'S' && bytes[header_size + 1u] == (uint8_t)'C';
+}
+
+static int schway__host_cards_mcs_save(const char *path, const uint8_t *bytes, size_t size)
+{
+    const size_t header_size = 128u;
+    return schway__host_cards_extension_is(path, "mcs") &&
+           schway__host_cards_save_blocks_valid(size, header_size) &&
+           bytes[header_size] == (uint8_t)'S' && bytes[header_size + 1u] == (uint8_t)'C';
+}
+
 schway_host_card_status schway_host_card_import_raw(const char *path, void *out,
                                                      size_t out_size,
                                                      schway_host_card_lint *lint)
@@ -141,17 +243,16 @@ schway_host_card_status schway_host_card_import_raw(const char *path, void *out,
     }
     memset(image, 0xFF, SCHWAY_MEMCARD_SIZE);
 
-    FILE *file = fopen(path, "rb");
-    if (file == NULL) {
+    FILE *file = NULL;
+    schway_host_card_status open_status = schway__host_cards_open_read(path, &file);
+    if (open_status != SCHWAY_HOST_CARD_OK) {
         free(image);
-        return SCHWAY_HOST_CARD_ERR_IO;
+        return open_status;
     }
 
     size_t count = fread(image, 1u, SCHWAY_MEMCARD_SIZE, file);
-    int read_error = ferror(file);
-    int extra = read_error ? EOF : fgetc(file);
-    int close_error = fclose(file);
-    if (read_error || close_error != 0) {
+    int extra = EOF;
+    if (!schway__host_cards_finish_read(file, &extra)) {
         free(image);
         return SCHWAY_HOST_CARD_ERR_IO;
     }
@@ -188,17 +289,16 @@ schway_host_card_status schway_host_card_import_file(const char *path, void *out
         return SCHWAY_HOST_CARD_ERR_IO;
     }
 
-    FILE *file = fopen(path, "rb");
-    if (file == NULL) {
+    FILE *file = NULL;
+    schway_host_card_status open_status = schway__host_cards_open_read(path, &file);
+    if (open_status != SCHWAY_HOST_CARD_OK) {
         free(image);
         free(input);
-        return SCHWAY_HOST_CARD_ERR_IO;
+        return open_status;
     }
     size_t count = fread(input, 1u, input_capacity, file);
-    int read_error = ferror(file);
-    int extra = read_error ? EOF : fgetc(file);
-    int close_error = fclose(file);
-    if (read_error || close_error != 0) {
+    int extra = EOF;
+    if (!schway__host_cards_finish_read(file, &extra)) {
         free(image);
         free(input);
         return SCHWAY_HOST_CARD_ERR_IO;
@@ -211,16 +311,37 @@ schway_host_card_status schway_host_card_import_file(const char *path, void *out
 
     const uint8_t *card = input;
     size_t card_size = count;
-    if (count >= 11u && memcmp(input, "123-456-STD", 11u) == 0) {
+    int gme_extension = schway__host_cards_extension_is(path, "gme");
+    int vgs_extension = schway__host_cards_extension_is(path, "mem") ||
+                        schway__host_cards_extension_is(path, "vgs");
+    int psx_extension = schway__host_cards_extension_is(path, "psx");
+    int psv_extension = schway__host_cards_extension_is(path, "psv");
+    int gme_signature = count >= 11u && memcmp(input, "123-456-STD", 11u) == 0;
+    int vgs_signature = count >= 4u && memcmp(input, "VgsM", 4u) == 0;
+    int psv_signature = count >= 3u && memcmp(input, "PSV", 3u) == 0;
+    static const uint8_t gme_marker_fields[5] = {0u, 0u, 1u, 0u, 1u};
+
+    if ((gme_extension && schway__host_cards_partial_signature(input, count,
+                                                                "123-456-STD", 11u)) ||
+        (vgs_extension && schway__host_cards_partial_signature(input, count, "VgsM", 4u)) ||
+        ((psx_extension || psv_extension) &&
+         schway__host_cards_partial_signature(input, count, "PSV", 3u))) {
+        free(image);
+        free(input);
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    }
+
+    if (gme_signature) {
         if (count != (size_t)SCHWAY_HOST_CARD_GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE ||
-            input[11] != 0u) {
+            input[11] != 0u ||
+            memcmp(input + 0x10u, gme_marker_fields, sizeof gme_marker_fields) != 0) {
             free(image);
             free(input);
             return SCHWAY_HOST_CARD_ERR_SIZE;
         }
         card = input + SCHWAY_HOST_CARD_GME_HEADER_SIZE;
         card_size = SCHWAY_MEMCARD_SIZE;
-    } else if (count >= 4u && memcmp(input, "VgsM", 4u) == 0) {
+    } else if (vgs_signature) {
         if (count != (size_t)SCHWAY_HOST_CARD_VGS_HEADER_SIZE + SCHWAY_MEMCARD_SIZE) {
             free(image);
             free(input);
@@ -228,7 +349,11 @@ schway_host_card_status schway_host_card_import_file(const char *path, void *out
         }
         card = input + SCHWAY_HOST_CARD_VGS_HEADER_SIZE;
         card_size = SCHWAY_MEMCARD_SIZE;
-    } else if (count >= 3u && memcmp(input, "PSV", 3u) == 0) {
+    } else if (psv_signature && psv_extension) {
+        free(image);
+        free(input);
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    } else if (psv_signature) {
         if (count != (size_t)SCHWAY_HOST_CARD_PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE) {
             free(image);
             free(input);
@@ -236,6 +361,11 @@ schway_host_card_status schway_host_card_import_file(const char *path, void *out
         }
         card = input + SCHWAY_HOST_CARD_PSX_HEADER_SIZE;
         card_size = SCHWAY_MEMCARD_SIZE;
+    } else if (schway__host_cards_xploder_save(path, input, count) ||
+               schway__host_cards_mcs_save(path, input, count)) {
+        free(image);
+        free(input);
+        return SCHWAY_HOST_CARD_ERR_SIZE;
     } else if (count > SCHWAY_MEMCARD_SIZE) {
         free(image);
         free(input);
