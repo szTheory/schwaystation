@@ -79,7 +79,18 @@ Plans:
   4. The libretro host exposes and reloads card 1 via `RETRO_MEMORY_SAVE_RAM`, passes the in-process and fresh-process hosted RetroArch round trips, keeps additional slots separate in the host save directory, and advertises the save capability once verified.
   5. A guest using documented PocketStation storage commands from `58h` onward can write and read its card data.
 
-**Plans**: TBD
+**Plans**: 10 plans
+Plans:
+- [ ] 08-01-PLAN.md — Prove the existing card path and register Phase 8 checks
+- [ ] 08-02-PLAN.md — Validate and atomically export complete cards
+- [ ] 08-03-PLAN.md — Resolve executable save-game identities and prove two-slot isolation
+- [ ] 08-04-PLAN.md — Pin PocketStation transcripts and implement card metadata
+- [ ] 08-05-PLAN.md — Persist independent libretro cards for every supported content entry
+- [ ] 08-06-PLAN.md — Round-trip PocketStation storage through a real guest
+- [ ] 08-07-PLAN.md — Wire the two-process RetroArch card test
+- [ ] 08-08-PLAN.md — Freeze runner save-game identity across declared disc swaps
+- [ ] 08-09-PLAN.md — Check the integrated state and save evidence before hosted release claims
+- [ ] 08-10-PLAN.md — Prove RetroArch save continuation and enable the verified claim
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`
 
