@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/szTheory/schwaystation/compare/v0.6.0...v0.7.0) (2026-11-19)
+
+
+### Features
+
+* publish the weekly triage artifact ([#28](https://github.com/szTheory/schwaystation/issues/28)) ([dcd5945](https://github.com/szTheory/schwaystation/commit/dcd594553fb9a98f4bf9b32a4bb6e2b18914fc1b))
+
 ## [0.6.0](https://github.com/szTheory/schwaystation/compare/v0.5.0...v0.6.0) (2026-11-18)
 
 
