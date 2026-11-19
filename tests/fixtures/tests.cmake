@@ -565,6 +565,7 @@ schway__fixture(timers_lines.exe timers_lines.asm)
 schway__fixture(gpu_motion.exe gpu_motion.asm)
 schway__fixture(pad_counter.exe pad_counter.asm)
 schway__fixture(memcard_roundtrip.exe memcard_roundtrip.asm)
+schway__fixture(pocketstation_storage.exe pocketstation_storage.asm)
 set(schway__fixture_extra ${schway__fixture_src}/spu_blocks.inc)
 schway__fixture(spu_tone.exe spu_tone.asm)
 set(schway__fixture_extra "")
@@ -699,6 +700,11 @@ expect_runner(fixtures.mailbox_fault 6 "mailbox SWMB status=ff records=1"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/mailbox_fault.exe --stop-on mailbox --frames 30)
 expect_runner(fixtures.mailbox_crc 6 "mailbox crc mismatch"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/mailbox_crc.exe --stop-on mailbox --frames 30)
+
+# Fault prevented: a malformed standard card ID transaction, an unbounded JOY wait, or a lost
+# debug exit byte is reported as success rather than status 6 with the 51h success sentinel.
+expect_runner(fixtures.pocketstation_storage 6 "exit code=0x51"
+  --exe ${SCHWAYSTATION_FIXTURES_DIR}/pocketstation_storage.exe --tty --frames 10)
 
 # Fault prevented: an exception whose CAUSE, EPC or BadVaddr is wrong for its class, taken with or without
 # a branch delay slot: exc_matrix.exe records them in its mailbox and tests/diag/expected.csv judges
