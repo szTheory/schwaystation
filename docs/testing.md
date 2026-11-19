@@ -95,7 +95,11 @@ a different boundary; none is a complete silicon PCM oracle.
 | Reverb measurement constraints | `spu.reverb`; psx-spx SCPH-1001 measurement [`a37f2fec163e149f4e3e39599eb43c65c21181a8`](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8) | Delay, alternating channels and intermediate saturation constraints are checked | Exact per-stage rounding, which remains unresolved, or a complete hardware reverb waveform |
 | Deterministic model regressions | `spu.fixture`, `spu.reverb`, and runner audio-hash checks | Self-authored PCM digests and repeatable integer behavior; `spu.fixture` also compares exact PCM pair counts and a CPU-free authored BRR replay with the guest-produced PCM in each region | Independent hardware correctness; the audio digest is a regression, not a captured waveform |
 | Runner/libretro delivery | `libretro.host` | Batch and single-sample callback streams match the runner's drained PCM for NTSC-J, NTSC-U and PAL | Hardware correctness or RetroArch audio-device output |
-| Real-host smoke | Required hosted `retroarch` job in `.github/workflows/ci.yml` | The core's frame matches the runner, deterministic input replay reaches the expected frames, and `spu_tone.exe` boots under the stub with runner-matched video | Audio: this is a video/input smoke check only |
+| Real-host smoke | Required hosted `retroarch` job in `.github/workflows/ci.yml` | The core's frame matches the runner, replay reaches both expected frames, `spu_tone.exe` boots under the stub, and two clean RetroArch processes persist both per-game cards at 131,072 bytes with counters advancing from 1/2 to 2/3 | Audio or full hardware correctness |
+
+RetroArch runs use isolated home, save, screenshot, system and log directories. The pinned config captures unscaled
+video without an audio device, keeps replay startup synchronous, and disables content/core save subfolders so both
+card files remain in the same save directory across the two frontend processes.
 
 Every CI lane adds the `spu_tone.exe` frame-600 audio digest and its completed mailbox records to `hashes.txt`.
 The existing eight-file equality step compares those rows along with each lane's fixture identity. `spu.fixture`
