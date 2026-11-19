@@ -103,6 +103,30 @@ These corrections have passed read-only code review and focused local checks, in
 integration and the four relevant hygiene tests. A new exact-head hosted run remains pending; it must confirm the
 Windows fix, checked-in WASI bound, all required CI lanes, and revised fuzz timeout before Phase 7 can ship.
 
+## Second Windows failure and correction
+
+The next exact-head CI run [44464772297](https://github.com/szTheory/schwaystation/actions/runs/44464772297) used
+commit `4d389aef0a58ceadc8e010a15559852bbbe237f4`. Its x64 Windows lane cleared the CRLF parser failure but
+exposed a second portability issue: CMake supplied `D:/a/.../quality.json`, while the timing script treated only
+`/*` as absolute and incorrectly prefixed the repository root. The arm64 lane passed; the x64 registry read
+failed, and this known-failing run was canceled. The aggregate conclusion is not a pass.
+
+Independent follow-up review confirmed the corrected `case` accepts Windows drive-rooted and POSIX absolute
+paths and continues to root relative paths, with the `quality` value quoted. Before another hosted run, these
+cheap checks passed:
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `cmake --preset hygiene && cmake --preset ci` | 0 | Both existing trees configured before the focused selectors. |
+| `sh -n scripts/ci-critical-path.sh && git diff --check` | 0 | Script syntax and patch whitespace are valid. |
+| `ctest --test-dir build/ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1` | 0 | 1/1 passed in 35.45 seconds after the Windows path correction. |
+| `ctest --test-dir build/hygiene --no-tests=error -R '^(policy[.](gate_budget|e2e_budget|action_pins)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1` | 0 | 4/4 passed in 0.03 seconds; repository checks remain 3,901/3,901 and RetroArch remains 300/300. |
+
+PR Nightly run [44464210494](https://github.com/szTheory/schwaystation/actions/runs/44464210494) completed
+successfully on the preceding head, including all six fuzz campaigns under the measured 15-minute timeout; the
+corrected code head must run Nightly again before ship. Do not edit PR metadata while checks run: this workflow
+treats PR body edits as CI-triggering `edited` events and cancels/restarts in-progress work.
+
 ## Requirement status and ship-only evidence
 
 | Requirement | Local or historical result | Remaining evidence and locator |

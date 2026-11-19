@@ -109,6 +109,18 @@ passed 1/1 in 30.27 seconds; the four focused hygiene tests passed 4/4 in 0.03 s
 A new exact-head hosted CI/Nightly run and the release are still required. Phase 8 planning remains stopped until
 Phase 7 is shipped, merged, green on main, and released.
 
+The next exact-head CI attempt used commit `4d389aef0a58ceadc8e010a15559852bbbe237f4` (run 44464772297). It
+reproduced a second Windows-only path issue in `policy.quality_metrics`: CMake passed a native `D:/.../quality.json`
+path, but the timing helper recognized only POSIX absolute paths and prefixed the Windows drive path with the
+repository root. The arm64 Windows lane completed successfully; x64 failed at this registry read and the run was
+canceled once the known required failure was confirmed. This is new platform evidence beyond the CRLF failure.
+Independent follow-up review confirmed the one-line case pattern now recognizes drive-rooted and POSIX absolute
+paths while still rooting relative paths. After review, local preflights passed (`sh -n`, `git diff --check`, CI
+and hygiene configure); `policy.quality_metrics` passed 1/1 in 35.45 seconds, and gate, E2E, action-pin and
+timeout-comment controls passed 4/4 in 0.03 seconds. Current branch diff contains the one-line correction;
+commit, exact-head hosted rerun, PR timing and release evidence remain pending. Runtime/model: Codex/OpenGSD CLI
+1.20.0; primary GPT-6 session (deployed ID unavailable); follow-up read-only reviewer gpt-6-luna xhigh.
+
 ### Phase 7 discussion and planning (2026-11-18)
 
 Runtime/model: Codex, OpenGSD 1.21.0; primary GPT-6 session (exact deployed model ID not exposed). Phase researcher

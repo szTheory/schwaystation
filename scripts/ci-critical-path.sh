@@ -181,7 +181,7 @@ else
 fi
 
 quality=${QUALITY_FILE:-quality.json}
-case "$quality" in /*) ;; *) quality="$root/$quality";; esac
+case "$quality" in /*|[A-Za-z]:/*) ;; *) quality="$root/$quality";; esac
 cmake "-DQUALITY=$quality" -P "$root/tests/cmake/quality.cmake" || fail "invalid quality registry"
 baseline=$(jq -er '.ci.critical_path_s.workload_sha256 | select(test("^[0-9a-f]{64}$"))' "$quality") || fail "missing CI workload baseline"
 printf 'ci timing: measured=%s s fingerprint=%s\n' "$critical_path" "$fingerprint"
