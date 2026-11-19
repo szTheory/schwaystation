@@ -372,7 +372,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${identity_a_exe}")
     file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${identity_b_exe}")
     function(run_identity_guest image label)
-      execute_process(COMMAND ${NORMAL_RUN} --exe "${image}" --frames 120 --stop-on mailbox
+      execute_process(COMMAND ${EMULATOR} ${NORMAL_RUN} --exe "${image}" --frames 120 --stop-on mailbox
           --save-dir "${identity_dir}" --memcard-names serial
         RESULT_VARIABLE identity_rc OUTPUT_VARIABLE identity_out ERROR_VARIABLE identity_err)
       if(NOT identity_rc STREQUAL "0" OR NOT identity_out MATCHES "mailbox SWMB status=00")
