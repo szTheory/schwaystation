@@ -3,7 +3,7 @@ tests/vectors/r3000/sst-sample.bin	SingleStepTests/r3000 v1, first 100 cases of 
 src/stub_kernel.c	tests/fixtures/src/stub/stub.asm	-	MIT	745175ec67b65820b6800bc0efa1982605475672f985678dd1c93a505176392f	-
 tests/fixtures/src/gpu_motion.asm	schwaystation first-party fixture	-	MIT	c9af0565caa7a5786c270fde6aaf661faea346ed51f597294fc0d9e7bec7eb1f	-
 tests/fixtures/src/memcard_roundtrip.asm	schwaystation first-party fixture	-	MIT	9c8e9f07c963e3cb8c56a90fc56df8046ecb36f80f71e244d73c3da0a22ee8c0	-
-tests/fixtures/src/pocketstation_storage.asm	schwaystation first-party fixture	-	MIT	09c81a42b8a978e1162daa08fdb000201fd1e4bf0825942869de485310fa85a8	-
+tests/fixtures/src/pocketstation_storage.asm	schwaystation first-party fixture	-	MIT	0bb48452d9222a57e8a0779d816164e075f9f37cb23b4a4008d4e79d7005459e	-
 tests/fixtures/src/pad_counter.asm	schwaystation first-party fixture	-	MIT	8520b66e145ae33ae44b7a30c0c4886adc97f32a1afe7cce90032f107ffb3057	-
 tests/fixtures/src/unbuilt.asm	schwaystation first-party fixture	-	MIT	9d73c6dedc765baf8720ee3feaea80ba49253fe37806ff4603780c8e372f39b2	-
 tests/fixtures/src/spu_blocks.inc	schwaystation first-party fixture	-	MIT	e19b56c175af6d3e42776ac9e10ad039abcd9a41572217016246c41fa1807f5a	-
