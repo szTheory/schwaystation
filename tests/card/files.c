@@ -214,11 +214,14 @@ static void wrappers(void)
 
     make_valid_card(card);
     memset(wrapped, 0, GME_HEADER_SIZE);
+    /* PSX-SPX Memory Card Images, verified at commit 6d7d1bc106a7e0b616b0330fe58401ab1ba57f0f. */
     memcpy(wrapped, "123-456-STD", 11u);
     wrapped[11] = 0u;
-    wrapped[0x12] = 1u;
-    wrapped[0x14] = 1u;
-    memset(wrapped + 0x25, 0x08, 16u);
+    memcpy(wrapped + 0x10, "\0\0\1\0\1", 5u);
+    for (size_t sector = 0u; sector < 16u; sector++) {
+        wrapped[0x15u + sector] = card[sector * 128u];
+        wrapped[0x25u + sector] = card[sector * 128u + 8u];
+    }
     memcpy(wrapped + GME_HEADER_SIZE, card, SCHWAY_MEMCARD_SIZE);
     CHECK(write_file(gme_path, wrapped, (size_t)GME_HEADER_SIZE + SCHWAY_MEMCARD_SIZE));
     have_gme = 1;
@@ -338,6 +341,12 @@ static void wrapper_edges(void)
     char directory[TEMP_PATH_CAP] = {0};
     char source_path[TEMP_PATH_CAP] = {0};
     char missing_path[TEMP_PATH_CAP] = {0};
+    char partial_gme_path[TEMP_PATH_CAP] = {0};
+    char partial_vgs_path[TEMP_PATH_CAP] = {0};
+    char partial_psx_path[TEMP_PATH_CAP] = {0};
+    char single_psx_path[TEMP_PATH_CAP] = {0};
+    char single_mcs_path[TEMP_PATH_CAP] = {0};
+    char ps3_psv_path[TEMP_PATH_CAP] = {0};
     char slot1[TEMP_PATH_CAP];
     char slot2[TEMP_PATH_CAP];
     char long_serial[65];
@@ -347,6 +356,12 @@ static void wrapper_edges(void)
     uint8_t *snapshot = (uint8_t *)malloc(input_capacity + 1u);
     int made_directory = 0;
     int have_source = 0;
+    int have_partial_gme = 0;
+    int have_partial_vgs = 0;
+    int have_partial_psx = 0;
+    int have_single_psx = 0;
+    int have_single_mcs = 0;
+    int have_ps3_psv = 0;
 
     CHECK(card != NULL && input != NULL && out != NULL && snapshot != NULL);
     if (card == NULL || input == NULL || out == NULL || snapshot == NULL) {
@@ -355,13 +370,65 @@ static void wrapper_edges(void)
     made_directory = create_work_directory(directory, sizeof directory);
     CHECK(made_directory != 0);
     if (!made_directory || !set_path(source_path, sizeof source_path, directory, "malformed.card") ||
-        !set_path(missing_path, sizeof missing_path, directory, "missing.card")) {
+        !set_path(missing_path, sizeof missing_path, directory, "missing.card") ||
+        !set_path(partial_gme_path, sizeof partial_gme_path, directory, "partial.gme") ||
+        !set_path(partial_vgs_path, sizeof partial_vgs_path, directory, "partial.mem") ||
+        !set_path(partial_psx_path, sizeof partial_psx_path, directory, "partial.psx") ||
+        !set_path(single_psx_path, sizeof single_psx_path, directory, "single.psx") ||
+        !set_path(single_mcs_path, sizeof single_mcs_path, directory, "single.mcs") ||
+        !set_path(ps3_psv_path, sizeof ps3_psv_path, directory, "single.psv")) {
         CHECK(0);
         goto cleanup;
     }
 
     schway_host_card_lint lint = {0u, 0u};
-    expect_import_refusal(missing_path, SCHWAY_HOST_CARD_ERR_IO, NULL, 0u,
+    expect_import_refusal(missing_path, SCHWAY_HOST_CARD_ERR_NOT_FOUND, NULL, 0u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    /* A known wrapper extension plus a partial pinned signature is a malformed wrapper. */
+    memcpy(input, "123-456", 7u);
+    CHECK(write_file(partial_gme_path, input, 7u));
+    have_partial_gme = 1;
+    expect_import_refusal(partial_gme_path, SCHWAY_HOST_CARD_ERR_SIZE, input, 7u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memcpy(input, "Vgs", 3u);
+    CHECK(write_file(partial_vgs_path, input, 3u));
+    have_partial_vgs = 1;
+    expect_import_refusal(partial_vgs_path, SCHWAY_HOST_CARD_ERR_SIZE, input, 3u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memcpy(input, "PS", 2u);
+    CHECK(write_file(partial_psx_path, input, 2u));
+    have_partial_psx = 1;
+    expect_import_refusal(partial_psx_path, SCHWAY_HOST_CARD_ERR_SIZE, input, 2u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    /* PSX-SPX identifies these as single-save layouts rather than card images. */
+    memset(input, 0, 54u + 8192u);
+    memcpy(input, "SLUS_123.45", sizeof("SLUS_123.45") - 1u);
+    memcpy(input + 21u, "Saved title", sizeof("Saved title") - 1u);
+    input[54] = (uint8_t)'S';
+    input[55] = (uint8_t)'C';
+    CHECK(write_file(single_psx_path, input, 54u + 8192u));
+    have_single_psx = 1;
+    expect_import_refusal(single_psx_path, SCHWAY_HOST_CARD_ERR_SIZE, input, 54u + 8192u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0, 128u + 8192u);
+    input[128] = (uint8_t)'S';
+    input[129] = (uint8_t)'C';
+    CHECK(write_file(single_mcs_path, input, 128u + 8192u));
+    have_single_mcs = 1;
+    expect_import_refusal(single_mcs_path, SCHWAY_HOST_CARD_ERR_SIZE, input, 128u + 8192u,
+                          out, &lint, snapshot, input_capacity + 1u);
+
+    memset(input, 0, PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE);
+    memcpy(input, "PSV", 3u);
+    CHECK(write_file(ps3_psv_path, input, (size_t)PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE));
+    have_ps3_psv = 1;
+    expect_import_refusal(ps3_psv_path, SCHWAY_HOST_CARD_ERR_SIZE, input,
+                          (size_t)PSX_HEADER_SIZE + SCHWAY_MEMCARD_SIZE,
                           out, &lint, snapshot, input_capacity + 1u);
 
     make_valid_card(card);
@@ -499,6 +566,12 @@ static void wrapper_edges(void)
 
 cleanup:
     if (have_source) (void)remove(source_path);
+    if (have_ps3_psv) (void)remove(ps3_psv_path);
+    if (have_single_mcs) (void)remove(single_mcs_path);
+    if (have_single_psx) (void)remove(single_psx_path);
+    if (have_partial_psx) (void)remove(partial_psx_path);
+    if (have_partial_vgs) (void)remove(partial_vgs_path);
+    if (have_partial_gme) (void)remove(partial_gme_path);
     if (made_directory) (void)remove_directory(directory);
     free(snapshot);
     free(out);
@@ -706,7 +779,7 @@ static void atomic_failures(void)
     CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
     CHECK(all_bytes_are(out, SCHWAY_MEMCARD_SIZE, 0x5Au));
     status = schway_host_card_import_raw(missing_source, out, SCHWAY_MEMCARD_SIZE, NULL);
-    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_IO);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_NOT_FOUND);
     CHECK(all_bytes_are(out, SCHWAY_MEMCARD_SIZE, 0x5Au));
     status = schway_host_card_import_raw(exact_source, out, SCHWAY_MEMCARD_SIZE - 1u, NULL);
     CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);

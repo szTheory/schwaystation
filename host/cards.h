@@ -11,7 +11,8 @@ typedef enum schway_host_card_status {
     SCHWAY_HOST_CARD_OK = 0,
     SCHWAY_HOST_CARD_ERR_ARGUMENT = 1,
     SCHWAY_HOST_CARD_ERR_SIZE = 2,
-    SCHWAY_HOST_CARD_ERR_IO = 3
+    SCHWAY_HOST_CARD_ERR_IO = 3,
+    SCHWAY_HOST_CARD_ERR_NOT_FOUND = 4
 } schway_host_card_status;
 
 enum {
