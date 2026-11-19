@@ -5,18 +5,18 @@ milestone_name: The whole library
 current_phase: 07
 current_phase_name: Faster and more trustworthy CI
 current_plan: 10
-status: executing
-stopped_at: Completed 07-09-PLAN.md
-last_updated: "2026-11-19T01:45:21.421Z"
+status: verifying
+stopped_at: Completed 07-10-PLAN.md; phase-level independent code review, verification, and ship evidence remain pending
+last_updated: "2026-11-19T02:17:47.343Z"
 last_activity: 2026-11-19
-last_activity_desc: Completed Plan 07-09; Plan 07-10 is next; hosted triage, release-PR timing, and WASI-size evidence remain for ship
-state_head: 11a1251261e0c71fc0ce03702632aa27ffe08a21
+last_activity_desc: Plan 07-10 evidence is complete; independent phase code review comes next, then final verification; hosted release evidence remains for ship
+state_head: ff767a23b28e1af1719348e917870b0a25f3f7bd
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_plans: 10
+  percent: 0
 ---
 
 # Project State
@@ -33,8 +33,8 @@ See: .planning/PROJECT.md (updated 2026-11-18)
 Phase: 07 (Faster and more trustworthy CI) — EXECUTING
 Current Plan: 10
 Total Plans in Phase: 10
-Status: Ready to execute
-Last activity: 2026-11-19 — Plan 07-09 completed; Plan 07-10 is next, with hosted triage, release-PR timing and WASI-size evidence reserved for ship
+Status: Ready for phase-level independent code review
+Last activity: 2026-11-19 — Plan 07-10 evidence is complete; review and final verification remain before ship
 
 ### Phase 7 execution (2026-11-18–19)
 
@@ -84,6 +84,8 @@ Plan 07-07 completed on 2026-11-18. Runtime/model: Codex/OpenGSD CLI 1.20.0; exe
 Plan 07-08 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The exact-attempt timing helper and `CI required` production path are complete. The focused CI selectors passed 2/2; hygiene, pin, timeout-comment, and gate-budget selectors passed 3/3; the duplicate-ID control passed in a 24.30-second focused rerun. The repository-check budget is 3,890/3,900 lines. Historical replay exited 0 across 40 run rows and 573 job records. The test-first failure was observed while the helper was absent, but no durable RED report or exit-status record was retained; no classifier result is claimed. Two Plan 07-08 commits are `931e055` and `577ef3d`; `bf84ae2` is the prior Plan 07-07 gate-budget closeout, and the full execution-start range contains three commits. No hosted Phase PR measurement was made; both the matching critical-path measurement and actual WASI module size/bound remain for ship. `.planning/config.json` was preserved. Plan duration was approximately 58 minutes; Plan 07-09 is next.
 
 Plan 07-09 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. Maintainer and testing docs, engineering, product roadmap, prompt coverage, and the upgrade audit now reflect current workflow sources and measured baselines; README installation remains unchanged and is backed by existing release run 44262491280. `git diff --check HEAD`, the docs byte budget, the repository gate budget (3,890/3,900), and the RetroArch budget (300/300) passed. ARCHITECTURE §10 now records the owned `disc_boot` DMA3 → RAM → DMA0 → MDEC → DMA1 → RAM → DMA2 → native 24-bit display path, with Phase 6 Plan 06-16 and DISC-03 citations; it explicitly leaves full decoded output and external frame/movie hardware conformance unproven. Device MIPS remain assumptions and `gpu_motion` exceeds each provisional low-power budget. This plan's TUNE-04 and TUNE-06 deliverables are complete; phase-level readiness remains pending on the remaining work. TUNE-01 still needs a post-merge triage artifact run; TUNE-02/03 need the release-App comparison; TUNE-05 still needs the matching release-PR timing and actual Ubuntu 26 WASI module size before setting that bound. No new hosted workflow was started. Plan range `98d0b9c..11a1251` contains two commits: `b9a4ecd` (bounded plan revision) and `11a1251` (documentation/evidence). Plan duration was about 27 minutes wall elapsed; exact start and active time were not captured across handoff. Plan 07-10 is next.
+
+Plan 07-10 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh. The focused serialized CI selector passed 5/5 at the 60-second quality timeout (39.17 seconds total; 38.61 seconds for `policy.quality_metrics`); after the final 80-second cap was registered, the isolated `policy.quality_metrics` selector passed 1/1 in 28.26 seconds total (28.25 seconds for the test). The repository-check budget passes at 3,890/3,890 and the separate RetroArch budget at 300/300; focused hygiene checks passed 5/5. The repository-root producer command `cmake -DROOT="$PWD" -DBIN="$PWD/build/ci/policy/quality" -P tests/cmake/quality_controls.cmake` exited 0 in about 25 seconds. The proposed release title and release-please strategy checks passed. The timeout changes are measured headroom, not a speedup; test cases and assertions were preserved. Plan range `501a1a1..ff767a2` contains three commits: `ed5a86b` (30→60 evidence-based plan revision), `4b8c14b` (60→80 revision after the 38.61-second run), and `ff767a2` (test and evidence changes). No phase review, final verification, hosted workflow, PR, merge, release, or triage dispatch was run. The matched release-App comparison, Ubuntu 26 WASI size, and post-merge artifact remain pending for ship. Next: independent phase-level code review, then final automated verification; Phase 7 remains in progress.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -314,6 +316,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 07 P07 | 43min | 2 tasks | 14 files |
 | Phase 07 P08 | 58min | 2 tasks | 4 files |
 | Phase 07 P09 | 27 min | 2 tasks | 12 files |
+| Phase 07 P10 | not captured across handoffs | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -690,6 +693,8 @@ Recent decisions affecting current work:
 - [Phase 07]: The README install command remains unchanged because it still matches the automated install control and attributable release evidence.
 - [Phase 07]: The actual WASI runner module remains unmeasured; size.wasm stays unbounded until the Release module is directly measured.
 - [Phase 07]: Device MIPS remain assumptions; the measured gpu_motion workload exceeds provisional low-power budgets and stays a named SEED-005 follow-up.
+- [Phase 07]: Use an 80-second policy.quality_metrics timeout from the 38.61-second serialized measurement; this adds headroom and is not a speedup.
+- [Phase 07]: Keep matched release-App timing, triage artifact, actual WASI module size, release, and hosted verification explicitly pending until ship.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -931,8 +936,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T01:45:21.389Z
-Stopped at: Completed 07-09-PLAN.md
+Last session: 2026-11-19T02:17:47.313Z
+Stopped at: Completed 07-10-PLAN.md; phase-level independent code review, verification, and ship evidence remain pending
 Resume file: .planning/phases/07-faster-and-more-trustworthy-ci/07-10-PLAN.md
 
 ### v1.0 session history
@@ -1115,7 +1120,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 7 autonomously from Plan 07-08. Complete its remaining plans, code review and automated verification; at ship, measure the WASI module and add its bound, dispatch triage and confirm its artifact, compare the automatic release PR with run 44253419074, then confirm merged main CI and the release before starting Phase 8.
+- Complete Phase 7's independent code review, then final automated verification. At ship, measure the WASI module before setting its bound, verify the triage artifact, compare the automatic release PR with run 44253419074, and confirm green merged-main CI and the release before starting Phase 8.
 
 ### v2.0 roadmap creation (2026-11-18)
 
