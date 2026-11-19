@@ -13,6 +13,8 @@ case "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT" in *[!0-9:]*|:*|*:) fail "invalid run 
 [ "${GITHUB_EVENT_NAME:-}" = pull_request ] || fail "timing applies only to pull requests"
 [ "${CI_HEAVY:-}" = true ] && [ "${CI_CALLED:-}" = false ] || fail "timing applies only to full, uncalled CI"
 [ -n "${GITHUB_HEAD_REF:-}" ] || fail "missing pull request branch identity"
+release_inputs=${CI_RELEASE_INPUTS:-false}
+case "$release_inputs" in true|false) ;; *) fail "invalid release-input route";; esac
 
 root=$(git rev-parse --show-toplevel) || fail "not in a git checkout"
 actual_head=$(git -C "$root" rev-parse HEAD) || fail "could not resolve checkout head"
@@ -149,7 +151,7 @@ jq -c '[.[].jobs[] | [.name, (.labels | sort)]] | sort_by(.[0])' "$pages" >> "$s
 printf '\n' >> "$stream"
 branch_class=non-main
 [ "$GITHUB_HEAD_REF" = main ] && branch_class=main
-printf '%s\0%s\0%s\0%s\0%s\n' '@workflow-route' ci.yml pull_request "$branch_class" full >> "$stream"
+printf '%s\0%s\0%s\0%s\0%s\n' '@workflow-route' ci.yml pull_request "$branch_class" "$release_inputs" >> "$stream"
 while IFS= read -r path; do
   [ "$path" = .github/workflows/ci.yml ] && continue
   source="$input_root/$path"
