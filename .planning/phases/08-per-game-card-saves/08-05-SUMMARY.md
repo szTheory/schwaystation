@@ -74,6 +74,7 @@ status: complete
 ## Performance
 
 - **Duration:** 30 min
+- **Executor wall time:** 35 min 49 sec, including startup and summary checks.
 - **Started:** 2026-11-19T15:21:06Z
 - **Completed:** 2026-11-19T15:51:10Z
 - **Tasks:** 2
@@ -98,7 +99,7 @@ status: complete
 
 - `libretro/libretro.c` - Gate card 2 imports and saves on successful content load and safe import outcomes; derive disc and playlist sidecar paths; expose test-only card 2 inspection accessors.
 - `tests/libretro/host.c` - Verify stable content paths, rejected import preservation, fresh-instance reinjection, and the missing-injection control.
-- `tests/libretro/tests.cmake` - Pass an isolated save directory to the disc-control host test and enable test-only accessors for the in-process test module.
+- `tests/libretro/tests.cmake` - Pass an isolated save directory to the disc-control host test. Build the card-inspection module only for tests.
 
 ## Decisions Made
 
@@ -127,6 +128,14 @@ None - plan executed exactly as written.
 - The first compile reported missing prior prototypes for the test-only card 2 accessors. Guarded declarations were added, and the focused build then passed.
 - The sandbox initially denied writes to the linked worktree Git index. The authorized narrow escalation let the GSD commit handler stage the explicit task paths and run the configured hooks; all three task commits succeeded.
 
+## Wave Integration
+
+The executor build exposed the two card-inspection accessors on the installable module. The disc-control and persistence tests now use a separate, uninstalled build of the same source. Other host tests use the installable module and fail if it exposes either accessor.
+
+- `cmake --build --preset ci --target schwaystation-test-libretro-host` passed, exit 0 in 0.47 sec.
+- `ctest --preset ci --no-tests=error -R '^libretro[.](cards[.](controls|persistence)|host[.]disc_control|content[.]lifecycle)$' --output-on-failure` passed, exit 0 in 2.90 sec.
+- `nm -gU build/ci/libretro/schwaystation_libretro.dylib` and the same command on the test module both exited 0. The installable build had no card-inspection exports and the test module had both.
+
 ## User Setup Required
 
 None - no external service configuration required.
@@ -139,7 +148,6 @@ Plan 08-05 is complete. The orchestrator owns wave merge, shared state updates, 
 
 - All three modified key files exist, and all three task commits are ancestors of the current plan head.
 - The exact Task 1 and Task 2 CTest selectors passed; coverage entries reference those passing cases.
-- This summary is the only remaining plan artifact to commit.
 
 ---
 *Phase: 08-per-game-card-saves*

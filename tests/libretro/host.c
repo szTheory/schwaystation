@@ -142,7 +142,7 @@ static const char *missing;
         }                                                                                          \
     } while (0)
 
-static void resolve_all(void)
+static void resolve_all(int inspect_card2)
 {
     RESOLVE(p_set_environment, "retro_set_environment");
     RESOLVE(p_set_video_refresh, "retro_set_video_refresh");
@@ -169,8 +169,10 @@ static void resolve_all(void)
     RESOLVE(p_get_region, "retro_get_region");
     RESOLVE(p_get_memory_data, "retro_get_memory_data");
     RESOLVE(p_get_memory_size, "retro_get_memory_size");
-    RESOLVE(p_test_card2_data, "schway__libretro_test_card2_data");
-    RESOLVE(p_test_card2_path, "schway__libretro_test_card2_path");
+    if (inspect_card2) {
+        RESOLVE(p_test_card2_data, "schway__libretro_test_card2_data");
+        RESOLVE(p_test_card2_path, "schway__libretro_test_card2_path");
+    }
 }
 
 /* ---- frontend callbacks: record what the core does ---- */
@@ -4081,9 +4083,17 @@ int main(int argc, char **argv)
         return 1;
     }
     /* Every entry point, before anything else is called. */
-    resolve_all();
+    int inspect_card2 = disc_control_mode || card_persistence_mode;
+    resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
+        module_close();
+        return 1;
+    }
+    if (!inspect_card2 &&
+        (module_sym("schway__libretro_test_card2_data") != NULL ||
+         module_sym("schway__libretro_test_card2_path") != NULL)) {
+        fprintf(stderr, "production libretro module exports card test accessors\n");
         module_close();
         return 1;
     }

@@ -90,12 +90,20 @@ if(CMAKE_SCRIPT_MODE_FILE AND DEFINED SCHWAY_LIBRETRO_AUDIO_TEST)
   return()
 endif()
 
-# The libretro core loaded in-process by a test host.
+# Tests that inspect card 2 use a separate, uninstalled module.
+add_library(schwaystation-libretro-card-test MODULE
+  ${PROJECT_SOURCE_DIR}/libretro/libretro.c)
+target_link_libraries(schwaystation-libretro-card-test PRIVATE
+  schwaystation::schwaystation schwaystation-host schwaystation_disc_image)
+target_compile_definitions(schwaystation-libretro-card-test PRIVATE
+  SCHWAYSTATION_LIBRETRO_TESTING
+  SCHWAYSTATION_LIBRETRO_VERSION="${PROJECT_VERSION}")
+set_target_properties(schwaystation-libretro-card-test PROPERTIES C_VISIBILITY_PRESET hidden)
+schway_warnings(schwaystation-libretro-card-test)
 
 # The in-process frontend. It links the library and the shared converter
 # itself, runs a reference instance beside the module and compares the
 # delivered frame with that instance's conversion byte for byte.
-target_compile_definitions(schwaystation_libretro PRIVATE SCHWAYSTATION_LIBRETRO_TESTING)
 add_executable(schwaystation-test-libretro-host ${CMAKE_CURRENT_LIST_DIR}/host.c)
 target_include_directories(schwaystation-test-libretro-host PRIVATE ${PROJECT_SOURCE_DIR}/libretro)
 target_link_libraries(schwaystation-test-libretro-host PRIVATE schwaystation::schwaystation
@@ -103,7 +111,7 @@ target_link_libraries(schwaystation-test-libretro-host PRIVATE schwaystation::sc
 set_target_properties(schwaystation-test-libretro-host PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-libretro-host)
-add_dependencies(schwaystation-test-libretro-host schwaystation_libretro)
+add_dependencies(schwaystation-test-libretro-host schwaystation_libretro schwaystation-libretro-card-test)
 add_dependencies(schwaystation-test-libretro-host schwaystation-fixtures)
 add_dependencies(schwaystation-test-libretro-host schwaystation-run-test)
 if(TARGET schwaystation-disc-fixtures)
@@ -164,7 +172,7 @@ endforeach()
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-disc-control)
 schway_add_test(NAME libretro.host.disc_control
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
-    $<TARGET_FILE:schwaystation_libretro> disc-control
+    $<TARGET_FILE:schwaystation-libretro-card-test> disc-control
     ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u
     ${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.cue
     ${PROJECT_BINARY_DIR}/openbios ${PROJECT_BINARY_DIR}/tests/libretro-disc-control
@@ -227,7 +235,7 @@ schway_add_test(NAME libretro.content.lifecycle
 # card, or fails to load and persist the independent second card.
 schway_add_test(NAME libretro.cards.persistence
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
-    $<TARGET_FILE:schwaystation_libretro> card-persistence
+    $<TARGET_FILE:schwaystation-libretro-card-test> card-persistence
     ${PROJECT_BINARY_DIR}/fixtures/memcard_roundtrip.exe ${PROJECT_BINARY_DIR}/tests
   LABELS libretro portable TIMEOUT 120)
 
