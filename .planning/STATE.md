@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 8
 current_phase_name: Per-game card saves
-current_plan: Not started
-status: planning
-stopped_at: Phase 8 plans written and locally validated; independent plan check next
-last_updated: "2026-11-19T10:39:52Z"
+current_plan: 2
+status: executing
+stopped_at: Completed 08-01-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
+last_updated: "2026-11-19T13:01:20.540Z"
 last_activity: 2026-11-19
-last_activity_desc: "Phase 8 planning prepared ten plans covering save identity, card interchange, both hosts and PocketStation storage. Runtime/model: Codex/OpenGSD CLI 1.20.0; planner gpt-6.2-sol high."
-state_head: e41631ce13ab074ff2701c0192bc304dd9c56130
+last_activity_desc: "Phase 8 execution started: Codex gpt-6-luna; using the configured single-writer path because worktree isolation is disabled and no fork base is configured."
+state_head: 38ad4bb1c0e3a33e866daffa58eaacf845ccda03
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 20
-  completed_plans: 10
+  completed_plans: 11
   percent: 10
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 08 — Per-game card saves
+**Current focus:** Phase 8 — Per-game card saves
 
 ## Current Position
 
-Phase: 8 — Per-game card saves
-Current Plan: Not started
+Phase: 8 (Per-game card saves) — EXECUTING
+Current Plan: 2
 Total Plans in Phase: 10
-Status: Plans written and locally validated; independent check pending
-Last activity: 2026-11-19 — Phase 8 planning with Codex/OpenGSD CLI 1.20.0 and gpt-6.2-sol high
+Status: Ready to execute
+Last activity: 2026-11-19 — Phase 8 execution started
 
 ### Phase 7 execution (2026-11-18–19)
 
@@ -374,6 +374,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 07 P08 | 58min | 2 tasks | 4 files |
 | Phase 07 P09 | 27 min | 2 tasks | 12 files |
 | Phase 07 P10 | not captured across handoffs | 2 tasks | 9 files |
+| Phase 8 P1 | 74m | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -752,6 +753,9 @@ Recent decisions affecting current work:
 - [Phase 07]: Device MIPS remain assumptions; the measured gpu_motion workload exceeds provisional low-power budgets and stays a named SEED-005 follow-up.
 - [Phase 07]: Use an 80-second policy.quality_metrics timeout from the 38.61-second serialized measurement; this adds headroom and is not a speedup.
 - [Phase 07]: Keep matched release-App timing, triage artifact, actual WASI module size, release, and hosted verification explicitly pending until ship.
+- [Phase 8]: Preserve caller-supplied serial spelling for literal runner card filenames.
+- [Phase 8]: Map a true libretro_saves claim to both card persistence and controls tests while keeping the template false.
+- [Phase 8]: Use a standard card ID guest as the reusable transport base for later PocketStation transfers.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -997,9 +1001,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T09:53:39.826Z
-Stopped at: Phase 8 discussion captured; planning next
-Resume file: .planning/phases/08-per-game-card-saves/08-CONTEXT.md
+Last session: 2026-11-19T13:01:20.501Z
+Stopped at: Completed 08-01-PLAN.md; Codex/OpenGSD CLI 1.20.0, executor gpt-6-luna
+Resume file: None
 
 ### v1.0 session history
 
