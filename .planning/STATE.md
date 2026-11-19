@@ -117,9 +117,20 @@ canceled once the known required failure was confirmed. This is new platform evi
 Independent follow-up review confirmed the one-line case pattern now recognizes drive-rooted and POSIX absolute
 paths while still rooting relative paths. After review, local preflights passed (`sh -n`, `git diff --check`, CI
 and hygiene configure); `policy.quality_metrics` passed 1/1 in 35.45 seconds, and gate, E2E, action-pin and
-timeout-comment controls passed 4/4 in 0.03 seconds. Current branch diff contains the one-line correction;
-commit, exact-head hosted rerun, PR timing and release evidence remain pending. Runtime/model: Codex/OpenGSD CLI
+timeout-comment controls passed 4/4 in 0.03 seconds. At that checkpoint, the branch held the one-line correction;
+commit 57501d4 and its hosted run follow below. Successful CI, PR timing and release evidence remained pending.
+Runtime/model: Codex/OpenGSD CLI
 1.20.0; primary GPT-6 session (deployed ID unavailable); follow-up read-only reviewer gpt-6-luna xhigh.
+
+Exact-head run 44466369143 on commit `57501d46bf5b102e448e0436e7f28fc888cbe136` then passed `policy.quality_metrics`
+on Windows x64 in 38.51 seconds but Windows ARM64 timed out at 80.02 seconds; the other 617/618 tests in its
+matrix job passed. The run was canceled once this single known failure was captured; its failed aggregate is not
+a phase pass. Matching Nightly run 44466369199 completed successfully on that head, including fuzz. The
+assertion-heavy quality control launches many CMake checks, so a read-only review approved a provisional 180s
+CTest allowance without removing coverage. After `cmake --preset ci` reconfigured the selector, the local
+serialized test passed 1/1 in 29.36 seconds. The next exact-head Windows ARM64 lane must establish its actual
+completion time; the 180s allowance is not yet validated there. Runtime/model: Codex/OpenGSD CLI 1.20.0; primary
+GPT-6 session (deployed ID unavailable); follow-up read-only reviewer gpt-6-luna xhigh.
 
 ### Phase 7 discussion and planning (2026-11-18)
 

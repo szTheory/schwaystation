@@ -127,6 +127,24 @@ successfully on the preceding head, including all six fuzz campaigns under the m
 corrected code head must run Nightly again before ship. Do not edit PR metadata while checks run: this workflow
 treats PR body edits as CI-triggering `edited` events and cancels/restarts in-progress work.
 
+On corrected-path head `57501d46bf5b102e448e0436e7f28fc888cbe136`, the Windows x64 lane passed
+`policy.quality_metrics` in 38.51 seconds. Windows ARM64 ran the same registered check but CTest stopped it at
+the existing 80-second limit; its other 617/618 tests passed. The CI run [44466369143](https://github.com/szTheory/schwaystation/actions/runs/44466369143)
+was canceled after that known failure, so its aggregate is not green. The matching Nightly run
+[44466369199](https://github.com/szTheory/schwaystation/actions/runs/44466369199) completed successfully,
+including full vectors, all three native benchmark legs, WASI and fuzz.
+
+The focused quality control invokes many separate CMake checks. A read-only follow-up review approved increasing
+its CTest timeout from 80 to 180 seconds as a provisional cross-platform allowance; the ARM64 completion time is
+not known from the timed-out attempt. All assertions and checks remain enabled. After `cmake --preset ci`, the
+local serialized selector passed 1/1 in 29.36 seconds. The next exact-head Windows ARM64 run must establish the
+real duration before this allowance can be described as measured headroom.
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `git diff --check && cmake --preset ci` | 0 | The timeout change is whitespace-clean and the CI selector was regenerated before running it. |
+| `ctest --test-dir build/ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1` | 0 | 1/1 passed in 29.36 seconds with the provisional 180-second cap. |
+
 ## Requirement status and ship-only evidence
 
 | Requirement | Local or historical result | Remaining evidence and locator |

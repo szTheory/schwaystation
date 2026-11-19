@@ -1,8 +1,8 @@
 ---
 phase: 07-faster-and-more-trustworthy-ci
-reviewed: 2026-11-19T05:10:15Z
+reviewed: 2026-11-19T05:51:16Z
 depth: standard
-files_reviewed: 7
+files_reviewed: 8
 files_reviewed_list:
   - scripts/ci-critical-path.sh
   - .github/workflows/nightly.yml
@@ -11,6 +11,7 @@ files_reviewed_list:
   - tests/hygiene/tests.cmake
   - .planning/REQUIREMENTS.md
   - .planning/phases/07-faster-and-more-trustworthy-ci/07-DELIVERY-EVIDENCE.md
+  - tests/policy/tests.cmake
 findings:
   critical: 0
   warning: 0
@@ -22,9 +23,9 @@ status: clean
 
 # Phase 7: Code Review Report
 
-**Reviewed:** 2026-11-19T05:10:15Z
+**Reviewed:** 2026-11-19T05:51:16Z
 **Depth:** standard
-**Files Reviewed:** 7
+**Files Reviewed:** 8
 **Status:** clean
 
 ## Summary
@@ -53,7 +54,13 @@ root. The focused correction was reviewed independently and found sound: `/*` re
 `[A-Za-z]:/*` recognizes drive-rooted paths, and the fallback still resolves relative registry paths from the
 repository root. This follow-up addresses a newly observed Windows failure after the prior clean review.
 
+The later exact-head matrix passed the quality check on Windows x64 in 38.51 seconds, but Windows ARM64 reached
+the 80-second CTest timeout while the other 617 tests passed. A further read-only review approved 180 seconds as
+a provisional cap; it does not assert an unobserved ARM64 completion time. The test retains all cases. After
+reconfiguring CI, the local serialized selector passed 1/1 in 29.36 seconds; the next Windows ARM64 run must
+measure the actual duration.
+
 ---
-_Reviewed: 2026-11-19T05:10:15Z_
+_Reviewed: 2026-11-19T05:51:16Z_
 _Reviewer: gsd-code-reviewer agent_
 _Depth: standard_

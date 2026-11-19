@@ -194,12 +194,15 @@ corrected exact-head CI, generated release-App comparison and required-check par
 release, default-branch triage artifact, and final PR timing remain pending. None is claimed as complete. The
 phase remains in progress until ship evidence is complete; Phase 8 stays stopped.
 
-The next exact-head run on `4d389aef0a58ceadc8e010a15559852bbbe237f4` failed in Windows x64 because the timing
-script prefixed CMake's `D:/...` absolute registry path with the repository root; its Windows arm64 lane passed.
+The exact-head run on `4d389aef0a58ceadc8e010a15559852bbbe237f4` failed in Windows x64 because the timing script
+prefixed CMake's `D:/...` absolute registry path with the repository root; Windows arm64 passed that attempt.
 This was new evidence after the CRLF correction. A read-only follow-up review approved recognition of drive-rooted
 paths. `sh -n`, `git diff --check`, CI/hygiene configure, the isolated quality metric test (1/1 in 35.45 seconds),
-and focused hygiene controls (4/4 in 0.03 seconds) then passed. Commit and corrected exact-head hosted CI/Nightly
-remain pending; no hosted pass is claimed for the corrected source.
+and focused hygiene controls (4/4 in 0.03 seconds) then passed. This correction was committed as 57501d4. On that
+head, Windows x64 then passed the quality test in 38.51 seconds but Windows ARM64 timed out at 80 seconds while
+the other 617 tests passed; the matching Nightly run passed. The CI run was canceled after the known failure.
+Following new timing evidence, review approved a 180-second provisional CTest cap. The reconfigured local test
+passed 1/1 in 29.36 seconds. A passing exact-head Windows ARM64 test and broad CI/Nightly remain pending.
 
 ## Deviations from plan
 
