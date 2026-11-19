@@ -485,14 +485,11 @@ schway_host_card_status schway_host_card_paths_for_basename(const char *director
     return SCHWAY_HOST_CARD_OK;
 }
 
-static schway_host_card_status schway__host_cards_save_atomic(
+static schway_host_card_status schway__host_cards_publish_atomic(
     const char *path, const void *bytes, size_t size, int failure)
 {
     if (path == NULL || path[0] == '\0' || bytes == NULL) {
         return SCHWAY_HOST_CARD_ERR_ARGUMENT;
-    }
-    if (size != SCHWAY_MEMCARD_SIZE) {
-        return SCHWAY_HOST_CARD_ERR_SIZE;
     }
 #if defined(SCHWAY_HOST_CARD_TESTING)
     if (failure < SCHWAY__HOST_CARD_FAILURE_NONE || failure > SCHWAY__HOST_CARD_FAILURE_RENAME) {
@@ -573,21 +570,80 @@ static schway_host_card_status schway__host_cards_save_atomic(
     return failed ? SCHWAY_HOST_CARD_ERR_IO : SCHWAY_HOST_CARD_OK;
 }
 
+static size_t schway__host_cards_export_header_size(schway_host_card_format format)
+{
+    switch (format) {
+    case SCHWAY_HOST_CARD_FORMAT_RAW:
+        return 0u;
+    case SCHWAY_HOST_CARD_FORMAT_GME:
+        return SCHWAY_HOST_CARD_GME_HEADER_SIZE;
+    case SCHWAY_HOST_CARD_FORMAT_VGS:
+        return SCHWAY_HOST_CARD_VGS_HEADER_SIZE;
+    case SCHWAY_HOST_CARD_FORMAT_PSV:
+        return SCHWAY_HOST_CARD_PSX_HEADER_SIZE;
+    }
+    return SIZE_MAX;
+}
+
+static schway_host_card_status schway__host_cards_export_atomic(
+    const char *path, const void *bytes, size_t size, schway_host_card_format format,
+    int failure)
+{
+    if (path == NULL || path[0] == '\0' || bytes == NULL) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    if (size != SCHWAY_MEMCARD_SIZE) {
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    }
+    size_t header_size = schway__host_cards_export_header_size(format);
+    if (header_size == SIZE_MAX || header_size > SIZE_MAX - size) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    size_t output_size = header_size + size;
+    uint8_t *output = (uint8_t *)malloc(output_size);
+    if (output == NULL) {
+        return SCHWAY_HOST_CARD_ERR_IO;
+    }
+    if (header_size != 0u) {
+        memset(output, 0, header_size);
+    }
+
+    const uint8_t *card = (const uint8_t *)bytes;
+    if (format == SCHWAY_HOST_CARD_FORMAT_GME) {
+        static const uint8_t marker_fields[5] = {0u, 0u, 1u, 0u, 1u};
+        memcpy(output, "123-456-STD", 11u);
+        output[11] = 0u;
+        memcpy(output + 0x10u, marker_fields, sizeof marker_fields);
+        for (size_t sector = 0u; sector < 16u; sector++) {
+            output[0x15u + sector] = card[sector * SCHWAY_HOST_CARD_FRAME_SIZE];
+            output[0x25u + sector] = card[sector * SCHWAY_HOST_CARD_FRAME_SIZE + 8u];
+        }
+    } else if (format == SCHWAY_HOST_CARD_FORMAT_VGS) {
+        memcpy(output, "VgsM", 4u);
+    } else if (format == SCHWAY_HOST_CARD_FORMAT_PSV) {
+        memcpy(output, "PSV", 3u);
+    }
+    memcpy(output + header_size, card, size);
+
+    schway_host_card_status status =
+        schway__host_cards_publish_atomic(path, output, output_size, failure);
+    free(output);
+    return status;
+}
+
 schway_host_card_status schway_host_card_save_atomic(const char *path, const void *bytes,
                                                       size_t size)
 {
-    return schway__host_cards_save_atomic(path, bytes, size, SCHWAY__HOST_CARD_FAILURE_NONE);
+    return schway__host_cards_export_atomic(path, bytes, size, SCHWAY_HOST_CARD_FORMAT_RAW,
+                                            SCHWAY__HOST_CARD_FAILURE_NONE);
 }
 
 schway_host_card_status schway_host_card_export_atomic(const char *path, const void *bytes,
                                                         size_t size,
                                                         schway_host_card_format format)
 {
-    (void)path;
-    (void)bytes;
-    (void)size;
-    (void)format;
-    return SCHWAY_HOST_CARD_ERR_IO;
+    return schway__host_cards_export_atomic(path, bytes, size, format,
+                                            SCHWAY__HOST_CARD_FAILURE_NONE);
 }
 
 #if defined(SCHWAY_HOST_CARD_TESTING)
@@ -595,18 +651,14 @@ schway_host_card_status schway_host_card_test_save_atomic(const char *path, cons
                                                            size_t size,
                                                            schway_host_card_test_failure failure)
 {
-    return schway__host_cards_save_atomic(path, bytes, size, (int)failure);
+    return schway__host_cards_export_atomic(path, bytes, size, SCHWAY_HOST_CARD_FORMAT_RAW,
+                                            (int)failure);
 }
 
 schway_host_card_status schway_host_card_test_export_atomic(
     const char *path, const void *bytes, size_t size, schway_host_card_format format,
     schway_host_card_test_failure failure)
 {
-    (void)path;
-    (void)bytes;
-    (void)size;
-    (void)format;
-    (void)failure;
-    return SCHWAY_HOST_CARD_ERR_IO;
+    return schway__host_cards_export_atomic(path, bytes, size, format, (int)failure);
 }
 #endif
