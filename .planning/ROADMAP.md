@@ -199,7 +199,7 @@ Plans:
 
 ## Progress
 
-Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the 3,900-line outer repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
+Phases ship in numeric order. Dependency lines identify the implementation inputs each phase uses. Each phase follows its own `phase/NN-slug` branch and pull request, from discussion through planning, execution, code review and automated verification. After `$gsd-ship N`, confirm the merge, green main CI and the automatic release before the next phase. Follow [standing autonomy and delivery instructions](AUTONOMOUS.md) and the [requirements budgets](REQUIREMENTS.md), including the 3,901-line outer repository-check limit ratcheted to measured totals and the 300-line real-host test limit. Run the cheapest relevant consistency check before builds, guest runs or hosted workflows. After the final release, audit, complete and archive v2.0.
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|

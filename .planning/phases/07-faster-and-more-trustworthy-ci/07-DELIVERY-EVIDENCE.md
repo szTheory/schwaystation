@@ -1,22 +1,23 @@
 # Phase 7 delivery evidence and ship handoff
 
 Updated 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna at xhigh effort. Plan 07-10 is
-the final phase execution plan. This document separates local evidence from hosted results that only exist after
-the reviewed phase branch is shipped. No push, PR, merge, hosted workflow or triage dispatch was run here.
+the final phase execution plan. The original handoff below records local evidence before ship. The ship follow-up
+section records the later PR and hosted evidence without treating the canceled first attempt as a passing run.
 
 ## Focused local evidence
 
 The initial preflight confirmed all expected selectors were registered, workflow and producer paths were present,
 and the current inputs were internally consistent. Before the ratchet, the repository-check inventory counted
-3,890 lines against the corrected 3,900 ceiling; the RetroArch inventory counted 300 against its separate 300
-ceiling. `quality.json` parsed and recorded current testcard, gpu_motion, state and CI values; `size.wasm` remains
-explicitly unbounded. The workflow source links the Cachegrind, state, WASI module and current-attempt CI outputs
-to the shared comparator. The triage workflow and its fixture-based privacy/schema controls are present.
+3,890 lines against the then-current 3,900 ceiling; the RetroArch inventory counted 300 against its separate 300
+ceiling. At that handoff, `quality.json` recorded current testcard, gpu_motion, state and CI values while
+`size.wasm` remained unbounded. The workflow source linked the Cachegrind, state, WASI module and current-attempt
+CI outputs to the shared comparator. The triage workflow and its fixture-based privacy/schema controls were present.
 
 At the Plan 10 handoff, the hygiene `policy.gate_budget` registration was ratcheted to 3,890 lines. The
-independent review fixes added required regression coverage; the count then reached the approved 3,900-line
-ceiling, so the registration was carried forward to the new measured total as Plan 10 directs. The separate
-`policy.e2e_budget` limit remains 300. No case or assertion was removed or weakened.
+independent review fixes added required regression coverage; the count reached 3,900 and the registration was
+carried forward as Plan 10 directs. A later Windows run exposed CRLF output from native `jq`; a one-line
+normalization in the timing producer adds one counted line. The current exact budget is therefore 3,901. The
+separate `policy.e2e_budget` limit remains 300. No case or assertion was removed or weakened.
 
 | Command | Exit | Result |
 | --- | ---: | --- |
@@ -33,10 +34,18 @@ ceiling, so the registration was carried forward to the new measured total as Pl
 | `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3890 -P tests/cmake/line_budget.cmake` | 0 | Repository-check total is 3,890/3,890 lines. |
 | `cmake -DROOT=. '-DPATTERNS=tests/retroarch/*' -DLIMIT=300 -P tests/cmake/line_budget.cmake` | 0 | RetroArch test total is 300/300 lines. |
 | `ctest --preset ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1` | 0 | Post-review selector passed 1/1 in 37.22 seconds with the checked-in push baseline preserved and PR timing explicitly unbaselined. |
-| `cmake --preset hygiene`, then focused CTest for gate budget, E2E budget, action pins, and timeout comments | 0 | Refreshed the stale generated 3,890-line registration; the four selected checks passed, confirming 3,900/3,900 and 300/300. |
+| `cmake --preset hygiene`, then focused CTest for gate budget, E2E budget, action pins, and timeout comments | 0 | Refreshed the stale generated 3,890-line registration; the four selected checks passed, confirming 3,900/3,900 and 300/300 before the Windows timing fix. |
 | `sh scripts/check-title.sh 'feat: publish the weekly triage artifact' < build/phase07/pr-body.md` | 0 | Proposed title/body pass the local Conventional Commit and no-CI-skip checks. The body file is ignored build output. |
 | `jq -e '.packages["."].["release-type"] == "simple"' release-please-config.json` | 0 | The unscoped `feat:` title uses the configured release-please simple strategy and is release-affecting. |
 | `git diff --check HEAD` | 0 | No whitespace errors in the scoped work. |
+| `jq -e . quality.json >/dev/null && cmake -DQUALITY=quality.json -P tests/cmake/quality.cmake` | 0 | The measured WASI bound parses and passes the shared quality registry contract. |
+| `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` | 0 | Corrected repository-check inventory is 3,901/3,901 lines. |
+| `cmake -DROOT=. '-DPATTERNS=tests/retroarch/*' -DLIMIT=300 -P tests/cmake/line_budget.cmake` | 0 | RetroArch test inventory remains 300/300 lines. |
+| `cmake -DMODE=timeouts -DDIR=.github/workflows -P tests/cmake/workflows.cmake` | 0 | All 25 workflow timeout comments name a run ID or provisional evidence. |
+| `cmake --preset ci` and `cmake --preset hygiene` | 0 | Both existing build trees reconfigured successfully before focused tests. |
+| `ctest --test-dir build/ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1` | 0 | 1/1 passed in 30.27 seconds with the bounded WASI registry and production PR timing control. |
+| `ctest --test-dir build/hygiene --no-tests=error -R '^(policy[.](gate_budget|e2e_budget|action_pins)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1` | 0 | 4/4 passed in 0.03 seconds, including the 3,901-line and timeout-comment checks. |
+| `git diff --check` | 0 | No whitespace errors in the corrected diff. |
 
 The initial parallel timeout was diagnosed from the test registration and exact `quality_controls.cmake` command.
 Serialized measurements were 29.69 seconds and 38.61 seconds in the five-test selector; after the timeout was
@@ -71,6 +80,29 @@ gate at exactly 3,900 lines and the RetroArch budget at 300. The verifier also c
 workflow markers, selector inventory and locally automatable behavior. Its report records hosted acceptance
 items as pending ship evidence, not as passed or as owner UAT.
 
+## Ship follow-up: first hosted attempt and corrections
+
+PR [#28](https://github.com/szTheory/schwaystation/pull/28) first ran at head `8a3a502ab4dd3a47fe906e7976a33680a71b8584`.
+The successful WASI job measured the linked module at 595,820 bytes on Ubuntu 26.04.1 image 20261111.196.1,
+with `libclang-rt-21-dev-wasm32` 1:21.1.8-6ubuntu1 and `wasi-libc` 0.0~git20250726.3f7eb4c-4. The exact
+measurement is recorded in `quality.json` and [07-BASELINES.md](07-BASELINES.md).
+
+Both Windows build jobs reached the test inventory but failed the same `policy.quality_metrics` timing control:
+Windows-native `jq` emitted CRLF, so the elapsed-seconds parser rejected the trailing carriage return. The same
+test failed on both Windows runners while their other 617 tests passed. A one-line CRLF normalization now follows
+the successful `jq` write, preserving its failure status. This real Windows test failure is the regression case;
+the corrected test must pass on both Windows lanes in the next exact-head CI run.
+
+The separate PR-triggered Nightly fuzz job [run 44460238938](https://github.com/szTheory/schwaystation/actions/runs/44460238938)
+was canceled at its 5-minute job timeout. Successful comparable native fuzz job [run 44190163638](https://github.com/szTheory/schwaystation/actions/runs/44190163638)
+took 7m03. Its doubled duration is 14m06, rounded up to 15 minutes; the workflow timeout now follows that
+evidence. The incomplete first PR CI run [44460238941](https://github.com/szTheory/schwaystation/actions/runs/44460238941)
+was canceled after the required Windows failures were confirmed and its completed WASI log yielded the size.
+
+These corrections have passed read-only code review and focused local checks, including the quality metric
+integration and the four relevant hygiene tests. A new exact-head hosted run remains pending; it must confirm the
+Windows fix, checked-in WASI bound, all required CI lanes, and revised fuzz timeout before Phase 7 can ship.
+
 ## Requirement status and ship-only evidence
 
 | Requirement | Local or historical result | Remaining evidence and locator |
@@ -79,7 +111,7 @@ items as pending ship evidence, not as passed or as owner UAT.
 | TUNE-02 | The [CI report](07-CI-EFFICIENCY.md) captures 40 workflow runs, 573 job records, comparable workload groups and the original critical path. Production release-route and exact-attempt timing controls pass locally. | Compare the real generated release-App PR against the explicitly qualified baseline below; include required-check parity, the matching final PR head, path list, slowest job, critical path and run/job URLs. No speedup is claimed before that comparison. |
 | TUNE-03 | The report links sampled timeout formulas to their extremal run IDs and reviewed all captured failures; it found no confirmed same-workload flaky test. | Complete the post-change release-App comparison at ship and preserve the current timeout provenance. The baseline sample remains small and its unsampled jobs remain provisional. |
 | TUNE-04 | Plan 04's selected README correction passed its obsolete-claim and diff checks; see [Plan 04 summary](07-04-SUMMARY.md) and [quality review](07-QUALITY-REVIEW.md). | No additional change is selected in Plan 10. Phase readiness and final requirement audit still occur after independent review. |
-| TUNE-05 | `policy.quality_metrics`, `policy.lessons_unique`, and its duplicate negative control pass in focused CI. The registry records both Ir/frame fixtures, 3,755,020 state bytes, and the historical push/main CI range bound to its original fingerprint. The production PR route is intentionally unbaselined. | Measure the actual Release `build/wasm32/schwaystation-run` module on Ubuntu 26 before setting `size.wasm`. Measure matching final-head PR timing attempts before setting a PR-route range; do not reuse the push/main interval without evidence. |
+| TUNE-05 | `policy.quality_metrics`, `policy.lessons_unique`, and its duplicate negative control pass in focused CI. The registry records both Ir/frame fixtures, 3,755,020 state bytes, the measured 595,820-byte WASI module, and the historical push/main CI range bound to its original fingerprint. The production PR route is intentionally unbaselined. | Verify the checked-in WASI size bound on the corrected final head. Measure matching final-head PR timing attempts before setting a PR-route range; do not reuse the push/main interval without evidence. |
 | TUNE-06 | The [upgrade audit](07-UPGRADE-AUDIT.md), docs byte budget, settings/pin checks and prior install-line evidence record unchanged items. The README invocation still matches `tests/cmake/install_line.cmake` and the successful install-line-latest check in [release run 44262491280](https://github.com/szTheory/schwaystation/actions/runs/44262491280). | Confirm the remaining phase evidence after the reviewed final head and real release. Hardware pages stay unchanged because this phase changes CI policy and documentation rather than emulator behavior. |
 
 ## Release-App comparison row
@@ -96,7 +128,7 @@ After independent code review and final local verification, the authorized ship 
 2. Capture a broad CI run on that changed head with all required jobs and only established conditional skips. It should report the current PR workload as unbaselined against the distinct push/main fingerprint; record the PR head SHA, measured path, fingerprint and run/job URL. Gather matching PR attempts before setting a PR timing range, then confirm the comparator on the updated final head.
 3. Merge only after those checks, then record green main CI and the generated release-App PR's successful checks. Verify the real Release workflow, published release, and `install-line-latest` result.
 4. Complete the release-App comparison row above and record one successful default-branch triage artifact with its run URL.
-5. Measure the actual linked WASI module on the supported Ubuntu 26 lane before adding a size bound; keep all unmeasured or incomparable values explicitly pending.
+5. Confirm the exact 595,820-byte bound on the supported Ubuntu 26 lane; keep all unmeasured or incomparable values explicitly pending.
 
 There is no final PR SHA, generated release PR, merged-main run, release URL, or post-merge triage URL yet. They are
 ship evidence, not inferred from the current branch or older runs. Phase 8 does not start until that release

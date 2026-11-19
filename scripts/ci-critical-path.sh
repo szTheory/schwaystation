@@ -66,6 +66,7 @@ jq -r '
      then ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601)) | tostring
      else error("job timestamp") end)] | map(tostring) | join("|")
 ' "$flat" > "$tmp/job-times" || fail "invalid UTC timestamps in completed jobs"
+tr -d '\r' < "$tmp/job-times" > "$tmp/job-times.clean" && mv "$tmp/job-times.clean" "$tmp/job-times" || fail "could not normalize job timing output"
 ci_started=$(jq -r '[.[] | select(.name == "CI required")][0].started_at // ""' "$flat")
 printf '%s\n' "$ci_started" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' || fail "invalid current gate start time"
 d_changes= d_hygiene= d_title= d_gpu= d_openbios= d_asan=

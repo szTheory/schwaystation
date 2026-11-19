@@ -7,9 +7,9 @@ current_phase_name: Per-game card saves
 current_plan: Not started
 status: planning
 stopped_at: Phase 7 verified; finish its ship evidence before planning Phase 8
-last_updated: "2026-11-19T04:34:08.919Z"
+last_updated: "2026-11-19T05:17:08Z"
 last_activity: 2026-11-19
-last_activity_desc: Phase 7 verification passed; Phase 7 ship evidence remains before Phase 8 planning
+last_activity_desc: Phase 7 correction passed focused local checks; exact-head hosted verification and release remain before Phase 8 planning
 state_head: f5f5ea6640392a7ba447f83b07122bf19fe5ff49
 progress:
   total_phases: 10
@@ -91,7 +91,23 @@ Plan 07-10 completed on 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; exe
 
 Runtime/model: Codex/OpenGSD CLI 1.20.0; gsd-code-reviewer, gsd-code-fixer, and gsd-verifier gpt-6-luna xhigh; primary session model ID unavailable. Independent review found one critical PR timing SHA defect and four fingerprint/registry warnings. Fixes added focused regression controls and preserved existing production-gate cases. A second review prevented applying the historical push/main timing interval to the PR route without matching hosted evidence; the stored push interval remains tied to its original fingerprint and the current PR route is explicitly unbaselined. Final code review is clean in `07-REVIEW.md`.
 
-The review fixes raised the counted repository checks from 3,890 to the approved 3,900 ceiling; the registered limit now matches 3,900. The separate RetroArch count remains 300/300. The post-review `policy.quality_metrics` selector passed 1/1 in 37.22 seconds. After `cmake --preset hygiene` refreshed the stale generated test registration, `ctest --preset hygiene --no-tests=error -R '^(policy[.](action_pins|e2e_budget|gate_budget)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1` passed 4/4 in 0.03 seconds. The verifier also passed locally automatable CI behavior controls 4/4, no-skip controls 2/2, and all 10 plan artifact queries. Under the infrastructure-phase verifier rule, `07-VERIFICATION.md` records `passed` (5/5 pre-ship implementation and data-flow truths; 0 behavior-unverified) with no owner UAT. Hosted PR timing, WASI size, triage artifact, and release outcomes remain explicit ship evidence, not claimed as run. A report-path preflight caught and corrected an extension typo before transition; all 51 covered files now exist and the refreshed fingerprint passes. Phase completion emitted only non-blocking warnings for command examples misread as missing files; no implementation artifacts are missing.
+The review fixes raised the counted repository checks from 3,890 to 3,900; the registered limit then matched 3,900. The separate RetroArch count remains 300/300. The post-review `policy.quality_metrics` selector passed 1/1 in 37.22 seconds. After `cmake --preset hygiene` refreshed the stale generated test registration, `ctest --preset hygiene --no-tests=error -R '^(policy[.](action_pins|e2e_budget|gate_budget)|hygiene[.]timeout_comments)$' --output-on-failure --parallel 1` passed 4/4 in 0.03 seconds. The verifier also passed locally automatable CI behavior controls 4/4, no-skip controls 2/2, and all 10 plan artifact queries. Under the infrastructure-phase verifier rule, `07-VERIFICATION.md` records `passed` (5/5 pre-ship implementation and data-flow truths; 0 behavior-unverified) with no owner UAT. The first ship run later measured the WASI module, and its Windows timing failures are recorded below. A report-path preflight caught and corrected an extension typo before transition; all 51 covered files now exist and the refreshed fingerprint passes. Phase completion emitted only non-blocking warnings for command examples misread as missing files; no implementation artifacts are missing.
+
+### Phase 7 ship preflight follow-up (2026-11-19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; primary GPT-6 session (exact deployed model ID unavailable); read-only
+code review gpt-6-luna xhigh. PR #28's first hosted attempt on `8a3a502ab4dd3a47fe906e7976a33680a71b8584`
+measured the linked Ubuntu 26.04 WASI module at 595,820 bytes. Both Windows jobs exposed the same CRLF parsing
+failure in `policy.quality_metrics`; 617/618 tests passed on each, and the required jobs were not green. The PR
+Nightly fuzz job also hit the five-minute timeout; a matching successful historical fuzz job took 7m03, so the
+workflow now allows 15 minutes (twice that run, rounded up). The initial PR run was canceled after the known
+Windows failures and WASI measurement were captured. Read-only review supports the corrective diff, including a
+595,820-byte exact WASI bound and a one-line CRLF normalization; the repository-check cap is now 3,901 lines.
+`jq`/CMake quality-schema validation, the 3,901/3,901 repository budget, 300/300 RetroArch budget, workflow timeout
+comments and selector inventory all passed as cheap preflights. The serialized `policy.quality_metrics` test then
+passed 1/1 in 30.27 seconds; the four focused hygiene tests passed 4/4 in 0.03 seconds. The final diff check passed.
+A new exact-head hosted CI/Nightly run and the release are still required. Phase 8 planning remains stopped until
+Phase 7 is shipped, merged, green on main, and released.
 
 ### Phase 7 discussion and planning (2026-11-18)
 
@@ -1131,7 +1147,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Complete Phase 7 ship evidence: measure final-head PR timing and the actual Ubuntu 26 WASI module, verify the triage artifact, compare the automatic release PR with run 44253419074, then confirm green merged-main CI and the published release before starting Phase 8. No owner UAT is needed.
+- Complete Phase 7 ship evidence: verify the corrected Windows timing parser, 595,820-byte WASI bound and 15-minute fuzz timeout on the exact hosted head; measure final-head PR timing, verify the triage artifact, compare the automatic release PR with run 44253419074, then confirm green merged-main CI and the published release before starting Phase 8. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 

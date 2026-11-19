@@ -98,7 +98,7 @@ coverage:
         status: pass
     human_judgment: false
   - id: C6
-    description: Quality producer and lesson-uniqueness controls pass; PR timing stays unbaselined pending hosted evidence, and WASI size is unmeasured.
+    description: Quality producer and lesson-uniqueness controls pass; PR timing stays unbaselined pending hosted evidence, and the measured WASI size bound awaits exact-head confirmation.
     requirement: TUNE-05
     verification:
       - kind: integration
@@ -108,7 +108,7 @@ coverage:
         ref: "ctest --preset ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1 (exit 0; post-review regressions passed 1/1 in 37.22s; PR route remains unbaselined against the push/main range)"
         status: pass
       - kind: other
-        ref: "07-DELIVERY-EVIDENCE.md: Ubuntu 26 Release WASI module byte count and size.wasm bound are pending for ship"
+        ref: "07-DELIVERY-EVIDENCE.md: Ubuntu 26 measured the module at 595820 bytes; the checked-in bound awaits exact-head confirmation"
         status: unknown
     human_judgment: false
   - id: C7
@@ -130,22 +130,23 @@ status: complete
 
 # Phase 7 Plan 10: CI and release evidence handoff Summary
 
-**Plan 10's focused CI and hygiene controls passed with a measured 80-second quality-test timeout; post-review fixes carried the repository gate from 3,890 to 3,900 lines, and hosted ship evidence remains pending.**
+**Plan 10's focused CI and hygiene controls passed with a measured 80-second quality-test timeout; post-review fixes carried the repository gate from 3,890 to 3,900 lines, and the later Windows timing portability fix brings the current measured gate to 3,901. Hosted exact-head verification remains pending.**
 
 ## Performance
 
 - **Duration:** Not captured across executor and commit handoffs.
 - **Completed:** 2026-11-19.
 - **Tasks:** 2.
-- **Files modified:** 9, including this summary, STATE, and ROADMAP; the pre-existing `.planning/config.json` edit is excluded.
+- **Files modified:** 12 in the corrective ship follow-up, including this summary, STATE, and ROADMAP; the pre-existing `.planning/config.json` edit is excluded.
 - **Runtime/model:** Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna at xhigh effort.
 - **Measured plan range:** 3 commits from `501a1a1` through `ff767a2`.
 
 ## Accomplishments
 
 - Confirmed the serialized CI selector passes all five classifier, triage, quality, and lesson-uniqueness cases. The quality metric test took 38.61 seconds under the 60-second cap; the final isolated run passed in 28.25 seconds with the 80-second cap.
-- Ratcheted `policy.gate_budget` to the measured 3,890 lines and preserved the separate 300-line RetroArch budget. Both boundary checks and the focused hygiene selectors passed.
-- Recorded the release title check and release-please strategy. The delivery record distinguishes local results from pending exact-head, generated release-App, main CI, release, WASI-size, and triage-artifact evidence.
+- Ratcheted `policy.gate_budget` to 3,890 lines at the original Plan 10 handoff and preserved the separate 300-line RetroArch budget. Both boundary checks and the focused hygiene selectors passed.
+- Recorded the release title check and release-please strategy. The delivery record distinguishes local results from pending exact-head, generated release-App, main CI, release, WASI-bound confirmation, and triage-artifact evidence.
+- After the hosted Windows failure, the reviewed CRLF normalization and evidence-based fuzz timeout correction passed the focused `policy.quality_metrics` test (1/1, 30.27 seconds) and hygiene selectors (4/4, 0.03 seconds); the corrected repository gate is 3,901/3,901 lines and RetroArch remains 300/300.
 
 ## Verification
 
@@ -187,9 +188,10 @@ machine-checkable ship evidence, not owner UAT.
 
 Final verification now records `passed` (5/5 implementation and data-flow truths; 0 behavior-unverified).
 The initial `human_needed` classification was corrected under the infrastructure-phase verifier rule: these
-checks are automated ship evidence, not owner UAT. Hosted changed-head CI, the generated release-App comparison
-and required-check parity, green main CI, the published release, the default-branch triage artifact, final PR
-timing, and the actual Ubuntu 26 WASI module byte count and bound remain pending. None is claimed as run. The
+checks are automated ship evidence, not owner UAT. The first PR attempt measured the Ubuntu 26 WASI module at
+595,820 bytes, but did not verify a checked-in bound; its Windows timing tests failed and it was canceled. The
+corrected exact-head CI, generated release-App comparison and required-check parity, green main CI, published
+release, default-branch triage artifact, and final PR timing remain pending. None is claimed as complete. The
 phase remains in progress until ship evidence is complete; Phase 8 stays stopped.
 
 ## Deviations from plan

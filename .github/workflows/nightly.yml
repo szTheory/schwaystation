@@ -144,7 +144,7 @@ jobs:
   # it; nothing is blocked. The crash files are kept for minimising.
   fuzz:
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 76 s = 3 min (1 sample); [run 44237075704](https://github.com/szTheory/schwaystation/actions/runs/44237075704), provisional
+    timeout-minutes: 15  # Twice the slowest recent matching successful run (7m03s = 14m06s), rounded up; [run 44190163638](https://github.com/szTheory/schwaystation/actions/runs/44190163638)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

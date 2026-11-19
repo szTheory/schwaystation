@@ -1,8 +1,8 @@
 # Phase 7: Measured quality baselines
 
 These are producer-bound observations for the current library and CI. A number is eligible for a hard bound only
-when its producer, units, source inputs and workload match the recorded evidence. The WASI module measurement is
-the one outstanding value; its focused producer check is specified below before a bound can be enabled.
+when its producer, units, source inputs and workload match the recorded evidence. The WASI module size was
+measured on the hosted Linux producer, and the checked-in bound matches that exact linked-module measurement.
 
 ## Baseline table
 
@@ -10,7 +10,7 @@ the one outstanding value; its focused producer check is specified below before 
 | --- | --- | --- | ---: | --- |
 | `ir_per_frame.testcard` | Cachegrind Ir per emulated frame | Release `schwaystation-run`; built-in test card; `ubuntu-26.04`; Valgrind 3.26.0; matching manual `perf` producer, three samples | 1,619,573, 1,619,573, 1,619,573; spread 0 | floor 1,619,573; ceiling 1,619,573 |
 | `ir_per_frame.gpu_motion` | Cachegrind Ir per emulated frame | Same Release runner and toolchain; `tests/fixtures/src/gpu_motion.asm`, built by the pinned armips tool; same manual `perf` producer, three samples | 137,752,334, 137,752,334, 137,752,334; spread 0 | floor 137,752,334; ceiling 137,752,334 |
-| `size.wasm` | linked module bytes | Release `schwaystation-run` target from the `wasm32` preset; the runner module at `build/wasm32/schwaystation-run`, not a host wrapper or compressed archive | **Not measured:** this host has no `clang-21`, `clang++-21`, `wasm-ld-21`, or WASI sysroot; `build/wasm32` has no generated build files | no floor or ceiling until the focused WASI measurement below succeeds |
+| `size.wasm` | linked module bytes | Release `schwaystation-run` target from the `wasm32` preset; the runner module at `build/wasm32/schwaystation-run`, not a host wrapper or compressed archive; `ubuntu-26.04` | 595,820 bytes; [PR run 44460238941, WASI job 135345194644](https://github.com/szTheory/schwaystation/actions/runs/44460238941/job/135345194644) | floor 595,820; ceiling 595,820 |
 | `state.bytes` | serialized bytes including header | Current Release `schwaystation` library; NTSC-U instance matching `tests/core/test_state.c::make`; public `schway_state_size` and `schway_save_state` API | 3,755,020 total: 20-byte header + 3,755,000-byte body; serialized header total field also equals 3,755,020 | floor 3,755,020; ceiling 3,755,020 |
 | `ci.critical_path_s` | seconds from recorded job DAG | Exact matching `ci.yml` push cohort from Plan 02; `changes → openbios → be32 → hash-equality → ci-required`; fingerprint and runs below | 2,249 s and 3,293 s; observed spread 1,044 s | floor 2,249; ceiling 3,293 |
 
@@ -60,12 +60,14 @@ region=NTSC-U header_bytes=20 state_size_api=3755020 body_bytes=3755000 encoded_
 The state existed only in process memory; no state bytes or diagnostic source were committed. `state.bytes` counts
 the complete API-reported length, including the header.
 
-## WASI module measurement prerequisite
+## WASI module measurement
 
 The configured `build/wasm32/CMakeCache.txt` names `cmake/toolchains/wasm32-wasi.cmake` and Release mode, but this
 checkout has no generated `build.ninja` or Makefile for that tree. `cmake --build build/wasm32 --target help` exited 1
 with `ninja: error: loading 'build.ninja': No such file or directory`; `clang-21`, `clang++-21`, `wasm-ld-21` and a
-WASI sysroot are absent locally. Do not substitute `build/ci/schwaystation-run`, a wrapper, or an archive size.
+WASI sysroot are absent locally. The hosted `wasm32` lane ran the canonical size comparator against the linked
+target and reported exactly 595,820 bytes. Its CI log is linked above. This is the module itself, not a host
+wrapper or compressed archive.
 
 The narrow measurement can run on the existing `ubuntu-26.04` WASI lane after its current toolchain setup installs
 `wasi-libc` and `libclang-rt-21-dev-wasm32`:
@@ -77,8 +79,8 @@ wc -c build/wasm32/schwaystation-run
 ```
 
 Confirm the target is a WebAssembly module and record the OS image version plus package versions. This focused
-target build does not need to run the WASI test inventory or Wasmtime. Record the returned integer byte count
-before adding a nonzero floor and that exact ceiling to `quality.json`.
+target build does not need to run the WASI test inventory or Wasmtime. For a future toolchain or source change,
+remeasure on this producer and review the bound before updating it.
 
 ## Comparable CI critical path
 
