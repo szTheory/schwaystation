@@ -229,6 +229,103 @@ if(CMAKE_SCRIPT_MODE_FILE)
        NOT old_slot_two STREQUAL new_slot_two)
       message(FATAL_ERROR "normal exit did not save only slot 1's completed card generation")
     endif()
+
+    # The same two-slot guest has independent normalized serial identities.
+    if(NOT DEFINED FIXTURES)
+      message(FATAL_ERROR "runner card fixture path was not provided")
+    endif()
+    set(identity_dir "${OUT}/runner-cards-identities")
+    file(MAKE_DIRECTORY "${identity_dir}")
+    set(identity_a_exe "${OUT}/sLuS_123.45.exe")
+    set(identity_b_exe "${OUT}/SLUS_123.46.exe")
+    file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${identity_a_exe}")
+    file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${identity_b_exe}")
+    function(run_identity_guest image label)
+      execute_process(COMMAND ${RUN} --exe "${image}" --frames 120 --stop-on mailbox
+          --save-dir "${identity_dir}" --memcard-names serial
+        RESULT_VARIABLE identity_rc OUTPUT_VARIABLE identity_out ERROR_VARIABLE identity_err)
+      if(NOT identity_rc STREQUAL "0" OR NOT identity_out MATCHES "mailbox SWMB status=00")
+        message(FATAL_ERROR "${label} automatic identity guest failed (${identity_rc}): ${identity_out}${identity_err}")
+      endif()
+    endfunction()
+    function(check_identity_card path value label)
+      if(NOT EXISTS "${path}")
+        message(FATAL_ERROR "${label} card was not persisted: ${path}")
+      endif()
+      file(SIZE "${path}" card_size)
+      file(READ "${path}" card_value HEX OFFSET 128 LIMIT 1)
+      string(TOLOWER "${card_value}" card_value)
+      file(READ "${path}" frame_checksum HEX OFFSET 255 LIMIT 1)
+      string(TOLOWER "${frame_checksum}" frame_checksum)
+      if(NOT card_size EQUAL 131072 OR NOT card_value STREQUAL value OR
+         NOT frame_checksum STREQUAL value)
+        message(FATAL_ERROR "${label} card has size/value/checksum ${card_size}/${card_value}/${frame_checksum}")
+      endif()
+    endfunction()
+    run_identity_guest("${identity_a_exe}" "identity A first process")
+    run_identity_guest("${identity_b_exe}" "identity B first process")
+    set(identity_a_slot1 "${identity_dir}/SLUS-12345.srm")
+    set(identity_a_slot2 "${identity_dir}/SLUS-12345.1.mcr")
+    set(identity_b_slot1 "${identity_dir}/SLUS-12346.srm")
+    set(identity_b_slot2 "${identity_dir}/SLUS-12346.1.mcr")
+    check_identity_card("${identity_a_slot1}" "01" "first-process identity A slot 1")
+    check_identity_card("${identity_a_slot2}" "02" "first-process identity A slot 2")
+    check_identity_card("${identity_b_slot1}" "01" "first-process identity B slot 1")
+    check_identity_card("${identity_b_slot2}" "02" "first-process identity B slot 2")
+    file(GLOB identity_files LIST_DIRECTORIES FALSE "${identity_dir}/*.srm" "${identity_dir}/*.mcr")
+    set(expected_identity_files "${identity_a_slot1}" "${identity_a_slot2}" "${identity_b_slot1}" "${identity_b_slot2}")
+    list(SORT identity_files)
+    list(SORT expected_identity_files)
+    if(NOT identity_files STREQUAL expected_identity_files)
+      message(FATAL_ERROR "two identities did not produce exactly four card files: ${identity_files}")
+    endif()
+    file(SHA256 "${identity_b_slot1}" identity_b_slot1_before)
+    file(SHA256 "${identity_b_slot2}" identity_b_slot2_before)
+    run_identity_guest("${identity_a_exe}" "identity A second process")
+    check_identity_card("${identity_a_slot1}" "02" "second-process identity A slot 1")
+    check_identity_card("${identity_a_slot2}" "03" "second-process identity A slot 2")
+    file(SHA256 "${identity_b_slot1}" identity_b_slot1_after)
+    file(SHA256 "${identity_b_slot2}" identity_b_slot2_after)
+    if(NOT identity_b_slot1_before STREQUAL identity_b_slot1_after OR
+       NOT identity_b_slot2_before STREQUAL identity_b_slot2_after)
+      message(FATAL_ERROR "running identity A changed identity B's cards")
+    endif()
+
+    # A rejected second-slot import cannot change the first complete file.
+    file(WRITE "${identity_a_slot2}" "")
+    file(SHA256 "${identity_a_slot1}" identity_a_slot1_before_refusal)
+    execute_process(COMMAND ${RUN} --exe "${identity_a_exe}" --frames 120 --stop-on mailbox
+        --save-dir "${identity_dir}" --memcard-names serial
+      RESULT_VARIABLE refused_rc OUTPUT_VARIABLE refused_out ERROR_VARIABLE refused_err)
+    file(SHA256 "${identity_a_slot1}" identity_a_slot1_after_refusal)
+    if(NOT refused_rc STREQUAL "1" OR NOT refused_err MATCHES "cannot import card file" OR
+       NOT identity_a_slot1_before_refusal STREQUAL identity_a_slot1_after_refusal)
+      message(FATAL_ERROR "refused automatic identity import changed an existing complete file: ${refused_out}${refused_err}")
+    endif()
+    file(REMOVE "${identity_a_slot2}")
+
+    # A forced rename failure on the selected identity preserves both stored slots.
+    file(SHA256 "${identity_a_slot1}" identity_a_slot1_before_failure)
+    file(SHA256 "${identity_a_slot2}" identity_a_slot2_before_failure)
+    execute_process(COMMAND ${RUN} --exe "${identity_a_exe}" --frames 1 --save-dir "${identity_dir}"
+        --memcard-names serial --test-card-write slot1 --test-save-failure rename
+      RESULT_VARIABLE failed_rc OUTPUT_VARIABLE failed_out ERROR_VARIABLE failed_err)
+    file(SHA256 "${identity_a_slot1}" identity_a_slot1_after_failure)
+    file(SHA256 "${identity_a_slot2}" identity_a_slot2_after_failure)
+    if(NOT failed_rc STREQUAL "1" OR NOT failed_err MATCHES "cannot save card file" OR
+       NOT identity_a_slot1_before_failure STREQUAL identity_a_slot1_after_failure OR
+       NOT identity_a_slot2_before_failure STREQUAL identity_a_slot2_after_failure)
+      message(FATAL_ERROR "failed automatic identity publication changed an existing card: ${failed_out}${failed_err}")
+    endif()
+
+    file(SHA256 "${identity_a_slot1}" identity_a_slot1_before_b)
+    run_identity_guest("${identity_b_exe}" "identity B second process")
+    check_identity_card("${identity_b_slot1}" "02" "second-process identity B slot 1")
+    check_identity_card("${identity_b_slot2}" "03" "second-process identity B slot 2")
+    file(SHA256 "${identity_a_slot1}" identity_a_slot1_after_b)
+    if(NOT identity_a_slot1_before_b STREQUAL identity_a_slot1_after_b)
+      message(FATAL_ERROR "running identity B changed identity A's cards")
+    endif()
   elseif(CASE STREQUAL "cards_sigterm")
     set(RUN ${HOOKED})
     string(REPEAT "[0-9a-f]" 64 digits)
@@ -344,6 +441,52 @@ if(CMAKE_SCRIPT_MODE_FILE)
        EXISTS "${exe_serial_dir}/sLuS_123.45.srm" OR
        EXISTS "${exe_serial_dir}/schwaystation.srm")
       message(FATAL_ERROR "PS-EXE serial naming did not normalize the complete source stem")
+    endif()
+
+    # An explicit override remains literal even when its prefix is reserved for
+    # automatic digest identities.
+    set(literal_identity_dir "${OUT}/runner-cards-literal-identity")
+    file(MAKE_DIRECTORY "${literal_identity_dir}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${literal_identity_dir}"
+      --memcard-names serial --serial sGi1-literal --exe "${serial_exe}" --test-card-write slot1)
+    if(NOT EXISTS "${literal_identity_dir}/sGi1-literal.srm" OR
+       EXISTS "${literal_identity_dir}/SGI1-LITERAL.srm")
+      message(FATAL_ERROR "literal serial override was normalized or treated as an automatic digest")
+    endif()
+
+    # A serial-shaped-but-invalid source stem falls back to a framed digest of
+    # all executable bytes; moving the same bytes cannot change that identity.
+    set(digest_dir "${OUT}/runner-cards-exe-digest")
+    file(MAKE_DIRECTORY "${digest_dir}" "${OUT}/renamed")
+    set(homebrew_exe "${OUT}/homebrew.exe")
+    set(invalid_serial_exe "${OUT}/renamed/slus_123.4.exe")
+    file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${homebrew_exe}")
+    file(COPY_FILE "${FIXTURES}/memcard_roundtrip.exe" "${invalid_serial_exe}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${digest_dir}"
+      --memcard-names serial --exe "${homebrew_exe}" --test-card-write slot1)
+    set(exe_digest "sgi1-115696bfa2b40f832c731a520fe237039582ad768916dfaaa207737f285378cd")
+    if(NOT EXISTS "${digest_dir}/${exe_digest}.srm")
+      message(FATAL_ERROR "missing complete framed executable digest card path")
+    endif()
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${digest_dir}"
+      --memcard-names serial --exe "${invalid_serial_exe}" --test-card-write slot1)
+    file(GLOB digest_card_files LIST_DIRECTORIES FALSE "${digest_dir}/*.srm" "${digest_dir}/*.mcr")
+    set(expected_digest_card_files "${digest_dir}/${exe_digest}.srm")
+    if(NOT digest_card_files STREQUAL expected_digest_card_files OR
+       EXISTS "${digest_dir}/homebrew.srm" OR EXISTS "${digest_dir}/slus_123.4.srm")
+      message(FATAL_ERROR "executable paths changed the automatic digest identity: ${digest_card_files}")
+    endif()
+
+    # Accepted trailing bytes participate in the same full-file digest frame.
+    set(tail_exe "${OUT}/homebrew-tail.exe")
+    file(COPY_FILE "${homebrew_exe}" "${tail_exe}")
+    file(APPEND "${tail_exe}" "tail-change")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${digest_dir}"
+      --memcard-names serial --exe "${tail_exe}" --test-card-write slot2)
+    set(tail_digest "sgi1-1cbe12ac81973779678ada3e9839e44d792f84d8359c48c7b83ffd7ce898d314")
+    if(NOT EXISTS "${digest_dir}/${tail_digest}.1.mcr" OR
+       EXISTS "${digest_dir}/${tail_digest}.srm")
+      message(FATAL_ERROR "accepted executable tail bytes did not change the full content identity")
     endif()
 
     # A forced atomic replacement failure returns status 1, preserves the old card, and cleans its temp.
