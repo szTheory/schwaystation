@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 8
-current_phase_name: Per-game card saves
-current_plan: 10
-status: executing
-stopped_at: Completed 08-10-PLAN.md; phase review and verification follow
-last_updated: "2026-11-19T22:31:22Z"
+current_phase: 9
+current_phase_name: CHD disc images
+current_plan: Not started
+status: planning
+stopped_at: Phase 8 verified; ship pending before Phase 9 work
+last_updated: "2026-11-19T23:12:29Z"
 last_activity: 2026-11-19
-last_activity_desc: Completed Phase 8 Plan 08-10; both exact-head save proofs passed, phase closeout remains.
-state_head: d0c0bb18067a21b100a75b2818b3a1f25610049a
+last_activity_desc: Phase 8 verification passed; phase PR and release must finish before Phase 9 starts
+state_head: 909cebe61d580e413e74e9c05f00d1085862e015
 progress:
   total_phases: 10
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 20
   completed_plans: 20
-  percent: 10
+  percent: 20
 ---
 
 # Project State
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 8 — Per-game card saves
+**Current focus:** Phase 9 — CHD disc images, after Phase 8 ships
 
 ## Current Position
 
-Phase: 8 (Per-game card saves) — EXECUTING
-Current Plan: 10
-Total Plans in Phase: 10
-Status: Plan execution complete; phase review and verification follow
-Last activity: 2026-11-19 — Plan 08-10 passed its exact-head hosted runs; phase closeout follows.
+Phase: 9 — CHD disc images
+Current Plan: Not started
+Total Plans in Phase: Not planned
+Status: Ready to plan after Phase 8 PR, release and green main CI
+Last activity: 2026-11-19 — Phase 8 verification passed; ship before Phase 9 discussion.
 
 ### Phase 8 Plan 08-10 execution (2026-11-19)
 
@@ -48,8 +48,25 @@ selectors passed 4/4 and run 44618451958 passed the full required matrix on
 `d4463e798bcb23b3b059a6844908616e526a9b20`, including the same fresh-process proof, hash equality and required
 roll-up. BE32 took about 76 minutes in the first run and 65m39s in the second. The true-claim self-test was
 updated to derive its baseline from generated metadata after its first run exposed the old hardcoded-false
-assumption. Both full run links and artifacts are recorded in `08-10-SUMMARY.md`; review and phase verification
-are the remaining closeout steps.
+assumption. Both full run links and artifacts are recorded in `08-10-SUMMARY.md`; the phase review and
+verification are complete.
+
+### Phase 8 verification and transition (2026-11-19)
+
+Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session, exact deployed model ID unavailable. The wall interval from
+the 22:31:22Z checkpoint to phase transition at 23:09:35Z was about 38 minutes; active inline verification was
+about 12 minutes, not precisely measured. The typed verifier was interrupted before it wrote a report, so its
+existing evidence was recovered and checked inline rather than repeating the full suite. A fresh CMake CI
+configure and the consolidated Phase 8 selector passed 24/24 tests in 5.13 seconds; all ten plans' artifact
+checks passed 40/40; canonical verification status and the five-check automated UAT predicate both passed.
+The exact-head hosted run 44618451958 passed the required matrix and two-process RetroArch card continuation;
+BE32 remained the critical path at 65m39s. Its run and artifact links are in 08-VERIFICATION.md.
+
+CI efficiency review: the stable-state-size preflight ran in about nine seconds before the 4m03s Linux
+build/test job. The local full CMake suite and exact-head hosted run already covered the useful local and hosted
+paths, so act would have repeated equivalent checks. Phase 8 has no supported additional coverage-preserving
+CI change. Its PR CI and automatic release remain required; do not begin Phase 9 until main CI is green and the
+release is published. The only open todo is 050, explicitly bound to Phase 9.
 
 ### Phase 8 Plan 08-02 execution (2026-11-19)
 
@@ -179,7 +196,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 205
+- Total plans completed: 215
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -194,6 +211,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 05 | 24 | - | - |
 | 06 | 45 | - | - |
 | 7 | 10 | - | - |
+| 8 | 10 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1031,8 +1049,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T18:46:12.011Z
-Stopped at: Completed 08-09-PLAN.md
+Last session: 2026-11-19T23:12:29Z
+Stopped at: Phase 8 verified and transitioned; ship Phase 8 before starting Phase 9
 Resume file: None
 
 ### v1.0 session history
