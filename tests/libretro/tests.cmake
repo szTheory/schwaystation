@@ -95,6 +95,7 @@ endif()
 # The in-process frontend. It links the library and the shared converter
 # itself, runs a reference instance beside the module and compares the
 # delivered frame with that instance's conversion byte for byte.
+target_compile_definitions(schwaystation_libretro PRIVATE SCHWAYSTATION_LIBRETRO_TESTING)
 add_executable(schwaystation-test-libretro-host ${CMAKE_CURRENT_LIST_DIR}/host.c)
 target_include_directories(schwaystation-test-libretro-host PRIVATE ${PROJECT_SOURCE_DIR}/libretro)
 target_link_libraries(schwaystation-test-libretro-host PRIVATE schwaystation::schwaystation
@@ -158,13 +159,15 @@ foreach(case IN ITEMS "libretro.host;ntsc-u" "libretro.host.pal;pal")
 endforeach()
 
 # Fault prevented: disk callbacks report success without changing the live
-# guest's CD-ROM interrupt and subsequent TOC responses.
+# guest's CD-ROM interrupt and subsequent TOC responses, or a playlist/member
+# swap changes card 2's original frontend content path.
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-disc-control)
 schway_add_test(NAME libretro.host.disc_control
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> disc-control
     ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u
     ${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.cue
-    ${PROJECT_BINARY_DIR}/openbios
+    ${PROJECT_BINARY_DIR}/openbios ${PROJECT_BINARY_DIR}/tests/libretro-disc-control
   LABELS libretro portable TIMEOUT 240)
 
 # Fault prevented: the libretro core changes disc XA/CD-DA samples, callback

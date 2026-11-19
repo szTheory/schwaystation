@@ -120,6 +120,8 @@ static void(RETRO_CALLCONV *p_unload_game)(void);
 static unsigned(RETRO_CALLCONV *p_get_region)(void);
 static void *(RETRO_CALLCONV *p_get_memory_data)(unsigned);
 static size_t(RETRO_CALLCONV *p_get_memory_size)(unsigned);
+static const uint8_t *(RETRO_CALLCONV *p_test_card2_data)(size_t *);
+static const char *(RETRO_CALLCONV *p_test_card2_path)(void);
 
 static const char *missing;
 
@@ -164,6 +166,8 @@ static void resolve_all(void)
     RESOLVE(p_get_region, "retro_get_region");
     RESOLVE(p_get_memory_data, "retro_get_memory_data");
     RESOLVE(p_get_memory_size, "retro_get_memory_size");
+    RESOLVE(p_test_card2_data, "schway__libretro_test_card2_data");
+    RESOLVE(p_test_card2_path, "schway__libretro_test_card2_path");
 }
 
 /* ---- frontend callbacks: record what the core does ---- */
@@ -202,6 +206,7 @@ static const char *bios_option_value = "none";
 static const char *system_directory;
 static const char *save_directory;
 static int save_directory_available = 1;
+static unsigned save_directory_calls;
 static int memory_maps_available = 1;
 static unsigned memory_map_calls;
 #define MEMORY_DESCRIPTOR_CAP 16u
@@ -462,6 +467,7 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         if (!save_directory_available || save_directory == NULL || data == NULL) {
             return false;
         }
+        save_directory_calls++;
         *(const char **)data = save_directory;
         return true;
     case RETRO_ENVIRONMENT_SET_MEMORY_MAPS: {
@@ -2218,19 +2224,22 @@ static uint32_t guest_mailbox_record(const unsigned char *ram, unsigned id)
 }
 
 static int test_disc_control(const char *playlist_path, const char *second_path,
-                             const char *bios_directory)
+                             const char *bios_directory, const char *card_directory)
 {
     struct retro_game_info game;
     schway_disc_image *second_image = NULL;
     schway_disc_image_error image_error;
     char expected_first[4096];
     char expected_second[4096];
+    char playlist_card1[4096], playlist_card2[4096], member_card2[4096];
     char path[4096];
     char label[256];
+    unsigned char card_seed[SCHWAY_MEMCARD_SIZE];
     unsigned char *ram;
     uint32_t expected_first_toc, expected_second_toc;
     size_t path_length;
     const char *canonical_first;
+    unsigned save_calls_before = save_directory_calls;
 
     CHECK(disk_control_set_calls != 0u);
     CHECK(disk_control.set_eject_state != NULL);
@@ -2291,6 +2300,23 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
     CHECK(expected_first_toc != 0u);
     CHECK(expected_second_toc != 0u);
     CHECK(expected_first_toc != expected_second_toc);
+    CHECK(test_path(playlist_card1, sizeof playlist_card1, card_directory,
+                    "disc_boot_runner.srm"));
+    CHECK(test_path(playlist_card2, sizeof playlist_card2, card_directory,
+                    "disc_boot_runner.1.mcr"));
+    CHECK(test_path(member_card2, sizeof member_card2, card_directory,
+                    "disc_boot_playlist.1.mcr"));
+    if (check_failures != 0) {
+        return 1;
+    }
+    (void)remove(playlist_card1);
+    (void)remove(playlist_card2);
+    (void)remove(member_card2);
+    memset(card_seed, 0xFF, sizeof card_seed);
+    card_seed[128u] = 0x42u;
+    CHECK(write_test_file(playlist_card2, card_seed, sizeof card_seed));
+    save_directory = card_directory;
+    save_directory_available = 1;
 
     system_directory = bios_directory;
     bios_option_value = "none";
@@ -2305,6 +2331,21 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
     CHECK_EQ_U64(disk_control.get_num_images(), 2u);
     CHECK_EQ_U64(disk_control.get_image_index(), 1u);
     CHECK(!disk_control.get_eject_state());
+    CHECK_EQ_U64(save_directory_calls, save_calls_before + 1u);
+    {
+        size_t card2_size = 0u;
+        const uint8_t *card2 = p_test_card2_data(&card2_size);
+        const char *card2_path = p_test_card2_path();
+        CHECK(card2 != NULL);
+        CHECK_EQ_U64(card2_size, SCHWAY_MEMCARD_SIZE);
+        if (card2 != NULL && card2_size == SCHWAY_MEMCARD_SIZE) {
+            CHECK_EQ_U64(card2[128u], 0x42u);
+        }
+        CHECK(card2_path != NULL);
+        if (card2_path != NULL) {
+            CHECK(strcmp(card2_path, playlist_card2) == 0);
+        }
+    }
 
     memset(path, 0xA5, sizeof path);
     CHECK(disk_control.get_image_path(1u, path, sizeof path));
@@ -2376,6 +2417,21 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
     CHECK(strcmp(path, expected_first) == 0);
     CHECK(disk_control.set_image_index(0u));
     CHECK_EQ_U64(disk_control.get_image_index(), 0u);
+    CHECK_EQ_U64(save_directory_calls, save_calls_before + 1u);
+    {
+        size_t card2_size = 0u;
+        const uint8_t *card2 = p_test_card2_data(&card2_size);
+        const char *card2_path = p_test_card2_path();
+        CHECK(card2 != NULL);
+        CHECK_EQ_U64(card2_size, SCHWAY_MEMCARD_SIZE);
+        if (card2 != NULL && card2_size == SCHWAY_MEMCARD_SIZE) {
+            CHECK_EQ_U64(card2[128u], 0x42u);
+        }
+        CHECK(card2_path != NULL);
+        if (card2_path != NULL) {
+            CHECK(strcmp(card2_path, playlist_card2) == 0);
+        }
+    }
     CHECK(disk_control.set_eject_state(false));
     CHECK(!disk_control.get_eject_state());
     CHECK(!disk_control.set_image_index(1u));
@@ -2432,6 +2488,37 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
     CHECK_EQ_U64(disk_control.get_image_index(), 0u);
     CHECK(disk_control.get_eject_state() == false);
     p_unload_game();
+    check_card_file_equal(playlist_card2, card_seed);
+    {
+        FILE *card_one_file = schway__test_open_file(playlist_card1, "rb");
+        CHECK(card_one_file == NULL);
+        if (card_one_file != NULL) {
+            (void)fclose(card_one_file);
+        }
+    }
+
+    memset(card_seed, 0xFF, sizeof card_seed);
+    card_seed[128u] = 0x63u;
+    CHECK(write_test_file(member_card2, card_seed, sizeof card_seed));
+    game.path = second_path;
+    CHECK(p_load_game(&game));
+    CHECK_EQ_U64(save_directory_calls, save_calls_before + 3u);
+    {
+        size_t card2_size = 0u;
+        const uint8_t *card2 = p_test_card2_data(&card2_size);
+        const char *card2_path = p_test_card2_path();
+        CHECK(card2 != NULL);
+        CHECK_EQ_U64(card2_size, SCHWAY_MEMCARD_SIZE);
+        if (card2 != NULL && card2_size == SCHWAY_MEMCARD_SIZE) {
+            CHECK_EQ_U64(card2[128u], 0x63u);
+        }
+        CHECK(card2_path != NULL);
+        if (card2_path != NULL) {
+            CHECK(strcmp(card2_path, member_card2) == 0);
+        }
+    }
+    p_unload_game();
+    check_card_file_equal(member_card2, card_seed);
     p_deinit();
     CHECK(disk_control_unregister_calls != 0u);
     CHECK(disk_control.set_eject_state == NULL);
@@ -3766,7 +3853,7 @@ int main(int argc, char **argv)
                                          ? audio_region(argv[3])
                                          : SCHWAY_REGION_NTSC_U;
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
-    int disc_control_mode = argc == 6 && strcmp(argv[2], "disc-control") == 0;
+    int disc_control_mode = argc == 7 && strcmp(argv[2], "disc-control") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
@@ -3795,12 +3882,13 @@ int main(int argc, char **argv)
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
           card_persistence_mode || card_controls_mode) &&
          argv[3][0] == '\0') ||
-        (disc_control_mode && (argv[4][0] == '\0' || argv[5][0] == '\0')) ||
+        (disc_control_mode &&
+         (argv[4][0] == '\0' || argv[5][0] == '\0' || argv[6][0] == '\0')) ||
         ((psexe_mode || lifecycle_mode || card_persistence_mode || card_controls_mode) &&
          argv[4][0] == '\0')) {
         fprintf(stderr,
                 "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | "
-                "disc-control <m3u> <second-cue> <bios-directory> | "
+                "disc-control <m3u> <second-cue> <bios-directory> <save-directory> | "
                 "disc-audio-equality-batch|disc-audio-equality-single <region> <m3u> <pcm> <bios-directory> | "
                 "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
@@ -3875,7 +3963,7 @@ int main(int argc, char **argv)
     }
 
     if (disc_control_mode) {
-        return test_disc_control(argv[3], argv[4], argv[5]);
+        return test_disc_control(argv[3], argv[4], argv[5], argv[6]);
     }
 
     if (rumble_guest_mode) {
