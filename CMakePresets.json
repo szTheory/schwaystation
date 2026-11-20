@@ -19,14 +19,20 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
-        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13"
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13",
+        "SCHWAYSTATION_CHD": "ON",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "ON"
       }
     },
     {
       "name": "library",
       "inherits": "ci",
       "$comment": "Local-only compatibility report checks use temporary fixtures; owner data is scanned only by scripts/library.sh after the workflow.",
-      "binaryDir": "${sourceDir}/build/library"
+      "binaryDir": "${sourceDir}/build/library",
+      "cacheVariables": {
+        "SCHWAYSTATION_CHD": "OFF",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "OFF"
+      }
     },
     {
       "name": "ci-msvc",
@@ -36,7 +42,23 @@
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
+        "SCHWAYSTATION_CHD": "ON",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "ON"
+      }
+    },
+    {
+      "name": "chd-tool",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/chd-tool",
+      "$comment": "Native-only fixture generator for cross-compiled CI lanes; the standalone library stays CHD-off.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SCHWAYSTATION_BUILD_TESTS": "OFF",
+        "SCHWAYSTATION_BUILD_RUNNER": "OFF",
+        "SCHWAYSTATION_BUILD_LIBRETRO": "OFF",
+        "SCHWAYSTATION_CHD": "OFF",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "ON"
       }
     },
     {
@@ -70,7 +92,7 @@
     {
       "name": "fuzz",
       "inherits": "base",
-      "$comment": "The loader, SPU and six media fuzz targets use clang-21 with ASan and UBSan. Selected libretro consumers use generated fixtures; the asan inventory omits standalone fixture tests. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage. Nightly runs six bounded campaigns.",
+      "$comment": "The loader, SPU and six media fuzz targets use clang-21 with ASan and UBSan. CHD uses an external uninstrumented tool built by chd-tool. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -84,7 +106,10 @@
         "SCHWAYSTATION_TIMEOUT_SCALE": "3",
         "SCHWAYSTATION_INVENTORY": "asan",
         "SCHWAYSTATION_FIXTURES": "ON",
-        "SCHWAYSTATION_FUZZ": "ON"
+        "SCHWAYSTATION_FUZZ": "ON",
+        "SCHWAYSTATION_CHD": "ON",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "OFF",
+        "SCHWAYSTATION_CHD_TOOL_EXECUTABLE": "${sourceDir}/build/chd-tool/tools/schwaystation-chd-tool"
       }
     },
     {
@@ -169,6 +194,7 @@
     { "name": "ci", "configurePreset": "ci" },
     { "name": "library", "configurePreset": "library" },
     { "name": "ci-msvc", "configurePreset": "ci-msvc" },
+    { "name": "chd-tool", "configurePreset": "chd-tool", "targets": ["schwaystation-chd-tool"] },
     { "name": "hygiene", "configurePreset": "hygiene" },
     { "name": "asan", "configurePreset": "asan" },
     {
