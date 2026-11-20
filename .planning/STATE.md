@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Completed 09-05-PLAN.md
-last_updated: "2026-11-20T09:22:03Z"
+stopped_at: Completed 09-06-PLAN.md
+last_updated: "2026-11-20T09:54:00Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-05 complete; Plan 09-06 is next
-state_head: 6a4d468
+last_activity_desc: Phase 09 Plan 09-06 complete; Plan 09-07 is next
+state_head: 277b592
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 25
+  completed_plans: 26
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 09 Plan 09-05 complete; Plan 09-06 is next
+Last activity: 2026-11-20 — Phase 09 Plan 09-06 complete; Plan 09-07 is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -99,6 +99,18 @@ The CHD-on generated-fixture selectors passed 4/4 in 0.06 seconds; CHD-off selec
 seconds. No workflow changed, so no full suite, `act` or hosted CI run applied. The implementation and docs task
 commits are `725c464` and `6a4d468`; plan-scope corrections are `ba579e5`, `7af3a5f` and `04d3558`; summary is
 committed separately. MEDIA-01, MEDIA-02 and CHD-01 remain phase-level pending. Plan 09-06 is next.
+
+### Phase 9 Plan 09-06 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The 32-minute wall interval from
+the preceding STATE checkpoint at 09:22:03Z to plan closeout included a targeted diagnosis of a byte-order
+mismatch at the first data-track sector. The owned fixture showed decoded CHD CDDA words are pair-swapped from
+the CUE/BIN payload; normalizing each audio word restored exact output. The enabled and disabled CHD/media
+slices each passed 8/8 (0.06 seconds and 0.01 seconds); parity covered all 222 sectors in forward and reverse
+order and returned the same content identity. Sorted inventory and diff preflights passed before the full
+slice. No workflow changed, so `act`, hosted CI and a full suite added no relevant coverage. Task commits are
+`9758617` and `277b592`; the summary is committed separately. MEDIA-01 and CHD-01 remain phase-level pending.
+Plan 09-07 is next.
 
 ### Phase 9 planning (2026-11-19)
 
