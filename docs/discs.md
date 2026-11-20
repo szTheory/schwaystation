@@ -6,6 +6,31 @@ the core. File access stays in the host. The provider currently accepts cooked
 MODE2/2352, or AUDIO tracks. It rejects `.chd`, `.pbp`, `.ecm`, and `.ccd` as
 unsupported formats; those formats are not sniffed or partially opened.
 
+## CHD metadata subset
+
+`SCHWAYSTATION_CHD` is off by default. The bounded header reader recognizes
+CHD v1 through v5 header layouts, but the PlayStation CD metadata path currently
+accepts v3 through v5 with sequential `CHTR` or `CHT2` track records. CHD v1
+and v2, images without track records, non-track metadata, mixed metadata tags,
+and non-CD layouts are unsupported.
+
+The accepted track types are `AUDIO` and raw `MODE1_RAW` or `MODE2_RAW` data.
+Track and pregap subcode types must be `NONE`; subcode-bearing CHDs are
+unsupported. `POSTGAP` must be zero. CHT2 pregaps with a `V`-prefixed `PGTYPE`
+are stored in the track frames; an unprefixed pregap is virtual. Both require
+the pregap type to match the track type. Stored pregap frames count in
+`FRAMES`; virtual pregap frames do not. Track order and counts are checked
+before narrowing to public TOC fields.
+
+The CHD storage stream pads each track to a four-frame boundary. The reader
+includes those frames when reconciling the CHD logical byte count, but excludes
+them from public LBAs and leadouts. The TOC fixture checks index 0, index 1,
+pregap and exclusive leadout against the owned CUE. `disc.image.chd_headers`,
+`disc.image.chd_metadata` and `disc.image.chd_toc` cover header bounds, metadata
+variants and the generated CHD. The public image router and sector parity are
+separate integration steps; this private metadata contract does not claim that
+`.chd` is yet accepted through `schway_disc_image_open()`.
+
 ## Playlists
 
 An `.m3u` file is ASCII text containing up to 32 relative paths, one path per
