@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 9
+current_phase: 09
 current_phase_name: CHD disc images
-current_plan: Not started
-status: planning
-stopped_at: Phase 9 plans verified; execution starts at Plan 09-01
-last_updated: "2026-11-20T03:42:12.646Z"
+current_plan: 2
+status: executing
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-11-20T03:57:56.443Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 9's fourteen plans passed independent goal-backward review; execution starts at Plan 09-01
-state_head: 3e17b4c3c551d5dc90f71d0dd54cc64f664847f6
+last_activity_desc: Phase 09 Plan 09-01 complete; Plan 09-02 is next
+state_head: 9048b897ecdaa519952c6701576dd77c8016bff2
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 20
+  completed_plans: 21
   percent: 20
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 9 — CHD disc images; Phase 8 is shipped and green on main
+**Current focus:** Phase 09 — CHD disc images
 
 ## Current Position
 
-Phase: 9 — CHD disc images
-Current Plan: Not started
+Phase: 09 (CHD disc images) — EXECUTING
+Current Plan: 2
 Total Plans in Phase: 14
-Status: Phase 9 plans verified; execution starts at Plan 09-01
-Last activity: 2026-11-19 — Phase 9's fourteen plans passed independent goal-backward review.
+Status: Ready to execute
+Last activity: 2026-11-19 — Phase 09 Plan 09-01 complete; Plan 09-02 is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -45,6 +45,17 @@ newly surfaced file-scope warnings were resolved by splitting the package and fi
 changing acceptance scope. The fixture-generator license gate remains a prerequisite before any tool use. The
 command-path probe had 30 `not_applicable` rows because no Phase 9 verification artifact exists yet; the
 failure-direction probe checked all 30 commands with no findings. No test suite or CI ran during planning.
+
+### Phase 9 Plan 09-01 execution (2026-11-19)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable. The configured worktree opt-out kept this
+plan sequential and inline. The owned CUE's production callback preflight passed 1/1 after configure and a
+targeted build; it was rerun at the committed head in under one second with no build work. Disc, fuzz and
+compatibility inventories and both diff checks passed. No guest boot, full suite, hosted CI or `act` run was
+needed for the skeleton. The first configure noted that `SCHWAYSTATION_CHD=OFF` is unused until the later option
+plan; configuration still passed. The two task commits are `b6ae475` and `80be717`; Plan 09-01 summary is
+committed separately. MEDIA-01 and MEDIA-02 remain pending because this shared preflight does not complete their
+phase-wide provider, bounds and fuzz requirements. Plan 09-02 is next.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -466,6 +477,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 8 P7 | at least 318 min; active time unknown | 2 tasks | 6 files |
 | Phase 8 P08 | at least 27min; active time unavailable | 2 tasks | 10 files |
 | Phase 8 P09 | at least 20min; active time unavailable | 2 tasks | 2 files |
+| Phase 09 P01 | 9m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1097,9 +1109,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-20T03:42:12.560Z
-Stopped at: Phase 9 plans verified; execution starts at Plan 09-01
-Resume file: .planning/phases/09-chd-disc-images/09-01-PLAN.md
+Last session: 2026-11-20T03:57:56.358Z
+Stopped at: Completed 09-01-PLAN.md
+Resume file: None
 
 ### v1.0 session history
 
