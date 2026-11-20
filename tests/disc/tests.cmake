@@ -84,6 +84,7 @@ if(SCHWAYSTATION_CHD)
     LABELS disc portable TIMEOUT 30)
   set_tests_properties(disc.image.chd_open disc.image.chd_boundaries disc.image.chd_parity
     PROPERTIES FIXTURES_REQUIRED disc_media_preflight)
+  set_tests_properties(disc.image.chd_parity PROPERTIES FIXTURES_SETUP disc_chd_parity)
 else()
   schway_add_test(NAME disc.image.chd_toc
     COMMAND schwaystation-test-disc-chd --toc disabled-feature.chd
@@ -216,3 +217,37 @@ schway_add_test(NAME disc.fixture.read
 
 set_tests_properties(disc.fixture.boot disc.fixture.read disc.fixture.audio disc.fixture.fmv
   PROPERTIES FIXTURES_REQUIRED disc_media_preflight)
+
+# Run the exact bounded guest cases against the shipping CHD callbacks. These
+# setup fixtures make structure, complete source parity and feature-key checks
+# finish before any CHD guest starts.
+foreach(case boot read audio fmv)
+  set(timeout 300)
+  if(case STREQUAL "boot")
+    set(timeout 180)
+  endif()
+  if(case STREQUAL "fmv")
+    schway_add_test(NAME disc.fixture.chd.${case}
+      COMMAND schwaystation-test-disc-fixture chd-${case}
+        "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+        "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+        "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
+        "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+        "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+        "${PROJECT_BINARY_DIR}/disc/predicates.txt"
+      LABELS disc portable TIMEOUT ${timeout})
+    set_tests_properties(disc.fixture.chd.${case} PROPERTIES
+      FIXTURES_REQUIRED "disc_media_preflight;disc_chd_parity;compat_features_preflight;disc_fmv_predicates")
+  else()
+    schway_add_test(NAME disc.fixture.chd.${case}
+      COMMAND schwaystation-test-disc-fixture chd-${case}
+        "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+        "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+        "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
+        "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+        "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+      LABELS disc portable TIMEOUT ${timeout})
+    set_tests_properties(disc.fixture.chd.${case} PROPERTIES
+      FIXTURES_REQUIRED "disc_media_preflight;disc_chd_parity;compat_features_preflight")
+  endif()
+endforeach()
