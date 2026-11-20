@@ -1,4 +1,8 @@
 # Host-side disc provider behavior through the installed schway_disc callbacks.
+if(SCHWAYSTATION_CHD AND NOT SCHWAYSTATION_BUILD_CHD_TOOL)
+  message(FATAL_ERROR "CHD tests require -DSCHWAYSTATION_BUILD_CHD_TOOL=ON for the run-local fixture")
+endif()
+
 add_executable(schwaystation-test-disc-fixture
   ${PROJECT_SOURCE_DIR}/tests/disc/fixture.c)
 target_include_directories(schwaystation-test-disc-fixture PRIVATE
@@ -23,6 +27,13 @@ file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 
 add_executable(schwaystation-test-disc-media ${CMAKE_CURRENT_LIST_DIR}/media.c)
 target_link_libraries(schwaystation-test-disc-media PRIVATE schwaystation_disc_image)
+if(SCHWAYSTATION_CHD)
+  target_sources(schwaystation-test-disc-media PRIVATE ${PROJECT_SOURCE_DIR}/runner/sha256.c)
+  target_include_directories(schwaystation-test-disc-media PRIVATE ${PROJECT_SOURCE_DIR}/runner)
+  target_compile_definitions(schwaystation-test-disc-media PRIVATE SCHWAYSTATION_CHD=1)
+else()
+  target_compile_definitions(schwaystation-test-disc-media PRIVATE SCHWAYSTATION_CHD=0)
+endif()
 set_target_properties(schwaystation-test-disc-media PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-media)
@@ -43,11 +54,33 @@ schway_add_test(NAME disc.image.chd_headers
   COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 15)
 
-schway_add_test(NAME disc.media.preflight
-  COMMAND schwaystation-test-disc-media
-    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue" "${PROJECT_BINARY_DIR}/tests"
-  LABELS disc portable TIMEOUT 10)
+if(SCHWAYSTATION_CHD)
+  schway_add_test(NAME disc.media.preflight
+    COMMAND schwaystation-test-disc-media
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue" "${PROJECT_BINARY_DIR}/tests"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd.manifest"
+      "${SCHWAYSTATION_CHD_TOOL}"
+    LABELS disc portable TIMEOUT 20)
+  schway_add_test(NAME disc.media.fixture_controls
+    COMMAND schwaystation-test-disc-media --fixture-controls
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue" "${PROJECT_BINARY_DIR}/tests"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd.manifest"
+      "${SCHWAYSTATION_CHD_TOOL}"
+    LABELS disc portable TIMEOUT 30)
+else()
+  schway_add_test(NAME disc.media.preflight
+    COMMAND schwaystation-test-disc-media
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue" "${PROJECT_BINARY_DIR}/tests"
+    LABELS disc portable TIMEOUT 10)
+  schway_add_test(NAME disc.media.fixture_controls
+    COMMAND schwaystation-test-disc-media --fixture-controls
+      "${PROJECT_BINARY_DIR}/fixtures"
+    LABELS disc portable TIMEOUT 10)
+endif()
 set_tests_properties(disc.media.preflight PROPERTIES FIXTURES_SETUP disc_media_preflight)
+set_tests_properties(disc.media.fixture_controls PROPERTIES FIXTURES_REQUIRED disc_media_preflight)
 
 add_executable(schwaystation-test-disc-hash
   ${PROJECT_SOURCE_DIR}/tests/probe/disc_hash.c

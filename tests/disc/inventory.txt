@@ -15,5 +15,6 @@ disc.image.cue_root_child	disc,portable
 disc.image.cue_symlink	disc,portable
 disc.image.iso_limits	disc,portable
 disc.image.iso_sector	disc,portable
+disc.media.fixture_controls	disc,portable
 disc.media.preflight	disc,portable
 disc.playlist	disc,portable
