@@ -14,6 +14,7 @@ struct schway__state_io;
 #define SCHWAY__CARD_ACK_FROM_TX 1500u
 #define SCHWAY__CARD_READ_PAUSE_FROM_TX 31000u
 #define SCHWAY__CARD_WRITE_FINAL_STEP 136u
+#define SCHWAY__CARD_POCKET_TRANSFER_MAX 0x80u
 
 enum {
     SCHWAY__CARD_BYTE_UNHANDLED = 0u,
@@ -26,6 +27,8 @@ struct schway__card_slot {
     uint8_t bytes[SCHWAY__CARD_SIZE];
     uint64_t generation;
     uint32_t flags;
+    uint32_t pocket_index;
+    uint32_t pocket_flags;
     uint32_t phase;
     uint32_t command;
     uint32_t read_step;
@@ -35,6 +38,11 @@ struct schway__card_slot {
     uint32_t write_step;
     uint32_t write_bad_checksum;
     uint8_t write_data[SCHWAY__CARD_SECTOR_SIZE];
+    uint8_t pocket_data[6];
+    uint32_t pocket_address;
+    uint32_t pocket_length;
+    uint32_t pocket_step;
+    uint8_t pocket_payload[SCHWAY__CARD_POCKET_TRANSFER_MAX];
 };
 
 struct schway__card {

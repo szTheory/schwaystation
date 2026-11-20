@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 8
-current_phase_name: Per-game card saves
+current_phase: 9
+current_phase_name: CHD disc images
 current_plan: Not started
 status: planning
-stopped_at: Phase 7 verified; finish its ship evidence before planning Phase 8
-last_updated: "2026-11-19T05:17:08Z"
+stopped_at: Phase 8 verified; ship pending before Phase 9 work
+last_updated: "2026-11-19T23:12:29Z"
 last_activity: 2026-11-19
-last_activity_desc: Phase 7 correction passed focused local checks; exact-head hosted verification and release remain before Phase 8 planning
-state_head: f5f5ea6640392a7ba447f83b07122bf19fe5ff49
+last_activity_desc: Phase 8 verification passed; phase PR and release must finish before Phase 9 starts
+state_head: 909cebe61d580e413e74e9c05f00d1085862e015
 progress:
   total_phases: 10
-  completed_phases: 1
-  total_plans: 10
-  completed_plans: 10
-  percent: 10
+  completed_phases: 2
+  total_plans: 20
+  completed_plans: 20
+  percent: 20
 ---
 
 # Project State
@@ -26,15 +26,51 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 08 — Per-game card saves
+**Current focus:** Phase 9 — CHD disc images, after Phase 8 ships
 
 ## Current Position
 
-Phase: 8 — Per-game card saves
+Phase: 9 — CHD disc images
 Current Plan: Not started
-Total Plans in Phase: 10
-Status: Ready to plan
-Last activity: 2026-11-19 — Phase 7 verification passed; ship it before Phase 8 planning
+Total Plans in Phase: Not planned
+Status: Ready to plan after Phase 8 PR, release and green main CI
+Last activity: 2026-11-19 — Phase 8 verification passed; ship before Phase 9 discussion.
+
+### Phase 8 Plan 08-10 execution (2026-11-19)
+
+Runtime/model: Codex/OpenGSD session; GPT-6, exact deployed model and CLI minor version unavailable. The plan
+spanned at least 224 minutes from the 18:47 STATE checkpoint through the second exact-head CI roll-up; active
+time was not measured. The local integrated workflow passed 621/621 CTests and 5/5 release checks before the
+final one-line workflow-test consolidation. Exact-head CI run 44604545904 then passed on the claim-false head
+`f52ef90b7653c1f172f3141a85080751e6a306c5`; its required RetroArch card step verified two 120-frame launches
+and counters `01/02` then `02/03` for two 131,072-byte card files. After enabling the claim, the focused local
+selectors passed 4/4 and run 44618451958 passed the full required matrix on
+`d4463e798bcb23b3b059a6844908616e526a9b20`, including the same fresh-process proof, hash equality and required
+roll-up. BE32 took about 76 minutes in the first run and 65m39s in the second. The true-claim self-test was
+updated to derive its baseline from generated metadata after its first run exposed the old hardcoded-false
+assumption. Both full run links and artifacts are recorded in `08-10-SUMMARY.md`; the phase review and
+verification are complete.
+
+### Phase 8 verification and transition (2026-11-19)
+
+Runtime/model: Codex/OpenGSD 1.20.0; GPT-6 session, exact deployed model ID unavailable. The wall interval from
+the 22:31:22Z checkpoint to phase transition at 23:09:35Z was about 38 minutes; active inline verification was
+about 12 minutes, not precisely measured. The typed verifier was interrupted before it wrote a report, so its
+existing evidence was recovered and checked inline rather than repeating the full suite. A fresh CMake CI
+configure and the consolidated Phase 8 selector passed 24/24 tests in 5.13 seconds; all ten plans' artifact
+checks passed 40/40; canonical verification status and the five-check automated UAT predicate both passed.
+The exact-head hosted run 44618451958 passed the required matrix and two-process RetroArch card continuation;
+BE32 remained the critical path at 65m39s. Its run and artifact links are in 08-VERIFICATION.md.
+
+CI efficiency review: the stable-state-size preflight ran in about nine seconds before the 4m03s Linux
+build/test job. The local full CMake suite and exact-head hosted run already covered the useful local and hosted
+paths, so act would have repeated equivalent checks. Phase 8 has no supported additional coverage-preserving
+CI change. Its PR CI and automatic release remain required; do not begin Phase 9 until main CI is green and the
+release is published. The only open todo is 050, explicitly bound to Phase 9.
+
+### Phase 8 Plan 08-02 execution (2026-11-19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. Completed three tasks in 33 minutes with six atomic task commits. The focused card-file selectors passed 3/3, 4/4, and 1/1. Wrapper fields were checked against the pinned public PSX-SPX source before implementation. SAVE-02 is complete; SAVE-01, SAVE-03, and SAVE-04 were already complete. No hosted run applies. Plan 08-03 is next.
 
 ### Phase 7 execution (2026-11-18–19)
 
@@ -132,6 +168,17 @@ serialized test passed 1/1 in 29.36 seconds. The next exact-head Windows ARM64 l
 completion time; the 180s allowance is not yet validated there. Runtime/model: Codex/OpenGSD CLI 1.20.0; primary
 GPT-6 session (deployed ID unavailable); follow-up read-only reviewer gpt-6-luna xhigh.
 
+### Phase 7 ship closeout (2026-11-19)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; primary GPT-6 model ID unavailable. Phase PR #28 exact-head CI run
+44468099352 and Nightly run 44468099361 passed. Windows ARM64 completed the quality control in 116.03 seconds
+under the 180-second cap. Release PR #29 merged as `af64484f388eddf67c615673b98edd6ccb5dae4c`; main CI passed
+after a targeted retry of an anomalously slow macOS x64 path. Release run 44477155670 published v0.7.0 with 19
+assets and passed the latest-install check. Triage run 44486437761 uploaded a valid artifact with zero open
+issues and no truncation. Release-App baseline SHA limitations and same-commit duplicated runner cost are
+documented in `07-DELIVERY-EVIDENCE.md` and `07-CI-EFFICIENCY.md`; the safe-reuse investigation is bound to a
+Phase 9 workflow-editing plan in todo 050. Phase 7 ship evidence is complete; no owner UAT is needed.
+
 ### Phase 7 discussion and planning (2026-11-18)
 
 Runtime/model: Codex, OpenGSD 1.21.0; primary GPT-6 session (exact deployed model ID not exposed). Phase researcher
@@ -149,7 +196,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 205
+- Total plans completed: 215
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -164,6 +211,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 05 | 24 | - | - |
 | 06 | 45 | - | - |
 | 7 | 10 | - | - |
+| 8 | 10 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -363,6 +411,13 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 07 P08 | 58min | 2 tasks | 4 files |
 | Phase 07 P09 | 27 min | 2 tasks | 12 files |
 | Phase 07 P10 | not captured across handoffs | 2 tasks | 9 files |
+| Phase 8 P1 | 74m | 3 tasks | 6 files |
+| Phase 08 P02 | 33m | 3 tasks | 3 files |
+| Phase 08 P04 | 37 min | 3 tasks | 10 files |
+| Phase 08 P03 | 39min | 2 tasks | 6 files |
+| Phase 8 P7 | at least 318 min; active time unknown | 2 tasks | 6 files |
+| Phase 8 P08 | at least 27min; active time unavailable | 2 tasks | 10 files |
+| Phase 8 P09 | at least 20min; active time unavailable | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -741,6 +796,14 @@ Recent decisions affecting current work:
 - [Phase 07]: Device MIPS remain assumptions; the measured gpu_motion workload exceeds provisional low-power budgets and stays a named SEED-005 follow-up.
 - [Phase 07]: Use an 80-second policy.quality_metrics timeout from the 38.61-second serialized measurement; this adds headroom and is not a speedup.
 - [Phase 07]: Keep matched release-App timing, triage artifact, actual WASI module size, release, and hosted verification explicitly pending until ship.
+- [Phase 8]: Preserve caller-supplied serial spelling for literal runner card filenames.
+- [Phase 8]: Map a true libretro_saves claim to both card persistence and controls tests while keeping the template false.
+- [Phase 8]: Use a standard card ID guest as the reusable transport base for later PocketStation transfers.
+- [Phase 08]: Directory entry size occupies bytes 4–7 in the pinned source, but its byte order is unspecified; preserve a focused probe for the first 08-06 storage caller.
+- [Phase 08]: Keep existing DEC.60 ACK scheduling where PSX-SPX gives no command-specific delay; fixed BCD and unsupported storage commands are deterministic bounds, not RTC or PocketStation CPU emulation.
+- [Phase 08]: Resolve one save identity from a complete PS-EXE stem or the framed full-image digest; explicit serial overrides remain literal.
+- [Phase 08]: Keep runner auto-identity opt-in and preserve libretro frontend-based card filenames.
+- [Phase 8]: Format 18's new card protocol latches require only the two changed state pins; frame hashes and host-owned card bytes and generations stay unchanged.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -780,7 +843,7 @@ Recent decisions affecting current work:
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
-- [Phase 7]: Complete hosted ship evidence (exact-head PR CI and timing, release-App comparison, WASI byte count and bound, triage artifact, and post-merge release checks) before Phase 8 planning.
+- [Phase 7]: Closed; hosted verification, main CI, release v0.7.0 and triage artifact passed. Follow-up efficiency investigation is in todo 050, bound to Phase 9.
 
 ### Quick Tasks Completed
 
@@ -986,8 +1049,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T04:34:08.919Z
-Stopped at: Phase 7 verified; finish ship evidence before Phase 8 planning
+Last session: 2026-11-19T23:12:29Z
+Stopped at: Phase 8 verified and transitioned; ship Phase 8 before starting Phase 9
 Resume file: None
 
 ### v1.0 session history
@@ -1170,7 +1233,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Complete Phase 7 ship evidence: verify the corrected Windows timing parser, 595,820-byte WASI bound and 15-minute fuzz timeout on the exact hosted head; measure final-head PR timing, verify the triage artifact, compare the automatic release PR with run 44253419074, then confirm green merged-main CI and the published release before starting Phase 8. No owner UAT is needed.
+- Continue Phase 8 per-game card saves through autonomous discussion, planning, execution, review, verification and ship. Run cheap input and inventory checks before long suites, then confirm the merge, green main CI and automatic release before Phase 9. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 

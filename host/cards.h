@@ -11,8 +11,16 @@ typedef enum schway_host_card_status {
     SCHWAY_HOST_CARD_OK = 0,
     SCHWAY_HOST_CARD_ERR_ARGUMENT = 1,
     SCHWAY_HOST_CARD_ERR_SIZE = 2,
-    SCHWAY_HOST_CARD_ERR_IO = 3
+    SCHWAY_HOST_CARD_ERR_IO = 3,
+    SCHWAY_HOST_CARD_ERR_NOT_FOUND = 4
 } schway_host_card_status;
+
+typedef enum schway_host_card_format {
+    SCHWAY_HOST_CARD_FORMAT_RAW = 0,
+    SCHWAY_HOST_CARD_FORMAT_GME = 1,
+    SCHWAY_HOST_CARD_FORMAT_VGS = 2,
+    SCHWAY_HOST_CARD_FORMAT_PSV = 3
+} schway_host_card_format;
 
 enum {
     SCHWAY_HOST_CARD_LINT_BAD_HEADER = 1u,
@@ -36,8 +44,15 @@ schway_host_card_status schway_host_card_paths_for_basename(const char *director
                                                              const char *basename,
                                                              char *slot1, size_t slot1_size,
                                                              char *slot2, size_t slot2_size);
+schway_host_card_status schway__host_card_paths_for_identity(const char *directory,
+                                                              const char *identity,
+                                                              char *slot1, size_t slot1_size,
+                                                              char *slot2, size_t slot2_size);
 schway_host_card_status schway_host_card_save_atomic(const char *path, const void *bytes,
                                                       size_t size);
+schway_host_card_status schway_host_card_export_atomic(const char *path, const void *bytes,
+                                                        size_t size,
+                                                        schway_host_card_format format);
 
 #if defined(SCHWAY_HOST_CARD_TESTING)
 typedef enum schway_host_card_test_failure {
@@ -49,6 +64,9 @@ typedef enum schway_host_card_test_failure {
 schway_host_card_status schway_host_card_test_save_atomic(const char *path, const void *bytes,
                                                            size_t size,
                                                            schway_host_card_test_failure failure);
+schway_host_card_status schway_host_card_test_export_atomic(
+    const char *path, const void *bytes, size_t size, schway_host_card_format format,
+    schway_host_card_test_failure failure);
 #endif
 
 #endif /* SCHWAYSTATION_HOST_CARDS_H */

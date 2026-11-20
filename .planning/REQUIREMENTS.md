@@ -26,11 +26,11 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 
 ### Content identity and card lifecycle
 
-- [ ] **SAVE-01**: A documented host policy gives stable per-game card names from normalized disc serials; discs in a declared multi-disc set share the intended card identity, while a missing/invalid serial uses an explicit content-identity fallback that cannot silently collide with another game.
-- [ ] **SAVE-02**: The host imports and exports raw cards and supported `.gme`, `.mem` and `.psx` wrappers by validated content/magic, preserving card bytes exactly; invalid, truncated, oversized or unsupported input leaves the current card and file unchanged.
-- [ ] **SAVE-03**: Runner serial-based naming and both card slots load and flush through host helpers, with two-game and two-slot isolation and a fresh-process persistence round trip; failed writes do not publish partial card files.
-- [ ] **SAVE-04**: The libretro core exposes card 1 through `RETRO_MEMORY_SAVE_RAM`, reports `libretro_saves "true"` only with the implemented save path, and passes an in-process plus fresh-process save/load/continue round trip; additional card slots use the host save directory without aliasing card 1.
-- [ ] **SAVE-05**: The serial storage protocol answers the documented PocketStation memory-card commands from `58h` onward and round-trips card data; no PocketStation CPU, BIOS, LCD, RTC or IrDA emulation is claimed.
+- [x] **SAVE-01**: A documented host policy gives stable per-game card names from normalized disc serials; discs in a declared multi-disc set share the intended card identity, while a missing/invalid serial uses an explicit content-identity fallback that cannot silently collide with another game.
+- [x] **SAVE-02**: The host imports and exports raw cards and supported `.gme`, `.mem` and `.psx` wrappers by validated content/magic, preserving card bytes exactly; invalid, truncated, oversized or unsupported input leaves the current card and file unchanged.
+- [x] **SAVE-03**: Runner serial-based naming and both card slots load and flush through host helpers, with two-game and two-slot isolation and a fresh-process persistence round trip; failed writes do not publish partial card files.
+- [x] **SAVE-04**: The libretro core exposes card 1 through `RETRO_MEMORY_SAVE_RAM`, reports `libretro_saves "true"` only with the implemented save path, and passes an in-process plus fresh-process save/load/continue round trip; additional card slots use the host save directory without aliasing card 1.
+- [x] **SAVE-05**: The serial storage protocol answers the documented PocketStation memory-card commands from `58h` onward and round-trips card data; no PocketStation CPU, BIOS, LCD, RTC or IrDA emulation is claimed.
 
 ### Shared media boundary and providers
 
@@ -90,11 +90,11 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | TUNE-04 | Phase 7 | Complete |
 | TUNE-05 | Phase 7 | Complete |
 | TUNE-06 | Phase 7 | Complete |
-| SAVE-01 | Phase 8 | Pending |
-| SAVE-02 | Phase 8 | Pending |
-| SAVE-03 | Phase 8 | Pending |
-| SAVE-04 | Phase 8 | Pending |
-| SAVE-05 | Phase 8 | Pending |
+| SAVE-01 | Phase 8 | Complete |
+| SAVE-02 | Phase 8 | Complete |
+| SAVE-03 | Phase 8 | Complete |
+| SAVE-04 | Phase 8 | Complete |
+| SAVE-05 | Phase 8 | Complete |
 | MEDIA-01 | Phase 9 | Pending |
 | MEDIA-02 | Phase 9 | Pending |
 | CHD-01 | Phase 9 | Pending |

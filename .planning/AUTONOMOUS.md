@@ -46,12 +46,14 @@ checks as well; diagnose background failures before considering any foreground c
 - Hand the owner only what is identity-bound or needs their own hardware, and say why.
 - Record what was automated in the phase's verification report so no later step revisits it.
 
-## CI and release steps: look for cheap speed-ups
+## CI, ship and release steps: look for cheap speed-ups
 
-Whenever a CI or release run is in progress or finished, look for low-hanging wins in wall-clock time, iteration
-time and Actions cost: caching, job parallelism, skipping a job a change cannot affect, trimmed matrix legs,
-timeouts that follow measured runs. Never trade away check quality. Apply a safe win in the same step; record
-anything larger as one todo (rule 7).
+For every CI run, inspect it while it is in progress and again after it finishes. For every ship or release step,
+inspect the required CI and release-pipeline runs as part of the same work. Look for evidence-backed wins in
+critical-path time, iteration speed and Actions cost: remove duplicate work, parallelize independent jobs, skip a
+job only when the changed files cannot affect it, trim matrix legs only when required platform coverage remains,
+and tune timeouts from measured runs. Never trade away check quality, required cases or coverage. Apply a safe
+fix within the current step; record larger work as one todo tied to the phase that first needs it (rule 7).
 
 ## Current authorization and boundaries
 
@@ -94,9 +96,14 @@ an obsolete known-failing CI tail before dispatching its repaired head. Capture 
 accurately instead of repeating the full suite for bookkeeping.
 
 Before a long test, build, emulation or hosted run, do the cheapest relevant consistency check first: verify
-inputs and decoded output counts, command selectors and workflow wiring, inventories, or budget totals. Use
-that preflight to catch a structural mismatch before spending time on the full run; maintain it as a gate only
-when it prevents a recurring fault.
+inputs and decoded output counts, command selectors and workflow/artifact wiring, inventories, fixture sizes,
+and budget totals. Use that preflight to catch a structural mismatch before spending time on the full run; keep
+it as a permanent gate only when it prevents a recurring fault. Record measured phase/task duration and the
+observed bottleneck in the phase evidence so later estimates and CI changes use actuals rather than guesses.
+Before expensive hosted CI, use `act` for workflow jobs the local host can reproduce when that adds coverage
+beyond the existing local suite; use `act --dryrun` for routing checks. Record the hosted-only runners,
+artifacts, permissions and integrations it cannot establish, and keep their hosted gates required. Avoid
+repeating an equivalent green local suite solely to exercise `act`.
 
 For delegated research, write concise findings and verified pins to the assigned artifact early. When the
 remaining uncertainties are routine implementation probes, return them to the executor instead of delaying

@@ -26,7 +26,9 @@ which reconfigures, rather than `ctest` alone.
 
 ## Lanes
 
-Each lane is one workflow preset, `cmake --workflow --preset <name>`, building into `build/<name>`.
+Most lanes are one workflow preset, `cmake --workflow --preset <name>`, building into `build/<name>`. The hosted
+WASI lane splits configure/build from test execution so it can measure the linked module and run a focused card
+persistence preflight before the longer portable suite.
 
 | Preset | What it proves | Inventory | Tests run |
 |---|---|---|---|
@@ -38,7 +40,7 @@ Each lane is one workflow preset, `cmake --workflow --preset <name>`, building i
 | `fuzz` | The executable loader plus five disc/MDEC parser campaigns and replay targets, built with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binaries. | `asan` | none |
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
-| `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
+| `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. CI runs `cmake --workflow --preset wasm32-build`, measures the linked module, then runs `ctest --preset wasm32-preflight` and the full `ctest --preset wasm32` suite. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
 | `nightly` | Runs all 55,000 public single-step vectors, ten GPU capture references, three GPU log predicates, the pinned SPU transfer guest, and CD-ROM/MDEC references. The recorded MDEC 8-bit and status hardware comparisons remain unresolved, so DISC-03 is unaccepted pending the approved successor checks and final acceptance. | `nightly` | `gpu.reference.*`, `vectors.r3000.full`, `spu.reference.memory_transfer`, `cdrom.reference.*`, `mdec.reference.*` |
 | `perf` | A Release build for the instructions-per-frame job. Configure and build only. | `ci` | none |
 
@@ -95,7 +97,11 @@ a different boundary; none is a complete silicon PCM oracle.
 | Reverb measurement constraints | `spu.reverb`; psx-spx SCPH-1001 measurement [`a37f2fec163e149f4e3e39599eb43c65c21181a8`](https://github.com/psx-spx/psx-spx.github.io/commit/a37f2fec163e149f4e3e39599eb43c65c21181a8) | Delay, alternating channels and intermediate saturation constraints are checked | Exact per-stage rounding, which remains unresolved, or a complete hardware reverb waveform |
 | Deterministic model regressions | `spu.fixture`, `spu.reverb`, and runner audio-hash checks | Self-authored PCM digests and repeatable integer behavior; `spu.fixture` also compares exact PCM pair counts and a CPU-free authored BRR replay with the guest-produced PCM in each region | Independent hardware correctness; the audio digest is a regression, not a captured waveform |
 | Runner/libretro delivery | `libretro.host` | Batch and single-sample callback streams match the runner's drained PCM for NTSC-J, NTSC-U and PAL | Hardware correctness or RetroArch audio-device output |
-| Real-host smoke | Required hosted `retroarch` job in `.github/workflows/ci.yml` | The core's frame matches the runner, deterministic input replay reaches the expected frames, and `spu_tone.exe` boots under the stub with runner-matched video | Audio: this is a video/input smoke check only |
+| Real-host smoke | Required hosted `retroarch` job in `.github/workflows/ci.yml` | The core's frame matches the runner, replay reaches both expected frames, `spu_tone.exe` boots under the stub, and two clean RetroArch processes persist both per-game cards at 131,072 bytes with counters advancing from 1/2 to 2/3 | Audio or full hardware correctness |
+
+RetroArch runs use isolated home, save, screenshot, system and log directories. The pinned config captures unscaled
+video without an audio device, keeps replay startup synchronous, and disables content/core save subfolders so both
+card files remain in the same save directory across the two frontend processes.
 
 Every CI lane adds the `spu_tone.exe` frame-600 audio digest and its completed mailbox records to `hashes.txt`.
 The existing eight-file equality step compares those rows along with each lane's fixture identity. `spu.fixture`
@@ -260,7 +266,9 @@ observed output.
 `hashes.txt` carries frame 30 and state hashes for `hello`, `gte_vectors`, `dma_chain` and `timers_lines`. It also carries
 `gpu_motion.exe` frame hashes at 60, 120 and 180 and state hashes at 150 and 180. This fixture draws moving pixels
 through GP0 and DMA2, so its frame digest covers rendered output; its saved-state digests cover the VRAM and GPU state
-needed to continue after frame 150. `hash-equality` compares every row across all eight lanes, including generated
+needed to continue after frame 150. Format 18 also records the card protocol's pending-error latches, so the state pins
+changed while the rendered frame pins stayed fixed; card bytes and generation counters remain host-owned. `hash-equality`
+compares every row across all eight lanes, including generated
 media-file digests and the owned-disc predicates (boot at frame 600; mailbox, audio and frame at frame 900 for both
 no-input and Cross-input runs), as well as the portable be32 lane.
 
@@ -592,18 +600,19 @@ no `perf` preset. An empty or non-numeric measurement is an input error, never a
 
 The current absolute measurements and their producer identities are recorded in [`quality.json`](../quality.json)
 and [the Phase 7 baseline](../.planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md): test-card Ir is
-1,619,573 per frame, `gpu_motion` is 137,752,334, and serialized state is 3,755,020 bytes including its header.
-The linked WASI module size remains unbounded because no actual module size has been recorded. The exact CI
-critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
+1,619,573 per frame, `gpu_motion` is 137,752,334, serialized state is 3,755,328 bytes including its header,
+and the linked Release WASI module is 608,540 bytes, measured on [Phase 8 CI run 44597715729](https://github.com/szTheory/schwaystation/actions/runs/44597715729/job/135820879050).
+The exact CI critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
 fingerprint; see the [matching cohort and DAG](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
 
 CI measures these through different live producers: the `perf` job checks the current fixture instructions;
-the Linux x64 build reads `state.stable_bytes`; the WASI lane measures the linked `schwaystation-run` module; and
+the Linux x64 build reads `state.stable_bytes`; the WASI lane measures the linked `schwaystation-run` module
+immediately after build and before its preflight and full portable suite; and
 `CI required` derives the longest completed dependency path from the exact current Actions attempt. A timing
 comparison uses the dependency-path seconds only when the workload fingerprint matches the baseline. A changed
 fingerprint is reported as unbaselined; planning-only runs, main pushes and the full Release DAG are not that
 comparison. The in-progress `CI required` job is excluded from its own timing sample because it has no completion
-timestamp yet. The Phase 7 PR timing and actual WASI module size remain pending for ship.
+timestamp yet. The Phase 7 PR timing remains pending for ship.
 
 **Gate mode.** CI sets `SCHWAYSTATION_PERF_MODE` to `gate`: `FAIL`, `UNSTABLE` and `NO_BASE` exit 1. The script
 also accepts `report`, which prints the verdict and exits 0; bad input always fails. A manual run without inputs
@@ -681,7 +690,7 @@ not replace the required hosted checks on the pull request and resulting `main` 
 | `hash-equality` | `tests/cmake/hashes.cmake` with `MODE=compare` and `COUNT=8`: the six build legs', `be32`'s and `wasm32`'s `hashes.txt`, including generated media digests and OpenBIOS and owned-disc predicate rows, must be byte-identical. | yes |
 | `wasm32` | The `wasm32` preset with the pinned wasmtime; uploads `hashes-wasm32` for the eight-lane comparison. | yes |
 | `retroarch` | The pinned RetroArch 1.22.2 runs the macOS arm64 core with no content for 5 frames; its screenshot must equal `schwaystation-run --frames 5 --png 5:FILE` pixel for pixel at `320x240`. Pixel and wrong-dimension controls must fail. It boots `spu_tone.exe` and `disc_boot.cue` and compares their frame captures with the runner, including the disc at frame 900; it also replays `pad_counter.exe` with Cross at guest frame 60, where captures for frames 59 and 60 must differ and each must equal its runner PNG. | yes |
-| `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, checked against `quality.json` and compared with the merge base in gate mode on pull requests. Manual runs measure both fixtures three times or compare `gpu_motion` with an explicit control commit. | yes |
+| `perf` | Cachegrind instructions per frame for testcard and `gpu_motion`, checked against `quality.json` and compared with the merge base in gate mode on pull requests. A manual run performs the comparison only when an explicit control commit is supplied; exact-head validation runs without one skip this report-only sampler. | yes |
 | `rehearsal` | Rehearses publication on same-repository pull requests that change release inputs, signing a `rehearsal-*` release. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `cleanup` | Runs whatever the rehearsal did, once it started, and deletes the rehearsal release and its tag. See [maintaining.md](maintaining.md). | yes, when applicable |
 | `CI required` | The one ruleset check. It requires the full listed job roll-up to succeed, allowing only the documented skips for planning-only changes, non-PR title/perf, nested release calls, and inapplicable rehearsal/cleanup. On full heavy uncalled PRs it then reads the complete exact-attempt Actions jobs page and checks the comparable critical path against `quality.json`. | the check |

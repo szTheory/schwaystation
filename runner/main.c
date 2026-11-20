@@ -103,6 +103,7 @@
 #include "probe.h"
 #include "revision.h"
 #include "rss.h"
+#include "save_game_identity.h"
 #include "schwaystation.h"
 #include "sha256.h"
 #include "stop.h"
@@ -162,8 +163,8 @@ static const char synopsis[] =
     "  --inputs FILE     apply a validated controller script before each frame latch\n"
     "                    records may also use 'N lid=open', 'N disc=INDEX', 'N lid=closed'\n"
     "  --save-dir DIR    import and save memory cards in this existing directory\n"
-    "  --memcard-names MODE  basename (default) or serial\n"
-    "  --serial SERIAL   use this validated serial as the card basename with serial mode\n"
+    "  --memcard-names MODE  basename (default) or serial; serial derives from an EXE or first disc member\n"
+    "  --serial SERIAL   preserve this literal card basename as a compatibility override\n"
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --bios FILE        load an exactly 524288-byte BIOS image and report its identity\n"
     "  --disc FILE        attach a cue sheet, ISO image or m3u playlist (needs --bios)\n"
@@ -373,6 +374,7 @@ typedef struct options {
 #ifdef SCHWAY_RUN_TEST_HOOKS
     int test_card_write;
     int test_save_failure;
+    int test_disc_identity_read_failure;
     int test_audio_failure;
 #endif
 } options;
@@ -487,6 +489,11 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("--test-save-failure needs flush or rename");
             }
             i++;
+        } else if (strcmp(arg, "--test-disc-identity-read-failure") == 0) {
+            if (o->test_disc_identity_read_failure) {
+                return usage("give --test-disc-identity-read-failure once");
+            }
+            o->test_disc_identity_read_failure = 1;
         } else if (strcmp(arg, "--test-audio-failure") == 0) {
             if (o->test_audio_failure) {
                 return usage("give --test-audio-failure once");
@@ -669,8 +676,11 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->keep_going && o->exe == NULL) {
         return usage("--no-stop-on-fault needs --exe");
     }
-    if (o->serial_card_names && (o->save_dir == NULL || o->serial == NULL)) {
-        return usage("--memcard-names serial needs --save-dir and --serial");
+    if (o->serial_card_names && o->save_dir == NULL) {
+        return usage("--memcard-names serial needs --save-dir");
+    }
+    if (o->serial_card_names && o->serial == NULL && o->exe == NULL && o->disc == NULL) {
+        return usage("--memcard-names serial needs --serial unless --exe or --disc is supplied");
     }
     if (o->serial != NULL && !o->serial_card_names) {
         return usage("--serial needs --memcard-names serial");
@@ -678,6 +688,10 @@ static int parse_options(int argc, char **argv, options *o)
 #ifdef SCHWAY_RUN_TEST_HOOKS
     if ((o->test_card_write != 0 || o->test_save_failure != 0) && o->save_dir == NULL) {
         return usage("card test options need --save-dir");
+    }
+    if (o->test_disc_identity_read_failure &&
+        (o->save_dir == NULL || o->disc == NULL || !o->serial_card_names)) {
+        return usage("disc identity read failure test needs disc serial card names and --save-dir");
     }
     if (o->test_audio_failure && !o->hash_audio) {
         return usage("--test-audio-failure needs --hash-audio");
@@ -714,9 +728,7 @@ static void runner_cards_release(runner_card_files *cards)
 static int runner_card_basename(const options *opt, char out[64])
 {
     const char *name = "schwaystation";
-    if (opt->serial_card_names) {
-        name = opt->serial;
-    } else if (opt->exe != NULL) {
+    if (opt->exe != NULL) {
         name = opt->exe;
         for (const char *p = opt->exe; *p != '\0'; p++) {
             if (*p == '/' || *p == '\\') {
@@ -753,19 +765,60 @@ static void runner_card_lint(const char *path, const schway_host_card_lint *lint
     }
 }
 
-static int runner_cards_load(const options *opt, schway *inst, runner_card_files *cards)
+static int runner_cards_load(const options *opt, schway *inst, runner_card_files *cards,
+                             const uint8_t *exe, size_t exe_size,
+                             const schway_disc_image *disc_image)
 {
     if (opt->save_dir == NULL) {
         return SCHWAY__EXIT_OK;
     }
 
+    schway__save_game_identity identity;
+    const char *component;
+    int literal_identity = 0;
     char basename[64];
-    if (!runner_card_basename(opt, basename)) {
-        fprintf(stderr, "schwaystation-run: invalid card save basename\n");
-        return SCHWAY__EXIT_USAGE;
+    if (opt->serial_card_names) {
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        if (opt->test_disc_identity_read_failure) {
+            schway__save_game_identity_test_fail_after(0u);
+        }
+#endif
+        schway__save_game_identity_status identity_status = schway__save_game_identity_resolve(
+            opt->serial, opt->disc == NULL ? exe : NULL,
+            opt->disc == NULL ? exe_size : 0u,
+            opt->disc == NULL ? opt->exe : opt->disc,
+            disc_image, &identity);
+#ifdef SCHWAY_RUN_TEST_HOOKS
+        if (opt->test_disc_identity_read_failure) {
+            schway__save_game_identity_test_fail_after(UINT32_MAX);
+        }
+#endif
+        if (identity_status != SCHWAY__SAVE_GAME_IDENTITY_OK) {
+            if (identity_status == SCHWAY__SAVE_GAME_IDENTITY_NO_SOURCE) {
+                fprintf(stderr, "schwaystation-run: --memcard-names serial needs --serial unless --exe or --disc is supplied\n");
+            } else if (identity_status == SCHWAY__SAVE_GAME_IDENTITY_ERR_IO) {
+                fprintf(stderr, "schwaystation-run: cannot read disc for card identity\n");
+                return SCHWAY__EXIT_FAILURE;
+            } else if (identity_status == SCHWAY__SAVE_GAME_IDENTITY_ERR_MEMORY) {
+                fprintf(stderr, "schwaystation-run: out of memory resolving card identity\n");
+                return SCHWAY__EXIT_FAILURE;
+            } else {
+                fprintf(stderr, "schwaystation-run: invalid serial card identity\n");
+            }
+            return SCHWAY__EXIT_USAGE;
+        }
+        component = identity.value;
+        literal_identity = identity.kind == SCHWAY__SAVE_GAME_IDENTITY_LITERAL;
+    } else {
+        if (!runner_card_basename(opt, basename)) {
+            fprintf(stderr, "schwaystation-run: invalid card save basename\n");
+            return SCHWAY__EXIT_USAGE;
+        }
+        component = basename;
     }
     size_t directory_size = strlen(opt->save_dir);
-    size_t suffix_capacity = 1u + 63u + sizeof(".1.mcr");
+    size_t component_size = strlen(component);
+    size_t suffix_capacity = 1u + component_size + sizeof(".1.mcr");
     if (directory_size > SIZE_MAX - suffix_capacity) {
         fprintf(stderr, "schwaystation-run: card save path is too long\n");
         return SCHWAY__EXIT_FAILURE;
@@ -778,8 +831,11 @@ static int runner_cards_load(const options *opt, schway *inst, runner_card_files
         runner_cards_release(cards);
         return SCHWAY__EXIT_FAILURE;
     }
-    schway_host_card_status path_status = schway_host_card_paths_for_basename(
-        opt->save_dir, basename, cards->path[0], path_capacity, cards->path[1], path_capacity);
+    schway_host_card_status path_status = literal_identity || !opt->serial_card_names
+        ? schway_host_card_paths_for_basename(opt->save_dir, component, cards->path[0],
+                                               path_capacity, cards->path[1], path_capacity)
+        : schway__host_card_paths_for_identity(opt->save_dir, component, cards->path[0],
+                                                path_capacity, cards->path[1], path_capacity);
     if (path_status != SCHWAY_HOST_CARD_OK) {
         fprintf(stderr, "schwaystation-run: invalid card save path\n");
         runner_cards_release(cards);
@@ -1487,22 +1543,6 @@ static int run(const options *opt)
 #endif
     runner_card_files card_files;
     memset(&card_files, 0, sizeof card_files);
-    status = runner_cards_load(opt, inst, &card_files);
-#ifdef SCHWAY_RUN_TEST_HOOKS
-    if (status == SCHWAY__EXIT_OK && opt->test_audio_file != NULL) {
-#ifdef _MSC_VER
-        if (fopen_s(&audio_capture, opt->test_audio_file, "wb") != 0) {
-            audio_capture = NULL;
-        }
-#else
-        audio_capture = fopen(opt->test_audio_file, "wb");
-#endif
-        if (audio_capture == NULL) {
-            fprintf(stderr, "schwaystation-run: cannot open test audio capture\n");
-            status = SCHWAY__EXIT_FAILURE;
-        }
-    }
-#endif
     /* The debug-port flag is set for --tty and for nothing else. */
     if (status == SCHWAY__EXIT_OK && (opt->region != 0u || opt->tty || opt->disc != NULL)) {
         schway_profile p;
@@ -1548,7 +1588,23 @@ static int run(const options *opt)
             status = SCHWAY__EXIT_FAILURE;
         }
     }
+    if (status == SCHWAY__EXIT_OK) {
+        status = runner_cards_load(opt, inst, &card_files, exe, exe_size, disc_image);
+    }
 #ifdef SCHWAY_RUN_TEST_HOOKS
+    if (status == SCHWAY__EXIT_OK && opt->test_audio_file != NULL) {
+#ifdef _MSC_VER
+        if (fopen_s(&audio_capture, opt->test_audio_file, "wb") != 0) {
+            audio_capture = NULL;
+        }
+#else
+        audio_capture = fopen(opt->test_audio_file, "wb");
+#endif
+        if (audio_capture == NULL) {
+            fprintf(stderr, "schwaystation-run: cannot open test audio capture\n");
+            status = SCHWAY__EXIT_FAILURE;
+        }
+    }
     if (status == SCHWAY__EXIT_OK && opt->test_card_write != 0 &&
         !runner_test_card_mode(inst, opt->test_card_write)) {
         fprintf(stderr, "schwaystation-run: card test transaction failed\n");

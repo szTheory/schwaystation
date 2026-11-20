@@ -4,10 +4,10 @@
     "gpu_motion": {"floor": 137752334, "ceiling": 137752334}
   },
   "size": {
-    "wasm": {"floor": 595820, "ceiling": 595820}
+    "wasm": {"floor": 608540, "ceiling": 608540}
   },
   "state": {
-    "bytes": {"floor": 3755020, "ceiling": 3755020}
+    "bytes": {"floor": 3755328, "ceiling": 3755328}
   },
   "ci": {
     "critical_path_s": {
@@ -19,6 +19,8 @@
   "reasons": [
     "2026-11-18: the original repository-check cap was 3200 lines; Plan 01 measured 3133 and estimated 90-135 lines for remaining triage, routing, and quality controls, supporting a 3300 cap. After Plan 06 the measured total was 3299, while Plans 07-08 still required an estimated 370-500 counted lines. The corrected temporary cap was 3900, which covered the 500-line upper estimate plus 100 lines of headroom; Plan 10 and the Windows timing portability fix ratchet it to the final measured shipping total. Evidence: .planning/phases/07-faster-and-more-trustworthy-ci/07-01-SUMMARY.md and both dated decisions in .planning/phases/07-faster-and-more-trustworthy-ci/07-CONTEXT.md.",
     "2026-11-18: the 2249-3293-second critical-path interval remains bound to the documented push/main workload fingerprint 316f86729c5129fc618ae0acf71014a5b18784d9e7a4f6c03ff067d0b4326ed8. PR timing remains unbaselined and deferred until the exact hosted final-head PR attempt establishes comparability at ship.",
-    "2026-11-19: the ubuntu-26.04 WASI lane measured the linked Release schwaystation-run module at 595820 bytes on PR run 44460238941; floor and ceiling are set to this exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44460238941/job/135345194644."
+    "2026-11-19: the ubuntu-26.04 WASI lane measured the linked Release schwaystation-run module at 595820 bytes on PR run 44460238941; floor and ceiling initially used that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44460238941/job/135345194644.",
+    "2026-11-19: Phase 8's per-game card identity support measures the linked Release WASI module at 608540 bytes on run 44597715729; the floor and ceiling now track that exact measurement: https://github.com/szTheory/schwaystation/actions/runs/44597715729/job/135820879050.",
+    "2026-11-19: Phase 8 PocketStation card state measures 3755328 stable serialized bytes, 308 above the prior bound; the exact producer measurement is in run 44600162797: https://github.com/szTheory/schwaystation/actions/runs/44600162797/job/135829636881. The bound now tracks the current serialized state size."
   ]
 }

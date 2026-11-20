@@ -18,10 +18,13 @@ endfunction()
 if(CASE STREQUAL "spu_registration" OR CASE STREQUAL "disc_registration")
   yaml_job_has(.github/workflows/ci.yml ci-required "needs:.*hash-equality.*retroarch.*perf")
   yaml_job_has(.github/workflows/ci.yml hash-equality "COUNT=8")
-  yaml_job_has(.github/workflows/ci.yml build "INVENTORY=tests/inventory/ci\\.txt.*fixtures/spu_tone\\.exe")
+  yaml_job_has(.github/workflows/ci.yml build "name: Stable state size preflight.*cmake --build build/ci --target schwaystation-test-state.*QUALITY_STATE_BYTES_BEGIN.*name: Build, test, package.*cmake --workflow --preset.*INVENTORY=tests/inventory/ci\\.txt.*fixtures/spu_tone\\.exe")
   yaml_job_has(.github/workflows/ci.yml retroarch
     "name: pad-counter-fixture.*schwaystation-disc-fixtures.*PROBE_CONTENT=build/fixtures/spu_tone\\.exe.*run_retroarch\\.cmake.*--exe ../fixtures/spu_tone\\.exe --frames 59.*ra-spu-tone/system.*verify\\.py compare spu-tone-runner59\\.bmp spu-tone\\.59\\.bmp 256 240.*verify\\.py compare spu-tone-runner60\\.bmp spu-tone\\.60\\.bmp 256 240.*CONTENT=build/ci/fixtures/disc_boot\\.cue.*--disc ../ci/fixtures/disc_boot\\.cue.*verify\\.py compare disc-runner\\.bmp disc\\.bmp 16 16")
-  yaml_job_has(.github/workflows/ci.yml perf "CASE=spu_idle" "CASE=cd_idle")
+  yaml_job_has(.github/workflows/ci.yml build "name: pad-counter-fixture.*fixtures/memcard_roundtrip\\.exe")
+  yaml_job_has(.github/workflows/ci.yml retroarch
+    "Required RetroArch guests exist.*memcard_roundtrip\\.exe.*RetroArch saves and resumes both cards.*ra-cards.*PROBE_CONTENT=build/fixtures/memcard_roundtrip\\.exe.*MODE=cards")
+  yaml_job_has(.github/workflows/ci.yml perf "github.event_name == 'pull_request'.*workflow_dispatch.*inputs[.]control_ref != ''.*timeout-minutes: 10.*run 44600162797.*run 44218206100.*CASE=spu_idle.*CASE=cd_idle")
   yaml_job_has(.github/workflows/ci.yml be32 "INVENTORY=tests/inventory/ci\\.txt" "LABELS=portable")
   yaml_job_has(.github/workflows/ci.yml wasm32 "INVENTORY=tests/inventory/wasm32\\.txt" "LABELS=portable")
   yaml_job_has(.github/workflows/nightly.yml vectors-full "cmake --workflow --preset nightly"

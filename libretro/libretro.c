@@ -93,6 +93,16 @@ static bool RETRO_CALLCONV lr_disk_add_image_index(void);
 static bool RETRO_CALLCONV lr_disk_set_initial_image(unsigned index, const char *path);
 static bool RETRO_CALLCONV lr_disk_get_image_path(unsigned index, char *path, size_t length);
 static bool RETRO_CALLCONV lr_disk_get_image_label(unsigned index, char *label, size_t length);
+#if defined(SCHWAYSTATION_LIBRETRO_TESTING)
+#if defined(_WIN32)
+#define SCHWAYSTATION_TEST_EXPORT __declspec(dllexport)
+#else
+#define SCHWAYSTATION_TEST_EXPORT __attribute__((visibility("default")))
+#endif
+SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
+schway__libretro_test_card2_data(size_t *size);
+SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void);
+#endif
 
 static struct retro_disk_control_ext_callback lr_disk_control = {
     lr_disk_set_eject_state,
@@ -698,7 +708,9 @@ static int lr_card2_path_for_game(const struct retro_game_info *game,
 static void lr_card2_load(const char *path)
 {
     uint8_t *bytes;
-    uint64_t generation = 0u;
+    schway_host_card_status import_status;
+    uint64_t generation;
+    size_t path_size;
     if (inst == NULL || path == NULL || path[0] == '\0') {
         return;
     }
@@ -706,18 +718,25 @@ static void lr_card2_load(const char *path)
     if (bytes == NULL) {
         return;
     }
-    if (schway_host_card_import_file(path, bytes, SCHWAY_MEMCARD_SIZE, NULL) ==
-            SCHWAY_HOST_CARD_OK &&
-        schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, bytes, SCHWAY_MEMCARD_SIZE) !=
+    import_status = schway_host_card_import_file(path, bytes, SCHWAY_MEMCARD_SIZE, NULL);
+    if (import_status == SCHWAY_HOST_CARD_OK) {
+        if (schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, bytes, SCHWAY_MEMCARD_SIZE) !=
             SCHWAY_STATUS_OK) {
+            free(bytes);
+            return;
+        }
+    } else if (import_status != SCHWAY_HOST_CARD_ERR_NOT_FOUND) {
         free(bytes);
         return;
     }
     free(bytes);
-    memcpy(lr_card2_path, path, strlen(path) + 1u);
-    if (schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &generation) == SCHWAY_STATUS_OK) {
-        lr_card2_saved_generation = generation;
+    path_size = strlen(path);
+    if (path_size >= sizeof lr_card2_path ||
+        schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &generation) != SCHWAY_STATUS_OK) {
+        return;
     }
+    memcpy(lr_card2_path, path, path_size + 1u);
+    lr_card2_saved_generation = generation;
 }
 
 /* Destroys the instance and frees the frame buffer. */
@@ -1422,6 +1441,7 @@ bool retro_load_game(const struct retro_game_info *game)
                 lr_disc_close_set(prepared_discs, prepared_count);
                 return false;
             }
+            have_card2_path = lr_card2_path_for_game(game, card2_path);
             disc_mode = 1;
         } else {
             return false;
@@ -1446,9 +1466,6 @@ bool retro_load_game(const struct retro_game_info *game)
         free(bios);
         lr_disc_close_set(prepared_discs, prepared_count);
         return false;
-    }
-    if (have_card2_path) {
-        lr_card2_load(card2_path);
     }
     if (disc_mode) {
         schway_status status = schway_load_bios(inst, bios, bios_size);
@@ -1497,6 +1514,9 @@ bool retro_load_game(const struct retro_game_info *game)
         }
     }
     lr_disc_close_set(prepared_discs, prepared_count);
+    if (have_card2_path) {
+        lr_card2_load(card2_path);
+    }
     lr_memory_map_register();
     return true;
 }
@@ -1550,3 +1570,28 @@ size_t retro_get_memory_size(unsigned id)
     schway_span span;
     return lr_memory_span(id, &span) ? span.size : 0u;
 }
+
+#if defined(SCHWAYSTATION_LIBRETRO_TESTING)
+SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
+schway__libretro_test_card2_data(size_t *size)
+{
+    schway_span card;
+    if (size != NULL) {
+        *size = 0u;
+    }
+    if (inst == NULL || schway_get_memory(inst, SCHWAY_MEMORY_CARD2, &card) != SCHWAY_STATUS_OK ||
+        card.size != SCHWAY_MEMCARD_SIZE) {
+        return NULL;
+    }
+    if (size != NULL) {
+        *size = card.size;
+    }
+    return (const uint8_t *)card.data;
+}
+
+SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void)
+{
+    return lr_card2_path[0] != '\0' ? lr_card2_path : NULL;
+}
+#undef SCHWAYSTATION_TEST_EXPORT
+#endif

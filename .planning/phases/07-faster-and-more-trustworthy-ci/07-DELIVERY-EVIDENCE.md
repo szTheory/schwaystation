@@ -1,8 +1,9 @@
 # Phase 7 delivery evidence and ship handoff
 
 Updated 2026-11-19. Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna at xhigh effort. Plan 07-10 is
-the final phase execution plan. The original handoff below records local evidence before ship. The ship follow-up
-section records the later PR and hosted evidence without treating the canceled first attempt as a passing run.
+the final phase execution plan. The original handoff and intermediate ship sections below preserve what was
+known at each checkpoint. The final ship section supersedes their pending statements and records the completed
+PR, hosted, merge, release, and artifact evidence without treating canceled attempts as passes.
 
 ## Focused local evidence
 
@@ -145,7 +146,7 @@ real duration before this allowance can be described as measured headroom.
 | `git diff --check && cmake --preset ci` | 0 | The timeout change is whitespace-clean and the CI selector was regenerated before running it. |
 | `ctest --test-dir build/ci --no-tests=error -R '^policy[.]quality_metrics$' --output-on-failure --parallel 1` | 0 | 1/1 passed in 29.36 seconds with the provisional 180-second cap. |
 
-## Requirement status and ship-only evidence
+## Requirement status at pre-ship handoff (historical)
 
 | Requirement | Local or historical result | Remaining evidence and locator |
 | --- | --- | --- |
@@ -156,13 +157,13 @@ real duration before this allowance can be described as measured headroom.
 | TUNE-05 | `policy.quality_metrics`, `policy.lessons_unique`, and its duplicate negative control pass in focused CI. The registry records both Ir/frame fixtures, 3,755,020 state bytes, the measured 595,820-byte WASI module, and the historical push/main CI range bound to its original fingerprint. The production PR route is intentionally unbaselined. | Verify the checked-in WASI size bound on the corrected final head. Measure matching final-head PR timing attempts before setting a PR-route range; do not reuse the push/main interval without evidence. |
 | TUNE-06 | The [upgrade audit](07-UPGRADE-AUDIT.md), docs byte budget, settings/pin checks and prior install-line evidence record unchanged items. The README invocation still matches `tests/cmake/install_line.cmake` and the successful install-line-latest check in [release run 44262491280](https://github.com/szTheory/schwaystation/actions/runs/44262491280). | Confirm the remaining phase evidence after the reviewed final head and real release. Hardware pages stay unchanged because this phase changes CI policy and documentation rather than emulator behavior. |
 
-## Release-App comparison row
+## Release-App comparison row at pre-ship handoff (historical)
 
 | Cohort | Before | After |
 | --- | --- | --- |
 | Release App PR #23, generated metadata only | [run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074); exact files were `.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`; `be32` took 60:21. The merge-ref SHA was not retained, so this is not an exact workload-fingerprint or timeout comparison. | **Pending ship.** Use the automatic App PR after the Plan 06 route. Record its head and merge SHA, stable complete file list, required-check parity and allowed skips, slowest job, critical path, and run/job URLs. Compare only if the generated workload matches. |
 
-## Ship sequence and evidence still to collect
+## Ship sequence recorded before ship (historical)
 
 After independent code review and final local verification, the authorized ship operator must:
 
@@ -172,6 +173,54 @@ After independent code review and final local verification, the authorized ship 
 4. Complete the release-App comparison row above and record one successful default-branch triage artifact with its run URL.
 5. Confirm the exact 595,820-byte bound on the supported Ubuntu 26 lane; keep all unmeasured or incomparable values explicitly pending.
 
-There is no final PR SHA, generated release PR, merged-main run, release URL, or post-merge triage URL yet. They are
-ship evidence, not inferred from the current branch or older runs. Phase 8 does not start until that release
-evidence is complete.
+At this checkpoint, the final PR SHA, generated release PR, merged-main run, release URL, and post-merge triage
+URL had not yet been observed. The following final ship record supersedes this checkpoint.
+
+## Final ship evidence and requirement closeout
+
+Phase 7 shipped through [PR #28](https://github.com/szTheory/schwaystation/pull/28), whose exact final head
+`9bda0bd6aea82381732247e79f04fd5c64b6877e` passed required CI in
+[run 44468099352](https://github.com/szTheory/schwaystation/actions/runs/44468099352) and Nightly in
+[run 44468099361](https://github.com/szTheory/schwaystation/actions/runs/44468099361). The Ubuntu 26 WASI job
+measured the linked module at 595,820 bytes; the checked-in bound was exercised on the final head. Windows ARM64
+ran `policy.quality_metrics` in 116.03 seconds under its 180-second cap, validating the cap with 63.97 seconds
+of observed headroom.
+
+The automatic release PR [#29](https://github.com/szTheory/schwaystation/pull/29) contained exactly
+`.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`. Its required check passed in
+[run 44476990492](https://github.com/szTheory/schwaystation/actions/runs/44476990492) in about 70 seconds; the
+metadata-only route retained `CI required` and skipped only the measured heavy matrix. The prior release PR
+baseline [run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074) had the same three
+paths and a 60:21 BE32 job, but its merge-ref SHA is unavailable. Therefore the report records the route and
+required-check parity but makes no exact fingerprint comparison or speedup claim.
+
+Release PR #29 merged as `af64484f388eddf67c615673b98edd6ccb5dae4c`. Main CI on that exact commit passed on its
+targeted second attempt in [run 44477155668](https://github.com/szTheory/schwaystation/actions/runs/44477155668).
+The first attempt's macOS x64 job was an anomalously slow hosted run: three tests timed out after the same tests
+passed on the release workflow for the identical commit. Only the failed macOS path was rerun; its tests,
+hash-equality check, RetroArch check, and final `CI required` all passed. The separate automatic Release workflow
+passed in [run 44477155670](https://github.com/szTheory/schwaystation/actions/runs/44477155670), published
+[v0.7.0](https://github.com/szTheory/schwaystation/releases/tag/v0.7.0) with 19 assets, and passed
+`install-line-latest`.
+
+The default-branch weekly triage workflow passed in
+[run 44486437761](https://github.com/szTheory/schwaystation/actions/runs/44486437761). Its downloaded
+`weekly-triage` artifact passed schema validation, reported zero open issues without truncation, and listed the
+current CI, release, and Nightly runs as successful.
+
+| Requirement | Final evidence | Status |
+| --- | --- | --- |
+| TUNE-01 | Sanitized default-branch artifact uploaded and downloaded from run 44486437761; schema valid, zero open issues, no truncation. | Complete |
+| TUNE-02 | The report compares the exact generated file list, route, and required-check parity; baseline merge SHA is missing, so it explicitly makes no speedup claim. | Complete |
+| TUNE-03 | Timeout derivations and flaky-check dispositions retain run evidence; the ARM64 quality control completed in 116.03s under its 180s cap. The macOS retry followed same-SHA evidence and was limited to the failed path. | Complete |
+| TUNE-04 | Seven-dimension review and selected README correction remain verified in [07-QUALITY-REVIEW.md](07-QUALITY-REVIEW.md). | Complete |
+| TUNE-05 | Exact Ubuntu 26 measurement is 595,820 WASI bytes; final PR CI exercised the checked-in bound. The PR timing route remains intentionally unbaselined against the distinct push/main fingerprint. | Complete |
+| TUNE-06 | Upgrade/settings/pin/docs audits and installation guidance are documented; the published v0.7.0 run passed `install-line-latest`. | Complete |
+
+Two full workflow matrices ran concurrently on the same release commit: main push CI and Release's reusable CI.
+That duplicates runner minutes but does not establish a wall-clock delay because the workflows overlapped. No
+required coverage was removed. The larger artifact-reuse question is recorded in
+[`050-release-ci-artifact-reuse.md`](../../todos/pending/050-release-ci-artifact-reuse.md), bound to a future
+Phase 9 plan that first edits the CI/release workflows.
+
+Phase 7 ship evidence is complete. Phase 8 may proceed from the verified main commit above.

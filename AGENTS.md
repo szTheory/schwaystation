@@ -81,7 +81,7 @@ evidence. Lessons from the sibling emulators are in `.planning/LESSONS.md`; re-r
     plans run in parallel waves wherever they share no inventory or header, and sequentially where they do. A
     plan past 30 minutes is split. No test is "non-gating".
 
-Discuss, verify, CI and release steps read `.planning/AUTONOMOUS.md` for the owner's standing research,
+Discuss, verify, CI, ship and release steps read `.planning/AUTONOMOUS.md` for the owner's standing research,
 automation and efficiency preferences; autonomous authorization and phase boundaries are recorded there.
 
 ## Recovery and local verification
@@ -94,6 +94,23 @@ automation and efficiency preferences; autonomous authorization and phase bounda
 - Keep small related integration repairs within the existing owner and plan follow-up when the concrete implementation stays under 30 minutes. Create a new plan for material scope or size, not routine repair bookkeeping.
 - Check affected native configure graphs, compilers and targeted consumers before broad CI. Batch coherent portability, producer, timing and real-host integration fixes into one changed-head hosted run where practical; metadata-only edits do not justify a broad suite.
 - Tune provisional executor-chosen timeouts from attributed workload and measured runs without another owner approval. Preserve explicit owner limits, all cases and assertions, and distinguish a larger allowance from a speed improvement.
+
+## CI/CD efficiency
+
+- For every CI run, while it is running and after it finishes, inspect critical-path time, duplicate work,
+  iteration delays and Actions cost. For ship/release work, inspect the required CI and release-pipeline runs
+  as part of the same review. Find safe ways to reduce wall-clock time and cost without dropping required
+  jobs, platforms, cases, assertions or quality bounds. Follow `.planning/AUTONOMOUS.md`'s CI and release
+  guidance.
+- Before a long build, suite, emulation or hosted run, run the cheapest relevant consistency checks first:
+  inputs and expected output counts, selectors and workflow wiring, sorted inventories, fixtures and budget
+  totals. Reuse existing checks; add a permanent preflight only when it prevents a recurring fault.
+- Before expensive hosted CI, use `act` to run workflow jobs locally when the host can reproduce them and that
+  adds coverage beyond the existing local suite. Use `act --dryrun` for routing checks. Record hosted-only
+  runners, artifacts, permissions and integrations that `act` cannot establish; keep their hosted gates required.
+- Apply small, evidence-backed efficiency fixes within the authorized scope. Measure before/after when possible;
+  record larger work as one todo bound to the phase that first needs it. Capture each run as its command, exit
+  status and URL; do not repeat a green full suite for bookkeeping.
 
 ## GSD summaries
 

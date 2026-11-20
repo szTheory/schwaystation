@@ -110,9 +110,10 @@ if(CMAKE_SCRIPT_MODE_FILE)
     file(MAKE_DIRECTORY "${OUT}")
     function(run_memcard_guest profile name directory out_hash)
       set(capture "${directory}/${name}.txt")
+      string(JOIN " " extra_flags ${ARGN})
       execute_process(COMMAND ${CMAKE_COMMAND} -DCASE=mailbox_judge -DFIXTURE=memcard_roundtrip
           -DIMAGE=${IMAGE} -DFRAMES=120 -DPROFILE=${profile}
-          "-DFLAGS=--save-dir ${directory} --hash --png 120:${directory}/${name}.png"
+          "-DFLAGS=--save-dir ${directory} ${extra_flags} --hash --png 120:${directory}/${name}.png"
           -DCSV=${CSV} -DCAPTURE=${capture} -DRUN=${RUN} "-DEMULATOR=${EMULATOR}"
           -P ${CMAKE_CURRENT_LIST_FILE}
         RESULT_VARIABLE rc OUTPUT_VARIABLE judge_out ERROR_VARIABLE judge_err)
@@ -172,6 +173,29 @@ if(CMAKE_SCRIPT_MODE_FILE)
         message(FATAL_ERROR "fresh card values 1/2 and 2/3 produced the same frame-120 hash")
       endif()
       message(STATUS "memcard frame-120 hashes: first=${first_hash} second=${second_hash}")
+      set(literal_dir "${OUT}/literal")
+      file(MAKE_DIRECTORY "${literal_dir}")
+      run_memcard_guest(first literal-first "${literal_dir}" first_literal_hash
+        --memcard-names serial --serial sLuS_123.45)
+      check_memcard_value("${literal_dir}/sLuS_123.45.srm" "01" "first-process literal card 1")
+      check_memcard_value("${literal_dir}/sLuS_123.45.1.mcr" "02" "first-process literal card 2")
+      run_memcard_guest(second literal-second "${literal_dir}" second_literal_hash
+        --memcard-names serial --serial sLuS_123.45)
+      check_memcard_value("${literal_dir}/sLuS_123.45.srm" "02" "second-process literal card 1")
+      check_memcard_value("${literal_dir}/sLuS_123.45.1.mcr" "03" "second-process literal card 2")
+      file(GLOB literal_card_files LIST_DIRECTORIES FALSE
+        "${literal_dir}/*.srm" "${literal_dir}/*.mcr")
+      set(expected_literal_card_files
+        "${literal_dir}/sLuS_123.45.srm" "${literal_dir}/sLuS_123.45.1.mcr")
+      list(SORT literal_card_files)
+      list(SORT expected_literal_card_files)
+      if(NOT literal_card_files STREQUAL expected_literal_card_files)
+        message(FATAL_ERROR "literal serial produced card files ${literal_card_files}, expected ${expected_literal_card_files}")
+      endif()
+      if(first_literal_hash STREQUAL second_literal_hash)
+        message(FATAL_ERROR "literal card values 1/2 and 2/3 produced the same frame-120 hash")
+      endif()
+      message(STATUS "literal memcard frame-120 hashes: first=${first_literal_hash} second=${second_literal_hash}")
     else()
       file(MAKE_DIRECTORY "${OUT}/missing" "${OUT}/wrong")
       run_memcard_guest(missing missing "${OUT}/missing" missing_hash)
@@ -541,6 +565,7 @@ schway__fixture(timers_lines.exe timers_lines.asm)
 schway__fixture(gpu_motion.exe gpu_motion.asm)
 schway__fixture(pad_counter.exe pad_counter.asm)
 schway__fixture(memcard_roundtrip.exe memcard_roundtrip.asm)
+schway__fixture(pocketstation_storage.exe pocketstation_storage.asm)
 set(schway__fixture_extra ${schway__fixture_src}/spu_blocks.inc)
 schway__fixture(spu_tone.exe spu_tone.asm)
 set(schway__fixture_extra "")
@@ -675,6 +700,11 @@ expect_runner(fixtures.mailbox_fault 6 "mailbox SWMB status=ff records=1"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/mailbox_fault.exe --stop-on mailbox --frames 30)
 expect_runner(fixtures.mailbox_crc 6 "mailbox crc mismatch"
   --exe ${SCHWAYSTATION_FIXTURES_DIR}/mailbox_crc.exe --stop-on mailbox --frames 30)
+
+# Fault prevented: a malformed standard card ID transaction, an unbounded JOY wait, or a lost
+# debug exit byte is reported as success rather than status 6 with the 51h success sentinel.
+expect_runner(fixtures.pocketstation_storage 6 "exit code=0x51"
+  --exe ${SCHWAYSTATION_FIXTURES_DIR}/pocketstation_storage.exe --tty --frames 10)
 
 # Fault prevented: an exception whose CAUSE, EPC or BadVaddr is wrong for its class, taken with or without
 # a branch delay slot: exc_matrix.exe records them in its mailbox and tests/diag/expected.csv judges
@@ -995,10 +1025,10 @@ foreach(row IN LISTS schway__motion_hashes)
     LABELS fixtures portable TIMEOUT 60)
 endforeach()
 foreach(row IN ITEMS
-    # The unreleased state revision now records each card slot's pending-error
-    # latch. At these frames both values are zero; the frame hashes stay fixed.
-    "150|bf69904d540267001c6ab569a42c87621a5bcd498eb5f195f5d92b3141c87196"
-    "180|6dfc72baf728cfe462219fb9389644002e83dff323acb78f5777f909f5d0f7f9")
+    # Format 18 records each card slot's pending-error latch. Reproduced on two
+    # independent native build directories; frame hashes are unchanged.
+    "150|d6bef00aeadcaf9ae91354e316dcecb6c1ccbc7be74e59ba777d4496cb950ace"
+    "180|9e06757cdd4f4d233ec23c331a0e466b1c44339ef7f5d72fc82a2cc9ea529873")
   string(REPLACE "|" ";" fields "${row}")
   list(GET fields 0 frame)
   list(GET fields 1 hash)

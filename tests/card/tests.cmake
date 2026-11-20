@@ -18,6 +18,11 @@ set_target_properties(schwaystation-test-card-files PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-card-files)
 
+# Fault prevented: PocketStation metadata commands lose exact byte order, slot isolation, or abort safety.
+schway_add_test(NAME card.protocol.pocketstation_metadata
+  COMMAND schwaystation-test-card protocol_pocketstation_metadata
+  LABELS card portable TIMEOUT 10)
+
 # Fault prevented: card address handshakes lose their distinct scheduled ACK deadline.
 schway_add_test(NAME card.protocol.read
   COMMAND schwaystation-test-card protocol_read
@@ -46,6 +51,11 @@ schway_add_test(NAME card.state.import_atomic
 # Fault prevented: state restores accept impossible in-flight card transport fields.
 schway_add_test(NAME card.state.pending_edges
   COMMAND schwaystation-test-card state_pending_edges
+  LABELS card portable TIMEOUT 10)
+
+# Fault prevented: PocketStation transport loads cannot resume safely or roll back receiver media.
+schway_add_test(NAME card.state.pocketstation_metadata
+  COMMAND schwaystation-test-card state_pocketstation_metadata
   LABELS card portable TIMEOUT 10)
 
 # Fault prevented: raw card imports rewrite their source or atomic saves expose partial data.

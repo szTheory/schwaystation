@@ -63,6 +63,8 @@ configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/disc_boot_playlist.xml"
   "${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.xml" COPYONLY)
 configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.cnf"
   "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF" COPYONLY)
+file(CONFIGURE OUTPUT "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF.playlist"
+  CONTENT "BOOT = cdrom:\\SLUS_123.46;1\nTCB = 4\nEVENT = 10\n" NEWLINE_STYLE UNIX)
 configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
   "${PROJECT_BINARY_DIR}/fixtures/disc_boot.sbi" COPYONLY)
 
@@ -135,7 +137,7 @@ add_custom_command(OUTPUT "${schway__disc_playlist_bin}"
   WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/fixtures"
   DEPENDS schwaystation-mkpsxiso schwaystation-fixtures "${schway__disc_guest}"
     "${PROJECT_BINARY_DIR}/fixtures/disc_boot_playlist.xml"
-    "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF"
+    "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF.playlist"
     "${PROJECT_BINARY_DIR}/fixtures/hello.exe"
     "${schway__disc_media_dir}/media.sha256"
     "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"

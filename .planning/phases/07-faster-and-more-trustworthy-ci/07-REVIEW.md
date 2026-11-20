@@ -58,7 +58,16 @@ The later exact-head matrix passed the quality check on Windows x64 in 38.51 sec
 the 80-second CTest timeout while the other 617 tests passed. A further read-only review approved 180 seconds as
 a provisional cap; it does not assert an unobserved ARM64 completion time. The test retains all cases. After
 reconfiguring CI, the local serialized selector passed 1/1 in 29.36 seconds; the next Windows ARM64 run must
-measure the actual duration.
+measure the actual duration. This was the review-time status; the measured ship result follows.
+
+## Ship evidence update (2026-11-19)
+
+No source changes followed the reviewed portability correction and timeout allowance. Exact-head CI run
+44468099352 passed; Windows ARM64 completed `policy.quality_metrics` in 116.03 seconds under the 180-second
+cap, so the cap is now validated with 63.97 seconds of observed headroom. Matching Nightly run 44468099361,
+merged-main CI run 44477155668, Release run 44477155670, and triage run 44486437761 also passed. Main CI's
+first-attempt macOS x64 slowdown matched a same-commit Release-side pass; a targeted failed-path retry passed.
+This addendum records hosted outcomes and does not change the scope or clean finding of the code review.
 
 ---
 _Reviewed: 2026-11-19T05:51:16Z_

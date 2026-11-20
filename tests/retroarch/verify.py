@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Compare the hosted screenshots and adapt this run's pinned BSV sample."""
 import struct
 import sys
 import tempfile
@@ -14,11 +13,9 @@ CHECKPOINT_LIMIT = 64 * 1024 * 1024
 MOVIE_FRAMES = 59
 RECORD_SIZE = 264
 
-
 def require(ok, message):
     if not ok:
         raise ValueError(message)
-
 
 def bmp(path):
     path = Path(path)
@@ -50,7 +47,6 @@ def bmp(path):
             rgb[q:q + 3] = data[p + 2], data[p + 1], data[p]
     return data, width, rows, depth, offset, stride, top_down, bytes(rgb)
 
-
 def compare(expected, actual, size=None):
     _, ew, eh, _, _, _, _, ergb = bmp(expected)
     _, aw, ah, _, _, _, _, argb = bmp(actual)
@@ -69,7 +65,6 @@ def compare(expected, actual, size=None):
     print(f"{ew}x{eh}, every pixel equal")
     return 0
 
-
 def pixel_control(path, x, y):
     data, width, height, depth, offset, stride, top_down, _ = bmp(path)
     require(0 <= x < width and 0 <= y < height, "pixel control is outside the image")
@@ -87,7 +82,6 @@ def pixel_control(path, x, y):
     require(result == 1 and message.getvalue().startswith(f"first difference at {x},{y}: "),
             "pixel mutation was not rejected at the expected coordinate")
 
-
 def dimension_control(path, width, height):
     message = io.StringIO()
     with redirect_stdout(message):
@@ -96,14 +90,12 @@ def dimension_control(path, width, height):
     print(f"dimension control: compare exited {result}: {output}")
     require(result == 1 and output.startswith("size differs:"), "wrong dimensions were accepted")
 
-
 def distinct(left, right):
     _, lw, lh, _, _, _, _, lp = bmp(left)
     _, rw, rh, _, _, _, _, rp = bmp(right)
     require((lw, lh) == (rw, rh), "frame geometry differs")
     require(lp != rp, "captured frames are identical")
     print(f"{lw}x{lh}, frames are distinct")
-
 
 def patch_movie(source, destination):
     source = Path(source)
@@ -159,7 +151,6 @@ def patch_movie(source, destination):
     Path(destination).write_bytes(changed)
     print(f"replay v2: changed only frame {MOVIE_FRAMES} Cross from 0 to 1")
 
-
 def main(args):
     require(bool(args), "usage: verify.py compare|pixel-control|dimension-control|distinct|patch ...")
     if args[0] == "compare" and len(args) == 5:
@@ -175,7 +166,6 @@ def main(args):
     else:
         raise ValueError("usage: verify.py compare|pixel-control|dimension-control|distinct|patch ...")
     return 0
-
 
 if __name__ == "__main__":
     try:

@@ -42,6 +42,7 @@ fixtures.memcard_roundtrip.controls	fixtures,portable
 fixtures.memcard_roundtrip.persistence	fixtures,portable
 fixtures.pad_counter.movies	fixtures,portable
 fixtures.pad_counter.press60	fixtures,portable
+fixtures.pocketstation_storage	fixtures,portable
 fixtures.probe.hello	fixtures,portable
 fixtures.stub.window	fixtures,portable
 fixtures.stub_drift	fixtures,portable

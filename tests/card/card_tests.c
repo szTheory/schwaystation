@@ -957,12 +957,473 @@ static void state_pending_edges(void)
     free(source_image);
 }
 
+static void pocket_metadata(schway *inst, uint16_t index, uint8_t com_flags)
+{
+    uint8_t expected[18] = {
+        (uint8_t)(index >> 8), (uint8_t)index,
+        (uint8_t)(com_flags & 1u), (uint8_t)((com_flags >> 1) & 1u),
+        (uint8_t)((com_flags >> 3) & 1u), (uint8_t)((com_flags >> 2) & 1u),
+        0u, 0u, 0u, 0u, 1u, 1u, 0x99u, 0x19u, 0u, 0u, 0u, 1u
+    };
+    CHECK_EQ_HEX(command_flag(inst, 0x5Au), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x12u);
+    for (uint32_t i = 0u; i < sizeof expected; i++) {
+        uint32_t ack = i + 1u == sizeof expected ? 0u : CARD_ACK;
+        CHECK_EQ_HEX(transfer(inst, 0u, ack), expected[i]);
+    }
+}
+
+static void pocket_set_index(schway *inst, uint16_t index, uint32_t parameter,
+                             uint16_t old_index)
+{
+    CHECK_EQ_HEX(command_flag(inst, 0x59u), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x06u);
+    CHECK_EQ_HEX(transfer(inst, (uint8_t)(index >> 8), CARD_ACK),
+                 (uint8_t)(old_index >> 8));
+    CHECK_EQ_HEX(transfer(inst, (uint8_t)index, CARD_ACK), (uint8_t)old_index);
+    for (uint32_t i = 0u; i < 4u; i++) {
+        uint32_t ack = i == 3u ? 0u : CARD_ACK;
+        CHECK_EQ_HEX(transfer(inst, (uint8_t)(parameter >> (8u * i)), ack), 0u);
+    }
+}
+
+static uint8_t pocket_storage_begin(schway *inst, uint8_t command, uint32_t address,
+                                    uint8_t requested, uint32_t terminal_ack)
+{
+    uint8_t parameters[5] = {
+        (uint8_t)address, (uint8_t)(address >> 8), (uint8_t)(address >> 16),
+        (uint8_t)(address >> 24), requested
+    };
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    uint8_t flags = transfer(inst, command, CARD_ACK);
+    CHECK(flags == 0u || flags == 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0x01u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x05u);
+    for (uint32_t i = 0u; i < sizeof parameters; i++) {
+        CHECK_EQ_HEX(transfer(inst, parameters[i], CARD_ACK), 0u);
+    }
+    return transfer(inst, 0u, terminal_ack);
+}
+
+static void pocket_storage_write(schway *inst, uint8_t command, uint32_t address,
+                                 uint8_t requested, const uint8_t *bytes, uint32_t length)
+{
+    CHECK_EQ_HEX(pocket_storage_begin(inst, command, address, requested, CARD_ACK), length);
+    for (uint32_t i = 0u; i < length; i++) {
+        CHECK_EQ_HEX(transfer(inst, bytes[i], CARD_ACK), 0u);
+    }
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
+}
+
+static void pocket_storage_read(schway *inst, uint8_t command, uint32_t address,
+                                uint8_t requested, const uint8_t *expected, uint32_t length)
+{
+    CHECK_EQ_HEX(pocket_storage_begin(inst, command, address, requested, CARD_ACK), length);
+    for (uint32_t i = 0u; i < length; i++) {
+        CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), expected[i]);
+    }
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
+}
+
+static void pocket_directory_entry(schway *inst, uint32_t block, uint8_t state,
+                                   uint32_t size, uint16_t next)
+{
+    uint8_t *entry = &inst->card.slot[0].bytes[block * SCHWAY__CARD_SECTOR_SIZE];
+    uint8_t checksum = 0u;
+    memset(entry, 0, SCHWAY__CARD_SECTOR_SIZE);
+    entry[0] = state;
+    entry[4] = (uint8_t)size;
+    entry[5] = (uint8_t)(size >> 8);
+    entry[6] = (uint8_t)(size >> 16);
+    entry[7] = (uint8_t)(size >> 24);
+    entry[8] = (uint8_t)next;
+    entry[9] = (uint8_t)(next >> 8);
+    for (uint32_t i = 0u; i < SCHWAY__CARD_SECTOR_SIZE - 1u; i++) {
+        checksum ^= entry[i];
+    }
+    entry[127] = checksum;
+}
+
+static void pocket_file_seed(schway *inst, uint8_t seed, uint32_t last_block)
+{
+    pocket_directory_entry(inst, 1u, 0x51u, 0x4000u, (uint16_t)(last_block - 1u));
+    pocket_directory_entry(inst, last_block, 0x53u, 0x4000u, 0xFFFFu);
+    for (uint32_t i = 0u; i < 0x2000u; i++) {
+        inst->card.slot[0].bytes[0x2000u + i] = (uint8_t)(i * 11u + seed);
+        inst->card.slot[0].bytes[last_block * 0x2000u + i] =
+            (uint8_t)(i * 7u + seed + 1u);
+    }
+}
+
+static void protocol_pocketstation_storage(void)
+{
+    static const uint8_t short_data[8] = {0x91u, 0x82u, 0x73u, 0x64u, 0x55u, 0x46u, 0x37u, 0x28u};
+    uint8_t large_data[SCHWAY__CARD_POCKET_TRANSFER_MAX];
+    uint8_t untouched[sizeof short_data];
+    schway *inst = make();
+    configure(inst, 0u);
+    for (uint32_t i = 0u; i < sizeof large_data; i++) {
+        large_data[i] = (uint8_t)(i * 17u + 3u);
+    }
+
+    uint64_t generation = card_generation(inst, SCHWAY_CARD_SLOT_1);
+    pocket_storage_write(inst, 0x5Cu, 0x08000100u, sizeof short_data,
+                         short_data, sizeof short_data);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation + 1u);
+    CHECK(memcmp(&inst->card.slot[0].bytes[0x100u], short_data, sizeof short_data) == 0);
+    pocket_storage_read(inst, 0x5Bu, 0x08000100u, sizeof short_data,
+                         short_data, sizeof short_data);
+    pocket_storage_read(inst, 0x5Bu, 0x08020100u, sizeof short_data,
+                         short_data, sizeof short_data);
+
+    generation = card_generation(inst, SCHWAY_CARD_SLOT_1);
+    pocket_storage_write(inst, 0x5Cu, 0x08000200u, 0xFFu,
+                         large_data, SCHWAY__CARD_POCKET_TRANSFER_MAX);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation + 1u);
+    pocket_storage_read(inst, 0x5Bu, 0x08000200u, 0x80u,
+                        large_data, SCHWAY__CARD_POCKET_TRANSFER_MAX);
+    generation = card_generation(inst, SCHWAY_CARD_SLOT_1);
+    pocket_storage_write(inst, 0x5Cu, 0x08000300u, 0u, NULL, 0u);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation);
+
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Cu, 0x06000300u, 4u, 0u), 0xFFu);
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Bu, 0x0801FFFFu, 2u, 0u), 0xFFu);
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Bu, 0x0801FFFFu, 1u, CARD_ACK), 1u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Cu, 0x08000101u, 4u, 0u), 0xFFu);
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Bu, 0x08000000u, 4u, CARD_ACK), 4u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x4Du);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x43u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Bu, 0xFFFFFFFFu, 4u, 0u), 0xFFu);
+
+    memcpy(untouched, &inst->card.slot[0].bytes[0x400u], sizeof untouched);
+    generation = card_generation(inst, SCHWAY_CARD_SLOT_1);
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Cu, 0x08000400u, 8u, CARD_ACK), 8u);
+    for (uint32_t i = 0u; i < 3u; i++) {
+        CHECK_EQ_HEX(transfer(inst, short_data[i], CARD_ACK), 0u);
+    }
+    schway__card_abort(inst, 0u);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation);
+    CHECK(memcmp(&inst->card.slot[0].bytes[0x400u], untouched, sizeof untouched) == 0);
+    memcpy(untouched, &inst->card.slot[0].bytes[0x400u], sizeof untouched);
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Cu, 0x08000400u, 4u, CARD_ACK), 4u);
+    for (uint32_t i = 0u; i < 4u; i++) {
+        CHECK_EQ_HEX(transfer(inst, short_data[i], CARD_ACK), 0u);
+    }
+    CHECK_EQ_HEX(transfer(inst, 1u, 0u), 0xFFu);
+    CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation);
+    CHECK(memcmp(&inst->card.slot[0].bytes[0x400u], untouched, sizeof untouched) == 0);
+
+    /* Focused probe: PSX-SPX leaves directory integer byte order unstated.
+       LE 0x4000 bytes and link 0x0006 form blocks 1 -> 7; BE is invalid. */
+    pocket_file_seed(inst, 9u, 7u);
+    CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Bu, 0x02000000u, 1u, 0u), 0xFFu);
+    CHECK_EQ_HEX(command_flag(inst, 0x59u), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x06u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 1u, CARD_ACK), 0u);
+    for (uint32_t i = 0u; i < 4u; i++) {
+        CHECK_EQ_HEX(transfer(inst, 0u, i == 3u ? 0u : CARD_ACK), 0u);
+    }
+    {
+        static const uint8_t cross[8] = {0xA1u, 0xB2u, 0xC3u, 0xD4u, 0xE5u, 0xF6u, 0x17u, 0x28u};
+        generation = card_generation(inst, SCHWAY_CARD_SLOT_1);
+        pocket_storage_write(inst, 0x5Cu, 0x02001FFCu, sizeof cross,
+                             cross, sizeof cross);
+        CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation + 1u);
+        CHECK(memcmp(&inst->card.slot[0].bytes[0x3FFCu], cross, 4u) == 0);
+        CHECK(memcmp(&inst->card.slot[0].bytes[0xE000u], cross + 4u, 4u) == 0);
+        pocket_storage_read(inst, 0x5Bu, 0x02001FFCu, sizeof cross, cross, sizeof cross);
+        CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Bu, 0x02004000u, 1u, 0u), 0xFFu);
+        CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation + 1u);
+    }
+    {
+        uint8_t *entry = &inst->card.slot[0].bytes[128u];
+        entry[8] = 0u;
+        entry[9] = 0u;
+        entry[127] = 0u;
+        for (uint32_t i = 0u; i < 127u; i++) {
+            entry[127] ^= entry[i];
+        }
+        CHECK_EQ_HEX(pocket_storage_begin(inst, 0x5Bu, 0x02000000u, 1u, 0u), 0xFFu);
+    }
+
+    configure(inst, 1u);
+    {
+        uint64_t port2_generation = card_generation(inst, SCHWAY_CARD_SLOT_2);
+        pocket_storage_write(inst, 0x5Cu, 0x08000100u, sizeof short_data,
+                             short_data, sizeof short_data);
+        CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_2), port2_generation + 1u);
+        CHECK_EQ_U64(card_generation(inst, SCHWAY_CARD_SLOT_1), generation + 1u);
+    }
+    {
+        schway *other = make();
+        configure(other, 0u);
+        pocket_storage_read(other, 0x5Bu, 0x08000100u, sizeof short_data,
+                            (const uint8_t *)other->card.slot[0].bytes + 0x100u,
+                            sizeof short_data);
+        CHECK_EQ_U64(card_generation(other, SCHWAY_CARD_SLOT_1), 0u);
+        schway_destroy(other);
+    }
+    schway_destroy(inst);
+}
+
+static void protocol_pocketstation_metadata(void)
+{
+    schway *inst = make();
+    configure(inst, 0u);
+
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x58u, CARD_ACK), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x02u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x01u);
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0x01u);
+
+    pocket_set_index(inst, 3u, 0x12345678u, 0u);
+    pocket_metadata(inst, 3u, 0u);
+    pocket_set_index(inst, 0xFFFFu, 0u, 3u);
+    pocket_set_index(inst, 0x0010u, 0u, 3u);
+    pocket_set_index(inst, 0xFFFEu, 0u, 3u);
+
+    CHECK_EQ_HEX(command_flag(inst, 0x5Eu), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x03u);
+    CHECK_EQ_HEX(transfer(inst, 1u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 1u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0u);
+    CHECK_EQ_HEX(command_flag(inst, 0x5Fu), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x01u);
+    CHECK_EQ_HEX(transfer(inst, 1u, 0u), 0u);
+
+    CHECK_EQ_HEX(command_flag(inst, 0x5Eu), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x03u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 1u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 1u);
+    CHECK_EQ_HEX(transfer(inst, 2u, 0u), 0u);
+    CHECK_EQ_HEX(command_flag(inst, 0x5Fu), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x01u);
+    CHECK_EQ_HEX(transfer(inst, 2u, 0u), 1u);
+    pocket_metadata(inst, 3u, 0x0Bu);
+
+    CHECK_EQ_HEX(command_flag(inst, 0x5Du), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x03u);
+    CHECK_EQ_HEX(transfer(inst, 0x12u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0x34u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 0x56u, 0u), 0u);
+    pocket_metadata(inst, 3u, 0x0Bu);
+
+    configure(inst, 1u);
+    pocket_metadata(inst, 0u, 0u);
+    pocket_set_index(inst, 4u, 0u, 0u);
+    configure(inst, 0u);
+    pocket_metadata(inst, 3u, 0x0Bu);
+    get_id(inst);
+
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x5Bu, CARD_ACK), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0x02u, 0u), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x5Cu, CARD_ACK), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0x02u, 0u), 0xFFu);
+
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, 0x59u, CARD_ACK), 0x08u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x06u);
+    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(inst, 7u, CARD_ACK), 3u);
+    CHECK_EQ_HEX(transfer(inst, 0xAAu, CARD_ACK), 0u);
+    restart_transport(inst, 0u);
+    configure(inst, 0u);
+    pocket_metadata(inst, 3u, 0x0Bu);
+
+    protocol_pocketstation_storage();
+    schway_destroy(inst);
+}
+
+static void state_pocketstation_storage_restore(void)
+{
+    static const uint8_t payload[8] = {0x31u, 0x42u, 0x53u, 0x64u, 0x75u, 0x86u, 0x97u, 0xA8u};
+    uint8_t *source_image = make_card(13u);
+    uint8_t *target_image = make_card(71u);
+    uint8_t *bad_image = make_card(109u);
+    schway *source = make();
+    schway *target = make();
+    schway *bad_target = make();
+    CHECK_EQ_U64(schway_load_memcard(source, SCHWAY_CARD_SLOT_1, source_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_memcard(target, SCHWAY_CARD_SLOT_1, target_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_memcard(bad_target, SCHWAY_CARD_SLOT_1, bad_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    pocket_file_seed(source, 17u, 7u);
+    pocket_file_seed(target, 93u, 4u);
+    pocket_file_seed(bad_target, 131u, 7u);
+    pocket_directory_entry(bad_target, 1u, 0x51u, 0x4000u, 0x10u);
+    target->card.slot[0].generation = 4u;
+    bad_target->card.slot[0].generation = 7u;
+    configure(source, 0u);
+    pocket_set_index(source, 1u, 0u, 0u);
+    CHECK_EQ_HEX(pocket_storage_begin(source, 0x5Cu, 0x02001FFCu, sizeof payload,
+                                      CARD_ACK), sizeof payload);
+    for (uint32_t i = 0u; i < 3u; i++) {
+        CHECK_EQ_HEX(transfer(source, payload[i], CARD_ACK), 0u);
+    }
+
+    size_t state_size = schway_state_size(source);
+    uint8_t *state = (uint8_t *)malloc(state_size);
+    uint8_t *target_before = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *source_before = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *bad_before = (uint8_t *)malloc(sizeof *bad_target);
+    CHECK(state != NULL && target_before != NULL && source_before != NULL && bad_before != NULL);
+    if (state != NULL && target_before != NULL && source_before != NULL && bad_before != NULL) {
+        memcpy(target_before, target->card.slot[0].bytes, SCHWAY_MEMCARD_SIZE);
+        memcpy(source_before, source->card.slot[0].bytes, SCHWAY_MEMCARD_SIZE);
+        memcpy(bad_before, bad_target, sizeof *bad_target);
+        CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
+
+        configure(target, 0u);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK(memcmp(target->card.slot[0].bytes, target_before, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 4u);
+        for (uint32_t i = 3u; i < sizeof payload; i++) {
+            CHECK_EQ_HEX(transfer(target, payload[i], CARD_ACK), 0u);
+        }
+        CHECK_EQ_HEX(transfer(target, 0u, 0u), 0xFFu);
+        memcpy(&target_before[0x3FFCu], payload, 4u);
+        memcpy(&target_before[0x8000u], payload + 4u, 4u);
+        CHECK(memcmp(target->card.slot[0].bytes, target_before, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 5u);
+        CHECK(memcmp(source->card.slot[0].bytes, source_before, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(source, SCHWAY_CARD_SLOT_1), 0u);
+
+        CHECK_EQ_U64(schway_load_state(bad_target, state, state_size),
+                     SCHWAY_STATUS_ERR_STATE_FIELD);
+        CHECK(memcmp(bad_target, bad_before, sizeof *bad_target) == 0);
+        CHECK_EQ_U64(card_generation(bad_target, SCHWAY_CARD_SLOT_1), 7u);
+
+        /* The same write alignment applies when restoring pending bytes. */
+        source->card.slot[0].pocket_address++;
+        CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size),
+                     SCHWAY_STATUS_ERR_STATE_FIELD);
+        CHECK(memcmp(target->card.slot[0].bytes, target_before, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 5u);
+    }
+    free(bad_before);
+    free(source_before);
+    free(target_before);
+    free(state);
+    schway_destroy(bad_target);
+    schway_destroy(target);
+    schway_destroy(source);
+    free(bad_image);
+    free(target_image);
+    free(source_image);
+}
+
+static void state_pocketstation_metadata(void)
+{
+    uint8_t *source_image = make_card(19u);
+    uint8_t *target_image = make_card(83u);
+    schway *source = make();
+    schway *target = make();
+    CHECK_EQ_U64(schway_load_memcard(source, SCHWAY_CARD_SLOT_1, source_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_load_memcard(target, SCHWAY_CARD_SLOT_1, target_image,
+                                     SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+
+    configure(source, 0u);
+    pocket_set_index(source, 3u, 0u, 0u);
+    CHECK_EQ_HEX(command_flag(source, 0x5Eu), 0x08u);
+    CHECK_EQ_HEX(transfer(source, 0u, CARD_ACK), 0x03u);
+    CHECK_EQ_HEX(transfer(source, 1u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(source, 1u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(source, 0u, 0u), 0u);
+    CHECK_EQ_HEX(command_flag(source, 0x5Fu), 0x08u);
+    CHECK_EQ_HEX(transfer(source, 0u, CARD_ACK), 0x01u);
+    CHECK_EQ_HEX(transfer(source, 1u, 0u), 0u);
+
+    CHECK_EQ_HEX(command_flag(source, 0x59u), 0x08u);
+    CHECK_EQ_HEX(transfer(source, 0u, CARD_ACK), 0x06u);
+    CHECK_EQ_HEX(transfer(source, 0u, CARD_ACK), 0u);
+    CHECK_EQ_HEX(transfer(source, 7u, CARD_ACK), 3u);
+    CHECK_EQ_HEX(transfer(source, 0xAAu, CARD_ACK), 0u);
+
+    size_t field_count = schway__state_record(source, NULL, 0u);
+    struct schway__state_field *fields =
+        (struct schway__state_field *)calloc(field_count, sizeof *fields);
+    CHECK(fields != NULL);
+    if (fields != NULL) {
+        CHECK_EQ_U64(schway__state_record(source, fields, field_count), field_count);
+        const char *reserved[] = {
+            "card.slot1.pocket_address", "card.slot1.pocket_length",
+            "card.slot1.pocket_step", "card.slot1.pocket_payload"
+        };
+        for (uint32_t wanted = 0u; wanted < sizeof reserved / sizeof reserved[0]; wanted++) {
+            int found = 0;
+            for (size_t i = 0u; i < field_count; i++) {
+                if (strcmp(fields[i].name, reserved[wanted]) == 0) {
+                    found = 1;
+                    break;
+                }
+            }
+            CHECK(found);
+        }
+        free(fields);
+    }
+
+    size_t state_size = schway_state_size(source);
+    uint8_t *state = (uint8_t *)malloc(state_size);
+    CHECK(state != NULL);
+    if (state != NULL) {
+        CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(target->card.slot[0].pocket_index, 3u);
+        CHECK_EQ_U64(target->card.slot[0].pocket_flags, 0x0Bu);
+        CHECK_EQ_U64(target->card.slot[0].phase, source->card.slot[0].phase);
+        CHECK_EQ_U64(target->card.slot[0].read_step, source->card.slot[0].read_step);
+        CHECK_EQ_U64(target->card.slot[0].pocket_data[2], 0xAAu);
+
+        schway_span target_card;
+        CHECK_EQ_U64(schway_get_memory(target, SCHWAY_MEMORY_CARD1, &target_card),
+                     SCHWAY_STATUS_OK);
+        CHECK(memcmp(target_card.data, target_image, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 0u);
+
+        CHECK_EQ_HEX(transfer(target, 0xBBu, CARD_ACK), 0u);
+        CHECK_EQ_HEX(transfer(target, 0xCCu, CARD_ACK), 0u);
+        CHECK_EQ_HEX(transfer(target, 0xDDu, 0u), 0u);
+        CHECK_EQ_U64(target->card.slot[0].pocket_index, 7u);
+        CHECK(memcmp(target_card.data, target_image, SCHWAY_MEMCARD_SIZE) == 0);
+        CHECK_EQ_U64(card_generation(target, SCHWAY_CARD_SLOT_1), 0u);
+
+        reject_mutated_state(source, target, "card.slot1.pocket_index", 0u, 16u);
+        reject_mutated_state(source, target, "card.slot1.pocket_flags", 0u, 16u);
+        reject_mutated_state(source, target, "card.slot1.command", 0u, 0x57u);
+        reject_mutated_state(source, target, "card.slot1.pocket_address", 0u, 0x08000000u);
+        reject_mutated_state(source, target, "card.slot1.pocket_length", 0u, 0x81u);
+        reject_mutated_state(source, target, "card.slot1.pocket_step", 0u, 1u);
+        reject_mutated_state(source, target, "card.slot1.pocket_payload", 0u, 0xA5u);
+        free(state);
+    }
+    schway_destroy(target);
+    schway_destroy(source);
+    free(target_image);
+    free(source_image);
+    state_pocketstation_storage_restore();
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
         return 2;
     }
-    if (strcmp(argv[1], "protocol_read") == 0) {
+    if (strcmp(argv[1], "protocol_pocketstation_metadata") == 0) {
+        protocol_pocketstation_metadata();
+    } else if (strcmp(argv[1], "protocol_read") == 0) {
         protocol_read();
     } else if (strcmp(argv[1], "protocol_read_edges") == 0) {
         protocol_read_edges();
@@ -974,6 +1435,8 @@ int main(int argc, char **argv)
         state_import_atomic();
     } else if (strcmp(argv[1], "state_pending_edges") == 0) {
         state_pending_edges();
+    } else if (strcmp(argv[1], "state_pocketstation_metadata") == 0) {
+        state_pocketstation_metadata();
     } else {
         return 2;
     }

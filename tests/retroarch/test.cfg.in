@@ -1,27 +1,19 @@
-# Isolated RetroArch 1.22.2 config; substitute @RA_DIR@ and disable writes/fullscreen.
 config_save_on_exit = "false"
 video_fullscreen = "false"
-
-# Capture the core frame without scaling or on-screen text.
 video_gpu_screenshot = "false"
 video_font_enable = "false"
 notification_show_autoconfig = "false"
 notification_show_remap_load = "false"
 notification_show_config_override_load = "false"
-# No sound device; keep running when the window is unfocused.
 audio_driver = "null"
 audio_enable = "false"
 pause_nonactive = "false"
-# Keep queued replay startup synchronous so its preplay frame offset cannot vary by worker timing.
 threaded_data_runloop_enable = "false"
-
-# No start screen or menu at launch. RGUI draws without asset files.
 menu_driver = "rgui"
 rgui_show_start_screen = "false"
 history_list_enable = "false"
 content_runtime_log = "false"
 log_to_file = "false"
-# Every directory RetroArch reads or writes is inside the run directory.
 assets_directory = "@RA_DIR@/assets"
 cache_directory = "@RA_DIR@/cache"
 core_options_path = "@RA_DIR@/retroarch-core-options.cfg"
@@ -29,9 +21,10 @@ libretro_directory = "@RA_DIR@/cores"
 libretro_info_path = "@RA_DIR@/info"
 playlist_directory = "@RA_DIR@/playlists"
 savefile_directory = "@RA_DIR@/saves"
+savefiles_in_content_dir = "false"
+sort_savefiles_enable = "false"
 savestate_directory = "@RA_DIR@/states"
 screenshot_directory = "@RA_DIR@/shots"
 system_directory = "@RA_DIR@/system"
 log_dir = "@RA_DIR@/logs"
-# Prevent the macOS app from extracting bundled assets into the user's home.
 bundle_assets_extract_enable = "false"

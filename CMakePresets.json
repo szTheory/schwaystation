@@ -289,6 +289,17 @@
       "execution": { "noTestsAction": "error", "jobs": "" }
     },
     {
+      "name": "wasm32-preflight",
+      "configurePreset": "wasm32",
+      "$comment": "Run the cross-process card persistence check before the full portable suite; its nested guest launch must use the configured Wasmtime emulator.",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/wasm32/preflight-junit.xml"
+      },
+      "filter": { "include": { "name": "^runner[.]cards[.]persistence$" } },
+      "execution": { "noTestsAction": "error", "jobs": "" }
+    },
+    {
       "name": "nightly",
       "configurePreset": "nightly",
       "output": {
@@ -383,7 +394,16 @@
       "steps": [
         { "type": "configure", "name": "wasm32" },
         { "type": "build", "name": "wasm32" },
+        { "type": "test", "name": "wasm32-preflight" },
         { "type": "test", "name": "wasm32" }
+      ]
+    },
+    {
+      "name": "wasm32-build",
+      "$comment": "Build separately so CI can measure the linked module before starting the portable test suite.",
+      "steps": [
+        { "type": "configure", "name": "wasm32" },
+        { "type": "build", "name": "wasm32" }
       ]
     },
     {

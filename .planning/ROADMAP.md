@@ -11,7 +11,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 ## Phases
 
 - [x] **Phase 7: Faster and more trustworthy CI** - Measure the build and release pipeline, fix the weakest quality dimension, and establish reproducible quality baselines. (completed 2026-11-18)
-- [ ] **Phase 8: Per-game card saves** - Use separate saves per game, move cards between supported formats, and resume a game in the runner or libretro.
+- [x] **Phase 8: Per-game card saves** - Use separate saves per game, move cards between supported formats, and resume a game in the runner or libretro. (completed 2026-11-19)
 - [ ] **Phase 9: CHD disc images** - Open supported CHD images with equivalent disc behavior and establish the shared media checks and feature-ledger workflow.
 - [ ] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly.
 - [ ] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data.
@@ -79,7 +79,18 @@ Plans:
   4. The libretro host exposes and reloads card 1 via `RETRO_MEMORY_SAVE_RAM`, passes the in-process and fresh-process hosted RetroArch round trips, keeps additional slots separate in the host save directory, and advertises the save capability once verified.
   5. A guest using documented PocketStation storage commands from `58h` onward can write and read its card data.
 
-**Plans**: TBD
+**Plans**: 10/10 plans complete
+Plans:
+- [x] 08-01-PLAN.md — Prove the existing card path and register Phase 8 checks
+- [x] 08-02-PLAN.md — Validate and atomically export complete cards
+- [x] 08-03-PLAN.md — Resolve executable save-game identities and prove two-slot isolation
+- [x] 08-04-PLAN.md — Pin PocketStation transcripts and implement card metadata
+- [x] 08-05-PLAN.md — Persist independent libretro cards for every supported content entry
+- [x] 08-06-PLAN.md — Round-trip PocketStation storage through a real guest
+- [x] 08-07-PLAN.md — Wire the two-process RetroArch card test
+- [x] 08-08-PLAN.md — Freeze runner save-game identity across declared disc swaps
+- [x] 08-09-PLAN.md — Check the integrated state and save evidence before hosted release claims
+- [x] 08-10-PLAN.md — Prove RetroArch save continuation and enable the verified claim
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/ARCHITECTURE.md`, `.planning/preparation/CONFORMANCE.md`
 
@@ -203,8 +214,8 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-18 |
-| 8. Per-game card saves | 0/TBD | Not started | - |
+| 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
+| 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
 | 9. CHD disc images | 0/TBD | Not started | - |
 | 10. PBP disc images | 0/TBD | Not started | - |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |
