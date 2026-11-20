@@ -38,6 +38,12 @@ metadata variants, and normalized TOC fields. Runner/libretro selection,
 extension advertising, and packaged ON/OFF archives remain later integration
 work.
 
+The host limits image data to 1 GiB, CHD hunks to 16 MiB, and CHD files to
+65,536 hunks. A compressed v5 map is limited to 16 MiB; combined compressed
+and decoded map storage is limited to 17 MiB. Header, map, metadata and hunk
+extents are checked before libchdr decodes the image. CHD parent-image
+references and CHD versions 1 and 2 are unsupported.
+
 ## Playlists
 
 An `.m3u` file is ASCII text containing up to 32 relative paths, one path per

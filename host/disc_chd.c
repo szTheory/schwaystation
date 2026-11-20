@@ -1,5 +1,6 @@
 #include "disc_chd.h"
 #include "disc_chd_metadata.h"
+#include "media_limits.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -10,9 +11,16 @@
 #include <libchdr/chd.h>
 #endif
 
-#define SCHWAY__DISC_CHD_MAX_BYTES UINT64_C(1073741824)
 #define SCHWAY__DISC_CHD_MAX_HUNK_BYTES UINT32_C(16777216)
 #define SCHWAY__DISC_CHD_MAX_HUNKS UINT32_C(65536)
+#define SCHWAY__DISC_CHD_MAX_MAP_BYTES UINT32_C(16777216)
+#define SCHWAY__DISC_CHD_MAX_MAP_ALLOCATION_BYTES UINT32_C(17825792)
+#define SCHWAY__DISC_CHD_MAP_ENTRY_BYTES UINT32_C(16)
+#define SCHWAY__DISC_CHD_MEMORY_MAP_ENTRY_BYTES UINT32_C(32)
+#define SCHWAY__DISC_CHD_METADATA_HEADER_BYTES UINT32_C(16)
+#define SCHWAY__DISC_CHD_MAX_METADATA_BYTES \
+    (SCHWAY_DISC_MAX_TRACKS * (SCHWAY__DISC_CHD_METADATA_TEXT_MAX + \
+                               SCHWAY__DISC_CHD_METADATA_HEADER_BYTES))
 #define SCHWAY__DISC_CHD_FRAME_BYTES UINT32_C(2448)
 
 struct schway__disc_chd {
@@ -47,8 +55,11 @@ static schway_disc_image_status schway__disc_chd_error(
 #if SCHWAYSTATION_CHD
 typedef struct schway__disc_chd_bounds {
     uint64_t logical_bytes;
+    uint64_t file_bytes;
     uint64_t metadata_offset;
     uint64_t map_offset;
+    uint64_t map_start;
+    uint64_t map_end;
     uint32_t hunk_bytes;
     uint32_t total_hunks;
     uint32_t version;
@@ -67,12 +78,12 @@ static uint64_t schway__disc_chd_be64(const uint8_t *bytes)
            (uint64_t)schway__disc_chd_be32(bytes + 4);
 }
 
-static int schway__disc_chd_mul_u64(uint64_t left, uint64_t right,
-                                     uint64_t *out)
+static int schway__disc_chd_bytes_nonzero(const uint8_t *bytes, size_t size)
 {
-    if (out == NULL || (right != 0u && left > UINT64_MAX / right)) return 0;
-    *out = left * right;
-    return 1;
+    for (size_t i = 0u; i < size; i++) {
+        if (bytes[i] != 0u) return 1;
+    }
+    return 0;
 }
 
 static uint32_t schway__disc_chd_header_size(uint32_t version)
@@ -100,15 +111,22 @@ static schway_disc_image_status schway__disc_chd_preflight(
 {
     uint8_t raw[CHD_MAX_HEADER_SIZE];
     uint8_t prefix[16];
+    uint8_t map_header[16];
     uint64_t file_bytes;
     uint64_t rounded_hunks;
-    uint64_t legacy_hunk_bytes;
+    uint64_t raw_map_bytes;
+    uint64_t compressed_map_bytes = 0u;
+    uint64_t map_allocation_bytes;
+    uint64_t map_disk_bytes;
+    uint64_t map_end;
     long end;
     uint32_t expected_length;
     uint32_t total_hunks = 0u;
     uint32_t version;
     uint32_t hunk_bytes;
     uint64_t logical_bytes;
+    uint32_t map_entry_bytes;
+    int compressed;
 
     if (fseek(file, 0L, SEEK_END) != 0 || (end = ftell(file)) < 0 ||
         fseek(file, 0L, SEEK_SET) != 0) {
@@ -120,7 +138,7 @@ static schway_disc_image_status schway__disc_chd_preflight(
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                       "CHD header is truncated");
     }
-    if (file_bytes > SCHWAY__DISC_CHD_MAX_BYTES) {
+    if (file_bytes > SCHWAY__MEDIA_IMAGE_MAX_BYTES) {
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
                                       "CHD file exceeds the 1 GiB limit");
     }
@@ -138,6 +156,10 @@ static schway_disc_image_status schway__disc_chd_preflight(
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
                                       "CHD version is unsupported");
     }
+    if (version < 3u || version > 5u) {
+        return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                                      "CHD versions 3 through 5 are supported");
+    }
     if (schway__disc_chd_be32(prefix + 8u) != expected_length ||
         file_bytes < expected_length ||
         !schway__disc_chd_seek_read(file, 0u, raw, expected_length)) {
@@ -145,43 +167,34 @@ static schway_disc_image_status schway__disc_chd_preflight(
                                       "CHD header length is invalid or truncated");
     }
 
-    if (version <= 2u) {
-        uint64_t sector_bytes = version == 1u ? UINT64_C(512) :
-                                (uint64_t)schway__disc_chd_be32(raw + 76u);
-        uint64_t hunk_sectors = (uint64_t)schway__disc_chd_be32(raw + 24u);
-        uint64_t geometry = (uint64_t)schway__disc_chd_be32(raw + 32u);
-        if (!schway__disc_chd_mul_u64(geometry,
-                (uint64_t)schway__disc_chd_be32(raw + 36u), &geometry) ||
-            !schway__disc_chd_mul_u64(geometry,
-                (uint64_t)schway__disc_chd_be32(raw + 40u), &geometry) ||
-            !schway__disc_chd_mul_u64(geometry, sector_bytes, &logical_bytes) ||
-            !schway__disc_chd_mul_u64(hunk_sectors, sector_bytes,
-                &legacy_hunk_bytes)) {
-            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
-                                          "CHD legacy geometry overflows checked arithmetic");
-        }
-        if (legacy_hunk_bytes > UINT32_MAX) {
-            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
-                                          "CHD legacy hunk size exceeds its integer range");
-        }
-        hunk_bytes = (uint32_t)legacy_hunk_bytes;
-        total_hunks = schway__disc_chd_be32(raw + 28u);
-    } else if (version <= 4u) {
+    if (version <= 4u) {
         total_hunks = schway__disc_chd_be32(raw + 24u);
         logical_bytes = schway__disc_chd_be64(raw + 28u);
         bounds->metadata_offset = schway__disc_chd_be64(raw + 36u);
         hunk_bytes = schway__disc_chd_be32(raw + (version == 3u ? 76u : 44u));
+        if ((schway__disc_chd_be32(raw + 16u) & 1u) != 0u ||
+            (version == 3u &&
+             (schway__disc_chd_bytes_nonzero(raw + 60u, 16u) != 0 ||
+              schway__disc_chd_bytes_nonzero(raw + 100u, 20u) != 0)) ||
+            (version == 4u && schway__disc_chd_bytes_nonzero(raw + 68u, 20u) != 0)) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                                          "CHD parent images are unsupported");
+        }
     } else {
         logical_bytes = schway__disc_chd_be64(raw + 32u);
         bounds->map_offset = schway__disc_chd_be64(raw + 40u);
         bounds->metadata_offset = schway__disc_chd_be64(raw + 48u);
         hunk_bytes = schway__disc_chd_be32(raw + 56u);
+        if (schway__disc_chd_bytes_nonzero(raw + 104u, 20u) != 0) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                                          "CHD parent images are unsupported");
+        }
     }
     if (logical_bytes == 0u || hunk_bytes == 0u) {
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                       "CHD logical size and hunk size must be nonzero");
     }
-    if (logical_bytes > SCHWAY__DISC_CHD_MAX_BYTES ||
+    if (logical_bytes > SCHWAY__MEDIA_IMAGE_MAX_BYTES ||
         hunk_bytes > SCHWAY__DISC_CHD_MAX_HUNK_BYTES) {
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
                                       "CHD logical size or hunk exceeds its limit");
@@ -196,12 +209,94 @@ static schway_disc_image_status schway__disc_chd_preflight(
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                       "CHD hunk count does not match its logical size");
     }
-    if ((bounds->metadata_offset != 0u && bounds->metadata_offset >= file_bytes) ||
-        (bounds->map_offset != 0u && bounds->map_offset >= file_bytes)) {
+    if (hunk_bytes % SCHWAY__DISC_CHD_FRAME_BYTES != 0u ||
+        logical_bytes % SCHWAY__DISC_CHD_FRAME_BYTES != 0u) {
+        return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                      "CHD hunk and logical sizes must align to CD frames");
+    }
+    if ((bounds->metadata_offset != 0u &&
+         (bounds->metadata_offset < expected_length || bounds->metadata_offset >= file_bytes)) ||
+        (version == 5u && bounds->map_offset < expected_length)) {
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                       "CHD map or metadata offset exceeds the file");
     }
+    if (version < 5u) {
+        bounds->map_start = expected_length;
+        if (!schway__media_mul_u64(total_hunks, SCHWAY__DISC_CHD_MAP_ENTRY_BYTES,
+                                   &map_disk_bytes) ||
+            !schway__media_add_u64(expected_length, map_disk_bytes, &map_end) ||
+            !schway__media_mul_u64(total_hunks,
+                                   SCHWAY__DISC_CHD_MEMORY_MAP_ENTRY_BYTES,
+                                   &map_allocation_bytes)) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                          "CHD map size overflows checked arithmetic");
+        }
+        if (map_allocation_bytes > SCHWAY__DISC_CHD_MAX_MAP_ALLOCATION_BYTES) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                          "CHD map allocation exceeds its limit");
+        }
+        if (map_end >= file_bytes ||
+            (bounds->metadata_offset != 0u && bounds->metadata_offset < map_end)) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "CHD map extent is truncated or overlaps metadata");
+        }
+        bounds->map_end = map_end;
+    } else {
+        bounds->map_start = bounds->map_offset;
+        compressed = schway__disc_chd_be32(raw + 16u) != 0u;
+        map_entry_bytes = compressed != 0 ? 12u : 4u;
+        if (!schway__media_mul_u64(rounded_hunks, map_entry_bytes, &raw_map_bytes) ||
+            raw_map_bytes > SCHWAY__DISC_CHD_MAX_MAP_ALLOCATION_BYTES) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                          "CHD decoded map allocation exceeds its limit");
+        }
+        if (compressed != 0) {
+            if (!schway__media_add_u64(bounds->map_offset, sizeof(map_header), &map_end) ||
+                map_end > file_bytes ||
+                !schway__disc_chd_seek_read(file, bounds->map_offset, map_header,
+                                             sizeof(map_header))) {
+                return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                              "CHD compressed map header is truncated");
+            }
+            compressed_map_bytes = schway__disc_chd_be32(map_header);
+            if (compressed_map_bytes == 0u) {
+                return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                              "CHD compressed map is empty");
+            }
+            if (compressed_map_bytes > SCHWAY__DISC_CHD_MAX_MAP_BYTES) {
+                return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                              "CHD compressed map exceeds its limit");
+            }
+            if (map_header[12] > 32u || map_header[13] > 32u || map_header[14] > 32u ||
+                !schway__media_add_u64(sizeof(map_header), compressed_map_bytes,
+                                       &map_disk_bytes) ||
+                !schway__media_add_u64(bounds->map_offset, map_disk_bytes, &map_end)) {
+                return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                              "CHD compressed map fields are invalid");
+            }
+        } else {
+            map_disk_bytes = raw_map_bytes;
+            if (!schway__media_add_u64(bounds->map_offset, map_disk_bytes, &map_end)) {
+                return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                              "CHD uncompressed map extent overflows");
+            }
+        }
+        if (!schway__media_add_u64(raw_map_bytes, compressed_map_bytes,
+                                   &map_allocation_bytes) ||
+            map_allocation_bytes > SCHWAY__DISC_CHD_MAX_MAP_ALLOCATION_BYTES) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                          "CHD map allocation total exceeds its limit");
+        }
+        if ((compressed != 0 ? map_end > file_bytes : map_end >= file_bytes) ||
+            (bounds->metadata_offset != 0u && bounds->metadata_offset >= bounds->map_offset &&
+             bounds->metadata_offset < map_end)) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "CHD map extent is truncated or overlaps metadata");
+        }
+        bounds->map_end = map_end;
+    }
     bounds->logical_bytes = logical_bytes;
+    bounds->file_bytes = file_bytes;
     bounds->hunk_bytes = hunk_bytes;
     bounds->total_hunks = version == 5u ? (uint32_t)rounded_hunks : total_hunks;
     bounds->version = version;
@@ -275,6 +370,86 @@ static schway_disc_image_status schway__disc_chd_read_metadata(
     }
     return SCHWAY_DISC_IMAGE_OK;
 }
+
+static schway_disc_image_status schway__disc_chd_preflight_metadata(
+    FILE *file, const schway__disc_chd_bounds *bounds,
+    schway_disc_image_error *error)
+{
+    uint64_t seen[SCHWAY_DISC_MAX_TRACKS];
+    uint64_t offset = bounds->metadata_offset;
+    uint64_t total_bytes = 0u;
+    uint32_t expected_tag = 0u;
+    uint32_t count = 0u;
+
+    while (offset != 0u) {
+        uint8_t header[SCHWAY__DISC_CHD_METADATA_HEADER_BYTES];
+        uint8_t terminator;
+        uint64_t data_offset;
+        uint64_t record_end;
+        uint64_t record_bytes;
+        uint64_t next;
+        uint32_t tag;
+        uint32_t text_length;
+
+        if (count >= SCHWAY_DISC_MAX_TRACKS) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                          "CHD metadata has more than 99 records");
+        }
+        for (uint32_t i = 0u; i < count; i++) {
+            if (seen[i] == offset) {
+                return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                              "CHD metadata chain contains a cycle");
+            }
+        }
+        if (offset < bounds->header_length || offset > bounds->file_bytes ||
+            bounds->file_bytes - offset < sizeof(header) ||
+            !schway__disc_chd_seek_read(file, offset, header, sizeof(header))) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "CHD metadata header is outside the file");
+        }
+        tag = schway__disc_chd_be32(header);
+        text_length = schway__disc_chd_be32(header + 4u) & UINT32_C(0x00ffffff);
+        next = schway__disc_chd_be64(header + 8u);
+        if (tag != SCHWAY__DISC_CHD_TAG_CHT2 && tag != SCHWAY__DISC_CHD_TAG_CHTR) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                                          "CHD contains unsupported non-track metadata");
+        }
+        if (expected_tag == 0u) expected_tag = tag;
+        if (tag != expected_tag) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                                          "CHD mixes track metadata formats");
+        }
+        if (text_length < 2u) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "CHD metadata text is truncated");
+        }
+        if (text_length > SCHWAY__DISC_CHD_METADATA_TEXT_MAX) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                          "CHD metadata text exceeds its limit");
+        }
+        if (!schway__media_add_u64(offset, sizeof(header), &data_offset) ||
+            !schway__media_add_u64(data_offset, text_length, &record_end) ||
+            record_end > bounds->file_bytes ||
+            (offset < bounds->map_end && record_end > bounds->map_start)) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "CHD metadata extent is truncated or overlaps its map");
+        }
+        if (!schway__disc_chd_seek_read(file, record_end - 1u, &terminator, 1u) ||
+            terminator != 0u) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "CHD metadata text is not terminated");
+        }
+        if (!schway__media_add_u64(sizeof(header), text_length, &record_bytes) ||
+            !schway__media_add_u64(total_bytes, record_bytes, &total_bytes) ||
+            total_bytes > SCHWAY__DISC_CHD_MAX_METADATA_BYTES) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                          "CHD metadata total exceeds its limit");
+        }
+        seen[count++] = offset;
+        offset = next;
+    }
+    return SCHWAY_DISC_IMAGE_OK;
+}
 #endif
 
 schway_disc_image_status schway__disc_chd_open(const char *path,
@@ -303,6 +478,11 @@ schway_disc_image_status schway__disc_chd_open(const char *path,
         (void)fclose(file);
         return status;
     }
+    status = schway__disc_chd_preflight_metadata(file, &bounds, error);
+    if (status != SCHWAY_DISC_IMAGE_OK) {
+        (void)fclose(file);
+        return status;
+    }
     chd_error chd_status = chd_read_header_file(file, &header);
     if (chd_status != CHDERR_NONE) {
         (void)fclose(file);
@@ -311,7 +491,8 @@ schway_disc_image_status schway__disc_chd_open(const char *path,
     }
     if (header.version != bounds.version || header.length != bounds.header_length ||
         header.logicalbytes != bounds.logical_bytes || header.hunkbytes != bounds.hunk_bytes ||
-        header.totalhunks != bounds.total_hunks) {
+        header.totalhunks != bounds.total_hunks || header.metaoffset != bounds.metadata_offset ||
+        (bounds.version == 5u && header.mapoffset != bounds.map_offset)) {
         (void)fclose(file);
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                       "CHD header fields disagree with bounded geometry");

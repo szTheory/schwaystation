@@ -1,10 +1,10 @@
 #include "disc_chd_metadata.h"
+#include "media_limits.h"
 
 #include <string.h>
 
 #define SCHWAY__DISC_CHD_FRAME_BYTES UINT32_C(2448)
 #define SCHWAY__DISC_CHD_FRAME_PAD UINT32_C(4)
-#define SCHWAY__DISC_CHD_MAX_BYTES UINT64_C(1073741824)
 
 typedef struct schway__disc_chd_record_fields {
     uint32_t number;
@@ -148,7 +148,7 @@ schway_disc_image_status schway__disc_chd_metadata_parse(
     if (records == NULL) return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
     if (record_count > SCHWAY_DISC_MAX_TRACKS) return SCHWAY_DISC_IMAGE_LIMIT;
     if (version < 3u || version > 5u) return SCHWAY_DISC_IMAGE_UNSUPPORTED;
-    if (logical_bytes > SCHWAY__DISC_CHD_MAX_BYTES) return SCHWAY_DISC_IMAGE_LIMIT;
+    if (logical_bytes > SCHWAY__MEDIA_IMAGE_MAX_BYTES) return SCHWAY_DISC_IMAGE_LIMIT;
     if (hunk_bytes == 0u || hunk_bytes % SCHWAY__DISC_CHD_FRAME_BYTES != 0u ||
         logical_bytes == 0u || logical_bytes % SCHWAY__DISC_CHD_FRAME_BYTES != 0u) {
         return SCHWAY_DISC_IMAGE_BAD_IMAGE;
