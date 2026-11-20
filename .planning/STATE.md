@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 13
+current_plan: 11
 status: executing
-stopped_at: Completed Plan 09-13 Task 1 ON package checks
-last_updated: "2026-11-20T18:08:00Z"
+stopped_at: Completed Plan 09-13
+last_updated: "2026-11-20T18:11:24Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-13 Task 1 passed and was committed; ON package evidence recorded before OFF validation
-state_head: d275d99
+last_activity_desc: Phase 09 Plan 09-13 ON and OFF archive validations passed; Plan 09-11 is next
+state_head: 5edcbd1
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 30
+  completed_plans: 31
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 13 (ON/OFF archive validation)
+Current Plan: 11 (CI, fuzz and distributed package wiring)
 Total Plans in Phase: 14
-Status: Executing
-Last activity: 2026-11-20 — Plan 09-13 ON archive checks passed; OFF package validation is next
+Status: Ready to execute
+Last activity: 2026-11-20 — Plan 09-13 ON and OFF archive checks passed; Plan 09-11 is next by dependency order
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -178,6 +178,19 @@ archives. The release inventory is sorted and the gate remains 3900/3901 lines. 
 measured. This records ON evidence before Task 2 replaces these build-tree archives; no hosted URL applies.
 The plan selectors were corrected because `policy.notices` is registered by the hygiene preset, not CI.
 Next: configure CHD OFF in the same build directory, then rebuild, repackage and run the same release checks.
+
+### Phase 9 Plan 09-13 execution (2026-11-20)
+
+Runtime/model: Codex GPT-6 session; exact model ID unavailable. Both configured package legs passed before
+closeout. ON metadata and notice preflights passed 2/2 each, its build completed 229 Ninja actions, and
+`release.archive_contents`, its negative control, `release.notices` and its negative control passed 4/4 in
+about 0.13 seconds. OFF repeated the preflights at 2/2, then rebuilt in 27 Ninja actions and passed the same
+release selectors 4/4 in 0.10 seconds. CPack produced the same library, libretro and runner macOS arm64 ZIP
+names in each leg. Inventory sorting, diff checks and the 3900/3901 budget passed. Wall and active duration
+were not measured. No broad suite, `act` or hosted CI run applied because no workflow changed. The corrected
+plan routes notice checks through `hygiene`; Plan 09-11 retains `act --dryrun` and producer-path timing.
+Todo 005 remains bound to the first tracked SPDX-bearing source in Phase 10. Task implementation commit is
+`d275d99`; the ON checkpoint and plan selector correction are in `5edcbd1`; plan summary/state closeout follows.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -1421,7 +1434,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 9 in dependency order: 09-13 package checks, 09-11 workflow/fuzz wiring, 09-12 runner/libretro integration and 09-14 owned-guest evidence; then review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; use the planned `act --dryrun` routing check and measure the CHD producer critical path before any expensive hosted run. No owner UAT is needed.
+- Continue Phase 9 in dependency order: Plan 09-11 workflow/fuzz wiring, 09-12 runner/libretro integration and 09-14 owned-guest evidence; then review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; use the planned `act --dryrun` routing check and measure the CHD producer critical path before any expensive hosted run. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 

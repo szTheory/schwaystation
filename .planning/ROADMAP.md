@@ -230,7 +230,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 |---|---|---|---|
 | 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
 | 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
-| 9. CHD disc images | 9/14 | In Progress | - |
+| 9. CHD disc images | 10/14 | In Progress | - |
 | 10. PBP disc images | 0/TBD | Not started | - |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |
 | 12. SBI and LibCrypt | 0/TBD | Not started | - |
