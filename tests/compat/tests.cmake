@@ -1125,7 +1125,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   make_base(feature_protected_pass FALSE TRUE TRUE "${feature_pass}" TRUE)
   check_feature_base("feature protected pass regression" "${BASE_feature_protected_pass}" "${SHA_feature_protected_pass}"
     "${feature_fail}" "${feature_fail}" "${allow}" FALSE)
-  file(WRITE "${allow}" "2026-09-21 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-20 approved measured correction\n")
+  file(WRITE "${allow}" "2026-09-21 chd ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-20 approved measured correction\n")
   check_feature_base("feature matching allowance" "${BASE_feature_protected_pass}" "${SHA_feature_protected_pass}"
     "${feature_fail}" "${feature_fail}" "${allow}" TRUE)
   if(DEFINED ENV{COMPAT_BASE_DIR} AND EXISTS "$ENV{COMPAT_BASE_DIR}/scripts/compat-ratchet.sh" AND

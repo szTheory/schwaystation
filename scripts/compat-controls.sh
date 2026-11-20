@@ -29,9 +29,7 @@ judge() {
     expect "$name" "$want" "$pattern" "$@"
 }
 invalid() {
-    name=$1 rows=$(row "$2") want=$3 pattern=$4
-    ledger "$tmp/candidate.csv" "$rows" title; allowance none > "$tmp/allow"
-    expect "$name" "$want" "$pattern" sh "$source_root/scripts/compat-ratchet.sh" "$tmp/candidate.csv" "$tmp/candidate.csv" "$tmp/candidate.csv" "$tmp/allow" "$today"
+    judge "$1" "$2" "$2" none none "$3" title "$4"
 }
 preflight() {
     name=$1 rows=$(row "$2") want=$3 pattern=${4:-} max=${5:-}

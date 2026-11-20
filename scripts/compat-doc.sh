@@ -7,7 +7,12 @@ fi
 ledger=$1
 output=$2
 mode=${3:-write}
-case "$mode" in write|--check) ;; *) printf '%s\n' 'compatibility: third argument must be --check' >&2; exit 2 ;; esac
+case "$mode" in
+    write|--check) ;;
+    *) printf '%s\n' 'compatibility: third argument must be --check' >&2
+        exit 2
+        ;;
+esac
 prefix=${TMPDIR:-/tmp}/compat-doc-$$
 trap 'rm -f "$prefix".*' EXIT HUP INT TERM
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
@@ -42,7 +47,10 @@ awk -F, 'NR > 1 { printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $5,
     awk -F '\t' '{ printf "| %s | %s | %s | %s | %s | %s | %s | %s |\n", $1, $2, $3, $4, $5, $6, $7, $8 }' "$prefix.features"
 } > "$prefix.generated"
 if [ "$mode" = --check ]; then
-    cmp -s "$prefix.generated" "$output" || { printf '%s\n' 'compatibility: generated documentation is stale' >&2; exit 1; }
+    if ! cmp -s "$prefix.generated" "$output"; then
+        printf '%s\n' 'compatibility: generated documentation is stale' >&2
+        exit 1
+    fi
 else
     cp "$prefix.generated" "$output"
 fi
