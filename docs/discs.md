@@ -1,10 +1,12 @@
 # Disc images
 
 The runner and libretro host use `schway_disc_image` to provide sector data to
-the core. File access stays in the host. The provider currently accepts cooked
-`.iso` images and `.cue` sheets whose data files contain MODE1/2048,
-MODE2/2352, or AUDIO tracks. It rejects `.chd`, `.pbp`, `.ecm`, and `.ccd` as
-unsupported formats; those formats are not sniffed or partially opened.
+the core. File access stays in the host. The provider accepts cooked `.iso`
+images and `.cue` sheets whose data files contain MODE1/2048, MODE2/2352, or
+AUDIO tracks. With `SCHWAYSTATION_CHD=ON`, it also opens the bounded CHD subset
+below through the same raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off
+by default; `.chd`, `.pbp`, `.ecm`, and `.ccd` remain unsupported when their
+providers are not enabled or implemented.
 
 ## CHD metadata subset
 
@@ -24,12 +26,17 @@ before narrowing to public TOC fields.
 
 The CHD storage stream pads each track to a four-frame boundary. The reader
 includes those frames when reconciling the CHD logical byte count, but excludes
-them from public LBAs and leadouts. The TOC fixture checks index 0, index 1,
-pregap and exclusive leadout against the owned CUE. `disc.image.chd_headers`,
-`disc.image.chd_metadata` and `disc.image.chd_toc` cover header bounds, metadata
-variants and the generated CHD. The public image router and sector parity are
-separate integration steps; this private metadata contract does not claim that
-`.chd` is yet accepted through `schway_disc_image_open()`.
+them from public LBAs and leadouts. Virtual pregap sectors use the same blank
+sector construction as the CUE provider; stored pregaps map to their source
+frames. The owned fixture's complete 222-sector stream, 96-byte absent-subcode
+output, and content-based save identity are compared against CUE by
+`disc.image.chd_parity`. `disc.image.chd_open` checks shared routing and failed
+open isolation, while `disc.image.chd_boundaries` covers track/index/leadout and
+each eight-frame hunk transition. `disc.image.chd_headers`,
+`disc.image.chd_metadata`, and `disc.image.chd_toc` cover header bounds,
+metadata variants, and normalized TOC fields. Runner/libretro selection,
+extension advertising, and packaged ON/OFF archives remain later integration
+work.
 
 ## Playlists
 

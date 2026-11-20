@@ -14,10 +14,15 @@
     } \
 } while (0)
 
+static int make_named_path(char path[1024], const char *directory, const char *name)
+{
+    int size = snprintf(path, 1024u, "%s/%s", directory, name);
+    return size >= 0 && (size_t)size < 1024u;
+}
+
 static int make_path(char path[1024], const char *directory)
 {
-    int size = snprintf(path, 1024u, "%s/chd-header-test.bin", directory);
-    return size >= 0 && (size_t)size < 1024u;
+    return make_named_path(path, directory, "chd-header-test.bin");
 }
 
 #if SCHWAYSTATION_CHD
@@ -78,6 +83,9 @@ static int run_metadata_controls(void)
     schway__disc_chd_metadata_record one;
     schway__disc_chd_metadata_record max_records[SCHWAY_DISC_MAX_TRACKS];
     schway__disc_chd_metadata_record too_many[SCHWAY_DISC_MAX_TRACKS + 1u];
+    uint32_t frame;
+    uint32_t track_type;
+    uint32_t virtual_pregap;
 
 #define META_CHECK(condition, message) do { \
     if (!(condition)) { \
@@ -101,6 +109,18 @@ static int run_metadata_controls(void)
               map.tracks[1].chd_frame_count == 158u &&
               map.tracks[1].stored_pregap == 1u,
               "CHT2 padding or stored pregap changed the logical TOC");
+    META_CHECK(schway__disc_chd_map_lba(&map, 64u, &frame, &track_type,
+              &virtual_pregap) != 0u && frame == 64u &&
+              track_type == SCHWAY_DISC_TRACK_AUDIO && virtual_pregap == 0u &&
+              schway__disc_chd_map_lba(&map, 213u, &frame, &track_type,
+              &virtual_pregap) != 0u && frame == 213u && virtual_pregap == 0u &&
+              schway__disc_chd_map_lba(&map, 214u, &frame, &track_type,
+              &virtual_pregap) != 0u && frame == 214u && virtual_pregap == 0u &&
+              schway__disc_chd_map_lba(&map, 221u, &frame, &track_type,
+              &virtual_pregap) != 0u && frame == 221u && virtual_pregap == 0u &&
+              schway__disc_chd_map_lba(&map, 222u, &frame, &track_type,
+              &virtual_pregap) == 0u,
+              "stored pregap and leadout did not map to exact CHD frames");
 
     one = (schway__disc_chd_metadata_record){
         SCHWAY__DISC_CHD_TAG_CHT2, virtual_gap, (uint32_t)sizeof virtual_gap
@@ -110,6 +130,17 @@ static int run_metadata_controls(void)
               map.tracks[0].toc.index0 == 0u && map.tracks[0].toc.index1 == 150u &&
               map.tracks[0].toc.leadout == 158u && map.tracks[0].stored_pregap == 0u,
               "virtual pregap was counted as stored frames");
+    META_CHECK(schway__disc_chd_map_lba(&map, 0u, &frame, &track_type,
+              &virtual_pregap) != 0u && track_type == SCHWAY_DISC_TRACK_AUDIO &&
+              virtual_pregap == 1u && schway__disc_chd_map_lba(&map, 149u,
+              &frame, &track_type, &virtual_pregap) != 0u && virtual_pregap == 1u &&
+              schway__disc_chd_map_lba(&map, 150u, &frame, &track_type,
+              &virtual_pregap) != 0u && frame == 0u && virtual_pregap == 0u &&
+              schway__disc_chd_map_lba(&map, 157u, &frame, &track_type,
+              &virtual_pregap) != 0u && frame == 7u && virtual_pregap == 0u &&
+              schway__disc_chd_map_lba(&map, 158u, &frame, &track_type,
+              &virtual_pregap) == 0u,
+              "virtual pregap frames or data extent mapped incorrectly");
 
     one = (schway__disc_chd_metadata_record){
         SCHWAY__DISC_CHD_TAG_CHTR, legacy, (uint32_t)sizeof legacy
@@ -277,6 +308,197 @@ static int run_chd_toc(const char *path)
     return 0;
 }
 
+#if SCHWAYSTATION_CHD
+static int same_toc(const schway_disc *left, const schway_disc *right)
+{
+    schway_toc a;
+    schway_toc b;
+    if (left == NULL || right == NULL || left->toc == NULL || right->toc == NULL) return 0;
+    memset(&a, 0, sizeof a);
+    memset(&b, 0, sizeof b);
+    a.size = (uint32_t)sizeof a;
+    b.size = (uint32_t)sizeof b;
+    if (left->toc(left->user, &a) == 0u || right->toc(right->user, &b) == 0u ||
+        a.size != sizeof a || b.size != sizeof b || a.track_count != b.track_count ||
+        a.track_count == 0u || a.track_count > SCHWAY_DISC_MAX_TRACKS) return 0;
+    for (uint32_t i = 0u; i < a.track_count; i++) {
+        if (a.tracks[i].size != sizeof a.tracks[i] ||
+            b.tracks[i].size != sizeof b.tracks[i] ||
+            a.tracks[i].type != b.tracks[i].type ||
+            a.tracks[i].index0 != b.tracks[i].index0 ||
+            a.tracks[i].index1 != b.tracks[i].index1 ||
+            a.tracks[i].pregap != b.tracks[i].pregap ||
+            a.tracks[i].leadout != b.tracks[i].leadout) return 0;
+    }
+    return 1;
+}
+
+static int same_sector_at_lba(const schway_disc *left, const schway_disc *right,
+                              uint32_t lba)
+{
+    uint8_t left_sector[2354];
+    uint8_t right_sector[2354];
+    uint8_t left_subcode[98];
+    uint8_t right_subcode[98];
+    memset(left_sector, 0xa5, sizeof left_sector);
+    memset(right_sector, 0xa5, sizeof right_sector);
+    memset(left_subcode, 0xa5, sizeof left_subcode);
+    memset(right_subcode, 0xa5, sizeof right_subcode);
+    if (left == NULL || right == NULL || left->read_sector == NULL ||
+        right->read_sector == NULL ||
+        left->read_sector(left->user, lba, left_sector + 1u, left_subcode + 1u) != 1u ||
+        right->read_sector(right->user, lba, right_sector + 1u, right_subcode + 1u) != 1u ||
+        left_sector[0] != 0xa5u || left_sector[2353] != 0xa5u ||
+        right_sector[0] != 0xa5u || right_sector[2353] != 0xa5u ||
+        left_subcode[0] != 0xa5u || left_subcode[97] != 0xa5u ||
+        right_subcode[0] != 0xa5u || right_subcode[97] != 0xa5u) return 0;
+    for (size_t i = 0u; i < 2352u; i++) {
+        if (left_sector[i + 1u] != right_sector[i + 1u]) {
+            fprintf(stderr, "sector mismatch LBA %u offset %zu CUE=%02x CHD=%02x\n",
+                    lba, i, left_sector[i + 1u], right_sector[i + 1u]);
+            return 0;
+        }
+    }
+    for (size_t i = 0u; i < 96u; i++) {
+        if (left_subcode[i + 1u] != right_subcode[i + 1u]) {
+            fprintf(stderr, "subcode mismatch LBA %u offset %zu CUE=%02x CHD=%02x\n",
+                    lba, i, left_subcode[i + 1u], right_subcode[i + 1u]);
+            return 0;
+        }
+    }
+    return 1;
+}
+#endif
+
+static int run_chd_open(int argc, char **argv)
+{
+#if SCHWAYSTATION_CHD
+    schway_disc_image *cue_image = NULL;
+    schway_disc_image *chd_image = NULL;
+    schway_disc_image *failed_image = NULL;
+    schway_disc_image_error error;
+    const schway_disc *cue_disc;
+    const schway_disc *chd_disc;
+    char bad_path[1024];
+    uint8_t bad_header[16] = { 'M', 'C', 'o', 'm', 'p', 'r', 'H', 'D' };
+    int result = 1;
+    if (argc != 5) return 2;
+    put_be32(bad_header + 8u, 124u);
+    put_be32(bad_header + 12u, 6u);
+    if (!make_named_path(bad_path, argv[4], "chd-open-invalid.chd")) return 2;
+    memset(&error, 0, sizeof error);
+    if (schway_disc_image_open(argv[2], &cue_image, &error) != SCHWAY_DISC_IMAGE_OK ||
+        schway_disc_image_open(argv[3], &chd_image, &error) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.chd_open: a shared CUE or CHD open failed: %s\n",
+                error.message);
+        goto cleanup_open;
+    }
+    cue_disc = schway_disc_image_disc(cue_image);
+    chd_disc = schway_disc_image_disc(chd_image);
+    if (!same_toc(cue_disc, chd_disc) || !same_sector_at_lba(cue_disc, chd_disc, 0u)) {
+        fprintf(stderr, "ASSERT disc.image.chd_open: public callback differs from the CUE\n");
+        goto cleanup_open;
+    }
+    if (!write_bytes(bad_path, bad_header, sizeof bad_header) ||
+        schway_disc_image_open(bad_path, &failed_image, &error) !=
+            SCHWAY_DISC_IMAGE_UNSUPPORTED || failed_image != NULL ||
+        !same_sector_at_lba(cue_disc, chd_disc, 0u)) {
+        fprintf(stderr, "ASSERT disc.image.chd_open: failed replacement damaged active media\n");
+        goto cleanup_open;
+    }
+    result = 0;
+cleanup_open:
+    schway_disc_image_close(failed_image);
+    schway_disc_image_close(chd_image);
+    schway_disc_image_close(cue_image);
+    (void)remove(bad_path);
+    if (result == 0) puts("PASS disc.image.chd_open");
+    return result;
+#else
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    if (argc != 3) return 2;
+    if (schway_disc_image_open(argv[2], &image, &error) != SCHWAY_DISC_IMAGE_UNSUPPORTED ||
+        image != NULL) {
+        schway_disc_image_close(image);
+        fprintf(stderr, "ASSERT disc.image.chd_open: CHD-off build accepted CHD\n");
+        return 1;
+    }
+    schway_disc_image_close(image);
+    puts("PASS disc.image.chd_open");
+    return 0;
+#endif
+}
+
+static int run_chd_boundaries(int argc, char **argv)
+{
+#if SCHWAYSTATION_CHD
+    static const uint32_t fixed_lbas[] = { 0u, 63u, 64u, 213u, 214u, 215u, 221u };
+    schway_disc_image *cue_image = NULL;
+    schway_disc_image *chd_image = NULL;
+    schway_disc_image_error error;
+    const schway_disc *cue_disc;
+    const schway_disc *chd_disc;
+    uint8_t sector[2352];
+    uint8_t subcode[96];
+    int result = 1;
+    if (argc != 4) return 2;
+    memset(&error, 0, sizeof error);
+    if (schway_disc_image_open(argv[2], &cue_image, &error) != SCHWAY_DISC_IMAGE_OK ||
+        schway_disc_image_open(argv[3], &chd_image, &error) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.chd_boundaries: image open failed: %s\n", error.message);
+        goto cleanup_boundaries;
+    }
+    cue_disc = schway_disc_image_disc(cue_image);
+    chd_disc = schway_disc_image_disc(chd_image);
+    if (!same_toc(cue_disc, chd_disc)) {
+        fprintf(stderr, "ASSERT disc.image.chd_boundaries: TOCs differ\n");
+        goto cleanup_boundaries;
+    }
+    for (size_t i = 0u; i < sizeof fixed_lbas / sizeof fixed_lbas[0]; i++) {
+        if (!same_sector_at_lba(cue_disc, chd_disc, fixed_lbas[i])) {
+            fprintf(stderr, "ASSERT disc.image.chd_boundaries: mismatch at LBA %u\n",
+                    fixed_lbas[i]);
+            goto cleanup_boundaries;
+        }
+    }
+    for (uint32_t boundary = 8u; boundary < 222u; boundary += 8u) {
+        if (!same_sector_at_lba(cue_disc, chd_disc, boundary - 1u) ||
+            !same_sector_at_lba(cue_disc, chd_disc, boundary)) {
+            fprintf(stderr, "ASSERT disc.image.chd_boundaries: hunk mismatch near LBA %u\n",
+                    boundary);
+            goto cleanup_boundaries;
+        }
+    }
+    if (cue_disc->read_sector(cue_disc->user, 222u, sector, subcode) != 0u ||
+        chd_disc->read_sector(chd_disc->user, 222u, sector, subcode) != 0u ||
+        cue_disc->read_sector(cue_disc->user, UINT32_MAX, sector, subcode) != 0u ||
+        chd_disc->read_sector(chd_disc->user, UINT32_MAX, sector, subcode) != 0u) {
+        fprintf(stderr, "ASSERT disc.image.chd_boundaries: leadout/out-of-range read succeeded\n");
+        goto cleanup_boundaries;
+    }
+    result = 0;
+cleanup_boundaries:
+    schway_disc_image_close(chd_image);
+    schway_disc_image_close(cue_image);
+    if (result == 0) puts("PASS disc.image.chd_boundaries");
+    return result;
+#else
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    if (argc != 3) return 2;
+    if (schway_disc_image_open(argv[2], &image, &error) != SCHWAY_DISC_IMAGE_UNSUPPORTED ||
+        image != NULL) {
+        schway_disc_image_close(image);
+        fprintf(stderr, "ASSERT disc.image.chd_boundaries: CHD-off build accepted CHD\n");
+        return 1;
+    }
+    schway_disc_image_close(image);
+    puts("PASS disc.image.chd_boundaries");
+    return 0;
+#endif
+}
+
 int main(int argc, char **argv)
 {
     int result = 0;
@@ -286,6 +508,10 @@ int main(int argc, char **argv)
     }
     if (argc == 3 && strcmp(argv[1], "--toc") == 0) {
         return run_chd_toc(argv[2]);
+    }
+    if (argc >= 2 && strcmp(argv[1], "--open") == 0) return run_chd_open(argc, argv);
+    if (argc >= 2 && strcmp(argv[1], "--boundaries") == 0) {
+        return run_chd_boundaries(argc, argv);
     }
 #if SCHWAYSTATION_CHD
     uint8_t header[124];

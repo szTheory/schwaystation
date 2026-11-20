@@ -13,12 +13,19 @@
 #define SCHWAY__DISC_CHD_MAX_BYTES UINT64_C(1073741824)
 #define SCHWAY__DISC_CHD_MAX_HUNK_BYTES UINT32_C(16777216)
 #define SCHWAY__DISC_CHD_MAX_HUNKS UINT32_C(65536)
+#define SCHWAY__DISC_CHD_FRAME_BYTES UINT32_C(2448)
 
 struct schway__disc_chd {
 #if SCHWAYSTATION_CHD
     FILE *file;
     chd_file *chd;
     schway__disc_chd_metadata_map metadata;
+    uint8_t *hunk_buffer;
+    uint32_t hunk_bytes;
+    uint32_t frames_per_hunk;
+    uint32_t total_hunks;
+    uint32_t cached_hunk;
+    uint32_t cache_valid;
 #else
     uint32_t unavailable;
 #endif
@@ -331,9 +338,20 @@ schway_disc_image_status schway__disc_chd_open(const char *path,
         free(reader);
         return status;
     }
+    reader->hunk_buffer = (uint8_t *)malloc(bounds.hunk_bytes);
+    if (reader->hunk_buffer == NULL) {
+        chd_close(chd);
+        (void)fclose(file);
+        free(reader);
+        return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_OUT_OF_MEMORY,
+                                      "could not allocate the bounded CHD hunk cache");
+    }
     reader->file = file;
     reader->chd = chd;
     reader->metadata = metadata;
+    reader->hunk_bytes = bounds.hunk_bytes;
+    reader->frames_per_hunk = bounds.hunk_bytes / SCHWAY__DISC_CHD_FRAME_BYTES;
+    reader->total_hunks = bounds.total_hunks;
     *out = reader;
     return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_OK, "");
 #else
@@ -349,8 +367,49 @@ void schway__disc_chd_close(schway__disc_chd *reader)
 #if SCHWAYSTATION_CHD
     if (reader->chd != NULL) chd_close(reader->chd);
     if (reader->file != NULL) (void)fclose(reader->file);
+    free(reader->hunk_buffer);
 #endif
     free(reader);
+}
+
+uint32_t schway__disc_chd_map_lba(const schway__disc_chd_metadata_map *map,
+                                  uint32_t lba, uint32_t *frame,
+                                  uint32_t *track_type,
+                                  uint32_t *virtual_pregap)
+{
+    if (frame == NULL || track_type == NULL || virtual_pregap == NULL) return 0u;
+    *frame = 0u;
+    *track_type = 0u;
+    *virtual_pregap = 0u;
+    if (map == NULL || map->track_count == 0u ||
+        map->track_count > SCHWAY_DISC_MAX_TRACKS) return 0u;
+
+    for (uint32_t i = 0u; i < map->track_count; i++) {
+        const schway__disc_chd_track_map *track = &map->tracks[i];
+        uint64_t relative;
+        uint64_t absolute;
+        if (lba < track->toc.index0 || lba >= track->toc.leadout) continue;
+        if (track->toc.index0 > track->toc.index1 ||
+            track->toc.index1 > track->toc.leadout ||
+            track->toc.pregap != track->toc.index1 - track->toc.index0 ||
+            track->stored_pregap > 1u) return 0u;
+        *track_type = track->toc.type;
+        if (lba < track->toc.index1 && track->stored_pregap == 0u) {
+            *virtual_pregap = 1u;
+            return 1u;
+        }
+        if (track->stored_pregap != 0u) {
+            relative = (uint64_t)lba - track->toc.index0;
+        } else {
+            relative = (uint64_t)lba - track->toc.index1;
+        }
+        if (relative >= track->chd_frame_count) return 0u;
+        absolute = (uint64_t)track->chd_frame_start + relative;
+        if (absolute >= map->chd_frame_count || absolute > UINT32_MAX) return 0u;
+        *frame = (uint32_t)absolute;
+        return 1u;
+    }
+    return 0u;
 }
 
 schway_disc_image_status schway__disc_chd_toc(const schway__disc_chd *reader,
@@ -380,9 +439,50 @@ schway_disc_image_status schway__disc_chd_toc(const schway__disc_chd *reader,
 uint32_t schway__disc_chd_read_sector(void *user, uint32_t lba,
                                       uint8_t sector[2352], uint8_t subcode[96])
 {
+#if SCHWAYSTATION_CHD
+    schway__disc_chd *reader = (schway__disc_chd *)user;
+    uint32_t frame;
+    uint32_t track_type;
+    uint32_t virtual_pregap;
+    uint32_t hunk_index;
+    uint32_t frame_in_hunk;
+    uint32_t byte_offset;
+    if (reader == NULL || sector == NULL || reader->chd == NULL ||
+        reader->hunk_buffer == NULL || reader->frames_per_hunk == 0u ||
+        !schway__disc_chd_map_lba(&reader->metadata, lba, &frame,
+                                  &track_type, &virtual_pregap)) return 0u;
+    if (virtual_pregap != 0u) {
+        schway__disc_image_make_virtual_sector(track_type, lba, sector);
+        if (subcode != NULL) memset(subcode, 0, 96u);
+        return 1u;
+    }
+    hunk_index = frame / reader->frames_per_hunk;
+    frame_in_hunk = frame % reader->frames_per_hunk;
+    if (hunk_index >= reader->total_hunks ||
+        frame_in_hunk > (reader->hunk_bytes - SCHWAY__DISC_CHD_FRAME_BYTES) /
+                        SCHWAY__DISC_CHD_FRAME_BYTES) return 0u;
+    byte_offset = frame_in_hunk * SCHWAY__DISC_CHD_FRAME_BYTES;
+    if (reader->cache_valid == 0u || reader->cached_hunk != hunk_index) {
+        reader->cache_valid = 0u;
+        if (chd_read(reader->chd, hunk_index, reader->hunk_buffer) != CHDERR_NONE) return 0u;
+        reader->cached_hunk = hunk_index;
+        reader->cache_valid = 1u;
+    }
+    memcpy(sector, reader->hunk_buffer + byte_offset, 2352u);
+    if (track_type == SCHWAY_DISC_TRACK_AUDIO) {
+        for (uint32_t i = 0u; i < 2352u; i += 2u) {
+            uint8_t first = sector[i];
+            sector[i] = sector[i + 1u];
+            sector[i + 1u] = first;
+        }
+    }
+    if (subcode != NULL) memcpy(subcode, reader->hunk_buffer + byte_offset + 2352u, 96u);
+    return 1u;
+#else
     (void)user;
     (void)lba;
     (void)sector;
     (void)subcode;
     return 0u;
+#endif
 }
