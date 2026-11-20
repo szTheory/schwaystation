@@ -6,11 +6,11 @@ current_phase: 9
 current_phase_name: CHD disc images
 current_plan: Not started
 status: planning
-stopped_at: Phase 7 verification refresh complete; Phase 9 discussion is next
-last_updated: "2026-11-20T02:12:37Z"
+stopped_at: Phase 9 discussion complete
+last_updated: "2026-11-20T02:37:09.791Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 7 verification refreshed and Phase 8 release/main CI confirmed green; Phase 9 is unblocked
-state_head: 830bf4cfe74aca92930e34fdf9667c5c1b24c370
+last_activity_desc: Phase 9 discussion completed with parity, fixture-security, and CI/package decisions captured; planning is next
+state_head: 25b61176fdc4f0083f384fc7163568a8d7f194bc
 progress:
   total_phases: 10
   completed_phases: 2
@@ -33,8 +33,19 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 Phase: 9 — CHD disc images
 Current Plan: Not started
 Total Plans in Phase: Not planned
-Status: Ready to discuss; Phase 8 release and green main CI are confirmed
-Last activity: 2026-11-20 — Phase 7 verification refreshed; Phase 9 discussion is next.
+Status: Ready to plan; Phase 8 release and green main CI are confirmed
+Last activity: 2026-11-19 — Phase 9 discussion and three advisor reviews completed.
+
+### Phase 9 discussion (2026-11-19)
+
+Runtime/model: Codex, primary GPT-6 model ID unavailable; three `gsd-advisor-researcher` agents on
+gpt-6-luna xhigh. The discussion captured parity-first CHD projection, a run-local fixture generated only from
+a license-cleared pinned tool closure, structural/boundary preflights before guest execution, CHD-enabled release
+artifacts after parity, and measured exact-SHA CI reuse as the only basis for changing Main/Release wiring.
+Folded todos 005 and 050; todo 006 remains with Phase 10. All three focused advisor reviews completed and the
+adversarial pass found no decision that changes the approved scope. Context and discussion log were committed in
+`09-CONTEXT.md` and `09-DISCUSSION-LOG.md`; no implementation test or CI run applies yet. CI/CD efficiency
+guidance is already discoverable in `AGENTS.md` and `.planning/AUTONOMOUS.md` and will be applied at each run.
 
 ### Phase 8 Plan 08-10 execution (2026-11-19)
 
@@ -1049,9 +1060,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T23:12:29Z
-Stopped at: Phase 8 verified and transitioned; ship Phase 8 before starting Phase 9
-Resume file: None
+Last session: 2026-11-20T02:37:09.691Z
+Stopped at: Phase 9 discussion complete
+Resume file: .planning/phases/09-chd-disc-images/09-CONTEXT.md
 
 ### v1.0 session history
 
@@ -1233,7 +1244,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Discuss, plan, execute, review, verify and ship Phase 9 CHD disc images. Re-read `.planning/LESSONS.md`, `.planning/AUTONOMOUS.md` and the preparation references before design. Resolve todo 050 only if Phase 9 changes the CI or Release workflows. Run cheap selector, inventory and artifact checks before long suites; keep hosted matrix and release gates required. No owner UAT is needed.
+- Plan, execute, review, verify, and ship Phase 9 CHD disc images. Measure todo 050's exact-SHA artifact identity, runner-minutes, and critical path; change workflow wiring only if a tested reuse path is safe and measurably worthwhile. Run cheap selectors, inventory, fixture, and artifact checks before long suites; keep hosted matrix and release gates required. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
