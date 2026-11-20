@@ -236,7 +236,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "ci",
@@ -246,7 +246,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "library",
@@ -256,7 +256,7 @@
         "outputJUnitFile": "${sourceDir}/build/library/junit.xml"
       },
       "filter": { "include": { "label": "^library$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "ci-msvc",
@@ -266,7 +266,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "ci-release",
@@ -276,7 +276,7 @@
         "outputJUnitFile": "${sourceDir}/build/ci/junit-release.xml"
       },
       "filter": { "include": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "ci-msvc-release",
@@ -286,7 +286,7 @@
         "outputJUnitFile": "${sourceDir}/build/ci-msvc/junit-release.xml"
       },
       "filter": { "include": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "hygiene",
@@ -296,7 +296,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "include": { "label": "^hygiene$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "asan",
@@ -306,7 +306,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^(abi|release)$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "nofp",
@@ -316,7 +316,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "include": { "label": "^abi$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "be32",
@@ -326,7 +326,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "include": { "label": "^portable$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "be32-chd",
@@ -336,7 +336,7 @@
         "outputJUnitFile": "${sourceDir}/build/be32/junit.xml"
       },
       "filter": { "include": { "label": "^portable$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "wasm32",
@@ -346,7 +346,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "include": { "label": "^portable$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "wasm32-chd",
@@ -356,7 +356,7 @@
         "outputJUnitFile": "${sourceDir}/build/wasm32/junit.xml"
       },
       "filter": { "include": { "label": "^portable$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "wasm32-preflight",
@@ -367,7 +367,7 @@
         "outputJUnitFile": "${sourceDir}/build/wasm32/preflight-junit.xml"
       },
       "filter": { "include": { "name": "^runner[.]cards[.]persistence$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "nightly",
@@ -376,7 +376,7 @@
         "outputOnFailure": true,
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     }
   ],
   "packagePresets": [

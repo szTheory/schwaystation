@@ -19,6 +19,10 @@ check the packaged archives and run after the package step, with `ctest --preset
 label, so `-L gte` would also select any longer label that contains it; write `-L '^gte$'`, `-L '^dma$'` and
 `-L '^timers$'` to select exactly one.
 
+Test presets stop scheduling new tests after the first failure. A green run still covers its full selected
+inventory; a red run avoids spending time on unrelated checks after a blocking failure, while tests already
+running are allowed to finish.
+
 **Reconfigure after each commit.** Some checks read git's list of tracked files, and the runner's revision is
 embedded when CMake configures. A new file is seen only once git tracks it, and `build.revision_matches_head`
 fails when the embedded revision is not `git rev-parse HEAD`. After committing, rerun the whole workflow preset,

@@ -520,12 +520,22 @@ jobs:
           cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
           cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios-fast.bin -DEXPECTED_FILE=tests/built/fast-expected.txt -P cmake/OpenBIOS.cmake
       # clang-21 is on the image; its sanitizer runtimes may not be.
-      - name: Sanitizer runtimes
+      - name: Sanitizer runtime
         run: dpkg -s libclang-rt-21-dev > /dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y libclang-rt-21-dev; }
+      - name: Configure ASan with CHD
+        env:
+          SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/asan/disc-media
+        run: cmake --preset asan -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=ON
+      - name: Confirm CHD configuration before build
+        run: |
+          grep -Fxq 'SCHWAYSTATION_CHD:BOOL=ON' build/asan/CMakeCache.txt
+          grep -Fxq 'SCHWAYSTATION_BUILD_CHD_TOOL:BOOL=ON' build/asan/CMakeCache.txt
       - name: Build and test
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/asan/disc-media
-        run: cmake --workflow --preset asan
+        run: |
+          cmake --build --preset asan
+          ctest --preset asan
       # The abi and release checks read binary shapes the instrumentation changes.
       - name: Every test ran
         run: >-

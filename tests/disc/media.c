@@ -272,7 +272,11 @@ static int validate_chd_fixture(const char *cue, const char *chd,
         chd_bytes == 0u || chd_bytes >= UINT64_C(524288)) return 0;
 
     memset(&error, 0, sizeof error);
-    if (schway__disc_chd_open(chd, &reader, &error) != SCHWAY_DISC_IMAGE_OK || reader == NULL) goto cleanup;
+    if (schway__disc_chd_open(chd, &reader, &error) != SCHWAY_DISC_IMAGE_OK || reader == NULL) {
+        fprintf(stderr, "ASSERT disc.media.preflight: CHD reader rejected checked fixture: status=%u (%s)\n",
+                (unsigned)error.status, error.message);
+        goto cleanup;
+    }
     valid = 1;
 
 cleanup:

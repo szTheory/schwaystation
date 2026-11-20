@@ -13,6 +13,8 @@ set(SCHWAY_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
 add_executable(schwaystation-sdl2
   main.c
   "${SCHWAY_ROOT}/host/disc_image.c"
+  "${SCHWAY_ROOT}/host/disc_chd.c"
   "${SCHWAY_ROOT}/host/xrgb8888.c")
 target_include_directories(schwaystation-sdl2 PRIVATE "${SCHWAY_ROOT}/host")
+target_compile_definitions(schwaystation-sdl2 PRIVATE SCHWAYSTATION_CHD=0)
 target_link_libraries(schwaystation-sdl2 PRIVATE schwaystation::schwaystation PkgConfig::SDL2)

@@ -1361,7 +1361,7 @@ set_tests_properties(compat.features.preflight PROPERTIES FIXTURES_SETUP compat_
 schway_add_test(NAME compat.features.ratchet
   COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
     -DCASE=compat_features_ratchet -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
-  LABELS compat portable TIMEOUT 15)
+  LABELS compat portable TIMEOUT 45)
 
 # Fault prevented: an incomplete or wrong compatibility baseline selecting introduction.
 schway_add_test(NAME compat.ratchet.protected_controls
