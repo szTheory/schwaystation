@@ -44,7 +44,7 @@ key-files:
     - tests/compat/inventory.txt
     - docs/compatibility.md
 key-decisions:
-  - Feature identity is provider, profile, and predicate; protection and peripheral are required descriptive fields.
+  - Feature identity is provider, profile, protection, peripheral, and predicate.
   - Production allowance checks use the current UTC date; controls inject fixed dates for reproducible boundaries.
   - Preserve the five-argument title judge interface; append the kind argument only for feature-capable protected judges.
 requirements-completed:
@@ -94,8 +94,8 @@ status: complete
 
 ## Accomplishments
 
-- Added the unknown CHD feature row and stable inventory entry. The key is provider, profile, and predicate; protection and peripheral remain mandatory fields that describe the tested combination.
-- Added feature schema, key, tuple-order, row-count, date, and allowance checks. The production path uses the current UTC date, and controls inject a fixed date.
+- Added the unknown CHD feature row and stable inventory entry. The key covers provider, profile, protection, peripheral, and predicate.
+- Added feature schema, full-identity, tuple-order, row-count, date, and allowance checks. The production path uses the current UTC date, and controls inject a fixed date.
 - Kept title ratchet calls at five arguments for older protected judges. Feature mode receives the sixth kind argument only when the protected base supports it.
 - Compared the checked-in feature ledger with an independent expected-unknown fixture so changing the ledger and regenerating docs cannot certify itself.
 - Preserved title controls and added feature transition cases for missing evidence, regressions, removals, allowance errors, row-count bounds, and tuple-prefix sorting.
@@ -103,10 +103,11 @@ status: complete
 ## Verification and Efficiency
 
 - LC_ALL=C sort -cu tests/compat/inventory.txt passed.
-- The shipping-helper line budget passed at 3900/3901 lines. sh -n passed for the changed shell helpers, and cmake --preset ci configured successfully.
+- The shipping-helper line budget passed at 3901/3901 lines after review correction. sh -n passed for the changed shell helpers, and cmake --preset ci configured successfully.
 - The feature selector passed 2/2. The feature/ratchet selector passed 5/5 with COMPAT_BASE_DIR set to a shared clone of origin/main at 830bf4cfe74aca92930e34fdf9667c5c1b24c370.
 - The direct compat.ratchet.rows check against that same five-argument judge passed 6/6 including CTest's five required fixture setups. The documentation freshness check passed 1/1.
-- git diff --check HEAD passed. git diff --check origin/main...HEAD found a trailing blank line in the already committed Plan 09-07 summary; this is outside Plan 09-08 and is being handled separately by the plan owner.
+- Code review found that protection and peripheral were absent from feature identity. The ratchet and allowances now bind all five feature fields; a changed prior combination and candidate/fresh context mismatch both have negative controls. The post-fix selector for feature ratchet, title transitions and generated-document freshness passed 4/4 in 1.91s.
+- `COMPAT_TODAY=2026-11-20 sh scripts/compat-doc.sh tests/compat/ledger.csv docs/compatibility.md --check` passed. The Plan 09-07 and 09-08 summary EOF blanks were removed in commit 9224eac; both branch and HEAD diff checks pass.
 - The scenario runner moved from the large CMake control file into a counted POSIX shell helper, with a small CMake adapter and fixture-only TSV. This retained all title and feature assertions within the hard line budget. No full suite or hosted workflow run was needed because this plan changed no workflow.
 
 ## Task Commits

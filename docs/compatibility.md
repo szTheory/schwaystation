@@ -20,9 +20,8 @@ Generated from `tests/compat/ledger.csv` and `tests/compat/features.csv`.
 
 ## Feature evidence
 
-The key is provider, profile and predicate. Protection and peripheral fields describe the tested combination without changing key identity.
-Every field is required; unknown is valid until fresh evidence exists. A pass must match the fresh result status and evidence reference. Prior passes cannot regress or disappear without a matching dated allowance.
-Phase 10 onward adds provider/profile/protection/peripheral rows as each capability lands. Feature allowances use `<date> <provider> <profile> <predicate> behavior-rev=4 expires=<date> <reason>` and may cover at most 60 days.
+The key is provider, profile, protection, peripheral and predicate. Every field is required; unknown is valid until fresh evidence exists. A pass must match the fresh result status and evidence reference. Prior passes cannot regress or disappear without a matching dated allowance.
+Phase 10 onward adds provider/profile/protection/peripheral rows as each capability lands. Feature allowances use `<date> <provider> <profile> <protection>!<peripheral>!<predicate> behavior-rev=4 expires=<date> <reason>` and may cover at most 60 days.
 
 | Provider | Profile | Protection | Peripheral | Predicate | Status | Evidence | Date |
 | --- | --- | --- | --- | --- | --- | --- | --- |

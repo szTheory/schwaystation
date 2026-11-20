@@ -14,6 +14,7 @@ row|chd|chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,unknown,planned:09-1
 row|chdpass|chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,compat.chd:exit=0,2026-11-11
 row|chdfresh|chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,compat.chd:exit=0;sha256=abc123,2026-11-11
 row|chdfail|chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,fail,compat.chd:exit=1,2026-11-11
+row|chdprotectedpass|chd,ntsc-u,copy-protection,lightgun,disc_boot.toc+sectors+subcode,pass,compat.chd:exit=0,2026-11-11
 row|chd2|chd2,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,unknown,planned:09-14,2026-11-11
 row|pbp|pbp,ntsc-u,none,cdrom,boot-sector,unknown,pending:phase-10,2026-11-11
 row|fmissing|,ntsc-u,none,cdrom,disc_boot,unknown,pending,2026-11-11
@@ -25,9 +26,9 @@ allow|title61|2026-09-01 fixture/control 00000000000000000000000000000000 frame@
 allow|expired|2026-09-01 fixture/control 00000000000000000000000000000000 frame@60=aaaaaaaa behavior-rev=4 expires=2026-10-31 expired window
 allow|titlerev|2026-09-12 fixture/control 00000000000000000000000000000000 frame@60=aaaaaaaa behavior-rev=3 expires=2026-11-11 wrong revision
 allow|titlematch|2026-09-12 fixture/control 00000000000000000000000000000000 frame@60=aaaaaaaa behavior-rev=4 expires=2026-11-11 approved measured correction
-allow|fexpired|2026-09-10 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-09 expired
-allow|foverlong|2026-09-01 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-01 overlong
+allow|fexpired|2026-09-10 chd ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-09 expired
+allow|foverlong|2026-09-01 chd ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-01 overlong
 allow|fmalformed|malformed allowance
-allow|fmismatch|2026-09-12 pbp ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-11 mismatched key
-allow|frev|2026-09-12 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=3 expires=2026-11-11 wrong revision
-allow|fmatch|2026-09-12 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-11 approved measured correction
+allow|fmismatch|2026-09-12 pbp ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-11 mismatched key
+allow|frev|2026-09-12 chd ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=3 expires=2026-11-11 wrong revision
+allow|fmatch|2026-09-12 chd ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-11 approved measured correction

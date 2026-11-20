@@ -10,7 +10,7 @@ feature_header=provider,profile,protection,peripheral,predicate,status,evidence,
 control_data=$source_root/tests/compat/compat-control-cases.tsv
 fixture() { awk -F'|' -v id="$1" '$1=="row" && $2==id { sub(/^[^|]*[|][^|]*[|]/, ""); print; exit }' "$control_data"; }
 row() { case "$1" in none) return ;; *~*) row "${1%%~*}"; printf '\n'; row "${1#*~}" ;; *) fixture "$1" ;; esac; }
-ledger() { kind=$3; [ -n "$kind" ] || kind=title; case "$kind" in features) header=$feature_header ;; *) header=$title_header ;; esac; printf '%s\n' "$header" > "$1"; [ -z "$2" ] || printf '%s\n' "$2" >> "$1"; }
+ledger() { kind=$3; case "$kind" in features) header=$feature_header ;; *) header=$title_header ;; esac; printf '%s\n' "$header" > "$1"; [ -z "$2" ] || printf '%s\n' "$2" >> "$1"; }
 allowance() { awk -F'|' -v id="$1" '$1=="allow" && $2==id { sub(/^[^|]*[|][^|]*[|]/, ""); print }' "$control_data"; }
 expect() {
     name=$1 want=$2 pattern=$3; shift 3
@@ -20,7 +20,6 @@ expect() {
 }
 judge() {
     name=$1 candidate=$2 fresh=$3 prior=$4 allow=$5 want=$6 kind=$7 pattern=${8:-}
-    [ -n "$kind" ] || kind=title
     candidate=$(row "$candidate"); fresh=$(row "$fresh"); prior=$(row "$prior")
     [ -n "$prior" ] || prior=$candidate
     allowance "$allow" > "$tmp/allow"
@@ -62,10 +61,10 @@ ratchet)
 features)
     for spec in 'unknown_stays_unknown|chd|chd|none|none|TRUE|features' \
         'pass_without_evidence|chdpass|chd|none|none|FALSE|features|fresh result or evidence' \
-        'evidence_reference_mismatch|chdpass|chdfresh|none|none|FALSE|features|fresh result or evidence disagrees' \
+        'evidence_reference_mismatch|chdpass|chdfresh|none|none|FALSE|features|fresh result or evidence disagrees' 'fresh_context_mismatch|chdpass|chdprotectedpass|none|none|FALSE|features|fresh fixture result' \
         'retained_pass_new_provider|chdpass~pbp|chdpass~pbp|chdpass|none|TRUE|features' 'new_provider_row|chd~pbp|chd~pbp|chd|none|TRUE|features' \
         'pass_to_fail|chdfail|chdfail|chdpass|none|FALSE|features|prior result changed or disappeared' \
-        'removed_prior_pass|pbp|pbp|chdpass|none|FALSE|features|prior result changed or disappeared' \
+        'removed_prior_pass|chdpass|chdpass|chdprotectedpass|none|FALSE|features|prior result changed or disappeared' \
         'expired_allowance|chdfail|chdfail|chdpass|fexpired|FALSE|features|prior result changed or disappeared' \
         'overlong_allowance|chdfail|chdfail|chdpass|foverlong|FALSE|features|allowance window exceeds 60 days' \
         'malformed_allowance|chdfail|chdfail|chdpass|fmalformed|FALSE|features|malformed allowance' \
