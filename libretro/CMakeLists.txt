@@ -8,7 +8,8 @@ target_include_directories(schwaystation_libretro PRIVATE ${CMAKE_CURRENT_SOURCE
 target_link_libraries(schwaystation_libretro PRIVATE schwaystation::schwaystation
   schwaystation-host)
 target_compile_definitions(schwaystation_libretro PRIVATE
-  SCHWAYSTATION_LIBRETRO_VERSION="${PROJECT_VERSION}")
+  SCHWAYSTATION_LIBRETRO_VERSION="${PROJECT_VERSION}"
+  SCHWAYSTATION_CHD=$<BOOL:${SCHWAYSTATION_CHD}>)
 # No "lib" prefix: the frontend and the release name it schwaystation_libretro.
 # CMake gives a MODULE the suffix .so on macOS; RetroArch expects .dylib.
 set_target_properties(schwaystation_libretro PROPERTIES
