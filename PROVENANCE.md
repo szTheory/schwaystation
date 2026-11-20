@@ -65,6 +65,7 @@ requires. `[PV.NN]` IDs resolve in section 10.
 | libretro/libretro-database `12c21cf79f1e` [PV.16] | `LICENSE`: CC BY-SA 4.0 | `dat/System.dat` L498 to L519 (20 PS1 BIOS rows plus the PSP and PS3 images), `metadat/redump/Sony - PlayStation.dat` header | digests as facts (ASSET_POLICY 4); DAT titles for the ledger with the CC-BY-SA notice; no bulk redistribution |
 | psx-spx/psx-spx.github.io `6d7d1bc106a7` (`stable`) [PV.17] | no licence; README: not clean-room, relies on fair use | n/a | facts in our own words with a citation; paraphrase only (section 7) |
 | spicyjpeg/psxavenc `bdc24e897ed0` [PV.18] | Zlib | repository metadata | as a tool for fixture XA and STR streams; output is ours |
+| danifunker/libchdman-rs `7f71bdf3d4099dc38bded49c6745e453005d6e41` [PV.20] | root `LICENSE`: BSD-3-Clause; MAME CHD sources carry per-file BSD-3-Clause/public-domain headers; bundled codec notices are enumerated in `.planning/phases/09-chd-disc-images/09-GENERATOR-AUDIT.md` | exact source archive SHA-256 `7346f16486f114af808c6b361228ce9c816156bfd910c8ca8f7727a21d2b6a89`; embedded MAME base commit `f34f02505e32c1993c6a782b6814232cbfc74e36`; build-only C/C++ fixture tool, no Rust/Cargo or prebuilt archive |
 
 ## 3. How the audit was done
 Every row in section 2 was checked on 2026-10-19 with `gh api repos/<owner>/<repo>/contents/<path>?ref=<pin>`
