@@ -947,6 +947,43 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_baseline")
   return()
 endif()
 
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_preflight")
+  foreach(required SOURCE_ROOT WORK_ROOT)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "feature preflight requires ${required}")
+    endif()
+  endforeach()
+  set(features "${SOURCE_ROOT}/tests/compat/features.csv")
+  execute_process(COMMAND "${CMAKE_COMMAND}"
+      "-DLEDGER=${features}" "-DFRESH=${features}"
+      "-DALLOW=${SOURCE_ROOT}/tests/compat/allow.txt" -DTODAY=2026-11-20
+      -DKIND=features -P "${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake"
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT "${result}" STREQUAL "0")
+    message(FATAL_ERROR "complete unknown feature row failed its schema preflight: ${result}: ${output}${error}")
+  endif()
+  message(STATUS "compatibility: complete unknown feature row passed schema preflight")
+  return()
+endif()
+
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
+  foreach(required SOURCE_ROOT WORK_ROOT)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "feature ratchet test requires ${required}")
+    endif()
+  endforeach()
+  set(features "${SOURCE_ROOT}/tests/compat/features.csv")
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
+      sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${features}" "${features}" ""
+      "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-20 features
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT "${result}" STREQUAL "0")
+    message(FATAL_ERROR "unknown feature row was not accepted against matching fresh evidence: ${result}: ${output}${error}")
+  endif()
+  message(STATUS "compatibility: unknown feature row passed the protected ratchet")
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   foreach(required SOURCE_ROOT WORK_ROOT)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -1237,6 +1274,19 @@ schway_add_test(NAME compat.ratchet.baseline
     -DCASE=compat_baseline -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
+# Fault prevented: empty, malformed or duplicate feature evidence reaching broad guest suites.
+schway_add_test(NAME compat.features.preflight
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DCASE=compat_features_preflight -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 15)
+set_tests_properties(compat.features.preflight PROPERTIES FIXTURES_SETUP compat_features_preflight)
+
+# Fault prevented: a feature row bypassing the same protected base and fresh-result judge.
+schway_add_test(NAME compat.features.ratchet
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DCASE=compat_features_ratchet -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 15)
+
 # Fault prevented: an incomplete or wrong compatibility baseline selecting introduction.
 schway_add_test(NAME compat.ratchet.protected_controls
   COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
@@ -1269,3 +1319,13 @@ set_tests_properties(fixtures.pad_counter.press60 PROPERTIES FIXTURES_SETUP comp
 set_tests_properties(fixtures.memcard_roundtrip.persistence PROPERTIES FIXTURES_SETUP compat_memcard)
 set_tests_properties(compat.ratchet.rows PROPERTIES
   FIXTURES_REQUIRED "compat_gpu_motion;compat_pad_counter;compat_memcard;openbios_shell")
+
+get_property(compat__registered_tests DIRECTORY PROPERTY TESTS)
+foreach(compat__test IN LISTS compat__registered_tests)
+  if((compat__test MATCHES "^compat[.]" OR compat__test MATCHES "^disc[.]image[.]chd_") AND
+     NOT compat__test STREQUAL "compat.features.preflight")
+    get_property(compat__fixtures TEST "${compat__test}" PROPERTY FIXTURES_REQUIRED)
+    list(APPEND compat__fixtures compat_features_preflight)
+    set_tests_properties("${compat__test}" PROPERTIES FIXTURES_REQUIRED "${compat__fixtures}")
+  endif()
+endforeach()

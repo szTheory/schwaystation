@@ -1,4 +1,6 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
+compat.features.preflight	compat,portable
+compat.features.ratchet	compat,portable
 compat.library.controls	compat,library,portable
 compat.library.synthetic_result	compat,library,portable
 compat.probe.cue_edges	compat,portable
