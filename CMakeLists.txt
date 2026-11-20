@@ -27,9 +27,19 @@ endif()
 option(SCHWAYSTATION_BUILD_LIBRETRO "Build the schwaystation_libretro core" ${libretro_default})
 option(SCHWAYSTATION_CHD "Enable the optional host-side CHD image reader" OFF)
 option(SCHWAYSTATION_BUILD_CHD_TOOL "Build the opt-in CHD fixture generator" OFF)
-if(SCHWAYSTATION_BUILD_CHD_TOOL)
+set(SCHWAYSTATION_CHD_TOOL_EXECUTABLE "" CACHE FILEPATH
+  "External native CHD fixture generator for cross-compiled tests")
+if(SCHWAYSTATION_BUILD_CHD_TOOL AND SCHWAYSTATION_CHD_TOOL_EXECUTABLE)
+  message(FATAL_ERROR "CHD tool: choose either the in-tree target or an external executable")
+elseif(SCHWAYSTATION_BUILD_CHD_TOOL)
   enable_language(CXX)
   include(cmake/CHDTool.cmake)
+elseif(SCHWAYSTATION_CHD AND SCHWAYSTATION_CHD_TOOL_EXECUTABLE)
+  if(NOT EXISTS "${SCHWAYSTATION_CHD_TOOL_EXECUTABLE}"
+      OR IS_DIRECTORY "${SCHWAYSTATION_CHD_TOOL_EXECUTABLE}")
+    message(FATAL_ERROR "CHD tool: external executable is missing: ${SCHWAYSTATION_CHD_TOOL_EXECUTABLE}")
+  endif()
+  set(SCHWAYSTATION_CHD_TOOL "${SCHWAYSTATION_CHD_TOOL_EXECUTABLE}")
 endif()
 
 # The nofp lane proves the core integer-only by machine code, not text: GCC's
