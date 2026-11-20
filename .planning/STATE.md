@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: Completed 09-04-PLAN.md
-last_updated: "2026-11-20T06:03:28Z"
+stopped_at: Completed 09-05-PLAN.md
+last_updated: "2026-11-20T09:22:03Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-04 complete; Plan 09-05 is next
-state_head: 472c371f7c14d9ab30ab77834c5940baf82cdd96
+last_activity_desc: Phase 09 Plan 09-05 complete; Plan 09-06 is next
+state_head: 6a4d468
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 24
+  completed_plans: 25
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 09 Plan 09-04 complete; Plan 09-05 is next
+Last activity: 2026-11-20 — Phase 09 Plan 09-05 complete; Plan 09-06 is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -88,6 +88,17 @@ controls reject bad hashes, missing inputs, wrong counts, over-cap output and ma
 No guest or full suite ran because the plan explicitly stops before parity; no hosted workflow changed, so CI
 and `act` were not useful. The plan correction `b3b38c0` keeps the fixture build-local; task commits are
 `54bae5a` and `472c371`. Plan 09-05 is next.
+
+### Phase 9 Plan 09-05 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The wall interval from the preceding
+STATE checkpoint at 06:03:28Z through completion at 09:22:03Z was 3h19m; active time was not measured. The
+bounded CHTR/CHT2 parser projects the owned CHD into the same logical TOC as its CUE, including the stored
+150-sector pregap without counting four-frame storage padding. Cheap sorted-inventory/diff checks passed first.
+The CHD-on generated-fixture selectors passed 4/4 in 0.06 seconds; CHD-off selectors passed 3/3 in 0.03
+seconds. No workflow changed, so no full suite, `act` or hosted CI run applied. The implementation and docs task
+commits are `725c464` and `6a4d468`; plan-scope corrections are `ba579e5`, `7af3a5f` and `04d3558`; summary is
+committed separately. MEDIA-01, MEDIA-02 and CHD-01 remain phase-level pending. Plan 09-06 is next.
 
 ### Phase 9 planning (2026-11-19)
 
