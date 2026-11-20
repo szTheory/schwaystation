@@ -92,6 +92,14 @@ Every corresponding product ZIP also differed between Main and Release. The Rele
 | `schwaystation-runner-windows-arm64.zip` | `166cce6a1160dc88aad059aa2dcf981fcf9a8dee46228c3d1481330ab734c74c` | `636dfcafe2ba182cfbafa445f49e1b8f8b1bce57990087700702eeabe2b8c4f6` |
 | `schwaystation-runner-windows-x64.zip` | `c59b6d0b73027449d3c4c61989d6f0bfb35f3df530a5a048d01027c80996aeec` | `e513499ba48123a351efef0c146118c81b9a5fd64797d1fbcf5fed9e9c548129` |
 
+## Disposition
+
+Keep the independent Main and Release CI gates and their six-platform package matrices. Reusing Main's completed required result before Release publication would serialize the release behind Main's longer critical path: the measured Main `CI required` finished at 01:42:33, after the current Release run had completed at 01:24:18. With the measured 361-second publish job and 9-second install-line job after that wait, the projected Release completion is about 88m31s from its start, roughly 24m25s slower than this observed Release run. The 117.53 repeated Release-CI runner-minutes are real cost, but the concurrent pair establishes no wall-clock saving.
+
+Same source SHA and per-lane `commit.txt` are not enough to establish archive identity: all eighteen Main product ZIPs have different SHA-256 digests from the corresponding Release ZIPs. The Release ZIPs, in turn, match the published release assets byte-for-byte. A cross-run producer/consumer would need to bind the release-please SHA to the successful Main push run and its exact attempt, require every expected job and matrix lane, identify all six artifacts by name and digest, validate the eighteen archive names and per-lane commit files, and keep `publish.sh` checksum and attestation validation. Its negative controls would need to cover wrong SHA, wrong attempt, missing or expired artifacts, duplicate or missing lanes, and the race where Release starts before Main finishes. No such path is present or tested, and the added cross-run wait would lengthen the measured Release critical path. Retain the current separate checks; do not add cross-run artifact reuse, a matrix skip, or an untested fallback.
+
+Plan 11 should preserve the Main required `CI required` check, the Release `release-ci / CI required` gate, all six archive producers, and the exact-release-SHA packaging/attestation checks. It can close todo 050 after verifying those invariants remain intact on its changed workflow source.
+
 ## Commands and evidence
 
 Read-only GitHub API queries verified both run records, all job pages, both artifact lists, the active `main` ruleset, check runs for the source commit, and the published v0.8.0 assets. All API requests returned exit 0 except the legacy branch-protection endpoint, which returned the expected 404 because the active rule is a repository ruleset.
