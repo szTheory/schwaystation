@@ -4,12 +4,12 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 15 (owned-guest CHD parity, feature evidence and review handoff)
+current_plan: 15
 status: executing
-stopped_at: Completed 09-14-PLAN.md; Phase 9 source review and final verification remain
-last_updated: "2026-11-20T21:04:54.738Z"
+stopped_at: Completed Phase 9 source review
+last_updated: "2026-11-20T21:23:04Z"
 last_activity: 2026-11-20
-last_activity_desc: Plan 09-12 runner and libretro CHD integration completed; Plan 09-14 owns final guest evidence and reviewed hosted verification
+last_activity_desc: Phase 9 standard source review passed on 29 files with no findings; final local and hosted verification is next
 state_head: 938cca6f09514c51a4a211a13f2f577edfcce9fc
 progress:
   total_phases: 10
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 15 (owned-guest CHD parity, feature evidence and review handoff)
+Current Plan: 15 (all implementation plans complete; final verification remains)
 Total Plans in Phase: 15
-Status: Phase review pending
-Last activity: 2026-11-20 — Plan 09-14 completed; all fifteen plan summaries exist. Phase 9 source review and final verification are next.
+Status: Final verification pending
+Last activity: 2026-11-20 — Phase 9 standard source review passed with no findings; final local and hosted checks are next.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -1510,4 +1510,13 @@ Hosted evidence reused: [release-PR CI run 44253419074](https://github.com/szThe
 
 Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Work started at 20:42:42Z and the state closeout completed at 21:04:54Z. The owned CHD source/geometry preflight, 222-sector forward/reverse parity, feature-key check, and boot/read/audio/FMV guest cases all passed. The focused CHD selector passed 14/14 in 10.71 seconds and the required tracer rerun passed 14/14 in 11.45 seconds; the feature ratchet passed 2/2, documentation freshness passed, and both diff checks were clean. The four guest tests shared the existing pins and bounds and ran in parallel after setup fixtures. No broad Phase 9 suite, hosted CI, `act`, or source review ran in this plan. The local CI build remains CHD ON. Task commits: `1d48028`, `ab91147`, `938cca6`; summary: `.planning/phases/09-chd-disc-images/09-14-SUMMARY.md`.
 
-The feature row now passes only the demonstrated local provider, runner, libretro, package and guest predicate. Hosted eight-lane/hash/fuzz evidence and the actual WASI module size remain unknown for final Phase 9 verification. The next action is source review; no owner action is needed.
+The feature row now passes only the demonstrated local provider, runner, libretro, package and guest predicate. Hosted eight-lane/hash/fuzz evidence and the actual WASI module size remain unknown for final Phase 9 verification. The source review passed; final verification is next, with no owner action needed.
+
+### Phase 9 source review (2026-11-20)
+
+Runtime/model: GSD `gsd-code-reviewer`, gpt-6-luna xhigh, standard depth. Reviewed 29 source files changed since
+the preceding review commit `0f81b9a`; no new defects were confirmed and the prior resolved finding was not
+repeated. The review itself ran no tests. Artifact: `.planning/phases/09-chd-disc-images/09-REVIEW.md`.
+Plan 09-14's bounded 14-test selector ran twice (10.71s and 11.45s); the second identical pass added no
+coverage. Future closeout should keep the first green result and avoid a tracer-only rerun. Next: final local
+preflight and one exact-head hosted verification run, recording the WASI module size and CI critical path.

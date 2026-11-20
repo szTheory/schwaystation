@@ -1,58 +1,64 @@
 ---
 phase: 09-chd-disc-images
-reviewed: 2026-11-20T17:44:59Z
+reviewed: 2026-11-20T21:21:04Z
 depth: standard
-files_reviewed: 11
+files_reviewed: 29
 files_reviewed_list:
+  - .github/workflows/ci.yml
+  - .github/workflows/nightly.yml
+  - CMakeLists.txt
+  - CMakePresets.json
+  - cmake/CHDFixtures.cmake
+  - cmake/CHDTool.cmake
+  - cmake/CHDToolPins.cmake
+  - cmake/DiscFixtures.cmake
+  - docs/compatibility.md
+  - docs/discs.md
+  - docs/maintaining.md
+  - host/disc_probe.c
   - libretro/CMakeLists.txt
-  - libretro/schwaystation_libretro.info.in
-  - scripts/compat-ratchet.sh
-  - tests/cmake/compat-ratchet.cmake
-  - tests/cmake/date_days.cmake
-  - tests/cmake/info_claims.cmake
-  - tests/cmake/info_claims_self_test.cmake
-  - tests/cmake/perf_compare.cmake
+  - libretro/libretro.c
+  - tests/cmake/workflows.cmake
+  - tests/compat/features.csv
   - tests/compat/tests.cmake
-  - THIRD-PARTY-NOTICES.md
+  - tests/disc/fixture.c
+  - tests/disc/inventory.txt
+  - tests/disc/media.c
+  - tests/disc/tests.cmake
+  - tests/libretro/host.c
+  - tests/libretro/inventory.txt
+  - tests/libretro/tests.cmake
+  - tests/release/inventory.txt
+  - tests/release/tests.cmake
+  - tests/runner/disc.c
+  - tests/runner/inventory.txt
+  - tests/runner/tests.cmake
 findings:
-  critical: 1
+  critical: 0
   warning: 0
   info: 0
-  total: 1
+  total: 0
   necessity: 0
-status: resolved
+status: clean
 ---
 
-# Phase 9: Code Review Report
+# Phase 09: Code Review Report
 
-**Reviewed:** 2026-11-20T17:44:59Z
+**Reviewed:** 2026-11-20T21:21:04Z
 **Depth:** standard
-**Files Reviewed:** 11
-**Status:** resolved
+**Files Reviewed:** 29
+**Status:** clean
 
 ## Summary
 
-The metadata projection, shared date helper, protected-base transport and CHD notice additions were reviewed. The CHD metadata self-test contains an invalid regular expression, which prevents its new extension mutation control from reliably identifying the enabled configuration. No test suite was run during this review.
+Reviewed the source changes since commit `0f81b9a`, including CHD probe reads and track hashing, host/provider ownership and bounds, libretro feature gating, cross-lane fixture generation and hashes, the WASI size gate, fuzz campaign wiring, bounded guest integration, release metadata checks, and CI workflow changes. The prior review's resolved finding was not repeated. No source defects were confirmed in this scope. Tests were not run as requested.
 
-## Critical Issues
+## Narrative Findings (AI reviewer)
 
-### CR-01: BLOCKER — Unbalanced CHD extension regular expression
-
-**File:** `tests/cmake/info_claims_self_test.cmake:16`
-**Severity:** BLOCKER
-**Issue:** The pattern `(^|\\|)chd($|\\|` opens a second capture group but never closes it. CMake's regular-expression engine rejects the malformed pattern or fails to match the intended CHD token, so the self-test cannot select the correct inverse extension set for the CHD-on configuration. This leaves the claimed false-negative/false-positive CHD mutation control broken and may make the selector fail before its remaining controls run.
-**Fix:** Close the group (or match the known suffix directly), for example:
-
-```cmake
-if(expected_extensions MATCHES "\\|chd$")
-```
-
-**Resolution:** Replaced the malformed expression with the terminal-suffix match above. A follow-up read-only review confirmed it matches the canonical enabled extension list and removes only `|chd`.
-
-**Post-review verification:** The focused metadata self-test passed with CHD enabled and disabled (2/2 each).
+No issues found.
 
 ---
 
-_Reviewed: 2026-11-20T17:44:59Z_
+_Reviewed: 2026-11-20T21:21:04Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
