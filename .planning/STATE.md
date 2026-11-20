@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-11-20T03:57:56.443Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-11-20T04:28:46Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-01 complete; Plan 09-02 is next
-state_head: 9048b897ecdaa519952c6701576dd77c8016bff2
+last_activity_desc: Phase 09 Plan 09-02 complete; Plan 09-03 is next
+state_head: db9134e140d466ea99379aa26e96e75ffd60fdce
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 21
+  completed_plans: 22
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-19 — Phase 09 Plan 09-01 complete; Plan 09-02 is next
+Last activity: 2026-11-20 — Phase 09 Plan 09-02 complete; Plan 09-03 is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -56,6 +56,10 @@ needed for the skeleton. The first configure noted that `SCHWAYSTATION_CHD=OFF` 
 plan; configuration still passed. The two task commits are `b6ae475` and `80be717`; Plan 09-01 summary is
 committed separately. MEDIA-01 and MEDIA-02 remain pending because this shared preflight does not complete their
 phase-wide provider, bounds and fuzz requirements. Plan 09-02 is next.
+
+### Phase 9 Plan 09-02 execution (2026-11-20)
+
+Runtime/model: Codex with OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The configured worktree opt-out kept this plan sequential and inline. The exact libchdr commit and archive digest were verified, and a fresh enabled build compiled the static C closure without enabling C++. Explicit CMake cache settings keep system codecs, micro-flac, upstream tests and LZMA assembly disabled. ON/OFF malformed-header selectors passed 1/1, the default-OFF graph fetched no dependency, and a core-only CHD-on configure also fetched none. The cache-policy warning and off-only `-Werror` helper warning were corrected before the passing runs. No hosted CI, `act`, or full suite was needed for this plan. Task commits are `d2b0f31` and `e63727f`; summary `db9134e`. The private TOC and sector functions remain fail-closed until Plan 09-05 projects validated metadata and storage padding.
 
 ### Phase 9 planning (2026-11-19)
 
