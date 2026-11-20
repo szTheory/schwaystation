@@ -36,6 +36,8 @@ static FILE *disc_probe_open_readonly(const char *path)
 typedef struct schway__iso_source {
     FILE *file;
     FILE *track1_file;
+    schway_disc_image *image;
+    const schway_disc *disc;
     uint64_t file_size;
     uint64_t data_offset;
     uint64_t data_bytes;
@@ -44,6 +46,9 @@ typedef struct schway__iso_source {
     uint32_t sector_bytes;
     uint32_t user_offset;
     uint32_t sector_count;
+    uint32_t data_start_lba;
+    uint32_t track1_start_lba;
+    uint32_t track1_sector_count;
 } schway__iso_source;
 
 typedef struct schway__cue_file {
@@ -150,17 +155,30 @@ static int schway__iso_read_at(const schway__iso_source *source, uint64_t offset
         uint64_t sector = offset / SCHWAY__ISO_SECTOR_SIZE;
         size_t within = (size_t)(offset % SCHWAY__ISO_SECTOR_SIZE);
         size_t chunk = SCHWAY__ISO_SECTOR_SIZE - within;
-        uint64_t physical;
         if (chunk > remaining) chunk = remaining;
-        if (sector > (UINT64_MAX - source->data_offset) / source->sector_bytes) return 0;
-        physical = source->data_offset + sector * source->sector_bytes;
-        if (physical > UINT64_MAX - source->user_offset - within) return 0;
-        physical += source->user_offset + within;
-        if (physical > source->file_size || (uint64_t)chunk > source->file_size - physical ||
-            physical > (uint64_t)LONG_MAX ||
-            fseek(source->file, (long)physical, SEEK_SET) != 0 ||
-            fread(destination, 1u, chunk, source->file) != chunk) {
-            return 0;
+        if (source->image != NULL) {
+            uint8_t raw[2352];
+            uint8_t subcode[96];
+            uint64_t lba = (uint64_t)source->data_start_lba + sector;
+            if (source->disc == NULL || source->disc->read_sector == NULL ||
+                lba > UINT32_MAX ||
+                source->disc->read_sector(source->disc->user, (uint32_t)lba,
+                                          raw, subcode) == 0u) {
+                return 0;
+            }
+            memcpy(destination, raw + source->user_offset + within, chunk);
+        } else {
+            uint64_t physical;
+            if (sector > (UINT64_MAX - source->data_offset) / source->sector_bytes) return 0;
+            physical = source->data_offset + sector * source->sector_bytes;
+            if (physical > UINT64_MAX - source->user_offset - within) return 0;
+            physical += source->user_offset + within;
+            if (physical > source->file_size || (uint64_t)chunk > source->file_size - physical ||
+                physical > (uint64_t)LONG_MAX ||
+                fseek(source->file, (long)physical, SEEK_SET) != 0 ||
+                fread(destination, 1u, chunk, source->file) != chunk) {
+                return 0;
+            }
         }
         destination += chunk;
         remaining -= chunk;
@@ -886,6 +904,26 @@ static int schway__sha1_file_range(FILE *file, uint64_t offset, uint64_t size,
     return 1;
 }
 
+static int schway__sha1_disc_range(const schway__iso_source *source,
+                                   uint8_t digest[20])
+{
+    uint8_t sector[2352];
+    uint8_t subcode[96];
+    schway__sha1 state;
+    if (source->disc == NULL || source->disc->read_sector == NULL) return 0;
+    schway__sha1_init(&state);
+    for (uint32_t i = 0u; i < source->track1_sector_count; i++) {
+        uint64_t lba = (uint64_t)source->track1_start_lba + i;
+        if (lba > UINT32_MAX || source->disc->read_sector(source->disc->user,
+                (uint32_t)lba, sector, subcode) == 0u) {
+            return 0;
+        }
+        schway__sha1_update(&state, sector, sizeof sector);
+    }
+    schway__sha1_final(&state, digest);
+    return 1;
+}
+
 static int schway__path_is_cue(const char *path)
 {
     const char *dot = strrchr(path, '.');
@@ -905,8 +943,72 @@ static int schway__path_is_unsupported(const char *path)
     const char *last = slash;
     if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
     if (dot == NULL || (last != NULL && dot < last)) return 0;
-    return schway__cue_word_is(dot, ".chd") || schway__cue_word_is(dot, ".pbp") ||
-           schway__cue_word_is(dot, ".ecm") || schway__cue_word_is(dot, ".ccd");
+    return schway__cue_word_is(dot, ".pbp") || schway__cue_word_is(dot, ".ecm") ||
+           schway__cue_word_is(dot, ".ccd");
+}
+
+static int schway__path_is_chd(const char *path)
+{
+    const char *dot = strrchr(path, '.');
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+    const char *last = slash;
+    if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
+    return dot != NULL && (last == NULL || dot > last) && schway__cue_word_is(dot, ".chd");
+}
+
+static schway_host_disc_probe_status schway__chd_source(const char *path,
+                                                         schway__iso_source *source)
+{
+    schway_disc_image_error error;
+    schway_toc toc;
+    uint32_t data_index = UINT32_MAX;
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    schway_disc_image_status image_status = schway_disc_image_open(path, &source->image, &error);
+    if (image_status != SCHWAY_DISC_IMAGE_OK || source->image == NULL) {
+        if (image_status == SCHWAY_DISC_IMAGE_UNSUPPORTED) return SCHWAY_HOST_DISC_PROBE_UNSUPPORTED;
+        if (image_status == SCHWAY_DISC_IMAGE_LIMIT) return SCHWAY_HOST_DISC_PROBE_LIMIT;
+        if (image_status == SCHWAY_DISC_IMAGE_OUT_OF_MEMORY) return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
+        return SCHWAY_HOST_DISC_PROBE_IO;
+    }
+    source->disc = schway_disc_image_disc(source->image);
+    memset(&toc, 0, sizeof toc);
+    toc.size = (uint32_t)sizeof toc;
+    if (source->disc == NULL || source->disc->toc == NULL ||
+        source->disc->toc(source->disc->user, &toc) == 0u ||
+        toc.track_count == 0u || toc.track_count > SCHWAY_DISC_MAX_TRACKS) {
+        return SCHWAY_HOST_DISC_PROBE_NOT_ISO;
+    }
+    for (uint32_t i = 0u; i < toc.track_count; i++) {
+        const schway_disc_track *track = &toc.tracks[i];
+        if (track->type != SCHWAY_DISC_TRACK_AUDIO) {
+            data_index = i;
+            break;
+        }
+    }
+    if (data_index == UINT32_MAX) return SCHWAY_HOST_DISC_PROBE_CUE_NO_DATA;
+    const schway_disc_track *first = &toc.tracks[0];
+    const schway_disc_track *data = &toc.tracks[data_index];
+    if (first->leadout <= first->index1 || data->leadout <= data->index1) {
+        return SCHWAY_HOST_DISC_PROBE_NOT_ISO;
+    }
+    uint64_t track1_count = (uint64_t)first->leadout - first->index1;
+    uint64_t data_count = (uint64_t)data->leadout - data->index1;
+    if (track1_count * UINT64_C(2352) > SCHWAY__ISO_MAX_BYTES ||
+        data_count * SCHWAY__ISO_SECTOR_SIZE > SCHWAY__ISO_MAX_BYTES ||
+        data_count > UINT32_MAX) {
+        return SCHWAY_HOST_DISC_PROBE_LIMIT;
+    }
+    source->data_start_lba = data->index1;
+    source->track1_start_lba = first->index1;
+    source->track1_sector_count = (uint32_t)track1_count;
+    source->sector_bytes = 2352u;
+    source->user_offset = data->type == SCHWAY_DISC_TRACK_MODE1 ? 16u : 24u;
+    source->sector_count = (uint32_t)data_count;
+    source->data_bytes = data_count * SCHWAY__ISO_SECTOR_SIZE;
+    source->track1_bytes = track1_count * UINT64_C(2352);
+    return SCHWAY_HOST_DISC_PROBE_OK;
 }
 
 schway_host_disc_probe_status schway__disc_probe_image(const char *path,
@@ -922,7 +1024,13 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
     if (schway__path_is_unsupported(path)) return SCHWAY_HOST_DISC_PROBE_UNSUPPORTED;
     memset(&source, 0, sizeof source);
     is_cue = schway__path_is_cue(path);
-    if (is_cue) {
+    if (schway__path_is_chd(path)) {
+        status = schway__chd_source(path, &source);
+        if (status != SCHWAY_HOST_DISC_PROBE_OK) {
+            schway_disc_image_close(source.image);
+            return status;
+        }
+    } else if (is_cue) {
         status = schway__cue_source(path, &source);
         if (status != SCHWAY_HOST_DISC_PROBE_OK) return status;
     } else {
@@ -951,16 +1059,20 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
     }
     memset(&candidate, 0, sizeof candidate);
     status = schway__iso_process(&source, &candidate);
-    if (status == SCHWAY_HOST_DISC_PROBE_OK &&
-        !schway__sha1_file_range(source.track1_file, source.track1_offset,
-                                  source.track1_bytes, candidate.track1_sha1)) {
-        status = SCHWAY_HOST_DISC_PROBE_IO;
+    if (status == SCHWAY_HOST_DISC_PROBE_OK) {
+        int track1_hashed = source.image != NULL
+            ? schway__sha1_disc_range(&source, candidate.track1_sha1)
+            : schway__sha1_file_range(source.track1_file, source.track1_offset,
+                                      source.track1_bytes, candidate.track1_sha1);
+        if (!track1_hashed) status = SCHWAY_HOST_DISC_PROBE_IO;
     }
+    if (source.image != NULL) schway_disc_image_close(source.image);
     if (source.track1_file != source.file && fclose(source.track1_file) != 0 &&
         status == SCHWAY_HOST_DISC_PROBE_OK) {
         status = SCHWAY_HOST_DISC_PROBE_IO;
     }
-    if (fclose(source.file) != 0 && status == SCHWAY_HOST_DISC_PROBE_OK) {
+    if (source.file != NULL && fclose(source.file) != 0 &&
+        status == SCHWAY_HOST_DISC_PROBE_OK) {
         free(candidate.exe_bytes);
         return SCHWAY_HOST_DISC_PROBE_IO;
     }
