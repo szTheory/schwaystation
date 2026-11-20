@@ -226,8 +226,16 @@ target_compile_definitions(schwaystation_chd_tool_core PRIVATE
   ZSTD_DISABLE_ASM)
 set_source_files_properties(${schway__chdtool_lzma_sources} PROPERTIES COMPILE_DEFINITIONS Z7_ST)
 set_source_files_properties(${schway__chdtool_zstd_sources} PROPERTIES COMPILE_DEFINITIONS ZSTD_DISABLE_ASM)
+set(schway__chdtool_flac_posix_definition "")
+if(UNIX)
+  # FLAC's C sources use POSIX APIs that strict C17 hides without this feature level.
+  set(schway__chdtool_flac_posix_definition "_POSIX_C_SOURCE=200809L")
+  # Its compatibility header calls strcasecmp without including its declaration.
+  set_source_files_properties(${schway__chdtool_flac_sources} PROPERTIES
+    COMPILE_OPTIONS "-include;strings.h")
+endif()
 set_source_files_properties(${schway__chdtool_flac_sources} PROPERTIES
-  COMPILE_DEFINITIONS "FLAC__NO_ASM;HAVE_CONFIG_H;NDEBUG;FLAC__HAS_OGG=0;HAVE_LROUND=1;HAVE_INTTYPES_H=1;HAVE_STDBOOL_H=1;HAVE_STDINT_H=1;HAVE_STDIO_H=1;HAVE_STDLIB_H=1;HAVE_STRING_H=1;SIZE_T_MAX=UINT64_MAX")
+  COMPILE_DEFINITIONS "FLAC__NO_ASM;HAVE_CONFIG_H;NDEBUG;FLAC__HAS_OGG=0;HAVE_LROUND=1;HAVE_INTTYPES_H=1;HAVE_STDBOOL_H=1;HAVE_STDINT_H=1;HAVE_STDIO_H=1;HAVE_STDLIB_H=1;HAVE_STRING_H=1;SIZE_T_MAX=UINT64_MAX;${schway__chdtool_flac_posix_definition}")
 if(WIN32)
   set_source_files_properties(
     "${schway__chdtool_source}/mame-chd-src/3rdparty/flac/src/share/win_utf8_io/win_utf8_io.c"
