@@ -20,10 +20,10 @@ affects:
 actuals:
   tokens: 13596
   tasks: 2
-  commits: 3
+  commits: 5
 plan_head_before: 43ede68822c80c38a1f1d4a096c76f0883985bb3
-plan_head_after: 45b78672f61c3f8fdc94461416762eb10d7e8eff
-commits: 3
+plan_head_after: 249e7534ddf198a72046b6a1a08b40885bafd73f
+commits: 5
 tech-stack:
   added: []
   patterns:
@@ -55,7 +55,7 @@ coverage:
     requirement: COMPAT-02
     verification:
       kind: unit
-      ref: "ctest --preset ci --no-tests=error -R '^compat[.]features[.]' --output-on-failure; 2/2 passed, exit 0."
+      ref: "ctest --preset ci --no-tests=error -R '^compat[.](features[.]|ratchet[.](baseline|protected_controls|transitions)$)|^policy[.]compat_doc_fresh$' --output-on-failure; 6/6 passed in 0.91s, exit 0."
       status: pass
     human_judgment: false
   - id: PROTECTED-FEATURE-RATCHET
@@ -63,7 +63,7 @@ coverage:
     requirement: COMPAT-02
     verification:
       kind: integration
-      ref: "The feature/ratchet selector passed 5/5 with the actual origin/main base; COMPAT_BASE_DIR and COMPAT_BASE_SHA with selector '^compat[.]ratchet[.]rows$' passed 6/6 including required fixture setup, exit 0."
+      ref: "The focused feature, protected-base, title-transition, and documentation selector passed 6/6 in 0.91s, exit 0. Earlier, the actual origin/main title judge path passed 6/6 including fixture setup."
       status: pass
     human_judgment: false
   - id: COMPATIBILITY-DOCUMENTATION
@@ -71,10 +71,10 @@ coverage:
     requirement: COMPAT-02
     verification:
       kind: unit
-      ref: "ctest --preset ci --no-tests=error -R '^policy[.]compat_doc_fresh$' --output-on-failure; 1/1 passed, exit 0."
+      ref: "ctest --preset ci --no-tests=error -R '^compat[.](features[.]|ratchet[.](baseline|protected_controls|transitions)$)|^policy[.]compat_doc_fresh$' --output-on-failure; documentation freshness passed within 6/6, exit 0."
       status: pass
     human_judgment: false
-duration: 2h 05m
+duration: 2h 46m 33s
 completed: 2026-11-20
 status: complete
 ---
@@ -85,9 +85,9 @@ status: complete
 
 ## Performance
 
-- **Duration:** 2 hours 5 minutes from the saved Plan 09-07 state checkpoint at 2026-11-20T12:51:00Z to closeout.
+- **Duration:** 2 hours 46 minutes 33 seconds from the saved Plan 09-07 state checkpoint at 2026-11-20T12:51:00Z through final focused verification.
 - **Started:** 2026-11-20T12:51:00Z
-- **Completed:** 2026-11-20T14:55:33Z
+- **Completed:** 2026-11-20T15:37:33Z
 - **Tasks:** 2
 - **Files changed:** 10
 - **Runtime/model:** Codex runtime; executor model gpt-6-luna.
@@ -103,10 +103,9 @@ status: complete
 ## Verification and Efficiency
 
 - LC_ALL=C sort -cu tests/compat/inventory.txt passed.
-- The shipping-helper line budget passed at 3901/3901 lines after review correction. sh -n passed for the changed shell helpers, and cmake --preset ci configured successfully.
-- The feature selector passed 2/2. The feature/ratchet selector passed 5/5 with COMPAT_BASE_DIR set to a shared clone of origin/main at 830bf4cfe74aca92930e34fdf9667c5c1b24c370.
-- The direct compat.ratchet.rows check against that same five-argument judge passed 6/6 including CTest's five required fixture setups. The documentation freshness check passed 1/1.
-- Code review found that protection and peripheral were absent from feature identity. The ratchet and allowances now bind all five feature fields; a changed prior combination and candidate/fresh context mismatch both have negative controls. The post-fix selector for feature ratchet, title transitions and generated-document freshness passed 4/4 in 1.91s.
+- The shipping-helper line budget passed at 3900/3901 after restoring readable multi-line gate branches and removing duplicated control setup. `sh -n`, sorted inventory, and `git diff --check` passed; `cmake --preset ci` configured successfully.
+- The final focused feature, protected-base, title-transition and documentation selector passed 6/6 in 0.91s. A first post-review run exposed an old three-field allowance in the protected-base test fixture; the fixture now names protection, peripheral and predicate, and the rerun passed.
+- Code review found that protection and peripheral were absent from feature identity. The ratchet and allowances now bind all five feature fields; negative controls reject changing a prior passing combination and candidate/fresh context disagreement. The final code review is clean.
 - `COMPAT_TODAY=2026-11-20 sh scripts/compat-doc.sh tests/compat/ledger.csv docs/compatibility.md --check` passed. The Plan 09-07 and 09-08 summary EOF blanks were removed in commit 9224eac; both branch and HEAD diff checks pass.
 - The scenario runner moved from the large CMake control file into a counted POSIX shell helper, with a small CMake adapter and fixture-only TSV. This retained all title and feature assertions within the hard line budget. No full suite or hosted workflow run was needed because this plan changed no workflow.
 
@@ -115,6 +114,8 @@ status: complete
 1. **Task 1 RED probes** — aa18277 (test(09-08): add feature ledger schema probes)
 2. **Task 1 implementation** — d40e18b (feat(09-08): add protected feature compatibility ratchet)
 3. **Task 2 controls and docs** — 45b7867 (test(09-08): cover protected feature ledger transitions)
+4. **CR-01 identity correction** — 8d66514 (fix(09): CR-01 include protection and peripheral identity)
+5. **Readable controls and allowance fixture** — 249e753 (refactor(09): restore readable compatibility gate branches)
 
 ## Deviations from Plan
 

@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 9
+current_plan: 10
 status: executing
 stopped_at: Completed 09-08-PLAN.md
-last_updated: "2026-11-20T15:02:57.220Z"
+last_updated: "2026-11-20T15:44:44Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-08 complete; Plan 09-09 is next
-state_head: 88924c42af19d121c9d8f140bc7f72d6afe45a1e
+last_activity_desc: Phase 09 Plan 09-08 review fixes and 6/6 focused checks complete; Plan 09-10 is next by dependency order
+state_head: 249e7534ddf198a72046b6a1a08b40885bafd73f
 progress:
   total_phases: 10
   completed_phases: 2
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 9
+Current Plan: 10
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 09 Plan 09-08 complete; Plan 09-09 is next
+Last activity: 2026-11-20 — Plan 09-08 review fixes and focused checks complete; Plan 09-10 is next by dependency order
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -141,14 +141,16 @@ bounded-campaign and selector-prerequisite evidence commits are `57d4579` and `a
 
 ### Phase 9 Plan 09-08 execution (2026-11-20)
 
-Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. The wall interval from the saved STATE checkpoint
-at 12:51:00Z through closeout at 14:55:33Z was 2h05m; active time was not measured. The sorted feature ledger
-now has a schema/key/count preflight, a protected fresh-result ratchet, and generated documentation. The title
-judge preserves its five-argument interface for origin/main; feature mode receives the optional kind argument
-only from a capable protected judge. The counted-helper budget passed at 3900/3901 lines. Inventory, preset
-configuration, the feature selector, protected transition controls, the actual origin/main title judge, and
-documentation freshness checks passed. No full suite or hosted CI run applied because this plan changed no
-workflow. Task commits are `aa18277`, `d40e18b`, and `45b7867`; Plan 09-09 is next.
+Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh and reviewer gpt-6-luna xhigh. The wall
+interval from the saved STATE checkpoint at 12:51:00Z through final focused verification at 15:37:33Z was
+2h46m33s; active time was not measured. Review found and fixed a feature-identity gap: the protected ratchet
+now binds provider, profile, protection, peripheral and predicate. The dated allowance and negative controls
+cover changes to prior passing combinations and candidate/fresh-result disagreement. Review also caught
+minified gate branches and an outdated three-field allowance fixture; readable branches and the five-field
+fixture are restored. The final focused selector passed 6/6 in 0.91s, helper budget passed at 3900/3901,
+sorted inventory and shell syntax checks passed, and code review is clean. No full suite, `act` or hosted CI run
+applied because this plan changed no workflow. Task and follow-up commits are `aa18277`, `d40e18b`, `45b7867`,
+`8d66514` and `249e753`; Plan 09-10 is next by dependency order, then Plan 09-09.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -1390,7 +1392,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Execute Phase 9 Plan 09-08 next, then continue its remaining plans through code review and automated verification before ship. Measure todo 050's exact-SHA artifact identity, runner-minutes, and critical path; change workflow wiring only if a tested reuse path is safe and measurably worthwhile. Run cheap selectors, inventory, fixture, and artifact checks before long suites; keep hosted matrix and release gates required. No owner UAT is needed.
+- Continue Phase 9's remaining plans in dependency order (09-10 is ready before 09-09), then complete code review and automated verification before ship. Measure todo 050's exact-SHA artifact identity, runner-minutes, and critical path; change workflow wiring only if a tested reuse path is safe and measurably worthwhile. Run cheap selectors, inventory, fixture, and artifact checks before long suites; keep hosted matrix and release gates required. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
