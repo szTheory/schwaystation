@@ -4,17 +4,17 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 11
+current_plan: 15
 status: executing
-stopped_at: Completed Plan 09-13
-last_updated: "2026-11-20T18:11:24Z"
+stopped_at: Planning Plan 09-15 prerequisite
+last_updated: "2026-11-20T18:42:31Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-13 ON and OFF archive validations passed; Plan 09-11 is next
-state_head: 5edcbd1
+last_activity_desc: Phase 09-13 passed ON/OFF archive checks; Plan 09-15 plans the measured native-tool handoff before Plan 09-11
+state_head: a995f69
 progress:
   total_phases: 10
   completed_phases: 2
-  total_plans: 34
+  total_plans: 35
   completed_plans: 31
   percent: 20
 ---
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 11 (CI, fuzz and distributed package wiring)
-Total Plans in Phase: 14
+Current Plan: 15 (native CHD generator handoff for cross-compiled lanes)
+Total Plans in Phase: 15
 Status: Ready to execute
-Last activity: 2026-11-20 — Plan 09-13 ON and OFF archive checks passed; Plan 09-11 is next by dependency order
+Last activity: 2026-11-20 — Plan 09-13 ON and OFF archive checks passed; planning a focused native-generator prerequisite before Plan 09-11
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -1434,7 +1434,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 9 in dependency order: Plan 09-11 workflow/fuzz wiring, 09-12 runner/libretro integration and 09-14 owned-guest evidence; then review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; use the planned `act --dryrun` routing check and measure the CHD producer critical path before any expensive hosted run. No owner UAT is needed.
+- Complete prerequisite Plan 09-15, then follow dependency order through Plans 09-11, 09-12 and 09-14. Review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; use the planned `act --dryrun` routing check and measure the CHD producer critical path before any expensive hosted run. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
