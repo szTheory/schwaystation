@@ -53,6 +53,19 @@ schway_warnings(schwaystation-test-disc-chd)
 schway_add_test(NAME disc.image.chd_headers
   COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 15)
+schway_add_test(NAME disc.image.chd_metadata
+  COMMAND schwaystation-test-disc-chd --metadata-controls
+  LABELS disc portable TIMEOUT 15)
+if(SCHWAYSTATION_CHD)
+  schway_add_test(NAME disc.image.chd_toc
+    COMMAND schwaystation-test-disc-chd --toc ${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd
+    LABELS disc portable TIMEOUT 15)
+  set_tests_properties(disc.image.chd_toc PROPERTIES FIXTURES_REQUIRED disc_media_preflight)
+else()
+  schway_add_test(NAME disc.image.chd_toc
+    COMMAND schwaystation-test-disc-chd --toc disabled-feature.chd
+    LABELS disc portable TIMEOUT 15)
+endif()
 
 if(SCHWAYSTATION_CHD)
   schway_add_test(NAME disc.media.preflight

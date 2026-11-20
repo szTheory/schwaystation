@@ -1,4 +1,5 @@
 #include "disc_chd.h"
+#include "disc_chd_metadata.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -17,6 +18,7 @@ struct schway__disc_chd {
 #if SCHWAYSTATION_CHD
     FILE *file;
     chd_file *chd;
+    schway__disc_chd_metadata_map metadata;
 #else
     uint32_t unavailable;
 #endif
@@ -210,6 +212,62 @@ static FILE *schway__disc_chd_open_file(const char *path)
     return fopen(path, "rb");
 #endif
 }
+
+static schway_disc_image_status schway__disc_chd_read_metadata(
+    chd_file *chd, const schway__disc_chd_bounds *bounds,
+    schway__disc_chd_metadata_map *map, schway_disc_image_error *error)
+{
+    schway__disc_chd_metadata_record records[SCHWAY_DISC_MAX_TRACKS];
+    char text[SCHWAY_DISC_MAX_TRACKS][SCHWAY__DISC_CHD_METADATA_TEXT_MAX];
+    uint32_t count = 0u;
+
+    memset(records, 0, sizeof(records));
+    memset(text, 0, sizeof(text));
+    for (uint32_t index = 0u; index <= SCHWAY_DISC_MAX_TRACKS; index++) {
+        char candidate[SCHWAY__DISC_CHD_METADATA_TEXT_MAX] = { 0 };
+        uint32_t length = 0u;
+        uint32_t tag = 0u;
+        chd_error result = chd_get_metadata(chd, CHDMETATAG_WILDCARD, index,
+            candidate, sizeof(candidate), &length, &tag, NULL);
+
+        if (result == CHDERR_METADATA_NOT_FOUND) break;
+        if (result != CHDERR_NONE) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "CHD track metadata cannot be read");
+        }
+        if (count >= SCHWAY_DISC_MAX_TRACKS) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                          "CHD has more than 99 tracks");
+        }
+        if (tag != CDROM_TRACK_METADATA2_TAG && tag != CDROM_TRACK_METADATA_TAG) {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                                          "CHD contains unsupported non-track metadata");
+        }
+        memcpy(text[count], candidate, sizeof(candidate));
+        if (length < 2u || length > SCHWAY__DISC_CHD_METADATA_TEXT_MAX ||
+            text[count][length - 1u] != '\0') {
+            return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "CHD track metadata is oversized or unterminated");
+        }
+        records[count].tag = tag == CDROM_TRACK_METADATA2_TAG ?
+            SCHWAY__DISC_CHD_TAG_CHT2 : SCHWAY__DISC_CHD_TAG_CHTR;
+        records[count].text = text[count];
+        records[count].length = length;
+        count++;
+    }
+
+    schway_disc_image_status status = schway__disc_chd_metadata_parse(records, count,
+        bounds->version, bounds->hunk_bytes, bounds->logical_bytes, map);
+    if (status == SCHWAY_DISC_IMAGE_UNSUPPORTED) {
+        return schway__disc_chd_error(error, status,
+                                      "CHD track metadata is outside the supported CD subset");
+    }
+    if (status != SCHWAY_DISC_IMAGE_OK) {
+        return schway__disc_chd_error(error, status,
+                                      "CHD track metadata is malformed or inconsistent");
+    }
+    return SCHWAY_DISC_IMAGE_OK;
+}
 #endif
 
 schway_disc_image_status schway__disc_chd_open(const char *path,
@@ -226,6 +284,7 @@ schway_disc_image_status schway__disc_chd_open(const char *path,
     schway__disc_chd_bounds bounds;
     chd_header header;
     chd_file *chd = NULL;
+    schway__disc_chd_metadata_map metadata;
     FILE *file = schway__disc_chd_open_file(path);
     if (file == NULL) {
         return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_IO,
@@ -265,8 +324,16 @@ schway_disc_image_status schway__disc_chd_open(const char *path,
             SCHWAY_DISC_IMAGE_OUT_OF_MEMORY : SCHWAY_DISC_IMAGE_BAD_IMAGE;
         return schway__disc_chd_error(error, open_status, chd_error_string(chd_status));
     }
+    status = schway__disc_chd_read_metadata(chd, &bounds, &metadata, error);
+    if (status != SCHWAY_DISC_IMAGE_OK) {
+        chd_close(chd);
+        (void)fclose(file);
+        free(reader);
+        return status;
+    }
     reader->file = file;
     reader->chd = chd;
+    reader->metadata = metadata;
     *out = reader;
     return schway__disc_chd_error(error, SCHWAY_DISC_IMAGE_OK, "");
 #else
@@ -289,9 +356,25 @@ void schway__disc_chd_close(schway__disc_chd *reader)
 schway_disc_image_status schway__disc_chd_toc(const schway__disc_chd *reader,
                                                schway_toc *out)
 {
-    if (reader == NULL || out == NULL) return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
-    memset(out, 0, sizeof(*out));
+#if SCHWAYSTATION_CHD
+    schway_toc toc;
+    if (reader == NULL || out == NULL || out->size != sizeof(*out)) {
+        return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
+    }
+    memset(&toc, 0, sizeof(toc));
+    toc.size = (uint32_t)sizeof(toc);
+    toc.track_count = reader->metadata.track_count;
+    for (uint32_t i = 0u; i < toc.track_count; i++) {
+        toc.tracks[i] = reader->metadata.tracks[i].toc;
+    }
+    *out = toc;
+    return SCHWAY_DISC_IMAGE_OK;
+#else
+    if (reader == NULL || out == NULL || out->size != sizeof(*out)) {
+        return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
+    }
     return SCHWAY_DISC_IMAGE_UNSUPPORTED;
+#endif
 }
 
 uint32_t schway__disc_chd_read_sector(void *user, uint32_t lba,
