@@ -4,6 +4,7 @@
 #include "../test_open.h"
 #if SCHWAYSTATION_CHD
 #include "sha256.h"
+#include "save_game_identity.h"
 #include <stdbool.h>
 #endif
 
@@ -430,6 +431,149 @@ static int run_disabled_fixture_controls(const char *fixture_directory)
 }
 #endif
 
+#if SCHWAYSTATION_CHD
+static int same_toc(const schway_disc *left, const schway_disc *right,
+                    schway_toc *left_toc, schway_toc *right_toc)
+{
+    memset(left_toc, 0, sizeof *left_toc);
+    memset(right_toc, 0, sizeof *right_toc);
+    left_toc->size = (uint32_t)sizeof *left_toc;
+    right_toc->size = (uint32_t)sizeof *right_toc;
+    if (left == NULL || right == NULL || left->toc == NULL || right->toc == NULL ||
+        left->toc(left->user, left_toc) == 0u || right->toc(right->user, right_toc) == 0u ||
+        left_toc->size != sizeof *left_toc || right_toc->size != sizeof *right_toc ||
+        left_toc->track_count != right_toc->track_count ||
+        left_toc->track_count == 0u || left_toc->track_count > SCHWAY_DISC_MAX_TRACKS) {
+        return 0;
+    }
+    for (uint32_t i = 0u; i < left_toc->track_count; i++) {
+        const schway_disc_track *a = &left_toc->tracks[i];
+        const schway_disc_track *b = &right_toc->tracks[i];
+        if (a->size != sizeof *a || b->size != sizeof *b || a->type != b->type ||
+            a->index0 != b->index0 || a->index1 != b->index1 ||
+            a->pregap != b->pregap || a->leadout != b->leadout) return 0;
+    }
+    return 1;
+}
+
+static int compare_sector(const schway_disc *cue, const schway_disc *chd,
+                          uint32_t lba)
+{
+    uint8_t cue_sector[2354];
+    uint8_t chd_sector[2354];
+    uint8_t cue_subcode[98];
+    uint8_t chd_subcode[98];
+    memset(cue_sector, 0xa5, sizeof cue_sector);
+    memset(chd_sector, 0xa5, sizeof chd_sector);
+    memset(cue_subcode, 0xa5, sizeof cue_subcode);
+    memset(chd_subcode, 0xa5, sizeof chd_subcode);
+    if (cue == NULL || chd == NULL || cue->read_sector == NULL || chd->read_sector == NULL ||
+        cue->read_sector(cue->user, lba, cue_sector + 1u, cue_subcode + 1u) != 1u ||
+        chd->read_sector(chd->user, lba, chd_sector + 1u, chd_subcode + 1u) != 1u ||
+        cue_sector[0] != 0xa5u || cue_sector[2353] != 0xa5u ||
+        chd_sector[0] != 0xa5u || chd_sector[2353] != 0xa5u ||
+        cue_subcode[0] != 0xa5u || cue_subcode[97] != 0xa5u ||
+        chd_subcode[0] != 0xa5u || chd_subcode[97] != 0xa5u) return 0;
+    for (size_t i = 0u; i < 2352u; i++) {
+        if (cue_sector[i + 1u] != chd_sector[i + 1u]) {
+            fprintf(stderr, "sector mismatch LBA %u offset %zu CUE=%02x CHD=%02x\n",
+                    lba, i, cue_sector[i + 1u], chd_sector[i + 1u]);
+            return 0;
+        }
+    }
+    for (size_t i = 0u; i < 96u; i++) {
+        if (cue_subcode[i + 1u] != chd_subcode[i + 1u]) {
+            fprintf(stderr, "subcode mismatch LBA %u offset %zu CUE=%02x CHD=%02x\n",
+                    lba, i, cue_subcode[i + 1u], chd_subcode[i + 1u]);
+            return 0;
+        }
+    }
+    for (size_t i = 1u; i <= 96u; i++) {
+        if (cue_subcode[i] != 0u || chd_subcode[i] != 0u) return 0;
+    }
+    return 1;
+}
+
+static int run_chd_parity(const char *cue_path, const char *chd_path)
+{
+    schway_disc_image *cue_image = NULL;
+    schway_disc_image *chd_image = NULL;
+    schway_disc_image_error error;
+    schway__save_game_identity cue_identity;
+    schway__save_game_identity chd_identity;
+    const schway_disc *cue_disc;
+    const schway_disc *chd_disc;
+    schway_toc cue_toc;
+    schway_toc chd_toc;
+    uint64_t input_sectors = 0u;
+    uint64_t produced_sectors = 0u;
+    int result = 1;
+
+#define PARITY_CHECK(condition, message) do { \
+    if (!(condition)) { \
+        fprintf(stderr, "ASSERT disc.image.chd_parity: %s\n", (message)); \
+        goto cleanup_parity; \
+    } \
+} while (0)
+
+    memset(&error, 0, sizeof error);
+    PARITY_CHECK(schway_disc_image_open(cue_path, &cue_image, &error) == SCHWAY_DISC_IMAGE_OK,
+                 "owned CUE did not open through the shared provider");
+    PARITY_CHECK(schway_disc_image_open(chd_path, &chd_image, &error) == SCHWAY_DISC_IMAGE_OK,
+                 "owned CHD did not open through the shared provider");
+    cue_disc = schway_disc_image_disc(cue_image);
+    chd_disc = schway_disc_image_disc(chd_image);
+    PARITY_CHECK(same_toc(cue_disc, chd_disc, &cue_toc, &chd_toc),
+                 "CHD TOC differs from the CUE oracle");
+    for (uint32_t i = 0u; i < cue_toc.track_count; i++) {
+        input_sectors += (uint64_t)cue_toc.tracks[i].leadout - cue_toc.tracks[i].index0;
+        produced_sectors += (uint64_t)chd_toc.tracks[i].leadout - chd_toc.tracks[i].index0;
+    }
+    PARITY_CHECK(input_sectors == UINT64_C(222) && produced_sectors == input_sectors,
+                 "source and produced logical sector counts differ from 222");
+    for (uint32_t lba = 0u; lba < 222u; lba++) {
+        PARITY_CHECK(compare_sector(cue_disc, chd_disc, lba),
+                     "sector, subcode or output guard differs from CUE");
+    }
+    for (uint32_t lba = 222u; lba > 0u; lba--) {
+        PARITY_CHECK(compare_sector(cue_disc, chd_disc, lba - 1u),
+                     "reverse-order repeated read changed sector output");
+    }
+    PARITY_CHECK(schway__save_game_identity_resolve(NULL, NULL, 0u, cue_path,
+                 cue_image, &cue_identity) == SCHWAY__SAVE_GAME_IDENTITY_OK &&
+                 schway__save_game_identity_resolve(NULL, NULL, 0u, chd_path,
+                 chd_image, &chd_identity) == SCHWAY__SAVE_GAME_IDENTITY_OK &&
+                 cue_identity.kind == SCHWAY__SAVE_GAME_IDENTITY_DISC_DIGEST &&
+                 chd_identity.kind == cue_identity.kind &&
+                 strcmp(cue_identity.value, chd_identity.value) == 0,
+                 "content-based disc identity differs from the CUE");
+    printf("PASS disc.image.chd_parity input_sectors=%llu produced_sectors=%llu identity=%s\n",
+           (unsigned long long)input_sectors, (unsigned long long)produced_sectors,
+           chd_identity.value);
+    result = 0;
+cleanup_parity:
+    schway_disc_image_close(chd_image);
+    schway_disc_image_close(cue_image);
+    return result;
+#undef PARITY_CHECK
+}
+#else
+static int run_chd_parity_disabled(void)
+{
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    memset(&error, 0, sizeof error);
+    if (schway_disc_image_open("disabled-feature.chd", &image, &error) !=
+            SCHWAY_DISC_IMAGE_UNSUPPORTED || image != NULL) {
+        schway_disc_image_close(image);
+        fprintf(stderr, "ASSERT disc.image.chd_parity: CHD-off build accepted CHD\n");
+        return 1;
+    }
+    puts("PASS disc.image.chd_parity");
+    return 0;
+}
+#endif
+
 static int run_media_preflight(const char *cue, const char *test_directory,
                                const char *chd, const char *manifest,
                                const char *tool)
@@ -514,6 +658,15 @@ cleanup:
 int main(int argc, char **argv)
 {
     int result;
+    if (argc >= 2 && strcmp(argv[1], "--chd-parity") == 0) {
+#if SCHWAYSTATION_CHD
+        if (argc != 4) return 2;
+        return run_chd_parity(argv[2], argv[3]);
+#else
+        if (argc != 2) return 2;
+        return run_chd_parity_disabled();
+#endif
+    }
     if (argc >= 2 && strcmp(argv[1], "--fixture-controls") == 0) {
 #if SCHWAYSTATION_CHD
         if (argc != 7) return 2;

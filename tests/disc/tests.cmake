@@ -28,8 +28,13 @@ file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 add_executable(schwaystation-test-disc-media ${CMAKE_CURRENT_LIST_DIR}/media.c)
 target_link_libraries(schwaystation-test-disc-media PRIVATE schwaystation_disc_image)
 if(SCHWAYSTATION_CHD)
-  target_sources(schwaystation-test-disc-media PRIVATE ${PROJECT_SOURCE_DIR}/runner/sha256.c)
-  target_include_directories(schwaystation-test-disc-media PRIVATE ${PROJECT_SOURCE_DIR}/runner)
+  target_sources(schwaystation-test-disc-media PRIVATE
+    ${PROJECT_SOURCE_DIR}/runner/sha256.c
+    ${PROJECT_SOURCE_DIR}/host/disc_probe.c
+    ${PROJECT_SOURCE_DIR}/host/save_game_identity.c)
+  target_include_directories(schwaystation-test-disc-media PRIVATE
+    ${PROJECT_SOURCE_DIR}/runner ${PROJECT_SOURCE_DIR}/host)
+  target_link_libraries(schwaystation-test-disc-media PRIVATE schwaystation-host)
   target_compile_definitions(schwaystation-test-disc-media PRIVATE SCHWAYSTATION_CHD=1)
 else()
   target_compile_definitions(schwaystation-test-disc-media PRIVATE SCHWAYSTATION_CHD=0)
@@ -61,9 +66,35 @@ if(SCHWAYSTATION_CHD)
     COMMAND schwaystation-test-disc-chd --toc ${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd
     LABELS disc portable TIMEOUT 15)
   set_tests_properties(disc.image.chd_toc PROPERTIES FIXTURES_REQUIRED disc_media_preflight)
+  schway_add_test(NAME disc.image.chd_open
+    COMMAND schwaystation-test-disc-chd --open
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd" "${PROJECT_BINARY_DIR}/tests"
+    LABELS disc portable TIMEOUT 20)
+  schway_add_test(NAME disc.image.chd_boundaries
+    COMMAND schwaystation-test-disc-chd --boundaries
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
+    LABELS disc portable TIMEOUT 20)
+  schway_add_test(NAME disc.image.chd_parity
+    COMMAND schwaystation-test-disc-media --chd-parity
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
+    LABELS disc portable TIMEOUT 30)
+  set_tests_properties(disc.image.chd_open disc.image.chd_boundaries disc.image.chd_parity
+    PROPERTIES FIXTURES_REQUIRED disc_media_preflight)
 else()
   schway_add_test(NAME disc.image.chd_toc
     COMMAND schwaystation-test-disc-chd --toc disabled-feature.chd
+    LABELS disc portable TIMEOUT 15)
+  schway_add_test(NAME disc.image.chd_open
+    COMMAND schwaystation-test-disc-chd --open disabled-feature.chd
+    LABELS disc portable TIMEOUT 15)
+  schway_add_test(NAME disc.image.chd_boundaries
+    COMMAND schwaystation-test-disc-chd --boundaries disabled-feature.chd
+    LABELS disc portable TIMEOUT 15)
+  schway_add_test(NAME disc.image.chd_parity
+    COMMAND schwaystation-test-disc-media --chd-parity
     LABELS disc portable TIMEOUT 15)
 endif()
 
