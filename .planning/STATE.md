@@ -6,11 +6,11 @@ current_phase: 9
 current_phase_name: CHD disc images
 current_plan: Not started
 status: planning
-stopped_at: "Phase 9 scope-sanity revision complete; plan checker is next"
-last_updated: "2026-11-20T02:56:10.621Z"
+stopped_at: Phase 9 plans verified; execution starts at Plan 09-01
+last_updated: "2026-11-20T03:42:12.646Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 9 has fourteen scoped executable plans with package and owned-guest closeout split into Plans 13 and 14; plan checker is next
-state_head: b6452f548c6107781634ebe1937638c98e4d9351
+last_activity_desc: Phase 9's fourteen plans passed independent goal-backward review; execution starts at Plan 09-01
+state_head: 3e17b4c3c551d5dc90f71d0dd54cc64f664847f6
 progress:
   total_phases: 10
   completed_phases: 2
@@ -33,8 +33,18 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 Phase: 9 — CHD disc images
 Current Plan: Not started
 Total Plans in Phase: 14
-Status: Phase 9 plans drafted; plan checker is next
-Last activity: 2026-11-19 — Phase 9 plans split to fourteen scoped plans; plan checker is next.
+Status: Phase 9 plans verified; execution starts at Plan 09-01
+Last activity: 2026-11-19 — Phase 9's fourteen plans passed independent goal-backward review.
+
+### Phase 9 plan verification (2026-11-19)
+
+Runtime/model: Codex typed `gsd-plan-checker`, gpt-6-luna xhigh. The final independent review passed all fourteen
+plans with no requirement, decision, edge-case, dependency, file-scope, or command-direction gaps. Its prior
+blocker for OFF archive validation was fixed by explicitly packaging and checking both CHD ON and OFF; three
+newly surfaced file-scope warnings were resolved by splitting the package and final guest-evidence slices without
+changing acceptance scope. The fixture-generator license gate remains a prerequisite before any tool use. The
+command-path probe had 30 `not_applicable` rows because no Phase 9 verification artifact exists yet; the
+failure-direction probe checked all 30 commands with no findings. No test suite or CI ran during planning.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -1087,9 +1097,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-20T02:56:10.547Z
-Stopped at: Phase 9 planning: research complete
-Resume file: .planning/phases/09-chd-disc-images/09-RESEARCH.md
+Last session: 2026-11-20T03:42:12.560Z
+Stopped at: Phase 9 plans verified; execution starts at Plan 09-01
+Resume file: .planning/phases/09-chd-disc-images/09-01-PLAN.md
 
 ### v1.0 session history
 
