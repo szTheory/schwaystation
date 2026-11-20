@@ -132,10 +132,11 @@ static int manifest_read(const char *path, struct schway__manifest *manifest)
         size_t key_size;
         size_t value_size;
         if (equals == NULL || newline == NULL || newline[1] != '\0' ||
-            (newline > line && newline[-1] == '\r') || manifest->count >= SCHWAY__CHD_FIXTURE_FIELDS) {
+            manifest->count >= SCHWAY__CHD_FIXTURE_FIELDS) {
             valid = 0;
             break;
         }
+        if (newline > line && newline[-1] == '\r') newline[-1] = '\0';
         *equals = '\0';
         *newline = '\0';
         key_size = strlen(line);
@@ -202,7 +203,8 @@ static int cue_directory(char directory[1024], const char *cue)
 
 static int validate_chd_fixture(const char *cue, const char *chd,
                                 const char *manifest_path, const char *tool,
-                                const char *track_directory)
+                                const char *track_directory,
+                                const char **failure_reason)
 {
     static const char tool_commit[] = "7f71bdf3d4099dc38bded49c6745e453005d6e41";
     static const char tool_archive_sha256[] =
@@ -226,12 +228,21 @@ static int validate_chd_fixture(const char *cue, const char *chd,
     schway__disc_chd *reader = NULL;
     schway_disc_image_error error;
     int valid = 0;
+    const char *reason = "manifest is unreadable or malformed";
 
-    if (!manifest_read(manifest_path, &manifest) || !cue_directory(directory, cue)) return 0;
+    if (!manifest_read(manifest_path, &manifest)) goto cleanup;
+    if (!cue_directory(directory, cue)) {
+        reason = "source CUE path is invalid";
+        goto cleanup;
+    }
     if (track_directory == NULL) track_directory = directory;
     if (!join_path(track1, track_directory, "disc_boot.bin") ||
-        !join_path(track2, track_directory, "disc_boot_track02.bin")) return 0;
+        !join_path(track2, track_directory, "disc_boot_track02.bin")) {
+        reason = "source track path is invalid";
+        goto cleanup;
+    }
 
+    reason = "manifest metadata does not match the pinned CHD fixture profile";
     if (strcmp(manifest_get(&manifest, "format"), "schwaystation-chd-fixture-v1") != 0 ||
         strcmp(manifest_get(&manifest, "track1_file"), "disc_boot.bin") != 0 ||
         strcmp(manifest_get(&manifest, "track1_type"), "MODE2/2352") != 0 ||
@@ -243,8 +254,9 @@ static int validate_chd_fixture(const char *cue, const char *chd,
         strcmp(manifest_get(&manifest, "hunk_bytes"), "19584") != 0 ||
         strcmp(manifest_get(&manifest, "unit_bytes"), "2448") != 0 ||
         strcmp(manifest_get(&manifest, "workers"), "1") != 0 ||
-        strcmp(manifest_get(&manifest, "expected_track_count"), "2") != 0) return 0;
+        strcmp(manifest_get(&manifest, "expected_track_count"), "2") != 0) goto cleanup;
 
+    reason = "source, generator, or CHD digest does not match the manifest";
     if (!file_sha256(cue, cue_sha256) ||
         strcmp(manifest_get(&manifest, "source_cue_sha256"), cue_sha256) != 0 ||
         !file_sha256(track1, track1_sha256) ||
@@ -256,9 +268,10 @@ static int validate_chd_fixture(const char *cue, const char *chd,
         !file_sha256(chd, chd_sha256) ||
         strcmp(manifest_get(&manifest, "chd_sha256"), chd_sha256) != 0 ||
         !file_size(track1, &track1_bytes) || !file_size(track2, &track2_bytes) ||
-        !file_size(chd, &chd_bytes)) return 0;
+        !file_size(chd, &chd_bytes)) goto cleanup;
 
-    if (track1_bytes % 2352u != 0u || track2_bytes % 2352u != 0u) return 0;
+    reason = "source track geometry or CHD size does not match the manifest";
+    if (track1_bytes % 2352u != 0u || track2_bytes % 2352u != 0u) goto cleanup;
     track1_sectors = track1_bytes / 2352u;
     track2_sectors = track2_bytes / 2352u;
     logical_sectors = track1_sectors + track2_sectors;
@@ -269,18 +282,18 @@ static int validate_chd_fixture(const char *cue, const char *chd,
         !parse_u64(manifest_get(&manifest, "track2_sectors"), &manifest_value) || manifest_value != track2_sectors ||
         !parse_u64(manifest_get(&manifest, "logical_sector_count"), &manifest_value) || manifest_value != logical_sectors ||
         !parse_u64(manifest_get(&manifest, "chd_bytes"), &manifest_value) || manifest_value != chd_bytes ||
-        chd_bytes == 0u || chd_bytes >= UINT64_C(524288)) return 0;
+        chd_bytes == 0u || chd_bytes >= UINT64_C(524288)) goto cleanup;
 
+    reason = "CHD reader rejected the checked fixture";
     memset(&error, 0, sizeof error);
     if (schway__disc_chd_open(chd, &reader, &error) != SCHWAY_DISC_IMAGE_OK || reader == NULL) {
-        fprintf(stderr, "ASSERT disc.media.preflight: CHD reader rejected checked fixture: status=%u (%s)\n",
-                (unsigned)error.status, error.message);
         goto cleanup;
     }
     valid = 1;
 
 cleanup:
     schway__disc_chd_close(reader);
+    if (!valid && failure_reason != NULL) *failure_reason = reason;
     return valid;
 }
 
@@ -312,6 +325,37 @@ static int write_manifest_variant(const char *source, const char *output,
     if (fclose(input) != 0) valid = 0;
     if (fclose(result) != 0) valid = 0;
     return valid && found != 0;
+}
+
+static int write_crlf_manifest(const char *source, const char *output)
+{
+    char line[256];
+    FILE *input = schway__test_open_file(source, "rb");
+    FILE *result = schway__test_open_file(output, "wb");
+    int valid = 1;
+
+    if (input == NULL || result == NULL) {
+        if (input != NULL) (void)fclose(input);
+        if (result != NULL) (void)fclose(result);
+        return 0;
+    }
+    while (fgets(line, (int)sizeof line, input) != NULL) {
+        size_t size = strlen(line);
+        if (size == 0u || line[size - 1u] != '\n') {
+            valid = 0;
+            break;
+        }
+        if (size >= 2u && line[size - 2u] == '\r') size -= 2u;
+        else size--;
+        if (fwrite(line, 1u, size, result) != size || fputs("\r\n", result) == EOF) {
+            valid = 0;
+            break;
+        }
+    }
+    if (ferror(input) != 0) valid = 0;
+    if (fclose(input) != 0) valid = 0;
+    if (fclose(result) != 0) valid = 0;
+    return valid;
 }
 
 static int copy_and_corrupt(const char *source, const char *output)
@@ -356,38 +400,43 @@ static int run_fixture_controls(const char *cue, const char *test_directory,
     char missing_chd[1024];
     int valid = 1;
 
+    if (!join_path(path, test_directory, "chd-control-crlf.manifest") ||
+        !write_crlf_manifest(manifest, path) ||
+        !validate_chd_fixture(cue, chd, path, tool, NULL, NULL)) valid = 0;
+    (void)remove(path);
+
     if (!join_path(path, test_directory, "chd-control-wrong-digest.manifest") ||
         !write_manifest_variant(manifest, path, "chd_sha256", "0000000000000000000000000000000000000000000000000000000000000000") ||
-        validate_chd_fixture(cue, chd, path, tool, NULL)) valid = 0;
+        validate_chd_fixture(cue, chd, path, tool, NULL, NULL)) valid = 0;
     (void)remove(path);
 
     if (!join_path(path, test_directory, "chd-control-missing-track.manifest") ||
         !write_manifest_variant(manifest, path, "format", "schwaystation-chd-fixture-v1") ||
-        validate_chd_fixture(cue, chd, manifest, tool, test_directory)) valid = 0;
+        validate_chd_fixture(cue, chd, manifest, tool, test_directory, NULL)) valid = 0;
     (void)remove(path);
 
     if (!join_path(path, test_directory, "chd-control-wrong-count.manifest") ||
         !write_manifest_variant(manifest, path, "logical_sector_count", "221") ||
-        validate_chd_fixture(cue, chd, path, tool, NULL)) valid = 0;
+        validate_chd_fixture(cue, chd, path, tool, NULL, NULL)) valid = 0;
     (void)remove(path);
 
     if (!join_path(path, test_directory, "chd-control-oversized.manifest") ||
         !write_manifest_variant(manifest, path, "chd_bytes", "524288") ||
-        validate_chd_fixture(cue, chd, path, tool, NULL)) valid = 0;
+        validate_chd_fixture(cue, chd, path, tool, NULL, NULL)) valid = 0;
     (void)remove(path);
 
     if (!join_path(path, test_directory, "chd-control-corrupt.manifest") ||
-        !write_corrupt_manifest(path) || validate_chd_fixture(cue, chd, path, tool, NULL)) valid = 0;
+        !write_corrupt_manifest(path) || validate_chd_fixture(cue, chd, path, tool, NULL, NULL)) valid = 0;
     (void)remove(path);
 
     if (!join_path(path, test_directory, "chd-control-corrupt.chd") ||
-        !copy_and_corrupt(chd, path) || validate_chd_fixture(cue, path, manifest, tool, NULL)) valid = 0;
+        !copy_and_corrupt(chd, path) || validate_chd_fixture(cue, path, manifest, tool, NULL, NULL)) valid = 0;
     (void)remove(path);
 
     if (!join_path(missing_chd, test_directory, "chd-control-missing.chd") ||
         !join_path(path, test_directory, "chd-control-missing.manifest") ||
         !write_manifest_variant(manifest, path, "format", "schwaystation-chd-fixture-v1") ||
-        validate_chd_fixture(cue, missing_chd, path, tool, NULL)) valid = 0;
+        validate_chd_fixture(cue, missing_chd, path, tool, NULL, NULL)) valid = 0;
     (void)remove(path);
 
     if (!valid) {
@@ -643,9 +692,13 @@ static int run_media_preflight(const char *cue, const char *test_directory,
           "empty CUE input must be rejected without returning an image");
 
 #if SCHWAYSTATION_CHD
-    CHECK(chd != NULL && manifest != NULL && tool != NULL &&
-          validate_chd_fixture(cue, chd, manifest, tool, NULL),
-          "owned CHD, manifest, source digests, or geometry failed preflight");
+    const char *chd_failure = "CHD fixture inputs are missing";
+    if (chd == NULL || manifest == NULL || tool == NULL ||
+        !validate_chd_fixture(cue, chd, manifest, tool, NULL, &chd_failure)) {
+        fprintf(stderr, "ASSERT disc.media.preflight: %s\n", chd_failure);
+        result = 1;
+        goto cleanup;
+    }
 #else
     (void)chd;
     (void)manifest;

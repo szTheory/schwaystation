@@ -522,18 +522,33 @@ jobs:
       # clang-21 is on the image; its sanitizer runtimes may not be.
       - name: Sanitizer runtime
         run: dpkg -s libclang-rt-21-dev > /dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y libclang-rt-21-dev; }
+      # Keep the fixture-only encoder outside sanitizer instrumentation; the CHD reader and tests remain instrumented.
+      - name: Build native CHD fixture generator
+        run: |
+          cmake --preset chd-tool
+          cmake --build --preset chd-tool
+          test -x build/chd-tool/tools/schwaystation-chd-tool
       - name: Configure ASan with CHD
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/asan/disc-media
-        run: cmake --preset asan -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=ON
+        run: >-
+          cmake --preset asan -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=OFF
+          -DSCHWAYSTATION_CHD_TOOL_EXECUTABLE=${{ github.workspace }}/build/chd-tool/tools/schwaystation-chd-tool
       - name: Confirm CHD configuration before build
         run: |
           grep -Fxq 'SCHWAYSTATION_CHD:BOOL=ON' build/asan/CMakeCache.txt
-          grep -Fxq 'SCHWAYSTATION_BUILD_CHD_TOOL:BOOL=ON' build/asan/CMakeCache.txt
+          grep -Fxq 'SCHWAYSTATION_BUILD_CHD_TOOL:BOOL=OFF' build/asan/CMakeCache.txt
+          grep -Fxq "SCHWAYSTATION_CHD_TOOL_EXECUTABLE:FILEPATH=$GITHUB_WORKSPACE/build/chd-tool/tools/schwaystation-chd-tool" build/asan/CMakeCache.txt
       - name: Build and test
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/asan/disc-media
         run: |
+          cmake --build --preset asan --target schwaystation-disc-fixtures
+          cmake -DCHD_TOOL=build/chd-tool/tools/schwaystation-chd-tool \
+            -DCUE=build/asan/fixtures/disc_boot.cue \
+            -DOUTPUT_CHD=build/asan/fixtures/disc_boot.chd \
+            -DMANIFEST=build/asan/tests/disc_boot.chd.manifest \
+            -P cmake/CHDFixtures.cmake
           cmake --build --preset asan
           ctest --preset asan
       # The abi and release checks read binary shapes the instrumentation changes.
