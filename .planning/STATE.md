@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 09
+current_plan: 13
 status: executing
-stopped_at: Completed 09-10-PLAN.md
-last_updated: "2026-11-20T16:09:19.723Z"
+stopped_at: Completed 09-09-PLAN.md
+last_updated: "2026-11-20T17:54:01Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-10 measured and documented CI artifact reuse; Plan 09-09 is next by dependency order
-state_head: f12fbe7b72f54ed2fe707ea7cea99fd8d2ab7407
+last_activity_desc: Phase 09 Plan 09-09 completed; Plan 09-13 is next because Plan 09-11 depends on its archive checks
+state_head: 1470276
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 29
+  completed_plans: 30
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 09
+Current Plan: 13 (ON/OFF archive validation)
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Plan 09-10 measured and documented CI artifact reuse; Plan 09-09 is next by dependency order
+Last activity: 2026-11-20 — Plan 09-09 metadata, notice and compatibility checks completed; Plan 09-13 is next by dependency order
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -162,7 +162,11 @@ Release ZIPs matched the published assets. Waiting for Main's slower required pa
 projects about 24m25s more wall time than the observed release run. Separate gates and all lanes remain required.
 The measured evidence and disposition are in `09-CI-REUSE.md`; todo 050 now carries the decision and the Plan 11
 workflow-invariant check. No build, test suite, `act`, or hosted run was needed. Task commits are `3847aa3` and
-`f12fbe7`. The dependency-ready next plan is 09-09; Plan 11 will consume this disposition after its other inputs.
+`f12fbe7`. Plan 09-09 then completed; Plan 09-13 is next because Plan 09-11 depends on its package checks.
+
+### Phase 9 Plan 09-09 execution (2026-11-20)
+
+Runtime/model: Codex session; primary model ID unavailable; independent gsd-code-reviewer and two read-only planning/CI audits used gpt-6-luna xhigh. The inherited checkpoint did not preserve the full plan start time. The measured review-to-Task-2-commit interval was 6m15s; the wider active duration is unknown. ON/OFF metadata selectors passed 2/2 each, notice selectors 2/2, and compatibility setup/protected-base plus perf allowance selectors passed 3/3 in 0.92s. The counted gate is 3900/3901. Review found a malformed CHD suffix regex; it was corrected and confirmed before the selectors. The first notice run caught an Applies-to parser treating the backticked option as a path; CTest listing also showed the compatibility/perf selectors belong to the CI preset, not hygiene. Both issues were corrected before closeout. No build, broad suite, `act` or hosted run applied because no workflow changed. CI efficiency rules are already discoverable in `AGENTS.md` and `.planning/AUTONOMOUS.md`; Plan 09-11 retains the routing dry run and producer-path measurement. The owner chose to defer the generic source-wide SPDX scanner to the first tracked SPDX-bearing caller; todo 005 now targets Phase 10 planning. Task commits are `d336d33` and `1470276`; review resolution is in `09-REVIEW.md`. Plan 09-13 is next because 09-11 requires both package configurations.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -1406,7 +1410,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 9's remaining plans in dependency order (09-10 is ready before 09-09), then complete code review and automated verification before ship. Measure todo 050's exact-SHA artifact identity, runner-minutes, and critical path; change workflow wiring only if a tested reuse path is safe and measurably worthwhile. Run cheap selectors, inventory, fixture, and artifact checks before long suites; keep hosted matrix and release gates required. No owner UAT is needed.
+- Continue Phase 9 in dependency order: 09-13 package checks, 09-11 workflow/fuzz wiring, 09-12 runner/libretro integration and 09-14 owned-guest evidence; then review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; use the planned `act --dryrun` routing check and measure the CHD producer critical path before any expensive hosted run. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
