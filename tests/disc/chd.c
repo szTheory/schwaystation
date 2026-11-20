@@ -535,7 +535,8 @@ int main(int argc, char **argv)
         put_be32(header + 8u, header_lengths[version - 1u]);
         put_be32(header + 12u, version);
         CHECK(write_bytes(path, header, header_lengths[version - 1u]) &&
-              expect_rejection(path, SCHWAY_DISC_IMAGE_BAD_IMAGE),
+              expect_rejection(path, version < 3u ? SCHWAY_DISC_IMAGE_UNSUPPORTED :
+                                                      SCHWAY_DISC_IMAGE_BAD_IMAGE),
               "a recognized v1-v5 header length was misclassified");
     }
     memset(header, 0, sizeof(header));
@@ -561,16 +562,13 @@ int main(int argc, char **argv)
           expect_rejection(path, SCHWAY_DISC_IMAGE_LIMIT), "oversized logical geometry accepted");
     memset(header, 0, sizeof(header));
     memcpy(header, "MComprHD", 8u);
-    put_be32(header + 8u, 80u);
-    put_be32(header + 12u, 2u);
+    put_be32(header + 8u, 120u);
+    put_be32(header + 12u, 3u);
     put_be32(header + 24u, 1u);
-    put_be32(header + 28u, UINT32_MAX);
-    put_be32(header + 32u, UINT32_MAX);
-    put_be32(header + 36u, UINT32_MAX);
-    put_be32(header + 40u, UINT32_MAX);
-    put_be32(header + 76u, 2352u);
-    CHECK(write_bytes(path, header, 80u) &&
-          expect_rejection(path, SCHWAY_DISC_IMAGE_LIMIT), "overflowing legacy geometry accepted");
+    put_be64(header + 28u, UINT64_MAX);
+    put_be32(header + 76u, 2448u);
+    CHECK(write_bytes(path, header, 120u) &&
+          expect_rejection(path, SCHWAY_DISC_IMAGE_LIMIT), "oversized v3 geometry accepted");
     memset(header, 0, sizeof(header));
     memcpy(header, "MComprHD", 8u);
     put_be32(header + 8u, 124u);

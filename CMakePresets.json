@@ -70,7 +70,7 @@
     {
       "name": "fuzz",
       "inherits": "base",
-      "$comment": "The loader, SPU and five media fuzz targets use clang-21 with ASan and UBSan. Selected libretro consumers use generated fixtures; the asan inventory omits standalone fixture tests. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage. Nightly runs six bounded campaigns.",
+      "$comment": "The loader, SPU and six media fuzz targets use clang-21 with ASan and UBSan. Selected libretro consumers use generated fixtures; the asan inventory omits standalone fixture tests. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage. Nightly runs six bounded campaigns.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -167,6 +167,8 @@
         "schwaystation-fuzz-m3u-replay",
         "schwaystation-fuzz-cdrom",
         "schwaystation-fuzz-cdrom-replay",
+        "schwaystation-fuzz-chd",
+        "schwaystation-fuzz-chd-replay",
         "schwaystation-fuzz-mdec",
         "schwaystation-fuzz-mdec-replay"
       ]

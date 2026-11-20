@@ -582,16 +582,15 @@ static int test_cue_reject(const char *directory)
     CHECK(write_text(cue_path,
           "FILE \"unsupported.chd\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n",
           sizeof "FILE \"unsupported.chd\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n" - 1u) &&
-          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
-                             "unsupported: CHD (planned v2.0)"),
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u, NULL),
           "expected an unsupported cue child extension to be rejected consistently");
     (void)remove(cue_path);
     cue_path[0] = '\0';
-    for (uint32_t i = 0u; i < 4u; i++) {
-        static const char *extensions[] = {"chd", "pbp", "ecm", "ccd"};
+    for (uint32_t i = 0u; i < 3u; i++) {
+        static const char *extensions[] = {"pbp", "ecm", "ccd"};
         static const char *messages[] = {
-            "unsupported: CHD (planned v2.0)", "unsupported: PBP (planned v2.0)",
-            "unsupported: ECM (planned v2.0)", "unsupported: CCD (planned v2.0)"
+            "unsupported: PBP (planned v2.0)", "unsupported: ECM (planned v2.0)",
+            "unsupported: CCD (planned v2.0)"
         };
         int size = snprintf(cue_path, sizeof cue_path, "%s/unsupported.%s",
                             directory, extensions[i]);
@@ -599,9 +598,9 @@ static int test_cue_reject(const char *directory)
               expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u, messages[i]),
               "expected unsupported media to name its planned v2.0 format");
     }
-    CHECK(write_text(playlist_path, "unsupported.chd\n", sizeof "unsupported.chd\n" - 1u) &&
+    CHECK(write_text(playlist_path, "unsupported.pbp\n", sizeof "unsupported.pbp\n" - 1u) &&
           expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
-                             "unsupported: CHD (planned v2.0)"),
+                             "unsupported: PBP (planned v2.0)"),
           "expected an unsupported m3u entry extension to be rejected consistently");
 
 cleanup:

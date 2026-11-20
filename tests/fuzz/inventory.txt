@@ -1,4 +1,5 @@
 fuzz.regress.cdrom	fuzz,portable
+fuzz.regress.chd	fuzz,portable
 fuzz.regress.cnf	fuzz,portable
 fuzz.regress.cue	fuzz,portable
 fuzz.regress.exe	fuzz,portable
