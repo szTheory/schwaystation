@@ -977,7 +977,7 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
     endif()
   endforeach()
   set(expected_features "${WORK_ROOT}/compat-features-expected.csv")
-  file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,unknown,planned:09-14,2026-11-20\n")
+  file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0,2026-11-20\n")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
       sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${SOURCE_ROOT}/tests/compat/features.csv"
       "${expected_features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-20 features

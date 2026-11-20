@@ -28,15 +28,30 @@ The CHD storage stream pads each track to a four-frame boundary. The reader
 includes those frames when reconciling the CHD logical byte count, but excludes
 them from public LBAs and leadouts. Virtual pregap sectors use the same blank
 sector construction as the CUE provider; stored pregaps map to their source
-frames. The owned fixture's complete 222-sector stream, 96-byte absent-subcode
-output, and content-based save identity are compared against CUE by
-`disc.image.chd_parity`. `disc.image.chd_open` checks shared routing and failed
-open isolation, while `disc.image.chd_boundaries` covers track/index/leadout and
-each eight-frame hunk transition. `disc.image.chd_headers`,
-`disc.image.chd_metadata`, and `disc.image.chd_toc` cover header bounds,
-metadata variants, and normalized TOC fields. Runner/libretro selection,
-extension advertising, and packaged ON/OFF archives remain later integration
-work.
+frames. CHD track and pregap subcode metadata must say `NONE`; returned subcode
+bytes come from the CHD sector stream, with the owned no-subcode fixture
+returning 96 zero bytes per sector.
+
+The media preflight checks the owned CUE/CHD inputs, manifest digests and track
+geometry before guest runs. `disc.image.chd_parity` checks all 222 logical
+sectors in forward and reverse order, sector guards, TOC equality, absent
+subcode bytes and content-based save identity. `disc.image.chd_open` checks
+shared routing and failed-open isolation, while `disc.image.chd_boundaries`
+covers track/index/leadout and each eight-frame hunk transition.
+`disc.image.chd_headers`, `disc.image.chd_metadata`, and `disc.image.chd_toc`
+cover header bounds, metadata variants, and normalized TOC fields. The bounded
+owned guest reuses its CUE expectations and completion limits through CHD in
+`disc.fixture.chd.boot`, `.read`, `.audio`, and `.fmv`; the media parity and
+feature-key preflights finish before these cases run. `runner.disc.chd` and
+`libretro.content.chd` cover the two shipped hosts, and `release.archive_contents`
+plus `release.notices` check the CHD-enabled and disabled package outputs.
+
+Open errors retain the shared image status: malformed headers or geometry use
+`BAD_IMAGE`, unsupported versions, parent images and metadata use
+`UNSUPPORTED`, configured byte/hunk/track bounds use `LIMIT`, and open-time
+file-read failures use `IO`. A later hunk decode failure makes the sector
+callback return zero. A failed open leaves the image pointer null; its error
+message identifies the rejected condition.
 
 The host limits image data to 1 GiB, CHD hunks to 16 MiB, and CHD files to
 65,536 hunks. A compressed v5 map is limited to 16 MiB; combined compressed

@@ -25,4 +25,4 @@ Phase 10 onward adds provider/profile/protection/peripheral rows as each capabil
 
 | Provider | Profile | Protection | Peripheral | Predicate | Status | Evidence | Date |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| chd | ntsc-u | none | cdrom | disc_boot.toc+sectors+subcode | unknown | planned:09-14 | 2026-11-20 |
+| chd | ntsc-u | none | cdrom | disc_boot.toc+sectors+subcode | pass | provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0 | 2026-11-20 |
