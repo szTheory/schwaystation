@@ -87,6 +87,14 @@ int fail(const char *operation, int32_t error) {
 } // namespace
 
 int main(int argc, char **argv) {
+  if (argc == 2 && std::string(argv[1]) == "--print-settings") {
+    std::cout << "format=schwaystation-chd-tool-v1\n"
+              << "codecs=cdlz,cdzl,cdfl,0\n"
+              << "hunk_bytes=19584\n"
+              << "unit_bytes=2448\n"
+              << "workers=1\n";
+    return 0;
+  }
   if (argc != 3) {
     std::cerr << "usage: schwaystation-chd-tool <source.cue> <output.chd>\n";
     return 2;

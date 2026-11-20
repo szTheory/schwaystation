@@ -145,3 +145,14 @@ add_custom_command(OUTPUT "${schway__disc_playlist_bin}"
   VERBATIM)
 add_custom_target(schwaystation-disc-fixtures ALL DEPENDS
   "${schway__disc_bin}" "${schway__disc_playlist_bin}")
+
+if(SCHWAYSTATION_CHD AND SCHWAYSTATION_BUILD_CHD_TOOL)
+  include("${PROJECT_SOURCE_DIR}/cmake/CHDFixtures.cmake")
+  if(TARGET schwaystation-test-disc-media)
+    add_dependencies(schwaystation-test-disc-media schwaystation-chd-fixtures)
+  endif()
+else()
+  file(REMOVE
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd.manifest")
+endif()
