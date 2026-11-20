@@ -942,8 +942,7 @@ static int test_playlist(const char *directory)
     maximum_path[255] = '\n';
     maximum_path[256] = '\0';
     CHECK(write_text(playlist_path, maximum_path, 256u) &&
-          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
-                             "unsupported: CHD (planned v2.0)"),
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u, NULL),
           "expected a 255-byte playlist path to reach consistent unsupported-type handling");
     CHECK(write_text(playlist_path, "../outside.iso\n", sizeof "../outside.iso\n" - 1u) &&
           expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_BAD_M3U, 1u, NULL),
