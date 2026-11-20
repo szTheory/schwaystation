@@ -166,14 +166,24 @@ jobs:
             LC_ALL=C sort -cu "$inventory"
           done
           cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake
+      # clang-21 and the media encoder's FFmpeg development packages may not be on the image.
+      - name: Sanitizer and media-fixture dependencies
+        run: |
+          set -eu
+          packages=(libclang-rt-21-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev)
+          missing=false
+          for package in "${packages[@]}"; do
+            if ! dpkg -s "$package" > /dev/null 2>&1; then missing=true; break; fi
+          done
+          if [[ "$missing" == true ]]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends "${packages[@]}"
+          fi
       - name: Build the uninstrumented CHD fixture generator
         run: |
           cmake --preset chd-tool
           cmake --build --preset chd-tool
           test -x build/chd-tool/tools/schwaystation-chd-tool
-      # clang-21 is on the image; its sanitizer and libFuzzer runtimes may not be.
-      - name: Sanitizer runtimes
-        run: dpkg -s libclang-rt-21-dev > /dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y libclang-rt-21-dev; }
       - name: Build the owned CHD baseline fixture
         run: |
           set -eu

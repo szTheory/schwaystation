@@ -1,8 +1,8 @@
 ---
 phase: 09-chd-disc-images
-reviewed: 2026-11-20T22:16:05Z
+reviewed: 2026-11-20T22:32:35Z
 depth: standard
-files_reviewed: 31
+files_reviewed: 32
 files_reviewed_list:
   - .github/workflows/ci.yml
   - .github/workflows/nightly.yml
@@ -18,6 +18,7 @@ files_reviewed_list:
   - host/disc_probe.c
   - libretro/CMakeLists.txt
   - libretro/libretro.c
+  - quality.json
   - tests/cmake/workflows.cmake
   - tests/compat/features.csv
   - tests/compat/tests.cmake
@@ -46,14 +47,14 @@ status: clean
 
 # Phase 09: Code Review Report
 
-**Reviewed:** 2026-11-20T22:16:05Z
+**Reviewed:** 2026-11-20T22:32:35Z
 **Depth:** standard
-**Files Reviewed:** 31
+**Files Reviewed:** 32
 **Status:** clean
 
 ## Summary
 
-Reviewed the source changes since commit `0f81b9a`, including CHD probe reads and track hashing, host/provider ownership and bounds, libretro feature gating, cross-lane fixture generation and hashes, the WASI size gate, fuzz campaign wiring, bounded guest integration, release metadata checks, and CI workflow changes. The prior review's resolved finding was not repeated. The closeout deltas also align release-test registration with the WASI inventory's libretro-off configuration, and provide the pinned FLAC sources with strict-C17 POSIX declarations on Unix. The existing test inventories and release-test setup support these conditions. No source defects were confirmed in this scope. Verification is pending hosted checks.
+Reviewed the Phase 9 source set, including CHD probe reads and track hashing, host/provider ownership and bounds, libretro feature gating, cross-lane fixture generation and hashes, the WASI size gate, fuzz campaign wiring, bounded guest integration, release metadata checks, and CI workflow changes. Re-reviewed the closeout changes in `cmake/CHDTool.cmake`, `.github/workflows/nightly.yml`, and `tests/cmake/workflows.cmake`, and reviewed the updated `quality.json` bound. The source-specific MSVC forced include matches the observed CRT macro failures and covers the pinned C++ source list; Windows CI must confirm it compiles. Nightly's missing runtime and media dependencies are installed before compilation, and the new WASI value is supported by the job's valid-module measurement. No source defects were confirmed. Hosted verification remains pending.
 
 ## Narrative Findings (AI reviewer)
 
@@ -61,6 +62,6 @@ No issues found.
 
 ---
 
-_Reviewed: 2026-11-20T22:16:05Z_
+_Reviewed: 2026-11-20T22:32:35Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_

@@ -34,7 +34,7 @@ key-files:
     - docs/maintaining.md
 key-decisions:
   - Keep the Main and Release CI runs separate; measured outputs differ across all 18 product archives and serializing them adds 24m25s to the observed release duration.
-  - Keep the WASI bound at 608,540 bytes until the CHD-enabled hosted module is actually measured.
+  - The first CHD-enabled hosted WASI module measured 859,379 bytes; update the exact bound from the valid producer output and verify the new bound on a green exact-head run.
   - Use Act dry runs for route evidence only; the CI classifier outputs and hosted integrations still require GitHub Actions.
 patterns-established:
   - Run cheap source, pin, timeout, inventory, budget and route checks in the existing changes job before dependent CI work.
@@ -52,7 +52,7 @@ coverage:
         ref: "cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake; cmake --list-presets, --list-presets=build, --list-presets=test and --list-presets=workflow; act pull_request --dryrun for ci.yml; all exited 0."
         status: pass
       - kind: integration
-        ref: "Exact-head hosted eight-lane CHD parity/hash equality and WASI module-size measurement; deferred until Plan 14 and source review."
+        ref: "Run 44827711416 built and validated the CHD-enabled WASI module at 859379 bytes, then failed the previous CHD-off 608540-byte bound; Windows x64/arm64 also exposed missing MSVC floating-point macros. Candidate fixes are under review; final eight-lane verification is pending. https://github.com/szTheory/schwaystation/actions/runs/44827711416"
         status: unknown
     human_judgment: false
   - id: D2
@@ -71,7 +71,7 @@ coverage:
         ref: "disc_registration route selector and nightly act dry run exited 0; direct hosted sanitizer campaign remains pending final exact-head verification."
         status: pass
       - kind: integration
-        ref: "Exact-head hosted nightly CHD campaign, including seed count and bounded run; pending."
+        ref: "Run 44827711388 built the pinned CHD tool then failed while building the owned disc fixture because the fuzz job lacked FFmpeg development packages; final campaign verification is pending. https://github.com/szTheory/schwaystation/actions/runs/44827711388"
         status: unknown
     human_judgment: false
 duration: not measured
@@ -110,7 +110,9 @@ status: complete
 | `act pull_request --dryrun -W .github/workflows/nightly.yml` with all hosted labels mapped to `ubuntu:latest` | 0 | New preflight, generator, fixture and bounded campaign steps were routable; no workflow step executed. Both successful dry runs used `XDG_CACHE_HOME=/tmp/schwaystation-act-cache`. |
 | Release workflow review | 0 | No `release.yml` diff. The release CI call still uses the Release Please SHA; publish retains its 18-archive, checksum and attestation validation; `install-line-latest` remains wired. |
 
-No real Act job or hosted run was started. The available Act image is ARM64 on this host and lacks CMake; local clang-21/wasm-ld and a WASI module are absent. The actual CHD-enabled WASI module size is therefore unknown; `quality.json` remains unchanged at 608,540 bytes. Exact-head hosted CI must measure it and keep the existing bound. Hosted BE32/WASI, matrix routing, release permissions/attestations, and nightly sanitizer execution remain required final evidence.
+No real Act job was started. The available Act image is ARM64 on this host and lacks CMake; local clang-21/wasm-ld and Windows/MSVC are absent. Exact-head run 44827711416 measured the valid CHD-enabled WASI module at 859,379 bytes, then failed the old 608,540-byte CHD-off bound; Windows x64 and arm64 failed because the pinned C++ sources reached MSVC `<limits>` before its floating-point macros were defined. Its two Windows failures and the WASI failure were confirmed before canceling the remaining known-failing tail. The run consumed 1,684 raw runner-seconds (28.1 runner-minutes) over 268 seconds wall time. Nightly run 44827711388 passed vectors and all four benchmark jobs but failed its fuzz job when the owned fixture generator lacked FFmpeg development packages; it consumed 351 raw runner-seconds (5.9 runner-minutes) over 85 seconds wall time. Raw runner time is not billing-weighted cost.
+
+The reviewed follow-up sets the WASI bound to the measured CHD-enabled size, force-includes the MSVC CRT floating-point declarations for the pinned C++ source list, and installs the sanitizer/FFmpeg development packages once before expensive Nightly compilation. Workflow route checks and `act --dryrun` pass on these changes. The exact-head hosted rerun remains required for Windows, WASI, all eight parity lanes and the sanitizer campaign. Release permissions, attestations and publication remain ship-time hosted evidence.
 
 ## Task Commits
 

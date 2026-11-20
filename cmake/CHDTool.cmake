@@ -226,6 +226,10 @@ target_compile_definitions(schwaystation_chd_tool_core PRIVATE
   ZSTD_DISABLE_ASM)
 set_source_files_properties(${schway__chdtool_lzma_sources} PROPERTIES COMPILE_DEFINITIONS Z7_ST)
 set_source_files_properties(${schway__chdtool_zstd_sources} PROPERTIES COMPILE_DEFINITIONS ZSTD_DISABLE_ASM)
+if(MSVC)
+  # Pinned C++ sources reach MSVC's <limits> before defining its float.h macros.
+  set_source_files_properties(${schway__chdtool_cpp_sources} PROPERTIES COMPILE_OPTIONS "/FIfloat.h")
+endif()
 set(schway__chdtool_flac_posix_definition "")
 if(UNIX)
   # FLAC's C sources use POSIX APIs that strict C17 hides without this feature level.

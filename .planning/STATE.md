@@ -6,11 +6,11 @@ current_phase: 09
 current_phase_name: CHD disc images
 current_plan: 15
 status: executing
-stopped_at: Phase 9 local full workflow passed; exact-head hosted verification pending
-last_updated: "2026-11-20T21:43:44Z"
+stopped_at: Phase 9 reviewed fixes are ready for exact-head hosted CI and Nightly rerun
+last_updated: "2026-11-20T22:35:56Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 9 source review and final local workflow passed; exact-head hosted verification is next
-state_head: 78e459d
+last_activity_desc: Diagnosed the first exact-head hosted failures, reviewed three focused fixes, and passed cheap local and Act route preflights; exact-head hosted rerun is next
+state_head: e57ad5f
 progress:
   total_phases: 10
   completed_phases: 2
@@ -1489,7 +1489,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Complete Phase 9 source review, fix any accepted findings, then run final local and required hosted verification before shipping. Inspect the required CI and release runs for critical-path time and runner cost, measure the CHD producer and actual WASI module size, and keep hosted eight-lane/hash/fuzz predicates unknown until they pass. Keep todo 005 open for the first tracked SPDX-bearing source. No owner UAT is needed.
+- Push the reviewed Phase 9 corrections and complete one exact-head hosted CI/Nightly rerun. If both pass, write Phase 9 verification, ship PR #32, and confirm the release and main CI before discussing Phase 10. Keep todo 005 for the first tracked SPDX-bearing source and todo 051 bound to Phase 10's first Nightly routing change. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
@@ -1545,6 +1545,25 @@ Two read-only CI-efficiency reviews found no evidence-backed workflow reduction 
 sharing idea lacks timing evidence, the nightly job already reuses its configure, and Main/Release remain separate
 because measured archive digests differ and serialization added 24m25s. The standing preflight, Act, live-run and
 post-run cost guidance is discoverable in `AGENTS.md`, this file, and `docs/maintaining.md`. The workflow files did
-not change in this closeout, so the already-passing Act dry-run was not repeated. Hosted timing, exact-head CI and
-the actual WASI module size remain pending; the 608,540-byte quality bound is unchanged. The 09-14 summary now
-labels its second identical focused run as redundant rather than required.
+not change in this closeout, so the already-passing Act dry-run was not repeated. The 09-14 summary now labels its
+second identical focused run as redundant rather than required.
+
+### Phase 9 first exact-head hosted CI follow-up (2026-11-20)
+
+Runtime/model: Codex/GPT-6 session (primary model ID unavailable); gsd-code-reviewer gpt-6-luna xhigh. The first
+hosted CI head `e57ad5f` exposed three concrete integration gaps. The CHD-enabled WASI module was valid and
+measured 859,379 bytes, above the prior 608,540-byte CHD-off bound. Both Windows C++ lanes failed because pinned
+sources reached MSVC `<limits>` before the CRT floating-point macros were included. Nightly built the pinned CHD
+generator, then its owned media fixture failed because the job lacked the FFmpeg development packages required
+by the pinned encoder. These results are in [CI run 44827711416](https://github.com/szTheory/schwaystation/actions/runs/44827711416)
+and [Nightly run 44827711388](https://github.com/szTheory/schwaystation/actions/runs/44827711388).
+
+After confirming those failures, the known-failing CI tail was canceled. The CI attempt used 1,684 raw runner
+seconds (28.1 runner-minutes) over 268 seconds wall time; Nightly used 351 raw runner seconds (5.9 runner-minutes)
+over 85 seconds wall time. These are unweighted runner times, not billing cost. The reviewed follow-up sets the
+WASI bound to 859,379, force-includes `float.h` for the pinned MSVC C++ sources, and checks/installs sanitizer and
+FFmpeg dependencies once before Nightly compilation. The route selector, pin/timeout checks, sorted WASI
+inventory, budget, `git diff --check`, local CHD-tool configure/build, and `act -W .github/workflows/nightly.yml
+-j fuzz --dryrun` all passed. The local Mac build does not exercise MSVC; hosted Windows and WASI lanes remain
+necessary. The updated 32-file Phase 9 source review is clean with no findings. Exact-head CI and Nightly remain
+pending; no phase verification or ship claim is made.

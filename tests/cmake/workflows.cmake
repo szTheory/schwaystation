@@ -30,7 +30,7 @@ if(CASE STREQUAL "spu_registration" OR CASE STREQUAL "disc_registration")
   yaml_job_has(.github/workflows/ci.yml wasm32 "cmake --preset chd-tool.*build/wasm32/tests/schwaystation-chd-tool.*cmake --preset wasm32-chd.*disc_boot[.]chd[.]manifest.*CHDFixtures[.]cmake.*cmake --build --preset wasm32-chd.*QUALITY_WASM_COMPARE_BEGIN.*ctest --preset wasm32-preflight.*ctest --preset wasm32-chd" "INVENTORY=tests/inventory/wasm32\\.txt" "LABELS=portable")
   yaml_job_has(.github/workflows/nightly.yml vectors-full "cmake --workflow --preset nightly"
     "INVENTORY=tests/inventory/nightly\\.txt")
-  yaml_job_has(.github/workflows/nightly.yml fuzz "cmake --preset chd-tool.*name: Sanitizer runtimes.*cmake --preset fuzz.*CHDFixtures[.]cmake.*cmake --build --preset fuzz" "schwaystation-fuzz-exe -max_total_time=60" "subsystems=\\(cue cnf m3u cdrom chd mdec\\)" "expected=\\(5 5 7 15 12 6\\)" "-max_total_time=60")
+  yaml_job_has(.github/workflows/nightly.yml fuzz "name: Sanitizer and media-fixture dependencies.*libclang-rt-21-dev.*libavformat-dev.*libavcodec-dev.*libavutil-dev.*libswresample-dev.*libswscale-dev.*cmake --preset chd-tool.*cmake --build --preset chd-tool.*cmake --preset fuzz.*CHDFixtures[.]cmake.*cmake --build --preset fuzz" "schwaystation-fuzz-exe -max_total_time=60" "subsystems=\\(cue cnf m3u cdrom chd mdec\\)" "expected=\\(5 5 7 15 12 6\\)" "-max_total_time=60")
   file(READ "${ROOT}/tests/retroarch/test.cfg.in" config)
   if(NOT config MATCHES "audio_driver = \\\"null\\\"" OR NOT config MATCHES "audio_enable = \\\"false\\\"")
     message(FATAL_ERROR "${CASE}: RetroArch tone smoke must remain video-only")
