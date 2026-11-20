@@ -30,6 +30,7 @@ if [ -n "${COMPAT_BASE_DIR:-}" ] || [ -n "${COMPAT_BASE_SHA:-}" ]; then
         mkdir -p "$tmp/scripts" "$tmp/tests/cmake" "$tmp/tests/compat"
         cp "$COMPAT_BASE_DIR/scripts/compat-ratchet.sh" "$tmp/scripts/compat-ratchet.sh"
         cp "$COMPAT_BASE_DIR/tests/cmake/compat-ratchet.cmake" "$tmp/tests/cmake/compat-ratchet.cmake"
+        [ ! -f "$COMPAT_BASE_DIR/tests/cmake/date_days.cmake" ] || cp "$COMPAT_BASE_DIR/tests/cmake/date_days.cmake" "$tmp/tests/cmake/date_days.cmake"
         cp "$COMPAT_BASE_DIR/tests/compat/$ledger_name" "$tmp/tests/compat/$ledger_name"
         set -- "$candidate" "$fresh" "$tmp/tests/compat/$ledger_name" "$allow" "$today"
         [ "$kind" = title ] || set -- "$@" "$kind"
