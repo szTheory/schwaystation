@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 4
+current_plan: 5
 status: executing
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-11-20T05:12:09Z"
+stopped_at: Completed 09-04-PLAN.md
+last_updated: "2026-11-20T06:03:28Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-03 complete; Plan 09-04 is next
-state_head: 153f90b03f661291c9c5c8f467e3086e5488fe14
+last_activity_desc: Phase 09 Plan 09-04 complete; Plan 09-05 is next
+state_head: 472c371f7c14d9ab30ab77834c5940baf82cdd96
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 23
+  completed_plans: 24
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 09 Plan 09-03 complete; Plan 09-04 is next
+Last activity: 2026-11-20 — Phase 09 Plan 09-04 complete; Plan 09-05 is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -74,6 +74,20 @@ The incremental native build had no work; no fixture generation, full suite, hos
 The useful bottleneck discoveries were the missing OSD include and macOS `std::filesystem` deployment floor;
 both were corrected in the target-only wrapper. A cached-source weakness was also closed before accepting the
 preflight. Task commits are `a8a37c0` and `153f90b`; Plan 09-04 is next.
+
+### Phase 9 Plan 09-04 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The wall interval from the previous
+saved state at 05:12:09Z to completion at 06:03:28Z was 51 minutes; active time was not measured. The owned
+two-track source totals 522,144 bytes (64 data sectors and 158 audio sectors). The pinned native generator
+produced the same 5,552-byte CHD twice, SHA-256
+`4952c3a05ff2e2e596deed7ed2d37358a646790b890d5ed38484feec5b797569`, and wrote source/tool/output identity to a
+build-directory manifest. Sorted inventory, generated-media and exact CUE/track-size preflights passed before
+compression. Enabled and disabled structural selectors each passed 2/2 (0.07 seconds and 0.02 seconds). The
+controls reject bad hashes, missing inputs, wrong counts, over-cap output and malformed files before guest work.
+No guest or full suite ran because the plan explicitly stops before parity; no hosted workflow changed, so CI
+and `act` were not useful. The plan correction `b3b38c0` keeps the fixture build-local; task commits are
+`54bae5a` and `472c371`. Plan 09-05 is next.
 
 ### Phase 9 planning (2026-11-19)
 

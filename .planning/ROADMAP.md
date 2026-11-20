@@ -105,11 +105,11 @@ Plans:
   3. The shared media checks bound counts, offsets and allocations and confine companion paths. Malformed CHD inputs have fuzz and regression coverage. The preflight verifies track modes, indexes, pregaps, leadout and boundary sectors before guest boot, and invalid images leave the active disc intact. Following providers apply this contract and add their own regression cases.
   4. The feature ledger records the CHD evidence. Its preflight rejects missing or duplicate keys and its protected ratchet preserves prior passes except where a dated allowance permits change. Subsequent providers, profiles, protection and peripherals add their rows during their own phases.
 
-**Plans**: 3/14 plans executed
+**Plans**: 4/14 plans executed
 - [x] 09-01-PLAN.md — Shared callback preflight and CMake/test skeleton
 - [x] 09-02-PLAN.md — Pinned optional static reader and bounded header rejection
 - [x] 09-03-PLAN.md — Complete permissive fixture-tool closure audit and recipe
-- [ ] 09-04-PLAN.md — Reproducible owned CHD fixture and checked handoff
+- [x] 09-04-PLAN.md — Reproducible owned CHD fixture and checked build-local preflight
 - [ ] 09-05-PLAN.md — Bounded CHD metadata and exact logical TOC
 - [ ] 09-06-PLAN.md — Shared-provider whole-sector/subcode/identity parity
 - [ ] 09-07-PLAN.md — Shared media limits and production-parser fuzz/replay
