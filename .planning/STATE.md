@@ -6,11 +6,11 @@ current_phase: 09
 current_phase_name: CHD disc images
 current_plan: 15
 status: executing
-stopped_at: Completed Phase 9 source review
-last_updated: "2026-11-20T21:23:04Z"
+stopped_at: Phase 9 local full workflow passed; exact-head hosted verification pending
+last_updated: "2026-11-20T21:43:44Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 9 standard source review passed on 29 files with no findings; final local and hosted verification is next
-state_head: 938cca6f09514c51a4a211a13f2f577edfcce9fc
+last_activity_desc: Phase 9 source review and final local workflow passed; exact-head hosted verification is next
+state_head: 78e459d
 progress:
   total_phases: 10
   completed_phases: 2
@@ -1508,7 +1508,7 @@ Hosted evidence reused: [release-PR CI run 44253419074](https://github.com/szThe
 
 ### Phase 9 Plan 09-14 execution (2026-11-20)
 
-Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Work started at 20:42:42Z and the state closeout completed at 21:04:54Z. The owned CHD source/geometry preflight, 222-sector forward/reverse parity, feature-key check, and boot/read/audio/FMV guest cases all passed. The focused CHD selector passed 14/14 in 10.71 seconds and the required tracer rerun passed 14/14 in 11.45 seconds; the feature ratchet passed 2/2, documentation freshness passed, and both diff checks were clean. The four guest tests shared the existing pins and bounds and ran in parallel after setup fixtures. No broad Phase 9 suite, hosted CI, `act`, or source review ran in this plan. The local CI build remains CHD ON. Task commits: `1d48028`, `ab91147`, `938cca6`; summary: `.planning/phases/09-chd-disc-images/09-14-SUMMARY.md`.
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Work started at 20:42:42Z and the state closeout completed at 21:04:54Z. The owned CHD source/geometry preflight, 222-sector forward/reverse parity, feature-key check, and boot/read/audio/FMV guest cases all passed. The focused CHD selector passed 14/14 in 10.71 seconds; an identical extra rerun passed 14/14 in 11.45 seconds but added no coverage and was redundant. The feature ratchet passed 2/2, documentation freshness passed, and both diff checks were clean. The four guest tests shared the existing pins and bounds and ran in parallel after setup fixtures. No broad Phase 9 suite, hosted CI, `act`, or source review ran in this plan. The local CI build remains CHD ON. Task commits: `1d48028`, `ab91147`, `938cca6`; summary: `.planning/phases/09-chd-disc-images/09-14-SUMMARY.md`.
 
 The feature row now passes only the demonstrated local provider, runner, libretro, package and guest predicate. Hosted eight-lane/hash/fuzz evidence and the actual WASI module size remain unknown for final Phase 9 verification. The source review passed; final verification is next, with no owner action needed.
 
@@ -1520,3 +1520,31 @@ repeated. The review itself ran no tests. Artifact: `.planning/phases/09-chd-dis
 Plan 09-14's bounded 14-test selector ran twice (10.71s and 11.45s); the second identical pass added no
 coverage. Future closeout should keep the first green result and avoid a tracer-only rerun. Next: final local
 preflight and one exact-head hosted verification run, recording the WASI module size and CI critical path.
+
+### Phase 9 final local workflow and CI-efficiency review (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable. The Phase 9 final preflight ran
+`LC_ALL=C sort -cu` for the disc, compatibility and fuzz inventories, `git diff --check origin/main...HEAD`, and
+the six-test media/feature selector; all exited 0, with the selector completing in 0.49 seconds. The final local
+`cmake --workflow --preset ci` workflow exited 0: 639/639 CI tests passed, the separate release selector passed
+7/7, and CTest reported 74.78 seconds real time. The workflow also generated all three local macOS packages.
+
+The preceding local attempt exposed two corrective issues. `disc.playlist` still passed the 255-byte boundary,
+status and line assertions; only its pinned CHD message was stale after CHD became a supported parser path. The
+assertion now checks status and line without binding to that message. `docs/testing.md` exceeded its 61,440-byte
+page budget; the unchanged media-preflight details moved to `docs/media-testing.md`, leaving the original page at
+60,814 bytes. The exact targeted selector passed 2/2 in 0.06 seconds and the byte-budget check passed.
+
+Five failing libchdr test registrations came from an old ignored `build/ci/pins/libchdr/build/tests/CTestTestfile.cmake`
+left by a prior configuration, despite the current forced `CHDR_WANT_TESTS=OFF`. Removing only that generated
+CTest file restored the intended test inventory; the current configure retains 639 CI tests plus seven separate
+release checks. No tracked CMake or workflow change was needed. Fresh hosted runners do not inherit this local
+build metadata.
+
+Two read-only CI-efficiency reviews found no evidence-backed workflow reduction to apply: the cross-lane generator
+sharing idea lacks timing evidence, the nightly job already reuses its configure, and Main/Release remain separate
+because measured archive digests differ and serialization added 24m25s. The standing preflight, Act, live-run and
+post-run cost guidance is discoverable in `AGENTS.md`, this file, and `docs/maintaining.md`. The workflow files did
+not change in this closeout, so the already-passing Act dry-run was not repeated. Hosted timing, exact-head CI and
+the actual WASI module size remain pending; the 608,540-byte quality bound is unchanged. The 09-14 summary now
+labels its second identical focused run as redundant rather than required.
