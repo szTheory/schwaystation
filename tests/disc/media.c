@@ -396,7 +396,8 @@ static int run_fixture_controls(const char *cue, const char *test_directory,
 #endif
 
 #if !SCHWAYSTATION_CHD
-static int run_disabled_fixture_controls(const char *fixture_directory)
+static int run_disabled_fixture_controls(const char *fixture_directory,
+                                         const char *test_directory)
 {
     char chd[1024];
     char manifest[1024];
@@ -406,7 +407,7 @@ static int run_disabled_fixture_controls(const char *fixture_directory)
     int result = 0;
 
     if (!join_path(chd, fixture_directory, "disc_boot.chd") ||
-        !join_path(manifest, fixture_directory, "disc_boot.chd.manifest")) return 2;
+        !join_path(manifest, test_directory, "disc_boot.chd.manifest")) return 2;
     file = schway__test_open_file(chd, "rb");
     if (file != NULL) {
         (void)fclose(file);
@@ -672,8 +673,8 @@ int main(int argc, char **argv)
         if (argc != 7) return 2;
         result = run_fixture_controls(argv[2], argv[3], argv[4], argv[5], argv[6]);
 #else
-        if (argc != 3) return 2;
-        result = run_disabled_fixture_controls(argv[2]);
+        if (argc != 4) return 2;
+        result = run_disabled_fixture_controls(argv[2], argv[3]);
 #endif
     } else {
 #if SCHWAYSTATION_CHD

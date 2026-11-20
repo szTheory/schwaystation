@@ -151,8 +151,8 @@ if(SCHWAYSTATION_CHD AND SCHWAYSTATION_BUILD_CHD_TOOL)
   if(TARGET schwaystation-test-disc-media)
     add_dependencies(schwaystation-test-disc-media schwaystation-chd-fixtures)
   endif()
-else()
+elseif(NOT SCHWAYSTATION_CHD)
   file(REMOVE
     "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
-    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd.manifest")
+    "${PROJECT_BINARY_DIR}/tests/disc_boot.chd.manifest")
 endif()

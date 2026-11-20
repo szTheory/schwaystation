@@ -1,10 +1,26 @@
 if(CMAKE_SCRIPT_MODE_FILE)
   foreach(schway__chd_fixture_var IN ITEMS
-      CHD_TOOL CUE OUTPUT_CHD MANIFEST TOOL_COMMIT TOOL_ARCHIVE_SHA256)
+      CHD_TOOL CUE OUTPUT_CHD MANIFEST)
     if(NOT DEFINED ${schway__chd_fixture_var} OR "${${schway__chd_fixture_var}}" STREQUAL "")
       message(FATAL_ERROR "CHD fixture: -D${schway__chd_fixture_var} is required")
     endif()
   endforeach()
+  include("${CMAKE_CURRENT_LIST_DIR}/CHDToolPins.cmake")
+  foreach(schway__chd_fixture_pin IN ITEMS TOOL_COMMIT TOOL_ARCHIVE_SHA256)
+    if(DEFINED ${schway__chd_fixture_pin}
+        AND NOT "${${schway__chd_fixture_pin}}" STREQUAL "")
+      if(schway__chd_fixture_pin STREQUAL "TOOL_COMMIT")
+        set(schway__chd_fixture_expected "${schway__chdtool_commit}")
+      else()
+        set(schway__chd_fixture_expected "${schway__chdtool_sha256}")
+      endif()
+      if(NOT "${${schway__chd_fixture_pin}}" STREQUAL "${schway__chd_fixture_expected}")
+        message(FATAL_ERROR "CHD fixture: ${schway__chd_fixture_pin} does not match pins.txt")
+      endif()
+    endif()
+  endforeach()
+  set(TOOL_COMMIT "${schway__chdtool_commit}")
+  set(TOOL_ARCHIVE_SHA256 "${schway__chdtool_sha256}")
 
   foreach(schway__chd_fixture_path IN ITEMS "${CHD_TOOL}" "${CUE}")
     if(NOT EXISTS "${schway__chd_fixture_path}")
@@ -77,7 +93,8 @@ workers=1
   file(SHA256 "${schway__chd_fixture_track2}" schway__chd_fixture_track2_sha256)
   file(SHA256 "${CHD_TOOL}" schway__chd_fixture_tool_sha256)
   get_filename_component(schway__chd_fixture_output_dir "${OUTPUT_CHD}" DIRECTORY)
-  file(MAKE_DIRECTORY "${schway__chd_fixture_output_dir}")
+  get_filename_component(schway__chd_fixture_manifest_dir "${MANIFEST}" DIRECTORY)
+  file(MAKE_DIRECTORY "${schway__chd_fixture_output_dir}" "${schway__chd_fixture_manifest_dir}")
   set(schway__chd_fixture_repeat "${OUTPUT_CHD}.repeat")
   file(REMOVE "${OUTPUT_CHD}" "${MANIFEST}" "${schway__chd_fixture_repeat}")
 
@@ -147,7 +164,7 @@ if(NOT SCHWAYSTATION_CHD OR NOT SCHWAYSTATION_BUILD_CHD_TOOL)
 endif()
 
 set(SCHWAYSTATION_CHD_FIXTURE "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd")
-set(SCHWAYSTATION_CHD_MANIFEST "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd.manifest")
+set(SCHWAYSTATION_CHD_MANIFEST "${PROJECT_BINARY_DIR}/tests/disc_boot.chd.manifest")
 add_custom_command(OUTPUT "${SCHWAYSTATION_CHD_FIXTURE}" "${SCHWAYSTATION_CHD_MANIFEST}"
   COMMAND "${CMAKE_COMMAND}"
     "-DCHD_TOOL=$<TARGET_FILE:schwaystation-chd-tool>"

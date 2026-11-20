@@ -1,6 +1,7 @@
 # Host-side disc provider behavior through the installed schway_disc callbacks.
-if(SCHWAYSTATION_CHD AND NOT SCHWAYSTATION_BUILD_CHD_TOOL)
-  message(FATAL_ERROR "CHD tests require -DSCHWAYSTATION_BUILD_CHD_TOOL=ON for the run-local fixture")
+if(SCHWAYSTATION_CHD AND NOT SCHWAYSTATION_BUILD_CHD_TOOL
+    AND NOT SCHWAYSTATION_CHD_TOOL_EXECUTABLE)
+  message(FATAL_ERROR "CHD tests need an in-tree or external run-local fixture generator")
 endif()
 
 add_executable(schwaystation-test-disc-fixture
@@ -103,14 +104,14 @@ if(SCHWAYSTATION_CHD)
     COMMAND schwaystation-test-disc-media
       "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue" "${PROJECT_BINARY_DIR}/tests"
       "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
-      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd.manifest"
+      "${PROJECT_BINARY_DIR}/tests/disc_boot.chd.manifest"
       "${SCHWAYSTATION_CHD_TOOL}"
     LABELS disc portable TIMEOUT 20)
   schway_add_test(NAME disc.media.fixture_controls
     COMMAND schwaystation-test-disc-media --fixture-controls
       "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue" "${PROJECT_BINARY_DIR}/tests"
       "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd"
-      "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd.manifest"
+      "${PROJECT_BINARY_DIR}/tests/disc_boot.chd.manifest"
       "${SCHWAYSTATION_CHD_TOOL}"
     LABELS disc portable TIMEOUT 30)
 else()
@@ -120,7 +121,7 @@ else()
     LABELS disc portable TIMEOUT 10)
   schway_add_test(NAME disc.media.fixture_controls
     COMMAND schwaystation-test-disc-media --fixture-controls
-      "${PROJECT_BINARY_DIR}/fixtures"
+      "${PROJECT_BINARY_DIR}/fixtures" "${PROJECT_BINARY_DIR}/tests"
     LABELS disc portable TIMEOUT 10)
 endif()
 set_tests_properties(disc.media.preflight PROPERTIES FIXTURES_SETUP disc_media_preflight)
