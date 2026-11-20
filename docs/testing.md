@@ -380,6 +380,32 @@ mode strings and NULL-on-open-failure behavior. The libretro content and BIOS re
 read-only opener. This avoids global warning suppression and keeps Windows `/WX` intact. Windows and GCC
 cross-compiler acceptance is established by the hosted matrix, not by a native configure.
 
+### Disc media preflight
+
+`disc.media.preflight` opens the owned CUE through the production host provider and checks its independently
+authored two-track geometry, the touching track boundary, pregap/index values and exclusive leadout. It reads the
+first and last sector at each track boundary through the same 2352-byte sector and 96-byte subcode callbacks used
+by the runner and libretro core, with guard bytes around both buffers. It also rejects an empty path, an empty CUE,
+and the exclusive leadout LBA. This is a cheap gate against broken metadata, out-of-range callback reads and
+invalid media before the longer guest boot, audio and movie checks; CTest runs it first through
+`FIXTURES_SETUP disc_media_preflight` and requires it for each `disc.fixture.*` guest test.
+
+For a local edit, check the exact inventory before configuring, then build only the provider test and deterministic
+disc fixtures and run the preflight selector:
+
+```sh
+LC_ALL=C sort -cu tests/disc/inventory.txt
+cmake --preset ci -DSCHWAYSTATION_CHD=OFF
+cmake --build --preset ci --target schwaystation-test-disc-media schwaystation-disc-fixtures
+ctest --preset ci --no-tests=error -R '^disc[.]media[.]preflight$' --output-on-failure
+```
+
+Keep the directory inventories tab-separated and bytewise sorted. Update `tests/fuzz/inventory.txt` or
+`tests/compat/inventory.txt` only when the same change adds or removes a real test in that directory. Repository
+checks remain CMake `-P` or POSIX sh and stay within the 3,901-line absolute ceiling; real-host RetroArch test code
+stays below 300 lines. Run the existing budget check before adding a permanent repository gate, and retain a new
+gate only when it prevents a recurring fault named by a requirement.
+
 The CUE reader accepts a relative `FILE` component of up to 255 bytes. Its Windows boundary test confirms that a
 255-byte component passes CUE validation and reaches the file-open step; the full identity/open positive uses the
 same fixture on POSIX and macOS, where the build-tree prefix stays within the host path limit.
