@@ -14,4 +14,8 @@ if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
     C_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON)
   schway_warnings(schwaystation_disc_image)
+  if(SCHWAYSTATION_CHD)
+    include(${PROJECT_SOURCE_DIR}/cmake/Libchdr.cmake)
+    target_link_libraries(schwaystation_disc_image PRIVATE chdr-static)
+  endif()
 endif()
