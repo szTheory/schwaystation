@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 11
+current_plan: 12
 status: executing
-stopped_at: Completed Plan 09-15
-last_updated: "2026-11-20T19:10:32Z"
+stopped_at: Completed Plan 09-11
+last_updated: "2026-11-20T19:50:33Z"
 last_activity: 2026-11-20
-last_activity_desc: Plan 09-15 external CHD handoff and relocated provenance checks passed; Plan 09-11 is next
-state_head: 4bdeece
+last_activity_desc: Plan 09-11 CI, nightly fuzz, cheap preflight and CI efficiency guidance committed; Plan 09-12 is next
+state_head: 82606fc
 progress:
   total_phases: 10
   completed_phases: 2
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 11 (CI, fuzz and distributed package wiring)
+Current Plan: 12 (runner and libretro CHD integration)
 Total Plans in Phase: 15
 Status: Ready to execute
-Last activity: 2026-11-20 — Plan 09-15 passed external-tool, manifest-parity and CHD-off cleanup checks; Plan 09-11 is next by dependency order
+Last activity: 2026-11-20 — Plan 09-11 wired CHD CI/fuzz and recorded Act routing; hosted WASI size and eight-lane evidence remain for final verification
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -205,6 +205,26 @@ because its build omitted the CHD test executable; rebuilding that target fixed 
 same selector passed 7/7 in 0.09 seconds. Local BE32/WASI compilers are unavailable (tool check exit 1); hosted
 cross-lane validation is assigned to Plan 09-11. No workflow changed, so no `act` or hosted CI run applied.
 Task commits are `9a35d55` and `4bdeece`; Plan 09-11 is next by dependency order.
+
+### Phase 9 Plan 09-11 execution (2026-11-20)
+
+Runtime/model: Codex GPT-6 session; exact model ID unavailable. The inherited executor completed the Plan 11
+implementation checks but did not preserve a reliable start timestamp or close the summary. The parent recovered
+the committed working tree and completed the plan closeout; wall and active duration are not reliably measured.
+The existing CI `changes` and nightly fuzz jobs now run pin, timeout, sorted-inventory, 3901-line budget and route
+preflights. CHD is enabled in required CI/package presets; BE32 and WASI generate checked fixtures with a copied
+native tool, and nightly adds a CHD campaign with 12 seeds and a 16,384-byte maximum input under the existing
+60-second bound. Main and Release remain separate based on Plan 10's measured
+18-archive digest mismatch and 24m25s serialization cost; todo 050 is completed. Maintainer docs explain Act's
+classifier/matrix limitation and required hosted-only evidence.
+
+Cheap post-change route, pin, timeout, preset, sorted-inventory, diff and budget checks passed; the gate remains
+3901/3901 lines. Both Act dry runs passed using `/tmp` for its cache. Act did not execute workflow steps or prove
+dependent matrix routing. Nightly now uses its already-configured build preset after fixture generation, avoiding
+a duplicate CMake configure; time saved was not measured because clang-21 is unavailable locally. The WASI
+module size remains unknown and `quality.json` stays at 608,540 bytes until the hosted CHD-enabled module is
+measured. No full suite or hosted CI was started; final exact-head verification follows Plan 14 and source review.
+Task commits are `0fc7f50` and `6e60d85`; the shared selector diagnostic follow-up is `82606fc`.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -1448,7 +1468,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 9 in dependency order with Plan 09-11, then Plans 09-12 and 09-14. Review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; use the planned `act --dryrun` routing check and measure the CHD producer critical path before any expensive hosted run. No owner UAT is needed.
+- Continue Phase 9 in dependency order with Plans 09-12 and 09-14. Review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; inspect the hosted run live and after completion, measure the CHD producer critical path, and record the actual WASI module size. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
