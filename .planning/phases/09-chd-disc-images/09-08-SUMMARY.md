@@ -134,4 +134,3 @@ COMPAT-02 feature evidence is ready for later providers. Plan 09-11 must add tes
 *Completed: 2026-11-20*
 
 ## Self-Check: PASSED
-

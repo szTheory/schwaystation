@@ -156,4 +156,3 @@ Plan 09-07 is complete. Continue with the next ready Phase 9 plan. Plan 11 can w
 
 - `09-07-SUMMARY.md` exists.
 - All four measured plan commits are ancestors of the current phase branch.
-
