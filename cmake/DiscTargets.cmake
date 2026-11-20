@@ -5,7 +5,7 @@ add_library(schwaystation_cdrom OBJECT src/cdrom.c src/cdrom_audio.c src/cdrom_s
 add_library(schwaystation_mdec OBJECT src/mdec.c)
 
 if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
-  add_library(schwaystation_disc_image STATIC host/disc_image.c)
+  add_library(schwaystation_disc_image STATIC host/disc_image.c host/disc_chd.c)
   target_include_directories(schwaystation_disc_image PUBLIC
     ${PROJECT_SOURCE_DIR}/host
     ${PROJECT_SOURCE_DIR}/include
@@ -16,6 +16,9 @@ if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
   schway_warnings(schwaystation_disc_image)
   if(SCHWAYSTATION_CHD)
     include(${PROJECT_SOURCE_DIR}/cmake/Libchdr.cmake)
+    target_compile_definitions(schwaystation_disc_image PRIVATE SCHWAYSTATION_CHD=1)
     target_link_libraries(schwaystation_disc_image PRIVATE chdr-static)
+  else()
+    target_compile_definitions(schwaystation_disc_image PRIVATE SCHWAYSTATION_CHD=0)
   endif()
 endif()

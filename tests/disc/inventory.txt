@@ -5,6 +5,7 @@ disc.fixture.boot	disc,portable
 disc.fixture.fmv	disc,portable
 disc.fixture.read	disc,portable
 disc.hash	disc,portable
+disc.image.chd_headers	disc,portable
 disc.image.cue_index_limits	disc,portable
 disc.image.cue_limits	disc,portable
 disc.image.cue_modes	disc,portable

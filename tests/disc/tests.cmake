@@ -27,6 +27,22 @@ set_target_properties(schwaystation-test-disc-media PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-media)
 
+add_executable(schwaystation-test-disc-chd ${CMAKE_CURRENT_LIST_DIR}/chd.c)
+target_include_directories(schwaystation-test-disc-chd PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(schwaystation-test-disc-chd PRIVATE schwaystation_disc_image)
+if(SCHWAYSTATION_CHD)
+  target_compile_definitions(schwaystation-test-disc-chd PRIVATE SCHWAYSTATION_CHD=1)
+else()
+  target_compile_definitions(schwaystation-test-disc-chd PRIVATE SCHWAYSTATION_CHD=0)
+endif()
+set_target_properties(schwaystation-test-disc-chd PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-chd)
+
+schway_add_test(NAME disc.image.chd_headers
+  COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests
+  LABELS disc portable TIMEOUT 15)
+
 schway_add_test(NAME disc.media.preflight
   COMMAND schwaystation-test-disc-media
     "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue" "${PROJECT_BINARY_DIR}/tests"
