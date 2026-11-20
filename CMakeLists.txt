@@ -26,6 +26,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
 endif()
 option(SCHWAYSTATION_BUILD_LIBRETRO "Build the schwaystation_libretro core" ${libretro_default})
 option(SCHWAYSTATION_CHD "Enable the optional host-side CHD image reader" OFF)
+option(SCHWAYSTATION_BUILD_CHD_TOOL "Build the opt-in CHD fixture generator" OFF)
+if(SCHWAYSTATION_BUILD_CHD_TOOL)
+  enable_language(CXX)
+  include(cmake/CHDTool.cmake)
+endif()
 
 # The nofp lane proves the core integer-only by machine code, not text: GCC's
 # -mgeneral-regs-only rejects any floating-point type in every core target
