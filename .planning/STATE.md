@@ -6,11 +6,11 @@ current_phase: 9
 current_phase_name: CHD disc images
 current_plan: Not started
 status: planning
-stopped_at: Phase 9 discussion complete
-last_updated: "2026-11-20T02:37:09.791Z"
+stopped_at: "Phase 9 planning: research complete"
+last_updated: "2026-11-20T02:56:10.621Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 9 discussion completed with parity, fixture-security, and CI/package decisions captured; planning is next
-state_head: 25b61176fdc4f0083f384fc7163568a8d7f194bc
+state_head: b6452f548c6107781634ebe1937638c98e4d9351
 progress:
   total_phases: 10
   completed_phases: 2
@@ -35,6 +35,17 @@ Current Plan: Not started
 Total Plans in Phase: Not planned
 Status: Ready to plan; Phase 8 release and green main CI are confirmed
 Last activity: 2026-11-19 — Phase 9 discussion and three advisor reviews completed.
+
+### Phase 9 research (2026-11-19)
+
+Runtime/model: Codex; `gsd-phase-researcher` gpt-6-luna xhigh. The first research handoff exceeded its expected
+window without an artifact and was stopped; a narrow synthesis pass reused the three completed advisor reports
+and verified project references, then committed `09-RESEARCH.md`. It records the approved libchdr pin and host
+boundary, parity/preflight/package sequence, and required Validation Architecture. The full fixture-generator
+license/build closure remains explicitly unresolved and must be cleared before use. Plan-pre checks found no
+assumption delta, skipped codebase drift because no structure map exists, and found no context drift. The
+deterministic edge probe surfaced 13 applicable edge candidates across the four requirements; the planner must
+resolve or explicitly flag every one. No tests or CI ran during research.
 
 ### Phase 9 discussion (2026-11-19)
 
@@ -1060,9 +1071,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-20T02:37:09.691Z
-Stopped at: Phase 9 discussion complete
-Resume file: .planning/phases/09-chd-disc-images/09-CONTEXT.md
+Last session: 2026-11-20T02:56:10.547Z
+Stopped at: Phase 9 planning: research complete
+Resume file: .planning/phases/09-chd-disc-images/09-RESEARCH.md
 
 ### v1.0 session history
 
