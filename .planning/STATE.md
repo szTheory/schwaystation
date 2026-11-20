@@ -6,11 +6,11 @@ current_phase: 09
 current_phase_name: CHD disc images
 current_plan: 13
 status: executing
-stopped_at: Completed 09-09-PLAN.md
-last_updated: "2026-11-20T17:54:01Z"
+stopped_at: Completed Plan 09-13 Task 1 ON package checks
+last_updated: "2026-11-20T18:08:00Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-09 completed; Plan 09-13 is next because Plan 09-11 depends on its archive checks
-state_head: 1470276
+last_activity_desc: Phase 09 Plan 09-13 Task 1 passed and was committed; ON package evidence recorded before OFF validation
+state_head: d275d99
 progress:
   total_phases: 10
   completed_phases: 2
@@ -33,8 +33,8 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 Phase: 09 (CHD disc images) — EXECUTING
 Current Plan: 13 (ON/OFF archive validation)
 Total Plans in Phase: 14
-Status: Ready to execute
-Last activity: 2026-11-20 — Plan 09-09 metadata, notice and compatibility checks completed; Plan 09-13 is next by dependency order
+Status: Executing
+Last activity: 2026-11-20 — Plan 09-13 ON archive checks passed; OFF package validation is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -167,6 +167,17 @@ workflow-invariant check. No build, test suite, `act`, or hosted run was needed.
 ### Phase 9 Plan 09-09 execution (2026-11-20)
 
 Runtime/model: Codex session; primary model ID unavailable; independent gsd-code-reviewer and two read-only planning/CI audits used gpt-6-luna xhigh. The inherited checkpoint did not preserve the full plan start time. The measured review-to-Task-2-commit interval was 6m15s; the wider active duration is unknown. ON/OFF metadata selectors passed 2/2 each, notice selectors 2/2, and compatibility setup/protected-base plus perf allowance selectors passed 3/3 in 0.92s. The counted gate is 3900/3901. Review found a malformed CHD suffix regex; it was corrected and confirmed before the selectors. The first notice run caught an Applies-to parser treating the backticked option as a path; CTest listing also showed the compatibility/perf selectors belong to the CI preset, not hygiene. Both issues were corrected before closeout. No build, broad suite, `act` or hosted run applied because no workflow changed. CI efficiency rules are already discoverable in `AGENTS.md` and `.planning/AUTONOMOUS.md`; Plan 09-11 retains the routing dry run and producer-path measurement. The owner chose to defer the generic source-wide SPDX scanner to the first tracked SPDX-bearing caller; todo 005 now targets Phase 10 planning. Task commits are `d336d33` and `1470276`; review resolution is in `09-REVIEW.md`. Plan 09-13 is next because 09-11 requires both package configurations.
+
+### Phase 9 Plan 09-13 ON package checkpoint (2026-11-20)
+
+Runtime/model: Codex GPT-6 session; exact model ID unavailable. Plan Task 1 is committed as `d275d99`.
+The corrected ON preflight and package command passed: configured CHD ON; metadata claims passed 2/2,
+policy notices passed 2/2, the build completed 229 Ninja actions, and the release archive/metadata/notices
+selectors passed 4/4 in about 0.13 seconds. CPack produced the library, libretro and runner macOS arm64
+archives. The release inventory is sorted and the gate remains 3900/3901 lines. Exact build duration was not
+measured. This records ON evidence before Task 2 replaces these build-tree archives; no hosted URL applies.
+The plan selectors were corrected because `policy.notices` is registered by the hygiene preset, not CI.
+Next: configure CHD OFF in the same build directory, then rebuild, repackage and run the same release checks.
 
 ### Phase 9 planning (2026-11-19)
 
