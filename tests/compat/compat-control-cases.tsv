@@ -1,0 +1,33 @@
+# row|id|CSV fields (tilde joins physical rows)
+row|tpass|fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,pass,fixtures.control:exit=0,2026-11-11
+row|tfail|fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,fail,fixtures.control:exit=1,2026-11-11
+row|tunknown|fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,unknown,fixtures.control:exit=77,2026-11-11
+row|tother|fixture/other,11111111111111111111111111111111,-,Other,pal,exe,boots@10,pass,fixtures.other:exit=0,2026-11-11
+row|tchanged|fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=bbbbbbbb,pass,fixtures.control:exit=0,2026-11-11
+row|tcomma|fixture/control,00000000000000000000000000000000,-,Bad,Comma,ntsc-u,exe,frame@60=aaaaaaaa,pass,evidence,2026-11-11
+row|tquote|fixture/control,00000000000000000000000000000000,-,Bad"Quote,ntsc-u,exe,frame@60=aaaaaaaa,pass,evidence,2026-11-11
+row|bad|Bad
+row|field|Field
+row|alpha|fixture/alpha,22222222222222222222222222222222,-,Alpha,ntsc-u,exe,boots@10,pass,fixtures.alpha:exit=0,2026-11-11
+row|zulu|fixture/zulu,33333333333333333333333333333333,-,Zulu,pal,bios,frame@10=cccc,unknown,built.zulu:exit=0,2026-11-10
+row|chd|chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,unknown,planned:09-14,2026-11-11
+row|chdpass|chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,compat.chd:exit=0,2026-11-11
+row|chdfresh|chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,compat.chd:exit=0;sha256=abc123,2026-11-11
+row|chdfail|chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,fail,compat.chd:exit=1,2026-11-11
+row|chd2|chd2,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,unknown,planned:09-14,2026-11-11
+row|pbp|pbp,ntsc-u,none,cdrom,boot-sector,unknown,pending:phase-10,2026-11-11
+row|fmissing|,ntsc-u,none,cdrom,disc_boot,unknown,pending,2026-11-11
+row|fdate|chd,ntsc-u,none,cdrom,disc_boot,unknown,pending,2026-02-30
+# allow|id|dated allowance line
+allow|none|# temporary test allowances
+allow|title60|2026-09-12 fixture/control 00000000000000000000000000000000 frame@60=aaaaaaaa behavior-rev=4 expires=2026-11-11 approved measured correction
+allow|title61|2026-09-01 fixture/control 00000000000000000000000000000000 frame@60=aaaaaaaa behavior-rev=4 expires=2026-11-01 too-long window
+allow|expired|2026-09-01 fixture/control 00000000000000000000000000000000 frame@60=aaaaaaaa behavior-rev=4 expires=2026-10-31 expired window
+allow|titlerev|2026-09-12 fixture/control 00000000000000000000000000000000 frame@60=aaaaaaaa behavior-rev=3 expires=2026-11-11 wrong revision
+allow|titlematch|2026-09-12 fixture/control 00000000000000000000000000000000 frame@60=aaaaaaaa behavior-rev=4 expires=2026-11-11 approved measured correction
+allow|fexpired|2026-09-10 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-09 expired
+allow|foverlong|2026-09-01 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-01 overlong
+allow|fmalformed|malformed allowance
+allow|fmismatch|2026-09-12 pbp ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-11 mismatched key
+allow|frev|2026-09-12 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=3 expires=2026-11-11 wrong revision
+allow|fmatch|2026-09-12 chd ntsc-u disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-11 approved measured correction

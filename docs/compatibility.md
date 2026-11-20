@@ -1,6 +1,6 @@
 # Compatibility results
 
-Generated from `tests/compat/ledger.csv`.
+Generated from `tests/compat/ledger.csv` and `tests/compat/features.csv`.
 
 ## Counts
 
@@ -17,3 +17,13 @@ Generated from `tests/compat/ledger.csv`.
 | gpu_motion | fixture/gpu_motion | pass | frame@60=20c3dcac8ba7b17ac4a6fd611164d1ca2c1aab03419f72c9ef58f04fe6d47042 | measured fixture | fixtures.gpu_motion.hash.60:exit=0;core=59ad2c5d589b | 2026-11-11 |
 | memcard_roundtrip | fixture/memcard_roundtrip | pass | frame@120=cd1c037ef800397a9c95eb23ebc5524710f55db2eca8e03c975f841f0e9232db | measured fixture | fixtures.memcard_roundtrip.persistence:exit=0;core=59ad2c5d589b | 2026-11-11 |
 | pad_counter | fixture/pad_counter | pass | frame@300=cfcae1a726602580ac1741eb597c951cd3977f8f96a8df6be30c9ea50d9543b4 | measured fixture | fixtures.pad_counter.press60:exit=0;core=59ad2c5d589b | 2026-11-11 |
+
+## Feature evidence
+
+The key is provider, profile and predicate. Protection and peripheral fields describe the tested combination without changing key identity.
+Every field is required; unknown is valid until fresh evidence exists. A pass must match the fresh result status and evidence reference. Prior passes cannot regress or disappear without a matching dated allowance.
+Phase 10 onward adds provider/profile/protection/peripheral rows as each capability lands. Feature allowances use `<date> <provider> <profile> <predicate> behavior-rev=4 expires=<date> <reason>` and may cover at most 60 days.
+
+| Provider | Profile | Protection | Peripheral | Predicate | Status | Evidence | Date |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| chd | ntsc-u | none | cdrom | disc_boot.toc+sectors+subcode | unknown | planned:09-14 | 2026-11-20 |
