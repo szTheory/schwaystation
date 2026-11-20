@@ -52,7 +52,7 @@ coverage:
         ref: "cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake; cmake --list-presets, --list-presets=build, --list-presets=test and --list-presets=workflow; act pull_request --dryrun for ci.yml; all exited 0."
         status: pass
       - kind: integration
-        ref: "Run 44827711416 built and validated the CHD-enabled WASI module at 859379 bytes, then failed the previous CHD-off 608540-byte bound; Windows x64/arm64 also exposed missing MSVC floating-point macros. Candidate fixes are under review; final eight-lane verification is pending. https://github.com/szTheory/schwaystation/actions/runs/44827711416"
+        ref: "Run 44827711416 built and validated the CHD-enabled WASI module at 859379 bytes, then failed the previous CHD-off 608540-byte bound. Run 44830485927 confirmed the Windows CRT-header collision fix was incomplete; the final CMake include-scope correction has local compile-graph evidence, with hosted Windows/WASI/eight-lane verification pending. https://github.com/szTheory/schwaystation/actions/runs/44827711416; https://github.com/szTheory/schwaystation/actions/runs/44830485927"
         status: unknown
     human_judgment: false
   - id: D2
@@ -71,8 +71,8 @@ coverage:
         ref: "disc_registration route selector and nightly act dry run exited 0; direct hosted sanitizer campaign remains pending final exact-head verification."
         status: pass
       - kind: integration
-        ref: "Run 44827711388 built the pinned CHD tool then failed while building the owned disc fixture because the fuzz job lacked FFmpeg development packages; final campaign verification is pending. https://github.com/szTheory/schwaystation/actions/runs/44827711388"
-        status: unknown
+        ref: "Run 44830486029 on exact head 83a27a4 passed the owned fixture build and bounded campaigns, including the CHD target, after dependency installation was moved before compilation. https://github.com/szTheory/schwaystation/actions/runs/44830486029"
+        status: pass
     human_judgment: false
 duration: not measured
 completed: 2026-11-20
@@ -112,7 +112,7 @@ status: complete
 
 No real Act job was started. The available Act image is ARM64 on this host and lacks CMake; local clang-21/wasm-ld and Windows/MSVC are absent. Exact-head run 44827711416 measured the valid CHD-enabled WASI module at 859,379 bytes, then failed the old 608,540-byte CHD-off bound; Windows x64 and arm64 failed because the pinned C++ sources reached MSVC `<limits>` before its floating-point macros were defined. Its two Windows failures and the WASI failure were confirmed before canceling the remaining known-failing tail. The run consumed 1,684 raw runner-seconds (28.1 runner-minutes) over 268 seconds wall time. Nightly run 44827711388 passed vectors and all four benchmark jobs but failed its fuzz job when the owned fixture generator lacked FFmpeg development packages; it consumed 351 raw runner-seconds (5.9 runner-minutes) over 85 seconds wall time. Raw runner time is not billing-weighted cost.
 
-The reviewed follow-up sets the WASI bound to the measured CHD-enabled size, force-includes the MSVC CRT floating-point declarations for the pinned C++ source list, and installs the sanitizer/FFmpeg development packages once before expensive Nightly compilation. Workflow route checks and `act --dryrun` pass on these changes. The exact-head hosted rerun remains required for Windows, WASI, all eight parity lanes and the sanitizer campaign. Release permissions, attestations and publication remain ship-time hosted evidence.
+The follow-up sets the WASI bound to the measured CHD-enabled size and installs the sanitizer/FFmpeg development packages once before expensive Nightly compilation. Its first Windows repair force-included `float.h`, but hosted compile commands showed the name resolving to vendored FLAC's private header. The current reviewed correction confines FLAC private/protected include paths to FLAC C sources; local compile commands show all 21 pinned C++ sources exclude them, all 17 FLAC C sources retain them, and the CHD tool rebuilt 85/85 actions. The second attempt's exact-head Nightly passed the bounded sanitizer campaign. Four benchmarks and the full-vector job, unrelated to CHD, consumed 322 raw runner-seconds (5.4 runner-minutes); the measured router remains assigned to Phase 10 todo 051. The next exact-head hosted rerun remains required for Windows, WASI, all eight parity lanes and the corrected source graph. Release permissions, attestations and publication remain ship-time hosted evidence.
 
 ## Task Commits
 

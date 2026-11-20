@@ -205,8 +205,6 @@ set(schway__chdtool_include_dirs
   "${schway__chdtool_source}/mame-chd-src/3rdparty/zlib"
   "${schway__chdtool_source}/mame-chd-src/3rdparty/flac/include"
   "${schway__chdtool_source}/mame-chd-src/3rdparty/flac/src/libFLAC/include"
-  "${schway__chdtool_source}/mame-chd-src/3rdparty/flac/src/libFLAC/include/private"
-  "${schway__chdtool_source}/mame-chd-src/3rdparty/flac/src/libFLAC/include/protected"
   "${schway__chdtool_source}/mame-chd-src/3rdparty/lzma/C"
   "${schway__chdtool_source}/mame-chd-src/3rdparty"
   "${schway__chdtool_source}/mame-chd-src/3rdparty/zstd/lib"
@@ -226,10 +224,8 @@ target_compile_definitions(schwaystation_chd_tool_core PRIVATE
   ZSTD_DISABLE_ASM)
 set_source_files_properties(${schway__chdtool_lzma_sources} PROPERTIES COMPILE_DEFINITIONS Z7_ST)
 set_source_files_properties(${schway__chdtool_zstd_sources} PROPERTIES COMPILE_DEFINITIONS ZSTD_DISABLE_ASM)
-if(MSVC)
-  # Pinned C++ sources reach MSVC's <limits> before defining its float.h macros.
-  set_source_files_properties(${schway__chdtool_cpp_sources} PROPERTIES COMPILE_OPTIONS "/FIfloat.h")
-endif()
+set_source_files_properties(${schway__chdtool_flac_sources} PROPERTIES INCLUDE_DIRECTORIES
+  "${schway__chdtool_source}/mame-chd-src/3rdparty/flac/src/libFLAC/include/private;${schway__chdtool_source}/mame-chd-src/3rdparty/flac/src/libFLAC/include/protected")
 set(schway__chdtool_flac_posix_definition "")
 if(UNIX)
   # FLAC's C sources use POSIX APIs that strict C17 hides without this feature level.

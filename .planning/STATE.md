@@ -6,11 +6,11 @@ current_phase: 09
 current_phase_name: CHD disc images
 current_plan: 15
 status: executing
-stopped_at: Phase 9 reviewed fixes are ready for exact-head hosted CI and Nightly rerun
-last_updated: "2026-11-20T22:35:56Z"
+stopped_at: Phase 9 MSVC include-path collision is fixed and reviewed locally; hosted rerun is pending
+last_updated: "2026-11-20T22:48:36Z"
 last_activity: 2026-11-20
-last_activity_desc: Diagnosed the first exact-head hosted failures, reviewed three focused fixes, and passed cheap local and Act route preflights; exact-head hosted rerun is next
-state_head: e57ad5f
+last_activity_desc: Diagnosed a second Windows compile failure to a vendored FLAC header collision, fixed and reviewed the CMake include graph, and passed the native CHD rebuild; exact-head hosted rerun is next
+state_head: 83a27a4
 progress:
   total_phases: 10
   completed_phases: 2
@@ -1558,12 +1558,23 @@ generator, then its owned media fixture failed because the job lacked the FFmpeg
 by the pinned encoder. These results are in [CI run 44827711416](https://github.com/szTheory/schwaystation/actions/runs/44827711416)
 and [Nightly run 44827711388](https://github.com/szTheory/schwaystation/actions/runs/44827711388).
 
-After confirming those failures, the known-failing CI tail was canceled. The CI attempt used 1,684 raw runner
+After confirming those failures, the known-failing CI tail was canceled. That attempt used 1,684 raw runner
 seconds (28.1 runner-minutes) over 268 seconds wall time; Nightly used 351 raw runner seconds (5.9 runner-minutes)
-over 85 seconds wall time. These are unweighted runner times, not billing cost. The reviewed follow-up sets the
-WASI bound to 859,379, force-includes `float.h` for the pinned MSVC C++ sources, and checks/installs sanitizer and
-FFmpeg dependencies once before Nightly compilation. The route selector, pin/timeout checks, sorted WASI
-inventory, budget, `git diff --check`, local CHD-tool configure/build, and `act -W .github/workflows/nightly.yml
--j fuzz --dryrun` all passed. The local Mac build does not exercise MSVC; hosted Windows and WASI lanes remain
-necessary. The updated 32-file Phase 9 source review is clean with no findings. Exact-head CI and Nightly remain
-pending; no phase verification or ship claim is made.
+over 85 seconds wall time. These are unweighted runner times, not billing cost. The follow-up set the WASI bound
+to 859,379 and moved sanitizer/FFmpeg dependency installation ahead of Nightly compilation. Cheap route, pin,
+timeout, inventory, budget, diff and Act dry-run checks passed.
+
+A second hosted CI attempt on `83a27a4` showed `/FIfloat.h` was present but resolved to pinned FLAC's
+`include/private/float.h` because that directory preceded MSVC's implicit headers. Both Windows architectures
+therefore repeated the missing `FLT_*`/`DBL_*` failure. [CI run 44830485927](https://github.com/szTheory/schwaystation/actions/runs/44830485927)
+was canceled after these failures; it consumed 1,654 raw runner-seconds (27.6 runner-minutes) over 380 seconds
+wall time. The same exact head's [Nightly run 44830486029](https://github.com/szTheory/schwaystation/actions/runs/44830486029)
+passed the bounded fuzz campaign. Nightly consumed 825 raw runner-seconds (13.8 runner-minutes) over 503 seconds
+wall time. Its four benchmark jobs plus full-vector job used 322 seconds (5.4 runner-minutes) unrelated to CHD;
+keep the Phase 10 routing todo 051 bound to the first Nightly-routing change.
+
+The current CMake correction removes FLAC private/protected include directories from the whole target and applies
+them only to FLAC C sources. The generated compile database shows all 21 pinned C++ files exclude those paths
+and all 17 FLAC C files retain them; the native CHD tool rebuilt successfully (85/85 actions). The updated
+32-file source review is clean. Hosted Windows/WASI and eight-lane checks must still confirm the correction on
+the next head; no Phase 9 verification or ship claim is made.
