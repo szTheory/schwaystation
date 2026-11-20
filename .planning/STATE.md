@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 10
+current_plan: 09
 status: executing
-stopped_at: Completed 09-08-PLAN.md
-last_updated: "2026-11-20T15:44:44Z"
+stopped_at: Completed 09-10-PLAN.md
+last_updated: "2026-11-20T16:09:19.723Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-08 review fixes and 6/6 focused checks complete; Plan 09-10 is next by dependency order
-state_head: 249e7534ddf198a72046b6a1a08b40885bafd73f
+last_activity_desc: Phase 09 Plan 09-10 measured and documented CI artifact reuse; Plan 09-09 is next by dependency order
+state_head: f12fbe7b72f54ed2fe707ea7cea99fd8d2ab7407
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 28
+  completed_plans: 29
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 10
+Current Plan: 09
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Plan 09-08 review fixes and focused checks complete; Plan 09-10 is next by dependency order
+Last activity: 2026-11-20 — Plan 09-10 measured and documented CI artifact reuse; Plan 09-09 is next by dependency order
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -151,6 +151,18 @@ fixture are restored. The final focused selector passed 6/6 in 0.91s, helper bud
 sorted inventory and shell syntax checks passed, and code review is clean. No full suite, `act` or hosted CI run
 applied because this plan changed no workflow. Task and follow-up commits are `aa18277`, `d40e18b`, `45b7867`,
 `8d66514` and `249e753`; Plan 09-10 is next by dependency order, then Plan 09-09.
+
+### Phase 9 Plan 09-10 execution (2026-11-20)
+
+Runtime/model: Codex runtime, executor model gpt-6-luna. The wall interval from the saved STATE checkpoint at
+15:44:44Z through the summary at 16:07:53Z was 23m09s; active time was not measured. Main CI and Release both
+passed on source SHA `830bf4c`; Main used 139.13 runner-minutes and Release's duplicate CI jobs used 117.53.
+Every lane's commit file matched that SHA, but all eighteen Main/Release product ZIP pairs differed by digest;
+Release ZIPs matched the published assets. Waiting for Main's slower required path before Release publication
+projects about 24m25s more wall time than the observed release run. Separate gates and all lanes remain required.
+The measured evidence and disposition are in `09-CI-REUSE.md`; todo 050 now carries the decision and the Plan 11
+workflow-invariant check. No build, test suite, `act`, or hosted run was needed. Task commits are `3847aa3` and
+`f12fbe7`. The dependency-ready next plan is 09-09; Plan 11 will consume this disposition after its other inputs.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -574,6 +586,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 8 P09 | at least 20min; active time unavailable | 2 tasks | 2 files |
 | Phase 09 P01 | 9m | 2 tasks | 4 files |
 | Phase 09 P08 | 2h 05m | 2 tasks | 10 files |
+| Phase 09 P10 | 23m 09s | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -963,6 +976,7 @@ Recent decisions affecting current work:
 - [Phase 09]: Feature ledger keys use provider, profile, and predicate; protection and peripheral are mandatory descriptive fields.
 - [Phase 09]: Production compatibility allowance checks use the current UTC date; tests inject fixed dates.
 - [Phase 09]: Protected delegation preserves the legacy five-argument title judge and appends kind only for feature-capable judges.
+- [Phase 09]: Retain separate Main and Release CI gates: measured reuse has no wall-clock benefit, and same-source product archive digests differ across all eighteen outputs.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1208,8 +1222,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-20T15:02:56.889Z
-Stopped at: Completed 09-08-PLAN.md
+Last session: 2026-11-20T16:09:19.598Z
+Stopped at: Completed 09-10-PLAN.md
 Resume file: None
 
 ### v1.0 session history
