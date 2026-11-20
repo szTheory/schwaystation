@@ -1,34 +1,23 @@
 #!/bin/sh
 set -eu
-
-if [ "$#" -ne 5 ]; then
-    printf '%s\n' 'usage: compat-ratchet.sh candidate.csv fresh.csv prior.csv allow.txt YYYY-MM-DD' >&2
-    exit 2
-fi
+[ "$#" -ge 5 ] && [ "$#" -le 6 ] || { printf '%s\n' 'usage: compat-ratchet.sh candidate.csv fresh.csv prior.csv allow.txt YYYY-MM-DD [title|features]' >&2; exit 2; }
 
 candidate=$1
 fresh=$2
 prior=$3
 allow=$4
 today=$5
+kind=${6:-title}
+case "$kind" in title) ledger_name=ledger.csv ;; features) ledger_name=features.csv ;; *) printf '%s\n' "compatibility: unknown ledger kind '$kind'" >&2; exit 2 ;; esac
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 if [ -n "${COMPAT_BASE_DIR:-}" ] || [ -n "${COMPAT_BASE_SHA:-}" ]; then
-    if [ -z "${COMPAT_BASE_DIR:-}" ] || [ -z "${COMPAT_BASE_SHA:-}" ]; then
-        printf '%s\n' 'compatibility: protected base directory and commit must be supplied together' >&2
-        exit 1
-    fi
-    actual=$(git -C "$COMPAT_BASE_DIR" rev-parse --verify HEAD 2>/dev/null) || {
-        printf '%s\n' 'compatibility: protected base checkout is unavailable' >&2
-        exit 1
-    }
-    if [ "$actual" != "$COMPAT_BASE_SHA" ]; then
-        printf '%s\n' 'compatibility: protected base checkout does not match its commit' >&2
-        exit 1
-    fi
+    [ -n "${COMPAT_BASE_DIR:-}" ] && [ -n "${COMPAT_BASE_SHA:-}" ] || { printf '%s\n' 'compatibility: protected base directory and commit must be supplied together' >&2; exit 1; }
+    actual=$(git -C "$COMPAT_BASE_DIR" rev-parse --verify HEAD 2>/dev/null) || { printf '%s\n' 'compatibility: protected base checkout is unavailable' >&2; exit 1; }
+    [ "$actual" = "$COMPAT_BASE_SHA" ] || { printf '%s\n' 'compatibility: protected base checkout does not match its commit' >&2; exit 1; }
     have_ledger=no
     have_judge=no
-    [ ! -f "$COMPAT_BASE_DIR/tests/compat/ledger.csv" ] || have_ledger=yes
-    [ ! -f "$COMPAT_BASE_DIR/scripts/compat-ratchet.sh" ] || have_judge=yes
+    [ ! -f "$COMPAT_BASE_DIR/tests/compat/$ledger_name" ] || have_ledger=yes
+    if [ -f "$COMPAT_BASE_DIR/scripts/compat-ratchet.sh" ] && { [ "$kind" = title ] || grep -Fq '[title|features]' "$COMPAT_BASE_DIR/scripts/compat-ratchet.sh"; }; then have_judge=yes; fi
     if [ "$have_ledger" = no ] && [ "$have_judge" = no ]; then
         prior=
     elif [ "$have_ledger" = yes ] && [ "$have_judge" = yes ]; then
@@ -41,18 +30,15 @@ if [ -n "${COMPAT_BASE_DIR:-}" ] || [ -n "${COMPAT_BASE_SHA:-}" ]; then
         mkdir -p "$tmp/scripts" "$tmp/tests/cmake" "$tmp/tests/compat"
         cp "$COMPAT_BASE_DIR/scripts/compat-ratchet.sh" "$tmp/scripts/compat-ratchet.sh"
         cp "$COMPAT_BASE_DIR/tests/cmake/compat-ratchet.cmake" "$tmp/tests/cmake/compat-ratchet.cmake"
-        cp "$COMPAT_BASE_DIR/tests/compat/ledger.csv" "$tmp/tests/compat/ledger.csv"
-        if COMPAT_BASE_DIR= COMPAT_BASE_SHA= sh "$tmp/scripts/compat-ratchet.sh" \
-            "$candidate" "$fresh" "$tmp/tests/compat/ledger.csv" "$allow" "$today"; then
-            exit 0
-        else
-            result=$?
-            exit "$result"
-        fi
+        cp "$COMPAT_BASE_DIR/tests/compat/$ledger_name" "$tmp/tests/compat/$ledger_name"
+        set -- "$candidate" "$fresh" "$tmp/tests/compat/$ledger_name" "$allow" "$today"
+        [ "$kind" = title ] || set -- "$@" "$kind"
+        COMPAT_BASE_DIR= COMPAT_BASE_SHA= sh "$tmp/scripts/compat-ratchet.sh" "$@" || exit $?
+        exit 0
     else
         printf '%s\n' 'compatibility: malformed base has only one protected artifact' >&2
         exit 1
     fi
 fi
 exec cmake "-DLEDGER=$candidate" "-DFRESH=$fresh" "-DBASE=$prior" \
-    "-DALLOW=$allow" "-DTODAY=$today" -P "$root/tests/cmake/compat-ratchet.cmake"
+    "-DALLOW=$allow" "-DTODAY=$today" "-DKIND=$kind" -P "$root/tests/cmake/compat-ratchet.cmake"

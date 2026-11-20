@@ -955,9 +955,8 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_preflight")
   endforeach()
   set(features "${SOURCE_ROOT}/tests/compat/features.csv")
   execute_process(COMMAND "${CMAKE_COMMAND}"
-      "-DLEDGER=${features}" "-DFRESH=${features}"
-      "-DALLOW=${SOURCE_ROOT}/tests/compat/allow.txt" -DTODAY=2026-11-20
-      -DKIND=features -P "${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake"
+      "-DFEATURES=${features}" -DMODE=features-preflight
+      -P "${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake"
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
   if(NOT "${result}" STREQUAL "0")
     message(FATAL_ERROR "complete unknown feature row failed its schema preflight: ${result}: ${output}${error}")
@@ -972,15 +971,16 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
       message(FATAL_ERROR "feature ratchet test requires ${required}")
     endif()
   endforeach()
-  set(features "${SOURCE_ROOT}/tests/compat/features.csv")
+  set(expected_features "${WORK_ROOT}/compat-features-expected.csv")
+  file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,unknown,planned:09-14,2026-11-20\n")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
-      sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${features}" "${features}" ""
-      "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-20 features
+      sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${SOURCE_ROOT}/tests/compat/features.csv"
+      "${expected_features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-20 features
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
   if(NOT "${result}" STREQUAL "0")
-    message(FATAL_ERROR "unknown feature row was not accepted against matching fresh evidence: ${result}: ${output}${error}")
+    message(FATAL_ERROR "checked-in feature ledger differs from independent expected unknown results: ${result}: ${output}${error}")
   endif()
-  message(STATUS "compatibility: unknown feature row passed the protected ratchet")
+  message(STATUS "compatibility: checked-in feature ledger matched independent unknown results")
   return()
 endif()
 
