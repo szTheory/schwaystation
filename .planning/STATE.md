@@ -6,15 +6,15 @@ current_phase: 9
 current_phase_name: CHD disc images
 current_plan: Not started
 status: planning
-stopped_at: "Phase 9 planning: research complete"
+stopped_at: "Phase 9 scope-sanity revision complete; plan checker is next"
 last_updated: "2026-11-20T02:56:10.621Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 9 discussion completed with parity, fixture-security, and CI/package decisions captured; planning is next
+last_activity_desc: Phase 9 has fourteen scoped executable plans with package and owned-guest closeout split into Plans 13 and 14; plan checker is next
 state_head: b6452f548c6107781634ebe1937638c98e4d9351
 progress:
   total_phases: 10
   completed_phases: 2
-  total_plans: 20
+  total_plans: 34
   completed_plans: 20
   percent: 20
 ---
@@ -32,19 +32,25 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 Phase: 9 — CHD disc images
 Current Plan: Not started
-Total Plans in Phase: 12
+Total Plans in Phase: 14
 Status: Phase 9 plans drafted; plan checker is next
-Last activity: 2026-11-19 — Phase 9 executable plans and multi-source coverage audit created.
+Last activity: 2026-11-19 — Phase 9 plans split to fourteen scoped plans; plan checker is next.
 
 ### Phase 9 planning (2026-11-19)
 
-Runtime/model: Codex typed gsd-planner, gpt-6.1-sol xhigh. Twelve short plans cover the optional pinned reader,
+Runtime/model: Codex typed gsd-planner, gpt-6.1-sol xhigh. Fourteen short plans cover the optional pinned reader,
 complete fixture-tool closure audit, owned fixture producer, exact metadata/sector/subcode parity, shared limits,
 fuzzing, feature ledger, notices, measured CI reuse, all-lane workflow wiring and both shipped hosts. The generator
 is still not cleared; Plan 03 blocks its use until the complete compiled closure is permissive. Independent ledger
 and CI measurement plans can proceed after the skeleton. The source audit maps all four requirements, nine
 decisions and thirteen edge-probe candidates. Source review remains before final verification; no tests or hosted
 runs were launched during planning. Estimate calibration had zero samples, factor 1 and confidence low.
+
+The scope-sanity revision removed redundant notice work from Plan 02, moved ON/OFF archive validation and
+todo 005 closeout to Plan 13, and moved owned-guest parity/feature evidence/docs from Plan 12 to final Plan 14.
+Every plan now declares at most ten modified paths; no requirement, acceptance case, edge resolution, lane,
+fuzz case, notice, resource bound or review-before-verification rule was deferred. Plan 11 waits for both
+package configurations before distributed enablement; source review follows the final Plan 14 handoff.
 
 ### Phase 9 research (2026-11-19)
 
