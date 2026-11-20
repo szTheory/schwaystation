@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 3
+current_plan: 4
 status: executing
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-11-20T04:28:46Z"
+stopped_at: Completed 09-03-PLAN.md
+last_updated: "2026-11-20T05:12:09Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-02 complete; Plan 09-03 is next
-state_head: db9134e140d466ea99379aa26e96e75ffd60fdce
+last_activity_desc: Phase 09 Plan 09-03 complete; Plan 09-04 is next
+state_head: 153f90b03f661291c9c5c8f467e3086e5488fe14
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 22
+  completed_plans: 23
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 3
+Current Plan: 4
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 09 Plan 09-02 complete; Plan 09-03 is next
+Last activity: 2026-11-20 — Phase 09 Plan 09-03 complete; Plan 09-04 is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -60,6 +60,20 @@ phase-wide provider, bounds and fuzz requirements. Plan 09-02 is next.
 ### Phase 9 Plan 09-02 execution (2026-11-20)
 
 Runtime/model: Codex with OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The configured worktree opt-out kept this plan sequential and inline. The exact libchdr commit and archive digest were verified, and a fresh enabled build compiled the static C closure without enabling C++. Explicit CMake cache settings keep system codecs, micro-flac, upstream tests and LZMA assembly disabled. ON/OFF malformed-header selectors passed 1/1, the default-OFF graph fetched no dependency, and a core-only CHD-on configure also fetched none. The cache-policy warning and off-only `-Werror` helper warning were corrected before the passing runs. No hosted CI, `act`, or full suite was needed for this plan. Task commits are `d2b0f31` and `e63727f`; summary `db9134e`. The private TOC and sector functions remain fail-closed until Plan 09-05 projects validated metadata and storage padding.
+
+### Phase 9 Plan 09-03 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The wall interval from the previous
+saved state at 04:28:46Z to completion at 05:12:09Z was 43 minutes; active time was not measured. The pinned
+`libchdman-rs` archive and full reachable C/C++/codec closure cleared the permissive-license gate. The native
+fixture tool is opt-in and excluded from normal build/install paths. Its configure preflight checks archive and
+source identity, licenses, source count and submodule metadata before target creation. The ON configure/build
+passed; a fresh OFF configure completed in 0.3 seconds with no C++ compiler or generator archive. A deliberate
+mutation of the extracted shim was removed on reconfigure, confirming source reset from the verified archive.
+The incremental native build had no work; no fixture generation, full suite, hosted CI or `act` run applies yet.
+The useful bottleneck discoveries were the missing OSD include and macOS `std::filesystem` deployment floor;
+both were corrected in the target-only wrapper. A cached-source weakness was also closed before accepting the
+preflight. Task commits are `a8a37c0` and `153f90b`; Plan 09-04 is next.
 
 ### Phase 9 planning (2026-11-19)
 
