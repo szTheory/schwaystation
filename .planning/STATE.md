@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 8
+current_plan: 9
 status: executing
-stopped_at: Completed 09-07-PLAN.md
-last_updated: "2026-11-20T12:51:00Z"
+stopped_at: Completed 09-08-PLAN.md
+last_updated: "2026-11-20T15:00:01.460Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 09 Plan 09-07 complete; Plan 09-08 is next
-state_head: a6271c201fa096cef3aa9ef106bcfdeb849de9c9
+state_head: 45b78672f61c3f8fdc94461416762eb10d7e8eff
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 27
+  completed_plans: 28
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 8
+Current Plan: 9
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 09 Plan 09-07 complete; Plan 09-08 is next
+Last activity: 2026-11-20 — Phase 09 Plan 09-08 complete; Plan 09-09 is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -138,6 +138,17 @@ from the generated fixture, so no disc bytes are committed. The CTest selector c
 fixture and mode-specific media preflight first, avoiding stale ON/OFF binaries after configuration changes.
 No workflow changed, so no `act` or hosted CI run was needed. Task commits are `b6205e7` and `5e5915b`; the
 bounded-campaign and selector-prerequisite evidence commits are `57d4579` and `a6271c2`. Plan 09-08 is next.
+
+### Phase 9 Plan 09-08 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna. The wall interval from the saved STATE checkpoint
+at 12:51:00Z through closeout at 14:55:33Z was 2h05m; active time was not measured. The sorted feature ledger
+now has a schema/key/count preflight, a protected fresh-result ratchet, and generated documentation. The title
+judge preserves its five-argument interface for origin/main; feature mode receives the optional kind argument
+only from a capable protected judge. The counted-helper budget passed at 3900/3901 lines. Inventory, preset
+configuration, the feature selector, protected transition controls, the actual origin/main title judge, and
+documentation freshness checks passed. No full suite or hosted CI run applied because this plan changed no
+workflow. Task commits are `aa18277`, `d40e18b`, and `45b7867`; Plan 09-09 is next.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -560,6 +571,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 8 P08 | at least 27min; active time unavailable | 2 tasks | 10 files |
 | Phase 8 P09 | at least 20min; active time unavailable | 2 tasks | 2 files |
 | Phase 09 P01 | 9m | 2 tasks | 4 files |
+| Phase 09 P08 | 2h 05m | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -946,6 +958,9 @@ Recent decisions affecting current work:
 - [Phase 08]: Resolve one save identity from a complete PS-EXE stem or the framed full-image digest; explicit serial overrides remain literal.
 - [Phase 08]: Keep runner auto-identity opt-in and preserve libretro frontend-based card filenames.
 - [Phase 8]: Format 18's new card protocol latches require only the two changed state pins; frame hashes and host-owned card bytes and generations stay unchanged.
+- [Phase 09]: Feature ledger keys use provider, profile, and predicate; protection and peripheral are mandatory descriptive fields.
+- [Phase 09]: Production compatibility allowance checks use the current UTC date; tests inject fixed dates.
+- [Phase 09]: Protected delegation preserves the legacy five-argument title judge and appends kind only for feature-capable judges.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1191,8 +1206,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-20T03:57:56.358Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-11-20T15:00:01.280Z
+Stopped at: Completed 09-08-PLAN.md
 Resume file: None
 
 ### v1.0 session history
