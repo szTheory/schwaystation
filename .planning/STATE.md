@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 12
+current_plan: 14
 status: executing
-stopped_at: Completed Plan 09-11
-last_updated: "2026-11-20T19:50:33Z"
+stopped_at: Completed 09-12-PLAN.md
+last_updated: "2026-11-20T20:36:38.999Z"
 last_activity: 2026-11-20
-last_activity_desc: Plan 09-11 CI, nightly fuzz, cheap preflight and CI efficiency guidance committed; Plan 09-12 is next
-state_head: 82606fc
+last_activity_desc: Plan 09-12 runner and libretro CHD integration completed; Plan 09-14 owns final guest evidence and reviewed hosted verification
+state_head: 8a0637ded697a8784dd6cf5a826b7ec0ba1b2e7d
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 35
-  completed_plans: 32
+  completed_plans: 34
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 12 (runner and libretro CHD integration)
+Current Plan: 14 (owned-guest CHD parity, feature evidence and review handoff)
 Total Plans in Phase: 15
 Status: Ready to execute
-Last activity: 2026-11-20 — Plan 09-11 wired CHD CI/fuzz and recorded Act routing; hosted WASI size and eight-lane evidence remain for final verification
+Last activity: 2026-11-20 — Plan 09-12 added runner/libretro CHD coverage; Plan 09-14 owns final guest, eight-lane, hosted and review evidence
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -225,6 +225,20 @@ a duplicate CMake configure; time saved was not measured because clang-21 is una
 module size remains unknown and `quality.json` stays at 608,540 bytes until the hosted CHD-enabled module is
 measured. No full suite or hosted CI was started; final exact-head verification follows Plan 14 and source review.
 Task commits are `0fc7f50` and `6e60d85`; the shared selector diagnostic follow-up is `82606fc`.
+
+### Phase 9 Plan 09-12 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh; primary session model ID unavailable. Wall time
+was 38m37s from 19:53:15Z to 20:31:52Z; active time was not measured. Sorted runner/libretro inventories,
+fixture inputs and `git diff --check` passed before targeted builds. The CHD-on configure and affected target
+build passed (0.77s); the focused runner/libretro selector passed 14/14 (0.91s). The CHD-off configure and
+affected target build passed (0.73s); the unsupported-path selector passed 6/6 (0.36s), then the local build
+tree was restored to CHD on. The initial runner selector exposed a parallel scratch-directory collision;
+isolating the CHD case removed it. The bounded runner probe now reads CHD through shared disc callbacks, while
+libretro's path acceptance and extension reporting follow the build feature. No broad suite, `act`, or hosted
+CI run was needed for this focused provider integration; Plan 09-14 still owns cross-lane/hosted verification
+and the final reviewed head. Task commits are `69c00c9` and `8a0637d`; planning closeout remains unstaged for
+the root executor.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -649,6 +663,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 09 P01 | 9m | 2 tasks | 4 files |
 | Phase 09 P08 | 2h 05m | 2 tasks | 10 files |
 | Phase 09 P10 | 23m 09s | 2 tasks | 2 files |
+| Phase 09 P12 | 38m37s | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -1039,6 +1054,9 @@ Recent decisions affecting current work:
 - [Phase 09]: Production compatibility allowance checks use the current UTC date; tests inject fixed dates.
 - [Phase 09]: Protected delegation preserves the legacy five-argument title judge and appends kind only for feature-capable judges.
 - [Phase 09]: Retain separate Main and Release CI gates: measured reuse has no wall-clock benefit, and same-source product archive digests differ across all eighteen outputs.
+- [Phase 09]: Read CHD probe metadata and track identity through shared disc callbacks rather than duplicating media parsing.
+- [Phase 09]: Gate libretro CHD acceptance and extension advertisement with SCHWAYSTATION_CHD.
+- [Phase 09]: Leave CHD playlist membership out of Plan 09-12 because the existing provider rejects CHD playlist children.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1284,8 +1302,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-20T16:09:19.598Z
-Stopped at: Completed 09-10-PLAN.md
+Last session: 2026-11-20T20:35:58.895Z
+Stopped at: Completed 09-12-PLAN.md
 Resume file: None
 
 ### v1.0 session history
