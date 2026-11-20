@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 15
+current_plan: 11
 status: executing
-stopped_at: Planning Plan 09-15 prerequisite
-last_updated: "2026-11-20T18:42:31Z"
+stopped_at: Completed Plan 09-15
+last_updated: "2026-11-20T19:10:32Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09-13 passed ON/OFF archive checks; Plan 09-15 plans the measured native-tool handoff before Plan 09-11
-state_head: a995f69
+last_activity_desc: Plan 09-15 external CHD handoff and relocated provenance checks passed; Plan 09-11 is next
+state_head: 4bdeece
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 35
-  completed_plans: 31
+  completed_plans: 32
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 15 (native CHD generator handoff for cross-compiled lanes)
+Current Plan: 11 (CI, fuzz and distributed package wiring)
 Total Plans in Phase: 15
 Status: Ready to execute
-Last activity: 2026-11-20 — Plan 09-13 ON and OFF archive checks passed; planning a focused native-generator prerequisite before Plan 09-11
+Last activity: 2026-11-20 — Plan 09-15 passed external-tool, manifest-parity and CHD-off cleanup checks; Plan 09-11 is next by dependency order
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -191,6 +191,20 @@ were not measured. No broad suite, `act` or hosted CI run applied because no wor
 plan routes notice checks through `hygiene`; Plan 09-11 retains `act --dryrun` and producer-path timing.
 Todo 005 remains bound to the first tracked SPDX-bearing source in Phase 10. Task implementation commit is
 `d275d99`; the ON checkpoint and plan selector correction are in `5edcbd1`; plan summary/state closeout follows.
+
+### Phase 9 Plan 09-15 execution (2026-11-20)
+
+Runtime/model: Codex gsd-executor gpt-6-luna xhigh; primary session model ID unavailable. Wall time from the
+executor checkpoint at 18:47:57Z through closeout at 19:10:00Z was about 22 minutes; active time was not
+measured. Cheap preset/inventory/budget checks passed in 0.01 seconds and the line budget remained 3900/3901.
+External CHD mode configured in 8.8 seconds and its focused fixture/test build took about 16 seconds. Existing
+generator pins, tool digest and media provenance passed preflight; enabled selectors passed 7/7 in 0.14 seconds.
+Reconfiguring CHD OFF removed both outputs immediately; the disabled selector passed 2/2 in 0.03 seconds.
+The fixture glob check found CHD and excluded the relocated manifest. The first in-tree selector attempt exited 8
+because its build omitted the CHD test executable; rebuilding that target fixed the stale-binary issue, and the
+same selector passed 7/7 in 0.09 seconds. Local BE32/WASI compilers are unavailable (tool check exit 1); hosted
+cross-lane validation is assigned to Plan 09-11. No workflow changed, so no `act` or hosted CI run applied.
+Task commits are `9a35d55` and `4bdeece`; Plan 09-11 is next by dependency order.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -1434,7 +1448,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Complete prerequisite Plan 09-15, then follow dependency order through Plans 09-11, 09-12 and 09-14. Review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; use the planned `act --dryrun` routing check and measure the CHD producer critical path before any expensive hosted run. No owner UAT is needed.
+- Continue Phase 9 in dependency order with Plan 09-11, then Plans 09-12 and 09-14. Review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; use the planned `act --dryrun` routing check and measure the CHD producer critical path before any expensive hosted run. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
