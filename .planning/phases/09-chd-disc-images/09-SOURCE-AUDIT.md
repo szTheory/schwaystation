@@ -23,7 +23,7 @@ All four phase requirements and all nine discussion decisions have executable co
 | RESEARCH | Metadata/padding/pregap/version/mode/subcode semantics | 05, 06 | Covered |
 | RESEARCH | Hostile header/extents/path safety and replay/campaign coverage | 02, 05, 07 | Covered |
 | RESEARCH | Eight-lane hash evidence and one checked ephemeral fixture producer | 04, 06, 11 | Covered |
-| RESEARCH | ON/OFF metadata and archive closure, eighteen retained names | 09, 11 | Covered |
+| RESEARCH | ON/OFF metadata and archive closure, eighteen retained names | 09 Task 3 explicitly configures, builds, packages and validates ON then OFF archives; 11 retains required hosted release checks | Covered |
 | RESEARCH | Runner/libretro/guest integration and evidence ledger | 08, 12 | Covered |
 | RESEARCH | Validation Architecture and no duplicate full-suite bookkeeping | Each task's automated command; 12 final verification sequence | Covered |
 | TODO | 005 triggered SPDX and release notices checks | 09 | Covered |
