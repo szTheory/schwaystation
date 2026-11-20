@@ -26,8 +26,8 @@ remain unproven under the accepted v1.0 scope. The detailed discrepancy and evid
 Milestone v2.0, “The whole library,” is active. It expands disc-format and LibCrypt support, peripherals and save
 compatibility, region and revision coverage, ROM-hacker patches and cheats, and the compatibility ledger.
 Phase 7 is released as v0.7.0. Phase 8 per-game card saves passed goal verification, including the exact-head
-hosted RetroArch continuation proof; its phase PR and automatic release are pending. Phase 9 CHD work starts
-after that release and green main CI. The v1.0 limits in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md)
+hosted RetroArch continuation proof, and shipped in v0.8.0 after its release and main CI passed. Phase 9 CHD
+work is now unblocked. The v1.0 limits in the [milestone audit](.planning/milestones/v1.0-MILESTONE-AUDIT.md)
 remain explicit; v2.0 does not claim the unresolved MDEC or full-frame/movie hardware conformance.
 
 ## Current Milestone: v2.0 The whole library
