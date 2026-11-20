@@ -32,9 +32,19 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 Phase: 9 — CHD disc images
 Current Plan: Not started
-Total Plans in Phase: Not planned
-Status: Ready to plan; Phase 8 release and green main CI are confirmed
-Last activity: 2026-11-19 — Phase 9 discussion and three advisor reviews completed.
+Total Plans in Phase: 12
+Status: Phase 9 plans drafted; plan checker is next
+Last activity: 2026-11-19 — Phase 9 executable plans and multi-source coverage audit created.
+
+### Phase 9 planning (2026-11-19)
+
+Runtime/model: Codex typed gsd-planner, gpt-6.1-sol xhigh. Twelve short plans cover the optional pinned reader,
+complete fixture-tool closure audit, owned fixture producer, exact metadata/sector/subcode parity, shared limits,
+fuzzing, feature ledger, notices, measured CI reuse, all-lane workflow wiring and both shipped hosts. The generator
+is still not cleared; Plan 03 blocks its use until the complete compiled closure is permissive. Independent ledger
+and CI measurement plans can proceed after the skeleton. The source audit maps all four requirements, nine
+decisions and thirteen edge-probe candidates. Source review remains before final verification; no tests or hosted
+runs were launched during planning. Estimate calibration had zero samples, factor 1 and confidence low.
 
 ### Phase 9 research (2026-11-19)
 
