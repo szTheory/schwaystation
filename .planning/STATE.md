@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 7
+current_plan: 8
 status: executing
-stopped_at: Completed 09-06-PLAN.md
-last_updated: "2026-11-20T09:54:00Z"
+stopped_at: Completed 09-07-PLAN.md
+last_updated: "2026-11-20T12:51:00Z"
 last_activity: 2026-11-20
-last_activity_desc: Phase 09 Plan 09-06 complete; Plan 09-07 is next
-state_head: 277b592
+last_activity_desc: Phase 09 Plan 09-07 complete; Plan 09-08 is next
+state_head: a6271c201fa096cef3aa9ef106bcfdeb849de9c9
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 34
-  completed_plans: 26
+  completed_plans: 27
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 7
+Current Plan: 8
 Total Plans in Phase: 14
 Status: Ready to execute
-Last activity: 2026-11-20 — Phase 09 Plan 09-06 complete; Plan 09-07 is next
+Last activity: 2026-11-20 — Phase 09 Plan 09-07 complete; Plan 09-08 is next
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -111,6 +111,33 @@ order and returned the same content identity. Sorted inventory and diff prefligh
 slice. No workflow changed, so `act`, hosted CI and a full suite added no relevant coverage. Task commits are
 `9758617` and `277b592`; the summary is committed separately. MEDIA-01 and CHD-01 remain phase-level pending.
 Plan 09-07 is next.
+
+### Phase 9 Plan 09-07 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; primary model ID unavailable; typed executor gpt-6-luna xhigh.
+The wall interval from the preceding STATE checkpoint at 09:54:00Z through closeout at 12:46:09Z was 2h52m;
+active time was not measured. Shared checked arithmetic and the existing 1 GiB bound now guard both CUE and CHD
+parsing. CHD preflight rejects oversized hunk/map/metadata allocations, invalid extents, parent references and
+unsafe offset narrowing before libchdr decode. The production-parser replay validates stable TOCs, repeated
+successful reads, bounded leadout and failure-atomic rejected opens in a build-owned directory.
+
+Cheap `git diff --check`, preset JSON parsing, sorted fuzz inventory and the generated fixture size/hash checks
+passed first. The enabled CTest replay passed 2/2, including `disc.media.preflight`; the disabled replay passed
+1/1. The CHD-on `disc.image.*` selector slice passed 16/16 in 0.03s after rebuilding the ON-mode preflight
+binary and fixture. The sanitizer campaign ran in native ARM64 Ubuntu 26.04 Docker because Homebrew's macOS
+ASan runtime stalled before `main`. The image's CMake 4.2.3 was below this repository's 4.3/schema-11 preset
+minimum, so the fuzz tree was configured directly with the preset's ASan/UBSan flags and CHD settings; the user
+preset file was left untouched. A one-iteration smoke on a copy of the 13-input corpus passed, then the bounded
+campaign exited 0 after 31s and 47,207 runs (701 edges, 1,304 features, about 383 MB peak RSS). The run-local
+corpus and crash artifact paths stay under `build/fuzz`.
+
+The first campaign exposed a harness false positive: a one-byte payload mutation can open with a stable TOC
+while lazy decode of a compressed hunk fails consistently. The harness now allows stable read failure, compares
+repeated data when a read succeeds, validates the TOC, and rejects a leadout read; `unreadable_hunk` derives
+from the generated fixture, so no disc bytes are committed. The CTest selector command now builds the generated
+fixture and mode-specific media preflight first, avoiding stale ON/OFF binaries after configuration changes.
+No workflow changed, so no `act` or hosted CI run was needed. Task commits are `b6205e7` and `5e5915b`; the
+bounded-campaign and selector-prerequisite evidence commits are `57d4579` and `a6271c2`. Plan 09-08 is next.
 
 ### Phase 9 planning (2026-11-19)
 
@@ -1348,7 +1375,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Plan, execute, review, verify, and ship Phase 9 CHD disc images. Measure todo 050's exact-SHA artifact identity, runner-minutes, and critical path; change workflow wiring only if a tested reuse path is safe and measurably worthwhile. Run cheap selectors, inventory, fixture, and artifact checks before long suites; keep hosted matrix and release gates required. No owner UAT is needed.
+- Execute Phase 9 Plan 09-08 next, then continue its remaining plans through code review and automated verification before ship. Measure todo 050's exact-SHA artifact identity, runner-minutes, and critical path; change workflow wiring only if a tested reuse path is safe and measurably worthwhile. Run cheap selectors, inventory, fixture, and artifact checks before long suites; keep hosted matrix and release gates required. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
