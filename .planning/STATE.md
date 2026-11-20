@@ -6,11 +6,11 @@ current_phase: 9
 current_phase_name: CHD disc images
 current_plan: Not started
 status: planning
-stopped_at: Phase 8 verified; ship pending before Phase 9 work
-last_updated: "2026-11-19T23:12:29Z"
-last_activity: 2026-11-19
-last_activity_desc: Phase 8 verification passed; phase PR and release must finish before Phase 9 starts
-state_head: 909cebe61d580e413e74e9c05f00d1085862e015
+stopped_at: Phase 7 verification refresh complete; Phase 9 discussion is next
+last_updated: "2026-11-20T02:12:37Z"
+last_activity: 2026-11-20
+last_activity_desc: Phase 7 verification refreshed and Phase 8 release/main CI confirmed green; Phase 9 is unblocked
+state_head: 830bf4cfe74aca92930e34fdf9667c5c1b24c370
 progress:
   total_phases: 10
   completed_phases: 2
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 9 — CHD disc images, after Phase 8 ships
+**Current focus:** Phase 9 — CHD disc images; Phase 8 is shipped and green on main
 
 ## Current Position
 
 Phase: 9 — CHD disc images
 Current Plan: Not started
 Total Plans in Phase: Not planned
-Status: Ready to plan after Phase 8 PR, release and green main CI
-Last activity: 2026-11-19 — Phase 8 verification passed; ship before Phase 9 discussion.
+Status: Ready to discuss; Phase 8 release and green main CI are confirmed
+Last activity: 2026-11-20 — Phase 7 verification refreshed; Phase 9 discussion is next.
 
 ### Phase 8 Plan 08-10 execution (2026-11-19)
 
@@ -1233,11 +1233,15 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 8 per-game card saves through autonomous discussion, planning, execution, review, verification and ship. Run cheap input and inventory checks before long suites, then confirm the merge, green main CI and automatic release before Phase 9. No owner UAT is needed.
+- Discuss, plan, execute, review, verify and ship Phase 9 CHD disc images. Re-read `.planning/LESSONS.md`, `.planning/AUTONOMOUS.md` and the preparation references before design. Resolve todo 050 only if Phase 9 changes the CI or Release workflows. Run cheap selector, inventory and artifact checks before long suites; keep hosted matrix and release gates required. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
 Runtime/model: Codex, OpenGSD 1.20.0, gsd-roadmapper gpt-6.2-sol high. The approved milestone has 10 phases and 34 requirements. Phase 9 establishes the shared media controls and feature-ledger checks with the first provider. Later feature phases record their own evidence. Phase 16 reconciles the pinned DAT inventory and gates libretro metadata on the required-capability matrix. The v1.0 MDEC evidence boundary and the standing 300-line real-host limit carry forward. No implementation or phase verification is claimed here.
+
+### Phase 7 verification refresh (2026-11-20)
+
+Runtime/model: Codex/OpenGSD; primary GPT-6 model ID unavailable; gsd-verifier gpt-6-luna xhigh. The Phase 7 review scope contained only release-version metadata, so no new source review was needed. Refreshed `07-VERIFICATION.md`; 5/5 implementation truths and 27/27 plan artifacts passed, and `verification.status` returned `passed`. The baseline note now identifies the initial 595,820-byte WASI and 3,755,020-byte state measurements as superseded by Phase 8 producer evidence: 608,540 and 3,755,328 bytes. `git diff --check` passed. The 24 Phase 8 regression selectors were present; full suite execution was not repeated because exact-head Main CI [44645037841](https://github.com/szTheory/schwaystation/actions/runs/44645037841) and Release [44645037923](https://github.com/szTheory/schwaystation/actions/runs/44645037923) passed on `830bf4c`. BE32 took 4,694 seconds on Main CI and 3,402 seconds in the concurrent Release matrix; todo 050 remains bound to Phase 9 for measured reuse analysis. Phase 7 is complete and its existing v0.7.0 release remains valid.
 
 
 ### v1.0 milestone closeout (2026-11-18)

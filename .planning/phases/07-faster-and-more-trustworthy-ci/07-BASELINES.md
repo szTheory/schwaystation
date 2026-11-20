@@ -10,8 +10,8 @@ measured on the hosted Linux producer, and the checked-in bound matches that exa
 | --- | --- | --- | ---: | --- |
 | `ir_per_frame.testcard` | Cachegrind Ir per emulated frame | Release `schwaystation-run`; built-in test card; `ubuntu-26.04`; Valgrind 3.26.0; matching manual `perf` producer, three samples | 1,619,573, 1,619,573, 1,619,573; spread 0 | floor 1,619,573; ceiling 1,619,573 |
 | `ir_per_frame.gpu_motion` | Cachegrind Ir per emulated frame | Same Release runner and toolchain; `tests/fixtures/src/gpu_motion.asm`, built by the pinned armips tool; same manual `perf` producer, three samples | 137,752,334, 137,752,334, 137,752,334; spread 0 | floor 137,752,334; ceiling 137,752,334 |
-| `size.wasm` | linked module bytes | Release `schwaystation-run` target from the `wasm32` preset; the runner module at `build/wasm32/schwaystation-run`, not a host wrapper or compressed archive; `ubuntu-26.04` | 595,820 bytes; [PR run 44460238941, WASI job 135345194644](https://github.com/szTheory/schwaystation/actions/runs/44460238941/job/135345194644) | floor 595,820; ceiling 595,820 |
-| `state.bytes` | serialized bytes including header | Current Release `schwaystation` library; NTSC-U instance matching `tests/core/test_state.c::make`; public `schway_state_size` and `schway_save_state` API | 3,755,020 total: 20-byte header + 3,755,000-byte body; serialized header total field also equals 3,755,020 | floor 3,755,020; ceiling 3,755,020 |
+| `size.wasm` | linked module bytes | Release `schwaystation-run` target from the `wasm32` preset; the runner module at `build/wasm32/schwaystation-run`, not a host wrapper or compressed archive; `ubuntu-26.04` | 608,540 bytes; [Phase 8 run 44597715729, WASI job 135820879050](https://github.com/szTheory/schwaystation/actions/runs/44597715729/job/135820879050) | floor 608,540; ceiling 608,540 |
+| `state.bytes` | serialized bytes including header | Current Release `schwaystation` library; NTSC-U instance matching `tests/core/test_state.c::make`; public `schway_state_size` and `schway_save_state` API | 3,755,328 total; [Phase 8 run 44600162797, state measurement job 135829636881](https://github.com/szTheory/schwaystation/actions/runs/44600162797/job/135829636881) | floor 3,755,328; ceiling 3,755,328 |
 | `ci.critical_path_s` | seconds from recorded job DAG | Exact matching `ci.yml` push cohort from Plan 02; `changes → openbios → be32 → hash-equality → ci-required`; fingerprint and runs below | 2,249 s and 3,293 s; observed spread 1,044 s | floor 2,249; ceiling 3,293 |
 
 ## Instructions per frame
@@ -41,9 +41,11 @@ unchanged. The run therefore measures the same source, fixture and producer inpu
 ## Serialized state
 
 The state harness constructs a default instance with its NTSC-U profile, reads `schway_state_size`, allocates that
-capacity and calls `schway_save_state`. A one-off diagnostic in ignored `build/phase07/` used the same setup and
-verified the header's total-size field at offset 12 against the API result. It ran against the current Release
-library after this focused build:
+capacity and calls `schway_save_state`. The original Phase 7 diagnostic in ignored `build/phase07/` used the same
+setup and verified the header's total-size field at offset 12 against the API result. It recorded 3,755,020 bytes
+before Phase 8 added per-game card identity state. The current serialized size is 3,755,328 bytes, measured by
+the producer in [Phase 8 run 44600162797, state measurement job 135829636881](https://github.com/szTheory/schwaystation/actions/runs/44600162797/job/135829636881).
+The original diagnostic commands were:
 
 ```text
 cmake --build build/perf --target schwaystation
@@ -65,9 +67,10 @@ the complete API-reported length, including the header.
 The configured `build/wasm32/CMakeCache.txt` names `cmake/toolchains/wasm32-wasi.cmake` and Release mode, but this
 checkout has no generated `build.ninja` or Makefile for that tree. `cmake --build build/wasm32 --target help` exited 1
 with `ninja: error: loading 'build.ninja': No such file or directory`; `clang-21`, `clang++-21`, `wasm-ld-21` and a
-WASI sysroot are absent locally. The hosted `wasm32` lane ran the canonical size comparator against the linked
-target and reported exactly 595,820 bytes. Its CI log is linked above. This is the module itself, not a host
-wrapper or compressed archive.
+WASI sysroot are absent locally. The initial Phase 7 hosted measurement was 595,820 bytes. After Phase 8 added
+per-game card identity support, the hosted `wasm32` lane measured the linked target at 608,540 bytes in
+[run 44597715729, WASI job 135820879050](https://github.com/szTheory/schwaystation/actions/runs/44597715729/job/135820879050).
+This is the module itself, not a host wrapper or compressed archive.
 
 The narrow measurement can run on the existing `ubuntu-26.04` WASI lane after its current toolchain setup installs
 `wasi-libc` and `libclang-rt-21-dev-wasm32`:
