@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/szTheory/schwaystation/compare/v0.7.0...v0.8.0) (2026-11-20)
+
+
+### Features
+
+* **libretro:** add verified per-game card saves ([#30](https://github.com/szTheory/schwaystation/issues/30)) ([90a7d82](https://github.com/szTheory/schwaystation/commit/90a7d82d2c28fa183e654563bc1369622d82e3e2))
+
 ## [0.7.0](https://github.com/szTheory/schwaystation/compare/v0.6.0...v0.7.0) (2026-11-19)
 
 
