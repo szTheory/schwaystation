@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 09
 current_phase_name: CHD disc images
-current_plan: 14
+current_plan: 15 (owned-guest CHD parity, feature evidence and review handoff)
 status: executing
-stopped_at: Completed 09-12-PLAN.md
-last_updated: "2026-11-20T20:36:38.999Z"
+stopped_at: Completed 09-14-PLAN.md; Phase 9 source review and final verification remain
+last_updated: "2026-11-20T21:04:54.738Z"
 last_activity: 2026-11-20
 last_activity_desc: Plan 09-12 runner and libretro CHD integration completed; Plan 09-14 owns final guest evidence and reviewed hosted verification
-state_head: 8a0637ded697a8784dd6cf5a826b7ec0ba1b2e7d
+state_head: 938cca6f09514c51a4a211a13f2f577edfcce9fc
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 35
-  completed_plans: 34
+  completed_plans: 35
   percent: 20
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 14 (owned-guest CHD parity, feature evidence and review handoff)
+Current Plan: 15 (owned-guest CHD parity, feature evidence and review handoff)
 Total Plans in Phase: 15
-Status: Ready to execute
-Last activity: 2026-11-20 — Plan 09-12 added runner/libretro CHD coverage; Plan 09-14 owns final guest, eight-lane, hosted and review evidence
+Status: Phase review pending
+Last activity: 2026-11-20 — Plan 09-14 completed; all fifteen plan summaries exist. Phase 9 source review and final verification are next.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -664,6 +664,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 09 P08 | 2h 05m | 2 tasks | 10 files |
 | Phase 09 P10 | 23m 09s | 2 tasks | 2 files |
 | Phase 09 P12 | 38m37s | 2 tasks | 9 files |
+| Phase 09 P14 | 22m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -1057,6 +1058,8 @@ Recent decisions affecting current work:
 - [Phase 09]: Read CHD probe metadata and track identity through shared disc callbacks rather than duplicating media parsing.
 - [Phase 09]: Gate libretro CHD acceptance and extension advertisement with SCHWAYSTATION_CHD.
 - [Phase 09]: Leave CHD playlist membership out of Plan 09-12 because the existing provider rejects CHD playlist children.
+- [Phase 09]: Plan 09-14 reuses the bounded boot/read/audio/FMV guest paths and pins for CHD input.
+- [Phase 09]: The local CHD compatibility predicate passes on provider, host, package and guest evidence; hosted lane/hash/fuzz and WASI size remain unknown.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1302,9 +1305,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-20T20:35:58.895Z
-Stopped at: Completed 09-12-PLAN.md
-Resume file: None
+Last session: 2026-11-20T21:04:54.561Z
+Stopped at: Completed 09-14-PLAN.md; Phase 9 source review and final verification remain
+Resume file: .planning/phases/09-chd-disc-images/09-14-SUMMARY.md
 
 ### v1.0 session history
 
@@ -1486,7 +1489,7 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 9 in dependency order with Plans 09-12 and 09-14. Review all changed source before final verification and ship. Keep todo 005 open for the first tracked SPDX-bearing source. Preserve required CI and release gates; inspect the hosted run live and after completion, measure the CHD producer critical path, and record the actual WASI module size. No owner UAT is needed.
+- Complete Phase 9 source review, fix any accepted findings, then run final local and required hosted verification before shipping. Inspect the required CI and release runs for critical-path time and runner cost, measure the CHD producer and actual WASI module size, and keep hosted eight-lane/hash/fuzz predicates unknown until they pass. Keep todo 005 open for the first tracked SPDX-bearing source. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
@@ -1502,3 +1505,9 @@ Runtime/model: Codex/OpenGSD; primary GPT-6 model ID unavailable; gsd-verifier g
 All six phase verification reports passed; milestone audit found 30/30 requirements, 30/30 integration paths and 7/7 flows, with accepted MDEC conformance limits and non-blocking follow-ups recorded in `.planning/milestones/v1.0-MILESTONE-AUDIT.md`. The closeout scanner found 29 pending todos, 11 dormant seeds and two existing deferred notes. All 42 were acknowledged as deferred, not marked resolved; the details are listed in the Deferred Items table above. The phase trees and one completed quick task are archived under `.planning/milestones/v1.0-phases/` and `.planning/milestones/v1.0-quick/`.
 
 Hosted evidence reused: [release-PR CI run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074), [nightly full-vector job 134564625732](https://github.com/szTheory/schwaystation/actions/runs/44233700921/jobs/134564625732), and [v0.6.0 release run 44262491280](https://github.com/szTheory/schwaystation/actions/runs/44262491280). Planning-only edits received `git diff --check`; no implementation tests were added or rerun.
+
+### Phase 9 Plan 09-14 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Work started at 20:42:42Z and the state closeout completed at 21:04:54Z. The owned CHD source/geometry preflight, 222-sector forward/reverse parity, feature-key check, and boot/read/audio/FMV guest cases all passed. The focused CHD selector passed 14/14 in 10.71 seconds and the required tracer rerun passed 14/14 in 11.45 seconds; the feature ratchet passed 2/2, documentation freshness passed, and both diff checks were clean. The four guest tests shared the existing pins and bounds and ran in parallel after setup fixtures. No broad Phase 9 suite, hosted CI, `act`, or source review ran in this plan. The local CI build remains CHD ON. Task commits: `1d48028`, `ab91147`, `938cca6`; summary: `.planning/phases/09-chd-disc-images/09-14-SUMMARY.md`.
+
+The feature row now passes only the demonstrated local provider, runner, libretro, package and guest predicate. Hosted eight-lane/hash/fuzz evidence and the actual WASI module size remain unknown for final Phase 9 verification. The next action is source review; no owner action is needed.
