@@ -21,6 +21,18 @@ set_target_properties(schwaystation-test-disc-image PROPERTIES
 schway_warnings(schwaystation-test-disc-image)
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 
+add_executable(schwaystation-test-disc-media ${CMAKE_CURRENT_LIST_DIR}/media.c)
+target_link_libraries(schwaystation-test-disc-media PRIVATE schwaystation_disc_image)
+set_target_properties(schwaystation-test-disc-media PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-media)
+
+schway_add_test(NAME disc.media.preflight
+  COMMAND schwaystation-test-disc-media
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue" "${PROJECT_BINARY_DIR}/tests"
+  LABELS disc portable TIMEOUT 10)
+set_tests_properties(disc.media.preflight PROPERTIES FIXTURES_SETUP disc_media_preflight)
+
 add_executable(schwaystation-test-disc-hash
   ${PROJECT_SOURCE_DIR}/tests/probe/disc_hash.c
   ${PROJECT_SOURCE_DIR}/tests/probe/rc_hash_disc.c
@@ -107,3 +119,6 @@ schway_add_test(NAME disc.fixture.read
     "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
     "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
   LABELS disc portable TIMEOUT 300)
+
+set_tests_properties(disc.fixture.boot disc.fixture.read disc.fixture.audio disc.fixture.fmv
+  PROPERTIES FIXTURES_REQUIRED disc_media_preflight)
