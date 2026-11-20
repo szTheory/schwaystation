@@ -53,6 +53,26 @@ gh attestation verify schwaystation-runner-linux-x64.zip --repo szTheory/schways
 Release runs queue behind each other and are never cancelled. A version moves to 1.0.0 only through a final
 `Release-As: 1.0.0` line in the body of the pull request that should cut it.
 
+## Fast preflight and CI cost review
+
+The `changes` job runs the cheap source, workflow-route, sorted-inventory and gate-budget checks immediately
+after checkout, before the build, guest and release jobs that depend on it. Keep input counts, selectors,
+artifact wiring and budget totals in these existing checks; add a permanent check only when it prevents a
+recurring fault. For a local route check, use `act pull_request --dryrun -W .github/workflows/ci.yml` and
+`act pull_request --dryrun -W .github/workflows/nightly.yml`, mapping each hosted runner label to an available
+local image when needed. `act --dryrun` validates the workflow route without running steps. In particular, it
+cannot execute the `changes` classifier or populate its outputs, so it does not prove that dependent matrix jobs
+will run. A real local `act` job is useful only when it exercises behavior beyond direct CMake checks; it cannot
+stand in for hosted macOS, Windows, ARM, release App permissions, attestations or GitHub artifact handoffs.
+
+For every hosted run, inspect it while it runs and after it finishes. Record the exact head SHA, run URL, job
+durations, total runner-minutes and the critical path; then look for safe reductions in duplicate work and serial
+waits without removing platforms, cases, assertions, archives or required checks. Main CI and Release CI remain
+separate gates: the measured runs produced different bytes for all 18 product zips, and waiting for Main before
+Release added 24 minutes 25 seconds to the observed release duration. The evidence and disposition are tracked in
+the completed [artifact-reuse review](../.planning/todos/completed/050-release-ci-artifact-reuse.md). Do not
+repeat a green full suite for bookkeeping when exact-head evidence already covers the unchanged checks.
+
 ## The rehearsal
 
 A same-repository pull request that changes a release input (`release.yml`, `ci.yml`, `scripts/publish.sh`,
