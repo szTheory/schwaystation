@@ -4,6 +4,7 @@
 #include "disc_pbp.h"
 #include "disc_pbp_metadata.h"
 #include "media_limits.h"
+#include "pbp_inflate.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -14,8 +15,17 @@
 #include <sys/types.h>
 #endif
 
+#define SCHWAY__DISC_PBP_BLOCK_BYTES UINT32_C(0x9300)
+#define SCHWAY__DISC_PBP_SECTOR_BYTES UINT32_C(2352)
+#define SCHWAY__DISC_PBP_SECTORS_PER_BLOCK 16u
+
 struct schway__disc_pbp {
-    uint8_t reserved;
+    FILE *file;
+    schway__disc_pbp_metadata_map map;
+    uint8_t *compressed;
+    uint8_t decoded[SCHWAY__DISC_PBP_BLOCK_BYTES];
+    uint32_t cached_block;
+    uint8_t cache_valid;
 };
 
 static schway_disc_image_status schway__disc_pbp_error(
@@ -66,6 +76,32 @@ static schway_disc_image_status schway__disc_pbp_read_at(
     return ferror(file) != 0 ? SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
 }
 
+static int schway__disc_pbp_decode_block(schway__disc_pbp *reader,
+                                          uint32_t block_index)
+{
+    const schway__disc_pbp_block *block;
+    uint64_t file_offset;
+    if (reader == NULL || block_index >= reader->map.block_count) return 0;
+    if (reader->cache_valid != 0u && reader->cached_block == block_index) return 1;
+    block = &reader->map.blocks[block_index];
+    if (block->size == 0u || block->size > SCHWAY__DISC_PBP_BLOCK_BYTES ||
+        !schway__media_add_u64(reader->map.data_offset, (uint64_t)block->offset,
+                               &file_offset) ||
+        schway__disc_pbp_read_at(reader->file, file_offset, reader->compressed,
+                                 (size_t)block->size) != SCHWAY_DISC_IMAGE_OK) {
+        return 0;
+    }
+    if (block->size == SCHWAY__DISC_PBP_BLOCK_BYTES) {
+        memcpy(reader->decoded, reader->compressed, sizeof(reader->decoded));
+    } else if (!schway__pbp_inflate_raw(reader->compressed, (size_t)block->size,
+                                       reader->decoded, sizeof(reader->decoded))) {
+        return 0;
+    }
+    reader->cached_block = block_index;
+    reader->cache_valid = 1u;
+    return 1;
+}
+
 schway_disc_image_status schway__disc_pbp_open(const char *path,
                                                 schway__disc_pbp **out,
                                                 schway_disc_image_error *error)
@@ -73,7 +109,10 @@ schway_disc_image_status schway__disc_pbp_open(const char *path,
     schway__disc_pbp_metadata_map map;
     schway_disc_image_status status;
     uint64_t file_bytes;
+    uint64_t logical_bytes;
+    uint64_t scanned_bytes = 0u;
     FILE *file;
+    schway__disc_pbp *reader;
 
     if (out != NULL) *out = NULL;
     if (path == NULL || path[0] == '\0' || out == NULL) {
@@ -98,37 +137,95 @@ schway_disc_image_status schway__disc_pbp_open(const char *path,
     memset(&map, 0, sizeof(map));
     status = schway__disc_pbp_metadata_parse(schway__disc_pbp_read_at, file,
                                               file_bytes, &map);
-    schway__disc_pbp_metadata_clear(&map);
-    if (fclose(file) != 0 && status == SCHWAY_DISC_IMAGE_OK) {
-        status = SCHWAY_DISC_IMAGE_IO;
-    }
     if (status != SCHWAY_DISC_IMAGE_OK) {
+        schway__disc_pbp_metadata_clear(&map);
+        (void)fclose(file);
         return schway__disc_pbp_error(error, status,
             status == SCHWAY_DISC_IMAGE_UNSUPPORTED ?
             "PBP layout is unsupported" : "PBP metadata is invalid");
     }
-    return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
-                                  "PBP metadata is valid; sector reading is unavailable");
+    if (map.block_count == 0u ||
+        !schway__media_mul_u64((uint64_t)map.sector_count,
+                               SCHWAY__DISC_PBP_SECTOR_BYTES, &logical_bytes) ||
+        logical_bytes > SCHWAY__MEDIA_IMAGE_MAX_BYTES) {
+        schway__disc_pbp_metadata_clear(&map);
+        (void)fclose(file);
+        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_LIMIT,
+                                      "PBP logical image exceeds the 1 GiB limit");
+    }
+    reader = (schway__disc_pbp *)calloc(1u, sizeof(*reader));
+    if (reader == NULL) {
+        schway__disc_pbp_metadata_clear(&map);
+        (void)fclose(file);
+        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_OUT_OF_MEMORY,
+                                      "could not allocate PBP reader");
+    }
+    reader->file = file;
+    reader->map = map;
+    memset(&map, 0, sizeof(map));
+    reader->compressed = (uint8_t *)malloc(SCHWAY__DISC_PBP_BLOCK_BYTES);
+    if (reader->compressed == NULL) {
+        schway__disc_pbp_close(reader);
+        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_OUT_OF_MEMORY,
+                                      "could not allocate PBP block input");
+    }
+    for (uint32_t i = 0u; i < reader->map.block_count; i++) {
+        if (!schway__media_add_u64(scanned_bytes, SCHWAY__DISC_PBP_BLOCK_BYTES,
+                                   &scanned_bytes) || scanned_bytes > logical_bytes ||
+            !schway__disc_pbp_decode_block(reader, i)) {
+            schway__disc_pbp_close(reader);
+            return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "PBP data block is truncated or invalid");
+        }
+    }
+    if (scanned_bytes != logical_bytes ||
+        reader->map.block_count != reader->map.sector_count /
+                                   SCHWAY__DISC_PBP_SECTORS_PER_BLOCK) {
+        schway__disc_pbp_close(reader);
+        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                      "PBP block count does not match its TOC");
+    }
+    reader->cache_valid = 0u;
+    *out = reader;
+    return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_OK, "ok");
 }
 
 void schway__disc_pbp_close(schway__disc_pbp *reader)
 {
+    if (reader == NULL) return;
+    if (reader->file != NULL) (void)fclose(reader->file);
+    schway__disc_pbp_metadata_clear(&reader->map);
+    free(reader->compressed);
     free(reader);
 }
 
 schway_disc_image_status schway__disc_pbp_toc(const schway__disc_pbp *reader,
                                                schway_toc *out)
 {
-    if (reader == NULL || out == NULL) return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
-    return SCHWAY_DISC_IMAGE_UNSUPPORTED;
+    schway_toc candidate;
+    if (reader == NULL || out == NULL || out->size != sizeof(*out)) {
+        return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
+    }
+    memset(&candidate, 0, sizeof(candidate));
+    candidate.size = (uint32_t)sizeof(candidate);
+    candidate.track_count = 1u;
+    candidate.tracks[0] = reader->map.track;
+    *out = candidate;
+    return SCHWAY_DISC_IMAGE_OK;
 }
 
 uint32_t schway__disc_pbp_read_sector(void *user, uint32_t lba,
                                       uint8_t sector[2352], uint8_t subcode[96])
 {
-    (void)user;
-    (void)lba;
-    (void)sector;
-    (void)subcode;
-    return 0u;
+    schway__disc_pbp *reader = (schway__disc_pbp *)user;
+    uint32_t block_index;
+    uint32_t sector_in_block;
+    if (reader == NULL || sector == NULL || lba >= reader->map.sector_count) return 0u;
+    block_index = lba / SCHWAY__DISC_PBP_SECTORS_PER_BLOCK;
+    sector_in_block = lba % SCHWAY__DISC_PBP_SECTORS_PER_BLOCK;
+    if (!schway__disc_pbp_decode_block(reader, block_index)) return 0u;
+    memcpy(sector, reader->decoded + (size_t)sector_in_block * SCHWAY__DISC_PBP_SECTOR_BYTES,
+           SCHWAY__DISC_PBP_SECTOR_BYTES);
+    if (subcode != NULL) memset(subcode, 0, 96u);
+    return 1u;
 }

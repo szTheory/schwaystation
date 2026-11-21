@@ -18,7 +18,11 @@ schway_warnings(schwaystation-test-disc-fixture)
 
 add_executable(schwaystation-test-disc-image
   ${CMAKE_CURRENT_LIST_DIR}/image.c
-  ${PROJECT_SOURCE_DIR}/host/disc_probe.c)
+  ${PROJECT_SOURCE_DIR}/host/disc_probe.c
+  ${PROJECT_SOURCE_DIR}/host/save_game_identity.c
+  ${PROJECT_SOURCE_DIR}/runner/sha256.c)
+target_include_directories(schwaystation-test-disc-image PRIVATE
+  ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/runner)
 target_link_libraries(schwaystation-test-disc-image PRIVATE
   schwaystation_disc_image schwaystation-host)
 set_target_properties(schwaystation-test-disc-image PROPERTIES
@@ -75,6 +79,11 @@ schway_add_test(NAME disc.image.pbp_metadata
   COMMAND schwaystation-test-disc-pbp --metadata
     "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
   LABELS disc portable TIMEOUT 15)
+schway_add_test(NAME disc.image.pbp_raw
+  COMMAND schwaystation-test-disc-pbp --raw
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_BINARY_DIR}/tests"
+  LABELS disc portable TIMEOUT 15)
 schway_add_test(NAME disc.image.pbp_bounds
   COMMAND schwaystation-test-disc-pbp --bounds
     "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
@@ -100,6 +109,25 @@ schway_add_test(NAME disc.image.pbp_fixture_controls
 set_tests_properties(disc.image.pbp_preflight PROPERTIES FIXTURES_SETUP disc_pbp_preflight)
 set_tests_properties(disc.image.pbp_fixture_controls disc.image.pbp_metadata
   disc.image.pbp_bounds PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
+set_tests_properties(disc.image.pbp_raw PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
+schway_add_test(NAME disc.image.pbp_open
+  COMMAND schwaystation-test-disc-image pbp_open
+    "${PROJECT_BINARY_DIR}/tests"
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.cue"
+  LABELS disc portable TIMEOUT 20)
+schway_add_test(NAME disc.image.pbp_boundaries
+  COMMAND schwaystation-test-disc-image pbp_boundaries
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.cue"
+  LABELS disc portable TIMEOUT 20)
+schway_add_test(NAME disc.image.pbp_parity
+  COMMAND schwaystation-test-disc-image pbp_parity
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.cue"
+  LABELS disc portable TIMEOUT 30)
+set_tests_properties(disc.image.pbp_open disc.image.pbp_boundaries disc.image.pbp_parity
+  PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
 
 schway_add_test(NAME disc.image.chd_headers
   COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests

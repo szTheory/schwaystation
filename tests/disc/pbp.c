@@ -658,6 +658,10 @@ static int run_metadata(const char *pbp_path)
     schway__disc_pbp_metadata_map map;
     schway_disc_image_error image_error;
     schway__disc_pbp *reader = (schway__disc_pbp *)(uintptr_t)1u;
+    schway_toc toc;
+    uint8_t decoded[SCHWAY__DISC_PBP_BLOCK_BYTES];
+    uint8_t sector[SCHWAY__DISC_PBP_SECTOR_BYTES];
+    uint8_t subcode[96];
     schway_disc_image_status status;
     if (!read_file(pbp_path, SCHWAY__DISC_PBP_FIXTURE_CAP_BYTES, &bytes, &size,
                    "could not read accepted PBP", error, sizeof(error))) {
@@ -686,17 +690,177 @@ static int run_metadata(const char *pbp_path)
             return 1;
         }
     }
-    schway__disc_pbp_metadata_clear(&map);
     memset(&image_error, 0, sizeof(image_error));
     status = schway__disc_pbp_open(pbp_path, &reader, &image_error);
-    free(bytes);
-    if (status != SCHWAY_DISC_IMAGE_UNSUPPORTED || reader != NULL ||
+    if (status != SCHWAY_DISC_IMAGE_OK || reader == NULL ||
         image_error.status != (uint32_t)status) {
-        fprintf(stderr, "ASSERT disc.image.pbp_metadata: valid metadata open returned %u handle=%p\n",
+        fprintf(stderr, "ASSERT disc.image.pbp_metadata: valid PBP open returned %u handle=%p\n",
                 (unsigned int)status, (void *)reader);
+        schway__disc_pbp_close(reader);
+        schway__disc_pbp_metadata_clear(&map);
+        free(bytes);
         return 1;
     }
+    memset(&toc, 0, sizeof(toc));
+    toc.size = (uint32_t)sizeof(toc);
+    if (schway__disc_pbp_toc(reader, &toc) != SCHWAY_DISC_IMAGE_OK ||
+        toc.track_count != 1u || toc.tracks[0].type != SCHWAY_DISC_TRACK_MODE2 ||
+        toc.tracks[0].index0 != 0u || toc.tracks[0].index1 != 0u ||
+        toc.tracks[0].pregap != 0u || toc.tracks[0].leadout != 64u) {
+        fprintf(stderr, "ASSERT disc.image.pbp_metadata: normalized TOC is wrong\n");
+        schway__disc_pbp_close(reader);
+        schway__disc_pbp_metadata_clear(&map);
+        free(bytes);
+        return 1;
+    }
+    if (!schway__pbp_inflate_raw(bytes + map.data_offset + map.blocks[0].offset,
+                                 map.blocks[0].size, decoded, sizeof(decoded)) ||
+        schway__disc_pbp_read_sector(reader, 0u, sector, subcode) != 1u ||
+        memcmp(sector, decoded, sizeof(sector)) != 0) {
+        fprintf(stderr, "ASSERT disc.image.pbp_metadata: first raw sector differs from block\n");
+        schway__disc_pbp_close(reader);
+        schway__disc_pbp_metadata_clear(&map);
+        free(bytes);
+        return 1;
+    }
+    for (size_t i = 0u; i < sizeof(subcode); i++) {
+        if (subcode[i] != 0u) {
+            fprintf(stderr, "ASSERT disc.image.pbp_metadata: unavailable subcode is not zero\n");
+            schway__disc_pbp_close(reader);
+            schway__disc_pbp_metadata_clear(&map);
+            free(bytes);
+            return 1;
+        }
+    }
+    if (!schway__pbp_inflate_raw(bytes + map.data_offset + map.blocks[3].offset,
+                                 map.blocks[3].size, decoded, sizeof(decoded)) ||
+        schway__disc_pbp_read_sector(reader, 63u, sector, subcode) != 1u ||
+        memcmp(sector, decoded + 15u * SCHWAY__DISC_PBP_SECTOR_BYTES,
+               sizeof(sector)) != 0) {
+        fprintf(stderr, "ASSERT disc.image.pbp_metadata: final raw sector differs from block\n");
+        schway__disc_pbp_close(reader);
+        schway__disc_pbp_metadata_clear(&map);
+        free(bytes);
+        return 1;
+    }
+    memset(sector, 0xa5, sizeof(sector));
+    memset(subcode, 0x5a, sizeof(subcode));
+    if (schway__disc_pbp_read_sector(reader, 64u, sector, subcode) != 0u ||
+        sector[0] != 0xa5u || sector[sizeof(sector) - 1u] != 0xa5u ||
+        subcode[0] != 0x5au || subcode[sizeof(subcode) - 1u] != 0x5au) {
+        fprintf(stderr, "ASSERT disc.image.pbp_metadata: leadout read modified outputs\n");
+        schway__disc_pbp_close(reader);
+        schway__disc_pbp_metadata_clear(&map);
+        free(bytes);
+        return 1;
+    }
+    schway__disc_pbp_close(reader);
+    schway__disc_pbp_metadata_clear(&map);
+    free(bytes);
     return 0;
+}
+
+static int run_raw_block(const char *pbp_path, const char *directory)
+{
+    uint8_t *source = NULL;
+    uint8_t *raw_pbp = NULL;
+    size_t source_size = 0u;
+    size_t raw_size = (size_t)SCHWAY__DISC_PBP_DATA_BASE + SCHWAY__DISC_PBP_BLOCK_BYTES;
+    char path[1024] = "";
+    char error[256];
+    schway__disc_pbp_test_memory memory;
+    schway__disc_pbp_metadata_map map;
+    schway__disc_pbp *reader = NULL;
+    schway_disc_image_error image_error;
+    schway_toc toc;
+    uint8_t decoded[SCHWAY__DISC_PBP_BLOCK_BYTES];
+    uint8_t sector[SCHWAY__DISC_PBP_SECTOR_BYTES];
+    uint8_t subcode[96];
+    schway_disc_image_status status;
+    int result = 1;
+
+    memset(&map, 0, sizeof(map));
+    if (!read_file(pbp_path, SCHWAY__DISC_PBP_FIXTURE_CAP_BYTES, &source, &source_size,
+                   "could not read PBP for raw-block control", error, sizeof(error))) {
+        fprintf(stderr, "ASSERT disc.image.pbp_raw: %s\n", error);
+        goto done;
+    }
+    memory.bytes = source;
+    memory.size = source_size;
+    status = schway__disc_pbp_metadata_parse(read_memory, &memory,
+                                               (uint64_t)source_size, &map);
+    if (status != SCHWAY_DISC_IMAGE_OK || map.block_count == 0u ||
+        map.data_offset != SCHWAY__DISC_PBP_DATA_BASE ||
+        source_size < (size_t)SCHWAY__DISC_PBP_DATA_BASE ||
+        !schway__pbp_inflate_raw(source + map.data_offset + map.blocks[0].offset,
+                                 map.blocks[0].size, decoded, sizeof(decoded))) {
+        fprintf(stderr, "ASSERT disc.image.pbp_raw: source block could not be decoded (%u)\n",
+                (unsigned int)status);
+        goto done;
+    }
+    raw_pbp = (uint8_t *)calloc(raw_size, 1u);
+    if (raw_pbp == NULL) {
+        fprintf(stderr, "ASSERT disc.image.pbp_raw: could not allocate one-block PBP\n");
+        goto done;
+    }
+    memcpy(raw_pbp, source, (size_t)SCHWAY__DISC_PBP_DATA_BASE);
+    memcpy(raw_pbp + SCHWAY__DISC_PBP_DATA_BASE, decoded, sizeof(decoded));
+    raw_pbp[SCHWAY__DISC_PBP_TOC_OFFSET + 27u] = 0x00u;
+    raw_pbp[SCHWAY__DISC_PBP_TOC_OFFSET + 28u] = 0x02u;
+    raw_pbp[SCHWAY__DISC_PBP_TOC_OFFSET + 29u] = 0x16u;
+    put_le32(raw_pbp + SCHWAY__DISC_PBP_PSAR_OFFSET + 12u,
+             (uint32_t)(raw_size - SCHWAY__DISC_PBP_PSAR_OFFSET));
+    put_le32(raw_pbp + SCHWAY__DISC_PBP_PSAR_OFFSET + 16u,
+             (uint32_t)(raw_size - 0x6420u));
+    put_le32(raw_pbp + SCHWAY__DISC_PBP_PSAR_OFFSET + 0x1220u,
+             (uint32_t)(raw_size - 0xD2CFu));
+    {
+        uint8_t *entry = raw_pbp + SCHWAY__DISC_PBP_INDEX_OFFSET;
+        put_le32(entry, 0u);
+        put_le16(entry + 4u, (uint16_t)SCHWAY__DISC_PBP_BLOCK_BYTES);
+        put_le16(entry + 6u, 0u);
+        memset(entry + 8u, 0, 24u);
+    }
+    if (!make_path(path, directory, "pbp-one-raw-block.pbp") ||
+        !write_bytes(path, raw_pbp, raw_size)) {
+        fprintf(stderr, "ASSERT disc.image.pbp_raw: could not write one-block PBP\n");
+        goto done;
+    }
+    memset(&image_error, 0, sizeof(image_error));
+    status = schway__disc_pbp_open(path, &reader, &image_error);
+    if (status != SCHWAY_DISC_IMAGE_OK || reader == NULL ||
+        image_error.status != (uint32_t)SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.pbp_raw: raw-block open returned %u (%s)\n",
+                (unsigned int)status, image_error.message);
+        goto done;
+    }
+    memset(&toc, 0, sizeof(toc));
+    toc.size = (uint32_t)sizeof(toc);
+    if (schway__disc_pbp_toc(reader, &toc) != SCHWAY_DISC_IMAGE_OK ||
+        toc.track_count != 1u || toc.tracks[0].leadout != 16u) {
+        fprintf(stderr, "ASSERT disc.image.pbp_raw: one-block TOC is invalid\n");
+        goto done;
+    }
+    for (size_t i = 0u; i < 3u; i++) {
+        static const uint32_t lbas[] = {0u, 7u, 15u};
+        memset(sector, 0xa5, sizeof(sector));
+        memset(subcode, 0x5a, sizeof(subcode));
+        if (schway__disc_pbp_read_sector(reader, lbas[i], sector, subcode) != 1u ||
+            memcmp(sector, decoded + (size_t)lbas[i] * SCHWAY__DISC_PBP_SECTOR_BYTES,
+                   sizeof(sector)) != 0 || subcode[0] != 0u || subcode[95] != 0u) {
+            fprintf(stderr, "ASSERT disc.image.pbp_raw: raw byte parity failed at LBA %u\n",
+                    lbas[i]);
+            goto done;
+        }
+    }
+    result = 0;
+done:
+    schway__disc_pbp_close(reader);
+    schway__disc_pbp_metadata_clear(&map);
+    if (path[0] != '\0') (void)remove(path);
+    free(raw_pbp);
+    free(source);
+    return result;
 }
 
 static int run_bounds(const char *pbp_path, const char *directory)
@@ -809,9 +973,31 @@ static int run_bounds(const char *pbp_path, const char *directory)
     if (!expect_metadata_status("out-of-file extent", mutated, size,
                                 SCHWAY_DISC_IMAGE_BAD_IMAGE)) goto done;
     if (!expect_open_status(directory, "pbp-invalid-metadata.bin", mutated, size,
-                            SCHWAY_DISC_IMAGE_BAD_IMAGE) ||
-        !expect_open_status(directory, "pbp-unsupported-metadata.bin", source, size,
+                            SCHWAY_DISC_IMAGE_BAD_IMAGE)) goto done;
+    memcpy(mutated, source, size);
+    memcpy(mutated + psar, pgd, sizeof(pgd));
+    if (!expect_open_status(directory, "pbp-unsupported-metadata.bin", mutated, size,
                             SCHWAY_DISC_IMAGE_UNSUPPORTED)) goto done;
+    memcpy(mutated, source, size);
+    memcpy(mutated + psar, unknown, sizeof(unknown));
+    if (!expect_open_status(directory, "pbp-unknown-layout.bin", mutated, size,
+                            SCHWAY_DISC_IMAGE_UNSUPPORTED)) goto done;
+    memcpy(mutated, source, size);
+    memcpy(mutated + psar, multi_disc, sizeof(multi_disc));
+    if (!expect_open_status(directory, "pbp-multidisc-layout.bin", mutated, size,
+                            SCHWAY_DISC_IMAGE_UNSUPPORTED)) goto done;
+    memcpy(mutated, source, size);
+    mutated[toc + 30u] = 0x01u;
+    if (!expect_open_status(directory, "pbp-audio-track.bin", mutated, size,
+                            SCHWAY_DISC_IMAGE_UNSUPPORTED)) goto done;
+    memcpy(mutated, source, size);
+    memcpy(mutated + toc + 40u, track2, sizeof(track2));
+    if (!expect_open_status(directory, "pbp-extra-track.bin", mutated, size,
+                            SCHWAY_DISC_IMAGE_UNSUPPORTED)) goto done;
+    memcpy(mutated, source, size);
+    mutated[SCHWAY__DISC_PBP_DATA_BASE + get_le32(source + index)] = 0x07u;
+    if (!expect_open_status(directory, "pbp-invalid-deflate.bin", mutated, size,
+                            SCHWAY_DISC_IMAGE_BAD_IMAGE)) goto done;
 
     free(mutated);
     mutated = NULL;
@@ -1004,6 +1190,9 @@ int main(int argc, char **argv)
 {
     if (argc == 2 && strcmp(argv[1], "--inflate") == 0) return run_inflate();
     if (argc == 3 && strcmp(argv[1], "--metadata") == 0) return run_metadata(argv[2]);
+    if (argc == 4 && strcmp(argv[1], "--raw") == 0) {
+        return run_raw_block(argv[2], argv[3]);
+    }
     if (argc == 4 && strcmp(argv[1], "--bounds") == 0) {
         return run_bounds(argv[2], argv[3]);
     }
@@ -1018,7 +1207,7 @@ int main(int argc, char **argv)
         return run_fixture_controls(argv[2], argv[3], argv[4], argv[5], argv[6], argv[7]);
     }
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-disc-pbp <build-test-directory>|--inflate|--metadata <pbp>|--bounds <pbp> <dir>|--preflight <pbp> <cue> <source> <manifest> <generator>|--fixture-controls <dir> <pbp> <cue> <source> <manifest> <generator>\n");
+        fprintf(stderr, "usage: schwaystation-test-disc-pbp <build-test-directory>|--inflate|--metadata <pbp>|--raw <pbp> <dir>|--bounds <pbp> <dir>|--preflight <pbp> <cue> <source> <manifest> <generator>|--fixture-controls <dir> <pbp> <cue> <source> <manifest> <generator>\n");
         return 2;
     }
     return run_headers(argv[1]);

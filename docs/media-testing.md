@@ -25,11 +25,23 @@ CUE/BIN image cap remains 512 KiB. No generated PBP bytes are committed.
 `disc.image.pbp_preflight` checks source CUE track count, raw sectors, PBP directory and PSISO metadata, TOC,
 block extents, decoded sector totals, source/generator/output hashes and the PBP-only cap before provider or
 guest consumers run. `disc.image.pbp_fixture_controls` proves wrong digest, missing input, wrong source/TOC count,
-overlap, truncation and over-cap inputs fail for the intended reason. Later provider and guest selectors require
-the `disc_pbp_preflight` CTest fixture. `disc.image.pbp_headers` checks
-the production private boundary against empty and truncated headers, bad magic, encrypted or unknown PSAR markers,
-and out-of-range or overflowing section offsets. This slice does not yet accept PSISO sectors, so runner and
-libretro metadata do not advertise PBP.
+overlap, truncation and over-cap inputs fail for the intended reason. Provider and guest selectors require the
+`disc_pbp_preflight` CTest fixture. `disc.image.pbp_headers` checks the production private boundary against
+empty and truncated headers, bad magic, encrypted or unknown PSAR markers, and out-of-range or overflowing
+section offsets. The shared image dispatcher accepts the fixture-proven unencrypted PSISO data track. On open,
+the host checks every indexed block once before returning a reader. It accepts either a verbatim block stored at
+exactly 0x9300 bytes or a smaller raw-DEFLATE stream, using one 0x9300-byte decoded block and compressed input
+bounded to 0x9300 bytes; total decoded work cannot exceed the 1 GiB logical-media limit. The returned reader
+retains only one decoded block as its cache. PBP sectors preserve the source's 2352 raw bytes and zero-fill
+unavailable subcode.
+
+`disc.image.pbp_open` checks dispatcher routing, normalized TOC parity and failure-atomic replacement.
+`disc.image.pbp_boundaries` exercises the first/final sectors, each compressed-block transition, repeated reads,
+exclusive leadout and beyond-leadout output preservation. `disc.image.pbp_parity` compares every source sector
+in forward and reverse order, TOC, zero subcode and content identity against `disc_boot_pbp.cue`.
+`disc.image.pbp_raw` constructs a one-block PBP with a verbatim block from the owned fixture and verifies sector
+bytes through the provider. These selectors require `disc_pbp_preflight`, so fixture identity and extent checks
+run before provider reads.
 
 `disc.image.pbp_inflate` exercises the standalone raw-block wrapper with fixed stored and Huffman streams. It
 requires terminal success, exact compressed-input consumption and exact output length; malformed, truncated,
@@ -37,14 +49,14 @@ trailing and size-mismatched streams leave the caller's output unchanged. The wr
 decoder with private symbols and adds no system zlib dependency. The selector is checked with CHD both disabled
 and enabled.
 
-For a local edit, check the exact inventory before configuring, then build only the provider test and deterministic
-disc fixtures and run the preflight selector:
+For a local edit, check the exact inventory before configuring, then build only the affected provider/image tests
+and deterministic disc fixtures. Run fixture preflight and the focused PBP selectors before any guest suite:
 
 ```sh
 LC_ALL=C sort -cu tests/disc/inventory.txt
 cmake --preset ci -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=ON
-cmake --build --preset ci --target schwaystation-test-disc-media schwaystation-chd-fixtures
-ctest --preset ci --no-tests=error -R '^disc[.]media[.](preflight|fixture_controls)$' --output-on-failure
+cmake --build --preset ci --target schwaystation-test-disc-pbp schwaystation-test-disc-image schwaystation-pbp-fixtures
+ctest --preset ci --no-tests=error -R '^disc[.]image[.]pbp_|^disc[.]playlist$' --output-on-failure
 ```
 
 Use `-DSCHWAYSTATION_CHD=OFF` for the dependency-free negative path; configure removes any stale run-local CHD
