@@ -18,10 +18,11 @@ CHD-off builds it confirms the fixture and manifest are absent and `.chd` remain
 
 ## PBP provider
 
-The PBP provider is a separate host-side source in `schwaystation_disc_image`. Its build-local producer copies
-the owned first MODE2/2352 track into an equivalent single-track CUE, then generates the same unencrypted PSISO
-PBP twice and requires byte identity. Raw-DEFLATE blocks are independently decoded with Python's standard
-library. The PBP has a 1.5 MiB cap because the documented PSAR data base is at `PSAR + 0x100000`; the separate
+The PBP provider is a separate host-side source in `schwaystation_disc_image`. Its build-local producer creates
+a separate 64-sector, one-data-track ISO source fixture, builds the PBP-specific guest without a CDDA sequence,
+then generates the same unencrypted PSISO PBP twice and requires byte identity. Raw-DEFLATE blocks are
+independently decoded with Python's standard library. The PBP has a 1.5 MiB cap because the documented PSAR
+data base is at `PSAR + 0x100000`; the separate
 CUE/BIN image cap remains 512 KiB. No generated PBP bytes are committed.
 
 `disc.image.pbp_preflight` checks source CUE track count, raw sectors, PBP directory and PSISO metadata, TOC,
@@ -44,6 +45,12 @@ in forward and reverse order, TOC, zero subcode and content identity against `di
 `disc.image.pbp_raw` constructs a one-block PBP with a verbatim block from the owned fixture and verifies sector
 bytes through the provider. These selectors require `disc_pbp_preflight`, so fixture identity and extent checks
 run before provider reads.
+
+The bounded guest selectors exercise only the owned one-data-track NTSC-U fixture: boot, a 16-sector
+read/replay, and the first FMV frame. They depend on PBP fixture preflight and complete sector/TOC parity before
+launch. This establishes behavior for that source fixture only; PBP CDDA/audio, multiple tracks, other profiles,
+encrypted or PGD layouts, multidisc packages and other untested variants remain unsupported or unknown. The PBP
+guest omits the original CUE/CHD CDDA sequence, whose two-track predicates and hashes remain unchanged.
 
 `runner.disc.pbp` compares runner probe output, a fixed-frame hash and save identity against the equivalent
 single-track CUE. It also checks unsupported PSAR markers and malformed tables/streams fail before a guest frame.
@@ -76,6 +83,15 @@ LC_ALL=C sort -cu tests/disc/inventory.txt
 cmake --preset ci -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=ON
 cmake --build --preset ci --target schwaystation-test-disc-pbp schwaystation-test-disc-image schwaystation-pbp-fixtures
 ctest --preset ci --no-tests=error -R '^disc[.]image[.]pbp_|^disc[.]playlist$' --output-on-failure
+```
+
+Before bounded guest checks, verify the sorted guest inventory and run the PBP input preflight, full source parity
+and compatibility feature preflight. Then run only the bounded PBP guest selectors:
+
+```sh
+LC_ALL=C sort -cu tests/disc/inventory.txt
+ctest --preset ci --no-tests=error -R '^disc[.]image[.]pbp_(preflight|parity)$|^compat[.]features[.]preflight$' --output-on-failure
+ctest --preset ci --no-tests=error -R '^disc[.]fixture[.]pbp[.](boot|read|fmv)$' --output-on-failure
 ```
 
 Use `-DSCHWAYSTATION_CHD=OFF` for the dependency-free negative path; configure removes any stale run-local CHD

@@ -977,10 +977,10 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
     endif()
   endforeach()
   set(expected_features "${WORK_ROOT}/compat-features-expected.csv")
-  file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0,2026-11-20\n")
+  file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0,2026-11-20\npbp,ntsc-u,none,cdrom,disc_boot.one_data_track+toc+sectors+subcode+guest.boot+read+fmv_first_frame,pass,provider.disc.image.pbp_parity.64x1.exit0;runner.disc.pbp.exit0;libretro.content.pbp.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.pbp.boot+read+fmv.exit0;hosted_ci.not_run,2026-11-21\n")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
       sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${SOURCE_ROOT}/tests/compat/features.csv"
-      "${expected_features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-20 features
+      "${expected_features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-21 features
     RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
   if(NOT "${result}" STREQUAL "0")
     message(FATAL_ERROR "checked-in feature ledger differs from independent expected unknown results: ${result}: ${output}${error}")
