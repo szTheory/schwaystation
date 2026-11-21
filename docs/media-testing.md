@@ -21,6 +21,12 @@ the production private boundary against empty and truncated headers, bad magic, 
 and out-of-range or overflowing section offsets. This slice does not yet accept PSISO sectors, so runner and
 libretro metadata do not advertise PBP.
 
+`disc.image.pbp_inflate` exercises the standalone raw-block wrapper with fixed stored and Huffman streams. It
+requires terminal success, exact compressed-input consumption and exact output length; malformed, truncated,
+trailing and size-mismatched streams leave the caller's output unchanged. The wrapper uses the pinned miniz
+decoder with private symbols and adds no system zlib dependency. The selector is checked with CHD both disabled
+and enabled.
+
 For a local edit, check the exact inventory before configuring, then build only the provider test and deterministic
 disc fixtures and run the preflight selector:
 

@@ -65,6 +65,9 @@ schway_warnings(schwaystation-test-disc-pbp)
 schway_add_test(NAME disc.image.pbp_headers
   COMMAND schwaystation-test-disc-pbp ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 15)
+schway_add_test(NAME disc.image.pbp_inflate
+  COMMAND schwaystation-test-disc-pbp --inflate
+  LABELS disc portable TIMEOUT 15)
 
 schway_add_test(NAME disc.image.chd_headers
   COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests

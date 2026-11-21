@@ -25,6 +25,7 @@ disc.image.cue_symlink	disc,portable
 disc.image.iso_limits	disc,portable
 disc.image.iso_sector	disc,portable
 disc.image.pbp_headers	disc,portable
+disc.image.pbp_inflate	disc,portable
 disc.media.fixture_controls	disc,portable
 disc.media.preflight	disc,portable
 disc.playlist	disc,portable

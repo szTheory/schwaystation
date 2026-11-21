@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../test_open.h"
+#include "pbp_inflate.h"
 
 #define SCHWAY__DISC_PBP_TEST_HEADER_BYTES 40u
 #define SCHWAY__DISC_PBP_TEST_MARKER_BYTES 12u
@@ -124,10 +125,90 @@ static int run_headers(const char *directory)
     return 0;
 }
 
+static int expect_inflate(const char *name, const uint8_t *input, size_t input_size,
+                          const uint8_t *expected, size_t expected_size,
+                          size_t output_size, int expected_success)
+{
+    uint8_t output[128];
+    size_t i;
+    int success;
+
+    memset(output, 0xa5, sizeof(output));
+    success = schway__pbp_inflate_raw(input, input_size, output, output_size);
+    if (success != expected_success) {
+        fprintf(stderr, "ASSERT disc.image.pbp_inflate: %s returned %d, expected %d\n",
+                name, success, expected_success);
+        return 0;
+    }
+    if (success != 0) {
+        if (expected_size != output_size || memcmp(output, expected, expected_size) != 0) {
+            fprintf(stderr, "ASSERT disc.image.pbp_inflate: %s output differs\n", name);
+            return 0;
+        }
+        for (i = expected_size; i < sizeof(output); i++) {
+            if (output[i] != 0xa5u) {
+                fprintf(stderr, "ASSERT disc.image.pbp_inflate: %s wrote past output\n", name);
+                return 0;
+            }
+        }
+    } else {
+        for (i = 0u; i < sizeof(output); i++) {
+            if (output[i] != 0xa5u) {
+                fprintf(stderr, "ASSERT disc.image.pbp_inflate: %s changed output on failure\n", name);
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+static int run_inflate(void)
+{
+    static const uint8_t stored_stream[] = {
+        0x01u, 0x05u, 0x00u, 0xfau, 0xffu, 'h', 'e', 'l', 'l', 'o'
+    };
+    static const uint8_t stored_output[] = { 'h', 'e', 'l', 'l', 'o' };
+    static const uint8_t huffman_stream[] = {
+        0x2bu, 0x4eu, 0xceu, 0x28u, 0x4fu, 0xacu, 0x2cu, 0x2eu, 0x49u, 0x2cu,
+        0xc9u, 0xccu, 0xcfu, 0x53u, 0x48u, 0xcau, 0x2fu, 0xcdu, 0x4bu, 0x49u,
+        0x4du, 0x51u, 0x28u, 0x4au, 0x2cu, 0x57u, 0x70u, 0x71u, 0x75u, 0xf3u,
+        0x71u, 0x0cu, 0x71u, 0x55u, 0x28u, 0xa6u, 0x82u, 0x0au, 0x00u
+    };
+    static const uint8_t huffman_output[] =
+        "schwaystation bounded raw DEFLATE "
+        "schwaystation bounded raw DEFLATE "
+        "schwaystation bounded raw DEFLATE ";
+    uint8_t trailing[sizeof(stored_stream) + 1u];
+    size_t output_size = sizeof(huffman_output) - 1u;
+
+    memcpy(trailing, stored_stream, sizeof(stored_stream));
+    trailing[sizeof(stored_stream)] = 0u;
+    if (!expect_inflate("stored block", stored_stream, sizeof(stored_stream),
+                        stored_output, sizeof(stored_output), sizeof(stored_output), 1) ||
+        !expect_inflate("fixed Huffman block", huffman_stream, sizeof(huffman_stream),
+                        huffman_output, output_size, output_size, 1) ||
+        !expect_inflate("trailing input", trailing, sizeof(trailing),
+                        stored_output, sizeof(stored_output), sizeof(stored_output), 0) ||
+        !expect_inflate("truncated input", huffman_stream, sizeof(huffman_stream) - 1u,
+                        huffman_output, output_size, output_size, 0) ||
+        !expect_inflate("short expected output", huffman_stream, sizeof(huffman_stream),
+                        huffman_output, output_size, output_size - 1u, 0) ||
+        !expect_inflate("long expected output", huffman_stream, sizeof(huffman_stream),
+                        huffman_output, output_size, output_size + 1u, 0) ||
+        !expect_inflate("output overflow", huffman_stream, sizeof(huffman_stream),
+                        huffman_output, output_size, 10u, 0) ||
+        !expect_inflate("empty input", stored_stream, 0u,
+                        stored_output, sizeof(stored_output), sizeof(stored_output), 0) ||
+        !expect_inflate("empty output", stored_stream, sizeof(stored_stream),
+                        stored_output, sizeof(stored_output), 0u, 0)) return 1;
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc == 2 && strcmp(argv[1], "--inflate") == 0) return run_inflate();
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-disc-pbp <build-test-directory>\n");
+        fprintf(stderr, "usage: schwaystation-test-disc-pbp <build-test-directory>|--inflate\n");
         return 2;
     }
     return run_headers(argv[1]);

@@ -7,7 +7,8 @@ set(schway__pbp_tinfl_symbol_aliases
   tinfl_decompress_mem_to_callback=schway__pbp_tinfl_decompress_mem_to_callback)
 
 add_library(schwaystation_pbp_miniz STATIC
-  "${PROJECT_SOURCE_DIR}/host/miniz/miniz_tinfl.c")
+  "${PROJECT_SOURCE_DIR}/host/miniz/miniz_tinfl.c"
+  "${PROJECT_SOURCE_DIR}/host/pbp_inflate.c")
 target_include_directories(schwaystation_pbp_miniz PUBLIC
   "${PROJECT_SOURCE_DIR}/host/miniz"
   "${PROJECT_SOURCE_DIR}/host/miniz_compat"
