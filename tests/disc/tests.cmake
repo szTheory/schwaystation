@@ -56,7 +56,10 @@ set_target_properties(schwaystation-test-disc-chd PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-chd)
 
-add_executable(schwaystation-test-disc-pbp ${CMAKE_CURRENT_LIST_DIR}/pbp.c)
+add_executable(schwaystation-test-disc-pbp
+  ${CMAKE_CURRENT_LIST_DIR}/pbp.c
+  ${PROJECT_SOURCE_DIR}/runner/sha256.c)
+target_include_directories(schwaystation-test-disc-pbp PRIVATE ${PROJECT_SOURCE_DIR}/runner)
 target_link_libraries(schwaystation-test-disc-pbp PRIVATE schwaystation_disc_image)
 set_target_properties(schwaystation-test-disc-pbp PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
@@ -68,6 +71,25 @@ schway_add_test(NAME disc.image.pbp_headers
 schway_add_test(NAME disc.image.pbp_inflate
   COMMAND schwaystation-test-disc-pbp --inflate
   LABELS disc portable TIMEOUT 15)
+schway_add_test(NAME disc.image.pbp_preflight
+  COMMAND schwaystation-test-disc-pbp --preflight
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.cue"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.bin"
+    "${PROJECT_BINARY_DIR}/tests/disc_boot_pbp.manifest"
+    "${PROJECT_SOURCE_DIR}/tools/gen_pbp.py"
+  LABELS disc portable TIMEOUT 15)
+schway_add_test(NAME disc.image.pbp_fixture_controls
+  COMMAND schwaystation-test-disc-pbp --fixture-controls
+    "${PROJECT_BINARY_DIR}/tests"
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.cue"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.bin"
+    "${PROJECT_BINARY_DIR}/tests/disc_boot_pbp.manifest"
+    "${PROJECT_SOURCE_DIR}/tools/gen_pbp.py"
+  LABELS disc portable TIMEOUT 30)
+set_tests_properties(disc.image.pbp_preflight PROPERTIES FIXTURES_SETUP disc_pbp_preflight)
+set_tests_properties(disc.image.pbp_fixture_controls PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
 
 schway_add_test(NAME disc.image.chd_headers
   COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests

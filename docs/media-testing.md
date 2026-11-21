@@ -16,7 +16,17 @@ hashes, source counts, CHD size and header before guest work. `disc.media.fixtur
 hashes, a missing track, wrong sector count, an oversized CHD, a damaged file and a malformed manifest fail. In
 CHD-off builds it confirms the fixture and manifest are absent and `.chd` remains unsupported.
 
-The PBP provider is a separate host-side source in `schwaystation_disc_image`. `disc.image.pbp_headers` checks
+The PBP provider is a separate host-side source in `schwaystation_disc_image`. Its build-local producer copies
+the owned first MODE2/2352 track into an equivalent single-track CUE, then generates the same unencrypted PSISO
+PBP twice and requires byte identity. Raw-DEFLATE blocks are independently decoded with Python's standard
+library. The PBP has a 1.5 MiB cap because the documented PSAR data base is at `PSAR + 0x100000`; the separate
+CUE/BIN image cap remains 512 KiB. No generated PBP bytes are committed.
+
+`disc.image.pbp_preflight` checks source CUE track count, raw sectors, PBP directory and PSISO metadata, TOC,
+block extents, decoded sector totals, source/generator/output hashes and the PBP-only cap before provider or
+guest consumers run. `disc.image.pbp_fixture_controls` proves wrong digest, missing input, wrong source/TOC count,
+overlap, truncation and over-cap inputs fail for the intended reason. Later provider and guest selectors require
+the `disc_pbp_preflight` CTest fixture. `disc.image.pbp_headers` checks
 the production private boundary against empty and truncated headers, bad magic, encrypted or unknown PSAR markers,
 and out-of-range or overflowing section offsets. This slice does not yet accept PSISO sectors, so runner and
 libretro metadata do not advertise PBP.
