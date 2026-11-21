@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 7
+current_plan: 8
 status: executing
-stopped_at: Completed 10-06-PLAN.md
-last_updated: "2026-11-21T12:27:39Z"
+stopped_at: Completed 10-07-PLAN.md
+last_updated: "2026-11-21T13:16:00Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-06 complete; Plan 10-07 next
-state_head: 83d7bf0
+last_activity_desc: Phase 10 Plan 10-07 complete; Plan 10-08 next
+state_head: e2115d1
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 42
+completed_plans: 43
   percent: 30
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 (PBP disc images) — EXECUTING
-Current Plan: 6
+Current Plan: 8
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-06 complete; Plan 10-07 is next
+Last activity: 2026-11-21 — Plan 10-07 complete; Plan 10-08 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -776,6 +776,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 09 P12 | 38m37s | 2 tasks | 9 files |
 | Phase 09 P14 | 22m | 2 tasks | 7 files |
 | Phase 10 P01 | 24m53s | 3 tasks | 22 files |
+| Phase 10 P07 | 44m | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -1171,6 +1172,8 @@ Recent decisions affecting current work:
 - [Phase 09]: Leave CHD playlist membership out of Plan 09-12 because the existing provider rejects CHD playlist children.
 - [Phase 09]: Plan 09-14 reuses the bounded boot/read/audio/FMV guest paths and pins for CHD input.
 - [Phase 09]: The local CHD compatibility predicate passes on provider, host, package and guest evidence; hosted lane/hash/fuzz and WASI size remain unknown.
+- [Phase 10]: Keep the PBP fuzz corpus as 14 generated mutation scripts capped at 256 bytes, with build-owned raw and compressed baselines and no committed disc bytes.
+- [Phase 10]: Keep all Nightly fuzz cases; skip CHD and non-PBP fuzz work only when the classifier proves a pull request is PBP-only.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1413,12 +1416,13 @@ come from `AGENTS.md`.
 | 2026-11-14 | /gsd-execute-plan 05-06 | Codex, OpenGSD 1.20.0; sequential shared checkout; BRR tracer TDD GREEN and focused save-state continuation checks; full 24-voice/mixer task moved to 05-22 | GPT-6 session (exact model ID not exposed) |
 | 2026-11-14 | /gsd-execute-phase 5 plan 05-12 | Codex, OpenGSD 1.21.0; sequential shared checkout; test-only PCM capture, six region/callback comparisons, reset/reload/cadence/AV checks | GPT-6 session (exact model ID not exposed) |
 | 2026-11-14 | /gsd-execute-phase 5 plan 05-14 | Codex, OpenGSD 1.21.0; sequential shared checkout; active PCM save/load continuation, malformed queued SPU address rejection, atomic ring refusal, state/DMA/reverb/API checks | GPT-6 session (exact model ID not exposed) |
+| 2026-11-21 | /gsd-execute-phase 10 plan 10-07 | Codex, OpenGSD 1.21.0; focused PBP replay/bounds, 14-seed ASan/UBSan campaign in native ARM64 Ubuntu Docker (54,946 inputs/61s), Act routing dry-run, 3,900/3,901 line budget; 44m wall | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-21T06:16:36.085Z
-Stopped at: Completed 10-01-PLAN.md
-Resume file: .planning/phases/10-pbp-disc-images/10-02-PLAN.md
+Last session: 2026-11-21T13:12:20.780Z
+Stopped at: Completed 10-07-PLAN.md
+Resume file: None
 
 ### v1.0 session history
 
