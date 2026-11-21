@@ -91,6 +91,8 @@ armips 62adab4ef30d https://github.com/Kingcom/armips/archive/62adab4ef30da765f5
 # Build-only disc media tools. mkpsxiso's source archive contains gitlinks, so its required
 # permissive submodules are pinned and fetched separately; FLAC is disabled (mkpsxiso is the only target).
 # psxavenc is built once by the Ubuntu media producer and its output is handed to each platform leg.
+libchdr 47d794151b2b64f6aba60304e6480f4f5a2bc24b https://api.github.com/repos/rtissera/libchdr/tarball/47d794151b2b64f6aba60304e6480f4f5a2bc24b d2f1756ba5dced374ea1288943fecee92fcab2351ea99add5c726e42d3561957
+libchdman-rs 7f71bdf3d4099dc38bded49c6745e453005d6e41 https://github.com/danifunker/libchdman-rs/archive/7f71bdf3d4099dc38bded49c6745e453005d6e41.tar.gz 7346f16486f114af808c6b361228ce9c816156bfd910c8ca8f7727a21d2b6a89
 mkpsxiso 54fb1644ed8741223583e2dcda358b75a205e214 https://github.com/Lameguy64/mkpsxiso/archive/refs/tags/v2.30.tar.gz b44778180d239a586c13762322a1f4b9692c787db8772790ddd2fa255a75d9e0
 mkpsxiso-tinyxml2 3dcad8e3c38e7091ae3771bf63020027f91715ce https://github.com/leethomason/tinyxml2/archive/3dcad8e3c38e7091ae3771bf63020027f91715ce.tar.gz f683db3d28be7c999df8c45f469466ca562eae42368e69797ed0caa705cef324
 mkpsxiso-miniaudio 9634bedb5b5a2ca38c1ee7108a9358a4e233f14d https://github.com/mackron/miniaudio/archive/9634bedb5b5a2ca38c1ee7108a9358a4e233f14d.tar.gz 1a3a79b80fc6f0b0cc155e28b954a598e0ddfa2db64e2afa8466be88c476fa55

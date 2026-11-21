@@ -1,10 +1,63 @@
 # Disc images
 
 The runner and libretro host use `schway_disc_image` to provide sector data to
-the core. File access stays in the host. The provider currently accepts cooked
-`.iso` images and `.cue` sheets whose data files contain MODE1/2048,
-MODE2/2352, or AUDIO tracks. It rejects `.chd`, `.pbp`, `.ecm`, and `.ccd` as
-unsupported formats; those formats are not sniffed or partially opened.
+the core. File access stays in the host. The provider accepts cooked `.iso`
+images and `.cue` sheets whose data files contain MODE1/2048, MODE2/2352, or
+AUDIO tracks. With `SCHWAYSTATION_CHD=ON`, it also opens the bounded CHD subset
+below through the same raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off
+by default; `.chd`, `.pbp`, `.ecm`, and `.ccd` remain unsupported when their
+providers are not enabled or implemented.
+
+## CHD metadata subset
+
+`SCHWAYSTATION_CHD` is off by default. The bounded header reader recognizes
+CHD v1 through v5 header layouts, but the PlayStation CD metadata path currently
+accepts v3 through v5 with sequential `CHTR` or `CHT2` track records. CHD v1
+and v2, images without track records, non-track metadata, mixed metadata tags,
+and non-CD layouts are unsupported.
+
+The accepted track types are `AUDIO` and raw `MODE1_RAW` or `MODE2_RAW` data.
+Track and pregap subcode types must be `NONE`; subcode-bearing CHDs are
+unsupported. `POSTGAP` must be zero. CHT2 pregaps with a `V`-prefixed `PGTYPE`
+are stored in the track frames; an unprefixed pregap is virtual. Both require
+the pregap type to match the track type. Stored pregap frames count in
+`FRAMES`; virtual pregap frames do not. Track order and counts are checked
+before narrowing to public TOC fields.
+
+The CHD storage stream pads each track to a four-frame boundary. The reader
+includes those frames when reconciling the CHD logical byte count, but excludes
+them from public LBAs and leadouts. Virtual pregap sectors use the same blank
+sector construction as the CUE provider; stored pregaps map to their source
+frames. CHD track and pregap subcode metadata must say `NONE`; returned subcode
+bytes come from the CHD sector stream, with the owned no-subcode fixture
+returning 96 zero bytes per sector.
+
+The media preflight checks the owned CUE/CHD inputs, manifest digests and track
+geometry before guest runs. `disc.image.chd_parity` checks all 222 logical
+sectors in forward and reverse order, sector guards, TOC equality, absent
+subcode bytes and content-based save identity. `disc.image.chd_open` checks
+shared routing and failed-open isolation, while `disc.image.chd_boundaries`
+covers track/index/leadout and each eight-frame hunk transition.
+`disc.image.chd_headers`, `disc.image.chd_metadata`, and `disc.image.chd_toc`
+cover header bounds, metadata variants, and normalized TOC fields. The bounded
+owned guest reuses its CUE expectations and completion limits through CHD in
+`disc.fixture.chd.boot`, `.read`, `.audio`, and `.fmv`; the media parity and
+feature-key preflights finish before these cases run. `runner.disc.chd` and
+`libretro.content.chd` cover the two shipped hosts, and `release.archive_contents`
+plus `release.notices` check the CHD-enabled and disabled package outputs.
+
+Open errors retain the shared image status: malformed headers or geometry use
+`BAD_IMAGE`, unsupported versions, parent images and metadata use
+`UNSUPPORTED`, configured byte/hunk/track bounds use `LIMIT`, and open-time
+file-read failures use `IO`. A later hunk decode failure makes the sector
+callback return zero. A failed open leaves the image pointer null; its error
+message identifies the rejected condition.
+
+The host limits image data to 1 GiB, CHD hunks to 16 MiB, and CHD files to
+65,536 hunks. A compressed v5 map is limited to 16 MiB; combined compressed
+and decoded map storage is limited to 17 MiB. Header, map, metadata and hunk
+extents are checked before libchdr decodes the image. CHD parent-image
+references and CHD versions 1 and 2 are unsupported.
 
 ## Playlists
 

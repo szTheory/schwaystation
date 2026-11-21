@@ -68,6 +68,16 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref || '' }}
+      - name: Cheap source, inventory and route preflight
+        run: |
+          set -eu
+          cmake -DMODE=pins -DDIR=.github/workflows -P tests/cmake/workflows.cmake
+          cmake -DMODE=timeouts -DDIR=.github/workflows -P tests/cmake/workflows.cmake
+          cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake
+          for inventory in tests/inventory/*.txt tests/disc/inventory.txt tests/fuzz/inventory.txt tests/release/inventory.txt; do
+            LC_ALL=C sort -cu "$inventory"
+          done
+          cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake
       # A failed listing adds a path outside .planning/, so it counts as heavy;
       # CHANGED catches a listing cut short at the API's 3000 files.
       - id: classify
@@ -510,12 +520,37 @@ jobs:
           cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
           cmake -DOPENBIOS_INPUT=build/asan/openbios/openbios-fast.bin -DEXPECTED_FILE=tests/built/fast-expected.txt -P cmake/OpenBIOS.cmake
       # clang-21 is on the image; its sanitizer runtimes may not be.
-      - name: Sanitizer runtimes
+      - name: Sanitizer runtime
         run: dpkg -s libclang-rt-21-dev > /dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y libclang-rt-21-dev; }
+      # Keep the fixture-only encoder outside sanitizer instrumentation; the CHD reader and tests remain instrumented.
+      - name: Build native CHD fixture generator
+        run: |
+          cmake --preset chd-tool
+          cmake --build --preset chd-tool
+          test -x build/chd-tool/tools/schwaystation-chd-tool
+      - name: Configure ASan with CHD
+        env:
+          SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/asan/disc-media
+        run: >-
+          cmake --preset asan -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=OFF
+          -DSCHWAYSTATION_CHD_TOOL_EXECUTABLE=${{ github.workspace }}/build/chd-tool/tools/schwaystation-chd-tool
+      - name: Confirm CHD configuration before build
+        run: |
+          grep -Fxq 'SCHWAYSTATION_CHD:BOOL=ON' build/asan/CMakeCache.txt
+          grep -Fxq 'SCHWAYSTATION_BUILD_CHD_TOOL:BOOL=OFF' build/asan/CMakeCache.txt
+          grep -Fxq "SCHWAYSTATION_CHD_TOOL_EXECUTABLE:FILEPATH=$GITHUB_WORKSPACE/build/chd-tool/tools/schwaystation-chd-tool" build/asan/CMakeCache.txt
       - name: Build and test
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/asan/disc-media
-        run: cmake --workflow --preset asan
+        run: |
+          cmake --build --preset asan --target schwaystation-disc-fixtures
+          cmake -DCHD_TOOL=build/chd-tool/tools/schwaystation-chd-tool \
+            -DCUE=build/asan/fixtures/disc_boot.cue \
+            -DOUTPUT_CHD=build/asan/fixtures/disc_boot.chd \
+            -DMANIFEST=build/asan/tests/disc_boot.chd.manifest \
+            -P cmake/CHDFixtures.cmake
+          cmake --build --preset asan
+          ctest --preset asan
       # The abi and release checks read binary shapes the instrumentation changes.
       - name: Every test ran
         run: >-
@@ -565,12 +600,35 @@ jobs:
         run: |
           cmake -DOPENBIOS_INPUT=build/be32/openbios/openbios.bin -DEXPECTED_FILE=tests/built/expected.txt -P cmake/OpenBIOS.cmake
           cmake -DOPENBIOS_INPUT=build/be32/openbios/openbios-fast.bin -DEXPECTED_FILE=tests/built/fast-expected.txt -P cmake/OpenBIOS.cmake
+      - name: Build and copy native CHD fixture generator
+        run: |
+          set -eu
+          cmake --preset chd-tool
+          cmake --build --preset chd-tool
+          test -x build/chd-tool/tools/schwaystation-chd-tool
+          cmake -E make_directory build/be32/tests
+          cmake -E copy build/chd-tool/tools/schwaystation-chd-tool build/be32/tests/schwaystation-chd-tool
+          test -x build/be32/tests/schwaystation-chd-tool
       - name: Cross compiler and qemu-user
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-powerpc-linux-gnu g++-powerpc-linux-gnu qemu-user
+      - name: Configure target and create checked CHD fixture
+        env:
+          SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/be32/disc-media
+        run: |
+          set -eu
+          cmake --preset be32-chd
+          cmake --build build/be32 --target schwaystation-disc-fixtures
+          cmake -DCHD_TOOL=build/be32/tests/schwaystation-chd-tool \
+            -DCUE=build/be32/fixtures/disc_boot.cue \
+            -DOUTPUT_CHD=build/be32/fixtures/disc_boot.chd \
+            -DMANIFEST=build/be32/tests/disc_boot.chd.manifest \
+            -P cmake/CHDFixtures.cmake
       - name: Build and test
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/be32/disc-media
-        run: cmake --workflow --preset be32
+        run: |
+          cmake --build --preset be32-chd
+          ctest --preset be32-chd --output-on-failure
       - name: Every test ran
         run: >-
           cmake -DJUNIT=build/be32/junit.xml -DINVENTORY=tests/inventory/ci.txt
@@ -629,10 +687,31 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y --no-install-recommends wasi-libc libclang-rt-21-dev-wasm32
           scripts/fetch-pin.sh wasmtime-x86_64-linux build/pins/wasmtime
-      - name: Configure and build
+      - name: Build and copy native CHD fixture generator
+        run: |
+          set -eu
+          cmake --preset chd-tool
+          cmake --build --preset chd-tool
+          test -x build/chd-tool/tools/schwaystation-chd-tool
+          cmake -E make_directory build/wasm32/tests
+          cmake -E copy build/chd-tool/tools/schwaystation-chd-tool build/wasm32/tests/schwaystation-chd-tool
+          test -x build/wasm32/tests/schwaystation-chd-tool
+      - name: Configure target and create checked CHD fixture
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/wasm32/disc-media
-        run: cmake --workflow --preset wasm32-build
+        run: |
+          set -eu
+          cmake --preset wasm32-chd
+          cmake --build build/wasm32 --target schwaystation-disc-fixtures
+          cmake -DCHD_TOOL=build/wasm32/tests/schwaystation-chd-tool \
+            -DCUE=build/wasm32/fixtures/disc_boot.cue \
+            -DOUTPUT_CHD=build/wasm32/fixtures/disc_boot.chd \
+            -DMANIFEST=build/wasm32/tests/disc_boot.chd.manifest \
+            -P cmake/CHDFixtures.cmake
+      - name: Build target before WASI size check
+        env:
+          SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/wasm32/disc-media
+        run: cmake --build --preset wasm32-chd
       - name: Measure linked WASI module
         run: |
           # QUALITY_WASM_COMPARE_BEGIN
@@ -641,7 +720,7 @@ jobs:
       - name: WASI persistence preflight
         run: ctest --preset wasm32-preflight --output-on-failure
       - name: Portable tests
-        run: ctest --preset wasm32 --output-on-failure
+        run: ctest --preset wasm32-chd --output-on-failure
       - name: Every test ran
         run: >-
           cmake -DJUNIT=build/wasm32/junit.xml -DINVENTORY=tests/inventory/wasm32.txt

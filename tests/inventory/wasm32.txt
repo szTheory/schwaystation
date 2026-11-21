@@ -18,7 +18,6 @@ install
 mdec
 perf
 policy
-release
 runner
 sio
 spu

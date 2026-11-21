@@ -97,7 +97,8 @@ target_link_libraries(schwaystation-libretro-card-test PRIVATE
   schwaystation::schwaystation schwaystation-host schwaystation_disc_image)
 target_compile_definitions(schwaystation-libretro-card-test PRIVATE
   SCHWAYSTATION_LIBRETRO_TESTING
-  SCHWAYSTATION_LIBRETRO_VERSION="${PROJECT_VERSION}")
+  SCHWAYSTATION_LIBRETRO_VERSION="${PROJECT_VERSION}"
+  SCHWAYSTATION_CHD=$<BOOL:${SCHWAYSTATION_CHD}>)
 set_target_properties(schwaystation-libretro-card-test PROPERTIES C_VISIBILITY_PRESET hidden)
 schway_warnings(schwaystation-libretro-card-test)
 
@@ -108,6 +109,8 @@ add_executable(schwaystation-test-libretro-host ${CMAKE_CURRENT_LIST_DIR}/host.c
 target_include_directories(schwaystation-test-libretro-host PRIVATE ${PROJECT_SOURCE_DIR}/libretro)
 target_link_libraries(schwaystation-test-libretro-host PRIVATE schwaystation::schwaystation
   schwaystation-host schwaystation_disc_image ${CMAKE_DL_LIBS})
+target_compile_definitions(schwaystation-test-libretro-host PRIVATE
+  SCHWAYSTATION_CHD=$<BOOL:${SCHWAYSTATION_CHD}>)
 set_target_properties(schwaystation-test-libretro-host PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-libretro-host)
@@ -230,6 +233,22 @@ schway_add_test(NAME libretro.content.lifecycle
     $<TARGET_FILE:schwaystation_libretro> content-lifecycle
     ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe ${PROJECT_BINARY_DIR}/tests
   LABELS libretro portable TIMEOUT 120)
+
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-content-chd)
+file(WRITE ${PROJECT_BINARY_DIR}/tests/libretro-content-chd/invalid.chd "not a CHD image\n")
+# Fault prevented: CHD is omitted from the frontend path or extension contract,
+# its sector callbacks differ from CUE, or a rejected replacement loses media.
+schway_add_test(NAME libretro.content.chd
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation-libretro-card-test> content-chd
+    $<BOOL:${SCHWAYSTATION_CHD}>
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue
+    ${PROJECT_BINARY_DIR}/tests/libretro-content-chd/invalid.chd
+    ${PROJECT_BINARY_DIR}/openbios ${PROJECT_BINARY_DIR}/tests/libretro-content-chd
+  LABELS libretro portable TIMEOUT 180)
+set_tests_properties(libretro.content.chd PROPERTIES
+  FIXTURES_REQUIRED "disc_media_preflight;compat_features_preflight")
 
 # Fault prevented: libretro hides SAVE_RAM, writes the frontend-owned first
 # card, or fails to load and persist the independent second card.

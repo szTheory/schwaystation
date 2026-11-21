@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 9
-current_phase_name: CHD disc images
+current_phase: 10
+current_phase_name: PBP disc images
 current_plan: Not started
 status: planning
-stopped_at: Phase 8 verified; ship pending before Phase 9 work
-last_updated: "2026-11-19T23:12:29Z"
-last_activity: 2026-11-19
-last_activity_desc: Phase 8 verification passed; phase PR and release must finish before Phase 9 starts
-state_head: 909cebe61d580e413e74e9c05f00d1085862e015
+stopped_at: Phase 9 complete, ready to plan Phase 10
+last_updated: "2026-11-21T01:24:41.094Z"
+last_activity: 2026-11-20
+last_activity_desc: Phase 9 complete, transitioned to Phase 10
+state_head: 16dc50920b793316ad1295d47168bdb39d2cc87b
 progress:
   total_phases: 10
-  completed_phases: 2
-  total_plans: 20
-  completed_plans: 20
-  percent: 20
+  completed_phases: 3
+  total_plans: 35
+  completed_plans: 35
+  percent: 30
 ---
 
 # Project State
@@ -26,15 +26,257 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 9 — CHD disc images, after Phase 8 ships
+**Current focus:** Phase 10 — PBP disc images
 
 ## Current Position
 
-Phase: 9 — CHD disc images
+Phase: 10 — PBP disc images
 Current Plan: Not started
-Total Plans in Phase: Not planned
-Status: Ready to plan after Phase 8 PR, release and green main CI
-Last activity: 2026-11-19 — Phase 8 verification passed; ship before Phase 9 discussion.
+Total Plans in Phase: TBD
+Status: Ready to plan
+Last activity: 2026-11-20 — Phase 9 complete, transitioned to Phase 10
+
+### Phase 9 plan verification (2026-11-19)
+
+Runtime/model: Codex typed `gsd-plan-checker`, gpt-6-luna xhigh. The final independent review passed all fourteen
+plans with no requirement, decision, edge-case, dependency, file-scope, or command-direction gaps. Its prior
+blocker for OFF archive validation was fixed by explicitly packaging and checking both CHD ON and OFF; three
+newly surfaced file-scope warnings were resolved by splitting the package and final guest-evidence slices without
+changing acceptance scope. The fixture-generator license gate remains a prerequisite before any tool use. The
+command-path probe had 30 `not_applicable` rows because no Phase 9 verification artifact exists yet; the
+failure-direction probe checked all 30 commands with no findings. No test suite or CI ran during planning.
+
+### Phase 9 Plan 09-01 execution (2026-11-19)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable. The configured worktree opt-out kept this
+plan sequential and inline. The owned CUE's production callback preflight passed 1/1 after configure and a
+targeted build; it was rerun at the committed head in under one second with no build work. Disc, fuzz and
+compatibility inventories and both diff checks passed. No guest boot, full suite, hosted CI or `act` run was
+needed for the skeleton. The first configure noted that `SCHWAYSTATION_CHD=OFF` is unused until the later option
+plan; configuration still passed. The two task commits are `b6ae475` and `80be717`; Plan 09-01 summary is
+committed separately. MEDIA-01 and MEDIA-02 remain pending because this shared preflight does not complete their
+phase-wide provider, bounds and fuzz requirements. Plan 09-02 is next.
+
+### Phase 9 Plan 09-02 execution (2026-11-20)
+
+Runtime/model: Codex with OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The configured worktree opt-out kept this plan sequential and inline. The exact libchdr commit and archive digest were verified, and a fresh enabled build compiled the static C closure without enabling C++. Explicit CMake cache settings keep system codecs, micro-flac, upstream tests and LZMA assembly disabled. ON/OFF malformed-header selectors passed 1/1, the default-OFF graph fetched no dependency, and a core-only CHD-on configure also fetched none. The cache-policy warning and off-only `-Werror` helper warning were corrected before the passing runs. No hosted CI, `act`, or full suite was needed for this plan. Task commits are `d2b0f31` and `e63727f`; summary `db9134e`. The private TOC and sector functions remain fail-closed until Plan 09-05 projects validated metadata and storage padding.
+
+### Phase 9 Plan 09-03 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The wall interval from the previous
+saved state at 04:28:46Z to completion at 05:12:09Z was 43 minutes; active time was not measured. The pinned
+`libchdman-rs` archive and full reachable C/C++/codec closure cleared the permissive-license gate. The native
+fixture tool is opt-in and excluded from normal build/install paths. Its configure preflight checks archive and
+source identity, licenses, source count and submodule metadata before target creation. The ON configure/build
+passed; a fresh OFF configure completed in 0.3 seconds with no C++ compiler or generator archive. A deliberate
+mutation of the extracted shim was removed on reconfigure, confirming source reset from the verified archive.
+The incremental native build had no work; no fixture generation, full suite, hosted CI or `act` run applies yet.
+The useful bottleneck discoveries were the missing OSD include and macOS `std::filesystem` deployment floor;
+both were corrected in the target-only wrapper. A cached-source weakness was also closed before accepting the
+preflight. Task commits are `a8a37c0` and `153f90b`; Plan 09-04 is next.
+
+### Phase 9 Plan 09-04 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The wall interval from the previous
+saved state at 05:12:09Z to completion at 06:03:28Z was 51 minutes; active time was not measured. The owned
+two-track source totals 522,144 bytes (64 data sectors and 158 audio sectors). The pinned native generator
+produced the same 5,552-byte CHD twice, SHA-256
+`4952c3a05ff2e2e596deed7ed2d37358a646790b890d5ed38484feec5b797569`, and wrote source/tool/output identity to a
+build-directory manifest. Sorted inventory, generated-media and exact CUE/track-size preflights passed before
+compression. Enabled and disabled structural selectors each passed 2/2 (0.07 seconds and 0.02 seconds). The
+controls reject bad hashes, missing inputs, wrong counts, over-cap output and malformed files before guest work.
+No guest or full suite ran because the plan explicitly stops before parity; no hosted workflow changed, so CI
+and `act` were not useful. The plan correction `b3b38c0` keeps the fixture build-local; task commits are
+`54bae5a` and `472c371`. Plan 09-05 is next.
+
+### Phase 9 Plan 09-05 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The wall interval from the preceding
+STATE checkpoint at 06:03:28Z through completion at 09:22:03Z was 3h19m; active time was not measured. The
+bounded CHTR/CHT2 parser projects the owned CHD into the same logical TOC as its CUE, including the stored
+150-sector pregap without counting four-frame storage padding. Cheap sorted-inventory/diff checks passed first.
+The CHD-on generated-fixture selectors passed 4/4 in 0.06 seconds; CHD-off selectors passed 3/3 in 0.03
+seconds. No workflow changed, so no full suite, `act` or hosted CI run applied. The implementation and docs task
+commits are `725c464` and `6a4d468`; plan-scope corrections are `ba579e5`, `7af3a5f` and `04d3558`; summary is
+committed separately. MEDIA-01, MEDIA-02 and CHD-01 remain phase-level pending. Plan 09-06 is next.
+
+### Phase 9 Plan 09-06 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID is not exposed. The 32-minute wall interval from
+the preceding STATE checkpoint at 09:22:03Z to plan closeout included a targeted diagnosis of a byte-order
+mismatch at the first data-track sector. The owned fixture showed decoded CHD CDDA words are pair-swapped from
+the CUE/BIN payload; normalizing each audio word restored exact output. The enabled and disabled CHD/media
+slices each passed 8/8 (0.06 seconds and 0.01 seconds); parity covered all 222 sectors in forward and reverse
+order and returned the same content identity. Sorted inventory and diff preflights passed before the full
+slice. No workflow changed, so `act`, hosted CI and a full suite added no relevant coverage. Task commits are
+`9758617` and `277b592`; the summary is committed separately. MEDIA-01 and CHD-01 remain phase-level pending.
+Plan 09-07 is next.
+
+### Phase 9 Plan 09-07 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; primary model ID unavailable; typed executor gpt-6-luna xhigh.
+The wall interval from the preceding STATE checkpoint at 09:54:00Z through closeout at 12:46:09Z was 2h52m;
+active time was not measured. Shared checked arithmetic and the existing 1 GiB bound now guard both CUE and CHD
+parsing. CHD preflight rejects oversized hunk/map/metadata allocations, invalid extents, parent references and
+unsafe offset narrowing before libchdr decode. The production-parser replay validates stable TOCs, repeated
+successful reads, bounded leadout and failure-atomic rejected opens in a build-owned directory.
+
+Cheap `git diff --check`, preset JSON parsing, sorted fuzz inventory and the generated fixture size/hash checks
+passed first. The enabled CTest replay passed 2/2, including `disc.media.preflight`; the disabled replay passed
+1/1. The CHD-on `disc.image.*` selector slice passed 16/16 in 0.03s after rebuilding the ON-mode preflight
+binary and fixture. The sanitizer campaign ran in native ARM64 Ubuntu 26.04 Docker because Homebrew's macOS
+ASan runtime stalled before `main`. The image's CMake 4.2.3 was below this repository's 4.3/schema-11 preset
+minimum, so the fuzz tree was configured directly with the preset's ASan/UBSan flags and CHD settings; the user
+preset file was left untouched. A one-iteration smoke on a copy of the 13-input corpus passed, then the bounded
+campaign exited 0 after 31s and 47,207 runs (701 edges, 1,304 features, about 383 MB peak RSS). The run-local
+corpus and crash artifact paths stay under `build/fuzz`.
+
+The first campaign exposed a harness false positive: a one-byte payload mutation can open with a stable TOC
+while lazy decode of a compressed hunk fails consistently. The harness now allows stable read failure, compares
+repeated data when a read succeeds, validates the TOC, and rejects a leadout read; `unreadable_hunk` derives
+from the generated fixture, so no disc bytes are committed. The CTest selector command now builds the generated
+fixture and mode-specific media preflight first, avoiding stale ON/OFF binaries after configuration changes.
+No workflow changed, so no `act` or hosted CI run was needed. Task commits are `b6205e7` and `5e5915b`; the
+bounded-campaign and selector-prerequisite evidence commits are `57d4579` and `a6271c2`. Plan 09-08 is next.
+
+### Phase 9 Plan 09-08 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD CLI 1.20.0; executor gpt-6-luna xhigh and reviewer gpt-6-luna xhigh. The wall
+interval from the saved STATE checkpoint at 12:51:00Z through final focused verification at 15:37:33Z was
+2h46m33s; active time was not measured. Review found and fixed a feature-identity gap: the protected ratchet
+now binds provider, profile, protection, peripheral and predicate. The dated allowance and negative controls
+cover changes to prior passing combinations and candidate/fresh-result disagreement. Review also caught
+minified gate branches and an outdated three-field allowance fixture; readable branches and the five-field
+fixture are restored. The final focused selector passed 6/6 in 0.91s, helper budget passed at 3900/3901,
+sorted inventory and shell syntax checks passed, and code review is clean. No full suite, `act` or hosted CI run
+applied because this plan changed no workflow. Task and follow-up commits are `aa18277`, `d40e18b`, `45b7867`,
+`8d66514` and `249e753`; Plan 09-10 is next by dependency order, then Plan 09-09.
+
+### Phase 9 Plan 09-10 execution (2026-11-20)
+
+Runtime/model: Codex runtime, executor model gpt-6-luna. The wall interval from the saved STATE checkpoint at
+15:44:44Z through the summary at 16:07:53Z was 23m09s; active time was not measured. Main CI and Release both
+passed on source SHA `830bf4c`; Main used 139.13 runner-minutes and Release's duplicate CI jobs used 117.53.
+Every lane's commit file matched that SHA, but all eighteen Main/Release product ZIP pairs differed by digest;
+Release ZIPs matched the published assets. Waiting for Main's slower required path before Release publication
+projects about 24m25s more wall time than the observed release run. Separate gates and all lanes remain required.
+The measured evidence and disposition are in `09-CI-REUSE.md`; todo 050 now carries the decision and the Plan 11
+workflow-invariant check. No build, test suite, `act`, or hosted run was needed. Task commits are `3847aa3` and
+`f12fbe7`. Plan 09-09 then completed; Plan 09-13 is next because Plan 09-11 depends on its package checks.
+
+### Phase 9 Plan 09-09 execution (2026-11-20)
+
+Runtime/model: Codex session; primary model ID unavailable; independent gsd-code-reviewer and two read-only planning/CI audits used gpt-6-luna xhigh. The inherited checkpoint did not preserve the full plan start time. The measured review-to-Task-2-commit interval was 6m15s; the wider active duration is unknown. ON/OFF metadata selectors passed 2/2 each, notice selectors 2/2, and compatibility setup/protected-base plus perf allowance selectors passed 3/3 in 0.92s. The counted gate is 3900/3901. Review found a malformed CHD suffix regex; it was corrected and confirmed before the selectors. The first notice run caught an Applies-to parser treating the backticked option as a path; CTest listing also showed the compatibility/perf selectors belong to the CI preset, not hygiene. Both issues were corrected before closeout. No build, broad suite, `act` or hosted run applied because no workflow changed. CI efficiency rules are already discoverable in `AGENTS.md` and `.planning/AUTONOMOUS.md`; Plan 09-11 retains the routing dry run and producer-path measurement. The owner chose to defer the generic source-wide SPDX scanner to the first tracked SPDX-bearing caller; todo 005 now targets Phase 10 planning. Task commits are `d336d33` and `1470276`; review resolution is in `09-REVIEW.md`. Plan 09-13 is next because 09-11 requires both package configurations.
+
+### Phase 9 Plan 09-13 ON package checkpoint (2026-11-20)
+
+Runtime/model: Codex GPT-6 session; exact model ID unavailable. Plan Task 1 is committed as `d275d99`.
+The corrected ON preflight and package command passed: configured CHD ON; metadata claims passed 2/2,
+policy notices passed 2/2, the build completed 229 Ninja actions, and the release archive/metadata/notices
+selectors passed 4/4 in about 0.13 seconds. CPack produced the library, libretro and runner macOS arm64
+archives. The release inventory is sorted and the gate remains 3900/3901 lines. Exact build duration was not
+measured. This records ON evidence before Task 2 replaces these build-tree archives; no hosted URL applies.
+The plan selectors were corrected because `policy.notices` is registered by the hygiene preset, not CI.
+Next: configure CHD OFF in the same build directory, then rebuild, repackage and run the same release checks.
+
+### Phase 9 Plan 09-13 execution (2026-11-20)
+
+Runtime/model: Codex GPT-6 session; exact model ID unavailable. Both configured package legs passed before
+closeout. ON metadata and notice preflights passed 2/2 each, its build completed 229 Ninja actions, and
+`release.archive_contents`, its negative control, `release.notices` and its negative control passed 4/4 in
+about 0.13 seconds. OFF repeated the preflights at 2/2, then rebuilt in 27 Ninja actions and passed the same
+release selectors 4/4 in 0.10 seconds. CPack produced the same library, libretro and runner macOS arm64 ZIP
+names in each leg. Inventory sorting, diff checks and the 3900/3901 budget passed. Wall and active duration
+were not measured. No broad suite, `act` or hosted CI run applied because no workflow changed. The corrected
+plan routes notice checks through `hygiene`; Plan 09-11 retains `act --dryrun` and producer-path timing.
+Todo 005 remains bound to the first tracked SPDX-bearing source in Phase 10. Task implementation commit is
+`d275d99`; the ON checkpoint and plan selector correction are in `5edcbd1`; plan summary/state closeout follows.
+
+### Phase 9 Plan 09-15 execution (2026-11-20)
+
+Runtime/model: Codex gsd-executor gpt-6-luna xhigh; primary session model ID unavailable. Wall time from the
+executor checkpoint at 18:47:57Z through closeout at 19:10:00Z was about 22 minutes; active time was not
+measured. Cheap preset/inventory/budget checks passed in 0.01 seconds and the line budget remained 3900/3901.
+External CHD mode configured in 8.8 seconds and its focused fixture/test build took about 16 seconds. Existing
+generator pins, tool digest and media provenance passed preflight; enabled selectors passed 7/7 in 0.14 seconds.
+Reconfiguring CHD OFF removed both outputs immediately; the disabled selector passed 2/2 in 0.03 seconds.
+The fixture glob check found CHD and excluded the relocated manifest. The first in-tree selector attempt exited 8
+because its build omitted the CHD test executable; rebuilding that target fixed the stale-binary issue, and the
+same selector passed 7/7 in 0.09 seconds. Local BE32/WASI compilers are unavailable (tool check exit 1); hosted
+cross-lane validation is assigned to Plan 09-11. No workflow changed, so no `act` or hosted CI run applied.
+Task commits are `9a35d55` and `4bdeece`; Plan 09-11 is next by dependency order.
+
+### Phase 9 Plan 09-11 execution (2026-11-20)
+
+Runtime/model: Codex GPT-6 session; exact model ID unavailable. The inherited executor completed the Plan 11
+implementation checks but did not preserve a reliable start timestamp or close the summary. The parent recovered
+the committed working tree and completed the plan closeout; wall and active duration are not reliably measured.
+The existing CI `changes` and nightly fuzz jobs now run pin, timeout, sorted-inventory, 3901-line budget and route
+preflights. CHD is enabled in required CI/package presets; BE32 and WASI generate checked fixtures with a copied
+native tool, and nightly adds a CHD campaign with 12 seeds and a 16,384-byte maximum input under the existing
+60-second bound. Main and Release remain separate based on Plan 10's measured
+18-archive digest mismatch and 24m25s serialization cost; todo 050 is completed. Maintainer docs explain Act's
+classifier/matrix limitation and required hosted-only evidence.
+
+Cheap post-change route, pin, timeout, preset, sorted-inventory, diff and budget checks passed; the gate remains
+3901/3901 lines. Both Act dry runs passed using `/tmp` for its cache. Act did not execute workflow steps or prove
+dependent matrix routing. Nightly now uses its already-configured build preset after fixture generation, avoiding
+a duplicate CMake configure; time saved was not measured because clang-21 is unavailable locally. The WASI
+module size remains unknown and `quality.json` stays at 608,540 bytes until the hosted CHD-enabled module is
+measured. No full suite or hosted CI was started; final exact-head verification follows Plan 14 and source review.
+Task commits are `0fc7f50` and `6e60d85`; the shared selector diagnostic follow-up is `82606fc`.
+
+### Phase 9 Plan 09-12 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh; primary session model ID unavailable. Wall time
+was 38m37s from 19:53:15Z to 20:31:52Z; active time was not measured. Sorted runner/libretro inventories,
+fixture inputs and `git diff --check` passed before targeted builds. The CHD-on configure and affected target
+build passed (0.77s); the focused runner/libretro selector passed 14/14 (0.91s). The CHD-off configure and
+affected target build passed (0.73s); the unsupported-path selector passed 6/6 (0.36s), then the local build
+tree was restored to CHD on. The initial runner selector exposed a parallel scratch-directory collision;
+isolating the CHD case removed it. The bounded runner probe now reads CHD through shared disc callbacks, while
+libretro's path acceptance and extension reporting follow the build feature. No broad suite, `act`, or hosted
+CI run was needed for this focused provider integration; Plan 09-14 still owns cross-lane/hosted verification
+and the final reviewed head. Task commits are `69c00c9` and `8a0637d`; planning closeout remains unstaged for
+the root executor.
+
+### Phase 9 planning (2026-11-19)
+
+Runtime/model: Codex typed gsd-planner, gpt-6.1-sol xhigh. Fourteen short plans cover the optional pinned reader,
+complete fixture-tool closure audit, owned fixture producer, exact metadata/sector/subcode parity, shared limits,
+fuzzing, feature ledger, notices, measured CI reuse, all-lane workflow wiring and both shipped hosts. The generator
+is still not cleared; Plan 03 blocks its use until the complete compiled closure is permissive. Independent ledger
+and CI measurement plans can proceed after the skeleton. The source audit maps all four requirements, nine
+decisions and thirteen edge-probe candidates. Source review remains before final verification; no tests or hosted
+runs were launched during planning. Estimate calibration had zero samples, factor 1 and confidence low.
+
+The scope-sanity revision removed redundant notice work from Plan 02, moved ON/OFF archive validation and
+todo 005 closeout to Plan 13, and moved owned-guest parity/feature evidence/docs from Plan 12 to final Plan 14.
+Every plan now declares at most ten modified paths; no requirement, acceptance case, edge resolution, lane,
+fuzz case, notice, resource bound or review-before-verification rule was deferred. Plan 11 waits for both
+package configurations before distributed enablement; source review follows the final Plan 14 handoff.
+
+### Phase 9 research (2026-11-19)
+
+Runtime/model: Codex; `gsd-phase-researcher` gpt-6-luna xhigh. The first research handoff exceeded its expected
+window without an artifact and was stopped; a narrow synthesis pass reused the three completed advisor reports
+and verified project references, then committed `09-RESEARCH.md`. It records the approved libchdr pin and host
+boundary, parity/preflight/package sequence, and required Validation Architecture. The full fixture-generator
+license/build closure remains explicitly unresolved and must be cleared before use. Plan-pre checks found no
+assumption delta, skipped codebase drift because no structure map exists, and found no context drift. The
+deterministic edge probe surfaced 13 applicable edge candidates across the four requirements; the planner must
+resolve or explicitly flag every one. No tests or CI ran during research.
+
+### Phase 9 discussion (2026-11-19)
+
+Runtime/model: Codex, primary GPT-6 model ID unavailable; three `gsd-advisor-researcher` agents on
+gpt-6-luna xhigh. The discussion captured parity-first CHD projection, a run-local fixture generated only from
+a license-cleared pinned tool closure, structural/boundary preflights before guest execution, CHD-enabled release
+artifacts after parity, and measured exact-SHA CI reuse as the only basis for changing Main/Release wiring.
+Folded todos 005 and 050; todo 006 remains with Phase 10. All three focused advisor reviews completed and the
+adversarial pass found no decision that changes the approved scope. Context and discussion log were committed in
+`09-CONTEXT.md` and `09-DISCUSSION-LOG.md`; no implementation test or CI run applies yet. CI/CD efficiency
+guidance is already discoverable in `AGENTS.md` and `.planning/AUTONOMOUS.md` and will be applied at each run.
 
 ### Phase 8 Plan 08-10 execution (2026-11-19)
 
@@ -196,7 +438,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 215
+- Total plans completed: 230
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -212,6 +454,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 06 | 45 | - | - |
 | 7 | 10 | - | - |
 | 8 | 10 | - | - |
+| 9 | 15 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -418,6 +661,11 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 8 P7 | at least 318 min; active time unknown | 2 tasks | 6 files |
 | Phase 8 P08 | at least 27min; active time unavailable | 2 tasks | 10 files |
 | Phase 8 P09 | at least 20min; active time unavailable | 2 tasks | 2 files |
+| Phase 09 P01 | 9m | 2 tasks | 4 files |
+| Phase 09 P08 | 2h 05m | 2 tasks | 10 files |
+| Phase 09 P10 | 23m 09s | 2 tasks | 2 files |
+| Phase 09 P12 | 38m37s | 2 tasks | 9 files |
+| Phase 09 P14 | 22m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -804,6 +1052,15 @@ Recent decisions affecting current work:
 - [Phase 08]: Resolve one save identity from a complete PS-EXE stem or the framed full-image digest; explicit serial overrides remain literal.
 - [Phase 08]: Keep runner auto-identity opt-in and preserve libretro frontend-based card filenames.
 - [Phase 8]: Format 18's new card protocol latches require only the two changed state pins; frame hashes and host-owned card bytes and generations stay unchanged.
+- [Phase 09]: Feature ledger keys use provider, profile, and predicate; protection and peripheral are mandatory descriptive fields.
+- [Phase 09]: Production compatibility allowance checks use the current UTC date; tests inject fixed dates.
+- [Phase 09]: Protected delegation preserves the legacy five-argument title judge and appends kind only for feature-capable judges.
+- [Phase 09]: Retain separate Main and Release CI gates: measured reuse has no wall-clock benefit, and same-source product archive digests differ across all eighteen outputs.
+- [Phase 09]: Read CHD probe metadata and track identity through shared disc callbacks rather than duplicating media parsing.
+- [Phase 09]: Gate libretro CHD acceptance and extension advertisement with SCHWAYSTATION_CHD.
+- [Phase 09]: Leave CHD playlist membership out of Plan 09-12 because the existing provider rejects CHD playlist children.
+- [Phase 09]: Plan 09-14 reuses the bounded boot/read/audio/FMV guest paths and pins for CHD input.
+- [Phase 09]: The local CHD compatibility predicate passes on provider, host, package and guest evidence; hosted lane/hash/fuzz and WASI size remain unknown.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1049,9 +1306,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-19T23:12:29Z
-Stopped at: Phase 8 verified and transitioned; ship Phase 8 before starting Phase 9
-Resume file: None
+Last session: 2026-11-20T21:04:54.561Z
+Stopped at: Phase 9 complete, ready to plan Phase 10
+Resume file: .planning/phases/09-chd-disc-images/09-14-SUMMARY.md
 
 ### v1.0 session history
 
@@ -1233,11 +1490,15 @@ Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable; gsd-ver
 
 ## Operator Next Steps
 
-- Continue Phase 8 per-game card saves through autonomous discussion, planning, execution, review, verification and ship. Run cheap input and inventory checks before long suites, then confirm the merge, green main CI and automatic release before Phase 9. No owner UAT is needed.
+- Push the reviewed Phase 9 corrections and complete one exact-head hosted CI/Nightly rerun. If both pass, write Phase 9 verification, ship PR #32, and confirm the release and main CI before discussing Phase 10. Keep todo 005 for the first tracked SPDX-bearing source and todo 051 bound to Phase 10's first Nightly routing change. No owner UAT is needed.
 
 ### v2.0 roadmap creation (2026-11-18)
 
 Runtime/model: Codex, OpenGSD 1.20.0, gsd-roadmapper gpt-6.2-sol high. The approved milestone has 10 phases and 34 requirements. Phase 9 establishes the shared media controls and feature-ledger checks with the first provider. Later feature phases record their own evidence. Phase 16 reconciles the pinned DAT inventory and gates libretro metadata on the required-capability matrix. The v1.0 MDEC evidence boundary and the standing 300-line real-host limit carry forward. No implementation or phase verification is claimed here.
+
+### Phase 7 verification refresh (2026-11-20)
+
+Runtime/model: Codex/OpenGSD; primary GPT-6 model ID unavailable; gsd-verifier gpt-6-luna xhigh. The Phase 7 review scope contained only release-version metadata, so no new source review was needed. Refreshed `07-VERIFICATION.md`; 5/5 implementation truths and 27/27 plan artifacts passed, and `verification.status` returned `passed`. The baseline note now identifies the initial 595,820-byte WASI and 3,755,020-byte state measurements as superseded by Phase 8 producer evidence: 608,540 and 3,755,328 bytes. `git diff --check` passed. The 24 Phase 8 regression selectors were present; full suite execution was not repeated because exact-head Main CI [44645037841](https://github.com/szTheory/schwaystation/actions/runs/44645037841) and Release [44645037923](https://github.com/szTheory/schwaystation/actions/runs/44645037923) passed on `830bf4c`. BE32 took 4,694 seconds on Main CI and 3,402 seconds in the concurrent Release matrix; todo 050 remains bound to Phase 9 for measured reuse analysis. Phase 7 is complete and its existing v0.7.0 release remains valid.
 
 
 ### v1.0 milestone closeout (2026-11-18)
@@ -1245,3 +1506,102 @@ Runtime/model: Codex, OpenGSD 1.20.0, gsd-roadmapper gpt-6.2-sol high. The appro
 All six phase verification reports passed; milestone audit found 30/30 requirements, 30/30 integration paths and 7/7 flows, with accepted MDEC conformance limits and non-blocking follow-ups recorded in `.planning/milestones/v1.0-MILESTONE-AUDIT.md`. The closeout scanner found 29 pending todos, 11 dormant seeds and two existing deferred notes. All 42 were acknowledged as deferred, not marked resolved; the details are listed in the Deferred Items table above. The phase trees and one completed quick task are archived under `.planning/milestones/v1.0-phases/` and `.planning/milestones/v1.0-quick/`.
 
 Hosted evidence reused: [release-PR CI run 44253419074](https://github.com/szTheory/schwaystation/actions/runs/44253419074), [nightly full-vector job 134564625732](https://github.com/szTheory/schwaystation/actions/runs/44233700921/jobs/134564625732), and [v0.6.0 release run 44262491280](https://github.com/szTheory/schwaystation/actions/runs/44262491280). Planning-only edits received `git diff --check`; no implementation tests were added or rerun.
+
+### Phase 9 Plan 09-14 execution (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna xhigh. Work started at 20:42:42Z and the state closeout completed at 21:04:54Z. The owned CHD source/geometry preflight, 222-sector forward/reverse parity, feature-key check, and boot/read/audio/FMV guest cases all passed. The focused CHD selector passed 14/14 in 10.71 seconds; an identical extra rerun passed 14/14 in 11.45 seconds but added no coverage and was redundant. The feature ratchet passed 2/2, documentation freshness passed, and both diff checks were clean. The four guest tests shared the existing pins and bounds and ran in parallel after setup fixtures. No broad Phase 9 suite, hosted CI, `act`, or source review ran in this plan. The local CI build remains CHD ON. Task commits: `1d48028`, `ab91147`, `938cca6`; summary: `.planning/phases/09-chd-disc-images/09-14-SUMMARY.md`.
+
+The feature row now passes only the demonstrated local provider, runner, libretro, package and guest predicate. Hosted eight-lane/hash/fuzz evidence and the actual WASI module size remain unknown for final Phase 9 verification. The source review passed; final verification is next, with no owner action needed.
+
+### Phase 9 source review (2026-11-20)
+
+Runtime/model: GSD `gsd-code-reviewer`, gpt-6-luna xhigh, standard depth. Reviewed 29 source files changed since
+the preceding review commit `0f81b9a`; no new defects were confirmed and the prior resolved finding was not
+repeated. The review itself ran no tests. Artifact: `.planning/phases/09-chd-disc-images/09-REVIEW.md`.
+Plan 09-14's bounded 14-test selector ran twice (10.71s and 11.45s); the second identical pass added no
+coverage. Future closeout should keep the first green result and avoid a tracer-only rerun. Next: final local
+preflight and one exact-head hosted verification run, recording the WASI module size and CI critical path.
+
+### Phase 9 final local workflow and CI-efficiency review (2026-11-20)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary GPT-6 model ID unavailable. The Phase 9 final preflight ran
+`LC_ALL=C sort -cu` for the disc, compatibility and fuzz inventories, `git diff --check origin/main...HEAD`, and
+the six-test media/feature selector; all exited 0, with the selector completing in 0.49 seconds. The final local
+`cmake --workflow --preset ci` workflow exited 0: 639/639 CI tests passed, the separate release selector passed
+7/7, and CTest reported 74.78 seconds real time. The workflow also generated all three local macOS packages.
+
+The preceding local attempt exposed two corrective issues. `disc.playlist` still passed the 255-byte boundary,
+status and line assertions; only its pinned CHD message was stale after CHD became a supported parser path. The
+assertion now checks status and line without binding to that message. `docs/testing.md` exceeded its 61,440-byte
+page budget; the unchanged media-preflight details moved to `docs/media-testing.md`, leaving the original page at
+60,814 bytes. The exact targeted selector passed 2/2 in 0.06 seconds and the byte-budget check passed.
+
+Five failing libchdr test registrations came from an old ignored `build/ci/pins/libchdr/build/tests/CTestTestfile.cmake`
+left by a prior configuration, despite the current forced `CHDR_WANT_TESTS=OFF`. Removing only that generated
+CTest file restored the intended test inventory; the current configure retains 639 CI tests plus seven separate
+release checks. No tracked CMake or workflow change was needed. Fresh hosted runners do not inherit this local
+build metadata.
+
+Two read-only CI-efficiency reviews found no evidence-backed workflow reduction to apply: the cross-lane generator
+sharing idea lacks timing evidence, the nightly job already reuses its configure, and Main/Release remain separate
+because measured archive digests differ and serialization added 24m25s. The standing preflight, Act, live-run and
+post-run cost guidance is discoverable in `AGENTS.md`, this file, and `docs/maintaining.md`. The workflow files did
+not change in this closeout, so the already-passing Act dry-run was not repeated. The 09-14 summary now labels its
+second identical focused run as redundant rather than required.
+
+### Phase 9 first exact-head hosted CI follow-up (2026-11-20)
+
+Runtime/model: Codex/GPT-6 session (primary model ID unavailable); gsd-code-reviewer gpt-6-luna xhigh. The first
+hosted CI head `e57ad5f` exposed three concrete integration gaps. The CHD-enabled WASI module was valid and
+measured 859,379 bytes, above the prior 608,540-byte CHD-off bound. Both Windows C++ lanes failed because pinned
+sources reached MSVC `<limits>` before the CRT floating-point macros were included. Nightly built the pinned CHD
+generator, then its owned media fixture failed because the job lacked the FFmpeg development packages required
+by the pinned encoder. These results are in [CI run 44827711416](https://github.com/szTheory/schwaystation/actions/runs/44827711416)
+and [Nightly run 44827711388](https://github.com/szTheory/schwaystation/actions/runs/44827711388).
+
+After confirming those failures, the known-failing CI tail was canceled. That attempt used 1,684 raw runner
+seconds (28.1 runner-minutes) over 268 seconds wall time; Nightly used 351 raw runner seconds (5.9 runner-minutes)
+over 85 seconds wall time. These are unweighted runner times, not billing cost. The follow-up set the WASI bound
+to 859,379 and moved sanitizer/FFmpeg dependency installation ahead of Nightly compilation. Cheap route, pin,
+timeout, inventory, budget, diff and Act dry-run checks passed.
+
+A second hosted CI attempt on `83a27a4` showed `/FIfloat.h` was present but resolved to pinned FLAC's
+`include/private/float.h` because that directory preceded MSVC's implicit headers. Both Windows architectures
+therefore repeated the missing `FLT_*`/`DBL_*` failure. [CI run 44830485927](https://github.com/szTheory/schwaystation/actions/runs/44830485927)
+was canceled after these failures; it consumed 1,654 raw runner-seconds (27.6 runner-minutes) over 380 seconds
+wall time. The same exact head's [Nightly run 44830486029](https://github.com/szTheory/schwaystation/actions/runs/44830486029)
+passed the bounded fuzz campaign. Nightly consumed 825 raw runner-seconds (13.8 runner-minutes) over 503 seconds
+wall time. Its four benchmark jobs plus full-vector job used 322 seconds (5.4 runner-minutes) unrelated to CHD;
+keep the Phase 10 routing todo 051 bound to the first Nightly-routing change.
+
+The current CMake correction removes FLAC private/protected include directories from the whole target and applies
+them only to FLAC C sources. The generated compile database shows all 21 pinned C++ files exclude those paths
+and all 17 FLAC C files retain them; the native CHD tool rebuilt successfully (85/85 actions). The updated
+32-file source review is clean. Hosted Windows/WASI and eight-lane checks must still confirm the correction on
+the next head; no Phase 9 verification or ship claim is made.
+
+### Phase 9 verification and completion (2026-11-20)
+
+Runtime/model: Codex with OpenGSD 1.20.0; primary model ID not exposed. A typed verifier handoff made no artifact
+or state change and was stopped; the orchestrator completed goal-backward verification inline from the code,
+phase artifacts and exact-head CI evidence. The wall interval from the saved STATE checkpoint at 22:48:36Z to
+closeout at 01:24Z was about 2h36m; active time was not measured. The Phase 9 report passed 5/5 observable truths
+with no human checks and records its fingerprint as
+`v4:sha256:c8d13054d5c31b7f5d051488ebe7bdd6bc3e2fbb1d20bb171dd15f2460b096a7`.
+
+The exact-head [Main CI run 44843623296](https://github.com/szTheory/schwaystation/actions/runs/44843623296)
+passed on `16dc50920b793316ad1295d47168bdb39d2cc87b`, including all six package lanes, BE32, WASI, hash equality,
+RetroArch and release rehearsal. The linked WASI module measured exactly 859,379 bytes. `CI required` measured a
+2,419-second critical path and the workflow used 6,571 raw runner-seconds (109.52 runner-minutes); the run
+fingerprint differed from the stored baseline, so no speedup is claimed. Hosted CHD fuzz passed on
+[run 44830486029](https://github.com/szTheory/schwaystation/actions/runs/44830486029); the redundant Nightly
+attempt on the final head was canceled. `gsd-tools query verification.status` returned `passed` (exit 0),
+`git diff --check` passed, and `gsd-tools query phase.complete 9` advanced ROADMAP/STATE/REQUIREMENTS to Phase 10.
+Its six evidence-path warnings are command strings parsed as file paths plus one old todo path after the todo
+moved to `completed/`; no Phase 9 source or verification gap was reported.
+
+The Phase 9 review is clean. Existing CI/CD guidance is discoverable in `AGENTS.md`, `.planning/AUTONOMOUS.md`
+and `docs/maintaining.md`; no extra workflow change or repeated full local suite was needed. Before Phase 10
+planning on its branch, refresh the stale Phase 7 and Phase 8 verification reports using the exact main/release
+evidence already available, then continue Phase 10 discussion and planning. The roadmap now marks Phase 9
+complete; the Phase 9 report and tracking edits still need to be committed and shipped through PR #32.

@@ -19,14 +19,20 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
-        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13"
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13",
+        "SCHWAYSTATION_CHD": "ON",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "ON"
       }
     },
     {
       "name": "library",
       "inherits": "ci",
       "$comment": "Local-only compatibility report checks use temporary fixtures; owner data is scanned only by scripts/library.sh after the workflow.",
-      "binaryDir": "${sourceDir}/build/library"
+      "binaryDir": "${sourceDir}/build/library",
+      "cacheVariables": {
+        "SCHWAYSTATION_CHD": "OFF",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "OFF"
+      }
     },
     {
       "name": "ci-msvc",
@@ -36,7 +42,23 @@
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
         "CMAKE_C_COMPILER": "cl",
         "CMAKE_CXX_COMPILER": "cl",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
+        "SCHWAYSTATION_CHD": "ON",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "ON"
+      }
+    },
+    {
+      "name": "chd-tool",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/chd-tool",
+      "$comment": "Native-only fixture generator for cross-compiled CI lanes; the standalone library stays CHD-off.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "SCHWAYSTATION_BUILD_TESTS": "OFF",
+        "SCHWAYSTATION_BUILD_RUNNER": "OFF",
+        "SCHWAYSTATION_BUILD_LIBRETRO": "OFF",
+        "SCHWAYSTATION_CHD": "OFF",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "ON"
       }
     },
     {
@@ -70,7 +92,7 @@
     {
       "name": "fuzz",
       "inherits": "base",
-      "$comment": "The loader, SPU and five media fuzz targets use clang-21 with ASan and UBSan. Selected libretro consumers use generated fixtures; the asan inventory omits standalone fixture tests. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage. Nightly runs six bounded campaigns.",
+      "$comment": "The loader, SPU and six media fuzz targets use clang-21 with ASan and UBSan. CHD uses an external uninstrumented tool built by chd-tool. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -84,7 +106,10 @@
         "SCHWAYSTATION_TIMEOUT_SCALE": "3",
         "SCHWAYSTATION_INVENTORY": "asan",
         "SCHWAYSTATION_FIXTURES": "ON",
-        "SCHWAYSTATION_FUZZ": "ON"
+        "SCHWAYSTATION_FUZZ": "ON",
+        "SCHWAYSTATION_CHD": "ON",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "OFF",
+        "SCHWAYSTATION_CHD_TOOL_EXECUTABLE": "${sourceDir}/build/chd-tool/tools/schwaystation-chd-tool"
       }
     },
     {
@@ -112,6 +137,16 @@
       }
     },
     {
+      "name": "be32-chd",
+      "inherits": "be32",
+      "binaryDir": "${sourceDir}/build/be32",
+      "cacheVariables": {
+        "SCHWAYSTATION_CHD": "ON",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "OFF",
+        "SCHWAYSTATION_CHD_TOOL_EXECUTABLE": "${sourceDir}/build/be32/tests/schwaystation-chd-tool"
+      }
+    },
+    {
       "name": "wasm32",
       "inherits": "base",
       "$comment": "The test emulator exposes only the build tree at guest / and source tree at /source; its wrapper maps host test paths into that namespace and pins guest cwd to /. SCHWAYSTATION_TIMEOUT_SCALE 5: under wasmtime the seed's 40 shared tests took 4.3 times as long as on the Linux x64 leg in total (its run 39336389305).",
@@ -123,6 +158,16 @@
         "SCHWAYSTATION_TIMEOUT_SCALE": "5",
         "SCHWAYSTATION_INVENTORY": "wasm32",
         "CMAKE_CROSSCOMPILING_EMULATOR": "${sourceDir}/scripts/wasm-test-emulator.sh;${sourceDir}/build/pins/wasmtime/wasmtime;${sourceDir};${sourceDir}/build/wasm32"
+      }
+    },
+    {
+      "name": "wasm32-chd",
+      "inherits": "wasm32",
+      "binaryDir": "${sourceDir}/build/wasm32",
+      "cacheVariables": {
+        "SCHWAYSTATION_CHD": "ON",
+        "SCHWAYSTATION_BUILD_CHD_TOOL": "OFF",
+        "SCHWAYSTATION_CHD_TOOL_EXECUTABLE": "${sourceDir}/build/wasm32/tests/schwaystation-chd-tool"
       }
     },
     {
@@ -149,6 +194,7 @@
     { "name": "ci", "configurePreset": "ci" },
     { "name": "library", "configurePreset": "library" },
     { "name": "ci-msvc", "configurePreset": "ci-msvc" },
+    { "name": "chd-tool", "configurePreset": "chd-tool", "targets": ["schwaystation-chd-tool"] },
     { "name": "hygiene", "configurePreset": "hygiene" },
     { "name": "asan", "configurePreset": "asan" },
     {
@@ -167,13 +213,17 @@
         "schwaystation-fuzz-m3u-replay",
         "schwaystation-fuzz-cdrom",
         "schwaystation-fuzz-cdrom-replay",
+        "schwaystation-fuzz-chd",
+        "schwaystation-fuzz-chd-replay",
         "schwaystation-fuzz-mdec",
         "schwaystation-fuzz-mdec-replay"
       ]
     },
     { "name": "nofp", "configurePreset": "nofp" },
     { "name": "be32", "configurePreset": "be32" },
+    { "name": "be32-chd", "configurePreset": "be32-chd" },
     { "name": "wasm32", "configurePreset": "wasm32" },
+    { "name": "wasm32-chd", "configurePreset": "wasm32-chd" },
     { "name": "nightly", "configurePreset": "nightly", "targets": ["schwaystation-run", "schwaystation-test-gpu-reference", "schwaystation-test-spu-reference", "schwaystation-test-vectors", "schwaystation-test-cdrom-reference", "schwaystation-test-mdec-reference"] },
     { "name": "perf", "configurePreset": "perf", "targets": ["schwaystation-run"] }
   ],
@@ -186,7 +236,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "ci",
@@ -196,7 +246,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "library",
@@ -206,7 +256,7 @@
         "outputJUnitFile": "${sourceDir}/build/library/junit.xml"
       },
       "filter": { "include": { "label": "^library$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "ci-msvc",
@@ -216,7 +266,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "ci-release",
@@ -226,7 +276,7 @@
         "outputJUnitFile": "${sourceDir}/build/ci/junit-release.xml"
       },
       "filter": { "include": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "ci-msvc-release",
@@ -236,7 +286,7 @@
         "outputJUnitFile": "${sourceDir}/build/ci-msvc/junit-release.xml"
       },
       "filter": { "include": { "label": "^release$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "hygiene",
@@ -246,7 +296,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "include": { "label": "^hygiene$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "asan",
@@ -256,7 +306,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "exclude": { "label": "^(abi|release)$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "nofp",
@@ -266,7 +316,7 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "include": { "label": "^abi$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "be32",
@@ -276,7 +326,17 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "include": { "label": "^portable$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
+    },
+    {
+      "name": "be32-chd",
+      "configurePreset": "be32-chd",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/be32/junit.xml"
+      },
+      "filter": { "include": { "label": "^portable$" } },
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "wasm32",
@@ -286,7 +346,17 @@
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
       "filter": { "include": { "label": "^portable$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
+    },
+    {
+      "name": "wasm32-chd",
+      "configurePreset": "wasm32-chd",
+      "output": {
+        "outputOnFailure": true,
+        "outputJUnitFile": "${sourceDir}/build/wasm32/junit.xml"
+      },
+      "filter": { "include": { "label": "^portable$" } },
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "wasm32-preflight",
@@ -297,7 +367,7 @@
         "outputJUnitFile": "${sourceDir}/build/wasm32/preflight-junit.xml"
       },
       "filter": { "include": { "name": "^runner[.]cards[.]persistence$" } },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     },
     {
       "name": "nightly",
@@ -306,7 +376,7 @@
         "outputOnFailure": true,
         "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml"
       },
-      "execution": { "noTestsAction": "error", "jobs": "" }
+      "execution": { "noTestsAction": "error", "jobs": "", "stopOnFailure": true }
     }
   ],
   "packagePresets": [

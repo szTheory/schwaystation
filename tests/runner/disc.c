@@ -71,10 +71,130 @@ static void check_script_controls(const schway_disc_image *image, const schway_d
     schway__inputs_release(&movie);
 }
 
+static int equal_toc(const schway_toc *left, const schway_toc *right)
+{
+    if (left->track_count != right->track_count) return 0;
+    for (uint32_t i = 0u; i < left->track_count; i++) {
+        const schway_disc_track *a = &left->tracks[i];
+        const schway_disc_track *b = &right->tracks[i];
+        if (a->type != b->type || a->index0 != b->index0 || a->index1 != b->index1 ||
+            a->pregap != b->pregap || a->leadout != b->leadout) return 0;
+    }
+    return 1;
+}
+
+static void check_chd_provider(const char *cue_path, const char *chd_path,
+                               const char *invalid_path, int chd_enabled)
+{
+    schway_disc_image *cue_image = NULL;
+    schway_disc_image *chd_image = NULL;
+    schway_disc_image *invalid_image = NULL;
+    schway_disc_image_error error;
+    const schway_disc *cue = NULL;
+    const schway_disc *chd = NULL;
+    schway_toc cue_toc, chd_toc;
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    CHECK_EQ_U64(schway_disc_image_open(cue_path, &cue_image, &error), SCHWAY_DISC_IMAGE_OK);
+    CHECK(cue_image != NULL);
+    if (cue_image == NULL) return;
+    CHECK_EQ_U64(schway_disc_image_count(cue_image), 1u);
+    cue = schway_disc_image_disc(cue_image);
+    CHECK(cue != NULL && cue->read_sector != NULL && cue->toc != NULL);
+    if (cue == NULL || cue->read_sector == NULL || cue->toc == NULL) {
+        schway_disc_image_close(cue_image);
+        return;
+    }
+
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    schway_disc_image_status chd_status = schway_disc_image_open(chd_path, &chd_image, &error);
+    if (!chd_enabled) {
+        CHECK_EQ_U64(chd_status, SCHWAY_DISC_IMAGE_UNSUPPORTED);
+        CHECK(chd_image == NULL);
+        schway_disc_image_close(cue_image);
+        return;
+    }
+    CHECK_EQ_U64(chd_status, SCHWAY_DISC_IMAGE_OK);
+    CHECK(chd_image != NULL);
+    if (chd_image == NULL) {
+        schway_disc_image_close(cue_image);
+        return;
+    }
+    CHECK_EQ_U64(schway_disc_image_count(chd_image), 1u);
+    chd = schway_disc_image_disc(chd_image);
+    CHECK(chd != NULL && chd->read_sector != NULL && chd->toc != NULL);
+    if (chd == NULL || chd->read_sector == NULL || chd->toc == NULL) {
+        schway_disc_image_close(chd_image);
+        schway_disc_image_close(cue_image);
+        return;
+    }
+    memset(&cue_toc, 0, sizeof cue_toc);
+    memset(&chd_toc, 0, sizeof chd_toc);
+    cue_toc.size = (uint32_t)sizeof cue_toc;
+    chd_toc.size = (uint32_t)sizeof chd_toc;
+    CHECK_EQ_U64(cue->toc(cue->user, &cue_toc), 1u);
+    CHECK_EQ_U64(chd->toc(chd->user, &chd_toc), 1u);
+    CHECK(equal_toc(&cue_toc, &chd_toc));
+    for (uint32_t track = 0u; track < cue_toc.track_count; track++) {
+        for (uint32_t lba = cue_toc.tracks[track].index1;
+             lba < cue_toc.tracks[track].leadout; lba++) {
+            uint8_t cue_sector[2352], chd_sector[2352];
+            uint8_t cue_subcode[96], chd_subcode[96];
+            uint32_t cue_ok = cue->read_sector(cue->user, lba, cue_sector, cue_subcode);
+            uint32_t chd_ok = chd->read_sector(chd->user, lba, chd_sector, chd_subcode);
+            CHECK_EQ_U64(cue_ok, 1u);
+            CHECK_EQ_U64(chd_ok, 1u);
+            if (cue_ok != 0u && chd_ok != 0u) {
+                CHECK(memcmp(cue_sector, chd_sector, sizeof cue_sector) == 0);
+                CHECK(memcmp(cue_subcode, chd_subcode, sizeof cue_subcode) == 0);
+            }
+        }
+    }
+
+    schway_config config;
+    memset(&config, 0, sizeof config);
+    config.size = (uint32_t)sizeof config;
+    config.allocator.alloc = test_alloc;
+    config.allocator.free = test_free;
+    schway *inst = NULL;
+    CHECK_EQ_U64(schway_create(&config, &inst), SCHWAY_STATUS_OK);
+    CHECK(inst != NULL);
+    if (inst == NULL) {
+        schway_disc_image_close(chd_image);
+        schway_disc_image_close(cue_image);
+        return;
+    }
+    CHECK_EQ_U64(schway_open_disc(inst, cue), SCHWAY_STATUS_OK);
+    struct schway__disc_host before = inst->disc_host;
+    CHECK_EQ_U64(schway_swap_disc(inst, chd), SCHWAY_STATUS_ERR_LID_CLOSED);
+    CHECK(memcmp(&before, &inst->disc_host, sizeof before) == 0);
+    CHECK_EQ_U64(schway_set_lid(inst, 1u), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_swap_disc(inst, chd), SCHWAY_STATUS_OK);
+    CHECK(inst->disc_host.callbacks.user == chd->user);
+    before = inst->disc_host;
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    CHECK_EQ_U64(schway_disc_image_open(invalid_path, &invalid_image, &error),
+                 SCHWAY_DISC_IMAGE_BAD_IMAGE);
+    CHECK(invalid_image == NULL);
+    CHECK(memcmp(&before, &inst->disc_host, sizeof before) == 0);
+    CHECK_EQ_U64(schway_set_lid(inst, 0u), SCHWAY_STATUS_OK);
+    schway_destroy(inst);
+    schway_disc_image_close(invalid_image);
+    schway_disc_image_close(chd_image);
+    schway_disc_image_close(cue_image);
+}
+
 int main(int argc, char **argv)
 {
-    CHECK(argc == 2 || argc == 3);
-    if (argc < 2 || argc > 3) CHECK_DONE();
+    CHECK(argc == 2 || argc == 3 || argc == 6);
+    if (argc < 2 || argc > 6) CHECK_DONE();
+
+    if (argc == 6 && strcmp(argv[1], "chd") == 0) {
+        check_chd_provider(argv[2], argv[3], argv[4], argv[5][0] == '1');
+        CHECK_DONE();
+    }
 
     schway_disc_image *image = NULL;
     schway_disc_image_error image_error;

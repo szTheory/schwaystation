@@ -260,6 +260,9 @@ static inline schway_disc_image_status schway_disc_image_parse_system_cnf(
 schway_disc_image_status schway_disc_image_open(const char *path,
                                                 schway_disc_image **out,
                                                 schway_disc_image_error *error);
+/* Shared by CUE and CHD providers for absent virtual-pregap sectors. */
+void schway__disc_image_make_virtual_sector(uint32_t track_type, uint32_t lba,
+                                            uint8_t sector[2352]);
 void schway_disc_image_close(schway_disc_image *image);
 const schway_disc *schway_disc_image_disc(const schway_disc_image *image);
 uint32_t schway_disc_image_count(const schway_disc_image *image);

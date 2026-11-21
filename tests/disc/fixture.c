@@ -1017,11 +1017,15 @@ static int run_av_case(const char *mode, const char *bios_path,
 
 int main(int argc, char **argv)
 {
-    if ((argc != 7 && !(argc == 8 && strcmp(argv[1], "fmv") == 0)) ||
-        (strcmp(argv[1], "boot") != 0 && strcmp(argv[1], "read") != 0 &&
-                      strcmp(argv[1], "audio") != 0 && strcmp(argv[1], "fmv") != 0 &&
-                      strcmp(argv[1], "record") != 0)) {
-        fprintf(stderr, "usage: schwaystation-test-disc-fixture boot|read|audio|fmv|record BIOS EXPECTED CUE SBI CSV [PREDICATES]\n");
+    const char *mode = argc > 1 ? argv[1] : "";
+    int chd_mode = strncmp(mode, "chd-", 4u) == 0;
+    const char *case_mode = chd_mode != 0 ? mode + 4 : mode;
+    if ((argc != 7 && !(argc == 8 && strcmp(case_mode, "fmv") == 0)) ||
+        (strcmp(case_mode, "boot") != 0 && strcmp(case_mode, "read") != 0 &&
+         strcmp(case_mode, "audio") != 0 && strcmp(case_mode, "fmv") != 0 &&
+         strcmp(case_mode, "record") != 0) ||
+        (chd_mode != 0 && strcmp(case_mode, "record") == 0)) {
+        fprintf(stderr, "usage: schwaystation-test-disc-fixture boot|read|audio|fmv|record|chd-{boot|read|audio|fmv} BIOS EXPECTED IMAGE SBI CSV [PREDICATES]\n");
         return 2;
     }
     uint32_t expected_records[8] = {0u};
@@ -1031,7 +1035,7 @@ int main(int argc, char **argv)
     }
     struct av_expectations expected_av;
     memset(&expected_av, 0, sizeof expected_av);
-    if ((strcmp(argv[1], "audio") == 0 || strcmp(argv[1], "fmv") == 0) &&
+    if ((strcmp(case_mode, "audio") == 0 || strcmp(case_mode, "fmv") == 0) &&
         !load_expected_av(argv[6], &expected_av)) {
         fprintf(stderr, "disc fixture: audiovisual CSV pins are missing or malformed\n");
         return 1;
@@ -1054,12 +1058,12 @@ int main(int argc, char **argv)
     memset(&error, 0, sizeof error);
     error.size = (uint32_t)sizeof error;
     if (schway_disc_image_open(argv[4], &image, &error) != SCHWAY_DISC_IMAGE_OK || image == NULL) {
-        fprintf(stderr, "disc fixture: cannot open cue image: %s\n", error.message);
+        fprintf(stderr, "disc fixture: cannot open disc image: %s\n", error.message);
         return 1;
     }
     const schway_disc *source = schway_disc_image_disc(image);
     if (source == NULL || source->read_sector == NULL || source->toc == NULL) {
-        fprintf(stderr, "disc fixture: cue provider has no sector/TOC callbacks\n");
+        fprintf(stderr, "disc fixture: image provider has no sector/TOC callbacks\n");
         schway_disc_image_close(image);
         return 1;
     }
@@ -1079,12 +1083,12 @@ int main(int argc, char **argv)
         return 1;
     }
     int ok;
-    if (strcmp(argv[1], "boot") == 0) {
+    if (strcmp(case_mode, "boot") == 0) {
         ok = run_boot_case(argv[2], expected_digest, &disc, &host);
-    } else if (strcmp(argv[1], "read") == 0) {
+    } else if (strcmp(case_mode, "read") == 0) {
         ok = run_read_case(argv[2], expected_digest, &disc, &host, expected_records);
     } else {
-        ok = run_av_case(argv[1], argv[2], expected_digest, &disc, &host,
+        ok = run_av_case(case_mode, argv[2], expected_digest, &disc, &host,
                          expected_records, &expected_av, argc == 8 ? argv[7] : NULL);
     }
     if (host.outside_run_calls != 0u) {
@@ -1094,13 +1098,16 @@ int main(int argc, char **argv)
     }
     schway_disc_image_close(image);
     if (ok == 0) return 1;
-    if (strcmp(argv[1], "audio") == 0 || strcmp(argv[1], "fmv") == 0 ||
-        strcmp(argv[1], "record") == 0) {
+    if (chd_mode != 0) {
+        printf("PASS disc.fixture.chd.%s: bounded owned guest completed with the CHD provider\n",
+               case_mode);
+    } else if (strcmp(case_mode, "audio") == 0 || strcmp(case_mode, "fmv") == 0 ||
+               strcmp(case_mode, "record") == 0) {
         printf("disc fixture %s passed: XA/CD-DA PCM, STR MDEC/GPU RGB24, split-state replay\n",
-               argv[1]);
+               case_mode);
     } else {
         printf("disc fixture %s passed: OpenBIOS, SYSTEM.CNF, TOC, GetID, ReadN DMA3, SBI callback\n",
-               argv[1]);
+               case_mode);
     }
     return 0;
 }

@@ -10,6 +10,8 @@ runner.cards.controls	portable,runner
 runner.cards.persistence	portable,runner
 runner.cards.sigterm	portable,runner
 runner.disc.api	portable,runner
+runner.disc.api.chd	portable,runner
+runner.disc.chd	portable,runner
 runner.disc.load	portable,runner
 runner.disc.probe	portable,runner
 runner.disc.unsupported	portable,runner

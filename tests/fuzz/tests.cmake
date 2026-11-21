@@ -48,6 +48,43 @@ foreach(subsystem IN ITEMS gpu sio memcard spu)
     LABELS fuzz portable TIMEOUT 60)
 endforeach()
 
+# CHD replay calls the production parser in a fixed build-owned directory.
+# The enabled lane uses the generated fixture as a known-good input and keeps
+# its required fixture setup explicit; disabled builds assert unsupported.
+set(chd_work_dir "${PROJECT_BINARY_DIR}/tests/fuzz-work/chd")
+file(MAKE_DIRECTORY "${chd_work_dir}")
+set(chd_guest_work_dir "${chd_work_dir}")
+set(chd_fixture "${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd")
+set(chd_guest_fixture "${chd_fixture}")
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  set(chd_guest_work_dir "/tests/fuzz-work/chd")
+  set(chd_guest_fixture "/fixtures/disc_boot.chd")
+endif()
+add_executable(schwaystation-fuzz-chd-replay ${fuzz_dir}/chd.c)
+target_compile_definitions(schwaystation-fuzz-chd-replay PRIVATE
+  SCHWAY_FUZZ_REPLAY SCHWAY_FUZZ_CHD_SEEDS
+  "SCHWAYSTATION_CHD=$<BOOL:${SCHWAYSTATION_CHD}>"
+  "SCHWAY_FUZZ_WORK_DIR=\"${chd_guest_work_dir}\"")
+if(SCHWAYSTATION_CHD)
+  target_compile_definitions(schwaystation-fuzz-chd-replay PRIVATE
+    "SCHWAY_FUZZ_CHD_FIXTURE=\"${chd_guest_fixture}\"")
+endif()
+target_include_directories(schwaystation-fuzz-chd-replay PRIVATE ${PROJECT_SOURCE_DIR}/host)
+target_link_libraries(schwaystation-fuzz-chd-replay PRIVATE schwaystation_disc_image)
+set_target_properties(schwaystation-fuzz-chd-replay PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-fuzz-chd-replay)
+if(SCHWAYSTATION_CHD)
+  schway_add_test(NAME fuzz.regress.chd
+    COMMAND schwaystation-fuzz-chd-replay "${chd_fixture}"
+    LABELS fuzz portable TIMEOUT 60)
+  set_tests_properties(fuzz.regress.chd PROPERTIES FIXTURES_REQUIRED disc_media_preflight)
+else()
+  schway_add_test(NAME fuzz.regress.chd
+    COMMAND schwaystation-fuzz-chd-replay
+    LABELS fuzz portable TIMEOUT 60)
+endif()
+
 # The new hostile-media targets call the actual host parsers or core devices.
 # CUE and M3U receive build-owned working directories containing only their
 # small, fixed media child, so fuzzed paths cannot name arbitrary host files.
@@ -131,4 +168,17 @@ if(SCHWAYSTATION_FUZZ)
       RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
     schway_warnings(${target})
   endforeach()
+
+  add_executable(schwaystation-fuzz-chd ${fuzz_dir}/chd.c)
+  target_compile_definitions(schwaystation-fuzz-chd PRIVATE
+    "SCHWAYSTATION_CHD=1"
+    "SCHWAY_FUZZ_WORK_DIR=\"${chd_guest_work_dir}\""
+    "SCHWAY_FUZZ_CHD_FIXTURE=\"${chd_guest_fixture}\"")
+  target_include_directories(schwaystation-fuzz-chd PRIVATE ${PROJECT_SOURCE_DIR}/host)
+  target_link_libraries(schwaystation-fuzz-chd PRIVATE schwaystation_disc_image)
+  target_compile_options(schwaystation-fuzz-chd PRIVATE -fsanitize=fuzzer)
+  target_link_options(schwaystation-fuzz-chd PRIVATE -fsanitize=fuzzer)
+  set_target_properties(schwaystation-fuzz-chd PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(schwaystation-fuzz-chd)
 endif()

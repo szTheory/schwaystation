@@ -910,10 +910,15 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_baseline")
     configure_file("${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${root}/scripts/compat-ratchet.sh" COPYONLY)
   endforeach()
   configure_file("${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake" "${base}/tests/cmake/compat-ratchet.cmake" COPYONLY)
+  configure_file("${SOURCE_ROOT}/tests/cmake/date_days.cmake" "${base}/tests/cmake/date_days.cmake" COPYONLY)
   file(WRITE "${head}/tests/cmake/compat-ratchet.cmake" "message(STATUS \"head judge accepted all rows\")\n")
   set(header "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date")
+  set(feature_header "provider,profile,protection,peripheral,predicate,status,evidence,date")
   set(pass "fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,pass,fixture.control:exit=0,2026-11-11")
   set(fail "fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,fail,fixture.control:exit=1,2026-11-11")
+  set(feature_pass "chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,compat.chd:exit=0,2026-11-20")
+  set(feature_fail "chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,fail,compat.chd:exit=1,2026-11-20")
+  set(feature_unknown "chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,unknown,planned:09-14,2026-11-20")
   file(WRITE "${base}/tests/compat/ledger.csv" "${header}\n${pass}\n")
   execute_process(COMMAND git init -q "${base}" RESULT_VARIABLE result ERROR_VARIABLE error)
   if(NOT "${result}" STREQUAL "0")
@@ -947,6 +952,50 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_baseline")
   return()
 endif()
 
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_preflight")
+  foreach(required SOURCE_ROOT WORK_ROOT)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "feature preflight requires ${required}")
+    endif()
+  endforeach()
+  set(features "${SOURCE_ROOT}/tests/compat/features.csv")
+  execute_process(COMMAND "${CMAKE_COMMAND}"
+      "-DFEATURES=${features}" -DMODE=features-preflight
+      -P "${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake"
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT "${result}" STREQUAL "0")
+    message(FATAL_ERROR "complete unknown feature row failed its schema preflight: ${result}: ${output}${error}")
+  endif()
+  message(STATUS "compatibility: complete unknown feature row passed schema preflight")
+  return()
+endif()
+
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
+  foreach(required SOURCE_ROOT WORK_ROOT)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "feature ratchet test requires ${required}")
+    endif()
+  endforeach()
+  set(expected_features "${WORK_ROOT}/compat-features-expected.csv")
+  file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0,2026-11-20\n")
+  execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
+      sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${SOURCE_ROOT}/tests/compat/features.csv"
+      "${expected_features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-20 features
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT "${result}" STREQUAL "0")
+    message(FATAL_ERROR "checked-in feature ledger differs from independent expected unknown results: ${result}: ${output}${error}")
+  endif()
+  execute_process(COMMAND "${CMAKE_COMMAND}"
+      -DSOURCE_ROOT=${SOURCE_ROOT} -DWORK_ROOT=${WORK_ROOT} -DCASE=features
+      -P "${SOURCE_ROOT}/tests/cmake/compat-controls.cmake"
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if(NOT "${result}" STREQUAL "0")
+    message(FATAL_ERROR "feature transition controls failed: ${result}: ${output}${error}")
+  endif()
+  message(STATUS "compatibility: feature transition controls passed")
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   foreach(required SOURCE_ROOT WORK_ROOT)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -959,9 +1008,14 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   file(MAKE_DIRECTORY "${head}/scripts" "${head}/tests/cmake")
   configure_file("${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${head}/scripts/compat-ratchet.sh" COPYONLY)
   configure_file("${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake" "${head}/tests/cmake/compat-ratchet.cmake" COPYONLY)
+  configure_file("${SOURCE_ROOT}/tests/cmake/date_days.cmake" "${head}/tests/cmake/date_days.cmake" COPYONLY)
   set(header "serial,md5,track1_sha1,title,region,media,predicate,status,evidence,date")
+  set(feature_header "provider,profile,protection,peripheral,predicate,status,evidence,date")
   set(pass "fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,pass,fixture.control:exit=0,2026-11-11")
   set(fail "fixture/control,00000000000000000000000000000000,-,Control,ntsc-u,exe,frame@60=aaaaaaaa,fail,fixture.control:exit=1,2026-11-11")
+  set(feature_pass "chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,compat.chd:exit=0,2026-11-20")
+  set(feature_fail "chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,fail,compat.chd:exit=1,2026-11-20")
+  set(feature_unknown "chd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,unknown,planned:09-14,2026-11-20")
   set(candidate "${work}/candidate.csv")
   set(fresh "${work}/fresh.csv")
   set(allow "${work}/allow.txt")
@@ -971,6 +1025,8 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   file(WRITE "${allow}" "")
 
   function(make_base name include_ledger include_judge include_helper)
+    set(feature_row "${ARGV4}")
+    set(feature_support "${ARGV5}")
     set(base "${work}/${name}/base")
     file(MAKE_DIRECTORY "${base}")
     file(WRITE "${base}/seed.txt" "base\n")
@@ -986,15 +1042,27 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
       file(WRITE "${base}/tests/compat/ledger.csv" "${header}\n${pass}\n")
       list(APPEND stage_files tests/compat/ledger.csv)
     endif()
+    if(NOT "${feature_row}" STREQUAL "")
+      file(MAKE_DIRECTORY "${base}/tests/compat")
+      file(WRITE "${base}/tests/compat/features.csv" "${feature_header}\n${feature_row}\n")
+      list(APPEND stage_files tests/compat/features.csv)
+    endif()
     if(include_judge)
       file(MAKE_DIRECTORY "${base}/scripts")
       configure_file("${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${base}/scripts/compat-ratchet.sh" COPYONLY)
       list(APPEND stage_files scripts/compat-ratchet.sh)
+      if(NOT feature_support)
+        file(READ "${base}/scripts/compat-ratchet.sh" legacy_script)
+        string(REPLACE "[title|features]" "[title]" legacy_script "${legacy_script}")
+        file(WRITE "${base}/scripts/compat-ratchet.sh" "${legacy_script}")
+      endif()
     endif()
     if(include_helper)
       file(MAKE_DIRECTORY "${base}/tests/cmake")
       configure_file("${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake" "${base}/tests/cmake/compat-ratchet.cmake" COPYONLY)
+      configure_file("${SOURCE_ROOT}/tests/cmake/date_days.cmake" "${base}/tests/cmake/date_days.cmake" COPYONLY)
       list(APPEND stage_files tests/cmake/compat-ratchet.cmake)
+      list(APPEND stage_files tests/cmake/date_days.cmake)
     endif()
     execute_process(COMMAND git -C "${base}" add ${stage_files} RESULT_VARIABLE result)
     execute_process(COMMAND git -C "${base}" commit -qm "protected ${name} base" RESULT_VARIABLE result)
@@ -1020,6 +1088,21 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
     endif()
   endfunction()
 
+  function(check_feature_base name base base_sha candidate_row fresh_row allow expected)
+    set(feature_candidate "${work}/${name}-candidate.csv")
+    set(feature_fresh "${work}/${name}-fresh.csv")
+    file(WRITE "${feature_candidate}" "${feature_header}\n${candidate_row}\n")
+    file(WRITE "${feature_fresh}" "${feature_header}\n${fresh_row}\n")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "COMPAT_BASE_DIR=${base}" "COMPAT_BASE_SHA=${base_sha}"
+        sh "${head}/scripts/compat-ratchet.sh" "${feature_candidate}" "${feature_fresh}" "" "${allow}" 2026-11-20 features
+      RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+    if(expected AND NOT "${result}" STREQUAL "0")
+      message(FATAL_ERROR "${name}: expected acceptance, got ${result}: ${output}${error}")
+    elseif(NOT expected AND "${result}" STREQUAL "0")
+      message(FATAL_ERROR "${name}: invalid feature baseline was accepted")
+    endif()
+  endfunction()
+
   make_base(introduction FALSE FALSE FALSE)
   check_base("absent-both introduction" "${BASE_introduction}" "${SHA_introduction}" TRUE)
   make_base(ledger_only TRUE FALSE TRUE)
@@ -1030,6 +1113,36 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_protected_controls")
   check_base("judge without CMake dependency" "${BASE_missing_helper}" "${SHA_missing_helper}" FALSE)
   make_base(wrong_sha TRUE TRUE TRUE)
   check_base("mismatched base commit" "${BASE_wrong_sha}" "0000000000000000000000000000000000000000" FALSE)
+  file(WRITE "${allow}" "")
+  make_base(feature_introduction TRUE TRUE TRUE "" FALSE)
+  check_feature_base("feature absent-both introduction" "${BASE_feature_introduction}" "${SHA_feature_introduction}"
+    "${feature_unknown}" "${feature_unknown}" "${allow}" TRUE)
+  make_base(feature_ledger_only FALSE TRUE TRUE "${feature_unknown}" FALSE)
+  check_feature_base("feature ledger without feature judge" "${BASE_feature_ledger_only}" "${SHA_feature_ledger_only}"
+    "${feature_unknown}" "${feature_unknown}" "${allow}" FALSE)
+  make_base(feature_judge_only FALSE TRUE TRUE "" TRUE)
+  check_feature_base("feature judge without feature ledger" "${BASE_feature_judge_only}" "${SHA_feature_judge_only}"
+    "${feature_unknown}" "${feature_unknown}" "${allow}" FALSE)
+  make_base(feature_missing_helper FALSE TRUE FALSE "${feature_unknown}" TRUE)
+  check_feature_base("feature judge without dependency" "${BASE_feature_missing_helper}" "${SHA_feature_missing_helper}"
+    "${feature_unknown}" "${feature_unknown}" "${allow}" FALSE)
+  make_base(feature_protected_pass FALSE TRUE TRUE "${feature_pass}" TRUE)
+  check_feature_base("feature protected pass regression" "${BASE_feature_protected_pass}" "${SHA_feature_protected_pass}"
+    "${feature_fail}" "${feature_fail}" "${allow}" FALSE)
+  file(WRITE "${allow}" "2026-09-21 chd ntsc-u none!cdrom!disc_boot.toc+sectors+subcode behavior-rev=4 expires=2026-11-20 approved measured correction\n")
+  check_feature_base("feature matching allowance" "${BASE_feature_protected_pass}" "${SHA_feature_protected_pass}"
+    "${feature_fail}" "${feature_fail}" "${allow}" TRUE)
+  if(DEFINED ENV{COMPAT_BASE_DIR} AND EXISTS "$ENV{COMPAT_BASE_DIR}/scripts/compat-ratchet.sh" AND
+     DEFINED ENV{COMPAT_BASE_SHA} AND NOT "$ENV{COMPAT_BASE_SHA}" STREQUAL "")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+        "COMPAT_BASE_DIR=$ENV{COMPAT_BASE_DIR}" "COMPAT_BASE_SHA=$ENV{COMPAT_BASE_SHA}"
+        sh "${head}/scripts/compat-ratchet.sh" "${SOURCE_ROOT}/tests/compat/ledger.csv"
+        "${SOURCE_ROOT}/tests/compat/ledger.csv" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-20
+      RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+    if(NOT "${result}" STREQUAL "0")
+      message(FATAL_ERROR "current title judge failed against protected five-argument base judge: ${result}: ${output}${error}")
+    endif()
+  endif()
   file(REMOVE "${head}/tests/cmake/compat-ratchet.cmake")
   check_base("deleted head helper" "${BASE_wrong_sha}" "${SHA_wrong_sha}" FALSE)
   file(REMOVE_RECURSE "${work}")
@@ -1237,6 +1350,19 @@ schway_add_test(NAME compat.ratchet.baseline
     -DCASE=compat_baseline -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 30)
 
+# Fault prevented: empty, malformed or duplicate feature evidence reaching broad guest suites.
+schway_add_test(NAME compat.features.preflight
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DCASE=compat_features_preflight -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 15)
+set_tests_properties(compat.features.preflight PROPERTIES FIXTURES_SETUP compat_features_preflight)
+
+# Fault prevented: a feature row bypassing the same protected base and fresh-result judge.
+schway_add_test(NAME compat.features.ratchet
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DCASE=compat_features_ratchet -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 45)
+
 # Fault prevented: an incomplete or wrong compatibility baseline selecting introduction.
 schway_add_test(NAME compat.ratchet.protected_controls
   COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
@@ -1269,3 +1395,13 @@ set_tests_properties(fixtures.pad_counter.press60 PROPERTIES FIXTURES_SETUP comp
 set_tests_properties(fixtures.memcard_roundtrip.persistence PROPERTIES FIXTURES_SETUP compat_memcard)
 set_tests_properties(compat.ratchet.rows PROPERTIES
   FIXTURES_REQUIRED "compat_gpu_motion;compat_pad_counter;compat_memcard;openbios_shell")
+
+get_property(compat__registered_tests DIRECTORY PROPERTY TESTS)
+foreach(compat__test IN LISTS compat__registered_tests)
+  if((compat__test MATCHES "^compat[.]" OR compat__test MATCHES "^disc[.]image[.]chd_") AND
+     NOT compat__test STREQUAL "compat.features.preflight")
+    get_property(compat__fixtures TEST "${compat__test}" PROPERTY FIXTURES_REQUIRED)
+    list(APPEND compat__fixtures compat_features_preflight)
+    set_tests_properties("${compat__test}" PROPERTIES FIXTURES_REQUIRED "${compat__fixtures}")
+  endif()
+endforeach()

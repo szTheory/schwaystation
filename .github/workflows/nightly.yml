@@ -5,7 +5,7 @@
 # the one open issue labelled nightly; a good night closes it. The vectors-full
 # job replays all 55,000 public single-step vectors at their pin; it reports
 # through the same issue and is not part of the CI required aggregate. The
-  # fuzz job runs the loader and five media libFuzzer targets for 60 seconds and reports the
+  # fuzz job runs the loader, SPU and six media libFuzzer targets for 60 seconds and reports the
 # same way (docs/testing.md, "The loader fuzz target").
 name: Nightly
 
@@ -24,9 +24,14 @@ on:
     paths:
       - .github/workflows/nightly.yml
       - CMakePresets.json
+      - CMakeLists.txt
+      - cmake/CHD*.cmake
       - cmake/CDReferences.cmake
+      - cmake/DiscFixtures.cmake
       - cmake/MDECReferences.cmake
       - cmake/SPUReferences.cmake
+      - host/disc*.c
+      - host/disc*.h
       - pins.txt
       - runner/bench.c
       - runner/bench.h
@@ -35,6 +40,8 @@ on:
       - runner/rss.c
       - runner/rss.h
       - tests/cdrom/reference.c
+      - tests/disc/**
+      - tests/fixtures/**
       - tests/fuzz/**
       - tests/mdec/reference.c
       - tests/nightly/inventory.txt
@@ -149,10 +156,45 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # clang-21 is on the image; its sanitizer and libFuzzer runtimes may not be.
-      - name: Sanitizer runtimes
-        run: dpkg -s libclang-rt-21-dev > /dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y libclang-rt-21-dev; }
-      - run: cmake --workflow --preset fuzz
+      - name: Cheap source, inventory and route preflight
+        run: |
+          set -eu
+          cmake -DMODE=pins -DDIR=.github/workflows -P tests/cmake/workflows.cmake
+          cmake -DMODE=timeouts -DDIR=.github/workflows -P tests/cmake/workflows.cmake
+          cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake
+          for inventory in tests/inventory/*.txt tests/disc/inventory.txt tests/fuzz/inventory.txt tests/release/inventory.txt; do
+            LC_ALL=C sort -cu "$inventory"
+          done
+          cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake
+      # clang-21 and the media encoder's FFmpeg development packages may not be on the image.
+      - name: Sanitizer and media-fixture dependencies
+        run: |
+          set -eu
+          packages=(libclang-rt-21-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev)
+          missing=false
+          for package in "${packages[@]}"; do
+            if ! dpkg -s "$package" > /dev/null 2>&1; then missing=true; break; fi
+          done
+          if [[ "$missing" == true ]]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends "${packages[@]}"
+          fi
+      - name: Build the uninstrumented CHD fixture generator
+        run: |
+          cmake --preset chd-tool
+          cmake --build --preset chd-tool
+          test -x build/chd-tool/tools/schwaystation-chd-tool
+      - name: Build the owned CHD baseline fixture
+        run: |
+          set -eu
+          cmake --preset fuzz
+          cmake --build build/fuzz --target schwaystation-disc-fixtures
+          cmake -DCHD_TOOL=build/chd-tool/tools/schwaystation-chd-tool \
+            -DCUE=build/fuzz/fixtures/disc_boot.cue \
+            -DOUTPUT_CHD=build/fuzz/fixtures/disc_boot.chd \
+            -DMANIFEST=build/fuzz/tests/disc_boot.chd.manifest \
+            -P cmake/CHDFixtures.cmake
+      - run: cmake --build --preset fuzz
       - name: Check media seeds and run bounded campaigns
         env:
           UBSAN_OPTIONS: print_stacktrace=1
@@ -166,9 +208,9 @@ jobs:
           tail -n 30 build/fuzz/log.txt
           { echo '### fuzz'; echo '```'; tail -n 3 build/fuzz/log.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           test "$rc" -eq 0
-          subsystems=(cue cnf m3u cdrom mdec)
-          expected=(5 5 7 15 6)
-          max_lengths=(65536 4096 65536 16384 262144)
+          subsystems=(cue cnf m3u cdrom chd mdec)
+          expected=(5 5 7 15 12 6)
+          max_lengths=(65536 4096 65536 16384 16384 262144)
           for i in "${!subsystems[@]}"; do
             name=${subsystems[$i]}
             corpus="build/fuzz/corpus/$name"

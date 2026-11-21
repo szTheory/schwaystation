@@ -34,9 +34,9 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 
 ### Shared media boundary and providers
 
-- [ ] **MEDIA-01**: Each supported provider presents the existing host-supplied disc contract with consistent identity, TOC, track/index/pregap/leadout, sector type, raw sector and applicable subcode; format errors and unsupported variants are explicit and do not partially replace an active disc.
-- [ ] **MEDIA-02**: Format readers use checked arithmetic and documented limits before allocation or decode, confine companion paths to the selected image directory, and have bounded regression-fuzz tests for malformed headers, offsets, track counts and truncated inputs. A cheap fixture inventory checks track/sector counts and boundary LBAs before any long guest run.
-- [ ] **CHD-01**: When `SCHWAYSTATION_CHD=ON`, the host opens the documented CHD v1–v5 subset using the pinned libchdr BSD-3 closure, returns matching sector/TOC/subcode data and deterministic fixture hashes on all eight applicable lanes, and fuzzes malformed CHD inputs; `OFF` remains a dependency-free default build until the sub-512-KiB parity fixture passes. Every distributed archive includes the exact required notices, and `.info` advertises `chd` only for a build that contains the provider.
+- [x] **MEDIA-01**: Each supported provider presents the existing host-supplied disc contract with consistent identity, TOC, track/index/pregap/leadout, sector type, raw sector and applicable subcode; format errors and unsupported variants are explicit and do not partially replace an active disc.
+- [x] **MEDIA-02**: Format readers use checked arithmetic and documented limits before allocation or decode, confine companion paths to the selected image directory, and have bounded regression-fuzz tests for malformed headers, offsets, track counts and truncated inputs. A cheap fixture inventory checks track/sector counts and boundary LBAs before any long guest run.
+- [x] **CHD-01**: When `SCHWAYSTATION_CHD=ON`, the host opens the documented CHD v1–v5 subset using the pinned libchdr BSD-3 closure, returns matching sector/TOC/subcode data and deterministic fixture hashes on all eight applicable lanes, and fuzzes malformed CHD inputs; `OFF` remains a dependency-free default build until the sub-512-KiB parity fixture passes. Every distributed archive includes the exact required notices, and `.info` advertises `chd` only for a build that contains the provider.
 - [ ] **PBP-01**: The host reads the explicitly tested, unencrypted PSISO PBP layout and supported track variants with bounded directory/TOC parsing and deterministic sector output; encrypted PGD and undocumented layouts are rejected with a clear unsupported result. The inflater is in-tree permissive source with its notice and does not require system zlib.
 - [ ] **ECM-01**: The host decodes the documented ECM input subset with bounded random access, preserving sector bytes and rejecting invalid tables, offsets and truncated streams; a preflight confirms source extents and requested/produced sector counts before booting a guest.
 - [ ] **CCD-01**: The host parses the documented CCD descriptor subset and its confined IMG/SUB companions, preserving track modes, indexes, pregaps, subcode and first/last-sector reads; malformed or escaping companion paths are rejected before opening files outside the image directory.
@@ -64,7 +64,7 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 - [ ] **PATCH-01**: `schwaystation-run --patch` applies the documented PPF 1/2/3 and BPS subset as a host-side sector overlay, validates patch identity/bounds before use, preserves the source image, and produces deterministic patched sectors; malformed patches fail without partial application.
 - [ ] **CHEAT-01**: The runner and libretro host parse a documented bounded GameShark text subset and apply only supported deterministic memory writes through a narrow explicit core operation; invalid codes are rejected, source memory is not mutated, and cheat state is included in relevant hashes/serialization.
 - [ ] **COMPAT-01**: A pinned, licensed Redump DAT inventory accounts for all 13,407 source entries with explicit pass/fail/unknown evidence and provenance; untested title/profile/media combinations remain unknown and the generated compatibility document says the inventory does not imply playability.
-- [ ] **COMPAT-02**: Feature-specific compatibility rows accrue with each provider, profile, protection mechanism and peripheral; the protected ledger ratchet preserves prior passes and requires a dated allowance for any permitted regression or removal. A cheap count/key preflight runs before any broad ledger or guest suite.
+- [x] **COMPAT-02**: Feature-specific compatibility rows accrue with each provider, profile, protection mechanism and peripheral; the protected ledger ratchet preserves prior passes and requires a dated allowance for any permitted regression or removal. A cheap count/key preflight runs before any broad ledger or guest suite.
 - [ ] **COMPAT-03**: The libretro metadata sets `is_experimental "false"` only when 100% of a committed required-capability matrix passes with zero required unknown/fail rows; that matrix contains at least one boot-to-play fixture per shipped disc-provider family, each declared region/board tuple, each implemented peripheral class, card persistence and each supported patch/cheat family. If the matrix is incomplete or fails, the metadata remains `true`. DAT entries outside the required matrix remain explicitly unknown and are not represented as passing.
 
 ## Out of Scope
@@ -95,10 +95,10 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | SAVE-03 | Phase 8 | Complete |
 | SAVE-04 | Phase 8 | Complete |
 | SAVE-05 | Phase 8 | Complete |
-| MEDIA-01 | Phase 9 | Pending |
-| MEDIA-02 | Phase 9 | Pending |
-| CHD-01 | Phase 9 | Pending |
-| COMPAT-02 | Phase 9 | Pending |
+| MEDIA-01 | Phase 9 | Complete |
+| MEDIA-02 | Phase 9 | Complete |
+| CHD-01 | Phase 9 | Complete |
+| COMPAT-02 | Phase 9 | Complete |
 | PBP-01 | Phase 10 | Pending |
 | ECM-01 | Phase 11 | Pending |
 | CCD-01 | Phase 11 | Pending |

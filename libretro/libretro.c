@@ -23,6 +23,10 @@
 #include "disc_image.h"
 #include "xrgb8888.h"
 
+#ifndef SCHWAYSTATION_CHD
+#define SCHWAYSTATION_CHD 0
+#endif
+
 /* The largest display the GPU scans out: 640 dots by 480 lines NTSC or 576
    PAL, interlaced (.planning/preparation/HOSTS-AND-INTEGRATION.md section 1,
    AV fields). */
@@ -232,7 +236,13 @@ static int lr_disc_path_supported(const char *path)
             (extension[2] == 's' || extension[2] == 'S') &&
             (extension[3] == 'o' || extension[3] == 'O')) ||
            (length == 4u && (extension[1] == 'm' || extension[1] == 'M') &&
-            (extension[2] == '3') && (extension[3] == 'u' || extension[3] == 'U'));
+            (extension[2] == '3') && (extension[3] == 'u' || extension[3] == 'U'))
+#if SCHWAYSTATION_CHD
+           || (length == 4u && (extension[1] == 'c' || extension[1] == 'C') &&
+               (extension[2] == 'h' || extension[2] == 'H') &&
+               (extension[3] == 'd' || extension[3] == 'D'))
+#endif
+           ;
 }
 
 static schway_disc_image *lr_disc_open_one(const char *path)
@@ -1222,7 +1232,11 @@ void retro_get_system_info(struct retro_system_info *sys)
     memset(sys, 0, sizeof *sys);
     sys->library_name = "schwaystation";
     sys->library_version = SCHWAYSTATION_LIBRETRO_VERSION;
+#if SCHWAYSTATION_CHD
+    sys->valid_extensions = "exe|psexe|cue|iso|m3u|chd";
+#else
     sys->valid_extensions = "exe|psexe|cue|iso|m3u";
+#endif
     sys->need_fullpath = true;
     sys->block_extract = true;
 }

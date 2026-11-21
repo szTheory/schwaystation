@@ -4,3 +4,5 @@ release.archive_contents.self_test	release
 release.firmware_scan	release
 release.firmware_scan.archive_edges	release
 release.firmware_scan.self_test	release
+release.notices	release
+release.notices.self_test	release

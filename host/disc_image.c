@@ -3,6 +3,8 @@
 #define _XOPEN_SOURCE 700
 #endif
 #include "disc_image.h"
+#include "disc_chd.h"
+#include "media_limits.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -17,13 +19,11 @@
 #include <unistd.h>
 #endif
 
-#define SCHWAY__DISC_IMAGE_MAX_BYTES UINT64_C(1073741824)
 #define SCHWAY__DISC_IMAGE_ISO_SECTOR_BYTES 2048u
 #define SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES 2352u
 #define SCHWAY__DISC_IMAGE_MIN_DATA_SECTORS 16u
 #define SCHWAY__DISC_IMAGE_CUE_MAX_BYTES 65536u
 #define SCHWAY__DISC_IMAGE_CUE_NAME_MAX 255u
-#define SCHWAY__DISC_IMAGE_TRACK_LIMIT 99u
 #define SCHWAY__DISC_IMAGE_INDEX_LIMIT 99u
 #define SCHWAY__DISC_IMAGE_PATH_CAP 4096u
 #define SCHWAY__DISC_IMAGE_M3U_MAX_BYTES 65536u
@@ -68,9 +68,10 @@ struct schway_disc_image {
     size_t playlist_count;
     char *path;
     char label[SCHWAY__DISC_IMAGE_CUE_NAME_MAX + 1u];
+    schway__disc_chd *chd;
     schway_disc_image *playlist[SCHWAY__DISC_IMAGE_M3U_ENTRY_MAX];
-    schway__disc_image_source sources[SCHWAY__DISC_IMAGE_TRACK_LIMIT];
-    schway__disc_image_track tracks[SCHWAY__DISC_IMAGE_TRACK_LIMIT];
+    schway__disc_image_source sources[SCHWAY_DISC_MAX_TRACKS];
+    schway__disc_image_track tracks[SCHWAY_DISC_MAX_TRACKS];
     schway_disc descriptor;
     schway_toc toc;
 };
@@ -247,6 +248,19 @@ static void schway__disc_image_mode2_blank(
 #undef SCHWAY__BCD
 }
 
+void schway__disc_image_make_virtual_sector(uint32_t track_type, uint32_t lba,
+                                            uint8_t sector[SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES])
+{
+    if (sector == NULL) return;
+    memset(sector, 0, SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES);
+    if (track_type == SCHWAY_DISC_TRACK_MODE1) {
+        schway__disc_image_mode1_header(sector, lba);
+        schway__disc_image_mode1_trailer(sector);
+    } else if (track_type == SCHWAY_DISC_TRACK_MODE2) {
+        schway__disc_image_mode2_blank(sector, lba);
+    }
+}
+
 static uint32_t schway__disc_image_digit_pair(const char *text, uint32_t *out)
 {
     if (text[0] < '0' || text[0] > '9' || text[1] < '0' || text[1] > '9') return 0u;
@@ -407,7 +421,7 @@ static schway_disc_image_status schway__disc_image_parse_cue(
         if (schway__disc_image_word_is(keyword, "FILE")) {
             char name[SCHWAY__DISC_IMAGE_CUE_NAME_MAX + 1u];
             char file_type[16];
-            if (image->source_count >= SCHWAY__DISC_IMAGE_TRACK_LIMIT ||
+            if (image->source_count >= SCHWAY_DISC_MAX_TRACKS ||
                 (active_track != NULL && active_track->have_index01 == 0u) ||
                 !schway__disc_image_token(&cursor, name, sizeof name) ||
                 !schway__disc_image_token(&cursor, file_type, sizeof file_type) ||
@@ -431,7 +445,7 @@ static schway_disc_image_status schway__disc_image_parse_cue(
             char number_text[8];
             char mode[24];
             uint32_t number;
-            if (active_file == SIZE_MAX || image->track_count >= SCHWAY__DISC_IMAGE_TRACK_LIMIT ||
+            if (active_file == SIZE_MAX || image->track_count >= SCHWAY_DISC_MAX_TRACKS ||
                 (active_track != NULL && active_track->have_index01 == 0u) ||
                 !schway__disc_image_token(&cursor, number_text, sizeof number_text) ||
                 strlen(number_text) != 2u ||
@@ -613,7 +627,13 @@ static int schway__disc_image_store_path(schway_disc_image *image, const char *p
 
 static const char *schway__disc_image_unsupported_reason(const char *path)
 {
-    if (schway__disc_image_extension_is(path, ".chd")) return "unsupported: CHD (planned v2.0)";
+    if (schway__disc_image_extension_is(path, ".chd")) {
+#if SCHWAYSTATION_CHD
+        return "unsupported: CHD companion files are not allowed";
+#else
+        return "unsupported: CHD (SCHWAYSTATION_CHD=OFF)";
+#endif
+    }
     if (schway__disc_image_extension_is(path, ".pbp")) return "unsupported: PBP (planned v2.0)";
     if (schway__disc_image_extension_is(path, ".ecm")) return "unsupported: ECM (planned v2.0)";
     if (schway__disc_image_extension_is(path, ".ccd")) return "unsupported: CCD (planned v2.0)";
@@ -779,7 +799,8 @@ static schway_disc_image_status schway__disc_image_open_cue_children(
             }
         }
         if (!duplicate) {
-            if (source->size > SCHWAY__DISC_IMAGE_MAX_BYTES - total) {
+            if (total > SCHWAY__MEDIA_IMAGE_MAX_BYTES ||
+                source->size > SCHWAY__MEDIA_IMAGE_MAX_BYTES - total) {
                 return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_LIMIT,
                                                      source->line, "total cue image exceeds 1 GiB");
             }
@@ -787,20 +808,6 @@ static schway_disc_image_status schway__disc_image_open_cue_children(
         }
     }
     return SCHWAY_DISC_IMAGE_OK;
-}
-
-static int schway__disc_image_add_u64(uint64_t left, uint64_t right, uint64_t *out)
-{
-    if (right > UINT64_MAX - left) return 0;
-    *out = left + right;
-    return 1;
-}
-
-static int schway__disc_image_mul_u64(uint64_t left, uint64_t right, uint64_t *out)
-{
-    if (left != 0u && right > UINT64_MAX / left) return 0;
-    *out = left * right;
-    return 1;
 }
 
 static schway_disc_image_status schway__disc_image_build_cue_toc(
@@ -819,12 +826,12 @@ static schway_disc_image_status schway__disc_image_build_cue_toc(
         if (i == 0u) {
             track->index0_lba = 0u;
             if (track->have_index00 != 0u) {
-                if (!schway__disc_image_mul_u64(start_frame, track->sector_bytes,
+                if (!schway__media_mul_u64(start_frame, track->sector_bytes,
                                                  &track->index0_file_offset)) {
                     return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
                                                          track->index_line, "INDEX offset overflow");
                 }
-            } else if (!schway__disc_image_mul_u64(track->index01_frame, track->sector_bytes,
+            } else if (!schway__media_mul_u64(track->index01_frame, track->sector_bytes,
                                                    &track->index0_file_offset)) {
                 return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
                                                      track->index_line, "INDEX offset overflow");
@@ -840,36 +847,36 @@ static schway_disc_image_status schway__disc_image_build_cue_toc(
                                                          "overlapping or backward track indexes");
                 }
                 delta_frames = start_frame - previous->index01_frame;
-                if (!schway__disc_image_mul_u64(delta_frames, previous->sector_bytes,
+                if (!schway__media_mul_u64(delta_frames, previous->sector_bytes,
                                                  &delta_bytes) ||
-                    !schway__disc_image_add_u64(previous->index1_file_offset, delta_bytes,
+                    !schway__media_add_u64(previous->index1_file_offset, delta_bytes,
                                                  &track->index0_file_offset) ||
-                    !schway__disc_image_add_u64(previous->index1_lba, delta_frames,
+                    !schway__media_add_u64(previous->index1_lba, delta_frames,
                                                  &track->index0_lba)) {
                     return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
                                                          track->index_line, "track offset overflow");
                 }
             } else {
                 track->index0_lba = previous->leadout;
-                if (!schway__disc_image_mul_u64(start_frame, track->sector_bytes,
+                if (!schway__media_mul_u64(start_frame, track->sector_bytes,
                                                  &track->index0_file_offset)) {
                     return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
                                                          track->index_line, "INDEX offset overflow");
                 }
             }
         }
-        if (!schway__disc_image_mul_u64(track->physical_pregap, track->sector_bytes,
+        if (!schway__media_mul_u64(track->physical_pregap, track->sector_bytes,
                                          &physical_bytes) ||
-            !schway__disc_image_add_u64(track->index0_file_offset, physical_bytes,
+            !schway__media_add_u64(track->index0_file_offset, physical_bytes,
                                          &track->index1_file_offset) ||
             track->index0_file_offset > source->size || track->index1_file_offset > source->size) {
             return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                                  track->file_line, "track data exceeds FILE child");
         }
         uint64_t index1_lba;
-        if (!schway__disc_image_add_u64(track->index0_lba, track->physical_pregap,
+        if (!schway__media_add_u64(track->index0_lba, track->physical_pregap,
                                          &index1_lba) ||
-            !schway__disc_image_add_u64(index1_lba, track->virtual_pregap,
+            !schway__media_add_u64(index1_lba, track->virtual_pregap,
                                          &track->index1_lba) ||
             track->index1_lba > UINT32_MAX) {
             return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
@@ -883,9 +890,9 @@ static schway_disc_image_status schway__disc_image_build_cue_toc(
             uint32_t next_start = next->have_index00 != 0u ?
                                       next->index00_frame : next->index01_frame;
             if (next_start < track->index01_frame ||
-                !schway__disc_image_mul_u64(next_start - track->index01_frame,
+                !schway__media_mul_u64(next_start - track->index01_frame,
                                              track->sector_bytes, &data_bytes) ||
-                !schway__disc_image_add_u64(track->index1_file_offset, data_bytes, &sectors) ||
+                !schway__media_add_u64(track->index1_file_offset, data_bytes, &sectors) ||
                 sectors > source->size || data_bytes % track->sector_bytes != 0u) {
                 return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
                                                      next->index_line,
@@ -905,21 +912,21 @@ static schway_disc_image_status schway__disc_image_build_cue_toc(
             }
             sectors = data_bytes / track->sector_bytes;
         }
-        if (sectors == 0u || !schway__disc_image_add_u64(track->index1_lba, sectors,
+        if (sectors == 0u || !schway__media_add_u64(track->index1_lba, sectors,
                                                          &track->leadout) ||
             track->leadout > UINT32_MAX) {
             return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                                  track->file_line, "track has no bounded data sectors");
         }
         if (track->type != SCHWAY_DISC_TRACK_AUDIO) {
-            if (!schway__disc_image_add_u64(data_sectors, sectors, &data_sectors)) {
+            if (!schway__media_add_u64(data_sectors, sectors, &data_sectors)) {
                 return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                                      track->file_line, "data sector count overflow");
             }
         }
         if (track->last_index_frame > track->index01_frame) {
             uint64_t last_index_offset;
-            if (!schway__disc_image_mul_u64(track->last_index_frame, track->sector_bytes,
+            if (!schway__media_mul_u64(track->last_index_frame, track->sector_bytes,
                                              &last_index_offset) ||
                 last_index_offset > source->size) {
                 return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
@@ -972,7 +979,7 @@ static schway_disc_image_status schway__disc_image_open_iso(
                                      "cannot size disc image");
         return SCHWAY_DISC_IMAGE_IO;
     }
-    if (file_size > SCHWAY__DISC_IMAGE_MAX_BYTES) {
+    if (file_size > SCHWAY__MEDIA_IMAGE_MAX_BYTES) {
         schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_LIMIT, 0u,
                                      "disc image exceeds the 1 GiB limit");
         return SCHWAY_DISC_IMAGE_LIMIT;
@@ -1011,6 +1018,25 @@ static schway_disc_image_status schway__disc_image_open_cue(
     schway__disc_image_prepare_descriptor(image);
     return SCHWAY_DISC_IMAGE_OK;
 }
+
+#if SCHWAYSTATION_CHD
+static schway_disc_image_status schway__disc_image_open_chd(
+    const char *path, schway_disc_image *image, schway_disc_image_error *error)
+{
+    schway_disc_image_status status = schway__disc_chd_open(path, &image->chd, error);
+    if (status != SCHWAY_DISC_IMAGE_OK) return status;
+    image->toc.size = (uint32_t)sizeof image->toc;
+    status = schway__disc_chd_toc(image->chd, &image->toc);
+    if (status != SCHWAY_DISC_IMAGE_OK) {
+        schway__disc_image_error_set(error, status, 0u,
+                                     "CHD metadata could not be projected into a TOC");
+        return status;
+    }
+    image->track_count = image->toc.track_count;
+    schway__disc_image_prepare_descriptor(image);
+    return SCHWAY_DISC_IMAGE_OK;
+}
+#endif
 
 static schway_disc_image_status schway__disc_image_m3u_error(
     schway_disc_image_error *error, schway_disc_image_status status,
@@ -1175,6 +1201,9 @@ static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
     uint64_t virtual_end;
     uint8_t raw[SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES];
     if (image == NULL || sector == NULL) return 0u;
+    if (image->chd != NULL) {
+        return schway__disc_chd_read_sector(image->chd, lba, sector, subcode);
+    }
     for (size_t i = 0u; i < image->track_count; i++) {
         if (lba >= image->tracks[i].index0_lba && lba < image->tracks[i].leadout) {
             track = &image->tracks[i];
@@ -1184,23 +1213,17 @@ static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
     if (track == NULL) return 0u;
     virtual_end = track->index0_lba + track->virtual_pregap;
     if ((uint64_t)lba < virtual_end) {
-        memset(raw, 0, sizeof raw);
-        if (track->type == SCHWAY_DISC_TRACK_MODE1) {
-            schway__disc_image_mode1_header(raw, lba);
-            schway__disc_image_mode1_trailer(raw);
-        } else if (track->type == SCHWAY_DISC_TRACK_MODE2) {
-            schway__disc_image_mode2_blank(raw, lba);
-        }
+        schway__disc_image_make_virtual_sector(track->type, lba, raw);
     } else {
         if ((uint64_t)lba < track->index1_lba) {
             local_lba = (uint64_t)lba - virtual_end;
-            if (!schway__disc_image_mul_u64(local_lba, track->sector_bytes, &file_offset) ||
-                !schway__disc_image_add_u64(track->index0_file_offset, file_offset,
+            if (!schway__media_mul_u64(local_lba, track->sector_bytes, &file_offset) ||
+                !schway__media_add_u64(track->index0_file_offset, file_offset,
                                              &file_offset)) return 0u;
         } else {
             local_lba = (uint64_t)lba - track->index1_lba;
-            if (!schway__disc_image_mul_u64(local_lba, track->sector_bytes, &file_offset) ||
-                !schway__disc_image_add_u64(track->index1_file_offset, file_offset,
+            if (!schway__media_mul_u64(local_lba, track->sector_bytes, &file_offset) ||
+                !schway__media_add_u64(track->index1_file_offset, file_offset,
                                              &file_offset)) return 0u;
         }
         schway__disc_image_source *source = &image->sources[track->source_index];
@@ -1248,15 +1271,29 @@ schway_disc_image_status schway_disc_image_open(const char *path,
         error->size = (uint32_t)sizeof *error;
     }
     if (schway__disc_image_path_is_unsupported(path)) {
+#if SCHWAYSTATION_CHD
+        if (!schway__disc_image_extension_is(path, ".chd")) {
+#endif
         schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u,
                                      schway__disc_image_unsupported_reason(path));
         return SCHWAY_DISC_IMAGE_UNSUPPORTED;
+#if SCHWAYSTATION_CHD
+        }
+#endif
     }
     if (!schway__disc_image_extension_is(path, ".iso") &&
         !schway__disc_image_extension_is(path, ".cue") &&
-        !schway__disc_image_extension_is(path, ".m3u")) {
+        !schway__disc_image_extension_is(path, ".m3u")
+#if SCHWAYSTATION_CHD
+        && !schway__disc_image_extension_is(path, ".chd")
+#endif
+        ) {
         schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_BAD_IMAGE, 0u,
+#if SCHWAYSTATION_CHD
+                                     "expected cue, ISO, m3u, or CHD image");
+#else
                                      "expected a cue sheet, ISO image, or m3u playlist");
+#endif
         return SCHWAY_DISC_IMAGE_BAD_IMAGE;
     }
     if (!schway__disc_image_canonical_path(path, canonical)) {
@@ -1280,6 +1317,10 @@ schway_disc_image_status schway_disc_image_open(const char *path,
         status = schway__disc_image_open_iso(canonical, image, error);
     } else if (schway__disc_image_extension_is(canonical, ".m3u")) {
         status = schway__disc_image_open_m3u(canonical, image, error);
+#if SCHWAYSTATION_CHD
+    } else if (schway__disc_image_extension_is(canonical, ".chd")) {
+        status = schway__disc_image_open_chd(canonical, image, error);
+#endif
     } else {
         status = schway__disc_image_open_cue(canonical, image, error);
     }
@@ -1302,6 +1343,7 @@ void schway_disc_image_close(schway_disc_image *image)
         if (image->sources[i].file != NULL) (void)fclose(image->sources[i].file);
         free(image->sources[i].canonical_path);
     }
+    schway__disc_chd_close(image->chd);
     free(image->path);
     free(image);
 }

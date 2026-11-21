@@ -82,6 +82,43 @@ if(CMAKE_SCRIPT_MODE_FILE)
     if(NOT base_card MATCHES "^sgi2-${digits}[.]srm$")
       message(FATAL_ERROR "missing/invalid first-disc serial should use the v2 full-content digest: ${base_card}")
     endif()
+    if(CHD_ONLY)
+      if(CHD_ENABLED)
+        execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot.cue"
+          RESULT_VARIABLE cue_probe_rc OUTPUT_VARIABLE cue_probe_out ERROR_VARIABLE cue_probe_err)
+        execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot.chd"
+          RESULT_VARIABLE chd_probe_rc OUTPUT_VARIABLE chd_probe_out ERROR_VARIABLE chd_probe_err)
+        if(NOT cue_probe_rc STREQUAL "0" OR NOT chd_probe_rc STREQUAL "0" OR
+           NOT cue_probe_out STREQUAL chd_probe_out)
+          message(FATAL_ERROR "CUE and CHD probe identity differs:\n"
+            "CUE ${cue_probe_rc}\n${cue_probe_out}${cue_probe_err}\n"
+            "CHD ${chd_probe_rc}\n${chd_probe_out}${chd_probe_err}")
+        endif()
+        foreach(format IN ITEMS cue chd)
+          execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}"
+              --disc "${FIXTURES}/disc_boot.${format}" --frames 1200 --stop-on mailbox --hash
+            RESULT_VARIABLE ${format}_rc OUTPUT_VARIABLE ${format}_out ERROR_VARIABLE ${format}_err)
+          if(NOT ${format}_rc STREQUAL "0" OR NOT ${format}_out MATCHES "mailbox SWMB status=00" OR
+             NOT ${format}_out MATCHES "frame [0-9]+ sha256 ${digits}")
+            message(FATAL_ERROR "${format} disc run failed: exit ${${format}_rc}\n"
+              "${${format}_out}${${format}_err}")
+          endif()
+        endforeach()
+        if(NOT cue_out STREQUAL chd_out)
+          message(FATAL_ERROR "CUE and CHD guest output or state hash differs:\nCUE ${cue_out}\nCHD ${chd_out}")
+        endif()
+        run_disc_identity("${FIXTURES}/disc_boot.chd" "${OUT}/runner-disc-identities-chd" chd_card)
+        if(NOT chd_card STREQUAL base_card)
+          message(FATAL_ERROR "equivalent CUE and CHD content produced different memory-card identities: ${base_card} vs ${chd_card}")
+        endif()
+      else()
+        expect_exit(77 "unsupported: CHD [(]SCHWAYSTATION_CHD=OFF[)]"
+          --probe "${FIXTURES}/disc_boot.chd")
+        expect_exit(77 "unsupported: CHD [(]SCHWAYSTATION_CHD=OFF[)]"
+          --bios "${BIOS}" --disc "${FIXTURES}/disc_boot.chd" --frames 1)
+      endif()
+      return()
+    endif()
 
     set(moved_dir "${OUT}/runner-disc-identity-moved")
     file(REMOVE_RECURSE "${moved_dir}")
@@ -228,9 +265,16 @@ if(CMAKE_SCRIPT_MODE_FILE)
       "FILE \"unsupported.ccd\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
     file(WRITE "${root}/nested-chd.m3u" "unsupported.chd\n")
     file(WRITE "${root}/nested-pbp.m3u" "unsupported.pbp\n")
-    foreach(kind IN ITEMS CHD PBP ECM CCD)
+    set(unsupported_kinds PBP ECM CCD)
+    if(NOT CHD_ENABLED)
+      list(APPEND unsupported_kinds CHD)
+    endif()
+    foreach(kind IN LISTS unsupported_kinds)
       string(TOLOWER "${kind}" lower)
       set(want "unsupported: ${kind} (planned v2.0)")
+      if(kind STREQUAL "CHD" AND NOT CHD_ENABLED)
+        set(want "unsupported: CHD (SCHWAYSTATION_CHD=OFF)")
+      endif()
       execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/unsupported.${lower}"
           --frames 1
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
@@ -246,12 +290,18 @@ if(CMAKE_SCRIPT_MODE_FILE)
           "${probe_out}${probe_err}")
       endif()
     endforeach()
-    foreach(row IN ITEMS "nested-ecm.cue|ECM" "nested-ccd.cue|CCD"
-        "nested-chd.m3u|CHD" "nested-pbp.m3u|PBP")
+    set(nested_unsupported_rows "nested-ecm.cue|ECM" "nested-ccd.cue|CCD" "nested-pbp.m3u|PBP")
+    if(NOT CHD_ENABLED)
+      list(APPEND nested_unsupported_rows "nested-chd.m3u|CHD")
+    endif()
+    foreach(row IN LISTS nested_unsupported_rows)
       string(REPLACE "|" ";" fields "${row}")
       list(GET fields 0 child)
       list(GET fields 1 kind)
       set(want "unsupported: ${kind} (planned v2.0)")
+      if(kind STREQUAL "CHD" AND NOT CHD_ENABLED)
+        set(want "unsupported: CHD (SCHWAYSTATION_CHD=OFF)")
+      endif()
       execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/${child}"
           --frames 1
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
@@ -1086,6 +1136,20 @@ schway_add_test(NAME runner.disc.api
     ${runner_disc_playlist}
   LABELS portable runner TIMEOUT 15)
 
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/runner-disc-chd)
+file(WRITE ${PROJECT_BINARY_DIR}/tests/runner-disc-chd/invalid.chd "not a CHD image\n")
+# Fault prevented: CHD callbacks or TOC differ from equivalent CUE sectors,
+# or a closed-lid / rejected provider operation mutates the selected disc.
+schway_add_test(NAME runner.disc.api.chd
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-runner-disc>
+    chd ${PROJECT_BINARY_DIR}/fixtures/disc_boot.cue
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot.chd
+    ${PROJECT_BINARY_DIR}/tests/runner-disc-chd/invalid.chd
+    $<BOOL:${SCHWAYSTATION_CHD}>
+  LABELS portable runner TIMEOUT 30)
+set_tests_properties(runner.disc.api.chd PROPERTIES
+  FIXTURES_REQUIRED "disc_media_preflight;compat_features_preflight")
+
 # Fault prevented: frame-indexed script application that skips the selected boundary or fails to
 # apply the controller edge, eject, playlist selection, or final lid close.
 schway_add_test(NAME runner.inputs.disc_apply
@@ -1100,13 +1164,28 @@ schway_add_test(NAME runner.disc.load
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 180)
 
+# Fault prevented: CHD probing or guest sectors disagree with equivalent CUE
+# input, card identity aliases, or CHD-off builds accept an image without their
+# explicit unsupported result.
+schway_add_test(NAME runner.disc.chd
+  COMMAND ${runner_check} -DCASE=disc_load -DCHD_ONLY=ON
+    -DCHD_ENABLED=$<BOOL:${SCHWAYSTATION_CHD}>
+    -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests/runner-disc-chd
+    -DHOOKED=$<TARGET_FILE:schwaystation-run-test> -DPYTHON3=${Python3_EXECUTABLE}
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 180)
+set_tests_properties(runner.disc.chd PROPERTIES
+  FIXTURES_REQUIRED "disc_media_preflight;compat_features_preflight")
+
 schway_add_test(NAME runner.disc.probe
   COMMAND ${runner_check} -DCASE=disc_probe -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
 schway_add_test(NAME runner.disc.unsupported
-  COMMAND ${runner_check} -DCASE=disc_unsupported -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+  COMMAND ${runner_check} -DCASE=disc_unsupported
+    -DCHD_ENABLED=$<BOOL:${SCHWAYSTATION_CHD}> -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
     -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)

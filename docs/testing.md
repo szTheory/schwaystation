@@ -19,6 +19,10 @@ check the packaged archives and run after the package step, with `ctest --preset
 label, so `-L gte` would also select any longer label that contains it; write `-L '^gte$'`, `-L '^dma$'` and
 `-L '^timers$'` to select exactly one.
 
+Test presets stop scheduling new tests after the first failure. A green run still covers its full selected
+inventory; a red run avoids spending time on unrelated checks after a blocking failure, while tests already
+running are allowed to finish.
+
 **Reconfigure after each commit.** Some checks read git's list of tracked files, and the runner's revision is
 embedded when CMake configures. A new file is seen only once git tracks it, and `build.revision_matches_head`
 fails when the embedded revision is not `git rev-parse HEAD`. After committing, rerun the whole workflow preset,
@@ -380,9 +384,10 @@ mode strings and NULL-on-open-failure behavior. The libretro content and BIOS re
 read-only opener. This avoids global warning suppression and keeps Windows `/WX` intact. Windows and GCC
 cross-compiler acceptance is established by the hosted matrix, not by a native configure.
 
-The CUE reader accepts a relative `FILE` component of up to 255 bytes. Its Windows boundary test confirms that a
-255-byte component passes CUE validation and reaches the file-open step; the full identity/open positive uses the
-same fixture on POSIX and macOS, where the build-tree prefix stays within the host path limit.
+### Disc media preflight
+
+The provider preflight, deterministic CHD fixture, media bounds and local test commands are documented in
+[Media testing](media-testing.md).
 
 Compatibility scripts prefix each raw helper and runner call with the complete `CMAKE_CROSSCOMPILING_EMULATOR`
 argument list. The shell library accepts one runner executable, so cross-emulated library checks use generated
