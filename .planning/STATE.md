@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 9
+current_plan: 10
 status: executing
-stopped_at: Completed 10-08-PLAN.md; runtime Codex/OpenGSD 1.20.0, executor gpt-6-luna
-last_updated: "2026-11-21T13:39:28.404Z"
+stopped_at: Completed 10-09-PLAN.md; Plan 10-10 remains next
+last_updated: "2026-11-21T14:09:41Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-08 complete; Plan 10-09 next
-state_head: b5b0076
+last_activity_desc: Phase 10 Plan 10-09 complete; Plan 10-10 next
+state_head: d354bfe
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 44
+completed_plans: 45
   percent: 30
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 (PBP disc images) — EXECUTING
-Current Plan: 9
+Current Plan: 10
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-08 complete; Plan 10-09 is next
+Last activity: 2026-11-21 — Plan 10-09 complete; Plan 10-10 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -157,6 +157,19 @@ CUE runs both exited 0 and produced the same hash, so the runner test now checks
 playlist guard keeps M3U membership at its documented ISO/CUE scope; broken-windows entry 15 is fixed. No
 workflow changed, so `act` and hosted CI did not apply. Task commits are `b8f43b1` and `b5b0076`; summary:
 `.planning/phases/10-pbp-disc-images/10-08-SUMMARY.md`. PBP-01 remains phase-wide pending; Plan 10-09 is next.
+
+### Phase 10 Plan 10-09 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.21.0; executor `gpt-6-luna` xhigh. Work began at 13:45:05Z; wall time through
+closeout was about 25 minutes, with active time not separately measured. Sorted libretro inventory, fixture
+preflight, selector wiring and the 3,900/3,901 line-budget check passed before the focused build. The PBP/CUE
+libretro host test passed with both fixture prerequisites in 6.00s; generated metadata checks passed 2/2 in
+both CHD-OFF and CHD-ON configurations. The 1,200-frame PBP/CUE host comparison is the local critical path;
+its measured host test took 5.97s. A bounded test timeout of 60s keeps over 10x allowance for slower CI hosts.
+The provider exposes no serializable disc identity, so failure-atomic state evidence compares exact RAM and
+card bytes alongside the frame/audio traces and active path. No workflow changed, so `act` and hosted CI did
+not apply. Task commits are `47d233e` and `d354bfe`; summary: `.planning/phases/10-pbp-disc-images/10-09-SUMMARY.md`.
+PBP-01 remains phase-wide pending; Plan 10-10 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -791,6 +804,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 10 P01 | 24m53s | 3 tasks | 22 files |
 | Phase 10 P07 | 44m | 2 tasks | 9 files |
 | Phase 10 P08 | 24m | 2 tasks | 8 files |
+| Phase 10 P09 | 25m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -1189,6 +1203,8 @@ Recent decisions affecting current work:
 - [Phase 10]: Keep the PBP fuzz corpus as 14 generated mutation scripts capped at 256 bytes, with build-owned raw and compressed baselines and no committed disc bytes.
 - [Phase 10]: Keep all Nightly fuzz cases; skip CHD and non-PBP fuzz work only when the classifier proves a pull request is PBP-only.
 - [Phase 10]: Standalone PBP support leaves M3U playlist membership limited to the existing ISO/CUE contract.
+- [Phase 10]: Keep PBP always available in the host path and gate its metadata claim on the registered libretro.content.pbp integration test.
+- [Phase 10]: Keep the supported PBP claim limited to unencrypted single-data-track PSISO images and preserve CHD license derivation from the linked closure.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1435,9 +1451,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T13:39:28.404Z
-Stopped at: Completed 10-08-PLAN.md; runtime Codex/OpenGSD 1.20.0, executor gpt-6-luna
-Resume file: .planning/phases/10-pbp-disc-images/10-09-PLAN.md
+Last session: 2026-11-21T14:09:03.104Z
+Stopped at: Completed 10-09-PLAN.md; Plan 10-10 remains next
+Resume file: None
 
 ### v1.0 session history
 
