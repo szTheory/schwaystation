@@ -5,7 +5,7 @@
 # the one open issue labelled nightly; a good night closes it. The vectors-full
 # job replays all 55,000 public single-step vectors at their pin; it reports
 # through the same issue and is not part of the CI required aggregate. The
-  # fuzz job runs the loader, SPU and six media libFuzzer targets for 60 seconds and reports the
+  # fuzz job runs the loader, SPU and seven media libFuzzer targets for 60 seconds and reports the
 # same way (docs/testing.md, "The loader fuzz target").
 name: Nightly
 
@@ -187,9 +187,15 @@ jobs:
           cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake
       # clang-21 and the media encoder's FFmpeg development packages may not be on the image.
       - name: Sanitizer and media-fixture dependencies
+        env:
+          PBP_ONLY: ${{ needs.changes.outputs.pbp_only }}
         run: |
           set -eu
-          packages=(libclang-rt-21-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev)
+          if [[ "$PBP_ONLY" == 'true' ]]; then
+            packages=(libclang-rt-21-dev)
+          else
+            packages=(libclang-rt-21-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev)
+          fi
           missing=false
           for package in "${packages[@]}"; do
             if ! dpkg -s "$package" > /dev/null 2>&1; then missing=true; break; fi
@@ -199,11 +205,13 @@ jobs:
             sudo apt-get install -y --no-install-recommends "${packages[@]}"
           fi
       - name: Build the uninstrumented CHD fixture generator
+        if: needs.changes.outputs.pbp_only != 'true'
         run: |
           cmake --preset chd-tool
           cmake --build --preset chd-tool
           test -x build/chd-tool/tools/schwaystation-chd-tool
       - name: Build the owned CHD baseline fixture
+        if: needs.changes.outputs.pbp_only != 'true'
         run: |
           set -eu
           cmake --preset fuzz
@@ -213,23 +221,41 @@ jobs:
             -DOUTPUT_CHD=build/fuzz/fixtures/disc_boot.chd \
             -DMANIFEST=build/fuzz/tests/disc_boot.chd.manifest \
             -P cmake/CHDFixtures.cmake
-      - run: cmake --build --preset fuzz
+      - name: Configure PBP-only sanitizer targets
+        if: needs.changes.outputs.pbp_only == 'true'
+        run: cmake --preset fuzz -DSCHWAYSTATION_CHD=OFF
+      - name: Build sanitizer targets
+        env:
+          PBP_ONLY: ${{ needs.changes.outputs.pbp_only }}
+        run: |
+          if [[ "$PBP_ONLY" == 'true' ]]; then
+            cmake --build build/fuzz --target schwaystation-fuzz-pbp schwaystation-fuzz-pbp-replay schwaystation-pbp-fixtures
+          else
+            cmake --build --preset fuzz
+          fi
       - name: Check media seeds and run bounded campaigns
         env:
+          PBP_ONLY: ${{ needs.changes.outputs.pbp_only }}
           UBSAN_OPTIONS: print_stacktrace=1
         run: |
           set -eu
           mkdir -p build/fuzz/corpus build/fuzz/crash
-          build/fuzz/tests/schwaystation-fuzz-exe-replay --write build/fuzz/corpus
-          rc=0
-          build/fuzz/tests/schwaystation-fuzz-exe -max_total_time=60 -timeout=20 -max_len=2099200 \
-            -artifact_prefix=build/fuzz/crash/ build/fuzz/corpus > build/fuzz/log.txt 2>&1 || rc=$?
-          tail -n 30 build/fuzz/log.txt
-          { echo '### fuzz'; echo '```'; tail -n 3 build/fuzz/log.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          test "$rc" -eq 0
-          subsystems=(cue cnf m3u cdrom chd mdec)
-          expected=(5 5 7 15 12 6)
-          max_lengths=(65536 4096 65536 16384 16384 262144)
+          if [[ "$PBP_ONLY" != 'true' ]]; then
+            build/fuzz/tests/schwaystation-fuzz-exe-replay --write build/fuzz/corpus
+            rc=0
+            build/fuzz/tests/schwaystation-fuzz-exe -max_total_time=60 -timeout=20 -max_len=2099200 \
+              -artifact_prefix=build/fuzz/crash/ build/fuzz/corpus > build/fuzz/log.txt 2>&1 || rc=$?
+            tail -n 30 build/fuzz/log.txt
+            { echo '### fuzz'; echo '```'; tail -n 3 build/fuzz/log.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            test "$rc" -eq 0
+            subsystems=(cue cnf m3u cdrom chd mdec pbp)
+            expected=(5 5 7 15 12 6 14)
+            max_lengths=(65536 4096 65536 16384 16384 262144 256)
+          else
+            subsystems=(pbp)
+            expected=(14)
+            max_lengths=(256)
+          fi
           for i in "${!subsystems[@]}"; do
             name=${subsystems[$i]}
             corpus="build/fuzz/corpus/$name"
