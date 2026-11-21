@@ -133,7 +133,7 @@ Plans:
   1. The runner and libretro host read the verified unencrypted PSISO layouts and track variants with matching sectors and deterministic hashes. The provider functions with CHD disabled and without system zlib, and the bundled inflater carries its permissive notice.
   2. Bad PSISO offsets, track tables, sizes and truncated blocks fail at the media boundary. Encrypted PGD and undocumented layouts return a clear unsupported result before guest execution. The ledger records the variants exercised.
 
-**Plans**: 6/13 plans executed
+**Plans**: 7/13 plans executed
 
 Plans:
 **Wave 1**
@@ -153,7 +153,7 @@ Plans:
 - [x] 10-05-PLAN.md — Validate PSISO directory, TOC and block tables
 
 **Wave 6** *(depends on bounded metadata)*
-- [ ] 10-06-PLAN.md — Expose validated PBP sectors through shared callbacks
+- [x] 10-06-PLAN.md — Expose validated PBP sectors through shared callbacks
 
 **Wave 7** *(depends on sector parity; fuzz also consumes Nightly routing)*
 - [ ] 10-07-PLAN.md — Replay and fuzz hostile input through the production parser

@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Completed 10-05-PLAN.md
-last_updated: "2026-11-21T12:02:59Z"
+stopped_at: Completed 10-06-PLAN.md
+last_updated: "2026-11-21T12:27:39Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-05 complete; Plan 10-06 next
-state_head: 826cb13
+last_activity_desc: Phase 10 Plan 10-06 complete; Plan 10-07 next
+state_head: 83d7bf0
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 41
+completed_plans: 42
   percent: 30
 ---
 
@@ -34,7 +34,7 @@ Phase: 10 (PBP disc images) — EXECUTING
 Current Plan: 6
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-05 complete; Plan 10-06 is next
+Last activity: 2026-11-21 — Plan 10-06 complete; Plan 10-07 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -131,6 +131,19 @@ Valid BCD MSF cannot encode a logical image over 1 GiB; the maximum legal table 
 are tested separately. The gate remains 3,900/3,901. No workflow changed, so `act` and hosted CI were not
 applicable. Task commits: `5db27a6`, `826cb13`; summary:
 `.planning/phases/10-pbp-disc-images/10-05-SUMMARY.md`. Plan 10-06 is next.
+
+### Phase 10 Plan 10-06 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna` xhigh; orchestration model ID and effort were not
+exposed. The measured wall interval from the prior STATE checkpoint at 12:02:59Z through root closeout at
+12:27:39Z was 24m40s; active executor time was not separately measured. Root review caught a missing verbatim
+0x9300-byte block path; it was implemented and tested before acceptance. Root also corrected the raw fixture's
+PSAR length metadata. Sorted inventory, diff, selector and 3,900/3,901 line-budget checks passed before the
+focused rebuild. The raw selector plus fixture preflight passed 2/2 in 0.02s. The executor's PBP raw/metadata/
+bounds/parity selection passed 5/5 in 0.02s, and open/boundary/parity plus playlist passed 10/10. A malformed
+compressed block is rejected before reader publication. The measured open/scan process time was 0.002783s.
+No workflow changed, so `act` and hosted CI did not apply. Task commit: `83d7bf0`; Plan 10-06 summary is
+`.planning/phases/10-pbp-disc-images/10-06-SUMMARY.md`. Plan 10-07 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
