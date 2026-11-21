@@ -377,6 +377,7 @@ jobs:
           sparse-checkout: |
             scripts/compat-ratchet.sh
             tests/cmake/compat-ratchet.cmake
+            tests/cmake/date_days.cmake
             tests/compat/ledger.csv
           sparse-checkout-cone-mode: false
       - name: Preserve protected base checkout for ratchet

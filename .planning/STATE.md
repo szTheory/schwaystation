@@ -4,19 +4,19 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: Not started
-status: planning
-stopped_at: Phase 9 complete, ready to plan Phase 10
-last_updated: "2026-11-21T01:24:41.094Z"
-last_activity: 2026-11-20
-last_activity_desc: Phase 9 complete, transitioned to Phase 10
-state_head: 16dc50920b793316ad1295d47168bdb39d2cc87b
+current_plan: Ship follow-up 4
+status: shipping
+stopped_at: Phase 10 deterministic PBP fixture correction reviewed and locally verified, awaiting repaired-head CI/Nightly and release
+last_updated: "2026-11-21T20:36:14Z"
+last_activity: 2026-11-21
+last_activity_desc: "Replaced host-zlib PBP encoding after exact-head hash mismatch; local PBP paths pass"
+state_head: 8224693353ead38ae747ec2640f844b2c3f32cc3
 progress:
   total_phases: 10
-  completed_phases: 3
-  total_plans: 35
-  completed_plans: 35
-  percent: 30
+  completed_phases: 4
+  total_plans: 48
+  completed_plans: 48
+  percent: 40
 ---
 
 # Project State
@@ -26,15 +26,275 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 10 — PBP disc images
+**Current focus:** Phase 10 — PBP disc images; exact-head hosted CI and Nightly pass, awaiting merge and release
 
 ## Current Position
 
 Phase: 10 — PBP disc images
-Current Plan: Not started
-Total Plans in Phase: TBD
-Status: Ready to plan
-Last activity: 2026-11-20 — Phase 9 complete, transitioned to Phase 10
+Current Plan: Ship follow-up 4
+Total Plans in Phase: 13
+Status: Exact-head verification passed; awaiting Phase 10 PR merge and automatic release
+Last activity: 2026-11-21 -- PR #34 CI/Nightly passed and final timing review recorded
+Progress: [████░░░░░░] 40% (3/10 phases released)
+
+### Phase 10 verification (2026-11-21)
+
+Runtime/model: GSD verifier `gpt-6-luna` xhigh. Goal-backward verification passed 2/2 roadmap truths; implementation artifacts, wiring, data flow, requirements coverage, and all 13 plan artifact/key-link audits passed. Context decision coverage was 12/12. The local final workflow evidence already recorded above passed 655 standard tests and 7 release checks; verification did not rerun tests. The verifier corrected four stale Plan 10-09 references from `libretro/schwaystation_libretro.c` to `libretro/libretro.c` and confirmed that plan's artifact/key-link audit passed. Report: `.planning/phases/10-pbp-disc-images/10-VERIFICATION.md`; `verification.status` returned `passed` (exit 0).
+
+The pre-repair exact-head hosted attempt failed and was cancelled after exposing fixable CI issues. The WASI producer measured the linked Phase 10 module at 875,971 bytes on run 44924014258; `quality.json` records that value. Exact-head CI 44947489771 and Nightly 44947489816 passed. Their critical path and runner-time review is recorded in `10-CI-EFFICIENCY.md`; merge and the automatic release remain mandatory before Phase 11.
+
+### Phase 10 Plan 10-13 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna` xhigh; primary model ID unavailable. The wall
+interval from the prior saved state at 15:15:19Z through the closeout at 15:53:05Z was about 38 minutes; active
+time was not measured. The reviewed Phase 10 test correction passed its focused compatibility selector (2/2,
+0.07s). The final `cmake --workflow --preset ci` passed all 655 regular tests plus 7 release checks in 78s;
+its CTest critical path was 75.65s and the release checks took 1.35s. The local build was incremental.
+
+The initial full run exposed one stale compatibility expectation for PBP, corrected in `e9ce168` and independently
+reviewed before the passing rerun. Cheap inventories, workflow pin/timeout and wiring checks, and the 3,900/3,901
+line-budget preflight passed. The Nightly route dry-run passed. Prior Phase 9 measurements identify BE32/QEMU as
+the historical hosted critical-path candidate. The first Phase 10 hosted CI/Nightly attempt is recorded in
+`10-CI-EFFICIENCY.md`; it was cancelled after failures. The actual WASI module measured 875,971 bytes and the
+quality bound now tracks it. Final exact-head CI 44947489771 and Nightly 44947489816 passed. CI took 63m30s
+wall/8,250 summed runner-seconds with BE32 at 62m18s; Nightly took 9m43s wall/908 summed runner-seconds. The
+successful WASI comparator confirmed the recorded bound but did not print the new exact measurement. No safe
+coverage-preserving workflow optimization was supported by the run-to-run timing; see `10-CI-EFFICIENCY.md`.
+The phase PR and automatic release remain before Phase 11.
+
+### Phase 10 ship-fix follow-up (2026-11-21)
+
+Runtime/model: Codex GPT-6 session; independent `gsd-code-reviewer` used `gpt-6-luna` xhigh. The previous STATE
+checkpoint was 16:20:53Z; closeout is at 16:55Z (about 34 minutes wall, including tool waits; active time was
+not measured). The cancelled run failed the hygiene classifier assertion, WASI size bound, BE32 pointer cast,
+Windows `fopen` warning, and protected-base sparse-checkout dependency. These were fixed in one batch; the missing
+`date_days.cmake` input was added to the CI sparse checkout and its wiring is now checked. Focused classifier,
+PBP, workflow-closure, full-base ratchet, quality and line-budget preflights passed; the 3,901-line cap is exactly
+full. One complete local CMake workflow passed 655 standard tests and 7 release checks in 78.09s CTest time.
+`act pull_request --dryrun` passed with a writable `/private/tmp` action cache; it establishes routing only. The
+old hosted CI/Nightly tails were cancelled after diagnosis; summed elapsed job time was 26.5 CI runner-minutes
+and 9.7 Nightly runner-minutes. No dollar billing estimate is available. No local BE32 toolchain/QEMU or WASI
+sysroot is installed, so those hosted gates remain required. The correction diff had a clean independent review.
+Continue with one repaired-head PR/Nightly attempt, inspect live and final job timing, then merge/release only
+after all required lanes pass.
+
+### Phase 10 ship-fix follow-up 2 (2026-11-21)
+
+Runtime/model: Codex GPT-6; independent code review dispatched to `gsd-code-reviewer` gpt-6-luna xhigh.
+The previous state checkpoint was 16:55Z; this repair reached local verification at 17:23Z (28 minutes wall,
+including CI and tool waits; active time was not measured). PR CI 44927726830 failed in the SDL2 example because
+its source-built host image layer omitted the PBP provider/inflater. Nightly 44927726826 failed because the full
+fuzz build preset did not include the PBP fixture; the regression seed check occurred after earlier 60-second
+campaigns. The obsolete CI tail was cancelled after its deterministic link failure was reproduced and fixed.
+The Nightly run had already ended.
+
+The example now links the PBP reader and inflater; its local configure/build passed. Nightly now builds the PBP
+fixture and validates all seeds before timed campaigns. The local replay preflight wrote the expected 42 EXE
+seeds and 5/5/7/15/12/6/14 subsystem seeds. Workflow closure, actionlint, and the 3,901/3,901 line budget pass;
+`act pull_request --dryrun` parsed the Nightly route but did not execute it. The two attempts consumed 79.22 CI
+and 14.17 Nightly summed runner-minutes; no Actions dollar data was available. Keep every platform, case,
+campaign and assertion. Independent review found one gap in the seed-order assertion; the next subsection records
+the correction and post-review checks before the exact-head CI and Nightly attempt.
+
+### Phase 10 seed-order assertion follow-up (2026-11-21)
+
+Runtime/model: Codex GPT-6 session; independent `gsd-code-reviewer` `gpt-6-luna` xhigh. The interval from the
+17:23Z checkpoint through the 17:39Z local checks was about 16 minutes wall; active time was not measured. Review
+found that the Nightly regression assertion could accept a campaign inside the replay seed loop: the loader
+fragment preceded seed validation, and the route's literal `||` was interpreted as regex alternation. The check
+now treats the operator literally and requires the loader command after loop closure. The real workflow check
+passes, and a temporary inside-the-loop campaign fixture fails as expected. The gate remains 3,901/3,901 lines;
+actionlint and diff checks pass. The earlier CI/Nightly failures remain diagnosed and linked above. Commit this
+reviewed fix, run one consolidated exact-head CI/Nightly attempt, inspect its timing/cost while active and after
+completion, then release before Phase 11.
+
+### Phase 10 generated-media graph follow-up (2026-11-21)
+
+Runtime/model: Codex GPT-6 session; independent `gsd-code-reviewer` `gpt-6-luna` xhigh. From the 17:42Z checkpoint
+through the 18:02Z preflight was about 20 minutes wall; active time was not measured. Exact-head Nightly
+44931682921 failed after 61 seconds in the fuzz fixture build: the PBP source image named `xa.xa` and `movie.str`
+as inputs, but the media-generation rule declared only `media.sha256`. A fresh local CMake configure with
+`SCHWAYSTATION_DISC_MEDIA_DIR` unset reproduced the clean-host build graph. The fix declares all three generated
+media files as byproducts. Ninja now finds the producer for each file; the route check and a negative misplaced-
+byproduct fixture pass, and the gate remains 3,901/3,901 lines.
+
+The paired CI 44931682851 had all six native builds and WASI pass, plus the listed quick gates; it was cancelled
+after the Nightly failure while BE32/ASan and dependent checks were still running. The partial CI run used 75
+runner-minutes; Nightly used 6.28. These are elapsed job sums, not billed dollars. Review found the first version
+of the new static guard could associate byproducts with an unrelated command; it now extracts only the command
+whose output is `media.sha256`, and a negative control rejects declarations attached elsewhere. Independent
+re-review of this narrowed guard was clean. Commit the fix, run one exact-head CI/Nightly pair, and inspect the
+live and final timing before release and Phase 11.
+
+### Phase 10 cross-platform PBP hash follow-up (2026-11-21)
+
+Runtime/model: Codex GPT-6 session (exact primary model ID not exposed); independent `gsd-code-reviewer`
+`gpt-6-luna` xhigh. The exact-head [CI run 44940420226](https://github.com/szTheory/schwaystation/actions/runs/44940420226)
+failed only at hash equality: Windows x64's generated PBP differed from the other seven platform outputs, while
+the normalized CUE and all other 112 records matched. The paired [Nightly run 44940420161](https://github.com/szTheory/schwaystation/actions/runs/44940420161)
+passed its full route. CI used 8,481 summed runner-seconds over 63m32s, with BE32 at 3,744s; Nightly used 860
+runner-seconds over 10m20s. The CI efficiency artifact records that no coverage reduction is supported.
+
+The fixture generator now emits fixed-Huffman raw DEFLATE using deterministic distance-one byte runs instead of
+host zlib compression, retaining zlib only as an independent decoder check. Its 64-sector output is 1,132,683
+bytes under the 1,572,864-byte cap; all four PBP blocks remain compressed. `python3 -m py_compile tools/gen_pbp.py`
+and the synthetic 1,000 run-length/decode checks passed. `cmake --build --preset ci --target
+schwaystation-test-disc-pbp schwaystation-pbp-fixtures` passed. The ten `disc.image.pbp` provider tests passed,
+and the nine guest/fuzz selector tests passed, including PBP boot/read/FMV and fuzz replay. The separate runner
+and libretro PBP integration tests passed as well. The line-budget, inventory sort, workflow closure and diff
+preflights passed at 3,901/3,901.
+Independent standard review found no blockers or warnings. No workflow changed, so Act was not repeated; local
+tests covered the generator and consumers, while only hosted platforms can establish cross-platform hash parity.
+The repaired-head CI/Nightly pair and Phase 10 release remain pending; Phase 11 has not started.
+
+### Phase 10 discussion (2026-11-21)
+
+Runtime/model: Codex session; primary model ID is not exposed. OpenGSD CLI 1.20.0; domain, security/architecture,
+CI/DevOps, and pattern-map advisors used gpt-6-luna xhigh. The elapsed wall interval from the previous saved
+STATE checkpoint at 01:24:41Z through discussion closeout at 05:04:26Z was 3h39m; active time was not measured.
+Phase 9's release and exact-main CI completed green before this discussion. The PBP boundary is limited to
+fixture-proven unencrypted PSISO layouts; malformed structures fail as bad media, unknown/encrypted variants
+remain unsupported, and the provider stays host-only with no system zlib dependency. Folded TODOs 006 and 051;
+retained the existing 3,901-line ceiling. The four pinned miniz files inspected contain no SPDX identifier,
+so TODO 005 remains deferred per the owner's choice; TODO 002's and TODO 003's recorded first triggers predate
+this phase. The stale Unlicense wording in upstream `miniz.h` is excluded; use the three modular MIT files,
+project-owned shim, generated export header, and private symbol aliases. The cheap line-budget preflight passed
+at 3,901/3,901; no build, broad suite, `act`, or hosted workflow ran during discussion. The original context
+commit is `a66a49b`; the corrected scope and research are being committed before planning continues.
+
+### Phase 10 plan and independent review (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary model ID unavailable; planner model ID not preserved; independent
+`gsd-plan-checker` gpt-6-luna xhigh and source researcher gpt-6-luna xhigh. Wall time from the discussion
+checkpoint at 05:04:26Z through final plan review at about 05:43Z was roughly 39 minutes; active time is not
+reliably attributable. The checker first found unresolved Q1–Q4 in the research and an advisory 10-file Plan
+10-02 footprint. The research now records each resolved choice, including all four emitted inflater aliases
+under `MINIZ_NO_MALLOC`; the two Plan 10-02 tasks each own five files, so no evidence supported splitting it.
+The focused independent re-review passed. All 13 plan structures, 11/11 decisions, 27/27 failure-direction
+checks, sorted inventories, `git diff --check`, and the 3,901-line ceiling passed. The roadmap already contains
+its wave map and cross-cutting constraints; the annotation helper skipped its existing em-dash checklist syntax.
+No implementation build, suite, `act`, or hosted CI ran during planning. Plan 10-01 is next.
+
+### Phase 10 Plan 10-01 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna; primary model ID and reasoning effort were not exposed.
+Measured wall time was 24m53s from 05:47:33Z through final verification at 06:12:26Z; active time was not
+measured. The quality and triage control drivers were reduced by 37 lines with their cases preserved, leaving
+the repository gate at 3,864/3,901. Both tracer runs passed all three control selectors and the line-budget
+check; `policy.quality_metrics` took 31.10–33.39s. The CHD-OFF host image target built, the sorted 30-row
+inventory passed, and `disc.image.pbp_headers` passed 1/1. Branch-wide `git diff --check` initially caught an
+extra blank line in each Phase 10 plan; commit `875f147` removed only those trailing blank lines, after which
+the full range check passed. No workflow changed, so no `act` or hosted CI run applied. This proves only the
+host-only outer-envelope boundary; PBP-01 remains phase-wide pending. Task commits: `2df74ad`, `7349f35`,
+`9dfccfb`; planning-ending correction: `875f147`. Plan 10-02 followed.
+
+### Phase 10 Plan 10-02 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna` xhigh. The wall interval from the previous saved
+STATE checkpoint at 06:16:36Z through this plan's closeout was about 1h05m; active work time was not measured.
+The three exact pinned modular miniz files, the project shim and the MIT grant are recorded in provenance and
+notices; the upstream `miniz.h` remains excluded. Cheap pin/hash/license, notice, mutation, selector, diff and
+budget checks passed before the build. The standalone target first failed under `-Werror` on undefined upstream
+portability macros and conversion warnings; setting the three research-verified macros and suppressing only
+conversion warnings for the unchanged vendor C file made the focused build pass. The `library` preset confirmed
+CHD and its tool OFF, and the image target compiled with the standalone inflater. The symbol audit found all four
+private definitions and no unresolved tinfl, allocator or zlib symbols. The vendored CTest selectors passed 2/2
+in 0.11s; direct notice and digest scripts passed, including both expected negative mutations. Gate total is
+3,869/3,901. No workflow changed, so no `act` or hosted run applied. A `cmake --preset ci -LAH` cache inspection
+reconfigured build/ci and restored its preset defaults; use `cmake -LA -N build/ci` for read-only inspection.
+Task commits are `8e64f5c` and `07fd276`; summary is `.planning/phases/10-pbp-disc-images/10-02-SUMMARY.md`.
+Plan 10-11 is the other ready Wave 2 item and is next under the sequential executor.
+
+### Phase 10 Plan 10-11 execution (2026-11-21)
+
+Runtime/model: Codex session; primary model ID is not exposed. Wall interval from the prior STATE checkpoint at
+07:26Z through closeout at 09:31Z was about 2h05m; active time was not measured. The Nightly classifier keeps
+existing CI outputs intact, routes exact PBP-only lists to fuzz, skips only complete docs/planning-only lists,
+and sends uncertain changes to full Nightly. A focused review found the missing failed-classifier fallback and
+recommended using 100-file REST pages; both were implemented and re-reviewed. Route tests, the registered
+classifier CTest (1/1), workflow wiring, action pins/timeouts, actionlint, `act` PR dry-run, diff checks and the
+3,900/3,901 gate passed. The workflow_dispatch act attempt failed locally at artifact upload because no
+`ACTIONS_RUNTIME_TOKEN` is available; no hosted run or cost comparison was made. TODO 051 stays pending until
+the exact-head hosted run in Plan 10-13. Task commits: `bc4e922`, `9d74ab0`; summary:
+`.planning/phases/10-pbp-disc-images/10-11-SUMMARY.md`. Plan 10-03 was completed before this checkpoint; Plan 10-04 followed.
+
+### Phase 10 Plan 10-04 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary model ID is not exposed. The wall interval from the saved
+09:49:43Z STATE checkpoint through closeout at 11:28:58Z was about 1h39m and includes inherited idle time;
+active time in the resumed segment was not separately measured. Cheap inventory, whitespace, Python syntax and
+3,900/3,901 budget checks passed before configure/build. The deterministic generator produced identical
+1,124,404-byte PBP output from 64 owned sectors in four blocks. The focused build passed, and fixture preflight
+plus all negative controls passed 2/2 in 0.04s. The focused checks were not the source of the inherited pause;
+no process was interrupted. No workflow changed, so `act` and hosted CI were not applicable. Task commits are
+`68f8173` and `54679e1`; the plan summary is `.planning/phases/10-pbp-disc-images/10-04-SUMMARY.md`.
+Plan 10-05 is next.
+
+### Phase 10 Plan 10-05 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna` xhigh; primary model ID is not exposed. The wall
+interval from the prior saved STATE checkpoint at 11:28:58Z through closeout at 12:02:59Z was about 34 minutes;
+active time was not separately measured. Cheap inventory, diff and repository-budget checks passed before the
+focused build. The metadata parser maps the fixture's absolute `00:02:00` start through the 150-frame lead-in
+and checks cumulative compressed extents. An initial `-Werror`, legacy test header and maximum-BCD test
+expectation each surfaced at focused checks and were corrected. All six PBP selectors passed 6/6 in 0.03s.
+Valid BCD MSF cannot encode a logical image over 1 GiB; the maximum legal table and oversized file-size guard
+are tested separately. The gate remains 3,900/3,901. No workflow changed, so `act` and hosted CI were not
+applicable. Task commits: `5db27a6`, `826cb13`; summary:
+`.planning/phases/10-pbp-disc-images/10-05-SUMMARY.md`. Plan 10-06 is next.
+
+### Phase 10 Plan 10-06 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna` xhigh; orchestration model ID and effort were not
+exposed. The measured wall interval from the prior STATE checkpoint at 12:02:59Z through root closeout at
+12:27:39Z was 24m40s; active executor time was not separately measured. Root review caught a missing verbatim
+0x9300-byte block path; it was implemented and tested before acceptance. Root also corrected the raw fixture's
+PSAR length metadata. Sorted inventory, diff, selector and 3,900/3,901 line-budget checks passed before the
+focused rebuild. The raw selector plus fixture preflight passed 2/2 in 0.02s. The executor's PBP raw/metadata/
+bounds/parity selection passed 5/5 in 0.02s, and open/boundary/parity plus playlist passed 10/10. A malformed
+compressed block is rejected before reader publication. The measured open/scan process time was 0.002783s.
+No workflow changed, so `act` and hosted CI did not apply. Task commit: `83d7bf0`; Plan 10-06 summary is
+`.planning/phases/10-pbp-disc-images/10-06-SUMMARY.md`. Plan 10-07 completed at the 13:16Z checkpoint; Plan 10-08 followed.
+
+### Phase 10 Plan 10-08 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna`; reasoning effort was not exposed. The wall interval
+from the saved STATE checkpoint at 13:16Z through closeout was about 24 minutes; active time was not measured.
+Runner and disc inventories, diff checks, selector wiring, fixture preflight and the 3,900/3,901 gate passed
+before the focused configure and run. The PBP runner/probe check, source-CUE parity, M3U compatibility and docs
+budget passed 5/5 in 4.85s. `runner.disc.pbp` took 4.83s; PBP fixture preflight and provider parity each took
+about 0.01s. The first mailbox-stop assertion reached the fixture's 1,200-frame cap; fixed-frame PBP and source
+CUE runs both exited 0 and produced the same hash, so the runner test now checks that bounded result. A PBP
+playlist guard keeps M3U membership at its documented ISO/CUE scope; broken-windows entry 15 is fixed. No
+workflow changed, so `act` and hosted CI did not apply. Task commits are `b8f43b1` and `b5b0076`; summary:
+`.planning/phases/10-pbp-disc-images/10-08-SUMMARY.md`. PBP-01 remains phase-wide pending; Plan 10-09 is next.
+
+### Phase 10 Plan 10-09 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.21.0; executor `gpt-6-luna` xhigh. Work began at 13:45:05Z; wall time through
+closeout was about 25 minutes, with active time not separately measured. Sorted libretro inventory, fixture
+preflight, selector wiring and the 3,900/3,901 line-budget check passed before the focused build. The PBP/CUE
+libretro host test passed with both fixture prerequisites in 6.00s; generated metadata checks passed 2/2 in
+both CHD-OFF and CHD-ON configurations. The 1,200-frame PBP/CUE host comparison is the local critical path;
+its measured host test took 5.97s. A bounded test timeout of 60s keeps over 10x allowance for slower CI hosts.
+The provider exposes no serializable disc identity, so failure-atomic state evidence compares exact RAM and
+card bytes alongside the frame/audio traces and active path. No workflow changed, so `act` and hosted CI did
+not apply. Task commits are `47d233e` and `d354bfe`; summary: `.planning/phases/10-pbp-disc-images/10-09-SUMMARY.md`.
+PBP-01 remains phase-wide pending; Plan 10-10 is next.
+
+### Phase 10 Plan 10-10 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.21.0; primary GPT-6 model ID was not exposed. The wall interval from the saved
+STATE checkpoint at 14:09:41Z through focused verification was about 19 minutes; active time was not measured.
+Pin/digest, notice, sorted inventories, selector wiring and the 3,900/3,901 line budget passed before packaging.
+CHD-OFF PBP, runner and libretro checks passed 7/7; CHD-ON PBP and original CHD parity plus package checks
+passed 9/9. All three packages in both configurations retained the exact notices and correct .info claims.
+The arm64 native libretro bundle measured 359,952 bytes OFF and 612,128 bytes ON; these are not WASI evidence.
+The ci preset excluded release-labeled archive tests, so the existing ci-release selector ran all four cases.
+A stale ON-built helper initially failed the OFF host test; rebuilding configuration-sensitive helpers made
+the 7/7 OFF selector pass. No workflow changed, so no hosted CI or act run applied. Task commits are d54349b
+and 32b4104; evidence and summary are in .planning/phases/10-pbp-disc-images/. PBP-01 remains phase-wide
+pending; Plan 10-12 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -438,7 +698,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 230
+- Total plans completed: 243
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -455,6 +715,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 7 | 10 | - | - |
 | 8 | 10 | - | - |
 | 9 | 15 | - | - |
+| 10 | 13 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -666,6 +927,13 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 09 P10 | 23m 09s | 2 tasks | 2 files |
 | Phase 09 P12 | 38m37s | 2 tasks | 9 files |
 | Phase 09 P14 | 22m | 2 tasks | 7 files |
+| Phase 10 P01 | 24m53s | 3 tasks | 22 files |
+| Phase 10 P07 | 44m | 2 tasks | 9 files |
+| Phase 10 P08 | 24m | 2 tasks | 8 files |
+| Phase 10 P09 | 25m | 2 tasks | 7 files |
+| Phase 10 P10 | 19m | 2 tasks | 1 files |
+| Phase 10 P12 | 41m | 2 tasks | 12 files |
+| Phase 10 P13 | 38 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -1061,6 +1329,18 @@ Recent decisions affecting current work:
 - [Phase 09]: Leave CHD playlist membership out of Plan 09-12 because the existing provider rejects CHD playlist children.
 - [Phase 09]: Plan 09-14 reuses the bounded boot/read/audio/FMV guest paths and pins for CHD input.
 - [Phase 09]: The local CHD compatibility predicate passes on provider, host, package and guest evidence; hosted lane/hash/fuzz and WASI size remain unknown.
+- [Phase 10]: Keep the PBP fuzz corpus as 14 generated mutation scripts capped at 256 bytes, with build-owned raw and compressed baselines and no committed disc bytes.
+- [Phase 10]: Keep all Nightly fuzz cases; skip CHD and non-PBP fuzz work only when the classifier proves a pull request is PBP-only.
+- [Phase 10]: Standalone PBP support leaves M3U playlist membership limited to the existing ISO/CUE contract.
+- [Phase 10]: Keep PBP always available in the host path and gate its metadata claim on the registered libretro.content.pbp integration test.
+- [Phase 10]: Keep the supported PBP claim limited to unencrypted single-data-track PSISO images and preserve CHD license derivation from the linked closure.
+- [Phase 10]: Used the ci-release preset for release-labeled package tests; all existing archive and notice cases remained enabled.
+- [Phase 10]: Rebuilt configuration-sensitive host/card helpers after toggling CHD in the reused build tree so tests matched the configured provider.
+- [Phase 10]: The compatibility pass covers only the exercised 64-sector PBP layout; audio, untested track/profile variants and hosted verification remain explicitly unclaimed.
+- [Phase 10]: PBP guest evidence uses a distinct one-data-track NTSC-U guest source and omits the CUE/CHD-only CDDA path; original two-track predicates remain unchanged.
+- [Phase 10]: Keep the 3,901-line cap and defer the generic SPDX scanner.
+- [Phase 10]: Keep the WASI size bound unchanged until the Phase 10 hosted lane reports the actual linked module size.
+- [Phase 10]: Run exact-head CI and Nightly once at the ship PR to avoid duplicate hosted workloads.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1303,12 +1583,13 @@ come from `AGENTS.md`.
 | 2026-11-14 | /gsd-execute-plan 05-06 | Codex, OpenGSD 1.20.0; sequential shared checkout; BRR tracer TDD GREEN and focused save-state continuation checks; full 24-voice/mixer task moved to 05-22 | GPT-6 session (exact model ID not exposed) |
 | 2026-11-14 | /gsd-execute-phase 5 plan 05-12 | Codex, OpenGSD 1.21.0; sequential shared checkout; test-only PCM capture, six region/callback comparisons, reset/reload/cadence/AV checks | GPT-6 session (exact model ID not exposed) |
 | 2026-11-14 | /gsd-execute-phase 5 plan 05-14 | Codex, OpenGSD 1.21.0; sequential shared checkout; active PCM save/load continuation, malformed queued SPU address rejection, atomic ring refusal, state/DMA/reverb/API checks | GPT-6 session (exact model ID not exposed) |
+| 2026-11-21 | /gsd-execute-phase 10 plan 10-07 | Codex, OpenGSD 1.21.0; focused PBP replay/bounds, 14-seed ASan/UBSan campaign in native ARM64 Ubuntu Docker (54,946 inputs/61s), Act routing dry-run, 3,900/3,901 line budget; 44m wall | gpt-6-luna xhigh |
 
 ## Session Continuity
 
-Last session: 2026-11-20T21:04:54.561Z
-Stopped at: Phase 9 complete, ready to plan Phase 10
-Resume file: .planning/phases/09-chd-disc-images/09-14-SUMMARY.md
+Last session: 2026-11-21T15:54:44.176Z
+Stopped at: Phase 10 complete, ready to plan Phase 11
+Resume file: None
 
 ### v1.0 session history
 

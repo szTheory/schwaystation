@@ -101,19 +101,18 @@ function(assert_no_temp_files)
   endif()
 endfunction()
 
-function(collect scenario predicate)
-  file(REMOVE "${output}" "${BIN}/requests.txt")
+macro(invoke scenario fail_endpoint)
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env
-      "PATH=${stub_dir}:$ENV{PATH}"
-      "GH_TOKEN=fixture-token"
-      "GITHUB_REPOSITORY=owner/repo"
-      "TRIAGE_FIXTURE_DIR=${fixture_dir}"
-      "TRIAGE_REQUEST_LOG=${BIN}/requests.txt"
-      "TRIAGE_SCENARIO=${scenario}"
-      "TRIAGE_FAIL_ENDPOINT="
-      "TMPDIR=${tmp_dir}"
+      "PATH=${stub_dir}:$ENV{PATH}" "GH_TOKEN=fixture-token" "GITHUB_REPOSITORY=owner/repo"
+      "TRIAGE_FIXTURE_DIR=${fixture_dir}" "TRIAGE_REQUEST_LOG=${BIN}/requests.txt"
+      "TRIAGE_SCENARIO=${scenario}" "TRIAGE_FAIL_ENDPOINT=${fail_endpoint}" "TMPDIR=${tmp_dir}"
       "${SH}" "${report}" collect "${output}"
     WORKING_DIRECTORY "${BIN}" RESULT_VARIABLE rc OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr)
+endmacro()
+
+function(collect scenario predicate)
+  file(REMOVE "${output}" "${BIN}/requests.txt")
+  invoke("${scenario}" "")
   if(NOT rc STREQUAL "0" OR NOT EXISTS "${output}")
     message(FATAL_ERROR "ci.triage: valid API metadata did not produce the sanitized artifact")
   endif()
@@ -144,17 +143,7 @@ endfunction()
 
 function(reject scenario fail_endpoint)
   file(REMOVE "${output}" "${BIN}/requests.txt")
-  execute_process(COMMAND "${CMAKE_COMMAND}" -E env
-      "PATH=${stub_dir}:$ENV{PATH}"
-      "GH_TOKEN=fixture-token"
-      "GITHUB_REPOSITORY=owner/repo"
-      "TRIAGE_FIXTURE_DIR=${fixture_dir}"
-      "TRIAGE_REQUEST_LOG=${BIN}/requests.txt"
-      "TRIAGE_SCENARIO=${scenario}"
-      "TRIAGE_FAIL_ENDPOINT=${fail_endpoint}"
-      "TMPDIR=${tmp_dir}"
-      "${SH}" "${report}" collect "${output}"
-    WORKING_DIRECTORY "${BIN}" RESULT_VARIABLE rc OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr)
+  invoke("${scenario}" "${fail_endpoint}")
   if(rc STREQUAL "0" OR EXISTS "${output}" OR "${stdout}${stderr}" MATCHES "CANARY|RAWFAIL|fixture-token")
     message(FATAL_ERROR "ci.triage: invalid API response published data or leaked response text")
   endif()

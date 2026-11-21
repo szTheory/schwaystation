@@ -25,3 +25,11 @@ Bind this to the Phase 10 plan that first changes Nightly job routing. Keep PR-o
 - Scheduled and manually dispatched runs execute the complete existing workload.
 - A fast self-test covers representative PBP-only, fuzz-relevant, build/workflow, and unknown-path changes; the existing campaign bounds and test cases remain unchanged.
 - Act dry-run and one hosted changed-head run confirm routing; record the measured critical path and raw job time before and after when the hosted result permits.
+
+## Phase 10 binding
+
+Plan 10-11 routes only a complete exact PBP path set to fuzz, and skips Nightly only for complete docs/planning-only
+lists. Mixed, renamed (including both rename names in the allowlist), unknown, incomplete, API-failure and failed
+classifier-job cases run the full workload. The API requests up to 100 files per page; route controls cover a
+non-PBP fuzz input and each former Nightly path. Keep this todo pending until the exact-head hosted run confirms
+the new read-only GitHub API route and its measured cost.

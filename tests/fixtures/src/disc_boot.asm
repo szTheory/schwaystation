@@ -83,6 +83,7 @@ mailbox_header 21, 0
   sw t0, MB_RECORDS + 16(s1)
   sw s3, MB_RECORDS + 20(s1)
 
+.if PBP_MODE == 0
   ; GetTD for track two.
   sb zero, 0(s0)
   li t0, 2
@@ -103,6 +104,12 @@ mailbox_header 21, 0
   li t0, 0x00010004
   sw t0, MB_RECORDS + 24(s1)
   sw s4, MB_RECORDS + 28(s1)
+.else
+  ; The owned PBP fixture has one data track and no track two.
+  li t0, 0x00010004
+  sw t0, MB_RECORDS + 24(s1)
+  sw zero, MB_RECORDS + 28(s1)
+.endif
 
   ; GetID has an INT3 acknowledgement and a delayed INT2 answer.
   sb zero, 0(s0)
@@ -306,6 +313,7 @@ xa_wait:
   jal cd_ack2
   nop
 
+.if PBP_MODE == 0
   ; Setloc to the generated track's INDEX 1 (LBA 214), then Play from that point.
   ; This skips its two-second pregap while still exercising CD-DA sector playback.
   sb zero, 0(s0)
@@ -381,6 +389,7 @@ cdda_drain_wait:
   bne t0, zero, cdda_drain_wait
   nop
   sb zero, 3(s0)
+.endif
 
   ; Read and DMA every STR chunk to RAM before stripping the 20h-byte headers.
   sb zero, 0(s0)

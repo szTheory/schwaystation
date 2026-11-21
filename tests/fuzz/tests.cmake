@@ -120,6 +120,33 @@ foreach(subsystem IN ITEMS cue cnf m3u cdrom mdec)
     LABELS fuzz portable TIMEOUT 60)
 endforeach()
 
+# PBP mutation scripts target two build-owned accepted images, so the replay
+# and sanitizer exercise production block decoding without storing disc bytes.
+set(pbp_work_dir "${PROJECT_BINARY_DIR}/tests/fuzz-work/pbp")
+file(MAKE_DIRECTORY "${pbp_work_dir}")
+set(pbp_guest_work_dir "${pbp_work_dir}")
+set(pbp_fixture "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp")
+set(pbp_guest_fixture "${pbp_fixture}")
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  set(pbp_guest_work_dir "/tests/fuzz-work/pbp")
+  set(pbp_guest_fixture "/fixtures/schwaystation-disc_boot.pbp")
+endif()
+add_executable(schwaystation-fuzz-pbp-replay ${fuzz_dir}/pbp.c)
+target_compile_definitions(schwaystation-fuzz-pbp-replay PRIVATE
+  SCHWAY_FUZZ_REPLAY SCHWAY_FUZZ_PBP_SEEDS
+  "SCHWAY_FUZZ_WORK_DIR=\"${pbp_guest_work_dir}\""
+  "SCHWAY_FUZZ_PBP_FIXTURE=\"${pbp_guest_fixture}\"")
+target_include_directories(schwaystation-fuzz-pbp-replay PRIVATE ${PROJECT_SOURCE_DIR}/host)
+target_link_libraries(schwaystation-fuzz-pbp-replay PRIVATE schwaystation_disc_image)
+set_target_properties(schwaystation-fuzz-pbp-replay PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-fuzz-pbp-replay)
+# Fault prevented: hostile PSISO metadata or streams publish a bad reader.
+schway_add_test(NAME fuzz.regress.pbp
+  COMMAND schwaystation-fuzz-pbp-replay
+  LABELS fuzz portable TIMEOUT 60)
+set_tests_properties(fuzz.regress.pbp PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
+
 if(SCHWAYSTATION_FUZZ)
   # The libFuzzer binary keeps libFuzzer's main. The fuzz preset builds every
   # object with ASan, UBSan and coverage instrumentation, so the core's own
@@ -181,4 +208,16 @@ if(SCHWAYSTATION_FUZZ)
   set_target_properties(schwaystation-fuzz-chd PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
   schway_warnings(schwaystation-fuzz-chd)
+
+  add_executable(schwaystation-fuzz-pbp ${fuzz_dir}/pbp.c)
+  target_compile_definitions(schwaystation-fuzz-pbp PRIVATE
+    "SCHWAY_FUZZ_WORK_DIR=\"${pbp_guest_work_dir}\""
+    "SCHWAY_FUZZ_PBP_FIXTURE=\"${pbp_guest_fixture}\"")
+  target_include_directories(schwaystation-fuzz-pbp PRIVATE ${PROJECT_SOURCE_DIR}/host)
+  target_link_libraries(schwaystation-fuzz-pbp PRIVATE schwaystation_disc_image)
+  target_compile_options(schwaystation-fuzz-pbp PRIVATE -fsanitize=fuzzer)
+  target_link_options(schwaystation-fuzz-pbp PRIVATE -fsanitize=fuzzer)
+  set_target_properties(schwaystation-fuzz-pbp PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(schwaystation-fuzz-pbp)
 endif()

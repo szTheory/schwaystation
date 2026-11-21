@@ -201,7 +201,8 @@ source_root=$2
 fixture_root=$3
 n=0
 check_paths() {
-  got=$(printf '%b' "$3" | sh "$source_root/scripts/classify-changes.sh" "${4-2}" | tr '\n' ' ')
+  got=$(printf '%b' "$3" | sh "$source_root/scripts/classify-changes.sh" "${4-2}" |
+    grep -E '^(heavy|release_inputs)=' | tr '\n' ' ')
   if [ "$got" != "heavy=$1 release_inputs=$2 " ]; then
     echo "ci.classify: want heavy=$1 release_inputs=$2, got $got for: $3"
     exit 1
@@ -229,7 +230,7 @@ check_route() {
     REST_BASE_SHA="${REST_BASE_SHA-${PR_BASE_SHA-}}" REST_BASE_REPO="${REST_BASE_REPO-${PR_BASE_REPO-}}" \
     REST_CHANGED="${REST_CHANGED-${PR_CHANGED-1}}" \
     PATH="$route_path:$PATH" bash -e -o pipefail "$workflow")
-  output_got=$(tr '\n' ' ' < "$output")
+  output_got=$(grep -E '^(heavy|release_inputs)=' "$output" | tr '\n' ' ')
   if [ "$output_got" != "$want" ]; then
     echo "ci.classify: $name wanted $want, got $output_got"
     echo "workflow stdout: $got"

@@ -822,6 +822,40 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 ```
 
+## Standalone miniz tinfl for PBP
+
+- **Applies to:** `cmake/Miniz.cmake`, `host/miniz/miniz_tinfl.c`, `host/miniz/miniz_tinfl.h`, `host/miniz/miniz_common.h`, and `host/miniz_compat/miniz.h`.
+- **Upstream:** https://github.com/richgel999/miniz at public commit `77d0dce8627735138c51770d1799a1ef48f2117d` (v3.1.2).
+- **SHA-256:** `miniz_tinfl.c` `2296ebd21ef9af5ebbefd5b454d4bb67d8fb4af2d24945e7fb32114374f75a76`; `miniz_tinfl.h` `da4850920fdf09f8877d9affabe1ebba1852ce4b1ebbd121f2ba7a7ea8e57e5d`; `miniz_common.h` `f1ba29821c8caef83585b328196aa346c5da7c82890a70a3d10d77c6cec0ed39`.
+- **Changes:** the three selected upstream files are unmodified. The project-owned shim exposes their modular declarations; the private static C target disables allocation, stdio and time helpers and prefixes every emitted tinfl global. It is separate from the build-tree miniz copy used by libchdr.
+- **Binary notice:** this MIT notice covers the standalone inflater object and host binaries that include it. The libchdr copy remains covered by its separate notice above.
+- **Licence:** MIT
+
+```
+Copyright 2013-2014 RAD Game Tools and Valve Software
+Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+
+All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
 ## dr_flac
 
 - **Applies to:** `cmake/Libchdr.cmake`, `host/disc_chd.c`, and `src/disc.c`.

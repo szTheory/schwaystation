@@ -5,8 +5,10 @@ add_library(schwaystation_cdrom OBJECT src/cdrom.c src/cdrom_audio.c src/cdrom_s
 add_library(schwaystation_mdec OBJECT src/mdec.c)
 
 if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
+  include("${PROJECT_SOURCE_DIR}/cmake/Miniz.cmake")
   add_library(schwaystation_disc_image STATIC
-    host/disc_image.c host/disc_chd.c host/disc_chd_metadata.c)
+    host/disc_image.c host/disc_chd.c host/disc_chd_metadata.c
+    host/disc_pbp.c host/disc_pbp_metadata.c)
   target_include_directories(schwaystation_disc_image PUBLIC
     ${PROJECT_SOURCE_DIR}/host
     ${PROJECT_SOURCE_DIR}/include
@@ -15,6 +17,7 @@ if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
     C_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON)
   schway_warnings(schwaystation_disc_image)
+  target_link_libraries(schwaystation_disc_image PRIVATE schwaystation_pbp_miniz)
   if(SCHWAYSTATION_CHD)
     include(${PROJECT_SOURCE_DIR}/cmake/Libchdr.cmake)
     target_compile_definitions(schwaystation_disc_image PRIVATE SCHWAYSTATION_CHD=1)

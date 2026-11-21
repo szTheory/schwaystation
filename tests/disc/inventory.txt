@@ -7,6 +7,9 @@ disc.fixture.chd.boot	disc,portable
 disc.fixture.chd.fmv	disc,portable
 disc.fixture.chd.read	disc,portable
 disc.fixture.fmv	disc,portable
+disc.fixture.pbp.boot	disc,portable
+disc.fixture.pbp.fmv	disc,portable
+disc.fixture.pbp.read	disc,portable
 disc.fixture.read	disc,portable
 disc.hash	disc,portable
 disc.image.chd_boundaries	disc,portable
@@ -24,6 +27,16 @@ disc.image.cue_root_child	disc,portable
 disc.image.cue_symlink	disc,portable
 disc.image.iso_limits	disc,portable
 disc.image.iso_sector	disc,portable
+disc.image.pbp_boundaries	disc,portable
+disc.image.pbp_bounds	disc,portable
+disc.image.pbp_fixture_controls	disc,portable
+disc.image.pbp_headers	disc,portable
+disc.image.pbp_inflate	disc,portable
+disc.image.pbp_metadata	disc,portable
+disc.image.pbp_open	disc,portable
+disc.image.pbp_parity	disc,portable
+disc.image.pbp_preflight	disc,portable
+disc.image.pbp_raw	disc,portable
 disc.media.fixture_controls	disc,portable
 disc.media.preflight	disc,portable
 disc.playlist	disc,portable

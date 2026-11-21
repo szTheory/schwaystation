@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iso_project image_name="disc_boot_pbp_source.bin" cue_sheet="disc_boot_pbp_source.cue">
+  <track type="data" cdvd_style="false">
+    <identifiers system="PLAYSTATION" application="PLAYSTATION" volume="SCHWAY_PBP"
+      volume_set="SCHWAY_PBP" publisher="SCHWAYSTATION" data_preparer="SCHWAYSTATION"
+      copyright="FIRST_PARTY" creation_date="2026010100000000" modification_date="2026010100000000" />
+    <directory_tree>
+      <file name="SYSTEM.CNF" source="SYSTEM.CNF" type="data" date="20260101000000" />
+      <file name="SWAY.EXE" source="disc_boot_pbp.exe" type="data" date="20260101000000" />
+      <file name="XA.XA" source="media/xa.xa" type="xa" date="20260101000000" />
+      <file name="MOVIE.STR" source="media/movie.str" type="str" date="20260101000000" />
+    </directory_tree>
+  </track>
+</iso_project>

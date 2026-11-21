@@ -249,9 +249,9 @@ static void check_string(const char *what, const char *got, const char *want)
 static const char *expected_valid_extensions(void)
 {
 #if SCHWAYSTATION_CHD
-    return "exe|psexe|cue|iso|m3u|chd";
+    return "exe|psexe|cue|iso|m3u|pbp|chd";
 #else
-    return "exe|psexe|cue|iso|m3u";
+    return "exe|psexe|cue|iso|m3u|pbp";
 #endif
 }
 
@@ -2588,6 +2588,322 @@ cleanup:
     return check_failures == 0 ? 0 : 1;
 }
 
+struct pbp_frame_trace {
+    uint64_t video_hash;
+    uint64_t audio_hash;
+    size_t audio_pairs;
+    unsigned width;
+    unsigned height;
+};
+
+static uint64_t pbp_hash_bytes(uint64_t hash, const void *data, size_t size)
+{
+    const unsigned char *bytes = (const unsigned char *)data;
+    for (size_t i = 0u; i < size; i++) {
+        hash = (hash ^ bytes[i]) * UINT64_C(1099511628211);
+    }
+    return hash;
+}
+
+static int make_pbp_pgd_variant(const char *source_path, const char *variant_path)
+{
+    FILE *file = schway__test_open_file(source_path, "rb");
+    unsigned char *bytes = NULL;
+    long length;
+    uint32_t psar_offset;
+    int ok = 0;
+    if (file == NULL) return 0;
+    if (fseek(file, 0L, SEEK_END) != 0 || (length = ftell(file)) < 40L ||
+        length > 1572864L || fseek(file, 0L, SEEK_SET) != 0) goto cleanup;
+    bytes = (unsigned char *)malloc((size_t)length);
+    if (bytes == NULL || fread(bytes, 1u, (size_t)length, file) != (size_t)length) goto cleanup;
+    psar_offset = load_le32(bytes + 36u);
+    if ((uint64_t)psar_offset + 3u > (uint64_t)length) goto cleanup;
+    memcpy(bytes + psar_offset, "PGD", 3u);
+    ok = write_test_file(variant_path, bytes, (size_t)length);
+
+cleanup:
+    free(bytes);
+    if (fclose(file) != 0) ok = 0;
+    return ok;
+}
+
+static int pbp_images_match(const char *pbp_path, const char *cue_path)
+{
+    schway_disc_image *pbp = NULL;
+    schway_disc_image *cue = NULL;
+    schway_disc_image_error error;
+    schway_toc pbp_toc, cue_toc;
+    const schway_disc *pbp_disc;
+    const schway_disc *cue_disc;
+    uint8_t pbp_sector[2352], cue_sector[2352];
+    uint8_t pbp_subcode[96], cue_subcode[96];
+    int ok = 0;
+
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    CHECK_EQ_U64(schway_disc_image_open(pbp_path, &pbp, &error), SCHWAY_DISC_IMAGE_OK);
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    CHECK_EQ_U64(schway_disc_image_open(cue_path, &cue, &error), SCHWAY_DISC_IMAGE_OK);
+    if (pbp == NULL || cue == NULL) goto cleanup;
+    pbp_disc = schway_disc_image_disc(pbp);
+    cue_disc = schway_disc_image_disc(cue);
+    CHECK(pbp_disc != NULL && cue_disc != NULL);
+    if (pbp_disc == NULL || cue_disc == NULL || pbp_disc->toc == NULL || cue_disc->toc == NULL ||
+        pbp_disc->read_sector == NULL || cue_disc->read_sector == NULL) goto cleanup;
+    memset(&pbp_toc, 0, sizeof pbp_toc);
+    memset(&cue_toc, 0, sizeof cue_toc);
+    pbp_toc.size = (uint32_t)sizeof pbp_toc;
+    cue_toc.size = (uint32_t)sizeof cue_toc;
+    CHECK(pbp_disc->toc(pbp_disc->user, &pbp_toc) != 0u);
+    CHECK(cue_disc->toc(cue_disc->user, &cue_toc) != 0u);
+    CHECK(memcmp(&pbp_toc, &cue_toc, sizeof pbp_toc) == 0);
+    CHECK_EQ_U64(pbp_disc->identity_size, cue_disc->identity_size);
+    if (pbp_disc->identity_size == cue_disc->identity_size &&
+        pbp_disc->identity_size == sizeof pbp_disc->identity_sha256) {
+        CHECK(memcmp(pbp_disc->identity_sha256, cue_disc->identity_sha256,
+                     sizeof pbp_disc->identity_sha256) == 0);
+    }
+    if (pbp_toc.track_count != 1u || cue_toc.track_count != 1u) goto cleanup;
+    for (uint32_t lba = 0u; lba < pbp_toc.tracks[0].leadout; lba++) {
+        uint32_t pbp_read = pbp_disc->read_sector(pbp_disc->user, lba,
+                                                  pbp_sector, pbp_subcode);
+        uint32_t cue_read = cue_disc->read_sector(cue_disc->user, lba,
+                                                  cue_sector, cue_subcode);
+        CHECK(pbp_read != 0u);
+        CHECK(cue_read != 0u);
+        if (pbp_read == 0u || cue_read == 0u) break;
+        CHECK(memcmp(pbp_sector, cue_sector, sizeof pbp_sector) == 0);
+        CHECK(memcmp(pbp_subcode, cue_subcode, sizeof pbp_subcode) == 0);
+    }
+    ok = check_failures == 0;
+
+cleanup:
+    schway_disc_image_close(cue);
+    schway_disc_image_close(pbp);
+    return ok;
+}
+
+static int test_pbp_rejection_unchanged(const char *path, uint32_t want_status,
+                                        const unsigned char *saved_ram,
+                                        const unsigned char *saved_card,
+                                        const unsigned char *saved_card2,
+                                        const char *saved_card2_path,
+                                        const char *active_path)
+{
+    struct retro_game_info game;
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    unsigned char *ram;
+    const unsigned char *card2;
+    size_t card2_size = 0u;
+    char current_path[4096];
+    memset(&game, 0, sizeof game);
+    game.path = path;
+    CHECK_EQ_U64(p_load_game(&game), 0u);
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    CHECK_EQ_U64(schway_disc_image_open(path, &image, &error), want_status);
+    schway_disc_image_close(image);
+    ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(ram != NULL);
+    if (ram != NULL && saved_ram != NULL) {
+        CHECK(memcmp(ram, saved_ram, 2u * 1024u * 1024u) == 0);
+    }
+    const unsigned char *card =
+        (const unsigned char *)p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    CHECK(card != NULL);
+    if (card != NULL && saved_card != NULL) {
+        CHECK(memcmp(card, saved_card, SCHWAY_MEMCARD_SIZE) == 0);
+    }
+    card2 = p_test_card2_data(&card2_size);
+    CHECK(card2 != NULL);
+    CHECK_EQ_U64(card2_size, SCHWAY_MEMCARD_SIZE);
+    if (card2 != NULL && saved_card2 != NULL && card2_size == SCHWAY_MEMCARD_SIZE) {
+        CHECK(memcmp(card2, saved_card2, SCHWAY_MEMCARD_SIZE) == 0);
+    }
+    const char *card2_path = p_test_card2_path();
+    CHECK(card2_path != NULL && strcmp(card2_path, saved_card2_path) == 0);
+    CHECK_EQ_U64(disk_control.get_num_images(), 1u);
+    CHECK_EQ_U64(disk_control.get_image_index(), 0u);
+    memset(current_path, 0, sizeof current_path);
+    CHECK(disk_control.get_image_path(0u, current_path, sizeof current_path));
+    CHECK(strcmp(current_path, active_path) == 0);
+    return check_failures == 0;
+}
+
+static int test_content_pbp(const char *pbp_path, const char *cue_path,
+                            const char *malformed_path, const char *bios_directory,
+                            const char *card_directory, int chd_enabled)
+{
+    enum { PBP_TRACE_FRAMES = 1200 };
+    struct retro_game_info game;
+    struct retro_system_info sys;
+    struct pbp_frame_trace pbp_trace[PBP_TRACE_FRAMES];
+    struct pbp_frame_trace cue_trace[PBP_TRACE_FRAMES];
+    unsigned char *pbp_ram = NULL;
+    unsigned char *cue_ram = NULL;
+    unsigned char *saved_ram = NULL;
+    unsigned char *saved_card = NULL;
+    unsigned char *saved_card2 = NULL;
+    size_t card2_size = 0u;
+    char active_path[4096];
+    char expected_path[4096];
+    char unsupported_path[4096];
+    char saved_card2_path[4096];
+    unsigned char *system_ram;
+    const unsigned char *card2;
+    unsigned save_calls_before = save_directory_calls;
+    int result = 1;
+
+    CHECK_EQ_U64(chd_enabled, SCHWAYSTATION_CHD);
+    memset(&sys, 0, sizeof sys);
+    p_get_system_info(&sys);
+    check_string("PBP-enabled extensions", sys.valid_extensions, expected_valid_extensions());
+    CHECK(disk_control_set_calls != 0u);
+    CHECK(disk_control.get_image_path != NULL && disk_control.get_num_images != NULL &&
+          disk_control.get_image_index != NULL);
+    CHECK(pbp_images_match(pbp_path, cue_path));
+    CHECK(test_path(unsupported_path, sizeof unsupported_path, card_directory,
+                    "unsupported.pbp"));
+    CHECK(make_pbp_pgd_variant(pbp_path, unsupported_path));
+    CHECK_EQ_U64(save_directory_calls, save_calls_before);
+    if (check_failures != 0) goto cleanup;
+
+    system_directory = bios_directory;
+    save_directory = card_directory;
+    save_directory_available = 1;
+    bios_option_value = "none";
+    CHECK(disc_copy_canonical_path(pbp_path, expected_path, sizeof expected_path));
+    memset(&game, 0, sizeof game);
+    game.path = pbp_path;
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    CHECK_EQ_U64(disk_control.get_num_images(), 1u);
+    CHECK_EQ_U64(disk_control.get_image_index(), 0u);
+    memset(active_path, 0, sizeof active_path);
+    CHECK(disk_control.get_image_path(0u, active_path, sizeof active_path));
+    CHECK(strcmp(active_path, expected_path) == 0);
+    if (check_failures != 0) goto cleanup;
+
+    for (unsigned i = 0u; i < PBP_TRACE_FRAMES; i++) {
+        run_one();
+        CHECK(frame_w != 0u && frame_w <= MAX_W && frame_h != 0u && frame_h <= MAX_H);
+        CHECK(got_pairs <= MAX_PAIRS);
+        CHECK_EQ_U64(video_bad, 0u);
+        pbp_trace[i].width = frame_w;
+        pbp_trace[i].height = frame_h;
+        pbp_trace[i].audio_pairs = got_pairs;
+        pbp_trace[i].video_hash = pbp_hash_bytes(UINT64_C(14695981039346656037),
+            frame, (size_t)frame_w * frame_h * sizeof frame[0]);
+        pbp_trace[i].audio_hash = pbp_hash_bytes(UINT64_C(14695981039346656037), got_audio,
+            got_pairs <= MAX_PAIRS ? got_pairs * 2u * sizeof got_audio[0] : 0u);
+    }
+    CHECK_EQ_U64(video_calls, PBP_TRACE_FRAMES);
+    CHECK_EQ_U64(video_bad, 0u);
+    system_ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(system_ram != NULL);
+    pbp_ram = system_ram;
+    if (system_ram != NULL) {
+        saved_ram = (unsigned char *)malloc(2u * 1024u * 1024u);
+        CHECK(saved_ram != NULL);
+        if (saved_ram != NULL) memcpy(saved_ram, system_ram, 2u * 1024u * 1024u);
+    }
+    const unsigned char *card =
+        (const unsigned char *)p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    CHECK(card != NULL);
+    if (card != NULL) {
+        saved_card = (unsigned char *)malloc(SCHWAY_MEMCARD_SIZE);
+        CHECK(saved_card != NULL);
+        if (saved_card != NULL) memcpy(saved_card, card, SCHWAY_MEMCARD_SIZE);
+    }
+    card2 = p_test_card2_data(&card2_size);
+    CHECK(card2 != NULL);
+    CHECK_EQ_U64(card2_size, SCHWAY_MEMCARD_SIZE);
+    if (card2 != NULL && card2_size == SCHWAY_MEMCARD_SIZE) {
+        saved_card2 = (unsigned char *)malloc(SCHWAY_MEMCARD_SIZE);
+        CHECK(saved_card2 != NULL);
+        if (saved_card2 != NULL) memcpy(saved_card2, card2, SCHWAY_MEMCARD_SIZE);
+    }
+    const char *card2_path = p_test_card2_path();
+    CHECK(card2_path != NULL && strlen(card2_path) < sizeof saved_card2_path);
+    if (card2_path != NULL && strlen(card2_path) < sizeof saved_card2_path) {
+        memcpy(saved_card2_path, card2_path, strlen(card2_path) + 1u);
+    } else {
+        saved_card2_path[0] = '\0';
+    }
+    CHECK(saved_ram != NULL && saved_card != NULL && saved_card2 != NULL &&
+          saved_card2_path[0] != '\0');
+    if (check_failures != 0) goto cleanup;
+
+    CHECK(test_pbp_rejection_unchanged(malformed_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+        saved_ram, saved_card, saved_card2, saved_card2_path,
+        expected_path));
+    CHECK(test_pbp_rejection_unchanged(unsupported_path, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+        saved_ram, saved_card, saved_card2, saved_card2_path,
+        expected_path));
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) == pbp_ram);
+    CHECK_EQ_U64(save_directory_calls, save_calls_before + 1u);
+    if (check_failures != 0) goto cleanup;
+
+    p_unload_game();
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    memset(&game, 0, sizeof game);
+    game.path = cue_path;
+    CHECK_EQ_U64(p_load_game(&game), 1u);
+    CHECK_EQ_U64(disk_control.get_num_images(), 1u);
+    CHECK_EQ_U64(disk_control.get_image_index(), 0u);
+    for (unsigned i = 0u; i < PBP_TRACE_FRAMES; i++) {
+        run_one();
+        cue_trace[i].width = frame_w;
+        cue_trace[i].height = frame_h;
+        cue_trace[i].audio_pairs = got_pairs;
+        cue_trace[i].video_hash = pbp_hash_bytes(UINT64_C(14695981039346656037),
+            frame, (size_t)frame_w * frame_h * sizeof frame[0]);
+        cue_trace[i].audio_hash = pbp_hash_bytes(UINT64_C(14695981039346656037), got_audio,
+            got_pairs <= MAX_PAIRS ? got_pairs * 2u * sizeof got_audio[0] : 0u);
+    }
+    CHECK_EQ_U64(video_calls, PBP_TRACE_FRAMES * 2u);
+    CHECK_EQ_U64(video_bad, 0u);
+    for (unsigned i = 0u; i < PBP_TRACE_FRAMES; i++) {
+        CHECK_EQ_U64(cue_trace[i].width, pbp_trace[i].width);
+        CHECK_EQ_U64(cue_trace[i].height, pbp_trace[i].height);
+        CHECK_EQ_U64(cue_trace[i].audio_pairs, pbp_trace[i].audio_pairs);
+        CHECK_EQ_U64(cue_trace[i].video_hash, pbp_trace[i].video_hash);
+        CHECK_EQ_U64(cue_trace[i].audio_hash, pbp_trace[i].audio_hash);
+    }
+    system_ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    CHECK(system_ram != NULL);
+    cue_ram = system_ram != NULL ? (unsigned char *)malloc(2u * 1024u * 1024u) : NULL;
+    CHECK(cue_ram != NULL);
+    if (system_ram != NULL && cue_ram != NULL) {
+        memcpy(cue_ram, system_ram, 2u * 1024u * 1024u);
+        CHECK(memcmp(saved_ram, cue_ram, 2u * 1024u * 1024u) == 0);
+    }
+    card = (const unsigned char *)p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    CHECK(card != NULL);
+    if (card != NULL && saved_card != NULL) {
+        CHECK(memcmp(card, saved_card, SCHWAY_MEMCARD_SIZE) == 0);
+    }
+    card2 = p_test_card2_data(&card2_size);
+    CHECK(card2 != NULL);
+    CHECK_EQ_U64(card2_size, SCHWAY_MEMCARD_SIZE);
+    if (card2 != NULL && saved_card2 != NULL && card2_size == SCHWAY_MEMCARD_SIZE) {
+        CHECK(memcmp(card2, saved_card2, SCHWAY_MEMCARD_SIZE) == 0);
+    }
+    CHECK_EQ_U64(save_directory_calls, save_calls_before + 2u);
+    result = check_failures == 0 ? 0 : 1;
+
+cleanup:
+    p_unload_game();
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    free(saved_card2);
+    free(saved_card);
+    free(cue_ram);
+    free(saved_ram);
+    return result != 0 || check_failures != 0 ? 1 : 0;
+}
+
 static int test_disc_control(const char *playlist_path, const char *second_path,
                              const char *bios_directory, const char *card_directory)
 {
@@ -4178,6 +4494,7 @@ int main(int argc, char **argv)
     int content_mode = argc == 4 && strcmp(argv[2], "content-no-bios") == 0;
     int disc_control_mode = argc == 7 && strcmp(argv[2], "disc-control") == 0;
     int content_chd_mode = argc == 9 && strcmp(argv[2], "content-chd") == 0;
+    int content_pbp_mode = argc == 9 && strcmp(argv[2], "content-pbp") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
@@ -4192,7 +4509,7 @@ int main(int argc, char **argv)
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
-    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !psexe_mode && !input_descriptors_mode &&
+    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !psexe_mode && !input_descriptors_mode &&
          !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
@@ -4202,13 +4519,16 @@ int main(int argc, char **argv)
                         argv[5][0] == '\0')) ||
         (disc_audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
                              argv[5][0] == '\0' || argv[6][0] == '\0')) ||
-        ((content_mode || disc_control_mode || content_chd_mode || psexe_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
+        ((content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || psexe_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
           card_persistence_mode || card_controls_mode) &&
          argv[3][0] == '\0') ||
         (content_chd_mode && (argv[4][0] == '\0' || argv[5][0] == '\0' ||
                               argv[6][0] == '\0' || argv[7][0] == '\0' ||
                               argv[8][0] == '\0')) ||
+        (content_pbp_mode && (argv[3][0] == '\0' || argv[4][0] == '\0' ||
+                              argv[5][0] == '\0' || argv[6][0] == '\0' ||
+                              argv[7][0] == '\0' || argv[8][0] == '\0')) ||
         (disc_control_mode &&
          (argv[4][0] == '\0' || argv[5][0] == '\0' || argv[6][0] == '\0')) ||
         ((psexe_mode || lifecycle_mode || card_persistence_mode || card_controls_mode) &&
@@ -4217,6 +4537,7 @@ int main(int argc, char **argv)
                 "usage: schwaystation-test-libretro-host <module> ntsc-u|pal | content-no-bios <exe> | "
                 "disc-control <m3u> <second-cue> <bios-directory> <save-directory> | "
                 "content-chd <enabled:0|1> <chd> <cue> <invalid-chd> <bios-directory> <save-directory> | "
+                "content-pbp <chd-enabled:0|1> <pbp> <cue> <invalid-pbp> <bios-directory> <save-directory> | "
                 "disc-audio-equality-batch|disc-audio-equality-single <region> <m3u> <pcm> <bios-directory> | "
                 "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
@@ -4225,7 +4546,7 @@ int main(int argc, char **argv)
                 "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
-    content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || content_chd_mode || psexe_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
+    content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || psexe_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
                    input_controls_mode || lifecycle_mode || card_persistence_mode ||
                    card_controls_mode;
     rumble_available = rumble_guest_mode || rumble_controls_mode;
@@ -4249,7 +4570,7 @@ int main(int argc, char **argv)
         return 1;
     }
     /* Every entry point, before anything else is called. */
-    int inspect_card2 = disc_control_mode || content_chd_mode || card_persistence_mode;
+    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -4304,6 +4625,15 @@ int main(int argc, char **argv)
 
     if (content_chd_mode) {
         int result = test_content_chd(argv[4], argv[5], argv[6], argv[7],
+                                      argv[8], argv[3][0] == '1');
+        p_deinit();
+        module_close();
+        if (result != 0) return result;
+        CHECK_DONE();
+    }
+
+    if (content_pbp_mode) {
+        int result = test_content_pbp(argv[4], argv[5], argv[6], argv[7],
                                       argv[8], argv[3][0] == '1');
         p_deinit();
         module_close();

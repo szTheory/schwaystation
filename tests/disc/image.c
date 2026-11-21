@@ -4,6 +4,7 @@
 #endif
 #include "disc_image.h"
 #include "disc_probe.h"
+#include "save_game_identity.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -584,23 +585,27 @@ static int test_cue_reject(const char *directory)
           sizeof "FILE \"unsupported.chd\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n" - 1u) &&
           expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u, NULL),
           "expected an unsupported cue child extension to be rejected consistently");
+    CHECK(write_text(cue_path,
+          "FILE \"unsupported.pbp\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n",
+          sizeof "FILE \"unsupported.pbp\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n" - 1u) &&
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
+                             "unsupported: PBP cannot be a CUE track source"),
+          "expected PBP to remain unsupported as a CUE sector source");
     (void)remove(cue_path);
     cue_path[0] = '\0';
-    for (uint32_t i = 0u; i < 3u; i++) {
-        static const char *extensions[] = {"pbp", "ecm", "ccd"};
-        static const char *messages[] = {
-            "unsupported: PBP (planned v2.0)", "unsupported: ECM (planned v2.0)",
-            "unsupported: CCD (planned v2.0)"
-        };
+    for (uint32_t i = 0u; i < 2u; i++) {
+        static const char *extensions[] = {"ecm", "ccd"};
+        static const char *messages[] = {"unsupported: ECM (planned v2.0)",
+                                         "unsupported: CCD (planned v2.0)"};
         int size = snprintf(cue_path, sizeof cue_path, "%s/unsupported.%s",
                             directory, extensions[i]);
         CHECK(size >= 0 && (size_t)size < sizeof cue_path &&
               expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u, messages[i]),
               "expected unsupported media to name its planned v2.0 format");
     }
-    CHECK(write_text(playlist_path, "unsupported.pbp\n", sizeof "unsupported.pbp\n" - 1u) &&
+    CHECK(write_text(playlist_path, "unsupported.ecm\n", sizeof "unsupported.ecm\n" - 1u) &&
           expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
-                             "unsupported: PBP (planned v2.0)"),
+                             "unsupported: ECM (planned v2.0)"),
           "expected an unsupported m3u entry extension to be rejected consistently");
 
 cleanup:
@@ -1082,8 +1087,223 @@ cleanup:
     return result;
 }
 
+static int pbp_tocs_equal(const schway_disc *left, const schway_disc *right,
+                          uint32_t expected_tracks, uint32_t expected_leadout)
+{
+    schway_toc left_toc;
+    schway_toc right_toc;
+    if (left == NULL || right == NULL || left->toc == NULL || right->toc == NULL) return 0;
+    memset(&left_toc, 0, sizeof(left_toc));
+    memset(&right_toc, 0, sizeof(right_toc));
+    left_toc.size = (uint32_t)sizeof(left_toc);
+    right_toc.size = (uint32_t)sizeof(right_toc);
+    if (left->toc(left->user, &left_toc) != 1u ||
+        right->toc(right->user, &right_toc) != 1u ||
+        left_toc.track_count != expected_tracks ||
+        right_toc.track_count != expected_tracks) return 0;
+    for (uint32_t i = 0u; i < expected_tracks; i++) {
+        const schway_disc_track *a = &left_toc.tracks[i];
+        const schway_disc_track *b = &right_toc.tracks[i];
+        if (a->type != b->type || a->index0 != b->index0 || a->index1 != b->index1 ||
+            a->pregap != b->pregap || a->leadout != b->leadout ||
+            a->leadout != expected_leadout) return 0;
+    }
+    return 1;
+}
+
+static int pbp_compare_sector(const schway_disc *source, const schway_disc *packed,
+                              uint32_t lba)
+{
+    uint8_t source_sector[2354];
+    uint8_t packed_sector[2354];
+    uint8_t source_subcode[98];
+    uint8_t packed_subcode[98];
+    if (source == NULL || packed == NULL || source->read_sector == NULL ||
+        packed->read_sector == NULL) return 0;
+    memset(source_sector, 0xa5, sizeof(source_sector));
+    memset(packed_sector, 0xa5, sizeof(packed_sector));
+    memset(source_subcode, 0xa5, sizeof(source_subcode));
+    memset(packed_subcode, 0xa5, sizeof(packed_subcode));
+    if (source->read_sector(source->user, lba, source_sector + 1u,
+                            source_subcode + 1u) != 1u ||
+        packed->read_sector(packed->user, lba, packed_sector + 1u,
+                            packed_subcode + 1u) != 1u ||
+        source_sector[0] != 0xa5u || source_sector[2353] != 0xa5u ||
+        packed_sector[0] != 0xa5u || packed_sector[2353] != 0xa5u ||
+        source_subcode[0] != 0xa5u || source_subcode[97] != 0xa5u ||
+        packed_subcode[0] != 0xa5u || packed_subcode[97] != 0xa5u ||
+        memcmp(source_sector + 1u, packed_sector + 1u, 2352u) != 0 ||
+        memcmp(source_subcode + 1u, packed_subcode + 1u, 96u) != 0) return 0;
+    for (size_t i = 1u; i <= 96u; i++) {
+        if (source_subcode[i] != 0u || packed_subcode[i] != 0u) return 0;
+    }
+    return 1;
+}
+
+static int test_pbp_open(const char *directory, const char *pbp_path,
+                         const char *cue_path)
+{
+    const char *test_case = "disc.image.pbp_open";
+    char bad_path[1024] = "";
+    static const char invalid_pbp[] = "not a PBP image\n";
+    schway_disc_image *packed_image = NULL;
+    schway_disc_image *cue_image = NULL;
+    schway_disc_image *replacement = NULL;
+    schway_disc_image_error error;
+    schway_toc packed_toc;
+    schway_toc cue_toc;
+    const schway_disc *active_disc;
+    uint8_t before_sector[2352];
+    uint8_t after_sector[2352];
+    uint8_t before_subcode[96];
+    uint8_t after_subcode[96];
+    int result = 0;
+
+    CHECK(schway_disc_image_open(pbp_path, &packed_image, &error) == SCHWAY_DISC_IMAGE_OK,
+          "expected the validated PBP to open through the shared dispatcher");
+    CHECK(schway_disc_image_open(cue_path, &cue_image, &error) == SCHWAY_DISC_IMAGE_OK,
+          "expected the source CUE to open through the shared dispatcher");
+    CHECK(pbp_tocs_equal(schway_disc_image_disc(packed_image),
+                         schway_disc_image_disc(cue_image), 1u, 64u),
+          "expected PBP and source CUE TOCs to match");
+    memset(&packed_toc, 0, sizeof(packed_toc));
+    packed_toc.size = (uint32_t)sizeof(packed_toc);
+    memset(&cue_toc, 0, sizeof(cue_toc));
+    cue_toc.size = (uint32_t)sizeof(cue_toc);
+    CHECK(schway_disc_image_disc(packed_image)->toc(
+              schway_disc_image_disc(packed_image)->user, &packed_toc) == 1u &&
+          schway_disc_image_disc(cue_image)->toc(
+              schway_disc_image_disc(cue_image)->user, &cue_toc) == 1u &&
+          packed_toc.tracks[0].type == SCHWAY_DISC_TRACK_MODE2 &&
+          packed_toc.tracks[0].leadout == 64u &&
+          memcmp(&packed_toc.tracks[0], &cue_toc.tracks[0],
+                 sizeof(packed_toc.tracks[0])) == 0,
+          "expected the normalized PBP TOC entry to match the CUE entry");
+
+    active_disc = schway_disc_image_disc(cue_image);
+    memset(before_sector, 0xa5, sizeof(before_sector));
+    memset(before_subcode, 0x5a, sizeof(before_subcode));
+    CHECK(active_disc != NULL && active_disc->read_sector != NULL &&
+          active_disc->read_sector(active_disc->user, 0u, before_sector, before_subcode) == 1u,
+          "expected the current CUE reader to produce a sector before replacement");
+    CHECK(make_path(bad_path, directory, "pbp-failed-replacement.pbp") &&
+          write_text(bad_path, invalid_pbp, sizeof(invalid_pbp) - 1u),
+          "could not create the malformed PBP replacement");
+    memset(&error, 0, sizeof(error));
+    CHECK(schway_disc_image_open(bad_path, &replacement, &error) ==
+              SCHWAY_DISC_IMAGE_BAD_IMAGE && replacement == NULL &&
+          error.status == (uint32_t)SCHWAY_DISC_IMAGE_BAD_IMAGE,
+          "expected malformed PBP replacement to fail without publishing a reader");
+    CHECK(schway_disc_image_disc(cue_image) == active_disc &&
+          active_disc->read_sector(active_disc->user, 0u, after_sector, after_subcode) == 1u &&
+          memcmp(before_sector, after_sector, sizeof(before_sector)) == 0 &&
+          memcmp(before_subcode, after_subcode, sizeof(before_subcode)) == 0,
+          "expected failed replacement to preserve the active image and its output");
+
+cleanup:
+    (void)remove(bad_path);
+    schway_disc_image_close(replacement);
+    schway_disc_image_close(cue_image);
+    schway_disc_image_close(packed_image);
+    return result;
+}
+
+static int test_pbp_boundaries(const char *pbp_path, const char *cue_path)
+{
+    const char *test_case = "disc.image.pbp_boundaries";
+    static const uint32_t lbas[] = {0u, 1u, 15u, 16u, 17u, 31u, 32u, 47u, 48u, 62u, 63u};
+    schway_disc_image *packed_image = NULL;
+    schway_disc_image *cue_image = NULL;
+    schway_disc_image_error error;
+    const schway_disc *packed;
+    const schway_disc *source;
+    uint8_t sector[2352];
+    uint8_t subcode[96];
+    int result = 0;
+
+    CHECK(schway_disc_image_open(pbp_path, &packed_image, &error) == SCHWAY_DISC_IMAGE_OK &&
+          schway_disc_image_open(cue_path, &cue_image, &error) == SCHWAY_DISC_IMAGE_OK,
+          "expected PBP and source CUE to open for boundary reads");
+    packed = schway_disc_image_disc(packed_image);
+    source = schway_disc_image_disc(cue_image);
+    CHECK(pbp_tocs_equal(packed, source, 1u, 64u),
+          "expected the PBP and CUE boundary geometry to match");
+    for (size_t i = 0u; i < sizeof(lbas) / sizeof(lbas[0]); i++) {
+        CHECK(pbp_compare_sector(source, packed, lbas[i]),
+              "expected raw bytes and zero subcode at each block boundary");
+        CHECK(pbp_compare_sector(source, packed, lbas[i]),
+              "expected repeated cache reads to preserve the same bytes");
+    }
+    memset(sector, 0xa5, sizeof(sector));
+    memset(subcode, 0x5a, sizeof(subcode));
+    CHECK(packed->read_sector(packed->user, 64u, sector, subcode) == 0u &&
+          sector[0] == 0xa5u && sector[sizeof(sector) - 1u] == 0xa5u &&
+          subcode[0] == 0x5au && subcode[sizeof(subcode) - 1u] == 0x5au,
+          "expected the exclusive leadout to fail without changing outputs");
+    CHECK(packed->read_sector(packed->user, UINT32_MAX, sector, subcode) == 0u &&
+          sector[0] == 0xa5u && sector[sizeof(sector) - 1u] == 0xa5u &&
+          subcode[0] == 0x5au && subcode[sizeof(subcode) - 1u] == 0x5au,
+          "expected beyond-leadout reads to fail without changing outputs");
+
+cleanup:
+    schway_disc_image_close(cue_image);
+    schway_disc_image_close(packed_image);
+    return result;
+}
+
+static int test_pbp_parity(const char *pbp_path, const char *cue_path)
+{
+    const char *test_case = "disc.image.pbp_parity";
+    schway_disc_image *packed_image = NULL;
+    schway_disc_image *cue_image = NULL;
+    schway_disc_image_error error;
+    schway__save_game_identity packed_identity;
+    schway__save_game_identity cue_identity;
+    const schway_disc *packed;
+    const schway_disc *source;
+    int result = 0;
+
+    CHECK(schway_disc_image_open(pbp_path, &packed_image, &error) == SCHWAY_DISC_IMAGE_OK &&
+          schway_disc_image_open(cue_path, &cue_image, &error) == SCHWAY_DISC_IMAGE_OK,
+          "expected PBP and source CUE to open for full parity");
+    packed = schway_disc_image_disc(packed_image);
+    source = schway_disc_image_disc(cue_image);
+    CHECK(pbp_tocs_equal(source, packed, 1u, 64u),
+          "expected the normalized PBP TOC to match the source CUE");
+    for (uint32_t lba = 0u; lba < 64u; lba++) {
+        CHECK(pbp_compare_sector(source, packed, lba),
+              "expected exact source sector and zero-subcode parity in forward order");
+    }
+    for (uint32_t lba = 64u; lba > 0u; lba--) {
+        CHECK(pbp_compare_sector(source, packed, lba - 1u),
+              "expected exact repeated sector and zero-subcode parity in reverse order");
+    }
+    CHECK(schway__save_game_identity_resolve(NULL, NULL, 0u, cue_path,
+              cue_image, &cue_identity) == SCHWAY__SAVE_GAME_IDENTITY_OK &&
+          schway__save_game_identity_resolve(NULL, NULL, 0u, pbp_path,
+              packed_image, &packed_identity) == SCHWAY__SAVE_GAME_IDENTITY_OK &&
+          cue_identity.kind == SCHWAY__SAVE_GAME_IDENTITY_DISC_DIGEST &&
+          packed_identity.kind == cue_identity.kind &&
+          strcmp(packed_identity.value, cue_identity.value) == 0,
+          "expected source and PBP content identities to match");
+
+cleanup:
+    schway_disc_image_close(cue_image);
+    schway_disc_image_close(packed_image);
+    return result;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc == 5 && strcmp(argv[1], "pbp_open") == 0) {
+        return test_pbp_open(argv[2], argv[3], argv[4]);
+    }
+    if (argc == 4 && strcmp(argv[1], "pbp_boundaries") == 0) {
+        return test_pbp_boundaries(argv[2], argv[3]);
+    }
+    if (argc == 4 && strcmp(argv[1], "pbp_parity") == 0) {
+        return test_pbp_parity(argv[2], argv[3]);
+    }
     if (argc != 3) {
         fputs("usage: schwaystation-test-disc-image CASE BUILD_DIRECTORY\n", stderr);
         return 2;

@@ -189,6 +189,12 @@ and artifacts, never a gate. A failed night opens or comments on the one open is
 night closes it. To see the issue written, run it by hand on any branch with `force_failure` set:
 `gh workflow run nightly.yml --ref <branch> -f force_failure=true`.
 
+Pull requests first run a read-only `changes` job over the complete paginated file list. A complete list of only
+the four PBP provider/parser/test paths runs fuzz only; a list entirely under `docs/` or `.planning/` skips
+Nightly. Any mixed, unknown, renamed, incomplete or unclassified list runs the full workload. API errors or a
+failed/timed-out classifier job also fall back to full. Schedule and manual runs always keep every job. The local route controls exercise
+these decisions; `act --dryrun` checks job wiring but cannot call GitHub's PR files API or prove its outputs.
+
 Two more jobs in the same workflow report through the same issue and are not part of `CI required`: `vectors-full`
 replays all 55,000 public CPU vectors at their pin, and `fuzz` runs the loader's fuzz target for 60 seconds. Both are
 described in [testing.md](testing.md#the-full-vectors); a red one is a finding to fix, not a block on a merge.

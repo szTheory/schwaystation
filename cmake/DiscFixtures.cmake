@@ -70,7 +70,8 @@ configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
 
 set(schway__disc_guest "${PROJECT_BINARY_DIR}/fixtures/disc_boot.exe")
 add_custom_command(OUTPUT "${schway__disc_guest}"
-  COMMAND "${SCHWAYSTATION_ARMIPS}" -strequ IMAGE "${schway__disc_guest}" disc_boot.asm
+  COMMAND "${SCHWAYSTATION_ARMIPS}" -strequ IMAGE "${schway__disc_guest}"
+    -equ PBP_MODE 0 disc_boot.asm
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/tests/fixtures/src"
   DEPENDS schwaystation-armips
     "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.asm"
@@ -95,6 +96,10 @@ else()
     COMMENT "Build pinned psxavenc"
     VERBATIM)
   add_custom_command(OUTPUT "${schway__disc_media_dir}/media.sha256"
+    BYPRODUCTS
+      "${schway__disc_media_dir}/cdda.wav"
+      "${schway__disc_media_dir}/movie.str"
+      "${schway__disc_media_dir}/xa.xa"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${schway__disc_media_dir}"
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
       --output-dir "${schway__disc_media_dir}" --encoder "${schway__psxavenc}"
@@ -145,6 +150,7 @@ add_custom_command(OUTPUT "${schway__disc_playlist_bin}"
   VERBATIM)
 add_custom_target(schwaystation-disc-fixtures ALL DEPENDS
   "${schway__disc_bin}" "${schway__disc_playlist_bin}")
+include("${PROJECT_SOURCE_DIR}/cmake/PBPFixtures.cmake")
 
 if(SCHWAYSTATION_CHD AND SCHWAYSTATION_BUILD_CHD_TOOL)
   include("${PROJECT_SOURCE_DIR}/cmake/CHDFixtures.cmake")

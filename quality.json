@@ -4,7 +4,7 @@
     "gpu_motion": {"floor": 137752334, "ceiling": 137752334}
   },
   "size": {
-    "wasm": {"floor": 859379, "ceiling": 859379}
+    "wasm": {"floor": 875971, "ceiling": 875971}
   },
   "state": {
     "bytes": {"floor": 3755328, "ceiling": 3755328}
@@ -22,6 +22,7 @@
     "2026-11-19: the ubuntu-26.04 WASI lane measured the linked Release schwaystation-run module at 595820 bytes on PR run 44460238941; floor and ceiling initially used that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44460238941/job/135345194644.",
     "2026-11-19: Phase 8's per-game card identity support measures the linked Release WASI module at 608540 bytes on run 44597715729; the floor and ceiling now track that exact measurement: https://github.com/szTheory/schwaystation/actions/runs/44597715729/job/135820879050.",
     "2026-11-19: Phase 8 PocketStation card state measures 3755328 stable serialized bytes, 308 above the prior bound; the exact producer measurement is in run 44600162797: https://github.com/szTheory/schwaystation/actions/runs/44600162797/job/135829636881. The bound now tracks the current serialized state size.",
-    "2026-11-20: Phase 9's CHD-enabled WASI lane measured the linked Release module at 859379 bytes on run 44827711416; the lane validated the module before the previous CHD-off bound rejected its size, so the floor and ceiling now track the exact CHD-enabled producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44827711416/job/136604866560."
+    "2026-11-20: Phase 9's CHD-enabled WASI lane measured the linked Release module at 859379 bytes on run 44827711416; the lane validated the module before the previous CHD-off bound rejected its size, so the floor and ceiling now track the exact CHD-enabled producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44827711416/job/136604866560.",
+    "2026-11-21: Phase 10's PBP-enabled WASI lane measured the linked Release module at 875971 bytes on run 44924014258; floor and ceiling now track that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44924014258/job/136906260832."
   ]
 }

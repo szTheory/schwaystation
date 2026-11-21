@@ -164,7 +164,8 @@ code identified by the digest in `tests/built/expected.txt`, never a Sony image.
 |---|---|---|
 | One committed PS-EXE fixture source (`.asm`, `.inc`, `.xml`, glyph data) | 64 KiB | `policy.fixture_budget` |
 | One built PS-EXE | 64 KiB of authored content (plus the 2 KiB header) | `policy.fixture_budget` |
-| One built disc image | 512 KiB, build directory only, never committed | `policy.fixture_budget` |
+| One built CUE/BIN disc image | 512 KiB, build directory only, never committed | `policy.fixture_budget` |
+| One generated PBP disc image | 1.5 MiB, build directory only, never committed | `disc.image.pbp_preflight` |
 | `tests/fixtures/**` in all | 4 MiB | `policy.fixture_budget` |
 | One committed vector file (`tests/vectors/**`) | 4 MB (the r3000 sample is about 2.3 MB, the GTE table about 594 KB, both (derived)) | `policy.fixture_budget` |
 | `tests/fuzz/**` (minimised regressions only) | 1 MiB; each seed at most 4 KB | `policy.fixture_budget` |

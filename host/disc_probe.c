@@ -943,8 +943,17 @@ static int schway__path_is_unsupported(const char *path)
     const char *last = slash;
     if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
     if (dot == NULL || (last != NULL && dot < last)) return 0;
-    return schway__cue_word_is(dot, ".pbp") || schway__cue_word_is(dot, ".ecm") ||
-           schway__cue_word_is(dot, ".ccd");
+    return schway__cue_word_is(dot, ".ecm") || schway__cue_word_is(dot, ".ccd");
+}
+
+static int schway__path_is_pbp(const char *path)
+{
+    const char *dot = strrchr(path, '.');
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+    const char *last = slash;
+    if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
+    return dot != NULL && (last == NULL || dot > last) && schway__cue_word_is(dot, ".pbp");
 }
 
 static int schway__path_is_chd(const char *path)
@@ -1011,6 +1020,55 @@ static schway_host_disc_probe_status schway__chd_source(const char *path,
     return SCHWAY_HOST_DISC_PROBE_OK;
 }
 
+static schway_host_disc_probe_status schway__pbp_source(const char *path,
+                                                         schway__iso_source *source)
+{
+    schway_disc_image_error error;
+    schway_toc toc;
+    schway_disc_image_status image_status;
+    const schway_disc_track *track;
+    uint64_t sector_count;
+
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    image_status = schway_disc_image_open(path, &source->image, &error);
+    if (image_status != SCHWAY_DISC_IMAGE_OK || source->image == NULL) {
+        if (image_status == SCHWAY_DISC_IMAGE_UNSUPPORTED) return SCHWAY_HOST_DISC_PROBE_UNSUPPORTED;
+        if (image_status == SCHWAY_DISC_IMAGE_LIMIT) return SCHWAY_HOST_DISC_PROBE_LIMIT;
+        if (image_status == SCHWAY_DISC_IMAGE_OUT_OF_MEMORY) return SCHWAY_HOST_DISC_PROBE_OUT_OF_MEMORY;
+        return SCHWAY_HOST_DISC_PROBE_IO;
+    }
+    source->disc = schway_disc_image_disc(source->image);
+    memset(&toc, 0, sizeof toc);
+    toc.size = (uint32_t)sizeof toc;
+    if (source->disc == NULL || source->disc->toc == NULL ||
+        source->disc->toc(source->disc->user, &toc) == 0u || toc.track_count != 1u) {
+        return SCHWAY_HOST_DISC_PROBE_NOT_ISO;
+    }
+    track = &toc.tracks[0];
+    if (track->type != SCHWAY_DISC_TRACK_MODE2 || track->index1 != 0u ||
+        track->leadout <= track->index1) {
+        return SCHWAY_HOST_DISC_PROBE_UNSUPPORTED;
+    }
+    sector_count = (uint64_t)track->leadout - track->index1;
+    if (sector_count > UINT32_MAX ||
+        sector_count > UINT64_MAX / SCHWAY__ISO_SECTOR_SIZE ||
+        sector_count > UINT64_MAX / UINT64_C(2352) ||
+        sector_count * SCHWAY__ISO_SECTOR_SIZE > SCHWAY__ISO_MAX_BYTES ||
+        sector_count * UINT64_C(2352) > SCHWAY__ISO_MAX_BYTES) {
+        return SCHWAY_HOST_DISC_PROBE_LIMIT;
+    }
+    source->data_start_lba = track->index1;
+    source->track1_start_lba = track->index1;
+    source->track1_sector_count = (uint32_t)sector_count;
+    source->sector_bytes = 2352u;
+    source->user_offset = 24u;
+    source->sector_count = (uint32_t)sector_count;
+    source->data_bytes = sector_count * SCHWAY__ISO_SECTOR_SIZE;
+    source->track1_bytes = sector_count * UINT64_C(2352);
+    return SCHWAY_HOST_DISC_PROBE_OK;
+}
+
 schway_host_disc_probe_status schway__disc_probe_image(const char *path,
                                                         schway_host_disc_probe *out)
 {
@@ -1026,6 +1084,12 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
     is_cue = schway__path_is_cue(path);
     if (schway__path_is_chd(path)) {
         status = schway__chd_source(path, &source);
+        if (status != SCHWAY_HOST_DISC_PROBE_OK) {
+            schway_disc_image_close(source.image);
+            return status;
+        }
+    } else if (schway__path_is_pbp(path)) {
+        status = schway__pbp_source(path, &source);
         if (status != SCHWAY_HOST_DISC_PROBE_OK) {
             schway_disc_image_close(source.image);
             return status;

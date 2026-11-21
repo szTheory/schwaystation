@@ -18,6 +18,10 @@ metadata=true
 manifest=false
 changelog=false
 version=false
+nightly_full=true
+pbp_only=false
+all_pbp=true
+all_irrelevant=true
 case ${1-} in
   '' | *[!0-9]*) unknown=true ;;
   *) [ "$1" -le 3000 ] || unknown=true ;;
@@ -44,11 +48,20 @@ while IFS= read -r path || [ -n "$path" ]; do
     *) heavy=true; metadata=false ;;
   esac
   case "$path" in
+    host/disc_pbp.c | host/disc_pbp.h | tests/disc/pbp.c | tests/fuzz/pbp.c) all_irrelevant=false ;;
+    .planning/* | docs/*) all_pbp=false ;;
+    *) all_pbp=false; all_irrelevant=false ;;
+  esac
+  case "$path" in
     .github/workflows/release.yml | .github/workflows/ci.yml | scripts/publish.sh | \
       release-please-config.json | cmake/packaging.cmake) release=true ;;
   esac
 done
 [ "$paths" -gt 0 ] || unknown=true
+if [ "$unknown" = false ] && [ "$paths" -eq "$1" ]; then
+  if [ "$all_pbp" = true ]; then nightly_full=false; pbp_only=true
+  elif [ "$all_irrelevant" = true ]; then nightly_full=false; fi
+fi
 if [ "$unknown" = true ]; then
   heavy=true
   release=true
@@ -63,3 +76,5 @@ elif [ "$fast" = true ]; then
 fi
 echo "heavy=$heavy"
 echo "release_inputs=$release"
+echo "nightly_full=$nightly_full"
+echo "pbp_only=$pbp_only"

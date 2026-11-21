@@ -1,10 +1,4 @@
-# cmake -DMODE=timeouts|pins -DDIR=<workflows directory> or -DCASE=spu_registration -DROOT=<root> -P workflows.cmake
-# timeouts: every timeout-minutes line carries a comment naming the run it was
-#   measured from ("run" and nine or more digits) or the word provisional.
-#   Fault prevented: a job timeout guessed rather than measured.
-# pins: every uses: line names a local ./path, or owner/repo[/path] at a full
-#   40-hex commit followed by a "# v..." comment naming the release it is.
-#   Fault prevented: an action referenced by a tag that can be moved under a release.
+# cmake -DMODE=timeouts|pins -DDIR=<dir> or -DCASE=spu_registration -DROOT=<root>; guards guessed timeouts and moved action refs.
 cmake_minimum_required(VERSION 3.25)
 function(yaml_job_has file job)
   file(READ "${ROOT}/${file}" yaml)
@@ -18,6 +12,7 @@ endfunction()
 if(CASE STREQUAL "spu_registration" OR CASE STREQUAL "disc_registration")
   yaml_job_has(.github/workflows/ci.yml changes "Cheap source, inventory and route preflight.*MODE=pins.*MODE=timeouts.*line_budget[.]cmake.*sort -cu.*CASE=disc_registration")
   yaml_job_has(.github/workflows/ci.yml ci-required "needs:.*hash-equality.*retroarch.*perf")
+  yaml_job_has(.github/workflows/ci.yml build "path: compat-base.*sparse-checkout:.*scripts/compat-ratchet[.]sh.*tests/cmake/compat-ratchet[.]cmake.*tests/cmake/date_days[.]cmake.*tests/compat/ledger[.]csv")
   yaml_job_has(.github/workflows/ci.yml hash-equality "COUNT=8")
   yaml_job_has(.github/workflows/ci.yml build "name: Stable state size preflight.*cmake --build build/ci --target schwaystation-test-state.*QUALITY_STATE_BYTES_BEGIN.*name: Build, test, package.*cmake --workflow --preset.*INVENTORY=tests/inventory/ci\\.txt.*fixtures/spu_tone\\.exe")
   yaml_job_has(.github/workflows/ci.yml retroarch
@@ -28,9 +23,18 @@ if(CASE STREQUAL "spu_registration" OR CASE STREQUAL "disc_registration")
   yaml_job_has(.github/workflows/ci.yml perf "github.event_name == 'pull_request'.*workflow_dispatch.*inputs[.]control_ref != ''.*timeout-minutes: 10.*run 44600162797.*run 44218206100.*CASE=spu_idle.*CASE=cd_idle")
   yaml_job_has(.github/workflows/ci.yml be32 "cmake --preset chd-tool.*build/be32/tests/schwaystation-chd-tool.*cmake --preset be32-chd.*disc_boot[.]chd[.]manifest.*CHDFixtures[.]cmake.*cmake --build --preset be32-chd.*ctest --preset be32-chd" "INVENTORY=tests/inventory/ci\\.txt" "LABELS=portable")
   yaml_job_has(.github/workflows/ci.yml wasm32 "cmake --preset chd-tool.*build/wasm32/tests/schwaystation-chd-tool.*cmake --preset wasm32-chd.*disc_boot[.]chd[.]manifest.*CHDFixtures[.]cmake.*cmake --build --preset wasm32-chd.*QUALITY_WASM_COMPARE_BEGIN.*ctest --preset wasm32-preflight.*ctest --preset wasm32-chd" "INVENTORY=tests/inventory/wasm32\\.txt" "LABELS=portable")
-  yaml_job_has(.github/workflows/nightly.yml vectors-full "cmake --workflow --preset nightly"
-    "INVENTORY=tests/inventory/nightly\\.txt")
-  yaml_job_has(.github/workflows/nightly.yml fuzz "name: Sanitizer and media-fixture dependencies.*libclang-rt-21-dev.*libavformat-dev.*libavcodec-dev.*libavutil-dev.*libswresample-dev.*libswscale-dev.*cmake --preset chd-tool.*cmake --build --preset chd-tool.*cmake --preset fuzz.*CHDFixtures[.]cmake.*cmake --build --preset fuzz" "schwaystation-fuzz-exe -max_total_time=60" "subsystems=\\(cue cnf m3u cdrom chd mdec\\)" "expected=\\(5 5 7 15 12 6\\)" "-max_total_time=60")
+  yaml_job_has(.github/workflows/nightly.yml vectors-full "needs: changes.*if:.*nightly_full"
+    "cmake --workflow --preset nightly" "INVENTORY=tests/inventory/nightly\\.txt")
+  yaml_job_has(.github/workflows/nightly.yml changes "permissions:.*pull-requests: read.*nightly_full:.*pbp_only:.*full=true.*pbp=false.*gh api --paginate --slurp.*per_page=100.*previous_filename.*classify-changes[.]sh")
+  yaml_job_has(.github/workflows/nightly.yml bench "needs: changes.*!cancelled.*github.event_name != 'pull_request'.*needs[.]changes[.]result != 'success'.*nightly_full")
+  yaml_job_has(.github/workflows/nightly.yml bench-wasm32 "needs: changes.*!cancelled.*github.event_name != 'pull_request'.*needs[.]changes[.]result != 'success'.*nightly_full")
+  yaml_job_has(.github/workflows/nightly.yml fuzz "needs: changes.*!cancelled.*github.event_name != 'pull_request'.*needs[.]changes[.]result != 'success'.*nightly_full == 'true' [|][|] needs[.]changes[.]outputs[.]pbp_only == 'true'" "name: Sanitizer and media-fixture dependencies.*packages=\\(libclang-rt-21-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev\\).*cmake --preset chd-tool.*cmake --build --preset chd-tool.*Build owned CHD and PBP baseline fixtures.*cmake --preset fuzz.*cmake --build build/fuzz --target schwaystation-disc-fixtures schwaystation-pbp-fixtures.*CHDFixtures[.]cmake" "Configure PBP-only sanitizer targets.*CHD=OFF.*schwaystation-fuzz-pbp schwaystation-fuzz-pbp-replay schwaystation-pbp-fixtures.*cmake --build --preset fuzz" "subsystems=\\(cue cnf m3u cdrom chd mdec pbp\\).*expected=\\(5 5 7 15 12 6 14\\).*max_lengths=\\(65536 4096 65536 16384 16384 262144 256\\)" "seed_output=.*test.*done.*if.*PBP_ONLY.*schwaystation-fuzz-exe -max_total_time=60")
+  file(READ "${ROOT}/cmake/DiscFixtures.cmake" media_rules)
+  string(REPLACE "\n" " " media_rules "${media_rules}")
+  string(REGEX MATCH "add_custom_command\\(OUTPUT[^)]*media[.]sha256[^)]*\\)" media_command "${media_rules}")
+  if(NOT media_command MATCHES "BYPRODUCTS .*cdda[.]wav.*movie[.]str.*xa[.]xa")
+    message(FATAL_ERROR "${CASE}: generated disc media lack declared byproducts")
+  endif()
   file(READ "${ROOT}/tests/retroarch/test.cfg.in" config)
   if(NOT config MATCHES "audio_driver = \\\"null\\\"" OR NOT config MATCHES "audio_enable = \\\"false\\\"")
     message(FATAL_ERROR "${CASE}: RetroArch tone smoke must remain video-only")
@@ -47,11 +51,9 @@ if(CASE STREQUAL "spu_registration" OR CASE STREQUAL "disc_registration")
     message(FATAL_ERROR "media_registration: a nightly SPU/CD-ROM/MDEC reference is missing")
   endif()
   file(STRINGS "${ROOT}/tests/nightly/tests.cmake" transfer REGEX "schway_add_test\\(NAME spu\\.reference\\.memory_transfer")
-  file(STRINGS "${ROOT}/.github/workflows/nightly.yml" nightly_paths
-    REGEX "^      - (CMakePresets\\.json|cmake/CDReferences\\.cmake|cmake/MDECReferences\\.cmake|pins\\.txt|tests/cdrom/reference\\.c|tests/fuzz/\\*\\*|tests/mdec/reference\\.c|tests/nightly/inventory\\.txt|tests/nightly/tests\\.cmake|tests/spu/reference\\.c)$")
-  if(NOT transfer OR NOT "${nightly_paths}" MATCHES
-     "CMakePresets\\.json.*cmake/CDReferences\\.cmake.*cmake/MDECReferences\\.cmake.*pins\\.txt.*tests/cdrom/reference\\.c.*tests/fuzz/\\*\\*.*tests/mdec/reference\\.c.*tests/nightly/inventory\\.txt.*tests/nightly/tests\\.cmake.*tests/spu/reference\\.c")
-    message(FATAL_ERROR "${CASE}: nightly SPU transfer test is disconnected")
+  file(STRINGS "${ROOT}/.github/workflows/nightly.yml" nightly_path_filter REGEX "^    paths:")
+  if(NOT transfer OR nightly_path_filter)
+    message(FATAL_ERROR "${CASE}: nightly transfer must stay registered and routing must use the changes job")
   endif()
   message(STATUS "${CASE}: hosted and inventory wiring is connected")
   return()

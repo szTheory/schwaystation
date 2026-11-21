@@ -13,7 +13,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 7: Faster and more trustworthy CI** - Measure the build and release pipeline, fix the weakest quality dimension, and establish reproducible quality baselines. (completed 2026-11-18)
 - [x] **Phase 8: Per-game card saves** - Use separate saves per game, move cards between supported formats, and resume a game in the runner or libretro. (completed 2026-11-19)
 - [x] **Phase 9: CHD disc images** - Open supported CHD images with equivalent disc behavior and establish the shared media checks and feature-ledger workflow. (completed 2026-11-20)
-- [ ] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly.
+- [x] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly. (completed 2026-11-21)
 - [ ] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data.
 - [ ] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact.
 - [ ] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior.
@@ -133,7 +133,46 @@ Plans:
   1. The runner and libretro host read the verified unencrypted PSISO layouts and track variants with matching sectors and deterministic hashes. The provider functions with CHD disabled and without system zlib, and the bundled inflater carries its permissive notice.
   2. Bad PSISO offsets, track tables, sizes and truncated blocks fail at the media boundary. Encrypted PGD and undocumented layouts return a clear unsupported result before guest execution. The ledger records the variants exercised.
 
-**Plans**: TBD
+**Plans**: 13/13 plans complete
+
+Plans:
+**Wave 1**
+- [x] 10-01-PLAN.md — Fit the gate budget and register the PBP provider test seam
+
+**Wave 2** *(depends on Wave 1)*
+- [x] 10-02-PLAN.md — Admit the pinned MIT inflater, provenance and digest controls
+- [x] 10-11-PLAN.md — Route Nightly PR jobs conservatively within the cap
+
+**Wave 3** *(depends on source admission)*
+- [x] 10-03-PLAN.md — Prove bounded raw inflate with independent CHD ON/OFF links
+
+**Wave 4** *(depends on the inflater seam)*
+- [x] 10-04-PLAN.md — Produce owned deterministic PBP bytes and source preflight
+
+**Wave 5** *(depends on fixture preflight)*
+- [x] 10-05-PLAN.md — Validate PSISO directory, TOC and block tables
+
+**Wave 6** *(depends on bounded metadata)*
+- [x] 10-06-PLAN.md — Expose validated PBP sectors through shared callbacks
+
+**Wave 7** *(depends on sector parity; fuzz also consumes Nightly routing)*
+- [x] 10-07-PLAN.md — Replay and fuzz hostile input through the production parser
+- [x] 10-08-PLAN.md — Load and probe supported PBP through the runner
+- [x] 10-09-PLAN.md — Load PBP through libretro and bind metadata to evidence
+
+**Wave 8** *(depends on both host consumers)*
+- [x] 10-10-PLAN.md — Validate ON/OFF packages, notices and independent linking
+
+**Wave 9** *(depends on replay, consumers and package evidence)*
+- [x] 10-12-PLAN.md — Run bounded PBP guests and publish precise feature evidence
+
+**Wave 10** *(depends on implementation and ledger evidence)*
+- [x] 10-13-PLAN.md — Review, then verify one changed head across required lanes
+
+**Cross-cutting constraints:** Only fixture-proven unencrypted single-data-track PSISO; host-only bounded
+parsing and source-preserving MIT inflater; no system zlib; exact parity/preflights before guests; all required
+platforms and Main/Release gates retained; complete repository checks at or below 3,901 lines.
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/research/STACK.md`, `.planning/research/FEATURES.md`, `PROVENANCE.md`
 
@@ -232,7 +271,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
 | 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
 | 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
-| 10. PBP disc images | 0/TBD | Not started | - |
+| 10. PBP disc images | 13/13 | Complete    | 2026-11-21 |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |
 | 12. SBI and LibCrypt | 0/TBD | Not started | - |
 | 13. Regions, console revisions and playback | 0/TBD | Not started | - |
