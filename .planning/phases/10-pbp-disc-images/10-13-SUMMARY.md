@@ -175,3 +175,13 @@ the PBP fixture. `DiscFixtures.cmake` now declares `cdda.wav`, `movie.str`, and 
 queries passed. Independent review found and we fixed a false-positive path in the static guard; it now checks
 byproducts only in the `media.sha256` command block, and a temporary misplaced-output fixture is rejected. The
 guard stays within the 3,901-line cap. Exact-head CI and Nightly still need to pass before ship.
+
+## Final exact-head hosted verification (2026-11-21)
+
+PR CI [44947489771](https://github.com/szTheory/schwaystation/actions/runs/44947489771) and Nightly
+[44947489816](https://github.com/szTheory/schwaystation/actions/runs/44947489816) passed on
+`df838815a5a4afd99f95d50e8caf66813aaa7cb4`. The WASI module passed the recorded 875,971-byte bound; the
+successful comparison does not emit its newly measured exact byte count. CI took 63m30s wall/8,250 runner-
+seconds with BE32 at 62m18s; Nightly took 9m43s/908 runner-seconds. Comparison with the previous complete run
+did not support a coverage-preserving workflow reduction. The details and remaining release boundary are in
+`10-VERIFICATION-EVIDENCE.md` and `10-CI-EFFICIENCY.md`.

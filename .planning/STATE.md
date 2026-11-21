@@ -26,22 +26,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 10 — PBP disc images; deterministic fixture correction is locally verified, hosted ship gates remain
+**Current focus:** Phase 10 — PBP disc images; exact-head hosted CI and Nightly pass, awaiting merge and release
 
 ## Current Position
 
 Phase: 10 — PBP disc images
 Current Plan: Ship follow-up 4
 Total Plans in Phase: 13
-Status: Awaiting repaired-head hosted CI/Nightly and release
-Last activity: 2026-11-21 -- PR #34 hash mismatch diagnosed and PBP encoder corrected locally
+Status: Exact-head verification passed; awaiting Phase 10 PR merge and automatic release
+Last activity: 2026-11-21 -- PR #34 CI/Nightly passed and final timing review recorded
 Progress: [████░░░░░░] 40% (3/10 phases released)
 
 ### Phase 10 verification (2026-11-21)
 
 Runtime/model: GSD verifier `gpt-6-luna` xhigh. Goal-backward verification passed 2/2 roadmap truths; implementation artifacts, wiring, data flow, requirements coverage, and all 13 plan artifact/key-link audits passed. Context decision coverage was 12/12. The local final workflow evidence already recorded above passed 655 standard tests and 7 release checks; verification did not rerun tests. The verifier corrected four stale Plan 10-09 references from `libretro/schwaystation_libretro.c` to `libretro/libretro.c` and confirmed that plan's artifact/key-link audit passed. Report: `.planning/phases/10-pbp-disc-images/10-VERIFICATION.md`; `verification.status` returned `passed` (exit 0).
 
-The pre-repair exact-head hosted attempt failed and was cancelled after exposing fixable CI issues. The WASI producer measured the linked Phase 10 module at 875,971 bytes on run 44924014258; `quality.json` now records that value. The repaired exact-head CI/Nightly, release-pipeline checks, critical path and runner-time review remain mandatory before advancing to Phase 11.
+The pre-repair exact-head hosted attempt failed and was cancelled after exposing fixable CI issues. The WASI producer measured the linked Phase 10 module at 875,971 bytes on run 44924014258; `quality.json` records that value. Exact-head CI 44947489771 and Nightly 44947489816 passed. Their critical path and runner-time review is recorded in `10-CI-EFFICIENCY.md`; merge and the automatic release remain mandatory before Phase 11.
 
 ### Phase 10 Plan 10-13 execution (2026-11-21)
 
@@ -56,7 +56,11 @@ reviewed before the passing rerun. Cheap inventories, workflow pin/timeout and w
 line-budget preflight passed. The Nightly route dry-run passed. Prior Phase 9 measurements identify BE32/QEMU as
 the historical hosted critical-path candidate. The first Phase 10 hosted CI/Nightly attempt is recorded in
 `10-CI-EFFICIENCY.md`; it was cancelled after failures. The actual WASI module measured 875,971 bytes and the
-quality bound now tracks it. The repaired exact-head runs and final hosted timing/cost evidence remain pending.
+quality bound now tracks it. Final exact-head CI 44947489771 and Nightly 44947489816 passed. CI took 63m30s
+wall/8,250 summed runner-seconds with BE32 at 62m18s; Nightly took 9m43s wall/908 summed runner-seconds. The
+successful WASI comparator confirmed the recorded bound but did not print the new exact measurement. No safe
+coverage-preserving workflow optimization was supported by the run-to-run timing; see `10-CI-EFFICIENCY.md`.
+The phase PR and automatic release remain before Phase 11.
 
 ### Phase 10 ship-fix follow-up (2026-11-21)
 

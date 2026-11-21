@@ -131,3 +131,31 @@ Huffman encoder now preserves the compressed PBP path while keeping the existing
 generated 64-sector fixture remains below the 1,572,864-byte cap, and the local provider, guest, runner,
 libretro and fuzz replay selectors pass. The next exact-head CI/Nightly run is needed to establish cross-platform
 hash parity; no quality bound or required CI coverage changed.
+
+## Final repaired-head attempt — 2026-11-21
+
+PR CI [44947489771](https://github.com/szTheory/schwaystation/actions/runs/44947489771) and Nightly
+[44947489816](https://github.com/szTheory/schwaystation/actions/runs/44947489816) both passed on exact head
+`df838815a5a4afd99f95d50e8caf66813aaa7cb4`. CI passed every required job, including all six native platform
+builds, ASan, no-float, BE32, WASI, eight-way hash equality, RetroArch, release rehearsal and the required
+aggregate. Nightly passed its full vector, benchmark and fuzz route.
+
+CI took 3,810 seconds (63m30s) wall time and 8,250 summed job-seconds (137.5 runner-minutes) over 22 jobs.
+BE32/QEMU took 3,738 seconds (62m18s) and remained the critical path. Hash equality began two seconds after
+BE32 finished and completed eight seconds later; the required aggregate finished ten seconds after that. The
+comparable prior CI run 44940420226 took 63m32s wall and 8,481 summed job-seconds, with BE32 at 3,744 seconds.
+This two-second wall and six-second BE32 difference is normal run variation, not an evidenced workflow speedup.
+
+Nightly took 583 seconds (9m43s) wall and 908 summed job-seconds across eight jobs; fuzz used 574 seconds.
+The comparable prior Nightly run 44940420161 took 10m20s wall and 860 summed job-seconds. These totals move
+in opposite directions and do not establish a cost or speed improvement. GitHub did not expose dollar billing
+data. Every lane, case, hash and campaign remained enabled. The evidence does not support removing or reordering
+the BE32 lane.
+
+The final WASI job passed `quality.json`'s 875,971-byte linked-module bound. The previous producer log records
+the exact 875,971-byte module; on successful comparisons `tests/cmake/quality.cmake` does not print the new
+measurement, and the workflow retains only the hashes artifact rather than the module. The final head
+therefore establishes that the linked module is within the bound but does not expose a second exact byte count.
+No bound change is justified. The existing `act --dryrun` covered workflow routing; another dry run would add no
+coverage because workflow wiring was unchanged after it. Hosted-only runners and artifact/permission integrations
+remain established by these successful GitHub runs.

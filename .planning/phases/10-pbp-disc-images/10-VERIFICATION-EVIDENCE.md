@@ -1,10 +1,9 @@
 # Phase 10 Verification Evidence
 
-This records Plan 10-13's final local verification and Phase 10 ship repairs. The first PR/Nightly attempt on
-`50efc31` exposed five issues; the next attempt on `0cbf4fa` exposed an example link gap and a missing PBP fuzz
-fixture. Both attempts are diagnosed, and the second repair passes focused local checks. The next exact-head
-CI/Nightly and release-pipeline gates remain pending. Do not advance to Phase 11 until those gates are green and
-the release is published.
+This records Plan 10-13's final local verification, ship repairs, and exact-head hosted CI/Nightly result. The
+initial PR/Nightly attempts exposed fixable integration failures; they were repaired and independently reviewed.
+The final exact-head CI and full Nightly gates are green. Phase 10 remains at ship until its PR is merged and the
+automatic release is published; do not advance to Phase 11 before that boundary is confirmed.
 
 ## Frozen review and cheap checks
 
@@ -48,16 +47,14 @@ local suite took 75.65s; the seven release checks took 1.35s. It creates the loc
 the five-step CMake workflow. The command's console output was retained only at
 `/private/tmp/schwaystation-phase10-ci-final.log`; it is not committed.
 
-## Hosted gates still required at ship
+## Initial hosted attempt and WASI bound
 
 The first exact-head attempt ran on commit `50efc31217b851de8cbe3b53677b525b9b65447d` and was cancelled after
 the failures listed in `10-CI-EFFICIENCY.md`; it did not satisfy the ship gate. The WASI job produced the actual
 linked module measurement of 875,971 bytes (run
 [44924014258](https://github.com/szTheory/schwaystation/actions/runs/44924014258), job
 [136906260832](https://github.com/szTheory/schwaystation/actions/runs/44924014258/job/136906260832)), now recorded
-in `quality.json`. On the repaired head, inspect one exact-head PR CI run and Nightly run, including all native
-and package lanes, ASan, nofp, BE32, WASI, eight-way hash equality, RetroArch, release rehearsal and the full
-Nightly route. Re-measure the linked module from that run and adjust the bound only if the new measurement differs.
+in `quality.json`. The final repaired-head checks and their inspection are recorded below.
 
 The local Mac has Apple Clang and Wasmtime but no WASI sysroot or wasm compiler runtime; the BE32 cross compiler
 and QEMU are also absent, and the existing `build/be32` cache belongs to an old `/repo` checkout. `act --dryrun`
@@ -122,3 +119,29 @@ The CMake workflow guard now requires the byproducts in the same command block a
 review found this binding necessary and re-reviewed the correction clean. A temporary negative control that
 moved the declarations to another command was rejected. The runs above remain failed/cancelled and are not ship
 approval.
+
+## Final exact-head CI and Nightly — 2026-11-21
+
+Shipping head `df838815a5a4afd99f95d50e8caf66813aaa7cb4` passed PR [CI 44947489771](https://github.com/szTheory/schwaystation/actions/runs/44947489771)
+and [Nightly 44947489816](https://github.com/szTheory/schwaystation/actions/runs/44947489816). CI passed its six
+native builds, ASan, no-float, BE32, WASI, eight-way hash equality, RetroArch replay, release rehearsal, cleanup
+and required aggregate. Nightly passed its complete vectors, benchmark and fuzz route. The WASI linked-module
+comparison passed the recorded 875,971-byte ceiling. A successful comparison does not emit its measured number
+and the module is not retained as a workflow artifact, so this records the final run as within the bound without
+claiming a new exact size or changing the bound.
+
+CI took 63m30s wall and 8,250 summed job-seconds across 22 jobs; BE32/QEMU took 62m18s. Hash equality began two
+seconds after BE32 completed, and the required aggregate finished ten seconds later. Nightly took 9m43s wall and
+908 summed job-seconds across eight jobs. Dollar billing was unavailable. The prior comparable CI critical path
+was within six seconds of this result, so the measured evidence does not support a coverage-preserving workflow
+reduction. See `10-CI-EFFICIENCY.md` for the run comparison and disposition.
+
+| Hosted gate | Command/event | Exit | Evidence |
+| --- | --- | ---: | --- |
+| PR CI | `pull_request` on `df838815a5a4afd99f95d50e8caf66813aaa7cb4` | 0 | [Run 44947489771](https://github.com/szTheory/schwaystation/actions/runs/44947489771); all required jobs passed |
+| Nightly | `pull_request` on `df838815a5a4afd99f95d50e8caf66813aaa7cb4` | 0 | [Run 44947489816](https://github.com/szTheory/schwaystation/actions/runs/44947489816); full route passed |
+| WASI linked size | Hosted `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DARTIFACT=build/wasm32/schwaystation-run -P tests/cmake/quality.cmake` | 0 | [WASI job](https://github.com/szTheory/schwaystation/actions/runs/44947489771/job/136978138043); within 875,971-byte ceiling |
+
+The existing `act pull_request --dryrun` is routing evidence only. Workflow files did not change after that dry
+run; hosted-only runners, permissions and artifact handoffs are established by the successful hosted jobs. The
+ship PR and automatic release pipeline remain the Phase 10 boundary.
