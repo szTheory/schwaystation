@@ -1,6 +1,6 @@
 ---
 phase: 10-pbp-disc-images
-reviewed: 2026-11-21T15:29:09Z
+reviewed: 2026-11-21T19:18:34Z
 depth: standard
 files_reviewed: 56
 files_reviewed_list:
@@ -70,7 +70,7 @@ status: clean
 ---
 # Phase 10: Code Review Report
 
-**Reviewed:** 2026-11-21T15:29:09Z
+**Reviewed:** 2026-11-21T19:18:34Z
 **Depth:** standard
 **Files Reviewed:** 56
 **Status:** clean after resolving one warning before final verification.
@@ -141,3 +141,11 @@ unrelated command. The assertion now extracts the `add_custom_command` whose out
 only that block. A temporary negative fixture attaching byproducts to another command was rejected, while the
 actual `disc_registration` check passed. The narrowed assertion was independently re-reviewed clean; no
 coverage was dropped, and the line budget remains 3,901/3,901.
+
+## Cross-platform CUE normalization follow-up (2026-11-21)
+
+A standard review of `cmake/PBPFixtures.cmake`, `tools/gen_pbp.py`, `tests/disc/pbp.c`, and
+`tests/disc/tests.cmake` found no blockers or warnings. The fixture producer runs normalization after
+mkpsxiso exits and depends on the normalizer script; the existing PBP preflight receives and checks the
+generated source CUE's exact bytes, so missing or CRLF output fails before downstream PBP checks. The
+normalizer converts CRLF only and fails on bare carriage returns.

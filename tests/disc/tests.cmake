@@ -96,6 +96,7 @@ schway_add_test(NAME disc.image.pbp_preflight
     "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.bin"
     "${PROJECT_BINARY_DIR}/tests/disc_boot_pbp.manifest"
     "${PROJECT_SOURCE_DIR}/tools/gen_pbp.py"
+    "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp_source.cue"
   LABELS disc portable TIMEOUT 15)
 schway_add_test(NAME disc.image.pbp_fixture_controls
   COMMAND schwaystation-test-disc-pbp --fixture-controls

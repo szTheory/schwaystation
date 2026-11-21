@@ -23,11 +23,14 @@ add_custom_command(OUTPUT "${schway__pbp_source_bin}"
   BYPRODUCTS "${schway__pbp_source_cue}"
   COMMAND "${SCHWAYSTATION_MKPSXISO}" -q -y -o "${schway__pbp_source_bin}"
     disc_boot_pbp.xml
+  COMMAND "${Python3_EXECUTABLE}" "${schway__pbp_generator}"
+    --normalize-cue "${schway__pbp_source_cue}"
   WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/fixtures"
   DEPENDS schwaystation-mkpsxiso "${schway__pbp_source_guest}"
     "${schway__pbp_source_xml}" "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF"
     "${schway__disc_media_dir}/media.sha256"
     "${schway__disc_media_dir}/xa.xa" "${schway__disc_media_dir}/movie.str"
+    "${schway__pbp_generator}"
   COMMENT "Build the one-data-track PBP source image"
   VERBATIM)
 add_custom_target(schwaystation-pbp-source DEPENDS "${schway__pbp_source_bin}")

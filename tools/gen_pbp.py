@@ -125,6 +125,15 @@ def write_cue_and_source_copy(source_path, cue_path):
     return data_copy
 
 
+def normalize_cue_newlines(path):
+    content = path.read_bytes()
+    normalized = content.replace(b"\r\n", b"\n")
+    if b"\r" in normalized:
+        raise ValueError("generated CUE contains a bare carriage return")
+    if normalized != content:
+        path.write_bytes(normalized)
+
+
 def write_manifest(path, data_copy, output_path, generator_path,
                    output, sector_count, block_count):
     source_bytes = data_copy.read_bytes()
@@ -148,11 +157,18 @@ def write_manifest(path, data_copy, output_path, generator_path,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source", required=True, type=pathlib.Path)
-    parser.add_argument("--output", required=True, type=pathlib.Path)
-    parser.add_argument("--cue", required=True, type=pathlib.Path)
-    parser.add_argument("--manifest", required=True, type=pathlib.Path)
+    parser.add_argument("--source", type=pathlib.Path)
+    parser.add_argument("--output", type=pathlib.Path)
+    parser.add_argument("--cue", type=pathlib.Path)
+    parser.add_argument("--manifest", type=pathlib.Path)
+    parser.add_argument("--normalize-cue", type=pathlib.Path)
     args = parser.parse_args()
+
+    if args.normalize_cue is not None:
+        normalize_cue_newlines(args.normalize_cue)
+        return
+    if any(value is None for value in (args.source, args.output, args.cue, args.manifest)):
+        parser.error("--source, --output, --cue, and --manifest are required")
 
     source_bytes = args.source.read_bytes()
     first, sector_count, block_count = make_pbp(source_bytes)

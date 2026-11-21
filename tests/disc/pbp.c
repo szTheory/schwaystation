@@ -327,6 +327,28 @@ done:
     return valid;
 }
 
+static int validate_source_cue(const char *path, char *error, size_t error_size)
+{
+    static const char expected[] =
+        "FILE \"disc_boot_pbp_source.bin\" BINARY\n"
+        "  TRACK 01 MODE2/2352\n"
+        "    INDEX 01 00:00:00\n";
+    uint8_t *cue = NULL;
+    size_t cue_size = 0u;
+    int valid = 0;
+
+    if (!read_file(path, 1024u, &cue, &cue_size,
+                   "could not read generated source CUE", error, error_size)) return 0;
+    if (cue_size != sizeof(expected) - 1u ||
+        memcmp(cue, expected, sizeof(expected) - 1u) != 0) {
+        (void)snprintf(error, error_size, "generated source CUE layout or newlines differ");
+    } else {
+        valid = 1;
+    }
+    free(cue);
+    return valid;
+}
+
 static int expect_fixture_failure(const char *label, const char *pbp_path,
                                   const char *cue_path, const char *source_path,
                                   const char *manifest_path, const char *generator_path,
@@ -1218,8 +1240,12 @@ int main(int argc, char **argv)
     if (argc == 4 && strcmp(argv[1], "--bounds") == 0) {
         return run_bounds(argv[2], argv[3]);
     }
-    if (argc == 7 && strcmp(argv[1], "--preflight") == 0) {
+    if (argc == 8 && strcmp(argv[1], "--preflight") == 0) {
         char error[256];
+        if (!validate_source_cue(argv[7], error, sizeof(error))) {
+            fprintf(stderr, "ASSERT disc.image.pbp_preflight: %s\n", error);
+            return 1;
+        }
         if (validate_fixture(argv[2], argv[3], argv[4], argv[5], argv[6],
                              error, sizeof(error))) return 0;
         fprintf(stderr, "ASSERT disc.image.pbp_preflight: %s\n", error);
@@ -1229,7 +1255,7 @@ int main(int argc, char **argv)
         return run_fixture_controls(argv[2], argv[3], argv[4], argv[5], argv[6], argv[7]);
     }
     if (argc != 2) {
-        fprintf(stderr, "usage: schwaystation-test-disc-pbp <build-test-directory>|--inflate|--metadata <pbp>|--raw <pbp> <dir>|--bounds <pbp> <dir>|--preflight <pbp> <cue> <source> <manifest> <generator>|--fixture-controls <dir> <pbp> <cue> <source> <manifest> <generator>\n");
+        fprintf(stderr, "usage: schwaystation-test-disc-pbp <build-test-directory>|--inflate|--metadata <pbp>|--raw <pbp> <dir>|--bounds <pbp> <dir>|--preflight <pbp> <cue> <source> <manifest> <generator> <source-cue>|--fixture-controls <dir> <pbp> <cue> <source> <manifest> <generator>\n");
         return 2;
     }
     return run_headers(argv[1]);
