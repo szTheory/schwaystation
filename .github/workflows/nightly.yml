@@ -18,35 +18,7 @@ on:
         description: "Fail the run on purpose, to show the nightly issue being written"
         type: boolean
         default: false
-  # A change to the bench or this file runs the bench jobs on its pull
-  # request; the report job writes no issue for pull requests.
   pull_request:
-    paths:
-      - .github/workflows/nightly.yml
-      - CMakePresets.json
-      - CMakeLists.txt
-      - cmake/CHD*.cmake
-      - cmake/CDReferences.cmake
-      - cmake/DiscFixtures.cmake
-      - cmake/MDECReferences.cmake
-      - cmake/SPUReferences.cmake
-      - host/disc*.c
-      - host/disc*.h
-      - pins.txt
-      - runner/bench.c
-      - runner/bench.h
-      - runner/clock.c
-      - runner/clock.h
-      - runner/rss.c
-      - runner/rss.h
-      - tests/cdrom/reference.c
-      - tests/disc/**
-      - tests/fixtures/**
-      - tests/fuzz/**
-      - tests/mdec/reference.c
-      - tests/nightly/inventory.txt
-      - tests/nightly/tests.cmake
-      - tests/spu/reference.c
 
 permissions:
   contents: read
@@ -56,7 +28,48 @@ defaults:
     shell: bash
 
 jobs:
+  changes:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 3  # provisional
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      nightly_full: ${{ steps.route.outputs.nightly_full }}
+      pbp_only: ${{ steps.route.outputs.pbp_only }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Classify pull request files
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -eu
+          full=true
+          pbp=false
+          if [ "$EVENT" = pull_request ] && \
+            gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" > files.json; then
+            if count=$(jq -r '[.[][] | if .status == "renamed" then "__renamed__", .previous_filename, .filename else .filename end] | length' files.json) &&
+              [ "$count" -gt 0 ] && [ "$count" -lt 3000 ] &&
+              paths=$(jq -r '.[][] | if .status == "renamed" then "__renamed__", .previous_filename, .filename else .filename end' files.json) &&
+              routed=$(printf '%s\n' "$paths" | scripts/classify-changes.sh "$count"); then
+              full=$(printf '%s\n' "$routed" | sed -n 's/^nightly_full=//p')
+              pbp=$(printf '%s\n' "$routed" | sed -n 's/^pbp_only=//p')
+              case "$full:$pbp" in true:false | false:true | false:false) ;; *) full=true; pbp=false ;; esac
+            fi
+          fi
+          echo "nightly_full=$full" >> "$GITHUB_OUTPUT"
+          echo "pbp_only=$pbp" >> "$GITHUB_OUTPUT"
+
+  # The cheap changes job routes known PBP or documentation-only PRs without
+  # charging unrelated PRs for the full scheduled workload.
   bench:
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.nightly_full == 'true') }}
     name: bench (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 3  # 3-minute floor; 2 x 62 s = 3 min (1 sample); [run 44237075704](https://github.com/szTheory/schwaystation/actions/runs/44237075704), provisional
@@ -91,6 +104,8 @@ jobs:
   # The same bench under the pinned wasmtime, for the browser target. WASI
   # has no resident set size, so its max_rss_kib line reads 0.
   bench-wasm32:
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.nightly_full == 'true') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor; 2 x 108 s = 4 min (1 sample); [run 44237075704](https://github.com/szTheory/schwaystation/actions/runs/44237075704), provisional
     steps:
@@ -124,6 +139,8 @@ jobs:
   # 55 pinned blobs, checks each against its git SHA-1, then runs the nightly
   # preset. Nothing is cached or uploaded.
   vectors-full:
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.nightly_full == 'true') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5  # 5-minute floor; 2 x 40 s = 2 min (1 sample); [run 44237075704](https://github.com/szTheory/schwaystation/actions/runs/44237075704), provisional
     steps:
@@ -150,6 +167,8 @@ jobs:
   # A crash fails the job, so the rolling issue names
   # it; nothing is blocked. The crash files are kept for minimising.
   fuzz:
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result != 'success' || needs.changes.outputs.nightly_full == 'true' || needs.changes.outputs.pbp_only == 'true') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15  # Twice the slowest recent matching successful run (7m03s = 14m06s), rounded up; [run 44190163638](https://github.com/szTheory/schwaystation/actions/runs/44190163638)
     steps:
