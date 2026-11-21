@@ -998,6 +998,28 @@ static int run_bounds(const char *pbp_path, const char *directory)
     mutated[SCHWAY__DISC_PBP_DATA_BASE + get_le32(source + index)] = 0x07u;
     if (!expect_open_status(directory, "pbp-invalid-deflate.bin", mutated, size,
                             SCHWAY_DISC_IMAGE_BAD_IMAGE)) goto done;
+    for (int32_t shift = -1; shift <= 1; shift += 2) {
+        const uint32_t block_count = 4u;
+        uint16_t first_size = get_le16(source + index + 4u);
+        size_t last_entry = index + (size_t)(block_count - 1u) * 32u;
+        uint16_t last_size = get_le16(source + last_entry + 4u);
+        memcpy(mutated, source, size);
+        put_le16(mutated + index + 4u, (uint16_t)((int32_t)first_size + shift));
+        for (uint32_t block = 1u; block < block_count; block++) {
+            size_t entry = index + (size_t)block * 32u;
+            uint32_t offset = get_le32(source + entry);
+            put_le32(mutated + entry, (uint32_t)((int32_t)offset + shift));
+        }
+        put_le16(mutated + last_entry + 4u,
+                 (uint16_t)((int32_t)last_size - shift));
+        if (!expect_open_status(directory,
+                shift < 0 ? "pbp-short-deflate.bin" : "pbp-long-deflate.bin",
+                mutated, size, SCHWAY_DISC_IMAGE_BAD_IMAGE)) goto done;
+    }
+    memcpy(mutated, source, size);
+    mutated[SCHWAY__DISC_PBP_DATA_BASE + get_le32(source + index + 3u * 32u)] = 0x07u;
+    if (!expect_open_status(directory, "pbp-invalid-final-deflate.bin", mutated, size,
+                            SCHWAY_DISC_IMAGE_BAD_IMAGE)) goto done;
 
     free(mutated);
     mutated = NULL;

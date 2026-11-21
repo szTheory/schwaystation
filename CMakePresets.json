@@ -92,7 +92,7 @@
     {
       "name": "fuzz",
       "inherits": "base",
-      "$comment": "The loader, SPU and six media fuzz targets use clang-21 with ASan and UBSan. CHD uses an external uninstrumented tool built by chd-tool. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage.",
+      "$comment": "The loader, SPU and seven media fuzz targets use clang-21 with ASan and UBSan. CHD uses an external uninstrumented tool built by chd-tool. Only campaigns link libFuzzer; replay targets and other objects use fuzzer-no-link coverage.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON",
@@ -215,6 +215,8 @@
         "schwaystation-fuzz-cdrom-replay",
         "schwaystation-fuzz-chd",
         "schwaystation-fuzz-chd-replay",
+        "schwaystation-fuzz-pbp",
+        "schwaystation-fuzz-pbp-replay",
         "schwaystation-fuzz-mdec",
         "schwaystation-fuzz-mdec-replay"
       ]
