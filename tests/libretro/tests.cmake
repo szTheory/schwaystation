@@ -250,6 +250,22 @@ schway_add_test(NAME libretro.content.chd
 set_tests_properties(libretro.content.chd PROPERTIES
   FIXTURES_REQUIRED "disc_media_preflight;compat_features_preflight")
 
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-content-pbp)
+file(WRITE ${PROJECT_BINARY_DIR}/tests/libretro-content-pbp/invalid.pbp "not a PBP image\n")
+# Fault prevented: libretro bypasses the shared PBP provider, changes media or
+# cards after a rejected image, or diverges from the owned single-track CUE.
+schway_add_test(NAME libretro.content.pbp
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation-libretro-card-test> content-pbp
+    $<BOOL:${SCHWAYSTATION_CHD}>
+    ${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.cue
+    ${PROJECT_BINARY_DIR}/tests/libretro-content-pbp/invalid.pbp
+    ${PROJECT_BINARY_DIR}/openbios ${PROJECT_BINARY_DIR}/tests/libretro-content-pbp
+  LABELS libretro portable TIMEOUT 60)
+set_tests_properties(libretro.content.pbp PROPERTIES
+  FIXTURES_REQUIRED "disc_pbp_preflight;compat_features_preflight")
+
 # Fault prevented: libretro hides SAVE_RAM, writes the frontend-owned first
 # card, or fails to load and persist the independent second card.
 schway_add_test(NAME libretro.cards.persistence

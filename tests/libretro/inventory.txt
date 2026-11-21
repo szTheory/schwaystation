@@ -4,6 +4,7 @@ libretro.cards.persistence	libretro,portable
 libretro.content.chd	libretro,portable
 libretro.content.lifecycle	libretro,portable
 libretro.content.no_bios	libretro,portable
+libretro.content.pbp	libretro,portable
 libretro.content.psexe	libretro,portable
 libretro.host	libretro,portable
 libretro.host.disc_audio	libretro,portable

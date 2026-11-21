@@ -237,6 +237,9 @@ static int lr_disc_path_supported(const char *path)
             (extension[3] == 'o' || extension[3] == 'O')) ||
            (length == 4u && (extension[1] == 'm' || extension[1] == 'M') &&
             (extension[2] == '3') && (extension[3] == 'u' || extension[3] == 'U'))
+           || (length == 4u && (extension[1] == 'p' || extension[1] == 'P') &&
+               (extension[2] == 'b' || extension[2] == 'B') &&
+               (extension[3] == 'p' || extension[3] == 'P'))
 #if SCHWAYSTATION_CHD
            || (length == 4u && (extension[1] == 'c' || extension[1] == 'C') &&
                (extension[2] == 'h' || extension[2] == 'H') &&
@@ -1223,7 +1226,7 @@ unsigned retro_api_version(void)
 }
 
 /* L8886: PS-EXEs use a bounded fullpath host read. Disc images use the shared
-   cue/ISO/M3U provider; archives are not extracted. */
+   CUE/ISO/M3U/PBP provider; archives are not extracted. */
 void retro_get_system_info(struct retro_system_info *sys)
 {
     if (sys == NULL) {
@@ -1233,9 +1236,9 @@ void retro_get_system_info(struct retro_system_info *sys)
     sys->library_name = "schwaystation";
     sys->library_version = SCHWAYSTATION_LIBRETRO_VERSION;
 #if SCHWAYSTATION_CHD
-    sys->valid_extensions = "exe|psexe|cue|iso|m3u|chd";
+    sys->valid_extensions = "exe|psexe|cue|iso|m3u|pbp|chd";
 #else
-    sys->valid_extensions = "exe|psexe|cue|iso|m3u";
+    sys->valid_extensions = "exe|psexe|cue|iso|m3u|pbp";
 #endif
     sys->need_fullpath = true;
     sys->block_extract = true;
