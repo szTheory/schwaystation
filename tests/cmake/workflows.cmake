@@ -1,10 +1,4 @@
-# cmake -DMODE=timeouts|pins -DDIR=<workflows directory> or -DCASE=spu_registration -DROOT=<root> -P workflows.cmake
-# timeouts: every timeout-minutes line carries a comment naming the run it was
-#   measured from ("run" and nine or more digits) or the word provisional.
-#   Fault prevented: a job timeout guessed rather than measured.
-# pins: every uses: line names a local ./path, or owner/repo[/path] at a full
-#   40-hex commit followed by a "# v..." comment naming the release it is.
-#   Fault prevented: an action referenced by a tag that can be moved under a release.
+# cmake -DMODE=timeouts|pins -DDIR=<dir> or -DCASE=spu_registration -DROOT=<root>; guards guessed timeouts and moved action refs.
 cmake_minimum_required(VERSION 3.25)
 function(yaml_job_has file job)
   file(READ "${ROOT}/${file}" yaml)
@@ -35,6 +29,12 @@ if(CASE STREQUAL "spu_registration" OR CASE STREQUAL "disc_registration")
   yaml_job_has(.github/workflows/nightly.yml bench "needs: changes.*!cancelled.*github.event_name != 'pull_request'.*needs[.]changes[.]result != 'success'.*nightly_full")
   yaml_job_has(.github/workflows/nightly.yml bench-wasm32 "needs: changes.*!cancelled.*github.event_name != 'pull_request'.*needs[.]changes[.]result != 'success'.*nightly_full")
   yaml_job_has(.github/workflows/nightly.yml fuzz "needs: changes.*!cancelled.*github.event_name != 'pull_request'.*needs[.]changes[.]result != 'success'.*nightly_full == 'true' [|][|] needs[.]changes[.]outputs[.]pbp_only == 'true'" "name: Sanitizer and media-fixture dependencies.*packages=\\(libclang-rt-21-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev\\).*cmake --preset chd-tool.*cmake --build --preset chd-tool.*Build owned CHD and PBP baseline fixtures.*cmake --preset fuzz.*cmake --build build/fuzz --target schwaystation-disc-fixtures schwaystation-pbp-fixtures.*CHDFixtures[.]cmake" "Configure PBP-only sanitizer targets.*CHD=OFF.*schwaystation-fuzz-pbp schwaystation-fuzz-pbp-replay schwaystation-pbp-fixtures.*cmake --build --preset fuzz" "subsystems=\\(cue cnf m3u cdrom chd mdec pbp\\).*expected=\\(5 5 7 15 12 6 14\\).*max_lengths=\\(65536 4096 65536 16384 16384 262144 256\\)" "seed_output=.*test.*done.*if.*PBP_ONLY.*schwaystation-fuzz-exe -max_total_time=60")
+  file(READ "${ROOT}/cmake/DiscFixtures.cmake" media_rules)
+  string(REPLACE "\n" " " media_rules "${media_rules}")
+  string(REGEX MATCH "add_custom_command\\(OUTPUT[^)]*media[.]sha256[^)]*\\)" media_command "${media_rules}")
+  if(NOT media_command MATCHES "BYPRODUCTS .*cdda[.]wav.*movie[.]str.*xa[.]xa")
+    message(FATAL_ERROR "${CASE}: generated disc media lack declared byproducts")
+  endif()
   file(READ "${ROOT}/tests/retroarch/test.cfg.in" config)
   if(NOT config MATCHES "audio_driver = \\\"null\\\"" OR NOT config MATCHES "audio_enable = \\\"false\\\"")
     message(FATAL_ERROR "${CASE}: RetroArch tone smoke must remain video-only")

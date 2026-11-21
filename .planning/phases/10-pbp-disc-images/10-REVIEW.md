@@ -130,3 +130,14 @@ The assertion now treats `||` literally and requires the loader campaign after t
 `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` passed. A temporary negative fixture
 with the loader campaign moved inside the seed loop was rejected by the same command (expected exit 1). The
 3,901-line budget remains exactly at its cap. No implementation or workflow coverage was removed.
+
+## Generated-media graph review follow-up (2026-11-21)
+
+The Nightly failure showed the PBP fixture directly depends on `xa.xa` and `movie.str`, which the no-external-
+media generator produces alongside `media.sha256`. Those files were not declared as Ninja byproducts. The
+`DiscFixtures.cmake` command now declares `cdda.wav`, `movie.str`, and `xa.xa` as byproducts. Independent review
+also caught that the first static assertion searched the whole file and could accept byproducts attached to an
+unrelated command. The assertion now extracts the `add_custom_command` whose output is `media.sha256` and checks
+only that block. A temporary negative fixture attaching byproducts to another command was rejected, while the
+actual `disc_registration` check passed. The narrowed assertion was independently re-reviewed clean; no
+coverage was dropped, and the line budget remains 3,901/3,901.

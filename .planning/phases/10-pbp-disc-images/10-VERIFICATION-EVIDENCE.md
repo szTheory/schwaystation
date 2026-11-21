@@ -97,3 +97,28 @@ corrected without increasing the gate budget. The focused commands below were ru
 
 The hosted exact-head CI/Nightly and release-pipeline runs remain the ship gates; the preceding failed runs are
 linked above and do not count as passing evidence.
+
+## Clean fixture-graph follow-up — 2026-11-21
+
+The exact-head Nightly run [44931682921](https://github.com/szTheory/schwaystation/actions/runs/44931682921)
+failed in the fuzz job because the generated media files used by the PBP source image were not declared as
+outputs to Ninja. The required CI run
+[44931682851](https://github.com/szTheory/schwaystation/actions/runs/44931682851) was cancelled after local
+reproduction and repair; all six native platform builds, WASI, and the other listed completed gates passed, but
+the aggregate required check did not.
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `env -u SCHWAYSTATION_DISC_MEDIA_DIR cmake -S . -B /private/tmp/schwaystation-pbp-graph -G Ninja -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_BUILD_TYPE=Release -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=OFF -DSCHWAYSTATION_CHD_TOOL_EXECUTABLE=build/chd-tool/tools/schwaystation-chd-tool -DSCHWAYSTATION_BUILD_TESTS=ON -DSCHWAYSTATION_BUILD_RUNNER=ON -DSCHWAYSTATION_BUILD_LIBRETRO=ON -DSCHWAYSTATION_FIXTURES=ON` | 0 | Fresh no-external-media CMake graph configured |
+| `ninja -C /private/tmp/schwaystation-pbp-graph -t query fixtures/media/cdda.wav` | 0 | `cdda.wav` has a `CUSTOM_COMMAND` producer |
+| `ninja -C /private/tmp/schwaystation-pbp-graph -t query fixtures/media/xa.xa` | 0 | `xa.xa` has a `CUSTOM_COMMAND` producer |
+| `ninja -C /private/tmp/schwaystation-pbp-graph -t query fixtures/media/movie.str` | 0 | `movie.str` has the same declared media producer |
+| `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` | 0 | Nightly ordering and media-output closure pass |
+| Repository line-budget command (above) | 0 | 3,901/3,901 lines |
+| Temporary Python negative-control harness; moves media BYPRODUCTS to an unrelated command, then runs the workflow check | 0 outer / 1 expected inner | The guard rejects declarations not attached to the `media.sha256` producer |
+
+The build graph check ran with the media directory unset and did not build the encoder or start fuzz campaigns.
+The CMake workflow guard now requires the byproducts in the same command block as `media.sha256`; independent
+review found this binding necessary and re-reviewed the correction clean. A temporary negative control that
+moved the declarations to another command was rejected. The runs above remain failed/cancelled and are not ship
+approval.

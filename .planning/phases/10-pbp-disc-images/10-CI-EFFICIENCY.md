@@ -81,3 +81,30 @@ The failures were caused by integration and fixture-wiring gaps, not excessive r
 known-failing CI tail was cancelled after the local fix passed; Nightly had already completed. No coverage was
 removed. The seed preflight now runs before the expensive campaign loop. Run the next repaired PR head once,
 inspect it live and after completion, and record the release-pipeline result before merge.
+
+## Third repaired-head attempt — 2026-11-21
+
+PR CI [44931682851](https://github.com/szTheory/schwaystation/actions/runs/44931682851) and Nightly
+[44931682921](https://github.com/szTheory/schwaystation/actions/runs/44931682921) ran on `f6b756e`. Nightly's
+route, vectors, and four benchmark jobs passed. Its fuzz job failed 61 seconds after start while building the
+PBP source fixture: Ninja had no rule for `fixtures/media/xa.xa`, which the PBP fixture directly depends on.
+The `DiscFixtures.cmake` media command generated that file but declared only `media.sha256` as an output.
+No replay seeds or timed campaigns ran.
+
+The CI workflow reached the RetroArch and rehearsal jobs without an observed failure; hygiene, route, title,
+GPU reference, OpenBIOS, nofp, perf, WASI, and all six native platform builds had passed. BE32 and ASan had each
+run 645 seconds when their tails were cancelled, followed by cancellation of the dependent hash-equality,
+RetroArch and rehearsal jobs. CI ended `cancelled`, so its aggregate required job was not a passing result.
+
+Nightly used 377 summed runner-seconds (6.28 runner-minutes) over 1m51s wall time. CI used 4,500 summed
+runner-seconds (75 runner-minutes) over 11m41s wall time. These are job elapsed-time sums, not billed dollars;
+no Actions cost data was available. The longest completed CI lane was 568 seconds, while BE32 and ASan each
+consumed 645 seconds before cancellation. This is not a completed CI critical-path sample.
+
+The fix declares `cdda.wav`, `movie.str`, and `xa.xa` as byproducts of the media-generation command. A fresh
+local configure with `SCHWAYSTATION_DISC_MEDIA_DIR` unset succeeded, and Ninja reports the missing media files
+as outputs of the generator. A permanent static workflow check guards that output closure at the unchanged
+3,901-line cap. This cheap local graph check reproduced the clean-host failure without starting the encoder,
+sanitizer build, or any fuzz campaign; the now-obsolete CI tail was cancelled after it passed. Independent
+review of this CMake change is clean. Run the next exact head once and inspect its live/final critical path and
+runner time.

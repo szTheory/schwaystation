@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: Ship follow-up 3
+current_plan: Ship follow-up 4
 status: shipping
-stopped_at: Phase 10 review finding fixed and locally verified, awaiting exact-head hosted CI/Nightly and release
-last_updated: "2026-11-21T17:42:31Z"
+stopped_at: Phase 10 media-output graph fix and scoped guard reviewed and locally verified, awaiting exact-head CI/Nightly and release
+last_updated: "2026-11-21T18:03:26Z"
 last_activity: 2026-11-21
-last_activity_desc: "Strengthened Nightly seed-order guard and validated its negative control; exact-head rerun pending"
-state_head: 0cbf4fa1c9e56893cc34ea448e88388b88fae549
+last_activity_desc: "Fixed generated media output graph; scoped guard and clean graph pass independent review"
+state_head: f6b756ec2d39904e66dd87b416c5079d42a9e094
 progress:
   total_phases: 10
   completed_phases: 4
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 — PBP disc images
-Current Plan: Ship follow-up
+Current Plan: Ship follow-up 4
 Total Plans in Phase: 13
 Status: Awaiting repaired-head hosted CI/Nightly and release
 Last activity: 2026-11-21 -- PR #34 first attempt diagnosed and repaired locally
@@ -103,6 +103,24 @@ passes, and a temporary inside-the-loop campaign fixture fails as expected. The 
 actionlint and diff checks pass. The earlier CI/Nightly failures remain diagnosed and linked above. Commit this
 reviewed fix, run one consolidated exact-head CI/Nightly attempt, inspect its timing/cost while active and after
 completion, then release before Phase 11.
+
+### Phase 10 generated-media graph follow-up (2026-11-21)
+
+Runtime/model: Codex GPT-6 session; independent `gsd-code-reviewer` `gpt-6-luna` xhigh. From the 17:42Z checkpoint
+through the 18:02Z preflight was about 20 minutes wall; active time was not measured. Exact-head Nightly
+44931682921 failed after 61 seconds in the fuzz fixture build: the PBP source image named `xa.xa` and `movie.str`
+as inputs, but the media-generation rule declared only `media.sha256`. A fresh local CMake configure with
+`SCHWAYSTATION_DISC_MEDIA_DIR` unset reproduced the clean-host build graph. The fix declares all three generated
+media files as byproducts. Ninja now finds the producer for each file; the route check and a negative misplaced-
+byproduct fixture pass, and the gate remains 3,901/3,901 lines.
+
+The paired CI 44931682851 had all six native builds and WASI pass, plus the listed quick gates; it was cancelled
+after the Nightly failure while BE32/ASan and dependent checks were still running. The partial CI run used 75
+runner-minutes; Nightly used 6.28. These are elapsed job sums, not billed dollars. Review found the first version
+of the new static guard could associate byproducts with an unrelated command; it now extracts only the command
+whose output is `media.sha256`, and a negative control rejects declarations attached elsewhere. Independent
+re-review of this narrowed guard was clean. Commit the fix, run one exact-head CI/Nightly pair, and inspect the
+live and final timing before release and Phase 11.
 
 ### Phase 10 discussion (2026-11-21)
 

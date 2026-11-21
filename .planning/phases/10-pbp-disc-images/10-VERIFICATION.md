@@ -221,6 +221,20 @@ temporary malformed workflow with the loader campaign moved into the loop failed
 The repository-check budget remains 3,901/3,901. This closes the local review/verification delta, but the
 repaired source and workflow still need one exact-head hosted CI/Nightly run and the release-pipeline checks.
 
+## Generated-media graph guard — 2026-11-21T18:03Z
+
+Nightly [44931682921](https://github.com/szTheory/schwaystation/actions/runs/44931682921) failed in its fuzz
+fixture build because CMake generated `xa.xa` and `movie.str` but exposed only the manifest as an output to
+Ninja. The paired CI run [44931682851](https://github.com/szTheory/schwaystation/actions/runs/44931682851) was
+cancelled after local reproduction while BE32, ASan, RetroArch, and rehearsal work was still running. The CMake
+media rule now declares all three generated files as byproducts.
+
+The no-external-media configure command and three Ninja producer queries passed. The workflow regression check
+passed after review; it scopes byproduct matching to the command that emits `media.sha256`. A negative fixture
+with the files declared on another command is rejected. The code-review report records the clean re-review.
+The local media graph now has a producer for every dependency, with no encoding or sanitizer campaign run. The
+exact-head CI/Nightly and release-pipeline checks remain required.
+
 ---
 *Verified: 2026-11-21T16:50:05Z*
 *Verifier: the agent (gsd-verifier)*

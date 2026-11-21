@@ -96,6 +96,10 @@ else()
     COMMENT "Build pinned psxavenc"
     VERBATIM)
   add_custom_command(OUTPUT "${schway__disc_media_dir}/media.sha256"
+    BYPRODUCTS
+      "${schway__disc_media_dir}/cdda.wav"
+      "${schway__disc_media_dir}/movie.str"
+      "${schway__disc_media_dir}/xa.xa"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${schway__disc_media_dir}"
     COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/gen_disc.py"
       --output-dir "${schway__disc_media_dir}" --encoder "${schway__psxavenc}"

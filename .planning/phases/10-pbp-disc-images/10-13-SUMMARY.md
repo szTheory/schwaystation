@@ -166,3 +166,12 @@ too weak: a literal `||` was parsed as regex alternation, and the loader check w
 The assertion now treats `||` literally and places the loader requirement after loop closure; the real workflow
 passes and a temporary inside-the-loop campaign regression is rejected. Both hosted attempts remain
 failed/cancelled evidence, not ship approval; rerun the complete required CI and Nightly on the next head.
+
+## Third ship-fix follow-up (2026-11-21)
+
+The next exact-head Nightly run failed before fuzz campaigns because Ninja had no rule for media outputs used by
+the PBP fixture. `DiscFixtures.cmake` now declares `cdda.wav`, `movie.str`, and `xa.xa` as byproducts of the
+`media.sha256` generator. A fresh local configure with no external media directory and direct Ninja producer
+queries passed. Independent review found and we fixed a false-positive path in the static guard; it now checks
+byproducts only in the `media.sha256` command block, and a temporary misplaced-output fixture is rejected. The
+guard stays within the 3,901-line cap. Exact-head CI and Nightly still need to pass before ship.
