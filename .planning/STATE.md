@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 12
+current_plan: 13
 status: executing
-stopped_at: Completed 10-10-PLAN.md; Plan 10-12 is next
-last_updated: "2026-11-21T14:31:41Z"
+stopped_at: Completed 10-12-PLAN.md; Plan 10-13 is next
+last_updated: "2026-11-21T15:15:19Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-10 complete; Plan 10-12 next
-state_head: 32b4104
+last_activity_desc: Phase 10 Plan 10-12 complete; Plan 10-13 next
+state_head: 7a846f8
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 46
+completed_plans: 47
   percent: 30
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 (PBP disc images) — EXECUTING
-Current Plan: 12
+Current Plan: 13
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-10 complete; Plan 10-12 is next
+Last activity: 2026-11-21 — Plan 10-12 complete; Plan 10-13 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -820,6 +820,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 10 P08 | 24m | 2 tasks | 8 files |
 | Phase 10 P09 | 25m | 2 tasks | 7 files |
 | Phase 10 P10 | 19m | 2 tasks | 1 files |
+| Phase 10 P12 | 41m | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -1222,6 +1223,8 @@ Recent decisions affecting current work:
 - [Phase 10]: Keep the supported PBP claim limited to unencrypted single-data-track PSISO images and preserve CHD license derivation from the linked closure.
 - [Phase 10]: Used the ci-release preset for release-labeled package tests; all existing archive and notice cases remained enabled.
 - [Phase 10]: Rebuilt configuration-sensitive host/card helpers after toggling CHD in the reused build tree so tests matched the configured provider.
+- [Phase 10]: The compatibility pass covers only the exercised 64-sector PBP layout; audio, untested track/profile variants and hosted verification remain explicitly unclaimed.
+- [Phase 10]: PBP guest evidence uses a distinct one-data-track NTSC-U guest source and omits the CUE/CHD-only CDDA path; original two-track predicates remain unchanged.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1468,8 +1471,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T14:29:40.034Z
-Stopped at: Completed 10-10-PLAN.md; Plan 10-12 is next
+Last session: 2026-11-21T15:14:42.231Z
+Stopped at: Completed 10-12-PLAN.md
 Resume file: None
 
 ### v1.0 session history
