@@ -88,7 +88,10 @@ status: complete
 
 ## Commands and Results
 
-- `LC_ALL=C sort -cu tests/libretro/inventory.txt` — exit 0.
+- The sorted libretro inventory check — exit 0:
+  ```sh
+  LC_ALL=C sort -cu tests/libretro/inventory.txt
+  ```
 - `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` — exit 0; 3,900/3,901 lines.
 - `git diff --check` and `git diff ea941f6..HEAD --check` — exit 0.
 - `ctest --preset ci --no-tests=error -R '^disc[.]image[.]pbp_preflight$' --output-on-failure` — exit 0; fixture digest, size and source parity preflight passed in 0.02s.
