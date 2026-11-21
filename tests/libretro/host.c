@@ -2385,6 +2385,32 @@ static uint32_t disc_gettd_for_path(const char *path)
     return result;
 }
 
+static int disc_copy_canonical_path(const char *path, char *canonical, size_t capacity)
+{
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    const char *image_path;
+    size_t length;
+    int valid = 0;
+
+    if (path == NULL || canonical == NULL || capacity == 0u) return 0;
+    memset(&error, 0, sizeof error);
+    error.size = (uint32_t)sizeof error;
+    if (schway_disc_image_open(path, &image, &error) != SCHWAY_DISC_IMAGE_OK || image == NULL) {
+        goto cleanup;
+    }
+    image_path = schway_disc_image_path(image, 0u);
+    if (image_path == NULL) goto cleanup;
+    length = strlen(image_path);
+    if (length >= capacity) goto cleanup;
+    memcpy(canonical, image_path, length + 1u);
+    valid = 1;
+
+cleanup:
+    schway_disc_image_close(image);
+    return valid;
+}
+
 static uint32_t guest_mailbox_record(const unsigned char *ram, unsigned id)
 {
     const unsigned char *mailbox = ram + 0x10000u;
@@ -2431,11 +2457,16 @@ static int test_content_chd(const char *chd_path, const char *cue_path,
     unsigned char *active_system_ram = NULL;
     const void *active_card = NULL;
     char active_path[4096];
+    char expected_content_path[4096];
     char saved_card2_path[4096];
     unsigned save_calls_before = save_directory_calls;
     unsigned frames;
     uint32_t expected_toc;
     const char *content_path = chd_enabled ? chd_path : cue_path;
+
+    expected_content_path[0] = '\0';
+    CHECK(disc_copy_canonical_path(content_path, expected_content_path,
+                                   sizeof expected_content_path));
 
     memset(&sys, 0, sizeof sys);
     p_get_system_info(&sys);
@@ -2461,7 +2492,7 @@ static int test_content_chd(const char *chd_path, const char *cue_path,
     CHECK_EQ_U64(disk_control.get_image_index(), 0u);
     memset(active_path, 0, sizeof active_path);
     CHECK(disk_control.get_image_path(0u, active_path, sizeof active_path));
-    CHECK(strcmp(active_path, content_path) == 0);
+    CHECK(strcmp(active_path, expected_content_path) == 0);
     frames = run_disc_to_mailbox(expected_toc);
     CHECK(frames != 0u);
     system_ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
@@ -2502,7 +2533,7 @@ static int test_content_chd(const char *chd_path, const char *cue_path,
     CHECK_EQ_U64(disk_control.get_image_index(), 0u);
     memset(active_path, 0, sizeof active_path);
     CHECK(disk_control.get_image_path(0u, active_path, sizeof active_path));
-    CHECK(strcmp(active_path, content_path) == 0);
+    CHECK(strcmp(active_path, expected_content_path) == 0);
     card2_path = p_test_card2_path();
     CHECK(card2_path != NULL);
     if (card2_path != NULL && saved_card2_path[0] != '\0') {
@@ -2561,8 +2592,6 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
                              const char *bios_directory, const char *card_directory)
 {
     struct retro_game_info game;
-    schway_disc_image *second_image = NULL;
-    schway_disc_image_error image_error;
     char expected_first[4096];
     char expected_second[4096];
     char playlist_card1[4096], playlist_card2[4096], member_card2[4096];
@@ -2571,8 +2600,6 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
     unsigned char card_seed[SCHWAY_MEMCARD_SIZE];
     unsigned char *ram;
     uint32_t expected_first_toc, expected_second_toc;
-    size_t path_length;
-    const char *canonical_first;
     unsigned save_calls_before = save_directory_calls;
 
     CHECK(disk_control_set_calls != 0u);
@@ -2590,45 +2617,9 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
         return 1;
     }
 
-    memset(&image_error, 0, sizeof image_error);
-    image_error.size = (uint32_t)sizeof image_error;
-    CHECK_EQ_U64(schway_disc_image_open(playlist_path, &second_image, &image_error),
-                 SCHWAY_DISC_IMAGE_OK);
-    CHECK(second_image != NULL);
-    if (second_image == NULL) {
-        return 1;
-    }
-    canonical_first = schway_disc_image_path(second_image, 0u);
-    CHECK(canonical_first != NULL);
-    path_length = canonical_first != NULL ? strlen(canonical_first) : 0u;
-    CHECK(path_length < sizeof expected_first);
-    if (canonical_first == NULL || path_length >= sizeof expected_first) {
-        schway_disc_image_close(second_image);
-        return 1;
-    }
-    memcpy(expected_first, canonical_first, path_length + 1u);
-    schway_disc_image_close(second_image);
-    second_image = NULL;
-
-    memset(&image_error, 0, sizeof image_error);
-    image_error.size = (uint32_t)sizeof image_error;
-    CHECK_EQ_U64(schway_disc_image_open(second_path, &second_image, &image_error),
-                 SCHWAY_DISC_IMAGE_OK);
-    CHECK(second_image != NULL);
-    if (second_image == NULL) {
-        return 1;
-    }
-    const char *canonical_second = schway_disc_image_path(second_image, 0u);
-    CHECK(canonical_second != NULL);
-    path_length = canonical_second != NULL ? strlen(canonical_second) : 0u;
-    CHECK(path_length < sizeof expected_second);
-    if (canonical_second == NULL || path_length >= sizeof expected_second) {
-        schway_disc_image_close(second_image);
-        return 1;
-    }
-    memcpy(expected_second, canonical_second, path_length + 1u);
-    schway_disc_image_close(second_image);
-    second_image = NULL;
+    CHECK(disc_copy_canonical_path(playlist_path, expected_first, sizeof expected_first));
+    CHECK(disc_copy_canonical_path(second_path, expected_second, sizeof expected_second));
+    if (check_failures != 0) return 1;
     expected_first_toc = disc_gettd_for_path(playlist_path);
     expected_second_toc = disc_gettd_for_path(second_path);
     CHECK(expected_first_toc != 0u);
@@ -2706,7 +2697,6 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
     CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 2u * 1024u * 1024u);
     if (ram == NULL) {
         p_unload_game();
-        schway_disc_image_close(second_image);
         return 1;
     }
     unsigned frame_index = 0u;
@@ -2721,7 +2711,6 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
     CHECK(frame_index < 1200u);
     if (frame_index >= 1200u || ram == NULL) {
         p_unload_game();
-        schway_disc_image_close(second_image);
         return 1;
     }
     CHECK_EQ_HEX(guest_mailbox_record(ram, 2u), UINT32_C(0x00020102));
