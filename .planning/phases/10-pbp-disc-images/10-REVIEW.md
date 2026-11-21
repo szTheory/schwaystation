@@ -149,3 +149,13 @@ A standard review of `cmake/PBPFixtures.cmake`, `tools/gen_pbp.py`, `tests/disc/
 mkpsxiso exits and depends on the normalizer script; the existing PBP preflight receives and checks the
 generated source CUE's exact bytes, so missing or CRLF output fails before downstream PBP checks. The
 normalizer converts CRLF only and fails on bare carriage returns.
+
+## Deterministic PBP encoder follow-up (2026-11-21T20:35:08Z)
+
+Standard-depth review of `tools/gen_pbp.py` found no blockers or warnings. The encoder emits a final fixed-Huffman
+DEFLATE block, emits literal symbols for non-runs, and uses distance-one matches only when the preceding byte
+and at least two following bytes are identical. The length code and extra-bit tables cover the valid 3–258
+range; the producer retains its independent decompression/equality check and existing output-size cap. No
+source-backed necessity finding was identified. Tests were not rerun as part of this review.
+
+Reviewed file: `tools/gen_pbp.py`.

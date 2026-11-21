@@ -108,3 +108,26 @@ as outputs of the generator. A permanent static workflow check guards that outpu
 sanitizer build, or any fuzz campaign; the now-obsolete CI tail was cancelled after it passed. Independent
 review of this CMake change is clean. Run the next exact head once and inspect its live/final critical path and
 runner time.
+
+## Fourth repaired-head attempt — 2026-11-21
+
+PR CI [44940420226](https://github.com/szTheory/schwaystation/actions/runs/44940420226) and Nightly
+[44940420161](https://github.com/szTheory/schwaystation/actions/runs/44940420161) ran on `8224693`. Nightly
+passed its full route. CI passed every job except the final `hash-equality` check: Windows x64's generated
+`schwaystation-disc_boot.pbp` digest differed, while the other seven platform digests matched. The source CUE
+digest matched across platforms, and all other 112 hash records matched. The comparator failed six seconds
+after the BE32 lane completed; no required platform lane or test case was skipped.
+
+CI used 8,481 summed runner-seconds (141.35 runner-minutes) across 22 jobs and 63m32s wall time. BE32 took
+3,744 seconds (62m24s) and was the critical path. Nightly used 860 summed runner-seconds (14.33 runner-minutes)
+across eight jobs and 10m20s wall time; its fuzz job took 607 seconds, vector job 55 seconds, and four benchmark
+jobs 191 seconds combined. These are elapsed runner-time sums, not billed-dollar estimates; Actions exposed no
+dollar cost. The full routes and required gates behaved as configured. No safe reduction in coverage, campaigns
+or platform legs is supported by these measurements, and moving BE32 behind other lanes would only delay a
+successful path without avoiding work on this failure.
+
+The remaining mismatch was isolated to host-zlib output in the PBP fixture generator. A deterministic fixed-
+Huffman encoder now preserves the compressed PBP path while keeping the existing raw-block control. Its
+generated 64-sector fixture remains below the 1,572,864-byte cap, and the local provider, guest, runner,
+libretro and fuzz replay selectors pass. The next exact-head CI/Nightly run is needed to establish cross-platform
+hash parity; no quality bound or required CI coverage changed.

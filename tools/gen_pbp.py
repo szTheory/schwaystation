@@ -19,10 +19,75 @@ INDEX_OFFSET = PSAR_OFFSET + 0x4000
 MAX_PBP_BYTES = 1572864
 MAX_SOURCE_BYTES = 524288
 INDEX_ENTRIES = 80
+DEFLATE_LENGTH_BASES = (
+    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35,
+    43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258,
+)
+DEFLATE_LENGTH_EXTRA_BITS = (
+    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3,
+    3, 4, 4, 4, 4, 5, 5, 5, 5, 0,
+)
 
 
 def sha256(data):
     return hashlib.sha256(data).hexdigest()
+
+
+class DeflateBitWriter:
+    """Write DEFLATE bits least-significant bit first."""
+
+    def __init__(self):
+        self.output = bytearray()
+        self.bits = 0
+        self.bit_count = 0
+
+    def write(self, value, count):
+        self.bits |= value << self.bit_count
+        self.bit_count += count
+        while self.bit_count >= 8:
+            self.output.append(self.bits & 0xFF)
+            self.bits >>= 8
+            self.bit_count -= 8
+
+    def finish(self):
+        if self.bit_count:
+            self.output.append(self.bits & 0xFF)
+        return bytes(self.output)
+
+
+def reverse_bits(value, count):
+    reversed_value = 0
+    for _ in range(count):
+        reversed_value = (reversed_value << 1) | (value & 1)
+        value >>= 1
+    return reversed_value
+
+
+def write_fixed_symbol(writer, symbol):
+    if symbol <= 143:
+        code, bit_count = 0x30 + symbol, 8
+    elif symbol <= 255:
+        code, bit_count = 0x190 + symbol - 144, 9
+    elif symbol <= 279:
+        code, bit_count = symbol - 256, 7
+    else:
+        code, bit_count = 0xC0 + symbol - 280, 8
+    writer.write(reverse_bits(code, bit_count), bit_count)
+
+
+def write_repeated_byte_match(writer, length):
+    length_code = max(index for index, base in enumerate(DEFLATE_LENGTH_BASES)
+                      if base <= length)
+    extra_bits = DEFLATE_LENGTH_EXTRA_BITS[length_code]
+    extra_value = length - DEFLATE_LENGTH_BASES[length_code]
+    if extra_bits == 0 and extra_value != 0:
+        raise ValueError("invalid fixed-DEFLATE run length")
+    if extra_bits and extra_value >= (1 << extra_bits):
+        raise ValueError("invalid fixed-DEFLATE run length")
+    write_fixed_symbol(writer, 257 + length_code)
+    if extra_bits:
+        writer.write(extra_value, extra_bits)
+    writer.write(0, 5)  # Fixed distance code zero means distance one.
 
 
 def bcd(value):
@@ -32,14 +97,24 @@ def bcd(value):
 
 
 def raw_deflate(data):
-    compressor = zlib.compressobj(
-        level=9,
-        method=zlib.DEFLATED,
-        wbits=-15,
-        memLevel=9,
-        strategy=zlib.Z_FIXED,
-    )
-    encoded = compressor.compress(data) + compressor.flush(zlib.Z_FINISH)
+    writer = DeflateBitWriter()
+    writer.write(1, 1)  # Final block.
+    writer.write(1, 2)  # Fixed Huffman codes.
+    offset = 0
+    while offset < len(data):
+        run_length = 1
+        while (run_length < 258 and offset + run_length < len(data) and
+               data[offset + run_length] == data[offset]):
+            run_length += 1
+        if (offset > 0 and data[offset] == data[offset - 1] and
+                run_length >= 3):
+            write_repeated_byte_match(writer, run_length)
+            offset += run_length
+        else:
+            write_fixed_symbol(writer, data[offset])
+            offset += 1
+    write_fixed_symbol(writer, 256)
+    encoded = writer.finish()
     decoder = zlib.decompressobj(wbits=-15)
     decoded = decoder.decompress(encoded) + decoder.flush()
     if (decoded != data or not decoder.eof or decoder.unused_data or

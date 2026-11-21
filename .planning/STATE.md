@@ -6,11 +6,11 @@ current_phase: 10
 current_phase_name: PBP disc images
 current_plan: Ship follow-up 4
 status: shipping
-stopped_at: Phase 10 media-output graph fix and scoped guard reviewed and locally verified, awaiting exact-head CI/Nightly and release
-last_updated: "2026-11-21T18:03:26Z"
+stopped_at: Phase 10 deterministic PBP fixture correction reviewed and locally verified, awaiting repaired-head CI/Nightly and release
+last_updated: "2026-11-21T20:36:14Z"
 last_activity: 2026-11-21
-last_activity_desc: "Fixed generated media output graph; scoped guard and clean graph pass independent review"
-state_head: f6b756ec2d39904e66dd87b416c5079d42a9e094
+last_activity_desc: "Replaced host-zlib PBP encoding after exact-head hash mismatch; local PBP paths pass"
+state_head: 8224693353ead38ae747ec2640f844b2c3f32cc3
 progress:
   total_phases: 10
   completed_phases: 4
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 10 — PBP disc images; local corrections are verified, hosted ship gates remain
+**Current focus:** Phase 10 — PBP disc images; deterministic fixture correction is locally verified, hosted ship gates remain
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Phase: 10 — PBP disc images
 Current Plan: Ship follow-up 4
 Total Plans in Phase: 13
 Status: Awaiting repaired-head hosted CI/Nightly and release
-Last activity: 2026-11-21 -- PR #34 first attempt diagnosed and repaired locally
+Last activity: 2026-11-21 -- PR #34 hash mismatch diagnosed and PBP encoder corrected locally
 Progress: [████░░░░░░] 40% (3/10 phases released)
 
 ### Phase 10 verification (2026-11-21)
@@ -121,6 +121,27 @@ of the new static guard could associate byproducts with an unrelated command; it
 whose output is `media.sha256`, and a negative control rejects declarations attached elsewhere. Independent
 re-review of this narrowed guard was clean. Commit the fix, run one exact-head CI/Nightly pair, and inspect the
 live and final timing before release and Phase 11.
+
+### Phase 10 cross-platform PBP hash follow-up (2026-11-21)
+
+Runtime/model: Codex GPT-6 session (exact primary model ID not exposed); independent `gsd-code-reviewer`
+`gpt-6-luna` xhigh. The exact-head [CI run 44940420226](https://github.com/szTheory/schwaystation/actions/runs/44940420226)
+failed only at hash equality: Windows x64's generated PBP differed from the other seven platform outputs, while
+the normalized CUE and all other 112 records matched. The paired [Nightly run 44940420161](https://github.com/szTheory/schwaystation/actions/runs/44940420161)
+passed its full route. CI used 8,481 summed runner-seconds over 63m32s, with BE32 at 3,744s; Nightly used 860
+runner-seconds over 10m20s. The CI efficiency artifact records that no coverage reduction is supported.
+
+The fixture generator now emits fixed-Huffman raw DEFLATE using deterministic distance-one byte runs instead of
+host zlib compression, retaining zlib only as an independent decoder check. Its 64-sector output is 1,132,683
+bytes under the 1,572,864-byte cap; all four PBP blocks remain compressed. `python3 -m py_compile tools/gen_pbp.py`
+and the synthetic 1,000 run-length/decode checks passed. `cmake --build --preset ci --target
+schwaystation-test-disc-pbp schwaystation-pbp-fixtures` passed. The ten `disc.image.pbp` provider tests passed,
+and the nine guest/fuzz selector tests passed, including PBP boot/read/FMV and fuzz replay. The separate runner
+and libretro PBP integration tests passed as well. The line-budget, inventory sort, workflow closure and diff
+preflights passed at 3,901/3,901.
+Independent standard review found no blockers or warnings. No workflow changed, so Act was not repeated; local
+tests covered the generator and consumers, while only hosted platforms can establish cross-platform hash parity.
+The repaired-head CI/Nightly pair and Phase 10 release remain pending; Phase 11 has not started.
 
 ### Phase 10 discussion (2026-11-21)
 
