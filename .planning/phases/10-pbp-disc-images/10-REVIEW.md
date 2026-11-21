@@ -95,6 +95,15 @@ The PBP provider, inflater integration, shared image routing, runner/libretro co
 - `act workflow_dispatch --dryrun -W .github/workflows/nightly.yml -j fuzz -P ubuntu-26.04=ubuntu:latest --action-cache-path /private/tmp/schwaystation-act-cache` — exit 0; the Nightly fuzz job and its dependency/preflight steps parse and route. The PBP-only pull-request classification is separately covered by the existing classifier controls and this plan's static wiring check.
 - Local actionlint passes after ignoring its stale runner-label catalog for the existing `ubuntu-26.04` labels; no workflow syntax errors remain.
 
+## Follow-up test review (2026-11-21)
+
+The first full local workflow exposed a stale compatibility assertion: the malformed sentinel `.pbp` was expected
+to be classified as unsupported even though Phase 10 adds PBP parsing. The assertion now requires the existing
+generic `PBP metadata is invalid` diagnostic while continuing to require empty stdout and no private-path leak.
+An independent focused review found no actionable issue; `compat.probe.malformed` passed with its compatibility
+preflight. The corrected final full local workflow also passed. This was a test expectation correction; no PBP
+production code or acceptance bound changed.
+
 ---
 
 _Reviewed: 2026-11-21T15:29:09Z_  

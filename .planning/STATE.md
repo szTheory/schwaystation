@@ -5,17 +5,17 @@ milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
 current_plan: 13
-status: executing
-stopped_at: Completed 10-12-PLAN.md; Plan 10-13 is next
-last_updated: "2026-11-21T15:15:19Z"
+status: ready_for_verification
+stopped_at: Completed 10-13-PLAN.md; final local workflow passed; Phase 10 verification/ship next
+last_updated: "2026-11-21T15:55:49.987Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-12 complete; Plan 10-13 next
-state_head: 7a846f8
+last_activity_desc: Phase 10 Plan 10-13 complete; formal verification is next
+state_head: e9ce1686c59302885d21653159da005ef0c7d9bd
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 47
+  completed_plans: 48
   percent: 30
 ---
 
@@ -30,11 +30,27 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 ## Current Position
 
-Phase: 10 (PBP disc images) — EXECUTING
+Phase: 10 (PBP disc images) — READY FOR VERIFICATION
 Current Plan: 13
 Total Plans in Phase: 13
-Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-12 complete; Plan 10-13 is next
+Status: Ready for formal verification; hosted CI, Nightly and the linked WASI measurement are pending at ship.
+Last activity: 2026-11-21 — Plan 10-13 local closeout complete; formal verification is next
+Progress: [███░░░░░░░] 30% (3/10 phases released)
+
+### Phase 10 Plan 10-13 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna` xhigh; primary model ID unavailable. The wall
+interval from the prior saved state at 15:15:19Z through the closeout at 15:53:05Z was about 38 minutes; active
+time was not measured. The reviewed Phase 10 test correction passed its focused compatibility selector (2/2,
+0.07s). The final `cmake --workflow --preset ci` passed all 655 regular tests plus 7 release checks in 78s;
+its CTest critical path was 75.65s and the release checks took 1.35s. The local build was incremental.
+
+The initial full run exposed one stale compatibility expectation for PBP, corrected in `e9ce168` and independently
+reviewed before the passing rerun. Cheap inventories, workflow pin/timeout and wiring checks, and the 3,900/3,901
+line-budget preflight passed. The Nightly route dry-run passed. Prior Phase 9 measurements identify BE32/QEMU as
+the current hosted critical-path candidate, but no Phase 10 hosted run exists yet. The single exact-head CI and
+Nightly runs, hosted timing/cost evidence and actual linked WASI size are pending the ship PR; `quality.json`
+remains at its previous verified 859,379-byte bound. No standalone hosted dispatch was started.
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -821,6 +837,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 10 P09 | 25m | 2 tasks | 7 files |
 | Phase 10 P10 | 19m | 2 tasks | 1 files |
 | Phase 10 P12 | 41m | 2 tasks | 12 files |
+| Phase 10 P13 | 38 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -1225,6 +1242,9 @@ Recent decisions affecting current work:
 - [Phase 10]: Rebuilt configuration-sensitive host/card helpers after toggling CHD in the reused build tree so tests matched the configured provider.
 - [Phase 10]: The compatibility pass covers only the exercised 64-sector PBP layout; audio, untested track/profile variants and hosted verification remain explicitly unclaimed.
 - [Phase 10]: PBP guest evidence uses a distinct one-data-track NTSC-U guest source and omits the CUE/CHD-only CDDA path; original two-track predicates remain unchanged.
+- [Phase 10]: Keep the 3,901-line cap and defer the generic SPDX scanner.
+- [Phase 10]: Keep the WASI size bound unchanged until the Phase 10 hosted lane reports the actual linked module size.
+- [Phase 10]: Run exact-head CI and Nightly once at the ship PR to avoid duplicate hosted workloads.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1471,8 +1491,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T15:14:42.231Z
-Stopped at: Completed 10-12-PLAN.md
+Last session: 2026-11-21T15:54:44.176Z
+Stopped at: Completed 10-13-PLAN.md; final local workflow passed; Phase 10 verification/ship next
 Resume file: None
 
 ### v1.0 session history
