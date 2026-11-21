@@ -600,8 +600,8 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "probe_malformed")
   execute_process(COMMAND ${EMULATOR} "${RUN}" --probe "${unsupported}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
   if(rc STREQUAL "0" OR NOT "${out}" STREQUAL "" OR
-     NOT err MATCHES "unsupported: PBP" OR err MATCHES "PRIVATE_SENTINEL")
-    message(FATAL_ERROR "unsupported media was accepted or exposed private input: ${rc}: ${out}${err}")
+     NOT err MATCHES "PBP metadata is invalid" OR err MATCHES "PRIVATE_SENTINEL")
+    message(FATAL_ERROR "malformed PBP was accepted or exposed private input: ${rc}: ${out}${err}")
   endif()
 
   set(root "${work}/PRIVATE_SENTINEL_ROOT_04_42")
