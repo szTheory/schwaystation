@@ -95,9 +95,12 @@ status: complete
 - Updated generated compatibility output and media-testing instructions to state the exact tested subset and preflight order. Other track layouts, profiles, encrypted/PGD, multidisc and audio behavior remain unsupported or unknown.
 - Preserved all existing CUE/CHD two-track and CDDA records, hashes, guest bounds, and the 3,901-line repository-check ceiling (measured 3,900/3,901).
 
-## Verification Evidence
+## Commands and Evidence
 
-- `LC_ALL=C sort -cu tests/disc/inventory.txt` — exit 0.
+- Sorted disc inventory check — exit 0:
+  ```sh
+  LC_ALL=C sort -cu tests/disc/inventory.txt
+  ```
 - The PBP source-count sanity check confirmed exactly two ledger rows and one passing PBP row for the `guest.boot+read+fmv_first_frame` predicate — exit 0.
 - `cmake --preset ci -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=ON` — exit 0.
 - `cmake --build --preset ci --target schwaystation-test-disc-fixture schwaystation-test-disc-pbp schwaystation-pbp-fixtures` — exit 0.
@@ -105,9 +108,16 @@ status: complete
 - Original CUE/CHD bounded boot/read/audio/FMV selection — exit 0, 11/11; existing two-track and CDDA assertions remain unchanged.
 - `ctest --preset ci --no-tests=error -N -R '^compat[.]features[.]|^compat[.]ratchet[.](baseline|protected_controls|transitions)$|^policy[.](compat_doc_fresh|gate_budget)$'` — exit 0; all six affected compatibility/documentation selectors were registered. No CI-preset policy gate-budget selector exists; the dedicated hygiene preset owns that check.
 - `ctest --preset ci --no-tests=error -R '^compat[.]features[.]|^compat[.]ratchet[.](baseline|protected_controls|transitions)$|^policy[.]compat_doc_fresh$' --output-on-failure` — exit 0, 6/6 in 1.27 seconds.
-- `scripts/compat-doc.sh tests/compat/ledger.csv docs/compatibility.md --check` — exit 0.
+- Compatibility documentation freshness command — exit 0:
+  ```sh
+  scripts/compat-doc.sh tests/compat/ledger.csv docs/compatibility.md --check
+  ```
 - `ctest --preset hygiene --no-tests=error -R '^policy[.]gate_budget([.]self_test)?$' --output-on-failure` — exit 0, 2/2. Direct measurement: `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` — exit 0, 3,900/3,901.
-- `git diff --check origin/main...HEAD`, `git diff --check HEAD` and the post-commit status/deletion checks — exit 0; no generated or task-source untracked files remain. The plan summary is the only pending planning artifact.
+- Diff and post-commit status/deletion checks — exit 0; no generated or task-source untracked files remain. The plan summary was the only pending planning artifact:
+  ```sh
+  git diff --check origin/main...HEAD
+  git diff --check HEAD
+  ```
 - No hosted CI or `act` run applied in this plan because workflow routing did not change. Exact-head hosted verification and WASI module measurement remain in Plan 10-13.
 
 ## Task Commits
