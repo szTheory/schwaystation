@@ -82,6 +82,8 @@ status: complete
 1. **Task 1: Package and inspect the default CHD-OFF PBP deliverables** — `d54349b`.
 2. **Task 2: Confirm the same PBP behavior and separate symbols with CHD enabled** — `32b4104`.
 
+**Plan metadata:** `24d7a31` (docs: complete plan).
+
 ## Commands and Results
 
 The exact package identities, configure/build/test commands, notice digest, metadata claims, symbol findings and measured module sizes are in [10-PACKAGE-EVIDENCE.md](10-PACKAGE-EVIDENCE.md).
@@ -108,7 +110,7 @@ The exact package identities, configure/build/test commands, notice digest, meta
 - **Fix:** Used the existing `ci-release` preset and verified all four archive and notice cases.
 - **Files modified:** `.planning/phases/10-pbp-disc-images/10-PACKAGE-EVIDENCE.md`
 - **Verification:** `ci-release` archive and notice selector passed 4/4 for both configurations.
-- **Committed in:** `d54349b` and `32b4104` (recorded across the two evidence commits).
+- **Committed in:** `d54349b`.
 
 **2. [Rule 3 - Blocking] Rebuilt stale CHD-OFF host/card helpers**
 - **Found during:** Task 1 (CHD-OFF PBP host integration)
