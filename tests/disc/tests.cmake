@@ -71,6 +71,15 @@ schway_add_test(NAME disc.image.pbp_headers
 schway_add_test(NAME disc.image.pbp_inflate
   COMMAND schwaystation-test-disc-pbp --inflate
   LABELS disc portable TIMEOUT 15)
+schway_add_test(NAME disc.image.pbp_metadata
+  COMMAND schwaystation-test-disc-pbp --metadata
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+  LABELS disc portable TIMEOUT 15)
+schway_add_test(NAME disc.image.pbp_bounds
+  COMMAND schwaystation-test-disc-pbp --bounds
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_BINARY_DIR}/tests"
+  LABELS disc portable TIMEOUT 15)
 schway_add_test(NAME disc.image.pbp_preflight
   COMMAND schwaystation-test-disc-pbp --preflight
     "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
@@ -89,7 +98,8 @@ schway_add_test(NAME disc.image.pbp_fixture_controls
     "${PROJECT_SOURCE_DIR}/tools/gen_pbp.py"
   LABELS disc portable TIMEOUT 30)
 set_tests_properties(disc.image.pbp_preflight PROPERTIES FIXTURES_SETUP disc_pbp_preflight)
-set_tests_properties(disc.image.pbp_fixture_controls PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
+set_tests_properties(disc.image.pbp_fixture_controls disc.image.pbp_metadata
+  disc.image.pbp_bounds PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
 
 schway_add_test(NAME disc.image.chd_headers
   COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests

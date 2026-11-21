@@ -59,6 +59,25 @@ and decoded map storage is limited to 17 MiB. Header, map, metadata and hunk
 extents are checked before libchdr decodes the image. CHD parent-image
 references and CHD versions 1 and 2 are unsupported.
 
+## PBP metadata subset
+
+The host metadata validator recognizes the owned, single-disc PSISO fixture
+layout: one MODE2 data track with A0, A1, and A2 lead-in records, followed by
+track 1. The track record's absolute start is `00:02:00`; subtracting the
+150-frame lead-in maps it to the source CUE's INDEX 01 at LBA 0. A2 leadout is
+also absolute MSF and includes those 150 frames, so the public leadout is the
+decoded frame count. The index contains contiguous compressed byte extents;
+each entry represents 16 sectors and a decoded block is at most `0x9300`
+bytes. PBP files, logical media, counts, and every table/data extent are bounded
+before allocation.
+
+This phase validates and maps metadata only. It does not publish a playable
+disc handle until the sector reader validates the compressed streams. PGD,
+multi-disc markers, audio or additional tracks, other control/mode variants,
+unknown markers, and unknown TOC layouts return `UNSUPPORTED`; malformed
+fields, inconsistent leadout, and truncated or overlapping extents return
+`BAD_IMAGE`.
+
 ## Playlists
 
 An `.m3u` file is ASCII text containing up to 32 relative paths, one path per
