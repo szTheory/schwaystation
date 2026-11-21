@@ -28,6 +28,17 @@ struct schway__disc_pbp {
     uint8_t cache_valid;
 };
 
+static FILE *schway__disc_pbp_open_file(const char *path)
+{
+#if defined(_MSC_VER)
+    FILE *file = NULL;
+    if (fopen_s(&file, path, "rb") != 0) return NULL;
+    return file;
+#else
+    return fopen(path, "rb");
+#endif
+}
+
 static schway_disc_image_status schway__disc_pbp_error(
     schway_disc_image_error *error, schway_disc_image_status status,
     const char *message)
@@ -119,7 +130,7 @@ schway_disc_image_status schway__disc_pbp_open(const char *path,
         return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_BAD_ARGUMENT,
                                       "PBP path and output are required");
     }
-    file = fopen(path, "rb");
+    file = schway__disc_pbp_open_file(path);
     if (file == NULL) {
         return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_IO,
                                       "could not open PBP file");

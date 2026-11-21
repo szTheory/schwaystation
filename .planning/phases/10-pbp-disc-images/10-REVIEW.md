@@ -70,9 +70,9 @@ status: clean
 ---
 # Phase 10: Code Review Report
 
-**Reviewed:** 2026-11-21T15:29:09Z  
-**Depth:** standard  
-**Files Reviewed:** 56  
+**Reviewed:** 2026-11-21T15:29:09Z
+**Depth:** standard
+**Files Reviewed:** 56
 **Status:** clean after resolving one warning before final verification.
 
 ## Summary
@@ -83,8 +83,8 @@ The PBP provider, inflater integration, shared image routing, runner/libretro co
 
 ### WR-01: PBP-only Nightly omitted required fixture dependencies
 
-**Severity:** WARNING  
-**File:** `.github/workflows/nightly.yml:194-197`  
+**Severity:** WARNING
+**File:** `.github/workflows/nightly.yml:194-197`
 **Issue:** When `pbp_only` is true, the dependency step installs only `libclang-rt-21-dev`. The PBP-only build still builds `schwaystation-pbp-fixtures`; that target depends on `schwaystation-disc-fixtures` and on the generated `xa.xa` and `movie.str` media (`cmake/PBPFixtures.cmake:27-30`). Without `SCHWAYSTATION_DISC_MEDIA_DIR`, the fixture chain generates those assets through `psxavenc`, whose configure step requires the FFmpeg development packages (`cmake/DiscFixtures.cmake:88-105`, `cmake/Psxavenc.cmake:105`). On a runner image missing those packages, the route fails during fixture construction before the PBP campaign runs.
 **Resolution:** Commit `76bdc68` removes the unnecessary PBP-only dependency branch. Both routes install the media encoder's full FFmpeg development closure, which the shared fixture build requires. The workflow wiring assertion now requires the complete package array, so this dependency cannot silently disappear on the PBP route.
 
@@ -106,6 +106,15 @@ production code or acceptance bound changed.
 
 ---
 
-_Reviewed: 2026-11-21T15:29:09Z_  
-_Reviewer: the agent (gsd-code-reviewer)_  
+_Reviewed: 2026-11-21T15:29:09Z_
+_Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
+
+## Ship-fix review (2026-11-21)
+
+An independent review of the repaired Phase 10 CI diff found no blockers or warnings. It confirmed the
+classifier test still checks the two outputs consumed by the CI job while the dedicated route test covers
+`nightly_full` and `pbp_only`; the pointer check is type-safe; and the MSVC opener matches existing host code.
+After the hosted matrix exposed a protected-base dependency gap, the `compat-base` sparse checkout added
+`tests/cmake/date_days.cmake`, and the workflow wiring assertion now guards that file closure. This follow-up
+was also independently reviewed clean. Focused classifier, PBP and protected-ratchet checks passed locally.

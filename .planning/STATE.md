@@ -2,14 +2,14 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 11
-current_phase_name: ECM and CloneCD images
-current_plan: Not started
-status: planning
-stopped_at: Phase 10 complete, ready to plan Phase 11
-last_updated: "2026-11-21T16:20:53.988Z"
+current_phase: 10
+current_phase_name: PBP disc images
+current_plan: Ship follow-up
+status: shipping
+stopped_at: Phase 10 repaired local head, awaiting exact-head hosted CI/Nightly and release
+last_updated: "2026-11-21T16:55:15Z"
 last_activity: 2026-11-21
-last_activity_desc: "Phase 10 shipped as PR #34"
+last_activity_desc: "Repaired Phase 10 ship failures; PR #34 needs one exact-head hosted rerun"
 state_head: 50efc31217b851de8cbe3b53677b525b9b65447d
 progress:
   total_phases: 10
@@ -26,22 +26,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 10 — PBP disc images; verified locally, ready for ship gates
+**Current focus:** Phase 10 — PBP disc images; local corrections are verified, hosted ship gates remain
 
 ## Current Position
 
-Phase: 11 — ECM and CloneCD images
-Current Plan: Not started
+Phase: 10 — PBP disc images
+Current Plan: Ship follow-up
 Total Plans in Phase: 13
-Status: Ready to plan
-Last activity: 2026-11-21 -- Phase 10 shipped as PR #34
+Status: Awaiting repaired-head hosted CI/Nightly and release
+Last activity: 2026-11-21 -- PR #34 first attempt diagnosed and repaired locally
 Progress: [████░░░░░░] 40% (3/10 phases released)
 
 ### Phase 10 verification (2026-11-21)
 
 Runtime/model: GSD verifier `gpt-6-luna` xhigh. Goal-backward verification passed 2/2 roadmap truths; implementation artifacts, wiring, data flow, requirements coverage, and all 13 plan artifact/key-link audits passed. Context decision coverage was 12/12. The local final workflow evidence already recorded above passed 655 standard tests and 7 release checks; verification did not rerun tests. The verifier corrected four stale Plan 10-09 references from `libretro/schwaystation_libretro.c` to `libretro/libretro.c` and confirmed that plan's artifact/key-link audit passed. Report: `.planning/phases/10-pbp-disc-images/10-VERIFICATION.md`; `verification.status` returned `passed` (exit 0).
 
-The actual linked WASI size and exact-head hosted PR CI/Nightly remain mandatory ship gates, not implementation gaps. No hosted result or WASI measurement is claimed. Do not advance to Phase 11 or release before the ship gate records the hosted run URLs, checks critical-path time and Actions usage, and measures the linked WASI module.
+The pre-repair exact-head hosted attempt failed and was cancelled after exposing fixable CI issues. The WASI producer measured the linked Phase 10 module at 875,971 bytes on run 44924014258; `quality.json` now records that value. The repaired exact-head CI/Nightly, release-pipeline checks, critical path and runner-time review remain mandatory before advancing to Phase 11.
 
 ### Phase 10 Plan 10-13 execution (2026-11-21)
 
@@ -54,9 +54,25 @@ its CTest critical path was 75.65s and the release checks took 1.35s. The local 
 The initial full run exposed one stale compatibility expectation for PBP, corrected in `e9ce168` and independently
 reviewed before the passing rerun. Cheap inventories, workflow pin/timeout and wiring checks, and the 3,900/3,901
 line-budget preflight passed. The Nightly route dry-run passed. Prior Phase 9 measurements identify BE32/QEMU as
-the current hosted critical-path candidate, but no Phase 10 hosted run exists yet. The single exact-head CI and
-Nightly runs, hosted timing/cost evidence and actual linked WASI size are pending the ship PR; `quality.json`
-remains at its previous verified 859,379-byte bound. No standalone hosted dispatch was started.
+the historical hosted critical-path candidate. The first Phase 10 hosted CI/Nightly attempt is recorded in
+`10-CI-EFFICIENCY.md`; it was cancelled after failures. The actual WASI module measured 875,971 bytes and the
+quality bound now tracks it. The repaired exact-head runs and final hosted timing/cost evidence remain pending.
+
+### Phase 10 ship-fix follow-up (2026-11-21)
+
+Runtime/model: Codex GPT-6 session; independent `gsd-code-reviewer` used `gpt-6-luna` xhigh. The previous STATE
+checkpoint was 16:20:53Z; closeout is at 16:55Z (about 34 minutes wall, including tool waits; active time was
+not measured). The cancelled run failed the hygiene classifier assertion, WASI size bound, BE32 pointer cast,
+Windows `fopen` warning, and protected-base sparse-checkout dependency. These were fixed in one batch; the missing
+`date_days.cmake` input was added to the CI sparse checkout and its wiring is now checked. Focused classifier,
+PBP, workflow-closure, full-base ratchet, quality and line-budget preflights passed; the 3,901-line cap is exactly
+full. One complete local CMake workflow passed 655 standard tests and 7 release checks in 78.09s CTest time.
+`act pull_request --dryrun` passed with a writable `/private/tmp` action cache; it establishes routing only. The
+old hosted CI/Nightly tails were cancelled after diagnosis; summed elapsed job time was 26.5 CI runner-minutes
+and 9.7 Nightly runner-minutes. No dollar billing estimate is available. No local BE32 toolchain/QEMU or WASI
+sysroot is installed, so those hosted gates remain required. The correction diff had a clean independent review.
+Continue with one repaired-head PR/Nightly attempt, inspect live and final job timing, then merge/release only
+after all required lanes pass.
 
 ### Phase 10 discussion (2026-11-21)
 

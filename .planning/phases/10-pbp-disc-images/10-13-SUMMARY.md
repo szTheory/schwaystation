@@ -139,3 +139,18 @@ Ready for formal Phase 10 verification. At ship, run and inspect one exact-head 
 ---
 *Phase: 10-pbp-disc-images*
 *Completed: 2026-11-21*
+
+## Ship follow-up: cross-platform CI repairs (2026-11-21)
+
+The first PR CI attempt (`50efc31`) and its Nightly run exposed five causes before release: a stale hygiene
+classifier-output comparison, the old WASI size bound, a pointer-to-integer assertion in the BE32 host test,
+MSVC's C4996 rejection of direct `fopen`, and an omitted `date_days.cmake` dependency in the protected-base
+sparse checkout. Those failures were fixed together. The WASI job's actual linked module measured 875,971
+bytes; `quality.json` now records that measurement and its run/job URL. The run was cancelled after its failing
+checks were diagnosed; it is not counted as passing hosted evidence.
+
+An independent review found the correction diff clean. Cheap workflow, line-budget, quality, inventory and
+route checks passed; the full local workflow passed 655/655 tests and 7/7 release checks. The focused
+protected-ratchet tests passed with a complete base checkout. The repaired head still requires one exact-head
+hosted CI and Nightly run before release. The failed-attempt timing and local evidence are recorded in
+`10-CI-EFFICIENCY.md` and `10-VERIFICATION-EVIDENCE.md`.

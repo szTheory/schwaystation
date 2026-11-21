@@ -2842,7 +2842,7 @@ static int test_content_pbp(const char *pbp_path, const char *cue_path,
     CHECK(test_pbp_rejection_unchanged(unsupported_path, SCHWAY_DISC_IMAGE_UNSUPPORTED,
         saved_ram, saved_card, saved_card2, saved_card2_path,
         expected_path));
-    CHECK_EQ_U64(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM), pbp_ram);
+    CHECK(p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) == pbp_ram);
     CHECK_EQ_U64(save_directory_calls, save_calls_before + 1u);
     if (check_failures != 0) goto cleanup;
 

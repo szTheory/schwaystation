@@ -18,6 +18,7 @@ endfunction()
 if(CASE STREQUAL "spu_registration" OR CASE STREQUAL "disc_registration")
   yaml_job_has(.github/workflows/ci.yml changes "Cheap source, inventory and route preflight.*MODE=pins.*MODE=timeouts.*line_budget[.]cmake.*sort -cu.*CASE=disc_registration")
   yaml_job_has(.github/workflows/ci.yml ci-required "needs:.*hash-equality.*retroarch.*perf")
+  yaml_job_has(.github/workflows/ci.yml build "path: compat-base.*sparse-checkout:.*scripts/compat-ratchet[.]sh.*tests/cmake/compat-ratchet[.]cmake.*tests/cmake/date_days[.]cmake.*tests/compat/ledger[.]csv")
   yaml_job_has(.github/workflows/ci.yml hash-equality "COUNT=8")
   yaml_job_has(.github/workflows/ci.yml build "name: Stable state size preflight.*cmake --build build/ci --target schwaystation-test-state.*QUALITY_STATE_BYTES_BEGIN.*name: Build, test, package.*cmake --workflow --preset.*INVENTORY=tests/inventory/ci\\.txt.*fixtures/spu_tone\\.exe")
   yaml_job_has(.github/workflows/ci.yml retroarch

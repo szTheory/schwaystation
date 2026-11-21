@@ -1,10 +1,10 @@
 ---
 phase: 10-pbp-disc-images
-verified: 2026-11-21T16:08:38Z
+verified: 2026-11-21T16:50:05Z
 status: passed
 score: 2/2 must-haves verified
 covered_files:
-  - .github/workflows/nightly.yml
+  - .github/workflows/ci.yml
   - .planning/phases/10-pbp-disc-images/10-01-PLAN.md
   - .planning/phases/10-pbp-disc-images/10-01-SUMMARY.md
   - .planning/phases/10-pbp-disc-images/10-02-PLAN.md
@@ -34,62 +34,12 @@ covered_files:
   - .planning/phases/10-pbp-disc-images/10-CI-EFFICIENCY.md
   - .planning/phases/10-pbp-disc-images/10-REVIEW.md
   - .planning/phases/10-pbp-disc-images/10-VERIFICATION-EVIDENCE.md
-  - ASSET_POLICY.md
-  - CMakePresets.json
-  - PROVENANCE.md
-  - THIRD-PARTY-NOTICES.md
-  - cmake/DiscFixtures.cmake
-  - cmake/DiscTargets.cmake
-  - cmake/Miniz.cmake
-  - cmake/PBPFixtures.cmake
-  - docs/compatibility.md
-  - docs/discs.md
-  - docs/libretro.md
-  - docs/maintaining.md
-  - docs/media-testing.md
-  - docs/runner.md
-  - host/disc_image.c
   - host/disc_pbp.c
-  - host/disc_pbp.h
-  - host/disc_pbp_metadata.c
-  - host/disc_pbp_metadata.h
-  - host/disc_probe.c
-  - host/miniz/miniz_common.h
-  - host/miniz/miniz_tinfl.c
-  - host/miniz/miniz_tinfl.h
-  - host/miniz_compat/miniz.h
-  - host/pbp_inflate.c
-  - host/pbp_inflate.h
-  - libretro/CMakeLists.txt
-  - libretro/libretro.c
-  - scripts/classify-changes.sh
-  - tests/cmake/ci_route_controls.cmake
-  - tests/cmake/info_claims.cmake
-  - tests/cmake/quality_controls.cmake
-  - tests/cmake/triage_controls.cmake
-  - tests/cmake/vendored.cmake
+  - quality.json
   - tests/cmake/workflows.cmake
-  - tests/compat/features.csv
-  - tests/compat/tests.cmake
-  - tests/disc/fixture.c
-  - tests/disc/image.c
-  - tests/disc/inventory.txt
-  - tests/disc/pbp.c
-  - tests/disc/tests.cmake
-  - tests/fixtures/disc_boot_pbp.xml
-  - tests/fixtures/manifest.txt
-  - tests/fixtures/src/disc_boot.asm
-  - tests/fuzz/inventory.txt
-  - tests/fuzz/pbp.c
-  - tests/fuzz/seeds.h
-  - tests/fuzz/tests.cmake
+  - tests/hygiene/tests.cmake
   - tests/libretro/host.c
-  - tests/libretro/inventory.txt
-  - tests/libretro/tests.cmake
-  - tests/runner/inventory.txt
-  - tests/runner/tests.cmake
-  - tools/gen_pbp.py
-covered_digest: "v4:sha256:d6adc872bfa475f5bd3b52ddbab6bf0a390187f773064fb9852d26d79588bcd4"
+covered_digest: "v4:sha256:602528f9e6b3f1c8f7e1a164122bf19352f6a538c3b3f0c11a6c11ed5e7b07b2"
 behavior_unverified: 0
 overrides_applied: 0
 decision_coverage:
@@ -197,15 +147,31 @@ No shell probe was declared for Phase 10. The runner's PBP `--probe` path is cov
 
 None. The phase has no visual or hardware-only acceptance criterion; its file parsing, determinism and host seams are exercised by automated tests. No BIOS, disc, or physical-console test is required.
 
-### Ship Gates Pending
+### Initial Ship-Gate Snapshot — 2026-11-21T16:08:38Z
 
-The hosted evidence is a **required next ship gate**, not a failed implementation truth. `.planning/AUTONOMOUS.md` and AGENTS rules 9–10 require formal phase verification before `$gsd-ship`, then place exact-head PR CI, Nightly and release-pipeline inspection at ship. The PR does not exist yet, so no hosted run is claimed here. Before release or Phase 11, the ship step must:
+The hosted evidence is a **required ship gate**, not a failed implementation truth. `.planning/AUTONOMOUS.md` and AGENTS rules 9–10 require exact-head PR CI, Nightly and release-pipeline inspection before release or Phase 11. The first attempt ran on pre-repair commit `50efc31217b851de8cbe3b53677b525b9b65447d` and was cancelled after actionable failures; it does not satisfy the gate. Before release or Phase 11, the ship step must:
 
 1. Run and inspect one exact-head PR CI and full Nightly attempt, including required platform/package jobs, sanitizer, no-float, BE32, WASI, eight-way hashes, RetroArch, release rehearsal and the full fuzz route.
-2. Extract the actual linked WASI module size from the hosted `wasm32` job. Keep the previous 859,379-byte bound unchanged until this producer measurement is available; do not substitute the native macOS module size.
+2. Re-measure the linked WASI module on the repaired head. The first hosted producer measured 875,971 bytes on [run 44924014258](https://github.com/szTheory/schwaystation/actions/runs/44924014258), [job 136906260832](https://github.com/szTheory/schwaystation/actions/runs/44924014258/job/136906260832); `quality.json` now records that exact measurement. If the repaired producer differs, update the bound from its linked artifact. Do not substitute the native macOS module size.
 3. Record exact run URLs, lane critical path and runner-time signals. Historical data identifies BE32/QEMU as the critical-path candidate; current Phase 10 Actions dollars are not yet available. No coverage reduction is justified from historical runs alone.
 
-The mixed code/workflow head must use the full Nightly route. Docker is available locally, but this Apple Silicon host would need x86_64 emulation for the workflow's pinned x86_64 Wasmtime runtime; Act dry-run already checked route wiring. The hosted WASI job provides the required artifact handoffs and matching architecture, so another local Act run would not establish those hosted properties.
+The mixed code/workflow head must use the full Nightly route. Docker is available locally, but this Apple Silicon host would need x86_64 emulation for the workflow's pinned x86_64 Wasmtime runtime; Act dry-runs checked route wiring only. The hosted WASI job provides the required artifact handoffs and matching architecture, so another local Act run would not establish those hosted properties.
+
+## Follow-Up Verification — 2026-11-21T16:50:05Z
+
+This follow-up preserves the initial report above and checks the Phase 10 ship-fix batch against the two roadmap success criteria. No PBP parsing or acceptance scope changed. The implementation truths remain **2/2 verified locally**; hosted exact-head checks are still a separate required ship gate. No broad suite was rerun by this verifier.
+
+| Repair | Code and wiring evidence | Verification result |
+|---|---|---|
+| MSVC PBP opener | `host/disc_pbp.c` routes PBP opens through `schway__disc_pbp_open_file`; the `_MSC_VER` branch uses `fopen_s`, while other compilers use `fopen`. | The local PBP module build passed on this host. The MSVC branch has not yet been compiled on the repaired head; the old Windows jobs failed before this fix, so Windows CI remains required. |
+| Pointer-safe libretro assertion | `tests/libretro/host.c` compares the current RAM pointer directly with the saved `pbp_ram` pointer after rejected replacements. | The local full workflow recorded 655/655 tests and 7/7 release checks passing. This removes the pointer-to-integer conversion that failed the old BE32 build; repaired BE32 CI remains pending. |
+| Classifier workflow assertion | `tests/hygiene/tests.cmake` filters classifier output to the two values that `ci.classify` owns. `tests/cmake/ci_route_controls.cmake` independently checks `nightly_full` and `pbp_only` outputs across route cases. | Recorded focused checks passed: `ci.classify` 1/1 and `ci.classify_policy` plus PBP tests 11/11. |
+| Protected-base sparse checkout | `.github/workflows/ci.yml` includes `tests/cmake/date_days.cmake` in `compat-base`; `tests/cmake/workflows.cmake` asserts that required dependency remains in the sparse checkout. `tests/cmake/compat-ratchet.cmake` includes that helper. | The route/closure check passed, as did protected-base ratchet tests against a full base checkout (7/7). GitHub has not yet exercised the repaired sparse checkout. |
+| WASI module bound | `quality.json` now records 875,971 bytes, matching the linked module measured by the first PBP-enabled WASI attempt. The local quality comparison passed. | This is a measurement from the failed/cancelled pre-repair run, not a green repaired-head WASI gate. Re-measure the linked module on the repaired head. |
+
+The first exact-head PR run [44924014258](https://github.com/szTheory/schwaystation/actions/runs/44924014258) ended **cancelled** on pre-repair SHA `50efc31217b851de8cbe3b53677b525b9b65447d`; hygiene, WASI, BE32 and several native build jobs had failed. The concurrent [Nightly run 44924014369](https://github.com/szTheory/schwaystation/actions/runs/44924014369) on the same SHA also ended **cancelled**, with its fuzz and report jobs cancelled. Neither is a passing ship gate. At 16:50Z, PR [#34](https://github.com/szTheory/schwaystation/pull/34) still pointed to the pre-repair SHA; the repaired working-tree changes therefore have no exact-head hosted result yet.
+
+Local evidence recorded in `10-VERIFICATION-EVIDENCE.md` includes the successful native workflow, targeted classifier and PBP checks, module build, workflow closure test, and `act --dryrun` routing check. Act establishes routing only; hosted Windows/MSVC, BE32, WASI, platform/package lanes, artifact handoffs, RetroArch and release integrations remain unverified here. Repaired exact-head PR CI, the full Nightly route, linked WASI measurement and release pipeline must be green and inspected before shipping or advancing to Phase 11.
 
 ## Decision Coverage
 
@@ -215,6 +181,22 @@ All 12 trackable `10-CONTEXT.md` decisions are honored by the phase plans and im
 
 No Phase 10 implementation gap was found. The phase goal is verified on the local host; release and milestone advancement remain gated on the exact-head hosted work listed above. The generic SPDX scanner remains deferred by the owner's explicit choice, and the 3,901-line ceiling remains unchanged.
 
+## Ship repair follow-up (2026-11-21)
+
+The pre-repair exact-head CI attempt failed in five areas: the hygiene classifier-output assertion, the prior WASI
+size bound, a pointer-to-integer assertion in the BE32 host test, MSVC's warning-as-error for direct `fopen`, and
+the protected-base sparse checkout's missing `date_days.cmake` dependency. Its Nightly attempt's classifier,
+vectors, WASI benchmark and three benchmark legs passed; the fuzz job was cancelled. Both attempts were cancelled
+after diagnosis. They are recorded in [10-CI-EFFICIENCY.md](10-CI-EFFICIENCY.md) and are not treated as green
+ship evidence.
+
+The fixes were independently reviewed clean. The full local workflow passed 655 standard tests and 7 release
+checks; focused hygiene, PBP, classifier-policy, protected-ratchet and workflow-closure checks passed. The
+protected-base sparse checkout now includes `tests/cmake/date_days.cmake`, guarded by a workflow assertion. The
+repository-check budget is exactly 3,901/3,901 lines. These results preserve the two roadmap truths and do not
+claim cross-platform hosted success. The repaired exact-head CI, Nightly and release-pipeline runs remain
+required before Phase 11.
+
 ---
-*Verified: 2026-11-21T16:08:38Z*
+*Verified: 2026-11-21T16:50:05Z*
 *Verifier: the agent (gsd-verifier)*
