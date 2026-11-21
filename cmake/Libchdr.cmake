@@ -87,5 +87,7 @@ set(CHDR_MICROFLAC_SOURCE_DIR "" CACHE PATH "" FORCE)
 set(CHDR_MICROFLAC_GIT_TAG "" CACHE STRING "" FORCE)
 set(WITH_LZMA_ASM OFF CACHE BOOL "" FORCE)
 add_subdirectory("${schway__libchdr_source}" "${schway__libchdr_root}/build" EXCLUDE_FROM_ALL)
-# The PIC-enabled host disc-image library can feed shared libretro modules.
-set_target_properties(chdr-static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# The host disc-image library feeds shared modules only when libretro is built.
+if(SCHWAYSTATION_BUILD_LIBRETRO)
+  set_target_properties(chdr-static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()

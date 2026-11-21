@@ -1,6 +1,6 @@
 ---
 phase: 09-chd-disc-images
-reviewed: 2026-11-20T23:59:29Z
+reviewed: 2026-11-21T00:08:30Z
 depth: standard
 files_reviewed: 3
 files_reviewed_list:
@@ -18,14 +18,14 @@ status: clean
 
 # Phase 09: Code Review Report
 
-**Reviewed:** 2026-11-20T23:59:29Z
+**Reviewed:** 2026-11-21T00:08:30Z
 **Depth:** standard
 **Files Reviewed:** 3
 **Status:** clean
 
 ## Summary
 
-Reviewed the Phase 9 follow-up diff in the ASan CI setup, CHD media fixture validation, and libchdr target configuration. The external fixture generator stays outside sanitizer instrumentation while the CHD reader and tests remain instrumented; CMake cache assertions and LF/CRLF manifest parsing are consistent. The CUE-path failure now has its own diagnostic. `POSITION_INDEPENDENT_CODE` is applied to the pinned `chdr-static` target after `add_subdirectory`; CMake applies that target property at generation, and its linked miniz, LZMA, and zstd static targets already set PIC. No issues found.
+Reviewed the Phase 9 follow-up diff in the ASan CI setup, CHD media fixture validation, and libchdr target configuration. The external fixture generator stays outside sanitizer instrumentation while the CHD reader and tests remain instrumented; CMake cache assertions and LF/CRLF manifest parsing are consistent. The CUE-path failure now has its own diagnostic. `POSITION_INDEPENDENT_CODE` is applied to the pinned `chdr-static` target after `add_subdirectory` only when `SCHWAYSTATION_BUILD_LIBRETRO` is true, the condition that adds the host shared module. CMake applies the target property at generation, and its linked miniz, LZMA, and zstd static targets already set PIC. WASI explicitly disables libretro, so its runner-only target skips the PIC change. No issues found.
 
 ## Narrative Findings (AI reviewer)
 
@@ -33,6 +33,6 @@ No issues found.
 
 ---
 
-_Reviewed: 2026-11-20T23:59:29Z_
+_Reviewed: 2026-11-21T00:08:30Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
