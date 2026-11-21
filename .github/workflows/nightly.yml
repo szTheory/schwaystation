@@ -187,15 +187,9 @@ jobs:
           cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake
       # clang-21 and the media encoder's FFmpeg development packages may not be on the image.
       - name: Sanitizer and media-fixture dependencies
-        env:
-          PBP_ONLY: ${{ needs.changes.outputs.pbp_only }}
         run: |
           set -eu
-          if [[ "$PBP_ONLY" == 'true' ]]; then
-            packages=(libclang-rt-21-dev)
-          else
-            packages=(libclang-rt-21-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev)
-          fi
+          packages=(libclang-rt-21-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev)
           missing=false
           for package in "${packages[@]}"; do
             if ! dpkg -s "$package" > /dev/null 2>&1; then missing=true; break; fi
