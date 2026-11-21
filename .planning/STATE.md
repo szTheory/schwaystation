@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 8
+current_plan: 9
 status: executing
-stopped_at: Completed 10-07-PLAN.md
-last_updated: "2026-11-21T13:16:00Z"
+stopped_at: Completed 10-08-PLAN.md; runtime Codex/OpenGSD 1.20.0, executor gpt-6-luna
+last_updated: "2026-11-21T13:39:28.404Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-07 complete; Plan 10-08 next
-state_head: e2115d1
+last_activity_desc: Phase 10 Plan 10-08 complete; Plan 10-09 next
+state_head: b5b0076
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 43
+completed_plans: 44
   percent: 30
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 (PBP disc images) — EXECUTING
-Current Plan: 8
+Current Plan: 9
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-07 complete; Plan 10-08 is next
+Last activity: 2026-11-21 — Plan 10-08 complete; Plan 10-09 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -143,7 +143,20 @@ focused rebuild. The raw selector plus fixture preflight passed 2/2 in 0.02s. Th
 bounds/parity selection passed 5/5 in 0.02s, and open/boundary/parity plus playlist passed 10/10. A malformed
 compressed block is rejected before reader publication. The measured open/scan process time was 0.002783s.
 No workflow changed, so `act` and hosted CI did not apply. Task commit: `83d7bf0`; Plan 10-06 summary is
-`.planning/phases/10-pbp-disc-images/10-06-SUMMARY.md`. Plan 10-07 is next.
+`.planning/phases/10-pbp-disc-images/10-06-SUMMARY.md`. Plan 10-07 completed at the 13:16Z checkpoint; Plan 10-08 followed.
+
+### Phase 10 Plan 10-08 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna`; reasoning effort was not exposed. The wall interval
+from the saved STATE checkpoint at 13:16Z through closeout was about 24 minutes; active time was not measured.
+Runner and disc inventories, diff checks, selector wiring, fixture preflight and the 3,900/3,901 gate passed
+before the focused configure and run. The PBP runner/probe check, source-CUE parity, M3U compatibility and docs
+budget passed 5/5 in 4.85s. `runner.disc.pbp` took 4.83s; PBP fixture preflight and provider parity each took
+about 0.01s. The first mailbox-stop assertion reached the fixture's 1,200-frame cap; fixed-frame PBP and source
+CUE runs both exited 0 and produced the same hash, so the runner test now checks that bounded result. A PBP
+playlist guard keeps M3U membership at its documented ISO/CUE scope; broken-windows entry 15 is fixed. No
+workflow changed, so `act` and hosted CI did not apply. Task commits are `b8f43b1` and `b5b0076`; summary:
+`.planning/phases/10-pbp-disc-images/10-08-SUMMARY.md`. PBP-01 remains phase-wide pending; Plan 10-09 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -777,6 +790,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 09 P14 | 22m | 2 tasks | 7 files |
 | Phase 10 P01 | 24m53s | 3 tasks | 22 files |
 | Phase 10 P07 | 44m | 2 tasks | 9 files |
+| Phase 10 P08 | 24m | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -1174,6 +1188,7 @@ Recent decisions affecting current work:
 - [Phase 09]: The local CHD compatibility predicate passes on provider, host, package and guest evidence; hosted lane/hash/fuzz and WASI size remain unknown.
 - [Phase 10]: Keep the PBP fuzz corpus as 14 generated mutation scripts capped at 256 bytes, with build-owned raw and compressed baselines and no committed disc bytes.
 - [Phase 10]: Keep all Nightly fuzz cases; skip CHD and non-PBP fuzz work only when the classifier proves a pull request is PBP-only.
+- [Phase 10]: Standalone PBP support leaves M3U playlist membership limited to the existing ISO/CUE contract.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1420,9 +1435,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T13:12:20.780Z
-Stopped at: Completed 10-07-PLAN.md
-Resume file: None
+Last session: 2026-11-21T13:39:28.404Z
+Stopped at: Completed 10-08-PLAN.md; runtime Codex/OpenGSD 1.20.0, executor gpt-6-luna
+Resume file: .planning/phases/10-pbp-disc-images/10-09-PLAN.md
 
 ### v1.0 session history
 
