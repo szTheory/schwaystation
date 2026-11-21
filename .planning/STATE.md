@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 10
+current_plan: 12
 status: executing
-stopped_at: Completed 10-09-PLAN.md; Plan 10-10 remains next
-last_updated: "2026-11-21T14:09:41Z"
+stopped_at: Completed 10-10-PLAN.md; Plan 10-12 is next
+last_updated: "2026-11-21T14:31:41Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-09 complete; Plan 10-10 next
-state_head: d354bfe
+last_activity_desc: Phase 10 Plan 10-10 complete; Plan 10-12 next
+state_head: 32b4104
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 45
+completed_plans: 46
   percent: 30
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 (PBP disc images) — EXECUTING
-Current Plan: 10
+Current Plan: 12
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-09 complete; Plan 10-10 is next
+Last activity: 2026-11-21 — Plan 10-10 complete; Plan 10-12 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -170,6 +170,20 @@ The provider exposes no serializable disc identity, so failure-atomic state evid
 card bytes alongside the frame/audio traces and active path. No workflow changed, so `act` and hosted CI did
 not apply. Task commits are `47d233e` and `d354bfe`; summary: `.planning/phases/10-pbp-disc-images/10-09-SUMMARY.md`.
 PBP-01 remains phase-wide pending; Plan 10-10 is next.
+
+### Phase 10 Plan 10-10 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.21.0; primary GPT-6 model ID was not exposed. The wall interval from the saved
+STATE checkpoint at 14:09:41Z through focused verification was about 19 minutes; active time was not measured.
+Pin/digest, notice, sorted inventories, selector wiring and the 3,900/3,901 line budget passed before packaging.
+CHD-OFF PBP, runner and libretro checks passed 7/7; CHD-ON PBP and original CHD parity plus package checks
+passed 9/9. All three packages in both configurations retained the exact notices and correct .info claims.
+The arm64 native libretro bundle measured 359,952 bytes OFF and 612,128 bytes ON; these are not WASI evidence.
+The ci preset excluded release-labeled archive tests, so the existing ci-release selector ran all four cases.
+A stale ON-built helper initially failed the OFF host test; rebuilding configuration-sensitive helpers made
+the 7/7 OFF selector pass. No workflow changed, so no hosted CI or act run applied. Task commits are d54349b
+and 32b4104; evidence and summary are in .planning/phases/10-pbp-disc-images/. PBP-01 remains phase-wide
+pending; Plan 10-12 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -805,6 +819,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 10 P07 | 44m | 2 tasks | 9 files |
 | Phase 10 P08 | 24m | 2 tasks | 8 files |
 | Phase 10 P09 | 25m | 2 tasks | 7 files |
+| Phase 10 P10 | 19m | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -1205,6 +1220,8 @@ Recent decisions affecting current work:
 - [Phase 10]: Standalone PBP support leaves M3U playlist membership limited to the existing ISO/CUE contract.
 - [Phase 10]: Keep PBP always available in the host path and gate its metadata claim on the registered libretro.content.pbp integration test.
 - [Phase 10]: Keep the supported PBP claim limited to unencrypted single-data-track PSISO images and preserve CHD license derivation from the linked closure.
+- [Phase 10]: Used the ci-release preset for release-labeled package tests; all existing archive and notice cases remained enabled.
+- [Phase 10]: Rebuilt configuration-sensitive host/card helpers after toggling CHD in the reused build tree so tests matched the configured provider.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1451,8 +1468,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T14:09:03.104Z
-Stopped at: Completed 10-09-PLAN.md; Plan 10-10 remains next
+Last session: 2026-11-21T14:29:40.034Z
+Stopped at: Completed 10-10-PLAN.md; Plan 10-12 is next
 Resume file: None
 
 ### v1.0 session history
