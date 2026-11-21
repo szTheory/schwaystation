@@ -13,6 +13,7 @@ runner.disc.api	portable,runner
 runner.disc.api.chd	portable,runner
 runner.disc.chd	portable,runner
 runner.disc.load	portable,runner
+runner.disc.pbp	portable,runner
 runner.disc.probe	portable,runner
 runner.disc.unsupported	portable,runner
 runner.exe.missing	portable,runner

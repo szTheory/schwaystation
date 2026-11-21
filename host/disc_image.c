@@ -1181,6 +1181,12 @@ static schway_disc_image_status schway__disc_image_open_m3u(
             status = SCHWAY_DISC_IMAGE_UNSUPPORTED;
             goto done;
         }
+        if (schway__disc_image_extension_is(entry, ".pbp")) {
+            schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED, line,
+                                         "unsupported: PBP playlist entries are not supported");
+            status = SCHWAY_DISC_IMAGE_UNSUPPORTED;
+            goto done;
+        }
         char candidate[SCHWAY__DISC_IMAGE_PATH_CAP];
         char canonical[SCHWAY__DISC_IMAGE_PATH_CAP];
         if (!schway__disc_image_child_path(root, entry, candidate) ||

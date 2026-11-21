@@ -244,6 +244,154 @@ if(CMAKE_SCRIPT_MODE_FILE)
       message(FATAL_ERROR "missing/short BIOS was not refused before the first frame:\n"
         "missing: ${missing_rc}\n${missing_out}${missing_err}\nshort: ${short_rc}\n${short_out}${short_err}")
     endif()
+  elseif(CASE STREQUAL "disc_pbp")
+    if(NOT DEFINED PYTHON3 OR PYTHON3 STREQUAL "")
+      message(FATAL_ERROR "PBP runner controls need the configured Python 3 executable")
+    endif()
+    if(NOT DEFINED HOOKED OR NOT DEFINED BIOS OR NOT EXISTS "${BIOS}")
+      message(FATAL_ERROR "PBP runner controls need the test runner and owned BIOS")
+    endif()
+    set(root "${OUT}/runner-disc-pbp")
+    file(MAKE_DIRECTORY "${root}")
+    set(python_code [=[
+import pathlib
+import struct
+import sys
+
+source = bytearray(pathlib.Path(sys.argv[1]).read_bytes())
+root = pathlib.Path(sys.argv[2])
+psar = 0x10000
+toc = 0x10800
+index = 0x14000
+data = 0x110000
+
+def save(name, image):
+    (root / name).write_bytes(image)
+
+image = bytearray(source)
+image[psar:psar + 12] = b"PGD" + b"\0" * 9
+save("pgd.pbp", image)
+
+image = bytearray(source)
+image[psar:psar + 12] = b"UNKNOWN!!!!!"
+save("unknown.pbp", image)
+
+image = bytearray(source)
+struct.pack_into("<H", image, index + 4, 0)
+save("corrupt-table.pbp", image)
+
+image = bytearray(source)
+first_size = struct.unpack_from("<H", image, index + 4)[0]
+if first_size < 2:
+    raise SystemExit("first PBP block is too short to truncate")
+del image[data + first_size - 1]
+struct.pack_into("<H", image, index + 4, first_size - 1)
+for block in range(1, 4):
+    entry = index + block * 32
+    offset = struct.unpack_from("<I", image, entry)[0]
+    struct.pack_into("<I", image, entry, offset - 1)
+size = len(image)
+struct.pack_into("<I", image, psar + 12, size - psar)
+struct.pack_into("<I", image, psar + 16, size - 0x6420)
+struct.pack_into("<I", image, psar + 0x1220, size - 0xD2CF)
+save("truncated-block.pbp", image)
+]=])
+    execute_process(COMMAND "${PYTHON3}" -c "${python_code}"
+      "${FIXTURES}/schwaystation-disc_boot.pbp" "${root}"
+      RESULT_VARIABLE mutate_rc OUTPUT_VARIABLE mutate_out ERROR_VARIABLE mutate_err)
+    if(NOT mutate_rc STREQUAL "0")
+      message(FATAL_ERROR "could not create bounded PBP runner controls: ${mutate_out}${mutate_err}")
+    endif()
+
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/schwaystation-disc_boot.pbp"
+      RESULT_VARIABLE pbp_probe_rc OUTPUT_VARIABLE pbp_probe_out ERROR_VARIABLE pbp_probe_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot_pbp.cue"
+      RESULT_VARIABLE cue_probe_rc OUTPUT_VARIABLE cue_probe_out ERROR_VARIABLE cue_probe_err)
+    if(NOT pbp_probe_rc STREQUAL "0" OR NOT cue_probe_rc STREQUAL "0" OR
+       NOT pbp_probe_out STREQUAL cue_probe_out OR NOT pbp_probe_out MATCHES "format=disc")
+      message(FATAL_ERROR "PBP and single-track CUE probe identity differs:\n"
+        "PBP ${pbp_probe_rc}\n${pbp_probe_out}${pbp_probe_err}\n"
+        "CUE ${cue_probe_rc}\n${cue_probe_out}${cue_probe_err}")
+    endif()
+
+    foreach(format IN ITEMS pbp cue)
+      if(format STREQUAL "pbp")
+        set(image "${FIXTURES}/schwaystation-disc_boot.pbp")
+      else()
+        set(image "${FIXTURES}/disc_boot_pbp.cue")
+      endif()
+      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${image}"
+          --frames 1200 --hash
+        RESULT_VARIABLE ${format}_run_rc OUTPUT_VARIABLE ${format}_run_out ERROR_VARIABLE ${format}_run_err)
+      if(NOT ${format}_run_rc STREQUAL "0" OR
+         NOT ${format}_run_out MATCHES "frame 1200 sha256 [0-9a-f]+")
+        message(FATAL_ERROR "${format} bounded PBP guest run failed: exit ${${format}_run_rc}\n"
+          "${${format}_run_out}${${format}_run_err}")
+      endif()
+    endforeach()
+    if(NOT pbp_run_out STREQUAL cue_run_out)
+      message(FATAL_ERROR "PBP and single-track CUE guest output/state hash differs:\n"
+        "PBP ${pbp_run_out}\nCUE ${cue_run_out}")
+    endif()
+
+    function(pbp_identity image save_dir result_name)
+      file(REMOVE_RECURSE "${save_dir}")
+      file(MAKE_DIRECTORY "${save_dir}")
+      foreach(slot IN ITEMS slot1 slot2)
+        execute_process(COMMAND ${EMULATOR} "${HOOKED}" --bios "${BIOS}" --disc "${image}"
+            --frames 1 --save-dir "${save_dir}" --memcard-names serial --test-card-write "${slot}"
+          RESULT_VARIABLE identity_rc OUTPUT_VARIABLE identity_out ERROR_VARIABLE identity_err)
+        if(NOT identity_rc STREQUAL "0")
+          message(FATAL_ERROR "PBP content identity failed for ${image} ${slot}: exit ${identity_rc}\n"
+            "${identity_out}${identity_err}")
+        endif()
+      endforeach()
+      file(GLOB cards LIST_DIRECTORIES FALSE "${save_dir}/*.srm" "${save_dir}/*.mcr")
+      list(LENGTH cards card_count)
+      if(NOT card_count EQUAL 2)
+        message(FATAL_ERROR "PBP content identity expected two isolated card files: ${cards}")
+      endif()
+      set(stem "")
+      foreach(card IN LISTS cards)
+        get_filename_component(card "${card}" NAME)
+        if(card MATCHES "[.]srm$")
+          string(REGEX REPLACE "[.]srm$" "" stem "${card}")
+        elseif(card MATCHES "[.]1[.]mcr$")
+          string(REGEX REPLACE "[.]1[.]mcr$" "" other_stem "${card}")
+          if(NOT stem STREQUAL "" AND NOT stem STREQUAL other_stem)
+            message(FATAL_ERROR "PBP slots produced different identity stems: ${cards}")
+          endif()
+          set(stem "${other_stem}")
+        endif()
+      endforeach()
+      set(${result_name} "${stem}" PARENT_SCOPE)
+    endfunction()
+    pbp_identity("${FIXTURES}/schwaystation-disc_boot.pbp" "${root}/cards-pbp" pbp_card)
+    pbp_identity("${FIXTURES}/disc_boot_pbp.cue" "${root}/cards-cue" cue_card)
+    if(pbp_card STREQUAL "" OR NOT pbp_card STREQUAL cue_card)
+      message(FATAL_ERROR "PBP and single-track CUE produced different save identities: ${pbp_card} vs ${cue_card}")
+    endif()
+
+    function(expect_pbp_failure image code pattern)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${image}"
+        RESULT_VARIABLE probe_rc OUTPUT_VARIABLE probe_out ERROR_VARIABLE probe_err)
+      if(NOT probe_rc STREQUAL "${code}" OR NOT probe_err MATCHES "${pattern}" OR
+         probe_out MATCHES "frame [0-9]+ sha256")
+        message(FATAL_ERROR "PBP probe ${image} expected exit ${code} and ${pattern}, got ${probe_rc}\n"
+          "${probe_out}${probe_err}")
+      endif()
+      execute_process(COMMAND ${EMULATOR} "${HOOKED}" --bios "${BIOS}" --disc "${image}" --frames 1
+        RESULT_VARIABLE run_rc OUTPUT_VARIABLE run_out ERROR_VARIABLE run_err)
+      if(NOT run_rc STREQUAL "${code}" OR NOT run_err MATCHES "${pattern}" OR
+         run_out MATCHES "frame [0-9]+ sha256")
+        message(FATAL_ERROR "PBP runner ${image} expected pre-frame exit ${code} and ${pattern}, got ${run_rc}\n"
+          "${run_out}${run_err}")
+      endif()
+    endfunction()
+    expect_pbp_failure("${root}/pgd.pbp" 77 "PBP layout is unsupported")
+    expect_pbp_failure("${root}/unknown.pbp" 77 "PBP layout is unsupported")
+    expect_pbp_failure("${root}/corrupt-table.pbp" 1 "PBP metadata is invalid")
+    expect_pbp_failure("${root}/truncated-block.pbp" 1 "PBP data block is truncated or invalid")
   elseif(CASE STREQUAL "disc_probe")
     execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot.cue"
       RESULT_VARIABLE cue_rc OUTPUT_VARIABLE cue_out ERROR_VARIABLE cue_err)
@@ -265,7 +413,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
       "FILE \"unsupported.ccd\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
     file(WRITE "${root}/nested-chd.m3u" "unsupported.chd\n")
     file(WRITE "${root}/nested-pbp.m3u" "unsupported.pbp\n")
-    set(unsupported_kinds PBP ECM CCD)
+    set(unsupported_kinds ECM CCD)
     if(NOT CHD_ENABLED)
       list(APPEND unsupported_kinds CHD)
     endif()
@@ -299,7 +447,9 @@ if(CMAKE_SCRIPT_MODE_FILE)
       list(GET fields 0 child)
       list(GET fields 1 kind)
       set(want "unsupported: ${kind} (planned v2.0)")
-      if(kind STREQUAL "CHD" AND NOT CHD_ENABLED)
+      if(kind STREQUAL "PBP")
+        set(want "unsupported: PBP playlist entries are not supported")
+      elseif(kind STREQUAL "CHD" AND NOT CHD_ENABLED)
         set(want "unsupported: CHD (SCHWAYSTATION_CHD=OFF)")
       endif()
       execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/${child}"
@@ -1177,6 +1327,16 @@ schway_add_test(NAME runner.disc.chd
   LABELS portable runner TIMEOUT 180)
 set_tests_properties(runner.disc.chd PROPERTIES
   FIXTURES_REQUIRED "disc_media_preflight;compat_features_preflight")
+
+# Fault prevented: runner PBP probing, guest sectors and save identity differ from the owned
+# single-track CUE source, or malformed/unsupported input reaches guest execution.
+schway_add_test(NAME runner.disc.pbp
+  COMMAND ${runner_check} -DCASE=disc_pbp -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
+    -DHOOKED=$<TARGET_FILE:schwaystation-run-test> -DPYTHON3=${Python3_EXECUTABLE}
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 180)
+set_tests_properties(runner.disc.pbp PROPERTIES FIXTURES_REQUIRED "disc_pbp_preflight")
 
 schway_add_test(NAME runner.disc.probe
   COMMAND ${runner_check} -DCASE=disc_probe -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures
