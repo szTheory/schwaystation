@@ -1,19 +1,20 @@
 # Phase 10 gate budget
 
 The admitted scope folds only the existing vendored digest extension and Nightly routing. The ceiling stays
-3,901 lines. Planning measured the complete current glob at 3,901; the following scratch implementation fits
-at 3,899, including the replacement workflow-wiring assertions and PBP metadata mapping.
+3,901 lines. The planning scratch implementation estimated 3,899; the executed classifier, route table and
+workflow assertions currently measure 3,900/3,901. This includes a fail-open rename marker, non-PBP fuzz route,
+and exact docs/planning-only skip. Keep the bound fixed.
 
 | Counted file | Before | Proposed | Delta |
 |---|---:|---:|---:|
-| `tests/cmake/quality_controls.cmake` | 425 | 397 | -28 |
-| `tests/cmake/triage_controls.cmake` | 178 | 171 | -7 |
-| `scripts/classify-changes.sh` | 65 | 75 | +10 |
-| `tests/cmake/ci_route_controls.cmake` | 33 | 50 | +17 |
-| `tests/cmake/vendored.cmake` | 31 | 35 | +4 |
-| `tests/cmake/workflows.cmake` | 96 | 98 | +2 |
+| `tests/cmake/quality_controls.cmake` | 425 | 399 | -26 |
+| `tests/cmake/triage_controls.cmake` | 178 | 167 | -11 |
+| `scripts/classify-changes.sh` | 65 | 80 | +15 |
+| `tests/cmake/ci_route_controls.cmake` | 33 | 48 | +15 |
+| `tests/cmake/vendored.cmake` | 31 | 36 | +5 |
+| `tests/cmake/workflows.cmake` | 96 | 97 | +1 |
 | `tests/cmake/info_claims.cmake` | 98 | 98 | 0 |
-| Complete gate glob | 3,901 | 3,899 | -2 |
+| Complete gate glob | 3,901 | 3,900 | -1 |
 
 ## Preserving reductions
 
@@ -35,14 +36,16 @@ as the registered test does. No test assertion or production gate was removed.
 ## Additions
 
 - Add `pbp_only=true` and `nightly_full=true` to the existing classifier. Only `host/disc_pbp.c`,
-  `host/disc_pbp.h`, `tests/disc/pbp.c`, and `tests/fuzz/pbp.c` preserve `pbp_only`; all other paths select full
-  Nightly work. Emit false only for a valid, nonempty complete list whose count matches. Preserve the existing
-  `heavy` and `release_inputs` outputs and release-metadata cases.
-- Extend the existing `route` control to assert `nightly_full` (true by default). Keep every old row and add
-  four PBP-only paths, the Nightly workflow, an unknown path, a count mismatch, and both sides of a rename.
+  `host/disc_pbp.h`, `tests/disc/pbp.c`, and `tests/fuzz/pbp.c` preserve `pbp_only`; a complete list wholly under
+  `docs/` or `.planning/` skips Nightly, while every other list selects full Nightly work. Emit a skip only for a
+  valid, nonempty complete list whose count matches. Preserve the existing `heavy` and `release_inputs` outputs
+  and release-metadata cases.
+- Extend the existing `route` control to assert both outputs (full/false by default). Keep every old row and add
+  four PBP-only paths, a non-PBP fuzz path, the Nightly workflow, an unknown path, a count mismatch, and a rename
+  marker plus both names so even a rename between allowlisted paths stays full.
   Also retain the previous Nightly path-selection assertions as explicit full-route cases for
   `CMakePresets.json`, `cmake/CDReferences.cmake`, `cmake/MDECReferences.cmake`, `pins.txt`,
-  `tests/cdrom/reference.c`, a `tests/fuzz/` child, `tests/mdec/reference.c`,
+  `tests/cdrom/reference.c`, `tests/disc/chd.c`, a non-PBP `tests/fuzz/` child, `tests/mdec/reference.c`,
   `tests/nightly/inventory.txt`, `tests/nightly/tests.cmake`, and `tests/spu/reference.c`.
   The scratch route controls exited 0.
 - Add three upstream miniz digest rows to the existing table. Copy that source directory in the existing
