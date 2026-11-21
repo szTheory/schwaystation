@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 4
+current_plan: 5
 status: executing
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-11-21T09:49:43Z"
+stopped_at: Completed 10-04-PLAN.md
+last_updated: "2026-11-21T11:28:58Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-03 complete; Plan 10-04 next
-state_head: c108c18
+last_activity_desc: Phase 10 Plan 10-04 complete; Plan 10-05 next
+state_head: 54679e1
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 39
+completed_plans: 40
   percent: 30
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 (PBP disc images) — EXECUTING
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-03 complete; Plan 10-04 is next
+Last activity: 2026-11-21 — Plan 10-04 complete; Plan 10-05 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -105,7 +105,19 @@ classifier CTest (1/1), workflow wiring, action pins/timeouts, actionlint, `act`
 3,900/3,901 gate passed. The workflow_dispatch act attempt failed locally at artifact upload because no
 `ACTIONS_RUNTIME_TOKEN` is available; no hosted run or cost comparison was made. TODO 051 stays pending until
 the exact-head hosted run in Plan 10-13. Task commits: `bc4e922`, `9d74ab0`; summary:
-`.planning/phases/10-pbp-disc-images/10-11-SUMMARY.md`. Plan 10-03 is next.
+`.planning/phases/10-pbp-disc-images/10-11-SUMMARY.md`. Plan 10-03 was completed before this checkpoint; Plan 10-04 followed.
+
+### Phase 10 Plan 10-04 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary model ID is not exposed. The wall interval from the saved
+09:49:43Z STATE checkpoint through closeout at 11:28:58Z was about 1h39m and includes inherited idle time;
+active time in the resumed segment was not separately measured. Cheap inventory, whitespace, Python syntax and
+3,900/3,901 budget checks passed before configure/build. The deterministic generator produced identical
+1,124,404-byte PBP output from 64 owned sectors in four blocks. The focused build passed, and fixture preflight
+plus all negative controls passed 2/2 in 0.04s. The focused checks were not the source of the inherited pause;
+no process was interrupted. No workflow changed, so `act` and hosted CI were not applicable. Task commits are
+`68f8173` and `54679e1`; the plan summary is `.planning/phases/10-pbp-disc-images/10-04-SUMMARY.md`.
+Plan 10-05 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
