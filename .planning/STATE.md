@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 2
+current_plan: 11
 status: executing
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-11-21T06:16:36.191Z"
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-11-21T07:26:17Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 execution started
-state_head: 875f1477490e9dbf978b8ee25f9e1c68ff980177
+last_activity_desc: Phase 10 Plan 10-02 complete; Plan 10-11 next
+state_head: 07fd276ae8d5fb355ca32720cb06306200d2c395
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-  completed_plans: 36
+  completed_plans: 37
   percent: 30
 ---
 
@@ -75,7 +75,24 @@ inventory passed, and `disc.image.pbp_headers` passed 1/1. Branch-wide `git diff
 extra blank line in each Phase 10 plan; commit `875f147` removed only those trailing blank lines, after which
 the full range check passed. No workflow changed, so no `act` or hosted CI run applied. This proves only the
 host-only outer-envelope boundary; PBP-01 remains phase-wide pending. Task commits: `2df74ad`, `7349f35`,
-`9dfccfb`; planning-ending correction: `875f147`. Plan 10-02 is next.
+`9dfccfb`; planning-ending correction: `875f147`. Plan 10-02 followed.
+
+### Phase 10 Plan 10-02 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna` xhigh. The wall interval from the previous saved
+STATE checkpoint at 06:16:36Z through this plan's closeout was about 1h05m; active work time was not measured.
+The three exact pinned modular miniz files, the project shim and the MIT grant are recorded in provenance and
+notices; the upstream `miniz.h` remains excluded. Cheap pin/hash/license, notice, mutation, selector, diff and
+budget checks passed before the build. The standalone target first failed under `-Werror` on undefined upstream
+portability macros and conversion warnings; setting the three research-verified macros and suppressing only
+conversion warnings for the unchanged vendor C file made the focused build pass. The `library` preset confirmed
+CHD and its tool OFF, and the image target compiled with the standalone inflater. The symbol audit found all four
+private definitions and no unresolved tinfl, allocator or zlib symbols. The vendored CTest selectors passed 2/2
+in 0.11s; direct notice and digest scripts passed, including both expected negative mutations. Gate total is
+3,869/3,901. No workflow changed, so no `act` or hosted run applied. A `cmake --preset ci -LAH` cache inspection
+reconfigured build/ci and restored its preset defaults; use `cmake -LA -N build/ci` for read-only inspection.
+Task commits are `8e64f5c` and `07fd276`; summary is `.planning/phases/10-pbp-disc-images/10-02-SUMMARY.md`.
+Plan 10-11 is the other ready Wave 2 item and is next under the sequential executor.
 
 ### Phase 9 plan verification (2026-11-19)
 
