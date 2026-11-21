@@ -5,12 +5,12 @@ milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
 current_plan: 13
-status: ready_for_verification
-stopped_at: Completed 10-13-PLAN.md; final local workflow passed; Phase 10 verification/ship next
-last_updated: "2026-11-21T15:55:49.987Z"
+status: ready_for_ship
+stopped_at: Phase 10 verification passed; exact-head hosted CI/Nightly and linked WASI size remain required ship gates
+last_updated: "2026-11-21T16:08:38Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-13 complete; formal verification is next
-state_head: e9ce1686c59302885d21653159da005ef0c7d9bd
+last_activity_desc: Phase 10 verification passed; hosted CI/Nightly and linked WASI measurement are next at ship
+state_head: 863d2e2dae4b1ae9434105156bd599445a3bbf27
 progress:
   total_phases: 10
   completed_phases: 3
@@ -26,16 +26,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 10 — PBP disc images
+**Current focus:** Phase 10 — PBP disc images; verified locally, ready for ship gates
 
 ## Current Position
 
-Phase: 10 (PBP disc images) — READY FOR VERIFICATION
+Phase: 10 (PBP disc images) — VERIFIED; READY FOR SHIP
 Current Plan: 13
 Total Plans in Phase: 13
-Status: Ready for formal verification; hosted CI, Nightly and the linked WASI measurement are pending at ship.
-Last activity: 2026-11-21 — Plan 10-13 local closeout complete; formal verification is next
+Status: Phase goal passed formal verification; exact-head hosted CI, Nightly and the linked WASI measurement remain mandatory ship gates. No phase advance or release has occurred.
+Last activity: 2026-11-21 — Phase 10 verification passed; ship gates are next
 Progress: [███░░░░░░░] 30% (3/10 phases released)
+
+### Phase 10 verification (2026-11-21)
+
+Runtime/model: GSD verifier `gpt-6-luna` xhigh. Goal-backward verification passed 2/2 roadmap truths; implementation artifacts, wiring, data flow, requirements coverage, and all 13 plan artifact/key-link audits passed. Context decision coverage was 12/12. The local final workflow evidence already recorded above passed 655 standard tests and 7 release checks; verification did not rerun tests. The verifier corrected four stale Plan 10-09 references from `libretro/schwaystation_libretro.c` to `libretro/libretro.c` and confirmed that plan's artifact/key-link audit passed. Report: `.planning/phases/10-pbp-disc-images/10-VERIFICATION.md`; `verification.status` returned `passed` (exit 0).
+
+The actual linked WASI size and exact-head hosted PR CI/Nightly remain mandatory ship gates, not implementation gaps. No hosted result or WASI measurement is claimed. Do not advance to Phase 11 or release before the ship gate records the hosted run URLs, checks critical-path time and Actions usage, and measures the linked WASI module.
 
 ### Phase 10 Plan 10-13 execution (2026-11-21)
 
