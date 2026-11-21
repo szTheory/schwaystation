@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: Completed 10-04-PLAN.md
-last_updated: "2026-11-21T11:28:58Z"
+stopped_at: Completed 10-05-PLAN.md
+last_updated: "2026-11-21T12:02:59Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-04 complete; Plan 10-05 next
-state_head: 54679e1
+last_activity_desc: Phase 10 Plan 10-05 complete; Plan 10-06 next
+state_head: 826cb13
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-completed_plans: 40
+completed_plans: 41
   percent: 30
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 (PBP disc images) — EXECUTING
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Plan 10-04 complete; Plan 10-05 is next
+Last activity: 2026-11-21 — Plan 10-05 complete; Plan 10-06 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -118,6 +118,19 @@ plus all negative controls passed 2/2 in 0.04s. The focused checks were not the 
 no process was interrupted. No workflow changed, so `act` and hosted CI were not applicable. Task commits are
 `68f8173` and `54679e1`; the plan summary is `.planning/phases/10-pbp-disc-images/10-04-SUMMARY.md`.
 Plan 10-05 is next.
+
+### Phase 10 Plan 10-05 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor `gpt-6-luna` xhigh; primary model ID is not exposed. The wall
+interval from the prior saved STATE checkpoint at 11:28:58Z through closeout at 12:02:59Z was about 34 minutes;
+active time was not separately measured. Cheap inventory, diff and repository-budget checks passed before the
+focused build. The metadata parser maps the fixture's absolute `00:02:00` start through the 150-frame lead-in
+and checks cumulative compressed extents. An initial `-Werror`, legacy test header and maximum-BCD test
+expectation each surfaced at focused checks and were corrected. All six PBP selectors passed 6/6 in 0.03s.
+Valid BCD MSF cannot encode a logical image over 1 GiB; the maximum legal table and oversized file-size guard
+are tested separately. The gate remains 3,900/3,901. No workflow changed, so `act` and hosted CI were not
+applicable. Task commits: `5db27a6`, `826cb13`; summary:
+`.planning/phases/10-pbp-disc-images/10-05-SUMMARY.md`. Plan 10-06 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
