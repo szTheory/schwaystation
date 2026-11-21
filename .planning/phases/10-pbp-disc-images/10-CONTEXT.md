@@ -1,6 +1,6 @@
 # Phase 10: PBP disc images - Context
 
-**Gathered:** 2026-11-20
+**Gathered:** 2026-11-21
 **Status:** Ready for planning
 
 <domain>
@@ -20,11 +20,11 @@ Players can open explicitly verified, unencrypted PSISO PBP images through the e
 
 ### Provider and inflater
 - **D-04:** Implement PBP as a separate host-only provider that plugs into the shared `schway_disc` contract and is called by the existing image dispatcher. Keep the core, public ABI, and guest-visible disc path unchanged. PBP must work with `SCHWAYSTATION_CHD=OFF` and without system zlib.
-- **D-05:** Verify the exact standalone miniz source revision, file set, license grant, notice text, and per-file digest before copying it into the repository. Keep this source and its MIT notice distinct from libchdr's build-tree miniz copy. Pin the source to a public commit; preserve notices in every archive that links it and update `PROVENANCE.md` and `THIRD-PARTY-NOTICES.md`.
+- **D-05:** Use the pinned modular inflater files `miniz_tinfl.c`, `miniz_tinfl.h`, and `miniz_common.h` under the upstream MIT grant. Exclude upstream `miniz.h`, whose stale Unlicense wording conflicts with the pin's MIT license record; supply the small project-owned compatibility header it needs and a generated export header. Keep these sources and notices distinct from libchdr's build-tree miniz copy, preserve their exact digests, and update `PROVENANCE.md` and `THIRD-PARTY-NOTICES.md`.
 - **D-06:** Keep generated PBP bytes run-local. Derive them from owned source media and record input/tool/output identities. Before any long test or guest run, check fixture size and digest, directory/TOC bounds and ordering, track counts, compressed extents, requested versus decoded sector counts, and first/final boundary sectors. Compare supported sectors and TOC against the owned source media before guest execution.
 
 ### CI, quality gates, and iteration speed
-- **D-07:** Fold TODOs 002, 005, 006, and 051 into this phase. Add the release-floor check because this phase first adds a statically linked PBP inflater to the packaged libretro core; implement the deferred tracked-source SPDX scan with the first tracked SPDX-bearing source; extend the existing vendored-file digest self-test for the exact new source; and route Nightly PR jobs conservatively. Update each todo's status/binding and correct stale phase text as appropriate.
+- **D-07:** Fold TODOs 006 and 051 into this phase. Extend the existing vendored-file digest self-test for the exact new source and route Nightly PR jobs conservatively. Leave TODO 002 pending because its recorded first link/export trigger was already crossed in Phase 4; leave TODO 005 pending because the pinned miniz source files selected so far contain no SPDX identifiers and the owner chose to defer the generic scanner. Preserve the miniz license notice and archive checks required for this dependency; do not treat those as a reason to add the deferred scanner.
 - **D-08:** Keep the repository-check gate under the existing 3,901-line ceiling. No increase is authorized. Planning must account for all new counted helpers and negative controls, reuse existing gates where they cover the same fault, and preserve every requirement-named assertion. If the full folded scope cannot fit without moving/minifying gate logic or weakening checks, surface the concrete budget conflict before implementation instead of silently dropping acceptance.
 - **D-09:** For Nightly pull requests, skip only the four benchmark jobs and `vectors-full` when a conservative classifier proves the change is PBP-only. Keep relevant fuzz campaigns. Unknown paths, shared source/tests, build or workflow changes, and routing changes run every Nightly job. Scheduled and manual runs retain the full existing workload. Confirm routing with `act --dryrun` and a hosted changed-head run; record raw runner time separately from wall-clock time and do not call raw runner seconds billing cost.
 - **D-10:** Run cheap, relevant consistency checks before broad suites or hosted CI: sorted inventories, workflow selectors and job wiring, fixture identity and extents, and the current gate total. Reuse checks that already catch recurring faults; add a permanent preflight only when it prevents a named recurring fault. For each CI run, inspect critical-path time, duplicate work, iteration delay, and Actions cost while it is running and after completion. Preserve all required platforms, cases, assertions, and quality bounds.
@@ -36,15 +36,15 @@ Players can open explicitly verified, unencrypted PSISO PBP images through the e
 - Use one hosted changed-head CI run for coherent routing and code changes where practical, after the cheapest local preflights and any `act` check that adds coverage. Adjust provisional executor-chosen timeouts from measured workload only; preserve every case and explicit limit.
 
 ### Folded Todos
-- **002 — release floor check:** The PBP inflater will be statically linked into packaged libretro builds, so inspect packaged platform floors, dependencies, and required exports against documented supported platforms.
-- **005 — tracked-source SPDX scan:** This phase adds the first tracked SPDX-bearing source. Add the source-wide admitted-license and notice scan with its registered negative control, within the existing gate ceiling. Do not duplicate Phase 9's configure-time `.info`/linked-provider check.
 - **006 — vendored-file digest check:** Extend the existing `libretro.vendored` gate and negative control to hash the newly admitted standalone inflater source; retain the existing file coverage.
 - **051 — Nightly PR routing:** Apply a fail-closed changed-path classifier and its fast self-test, preserving full scheduled/manual coverage and relevant fuzz jobs.
 
 ### Reviewed Todos (not folded)
+- **002 — release floor check:** Its binding is the first Phase 4-or-later plan that changes packaged core links or exports, with Phase 4 called out as the intended trigger. That first trigger has already passed; PBP adds a private static C implementation but does not change the public export or platform policy in this phase. Do not silently rebind the overdue todo.
 - **003 — pins file schema gate:** Its recorded binding is the first `pins.txt` row after the armips entry; that trigger predates this phase. A PBP source pin is not a new first-trigger. Do not rebind the stale todo without evidence that this phase owns the missing generic schema gate.
 - **001 — CI required roll-up:** Nightly routing edits do not add a job to `ci.yml` or alter the required roll-up.
 - **004 — single version source:** Phase 10 does not introduce a second machine-edited release version.
+- **005 — tracked-source SPDX scan:** It is bound to the first tracked C source with an SPDX identifier. The four pinned miniz files reviewed for this phase contain no SPDX identifier; keep the user's scanner deferral and revisit on the first actual SPDX-bearing C source. Preserve miniz's upstream MIT license and notices now.
 - **021 — actionlint local config:** This phase does not add an actionlint gate.
 - **050 — release CI artifact reuse:** Already resolved with evidence and a prohibition on untested Main/Release substitution; keep it closed.
 
@@ -85,7 +85,8 @@ Players can open explicitly verified, unencrypted PSISO PBP images through the e
 - `libretro/schwaystation_libretro.info.in` and `docs/discs.md` — supported extension and user-facing media behavior.
 - `tests/cmake/vendored.cmake`, `tests/cmake/notices.cmake`, and `tests/cmake/expect_fail.cmake` — existing digest/notice checks and negative-control convention.
 - `.github/workflows/nightly.yml`, `.github/workflows/ci.yml`, and `.github/workflows/release.yml` — PR routing, required build lanes, and release packaging.
-- `.planning/todos/pending/002-release-floor-gate.md`, `.planning/todos/pending/005-notices-gates.md`, `.planning/todos/pending/006-vendored-digest-gate.md`, and `.planning/todos/pending/051-nightly-pr-job-routing.md` — folded acceptance details.
+- `.planning/todos/pending/006-vendored-digest-gate.md` and `.planning/todos/pending/051-nightly-pr-job-routing.md` — folded acceptance details.
+- `.planning/todos/pending/002-release-floor-gate.md`, `.planning/todos/pending/003-pins-gate.md`, and `.planning/todos/pending/005-notices-gates.md` — reviewed stale/future bindings that remain pending.
 - `.planning/todos/pending/050-release-ci-artifact-reuse.md` — resolved Main/Release reuse evidence and constraint.
 
 </canonical_refs>
@@ -121,6 +122,7 @@ Players can open explicitly verified, unencrypted PSISO PBP images through the e
 - The public PBP reference is partly reverse-engineered; unknown structures remain unsupported until an owned fixture proves their mapping.
 - Verify the requested source track count against both decoded sectors and boundary reads before guest execution.
 - Check the exact miniz revision, MIT notice, and per-file hash before source admission; keep the standalone PBP copy distinct from libchdr's build-tree copy.
+- Keep standalone `tinfl_*` symbols private at compile time without changing the pinned source bytes, disable unused allocation exports, and prove both CHD-disabled and CHD-enabled link graphs.
 - Preserve the current cap and all existing assertions; use measured before/after CI evidence to justify safe routing changes.
 
 </specifics>
@@ -129,7 +131,8 @@ Players can open explicitly verified, unencrypted PSISO PBP images through the e
 ## Deferred Ideas
 
 - Encrypted PGD, multi-disc switching, audio compression, and undocumented PSISO layouts stay unsupported.
-- A generic `pins.txt` schema-gate rebind is deferred because its recorded first-row trigger was already crossed; handle it only with new scope evidence.
+- TODOs 002 and 003 remain pending with their recorded first-trigger bindings already crossed; do not rebind without new scope evidence.
+- The generic SPDX scanner (TODO 005) remains deferred until the first tracked C source with an SPDX identifier; miniz's license and archive notices are still checked for this phase.
 - Any broader Main/Release artifact handoff stays deferred pending a tested producer/consumer design and measured benefit.
 - ECM/CloneCD, SBI/LibCrypt, profiles, peripherals, patch/cheat support, and milestone-wide DAT claims remain in their mapped later phases.
 
@@ -138,4 +141,4 @@ Players can open explicitly verified, unencrypted PSISO PBP images through the e
 ---
 
 *Phase: 10-pbp-disc-images*
-*Context gathered: 2026-11-20*
+*Context gathered: 2026-11-21*

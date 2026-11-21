@@ -6,11 +6,11 @@ current_phase: 10
 current_phase_name: PBP disc images
 current_plan: Not started
 status: planning
-stopped_at: Phase 10 context gathered
-last_updated: "2026-11-21T04:45:34.234Z"
+stopped_at: Phase 10 context and research corrected
+last_updated: "2026-11-21T05:10:42.608Z"
 last_activity: 2026-11-20
 last_activity_desc: Phase 9 complete, transitioned to Phase 10
-state_head: a66a49b858245461d052266b0e28ad812923d78a
+state_head: fb58ab910e2997490086f656eb1ba1de61fd369c
 progress:
   total_phases: 10
   completed_phases: 3
@@ -40,13 +40,16 @@ Last activity: 2026-11-20 — Phase 9 complete, transitioned to Phase 10
 
 Runtime/model: Codex session; primary model ID is not exposed. OpenGSD CLI 1.20.0; domain, security/architecture,
 CI/DevOps, and pattern-map advisors used gpt-6-luna xhigh. The elapsed wall interval from the previous saved
-STATE checkpoint at 01:24:41Z through discussion closeout at 04:45:44Z was 3h21m; active time was not measured.
+STATE checkpoint at 01:24:41Z through discussion closeout at 05:04:26Z was 3h39m; active time was not measured.
 Phase 9's release and exact-main CI completed green before this discussion. The PBP boundary is limited to
 fixture-proven unencrypted PSISO layouts; malformed structures fail as bad media, unknown/encrypted variants
-remain unsupported, and the provider stays host-only with no system zlib dependency. Folded TODOs 002, 005,
-006, and 051; retained the existing 3,901-line ceiling. Reviewed but did not rebind stale TODO 003. No test,
-build, `act`, or hosted workflow ran during discussion. Context is committed as `a66a49b`; Phase 10 planning
-is next.
+remain unsupported, and the provider stays host-only with no system zlib dependency. Folded TODOs 006 and 051;
+retained the existing 3,901-line ceiling. The four pinned miniz files inspected contain no SPDX identifier,
+so TODO 005 remains deferred per the owner's choice; TODO 002's and TODO 003's recorded first triggers predate
+this phase. The stale Unlicense wording in upstream `miniz.h` is excluded; use the three modular MIT files,
+project-owned shim, generated export header, and private symbol aliases. The cheap line-budget preflight passed
+at 3,901/3,901; no build, broad suite, `act`, or hosted workflow ran during discussion. The original context
+commit is `a66a49b`; the corrected scope and research are being committed before planning continues.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -1318,8 +1321,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T04:45:34.104Z
-Stopped at: Phase 10 context gathered
+Last session: 2026-11-21T05:10:42.478Z
+Stopped at: Phase 10 context and research corrected
 Resume file: .planning/phases/10-pbp-disc-images/10-CONTEXT.md
 
 ### v1.0 session history
