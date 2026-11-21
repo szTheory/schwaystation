@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/szTheory/schwaystation/compare/v0.9.0...v0.10.0) (2026-11-21)
+
+
+### Features
+
+* **media:** support PBP disc images ([#34](https://github.com/szTheory/schwaystation/issues/34)) ([9bf39aa](https://github.com/szTheory/schwaystation/commit/9bf39aa03ca7309ec5bf571333497937fe2fd150))
+
 ## [0.9.0](https://github.com/szTheory/schwaystation/compare/v0.8.0...v0.9.0) (2026-11-21)
 
 
