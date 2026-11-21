@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 10
-current_phase_name: PBP disc images
-current_plan: 13
-status: ready_for_ship
-stopped_at: Phase 10 verification passed; exact-head hosted CI/Nightly and linked WASI size remain required ship gates
-last_updated: "2026-11-21T16:08:38Z"
+current_phase: 11
+current_phase_name: ECM and CloneCD images
+current_plan: Not started
+status: planning
+stopped_at: Phase 10 complete, ready to plan Phase 11
+last_updated: "2026-11-21T16:15:05.946Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 verification passed; hosted CI/Nightly and linked WASI measurement are next at ship
-state_head: 863d2e2dae4b1ae9434105156bd599445a3bbf27
+last_activity_desc: Phase 10 complete, transitioned to Phase 11
+state_head: 532b8a7a7ad52a07c4fea9edeafdd417f89f9385
 progress:
   total_phases: 10
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 48
   completed_plans: 48
-  percent: 30
+  percent: 40
 ---
 
 # Project State
@@ -30,12 +30,12 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 ## Current Position
 
-Phase: 10 (PBP disc images) — VERIFIED; READY FOR SHIP
-Current Plan: 13
+Phase: 11 — ECM and CloneCD images
+Current Plan: Not started
 Total Plans in Phase: 13
-Status: Phase goal passed formal verification; exact-head hosted CI, Nightly and the linked WASI measurement remain mandatory ship gates. No phase advance or release has occurred.
-Last activity: 2026-11-21 — Phase 10 verification passed; ship gates are next
-Progress: [███░░░░░░░] 30% (3/10 phases released)
+Status: Ready to plan
+Last activity: 2026-11-21 — Phase 10 complete, transitioned to Phase 11
+Progress: [████░░░░░░] 40% (3/10 phases released)
 
 ### Phase 10 verification (2026-11-21)
 
@@ -609,7 +609,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 230
+- Total plans completed: 243
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -626,6 +626,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 7 | 10 | - | - |
 | 8 | 10 | - | - |
 | 9 | 15 | - | - |
+| 10 | 13 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1498,7 +1499,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-21T15:54:44.176Z
-Stopped at: Completed 10-13-PLAN.md; final local workflow passed; Phase 10 verification/ship next
+Stopped at: Phase 10 complete, ready to plan Phase 11
 Resume file: None
 
 ### v1.0 session history
