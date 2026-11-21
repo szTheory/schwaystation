@@ -86,3 +86,70 @@ The initial CHD-OFF focused host test also exposed a stale host/card helper
 built under the previous CHD-ON configuration (`chd_enabled 0 != 1`). The
 configuration-sensitive helpers and fixture targets were rebuilt for OFF;
 the final 7/7 focused run passed.
+
+## Task 2: CHD-ON parity and package closure
+
+### Configuration, tests, and archives
+
+```sh
+cmake --preset ci -DSCHWAYSTATION_CHD=ON -DSCHWAYSTATION_BUILD_CHD_TOOL=ON
+ctest --preset ci --no-tests=error -R '^libretro[.]info[.]claims([.]self_test)?$' --output-on-failure
+cmake --build --preset ci --target schwaystation-run schwaystation_libretro schwaystation-test-disc-pbp schwaystation-test-disc-chd schwaystation-test-libretro-host schwaystation-libretro-card-test schwaystation-pbp-fixtures schwaystation-chd-fixtures
+ctest --preset ci --no-tests=error -R '^disc[.]image[.](pbp_parity|chd_parity)$|^runner[.]disc[.]pbp$|^libretro[.]content[.]pbp$|^libretro[.]info[.]claims([.]self_test)?$' --output-on-failure
+cpack --config build/ci/CPackConfig.cmake -C Release
+ctest --preset ci-release --no-tests=error -R '^release[.](archive_contents|notices)([.]self_test)?$' --output-on-failure
+```
+
+Configure, build, CPack, and all final selectors exited 0. The metadata
+selector passed 2/2 in 0.27 seconds. The combined PBP/CHD, runner, libretro
+content, metadata and preflight selector passed 9/9 in 5.79 seconds. It retained
+the original owned two-track CHD fixture and `disc.image.chd_parity` case; the
+fixture remains 5,552 bytes / 222 sectors with SHA-256
+`4952c3a05ff2e2e596deed7ed2d37358a646790b890d5ed38484feec5b797569`. The three
+ON component archives passed the same four existing archive and notice checks
+in 0.16 seconds.
+
+| Component archive | SHA-256 |
+| --- | --- |
+| `schwaystation-library-macos-arm64.zip` | `866613425db6d6d467f7f6069cb13dec527bc5d798dc23944ad62a2006c57b8d` |
+| `schwaystation-runner-macos-arm64.zip` | `e614e4cf92e916f0edc17b82ac9b90f0fd596384b258654dab2b87c0d5a5ae9e` |
+| `schwaystation-libretro-macos-arm64.zip` | `10aeec047be2b1e74191e95a4858a199c8d53a9db0e7ad8af8d532d97dfdcdbf` |
+
+Each archive carries the exact source notices file with SHA-256
+`239d21a89a87fb6d6322909808f27196b558eb02fb7836f06701b0710626b31d`.
+Generated `.info` metadata advertises
+`exe|psexe|cue|iso|m3u|pbp|chd`, reports the linked closure as
+`BSD-3-Clause, CC BY-SA 4.0, ISC, MIT, Public domain`, and retains
+`is_experimental = "true"`. The MIT PBP inflater notice stays present alongside
+the CHD/libchdr notices.
+
+### Independent inflater and CHD link inspection
+
+The verbose link commands and `ninja -C build/ci -t commands
+schwaystation_libretro` show the PBP inflater as its own
+`libschwaystation_pbp_miniz.a` archive, separate from libchdr's copy of miniz.
+The CHD-enabled core statically links the PBP archive with the libchdr, LZMA,
+and Zstandard archives; neither configuration uses `-lz`. The PBP archive is
+10,872 bytes. Its `nm -g` exports remain private `_schway__pbp_tinfl_*` and
+`_schway__pbp_inflate_raw` names, with no unprefixed standalone `tinfl_*`
+export. The CHD parity selector passes with both inflater symbol sets present,
+so no collision was introduced. `otool -L` lists only `/usr/lib/libSystem.B.dylib`
+for the resulting core.
+
+The actual CHD-ON arm64 Mach-O core is 612,128 bytes (the CHD-OFF core is
+359,952 bytes). These are native linked-module measurements only. They do not
+set, estimate, or replace any WASI size bound.
+
+## Efficiency and run disposition
+
+The exact digest, notice, inventory, budget and selector preflight completed
+before configure/build/package work. The affected PBP and existing CHD parity
+cases plus package/archive checks were sufficient; no broad suite was rerun.
+Switching CHD in the reused build tree required rebuilding the configuration-
+sensitive libretro host/card helpers after a stale-helper failure; the
+post-rebuild focused OFF run passed. The `ci` preset excludes release-labeled
+archive tests, so the existing `ci-release` preset ran those checks without
+changing their cases or assertions. No workflow changed, so hosted CI and `act`
+would not add coverage here. No package, lane, case, assertion, or quality bound
+was removed. The generic SPDX scanner remains deferred; the 3,901-line cap is
+unchanged.
