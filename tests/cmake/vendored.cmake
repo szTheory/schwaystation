@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.25)
 set(entries
   "libretro/libretro.h|036ddffc995ad116c3081ca0a7515d09c2a116f3483e4f5012fe0c29a885da76"
-  "tests/probe/rc_hash_disc.c|03c25f0a834006ab8dbb4bebc83f6ccb7500d1e2d15ea36e8ff8a30641c80444")
+  "tests/probe/rc_hash_disc.c|03c25f0a834006ab8dbb4bebc83f6ccb7500d1e2d15ea36e8ff8a30641c80444"
+  "host/miniz/miniz_tinfl.c|2296ebd21ef9af5ebbefd5b454d4bb67d8fb4af2d24945e7fb32114374f75a76"
+  "host/miniz/miniz_tinfl.h|da4850920fdf09f8877d9affabe1ebba1852ce4b1ebbd121f2ba7a7ea8e57e5d"
+  "host/miniz/miniz_common.h|f1ba29821c8caef83585b328196aa346c5da7c82890a70a3d10d77c6cec0ed39")
 if(NOT IS_DIRECTORY "${ROOT}" OR NOT CASE MATCHES "^(check|self_test)$")
   message(FATAL_ERROR "vendored: -DROOT and a valid -DCASE are required")
 endif()
@@ -20,12 +23,14 @@ elseif(CASE STREQUAL "self_test")
   file(REMOVE_RECURSE "${WORK}")
   file(COPY "${ROOT}/libretro" DESTINATION "${WORK}")
   file(COPY "${ROOT}/tests/probe" DESTINATION "${WORK}/tests")
-  set(changed "${WORK}/tests/probe/rc_hash_disc.c")
-  file(READ "${changed}" source)
-  string(REPLACE "#include \"rc_hash.h\"" "#include \"rc_hash.i\"" source "${source}")
-  file(WRITE "${changed}" "${source}")
+  file(COPY "${ROOT}/host/miniz" DESTINATION "${WORK}/host")
   set(CMD "${CMAKE_COMMAND}" -DCASE=check "-DROOT=${WORK}" -P "${CMAKE_CURRENT_LIST_FILE}")
   set(CODE 1)
   set(REGEX "vendored: digest mismatch")
-  include("${CMAKE_CURRENT_LIST_DIR}/expect_fail.cmake")
+  foreach(path IN ITEMS "tests/probe/rc_hash_disc.c" "host/miniz/miniz_tinfl.c")
+    set(changed "${WORK}/${path}")
+    file(APPEND "${changed}" " ")
+    include("${CMAKE_CURRENT_LIST_DIR}/expect_fail.cmake")
+    file(COPY_FILE "${ROOT}/${path}" "${changed}")
+  endforeach()
 endif()
