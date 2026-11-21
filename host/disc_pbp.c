@@ -2,6 +2,7 @@
 #define _XOPEN_SOURCE 700
 #endif
 #include "disc_pbp.h"
+#include "disc_pbp_metadata.h"
 #include "media_limits.h"
 
 #include <limits.h>
@@ -13,9 +14,9 @@
 #include <sys/types.h>
 #endif
 
-#define SCHWAY__DISC_PBP_HEADER_BYTES 40u
-#define SCHWAY__DISC_PBP_OFFSET_COUNT 8u
-#define SCHWAY__DISC_PBP_PSAR_MARKER_BYTES 12u
+struct schway__disc_pbp {
+    uint8_t reserved;
+};
 
 static schway_disc_image_status schway__disc_pbp_error(
     schway_disc_image_error *error, schway_disc_image_status status,
@@ -28,12 +29,6 @@ static schway_disc_image_status schway__disc_pbp_error(
         (void)snprintf(error->message, sizeof(error->message), "%s", message);
     }
     return status;
-}
-
-static uint32_t schway__disc_pbp_le32(const uint8_t bytes[4])
-{
-    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) |
-           ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
 }
 
 static int schway__disc_pbp_file_size(FILE *file, uint64_t *size)
@@ -55,13 +50,28 @@ static int schway__disc_pbp_file_size(FILE *file, uint64_t *size)
     return 1;
 }
 
+static schway_disc_image_status schway__disc_pbp_read_at(
+    void *context, uint64_t offset, uint8_t *bytes, size_t size)
+{
+    FILE *file = (FILE *)context;
+    if (file == NULL || bytes == NULL || offset > (uint64_t)INT64_MAX) {
+        return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
+    }
+#if defined(_WIN32)
+    if (_fseeki64(file, (__int64)offset, SEEK_SET) != 0) return SCHWAY_DISC_IMAGE_IO;
+#else
+    if (fseeko(file, (off_t)offset, SEEK_SET) != 0) return SCHWAY_DISC_IMAGE_IO;
+#endif
+    if (fread(bytes, 1u, size, file) == size) return SCHWAY_DISC_IMAGE_OK;
+    return ferror(file) != 0 ? SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+}
+
 schway_disc_image_status schway__disc_pbp_open(const char *path,
                                                 schway__disc_pbp **out,
                                                 schway_disc_image_error *error)
 {
-    uint8_t header[SCHWAY__DISC_PBP_HEADER_BYTES];
-    uint8_t marker[SCHWAY__DISC_PBP_PSAR_MARKER_BYTES];
-    uint32_t offsets[SCHWAY__DISC_PBP_OFFSET_COUNT];
+    schway__disc_pbp_metadata_map map;
+    schway_disc_image_status status;
     uint64_t file_bytes;
     FILE *file;
 
@@ -85,56 +95,20 @@ schway_disc_image_status schway__disc_pbp_open(const char *path,
         return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_LIMIT,
                                       "PBP file exceeds the 1 GiB limit");
     }
-    if (file_bytes < sizeof(header)) {
-        (void)fclose(file);
-        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
-                                      "PBP header is truncated");
+    memset(&map, 0, sizeof(map));
+    status = schway__disc_pbp_metadata_parse(schway__disc_pbp_read_at, file,
+                                              file_bytes, &map);
+    schway__disc_pbp_metadata_clear(&map);
+    if (fclose(file) != 0 && status == SCHWAY_DISC_IMAGE_OK) {
+        status = SCHWAY_DISC_IMAGE_IO;
     }
-    if (fread(header, 1u, sizeof(header), file) != sizeof(header)) {
-        schway_disc_image_status status = ferror(file) != 0 ?
-            SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
-        (void)fclose(file);
-        return schway__disc_pbp_error(error, status, "could not read PBP header");
-    }
-    if (memcmp(header, "\0PBP", 4u) != 0) {
-        (void)fclose(file);
-        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
-                                      "PBP header magic is invalid");
-    }
-    for (uint32_t i = 0u; i < SCHWAY__DISC_PBP_OFFSET_COUNT; i++) {
-        offsets[i] = schway__disc_pbp_le32(header + 8u + (size_t)i * 4u);
-        if (offsets[i] < SCHWAY__DISC_PBP_HEADER_BYTES ||
-            (uint64_t)offsets[i] > file_bytes ||
-            (i != 0u && offsets[i] < offsets[i - 1u])) {
-            (void)fclose(file);
-            return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
-                                          "PBP section offsets are invalid");
-        }
-    }
-    if (file_bytes - offsets[SCHWAY__DISC_PBP_OFFSET_COUNT - 1u] < sizeof(marker)) {
-        (void)fclose(file);
-        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
-                                      "PBP data section is truncated");
-    }
-    if ((uint64_t)offsets[SCHWAY__DISC_PBP_OFFSET_COUNT - 1u] > (uint64_t)LONG_MAX ||
-        fseek(file, (long)offsets[SCHWAY__DISC_PBP_OFFSET_COUNT - 1u], SEEK_SET) != 0) {
-        (void)fclose(file);
-        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_IO,
-                                      "could not seek to PBP data section");
-    }
-    if (fread(marker, 1u, sizeof(marker), file) != sizeof(marker)) {
-        schway_disc_image_status status = ferror(file) != 0 ?
-            SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
-        (void)fclose(file);
-        return schway__disc_pbp_error(error, status, "could not read PBP data marker");
-    }
-    (void)fclose(file);
-    if (memcmp(marker, "PSISOIMG0000", sizeof(marker)) != 0) {
-        return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
-                                      "PBP encrypted or unknown data marker is unsupported");
+    if (status != SCHWAY_DISC_IMAGE_OK) {
+        return schway__disc_pbp_error(error, status,
+            status == SCHWAY_DISC_IMAGE_UNSUPPORTED ?
+            "PBP layout is unsupported" : "PBP metadata is invalid");
     }
     return schway__disc_pbp_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
-                                  "PBP PSISO parsing is not available in this provider slice");
+                                  "PBP metadata is valid; sector reading is unavailable");
 }
 
 void schway__disc_pbp_close(schway__disc_pbp *reader)
