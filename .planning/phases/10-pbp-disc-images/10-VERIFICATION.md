@@ -197,6 +197,30 @@ repository-check budget is exactly 3,901/3,901 lines. These results preserve the
 claim cross-platform hosted success. The repaired exact-head CI, Nightly and release-pipeline runs remain
 required before Phase 11.
 
+## Second ship-fix follow-up — 2026-11-21T17:23Z
+
+The second repaired-head attempt [44927726830](https://github.com/szTheory/schwaystation/actions/runs/44927726830)
+passed its WASI job at the recorded 875,971-byte bound but failed while linking the SDL2 example. The optional
+example's source list did not include the PBP provider or inflater. The concurrent Nightly
+[44927726826](https://github.com/szTheory/schwaystation/actions/runs/44927726826) reached the full fuzz route;
+`fuzz.regress.pbp` found that its owned fixture had not been built. The full route's explicit preset builds
+campaign executables but not the PBP fixture target, and seed validation was interleaved with long campaigns.
+
+The example source closure now builds the PBP provider and private inflater target; the exact local SDL2 example
+configure/build command passed. Nightly now builds the PBP fixture and validates all replay seed counts before
+any timed campaign; the focused local PBP replay wrote 14 seeds. The workflow-closure assertion, actionlint and
+diff checks passed. No acceptance behavior or roadmap truth changed. The two hosted attempts are not green ship
+evidence; finish the post-review local checks and run CI/Nightly together on the next head before release.
+
+## Post-review seed-order guard — 2026-11-21T17:39Z
+
+The independent review found the workflow assertion could accept a campaign moved inside the replay seed loop.
+The regex also used the route's literal `||` without escaping it. The test now checks that the loader campaign
+appears after the seed loop closes and treats `||` literally. The actual `disc_registration` check passed; a
+temporary malformed workflow with the loader campaign moved into the loop failed the same check as expected.
+The repository-check budget remains 3,901/3,901. This closes the local review/verification delta, but the
+repaired source and workflow still need one exact-head hosted CI/Nightly run and the release-pipeline checks.
+
 ---
 *Verified: 2026-11-21T16:50:05Z*
 *Verifier: the agent (gsd-verifier)*

@@ -96,8 +96,8 @@ The plan ledger recorded one commit after `cc46618`; the two earlier Phase 10 re
 ## Decisions Made
 
 - Keep the 3,901-line ceiling and defer the generic SPDX scanner, as the owner selected.
-- Leave the WASI bound at the prior valid 859,379-byte CHD-enabled producer measurement until the Phase 10 hosted job measures the actual linked PBP-enabled module.
-- Avoid a standalone `workflow_dispatch` run. The required exact-head CI and Nightly workloads will run once through the ship PR after phase verification, avoiding duplicate Actions cost.
+- Set the WASI bound from the measured 875,971-byte linked PBP-enabled producer on hosted run 44924014258; the later repaired-head WASI producer accepted the same value.
+- Keep exact-head CI and Nightly attempts consolidated through the ship PR; cancel an obsolete CI tail once a deterministic failure is fixed locally.
 
 ## Deviations from Plan
 
@@ -154,3 +154,15 @@ route checks passed; the full local workflow passed 655/655 tests and 7/7 releas
 protected-ratchet tests passed with a complete base checkout. The repaired head still requires one exact-head
 hosted CI and Nightly run before release. The failed-attempt timing and local evidence are recorded in
 `10-CI-EFFICIENCY.md` and `10-VERIFICATION-EVIDENCE.md`.
+
+## Second ship-fix follow-up (2026-11-21)
+
+PR CI 44927726830 exposed a missing PBP provider link in the SDL2 example; Nightly 44927726826 exposed that the
+full fuzz build preset omitted the PBP fixture and seed validation occurred after earlier timed campaigns. The
+example now builds the provider and inflater; Nightly builds the PBP fixture and validates all seeds before
+starting any campaign. Focused local verification passed: the SDL2 example linked, PBP replay wrote 14 seeds,
+the workflow-closure check and actionlint passed. Independent review found the seed-order assertion itself was
+too weak: a literal `||` was parsed as regex alternation, and the loader check was ordered before `seed_output`.
+The assertion now treats `||` literally and places the loader requirement after loop closure; the real workflow
+passes and a temporary inside-the-loop campaign regression is rejected. Both hosted attempts remain
+failed/cancelled evidence, not ship approval; rerun the complete required CI and Nightly on the next head.

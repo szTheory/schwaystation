@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: Ship follow-up
+current_plan: Ship follow-up 3
 status: shipping
-stopped_at: Phase 10 repaired local head, awaiting exact-head hosted CI/Nightly and release
-last_updated: "2026-11-21T16:55:15Z"
+stopped_at: Phase 10 review finding fixed and locally verified, awaiting exact-head hosted CI/Nightly and release
+last_updated: "2026-11-21T17:42:31Z"
 last_activity: 2026-11-21
-last_activity_desc: "Repaired Phase 10 ship failures; PR #34 needs one exact-head hosted rerun"
-state_head: 50efc31217b851de8cbe3b53677b525b9b65447d
+last_activity_desc: "Strengthened Nightly seed-order guard and validated its negative control; exact-head rerun pending"
+state_head: 0cbf4fa1c9e56893cc34ea448e88388b88fae549
 progress:
   total_phases: 10
   completed_phases: 4
@@ -73,6 +73,36 @@ and 9.7 Nightly runner-minutes. No dollar billing estimate is available. No loca
 sysroot is installed, so those hosted gates remain required. The correction diff had a clean independent review.
 Continue with one repaired-head PR/Nightly attempt, inspect live and final job timing, then merge/release only
 after all required lanes pass.
+
+### Phase 10 ship-fix follow-up 2 (2026-11-21)
+
+Runtime/model: Codex GPT-6; independent code review dispatched to `gsd-code-reviewer` gpt-6-luna xhigh.
+The previous state checkpoint was 16:55Z; this repair reached local verification at 17:23Z (28 minutes wall,
+including CI and tool waits; active time was not measured). PR CI 44927726830 failed in the SDL2 example because
+its source-built host image layer omitted the PBP provider/inflater. Nightly 44927726826 failed because the full
+fuzz build preset did not include the PBP fixture; the regression seed check occurred after earlier 60-second
+campaigns. The obsolete CI tail was cancelled after its deterministic link failure was reproduced and fixed.
+The Nightly run had already ended.
+
+The example now links the PBP reader and inflater; its local configure/build passed. Nightly now builds the PBP
+fixture and validates all seeds before timed campaigns. The local replay preflight wrote the expected 42 EXE
+seeds and 5/5/7/15/12/6/14 subsystem seeds. Workflow closure, actionlint, and the 3,901/3,901 line budget pass;
+`act pull_request --dryrun` parsed the Nightly route but did not execute it. The two attempts consumed 79.22 CI
+and 14.17 Nightly summed runner-minutes; no Actions dollar data was available. Keep every platform, case,
+campaign and assertion. Independent review found one gap in the seed-order assertion; the next subsection records
+the correction and post-review checks before the exact-head CI and Nightly attempt.
+
+### Phase 10 seed-order assertion follow-up (2026-11-21)
+
+Runtime/model: Codex GPT-6 session; independent `gsd-code-reviewer` `gpt-6-luna` xhigh. The interval from the
+17:23Z checkpoint through the 17:39Z local checks was about 16 minutes wall; active time was not measured. Review
+found that the Nightly regression assertion could accept a campaign inside the replay seed loop: the loader
+fragment preceded seed validation, and the route's literal `||` was interpreted as regex alternation. The check
+now treats the operator literally and requires the loader command after loop closure. The real workflow check
+passes, and a temporary inside-the-loop campaign fixture fails as expected. The gate remains 3,901/3,901 lines;
+actionlint and diff checks pass. The earlier CI/Nightly failures remain diagnosed and linked above. Commit this
+reviewed fix, run one consolidated exact-head CI/Nightly attempt, inspect its timing/cost while active and after
+completion, then release before Phase 11.
 
 ### Phase 10 discussion (2026-11-21)
 

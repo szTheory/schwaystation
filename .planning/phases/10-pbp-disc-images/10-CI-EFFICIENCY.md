@@ -43,10 +43,41 @@ fingerprints. `act pull_request --dryrun` passed for CI routing with job-specifi
 not execute hosted steps. Hosted platforms, artifact handoffs, GitHub permissions, RetroArch, WASI producer size
 and release integrations remain hosted-only.
 
+## Second repaired-head attempt
+
+PR CI [44927726830](https://github.com/szTheory/schwaystation/actions/runs/44927726830) and Nightly
+[44927726826](https://github.com/szTheory/schwaystation/actions/runs/44927726826) ran on `0cbf4fa`. The WASI
+job passed the 875,971-byte quality bound. CI's Linux x64 lane failed after 395 seconds while linking the
+optional SDL2 example: `disc_image.c` now calls the PBP provider, but the example target omitted the provider
+and its inflater. The other completed platform legs passed; BE32 and ASan were cancelled after the deterministic
+failure was diagnosed. The Nightly full route failed in `fuzz.regress.pbp` after 527 seconds because the fuzz
+build preset lists campaign executables but not `schwaystation-pbp-fixtures`; the PBP corpus check ran after
+earlier 60-second campaigns and could not read its owned fixture.
+
+The interrupted CI attempt used 79.22 summed job-minutes over 14m24s wall time. Nightly used 14.17 summed
+job-minutes over 8m58s wall time. These are runner-time sums, not billing-dollar estimates. The longest
+completed CI leg was macOS x64 at 724 seconds; BE32 and ASan each had consumed 818 seconds when cancelled, so
+this is not a completed critical-path sample. No dollar billing data is exposed here.
+
+The local repair now builds the SDL2 example with the PBP reader and private inflater closure. The Nightly full
+route explicitly builds the PBP fixture, and all replay seed files/counts are checked before any timed fuzz
+campaign starts. Focused local checks confirm the 14 PBP seeds are generated and the route assertion and
+actionlint pass. This keeps every platform, seed, campaign and assertion while moving a cheap consistency check
+ahead of long work. Re-run CI and Nightly together on the next repaired head, then record the successful
+critical path and runner-time signal before release.
+
+## Regression-check review follow-up
+
+The independent review found the static ordering assertion had a false-positive path: its literal `||` route
+operator was being interpreted as regex alternation, and the loader-campaign fragment preceded the seed-output
+fragment. The assertion now escapes the operator and requires the post-loop campaign after the seed-output
+checks. The real route check and line-budget check pass; a temporary workflow placing the loader campaign inside
+the seed loop fails the guard as intended. This validates the cheap preflight before spending another Nightly
+campaign run. No Actions coverage changed.
+
 ## Disposition
 
-The failures were caused by small compatibility/test wiring faults, not excessive required coverage. The
-obsolete known-failing tail was cancelled instead of waiting through the BE32 timeout or Nightly fuzz completion.
-No coverage was removed and no safe structural CI speedup was found in this attempt. Run the repaired PR head
-once; then record the final exact-head timing, runner-time signal, release-pipeline result and WASI size before
-merge.
+The failures were caused by integration and fixture-wiring gaps, not excessive required coverage. The obsolete
+known-failing CI tail was cancelled after the local fix passed; Nightly had already completed. No coverage was
+removed. The seed preflight now runs before the expensive campaign loop. Run the next repaired PR head once,
+inspect it live and after completion, and record the release-pipeline result before merge.

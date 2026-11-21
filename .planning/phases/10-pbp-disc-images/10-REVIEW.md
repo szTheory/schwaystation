@@ -118,3 +118,15 @@ classifier test still checks the two outputs consumed by the CI job while the de
 After the hosted matrix exposed a protected-base dependency gap, the `compat-base` sparse checkout added
 `tests/cmake/date_days.cmake`, and the workflow wiring assertion now guards that file closure. This follow-up
 was also independently reviewed clean. Focused classifier, PBP and protected-ratchet checks passed locally.
+
+## Seed-preflight assertion follow-up (2026-11-21)
+
+An independent review found that the Nightly workflow assertion did not guarantee every replay seed count was
+checked before the first timed campaign. The workflow itself already placed the loader campaign after the seed
+loop, but the assertion mentioned that loader campaign before `seed_output`, and its route regex treated the
+literal shell `||` as regex alternation. That made the regression check weaker than intended.
+
+The assertion now treats `||` literally and requires the loader campaign after the seed validation loop closes.
+`cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` passed. A temporary negative fixture
+with the loader campaign moved inside the seed loop was rejected by the same command (expected exit 1). The
+3,901-line budget remains exactly at its cap. No implementation or workflow coverage was removed.

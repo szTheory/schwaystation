@@ -204,12 +204,12 @@ jobs:
           cmake --preset chd-tool
           cmake --build --preset chd-tool
           test -x build/chd-tool/tools/schwaystation-chd-tool
-      - name: Build the owned CHD baseline fixture
+      - name: Build owned CHD and PBP baseline fixtures
         if: needs.changes.outputs.pbp_only != 'true'
         run: |
           set -eu
           cmake --preset fuzz
-          cmake --build build/fuzz --target schwaystation-disc-fixtures
+          cmake --build build/fuzz --target schwaystation-disc-fixtures schwaystation-pbp-fixtures
           cmake -DCHD_TOOL=build/chd-tool/tools/schwaystation-chd-tool \
             -DCUE=build/fuzz/fixtures/disc_boot.cue \
             -DOUTPUT_CHD=build/fuzz/fixtures/disc_boot.chd \
@@ -236,12 +236,8 @@ jobs:
           mkdir -p build/fuzz/corpus build/fuzz/crash
           if [[ "$PBP_ONLY" != 'true' ]]; then
             build/fuzz/tests/schwaystation-fuzz-exe-replay --write build/fuzz/corpus
-            rc=0
-            build/fuzz/tests/schwaystation-fuzz-exe -max_total_time=60 -timeout=20 -max_len=2099200 \
-              -artifact_prefix=build/fuzz/crash/ build/fuzz/corpus > build/fuzz/log.txt 2>&1 || rc=$?
-            tail -n 30 build/fuzz/log.txt
-            { echo '### fuzz'; echo '```'; tail -n 3 build/fuzz/log.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-            test "$rc" -eq 0
+            files=$(find build/fuzz/corpus -maxdepth 1 -type f -name '*.exe' | wc -l | tr -d ' ')
+            test "$files" -eq 42
             subsystems=(cue cnf m3u cdrom chd mdec pbp)
             expected=(5 5 7 15 12 6 14)
             max_lengths=(65536 4096 65536 16384 16384 262144 256)
@@ -259,6 +255,19 @@ jobs:
             files=$(find "$corpus" -maxdepth 1 -type f -name '*.exe' | wc -l | tr -d ' ')
             test "$files" -eq "${expected[$i]}"
             [[ "$seed_output" == *"wrote ${expected[$i]} seeds"* ]]
+          done
+          if [[ "$PBP_ONLY" != 'true' ]]; then
+            rc=0
+            build/fuzz/tests/schwaystation-fuzz-exe -max_total_time=60 -timeout=20 -max_len=2099200 \
+              -artifact_prefix=build/fuzz/crash/ build/fuzz/corpus > build/fuzz/log.txt 2>&1 || rc=$?
+            tail -n 30 build/fuzz/log.txt
+            { echo '### fuzz'; echo '```'; tail -n 3 build/fuzz/log.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            test "$rc" -eq 0
+          fi
+          for i in "${!subsystems[@]}"; do
+            name=${subsystems[$i]}
+            corpus="build/fuzz/corpus/$name"
+            crash="build/fuzz/crash/$name"
             rc=0
             "build/fuzz/tests/schwaystation-fuzz-$name" -max_total_time=60 -timeout=20 \
               -max_len="${max_lengths[$i]}" -artifact_prefix="$crash/" "$corpus" \
