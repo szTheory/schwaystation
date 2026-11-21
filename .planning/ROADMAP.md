@@ -133,7 +133,7 @@ Plans:
   1. The runner and libretro host read the verified unencrypted PSISO layouts and track variants with matching sectors and deterministic hashes. The provider functions with CHD disabled and without system zlib, and the bundled inflater carries its permissive notice.
   2. Bad PSISO offsets, track tables, sizes and truncated blocks fail at the media boundary. Encrypted PGD and undocumented layouts return a clear unsupported result before guest execution. The ledger records the variants exercised.
 
-**Plans**: 3/13 plans executed
+**Plans**: 4/13 plans executed
 
 Plans:
 **Wave 1**
@@ -144,7 +144,7 @@ Plans:
 - [x] 10-11-PLAN.md — Route Nightly PR jobs conservatively within the cap
 
 **Wave 3** *(depends on source admission)*
-- [ ] 10-03-PLAN.md — Prove bounded raw inflate with independent CHD ON/OFF links
+- [x] 10-03-PLAN.md — Prove bounded raw inflate with independent CHD ON/OFF links
 
 **Wave 4** *(depends on the inflater seam)*
 - [ ] 10-04-PLAN.md — Produce owned deterministic PBP bytes and source preflight
