@@ -7,6 +7,9 @@ disc.fixture.chd.boot	disc,portable
 disc.fixture.chd.fmv	disc,portable
 disc.fixture.chd.read	disc,portable
 disc.fixture.fmv	disc,portable
+disc.fixture.pbp.boot	disc,portable
+disc.fixture.pbp.fmv	disc,portable
+disc.fixture.pbp.read	disc,portable
 disc.fixture.read	disc,portable
 disc.hash	disc,portable
 disc.image.chd_boundaries	disc,portable

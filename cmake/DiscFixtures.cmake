@@ -70,7 +70,8 @@ configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
 
 set(schway__disc_guest "${PROJECT_BINARY_DIR}/fixtures/disc_boot.exe")
 add_custom_command(OUTPUT "${schway__disc_guest}"
-  COMMAND "${SCHWAYSTATION_ARMIPS}" -strequ IMAGE "${schway__disc_guest}" disc_boot.asm
+  COMMAND "${SCHWAYSTATION_ARMIPS}" -strequ IMAGE "${schway__disc_guest}"
+    -equ PBP_MODE 0 disc_boot.asm
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/tests/fixtures/src"
   DEPENDS schwaystation-armips
     "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.asm"

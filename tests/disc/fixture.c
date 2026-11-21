@@ -627,9 +627,15 @@ static uint32_t expected_gettd(const schway_disc_track *track)
            ((uint32_t)to_bcd(second) << 16);
 }
 
+static uint32_t expected_gettn(uint32_t track_count)
+{
+    return UINT32_C(0x02) | (UINT32_C(1) << 8) | ((uint32_t)to_bcd(track_count) << 16);
+}
+
 static int verify_guest(schway *inst, struct fixture_disc *host,
                         const uint8_t expected_data[DISC_DATA_BYTES], uint32_t expected_crc,
                         const uint32_t expected_records[8],
+                        uint32_t expected_track_count,
                         uint8_t mailbox_copy[MAILBOX_SIZE])
 {
     const uint8_t *ram = fixture_ram(inst);
@@ -683,15 +689,16 @@ static int verify_guest(schway *inst, struct fixture_disc *host,
     schway_toc toc;
     memset(&toc, 0, sizeof toc);
     toc.size = (uint32_t)sizeof toc;
-    if (host->provider.toc(host->provider.user, &toc) == 0u || toc.track_count != 2u) {
+    if (host->provider.toc(host->provider.user, &toc) == 0u ||
+        toc.track_count != expected_track_count) {
         fprintf(stderr, "disc fixture: unexpected TOC track count\n");
         return 0;
     }
     const uint32_t derived_values[8] = {
         UINT32_C(0x424F4F54),
-        UINT32_C(0x00020102),
+        expected_gettn(toc.track_count),
         expected_gettd(&toc.tracks[0]),
-        expected_gettd(&toc.tracks[1]),
+        toc.track_count == 1u ? 0u : expected_gettd(&toc.tracks[1]),
         expected_id_words[0],
         expected_id_words[1],
         DISC_SECTOR_COUNT,
@@ -700,14 +707,20 @@ static int verify_guest(schway *inst, struct fixture_disc *host,
     for (uint16_t id = 1u; id <= 8u; id++) {
         int found = 0;
         uint32_t got = mailbox_record(mailbox, id, &found);
-        if (expected_records[id - 1u] != derived_values[id - 1u]) {
+        int source_specific_pbp_record = toc.track_count == 1u &&
+                                         (id == 2u || id == 3u || id == 4u || id == 8u);
+        if (source_specific_pbp_record == 0 &&
+            expected_records[id - 1u] != derived_values[id - 1u]) {
             fprintf(stderr, "disc fixture: CSV row %u disagrees with independent source value\n",
                     (unsigned)id);
             return 0;
         }
-        if (found == 0 || got != expected_records[id - 1u]) {
+        uint32_t expected_value = source_specific_pbp_record != 0
+                                      ? derived_values[id - 1u]
+                                      : expected_records[id - 1u];
+        if (found == 0 || got != expected_value) {
             fprintf(stderr, "disc fixture: record %u got %08x expected %08x\n",
-                    (unsigned)id, got, expected_records[id - 1u]);
+                    (unsigned)id, got, expected_value);
             return 0;
         }
     }
@@ -721,13 +734,16 @@ static int verify_guest(schway *inst, struct fixture_disc *host,
             return 0;
         }
     }
-    for (size_t i = 0u; i < sizeof fixture_bad_q_lbas / sizeof fixture_bad_q_lbas[0]; i++) {
-        if (host->bad_q_seen[fixture_bad_q_lbas[i]] == 0u) {
-            fprintf(stderr, "disc fixture: bad-Q callback missed LBA %u\n", fixture_bad_q_lbas[i]);
-            return 0;
+    if (toc.track_count == 2u) {
+        for (size_t i = 0u; i < sizeof fixture_bad_q_lbas / sizeof fixture_bad_q_lbas[0]; i++) {
+            if (host->bad_q_seen[fixture_bad_q_lbas[i]] == 0u) {
+                fprintf(stderr, "disc fixture: bad-Q callback missed LBA %u\n", fixture_bad_q_lbas[i]);
+                return 0;
+            }
         }
     }
-    if (host->bad_q_hits < sizeof fixture_bad_q_lbas / sizeof fixture_bad_q_lbas[0] ||
+    if ((toc.track_count == 2u &&
+         host->bad_q_hits < sizeof fixture_bad_q_lbas / sizeof fixture_bad_q_lbas[0]) ||
         host->outside_run_calls != 0u) {
         fprintf(stderr, "disc fixture: bad-Q or callback run-boundary check failed\n");
         return 0;
@@ -766,7 +782,7 @@ static int run_boot_case(const char *bios_path, const uint8_t digest[32],
 
 static int run_read_case(const char *bios_path, const uint8_t digest[32],
                          const schway_disc *disc, struct fixture_disc *host,
-                         const uint32_t expected_records[8])
+                         const uint32_t expected_records[8], uint32_t expected_track_count)
 {
     uint8_t expected_data[DISC_DATA_BYTES];
     uint32_t expected_crc = 0u;
@@ -791,7 +807,8 @@ static int run_read_case(const char *bios_path, const uint8_t digest[32],
          schway_save_state(inst, checkpoint, state_size) == SCHWAY_STATUS_OK &&
          run_frames(inst, host, 301u, 600u, 0u, NULL) && guest_started(inst) &&
          run_frames(inst, host, 601u, 900u, 0u, NULL) &&
-         verify_guest(inst, host, expected_data, expected_crc, expected_records, first_mailbox) &&
+         verify_guest(inst, host, expected_data, expected_crc, expected_records,
+                      expected_track_count, first_mailbox) &&
          schway_save_state(inst, final_state, state_size) == SCHWAY_STATUS_OK;
     if (ok == 0) {
         fprintf(stderr, "disc fixture: no-input boot/read acceptance failed\n");
@@ -799,7 +816,8 @@ static int run_read_case(const char *bios_path, const uint8_t digest[32],
     }
     if (schway_load_state(inst, checkpoint, state_size) != SCHWAY_STATUS_OK ||
         !run_frames(inst, host, 301u, 900u, 0u, NULL) ||
-        !verify_guest(inst, host, expected_data, expected_crc, expected_records, press_mailbox) ||
+        !verify_guest(inst, host, expected_data, expected_crc, expected_records,
+                      expected_track_count, press_mailbox) ||
         schway_save_state(inst, replay_state, state_size) != SCHWAY_STATUS_OK ||
         memcmp(first_mailbox, press_mailbox, MAILBOX_SIZE) != 0 ||
         memcmp(final_state, replay_state, state_size) != 0) {
@@ -815,7 +833,8 @@ static int run_read_case(const char *bios_path, const uint8_t digest[32],
     }
     ok = run_frames(inst, host, 1u, 600u, 300u, NULL) && guest_started(inst) &&
          run_frames(inst, host, 601u, 900u, 300u, NULL) &&
-         verify_guest(inst, host, expected_data, expected_crc, expected_records, press_mailbox) &&
+         verify_guest(inst, host, expected_data, expected_crc, expected_records,
+                      expected_track_count, press_mailbox) &&
          memcmp(first_mailbox, press_mailbox, MAILBOX_SIZE) == 0;
     if (ok == 0) fprintf(stderr, "disc fixture: press@300 boot/read acceptance failed\n");
 
@@ -834,6 +853,7 @@ static int run_av_variant(const char *bios_path, const uint8_t digest[32],
                           const uint32_t expected_records[8],
                           const uint8_t expected_data[DISC_DATA_BYTES], uint32_t expected_crc,
                           uint32_t press_frame, uint32_t check_split,
+                          uint32_t expected_track_count,
                           struct audio_capture *capture, uint8_t pixels[AV_FRAME_BYTES],
                           uint8_t mailbox_copy[MAILBOX_SIZE])
 {
@@ -862,7 +882,8 @@ static int run_av_variant(const char *bios_path, const uint8_t digest[32],
     if (ok != 0) {
         ok = run_frames(inst, host, 301u, 600u, press_frame, capture) && guest_started(inst) &&
              run_frames(inst, host, 601u, AV_CAPTURE_FRAME, press_frame, capture) &&
-             verify_guest(inst, host, expected_data, expected_crc, expected_records, mailbox) &&
+             verify_guest(inst, host, expected_data, expected_crc, expected_records,
+                          expected_track_count, mailbox) &&
              capture_frame(inst, pixels) &&
              schway_save_state(inst, final_state, state_size) == SCHWAY_STATUS_OK;
     }
@@ -870,11 +891,12 @@ static int run_av_variant(const char *bios_path, const uint8_t digest[32],
         fprintf(stderr, "disc fixture: AV acceptance failed (press frame %u)\n", press_frame);
         goto cleanup;
     }
-    if (capture->pairs == 0u || capture->nonzero == 0u ||
-        capture->saw_xa_decode == 0u || capture->saw_xa_nonzero_queue == 0u ||
-        capture->saw_cdda_nonzero_queue == 0u || audio_sector_coverage(host) == 0 ||
-        host->xa_mode_seen != 0x48u || host->xa_file_seen != 7u ||
-        host->xa_channel_seen != 3u || host->xa_sector_shape_seen == 0u) {
+    if (expected_track_count == 2u &&
+        (capture->pairs == 0u || capture->nonzero == 0u ||
+         capture->saw_xa_decode == 0u || capture->saw_xa_nonzero_queue == 0u ||
+         capture->saw_cdda_nonzero_queue == 0u || audio_sector_coverage(host) == 0 ||
+         host->xa_mode_seen != 0x48u || host->xa_file_seen != 7u ||
+         host->xa_channel_seen != 3u || host->xa_sector_shape_seen == 0u)) {
         fprintf(stderr,
                 "disc fixture: audio source predicate failed "
                 "(pairs=%zu PCM=%u XA decode/nonzero queue=%u/%u CDDA nonzero queue=%u "
@@ -897,13 +919,16 @@ static int run_av_variant(const char *bios_path, const uint8_t digest[32],
         ok = schway_load_state(inst, checkpoint, state_size) == SCHWAY_STATUS_OK &&
              run_frames(inst, host, 301u, AV_CAPTURE_FRAME, press_frame, &replay_capture) &&
              verify_guest(inst, host, expected_data, expected_crc, expected_records,
+                          expected_track_count,
                           replay_mailbox) &&
              capture_frame(inst, replay_pixels) &&
              schway_save_state(inst, replay_state, state_size) == SCHWAY_STATUS_OK;
-        if (ok == 0 || capture->pairs < split_pairs ||
-            replay_capture.pairs != capture->pairs - split_pairs ||
-            memcmp(replay_capture.samples, capture->samples + split_pairs * 2u,
-                   replay_capture.pairs * 2u * sizeof *capture->samples) != 0 ||
+        int audio_matches = expected_track_count == 1u ||
+            (capture->pairs >= split_pairs &&
+             replay_capture.pairs == capture->pairs - split_pairs &&
+             memcmp(replay_capture.samples, capture->samples + split_pairs * 2u,
+                    replay_capture.pairs * 2u * sizeof *capture->samples) == 0);
+        if (ok == 0 || audio_matches == 0 ||
             memcmp(replay_pixels, pixels, AV_FRAME_BYTES) != 0 ||
             memcmp(mailbox, replay_mailbox, MAILBOX_SIZE) != 0 ||
             memcmp(final_state, replay_state, state_size) != 0) {
@@ -936,7 +961,8 @@ static int audio_sector_coverage(const struct fixture_disc *host)
 static int run_av_case(const char *mode, const char *bios_path,
                        const uint8_t digest[32], const schway_disc *disc,
                        struct fixture_disc *host, const uint32_t expected_records[8],
-                       const struct av_expectations *expected, const char *predicate_path)
+                       const struct av_expectations *expected, const char *predicate_path,
+                       uint32_t expected_track_count)
 {
     uint8_t expected_data[DISC_DATA_BYTES];
     uint32_t expected_crc = 0u;
@@ -953,31 +979,36 @@ static int run_av_case(const char *mode, const char *bios_path,
     uint8_t none_pixels[AV_FRAME_BYTES];
     uint8_t press_pixels[AV_FRAME_BYTES];
     int ok = run_av_variant(bios_path, digest, disc, host, expected_records,
-                            expected_data, expected_crc, 0u, 1u, &none, none_pixels,
+                            expected_data, expected_crc, 0u, 1u, expected_track_count,
+                            &none, none_pixels,
                             none_mailbox);
     if (ok != 0) {
         ok = run_av_variant(bios_path, digest, disc, host, expected_records,
-                            expected_data, expected_crc, 300u, 0u, &press, press_pixels,
+                            expected_data, expected_crc, 300u, 0u, expected_track_count,
+                            &press, press_pixels,
                             press_mailbox);
     }
     if (ok != 0) {
-        char audio_none[65];
+        char audio_none[65] = "";
+        char audio_press[65] = "";
         char frame_none[65];
-        char audio_press[65];
         char frame_press[65];
-        digest_audio(&none, audio_none);
         digest_frame(none_pixels, frame_none);
-        digest_audio(&press, audio_press);
         digest_frame(press_pixels, frame_press);
-        printf("CAPTURE audio-900.none=%s (%zu pairs)\n", audio_none, none.pairs);
+        if (expected_track_count == 2u) {
+            digest_audio(&none, audio_none);
+            digest_audio(&press, audio_press);
+            printf("CAPTURE audio-900.none=%s (%zu pairs)\n", audio_none, none.pairs);
+            printf("CAPTURE audio-900.press300=%s (%zu pairs)\n", audio_press, press.pairs);
+        }
         printf("CAPTURE frame-900.none=%s\n", frame_none);
-        printf("CAPTURE audio-900.press300=%s (%zu pairs)\n", audio_press, press.pairs);
         printf("CAPTURE frame-900.press300=%s\n", frame_press);
-        if (strcmp(mode, "audio") == 0 &&
-            (strcmp(audio_none, expected->audio_none) != 0 ||
-             strcmp(audio_press, expected->audio_press) != 0)) {
-            fprintf(stderr, "disc fixture: PCM regression pin changed\n");
-            ok = 0;
+        if (expected_track_count == 2u && strcmp(mode, "audio") == 0) {
+            if (strcmp(audio_none, expected->audio_none) != 0 ||
+                strcmp(audio_press, expected->audio_press) != 0) {
+                fprintf(stderr, "disc fixture: PCM regression pin changed\n");
+                ok = 0;
+            }
         }
         if (strcmp(mode, "fmv") == 0 &&
             (strcmp(frame_none, expected->frame_none) != 0 ||
@@ -1019,13 +1050,16 @@ int main(int argc, char **argv)
 {
     const char *mode = argc > 1 ? argv[1] : "";
     int chd_mode = strncmp(mode, "chd-", 4u) == 0;
-    const char *case_mode = chd_mode != 0 ? mode + 4 : mode;
+    int pbp_mode = strncmp(mode, "pbp-", 4u) == 0;
+    const char *case_mode = chd_mode != 0 || pbp_mode != 0 ? mode + 4 : mode;
     if ((argc != 7 && !(argc == 8 && strcmp(case_mode, "fmv") == 0)) ||
         (strcmp(case_mode, "boot") != 0 && strcmp(case_mode, "read") != 0 &&
          strcmp(case_mode, "audio") != 0 && strcmp(case_mode, "fmv") != 0 &&
          strcmp(case_mode, "record") != 0) ||
-        (chd_mode != 0 && strcmp(case_mode, "record") == 0)) {
-        fprintf(stderr, "usage: schwaystation-test-disc-fixture boot|read|audio|fmv|record|chd-{boot|read|audio|fmv} BIOS EXPECTED IMAGE SBI CSV [PREDICATES]\n");
+        (chd_mode != 0 && strcmp(case_mode, "record") == 0) ||
+        (pbp_mode != 0 && strcmp(case_mode, "boot") != 0 && strcmp(case_mode, "read") != 0 &&
+         strcmp(case_mode, "fmv") != 0)) {
+        fprintf(stderr, "usage: schwaystation-test-disc-fixture boot|read|audio|fmv|record|chd-{boot|read|audio|fmv}|pbp-{boot|read|fmv} BIOS EXPECTED IMAGE SBI CSV [PREDICATES]\n");
         return 2;
     }
     uint32_t expected_records[8] = {0u};
@@ -1086,10 +1120,12 @@ int main(int argc, char **argv)
     if (strcmp(case_mode, "boot") == 0) {
         ok = run_boot_case(argv[2], expected_digest, &disc, &host);
     } else if (strcmp(case_mode, "read") == 0) {
-        ok = run_read_case(argv[2], expected_digest, &disc, &host, expected_records);
+        ok = run_read_case(argv[2], expected_digest, &disc, &host, expected_records,
+                           pbp_mode != 0 ? 1u : 2u);
     } else {
         ok = run_av_case(case_mode, argv[2], expected_digest, &disc, &host,
-                         expected_records, &expected_av, argc == 8 ? argv[7] : NULL);
+                         expected_records, &expected_av, argc == 8 ? argv[7] : NULL,
+                         pbp_mode != 0 ? 1u : 2u);
     }
     if (host.outside_run_calls != 0u) {
         fprintf(stderr, "disc fixture: %u host callbacks ran outside a core run\n",
@@ -1100,6 +1136,9 @@ int main(int argc, char **argv)
     if (ok == 0) return 1;
     if (chd_mode != 0) {
         printf("PASS disc.fixture.chd.%s: bounded owned guest completed with the CHD provider\n",
+               case_mode);
+    } else if (pbp_mode != 0) {
+        printf("PASS disc.fixture.pbp.%s: bounded single-data-track predicate passed; no audio claim\n",
                case_mode);
     } else if (strcmp(case_mode, "audio") == 0 || strcmp(case_mode, "fmv") == 0 ||
                strcmp(case_mode, "record") == 0) {

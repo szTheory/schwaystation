@@ -128,6 +128,7 @@ schway_add_test(NAME disc.image.pbp_parity
   LABELS disc portable TIMEOUT 30)
 set_tests_properties(disc.image.pbp_open disc.image.pbp_boundaries disc.image.pbp_parity
   PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
+set_tests_properties(disc.image.pbp_parity PROPERTIES FIXTURES_SETUP disc_pbp_parity)
 
 schway_add_test(NAME disc.image.chd_headers
   COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests
@@ -324,3 +325,34 @@ foreach(case boot read audio fmv)
       FIXTURES_REQUIRED "disc_media_preflight;disc_chd_parity;compat_features_preflight")
   endif()
 endforeach()
+
+# The owned PBP fixture proves one 64-sector data track, including XA and the
+# first FMV frame. It has no second track or CD-DA sectors.
+schway_add_test(NAME disc.fixture.pbp.boot
+  COMMAND schwaystation-test-disc-fixture pbp-boot
+    "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+    "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+    "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+  LABELS disc portable TIMEOUT 180)
+schway_add_test(NAME disc.fixture.pbp.read
+  COMMAND schwaystation-test-disc-fixture pbp-read
+    "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+    "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+    "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+  LABELS disc portable TIMEOUT 300)
+schway_add_test(NAME disc.fixture.pbp.fmv
+  COMMAND schwaystation-test-disc-fixture pbp-fmv
+    "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+    "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+    "${PROJECT_BINARY_DIR}/fixtures/schwaystation-disc_boot.pbp"
+    "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+    "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+  LABELS disc portable TIMEOUT 300)
+set_tests_properties(disc.fixture.pbp.boot disc.fixture.pbp.read PROPERTIES
+  FIXTURES_REQUIRED "disc_pbp_preflight;disc_pbp_parity;compat_features_preflight")
+set_tests_properties(disc.fixture.pbp.fmv PROPERTIES
+  FIXTURES_REQUIRED "disc_pbp_preflight;disc_pbp_parity;compat_features_preflight;disc_fmv_predicates")
