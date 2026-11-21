@@ -3,10 +3,10 @@
 The runner and libretro host use `schway_disc_image` to provide sector data to
 the core. File access stays in the host. The provider accepts cooked `.iso`
 images and `.cue` sheets whose data files contain MODE1/2048, MODE2/2352, or
-AUDIO tracks. With `SCHWAYSTATION_CHD=ON`, it also opens the bounded CHD subset
-below through the same raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off
-by default; `.chd`, `.pbp`, `.ecm`, and `.ccd` remain unsupported when their
-providers are not enabled or implemented.
+AUDIO tracks. It also accepts the fixture-proven unencrypted PBP subset below.
+With `SCHWAYSTATION_CHD=ON`, it opens the bounded CHD subset below through the
+same raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off by default;
+`.ecm` and `.ccd` remain unsupported.
 
 ## CHD metadata subset
 
@@ -59,24 +59,27 @@ and decoded map storage is limited to 17 MiB. Header, map, metadata and hunk
 extents are checked before libchdr decodes the image. CHD parent-image
 references and CHD versions 1 and 2 are unsupported.
 
-## PBP metadata subset
+## PBP subset
 
-The host metadata validator recognizes the owned, single-disc PSISO fixture
-layout: one MODE2 data track with A0, A1, and A2 lead-in records, followed by
-track 1. The track record's absolute start is `00:02:00`; subtracting the
-150-frame lead-in maps it to the source CUE's INDEX 01 at LBA 0. A2 leadout is
-also absolute MSF and includes those 150 frames, so the public leadout is the
-decoded frame count. The index contains contiguous compressed byte extents;
-each entry represents 16 sectors and a decoded block is at most `0x9300`
-bytes. PBP files, logical media, counts, and every table/data extent are bounded
-before allocation.
+The provider accepts the owned, unencrypted single-disc PSISO layout: one
+MODE2 data track with A0, A1, and A2 lead-in records, followed by track 1. The
+track record's absolute start is `00:02:00`; subtracting the 150-frame lead-in
+maps it to the source CUE's INDEX 01 at LBA 0. A2 leadout is also absolute MSF
+and includes those 150 frames, so the public leadout is the decoded frame
+count. The index contains contiguous data extents in 16-sector blocks. Each
+decoded block is at most `0x9300` bytes. Open validates every indexed stream
+before publishing a playable handle, using one decoded-block buffer; PBP files
+and logical media are limited to 1 GiB. PBP works with `SCHWAYSTATION_CHD=OFF`
+and without system zlib.
 
-This phase validates and maps metadata only. It does not publish a playable
-disc handle until the sector reader validates the compressed streams. PGD,
-multi-disc markers, audio or additional tracks, other control/mode variants,
-unknown markers, and unknown TOC layouts return `UNSUPPORTED`; malformed
-fields, inconsistent leadout, and truncated or overlapping extents return
-`BAD_IMAGE`.
+PGD, multi-disc markers, audio or additional tracks, other control/mode
+variants, unknown markers, and unknown TOC layouts return `UNSUPPORTED`.
+Malformed fields, inconsistent tables or leadout, and truncated or overlapping
+extents return `BAD_IMAGE`. The runner reports unsupported media with exit 77
+and malformed media with exit 1, before guest execution. The owned runner test
+compares probe output, a bounded frame hash, and save identity with the
+equivalent single-track CUE. See [media testing](media-testing.md#pbp-provider)
+for the focused fixture and provider checks.
 
 ## Playlists
 

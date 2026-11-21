@@ -16,6 +16,8 @@ hashes, source counts, CHD size and header before guest work. `disc.media.fixtur
 hashes, a missing track, wrong sector count, an oversized CHD, a damaged file and a malformed manifest fail. In
 CHD-off builds it confirms the fixture and manifest are absent and `.chd` remains unsupported.
 
+## PBP provider
+
 The PBP provider is a separate host-side source in `schwaystation_disc_image`. Its build-local producer copies
 the owned first MODE2/2352 track into an equivalent single-track CUE, then generates the same unencrypted PSISO
 PBP twice and requires byte identity. Raw-DEFLATE blocks are independently decoded with Python's standard
@@ -42,6 +44,14 @@ in forward and reverse order, TOC, zero subcode and content identity against `di
 `disc.image.pbp_raw` constructs a one-block PBP with a verbatim block from the owned fixture and verifies sector
 bytes through the provider. These selectors require `disc_pbp_preflight`, so fixture identity and extent checks
 run before provider reads.
+
+`runner.disc.pbp` compares runner probe output, a fixed-frame hash and save identity against the equivalent
+single-track CUE. It also checks unsupported PSAR markers and malformed tables/streams fail before a guest frame.
+Run the runner integration and provider parity checks together with:
+
+```sh
+ctest --preset ci --no-tests=error -R '^runner[.]disc[.]pbp$|^disc[.]image[.]pbp_parity$' --output-on-failure
+```
 
 `fuzz.regress.pbp` drives 14 run-generated mutation scripts through the public image reader. It starts from the
 owned compressed fixture and a run-generated one-block raw image, then applies at most 51 byte edits per input;
