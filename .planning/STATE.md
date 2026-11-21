@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: Not started
+current_plan: 2
 status: executing
-stopped_at: Phase 10 planning passed independent review; ready to execute Plan 10-01
-last_updated: "2026-11-21T05:43:30.394Z"
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-11-21T06:16:36.191Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 plans reviewed; ready to execute
-state_head: 94524f98f26af0e26f35fdc51c1bc29f29b69746
+last_activity_desc: Phase 10 execution started
+state_head: 875f1477490e9dbf978b8ee25f9e1c68ff980177
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-  completed_plans: 35
+  completed_plans: 36
   percent: 30
 ---
 
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 ## Current Position
 
-Phase: 10 (PBP disc images) — READY TO EXECUTE
-Current Plan: Not started
+Phase: 10 (PBP disc images) — EXECUTING
+Current Plan: 2
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Phase 10 plans reviewed; ready to execute
+Last activity: 2026-11-21 — Phase 10 execution started
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -63,6 +63,19 @@ The focused independent re-review passed. All 13 plan structures, 11/11 decision
 checks, sorted inventories, `git diff --check`, and the 3,901-line ceiling passed. The roadmap already contains
 its wave map and cross-cutting constraints; the annotation helper skipped its existing em-dash checklist syntax.
 No implementation build, suite, `act`, or hosted CI ran during planning. Plan 10-01 is next.
+
+### Phase 10 Plan 10-01 execution (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; executor gpt-6-luna; primary model ID and reasoning effort were not exposed.
+Measured wall time was 24m53s from 05:47:33Z through final verification at 06:12:26Z; active time was not
+measured. The quality and triage control drivers were reduced by 37 lines with their cases preserved, leaving
+the repository gate at 3,864/3,901. Both tracer runs passed all three control selectors and the line-budget
+check; `policy.quality_metrics` took 31.10–33.39s. The CHD-OFF host image target built, the sorted 30-row
+inventory passed, and `disc.image.pbp_headers` passed 1/1. Branch-wide `git diff --check` initially caught an
+extra blank line in each Phase 10 plan; commit `875f147` removed only those trailing blank lines, after which
+the full range check passed. No workflow changed, so no `act` or hosted CI run applied. This proves only the
+host-only outer-envelope boundary; PBP-01 remains phase-wide pending. Task commits: `2df74ad`, `7349f35`,
+`9dfccfb`; planning-ending correction: `875f147`. Plan 10-02 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -694,6 +707,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 09 P10 | 23m 09s | 2 tasks | 2 files |
 | Phase 09 P12 | 38m37s | 2 tasks | 9 files |
 | Phase 09 P14 | 22m | 2 tasks | 7 files |
+| Phase 10 P01 | 24m53s | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -1334,9 +1348,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T05:43:30.308Z
-Stopped at: Phase 10 planning passed independent review; ready to execute Plan 10-01
-Resume file: .planning/phases/10-pbp-disc-images/10-01-PLAN.md
+Last session: 2026-11-21T06:16:36.085Z
+Stopped at: Completed 10-01-PLAN.md
+Resume file: .planning/phases/10-pbp-disc-images/10-02-PLAN.md
 
 ### v1.0 session history
 

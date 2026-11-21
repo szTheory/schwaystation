@@ -133,11 +133,11 @@ Plans:
   1. The runner and libretro host read the verified unencrypted PSISO layouts and track variants with matching sectors and deterministic hashes. The provider functions with CHD disabled and without system zlib, and the bundled inflater carries its permissive notice.
   2. Bad PSISO offsets, track tables, sizes and truncated blocks fail at the media boundary. Encrypted PGD and undocumented layouts return a clear unsupported result before guest execution. The ledger records the variants exercised.
 
-**Plans**: 13 plans
+**Plans**: 1/13 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 10-01-PLAN.md — Fit the gate budget and register the PBP provider test seam
+- [x] 10-01-PLAN.md — Fit the gate budget and register the PBP provider test seam
 
 **Wave 2** *(depends on Wave 1)*
 - [ ] 10-02-PLAN.md — Admit the pinned MIT inflater, provenance and digest controls
@@ -271,7 +271,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
 | 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
 | 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
-| 10. PBP disc images | 0/TBD | Not started | - |
+| 10. PBP disc images | 1/13 | In Progress | - |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |
 | 12. SBI and LibCrypt | 0/TBD | Not started | - |
 | 13. Regions, console revisions and playback | 0/TBD | Not started | - |
