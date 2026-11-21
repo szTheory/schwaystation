@@ -34,8 +34,8 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 
 ### Shared media boundary and providers
 
-- [ ] **MEDIA-01**: Each supported provider presents the existing host-supplied disc contract with consistent identity, TOC, track/index/pregap/leadout, sector type, raw sector and applicable subcode; format errors and unsupported variants are explicit and do not partially replace an active disc.
-- [ ] **MEDIA-02**: Format readers use checked arithmetic and documented limits before allocation or decode, confine companion paths to the selected image directory, and have bounded regression-fuzz tests for malformed headers, offsets, track counts and truncated inputs. A cheap fixture inventory checks track/sector counts and boundary LBAs before any long guest run.
+- [x] **MEDIA-01**: Each supported provider presents the existing host-supplied disc contract with consistent identity, TOC, track/index/pregap/leadout, sector type, raw sector and applicable subcode; format errors and unsupported variants are explicit and do not partially replace an active disc.
+- [x] **MEDIA-02**: Format readers use checked arithmetic and documented limits before allocation or decode, confine companion paths to the selected image directory, and have bounded regression-fuzz tests for malformed headers, offsets, track counts and truncated inputs. A cheap fixture inventory checks track/sector counts and boundary LBAs before any long guest run.
 - [x] **CHD-01**: When `SCHWAYSTATION_CHD=ON`, the host opens the documented CHD v1–v5 subset using the pinned libchdr BSD-3 closure, returns matching sector/TOC/subcode data and deterministic fixture hashes on all eight applicable lanes, and fuzzes malformed CHD inputs; `OFF` remains a dependency-free default build until the sub-512-KiB parity fixture passes. Every distributed archive includes the exact required notices, and `.info` advertises `chd` only for a build that contains the provider.
 - [ ] **PBP-01**: The host reads the explicitly tested, unencrypted PSISO PBP layout and supported track variants with bounded directory/TOC parsing and deterministic sector output; encrypted PGD and undocumented layouts are rejected with a clear unsupported result. The inflater is in-tree permissive source with its notice and does not require system zlib.
 - [ ] **ECM-01**: The host decodes the documented ECM input subset with bounded random access, preserving sector bytes and rejecting invalid tables, offsets and truncated streams; a preflight confirms source extents and requested/produced sector counts before booting a guest.
@@ -95,8 +95,8 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | SAVE-03 | Phase 8 | Complete |
 | SAVE-04 | Phase 8 | Complete |
 | SAVE-05 | Phase 8 | Complete |
-| MEDIA-01 | Phase 9 | Pending |
-| MEDIA-02 | Phase 9 | Pending |
+| MEDIA-01 | Phase 9 | Complete |
+| MEDIA-02 | Phase 9 | Complete |
 | CHD-01 | Phase 9 | Complete |
 | COMPAT-02 | Phase 9 | Complete |
 | PBP-01 | Phase 10 | Pending |

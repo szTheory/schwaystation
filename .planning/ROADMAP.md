@@ -12,7 +12,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 
 - [x] **Phase 7: Faster and more trustworthy CI** - Measure the build and release pipeline, fix the weakest quality dimension, and establish reproducible quality baselines. (completed 2026-11-18)
 - [x] **Phase 8: Per-game card saves** - Use separate saves per game, move cards between supported formats, and resume a game in the runner or libretro. (completed 2026-11-19)
-- [ ] **Phase 9: CHD disc images** - Open supported CHD images with equivalent disc behavior and establish the shared media checks and feature-ledger workflow.
+- [x] **Phase 9: CHD disc images** - Open supported CHD images with equivalent disc behavior and establish the shared media checks and feature-ledger workflow. (completed 2026-11-20)
 - [ ] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly.
 - [ ] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data.
 - [ ] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact.
@@ -105,7 +105,7 @@ Plans:
   3. The shared media checks bound counts, offsets and allocations and confine companion paths. Malformed CHD inputs have fuzz and regression coverage. The preflight verifies track modes, indexes, pregaps, leadout and boundary sectors before guest boot, and invalid images leave the active disc intact. Following providers apply this contract and add their own regression cases.
   4. The feature ledger records the CHD evidence. Its preflight rejects missing or duplicate keys and its protected ratchet preserves prior passes except where a dated allowance permits change. Subsequent providers, profiles, protection and peripherals add their rows during their own phases.
 
-**Plans**: 15/15 plans executed
+**Plans**: 15/15 plans complete
 - [x] 09-01-PLAN.md — Shared callback preflight and CMake/test skeleton
 - [x] 09-02-PLAN.md — Pinned optional static reader and bounded header rejection
 - [x] 09-03-PLAN.md — Complete permissive fixture-tool closure audit and recipe
@@ -231,7 +231,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 |---|---|---|---|
 | 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
 | 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
-| 9. CHD disc images | 15/15 | In Progress | - |
+| 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
 | 10. PBP disc images | 0/TBD | Not started | - |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |
 | 12. SBI and LibCrypt | 0/TBD | Not started | - |

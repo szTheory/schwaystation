@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 09
-current_phase_name: CHD disc images
-current_plan: 15
-status: executing
-stopped_at: Phase 9 MSVC include-path collision is fixed and reviewed locally; hosted rerun is pending
-last_updated: "2026-11-20T22:48:36Z"
+current_phase: 10
+current_phase_name: PBP disc images
+current_plan: Not started
+status: planning
+stopped_at: Phase 9 complete, ready to plan Phase 10
+last_updated: "2026-11-21T01:24:41.094Z"
 last_activity: 2026-11-20
-last_activity_desc: Diagnosed a second Windows compile failure to a vendored FLAC header collision, fixed and reviewed the CMake include graph, and passed the native CHD rebuild; exact-head hosted rerun is next
-state_head: 83a27a4
+last_activity_desc: Phase 9 complete, transitioned to Phase 10
+state_head: 16dc50920b793316ad1295d47168bdb39d2cc87b
 progress:
   total_phases: 10
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 35
   completed_plans: 35
-  percent: 20
+  percent: 30
 ---
 
 # Project State
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 09 — CHD disc images
+**Current focus:** Phase 10 — PBP disc images
 
 ## Current Position
 
-Phase: 09 (CHD disc images) — EXECUTING
-Current Plan: 15 (all implementation plans complete; final verification remains)
-Total Plans in Phase: 15
-Status: Final verification pending
-Last activity: 2026-11-20 — Phase 9 standard source review passed with no findings; final local and hosted checks are next.
+Phase: 10 — PBP disc images
+Current Plan: Not started
+Total Plans in Phase: TBD
+Status: Ready to plan
+Last activity: 2026-11-20 — Phase 9 complete, transitioned to Phase 10
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -438,7 +438,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 215
+- Total plans completed: 230
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -454,6 +454,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 06 | 45 | - | - |
 | 7 | 10 | - | - |
 | 8 | 10 | - | - |
+| 9 | 15 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1306,7 +1307,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-20T21:04:54.561Z
-Stopped at: Completed 09-14-PLAN.md; Phase 9 source review and final verification remain
+Stopped at: Phase 9 complete, ready to plan Phase 10
 Resume file: .planning/phases/09-chd-disc-images/09-14-SUMMARY.md
 
 ### v1.0 session history
@@ -1578,3 +1579,29 @@ them only to FLAC C sources. The generated compile database shows all 21 pinned 
 and all 17 FLAC C files retain them; the native CHD tool rebuilt successfully (85/85 actions). The updated
 32-file source review is clean. Hosted Windows/WASI and eight-lane checks must still confirm the correction on
 the next head; no Phase 9 verification or ship claim is made.
+
+### Phase 9 verification and completion (2026-11-20)
+
+Runtime/model: Codex with OpenGSD 1.20.0; primary model ID not exposed. A typed verifier handoff made no artifact
+or state change and was stopped; the orchestrator completed goal-backward verification inline from the code,
+phase artifacts and exact-head CI evidence. The wall interval from the saved STATE checkpoint at 22:48:36Z to
+closeout at 01:24Z was about 2h36m; active time was not measured. The Phase 9 report passed 5/5 observable truths
+with no human checks and records its fingerprint as
+`v4:sha256:c8d13054d5c31b7f5d051488ebe7bdd6bc3e2fbb1d20bb171dd15f2460b096a7`.
+
+The exact-head [Main CI run 44843623296](https://github.com/szTheory/schwaystation/actions/runs/44843623296)
+passed on `16dc50920b793316ad1295d47168bdb39d2cc87b`, including all six package lanes, BE32, WASI, hash equality,
+RetroArch and release rehearsal. The linked WASI module measured exactly 859,379 bytes. `CI required` measured a
+2,419-second critical path and the workflow used 6,571 raw runner-seconds (109.52 runner-minutes); the run
+fingerprint differed from the stored baseline, so no speedup is claimed. Hosted CHD fuzz passed on
+[run 44830486029](https://github.com/szTheory/schwaystation/actions/runs/44830486029); the redundant Nightly
+attempt on the final head was canceled. `gsd-tools query verification.status` returned `passed` (exit 0),
+`git diff --check` passed, and `gsd-tools query phase.complete 9` advanced ROADMAP/STATE/REQUIREMENTS to Phase 10.
+Its six evidence-path warnings are command strings parsed as file paths plus one old todo path after the todo
+moved to `completed/`; no Phase 9 source or verification gap was reported.
+
+The Phase 9 review is clean. Existing CI/CD guidance is discoverable in `AGENTS.md`, `.planning/AUTONOMOUS.md`
+and `docs/maintaining.md`; no extra workflow change or repeated full local suite was needed. Before Phase 10
+planning on its branch, refresh the stale Phase 7 and Phase 8 verification reports using the exact main/release
+evidence already available, then continue Phase 10 discussion and planning. The roadmap now marks Phase 9
+complete; the Phase 9 report and tracking edits still need to be committed and shipped through PR #32.
