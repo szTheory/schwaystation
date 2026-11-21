@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
-current_plan: 11
+current_plan: 3
 status: executing
-stopped_at: Completed 10-02-PLAN.md
-last_updated: "2026-11-21T07:26:17Z"
+stopped_at: Completed 10-11-PLAN.md
+last_updated: "2026-11-21T09:31:30Z"
 last_activity: 2026-11-21
-last_activity_desc: Phase 10 Plan 10-02 complete; Plan 10-11 next
-state_head: 07fd276ae8d5fb355ca32720cb06306200d2c395
+last_activity_desc: Phase 10 Plan 10-11 complete; Plan 10-03 next
+state_head: 9d74ab060ca8f9eea1dd30815749cea4d1a84b33
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 48
-  completed_plans: 37
+completed_plans: 38
   percent: 30
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 10 (PBP disc images) — EXECUTING
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-21 — Phase 10 execution started
+Last activity: 2026-11-21 — Plan 10-11 complete; Plan 10-03 is next
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -93,6 +93,19 @@ in 0.11s; direct notice and digest scripts passed, including both expected negat
 reconfigured build/ci and restored its preset defaults; use `cmake -LA -N build/ci` for read-only inspection.
 Task commits are `8e64f5c` and `07fd276`; summary is `.planning/phases/10-pbp-disc-images/10-02-SUMMARY.md`.
 Plan 10-11 is the other ready Wave 2 item and is next under the sequential executor.
+
+### Phase 10 Plan 10-11 execution (2026-11-21)
+
+Runtime/model: Codex session; primary model ID is not exposed. Wall interval from the prior STATE checkpoint at
+07:26Z through closeout at 09:31Z was about 2h05m; active time was not measured. The Nightly classifier keeps
+existing CI outputs intact, routes exact PBP-only lists to fuzz, skips only complete docs/planning-only lists,
+and sends uncertain changes to full Nightly. A focused review found the missing failed-classifier fallback and
+recommended using 100-file REST pages; both were implemented and re-reviewed. Route tests, the registered
+classifier CTest (1/1), workflow wiring, action pins/timeouts, actionlint, `act` PR dry-run, diff checks and the
+3,900/3,901 gate passed. The workflow_dispatch act attempt failed locally at artifact upload because no
+`ACTIONS_RUNTIME_TOKEN` is available; no hosted run or cost comparison was made. TODO 051 stays pending until
+the exact-head hosted run in Plan 10-13. Task commits: `bc4e922`, `9d74ab0`; summary:
+`.planning/phases/10-pbp-disc-images/10-11-SUMMARY.md`. Plan 10-03 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
