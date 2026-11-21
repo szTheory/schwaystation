@@ -16,6 +16,11 @@ hashes, source counts, CHD size and header before guest work. `disc.media.fixtur
 hashes, a missing track, wrong sector count, an oversized CHD, a damaged file and a malformed manifest fail. In
 CHD-off builds it confirms the fixture and manifest are absent and `.chd` remains unsupported.
 
+The PBP provider is a separate host-side source in `schwaystation_disc_image`. `disc.image.pbp_headers` checks
+the production private boundary against empty and truncated headers, bad magic, encrypted or unknown PSAR markers,
+and out-of-range or overflowing section offsets. This slice does not yet accept PSISO sectors, so runner and
+libretro metadata do not advertise PBP.
+
 For a local edit, check the exact inventory before configuring, then build only the provider test and deterministic
 disc fixtures and run the preflight selector:
 

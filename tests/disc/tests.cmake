@@ -56,6 +56,16 @@ set_target_properties(schwaystation-test-disc-chd PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-chd)
 
+add_executable(schwaystation-test-disc-pbp ${CMAKE_CURRENT_LIST_DIR}/pbp.c)
+target_link_libraries(schwaystation-test-disc-pbp PRIVATE schwaystation_disc_image)
+set_target_properties(schwaystation-test-disc-pbp PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-pbp)
+
+schway_add_test(NAME disc.image.pbp_headers
+  COMMAND schwaystation-test-disc-pbp ${PROJECT_BINARY_DIR}/tests
+  LABELS disc portable TIMEOUT 15)
+
 schway_add_test(NAME disc.image.chd_headers
   COMMAND schwaystation-test-disc-chd ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 15)
