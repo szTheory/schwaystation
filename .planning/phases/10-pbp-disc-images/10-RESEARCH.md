@@ -14,7 +14,7 @@
 
 ### Provider and inflater
 - **D-04:** Implement PBP as a separate host-only provider that plugs into the shared `schway_disc` contract and is called by the existing image dispatcher. Keep the core, public ABI, and guest-visible disc path unchanged. PBP must work with `SCHWAYSTATION_CHD=OFF` and without system zlib.
-- **D-05:** Verify the exact standalone miniz source revision, file set, license grant, notice text, and per-file digest before copying it into the repository. Keep this source and its MIT notice distinct from libchdr's build-tree miniz copy. Pin the source to a public commit; preserve notices in every archive that links it and update `PROVENANCE.md` and `THIRD-PARTY-NOTICES.md`.
+- **D-05:** Use the pinned modular inflater files `miniz_tinfl.c`, `miniz_tinfl.h`, and `miniz_common.h` under the upstream MIT grant. Exclude upstream `miniz.h`, whose stale Unlicense wording conflicts with the pin's MIT license record; supply the small project-owned compatibility header it needs and a generated export header. Keep these sources and notices distinct from libchdr's build-tree miniz copy, preserve their exact digests, and update `PROVENANCE.md` and `THIRD-PARTY-NOTICES.md`.
 - **D-06:** Keep generated PBP bytes run-local. Derive them from owned source media and record input/tool/output identities. Before any long test or guest run, check fixture size and digest, directory/TOC bounds and ordering, track counts, compressed extents, requested versus decoded sector counts, and first/final boundary sectors. Compare supported sectors and TOC against the owned source media before guest execution.
 
 ### CI, quality gates, and iteration speed
@@ -57,9 +57,9 @@
 
 ## Summary
 
-**Primary recommendation:** Add a dedicated host-side PBP provider and use the upstream standalone miniz v3.1.2 inflater at public commit `77d0dce8627735138c51770d1799a1ef48f2117d`; accept only fixture-proven unencrypted PSISO layouts, validate all arithmetic/extents before use, and prove sector/TOC parity to owned source media. PBP format claims are medium confidence because the reference is reverse-engineered from homebrew. Keep full-block validation bounded to one `0x9300` byte output buffer and settle whether open-time validation is necessary for the chosen failure boundary before implementing it.
+**Primary recommendation:** Add a dedicated host-side PBP provider and use the upstream standalone miniz v3.1.2 inflater at public commit `77d0dce8627735138c51770d1799a1ef48f2117d`; accept only the planned owned single-data-track PSISO subset after sector/TOC parity passes. Validate all indexed streams during open before publishing a reader, with one reusable `0x9300`-byte decoded buffer and checked logical/count limits (Plan 10-06). PBP format claims remain medium confidence because the reference is reverse-engineered; the later fixture checks establish behavior, not normative format coverage.
 
-**Measured gate budget is a planning constraint:** the current counted set is exactly 3,901/3,901 lines. After checking the original trigger text and the pinned source headers, only TODOs 006 and 051 remain in scope. TODO 006 can extend the existing 31-line vendored check; TODO 051 requires conservative routing plus fast self-tests. There is no headroom. The planner must identify a concrete, assertion-preserving consolidation supported by current code evidence; do not raise the cap, relocate/minify gates, or drop coverage.
+**Measured gate budget is resolved for the planned scope:** the current set is 3,901/3,901. Only TODOs 006 and 051 are folded. The preserving driver consolidation plus digest/routing/wiring additions measured in `10-GATE-BUDGET.md` project 3,899/3,901, including the obsolete Nightly path-filter assertion and PBP metadata-test mapping. The scratch quality, triage and routing controls passed; execution must reproduce the complete count and controls. No cap increase, assertion removal, relocation or generic SPDX scanner is authorized.
 
 ## Architectural Responsibility Map
 
@@ -89,6 +89,44 @@ Standalone miniz files at that commit and SHA-256 values obtained from the GitHu
 `LICENSE` must also be retained verbatim. It names RAD Game Tools and Valve Software (2013–2014) and Rich Geldreich and Tenacious Software LLC (2010–2014), and grants use, modification, distribution, sublicensing, and sale subject to retaining the copyright and permission notice. The selected standalone modular files are covered by this MIT grant; omit upstream `miniz.h`, which contains stale public-domain/Unlicense wording and is unnecessary for the low-level inflater. Provide a project-owned `miniz.h` shim and generate `miniz_export.h` through CMake's `GenerateExportHeader`. This source is not the build-tree miniz copy under `pins/libchdr/`, whose checked project provenance identifies a separate Unlicense/public-domain grant. Keep the two provenance records distinct.
 
 **Raw inflater API:** upstream `miniz_tinfl.h` documents `TINFL_FLAG_PARSE_ZLIB_HEADER` as the flag for zlib-wrapped input; with that flag absent, the input is raw DEFLATE. `TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF` is the mode for a known, complete output buffer. Use a freshly initialized decompressor per independent block, cap the output at exactly the expected block size, and reject incomplete input, incomplete output, unexpected extra output, or nonterminal inflater status. The source also defines global `tinfl_*` symbols that collide with libchdr's separate miniz object when both features are linked. Apply compile-time aliases to the standalone object and matching caller declarations without editing upstream bytes; define `MINIZ_NO_MALLOC` and rename any remaining global inflater helpers. Test both CHD-OFF and CHD-ON link graphs.
+
+### Verified standalone symbol closure
+
+At the pinned source, `MINIZ_NO_MALLOC` still emits the following four global functions. Apply all four
+compile definitions to the standalone source **and its caller declarations**; keep upstream files byte-exact.
+
+| Upstream symbol (verbatim) | Private alias | Pinned source line |
+|---|---|---:|
+| `tinfl_decompress` | `schway__pbp_tinfl_decompress` | `miniz_tinfl.c:187` |
+| `tinfl_decompress_mem_to_heap` | `schway__pbp_tinfl_decompress_mem_to_heap` | `miniz_tinfl.c:682` |
+| `tinfl_decompress_mem_to_mem` | `schway__pbp_tinfl_decompress_mem_to_mem` | `miniz_tinfl.c:720` |
+| `tinfl_decompress_mem_to_callback` | `schway__pbp_tinfl_decompress_mem_to_callback` | `miniz_tinfl.c:729` |
+
+[VERIFIED: pinned `miniz_tinfl.c:177-187,682-778`, `miniz_tinfl.h:32-53,101-105`, source hash above; native object inspection 2026-11-21.]
+The high-level helpers remain emitted; the no-malloc option does not remove them. `tinfl_decompressor_alloc`
+and `tinfl_decompressor_free` at lines 760/768 are excluded by `#ifndef MINIZ_NO_MALLOC` at line 759.
+`tinfl_clear_tree` at line 177 is `static`; `tinfl_init` is a header macro. `miniz_def_*` are declarations in
+`miniz_common.h:80-82`, with no definitions or references in this selected no-malloc object.
+
+The one-off compile used the three hash-verified upstream files and a private shim selecting
+`MINIZ_NO_MALLOC`, `MINIZ_NO_STDIO`, `MINIZ_NO_TIME`, and portable zero values for
+`MINIZ_HAS_64BIT_REGISTERS`, `MINIZ_USE_UNALIGNED_LOADS_AND_STORES`, and `MINIZ_LITTLE_ENDIAN`.
+`nm -gjU` reported exactly the four upstream globals in the plain object and exactly the four aliases in
+the prefixed object (Mach-O adds a leading underscore). `nm -u` showed only platform stack/memory helpers;
+no allocator, zlib or unprefixed inflater reference remained. A relocatable link of plain plus prefixed objects
+exited 0, demonstrating that the alias set removes duplicate definitions. This is an isolated symbol probe;
+Plan 10-03 still verifies the actual CHD OFF/ON host link graphs.
+
+Reproducible object commands, with the isolated verified source/shim under `build/planning/pbp-alias-proof`:
+
+- `cc -std=c17 -O2 -DNDEBUG -Ibuild/planning/pbp-alias-proof -c build/planning/pbp-alias-proof/miniz_tinfl.c -o build/planning/pbp-alias-proof/plain.o` — exit 0.
+- `cc -std=c17 -O2 -DNDEBUG -Ibuild/planning/pbp-alias-proof -Dtinfl_decompress=schway__pbp_tinfl_decompress -Dtinfl_decompress_mem_to_heap=schway__pbp_tinfl_decompress_mem_to_heap -Dtinfl_decompress_mem_to_mem=schway__pbp_tinfl_decompress_mem_to_mem -Dtinfl_decompress_mem_to_callback=schway__pbp_tinfl_decompress_mem_to_callback -c build/planning/pbp-alias-proof/miniz_tinfl.c -o build/planning/pbp-alias-proof/prefixed.o` — exit 0.
+- `nm -gjU build/planning/pbp-alias-proof/plain.o` and `nm -gjU build/planning/pbp-alias-proof/prefixed.o` — exit 0, four globals each as listed above.
+- `nm -u build/planning/pbp-alias-proof/prefixed.o` — exit 0, no allocator/zlib/unprefixed inflater reference.
+- `cc -r build/planning/pbp-alias-proof/plain.o build/planning/pbp-alias-proof/prefixed.o -o build/planning/pbp-alias-proof/together.o` — exit 0; linker emitted an SDK text-stub warning, not a duplicate-symbol failure.
+
+These are untracked planning-probe files, not an execution dependency or new repository gate. Execution uses
+the alias table and CMake-generated export header specified in Plans 10-02/10-03. No hosted run URL applies.
 
 ### Supporting
 
@@ -130,7 +168,7 @@ Use `host/media_limits.h` checked arithmetic before narrowing. Its source states
 
 ### Raw block decode pattern
 
-Initialize the miniz inflater for one block, pass the complete compressed extent, use raw mode (do not set the zlib-header flag), cap the destination at `0x9300`, and require the decompressor to report completion with exactly the expected output and a bounded/acceptable input-consumption result. The source documentation warns that corrupted streams can yield more output than expected; stop immediately when the output limit is reached. Whether the parser validates every block during open or each block before exposing its sectors is still an implementation decision: early validation detects bad blocks before guest execution but adds one full decompression pass at open, while lazy validation is cheaper at open and still must fail at the media callback before returning invalid sector bytes. Plan tests must pin the selected behavior and bound the work.
+Initialize the miniz inflater for one block, pass the complete compressed extent, use raw mode (do not set the zlib-header flag), cap the destination at `0x9300`, and require exact output and input consumption plus terminal success. Plan 10-06 resolves the lifecycle choice: validate every indexed stream once during open before publishing the handle, then retain at most one decoded-block cache. Bound physical input and logical decoded size by the existing 1 GiB limit, derive the checked block count/table limits from that size and the 16-sector block unit, and permit only the fixture-proven final-block padding. Reuse one decoded buffer; do not materialize the whole image or perform unbounded retries.
 
 ## Don't Hand-Roll
 
@@ -179,16 +217,16 @@ The relevant upstream pin is miniz 3.1.2, released on 2026-07-01. Its release no
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | A run-local fixture can be generated from the existing owned CUE/BIN source without adding an uncleared tool dependency. | Architecture Patterns | Source/tool closure could block fixture production; planner must inspect the fixture route before assigning implementation. |
-| A2 | Every accepted PSISO layout can validate all compressed blocks with one `0x9300` scratch buffer and a practical bounded open-time cost. | Raw block decode pattern | It may increase image-open latency or require a different lifecycle boundary; measure before accepting the tradeoff. |
-| A3 | The three modular inflater files plus upstream MIT `LICENSE`, project-owned `miniz.h` compatibility shim, and generated `miniz_export.h` are sufficient. | Standard Stack | Upstream CMake uses `GenerateExportHeader`; compile-test exact feature macros and source-preserving symbol aliases before source admission. |
+| A1 | RESOLVED: Plan 10-04 selects an owned first-data-track CUE and a local Python fixture writer with deterministic encoding and an independent standard-library decode check. | Architecture Patterns | Generation, exact source/output counts and repeat-byte identity remain required implementation acceptance tests. |
+| A2 | RESOLVED: Plan 10-06 chooses one full indexed-stream pass at open, one reusable `0x9300` output buffer, and checked 1 GiB logical/count limits. | Raw block decode pattern | Fixture latency is measured during execution; no alternative lifecycle choice remains open. |
+| A3 | RESOLVED: the three verified files compile with a small private shim/export macro; the exact four aliases were confirmed by native object inspection and a combined relocatable link. | Standard Stack | Actual CMake export generation and CHD ON/OFF host links remain acceptance checks in 10-02/10-03, not unresolved design questions. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Which exact PBP variants can the owned fixture producer generate?** The public reference has one CD-ROM data-track example but additional audio layouts remain unclear. The planner should use source media with known tracks and require exact TOC/sector parity; do not infer support from parser acceptance.
-2. **What failure boundary is required for truncated blocks?** Full block validation at open ensures no compressed corruption remains for guest execution but scans the image once; per-block validation at sector callback avoids a full open pass but detects corruption only when that block is requested. Choose from requirement wording and measured bounded workload, then test the chosen behavior.
-3. **Can the remaining folded gates fit under 3,901 lines?** Current count is exactly 3,901 and only TODOs 006/051 are in scope. Reuse existing vendored and routing controls, then show exact line accounting for any assertion-preserving consolidation; do not change the ceiling or drop checks.
-4. **Which global inflater helpers remain after private symbol aliases?** The `tinfl_*` exports must not collide with libchdr when CHD is enabled. Compile and inspect both link graphs after setting private aliases and `MINIZ_NO_MALLOC`.
+1. **Q1 — exact supported fixture variant — RESOLVED:** Plan 10-04 selects the owned disc_boot first MODE2/2352 data track and its equivalent single-track CUE, with deterministic raw/compressed PSISO fixture bytes. Plans 10-05/10-06 require exact TOC and all-sector parity before accepting that layout. CDDA/audio compression, PGD, multi-disc and unknown TOCs remain unsupported; no claim is made before those acceptance checks pass.
+2. **Q2 — compressed corruption boundary — RESOLVED:** Plan 10-06 validates every indexed block during open before publishing the reader. Checked logical/count/table limits bound a single pass and one reusable `0x9300`-byte decoded buffer; exact stream completion/size and final-padding tests enforce the selected behavior before guests.
+3. **Q3 — fixed gate budget fit — RESOLVED:** `10-GATE-BUDGET.md` records the measured preserving reductions and all digest/routing/wiring/metadata additions: 3,899/3,901 projected lines. The complete controls and count are required before/after implementation. Only TODOs 006/051 are folded; the generic SPDX scanner stays deferred and the ceiling is unchanged.
+4. **Q4 — complete standalone symbol aliases — RESOLVED:** The pinned no-malloc object emits exactly `tinfl_decompress`, `tinfl_decompress_mem_to_heap`, `tinfl_decompress_mem_to_mem`, and `tinfl_decompress_mem_to_callback`. Alias them respectively to `schway__pbp_tinfl_decompress`, `schway__pbp_tinfl_decompress_mem_to_heap`, `schway__pbp_tinfl_decompress_mem_to_mem`, and `schway__pbp_tinfl_decompress_mem_to_callback` in the standalone object and caller declarations. Alloc/free helpers are preprocessed out; the other three high-level helpers remain emitted. The source/hash/object/link evidence is in the verified symbol-closure section above; Plans 10-02/10-03 apply and test this fixed set.
 
 ## Environment Availability
 
@@ -229,10 +267,10 @@ Omitted: `.planning/config.json` explicitly sets `workflow.nyquist_validation` t
 ## Metadata
 
 **Confidence breakdown:**
-- Standard stack: HIGH — exact upstream pin, file hashes, and MIT license checked via GitHub API; generated export header detail remains open.
+- Standard stack: HIGH — exact upstream pin/hashes, MIT licensing, modular shim compilation and complete private symbol aliases checked; CMake export generation is assigned to 10-02.
 - Architecture: HIGH — existing host dispatcher, media cap, CMake seam, and consumer call paths were inspected.
 - PBP format: MEDIUM — one primary community reference, marked reverse-engineered; fixture parity must settle supported variants.
-- Gate-budget fit: HIGH — current count and seed line counts were measured; whether the full fold can fit remains unresolved.
+- Gate-budget fit: HIGH — exact preserving recipe projects 3,899/3,901 including routing/digest/wiring/metadata changes; execution must reproduce its counts and retained controls.
 
 **Research date:** 2026-11-21
 **Valid until:** Stable format/source pin; recheck only if the accepted PBP subset, upstream source, or gate inventory changes.

@@ -133,7 +133,46 @@ Plans:
   1. The runner and libretro host read the verified unencrypted PSISO layouts and track variants with matching sectors and deterministic hashes. The provider functions with CHD disabled and without system zlib, and the bundled inflater carries its permissive notice.
   2. Bad PSISO offsets, track tables, sizes and truncated blocks fail at the media boundary. Encrypted PGD and undocumented layouts return a clear unsupported result before guest execution. The ledger records the variants exercised.
 
-**Plans**: TBD
+**Plans**: 13 plans
+
+Plans:
+**Wave 1**
+- [ ] 10-01-PLAN.md — Fit the gate budget and register the PBP provider test seam
+
+**Wave 2** *(depends on Wave 1)*
+- [ ] 10-02-PLAN.md — Admit the pinned MIT inflater, provenance and digest controls
+- [ ] 10-11-PLAN.md — Route Nightly PR jobs conservatively within the cap
+
+**Wave 3** *(depends on source admission)*
+- [ ] 10-03-PLAN.md — Prove bounded raw inflate with independent CHD ON/OFF links
+
+**Wave 4** *(depends on the inflater seam)*
+- [ ] 10-04-PLAN.md — Produce owned deterministic PBP bytes and source preflight
+
+**Wave 5** *(depends on fixture preflight)*
+- [ ] 10-05-PLAN.md — Validate PSISO directory, TOC and block tables
+
+**Wave 6** *(depends on bounded metadata)*
+- [ ] 10-06-PLAN.md — Expose validated PBP sectors through shared callbacks
+
+**Wave 7** *(depends on sector parity; fuzz also consumes Nightly routing)*
+- [ ] 10-07-PLAN.md — Replay and fuzz hostile input through the production parser
+- [ ] 10-08-PLAN.md — Load and probe supported PBP through the runner
+- [ ] 10-09-PLAN.md — Load PBP through libretro and bind metadata to evidence
+
+**Wave 8** *(depends on both host consumers)*
+- [ ] 10-10-PLAN.md — Validate ON/OFF packages, notices and independent linking
+
+**Wave 9** *(depends on replay, consumers and package evidence)*
+- [ ] 10-12-PLAN.md — Run bounded PBP guests and publish precise feature evidence
+
+**Wave 10** *(depends on implementation and ledger evidence)*
+- [ ] 10-13-PLAN.md — Review, then verify one changed head across required lanes
+
+**Cross-cutting constraints:** Only fixture-proven unencrypted single-data-track PSISO; host-only bounded
+parsing and source-preserving MIT inflater; no system zlib; exact parity/preflights before guests; all required
+platforms and Main/Release gates retained; complete repository checks at or below 3,901 lines.
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/research/STACK.md`, `.planning/research/FEATURES.md`, `PROVENANCE.md`
 

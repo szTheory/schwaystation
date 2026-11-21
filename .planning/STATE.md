@@ -5,16 +5,16 @@ milestone_name: The whole library
 current_phase: 10
 current_phase_name: PBP disc images
 current_plan: Not started
-status: planning
-stopped_at: Phase 10 context and research corrected
-last_updated: "2026-11-21T05:10:42.608Z"
-last_activity: 2026-11-20
-last_activity_desc: Phase 9 complete, transitioned to Phase 10
-state_head: fb58ab910e2997490086f656eb1ba1de61fd369c
+status: executing
+stopped_at: Phase 10 planning passed independent review; ready to execute Plan 10-01
+last_updated: "2026-11-21T05:43:30.394Z"
+last_activity: 2026-11-21
+last_activity_desc: Phase 10 plans reviewed; ready to execute
+state_head: 94524f98f26af0e26f35fdc51c1bc29f29b69746
 progress:
   total_phases: 10
   completed_phases: 3
-  total_plans: 35
+  total_plans: 48
   completed_plans: 35
   percent: 30
 ---
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 ## Current Position
 
-Phase: 10 — PBP disc images
+Phase: 10 (PBP disc images) — READY TO EXECUTE
 Current Plan: Not started
-Total Plans in Phase: TBD
-Status: Ready to plan
-Last activity: 2026-11-20 — Phase 9 complete, transitioned to Phase 10
+Total Plans in Phase: 13
+Status: Ready to execute
+Last activity: 2026-11-21 — Phase 10 plans reviewed; ready to execute
 
 ### Phase 10 discussion (2026-11-21)
 
@@ -50,6 +50,19 @@ this phase. The stale Unlicense wording in upstream `miniz.h` is excluded; use t
 project-owned shim, generated export header, and private symbol aliases. The cheap line-budget preflight passed
 at 3,901/3,901; no build, broad suite, `act`, or hosted workflow ran during discussion. The original context
 commit is `a66a49b`; the corrected scope and research are being committed before planning continues.
+
+### Phase 10 plan and independent review (2026-11-21)
+
+Runtime/model: Codex/OpenGSD 1.20.0; primary model ID unavailable; planner model ID not preserved; independent
+`gsd-plan-checker` gpt-6-luna xhigh and source researcher gpt-6-luna xhigh. Wall time from the discussion
+checkpoint at 05:04:26Z through final plan review at about 05:43Z was roughly 39 minutes; active time is not
+reliably attributable. The checker first found unresolved Q1–Q4 in the research and an advisory 10-file Plan
+10-02 footprint. The research now records each resolved choice, including all four emitted inflater aliases
+under `MINIZ_NO_MALLOC`; the two Plan 10-02 tasks each own five files, so no evidence supported splitting it.
+The focused independent re-review passed. All 13 plan structures, 11/11 decisions, 27/27 failure-direction
+checks, sorted inventories, `git diff --check`, and the 3,901-line ceiling passed. The roadmap already contains
+its wave map and cross-cutting constraints; the annotation helper skipped its existing em-dash checklist syntax.
+No implementation build, suite, `act`, or hosted CI ran during planning. Plan 10-01 is next.
 
 ### Phase 9 plan verification (2026-11-19)
 
@@ -1321,9 +1334,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T05:10:42.478Z
-Stopped at: Phase 10 context and research corrected
-Resume file: .planning/phases/10-pbp-disc-images/10-CONTEXT.md
+Last session: 2026-11-21T05:43:30.308Z
+Stopped at: Phase 10 planning passed independent review; ready to execute Plan 10-01
+Resume file: .planning/phases/10-pbp-disc-images/10-01-PLAN.md
 
 ### v1.0 session history
 
