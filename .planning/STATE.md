@@ -4,17 +4,17 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 2 of 12 (ready)
-status: ready_to_execute
-stopped_at: Completed 11-03-PLAN.md; 11-02 remains outstanding at 3928/3901 counted lines
-last_updated: "2026-11-22T03:14:28.474Z"
+current_plan: 2 of 13 (blocked; Plan 04 Task 1 verified, follow-up 13 planned)
+status: in_progress
+stopped_at: Plan 11-04 Task 1 is committed and verified; split its unstarted companion-confinement task into Plan 13; 11-02 remains over budget at 3928/3901
+last_updated: "2026-11-22T13:04:44.000Z"
 last_activity: 2026-11-22
-last_activity_desc: Completed Phase 11 Plan 01; ready to execute Plan 02
-state_head: 99fbc64d6c2ad1cf2c010cebec1fd4a5051c1acd
+last_activity_desc: Plan 11-04 Task 1 passed focused verification; Plan 13 now owns remaining companion confinement
+state_head: 043403f
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 60
+  total_plans: 61
   completed_plans: 50
   percent: 40
 ---
@@ -26,16 +26,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plan 03 complete; Plan 02 is over the 3901-line cap, and Plan 04 is dependency-ready
+**Current focus:** Phase 11 — Plan 02 is over the 3901-line cap; Plan 04 Task 1 is committed, and its remaining companion work is Plan 13
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 2 of 12 (blocked by the fixed line cap; Plan 04 is dependency-ready)
-Total Plans in Phase: 12
+Current Plan: 2 of 13 (blocked by the fixed line cap; Plan 04 Task 1 is verified and its unstarted task is split into Plan 13)
+Total Plans in Phase: 13
 Status: In progress
-Last activity: 2026-11-22 -- Phase 11 Plan 03 completed; Plan 02 remains over budget and Plan 04 is dependency-ready
+Last activity: 2026-11-22 -- Plan 11-04 Task 1 passed focused post-commit checks; Plan 02 remains over budget
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 Plan 11-04 split (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0; executor `gpt-6-luna` (xhigh), planning follow-up `gpt-6-luna` (high). Plan 11-04 Task 1 took about 33 minutes; its exact start time was not retained. RED `5780f40` and implementation `043403f` are committed. Post-commit CI-preset configure and target build exited 0; the focused CCD, CUE-rejection and playlist selector passed 3/3. No broad suite or hosted CI was run. The unstarted companion confinement, SUB/missing-file, IO and failure-atomic scope was moved to Plan 13 so the verified work remains intact and Plan 11-04 stays within the 30-minute plan rule. Plan 11-06 now depends on Plan 13 and moves to Wave 5; Plan 11-05 is independent of Plan 13 in Wave 4. Plan 11-02 remains blocked at 3928/3901 counted lines; neither its budget nor its cases changed. Next: record Plan 11-04's summary from these command results, then continue ready Phase 11 plans. Planning split duration was not measured.
 
 ### Phase 11 Plan 11-01 execution (2026-11-22)
 

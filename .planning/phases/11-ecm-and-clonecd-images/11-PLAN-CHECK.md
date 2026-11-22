@@ -1,5 +1,9 @@
 # Phase 11 plan review
 
+## Scope update after execution sizing
+
+The independent review below applies to the original twelve-plan set. After Plan 11-04 Task 1 took about 33 minutes, its unstarted companion-confinement task was moved intact to Plan 11-13. Plan 11-06 now waits on Plan 11-13 to preserve exclusive CCD file ownership; Plan 11-05 remains independent in Wave 4. The new Plan 11-13 and updated dependencies/waves have not yet received a refreshed independent plan-checker verdict.
+
 ## VERIFICATION PASSED
 
 Reviewed twelve executable plans against the Phase 11 goal, ECM-01/CCD-01, all eleven locked decisions, the research responsibility map and project instructions. No remaining blocker, warning or advisory finding.

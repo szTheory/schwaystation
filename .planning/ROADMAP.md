@@ -186,7 +186,7 @@ platforms and Main/Release gates retained; complete repository checks at or belo
   2. Supported CloneCD fixtures preserve modes, indexes, pregaps, subcode and first and last sector reads through CCD and its IMG/SUB companions. Invalid companion paths are rejected before an external file is opened.
   3. The ledger records fixture results for both providers against the existing disc contract.
 
-**Plans**: 2/12 plans executed
+**Plans**: 2/13 plans executed
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/research/FEATURES.md`
 
@@ -198,25 +198,28 @@ Plans:
 - [ ] 11-02-PLAN.md — Exact metadata-only PR Nightly route with fail-closed controls
 - [x] 11-03-PLAN.md — Validated literal ECM stream and bounded random access
 
-**Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 11-04-PLAN.md — Confined CloneCD single-data-track reader
+**Wave 3** *(after 11-03)*
+- [ ] 11-04-PLAN.md — Fixture-proven CloneCD single-data-track reader
 
-**Wave 4** *(blocked on Wave 3 completion)*
+**Wave 4** *(11-05 and 11-13 can proceed independently after their prerequisites)*
 - [ ] 11-05-PLAN.md — Proven modeled ECM records and CUE source mapping
-- [ ] 11-06-PLAN.md — CloneCD indexes, pregaps and independent SUB transpose
+- [ ] 11-13-PLAN.md — Confine CCD companions and preserve the active reader on failure
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 11-07-PLAN.md — Owned deterministic fixtures and source-count preflight
+- [ ] 11-06-PLAN.md — CloneCD indexes, pregaps and independent SUB transpose
 
 **Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 11-07-PLAN.md — Owned deterministic fixtures and source-count preflight
+
+**Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 11-08-PLAN.md — Runner/probe and content identity
 - [ ] 11-09-PLAN.md — Libretro loading, replacement and extension claims
 - [ ] 11-10-PLAN.md — Production fuzz replay and sanitizer targets
 
-**Wave 7** *(blocked on Wave 6 completion)*
+**Wave 8** *(blocked on Wave 7 completion)*
 - [ ] 11-11-PLAN.md — Bounded guest evidence and protected provider ledger
 
-**Wave 8** *(blocked on Wave 7 completion)*
+**Wave 9** *(blocked on Wave 8 completion)*
 - [ ] 11-12-PLAN.md — CI producer closure, portability and package acceptance
 
 ### Phase 12: SBI and LibCrypt
@@ -301,7 +304,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
 | 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
 | 10. PBP disc images | 13/13 | Complete    | 2026-11-22 |
-| 11. ECM and CloneCD images | 2/12 | In Progress | - |
+| 11. ECM and CloneCD images | 2/13 | In Progress | - |
 | 12. SBI and LibCrypt | 0/TBD | Not started | - |
 | 13. Regions, console revisions and playback | 0/TBD | Not started | - |
 | 14. Multitap and special controllers | 0/TBD | Not started | - |
