@@ -591,22 +591,27 @@ static int test_cue_reject(const char *directory)
           expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
                              "unsupported: PBP cannot be a CUE track source"),
           "expected PBP to remain unsupported as a CUE sector source");
+    CHECK(write_text(cue_path,
+          "FILE \"unsupported.ecm\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n",
+          sizeof "FILE \"unsupported.ecm\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n" - 1u) &&
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
+                             "unsupported: ECM cannot be a CUE track source"),
+          "expected ECM to remain unsupported as a CUE track source");
     (void)remove(cue_path);
     cue_path[0] = '\0';
-    for (uint32_t i = 0u; i < 2u; i++) {
-        static const char *extensions[] = {"ecm", "ccd"};
-        static const char *messages[] = {"unsupported: ECM (planned v2.0)",
-                                         "unsupported: CCD (planned v2.0)"};
-        int size = snprintf(cue_path, sizeof cue_path, "%s/unsupported.%s",
-                            directory, extensions[i]);
-        CHECK(size >= 0 && (size_t)size < sizeof cue_path &&
-              expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u, messages[i]),
-              "expected unsupported media to name its planned v2.0 format");
-    }
-    CHECK(write_text(playlist_path, "unsupported.ecm\n", sizeof "unsupported.ecm\n" - 1u) &&
-          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
-                             "unsupported: ECM (planned v2.0)"),
-          "expected an unsupported m3u entry extension to be rejected consistently");
+    CHECK(make_path(cue_path, directory, "malformed.ecm") &&
+          write_text(cue_path, "BAD!", sizeof "BAD!" - 1u) &&
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, 0u, NULL),
+          "expected direct malformed ECM input to fail image validation");
+    CHECK(make_path(cue_path, directory, "unsupported.ccd") &&
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u,
+                             "unsupported: CCD (planned v2.0)"),
+          "expected CCD to remain unsupported until its reader is implemented");
+    CHECK(make_path(child_path, directory, "unsupported.ecm") &&
+          write_text(child_path, "BAD!", sizeof "BAD!" - 1u) &&
+          write_text(playlist_path, "unsupported.ecm\n", sizeof "unsupported.ecm\n" - 1u) &&
+          expect_open_status(playlist_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, 1u, NULL),
+          "expected malformed ECM playlist child to reach format validation");
 
 cleanup:
     if (cue_path[0] != '\0') (void)remove(cue_path);
