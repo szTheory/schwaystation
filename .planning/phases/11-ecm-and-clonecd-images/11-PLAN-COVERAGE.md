@@ -17,7 +17,7 @@ Runtime/model: Codex planner, inherited model identifier unavailable; OpenGSD 1.
 | RESEARCH | Independent asymmetric SUB vector plus distinct valid Q/GetlocP proof | 06,09 | COVERED |
 | RESEARCH | Deterministic producers, output closure, source/request/output preflight and identity | 07–12 | COVERED |
 | RESEARCH | Protected ledger, bounded guest proof, endian/WASI/sanitizer replay | 07–12 | COVERED |
-| RESEARCH | Conservative trusted-files Nightly route; Main/Release distinct | 02,12 | COVERED |
+| RESEARCH | Existing trusted-files boundary and separate Main/Release gates remain intact | 02,12 | COVERED |
 | CONTEXT | D-01 complete scan, ECM termination/checksum and bounded random reads | 03,05,10 | COVERED |
 | CONTEXT | D-02 exact stream/model mapping and evidence-backed rejection | 03,05,07 | COVERED |
 | CONTEXT | D-03 no inferred TOC; exact raw alignment; proven CUE source path | 03,05,08 | COVERED |
@@ -25,7 +25,7 @@ Runtime/model: Codex planner, inherited model identifier unavailable; OpenGSD 1.
 | CONTEXT | D-05 fixture-proven CCD fields and confined same-stem companions | 04,13,06,10 | COVERED |
 | CONTEXT | D-06 explicit Entry/INDEX/pregap/mode reconciliation | 04,06,07,11 | COVERED |
 | CONTEXT | D-07 absent/empty/exact SUB; independent transpose and Q proof | 04,06,09 | COVERED |
-| CONTEXT | D-08 trusted complete metadata exact set, fail-closed negatives, unchanged schedule/manual | 02,12 | COVERED |
+| CONTEXT | D-08 superseded by D-12: metadata shortcut deferred after measured cap audit; current full route retained | 02 | DEFERRED WITH EVIDENCE |
 | CONTEXT | D-09 3901-line cap; generic SPDX deferred; exact source notices | 01,02,07,09,12 | COVERED |
 | CONTEXT | D-10 Main/Release separate, cheap checks before long work, act and CI timing | 02,07,10,12 | COVERED |
 | CONTEXT | D-11 owned fixtures, parity/counts, shared consumers, fuzz/endian/WASI and sorted inventory | 01,03–12 | COVERED |

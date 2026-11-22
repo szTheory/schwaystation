@@ -33,3 +33,12 @@ lists. Mixed, renamed (including both rename names in the allowlist), unknown, i
 classifier-job cases run the full workload. The API requests up to 100 files per page; route controls cover a
 non-PBP fuzz input and each former Nightly path. Keep this todo pending until the exact-head hosted run confirms
 the new read-only GitHub API route and its measured cost.
+
+## Phase 11 evidence-based deferral
+
+The proposed exact generated-release-metadata Nightly exception was deferred after its required route controls
+were measured at 30 additional counted lines: the current 3,898/3,901 set would become 3,928 before classifier
+and workflow-boundary controls. Independent audits found no safe, measured reduction that preserves the current
+gates. Phase 11 keeps the full-Nightly fallback, every case and lane, and the 3,901-line cap. Revisit this
+shortcut only after a measured semantics-preserving gate refactor makes the complete control set fit; no hosted
+run was started for the unimplemented route.

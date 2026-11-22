@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 13
+open_count: 10
 waived_count: 4
-fixed_count: 7
+fixed_count: 10
 total_count: 24
-last_updated: 2026-11-22T03:12:50.763Z
+last_updated: 2026-11-22T13:35:43.206Z
 ---
 
 # Broken Windows Ledger
@@ -35,9 +35,9 @@ last_updated: 2026-11-22T03:12:50.763Z
 | 18 | 11 | stub | host/disc_ecm.c | 157 | ECM decoded-size reporting remains unsupported until Plan 11-03 builds bounded checkpoints. | fixed |  | 2026-11-22T02:07:27.969Z | 2026-11-22T03:07:48.764Z |
 | 19 | 11 | stub | host/disc_ecm.c | 165 | ECM random byte reads remain unsupported until Plan 11-03 builds bounded checkpoints. | fixed |  | 2026-11-22T02:07:28.118Z | 2026-11-22T03:07:48.889Z |
 | 20 | 11 | stub | host/disc_ecm.c | 175 | ECM sector reads remain unsupported until Plan 11-03 validates its sector mapping. | fixed |  | 2026-11-22T02:07:28.247Z | 2026-11-22T03:07:49.015Z |
-| 21 | 11 | stub | host/disc_ccd.c | 171 | CloneCD v3 track metadata remains unsupported until Plan 11-04 validates tracks and companions. | open |  | 2026-11-22T02:07:28.377Z |  |
-| 22 | 11 | stub | host/disc_ccd.c | 188 | CloneCD TOC generation remains unsupported until Plan 11-04 validates the descriptor tracks. | open |  | 2026-11-22T02:07:28.513Z |  |
-| 23 | 11 | stub | host/disc_ccd.c | 198 | CloneCD sector reads remain unsupported until Plan 11-04 validates its sector mapping. | open |  | 2026-11-22T02:07:28.648Z |  |
+| 21 | 11 | stub | host/disc_ccd.c | 171 | CloneCD v3 track metadata remains unsupported until Plan 11-04 validates tracks and companions. | fixed |  | 2026-11-22T02:07:28.377Z | 2026-11-22T13:35:34.529Z |
+| 22 | 11 | stub | host/disc_ccd.c | 188 | CloneCD TOC generation remains unsupported until Plan 11-04 validates the descriptor tracks. | fixed |  | 2026-11-22T02:07:28.513Z | 2026-11-22T13:35:43.098Z |
+| 23 | 11 | stub | host/disc_ccd.c | 198 | CloneCD sector reads remain unsupported until Plan 11-04 validates its sector mapping. | fixed |  | 2026-11-22T02:07:28.648Z | 2026-11-22T13:35:43.206Z |
 | 24 | 11 | stub | host/disc_ecm.c | 222 | ECM type-1/2/3 record decoding remains unsupported pending independent output vectors in Plan 11-05. | open |  | 2026-11-22T03:12:50.763Z |  |
 
 ````json
@@ -309,10 +309,10 @@ last_updated: 2026-11-22T03:12:50.763Z
     "file": "host/disc_ccd.c",
     "line": 171,
     "description": "CloneCD v3 track metadata remains unsupported until Plan 11-04 validates tracks and companions.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-11-22T02:07:28.377Z",
-    "resolved_at": null,
+    "resolved_at": "2026-11-22T13:35:34.529Z",
     "milestone": "v2.0"
   },
   {
@@ -322,10 +322,10 @@ last_updated: 2026-11-22T03:12:50.763Z
     "file": "host/disc_ccd.c",
     "line": 188,
     "description": "CloneCD TOC generation remains unsupported until Plan 11-04 validates the descriptor tracks.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-11-22T02:07:28.513Z",
-    "resolved_at": null,
+    "resolved_at": "2026-11-22T13:35:43.098Z",
     "milestone": "v2.0"
   },
   {
@@ -335,10 +335,10 @@ last_updated: 2026-11-22T03:12:50.763Z
     "file": "host/disc_ccd.c",
     "line": 198,
     "description": "CloneCD sector reads remain unsupported until Plan 11-04 validates its sector mapping.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-11-22T02:07:28.648Z",
-    "resolved_at": null,
+    "resolved_at": "2026-11-22T13:35:43.206Z",
     "milestone": "v2.0"
   },
   {

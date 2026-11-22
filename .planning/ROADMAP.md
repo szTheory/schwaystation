@@ -195,7 +195,7 @@ Plans:
 - [x] 11-01-PLAN.md — Bounded host-provider skeleton and exact inventories
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 11-02-PLAN.md — Exact metadata-only PR Nightly route with fail-closed controls
+- [ ] 11-02-PLAN.md — Record cap-based deferral of metadata-only PR Nightly shortcut
 - [x] 11-03-PLAN.md — Validated literal ECM stream and bounded random access
 
 **Wave 3** *(after 11-03)*

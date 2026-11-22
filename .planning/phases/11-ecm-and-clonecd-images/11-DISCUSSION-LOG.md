@@ -69,6 +69,20 @@
   path checks, route checks and budget gate.
 - Keep code review before final verification, and batch related repairs before one changed-head hosted run.
 
+## Execution re-review: Nightly route budget (2026-11-22)
+
+New cap evidence made the originally selected D-08 route infeasible within the locked repository-check ceiling.
+The existing counted set is 3,898/3,901 lines, leaving three lines; the route-control additions alone were
+measured at 30 lines, for 3,928 before adding classifier or workflow-boundary controls. Two independent
+read-only audits found no safe existing assertion to remove and no measured 27-line consolidation that retained
+all cases. The parent reviewed the alternate options adversarially: raising the cap violates D-09; deleting or
+relaxing controls weakens the fail-closed boundary; minifying or moving gate code violates the project policy;
+the existing full-Nightly fallback is safe and keeps all coverage.
+
+**Decision D-12:** Defer only the generated-release-metadata Nightly shortcut to existing pending todo 051.
+Keep all current routes, cases, platform jobs and Main/Release separation unchanged. Plan 11-02 now records this
+evidence and verifies the existing classifier behavior; this does not complete or waive ECM-01 or CCD-01.
+
 ## Deferred Ideas
 
 - Generic SPDX scanner; broader CI/CD redesign; undocumented CCD variants; any ECM sector layout without proven

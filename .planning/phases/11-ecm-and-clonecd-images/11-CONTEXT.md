@@ -70,6 +70,12 @@ introduce generic licence-scanning infrastructure. Keep the approved 3,901-line 
   requested/produced sector counts before guest execution. Keep provider, shared consumer, malformed, fuzz/replay,
   endian, sanitizer and applicable wasm32 coverage in the existing test and CI structure. Sort the exact test
   inventory before configuring.
+- **D-12 (execution re-review, 2026-11-22):** Supersede the metadata-only Nightly shortcut portion of D-08.
+  The existing counted checks are 3,898/3,901 lines; the required route-control additions alone add 30 lines,
+  producing 3,928 before classifier and workflow controls. Independent audits found no safe, measured gate
+  consolidation that preserves every assertion. Defer this shortcut under existing todo 051, keep the current
+  full-Nightly behavior and every required case/lane, and do not raise the cap. Revisit only after a measured,
+  semantics-preserving reduction can fit the complete control set.
 
 ### Trade-offs by role
 
