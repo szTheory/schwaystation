@@ -38,8 +38,8 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 - [x] **MEDIA-02**: Format readers use checked arithmetic and documented limits before allocation or decode, confine companion paths to the selected image directory, and have bounded regression-fuzz tests for malformed headers, offsets, track counts and truncated inputs. A cheap fixture inventory checks track/sector counts and boundary LBAs before any long guest run.
 - [x] **CHD-01**: When `SCHWAYSTATION_CHD=ON`, the host opens the documented CHD v1–v5 subset using the pinned libchdr BSD-3 closure, returns matching sector/TOC/subcode data and deterministic fixture hashes on all eight applicable lanes, and fuzzes malformed CHD inputs; `OFF` remains a dependency-free default build until the sub-512-KiB parity fixture passes. Every distributed archive includes the exact required notices, and `.info` advertises `chd` only for a build that contains the provider.
 - [x] **PBP-01**: The host reads the explicitly tested, unencrypted PSISO PBP layout and supported track variants with bounded directory/TOC parsing and deterministic sector output; encrypted PGD and undocumented layouts are rejected with a clear unsupported result. The inflater is in-tree permissive source with its notice and does not require system zlib.
-- [ ] **ECM-01**: The host decodes the documented ECM input subset with bounded random access, preserving sector bytes and rejecting invalid tables, offsets and truncated streams; a preflight confirms source extents and requested/produced sector counts before booting a guest.
-- [ ] **CCD-01**: The host parses the documented CCD descriptor subset and its confined IMG/SUB companions, preserving track modes, indexes, pregaps, subcode and first/last-sector reads; malformed or escaping companion paths are rejected before opening files outside the image directory.
+- [x] **ECM-01**: The host decodes the documented ECM input subset with bounded random access, preserving sector bytes and rejecting invalid tables, offsets and truncated streams; a preflight confirms source extents and requested/produced sector counts before booting a guest.
+- [x] **CCD-01**: The host parses the documented CCD descriptor subset and its confined IMG/SUB companions, preserving track modes, indexes, pregaps, subcode and first/last-sector reads; malformed or escaping companion paths are rejected before opening files outside the image directory.
 - [ ] **CRYPT-01**: An SBI sidecar is bound to the selected disc identity and LBA map; its bad-Q result remains separate from data-sector success and the CD-ROM GetlocP path returns the required previous-good position. A short command-sequence test verifies the result before any protected-title guest run, and `fuzz.sbi` plus seed replay cover malformed input.
 
 ### Region, board and bounded boot/MDEC behavior
@@ -100,8 +100,8 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | CHD-01 | Phase 9 | Complete |
 | COMPAT-02 | Phase 9 | Complete |
 | PBP-01 | Phase 10 | Complete |
-| ECM-01 | Phase 11 | Pending |
-| CCD-01 | Phase 11 | Pending |
+| ECM-01 | Phase 11 | Complete |
+| CCD-01 | Phase 11 | Complete |
 | CRYPT-01 | Phase 12 | Pending |
 | PROFILE-01 | Phase 13 | Pending |
 | PROFILE-02 | Phase 13 | Pending |
@@ -126,4 +126,4 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 
 ---
 *Requirements defined: 2026-11-18*
-*Last updated: 2026-11-18 after roadmap mapping*
+*Last updated: 2026-11-22 after Phase 11 verification*

@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 11
-current_phase_name: ECM and CloneCD images
-current_plan: 15 of 15 (all implementation plans complete; code review and final exact-head verification remain)
-status: verifying
-stopped_at: Completed 11-15-PLAN.md
-last_updated: "2026-11-22T20:13:40.986Z"
+current_phase: 12
+current_phase_name: SBI and LibCrypt
+current_plan: Not started
+status: planning
+stopped_at: Phase 11 verified and transitioned; ship Phase 11 before planning Phase 12
+last_updated: "2026-11-22T21:01:07.019Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-15 staged SDL2 example and focused CHD-ON checks passed; code review and final verification are next
-state_head: cbc347c8f41f7f90d1bc18bc615d34c57d5117dd
+last_activity_desc: Phase 11 automated verification and completion transition passed; Phase 11 ship is next
+state_head: d7c7e83032a602c1a4bdf0ee7c6b3d967d6a1d7e
 progress:
   total_phases: 10
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 63
   completed_plans: 63
-  percent: 40
+  percent: 50
 ---
 
 # Project State
@@ -26,16 +26,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 implementation plans are complete; code review and final exact-head verification are next
+**Current focus:** Phase 11 is verified and transitioned; ship, merge and release it before planning Phase 12
 
 ## Current Position
 
-Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 15 of 15 (all implementation plans complete; code review and final exact-head verification remain)
+Phase: 12 — SBI and LibCrypt
+Current Plan: Not started
 Total Plans in Phase: 15
-Status: Ready for code review and final verification
-Last activity: 2026-11-22 -- Plan 11-15 staged SDL2 example and focused CHD-ON checks passed
-Progress: [████░░░░░░] 40% (4/10 phases released)
+Status: Ready to plan
+Last activity: 2026-11-22 — Phase 11 complete, transitioned to Phase 12
+Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
+
+### Phase 11 review, verification and transition (2026-11-22)
+
+Runtime/model: Codex/OpenGSD 1.20.0; GSD reviewer and verifier roles resolved to `gpt-6-luna` xhigh; the primary runtime-reported model ID was unavailable. The deep review covered 40 Phase 11 implementation/integration files and found no blockers plus one metadata warning. Commit `961964a` corrected both CHD-off/on descriptions and added a regression check. Goal-backward verification passed 45/45 truths; the automation-only UAT record passed 4/4 with no owner or hardware observations claimed. The GSD completion transition marked Phase 11 complete and validated ECM-01/CCD-01. The phase still needs the authorized ship, hosted Main/Nightly/Release evidence, merge and automatic release before Phase 12 planning.
+
+The exact code head `961964a` passed `cmake --workflow --preset ci` with exit 0: 670/670 CI tests in 105.02 seconds and 7/7 release checks in 1.46 seconds. The fixed repository-check set passed at exactly 3,901/3,901 lines. The CMake configure and focused libretro metadata positive/negative tests also passed. No local Act container or campaign ran for this exact head; the earlier `act schedule --dryrun` route check is recorded in Plan 11-12. Hosted Main, Nightly and Release results remain unknown until the PR runs.
+
+CI efficiency review: the full suite had no duplicate broad test run; package checks were a distinct post-package gate. The slowest measured cases were `policy.quality_metrics` at 65.82 seconds and `libretro.host` at 59.36 seconds. The former preserves many isolated production-gate scenarios; no safe in-scope assertion reduction was found. A measured, quality-preserving optimization seed is `.planning/seeds/SEED-261122-vlf-reduce-quality-gate-test-runtime-without-losing-coverage.md`.
 
 ### Phase 11 Plan 11-15 execution (2026-11-22)
 
@@ -957,7 +965,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 243
+- Total plans completed: 258
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -975,6 +983,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 8 | 10 | - | - |
 | 9 | 15 | - | - |
 | 10 | 13 | - | - |
+| 11 | 15 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1666,12 +1675,15 @@ Recent decisions affecting current work:
 - [Phase 07]: Keep historical push timing bounds tied to their workload fingerprint; the PR route remains unbaselined until exact-head hosted runs prove comparability.
 - [Phase 07]: Keep `size.wasm` unbounded until the linked Ubuntu 26 Release module is measured; set the bound only from its actual byte count.
 - [Phase 07]: Infrastructure verification with zero behavior-unverified invariants has no owner UAT; hosted delivery checks are recorded as ship evidence.
+- [Phase 11]: ECM and CCD are host-side bounded providers on the shared disc contract; fixtures and consumer tests preserve the documented subsets.
+- [Phase 11]: Keep full Nightly routing and every campaign case; D-12 defers the metadata-only shortcut until a measured gate refactor fits the fixed line budget.
+- [Phase 11]: The final local CI run is green; hosted Main/Nightly/Release evidence must be recorded at ship before Phase 12 planning.
 ### Blockers/Concerns
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
 - [Phase 7]: Closed; hosted verification, main CI, release v0.7.0 and triage artifact passed. Follow-up efficiency investigation is in todo 050, bound to Phase 9.
-- [Phase 11]: D-08's Nightly shortcut is deferred under D-12; the full Nightly route and all cases remain active. This is a closed scope disposition, not an active blocker.
+- [Phase 11]: D-08's Nightly shortcut is deferred under D-12; the full Nightly route and all cases remain active. This is a closed scope disposition, not an active blocker. Phase 11 hosted Main/Nightly/Release results remain unknown until its PR runs.
 
 ### Quick Tasks Completed
 
@@ -1878,8 +1890,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T20:13:40.788Z
-Stopped at: Completed 11-15-PLAN.md
+Last session: 2026-11-22T21:01:07Z
+Stopped at: Phase 11 verified and transitioned; ship/merge/release Phase 11 before planning Phase 12
 Resume file: None
 
 ### v1.0 session history

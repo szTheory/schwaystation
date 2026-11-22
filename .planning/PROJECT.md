@@ -58,6 +58,10 @@ conformance are not claims of this milestone.
 - ✓ Phase 5: deterministic SPU audio, pinned memory-transfer logs and runner/libretro PCM parity — v1.0.
 - ✓ Phase 6: CD-ROM images, XA, CD-DA, MDEC within the approved evidence scope, owned disc boot and disk control — v1.0.
 - ✓ Phase 7: weekly triage, measured CI/quality controls and maintainer guidance — v2.0; hosted ship evidence is tracked in the phase report.
+- ✓ Phase 8: SAVE-01–05 — per-game card identity, supported card formats, persistence and storage-only PocketStation — v2.0.
+- ✓ Phase 9: MEDIA-01–02, CHD-01, COMPAT-02 — bounded CHD reading, shared media checks and evidence ledger — v2.0.
+- ✓ Phase 10: PBP-01 — the documented unencrypted PSISO subset and unsupported-layout handling — v2.0.
+- ✓ Phase 11: ECM-01 and CCD-01 — bounded ECM and CloneCD/IMG/SUB readers, consumer integration and automated checks; hosted gates remain in the ship record — v2.0.
 
 ### Active
 
@@ -123,7 +127,7 @@ conformance are not claims of this milestone.
 | A retail BIOS is user-supplied only, recognised by digest; OpenBIOS is built in CI as the stand-in; an own stub kernel boots every PS-EXE fixture; no HLE | Firmware copyright; HLE is the top compatibility complaint | ✓ v1.0: BIOS digest recognition, CI OpenBIOS and own stub paths pass; no proprietary bytes committed. |
 | Video is the native display frame in GPU encoding with a metadata tuple plus a read-only VRAM view; conversion, borders and deinterlacing are host helpers outside the hash | Lossless and host-independent; ps1-tests compare whole VRAM | ✓ v1.0: native frames and host conversion are deterministic; GPU references pass. |
 | Audio is int16 stereo at 44,100 Hz with exactly `frame_cycles / 768` samples per frame; the hash is over that stream before any host resampling | Mixer-independent determinism | ✓ v1.0: hardware transfer logs, cross-platform hashes and runner/libretro PCM parity pass. |
-| The core never opens files: the host supplies `schway_disc` sector callbacks; an in-repo MIT helper parses cue/bin, iso and m3u; CHD, PBP and ECM are v2.0 | Hostile parsing stays out of the deterministic core; browser hosts serve sectors themselves | ✓ v1.0: host callbacks and cue/bin, ISO and M3U parsing pass; CHD/PBP/ECM remain deferred. |
+| The core never opens files: the host supplies `schway_disc` sector callbacks; host-side readers parse cue/bin, iso, m3u, CHD, PBP, bounded ECM and CloneCD/IMG/SUB through the shared contract | Hostile parsing stays out of the deterministic core; browser hosts serve sectors themselves | ✓ Phases 9–11: CHD/PBP/ECM/CCD readers and automated checks pass; Phase 11 hosted evidence is recorded at ship. |
 | Card bytes stay instance-owned and file access stays in hosts. Runner save names use normalized serials when valid and content-derived fallbacks otherwise; libretro card 1 belongs to frontend SAVE_RAM and card 2 persists separately. PocketStation support is storage-only over the card port. | Preserve deterministic host boundaries, portable card files and frontend ownership without claiming a PocketStation handheld emulator | ✓ Phase 8 verification: SAVE-01–05 passed local and hosted behavior checks; phase release pending. |
 | Nothing speed-changing exists: no CPU, GTE or GPU clock scale, no CD speedup; enhancements never enter the hashed path | rcheevos restricts such options; speedrun boards forbid them; accuracy complaints about PGXP and overclock | ✓ v1.0: no speed-changing option or enhancement enters the hashed path. |
 | Every phase ends in an automated release; phase 1 is the content-free walking skeleton ported from cogmaster and muhtari at public pins | Sibling velocity evidence | ✓ Six phase PRs merged; the automatic release workflow published v0.6.0. |
@@ -145,4 +149,4 @@ After each milestone:
 3. Lessons are exported to `.planning/LESSONS.md`.
 
 ---
-*Last updated: 2026-11-19 after Phase 8 verification*
+*Last updated: 2026-11-22 after Phase 11 verification*
