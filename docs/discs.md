@@ -6,7 +6,21 @@ images and `.cue` sheets whose data files contain MODE1/2048, MODE2/2352, or
 AUDIO tracks. It also accepts the fixture-proven unencrypted PBP subset below.
 With `SCHWAYSTATION_CHD=ON`, it opens the bounded CHD subset below through the
 same raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off by default;
-`.ecm` and `.ccd` remain unsupported.
+`.ccd` remains unsupported.
+
+## ECM images
+
+The provider reads ECM v1.0 literal and modeled records without materializing
+the decoded image. It validates the complete decoded-byte checksum and exposes
+bounded random reads. A bare `.ecm` has no TOC, so it uses the existing single
+MODE2/2352 fallback and must decode to an exact sequence of 2352-byte sectors.
+
+A CUE may name an `.ecm` FILE child for MODE2/2352 or AUDIO tracks. Track
+indexes and pregaps use the decoded extent, and reads match the equivalent
+uncompressed raw CUE. ECM has no track table: the provider rejects cooked
+2048-byte CUE sources and never invents the missing 16-byte sector header for
+type 2 or type 3 records. Canonical child paths stay inside the CUE directory;
+an open error leaves the caller's active disc unchanged.
 
 ## CHD metadata subset
 

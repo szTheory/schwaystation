@@ -594,9 +594,8 @@ static int test_cue_reject(const char *directory)
     CHECK(write_text(cue_path,
           "FILE \"unsupported.ecm\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n",
           sizeof "FILE \"unsupported.ecm\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n" - 1u) &&
-          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 1u,
-                             "unsupported: ECM cannot be a CUE track source"),
-          "expected ECM to remain unsupported as a CUE track source");
+          expect_open_status(cue_path, SCHWAY_DISC_IMAGE_BAD_CUE, 1u, NULL),
+          "expected a missing ECM CUE child to fail before decoding");
     (void)remove(cue_path);
     cue_path[0] = '\0';
     CHECK(make_path(cue_path, directory, "malformed.ecm") &&

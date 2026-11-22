@@ -324,6 +324,7 @@ static int test_cue_ecm_equivalence(const char *directory)
     uint8_t *raw = (uint8_t *)malloc(byte_count);
     char bin_path[1024] = {0}, ecm_path[1024] = {0};
     char bin_cue_path[1024] = {0}, ecm_cue_path[1024] = {0};
+    char escape_path[1024] = {0};
     schway_disc_image *bin_image = NULL;
     schway_disc_image *ecm_image = NULL;
     schway_disc_image_error error;
@@ -373,6 +374,58 @@ static int test_cue_ecm_equivalence(const char *directory)
             goto done;
         }
     }
+    schway_disc_image_close(ecm_image);
+    ecm_image = NULL;
+    schway_disc_image_close(bin_image);
+    bin_image = NULL;
+    int escape_size = snprintf(escape_path, sizeof escape_path,
+                               "%s/../disc-ecm-cue-escape.ecm", directory);
+    static const char escaped_cue[] =
+        "FILE \"../disc-ecm-cue-escape.ecm\" BINARY\n"
+        "TRACK 01 MODE2/2352\nINDEX 01 00:00:00\n";
+    if (escape_size < 0 || (size_t)escape_size >= sizeof escape_path ||
+        !write_literal_ecm(escape_path, raw, byte_count, 0) ||
+        !write_file(ecm_cue_path, (const uint8_t *)escaped_cue, sizeof escaped_cue - 1u) ||
+        schway_disc_image_open(ecm_cue_path, &ecm_image, &error) != SCHWAY_DISC_IMAGE_BAD_CUE ||
+        ecm_image != NULL) {
+        fprintf(stderr, "ASSERT disc.image.ecm: ECM CUE source escaped its canonical directory\n");
+        goto done;
+    }
+    static const char cooked_cue[] =
+        "FILE \"disc-ecm-cue.ecm\" BINARY\n"
+        "TRACK 01 MODE1/2048\nINDEX 01 00:00:00\n";
+    if (!write_file(ecm_cue_path, (const uint8_t *)cooked_cue, sizeof cooked_cue - 1u) ||
+        schway_disc_image_open(ecm_cue_path, &ecm_image, &error) !=
+            SCHWAY_DISC_IMAGE_UNSUPPORTED || ecm_image != NULL) {
+        fprintf(stderr, "ASSERT disc.image.ecm: unsupported cooked ECM CUE mode was accepted\n");
+        goto done;
+    }
+    static const char duplicate_cue[] =
+        "FILE \"disc-ecm-cue.ecm\" BINARY\n"
+        "TRACK 01 MODE2/2352\nINDEX 01 00:00:00\n"
+        "FILE \"disc-ecm-cue.ecm\" BINARY\n"
+        "TRACK 02 AUDIO\nINDEX 01 00:00:00\n";
+    if (!write_file(ecm_cue_path, (const uint8_t *)duplicate_cue,
+                    sizeof duplicate_cue - 1u) ||
+        schway_disc_image_open(ecm_cue_path, &ecm_image, &error) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.ecm: repeated ECM CUE source failed: %s\n", error.message);
+        goto done;
+    }
+    const schway_disc *duplicate_disc = schway_disc_image_disc(ecm_image);
+    schway_toc duplicate_toc;
+    memset(&duplicate_toc, 0, sizeof duplicate_toc);
+    duplicate_toc.size = (uint32_t)sizeof duplicate_toc;
+    uint8_t duplicate_sector[2352], duplicate_subcode[96];
+    if (duplicate_disc == NULL || duplicate_disc->toc == NULL ||
+        duplicate_disc->toc(duplicate_disc->user, &duplicate_toc) != 1u ||
+        duplicate_toc.track_count != 2u || duplicate_toc.tracks[0].leadout != 26u ||
+        duplicate_toc.tracks[1].leadout != 52u || duplicate_disc->read_sector == NULL ||
+        duplicate_disc->read_sector(duplicate_disc->user, 26u, duplicate_sector,
+                                    duplicate_subcode) != 1u ||
+        memcmp(duplicate_sector, raw, sizeof duplicate_sector) != 0) {
+        fprintf(stderr, "ASSERT disc.image.ecm: repeated ECM source extent or track offset differs\n");
+        goto done;
+    }
     ok = 1;
 done:
     free(raw);
@@ -382,6 +435,7 @@ done:
     if (ecm_path[0] != '\0') (void)remove(ecm_path);
     if (bin_cue_path[0] != '\0') (void)remove(bin_cue_path);
     if (ecm_cue_path[0] != '\0') (void)remove(ecm_cue_path);
+    if (escape_path[0] != '\0') (void)remove(escape_path);
     return ok;
 }
 
