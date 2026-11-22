@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 2 of 13 (blocked; Plan 04 Task 1 verified, follow-up 13 planned)
+current_plan: 2 of 13 (blocked by the fixed line cap; Plan 13 complete; Plan 05 runnable)
 status: in_progress
-stopped_at: Plan 11-04 Task 1 is committed and verified; split its unstarted companion-confinement task into Plan 13; 11-02 remains over budget at 3928/3901
-last_updated: "2026-11-22T13:04:44.000Z"
+stopped_at: Completed Plan 11-13; Plan 11-02 remains over cap and Plan 05 is runnable
+last_updated: "2026-11-22T13:33:34.362Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-04 Task 1 passed focused verification; Plan 13 now owns remaining companion confinement
-state_head: 043403f
+last_activity_desc: Plan 11-13 companion checks and CCD IO status correction passed focused verification
+state_head: 6696aec487d4865ea78e4f7f353bfcd310098a20
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 61
-  completed_plans: 51
+  completed_plans: 52
   percent: 40
 ---
 
@@ -26,16 +26,27 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plan 02 is over the 3901-line cap; Plan 04 Task 1 is committed, and its remaining companion work is Plan 13
+**Current focus:** Phase 11 — Plan 02 is over the 3901-line cap; Plan 13 is complete and Plan 05 is runnable
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 2 of 13 (blocked by the fixed line cap; Plan 04 Task 1 is verified and its unstarted task is split into Plan 13)
+Current Plan: 2 of 13 (blocked by the fixed line cap; Plan 13 is complete and Plan 05 is runnable)
 Total Plans in Phase: 13
 Status: In progress
-Last activity: 2026-11-22 -- Plan 11-04 Task 1 passed focused post-commit checks; Plan 02 remains over budget
+Last activity: 2026-11-22 -- Plan 11-13 passed focused post-commit CCD checks; Plan 02 remains over budget
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 Plan 11-13 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 GSD executor, `gpt-6-luna` xhigh. Plan 13 took 11 minutes 20 seconds, from
+2026-11-22T13:18:19Z to 13:29:39Z, and changed two files. RED `d2648c2` and GREEN `6696aec` are committed.
+The 3,898/3,901 line-budget preflight, sorted inventory and selector discovery passed. CI preset configure and
+focused CCD target build passed; the red JUnit evidence checker returned `RED_EVIDENCE_OK` for the dangling-SUB
+canonicalization status assertion. The rebuilt and committed CCD selector passed 1/1, including optional SUB,
+path escape and active-reader preservation cases. No broad suite, Windows/WASI hosted lane, Act job or hosted CI
+was run. Plan 13 is complete; Plan 02 remains blocked at 3928/3901. Plan 05 is runnable independently of Plan 13;
+the owner/orchestrator acts next on the Plan 02 budget audit and dependency-ready execution.
 
 ### Phase 11 Plan 11-04 execution and split (2026-11-22)
 
@@ -1023,6 +1034,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 10 P13 | 38 | 2 tasks | 7 files |
 | Phase 11 P01 | 37min | 3 tasks | 10 files |
 | Phase 11 P03 | 36min | 2 tasks | 5 files |
+| Phase 11 P13 | 11min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1682,9 +1694,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T03:14:28.329Z
-Stopped at: Completed 11-03-PLAN.md; 11-02 remains outstanding at 3928/3901 counted lines
-Resume file: 11-02-PLAN.md; Plan 11-04 is dependency-ready after 11-03
+Last session: 2026-11-22T13:33:34.181Z
+Stopped at: Completed Plan 11-13; Plan 11-02 remains over cap and Plan 05 is runnable
+Resume file: None
 
 ### v1.0 session history
 
