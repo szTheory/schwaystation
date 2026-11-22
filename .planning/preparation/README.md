@@ -51,7 +51,7 @@ reading end to end. `BRIEF.md` holds the conventions and the fan-out method ever
 | What does the v1 output frame look like, and where do enhancements hook in later? | PSX-GPU-AND-GTE 8; ARCHITECTURE 9; HOSTS-AND-INTEGRATION 8 |
 | SPU voices, ADSR, reverb and mixing; the audio contract and hash; A/V sync? | PSX-SPU-CDROM-AND-MDEC 1, 6; ARCHITECTURE 10 |
 | CD-ROM commands, INT semantics, measured timings, GetID and region, LibCrypt? | PSX-SPU-CDROM-AND-MDEC 2 |
-| Disc image formats and the host sector interface the core expects? | PSX-SPU-CDROM-AND-MDEC 3; ARCHITECTURE 4; DECISIONS DEC.42, DEC.43 |
+| Disc image formats and the host sector interface the core expects? | PSX-SPU-CDROM-AND-MDEC 3; ECM v1.0 author specification SCM.32; ARCHITECTURE 4; DECISIONS DEC.42, DEC.43 |
 | MDEC commands, the integer IDCT and the FMV path? | PSX-SPU-CDROM-AND-MDEC 4 |
 | SIO0 protocol and timing; pads, config mode, rumble, multitap, guns; what ships in v1.0? | PSX-PERIPHERALS-AND-SAVES 1, 2 |
 | Memory card layout, file formats, libretro naming and export; save-state constraints? | PSX-PERIPHERALS-AND-SAVES 3, 4; ARCHITECTURE 5; HOSTS-AND-INTEGRATION 1, 4 |

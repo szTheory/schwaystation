@@ -13,7 +13,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 7: Faster and more trustworthy CI** - Measure the build and release pipeline, fix the weakest quality dimension, and establish reproducible quality baselines. (completed 2026-11-18)
 - [x] **Phase 8: Per-game card saves** - Use separate saves per game, move cards between supported formats, and resume a game in the runner or libretro. (completed 2026-11-19)
 - [x] **Phase 9: CHD disc images** - Open supported CHD images with equivalent disc behavior and establish the shared media checks and feature-ledger workflow. (completed 2026-11-20)
-- [x] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly. (completed 2026-11-21)
+- [x] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly. (completed 2026-11-22)
 - [ ] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data.
 - [ ] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact.
 - [ ] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior.
@@ -271,7 +271,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
 | 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
 | 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
-| 10. PBP disc images | 13/13 | Complete    | 2026-11-21 |
+| 10. PBP disc images | 13/13 | Complete    | 2026-11-22 |
 | 11. ECM and CloneCD images | 0/TBD | Not started | - |
 | 12. SBI and LibCrypt | 0/TBD | Not started | - |
 | 13. Regions, console revisions and playback | 0/TBD | Not started | - |

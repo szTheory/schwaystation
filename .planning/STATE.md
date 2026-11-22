@@ -2,15 +2,15 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 10
-current_phase_name: PBP disc images
-current_plan: Ship follow-up 4
-status: shipping
-stopped_at: Phase 10 deterministic PBP fixture correction reviewed and locally verified, awaiting repaired-head CI/Nightly and release
-last_updated: "2026-11-21T20:36:14Z"
-last_activity: 2026-11-21
-last_activity_desc: "Replaced host-zlib PBP encoding after exact-head hash mismatch; local PBP paths pass"
-state_head: 8224693353ead38ae747ec2640f844b2c3f32cc3
+current_phase: 11
+current_phase_name: ECM and CloneCD images
+current_plan: Planning
+status: planning
+stopped_at: Phase 11 context ready for plan-phase
+last_updated: "2026-11-22T01:16:58Z"
+last_activity: 2026-11-22
+last_activity_desc: "Recorded Phase 10 release efficiency evidence and completed Phase 11 context"
+state_head: 636ac89d4add3192520084a73fa61295a8422bbc
 progress:
   total_phases: 10
   completed_phases: 4
@@ -26,16 +26,56 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 10 — PBP disc images; exact-head hosted CI and Nightly pass, awaiting merge and release
+**Current focus:** Phase 11 — ECM and CloneCD images; context ready for planning from the released v0.10.0 main head
 
 ## Current Position
 
-Phase: 10 — PBP disc images
-Current Plan: Ship follow-up 4
-Total Plans in Phase: 13
-Status: Exact-head verification passed; awaiting Phase 10 PR merge and automatic release
-Last activity: 2026-11-21 -- PR #34 CI/Nightly passed and final timing review recorded
-Progress: [████░░░░░░] 40% (3/10 phases released)
+Phase: 11 — ECM and CloneCD images
+Current Plan: Discussion
+Total Plans in Phase: TBD
+Status: Phase 10 released; Phase 11 context ready for planning
+Last activity: 2026-11-22 -- Phase 11 discussion and adversarial pass completed
+Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 discussion (2026-11-22)
+
+Runtime/model: Codex session (primary model ID unavailable), OpenGSD 1.20.0. Read-only fan-out completed with
+`gsd-assumptions-analyzer` (`gpt-6.1-sol`, high), `gsd-domain-researcher` (`gpt-6-luna`, xhigh), and
+`gsd-advisor-researcher` (`gpt-6-luna`, xhigh). Their independent notes were reconciled and adversarially
+reviewed; no source code or tests changed. The discussion pins the ECM author specification as SCM.32, records
+the CloneCD confidence boundary, and resolves the source/callback SUB conversion with an independent known-answer
+test. The owner selected the unchanged 3,901-line cap and deferred generic SPDX scanning. Phase 11 is ready for
+planning. The narrow metadata-only Nightly route is an implementation item grounded in Phase 10's measured
+419-runner-second false positive; all unknown and mixed changes stay on the full route.
+
+### Phase 10 release closeout (2026-11-22)
+
+Runtime/model: Codex session (primary model ID unavailable), OpenGSD 1.20.0. The interval from the saved STATE
+checkpoint at 2026-11-21T20:36:14Z to release and current-main CI closeout at 2026-11-22T00:50:02Z was about
+4h14m wall, including hosted waits; active time was not measured. PR #34 merged at `9bf39aa`; release PR #35
+merged and published `v0.10.0` at 00:09:45Z. The release is Latest with all 19 expected archives/checksum
+assets; asset, signature and download verification passed, and `install-line-latest` passed. Release workflow
+[44961621930](https://github.com/szTheory/schwaystation/actions/runs/44961621930) passed on
+`636ac89d4add3192520084a73fa61295a8422bbc`. Current-main CI
+[44961621903](https://github.com/szTheory/schwaystation/actions/runs/44961621903) passed on that same SHA;
+it took 85m51s wall and about 9,200 summed job-seconds, with BE32/QEMU at 5,095 seconds (84m55s) as the
+critical path. Release CI used about 6,150 job-seconds (102.5 runner-minutes) for the full artifact matrix; its
+BE32 lane took 2,520 seconds (42m). Dollar billing data was not exposed.
+
+The release PR's metadata-only CI route correctly skipped the heavy matrix. Its Nightly classifier did not
+recognize the exact generated release-metadata files and launched the full workload; the run was cancelled
+after 419 elapsed job-seconds (about 7 runner-minutes). A cheap local invocation reproduced
+`nightly_full=true` for `.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`. Add a narrow
+classifier/test change to the Phase 11 plan so only this complete exact metadata set skips PR Nightly; unknown,
+mixed and incomplete lists must retain the full route.
+
+The main run on superseded ancestor `9bf39aa` was cancelled after `636ac89` advanced main with only the three
+generated release metadata files and full CI plus Release CI were running on `636ac89`. The cancelled run had
+already consumed 6,634 elapsed job-seconds (110.6 runner-minutes); this is accrued work, not the counterfactual
+savings. Keep both full current-SHA main CI and Release CI: the completed artifact-reuse review found their 18
+product archives differ, so reusing one matrix would weaken release verification. No coverage or test cases were
+removed. The standing CI/CD efficiency guidance is already discoverable in `AGENTS.md`,
+`.planning/AUTONOMOUS.md`, and `docs/maintaining.md`.
 
 ### Phase 10 verification (2026-11-21)
 

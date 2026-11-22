@@ -159,3 +159,29 @@ therefore establishes that the linked module is within the bound but does not ex
 No bound change is justified. The existing `act --dryrun` covered workflow routing; another dry run would add no
 coverage because workflow wiring was unchanged after it. Hosted-only runners and artifact/permission integrations
 remain established by these successful GitHub runs.
+
+## Release and current-main closeout — 2026-11-22
+
+Current-main CI [44961621903](https://github.com/szTheory/schwaystation/actions/runs/44961621903) and Release
+workflow [44961621930](https://github.com/szTheory/schwaystation/actions/runs/44961621930) passed on
+`636ac89d4add3192520084a73fa61295a8422bbc`. Main CI took 5,151 seconds (85m51s) wall; GitHub job records sum
+to about 9,200 runner-seconds, with BE32/QEMU at 5,095 seconds as the critical path. The release workflow took
+2,934 seconds (48m54s) wall. Its `release-ci /` jobs sum to about 6,150 runner-seconds, including 2,520 seconds
+for BE32; publish and install-line verification are additional jobs. The workflow published 19 expected
+assets, and signature/download verification plus `install-line-latest` passed. These are job elapsed times, not
+billed dollars; GitHub did not expose billing data.
+
+The metadata-only release pull request correctly used CI's light route but unexpectedly launched the full
+Nightly workflow. Nightly [44961521762](https://github.com/szTheory/schwaystation/actions/runs/44961521762) was
+cancelled after 119 seconds wall and 419 summed job-seconds. The local classifier check reproduced the route:
+the exact three generated files `.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt` set
+`nightly_full=true`. Phase 11 should add a narrow, tested PR route that skips Nightly only when the complete
+trusted changed-file set exactly equals those three files. Mixed, incomplete, unknown, renamed, or untrusted
+lists keep the full route. Scheduled and manual Nightly remain unchanged. This removes one known irrelevant
+workload without dropping tests, fuzzing, platform coverage, or release gates.
+
+Main CI and Release CI remain separate required checks: the completed archive comparison found all 18 product
+archives differ, so neither run can substitute for the other. An obsolete main run on ancestor `9bf39aa` was
+cancelled after `636ac89` advanced with release metadata; GitHub job records show 6,634 job-seconds were already
+spent. This is accrued work, not a counterfactual savings estimate. `act --dryrun` establishes workflow routing;
+hosted runners, artifacts, permissions, and release integrations remain verified by the required GitHub runs.
