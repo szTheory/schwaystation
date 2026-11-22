@@ -108,6 +108,12 @@ automation and efficiency preferences; autonomous authorization and phase bounda
 - Before expensive hosted CI, use `act` to run workflow jobs locally when the host can reproduce them and that
   adds coverage beyond the existing local suite. Use `act --dryrun` for routing checks. Record hosted-only
   runners, artifacts, permissions and integrations that `act` cannot establish; keep their hosted gates required.
+- Before pushing, maximize useful local evidence on the changed head: run affected configure/build/test paths and
+  cheap consistency checks first. A local pass increases confidence but cannot guarantee hosted runners or
+  integrations; preserve and run the required hosted gates.
+- If Docker is used, give every task-created image, container, network and volume a project- and task-identifiable
+  name (for example `schwaystation-phase11-ccd`). Remove those task-owned resources when finished. Never use a
+  global prune command that could delete resources belonging to another project or user.
 - Apply small, evidence-backed efficiency fixes within the authorized scope. Measure before/after when possible;
   record larger work as one todo bound to the phase that first needs it. Capture each run as its command, exit
   status and URL; do not repeat a green full suite for bookkeeping.

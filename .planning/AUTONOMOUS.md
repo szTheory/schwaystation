@@ -105,6 +105,12 @@ beyond the existing local suite; use `act --dryrun` for routing checks. Record t
 artifacts, permissions and integrations it cannot establish, and keep their hosted gates required. Avoid
 repeating an equivalent green local suite solely to exercise `act`.
 
+Before pushing a changed head, maximize useful local evidence: run the affected configure, build and test paths,
+plus cheap inventory, selector, artifact and budget checks. This raises confidence but cannot guarantee a hosted
+pass; keep the required hosted gates. If Docker is needed, assign project- and task-identifiable names to every
+created image, container, network and volume, then remove only those task-owned resources when finished. Do not
+run global prune commands that can affect unrelated work.
+
 For delegated research, write concise findings and verified pins to the assigned artifact early. When the
 remaining uncertainties are routine implementation probes, return them to the executor instead of delaying
 the whole phase. If a handoff stalls, recover existing evidence and artifacts before repeating any research.
