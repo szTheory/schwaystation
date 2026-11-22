@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 8 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 08 is next)
+current_plan: 9 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 09 is next)
 status: executing
-stopped_at: Completed 11-07-PLAN.md
-last_updated: "2026-11-22T15:55:51.285Z"
+stopped_at: Completed 11-08-PLAN.md
+last_updated: "2026-11-22T16:39:17.145Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-07 completed; legacy preflight and parity selector passed 2/2
-state_head: 14bd092e345e17dd8fc89d450e28aa7c3da3aa99
+last_activity_desc: Plan 11-08 runner legacy and malformed-media selectors passed 4/4
+state_head: cdcd1b37d3e3b1f5d0f59748223669d84e035e09
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 61
-  completed_plans: 56
+  completed_plans: 57
   percent: 40
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plans 05, 06, 07 and 13 are complete; dependency-ready Plan 08 is next
+**Current focus:** Phase 11 — Plans 05, 06, 07, 08 and 13 are complete; dependency-ready Plan 09 is next
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 8 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 08 is next)
+Current Plan: 9 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 09 is next)
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-22 -- Plan 11-07 legacy preflight and parity selector passed 2/2
+Last activity: 2026-11-22 -- Plan 11-08 runner legacy and malformed-media selectors passed 4/4
 Progress: [████░░░░░░] 40% (4/10 phases released)
 
 ### Phase 11 Plan 11-02 budget disposition (2026-11-22)
@@ -104,6 +104,19 @@ the source identity lacked SUB while the CCD image included generated SUB; the t
 the summary does not claim canonical RED evidence. No guest, broad suite, Act job, hosted CI or Docker ran.
 The identity-oracle diagnosis was the main bottleneck and put the plan over 30 minutes; the concrete remaining
 work did not warrant a split. ECM-01 and CCD-01 remain open pending phase-level verification. Plan 08 is next.
+
+### Phase 11 Plan 11-08 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 Codex GSD executor, configured `gpt-6-luna` xhigh; primary runtime model ID was
+not exposed. Plan 08 took 33 minutes 32 seconds through final targeted verification, from 2026-11-22T16:00:47Z
+to 16:34:19Z, and changed four files. Task commits are `23d1c48`, `c7126f8`, `2123375`, and `cdcd1b3`.
+Inventory, fixture extents/counts, fixture edges, and the 3,898/3,901 cap passed. Configure and focused runner
+build passed; the final legacy and malformed-media selector passed 4/4 in 19.30 seconds, and diff checks passed.
+The direct ECM RED exited 8 and classified as `RED_EVIDENCE_OK`. Expanded checks exposed an ECM-CUE routing gap
+and a CCD save-identity oracle that compared different SUB bytes; the route and test comparator were corrected.
+The 30-minute target was exceeded during diagnosis, with no remaining implementation slice to split. PBP and CHD
+refusal controls remain. No broad suite, Act execution, Docker, or hosted CI ran. Phase-wide ECM-01/CCD-01 remain
+open pending review and final verification; dependency-ready Plan 09 is next.
 
 ### Phase 11 Plan 11-01 execution (2026-11-22)
 
@@ -1091,6 +1104,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P05 | 29min | 2 tasks | 5 files |
 | Phase 11 P06 | 27min | 2 tasks | 2 files |
 | Phase 11 P07 | 48m | 2 tasks | 8 files |
+| Phase 11 P08 | 33m32s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1508,6 +1522,8 @@ Recent decisions affecting current work:
 - [Phase 11]: Plan 11-06 accepts nonempty SUB only at exactly 96 bytes per IMG sector; missing or empty SUB remains zero-filled.
 - [Phase 11]: Plan 11-07 generates legacy media only from owned raw fixture sources and records generator digests and counts.
 - [Phase 11]: Compare save/content identity through the IMG-backed CUE view and independently compare all CloneCD SUB bytes.
+- [Phase 11]: Runner probes ECM-containing CUEs through the shared image reader; ordinary raw CUE handling remains unchanged.
+- [Phase 11]: Compare CCD save identity only against a matching SUB base; keep generated SUB byte parity as a separate check.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1755,8 +1771,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T15:55:50.990Z
-Stopped at: Completed 11-07-PLAN.md
+Last session: 2026-11-22T16:39:16.971Z
+Stopped at: Completed 11-08-PLAN.md
 Resume file: None
 
 ### v1.0 session history
