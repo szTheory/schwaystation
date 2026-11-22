@@ -8,6 +8,11 @@ find_program(RELEASE_DELETE_SH sh REQUIRED)
 set(fake_bin "${TEST_ROOT}/bin")
 file(REMOVE_RECURSE "${TEST_ROOT}")
 file(MAKE_DIRECTORY "${fake_bin}")
+if(WIN32)
+  set(path_separator ";")
+else()
+  set(path_separator ":")
+endif()
 file(WRITE "${fake_bin}/gh" [=[#!/bin/sh
 case "$*" in
   *"-X DELETE repos/owner/repo/git/refs/tags/"*) : > "$DELETE_MARKER"; exit 0 ;;
@@ -55,7 +60,7 @@ function(check_scenario mode expected_result expected_queries)
   endif()
   execute_process(
     COMMAND "${CMAKE_COMMAND}" -E env
-      "PATH=${fake_bin}:$ENV{PATH}" "MODE=${mode}" "COUNTER=${counter}"
+      "PATH=${fake_bin}${path_separator}$ENV{PATH}" "MODE=${mode}" "COUNTER=${counter}"
       "RELEASE_ID_COUNTER=${release_id_counter}" "RELEASE_TAG_COUNTER=${release_tag_counter}"
       "DELETE_MARKER=${delete_marker}" "RELEASE_ID_DELETE_MARKER=${release_id_delete_marker}"
       "RELEASE_DELETE_MARKER=${release_delete_marker}"
