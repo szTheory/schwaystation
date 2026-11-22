@@ -7,10 +7,10 @@ current_phase_name: SBI and LibCrypt
 current_plan: Not started
 status: planning
 stopped_at: Phase 11 PR
-last_updated: "2026-11-22T21:31:31.963Z"
+last_updated: "2026-11-22T22:10:06Z"
 last_activity: 2026-11-22
-last_activity_desc: "Phase 11 PR #36 hosted failures diagnosed and corrected locally; final head push pending"
-state_head: 4e381c184f3db889395743d7853a26e0983c7af8
+last_activity_desc: "Phase 11 PR #36 fixes reviewed; complete local CI and Nightly routing preflight passed; repaired head push pending"
+state_head: 8d3dad8f15e71d87855bfe9a1bf0006698429b7f
 progress:
   total_phases: 10
   completed_phases: 5
@@ -52,6 +52,18 @@ PR #36's first exact head was `4e381c184f3db889395743d7853a26e0983c7af8`. [Night
 The first-push hosted findings were reproduced and corrected locally before another broad hosted run. `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` exited 0; `act schedule --dryrun --workflows .github/workflows/nightly.yml --job fuzz ...` exited 0 and routed through fixture build, closure, and campaign steps (dry-run only; hosted Ubuntu 26.04 and its permissions/artifacts remain unverified). A fresh task-scoped fuzz build compiled the legacy test target plus ECM/CCD replay targets, and its exact four closure tests passed 4/4. The corrected CCD test passed the local CCD plus legacy preflight/parity selector 3/3, and GCC 15.3 in the named auto-removed container compiled `tests/disc/ccd.c` with the hosted Linux warning/error flags. The full local `cmake --workflow --preset ci` run after the workflow fix but before the final POSIX macro passed 670/670 in 82.38 seconds and separate release checks 7/7 in 1.44 seconds; build artifacts were reused (seven build actions). The final macro change then passed its targeted compile and tests. Do not claim hosted Main/Nightly/Release success until the final PR head runs.
 
 No new Docker image or volume was created. The existing `gcc:15` image was used with container name `schwaystation-phase11-gcc15-ccd-check`; `--rm` removed the container after the compile. No broad Act run was attempted because the available Act image is Ubuntu 24.04/arm64 rather than the hosted Ubuntu 26.04 lanes.
+
+### Phase 11 final-head failures, repair and local verification (2026-11-22)
+
+Runtime/model: Codex; primary model ID unavailable. Whole follow-up duration was not tracked; the complete local CI workflow's CTest phase took 111.59s and the Release checks took 1.91s. The focused deep review found no issues in the new seed, timeout, WASI bound and gate-order changes.
+
+The final pre-repair [Nightly run 45073362687](https://github.com/szTheory/schwaystation/actions/runs/45073362687) reached `fuzz.regress.chd` corpus creation and rejected its intentionally empty seed. The final pre-repair [CI run 45073362654](https://github.com/szTheory/schwaystation/actions/runs/45073362654) measured the linked CHD/ECM/CCD WASI runner at 906,778 bytes against the Phase 10 875,971-byte ceiling. All six native matrix legs then timed out at the 30-second `runner.disc.legacy` gate after one failure per lane; the test performs nine 1,200-frame fixture boots. The failed tail was canceled after useful failures were collected; no post-repair hosted result exists yet.
+
+The local fix allows only the named `empty` seed to be written as a zero-byte corpus file, registers a corpus-writing CTest, and includes it in Nightly's closure selector before timed fuzz campaigns. The legacy runner timeout is now 60 seconds: it took 19.98s in isolation and 29.05s while the full local suite ran in parallel. `quality.json` now tracks the actual hosted 906,778-byte module. In `.github/workflows/ci.yml`, only the runner target builds before size measurement; the full WASI portable-test build still runs after a passing bound and before every portable test. The prior failed measurement job built 331 Ninja actions before discovering the old bound, so this reordering fails early without changing passing-path coverage.
+
+Cheap preflights passed: sorted fuzz inventory, `disc_registration` CI/Nightly wiring, 3,901/3,901 counted lines, and `git diff --check`. A fresh local CHD replay build plus its corpus and ordinary replay tests passed 5/5; the corpus contained 12 files and `empty.exe` was zero bytes. The CHD-OFF `library` preset also rebuilt the replay and passed the seed-corpus CTest 1/1 without a baseline CHD fixture. `cmake --workflow --preset ci` passed 671/671 tests, packaged all three deliverables, and passed Release checks 7/7. Act's updated Nightly fuzz `--dryrun` exited 0 after its task-specific cache was placed under `/private/tmp`; it routed through the closure and campaign step without creating containers. The dry run maps hosted Ubuntu 26.04 to an Ubuntu 24.04/arm64 image and proves routing only. The actual WASI module measurement is hosted evidence; this machine did not build the WASI target.
+
+Next: commit and push the reviewed repair to PR #36, then inspect one final-head CI and Nightly run and complete auto-merge, main CI and the automatic release before Phase 12 planning. The v2.0 roadmap still has Phases 12–16 to execute and ship after this boundary.
 
 ### Phase 11 Plan 11-15 execution (2026-11-22)
 

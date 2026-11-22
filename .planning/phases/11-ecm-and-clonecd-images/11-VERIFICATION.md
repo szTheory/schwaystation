@@ -1,6 +1,6 @@
 ---
 phase: 11-ecm-and-clonecd-images
-verified: 2026-11-22T21:35:32Z
+verified: 2026-11-22T22:08:48Z
 status: passed
 score: 45/45 must-haves verified
 re_verification:
@@ -9,6 +9,7 @@ re_verification:
   gaps_closed:
     - "Nightly fuzz closure now builds schwaystation-test-disc-legacy before its closure CTests."
     - "The CCD regression test declares symlink() under strict POSIX C17 builds."
+    - "Nightly writes the designated zero-byte CHD seed before timed fuzz campaigns; runner timeout and WASI size gate are corrected from measured evidence."
   gaps_remaining: []
   regressions: []
 covered_files:
@@ -201,7 +202,7 @@ The generic key-link query could not resolve plan links whose `from:`/`to:` valu
 
 ## Behavioral Spot-Checks
 
-No tests were run for this re-verification. The evidence below was supplied from the Phase 11 ship follow-up; current committed HEAD is `32fc115`. The two CI fixes are included in that commit. A full local workflow run predates the last POSIX feature-test macro, so targeted checks cover that final change.
+At the prior verification point, the source was commit `32fc115`; that report's full local workflow preceded the POSIX feature-test macro and used targeted checks for the final change. The final ship follow-up below reran the full workflow on the repaired source.
 
 | Behavior/check | Command | Result | Status |
 |---|---|---|---|
@@ -213,6 +214,21 @@ No tests were run for this re-verification. The evidence below was supplied from
 | Repository-check budget | `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` | Exit 0 | ✓ PASS |
 | Changed-head workflow/diff preflight | `git diff --check`; `ctest --test-dir build/ci --no-tests=error -R '^docs[.]budgets$'` | Parent-reported exit 0 for both; README and libretro docs retain the limited-compatibility caveat | ✓ PASS |
 | Nightly route dry-run | `act schedule --dryrun` with the fuzz job selected | Exit 0; route included fixture build, closure and campaign steps; mapped to Ubuntu 24.04/arm64, dry-run only | ℹ️ Routing evidence only |
+
+### Final local Phase 11 ship follow-up (2026-11-22)
+
+The reviewed follow-up changes passed the final local workflow. The complete run and the focused regressions are recorded here; the hosted PR runs shown below predate these changes and cannot count as post-fix evidence.
+
+| Behavior/check | Command | Result | Status |
+|---|---|---|---|
+| Full CI workflow on the repaired worktree | `cmake --workflow --preset ci` | Exit 0; 671/671 tests in 111.59s, package step completed, Release checks 7/7 in 1.91s | ✓ PASS |
+| CHD replay and seed corpus | `ctest --test-dir build/ci --no-tests=error --output-on-failure -R '^fuzz[.]regress[.]chd($|[.]seed_corpus$)'` | Exit 0; fixture setup and both replay tests passed 5/5; 12 corpus files, `empty.exe` is 0 bytes | ✓ PASS |
+| CHD-OFF corpus writer | `cmake --preset library`; build `schwaystation-fuzz-chd-replay`; CTest `fuzz.regress.chd.seed_corpus` | Exit 0; CHD-off replay target built and the zero-byte seed corpus test passed 1/1 without the CHD fixture | ✓ PASS |
+| Legacy runner timeout under full-suite load | CTest's `runner.disc.legacy` in `cmake --workflow --preset ci` | Passed in 29.05s with the new 60s limit; isolated focused run passed in 19.98s | ✓ PASS |
+| Workflow, inventory and budget preflight | `LC_ALL=C sort -cu tests/fuzz/inventory.txt`; `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake`; line-budget command | Exit 0; CTest inventory sorted, CI/Nightly wiring matches, 3,901/3,901 lines | ✓ PASS |
+| Nightly route dry-run after the selector update | `act --action-cache-path /private/tmp/schwaystation-phase11-act-actions-v2 --cache-server-path /private/tmp/schwaystation-phase11-act-server-v2 --no-cache-server --platform ubuntu-26.04=catthehacker/ubuntu:act-24.04 --container-architecture linux/arm64 schedule --dryrun --workflows .github/workflows/nightly.yml --job fuzz` | Exit 0; route reached source preflight, fixture setup, closure and campaign step; dry-run only | ℹ️ Routing evidence only |
+
+The CI efficiency correction measures `schwaystation-run` before building the complete WASI portable-test target set. A failed size bound therefore avoids unrelated test-target compilation; when the bound passes, the complete build and portable suite still run. The prior failed run had built 331 Ninja actions before discovering the stale size bound, so this change moves the comparison earlier without removing coverage. The 906,778-byte module measurement came from the exact hosted producer job in [run 45073362654](https://github.com/szTheory/schwaystation/actions/runs/45073362654/job/137365283519).
 
 ## Probe Execution
 

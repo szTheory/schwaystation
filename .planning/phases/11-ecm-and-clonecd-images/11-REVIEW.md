@@ -109,3 +109,17 @@ The `_POSIX_C_SOURCE` feature-test macro is defined before every header and only
 _Follow-up reviewed: 2026-11-22T21:28:16Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
+
+## Follow-up: Nightly seed writing, runner timeout and WASI gate order
+
+**Reviewed:** 2026-11-22T22:03:54Z
+**Files:** `.github/workflows/ci.yml`, `.github/workflows/nightly.yml`, `quality.json`, `tests/cmake/workflows.cmake`, `tests/fuzz/*`, `tests/runner/tests.cmake`
+**Result:** No findings.
+
+The designated zero-byte CHD seed can now be written to the libFuzzer corpus while unexpected empty seeds remain rejected. The new corpus-writing regression is registered in the fuzz inventory and is included in the Nightly closure selector before timed campaigns. The `runner.disc.legacy` timeout now reflects its nine 1,200-frame guest runs: local evidence measured 19.98 seconds in isolation and 29.05 seconds under the full suite; the 60-second timeout retains all cases. The WASI job builds only `schwaystation-run` before measuring the linked module and retains the full test-target build before portable tests. The 906,778-byte bound matches the actual linked module measured on the failed final-head hosted run.
+
+The focused workflow/inventory preflight and local CI workflow passed after these changes. This read-only review ran no tests and found no security, correctness or workflow-coverage issue.
+
+_Follow-up reviewed: 2026-11-22T22:03:54Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: focused_
