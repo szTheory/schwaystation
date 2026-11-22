@@ -132,6 +132,8 @@ static int write_two_track_descriptor(const char *path, uint32_t track1_index1,
 {
     char descriptor[4096];
     size_t used = 0u;
+    uint32_t a0_lba = (UINT32_C(60) + UINT32_C(32)) * UINT32_C(75) - UINT32_C(150);
+    uint32_t a1_lba = UINT32_C(2) * UINT32_C(4500) - UINT32_C(150);
     int length = snprintf(descriptor, sizeof descriptor,
         "[CloneCD]\nVersion=3\n"
         "[Disc]\nTocEntries=5\nSessions=1\nDataTracksScrambled=0\nCDTextLength=0\n"
@@ -139,9 +141,9 @@ static int write_two_track_descriptor(const char *path, uint32_t track1_index1,
     if (length < 0 || (size_t)length >= sizeof descriptor) return 0;
     used = (size_t)length;
     if (!append_entry(descriptor, sizeof descriptor, &used, 0u, 0xa0u, 4u, 0u,
-                      1u, 32u, 0u, 0u) ||
+                      1u, 32u, 0u, a0_lba) ||
         !append_entry(descriptor, sizeof descriptor, &used, 1u, 0xa1u, 4u, 0u,
-                      2u, 0u, 0u, 0u) ||
+                      2u, 0u, 0u, a1_lba) ||
         !append_entry(descriptor, sizeof descriptor, &used, 2u, 0xa2u, 4u, 0u,
                       0u, 2u, 16u, 16u) ||
         !append_entry(descriptor, sizeof descriptor, &used, 3u, 1u, 4u, 1u,
@@ -338,8 +340,19 @@ static int test_malformed_metadata(const char *directory)
         !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                      "INDEX 1 integer overflow")) ok = 0;
     if (!write_descriptor(descriptor_path, 2u, 3u, 0) ||
-        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_UNSUPPORTED,
-                     "missing INDEX 0 cannot infer a pregap")) ok = 0;
+        !expect_supported(descriptor_path, SCHWAY_DISC_TRACK_MODE2, 3u, 3u,
+                          "missing INDEX 0 creates no stored pregap")) ok = 0;
+    if (!write_two_track_descriptor(descriptor_path, 4u, 2u, 10u) ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "overlapping track indexes are rejected")) ok = 0;
+    if (!write_two_track_descriptor(descriptor_path, 0u, 8u, 16u) ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "track index outside the leadout is rejected")) ok = 0;
+    if (!write_two_track_descriptor(descriptor_path, 0u, 8u, 10u) ||
+        !replace_file_text(descriptor_path, "PFrame=10\nPLBA=10\n[TRACK 1]",
+                           "PFrame=9\nPLBA=9\n[TRACK 1]") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "track Entry PLBA disagreement is rejected")) ok = 0;
     if (!write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352) - 1u) ||
         !write_descriptor(descriptor_path, 2u, 0u, 0) ||
         !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,

@@ -21,7 +21,8 @@
 
 #define SCHWAY__DISC_CCD_DESCRIPTOR_MAX_BYTES UINT64_C(65536)
 #define SCHWAY__DISC_CCD_PATH_CAP 4096u
-#define SCHWAY__DISC_CCD_ENTRY_COUNT 4u
+#define SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT 3u
+#define SCHWAY__DISC_CCD_ENTRY_COUNT (SCHWAY_DISC_MAX_TRACKS + SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT)
 #define SCHWAY__DISC_CCD_ENTRY_REQUIRED UINT32_C(0x3fff)
 #define SCHWAY__DISC_CCD_SECTOR_BYTES UINT64_C(2352)
 #define SCHWAY__DISC_CCD_MIN_SECTORS UINT64_C(16)
@@ -70,6 +71,14 @@ typedef struct schway__disc_ccd_entry {
     uint32_t seen;
 } schway__disc_ccd_entry;
 
+typedef struct schway__disc_ccd_track {
+    uint64_t index0;
+    uint64_t index1;
+    uint32_t mode;
+    uint32_t seen;
+    uint8_t have_index0;
+} schway__disc_ccd_track;
+
 typedef struct schway__disc_ccd_metadata {
     uint64_t version;
     uint64_t toc_entries;
@@ -82,12 +91,9 @@ typedef struct schway__disc_ccd_metadata {
     uint32_t disc_seen;
     uint32_t session_seen;
     uint32_t entry_count;
-    uint32_t mode;
-    uint64_t index0;
-    uint64_t index1;
-    uint32_t track_seen;
-    uint8_t have_index0;
+    uint32_t track_count;
     schway__disc_ccd_entry entries[SCHWAY__DISC_CCD_ENTRY_COUNT];
+    schway__disc_ccd_track tracks[SCHWAY_DISC_MAX_TRACKS];
 } schway__disc_ccd_metadata;
 
 struct schway__disc_ccd {
@@ -262,31 +268,45 @@ static int schway__disc_ccd_entry_time_matches(const schway__disc_ccd_entry *ent
 }
 
 static schway_disc_image_status schway__disc_ccd_validate_metadata(
-    const schway__disc_ccd_metadata *metadata, uint32_t *type,
-    uint32_t *index0, uint32_t *index1, uint32_t *leadout)
+    const schway__disc_ccd_metadata *metadata, uint32_t *leadout)
 {
-    const uint64_t expected_points[SCHWAY__DISC_CCD_ENTRY_COUNT] = {
-        UINT64_C(0xa0), UINT64_C(0xa1), UINT64_C(0xa2), UINT64_C(1)
-    };
+    uint32_t first_mode;
+    uint32_t first_control;
     uint64_t disc_type;
     if (metadata->clone_seen != 1u || metadata->version != 3u ||
         metadata->disc_seen != 15u || metadata->session_seen != 3u ||
-        metadata->entry_count != SCHWAY__DISC_CCD_ENTRY_COUNT ||
-        (metadata->track_seen & 5u) != 5u) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
-    if (metadata->toc_entries != SCHWAY__DISC_CCD_ENTRY_COUNT ||
+        metadata->track_count == 0u ||
+        metadata->entry_count != metadata->track_count + SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT) {
+        return SCHWAY_DISC_IMAGE_BAD_IMAGE;
+    }
+    if (metadata->toc_entries != metadata->entry_count ||
         metadata->sessions != 1u || metadata->scrambled != 0u ||
         metadata->cdtext_length != 0u) return SCHWAY_DISC_IMAGE_UNSUPPORTED;
     if (metadata->pregap_mode != 0u || metadata->pregap_subc != 0u) {
         return SCHWAY_DISC_IMAGE_UNSUPPORTED;
     }
-    if (metadata->mode != 1u && metadata->mode != 2u) return SCHWAY_DISC_IMAGE_UNSUPPORTED;
-    disc_type = metadata->mode == 2u ? UINT64_C(32) : UINT64_C(0);
-    for (size_t i = 0u; i < SCHWAY__DISC_CCD_ENTRY_COUNT; i++) {
+    first_mode = metadata->tracks[0].mode;
+    if (first_mode > 2u) return SCHWAY_DISC_IMAGE_UNSUPPORTED;
+    first_control = first_mode == 0u ? 0u : 4u;
+    disc_type = first_mode == 2u ? UINT64_C(32) : UINT64_C(0);
+    for (size_t i = 0u; i < metadata->entry_count; i++) {
         const schway__disc_ccd_entry *entry = &metadata->entries[i];
+        uint64_t point = i < SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT ?
+            UINT64_C(0xa0) + i : i - SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT + 1u;
+        uint32_t control = first_control;
+        uint64_t track_no = 0u;
+        if (i >= SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT) {
+            const schway__disc_ccd_track *track =
+                &metadata->tracks[i - SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT];
+            if ((track->seen & 5u) != 5u) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
+            if (track->mode > 2u) return SCHWAY_DISC_IMAGE_UNSUPPORTED;
+            control = track->mode == 0u ? 0u : 4u;
+            track_no = i - SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT + 1u;
+        }
         if (entry->seen != SCHWAY__DISC_CCD_ENTRY_REQUIRED ||
-            entry->session != 1u || entry->point != expected_points[i] ||
-            entry->adr != 1u || entry->control != 4u ||
-            entry->track_no != (i == 3u ? 1u : 0u) ||
+            entry->session != 1u || entry->point != point ||
+            entry->adr != 1u || entry->control != control ||
+            entry->track_no != track_no ||
             entry->amin != 0u || entry->asec != 0u || entry->aframe != 0u ||
             entry->alba != -150 || entry->zero != 0u ||
             !schway__disc_ccd_entry_time_matches(entry)) {
@@ -295,26 +315,29 @@ static schway_disc_image_status schway__disc_ccd_validate_metadata(
     }
     if (metadata->entries[0].pmin != 1u ||
         metadata->entries[0].psec != disc_type || metadata->entries[0].pframe != 0u ||
-        metadata->entries[1].pmin != 1u || metadata->entries[1].psec != 0u ||
+        metadata->entries[1].pmin != metadata->track_count || metadata->entries[1].psec != 0u ||
         metadata->entries[1].pframe != 0u ||
         metadata->entries[2].plba == 0u || metadata->entries[2].plba > UINT32_MAX) {
         return SCHWAY_DISC_IMAGE_BAD_IMAGE;
     }
-    if (metadata->index1 > UINT32_MAX || metadata->entries[3].plba != metadata->index1 ||
-        metadata->index1 >= metadata->entries[2].plba) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
-    if (metadata->have_index0 != 0u) {
-        if (metadata->index0 > UINT32_MAX || metadata->index0 > metadata->index1) {
+    for (size_t i = 0u; i < metadata->track_count; i++) {
+        const schway__disc_ccd_track *track = &metadata->tracks[i];
+        const schway__disc_ccd_entry *entry =
+            &metadata->entries[SCHWAY__DISC_CCD_SPECIAL_ENTRY_COUNT + i];
+        uint64_t index0 = track->have_index0 != 0u ? track->index0 : track->index1;
+        uint64_t next_index0 = metadata->entries[2].plba;
+        if (i + 1u < metadata->track_count) {
+            const schway__disc_ccd_track *next = &metadata->tracks[i + 1u];
+            next_index0 = next->have_index0 != 0u ? next->index0 : next->index1;
+        }
+        if (track->index1 > UINT32_MAX || index0 > track->index1 ||
+            entry->plba != track->index1 || track->index1 >= next_index0 ||
+            next_index0 > metadata->entries[2].plba ||
+            (i != 0u && index0 < metadata->tracks[i - 1u].index1)) {
             return SCHWAY_DISC_IMAGE_BAD_IMAGE;
         }
-    } else if (metadata->index1 != 0u) {
-        return SCHWAY_DISC_IMAGE_UNSUPPORTED;
     }
-    *type = metadata->mode == 1u ? SCHWAY_DISC_TRACK_MODE1 : SCHWAY_DISC_TRACK_MODE2;
-    *index0 = metadata->have_index0 != 0u ? (uint32_t)metadata->index0 :
-                                          (uint32_t)metadata->index1;
-    *index1 = (uint32_t)metadata->index1;
     *leadout = (uint32_t)metadata->entries[2].plba;
-    if (*index0 != 0u) return SCHWAY_DISC_IMAGE_UNSUPPORTED;
     return SCHWAY_DISC_IMAGE_OK;
 }
 
@@ -325,7 +348,7 @@ static schway_disc_image_status schway__disc_ccd_parse_descriptor(
     uint32_t clone_version_seen = 0u;
     uint32_t disc_seen = 0u;
     uint32_t session_seen = 0u;
-    uint32_t track_seen = 0u;
+    uint32_t current_track = 0u;
     uint32_t entry_index = 0u;
     size_t position = 0u;
     memset(metadata, 0, sizeof *metadata);
@@ -375,7 +398,7 @@ static schway_disc_image_status schway__disc_ccd_parse_descriptor(
                 section = SCHWAY__DISC_CCD_SESSION;
             } else if (schway__disc_ccd_section_index(line, line_size, "[Entry ",
                                                        &section_number)) {
-                if (session_seen == 0u || section == SCHWAY__DISC_CCD_TRACK) {
+                if (session_seen == 0u || metadata->track_count != 0u) {
                     return SCHWAY_DISC_IMAGE_BAD_IMAGE;
                 }
                 if (section_number >= SCHWAY__DISC_CCD_ENTRY_COUNT) {
@@ -384,15 +407,17 @@ static schway_disc_image_status schway__disc_ccd_parse_descriptor(
                 if (section_number != entry_index) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
                 entry_index++;
                 section = SCHWAY__DISC_CCD_ENTRY;
-            } else if (schway__disc_ccd_name_is(line, line_size, "[TRACK 1]")) {
-                if (entry_index != SCHWAY__DISC_CCD_ENTRY_COUNT || track_seen != 0u) {
-                    return SCHWAY_DISC_IMAGE_BAD_IMAGE;
-                }
-                track_seen = 1u;
-                section = SCHWAY__DISC_CCD_TRACK;
             } else if (schway__disc_ccd_section_index(line, line_size, "[TRACK ",
                                                        &section_number)) {
-                return SCHWAY_DISC_IMAGE_UNSUPPORTED;
+                if (session_seen == 0u || entry_index != metadata->toc_entries ||
+                    section_number != metadata->track_count + 1u ||
+                    section_number > SCHWAY_DISC_MAX_TRACKS) {
+                    return section_number > SCHWAY_DISC_MAX_TRACKS ?
+                           SCHWAY_DISC_IMAGE_UNSUPPORTED : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+                }
+                current_track = (uint32_t)section_number - 1u;
+                metadata->track_count++;
+                section = SCHWAY__DISC_CCD_TRACK;
             } else {
                 return metadata->clone_seen == 0u ? SCHWAY_DISC_IMAGE_BAD_IMAGE :
                                                     SCHWAY_DISC_IMAGE_UNSUPPORTED;
@@ -449,28 +474,29 @@ static schway_disc_image_status schway__disc_ccd_parse_descriptor(
             if (assigned < 0) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
             if (assigned == 0) return SCHWAY_DISC_IMAGE_UNSUPPORTED;
         } else if (section == SCHWAY__DISC_CCD_TRACK) {
+            schway__disc_ccd_track *track = &metadata->tracks[current_track];
             uint64_t parsed;
             if (schway__disc_ccd_name_is(key, key_size, "MODE")) {
-                if ((metadata->track_seen & 1u) != 0u ||
+                if ((track->seen & 1u) != 0u ||
                     !schway__disc_ccd_parse_unsigned(value, value_size, 10u, 0, &parsed) ||
                     parsed > UINT32_MAX) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
-                metadata->mode = (uint32_t)parsed;
-                metadata->track_seen |= 1u;
+                track->mode = (uint32_t)parsed;
+                track->seen |= 1u;
             } else if (schway__disc_ccd_name_is(key, key_size, "INDEX 0")) {
-                if ((metadata->track_seen & 2u) != 0u ||
+                if ((track->seen & 2u) != 0u ||
                     !schway__disc_ccd_parse_unsigned(value, value_size, 10u, 0, &parsed)) {
                     return SCHWAY_DISC_IMAGE_BAD_IMAGE;
                 }
-                metadata->index0 = parsed;
-                metadata->have_index0 = 1u;
-                metadata->track_seen |= 2u;
+                track->index0 = parsed;
+                track->have_index0 = 1u;
+                track->seen |= 2u;
             } else if (schway__disc_ccd_name_is(key, key_size, "INDEX 1")) {
-                if ((metadata->track_seen & 4u) != 0u ||
+                if ((track->seen & 4u) != 0u ||
                     !schway__disc_ccd_parse_unsigned(value, value_size, 10u, 0, &parsed)) {
                     return SCHWAY_DISC_IMAGE_BAD_IMAGE;
                 }
-                metadata->index1 = parsed;
-                metadata->track_seen |= 4u;
+                track->index1 = parsed;
+                track->seen |= 4u;
             } else if (key_size >= 6u &&
                        schway__disc_ccd_name_is(key, 6u, "INDEX ")) {
                 return SCHWAY_DISC_IMAGE_UNSUPPORTED;
@@ -485,7 +511,7 @@ next_line:
     }
     metadata->entry_count = entry_index;
     metadata->clone_seen = metadata->clone_seen != 0u && clone_version_seen != 0u ? 1u : 0u;
-    if (disc_seen == 0u || session_seen == 0u || track_seen == 0u) {
+    if (disc_seen == 0u || session_seen == 0u || metadata->track_count == 0u) {
         return SCHWAY_DISC_IMAGE_BAD_IMAGE;
     }
     return SCHWAY_DISC_IMAGE_OK;
@@ -685,9 +711,6 @@ schway_disc_image_status schway__disc_ccd_open(const char *path,
     int have_sub = 0;
     uint64_t img_bytes;
     uint64_t sectors;
-    uint32_t track_type;
-    uint32_t index0;
-    uint32_t index1;
     uint32_t leadout;
     schway__disc_ccd_metadata metadata;
     schway_disc_image_status status;
@@ -752,8 +775,7 @@ schway_disc_image_status schway__disc_ccd_open(const char *path,
                                       "CCD metadata is outside the supported subset" :
                                       "CCD descriptor is malformed or inconsistent");
     }
-    status = schway__disc_ccd_validate_metadata(&metadata, &track_type,
-                                                 &index0, &index1, &leadout);
+    status = schway__disc_ccd_validate_metadata(&metadata, &leadout);
     if (status != SCHWAY_DISC_IMAGE_OK) {
         return schway__disc_ccd_error(error, status,
                                       "CCD metadata is outside the supported subset");
@@ -858,13 +880,23 @@ schway_disc_image_status schway__disc_ccd_open(const char *path,
     reader->image_bytes = img_bytes;
     reader->sector_count = (uint32_t)sectors;
     reader->toc.size = (uint32_t)sizeof reader->toc;
-    reader->toc.track_count = 1u;
-    reader->toc.tracks[0].size = (uint32_t)sizeof reader->toc.tracks[0];
-    reader->toc.tracks[0].type = track_type;
-    reader->toc.tracks[0].index0 = index0;
-    reader->toc.tracks[0].index1 = index1;
-    reader->toc.tracks[0].pregap = index1 - index0;
-    reader->toc.tracks[0].leadout = (uint32_t)sectors;
+    reader->toc.track_count = metadata.track_count;
+    for (size_t i = 0u; i < metadata.track_count; i++) {
+        const schway__disc_ccd_track *source = &metadata.tracks[i];
+        schway_disc_track *target = &reader->toc.tracks[i];
+        target->size = (uint32_t)sizeof *target;
+        target->type = source->mode == 0u ? SCHWAY_DISC_TRACK_AUDIO :
+                       source->mode == 1u ? SCHWAY_DISC_TRACK_MODE1 :
+                                            SCHWAY_DISC_TRACK_MODE2;
+        target->index0 = (uint32_t)(source->have_index0 != 0u ? source->index0 :
+                                                             source->index1);
+        target->index1 = (uint32_t)source->index1;
+        target->pregap = target->index1 - target->index0;
+        target->leadout = i + 1u < metadata.track_count ?
+            (uint32_t)(metadata.tracks[i + 1u].have_index0 != 0u ?
+                       metadata.tracks[i + 1u].index0 : metadata.tracks[i + 1u].index1) :
+            (uint32_t)sectors;
+    }
     *out = reader;
     return schway__disc_ccd_error(error, SCHWAY_DISC_IMAGE_OK, "ok");
 
