@@ -1539,12 +1539,16 @@ schway_add_test(NAME runner.disc.probe
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
+set(runner_disc_legacy_timeout 120)
+if(SCHWAYSTATION_INVENTORY STREQUAL "asan")
+  set(runner_disc_legacy_timeout 240)
+endif()
 schway_add_test(NAME runner.disc.legacy
   COMMAND ${runner_check} -DCASE=disc_legacy -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
     -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
     -DHOOKED=$<TARGET_FILE:schwaystation-run-test>
     -P ${CMAKE_CURRENT_LIST_FILE}
-  LABELS portable runner TIMEOUT 120)
+  LABELS portable runner TIMEOUT ${runner_disc_legacy_timeout})
 set_tests_properties(runner.disc.legacy PROPERTIES
   FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")
 

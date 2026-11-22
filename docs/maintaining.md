@@ -92,6 +92,9 @@ A same-repository pull request that changes a release input (`release.yml`, `ci.
   `actions/attest`, `attested`, a publish as a prerelease that is never latest, and `verify`;
 - `cleanup` runs whatever the rehearsal did, once it started, and deletes the release and its tag.
 
+After deletion, `publish.sh` retries release and tag lookups for up to ten attempts and accepts only HTTP 404 as
+proof that each is gone. A persistent resource or repeated API error still fails cleanup.
+
 Only the trigger, the signer workflow, the source ref and the `latest` flag differ from a real release, and
 `policy.publish_ref` and `policy.publish_signer` keep a release from ever accepting a rehearsal's attestation. Each
 attempt gets a new tag, because a deleted tag of a published immutable release can never be reused. A pull request

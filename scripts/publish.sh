@@ -1,19 +1,7 @@
 #!/bin/sh
-# Publish steps shared by the release and its rehearsal, each safe to re-run:
-#   publish.sh prepare DIR                 exactly the 18 zips, one commit; SHA256SUMS
-#   publish.sh upload TAG RELEASE_ID DIR   upload to that release, replacing
-#   publish.sh attested DIR                attestations verify; tampered copies do not
-#   publish.sh verify TAG DIR              attested, then the published release
-#   publish.sh rehearsal-create TAG        a draft prerelease at EXPECTED_SHA; prints its ID
-#   publish.sh rehearsal-delete TAG [ID]   delete a rehearsal release and its tag
-# Fault prevented: a release with a missing, extra, unverifiable or tampered
-# asset, or with archives built from another commit, or a release that
-# accepts a pull request's attestation. prepare reads EXPECTED_SHA; the rest
-# call gh with GH_TOKEN and GITHUB_REPOSITORY, and attested and verify accept
-# only attestations made on SOURCE_REF, which for a release is refs/heads/main.
-# verify also requires the downloads to be signed by release.yml; only a
-# rehearsal-* tag may name another workflow file in SIGNER_WORKFLOW (ci.yml,
-# where the rehearsal runs), so a release never accepts a rehearsal's signer.
+# Release/rehearsal commands: prepare DIR; upload TAG ID DIR; attested DIR; verify TAG DIR; rehearsal-create TAG; rehearsal-delete TAG [ID].
+# Guards package integrity, commit provenance and PR attestation rejection; prepare binds EXPECTED_SHA, GitHub uses GH_TOKEN/GITHUB_REPOSITORY.
+# Releases require SOURCE_REF=refs/heads/main attestations signed by release.yml; rehearsal tags alone accept ci.yml.
 set -eu
 
 fail() {
@@ -153,16 +141,28 @@ rehearsal_create() {
   echo "$id"
 }
 
-# The release goes before its tag, which an immutable release protects.
+wait_for_absence() {
+  tries=0
+  while [ "$tries" -lt 10 ]; do
+    response=$(gh api --include "repos/$REPO/$1" 2>&1) && status=0 || status=$?
+    if [ "$status" -ne 0 ] && printf '%s\n' "$response" | grep -Eq 'HTTP(/[^ ]+)? 404([[:space:]]|$)'; then return 0; fi
+    tries=$((tries + 1))
+    [ "$tries" -eq 10 ] || sleep 1
+  done
+  return 1
+}
+
+# Delete the release before its tag; require confirmed absence for both.
 rehearsal_delete() {
   if [ -n "${2:-}" ]; then
     gh api -X DELETE "repos/$REPO/releases/$2" > /dev/null 2>&1 || true
-    if gh api "repos/$REPO/releases/$2" > /dev/null 2>&1; then fail "release $2 still exists"; fi
+    wait_for_absence "releases/$2" || fail "release $2 still exists or deletion could not be confirmed"
+  else
+    gh release delete "$1" --repo "$REPO" --yes > /dev/null 2>&1 || true
   fi
-  gh release delete "$1" --repo "$REPO" --yes > /dev/null 2>&1 || true
-  if [ -n "$(release_id "$1")" ]; then fail "$1 still has a release"; fi
+  wait_for_absence "releases/tags/$1" || fail "release $1 still exists or deletion could not be confirmed"
   gh api -X DELETE "repos/$REPO/git/refs/tags/$1" > /dev/null 2>&1 || true
-  if gh api "repos/$REPO/git/ref/tags/$1" > /dev/null 2>&1; then fail "tag $1 still exists"; fi
+  wait_for_absence "git/ref/tags/$1" || fail "tag $1 still exists or deletion could not be confirmed"
   echo "publish: $1 and its release are gone"
 }
 
