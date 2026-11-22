@@ -240,7 +240,7 @@ jobs:
             test -s "$fixture"
           done
           ctest --test-dir build/fuzz --no-tests=error --output-on-failure \
-            -R '^disc[.]image[.]legacy_(preflight|parity)$|^fuzz[.]regress[.](ecm|ccd)$'
+            -R '^disc[.]image[.]legacy_(preflight|parity)$|^fuzz[.]regress[.](ecm|ccd|chd[.]seed_corpus)$'
       - name: Check media seeds and run bounded campaigns
         env:
           PBP_ONLY: ${{ needs.changes.outputs.pbp_only }}

@@ -85,6 +85,16 @@ else()
     LABELS fuzz portable TIMEOUT 60)
 endif()
 
+set(chd_seed_corpus "${PROJECT_BINARY_DIR}/tests/fuzz-work/chd-corpus")
+file(MAKE_DIRECTORY "${chd_seed_corpus}")
+schway_add_test(NAME fuzz.regress.chd.seed_corpus
+  COMMAND schwaystation-fuzz-chd-replay --write "${chd_seed_corpus}"
+  LABELS fuzz portable TIMEOUT 60)
+if(SCHWAYSTATION_CHD)
+  set_tests_properties(fuzz.regress.chd.seed_corpus PROPERTIES
+    FIXTURES_REQUIRED disc_media_preflight)
+endif()
+
 # The new hostile-media targets call the actual host parsers or core devices.
 # CUE and M3U receive build-owned working directories containing only their
 # small, fixed media child, so fuzzed paths cannot name arbitrary host files.

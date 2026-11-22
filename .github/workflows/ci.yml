@@ -718,12 +718,14 @@ jobs:
       - name: Build target before WASI size check
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/wasm32/disc-media
-        run: cmake --build --preset wasm32-chd
+        run: cmake --build build/wasm32 --target schwaystation-run
       - name: Measure linked WASI module
         run: |
           # QUALITY_WASM_COMPARE_BEGIN
           cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=size.wasm "-DARTIFACT=${WASM_MODULE:-build/wasm32/schwaystation-run}" -P tests/cmake/quality.cmake
           # QUALITY_WASM_COMPARE_END
+      - name: Build WASI portable test targets
+        run: cmake --build --preset wasm32-chd
       - name: WASI persistence preflight
         run: ctest --preset wasm32-preflight --output-on-failure
       - name: Portable tests

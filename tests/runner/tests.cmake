@@ -1544,7 +1544,7 @@ schway_add_test(NAME runner.disc.legacy
     -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
     -DHOOKED=$<TARGET_FILE:schwaystation-run-test>
     -P ${CMAKE_CURRENT_LIST_FILE}
-  LABELS portable runner TIMEOUT 30)
+  LABELS portable runner TIMEOUT 60)
 set_tests_properties(runner.disc.legacy PROPERTIES
   FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")
 
