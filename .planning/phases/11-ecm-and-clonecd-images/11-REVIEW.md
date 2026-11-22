@@ -83,3 +83,29 @@ Reviewed the Phase 11 source and integration diff against its ECM/CCD requiremen
 _Reviewed: 2026-11-22T20:28:55Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: deep_
+
+## Follow-up: Nightly fixture-closure correction
+
+**Reviewed:** 2026-11-22T21:23:00Z
+**Files:** `.github/workflows/nightly.yml`, `tests/cmake/workflows.cmake`
+**Result:** No new findings.
+
+The Nightly fuzz job now builds `schwaystation-test-disc-legacy` alongside its legacy fixture producers before the closure CTest selection (`.github/workflows/nightly.yml:212-243`). The two `disc.image.legacy_*` tests invoke that executable, and the ECM/CCD replay tests require the legacy preflight/parity fixtures; building the target before CTest resolves the recorded `Unable to find executable` failure without removing a case or changing the campaign. The existing workflow assertion now requires the target on the fixture-build command, so deleting it will fail the `disc_registration` preflight (`tests/cmake/workflows.cmake:28`). The PBP-only route skips this closure test and does not need the legacy executable.
+
+The orchestrator's targeted local evidence reports the workflow preflight passed, the isolated AppleClang 21 fuzz closure build completed, and the exact four CTest closure cases passed. I did not rerun tests during this read-only review. No security, correctness or robustness issue remains in these two changes.
+
+_Follow-up reviewed: 2026-11-22T21:23:00Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_
+
+## Follow-up: POSIX symlink declaration
+
+**Reviewed:** 2026-11-22T21:28:16Z
+**File:** `tests/disc/ccd.c`
+**Result:** No findings.
+
+The `_POSIX_C_SOURCE` feature-test macro is defined before every header and only for non-Windows, non-WASI builds where it is unset. That exposes `symlink()` on strict-C17 glibc builds and matches the existing guards around `<unistd.h>` and symlink-dependent tests. Windows and WASI compilation paths remain unchanged. No tests were rerun during this read-only review.
+
+_Follow-up reviewed: 2026-11-22T21:28:16Z_
+_Reviewer: the agent (gsd-code-reviewer)_
+_Depth: standard_

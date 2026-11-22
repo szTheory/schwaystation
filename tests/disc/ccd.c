@@ -1,3 +1,7 @@
+#if !defined(_WIN32) && !defined(__wasi__) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "disc_ccd.h"
 #include "disc_image.h"
 

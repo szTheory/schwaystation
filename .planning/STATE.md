@@ -6,11 +6,11 @@ current_phase: 12
 current_phase_name: SBI and LibCrypt
 current_plan: Not started
 status: planning
-stopped_at: Phase 11 verified and transitioned; ship Phase 11 before planning Phase 12
-last_updated: "2026-11-22T21:01:07.019Z"
+stopped_at: Phase 11 PR
+last_updated: "2026-11-22T21:31:31.963Z"
 last_activity: 2026-11-22
-last_activity_desc: Phase 11 automated verification and completion transition passed; Phase 11 ship is next
-state_head: d7c7e83032a602c1a4bdf0ee7c6b3d967d6a1d7e
+last_activity_desc: "Phase 11 PR #36 hosted failures diagnosed and corrected locally; final head push pending"
+state_head: 4e381c184f3db889395743d7853a26e0983c7af8
 progress:
   total_phases: 10
   completed_phases: 5
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 is verified and transitioned; ship, merge and release it before planning Phase 12
+**Current focus:** Resolve and verify Phase 11 PR #36's hosted integration findings; merge and publish its release before planning Phase 12
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Phase: 12 — SBI and LibCrypt
 Current Plan: Not started
 Total Plans in Phase: 15
 Status: Ready to plan
-Last activity: 2026-11-22 — Phase 11 complete, transitioned to Phase 12
+Last activity: 2026-11-22 -- Phase 11 PR #36 hosted failures diagnosed and corrected locally; final head push pending
 Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
 
 ### Phase 11 review, verification and transition (2026-11-22)
@@ -44,6 +44,14 @@ Runtime/model: Codex/OpenGSD 1.20.0; GSD reviewer and verifier roles resolved to
 The exact code head `961964a` passed `cmake --workflow --preset ci` with exit 0: 670/670 CI tests in 105.02 seconds and 7/7 release checks in 1.46 seconds. The fixed repository-check set passed at exactly 3,901/3,901 lines. The CMake configure and focused libretro metadata positive/negative tests also passed. No local Act container or campaign ran for this exact head; the earlier `act schedule --dryrun` route check is recorded in Plan 11-12. Hosted Main, Nightly and Release results remain unknown until the PR runs.
 
 CI efficiency review: the full suite had no duplicate broad test run; package checks were a distinct post-package gate. The slowest measured cases were `policy.quality_metrics` at 65.82 seconds and `libretro.host` at 59.36 seconds. The former preserves many isolated production-gate scenarios; no safe in-scope assertion reduction was found. A measured, quality-preserving optimization seed is `.planning/seeds/SEED-261122-vlf-reduce-quality-gate-test-runtime-without-losing-coverage.md`.
+
+### Phase 11 ship follow-up and hosted failure correction (2026-11-22)
+
+PR #36's first exact head was `4e381c184f3db889395743d7853a26e0983c7af8`. [Nightly run 45070735998](https://github.com/szTheory/schwaystation/actions/runs/45070735998) passed the four benchmark jobs and full-vector job, then failed its ECM/CCD fixture-closure step because CTest's `disc.image.legacy_preflight` executable had not been built. The fix adds `schwaystation-test-disc-legacy` to the existing fixture build and strengthens `tests/cmake/workflows.cmake` so the cheap route preflight catches its removal. [CI run 45070735988](https://github.com/szTheory/schwaystation/actions/runs/45070735988) exposed a separate shared compile issue: ASan and Linux x64/arm64 failed because strict C17 hid `symlink()` in `tests/disc/ccd.c`; a guarded `_POSIX_C_SOURCE=200809L` definition before headers fixes the POSIX declaration while Windows/WASI remain excluded. Other CI matrix jobs were canceled after these failures. The changed workflow/source files received a clean follow-up review.
+
+The first-push hosted findings were reproduced and corrected locally before another broad hosted run. `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` exited 0; `act schedule --dryrun --workflows .github/workflows/nightly.yml --job fuzz ...` exited 0 and routed through fixture build, closure, and campaign steps (dry-run only; hosted Ubuntu 26.04 and its permissions/artifacts remain unverified). A fresh task-scoped fuzz build compiled the legacy test target plus ECM/CCD replay targets, and its exact four closure tests passed 4/4. The corrected CCD test passed the local CCD plus legacy preflight/parity selector 3/3, and GCC 15.3 in the named auto-removed container compiled `tests/disc/ccd.c` with the hosted Linux warning/error flags. The full local `cmake --workflow --preset ci` run after the workflow fix but before the final POSIX macro passed 670/670 in 82.38 seconds and separate release checks 7/7 in 1.44 seconds; build artifacts were reused (seven build actions). The final macro change then passed its targeted compile and tests. Do not claim hosted Main/Nightly/Release success until the final PR head runs.
+
+No new Docker image or volume was created. The existing `gcc:15` image was used with container name `schwaystation-phase11-gcc15-ccd-check`; `--rm` removed the container after the compile. No broad Act run was attempted because the available Act image is Ubuntu 24.04/arm64 rather than the hosted Ubuntu 26.04 lanes.
 
 ### Phase 11 Plan 11-15 execution (2026-11-22)
 
