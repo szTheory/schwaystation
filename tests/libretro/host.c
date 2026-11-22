@@ -249,9 +249,9 @@ static void check_string(const char *what, const char *got, const char *want)
 static const char *expected_valid_extensions(void)
 {
 #if SCHWAYSTATION_CHD
-    return "exe|psexe|cue|iso|m3u|pbp|chd";
+    return "exe|psexe|cue|iso|m3u|pbp|ecm|ccd|chd";
 #else
-    return "exe|psexe|cue|iso|m3u|pbp";
+    return "exe|psexe|cue|iso|m3u|pbp|ecm|ccd";
 #endif
 }
 
@@ -3037,6 +3037,7 @@ static int test_content_legacy(const char *ecm_path, const char *ecm_cue_path,
 {
     enum { LEGACY_TRACE_FRAMES = 1200 };
     struct retro_game_info game;
+    struct retro_system_info sys;
     struct pbp_frame_trace provider_trace[LEGACY_TRACE_FRAMES];
     struct pbp_frame_trace cue_trace[LEGACY_TRACE_FRAMES];
     unsigned char *saved_ram = NULL;
@@ -3164,6 +3165,10 @@ static int test_content_legacy(const char *ecm_path, const char *ecm_cue_path,
     p_reset();
     control_mailbox_frames = run_disc_to_mailbox(ccd_toc);
     CHECK_EQ_U64(ccd_mailbox_frames, control_mailbox_frames);
+    memset(&sys, 0, sizeof sys);
+    p_get_system_info(&sys);
+    check_string("ECM/CCD runtime extensions", sys.valid_extensions,
+                 expected_valid_extensions());
     result = check_failures == 0 ? 0 : 1;
 
 cleanup:
