@@ -46,3 +46,49 @@ All estimates are below the configured 100000-token smart-zone budget. Estimates
 No application, source implementation, broad suite or hosted workflow was run by this review. The plans require source review/fixes before final phase verification and keep hosted-only evidence assigned to the appropriate lifecycle step.
 
 Runtime/model: Codex GSD plan checker; inherited model identifier unavailable. Planning may proceed to the orchestrator's commit and execution handoff. No owner action is needed.
+
+## Re-review after the CCD plan split
+
+**Phase:** 11 — ECM and CloneCD images
+
+**Plans checked:** 13
+
+**Status:** The 11-04 / 11-13 split and dependency updates are sound. One existing blocker remains in Plan 11-02.
+
+### Split review
+
+| Check | Result |
+|---|---|
+| ECM-01 coverage | Plans 03, 05, 07–12 cover decoding, bounds, consumers, evidence and CI closure. |
+| CCD-01 coverage | Plans 04, 06–13 cover direct data reads, confinement, indexes, SUB, consumers, evidence and CI closure. |
+| Plan structure | All 13 `verify.plan-structure` checks returned valid; the new Plan 13 has one complete task. |
+| Dependencies and waves | The graph is acyclic. Plan 13 follows Plan 04; Plans 05 and 13 occupy Wave 4 with disjoint files; Plan 06 waits for Plan 13 before editing the same CCD files. |
+| Context decisions | Plan 13 preserves D-05 same-stem canonical confinement, D-07 missing/empty SUB behavior and explicit rejection of nonempty SUB until Plan 06 proves its mapping. Plan 06 retains independent SUB transpose and consumer checks. |
+| Gate ceiling | The split adds no repository-check controls and leaves the 3,901-line ceiling unchanged. |
+| Syntax and same-wave ownership | `python3 /tmp/schway11-plan-syntax.py` passed: 13 plans, 26 shell commands, no syntax or ownership findings. |
+
+### Blocker
+
+**1. [scope_sanity] Planned work must pass the approved 3,901-line gate before execution.**
+
+- Plan: `11-02`
+- Required property: The exact Nightly-route task is executable while retaining the approved gate ceiling and all required cases.
+- Evidence: `.planning/STATE.md` records Plan 11-02 at 3,928/3,901 counted lines. Its verification begins with the 3,901-line budget command, so it cannot reach the classifier checks on the measured state. D-08 remains part of the phase scope and D-09 fixes the cap.
+- Example fix (non-binding): Find a semantics-preserving consolidation that keeps every gate and case, or leave Plan 11-02 deferred and do not claim Phase 11 complete until a cap-compatible route is planned.
+
+### Structured issues
+
+```yaml
+issues:
+  - plan: "11-02"
+    dimension: scope_sanity
+    severity: blocker
+    required_property: "The exact metadata-only Nightly route is executable under the approved 3901-line ceiling while retaining all required cases."
+    description: "STATE.md records 3928/3901 counted lines. Plan 11-02's first verification command enforces the 3901-line limit, so its current measured state fails before the classifier checks. D-08 remains in phase scope and D-09 locks the ceiling."
+```
+
+### Recommendation
+
+The CCD split is ready for execution. Continue independent Phase 11 plans, but resolve or explicitly re-plan the Plan 11-02 budget blocker before phase-level verification and ship; do not raise the cap or remove required controls to force a pass.
+
+Runtime/model: Codex GSD plan checker (`gpt-6-luna`, xhigh). No product build, test, hosted workflow or source inspection was performed for this re-review.
