@@ -30,19 +30,49 @@ static uint8_t fixture_byte(uint32_t lba, size_t offset)
                      (uint32_t)offset * UINT32_C(13));
 }
 
-static int write_raw_image(const char *path)
+static int write_raw_image(const char *path, uint64_t image_bytes)
 {
     uint8_t sector[2352];
     FILE *file = schway__test_open_file(path, "wb");
+    uint64_t written = 0u;
+    uint32_t lba = 0u;
     if (file == NULL) return 0;
-    for (uint32_t lba = 0u; lba < 16u; lba++) {
+    while (written < image_bytes) {
+        uint64_t remaining = image_bytes - written;
+        size_t chunk = remaining < sizeof sector ? (size_t)remaining : sizeof sector;
         for (size_t i = 0u; i < sizeof sector; i++) sector[i] = fixture_byte(lba, i);
-        if (fwrite(sector, 1u, sizeof sector, file) != sizeof sector) {
+        if (fwrite(sector, 1u, chunk, file) != chunk) {
             (void)fclose(file);
             return 0;
         }
+        written += chunk;
+        lba++;
     }
     return fclose(file) == 0;
+}
+
+static int replace_file_text(const char *path, const char *needle, const char *replacement)
+{
+    char contents[4096];
+    FILE *file = schway__test_open_file(path, "rb");
+    size_t size;
+    size_t needle_size = strlen(needle);
+    size_t replacement_size = strlen(replacement);
+    char *match;
+    int read_error;
+    int close_error;
+    if (file == NULL) return 0;
+    size = fread(contents, 1u, sizeof contents - 1u, file);
+    read_error = ferror(file);
+    close_error = fclose(file);
+    if (read_error || size == sizeof contents - 1u || close_error != 0) return 0;
+    contents[size] = '\0';
+    match = strstr(contents, needle);
+    if (match == NULL || size - needle_size + replacement_size >= sizeof contents) return 0;
+    memmove(match + replacement_size, match + needle_size,
+            size - (size_t)(match - contents) - needle_size + 1u);
+    memcpy(match, replacement, replacement_size);
+    return write_file(path, contents);
 }
 
 static int write_descriptor(const char *path, uint32_t mode,
@@ -64,12 +94,12 @@ static int write_descriptor(const char *path, uint32_t mode,
         "[Entry 2]\nSession=1\nPoint=0xa2\nADR=0x01\nControl=0x04\n"
         "TrackNo=0\nAMin=0\nASec=0\nAFrame=0\nALBA=-150\nZero=0\n"
         "PMin=0\nPSec=2\nPFrame=16\nPLBA=16\n"
-        "[Entry 3]\nSession=1\nPoint=1\nADR=0x01\nControl=0x04\n"
+        "[Entry 3]\nSession=1\nPoint=0x01\nADR=0x01\nControl=0x04\n"
         "TrackNo=1\nAMin=0\nASec=0\nAFrame=0\nALBA=-150\nZero=0\n"
         "PMin=0\nPSec=2\nPFrame=%u\nPLBA=%u\n"
         "[TRACK 1]\nMODE=%u\n%sINDEX 1=%u\n",
         (unsigned int)disc_type, (unsigned int)a0_plba,
-        (unsigned int)(index1 + 2u), (unsigned int)index1,
+        (unsigned int)index1, (unsigned int)index1,
         (unsigned int)mode, have_index0 != 0 ? "INDEX 0=0\n" : "",
         (unsigned int)index1);
     return length > 0 && (size_t)length < sizeof descriptor &&
@@ -147,11 +177,12 @@ static int test_supported_routes(const char *directory)
     char image_path[1024];
     char playlist_path[1024];
     int ok = 1;
-    if (!make_path(descriptor_path, directory, "disc-ccd-input.ccd") ||
+    if (!make_path(descriptor_path, directory, "disc-ccd-input.CCD") ||
         !make_path(image_path, directory, "disc-ccd-input.img") ||
         !make_path(playlist_path, directory, "disc-ccd-input.m3u")) return 0;
 
-    if (!write_raw_image(image_path) || !write_descriptor(descriptor_path, 2u, 0u, 0)) {
+    if (!write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352)) ||
+        !write_descriptor(descriptor_path, 2u, 0u, 0)) {
         fprintf(stderr, "ASSERT disc.image.ccd: could not create independent MODE2 fixture\n");
         ok = 0;
     } else if (!expect_supported(descriptor_path, SCHWAY_DISC_TRACK_MODE2, 0u, 0u,
@@ -160,7 +191,7 @@ static int test_supported_routes(const char *directory)
     }
 
     if (!write_descriptor(descriptor_path, 1u, 3u, 1) ||
-        !write_file(playlist_path, "disc-ccd-input.ccd\n") ||
+        !write_file(playlist_path, "disc-ccd-input.CCD\n") ||
         !expect_supported(playlist_path, SCHWAY_DISC_TRACK_MODE1, 0u, 3u,
                           "M3U MODE1 with explicit pregap")) {
         fprintf(stderr, "ASSERT disc.image.ccd: M3U child route or MODE1 fixture failed\n");
@@ -169,6 +200,44 @@ static int test_supported_routes(const char *directory)
     (void)remove(descriptor_path);
     (void)remove(image_path);
     (void)remove(playlist_path);
+    return ok;
+}
+
+static int expect_open(const char *path, schway_disc_image_status expected,
+                       const char *name);
+
+static int test_malformed_metadata(const char *directory)
+{
+    char descriptor_path[1024];
+    char image_path[1024];
+    int ok = 1;
+    if (!make_path(descriptor_path, directory, "disc-ccd-invalid.ccd") ||
+        !make_path(image_path, directory, "disc-ccd-invalid.img") ||
+        !write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352))) return 0;
+
+    if (!write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        !replace_file_text(descriptor_path, "PFrame=0\nPLBA=0\n[TRACK 1]",
+                           "PFrame=1\nPLBA=1\n[TRACK 1]") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "track Entry conflicts with INDEX 1")) ok = 0;
+    if (!write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        !replace_file_text(descriptor_path, "PFrame=16\nPLBA=16\n[Entry 3]",
+                           "PFrame=17\nPLBA=17\n[Entry 3]") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "leadout conflicts with exact IMG extent")) ok = 0;
+    if (!write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        !replace_file_text(descriptor_path, "INDEX 1=0", "INDEX 1=18446744073709551616") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "INDEX 1 integer overflow")) ok = 0;
+    if (!write_descriptor(descriptor_path, 2u, 3u, 0) ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                     "missing INDEX 0 cannot infer a pregap")) ok = 0;
+    if (!write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352) - 1u) ||
+        !write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "truncated IMG sector")) ok = 0;
+    (void)remove(descriptor_path);
+    (void)remove(image_path);
     return ok;
 }
 
@@ -249,8 +318,9 @@ int main(int argc, char **argv)
     if (!write_file(input_path, "[CloneCD]\nVersion=4\n") ||
         !expect_open(input_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, "unsupported version")) result = 1;
     if (!write_file(input_path, "[CloneCD]\nVersion=3\n") ||
-        !expect_open(input_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, "unvalidated track metadata")) result = 1;
+        !expect_open(input_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, "incomplete descriptor")) result = 1;
     if (!test_supported_routes(argv[1])) result = 1;
+    if (!test_malformed_metadata(argv[1])) result = 1;
     if (!active_iso_is_readable(active, active_disc)) {
         fprintf(stderr, "ASSERT disc.image.ccd: failed open changed the active ISO source\n");
         result = 1;
