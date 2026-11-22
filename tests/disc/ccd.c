@@ -29,6 +29,16 @@ static int write_file(const char *path, const char *text)
     return ok;
 }
 
+static int write_file_bytes(const char *path, const uint8_t *bytes, size_t size)
+{
+    FILE *file = schway__test_open_file(path, "wb");
+    int ok;
+    if (file == NULL) return 0;
+    ok = fwrite(bytes, 1u, size, file) == size;
+    if (fclose(file) != 0) ok = 0;
+    return ok;
+}
+
 static uint8_t fixture_byte(uint32_t lba, size_t offset)
 {
     return (uint8_t)(UINT32_C(0x51) + lba * UINT32_C(37) +
@@ -383,6 +393,117 @@ static int expect_open(const char *path, schway_disc_image_status expected,
     return 0;
 }
 
+static int test_subcode_transpose(const char *directory)
+{
+    static const uint8_t expected_subcode[96] = {
+        [0] = 0x80, [1] = 0x40, [2] = 0x80, [3] = 0x20,
+        [7] = 0x01, [18] = 0x04, [95] = 0x40
+    };
+    static const uint8_t expected_q[12] = {
+        0x41, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x02, 0x01, 0x92, 0x42
+    };
+    static const uint8_t expected_getlocp[8] = {
+        0x01, 0x01, 0x00, 0x02, 0x01, 0x00, 0x00, 0x01
+    };
+    uint8_t sub[16u * 96u] = {0u};
+    uint8_t sector[2352];
+    uint8_t output[96];
+    uint8_t q[12] = {0u};
+    uint8_t getlocp[8];
+    uint8_t mismatched[sizeof sub + 1u];
+    char descriptor_path[1024];
+    char image_path[1024];
+    char sub_path[1024];
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    const schway_disc *disc;
+    int ok = 1;
+    memset(&error, 0, sizeof error);
+    if (!make_path(descriptor_path, directory, "disc-ccd-sub.ccd") ||
+        !make_path(image_path, directory, "disc-ccd-sub.img") ||
+        !make_path(sub_path, directory, "disc-ccd-sub.sub") ||
+        !write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352)) ||
+        !write_descriptor(descriptor_path, 2u, 0u, 0)) return 0;
+    sub[0] = 0xa0u;
+    sub[12] = 0x40u;
+    sub[23] = 0x01u;
+    sub[24] = 0x10u;
+    sub[62] = 0x20u;
+    sub[84] = 0x01u;
+    memcpy(&sub[96u + 12u], expected_q, sizeof expected_q);
+    if (!write_file_bytes(sub_path, sub, sizeof sub) ||
+        schway_disc_image_open(descriptor_path, &image, &error) != SCHWAY_DISC_IMAGE_OK ||
+        image == NULL) {
+        fprintf(stderr, "ASSERT disc.image.ccd: exact SUB extent was rejected: %s\n",
+                error.message);
+        ok = 0;
+        goto done;
+    }
+    disc = schway_disc_image_disc(image);
+    if (disc == NULL || disc->read_sector == NULL) {
+        ok = 0;
+        goto done;
+    }
+    if (disc->read_sector(disc->user, 0u, sector, output) != 1u ||
+        memcmp(output, expected_subcode, sizeof output) != 0 ||
+        disc->read_sector(disc->user, 0u, sector, output) != 1u ||
+        memcmp(output, expected_subcode, sizeof output) != 0 ||
+        disc->read_sector(disc->user, 0u, sector, NULL) != 1u) {
+        fprintf(stderr, "ASSERT disc.image.ccd: independent P-W vector or repeated read differs\n");
+        ok = 0;
+    }
+    if (disc->read_sector(disc->user, 1u, sector, output) != 1u) {
+        fprintf(stderr, "ASSERT disc.image.ccd: valid Q sector could not be read\n");
+        ok = 0;
+    } else {
+        for (size_t i = 0u; i < 96u; i++) {
+            q[i / 8u] |= (uint8_t)(((output[i] >> 6) & 1u) << (7u - (i & 7u)));
+        }
+        getlocp[0] = q[1];
+        getlocp[1] = q[2];
+        getlocp[2] = q[7];
+        getlocp[3] = q[8];
+        getlocp[4] = q[9];
+        getlocp[5] = q[3];
+        getlocp[6] = q[4];
+        getlocp[7] = q[5];
+        if (memcmp(q, expected_q, sizeof q) != 0 ||
+            memcmp(getlocp, expected_getlocp, sizeof getlocp) != 0) {
+            fprintf(stderr, "ASSERT disc.image.ccd: Q bit 6 or GetlocP byte order differs\n");
+            ok = 0;
+        }
+    }
+    if (disc->read_sector(disc->user, 15u, sector, output) != 1u) {
+        ok = 0;
+    } else {
+        for (size_t i = 0u; i < sizeof output; i++) {
+            if (output[i] != 0u) {
+                fprintf(stderr, "ASSERT disc.image.ccd: final SUB sector was not zero-filled\n");
+                ok = 0;
+                break;
+            }
+        }
+    }
+done:
+    schway_disc_image_close(image);
+    if (!ok) goto cleanup;
+    memset(mismatched, 0x5a, sizeof mismatched);
+    if (!write_file_bytes(sub_path, mismatched, sizeof mismatched - 1u) ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "one-byte-short SUB is rejected") ||
+        !write_file_bytes(sub_path, mismatched, sizeof mismatched + 1u) ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "one-byte-long SUB is rejected") ||
+        !write_file_bytes(sub_path, mismatched, sizeof mismatched - 96u) ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "whole-sector SUB count mismatch is rejected")) ok = 0;
+cleanup:
+    (void)remove(descriptor_path);
+    (void)remove(image_path);
+    (void)remove(sub_path);
+    return ok;
+}
+
 static int test_companion_outcomes(const char *directory)
 {
     char descriptor_path[1024];
@@ -401,8 +522,8 @@ static int test_companion_outcomes(const char *directory)
         !expect_supported(descriptor_path, SCHWAY_DISC_TRACK_MODE2, 0u, 0u,
                           "empty optional SUB")) ok = 0;
     if (!write_file(sub_path, "sentinel") ||
-        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_UNSUPPORTED,
-                     "nonempty SUB remains unsupported")) ok = 0;
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "short nonempty SUB is a bad image")) ok = 0;
 
 #if !defined(_WIN32) && !defined(__wasi__)
     if (chmod(sub_path, 0) == 0) {
@@ -539,6 +660,7 @@ int main(int argc, char **argv)
     if (!test_supported_routes(argv[1])) result = 1;
     if (!test_two_track_indexes(argv[1])) result = 1;
     if (!test_malformed_metadata(argv[1])) result = 1;
+    if (!test_subcode_transpose(argv[1])) result = 1;
     if (!test_companion_outcomes(argv[1])) result = 1;
 #if !defined(_WIN32) && !defined(__wasi__)
     if (!test_companion_confinement(argv[1])) result = 1;
