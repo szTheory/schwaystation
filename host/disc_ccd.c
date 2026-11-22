@@ -786,8 +786,11 @@ schway_disc_image_status schway__disc_ccd_open(const char *path,
                                       "could not inspect CCD SUB companion");
     }
     if (sub_state > 0) {
-        if (!schway__disc_ccd_canonical_path(sub_candidate, sub_path) ||
-            !schway__disc_ccd_path_contained(root, sub_path)) {
+        if (!schway__disc_ccd_canonical_path(sub_candidate, sub_path)) {
+            return schway__disc_ccd_error(error, SCHWAY_DISC_IMAGE_IO,
+                                          "could not resolve CCD SUB companion");
+        }
+        if (!schway__disc_ccd_path_contained(root, sub_path)) {
             return schway__disc_ccd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                           "CCD SUB companion escapes its directory");
         }
