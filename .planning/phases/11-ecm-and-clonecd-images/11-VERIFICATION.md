@@ -1,8 +1,16 @@
 ---
 phase: 11-ecm-and-clonecd-images
-verified: 2026-11-22T20:52:25Z
+verified: 2026-11-22T21:35:32Z
 status: passed
 score: 45/45 must-haves verified
+re_verification:
+  previous_status: passed
+  previous_score: 45/45
+  gaps_closed:
+    - "Nightly fuzz closure now builds schwaystation-test-disc-legacy before its closure CTests."
+    - "The CCD regression test declares symlink() under strict POSIX C17 builds."
+  gaps_remaining: []
+  regressions: []
 covered_files:
   - .github/workflows/ci.yml
   - .github/workflows/nightly.yml
@@ -42,13 +50,16 @@ covered_files:
   - .planning/phases/11-ecm-and-clonecd-images/11-PLAN-COVERAGE.md
   - .planning/phases/11-ecm-and-clonecd-images/11-RESEARCH.md
   - .planning/phases/11-ecm-and-clonecd-images/11-REVIEW.md
+  - .planning/phases/11-ecm-and-clonecd-images/11-UAT.md
   - .planning/phases/11-ecm-and-clonecd-images/deferred-items.md
   - CMakePresets.json
+  - README.md
   - cmake/DiscFixtures.cmake
   - cmake/DiscTargets.cmake
   - cmake/LegacyDiscFixtures.cmake
   - docs/compatibility.md
   - docs/discs.md
+  - docs/libretro.md
   - docs/maintaining.md
   - docs/media-testing.md
   - docs/runner.md
@@ -87,7 +98,7 @@ covered_files:
   - tests/runner/tests.cmake
   - tools/gen_ccd.py
   - tools/gen_ecm.py
-covered_digest: "v4:sha256:7b0baf4081d2f170e1c2b00109312dedc57d092d918f0cb5c6f3438f192a6ef7"
+covered_digest: "v4:sha256:7e62f50e8dfee6b22333c167415d6ca322c58e00d8f85518984150b83279e344"
 behavior_unverified: 0
 overrides_applied: 0
 ---
@@ -95,7 +106,7 @@ overrides_applied: 0
 # Phase 11: ECM and CloneCD Images Verification Report
 
 **Phase Goal:** Players can open ECM and CloneCD images while retaining their documented track, sector and subcode behavior.
-**Verified:** 2026-11-22T20:52:25Z
+**Verified:** 2026-11-22T21:35:32Z
 **Status:** passed
 **Re-verification:** No; no prior verification report existed.
 
@@ -190,15 +201,18 @@ The generic key-link query could not resolve plan links whose `from:`/`to:` valu
 
 ## Behavioral Spot-Checks
 
-No new commands were run for this verification. The following exact-head results were supplied from the completed Phase 11 run and checked against current source history; no implementation source changed after `961964a` (current HEAD `44ba420` adds planning-only CI-efficiency seed documentation).
+No tests were run for this re-verification. The evidence below was supplied from the Phase 11 ship follow-up; current committed HEAD is `32fc115`. The two CI fixes are included in that commit. A full local workflow run predates the last POSIX feature-test macro, so targeted checks cover that final change.
 
 | Behavior/check | Command | Result | Status |
 |---|---|---|---|
-| Full exact-code-head CI workflow | `cmake --workflow --preset ci` at `961964a` | Exit 0; 670/670 CI tests in 105.02s and 7/7 release checks in 1.46s | ✓ PASS |
-| Repository-check budget | `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` | Exit 0; 3,901/3,901 lines | ✓ PASS |
-| CI configuration | `cmake --preset ci` | Exit 0 | ✓ PASS |
-| Changed libretro metadata guard and negative self-test | `ctest --test-dir build/ci --output-on-failure -R '^libretro[.]info[.]claims([.]self_test)?$'` | Exit 0; 2/2 passed | ✓ PASS |
-| Local Nightly route simulation | `act schedule --dryrun` from the earlier Phase 12 routing task | Passed as recorded; it is not a hosted campaign and was not rerun at the final code head | ℹ️ Informational only |
+| Full CI workflow, after Nightly target fix and before POSIX feature macro | `cmake --workflow --preset ci` | Exit 0; 670/670 in 82.38s; separate Release checks 7/7 in 1.44s | ✓ PASS (not final source head) |
+| Final CCD test source | `ctest --test-dir build/ci --no-tests=error --output-on-failure -R '^disc[.]image[.]ccd$'` | Exit 0; CCD plus legacy preflight/parity 3/3 | ✓ PASS |
+| Strict-C17 Linux CCD test compile | GCC 15.3 in the named auto-removed `schwaystation-phase11-gcc15-ccd-check` container, using hosted warning/error flags | Exit 0; `tests/disc/ccd.c` compiled | ✓ PASS |
+| Nightly fuzz closure | Fresh task-scoped fuzz configure/build of `schwaystation-test-disc-legacy` and ECM/CCD replay targets; exact four closure CTests | Build exit 0; CTests 4/4 passed | ✓ PASS |
+| Workflow routing preflight | `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` | Exit 0; now requires the legacy test executable before closure CTests | ✓ PASS |
+| Repository-check budget | `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` | Exit 0 | ✓ PASS |
+| Changed-head workflow/diff preflight | `git diff --check`; `ctest --test-dir build/ci --no-tests=error -R '^docs[.]budgets$'` | Parent-reported exit 0 for both; README and libretro docs retain the limited-compatibility caveat | ✓ PASS |
+| Nightly route dry-run | `act schedule --dryrun` with the fuzz job selected | Exit 0; route included fixture build, closure and campaign steps; mapped to Ubuntu 24.04/arm64, dry-run only | ℹ️ Routing evidence only |
 
 ## Probe Execution
 
@@ -211,7 +225,7 @@ No phase-declared `probe-*.sh` was found in the Phase 11 plans/summaries. No sep
 | ECM-01 | Phase 11 plans 03, 05, 07, 08, 10, 11 | Bounded ECM decoding, preserved sectors and pre-guest source/count checks | ✓ SATISFIED | ECM source validation/read tests, source parity, runner/libretro integration and full CI pass. Hosted gates are a separate ship-time check. |
 | CCD-01 | Phase 11 plans 04, 06, 07, 08, 10, 11, 13 | CCD/IMG/SUB subset, exact TOC/subcode/boundary behavior, confined companion paths | ✓ SATISFIED | CCD metadata, path, SUB and integration tests; full CI pass. Hosted gates are a separate ship-time check. |
 
-No Phase 11 requirement is orphaned. The verification was recorded before the GSD completion transition, which then marked ECM-01 and CCD-01 complete. Their hosted Main/Nightly/Release evidence remains pending the ship workflow.
+No Phase 11 requirement is orphaned. ECM-01 and CCD-01 are marked complete after local implementation evidence and verification. Hosted Main/Nightly/Release evidence remains pending successful post-fix runs.
 
 ## Anti-Patterns Found
 
@@ -219,20 +233,23 @@ No Phase 11 requirement is orphaned. The verification was recorded before the GS
 |---|---:|---|---|---|
 | `docs/maintaining.md` | 73 | “TODO” substring in the path of a completed artifact-reuse review | ℹ️ Info | Not a debt marker or unfinished implementation. |
 | `docs/testing.md` | 75 | “placeholder” describing test registration behavior | ℹ️ Info | Explanatory documentation, not a product stub. |
+| `README.md`, `docs/libretro.md` | — | Current user-facing format list and scope caveat | ✓ VERIFIED | The edits list ECM/CloneCD, supported PBP, and CHD when enabled, while retaining the limited-compatibility caveat. Parent-reported `git diff --check` and `docs.budgets` checks passed. |
 
 No unreferenced `TBD`, `FIXME` or `XXX` markers were found in changed implementation files. No blocker anti-pattern was found.
 
 ## Hosted Evidence and Next Action
 
-Hosted Main, Nightly and Release results are **unknown**. The exact changed-head local workflow and local release checks passed, but they do not establish GitHub runner, artifact, permission or integration behavior. The feature ledger preserves those fields as unknown. No actual `act` container/campaign was run for this final code head; the earlier `act schedule --dryrun` only established routing syntax.
+Hosted post-fix Main, Nightly and Release results are **unknown**. The initial PR CI run at pre-fix head [`45070735988`](https://github.com/szTheory/schwaystation/actions/runs/45070735988) failed in ASan and Linux x64/arm64 because strict C17 hid the `symlink()` declaration; other matrix jobs were cancelled. The initial Nightly run at that pre-fix head [`45070735998`](https://github.com/szTheory/schwaystation/actions/runs/45070735998) passed four benchmark jobs and the full-vector job, then failed during ECM/CCD fixture closure because `schwaystation-test-disc-legacy` had not been built. Neither run establishes post-fix status. The follow-up source review found no new issue in either fix.
 
-The next action is `$gsd-ship 11`, then confirm the PR's required Main/Nightly/Release checks and automatic release on the merged head. Do not mark hosted fields complete until those runs exist and are green. No owner hardware or manual UAT is required.
+The local full `cmake --workflow --preset ci` passed 670/670 tests and separate Release checks passed 7/7 after the Nightly target fix but immediately before the POSIX feature macro. After the macro, the targeted CCD selector passed 3/3, GCC 15.3 compiled the test with hosted strict-C17 warning/error flags, and fresh fuzz configure/build plus all four closure CTests passed. The `disc_registration` preflight and line budget passed. The Act route reached the fuzz closure but used an Ubuntu 24.04/arm64 dry-run mapping; it does not establish hosted Ubuntu 26.04 behavior. The parent also reports `git diff --check` and the docs budget test passed for current README/libretro documentation edits. The feature ledger correctly keeps Main, Nightly and Release unknown until a post-fix hosted run exists.
+
+The next action is to run or confirm required Main/Nightly/Release checks on the fixed PR head, then finish the authorized ship/merge/release path only after they are green. Do not treat the pre-fix failures, local checks or Act dry-run as hosted passes. No owner hardware or manual UAT is required.
 
 ## Gaps Summary
 
-The Phase 11 code goal is achieved and all 45 deduplicated roadmap/plan truths are verified. No implementation gaps or human-verification items remain. Hosted checks are intentionally pending the release flow; there is no hosted run URL to report yet.
+The Phase 11 code goal remains achieved and all 45 deduplicated roadmap/plan truths are verified. The two post-verification CI defects are fixed and covered by local regression checks; no current implementation gap or human-verification item remains. Hosted post-fix checks are unknown and must run before ship completion.
 
 ---
 
-_Verified: 2026-11-22T20:52:25Z_
+_Verified: 2026-11-22T21:35:32Z_
 _Verifier: the agent (gsd-verifier)_

@@ -4,8 +4,9 @@ A Sony PlayStation emulator core in C: a small library, a headless runner (`schw
 core (`schwaystation_libretro`) for RetroArch. One core covers every console revision and every region (NTSC-J,
 NTSC-U/C and PAL).
 
-**Status: early.** The release includes the built-in test card, PS-X EXE execution, and BIOS-based runs with CUE,
-ISO, or M3U media in the headless runner. Compatibility results are limited to the fixtures in
+**Status: early.** The core includes a built-in test card and PS-X EXE execution, and accepts BIOS-based disc
+content in CUE, ISO, M3U, ECM, and CloneCD formats, supported unencrypted PSISO PBP layouts, and CHD in
+CHD-enabled builds. Compatibility results are limited to the fixtures in
 [docs/compatibility.md](docs/compatibility.md); they do not establish broad game compatibility.
 
 ## What you get
