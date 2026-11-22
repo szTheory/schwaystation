@@ -6,16 +6,16 @@ current_phase: 11
 current_phase_name: ECM and CloneCD images
 current_plan: 2 of 12 (ready)
 status: ready_to_execute
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-11-22T02:12:20.906Z"
+stopped_at: Completed 11-03-PLAN.md; 11-02 remains outstanding at 3928/3901 counted lines
+last_updated: "2026-11-22T03:14:28.474Z"
 last_activity: 2026-11-22
 last_activity_desc: Completed Phase 11 Plan 01; ready to execute Plan 02
-state_head: fbb74d87c2e4432d1981352857b84687bcba01ac
+state_head: 99fbc64d6c2ad1cf2c010cebec1fd4a5051c1acd
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 60
-  completed_plans: 49
+  completed_plans: 50
   percent: 40
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — ECM and CloneCD images; Plan 01 complete, Plan 02 ready
+**Current focus:** Phase 11 — Plan 03 complete; Plan 02 is over the 3901-line cap, and Plan 04 is dependency-ready
 
 ## Current Position
 
-Phase: 11 (ECM and CloneCD images) — READY TO EXECUTE
-Current Plan: 2 of 12 (ready)
+Phase: 11 (ECM and CloneCD images) — IN PROGRESS
+Current Plan: 2 of 12 (blocked by the fixed line cap; Plan 04 is dependency-ready)
 Total Plans in Phase: 12
-Status: Ready to execute
-Last activity: 2026-11-22 -- Phase 11 Plan 01 completed; Plan 02 is next
+Status: In progress
+Last activity: 2026-11-22 -- Phase 11 Plan 03 completed; Plan 02 remains over budget and Plan 04 is dependency-ready
 Progress: [████░░░░░░] 40% (4/10 phases released)
 
 ### Phase 11 Plan 11-01 execution (2026-11-22)
@@ -50,6 +50,21 @@ build, and the two focused tests completed in under one second; evidence/commit 
 longer part of the plan. No hosted CI run was started. The intentionally incomplete positive ECM/CCD
 provider seams are listed in `.planning/WINDOWS.md` and owned by Plans 03/04. ECM-01 and CCD-01 remain
 incomplete until phase-level verification. Plan 02 is next; no user action is needed.
+
+### Phase 11 Plan 11-03 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 in the Codex GSD executor; configured model `gpt-6-luna`. The primary
+runtime model identifier is not exposed. Two tasks took 36 minutes (started 2026-11-22T02:37:28Z,
+completed 2026-11-22T03:13:26Z), changing five host and test files. Task commits are `9c00a79` and
+`99fbc64`; each followed its recorded TDD RED evidence and GREEN checks, with test and implementation
+changes together in the task commit. No history rewrite was made. The committed-state checks exited 0:
+CI preset configure, focused ECM/image target build, focused ECM/CUE-rejection/playlist CTest (3/3),
+then the ECM target build and ECM bounds CTest (1/1). Inventory ordering, focused test discovery,
+`git diff --check`, and the 3898/3901 line budget also exited 0. The two planned RED CTest commands
+exited 8 on their expected assertions and both `tdd-red-evidence` checks exited 0. No hosted CI run
+was started. Literal type-0 direct and M3U ECM reading is implemented; ECM-01 remains incomplete
+pending phase scope and final verification. Plan 02 remains over the cap at 3928/3901; Plan 04's
+dependencies are met and it can proceed while the Plan 02 blocker remains open.
 
 ### Phase 11 planning (2026-11-22)
 
@@ -1003,6 +1018,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 10 P12 | 41m | 2 tasks | 12 files |
 | Phase 10 P13 | 38 | 2 tasks | 7 files |
 | Phase 11 P01 | 37min | 3 tasks | 10 files |
+| Phase 11 P03 | 36min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1413,6 +1429,8 @@ Recent decisions affecting current work:
 - [Phase 11]: Plan 11-01 keeps ECM and CCD private and fail-closed until their positive readers validate complete media.
 - [Phase 11]: A missing ECM continuation byte is malformed and must leave the output reader null.
 - [Phase 11]: Workflow assertions were consolidated while preserving all controls under the unchanged 3901-line cap.
+- [Phase 11]: Type-0 ECM literal streams are the supported direct and M3U path in Plan 11-03; ECM remains unsupported as a CUE source until Plan 11-05.
+- [Phase 11]: The ECM open scan validates exact extent and global EDC before publishing; checkpoint memory and per-read work use independent fixed bounds.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1453,6 +1471,7 @@ Recent decisions affecting current work:
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
 - [Phase 7]: Closed; hosted verification, main CI, release v0.7.0 and triage artifact passed. Follow-up efficiency investigation is in todo 050, bound to Phase 9.
+- Plan 11-02 route-control draft is 3928/3901 counted lines, exceeding the fixed cap by 27; no configure/build ran. Preserve every routing case and resolve with semantics-preserving consolidation or a re-plan.
 
 ### Quick Tasks Completed
 
@@ -1659,9 +1678,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T02:12:20.748Z
-Stopped at: Completed 11-01-PLAN.md
-Resume file: None
+Last session: 2026-11-22T03:14:28.329Z
+Stopped at: Completed 11-03-PLAN.md; 11-02 remains outstanding at 3928/3901 counted lines
+Resume file: 11-02-PLAN.md; Plan 11-04 is dependency-ready after 11-03
 
 ### v1.0 session history
 
