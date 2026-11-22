@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 14 of 15 (Plan 12 Task 1 is closed; Plan 14 CHD-OFF package checks are next)
+current_plan: 15 of 15 (Plan 14 complete; Plan 15 installed-example and CHD-ON checks are next)
 status: executing
-stopped_at: Plan 12 Task 1 closed; unstarted package and installed-example checks split into Plans 14 and 15
-last_updated: "2026-11-22T19:44:34Z"
+stopped_at: Completed 11-14-PLAN.md
+last_updated: "2026-11-22T20:00:41.791Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-12 Task 1 closed with its measured 33m25s; package and CHD-ON checks moved to Plans 14 and 15
-state_head: 7226071cd859d79338859da3a19600b446eb0d18
+last_activity_desc: Plan 11-14 CHD-OFF package/archive checks passed; Plan 15 is next
+state_head: 7f31a0fab3b62ad43da713bba53c3da15eb5aa34
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 63
-  completed_plans: 61
+  completed_plans: 62
   percent: 40
 ---
 
@@ -26,16 +26,28 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plan 12 Task 1 is closed; Plan 14 covers CHD-OFF packages and Plan 15 covers the installed example and CHD-ON consumers
+**Current focus:** Phase 11 — Plan 14 package evidence is complete; Plan 15 covers the installed example and CHD-ON consumers
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 14 of 15 (Plan 12 Task 1 is closed; Plan 14 CHD-OFF package checks are next)
+Current Plan: 15 of 15 (Plan 14 complete; Plan 15 installed-example and CHD-ON checks are next)
 Total Plans in Phase: 15
-Status: In progress
-Last activity: 2026-11-22 -- Plan 11-12 Task 1 committed; Nightly producer/preflight route checks passed
+Status: Ready to execute
+Last activity: 2026-11-22 -- Plan 11-14 CHD-OFF package/archive checks passed; Plan 15 is next
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 Plan 11-14 execution (2026-11-22)
+
+Runtime/model: Codex/OpenGSD 1.20.0; configured executor `gpt-6-luna`; primary runtime model ID unavailable. Measured
+duration was 13 minutes from 2026-11-22T19:48:06Z through local package verification and state closeout. The 3,899/3,901
+line budget, package selector discovery and feature-row order checks passed. The CHD-OFF CI preset configured, and
+`schwaystation-run` plus `schwaystation_libretro` built with both ECM and CCD provider objects present in the disc-image
+archive. Libretro vendored/info claims passed 4/4; hygiene `policy.notices` passed 2/2; CPack generated library, runner
+and libretro macOS arm64 Release archives; archive-content and notice checks passed 4/4. The feature-ledger schema and
+both ECM/CCD feature tests passed. Local package evidence is recorded separately from unknown Main, Nightly and Release
+hosted evidence; ECM-01 and CCD-01 remain open. No hosted workflow, timed campaign or broad suite ran. Task commit is
+`7f31a0f`; Plan 14 summary records the evidence. Plan 15 owns the installed SDL2 example and CHD-ON consumers.
 
 ### Phase 11 Plan 11-12 execution and bounded follow-up split (2026-11-22)
 
@@ -1179,6 +1191,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P09 | 26m | 2 tasks | 7 files |
 | Phase 11 P10 | 1h 10m 25s | 2 tasks | 6 files |
 | Phase 11 P11 | 23m27s | 2 tasks | 8 files |
+| Phase 11 P14 | 13m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1603,6 +1616,7 @@ Recent decisions affecting current work:
 - [Phase 11]: Use a named disposable local Linux container to build Clang 21 libFuzzer targets when the host Apple Clang lacks its Fuzzer runtime; keep long campaigns separate from bounded build/replay checks.
 - [Phase 11]: The owned one-data-track ECM fixture supports boot, read/replay and FMV guest predicates, but no CD-DA claim.
 - [Phase 11]: ECM and CCD compatibility rows report only local fixture, runner and libretro evidence; hosted CI, package and fuzz remain unknown until Plan 12.
+- [Phase 11]: Keep local CHD-OFF package evidence separate from unknown hosted Main, Nightly and Release evidence.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1850,9 +1864,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T18:56:51.142Z
-Stopped at: Completed 11-11-PLAN.md
-Resume file: None
+Last session: 2026-11-22T20:00:41.623Z
+Stopped at: Completed 11-14-PLAN.md
+Resume file: 11-15-PLAN.md
 
 ### v1.0 session history
 
