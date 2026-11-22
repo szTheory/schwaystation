@@ -19,13 +19,18 @@
 #define SCHWAY__DISC_ECM_CHECKPOINT_MAX 16386u
 #define SCHWAY__DISC_ECM_READ_MAX 70240u
 #define SCHWAY__DISC_ECM_INDEX_BYTES UINT64_C(1048576)
+#define SCHWAY__DISC_ECM_TYPE1_INPUT 2051u
+#define SCHWAY__DISC_ECM_TYPE2_INPUT 2052u
+#define SCHWAY__DISC_ECM_TYPE3_INPUT 2328u
+#define SCHWAY__DISC_ECM_MODE2_OUTPUT 2336u
 
 typedef struct schway__disc_ecm_checkpoint {
     uint64_t source_offset;
     uint64_t decoded_offset;
     uint32_t remaining;
     uint8_t type;
-    uint8_t reserved[3];
+    uint16_t output_offset;
+    uint8_t reserved;
 } schway__disc_ecm_checkpoint;
 
 _Static_assert(sizeof(schway__disc_ecm_checkpoint) <= 48u,
@@ -160,7 +165,8 @@ int schway__disc_ecm_test_limits(uint64_t file_bytes, uint64_t decoded_bytes,
 static int schway__disc_ecm_add_checkpoint(schway__disc_ecm *reader,
                                             uint64_t source_offset,
                                             uint64_t decoded_offset,
-                                            uint64_t remaining)
+                                            uint64_t remaining, uint8_t type,
+                                            uint16_t output_offset)
 {
     schway__disc_ecm_checkpoint *checkpoint;
     if (remaining > UINT32_MAX || reader->checkpoint_count >= SCHWAY__DISC_ECM_CHECKPOINT_MAX) {
@@ -170,8 +176,139 @@ static int schway__disc_ecm_add_checkpoint(schway__disc_ecm *reader,
     checkpoint->source_offset = source_offset;
     checkpoint->decoded_offset = decoded_offset;
     checkpoint->remaining = (uint32_t)remaining;
-    checkpoint->type = 0u;
-    memset(checkpoint->reserved, 0, sizeof checkpoint->reserved);
+    checkpoint->type = type;
+    checkpoint->output_offset = output_offset;
+    checkpoint->reserved = 0u;
+    return 1;
+}
+
+static uint32_t schway__disc_ecm_input_unit(uint8_t type)
+{
+    return type == 1u ? SCHWAY__DISC_ECM_TYPE1_INPUT :
+           type == 2u ? SCHWAY__DISC_ECM_TYPE2_INPUT :
+           type == 3u ? SCHWAY__DISC_ECM_TYPE3_INPUT : 1u;
+}
+
+static uint32_t schway__disc_ecm_output_unit(uint8_t type)
+{
+    return type == 1u ? SCHWAY__DISC_ECM_SECTOR_BYTES :
+           type == 2u || type == 3u ? SCHWAY__DISC_ECM_MODE2_OUTPUT : 1u;
+}
+
+static uint8_t schway__disc_ecm_ecc_forward(uint8_t value)
+{
+    uint16_t doubled = (uint16_t)((uint16_t)value << 1);
+    if ((value & 0x80u) != 0u) doubled = (uint16_t)(doubled ^ 0x11du);
+    return (uint8_t)doubled;
+}
+
+static void schway__disc_ecm_ecc(const uint8_t *source, uint32_t major_count,
+                                 uint32_t minor_count, uint32_t major_mult,
+                                 uint32_t minor_inc, uint8_t *destination)
+{
+    uint32_t size = major_count * minor_count;
+    uint8_t backward[256];
+    for (uint32_t i = 0u; i < 256u; i++) {
+        uint8_t value = (uint8_t)i;
+        backward[value ^ schway__disc_ecm_ecc_forward(value)] = value;
+    }
+    for (uint32_t major = 0u; major < major_count; major++) {
+        uint32_t index = (major >> 1) * major_mult + (major & 1u);
+        uint8_t a = 0u;
+        uint8_t b = 0u;
+        for (uint32_t minor = 0u; minor < minor_count; minor++) {
+            uint8_t value = source[index];
+            index += minor_inc;
+            if (index >= size) index -= size;
+            a ^= value;
+            b ^= value;
+            a = schway__disc_ecm_ecc_forward(a);
+        }
+        a = backward[schway__disc_ecm_ecc_forward(a) ^ b];
+        destination[major] = a;
+        destination[major + major_count] = (uint8_t)(a ^ b);
+    }
+}
+
+static void schway__disc_ecm_mode1_trailer(uint8_t sector[SCHWAY__DISC_ECM_SECTOR_BYTES])
+{
+    uint32_t edc = schway__disc_ecm_edc(0u, sector, 2064u);
+    sector[2064] = (uint8_t)edc;
+    sector[2065] = (uint8_t)(edc >> 8);
+    sector[2066] = (uint8_t)(edc >> 16);
+    sector[2067] = (uint8_t)(edc >> 24);
+    memset(sector + 2068u, 0, 8u);
+    schway__disc_ecm_ecc(sector + 12u, 86u, 24u, 2u, 86u, sector + 2076u);
+    schway__disc_ecm_ecc(sector + 12u, 52u, 43u, 86u, 88u, sector + 2248u);
+}
+
+static void schway__disc_ecm_expand(uint8_t type, const uint8_t *stored,
+                                    uint8_t sector[SCHWAY__DISC_ECM_SECTOR_BYTES],
+                                    uint32_t *output_size)
+{
+    if (type == 1u) {
+        memset(sector, 0, SCHWAY__DISC_ECM_SECTOR_BYTES);
+        memset(sector + 1u, 0xff, 10u);
+        memcpy(sector + 12u, stored, 3u);
+        sector[15] = 1u;
+        memcpy(sector + 16u, stored + 3u, 2048u);
+        schway__disc_ecm_mode1_trailer(sector);
+        *output_size = SCHWAY__DISC_ECM_SECTOR_BYTES;
+        return;
+    }
+    if (type == 2u) {
+        uint32_t edc;
+        memset(sector, 0, SCHWAY__DISC_ECM_SECTOR_BYTES);
+        memcpy(sector + 16u, stored, 4u);
+        memcpy(sector + 20u, stored, 4u);
+        memcpy(sector + 24u, stored + 4u, 2048u);
+        edc = schway__disc_ecm_edc(0u, sector + 16u, 2056u);
+        sector[2072] = (uint8_t)edc;
+        sector[2073] = (uint8_t)(edc >> 8);
+        sector[2074] = (uint8_t)(edc >> 16);
+        sector[2075] = (uint8_t)(edc >> 24);
+        schway__disc_ecm_ecc(sector + 12u, 86u, 24u, 2u, 86u, sector + 2076u);
+        schway__disc_ecm_ecc(sector + 12u, 52u, 43u, 86u, 88u, sector + 2248u);
+        *output_size = SCHWAY__DISC_ECM_MODE2_OUTPUT;
+        memmove(sector, sector + 16u, *output_size);
+        return;
+    }
+    if (type == 3u) {
+        uint32_t edc;
+        memcpy(sector, stored, 4u);
+        memcpy(sector + 4u, stored, 4u);
+        memcpy(sector + 8u, stored + 4u, 2324u);
+        edc = schway__disc_ecm_edc(0u, sector, 2332u);
+        sector[2332] = (uint8_t)edc;
+        sector[2333] = (uint8_t)(edc >> 8);
+        sector[2334] = (uint8_t)(edc >> 16);
+        sector[2335] = (uint8_t)(edc >> 24);
+        *output_size = SCHWAY__DISC_ECM_MODE2_OUTPUT;
+    }
+}
+
+static int schway__disc_ecm_add_record_checkpoints(
+    schway__disc_ecm *reader, uint64_t source_offset, uint64_t decoded_offset,
+    uint64_t count, uint8_t type, uint32_t input_unit, uint32_t output_unit,
+    uint64_t decoded_end, uint64_t *next_checkpoint)
+{
+    while (*next_checkpoint < decoded_end) {
+        uint64_t within = *next_checkpoint - decoded_offset;
+        uint64_t source_delta = within;
+        uint64_t remaining = count - within;
+        uint16_t output_offset = 0u;
+        uint64_t indexed_source;
+        if (type != 0u) {
+            uint64_t unit = within / output_unit;
+            if (!schway__media_mul_u64(unit, input_unit, &source_delta)) return 0;
+            remaining = count - unit;
+            output_offset = (uint16_t)(within % output_unit);
+        }
+        if (!schway__media_add_u64(source_offset, source_delta, &indexed_source) ||
+            !schway__disc_ecm_add_checkpoint(reader, indexed_source, *next_checkpoint,
+                                             remaining, type, output_offset)) return 0;
+        *next_checkpoint += SCHWAY__DISC_ECM_CHECKPOINT_STEP;
+    }
     return 1;
 }
 
@@ -179,6 +316,8 @@ static schway_disc_image_status schway__disc_ecm_validate(
     schway__disc_ecm *reader)
 {
     uint8_t buffer[8192];
+    uint8_t stored[SCHWAY__DISC_ECM_TYPE3_INPUT];
+    uint8_t sector[SCHWAY__DISC_ECM_SECTOR_BYTES];
     uint32_t edc = 0u;
     uint32_t records = 0u;
     uint64_t decoded = 0u;
@@ -189,7 +328,11 @@ static schway_disc_image_status schway__disc_ecm_validate(
         uint64_t encoded;
         uint64_t position = 0u;
         uint64_t count;
+        uint64_t input_bytes;
+        uint64_t output_bytes;
         uint64_t next_decoded;
+        uint32_t input_unit;
+        uint32_t output_unit;
         schway_disc_image_status status;
         if (records >= SCHWAY__DISC_ECM_RECORD_MAX) return SCHWAY_DISC_IMAGE_LIMIT;
         status = schway__disc_ecm_read_count(reader->file, &type, &encoded);
@@ -219,42 +362,49 @@ static schway_disc_image_status schway__disc_ecm_validate(
         }
         count = encoded + 1u;
         if (count > UINT32_C(0x7fffffff)) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
-        if (type != 0u) return SCHWAY_DISC_IMAGE_UNSUPPORTED;
-        if (!schway__media_add_u64(decoded, count, &next_decoded)) {
+        input_unit = schway__disc_ecm_input_unit(type);
+        output_unit = schway__disc_ecm_output_unit(type);
+        if (type > 3u || !schway__media_mul_u64(count, input_unit, &input_bytes) ||
+            !schway__media_mul_u64(count, output_unit, &output_bytes) ||
+            !schway__media_add_u64(decoded, output_bytes, &next_decoded)) {
             return SCHWAY_DISC_IMAGE_LIMIT;
         }
         if (next_decoded > SCHWAY__MEDIA_IMAGE_MAX_BYTES) return SCHWAY_DISC_IMAGE_LIMIT;
         if (!schway__disc_ecm_tell(reader->file, &position) || position > reader->file_bytes ||
-            count > reader->file_bytes - position) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
-        if (decoded == next_checkpoint) {
-            if (!schway__disc_ecm_add_checkpoint(reader, position, decoded, count)) {
-                return SCHWAY_DISC_IMAGE_LIMIT;
-            }
-            next_checkpoint += SCHWAY__DISC_ECM_CHECKPOINT_STEP;
+            input_bytes > reader->file_bytes - position) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
+        if (!schway__disc_ecm_add_record_checkpoints(reader, position, decoded, count,
+                                                     type, input_unit, output_unit,
+                                                     next_decoded, &next_checkpoint)) {
+            return SCHWAY_DISC_IMAGE_LIMIT;
         }
-        while (next_checkpoint < next_decoded) {
-            uint64_t offset = position + (next_checkpoint - decoded);
-            if (!schway__disc_ecm_add_checkpoint(reader, offset, next_checkpoint,
-                                                 next_decoded - next_checkpoint)) {
-                return SCHWAY_DISC_IMAGE_LIMIT;
+        if (type == 0u) {
+            uint64_t remaining = input_bytes;
+            while (remaining != 0u) {
+                size_t chunk = remaining > sizeof buffer ? sizeof buffer : (size_t)remaining;
+                if (fread(buffer, 1u, chunk, reader->file) != chunk) {
+                    return ferror(reader->file) != 0 ? SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+                }
+                edc = schway__disc_ecm_edc(edc, buffer, chunk);
+                remaining -= chunk;
             }
-            next_checkpoint += SCHWAY__DISC_ECM_CHECKPOINT_STEP;
-        }
-        uint64_t remaining = count;
-        while (remaining != 0u) {
-            size_t chunk = remaining > sizeof buffer ? sizeof buffer : (size_t)remaining;
-            if (fread(buffer, 1u, chunk, reader->file) != chunk) {
-                return ferror(reader->file) != 0 ? SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+        } else {
+            for (uint64_t unit = 0u; unit < count; unit++) {
+                uint32_t expanded = 0u;
+                if (fread(stored, 1u, input_unit, reader->file) != input_unit) {
+                    return ferror(reader->file) != 0 ? SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+                }
+                schway__disc_ecm_expand(type, stored, sector, &expanded);
+                if (expanded != output_unit) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
+                edc = schway__disc_ecm_edc(edc, sector, expanded);
             }
-            edc = schway__disc_ecm_edc(edc, buffer, chunk);
-            remaining -= chunk;
         }
         decoded = next_decoded;
     }
 }
 
 static schway_disc_image_status schway__disc_ecm_next_record(
-    schway__disc_ecm *reader, uint64_t *source_offset, uint32_t *remaining)
+    schway__disc_ecm *reader, uint64_t *source_offset, uint32_t *remaining,
+    uint8_t *record_type)
 {
     uint8_t type;
     uint64_t encoded;
@@ -266,12 +416,30 @@ static schway_disc_image_status schway__disc_ecm_next_record(
     status = schway__disc_ecm_read_count(reader->file, &type, &encoded);
     if (status != SCHWAY_DISC_IMAGE_OK) return status;
     reader->last_record_headers++;
-    if (type != 0u || encoded == UINT32_MAX) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
+    if (encoded == UINT32_MAX) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
     count = encoded + 1u;
     if (count > UINT32_C(0x7fffffff)) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
     if (!schway__disc_ecm_tell(reader->file, source_offset)) return SCHWAY_DISC_IMAGE_IO;
     *remaining = (uint32_t)count;
+    *record_type = type;
     return SCHWAY_DISC_IMAGE_OK;
+}
+
+static schway_disc_image_status schway__disc_ecm_decode_at(
+    schway__disc_ecm *reader, uint8_t type, uint64_t source_offset,
+    uint8_t sector[SCHWAY__DISC_ECM_SECTOR_BYTES], uint32_t *output_size)
+{
+    uint8_t stored[SCHWAY__DISC_ECM_TYPE3_INPUT];
+    uint32_t input_size = schway__disc_ecm_input_unit(type);
+    if (type == 0u || type > 3u || !schway__disc_ecm_seek(reader->file, source_offset)) {
+        return SCHWAY_DISC_IMAGE_IO;
+    }
+    if (fread(stored, 1u, input_size, reader->file) != input_size) {
+        return ferror(reader->file) != 0 ? SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+    }
+    schway__disc_ecm_expand(type, stored, sector, output_size);
+    return *output_size == schway__disc_ecm_output_unit(type) ?
+           SCHWAY_DISC_IMAGE_OK : SCHWAY_DISC_IMAGE_BAD_IMAGE;
 }
 
 static schway_disc_image_status schway__disc_ecm_open_impl(
@@ -402,6 +570,8 @@ schway_disc_image_status schway__disc_ecm_read_bytes(
     uint64_t source_offset;
     uint64_t skipped;
     uint32_t remaining;
+    uint8_t type;
+    uint16_t output_offset;
     size_t copied = 0u;
     if (reader == NULL || (bytes == NULL && size != 0u)) return SCHWAY_DISC_IMAGE_BAD_ARGUMENT;
     reader->last_forward_bytes = 0u;
@@ -413,6 +583,8 @@ schway_disc_image_status schway__disc_ecm_read_bytes(
     checkpoint_index = (uint32_t)(offset / SCHWAY__DISC_ECM_CHECKPOINT_STEP);
     if (checkpoint_index >= reader->checkpoint_count) return SCHWAY_DISC_IMAGE_BAD_IMAGE;
     checkpoint = &reader->checkpoints[checkpoint_index];
+    type = checkpoint->type;
+    output_offset = checkpoint->output_offset;
     forward = offset - checkpoint->decoded_offset;
     if (forward > SCHWAY__DISC_ECM_READ_MAX ||
         (uint64_t)size > SCHWAY__DISC_ECM_READ_MAX - forward) {
@@ -425,31 +597,72 @@ schway_disc_image_status schway__disc_ecm_read_bytes(
     while (skipped != 0u) {
         if (remaining == 0u) {
             schway_disc_image_status status = schway__disc_ecm_next_record(
-                reader, &source_offset, &remaining);
+                reader, &source_offset, &remaining, &type);
             if (status != SCHWAY_DISC_IMAGE_OK) return status;
+            output_offset = 0u;
         }
-        uint32_t amount = remaining < skipped ? remaining : (uint32_t)skipped;
-        source_offset += amount;
-        remaining -= amount;
-        skipped -= amount;
-        if (remaining == 0u && !schway__disc_ecm_seek(reader->file, source_offset)) {
-            return SCHWAY_DISC_IMAGE_IO;
+        if (type == 0u) {
+            uint32_t amount = remaining < skipped ? remaining : (uint32_t)skipped;
+            source_offset += amount;
+            remaining -= amount;
+            skipped -= amount;
+            if (remaining == 0u && !schway__disc_ecm_seek(reader->file, source_offset)) {
+                return SCHWAY_DISC_IMAGE_IO;
+            }
+        } else {
+            uint8_t sector[SCHWAY__DISC_ECM_SECTOR_BYTES];
+            uint32_t output_size;
+            uint32_t available;
+            uint32_t amount;
+            schway_disc_image_status status = schway__disc_ecm_decode_at(
+                reader, type, source_offset, sector, &output_size);
+            if (status != SCHWAY_DISC_IMAGE_OK) return status;
+            available = output_size - output_offset;
+            amount = available < skipped ? available : (uint32_t)skipped;
+            output_offset = (uint16_t)(output_offset + amount);
+            skipped -= amount;
+            if (output_offset == output_size) {
+                source_offset += schway__disc_ecm_input_unit(type);
+                output_offset = 0u;
+                remaining--;
+            }
         }
     }
     while (copied < size) {
         if (remaining == 0u) {
             schway_disc_image_status status = schway__disc_ecm_next_record(
-                reader, &source_offset, &remaining);
+                reader, &source_offset, &remaining, &type);
             if (status != SCHWAY_DISC_IMAGE_OK) return status;
+            output_offset = 0u;
         }
-        size_t amount = size - copied < remaining ? size - copied : remaining;
-        if (!schway__disc_ecm_seek(reader->file, source_offset) ||
-            fread(bytes + copied, 1u, amount, reader->file) != amount) {
-            return ferror(reader->file) != 0 ? SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+        if (type == 0u) {
+            size_t amount = size - copied < remaining ? size - copied : remaining;
+            if (!schway__disc_ecm_seek(reader->file, source_offset) ||
+                fread(bytes + copied, 1u, amount, reader->file) != amount) {
+                return ferror(reader->file) != 0 ? SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+            }
+            copied += amount;
+            source_offset += amount;
+            remaining -= (uint32_t)amount;
+        } else {
+            uint8_t sector[SCHWAY__DISC_ECM_SECTOR_BYTES];
+            uint32_t output_size;
+            size_t available;
+            size_t amount;
+            schway_disc_image_status status = schway__disc_ecm_decode_at(
+                reader, type, source_offset, sector, &output_size);
+            if (status != SCHWAY_DISC_IMAGE_OK) return status;
+            available = output_size - output_offset;
+            amount = size - copied < available ? size - copied : available;
+            memcpy(bytes + copied, sector + output_offset, amount);
+            copied += amount;
+            output_offset = (uint16_t)(output_offset + amount);
+            if (output_offset == output_size) {
+                source_offset += schway__disc_ecm_input_unit(type);
+                output_offset = 0u;
+                remaining--;
+            }
         }
-        copied += amount;
-        source_offset += amount;
-        remaining -= (uint32_t)amount;
     }
     return SCHWAY_DISC_IMAGE_OK;
 }

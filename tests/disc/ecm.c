@@ -112,7 +112,7 @@ static const char ecm_type3_trailer_hex[] = "90adca2b";
 
 static int write_modeled_ecm(const char *path, const uint8_t *decoded,
                              const uint8_t type1[2051], const uint8_t type2[2052],
-                             const uint8_t type3[2328])
+                             const uint8_t type3[2328], int bad_checksum)
 {
     static const uint8_t terminator[] = { 0xfcu, 0xffu, 0xffu, 0xffu, 0x3fu };
     static const uint8_t header2[16] = {
@@ -129,12 +129,57 @@ static int write_modeled_ecm(const char *path, const uint8_t *decoded,
     FILE *file = schway__test_open_file(path, "wb");
     int ok;
     if (file == NULL) return 0;
+    if (bad_checksum) checksum[0] ^= 1u;
     ok = fwrite("ECM\0", 1u, 4u, file) == 4u &&
          write_record_count(file, 1u, 1u) && fwrite(type1, 1u, 2051u, file) == 2051u &&
          write_count(file, 16u) && fwrite(header2, 1u, sizeof header2, file) == sizeof header2 &&
          write_record_count(file, 2u, 1u) && fwrite(type2, 1u, 2052u, file) == 2052u &&
          write_count(file, 16u) && fwrite(header3, 1u, sizeof header3, file) == sizeof header3 &&
          write_record_count(file, 3u, 1u) && fwrite(type3, 1u, 2328u, file) == 2328u &&
+         fwrite(terminator, 1u, sizeof terminator, file) == sizeof terminator &&
+         fwrite(checksum, 1u, sizeof checksum, file) == sizeof checksum;
+    if (fclose(file) != 0) ok = 0;
+    return ok;
+}
+
+static int write_type1_repeat_ecm(const char *path, const uint8_t stored[2051],
+                                  const uint8_t decoded[2352], uint32_t count)
+{
+    static const uint8_t terminator[] = { 0xfcu, 0xffu, 0xffu, 0xffu, 0x3fu };
+    FILE *file = schway__test_open_file(path, "wb");
+    uint32_t edc = 0u;
+    uint8_t checksum[4];
+    int ok;
+    if (file == NULL) return 0;
+    ok = fwrite("ECM\0", 1u, 4u, file) == 4u &&
+         write_record_count(file, 1u, count);
+    for (uint32_t i = 0u; ok && i < count; i++) {
+        ok = fwrite(stored, 1u, 2051u, file) == 2051u;
+        edc = ecm_edc_update(edc, decoded, 2352u);
+    }
+    checksum[0] = (uint8_t)edc;
+    checksum[1] = (uint8_t)(edc >> 8);
+    checksum[2] = (uint8_t)(edc >> 16);
+    checksum[3] = (uint8_t)(edc >> 24);
+    ok = ok && fwrite(terminator, 1u, sizeof terminator, file) == sizeof terminator &&
+         fwrite(checksum, 1u, sizeof checksum, file) == sizeof checksum;
+    if (fclose(file) != 0) ok = 0;
+    return ok;
+}
+
+static int write_one_model_ecm(const char *path, uint8_t type, const uint8_t *stored,
+                               size_t stored_size, const uint8_t *decoded,
+                               size_t decoded_size)
+{
+    static const uint8_t terminator[] = { 0xfcu, 0xffu, 0xffu, 0xffu, 0x3fu };
+    uint32_t edc = ecm_edc(decoded, decoded_size);
+    uint8_t checksum[4] = { (uint8_t)edc, (uint8_t)(edc >> 8),
+                            (uint8_t)(edc >> 16), (uint8_t)(edc >> 24) };
+    FILE *file = schway__test_open_file(path, "wb");
+    int ok;
+    if (file == NULL) return 0;
+    ok = fwrite("ECM\0", 1u, 4u, file) == 4u &&
+         write_record_count(file, type, 1u) && fwrite(stored, 1u, stored_size, file) == stored_size &&
          fwrite(terminator, 1u, sizeof terminator, file) == sizeof terminator &&
          fwrite(checksum, 1u, sizeof checksum, file) == sizeof checksum;
     if (fclose(file) != 0) ok = 0;
@@ -158,6 +203,7 @@ static int test_modeled_known_answers(const char *path)
     uint8_t actual[sizeof decoded];
     schway__disc_ecm *reader = NULL;
     schway_disc_image_error error;
+    schway_disc_image *image = NULL;
     int ok = 0;
     decoded[0] = 0u;
     memset(decoded + 1u, 0xff, 10u);
@@ -187,7 +233,7 @@ static int test_modeled_known_answers(const char *path)
         decoded[4728u + i] = type3[4u + i];
     }
     if (!decode_hex(ecm_type3_trailer_hex, decoded + 7052u, 4u) ||
-        !write_modeled_ecm(path, decoded, type1, type2, type3) ||
+        !write_modeled_ecm(path, decoded, type1, type2, type3, 0) ||
         schway__disc_ecm_open(path, &reader, &error) != SCHWAY_DISC_IMAGE_OK) {
         fprintf(stderr, "ASSERT disc.image.ecm: independent modeled known-answer stream did not open: %s\n",
                 error.message);
@@ -198,8 +244,57 @@ static int test_modeled_known_answers(const char *path)
         fprintf(stderr, "ASSERT disc.image.ecm: type 1/2/3 complete decoded bytes differ\n");
         goto done;
     }
+    if (schway_disc_image_open(path, &image, &error) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.ecm: modeled fallback open failed: %s\n", error.message);
+        goto done;
+    }
+    const schway_disc *disc = schway_disc_image_disc(image);
+    for (uint32_t lba = 0u; lba < 3u; lba++) {
+        uint8_t sector[2352];
+        uint8_t subcode[96];
+        if (disc == NULL || disc->read_sector == NULL ||
+            disc->read_sector(disc->user, lba, sector, subcode) != 1u ||
+            memcmp(sector, decoded + (size_t)lba * 2352u, sizeof sector) != 0) {
+            fprintf(stderr, "ASSERT disc.image.ecm: modeled callback sector %u differs\n", lba);
+            goto done;
+        }
+    }
+    schway_disc_image_close(image);
+    image = NULL;
+    schway__disc_ecm_close(reader);
+    reader = NULL;
+    if (!write_modeled_ecm(path, decoded, type1, type2, type3, 1) ||
+        schway__disc_ecm_open(path, &reader, &error) != SCHWAY_DISC_IMAGE_BAD_IMAGE ||
+        reader != NULL) {
+        fprintf(stderr, "ASSERT disc.image.ecm: modeled output checksum mutation was accepted\n");
+        goto done;
+    }
+    if (!write_one_model_ecm(path, 2u, type2, sizeof type2, decoded + 2368u, 2336u) ||
+        schway__disc_ecm_open(path, &reader, &error) != SCHWAY_DISC_IMAGE_BAD_IMAGE ||
+        reader != NULL) {
+        fprintf(stderr, "ASSERT disc.image.ecm: bare 2336-byte modeled image was accepted\n");
+        goto done;
+    }
+    if (!write_type1_repeat_ecm(path, type1, decoded, 40u) ||
+        schway__disc_ecm_open(path, &reader, &error) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.ecm: repeated modeled checkpoint image did not open\n");
+        goto done;
+    }
+    uint8_t around_checkpoint[128];
+    if (schway__disc_ecm_read_bytes(reader, 65536u, around_checkpoint,
+                                    sizeof around_checkpoint) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.ecm: modeled checkpoint restart failed\n");
+        goto done;
+    }
+    for (size_t i = 0u; i < sizeof around_checkpoint; i++) {
+        if (around_checkpoint[i] != decoded[(65536u + i) % 2352u]) {
+            fprintf(stderr, "ASSERT disc.image.ecm: modeled checkpoint byte %zu differs\n", i);
+            goto done;
+        }
+    }
     ok = 1;
 done:
+    schway_disc_image_close(image);
     schway__disc_ecm_close(reader);
     return ok;
 }
@@ -521,7 +616,7 @@ int main(int argc, char **argv)
     if (!write_file(input_path, overflow_count, sizeof overflow_count) ||
         !expect_open(input_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, "varint overflow")) result = 1;
     if (!write_file(input_path, modeled_record, sizeof modeled_record) ||
-        !expect_open(input_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, "modeled record type")) result = 1;
+        !expect_open(input_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, "truncated modeled record")) result = 1;
     if (!write_literal_ecm(input_path, expected, sizeof expected, 0) ||
         !append_byte(input_path, 0u) ||
         !expect_open(input_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, "trailing byte")) result = 1;
