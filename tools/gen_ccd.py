@@ -91,7 +91,6 @@ def descriptor(track1_sectors, track2_sectors):
 def image_cue(track1_sectors, track2_sectors):
     index0 = track1_sectors
     index1 = index0 + 150
-    leadout = index0 + track2_sectors
     def stamp(lba):
         frames = lba
         return f"{frames // 4500:02}:{(frames // 75) % 60:02}:{frames % 75:02}"
