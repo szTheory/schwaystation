@@ -24,9 +24,11 @@ add_custom_command(OUTPUT "${schway__legacy_ecm_literal}" "${schway__legacy_ecm_
 set(schway__legacy_ccd_img "${schway__legacy_fixture_dir}/disc_boot_legacy.img")
 set(schway__legacy_ccd "${schway__legacy_fixture_dir}/disc_boot_legacy.ccd")
 set(schway__legacy_ccd_sub "${schway__legacy_fixture_dir}/disc_boot_legacy.sub")
+set(schway__legacy_ccd_image_cue "${schway__legacy_fixture_dir}/disc_boot_legacy_image.cue")
 set(schway__legacy_ccd_manifest "${schway__legacy_fixture_dir}/disc_boot_legacy_ccd.manifest")
 add_custom_command(OUTPUT "${schway__legacy_ccd_img}" "${schway__legacy_ccd}"
-    "${schway__legacy_ccd_sub}" "${schway__legacy_ccd_manifest}"
+    "${schway__legacy_ccd_sub}" "${schway__legacy_ccd_image_cue}"
+    "${schway__legacy_ccd_manifest}"
   COMMAND "${Python3_EXECUTABLE}" "${schway__legacy_ccd_generator}"
     --source-cue "${schway__legacy_disc_cue}" --output-dir "${schway__legacy_fixture_dir}"
   DEPENDS schwaystation-disc-fixtures "${schway__legacy_disc_cue}"
@@ -41,4 +43,5 @@ add_custom_target(schwaystation-legacy-disc-fixtures
     "${schway__legacy_ecm_manifest}" "${schway__legacy_ecm_source_cue}"
     "${schway__legacy_ecm_literal_cue}" "${schway__legacy_ecm_modeled_cue}"
     "${schway__legacy_ccd_img}" "${schway__legacy_ccd}"
-    "${schway__legacy_ccd_sub}" "${schway__legacy_ccd_manifest}")
+    "${schway__legacy_ccd_sub}" "${schway__legacy_ccd_image_cue}"
+    "${schway__legacy_ccd_manifest}")

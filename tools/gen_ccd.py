@@ -88,6 +88,22 @@ def descriptor(track1_sectors, track2_sectors):
     )
 
 
+def image_cue(track1_sectors, track2_sectors):
+    index0 = track1_sectors
+    index1 = index0 + 150
+    leadout = index0 + track2_sectors
+    def stamp(lba):
+        frames = lba
+        return f"{frames // 4500:02}:{(frames // 75) % 60:02}:{frames % 75:02}"
+    return (
+        'FILE "disc_boot_legacy.img" BINARY\n'
+        "  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n"
+        "  TRACK 02 AUDIO\n"
+        f"    INDEX 00 {stamp(index0)}\n"
+        f"    INDEX 01 {stamp(index1)}\n"
+    )
+
+
 def make_sub(sectors):
     output = bytearray()
     for lba in range(sectors):
@@ -116,9 +132,11 @@ def main():
     image_path = args.output_dir / "disc_boot_legacy.img"
     ccd_path = args.output_dir / "disc_boot_legacy.ccd"
     sub_path = args.output_dir / "disc_boot_legacy.sub"
+    image_cue_path = args.output_dir / "disc_boot_legacy_image.cue"
     image_path.write_bytes(image)
     ccd_path.write_bytes(ccd)
     sub_path.write_bytes(sub)
+    write_text_lf(image_cue_path, image_cue(*counts))
     generator = pathlib.Path(__file__).read_bytes()
     source_cue = args.source_cue.read_bytes()
     fields = [
@@ -133,6 +151,8 @@ def main():
         f"img_bytes={len(image)}", f"img_sha256={digest(image)}",
         f"ccd_bytes={len(ccd)}", f"ccd_sha256={digest(ccd)}",
         f"sub_bytes={len(sub)}", f"sub_sha256={digest(sub)}",
+        f"image_cue_bytes={image_cue_path.stat().st_size}",
+        f"image_cue_sha256={digest(image_cue_path.read_bytes())}",
         f"guest_reads={len(image) // SECTOR_BYTES}",
         f"guest_outputs={len(image) // SECTOR_BYTES}",
         "",

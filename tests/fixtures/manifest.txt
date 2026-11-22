@@ -16,5 +16,5 @@ tests/fixtures/src/disc_boot.cnf	schwaystation first-party fixture	-	MIT	a3a9b3b
 tests/fixtures/src/disc_boot.sbi	schwaystation first-party fixture	-	MIT	8d80422239e2f6a211d7cfe0fb257543370f0c373fc973b1e550848e93bbeb90	-
 tests/vectors/gte/ps1tests-1150.bin	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	e8a0e61a57a6582ac53d39b941eeaa83b87498444a3ada915d9de73d313dd9c2	THIRD-PARTY-NOTICES.md
 tests/fixtures/src/gte_cases.inc	JaCzekanski/ps1-tests gte/test-all/tests.c, transcoded by tools/gte2bin.py	f727802fead1	MIT	22d83f53a818096106543758c20c8cab3218255af740faff37ff403b6e581220	THIRD-PARTY-NOTICES.md
-tools/gen_ccd.py	schwaystation first-party deterministic CloneCD fixture generator	-	MIT	2bf5732aa68e2cbe663e6e30da6b6c581c9b2f2fea036c27478cdba57a526fe5	-
+tools/gen_ccd.py	schwaystation first-party deterministic CloneCD fixture generator	-	MIT	d96bc058b7f80fef8634654b32ca149d67eabde2c650310126f800f8af68e22d	-
 tools/gen_ecm.py	schwaystation first-party deterministic ECM fixture generator	-	MIT	d5b1f7e3d01d56c3a8d96d68513c41b5523c6c3f50f585557c927d69c49f7d68	-
