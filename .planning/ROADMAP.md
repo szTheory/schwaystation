@@ -186,7 +186,7 @@ platforms and Main/Release gates retained; complete repository checks at or belo
   2. Supported CloneCD fixtures preserve modes, indexes, pregaps, subcode and first and last sector reads through CCD and its IMG/SUB companions. Invalid companion paths are rejected before an external file is opened.
   3. The ledger records fixture results for both providers against the existing disc contract.
 
-**Plans**: 9/13 plans executed
+**Plans**: 10/13 plans executed
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/research/FEATURES.md`
 
@@ -213,7 +213,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [x] 11-08-PLAN.md — Runner/probe and content identity
-- [ ] 11-09-PLAN.md — Libretro loading, replacement and extension claims
+- [x] 11-09-PLAN.md — Libretro loading, replacement and extension claims
 - [ ] 11-10-PLAN.md — Production fuzz replay and sanitizer targets
 
 **Wave 8** *(blocked on Wave 7 completion)*
@@ -304,7 +304,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
 | 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
 | 10. PBP disc images | 13/13 | Complete    | 2026-11-22 |
-| 11. ECM and CloneCD images | 9/13 | In Progress | - |
+| 11. ECM and CloneCD images | 10/13 | In Progress | - |
 | 12. SBI and LibCrypt | 0/TBD | Not started | - |
 | 13. Regions, console revisions and playback | 0/TBD | Not started | - |
 | 14. Multitap and special controllers | 0/TBD | Not started | - |

@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 9 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 09 is next)
+current_plan: 10 of 13 (ready; Plan 02 is closed by evidence-based deferral)
 status: executing
-stopped_at: Completed 11-08-PLAN.md
-last_updated: "2026-11-22T16:39:17.145Z"
+stopped_at: Completed 11-09-PLAN.md
+last_updated: "2026-11-22T17:12:52.661Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-08 runner legacy and malformed-media selectors passed 4/4
-state_head: cdcd1b37d3e3b1f5d0f59748223669d84e035e09
+last_activity_desc: Plan 11-09 libretro legacy selector passed 5/5 and info claims passed 2/2
+state_head: 7ef84fb75b62ef8bc2cf0e49ac199108079d89c4
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 61
-  completed_plans: 57
+  completed_plans: 58
   percent: 40
 ---
 
@@ -26,16 +26,27 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plans 05, 06, 07, 08 and 13 are complete; dependency-ready Plan 09 is next
+**Current focus:** Phase 11 — Plans 05, 06, 07, 08, 09 and 13 are complete; Plan 10 is next
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 9 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 09 is next)
+Current Plan: 10 of 13 (ready; Plan 02 is closed by evidence-based deferral)
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-22 -- Plan 11-08 runner legacy and malformed-media selectors passed 4/4
+Last activity: 2026-11-22 -- Plan 11-09 libretro legacy selector passed 5/5 and info claims passed 2/2
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 Plan 11-09 execution (2026-11-22)
+
+Runtime/model: Codex with OpenGSD 1.20.0; configured executor model `gpt-6-luna`; primary runtime model ID unavailable.
+Measured duration was 26 minutes (2026-11-22T16:47:08Z–17:13:00Z). Four task commits are recorded in
+`11-09-SUMMARY.md`. The inventory and fixed line-budget preflights passed at 3899/3901. The targeted host,
+libretro, card-test and fixture build exited 0. The `disc.image.ccd` + `libretro.content.legacy` selector passed
+5/5 in 10.04 seconds, including legacy preflight/parity, the existing Q/GetlocP vector, both source-CUE
+comparisons, rejected replacement preservation and disk replacement. The two info-claim tests passed 2/2 in
+0.31 seconds. Both TDD RED records passed `gsd-tools check tdd-red-evidence`; no hosted CI, Docker or broad
+suite was run. ECM-01 and CCD-01 remain phase-level requirements pending remaining plans and final verification.
 
 ### Phase 11 Plan 11-02 budget disposition (2026-11-22)
 
@@ -1105,6 +1116,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P06 | 27min | 2 tasks | 2 files |
 | Phase 11 P07 | 48m | 2 tasks | 8 files |
 | Phase 11 P08 | 33m32s | 2 tasks | 4 files |
+| Phase 11 P09 | 26m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -1524,6 +1536,7 @@ Recent decisions affecting current work:
 - [Phase 11]: Compare save/content identity through the IMG-backed CUE view and independently compare all CloneCD SUB bytes.
 - [Phase 11]: Runner probes ECM-containing CUEs through the shared image reader; ordinary raw CUE handling remains unchanged.
 - [Phase 11]: Compare CCD save identity only against a matching SUB base; keep generated SUB byte parity as a separate check.
+- [Phase 11]: Libretro runtime and generated metadata advertise ECM and CCD from the same inventory-backed loader, retaining the CHD conditional.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1771,8 +1784,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T16:39:16.971Z
-Stopped at: Completed 11-08-PLAN.md
+Last session: 2026-11-22T17:12:52.498Z
+Stopped at: Completed 11-09-PLAN.md
 Resume file: None
 
 ### v1.0 session history
