@@ -63,6 +63,8 @@ schway_disc_image_status schway__disc_ecm_open(const char *path,
 {
     FILE *file;
     uint8_t signature[4];
+    uint8_t record_count;
+    unsigned int count_bytes = 1u;
     uint64_t file_bytes;
     if (out != NULL) *out = NULL;
     if (path == NULL || path[0] == '\0' || out == NULL) {
@@ -99,11 +101,34 @@ schway_disc_image_status schway__disc_ecm_open(const char *path,
         return schway__disc_ecm_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                       "ECM signature is invalid");
     }
-    (void)fclose(file);
     if (file_bytes == sizeof(signature)) {
+        (void)fclose(file);
         return schway__disc_ecm_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                                       "ECM record stream is truncated");
     }
+    if (fread(&record_count, 1u, 1u, file) != 1u) {
+        schway_disc_image_status status = ferror(file) != 0 ?
+            SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+        (void)fclose(file);
+        return schway__disc_ecm_error(error, status,
+                                      "ECM record count is truncated");
+    }
+    while ((record_count & 0x80u) != 0u) {
+        if (count_bytes >= 10u) {
+            (void)fclose(file);
+            return schway__disc_ecm_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                          "ECM record count is too long");
+        }
+        if (fread(&record_count, 1u, 1u, file) != 1u) {
+            schway_disc_image_status status = ferror(file) != 0 ?
+                SCHWAY_DISC_IMAGE_IO : SCHWAY_DISC_IMAGE_BAD_IMAGE;
+            (void)fclose(file);
+            return schway__disc_ecm_error(error, status,
+                                          "ECM record count is truncated");
+        }
+        count_bytes++;
+    }
+    (void)fclose(file);
     return schway__disc_ecm_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
                                   "ECM records are not yet validated");
 }
