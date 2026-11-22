@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 5 of 13 (ready; Plan 02 closed by evidence-based deferral; Plan 05 next)
-status: in_progress
-stopped_at: Completed Plan 11-02 budget disposition; Plan 05 is ready to execute
-last_updated: "2026-11-22T14:02:39.000Z"
+current_plan: 6 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 06 is next)
+status: executing
+stopped_at: Completed 11-05-PLAN.md
+last_updated: "2026-11-22T14:33:34.320Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-02 closed by cap-based deferral; 3898-line preflight and classifier selector passed
-state_head: 6696aec487d4865ea78e4f7f353bfcd310098a20
+last_activity_desc: Plan 11-05 completed; modeled ECM and ECM-backed CUE selectors passed
+state_head: 90cc6d1e458525126ce7f7cc3c1b0150ac85aa9e
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 61
-  completed_plans: 53
+  completed_plans: 54
   percent: 40
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — the D-08 Nightly shortcut is deferred under D-12; Plan 05 is next and Plan 13 is complete
+**Current focus:** Phase 11 — Plan 05 is complete, Plan 13 is complete, and dependency-ready Plan 06 is next
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 5 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 05 is next)
+Current Plan: 6 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 06 is next)
 Total Plans in Phase: 13
-Status: In progress
-Last activity: 2026-11-22 -- Plan 11-02 recorded the D-08 deferral; current classifier and cap checks passed
+Status: Ready to execute
+Last activity: 2026-11-22 -- Plan 11-05 modeled ECM and CUE tests passed
 Progress: [████░░░░░░] 40% (4/10 phases released)
 
 ### Phase 11 Plan 11-02 budget disposition (2026-11-22)
@@ -57,12 +57,24 @@ The 3,898/3,901 line-budget preflight, sorted inventory and selector discovery p
 focused CCD target build passed; the red JUnit evidence checker returned `RED_EVIDENCE_OK` for the dangling-SUB
 canonicalization status assertion. The rebuilt and committed CCD selector passed 1/1, including optional SUB,
 path escape and active-reader preservation cases. No broad suite, Windows/WASI hosted lane, Act job or hosted CI
-was run. Plan 13 is complete; Plan 02 remains blocked at 3928/3901. Plan 05 is runnable independently of Plan 13;
-the owner/orchestrator acts next on the Plan 02 budget audit and dependency-ready execution.
+was run. Plan 13 and Plan 05 are complete. Plan 02 is closed as an evidence-based D-08 deferral; D-12 leaves the
+full Nightly route and all cases intact. Plan 06 is next after its Plan 05 and Plan 13 dependencies.
 
 ### Phase 11 Plan 11-04 execution and split (2026-11-22)
 
-Runtime/model: OpenGSD 1.20.0; executor `gpt-6-luna` (xhigh), planning follow-up `gpt-6-luna` (high). Plan 11-04 Task 1 took about 33 minutes; its exact start time was not retained. RED `5780f40` and implementation `043403f` are committed. Post-commit CI-preset configure and target build exited 0; the focused CCD, CUE-rejection and playlist selector passed 3/3. No broad suite or hosted CI was run. The unstarted companion confinement, SUB/missing-file, IO and failure-atomic scope was moved to Plan 13 so the verified work remains intact and Plan 11-04 stays within the 30-minute plan rule. Plan 11-06 now depends on Plan 13 and moves to Wave 5; Plan 11-05 is independent of Plan 13 in Wave 4. Plan 11-02 remains blocked at 3928/3901 counted lines; neither its budget nor its cases changed. The independent plan-split review passed, and `11-04-SUMMARY.md` now records the verified slice. Next: audit the counted controls for a semantics-preserving 27-line reduction to unblock Plan 02 while continuing dependency-ready work in Plans 05 and 13. Planning split duration was not measured.
+Runtime/model: OpenGSD 1.20.0; executor `gpt-6-luna` (xhigh), planning follow-up `gpt-6-luna` (high). Plan 11-04 Task 1 took about 33 minutes; its exact start time was not retained. RED `5780f40` and implementation `043403f` are committed. Post-commit CI-preset configure and target build exited 0; the focused CCD, CUE-rejection and playlist selector passed 3/3. No broad suite or hosted CI was run. The unstarted companion confinement, SUB/missing-file, IO and failure-atomic scope was moved to Plan 13 so the verified work remains intact and Plan 11-04 stays within the 30-minute plan rule. Plan 11-06 depends on Plans 11-05 and 11-13 and moves to Wave 5. Plan 11-02 is closed as a D-08 deferral under D-12; the full Nightly route and all cases remain unchanged. The independent plan-split review passed, and `11-04-SUMMARY.md` records the verified slice. Next: complete dependency-ready Plan 06. Planning split duration was not measured.
+
+### Phase 11 Plan 11-05 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 GSD executor, `gpt-6-luna` xhigh. Plan 05 took 29 minutes, from
+2026-11-22T14:05:13Z to 14:34:10Z, and changed five files. Task commits are `8afd490` (modeled RED),
+`10c9bd7` (modeled GREEN), `3b23e90` (CUE RED), and `90cc6d1` (CUE GREEN). The 3,898/3,901 line-budget,
+sorted inventory and selector preflights passed. Both intentional RED runs exited 8 and passed the RED evidence
+classifier; configure and focused builds passed. The final ECM/CUE/playlist selector passed 9/9, then the ECM
+selector passed 1/1 after duplicate-source coverage. No hosted CI or broad suite ran. ECM type 1–3 records now
+match independent trailer vectors, checkpoint reads and the full decoded EDC. Raw MODE2/2352 and AUDIO CUE
+sources use decoded extents and preserve the raw CUE TOC and boundary reads; cooked ECM CUE sources are rejected.
+ECM-01 remains incomplete until phase-level verification. Plan 06 is dependency-ready; no user action is needed.
 
 ### Phase 11 Plan 11-01 execution (2026-11-22)
 
@@ -76,7 +88,7 @@ classifier exited 0 with `RED_EVIDENCE_OK`. The committed-state tracer rerun exi
 build, and the two focused tests completed in under one second; evidence/commit bookkeeping was the
 longer part of the plan. No hosted CI run was started. The intentionally incomplete positive ECM/CCD
 provider seams are listed in `.planning/WINDOWS.md` and owned by Plans 03/04. ECM-01 and CCD-01 remain
-incomplete until phase-level verification. Plan 02 is next; no user action is needed.
+incomplete until phase-level verification. Plan 02 is closed as a D-08 deferral under D-12; Plan 06 is next.
 
 ### Phase 11 Plan 11-03 execution (2026-11-22)
 
@@ -90,8 +102,8 @@ then the ECM target build and ECM bounds CTest (1/1). Inventory ordering, focuse
 `git diff --check`, and the 3898/3901 line budget also exited 0. The two planned RED CTest commands
 exited 8 on their expected assertions and both `tdd-red-evidence` checks exited 0. No hosted CI run
 was started. Literal type-0 direct and M3U ECM reading is implemented; ECM-01 remains incomplete
-pending phase scope and final verification. Plan 02 remains over the cap at 3928/3901; Plan 04's
-dependencies are met and it can proceed while the Plan 02 blocker remains open.
+pending phase scope and final verification. Plan 02 was closed as an evidence-based D-08 deferral;
+Plan 04 continued independently and Plans 05 and 13 are now complete.
 
 ### Phase 11 planning (2026-11-22)
 
@@ -105,7 +117,7 @@ The 3901-line cap, generic SPDX deferral, separate Main/Release checks and cheap
 No source implementation or hosted run was performed. The independent checker passed after adding explicit
 CHD-ON consumer and installed-SDL2 example verification. Decision and post-planning coverage gates pass;
 the unchanged counted source was exactly 3901/3901 lines. Planning duration was not reliably measured.
-Plan 11-01 has since completed; Plan 02 is ready to execute.
+Plan 11-01 has since completed; Plan 02 is closed as a D-08 deferral under D-12. Plan 06 is next.
 
 ### Phase 11 discussion (2026-11-22)
 
@@ -1047,6 +1059,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P01 | 37min | 3 tasks | 10 files |
 | Phase 11 P03 | 36min | 2 tasks | 5 files |
 | Phase 11 P13 | 11min | 1 tasks | 2 files |
+| Phase 11 P05 | 29min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1459,6 +1472,7 @@ Recent decisions affecting current work:
 - [Phase 11]: Workflow assertions were consolidated while preserving all controls under the unchanged 3901-line cap.
 - [Phase 11]: Type-0 ECM literal streams are the supported direct and M3U path in Plan 11-03; ECM remains unsupported as a CUE source until Plan 11-05.
 - [Phase 11]: The ECM open scan validates exact extent and global EDC before publishing; checkpoint memory and per-read work use independent fixed bounds.
+- [Phase 11]: Keep ECM type 2/3 output at 2336 bytes and require CUE raw 2352 geometry so no missing sector header is invented.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1499,7 +1513,7 @@ Recent decisions affecting current work:
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
 - [Phase 7]: Closed; hosted verification, main CI, release v0.7.0 and triage artifact passed. Follow-up efficiency investigation is in todo 050, bound to Phase 9.
-- Plan 11-02 route-control draft is 3928/3901 counted lines, exceeding the fixed cap by 27; no configure/build ran. Preserve every routing case and resolve with semantics-preserving consolidation or a re-plan.
+- [Phase 11]: D-08's Nightly shortcut is deferred under D-12; the full Nightly route and all cases remain active. This is a closed scope disposition, not an active blocker.
 
 ### Quick Tasks Completed
 
@@ -1706,9 +1720,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T13:33:34.181Z
-Stopped at: Completed Plan 11-13; Plan 11-02 remains over cap and Plan 05 is runnable
-Resume file: None
+Last session: 2026-11-22T14:33:34.084Z
+Stopped at: Completed 11-05-PLAN.md
+Resume file: .planning/phases/11-ecm-and-clonecd-images/11-06-PLAN.md
 
 ### v1.0 session history
 
