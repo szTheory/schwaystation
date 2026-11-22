@@ -24,7 +24,7 @@ schway_warnings(schwaystation_libretro)
 # taken from version.txt. Project the optional CHD provider from the host
 # target's actual link closure, not just the requested option.
 get_target_property(info_disc_image_links schwaystation_disc_image LINK_LIBRARIES)
-set(SCHWAYSTATION_INFO_EXTENSIONS "exe|psexe|cue|iso|m3u|pbp")
+set(SCHWAYSTATION_INFO_EXTENSIONS "exe|psexe|cue|iso|m3u|pbp|ecm|ccd")
 set(SCHWAYSTATION_INFO_LICENSE "CC BY-SA 4.0, ISC, MIT")
 set(SCHWAYSTATION_INFO_DESCRIPTION "Sony PlayStation core. Loads PS-EXE homebrew, cue/ISO/M3U discs, and supported unencrypted single-data-track PSISO PBP images.")
 set(SCHWAYSTATION_INFO_CHD FALSE)
