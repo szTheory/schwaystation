@@ -2,10 +2,17 @@
 disc.cnf	disc,portable
 disc.fixture.audio	disc,portable
 disc.fixture.boot	disc,portable
+disc.fixture.ccd.audio	disc,portable
+disc.fixture.ccd.boot	disc,portable
+disc.fixture.ccd.fmv	disc,portable
+disc.fixture.ccd.read	disc,portable
 disc.fixture.chd.audio	disc,portable
 disc.fixture.chd.boot	disc,portable
 disc.fixture.chd.fmv	disc,portable
 disc.fixture.chd.read	disc,portable
+disc.fixture.ecm.boot	disc,portable
+disc.fixture.ecm.fmv	disc,portable
+disc.fixture.ecm.read	disc,portable
 disc.fixture.fmv	disc,portable
 disc.fixture.pbp.boot	disc,portable
 disc.fixture.pbp.fmv	disc,portable

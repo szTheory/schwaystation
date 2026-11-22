@@ -394,6 +394,52 @@ set_tests_properties(disc.fixture.pbp.boot disc.fixture.pbp.read PROPERTIES
 set_tests_properties(disc.fixture.pbp.fmv PROPERTIES
   FIXTURES_REQUIRED "disc_pbp_preflight;disc_pbp_parity;compat_features_preflight;disc_fmv_predicates")
 
+# The owned ECM fixture is a 64-sector single-data image; it has no CD-DA
+# track. The owned CloneCD fixture preserves the mixed 64-data/158-audio source.
+foreach(case boot read fmv)
+  set(timeout 300)
+  set(extra_args)
+  if(case STREQUAL "boot")
+    set(timeout 180)
+  endif()
+  if(case STREQUAL "fmv")
+    set(extra_args "${PROJECT_BINARY_DIR}/disc/predicates.txt")
+  endif()
+  schway_add_test(NAME disc.fixture.ecm.${case}
+    COMMAND schwaystation-test-disc-fixture ${case}
+      "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+      "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy_modeled.ecm"
+      "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+      "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+      ${extra_args}
+    LABELS disc portable TIMEOUT ${timeout})
+endforeach()
+foreach(case boot read audio fmv)
+  set(timeout 300)
+  set(extra_args)
+  if(case STREQUAL "boot")
+    set(timeout 180)
+  endif()
+  if(case STREQUAL "fmv")
+    set(extra_args "${PROJECT_BINARY_DIR}/disc/predicates.txt")
+  endif()
+  schway_add_test(NAME disc.fixture.ccd.${case}
+    COMMAND schwaystation-test-disc-fixture ${case}
+      "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+      "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy.ccd"
+      "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+      "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+      ${extra_args}
+    LABELS disc portable TIMEOUT ${timeout})
+endforeach()
+set_tests_properties(disc.fixture.ecm.fmv disc.fixture.ccd.fmv PROPERTIES
+  FIXTURES_REQUIRED "compat_features_preflight;disc_fmv_predicates")
+set_tests_properties(disc.fixture.ecm.boot disc.fixture.ecm.read
+  disc.fixture.ccd.boot disc.fixture.ccd.read disc.fixture.ccd.audio PROPERTIES
+  FIXTURES_REQUIRED compat_features_preflight)
+
 set_tests_properties(disc.image.legacy_preflight PROPERTIES
   FIXTURES_SETUP disc_legacy_preflight)
 set_tests_properties(disc.image.legacy_parity PROPERTIES
