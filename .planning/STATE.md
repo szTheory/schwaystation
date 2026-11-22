@@ -7,10 +7,10 @@ current_phase_name: ECM and CloneCD images
 current_plan: 7 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 07 is next)
 status: executing
 stopped_at: Completed 11-06-PLAN.md
-last_updated: "2026-11-22T15:01:21.798Z"
+last_updated: "2026-11-22T15:03:58.080Z"
 last_activity: 2026-11-22
 last_activity_desc: Plan 11-06 completed; mixed-track CCD and exact SUB selector passed
-state_head: a67d50351bde0bfb2c0f384042f423fffda362e3
+state_head: dcd88d1bfee3066e7c940695a35fa7dd08dc5dd7
 progress:
   total_phases: 10
   completed_phases: 4
@@ -79,8 +79,8 @@ ECM-01 remains incomplete until phase-level verification. Plan 06 is dependency-
 ### Phase 11 Plan 11-06 execution (2026-11-22)
 
 Runtime/model: OpenGSD 1.20.0 Codex executor, configured `gpt-6-luna` xhigh; the primary runtime model
-identifier is not exposed. Plan 06 took 19 minutes 2 seconds, from 2026-11-22T14:36:57Z to
-14:55:59Z, and changed two source/test files. Task commits are `b13e65f` (track-boundary RED),
+identifier is not exposed. Plan 06 took about 27 minutes overall, from 2026-11-22T14:36:57Z through
+2026-11-22T15:03:34Z; implementation took about 19 minutes and changed two source/test files. Task commits are `b13e65f` (track-boundary RED),
 `37f3efe` (track/index GREEN), `0e55424` (SUB/Q RED), and `065b064` (SUB transpose GREEN). The
 3,898/3,901 line-budget preflight, sorted disc inventory, exact CCD selector discovery and diff checks
 passed. Both planned RED CTest runs exited 8 on their expected behavior assertions and their JUnit
@@ -1075,7 +1075,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P03 | 36min | 2 tasks | 5 files |
 | Phase 11 P13 | 11min | 1 tasks | 2 files |
 | Phase 11 P05 | 29min | 2 tasks | 5 files |
-| Phase 11 P06 | 19min | 2 tasks | 2 files |
+| Phase 11 P06 | 27min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1738,7 +1738,7 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T15:01:21.478Z
+Last session: 2026-11-22T15:03:57.789Z
 Stopped at: Completed 11-06-PLAN.md
 Resume file: .planning/phases/11-ecm-and-clonecd-images/11-07-PLAN.md
 

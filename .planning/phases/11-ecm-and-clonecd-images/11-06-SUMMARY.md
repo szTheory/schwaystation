@@ -47,7 +47,7 @@ coverage:
         ref: "ctest --preset ci --no-tests=error -R '^disc[.]image[.]ccd$' --output-on-failure"
         status: pass
     human_judgment: false
-duration: 19min
+duration: 27min
 completed: 2026-11-22
 status: complete
 ---
@@ -58,11 +58,11 @@ status: complete
 
 ## Performance
 
-- **Duration:** 19 minutes, from 2026-11-22T14:36:57Z to 2026-11-22T14:55:59Z.
+- **Duration:** About 27 minutes, from 2026-11-22T14:36:57Z through final state closeout at 2026-11-22T15:03:34Z.
 - **Runtime/model:** OpenGSD 1.20.0 Codex executor, configured `gpt-6-luna` xhigh; primary runtime model identifier is not exposed.
 - **Tasks:** 2.
 - **Files modified:** 2.
-- **Bottleneck:** CCD grammar/index reconciliation and independent byte-vector checks; configure, target builds, and focused CTest completed in seconds.
+- **Bottleneck:** CCD grammar/index reconciliation and independent byte-vector checks took about 19 minutes; configure, target builds, and focused CTest completed in seconds, with the remaining time spent on summary/state closeout.
 
 ## Accomplishments
 
