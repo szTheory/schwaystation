@@ -12,6 +12,7 @@ disc.fixture.pbp.fmv	disc,portable
 disc.fixture.pbp.read	disc,portable
 disc.fixture.read	disc,portable
 disc.hash	disc,portable
+disc.image.ccd	disc,portable
 disc.image.chd_boundaries	disc,portable
 disc.image.chd_headers	disc,portable
 disc.image.chd_metadata	disc,portable
@@ -25,6 +26,7 @@ disc.image.cue_pregap	disc,portable
 disc.image.cue_reject	disc,portable
 disc.image.cue_root_child	disc,portable
 disc.image.cue_symlink	disc,portable
+disc.image.ecm	disc,portable
 disc.image.iso_limits	disc,portable
 disc.image.iso_sector	disc,portable
 disc.image.pbp_boundaries	disc,portable
