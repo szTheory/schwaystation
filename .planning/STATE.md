@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 15 of 15 (Plan 14 complete; Plan 15 installed-example and CHD-ON checks are next)
-status: executing
-stopped_at: Completed 11-14-PLAN.md
-last_updated: "2026-11-22T20:00:41.791Z"
+current_plan: 15 of 15 (all implementation plans complete; code review and final exact-head verification remain)
+status: verifying
+stopped_at: Completed 11-15-PLAN.md
+last_updated: "2026-11-22T20:13:40.986Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-14 CHD-OFF package/archive checks passed; Plan 15 is next
-state_head: 7f31a0fab3b62ad43da713bba53c3da15eb5aa34
+last_activity_desc: Plan 11-15 staged SDL2 example and focused CHD-ON checks passed; code review and final verification are next
+state_head: cbc347c8f41f7f90d1bc18bc615d34c57d5117dd
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 63
-  completed_plans: 62
+  completed_plans: 63
   percent: 40
 ---
 
@@ -26,16 +26,28 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plan 14 package evidence is complete; Plan 15 covers the installed example and CHD-ON consumers
+**Current focus:** Phase 11 implementation plans are complete; code review and final exact-head verification are next
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 15 of 15 (Plan 14 complete; Plan 15 installed-example and CHD-ON checks are next)
+Current Plan: 15 of 15 (all implementation plans complete; code review and final exact-head verification remain)
 Total Plans in Phase: 15
-Status: Ready to execute
-Last activity: 2026-11-22 -- Plan 11-14 CHD-OFF package/archive checks passed; Plan 15 is next
+Status: Ready for code review and final verification
+Last activity: 2026-11-22 -- Plan 11-15 staged SDL2 example and focused CHD-ON checks passed
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 Plan 11-15 execution (2026-11-22)
+
+Runtime/model: Codex/OpenGSD 1.20.0; configured executor `gpt-6-luna`; primary runtime model ID unavailable. Measured
+duration was 6 minutes from 2026-11-22T20:05:25Z through the plan state closeout at 20:11:54Z. The line-budget
+preflight passed at 3,899/3,901; all 10 focused selectors were discovered; installed SDL2 2.32.70 was available.
+The staged package and explicit `schwaystation_DIR` configured the SDL2 example, which built with ECM/CCD sources
+and was not launched, tested or packaged. CHD-ON configuration and runner, libretro and two provider targets built;
+the focused provider/info/install selector passed 10/10 and the compatibility feature checks passed 2/2. Local
+example/CHD-ON evidence was appended without changing hosted Main, Nightly or Release status. Requirements remain
+open. No full suite, hosted workflow or campaign ran. Task commit is `cbc347c`; code review and exact-head phase
+verification are next.
 
 ### Phase 11 Plan 11-14 execution (2026-11-22)
 
@@ -1192,6 +1204,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P10 | 1h 10m 25s | 2 tasks | 6 files |
 | Phase 11 P11 | 23m27s | 2 tasks | 8 files |
 | Phase 11 P14 | 13m | 2 tasks | 3 files |
+| Phase 11 P15 | 6m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1617,6 +1630,7 @@ Recent decisions affecting current work:
 - [Phase 11]: The owned one-data-track ECM fixture supports boot, read/replay and FMV guest predicates, but no CD-DA claim.
 - [Phase 11]: ECM and CCD compatibility rows report only local fixture, runner and libretro evidence; hosted CI, package and fuzz remain unknown until Plan 12.
 - [Phase 11]: Keep local CHD-OFF package evidence separate from unknown hosted Main, Nightly and Release evidence.
+- [Phase 11]: Record local installed-example and CHD-ON evidence separately from unknown hosted workflow results
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1864,9 +1878,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T20:00:41.623Z
-Stopped at: Completed 11-14-PLAN.md
-Resume file: 11-15-PLAN.md
+Last session: 2026-11-22T20:13:40.788Z
+Stopped at: Completed 11-15-PLAN.md
+Resume file: None
 
 ### v1.0 session history
 
