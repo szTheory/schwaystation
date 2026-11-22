@@ -137,6 +137,11 @@ uint32_t seeds_count(void) { return CCD_SEED_COUNT; }
 const char *seeds_name(uint32_t index)
 {
     if (index >= CCD_SEED_COUNT) return "invalid";
+    if (index == 0u) {
+        printf("fuzz.regress.ccd seed_count=%lu file_cap=%lu fixtures=disc_boot_legacy.ccd,disc_boot_legacy.img,disc_boot_legacy.sub\n",
+               (unsigned long)seeds_count(),
+               (unsigned long)(CCD_INPUT_MAX + CCD_TAG_BYTES));
+    }
     printf("fuzz.regress.ccd seed[%lu]=%s\n", (unsigned long)index,
            ccd_seed_names[index]);
     return ccd_seed_names[index];
@@ -303,7 +308,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     if (mode == CCD_ESCAPE_SUB) {
         (void)remove(escape_sub);
         (void)remove(outside_sub);
-        if (!write_file(outside_sub, (const uint8_t *)"outside", 7u) ||
+        if (!copy_file(SCHWAY_FUZZ_CCD_SUB, outside_sub, CCD_MEDIA_MAX, SIZE_MAX) ||
             symlink("../outside.sub", escape_sub) != 0) {
             broken("could not create the bounded external SUB sentinel");
         }

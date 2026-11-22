@@ -291,4 +291,34 @@ if(SCHWAYSTATION_FUZZ)
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
   schway_warnings(schwaystation-fuzz-pbp)
 
+  foreach(subsystem IN ITEMS ecm ccd)
+    set(target schwaystation-fuzz-${subsystem})
+    add_executable(${target} ${fuzz_dir}/${subsystem}.c)
+    target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/host)
+    target_link_libraries(${target} PRIVATE schwaystation_disc_image)
+    add_dependencies(${target} schwaystation-legacy-disc-fixtures)
+    if(subsystem STREQUAL "ecm")
+      target_compile_definitions(${target} PRIVATE
+        "SCHWAY_FUZZ_WORK_DIR=\"${ecm_guest_work_dir}\"")
+      target_compile_definitions(${target} PRIVATE
+        "SCHWAY_FUZZ_ECM_LITERAL=\"${ecm_guest_literal_fixture}\"")
+      target_compile_definitions(${target} PRIVATE
+        "SCHWAY_FUZZ_ECM_MODELED=\"${ecm_guest_modeled_fixture}\"")
+    else()
+      target_compile_definitions(${target} PRIVATE
+        "SCHWAY_FUZZ_WORK_DIR=\"${ccd_guest_work_dir}\"")
+      target_compile_definitions(${target} PRIVATE
+        "SCHWAY_FUZZ_CCD_FIXTURE=\"${ccd_guest_fixture}\"")
+      target_compile_definitions(${target} PRIVATE
+        "SCHWAY_FUZZ_CCD_IMAGE=\"${ccd_guest_image}\"")
+      target_compile_definitions(${target} PRIVATE
+        "SCHWAY_FUZZ_CCD_SUB=\"${ccd_guest_sub}\"")
+    endif()
+    target_compile_options(${target} PRIVATE -fsanitize=fuzzer)
+    target_link_options(${target} PRIVATE -fsanitize=fuzzer)
+    set_target_properties(${target} PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+    schway_warnings(${target})
+  endforeach()
+
 endif()

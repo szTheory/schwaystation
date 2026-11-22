@@ -135,6 +135,11 @@ static uint32_t replay_seeds(const char *dir)
             (void)LLVMFuzzerTestOneInput(buf, n);
             continue;
         }
+        if (n == 0u) {
+            fprintf(stderr, SCHWAY_REPLAY_NAME ": cannot build seed %s\n", seeds_name(i));
+            free(buf);
+            return 0u;
+        }
         char path[1024];
         int len = snprintf(path, sizeof path, "%s/%s.exe", dir, seeds_name(i));
         FILE *file = len > 0 && (size_t)len < sizeof path ? schway__test_open_file(path, "wb") : NULL;

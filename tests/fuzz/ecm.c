@@ -103,6 +103,10 @@ uint32_t seeds_count(void) { return ECM_SEED_COUNT; }
 const char *seeds_name(uint32_t index)
 {
     if (index >= ECM_SEED_COUNT) return "invalid";
+    if (index == 0u) {
+        printf("fuzz.regress.ecm seed_count=%lu file_cap=%lu fixtures=disc_boot_legacy_literal.ecm,disc_boot_legacy_modeled.ecm\n",
+               (unsigned long)seeds_count(), (unsigned long)SEEDS_SIZE_MAX);
+    }
     printf("fuzz.regress.ecm seed[%lu]=%s\n", (unsigned long)index,
            ecm_seed_names[index]);
     return ecm_seed_names[index];
