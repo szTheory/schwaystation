@@ -186,9 +186,38 @@ platforms and Main/Release gates retained; complete repository checks at or belo
   2. Supported CloneCD fixtures preserve modes, indexes, pregaps, subcode and first and last sector reads through CCD and its IMG/SUB companions. Invalid companion paths are rejected before an external file is opened.
   3. The ledger records fixture results for both providers against the existing disc contract.
 
-**Plans**: TBD
+**Plans**: 12 plans
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/research/FEATURES.md`
+
+Plans:
+**Wave 1**
+- [ ] 11-01-PLAN.md — Bounded host-provider skeleton and exact inventories
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 11-02-PLAN.md — Exact metadata-only PR Nightly route with fail-closed controls
+- [ ] 11-03-PLAN.md — Validated literal ECM stream and bounded random access
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 11-04-PLAN.md — Confined CloneCD single-data-track reader
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 11-05-PLAN.md — Proven modeled ECM records and CUE source mapping
+- [ ] 11-06-PLAN.md — CloneCD indexes, pregaps and independent SUB transpose
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 11-07-PLAN.md — Owned deterministic fixtures and source-count preflight
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 11-08-PLAN.md — Runner/probe and content identity
+- [ ] 11-09-PLAN.md — Libretro loading, replacement and extension claims
+- [ ] 11-10-PLAN.md — Production fuzz replay and sanitizer targets
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 11-11-PLAN.md — Bounded guest evidence and protected provider ledger
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 11-12-PLAN.md — CI producer closure, portability and package acceptance
 
 ### Phase 12: SBI and LibCrypt
 

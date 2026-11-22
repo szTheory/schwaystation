@@ -4,17 +4,17 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: Planning
-status: planning
-stopped_at: Phase 11 context ready for plan-phase
-last_updated: "2026-11-22T01:16:58Z"
+current_plan: 1
+status: ready_to_execute
+stopped_at: Phase 11 planning complete; ready to execute Plan 01
+last_updated: "2026-11-22T01:30:50.466Z"
 last_activity: 2026-11-22
-last_activity_desc: "Recorded Phase 10 release efficiency evidence and completed Phase 11 context"
-state_head: 636ac89d4add3192520084a73fa61295a8422bbc
+last_activity_desc: Phase 11 plans passed independent review and all planning coverage gates
+state_head: 785c92d9efee4e3095e83125f9cac72c0d5ad3c3
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 48
+  total_plans: 60
   completed_plans: 48
   percent: 40
 ---
@@ -26,16 +26,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — ECM and CloneCD images; context ready for planning from the released v0.10.0 main head
+**Current focus:** Phase 11 — ECM and CloneCD images; plans passed, ready for implementation
 
 ## Current Position
 
-Phase: 11 — ECM and CloneCD images
-Current Plan: Discussion
-Total Plans in Phase: TBD
-Status: Phase 10 released; Phase 11 context ready for planning
-Last activity: 2026-11-22 -- Phase 11 discussion and adversarial pass completed
+Phase: 11 (ECM and CloneCD images) — READY TO EXECUTE
+Current Plan: 1 of 12 (ready)
+Total Plans in Phase: 12
+Status: Ready to execute
+Last activity: 2026-11-22 -- Phase 11 planning passed independent review and coverage checks
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 planning (2026-11-22)
+
+Runtime/model: Codex planner, inherited model identifier unavailable; OpenGSD 1.20.0. A dedicated
+gsd-phase-researcher established primary ECM byte-stream mapping and the independent CloneCD SUB vector.
+Twelve plans cover both requirements and every locked decision; wave ownership is recorded in
+`11-PLAN-COVERAGE.md`. All plan frontmatter/structure validators passed. The one-shot balanced-tag,
+shell-syntax, same-wave ownership, command-path and failure-direction checks passed without findings;
+the command-path probe reports CMake forms as not applicable rather than claiming target resolution.
+The 3901-line cap, generic SPDX deferral, separate Main/Release checks and cheap preflights are preserved.
+No source implementation or hosted run was performed. The independent checker passed after adding explicit
+CHD-ON consumer and installed-SDL2 example verification. Decision and post-planning coverage gates pass;
+the unchanged counted source is exactly 3901/3901 lines. Planning duration was not reliably measured.
+The orchestrator acts next with execution; no owner action is needed.
 
 ### Phase 11 discussion (2026-11-22)
 
