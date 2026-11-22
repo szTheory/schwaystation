@@ -29,6 +29,8 @@ disc.image.cue_symlink	disc,portable
 disc.image.ecm	disc,portable
 disc.image.iso_limits	disc,portable
 disc.image.iso_sector	disc,portable
+disc.image.legacy_parity	disc,portable
+disc.image.legacy_preflight	disc,portable
 disc.image.pbp_boundaries	disc,portable
 disc.image.pbp_bounds	disc,portable
 disc.image.pbp_fixture_controls	disc,portable
