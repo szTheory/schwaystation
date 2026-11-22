@@ -935,17 +935,6 @@ static int schway__path_is_cue(const char *path)
            schway__cue_word_is(dot, ".cue");
 }
 
-static int schway__path_is_unsupported(const char *path)
-{
-    const char *dot = strrchr(path, '.');
-    const char *slash = strrchr(path, '/');
-    const char *backslash = strrchr(path, '\\');
-    const char *last = slash;
-    if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
-    if (dot == NULL || (last != NULL && dot < last)) return 0;
-    return schway__cue_word_is(dot, ".ecm") || schway__cue_word_is(dot, ".ccd");
-}
-
 static int schway__path_is_pbp(const char *path)
 {
     const char *dot = strrchr(path, '.');
@@ -956,18 +945,20 @@ static int schway__path_is_pbp(const char *path)
     return dot != NULL && (last == NULL || dot > last) && schway__cue_word_is(dot, ".pbp");
 }
 
-static int schway__path_is_chd(const char *path)
+static int schway__path_is_provider_image(const char *path)
 {
     const char *dot = strrchr(path, '.');
     const char *slash = strrchr(path, '/');
     const char *backslash = strrchr(path, '\\');
     const char *last = slash;
     if (backslash != NULL && (last == NULL || backslash > last)) last = backslash;
-    return dot != NULL && (last == NULL || dot > last) && schway__cue_word_is(dot, ".chd");
+    return dot != NULL && (last == NULL || dot > last) &&
+           (schway__cue_word_is(dot, ".chd") || schway__cue_word_is(dot, ".ecm") ||
+            schway__cue_word_is(dot, ".ccd"));
 }
 
-static schway_host_disc_probe_status schway__chd_source(const char *path,
-                                                         schway__iso_source *source)
+static schway_host_disc_probe_status schway__provider_source(const char *path,
+                                                              schway__iso_source *source)
 {
     schway_disc_image_error error;
     schway_toc toc;
@@ -1079,11 +1070,10 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
     long end;
     int is_cue;
     if (path == NULL || out == NULL) return SCHWAY_HOST_DISC_PROBE_IO;
-    if (schway__path_is_unsupported(path)) return SCHWAY_HOST_DISC_PROBE_UNSUPPORTED;
     memset(&source, 0, sizeof source);
     is_cue = schway__path_is_cue(path);
-    if (schway__path_is_chd(path)) {
-        status = schway__chd_source(path, &source);
+    if (schway__path_is_provider_image(path)) {
+        status = schway__provider_source(path, &source);
         if (status != SCHWAY_HOST_DISC_PROBE_OK) {
             schway_disc_image_close(source.image);
             return status;
