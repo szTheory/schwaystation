@@ -89,9 +89,9 @@ owned compressed fixture and a run-generated one-block raw image, then applies a
 the checked corpus contains no disc bytes. The sanitizer input is capped at 256 bytes, which bounds mutation
 work while still covering PSAR markers, TOC fields, block extents and compressed payloads. Nightly's exact
 PBP-only route skips the CHD generator/baseline and non-PBP fuzz targets, but still builds PBP's shared disc
-fixture dependencies and runs only this 60-second campaign. Full Nightly runs keep all existing campaigns and
-add PBP as the seventh media campaign. This routing saves unrelated campaign/build work only when the classifier
-proves the change affects PBP alone.
+fixture dependencies and runs only this 60-second campaign. Full Nightly retains every existing campaign and adds
+ECM and CloneCD as the eighth and ninth media campaigns. This routing saves unrelated campaign/build work only
+when the classifier proves the change affects PBP alone.
 
 `disc.image.pbp_inflate` exercises the standalone raw-block wrapper with fixed stored and Huffman streams. It
 requires terminal success, exact compressed-input consumption and exact output length; malformed, truncated,

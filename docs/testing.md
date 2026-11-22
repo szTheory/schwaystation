@@ -41,7 +41,7 @@ persistence preflight before the longer portable suite.
 | `ci-msvc` | The same with MSVC and the static C runtime. | `ci` | all but `release` |
 | `hygiene` | The repository is clean: tree scan, BIOS and executable bytes, the integer-only text scan, titles, the publish script, the workflow's timeouts and action pins, and the gate-line and end-to-end budgets. | `hygiene` | `hygiene` |
 | `asan` | No memory or undefined-behaviour fault, with clang-21's AddressSanitizer and UndefinedBehaviorSanitizer; any finding stops the test. | `ci` | all but `abi` and `release`, whose binary-shape checks the instrumentation changes |
-| `fuzz` | The executable loader plus five disc/MDEC parser campaigns and replay targets, built with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binaries. | `asan` | none |
+| `fuzz` | The executable loader plus nine disc-media parser campaigns and replay targets, built with clang-21, AddressSanitizer and UndefinedBehaviorSanitizer. Configure and build only: the nightly job runs the binaries. | `asan` | none |
 | `nofp` | The core uses no floating point: GCC's `-mgeneral-regs-only` rejects any floating-point type in it. | `nofp` | `abi` |
 | `be32` | The same hashes on a big-endian, 32-bit target with unsigned `char`: 32-bit PowerPC (`cmake/toolchains/ppc-linux-gnu.cmake`) under `qemu-ppc`. | `ci` | `portable` |
 | `wasm32` | The same hashes in WebAssembly: clang-21 for `wasm32-wasi` (`cmake/toolchains/wasm32-wasi.cmake`) under the pinned wasmtime. CI runs `cmake --workflow --preset wasm32-build`, measures the linked module, then runs `ctest --preset wasm32-preflight` and the full `ctest --preset wasm32` suite. WASI cannot load a libretro core, so this lane builds none. | `wasm32` | `portable` |
@@ -164,7 +164,7 @@ names each by its git blob SHA-1 (`r3000-<NAME>` rows). Fetch a file with
 `SCHWAYSTATION_SST_DIR` lacks, so the lane never skips. The harness's `--upstream DIR --prefix-of SAMPLE` reads
 them and fails unless the first records of each equal the committed sample. The `vectors-full` job in
 `nightly.yml` does this on a schedule; it reports through the nightly issue and is not part of `CI required`. The
-workflow's other jobs, the benches and the six bounded fuzz campaigns below, report the same way and also sit outside
+workflow's other jobs, the benches and the bounded fuzz campaigns below, report the same way and also sit outside
 `CI required`.
 
 ### GPU hardware references
@@ -314,9 +314,11 @@ device decodes), so no seed byte is committed.
 which has no fuzzing engine and so runs on every leg, `be32` and `wasm32` included. It gates like any other test.
 The loader campaign is the report-only half: the `fuzz` job in `nightly.yml` writes the seeds with
 `schwaystation-fuzz-exe-replay --write DIR`, checks their count, and runs `schwaystation-fuzz-exe` for 60 seconds
-with `-max_len=2099200`. It also checks seed counts before running five 60-second campaigns: CUE (5 seeds,
-`-max_len=65536`), CNF (5, `4096`), M3U (7, `65536`), CD-ROM (15, `16384`) and MDEC (6, `262144`). A crash
-fails the job, which opens or updates the nightly issue and blocks nothing.
+with `-max_len=2099200`. It checks the source fixtures, replay selectors, seed counts and per-file caps before
+running nine 60-second media campaigns: CUE (5 seeds, `65536`), CNF (5, `4096`), M3U (7, `65536`), CD-ROM (15,
+`16384`), CHD (12, `16384`), MDEC (6, `262144`), PBP (14, `256`), ECM (10, `2101249`) and CloneCD (10,
+`65536`). ECM seeds are capped at 2,099,201 bytes and CloneCD seeds at 65,541 bytes. A crash fails the job, which
+opens or updates the nightly issue and blocks nothing.
 
 To keep a crasher, minimise it (`schwaystation-fuzz-exe -minimize_crash=1 -runs=100000 FILE`), commit it as
 `tests/fuzz/regress/<name>.hex` (hexadecimal text; whitespace and `#` comments are skipped) with its fix, and add its

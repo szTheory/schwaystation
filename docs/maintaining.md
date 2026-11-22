@@ -203,8 +203,9 @@ failed/timed-out classifier job also fall back to full. Schedule and manual runs
 these decisions; `act --dryrun` checks job wiring but cannot call GitHub's PR files API or prove its outputs.
 
 Two more jobs in the same workflow report through the same issue and are not part of `CI required`: `vectors-full`
-replays all 55,000 public CPU vectors at their pin, and `fuzz` runs the loader's fuzz target for 60 seconds. Both are
-described in [testing.md](testing.md#the-full-vectors); a red one is a finding to fix, not a block on a merge.
+replays all 55,000 public CPU vectors at their pin, and `fuzz` replays the loader and nine media seed sets before
+running the loader and media campaigns for 60 seconds each. See [the fuzz target notes](testing.md#fuzz-targets);
+a red one is a finding to fix, not a block on a merge.
 
 ## Phase-1 CI tail (complete)
 

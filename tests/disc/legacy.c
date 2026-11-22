@@ -136,13 +136,20 @@ static int field_matches_hash(const char *manifest, const char *key,
 static int read_manifest(const char *path, char **manifest)
 {
     uint8_t *bytes = NULL;
+    uint8_t *terminated;
     size_t size = 0u;
     if (!read_bytes(path, &bytes, &size) || size == 0u ||
         memchr(bytes, '\0', size) != NULL) {
         free(bytes);
         return 0;
     }
-    *manifest = (char *)bytes;
+    terminated = (uint8_t *)realloc(bytes, size + 1u);
+    if (terminated == NULL) {
+        free(bytes);
+        return 0;
+    }
+    terminated[size] = '\0';
+    *manifest = (char *)terminated;
     return 1;
 }
 

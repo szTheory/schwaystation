@@ -436,6 +436,12 @@ jobs:
           case "$state_bytes" in ''|0|0*|*[!0123456789]*) printf '%s\n' 'quality: state_bytes must be a positive integer' >&2; exit 1;; esac
           cmake "-DQUALITY=${QUALITY_FILE:-quality.json}" -DMETRIC=state.bytes "-DMEASURED=$state_bytes" -P tests/cmake/quality.cmake
           # QUALITY_STATE_BYTES_END
+      - name: Build legacy disc image fixtures
+        env:
+          SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/${{ matrix.preset }}/disc-media
+        run: |
+          cmake --preset ${{ matrix.preset }}
+          cmake --build build/${{ matrix.preset }} --target schwaystation-legacy-disc-fixtures
       - name: Build, test, package
         env:
           COMPAT_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
@@ -544,7 +550,7 @@ jobs:
         env:
           SCHWAYSTATION_DISC_MEDIA_DIR: ${{ github.workspace }}/build/asan/disc-media
         run: |
-          cmake --build --preset asan --target schwaystation-disc-fixtures
+          cmake --build --preset asan --target schwaystation-disc-fixtures schwaystation-legacy-disc-fixtures
           cmake -DCHD_TOOL=build/chd-tool/tools/schwaystation-chd-tool \
             -DCUE=build/asan/fixtures/disc_boot.cue \
             -DOUTPUT_CHD=build/asan/fixtures/disc_boot.chd \
@@ -618,7 +624,7 @@ jobs:
         run: |
           set -eu
           cmake --preset be32-chd
-          cmake --build build/be32 --target schwaystation-disc-fixtures
+          cmake --build build/be32 --target schwaystation-disc-fixtures schwaystation-legacy-disc-fixtures
           cmake -DCHD_TOOL=build/be32/tests/schwaystation-chd-tool \
             -DCUE=build/be32/fixtures/disc_boot.cue \
             -DOUTPUT_CHD=build/be32/fixtures/disc_boot.chd \
@@ -703,7 +709,7 @@ jobs:
         run: |
           set -eu
           cmake --preset wasm32-chd
-          cmake --build build/wasm32 --target schwaystation-disc-fixtures
+          cmake --build build/wasm32 --target schwaystation-disc-fixtures schwaystation-legacy-disc-fixtures
           cmake -DCHD_TOOL=build/wasm32/tests/schwaystation-chd-tool \
             -DCUE=build/wasm32/fixtures/disc_boot.cue \
             -DOUTPUT_CHD=build/wasm32/fixtures/disc_boot.chd \
