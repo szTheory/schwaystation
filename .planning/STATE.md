@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 6 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 06 is next)
+current_plan: 7 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 06 is next)
 status: executing
-stopped_at: Completed 11-05-PLAN.md
-last_updated: "2026-11-22T14:33:34.320Z"
+stopped_at: Completed 11-06-PLAN.md
+last_updated: "2026-11-22T14:57:56.274Z"
 last_activity: 2026-11-22
 last_activity_desc: Plan 11-05 completed; modeled ECM and ECM-backed CUE selectors passed
-state_head: 90cc6d1e458525126ce7f7cc3c1b0150ac85aa9e
+state_head: 065b064b0e6ee6c8986d9ff2f5d0508418d91298
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 61
-  completed_plans: 54
+  completed_plans: 55
   percent: 40
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 6 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 06 is next)
+Current Plan: 7 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 06 is next)
 Total Plans in Phase: 13
 Status: Ready to execute
 Last activity: 2026-11-22 -- Plan 11-05 modeled ECM and CUE tests passed
@@ -1060,6 +1060,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P03 | 36min | 2 tasks | 5 files |
 | Phase 11 P13 | 11min | 1 tasks | 2 files |
 | Phase 11 P05 | 29min | 2 tasks | 5 files |
+| Phase 11 P06 | 19min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1473,6 +1474,8 @@ Recent decisions affecting current work:
 - [Phase 11]: Type-0 ECM literal streams are the supported direct and M3U path in Plan 11-03; ECM remains unsupported as a CUE source until Plan 11-05.
 - [Phase 11]: The ECM open scan validates exact extent and global EDC before publishing; checkpoint memory and per-read work use independent fixed bounds.
 - [Phase 11]: Keep ECM type 2/3 output at 2336 bytes and require CUE raw 2352 geometry so no missing sector header is invented.
+- [Phase 11]: Plan 11-06 maps an omitted INDEX 0 to INDEX 1, preserving no stored pregap without inventing geometry.
+- [Phase 11]: Plan 11-06 accepts nonempty SUB only at exactly 96 bytes per IMG sector; missing or empty SUB remains zero-filled.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1720,9 +1723,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T14:33:34.084Z
-Stopped at: Completed 11-05-PLAN.md
-Resume file: .planning/phases/11-ecm-and-clonecd-images/11-06-PLAN.md
+Last session: 2026-11-22T14:57:56.085Z
+Stopped at: Completed 11-06-PLAN.md
+Resume file: .planning/phases/11-ecm-and-clonecd-images/11-07-PLAN.md
 
 ### v1.0 session history
 
