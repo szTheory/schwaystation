@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 10 of 13 (ready; Plan 02 is closed by evidence-based deferral)
+current_plan: 11 of 13 (ready; Plan 02 is closed by evidence-based deferral)
 status: executing
-stopped_at: Completed 11-09-PLAN.md
-last_updated: "2026-11-22T17:15:27.456Z"
+stopped_at: Completed 11-10-PLAN.md
+last_updated: "2026-11-22T18:27:35.786Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-09 libretro legacy selector passed 5/5 and info claims passed 2/2
-state_head: cb5ccaebfec2cbbef452e01f57b2290d4200d572
+last_activity_desc: Plan 11-10 ECM/CCD replay selector passed 4/4 and Clang 21 campaign targets built
+state_head: 2aee10a4607ac332c6b263e881f7f29137e27a2c
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 61
-  completed_plans: 58
+  completed_plans: 59
   percent: 40
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plans 05, 06, 07, 08, 09 and 13 are complete; Plan 10 is next
+**Current focus:** Phase 11 — Plans 05, 06, 07, 08, 09, 10 and 13 are complete; Plan 11 is next
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 10 of 13 (ready; Plan 02 is closed by evidence-based deferral)
+Current Plan: 11 of 13 (ready; Plan 02 is closed by evidence-based deferral)
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-22 -- Plan 11-09 libretro legacy selector passed 5/5 and info claims passed 2/2
+Last activity: 2026-11-22 -- Plan 11-10 ECM/CCD replay selector passed 4/4 and Clang 21 campaign targets built
 Progress: [████░░░░░░] 40% (4/10 phases released)
 
 ### Phase 11 Plan 11-09 execution (2026-11-22)
@@ -47,6 +47,19 @@ libretro, card-test and fixture build exited 0. The `disc.image.ccd` + `libretro
 comparisons, rejected replacement preservation and disk replacement. The two info-claim tests passed 2/2 in
 0.31 seconds. Both TDD RED records passed `gsd-tools check tdd-red-evidence`; no hosted CI, Docker or broad
 suite was run. ECM-01 and CCD-01 remain phase-level requirements pending remaining plans and final verification.
+
+### Phase 11 Plan 11-10 execution (2026-11-22)
+
+Runtime/model: Codex with OpenGSD 1.20.0; configured executor model `gpt-6-luna`; primary runtime model ID unavailable.
+Measured wall duration was 1h 10m 25s from 2026-11-22T17:16:28Z to 18:26:53Z. The 3899/3901 line budget and
+sorted fuzz inventory passed. The CI-preset ECM/CCD selector passed 4/4. A disposable local Ubuntu 26.04
+container built both Clang 21 ASan/UBSan campaign targets, both replay targets and legacy fixtures (104 Ninja
+steps, exit 0); each campaign loaded its ten named seeds and completed a bounded `-runs=1` smoke check (11 runs
+per format, exit 0). No 60-second campaign, broad suite or hosted CI ran. An exploratory ASan selector
+failed in the inherited `tests/disc/legacy.c:replace_manifest_field` preflight; this unrelated finding is logged
+in `deferred-items.md` for Plan 11-12 triage if its Nightly lane exercises that setup. The disposable container
+was removed. Task commits `12008bd` and `2aee10a` are recorded in `11-10-SUMMARY.md`. ECM-01 and CCD-01 remain
+phase-level requirements pending remaining plans and final verification. Plan 11-11 is next.
 
 ### Phase 11 Plan 11-02 budget disposition (2026-11-22)
 
@@ -1117,6 +1130,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P07 | 48m | 2 tasks | 8 files |
 | Phase 11 P08 | 33m32s | 2 tasks | 4 files |
 | Phase 11 P09 | 26m | 2 tasks | 7 files |
+| Phase 11 P10 | 1h 10m 25s | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1537,6 +1551,8 @@ Recent decisions affecting current work:
 - [Phase 11]: Runner probes ECM-containing CUEs through the shared image reader; ordinary raw CUE handling remains unchanged.
 - [Phase 11]: Compare CCD save identity only against a matching SUB base; keep generated SUB byte parity as a separate check.
 - [Phase 11]: Libretro runtime and generated metadata advertise ECM and CCD from the same inventory-backed loader, retaining the CHD conditional.
+- [Phase 11]: Keep ECM-01 and CCD-01 phase requirements open until all remaining Phase 11 evidence and final verification are complete.
+- [Phase 11]: Use a named disposable local Linux container to build Clang 21 libFuzzer targets when the host Apple Clang lacks its Fuzzer runtime; keep long campaigns separate from bounded build/replay checks.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1784,8 +1800,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T17:15:27.301Z
-Stopped at: Completed 11-09-PLAN.md
+Last session: 2026-11-22T18:27:35.600Z
+Stopped at: Completed 11-10-PLAN.md
 Resume file: None
 
 ### v1.0 session history
