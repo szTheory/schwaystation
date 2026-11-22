@@ -147,6 +147,76 @@ schway_add_test(NAME fuzz.regress.pbp
   LABELS fuzz portable TIMEOUT 60)
 set_tests_properties(fuzz.regress.pbp PROPERTIES FIXTURES_REQUIRED disc_pbp_preflight)
 
+# ECM and CloneCD replay the generated, owned legacy fixtures through the
+# production parser and dispatcher on every portable lane.
+foreach(subsystem IN ITEMS ecm ccd)
+  string(TOUPPER ${subsystem} seed_mode)
+  set(replay_target schwaystation-fuzz-${subsystem}-replay)
+  set(work_dir "${PROJECT_BINARY_DIR}/tests/fuzz-work/${subsystem}")
+  file(MAKE_DIRECTORY "${work_dir}" "${work_dir}/candidate")
+  set(guest_work_dir "${work_dir}")
+  if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+    set(guest_work_dir "/tests/fuzz-work/${subsystem}")
+  endif()
+  if(subsystem STREQUAL "ecm")
+    set(ecm_guest_work_dir "${guest_work_dir}")
+  else()
+    set(ccd_guest_work_dir "${guest_work_dir}")
+  endif()
+  add_executable(${replay_target} ${fuzz_dir}/${subsystem}.c)
+  target_compile_definitions(${replay_target} PRIVATE
+    SCHWAY_FUZZ_REPLAY SCHWAY_FUZZ_${seed_mode}_SEEDS
+    "SCHWAY_FUZZ_WORK_DIR=\"${guest_work_dir}\"")
+  target_include_directories(${replay_target} PRIVATE ${PROJECT_SOURCE_DIR}/host)
+  target_link_libraries(${replay_target} PRIVATE schwaystation_disc_image)
+  add_dependencies(${replay_target} schwaystation-legacy-disc-fixtures)
+  if(subsystem STREQUAL "ecm")
+    set(literal_fixture "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy_literal.ecm")
+    set(modeled_fixture "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy_modeled.ecm")
+    set(guest_literal_fixture "${literal_fixture}")
+    set(guest_modeled_fixture "${modeled_fixture}")
+    if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+      set(guest_literal_fixture "/fixtures/disc_boot_legacy_literal.ecm")
+      set(guest_modeled_fixture "/fixtures/disc_boot_legacy_modeled.ecm")
+    endif()
+    set(ecm_guest_literal_fixture "${guest_literal_fixture}")
+    set(ecm_guest_modeled_fixture "${guest_modeled_fixture}")
+    target_compile_definitions(${replay_target} PRIVATE
+      "SCHWAY_FUZZ_ECM_LITERAL=\"${guest_literal_fixture}\"")
+    target_compile_definitions(${replay_target} PRIVATE
+      "SCHWAY_FUZZ_ECM_MODELED=\"${guest_modeled_fixture}\"")
+  else()
+    set(ccd_fixture "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy.ccd")
+    set(ccd_image "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy.img")
+    set(ccd_sub "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy.sub")
+    set(guest_ccd_fixture "${ccd_fixture}")
+    set(guest_ccd_image "${ccd_image}")
+    set(guest_ccd_sub "${ccd_sub}")
+    if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+      set(guest_ccd_fixture "/fixtures/disc_boot_legacy.ccd")
+      set(guest_ccd_image "/fixtures/disc_boot_legacy.img")
+      set(guest_ccd_sub "/fixtures/disc_boot_legacy.sub")
+    endif()
+    set(ccd_guest_fixture "${guest_ccd_fixture}")
+    set(ccd_guest_image "${guest_ccd_image}")
+    set(ccd_guest_sub "${guest_ccd_sub}")
+    target_compile_definitions(${replay_target} PRIVATE
+      "SCHWAY_FUZZ_CCD_FIXTURE=\"${guest_ccd_fixture}\"")
+    target_compile_definitions(${replay_target} PRIVATE
+      "SCHWAY_FUZZ_CCD_IMAGE=\"${guest_ccd_image}\"")
+    target_compile_definitions(${replay_target} PRIVATE
+      "SCHWAY_FUZZ_CCD_SUB=\"${guest_ccd_sub}\"")
+  endif()
+  set_target_properties(${replay_target} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(${replay_target})
+  schway_add_test(NAME fuzz.regress.${subsystem}
+    COMMAND ${replay_target}
+    LABELS fuzz portable TIMEOUT 60)
+  set_tests_properties(fuzz.regress.${subsystem} PROPERTIES
+    FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")
+endforeach()
+
 if(SCHWAYSTATION_FUZZ)
   # The libFuzzer binary keeps libFuzzer's main. The fuzz preset builds every
   # object with ASan, UBSan and coverage instrumentation, so the core's own
@@ -220,4 +290,5 @@ if(SCHWAYSTATION_FUZZ)
   set_target_properties(schwaystation-fuzz-pbp PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
   schway_warnings(schwaystation-fuzz-pbp)
+
 endif()
