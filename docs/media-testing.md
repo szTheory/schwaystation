@@ -32,6 +32,28 @@ The guest evidence is specific to these NTSC-U fixtures. It does not establish
 hosted CI, package contents or fuzz campaign results; those remain separate
 checks.
 
+## CHD-OFF product package
+
+The local package check configures CHD and the optional CHD tool off, builds
+the runner and libretro products, checks libretro claims and notices, creates
+the Release-configured CPack archives, then checks their contents and packaged
+notices:
+
+```sh
+cmake --preset ci -DSCHWAYSTATION_CHD=OFF -DSCHWAYSTATION_BUILD_CHD_TOOL=OFF
+cmake --build --preset ci --target schwaystation-run schwaystation_libretro
+ctest --preset ci --no-tests=error -R '^libretro[.](vendored|info[.]claims)([.]self_test)?$' --output-on-failure
+ctest --test-dir build/hygiene --no-tests=error -R '^policy[.]notices([.]self_test)?$' --output-on-failure
+cpack --config build/ci/CPackConfig.cmake -C Release
+ctest --test-dir build/ci --no-tests=error -R '^release[.](archive_contents|notices)([.]self_test)?$' --output-on-failure
+```
+
+The `policy.notices` check belongs to the hygiene inventory; the release
+selectors inspect the generated archives. The ECM and CloneCD rows record this
+local CHD-OFF package result separately from `hosted_main.unknown`,
+`hosted_nightly.unknown` and `hosted_release.unknown`. Local packaging does not
+establish any hosted workflow result.
+
 With `SCHWAYSTATION_CHD=ON`, the opt-in `SCHWAYSTATION_BUILD_CHD_TOOL=ON` target also creates a run-local CHD
 from those same two tracks. Before compression, CMake checks the exact CUE layout, whole-sector source sizes,
 track counts and the tool's codec/hunk/worker settings. It generates the CHD twice, requires byte-identical output
