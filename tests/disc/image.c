@@ -605,8 +605,8 @@ static int test_cue_reject(const char *directory)
           "expected direct malformed ECM input to fail image validation");
     CHECK(make_path(cue_path, directory, "unsupported.ccd") &&
           expect_open_status(cue_path, SCHWAY_DISC_IMAGE_UNSUPPORTED, 0u,
-                             "unsupported: CCD (planned v2.0)"),
-          "expected CCD to remain unsupported until its reader is implemented");
+                             "unsupported: CCD cannot be a CUE track source"),
+          "expected CCD to remain unsupported as a CUE track source");
     CHECK(make_path(child_path, directory, "unsupported.ecm") &&
           write_text(child_path, "BAD!", sizeof "BAD!" - 1u) &&
           write_text(playlist_path, "unsupported.ecm\n", sizeof "unsupported.ecm\n" - 1u) &&
