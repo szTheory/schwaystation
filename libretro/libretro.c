@@ -240,6 +240,12 @@ static int lr_disc_path_supported(const char *path)
            || (length == 4u && (extension[1] == 'p' || extension[1] == 'P') &&
                (extension[2] == 'b' || extension[2] == 'B') &&
                (extension[3] == 'p' || extension[3] == 'P'))
+           || (length == 4u && (extension[1] == 'e' || extension[1] == 'E') &&
+               (extension[2] == 'c' || extension[2] == 'C') &&
+               (extension[3] == 'm' || extension[3] == 'M'))
+           || (length == 4u && (extension[1] == 'c' || extension[1] == 'C') &&
+               (extension[2] == 'c' || extension[2] == 'C') &&
+               (extension[3] == 'd' || extension[3] == 'D'))
 #if SCHWAYSTATION_CHD
            || (length == 4u && (extension[1] == 'c' || extension[1] == 'C') &&
                (extension[2] == 'h' || extension[2] == 'H') &&
@@ -1236,9 +1242,9 @@ void retro_get_system_info(struct retro_system_info *sys)
     sys->library_name = "schwaystation";
     sys->library_version = SCHWAYSTATION_LIBRETRO_VERSION;
 #if SCHWAYSTATION_CHD
-    sys->valid_extensions = "exe|psexe|cue|iso|m3u|pbp|chd";
+    sys->valid_extensions = "exe|psexe|cue|iso|m3u|pbp|ecm|ccd|chd";
 #else
-    sys->valid_extensions = "exe|psexe|cue|iso|m3u|pbp";
+    sys->valid_extensions = "exe|psexe|cue|iso|m3u|pbp|ecm|ccd";
 #endif
     sys->need_fullpath = true;
     sys->block_extract = true;
