@@ -4,9 +4,9 @@ The runner and libretro host use `schway_disc_image` to provide sector data to
 the core. File access stays in the host. The provider accepts cooked `.iso`
 images and `.cue` sheets whose data files contain MODE1/2048, MODE2/2352, or
 AUDIO tracks. It also accepts the fixture-proven unencrypted PBP subset below.
-With `SCHWAYSTATION_CHD=ON`, it opens the bounded CHD subset below through the
-same raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off by default;
-`.ccd` remains unsupported.
+It also accepts ECM v1.0 images and supported CloneCD `.ccd` images. With
+`SCHWAYSTATION_CHD=ON`, it opens the bounded CHD subset below through the same
+raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off by default.
 
 ## ECM images
 
@@ -21,6 +21,29 @@ uncompressed raw CUE. ECM has no track table: the provider rejects cooked
 2048-byte CUE sources and never invents the missing 16-byte sector header for
 type 2 or type 3 records. Canonical child paths stay inside the CUE directory;
 an open error leaves the caller's active disc unchanged.
+
+## CloneCD metadata subset
+
+A `.ccd` descriptor reads a same-stem `.img` file. A same-stem `.sub` companion
+is optional. The accepted descriptor is Version 3, single-session, unscrambled,
+without CD-TEXT or pregap subcode metadata, and contains the required TOC
+entries for its tracks. Track modes are audio, Mode 1 or Mode 2; the descriptor
+indexes define the source track and pregap boundaries. CUE sheets cannot use a
+`.ccd` descriptor as a track file.
+
+When `.sub` is present, it must contain exactly 96 packed P-W channel bytes for
+each IMG sector. The reader maps those channel-major bytes into the returned
+subcode representation. Without `.sub`, each sector returns zeroed subcode.
+The IMG extent, required track geometry, and canonical companion paths are
+checked before the image opens; a missing required IMG or an escaping or
+malformed companion is rejected. An open error leaves the caller's active disc
+unchanged.
+
+The owned CloneCD fixture covers a mixed Mode 2 and audio disc, companion
+extents, TOC and pregap mapping, optional SUB reads, and save/content identity
+against a matching IMG-backed CUE. It does not claim support for multiple
+sessions, other descriptor versions, scrambling, CD-TEXT, or alternate
+pregap-subcode modes.
 
 ## CHD metadata subset
 
