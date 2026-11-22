@@ -1062,6 +1062,12 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: schwaystation-test-disc-fixture boot|read|audio|fmv|record|chd-{boot|read|audio|fmv}|pbp-{boot|read|fmv} BIOS EXPECTED IMAGE SBI CSV [PREDICATES]\n");
         return 2;
     }
+    size_t image_path_size = strlen(argv[4]);
+    int ecm_image = image_path_size >= 4u &&
+                    memcmp(argv[4] + image_path_size - 4u, ".ecm", 4u) == 0;
+    int ccd_image = image_path_size >= 4u &&
+                    memcmp(argv[4] + image_path_size - 4u, ".ccd", 4u) == 0;
+    uint32_t expected_track_count = pbp_mode != 0 || ecm_image != 0 ? 1u : 2u;
     uint32_t expected_records[8] = {0u};
     if (!load_expected_records(argv[6], expected_records)) {
         fprintf(stderr, "disc fixture: expected CSV rows are missing or malformed\n");
@@ -1121,11 +1127,11 @@ int main(int argc, char **argv)
         ok = run_boot_case(argv[2], expected_digest, &disc, &host);
     } else if (strcmp(case_mode, "read") == 0) {
         ok = run_read_case(argv[2], expected_digest, &disc, &host, expected_records,
-                           pbp_mode != 0 ? 1u : 2u);
+                           expected_track_count);
     } else {
         ok = run_av_case(case_mode, argv[2], expected_digest, &disc, &host,
                          expected_records, &expected_av, argc == 8 ? argv[7] : NULL,
-                         pbp_mode != 0 ? 1u : 2u);
+                         expected_track_count);
     }
     if (host.outside_run_calls != 0u) {
         fprintf(stderr, "disc fixture: %u host callbacks ran outside a core run\n",
@@ -1140,6 +1146,10 @@ int main(int argc, char **argv)
     } else if (pbp_mode != 0) {
         printf("PASS disc.fixture.pbp.%s: bounded single-data-track predicate passed; no audio claim\n",
                case_mode);
+    } else if (ecm_image != 0) {
+        printf("PASS disc.fixture.ecm.%s: bounded one-data-track predicate passed\n", case_mode);
+    } else if (ccd_image != 0) {
+        printf("PASS disc.fixture.ccd.%s: bounded mixed-mode predicate passed\n", case_mode);
     } else if (strcmp(case_mode, "audio") == 0 || strcmp(case_mode, "fmv") == 0 ||
                strcmp(case_mode, "record") == 0) {
         printf("disc fixture %s passed: XA/CD-DA PCM, STR MDEC/GPU RGB24, split-state replay\n",
