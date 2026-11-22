@@ -36,6 +36,8 @@ add_executable(schwaystation-sdl2
   main.c
   "${SCHWAY_ROOT}/host/disc_image.c"
   "${SCHWAY_ROOT}/host/disc_chd.c"
+  "${SCHWAY_ROOT}/host/disc_ecm.c"
+  "${SCHWAY_ROOT}/host/disc_ccd.c"
   "${SCHWAY_ROOT}/host/disc_pbp.c"
   "${SCHWAY_ROOT}/host/disc_pbp_metadata.c"
   "${SCHWAY_ROOT}/host/xrgb8888.c")
