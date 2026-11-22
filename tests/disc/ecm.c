@@ -51,6 +51,8 @@ static uint32_t ecm_edc(const uint8_t *bytes, size_t size)
 }
 
 static int write_record_count(FILE *file, uint32_t type, uint32_t count);
+static int write_literal_ecm(const char *path, const uint8_t *bytes, size_t size,
+                             int bad_checksum);
 
 static int write_count(FILE *file, uint32_t count)
 {
@@ -296,6 +298,90 @@ static int test_modeled_known_answers(const char *path)
 done:
     schway_disc_image_close(image);
     schway__disc_ecm_close(reader);
+    return ok;
+}
+
+static int test_cue_ecm_equivalence(const char *directory)
+{
+    static const char cue_bin[] =
+        "FILE \"disc-ecm-cue.bin\" BINARY\n"
+        "  TRACK 01 MODE2/2352\n"
+        "    INDEX 01 00:00:00\n"
+        "  TRACK 02 AUDIO\n"
+        "    PREGAP 00:00:01\n"
+        "    INDEX 00 00:00:16\n"
+        "    INDEX 01 00:00:18\n";
+    static const char cue_ecm[] =
+        "FILE \"disc-ecm-cue.ecm\" BINARY\n"
+        "  TRACK 01 MODE2/2352\n"
+        "    INDEX 01 00:00:00\n"
+        "  TRACK 02 AUDIO\n"
+        "    PREGAP 00:00:01\n"
+        "    INDEX 00 00:00:16\n"
+        "    INDEX 01 00:00:18\n";
+    static const uint32_t lbas[] = {26u, 0u, 19u, 17u, 15u, 16u, 18u, 25u, 10u, 1u};
+    const size_t byte_count = 26u * 2352u;
+    uint8_t *raw = (uint8_t *)malloc(byte_count);
+    char bin_path[1024] = {0}, ecm_path[1024] = {0};
+    char bin_cue_path[1024] = {0}, ecm_cue_path[1024] = {0};
+    schway_disc_image *bin_image = NULL;
+    schway_disc_image *ecm_image = NULL;
+    schway_disc_image_error error;
+    int ok = 0;
+    if (raw == NULL || !make_path(bin_path, directory, "disc-ecm-cue.bin") ||
+        !make_path(ecm_path, directory, "disc-ecm-cue.ecm") ||
+        !make_path(bin_cue_path, directory, "disc-ecm-cue-bin.cue") ||
+        !make_path(ecm_cue_path, directory, "disc-ecm-cue-ecm.cue")) goto done;
+    for (size_t i = 0u; i < byte_count; i++) raw[i] = (uint8_t)(i * 13u + 0x29u);
+    if (!write_file(bin_path, raw, byte_count) ||
+        !write_literal_ecm(ecm_path, raw, byte_count, 0) ||
+        !write_file(bin_cue_path, (const uint8_t *)cue_bin, sizeof cue_bin - 1u) ||
+        !write_file(ecm_cue_path, (const uint8_t *)cue_ecm, sizeof cue_ecm - 1u) ||
+        schway_disc_image_open(bin_cue_path, &bin_image, &error) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.ecm: uncompressed CUE oracle setup failed: %s\n", error.message);
+        goto done;
+    }
+    if (schway_disc_image_open(ecm_cue_path, &ecm_image, &error) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.ecm: ECM-backed CUE was rejected: %s\n", error.message);
+        goto done;
+    }
+    const schway_disc *bin_disc = schway_disc_image_disc(bin_image);
+    const schway_disc *ecm_disc = schway_disc_image_disc(ecm_image);
+    schway_toc bin_toc, ecm_toc;
+    memset(&bin_toc, 0, sizeof bin_toc);
+    memset(&ecm_toc, 0, sizeof ecm_toc);
+    bin_toc.size = (uint32_t)sizeof bin_toc;
+    ecm_toc.size = (uint32_t)sizeof ecm_toc;
+    if (bin_disc == NULL || ecm_disc == NULL || bin_disc->toc == NULL || ecm_disc->toc == NULL ||
+        bin_disc->toc(bin_disc->user, &bin_toc) != 1u ||
+        ecm_disc->toc(ecm_disc->user, &ecm_toc) != 1u ||
+        bin_toc.track_count != 2u || ecm_toc.track_count != 2u ||
+        bin_toc.tracks[0].leadout != 16u || bin_toc.tracks[1].index0 != 16u ||
+        bin_toc.tracks[1].index1 != 19u || bin_toc.tracks[1].pregap != 3u ||
+        bin_toc.tracks[1].leadout != 27u ||
+        memcmp(&bin_toc, &ecm_toc, sizeof bin_toc) != 0) {
+        fprintf(stderr, "ASSERT disc.image.ecm: ECM-backed CUE geometry differs from raw CUE\n");
+        goto done;
+    }
+    for (size_t i = 0u; i < sizeof lbas / sizeof lbas[0]; i++) {
+        uint8_t bin_sector[2352], ecm_sector[2352], bin_subcode[96], ecm_subcode[96];
+        if (bin_disc->read_sector(bin_disc->user, lbas[i], bin_sector, bin_subcode) != 1u ||
+            ecm_disc->read_sector(ecm_disc->user, lbas[i], ecm_sector, ecm_subcode) != 1u ||
+            memcmp(bin_sector, ecm_sector, sizeof bin_sector) != 0 ||
+            memcmp(bin_subcode, ecm_subcode, sizeof bin_subcode) != 0) {
+            fprintf(stderr, "ASSERT disc.image.ecm: ECM CUE LBA %u differs from raw CUE\n", lbas[i]);
+            goto done;
+        }
+    }
+    ok = 1;
+done:
+    free(raw);
+    schway_disc_image_close(ecm_image);
+    schway_disc_image_close(bin_image);
+    if (bin_path[0] != '\0') (void)remove(bin_path);
+    if (ecm_path[0] != '\0') (void)remove(ecm_path);
+    if (bin_cue_path[0] != '\0') (void)remove(bin_cue_path);
+    if (ecm_cue_path[0] != '\0') (void)remove(ecm_cue_path);
     return ok;
 }
 
@@ -594,7 +680,8 @@ int main(int argc, char **argv)
     }
     if (!test_read_work_limit(input_path) || !test_tiny_record_storm(input_path) ||
         !test_allocation_failure(input_path, expected) ||
-        !test_modeled_known_answers(input_path)) result = 1;
+        !test_modeled_known_answers(input_path) ||
+        !test_cue_ecm_equivalence(argv[1])) result = 1;
     uint8_t unaligned_image[2351];
     memcpy(unaligned_image, expected, sizeof unaligned_image);
     if (!write_literal_ecm(input_path, unaligned_image, sizeof unaligned_image, 0) ||
