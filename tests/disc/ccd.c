@@ -5,6 +5,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#if !defined(_WIN32) && !defined(__wasi__)
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 #include "../test_open.h"
 
 static int make_path(char path[1024], const char *directory, const char *name)
@@ -262,6 +267,102 @@ static int expect_open(const char *path, schway_disc_image_status expected,
     return 0;
 }
 
+static int test_companion_outcomes(const char *directory)
+{
+    char descriptor_path[1024];
+    char image_path[1024];
+    char sub_path[1024];
+    int ok = 1;
+    if (!make_path(descriptor_path, directory, "disc-ccd-policy.ccd") ||
+        !make_path(image_path, directory, "disc-ccd-policy.img") ||
+        !make_path(sub_path, directory, "disc-ccd-policy.sub")) return 0;
+
+    if (!write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_IO, "missing required IMG")) ok = 0;
+    if (!write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352)) ||
+        !write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        !write_file(sub_path, "") ||
+        !expect_supported(descriptor_path, SCHWAY_DISC_TRACK_MODE2, 0u, 0u,
+                          "empty optional SUB")) ok = 0;
+    if (!write_file(sub_path, "sentinel") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                     "nonempty SUB remains unsupported")) ok = 0;
+
+#if !defined(_WIN32) && !defined(__wasi__)
+    if (chmod(sub_path, 0) == 0) {
+        FILE *probe = schway__test_open_file(sub_path, "rb");
+        schway_disc_image_status expected = SCHWAY_DISC_IMAGE_IO;
+        if (probe != NULL) {
+            (void)fclose(probe);
+            expected = SCHWAY_DISC_IMAGE_UNSUPPORTED;
+        }
+        if (!expect_open(descriptor_path, expected, "unreadable SUB is an IO error")) ok = 0;
+        (void)chmod(sub_path, 0600);
+    }
+#endif
+
+    (void)remove(descriptor_path);
+    (void)remove(image_path);
+    (void)remove(sub_path);
+    return ok;
+}
+
+#if !defined(_WIN32) && !defined(__wasi__)
+static int test_companion_confinement(const char *directory)
+{
+    char sibling_directory[1024];
+    char descriptor_path[1024];
+    char image_path[1024];
+    char sub_path[1024];
+    char external_image[1024];
+    char external_sub[1024];
+    char missing_sub[1024];
+    int sibling_length = snprintf(sibling_directory, sizeof sibling_directory,
+                                  "%s-sibling", directory);
+    int ok = 1;
+    if (sibling_length < 0 || (size_t)sibling_length >= sizeof sibling_directory ||
+        !make_path(descriptor_path, directory, "disc-ccd-img-escape.ccd") ||
+        !make_path(image_path, directory, "disc-ccd-img-escape.img") ||
+        !make_path(external_image, sibling_directory, "disc-ccd-img-escape.img") ||
+        !make_path(sub_path, directory, "disc-ccd-img-escape.sub") ||
+        !make_path(external_sub, sibling_directory, "disc-ccd-sub-escape.sub") ||
+        !make_path(missing_sub, sibling_directory, "missing-target.sub") ||
+        mkdir(sibling_directory, 0700) != 0) return 0;
+
+    if (!write_raw_image(external_image, UINT64_C(16) * UINT64_C(2352)) ||
+        !write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        symlink(external_image, image_path) != 0 ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "valid IMG sentinel in sibling-prefix directory is rejected")) ok = 0;
+    (void)remove(image_path);
+    (void)remove(descriptor_path);
+
+    if (!write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352)) ||
+        !write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        !write_file(external_sub, "sentinel") ||
+        symlink(external_sub, sub_path) != 0 ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "SUB sentinel outside the descriptor directory is rejected")) ok = 0;
+    (void)remove(sub_path);
+    (void)remove(descriptor_path);
+    (void)remove(image_path);
+
+    if (!write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352)) ||
+        !write_descriptor(descriptor_path, 2u, 0u, 0) ||
+        symlink(missing_sub, sub_path) != 0 ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_IO,
+                     "dangling optional SUB is a canonicalization IO error")) ok = 0;
+
+    (void)remove(sub_path);
+    (void)remove(descriptor_path);
+    (void)remove(image_path);
+    (void)remove(external_image);
+    (void)remove(external_sub);
+    (void)rmdir(sibling_directory);
+    return ok;
+}
+#endif
+
 static int write_active_iso(const char *path)
 {
     uint8_t sector[2048];
@@ -321,6 +422,10 @@ int main(int argc, char **argv)
         !expect_open(input_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, "incomplete descriptor")) result = 1;
     if (!test_supported_routes(argv[1])) result = 1;
     if (!test_malformed_metadata(argv[1])) result = 1;
+    if (!test_companion_outcomes(argv[1])) result = 1;
+#if !defined(_WIN32) && !defined(__wasi__)
+    if (!test_companion_confinement(argv[1])) result = 1;
+#endif
     if (!active_iso_is_readable(active, active_disc)) {
         fprintf(stderr, "ASSERT disc.image.ccd: failed open changed the active ISO source\n");
         result = 1;
