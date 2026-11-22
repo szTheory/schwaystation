@@ -76,6 +76,21 @@ match independent trailer vectors, checkpoint reads and the full decoded EDC. Ra
 sources use decoded extents and preserve the raw CUE TOC and boundary reads; cooked ECM CUE sources are rejected.
 ECM-01 remains incomplete until phase-level verification. Plan 06 is dependency-ready; no user action is needed.
 
+### Phase 11 Plan 11-06 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 Codex executor, configured `gpt-6-luna` xhigh; the primary runtime model
+identifier is not exposed. Plan 06 took 19 minutes 2 seconds, from 2026-11-22T14:36:57Z to
+14:55:59Z, and changed two source/test files. Task commits are `b13e65f` (track-boundary RED),
+`37f3efe` (track/index GREEN), `0e55424` (SUB/Q RED), and `065b064` (SUB transpose GREEN). The
+3,898/3,901 line-budget preflight, sorted disc inventory, exact CCD selector discovery and diff checks
+passed. Both planned RED CTest runs exited 8 on their expected behavior assertions and their JUnit
+records passed `tdd-red-evidence`; the final CI-preset CCD target build and selector passed, 1/1.
+Missing/empty SUB remains zero-filled, exact-size SUB transposes into callback P-W bits, and malformed
+track indexes/entries reject. No broad suite, Act job, or hosted CI run was needed. The parser/index
+reconciliation and independent byte vectors were the main work; configure, focused build, and CTest
+completed in seconds. CCD-01 remains open until Phase 11 verification. Plan 07 is next and is
+dependency-ready after Plans 05 and 06.
+
 ### Phase 11 Plan 11-01 execution (2026-11-22)
 
 Runtime/model: OpenGSD 1.20.0 in the Codex GSD executor; configured model `gpt-6-luna`. The primary
