@@ -7,10 +7,10 @@ current_phase_name: ECM and CloneCD images
 current_plan: 10 of 13 (ready; Plan 02 is closed by evidence-based deferral)
 status: executing
 stopped_at: Completed 11-09-PLAN.md
-last_updated: "2026-11-22T17:12:52.661Z"
+last_updated: "2026-11-22T17:15:01.649Z"
 last_activity: 2026-11-22
 last_activity_desc: Plan 11-09 libretro legacy selector passed 5/5 and info claims passed 2/2
-state_head: 7ef84fb75b62ef8bc2cf0e49ac199108079d89c4
+state_head: 4e77d96b39111d1c8fcb2a09fd98373a525df9f7
 progress:
   total_phases: 10
   completed_phases: 4
@@ -40,7 +40,7 @@ Progress: [████░░░░░░] 40% (4/10 phases released)
 ### Phase 11 Plan 11-09 execution (2026-11-22)
 
 Runtime/model: Codex with OpenGSD 1.20.0; configured executor model `gpt-6-luna`; primary runtime model ID unavailable.
-Measured duration was 26 minutes (2026-11-22T16:47:08Z–17:13:00Z). Four task commits are recorded in
+Measured duration was 27 minutes (2026-11-22T16:47:08Z–17:14:22Z). Four task commits are recorded in
 `11-09-SUMMARY.md`. The inventory and fixed line-budget preflights passed at 3899/3901. The targeted host,
 libretro, card-test and fixture build exited 0. The `disc.image.ccd` + `libretro.content.legacy` selector passed
 5/5 in 10.04 seconds, including legacy preflight/parity, the existing Q/GetlocP vector, both source-CUE
@@ -1784,7 +1784,7 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T17:12:52.498Z
+Last session: 2026-11-22T17:15:01.464Z
 Stopped at: Completed 11-09-PLAN.md
 Resume file: None
 
