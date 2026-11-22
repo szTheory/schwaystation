@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 7 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 06 is next)
+current_plan: 7 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 07 is next)
 status: executing
 stopped_at: Completed 11-06-PLAN.md
-last_updated: "2026-11-22T14:57:56.274Z"
+last_updated: "2026-11-22T15:01:21.798Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-05 completed; modeled ECM and ECM-backed CUE selectors passed
-state_head: 065b064b0e6ee6c8986d9ff2f5d0508418d91298
+last_activity_desc: Plan 11-06 completed; mixed-track CCD and exact SUB selector passed
+state_head: a67d50351bde0bfb2c0f384042f423fffda362e3
 progress:
   total_phases: 10
   completed_phases: 4
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plan 05 is complete, Plan 13 is complete, and dependency-ready Plan 06 is next
+**Current focus:** Phase 11 — Plans 05 and 06 and Plan 13 are complete; dependency-ready Plan 07 is next
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 7 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 06 is next)
+Current Plan: 7 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 07 is next)
 Total Plans in Phase: 13
 Status: Ready to execute
-Last activity: 2026-11-22 -- Plan 11-05 modeled ECM and CUE tests passed
+Last activity: 2026-11-22 -- Plan 11-06 mixed-track CCD and exact SUB tests passed
 Progress: [████░░░░░░] 40% (4/10 phases released)
 
 ### Phase 11 Plan 11-02 budget disposition (2026-11-22)
@@ -1738,7 +1738,7 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T14:57:56.085Z
+Last session: 2026-11-22T15:01:21.478Z
 Stopped at: Completed 11-06-PLAN.md
 Resume file: .planning/phases/11-ecm-and-clonecd-images/11-07-PLAN.md
 
