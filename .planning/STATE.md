@@ -4,12 +4,12 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 12 of 13 (ready; Plan 02 is closed by evidence-based deferral)
+current_plan: 12 of 13 (Task 1 committed; Tasks 2-3 not started and need a bounded follow-up)
 status: executing
-stopped_at: Completed 11-11-PLAN.md
-last_updated: "2026-11-22T18:56:51.309Z"
+stopped_at: Completed 11-12 Task 1; split unstarted validation tasks for a bounded follow-up
+last_updated: "2026-11-22T19:33:57Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-11 ECM/CCD guest selector passed 12/12; feature evidence checks passed 2/2
+last_activity_desc: Plan 11-12 Task 1 committed; Nightly producer/preflight route checks passed
 state_head: 7226071cd859d79338859da3a19600b446eb0d18
 progress:
   total_phases: 10
@@ -26,16 +26,36 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plans 05–11 and 13 are complete; Plan 12 is next
+**Current focus:** Phase 11 — Plan 12 Task 1 is committed; the CHD-OFF package and CHD-ON installed-example checks remain
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 12 of 13 (ready; Plan 02 is closed by evidence-based deferral)
+Current Plan: 12 of 13 (Task 1 committed; Tasks 2-3 not started and need a bounded follow-up)
 Total Plans in Phase: 13
-Status: Ready to execute
-Last activity: 2026-11-22 -- Plan 11-11 ECM/CCD guest selector passed 12/12; feature evidence checks passed 2/2
+Status: In progress
+Last activity: 2026-11-22 -- Plan 11-12 Task 1 committed; Nightly producer/preflight route checks passed
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 Plan 11-12 partial execution (2026-11-22)
+
+Runtime/model: Codex with OpenGSD 1.20.0; configured executor `gpt-6-luna`; primary runtime model ID unavailable.
+Measured elapsed time was 33m25s from 2026-11-22T19:00:32Z to 19:33:57Z. Task 1 is committed as
+`ef50063`; the CHD-OFF package checks and installed-example/CHD-ON checks were not started because the remaining
+concrete work would make this plan exceed the project's 30-minute split rule. No requirement is marked complete.
+
+The 3899/3901 counted-line preflight passed. The positive `disc_registration` check passed, and temporary
+mutations removing the legacy fixture producer and moving the loader campaign before preflight were both rejected
+(exit 1). CI/Nightly actionlint passed. The all-workflow actionlint command exited 1 only on the unchanged
+`release.yml` `concurrency.queue: max` warning. The explicit `act schedule --dryrun` route passed and showed the
+fuzz producer, ECM/CCD source/replay preflight, and seed/campaign step without running a campaign. A fresh
+ASan/UBSan configure and build of the legacy test/fixture targets passed; the focused `legacy_preflight` and
+`legacy_parity` selector passed 2/2 in 0.25s after NUL-terminating the manifest buffer. This directly fixes the
+pre-existing fixture harness fault recorded during Plan 11-10 and required by the new Nightly preflight.
+
+No timed campaign, full suite, hosted CI or Docker run occurred. Next: move the unstarted Task 2 package/evidence
+work and Task 3 installed SDL2 example/CHD-ON checks into a bounded follow-up plan; keep Phase 11 code review and
+final verification with the orchestrator.
 
 ### Phase 11 Plan 11-09 execution (2026-11-22)
 
