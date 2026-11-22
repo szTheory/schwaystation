@@ -226,6 +226,7 @@ jobs:
             cmake --build build/fuzz --target schwaystation-fuzz-pbp schwaystation-fuzz-pbp-replay schwaystation-pbp-fixtures
           else
             cmake --build --preset fuzz
+            cmake --build build/fuzz --target schwaystation-test-disc-media
           fi
       - name: Verify ECM and CCD fixture and replay closure
         if: needs.changes.outputs.pbp_only != 'true'
