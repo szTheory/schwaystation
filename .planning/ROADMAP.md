@@ -186,7 +186,7 @@ platforms and Main/Release gates retained; complete repository checks at or belo
   2. Supported CloneCD fixtures preserve modes, indexes, pregaps, subcode and first and last sector reads through CCD and its IMG/SUB companions. Invalid companion paths are rejected before an external file is opened.
   3. The ledger records fixture results for both providers against the existing disc contract.
 
-**Plans**: 12/13 plans executed
+**Plans**: 13/15 plans executed
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/research/FEATURES.md`
 
@@ -220,7 +220,13 @@ Plans:
 - [x] 11-11-PLAN.md — Bounded guest evidence and protected provider ledger
 
 **Wave 9** *(blocked on Wave 8 completion)*
-- [ ] 11-12-PLAN.md — CI producer closure, portability and package acceptance
+- [x] 11-12-PLAN.md — Gate ECM/CCD fixture producers before timed Nightly campaigns
+
+**Wave 10** *(after 11-12; bounded CHD-OFF package acceptance)*
+- [ ] 11-14-PLAN.md — Validate CHD-OFF package contents, notices and feature evidence
+
+**Wave 11** *(after 11-14; bounded installed example and CHD-ON consumers)*
+- [ ] 11-15-PLAN.md — Build the installed SDL2 example and verify CHD-ON consumers
 
 ### Phase 12: SBI and LibCrypt
 

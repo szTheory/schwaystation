@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 12 of 13 (Task 1 committed; Tasks 2-3 not started and need a bounded follow-up)
+current_plan: 14 of 15 (Plan 12 Task 1 is closed; Plan 14 CHD-OFF package checks are next)
 status: executing
-stopped_at: Completed 11-12 Task 1; split unstarted validation tasks for a bounded follow-up
-last_updated: "2026-11-22T19:33:57Z"
+stopped_at: Plan 12 Task 1 closed; unstarted package and installed-example checks split into Plans 14 and 15
+last_updated: "2026-11-22T19:44:34Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-12 Task 1 committed; Nightly producer/preflight route checks passed
+last_activity_desc: Plan 11-12 Task 1 closed with its measured 33m25s; package and CHD-ON checks moved to Plans 14 and 15
 state_head: 7226071cd859d79338859da3a19600b446eb0d18
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 61
-  completed_plans: 60
+  total_plans: 63
+  completed_plans: 61
   percent: 40
 ---
 
@@ -26,25 +26,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plan 12 Task 1 is committed; the CHD-OFF package and CHD-ON installed-example checks remain
+**Current focus:** Phase 11 — Plan 12 Task 1 is closed; Plan 14 covers CHD-OFF packages and Plan 15 covers the installed example and CHD-ON consumers
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 12 of 13 (Task 1 committed; Tasks 2-3 not started and need a bounded follow-up)
-Total Plans in Phase: 13
+Current Plan: 14 of 15 (Plan 12 Task 1 is closed; Plan 14 CHD-OFF package checks are next)
+Total Plans in Phase: 15
 Status: In progress
 Last activity: 2026-11-22 -- Plan 11-12 Task 1 committed; Nightly producer/preflight route checks passed
 Progress: [████░░░░░░] 40% (4/10 phases released)
 
-### Phase 11 Plan 11-12 partial execution (2026-11-22)
+### Phase 11 Plan 11-12 execution and bounded follow-up split (2026-11-22)
 
 Runtime/model: Codex with OpenGSD 1.20.0; configured executor `gpt-6-luna`; primary runtime model ID unavailable.
 Measured elapsed time was 33m25s from 2026-11-22T19:00:32Z to 19:33:57Z. Task 1 is committed as
 `ef50063`; the CHD-OFF package checks and installed-example/CHD-ON checks were not started because the remaining
 concrete work would make this plan exceed the project's 30-minute split rule. No requirement is marked complete.
 
-The 3899/3901 counted-line preflight passed. The positive `disc_registration` check passed, and temporary
+The 3,899/3,901 counted-line preflight passed. The positive `disc_registration` check passed, and temporary
 mutations removing the legacy fixture producer and moving the loader campaign before preflight were both rejected
 (exit 1). CI/Nightly actionlint passed. The all-workflow actionlint command exited 1 only on the unchanged
 `release.yml` `concurrency.queue: max` warning. The explicit `act schedule --dryrun` route passed and showed the
@@ -53,9 +53,22 @@ ASan/UBSan configure and build of the legacy test/fixture targets passed; the fo
 `legacy_parity` selector passed 2/2 in 0.25s after NUL-terminating the manifest buffer. This directly fixes the
 pre-existing fixture harness fault recorded during Plan 11-10 and required by the new Nightly preflight.
 
-No timed campaign, full suite, hosted CI or Docker run occurred. Next: move the unstarted Task 2 package/evidence
-work and Task 3 installed SDL2 example/CHD-ON checks into a bounded follow-up plan; keep Phase 11 code review and
-final verification with the orchestrator.
+No timed campaign, full suite, hosted CI or Docker run occurred. Plan 12 is now scoped to its one completed Task 1
+and has `requirements-completed: []`. Its CHD-OFF package/evidence work is in Plan 14; installed SDL2
+example/CHD-ON checks are in Plan 15. Cross-platform evidence and hosted Main/Nightly/Release checks remain with
+final phase review. Plan 14 is next, followed by Plan 15; neither plan runs hosted ship checks. Phase 11 code
+review and final verification remain outstanding.
+
+### Phase 11 Plan 12 closeout and Plans 14-15 (2026-11-22)
+
+Runtime/model: Codex GSD planner; primary model identifier unavailable. Planning duration was not reliably captured.
+The split preserves the 3,901-line cap, leaves the generic scanner deferred, records Plan 12 Task 1 only, and
+assigns CHD-OFF package checks to Plan 14 followed by the installed SDL2 example and CHD-ON consumers in
+Plan 15. Cross-platform evidence and hosted Main/Nightly/Release checks remain with final phase review. Plan
+frontmatter and structure checks passed for Plans 12, 14 and 15. The local line-budget check
+reported 3,899/3,901; CTest discovery confirmed all selected package, provider, extension and install selectors.
+No tests/builds, hosted workflows or campaigns were run during planning. Next: execute Plan 14; source review
+and the distinct hosted Main/Nightly/Release checks remain for final phase review.
 
 ### Phase 11 Plan 11-09 execution (2026-11-22)
 
