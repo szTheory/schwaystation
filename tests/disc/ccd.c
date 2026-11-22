@@ -111,6 +111,53 @@ static int write_descriptor(const char *path, uint32_t mode,
            write_file(path, descriptor);
 }
 
+static int append_entry(char *text, size_t capacity, size_t *used, uint32_t number,
+                        uint32_t point, uint32_t control, uint32_t track_no,
+                        uint32_t minute, uint32_t second, uint32_t frame, uint32_t lba)
+{
+    int length = snprintf(text + *used, capacity - *used,
+        "[Entry %u]\nSession=1\nPoint=0x%02x\nADR=0x01\nControl=0x%02x\n"
+        "TrackNo=%u\nAMin=0\nASec=0\nAFrame=0\nALBA=-150\nZero=0\n"
+        "PMin=%u\nPSec=%u\nPFrame=%u\nPLBA=%u\n",
+        (unsigned int)number, (unsigned int)point, (unsigned int)control,
+        (unsigned int)track_no, (unsigned int)minute, (unsigned int)second,
+        (unsigned int)frame, (unsigned int)lba);
+    if (length < 0 || (size_t)length >= capacity - *used) return 0;
+    *used += (size_t)length;
+    return 1;
+}
+
+static int write_two_track_descriptor(const char *path, uint32_t track1_index1,
+                                      uint32_t track2_index0, uint32_t track2_index1)
+{
+    char descriptor[4096];
+    size_t used = 0u;
+    int length = snprintf(descriptor, sizeof descriptor,
+        "[CloneCD]\nVersion=3\n"
+        "[Disc]\nTocEntries=5\nSessions=1\nDataTracksScrambled=0\nCDTextLength=0\n"
+        "[Session 1]\nPreGapMode=0\nPreGapSubC=0\n");
+    if (length < 0 || (size_t)length >= sizeof descriptor) return 0;
+    used = (size_t)length;
+    if (!append_entry(descriptor, sizeof descriptor, &used, 0u, 0xa0u, 4u, 0u,
+                      1u, 32u, 0u, 0u) ||
+        !append_entry(descriptor, sizeof descriptor, &used, 1u, 0xa1u, 4u, 0u,
+                      2u, 0u, 0u, 0u) ||
+        !append_entry(descriptor, sizeof descriptor, &used, 2u, 0xa2u, 4u, 0u,
+                      0u, 2u, 16u, 16u) ||
+        !append_entry(descriptor, sizeof descriptor, &used, 3u, 1u, 4u, 1u,
+                      0u, 2u, track1_index1, track1_index1) ||
+        !append_entry(descriptor, sizeof descriptor, &used, 4u, 2u, 0u, 2u,
+                      0u, 2u, track2_index1, track2_index1)) return 0;
+    length = snprintf(descriptor + used, sizeof descriptor - used,
+        "[TRACK 1]\nMODE=2\nINDEX 1=%u\n"
+        "[TRACK 2]\nMODE=0\nINDEX 0=%u\nINDEX 1=%u\n",
+        (unsigned int)track1_index1, (unsigned int)track2_index0,
+        (unsigned int)track2_index1);
+    if (length < 0 || (size_t)length >= sizeof descriptor - used) return 0;
+    used += (size_t)length;
+    return used == strlen(descriptor) && write_file(path, descriptor);
+}
+
 static int expect_supported(const char *path, uint32_t mode,
                             uint32_t expected_index0, uint32_t expected_index1,
                             const char *name)
@@ -205,6 +252,62 @@ static int test_supported_routes(const char *directory)
     (void)remove(descriptor_path);
     (void)remove(image_path);
     (void)remove(playlist_path);
+    return ok;
+}
+
+static int test_two_track_indexes(const char *directory)
+{
+    char descriptor_path[1024];
+    char image_path[1024];
+    schway_disc_image *image = NULL;
+    schway_disc_image_error error;
+    const schway_disc *disc;
+    schway_toc toc;
+    uint8_t sector[2352];
+    int ok = 1;
+    if (!make_path(descriptor_path, directory, "disc-ccd-multi.ccd") ||
+        !make_path(image_path, directory, "disc-ccd-multi.img") ||
+        !write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352)) ||
+        !write_two_track_descriptor(descriptor_path, 0u, 8u, 10u)) return 0;
+    if (schway_disc_image_open(descriptor_path, &image, &error) != SCHWAY_DISC_IMAGE_OK ||
+        image == NULL) {
+        fprintf(stderr, "ASSERT disc.image.ccd: mixed two-track descriptor was rejected: %s\n",
+                error.message);
+        ok = 0;
+        goto done;
+    }
+    disc = schway_disc_image_disc(image);
+    memset(&toc, 0, sizeof toc);
+    toc.size = (uint32_t)sizeof toc;
+    if (disc == NULL || disc->toc == NULL || disc->toc(disc->user, &toc) != 1u ||
+        toc.track_count != 2u ||
+        toc.tracks[0].type != SCHWAY_DISC_TRACK_MODE2 ||
+        toc.tracks[0].index0 != 0u || toc.tracks[0].index1 != 0u ||
+        toc.tracks[0].pregap != 0u || toc.tracks[0].leadout != 8u ||
+        toc.tracks[1].type != SCHWAY_DISC_TRACK_AUDIO ||
+        toc.tracks[1].index0 != 8u || toc.tracks[1].index1 != 10u ||
+        toc.tracks[1].pregap != 2u || toc.tracks[1].leadout != 16u) {
+        fprintf(stderr, "ASSERT disc.image.ccd: mixed track indexes or extents differ\n");
+        ok = 0;
+    }
+    if (disc == NULL || disc->read_sector == NULL) {
+        ok = 0;
+    } else {
+        const uint32_t boundaries[] = {0u, 7u, 8u, 9u, 10u, 15u};
+        for (size_t i = 0u; i < sizeof boundaries / sizeof boundaries[0]; i++) {
+            if (disc->read_sector(disc->user, boundaries[i], sector, NULL) != 1u ||
+                sector[0] != fixture_byte(boundaries[i], 0u) ||
+                sector[2351] != fixture_byte(boundaries[i], 2351u)) {
+                fprintf(stderr, "ASSERT disc.image.ccd: sector boundary %u differs\n",
+                        (unsigned int)boundaries[i]);
+                ok = 0;
+            }
+        }
+    }
+done:
+    schway_disc_image_close(image);
+    (void)remove(descriptor_path);
+    (void)remove(image_path);
     return ok;
 }
 
@@ -421,6 +524,7 @@ int main(int argc, char **argv)
     if (!write_file(input_path, "[CloneCD]\nVersion=3\n") ||
         !expect_open(input_path, SCHWAY_DISC_IMAGE_BAD_IMAGE, "incomplete descriptor")) result = 1;
     if (!test_supported_routes(argv[1])) result = 1;
+    if (!test_two_track_indexes(argv[1])) result = 1;
     if (!test_malformed_metadata(argv[1])) result = 1;
     if (!test_companion_outcomes(argv[1])) result = 1;
 #if !defined(_WIN32) && !defined(__wasi__)
