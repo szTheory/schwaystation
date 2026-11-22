@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 1
+current_plan: 2 of 12 (ready)
 status: ready_to_execute
-stopped_at: Phase 11 planning complete; ready to execute Plan 01
-last_updated: "2026-11-22T01:30:50.466Z"
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-11-22T02:12:20.906Z"
 last_activity: 2026-11-22
-last_activity_desc: Phase 11 plans passed independent review and all planning coverage gates
-state_head: 785c92d9efee4e3095e83125f9cac72c0d5ad3c3
+last_activity_desc: Completed Phase 11 Plan 01; ready to execute Plan 02
+state_head: fbb74d87c2e4432d1981352857b84687bcba01ac
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 60
-  completed_plans: 48
+  completed_plans: 49
   percent: 40
 ---
 
@@ -26,16 +26,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — ECM and CloneCD images; plans passed, ready for implementation
+**Current focus:** Phase 11 — ECM and CloneCD images; Plan 01 complete, Plan 02 ready
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — READY TO EXECUTE
-Current Plan: 1 of 12 (ready)
+Current Plan: 2 of 12 (ready)
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-22 -- Phase 11 planning passed independent review and coverage checks
+Last activity: 2026-11-22 -- Phase 11 Plan 01 completed; Plan 02 is next
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 Plan 11-01 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 in the Codex GSD executor; configured model `gpt-6-luna`. The primary
+runtime model identifier is not exposed. Three tasks took 37 minutes (started 2026-11-22T01:34:33Z,
+completed 2026-11-22T02:11:22Z), producing four task commits and changing ten source, CMake, and test
+files. The route controls pass with 3898/3901 counted lines. Commands exited 0 for the route check,
+the classifier test, the host target build, and the final focused ECM/CCD configure/build/CTest run
+(2/2 tests). The planned RED command exited 8 on the truncated ECM count assertion; the RED evidence
+classifier exited 0 with `RED_EVIDENCE_OK`. The committed-state tracer rerun exited 0. Configure,
+build, and the two focused tests completed in under one second; evidence/commit bookkeeping was the
+longer part of the plan. No hosted CI run was started. The intentionally incomplete positive ECM/CCD
+provider seams are listed in `.planning/WINDOWS.md` and owned by Plans 03/04. ECM-01 and CCD-01 remain
+incomplete until phase-level verification. Plan 02 is next; no user action is needed.
 
 ### Phase 11 planning (2026-11-22)
 
@@ -48,8 +62,8 @@ the command-path probe reports CMake forms as not applicable rather than claimin
 The 3901-line cap, generic SPDX deferral, separate Main/Release checks and cheap preflights are preserved.
 No source implementation or hosted run was performed. The independent checker passed after adding explicit
 CHD-ON consumer and installed-SDL2 example verification. Decision and post-planning coverage gates pass;
-the unchanged counted source is exactly 3901/3901 lines. Planning duration was not reliably measured.
-The orchestrator acts next with execution; no owner action is needed.
+the unchanged counted source was exactly 3901/3901 lines. Planning duration was not reliably measured.
+Plan 11-01 has since completed; Plan 02 is ready to execute.
 
 ### Phase 11 discussion (2026-11-22)
 
@@ -988,6 +1002,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 10 P10 | 19m | 2 tasks | 1 files |
 | Phase 10 P12 | 41m | 2 tasks | 12 files |
 | Phase 10 P13 | 38 | 2 tasks | 7 files |
+| Phase 11 P01 | 37min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -1395,6 +1410,9 @@ Recent decisions affecting current work:
 - [Phase 10]: Keep the 3,901-line cap and defer the generic SPDX scanner.
 - [Phase 10]: Keep the WASI size bound unchanged until the Phase 10 hosted lane reports the actual linked module size.
 - [Phase 10]: Run exact-head CI and Nightly once at the ship PR to avoid duplicate hosted workloads.
+- [Phase 11]: Plan 11-01 keeps ECM and CCD private and fail-closed until their positive readers validate complete media.
+- [Phase 11]: A missing ECM continuation byte is malformed and must leave the output reader null.
+- [Phase 11]: Workflow assertions were consolidated while preserving all controls under the unchanged 3901-line cap.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1641,8 +1659,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T15:54:44.176Z
-Stopped at: Phase 10 complete, ready to plan Phase 11
+Last session: 2026-11-22T02:12:20.748Z
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None
 
 ### v1.0 session history
