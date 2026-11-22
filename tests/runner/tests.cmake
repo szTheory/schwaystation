@@ -403,6 +403,19 @@ save("truncated-block.pbp", image)
       message(FATAL_ERROR "disc probe failed:\nCUE ${cue_rc}\n${cue_out}${cue_err}\n"
         "playlist ${playlist_rc}\n${playlist_out}${playlist_err}")
     endif()
+  elseif(CASE STREQUAL "disc_legacy")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot_legacy_source.cue"
+      RESULT_VARIABLE source_rc OUTPUT_VARIABLE source_out ERROR_VARIABLE source_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot_legacy_literal.ecm"
+      RESULT_VARIABLE legacy_rc OUTPUT_VARIABLE legacy_out ERROR_VARIABLE legacy_err)
+    if(NOT source_rc STREQUAL "0" OR NOT source_out MATCHES "format=disc")
+      message(FATAL_ERROR "legacy source probe failed: exit ${source_rc}\n${source_out}${source_err}")
+    endif()
+    if(NOT legacy_rc STREQUAL "0" OR NOT legacy_out STREQUAL source_out)
+      message(FATAL_ERROR "direct ECM probe must match its source CUE:\n"
+        "source ${source_rc}\n${source_out}${source_err}\n"
+        "ECM ${legacy_rc}\n${legacy_out}${legacy_err}")
+    endif()
   elseif(CASE STREQUAL "disc_unsupported")
     file(MAKE_DIRECTORY "${OUT}/runner-disc-unsupported")
     set(root "${OUT}/runner-disc-unsupported")
@@ -1342,6 +1355,13 @@ schway_add_test(NAME runner.disc.probe
   COMMAND ${runner_check} -DCASE=disc_probe -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
+
+schway_add_test(NAME runner.disc.legacy
+  COMMAND ${runner_check} -DCASE=disc_legacy -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+set_tests_properties(runner.disc.legacy PROPERTIES
+  FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")
 
 schway_add_test(NAME runner.disc.unsupported
   COMMAND ${runner_check} -DCASE=disc_unsupported
