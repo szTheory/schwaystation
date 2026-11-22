@@ -25,5 +25,7 @@ Phase 10 onward adds provider/profile/protection/peripheral rows as each capabil
 
 | Provider | Profile | Protection | Peripheral | Predicate | Status | Evidence | Date |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| ccd | ntsc-u | none | cdrom | disc_boot.mixed.64data+158audio+toc+indexes+pregap+subcode+guest.boot+read+audio+fmv | pass | disc.image.ccd.exit0;disc.image.legacy_parity.ccd.222x1+sub.21312.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ccd.boot+read+audio+fmv.exit0;hosted_ci.unknown;package.unknown;fuzz.unknown | 2026-11-22 |
 | chd | ntsc-u | none | cdrom | disc_boot.toc+sectors+subcode | pass | provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0 | 2026-11-20 |
+| ecm | ntsc-u | none | cdrom | disc_boot.one_data_track.64x1+toc+sectors+guest.boot+read+fmv | pass | disc.image.ecm.literal+modeled.exit0;disc.image.legacy_parity.ecm.64x1.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ecm.boot+read+fmv.exit0;hosted_ci.unknown;package.unknown;fuzz.unknown | 2026-11-22 |
 | pbp | ntsc-u | none | cdrom | disc_boot.one_data_track+toc+sectors+subcode+guest.boot+read+fmv_first_frame | pass | provider.disc.image.pbp_parity.64x1.exit0;runner.disc.pbp.exit0;libretro.content.pbp.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.pbp.boot+read+fmv.exit0;hosted_ci.not_run | 2026-11-21 |

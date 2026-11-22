@@ -8,6 +8,30 @@ and the exclusive leadout LBA. This is a cheap gate against broken metadata, out
 invalid media before the longer guest boot, audio and movie checks; CTest runs it first through
 `FIXTURES_SETUP disc_media_preflight` and requires it for each `disc.fixture.*` guest test.
 
+## ECM and CloneCD guests
+
+The legacy source preflight and parity tests run before the bounded guests. They
+compare source sectors, requested reads and produced outputs: the owned ECM is
+one 64-sector data track, and the owned CloneCD image has 64 data sectors plus
+158 audio sectors (222 total) and 21,312 SUB bytes. The owned ECM has no CD-DA
+track, so its supported guest predicates are boot, read/replay and the first
+FMV frame; the mixed CloneCD fixture also exercises audio. These cases reuse
+the existing guest caps and output assertions.
+
+For the focused route, check the exact inventory, configure the CHD-off path,
+build only the fixture dependencies, then run the fixture-gated selector:
+
+```sh
+LC_ALL=C sort -cu tests/disc/inventory.txt
+cmake --preset ci -DSCHWAYSTATION_CHD=OFF -DSCHWAYSTATION_BUILD_CHD_TOOL=OFF
+cmake --build --preset ci --target schwaystation-test-disc-fixture schwaystation-test-disc-media schwaystation-legacy-disc-fixtures
+ctest --preset ci --no-tests=error -R '^disc[.]image[.]legacy_|^disc[.]fixture[.](ecm|ccd)[.]' --output-on-failure
+```
+
+The guest evidence is specific to these NTSC-U fixtures. It does not establish
+hosted CI, package contents or fuzz campaign results; those remain separate
+checks.
+
 With `SCHWAYSTATION_CHD=ON`, the opt-in `SCHWAYSTATION_BUILD_CHD_TOOL=ON` target also creates a run-local CHD
 from those same two tracks. Before compression, CMake checks the exact CUE layout, whole-sector source sizes,
 track counts and the tool's codec/hunk/worker settings. It generates the CHD twice, requires byte-identical output

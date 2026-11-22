@@ -22,6 +22,13 @@ uncompressed raw CUE. ECM has no track table: the provider rejects cooked
 type 2 or type 3 records. Canonical child paths stay inside the CUE directory;
 an open error leaves the caller's active disc unchanged.
 
+The compressed file and decoded image are each limited to 1 GiB. Opening scans
+the record stream once to validate the whole-output EDC and build a checkpoint
+index capped at 1 MiB; random reads resume from those checkpoints. A bare ECM
+must decode to a whole number of 2352-byte sectors. These are ECM v1.0 record
+rules; the source and modeled-mode mappings are covered by the project's
+independently authored fixture vectors.
+
 ## CloneCD metadata subset
 
 A `.ccd` descriptor reads a same-stem `.img` file. A same-stem `.sub` companion
@@ -44,6 +51,13 @@ extents, TOC and pregap mapping, optional SUB reads, and save/content identity
 against a matching IMG-backed CUE. It does not claim support for multiple
 sessions, other descriptor versions, scrambling, CD-TEXT, or alternate
 pregap-subcode modes.
+
+The descriptor is limited to 64 KiB and media bytes to 1 GiB. The reader checks
+the full IMG extent and exact optional SUB extent before publishing the image;
+sector callbacks return one 2352-byte sector and, when present, its 96-byte
+subcode. CloneCD fields and P-W channel layout are community described rather
+than a complete official specification, so support stays limited to mappings
+proven by the owned fixture.
 
 ## CHD metadata subset
 
