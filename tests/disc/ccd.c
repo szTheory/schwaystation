@@ -363,6 +363,26 @@ static int test_malformed_metadata(const char *directory)
                            "PFrame=9\nPLBA=9\n[TRACK 1]") ||
         !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                      "track Entry PLBA disagreement is rejected")) ok = 0;
+    if (!write_two_track_descriptor(descriptor_path, 0u, 8u, 10u) ||
+        !replace_file_text(descriptor_path, "INDEX 0=8", "INDEX 0=-1") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "negative track indexes are rejected")) ok = 0;
+    if (!write_two_track_descriptor(descriptor_path, 0u, 8u, 10u) ||
+        !replace_file_text(descriptor_path, "INDEX 0=8", "INDEX 0=11") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "INDEX 0 after INDEX 1 is rejected")) ok = 0;
+    if (!write_two_track_descriptor(descriptor_path, 0u, 8u, 10u) ||
+        !replace_file_text(descriptor_path, "MODE=2", "MODE=3") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                     "unsupported track mode is rejected")) ok = 0;
+    if (!write_two_track_descriptor(descriptor_path, 0u, 8u, 10u) ||
+        !replace_file_text(descriptor_path, "[Session 1]", "[Session 2]") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                     "unsupported session is rejected")) ok = 0;
+    if (!write_two_track_descriptor(descriptor_path, 0u, 8u, 10u) ||
+        !replace_file_text(descriptor_path, "[TRACK 1]", "[TRACK 2]") ||
+        !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                     "unsorted track sections are rejected")) ok = 0;
     if (!write_raw_image(image_path, UINT64_C(16) * UINT64_C(2352) - 1u) ||
         !write_descriptor(descriptor_path, 2u, 0u, 0) ||
         !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
@@ -488,10 +508,10 @@ done:
     schway_disc_image_close(image);
     if (!ok) goto cleanup;
     memset(mismatched, 0x5a, sizeof mismatched);
-    if (!write_file_bytes(sub_path, mismatched, sizeof mismatched - 1u) ||
+    if (!write_file_bytes(sub_path, mismatched, sizeof sub - 1u) ||
         !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                      "one-byte-short SUB is rejected") ||
-        !write_file_bytes(sub_path, mismatched, sizeof mismatched + 1u) ||
+        !write_file_bytes(sub_path, mismatched, sizeof mismatched) ||
         !expect_open(descriptor_path, SCHWAY_DISC_IMAGE_BAD_IMAGE,
                      "one-byte-long SUB is rejected") ||
         !write_file_bytes(sub_path, mismatched, sizeof mismatched - 96u) ||

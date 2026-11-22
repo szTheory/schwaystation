@@ -98,6 +98,7 @@ typedef struct schway__disc_ccd_metadata {
 
 struct schway__disc_ccd {
     FILE *img;
+    FILE *sub;
     uint64_t image_bytes;
     uint32_t sector_count;
     schway_toc toc;
@@ -858,6 +859,7 @@ schway_disc_image_status schway__disc_ccd_open(const char *path,
     }
     if (have_sub != 0) {
         uint64_t sub_bytes;
+        uint64_t expected_sub_bytes;
         sub = schway__disc_ccd_open_file(sub_path);
         if (sub == NULL) {
             status = schway__disc_ccd_error(error, SCHWAY_DISC_IMAGE_IO,
@@ -869,12 +871,27 @@ schway_disc_image_status schway__disc_ccd_open(const char *path,
                                             "could not determine CCD SUB size");
             goto fail;
         }
-        (void)fclose(sub);
-        sub = NULL;
-        if (sub_bytes != 0u) {
-            status = schway__disc_ccd_error(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
-                                            "nonempty CCD SUB is not supported yet");
+        if (!schway__media_mul_u64(sectors, UINT64_C(96), &expected_sub_bytes)) {
+            status = schway__disc_ccd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                            "CCD SUB extent overflows its sector count");
             goto fail;
+        }
+        if (sub_bytes != 0u && sub_bytes != expected_sub_bytes) {
+            status = schway__disc_ccd_error(error, SCHWAY_DISC_IMAGE_BAD_IMAGE,
+                                            "CCD SUB must contain exactly 96 bytes per IMG sector");
+            goto fail;
+        }
+        if (sub_bytes == 0u) {
+            if (fclose(sub) != 0) {
+                sub = NULL;
+                status = schway__disc_ccd_error(error, SCHWAY_DISC_IMAGE_IO,
+                                                "could not close empty CCD SUB companion");
+                goto fail;
+            }
+            sub = NULL;
+        } else {
+            reader->sub = sub;
+            sub = NULL;
         }
     }
     reader->image_bytes = img_bytes;
@@ -910,6 +927,7 @@ void schway__disc_ccd_close(schway__disc_ccd *reader)
 {
     if (reader == NULL) return;
     if (reader->img != NULL) (void)fclose(reader->img);
+    if (reader->sub != NULL) (void)fclose(reader->sub);
     free(reader);
 }
 
@@ -928,7 +946,10 @@ uint32_t schway__disc_ccd_read_sector(void *user, uint32_t lba,
 {
     schway__disc_ccd *reader = (schway__disc_ccd *)user;
     uint8_t raw[2352];
+    uint8_t raw_subcode[96];
+    uint8_t decoded_subcode[96];
     uint64_t offset;
+    uint64_t sub_offset;
     if (reader == NULL || reader->img == NULL || sector == NULL ||
         lba >= reader->sector_count ||
         !schway__media_mul_u64(lba, SCHWAY__DISC_CCD_SECTOR_BYTES, &offset) ||
@@ -940,7 +961,30 @@ uint32_t schway__disc_ccd_read_sector(void *user, uint32_t lba,
     if (fseeko(reader->img, (off_t)offset, SEEK_SET) != 0) return 0u;
 #endif
     if (fread(raw, 1u, sizeof raw, reader->img) != sizeof raw) return 0u;
+    if (subcode != NULL && reader->sub != NULL) {
+        if (!schway__media_mul_u64(lba, UINT64_C(96), &sub_offset)) return 0u;
+#if defined(_WIN32)
+        if (_fseeki64(reader->sub, (__int64)sub_offset, SEEK_SET) != 0) return 0u;
+#else
+        if (fseeko(reader->sub, (off_t)sub_offset, SEEK_SET) != 0) return 0u;
+#endif
+        if (fread(raw_subcode, 1u, sizeof raw_subcode, reader->sub) !=
+            sizeof raw_subcode) return 0u;
+        for (size_t i = 0u; i < sizeof decoded_subcode; i++) {
+            uint8_t value = 0u;
+            for (uint32_t channel = 0u; channel < 8u; channel++) {
+                size_t input = (size_t)channel * 12u + i / 8u;
+                uint32_t bit = 7u - (uint32_t)(i % 8u);
+                value |= (uint8_t)(((raw_subcode[input] >> bit) & 1u) <<
+                                   (7u - channel));
+            }
+            decoded_subcode[i] = value;
+        }
+    }
     memcpy(sector, raw, sizeof raw);
-    if (subcode != NULL) memset(subcode, 0, 96u);
+    if (subcode != NULL) {
+        if (reader->sub != NULL) memcpy(subcode, decoded_subcode, sizeof decoded_subcode);
+        else memset(subcode, 0, sizeof decoded_subcode);
+    }
     return 1u;
 }
