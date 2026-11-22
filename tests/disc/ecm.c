@@ -50,10 +50,17 @@ static uint32_t ecm_edc(const uint8_t *bytes, size_t size)
     return ecm_edc_update(0u, bytes, size);
 }
 
+static int write_record_count(FILE *file, uint32_t type, uint32_t count);
+
 static int write_count(FILE *file, uint32_t count)
 {
+    return write_record_count(file, 0u, count);
+}
+
+static int write_record_count(FILE *file, uint32_t type, uint32_t count)
+{
     uint32_t encoded = count - 1u;
-    uint8_t byte = (uint8_t)((encoded & 0x1fu) << 2);
+    uint8_t byte = (uint8_t)(((encoded & 0x1fu) << 2) | type);
     encoded >>= 5;
     if (encoded != 0u) byte |= 0x80u;
     if (fwrite(&byte, 1u, 1u, file) != 1u) return 0;
@@ -64,6 +71,137 @@ static int write_count(FILE *file, uint32_t count)
         if (fwrite(&byte, 1u, 1u, file) != 1u) return 0;
     }
     return 1;
+}
+
+static int hex_digit(char value)
+{
+    if (value >= '0' && value <= '9') return value - '0';
+    if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+    return -1;
+}
+
+static int decode_hex(const char *hex, uint8_t *bytes, size_t size)
+{
+    if (hex == NULL || bytes == NULL || strlen(hex) != size * 2u) return 0;
+    for (size_t i = 0u; i < size; i++) {
+        int high = hex_digit(hex[i * 2u]);
+        int low = hex_digit(hex[i * 2u + 1u]);
+        if (high < 0 || low < 0) return 0;
+        bytes[i] = (uint8_t)((high << 4) | low);
+    }
+    return 1;
+}
+
+/* Independent ECM v1.0 known answers; trailers were calculated from the
+   source fields and format equations, not by the production reader. */
+static const char ecm_type1_trailer_hex[] =
+    "12e390d9000000000000000028e417f85697ec964681e3dfacca093861d2bafcff9ff5b8055690428e96089fd89517b9"
+    "28b7a6b1a2ea48eb16d0adcfd2c8b10b674ea89ced8ca44f361237cb208f7ece6b7599f2732a5e54f00b68e5b0d93e46"
+    "dc5fef289255a607ccf6d6b1035fdcbaa918b142ba9c2f6f5518750670421ec6283f286597d918274691329ae86b26e0"
+    "cdaf0258b1ab377e487cdddc044fa6c257ab10bffe6e1be5b912e31a3f2db10ae7f3dd0d75f4d54fa04b0767df33bebe"
+    "f558f1854586637f6231d2aad6651a67133b0f37b58d89212bd31f05a9de92fc3a1abfa46d0975dd66164c34577ee998"
+    "23821579f44b4cbe64d6d8353a309d9de1f58dbe0f28211f70872336a5348bc4391fe739516b16d6edb1245ee44ba0a4";
+static const char ecm_type2_trailer_hex[] =
+    "e2c1f023fdf7e088418de65adde415fe5697ec964681e3dfacca093861d2bafcff9ff5b8055690428e96089fd89517b9"
+    "28b7a6b1a2ea48eb16d0adcfd2c8b10b674ea89ced8ca44f361237cb208f7ece6b7599f2732a5332501872e18d5c0b3d"
+    "ec4e1b289356a607ccf6d6b1035fdcbaa918b142ba9c2f6f5518750670421ec6283f286597d918274691329ae86b26e0"
+    "cdaf0258b1ab377e487cdddc044fa6c257ab10bffe6e1be5b912e31ac26971e3409a20d976382ae759e2aa64f8f8f03d"
+    "8d61703c402ac894b5d512f74fe8a7df43ecbcfb7bc81e16f55d7ccf981ce49b62ebf01edeef9da29768a8ad45f45b66"
+    "690fda8e993693dbb86422c37b7246f6dfe9921ae85dd549bb304dd3430398607b42b7e98cb96120";
+static const char ecm_type3_trailer_hex[] = "90adca2b";
+
+static int write_modeled_ecm(const char *path, const uint8_t *decoded,
+                             const uint8_t type1[2051], const uint8_t type2[2052],
+                             const uint8_t type3[2328])
+{
+    static const uint8_t terminator[] = { 0xfcu, 0xffu, 0xffu, 0xffu, 0x3fu };
+    static const uint8_t header2[16] = {
+        0u, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu,
+        0xffu, 0xffu, 0xffu, 0u, 0u, 2u, 1u, 2u
+    };
+    static const uint8_t header3[16] = {
+        0u, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu,
+        0xffu, 0xffu, 0xffu, 0u, 0u, 2u, 2u, 2u
+    };
+    uint32_t edc = ecm_edc(decoded, 3u * 2352u);
+    uint8_t checksum[4] = { (uint8_t)edc, (uint8_t)(edc >> 8),
+                            (uint8_t)(edc >> 16), (uint8_t)(edc >> 24) };
+    FILE *file = schway__test_open_file(path, "wb");
+    int ok;
+    if (file == NULL) return 0;
+    ok = fwrite("ECM\0", 1u, 4u, file) == 4u &&
+         write_record_count(file, 1u, 1u) && fwrite(type1, 1u, 2051u, file) == 2051u &&
+         write_count(file, 16u) && fwrite(header2, 1u, sizeof header2, file) == sizeof header2 &&
+         write_record_count(file, 2u, 1u) && fwrite(type2, 1u, 2052u, file) == 2052u &&
+         write_count(file, 16u) && fwrite(header3, 1u, sizeof header3, file) == sizeof header3 &&
+         write_record_count(file, 3u, 1u) && fwrite(type3, 1u, 2328u, file) == 2328u &&
+         fwrite(terminator, 1u, sizeof terminator, file) == sizeof terminator &&
+         fwrite(checksum, 1u, sizeof checksum, file) == sizeof checksum;
+    if (fclose(file) != 0) ok = 0;
+    return ok;
+}
+
+static int test_modeled_known_answers(const char *path)
+{
+    static const uint8_t header2[16] = {
+        0u, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu,
+        0xffu, 0xffu, 0xffu, 0u, 0u, 2u, 1u, 2u
+    };
+    static const uint8_t header3[16] = {
+        0u, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu,
+        0xffu, 0xffu, 0xffu, 0u, 0u, 2u, 2u, 2u
+    };
+    uint8_t decoded[3u * 2352u] = {0};
+    uint8_t type1[2051];
+    uint8_t type2[2052];
+    uint8_t type3[2328];
+    uint8_t actual[sizeof decoded];
+    schway__disc_ecm *reader = NULL;
+    schway_disc_image_error error;
+    int ok = 0;
+    decoded[0] = 0u;
+    memset(decoded + 1u, 0xff, 10u);
+    decoded[11] = 0u;
+    decoded[12] = 0u; decoded[13] = 2u; decoded[14] = 0u; decoded[15] = 1u;
+    type1[0] = 0u; type1[1] = 2u; type1[2] = 0u;
+    for (size_t i = 0u; i < 2048u; i++) {
+        type1[3u + i] = (uint8_t)(i * 7u + 0x13u);
+        decoded[16u + i] = type1[3u + i];
+    }
+    if (!decode_hex(ecm_type1_trailer_hex, decoded + 2064u, 288u)) return 0;
+    memcpy(decoded + 2352u, header2, sizeof header2);
+    memcpy(type2, (uint8_t[]){1u, 2u, 3u, 4u}, 4u);
+    memcpy(decoded + 2368u, type2, 4u);
+    memcpy(decoded + 2372u, type2, 4u);
+    for (size_t i = 0u; i < 2048u; i++) {
+        type2[4u + i] = (uint8_t)(i * 7u + 0x13u);
+        decoded[2376u + i] = type2[4u + i];
+    }
+    if (!decode_hex(ecm_type2_trailer_hex, decoded + 4424u, 280u)) return 0;
+    memcpy(decoded + 4704u, header3, sizeof header3);
+    memcpy(type3, (uint8_t[]){0x81u, 1u, 1u, 8u}, 4u);
+    memcpy(decoded + 4720u, type3, 4u);
+    memcpy(decoded + 4724u, type3, 4u);
+    for (size_t i = 0u; i < 2324u; i++) {
+        type3[4u + i] = (uint8_t)(i * 11u + 0x31u);
+        decoded[4728u + i] = type3[4u + i];
+    }
+    if (!decode_hex(ecm_type3_trailer_hex, decoded + 7052u, 4u) ||
+        !write_modeled_ecm(path, decoded, type1, type2, type3) ||
+        schway__disc_ecm_open(path, &reader, &error) != SCHWAY_DISC_IMAGE_OK) {
+        fprintf(stderr, "ASSERT disc.image.ecm: independent modeled known-answer stream did not open: %s\n",
+                error.message);
+        goto done;
+    }
+    if (schway__disc_ecm_read_bytes(reader, 0u, actual, sizeof actual) != SCHWAY_DISC_IMAGE_OK ||
+        memcmp(actual, decoded, sizeof decoded) != 0) {
+        fprintf(stderr, "ASSERT disc.image.ecm: type 1/2/3 complete decoded bytes differ\n");
+        goto done;
+    }
+    ok = 1;
+done:
+    schway__disc_ecm_close(reader);
+    return ok;
 }
 
 static int write_literal_ecm(const char *path, const uint8_t *bytes, size_t size,
@@ -360,7 +498,8 @@ int main(int argc, char **argv)
         schway__disc_ecm_close(reader);
     }
     if (!test_read_work_limit(input_path) || !test_tiny_record_storm(input_path) ||
-        !test_allocation_failure(input_path, expected)) result = 1;
+        !test_allocation_failure(input_path, expected) ||
+        !test_modeled_known_answers(input_path)) result = 1;
     uint8_t unaligned_image[2351];
     memcpy(unaligned_image, expected, sizeof unaligned_image);
     if (!write_literal_ecm(input_path, unaligned_image, sizeof unaligned_image, 0) ||
