@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 11
 current_phase_name: ECM and CloneCD images
-current_plan: 2 of 13 (blocked by the fixed line cap; Plan 13 complete; Plan 05 runnable)
+current_plan: 5 of 13 (ready; Plan 02 closed by evidence-based deferral; Plan 05 next)
 status: in_progress
-stopped_at: Completed Plan 11-13; Plan 11-02 remains over cap and Plan 05 is runnable
-last_updated: "2026-11-22T13:33:34.362Z"
+stopped_at: Completed Plan 11-02 budget disposition; Plan 05 is ready to execute
+last_updated: "2026-11-22T14:02:39.000Z"
 last_activity: 2026-11-22
-last_activity_desc: Plan 11-13 companion checks and CCD IO status correction passed focused verification
+last_activity_desc: Plan 11-02 closed by cap-based deferral; 3898-line preflight and classifier selector passed
 state_head: 6696aec487d4865ea78e4f7f353bfcd310098a20
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 61
-  completed_plans: 52
+  completed_plans: 53
   percent: 40
 ---
 
@@ -26,16 +26,28 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 11 — Plan 02 is over the 3901-line cap; Plan 13 is complete and Plan 05 is runnable
+**Current focus:** Phase 11 — the D-08 Nightly shortcut is deferred under D-12; Plan 05 is next and Plan 13 is complete
 
 ## Current Position
 
 Phase: 11 (ECM and CloneCD images) — IN PROGRESS
-Current Plan: 2 of 13 (blocked by the fixed line cap; Plan 13 is complete and Plan 05 is runnable)
+Current Plan: 5 of 13 (ready; Plan 02 is closed by evidence-based deferral and Plan 05 is next)
 Total Plans in Phase: 13
 Status: In progress
-Last activity: 2026-11-22 -- Plan 11-13 passed focused post-commit CCD checks; Plan 02 remains over budget
+Last activity: 2026-11-22 -- Plan 11-02 recorded the D-08 deferral; current classifier and cap checks passed
 Progress: [████░░░░░░] 40% (4/10 phases released)
+
+### Phase 11 Plan 11-02 budget disposition (2026-11-22)
+
+Runtime/model: Codex primary model identifier unavailable; OpenGSD 1.20.0. Read-only audits and plan checking used
+`gpt-6-luna` xhigh. This planning and closeout step took about 27 minutes; its exact start time was not retained.
+Two independent audits found the complete metadata-only Nightly controls could not fit the fixed cap: 3898/3901
+current lines plus 30 route-control lines would reach 3928 before classifier/workflow changes, with no safe,
+measured reduction identified. D-12 supersedes only the shortcut portion of D-08; todo 051 remains pending. The
+current full-Nightly fallback, all tests and lanes, and Main/Release separation are unchanged. Plan-structure
+validation passed, the line-budget check exited 0 at 3898, and `ci.classify_policy` passed 1/1 in 0.15 seconds.
+No hosted run or workflow change was made. Plan 02 is closed as a decision record, not as an implemented CI
+optimization; ECM-01 and CCD-01 remain open. Next: execute Plan 05.
 
 ### Phase 11 Plan 11-13 execution (2026-11-22)
 
