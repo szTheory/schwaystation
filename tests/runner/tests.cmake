@@ -255,7 +255,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
     file(WRITE "${playlist_dir}/serial-first.m3u" "disc_boot_playlist.cue\ndisc_boot.cue\n")
     run_disc_identity("${playlist_dir}/serial-first.m3u" "${OUT}/runner-disc-identity-serial-cards" serial_card)
-    if(NOT serial_card STREQUAL "SLUS-12346.srm")
+    if(NOT serial_card STREQUAL "SLES-12346.srm")
       message(FATAL_ERROR "the valid first-member serial did not win over later members: ${serial_card}")
     endif()
     file(COPY_FILE "${playlist_dir}/disc_boot_playlist_track02.bin"
