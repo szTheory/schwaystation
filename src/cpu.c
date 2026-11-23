@@ -201,6 +201,10 @@ static void trace_push(schway *inst, uint32_t event, uint64_t cycle, uint32_t pc
 #include "cpu_exec.inc"
 #undef SCHWAY_TRACE
 
+/* BIOS kernel initialization enters the user shell here; the documented
+   fast path returns to the initialized caller in r31 (PSX-SYSTEM section 7). */
+#define SCHWAY__BIOS_SHELL_ENTRY 0x80030000u
+
 /* The run loop. Each pass first runs the device events that are due, which
    happens at the first instruction boundary at or after a deadline. A DMA unit
    that holds the bus freezes the CPU: ticks advance without an instruction,
@@ -226,6 +230,15 @@ uint32_t schway__cpu_run(schway *inst, uint64_t cycles, uint32_t flags)
                 stop = SCHWAY_STOP_FRAME;
                 break;
             }
+        }
+        if (inst->cpu.pc == SCHWAY__BIOS_SHELL_ENTRY &&
+            inst->cpu.r[31] != SCHWAY__BIOS_SHELL_ENTRY &&
+            (inst->profile_flags & SCHWAY_PROFILE_FAST_BOOT) != 0u &&
+            inst->bus.bios_loaded != 0u && inst->disc_host.attached != 0u) {
+            /* The preceding CPU block stops at this 4 KiB page boundary, so
+               the handoff occurs before the first shell instruction fetch. */
+            inst->cpu.pc = inst->cpu.r[31];
+            continue;
         }
         uint64_t left = limit - ran;
         uint64_t until = inst->sched.next > inst->ticks ? inst->sched.next - inst->ticks : 1u;

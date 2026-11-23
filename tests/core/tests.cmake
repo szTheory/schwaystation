@@ -38,6 +38,9 @@ foreach(case IN ITEMS testcard.pixels testcard.counter testcard.frames_differ te
     COMMAND schwaystation-test-core ${case}
     LABELS core portable TIMEOUT 10)
 endforeach()
+schway_add_test(NAME core.boot.fast
+  COMMAND schwaystation-test-core boot.fast
+  LABELS core portable TIMEOUT 10)
 
 # audio.pairs runs 8,000 frames, so its time is set by the lane's memory speed:
 # 1.2 s on an Apple core, 6.42 s on the Intel macOS runner in run 40942957712

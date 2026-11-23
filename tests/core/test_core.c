@@ -619,6 +619,172 @@ static void test_profile_locked(void)
 
 /* Documented board/GPU pairs from PSX-SYSTEM section 8. Board identity and
    the legacy GPU flag are independent for old-sized callers. */
+static uint32_t fast_boot_read_sector(void *user, uint32_t lba, uint8_t sector[2352],
+                                     uint8_t subcode[96])
+{
+    (void)user;
+    (void)lba;
+    memset(sector, 0, 2352u);
+    memset(subcode, 0, 96u);
+    return 1u;
+}
+
+static uint32_t fast_boot_read_toc(void *user, schway_toc *out)
+{
+    (void)user;
+    memset(out, 0, sizeof *out);
+    out->size = (uint32_t)sizeof *out;
+    out->track_count = 1u;
+    out->tracks[0].size = (uint32_t)sizeof out->tracks[0];
+    out->tracks[0].type = SCHWAY_DISC_TRACK_MODE2;
+    out->tracks[0].index0 = 150u;
+    out->tracks[0].index1 = 150u;
+    out->tracks[0].leadout = 300u;
+    return 1u;
+}
+
+static void fast_boot_attach_disc(schway *inst)
+{
+    schway_disc disc;
+    memset(&disc, 0, sizeof disc);
+    disc.size = (uint32_t)sizeof disc;
+    disc.read_sector = fast_boot_read_sector;
+    disc.toc = fast_boot_read_toc;
+    disc.identity_size = (uint32_t)sizeof disc.identity_sha256;
+    memset(disc.identity_sha256, 0xA5, sizeof disc.identity_sha256);
+    CHECK_EQ_U64(schway_open_disc(inst, &disc), SCHWAY_STATUS_OK);
+}
+
+static void fast_boot_write_word(schway *inst, uint32_t address, uint32_t value)
+{
+    uint32_t physical = address & 0x1FFFFFFFu;
+    CHECK(physical <= SCHWAY__RAM_SIZE - 4u);
+    if (physical <= SCHWAY__RAM_SIZE - 4u) {
+        for (uint32_t byte = 0u; byte < 4u; byte++) {
+            inst->bus.ram[physical + byte] = (uint8_t)(value >> (8u * byte));
+        }
+    }
+}
+
+static schway *fast_boot_instance(uint32_t flags, const uint8_t *bios, uint32_t attach_disc)
+{
+    const uint32_t shell_entry = 0x80030000u;
+    const uint32_t return_address = 0x80010000u;
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    schway_profile profile = make_profile(SCHWAY_REGION_NTSC_U);
+    profile.flags = flags;
+    CHECK_EQ_U64(schway_set_profile(inst, &profile), SCHWAY_STATUS_OK);
+    if (bios != NULL) {
+        CHECK_EQ_U64(schway_load_bios(inst, bios, SCHWAY__BIOS_SIZE), SCHWAY_STATUS_OK);
+    }
+    if (attach_disc != 0u) {
+        fast_boot_attach_disc(inst);
+    }
+    fast_boot_write_word(inst, shell_entry, 0x24020063u); /* addiu v0, zero, 99 */
+    fast_boot_write_word(inst, return_address, 0x2402002Au); /* addiu v0, zero, 42 */
+    fast_boot_write_word(inst, return_address + 4u, 0x2402002Bu); /* addiu v0, zero, 43 */
+    fast_boot_write_word(inst, shell_entry - 4u, 0x24020007u); /* addiu v0, zero, 7 */
+    fast_boot_write_word(inst, shell_entry + 4u, 0x24020011u); /* addiu v0, zero, 17 */
+    return inst;
+}
+
+static void test_boot_fast(void)
+{
+    uint8_t *bios = (uint8_t *)calloc(1u, SCHWAY__BIOS_SIZE);
+    CHECK(bios != NULL);
+    if (bios == NULL) {
+        exit(1);
+    }
+
+    const uint32_t shell_entry = 0x80030000u;
+    const uint32_t return_address = 0x80010000u;
+    schway *fast = fast_boot_instance(SCHWAY_PROFILE_FAST_BOOT, bios, 1u);
+    schway *direct = fast_boot_instance(SCHWAY_PROFILE_FAST_BOOT, bios, 1u);
+    fast->cpu.pc = shell_entry;
+    direct->cpu.pc = return_address;
+    fast->cpu.r[31] = return_address;
+    direct->cpu.r[31] = return_address;
+    fast->cpu.r[5] = 0x12345678u;
+    direct->cpu.r[5] = 0x12345678u;
+
+    CHECK_EQ_U64(schway__cpu_run(fast, 1u, 0u), SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(schway__cpu_run(direct, 1u, 0u), SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(fast->cpu.r[2], 42u);
+    CHECK_EQ_U64(fast->cpu.r[5], 0x12345678u);
+    CHECK_EQ_U64(fast->cpu.r[31], return_address);
+    CHECK_EQ_U64(fast->cpu.pc, direct->cpu.pc);
+    CHECK_EQ_U64(fast->cpu.cycle, direct->cpu.cycle);
+    CHECK_EQ_U64(fast->ticks, direct->ticks);
+
+    size_t state_size = schway_state_size(fast);
+    uint8_t *fast_state = (uint8_t *)malloc(state_size);
+    uint8_t *direct_state = (uint8_t *)malloc(state_size);
+    CHECK(fast_state != NULL);
+    CHECK(direct_state != NULL);
+    if (fast_state == NULL || direct_state == NULL) {
+        free(fast_state);
+        free(direct_state);
+        schway_destroy(direct);
+        schway_destroy(fast);
+        free(bios);
+        exit(1);
+    }
+    CHECK_EQ_U64(schway_save_state(fast, fast_state, state_size), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(schway_save_state(direct, direct_state, state_size), SCHWAY_STATUS_OK);
+    CHECK(memcmp(fast_state, direct_state, state_size) == 0);
+
+    /* The returned PC is no longer the shell hook; its next instruction runs. */
+    CHECK_EQ_U64(schway__cpu_run(fast, 1u, 0u), SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(fast->cpu.r[2], 43u);
+    CHECK_EQ_U64(fast->cpu.pc, return_address + 8u);
+
+    schway *full = fast_boot_instance(0u, bios, 1u);
+    full->cpu.pc = shell_entry;
+    full->cpu.r[31] = return_address;
+    CHECK_EQ_U64(schway__cpu_run(full, 1u, 0u), SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(full->cpu.r[2], 99u);
+    CHECK_EQ_U64(full->cpu.pc, shell_entry + 4u);
+
+    schway *no_bios = fast_boot_instance(SCHWAY_PROFILE_FAST_BOOT, NULL, 1u);
+    no_bios->cpu.pc = shell_entry;
+    no_bios->cpu.r[31] = return_address;
+    CHECK_EQ_U64(schway__cpu_run(no_bios, 1u, 0u), SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(no_bios->cpu.r[2], 99u);
+    CHECK_EQ_U64(no_bios->cpu.pc, shell_entry + 4u);
+
+    schway *no_disc = fast_boot_instance(SCHWAY_PROFILE_FAST_BOOT, bios, 0u);
+    no_disc->cpu.pc = shell_entry;
+    no_disc->cpu.r[31] = return_address;
+    CHECK_EQ_U64(schway__cpu_run(no_disc, 1u, 0u), SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(no_disc->cpu.r[2], 99u);
+    CHECK_EQ_U64(no_disc->cpu.pc, shell_entry + 4u);
+
+    schway *before_shell = fast_boot_instance(SCHWAY_PROFILE_FAST_BOOT, bios, 1u);
+    before_shell->cpu.pc = shell_entry - 4u;
+    before_shell->cpu.r[31] = return_address;
+    CHECK_EQ_U64(schway__cpu_run(before_shell, 1u, 0u), SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(before_shell->cpu.r[2], 7u);
+    CHECK_EQ_U64(before_shell->cpu.pc, shell_entry);
+
+    schway *after_shell = fast_boot_instance(SCHWAY_PROFILE_FAST_BOOT, bios, 1u);
+    after_shell->cpu.pc = shell_entry + 4u;
+    after_shell->cpu.r[31] = return_address;
+    CHECK_EQ_U64(schway__cpu_run(after_shell, 1u, 0u), SCHWAY_STOP_BUDGET);
+    CHECK_EQ_U64(after_shell->cpu.r[2], 17u);
+    CHECK_EQ_U64(after_shell->cpu.pc, shell_entry + 8u);
+
+    schway_destroy(after_shell);
+    schway_destroy(before_shell);
+    schway_destroy(no_disc);
+    schway_destroy(no_bios);
+    schway_destroy(full);
+    free(direct_state);
+    free(fast_state);
+    schway_destroy(direct);
+    schway_destroy(fast);
+    free(bios);
+}
+
 static const struct {
     uint32_t board;
     uint32_t gpu_v0;
@@ -1239,6 +1405,7 @@ static const struct {
     const char *name;
     void (*run)(void);
 } cases[] = {
+    {"boot.fast", test_boot_fast},
     {"api.error_changes_nothing", test_error_changes_nothing},
     {"api.size_tags", test_size_tags},
     {"api.statuses", test_statuses},
