@@ -26,6 +26,7 @@ typedef enum schway_host_disc_probe_status {
 typedef struct schway_host_disc_probe {
     char serial[16];
     char boot_name[64];
+    uint32_t licence_area; /* SCHWAY_LICENCE_*; zero if sector 4 is unknown/unreadable */
     uint8_t track1_sha1[20];
     uint8_t *exe_bytes;
     size_t exe_size;

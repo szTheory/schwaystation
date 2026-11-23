@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "disc_image.h"
+#include "schwaystation.h"
 #include "sha1.h"
 
 #define SCHWAY__ISO_SECTOR_SIZE 2048u
@@ -122,6 +123,40 @@ static unsigned char schway__iso_ascii_upper(unsigned char c)
         return (unsigned char)(c - (unsigned char)'a' + (unsigned char)'A');
     }
     return c;
+}
+
+static uint32_t schway__iso_licence_area(const uint8_t *sector)
+{
+    static const char sony[] = "SONYCOMPUTERENTERTAINMENT";
+    char letters[SCHWAY__ISO_SECTOR_SIZE];
+    size_t letter_count = 0u;
+    uint32_t found = SCHWAY_LICENCE_NONE;
+    for (size_t i = 0u; i < SCHWAY__ISO_SECTOR_SIZE; i++) {
+        unsigned char c = schway__iso_ascii_upper(sector[i]);
+        if (c >= (unsigned char)'A' && c <= (unsigned char)'Z') {
+            letters[letter_count++] = (char)c;
+        }
+    }
+    for (size_t i = 0u; i + sizeof sony - 1u < letter_count; i++) {
+        size_t after;
+        uint32_t area = SCHWAY_LICENCE_NONE;
+        if (memcmp(letters + i, sony, sizeof sony - 1u) != 0) continue;
+        after = i + sizeof sony - 1u;
+        if (after + 3u <= letter_count && memcmp(letters + after, "INC", 3u) == 0) {
+            area = SCHWAY_LICENCE_JAPAN;
+        } else if (after + 6u <= letter_count &&
+                   memcmp(letters + after, "EUROPE", 6u) == 0) {
+            area = SCHWAY_LICENCE_EUROPE;
+        } else if (after + 7u <= letter_count &&
+                   memcmp(letters + after, "AMERICA", 7u) == 0) {
+            area = SCHWAY_LICENCE_NORTH_AMERICA;
+        }
+        if (area != SCHWAY_LICENCE_NONE) {
+            if (found != SCHWAY_LICENCE_NONE && found != area) return SCHWAY_LICENCE_NONE;
+            found = area;
+        }
+    }
+    return found;
 }
 
 static int schway__iso_both_u16(const uint8_t *p, uint16_t *value)
@@ -407,6 +442,11 @@ static schway_host_disc_probe_status schway__iso_process(
     if (!have_pvd || !have_terminator || !schway__iso_both_u32(pvd + 80u, &volume_sectors) ||
         volume_sectors < 18u || volume_sectors > actual_sectors) {
         return SCHWAY_HOST_DISC_PROBE_BAD_ISO;
+    }
+    uint8_t licence_sector[SCHWAY__ISO_SECTOR_SIZE];
+    if (schway__iso_read_at(source, 4u * SCHWAY__ISO_SECTOR_SIZE,
+                            licence_sector, sizeof licence_sector)) {
+        result->licence_area = schway__iso_licence_area(licence_sector);
     }
     uint16_t block_size;
     if (!schway__iso_both_u16(pvd + 128u, &block_size) || block_size != SCHWAY__ISO_SECTOR_SIZE ||

@@ -403,6 +403,44 @@ save("truncated-block.pbp", image)
       message(FATAL_ERROR "disc probe failed:\nCUE ${cue_rc}\n${cue_out}${cue_err}\n"
         "playlist ${playlist_rc}\n${playlist_out}${playlist_err}")
     endif()
+    if(NOT DEFINED PYTHON3 OR PYTHON3 STREQUAL "")
+      message(FATAL_ERROR "sector-4 region probe needs the configured Python 3 executable")
+    endif()
+    file(MAKE_DIRECTORY "${OUT}")
+    set(patch_sector4 [==[
+from pathlib import Path
+import sys
+image = bytearray(Path(sys.argv[1]).read_bytes())
+start = 4 * 2352 + 24
+if start + 2048 > len(image):
+    raise SystemExit("disc fixture is too short for sector 4")
+sector = bytearray(2048)
+marker = b"          Licensed  by          Sony Computer Entertainment Euro pe   "
+sector[:len(marker)] = marker
+image[start:start + 2048] = sector
+Path(sys.argv[2]).write_bytes(image)
+]==])
+    execute_process(COMMAND "${PYTHON3}" -c "${patch_sector4}"
+        "${FIXTURES}/disc_boot.bin" "${OUT}/disc_boot_region.bin"
+      RESULT_VARIABLE patch_rc OUTPUT_VARIABLE patch_out ERROR_VARIABLE patch_err)
+    if(NOT patch_rc STREQUAL "0")
+      message(FATAL_ERROR "could not create the sector-4 probe image: ${patch_out}${patch_err}")
+    endif()
+    file(COPY_FILE "${FIXTURES}/disc_boot_track02.bin" "${OUT}/disc_boot_region_track02.bin")
+    file(WRITE "${OUT}/disc_boot_region.cue"
+      "FILE \"disc_boot_region.bin\" BINARY\n"
+      "  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n"
+      "FILE \"disc_boot_region_track02.bin\" BINARY\n"
+      "  TRACK 02 AUDIO\n    INDEX 00 00:00:00\n    INDEX 01 00:02:00\n")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${OUT}/disc_boot_region.cue"
+      RESULT_VARIABLE region_rc OUTPUT_VARIABLE region_out ERROR_VARIABLE region_err)
+    if(NOT region_rc STREQUAL "0" OR
+       NOT region_out MATCHES "disc_licence_area=europe" OR
+       NOT region_out MATCHES "region_guess=pal" OR
+       NOT region_out MATCHES "region_conflicts=0x00000004")
+      message(FATAL_ERROR "sector-4 licence area was not extracted before the EXE marker:\n"
+        "exit ${region_rc}\n${region_out}${region_err}")
+    endif()
   elseif(CASE STREQUAL "disc_legacy")
     if(NOT DEFINED HOOKED OR NOT EXISTS "${BIOS}")
       message(FATAL_ERROR "legacy runner checks need the hooked runner and owned BIOS")
@@ -1440,6 +1478,17 @@ set_target_properties(schwaystation-test-runner PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-runner)
 
+# The region precedence resolver is deliberately host-only and has no runner,
+# disc-image or core dependency, so the table test links only this module.
+add_executable(schwaystation-test-region-probe
+  ${CMAKE_CURRENT_LIST_DIR}/test_region_probe.c
+  ${PROJECT_SOURCE_DIR}/runner/region.c)
+target_include_directories(schwaystation-test-region-probe PRIVATE
+  ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/generated ${PROJECT_SOURCE_DIR}/runner)
+set_target_properties(schwaystation-test-region-probe PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-region-probe)
+
 # Fault prevented: an encoder whose chunk CRCs, Adler-32 or stored blocks are
 # wrong, so a viewer or the RetroArch compare rejects or misreads the file.
 schway_add_test(NAME runner.png
@@ -1536,6 +1585,7 @@ set_tests_properties(runner.disc.pbp PROPERTIES FIXTURES_REQUIRED "disc_pbp_pref
 
 schway_add_test(NAME runner.disc.probe
   COMMAND ${runner_check} -DCASE=disc_probe -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures
+    -DOUT=${PROJECT_BINARY_DIR}/tests/runner-disc-probe -DPYTHON3=${Python3_EXECUTABLE}
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
@@ -1610,6 +1660,12 @@ foreach(case no_args unknown positional exe frame_range png_syntax region)
       -P ${CMAKE_CURRENT_LIST_FILE}
     LABELS portable runner TIMEOUT 30)
 endforeach()
+
+# Fault prevented: serial, disc licence and executable hints are resolved in
+# priority order while every disagreement remains visible to diagnostics.
+schway_add_test(NAME runner.region.probe
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-region-probe>
+  LABELS portable runner TIMEOUT 10)
 
 # The bench statistics and the stop flag, tested directly, and a runner built
 # with a hook that raises SIGTERM from inside frame 5.

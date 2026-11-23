@@ -37,6 +37,7 @@ runner.inputs.script	portable,runner
 runner.native_hash	portable,runner
 runner.png	portable,runner
 runner.png_file	portable,runner
+runner.region.probe	portable,runner
 runner.rgb24	portable,runner
 runner.stop	portable,runner
 runner.trace.golden	portable,runner

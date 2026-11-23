@@ -13,6 +13,7 @@
 #include "schwaystation.h"
 #include "sha1.h"
 #include "disc_probe.h"
+#include "region.h"
 
 #define EXE_HEADER 0x800u
 #define EXE_MAX (EXE_HEADER + 0x200000u) /* the validator's largest file */
@@ -87,15 +88,22 @@ static const char *licence_area_name(uint32_t area)
 
 static const char *region_guess(uint32_t area)
 {
-    switch (area) {
-    case SCHWAY_LICENCE_JAPAN:
-        return "ntsc-j";
-    case SCHWAY_LICENCE_EUROPE:
-        return "pal";
-    case SCHWAY_LICENCE_NORTH_AMERICA:
-        return "ntsc-u";
-    default:
-        return "unknown";
+    uint32_t region = schway__region_from_licence_area(area);
+    switch (region) {
+    case SCHWAY_REGION_NTSC_J: return "ntsc-j";
+    case SCHWAY_REGION_PAL: return "pal";
+    case SCHWAY_REGION_NTSC_U: return "ntsc-u";
+    default: return "unknown";
+    }
+}
+
+static const char *region_name(uint32_t region)
+{
+    switch (region) {
+    case SCHWAY_REGION_NTSC_J: return "ntsc-j";
+    case SCHWAY_REGION_PAL: return "pal";
+    case SCHWAY_REGION_NTSC_U: return "ntsc-u";
+    default: return "unknown";
     }
 }
 
@@ -385,6 +393,8 @@ int schway__probe_print(FILE *out, const char *path,
             refuse("input", schway_status_string(validation));
             return 1;
         }
+        schway__region_resolution resolution = schway__region_resolve(
+            disc.serial, disc.licence_area, disc_info.licence_area);
         char md5_hex[33];
         char track_sha1_hex[41];
         char title[256] = "";
@@ -403,6 +413,9 @@ int schway__probe_print(FILE *out, const char *path,
                   "boot_name=redacted\nsha256=redacted\ntitle=unavailable\n"
                   "metadata.identity=unknown\n", out);
         }
+        fprintf(out, "disc_licence_area=%s\nregion_guess=%s\nregion_conflicts=0x%08lx\n",
+                licence_area_name(disc.licence_area), region_name(resolution.region),
+                (unsigned long)resolution.disagreements);
         fputs("boot_status=unknown\nplay_status=unknown\n", out);
         schway__disc_probe_dispose(&disc);
         return ferror(out) == 0 ? 0 : 1;
