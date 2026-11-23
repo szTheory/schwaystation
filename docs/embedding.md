@@ -443,7 +443,9 @@ API version 8 appends `board` after `disc_flags`. New instances use PU-18 defaul
 `board`, or sets it to zero, keeps the instance's current board defaults; `SCHWAY_PROFILE_GPU_V0` remains the
 legacy GPU override for those profiles. An explicit board selects its documented SPU, CD firmware, RAM-control
 and port defaults. Its GPU must match the board: GPU v0 is valid for PU-7 and early PU-8, while the other boards
-use GPU v2.
+use GPU v2. The board identifiers are `SCHWAY_BOARD_PU7`, `SCHWAY_BOARD_PU8_EARLY`, `SCHWAY_BOARD_PU8_LATE`,
+`SCHWAY_BOARD_PU18`, `SCHWAY_BOARD_PU20`, `SCHWAY_BOARD_PU22`, `SCHWAY_BOARD_PU23`, `SCHWAY_BOARD_PM41` and
+`SCHWAY_BOARD_PM41_2`.
 
 - `schway_profile.disc_flags` with `SCHWAY_PROFILE_CD_LICENSED`: treat an attached data disc as licensed for the selected machine region. This is an
   explicit host override for discs whose lead-in licence cannot be supplied through the sector callback.
@@ -451,6 +453,8 @@ use GPU v2.
 - `schway_profile.flags` with `SCHWAY_PROFILE_DEBUG_PORT`: the guest's byte writes to the two debug ports (a TTY byte and an exit code) take effect.
   Retail hosts leave it clear, and then those writes do nothing.
 - `schway_profile.flags` with `SCHWAY_PROFILE_GPU_V0`: select the early GPU v0 model, which lacks rectangle texture flips. The default is GPU v2.
+- `schway_profile.flags` with `SCHWAY_PROFILE_FAST_BOOT`: request the bounded BIOS-shell handoff. Runner and libretro hosts
+  accept it only for eligible BIOS-backed discs with a valid boot executable; their standalone PS-EXE paths remain BIOS-free.
 
 ## Video
 
