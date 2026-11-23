@@ -391,6 +391,17 @@ function(schway_register_mdec_color_reference_tests reference_dir exes pngs)
   list(GET pngs 0 frame_scene)
   list(GET pngs 2 movie_scene)
   list(APPEND scene_pngs "${frame_scene}" "${frame_scene}" "${movie_scene}" "${movie_scene}")
+
+  list(GET exes 2 movie15_exe)
+  list(GET pngs 2 movie15_vram)
+  list(GET scene_pngs 2 movie15_scene)
+  schway_add_test(NAME mdec.reference.edge
+    COMMAND schwaystation-test-mdec-reference color movie15
+      "${movie15_exe}" "${movie15_vram}" "${movie15_scene}"
+    LABELS mdec nightly portable TIMEOUT 120)
+  set_tests_properties(mdec.reference.edge PROPERTIES
+    FIXTURES_REQUIRED "mdec_reference_input_preflight;mdec_color_reference_assets")
+
   foreach(index RANGE 0 3)
     list(GET cases ${index} case)
     list(GET exes ${index} exe)
