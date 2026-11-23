@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 12
 current_phase_name: SBI and LibCrypt
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed Phase 12-02; runtime/model Codex/GPT-6, primary model ID not exposed; 4m elapsed; parser CTest and fixture controls passed in 0.12s
-last_updated: "2026-11-23T05:27:55.409Z"
+stopped_at: Completed 12-02; runtime/model Codex/GPT-6, primary model ID not exposed; formats 1–3 and malformed bounds pass; 3m30s elapsed
+last_updated: "2026-11-23T05:28:57.025Z"
 last_activity: 2026-11-23
 last_activity_desc: Phase 12 execution started
-state_head: 1e6d661f167bae25529abd57c369c1001949fe66
+state_head: 40822158c8778b3fe6b31b292398bc428ccc78fe
 progress:
   total_phases: 10
   completed_phases: 5
   total_plans: 70
-  completed_plans: 64
+  completed_plans: 65
   percent: 50
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 12 (SBI and LibCrypt) — EXECUTING
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 7
 Status: Ready to execute
 Last activity: 2026-11-23 — Phase 12 execution started
@@ -1912,8 +1912,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T05:27:55.243Z
-Stopped at: Completed Phase 12-02; runtime/model Codex/GPT-6, primary model ID not exposed; 4m elapsed; parser CTest and fixture controls passed in 0.12s
+Last session: 2026-11-23T05:28:56.854Z
+Stopped at: Completed 12-02; runtime/model Codex/GPT-6, primary model ID not exposed; formats 1–3 and malformed bounds pass; 3m30s elapsed
 Resume file: .planning/phases/12-sbi-and-libcrypt/12-03-PLAN.md
 
 ### v1.0 session history
