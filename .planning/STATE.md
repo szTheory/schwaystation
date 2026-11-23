@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 13
 current_phase_name: Regions, console revisions and playback
-current_plan: 4
+current_plan: 5
 status: planned
-stopped_at: Completed 13-03-PLAN.md
-last_updated: "2026-11-23T17:19:44Z"
+stopped_at: Completed 13-04-PLAN.md
+last_updated: "2026-11-23T17:44:24.357Z"
 last_activity: 2026-11-23
-last_activity_desc: Plans 13-01 through 13-03 complete; Plan 13-04 is next
-state_head: 610fb32c4ae756d472cdb2c83f0c57f65579f92b
+last_activity_desc: Plans 13-01 through 13-04 complete; Plan 13-05 is next
+state_head: 1391c15c95cbc4c25032ba82215c50b79d61ed03
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 79
-  completed_plans: 73
+  completed_plans: 74
   percent: 60
 ---
 
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 13 — Regions, console revisions and playback
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 9
 Status: Ready to execute
-Last activity: 2026-11-23 -- Plans 13-01 through 13-03 complete; Plan 13-04 is next
-Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-03 are complete; Plan 13-04 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Last activity: 2026-11-23 -- Plans 13-01 through 13-04 complete; Plan 13-05 is next
+Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-04 are complete; Plan 13-05 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
@@ -60,6 +60,16 @@ Task 1 preflights passed: nine board rows, two 0x0B80 entries, sorted core/GPU i
 Task 2 preflights passed: firmware-generation counts were vC0/vC1/vC2/vC3 = 2/1/2/4 across nine rows, core/CD-ROM inventories were sorted, diff hygiene passed, and the line-budget gate remained 3,901/3,901. CI reconfigure passed in 0.81s. The exact selector graph was 5/5 in 0.05s, including `cdrom.profile.firmware`, `cdrom.region`, `core.profile.machine` and both disc fixtures. The targeted CD-ROM/core build passed in 0.25s and focused CTest passed 5/5 in 0.12s. A malformed selector shell wrapper exited 1 before invoking CTest; the corrected Python assertion passed. vC0 Test 22h returns INT5 `(0x11,0x10)`; vC1+ keeps the fixed-region string, and the region selector remains separate.
 
 No hosted CI, Act, Docker, or broad suite was run because workflow wiring was unchanged. PROFILE-02 remains pending until state serialization/hash work and full Phase 13 verification. Plan 13-04 is next.
+
+### Phase 13 Plan 13-04 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured wall interval was 17m02s from the saved STATE checkpoint at 17:19:44Z to final focused acceptance and the last task commit at 17:36:46Z; executor start and active time were not separately captured. Task commits were `bf503b3` (RED), `f7064ff` (GREEN), and `1391c15` (Task 2 regression assertions).
+
+The core inventory sort and fixed 3,901-line budget passed. Task 1 configured CI in 0.81s, asserted exactly five selectors including both disc fixture setups, built the state target in 0.56s for RED, and produced the intended RED: four of five tests passed, while `core.state.profile` showed board-derived identity was not restored. The RED evidence checker passed. After implementation, the changed target build passed in 0.87s and the exact selector passed 5/5 in 0.26s. Board identity is serialized once; the shared defaults table validates board/GPU_V0 pairing and reconstructs fixed defaults after APPLY without overwriting `bus.ram_size`.
+
+Task 2 reran the sorted inventory and line-budget checks, configured CI in 0.89s, and asserted exactly seven selectors including the disc fixtures with `core.state.record_sweep` excluded. The state target was rebuilt after test edits in 0.31s; the selected tests passed 7/7 in 0.60s. The added cases cover board zero, above-range board, a CRC-valid PU-7/GPU_V0 mismatch, prior format 18, atomic preservation of state/audio, and deterministic equal/different board state-byte hashes. Task 2's validation cases were green immediately because the validator was delivered in Task 1; no separate RED was fabricated. This sequencing deviation is documented and waived as WINDOWS entry 25.
+
+No broad suite, hosted CI, Act, Docker, or hardware run was needed because workflow wiring did not change. PROFILE-02 remains pending until remaining Phase 13 work and final phase verification. Plan 13-05 is next.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -1316,6 +1326,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 13 P01 | 20m43s | 2 tasks | 12 files |
 | Phase 13 P02 | 60m | 1 tasks | 3 files |
 | Phase 13 P03 | 59m22s | 2 tasks | 9 files |
+| Phase 13 P04 | 17m02s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1754,6 +1765,8 @@ Recent decisions affecting current work:
 - [Phase 13]: Plan 13-02 records the exact movie15 expected-incomplete signature as diagnostic-only; MDEC-01 remains pending until full Phase 13 verification.
 - [Phase 13]: Apply board RAM_SIZE at profile selection and power reset so explicit profiles are correct before the first frame.
 - [Phase 13]: Gate only vC0 Test 22h to the documented INT5 (11h,10h); leave Test 20h and unpinned Test 51h behavior unchanged.
+- [Phase 13]: Serialize board identity once and reconstruct fixed board-derived defaults from the canonical table after APPLY.
+- [Phase 13]: Preserve mutable bus.ram_size during board-identity restoration.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2004,8 +2017,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T17:19:44Z
-Stopped at: Closed Plan 13-03; checked Plan 13-04 is next
+Last session: 2026-11-23T17:44:24.004Z
+Stopped at: Completed 13-04-PLAN.md
 Resume file: None
 
 ### v1.0 session history
