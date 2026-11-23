@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 13
 current_phase_name: Regions, console revisions and playback
-current_plan: 3
+current_plan: 4
 status: planned
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-11-23T16:14:55Z"
+stopped_at: Completed 13-03-PLAN.md
+last_updated: "2026-11-23T17:14:46.825Z"
 last_activity: 2026-11-23
-last_activity_desc: Plans 13-01 and 13-02 complete; Plan 13-03 is next
-state_head: 8444508784d3a40c47b5a34cb9ce74237014e51e
+last_activity_desc: Plans 13-01 through 13-03 complete; Plan 13-04 is next
+state_head: cc256122959da2c105853794c8c4e0fa59009dd5
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 79
-  completed_plans: 72
+  completed_plans: 73
   percent: 60
 ---
 
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 13 — Regions, console revisions and playback
-Current Plan: 3
+Current Plan: 4
 Total Plans in Phase: 9
 Status: Ready to execute
-Last activity: 2026-11-23 -- Plans 13-01 and 13-02 complete; Plan 13-03 is next
-Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 and 13-02 are complete; Plan 13-03 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Last activity: 2026-11-23 -- Plans 13-01 through 13-03 complete; Plan 13-04 is next
+Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-03 are complete; Plan 13-04 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
@@ -50,6 +50,16 @@ Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtim
 The initial CI preset probe configured in 0.9s but exposed 0/4 MDEC selectors, so the checked plan was corrected to the supported MDEC-only Nightly lane. Nightly configure first discovered the four existing selectors (1.8s), then after registration the exact selector graph included only `mdec.reference.input_preflight`, `mdec.reference.color_assets`, and `mdec.reference.edge`. Archive/member extent and digest checks passed. The initial registered edge test exited 8 in 0.07s after both setup fixtures passed; it reproduced the 1,696-word movie15 DMA0 exhaustion at 1,902,230 ticks without a fault. The classifier now accepts only that pinned source count and exact MDEC/DMA signature after eight successful run/TTY empty-FIFO samples, below the unchanged 4,915,200-cycle cap.
 
 The corrected preflight sequence passed: Nightly inventory sort and the 3,901-line budget gate each exited 0 in 0.00s; MDEC-only Nightly configure exited 0 in 1.17s; exact three-name selector assertion exited 0 in 0.00s; focused target build exited 0 in 0.12s; and the single corrected CTest selection exited 0 with 3/3 tests in 0.06s (source preflight 0.02s, assets 0.03s, edge 0.03s). Its saved log reports source complete (1,440 blocks / 240 macroblocks / zero trailing), decoder FIFO empty, guest expected-incomplete, display not compared, ticks 1,902,230/4,915,200, DMA0 idle, DMA1 waiting remain=9/phase=2, and fault none. No full unaffected 4-bit/8-bit suite, hosted CI, Act job, or Docker resource ran because this plan changed no workflow wiring. MDEC-01 remains pending until full Phase 13 verification; no playback, decoded-frame, or hardware-conformance claim is made. Plan 13-03 is next.
+
+### Phase 13 Plan 13-03 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall interval was 59m22s from the saved STATE checkpoint at 16:14:55Z through the final implementation evidence checkpoint at 17:14:17Z; executor start and active time were not separately captured. Seven plan commits were measured from the persisted ledger (`fc67c35` through `cc25612`).
+
+Task 1 preflights passed: nine board rows, two 0x0B80 entries, sorted core/GPU inventories, 3,901/3,901 line budget and exactly 14 selectors including the two disc fixtures. The initial implementation's build and 14-test run passed in 0.50s and 0.15s, but only before the first-boot register seam was found; those are pre-change evidence. After applying defaults during profile selection and adding before/after-reset assertions, the final core/GPU build passed in 0.45s and the exact selector passed 14/14 in 0.13s.
+
+Task 2 preflights passed: firmware-generation counts were vC0/vC1/vC2/vC3 = 2/1/2/4 across nine rows, core/CD-ROM inventories were sorted, diff hygiene passed, and the line-budget gate remained 3,901/3,901. CI reconfigure passed in 0.81s. The exact selector graph was 5/5 in 0.05s, including `cdrom.profile.firmware`, `cdrom.region`, `core.profile.machine` and both disc fixtures. The targeted CD-ROM/core build passed in 0.25s and focused CTest passed 5/5 in 0.12s. A malformed selector shell wrapper exited 1 before invoking CTest; the corrected Python assertion passed. vC0 Test 22h returns INT5 `(0x11,0x10)`; vC1+ keeps the fixed-region string, and the region selector remains separate.
+
+No hosted CI, Act, Docker, or broad suite was run because workflow wiring was unchanged. PROFILE-02 remains pending until state serialization/hash work and full Phase 13 verification. Plan 13-04 is next.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -1305,6 +1315,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 12 P07 | 9min | 1 tasks | 1 files |
 | Phase 13 P01 | 20m43s | 2 tasks | 12 files |
 | Phase 13 P02 | 60m | 1 tasks | 3 files |
+| Phase 13 P03 | 59m22s | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -1741,6 +1752,8 @@ Recent decisions affecting current work:
 - [Phase 13]: Old-sized profiles and board zero inherit current board defaults; GPU_V0 stays a legacy override, while explicit boards must match their documented GPU pairing.
 - [Phase 13]: New instances default to the PU-18 board profile.
 - [Phase 13]: Plan 13-02 records the exact movie15 expected-incomplete signature as diagnostic-only; MDEC-01 remains pending until full Phase 13 verification.
+- [Phase 13]: Apply board RAM_SIZE at profile selection and power reset so explicit profiles are correct before the first frame.
+- [Phase 13]: Gate only vC0 Test 22h to the documented INT5 (11h,10h); leave Test 20h and unpinned Test 51h behavior unchanged.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1991,8 +2004,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T16:10:18.028Z
-Stopped at: Completed 13-02-PLAN.md
+Last session: 2026-11-23T17:14:46.613Z
+Stopped at: Completed 13-03-PLAN.md
 Resume file: None
 
 ### v1.0 session history
