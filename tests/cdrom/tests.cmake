@@ -8,6 +8,17 @@ set_target_properties(schwaystation-test-cdrom PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-cdrom)
 
+add_executable(schwaystation-test-cdrom-sbi ${CMAKE_CURRENT_LIST_DIR}/sbi.c)
+target_include_directories(schwaystation-test-cdrom-sbi PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(schwaystation-test-cdrom-sbi PRIVATE schwaystation::schwaystation)
+set_target_properties(schwaystation-test-cdrom-sbi PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-cdrom-sbi)
+
+schway_add_test(NAME cdrom.sbi
+  COMMAND schwaystation-test-cdrom-sbi
+  LABELS disc portable TIMEOUT 10)
+
 # Fault prevented: the command response does not raise the enabled CD interrupt,
 # or acknowledging it leaves a stale interrupt code visible.
 schway_add_test(NAME cdrom.command

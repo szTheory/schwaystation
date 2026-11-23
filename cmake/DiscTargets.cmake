@@ -7,7 +7,7 @@ add_library(schwaystation_mdec OBJECT src/mdec.c)
 if(SCHWAYSTATION_BUILD_RUNNER OR SCHWAYSTATION_BUILD_LIBRETRO)
   include("${PROJECT_SOURCE_DIR}/cmake/Miniz.cmake")
   add_library(schwaystation_disc_image STATIC
-    host/disc_image.c host/disc_chd.c host/disc_chd_metadata.c
+    host/disc_image.c host/disc_sbi.c host/disc_chd.c host/disc_chd_metadata.c
     host/disc_pbp.c host/disc_pbp_metadata.c
     host/disc_ecm.c host/disc_ccd.c)
   target_include_directories(schwaystation_disc_image PUBLIC
