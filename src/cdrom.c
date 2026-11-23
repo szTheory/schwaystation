@@ -180,13 +180,18 @@ static void command_error(schway *inst, uint8_t error)
     finish_command(cd);
 }
 
-static void command_invalid(schway *inst)
+static void command_invalid_with_error(schway *inst, uint8_t error)
 {
     struct schway__cdrom *cd = &inst->cdrom;
     cd->status |= 1u;
-    const uint8_t bytes[2] = {0x11u, 0x40u};
+    const uint8_t bytes[2] = {0x11u, error};
     response(inst, bytes, 2u, 5u);
     finish_command(cd);
+}
+
+static void command_invalid(schway *inst)
+{
+    command_invalid_with_error(inst, 0x40u);
 }
 
 static void consume_parameters(struct schway__cdrom *cd, uint32_t count)
@@ -940,6 +945,10 @@ static void begin_test(schway *inst)
         return;
     }
     if (p[0] == 0x22u) {
+        if (inst->cd_firmware == 0u) {
+            command_invalid_with_error(inst, 0x10u);
+            return;
+        }
         const char *region = inst->region == SCHWAY_REGION_NTSC_J ? "for Japan" :
                              inst->region == SCHWAY_REGION_NTSC_U ? "for U/C" : "for Europe";
         uint32_t count = inst->region == SCHWAY_REGION_NTSC_J ? 9u :
