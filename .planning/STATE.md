@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 12
-current_phase_name: SBI and LibCrypt
-current_plan: 7
-status: verifying
-stopped_at: Completed 12-07-PLAN.md
-last_updated: "2026-11-23T08:09:48.783Z"
+current_phase: 13
+current_phase_name: Regions, console revisions and playback
+current_plan: Not started
+status: planning
+stopped_at: Phase 12 complete, ready to plan Phase 13
+last_updated: "2026-11-23T08:46:12.734Z"
 last_activity: 2026-11-23
-last_activity_desc: Phase 12 Plan 05 complete; Plan 06 ready
-state_head: 57689ce90cf3459aab15ff984a188d18928438a6
+last_activity_desc: Phase 12 complete, transitioned to Phase 13
+state_head: 304c9b32d7d1f1f39372a0193faa9779d192bed9
 progress:
   total_phases: 10
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 70
   completed_plans: 70
-  percent: 50
+  percent: 60
 ---
 
 # Project State
@@ -30,12 +30,12 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 ## Current Position
 
-Phase: 12 (SBI and LibCrypt) — EXECUTING
-Current Plan: 7
+Phase: 13 — Regions, console revisions and playback
+Current Plan: Not started
 Total Plans in Phase: 7
-Status: Phase complete — ready for verification
-Last activity: 2026-11-23 — Phase 12 Plan 07 complete; phase ready for verification
-Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
+Status: Ready to plan
+Last activity: 2026-11-23 — Phase 12 complete, transitioned to Phase 13
+Progress: [██████░░░░] 60% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -999,7 +999,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 258
+- Total plans completed: 265
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1018,6 +1018,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 9 | 15 | - | - |
 | 10 | 13 | - | - |
 | 11 | 15 | - | - |
+| 12 | 7 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1939,7 +1940,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-23T08:09:48.339Z
-Stopped at: Completed 12-07-PLAN.md
+Stopped at: Phase 12 complete, ready to plan Phase 13
 Resume file: None
 
 ### v1.0 session history
