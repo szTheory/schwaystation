@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 12
 current_phase_name: SBI and LibCrypt
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Completed 12-05-PLAN.md
-last_updated: "2026-11-23T06:45:55.840Z"
+stopped_at: Completed 12-06-PLAN.md
+last_updated: "2026-11-23T07:56:42.128Z"
 last_activity: 2026-11-23
 last_activity_desc: Phase 12 Plan 05 complete; Plan 06 ready
-state_head: c0a36edce5f6ca5f2e5036cc1834827c809755d4
+state_head: 38b4497a96d006147c5269bdd65cd89cd28aa8cd
 progress:
   total_phases: 10
   completed_phases: 5
   total_plans: 70
-  completed_plans: 68
+  completed_plans: 69
   percent: 50
 ---
 
@@ -31,17 +31,21 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 12 (SBI and LibCrypt) — EXECUTING
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 7
 Status: Ready to execute
-Last activity: 2026-11-23 — Phase 12 Plan 05 complete; Plan 06 ready
+Last activity: 2026-11-23 — Phase 12 Plan 06 complete; Plan 07 ready
 Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
 Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The 37-minute plan run completed three tasks and three task-sized commits. The selected M3U child command test passed with the generated legacy fixture setup. The compatibility feature preflight and ratchet passed 2/2; the SBI image selector plus legacy setup/parity passed 3/3. Before the broader local check, selected test names, sorted inventories and the fixed 3,901-line budget all passed. The CD-ROM/disc-image group passed 39/39 in 0.16 seconds wall time.
 
-The broader selector exposed that the historical `SBId` fixture marker was copied beside `disc_boot.cue` and now collided with automatic same-stem sidecar discovery. Removing only the runtime copy restored legacy parity; explicit fixture tests continue to read the marker from its source path. The test compares payloads as one buffer and stops after a failed command guard to keep failure output bounded. No workflow changed, so no hosted CI or Act run was needed; no Docker resource was created. Plan 12-05 is complete, and Plan 12-06 owns the remaining SBI parser fuzz and seed replay required before CRYPT-01 can be checked complete.
+The broader selector exposed that the historical `SBId` fixture marker was copied beside `disc_boot.cue` and now collided with automatic same-stem sidecar discovery. Removing only the runtime copy restored legacy parity; explicit fixture tests continue to read the marker from its source path. The test compares payloads as one buffer and stops after a failed command guard to keep failure output bounded. No workflow changed, so no hosted CI or Act run was needed; no Docker resource was created. Plan 12-05 is complete.
+
+### Phase 12 Plan 12-06 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The 64-minute wall interval completed two tasks and one implementation commit; active time was not separately measured. The new SBI replay passed both the native CI preset and an Apple Clang 21 ASan/UBSan fuzz-preset build. Sorted inventory, workflow selector, Nightly target/count/length arrays and the fixed 3,901-line budget passed. Act dry-run traversed the Nightly fuzz job without creating Docker resources. The local Apple Clang fuzzer runtime is missing, so the mutation campaign remains hosted-only; CRYPT-01 is now complete, and Plan 12-07 remains.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 
@@ -1246,6 +1250,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 12 P03 | 16m | 3 tasks | 5 files |
 | Phase 12 P04 | 22m | 3 tasks | 5 files |
 | Phase 12 P05 | 37min | 3 tasks | 5 files |
+| Phase 12 P06 | 64min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -1675,6 +1680,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Reuse the generated legacy CCD/IMG/SUB fixture and patch only selected test sectors instead of adding another CCD generator.
 - [Phase 12]: Keep compatibility evidence limited to selected-provider binding, bad-Q data availability, and previous-good GetlocP; make no retail-title claim.
 - [Phase 12]: Keep the legacy SBId marker out of the runtime media directory so it cannot be mistaken for a real same-stem SBI sidecar.
+- [Phase 12]: Use the parser's 65,536-byte maximum as the SBI corpus cap, including an 8,193-record boundary case.
+- [Phase 12]: Register both SBI binaries in the explicit fuzz build preset so the existing Nightly job builds them.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1925,8 +1932,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T06:45:55.667Z
-Stopped at: Completed 12-05-PLAN.md
+Last session: 2026-11-23T07:56:41.081Z
+Stopped at: Completed 12-06-PLAN.md
 Resume file: None
 
 ### v1.0 session history
