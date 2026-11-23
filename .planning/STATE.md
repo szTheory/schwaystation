@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 13
 current_phase_name: Regions, console revisions and playback
-current_plan: Not started
+current_plan: 2
 status: planned
-stopped_at: Phase 13 planning complete
-last_updated: "2026-11-23T14:43:33.311Z"
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-11-23T15:09:37.293Z"
 last_activity: 2026-11-23
 last_activity_desc: Phase 13 research and nine plans reviewed; execution is next
-state_head: 1ab28e1190d545d569869ee8366155394c42e47d
+state_head: 067c6866674d51dc12a675b8488590c36a02d335
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 79
-  completed_plans: 70
+  completed_plans: 71
   percent: 60
 ---
 
@@ -31,11 +31,17 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 13 — Regions, console revisions and playback
-Current Plan: Not started
+Current Plan: 2
 Total Plans in Phase: 9
 Status: Ready to execute
 Last activity: 2026-11-23 -- Phase 13 research and nine plans passed structure, dependency and command-syntax checks
 Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+
+### Phase 13 Plan 13-01 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The recorded wall interval was 20m43s from the saved planning-state checkpoint at 14:43:33Z to closeout at 15:04:16Z; executor start was not separately captured and active time was not measured. Task commits: `9ceab60` registered `core.profile.machine`; `067c686` added API v8 board selection and defaults.
+
+`git diff --check` and both sorted exact inventories passed. The repository-check budget remained at its 3,901-line ceiling; the API version preflight covered 249 public header names. The first planned configure/build/CTest command exited 1 on the stale `sizeof(schway_profile) == 16` assertion; configure passed and CTest did not run. After asserting the board offset at 16 and the new size at 20, the focused configure/build/CTest command exited 0: 8/8 reported tests passed in 0.21 seconds, including the board matrix, old-size compatibility, ABI v8 surface and behavior revision check. No workflow changed, so no Act or hosted CI run was needed. PROFILE-02 remains pending until Plan 13-04 adds state validation, serialization and hash coverage; Plan 13-02 is next.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -1289,6 +1295,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 12 P05 | 37min | 3 tasks | 5 files |
 | Phase 12 P06 | 64min | 2 tasks | 8 files |
 | Phase 12 P07 | 9min | 1 tasks | 1 files |
+| Phase 13 P01 | 20m43s | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -1721,6 +1728,9 @@ Recent decisions affecting current work:
 - [Phase 12]: Use the parser's 65,536-byte maximum as the SBI corpus cap, including an 8,193-record boundary case.
 - [Phase 12]: Register both SBI binaries in the explicit fuzz build preset so the existing Nightly job builds them.
 - [Phase 12]: Capture one region-specific runner PCM file and reuse it for both callback comparisons after its existing size and SHA-256 checks pass.
+- [Phase 13]: API v8 appends board identity; behavior revision is 19, while state serialization/hash updates remain for Plan 13-04.
+- [Phase 13]: Old-sized profiles and board zero inherit current board defaults; GPU_V0 stays a legacy override, while explicit boards must match their documented GPU pairing.
+- [Phase 13]: New instances default to the PU-18 board profile.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1971,9 +1981,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T14:43:33.134Z
-Stopped at: Phase 13 planning complete
-Resume file: .planning/phases/13-regions-console-revisions-and-playback/13-01-PLAN.md
+Last session: 2026-11-23T15:08:44.033Z
+Stopped at: Completed 13-01-PLAN.md
+Resume file: None
 
 ### v1.0 session history
 
