@@ -1544,6 +1544,9 @@ if(SCHWAYSTATION_INVENTORY STREQUAL "asan")
   set(runner_disc_legacy_timeout 240)
 elseif(SCHWAYSTATION_OS STREQUAL "macos" AND SCHWAYSTATION_ARCH STREQUAL "x64")
   set(runner_disc_legacy_timeout 240)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "powerpc")
+  # run 45086798403: QEMU-PPC timed out at the 960 s cap under guest-test contention; scale 8 makes this 32 min.
+  set(runner_disc_legacy_timeout 240)
 endif()
 schway_add_test(NAME runner.disc.legacy
   COMMAND ${runner_check} -DCASE=disc_legacy -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
