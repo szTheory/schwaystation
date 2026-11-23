@@ -44,10 +44,10 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 
 ### Region, board and bounded boot/MDEC behavior
 
-- [ ] **PROFILE-01**: PAL timing uses the documented integer clock ratios and is covered by frame, audio cadence and cross-platform hash tests; profile region stays distinct from board revision and title serial.
-- [ ] **PROFILE-02**: Every documented legal board/GPU revision tuple can be selected, every illegal tuple is rejected, and behavior-affecting profile fields participate in instance validation, serialization and hashes; the compatibility ledger records only tuples actually exercised.
-- [ ] **BOOT-01**: The opt-in `fast` runner/core path skips only the documented BIOS-shell handoff for eligible executable content, remains off by default, still requires the user-supplied BIOS, adds no HLE, and does not alter emulated clock/timing; the ordinary BIOS path remains available and separately tested.
-- [ ] **MDEC-01**: Targeted FMV edge regressions exercise the supported MDEC input cases without changing the accepted v1.0 4-bit expected output, frozen deterministic 8-bit baseline or 4,915,200-cycle cap. The source-unit preflight runs first; compressed input coverage, decoder output, guest completion and displayed-image result are reported separately. No exact 8-bit hardware or complete frame/movie conformance claim is made.
+- [x] **PROFILE-01**: PAL timing uses the documented integer clock ratios and is covered by frame, audio cadence and cross-platform hash tests; profile region stays distinct from board revision and title serial.
+- [x] **PROFILE-02**: Every documented legal board/GPU revision tuple can be selected, every illegal tuple is rejected, and behavior-affecting profile fields participate in instance validation, serialization and hashes; the compatibility ledger records only tuples actually exercised.
+- [x] **BOOT-01**: The opt-in `fast` runner/core path skips only the documented BIOS-shell handoff for eligible executable content, remains off by default, still requires the user-supplied BIOS, adds no HLE, and does not alter emulated clock/timing; the ordinary BIOS path remains available and separately tested.
+- [x] **MDEC-01**: Targeted FMV edge regressions exercise the supported MDEC input cases without changing the accepted v1.0 4-bit expected output, frozen deterministic 8-bit baseline or 4,915,200-cycle cap. The source-unit preflight runs first; compressed input coverage, decoder output, guest completion and displayed-image result are reported separately. No exact 8-bit hardware or complete frame/movie conformance claim is made.
 
 ### Serial peripherals and light guns
 
@@ -103,10 +103,10 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | ECM-01 | Phase 11 | Complete |
 | CCD-01 | Phase 11 | Complete |
 | CRYPT-01 | Phase 12 | Complete |
-| PROFILE-01 | Phase 13 | Pending |
-| PROFILE-02 | Phase 13 | Pending |
-| BOOT-01 | Phase 13 | Pending |
-| MDEC-01 | Phase 13 | Pending |
+| PROFILE-01 | Phase 13 | Complete |
+| PROFILE-02 | Phase 13 | Complete |
+| BOOT-01 | Phase 13 | Complete |
+| MDEC-01 | Phase 13 | Complete |
 | SIO-01 | Phase 14 | Pending |
 | SIO-02 | Phase 14 | Pending |
 | SIO-03 | Phase 14 | Pending |

@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 13
-current_phase_name: Regions, console revisions and playback
-current_plan: 9
-status: planned
-stopped_at: Completed 13-09-PLAN.md
-last_updated: "2026-11-23T21:38:15Z"
+current_phase: 14
+current_phase_name: Multitap and special controllers
+current_plan: Not started
+status: planning
+stopped_at: Phase 13 complete, ready to plan Phase 14
+last_updated: "2026-11-23T22:52:54.687Z"
 last_activity: 2026-11-23
-last_activity_desc: All Phase 13 plans complete; code review is next
-state_head: 592d21b4b0c02921e4e8f3dec6dad5cf0dbd8562
+last_activity_desc: Phase 13 complete, transitioned to Phase 14
+state_head: a424e33388dc6e3c7820baa10a90d01803010037
 progress:
   total_phases: 10
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 79
   completed_plans: 79
-  percent: 60
+  percent: 70
 ---
 
 # Project State
@@ -26,16 +26,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 13 — Regions, console revisions and playback
+**Current focus:** Phase 14 — Multitap and special controllers (plan only after Phase 13 ships)
 
 ## Current Position
 
-Phase: 13 — Regions, console revisions and playback
-Current Plan: 9
-Total Plans in Phase: 9
-Status: Ready for code review
-Last activity: 2026-11-23 -- All Phase 13 plans complete; code review is next
-Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-09 are complete. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Phase: 14 — Multitap and special controllers
+Current Plan: Not started
+Total Plans in Phase: Not yet planned
+Status: Ready to plan
+Last activity: 2026-11-23 — Phase 13 complete, transitioned to Phase 14
+Progress: [███████░░░] 70% (6/10 v2.0 phases shipped; Phase 13 is verified and awaiting its PR/release. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
@@ -114,6 +114,14 @@ Runtime/model: Codex GSD executor, `gpt-6-luna` xhigh; primary session model ID 
 The core machine matrix and libretro option matrix passed 4/4 with fixture setup before profile rows were recorded. The exact compatibility feature preflight/ratchet/negative-control closure passed 3/3 in 0.50s. All 32 feature data rows are bytewise sorted; the title ledger remains at its original 10-column schema and four rows. The generated compatibility documentation reproduces from the generator and current ledgers; the generator's changed output-prose line keeps the counted repository-check gate at exactly 3,901 lines. CI configure passed in 0.80s, documentation generation in 0.11s, focused feature preflight in 0.04s, and `git diff --check HEAD` passed.
 
 The raw CSV sort preflight initially treated the header as data and failed. Plan 13-09 was corrected to sort from the second line; all feature rows then passed. The roadmap records 9/9 plans complete, but Phase 13 and PROFILE-01/02, BOOT-01 and MDEC-01 remain unchecked/Pending until aggregate verification. The generator change did not alter workflow wiring; the single full local CI workflow is next after code review, as planned. No Act, hosted run or Docker resource was used here. Phase 13 code review is next; no Phase 14 work starts before Phase 13 ship/release.
+
+### Phase 13 verification and completion (2026-11-23)
+
+Runtime/model: Codex GSD verifier, configured `gpt-6-luna` xhigh; primary session model ID unavailable. Goal-backward verification passed 32/32 plan and roadmap truths, all four requirements, and all seven tracked decisions. `verification.status` returned `passed`; the report fingerprint was regenerated and matched. The source review is clean; its two earlier findings are recorded as fixed in `13-REVIEW-DISPOSITION.md`.
+
+The final `cmake --workflow --preset ci` run on source head `ac4bb12` exited 0 in 81 seconds: 691/691 CI tests passed, all three macOS arm64 packages were produced, and the CI Release selector passed 8/8. Targeted verification passed 21/21 CI selectors, 5/5 Nightly MDEC reference selectors, and 3/3 compatibility selectors; commands and results are in `13-VERIFICATION.md`. The preceding full-workflow attempts exposed stale profile initializers, an API-version guard omission, changed state-format hashes, missing public-symbol docs, and a playlist expectation tied to the old first member. Each was fixed and targeted before the final green workflow. The later review-disposition and verification changes are planning documents only.
+
+The CI efficiency review measured `policy.quality_metrics` at 44.35 seconds. Its serial subprocess scenarios protect real quality and timing scripts; splitting them safely requires harness isolation/refactoring, so no small change was justified. No workflow changed, so Act would add no coverage beyond the local workflow. Hosted runners, release automation and Actions usage remain to inspect during ship; no Docker resources were created. `phase.complete` reported four summary file-list warnings because command strings were parsed as paths; these are not missing implementation files. Phase 13 is verified and marked complete, but must ship before Phase 14 planning.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -1109,7 +1117,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 265
+- Total plans completed: 274
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1129,6 +1137,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 10 | 13 | - | - |
 | 11 | 15 | - | - |
 | 12 | 7 | - | - |
+| 13 | 9 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -2071,7 +2080,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-23T20:39:03.752Z
-Stopped at: Completed 13-07-PLAN.md
+Stopped at: Phase 13 complete, ready to plan Phase 14
 Resume file: None
 
 ### v1.0 session history

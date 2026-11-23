@@ -16,7 +16,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly. (completed 2026-11-22)
 - [x] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data. (completed 2026-11-22)
 - [x] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact. (completed 2026-11-23)
-- [ ] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior.
+- [x] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior. (completed 2026-11-23)
 - [ ] **Phase 14: Multitap and special controllers** - Play with tap controllers and cards, mouse, neGcon, Jogcon and Dual Analog flight mode.
 - [ ] **Phase 15: GunCon and Justifier** - Aim and fire with deterministic beam sensing and documented libretro inputs.
 - [ ] **Phase 16: Patches, cheats and compatibility evidence** - Apply supported modifications and publish an evidence-backed account of library and core support.
@@ -259,7 +259,7 @@ Plans:
   3. The ordinary BIOS boot path remains the default. The opt-in `fast` runner and core paths require a supplied BIOS and skip only the documented eligible shell handoff, with the same emulated clock settings and timing rules.
   4. Targeted FMV checks run a source-unit preflight before guest execution and report input coverage, decoder output, guest completion and display results separately. The exact v1.0 4-bit expected output, deterministic 8-bit baseline and 4,915,200-cycle bound are preserved.
 
-**Plans**: 9/9 plans executed
+**Plans**: 9/9 plans complete
 - [x] 13-01-PLAN.md
 - [x] 13-02-PLAN.md
 - [x] 13-03-PLAN.md
@@ -328,7 +328,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 10. PBP disc images | 13/13 | Complete    | 2026-11-22 |
 | 11. ECM and CloneCD images | 15/15 | Complete    | 2026-11-22 |
 | 12. SBI and LibCrypt | 7/7 | Complete    | 2026-11-23 |
-| 13. Regions, console revisions and playback | 7/9 | In Progress | - |
+| 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
 | 14. Multitap and special controllers | 0/TBD | Not started | - |
 | 15. GunCon and Justifier | 0/TBD | Not started | - |
 | 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |
