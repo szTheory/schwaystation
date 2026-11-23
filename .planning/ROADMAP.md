@@ -259,7 +259,7 @@ Plans:
   3. The ordinary BIOS boot path remains the default. The opt-in `fast` runner and core paths require a supplied BIOS and skip only the documented eligible shell handoff, with the same emulated clock settings and timing rules.
   4. Targeted FMV checks run a source-unit preflight before guest execution and report input coverage, decoder output, guest completion and display results separately. The exact v1.0 4-bit expected output, deterministic 8-bit baseline and 4,915,200-cycle bound are preserved.
 
-**Plans**: 7/9 plans executed
+**Plans**: 8/9 plans executed
 - [x] 13-01-PLAN.md
 - [x] 13-02-PLAN.md
 - [x] 13-03-PLAN.md
@@ -267,7 +267,7 @@ Plans:
 - [x] 13-05-PLAN.md
 - [x] 13-06-PLAN.md
 - [x] 13-07-PLAN.md
-- [ ] 13-08-PLAN.md
+- [x] 13-08-PLAN.md
 - [ ] 13-09-PLAN.md
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SYSTEM.md`, `.planning/preparation/PSX-GPU-AND-GTE.md`, `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/milestones/v1.0-MILESTONE-AUDIT.md`

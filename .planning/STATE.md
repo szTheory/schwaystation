@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 13
 current_phase_name: Regions, console revisions and playback
-current_plan: 8
+current_plan: 9
 status: planned
-stopped_at: Completed 13-07-PLAN.md
-last_updated: "2026-11-23T20:39:03.978Z"
+stopped_at: Completed 13-08-PLAN.md
+last_updated: "2026-11-23T21:18:35Z"
 last_activity: 2026-11-23
-last_activity_desc: Plan 13-07 complete; Plan 13-08 is next
-state_head: ec6d167085be33b4b53b4ff117a7773aeac59c18
+last_activity_desc: Plan 13-08 complete; Plan 13-09 is next
+state_head: dd12d65da09fbbd7eff956ec221e89a1649a0085
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 79
-  completed_plans: 77
+  completed_plans: 78
   percent: 60
 ---
 
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 13 — Regions, console revisions and playback
-Current Plan: 8
+Current Plan: 9
 Total Plans in Phase: 9
 Status: Ready to execute
-Last activity: 2026-11-23 -- Plan 13-07 complete; Plan 13-08 is next
-Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-07 are complete; Plan 13-08 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Last activity: 2026-11-23 -- Plan 13-08 complete; Plan 13-09 is next
+Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-08 are complete; Plan 13-09 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
@@ -98,6 +98,14 @@ Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtim
 Sorted core inventory and the fixed 3,901-line budget passed; CI configure passed in 0.7s. After Task 1 test registration, the exact profile/state selector closure matched 7/7 names. The first Task 1 build failed in 0.55s before tests because `test_state.c` used a helper local to `test_core.c`; constructing the profile locally fixed it. The corrected target build plus CTest command passed in 0.656s, with 7/7 selected tests in 0.52s. Task 2's core target build passed in 0.359s, and the exact boot selector closure included its two disc fixtures and passed 3/3 in 0.16s. Final `git diff --check` passed.
 
 The fast-boot bit is carried by the existing serialized profile field, so state format 19 remains unchanged. Behavior revision 19 remains appropriate because only a new explicit input was added and the default path is unchanged. No workflow wiring changed, so no broad CI, Act, hosted CI, or Docker run was used. `BOOT-01` remains pending until Phase 13 verification; Plan 13-08 is next.
+
+### Phase 13 Plan 13-08 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor, `gpt-6-luna` xhigh; primary session model ID unavailable. Wall interval was about 39m31s from the saved STATE checkpoint at 20:39:03.978Z through closeout at 21:18:35Z; active time was not separately measured. Task commits were `1459a61` (runner) and `dd12d65` (libretro); plan preflight correction was `eac1a18`.
+
+The sorted runner/libretro inventories, fixed 3,901-line repository budget, both 524,288-byte OpenBIOS digests, current disc fixture producer, fixture budget and pre-change disc probe passed. Runner configure/build/selector took 0.6s/0.235s/0.76s; its exact five-test closure passed. Libretro configure/build/selector took 0.78s/0.90s/0.81s; its exact four-test closure passed. `git diff --check` and the Plan 13-08 summary validator passed.
+
+The first runner test asserted that fast mode must use fewer video frames. It failed because both boot modes completed at frame 276 with the same mailbox and frame hash; this fixture does not expose the CPU-cycle shortcut at frame granularity. The unsupported speed assertion was removed, and both host tests now assert the same guest output without claiming a speedup. The core handoff remains covered separately by the existing `core.boot.fast` test. No workflow changed, so no Act, hosted CI, broad suite or Docker work was needed. CI/CD efficiency and task-named Docker cleanup guidance is already discoverable in `AGENTS.md`, `.planning/AUTONOMOUS.md` and `docs/maintaining.md`. `BOOT-01` remains pending Phase 13 verification; Plan 13-09 is next.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
