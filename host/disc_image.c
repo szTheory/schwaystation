@@ -7,8 +7,10 @@
 #include "disc_ccd.h"
 #include "disc_ecm.h"
 #include "disc_pbp.h"
+#include "disc_sbi.h"
 #include "media_limits.h"
 
+#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,6 +78,7 @@ struct schway_disc_image {
     schway__disc_ccd *ccd;
     schway__disc_ecm *ecm;
     schway__disc_pbp *pbp;
+    schway_disc_sbi sbi;
     schway_disc_image *playlist[SCHWAY__DISC_IMAGE_M3U_ENTRY_MAX];
     schway__disc_image_source sources[SCHWAY_DISC_MAX_TRACKS];
     schway__disc_image_track tracks[SCHWAY_DISC_MAX_TRACKS];
@@ -86,6 +89,22 @@ struct schway_disc_image {
 static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
                                                uint8_t sector[2352], uint8_t subcode[96]);
 static uint32_t schway__disc_image_read_toc(void *user, schway_toc *out);
+
+static uint32_t schway__disc_image_bad_q(void *user, uint32_t lba)
+{
+    const schway_disc_image *image = (const schway_disc_image *)user;
+    size_t low = 0u;
+    size_t high;
+    if (image == NULL) return 0u;
+    high = image->sbi.count;
+    while (low < high) {
+        size_t middle = low + (high - low) / 2u;
+        uint32_t candidate = image->sbi.lbas[middle];
+        if (candidate < lba) low = middle + 1u;
+        else high = middle;
+    }
+    return low < image->sbi.count && image->sbi.lbas[low] == lba ? 1u : 0u;
+}
 
 static unsigned char schway__disc_image_ascii_lower(unsigned char value)
 {
@@ -988,6 +1007,88 @@ static void schway__disc_image_prepare_descriptor(schway_disc_image *image)
     image->descriptor.toc = schway__disc_image_read_toc;
 }
 
+static schway_disc_image_status schway__disc_image_load_sbi(
+    const char *canonical, schway_disc_image *image, schway_disc_image_error *error)
+{
+    char sidecar[SCHWAY__DISC_IMAGE_PATH_CAP];
+    const char *slash = strrchr(canonical, '/');
+    const char *backslash = strrchr(canonical, '\\');
+    const char *base = slash;
+    const char *dot;
+    FILE *file;
+    uint64_t file_size;
+    uint8_t *bytes = NULL;
+    uint32_t lba_count = 0u;
+    schway_disc_sbi_status parse_status;
+    schway_disc_image_status status = SCHWAY_DISC_IMAGE_OK;
+
+    if (image->playlist_count != 0u) return SCHWAY_DISC_IMAGE_OK;
+    if (backslash != NULL && (base == NULL || backslash > base)) base = backslash;
+    base = base == NULL ? canonical : base + 1;
+    dot = strrchr(base, '.');
+    if (dot == NULL || (size_t)(dot - canonical) + 5u > sizeof sidecar) {
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_LIMIT, 0u,
+                                     "SBI companion path exceeds the path limit");
+        return SCHWAY_DISC_IMAGE_LIMIT;
+    }
+    size_t prefix = (size_t)(dot - canonical);
+    memcpy(sidecar, canonical, prefix);
+    memcpy(sidecar + prefix, ".sbi", 5u);
+    file = schway__disc_image_open_readonly(sidecar);
+    if (file == NULL) {
+        if (errno == ENOENT) return SCHWAY_DISC_IMAGE_OK;
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_IO, 0u,
+                                     "cannot open SBI companion");
+        return SCHWAY_DISC_IMAGE_IO;
+    }
+    if (!schway__disc_image_file_size(file, &file_size)) {
+        (void)fclose(file);
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_IO, 0u,
+                                     "cannot size SBI companion");
+        return SCHWAY_DISC_IMAGE_IO;
+    }
+    if (file_size > SCHWAY_DISC_SBI_MAX_BYTES) {
+        (void)fclose(file);
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_LIMIT, 0u,
+                                     "SBI companion exceeds the 64 KiB limit");
+        return SCHWAY_DISC_IMAGE_LIMIT;
+    }
+    bytes = (uint8_t *)malloc(file_size == 0u ? 1u : (size_t)file_size);
+    if (bytes == NULL) {
+        (void)fclose(file);
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_OUT_OF_MEMORY, 0u,
+                                     "out of memory reading SBI companion");
+        return SCHWAY_DISC_IMAGE_OUT_OF_MEMORY;
+    }
+    int read_failed = fread(bytes, 1u, (size_t)file_size, file) != (size_t)file_size ||
+                      ferror(file) != 0;
+    if (fclose(file) != 0) read_failed = 1;
+    if (read_failed != 0) {
+        free(bytes);
+        schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_IO, 0u,
+                                     "cannot read SBI companion");
+        return SCHWAY_DISC_IMAGE_IO;
+    }
+    for (uint32_t i = 0u; i < image->toc.track_count; i++) {
+        if (image->toc.tracks[i].leadout > lba_count) {
+            lba_count = image->toc.tracks[i].leadout;
+        }
+    }
+    parse_status = schway_disc_sbi_parse(bytes, (size_t)file_size, lba_count,
+                                         &image->sbi);
+    free(bytes);
+    if (parse_status == SCHWAY_DISC_SBI_OK) {
+        if (image->sbi.count != 0u) image->descriptor.bad_q = schway__disc_image_bad_q;
+        return SCHWAY_DISC_IMAGE_OK;
+    }
+    if (parse_status == SCHWAY_DISC_SBI_LIMIT) status = SCHWAY_DISC_IMAGE_LIMIT;
+    else if (parse_status == SCHWAY_DISC_SBI_OUT_OF_MEMORY) status = SCHWAY_DISC_IMAGE_OUT_OF_MEMORY;
+    else status = SCHWAY_DISC_IMAGE_BAD_IMAGE;
+    schway__disc_image_error_set(error, status, 0u,
+                                 "SBI companion is malformed or outside the image map");
+    return status;
+}
+
 static schway_disc_image_status schway__disc_image_open_pbp(
     const char *path, schway_disc_image *image, schway_disc_image_error *error)
 {
@@ -1438,6 +1539,11 @@ schway_disc_image_status schway_disc_image_open(const char *path,
         schway_disc_image_close(image);
         return status;
     }
+    status = schway__disc_image_load_sbi(canonical, image, error);
+    if (status != SCHWAY_DISC_IMAGE_OK) {
+        schway_disc_image_close(image);
+        return status;
+    }
     *out = image;
     schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_OK, 0u, "ok");
     return SCHWAY_DISC_IMAGE_OK;
@@ -1458,6 +1564,7 @@ void schway_disc_image_close(schway_disc_image *image)
     schway__disc_ccd_close(image->ccd);
     schway__disc_ecm_close(image->ecm);
     schway__disc_pbp_close(image->pbp);
+    schway_disc_sbi_clear(&image->sbi);
     free(image->path);
     free(image);
 }

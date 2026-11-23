@@ -222,7 +222,9 @@
         "schwaystation-fuzz-pbp",
         "schwaystation-fuzz-pbp-replay",
         "schwaystation-fuzz-mdec",
-        "schwaystation-fuzz-mdec-replay"
+        "schwaystation-fuzz-mdec-replay",
+        "schwaystation-fuzz-sbi",
+        "schwaystation-fuzz-sbi-replay"
       ]
     },
     { "name": "nofp", "configurePreset": "nofp" },

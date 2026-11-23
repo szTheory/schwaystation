@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 12
-current_phase_name: SBI and LibCrypt
+current_phase: 13
+current_phase_name: Regions, console revisions and playback
 current_plan: Not started
 status: planning
-stopped_at: Phase 11 PR
-last_updated: "2026-11-22T22:10:06Z"
-last_activity: 2026-11-22
-last_activity_desc: "Phase 11 PR #36 fixes reviewed; complete local CI and Nightly routing preflight passed; repaired head push pending"
-state_head: 8d3dad8f15e71d87855bfe9a1bf0006698429b7f
+stopped_at: Phase 12 complete, ready to plan Phase 13
+last_updated: "2026-11-23T10:05:24.372Z"
+last_activity: 2026-11-23
+last_activity_desc: "Phase 12 shipped as PR #38"
+state_head: 145e7a053c35457d3297bffce8ac1ae67fc1191b
 progress:
   total_phases: 10
-  completed_phases: 5
-  total_plans: 63
-  completed_plans: 63
-  percent: 50
+  completed_phases: 6
+  total_plans: 70
+  completed_plans: 70
+  percent: 60
 ---
 
 # Project State
@@ -26,16 +26,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Resolve and verify Phase 11 PR #36's hosted integration findings; merge and publish its release before planning Phase 12
+**Current focus:** Phase 13 — Regions, console revisions and playback
 
 ## Current Position
 
-Phase: 12 — SBI and LibCrypt
+Phase: 13 — Regions, console revisions and playback
 Current Plan: Not started
-Total Plans in Phase: 15
+Total Plans in Phase: 0
 Status: Ready to plan
-Last activity: 2026-11-22 -- Phase 11 PR #36 hosted failures diagnosed and corrected locally; final head push pending
-Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
+Last activity: 2026-11-23 -- Phase 12 shipped as PR #38
+Progress: [██████░░░░] 60% (6/10 phases verified; 5/10 released; Phase 12 ship pending)
+
+### Phase 12 Plan 12-05 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The 37-minute plan run completed three tasks and three task-sized commits. The selected M3U child command test passed with the generated legacy fixture setup. The compatibility feature preflight and ratchet passed 2/2; the SBI image selector plus legacy setup/parity passed 3/3. Before the broader local check, selected test names, sorted inventories and the fixed 3,901-line budget all passed. The CD-ROM/disc-image group passed 39/39 in 0.16 seconds wall time.
+
+The broader selector exposed that the historical `SBId` fixture marker was copied beside `disc_boot.cue` and now collided with automatic same-stem sidecar discovery. Removing only the runtime copy restored legacy parity; explicit fixture tests continue to read the marker from its source path. The test compares payloads as one buffer and stops after a failed command guard to keep failure output bounded. No workflow changed, so no hosted CI or Act run was needed; no Docker resource was created. Plan 12-05 is complete.
+
+### Phase 12 Plan 12-06 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The 64-minute wall interval completed two tasks and one implementation commit; active time was not separately measured. The new SBI replay passed both the native CI preset and an Apple Clang 21 ASan/UBSan fuzz-preset build. Sorted inventory, workflow selector, Nightly target/count/length arrays and the fixed 3,901-line budget passed. Act dry-run traversed the Nightly fuzz job without creating Docker resources. The local Apple Clang fuzzer runtime is missing, so the mutation campaign remains hosted-only; CRYPT-01 is now complete, and Plan 12-07 remains.
+
+### Phase 12 Plan 12-07 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured 9-minute wall interval (08:02:00–08:11:27 UTC) completed one task and one implementation commit through the focused test and initial GSD closeout; active time was not separately measured. The subsequent metadata-only duration-correction commit is excluded. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans are complete; Phase 12 is ready for review and verification, not shipped.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 
@@ -985,7 +999,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 258
+- Total plans completed: 265
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1004,6 +1018,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 9 | 15 | - | - |
 | 10 | 13 | - | - |
 | 11 | 15 | - | - |
+| 12 | 7 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1234,6 +1249,14 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 11 P11 | 23m27s | 2 tasks | 8 files |
 | Phase 11 P14 | 13m | 2 tasks | 3 files |
 | Phase 11 P15 | 6m | 2 tasks | 3 files |
+| Phase 12 P01 | 8m | 2 tasks | 9 files |
+| Phase 12 P02 | 4m | 2 tasks | 3 files |
+| Phase 12 P03 | 12m | 3 tasks | 5 files |
+| Phase 12 P03 | 16m | 3 tasks | 5 files |
+| Phase 12 P04 | 22m | 3 tasks | 5 files |
+| Phase 12 P05 | 37min | 3 tasks | 5 files |
+| Phase 12 P06 | 64min | 2 tasks | 8 files |
+| Phase 12 P07 | 9min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -1660,6 +1683,12 @@ Recent decisions affecting current work:
 - [Phase 11]: ECM and CCD compatibility rows report only local fixture, runner and libretro evidence; hosted CI, package and fuzz remain unknown until Plan 12.
 - [Phase 11]: Keep local CHD-OFF package evidence separate from unknown hosted Main, Nightly and Release evidence.
 - [Phase 11]: Record local installed-example and CHD-ON evidence separately from unknown hosted workflow results
+- [Phase 12]: Reuse the generated legacy CCD/IMG/SUB fixture and patch only selected test sectors instead of adding another CCD generator.
+- [Phase 12]: Keep compatibility evidence limited to selected-provider binding, bad-Q data availability, and previous-good GetlocP; make no retail-title claim.
+- [Phase 12]: Keep the legacy SBId marker out of the runtime media directory so it cannot be mistaken for a real same-stem SBI sidecar.
+- [Phase 12]: Use the parser's 65,536-byte maximum as the SBI corpus cap, including an 8,193-record boundary case.
+- [Phase 12]: Register both SBI binaries in the explicit fuzz build preset so the existing Nightly job builds them.
+- [Phase 12]: Capture one region-specific runner PCM file and reuse it for both callback comparisons after its existing size and SHA-256 checks pass.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1910,8 +1939,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T21:01:07Z
-Stopped at: Phase 11 verified and transitioned; ship/merge/release Phase 11 before planning Phase 12
+Last session: 2026-11-23T08:09:48.339Z
+Stopped at: Phase 12 complete, ready to plan Phase 13
 Resume file: None
 
 ### v1.0 session history

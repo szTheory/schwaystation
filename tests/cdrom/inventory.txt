@@ -3,6 +3,7 @@ cdrom.bounds	disc,portable
 cdrom.command	disc,portable
 cdrom.delivery	disc,portable
 cdrom.region	disc,portable
+cdrom.sbi	disc,portable
 cdrom.sectors	disc,portable
 cdrom.timing	disc,portable
 disc.audio.cdda	disc,portable

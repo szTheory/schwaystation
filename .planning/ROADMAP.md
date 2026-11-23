@@ -15,7 +15,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 9: CHD disc images** - Open supported CHD images with equivalent disc behavior and establish the shared media checks and feature-ledger workflow. (completed 2026-11-20)
 - [x] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly. (completed 2026-11-22)
 - [x] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data. (completed 2026-11-22)
-- [ ] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact.
+- [x] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact. (completed 2026-11-23)
 - [ ] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior.
 - [ ] **Phase 14: Multitap and special controllers** - Play with tap controllers and cards, mouse, neGcon, Jogcon and Dual Analog flight mode.
 - [ ] **Phase 15: GunCon and Justifier** - Aim and fire with deterministic beam sensing and documented libretro inputs.
@@ -237,7 +237,14 @@ Plans:
   1. Each documented sidecar case binds SBI records to the selected disc identity and LBA map, including after disc selection changes. A malformed or mismatched sidecar cannot mark another disc's sectors as bad Q.
   2. A short CD command sequence verifies that a listed bad Q sector still delivers its data and GetlocP returns the previous valid position. SBI fuzz and seed replay cover malformed inputs, and the ledger records only the evaluated protection predicates.
 
-**Plans**: TBD
+**Plans**: 7/7 plans complete
+- [x] 12-01-PLAN.md
+- [x] 12-02-PLAN.md
+- [x] 12-03-PLAN.md
+- [x] 12-04-PLAN.md
+- [x] 12-05-PLAN.md
+- [x] 12-06-PLAN.md
+- [x] 12-07-PLAN.md
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`
 
@@ -311,7 +318,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
 | 10. PBP disc images | 13/13 | Complete    | 2026-11-22 |
 | 11. ECM and CloneCD images | 15/15 | Complete    | 2026-11-22 |
-| 12. SBI and LibCrypt | 0/TBD | Not started | - |
+| 12. SBI and LibCrypt | 7/7 | Complete    | 2026-11-23 |
 | 13. Regions, console revisions and playback | 0/TBD | Not started | - |
 | 14. Multitap and special controllers | 0/TBD | Not started | - |
 | 15. GunCon and Justifier | 0/TBD | Not started | - |

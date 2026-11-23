@@ -28,6 +28,18 @@ target_link_libraries(schwaystation-test-disc-image PRIVATE
 set_target_properties(schwaystation-test-disc-image PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-image)
+
+add_executable(schwaystation-test-disc-sbi ${CMAKE_CURRENT_LIST_DIR}/sbi.c)
+target_include_directories(schwaystation-test-disc-sbi PRIVATE
+  ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(schwaystation-test-disc-sbi PRIVATE schwaystation_disc_image)
+set_target_properties(schwaystation-test-disc-sbi PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-sbi)
+
+schway_add_test(NAME disc.image.sbi
+  COMMAND schwaystation-test-disc-sbi ${PROJECT_BINARY_DIR}/tests
+  LABELS disc portable TIMEOUT 10)
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 
 add_executable(schwaystation-test-disc-media ${CMAKE_CURRENT_LIST_DIR}/media.c)

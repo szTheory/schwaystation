@@ -34,6 +34,19 @@ struct sector_host {
     uint32_t callbacks_outside_run;
 };
 
+static const uint8_t sector_q_lba0[12] = {
+    0x41u, 0x01u, 0x01u, 0u, 0u, 0u, 0u, 0u, 0x02u, 0u, 0x28u, 0x32u
+};
+static const uint8_t sector_q_lba75[12] = {
+    0x41u, 0x01u, 0x01u, 0u, 0u, 0u, 0u, 0u, 0x03u, 0u, 0x1Bu, 0x03u
+};
+static const uint8_t sector_q_lba150[12] = {
+    0x41u, 0x01u, 0x01u, 0u, 0u, 0u, 0u, 0u, 0x04u, 0u, 0x82u, 0x94u
+};
+static const uint8_t sector_q_lba200[12] = {
+    0x41u, 0x01u, 0x01u, 0u, 0u, 0u, 0u, 0u, 0x04u, 0x50u, 0xD8u, 0x61u
+};
+
 static void *sector_alloc(void *user, size_t size)
 {
     (void)user;
@@ -232,6 +245,12 @@ static void sector_ack3(schway *inst)
     sector_wr8(inst, 3u, 4u);
 }
 
+static void sector_ack1(schway *inst)
+{
+    sector_wr8(inst, 0u, 1u);
+    sector_wr8(inst, 3u, 1u);
+}
+
 static uint8_t sector_int_code(schway *inst)
 {
     sector_wr8(inst, 0u, 1u);
@@ -243,6 +262,17 @@ static void sector_command(schway *inst, struct sector_host *host, uint8_t value
     sector_wr8(inst, 0u, 0u);
     sector_wr8(inst, 1u, value);
     sector_run(inst, 50000u, host);
+    sector_ack3(inst);
+}
+
+static void sector_getlocp(schway *inst, struct sector_host *host, uint8_t bytes[8])
+{
+    while (inst->cdrom.result_count != 0u) (void)sector_rd8(inst, 1u);
+    sector_wr8(inst, 0u, 0u);
+    sector_wr8(inst, 1u, 0x11u);
+    sector_run(inst, 50000u, host);
+    CHECK_EQ_U64(sector_int_code(inst), 3u);
+    for (uint32_t i = 0u; i < 8u; i++) bytes[i] = sector_rd8(inst, 1u);
     sector_ack3(inst);
 }
 
@@ -439,22 +469,89 @@ static void test_pending_interrupt_and_bad_q(void)
     schway *inst = sector_make();
     struct sector_host host;
     sector_attach(inst, &host);
-    host.bad_q_lba = 0u;
+    host.bad_q_lba = 1u;
+    host.q_present = 1u;
+    memcpy(host.q, sector_q_lba75, sizeof host.q);
     sector_start_read_pending(inst, &host);
     inst->cdrom.current_lba = 77u;
     uint64_t deadline = inst->ticks + SECTOR_PERIOD;
     sector_run(inst, SECTOR_PERIOD, &host);
     CHECK_EQ_U64(host.reads, 1u);
     CHECK_EQ_U64(host.bad_q_calls, 1u);
-    CHECK_EQ_U64(inst->cdrom.current_lba, 77u);
+    CHECK_EQ_U64(inst->cdrom.current_lba, 75u);
+    CHECK_EQ_U64(inst->cdrom.q_record_valid, 1u);
+    CHECK(memcmp(inst->cdrom.q_record, host.q, sizeof host.q) == 0);
     CHECK_EQ_U64(sector_int_code(inst), 3u);
+    memcpy(host.q, sector_q_lba150, sizeof host.q);
     sector_run(inst, SECTOR_PERIOD, &host);
     CHECK_EQ_U64(host.reads, 2u);
     CHECK_EQ_U64(host.bad_q_calls, 2u);
-    CHECK_EQ_U64(inst->cdrom.current_lba, 1u);
+    CHECK_EQ_U64(inst->cdrom.current_lba, 75u);
+    CHECK_EQ_U64(inst->cdrom.target_lba, 2u);
+    CHECK_EQ_U64(inst->cdrom.q_record_valid, 1u);
+    CHECK(memcmp(inst->cdrom.q_record, sector_q_lba75, sizeof sector_q_lba75) == 0);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 2u);
+    uint32_t first = inst->cdrom.sector_head;
+    uint32_t second = (first + 1u) % SCHWAY__CDROM_SECTOR_CAP;
+    CHECK_EQ_U64(inst->cdrom.sector_lba[first], 0u);
+    CHECK_EQ_U64(inst->cdrom.sector_lba[second], 1u);
+    CHECK_EQ_HEX(inst->cdrom.sector[second][24], 25u);
+    CHECK_EQ_U64(inst->cdrom.target_lba, 2u);
     sector_ack3(inst);
     CHECK_EQ_U64(sector_int_code(inst), 1u);
     CHECK_EQ_U64(inst->ticks, deadline + SECTOR_PERIOD);
+    sector_ack1(inst);
+    static const uint8_t previous_good[8] = {
+        0x01u, 0x01u, 0x00u, 0x03u, 0x00u, 0x00u, 0x00u, 0x00u
+    };
+    uint8_t actual[8];
+    sector_getlocp(inst, &host, actual);
+    CHECK(memcmp(actual, previous_good, sizeof actual) == 0);
+    schway_destroy(inst);
+}
+
+static void test_bad_q_seek_preserves_position_and_data(void)
+{
+    schway *inst = sector_make();
+    struct sector_host host;
+    sector_attach(inst, &host);
+    host.q_present = 1u;
+    memcpy(host.q, sector_q_lba0, sizeof host.q);
+    host.bad_q_lba = 1u;
+    sector_start_read(inst, &host);
+    sector_run(inst, SECTOR_PERIOD, &host);
+    CHECK_EQ_U64(inst->cdrom.current_lba, 0u);
+    CHECK_EQ_U64(inst->cdrom.q_record_valid, 1u);
+    CHECK(memcmp(inst->cdrom.q_record, sector_q_lba0, sizeof sector_q_lba0) == 0);
+    sector_ack1(inst);
+
+    memcpy(host.q, sector_q_lba200, sizeof host.q);
+    sector_command(inst, &host, 0x15u);
+    CHECK_EQ_U64(inst->cdrom.target_lba, 1u);
+    CHECK_EQ_U64(inst->cdrom.seek_active, 1u);
+    if (inst->cdrom.seek_active != 0u && inst->cdrom.seek_deadline > inst->ticks) {
+        uint64_t seek_wait = inst->cdrom.seek_deadline - inst->ticks;
+        sector_run(inst, seek_wait + 100000u, &host);
+    }
+    CHECK_EQ_U64(host.reads, 2u);
+    CHECK_EQ_U64(host.bad_q_calls, 2u);
+    CHECK_EQ_U64(inst->cdrom.current_lba, 0u);
+    CHECK_EQ_U64(inst->cdrom.target_lba, 1u);
+    CHECK_EQ_U64(inst->cdrom.q_record_valid, 1u);
+    CHECK(memcmp(inst->cdrom.q_record, sector_q_lba0, sizeof sector_q_lba0) == 0);
+    CHECK_EQ_U64(inst->cdrom.sector_count, 2u);
+    uint32_t second = (inst->cdrom.sector_head + 1u) % SCHWAY__CDROM_SECTOR_CAP;
+    CHECK_EQ_U64(inst->cdrom.sector_lba[second], 1u);
+    CHECK_EQ_HEX(inst->cdrom.sector[second][24], 25u);
+    uint8_t actual[8];
+    static const uint8_t expected[8] = {
+        0x01u, 0x01u, 0x00u, 0x02u, 0x00u, 0x00u, 0x00u, 0x00u
+    };
+    CHECK_EQ_U64(sector_int_code(inst), 2u);
+    sector_wr8(inst, 0u, 1u);
+    sector_wr8(inst, 3u, 2u);
+    sector_getlocp(inst, &host, actual);
+    CHECK(memcmp(actual, expected, sizeof actual) == 0);
     schway_destroy(inst);
 }
 
@@ -582,6 +679,7 @@ int schway__cdrom_sector_test(const char *name)
         test_speed_overrun_and_bad_reads();
     } else if (strcmp(name, "delivery") == 0) {
         test_pending_interrupt_and_bad_q();
+        test_bad_q_seek_preserves_position_and_data();
         test_q_xa_filter_retry_and_audio_play();
     } else {
         fprintf(stderr, "unknown CD-ROM sector case: %s\n", name);

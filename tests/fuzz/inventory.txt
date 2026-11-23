@@ -11,5 +11,6 @@ fuzz.regress.m3u	fuzz,portable
 fuzz.regress.mdec	fuzz,portable
 fuzz.regress.memcard	fuzz,portable
 fuzz.regress.pbp	fuzz,portable
+fuzz.regress.sbi	fuzz,portable
 fuzz.regress.sio	fuzz,portable
 fuzz.regress.spu	fuzz,portable

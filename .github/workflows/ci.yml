@@ -256,7 +256,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 35 s = 2 min (2 samples); [run 44307395327](https://github.com/szTheory/schwaystation/actions/runs/44307395327), provisional
+    timeout-minutes: 5  # Same producer completed in 28 s with Azure mirror; AWS mirror stalled past 10 min; [run 45145713601](https://github.com/szTheory/schwaystation/actions/runs/45145713601), [run 45153046547](https://github.com/szTheory/schwaystation/actions/runs/45153046547), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -295,6 +295,16 @@ jobs:
       - name: Build pinned media encoder and generate owned media
         run: |
           set -eu
+          grep -Eq '^[[:space:]]*URIs:[[:space:]].*mirror[+]file:/etc/apt/apt-mirrors[.]txt([[:space:]]|$)' /etc/apt/sources.list.d/ubuntu.sources
+          printf '%s\t%s\n' \
+            'http://azure.archive.ubuntu.com/ubuntu/' priority:1 \
+            'https://archive.ubuntu.com/ubuntu/' priority:2 \
+            'https://security.ubuntu.com/ubuntu/' priority:3 \
+            | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+          test "$(sed -n '1p' /etc/apt/apt-mirrors.txt)" = "$(printf '%s\t%s' 'http://azure.archive.ubuntu.com/ubuntu/' priority:1)"
+          test "$(sed -n '2p' /etc/apt/apt-mirrors.txt)" = "$(printf '%s\t%s' 'https://archive.ubuntu.com/ubuntu/' priority:2)"
+          test "$(sed -n '3p' /etc/apt/apt-mirrors.txt)" = "$(printf '%s\t%s' 'https://security.ubuntu.com/ubuntu/' priority:3)"
+          cat /etc/apt/apt-mirrors.txt
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends pkg-config libavformat-dev libavcodec-dev \
             libavutil-dev libswresample-dev libswscale-dev

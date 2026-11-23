@@ -1068,7 +1068,6 @@ void schway__cdrom_event(schway *inst, uint64_t now)
     if (cd->seek_event != 0u && cd->seek_deadline <= now) {
         cd->seek_event = 0u;
         cd->seek_deadline = 0u;
-        cd->current_lba = cd->target_lba;
         cd->seek_active = 0u;
         update_status_activity(cd);
         if (cd->read_active != 0u) {

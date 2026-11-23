@@ -48,6 +48,7 @@ disc.image.pbp_open	disc,portable
 disc.image.pbp_parity	disc,portable
 disc.image.pbp_preflight	disc,portable
 disc.image.pbp_raw	disc,portable
+disc.image.sbi	disc,portable
 disc.media.fixture_controls	disc,portable
 disc.media.preflight	disc,portable
 disc.playlist	disc,portable

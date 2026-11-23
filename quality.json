@@ -4,7 +4,7 @@
     "gpu_motion": {"floor": 137752334, "ceiling": 137752334}
   },
   "size": {
-    "wasm": {"floor": 906778, "ceiling": 906778}
+    "wasm": {"floor": 910370, "ceiling": 910370}
   },
   "state": {
     "bytes": {"floor": 3755328, "ceiling": 3755328}
@@ -24,6 +24,7 @@
     "2026-11-19: Phase 8 PocketStation card state measures 3755328 stable serialized bytes, 308 above the prior bound; the exact producer measurement is in run 44600162797: https://github.com/szTheory/schwaystation/actions/runs/44600162797/job/135829636881. The bound now tracks the current serialized state size.",
     "2026-11-20: Phase 9's CHD-enabled WASI lane measured the linked Release module at 859379 bytes on run 44827711416; the lane validated the module before the previous CHD-off bound rejected its size, so the floor and ceiling now track the exact CHD-enabled producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44827711416/job/136604866560.",
     "2026-11-21: Phase 10's PBP-enabled WASI lane measured the linked Release module at 875971 bytes on run 44924014258; floor and ceiling now track that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44924014258/job/136906260832.",
-    "2026-11-22: Phase 11's ECM/CCD-enabled WASI lane measured the linked Release module at 906778 bytes on run 45073362654; floor and ceiling now track that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/45073362654/job/137365283519."
+    "2026-11-22: Phase 11's ECM/CCD-enabled WASI lane measured the linked Release module at 906778 bytes on run 45073362654; floor and ceiling now track that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/45073362654/job/137365283519.",
+    "2026-11-23: Phase 12's SBI-enabled Ubuntu 26 WASI lane measured the linked Release module at 910370 bytes on PR run 45141834168; floor and ceiling now track that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/45141834168/job/137581782805."
   ]
 }

@@ -23,7 +23,7 @@ function(route name count paths heavy release nightly_full pbp_only)
 endfunction()
 
 route(planning 2 ".planning/STATE.md\n.planning/ROADMAP.md\n" false false false false)
-route(docs-only 1 "docs/maintaining.md\n" true false false false)
+route(non-nightly-metadata 3 "docs/maintaining.md\nquality.json\nexamples/sdl2/CMakeLists.txt\n" true false false false)
 route(pbp-only 4 "host/disc_pbp.c\nhost/disc_pbp.h\ntests/disc/pbp.c\ntests/fuzz/pbp.c\n" true false false true)
 route(source 2 ".planning/STATE.md\nsrc/core.c\n" true false true false)
 route(release 1 ".github/workflows/release.yml\n" true true true false)

@@ -75,6 +75,9 @@ static schway_status disc_prepare(const schway_disc *disc, schway_disc *callback
 
 static void disc_apply(schway *inst, const schway_disc *callbacks, const schway_toc *toc)
 {
+    memset(inst->cdrom.q_record, 0, sizeof inst->cdrom.q_record);
+    inst->cdrom.q_record_valid = 0u;
+    inst->cdrom.current_lba = 0u;
     inst->disc_host.callbacks = *callbacks;
     inst->disc_host.toc = *toc;
     inst->disc_host.attached = 1u;

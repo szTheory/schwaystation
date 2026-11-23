@@ -65,8 +65,8 @@ configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.cnf"
   "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF" COPYONLY)
 file(CONFIGURE OUTPUT "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF.playlist"
   CONTENT "BOOT = cdrom:\\SLUS_123.46;1\nTCB = 4\nEVENT = 10\n" NEWLINE_STYLE UNIX)
-configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
-  "${PROJECT_BINARY_DIR}/fixtures/disc_boot.sbi" COPYONLY)
+# The .sbi source is a fixture marker consumed explicitly by disc tests. Keep it
+# out of the media directory, where a same-stem .sbi is a real SBI sidecar.
 
 set(schway__disc_guest "${PROJECT_BINARY_DIR}/fixtures/disc_boot.exe")
 add_custom_command(OUTPUT "${schway__disc_guest}"

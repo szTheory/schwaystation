@@ -46,29 +46,29 @@ endif()
 if(CMAKE_SCRIPT_MODE_FILE AND DEFINED SCHWAY_LIBRETRO_AUDIO_TEST)
   file(MAKE_DIRECTORY "${TEST_DIR}")
   foreach(region IN ITEMS ntsc-j ntsc-u pal)
-    foreach(callback IN ITEMS batch single)
-      set(pcm_file "${TEST_DIR}/libretro-audio-${region}-${callback}.pcm")
-      file(REMOVE "${pcm_file}")
-      execute_process(
-        COMMAND ${EMULATOR} "${RUNNER}" --region "${region}" --exe "${FIXTURE}"
-          --frames "${FRAMES}" --stop-on mailbox --hash-audio --test-audio-file "${pcm_file}"
-        RESULT_VARIABLE runner_status OUTPUT_VARIABLE runner_out ERROR_VARIABLE runner_err)
-      if(NOT runner_status STREQUAL "0")
-        message(FATAL_ERROR "${region} ${callback} runner PCM capture failed (exit ${runner_status})\n${runner_out}\n${runner_err}")
-      endif()
-      if(NOT EXISTS "${pcm_file}")
-        message(FATAL_ERROR "${region} ${callback} runner reported success without writing PCM bytes")
-      endif()
-      file(SIZE "${pcm_file}" pcm_size)
-      math(EXPR pcm_remainder "${pcm_size} % 4")
-      if(pcm_size EQUAL 0 OR NOT pcm_remainder EQUAL 0)
-        message(FATAL_ERROR "${region} ${callback} runner PCM has invalid byte length ${pcm_size}")
-      endif()
-      file(SHA256 "${pcm_file}" pcm_sha256)
-      if(NOT runner_out MATCHES "audio sha256 ${pcm_sha256}")
-        message(FATAL_ERROR "${region} ${callback} runner PCM does not match --hash-audio output\n${runner_out}")
-      endif()
+    set(pcm_file "${TEST_DIR}/libretro-audio-${region}.pcm")
+    file(REMOVE "${pcm_file}")
+    execute_process(
+      COMMAND ${EMULATOR} "${RUNNER}" --region "${region}" --exe "${FIXTURE}"
+        --frames "${FRAMES}" --stop-on mailbox --hash-audio --test-audio-file "${pcm_file}"
+      RESULT_VARIABLE runner_status OUTPUT_VARIABLE runner_out ERROR_VARIABLE runner_err)
+    if(NOT runner_status STREQUAL "0")
+      message(FATAL_ERROR "${region} runner PCM capture failed (exit ${runner_status})\n${runner_out}\n${runner_err}")
+    endif()
+    if(NOT EXISTS "${pcm_file}")
+      message(FATAL_ERROR "${region} runner reported success without writing PCM bytes")
+    endif()
+    file(SIZE "${pcm_file}" pcm_size)
+    math(EXPR pcm_remainder "${pcm_size} % 4")
+    if(pcm_size EQUAL 0 OR NOT pcm_remainder EQUAL 0)
+      message(FATAL_ERROR "${region} runner PCM has invalid byte length ${pcm_size}")
+    endif()
+    file(SHA256 "${pcm_file}" pcm_sha256)
+    if(NOT runner_out MATCHES "audio sha256 ${pcm_sha256}")
+      message(FATAL_ERROR "${region} runner PCM does not match --hash-audio output\n${runner_out}")
+    endif()
 
+    foreach(callback IN ITEMS batch single)
       execute_process(
         COMMAND ${EMULATOR} "${HOST}" "${MODULE}" "audio-equality-${callback}" "${region}"
           "${FIXTURE}" "${pcm_file}"
