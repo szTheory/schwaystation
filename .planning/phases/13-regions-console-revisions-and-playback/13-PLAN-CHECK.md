@@ -21,13 +21,15 @@ The MDEC edge case is selected from pinned inputs during execution, as allowed b
 
 All nine plans pass `verify.plan-structure`; each has two tasks with complete files, actions, verification and done criteria. Plan-level file lists cover the task file lists. Dependencies are acyclic and waves are consistent. The shared CI build tree is serialized through Waves 1–9, and Plan 05 declares Plan 04's board-aware state/hash prerequisite.
 
-Plan 02 Task 1 now configures CI and parses CTest JSON to assert the exact four required selector names. Plan 02 Task 2 configures/builds the new selector before CTest. The checker reran `bash -n` on all 18 current automated command bodies: all parsed successfully and all have matching `[VALIDATED: bash -n exit 0]` records. The supplied path and failing-direction probe results show no findings across the 18 commands; those probes were not rerun.
+Plan 02 uses the existing Nightly preset with `SCHWAYSTATION_MEDIA_REFERENCE_ONLY=mdec`. Task 1 configures that lane and asserts the exact four pre-existing baseline/preflight/budget selector names; Task 2 sorts the Nightly inventory, configures the same lane, asserts exactly `{mdec.reference.input_preflight, mdec.reference.edge}` before building, then runs the focused CTest selection. The Nightly configure/build/test presets and target exist. The MDEC-only branch already calls `schway_register_mdec_reference_tests`, so no edit to `tests/nightly/tests.cmake` is needed. Plan 02 task files exactly match its frontmatter; it depends on Plan 01 and remains in Wave 2.
+
+Both revised Plan 02 command bodies pass a fresh `bash -n`; the other 16 are unchanged from the prior validated pass. All commands have `[VALIDATED: bash -n exit 0]` records. Previously supplied path/failing-direction probe results showed no findings for the then-current 18 commands; those probes were not rerun in this bounded audit.
 
 Nyquist checks 8a–8e are not applicable because this phase's RESEARCH.md has no `Validation Architecture` section. Per-plan calibrated estimates range from 9,000 to 15,000 tokens, below the 100,000-token budget. All have low confidence because this project has no completed phase actuals for calibration.
 
 CI/CD sequencing keeps cheap inventory, selector, fixture and budget checks ahead of expensive work. The plans retain the full local CI workflow and required hosted Main/Release gates, inspect hosted critical path and runner cost, and use `act` only when it adds evidence or checks changed routing. Docker cleanup is scoped to task-owned, identifiable resources.
 
-The prior review findings are resolved: CTest registration is configured before the MDEC test; the illegal profile tuple matrix is exhaustive; validate-only records are present; Plan 05 follows Plan 04; and Plan 03 no longer lists the unused `src/spu.c` path.
+The prior review findings are resolved: the MDEC selector set is asserted before its guest runs; the illegal profile tuple matrix is exhaustive; validate-only records are present; Plan 05 follows Plan 04; and Plan 03 no longer lists the unused `src/spu.c` path.
 
 ## Plan summary
 
