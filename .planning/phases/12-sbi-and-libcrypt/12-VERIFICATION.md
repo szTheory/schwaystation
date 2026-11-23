@@ -105,7 +105,18 @@ The generic key-link checker could not resolve several prose endpoints and the i
 
 The local workflow took about 3m36s by the accumulated command-session wait time. `libretro.input.movies` took 49.84s versus the prior 25.94s local sample in Phase 10 (about 1.9×). This is one unrelated full-suite sample and does not justify a timeout or workflow change. The Plan 12-07 `libretro.host` optimization reduced runner captures from six to three while preserving all six comparisons; no end-to-end speedup is claimed without comparable hosted timing.
 
-The Apple Clang host lacks `libclang_rt.fuzzer_osx.a`, so no local mutation campaign was run. The seed replay passed locally, and the hosted Ubuntu Nightly mutation campaign is wired but has not yet run on this head. It remains a host-side check for ship; this report does not claim a Nightly campaign pass.
+The Apple Clang host lacks `libclang_rt.fuzzer_osx.a`, so no local mutation campaign was run. The hosted Ubuntu Nightly mutation campaign passed in [run 45149805901](https://github.com/szTheory/schwaystation/actions/runs/45149805901) on source head `c72ebae`; it is being rerun on the final ship head. The first Main CI attempt on that source head, [run 45149805712](https://github.com/szTheory/schwaystation/actions/runs/45149805712/job/137608141424), ended cancelled after 5m15 while its media setup step spent 4m58 installing the pinned encoder's FFmpeg development dependencies. This was a producer timeout, before platform builds; its provisional allowance was raised to 10 minutes, and the final ship head's Main CI remains required before merge.
+
+### Post-verification integration checks (2026-11-23)
+
+| Command | Result |
+|---|---|
+| `cmake --install build/ci --prefix build/ci --component library && cmake -S examples/sdl2 -B build/example-sdl2 -DCMAKE_PREFIX_PATH="$PWD/build/ci" -Dschwaystation_DIR="$PWD/build/ci/lib/cmake/schwaystation" && cmake --build build/example-sdl2 --parallel 2` | Exit 0; installed-library SDL2 example linked, including `host/disc_sbi.c`. |
+| `cmake -DOUTPUT="$PWD/build/phase12-ci-producer/bin" -DBUILD_ROOT="$PWD/build/phase12-ci-producer/pins/psxavenc" -P cmake/Psxavenc.cmake && python3 tools/gen_disc.py --output-dir build/phase12-ci-producer/disc-media --encoder build/phase12-ci-producer/bin/psxavenc` | Exit 0; pinned encoder built and generated XA=7056, CD-DA=4704, STR=1 frames. |
+| `ctest --test-dir build/ci -R '^ci.classify_policy$' --output-on-failure` | Exit 0; 1/1 route-policy tests passed, including Main-only routing for metadata and example changes. |
+| `cmake -DMODE=timeouts -DDIR=.github/workflows -P tests/cmake/workflows.cmake && cmake -DMODE=pins -DDIR=.github/workflows -P tests/cmake/workflows.cmake && cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` | Exit 0; all 26 timeout annotations and 61 action pins passed; tooling remains at 3,901/3,901 lines. |
+
+No Docker resources were created.
 
 ## Test Quality Audit
 
@@ -127,7 +138,7 @@ N/A — Phase 12 is a subsystem implementation phase and declares no probe scrip
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| CRYPT-01 | SATISFIED | Parser/provider binding, bad-Q data delivery, prior-good GetlocP, malformed seed replay, and narrow compatibility evidence pass the local CI workflow. The hosted Nightly mutation execution remains pending ship. |
+| CRYPT-01 | SATISFIED | Parser/provider binding, bad-Q data delivery, prior-good GetlocP, malformed seed replay, and narrow compatibility evidence pass the local CI workflow; hosted Nightly mutation passed in run 45149805901. The final ship head's Main CI must pass before merge. |
 
 ---
 _Verifier: gsd-verifier_

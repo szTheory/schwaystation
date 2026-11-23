@@ -7,10 +7,10 @@ current_phase_name: Regions, console revisions and playback
 current_plan: Not started
 status: planning
 stopped_at: Phase 12 complete, ready to plan Phase 13
-last_updated: "2026-11-23T08:46:12.734Z"
+last_updated: "2026-11-23T10:05:24.372Z"
 last_activity: 2026-11-23
-last_activity_desc: Phase 12 complete, transitioned to Phase 13
-state_head: 304c9b32d7d1f1f39372a0193faa9779d192bed9
+last_activity_desc: "Phase 12 shipped as PR #38"
+state_head: 145e7a053c35457d3297bffce8ac1ae67fc1191b
 progress:
   total_phases: 10
   completed_phases: 6
@@ -26,16 +26,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 12 — SBI and LibCrypt
+**Current focus:** Phase 13 — Regions, console revisions and playback
 
 ## Current Position
 
 Phase: 13 — Regions, console revisions and playback
 Current Plan: Not started
-Total Plans in Phase: 7
+Total Plans in Phase: 0
 Status: Ready to plan
-Last activity: 2026-11-23 — Phase 12 complete, transitioned to Phase 13
-Progress: [██████░░░░] 60% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
+Last activity: 2026-11-23 -- Phase 12 shipped as PR #38
+Progress: [██████░░░░] 60% (6/10 phases verified; 5/10 released; Phase 12 ship pending)
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
