@@ -213,11 +213,12 @@ check_route() {
   name=$1 want=$2 event=$3 ref=$4 number=$5 call_ref=$6 before=$7 after=$8 checkout=$9
   route_path=${10:-$bin}
   gh_fail=${11:-}
+  actor=${12-}
   git -C "$runner" fetch -q --no-tags --depth=1 origin "$checkout"
   git -C "$runner" checkout -q --detach "$checkout"
   : > "$fixture_root/gh-calls"
   : > "$output"
-  got=$(cd "$runner" && EVENT="$event" REF="$ref" NUMBER="$number" CALL_REF="$call_ref" \
+  got=$(cd "$runner" && GITHUB_ACTOR="$actor" EVENT="$event" REF="$ref" NUMBER="$number" CALL_REF="$call_ref" \
     BEFORE="$before" AFTER="$after" CHANGED="${PR_CHANGED-1}" GITHUB_WORKSPACE="$runner" \
     GITHUB_REPOSITORY=fixture/project GITHUB_OUTPUT="$output" GH_TOKEN=test-token GH_LIST_FAIL="$gh_fail" \
     PR_AUTHOR="${PR_AUTHOR-}" PR_AUTHOR_TYPE="${PR_AUTHOR_TYPE-}" \
@@ -297,9 +298,22 @@ mkdir -p "$repo/.github/workflows"
 printf '%s\n' 'release' > "$repo/.github/workflows/release.yml"
 release=$(commit release-input)
 printf '%s\n' '{}' > "$repo/.release-please-manifest.json"
+printf '%s\n' '# old release' > "$repo/CHANGELOG.md"
+printf '%s\n' '0.0.0' > "$repo/version.txt"
+metadata_base=$(commit metadata-base)
+printf '%s\n' '{".":"0.1.0"}' > "$repo/.release-please-manifest.json"
 printf '%s\n' '# generated release' > "$repo/CHANGELOG.md"
 printf '%s\n' '0.1.0' > "$repo/version.txt"
 generated=$(commit generated-metadata)
+printf '%s\n' 'release note plus unrelated change' > "$repo/.planning/STATE.md"
+extra_metadata=$(commit metadata-with-extra-file)
+git -C "$repo" checkout -qb metadata-deleted "$generated"
+git -C "$repo" rm -q version.txt
+deleted_metadata=$(commit metadata-with-deletion)
+git -C "$repo" checkout -qb metadata-renamed "$generated"
+git -C "$repo" mv version.txt release-version.txt
+renamed_metadata=$(commit metadata-with-renamed-file)
+git -C "$repo" checkout -q main
 weird=$(printf '.planning/innocent\nsrc/escaped.c')
 mkdir -p "$(dirname "$repo/$weird")"
 printf '%s\n' 'quoted path' > "$repo/$weird"
@@ -311,7 +325,7 @@ while [ "$i" -le 3001 ]; do
   i=$((i + 1))
 done
 oversize=$(commit oversize)
-git -C "$repo" push -q origin main
+git -C "$repo" push -q --all origin
 git clone -q --depth 1 "file://$remote" "$runner"
 
 cat > "$fixture_root/bin/gh" <<'GH'
@@ -390,7 +404,13 @@ check_route mismatch 'heavy=true release_inputs=true ' push refs/heads/main '' '
 check_route release-call 'heavy=true release_inputs=true ' workflow_call '' '' "$base" '' '' "$planning"
 check_route manual 'heavy=true release_inputs=true ' workflow_dispatch refs/heads/main '' '' "$planning" "$planning" "$planning"
 check_route non-main-push 'heavy=true release_inputs=true ' push refs/heads/feature '' '' "$planning" "$planning" "$planning"
-check_route main-generated-metadata 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$release" "$generated" "$generated"
+check_route main-generated-metadata 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$release" "$metadata_base" "$metadata_base" "$bin" '' 'schwaystation-release[bot]'
+check_route main-release-metadata 'heavy=false release_inputs=false ' push refs/heads/main '' '' "$metadata_base" "$generated" "$generated" "$bin" '' 'schwaystation-release[bot]'
+check_route main-release-workflow-call 'heavy=true release_inputs=true ' push refs/heads/main '' "$generated" "$metadata_base" "$generated" "$generated" "$bin" '' 'schwaystation-release[bot]'
+check_route main-release-metadata-wrong-actor 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$metadata_base" "$generated" "$generated" "$bin" '' 'alice'
+check_route main-release-metadata-extra-file 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$metadata_base" "$extra_metadata" "$extra_metadata" "$bin" '' 'schwaystation-release[bot]'
+check_route main-release-metadata-deleted-file 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$generated" "$deleted_metadata" "$deleted_metadata" "$bin" '' 'schwaystation-release[bot]'
+check_route main-release-metadata-renamed-file 'heavy=true release_inputs=false ' push refs/heads/main '' '' "$generated" "$renamed_metadata" "$renamed_metadata" "$bin" '' 'schwaystation-release[bot]'
 
 set_release_pr() {
   PR_AUTHOR='schwaystation-release[bot]' PR_AUTHOR_TYPE=Bot
