@@ -58,6 +58,11 @@ static void apply_board_defaults(schway *inst, const struct schway__board_defaul
     inst->bus.ram_size = defaults->ram_ctrl_boot;
 }
 
+int schway__instance_board_valid(uint32_t board)
+{
+    return find_board_defaults(board) != NULL;
+}
+
 int schway__instance_board_profile_valid(uint32_t board, uint32_t profile_flags)
 {
     const struct schway__board_defaults *defaults = find_board_defaults(board);

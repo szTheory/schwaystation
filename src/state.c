@@ -109,7 +109,10 @@ static void body_io(struct schway__state_io *io, schway *inst)
                                                 SCHWAY_PROFILE_GPU_V0 |
                                                 SCHWAY_PROFILE_CD_UNLOCK |
                                                 SCHWAY_PROFILE_FAST_BOOT)) == 0u);
-    schway__state_check(io, schway__instance_board_profile_valid(board, profile_flags));
+    /* Explicit board/GPU pairs are checked when selected. Older profile
+       sizes can change the GPU flag while inheriting the current board, so
+       both values must be valid independently when loading a state. */
+    schway__state_check(io, schway__instance_board_valid(board));
     (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
     schway__state_disc_identity_io(io, &inst->disc_host.identity_valid,
                                    inst->disc_host.identity_sha256);

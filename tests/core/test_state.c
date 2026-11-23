@@ -303,6 +303,29 @@ static void test_profile(void)
     CHECK(memcmp(good, after, n) == 0);
     schway_destroy(dst);
     schway_destroy(src);
+
+    /* Old-sized callers may select GPU v0 while inheriting the PU-18 board.
+       That documented compatibility state must survive serialization. */
+    schway *legacy = make(SCHWAY_REGION_NTSC_U);
+    schway_profile old;
+    memset(&old, 0, sizeof old);
+    old.size = (uint32_t)offsetof(schway_profile, board);
+    old.region = SCHWAY_REGION_NTSC_U;
+    old.flags = SCHWAY_PROFILE_GPU_V0;
+    old.board = SCHWAY_BOARD_PM41_2; /* outside the caller's declared size */
+    CHECK_EQ_U64(schway_set_profile(legacy, &old), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(legacy->board, SCHWAY_BOARD_PU18);
+    CHECK_EQ_U64(legacy->profile_flags, SCHWAY_PROFILE_GPU_V0);
+    n = save(legacy, good);
+
+    schway *legacy_target = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(schway_load_state(legacy_target, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(legacy_target->board, SCHWAY_BOARD_PU18);
+    CHECK_EQ_U64(legacy_target->profile_flags, SCHWAY_PROFILE_GPU_V0);
+    CHECK_EQ_U64(save(legacy_target, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+    schway_destroy(legacy_target);
+    schway_destroy(legacy);
 }
 
 /* The opt-in boot bit is part of the existing serialized profile flags, and
@@ -431,12 +454,6 @@ static void test_rejects(void)
         expect_refused("board above maximum", target, bad, n,
                        SCHWAY_STATUS_ERR_STATE_FIELD);
 
-        memcpy(bad, good, n);
-        put_le(bad + board_at, SCHWAY_BOARD_PU7, 4u);
-        put_le(bad + profile_flags_at, 0u, 4u);
-        reseal(bad, n);
-        expect_refused("board GPU_V0 mismatch", target, bad, n,
-                       SCHWAY_STATUS_ERR_STATE_FIELD);
     }
 
     /* The architectural zero register and COP0's stored/derived bits cannot

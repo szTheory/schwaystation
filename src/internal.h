@@ -479,6 +479,7 @@ schway_status schway__instance_check_out_size(const void *s, uint32_t first);
 void schway__instance_write_out(void *out, const void *full, uint32_t ours);
 
 /* Board tuple checks share the profile defaults table with state loading. */
+int schway__instance_board_valid(uint32_t board);
 int schway__instance_board_profile_valid(uint32_t board, uint32_t profile_flags);
 void schway__instance_restore_board_identity(schway *inst);
 
