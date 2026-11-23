@@ -49,7 +49,7 @@ while IFS= read -r path || [ -n "$path" ]; do
   esac
   case "$path" in
     host/disc_pbp.c | host/disc_pbp.h | tests/disc/pbp.c | tests/fuzz/pbp.c) all_irrelevant=false ;;
-    .planning/* | docs/*) all_pbp=false ;;
+    .planning/* | docs/* | examples/* | quality.json) all_pbp=false ;;
     *) all_pbp=false; all_irrelevant=false ;;
   esac
   case "$path" in

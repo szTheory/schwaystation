@@ -35,6 +35,7 @@ generate_export_header(schwaystation_sdl2_pbp_miniz
 add_executable(schwaystation-sdl2
   main.c
   "${SCHWAY_ROOT}/host/disc_image.c"
+  "${SCHWAY_ROOT}/host/disc_sbi.c"
   "${SCHWAY_ROOT}/host/disc_chd.c"
   "${SCHWAY_ROOT}/host/disc_ecm.c"
   "${SCHWAY_ROOT}/host/disc_ccd.c"
