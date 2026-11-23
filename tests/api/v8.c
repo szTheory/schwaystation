@@ -23,6 +23,7 @@ int main(void)
 {
     CHECK(SCHWAY_API_VERSION >= 8);
     CHECK_EQ_U64(offsetof(schway_profile, board), 16u);
+    CHECK_EQ_U64(SCHWAY_PROFILE_FAST_BOOT, 16u);
     CHECK_EQ_U64(SCHWAY_BOARD_PU7, 1u);
     CHECK_EQ_U64(SCHWAY_BOARD_PU8_EARLY, 2u);
     CHECK_EQ_U64(SCHWAY_BOARD_PU8_LATE, 3u);
