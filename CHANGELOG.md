@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/szTheory/schwaystation/compare/v0.10.0...v0.11.0) (2026-11-23)
+
+
+### Features
+
+* add ECM and CloneCD disc image support ([#36](https://github.com/szTheory/schwaystation/issues/36)) ([4ff052a](https://github.com/szTheory/schwaystation/commit/4ff052affdea117f385884e369c79a903d120bd3))
+
 ## [0.10.0](https://github.com/szTheory/schwaystation/compare/v0.9.0...v0.10.0) (2026-11-21)
 
 
