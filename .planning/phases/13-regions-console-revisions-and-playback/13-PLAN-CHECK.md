@@ -19,11 +19,13 @@ The MDEC edge case is selected from pinned inputs during execution, as allowed b
 
 ## Plan integrity and verification
 
-All nine plans pass `verify.plan-structure`; each has two tasks with complete files, actions, verification and done criteria. Plan-level file lists cover the task file lists. Dependencies are acyclic and waves are consistent. The shared CI build tree is serialized through Waves 1–9, and Plan 05 declares Plan 04's board-aware state/hash prerequisite.
+All nine plans pass `verify.plan-structure`; each has one or two tasks with complete files, actions, verification and done criteria. Plan-level file lists cover the task file lists. Dependencies are acyclic and waves are consistent. The shared CI build tree is serialized through Waves 1–9, and Plan 05 declares Plan 04's board-aware state/hash prerequisite.
 
-Plan 02 uses the existing Nightly preset with `SCHWAYSTATION_MEDIA_REFERENCE_ONLY=mdec`. Task 1 configures that lane and asserts the exact four pre-existing baseline/preflight/budget selector names; Task 2 sorts the Nightly inventory, configures the same lane, asserts exactly `{mdec.reference.input_preflight, mdec.reference.edge}` before building, then runs the focused CTest selection. The Nightly configure/build/test presets and target exist. The MDEC-only branch already calls `schway_register_mdec_reference_tests`, so no edit to `tests/nightly/tests.cmake` is needed. Plan 02 task files exactly match its frontmatter; it depends on Plan 01 and remains in Wave 2.
+Plan 02 now reuses `tests/mdec/color_reference.c::run_color_guest(movie15)` through the existing MDEC-only Nightly lane. Its single task modifies exactly `cmake/MDECReferences.cmake` and `tests/nightly/inventory.txt`; the existing Nightly file already invokes the shared registration helper. The preset, MDEC-only cache variable, target, inventory and both required fixtures align. Plan 02 depends on Plan 01 and remains in Wave 2.
 
-Both revised Plan 02 command bodies pass a fresh `bash -n`; the other 16 are unchanged from the prior validated pass. All commands have `[VALIDATED: bash -n exit 0]` records. Previously supplied path/failing-direction probe results showed no findings for the then-current 18 commands; those probes were not rerun in this bounded audit.
+The selector assertion expects `mdec.reference.input_preflight`, `mdec.reference.color_assets` and `mdec.reference.edge`. A read-only CTest `--show-only` query of the existing `coverage_movie15` consumer confirmed CTest adds both required fixture setup tests to the selected set. The new assertion therefore accounts for fixture expansion. The task command also checks inventory sort and the 3,901-line cap before configuring/building, then runs only the bounded edge selection. No configure, build or guest test was run in this final bounded review.
+
+The current Plan 02 command body passes a fresh `bash -n`, has a matching validate-only record, and its one task's file list exactly matches frontmatter. The other 16 commands are unchanged from the previous validated pass, making 17 current task commands total. Previously supplied path/failing-direction probe results showed no findings for their then-current version; those probes were not rerun in this bounded audit.
 
 Nyquist checks 8a–8e are not applicable because this phase's RESEARCH.md has no `Validation Architecture` section. Per-plan calibrated estimates range from 9,000 to 15,000 tokens, below the 100,000-token budget. All have low confidence because this project has no completed phase actuals for calibration.
 
@@ -36,7 +38,7 @@ The prior review findings are resolved: the MDEC selector set is asserted before
 | Plan | Tasks | Wave | Dependencies | Status |
 |---|---:|---:|---|---|
 | 13-01 | 2 | 1 | — | Valid |
-| 13-02 | 2 | 2 | 13-01 | Valid |
+| 13-02 | 1 | 2 | 13-01 | Valid |
 | 13-03 | 2 | 3 | 13-02 | Valid |
 | 13-04 | 2 | 4 | 13-03 | Valid |
 | 13-05 | 2 | 5 | 13-01, 13-03, 13-04 | Valid |
