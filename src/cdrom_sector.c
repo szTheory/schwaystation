@@ -172,11 +172,15 @@ static void sector_make_q(const schway *inst, uint32_t lba, uint8_t q[12])
 }
 
 static uint32_t sector_location(schway *inst, uint32_t lba, const uint8_t subcode[96],
-                                uint32_t *position)
+                                uint32_t bad_q, uint32_t *position)
 {
     struct schway__cdrom *cd = &inst->cdrom;
     uint32_t track_index = 0u;
     if (sector_track(inst, lba, &track_index) == 0u) {
+        *position = cd->current_lba;
+        return cd->q_record_valid;
+    }
+    if (bad_q != 0u) {
         *position = cd->current_lba;
         return cd->q_record_valid;
     }
@@ -321,6 +325,7 @@ void schway__cdrom_sector_seek(schway *inst)
     uint32_t track_type = sector_track(inst, lba, &track_index);
     (void)track_index;
     if (track_type == 0u || track_type == SCHWAY_DISC_TRACK_AUDIO) {
+        cd->current_lba = lba;
         return;
     }
     uint8_t sector[SCHWAY__CDROM_SECTOR_BYTES] = {0u};
@@ -328,10 +333,16 @@ void schway__cdrom_sector_seek(schway *inst)
     if (inst->disc_host.callbacks.read_sector(inst->disc_host.callbacks.user, lba,
                                               sector, subcode) == 0u ||
         sector_is_well_formed(sector) == 0u) {
+        cd->current_lba = lba;
         return;
     }
+    uint32_t bad_q = inst->disc_host.callbacks.bad_q != NULL
+                         ? inst->disc_host.callbacks.bad_q(inst->disc_host.callbacks.user, lba)
+                         : 0u;
     uint32_t position = lba;
-    if (sector_location(inst, lba, subcode, &position) != 0u) cd->current_lba = position;
+    if (sector_location(inst, lba, subcode, bad_q, &position) != 0u || bad_q == 0u) {
+        cd->current_lba = position;
+    }
     /* GetlocL exposes the completed SeekL target header (SCM.02; docs/hardware/cdrom.md#command-behavior). */
     sector_store(cd, sector, lba, SCHWAY__CDROM_SECTOR_BYTES);
 }
@@ -385,7 +396,7 @@ void schway__cdrom_sector_event(schway *inst, uint64_t now)
                          ? inst->disc_host.callbacks.bad_q(inst->disc_host.callbacks.user, lba)
                          : 0u;
     uint32_t position = lba;
-    (void)sector_location(inst, lba, subcode, &position);
+    (void)sector_location(inst, lba, subcode, bad_q, &position);
     sector_advance(inst, lba, bad_q, position);
 
     if (audio_track != 0u && cd->play_active == 0u) {
