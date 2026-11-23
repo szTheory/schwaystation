@@ -80,7 +80,7 @@ status: complete
 1. **Bind SBI overlays to image providers** - `ea949fd` (`feat(12): bind SBI overlays to image providers`)
 2. **Cover SBI CUE provider binding** - `ab639dd` (`test(12-03): cover SBI CUE provider binding`)
 
-## Verification
+## Test Evidence
 
 - Cheap preflights passed: sorted disc inventory, exact CTest selector/argument wiring, `git diff --check`, and the 3,901-line repository-check budget.
 - `cmake --build --preset ci --target schwaystation-test-disc-image schwaystation-test-disc-sbi` - exit 0.
