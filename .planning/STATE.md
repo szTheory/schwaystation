@@ -49,7 +49,7 @@ Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtim
 
 ### Phase 12 Plan 12-07 execution (2026-11-23)
 
-Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The 9-minute wall interval completed one task and one implementation commit; active time was not separately measured. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans are complete; Phase 12 is ready for review and verification, not shipped.
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured 9-minute wall interval (08:02:00–08:11:27 UTC) completed one task and one implementation commit through the focused test and initial GSD closeout; active time was not separately measured. The subsequent metadata-only duration-correction commit is excluded. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans are complete; Phase 12 is ready for review and verification, not shipped.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 

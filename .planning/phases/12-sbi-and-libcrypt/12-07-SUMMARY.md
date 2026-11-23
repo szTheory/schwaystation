@@ -49,7 +49,7 @@ status: complete
 
 ## Performance
 
-- **Duration:** 9 minutes elapsed from plan start through implementation, focused verification and closeout; active time was not separately measured.
+- **Duration:** 9 minutes (08:02:00–08:11:27 UTC) from plan start through the focused test and initial GSD closeout; active time was not separately measured. The later metadata-only duration-correction commit is excluded from this interval.
 - **Started:** 2026-11-23T08:02:00Z
 - **Completed:** 2026-11-23T08:11:27Z
 - **Tasks:** 1
