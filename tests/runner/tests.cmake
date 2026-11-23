@@ -1542,6 +1542,8 @@ schway_add_test(NAME runner.disc.probe
 set(runner_disc_legacy_timeout 120)
 if(SCHWAYSTATION_INVENTORY STREQUAL "asan")
   set(runner_disc_legacy_timeout 240)
+elseif(SCHWAYSTATION_OS STREQUAL "macos" AND SCHWAYSTATION_ARCH STREQUAL "x64")
+  set(runner_disc_legacy_timeout 240)
 endif()
 schway_add_test(NAME runner.disc.legacy
   COMMAND ${runner_check} -DCASE=disc_legacy -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
