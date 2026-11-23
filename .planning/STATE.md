@@ -49,7 +49,7 @@ Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtim
 
 ### Phase 12 Plan 12-07 execution (2026-11-23)
 
-Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The 8-minute wall interval completed one task and one implementation commit; active time was not separately measured. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans are complete; Phase 12 is ready for review and verification, not shipped.
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The 9-minute wall interval completed one task and one implementation commit; active time was not separately measured. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans are complete; Phase 12 is ready for review and verification, not shipped.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 
@@ -1255,7 +1255,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 12 P04 | 22m | 3 tasks | 5 files |
 | Phase 12 P05 | 37min | 3 tasks | 5 files |
 | Phase 12 P06 | 64min | 2 tasks | 8 files |
-| Phase 12 P07 | 8min | 1 tasks | 1 files |
+| Phase 12 P07 | 9min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
