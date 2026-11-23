@@ -33,6 +33,13 @@ static schway_disc_sbi_status schway__disc_sbi_lba(
     return SCHWAY_DISC_SBI_OK;
 }
 
+static int schway__disc_sbi_compare_lba(const void *left, const void *right)
+{
+    uint32_t a = *(const uint32_t *)left;
+    uint32_t b = *(const uint32_t *)right;
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+
 schway_disc_sbi_status schway_disc_sbi_parse(const uint8_t *bytes, size_t size,
                                               uint32_t lba_count,
                                               schway_disc_sbi *out)
@@ -48,22 +55,26 @@ schway_disc_sbi_status schway_disc_sbi_parse(const uint8_t *bytes, size_t size,
     }
     if (size > SCHWAY_DISC_SBI_MAX_BYTES) return SCHWAY_DISC_SBI_LIMIT;
     capacity = (size - 4u) / 7u;
-    if (capacity > SCHWAY_DISC_SBI_MAX_RECORDS) return SCHWAY_DISC_SBI_LIMIT;
     if (capacity != 0u) {
         candidate.lbas = (uint32_t *)malloc(capacity * sizeof *candidate.lbas);
         if (candidate.lbas == NULL) return SCHWAY_DISC_SBI_OUT_OF_MEMORY;
     }
     while (offset < size) {
         uint32_t lba;
+        size_t record_size;
         if (size - offset < 4u) {
             free(candidate.lbas);
             return SCHWAY_DISC_SBI_TRUNCATED;
         }
-        if (bytes[offset + 3u] != 1u) {
+        if (bytes[offset + 3u] == 1u) {
+            record_size = 14u;
+        } else if (bytes[offset + 3u] == 2u || bytes[offset + 3u] == 3u) {
+            record_size = 7u;
+        } else {
             free(candidate.lbas);
             return SCHWAY_DISC_SBI_BAD_RECORD;
         }
-        if (size - offset < 14u) {
+        if (size - offset < record_size) {
             free(candidate.lbas);
             return SCHWAY_DISC_SBI_TRUNCATED;
         }
@@ -73,8 +84,23 @@ schway_disc_sbi_status schway_disc_sbi_parse(const uint8_t *bytes, size_t size,
             free(candidate.lbas);
             return status;
         }
+        if (candidate.count == SCHWAY_DISC_SBI_MAX_RECORDS) {
+            free(candidate.lbas);
+            return SCHWAY_DISC_SBI_LIMIT;
+        }
         candidate.lbas[candidate.count++] = lba;
-        offset += 14u;
+        offset += record_size;
+    }
+    if (candidate.count > 1u) {
+        qsort(candidate.lbas, candidate.count, sizeof *candidate.lbas,
+              schway__disc_sbi_compare_lba);
+        size_t unique = 1u;
+        for (size_t i = 1u; i < candidate.count; i++) {
+            if (candidate.lbas[i] != candidate.lbas[unique - 1u]) {
+                candidate.lbas[unique++] = candidate.lbas[i];
+            }
+        }
+        candidate.count = unique;
     }
     *out = candidate;
     return SCHWAY_DISC_SBI_OK;

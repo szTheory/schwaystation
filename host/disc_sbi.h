@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Defensive implementation bounds; these are not SBI format limits. */
 #define SCHWAY_DISC_SBI_MAX_BYTES 65536u
 #define SCHWAY_DISC_SBI_MAX_RECORDS 8192u
 
