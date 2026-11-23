@@ -622,17 +622,32 @@ static void test_profile_locked(void)
 static const struct {
     uint32_t board;
     uint32_t gpu_v0;
-} board_gpu_pairs[] = {
-    {SCHWAY_BOARD_PU7, 1u},
-    {SCHWAY_BOARD_PU8_EARLY, 1u},
-    {SCHWAY_BOARD_PU8_LATE, 0u},
-    {SCHWAY_BOARD_PU18, 0u},
-    {SCHWAY_BOARD_PU20, 0u},
-    {SCHWAY_BOARD_PU22, 0u},
-    {SCHWAY_BOARD_PU23, 0u},
-    {SCHWAY_BOARD_PM41, 0u},
-    {SCHWAY_BOARD_PM41_2, 0u},
+    uint32_t spu_revision;
+    uint32_t cd_firmware;
+    uint32_t ram_ctrl_boot;
+    uint32_t has_parallel_port;
+    uint32_t has_serial_port;
+} board_profiles[] = {
+    {SCHWAY_BOARD_PU7, 1u, 2922u, 0u, 0x0B80u, 1u, 0u},
+    {SCHWAY_BOARD_PU8_EARLY, 1u, 2922u, 0u, 0x0B80u, 1u, 0u},
+    {SCHWAY_BOARD_PU8_LATE, 0u, 2925u, 1u, 0x0B88u, 1u, 0u},
+    {SCHWAY_BOARD_PU18, 0u, 2925u, 2u, 0x0B88u, 1u, 0u},
+    {SCHWAY_BOARD_PU20, 0u, 2925u, 2u, 0x0B88u, 1u, 0u},
+    {SCHWAY_BOARD_PU22, 0u, 2925u, 3u, 0x0B88u, 1u, 0u},
+    {SCHWAY_BOARD_PU23, 0u, 2925u, 3u, 0x0B88u, 0u, 1u},
+    {SCHWAY_BOARD_PM41, 0u, 2938u, 3u, 0x0B88u, 0u, 0u},
+    {SCHWAY_BOARD_PM41_2, 0u, 2941u, 3u, 0x0B88u, 0u, 0u},
 };
+
+static void check_board_defaults(const schway *inst, size_t index)
+{
+    CHECK_EQ_U64(inst->board, board_profiles[index].board);
+    CHECK_EQ_U64(inst->spu_revision, board_profiles[index].spu_revision);
+    CHECK_EQ_U64(inst->cd_firmware, board_profiles[index].cd_firmware);
+    CHECK_EQ_U64(inst->ram_ctrl_boot, board_profiles[index].ram_ctrl_boot);
+    CHECK_EQ_U64(inst->has_parallel_port, board_profiles[index].has_parallel_port);
+    CHECK_EQ_U64(inst->has_serial_port, board_profiles[index].has_serial_port);
+}
 
 static schway_profile board_profile(uint32_t region, uint32_t board, uint32_t gpu_v0)
 {
@@ -653,6 +668,7 @@ static void test_profile_machine(void)
         exit(1);
     }
     CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU18);
+    check_board_defaults(inst, 3u);
 
     /* A profile ending at the previous struct size cannot supply board. */
     schway_profile old = make_profile(SCHWAY_REGION_PAL);
@@ -662,6 +678,7 @@ static void test_profile_machine(void)
     CHECK_EQ_U64(schway_set_profile(inst, &old), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU18);
     CHECK_EQ_U64(inst->profile_flags, SCHWAY_PROFILE_GPU_V0);
+    check_board_defaults(inst, 3u);
     CHECK_EQ_U64(info_of(inst).region, SCHWAY_REGION_PAL);
 
     /* Board zero inherits PU-18 while the legacy GPU override remains usable. */
@@ -669,27 +686,45 @@ static void test_profile_machine(void)
     CHECK_EQ_U64(schway_set_profile(inst, &inherit), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU18);
     CHECK_EQ_U64(inst->profile_flags, 0u);
+    check_board_defaults(inst, 3u);
 
-    for (size_t i = 0; i < sizeof board_gpu_pairs / sizeof board_gpu_pairs[0]; i++) {
-        uint32_t expected_v0 = board_gpu_pairs[i].gpu_v0;
-        schway_profile legal = board_profile(SCHWAY_REGION_NTSC_U,
-                                             board_gpu_pairs[i].board, expected_v0);
+    for (size_t i = 0; i < sizeof board_profiles / sizeof board_profiles[0]; i++) {
+        uint32_t expected_v0 = board_profiles[i].gpu_v0;
+        uint32_t legal_region = (uint32_t)(i % 3u) + SCHWAY_REGION_NTSC_J;
+        schway_profile legal = board_profile(legal_region,
+                                             board_profiles[i].board, expected_v0);
+        legal.disc_flags = SCHWAY_PROFILE_CD_LICENSED;
         CHECK_EQ_U64(schway_set_profile(inst, &legal), SCHWAY_STATUS_OK);
-        CHECK_EQ_U64(inst->board, board_gpu_pairs[i].board);
+        check_board_defaults(inst, i);
+        CHECK_EQ_U64(info_of(inst).region, legal_region);
         CHECK_EQ_U64(inst->profile_flags,
-                     expected_v0 != 0u ? SCHWAY_PROFILE_GPU_V0 : 0u);
+                     (expected_v0 != 0u ? SCHWAY_PROFILE_GPU_V0 : 0u) |
+                         SCHWAY_PROFILE_CD_LICENSED);
 
         uint32_t region_before = info_of(inst).region;
         uint32_t board_before = inst->board;
         uint32_t flags_before = inst->profile_flags;
-        schway_profile illegal = board_profile(SCHWAY_REGION_PAL,
-                                                board_gpu_pairs[i].board,
+        uint32_t spu_before = inst->spu_revision;
+        uint32_t cd_before = inst->cd_firmware;
+        uint32_t ram_before = inst->ram_ctrl_boot;
+        uint32_t parallel_before = inst->has_parallel_port;
+        uint32_t serial_before = inst->has_serial_port;
+        uint32_t illegal_region = legal_region == SCHWAY_REGION_PAL
+                                      ? SCHWAY_REGION_NTSC_U
+                                      : SCHWAY_REGION_PAL;
+        schway_profile illegal = board_profile(illegal_region,
+                                                board_profiles[i].board,
                                                 expected_v0 == 0u ? 1u : 0u);
         CHECK_EQ_U64(schway_set_profile(inst, &illegal),
                      SCHWAY_STATUS_ERR_PROFILE_REJECTED);
         CHECK_EQ_U64(info_of(inst).region, region_before);
         CHECK_EQ_U64(inst->board, board_before);
         CHECK_EQ_U64(inst->profile_flags, flags_before);
+        CHECK_EQ_U64(inst->spu_revision, spu_before);
+        CHECK_EQ_U64(inst->cd_firmware, cd_before);
+        CHECK_EQ_U64(inst->ram_ctrl_boot, ram_before);
+        CHECK_EQ_U64(inst->has_parallel_port, parallel_before);
+        CHECK_EQ_U64(inst->has_serial_port, serial_before);
     }
 
     static const uint32_t unsupported[] = {10u, 0xFFFFFFFFu};
@@ -697,11 +732,21 @@ static void test_profile_machine(void)
         uint32_t region_before = info_of(inst).region;
         uint32_t board_before = inst->board;
         uint32_t flags_before = inst->profile_flags;
+        uint32_t spu_before = inst->spu_revision;
+        uint32_t cd_before = inst->cd_firmware;
+        uint32_t ram_before = inst->ram_ctrl_boot;
+        uint32_t parallel_before = inst->has_parallel_port;
+        uint32_t serial_before = inst->has_serial_port;
         schway_profile bad = board_profile(SCHWAY_REGION_PAL, unsupported[i], 0u);
         CHECK_EQ_U64(schway_set_profile(inst, &bad), SCHWAY_STATUS_ERR_PROFILE_REJECTED);
         CHECK_EQ_U64(info_of(inst).region, region_before);
         CHECK_EQ_U64(inst->board, board_before);
         CHECK_EQ_U64(inst->profile_flags, flags_before);
+        CHECK_EQ_U64(inst->spu_revision, spu_before);
+        CHECK_EQ_U64(inst->cd_firmware, cd_before);
+        CHECK_EQ_U64(inst->ram_ctrl_boot, ram_before);
+        CHECK_EQ_U64(inst->has_parallel_port, parallel_before);
+        CHECK_EQ_U64(inst->has_serial_port, serial_before);
     }
     schway_destroy(inst);
 }

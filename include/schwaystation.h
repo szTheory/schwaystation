@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 7
+#define SCHWAY_API_VERSION 8
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -33,6 +33,16 @@ typedef uint32_t schway_status;
 #define SCHWAY_REGION_NTSC_J 1u
 #define SCHWAY_REGION_NTSC_U 2u
 #define SCHWAY_REGION_PAL 3u
+
+#define SCHWAY_BOARD_PU7 1u
+#define SCHWAY_BOARD_PU8_EARLY 2u
+#define SCHWAY_BOARD_PU8_LATE 3u
+#define SCHWAY_BOARD_PU18 4u
+#define SCHWAY_BOARD_PU20 5u
+#define SCHWAY_BOARD_PU22 6u
+#define SCHWAY_BOARD_PU23 7u
+#define SCHWAY_BOARD_PM41 8u
+#define SCHWAY_BOARD_PM41_2 9u
 
 #define SCHWAY_STOP_FRAME 1u
 #define SCHWAY_STOP_BUDGET 2u
@@ -152,6 +162,7 @@ typedef struct schway_profile {
     uint32_t region; /* SCHWAY_REGION_* */
     uint32_t flags;  /* SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0 */
     uint32_t disc_flags; /* SCHWAY_PROFILE_CD_* bits */
+    uint32_t board; /* SCHWAY_BOARD_*; zero inherits current board defaults */
 } schway_profile;
 
 typedef struct schway_exe_info {

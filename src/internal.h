@@ -22,7 +22,7 @@
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 18u
+#define SCHWAY__BEHAVIOUR_REVISION 19u
 #define SCHWAY__STATE_FORMAT 18u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
@@ -140,6 +140,12 @@ struct schway {
     schway_allocator allocator; /* the caller's, copied at create */
     size_t alloc_size;          /* the size given to alloc, given back to free */
     uint32_t region;            /* SCHWAY_REGION_* */
+    uint32_t board;             /* SCHWAY_BOARD_* */
+    uint32_t spu_revision;      /* CXD part number selected by the board */
+    uint32_t cd_firmware;       /* vC0..vC3 represented as 0..3 */
+    uint32_t ram_ctrl_boot;     /* board's BIOS DRAM_CTRL boot value */
+    uint32_t has_parallel_port;
+    uint32_t has_serial_port;
     uint32_t profile_locked;    /* 1 after the first run_frame */
     uint32_t run_active;        /* host callbacks may run only inside public run calls */
     uint64_t frame;             /* frames run since power-on */
@@ -227,7 +233,8 @@ _Static_assert(offsetof(schway_profile, size) == 0, "profile.size");
 _Static_assert(offsetof(schway_profile, region) == 4, "profile.region");
 _Static_assert(offsetof(schway_profile, flags) == 8, "profile.flags");
 _Static_assert(offsetof(schway_profile, disc_flags) == 12, "profile.disc_flags");
-_Static_assert(sizeof(schway_profile) == 16, "profile size");
+_Static_assert(offsetof(schway_profile, board) == 16, "profile.board");
+_Static_assert(sizeof(schway_profile) == 20, "profile size");
 _Static_assert(SCHWAY__PROFILE_DEBUG_PORT == SCHWAY_PROFILE_DEBUG_PORT, "debug port flag");
 
 _Static_assert(offsetof(schway_exe_info, size) == 0, "exe_info.size");
@@ -361,6 +368,7 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__PROFILE_SIZE_FIRST 8u /* a literal: appended fields leave it alone */
 #define SCHWAY__PROFILE_SIZE_FLAGS 12u /* flags ended the released v4 profile */
 #define SCHWAY__PROFILE_SIZE_DISC_FLAGS 16u /* appended in API v7 */
+#define SCHWAY__PROFILE_SIZE_BOARD 20u /* appended in API v8 */
 #define SCHWAY__INFO_SIZE_FIRST 36u
 #define SCHWAY__RUN_RESULT_SIZE_FIRST 24u /* a literal: appended fields leave it alone */
 #define SCHWAY__INPUT_SIZE_FIRST ((uint32_t)sizeof(schway_input))
@@ -379,7 +387,8 @@ _Static_assert(SCHWAY__CONFIG_SIZE_FIRST == sizeof(schway_config), "config first
 _Static_assert(SCHWAY__VERSIONS_SIZE_FIRST == sizeof(schway_versions), "versions first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FIRST == offsetof(schway_profile, flags), "profile first size");
 _Static_assert(SCHWAY__PROFILE_SIZE_FLAGS == offsetof(schway_profile, disc_flags), "profile flags size");
-_Static_assert(SCHWAY__PROFILE_SIZE_DISC_FLAGS == sizeof(schway_profile), "profile disc flags size");
+_Static_assert(SCHWAY__PROFILE_SIZE_DISC_FLAGS == offsetof(schway_profile, board), "profile disc flags size");
+_Static_assert(SCHWAY__PROFILE_SIZE_BOARD == sizeof(schway_profile), "profile board size");
 _Static_assert(SCHWAY__INFO_SIZE_FIRST == sizeof(schway_info), "info first size");
 _Static_assert(SCHWAY__INPUT_SIZE_FIRST == sizeof(schway_input), "input first size");
 _Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == offsetof(schway_run_result, exit_code),

@@ -439,6 +439,12 @@ and `disc_flags` for CD settings. A caller whose struct ends before a field gets
 in either field return `SCHWAY_STATUS_ERR_PROFILE_REJECTED`. Both fields survive a power reset and lock with the
 region.
 
+API version 8 appends `board` after `disc_flags`. New instances use PU-18 defaults. A profile that ends before
+`board`, or sets it to zero, keeps the instance's current board defaults; `SCHWAY_PROFILE_GPU_V0` remains the
+legacy GPU override for those profiles. An explicit board selects its documented SPU, CD firmware, RAM-control
+and port defaults. Its GPU must match the board: GPU v0 is valid for PU-7 and early PU-8, while the other boards
+use GPU v2.
+
 - `schway_profile.disc_flags` with `SCHWAY_PROFILE_CD_LICENSED`: treat an attached data disc as licensed for the selected machine region. This is an
   explicit host override for discs whose lead-in licence cannot be supplied through the sector callback.
 - `schway_profile.disc_flags` with `SCHWAY_PROFILE_CD_UNLOCK`: allow the modeled non-Japanese firmware unlock commands to accept a mismatched region.
@@ -623,7 +629,7 @@ an unknown one included, and never `NULL`.
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
 
-`SCHWAY_API_VERSION` is 7. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
+`SCHWAY_API_VERSION` is 8. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
 Version 3 added `SCHWAY_FAULT_DMA`; version 4 added read-only `schway_span` memory views, card loading and card
 generation queries, plus copied BIOS loading and SHA-256 reporting. Version 5 added the host-supplied disc and TOC
 callbacks, lid control, and disc swapping; version 6 appended disc identity; version 7 appended `disc_flags` to

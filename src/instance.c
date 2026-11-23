@@ -8,6 +8,50 @@
    so a garbage tag is refused without reading past the caller's object. */
 #define SIZE_TAG_MAX 4096u
 
+struct schway__board_defaults {
+    uint32_t board;
+    uint32_t gpu_v0;
+    uint32_t spu_revision;
+    uint32_t cd_firmware;
+    uint32_t ram_ctrl_boot;
+    uint32_t has_parallel_port;
+    uint32_t has_serial_port;
+};
+
+/* Board and chip pairings follow .planning/preparation/PSX-SYSTEM.md section 8.
+   The modeled defaults are explicit so a profile never infers a board from region. */
+static const struct schway__board_defaults board_defaults[] = {
+    {SCHWAY_BOARD_PU7, 1u, 2922u, 0u, 0x0B80u, 1u, 0u},
+    {SCHWAY_BOARD_PU8_EARLY, 1u, 2922u, 0u, 0x0B80u, 1u, 0u},
+    {SCHWAY_BOARD_PU8_LATE, 0u, 2925u, 1u, 0x0B88u, 1u, 0u},
+    {SCHWAY_BOARD_PU18, 0u, 2925u, 2u, 0x0B88u, 1u, 0u},
+    {SCHWAY_BOARD_PU20, 0u, 2925u, 2u, 0x0B88u, 1u, 0u},
+    {SCHWAY_BOARD_PU22, 0u, 2925u, 3u, 0x0B88u, 1u, 0u},
+    {SCHWAY_BOARD_PU23, 0u, 2925u, 3u, 0x0B88u, 0u, 1u},
+    {SCHWAY_BOARD_PM41, 0u, 2938u, 3u, 0x0B88u, 0u, 0u},
+    {SCHWAY_BOARD_PM41_2, 0u, 2941u, 3u, 0x0B88u, 0u, 0u},
+};
+
+static const struct schway__board_defaults *find_board_defaults(uint32_t board)
+{
+    for (size_t i = 0; i < sizeof board_defaults / sizeof board_defaults[0]; i++) {
+        if (board_defaults[i].board == board) {
+            return &board_defaults[i];
+        }
+    }
+    return NULL;
+}
+
+static void apply_board_defaults(schway *inst, const struct schway__board_defaults *defaults)
+{
+    inst->board = defaults->board;
+    inst->spu_revision = defaults->spu_revision;
+    inst->cd_firmware = defaults->cd_firmware;
+    inst->ram_ctrl_boot = defaults->ram_ctrl_boot;
+    inst->has_parallel_port = defaults->has_parallel_port;
+    inst->has_serial_port = defaults->has_serial_port;
+}
+
 static uint32_t size_tag(const void *s)
 {
     uint32_t size;
@@ -327,6 +371,7 @@ schway_status schway_create(const schway_config *cfg, schway **out)
     inst->alloc_size = alloc_size;
     inst->video_scanout = (uint8_t *)(void *)(inst + 1);
     inst->region = SCHWAY_REGION_NTSC_U;
+    apply_board_defaults(inst, find_board_defaults(SCHWAY_BOARD_PU18));
     schway__card_init(inst);
     power_on(inst);
     *out = inst;
@@ -355,6 +400,8 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     /* Disc overrides were appended so released callers keep the old flags mask. */
     uint32_t flags = profile->size >= SCHWAY__PROFILE_SIZE_FLAGS ? profile->flags : 0u;
     uint32_t disc_flags = profile->size >= SCHWAY__PROFILE_SIZE_DISC_FLAGS ? profile->disc_flags : 0u;
+    uint32_t board = profile->size >= SCHWAY__PROFILE_SIZE_BOARD ? profile->board : 0u;
+    const struct schway__board_defaults *defaults = NULL;
     uint32_t allowed_flags = SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0;
     if (profile->size < SCHWAY__PROFILE_SIZE_DISC_FLAGS) {
         allowed_flags |= SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_CD_UNLOCK;
@@ -364,8 +411,18 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
         (disc_flags & ~(SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_CD_UNLOCK)) != 0u) {
         return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
     }
+    if (board != 0u) {
+        defaults = find_board_defaults(board);
+        if (defaults == NULL ||
+            (((flags & SCHWAY_PROFILE_GPU_V0) != 0u) != (defaults->gpu_v0 != 0u))) {
+            return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
+        }
+    }
     if (inst->profile_locked) {
         return SCHWAY_STATUS_ERR_PROFILE_LOCKED;
+    }
+    if (defaults != NULL) {
+        apply_board_defaults(inst, defaults);
     }
     inst->region = profile->region;
     inst->profile_flags = flags | disc_flags;
