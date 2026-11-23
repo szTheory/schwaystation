@@ -92,9 +92,13 @@ endif()
 
 # Tests that inspect card 2 use a separate, uninstalled module.
 add_library(schwaystation-libretro-card-test MODULE
-  ${PROJECT_SOURCE_DIR}/libretro/libretro.c)
+  ${PROJECT_SOURCE_DIR}/libretro/libretro.c
+  ${PROJECT_SOURCE_DIR}/host/disc_probe.c
+  ${PROJECT_SOURCE_DIR}/runner/region.c)
 target_link_libraries(schwaystation-libretro-card-test PRIVATE
   schwaystation::schwaystation schwaystation-host schwaystation_disc_image)
+target_include_directories(schwaystation-libretro-card-test PRIVATE
+  ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/runner)
 target_compile_definitions(schwaystation-libretro-card-test PRIVATE
   SCHWAYSTATION_LIBRETRO_TESTING
   SCHWAYSTATION_LIBRETRO_VERSION="${PROJECT_VERSION}"
@@ -105,8 +109,12 @@ schway_warnings(schwaystation-libretro-card-test)
 # The in-process frontend. It links the library and the shared converter
 # itself, runs a reference instance beside the module and compares the
 # delivered frame with that instance's conversion byte for byte.
-add_executable(schwaystation-test-libretro-host ${CMAKE_CURRENT_LIST_DIR}/host.c)
-target_include_directories(schwaystation-test-libretro-host PRIVATE ${PROJECT_SOURCE_DIR}/libretro)
+add_executable(schwaystation-test-libretro-host
+  ${CMAKE_CURRENT_LIST_DIR}/host.c
+  ${PROJECT_SOURCE_DIR}/host/disc_probe.c
+  ${PROJECT_SOURCE_DIR}/runner/region.c)
+target_include_directories(schwaystation-test-libretro-host PRIVATE
+  ${PROJECT_SOURCE_DIR}/libretro ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/runner)
 target_link_libraries(schwaystation-test-libretro-host PRIVATE schwaystation::schwaystation
   schwaystation-host schwaystation_disc_image ${CMAKE_DL_LIBS})
 target_compile_definitions(schwaystation-test-libretro-host PRIVATE
@@ -225,6 +233,23 @@ schway_add_test(NAME libretro.content.psexe
     $<TARGET_FILE:schwaystation_libretro> content-psexe
     ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe ${PROJECT_BINARY_DIR}/tests/libretro-psexe
   LABELS libretro portable TIMEOUT 120)
+
+# Fault prevented: region and board options are ignored at content load, or
+# disc identity hints reach the core with a conflicting/inferred profile.
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-content-profile)
+schway_add_test(NAME libretro.content.profile
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> content-profile
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u
+    ${PROJECT_BINARY_DIR}/openbios
+    ${PROJECT_BINARY_DIR}/tests/libretro-content-profile
+  LABELS libretro portable TIMEOUT 60)
+set_tests_properties(libretro.content.profile PROPERTIES
+  FIXTURES_REQUIRED disc_media_preflight)
+schway_add_test(NAME libretro.options.profile
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> options-profile
+  LABELS libretro portable TIMEOUT 60)
 
 # Fault prevented: selected BIOS files silently fall back or replace active
 # state on failure, or PS-EXE content accidentally inherits the BIOS option.

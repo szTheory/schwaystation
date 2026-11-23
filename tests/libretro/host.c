@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +37,8 @@
 #include "libretro.h"
 #include "schwaystation.h"
 #include "disc_image.h"
+#include "disc_probe.h"
+#include "region.h"
 #include "xrgb8888.h"
 
 #ifndef SCHWAYSTATION_CHD
@@ -188,7 +191,9 @@ static int pixel_format_calls;
 static enum retro_pixel_format pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
 static unsigned options_v2_calls, variables_calls, get_variable_calls;
 static const char *option_value; /* what GET_VARIABLE answers */
+static const char *machine_option_value = "pu18";
 static bool option_updated;      /* what GET_VARIABLE_UPDATE answers, once */
+static char log_message[512];
 static unsigned av_info_calls;
 static struct retro_system_av_info av_info_sent;
 static unsigned geometry_calls;
@@ -255,8 +260,8 @@ static const char *expected_valid_extensions(void)
 #endif
 }
 
-/* The version 2 definitions (L7747) must hold the region and no-content BIOS
-   options, each with its default first and exact values. */
+/* The version 2 definitions (L7747) must expose separate board and region
+   choices plus the no-content BIOS option. */
 static void check_options_v2(const struct retro_core_options_v2 *o)
 {
     const struct retro_core_option_v2_definition *d = o != NULL ? o->definitions : NULL;
@@ -264,30 +269,39 @@ static void check_options_v2(const struct retro_core_options_v2 *o)
     if (d == NULL) {
         return;
     }
-    check_string("option key", d[0].key, "schwaystation_region");
-    check_string("option default", d[0].default_value, "ntsc-u");
-    check_string("option value 0", d[0].values[0].value, "ntsc-u");
-    check_string("option value 1", d[0].values[1].value, "ntsc-j");
-    check_string("option value 2", d[0].values[2].value, "pal");
-    CHECK(d[0].values[3].value == NULL);
-    check_string("BIOS option key", d[1].key, "schwaystation_bios");
-    check_string("BIOS option default", d[1].default_value, "none");
-    check_string("BIOS option value 0", d[1].values[0].value, "none");
-    check_string("BIOS option value 1", d[1].values[1].value, "scph5500.bin");
-    check_string("BIOS option value 2", d[1].values[2].value, "scph5501.bin");
-    check_string("BIOS option value 3", d[1].values[3].value, "scph5502.bin");
+    check_string("machine option key", d[0].key, "schwaystation_machine");
+    check_string("machine option default", d[0].default_value, "pu18");
+    static const char *const machines[] = {
+        "pu18", "pu7", "pu8-early", "pu8-late", "pu20", "pu22", "pu23", "pm41", "pm41-2"};
+    for (unsigned i = 0u; i < sizeof machines / sizeof machines[0]; i++) {
+        check_string("machine option token", d[0].values[i].value, machines[i]);
+    }
+    CHECK(d[0].values[sizeof machines / sizeof machines[0]].value == NULL);
+    check_string("region option key", d[1].key, "schwaystation_region");
+    check_string("region option default", d[1].default_value, "auto");
+    check_string("region option auto", d[1].values[0].value, "auto");
+    check_string("region option NTSC-U", d[1].values[1].value, "ntsc-u");
+    check_string("region option NTSC-J", d[1].values[2].value, "ntsc-j");
+    check_string("region option PAL", d[1].values[3].value, "pal");
     CHECK(d[1].values[4].value == NULL);
-    check_string("analog mode option key", d[2].key, "schwaystation_analog_mode");
-    check_string("analog mode option default", d[2].default_value, "analog");
-    check_string("analog mode value 0", d[2].values[0].value, "analog");
-    check_string("analog mode value 1", d[2].values[1].value, "digital");
-    CHECK(d[2].values[2].value == NULL);
-    check_string("analog toggle option key", d[3].key, "schwaystation_analog_toggle");
-    check_string("analog toggle option default", d[3].default_value, "enabled");
-    check_string("analog toggle value 0", d[3].values[0].value, "enabled");
-    check_string("analog toggle value 1", d[3].values[1].value, "disabled");
+    check_string("BIOS option key", d[2].key, "schwaystation_bios");
+    check_string("BIOS option default", d[2].default_value, "none");
+    check_string("BIOS option value 0", d[2].values[0].value, "none");
+    check_string("BIOS option value 1", d[2].values[1].value, "scph5500.bin");
+    check_string("BIOS option value 2", d[2].values[2].value, "scph5501.bin");
+    check_string("BIOS option value 3", d[2].values[3].value, "scph5502.bin");
+    CHECK(d[2].values[4].value == NULL);
+    check_string("analog mode option key", d[3].key, "schwaystation_analog_mode");
+    check_string("analog mode option default", d[3].default_value, "analog");
+    check_string("analog mode value 0", d[3].values[0].value, "analog");
+    check_string("analog mode value 1", d[3].values[1].value, "digital");
     CHECK(d[3].values[2].value == NULL);
-    CHECK(d[4].key == NULL);
+    check_string("analog toggle option key", d[4].key, "schwaystation_analog_toggle");
+    check_string("analog toggle option default", d[4].default_value, "enabled");
+    check_string("analog toggle value 0", d[4].values[0].value, "enabled");
+    check_string("analog toggle value 1", d[4].values[1].value, "disabled");
+    CHECK(d[4].values[2].value == NULL);
+    CHECK(d[5].key == NULL);
 }
 
 /* The version 0 variables (L7483) carry both options. */
@@ -297,18 +311,21 @@ static void check_variables(const struct retro_variable *v)
     if (v == NULL) {
         return;
     }
-    check_string("variable key", v[0].key, "schwaystation_region");
-    check_string("variable value", v[0].value, "Region (reload content); ntsc-u|ntsc-j|pal");
-    check_string("BIOS variable key", v[1].key, "schwaystation_bios");
+    check_string("machine variable key", v[0].key, "schwaystation_machine");
+    check_string("machine variable value", v[0].value,
+                 "Machine (reload content); pu18|pu7|pu8-early|pu8-late|pu20|pu22|pu23|pm41|pm41-2");
+    check_string("region variable key", v[1].key, "schwaystation_region");
+    check_string("region variable value", v[1].value, "Region (reload content); auto|ntsc-u|ntsc-j|pal");
+    check_string("BIOS variable key", v[2].key, "schwaystation_bios");
     check_string("BIOS variable value",
-                 v[1].value,
+                 v[2].value,
                  "BIOS for discs and no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin");
-    check_string("analog mode variable key", v[2].key, "schwaystation_analog_mode");
-    check_string("analog mode variable value", v[2].value, "DualShock mode; analog|digital");
-    check_string("analog toggle variable key", v[3].key, "schwaystation_analog_toggle");
-    check_string("analog toggle variable value", v[3].value,
+    check_string("analog mode variable key", v[3].key, "schwaystation_analog_mode");
+    check_string("analog mode variable value", v[3].value, "DualShock mode; analog|digital");
+    check_string("analog toggle variable key", v[4].key, "schwaystation_analog_toggle");
+    check_string("analog toggle variable value", v[4].value,
                  "DualShock mode toggle; enabled|disabled");
-    CHECK(v[4].key == NULL);
+    CHECK(v[5].key == NULL);
 }
 
 static void check_controller_info(const struct retro_controller_info *info)
@@ -411,6 +428,15 @@ static bool RETRO_CALLCONV rumble(unsigned port, enum retro_rumble_effect effect
     return true;
 }
 
+static void RETRO_CALLCONV log_printf(enum retro_log_level level, const char *format, ...)
+{
+    va_list args;
+    (void)level;
+    va_start(args, format);
+    (void)vsnprintf(log_message, sizeof log_message, format, args);
+    va_end(args);
+}
+
 static bool RETRO_CALLCONV env(unsigned cmd, void *data)
 {
     switch (cmd) {
@@ -436,6 +462,12 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         variables_calls++;
         check_variables((const struct retro_variable *)data);
         return true;
+    case RETRO_ENVIRONMENT_GET_LOG_INTERFACE:
+        if (data == NULL) {
+            return false;
+        }
+        ((struct retro_log_callback *)data)->log = log_printf;
+        return true;
     case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
         check_controller_info((const struct retro_controller_info *)data);
         return true;
@@ -459,6 +491,10 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         }
         if (strcmp(var->key, "schwaystation_region") == 0) {
             var->value = option_value;
+            return true;
+        }
+        if (strcmp(var->key, "schwaystation_machine") == 0) {
+            var->value = machine_option_value;
             return true;
         }
         if (strcmp(var->key, "schwaystation_bios") == 0) {
@@ -676,8 +712,8 @@ static void ref_free(void *user, void *ptr, size_t size)
     free(ptr);
 }
 
-/* A fresh instance with the given region, or NULL. */
-static schway *ref_create(uint32_t region)
+/* A fresh instance with the given region and optional board, or NULL. */
+static schway *ref_create_profile(uint32_t region, uint32_t board)
 {
     schway_config cfg;
     schway_profile profile;
@@ -689,6 +725,10 @@ static schway *ref_create(uint32_t region)
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = region;
+    profile.board = board;
+    if (board == SCHWAY_BOARD_PU7 || board == SCHWAY_BOARD_PU8_EARLY) {
+        profile.flags |= SCHWAY_PROFILE_GPU_V0;
+    }
     if (schway_create(&cfg, &ref) != SCHWAY_STATUS_OK) {
         return NULL;
     }
@@ -697,6 +737,11 @@ static schway *ref_create(uint32_t region)
         return NULL;
     }
     return ref;
+}
+
+static schway *ref_create(uint32_t region)
+{
+    return ref_create_profile(region, 0u);
 }
 
 static uint32_t want[MAX_W * MAX_H];
@@ -839,6 +884,169 @@ static void check_av(const struct retro_system_av_info *av, uint32_t region)
         CHECK_EQ_U64(av->geometry.max_height, 480u);
         CHECK_EQ_DBL(av->timing.fps, 53693175.0 / 897619.0);
     }
+}
+
+static uint32_t region_from_option(const char *name)
+{
+    if (strcmp(name, "ntsc-j") == 0) return SCHWAY_REGION_NTSC_J;
+    if (strcmp(name, "pal") == 0) return SCHWAY_REGION_PAL;
+    return SCHWAY_REGION_NTSC_U;
+}
+
+static void compare_loaded_profile(uint32_t expected_region, uint32_t expected_board)
+{
+    schway *reference = ref_create_profile(expected_region, expected_board);
+    size_t module_size = p_serialize_size();
+    size_t reference_size = reference != NULL ? schway_state_size(reference) : 0u;
+    unsigned char *module_state = module_size != 0u ? (unsigned char *)malloc(module_size) : NULL;
+    unsigned char *reference_state = reference_size != 0u
+                                         ? (unsigned char *)malloc(reference_size) : NULL;
+    CHECK(reference != NULL);
+    CHECK(module_state != NULL);
+    CHECK(reference_state != NULL);
+    CHECK_EQ_U64(module_size, reference_size);
+    if (reference != NULL && module_state != NULL && reference_state != NULL &&
+        module_size == reference_size) {
+        CHECK_EQ_U64(p_serialize(module_state, module_size), true);
+        CHECK_EQ_U64(schway_save_state(reference, reference_state, reference_size),
+                     SCHWAY_STATUS_OK);
+        if (memcmp(module_state, reference_state, module_size) != 0) {
+            size_t offset = 20u;
+            while (offset < module_size && module_state[offset] == reference_state[offset]) {
+                offset++;
+            }
+            fprintf(stderr, "profile state differs for region=%u board=%u at byte %lu: module=%02x reference=%02x\n",
+                    expected_region, expected_board, (unsigned long)offset,
+                    module_state[offset], reference_state[offset]);
+            check_failures++;
+        }
+    }
+    free(module_state);
+    free(reference_state);
+    schway_destroy(reference);
+}
+
+static void test_option_profiles(void)
+{
+    static const struct {
+        const char *token;
+        uint32_t board;
+    } machines[] = {
+        {"pu7", SCHWAY_BOARD_PU7},
+        {"pu8-early", SCHWAY_BOARD_PU8_EARLY},
+        {"pu8-late", SCHWAY_BOARD_PU8_LATE},
+        {"pu18", SCHWAY_BOARD_PU18},
+        {"pu20", SCHWAY_BOARD_PU20},
+        {"pu22", SCHWAY_BOARD_PU22},
+        {"pu23", SCHWAY_BOARD_PU23},
+        {"pm41", SCHWAY_BOARD_PM41},
+        {"pm41-2", SCHWAY_BOARD_PM41_2},
+    };
+    static const char *const regions[] = {"ntsc-u", "ntsc-j", "pal"};
+
+    machine_option_value = "pu18";
+    option_value = "auto";
+    CHECK_EQ_U64(p_load_game(NULL), true);
+    CHECK_EQ_U64(p_get_region(), RETRO_REGION_NTSC);
+    compare_loaded_profile(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU18);
+    p_unload_game();
+
+    machine_option_value = NULL;
+    CHECK_EQ_U64(p_load_game(NULL), true);
+    compare_loaded_profile(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU18);
+    p_unload_game();
+
+    machine_option_value = "unsupported";
+    CHECK_EQ_U64(p_load_game(NULL), true);
+    compare_loaded_profile(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU18);
+    p_unload_game();
+
+    for (size_t machine = 0u; machine < sizeof machines / sizeof machines[0]; machine++) {
+        machine_option_value = machines[machine].token;
+        for (size_t region = 0u; region < sizeof regions / sizeof regions[0]; region++) {
+            option_value = regions[region];
+            CHECK_EQ_U64(p_load_game(NULL), true);
+            uint32_t selected_region = region_from_option(regions[region]);
+            CHECK_EQ_U64(p_get_region(), selected_region == SCHWAY_REGION_PAL
+                                                ? RETRO_REGION_PAL : RETRO_REGION_NTSC);
+            compare_loaded_profile(selected_region, machines[machine].board);
+            p_unload_game();
+        }
+    }
+}
+
+static void test_content_profile(const char *path, const char *bios_directory)
+{
+    schway_disc_image *image = NULL;
+    schway_disc_image_error image_error;
+    schway_host_disc_probe probe;
+    schway_host_disc_probe_status probe_status;
+    uint32_t exe_licence = SCHWAY_LICENCE_NONE;
+    schway__region_resolution resolution;
+    struct retro_game_info game;
+    struct retro_system_av_info av;
+
+    memset(&image_error, 0, sizeof image_error);
+    image_error.size = (uint32_t)sizeof image_error;
+    schway_disc_image_status image_status = schway_disc_image_open(path, &image, &image_error);
+    const char *probe_path = image_status == SCHWAY_DISC_IMAGE_OK && image != NULL
+                                 ? schway_disc_image_path(image, 0u) : NULL;
+    memset(&probe, 0, sizeof probe);
+    probe_status = probe_path != NULL ? schway__disc_probe_region(probe_path, &probe)
+                                      : SCHWAY_HOST_DISC_PROBE_UNSUPPORTED;
+    CHECK_EQ_U64(probe_status, SCHWAY_HOST_DISC_PROBE_OK);
+    if (probe_status == SCHWAY_HOST_DISC_PROBE_OK && probe.exe_bytes != NULL) {
+        schway_exe_info exe;
+        memset(&exe, 0, sizeof exe);
+        exe.size = (uint32_t)sizeof exe;
+        if (schway_probe_exe(probe.exe_bytes, probe.exe_size, &exe) == SCHWAY_STATUS_OK) {
+            exe_licence = exe.licence_area;
+        }
+    }
+    resolution = schway__region_resolve(
+        probe_status == SCHWAY_HOST_DISC_PROBE_OK ? probe.serial : NULL,
+        probe_status == SCHWAY_HOST_DISC_PROBE_OK ? probe.licence_area : SCHWAY_LICENCE_NONE,
+        exe_licence);
+    schway__disc_probe_dispose(&probe);
+    schway_disc_image_close(image);
+
+    memset(&game, 0, sizeof game);
+    game.path = path;
+    system_directory = bios_directory;
+    machine_option_value = "pu8-early";
+    option_value = "auto";
+    log_message[0] = '\0';
+    CHECK_EQ_U64(p_load_game(&game), true);
+    CHECK_EQ_U64(p_get_region(), resolution.region == SCHWAY_REGION_PAL
+                                    ? RETRO_REGION_PAL : RETRO_REGION_NTSC);
+    memset(&av, 0, sizeof av);
+    p_get_system_av_info(&av);
+    check_av(&av, resolution.region);
+    if (resolution.disagreements != 0u) {
+        CHECK(strstr(log_message, "region hint disagreement") != NULL);
+    }
+    p_unload_game();
+
+    machine_option_value = "pm41";
+    option_value = "pal";
+    log_message[0] = '\0';
+    CHECK_EQ_U64(p_load_game(&game), true);
+    CHECK_EQ_U64(p_get_region(), RETRO_REGION_PAL);
+    memset(&av, 0, sizeof av);
+    p_get_system_av_info(&av);
+    check_av(&av, SCHWAY_REGION_PAL);
+    if (resolution.disagreements != 0u) {
+        CHECK(strstr(log_message, "selected=pal") != NULL);
+    }
+    p_unload_game();
+
+    schway__region_resolution conflict = schway__region_resolve(
+        "SLUS-00001", SCHWAY_LICENCE_JAPAN, SCHWAY_LICENCE_EUROPE);
+    CHECK_EQ_U64(conflict.region, SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(conflict.disagreements,
+                 SCHWAY__REGION_DISAGREES_SERIAL_DISC |
+                     SCHWAY__REGION_DISAGREES_SERIAL_EXE |
+                     SCHWAY__REGION_DISAGREES_DISC_EXE);
 }
 
 static int test_path(char *path, size_t capacity, const char *directory, const char *name)
@@ -4770,6 +4978,8 @@ int main(int argc, char **argv)
     int content_chd_mode = argc == 9 && strcmp(argv[2], "content-chd") == 0;
     int content_pbp_mode = argc == 9 && strcmp(argv[2], "content-pbp") == 0;
     int content_legacy_mode = argc == 12 && strcmp(argv[2], "content-legacy") == 0;
+    int content_profile_mode = argc == 6 && strcmp(argv[2], "content-profile") == 0;
+    int options_profile_mode = argc == 3 && strcmp(argv[2], "options-profile") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
@@ -4784,7 +4994,7 @@ int main(int argc, char **argv)
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
-    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !input_descriptors_mode &&
+    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !options_profile_mode && !input_descriptors_mode &&
          !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
@@ -4794,7 +5004,7 @@ int main(int argc, char **argv)
                         argv[5][0] == '\0')) ||
         (disc_audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
                              argv[5][0] == '\0' || argv[6][0] == '\0')) ||
-        ((content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
+        ((content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
           card_persistence_mode || card_controls_mode) &&
          argv[3][0] == '\0') ||
@@ -4810,6 +5020,8 @@ int main(int argc, char **argv)
           argv[9][0] == '\0' || argv[10][0] == '\0' || argv[11][0] == '\0')) ||
         (disc_control_mode &&
          (argv[4][0] == '\0' || argv[5][0] == '\0' || argv[6][0] == '\0')) ||
+        (content_profile_mode &&
+         (argv[4][0] == '\0' || argv[5][0] == '\0')) ||
         ((psexe_mode || lifecycle_mode || card_persistence_mode || card_controls_mode) &&
          argv[4][0] == '\0')) {
         fprintf(stderr,
@@ -4819,6 +5031,7 @@ int main(int argc, char **argv)
                 "content-pbp <chd-enabled:0|1> <pbp> <cue> <invalid-pbp> <bios-directory> <save-directory> | "
                 "content-legacy <chd-enabled:0|1> <ecm> <ecm-cue> <ccd> <ccd-cue> "
                 "<invalid-ecm> <invalid-ccd> <bios-directory> <save-directory> | "
+                "content-profile <m3u> <bios-directory> <save-directory> | options-profile | "
                 "disc-audio-equality-batch|disc-audio-equality-single <region> <m3u> <pcm> <bios-directory> | "
                 "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
@@ -4827,7 +5040,7 @@ int main(int argc, char **argv)
                 "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
-    content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
+    content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
                    input_controls_mode || lifecycle_mode || card_persistence_mode ||
                    card_controls_mode;
     rumble_available = rumble_guest_mode || rumble_controls_mode;
@@ -4894,6 +5107,20 @@ int main(int argc, char **argv)
 
     if (audio_mode) {
         return test_audio_equality(argv[4], argv[5], region);
+    }
+
+    if (options_profile_mode) {
+        test_option_profiles();
+        p_deinit();
+        module_close();
+        CHECK_DONE();
+    }
+
+    if (content_profile_mode) {
+        test_content_profile(argv[3], argv[4]);
+        p_deinit();
+        module_close();
+        CHECK_DONE();
     }
 
     if (disc_audio_mode) {

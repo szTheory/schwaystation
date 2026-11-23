@@ -6,6 +6,7 @@ libretro.content.legacy	libretro,portable
 libretro.content.lifecycle	libretro,portable
 libretro.content.no_bios	libretro,portable
 libretro.content.pbp	libretro,portable
+libretro.content.profile	libretro,portable
 libretro.content.psexe	libretro,portable
 libretro.host	libretro,portable
 libretro.host.disc_audio	libretro,portable
@@ -18,6 +19,7 @@ libretro.input.descriptors	libretro,portable
 libretro.input.movies	libretro,portable
 libretro.memory.aliases	libretro,portable
 libretro.memory.boundaries	libretro,portable
+libretro.options.profile	libretro,portable
 libretro.rumble.controls	libretro,portable
 libretro.rumble.guest	libretro,portable
 libretro.vendored	libretro,portable

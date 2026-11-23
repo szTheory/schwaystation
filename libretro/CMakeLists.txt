@@ -4,7 +4,11 @@
 # the export table. The core archive is the same schwaystation library the
 # abi tests check.
 add_library(schwaystation_libretro MODULE libretro.c)
-target_include_directories(schwaystation_libretro PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_sources(schwaystation_libretro PRIVATE
+  ${PROJECT_SOURCE_DIR}/host/disc_probe.c
+  ${PROJECT_SOURCE_DIR}/runner/region.c)
+target_include_directories(schwaystation_libretro PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/runner)
 target_link_libraries(schwaystation_libretro PRIVATE schwaystation::schwaystation
   schwaystation-host)
 target_compile_definitions(schwaystation_libretro PRIVATE

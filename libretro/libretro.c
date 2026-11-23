@@ -21,6 +21,8 @@
 #include "schwaystation.h"
 #include "cards.h"
 #include "disc_image.h"
+#include "../host/disc_probe.h"
+#include "../runner/region.h"
 #include "xrgb8888.h"
 
 #ifndef SCHWAYSTATION_CHD
@@ -474,15 +476,37 @@ static bool RETRO_CALLCONV lr_disk_get_image_label(unsigned index, char *label, 
    machine profile's region, selected at content load. A running instance
    keeps its profile and memory spans until unload. The default comes first. */
 #define LR_REGION_KEY "schwaystation_region"
+#define LR_MACHINE_KEY "schwaystation_machine"
 static struct retro_core_option_v2_definition lr_option_defs[] = {
+    {LR_MACHINE_KEY,
+     "Machine (reload content)",
+     NULL,
+     "Console board revision. Reload content to apply a change.",
+     NULL,
+     NULL,
+     {{"pu18", "PU-18"},
+      {"pu7", "PU-7"},
+      {"pu8-early", "PU-8 early"},
+      {"pu8-late", "PU-8 late"},
+      {"pu20", "PU-20"},
+      {"pu22", "PU-22"},
+      {"pu23", "PU-23"},
+      {"pm41", "PM-41"},
+      {"pm41-2", "PM-41(2)"},
+      {NULL, NULL}},
+     "pu18"},
     {LR_REGION_KEY,
      "Region (reload content)",
      NULL,
-     "The console's region. Reload content to apply a change.",
+     "Auto uses disc serial, licence and executable hints; otherwise choose a region. Reload content to apply a change.",
      NULL,
      NULL,
-     {{"ntsc-u", "NTSC-U/C"}, {"ntsc-j", "NTSC-J"}, {"pal", "PAL"}, {NULL, NULL}},
-     "ntsc-u"},
+     {{"auto", "Auto"},
+      {"ntsc-u", "NTSC-U/C"},
+      {"ntsc-j", "NTSC-J"},
+      {"pal", "PAL"},
+      {NULL, NULL}},
+     "auto"},
     {LR_BIOS_KEY,
      "BIOS for discs and no-content runs",
      NULL,
@@ -517,7 +541,9 @@ static struct retro_core_option_v2_category lr_option_cats[] = {{NULL, NULL, NUL
 static struct retro_core_options_v2 lr_options = {lr_option_cats, lr_option_defs};
 /* The same option for a frontend without core options version 2 (L1021). */
 static struct retro_variable lr_variables[] = {
-    {LR_REGION_KEY, "Region (reload content); ntsc-u|ntsc-j|pal"},
+    {LR_MACHINE_KEY,
+     "Machine (reload content); pu18|pu7|pu8-early|pu8-late|pu20|pu22|pu23|pm41|pm41-2"},
+    {LR_REGION_KEY, "Region (reload content); auto|ntsc-u|ntsc-j|pal"},
     {LR_BIOS_KEY, "BIOS for discs and no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin"},
     {LR_ANALOG_MODE_KEY, "DualShock mode; analog|digital"},
     {LR_ANALOG_TOGGLE_KEY, "DualShock mode toggle; enabled|disabled"},
@@ -791,7 +817,7 @@ static void lr_unload(void)
 
 /* Creates the one instance with the given region; 0 on failure, with
    nothing held. */
-static int lr_create(uint32_t region, uint32_t disc_flags)
+static int lr_create(uint32_t region, uint32_t board, uint32_t disc_flags)
 {
     schway_config cfg;
     schway_profile profile;
@@ -804,7 +830,11 @@ static int lr_create(uint32_t region, uint32_t disc_flags)
     memset(&profile, 0, sizeof profile);
     profile.size = (uint32_t)sizeof profile;
     profile.region = region;
+    if (board == SCHWAY_BOARD_PU7 || board == SCHWAY_BOARD_PU8_EARLY) {
+        profile.flags |= SCHWAY_PROFILE_GPU_V0;
+    }
     profile.disc_flags = disc_flags;
+    profile.board = board;
     info.size = (uint32_t)sizeof info;
     if (schway_create(&cfg, &inst) != SCHWAY_STATUS_OK) {
         inst = NULL;
@@ -997,11 +1027,14 @@ static void lr_queue_input(void)
 }
 
 /* The region the frontend's option names; ntsc-u when it names none. */
-static uint32_t lr_option_region(void)
+static uint32_t lr_option_region(uint32_t automatic_region)
 {
     struct retro_variable var = {LR_REGION_KEY, NULL};
     if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) || var.value == NULL) {
-        return SCHWAY_REGION_NTSC_U;
+        return automatic_region;
+    }
+    if (strcmp(var.value, "auto") == 0) {
+        return automatic_region;
     }
     if (strcmp(var.value, "ntsc-j") == 0) {
         return SCHWAY_REGION_NTSC_J;
@@ -1009,7 +1042,56 @@ static uint32_t lr_option_region(void)
     if (strcmp(var.value, "pal") == 0) {
         return SCHWAY_REGION_PAL;
     }
-    return SCHWAY_REGION_NTSC_U;
+    if (strcmp(var.value, "ntsc-u") == 0) {
+        return SCHWAY_REGION_NTSC_U;
+    }
+    return automatic_region;
+}
+
+static uint32_t lr_option_board(void)
+{
+    struct retro_variable var = {LR_MACHINE_KEY, NULL};
+    if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) || var.value == NULL) {
+        return SCHWAY_BOARD_PU18;
+    }
+    if (strcmp(var.value, "pu7") == 0) return SCHWAY_BOARD_PU7;
+    if (strcmp(var.value, "pu8-early") == 0) return SCHWAY_BOARD_PU8_EARLY;
+    if (strcmp(var.value, "pu8-late") == 0) return SCHWAY_BOARD_PU8_LATE;
+    if (strcmp(var.value, "pu18") == 0) return SCHWAY_BOARD_PU18;
+    if (strcmp(var.value, "pu20") == 0) return SCHWAY_BOARD_PU20;
+    if (strcmp(var.value, "pu22") == 0) return SCHWAY_BOARD_PU22;
+    if (strcmp(var.value, "pu23") == 0) return SCHWAY_BOARD_PU23;
+    if (strcmp(var.value, "pm41") == 0) return SCHWAY_BOARD_PM41;
+    if (strcmp(var.value, "pm41-2") == 0) return SCHWAY_BOARD_PM41_2;
+    return SCHWAY_BOARD_PU18;
+}
+
+static const char *lr_region_name(uint32_t region)
+{
+    switch (region) {
+    case SCHWAY_REGION_NTSC_J: return "ntsc-j";
+    case SCHWAY_REGION_PAL: return "pal";
+    case SCHWAY_REGION_NTSC_U: return "ntsc-u";
+    default: return "unknown";
+    }
+}
+
+static void lr_log_region_disagreement(const schway__region_resolution *resolution,
+                                       uint32_t selected_region)
+{
+    struct retro_log_callback callback;
+    if (resolution == NULL || resolution->disagreements == 0u || env_cb == NULL) {
+        return;
+    }
+    memset(&callback, 0, sizeof callback);
+    if (env_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &callback) && callback.log != NULL) {
+        callback.log(RETRO_LOG_WARN,
+                     "schwaystation: region hint disagreement: serial=%s disc=%s exe=%s; selected=%s\n",
+                     lr_region_name(resolution->serial_region),
+                     lr_region_name(resolution->disc_region),
+                     lr_region_name(resolution->exe_region),
+                     lr_region_name(selected_region));
+    }
 }
 
 static const char *lr_option_bios(void)
@@ -1433,6 +1515,9 @@ bool retro_load_game(const struct retro_game_info *game)
     char card2_path[LR_CARD_PATH_CAP];
     int have_card2_path = 0;
     int disc_mode = 0;
+    uint32_t exe_licence_area = SCHWAY_LICENCE_NONE;
+    uint32_t disc_licence_area = SCHWAY_LICENCE_NONE;
+    char identity_serial[16] = "";
 
     card2_path[0] = '\0';
 
@@ -1451,6 +1536,7 @@ bool retro_load_game(const struct retro_game_info *game)
                 free(exe);
                 return false;
             }
+            exe_licence_area = exe_info.licence_area;
             have_card2_path = lr_card2_path_for_game(game, card2_path);
         } else if (lr_disc_path_supported(game->path)) {
             const char *bios_name = lr_option_bios();
@@ -1478,13 +1564,41 @@ bool retro_load_game(const struct retro_game_info *game)
             }
         }
     }
+    if (disc_mode && game != NULL && game->path != NULL) {
+        schway_host_disc_probe identity;
+        const char *probe_path = prepared_count != 0u && prepared_discs[0] != NULL
+                                     ? schway_disc_image_path(prepared_discs[0], 0u)
+                                     : game->path;
+        memset(&identity, 0, sizeof identity);
+        if (probe_path != NULL && schway__disc_probe_region(probe_path, &identity) ==
+            SCHWAY_HOST_DISC_PROBE_OK) {
+            memcpy(identity_serial, identity.serial, sizeof identity_serial);
+            identity_serial[sizeof identity_serial - 1u] = '\0';
+            disc_licence_area = identity.licence_area;
+            if (identity.exe_bytes != NULL && identity.exe_size != 0u) {
+                schway_exe_info identity_exe;
+                memset(&identity_exe, 0, sizeof identity_exe);
+                identity_exe.size = (uint32_t)sizeof identity_exe;
+                if (schway_probe_exe(identity.exe_bytes, identity.exe_size,
+                                     &identity_exe) == SCHWAY_STATUS_OK) {
+                    exe_licence_area = identity_exe.licence_area;
+                }
+            }
+            schway__disc_probe_dispose(&identity);
+        }
+    }
+    schway__region_resolution region_resolution = schway__region_resolve(
+        identity_serial, disc_licence_area, exe_licence_area);
+    uint32_t selected_region = lr_option_region(region_resolution.region);
+    lr_log_region_disagreement(&region_resolution, selected_region);
     if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &format)) {
         free(exe);
         free(bios);
         lr_disc_close_set(prepared_discs, prepared_count);
         return false;
     }
-    if (!lr_create(lr_option_region(), disc_mode != 0 ? SCHWAY_PROFILE_CD_LICENSED : 0u)) {
+    if (!lr_create(selected_region, lr_option_board(),
+                   disc_mode != 0 ? SCHWAY_PROFILE_CD_LICENSED : 0u)) {
         free(exe);
         free(bios);
         lr_disc_close_set(prepared_discs, prepared_count);
