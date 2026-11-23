@@ -51,7 +51,7 @@ static schway *make_instance(uint32_t region, uint32_t flags)
     if (inst == NULL) {
         return NULL;
     }
-    schway_profile profile = {(uint32_t)sizeof profile, region, flags, 0u};
+    schway_profile profile = {(uint32_t)sizeof profile, region, flags, 0u, 0u};
     CHECK(schway_set_profile(inst, &profile) == SCHWAY_STATUS_OK);
     return inst;
 }

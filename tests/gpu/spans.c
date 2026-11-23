@@ -494,7 +494,7 @@ static void case_rectangle_profile(void)
         schway_destroy(v0);
         return;
     }
-    schway_profile profile = {sizeof profile, SCHWAY_REGION_NTSC_U, SCHWAY_PROFILE_GPU_V0, 0u};
+    schway_profile profile = {sizeof profile, SCHWAY_REGION_NTSC_U, SCHWAY_PROFILE_GPU_V0, 0u, 0u};
     CHECK(schway_set_profile(v0, &profile) == SCHWAY_STATUS_OK);
     full_draw_area(v2);
     full_draw_area(v0);
