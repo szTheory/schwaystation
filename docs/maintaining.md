@@ -84,6 +84,9 @@ workflow job beyond the local suite; use `act --dryrun` for routing only. Local 
 runner, permission, artifact or integration behavior, so keep the required hosted gates. If Docker is needed,
 name task-created images, containers, networks and volumes with a `schwaystation-<phase>-<task>` prefix and
 remove only those named resources after the check. Avoid global prune commands that can remove unrelated data.
+When a change can affect a `quality.json` metric, run its producer locally and compare the result with the active
+bound before broad hosted CI when its pinned host and toolchain are available. Otherwise record the hosted-only
+producer and use its exact result to review the bound; never guess or widen a quality limit.
 
 ## The rehearsal
 

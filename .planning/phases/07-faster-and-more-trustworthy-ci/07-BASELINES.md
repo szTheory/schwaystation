@@ -4,7 +4,10 @@ These are producer-bound observations for the current library and CI. A number i
 when its producer, units, source inputs and workload match the recorded evidence. The WASI module size was
 measured on the hosted Linux producer, and the checked-in bound matches that exact linked-module measurement.
 
-## Baseline table
+## Initial Phase 7 baseline table
+
+These rows preserve the original Phase 7 observations. Later measured changes to the active bounds are listed in
+the Phase 13 addendum below.
 
 | Metric | Units | Producer and input identity | Measured result | Candidate bound |
 | --- | --- | --- | ---: | --- |
@@ -99,3 +102,14 @@ cohort. See the full DAG, workload contract, per-run job evidence and exclusions
 [`07-CI-EFFICIENCY.md`](07-CI-EFFICIENCY.md).
 
 No before/after speedup is inferred from these baseline observations.
+
+## Phase 13 bound updates
+
+The following exact producers include the Phase 13 region, board and playback changes. They supersede the active
+`gpu_motion`, `state.bytes` and `size.wasm` values above; the relative performance regression limit remains +1.00%.
+
+| Metric | Phase 13 measurement | Active bound | Producer evidence |
+| --- | ---: | ---: | --- |
+| `ir_per_frame.gpu_motion` | 138,319,014 Ir/frame; +41 bp against the merge base | floor 138,319,014; ceiling 138,319,014 | [PR run 45286519140, perf job 138084221427](https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084221427) |
+| `state.bytes` | 3,755,332 bytes, including the header; +4 bytes from the serialized `instance.board` field | floor 3,755,332; ceiling 3,755,332 | [PR run 45286519140, Linux x64 build job 138084550570](https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550570) |
+| `size.wasm` | 923,753 linked Release module bytes | floor 923,753; ceiling 923,753 | [PR run 45286519140, WASI job 138084550942](https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550942) |

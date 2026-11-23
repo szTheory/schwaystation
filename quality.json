@@ -1,13 +1,13 @@
 {
   "ir_per_frame": {
     "testcard": {"floor": 1619573, "ceiling": 1619573},
-    "gpu_motion": {"floor": 137752334, "ceiling": 137752334}
+    "gpu_motion": {"floor": 138319014, "ceiling": 138319014}
   },
   "size": {
-    "wasm": {"floor": 910370, "ceiling": 910370}
+    "wasm": {"floor": 923753, "ceiling": 923753}
   },
   "state": {
-    "bytes": {"floor": 3755328, "ceiling": 3755328}
+    "bytes": {"floor": 3755332, "ceiling": 3755332}
   },
   "ci": {
     "critical_path_s": {
@@ -25,6 +25,9 @@
     "2026-11-20: Phase 9's CHD-enabled WASI lane measured the linked Release module at 859379 bytes on run 44827711416; the lane validated the module before the previous CHD-off bound rejected its size, so the floor and ceiling now track the exact CHD-enabled producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44827711416/job/136604866560.",
     "2026-11-21: Phase 10's PBP-enabled WASI lane measured the linked Release module at 875971 bytes on run 44924014258; floor and ceiling now track that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/44924014258/job/136906260832.",
     "2026-11-22: Phase 11's ECM/CCD-enabled WASI lane measured the linked Release module at 906778 bytes on run 45073362654; floor and ceiling now track that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/45073362654/job/137365283519.",
-    "2026-11-23: Phase 12's SBI-enabled Ubuntu 26 WASI lane measured the linked Release module at 910370 bytes on PR run 45141834168; floor and ceiling now track that exact producer measurement: https://github.com/szTheory/schwaystation/actions/runs/45141834168/job/137581782805."
+    "2026-11-23: Phase 12's SBI-enabled Ubuntu 26 WASI lane measured the linked Release module at 910370 bytes on PR run 45141834168; this was the pre-Phase-13 bound: https://github.com/szTheory/schwaystation/actions/runs/45141834168/job/137581782805.",
+    "2026-11-23: Phase 13 added the 4-byte instance.board field; the Linux x64 stable-state producer measured 3755332 bytes on PR run 45286519140, job 138084550570, so the state bound tracks the new serialized format: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550570.",
+    "2026-11-23: Phase 13's unchanged Cachegrind producer measured gpu_motion at 138319014 Ir/frame on PR run 45286519140, job 138084221427, 41 basis points above the merge base and within the existing 100-basis-point regression limit; the absolute bound tracks the measurement and the relative gate is unchanged: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084221427.",
+    "2026-11-23: Phase 13's Ubuntu 26 WASI lane measured the linked Release schwaystation-run module at 923753 bytes on PR run 45286519140, job 138084550942; the absolute bound tracks this exact producer result: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550942."
   ]
 }

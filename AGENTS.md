@@ -105,6 +105,10 @@ automation and efficiency preferences; autonomous authorization and phase bounda
 - Before a long build, suite, emulation or hosted run, run the cheapest relevant consistency checks first:
   inputs and expected output counts, selectors and workflow wiring, sorted inventories, fixtures and budget
   totals. Reuse existing checks; add a permanent preflight only when it prevents a recurring fault.
+- When a change can affect a `quality.json` metric, run that metric's producer locally and compare its measured
+  value with the active bound before broad hosted CI when the pinned host and toolchain are available. If they
+  are not reproducible locally, record the hosted-only producer and use its exact measurement to review the
+  bound; never guess or widen a quality limit without producer evidence.
 - Before expensive hosted CI, use `act` to run workflow jobs locally when the host can reproduce them and that
   adds coverage beyond the existing local suite. Use `act --dryrun` for routing checks. Record hosted-only
   runners, artifacts, permissions and integrations that `act` cannot establish; keep their hosted gates required.

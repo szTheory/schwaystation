@@ -100,6 +100,10 @@ inputs and decoded output counts, command selectors and workflow/artifact wiring
 and budget totals. Use that preflight to catch a structural mismatch before spending time on the full run; keep
 it as a permanent gate only when it prevents a recurring fault. Record measured phase/task duration and the
 observed bottleneck in the phase evidence so later estimates and CI changes use actuals rather than guesses.
+When a code change can affect a `quality.json` metric, run its producer locally and compare the output with the
+active bound before broad hosted CI when the pinned host and toolchain are available. If the host is unavailable,
+name the hosted-only producer and use its exact result to review the bound; do not guess or widen a limit. This
+preflight catches stale measurements before other required jobs spend runner time.
 Before expensive hosted CI, use `act` for workflow jobs the local host can reproduce when that adds coverage
 beyond the existing local suite; use `act --dryrun` for routing checks. Record the hosted-only runners,
 artifacts, permissions and integrations it cannot establish, and keep their hosted gates required. Avoid
