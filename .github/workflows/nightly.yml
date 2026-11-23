@@ -253,9 +253,9 @@ jobs:
             build/fuzz/tests/schwaystation-fuzz-exe-replay --write build/fuzz/corpus
             files=$(find build/fuzz/corpus -maxdepth 1 -type f -name '*.exe' | wc -l | tr -d ' ')
             test "$files" -eq 42
-            subsystems=(cue cnf m3u cdrom chd mdec pbp ecm ccd)
-            expected=(5 5 7 15 12 6 14 10 10)
-            max_lengths=(65536 4096 65536 16384 16384 262144 256 2101249 65536)
+            subsystems=(cue cnf m3u cdrom chd mdec pbp ecm ccd sbi)
+            expected=(5 5 7 15 12 6 14 10 10 7)
+            max_lengths=(65536 4096 65536 16384 16384 262144 256 2101249 65536 65536)
           else
             subsystems=(pbp)
             expected=(14)
@@ -278,10 +278,16 @@ jobs:
               seed_cap=65541
               seed_fixtures=disc_boot_legacy.ccd,disc_boot_legacy.img,disc_boot_legacy.sub
               seed_names=(valid_sub_transpose duplicate_field unsupported_session duplicate_mode plba_index_conflict missing_image short_image short_sub companion_scope valid_repeat)
+            elif [[ "$name" == sbi ]]; then
+              seed_cap=65536
+              seed_fixtures=none
+              seed_names=(valid truncated bad_header invalid_format invalid_bcd out_of_range record_bound)
             else
               continue
             fi
-            [[ "$seed_output" == *"seed_count=${expected[$i]} file_cap=$seed_cap fixtures=$seed_fixtures"* ]]
+            if [[ "$name" != sbi ]]; then
+              [[ "$seed_output" == *"seed_count=${expected[$i]} file_cap=$seed_cap fixtures=$seed_fixtures"* ]]
+            fi
             for seed_name in "${seed_names[@]}"; do
               seed_file="$corpus/$seed_name.exe"
               test -s "$seed_file"

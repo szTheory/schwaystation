@@ -4,7 +4,7 @@
 
 #if defined(SCHWAY_FUZZ_CUE_SEEDS) || defined(SCHWAY_FUZZ_CNF_SEEDS) || \
     defined(SCHWAY_FUZZ_M3U_SEEDS) || defined(SCHWAY_FUZZ_CDROM_SEEDS) || \
-    defined(SCHWAY_FUZZ_MDEC_SEEDS)
+    defined(SCHWAY_FUZZ_MDEC_SEEDS) || defined(SCHWAY_FUZZ_SBI_SEEDS)
 #include <string.h>
 
 #if defined(SCHWAY_FUZZ_CUE_SEEDS)
@@ -227,6 +227,60 @@ size_t seeds_build(uint32_t i, uint8_t *buf)
     }
     return at;
 }
+#elif defined(SCHWAY_FUZZ_SBI_SEEDS)
+#include "disc_sbi.h"
+
+static const char *const names[] = {"valid", "truncated", "bad_header", "invalid_format",
+                                    "invalid_bcd", "out_of_range", "record_bound"};
+
+uint32_t seeds_count(void)
+{
+    return (uint32_t)(sizeof names / sizeof names[0]);
+}
+
+const char *seeds_name(uint32_t i)
+{
+    return names[i];
+}
+
+size_t seeds_build(uint32_t i, uint8_t *buf)
+{
+    static const uint8_t valid[] = {0u, 2u, 0u, 2u, 0x11u, 0x22u, 0x33u};
+    static const uint8_t truncated[] = {0u, 2u, 0u};
+    static const uint8_t invalid_format[] = {0u, 2u, 0u, 4u, 0u, 0u, 0u};
+    static const uint8_t invalid_bcd[] = {0xFAu, 2u, 0u, 2u, 0u, 0u, 0u};
+    static const uint8_t out_of_range[] = {0u, 0x20u, 0u, 2u, 0u, 0u, 0u};
+    memcpy(buf, "SBI\0", 4u);
+    if (i == 0u) {
+        memcpy(buf + 4u, valid, sizeof valid);
+        return 4u + sizeof valid;
+    }
+    if (i == 1u) {
+        memcpy(buf + 4u, truncated, sizeof truncated);
+        return 4u + sizeof truncated;
+    }
+    if (i == 2u) {
+        memcpy(buf, "BAD\0", 4u);
+        return 4u;
+    }
+    if (i == 3u) {
+        memcpy(buf + 4u, invalid_format, sizeof invalid_format);
+        return 4u + sizeof invalid_format;
+    }
+    if (i == 4u) {
+        memcpy(buf + 4u, invalid_bcd, sizeof invalid_bcd);
+        return 4u + sizeof invalid_bcd;
+    }
+    if (i == 5u) {
+        memcpy(buf + 4u, out_of_range, sizeof out_of_range);
+        return 4u + sizeof out_of_range;
+    }
+    size_t records = SCHWAY_DISC_SBI_MAX_RECORDS + 1u;
+    for (size_t n = 0u; n < records; n++) {
+        memcpy(buf + 4u + n * sizeof valid, valid, sizeof valid);
+    }
+    return 4u + records * sizeof valid;
+}
 #endif
 #elif defined(SCHWAY_FUZZ_GPU_SEEDS)
 static const uint8_t corpus[][4] = {{0u}, {1u}, {2u}, {3u}, {4u}};
@@ -245,7 +299,7 @@ static const char *const names[] = {"staged_write", "bad_checksum", "abort_write
 
 #if defined(SCHWAY_FUZZ_CUE_SEEDS) || defined(SCHWAY_FUZZ_CNF_SEEDS) || \
     defined(SCHWAY_FUZZ_M3U_SEEDS) || defined(SCHWAY_FUZZ_CDROM_SEEDS) || \
-    defined(SCHWAY_FUZZ_MDEC_SEEDS)
+    defined(SCHWAY_FUZZ_MDEC_SEEDS) || defined(SCHWAY_FUZZ_SBI_SEEDS)
 /* The new campaign-specific seed interfaces are defined above. */
 #elif defined(SCHWAY_FUZZ_SPU_SEEDS)
 static size_t spu_record(uint8_t *buf, size_t at, uint8_t op, uint8_t selector, uint16_t value,

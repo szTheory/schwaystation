@@ -17,6 +17,8 @@
 #define SEEDS_SIZE_MAX 256u
 #elif defined(SCHWAY_FUZZ_CDROM_SEEDS)
 #define SEEDS_SIZE_MAX (16u * 1024u)
+#elif defined(SCHWAY_FUZZ_SBI_SEEDS)
+#define SEEDS_SIZE_MAX 65536u
 #elif defined(SCHWAY_FUZZ_MDEC_SEEDS)
 #define SEEDS_SIZE_MAX (256u * 1024u)
 #else
