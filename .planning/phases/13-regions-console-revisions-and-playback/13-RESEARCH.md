@@ -1,7 +1,7 @@
 # Phase 13: Regions, console revisions and playback — Research
 
-**Researched:** 2026-11-23  
-**Domain:** Machine profiles, region selection, BIOS-shell boot and bounded FMV evidence  
+**Researched:** 2026-11-23
+**Domain:** Machine profiles, region selection, BIOS-shell boot and bounded FMV evidence
 **Confidence:** HIGH for the documented profile and host seams; MEDIUM for the exact minimum owned fast-boot and MDEC fixtures, which the planner/executor should settle from the existing fixtures.
 
 ## Phase constraints

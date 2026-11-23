@@ -1,7 +1,7 @@
 # Phase 13 Plan Check
 
-**Phase:** Regions, console revisions and playback  
-**Plans verified:** 9  
+**Phase:** Regions, console revisions and playback
+**Plans verified:** 9
 **Status:** VERIFICATION PASSED
 
 ## Coverage summary

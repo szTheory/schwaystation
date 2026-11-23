@@ -67,4 +67,3 @@
 ## Deferred Ideas
 
 - Exact 8-bit MDEC hardware output and full external frame/movie conformance remain outside v2.0.
-

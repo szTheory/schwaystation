@@ -206,5 +206,5 @@ The local full workflow and focused tests establish the current macOS arm64 beha
 
 ---
 
-_Verified: 2026-11-23T22:48:22Z_  
+_Verified: 2026-11-23T22:48:22Z_
 _Verifier: the agent (gsd-verifier)_
