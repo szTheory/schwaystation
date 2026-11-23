@@ -56,13 +56,22 @@ static void test_provider_binding(const char *directory)
     static const uint8_t outside_map[] = {
         'S', 'B', 'I', 0, 0x00u, 0x02u, 0x16u, 0x02u, 0xFAu, 0xFAu, 0xFAu
     };
+    static const uint8_t cue_overlay[] = {
+        'S', 'B', 'I', 0, 0x00u, 0x02u, 0x02u, 0x02u, 0xFAu, 0xFAu, 0xFAu
+    };
     static const char playlist[] = "schway-sbi-provider-a.iso\n"
                                    "schway-sbi-provider-b.iso\n";
+    static const char cue[] = "FILE \"schway-sbi-provider.cue.bin\" BINARY\n"
+                              "  TRACK 01 MODE1/2048\n"
+                              "    INDEX 01 00:00:00\n";
     char a_path[1024] = "";
     char b_path[1024] = "";
     char a_sbi[1024] = "";
     char b_sbi[1024] = "";
     char m3u_path[1024] = "";
+    char cue_path[1024] = "";
+    char cue_data_path[1024] = "";
+    char cue_sbi[1024] = "";
     schway_disc_image *image = NULL;
     schway_disc_image_error error;
     const schway_disc *disc_a = NULL;
@@ -75,14 +84,32 @@ static void test_provider_binding(const char *directory)
     CHECK(make_path(a_sbi, directory, "schway-sbi-provider-a.sbi"));
     CHECK(make_path(b_sbi, directory, "schway-sbi-provider-b.sbi"));
     CHECK(make_path(m3u_path, directory, "schway-sbi-provider.m3u"));
+    CHECK(make_path(cue_path, directory, "schway-sbi-provider.cue"));
+    CHECK(make_path(cue_data_path, directory, "schway-sbi-provider.cue.bin"));
+    CHECK(make_path(cue_sbi, directory, "schway-sbi-provider.sbi"));
     if (a_path[0] == '\0' || b_path[0] == '\0' || a_sbi[0] == '\0' ||
-        b_sbi[0] == '\0' || m3u_path[0] == '\0') goto cleanup;
+        b_sbi[0] == '\0' || m3u_path[0] == '\0' || cue_path[0] == '\0' ||
+        cue_data_path[0] == '\0' || cue_sbi[0] == '\0') goto cleanup;
     CHECK(write_test_iso(a_path, 16u, 0x11u));
     CHECK(write_test_iso(b_path, 17u, 0x71u));
     CHECK(schway_disc_image_open(a_path, &image, &error) == SCHWAY_DISC_IMAGE_OK);
     if (image != NULL) {
         const schway_disc *plain = schway_disc_image_disc(image);
         CHECK(plain != NULL && plain->bad_q == NULL);
+        schway_disc_image_close(image);
+        image = NULL;
+    }
+    CHECK(write_test_iso(cue_data_path, 16u, 0x31u));
+    CHECK(write_bytes(cue_path, (const uint8_t *)cue, sizeof cue - 1u));
+    CHECK(write_bytes(cue_sbi, cue_overlay, sizeof cue_overlay));
+    CHECK(schway_disc_image_open(cue_path, &image, &error) == SCHWAY_DISC_IMAGE_OK);
+    if (image != NULL) {
+        const schway_disc *cue_disc = schway_disc_image_disc(image);
+        CHECK(cue_disc != NULL && cue_disc->bad_q != NULL);
+        if (cue_disc != NULL && cue_disc->bad_q != NULL) {
+            CHECK_EQ_U64(cue_disc->bad_q(cue_disc->user, 2u), 1u);
+            CHECK_EQ_U64(cue_disc->bad_q(cue_disc->user, 3u), 0u);
+        }
         schway_disc_image_close(image);
         image = NULL;
     }
@@ -132,6 +159,9 @@ cleanup:
     if (a_path[0] != '\0') (void)remove(a_path);
     if (b_path[0] != '\0') (void)remove(b_path);
     if (m3u_path[0] != '\0') (void)remove(m3u_path);
+    if (cue_path[0] != '\0') (void)remove(cue_path);
+    if (cue_data_path[0] != '\0') (void)remove(cue_data_path);
+    if (cue_sbi[0] != '\0') (void)remove(cue_sbi);
 }
 
 static void test_format_one(void)
