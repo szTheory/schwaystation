@@ -23,7 +23,7 @@
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
 #define SCHWAY__BEHAVIOUR_REVISION 19u
-#define SCHWAY__STATE_FORMAT 18u
+#define SCHWAY__STATE_FORMAT 19u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -477,6 +477,10 @@ schway_status schway__instance_check_out_size(const void *s, uint32_t first);
 /* Writes min(caller's size tag, ours) bytes of the fully built struct full to
    out; bytes past ours are left as the caller set them. */
 void schway__instance_write_out(void *out, const void *full, uint32_t ours);
+
+/* Board tuple checks share the profile defaults table with state loading. */
+int schway__instance_board_profile_valid(uint32_t board, uint32_t profile_flags);
+void schway__instance_restore_board_identity(schway *inst);
 
 _Static_assert(sizeof(struct schway__cop0) == 128, "cop0 size");
 /* The scalar state of the cpu ends with exc_repeat at 312; the write-queue

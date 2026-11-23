@@ -42,15 +42,35 @@ static const struct schway__board_defaults *find_board_defaults(uint32_t board)
     return NULL;
 }
 
-static void apply_board_defaults(schway *inst, const struct schway__board_defaults *defaults)
+static void apply_board_identity(schway *inst, const struct schway__board_defaults *defaults)
 {
     inst->board = defaults->board;
     inst->spu_revision = defaults->spu_revision;
     inst->cd_firmware = defaults->cd_firmware;
     inst->ram_ctrl_boot = defaults->ram_ctrl_boot;
-    inst->bus.ram_size = defaults->ram_ctrl_boot;
     inst->has_parallel_port = defaults->has_parallel_port;
     inst->has_serial_port = defaults->has_serial_port;
+}
+
+static void apply_board_defaults(schway *inst, const struct schway__board_defaults *defaults)
+{
+    apply_board_identity(inst, defaults);
+    inst->bus.ram_size = defaults->ram_ctrl_boot;
+}
+
+int schway__instance_board_profile_valid(uint32_t board, uint32_t profile_flags)
+{
+    const struct schway__board_defaults *defaults = find_board_defaults(board);
+    return defaults != NULL &&
+           (((profile_flags & SCHWAY_PROFILE_GPU_V0) != 0u) == (defaults->gpu_v0 != 0u));
+}
+
+void schway__instance_restore_board_identity(schway *inst)
+{
+    const struct schway__board_defaults *defaults = find_board_defaults(inst->board);
+    if (defaults != NULL) {
+        apply_board_identity(inst, defaults);
+    }
 }
 
 static uint32_t size_tag(const void *s)
@@ -414,8 +434,7 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     }
     if (board != 0u) {
         defaults = find_board_defaults(board);
-        if (defaults == NULL ||
-            (((flags & SCHWAY_PROFILE_GPU_V0) != 0u) != (defaults->gpu_v0 != 0u))) {
+        if (!schway__instance_board_profile_valid(board, flags)) {
             return SCHWAY_STATUS_ERR_PROFILE_REJECTED;
         }
     }

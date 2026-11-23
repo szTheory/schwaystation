@@ -3,7 +3,7 @@
    Layout. A 20-byte header, then the body:
      header  magic (8 bytes), state format (u32), total size (u32), body
              CRC-32 (u32)
-     body    instance.frame, instance.region, instance.ticks,
+     body    instance.frame, instance.region, instance.board, instance.ticks,
              instance.tick_acc, instance.frame_end, GPU and VRAM, CPU and cop0
              registers, the geometry engine, instance.profile_flags,
              instance.exe_loaded, the bus (RAM, scratchpad, memory control,
@@ -30,6 +30,7 @@ static const uint8_t state_magic[8] = {0x8Au, 0x50u, 0x53u, 0x58u, 0x0Du, 0x0Au,
 /* Field names handed to the visitor; static, so a host may keep them. */
 static const char name_frame[] = "instance.frame";
 static const char name_region[] = "instance.region";
+static const char name_board[] = "instance.board";
 static const char name_ticks[] = "instance.ticks";
 static const char name_tick_acc[] = "instance.tick_acc";
 static const char name_frame_end[] = "instance.frame_end";
@@ -88,6 +89,7 @@ static void body_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u64(io, name_frame, &inst->frame, 0u, SCHWAY__STATE_FRAME_MAX);
     /* A state loads only into an instance of the same region. */
     (void)schway__state_u32(io, name_region, &inst->region, inst->region, inst->region);
+    uint32_t board = schway__state_u32(io, name_board, &inst->board, 0u, SCHWAY_BOARD_PM41_2);
     uint64_t ticks = schway__state_u64(io, name_ticks, &inst->ticks, 0u, SCHWAY__STATE_TICKS_MAX);
     (void)schway__state_u64(io, name_tick_acc, &inst->tick_acc, 0u, den - 1u);
     /* The frame ends at or after the tick the state is at, and within one
@@ -106,6 +108,7 @@ static void body_io(struct schway__state_io *io, schway *inst)
                                                 SCHWAY_PROFILE_CD_LICENSED |
                                                 SCHWAY_PROFILE_GPU_V0 |
                                                 SCHWAY_PROFILE_CD_UNLOCK)) == 0u);
+    schway__state_check(io, schway__instance_board_profile_valid(board, profile_flags));
     (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
     schway__state_disc_identity_io(io, &inst->disc_host.identity_valid,
                                    inst->disc_host.identity_sha256);
@@ -254,6 +257,7 @@ schway_status schway_load_state(schway *inst, const void *buf, size_t size)
     io.mode = SCHWAY__STATE_APPLY;
     io.r = b;
     state_io(&io, inst, (uint32_t)need);
+    schway__instance_restore_board_identity(inst);
     schway__sched_sync(inst);
     schway__sched_recalc(inst);
     schway__frame_audio_clear(inst);
