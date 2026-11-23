@@ -32,6 +32,7 @@ core.sched.stall_freeze	core,portable
 core.sched.state_next_derived	core,portable
 core.state.cpu_fields	core,portable
 core.state.device_fields	core,portable
+core.state.profile	core,portable
 core.state.record_sweep	core,portable
 core.state.rejects	core,portable
 core.state.round_trip	core,portable

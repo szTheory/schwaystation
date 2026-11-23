@@ -61,6 +61,19 @@ static schway *make(uint32_t region)
     return inst;
 }
 
+static schway *make_board(uint32_t region, uint32_t board, uint32_t gpu_v0)
+{
+    schway *inst = make(region);
+    schway_profile p;
+    memset(&p, 0, sizeof p);
+    p.size = (uint32_t)sizeof p;
+    p.region = region;
+    p.flags = gpu_v0 != 0u ? SCHWAY_PROFILE_GPU_V0 : 0u;
+    p.board = board;
+    CHECK_EQ_U64(schway_set_profile(inst, &p), SCHWAY_STATUS_OK);
+    return inst;
+}
+
 /* Sizes the five buffers from a fresh instance. */
 static void bufs_init(void)
 {
@@ -241,6 +254,33 @@ static void test_stable_bytes(void)
     CHECK(memcmp(good, after, n) == 0);
     printf("state_bytes=%zu\n", n);
     schway_destroy(inst);
+}
+
+/* A cross-board load restores fixed board identity but keeps serialized
+   mutable RAM_SIZE instead of resetting it to the board's boot default. */
+static void test_profile(void)
+{
+    schway *src = make_board(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU7, 1u);
+    bus_write(src, 0x1F801060u, 4u, 0x1234u);
+    run_to(src, 4u);
+    size_t n = save(src, good);
+
+    schway *dst = make_board(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU18, 0u);
+    bus_write(dst, 0x1F801060u, 4u, 0x5678u);
+    CHECK_EQ_U64(dst->board, SCHWAY_BOARD_PU18);
+    CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(dst->board, SCHWAY_BOARD_PU7);
+    CHECK_EQ_U64(dst->profile_flags, SCHWAY_PROFILE_GPU_V0);
+    CHECK_EQ_U64(dst->spu_revision, 2922u);
+    CHECK_EQ_U64(dst->cd_firmware, 0u);
+    CHECK_EQ_U64(dst->ram_ctrl_boot, 0x0B80u);
+    CHECK_EQ_U64(dst->has_parallel_port, 1u);
+    CHECK_EQ_U64(dst->has_serial_port, 0u);
+    CHECK_EQ_U64(dst->bus.ram_size, 0x1234u);
+    CHECK_EQ_U64(save(dst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+    schway_destroy(dst);
+    schway_destroy(src);
 }
 
 /* Each corruption is refused with its own status before any byte applies. */
@@ -1453,6 +1493,7 @@ static const struct {
 } cases[] = {
     {"state.cpu_fields", test_cpu_fields},
     {"state.device_fields", test_device_fields},
+    {"state.profile", test_profile},
     {"state.record_sweep", test_record_sweep},
     {"state.rejects", test_rejects},
     {"state.round_trip", test_round_trip},
