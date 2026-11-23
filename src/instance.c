@@ -48,6 +48,7 @@ static void apply_board_defaults(schway *inst, const struct schway__board_defaul
     inst->spu_revision = defaults->spu_revision;
     inst->cd_firmware = defaults->cd_firmware;
     inst->ram_ctrl_boot = defaults->ram_ctrl_boot;
+    inst->bus.ram_size = defaults->ram_ctrl_boot;
     inst->has_parallel_port = defaults->has_parallel_port;
     inst->has_serial_port = defaults->has_serial_port;
 }

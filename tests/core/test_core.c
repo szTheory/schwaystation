@@ -657,6 +657,26 @@ static schway_profile board_profile(uint32_t region, uint32_t board, uint32_t gp
     return p;
 }
 
+static void check_ram_size_register(schway *inst, uint32_t expected)
+{
+    uint32_t cycles = 0u;
+    uint32_t value = 0u;
+    CHECK_EQ_U64(schway__bus_read(inst, 0x1F801060u, 4u, &value, &cycles), 0u);
+    CHECK_EQ_U64(value, expected);
+}
+
+/* GP1(09h) opens the v2 TBY2 write gate; v0 ignores it and keeps status bit
+   15 clear (docs/hardware/gpu.md, Polygons). */
+static void check_gpu_profile_behavior(schway *inst, uint32_t expected_v0)
+{
+    uint32_t cycles = 0u;
+    uint32_t status = 0u;
+    CHECK_EQ_U64(schway__bus_write(inst, 0x1F801814u, 4u, 0x09000001u, &cycles), 0u);
+    CHECK_EQ_U64(schway__bus_write(inst, 0x1F801810u, 4u, 0xE1000800u, &cycles), 0u);
+    CHECK_EQ_U64(schway__bus_read(inst, 0x1F801814u, 4u, &status, &cycles), 0u);
+    CHECK_EQ_U64((status >> 15u) & 1u, expected_v0 == 0u ? 1u : 0u);
+}
+
 /* Every documented board/GPU tuple is accepted and every other pair is
    rejected before region, board or GPU behavior changes. */
 static void test_profile_machine(void)
@@ -669,6 +689,7 @@ static void test_profile_machine(void)
     }
     CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU18);
     check_board_defaults(inst, 3u);
+    check_ram_size_register(inst, 0x0B88u);
 
     /* A profile ending at the previous struct size cannot supply board. */
     schway_profile old = make_profile(SCHWAY_REGION_PAL);
@@ -680,6 +701,9 @@ static void test_profile_machine(void)
     CHECK_EQ_U64(inst->profile_flags, SCHWAY_PROFILE_GPU_V0);
     check_board_defaults(inst, 3u);
     CHECK_EQ_U64(info_of(inst).region, SCHWAY_REGION_PAL);
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    check_ram_size_register(inst, 0x0B88u);
+    check_gpu_profile_behavior(inst, 1u);
 
     /* Board zero inherits PU-18 while the legacy GPU override remains usable. */
     schway_profile inherit = board_profile(SCHWAY_REGION_NTSC_J, 0u, 0u);
@@ -687,6 +711,9 @@ static void test_profile_machine(void)
     CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU18);
     CHECK_EQ_U64(inst->profile_flags, 0u);
     check_board_defaults(inst, 3u);
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    check_ram_size_register(inst, 0x0B88u);
+    check_gpu_profile_behavior(inst, 0u);
 
     for (size_t i = 0; i < sizeof board_profiles / sizeof board_profiles[0]; i++) {
         uint32_t expected_v0 = board_profiles[i].gpu_v0;
@@ -700,6 +727,31 @@ static void test_profile_machine(void)
         CHECK_EQ_U64(inst->profile_flags,
                      (expected_v0 != 0u ? SCHWAY_PROFILE_GPU_V0 : 0u) |
                          SCHWAY_PROFILE_CD_LICENSED);
+        check_ram_size_register(inst, board_profiles[i].ram_ctrl_boot);
+        CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+        check_ram_size_register(inst, board_profiles[i].ram_ctrl_boot);
+        check_gpu_profile_behavior(inst, expected_v0);
+
+        if (i == 0u) {
+            /* Both compatibility profiles inherit PU-7's non-default RAM
+               control before and after reset. */
+            CHECK_EQ_U64(schway_set_profile(inst, &old), SCHWAY_STATUS_OK);
+            CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU7);
+            check_board_defaults(inst, 0u);
+            check_ram_size_register(inst, 0x0B80u);
+            CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+            check_ram_size_register(inst, 0x0B80u);
+            check_gpu_profile_behavior(inst, 1u);
+
+            CHECK_EQ_U64(schway_set_profile(inst, &inherit), SCHWAY_STATUS_OK);
+            CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU7);
+            CHECK_EQ_U64(inst->profile_flags, 0u);
+            check_board_defaults(inst, 0u);
+            check_ram_size_register(inst, 0x0B80u);
+            CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+            check_ram_size_register(inst, 0x0B80u);
+            check_gpu_profile_behavior(inst, 0u);
+        }
 
         uint32_t region_before = info_of(inst).region;
         uint32_t board_before = inst->board;

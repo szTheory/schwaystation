@@ -116,7 +116,7 @@ void schway__bus_reset(schway *inst)
         b->memctl[i] = memctl_power_on(i);
     }
     port_costs(b);
-    b->ram_size = SCHWAY__RAM_SIZE_POWER_ON;
+    b->ram_size = inst->ram_ctrl_boot;
     b->cache_ctrl = 0u;
     memset(b->unbuilt_n, 0, sizeof b->unbuilt_n);
     memset(b->last_unbuilt, 0, sizeof b->last_unbuilt);
