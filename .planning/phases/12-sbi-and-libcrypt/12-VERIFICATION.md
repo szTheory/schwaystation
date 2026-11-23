@@ -138,7 +138,13 @@ N/A — Phase 12 is a subsystem implementation phase and declares no probe scrip
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| CRYPT-01 | SATISFIED | Parser/provider binding, bad-Q data delivery, prior-good GetlocP, malformed seed replay, and narrow compatibility evidence pass the local CI workflow; hosted Nightly mutation passed in run 45149805901. The final ship head's Main CI must pass before merge. |
+| CRYPT-01 | SATISFIED | Parser/provider binding, bad-Q data delivery, prior-good GetlocP, malformed seed replay, and narrow compatibility evidence pass the local CI workflow; hosted Nightly mutation passed in run 45149805901. The merged release head passed Main CI in [run 45168856493](https://github.com/szTheory/schwaystation/actions/runs/45168856493) and the full Release workflow in [run 45168856424](https://github.com/szTheory/schwaystation/actions/runs/45168856424); Release v0.12.0 was published. |
+
+## Ship and CI efficiency
+
+Both hosted runs used the exact merged release SHA `8a462ee2c256a7fde7b65a1ec17b24f509c0146b` and passed. Main CI used 9,173 runner-seconds (152.88 runner-minutes) with a 4,665-second BE32 critical path. Release CI used 7,893 runner-seconds (131.55 runner-minutes) with a 2,638-second BE32 critical path, then published all 18 product archives. The Release workflow remains the full artifact-producing gate.
+
+The duplicate Main matrix is avoidable on the later Release Please metadata-only push. A fail-closed Main fast path for the App actor and the exact three modified metadata files is carried on the Phase 13 branch; the Release workflow still takes the full route. Its local full workflow passed 674/674 tests and 8/8 release checks, and the classifier tests cover wrong actors, added/deleted/renamed paths, extra changes and the reusable-workflow full-route guard. The projected saving is about 153 runner-minutes per metadata-only release push, based on this Main run; the route still needs hosted confirmation on the Phase 13 pull request.
 
 ---
 _Verifier: gsd-verifier_

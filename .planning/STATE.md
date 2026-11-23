@@ -6,10 +6,10 @@ current_phase: 13
 current_phase_name: Regions, console revisions and playback
 current_plan: Not started
 status: planning
-stopped_at: Phase 12 complete, ready to plan Phase 13
-last_updated: "2026-11-23T10:05:24.372Z"
+stopped_at: Phase 12 released as v0.12.0 with Main CI green; ready to plan Phase 13
+last_updated: "2026-11-23T13:14:51Z"
 last_activity: 2026-11-23
-last_activity_desc: "Phase 12 shipped as PR #38"
+last_activity_desc: "Phase 12 v0.12.0 published and Main CI passed; Phase 13 planning is next"
 state_head: 145e7a053c35457d3297bffce8ac1ae67fc1191b
 progress:
   total_phases: 10
@@ -34,8 +34,8 @@ Phase: 13 — Regions, console revisions and playback
 Current Plan: Not started
 Total Plans in Phase: 0
 Status: Ready to plan
-Last activity: 2026-11-23 -- Phase 12 shipped as PR #38
-Progress: [██████░░░░] 60% (6/10 phases verified; 5/10 released; Phase 12 ship pending)
+Last activity: 2026-11-23 -- Phase 12 released as v0.12.0; Main CI passed
+Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -49,7 +49,15 @@ Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtim
 
 ### Phase 12 Plan 12-07 execution (2026-11-23)
 
-Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured 9-minute wall interval (08:02:00–08:11:27 UTC) completed one task and one implementation commit through the focused test and initial GSD closeout; active time was not separately measured. The subsequent metadata-only duration-correction commit is excluded. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans are complete; Phase 12 is ready for review and verification, not shipped.
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured 9-minute wall interval (08:02:00–08:11:27 UTC) completed one task and one implementation commit through the focused test and initial GSD closeout; active time was not separately measured. The subsequent metadata-only duration-correction commit is excluded. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans were complete; this entry preceded final review, verification, ship and release.
+
+### Phase 12 ship closeout (2026-11-23)
+
+Runtime/model: Codex; primary model ID unavailable. The merged release commit `8a462ee2c256a7fde7b65a1ec17b24f509c0146b` passed Main CI in [run 45168856493](https://github.com/szTheory/schwaystation/actions/runs/45168856493) and the full Release workflow in [run 45168856424](https://github.com/szTheory/schwaystation/actions/runs/45168856424); both used the same SHA. Main CI used 9,173 runner-seconds (152.88 runner-minutes), with BE32 at 4,665 seconds. Release CI used 7,893 runner-seconds (131.55 runner-minutes), with BE32 at 2,638 seconds, and published the 18 platform archives as [v0.12.0](https://github.com/szTheory/schwaystation/releases/tag/v0.12.0).
+
+CI efficiency review found the Release Please metadata push repeats Main's full matrix after Release CI already validates and packages that exact commit. A fail-closed route now skips Main's heavy matrix only for the Release App actor and the exact three modified generated metadata files; Release CI stays full. Its code and adversarial classifier cases are committed on the Phase 13 branch, and the local `cmake --workflow --preset ci` run passed 674/674 tests and 8/8 release checks before the documentation-only note. The projected saving is about 153 Main runner-minutes per metadata-only release push, based on this run; hosted confirmation is pending the Phase 13 pull request.
+
+Phase 7–11 reports became stale as later phases changed files they cover. The GSD phase-init check confirms this does not block Phase 13 planning. Defer refreshing those reports until the final milestone audit so a green full local workflow is not repeated five times for bookkeeping; do not hand-edit coverage digests or bypass the supported stale-verification route.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 
