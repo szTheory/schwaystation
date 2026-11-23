@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 12
 current_phase_name: SBI and LibCrypt
-current_plan: 1
+current_plan: 2
 status: executing
-stopped_at: Completed Phase 12-01; runtime/model Codex/GPT-6, primary model ID not exposed; 8m measured wall; parser and MMIO focused CTests passed in 0.13s
-last_updated: "2026-11-23T05:21:39.193Z"
+stopped_at: Completed 12-01; runtime/model Codex/GPT-6, primary model ID not exposed; plan build and focused CTests pass; 8m41s elapsed
+last_updated: "2026-11-23T05:23:55.784Z"
 last_activity: 2026-11-23
 last_activity_desc: Phase 12 execution started
-state_head: 04d70f6383e48156ab937460c92439e0efc3d218
+state_head: fcdd81ede72b537f2482f54f02565a58ca378e7d
 progress:
   total_phases: 10
   completed_phases: 5
   total_plans: 70
-  completed_plans: 63
+  completed_plans: 64
   percent: 50
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 12 (SBI and LibCrypt) — EXECUTING
-Current Plan: 1
+Current Plan: 2
 Total Plans in Phase: 7
-Status: Executing Phase 12
+Status: Ready to execute
 Last activity: 2026-11-23 — Phase 12 execution started
 Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
 
@@ -1911,9 +1911,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T05:21:39.025Z
-Stopped at: Completed Phase 12-01; runtime/model Codex/GPT-6, primary model ID not exposed; 8m measured wall; parser and MMIO focused CTests passed in 0.13s
-Resume file: Plan 12-02
+Last session: 2026-11-23T05:23:55.621Z
+Stopped at: Completed 12-01; runtime/model Codex/GPT-6, primary model ID not exposed; plan build and focused CTests pass; 8m41s elapsed
+Resume file: .planning/phases/12-sbi-and-libcrypt/12-02-PLAN.md
 
 ### v1.0 session history
 
