@@ -83,13 +83,13 @@ valid LBAs.
 ### Reusable Assets
 - `schway_disc_image` already owns each concrete M3U child and returns that child's descriptor on selection; this is the natural lifetime for a per-image SBI overlay.
 - `schway_disc.bad_q` already separates bad-Q queries from sector reads, so no public ABI change is required.
-- `src/cdrom_sector.c` already keeps `current_lba` at the previous position when the callback reports bad-Q, and `tests/cdrom/sectors.c` has a focused bad-Q selector to extend.
+- `src/cdrom_sector.c` gates `current_lba` on accepted Q during scheduled sector reads, and `tests/cdrom/sectors.c` has a focused bad-Q case under the `cdrom.delivery` selector. Seek completion in `src/cdrom.c` currently advances `current_lba` before its provider callback, so that path needs separate coverage and correction.
 - Existing CMake fixture, sorted-inventory, malformed-input, fuzz replay, and compatibility-ledger patterns cover the required seams.
 
 ### Established Patterns
 - The host owns file access and parsing; the deterministic core consumes sectors and callbacks only.
 - Provider open and replacement are failure-atomic; media parsing uses checked arithmetic and bounded extents.
-- M3U selects a concrete child image. PBP is currently single-disc, and M3U entries currently accept CUE/ISO only.
+- M3U selects a concrete child image through the regular image opener. CUE, ISO, ECM and CCD children are supported; CHD and PBP entries are rejected. CCD provides a route for generated subcode in the command-level Q tests.
 - Review precedes final verification; run cheap fixture, selector, inventory and budget checks before the long matrix.
 
 ### Integration Points
