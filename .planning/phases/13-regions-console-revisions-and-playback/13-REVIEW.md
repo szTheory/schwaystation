@@ -1,10 +1,11 @@
 ---
 phase: 13-regions-console-revisions-and-playback
-reviewed: 2026-11-23T21:52:33Z
+reviewed: 2026-11-23T22:16:45Z
 depth: standard
-files_reviewed: 43
+files_reviewed: 47
 files_reviewed_list:
   - cmake/MDECReferences.cmake
+  - cmake/DiscFixtures.cmake
   - docs/compatibility.md
   - docs/embedding.md
   - docs/libretro.md
@@ -40,6 +41,8 @@ files_reviewed_list:
   - tests/core/test_core.c
   - tests/core/test_state.c
   - tests/core/tests.cmake
+  - tests/fixtures/disc_boot_playlist.xml
+  - tests/fixtures/manifest.txt
   - tests/libretro/host.c
   - tests/libretro/inventory.txt
   - tests/libretro/tests.cmake
@@ -49,45 +52,33 @@ files_reviewed_list:
   - tests/runner/test_region_probe.c
   - tests/runner/tests.cmake
 findings:
-  critical: 1
-  warning: 1
+  critical: 0
+  warning: 0
   info: 0
-  total: 2
+  total: 0
   necessity: 0
-status: issues_found
+status: clean
 ---
 
 # Phase 13: Code Review Report
 
-**Reviewed:** 2026-11-23T21:52:33Z
+**Reviewed:** 2026-11-23T22:16:45Z
 **Depth:** standard
-**Files Reviewed:** 43
-**Status:** issues_found
+**Files Reviewed:** 47
+**Status:** clean
 
 ## Summary
 
-The review found one state compatibility defect and one playlist-selection defect. Both affect supported user flows. No tests were run as requested for this review. The repository necessity rubric was read; no necessity finding was supported by the reviewed code.
+The two findings from the initial review are resolved. The state validator now accepts documented legacy GPU-v0 states while still requiring a known board and valid profile flag bits; an old-sized profile state round-trips byte-for-byte. Libretro now resolves identity and fast-boot eligibility from the selected initial playlist member and opens that same member. The tests cover a region mismatch and a selected member without a boot executable.
 
-## Critical Issues
+I also reviewed the additional fixture generator and manifest changes introduced by the fixes. No remaining Critical or Warning issues were found in the Phase 13 review scope. No tests were run during this read-only review.
 
-### CR-01: Legacy GPU override makes a valid state unloadable
+## Narrative Findings (AI reviewer)
 
-**Classification:** BLOCKER
-**File:** src/state.c:112
-**Issue:** A caller using an older profile size, or a v8 profile with board zero, is explicitly allowed to keep the current board while using SCHWAY_PROFILE_GPU_V0. The new state validator instead requires the saved GPU flag to match that board's default. A fresh PU-18 instance configured with an old-sized profile and GPU_V0 is accepted by schway_set_profile (src/instance.c:424-449; this case is also exercised in tests/core/test_core.c:365-377), but its state contains board=PU18 and GPU_V0, so loading that same state fails this check. This breaks save-state round trips for a documented compatibility path.
-**Fix:** Preserve the legacy override in state validation. For example, encode whether the board/GPU tuple was selected through the new explicit-board field and enforce pairing only for explicit board selections; otherwise validate that the board ID and profile flags are individually valid.
-
-## Warnings
-
-### WR-01: Auto region and fast-boot eligibility use the first playlist disc
-
-**Classification:** WARNING
-**File:** libretro/libretro.c:1592-1608, 1655-1668
-**Issue:** The disc identity and boot-executable eligibility are probed from prepared_discs[0], but the initial disc may be a different playlist entry selected through lr_disk_set_initial_image and opened later as initial. Consequently, auto region can be chosen from another disc, and fast mode can accept or reject based on another entry's boot executable. This can run the selected title under the wrong region or incorrectly apply the BIOS shell shortcut.
-**Fix:** Resolve and validate the initial playlist index/path before probing. Use that selected image for serial, licence, EXE-region and fast-boot eligibility, while retaining disc-specific handling for later swaps. Add a playlist test where the chosen initial member differs in region and boot eligibility from member zero.
+No findings.
 
 ---
 
-_Reviewed: 2026-11-23T21:52:33Z_
+_Reviewed: 2026-11-23T22:16:45Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
