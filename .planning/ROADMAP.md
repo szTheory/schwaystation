@@ -259,9 +259,9 @@ Plans:
   3. The ordinary BIOS boot path remains the default. The opt-in `fast` runner and core paths require a supplied BIOS and skip only the documented eligible shell handoff, with the same emulated clock settings and timing rules.
   4. Targeted FMV checks run a source-unit preflight before guest execution and report input coverage, decoder output, guest completion and display results separately. The exact v1.0 4-bit expected output, deterministic 8-bit baseline and 4,915,200-cycle bound are preserved.
 
-**Plans**: 1/9 plans executed
+**Plans**: 2/9 plans executed
 - [x] 13-01-PLAN.md
-- [ ] 13-02-PLAN.md
+- [x] 13-02-PLAN.md
 - [ ] 13-03-PLAN.md
 - [ ] 13-04-PLAN.md
 - [ ] 13-05-PLAN.md
@@ -328,7 +328,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 10. PBP disc images | 13/13 | Complete    | 2026-11-22 |
 | 11. ECM and CloneCD images | 15/15 | Complete    | 2026-11-22 |
 | 12. SBI and LibCrypt | 7/7 | Complete    | 2026-11-23 |
-| 13. Regions, console revisions and playback | 1/9 | In Progress | - |
+| 13. Regions, console revisions and playback | 2/9 | In Progress | - |
 | 14. Multitap and special controllers | 0/TBD | Not started | - |
 | 15. GunCon and Justifier | 0/TBD | Not started | - |
 | 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |

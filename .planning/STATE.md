@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 13
 current_phase_name: Regions, console revisions and playback
-current_plan: 2
+current_plan: 3
 status: planned
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-11-23T15:11:48.258Z"
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-11-23T16:11:52Z"
 last_activity: 2026-11-23
-last_activity_desc: Plan 13-01 complete; Plan 13-02 is next
-state_head: 0cc04e404dbdbdebfac4b6dca63f5638b67cf7b6
+last_activity_desc: Plans 13-01 and 13-02 complete; Plan 13-03 is next
+state_head: 4ab751cd79a18b01f0d94a1be9af8f58abffc6dc
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 79
-  completed_plans: 71
+  completed_plans: 72
   percent: 60
 ---
 
@@ -31,17 +31,25 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 13 — Regions, console revisions and playback
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 9
 Status: Ready to execute
-Last activity: 2026-11-23 -- Plan 13-01 complete; Plan 13-02 is next
-Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plan 13-01 is complete; Plan 13-02 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Last activity: 2026-11-23 -- Plans 13-01 and 13-02 complete; Plan 13-03 is next
+Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 and 13-02 are complete; Plan 13-03 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
 Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The recorded wall interval was 20m43s from the saved planning-state checkpoint at 14:43:33Z to closeout at 15:04:16Z; executor start was not separately captured and active time was not measured. Task commits: `9ceab60` registered `core.profile.machine`; `067c686` added API v8 board selection and defaults.
 
 `git diff --check` and both sorted exact inventories passed. The repository-check budget remained at its 3,901-line ceiling; the API version preflight covered 249 public header names. The first planned configure/build/CTest command exited 1 on the stale `sizeof(schway_profile) == 16` assertion; configure passed and CTest did not run. After asserting the board offset at 16 and the new size at 20, the focused configure/build/CTest command exited 0: 8/8 reported tests passed in 0.21 seconds, including the board matrix, old-size compatibility, ABI v8 surface and behavior revision check. No workflow changed, so no Act or hosted CI run was needed. PROFILE-02 remains pending until Plan 13-04 adds state validation, serialization and hash coverage; Plan 13-02 is next.
+
+### Phase 13 Plan 13-02 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured wall interval from the saved STATE checkpoint at 15:11:48.258Z through the 16:11:52Z closeout checkpoint was 60m04s; executor start and active time were not separately captured. The task used the RED registration commit `77ae668` and GREEN classifier commit `4ab751c`.
+
+The initial CI preset probe configured in 0.9s but exposed 0/4 MDEC selectors, so the checked plan was corrected to the supported MDEC-only Nightly lane. Nightly configure first discovered the four existing selectors (1.8s), then after registration the exact selector graph included only `mdec.reference.input_preflight`, `mdec.reference.color_assets`, and `mdec.reference.edge`. Archive/member extent and digest checks passed. The initial registered edge test exited 8 in 0.07s after both setup fixtures passed; it reproduced the 1,696-word movie15 DMA0 exhaustion at 1,902,230 ticks without a fault. The classifier now accepts only that pinned source count and exact MDEC/DMA signature after eight successful run/TTY empty-FIFO samples, below the unchanged 4,915,200-cycle cap.
+
+The corrected preflight sequence passed: Nightly inventory sort and the 3,901-line budget gate each exited 0 in 0.00s; MDEC-only Nightly configure exited 0 in 1.17s; exact three-name selector assertion exited 0 in 0.00s; focused target build exited 0 in 0.12s; and the single corrected CTest selection exited 0 with 3/3 tests in 0.06s (source preflight 0.02s, assets 0.03s, edge 0.03s). Its saved log reports source complete (1,440 blocks / 240 macroblocks / zero trailing), decoder FIFO empty, guest expected-incomplete, display not compared, ticks 1,902,230/4,915,200, DMA0 idle, DMA1 waiting remain=9/phase=2, and fault none. No full unaffected 4-bit/8-bit suite, hosted CI, Act job, or Docker resource ran because this plan changed no workflow wiring. MDEC-01 remains pending until full Phase 13 verification; no playback, decoded-frame, or hardware-conformance claim is made. Plan 13-03 is next.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -1296,6 +1304,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 12 P06 | 64min | 2 tasks | 8 files |
 | Phase 12 P07 | 9min | 1 tasks | 1 files |
 | Phase 13 P01 | 20m43s | 2 tasks | 12 files |
+| Phase 13 P02 | 60m | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1731,6 +1740,7 @@ Recent decisions affecting current work:
 - [Phase 13]: API v8 appends board identity; behavior revision is 19, while state serialization/hash updates remain for Plan 13-04.
 - [Phase 13]: Old-sized profiles and board zero inherit current board defaults; GPU_V0 stays a legacy override, while explicit boards must match their documented GPU pairing.
 - [Phase 13]: New instances default to the PU-18 board profile.
+- [Phase 13]: Plan 13-02 records the exact movie15 expected-incomplete signature as diagnostic-only; MDEC-01 remains pending until full Phase 13 verification.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1981,8 +1991,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T15:11:48.067Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-11-23T16:10:18.028Z
+Stopped at: Completed 13-02-PLAN.md
 Resume file: None
 
 ### v1.0 session history
