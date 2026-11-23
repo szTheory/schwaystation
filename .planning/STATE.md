@@ -6,11 +6,11 @@ current_phase: 13
 current_phase_name: Regions, console revisions and playback
 current_plan: Not started
 status: planning
-stopped_at: Phase 12 released as v0.12.0 with Main CI green; ready to plan Phase 13
-last_updated: "2026-11-23T13:14:51Z"
+stopped_at: Phase 13 context gathered
+last_updated: "2026-11-23T13:28:05.307Z"
 last_activity: 2026-11-23
-last_activity_desc: "Phase 12 v0.12.0 published and Main CI passed; Phase 13 planning is next"
-state_head: 145e7a053c35457d3297bffce8ac1ae67fc1191b
+last_activity_desc: Phase 13 context captured with profile, boot and MDEC boundaries; planning is next
+state_head: f8937a8354a6598dbc9f9122391a432b818b9028
 progress:
   total_phases: 10
   completed_phases: 6
@@ -34,7 +34,7 @@ Phase: 13 — Regions, console revisions and playback
 Current Plan: Not started
 Total Plans in Phase: 0
 Status: Ready to plan
-Last activity: 2026-11-23 -- Phase 12 released as v0.12.0; Main CI passed
+Last activity: 2026-11-23 -- Phase 13 discussion captured; Phase 12 release is green
 Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
@@ -58,6 +58,18 @@ Runtime/model: Codex; primary model ID unavailable. The merged release commit `8
 CI efficiency review found the Release Please metadata push repeats Main's full matrix after Release CI already validates and packages that exact commit. A fail-closed route now skips Main's heavy matrix only for the Release App actor and the exact three modified generated metadata files; Release CI stays full. Its code and adversarial classifier cases are committed on the Phase 13 branch, and the local `cmake --workflow --preset ci` run passed 674/674 tests and 8/8 release checks before the documentation-only note. The projected saving is about 153 Main runner-minutes per metadata-only release push, based on this run; hosted confirmation is pending the Phase 13 pull request.
 
 Phase 7–11 reports became stale as later phases changed files they cover. The GSD phase-init check confirms this does not block Phase 13 planning. Defer refreshing those reports until the final milestone audit so a green full local workflow is not repeated five times for bookkeeping; do not hand-edit coverage digests or bypass the supported stale-verification route.
+
+### Phase 13 discussion (2026-11-23)
+
+Runtime/model: Codex discuss orchestrator; exact primary runtime model ID unavailable. Three independent
+`gsd-advisor-researcher` reviews used `gpt-6-luna` xhigh. The measured discussion wall interval from the first
+clock reading at 13:23:49 UTC through context/state closeout at 13:28:05 UTC was 4 minutes 16 seconds; active
+sampling time was not separately available. Context commit `f8937a8` records the nine documented board identities,
+legal GPU behavior pairs, region/title/board separation, BIOS-backed opt-in shell entry and MDEC evidence boundary.
+`git diff --check` passed before commit. No tests, hosted jobs, Act jobs or Docker resources were needed for this
+planning-only step. Three advisor reviews and an adversarial synthesis preferred the existing feature-ledger
+profile field with canonical `region.board.gpu` values; four loosely matched todos were reviewed and kept bound
+to their earlier phases or test-maintenance scope. The next action is Phase 13 research and planning.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 
@@ -1947,9 +1959,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T08:09:48.339Z
-Stopped at: Phase 12 complete, ready to plan Phase 13
-Resume file: None
+Last session: 2026-11-23T13:28:05.090Z
+Stopped at: Phase 13 context gathered
+Resume file: .planning/phases/13-regions-console-revisions-and-playback/13-CONTEXT.md
 
 ### v1.0 session history
 
