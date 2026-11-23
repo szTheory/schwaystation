@@ -5,8 +5,10 @@ sound device or input device. It can print a frame hash, write a PNG and report 
 to check that a build produces the expected picture or native audio stream. It can run a PS-EXE file and print the
 text the program writes, and it can say what a PS-EXE file is without running it.
 
-The runner loads CUE/BIN, ISO, M3U and the supported unencrypted PBP subset through the shared host provider. A run
-without `--bios`, `--disc` or `--exe` shows the built-in test card, described in
+The runner loads CUE/BIN, ISO, M3U, the supported unencrypted PBP subset, direct ECM images and CloneCD `.ccd`
+images through the shared host provider. CUE sheets may name supported `.ecm` track files; a `.ccd` uses its
+same-stem `.img` and optional `.sub` companions. A run without `--bios`, `--disc` or `--exe` shows the built-in
+test card, described in
 [embedding.md](embedding.md#the-test-card). `--probe` reads one PS-EXE or disc image and runs nothing.
 
 ## Synopsis
@@ -31,7 +33,7 @@ schwaystation-run --help | --version
 | `--frames N` | Run N frames, N from 1 to 1000000. Give either `--frames` or `--bench`, once. |
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
 | `--bios FILE` | Load an exactly 524288-byte BIOS image, report its digest identity, then run it. Without `--frames` or `--bench` the run is 600 frames. Give it once. See [BIOS images](#bios-images). |
-| `--disc FILE` | Attach a supported CUE sheet, ISO image, m3u playlist or unencrypted PBP image to a BIOS run. A `.cue` names its BINARY track files; an `.m3u` selects initial disc 0. Needs `--bios`. Give it once. |
+| `--disc FILE` | Attach a supported CUE, ISO, M3U, unencrypted PBP, ECM or CloneCD image to a BIOS run. A `.cue` names BINARY or ECM track files; `.ccd` uses its same-stem `.img` and optional `.sub`; an `.m3u` selects initial disc 0. Needs `--bios`. Give it once. |
 | `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
 | `--tty` | Print guest text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe` or `--bios`. |
 | `--stop-on mailbox` | End the run when the program's [mailbox](#mailbox) reports done or fault; a run that reaches the frame cap with neither is a [hang](#mailbox). Needs `--exe` or `--disc`. Give it once. |
@@ -531,18 +533,19 @@ shows that frame's time, and with fewer than 100,000 frames p99.999 is the maxim
 
 ## Probe
 
-`--probe FILE` reads a PS-EXE, a raw ISO9660 image, a CUE sheet with its referenced BINARY files, an m3u playlist, or
-the supported unencrypted single-data-track PBP layout. For m3u it reports the playlist entry count and withholds
-per-disc identity fields. It validates a
-disc's boot executable but does not create an emulator instance, submit sectors, or run a frame. Raw ISO images use
+`--probe FILE` reads a PS-EXE, raw ISO9660 image, CUE sheet with raw or ECM track files, M3U playlist, supported
+unencrypted single-data-track PBP layout, direct ECM image, or CloneCD `.ccd` image. CloneCD requires a same-stem
+`.img`; a same-stem `.sub` is optional. M3U entries may name ISO images or CUE sheets. For M3U it reports the
+playlist entry count and withholds per-disc identity fields. It validates a disc's boot executable but does not
+create an emulator instance, submit sectors, or run a frame. Raw ISO images use
 2048-byte sectors. CUE sheets are at most 64 KiB with at most 99 tracks and indexes; each relative `FILE` name is at
 most 255 bytes and cannot escape the sheet's directory. Companion images together are capped at 1 GiB. Supported
 CUE layouts are `MODE1/2048`, `MODE2/2352` and `AUDIO`; unsupported track modes are refused. Timestamps range through
 `99:59:74`. ISO parsing is bounded to 64 descriptors, 64 KiB directories with 4096 records, 2047 bytes of
 `SYSTEM.CNF`, and 16 boot-path components of at most 63 bytes each. The PBP open limits media to 1 GiB and validates
-each indexed block with one bounded decoded-block buffer. Unsupported PBP layouts, `.ecm`, `.ccd` and `.chd` when
-CHD is disabled return exit status 77; malformed PBP returns 1. The probe never executes a disc. Boot and play
-status remain `unknown`.
+each indexed block with one bounded decoded-block buffer. Unsupported PBP layouts and CHD when CHD is disabled
+return exit status 77. Malformed ECM, CUE, CCD and PBP data return 1; unsupported CCD metadata also returns 77.
+The probe never executes a disc. Boot and play status remain `unknown`.
 
 The output only reveals a disc identity when its serial, rcheevos MD5, first-track SHA-1, DAT title and passing
 `metadata.identity` ledger row all match. Otherwise its serial, names and digests are redacted. Bare PS-EXE names
@@ -551,7 +554,7 @@ do not echo a private path. Identity fields are:
 
 | Key | Value |
 |---|---|
-| `format` | `exe` for a bare file; `disc` for an ISO9660 image, CUE sheet, m3u playlist or supported PBP |
+| `format` | `exe` for a bare file; `disc` for an ISO9660 image, CUE sheet, m3u playlist, supported PBP, ECM or CCD |
 | `serial` | matched DAT serial; otherwise `redacted` |
 | `rcheevos_md5` | matched boot-executable MD5; otherwise `redacted` |
 | `track1_sha1` | matched physical first-track SHA-1; otherwise `redacted` |

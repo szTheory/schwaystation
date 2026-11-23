@@ -4,9 +4,60 @@ The runner and libretro host use `schway_disc_image` to provide sector data to
 the core. File access stays in the host. The provider accepts cooked `.iso`
 images and `.cue` sheets whose data files contain MODE1/2048, MODE2/2352, or
 AUDIO tracks. It also accepts the fixture-proven unencrypted PBP subset below.
-With `SCHWAYSTATION_CHD=ON`, it opens the bounded CHD subset below through the
-same raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off by default;
-`.ecm` and `.ccd` remain unsupported.
+It also accepts ECM v1.0 images and supported CloneCD `.ccd` images. With
+`SCHWAYSTATION_CHD=ON`, it opens the bounded CHD subset below through the same
+raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off by default.
+
+## ECM images
+
+The provider reads ECM v1.0 literal and modeled records without materializing
+the decoded image. It validates the complete decoded-byte checksum and exposes
+bounded random reads. A bare `.ecm` has no TOC, so it uses the existing single
+MODE2/2352 fallback and must decode to an exact sequence of 2352-byte sectors.
+
+A CUE may name an `.ecm` FILE child for MODE2/2352 or AUDIO tracks. Track
+indexes and pregaps use the decoded extent, and reads match the equivalent
+uncompressed raw CUE. ECM has no track table: the provider rejects cooked
+2048-byte CUE sources and never invents the missing 16-byte sector header for
+type 2 or type 3 records. Canonical child paths stay inside the CUE directory;
+an open error leaves the caller's active disc unchanged.
+
+The compressed file and decoded image are each limited to 1 GiB. Opening scans
+the record stream once to validate the whole-output EDC and build a checkpoint
+index capped at 1 MiB; random reads resume from those checkpoints. A bare ECM
+must decode to a whole number of 2352-byte sectors. These are ECM v1.0 record
+rules; the source and modeled-mode mappings are covered by the project's
+independently authored fixture vectors.
+
+## CloneCD metadata subset
+
+A `.ccd` descriptor reads a same-stem `.img` file. A same-stem `.sub` companion
+is optional. The accepted descriptor is Version 3, single-session, unscrambled,
+without CD-TEXT or pregap subcode metadata, and contains the required TOC
+entries for its tracks. Track modes are audio, Mode 1 or Mode 2; the descriptor
+indexes define the source track and pregap boundaries. CUE sheets cannot use a
+`.ccd` descriptor as a track file.
+
+When `.sub` is present, it must contain exactly 96 packed P-W channel bytes for
+each IMG sector. The reader maps those channel-major bytes into the returned
+subcode representation. Without `.sub`, each sector returns zeroed subcode.
+The IMG extent, required track geometry, and canonical companion paths are
+checked before the image opens; a missing required IMG or an escaping or
+malformed companion is rejected. An open error leaves the caller's active disc
+unchanged.
+
+The owned CloneCD fixture covers a mixed Mode 2 and audio disc, companion
+extents, TOC and pregap mapping, optional SUB reads, and save/content identity
+against a matching IMG-backed CUE. It does not claim support for multiple
+sessions, other descriptor versions, scrambling, CD-TEXT, or alternate
+pregap-subcode modes.
+
+The descriptor is limited to 64 KiB and media bytes to 1 GiB. The reader checks
+the full IMG extent and exact optional SUB extent before publishing the image;
+sector callbacks return one 2352-byte sector and, when present, its 96-byte
+subcode. CloneCD fields and P-W channel layout are community described rather
+than a complete official specification, so support stays limited to mappings
+proven by the owned fixture.
 
 ## CHD metadata subset
 

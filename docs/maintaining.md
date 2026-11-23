@@ -73,6 +73,13 @@ Release added 24 minutes 25 seconds to the observed release duration. The eviden
 the completed [artifact-reuse review](../.planning/todos/completed/050-release-ci-artifact-reuse.md). Do not
 repeat a green full suite for bookkeeping when exact-head evidence already covers the unchanged checks.
 
+Before pushing a changed head, run the relevant local configure/build/test paths and the cheapest consistency
+checks for selectors, inventories, workflow/artifact wiring and budget totals. Use `act` when it exercises a
+workflow job beyond the local suite; use `act --dryrun` for routing only. Local checks cannot guarantee hosted
+runner, permission, artifact or integration behavior, so keep the required hosted gates. If Docker is needed,
+name task-created images, containers, networks and volumes with a `schwaystation-<phase>-<task>` prefix and
+remove only those named resources after the check. Avoid global prune commands that can remove unrelated data.
+
 ## The rehearsal
 
 A same-repository pull request that changes a release input (`release.yml`, `ci.yml`, `scripts/publish.sh`,
@@ -84,6 +91,9 @@ A same-repository pull request that changes a release input (`release.yml`, `ci.
   pull request's merge commit, and runs `prepare`, `rehearsal-create rehearsal-<run id>-<attempt>`, `upload`,
   `actions/attest`, `attested`, a publish as a prerelease that is never latest, and `verify`;
 - `cleanup` runs whatever the rehearsal did, once it started, and deletes the release and its tag.
+
+After deletion, `publish.sh` retries release and tag lookups for up to ten attempts and accepts only HTTP 404 as
+proof that each is gone. A persistent resource or repeated API error still fails cleanup.
 
 Only the trigger, the signer workflow, the source ref and the `latest` flag differ from a real release, and
 `policy.publish_ref` and `policy.publish_signer` keep a release from ever accepting a rehearsal's attestation. Each
@@ -196,8 +206,9 @@ failed/timed-out classifier job also fall back to full. Schedule and manual runs
 these decisions; `act --dryrun` checks job wiring but cannot call GitHub's PR files API or prove its outputs.
 
 Two more jobs in the same workflow report through the same issue and are not part of `CI required`: `vectors-full`
-replays all 55,000 public CPU vectors at their pin, and `fuzz` runs the loader's fuzz target for 60 seconds. Both are
-described in [testing.md](testing.md#the-full-vectors); a red one is a finding to fix, not a block on a merge.
+replays all 55,000 public CPU vectors at their pin, and `fuzz` replays the loader and nine media seed sets before
+running the loader and media campaigns for 60 seconds each. See [the fuzz target notes](testing.md#fuzz-targets);
+a red one is a finding to fix, not a block on a merge.
 
 ## Phase-1 CI tail (complete)
 

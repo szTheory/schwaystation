@@ -13,8 +13,8 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 7: Faster and more trustworthy CI** - Measure the build and release pipeline, fix the weakest quality dimension, and establish reproducible quality baselines. (completed 2026-11-18)
 - [x] **Phase 8: Per-game card saves** - Use separate saves per game, move cards between supported formats, and resume a game in the runner or libretro. (completed 2026-11-19)
 - [x] **Phase 9: CHD disc images** - Open supported CHD images with equivalent disc behavior and establish the shared media checks and feature-ledger workflow. (completed 2026-11-20)
-- [x] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly. (completed 2026-11-21)
-- [ ] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data.
+- [x] **Phase 10: PBP disc images** - Open the verified unencrypted PSISO layouts and reject unsupported PBP variants clearly. (completed 2026-11-22)
+- [x] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data. (completed 2026-11-22)
 - [ ] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact.
 - [ ] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior.
 - [ ] **Phase 14: Multitap and special controllers** - Play with tap controllers and cards, mouse, neGcon, Jogcon and Dual Analog flight mode.
@@ -186,9 +186,47 @@ platforms and Main/Release gates retained; complete repository checks at or belo
   2. Supported CloneCD fixtures preserve modes, indexes, pregaps, subcode and first and last sector reads through CCD and its IMG/SUB companions. Invalid companion paths are rejected before an external file is opened.
   3. The ledger records fixture results for both providers against the existing disc contract.
 
-**Plans**: TBD
+**Plans**: 15/15 plans complete
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`, `.planning/research/FEATURES.md`
+
+Plans:
+**Wave 1**
+- [x] 11-01-PLAN.md — Bounded host-provider skeleton and exact inventories
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 11-02-PLAN.md — Record cap-based deferral of metadata-only PR Nightly shortcut
+- [x] 11-03-PLAN.md — Validated literal ECM stream and bounded random access
+
+**Wave 3** *(after 11-03)*
+- [x] 11-04-PLAN.md — Fixture-proven CloneCD single-data-track reader
+
+**Wave 4** *(11-05 and 11-13 can proceed independently after their prerequisites)*
+- [x] 11-05-PLAN.md — Proven modeled ECM records and CUE source mapping
+- [x] 11-13-PLAN.md — Confine CCD companions and preserve the active reader on failure
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 11-06-PLAN.md — CloneCD indexes, pregaps and independent SUB transpose
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 11-07-PLAN.md — Owned deterministic fixtures and source-count preflight
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 11-08-PLAN.md — Runner/probe and content identity
+- [x] 11-09-PLAN.md — Libretro loading, replacement and extension claims
+- [x] 11-10-PLAN.md — Production fuzz replay and sanitizer targets
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 11-11-PLAN.md — Bounded guest evidence and protected provider ledger
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 11-12-PLAN.md — Gate ECM/CCD fixture producers before timed Nightly campaigns
+
+**Wave 10** *(after 11-12; bounded CHD-OFF package acceptance)*
+- [x] 11-14-PLAN.md — Validate CHD-OFF package contents, notices and feature evidence
+
+**Wave 11** *(after 11-14; bounded installed example and CHD-ON consumers)*
+- [x] 11-15-PLAN.md — Build the installed SDL2 example and verify CHD-ON consumers
 
 ### Phase 12: SBI and LibCrypt
 
@@ -271,8 +309,8 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 7. Faster and more trustworthy CI | 10/10 | Complete    | 2026-11-19 |
 | 8. Per-game card saves | 10/10 | Complete    | 2026-11-19 |
 | 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
-| 10. PBP disc images | 13/13 | Complete    | 2026-11-21 |
-| 11. ECM and CloneCD images | 0/TBD | Not started | - |
+| 10. PBP disc images | 13/13 | Complete    | 2026-11-22 |
+| 11. ECM and CloneCD images | 15/15 | Complete    | 2026-11-22 |
 | 12. SBI and LibCrypt | 0/TBD | Not started | - |
 | 13. Regions, console revisions and playback | 0/TBD | Not started | - |
 | 14. Multitap and special controllers | 0/TBD | Not started | - |

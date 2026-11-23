@@ -151,6 +151,7 @@ add_custom_command(OUTPUT "${schway__disc_playlist_bin}"
 add_custom_target(schwaystation-disc-fixtures ALL DEPENDS
   "${schway__disc_bin}" "${schway__disc_playlist_bin}")
 include("${PROJECT_SOURCE_DIR}/cmake/PBPFixtures.cmake")
+include("${PROJECT_SOURCE_DIR}/cmake/LegacyDiscFixtures.cmake")
 
 if(SCHWAYSTATION_CHD AND SCHWAYSTATION_BUILD_CHD_TOOL)
   include("${PROJECT_SOURCE_DIR}/cmake/CHDFixtures.cmake")

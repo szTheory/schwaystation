@@ -8,6 +8,52 @@ and the exclusive leadout LBA. This is a cheap gate against broken metadata, out
 invalid media before the longer guest boot, audio and movie checks; CTest runs it first through
 `FIXTURES_SETUP disc_media_preflight` and requires it for each `disc.fixture.*` guest test.
 
+## ECM and CloneCD guests
+
+The legacy source preflight and parity tests run before the bounded guests. They
+compare source sectors, requested reads and produced outputs: the owned ECM is
+one 64-sector data track, and the owned CloneCD image has 64 data sectors plus
+158 audio sectors (222 total) and 21,312 SUB bytes. The owned ECM has no CD-DA
+track, so its supported guest predicates are boot, read/replay and the first
+FMV frame; the mixed CloneCD fixture also exercises audio. These cases reuse
+the existing guest caps and output assertions.
+
+For the focused route, check the exact inventory, configure the CHD-off path,
+build only the fixture dependencies, then run the fixture-gated selector:
+
+```sh
+LC_ALL=C sort -cu tests/disc/inventory.txt
+cmake --preset ci -DSCHWAYSTATION_CHD=OFF -DSCHWAYSTATION_BUILD_CHD_TOOL=OFF
+cmake --build --preset ci --target schwaystation-test-disc-fixture schwaystation-test-disc-media schwaystation-legacy-disc-fixtures
+ctest --preset ci --no-tests=error -R '^disc[.]image[.]legacy_|^disc[.]fixture[.](ecm|ccd)[.]' --output-on-failure
+```
+
+The guest evidence is specific to these NTSC-U fixtures. It does not establish
+hosted CI, package contents or fuzz campaign results; those remain separate
+checks.
+
+## CHD-OFF product package
+
+The local package check configures CHD and the optional CHD tool off, builds
+the runner and libretro products, checks libretro claims and notices, creates
+the Release-configured CPack archives, then checks their contents and packaged
+notices:
+
+```sh
+cmake --preset ci -DSCHWAYSTATION_CHD=OFF -DSCHWAYSTATION_BUILD_CHD_TOOL=OFF
+cmake --build --preset ci --target schwaystation-run schwaystation_libretro
+ctest --preset ci --no-tests=error -R '^libretro[.](vendored|info[.]claims)([.]self_test)?$' --output-on-failure
+ctest --test-dir build/hygiene --no-tests=error -R '^policy[.]notices([.]self_test)?$' --output-on-failure
+cpack --config build/ci/CPackConfig.cmake -C Release
+ctest --test-dir build/ci --no-tests=error -R '^release[.](archive_contents|notices)([.]self_test)?$' --output-on-failure
+```
+
+The `policy.notices` check belongs to the hygiene inventory; the release
+selectors inspect the generated archives. The ECM and CloneCD rows record this
+local CHD-OFF package result separately from `hosted_main.unknown`,
+`hosted_nightly.unknown` and `hosted_release.unknown`. Local packaging does not
+establish any hosted workflow result.
+
 With `SCHWAYSTATION_CHD=ON`, the opt-in `SCHWAYSTATION_BUILD_CHD_TOOL=ON` target also creates a run-local CHD
 from those same two tracks. Before compression, CMake checks the exact CUE layout, whole-sector source sizes,
 track counts and the tool's codec/hunk/worker settings. It generates the CHD twice, requires byte-identical output
@@ -65,9 +111,9 @@ owned compressed fixture and a run-generated one-block raw image, then applies a
 the checked corpus contains no disc bytes. The sanitizer input is capped at 256 bytes, which bounds mutation
 work while still covering PSAR markers, TOC fields, block extents and compressed payloads. Nightly's exact
 PBP-only route skips the CHD generator/baseline and non-PBP fuzz targets, but still builds PBP's shared disc
-fixture dependencies and runs only this 60-second campaign. Full Nightly runs keep all existing campaigns and
-add PBP as the seventh media campaign. This routing saves unrelated campaign/build work only when the classifier
-proves the change affects PBP alone.
+fixture dependencies and runs only this 60-second campaign. Full Nightly retains every existing campaign and adds
+ECM and CloneCD as the eighth and ninth media campaigns. This routing saves unrelated campaign/build work only
+when the classifier proves the change affects PBP alone.
 
 `disc.image.pbp_inflate` exercises the standalone raw-block wrapper with fixed stored and Huffman streams. It
 requires terminal success, exact compressed-input consumption and exact output length; malformed, truncated,

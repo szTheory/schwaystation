@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 9
+open_count: 10
 waived_count: 4
-fixed_count: 2
-total_count: 15
-last_updated: 2026-11-21T13:37:36.507Z
+fixed_count: 10
+total_count: 24
+last_updated: 2026-11-22T13:35:43.206Z
 ---
 
 # Broken Windows Ledger
@@ -30,6 +30,15 @@ last_updated: 2026-11-21T13:37:36.507Z
 | 13 | 6 | deviation | .planning/phases/06-discs-and-fmv/06-31-SUMMARY.md | 70 | MDEC pixel-order, clipping, and FE00-padding vectors moved to dependent Plan 06-32 after Plan 06-31 crossed 30 minutes. | fixed |  | 2026-11-16T05:22:27.956Z | 2026-11-16T05:30:45.909Z |
 | 14 | 06 | deviation | .planning/phases/06-discs-and-fmv/06-12-PLAN.md |  | Plan 06-12 was split at the 30-minute boundary after its real MDEC guests exposed a production DMA0 decode mismatch; Plan 06-35 preserves and owns the repair and full gating oracle. | open |  | 2026-11-16T09:38:06.684Z |  |
 | 15 | 10 | deviation | host/disc_image.c |  | Kept PBP excluded from M3U playlists while enabling standalone PBP through the shared provider. | fixed |  | 2026-11-21T13:37:30.614Z | 2026-11-21T13:37:36.507Z |
+| 16 | 11 | stub | host/disc_ecm.c | 132 | Structurally valid ECM record streams remain unsupported until Plan 11-03 validates and decodes them. | fixed |  | 2026-11-22T02:07:27.684Z | 2026-11-22T03:07:48.499Z |
+| 17 | 11 | stub | host/disc_ecm.c | 149 | ECM TOC generation remains unsupported until Plan 11-03 validates the complete record stream. | fixed |  | 2026-11-22T02:07:27.824Z | 2026-11-22T03:07:48.628Z |
+| 18 | 11 | stub | host/disc_ecm.c | 157 | ECM decoded-size reporting remains unsupported until Plan 11-03 builds bounded checkpoints. | fixed |  | 2026-11-22T02:07:27.969Z | 2026-11-22T03:07:48.764Z |
+| 19 | 11 | stub | host/disc_ecm.c | 165 | ECM random byte reads remain unsupported until Plan 11-03 builds bounded checkpoints. | fixed |  | 2026-11-22T02:07:28.118Z | 2026-11-22T03:07:48.889Z |
+| 20 | 11 | stub | host/disc_ecm.c | 175 | ECM sector reads remain unsupported until Plan 11-03 validates its sector mapping. | fixed |  | 2026-11-22T02:07:28.247Z | 2026-11-22T03:07:49.015Z |
+| 21 | 11 | stub | host/disc_ccd.c | 171 | CloneCD v3 track metadata remains unsupported until Plan 11-04 validates tracks and companions. | fixed |  | 2026-11-22T02:07:28.377Z | 2026-11-22T13:35:34.529Z |
+| 22 | 11 | stub | host/disc_ccd.c | 188 | CloneCD TOC generation remains unsupported until Plan 11-04 validates the descriptor tracks. | fixed |  | 2026-11-22T02:07:28.513Z | 2026-11-22T13:35:43.098Z |
+| 23 | 11 | stub | host/disc_ccd.c | 198 | CloneCD sector reads remain unsupported until Plan 11-04 validates its sector mapping. | fixed |  | 2026-11-22T02:07:28.648Z | 2026-11-22T13:35:43.206Z |
+| 24 | 11 | stub | host/disc_ecm.c | 222 | ECM type-1/2/3 record decoding remains unsupported pending independent output vectors in Plan 11-05. | open |  | 2026-11-22T03:12:50.763Z |  |
 
 ````json
 [
@@ -226,6 +235,123 @@ last_updated: 2026-11-21T13:37:36.507Z
     "reason": "",
     "recorded_at": "2026-11-21T13:37:30.614Z",
     "resolved_at": "2026-11-21T13:37:36.507Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 16,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ecm.c",
+    "line": 132,
+    "description": "Structurally valid ECM record streams remain unsupported until Plan 11-03 validates and decodes them.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-22T02:07:27.684Z",
+    "resolved_at": "2026-11-22T03:07:48.499Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 17,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ecm.c",
+    "line": 149,
+    "description": "ECM TOC generation remains unsupported until Plan 11-03 validates the complete record stream.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-22T02:07:27.824Z",
+    "resolved_at": "2026-11-22T03:07:48.628Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 18,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ecm.c",
+    "line": 157,
+    "description": "ECM decoded-size reporting remains unsupported until Plan 11-03 builds bounded checkpoints.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-22T02:07:27.969Z",
+    "resolved_at": "2026-11-22T03:07:48.764Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 19,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ecm.c",
+    "line": 165,
+    "description": "ECM random byte reads remain unsupported until Plan 11-03 builds bounded checkpoints.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-22T02:07:28.118Z",
+    "resolved_at": "2026-11-22T03:07:48.889Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 20,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ecm.c",
+    "line": 175,
+    "description": "ECM sector reads remain unsupported until Plan 11-03 validates its sector mapping.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-22T02:07:28.247Z",
+    "resolved_at": "2026-11-22T03:07:49.015Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 21,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ccd.c",
+    "line": 171,
+    "description": "CloneCD v3 track metadata remains unsupported until Plan 11-04 validates tracks and companions.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-22T02:07:28.377Z",
+    "resolved_at": "2026-11-22T13:35:34.529Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 22,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ccd.c",
+    "line": 188,
+    "description": "CloneCD TOC generation remains unsupported until Plan 11-04 validates the descriptor tracks.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-22T02:07:28.513Z",
+    "resolved_at": "2026-11-22T13:35:43.098Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 23,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ccd.c",
+    "line": 198,
+    "description": "CloneCD sector reads remain unsupported until Plan 11-04 validates its sector mapping.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-11-22T02:07:28.648Z",
+    "resolved_at": "2026-11-22T13:35:43.206Z",
+    "milestone": "v2.0"
+  },
+  {
+    "id": 24,
+    "kind": "stub",
+    "phase": "11",
+    "file": "host/disc_ecm.c",
+    "line": 222,
+    "description": "ECM type-1/2/3 record decoding remains unsupported pending independent output vectors in Plan 11-05.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-11-22T03:12:50.763Z",
+    "resolved_at": null,
     "milestone": "v2.0"
   }
 ]

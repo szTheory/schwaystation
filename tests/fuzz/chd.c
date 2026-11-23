@@ -315,6 +315,7 @@ size_t seeds_build(uint32_t index, uint8_t *bytes)
     }
 }
 
+#define SCHWAY_REPLAY_EMPTY_SEED "empty"
 #define SCHWAY_REPLAY_NAME "fuzz.regress.chd"
 #include "replay_main.h"
 #endif

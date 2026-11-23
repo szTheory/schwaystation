@@ -9,6 +9,7 @@ requires:
 provides:
   - Clean Phase 10 source review with the Nightly fixture dependency resolved
   - Passing final macOS arm64 local workflow, including release package checks
+  - Phase 10 main CI, release pipeline and v0.10.0 install-line verification
 affects: [11-ecm-clonecd]
 actuals:
   tokens: 4413
@@ -30,9 +31,11 @@ key-files:
     - .planning/phases/10-pbp-disc-images/10-REVIEW.md
 key-decisions:
   - Keep the 3,901-line cap and defer the generic SPDX scanner.
-  - Keep quality.json at 859,379 bytes until the linked Phase 10 WASI artifact is measured.
+  - Set the Phase 10 WASI size bound to the measured 875,971-byte linked module.
   - Run exact-head hosted CI and Nightly once at the ship PR to avoid a duplicate full workload.
-requirements-completed: []
+  - Keep the full current-main and release CI gates because the artifact-reuse review found different archive bytes.
+requirements-completed:
+  - PBP-01
 coverage:
   - id: D1
     description: Malformed PBP probe reports invalid metadata without leaking private input, and the local full workflow passes.
@@ -50,11 +53,11 @@ coverage:
     requirement: PBP-01
     verification:
       - kind: other
-        ref: "Pending the single exact-head PR CI and Nightly run at $gsd-ship 10."
-        status: unknown
+        ref: "CI 44954051682 on PR head 22c5ca7; Nightly 44947489816 and CI 44947489771 on code head df83881; main CI 44961621903 and release pipeline 44961621930 on release SHA 636ac89; v0.10.0 has 19 verified assets and install-line-latest passed."
+        status: pass
     human_judgment: false
 duration: 38m
-completed: 2026-11-21
+completed: 2026-11-22
 status: complete
 ---
 
@@ -185,3 +188,20 @@ successful comparison does not emit its newly measured exact byte count. CI took
 seconds with BE32 at 62m18s; Nightly took 9m43s/908 runner-seconds. Comparison with the previous complete run
 did not support a coverage-preserving workflow reduction. The details and remaining release boundary are in
 `10-VERIFICATION-EVIDENCE.md` and `10-CI-EFFICIENCY.md`.
+
+## Phase 10 release and main verification (2026-11-22)
+
+The phase PR #34 merged as `9bf39aa`; release PR #35 then merged `v0.10.0` at
+`636ac89d4add3192520084a73fa61295a8422bbc`. Current-main CI
+[44961621903](https://github.com/szTheory/schwaystation/actions/runs/44961621903) and the full Release
+workflow [44961621930](https://github.com/szTheory/schwaystation/actions/runs/44961621930) both passed on that
+same SHA. Main CI took 85m51s wall and 9,207 summed job-seconds; BE32/QEMU was the critical path at 5,095s.
+The release artifact matrix used about 6,150 summed runner-seconds; its BE32 lane took 2,520s. The release was
+published as Latest with all 19 expected assets. Signature/download verification and the `install-line-latest`
+check passed. These are elapsed job-time measurements; GitHub exposed no dollar billing data.
+
+The metadata-only release PR correctly took CI's fast route, but Nightly classified its three generated files
+as relevant and spent 419 runner-seconds before cancellation. A narrow future change should route only the
+complete exact set `.release-please-manifest.json`, `CHANGELOG.md`, `version.txt` away from PR Nightly. Preserve
+the full route for mixed, incomplete, unknown or untrusted file lists. Existing CI and release guidance is
+already discoverable in `AGENTS.md`, `.planning/AUTONOMOUS.md`, and `docs/maintaining.md`.

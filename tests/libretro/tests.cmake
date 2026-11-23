@@ -250,6 +250,25 @@ schway_add_test(NAME libretro.content.chd
 set_tests_properties(libretro.content.chd PROPERTIES
   FIXTURES_REQUIRED "disc_media_preflight;compat_features_preflight")
 
+# Fault prevented: libretro bypasses either shared legacy provider, changes bytes or
+# TOC, loses the active image after a rejected replacement, or breaks disk swap.
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-content-legacy)
+file(WRITE ${PROJECT_BINARY_DIR}/tests/libretro-content-legacy/invalid.ecm "not an ECM image\n")
+file(WRITE ${PROJECT_BINARY_DIR}/tests/libretro-content-legacy/invalid.ccd "not a CCD image\n")
+schway_add_test(NAME libretro.content.legacy
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation_libretro> content-legacy $<BOOL:${SCHWAYSTATION_CHD}>
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy_literal.ecm
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy_source.cue
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy.ccd
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy_image.cue
+    ${PROJECT_BINARY_DIR}/tests/libretro-content-legacy/invalid.ecm
+    ${PROJECT_BINARY_DIR}/tests/libretro-content-legacy/invalid.ccd
+    ${PROJECT_BINARY_DIR}/openbios ${PROJECT_BINARY_DIR}/tests/libretro-content-legacy
+  LABELS libretro portable TIMEOUT 120)
+set_tests_properties(libretro.content.legacy PROPERTIES
+  FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity;compat_features_preflight")
+
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-content-pbp)
 file(WRITE ${PROJECT_BINARY_DIR}/tests/libretro-content-pbp/invalid.pbp "not a PBP image\n")
 # Fault prevented: libretro bypasses the shared PBP provider, changes media or

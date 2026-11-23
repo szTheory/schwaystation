@@ -1,7 +1,10 @@
+fuzz.regress.ccd	fuzz,portable
 fuzz.regress.cdrom	fuzz,portable
 fuzz.regress.chd	fuzz,portable
+fuzz.regress.chd.seed_corpus	fuzz,portable
 fuzz.regress.cnf	fuzz,portable
 fuzz.regress.cue	fuzz,portable
+fuzz.regress.ecm	fuzz,portable
 fuzz.regress.exe	fuzz,portable
 fuzz.regress.gpu	fuzz,portable
 fuzz.regress.m3u	fuzz,portable

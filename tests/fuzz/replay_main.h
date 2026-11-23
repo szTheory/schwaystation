@@ -24,6 +24,9 @@
 #ifndef SCHWAY_REPLAY_NAME
 #define SCHWAY_REPLAY_NAME "fuzz.regress"
 #endif
+#ifndef SCHWAY_REPLAY_EMPTY_SEED
+#define SCHWAY_REPLAY_EMPTY_SEED ""
+#endif
 
 /* The most a file may hold: a hex text takes two characters a byte. */
 #define REPLAY_FILE_MAX (2ul * SEEDS_SIZE_MAX + 4096ul)
@@ -134,6 +137,11 @@ static uint32_t replay_seeds(const char *dir)
         if (dir == NULL) {
             (void)LLVMFuzzerTestOneInput(buf, n);
             continue;
+        }
+        if (n == 0u && strcmp(seeds_name(i), SCHWAY_REPLAY_EMPTY_SEED) != 0) {
+            fprintf(stderr, SCHWAY_REPLAY_NAME ": cannot build seed %s\n", seeds_name(i));
+            free(buf);
+            return 0u;
         }
         char path[1024];
         int len = snprintf(path, sizeof path, "%s/%s.exe", dir, seeds_name(i));

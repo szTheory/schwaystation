@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 10
-current_phase_name: PBP disc images
-current_plan: Ship follow-up 4
-status: shipping
-stopped_at: Phase 10 deterministic PBP fixture correction reviewed and locally verified, awaiting repaired-head CI/Nightly and release
-last_updated: "2026-11-21T20:36:14Z"
-last_activity: 2026-11-21
-last_activity_desc: "Replaced host-zlib PBP encoding after exact-head hash mismatch; local PBP paths pass"
-state_head: 8224693353ead38ae747ec2640f844b2c3f32cc3
+current_phase: 12
+current_phase_name: SBI and LibCrypt
+current_plan: Not started
+status: planning
+stopped_at: Phase 11 PR
+last_updated: "2026-11-22T22:10:06Z"
+last_activity: 2026-11-22
+last_activity_desc: "Phase 11 PR #36 fixes reviewed; complete local CI and Nightly routing preflight passed; repaired head push pending"
+state_head: 8d3dad8f15e71d87855bfe9a1bf0006698429b7f
 progress:
   total_phases: 10
-  completed_phases: 4
-  total_plans: 48
-  completed_plans: 48
-  percent: 40
+  completed_phases: 5
+  total_plans: 63
+  completed_plans: 63
+  percent: 50
 ---
 
 # Project State
@@ -26,16 +26,303 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 10 — PBP disc images; exact-head hosted CI and Nightly pass, awaiting merge and release
+**Current focus:** Resolve and verify Phase 11 PR #36's hosted integration findings; merge and publish its release before planning Phase 12
 
 ## Current Position
 
-Phase: 10 — PBP disc images
-Current Plan: Ship follow-up 4
-Total Plans in Phase: 13
-Status: Exact-head verification passed; awaiting Phase 10 PR merge and automatic release
-Last activity: 2026-11-21 -- PR #34 CI/Nightly passed and final timing review recorded
-Progress: [████░░░░░░] 40% (3/10 phases released)
+Phase: 12 — SBI and LibCrypt
+Current Plan: Not started
+Total Plans in Phase: 15
+Status: Ready to plan
+Last activity: 2026-11-22 -- Phase 11 PR #36 hosted failures diagnosed and corrected locally; final head push pending
+Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
+
+### Phase 11 review, verification and transition (2026-11-22)
+
+Runtime/model: Codex/OpenGSD 1.20.0; GSD reviewer and verifier roles resolved to `gpt-6-luna` xhigh; the primary runtime-reported model ID was unavailable. The deep review covered 40 Phase 11 implementation/integration files and found no blockers plus one metadata warning. Commit `961964a` corrected both CHD-off/on descriptions and added a regression check. Goal-backward verification passed 45/45 truths; the automation-only UAT record passed 4/4 with no owner or hardware observations claimed. The GSD completion transition marked Phase 11 complete and validated ECM-01/CCD-01. The phase still needs the authorized ship, hosted Main/Nightly/Release evidence, merge and automatic release before Phase 12 planning.
+
+The exact code head `961964a` passed `cmake --workflow --preset ci` with exit 0: 670/670 CI tests in 105.02 seconds and 7/7 release checks in 1.46 seconds. The fixed repository-check set passed at exactly 3,901/3,901 lines. The CMake configure and focused libretro metadata positive/negative tests also passed. No local Act container or campaign ran for this exact head; the earlier `act schedule --dryrun` route check is recorded in Plan 11-12. Hosted Main, Nightly and Release results remain unknown until the PR runs.
+
+CI efficiency review: the full suite had no duplicate broad test run; package checks were a distinct post-package gate. The slowest measured cases were `policy.quality_metrics` at 65.82 seconds and `libretro.host` at 59.36 seconds. The former preserves many isolated production-gate scenarios; no safe in-scope assertion reduction was found. A measured, quality-preserving optimization seed is `.planning/seeds/SEED-261122-vlf-reduce-quality-gate-test-runtime-without-losing-coverage.md`.
+
+### Phase 11 ship follow-up and hosted failure correction (2026-11-22)
+
+PR #36's first exact head was `4e381c184f3db889395743d7853a26e0983c7af8`. [Nightly run 45070735998](https://github.com/szTheory/schwaystation/actions/runs/45070735998) passed the four benchmark jobs and full-vector job, then failed its ECM/CCD fixture-closure step because CTest's `disc.image.legacy_preflight` executable had not been built. The fix adds `schwaystation-test-disc-legacy` to the existing fixture build and strengthens `tests/cmake/workflows.cmake` so the cheap route preflight catches its removal. [CI run 45070735988](https://github.com/szTheory/schwaystation/actions/runs/45070735988) exposed a separate shared compile issue: ASan and Linux x64/arm64 failed because strict C17 hid `symlink()` in `tests/disc/ccd.c`; a guarded `_POSIX_C_SOURCE=200809L` definition before headers fixes the POSIX declaration while Windows/WASI remain excluded. Other CI matrix jobs were canceled after these failures. The changed workflow/source files received a clean follow-up review.
+
+The first-push hosted findings were reproduced and corrected locally before another broad hosted run. `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` exited 0; `act schedule --dryrun --workflows .github/workflows/nightly.yml --job fuzz ...` exited 0 and routed through fixture build, closure, and campaign steps (dry-run only; hosted Ubuntu 26.04 and its permissions/artifacts remain unverified). A fresh task-scoped fuzz build compiled the legacy test target plus ECM/CCD replay targets, and its exact four closure tests passed 4/4. The corrected CCD test passed the local CCD plus legacy preflight/parity selector 3/3, and GCC 15.3 in the named auto-removed container compiled `tests/disc/ccd.c` with the hosted Linux warning/error flags. The full local `cmake --workflow --preset ci` run after the workflow fix but before the final POSIX macro passed 670/670 in 82.38 seconds and separate release checks 7/7 in 1.44 seconds; build artifacts were reused (seven build actions). The final macro change then passed its targeted compile and tests. Do not claim hosted Main/Nightly/Release success until the final PR head runs.
+
+No new Docker image or volume was created. The existing `gcc:15` image was used with container name `schwaystation-phase11-gcc15-ccd-check`; `--rm` removed the container after the compile. No broad Act run was attempted because the available Act image is Ubuntu 24.04/arm64 rather than the hosted Ubuntu 26.04 lanes.
+
+### Phase 11 final-head failures, repair and local verification (2026-11-22)
+
+Runtime/model: Codex; primary model ID unavailable. Whole follow-up duration was not tracked; the complete local CI workflow's CTest phase took 111.59s and the Release checks took 1.91s. The focused deep review found no issues in the new seed, timeout, WASI bound and gate-order changes.
+
+The final pre-repair [Nightly run 45073362687](https://github.com/szTheory/schwaystation/actions/runs/45073362687) reached `fuzz.regress.chd` corpus creation and rejected its intentionally empty seed. The final pre-repair [CI run 45073362654](https://github.com/szTheory/schwaystation/actions/runs/45073362654) measured the linked CHD/ECM/CCD WASI runner at 906,778 bytes against the Phase 10 875,971-byte ceiling. All six native matrix legs then timed out at the 30-second `runner.disc.legacy` gate after one failure per lane; the test performs nine 1,200-frame fixture boots. The failed tail was canceled after useful failures were collected; no post-repair hosted result exists yet.
+
+The local fix allows only the named `empty` seed to be written as a zero-byte corpus file, registers a corpus-writing CTest, and includes it in Nightly's closure selector before timed fuzz campaigns. The legacy runner timeout is now 60 seconds: it took 19.98s in isolation and 29.05s while the full local suite ran in parallel. `quality.json` now tracks the actual hosted 906,778-byte module. In `.github/workflows/ci.yml`, only the runner target builds before size measurement; the full WASI portable-test build still runs after a passing bound and before every portable test. The prior failed measurement job built 331 Ninja actions before discovering the old bound, so this reordering fails early without changing passing-path coverage.
+
+Cheap preflights passed: sorted fuzz inventory, `disc_registration` CI/Nightly wiring, 3,901/3,901 counted lines, and `git diff --check`. A fresh local CHD replay build plus its corpus and ordinary replay tests passed 5/5; the corpus contained 12 files and `empty.exe` was zero bytes. The CHD-OFF `library` preset also rebuilt the replay and passed the seed-corpus CTest 1/1 without a baseline CHD fixture. `cmake --workflow --preset ci` passed 671/671 tests, packaged all three deliverables, and passed Release checks 7/7. Act's updated Nightly fuzz `--dryrun` exited 0 after its task-specific cache was placed under `/private/tmp`; it routed through the closure and campaign step without creating containers. The dry run maps hosted Ubuntu 26.04 to an Ubuntu 24.04/arm64 image and proves routing only. The actual WASI module measurement is hosted evidence; this machine did not build the WASI target.
+
+Next: commit and push the reviewed repair to PR #36, then inspect one final-head CI and Nightly run and complete auto-merge, main CI and the automatic release before Phase 12 planning. The v2.0 roadmap still has Phases 12–16 to execute and ship after this boundary.
+
+### Phase 11 Plan 11-15 execution (2026-11-22)
+
+Runtime/model: Codex/OpenGSD 1.20.0; configured executor `gpt-6-luna`; primary runtime model ID unavailable. Measured
+duration was 6 minutes from 2026-11-22T20:05:25Z through the plan state closeout at 20:11:54Z. The line-budget
+preflight passed at 3,899/3,901; all 10 focused selectors were discovered; installed SDL2 2.32.70 was available.
+The staged package and explicit `schwaystation_DIR` configured the SDL2 example, which built with ECM/CCD sources
+and was not launched, tested or packaged. CHD-ON configuration and runner, libretro and two provider targets built;
+the focused provider/info/install selector passed 10/10 and the compatibility feature checks passed 2/2. Local
+example/CHD-ON evidence was appended without changing hosted Main, Nightly or Release status. Requirements remain
+open. No full suite, hosted workflow or campaign ran. Task commit is `cbc347c`; code review and exact-head phase
+verification are next.
+
+### Phase 11 Plan 11-14 execution (2026-11-22)
+
+Runtime/model: Codex/OpenGSD 1.20.0; configured executor `gpt-6-luna`; primary runtime model ID unavailable. Measured
+duration was 13 minutes from 2026-11-22T19:48:06Z through local package verification and state closeout. The 3,899/3,901
+line budget, package selector discovery and feature-row order checks passed. The CHD-OFF CI preset configured, and
+`schwaystation-run` plus `schwaystation_libretro` built with both ECM and CCD provider objects present in the disc-image
+archive. Libretro vendored/info claims passed 4/4; hygiene `policy.notices` passed 2/2; CPack generated library, runner
+and libretro macOS arm64 Release archives; archive-content and notice checks passed 4/4. The feature-ledger schema and
+both ECM/CCD feature tests passed. Local package evidence is recorded separately from unknown Main, Nightly and Release
+hosted evidence; ECM-01 and CCD-01 remain open. No hosted workflow, timed campaign or broad suite ran. Task commit is
+`7f31a0f`; Plan 14 summary records the evidence. Plan 15 owns the installed SDL2 example and CHD-ON consumers.
+
+### Phase 11 Plan 11-12 execution and bounded follow-up split (2026-11-22)
+
+Runtime/model: Codex with OpenGSD 1.20.0; configured executor `gpt-6-luna`; primary runtime model ID unavailable.
+Measured elapsed time was 33m25s from 2026-11-22T19:00:32Z to 19:33:57Z. Task 1 is committed as
+`ef50063`; the CHD-OFF package checks and installed-example/CHD-ON checks were not started because the remaining
+concrete work would make this plan exceed the project's 30-minute split rule. No requirement is marked complete.
+
+The 3,899/3,901 counted-line preflight passed. The positive `disc_registration` check passed, and temporary
+mutations removing the legacy fixture producer and moving the loader campaign before preflight were both rejected
+(exit 1). CI/Nightly actionlint passed. The all-workflow actionlint command exited 1 only on the unchanged
+`release.yml` `concurrency.queue: max` warning. The explicit `act schedule --dryrun` route passed and showed the
+fuzz producer, ECM/CCD source/replay preflight, and seed/campaign step without running a campaign. A fresh
+ASan/UBSan configure and build of the legacy test/fixture targets passed; the focused `legacy_preflight` and
+`legacy_parity` selector passed 2/2 in 0.25s after NUL-terminating the manifest buffer. This directly fixes the
+pre-existing fixture harness fault recorded during Plan 11-10 and required by the new Nightly preflight.
+
+No timed campaign, full suite, hosted CI or Docker run occurred. Plan 12 is now scoped to its one completed Task 1
+and has `requirements-completed: []`. Its CHD-OFF package/evidence work is in Plan 14; installed SDL2
+example/CHD-ON checks are in Plan 15. Cross-platform evidence and hosted Main/Nightly/Release checks remain with
+final phase review. Plan 14 is next, followed by Plan 15; neither plan runs hosted ship checks. Phase 11 code
+review and final verification remain outstanding.
+
+### Phase 11 Plan 12 closeout and Plans 14-15 (2026-11-22)
+
+Runtime/model: Codex GSD planner; primary model identifier unavailable. Planning duration was not reliably captured.
+The split preserves the 3,901-line cap, leaves the generic scanner deferred, records Plan 12 Task 1 only, and
+assigns CHD-OFF package checks to Plan 14 followed by the installed SDL2 example and CHD-ON consumers in
+Plan 15. Cross-platform evidence and hosted Main/Nightly/Release checks remain with final phase review. Plan
+frontmatter and structure checks passed for Plans 12, 14 and 15. The local line-budget check
+reported 3,899/3,901; CTest discovery confirmed all selected package, provider, extension and install selectors.
+No tests/builds, hosted workflows or campaigns were run during planning. Next: execute Plan 14; source review
+and the distinct hosted Main/Nightly/Release checks remain for final phase review.
+
+### Phase 11 Plan 11-09 execution (2026-11-22)
+
+Runtime/model: Codex with OpenGSD 1.20.0; configured executor model `gpt-6-luna`; primary runtime model ID unavailable.
+Measured duration was 28 minutes (from 2026-11-22T16:47:08Z to final closeout at 17:15 UTC). Four task commits are recorded in
+`11-09-SUMMARY.md`. The inventory and fixed line-budget preflights passed at 3899/3901. The targeted host,
+libretro, card-test and fixture build exited 0. The `disc.image.ccd` + `libretro.content.legacy` selector passed
+5/5 in 10.04 seconds, including legacy preflight/parity, the existing Q/GetlocP vector, both source-CUE
+comparisons, rejected replacement preservation and disk replacement. The two info-claim tests passed 2/2 in
+0.31 seconds. Both TDD RED records passed `gsd-tools check tdd-red-evidence`; no hosted CI, Docker or broad
+suite was run. ECM-01 and CCD-01 remain phase-level requirements pending remaining plans and final verification.
+
+### Phase 11 Plan 11-10 execution (2026-11-22)
+
+Runtime/model: Codex with OpenGSD 1.20.0; configured executor model `gpt-6-luna`; primary runtime model ID unavailable.
+Measured wall duration was 1h 10m 25s from 2026-11-22T17:16:28Z to 18:26:53Z. The 3899/3901 line budget and
+sorted fuzz inventory passed. The CI-preset ECM/CCD selector passed 4/4. A disposable local Ubuntu 26.04
+container built both Clang 21 ASan/UBSan campaign targets, both replay targets and legacy fixtures (104 Ninja
+steps, exit 0); each campaign loaded its ten named seeds and completed a bounded `-runs=1` smoke check (11 runs
+per format, exit 0). No 60-second campaign, broad suite or hosted CI ran. An exploratory ASan selector
+failed in the inherited `tests/disc/legacy.c:replace_manifest_field` preflight; this unrelated finding is logged
+in `deferred-items.md` for Plan 11-12 triage if its Nightly lane exercises that setup. The disposable container
+was removed. Task commits `12008bd` and `2aee10a` are recorded in `11-10-SUMMARY.md`. ECM-01 and CCD-01 remain
+phase-level requirements pending remaining plans and final verification. Plan 11-11 is next.
+
+### Phase 11 Plan 11-11 execution (2026-11-22)
+
+Runtime/model: Codex with OpenGSD 1.20.0; configured executor `gpt-6-luna` xhigh; primary runtime model ID was not
+exposed. Measured duration was 23m27s from 2026-11-22T18:30:57Z through final focused verification at
+18:54:24Z. The sorted disc inventory and fixed line-budget preflights passed at 3,899/3,901. Independent source
+preflight/parity confirmed ECM 64/64 and CCD 222/222 sectors, with 21,312 SUB bytes. The final bounded guest
+selector passed 12/12 in 13.36s, including all seven ECM/CCD guest cases and their fixture gates. The protected
+feature selector passed 2/2 in 0.53s, and generated docs, ledger schema/order and whitespace checks passed.
+Two stale ignored test executables were rebuilt by target after their focused checks identified the stale output.
+Task commits `2193ce9`, `53fc4e4` and `7226071` are recorded in `11-11-SUMMARY.md`. No broad suite, hosted CI,
+Docker or hardware run was made. The feature ledger leaves hosted CI, package and fuzz evidence unknown until
+Plan 12; phase requirements ECM-01 and CCD-01 remain open pending Plan 12, code review and final verification.
+Plan 12 is next.
+
+### Phase 11 Plan 11-02 budget disposition (2026-11-22)
+
+Runtime/model: Codex primary model identifier unavailable; OpenGSD 1.20.0. Read-only audits and plan checking used
+`gpt-6-luna` xhigh. This planning and closeout step took about 27 minutes; its exact start time was not retained.
+Two independent audits found the complete metadata-only Nightly controls could not fit the fixed cap: 3898/3901
+current lines plus 30 route-control lines would reach 3928 before classifier/workflow changes, with no safe,
+measured reduction identified. D-12 supersedes only the shortcut portion of D-08; todo 051 remains pending. The
+current full-Nightly fallback, all tests and lanes, and Main/Release separation are unchanged. Plan-structure
+validation passed, the line-budget check exited 0 at 3898, and `ci.classify_policy` passed 1/1 in 0.15 seconds.
+No hosted run or workflow change was made. Plan 02 is closed as a decision record, not as an implemented CI
+optimization; ECM-01 and CCD-01 remain open. Next: execute Plan 05.
+
+### Phase 11 Plan 11-13 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 GSD executor, `gpt-6-luna` xhigh. Plan 13 took 11 minutes 20 seconds, from
+2026-11-22T13:18:19Z to 13:29:39Z, and changed two files. RED `d2648c2` and GREEN `6696aec` are committed.
+The 3,898/3,901 line-budget preflight, sorted inventory and selector discovery passed. CI preset configure and
+focused CCD target build passed; the red JUnit evidence checker returned `RED_EVIDENCE_OK` for the dangling-SUB
+canonicalization status assertion. The rebuilt and committed CCD selector passed 1/1, including optional SUB,
+path escape and active-reader preservation cases. No broad suite, Windows/WASI hosted lane, Act job or hosted CI
+was run. Plan 13 and Plan 05 are complete. Plan 02 is closed as an evidence-based D-08 deferral; D-12 leaves the
+full Nightly route and all cases intact. Plan 06 is next after its Plan 05 and Plan 13 dependencies.
+
+### Phase 11 Plan 11-04 execution and split (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0; executor `gpt-6-luna` (xhigh), planning follow-up `gpt-6-luna` (high). Plan 11-04 Task 1 took about 33 minutes; its exact start time was not retained. RED `5780f40` and implementation `043403f` are committed. Post-commit CI-preset configure and target build exited 0; the focused CCD, CUE-rejection and playlist selector passed 3/3. No broad suite or hosted CI was run. The unstarted companion confinement, SUB/missing-file, IO and failure-atomic scope was moved to Plan 13 so the verified work remains intact and Plan 11-04 stays within the 30-minute plan rule. Plan 11-06 depends on Plans 11-05 and 11-13 and moves to Wave 5. Plan 11-02 is closed as a D-08 deferral under D-12; the full Nightly route and all cases remain unchanged. The independent plan-split review passed, and `11-04-SUMMARY.md` records the verified slice. Next: complete dependency-ready Plan 06. Planning split duration was not measured.
+
+### Phase 11 Plan 11-05 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 GSD executor, `gpt-6-luna` xhigh. Plan 05 took 29 minutes, from
+2026-11-22T14:05:13Z to 14:34:10Z, and changed five files. Task commits are `8afd490` (modeled RED),
+`10c9bd7` (modeled GREEN), `3b23e90` (CUE RED), and `90cc6d1` (CUE GREEN). The 3,898/3,901 line-budget,
+sorted inventory and selector preflights passed. Both intentional RED runs exited 8 and passed the RED evidence
+classifier; configure and focused builds passed. The final ECM/CUE/playlist selector passed 9/9, then the ECM
+selector passed 1/1 after duplicate-source coverage. No hosted CI or broad suite ran. ECM type 1–3 records now
+match independent trailer vectors, checkpoint reads and the full decoded EDC. Raw MODE2/2352 and AUDIO CUE
+sources use decoded extents and preserve the raw CUE TOC and boundary reads; cooked ECM CUE sources are rejected.
+ECM-01 remains incomplete until phase-level verification. Plan 06 is dependency-ready; no user action is needed.
+
+### Phase 11 Plan 11-06 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 Codex executor, configured `gpt-6-luna` xhigh; the primary runtime model
+identifier is not exposed. Plan 06 took about 27 minutes overall, from 2026-11-22T14:36:57Z through
+2026-11-22T15:03:34Z; implementation took about 19 minutes and changed two source/test files. Task commits are `b13e65f` (track-boundary RED),
+`37f3efe` (track/index GREEN), `0e55424` (SUB/Q RED), and `065b064` (SUB transpose GREEN). The
+3,898/3,901 line-budget preflight, sorted disc inventory, exact CCD selector discovery and diff checks
+passed. Both planned RED CTest runs exited 8 on their expected behavior assertions and their JUnit
+records passed `tdd-red-evidence`; the final CI-preset CCD target build and selector passed, 1/1.
+Missing/empty SUB remains zero-filled, exact-size SUB transposes into callback P-W bits, and malformed
+track indexes/entries reject. No broad suite, Act job, or hosted CI run was needed. The parser/index
+reconciliation and independent byte vectors were the main work; configure, focused build, and CTest
+completed in seconds. CCD-01 remains open until Phase 11 verification. Plan 07 is next and is
+dependency-ready after Plans 05 and 06.
+
+### Phase 11 Plan 11-07 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 Codex executor, configured `gpt-6-luna` xhigh; the primary runtime model ID
+was not exposed. Plan 07 took 48 minutes 17 seconds, from 2026-11-22T15:07:34Z to 15:55:51Z, and changed
+eight files. Task commits are `64668c1` (fixture generators), `1eb224d` (preflight/parity tests), `cbefda7`
+(IMG-backed identity CUE producer), and `14bd092` (unused-value cleanup and digest update). The sorted
+inventory, 3,898/3,901 line cap, generator provenance hash, configure, fixture/test target builds, and
+focused legacy preflight/parity selector passed; CTest passed 2/2 in 0.14 seconds on the final producer.
+All five negative controls remain. The task's earlier machine-classified RED was semantically invalid because
+the source identity lacked SUB while the CCD image included generated SUB; the test oracle was corrected and
+the summary does not claim canonical RED evidence. No guest, broad suite, Act job, hosted CI or Docker ran.
+The identity-oracle diagnosis was the main bottleneck and put the plan over 30 minutes; the concrete remaining
+work did not warrant a split. ECM-01 and CCD-01 remain open pending phase-level verification. Plan 08 is next.
+
+### Phase 11 Plan 11-08 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 Codex GSD executor, configured `gpt-6-luna` xhigh; primary runtime model ID was
+not exposed. Plan 08 took 33 minutes 32 seconds through final targeted verification, from 2026-11-22T16:00:47Z
+to 16:34:19Z, and changed four files. Task commits are `23d1c48`, `c7126f8`, `2123375`, and `cdcd1b3`.
+Inventory, fixture extents/counts, fixture edges, and the 3,898/3,901 cap passed. Configure and focused runner
+build passed; the final legacy and malformed-media selector passed 4/4 in 19.30 seconds, and diff checks passed.
+The direct ECM RED exited 8 and classified as `RED_EVIDENCE_OK`. Expanded checks exposed an ECM-CUE routing gap
+and a CCD save-identity oracle that compared different SUB bytes; the route and test comparator were corrected.
+The 30-minute target was exceeded during diagnosis, with no remaining implementation slice to split. PBP and CHD
+refusal controls remain. No broad suite, Act execution, Docker, or hosted CI ran. Phase-wide ECM-01/CCD-01 remain
+open pending review and final verification; dependency-ready Plan 09 is next.
+
+### Phase 11 Plan 11-01 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 in the Codex GSD executor; configured model `gpt-6-luna`. The primary
+runtime model identifier is not exposed. Three tasks took 37 minutes (started 2026-11-22T01:34:33Z,
+completed 2026-11-22T02:11:22Z), producing four task commits and changing ten source, CMake, and test
+files. The route controls pass with 3898/3901 counted lines. Commands exited 0 for the route check,
+the classifier test, the host target build, and the final focused ECM/CCD configure/build/CTest run
+(2/2 tests). The planned RED command exited 8 on the truncated ECM count assertion; the RED evidence
+classifier exited 0 with `RED_EVIDENCE_OK`. The committed-state tracer rerun exited 0. Configure,
+build, and the two focused tests completed in under one second; evidence/commit bookkeeping was the
+longer part of the plan. No hosted CI run was started. The intentionally incomplete positive ECM/CCD
+provider seams are listed in `.planning/WINDOWS.md` and owned by Plans 03/04. ECM-01 and CCD-01 remain
+incomplete until phase-level verification. Plan 02 is closed as a D-08 deferral under D-12; Plan 06 is next.
+
+### Phase 11 Plan 11-03 execution (2026-11-22)
+
+Runtime/model: OpenGSD 1.20.0 in the Codex GSD executor; configured model `gpt-6-luna`. The primary
+runtime model identifier is not exposed. Two tasks took 36 minutes (started 2026-11-22T02:37:28Z,
+completed 2026-11-22T03:13:26Z), changing five host and test files. Task commits are `9c00a79` and
+`99fbc64`; each followed its recorded TDD RED evidence and GREEN checks, with test and implementation
+changes together in the task commit. No history rewrite was made. The committed-state checks exited 0:
+CI preset configure, focused ECM/image target build, focused ECM/CUE-rejection/playlist CTest (3/3),
+then the ECM target build and ECM bounds CTest (1/1). Inventory ordering, focused test discovery,
+`git diff --check`, and the 3898/3901 line budget also exited 0. The two planned RED CTest commands
+exited 8 on their expected assertions and both `tdd-red-evidence` checks exited 0. No hosted CI run
+was started. Literal type-0 direct and M3U ECM reading is implemented; ECM-01 remains incomplete
+pending phase scope and final verification. Plan 02 was closed as an evidence-based D-08 deferral;
+Plan 04 continued independently and Plans 05 and 13 are now complete.
+
+### Phase 11 planning (2026-11-22)
+
+Runtime/model: Codex planner, inherited model identifier unavailable; OpenGSD 1.20.0. A dedicated
+gsd-phase-researcher established primary ECM byte-stream mapping and the independent CloneCD SUB vector.
+Twelve plans cover both requirements and every locked decision; wave ownership is recorded in
+`11-PLAN-COVERAGE.md`. All plan frontmatter/structure validators passed. The one-shot balanced-tag,
+shell-syntax, same-wave ownership, command-path and failure-direction checks passed without findings;
+the command-path probe reports CMake forms as not applicable rather than claiming target resolution.
+The 3901-line cap, generic SPDX deferral, separate Main/Release checks and cheap preflights are preserved.
+No source implementation or hosted run was performed. The independent checker passed after adding explicit
+CHD-ON consumer and installed-SDL2 example verification. Decision and post-planning coverage gates pass;
+the unchanged counted source was exactly 3901/3901 lines. Planning duration was not reliably measured.
+Plan 11-01 has since completed; Plan 02 is closed as a D-08 deferral under D-12. Plan 06 is next.
+
+### Phase 11 discussion (2026-11-22)
+
+Runtime/model: Codex session (primary model ID unavailable), OpenGSD 1.20.0. Read-only fan-out completed with
+`gsd-assumptions-analyzer` (`gpt-6.1-sol`, high), `gsd-domain-researcher` (`gpt-6-luna`, xhigh), and
+`gsd-advisor-researcher` (`gpt-6-luna`, xhigh). Their independent notes were reconciled and adversarially
+reviewed; no source code or tests changed. The discussion pins the ECM author specification as SCM.32, records
+the CloneCD confidence boundary, and resolves the source/callback SUB conversion with an independent known-answer
+test. The owner selected the unchanged 3,901-line cap and deferred generic SPDX scanning. Phase 11 is ready for
+planning. The narrow metadata-only Nightly route is an implementation item grounded in Phase 10's measured
+419-runner-second false positive; all unknown and mixed changes stay on the full route.
+
+### Phase 10 release closeout (2026-11-22)
+
+Runtime/model: Codex session (primary model ID unavailable), OpenGSD 1.20.0. The interval from the saved STATE
+checkpoint at 2026-11-21T20:36:14Z to release and current-main CI closeout at 2026-11-22T00:50:02Z was about
+4h14m wall, including hosted waits; active time was not measured. PR #34 merged at `9bf39aa`; release PR #35
+merged and published `v0.10.0` at 00:09:45Z. The release is Latest with all 19 expected archives/checksum
+assets; asset, signature and download verification passed, and `install-line-latest` passed. Release workflow
+[44961621930](https://github.com/szTheory/schwaystation/actions/runs/44961621930) passed on
+`636ac89d4add3192520084a73fa61295a8422bbc`. Current-main CI
+[44961621903](https://github.com/szTheory/schwaystation/actions/runs/44961621903) passed on that same SHA;
+it took 85m51s wall and about 9,200 summed job-seconds, with BE32/QEMU at 5,095 seconds (84m55s) as the
+critical path. Release CI used about 6,150 job-seconds (102.5 runner-minutes) for the full artifact matrix; its
+BE32 lane took 2,520 seconds (42m). Dollar billing data was not exposed.
+
+The release PR's metadata-only CI route correctly skipped the heavy matrix. Its Nightly classifier did not
+recognize the exact generated release-metadata files and launched the full workload; the run was cancelled
+after 419 elapsed job-seconds (about 7 runner-minutes). A cheap local invocation reproduced
+`nightly_full=true` for `.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`. Add a narrow
+classifier/test change to the Phase 11 plan so only this complete exact metadata set skips PR Nightly; unknown,
+mixed and incomplete lists must retain the full route.
+
+The main run on superseded ancestor `9bf39aa` was cancelled after `636ac89` advanced main with only the three
+generated release metadata files and full CI plus Release CI were running on `636ac89`. The cancelled run had
+already consumed 6,634 elapsed job-seconds (110.6 runner-minutes); this is accrued work, not the counterfactual
+savings. Keep both full current-SHA main CI and Release CI: the completed artifact-reuse review found their 18
+product archives differ, so reusing one matrix would weaken release verification. No coverage or test cases were
+removed. The standing CI/CD efficiency guidance is already discoverable in `AGENTS.md`,
+`.planning/AUTONOMOUS.md`, and `docs/maintaining.md`.
 
 ### Phase 10 verification (2026-11-21)
 
@@ -698,7 +985,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 243
+- Total plans completed: 258
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -716,6 +1003,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 8 | 10 | - | - |
 | 9 | 15 | - | - |
 | 10 | 13 | - | - |
+| 11 | 15 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -934,6 +1222,18 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 10 P10 | 19m | 2 tasks | 1 files |
 | Phase 10 P12 | 41m | 2 tasks | 12 files |
 | Phase 10 P13 | 38 | 2 tasks | 7 files |
+| Phase 11 P01 | 37min | 3 tasks | 10 files |
+| Phase 11 P03 | 36min | 2 tasks | 5 files |
+| Phase 11 P13 | 11min | 1 tasks | 2 files |
+| Phase 11 P05 | 29min | 2 tasks | 5 files |
+| Phase 11 P06 | 27min | 2 tasks | 2 files |
+| Phase 11 P07 | 48m | 2 tasks | 8 files |
+| Phase 11 P08 | 33m32s | 2 tasks | 4 files |
+| Phase 11 P09 | 26m | 2 tasks | 7 files |
+| Phase 11 P10 | 1h 10m 25s | 2 tasks | 6 files |
+| Phase 11 P11 | 23m27s | 2 tasks | 8 files |
+| Phase 11 P14 | 13m | 2 tasks | 3 files |
+| Phase 11 P15 | 6m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1341,6 +1641,25 @@ Recent decisions affecting current work:
 - [Phase 10]: Keep the 3,901-line cap and defer the generic SPDX scanner.
 - [Phase 10]: Keep the WASI size bound unchanged until the Phase 10 hosted lane reports the actual linked module size.
 - [Phase 10]: Run exact-head CI and Nightly once at the ship PR to avoid duplicate hosted workloads.
+- [Phase 11]: Plan 11-01 keeps ECM and CCD private and fail-closed until their positive readers validate complete media.
+- [Phase 11]: A missing ECM continuation byte is malformed and must leave the output reader null.
+- [Phase 11]: Workflow assertions were consolidated while preserving all controls under the unchanged 3901-line cap.
+- [Phase 11]: Type-0 ECM literal streams are the supported direct and M3U path in Plan 11-03; ECM remains unsupported as a CUE source until Plan 11-05.
+- [Phase 11]: The ECM open scan validates exact extent and global EDC before publishing; checkpoint memory and per-read work use independent fixed bounds.
+- [Phase 11]: Keep ECM type 2/3 output at 2336 bytes and require CUE raw 2352 geometry so no missing sector header is invented.
+- [Phase 11]: Plan 11-06 maps an omitted INDEX 0 to INDEX 1, preserving no stored pregap without inventing geometry.
+- [Phase 11]: Plan 11-06 accepts nonempty SUB only at exactly 96 bytes per IMG sector; missing or empty SUB remains zero-filled.
+- [Phase 11]: Plan 11-07 generates legacy media only from owned raw fixture sources and records generator digests and counts.
+- [Phase 11]: Compare save/content identity through the IMG-backed CUE view and independently compare all CloneCD SUB bytes.
+- [Phase 11]: Runner probes ECM-containing CUEs through the shared image reader; ordinary raw CUE handling remains unchanged.
+- [Phase 11]: Compare CCD save identity only against a matching SUB base; keep generated SUB byte parity as a separate check.
+- [Phase 11]: Libretro runtime and generated metadata advertise ECM and CCD from the same inventory-backed loader, retaining the CHD conditional.
+- [Phase 11]: Keep ECM-01 and CCD-01 phase requirements open until all remaining Phase 11 evidence and final verification are complete.
+- [Phase 11]: Use a named disposable local Linux container to build Clang 21 libFuzzer targets when the host Apple Clang lacks its Fuzzer runtime; keep long campaigns separate from bounded build/replay checks.
+- [Phase 11]: The owned one-data-track ECM fixture supports boot, read/replay and FMV guest predicates, but no CD-DA claim.
+- [Phase 11]: ECM and CCD compatibility rows report only local fixture, runner and libretro evidence; hosted CI, package and fuzz remain unknown until Plan 12.
+- [Phase 11]: Keep local CHD-OFF package evidence separate from unknown hosted Main, Nightly and Release evidence.
+- [Phase 11]: Record local installed-example and CHD-ON evidence separately from unknown hosted workflow results
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1376,11 +1695,15 @@ Recent decisions affecting current work:
 - [Phase 07]: Keep historical push timing bounds tied to their workload fingerprint; the PR route remains unbaselined until exact-head hosted runs prove comparability.
 - [Phase 07]: Keep `size.wasm` unbounded until the linked Ubuntu 26 Release module is measured; set the bound only from its actual byte count.
 - [Phase 07]: Infrastructure verification with zero behavior-unverified invariants has no owner UAT; hosted delivery checks are recorded as ship evidence.
+- [Phase 11]: ECM and CCD are host-side bounded providers on the shared disc contract; fixtures and consumer tests preserve the documented subsets.
+- [Phase 11]: Keep full Nightly routing and every campaign case; D-12 defers the metadata-only shortcut until a measured gate refactor fits the fixed line budget.
+- [Phase 11]: The final local CI run is green; hosted Main/Nightly/Release evidence must be recorded at ship before Phase 12 planning.
 ### Blockers/Concerns
 
 - [Phase 4]: Research flag: GPU blend width, size rejection, stepper precision, GPU clocks per line, and the adapter's stub-kernel path for PS-EXE content in RetroArch.
 - [Phase 6]: Research flag: the CD seek model and INT1 period, and whether OpenBIOS boots the own mkpsxiso disc without licence data.
 - [Phase 7]: Closed; hosted verification, main CI, release v0.7.0 and triage artifact passed. Follow-up efficiency investigation is in todo 050, bound to Phase 9.
+- [Phase 11]: D-08's Nightly shortcut is deferred under D-12; the full Nightly route and all cases remain active. This is a closed scope disposition, not an active blocker. Phase 11 hosted Main/Nightly/Release results remain unknown until its PR runs.
 
 ### Quick Tasks Completed
 
@@ -1587,8 +1910,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-21T15:54:44.176Z
-Stopped at: Phase 10 complete, ready to plan Phase 11
+Last session: 2026-11-22T21:01:07Z
+Stopped at: Phase 11 verified and transitioned; ship/merge/release Phase 11 before planning Phase 12
 Resume file: None
 
 ### v1.0 session history

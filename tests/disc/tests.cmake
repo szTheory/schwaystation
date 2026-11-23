@@ -69,6 +69,32 @@ set_target_properties(schwaystation-test-disc-pbp PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-disc-pbp)
 
+add_executable(schwaystation-test-disc-legacy
+  ${CMAKE_CURRENT_LIST_DIR}/legacy.c
+  ${PROJECT_SOURCE_DIR}/host/disc_probe.c
+  ${PROJECT_SOURCE_DIR}/host/save_game_identity.c
+  ${PROJECT_SOURCE_DIR}/runner/sha256.c)
+target_include_directories(schwaystation-test-disc-legacy PRIVATE
+  ${PROJECT_SOURCE_DIR}/host ${PROJECT_SOURCE_DIR}/runner ${PROJECT_SOURCE_DIR}/tests)
+target_link_libraries(schwaystation-test-disc-legacy PRIVATE
+  schwaystation_disc_image schwaystation-host)
+set_target_properties(schwaystation-test-disc-legacy PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-disc-legacy)
+
+foreach(format IN ITEMS ecm ccd)
+  add_executable(schwaystation-test-disc-${format}
+    ${CMAKE_CURRENT_LIST_DIR}/${format}.c)
+  target_link_libraries(schwaystation-test-disc-${format} PRIVATE
+    schwaystation_disc_image)
+  set_target_properties(schwaystation-test-disc-${format} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+  schway_warnings(schwaystation-test-disc-${format})
+  schway_add_test(NAME disc.image.${format}
+    COMMAND schwaystation-test-disc-${format} "${PROJECT_BINARY_DIR}/tests"
+    LABELS disc portable TIMEOUT 15)
+endforeach()
+
 schway_add_test(NAME disc.image.pbp_headers
   COMMAND schwaystation-test-disc-pbp ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 15)
@@ -106,6 +132,16 @@ schway_add_test(NAME disc.image.pbp_fixture_controls
     "${PROJECT_BINARY_DIR}/fixtures/disc_boot_pbp.bin"
     "${PROJECT_BINARY_DIR}/tests/disc_boot_pbp.manifest"
     "${PROJECT_SOURCE_DIR}/tools/gen_pbp.py"
+  LABELS disc portable TIMEOUT 30)
+
+schway_add_test(NAME disc.image.legacy_preflight
+  COMMAND schwaystation-test-disc-legacy --preflight
+    "${PROJECT_BINARY_DIR}/fixtures" "${PROJECT_BINARY_DIR}/tests"
+    "${PROJECT_SOURCE_DIR}/tools/gen_ecm.py" "${PROJECT_SOURCE_DIR}/tools/gen_ccd.py"
+    64 222
+  LABELS disc portable TIMEOUT 15)
+schway_add_test(NAME disc.image.legacy_parity
+  COMMAND schwaystation-test-disc-legacy --parity "${PROJECT_BINARY_DIR}/fixtures"
   LABELS disc portable TIMEOUT 30)
 set_tests_properties(disc.image.pbp_preflight PROPERTIES FIXTURES_SETUP disc_pbp_preflight)
 set_tests_properties(disc.image.pbp_fixture_controls disc.image.pbp_metadata
@@ -357,3 +393,59 @@ set_tests_properties(disc.fixture.pbp.boot disc.fixture.pbp.read PROPERTIES
   FIXTURES_REQUIRED "disc_pbp_preflight;disc_pbp_parity;compat_features_preflight")
 set_tests_properties(disc.fixture.pbp.fmv PROPERTIES
   FIXTURES_REQUIRED "disc_pbp_preflight;disc_pbp_parity;compat_features_preflight;disc_fmv_predicates")
+
+# The owned ECM fixture is a 64-sector single-data image; it has no CD-DA
+# track. The owned CloneCD fixture preserves the mixed 64-data/158-audio source.
+foreach(case boot read fmv)
+  set(timeout 300)
+  set(extra_args)
+  if(case STREQUAL "boot")
+    set(timeout 180)
+  endif()
+  if(case STREQUAL "fmv")
+    set(extra_args "${PROJECT_BINARY_DIR}/disc/predicates.txt")
+  endif()
+  schway_add_test(NAME disc.fixture.ecm.${case}
+    COMMAND schwaystation-test-disc-fixture ${case}
+      "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+      "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy_modeled.ecm"
+      "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+      "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+      ${extra_args}
+    LABELS disc portable TIMEOUT ${timeout})
+endforeach()
+foreach(case boot read audio fmv)
+  set(timeout 300)
+  set(extra_args)
+  if(case STREQUAL "boot")
+    set(timeout 180)
+  endif()
+  if(case STREQUAL "fmv")
+    set(extra_args "${PROJECT_BINARY_DIR}/disc/predicates.txt")
+  endif()
+  schway_add_test(NAME disc.fixture.ccd.${case}
+    COMMAND schwaystation-test-disc-fixture ${case}
+      "${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin"
+      "${PROJECT_SOURCE_DIR}/tests/built/fast-expected.txt"
+      "${PROJECT_BINARY_DIR}/fixtures/disc_boot_legacy.ccd"
+      "${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.sbi"
+      "${PROJECT_SOURCE_DIR}/tests/diag/expected.csv"
+      ${extra_args}
+    LABELS disc portable TIMEOUT ${timeout})
+endforeach()
+set_tests_properties(disc.fixture.ecm.fmv disc.fixture.ccd.fmv PROPERTIES
+  FIXTURES_REQUIRED "compat_features_preflight;disc_fmv_predicates")
+set_tests_properties(disc.fixture.ecm.boot disc.fixture.ecm.read
+  disc.fixture.ccd.boot disc.fixture.ccd.read disc.fixture.ccd.audio PROPERTIES
+  FIXTURES_REQUIRED compat_features_preflight)
+
+set_tests_properties(disc.image.legacy_preflight PROPERTIES
+  FIXTURES_SETUP disc_legacy_preflight)
+set_tests_properties(disc.image.legacy_parity PROPERTIES
+  FIXTURES_SETUP disc_legacy_parity FIXTURES_REQUIRED disc_legacy_preflight)
+get_property(schway__disc_registered_tests DIRECTORY PROPERTY TESTS)
+list(REMOVE_ITEM schway__disc_registered_tests
+  disc.image.legacy_preflight disc.image.legacy_parity)
+set_property(TEST ${schway__disc_registered_tests} APPEND PROPERTY
+  FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")

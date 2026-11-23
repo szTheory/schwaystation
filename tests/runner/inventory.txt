@@ -12,6 +12,7 @@ runner.cards.sigterm	portable,runner
 runner.disc.api	portable,runner
 runner.disc.api.chd	portable,runner
 runner.disc.chd	portable,runner
+runner.disc.legacy	portable,runner
 runner.disc.load	portable,runner
 runner.disc.pbp	portable,runner
 runner.disc.probe	portable,runner

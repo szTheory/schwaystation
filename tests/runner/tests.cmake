@@ -403,69 +403,265 @@ save("truncated-block.pbp", image)
       message(FATAL_ERROR "disc probe failed:\nCUE ${cue_rc}\n${cue_out}${cue_err}\n"
         "playlist ${playlist_rc}\n${playlist_out}${playlist_err}")
     endif()
+  elseif(CASE STREQUAL "disc_legacy")
+    if(NOT DEFINED HOOKED OR NOT EXISTS "${BIOS}")
+      message(FATAL_ERROR "legacy runner checks need the hooked runner and owned BIOS")
+    endif()
+    file(SIZE "${FIXTURES}/disc_boot_pbp_source.bin" ecm_source_bytes)
+    file(SIZE "${FIXTURES}/disc_boot.bin" ccd_track1_bytes)
+    file(SIZE "${FIXTURES}/disc_boot_track02.bin" ccd_track2_bytes)
+    math(EXPR ecm_remainder "${ecm_source_bytes} % 2352")
+    math(EXPR ecm_sectors "${ecm_source_bytes} / 2352")
+    math(EXPR ccd_source_bytes "${ccd_track1_bytes} + ${ccd_track2_bytes}")
+    math(EXPR ccd_remainder "${ccd_source_bytes} % 2352")
+    math(EXPR ccd_sectors "${ccd_source_bytes} / 2352")
+    if(NOT ecm_remainder EQUAL 0 OR NOT ecm_sectors EQUAL 64 OR
+       NOT ccd_remainder EQUAL 0 OR NOT ccd_sectors EQUAL 222)
+      message(FATAL_ERROR "legacy source extent changed before the runner guest check: ECM=${ecm_source_bytes}, CCD=${ccd_source_bytes}")
+    endif()
+    function(assert_legacy_counts manifest expected)
+      if(NOT EXISTS "${manifest}")
+        message(FATAL_ERROR "legacy source-count manifest is missing: ${manifest}")
+      endif()
+      file(STRINGS "${manifest}" rows REGEX "^(source_sectors|guest_reads|guest_outputs)=")
+      list(LENGTH rows row_count)
+      if(NOT row_count EQUAL 3)
+        message(FATAL_ERROR "legacy manifest must have source, requested and produced sector counts: ${manifest}")
+      endif()
+      foreach(row IN LISTS rows)
+        string(REPLACE "=" ";" fields "${row}")
+        list(GET fields 0 field)
+        list(GET fields 1 value)
+        if(NOT value STREQUAL expected)
+          message(FATAL_ERROR "${manifest}: ${field}=${value}, expected ${expected} before guest execution")
+        endif()
+      endforeach()
+    endfunction()
+    assert_legacy_counts("${FIXTURES}/disc_boot_legacy_ecm.manifest" "${ecm_sectors}")
+    assert_legacy_counts("${FIXTURES}/disc_boot_legacy_ccd.manifest" "${ccd_sectors}")
+
+    set(root "${OUT}/runner-disc-legacy")
+    file(REMOVE_RECURSE "${root}")
+    file(MAKE_DIRECTORY "${root}")
+    foreach(name IN ITEMS disc_boot_legacy_literal.ecm disc_boot_legacy_modeled.ecm
+        disc_boot_legacy_literal.cue disc_boot_legacy_modeled.cue)
+      file(COPY_FILE "${FIXTURES}/${name}" "${root}/${name}")
+    endforeach()
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy_literal.ecm" "${root}/uppercase.ECM")
+    file(WRITE "${root}/uppercase.cue"
+      "FILE \"uppercase.ECM\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.ccd" "${root}/mixed.CCD")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.img" "${root}/mixed.img")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.sub" "${root}/mixed.sub")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.ccd" "${root}/mixed-nosub.ccd")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.img" "${root}/mixed-nosub.img")
+    file(WRITE "${root}/legacy.m3u"
+      "disc_boot_legacy_literal.cue\ndisc_boot_legacy_modeled.cue\n")
+
+    function(run_legacy_probe image result_name)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${image}"
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "format=disc")
+        message(FATAL_ERROR "legacy probe failed for ${image}: exit ${rc}\n${out}${err}")
+      endif()
+      set(${result_name} "${out}" PARENT_SCOPE)
+    endfunction()
+    function(expect_legacy_probe image expected label)
+      run_legacy_probe("${image}" actual)
+      if(NOT actual STREQUAL expected)
+        message(FATAL_ERROR "${label} probe identity differs from the owned raw source CUE:\n"
+          "expected:\n${expected}\nactual:\n${actual}")
+      endif()
+    endfunction()
+    run_legacy_probe("${FIXTURES}/disc_boot_legacy_source.cue" ecm_source_probe)
+    expect_legacy_probe("${FIXTURES}/disc_boot_legacy_literal.cue" "${ecm_source_probe}" "literal ECM CUE")
+    expect_legacy_probe("${FIXTURES}/disc_boot_legacy_modeled.cue" "${ecm_source_probe}" "modeled ECM CUE")
+    expect_legacy_probe("${FIXTURES}/disc_boot_legacy_literal.ecm" "${ecm_source_probe}" "direct ECM")
+    expect_legacy_probe("${root}/uppercase.cue" "${ecm_source_probe}" "uppercase ECM CUE child")
+    expect_legacy_probe("${root}/uppercase.ECM" "${ecm_source_probe}" "uppercase ECM extension")
+
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${root}/legacy.m3u"
+      RESULT_VARIABLE m3u_rc OUTPUT_VARIABLE m3u_out ERROR_VARIABLE m3u_err)
+    if(NOT m3u_rc STREQUAL "0" OR NOT m3u_out MATCHES "playlist_count=2" OR
+       NOT m3u_out MATCHES "serial=redacted")
+      message(FATAL_ERROR "legacy ECM CUE playlist probe did not retain M3U policy: ${m3u_rc}\n${m3u_out}${m3u_err}")
+    endif()
+
+    run_legacy_probe("${FIXTURES}/disc_boot.cue" ccd_source_probe)
+    expect_legacy_probe("${FIXTURES}/disc_boot_legacy.ccd" "${ccd_source_probe}" "direct CCD")
+    expect_legacy_probe("${root}/mixed.CCD" "${ccd_source_probe}" "uppercase CCD extension")
+    expect_legacy_probe("${root}/mixed-nosub.ccd" "${ccd_source_probe}" "CCD without optional SUB")
+
+    string(REPEAT "[0-9a-f]" 64 digest)
+    function(run_legacy_guest image result_name)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${image}"
+          --frames 1200 --hash
+        RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+      if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame 1200 sha256 ${digest}")
+        message(FATAL_ERROR "bounded legacy guest failed for ${image}: exit ${rc}\n${out}${err}")
+      endif()
+      set(${result_name} "${out}" PARENT_SCOPE)
+    endfunction()
+    run_legacy_guest("${FIXTURES}/disc_boot_legacy_source.cue" ecm_source_guest)
+    run_legacy_guest("${FIXTURES}/disc_boot_legacy_literal.cue" ecm_literal_guest)
+    run_legacy_guest("${FIXTURES}/disc_boot_legacy_modeled.cue" ecm_modeled_guest)
+    run_legacy_guest("${FIXTURES}/disc_boot_legacy_literal.ecm" ecm_direct_guest)
+    run_legacy_guest("${root}/legacy.m3u" ecm_m3u_guest)
+    if(NOT ecm_source_guest STREQUAL ecm_literal_guest OR
+       NOT ecm_source_guest STREQUAL ecm_modeled_guest OR
+       NOT ecm_source_guest STREQUAL ecm_direct_guest OR
+       NOT ecm_literal_guest STREQUAL ecm_m3u_guest)
+      message(FATAL_ERROR "ECM/CUE/M3U bounded guest output differs from the owned source CUE")
+    endif()
+    run_legacy_guest("${FIXTURES}/disc_boot.cue" ccd_source_guest)
+    run_legacy_guest("${FIXTURES}/disc_boot_legacy.ccd" ccd_guest)
+    run_legacy_guest("${root}/mixed.CCD" ccd_upper_guest)
+    run_legacy_guest("${root}/mixed-nosub.ccd" ccd_nosub_guest)
+    if(NOT ccd_source_guest STREQUAL ccd_guest OR NOT ccd_guest STREQUAL ccd_upper_guest OR
+       NOT ccd_guest STREQUAL ccd_nosub_guest)
+      message(FATAL_ERROR "CCD bounded guest output differs from its owned source CUE")
+    endif()
+
+    function(legacy_save_identity image save_dir result_name)
+      file(REMOVE_RECURSE "${save_dir}")
+      file(MAKE_DIRECTORY "${save_dir}")
+      foreach(slot IN ITEMS slot1 slot2)
+        execute_process(COMMAND ${EMULATOR} "${HOOKED}" --bios "${BIOS}" --disc "${image}"
+            --frames 1 --save-dir "${save_dir}" --memcard-names serial --test-card-write "${slot}"
+          RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+        if(NOT rc STREQUAL "0")
+          message(FATAL_ERROR "legacy save identity failed for ${image} ${slot}: exit ${rc}\n${out}${err}")
+        endif()
+      endforeach()
+      file(GLOB cards LIST_DIRECTORIES FALSE "${save_dir}/*.srm" "${save_dir}/*.1.mcr")
+      list(LENGTH cards card_count)
+      if(NOT card_count EQUAL 2)
+        message(FATAL_ERROR "legacy save identity expected both memory-card files: ${cards}")
+      endif()
+      set(stem "")
+      foreach(card IN LISTS cards)
+        get_filename_component(card_name "${card}" NAME)
+        if(card_name MATCHES "[.]srm$")
+          string(REGEX REPLACE "[.]srm$" "" card_stem "${card_name}")
+        elseif(card_name MATCHES "[.]1[.]mcr$")
+          string(REGEX REPLACE "[.]1[.]mcr$" "" card_stem "${card_name}")
+        else()
+          message(FATAL_ERROR "unexpected legacy memory-card path: ${card}")
+        endif()
+        if(stem STREQUAL "")
+          set(stem "${card_stem}")
+        elseif(NOT stem STREQUAL card_stem)
+          message(FATAL_ERROR "legacy memory-card slots have different identities: ${cards}")
+        endif()
+      endforeach()
+      set(${result_name} "${stem}" PARENT_SCOPE)
+    endfunction()
+    legacy_save_identity("${FIXTURES}/disc_boot_legacy_source.cue" "${root}/save-ecm-source" ecm_source_save)
+    legacy_save_identity("${FIXTURES}/disc_boot_legacy_literal.cue" "${root}/save-ecm-reader" ecm_reader_save)
+    legacy_save_identity("${FIXTURES}/disc_boot_legacy_image.cue" "${root}/save-ccd-source" ccd_source_save)
+    legacy_save_identity("${root}/mixed-nosub.ccd" "${root}/save-ccd-reader" ccd_reader_save)
+    if(NOT ecm_source_save STREQUAL ecm_reader_save OR NOT ccd_source_save STREQUAL ccd_reader_save)
+      message(FATAL_ERROR "legacy source/read save identities differ: ECM ${ecm_source_save} vs ${ecm_reader_save}, CCD ${ccd_source_save} vs ${ccd_reader_save}")
+    endif()
   elseif(CASE STREQUAL "disc_unsupported")
     file(MAKE_DIRECTORY "${OUT}/runner-disc-unsupported")
     set(root "${OUT}/runner-disc-unsupported")
-    file(COPY_FILE "${FIXTURES}/disc_boot.bin" "${root}/unsupported.ecm")
-    file(WRITE "${root}/nested-ecm.cue"
-      "FILE \"unsupported.ecm\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
+    if(NOT DEFINED PYTHON3 OR PYTHON3 STREQUAL "")
+      message(FATAL_ERROR "legacy malformed-media checks need the configured Python 3 executable")
+    endif()
+    set(ecm_mutation [==[
+from pathlib import Path
+import sys
+data = bytearray(Path(sys.argv[1]).read_bytes())
+if sys.argv[3] == "truncate":
+    data = data[:-1]
+elif sys.argv[3] == "edc":
+    data[-1] ^= 1
+else:
+    raise SystemExit("unknown ECM mutation")
+Path(sys.argv[2]).write_bytes(data)
+]==])
+    foreach(variant IN ITEMS truncated invalid-edc)
+      if(variant STREQUAL "truncated")
+        set(mutation truncate)
+      else()
+        set(mutation edc)
+      endif()
+      execute_process(COMMAND "${PYTHON3}" -c "${ecm_mutation}"
+          "${FIXTURES}/disc_boot_legacy_literal.ecm" "${root}/${variant}.ecm" "${mutation}"
+        RESULT_VARIABLE mutation_rc OUTPUT_VARIABLE mutation_out ERROR_VARIABLE mutation_err)
+      if(NOT mutation_rc STREQUAL "0")
+        message(FATAL_ERROR "could not create ${variant} ECM test input: ${mutation_out}${mutation_err}")
+      endif()
+    endforeach()
+    file(WRITE "${root}/nested-edc.cue"
+      "FILE \"invalid-edc.ecm\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy_modeled.ecm" "${root}/modeled.ecm")
+    file(WRITE "${root}/nested-2336.cue"
+      "FILE \"modeled.ecm\" BINARY\nTRACK 01 MODE2/2336\nINDEX 01 00:00:00\n")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.ccd" "${root}/missing-companion.ccd")
+    file(READ "${FIXTURES}/disc_boot_legacy.ccd" ccd_descriptor)
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.img" "${root}/unsupported-version.img")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.img" "${root}/unsupported-session.img")
+    set(ccd_version "${ccd_descriptor}")
+    string(REPLACE "Version=3" "Version=4" ccd_version "${ccd_version}")
+    if("${ccd_version}" STREQUAL "${ccd_descriptor}")
+      message(FATAL_ERROR "could not mutate CCD version test input")
+    endif()
+    file(WRITE "${root}/unsupported-version.ccd" "${ccd_version}")
+    set(ccd_session "${ccd_descriptor}")
+    string(REPLACE "Sessions=1" "Sessions=2" ccd_session "${ccd_session}")
+    if("${ccd_session}" STREQUAL "${ccd_descriptor}")
+      message(FATAL_ERROR "could not mutate CCD session test input")
+    endif()
+    file(WRITE "${root}/unsupported-session.ccd" "${ccd_session}")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.ccd" "${root}/nested-ccd.ccd")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy.img" "${root}/nested-ccd.img")
     file(WRITE "${root}/nested-ccd.cue"
-      "FILE \"unsupported.ccd\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
+      "FILE \"nested-ccd.ccd\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
+    file(COPY_FILE "${FIXTURES}/disc_boot_legacy_literal.ecm" "${OUT}/legacy-outside.ecm")
+    file(WRITE "${root}/nested-escape.cue"
+      "FILE \"../legacy-outside.ecm\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\n")
     file(WRITE "${root}/nested-chd.m3u" "unsupported.chd\n")
     file(WRITE "${root}/nested-pbp.m3u" "unsupported.pbp\n")
-    set(unsupported_kinds ECM CCD)
-    if(NOT CHD_ENABLED)
-      list(APPEND unsupported_kinds CHD)
-    endif()
-    foreach(kind IN LISTS unsupported_kinds)
-      string(TOLOWER "${kind}" lower)
-      set(want "unsupported: ${kind} (planned v2.0)")
-      if(kind STREQUAL "CHD" AND NOT CHD_ENABLED)
-        set(want "unsupported: CHD (SCHWAYSTATION_CHD=OFF)")
-      endif()
-      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/unsupported.${lower}"
-          --frames 1
+    function(expect_disc_run_failure image expected_rc pattern label)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${image}" --frames 1 --hash
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
-      string(FIND "${err}" "${want}" found)
-      if(NOT rc STREQUAL "77" OR found EQUAL -1)
-        message(FATAL_ERROR "direct ${kind} input expected exit 77 with its named status, got ${rc}\n${out}${err}")
+      if(NOT "${rc}" STREQUAL "${expected_rc}" OR NOT err MATCHES "${pattern}" OR
+         out MATCHES "frame [0-9]+ sha256")
+        message(FATAL_ERROR "${label} should fail before guest output with exit ${expected_rc} / ${pattern}; got ${rc}\n${out}${err}")
       endif()
-      execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${root}/unsupported.${lower}"
-        RESULT_VARIABLE probe_rc OUTPUT_VARIABLE probe_out ERROR_VARIABLE probe_err)
-      string(FIND "${probe_err}" "${want}" probe_found)
-      if(NOT probe_rc STREQUAL "77" OR probe_found EQUAL -1)
-        message(FATAL_ERROR "probe ${kind} expected exit 77 with its named status, got ${probe_rc}\n"
-          "${probe_out}${probe_err}")
-      endif()
-    endforeach()
-    set(nested_unsupported_rows "nested-ecm.cue|ECM" "nested-ccd.cue|CCD" "nested-pbp.m3u|PBP")
-    if(NOT CHD_ENABLED)
-      list(APPEND nested_unsupported_rows "nested-chd.m3u|CHD")
-    endif()
-    foreach(row IN LISTS nested_unsupported_rows)
-      string(REPLACE "|" ";" fields "${row}")
-      list(GET fields 0 child)
-      list(GET fields 1 kind)
-      set(want "unsupported: ${kind} (planned v2.0)")
-      if(kind STREQUAL "PBP")
-        set(want "unsupported: PBP playlist entries are not supported")
-      elseif(kind STREQUAL "CHD" AND NOT CHD_ENABLED)
-        set(want "unsupported: CHD (SCHWAYSTATION_CHD=OFF)")
-      endif()
-      execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/${child}"
-          --frames 1
+    endfunction()
+    function(expect_disc_probe_failure image expected_rc pattern label)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${image}"
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
-      string(FIND "${err}" "${want}" found)
-      if(NOT rc STREQUAL "77" OR found EQUAL -1)
-        message(FATAL_ERROR "nested ${kind} input expected exit 77 with its named status, got ${rc}\n${out}${err}")
+      if(NOT "${rc}" STREQUAL "${expected_rc}" OR NOT err MATCHES "${pattern}")
+        message(FATAL_ERROR "${label} probe should fail with exit ${expected_rc} / ${pattern}; got ${rc}\n${out}${err}")
       endif()
+    endfunction()
+
+    expect_disc_run_failure("${root}/truncated.ecm" 1 "ECM stream is malformed" "truncated ECM")
+    expect_disc_probe_failure("${root}/truncated.ecm" 1 "ECM stream is malformed" "truncated ECM")
+    expect_disc_run_failure("${root}/invalid-edc.ecm" 1 "ECM stream is malformed" "invalid ECM EDC")
+    expect_disc_probe_failure("${root}/invalid-edc.ecm" 1 "ECM stream is malformed" "invalid ECM EDC")
+    expect_disc_run_failure("${root}/missing-companion.ccd" 1 "CCD IMG companion is missing" "missing CCD IMG")
+    expect_disc_probe_failure("${root}/missing-companion.ccd" 1 "CCD IMG companion is missing" "missing CCD IMG")
+    foreach(variant IN ITEMS version session)
+      expect_disc_run_failure("${root}/unsupported-${variant}.ccd" 77
+        "CCD metadata is outside the supported subset" "unsupported CCD ${variant}")
+      expect_disc_probe_failure("${root}/unsupported-${variant}.ccd" 77
+        "CCD metadata is outside the supported subset" "unsupported CCD ${variant}")
     endforeach()
-    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${root}/nested-ecm.cue"
-      RESULT_VARIABLE cue_probe_rc OUTPUT_VARIABLE cue_probe_out ERROR_VARIABLE cue_probe_err)
-    string(FIND "${cue_probe_err}" "unsupported: ECM (planned v2.0)" cue_probe_message)
-    if(NOT cue_probe_rc STREQUAL "77" OR cue_probe_message EQUAL -1)
-      message(FATAL_ERROR "probe of CUE with readable nested ECM must name unsupported format and exit 77, got "
-        "${cue_probe_rc}\n${cue_probe_out}${cue_probe_err}")
+    expect_disc_run_failure("${root}/nested-edc.cue" 1 "ECM stream is malformed" "nested invalid ECM EDC")
+    expect_disc_run_failure("${root}/nested-escape.cue" 1 "unsafe FILE child path" "canonical CUE child escape")
+    expect_disc_run_failure("${root}/nested-2336.cue" 1 "unsupported cue track mode" "unproven ECM 2336-byte mapping")
+    expect_disc_run_failure("${root}/nested-ccd.cue" 77 "unsupported: CCD cannot be a CUE track source" "CCD CUE-child policy")
+    expect_disc_run_failure("${root}/nested-pbp.m3u" 77
+      "unsupported: PBP playlist entries are not supported" "PBP playlist refusal")
+    if(NOT CHD_ENABLED)
+      expect_disc_run_failure("${root}/unsupported.chd" 77 "unsupported: CHD" "CHD-off direct refusal")
+      expect_disc_probe_failure("${root}/unsupported.chd" 77 "unsupported: CHD" "CHD-off direct refusal")
+      expect_disc_run_failure("${root}/nested-chd.m3u" 77 "unsupported: CHD" "CHD-off playlist refusal")
     endif()
     execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${root}/missing.iso" --frames 1
       RESULT_VARIABLE io_rc OUTPUT_VARIABLE io_out ERROR_VARIABLE io_err)
@@ -1343,10 +1539,29 @@ schway_add_test(NAME runner.disc.probe
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 
+set(runner_disc_legacy_timeout 120)
+if(SCHWAYSTATION_INVENTORY STREQUAL "asan")
+  set(runner_disc_legacy_timeout 240)
+elseif(SCHWAYSTATION_OS STREQUAL "macos" AND SCHWAYSTATION_ARCH STREQUAL "x64")
+  set(runner_disc_legacy_timeout 240)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "powerpc")
+  # run 45086798403: QEMU-PPC timed out at the 960 s cap under guest-test contention; scale 8 makes this 32 min.
+  set(runner_disc_legacy_timeout 240)
+endif()
+schway_add_test(NAME runner.disc.legacy
+  COMMAND ${runner_check} -DCASE=disc_legacy -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
+    -DHOOKED=$<TARGET_FILE:schwaystation-run-test>
+    -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT ${runner_disc_legacy_timeout})
+set_tests_properties(runner.disc.legacy PROPERTIES
+  FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")
+
 schway_add_test(NAME runner.disc.unsupported
   COMMAND ${runner_check} -DCASE=disc_unsupported
     -DCHD_ENABLED=$<BOOL:${SCHWAYSTATION_CHD}> -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
     -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
+    -DPYTHON3=${Python3_EXECUTABLE}
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
 

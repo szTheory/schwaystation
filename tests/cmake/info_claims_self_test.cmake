@@ -64,7 +64,9 @@ reject_inventory_row("ungrounded input claim" "libretro.input.descriptors\tlibre
 reject_inventory_row("ungrounded memory claim" "libretro.memory.boundaries\tlibretro,portable\n" "memory_descriptors has no inventory test")
 
 reject_inventory_row("ungrounded disk control" "libretro.host.disc_control\tlibretro,portable\n" "supported_extensions has no inventory test")
+reject_inventory_row("ungrounded legacy content" "libretro.content.legacy\tlibretro,portable\n" "supported_extensions has no inventory test")
 replace_info("extension refusal" "supported_extensions = \"${expected_extensions}\"" "supported_extensions = \"exe|cue\"" "disc formats require full extensions")
+replace_info("format-description refusal" "CloneCD (.ccd)" "CCD (.ccd)" "description must include supported ECM and CloneCD formats")
 replace_info("wrong CHD extension" "supported_extensions = \"${expected_extensions}\"" "supported_extensions = \"${mismatch_extensions}\"" "disc formats require full extensions")
 replace_info("wrong license closure" "license = \"${expected_license}\"" "license = \"MIT\"" "license must match the selected code and notice closure")
 foreach(unsupported IN ITEMS savestate cheats load_subsystem)

@@ -4,6 +4,8 @@
 #endif
 #include "disc_image.h"
 #include "disc_chd.h"
+#include "disc_ccd.h"
+#include "disc_ecm.h"
 #include "disc_pbp.h"
 #include "media_limits.h"
 
@@ -34,6 +36,7 @@ typedef struct schway__disc_image_source {
     char name[SCHWAY__DISC_IMAGE_CUE_NAME_MAX + 1u];
     char *canonical_path;
     FILE *file;
+    schway__disc_ecm *ecm;
     uint64_t size;
     uint32_t line;
 } schway__disc_image_source;
@@ -70,6 +73,8 @@ struct schway_disc_image {
     char *path;
     char label[SCHWAY__DISC_IMAGE_CUE_NAME_MAX + 1u];
     schway__disc_chd *chd;
+    schway__disc_ccd *ccd;
+    schway__disc_ecm *ecm;
     schway__disc_pbp *pbp;
     schway_disc_image *playlist[SCHWAY__DISC_IMAGE_M3U_ENTRY_MAX];
     schway__disc_image_source sources[SCHWAY_DISC_MAX_TRACKS];
@@ -117,8 +122,7 @@ static int schway__disc_image_extension_is(const char *path, const char *extensi
 static int schway__disc_image_path_is_unsupported(const char *path)
 {
     return schway__disc_image_extension_is(path, ".chd") ||
-           schway__disc_image_extension_is(path, ".ecm") ||
-           schway__disc_image_extension_is(path, ".ccd");
+           schway__disc_image_extension_is(path, ".ecm");
 }
 
 static FILE *schway__disc_image_open_readonly(const char *path)
@@ -638,8 +642,8 @@ static const char *schway__disc_image_unsupported_reason(const char *path)
     if (schway__disc_image_extension_is(path, ".pbp")) {
         return "unsupported: PBP cannot be a CUE track source";
     }
-    if (schway__disc_image_extension_is(path, ".ecm")) return "unsupported: ECM (planned v2.0)";
-    if (schway__disc_image_extension_is(path, ".ccd")) return "unsupported: CCD (planned v2.0)";
+    if (schway__disc_image_extension_is(path, ".ecm")) return "unsupported: ECM cannot be a CUE track source";
+    if (schway__disc_image_extension_is(path, ".ccd")) return "unsupported: CCD cannot be a CUE track source";
     return "unsupported disc image";
 }
 
@@ -769,7 +773,9 @@ static schway_disc_image_status schway__disc_image_open_cue_children(
         schway__disc_image_source *source = &image->sources[i];
         char candidate[SCHWAY__DISC_IMAGE_PATH_CAP];
         char canonical[SCHWAY__DISC_IMAGE_PATH_CAP];
-        if (schway__disc_image_path_is_unsupported(source->name) ||
+        if ((schway__disc_image_path_is_unsupported(source->name) &&
+             !schway__disc_image_extension_is(source->name, ".ecm")) ||
+            schway__disc_image_extension_is(source->name, ".ccd") ||
             schway__disc_image_extension_is(source->name, ".pbp")) {
             schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
                                          source->line,
@@ -789,10 +795,18 @@ static schway_disc_image_status schway__disc_image_open_cue_children(
             return SCHWAY_DISC_IMAGE_OUT_OF_MEMORY;
         }
         memcpy(source->canonical_path, canonical, strlen(canonical) + 1u);
-        source->file = schway__disc_image_open_readonly(source->canonical_path);
-        if (source->file == NULL || !schway__disc_image_file_size(source->file, &source->size)) {
-            return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
-                                                 source->line, "cannot size FILE child");
+        if (schway__disc_image_extension_is(source->canonical_path, ".ecm")) {
+            schway_disc_image_status status = schway__disc_ecm_open(
+                source->canonical_path, &source->ecm, error);
+            if (status != SCHWAY_DISC_IMAGE_OK) return status;
+            status = schway__disc_ecm_decoded_size(source->ecm, &source->size);
+            if (status != SCHWAY_DISC_IMAGE_OK) return status;
+        } else {
+            source->file = schway__disc_image_open_readonly(source->canonical_path);
+            if (source->file == NULL || !schway__disc_image_file_size(source->file, &source->size)) {
+                return schway__disc_image_line_error(error, SCHWAY_DISC_IMAGE_BAD_CUE,
+                                                     source->line, "cannot size FILE child");
+            }
         }
         int duplicate = 0;
         for (size_t prior = 0u; prior < i; prior++) {
@@ -821,6 +835,13 @@ static schway_disc_image_status schway__disc_image_build_cue_toc(
     for (size_t i = 0u; i < image->track_count; i++) {
         schway__disc_image_track *track = &image->tracks[i];
         schway__disc_image_source *source = &image->sources[track->source_index];
+        if (source->ecm != NULL &&
+            track->sector_bytes != SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES) {
+            schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED,
+                                         track->file_line,
+                                         "unsupported: ECM CUE sources require raw 2352-byte tracks");
+            return SCHWAY_DISC_IMAGE_UNSUPPORTED;
+        }
         uint32_t start_frame = track->have_index00 != 0u ?
                                    track->index00_frame : track->index01_frame;
         uint64_t physical_bytes;
@@ -977,6 +998,40 @@ static schway_disc_image_status schway__disc_image_open_pbp(
     if (status != SCHWAY_DISC_IMAGE_OK) {
         schway__disc_image_error_set(error, status, 0u,
                                      "PBP metadata could not be projected into a TOC");
+        return status;
+    }
+    image->track_count = image->toc.track_count;
+    schway__disc_image_prepare_descriptor(image);
+    return SCHWAY_DISC_IMAGE_OK;
+}
+
+static schway_disc_image_status schway__disc_image_open_ecm(
+    const char *path, schway_disc_image *image, schway_disc_image_error *error)
+{
+    schway_disc_image_status status = schway__disc_ecm_open(path, &image->ecm, error);
+    if (status != SCHWAY_DISC_IMAGE_OK) return status;
+    image->toc.size = (uint32_t)sizeof(image->toc);
+    status = schway__disc_ecm_toc(image->ecm, &image->toc);
+    if (status != SCHWAY_DISC_IMAGE_OK) {
+        schway__disc_image_error_set(error, status, 0u,
+                                     "ECM metadata could not be projected into a TOC");
+        return status;
+    }
+    image->track_count = image->toc.track_count;
+    schway__disc_image_prepare_descriptor(image);
+    return SCHWAY_DISC_IMAGE_OK;
+}
+
+static schway_disc_image_status schway__disc_image_open_ccd(
+    const char *path, schway_disc_image *image, schway_disc_image_error *error)
+{
+    schway_disc_image_status status = schway__disc_ccd_open(path, &image->ccd, error);
+    if (status != SCHWAY_DISC_IMAGE_OK) return status;
+    image->toc.size = (uint32_t)sizeof image->toc;
+    status = schway__disc_ccd_toc(image->ccd, &image->toc);
+    if (status != SCHWAY_DISC_IMAGE_OK) {
+        schway__disc_image_error_set(error, status, 0u,
+                                     "CCD metadata could not be projected into a TOC");
         return status;
     }
     image->track_count = image->toc.track_count;
@@ -1175,7 +1230,8 @@ static schway_disc_image_status schway__disc_image_open_m3u(
                                                   line, "recursive playlists are not supported");
             goto done;
         }
-        if (schway__disc_image_path_is_unsupported(entry)) {
+        if (schway__disc_image_path_is_unsupported(entry) &&
+            !schway__disc_image_extension_is(entry, ".ecm")) {
             schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_UNSUPPORTED, line,
                                          schway__disc_image_unsupported_reason(entry));
             status = SCHWAY_DISC_IMAGE_UNSUPPORTED;
@@ -1234,6 +1290,12 @@ static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
     if (image->chd != NULL) {
         return schway__disc_chd_read_sector(image->chd, lba, sector, subcode);
     }
+    if (image->ecm != NULL) {
+        return schway__disc_ecm_read_sector(image->ecm, lba, sector, subcode);
+    }
+    if (image->ccd != NULL) {
+        return schway__disc_ccd_read_sector(image->ccd, lba, sector, subcode);
+    }
     for (size_t i = 0u; i < image->track_count; i++) {
         if (lba >= image->tracks[i].index0_lba && lba < image->tracks[i].leadout) {
             track = &image->tracks[i];
@@ -1257,10 +1319,18 @@ static uint32_t schway__disc_image_read_sector(void *user, uint32_t lba,
                                              &file_offset)) return 0u;
         }
         schway__disc_image_source *source = &image->sources[track->source_index];
-        if (file_offset > source->size || track->sector_bytes > source->size - file_offset ||
-            file_offset > (uint64_t)LONG_MAX ||
-            fseek(source->file, (long)file_offset, SEEK_SET) != 0 ||
-            fread(raw, 1u, track->sector_bytes, source->file) != track->sector_bytes) return 0u;
+        if (file_offset > source->size || track->sector_bytes > source->size - file_offset) {
+            return 0u;
+        }
+        if (source->ecm != NULL) {
+            if (track->sector_bytes != SCHWAY__DISC_IMAGE_RAW_SECTOR_BYTES ||
+                schway__disc_ecm_read_bytes(source->ecm, file_offset, raw,
+                                            track->sector_bytes) != SCHWAY_DISC_IMAGE_OK) return 0u;
+        } else if (file_offset > (uint64_t)LONG_MAX ||
+                   fseek(source->file, (long)file_offset, SEEK_SET) != 0 ||
+                   fread(raw, 1u, track->sector_bytes, source->file) != track->sector_bytes) {
+            return 0u;
+        }
         if (track->type == SCHWAY_DISC_TRACK_MODE1) {
             uint8_t cooked[SCHWAY__DISC_IMAGE_ISO_SECTOR_BYTES];
             memcpy(cooked, raw, sizeof cooked);
@@ -1300,7 +1370,8 @@ schway_disc_image_status schway_disc_image_open(const char *path,
         memset(error, 0, sizeof *error);
         error->size = (uint32_t)sizeof *error;
     }
-    if (schway__disc_image_path_is_unsupported(path)) {
+    if (schway__disc_image_path_is_unsupported(path) &&
+        !schway__disc_image_extension_is(path, ".ecm")) {
 #if SCHWAYSTATION_CHD
         if (!schway__disc_image_extension_is(path, ".chd")) {
 #endif
@@ -1315,15 +1386,17 @@ schway_disc_image_status schway_disc_image_open(const char *path,
         !schway__disc_image_extension_is(path, ".cue") &&
         !schway__disc_image_extension_is(path, ".m3u")
         && !schway__disc_image_extension_is(path, ".pbp")
+        && !schway__disc_image_extension_is(path, ".ecm")
+        && !schway__disc_image_extension_is(path, ".ccd")
 #if SCHWAYSTATION_CHD
         && !schway__disc_image_extension_is(path, ".chd")
 #endif
         ) {
         schway__disc_image_error_set(error, SCHWAY_DISC_IMAGE_BAD_IMAGE, 0u,
 #if SCHWAYSTATION_CHD
-                                     "expected cue, ISO, m3u, PBP, or CHD image");
+                                     "expected cue, ISO, m3u, PBP, ECM, CCD, or CHD image");
 #else
-                                     "expected a cue sheet, ISO, m3u, or PBP image");
+                                     "expected a cue sheet, ISO, m3u, PBP, ECM, or CCD image");
 #endif
         return SCHWAY_DISC_IMAGE_BAD_IMAGE;
     }
@@ -1348,6 +1421,10 @@ schway_disc_image_status schway_disc_image_open(const char *path,
         status = schway__disc_image_open_iso(canonical, image, error);
     } else if (schway__disc_image_extension_is(canonical, ".m3u")) {
         status = schway__disc_image_open_m3u(canonical, image, error);
+    } else if (schway__disc_image_extension_is(canonical, ".ecm")) {
+        status = schway__disc_image_open_ecm(canonical, image, error);
+    } else if (schway__disc_image_extension_is(canonical, ".ccd")) {
+        status = schway__disc_image_open_ccd(canonical, image, error);
     } else if (schway__disc_image_extension_is(canonical, ".pbp")) {
         status = schway__disc_image_open_pbp(canonical, image, error);
 #if SCHWAYSTATION_CHD
@@ -1374,9 +1451,12 @@ void schway_disc_image_close(schway_disc_image *image)
     }
     for (size_t i = 0u; i < image->source_count; i++) {
         if (image->sources[i].file != NULL) (void)fclose(image->sources[i].file);
+        schway__disc_ecm_close(image->sources[i].ecm);
         free(image->sources[i].canonical_path);
     }
     schway__disc_chd_close(image->chd);
+    schway__disc_ccd_close(image->ccd);
+    schway__disc_ecm_close(image->ecm);
     schway__disc_pbp_close(image->pbp);
     free(image->path);
     free(image);
