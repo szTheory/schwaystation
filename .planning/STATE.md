@@ -6,11 +6,11 @@ current_phase: 12
 current_phase_name: SBI and LibCrypt
 current_plan: Not started
 status: planning
-stopped_at: Phase 11 PR
-last_updated: "2026-11-22T22:10:06Z"
-last_activity: 2026-11-22
-last_activity_desc: "Phase 11 PR #36 fixes reviewed; complete local CI and Nightly routing preflight passed; repaired head push pending"
-state_head: 8d3dad8f15e71d87855bfe9a1bf0006698429b7f
+stopped_at: Phase 12 context gathered
+last_updated: "2026-11-23T04:23:25.971Z"
+last_activity: 2026-11-23
+last_activity_desc: Phase 12 context gathered; Codex model ID unavailable; three independent advisors plus adversarial review
+state_head: 13c68a9c3a554fc4a17924610ece94b9829025ee
 progress:
   total_phases: 10
   completed_phases: 5
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Resolve and verify Phase 11 PR #36's hosted integration findings; merge and publish its release before planning Phase 12
+**Current focus:** Plan and execute Phase 12 SBI/LibCrypt; then ship its release before Phase 13
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Phase: 12 — SBI and LibCrypt
 Current Plan: Not started
 Total Plans in Phase: 15
 Status: Ready to plan
-Last activity: 2026-11-22 -- Phase 11 PR #36 hosted failures diagnosed and corrected locally; final head push pending
+Last activity: 2026-11-23 -- Phase 12 context gathered; Codex model ID unavailable; three independent advisors plus adversarial review
 Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
 
 ### Phase 11 review, verification and transition (2026-11-22)
@@ -1910,9 +1910,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-22T21:01:07Z
-Stopped at: Phase 11 verified and transitioned; ship/merge/release Phase 11 before planning Phase 12
-Resume file: None
+Last session: 2026-11-23T04:16:41.779Z
+Stopped at: Phase 12 context gathered
+Resume file: .planning/phases/12-sbi-and-libcrypt/12-CONTEXT.md
 
 ### v1.0 session history
 
