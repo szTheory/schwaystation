@@ -153,6 +153,15 @@ static uint64_t frame_hash(const schway *inst)
     return hash;
 }
 
+static uint64_t state_bytes_hash(const uint8_t *bytes, size_t size)
+{
+    uint64_t hash = UINT64_C(14695981039346656037);
+    for (size_t i = 0u; i < size; i++) {
+        hash = (hash ^ bytes[i]) * UINT64_C(1099511628211);
+    }
+    return hash;
+}
+
 static void put_le(uint8_t *p, uint64_t v, uint32_t width)
 {
     for (uint32_t i = 0; i < width; i++) {
@@ -254,6 +263,19 @@ static void test_stable_bytes(void)
     CHECK(memcmp(good, after, n) == 0);
     printf("state_bytes=%zu\n", n);
     schway_destroy(inst);
+
+    schway *early = make_board(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU7, 1u);
+    run_to(early, 45u);
+    CHECK_EQ_U64(save(early, before), n);
+    uint64_t early_hash = state_bytes_hash(before, n);
+
+    schway *repeat = make_board(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU7, 1u);
+    run_to(repeat, 45u);
+    CHECK_EQ_U64(save(repeat, bad), n);
+    CHECK_EQ_HEX(state_bytes_hash(bad, n), early_hash);
+    CHECK(state_bytes_hash(good, n) != early_hash);
+    schway_destroy(repeat);
+    schway_destroy(early);
 }
 
 /* A cross-board load restores fixed board identity but keeps serialized
@@ -302,6 +324,10 @@ static void test_rejects(void)
     expect_refused("format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
+    put_le(bad + H_FORMAT, 18u, 4u);
+    expect_refused("previous format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
+
+    memcpy(bad, good, n);
     put_le(bad + H_FORMAT, 17u, 4u);
     expect_refused("format 17", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
@@ -327,9 +353,15 @@ static void test_rejects(void)
     size_t nf = schway__state_record(src, fields, MAX_FIELDS);
     CHECK(nf <= MAX_FIELDS);
     uint32_t region_at = 0;
+    uint32_t board_at = 0;
+    uint32_t profile_flags_at = 0;
     for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
         if (strcmp(fields[i].name, "instance.region") == 0) {
             region_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "instance.board") == 0) {
+            board_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "instance.profile_flags") == 0) {
+            profile_flags_at = fields[i].offset;
         }
     }
     CHECK(region_at >= SCHWAY__STATE_HEADER_SIZE);
@@ -341,6 +373,29 @@ static void test_rejects(void)
             reseal(bad, n);
             expect_refused("region", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
         }
+    }
+
+    CHECK(board_at >= SCHWAY__STATE_HEADER_SIZE);
+    CHECK(profile_flags_at >= SCHWAY__STATE_HEADER_SIZE);
+    if (board_at >= SCHWAY__STATE_HEADER_SIZE &&
+        profile_flags_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + board_at, 0u, 4u);
+        reseal(bad, n);
+        expect_refused("board zero", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+
+        memcpy(bad, good, n);
+        put_le(bad + board_at, SCHWAY_BOARD_PM41_2 + 1u, 4u);
+        reseal(bad, n);
+        expect_refused("board above maximum", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+
+        memcpy(bad, good, n);
+        put_le(bad + board_at, SCHWAY_BOARD_PU7, 4u);
+        put_le(bad + profile_flags_at, 0u, 4u);
+        reseal(bad, n);
+        expect_refused("board GPU_V0 mismatch", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
     }
 
     /* The architectural zero register and COP0's stored/derived bits cannot
