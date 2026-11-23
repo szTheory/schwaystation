@@ -237,7 +237,14 @@ Plans:
   1. Each documented sidecar case binds SBI records to the selected disc identity and LBA map, including after disc selection changes. A malformed or mismatched sidecar cannot mark another disc's sectors as bad Q.
   2. A short CD command sequence verifies that a listed bad Q sector still delivers its data and GetlocP returns the previous valid position. SBI fuzz and seed replay cover malformed inputs, and the ledger records only the evaluated protection predicates.
 
-**Plans**: TBD
+**Plans**: 5/7 plans executed
+- [x] 12-01-PLAN.md
+- [x] 12-02-PLAN.md
+- [x] 12-03-PLAN.md
+- [x] 12-04-PLAN.md
+- [x] 12-05-PLAN.md
+- [ ] 12-06-PLAN.md
+- [ ] 12-07-PLAN.md
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-SPU-CDROM-AND-MDEC.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/CONFORMANCE.md`
 
@@ -311,7 +318,7 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 9. CHD disc images | 15/15 | Complete    | 2026-11-20 |
 | 10. PBP disc images | 13/13 | Complete    | 2026-11-22 |
 | 11. ECM and CloneCD images | 15/15 | Complete    | 2026-11-22 |
-| 12. SBI and LibCrypt | 0/TBD | Not started | - |
+| 12. SBI and LibCrypt | 5/7 | In Progress | - |
 | 13. Regions, console revisions and playback | 0/TBD | Not started | - |
 | 14. Multitap and special controllers | 0/TBD | Not started | - |
 | 15. GunCon and Justifier | 0/TBD | Not started | - |

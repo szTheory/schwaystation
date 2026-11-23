@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 12
 current_phase_name: SBI and LibCrypt
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: Completed 12-04-PLAN.md
-last_updated: "2026-11-23T06:08:22.179Z"
+stopped_at: Completed 12-05-PLAN.md
+last_updated: "2026-11-23T06:45:55.840Z"
 last_activity: 2026-11-23
-last_activity_desc: Phase 12 execution started
-state_head: ddedc6b790d5580618264aedeb667958411a1209
+last_activity_desc: Phase 12 Plan 05 complete; Plan 06 ready
+state_head: c0a36edce5f6ca5f2e5036cc1834827c809755d4
 progress:
   total_phases: 10
   completed_phases: 5
   total_plans: 70
-  completed_plans: 67
+  completed_plans: 68
   percent: 50
 ---
 
@@ -31,11 +31,17 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 12 (SBI and LibCrypt) — EXECUTING
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 7
 Status: Ready to execute
-Last activity: 2026-11-23 — Phase 12 execution started
+Last activity: 2026-11-23 — Phase 12 Plan 05 complete; Plan 06 ready
 Progress: [█████░░░░░] 50% (5/10 phases verified; 4/10 released; Phase 11 ship pending)
+
+### Phase 12 Plan 12-05 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The 37-minute plan run completed three tasks and three task-sized commits. The selected M3U child command test passed with the generated legacy fixture setup. The compatibility feature preflight and ratchet passed 2/2; the SBI image selector plus legacy setup/parity passed 3/3. Before the broader local check, selected test names, sorted inventories and the fixed 3,901-line budget all passed. The CD-ROM/disc-image group passed 39/39 in 0.16 seconds wall time.
+
+The broader selector exposed that the historical `SBId` fixture marker was copied beside `disc_boot.cue` and now collided with automatic same-stem sidecar discovery. Removing only the runtime copy restored legacy parity; explicit fixture tests continue to read the marker from its source path. The test compares payloads as one buffer and stops after a failed command guard to keep failure output bounded. No workflow changed, so no hosted CI or Act run was needed; no Docker resource was created. Plan 12-05 is complete, and Plan 12-06 owns the remaining SBI parser fuzz and seed replay required before CRYPT-01 can be checked complete.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 
@@ -1239,6 +1245,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 12 P03 | 12m | 3 tasks | 5 files |
 | Phase 12 P03 | 16m | 3 tasks | 5 files |
 | Phase 12 P04 | 22m | 3 tasks | 5 files |
+| Phase 12 P05 | 37min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1665,6 +1672,9 @@ Recent decisions affecting current work:
 - [Phase 11]: ECM and CCD compatibility rows report only local fixture, runner and libretro evidence; hosted CI, package and fuzz remain unknown until Plan 12.
 - [Phase 11]: Keep local CHD-OFF package evidence separate from unknown hosted Main, Nightly and Release evidence.
 - [Phase 11]: Record local installed-example and CHD-ON evidence separately from unknown hosted workflow results
+- [Phase 12]: Reuse the generated legacy CCD/IMG/SUB fixture and patch only selected test sectors instead of adding another CCD generator.
+- [Phase 12]: Keep compatibility evidence limited to selected-provider binding, bad-Q data availability, and previous-good GetlocP; make no retail-title claim.
+- [Phase 12]: Keep the legacy SBId marker out of the runtime media directory so it cannot be mistaken for a real same-stem SBI sidecar.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1915,9 +1925,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T06:07:06.117Z
-Stopped at: Completed 12-04-PLAN.md
-Resume file: .planning/phases/12-sbi-and-libcrypt/12-05-PLAN.md
+Last session: 2026-11-23T06:45:55.667Z
+Stopped at: Completed 12-05-PLAN.md
+Resume file: None
 
 ### v1.0 session history
 
