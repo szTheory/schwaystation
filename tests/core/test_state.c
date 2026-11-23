@@ -305,6 +305,47 @@ static void test_profile(void)
     schway_destroy(src);
 }
 
+/* The opt-in boot bit is part of the existing serialized profile flags, and
+   unknown bits remain an atomic state rejection. */
+static void test_fast_boot_profile(void)
+{
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    schway_profile profile;
+    memset(&profile, 0, sizeof profile);
+    profile.size = (uint32_t)sizeof profile;
+    profile.region = SCHWAY_REGION_NTSC_U;
+    profile.flags = SCHWAY_PROFILE_FAST_BOOT;
+    CHECK_EQ_U64(schway_set_profile(src, &profile), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(src->profile_flags, SCHWAY_PROFILE_FAST_BOOT);
+    size_t n = save(src, good);
+
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(dst->profile_flags, SCHWAY_PROFILE_FAST_BOOT);
+    CHECK_EQ_U64(save(dst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+
+    size_t nf = schway__state_record(src, fields, MAX_FIELDS);
+    CHECK(nf <= MAX_FIELDS);
+    uint32_t profile_flags_at = 0u;
+    for (size_t i = 0u; i < nf && i < MAX_FIELDS; i++) {
+        if (strcmp(fields[i].name, "instance.profile_flags") == 0) {
+            profile_flags_at = fields[i].offset;
+        }
+    }
+    CHECK(profile_flags_at >= SCHWAY__STATE_HEADER_SIZE);
+    if (profile_flags_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + profile_flags_at, SCHWAY_PROFILE_FAST_BOOT | 0x20u, 4u);
+        reseal(bad, n);
+        expect_refused("unknown fast-boot profile flag", dst, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+
+    schway_destroy(dst);
+    schway_destroy(src);
+}
+
 /* Each corruption is refused with its own status before any byte applies. */
 static void test_rejects(void)
 {
@@ -1549,6 +1590,7 @@ static const struct {
     {"state.cpu_fields", test_cpu_fields},
     {"state.device_fields", test_device_fields},
     {"state.profile", test_profile},
+    {"profile.fast_boot", test_fast_boot_profile},
     {"state.record_sweep", test_record_sweep},
     {"state.rejects", test_rejects},
     {"state.round_trip", test_round_trip},

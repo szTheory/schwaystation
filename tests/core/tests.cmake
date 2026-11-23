@@ -67,6 +67,9 @@ foreach(case IN ITEMS state.cpu_fields state.device_fields state.profile state.r
     COMMAND schwaystation-test-state ${case}
     LABELS core portable TIMEOUT ${timeout})
 endforeach()
+schway_add_test(NAME core.profile.fast_boot
+  COMMAND schwaystation-test-state profile.fast_boot
+  LABELS core portable TIMEOUT 10)
 
 # The I/O page sweep. Fault prevented: an address of 1F801000h-1F801FFFh that
 # is owned, unbuilt and a gap at once, none of them, or on the wrong side of a

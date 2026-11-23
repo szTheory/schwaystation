@@ -423,7 +423,8 @@ schway_status schway_set_profile(schway *inst, const schway_profile *profile)
     uint32_t disc_flags = profile->size >= SCHWAY__PROFILE_SIZE_DISC_FLAGS ? profile->disc_flags : 0u;
     uint32_t board = profile->size >= SCHWAY__PROFILE_SIZE_BOARD ? profile->board : 0u;
     const struct schway__board_defaults *defaults = NULL;
-    uint32_t allowed_flags = SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0;
+    uint32_t allowed_flags = SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0 |
+                             SCHWAY_PROFILE_FAST_BOOT;
     if (profile->size < SCHWAY__PROFILE_SIZE_DISC_FLAGS) {
         allowed_flags |= SCHWAY_PROFILE_CD_LICENSED | SCHWAY_PROFILE_CD_UNLOCK;
     }

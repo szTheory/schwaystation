@@ -121,6 +121,7 @@ typedef uint32_t schway_status;
 #define SCHWAY_PROFILE_CD_LICENSED 2u
 #define SCHWAY_PROFILE_GPU_V0 4u
 #define SCHWAY_PROFILE_CD_UNLOCK 8u
+#define SCHWAY_PROFILE_FAST_BOOT 16u
 
 #define SCHWAY_INPUT_DEVICE_NONE 0u
 #define SCHWAY_INPUT_DEVICE_DIGITAL 1u
@@ -160,7 +161,7 @@ typedef struct schway_versions {
 typedef struct schway_profile {
     uint32_t size;
     uint32_t region; /* SCHWAY_REGION_* */
-    uint32_t flags;  /* SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0 */
+    uint32_t flags;  /* SCHWAY_PROFILE_DEBUG_PORT | SCHWAY_PROFILE_GPU_V0 | SCHWAY_PROFILE_FAST_BOOT */
     uint32_t disc_flags; /* SCHWAY_PROFILE_CD_* bits */
     uint32_t board; /* SCHWAY_BOARD_*; zero inherits current board defaults */
 } schway_profile;

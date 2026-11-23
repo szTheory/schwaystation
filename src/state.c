@@ -103,11 +103,12 @@ static void body_io(struct schway__state_io *io, schway *inst)
     uint64_t cycle = schway__cpu_state_io(io, inst);
     schway__gte_state_io(io, inst, cycle);
     uint32_t profile_flags = schway__state_u32(io, name_profile_flags, &inst->profile_flags, 0u,
-                                                15u);
+                                                31u);
     schway__state_check(io, (profile_flags & ~(SCHWAY_PROFILE_DEBUG_PORT |
                                                 SCHWAY_PROFILE_CD_LICENSED |
                                                 SCHWAY_PROFILE_GPU_V0 |
-                                                SCHWAY_PROFILE_CD_UNLOCK)) == 0u);
+                                                SCHWAY_PROFILE_CD_UNLOCK |
+                                                SCHWAY_PROFILE_FAST_BOOT)) == 0u);
     schway__state_check(io, schway__instance_board_profile_valid(board, profile_flags));
     (void)schway__state_u32(io, name_exe_loaded, &inst->exe_loaded, 0u, 1u);
     schway__state_disc_identity_io(io, &inst->disc_host.identity_valid,
