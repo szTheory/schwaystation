@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 13
 current_phase_name: Regions, console revisions and playback
-current_plan: 5
+current_plan: 6
 status: planned
-stopped_at: Completed 13-04-PLAN.md
-last_updated: "2026-11-23T17:46:49Z"
+stopped_at: Completed 13-05-PLAN.md
+last_updated: "2026-11-23T19:11:13.857Z"
 last_activity: 2026-11-23
-last_activity_desc: Plans 13-01 through 13-04 complete; Plan 13-05 is next
-state_head: 33b082a8159d2a3430e652b2fa67a089d9ebc3a4
+last_activity_desc: Plans 13-01 through 13-05 complete; Plan 13-06 is next
+state_head: e108691d1d566eaf59eea7ce7422dcbc289d4e62
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 79
-  completed_plans: 74
+  completed_plans: 75
   percent: 60
 ---
 
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 13 — Regions, console revisions and playback
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 9
 Status: Ready to execute
-Last activity: 2026-11-23 -- Plans 13-01 through 13-04 complete; Plan 13-05 is next
-Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-04 are complete; Plan 13-05 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Last activity: 2026-11-23 -- Plans 13-01 through 13-05 complete; Plan 13-06 is next
+Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-05 are complete; Plan 13-06 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
@@ -70,6 +70,16 @@ The core inventory sort and fixed 3,901-line budget passed. Task 1 configured CI
 Task 2 reran the sorted inventory and line-budget checks, configured CI in 0.89s, and asserted exactly seven selectors including the disc fixtures with `core.state.record_sweep` excluded. The state target was rebuilt after test edits in 0.31s; the selected tests passed 7/7 in 0.60s. The added cases cover board zero, above-range board, a CRC-valid PU-7/GPU_V0 mismatch, prior format 18, atomic preservation of state/audio, and deterministic equal/different board state-byte hashes. Task 2's validation cases were green immediately because the validator was delivered in Task 1; no separate RED was fabricated. This sequencing deviation is documented and waived as WINDOWS entry 25.
 
 No broad suite, hosted CI, Act, Docker, or hardware run was needed because workflow wiring did not change. PROFILE-02 remains pending until remaining Phase 13 work and final phase verification. Plan 13-05 is next.
+
+### Phase 13 Plan 13-05 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. A trustworthy start/end interval and active duration were not recorded. Task commits are `e59ff11` (host region resolution) and `e108691` (runner machine/region options); checked plan corrections are `60723cf`, `2181560`, and `177b815`.
+
+Task 1 passed the runner inventory sort (0.00s), the 3,901-line gate (0.02s), corrected CI configure (0.75s; another configure 0.74s), exact two-selector discovery (0.03s), fixture target (0.02s), and `policy.fixture_budget` (1/1 in 0.02s). Its first focused build exited 1 in 0.27s because the new test target lacked the build-generated include directory; adding `${PROJECT_BINARY_DIR}/generated` fixed it. The successful rebuild duration was not captured. The final region/disc selector passed 2/2 in 0.04s.
+
+Task 2 sorted both runner and compatibility inventories, kept the line budget at 3,901/3,901, configured the reused CI tree in 0.81s, and asserted the exact 16-name selector graph including `compat.features.preflight`. The focused runner/probe target build passed in 1.00s. The exact 16-test selection passed in 0.19s, including all nine machine tokens, canonical profile acceptance, region fallback/precedence, redaction, and full identity hash preservation.
+
+No broad suite, hosted CI, Act, Docker, or hardware run was needed because workflow wiring did not change. The summary records runner-observed region/profile evidence only; PROFILE-01 and PROFILE-02 remain pending until full Phase 13 verification. Plan 13-06 is next.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -1327,6 +1337,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 13 P02 | 60m | 1 tasks | 3 files |
 | Phase 13 P03 | 59m22s | 2 tasks | 9 files |
 | Phase 13 P04 | 17m02s | 2 tasks | 4 files |
+| Phase 13 P05 | not tracked | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -1767,6 +1778,8 @@ Recent decisions affecting current work:
 - [Phase 13]: Gate only vC0 Test 22h to the documented INT5 (11h,10h); leave Test 20h and unpinned Test 51h behavior unchanged.
 - [Phase 13]: Serialize board identity once and reconstruct fixed board-derived defaults from the canonical table after APPLY.
 - [Phase 13]: Preserve mutable bus.ram_size during board-identity restoration.
+- [Phase 13]: Resolve automatic region from serial, disc licence, and executable marker while keeping explicit selection authoritative.
+- [Phase 13]: Keep board selection separate from video region and title serial; pair PU-7 and PU-8 early with GPU_V0.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2017,8 +2030,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T17:46:49Z
-Stopped at: Closed Plan 13-04; checked Plan 13-05 is next
+Last session: 2026-11-23T19:11:13.612Z
+Stopped at: Completed 13-05-PLAN.md
 Resume file: None
 
 ### v1.0 session history
