@@ -269,9 +269,10 @@ observed output.
 **The state lines.** With no picture yet, the ordinary frame hash is the test card whatever the CPU and devices did, so
 `hashes.txt` carries frame 30 and state hashes for `hello`, `gte_vectors`, `dma_chain` and `timers_lines`. It also carries
 `gpu_motion.exe` frame hashes at 60, 120 and 180 and state hashes at 150 and 180. This fixture draws moving pixels
-through GP0 and DMA2, so its frame digest covers rendered output; its saved-state digests cover the VRAM and GPU state
-needed to continue after frame 150. Format 18 also records the card protocol's pending-error latches, so the state pins
-changed while the rendered frame pins stayed fixed; card bytes and generation counters remain host-owned. `hash-equality`
+through GP0 and DMA2, so its frame digest covers rendered output; its saved-state digests cover the serialized state
+needed to continue after frame 150. Format 18 records the card protocol's pending-error latches, and format 19 adds the
+selected board identity. Those state pins change while the rendered frame pins stay fixed; card bytes and generation
+counters remain host-owned. `hash-equality`
 compares every row across all eight lanes, including generated
 media-file digests and the owned-disc predicates (boot at frame 600; mailbox, audio and frame at frame 900 for both
 no-input and Cross-input runs), as well as the portable be32 lane.
