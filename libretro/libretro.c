@@ -42,6 +42,7 @@
 #define LR_DISC_LIMIT SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT
 #define LR_MEMORY_DESCRIPTOR_COUNT 6u
 #define LR_BIOS_KEY "schwaystation_bios"
+#define LR_BOOT_KEY "schwaystation_boot"
 #define LR_ANALOG_MODE_KEY "schwaystation_analog_mode"
 #define LR_ANALOG_TOGGLE_KEY "schwaystation_analog_toggle"
 #define LR_ANALOG_TOGGLE_FRAMES 60u
@@ -519,6 +520,14 @@ static struct retro_core_option_v2_definition lr_option_defs[] = {
       {"scph5502.bin", "SCPH-5502"},
       {NULL, NULL}},
      "none"},
+    {LR_BOOT_KEY,
+     "Boot (reload content)",
+     NULL,
+     "Full follows the BIOS shell. Fast skips the shell only for a BIOS-backed disc with a valid SYSTEM.CNF boot executable. Reload content to apply a change.",
+     NULL,
+     NULL,
+     {{"full", "Full"}, {"fast", "Fast"}, {NULL, NULL}},
+     "full"},
     {LR_ANALOG_MODE_KEY,
      "DualShock mode",
      NULL,
@@ -545,6 +554,7 @@ static struct retro_variable lr_variables[] = {
      "Machine (reload content); pu18|pu7|pu8-early|pu8-late|pu20|pu22|pu23|pm41|pm41-2"},
     {LR_REGION_KEY, "Region (reload content); auto|ntsc-u|ntsc-j|pal"},
     {LR_BIOS_KEY, "BIOS for discs and no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin"},
+    {LR_BOOT_KEY, "Boot (reload content); full|fast"},
     {LR_ANALOG_MODE_KEY, "DualShock mode; analog|digital"},
     {LR_ANALOG_TOGGLE_KEY, "DualShock mode toggle; enabled|disabled"},
     {NULL, NULL},
@@ -817,7 +827,7 @@ static void lr_unload(void)
 
 /* Creates the one instance with the given region; 0 on failure, with
    nothing held. */
-static int lr_create(uint32_t region, uint32_t board, uint32_t disc_flags)
+static int lr_create(uint32_t region, uint32_t board, uint32_t disc_flags, int fast_boot)
 {
     schway_config cfg;
     schway_profile profile;
@@ -832,6 +842,9 @@ static int lr_create(uint32_t region, uint32_t board, uint32_t disc_flags)
     profile.region = region;
     if (board == SCHWAY_BOARD_PU7 || board == SCHWAY_BOARD_PU8_EARLY) {
         profile.flags |= SCHWAY_PROFILE_GPU_V0;
+    }
+    if (fast_boot != 0) {
+        profile.flags |= SCHWAY_PROFILE_FAST_BOOT;
     }
     profile.disc_flags = disc_flags;
     profile.board = board;
@@ -1101,6 +1114,14 @@ static const char *lr_option_bios(void)
         return "none";
     }
     return var.value;
+}
+
+/* The fast path is opt-in and is applied only when content is reloaded. */
+static int lr_option_fast_boot(void)
+{
+    struct retro_variable var = {LR_BOOT_KEY, NULL};
+    return env_cb != NULL && env_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) &&
+           var.value != NULL && strcmp(var.value, "fast") == 0;
 }
 
 static void lr_refresh_input_options(void)
@@ -1515,6 +1536,8 @@ bool retro_load_game(const struct retro_game_info *game)
     char card2_path[LR_CARD_PATH_CAP];
     int have_card2_path = 0;
     int disc_mode = 0;
+    int fast_boot = lr_option_fast_boot();
+    int disc_boot_exe_eligible = 0;
     uint32_t exe_licence_area = SCHWAY_LICENCE_NONE;
     uint32_t disc_licence_area = SCHWAY_LICENCE_NONE;
     char identity_serial[16] = "";
@@ -1582,10 +1605,20 @@ bool retro_load_game(const struct retro_game_info *game)
                 if (schway_probe_exe(identity.exe_bytes, identity.exe_size,
                                      &identity_exe) == SCHWAY_STATUS_OK) {
                     exe_licence_area = identity_exe.licence_area;
+                    disc_boot_exe_eligible = 1;
                 }
             }
             schway__disc_probe_dispose(&identity);
         }
+    }
+    /* Fast mode is a BIOS-shell shortcut for bootable discs. Fullpath
+       PS-EXEs retain their BIOS-free stub path under full/default mode. */
+    if (fast_boot && (game == NULL || disc_mode == 0 ||
+                      disc_boot_exe_eligible == 0)) {
+        free(exe);
+        free(bios);
+        lr_disc_close_set(prepared_discs, prepared_count);
+        return false;
     }
     schway__region_resolution region_resolution = schway__region_resolve(
         identity_serial, disc_licence_area, exe_licence_area);
@@ -1598,7 +1631,8 @@ bool retro_load_game(const struct retro_game_info *game)
         return false;
     }
     if (!lr_create(selected_region, lr_option_board(),
-                   disc_mode != 0 ? SCHWAY_PROFILE_CD_LICENSED : 0u)) {
+                   disc_mode != 0 ? SCHWAY_PROFILE_CD_LICENSED : 0u,
+                   fast_boot && disc_mode)) {
         free(exe);
         free(bios);
         lr_disc_close_set(prepared_discs, prepared_count);

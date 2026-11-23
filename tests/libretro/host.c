@@ -192,6 +192,7 @@ static enum retro_pixel_format pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
 static unsigned options_v2_calls, variables_calls, get_variable_calls;
 static const char *option_value; /* what GET_VARIABLE answers */
 static const char *machine_option_value = "pu18";
+static const char *boot_option_value = "full";
 static bool option_updated;      /* what GET_VARIABLE_UPDATE answers, once */
 static char log_message[512];
 static unsigned av_info_calls;
@@ -291,17 +292,22 @@ static void check_options_v2(const struct retro_core_options_v2 *o)
     check_string("BIOS option value 2", d[2].values[2].value, "scph5501.bin");
     check_string("BIOS option value 3", d[2].values[3].value, "scph5502.bin");
     CHECK(d[2].values[4].value == NULL);
-    check_string("analog mode option key", d[3].key, "schwaystation_analog_mode");
-    check_string("analog mode option default", d[3].default_value, "analog");
-    check_string("analog mode value 0", d[3].values[0].value, "analog");
-    check_string("analog mode value 1", d[3].values[1].value, "digital");
+    check_string("boot option key", d[3].key, "schwaystation_boot");
+    check_string("boot option default", d[3].default_value, "full");
+    check_string("boot option full", d[3].values[0].value, "full");
+    check_string("boot option fast", d[3].values[1].value, "fast");
     CHECK(d[3].values[2].value == NULL);
-    check_string("analog toggle option key", d[4].key, "schwaystation_analog_toggle");
-    check_string("analog toggle option default", d[4].default_value, "enabled");
-    check_string("analog toggle value 0", d[4].values[0].value, "enabled");
-    check_string("analog toggle value 1", d[4].values[1].value, "disabled");
+    check_string("analog mode option key", d[4].key, "schwaystation_analog_mode");
+    check_string("analog mode option default", d[4].default_value, "analog");
+    check_string("analog mode value 0", d[4].values[0].value, "analog");
+    check_string("analog mode value 1", d[4].values[1].value, "digital");
     CHECK(d[4].values[2].value == NULL);
-    CHECK(d[5].key == NULL);
+    check_string("analog toggle option key", d[5].key, "schwaystation_analog_toggle");
+    check_string("analog toggle option default", d[5].default_value, "enabled");
+    check_string("analog toggle value 0", d[5].values[0].value, "enabled");
+    check_string("analog toggle value 1", d[5].values[1].value, "disabled");
+    CHECK(d[5].values[2].value == NULL);
+    CHECK(d[6].key == NULL);
 }
 
 /* The version 0 variables (L7483) carry both options. */
@@ -320,12 +326,14 @@ static void check_variables(const struct retro_variable *v)
     check_string("BIOS variable value",
                  v[2].value,
                  "BIOS for discs and no-content runs; none|scph5500.bin|scph5501.bin|scph5502.bin");
-    check_string("analog mode variable key", v[3].key, "schwaystation_analog_mode");
-    check_string("analog mode variable value", v[3].value, "DualShock mode; analog|digital");
-    check_string("analog toggle variable key", v[4].key, "schwaystation_analog_toggle");
-    check_string("analog toggle variable value", v[4].value,
+    check_string("boot variable key", v[3].key, "schwaystation_boot");
+    check_string("boot variable value", v[3].value, "Boot (reload content); full|fast");
+    check_string("analog mode variable key", v[4].key, "schwaystation_analog_mode");
+    check_string("analog mode variable value", v[4].value, "DualShock mode; analog|digital");
+    check_string("analog toggle variable key", v[5].key, "schwaystation_analog_toggle");
+    check_string("analog toggle variable value", v[5].value,
                  "DualShock mode toggle; enabled|disabled");
-    CHECK(v[5].key == NULL);
+    CHECK(v[6].key == NULL);
 }
 
 static void check_controller_info(const struct retro_controller_info *info)
@@ -499,6 +507,10 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         }
         if (strcmp(var->key, "schwaystation_bios") == 0) {
             var->value = bios_option_value;
+            return true;
+        }
+        if (strcmp(var->key, "schwaystation_boot") == 0) {
+            var->value = boot_option_value;
             return true;
         }
         if (strcmp(var->key, "schwaystation_analog_mode") == 0) {
@@ -1410,6 +1422,8 @@ static int test_content_psexe(const char *exe_path, const char *directory)
     struct retro_game_info game;
     unsigned red_pixel_seen = 0u;
     int copied = 0;
+    const char *prior_boot = boot_option_value;
+    const char *prior_bios = bios_option_value;
 
     CHECK(test_path(psexe_path, sizeof psexe_path, directory, "pad_counter.PsExE"));
     if (check_failures != 0) {
@@ -1425,7 +1439,15 @@ static int test_content_psexe(const char *exe_path, const char *directory)
     check_string("valid_extensions", sys.valid_extensions, expected_valid_extensions());
     memset(&game, 0, sizeof game);
     game.path = psexe_path;
-    CHECK_EQ_U64(p_load_game(&game), 1u);
+    boot_option_value = "fast";
+    bios_option_value = "missing.bin";
+    CHECK_EQ_U64(p_load_game(&game), 0u);
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    boot_option_value = "full";
+    int loaded = p_load_game(&game);
+    boot_option_value = prior_boot;
+    bios_option_value = prior_bios;
+    CHECK_EQ_U64(loaded, 1u);
     if (p_serialize_size() != 0u) {
         p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
         for (unsigned run = 1u; run <= 60u; run++) {
@@ -2650,6 +2672,94 @@ static unsigned run_disc_to_mailbox(uint32_t expected_toc)
         return frames + 1u;
     }
     return 0u;
+}
+
+static void test_content_boot(const char *playlist_path, const char *bios_directory,
+                              const char *test_directory)
+{
+    unsigned char ineligible_image[32768];
+    unsigned char full_mailbox[0x100];
+    unsigned char *ram;
+    char ineligible_path[4096];
+    struct retro_game_info game;
+    unsigned full_frames = 0u;
+    unsigned fast_frames = 0u;
+    uint32_t expected_toc;
+    int loaded;
+    unsigned video_before;
+
+    memset(full_mailbox, 0, sizeof full_mailbox);
+    memset(ineligible_image, 'S', sizeof ineligible_image);
+    ineligible_path[0] = '\0';
+    int path_ok = test_path(ineligible_path, sizeof ineligible_path, test_directory,
+                            "ineligible.iso");
+    CHECK(path_ok);
+    if (!path_ok) {
+        return;
+    }
+    int image_written = write_test_file(ineligible_path, ineligible_image,
+                                       sizeof ineligible_image);
+    CHECK(image_written);
+    if (!image_written) {
+        (void)remove(ineligible_path);
+        return;
+    }
+
+    system_directory = bios_directory;
+    save_directory = test_directory;
+    save_directory_available = 1;
+    bios_option_value = "none";
+    machine_option_value = "pu18";
+    option_value = "ntsc-u";
+    expected_toc = disc_gettd_for_path(playlist_path);
+    CHECK(expected_toc != 0u);
+    memset(&game, 0, sizeof game);
+    game.path = playlist_path;
+
+    /* A missing frontend value follows the declared full-boot default. */
+    boot_option_value = NULL;
+    loaded = p_load_game(&game);
+    CHECK_EQ_U64(loaded, 1u);
+    if (loaded) {
+        full_frames = run_disc_to_mailbox(expected_toc);
+        ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+        CHECK(ram != NULL);
+        if (ram != NULL) {
+            memcpy(full_mailbox, ram + 0x10000u, sizeof full_mailbox);
+        }
+        p_unload_game();
+    }
+
+    boot_option_value = "fast";
+    loaded = p_load_game(&game);
+    CHECK_EQ_U64(loaded, 1u);
+    if (loaded) {
+        fast_frames = run_disc_to_mailbox(expected_toc);
+        ram = (unsigned char *)p_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+        CHECK(ram != NULL);
+        if (ram != NULL) {
+            CHECK(memcmp(full_mailbox, ram + 0x10000u, sizeof full_mailbox) == 0);
+        }
+        p_unload_game();
+    }
+    CHECK(full_frames != 0u && fast_frames != 0u);
+
+    /* A selected but missing BIOS rejects fast mode before guest execution. */
+    bios_option_value = "missing.bin";
+    video_before = video_calls;
+    CHECK_EQ_U64(p_load_game(&game), 0u);
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    CHECK_EQ_U64(video_calls, video_before);
+
+    /* A readable image without a valid boot executable also rejects fast. */
+    bios_option_value = "none";
+    game.path = ineligible_path;
+    video_before = video_calls;
+    CHECK_EQ_U64(p_load_game(&game), 0u);
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    CHECK_EQ_U64(video_calls, video_before);
+    p_unload_game();
+    (void)remove(ineligible_path);
 }
 
 static int test_content_chd(const char *chd_path, const char *cue_path,
@@ -4979,6 +5089,7 @@ int main(int argc, char **argv)
     int content_pbp_mode = argc == 9 && strcmp(argv[2], "content-pbp") == 0;
     int content_legacy_mode = argc == 12 && strcmp(argv[2], "content-legacy") == 0;
     int content_profile_mode = argc == 6 && strcmp(argv[2], "content-profile") == 0;
+    int content_boot_mode = argc == 6 && strcmp(argv[2], "content-boot") == 0;
     int options_profile_mode = argc == 3 && strcmp(argv[2], "options-profile") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
@@ -4994,7 +5105,7 @@ int main(int argc, char **argv)
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
-    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !options_profile_mode && !input_descriptors_mode &&
+    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode &&
          !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
@@ -5004,7 +5115,7 @@ int main(int argc, char **argv)
                         argv[5][0] == '\0')) ||
         (disc_audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
                              argv[5][0] == '\0' || argv[6][0] == '\0')) ||
-        ((content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
+        ((content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || content_boot_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
           card_persistence_mode || card_controls_mode) &&
          argv[3][0] == '\0') ||
@@ -5022,6 +5133,8 @@ int main(int argc, char **argv)
          (argv[4][0] == '\0' || argv[5][0] == '\0' || argv[6][0] == '\0')) ||
         (content_profile_mode &&
          (argv[4][0] == '\0' || argv[5][0] == '\0')) ||
+        (content_boot_mode &&
+         (argv[3][0] == '\0' || argv[4][0] == '\0' || argv[5][0] == '\0')) ||
         ((psexe_mode || lifecycle_mode || card_persistence_mode || card_controls_mode) &&
          argv[4][0] == '\0')) {
         fprintf(stderr,
@@ -5031,7 +5144,8 @@ int main(int argc, char **argv)
                 "content-pbp <chd-enabled:0|1> <pbp> <cue> <invalid-pbp> <bios-directory> <save-directory> | "
                 "content-legacy <chd-enabled:0|1> <ecm> <ecm-cue> <ccd> <ccd-cue> "
                 "<invalid-ecm> <invalid-ccd> <bios-directory> <save-directory> | "
-                "content-profile <m3u> <bios-directory> <save-directory> | options-profile | "
+                "content-profile <m3u> <bios-directory> <save-directory> | "
+                "content-boot <m3u> <bios-directory> <test-directory> | options-profile | "
                 "disc-audio-equality-batch|disc-audio-equality-single <region> <m3u> <pcm> <bios-directory> | "
                 "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
@@ -5040,7 +5154,7 @@ int main(int argc, char **argv)
                 "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
     }
-    content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
+    content_test = audio_mode || disc_audio_mode || content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || content_boot_mode || video_geometry_mode || video_edges_mode || input_movies_mode ||
                    input_controls_mode || lifecycle_mode || card_persistence_mode ||
                    card_controls_mode;
     rumble_available = rumble_guest_mode || rumble_controls_mode;
@@ -5118,6 +5232,13 @@ int main(int argc, char **argv)
 
     if (content_profile_mode) {
         test_content_profile(argv[3], argv[4]);
+        p_deinit();
+        module_close();
+        CHECK_DONE();
+    }
+
+    if (content_boot_mode) {
+        test_content_boot(argv[3], argv[4], argv[5]);
         p_deinit();
         module_close();
         CHECK_DONE();
