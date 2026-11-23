@@ -38,7 +38,7 @@ set_target_properties(schwaystation-test-disc-sbi PROPERTIES
 schway_warnings(schwaystation-test-disc-sbi)
 
 schway_add_test(NAME disc.image.sbi
-  COMMAND schwaystation-test-disc-sbi
+  COMMAND schwaystation-test-disc-sbi ${PROJECT_BINARY_DIR}/tests
   LABELS disc portable TIMEOUT 10)
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 

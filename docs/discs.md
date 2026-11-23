@@ -8,6 +8,21 @@ It also accepts ECM v1.0 images and supported CloneCD `.ccd` images. With
 `SCHWAYSTATION_CHD=ON`, it opens the bounded CHD subset below through the same
 raw-sector and TOC callbacks. `SCHWAYSTATION_CHD` is off by default.
 
+## SBI bad-Q companions
+
+A supported image may have a same-stem `.sbi` file beside it. The host loads the
+companion when opening that image and exposes its validated sectors through the
+disc's optional bad-Q callback. Without a companion, the callback remains
+absent. An unreadable, malformed, oversized or out-of-map companion rejects the
+image before it is published. SBI files are limited to 64 KiB and 8,192 records
+by this implementation.
+
+For an `.m3u`, each child image owns its own companion; selecting a different
+child also selects that child's bad-Q data and TOC. A companion has no image
+digest, so it cannot authenticate that it belongs to the image beside it. The
+host validates record bounds and the selected image's addressable LBA range,
+but does not claim retail-title compatibility from that pairing alone.
+
 ## ECM images
 
 The provider reads ECM v1.0 literal and modeled records without materializing
@@ -180,4 +195,5 @@ An invalid or unreadable `SYSTEM.CNF` is an error and does not silently fall
 back. The probe transfers its allocated executable buffer only on success;
 the caller releases it with `schway__disc_probe_dispose()`.
 
-The CUE and SYSTEM.CNF parsers do not parse SBI subchannel patch files.
+The CUE and SYSTEM.CNF parsers do not parse SBI subchannel patch files; the
+image provider loads an optional same-stem SBI companion separately.
