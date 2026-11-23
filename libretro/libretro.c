@@ -1533,6 +1533,7 @@ bool retro_load_game(const struct retro_game_info *game)
     size_t bios_size = 0u;
     schway_disc_image *prepared_discs[LR_DISC_LIMIT] = {NULL};
     unsigned prepared_count = 0u;
+    unsigned initial_disc_index = 0u;
     char card2_path[LR_CARD_PATH_CAP];
     int have_card2_path = 0;
     int disc_mode = 0;
@@ -1575,6 +1576,16 @@ bool retro_load_game(const struct retro_game_info *game)
             }
             have_card2_path = lr_card2_path_for_game(game, card2_path);
             disc_mode = 1;
+            if (lr_disc_initial_valid != 0 &&
+                lr_disc_initial_index < prepared_count &&
+                prepared_discs[lr_disc_initial_index] != NULL) {
+                const char *initial_path = schway_disc_image_path(
+                    prepared_discs[lr_disc_initial_index], 0u);
+                if (initial_path != NULL &&
+                    strcmp(initial_path, lr_disc_initial_path) == 0) {
+                    initial_disc_index = lr_disc_initial_index;
+                }
+            }
         } else {
             return false;
         }
@@ -1589,8 +1600,10 @@ bool retro_load_game(const struct retro_game_info *game)
     }
     if (disc_mode && game != NULL && game->path != NULL) {
         schway_host_disc_probe identity;
-        const char *probe_path = prepared_count != 0u && prepared_discs[0] != NULL
-                                     ? schway_disc_image_path(prepared_discs[0], 0u)
+        const char *probe_path = initial_disc_index < prepared_count &&
+                                     prepared_discs[initial_disc_index] != NULL
+                                     ? schway_disc_image_path(
+                                           prepared_discs[initial_disc_index], 0u)
                                      : game->path;
         memset(&identity, 0, sizeof identity);
         if (probe_path != NULL && schway__disc_probe_region(probe_path, &identity) ==
@@ -1652,19 +1665,11 @@ bool retro_load_game(const struct retro_game_info *game)
             lr_discs[i] = prepared_discs[i];
             prepared_discs[i] = NULL;
         }
-        unsigned initial = 0u;
-        if (lr_disc_initial_valid != 0 && lr_disc_initial_index < lr_disc_count) {
-            const char *initial_path = schway_disc_image_path(
-                lr_discs[lr_disc_initial_index], 0u);
-            if (initial_path != NULL && strcmp(initial_path, lr_disc_initial_path) == 0) {
-                initial = lr_disc_initial_index;
-            }
-        }
         lr_disc_initial_valid = 0;
         lr_disc_initial_path[0] = '\0';
-        lr_disc_index = initial;
+        lr_disc_index = initial_disc_index;
         schway_disc initial_disc;
-        if (!lr_disc_make_descriptor(initial, &initial_disc) ||
+        if (!lr_disc_make_descriptor(initial_disc_index, &initial_disc) ||
             schway_open_disc(inst, &initial_disc) != SCHWAY_STATUS_OK) {
             lr_unload();
             return false;

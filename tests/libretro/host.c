@@ -2674,13 +2674,91 @@ static unsigned run_disc_to_mailbox(uint32_t expected_toc)
     return 0u;
 }
 
-static void test_content_boot(const char *playlist_path, const char *bios_directory,
+static void host_write_iso_u16_both(uint8_t *bytes, uint16_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8);
+    bytes[2] = (uint8_t)(value >> 8);
+    bytes[3] = (uint8_t)value;
+}
+
+static void host_write_iso_u32_both(uint8_t *bytes, uint32_t value)
+{
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8);
+    bytes[2] = (uint8_t)(value >> 16);
+    bytes[3] = (uint8_t)(value >> 24);
+    bytes[4] = (uint8_t)(value >> 24);
+    bytes[5] = (uint8_t)(value >> 16);
+    bytes[6] = (uint8_t)(value >> 8);
+    bytes[7] = (uint8_t)value;
+}
+
+static size_t host_write_iso_record(uint8_t *bytes, uint32_t extent, uint32_t size,
+                                    uint8_t flags, const uint8_t *name,
+                                    size_t name_size)
+{
+    size_t record_size = 33u + name_size + ((name_size & 1u) == 0u ? 1u : 0u);
+    memset(bytes, 0, record_size);
+    bytes[0] = (uint8_t)record_size;
+    host_write_iso_u32_both(bytes + 2u, extent);
+    host_write_iso_u32_both(bytes + 10u, size);
+    bytes[25] = flags;
+    host_write_iso_u16_both(bytes + 28u, 1u);
+    bytes[32] = (uint8_t)name_size;
+    memcpy(bytes + 33u, name, name_size);
+    return record_size;
+}
+
+static int write_nonboot_iso(const char *path)
+{
+    static const uint8_t dot[] = {0u};
+    static const uint8_t dotdot[] = {1u};
+    const size_t sector_size = 2048u;
+    uint8_t *image = (uint8_t *)calloc(24u, sector_size);
+    uint8_t *pvd;
+    uint8_t *root;
+    size_t root_size = 0u;
+    int ok;
+    if (image == NULL) {
+        return 0;
+    }
+    pvd = image + 16u * sector_size;
+    pvd[0] = 1u;
+    memcpy(pvd + 1u, "CD001", 5u);
+    pvd[6] = 1u;
+    host_write_iso_u32_both(pvd + 80u, 24u);
+    host_write_iso_u16_both(pvd + 128u, (uint16_t)sector_size);
+    (void)host_write_iso_record(pvd + 156u, 18u, (uint32_t)sector_size,
+                                2u, dot, sizeof dot);
+    uint8_t *terminator = image + 17u * sector_size;
+    terminator[0] = 255u;
+    memcpy(terminator + 1u, "CD001", 5u);
+    terminator[6] = 1u;
+    root = image + 18u * sector_size;
+    root_size += host_write_iso_record(root + root_size, 18u,
+                                       (uint32_t)sector_size, 2u,
+                                       dot, sizeof dot);
+    root_size += host_write_iso_record(root + root_size, 18u,
+                                       (uint32_t)sector_size, 2u,
+                                       dotdot, sizeof dotdot);
+    ok = root_size <= sector_size &&
+         write_test_file(path, image, 24u * sector_size);
+    free(image);
+    return ok;
+}
+
+static void test_content_boot(const char *playlist_path,
+                              const char *selected_playlist_path,
+                              const char *selected_no_boot_path,
+                              const char *bios_directory,
                               const char *test_directory)
 {
     unsigned char ineligible_image[32768];
     unsigned char full_mailbox[0x100];
     unsigned char *ram;
     char ineligible_path[4096];
+    char selected_no_boot_canonical[4096];
     struct retro_game_info game;
     unsigned full_frames = 0u;
     unsigned fast_frames = 0u;
@@ -2693,6 +2771,7 @@ static void test_content_boot(const char *playlist_path, const char *bios_direct
     ineligible_path[0] = '\0';
     int path_ok = test_path(ineligible_path, sizeof ineligible_path, test_directory,
                             "ineligible.iso");
+    selected_no_boot_canonical[0] = '\0';
     CHECK(path_ok);
     if (!path_ok) {
         return;
@@ -2701,6 +2780,16 @@ static void test_content_boot(const char *playlist_path, const char *bios_direct
                                        sizeof ineligible_image);
     CHECK(image_written);
     if (!image_written) {
+        (void)remove(ineligible_path);
+        return;
+    }
+    int selected_image_written = write_nonboot_iso(selected_no_boot_path);
+    CHECK(selected_image_written);
+    int selected_path_valid = disc_copy_canonical_path(
+        selected_no_boot_path, selected_no_boot_canonical,
+        sizeof selected_no_boot_canonical);
+    CHECK(selected_path_valid);
+    if (!selected_image_written || !selected_path_valid) {
         (void)remove(ineligible_path);
         return;
     }
@@ -2744,8 +2833,32 @@ static void test_content_boot(const char *playlist_path, const char *bios_direct
     }
     CHECK(full_frames != 0u && fast_frames != 0u);
 
+    /* The initial member, rather than playlist member zero, controls identity
+       and fast-boot eligibility. The selected member has a valid ISO volume
+       but no SYSTEM.CNF boot executable. */
+    game.path = selected_playlist_path;
+    option_value = "auto";
+    boot_option_value = "full";
+    CHECK(disk_control.set_initial_image(1u, selected_no_boot_canonical));
+    loaded = p_load_game(&game);
+    CHECK_EQ_U64(loaded, 1u);
+    if (loaded) {
+        CHECK_EQ_U64(p_get_region(), RETRO_REGION_NTSC);
+        p_unload_game();
+    }
+    boot_option_value = "fast";
+    CHECK(disk_control.set_initial_image(1u, selected_no_boot_canonical));
+    video_before = video_calls;
+    loaded = p_load_game(&game);
+    CHECK_EQ_U64(loaded, 0u);
+    CHECK_EQ_U64(p_serialize_size(), 0u);
+    CHECK_EQ_U64(video_calls, video_before);
+    p_unload_game();
+    option_value = "ntsc-u";
+
     /* A selected but missing BIOS rejects fast mode before guest execution. */
     bios_option_value = "missing.bin";
+    game.path = playlist_path;
     video_before = video_calls;
     CHECK_EQ_U64(p_load_game(&game), 0u);
     CHECK_EQ_U64(p_serialize_size(), 0u);
@@ -3553,6 +3666,7 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
 
     system_directory = bios_directory;
     bios_option_value = "none";
+    option_value = "auto";
     CHECK(disk_control.set_initial_image(1u, expected_second));
     CHECK(!disk_control.set_initial_image(SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT, expected_second));
     CHECK(!disk_control.set_initial_image(0u, NULL));
@@ -3563,6 +3677,7 @@ static int test_disc_control(const char *playlist_path, const char *second_path,
     CHECK(p_load_game(&game));
     CHECK_EQ_U64(disk_control.get_num_images(), 2u);
     CHECK_EQ_U64(disk_control.get_image_index(), 1u);
+    CHECK_EQ_U64(p_get_region(), RETRO_REGION_PAL);
     CHECK(!disk_control.get_eject_state());
     CHECK_EQ_U64(save_directory_calls, save_calls_before + 1u);
     {
@@ -5089,7 +5204,7 @@ int main(int argc, char **argv)
     int content_pbp_mode = argc == 9 && strcmp(argv[2], "content-pbp") == 0;
     int content_legacy_mode = argc == 12 && strcmp(argv[2], "content-legacy") == 0;
     int content_profile_mode = argc == 6 && strcmp(argv[2], "content-profile") == 0;
-    int content_boot_mode = argc == 6 && strcmp(argv[2], "content-boot") == 0;
+    int content_boot_mode = argc == 8 && strcmp(argv[2], "content-boot") == 0;
     int options_profile_mode = argc == 3 && strcmp(argv[2], "options-profile") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
@@ -5134,7 +5249,8 @@ int main(int argc, char **argv)
         (content_profile_mode &&
          (argv[4][0] == '\0' || argv[5][0] == '\0')) ||
         (content_boot_mode &&
-         (argv[3][0] == '\0' || argv[4][0] == '\0' || argv[5][0] == '\0')) ||
+         (argv[3][0] == '\0' || argv[4][0] == '\0' || argv[5][0] == '\0' ||
+          argv[6][0] == '\0' || argv[7][0] == '\0')) ||
         ((psexe_mode || lifecycle_mode || card_persistence_mode || card_controls_mode) &&
          argv[4][0] == '\0')) {
         fprintf(stderr,
@@ -5145,7 +5261,8 @@ int main(int argc, char **argv)
                 "content-legacy <chd-enabled:0|1> <ecm> <ecm-cue> <ccd> <ccd-cue> "
                 "<invalid-ecm> <invalid-ccd> <bios-directory> <save-directory> | "
                 "content-profile <m3u> <bios-directory> <save-directory> | "
-                "content-boot <m3u> <bios-directory> <test-directory> | options-profile | "
+                "content-boot <m3u> <selected-m3u> <selected-iso> "
+                "<bios-directory> <test-directory> | options-profile | "
                 "disc-audio-equality-batch|disc-audio-equality-single <region> <m3u> <pcm> <bios-directory> | "
                 "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
@@ -5238,7 +5355,7 @@ int main(int argc, char **argv)
     }
 
     if (content_boot_mode) {
-        test_content_boot(argv[3], argv[4], argv[5]);
+        test_content_boot(argv[3], argv[4], argv[5], argv[6], argv[7]);
         p_deinit();
         module_close();
         CHECK_DONE();

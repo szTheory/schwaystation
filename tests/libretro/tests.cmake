@@ -235,12 +235,15 @@ schway_add_test(NAME libretro.content.psexe
   LABELS libretro portable TIMEOUT 120)
 
 # Fault prevented: fast boot bypasses a valid BIOS shell handoff, accepts a
-# disc without a valid SYSTEM.CNF executable, or affects fullpath PS-EXE loading.
+# selected playlist member without a valid SYSTEM.CNF executable, or affects
+# fullpath PS-EXE loading.
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libretro-content-boot)
 schway_add_test(NAME libretro.content.boot
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> content-boot
     ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u
+    ${PROJECT_BINARY_DIR}/fixtures/disc_boot_selected_no_boot.m3u
+    ${PROJECT_BINARY_DIR}/fixtures/selected_no_boot.iso
     ${PROJECT_BINARY_DIR}/openbios
     ${PROJECT_BINARY_DIR}/tests/libretro-content-boot
   LABELS libretro portable TIMEOUT 120)
