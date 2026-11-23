@@ -33,7 +33,99 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   endfunction()
 
-  if(CASE STREQUAL "disc_load")
+  if(CASE STREQUAL "boot_full")
+    foreach(var RUN BIOS FIXTURES)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner full-boot case requires ${var}")
+      endif()
+    endforeach()
+    set(disc "${FIXTURES}/disc_boot.cue")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --disc "${disc}"
+        --frames 1200 --stop-on mailbox --hash
+      RESULT_VARIABLE default_rc OUTPUT_VARIABLE default_out ERROR_VARIABLE default_err)
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --disc "${disc}"
+        --boot full --frames 1200 --stop-on mailbox --hash
+      RESULT_VARIABLE full_rc OUTPUT_VARIABLE full_out ERROR_VARIABLE full_err)
+    set(default_output "${default_out}${default_err}")
+    set(full_output "${full_out}${full_err}")
+    if(NOT default_rc STREQUAL "0" OR NOT full_rc STREQUAL "0" OR
+       NOT default_output MATCHES "mailbox SWMB status=00" OR
+       NOT full_output MATCHES "mailbox SWMB status=00" OR
+       NOT default_output MATCHES "mailbox 0001=424f4f54" OR
+       NOT full_output MATCHES "mailbox 0001=424f4f54" OR
+       NOT default_output MATCHES "frame [0-9]+ sha256 [0-9a-f]+" OR
+       NOT full_output MATCHES "frame [0-9]+ sha256 [0-9a-f]+" OR
+       NOT default_output STREQUAL full_output)
+      message(FATAL_ERROR "full BIOS boot differs from the default runner path:\n"
+        "default (${default_rc}): ${default_output}\nfull (${full_rc}): ${full_output}")
+    endif()
+  elseif(CASE STREQUAL "boot_fast")
+    foreach(var RUN BIOS FIXTURES)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner fast-boot case requires ${var}")
+      endif()
+    endforeach()
+    set(disc "${FIXTURES}/disc_boot.cue")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --disc "${disc}"
+        --frames 1200 --stop-on mailbox --hash
+      RESULT_VARIABLE full_rc OUTPUT_VARIABLE full_out ERROR_VARIABLE full_err)
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --disc "${disc}"
+        --boot fast --frames 1200 --stop-on mailbox --hash
+      RESULT_VARIABLE fast_rc OUTPUT_VARIABLE fast_out ERROR_VARIABLE fast_err)
+    set(full_output "${full_out}${full_err}")
+    set(fast_output "${fast_out}${fast_err}")
+    string(REGEX MATCHALL "mailbox [0-9a-f]+=[0-9a-f]+" full_records "${full_output}")
+    string(REGEX MATCHALL "mailbox [0-9a-f]+=[0-9a-f]+" fast_records "${fast_output}")
+    string(REGEX MATCH "frame [0-9]+ sha256 [0-9a-f]+" full_frame_line "${full_output}")
+    string(REGEX MATCH "frame [0-9]+ sha256 [0-9a-f]+" fast_frame_line "${fast_output}")
+    if(NOT full_rc STREQUAL "0" OR NOT fast_rc STREQUAL "0" OR
+       NOT full_output MATCHES "mailbox SWMB status=00" OR
+       NOT fast_output MATCHES "mailbox SWMB status=00" OR
+       NOT full_output MATCHES "mailbox 0001=424f4f54" OR
+       NOT fast_output MATCHES "mailbox 0001=424f4f54" OR
+       NOT full_records STREQUAL fast_records OR
+       full_frame_line STREQUAL "" OR fast_frame_line STREQUAL "" OR
+       NOT full_frame_line STREQUAL fast_frame_line)
+      message(FATAL_ERROR "fast boot did not preserve the eligible disc guest result:\n"
+        "full (${full_rc}): ${full_output}\nfast (${fast_rc}): ${fast_output}")
+    endif()
+  elseif(CASE STREQUAL "boot_invalid")
+    foreach(var RUN BIOS FIXTURES OUT HELLO_EXE)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner fast-boot controls require ${var}")
+      endif()
+    endforeach()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --boot fast --disc "${FIXTURES}/disc_boot.cue"
+        --frames 1
+      RESULT_VARIABLE no_bios_rc OUTPUT_VARIABLE no_bios_out ERROR_VARIABLE no_bios_err)
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --boot fast --bios "${BIOS}" --frames 1
+      RESULT_VARIABLE no_disc_rc OUTPUT_VARIABLE no_disc_out ERROR_VARIABLE no_disc_err)
+    file(MAKE_DIRECTORY "${OUT}")
+    string(REPEAT "S" 32768 ineligible_iso)
+    set(ineligible_path "${OUT}/runner-boot-ineligible.iso")
+    file(WRITE "${ineligible_path}" "${ineligible_iso}")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --boot fast --bios "${BIOS}"
+        --disc "${ineligible_path}" --frames 1
+      RESULT_VARIABLE ineligible_rc OUTPUT_VARIABLE ineligible_out ERROR_VARIABLE ineligible_err)
+    if(NOT no_bios_rc STREQUAL "2" OR NOT no_bios_err MATCHES "--disc needs --bios" OR
+       no_bios_out MATCHES "frame [0-9]+ sha256" OR
+       NOT no_disc_rc STREQUAL "2" OR NOT no_disc_err MATCHES "--boot needs --bios and --disc" OR
+       no_disc_out MATCHES "frame [0-9]+ sha256" OR
+       NOT ineligible_rc STREQUAL "2" OR
+       NOT ineligible_err MATCHES "--boot fast needs an eligible disc boot executable" OR
+       ineligible_out MATCHES "frame [0-9]+ sha256")
+      message(FATAL_ERROR "fast boot accepted a missing BIOS, missing disc, or ineligible disc:\n"
+        "no BIOS (${no_bios_rc}): ${no_bios_out}${no_bios_err}\n"
+        "no disc (${no_disc_rc}): ${no_disc_out}${no_disc_err}\n"
+        "ineligible (${ineligible_rc}): ${ineligible_out}${ineligible_err}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${HELLO_EXE}" --tty --frames 10
+      RESULT_VARIABLE exe_rc OUTPUT_VARIABLE exe_out ERROR_VARIABLE exe_err)
+    set(exe_output "${exe_out}${exe_err}")
+    if(NOT exe_rc STREQUAL "0" OR NOT exe_output MATCHES "tty hello port")
+      message(FATAL_ERROR "standalone BIOS-free --exe stub path regressed: ${exe_rc}: ${exe_output}")
+    endif()
+  elseif(CASE STREQUAL "disc_load")
     string(REPEAT "[0-9a-f]" 64 digits)
     if(NOT DEFINED HOOKED)
       message(FATAL_ERROR "runner disc identity test runner was not provided")
@@ -1678,6 +1770,20 @@ schway_add_test(NAME runner.disc.probe
     -DOUT=${PROJECT_BINARY_DIR}/tests/runner-disc-probe -DPYTHON3=${Python3_EXECUTABLE}
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: the BIOS boot mode silently bypassing normal startup, skipping the
+# shell for arbitrary or BIOS-free content, or changing the standalone EXE stub path.
+foreach(mode IN ITEMS full fast invalid)
+  schway_add_test(NAME runner.boot.${mode}
+    COMMAND ${runner_check} -DCASE=boot_${mode}
+      -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+      -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
+      -DHELLO_EXE=${PROJECT_BINARY_DIR}/fixtures/hello.exe
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS portable runner TIMEOUT 180)
+  set_tests_properties(runner.boot.${mode} PROPERTIES
+    FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")
+endforeach()
 
 set(runner_disc_legacy_timeout 120)
 if(SCHWAYSTATION_INVENTORY STREQUAL "asan")

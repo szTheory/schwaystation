@@ -4,7 +4,7 @@
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
  *                     [--hash] [--hash-audio] [--hash-state]
- *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N]
  *                     [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
  *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
@@ -147,7 +147,7 @@ static const char synopsis[] =
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
     "                         [--hash] [--hash-audio] [--hash-state]\n"
-    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N | --bench N] [--tty]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]\n"
     "                         [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
@@ -171,6 +171,7 @@ static const char synopsis[] =
     "  --png N:FILE       write frame N to FILE as a PNG (1 <= N <= --frames)\n"
     "  --bios FILE        load an exactly 524288-byte BIOS image and report its identity\n"
     "  --disc FILE        attach a cue sheet, ISO image or m3u playlist (needs --bios)\n"
+    "  --boot MODE        full (default) or fast for eligible BIOS-backed discs\n"
     "  --exe FILE         load a PS-EXE and run it (600 frames unless --frames or --bench)\n"
     "  --tty              print guest text as tty lines; needs --exe or --bios\n"
     "  --stop-on mailbox  end the run when the program's mailbox says done or fault; needs --exe or --disc\n"
@@ -385,6 +386,8 @@ typedef struct options {
     const char *bios;  /* --bios FILE, else NULL */
     const char *disc;  /* --disc FILE, else NULL */
     const char *exe;   /* --exe FILE, else NULL */
+    int boot_set;      /* --boot was supplied */
+    int boot_fast;     /* --boot fast, else full/default */
     int tty;           /* --tty: debug-port flag and the tty lines */
     int stop_mailbox;  /* --stop-on mailbox */
     int trace;         /* --trace first-fault */
@@ -595,6 +598,19 @@ static int parse_options(int argc, char **argv, options *o)
             }
             o->disc = value;
             i++;
+        } else if (strcmp(arg, "--boot") == 0) {
+            if (o->boot_set || value == NULL) {
+                return usage("give --boot full or fast once");
+            }
+            if (strcmp(value, "full") == 0) {
+                o->boot_fast = 0;
+            } else if (strcmp(value, "fast") == 0) {
+                o->boot_fast = 1;
+            } else {
+                return usage("--boot needs full or fast");
+            }
+            o->boot_set = 1;
+            i++;
         } else if (strcmp(arg, "--tty") == 0) {
             o->tty = 1;
         } else if (strcmp(arg, "--stop-on") == 0) {
@@ -663,6 +679,9 @@ static int parse_options(int argc, char **argv, options *o)
     if (o->disc != NULL && o->exe != NULL) {
         return usage("--disc cannot be used with --exe");
     }
+    if (o->boot_set && (o->bios == NULL || o->disc == NULL || o->exe != NULL)) {
+        return usage("--boot needs --bios and --disc");
+    }
     if (o->disc != NULL && o->hash_state) {
         return usage("--hash-state is unavailable with --disc");
     }
@@ -679,7 +698,7 @@ static int parse_options(int argc, char **argv, options *o)
             o->exe != NULL || o->disc != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash || o->hash_audio ||
             o->hash_state || o->hash_vram || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
-            o->region_set || o->machine_set || o->test_audio_failure) {
+            o->region_set || o->machine_set || o->boot_set || o->test_audio_failure) {
             return usage("--probe cannot be combined with run options or partial test metadata");
         }
         return SCHWAY__EXIT_OK;
@@ -696,7 +715,8 @@ static int parse_options(int argc, char **argv, options *o)
             o->frames != 0u || o->bios != NULL || o->exe != NULL || o->disc != NULL || o->inputs != NULL ||
             o->save_dir != NULL || o->hash || o->hash_audio || o->hash_state || o->hash_vram || o->bench || o->tty ||
             o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
-            o->memcard_names_set || o->serial != NULL || o->region_set || o->machine_set) {
+            o->memcard_names_set || o->serial != NULL || o->region_set || o->machine_set ||
+            o->boot_set) {
             return usage("--probe takes no other option");
         }
         return SCHWAY__EXIT_OK;
@@ -1563,6 +1583,7 @@ static int run(const options *opt)
     }
     uint32_t disc_licence_area = SCHWAY_LICENCE_NONE;
     uint32_t exe_licence_area = SCHWAY_LICENCE_NONE;
+    int disc_boot_exe_eligible = 0;
     char identity_serial[16] = "";
     if (exe != NULL) {
         schway_exe_info info;
@@ -1586,9 +1607,18 @@ static int run(const options *opt)
             if (schway_probe_exe(identity.exe_bytes, identity.exe_size, &info) ==
                 SCHWAY_STATUS_OK) {
                 exe_licence_area = info.licence_area;
+                disc_boot_exe_eligible = 1;
             }
             schway__disc_probe_dispose(&identity);
         }
+    }
+    if (opt->boot_fast && !disc_boot_exe_eligible) {
+        schway_disc_image_close(disc_image);
+        free(samples);
+        free(bios);
+        free(exe);
+        schway__inputs_release(&movie);
+        return usage("--boot fast needs an eligible disc boot executable");
     }
     schway__region_resolution region_resolution = schway__region_resolve(
         identity_serial, disc_licence_area, exe_licence_area);
@@ -1625,20 +1655,20 @@ static int run(const options *opt)
 #endif
     runner_card_files card_files;
     memset(&card_files, 0, sizeof card_files);
+    schway_profile profile;
+    memset(&profile, 0, sizeof profile);
     /* The debug-port flag is set for --tty and for nothing else. */
     if (status == SCHWAY__EXIT_OK &&
         (opt->region_set || opt->machine_set || opt->tty || opt->disc != NULL || opt->exe != NULL)) {
-        schway_profile p;
-        memset(&p, 0, sizeof p);
-        p.size = (uint32_t)sizeof p;
-        p.region = selected_region;
-        p.flags = opt->tty ? SCHWAY_PROFILE_DEBUG_PORT : 0u;
+        profile.size = (uint32_t)sizeof profile;
+        profile.region = selected_region;
+        profile.flags = opt->tty ? SCHWAY_PROFILE_DEBUG_PORT : 0u;
         if (opt->board == SCHWAY_BOARD_PU7 || opt->board == SCHWAY_BOARD_PU8_EARLY) {
-            p.flags |= SCHWAY_PROFILE_GPU_V0;
+            profile.flags |= SCHWAY_PROFILE_GPU_V0;
         }
-        p.disc_flags = opt->disc != NULL ? SCHWAY_PROFILE_CD_LICENSED : 0u;
-        p.board = opt->board;
-        st = schway_set_profile(inst, &p);
+        profile.disc_flags = opt->disc != NULL ? SCHWAY_PROFILE_CD_LICENSED : 0u;
+        profile.board = opt->board;
+        st = schway_set_profile(inst, &profile);
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: schway_set_profile failed: %s\n",
                     schway_status_string(st));
@@ -1666,6 +1696,15 @@ static int run(const options *opt)
                         schway_status_string(st));
                 status = SCHWAY__EXIT_FAILURE;
             }
+        }
+    }
+    if (status == SCHWAY__EXIT_OK && opt->boot_fast) {
+        profile.flags |= SCHWAY_PROFILE_FAST_BOOT;
+        st = schway_set_profile(inst, &profile);
+        if (st != SCHWAY_STATUS_OK) {
+            fprintf(stderr, "schwaystation-run: fast boot profile selection failed: %s\n",
+                    schway_status_string(st));
+            status = SCHWAY__EXIT_FAILURE;
         }
     }
     if (status == SCHWAY__EXIT_OK && exe != NULL) {

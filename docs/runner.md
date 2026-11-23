@@ -17,7 +17,7 @@ test card, described in
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-audio] [--hash-state]
-schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N | --bench N] [--tty]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]
                   [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
 schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
@@ -34,6 +34,7 @@ schwaystation-run --help | --version
 | `--bench N` | Run N frames, time each one and print the [bench report](#bench-report). N is from 1 to 1000000. |
 | `--bios FILE` | Load an exactly 524288-byte BIOS image, report its digest identity, then run it. Without `--frames` or `--bench` the run is 600 frames. Give it once. See [BIOS images](#bios-images). |
 | `--disc FILE` | Attach a supported CUE, ISO, M3U, unencrypted PBP, ECM or CloneCD image to a BIOS run. A `.cue` names BINARY or ECM track files; `.ccd` uses its same-stem `.img` and optional `.sub`; an `.m3u` selects initial disc 0. Needs `--bios`. Give it once. |
+| `--boot MODE` | Choose `full` (the default) or `fast` for a BIOS-backed disc run. Fast requires a valid boot executable found through the disc's ISO9660 boot metadata. Give it once. |
 | `--exe FILE` | Load the PS-EXE file and run it. Without `--frames` or `--bench` the run is 600 frames; a count given with either option wins. Give it once. See [Running a PS-EXE](#running-a-ps-exe). |
 | `--tty` | Print guest text as [`tty` lines](#tty) and let it end the run through the [exit port](#exit-port). Needs `--exe` or `--bios`. |
 | `--stop-on mailbox` | End the run when the program's [mailbox](#mailbox) reports done or fault; a run that reaches the frame cap with neither is a [hang](#mailbox). Needs `--exe` or `--disc`. Give it once. |
@@ -58,7 +59,7 @@ schwaystation-run --help | --version
 Options may come in any order, except `--probe`, which takes no other option except the `--metadata-ledger` and
 `--metadata-dat` pair. Anything else on the command line is
 a usage error and nothing runs; that includes a file name that does not follow `--bios`, `--disc`, `--exe` or `--probe`,
-`--bios`, `--disc` or `--exe` twice, `--hash-audio` twice, `--bios` together with `--exe`, `--disc` without `--bios`, `--exe` with `--probe`, `--tty` without `--exe` or
+`--bios`, `--disc` or `--exe` twice, `--hash-audio` twice, `--bios` together with `--exe`, `--disc` without `--bios`, `--boot` without both `--bios` and `--disc`, `--exe` with `--probe`, `--tty` without `--exe` or
 `--bios`, `--stop-on`, `--trace` or `--no-stop-on-fault` without `--exe`, `--stop-on` with anything but `mailbox`,
 `--trace` with anything but `first-fault`, `--hash-state` with `--disc`, `--serial` without serial naming, serial naming
 without `--save-dir`, or serial naming without either a standalone `--exe` or a literal `--serial`, and any option
@@ -111,6 +112,15 @@ sectors, then closes it after destroying the instance. It never extracts or side
 ```sh
 schwaystation-run --bios ./openbios.bin --disc ./game.cue --frames 900 --stop-on mailbox --hash
 ```
+
+The BIOS-backed disc path defaults to `--boot full`; spelling `--boot full` produces the same ordinary firmware
+startup. `--boot fast` opts into the core's initialized shell handoff only after the runner has loaded the supplied
+BIOS, attached the disc, and verified a bounded boot executable named by the disc's ISO9660 boot metadata. Missing
+BIOS/disc arguments and discs without a valid boot executable are refused before the core instance runs. This skips
+only the post-initialization shell step; it does not replace BIOS initialization or add firmware services.
+
+The standalone `--exe FILE` path remains BIOS-free and uses the core's stub kernel. `--boot` is accepted only for
+BIOS-backed disc runs.
 
 `.cue` sheets may reference supported BINARY files. `.iso` images use cooked 2048-byte sectors. An `.m3u` playlist
 starts at entry 0. PBP accepts only the unencrypted, single-disc PSISO layout with one MODE2 data track described in
