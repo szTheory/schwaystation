@@ -7,10 +7,10 @@ current_phase_name: Multitap and special controllers
 current_plan: Not started
 status: planning
 stopped_at: Phase 13 complete, ready to plan Phase 14
-last_updated: "2026-11-23T22:52:54.687Z"
+last_updated: "2026-11-23T23:11:21.747Z"
 last_activity: 2026-11-23
-last_activity_desc: Phase 13 complete, transitioned to Phase 14
-state_head: a424e33388dc6e3c7820baa10a90d01803010037
+last_activity_desc: "Phase 13 shipped as PR #40"
+state_head: 35d178048bff1e1c33d3348868ba05e6887fc1db
 progress:
   total_phases: 10
   completed_phases: 7
@@ -34,8 +34,8 @@ Phase: 14 — Multitap and special controllers
 Current Plan: Not started
 Total Plans in Phase: Not yet planned
 Status: Ready to plan
-Last activity: 2026-11-23 — Phase 13 complete, transitioned to Phase 14
-Progress: [███████░░░] 70% (6/10 v2.0 phases shipped; Phase 13 is verified and awaiting its PR/release. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Last activity: 2026-11-23 -- Phase 13 shipped as PR #40
+Progress: [███████░░░] 70% (6/10 v2.0 phases released; Phase 13 is verified and PR #40 is awaiting merge/release. Phase 14 planning starts after that release. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
