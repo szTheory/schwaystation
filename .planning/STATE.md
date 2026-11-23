@@ -5,16 +5,16 @@ milestone_name: The whole library
 current_phase: 13
 current_phase_name: Regions, console revisions and playback
 current_plan: Not started
-status: planning
-stopped_at: Phase 13 context gathered
-last_updated: "2026-11-23T13:28:05.307Z"
+status: planned
+stopped_at: Phase 13 planning complete
+last_updated: "2026-11-23T14:43:33.311Z"
 last_activity: 2026-11-23
-last_activity_desc: Phase 13 context captured with profile, boot and MDEC boundaries; planning is next
-state_head: f8937a8354a6598dbc9f9122391a432b818b9028
+last_activity_desc: Phase 13 research and nine plans reviewed; execution is next
+state_head: 1ab28e1190d545d569869ee8366155394c42e47d
 progress:
   total_phases: 10
   completed_phases: 6
-  total_plans: 70
+  total_plans: 79
   completed_plans: 70
   percent: 60
 ---
@@ -32,9 +32,9 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 Phase: 13 — Regions, console revisions and playback
 Current Plan: Not started
-Total Plans in Phase: 0
-Status: Ready to plan
-Last activity: 2026-11-23 -- Phase 13 discussion captured; Phase 12 release is green
+Total Plans in Phase: 9
+Status: Ready to execute
+Last activity: 2026-11-23 -- Phase 13 research and nine plans passed structure, dependency and command-syntax checks
 Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
@@ -69,7 +69,19 @@ legal GPU behavior pairs, region/title/board separation, BIOS-backed opt-in shel
 `git diff --check` passed before commit. No tests, hosted jobs, Act jobs or Docker resources were needed for this
 planning-only step. Three advisor reviews and an adversarial synthesis preferred the existing feature-ledger
 profile field with canonical `region.board.gpu` values; four loosely matched todos were reviewed and kept bound
-to their earlier phases or test-maintenance scope. The next action is Phase 13 research and planning.
+to their earlier phases or test-maintenance scope. Phase 12 release is green. No tests or hosted work ran during
+discussion.
+
+### Phase 13 research and planning (2026-11-23)
+
+Runtime/model: Codex orchestrator; GSD planner `gpt-6.1-sol` high and plan checker `gpt-6-luna` xhigh; primary
+runtime model ID unavailable. Nine plans were created with serialized waves to avoid concurrent writes to the
+shared CMake build tree. Final plan review passed all structure, ownership and dependency checks; all 18
+automated command bodies pass `bash -n`, and failure-direction checks report zero findings. A local CTest
+show-only probe exposed that the existing build directory was unconfigured and CTest treats a missing selector
+as exit 0; Plan 02 now configures first and asserts the exact discovered selector set in JSON. The fixed
+repository-check budget remains 3,901/3,901 lines. No implementation build, test suite, hosted CI, Act job or
+Docker resource was started. Planning wall duration was not tracked. Next: execute Plan 13-01.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 
@@ -1959,9 +1971,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T13:28:05.090Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-regions-console-revisions-and-playback/13-CONTEXT.md
+Last session: 2026-11-23T14:43:33.134Z
+Stopped at: Phase 13 planning complete
+Resume file: .planning/phases/13-regions-console-revisions-and-playback/13-01-PLAN.md
 
 ### v1.0 session history
 
