@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 13
 current_phase_name: Regions, console revisions and playback
-current_plan: 6
+current_plan: 7
 status: planned
-stopped_at: Completed 13-05-PLAN.md
-last_updated: "2026-11-23T19:11:13.857Z"
+stopped_at: Completed 13-06-PLAN.md
+last_updated: "2026-11-23T20:09:49.633Z"
 last_activity: 2026-11-23
-last_activity_desc: Plans 13-01 through 13-05 complete; Plan 13-06 is next
-state_head: e108691d1d566eaf59eea7ce7422dcbc289d4e62
+last_activity_desc: Plan 13-06 complete; Plan 13-07 is next
+state_head: a8e803beb950881edc3e2073b99aa73edf618ba0
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 79
-  completed_plans: 75
+  completed_plans: 76
   percent: 60
 ---
 
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 13 — Regions, console revisions and playback
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 9
 Status: Ready to execute
-Last activity: 2026-11-23 -- Plans 13-01 through 13-05 complete; Plan 13-06 is next
-Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-05 are complete; Plan 13-06 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Last activity: 2026-11-23 -- Plan 13-06 complete; Plan 13-07 is next
+Progress: [██████░░░░] 60% (6/10 v2.0 phases shipped; Phase 13 is in progress. Plans 13-01 through 13-06 are complete; Plan 13-07 is next. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
@@ -80,6 +80,16 @@ Task 1 passed the runner inventory sort (0.00s), the 3,901-line gate (0.02s), co
 Task 2 sorted both runner and compatibility inventories, kept the line budget at 3,901/3,901, configured the reused CI tree in 0.81s, and asserted the exact 16-name selector graph including `compat.features.preflight`. The focused runner/probe target build passed in 1.00s. The exact 16-test selection passed in 0.19s, including all nine machine tokens, canonical profile acceptance, region fallback/precedence, redaction, and full identity hash preservation.
 
 No broad suite, hosted CI, Act, Docker, or hardware run was needed because workflow wiring did not change. The summary records runner-observed region/profile evidence only; PROFILE-01 and PROFILE-02 remain pending until full Phase 13 verification. Plan 13-06 is next.
+
+### Phase 13 Plan 13-06 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Total task duration was not reliably tracked. Task commits were `c072d8e` (libretro options and profile coverage) and `a8e803b` (option documentation); measured task commit count was two from `87eac29d1fec593efb7e019c7cbd4ef6fb3b6408` through `a8e803beb950881edc3e2073b99aa73edf618ba0`.
+
+The initial CI configure/target-registration attempt failed before any build. The production core and test targets needed to link `host/disc_probe.c` and `runner/region.c`; the plan file list and resolver-link note were corrected alongside target wiring. The subsequent CI configure passed in 0.8s. Sorted libretro inventory and the fixed 3,901-line budget passed, fixture producers were current, and `policy.fixture_budget` passed 1/1. The changed-target build passed in 0.465s. The exact profile selector closure matched 6/6 names and all six tests passed in 0.44s.
+
+The D-01 review changed the libretro machine default/fallback to PU-18 without changing the library default. That first profile run exposed three PM-41(2) comparisons failing across the three regions: the advertised `pm41-2` token lacked an explicit parser case and had depended on the old fallback. Adding the explicit PM-41(2) mapping fixed the isolated option-profile test and the final six-test selector. The detached first audio-test launch had no authoritative exit record, so the exact test was rerun as one managed session; selector closure was 1/1 and `libretro.host.disc_audio` passed in 2.20s with both PAL and NTSC cases. `git diff --check` passed.
+
+No workflow wiring changed, so no broad CI, Act, hosted CI, or Docker run was used. `PROFILE-01` and `PROFILE-02` remain pending full Phase 13 verification; Plan 13-07 is next.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -1338,6 +1348,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 13 P03 | 59m22s | 2 tasks | 9 files |
 | Phase 13 P04 | 17m02s | 2 tasks | 4 files |
 | Phase 13 P05 | not tracked | 2 tasks | 11 files |
+| Phase 13 P06 | not reliably tracked | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -1780,6 +1791,8 @@ Recent decisions affecting current work:
 - [Phase 13]: Preserve mutable bus.ram_size during board-identity restoration.
 - [Phase 13]: Resolve automatic region from serial, disc licence, and executable marker while keeping explicit selection authoritative.
 - [Phase 13]: Keep board selection separate from video region and title serial; pair PU-7 and PU-8 early with GPU_V0.
+- [Phase 13]: Libretro machine options default to and fall back to PU-18 per D-01 while the library default remains unchanged.
+- [Phase 13]: Machine and region remain independent options applied at content load; auto region identity uses the shared host resolver.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2030,8 +2043,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T19:11:13.612Z
-Stopped at: Completed 13-05-PLAN.md
+Last session: 2026-11-23T20:09:49.415Z
+Stopped at: Completed 13-06-PLAN.md
 Resume file: None
 
 ### v1.0 session history
