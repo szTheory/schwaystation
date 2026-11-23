@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/szTheory/schwaystation/compare/v0.11.0...v0.12.0) (2026-11-23)
+
+
+### Features
+
+* add SBI and LibCrypt support ([#38](https://github.com/szTheory/schwaystation/issues/38)) ([3891847](https://github.com/szTheory/schwaystation/commit/3891847a5daaa71ef8d3e9d6b4181d0a5ecc7ab2))
+
 ## [0.11.0](https://github.com/szTheory/schwaystation/compare/v0.10.0...v0.11.0) (2026-11-23)
 
 
