@@ -12,6 +12,7 @@ core.instances.independent	core,portable
 core.no_alloc_after_load	perf,portable
 core.no_busy_loop	core,portable
 core.profile.locked	core,portable
+core.profile.machine	core,portable
 core.profile.rejected	core,portable
 core.reset.power	core,portable
 core.run.budget_resume	core,portable

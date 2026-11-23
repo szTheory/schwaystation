@@ -617,6 +617,95 @@ static void test_profile_locked(void)
     schway_destroy(inst);
 }
 
+/* Documented board/GPU pairs from PSX-SYSTEM section 8. Board identity and
+   the legacy GPU flag are independent for old-sized callers. */
+static const struct {
+    uint32_t board;
+    uint32_t gpu_v0;
+} board_gpu_pairs[] = {
+    {SCHWAY_BOARD_PU7, 1u},
+    {SCHWAY_BOARD_PU8_EARLY, 1u},
+    {SCHWAY_BOARD_PU8_LATE, 0u},
+    {SCHWAY_BOARD_PU18, 0u},
+    {SCHWAY_BOARD_PU20, 0u},
+    {SCHWAY_BOARD_PU22, 0u},
+    {SCHWAY_BOARD_PU23, 0u},
+    {SCHWAY_BOARD_PM41, 0u},
+    {SCHWAY_BOARD_PM41_2, 0u},
+};
+
+static schway_profile board_profile(uint32_t region, uint32_t board, uint32_t gpu_v0)
+{
+    schway_profile p = make_profile(region);
+    p.board = board;
+    p.flags = gpu_v0 != 0u ? SCHWAY_PROFILE_GPU_V0 : 0u;
+    return p;
+}
+
+/* Every documented board/GPU tuple is accepted and every other pair is
+   rejected before region, board or GPU behavior changes. */
+static void test_profile_machine(void)
+{
+    schway_config cfg = plain_config();
+    schway *inst = NULL;
+    CHECK_EQ_U64(schway_create(&cfg, &inst), SCHWAY_STATUS_OK);
+    if (inst == NULL) {
+        exit(1);
+    }
+    CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU18);
+
+    /* A profile ending at the previous struct size cannot supply board. */
+    schway_profile old = make_profile(SCHWAY_REGION_PAL);
+    old.size = (uint32_t)offsetof(schway_profile, board);
+    old.flags = SCHWAY_PROFILE_GPU_V0;
+    old.board = SCHWAY_BOARD_PM41_2;
+    CHECK_EQ_U64(schway_set_profile(inst, &old), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU18);
+    CHECK_EQ_U64(inst->profile_flags, SCHWAY_PROFILE_GPU_V0);
+    CHECK_EQ_U64(info_of(inst).region, SCHWAY_REGION_PAL);
+
+    /* Board zero inherits PU-18 while the legacy GPU override remains usable. */
+    schway_profile inherit = board_profile(SCHWAY_REGION_NTSC_J, 0u, 0u);
+    CHECK_EQ_U64(schway_set_profile(inst, &inherit), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(inst->board, SCHWAY_BOARD_PU18);
+    CHECK_EQ_U64(inst->profile_flags, 0u);
+
+    for (size_t i = 0; i < sizeof board_gpu_pairs / sizeof board_gpu_pairs[0]; i++) {
+        uint32_t expected_v0 = board_gpu_pairs[i].gpu_v0;
+        schway_profile legal = board_profile(SCHWAY_REGION_NTSC_U,
+                                             board_gpu_pairs[i].board, expected_v0);
+        CHECK_EQ_U64(schway_set_profile(inst, &legal), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(inst->board, board_gpu_pairs[i].board);
+        CHECK_EQ_U64(inst->profile_flags,
+                     expected_v0 != 0u ? SCHWAY_PROFILE_GPU_V0 : 0u);
+
+        uint32_t region_before = info_of(inst).region;
+        uint32_t board_before = inst->board;
+        uint32_t flags_before = inst->profile_flags;
+        schway_profile illegal = board_profile(SCHWAY_REGION_PAL,
+                                                board_gpu_pairs[i].board,
+                                                expected_v0 == 0u ? 1u : 0u);
+        CHECK_EQ_U64(schway_set_profile(inst, &illegal),
+                     SCHWAY_STATUS_ERR_PROFILE_REJECTED);
+        CHECK_EQ_U64(info_of(inst).region, region_before);
+        CHECK_EQ_U64(inst->board, board_before);
+        CHECK_EQ_U64(inst->profile_flags, flags_before);
+    }
+
+    static const uint32_t unsupported[] = {10u, 0xFFFFFFFFu};
+    for (size_t i = 0; i < sizeof unsupported / sizeof unsupported[0]; i++) {
+        uint32_t region_before = info_of(inst).region;
+        uint32_t board_before = inst->board;
+        uint32_t flags_before = inst->profile_flags;
+        schway_profile bad = board_profile(SCHWAY_REGION_PAL, unsupported[i], 0u);
+        CHECK_EQ_U64(schway_set_profile(inst, &bad), SCHWAY_STATUS_ERR_PROFILE_REJECTED);
+        CHECK_EQ_U64(info_of(inst).region, region_before);
+        CHECK_EQ_U64(inst->board, board_before);
+        CHECK_EQ_U64(inst->profile_flags, flags_before);
+    }
+    schway_destroy(inst);
+}
+
 /* A power reset returns to the state after create, keeping the region; any
    other kind is refused and changes nothing. */
 static void test_reset_power(void)
@@ -1063,6 +1152,7 @@ static const struct {
     {"instances.independent", test_instances_independent},
     {"no_alloc_after_load", test_no_alloc_after_load},
     {"profile.locked", test_profile_locked},
+    {"profile.machine", test_profile_machine},
     {"profile.rejected", test_profile_rejected},
     {"reset.power", test_reset_power},
     {"testcard.counter", test_card_counter},
