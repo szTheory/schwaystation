@@ -398,6 +398,9 @@ save("truncated-block.pbp", image)
     execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot_runner.m3u"
       RESULT_VARIABLE playlist_rc OUTPUT_VARIABLE playlist_out ERROR_VARIABLE playlist_err)
     if(NOT cue_rc STREQUAL "0" OR NOT cue_out MATCHES "format=disc" OR
+       NOT cue_out MATCHES "serial=redacted" OR
+       NOT cue_out MATCHES "rcheevos_md5=redacted" OR
+       NOT cue_out MATCHES "track1_sha1=redacted" OR
        NOT playlist_rc STREQUAL "0" OR NOT playlist_out MATCHES "format=disc" OR
        NOT playlist_out MATCHES "playlist_count=2")
       message(FATAL_ERROR "disc probe failed:\nCUE ${cue_rc}\n${cue_out}${cue_err}\n"
@@ -1363,7 +1366,89 @@ Path(sys.argv[2]).write_bytes(data)
     refuse(--frames 1 --region)
     refuse(--frames 1 --region secam)
     refuse(--frames 1 --region NTSC-U)
-    refuse(--frames 1 --region auto)
+    refuse(--frames 1 --region ntsc-u --region pal)
+  elseif(CASE STREQUAL "machine")
+    refuse(--frames 1 --machine)
+    refuse(--frames 1 --machine unknown)
+    refuse(--frames 1 --machine pu7 --machine pu18)
+    foreach(board IN ITEMS pu7 pu8-early pu8-late pu18 pu20 pu22 pu23 pm41 pm41-2)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --region ntsc-u --machine ${board} --hash-state
+        RESULT_VARIABLE board_rc OUTPUT_VARIABLE board_out ERROR_VARIABLE board_err)
+      if(NOT board_rc STREQUAL "0" OR NOT board_out MATCHES "state sha256 [0-9a-f]+")
+        message(FATAL_ERROR "documented machine token ${board} or its GPU pairing was rejected:\n"
+          "exit ${board_rc}\n${board_out}${board_err}")
+      endif()
+    endforeach()
+  elseif(CASE STREQUAL "region_auto")
+    if(NOT DEFINED BIOS OR NOT EXISTS "${BIOS}" OR
+       NOT DEFINED PYTHON3 OR PYTHON3 STREQUAL "")
+      message(FATAL_ERROR "auto region test needs the checked BIOS and configured Python 3")
+    endif()
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state --region auto
+      RESULT_VARIABLE auto_fallback_rc OUTPUT_VARIABLE auto_fallback_out ERROR_VARIABLE auto_fallback_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state --region ntsc-u
+      RESULT_VARIABLE ntsc_u_rc OUTPUT_VARIABLE ntsc_u_out ERROR_VARIABLE ntsc_u_err)
+    if(NOT auto_fallback_rc STREQUAL "0" OR NOT ntsc_u_rc STREQUAL "0" OR
+       NOT auto_fallback_out STREQUAL ntsc_u_out)
+      message(FATAL_ERROR "no-hint auto region must retain NTSC-U:\n"
+        "auto ${auto_fallback_rc}\n${auto_fallback_out}${auto_fallback_err}\n"
+        "NTSC-U ${ntsc_u_rc}\n${ntsc_u_out}${ntsc_u_err}")
+    endif()
+    file(MAKE_DIRECTORY "${OUT}")
+    set(patch_sector4 [==[
+from pathlib import Path
+import sys
+image = bytearray(Path(sys.argv[1]).read_bytes())
+start = 4 * 2352 + 24
+if start + 2048 > len(image):
+    raise SystemExit("disc fixture is too short for sector 4")
+sector = bytearray(2048)
+marker = b"          Licensed  by          Sony Computer Entertainment Euro pe   "
+sector[:len(marker)] = marker
+image[start:start + 2048] = sector
+Path(sys.argv[2]).write_bytes(image)
+]==])
+    execute_process(COMMAND "${PYTHON3}" -c "${patch_sector4}"
+        "${FIXTURES}/disc_boot.bin" "${OUT}/disc_boot_region.bin"
+      RESULT_VARIABLE patch_rc OUTPUT_VARIABLE patch_out ERROR_VARIABLE patch_err)
+    if(NOT patch_rc STREQUAL "0")
+      message(FATAL_ERROR "could not create the auto-region disc fixture: ${patch_out}${patch_err}")
+    endif()
+    file(COPY_FILE "${FIXTURES}/disc_boot_track02.bin" "${OUT}/disc_boot_region_track02.bin")
+    file(WRITE "${OUT}/disc_boot_region.cue"
+      "FILE \"disc_boot_region.bin\" BINARY\n"
+      "  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n"
+      "FILE \"disc_boot_region_track02.bin\" BINARY\n"
+      "  TRACK 02 AUDIO\n    INDEX 00 00:00:00\n    INDEX 01 00:02:00\n")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${OUT}/disc_boot_region.cue"
+        --frames 1 --hash --region auto
+      RESULT_VARIABLE auto_rc OUTPUT_VARIABLE auto_out ERROR_VARIABLE auto_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${OUT}/disc_boot_region.cue"
+        --frames 1 --hash --region ntsc-j
+      RESULT_VARIABLE override_rc OUTPUT_VARIABLE override_out ERROR_VARIABLE override_err)
+    if(NOT auto_rc STREQUAL "0" OR NOT override_rc STREQUAL "0" OR
+       NOT auto_err MATCHES "region hint disagreement:.*disc=pal.*exe=ntsc-u; selected=pal" OR
+       NOT override_err MATCHES "region hint disagreement:.*disc=pal.*exe=ntsc-u; selected=ntsc-j" OR
+       auto_out STREQUAL override_out)
+      message(FATAL_ERROR "auto or explicit region selection lost precedence:\n"
+        "auto ${auto_rc}\n${auto_out}${auto_err}\n"
+        "override ${override_rc}\n${override_out}${override_err}")
+    endif()
+  elseif(CASE STREQUAL "hash_machine")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --region ntsc-u --machine pu7 --hash-state
+      RESULT_VARIABLE same_a_rc OUTPUT_VARIABLE same_a_out ERROR_VARIABLE same_a_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --region ntsc-u --machine pu7 --hash-state
+      RESULT_VARIABLE same_b_rc OUTPUT_VARIABLE same_b_out ERROR_VARIABLE same_b_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --region ntsc-u --machine pu18 --hash-state
+      RESULT_VARIABLE other_rc OUTPUT_VARIABLE other_out ERROR_VARIABLE other_err)
+    if(NOT same_a_rc STREQUAL "0" OR NOT same_b_rc STREQUAL "0" OR
+       NOT other_rc STREQUAL "0" OR NOT same_a_out STREQUAL same_b_out OR
+       same_a_out STREQUAL other_out OR NOT same_a_out MATCHES "state sha256 [0-9a-f]+")
+      message(FATAL_ERROR "machine profiles did not hash deterministically and distinctly:\n"
+        "pu7 A ${same_a_rc}\n${same_a_out}${same_a_err}\n"
+        "pu7 B ${same_b_rc}\n${same_b_out}${same_b_err}\n"
+        "pu18 ${other_rc}\n${other_out}${other_err}")
+    endif()
   elseif(CASE STREQUAL "png_file")
     # The decode check runs first, so the pinned digest is only ever
     # compared for a file whose IHDR and every pixel are already known good.
@@ -1512,6 +1597,11 @@ set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
   "-DEMULATOR=${runner_emulator_bars}")
 
 set(runner_disc_playlist ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u)
+# Fault prevented: board identity is omitted from or destabilizes the saved state hash.
+schway_add_test(NAME runner.hash.machine
+  COMMAND ${runner_check} -DCASE=hash_machine -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
 # Fault prevented: a platform-native newline changes a generated fixture hash
 # between CI lanes even though each lane parses the same playlist entries.
 file(CONFIGURE OUTPUT "${runner_disc_playlist}" CONTENT "disc_boot.cue\ndisc_boot_playlist.cue\n"
@@ -1654,7 +1744,7 @@ schway_add_test(NAME runner.png_file
 # CI step hashes a frame nobody asked for: no arguments, an option this
 # release lacks, a file name, --exe or --tty misused, a frame count out of
 # range or missing, a malformed or out-of-range --png, or an unknown region.
-foreach(case no_args unknown positional exe frame_range png_syntax region)
+foreach(case no_args unknown positional exe frame_range png_syntax region machine)
   schway_add_test(NAME runner.usage.${case}
     COMMAND ${runner_check} -DCASE=${case} -DOUT=${PROJECT_BINARY_DIR}/tests/refused.png
       -P ${CMAKE_CURRENT_LIST_FILE}
@@ -1666,6 +1756,13 @@ endforeach()
 schway_add_test(NAME runner.region.probe
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-region-probe>
   LABELS portable runner TIMEOUT 10)
+
+# Fault prevented: default auto region or explicit override ignores resolved identity.
+schway_add_test(NAME runner.region.auto
+  COMMAND ${runner_check} -DCASE=region_auto -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests/runner-region-auto
+    -DPYTHON3=${Python3_EXECUTABLE} -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
 
 # The bench statistics and the stop flag, tested directly, and a runner built
 # with a hook that raises SIGTERM from inside frame 5.

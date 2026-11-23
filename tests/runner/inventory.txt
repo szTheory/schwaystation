@@ -23,6 +23,7 @@ runner.exit_table	portable,runner
 runner.exit_table.self_test	portable,runner
 runner.hash	portable,runner
 runner.hash.frame5	portable,runner
+runner.hash.machine	portable,runner
 runner.hash.ntsc_j	portable,runner
 runner.hash.pal	portable,runner
 runner.hash_state	portable,runner
@@ -37,6 +38,7 @@ runner.inputs.script	portable,runner
 runner.native_hash	portable,runner
 runner.png	portable,runner
 runner.png_file	portable,runner
+runner.region.auto	portable,runner
 runner.region.probe	portable,runner
 runner.rgb24	portable,runner
 runner.stop	portable,runner
@@ -44,6 +46,7 @@ runner.trace.golden	portable,runner
 runner.tty_sanitize	portable,runner
 runner.usage.exe	portable,runner
 runner.usage.frame_range	portable,runner
+runner.usage.machine	portable,runner
 runner.usage.no_args	portable,runner
 runner.usage.png_syntax	portable,runner
 runner.usage.positional	portable,runner

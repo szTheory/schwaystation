@@ -1,12 +1,12 @@
 /* schwaystation-run: the headless runner.
  *
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N] [--tty]
  *                     [--hash] [--hash-audio] [--hash-state]
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N]
  *                     [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
- *   schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
+ *   schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]
  *                     [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault] [--hash]
  *                     [--hash-audio] [--hash-state]
  *   schwaystation-run --probe FILE
@@ -95,12 +95,14 @@
 #include "cards.h"
 #include "clock.h"
 #include "disc_image.h"
+#include "disc_probe.h"
 #include "exit_status.h"
 #include "frame_hash.h"
 #include "inputs.h"
 #include "mailbox.h"
 #include "png.h"
 #include "probe.h"
+#include "region.h"
 #include "revision.h"
 #include "rss.h"
 #include "save_game_identity.h"
@@ -141,19 +143,20 @@ static void run_free(void *user, void *ptr, size_t size)
 }
 
 static const char synopsis[] =
-    "usage: schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
-    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
-    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
+    "usage: schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
     "                         [--hash] [--hash-audio] [--hash-state]\n"
-    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N | --bench N] [--tty]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N | --bench N] [--tty]\n"
     "                         [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]\n"
-    "       schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
     "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
     "                         [--serial SERIAL] [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]\n"
     "       schwaystation-run --help | --version\n"
-    "  --region NAME      ntsc-u (default), ntsc-j or pal\n"
+    "  --machine NAME     pu7, pu8-early, pu8-late, pu18, pu20, pu22, pu23, pm41 or pm41-2\n"
+    "  --region NAME      auto (default), ntsc-u, ntsc-j or pal\n"
     "  --frames N         run N frames (1 <= N <= 1000000)\n"
     "  --bench N          run N frames and report the time per frame\n"
     "  --hash             print the SHA-256 of the last frame\n"
@@ -241,6 +244,21 @@ static const char *runner_bios_region_name(uint32_t region)
     default:
         return "unknown";
     }
+}
+
+static const char *runner_region_name(uint32_t region)
+{
+    switch (region) {
+    case SCHWAY_REGION_NTSC_J: return "ntsc-j";
+    case SCHWAY_REGION_NTSC_U: return "ntsc-u";
+    case SCHWAY_REGION_PAL: return "pal";
+    default: return "unknown";
+    }
+}
+
+static const char *runner_region_hint_name(uint32_t region)
+{
+    return region != 0u ? runner_region_name(region) : "none";
 }
 
 static const char *runner_bios_flags_name(uint32_t flags)
@@ -355,6 +373,8 @@ typedef struct options {
     const char *probe; /* --probe FILE, else NULL */
     const char *metadata_ledger;
     const char *metadata_dat;
+    int machine_set; /* --machine was supplied */
+    uint32_t board;
 #ifdef SCHWAY_RUN_TEST_HOOKS
     const char *test_ledger;
     const char *test_dat;
@@ -515,15 +535,36 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("--png needs N:FILE with N from 1 to 1000000");
             }
             i++;
+        } else if (strcmp(arg, "--machine") == 0) {
+            if (o->machine_set || value == NULL) {
+                return usage("give --machine board once");
+            }
+            if (strcmp(value, "pu7") == 0) o->board = SCHWAY_BOARD_PU7;
+            else if (strcmp(value, "pu8-early") == 0) o->board = SCHWAY_BOARD_PU8_EARLY;
+            else if (strcmp(value, "pu8-late") == 0) o->board = SCHWAY_BOARD_PU8_LATE;
+            else if (strcmp(value, "pu18") == 0) o->board = SCHWAY_BOARD_PU18;
+            else if (strcmp(value, "pu20") == 0) o->board = SCHWAY_BOARD_PU20;
+            else if (strcmp(value, "pu22") == 0) o->board = SCHWAY_BOARD_PU22;
+            else if (strcmp(value, "pu23") == 0) o->board = SCHWAY_BOARD_PU23;
+            else if (strcmp(value, "pm41") == 0) o->board = SCHWAY_BOARD_PM41;
+            else if (strcmp(value, "pm41-2") == 0) o->board = SCHWAY_BOARD_PM41_2;
+            else return usage("--machine needs a documented board token");
+            o->machine_set = 1;
+            i++;
         } else if (strcmp(arg, "--region") == 0) {
-            if (value != NULL && strcmp(value, "ntsc-u") == 0) {
+            if (o->region_set || value == NULL) {
+                return usage("give --region once");
+            }
+            if (strcmp(value, "auto") == 0) {
+                o->region = 0u;
+            } else if (strcmp(value, "ntsc-u") == 0) {
                 o->region = SCHWAY_REGION_NTSC_U;
-            } else if (value != NULL && strcmp(value, "ntsc-j") == 0) {
+            } else if (strcmp(value, "ntsc-j") == 0) {
                 o->region = SCHWAY_REGION_NTSC_J;
-            } else if (value != NULL && strcmp(value, "pal") == 0) {
+            } else if (strcmp(value, "pal") == 0) {
                 o->region = SCHWAY_REGION_PAL;
             } else {
-                return usage("--region needs ntsc-u, ntsc-j or pal");
+                return usage("--region needs auto, ntsc-u, ntsc-j or pal");
             }
             o->region_set = 1;
             i++;
@@ -638,7 +679,7 @@ static int parse_options(int argc, char **argv, options *o)
             o->exe != NULL || o->disc != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash || o->hash_audio ||
             o->hash_state || o->hash_vram || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
-            o->region_set || o->test_audio_failure) {
+            o->region_set || o->machine_set || o->test_audio_failure) {
             return usage("--probe cannot be combined with run options or partial test metadata");
         }
         return SCHWAY__EXIT_OK;
@@ -655,7 +696,7 @@ static int parse_options(int argc, char **argv, options *o)
             o->frames != 0u || o->bios != NULL || o->exe != NULL || o->disc != NULL || o->inputs != NULL ||
             o->save_dir != NULL || o->hash || o->hash_audio || o->hash_state || o->hash_vram || o->bench || o->tty ||
             o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
-            o->memcard_names_set || o->serial != NULL || o->region_set) {
+            o->memcard_names_set || o->serial != NULL || o->region_set || o->machine_set) {
             return usage("--probe takes no other option");
         }
         return SCHWAY__EXIT_OK;
@@ -1520,6 +1561,47 @@ static int run(const options *opt)
             return SCHWAY__EXIT_USAGE;
         }
     }
+    uint32_t disc_licence_area = SCHWAY_LICENCE_NONE;
+    uint32_t exe_licence_area = SCHWAY_LICENCE_NONE;
+    char identity_serial[16] = "";
+    if (exe != NULL) {
+        schway_exe_info info;
+        memset(&info, 0, sizeof info);
+        info.size = (uint32_t)sizeof info;
+        if (schway_probe_exe(exe, exe_size, &info) == SCHWAY_STATUS_OK) {
+            exe_licence_area = info.licence_area;
+        }
+    }
+    if (opt->disc != NULL) {
+        schway_host_disc_probe identity;
+        schway_host_disc_probe_status probe_status =
+            schway__disc_probe_region(opt->disc, &identity);
+        if (probe_status == SCHWAY_HOST_DISC_PROBE_OK) {
+            memcpy(identity_serial, identity.serial, sizeof identity_serial);
+            identity_serial[sizeof identity_serial - 1u] = '\0';
+            disc_licence_area = identity.licence_area;
+            schway_exe_info info;
+            memset(&info, 0, sizeof info);
+            info.size = (uint32_t)sizeof info;
+            if (schway_probe_exe(identity.exe_bytes, identity.exe_size, &info) ==
+                SCHWAY_STATUS_OK) {
+                exe_licence_area = info.licence_area;
+            }
+            schway__disc_probe_dispose(&identity);
+        }
+    }
+    schway__region_resolution region_resolution = schway__region_resolve(
+        identity_serial, disc_licence_area, exe_licence_area);
+    uint32_t selected_region = opt->region_set && opt->region != 0u ?
+                               opt->region : region_resolution.region;
+    if (region_resolution.disagreements != 0u) {
+        fprintf(stderr,
+                "schwaystation-run: region hint disagreement: serial=%s disc=%s exe=%s; selected=%s\n",
+                runner_region_hint_name(region_resolution.serial_region),
+                runner_region_hint_name(region_resolution.disc_region),
+                runner_region_hint_name(region_resolution.exe_region),
+                runner_region_name(selected_region));
+    }
     schway_config cfg;
     memset(&cfg, 0, sizeof cfg);
     cfg.size = (uint32_t)sizeof cfg;
@@ -1544,13 +1626,18 @@ static int run(const options *opt)
     runner_card_files card_files;
     memset(&card_files, 0, sizeof card_files);
     /* The debug-port flag is set for --tty and for nothing else. */
-    if (status == SCHWAY__EXIT_OK && (opt->region != 0u || opt->tty || opt->disc != NULL)) {
+    if (status == SCHWAY__EXIT_OK &&
+        (opt->region_set || opt->machine_set || opt->tty || opt->disc != NULL || opt->exe != NULL)) {
         schway_profile p;
         memset(&p, 0, sizeof p);
         p.size = (uint32_t)sizeof p;
-        p.region = opt->region != 0u ? opt->region : SCHWAY_REGION_NTSC_U;
+        p.region = selected_region;
         p.flags = opt->tty ? SCHWAY_PROFILE_DEBUG_PORT : 0u;
+        if (opt->board == SCHWAY_BOARD_PU7 || opt->board == SCHWAY_BOARD_PU8_EARLY) {
+            p.flags |= SCHWAY_PROFILE_GPU_V0;
+        }
         p.disc_flags = opt->disc != NULL ? SCHWAY_PROFILE_CD_LICENSED : 0u;
+        p.board = opt->board;
         st = schway_set_profile(inst, &p);
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: schway_set_profile failed: %s\n",

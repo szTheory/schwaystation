@@ -14,12 +14,12 @@ test card, described in
 ## Synopsis
 
 ```text
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-audio] [--hash-state]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N | --bench N] [--tty]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--hash-state] [--png N:FILE]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty] [--hash] [--hash-audio] [--hash-state]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--frames N | --bench N] [--tty]
                   [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]
-schwaystation-run [--region ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
+schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty] [--stop-on mailbox]
                   [--trace first-fault] [--no-stop-on-fault] [--inputs FILE] [--save-dir DIR]
                   [--memcard-names basename|serial] [--serial SERIAL] [--hash] [--hash-audio] [--hash-vram] [--hash-state]
 schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]
@@ -50,7 +50,8 @@ schwaystation-run --help | --version
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it once. |
 | `--metadata-ledger CSV` and `--metadata-dat DAT` | Supply both bounded lookup files to `--probe`; identity is shown only after an exact DAT and passing-ledger match. |
-| `--region NAME` | `ntsc-u` (the default), `ntsc-j` or `pal`: the console's region and its video timing. |
+| `--machine BOARD` | Select `pu7`, `pu8-early`, `pu8-late`, `pu18`, `pu20`, `pu22`, `pu23`, `pm41` or `pm41-2`, independently of region and title serial. Without this option the core's PU-18 default applies. |
+| `--region NAME` | `auto` (the default), `ntsc-u`, `ntsc-j` or `pal`: the console's region and its video timing. |
 | `--help` | Print the usage text and the exit statuses. Give it alone. |
 | `--version` | Print the version and the Git revision the build was configured from. Give it alone. |
 
@@ -62,6 +63,12 @@ a usage error and nothing runs; that includes a file name that does not follow `
 `--trace` with anything but `first-fault`, `--hash-state` with `--disc`, `--serial` without serial naming, serial naming
 without `--save-dir`, or serial naming without either a standalone `--exe` or a literal `--serial`, and any option
 this release does not have.
+
+With `--region auto`, the runner uses a recognized disc serial first, then the disc's sector-4 licence text, then the
+PS-EXE marker. If those hints disagree, it prints their values and the selected region to standard error; the serial
+wins among automatic hints. When no hint is available, auto keeps the NTSC-U default. An explicit `--region` value
+overrides the hints while disagreement diagnostics remain visible. The console board, video region and title serial
+are separate values: changing `--machine` does not change region selection or content identity.
 
 ## BIOS images
 
@@ -81,7 +88,7 @@ schwaystation-run --bios ./bios.bin --frames 600 --tty
 ```
 
 The checked OpenBIOS shell used by CI is an unknown image, so the runner reports the same unknown flags. The host
-chooses the image with `--bios` and the machine profile with `--region`; the portable shell check also boots the
+chooses the image with `--bios`, board with `--machine`, and region with `--region`; the portable shell check also boots the
 same checked image with the NTSC-J and PAL selectors. To inspect its 240th NTSC-U frame, use:
 
 ```sh
@@ -301,8 +308,8 @@ nothing, in the form `--probe` uses:
 schwaystation-run: game.exe: cannot open the file
 ```
 
-`--hash`, `--png` and `--bench` work as they do without `--exe`. `--region` sets the region; it does not read one from
-the file.
+`--hash`, `--png` and `--bench` work as they do without `--exe`. With auto region selection, the PS-EXE marker is the
+last region hint; an explicit `--region` value overrides it.
 
 ## TTY
 

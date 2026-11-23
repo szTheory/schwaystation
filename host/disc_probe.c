@@ -1125,8 +1125,8 @@ static schway_host_disc_probe_status schway__pbp_source(const char *path,
     return SCHWAY_HOST_DISC_PROBE_OK;
 }
 
-schway_host_disc_probe_status schway__disc_probe_image(const char *path,
-                                                        schway_host_disc_probe *out)
+static schway_host_disc_probe_status schway__disc_probe_image_internal(
+    const char *path, schway_host_disc_probe *out, int hash_track1)
 {
     schway__iso_source source;
     schway_host_disc_probe candidate;
@@ -1185,7 +1185,7 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
     }
     memset(&candidate, 0, sizeof candidate);
     status = schway__iso_process(&source, &candidate);
-    if (status == SCHWAY_HOST_DISC_PROBE_OK) {
+    if (status == SCHWAY_HOST_DISC_PROBE_OK && hash_track1) {
         int track1_hashed = source.image != NULL
             ? schway__sha1_disc_range(&source, candidate.track1_sha1)
             : schway__sha1_file_range(source.track1_file, source.track1_offset,
@@ -1205,6 +1205,18 @@ schway_host_disc_probe_status schway__disc_probe_image(const char *path,
     if (status == SCHWAY_HOST_DISC_PROBE_OK) *out = candidate;
     else free(candidate.exe_bytes);
     return status;
+}
+
+schway_host_disc_probe_status schway__disc_probe_image(const char *path,
+                                                        schway_host_disc_probe *out)
+{
+    return schway__disc_probe_image_internal(path, out, 1);
+}
+
+schway_host_disc_probe_status schway__disc_probe_region(const char *path,
+                                                         schway_host_disc_probe *out)
+{
+    return schway__disc_probe_image_internal(path, out, 0);
 }
 
 void schway__disc_probe_dispose(schway_host_disc_probe *probe)
