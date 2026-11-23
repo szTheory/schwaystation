@@ -256,7 +256,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 5  # 5-minute floor; 2 x 35 s = 2 min (2 samples); [run 44307395327](https://github.com/szTheory/schwaystation/actions/runs/44307395327), provisional
+    timeout-minutes: 10  # 10-minute allowance after media setup spent 4m58 and job ended cancelled at 5m15; [run 45149805712](https://github.com/szTheory/schwaystation/actions/runs/45149805712/job/137608141424), provisional
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
