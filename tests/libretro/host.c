@@ -5653,7 +5653,7 @@ static void visit_rumble_reference(void *user, const char *name, const void *dat
                                    uint32_t width)
 {
     struct rumble_reference_snapshot *found = (struct rumble_reference_snapshot *)user;
-    if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
+    if (strcmp(name, "pad.device") == 0 && count == 8u && width == 1u) {
         found->device[0] = ((const uint8_t *)data)[0];
         found->device[1] = ((const uint8_t *)data)[1];
     } else if (strcmp(name, "bus.ram") == 0 && width == 1u && count >= 0x2000Cu) {
