@@ -9,7 +9,7 @@ status: executing
 stopped_at: Completed 14-07-PLAN.md
 last_updated: "2026-11-24T06:49:16.448Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-06 complete; Codex GSD executor configured gpt-6-luna xhigh; four task commits; selector preflights and focused pad/SIO builds passed; flight/Jogcon selectors passed 6/6 and 4/4; SIO-03 complete; SIO-04 awaits libretro mapping; next Plan 14-07
+last_activity_desc: Phase 14 Plan 14-07 complete; Codex GSD executor configured gpt-6-luna xhigh; two tasks, four task commits, 26m10s wall time; candidate-state validation and eight-card restore checks passed; focused selection passed 15/15; SIO-01 and SIO-03 remain complete; next Plan 14-08
 state_head: c0e2b82a8bd751f799238cdaab37c6f4ef35dd4f
 progress:
   total_phases: 10
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-06 complete; Plan 14-07 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-07 complete; Plan 14-08 next)
 
 ## Current Position
 
@@ -34,8 +34,23 @@ Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
 Current Plan: 8
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-06 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); four task commits; focused flight/Jogcon/tap/DualShock selectors passed; SIO-03 complete and SIO-04 awaits libretro mapping
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 6/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-07 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); two tasks, four task commits, 26m10s wall time; focused state/card/SIO selection passed 15/15; SIO-01 and SIO-03 are complete
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 7/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-07 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured
+wall interval was 26m10s (06:23:04–06:49:14 UTC); active time was not separately measured. Two tasks produced
+four task commits: `4412a0f` (card-state RED), `139fd5f` (card-state GREEN), `d1bb44c` (aggregate-state RED),
+and `c0e2b82` (aggregate-state GREEN).
+
+Before configure/build, the card, SIO and core inventories sorted cleanly and CTest selector preflights found the
+required tests. `cmake --preset ci` and the focused card/SIO/state/API targets built successfully. The final focused
+selection passed 15/15 in 3.67 seconds; it covered all eight card endpoints, candidate state rejection, state
+round-trip/stable bytes, API v9, tap history and pending SIO byte/ACK events. The format-20 state producer reported
+3,757,638 bytes. No serialized layout or quality bound changed. A mistaken non-mouse round-trip expectation was
+corrected; no workflow wiring changed, so no broad suite, Act, hosted CI or Docker run was needed. The summary is
+`.planning/phases/14-multitap-and-special-controllers/14-07-SUMMARY.md`. Plan 14-08 is next.
 
 ### Phase 14 Plan 14-06 execution (2026-11-24)
 
@@ -58,7 +73,7 @@ The first Task 2 test compile exposed duplicate local variable names, corrected 
 JUnit path was also corrected to an absolute ignored evidence path before classification. No workflow wiring
 changed, so no broad workflow, Act or hosted CI run was needed; no Docker resources were created. Plan 14-05's
 neGcon coverage plus this Jogcon implementation completes SIO-03. SIO-04 remains pending the later libretro
-mapping. Plan 14-07 is next.
+mapping. Plan 14-07 followed.
 
 ### Phase 14 Plan 14-05 execution (2026-11-24)
 
