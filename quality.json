@@ -1,10 +1,10 @@
 {
   "ir_per_frame": {
-    "testcard": {"floor": 1619573, "ceiling": 1619573},
-    "gpu_motion": {"floor": 138319014, "ceiling": 138319014}
+    "testcard": {"floor": 1620101, "ceiling": 1620101},
+    "gpu_motion": {"floor": 138319540, "ceiling": 138319540}
   },
   "size": {
-    "wasm": {"floor": 923753, "ceiling": 923753}
+    "wasm": {"floor": 947976, "ceiling": 947976}
   },
   "state": {
     "bytes": {"floor": 3757638, "ceiling": 3757638}
@@ -29,6 +29,8 @@
     "2026-11-23: Phase 13 added the 4-byte instance.board field; the Linux x64 stable-state producer measured 3755332 bytes on PR run 45286519140, job 138084550570, so the state bound tracks the new serialized format: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550570.",
     "2026-11-23: Phase 13's unchanged Cachegrind producer measured gpu_motion at 138319014 Ir/frame on PR run 45286519140, job 138084221427, 41 basis points above the merge base and within the existing 100-basis-point regression limit; the absolute bound tracks the measurement and the relative gate is unchanged: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084221427.",
     "2026-11-23: Phase 13's Ubuntu 26 WASI lane measured the linked Release schwaystation-run module at 923753 bytes on PR run 45286519140, job 138084550942; the absolute bound tracks this exact producer result: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550942.",
-    "2026-11-24: Phase 14's local stable-state producer (build/ci/tests/schwaystation-test-state state.stable_bytes) measured 3757638 bytes after the controller protocol-state addition; the bound tracks this exact local result. The producer exited 0; execution evidence is in .planning/phases/14-multitap-and-special-controllers/14-16-SUMMARY.md."
+    "2026-11-24: Phase 14's local stable-state producer (build/ci/tests/schwaystation-test-state state.stable_bytes) measured 3757638 bytes after the controller protocol-state addition; the bound tracks this exact local result. The producer exited 0; execution evidence is in .planning/phases/14-multitap-and-special-controllers/14-16-SUMMARY.md.",
+    "2026-11-24: Phase 14's Ubuntu 26.04 WASI producer measured the linked Release schwaystation-run module at 947976 bytes on PR run 45420382438, job 138538583783; floor and ceiling now track this exact measurement: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783.",
+    "2026-11-24: Phase 14's Cachegrind producer measured testcard at 1620101 and gpu_motion at 138319540 Ir/frame on PR run 45420382438, job 138538117721. Both relative comparisons passed; the exact-measurement ceilings were stale by 528 Ir and now track the producer values without changing the 100-basis-point regression limit: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721."
   ]
 }

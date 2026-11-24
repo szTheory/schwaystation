@@ -927,8 +927,7 @@ static void lr_card_socket_load(unsigned endpoint, uint32_t port, uint32_t socke
     lr_card_saved_generations[endpoint] = generation;
 }
 
-static void lr_card_sockets_load(
-    const char paths[LR_CARD_ENDPOINT_COUNT][LR_CARD_PATH_CAP])
+static void lr_card_sockets_load(const char *const paths[LR_CARD_ENDPOINT_COUNT])
 {
     for (unsigned endpoint = 1u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
         if (paths[endpoint][0] != '\0') {
@@ -1958,7 +1957,11 @@ bool retro_load_game(const struct retro_game_info *game)
     }
     lr_disc_close_set(prepared_discs, prepared_count);
     if (have_card_paths) {
-        lr_card_sockets_load(card_paths);
+        const char *card_path_views[LR_CARD_ENDPOINT_COUNT];
+        for (unsigned endpoint = 0u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
+            card_path_views[endpoint] = card_paths[endpoint];
+        }
+        lr_card_sockets_load(card_path_views);
     }
     lr_apply_multitap_options();
     lr_memory_map_register();

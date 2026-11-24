@@ -608,8 +608,8 @@ than that or more than the allow file permits; `UNSTABLE` the two base measureme
 no `perf` preset. An empty or non-numeric measurement is an input error, never a pass.
 
 Current bounds and producer links are in [`quality.json`](../quality.json); the [Phase 7 baseline](../.planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md)
-retains the original samples. Current values: test-card 1,619,573 Ir/frame, `gpu_motion` 138,319,014, state
-3,757,638 bytes, and Release WASI module 923,753 bytes.
+retains the original samples. Current values: test-card 1,620,101 Ir/frame, `gpu_motion` 138,319,540, state
+3,757,638 bytes, and Release WASI module 947,976 bytes.
 The exact CI critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
 fingerprint; see the [matching cohort and DAG](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
 

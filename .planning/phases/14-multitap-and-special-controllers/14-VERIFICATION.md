@@ -1,6 +1,6 @@
 ---
 phase: multitap-and-special-controllers
-verified: 2026-11-24T14:55:40Z
+verified: 2026-11-24T15:18:34Z
 status: passed
 score: 49/49 must-haves verified
 covered_files:
@@ -81,7 +81,7 @@ covered_files:
   - tests/sio/pad_tests.c
   - tests/sio/sio_tests.c
   - tests/sio/tests.cmake
-covered_digest: "v4:sha256:f274e2d9b0ff9996d65ca632a8a458f3edd7056b0068ad46e662a7fc161e33a7"
+covered_digest: "v4:sha256:43da238df8e0028ca04512cbf7c25f000c05c3a92b49e4f6cbb5af795b8aba9a"
 behavior_unverified: 0
 overrides_applied: 0
 ---
@@ -89,7 +89,7 @@ overrides_applied: 0
 # Phase 14: Multitap and Special Controllers Verification Report
 
 **Phase Goal:** Players can use the multitap on either port and use the PlayStation mouse, neGcon, Jogcon and Dual Analog flight mode.
-**Verified:** 2026-11-24 14:55:40 UTC
+**Verified:** 2026-11-24 15:18:34 UTC
 **Status:** passed
 **Re-verification:** Yes — targeted follow-up for the GCC state-serialization portability correction.
 
@@ -147,7 +147,7 @@ overrides_applied: 0
 | 46 | Deinit clears every sidecar path, saved generation and temporary test hook. | ✓ VERIFIED | State/reset/load/disc-swap persistence selectors pass in the final workflow. |
 | 47 | The feature ledger identifies only the controller/tap predicates actually proved by passing selectors. | ✓ VERIFIED | Feature preflight, independent ratchet and generated-doc selectors pass in the final workflow. |
 | 48 | Controller and save documentation is reachable from existing embedding/testing docs. | ✓ VERIFIED | Documentation/API-name, fixture-hash and producer-backed quality selectors pass in the final workflow. |
-| 49 | Quality bounds change only from named producer measurements, and required final verification remains explicit. | ✓ VERIFIED | Documentation/API-name, fixture-hash and producer-backed quality selectors pass in the final workflow. |
+| 49 | Quality bounds change only from named producer measurements, and required final verification remains explicit. | ✓ VERIFIED | The Phase 14 hosted WASI producer measured 947,976 bytes and Cachegrind measured 1,620,101 / 138,319,540 Ir/frame; quality pins now use those exact values and preserve the relative regression limit. |
 
 **Score:** 49/49 truths verified (0 present, behavior-unverified).
 
@@ -157,7 +157,8 @@ overrides_applied: 0
 |---|---|---|---|
 | Phase 14 plan artifacts | Public API, SIO/pad/card/core, runner/libretro, tests, fixtures, compatibility and documentation | ✓ VERIFIED | 46/46 declared artifact paths across all plans exist and are substantive; `query verify.artifacts` returned `all_passed: true` for every plan. |
 | State quality | Stable state byte bound and fixture state hashes | ✓ VERIFIED | Producer measured 3,757,638 bytes; stable-bytes check passed. Updated state hashes were directly reproduced. |
-| WASI module metric | Exact linked module size | ✓ DEFERRED TO HOSTED PRODUCER | No supported local WASI compiler/linker; the existing bound is unchanged. The `wasm32` workflow’s “Measure linked WASI module” step remains the producer. |
+| WASI module metric | Exact linked module size | ✓ VERIFIED | Ubuntu 26.04 WASI producer measured 947,976 bytes in [PR run 45420382438, job 138538583783](https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783); the old pin rejected it, and `quality.json` now records the exact value. |
+| Cachegrind metrics | Testcard and GPU-motion instructions per frame | ✓ VERIFIED | Linux x64 producer measured 1,620,101 and 138,319,540 Ir/frame in [PR run 45420382438, job 138538117721](https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721); both relative comparisons passed, the old exact pins rejected them, and `quality.json` now records the exact values. |
 
 ### Key Link Verification
 
@@ -184,15 +185,19 @@ The built-in `verify.key-links` heuristic found 1/30 declared plan links and rep
 
 | Behavior | Command | Result | Status |
 |---|---|---|---|
-| Integrated controller/card/API/runner/libretro behavior | `cmake --workflow --preset ci` on source head `d7d3cbf` | Exit 0; 705/705 CTest tests passed; all three macOS arm64 packages produced before the GCC portability correction | ✓ PASS |
+| Integrated controller/card/API/runner/libretro behavior | `cmake --workflow --preset ci` after both GCC fixes and measured quality-pin updates | Exit 0; 705/705 CTest tests passed in 69.07 seconds; all three macOS arm64 packages produced; release checks passed 8/8 | ✓ PASS |
 | Release artifact validation | Workflow CI release-test step | Exit 0; 8/8 release checks passed | ✓ PASS |
 | API v9 and endpoint input mapping | `abi.api_v9`, `libretro.input.special`, `libretro.input.multitap` in final workflow | Included in 705/705 pass | ✓ PASS |
 | Multitap serial/card/persistence | `sio.tap.*`, `card.tap.*`, `runner.cards.multitap`, `libretro.cards.multitap` in final workflow | Included in 705/705 pass | ✓ PASS |
 | Special-controller serial and host mapping | `sio.special.*`, `libretro.input.special` in final workflow | Included in 705/705 pass | ✓ PASS |
 | Compatibility ledger | `compat.features.preflight`, `compat.features.ratchet`, `compat.features.controls` | Included in 705/705 pass | ✓ PASS |
-| GCC portability and multitap state follow-up | Linux GCC 15.2 CMake configure/build of `schwaystation_sio` with warnings-as-errors; focused `core.state.*` and `sio.tap.*` CTest selectors | Exit 0; the SIO object compiled and all four selected tests passed in 2.07 seconds on the corrected source | ✓ PASS |
+| GCC portability and multitap state follow-up | Linux GCC 15.2 configure/build of `schwaystation_sio` with warnings-as-errors; focused `core.state.*` and `sio.tap.*` CTest selectors | Exit 0; the SIO object compiled and all four selected tests passed in 2.07 seconds on the corrected source | ✓ PASS |
+| GCC C17 libretro card-path compatibility | Linux GCC 15.2 no-FP configure/build of `schwaystation_libretro` with warnings-as-errors | Exit 0 after passing a temporary array of `const char *` views to the synchronous loader | ✓ PASS |
+| Libretro card-path behavior | Build `schwaystation-test-libretro-host`; CTest selectors `libretro.cards.persistence`, `libretro.cards.controls`, `libretro.cards.multitap`, and `libretro.input.multitap` | Exit 0; all four tests passed in 5.16 seconds | ✓ PASS |
+| Hosted WASI module size | `wasm32` job’s linked-module producer on PR run 45420382438 | Measured 947,976 bytes; the old 923,753-byte exact pin rejected the measured value, so the floor/ceiling now track 947,976 | ✓ VERIFIED |
+| Hosted Cachegrind instructions | `perf` job’s instructions-per-frame producer on PR run 45420382438 | Measured testcard 1,620,101 and GPU motion 138,319,540 Ir/frame; both relative comparisons passed, old exact pins rejected them, and the updated pins match | ✓ VERIFIED |
 
-The hosted GCC build found undefined pointer arithmetic when the state serializer treated the first inner `[4]` array as an eight-byte object. The storage is now a flat eight-byte array, with a separate `port * 4 + socket` index preserving the original serialized slot order and per-port reset range. A focused read-only source review confirmed the corrected indexing. The full local workflow above ran before this portability-only correction; the repaired PR head is awaiting its required hosted workflow run.
+The hosted GCC build found undefined pointer arithmetic when the state serializer treated the first inner `[4]` array as an eight-byte object. The storage is now a flat eight-byte array, with a separate `port * 4 + socket` index preserving the original serialized slot order and per-port reset range. The no-FP retry exposed a second C17 issue: a mutable 2D path array could not be passed to a nested `const` array pointer under `-Wpedantic`. The helper now receives a temporary array of `const char *` views. Focused source review confirmed both corrections. The exact WASI and Cachegrind producers then reported values above the old exact pins; the pins now record those exact results, with the relative performance limit unchanged. The repaired source and updated pins pass the full local workflow; a successful repaired-head hosted workflow is still required before ship.
 
 ## Probe Execution
 
@@ -231,9 +236,9 @@ N/A — no visual UI or owner-hardware-only acceptance criterion exists. The lib
 
 ## Gaps Summary
 
-**No gaps found.** All four roadmap criteria, all 45 plan truths and all 46 declared artifacts are verified. The local WASI size and Cachegrind instructions-per-frame measurements remain with their named hosted producers; Phase 14 does not guess or widen either bound. Ready for phase completion and ship.
+**No implementation gaps found.** All four roadmap criteria, all 45 plan truths and all 46 declared artifacts are verified. The WASI and Cachegrind pins now track their exact hosted producer measurements; the completed PR-head CI and release are still required before Phase 15 starts.
 
 ---
 
-_Verified: 2026-11-24 14:55:40 UTC_
+_Verified: 2026-11-24 15:18:34 UTC_
 _Verifier: Codex; the initial goal-backward verification was produced by gsd-verifier._
