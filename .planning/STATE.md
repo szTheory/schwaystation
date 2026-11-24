@@ -7,14 +7,14 @@ current_phase_name: Multitap and special controllers
 current_plan: 10
 status: executing
 stopped_at: Completed 14-09-PLAN.md
-last_updated: "2026-11-24T08:18:54.318Z"
+last_updated: "2026-11-24T08:35:34.361Z"
 last_activity: 2026-11-24
 last_activity_desc: Phase 14 Plan 14-09 complete; configured gpt-6-luna xhigh; two tasks, three task commits, 60m42s wall time; runner card selectors passed 3/3 and the final multitap selector passed 1/1; Plan 14-10 next
-state_head: cc3d2d808d22b85fdccbcfd073c55b8df40a117a
+state_head: 0f5672ab50fe1cd7f5b947e8f07238f74d9b0df9
 progress:
   total_phases: 10
   completed_phases: 7
-  total_plans: 91
+  total_plans: 93
   completed_plans: 88
   percent: 70
 ---
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
 Current Plan: 10
-Total Plans in Phase: 12
+Total Plans in Phase: 14
 Status: Ready to execute
 Last activity: 2026-11-24 — Phase 14 Plan 14-09 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); two tasks, three task commits, 60m42s wall time; focused runner card selectors passed 3/3 and final multitap selector passed 1/1
 Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 9/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
@@ -1969,6 +1969,7 @@ Recent decisions affecting current work:
 - [Phase 14]: Plan 14-08: preserve A card filename aliases and map all eight stable port/socket suffixes; reject invalid or undersized paths atomically. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 16m21s.
 - [Phase 14]: Runner card persistence enumerates all eight physical port/socket identities and flushes only changed generations.
 - [Phase 14]: Per-port multitap options default off and are reapplied after each movie snapshot before frame latching.
+- [Phase 14]: Phase 14 Plans 10–14 split at behavior boundaries after Plan 14-09 took 60m42s; Codex GSD planner gpt-6.1-sol high and checker gpt-6-luna xhigh; planning/check review took about 8 minutes. — The plan checker passed requirements and dependency coverage. Keep each implementation slice below the 30-minute bound while preserving all selectors, metrics, and final verification.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)

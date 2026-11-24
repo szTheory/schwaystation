@@ -283,19 +283,42 @@ Plans:
   3. neGcon and Jogcon report documented serial modes and integer controls, and explicitly reject unsupported modes.
   4. The size-tagged input and libretro mappings carry Dual Analog flight axes and buttons. Existing digital-pad and DualShock callers still pass their compatibility checks. Ledger rows record the exercised controller modes.
 
-**Plans**: 9/12 plans executed
+**Plans**: 9/14 plans executed
+**Wave 1**
 - [x] 14-01-PLAN.md
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [x] 14-02-PLAN.md
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [x] 14-03-PLAN.md
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [x] 14-04-PLAN.md
+
+**Wave 5** *(blocked on Wave 4 completion)*
 - [x] 14-05-PLAN.md
-- [x] 14-06-PLAN.md
-- [x] 14-07-PLAN.md
 - [x] 14-08-PLAN.md
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 14-06-PLAN.md
 - [x] 14-09-PLAN.md
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 14-07-PLAN.md
 - [ ] 14-10-PLAN.md
+
+**Wave 8** *(blocked on Wave 7 completion)*
 - [ ] 14-11-PLAN.md
+
+**Wave 9** *(blocked on Wave 8 completion)*
 - [ ] 14-12-PLAN.md
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [ ] 14-13-PLAN.md
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [ ] 14-14-PLAN.md
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/ARCHITECTURE.md`
 
@@ -341,6 +364,6 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 11. ECM and CloneCD images | 15/15 | Complete    | 2026-11-22 |
 | 12. SBI and LibCrypt | 7/7 | Complete    | 2026-11-23 |
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
-| 14. Multitap and special controllers | 9/12 | In Progress | - |
+| 14. Multitap and special controllers | 9/14 | In Progress | - |
 | 15. GunCon and Justifier | 0/TBD | Not started | - |
 | 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |
