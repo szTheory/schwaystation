@@ -239,7 +239,17 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     schway__state_u8_array(io, name_tap_slot_mask, sio->tap_slot_mask, 2u, 0u, 0x0Fu);
     schway__state_u8_array(io, name_tap_slot_id, &sio->tap_slot_id[0][0], 8u, 0u,
                            UINT8_MAX);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->card_tx_active[port] = io->r[port];
+        }
+    }
     schway__state_u8_array(io, name_card_tx_active, sio->card_tx_active, 2u, 0u, 1u);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->card_tx_endpoint[port] = io->r[port];
+        }
+    }
     schway__state_u8_array(io, name_card_tx_endpoint, sio->card_tx_endpoint, 2u, 0u,
                            SCHWAY__CARD_ENDPOINT_COUNT - 1u);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
@@ -269,8 +279,8 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
                                        (sio->tap_slot_mask[port] & 1u) != 0u);
             schway__state_check(io, tap_mode != TAP_SHORT ||
                                        (sio->tap_slot_mask[port] & 1u) != 0u);
-            schway__state_check(io, sio->card_tx_active[port] == 0u ||
-                                       sio->card_tx_endpoint[port] / 4u == port);
+            schway__state_check(io, io->card_tx_active[port] == 0u ||
+                                       io->card_tx_endpoint[port] / 4u == port);
         }
     }
 }

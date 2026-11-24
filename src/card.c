@@ -384,6 +384,7 @@ void schway__card_abort(schway *inst, uint32_t endpoint)
 }
 
 static void slot_state_io(struct schway__state_io *io, struct schway__card_slot *slot,
+                          uint32_t endpoint,
                           const char *error_name, const char *phase_name, const char *command_name,
                           const char *read_step_name, const char *sector_name,
                           const char *checksum_name, const char *invalid_sector_name,
@@ -446,19 +447,27 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
                                     protocol_fields_valid(phase, command, read_step, sector,
                                                           checksum, invalid_sector, write_step,
                                                           write_bad_checksum));
+        uint32_t active = 0u;
+        for (uint32_t port = 0u; port < 2u; port++) {
+            active |= io->card_tx_active[port] != 0u &&
+                              io->card_tx_endpoint[port] == endpoint
+                          ? 1u
+                          : 0u;
+        }
+        schway__state_check(io, (phase != CARD_IDLE) == (active != 0u));
     }
 }
 
 void schway__card_state_io(struct schway__state_io *io, schway *inst)
 {
-    slot_state_io(io, &inst->card.slot[0], CARD_STATE_NAMES("card.slot1"));
-    slot_state_io(io, &inst->card.slot[1], CARD_STATE_NAMES("card.port1.socketB"));
-    slot_state_io(io, &inst->card.slot[2], CARD_STATE_NAMES("card.port1.socketC"));
-    slot_state_io(io, &inst->card.slot[3], CARD_STATE_NAMES("card.port1.socketD"));
-    slot_state_io(io, &inst->card.slot[4], CARD_STATE_NAMES("card.slot2"));
-    slot_state_io(io, &inst->card.slot[5], CARD_STATE_NAMES("card.port2.socketB"));
-    slot_state_io(io, &inst->card.slot[6], CARD_STATE_NAMES("card.port2.socketC"));
-    slot_state_io(io, &inst->card.slot[7], CARD_STATE_NAMES("card.port2.socketD"));
+    slot_state_io(io, &inst->card.slot[0], 0u, CARD_STATE_NAMES("card.slot1"));
+    slot_state_io(io, &inst->card.slot[1], 1u, CARD_STATE_NAMES("card.port1.socketB"));
+    slot_state_io(io, &inst->card.slot[2], 2u, CARD_STATE_NAMES("card.port1.socketC"));
+    slot_state_io(io, &inst->card.slot[3], 3u, CARD_STATE_NAMES("card.port1.socketD"));
+    slot_state_io(io, &inst->card.slot[4], 4u, CARD_STATE_NAMES("card.slot2"));
+    slot_state_io(io, &inst->card.slot[5], 5u, CARD_STATE_NAMES("card.port2.socketB"));
+    slot_state_io(io, &inst->card.slot[6], 6u, CARD_STATE_NAMES("card.port2.socketC"));
+    slot_state_io(io, &inst->card.slot[7], 7u, CARD_STATE_NAMES("card.port2.socketD"));
 }
 
 static uint32_t begin_command(struct schway__card_slot *slot, uint8_t sent, uint8_t *received)
