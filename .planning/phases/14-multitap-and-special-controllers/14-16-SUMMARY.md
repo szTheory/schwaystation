@@ -134,23 +134,39 @@ status: complete
 - The exact Ubuntu 26.04 WASI producer measured the linked Release runner at 947,976 bytes on PR run 45420382438,
   job 138538583783. Its quality comparison failed only because the stored exact pin was stale; the new floor and ceiling
   tracked that result for source before the watchdog-table representation change: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783.
-- The final source candidate measured 947,899 bytes with the Ubuntu 26.04 arm64 Clang/LLD 21.1.8 toolchain and CHD
-  enabled. In task-named container `schwaystation-phase14-wasi-size`, direct CMake configure/build of
-  `schwaystation-run` exited 0, `stat -c 'WASI_MODULE_BYTES=%s'` reported 947899, and the artifact form of
-  `tests/cmake/quality.cmake` exited 1 only because the then-current 947976 floor was higher; it validated the WASM magic.
-  After the exact bound update, `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=947899 -P
-  tests/cmake/quality.cmake` exited 0, and the focused `policy.quality_metrics` CTest passed 1/1 in 31.17 seconds.
+- The initial final-source local reproduction measured 947,899 bytes in Ubuntu 26.04 arm64 with
+  `SCHWAYSTATION_BUILD_TESTS=OFF`; this did not match the hosted x86_64 `wasm32-chd` preset and the bound update was
+  superseded. Main CI [45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507) measured
+  947,969 bytes on x86_64 and failed only because the temporary ceiling was 947,899. A task-named x86_64 Ubuntu 26.04
+  container with Clang/LLD 21.1.8, the same WASI packages, CHD enabled and test registration enabled built
+  `schwaystation-run` at exactly 947,969 bytes. `cmake --build /tmp/schwaystation-phase14-wasi-x64-exact-build
+  --target schwaystation-run` and `stat -c 'WASI_MODULE_BYTES=%s' ...` exited 0. This producer-only reproduction did not
+  run WASI CTest; CMake's emulator and fixture-tool paths were placeholders used only to configure test registration.
+  After setting floor/ceiling to 947969, `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=947969 -P
+  tests/cmake/quality.cmake` exited 0; `ctest --test-dir build/ci --output-on-failure -R '^policy[.]quality_metrics$'
+  --no-tests=error` passed 1/1 in 47.15 seconds. `jq -e . quality.json`, the SIO inventory sort and `git diff --check`
+  also exited 0.
 - Main CI [45428490941](https://github.com/szTheory/schwaystation/actions/runs/45428490941) failed before the WASI build
   because that runner's apt update saw Microsoft's package feed but no Ubuntu package index. The same-head Nightly
   [45428491372](https://github.com/szTheory/schwaystation/actions/runs/45428491372) installed the same packages and
   passed its WASI benchmark, full vectors, native benchmarks and fuzz. Main CI was canceled after 1,159 seconds wall
   time once the local exact producer revealed the stale pin; GitHub's timing API returned zero billable milliseconds.
+- On corrected-source head `d46ec1e`, Main CI run [45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507)
+  reached the size gate and reported 947,969 against the mistaken 947,899 ceiling. WASI setup, fixture generation,
+  configure and runner build passed; only the expected-value comparison failed. After confirming the exact result with
+  the x86_64 tests-enabled local producer, the rest of Main CI and Nightly run
+  [45436318741](https://github.com/szTheory/schwaystation/actions/runs/45436318741) were canceled. Main ran 323 seconds
+  total; Nightly ran 292 seconds; its fuzz job lasted 283 seconds wall, with the bounded-campaign step canceled after
+  180 seconds. Both timing endpoints reported zero billable
+  milliseconds, so no runner-minute savings are claimed. The focused corrected bound check and a final hosted retry
+  remain pending.
 - The exact Linux x64 Cachegrind producer measured testcard at 1,620,101 and `gpu_motion` at 138,319,540 Ir/frame
   on the same run, job 138538117721. Both relative comparisons passed; the absolute comparisons exceeded their exact
   pins by 528 Ir/frame, so those pins now track the producer outputs without changing the 100-basis-point regression
   limit: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721.
-- The WASI producer is now locally reproducible in a task-named Ubuntu container; the local macOS host still lacks
-  Cachegrind, so instructions-per-frame remains hosted-only. The initial hosted run exposed GCC SIO bounds and C17
+- The WASI producer is now locally reproducible in a task-named Ubuntu x86_64 container when test registration is
+  enabled to match `wasm32-chd`; an earlier arm64/tests-off reproduction under-measured it. The local macOS host still
+  lacks Cachegrind, so instructions-per-frame remains hosted-only. The initial hosted run exposed GCC SIO bounds and C17
   libretro qualifier issues; both are fixed and covered by local GCC builds/tests. A later no-FP run exposed the
   pointer-table ABI classification, fixed with a read-only table. The final exact size is measured locally; updated
   Main CI and Nightly results remain required before ship.

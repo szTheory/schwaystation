@@ -1,6 +1,6 @@
 ---
 phase: multitap-and-special-controllers
-verified: 2026-11-24T16:20:33Z
+verified: 2026-11-24T16:50:33Z
 status: passed
 score: 49/49 must-haves verified
 covered_files:
@@ -81,7 +81,7 @@ covered_files:
   - tests/sio/pad_tests.c
   - tests/sio/sio_tests.c
   - tests/sio/tests.cmake
-covered_digest: "v4:sha256:750169820f3be9331378651cec05182abd775c303268f880fedc3216c703dde8"
+covered_digest: "v4:sha256:e3ebad0df9e2c0cedf7e5b9b6aaa197e530c8cb7ab3c95212e138d2c975c13b3"
 behavior_unverified: 0
 overrides_applied: 0
 ---
@@ -89,9 +89,9 @@ overrides_applied: 0
 # Phase 14: Multitap and Special Controllers Verification Report
 
 **Phase Goal:** Players can use the multitap on either port and use the PlayStation mouse, neGcon, Jogcon and Dual Analog flight mode.
-**Verified:** 2026-11-24 16:20:33 UTC
+**Verified:** 2026-11-24 16:50:33 UTC
 **Status:** passed
-**Re-verification:** Yes — follow-up for the GCC ABI globals fix and the final-source WASI size measurement/pin refresh.
+**Re-verification:** No — the prior report had no `gaps:` section, so this follows the initial verification path with refreshed evidence.
 
 ## Goal Achievement
 
@@ -147,7 +147,7 @@ overrides_applied: 0
 | 46 | Deinit clears every sidecar path, saved generation and temporary test hook. | ✓ VERIFIED | State/reset/load/disc-swap persistence selectors pass in the final workflow. |
 | 47 | The feature ledger identifies only the controller/tap predicates actually proved by passing selectors. | ✓ VERIFIED | Feature preflight, independent ratchet and generated-doc selectors pass in the final workflow. |
 | 48 | Controller and save documentation is reachable from existing embedding/testing docs. | ✓ VERIFIED | Documentation/API-name, fixture-hash and producer-backed quality selectors pass in the final workflow. |
-| 49 | Quality bounds change only from named producer measurements, and required final verification remains explicit. | ✓ VERIFIED | The final-source Ubuntu 26.04 arm64 Clang/LLD 21.1.8 WASI producer measured 947,899 bytes locally; the exact-value quality gate and focused policy test passed. Cachegrind measured 1,620,101 / 138,319,540 Ir/frame on the hosted producer. A hosted retry after the WASI pin refresh remains pending before ship. |
+| 49 | Quality bounds change only from named producer measurements, and required final verification remains explicit. | ✓ VERIFIED | The matching Ubuntu 26.04 x86_64 Clang/LLD 21.1.8 WASI producer with CHD and test registration enabled measured 947,969 bytes; `quality.cmake` and `policy.quality_metrics` passed after the exact pin update. Main CI run [45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507) independently measured 947,969 but failed against the then-old 947,899 ceiling. The corrected hosted retry remains pending before ship. Cachegrind measured 1,620,101 / 138,319,540 Ir/frame on its hosted producer. |
 
 **Score:** 49/49 truths verified (0 present, behavior-unverified).
 
@@ -157,7 +157,7 @@ overrides_applied: 0
 |---|---|---|---|
 | Phase 14 plan artifacts | Public API, SIO/pad/card/core, runner/libretro, tests, fixtures, compatibility and documentation | ✓ VERIFIED | 46/46 declared artifact paths across all plans exist and are substantive; `query verify.artifacts` returned `all_passed: true` for every plan. |
 | State quality | Stable state byte bound and fixture state hashes | ✓ VERIFIED | Producer measured 3,757,638 bytes; stable-bytes check passed. Updated state hashes were directly reproduced. |
-| WASI module metric | Exact linked module size | ✓ VERIFIED | The final source (`2ab13f4`) was built in task-named container `schwaystation-phase14-wasi-size` with Ubuntu 26.04 arm64 Clang/LLD 21.1.8 and CHD enabled; the Release runner measured exactly 947,899 bytes. Its artifact check confirmed valid WASM magic and first exited 1 only because the prior 947,976-byte floor was stale. After the pin update, the exact-value `quality.cmake` check exited 0 and `policy.quality_metrics` passed 1/1. The final hosted retry after the pin update is pending. |
+| WASI module metric | Exact linked module size | ✓ VERIFIED | The earlier 947,899-byte local result used Ubuntu 26.04 arm64 with tests off and did not match the hosted `wasm32-chd` preset. On head `d46ec1e`, Main CI run [45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507) measured exactly 947,969 bytes and failed only against the then-old 947,899 ceiling; setup, fixture generation, configure, runner build and WASM magic check passed. A task-named Ubuntu 26.04 x86_64 reproduction with Clang/LLD 21.1.8, matching WASI package versions, CHD enabled and test registration enabled built `schwaystation-run` at 947,969 bytes. It did not run WASI CTest; emulator/fixture-tool placeholders were used only to configure test registration. After updating the exact floor/ceiling to 947969, `quality.cmake` exited 0 and focused `policy.quality_metrics` passed 1/1 in 47.15 seconds. `jq`, the SIO inventory sort and `git diff --check` also passed. A corrected hosted run is still pending. |
 | Cachegrind metrics | Testcard and GPU-motion instructions per frame | ✓ VERIFIED | Linux x64 producer measured 1,620,101 and 138,319,540 Ir/frame in [PR run 45420382438, job 138538117721](https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721); both relative comparisons passed, the old exact pins rejected them, and `quality.json` now records the exact values. |
 
 ### Key Link Verification
@@ -186,6 +186,7 @@ The built-in `verify.key-links` heuristic found 1/30 declared plan links and rep
 | Behavior | Command | Result | Status |
 |---|---|---|---|
 | Integrated controller/card/API/runner/libretro behavior | `cmake --workflow --preset ci` after the GCC watchdog-table correction | Exit 0; 705/705 CTest tests passed in 73.01 seconds; all three macOS arm64 packages produced; release checks passed 8/8 in 1.47 seconds | ✓ PASS |
+| Roadmap criteria and key controller seams | `ctest --test-dir build/ci --output-on-failure --no-tests=error -R '^(abi[.]api_v9|card[.]tap[.](protocol|state)|compat[.]features[.](controls|preflight|ratchet)|libretro[.](cards[.]multitap|input[.](special|multitap))|runner[.]cards[.]multitap|sio[.](special[.](flight|jogcon|mouse|negcon)|tap[.](history_edges|poll_methods)))$'` | Exit 0; all 16 selected tests passed in 3.74 seconds. Covers the four roadmap criteria's ABI, serial, card, compatibility, runner and libretro paths. | ✓ PASS |
 | Release artifact validation | Workflow CI release-test step | Exit 0; 8/8 release checks passed | ✓ PASS |
 | API v9 and endpoint input mapping | `abi.api_v9`, `libretro.input.special`, `libretro.input.multitap` in final workflow | Included in 705/705 pass | ✓ PASS |
 | Multitap serial/card/persistence | `sio.tap.*`, `card.tap.*`, `runner.cards.multitap`, `libretro.cards.multitap` in final workflow | Included in 705/705 pass | ✓ PASS |
@@ -195,16 +196,18 @@ The built-in `verify.key-links` heuristic found 1/30 declared plan links and rep
 | GCC C17 libretro card-path compatibility | Linux GCC 15.2 no-FP configure/build of `schwaystation_libretro` with warnings-as-errors | Exit 0 after passing a temporary array of `const char *` views to the synchronous loader | ✓ PASS |
 | Libretro card-path behavior | Build `schwaystation-test-libretro-host`; CTest selectors `libretro.cards.persistence`, `libretro.cards.controls`, `libretro.cards.multitap`, and `libretro.input.multitap` | Exit 0; all four tests passed in 5.16 seconds | ✓ PASS |
 | GCC no-FP ABI data classification | GCC 13 C17 compile of `src/pad.c` with `-mgeneral-regs-only`, then GNU `nm -P` for `name_watchdogs` | Exit 0; `name_watchdogs r 300 70` confirms the fixed-width constant string table is emitted as read-only data. The task-named `--rm` container was removed automatically. | ✓ PASS |
-| Final-source WASI module size | Ubuntu 26.04 arm64 Clang/LLD 21.1.8 Release producer in `schwaystation-phase14-wasi-size` | Measured 947,899 bytes; the artifact check validated WASM magic and rejected only the former 947,976-byte floor. After updating the floor/ceiling, `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=947899 -P tests/cmake/quality.cmake` exited 0. | ✓ VERIFIED |
-| Focused quality metric test | `ctest --test-dir build/ci --output-on-failure -R '^policy[.]quality_metrics$' --no-tests=error` after the bound update | Exit 0; 1/1 passed in 31.17 seconds. | ✓ PASS |
-| Quality pin preflight | `jq -e '.size.wasm == {"floor":947899,"ceiling":947899}' quality.json`; `git diff --check -- quality.json docs/testing.md .planning/phases/14-multitap-and-special-controllers/14-16-SUMMARY.md` | Both commands exited 0. | ✓ PASS |
+| Final-source WASI module size | Task-named Ubuntu 26.04 x86_64 Clang/LLD 21.1.8 Release producer, CHD and test registration enabled | `cmake --build /tmp/schwaystation-phase14-wasi-x64-exact-build --target schwaystation-run` and `stat -c 'WASI_MODULE_BYTES=%s' ...` exited 0; measured 947,969 bytes. This producer-only run did not run WASI CTest. The hosted run on the same head independently measured 947,969 and failed only because its pin was 947,899. | ✓ VERIFIED |
+| Focused quality metric test | `ctest --test-dir build/ci --output-on-failure -R '^policy[.]quality_metrics$' --no-tests=error` after pin update | Exit 0; 1/1 passed in 47.15 seconds. The exact `quality.cmake` comparison for `MEASURED=947969` also exited 0. | ✓ PASS |
+| Quality pin preflight | `jq -e '.size.wasm == {"floor":947969,"ceiling":947969}' quality.json`; SIO inventory sort; `git diff --check` | Each command exited 0. | ✓ PASS |
 | Hosted Cachegrind instructions | `perf` job’s instructions-per-frame producer on PR run 45420382438 | Measured testcard 1,620,101 and GPU motion 138,319,540 Ir/frame; both relative comparisons passed, old exact pins rejected them, and the updated pins match | ✓ VERIFIED |
 
-The hosted GCC build found undefined pointer arithmetic when the state serializer treated the first inner `[4]` array as an eight-byte object. The storage is now a flat eight-byte array, with a separate `port * 4 + socket` index preserving the original serialized slot order and per-port reset range. The next no-FP run exposed a C17 issue: a mutable 2D path array could not be passed to a nested `const` array pointer under `-Wpedantic`. The helper now receives a temporary array of `const char *` views. The first hosted WASI measurement was 947,976 bytes; after the watchdog-table representation fix, the final-source Ubuntu 26.04 arm64 producer measured 947,899 bytes locally. `quality.json` now tracks that exact local producer result. Cachegrind remains pinned to its exact hosted outputs, and its relative regression limit is unchanged.
+The hosted GCC build found undefined pointer arithmetic when the state serializer treated the first inner `[4]` array as an eight-byte object. The storage is now a flat eight-byte array, with a separate `port * 4 + socket` index preserving the original serialized slot order and per-port reset range. The next no-FP run exposed a C17 issue: a mutable 2D path array could not be passed to a nested `const` array pointer under `-Wpedantic`. The helper now receives a temporary array of `const char *` views. The first hosted WASI measurement was 947,976 bytes. After the watchdog-table representation fix, an arm64 local build with tests disabled measured 947,899 bytes; this was not comparable to the hosted x86_64 tests-enabled preset. The matching Ubuntu 26.04 x86_64 producer with tests registered measured 947,969 bytes, matching the hosted Main CI result. `quality.json` now tracks that exact value. Cachegrind remains pinned to its exact hosted outputs, and its relative regression limit is unchanged.
 
 The following final-head attempt, PR run [45425051636](https://github.com/szTheory/schwaystation/actions/runs/45425051636), failed both no-FP Linux lanes in `abi.globals` on the local symbol `d name_watchdogs`. The prior `static const char *const` table was semantically constant, but its relocations caused GNU `nm` to classify the archive entry as data. The table is now fixed-width `const char` rows, preserving all eight names, indices and NUL terminators. A focused GCC 13 compile with the no-FP flag and `nm -P` reports `name_watchdogs r`; the independent source review found no behavior change. PR run [45425051636](https://github.com/szTheory/schwaystation/actions/runs/45425051636) was canceled after 219 seconds and Nightly run [45425051737](https://github.com/szTheory/schwaystation/actions/runs/45425051737) after 189 seconds once the shared cause was confirmed. GitHub's timing API returned zero per-job milliseconds for both canceled runs, so no runner-time or billing savings are claimed. The latest local workflow after this correction passed 705/705 CTest cases, produced all three macOS arm64 packages and passed release checks 8/8.
 
-The bound refresh is producer-backed locally. Main CI run [45428490941](https://github.com/szTheory/schwaystation/actions/runs/45428490941) failed before compiling WASI because the runner's apt indexes lacked Ubuntu feeds. Same-head Nightly run [45428491372](https://github.com/szTheory/schwaystation/actions/runs/45428491372) installed the same packages and completed successfully, but it predates the uncommitted `quality.json` pin update, so it does not verify the refreshed bound. The focused local quality CTest and exact-value check pass; a hosted Main CI retry with the refreshed pin is pending before ship and Phase 15.
+The bound refresh is producer-backed locally. Main CI run [45428490941](https://github.com/szTheory/schwaystation/actions/runs/45428490941) failed before compiling WASI because the runner's apt indexes lacked Ubuntu feeds. Same-head Nightly run [45428491372](https://github.com/szTheory/schwaystation/actions/runs/45428491372) installed the same packages and completed successfully, but it predates the pin update and does not verify the refreshed bound.
+
+On head `d46ec1e`, Main CI run [45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507) measured 947,969 bytes at the WASI gate and failed only because the configured ceiling was still 947,899. Setup, fixture generation, configure, runner build and WASM magic validation passed before the comparison. The exact x86_64 local producer reproduced 947,969 and the corrected local comparator passed. Main CI was canceled after 323 seconds; Nightly run [45436318741](https://github.com/szTheory/schwaystation/actions/runs/45436318741) was canceled after 292 seconds. Its fuzz job lasted 283 seconds wall, and its `Check media seeds and run bounded campaigns` step ran 180 seconds before cancellation. Nightly's WASI benchmark, all three native benchmarks and full vectors had passed. Both GitHub timing APIs returned zero billed milliseconds, so no billing or runner-time savings are claimed. `quality.json` now pins 947969; its focused policy CTest passed 1/1 in 47.15 seconds, alongside `jq -e . quality.json`, the SIO inventory sort and `git diff --check`. The corrected hosted Main CI retry remains required before ship and Phase 15.
 
 ## Probe Execution
 
@@ -214,10 +217,10 @@ Not applicable — this peripheral/library phase declares no standalone migratio
 
 | Requirement | Description | Status | Evidence |
 |---|---|---|---|
-| SIO-01 | Both-port multitap controller/card sockets, protocol and persistence | ✓ SATISFIED | Serial/card/runner/libretro tap fixtures and final 705-test workflow. |
-| SIO-02 | Deterministic mouse movement, buttons, saturation/reset and host mapping | ✓ SATISFIED | Serial and libretro mouse fixtures in the final workflow. |
-| SIO-03 | neGcon/Jogcon modes, integer controls and unsupported-operation refusal | ✓ SATISFIED | Native payload/refusal tests and libretro mappings in the final workflow. |
-| SIO-04 | Dual Analog flight axes/buttons with size-tagged API and legacy compatibility | ✓ SATISFIED | API v9, flight serial/libretro tests, compatibility rows and final workflow. |
+| SIO-01 | Both-port multitap controller/card sockets, protocol and persistence | ✓ SATISFIED | Focused serial/card/runner/libretro tests passed as part of the 16/16 selected CTest run; full 705-test workflow also passed on the unchanged implementation. |
+| SIO-02 | Deterministic mouse movement, buttons, saturation/reset and host mapping | ✓ SATISFIED | `sio.special.mouse` and `libretro.input.special` passed in the 16/16 selected CTest run; the full workflow also passed. |
+| SIO-03 | neGcon/Jogcon modes, integer controls and unsupported-operation refusal | ✓ SATISFIED | `sio.special.negcon`, `sio.special.jogcon` and libretro mapping passed in the 16/16 selected CTest run; the full workflow also passed. |
+| SIO-04 | Dual Analog flight axes/buttons with size-tagged API and legacy compatibility | ✓ SATISFIED | `abi.api_v9`, `sio.special.flight`, libretro mapping and compatibility checks passed in the 16/16 selected CTest run; the full workflow also passed. |
 
 **Coverage:** 4/4 requirements satisfied; no orphan Phase 14 requirements.
 
@@ -243,9 +246,9 @@ N/A — no visual UI or owner-hardware-only acceptance criterion exists. The lib
 
 ## Gaps Summary
 
-**No implementation gaps found.** All four roadmap criteria, all 45 plan truths and all 46 declared artifacts are verified. The WASI bound now matches the exact final-source local producer measurement (947,899 bytes), and the focused exact-value and policy checks pass; Cachegrind pins match their hosted producer measurements. The hosted retry for the refreshed WASI bound remains pending before ship and Phase 15 starts.
+**No implementation gaps found.** All four roadmap criteria, all 45 plan truths and all 46 declared artifacts are verified. The WASI bound matches the exact final-source x86_64 tests-enabled producer measurement (947,969 bytes); the corrected local value comparison and focused policy test pass. A 16-test focused rerun covering the roadmap criteria also passed. Cachegrind pins match their hosted producer measurements. The corrected hosted Main CI retry remains pending before ship and Phase 15 starts.
 
 ---
 
-_Verified: 2026-11-24 16:20:33 UTC_
+_Verified: 2026-11-24 16:50:33 UTC_
 _Verifier: Codex; the initial goal-backward verification was produced by gsd-verifier._

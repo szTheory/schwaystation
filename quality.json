@@ -4,7 +4,7 @@
     "gpu_motion": {"floor": 138319540, "ceiling": 138319540}
   },
   "size": {
-    "wasm": {"floor": 947899, "ceiling": 947899}
+    "wasm": {"floor": 947969, "ceiling": 947969}
   },
   "state": {
     "bytes": {"floor": 3757638, "ceiling": 3757638}
@@ -31,7 +31,7 @@
     "2026-11-23: Phase 13's Ubuntu 26 WASI lane measured the linked Release schwaystation-run module at 923753 bytes on PR run 45286519140, job 138084550942; the absolute bound tracks this exact producer result: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550942.",
     "2026-11-24: Phase 14's local stable-state producer (build/ci/tests/schwaystation-test-state state.stable_bytes) measured 3757638 bytes after the controller protocol-state addition; the bound tracks this exact local result. The producer exited 0; execution evidence is in .planning/phases/14-multitap-and-special-controllers/14-16-SUMMARY.md.",
     "2026-11-24: Phase 14's Ubuntu 26.04 WASI producer measured the linked Release schwaystation-run module at 947976 bytes on PR run 45420382438, job 138538583783; floor and ceiling now track this exact measurement: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783.",
-    "2026-11-24: after the final Phase 14 source fix 2ab13f4, the Ubuntu 26.04 Clang 21.1.8/LLD 21.1.8 WASI producer built the CHD-enabled Release runner in task-named container schwaystation-phase14-wasi-size and measured 947899 bytes. tests/cmake/quality.cmake validated the WASM artifact and reported that exact measurement against the now-stale 947976 floor; the linked module is 77 bytes smaller than the earlier source measurement. The exact bound now tracks the current producer. Hosted Main CI run 45428490941 failed before this producer because its apt package indexes lacked Ubuntu feeds; same-head Nightly run 45428491372 installed the same WASI packages and passed its WASI benchmark.",
+    "2026-11-24: the first final-source local WASI reproduction measured 947899 bytes in an Ubuntu 26.04 arm64 container with SCHWAYSTATION_BUILD_TESTS=OFF; it did not match the hosted wasm32-chd preset. Main CI run 45436318507 measured 947969 bytes and failed only because the then-current ceiling was 947899. A local x86_64 Ubuntu 26.04 Clang/LLD 21.1.8 reproduction with tests enabled, CHD enabled and matching wasm32 settings built the Release runner at exactly 947969 bytes, confirming the hosted producer. The exact bound now tracks 947969. The run's other matrix jobs were canceled after this mismatch; GitHub timing reported zero billable milliseconds. The task-named x86_64 Docker container and its task-pulled image were removed after measurement.",
     "2026-11-24: Phase 14's Cachegrind producer measured testcard at 1620101 and gpu_motion at 138319540 Ir/frame on PR run 45420382438, job 138538117721. Both relative comparisons passed; the exact-measurement ceilings were stale by 528 Ir and now track the producer values without changing the 100-basis-point regression limit: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721."
   ]
 }

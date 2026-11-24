@@ -6,10 +6,10 @@ current_phase: 15
 current_phase_name: GunCon and Justifier
 current_plan: Not started
 status: planning
-stopped_at: Phase 14 exact WASI bound updated; final hosted retry pending
-last_updated: "2026-11-24T16:21:13Z"
+stopped_at: Phase 14 x86_64 tests-enabled WASI producer confirmed 947969; corrected pin and final hosted run pending
+last_updated: "2026-11-24T16:53:54Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 WASI size measured at 947899; updated exact pin and local quality test pass, hosted retry pending
+last_activity_desc: Phase 14 matched x86_64 tests-enabled WASI producer at 947969; correcting the pin after the earlier arm64 tests-off mismatch
 state_head: 2ab13f4e0d44f1ddb4fd9c31f7ddb2804c19b074
 progress:
   total_phases: 10
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — 947,899-byte WASI module pin passes locally; PR #42 needs this bound, Main CI and release before Phase 15
+**Current focus:** Phase 14 — the matching x86_64 tests-enabled WASI producer measures 947,969 bytes; PR #42 needs this pin, Main CI and release before Phase 15
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Phase: 15 — GunCon and Justifier
 Current Plan: Not started
 Total Plans in Phase: Not planned
 Status: Ready to plan
-Last activity: 2026-11-24 — final WASI module size was measured locally; CI needs a rerun after the exact pin update
+Last activity: 2026-11-24 — the tests-enabled x86_64 WASI producer matched CI at 947,969 bytes; update the bound before final hosted retry
 Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Its final PR head still needs green Main CI and release before Phase 15; Phase 7–11 verification digest reconciliation remains pending.)
 
 ### Phase 14 verification closeout (2026-11-24)
@@ -173,6 +173,33 @@ reference and the six-platform builds that completed before cancellation. It was
 after the local producer exposed the stale exact pin; Nightly completed in 796 seconds with its fuzz job taking 782
 seconds. GitHub's timing endpoint returned zero billable milliseconds for both runs, so no runner-minute savings are
 claimed. Main CI plus its WASI-dependent hash comparison must pass on the corrected exact bound before Phase 14 ships.
+
+### Phase 14 matched x86_64 WASI producer correction (2026-11-24)
+
+Runtime/model: Codex; primary session model ID unavailable. Main CI on head `d46ec1e` reached its linked-module size
+step and measured 947,969 bytes, failing only because the local update had set 947,899. The earlier 947,899-byte
+reproduction used an arm64 container and `SCHWAYSTATION_BUILD_TESTS=OFF`, so it did not match the hosted x86_64
+`wasm32-chd` preset. An x86_64 tests-off build measured 947,947; the tests-enabled build added the test-only card hook
+and matched CI exactly at 947,969.
+
+The local matched producer used a task-named Ubuntu 26.04 x86_64 container, Clang/LLD 21.1.8, `wasi-libc`
+0.0~git20250726.3f7eb4c-4, `libclang-rt-21-dev-wasm32`, Release, CHD enabled, and test registration enabled. Its
+direct CMake configure, `cmake --build ... --target schwaystation-run`, and `stat` command exited 0 with
+`WASI_MODULE_BYTES=947969`. Test emulator/fixture-tool paths were placeholders for configuration only; no WASI CTest
+was run locally. The exact measurement comes from both this producer and Main CI run
+[45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507). The pin is corrected to floor and
+ceiling 947969. `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=947969 -P
+tests/cmake/quality.cmake` exited 0; the focused `ctest --test-dir build/ci --output-on-failure -R
+'^policy[.]quality_metrics$' --no-tests=error` passed 1/1 in 47.15 seconds. The quality JSON, SIO inventory sort and
+`git diff --check` also passed before the retry push.
+
+After confirming the hosted mismatch, obsolete Main CI [45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507)
+and Nightly [45436318741](https://github.com/szTheory/schwaystation/actions/runs/45436318741) were canceled at 323 and
+292 seconds elapsed. Nightly had already passed its WASI benchmark, all three native benchmarks and vectors; its fuzz
+job lasted 283 seconds wall, with the bounded-campaign step canceled after 180 seconds. Both timing endpoints returned zero billable milliseconds, so no cost savings are
+claimed. The x86_64 container and x86_64 base image pulled for it were removed; the pre-existing arm64
+`ubuntu:26.04` tag was restored. The corrected exact bound needs one final Main CI/Nightly attempt before Phase 14
+ships. No workflow changes were made; direct exact-producer reproduction provided more relevant coverage than `act`.
 
 ### Phase 14 tail planning split (2026-11-24)
 
