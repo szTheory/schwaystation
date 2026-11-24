@@ -7,14 +7,14 @@ current_phase_name: Multitap and special controllers
 current_plan: 15
 status: executing
 stopped_at: Completed 14-14-PLAN.md
-last_updated: "2026-11-24T11:55:27.408Z"
+last_updated: "2026-11-24T12:01:08Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-14 complete; configured gpt-6-luna xhigh; 32m22s wall time (2m22s beyond cap); one test/documentation commit; card lifecycle selectors passed 3/3; Plan 14-15 next
+last_activity_desc: Phase 14 tail replanned into separate ledger and metrics/docs slices; Plans 14-15 and 14-16 remain unstarted; planning checks passed; no implementation tests executed
 state_head: 39cd8189966d38336627b79e98fef82d44cf56f1
 progress:
   total_phases: 10
   completed_phases: 7
-  total_plans: 94
+  total_plans: 95
   completed_plans: 93
   percent: 70
 ---
@@ -26,16 +26,36 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-14 complete; Plan 14-15 next; SIO-01 remains gated)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-14 complete; ledger Plan 14-15 next, then metrics/docs Plan 14-16; phase verification remains pending)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
 Current Plan: 15
-Total Plans in Phase: 15
+Total Plans in Phase: 16
 Status: Ready for the next authorized plan
-Last activity: 2026-11-24 — Phase 14 Plan 14-14 complete; Codex GSD executor configured `gpt-6-luna` xhigh; 32m22s wall time (2m22s past the plan cap); one test/documentation commit; card lifecycle selectors passed 3/3; SIO-01 remains gated
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 14/15 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 tail planning-only split; Codex/OpenGSD 1.23.0; configured planner `gpt-6.1-sol`, active runtime model ID unavailable; Plans 14-15/14-16 unstarted; cheap planning checks passed
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 14/16 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 tail planning split (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; configured planner `gpt-6.1-sol`; active runtime model ID unavailable.
+Planning duration was not separately measured. Plan14's 32m22s execution exceeded the 30-minute cap; the
+unstarted 11,500-token Plan15 had two independent existing task boundaries. Plan15 now owns only the
+compatibility ledger and generated evidence (5,000-token projection, Wave12). New Plan16 owns only measured
+metrics, fixture state hashes and discoverable documentation (6,500-token projection, Wave13), then the
+complete final review/verification handoff. Each single-task implementation slice targets 20–28 minutes.
+The estimate-calibration query returned factor1, zero samples and low confidence; no speedup is claimed.
+
+Both original tasks, automated verification commands, done criteria and the complete phase handoff are
+preserved byte-for-byte across the split. GSD schema/structure checks, shell/Python syntax, read-only selector
+inspection, dependency/ownership checks and diff checks passed. The structure parser's existing bare-diff
+advisory remains appropriate for task checks against the uncommitted tree; the decision gate skips this
+context's unnumbered decisions, whose grouped aliases remain covered by the source audit in Plan16.
+ROADMAP and the GSD plan index now show 14/16 complete and 13 waves; only Plan15 is ready. Plans01–14,
+all summaries and existing requirement statuses are unchanged. No source change, configure/build,
+implementation test, hosted CI, Act, Docker or execution ran; no hosted run URL applies. The parent
+orchestrator acts next on the reviewed planning split; neither remaining plan has started.
 
 ### Phase 14 Plan 14-14 execution (2026-11-24)
 
