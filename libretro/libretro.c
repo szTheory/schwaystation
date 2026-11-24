@@ -41,6 +41,7 @@
 #define LR_EXE_HEADER 0x800u
 #define LR_EXE_MAX_BYTES (LR_EXE_HEADER + 2u * 1024u * 1024u)
 #define LR_CARD_PATH_CAP 4096u
+#define LR_CARD_ENDPOINT_COUNT 8u
 #define LR_DISC_PATH_CAP 4096u
 #define LR_DISC_LIMIT SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT
 #define LR_MEMORY_DESCRIPTOR_COUNT 6u
@@ -73,8 +74,8 @@ static schway_info info;
 static uint32_t *pixels;
 static int16_t *samples;
 static unsigned geometry_width, geometry_height;
-static char lr_card2_path[LR_CARD_PATH_CAP];
-static uint64_t lr_card2_saved_generation;
+static char lr_card_paths[LR_CARD_ENDPOINT_COUNT][LR_CARD_PATH_CAP];
+static uint64_t lr_card_saved_generations[LR_CARD_ENDPOINT_COUNT];
 static schway_disc_image *lr_discs[LR_DISC_LIMIT];
 static unsigned lr_disc_count;
 static unsigned lr_disc_index = LR_DISC_LIMIT;
@@ -751,20 +752,29 @@ static void lr_acquire_rumble(void)
     }
 }
 
-static void lr_card2_flush(void)
+static void lr_cards_flush(void)
 {
-    schway_span card;
-    uint64_t generation;
-    if (inst == NULL || lr_card2_path[0] == '\0' ||
-        schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &generation) != SCHWAY_STATUS_OK ||
-        generation == lr_card2_saved_generation ||
-        schway_get_memory(inst, SCHWAY_MEMORY_CARD2, &card) != SCHWAY_STATUS_OK ||
-        card.size != SCHWAY_MEMCARD_SIZE) {
-        return;
-    }
-    if (schway_host_card_save_atomic(lr_card2_path, card.data, card.size) ==
-        SCHWAY_HOST_CARD_OK) {
-        lr_card2_saved_generation = generation;
+    if (inst == NULL) return;
+    for (unsigned endpoint = 1u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
+        uint32_t port = endpoint / 4u + 1u;
+        uint32_t socket = endpoint % 4u + 1u;
+        schway_span card;
+        uint64_t generation;
+        if (lr_card_paths[endpoint][0] == '\0' ||
+            schway_memcard_socket_generation(inst, port, socket, &generation) !=
+                SCHWAY_STATUS_OK ||
+            generation == lr_card_saved_generations[endpoint] ||
+            schway_get_memcard(inst, port, socket, &card) != SCHWAY_STATUS_OK ||
+            card.size != SCHWAY_MEMCARD_SIZE) {
+            continue;
+        }
+        if (schway_host_card_save_atomic(lr_card_paths[endpoint], card.data, card.size) ==
+            SCHWAY_HOST_CARD_OK) {
+            lr_card_saved_generations[endpoint] = generation;
+        } else {
+            fprintf(stderr, "schwaystation: memory card port %u socket %c save failed\n",
+                    (unsigned)port, (int)('A' + socket - 1u));
+        }
     }
 }
 
@@ -830,15 +840,16 @@ static void lr_memory_map_register(void)
     }
 }
 
-static int lr_card2_path_for_game(const struct retro_game_info *game,
-                                  char path[LR_CARD_PATH_CAP])
+static int lr_card_paths_for_game(
+    const struct retro_game_info *game,
+    char paths[LR_CARD_ENDPOINT_COUNT][LR_CARD_PATH_CAP])
 {
     const char *save_directory = NULL;
     const char *basename;
     const char *extension;
     char content_name[64];
-    char card_one[LR_CARD_PATH_CAP];
     size_t name_size;
+    memset(paths, 0, (size_t)LR_CARD_ENDPOINT_COUNT * LR_CARD_PATH_CAP);
     if (game == NULL || game->path == NULL || env_cb == NULL ||
         !env_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &save_directory) ||
         save_directory == NULL || save_directory[0] == '\0') {
@@ -860,12 +871,21 @@ static int lr_card2_path_for_game(const struct retro_game_info *game,
     }
     memcpy(content_name, basename, name_size);
     content_name[name_size] = '\0';
-    return schway_host_card_paths_for_basename(save_directory, content_name, card_one,
-                                                sizeof card_one, path, LR_CARD_PATH_CAP) ==
-           SCHWAY_HOST_CARD_OK;
+    for (unsigned endpoint = 1u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
+        uint32_t port = endpoint / 4u + 1u;
+        uint32_t socket = endpoint % 4u + 1u;
+        if (schway__host_card_path_for_socket(save_directory, content_name, port, socket,
+                                               paths[endpoint], LR_CARD_PATH_CAP) !=
+            SCHWAY_HOST_CARD_OK) {
+            memset(paths, 0, (size_t)LR_CARD_ENDPOINT_COUNT * LR_CARD_PATH_CAP);
+            return 0;
+        }
+    }
+    return 1;
 }
 
-static void lr_card2_load(const char *path)
+static void lr_card_socket_load(unsigned endpoint, uint32_t port, uint32_t socket,
+                                const char *path)
 {
     uint8_t *bytes;
     schway_host_card_status import_status;
@@ -880,7 +900,7 @@ static void lr_card2_load(const char *path)
     }
     import_status = schway_host_card_import_file(path, bytes, SCHWAY_MEMCARD_SIZE, NULL);
     if (import_status == SCHWAY_HOST_CARD_OK) {
-        if (schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, bytes, SCHWAY_MEMCARD_SIZE) !=
+        if (schway_load_memcard_socket(inst, port, socket, bytes, SCHWAY_MEMCARD_SIZE) !=
             SCHWAY_STATUS_OK) {
             free(bytes);
             return;
@@ -891,18 +911,29 @@ static void lr_card2_load(const char *path)
     }
     free(bytes);
     path_size = strlen(path);
-    if (path_size >= sizeof lr_card2_path ||
-        schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &generation) != SCHWAY_STATUS_OK) {
+    if (path_size >= sizeof lr_card_paths[endpoint] ||
+        schway_memcard_socket_generation(inst, port, socket, &generation) != SCHWAY_STATUS_OK) {
         return;
     }
-    memcpy(lr_card2_path, path, path_size + 1u);
-    lr_card2_saved_generation = generation;
+    memcpy(lr_card_paths[endpoint], path, path_size + 1u);
+    lr_card_saved_generations[endpoint] = generation;
+}
+
+static void lr_card_sockets_load(
+    const char paths[LR_CARD_ENDPOINT_COUNT][LR_CARD_PATH_CAP])
+{
+    for (unsigned endpoint = 1u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
+        if (paths[endpoint][0] != '\0') {
+            lr_card_socket_load(endpoint, endpoint / 4u + 1u, endpoint % 4u + 1u,
+                                paths[endpoint]);
+        }
+    }
 }
 
 /* Destroys the instance and frees the frame buffer. */
 static void lr_unload(void)
 {
-    lr_card2_flush();
+    lr_cards_flush();
     lr_memory_map_clear();
     if (inst != NULL) {
         lr_clear_rumble();
@@ -925,8 +956,8 @@ static void lr_unload(void)
     samples = NULL;
     geometry_width = 0u;
     geometry_height = 0u;
-    lr_card2_path[0] = '\0';
-    lr_card2_saved_generation = 0u;
+    memset(lr_card_paths, 0, sizeof lr_card_paths);
+    memset(lr_card_saved_generations, 0, sizeof lr_card_saved_generations);
     memset(&info, 0, sizeof info);
 }
 
@@ -1762,8 +1793,8 @@ bool retro_load_game(const struct retro_game_info *game)
     schway_disc_image *prepared_discs[LR_DISC_LIMIT] = {NULL};
     unsigned prepared_count = 0u;
     unsigned initial_disc_index = 0u;
-    char card2_path[LR_CARD_PATH_CAP];
-    int have_card2_path = 0;
+    char card_paths[LR_CARD_ENDPOINT_COUNT][LR_CARD_PATH_CAP];
+    int have_card_paths = 0;
     int disc_mode = 0;
     int fast_boot = lr_option_fast_boot();
     int disc_boot_exe_eligible = 0;
@@ -1771,7 +1802,7 @@ bool retro_load_game(const struct retro_game_info *game)
     uint32_t disc_licence_area = SCHWAY_LICENCE_NONE;
     char identity_serial[16] = "";
 
-    card2_path[0] = '\0';
+    memset(card_paths, 0, sizeof card_paths);
 
     lr_acquire_rumble();
     lr_refresh_input_options();
@@ -1789,7 +1820,7 @@ bool retro_load_game(const struct retro_game_info *game)
                 return false;
             }
             exe_licence_area = exe_info.licence_area;
-            have_card2_path = lr_card2_path_for_game(game, card2_path);
+            have_card_paths = lr_card_paths_for_game(game, card_paths);
         } else if (lr_disc_path_supported(game->path)) {
             const char *bios_name = lr_option_bios();
             if (strcmp(bios_name, "none") == 0) {
@@ -1802,7 +1833,7 @@ bool retro_load_game(const struct retro_game_info *game)
                 lr_disc_close_set(prepared_discs, prepared_count);
                 return false;
             }
-            have_card2_path = lr_card2_path_for_game(game, card2_path);
+            have_card_paths = lr_card_paths_for_game(game, card_paths);
             disc_mode = 1;
             if (lr_disc_initial_valid != 0 &&
                 lr_disc_initial_index < prepared_count &&
@@ -1918,8 +1949,8 @@ bool retro_load_game(const struct retro_game_info *game)
         }
     }
     lr_disc_close_set(prepared_discs, prepared_count);
-    if (have_card2_path) {
-        lr_card2_load(card2_path);
+    if (have_card_paths) {
+        lr_card_sockets_load(card_paths);
     }
     lr_apply_multitap_options();
     lr_memory_map_register();
@@ -1996,7 +2027,7 @@ schway__libretro_test_card2_data(size_t *size)
 
 SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void)
 {
-    return lr_card2_path[0] != '\0' ? lr_card2_path : NULL;
+    return lr_card_paths[4u][0] != '\0' ? lr_card_paths[4u] : NULL;
 }
 
 SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
@@ -2006,6 +2037,7 @@ schway__libretro_test_card_socket(unsigned port, unsigned socket, size_t *size,
 {
     schway_span card;
     uint64_t current_generation;
+    unsigned endpoint;
     if (size != NULL) *size = 0u;
     if (generation != NULL) *generation = 0u;
     if (saved_generation != NULL) *saved_generation = 0u;
@@ -2018,10 +2050,9 @@ schway__libretro_test_card_socket(unsigned port, unsigned socket, size_t *size,
     }
     if (size != NULL) *size = card.size;
     if (generation != NULL) *generation = current_generation;
-    if (port == SCHWAY_CARD_PORT_2 && socket == 1u) {
-        if (saved_generation != NULL) *saved_generation = lr_card2_saved_generation;
-        if (path != NULL && lr_card2_path[0] != '\0') *path = lr_card2_path;
-    }
+    endpoint = (port - 1u) * 4u + socket - 1u;
+    if (saved_generation != NULL) *saved_generation = lr_card_saved_generations[endpoint];
+    if (path != NULL && lr_card_paths[endpoint][0] != '\0') *path = lr_card_paths[endpoint];
     return (const uint8_t *)card.data;
 }
 
@@ -2044,7 +2075,7 @@ schway__libretro_test_write_card_socket(unsigned port, unsigned socket, uint8_t 
 
 SCHWAYSTATION_TEST_EXPORT void RETRO_CALLCONV schway__libretro_test_flush_cards(void)
 {
-    lr_card2_flush();
+    lr_cards_flush();
 }
 
 static int lr_test_write(uint32_t address, uint32_t width, uint32_t value)
