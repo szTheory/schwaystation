@@ -80,6 +80,8 @@ status: complete
 2. **Task 1 GREEN:** `1f14811` — persist runner cards across eight sockets.
 3. **Task 2:** `cc3d2d8` — add independent runner multitap controls, docs, and corrected focused build targets.
 
+**Plan metadata:** `9c16aae` — summary, State, and Roadmap closeout.
+
 The plan's focused verify command builds `schwaystation-test-run-stop`, the hook binary selected by the card tests.
 
 ## Files Created/Modified
