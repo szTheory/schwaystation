@@ -1,4 +1,5 @@
 # Tests this directory registers: name<TAB>labels, sorted by name.
+compat.features.controls	compat,portable
 compat.features.preflight	compat,portable
 compat.features.ratchet	compat,portable
 compat.library.controls	compat,library,portable

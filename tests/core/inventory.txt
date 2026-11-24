@@ -4,6 +4,7 @@ core.api.size_tags	core,portable
 core.api.statuses	core,portable
 core.audio.pairs	core,portable
 core.audio.ring	core,portable
+core.boot.fast	core,portable
 core.bus_unbuilt	bus,portable
 core.create.allocator	core,portable
 core.disc_api	core,portable
@@ -11,7 +12,9 @@ core.info	core,portable
 core.instances.independent	core,portable
 core.no_alloc_after_load	perf,portable
 core.no_busy_loop	core,portable
+core.profile.fast_boot	core,portable
 core.profile.locked	core,portable
+core.profile.machine	core,portable
 core.profile.rejected	core,portable
 core.reset.power	core,portable
 core.run.budget_resume	core,portable
@@ -31,6 +34,7 @@ core.sched.stall_freeze	core,portable
 core.sched.state_next_derived	core,portable
 core.state.cpu_fields	core,portable
 core.state.device_fields	core,portable
+core.state.profile	core,portable
 core.state.record_sweep	core,portable
 core.state.rejects	core,portable
 core.state.round_trip	core,portable

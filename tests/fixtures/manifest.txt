@@ -10,7 +10,7 @@ tests/fixtures/src/spu_blocks.inc	schwaystation first-party fixture	-	MIT	e19b56
 tests/fixtures/src/spu_tone.asm	schwaystation first-party fixture	-	MIT	7e463379e683d35d4fe1472d7e50d40a2312ac4d0978dee12e23a0cc2026c772	-
 tests/fixtures/disc_boot.xml	schwaystation first-party fixture	-	MIT	f49dc2c9a8ef20e96dabab412c96e728caf8a24343c66ce29de159d48aa1297e	-
 tests/fixtures/disc_boot_pbp.xml	schwaystation first-party fixture	-	MIT	e9769434dbfb1858383980f665e7c6e194ca676e267356c6d7f9d28b1963df34	-
-tests/fixtures/disc_boot_playlist.xml	schwaystation first-party fixture	-	MIT	41e12b61409f968de0afc3c62b4b7edfadef12ed9e2979d06cf01d04cf875868	-
+tests/fixtures/disc_boot_playlist.xml	schwaystation first-party fixture	-	MIT	205f6f192c48b0b58ff08e37078582a53d87a3ef4c56304a4e7aa37e41acae36	-
 tests/fixtures/src/disc_boot.asm	schwaystation first-party fixture	-	MIT	d95be45fa5430014b119ebdd2a7e6603ceefaeccf52058b1cb3b8baa0a6b344d	-
 tests/fixtures/src/disc_boot.cnf	schwaystation first-party fixture	-	MIT	a3a9b3b4fa6a886b3704102fa9f641706f7a117cd6996c80e8846d8a32930a26	-
 tests/fixtures/src/disc_boot.sbi	schwaystation first-party fixture	-	MIT	8d80422239e2f6a211d7cfe0fb257543370f0c373fc973b1e550848e93bbeb90	-

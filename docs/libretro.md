@@ -18,6 +18,21 @@ for `openbios-fast.bin` there; the checked OpenBIOS artifact is used by CI and i
 The BIOS option can instead name `scph5500.bin`, `scph5501.bin`, or `scph5502.bin` in the same directory. PS-EXE
 content uses the built-in stub and does not need a BIOS. With no content, `none` keeps the built-in test card.
 
+`Boot (reload content)` defaults to `full`, which follows the BIOS shell. `fast` skips the shell only when the selected
+content is a supported disc with a valid `SYSTEM.CNF` boot executable and the selected BIOS file is available. A
+missing BIOS, non-bootable disc, PS-EXE, or no-content load is refused while `fast` is selected. Reload content to
+apply a boot-mode change; selecting `full` keeps the normal BIOS path and the BIOS-free PS-EXE stub route.
+
+## Machine and region
+
+`Machine (reload content)` selects one of the documented boards: `pu7`, `pu8-early`, `pu8-late`, `pu18`, `pu20`,
+`pu22`, `pu23`, `pm41`, or `pm41-2`. It defaults to `pu18`, matching the settled v2 GPU and vC2 CD firmware
+defaults. `Region (reload content)`
+defaults to `auto`. Auto checks the disc serial first, then the disc licence area, then the boot executable's licence
+marker; if none is known it uses NTSC-U/C. Conflicting hints are reported through the frontend log. Selecting NTSC-U/C,
+NTSC-J, or PAL overrides the inferred region. Machine and region are independent choices, and both take effect when
+content is loaded or reloaded. Region selection does not establish title compatibility.
+
 ## Disc changes
 
 M3U playlists expose the libretro extended disk-control interface. Ejecting opens the emulated tray; selecting a

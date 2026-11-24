@@ -131,6 +131,17 @@ static void profile(schway *inst, uint32_t region, uint32_t flags)
     CHECK_EQ_U64(schway_set_profile(inst, &value), SCHWAY_STATUS_OK);
 }
 
+static void board_profile(schway *inst, uint32_t board, uint32_t gpu_v0)
+{
+    schway_profile value;
+    memset(&value, 0, sizeof value);
+    value.size = (uint32_t)sizeof value;
+    value.region = SCHWAY_REGION_NTSC_U;
+    value.flags = gpu_v0 != 0u ? SCHWAY_PROFILE_GPU_V0 : 0u;
+    value.board = board;
+    CHECK_EQ_U64(schway_set_profile(inst, &value), SCHWAY_STATUS_OK);
+}
+
 static void wr8(schway *inst, uint32_t offset, uint8_t value)
 {
     uint32_t cycles = 0u;
@@ -1114,6 +1125,49 @@ static void test_region_firmware(void)
     schway_destroy(inst);
 }
 
+static void test_profile_firmware(void)
+{
+    static const struct {
+        uint32_t board;
+        uint32_t gpu_v0;
+        uint32_t cd_firmware;
+    } profiles[] = {
+        {SCHWAY_BOARD_PU7, 1u, 0u},
+        {SCHWAY_BOARD_PU8_EARLY, 1u, 0u},
+        {SCHWAY_BOARD_PU8_LATE, 0u, 1u},
+        {SCHWAY_BOARD_PU18, 0u, 2u},
+        {SCHWAY_BOARD_PU20, 0u, 2u},
+        {SCHWAY_BOARD_PU22, 0u, 3u},
+        {SCHWAY_BOARD_PU23, 0u, 3u},
+        {SCHWAY_BOARD_PM41, 0u, 3u},
+        {SCHWAY_BOARD_PM41_2, 0u, 3u},
+    };
+
+    for (size_t i = 0u; i < sizeof profiles / sizeof profiles[0]; i++) {
+        schway *inst = make();
+        board_profile(inst, profiles[i].board, profiles[i].gpu_v0);
+        CHECK_EQ_U64(inst->cd_firmware, profiles[i].cd_firmware);
+        param(inst, 0x22u);
+        command(inst, 0x19u);
+        run_cycles(inst, 50000u);
+        if (profiles[i].cd_firmware == 0u) {
+            CHECK_EQ_U64(hint_status(inst) & 7u, 5u);
+            CHECK_EQ_U64(rd8(inst, 1u), 0x11u);
+            CHECK_EQ_U64(rd8(inst, 1u), 0x10u);
+        } else {
+            CHECK_EQ_U64(hint_status(inst) & 7u, 3u);
+            CHECK_EQ_U64(rd8(inst, 1u), 'f');
+            CHECK_EQ_U64(rd8(inst, 1u), 'o');
+            CHECK_EQ_U64(rd8(inst, 1u), 'r');
+            CHECK_EQ_U64(rd8(inst, 1u), ' ');
+            CHECK_EQ_U64(rd8(inst, 1u), 'U');
+            CHECK_EQ_U64(rd8(inst, 1u), '/');
+            CHECK_EQ_U64(rd8(inst, 1u), 'C');
+        }
+        schway_destroy(inst);
+    }
+}
+
 static void test_region_lid(void)
 {
     schway *inst = make();
@@ -1197,6 +1251,8 @@ int main(int argc, char **argv)
         test_bounds();
     } else if (strcmp(argv[1], "region") == 0) {
         test_region();
+    } else if (strcmp(argv[1], "profile-firmware") == 0) {
+        test_profile_firmware();
     } else if (strcmp(argv[1], "sectors") == 0 || strcmp(argv[1], "delivery") == 0) {
         return schway__cdrom_sector_test(argv[1]);
     } else {

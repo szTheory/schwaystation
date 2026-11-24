@@ -26,15 +26,21 @@ typedef enum schway_host_disc_probe_status {
 typedef struct schway_host_disc_probe {
     char serial[16];
     char boot_name[64];
+    uint32_t licence_area; /* SCHWAY_LICENCE_*; zero if sector 4 is unknown/unreadable */
     uint8_t track1_sha1[20];
     uint8_t *exe_bytes;
     size_t exe_size;
 } schway_host_disc_probe;
 
 /* Success transfers an allocated executable buffer to out. Failure leaves
-   out unchanged. NOT_ISO means the caller may try another file format. */
+   out unchanged. This full probe also hashes track 1 for identity reporting.
+   NOT_ISO means the caller may try another file format. */
 schway_host_disc_probe_status schway__disc_probe_image(const char *path,
                                                         schway_host_disc_probe *out);
+/* Extracts the same serial, licence and executable hints without hashing all
+   of track 1. track1_sha1 remains zero; use for profile selection only. */
+schway_host_disc_probe_status schway__disc_probe_region(const char *path,
+                                                         schway_host_disc_probe *out);
 void schway__disc_probe_dispose(schway_host_disc_probe *probe);
 const char *schway__disc_probe_status_string(schway_host_disc_probe_status status);
 

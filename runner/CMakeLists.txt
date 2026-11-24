@@ -6,7 +6,7 @@
 # The runner's sources, absolute, so the tests can build a second runner from
 # the same list.
 set(SCHWAYSTATION_RUNNER_SOURCES)
-foreach(src main.c bench.c clock.c crc32.c frame_hash.c inputs.c mailbox.c png.c probe.c rss.c stop.c trace.c)
+foreach(src main.c bench.c clock.c crc32.c frame_hash.c inputs.c mailbox.c png.c probe.c region.c rss.c stop.c trace.c)
   list(APPEND SCHWAYSTATION_RUNNER_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${src})
 endforeach()
 list(APPEND SCHWAYSTATION_RUNNER_SOURCES ${PROJECT_SOURCE_DIR}/host/disc_probe.c)

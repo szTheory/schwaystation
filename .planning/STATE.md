@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 13
-current_phase_name: Regions, console revisions and playback
+current_phase: 14
+current_phase_name: Multitap and special controllers
 current_plan: Not started
 status: planning
-stopped_at: Phase 12 complete, ready to plan Phase 13
-last_updated: "2026-11-23T10:05:24.372Z"
+stopped_at: Phase 13 complete, ready to plan Phase 14
+last_updated: "2026-11-23T23:11:21.747Z"
 last_activity: 2026-11-23
-last_activity_desc: "Phase 12 shipped as PR #38"
-state_head: 145e7a053c35457d3297bffce8ac1ae67fc1191b
+last_activity_desc: "Phase 13 shipped as PR #40"
+state_head: 35d178048bff1e1c33d3348868ba05e6887fc1db
 progress:
   total_phases: 10
-  completed_phases: 6
-  total_plans: 70
-  completed_plans: 70
-  percent: 60
+  completed_phases: 7
+  total_plans: 79
+  completed_plans: 79
+  percent: 70
 ---
 
 # Project State
@@ -26,16 +26,102 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 13 — Regions, console revisions and playback
+**Current focus:** Phase 14 — Multitap and special controllers (plan only after Phase 13 ships)
 
 ## Current Position
 
-Phase: 13 — Regions, console revisions and playback
+Phase: 14 — Multitap and special controllers
 Current Plan: Not started
-Total Plans in Phase: 0
+Total Plans in Phase: Not yet planned
 Status: Ready to plan
-Last activity: 2026-11-23 -- Phase 12 shipped as PR #38
-Progress: [██████░░░░] 60% (6/10 phases verified; 5/10 released; Phase 12 ship pending)
+Last activity: 2026-11-23 -- Phase 13 shipped as PR #40
+Progress: [███████░░░] 70% (6/10 v2.0 phases released; Phase 13 is verified and PR #40 is awaiting merge/release. Phase 14 planning starts after that release. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+
+### Phase 13 Plan 13-01 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The recorded wall interval was 20m43s from the saved planning-state checkpoint at 14:43:33Z to closeout at 15:04:16Z; executor start was not separately captured and active time was not measured. Task commits: `9ceab60` registered `core.profile.machine`; `067c686` added API v8 board selection and defaults.
+
+`git diff --check` and both sorted exact inventories passed. The repository-check budget remained at its 3,901-line ceiling; the API version preflight covered 249 public header names. The first planned configure/build/CTest command exited 1 on the stale `sizeof(schway_profile) == 16` assertion; configure passed and CTest did not run. After asserting the board offset at 16 and the new size at 20, the focused configure/build/CTest command exited 0: 8/8 reported tests passed in 0.21 seconds, including the board matrix, old-size compatibility, ABI v8 surface and behavior revision check. No workflow changed, so no Act or hosted CI run was needed. PROFILE-02 remains pending until Plan 13-04 adds state validation, serialization and hash coverage; Plan 13-02 is next.
+
+### Phase 13 Plan 13-02 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured wall interval from the saved STATE checkpoint at 15:11:48.258Z through the 16:11:52Z closeout checkpoint was 60m04s; executor start and active time were not separately captured. The task used the RED registration commit `77ae668` and GREEN classifier commit `4ab751c`.
+
+The initial CI preset probe configured in 0.9s but exposed 0/4 MDEC selectors, so the checked plan was corrected to the supported MDEC-only Nightly lane. Nightly configure first discovered the four existing selectors (1.8s), then after registration the exact selector graph included only `mdec.reference.input_preflight`, `mdec.reference.color_assets`, and `mdec.reference.edge`. Archive/member extent and digest checks passed. The initial registered edge test exited 8 in 0.07s after both setup fixtures passed; it reproduced the 1,696-word movie15 DMA0 exhaustion at 1,902,230 ticks without a fault. The classifier now accepts only that pinned source count and exact MDEC/DMA signature after eight successful run/TTY empty-FIFO samples, below the unchanged 4,915,200-cycle cap.
+
+The corrected preflight sequence passed: Nightly inventory sort and the 3,901-line budget gate each exited 0 in 0.00s; MDEC-only Nightly configure exited 0 in 1.17s; exact three-name selector assertion exited 0 in 0.00s; focused target build exited 0 in 0.12s; and the single corrected CTest selection exited 0 with 3/3 tests in 0.06s (source preflight 0.02s, assets 0.03s, edge 0.03s). Its saved log reports source complete (1,440 blocks / 240 macroblocks / zero trailing), decoder FIFO empty, guest expected-incomplete, display not compared, ticks 1,902,230/4,915,200, DMA0 idle, DMA1 waiting remain=9/phase=2, and fault none. No full unaffected 4-bit/8-bit suite, hosted CI, Act job, or Docker resource ran because this plan changed no workflow wiring. MDEC-01 remains pending until full Phase 13 verification; no playback, decoded-frame, or hardware-conformance claim is made. Plan 13-03 is next.
+
+### Phase 13 Plan 13-03 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall interval was 59m22s from the saved STATE checkpoint at 16:14:55Z through the final implementation evidence checkpoint at 17:14:17Z; executor start and active time were not separately captured. Seven plan commits were measured from the persisted ledger (`fc67c35` through `cc25612`).
+
+Task 1 preflights passed: nine board rows, two 0x0B80 entries, sorted core/GPU inventories, 3,901/3,901 line budget and exactly 14 selectors including the two disc fixtures. The initial implementation's build and 14-test run passed in 0.50s and 0.15s, but only before the first-boot register seam was found; those are pre-change evidence. After applying defaults during profile selection and adding before/after-reset assertions, the final core/GPU build passed in 0.45s and the exact selector passed 14/14 in 0.13s.
+
+Task 2 preflights passed: firmware-generation counts were vC0/vC1/vC2/vC3 = 2/1/2/4 across nine rows, core/CD-ROM inventories were sorted, diff hygiene passed, and the line-budget gate remained 3,901/3,901. CI reconfigure passed in 0.81s. The exact selector graph was 5/5 in 0.05s, including `cdrom.profile.firmware`, `cdrom.region`, `core.profile.machine` and both disc fixtures. The targeted CD-ROM/core build passed in 0.25s and focused CTest passed 5/5 in 0.12s. A malformed selector shell wrapper exited 1 before invoking CTest; the corrected Python assertion passed. vC0 Test 22h returns INT5 `(0x11,0x10)`; vC1+ keeps the fixed-region string, and the region selector remains separate.
+
+No hosted CI, Act, Docker, or broad suite was run because workflow wiring was unchanged. PROFILE-02 remains pending until state serialization/hash work and full Phase 13 verification. Plan 13-04 is next.
+
+### Phase 13 Plan 13-04 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured wall interval was 17m02s from the saved STATE checkpoint at 17:19:44Z to final focused acceptance and the last task commit at 17:36:46Z; executor start and active time were not separately captured. Task commits were `bf503b3` (RED), `f7064ff` (GREEN), and `1391c15` (Task 2 regression assertions).
+
+The core inventory sort and fixed 3,901-line budget passed. Task 1 configured CI in 0.81s, asserted exactly five selectors including both disc fixture setups, built the state target in 0.56s for RED, and produced the intended RED: four of five tests passed, while `core.state.profile` showed board-derived identity was not restored. The RED evidence checker passed. After implementation, the changed target build passed in 0.87s and the exact selector passed 5/5 in 0.26s. Board identity is serialized once; the shared defaults table validates board/GPU_V0 pairing and reconstructs fixed defaults after APPLY without overwriting `bus.ram_size`.
+
+Task 2 reran the sorted inventory and line-budget checks, configured CI in 0.89s, and asserted exactly seven selectors including the disc fixtures with `core.state.record_sweep` excluded. The state target was rebuilt after test edits in 0.31s; the selected tests passed 7/7 in 0.60s. The added cases cover board zero, above-range board, a CRC-valid PU-7/GPU_V0 mismatch, prior format 18, atomic preservation of state/audio, and deterministic equal/different board state-byte hashes. Task 2's validation cases were green immediately because the validator was delivered in Task 1; no separate RED was fabricated. This sequencing deviation is documented and waived as WINDOWS entry 25.
+
+No broad suite, hosted CI, Act, Docker, or hardware run was needed because workflow wiring did not change. PROFILE-02 remains pending until remaining Phase 13 work and final phase verification. Plan 13-05 is next.
+
+### Phase 13 Plan 13-05 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. A trustworthy start/end interval and active duration were not recorded. Task commits are `e59ff11` (host region resolution) and `e108691` (runner machine/region options); checked plan corrections are `60723cf`, `2181560`, and `177b815`.
+
+Task 1 passed the runner inventory sort (0.00s), the 3,901-line gate (0.02s), corrected CI configure (0.75s; another configure 0.74s), exact two-selector discovery (0.03s), fixture target (0.02s), and `policy.fixture_budget` (1/1 in 0.02s). Its first focused build exited 1 in 0.27s because the new test target lacked the build-generated include directory; adding `${PROJECT_BINARY_DIR}/generated` fixed it. The successful rebuild duration was not captured. The final region/disc selector passed 2/2 in 0.04s.
+
+Task 2 sorted both runner and compatibility inventories, kept the line budget at 3,901/3,901, configured the reused CI tree in 0.81s, and asserted the exact 16-name selector graph including `compat.features.preflight`. The focused runner/probe target build passed in 1.00s. The exact 16-test selection passed in 0.19s, including all nine machine tokens, canonical profile acceptance, region fallback/precedence, redaction, and full identity hash preservation.
+
+No broad suite, hosted CI, Act, Docker, or hardware run was needed because workflow wiring did not change. The summary records runner-observed region/profile evidence only; PROFILE-01 and PROFILE-02 remain pending until full Phase 13 verification. Plan 13-06 is next.
+
+### Phase 13 Plan 13-06 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Total task duration was not reliably tracked. Task commits were `c072d8e` (libretro options and profile coverage) and `a8e803b` (option documentation); measured task commit count was two from `87eac29d1fec593efb7e019c7cbd4ef6fb3b6408` through `a8e803beb950881edc3e2073b99aa73edf618ba0`.
+
+The initial CI configure/target-registration attempt failed before any build. The production core and test targets needed to link `host/disc_probe.c` and `runner/region.c`; the plan file list and resolver-link note were corrected alongside target wiring. The subsequent CI configure passed in 0.8s. Sorted libretro inventory and the fixed 3,901-line budget passed, fixture producers were current, and `policy.fixture_budget` passed 1/1. The changed-target build passed in 0.465s. The exact profile selector closure matched 6/6 names and all six tests passed in 0.44s.
+
+The D-01 review changed the libretro machine default/fallback to PU-18 without changing the library default. That first profile run exposed three PM-41(2) comparisons failing across the three regions: the advertised `pm41-2` token lacked an explicit parser case and had depended on the old fallback. Adding the explicit PM-41(2) mapping fixed the isolated option-profile test and the final six-test selector. The detached first audio-test launch had no authoritative exit record, so the exact test was rerun as one managed session; selector closure was 1/1 and `libretro.host.disc_audio` passed in 2.20s with both PAL and NTSC cases. `git diff --check` passed.
+
+No workflow wiring changed, so no broad CI, Act, hosted CI, or Docker run was used. `PROFILE-01` and `PROFILE-02` remain pending full Phase 13 verification; Plan 13-07 is next.
+
+### Phase 13 Plan 13-07 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Total task duration was not reliably tracked. Task commits were `16c6c7b` (fast-boot profile flag) and `ec6d167` (bounded BIOS shell handoff); measured count was two from `cfe434109311ce2244630edb5798dee06e98e9f2` through `ec6d167085be33b4b53b4ff117a7773aeac59c18`.
+
+Sorted core inventory and the fixed 3,901-line budget passed; CI configure passed in 0.7s. After Task 1 test registration, the exact profile/state selector closure matched 7/7 names. The first Task 1 build failed in 0.55s before tests because `test_state.c` used a helper local to `test_core.c`; constructing the profile locally fixed it. The corrected target build plus CTest command passed in 0.656s, with 7/7 selected tests in 0.52s. Task 2's core target build passed in 0.359s, and the exact boot selector closure included its two disc fixtures and passed 3/3 in 0.16s. Final `git diff --check` passed.
+
+The fast-boot bit is carried by the existing serialized profile field, so state format 19 remains unchanged. Behavior revision 19 remains appropriate because only a new explicit input was added and the default path is unchanged. No workflow wiring changed, so no broad CI, Act, hosted CI, or Docker run was used. `BOOT-01` remains pending until Phase 13 verification; Plan 13-08 is next.
+
+### Phase 13 Plan 13-08 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor, `gpt-6-luna` xhigh; primary session model ID unavailable. Wall interval was about 39m31s from the saved STATE checkpoint at 20:39:03.978Z through closeout at 21:18:35Z; active time was not separately measured. Task commits were `1459a61` (runner) and `dd12d65` (libretro); plan preflight correction was `eac1a18`.
+
+The sorted runner/libretro inventories, fixed 3,901-line repository budget, both 524,288-byte OpenBIOS digests, current disc fixture producer, fixture budget and pre-change disc probe passed. Runner configure/build/selector took 0.6s/0.235s/0.76s; its exact five-test closure passed. Libretro configure/build/selector took 0.78s/0.90s/0.81s; its exact four-test closure passed. `git diff --check` and the Plan 13-08 summary validator passed.
+
+The first runner test asserted that fast mode must use fewer video frames. It failed because both boot modes completed at frame 276 with the same mailbox and frame hash; this fixture does not expose the CPU-cycle shortcut at frame granularity. The unsupported speed assertion was removed, and both host tests now assert the same guest output without claiming a speedup. The core handoff remains covered separately by the existing `core.boot.fast` test. No workflow changed, so no Act, hosted CI, broad suite or Docker work was needed. CI/CD efficiency and task-named Docker cleanup guidance is already discoverable in `AGENTS.md`, `.planning/AUTONOMOUS.md` and `docs/maintaining.md`. `BOOT-01` remains pending Phase 13 verification; Plan 13-09 is next.
+
+### Phase 13 Plan 13-09 execution (2026-11-23)
+
+Runtime/model: Codex GSD executor, `gpt-6-luna` xhigh; primary session model ID unavailable. Wall interval was about 19m40s from the saved STATE checkpoint at 21:18:35Z through closeout at 21:38:15Z; active time was not separately measured. Task commits were `cb94d43` (canonical profile evidence and controls) and `592d21b` (generated documentation and roadmap plan status). Plan corrections were `861f21d`, `de5d4cd`, `48196d4` and `691112a`.
+
+The core machine matrix and libretro option matrix passed 4/4 with fixture setup before profile rows were recorded. The exact compatibility feature preflight/ratchet/negative-control closure passed 3/3 in 0.50s. All 32 feature data rows are bytewise sorted; the title ledger remains at its original 10-column schema and four rows. The generated compatibility documentation reproduces from the generator and current ledgers; the generator's changed output-prose line keeps the counted repository-check gate at exactly 3,901 lines. CI configure passed in 0.80s, documentation generation in 0.11s, focused feature preflight in 0.04s, and `git diff --check HEAD` passed.
+
+The raw CSV sort preflight initially treated the header as data and failed. Plan 13-09 was corrected to sort from the second line; all feature rows then passed. The roadmap records 9/9 plans complete, but Phase 13 and PROFILE-01/02, BOOT-01 and MDEC-01 remain unchecked/Pending until aggregate verification. The generator change did not alter workflow wiring; the single full local CI workflow is next after code review, as planned. No Act, hosted run or Docker resource was used here. Phase 13 code review is next; no Phase 14 work starts before Phase 13 ship/release.
+
+### Phase 13 verification and completion (2026-11-23)
+
+Runtime/model: Codex GSD verifier, configured `gpt-6-luna` xhigh; primary session model ID unavailable. Goal-backward verification passed 32/32 plan and roadmap truths, all four requirements, and all seven tracked decisions. `verification.status` returned `passed`; the report fingerprint was regenerated and matched. The source review is clean; its two earlier findings are recorded as fixed in `13-REVIEW-DISPOSITION.md`.
+
+The final `cmake --workflow --preset ci` run on source head `ac4bb12` exited 0 in 81 seconds: 691/691 CI tests passed, all three macOS arm64 packages were produced, and the CI Release selector passed 8/8. Targeted verification passed 21/21 CI selectors, 5/5 Nightly MDEC reference selectors, and 3/3 compatibility selectors; commands and results are in `13-VERIFICATION.md`. The preceding full-workflow attempts exposed stale profile initializers, an API-version guard omission, changed state-format hashes, missing public-symbol docs, and a playlist expectation tied to the old first member. Each was fixed and targeted before the final green workflow. The later review-disposition and verification changes are planning documents only.
+
+The CI efficiency review measured `policy.quality_metrics` at 44.35 seconds. Its serial subprocess scenarios protect real quality and timing scripts; splitting them safely requires harness isolation/refactoring, so no small change was justified. The branch also carries the Phase 12 Release Please routing optimization. `act --dryrun --strict --container-architecture linux/arm64 --platform ubuntu-26.04=catthehatter/ubuntu:act-latest --actor szTheory -W .github/workflows/ci.yml pull_request` exited 0 and validated PR workflow/job routing; it did not execute job steps. The first attempt exited 1 at Act's interactive image prompt before dispatch. The successful run used a project-named temporary action cache under `/private/tmp`, removed on exit, and created no Docker resources. The local workflow and classifier tests provide implementation coverage; hosted runners, release automation and Actions usage remain to inspect during ship. `phase.complete` reported four summary file-list warnings because command strings were parsed as paths; these are not missing implementation files. Phase 13 is verified and marked complete, but must ship before Phase 14 planning.
 
 ### Phase 12 Plan 12-05 execution (2026-11-23)
 
@@ -49,7 +135,39 @@ Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtim
 
 ### Phase 12 Plan 12-07 execution (2026-11-23)
 
-Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured 9-minute wall interval (08:02:00–08:11:27 UTC) completed one task and one implementation commit through the focused test and initial GSD closeout; active time was not separately measured. The subsequent metadata-only duration-correction commit is excluded. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans are complete; Phase 12 is ready for review and verification, not shipped.
+Runtime/model: Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured 9-minute wall interval (08:02:00–08:11:27 UTC) completed one task and one implementation commit through the focused test and initial GSD closeout; active time was not separately measured. The subsequent metadata-only duration-correction commit is excluded. `libretro.host` passed 1/1 in 131.00 seconds after a 4.6-second configure and 5.2-second focused build. The source count dropped runner PCM captures from six to three while retaining six callback comparisons and all size/hash/status checks. The prior BE32 result was about 18m52s; this native run is not comparable, so no hosted speedup is claimed. All seven plans were complete; this entry preceded final review, verification, ship and release.
+
+### Phase 12 ship closeout (2026-11-23)
+
+Runtime/model: Codex; primary model ID unavailable. The merged release commit `8a462ee2c256a7fde7b65a1ec17b24f509c0146b` passed Main CI in [run 45168856493](https://github.com/szTheory/schwaystation/actions/runs/45168856493) and the full Release workflow in [run 45168856424](https://github.com/szTheory/schwaystation/actions/runs/45168856424); both used the same SHA. Main CI used 9,173 runner-seconds (152.88 runner-minutes), with BE32 at 4,665 seconds. Release CI used 7,893 runner-seconds (131.55 runner-minutes), with BE32 at 2,638 seconds, and published the 18 platform archives as [v0.12.0](https://github.com/szTheory/schwaystation/releases/tag/v0.12.0).
+
+CI efficiency review found the Release Please metadata push repeats Main's full matrix after Release CI already validates and packages that exact commit. A fail-closed route now skips Main's heavy matrix only for the Release App actor and the exact three modified generated metadata files; Release CI stays full. Its code and adversarial classifier cases are committed on the Phase 13 branch, and the local `cmake --workflow --preset ci` run passed 674/674 tests and 8/8 release checks before the documentation-only note. The projected saving is about 153 Main runner-minutes per metadata-only release push, based on this run; hosted confirmation is pending the Phase 13 pull request.
+
+Phase 7–11 reports became stale as later phases changed files they cover. The GSD phase-init check confirms this does not block Phase 13 planning. Defer refreshing those reports until the final milestone audit so a green full local workflow is not repeated five times for bookkeeping; do not hand-edit coverage digests or bypass the supported stale-verification route.
+
+### Phase 13 discussion (2026-11-23)
+
+Runtime/model: Codex discuss orchestrator; exact primary runtime model ID unavailable. Three independent
+`gsd-advisor-researcher` reviews used `gpt-6-luna` xhigh. The measured discussion wall interval from the first
+clock reading at 13:23:49 UTC through context/state closeout at 13:28:05 UTC was 4 minutes 16 seconds; active
+sampling time was not separately available. Context commit `f8937a8` records the nine documented board identities,
+legal GPU behavior pairs, region/title/board separation, BIOS-backed opt-in shell entry and MDEC evidence boundary.
+`git diff --check` passed before commit. No tests, hosted jobs, Act jobs or Docker resources were needed for this
+planning-only step. Three advisor reviews and an adversarial synthesis preferred the existing feature-ledger
+profile field with canonical `region.board.gpu` values; four loosely matched todos were reviewed and kept bound
+to their earlier phases or test-maintenance scope. Phase 12 release is green. No tests or hosted work ran during
+discussion.
+
+### Phase 13 research and planning (2026-11-23)
+
+Runtime/model: Codex orchestrator; GSD planner `gpt-6.1-sol` high and plan checker `gpt-6-luna` xhigh; primary
+runtime model ID unavailable. Nine plans were created with serialized waves to avoid concurrent writes to the
+shared CMake build tree. Final plan review passed all structure, ownership and dependency checks; all 18
+automated command bodies pass `bash -n`, and failure-direction checks report zero findings. A local CTest
+show-only probe exposed that the existing build directory was unconfigured and CTest treats a missing selector
+as exit 0; Plan 02 now configures first and asserts the exact discovered selector set in JSON. The fixed
+repository-check budget remains 3,901/3,901 lines. No implementation build, test suite, hosted CI, Act job or
+Docker resource was started. Planning wall duration was not tracked. Next: execute Plan 13-01.
 
 ### Phase 11 review, verification and transition (2026-11-22)
 
@@ -999,7 +1117,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 265
+- Total plans completed: 274
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1019,6 +1137,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 10 | 13 | - | - |
 | 11 | 15 | - | - |
 | 12 | 7 | - | - |
+| 13 | 9 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1257,6 +1376,13 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 12 P05 | 37min | 3 tasks | 5 files |
 | Phase 12 P06 | 64min | 2 tasks | 8 files |
 | Phase 12 P07 | 9min | 1 tasks | 1 files |
+| Phase 13 P01 | 20m43s | 2 tasks | 12 files |
+| Phase 13 P02 | 60m | 1 tasks | 3 files |
+| Phase 13 P03 | 59m22s | 2 tasks | 9 files |
+| Phase 13 P04 | 17m02s | 2 tasks | 4 files |
+| Phase 13 P05 | not tracked | 2 tasks | 11 files |
+| Phase 13 P06 | not reliably tracked | 2 tasks | 7 files |
+| Phase 13 P07 | not reliably tracked | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -1689,6 +1815,20 @@ Recent decisions affecting current work:
 - [Phase 12]: Use the parser's 65,536-byte maximum as the SBI corpus cap, including an 8,193-record boundary case.
 - [Phase 12]: Register both SBI binaries in the explicit fuzz build preset so the existing Nightly job builds them.
 - [Phase 12]: Capture one region-specific runner PCM file and reuse it for both callback comparisons after its existing size and SHA-256 checks pass.
+- [Phase 13]: API v8 appends board identity; behavior revision is 19, while state serialization/hash updates remain for Plan 13-04.
+- [Phase 13]: Old-sized profiles and board zero inherit current board defaults; GPU_V0 stays a legacy override, while explicit boards must match their documented GPU pairing.
+- [Phase 13]: New instances default to the PU-18 board profile.
+- [Phase 13]: Plan 13-02 records the exact movie15 expected-incomplete signature as diagnostic-only; MDEC-01 remains pending until full Phase 13 verification.
+- [Phase 13]: Apply board RAM_SIZE at profile selection and power reset so explicit profiles are correct before the first frame.
+- [Phase 13]: Gate only vC0 Test 22h to the documented INT5 (11h,10h); leave Test 20h and unpinned Test 51h behavior unchanged.
+- [Phase 13]: Serialize board identity once and reconstruct fixed board-derived defaults from the canonical table after APPLY.
+- [Phase 13]: Preserve mutable bus.ram_size during board-identity restoration.
+- [Phase 13]: Resolve automatic region from serial, disc licence, and executable marker while keeping explicit selection authoritative.
+- [Phase 13]: Keep board selection separate from video region and title serial; pair PU-7 and PU-8 early with GPU_V0.
+- [Phase 13]: Libretro machine options default to and fall back to PU-18 per D-01 while the library default remains unchanged.
+- [Phase 13]: Machine and region remain independent options applied at content load; auto region identity uses the shared host resolver.
+- [Phase 13]: Full BIOS boot remains the default; only the explicit fast-boot profile flag enables the shell handoff.
+- [Phase 13]: State format and behavior revision remain 19 because profile flags were already serialized and default behavior is unchanged.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -1939,8 +2079,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T08:09:48.339Z
-Stopped at: Phase 12 complete, ready to plan Phase 13
+Last session: 2026-11-23T20:39:03.752Z
+Stopped at: Phase 13 complete, ready to plan Phase 14
 Resume file: None
 
 ### v1.0 session history

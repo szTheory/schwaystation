@@ -33,7 +33,99 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   endfunction()
 
-  if(CASE STREQUAL "disc_load")
+  if(CASE STREQUAL "boot_full")
+    foreach(var RUN BIOS FIXTURES)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner full-boot case requires ${var}")
+      endif()
+    endforeach()
+    set(disc "${FIXTURES}/disc_boot.cue")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --disc "${disc}"
+        --frames 1200 --stop-on mailbox --hash
+      RESULT_VARIABLE default_rc OUTPUT_VARIABLE default_out ERROR_VARIABLE default_err)
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --disc "${disc}"
+        --boot full --frames 1200 --stop-on mailbox --hash
+      RESULT_VARIABLE full_rc OUTPUT_VARIABLE full_out ERROR_VARIABLE full_err)
+    set(default_output "${default_out}${default_err}")
+    set(full_output "${full_out}${full_err}")
+    if(NOT default_rc STREQUAL "0" OR NOT full_rc STREQUAL "0" OR
+       NOT default_output MATCHES "mailbox SWMB status=00" OR
+       NOT full_output MATCHES "mailbox SWMB status=00" OR
+       NOT default_output MATCHES "mailbox 0001=424f4f54" OR
+       NOT full_output MATCHES "mailbox 0001=424f4f54" OR
+       NOT default_output MATCHES "frame [0-9]+ sha256 [0-9a-f]+" OR
+       NOT full_output MATCHES "frame [0-9]+ sha256 [0-9a-f]+" OR
+       NOT default_output STREQUAL full_output)
+      message(FATAL_ERROR "full BIOS boot differs from the default runner path:\n"
+        "default (${default_rc}): ${default_output}\nfull (${full_rc}): ${full_output}")
+    endif()
+  elseif(CASE STREQUAL "boot_fast")
+    foreach(var RUN BIOS FIXTURES)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner fast-boot case requires ${var}")
+      endif()
+    endforeach()
+    set(disc "${FIXTURES}/disc_boot.cue")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --disc "${disc}"
+        --frames 1200 --stop-on mailbox --hash
+      RESULT_VARIABLE full_rc OUTPUT_VARIABLE full_out ERROR_VARIABLE full_err)
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --bios "${BIOS}" --disc "${disc}"
+        --boot fast --frames 1200 --stop-on mailbox --hash
+      RESULT_VARIABLE fast_rc OUTPUT_VARIABLE fast_out ERROR_VARIABLE fast_err)
+    set(full_output "${full_out}${full_err}")
+    set(fast_output "${fast_out}${fast_err}")
+    string(REGEX MATCHALL "mailbox [0-9a-f]+=[0-9a-f]+" full_records "${full_output}")
+    string(REGEX MATCHALL "mailbox [0-9a-f]+=[0-9a-f]+" fast_records "${fast_output}")
+    string(REGEX MATCH "frame [0-9]+ sha256 [0-9a-f]+" full_frame_line "${full_output}")
+    string(REGEX MATCH "frame [0-9]+ sha256 [0-9a-f]+" fast_frame_line "${fast_output}")
+    if(NOT full_rc STREQUAL "0" OR NOT fast_rc STREQUAL "0" OR
+       NOT full_output MATCHES "mailbox SWMB status=00" OR
+       NOT fast_output MATCHES "mailbox SWMB status=00" OR
+       NOT full_output MATCHES "mailbox 0001=424f4f54" OR
+       NOT fast_output MATCHES "mailbox 0001=424f4f54" OR
+       NOT full_records STREQUAL fast_records OR
+       full_frame_line STREQUAL "" OR fast_frame_line STREQUAL "" OR
+       NOT full_frame_line STREQUAL fast_frame_line)
+      message(FATAL_ERROR "fast boot did not preserve the eligible disc guest result:\n"
+        "full (${full_rc}): ${full_output}\nfast (${fast_rc}): ${fast_output}")
+    endif()
+  elseif(CASE STREQUAL "boot_invalid")
+    foreach(var RUN BIOS FIXTURES OUT HELLO_EXE)
+      if(NOT DEFINED ${var} OR "${${var}}" STREQUAL "")
+        message(FATAL_ERROR "runner fast-boot controls require ${var}")
+      endif()
+    endforeach()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --boot fast --disc "${FIXTURES}/disc_boot.cue"
+        --frames 1
+      RESULT_VARIABLE no_bios_rc OUTPUT_VARIABLE no_bios_out ERROR_VARIABLE no_bios_err)
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --boot fast --bios "${BIOS}" --frames 1
+      RESULT_VARIABLE no_disc_rc OUTPUT_VARIABLE no_disc_out ERROR_VARIABLE no_disc_err)
+    file(MAKE_DIRECTORY "${OUT}")
+    string(REPEAT "S" 32768 ineligible_iso)
+    set(ineligible_path "${OUT}/runner-boot-ineligible.iso")
+    file(WRITE "${ineligible_path}" "${ineligible_iso}")
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --boot fast --bios "${BIOS}"
+        --disc "${ineligible_path}" --frames 1
+      RESULT_VARIABLE ineligible_rc OUTPUT_VARIABLE ineligible_out ERROR_VARIABLE ineligible_err)
+    if(NOT no_bios_rc STREQUAL "2" OR NOT no_bios_err MATCHES "--disc needs --bios" OR
+       no_bios_out MATCHES "frame [0-9]+ sha256" OR
+       NOT no_disc_rc STREQUAL "2" OR NOT no_disc_err MATCHES "--boot needs --bios and --disc" OR
+       no_disc_out MATCHES "frame [0-9]+ sha256" OR
+       NOT ineligible_rc STREQUAL "2" OR
+       NOT ineligible_err MATCHES "--boot fast needs an eligible disc boot executable" OR
+       ineligible_out MATCHES "frame [0-9]+ sha256")
+      message(FATAL_ERROR "fast boot accepted a missing BIOS, missing disc, or ineligible disc:\n"
+        "no BIOS (${no_bios_rc}): ${no_bios_out}${no_bios_err}\n"
+        "no disc (${no_disc_rc}): ${no_disc_out}${no_disc_err}\n"
+        "ineligible (${ineligible_rc}): ${ineligible_out}${ineligible_err}")
+    endif()
+    execute_process(COMMAND ${EMULATOR} "${RUN}" --exe "${HELLO_EXE}" --tty --frames 10
+      RESULT_VARIABLE exe_rc OUTPUT_VARIABLE exe_out ERROR_VARIABLE exe_err)
+    set(exe_output "${exe_out}${exe_err}")
+    if(NOT exe_rc STREQUAL "0" OR NOT exe_output MATCHES "tty hello port")
+      message(FATAL_ERROR "standalone BIOS-free --exe stub path regressed: ${exe_rc}: ${exe_output}")
+    endif()
+  elseif(CASE STREQUAL "disc_load")
     string(REPEAT "[0-9a-f]" 64 digits)
     if(NOT DEFINED HOOKED)
       message(FATAL_ERROR "runner disc identity test runner was not provided")
@@ -163,7 +255,7 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
     file(WRITE "${playlist_dir}/serial-first.m3u" "disc_boot_playlist.cue\ndisc_boot.cue\n")
     run_disc_identity("${playlist_dir}/serial-first.m3u" "${OUT}/runner-disc-identity-serial-cards" serial_card)
-    if(NOT serial_card STREQUAL "SLUS-12346.srm")
+    if(NOT serial_card STREQUAL "SLES-12346.srm")
       message(FATAL_ERROR "the valid first-member serial did not win over later members: ${serial_card}")
     endif()
     file(COPY_FILE "${playlist_dir}/disc_boot_playlist_track02.bin"
@@ -398,10 +490,51 @@ save("truncated-block.pbp", image)
     execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${FIXTURES}/disc_boot_runner.m3u"
       RESULT_VARIABLE playlist_rc OUTPUT_VARIABLE playlist_out ERROR_VARIABLE playlist_err)
     if(NOT cue_rc STREQUAL "0" OR NOT cue_out MATCHES "format=disc" OR
+       NOT cue_out MATCHES "serial=redacted" OR
+       NOT cue_out MATCHES "rcheevos_md5=redacted" OR
+       NOT cue_out MATCHES "track1_sha1=redacted" OR
        NOT playlist_rc STREQUAL "0" OR NOT playlist_out MATCHES "format=disc" OR
        NOT playlist_out MATCHES "playlist_count=2")
       message(FATAL_ERROR "disc probe failed:\nCUE ${cue_rc}\n${cue_out}${cue_err}\n"
         "playlist ${playlist_rc}\n${playlist_out}${playlist_err}")
+    endif()
+    if(NOT DEFINED PYTHON3 OR PYTHON3 STREQUAL "")
+      message(FATAL_ERROR "sector-4 region probe needs the configured Python 3 executable")
+    endif()
+    file(MAKE_DIRECTORY "${OUT}")
+    set(patch_sector4 [==[
+from pathlib import Path
+import sys
+image = bytearray(Path(sys.argv[1]).read_bytes())
+start = 4 * 2352 + 24
+if start + 2048 > len(image):
+    raise SystemExit("disc fixture is too short for sector 4")
+sector = bytearray(2048)
+marker = b"          Licensed  by          Sony Computer Entertainment Euro pe   "
+sector[:len(marker)] = marker
+image[start:start + 2048] = sector
+Path(sys.argv[2]).write_bytes(image)
+]==])
+    execute_process(COMMAND "${PYTHON3}" -c "${patch_sector4}"
+        "${FIXTURES}/disc_boot.bin" "${OUT}/disc_boot_region.bin"
+      RESULT_VARIABLE patch_rc OUTPUT_VARIABLE patch_out ERROR_VARIABLE patch_err)
+    if(NOT patch_rc STREQUAL "0")
+      message(FATAL_ERROR "could not create the sector-4 probe image: ${patch_out}${patch_err}")
+    endif()
+    file(COPY_FILE "${FIXTURES}/disc_boot_track02.bin" "${OUT}/disc_boot_region_track02.bin")
+    file(WRITE "${OUT}/disc_boot_region.cue"
+      "FILE \"disc_boot_region.bin\" BINARY\n"
+      "  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n"
+      "FILE \"disc_boot_region_track02.bin\" BINARY\n"
+      "  TRACK 02 AUDIO\n    INDEX 00 00:00:00\n    INDEX 01 00:02:00\n")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --probe "${OUT}/disc_boot_region.cue"
+      RESULT_VARIABLE region_rc OUTPUT_VARIABLE region_out ERROR_VARIABLE region_err)
+    if(NOT region_rc STREQUAL "0" OR
+       NOT region_out MATCHES "disc_licence_area=europe" OR
+       NOT region_out MATCHES "region_guess=pal" OR
+       NOT region_out MATCHES "region_conflicts=0x00000004")
+      message(FATAL_ERROR "sector-4 licence area was not extracted before the EXE marker:\n"
+        "exit ${region_rc}\n${region_out}${region_err}")
     endif()
   elseif(CASE STREQUAL "disc_legacy")
     if(NOT DEFINED HOOKED OR NOT EXISTS "${BIOS}")
@@ -1325,7 +1458,89 @@ Path(sys.argv[2]).write_bytes(data)
     refuse(--frames 1 --region)
     refuse(--frames 1 --region secam)
     refuse(--frames 1 --region NTSC-U)
-    refuse(--frames 1 --region auto)
+    refuse(--frames 1 --region ntsc-u --region pal)
+  elseif(CASE STREQUAL "machine")
+    refuse(--frames 1 --machine)
+    refuse(--frames 1 --machine unknown)
+    refuse(--frames 1 --machine pu7 --machine pu18)
+    foreach(board IN ITEMS pu7 pu8-early pu8-late pu18 pu20 pu22 pu23 pm41 pm41-2)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --region ntsc-u --machine ${board} --hash-state
+        RESULT_VARIABLE board_rc OUTPUT_VARIABLE board_out ERROR_VARIABLE board_err)
+      if(NOT board_rc STREQUAL "0" OR NOT board_out MATCHES "state sha256 [0-9a-f]+")
+        message(FATAL_ERROR "documented machine token ${board} or its GPU pairing was rejected:\n"
+          "exit ${board_rc}\n${board_out}${board_err}")
+      endif()
+    endforeach()
+  elseif(CASE STREQUAL "region_auto")
+    if(NOT DEFINED BIOS OR NOT EXISTS "${BIOS}" OR
+       NOT DEFINED PYTHON3 OR PYTHON3 STREQUAL "")
+      message(FATAL_ERROR "auto region test needs the checked BIOS and configured Python 3")
+    endif()
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state --region auto
+      RESULT_VARIABLE auto_fallback_rc OUTPUT_VARIABLE auto_fallback_out ERROR_VARIABLE auto_fallback_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --hash-state --region ntsc-u
+      RESULT_VARIABLE ntsc_u_rc OUTPUT_VARIABLE ntsc_u_out ERROR_VARIABLE ntsc_u_err)
+    if(NOT auto_fallback_rc STREQUAL "0" OR NOT ntsc_u_rc STREQUAL "0" OR
+       NOT auto_fallback_out STREQUAL ntsc_u_out)
+      message(FATAL_ERROR "no-hint auto region must retain NTSC-U:\n"
+        "auto ${auto_fallback_rc}\n${auto_fallback_out}${auto_fallback_err}\n"
+        "NTSC-U ${ntsc_u_rc}\n${ntsc_u_out}${ntsc_u_err}")
+    endif()
+    file(MAKE_DIRECTORY "${OUT}")
+    set(patch_sector4 [==[
+from pathlib import Path
+import sys
+image = bytearray(Path(sys.argv[1]).read_bytes())
+start = 4 * 2352 + 24
+if start + 2048 > len(image):
+    raise SystemExit("disc fixture is too short for sector 4")
+sector = bytearray(2048)
+marker = b"          Licensed  by          Sony Computer Entertainment Euro pe   "
+sector[:len(marker)] = marker
+image[start:start + 2048] = sector
+Path(sys.argv[2]).write_bytes(image)
+]==])
+    execute_process(COMMAND "${PYTHON3}" -c "${patch_sector4}"
+        "${FIXTURES}/disc_boot.bin" "${OUT}/disc_boot_region.bin"
+      RESULT_VARIABLE patch_rc OUTPUT_VARIABLE patch_out ERROR_VARIABLE patch_err)
+    if(NOT patch_rc STREQUAL "0")
+      message(FATAL_ERROR "could not create the auto-region disc fixture: ${patch_out}${patch_err}")
+    endif()
+    file(COPY_FILE "${FIXTURES}/disc_boot_track02.bin" "${OUT}/disc_boot_region_track02.bin")
+    file(WRITE "${OUT}/disc_boot_region.cue"
+      "FILE \"disc_boot_region.bin\" BINARY\n"
+      "  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n"
+      "FILE \"disc_boot_region_track02.bin\" BINARY\n"
+      "  TRACK 02 AUDIO\n    INDEX 00 00:00:00\n    INDEX 01 00:02:00\n")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${OUT}/disc_boot_region.cue"
+        --frames 1 --hash --region auto
+      RESULT_VARIABLE auto_rc OUTPUT_VARIABLE auto_out ERROR_VARIABLE auto_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --bios "${BIOS}" --disc "${OUT}/disc_boot_region.cue"
+        --frames 1 --hash --region ntsc-j
+      RESULT_VARIABLE override_rc OUTPUT_VARIABLE override_out ERROR_VARIABLE override_err)
+    if(NOT auto_rc STREQUAL "0" OR NOT override_rc STREQUAL "0" OR
+       NOT auto_err MATCHES "region hint disagreement:.*disc=pal.*exe=ntsc-u; selected=pal" OR
+       NOT override_err MATCHES "region hint disagreement:.*disc=pal.*exe=ntsc-u; selected=ntsc-j" OR
+       auto_out STREQUAL override_out)
+      message(FATAL_ERROR "auto or explicit region selection lost precedence:\n"
+        "auto ${auto_rc}\n${auto_out}${auto_err}\n"
+        "override ${override_rc}\n${override_out}${override_err}")
+    endif()
+  elseif(CASE STREQUAL "hash_machine")
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --region ntsc-u --machine pu7 --hash-state
+      RESULT_VARIABLE same_a_rc OUTPUT_VARIABLE same_a_out ERROR_VARIABLE same_a_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --region ntsc-u --machine pu7 --hash-state
+      RESULT_VARIABLE same_b_rc OUTPUT_VARIABLE same_b_out ERROR_VARIABLE same_b_err)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --frames 1 --region ntsc-u --machine pu18 --hash-state
+      RESULT_VARIABLE other_rc OUTPUT_VARIABLE other_out ERROR_VARIABLE other_err)
+    if(NOT same_a_rc STREQUAL "0" OR NOT same_b_rc STREQUAL "0" OR
+       NOT other_rc STREQUAL "0" OR NOT same_a_out STREQUAL same_b_out OR
+       same_a_out STREQUAL other_out OR NOT same_a_out MATCHES "state sha256 [0-9a-f]+")
+      message(FATAL_ERROR "machine profiles did not hash deterministically and distinctly:\n"
+        "pu7 A ${same_a_rc}\n${same_a_out}${same_a_err}\n"
+        "pu7 B ${same_b_rc}\n${same_b_out}${same_b_err}\n"
+        "pu18 ${other_rc}\n${other_out}${other_err}")
+    endif()
   elseif(CASE STREQUAL "png_file")
     # The decode check runs first, so the pinned digest is only ever
     # compared for a file whose IHDR and every pixel are already known good.
@@ -1440,6 +1655,17 @@ set_target_properties(schwaystation-test-runner PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-runner)
 
+# The region precedence resolver is deliberately host-only and has no runner,
+# disc-image or core dependency, so the table test links only this module.
+add_executable(schwaystation-test-region-probe
+  ${CMAKE_CURRENT_LIST_DIR}/test_region_probe.c
+  ${PROJECT_SOURCE_DIR}/runner/region.c)
+target_include_directories(schwaystation-test-region-probe PRIVATE
+  ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/generated ${PROJECT_SOURCE_DIR}/runner)
+set_target_properties(schwaystation-test-region-probe PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
+schway_warnings(schwaystation-test-region-probe)
+
 # Fault prevented: an encoder whose chunk CRCs, Adler-32 or stored blocks are
 # wrong, so a viewer or the RetroArch compare rejects or misreads the file.
 schway_add_test(NAME runner.png
@@ -1463,6 +1689,11 @@ set(runner_check ${CMAKE_COMMAND} -DRUN=$<TARGET_FILE:schwaystation-run>
   "-DEMULATOR=${runner_emulator_bars}")
 
 set(runner_disc_playlist ${PROJECT_BINARY_DIR}/fixtures/disc_boot_runner.m3u)
+# Fault prevented: board identity is omitted from or destabilizes the saved state hash.
+schway_add_test(NAME runner.hash.machine
+  COMMAND ${runner_check} -DCASE=hash_machine -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
 # Fault prevented: a platform-native newline changes a generated fixture hash
 # between CI lanes even though each lane parses the same playlist entries.
 file(CONFIGURE OUTPUT "${runner_disc_playlist}" CONTENT "disc_boot.cue\ndisc_boot_playlist.cue\n"
@@ -1536,8 +1767,23 @@ set_tests_properties(runner.disc.pbp PROPERTIES FIXTURES_REQUIRED "disc_pbp_pref
 
 schway_add_test(NAME runner.disc.probe
   COMMAND ${runner_check} -DCASE=disc_probe -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures
+    -DOUT=${PROJECT_BINARY_DIR}/tests/runner-disc-probe -DPYTHON3=${Python3_EXECUTABLE}
     -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS portable runner TIMEOUT 30)
+
+# Fault prevented: the BIOS boot mode silently bypassing normal startup, skipping the
+# shell for arbitrary or BIOS-free content, or changing the standalone EXE stub path.
+foreach(mode IN ITEMS full fast invalid)
+  schway_add_test(NAME runner.boot.${mode}
+    COMMAND ${runner_check} -DCASE=boot_${mode}
+      -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+      -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests
+      -DHELLO_EXE=${PROJECT_BINARY_DIR}/fixtures/hello.exe
+      -P ${CMAKE_CURRENT_LIST_FILE}
+    LABELS portable runner TIMEOUT 180)
+  set_tests_properties(runner.boot.${mode} PROPERTIES
+    FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")
+endforeach()
 
 set(runner_disc_legacy_timeout 120)
 if(SCHWAYSTATION_INVENTORY STREQUAL "asan")
@@ -1604,12 +1850,25 @@ schway_add_test(NAME runner.png_file
 # CI step hashes a frame nobody asked for: no arguments, an option this
 # release lacks, a file name, --exe or --tty misused, a frame count out of
 # range or missing, a malformed or out-of-range --png, or an unknown region.
-foreach(case no_args unknown positional exe frame_range png_syntax region)
+foreach(case no_args unknown positional exe frame_range png_syntax region machine)
   schway_add_test(NAME runner.usage.${case}
     COMMAND ${runner_check} -DCASE=${case} -DOUT=${PROJECT_BINARY_DIR}/tests/refused.png
       -P ${CMAKE_CURRENT_LIST_FILE}
     LABELS portable runner TIMEOUT 30)
 endforeach()
+
+# Fault prevented: serial, disc licence and executable hints are resolved in
+# priority order while every disagreement remains visible to diagnostics.
+schway_add_test(NAME runner.region.probe
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-region-probe>
+  LABELS portable runner TIMEOUT 10)
+
+# Fault prevented: default auto region or explicit override ignores resolved identity.
+schway_add_test(NAME runner.region.auto
+  COMMAND ${runner_check} -DCASE=region_auto -DBIOS=${PROJECT_BINARY_DIR}/openbios/openbios-fast.bin
+    -DFIXTURES=${PROJECT_BINARY_DIR}/fixtures -DOUT=${PROJECT_BINARY_DIR}/tests/runner-region-auto
+    -DPYTHON3=${Python3_EXECUTABLE} -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
 
 # The bench statistics and the stop flag, tested directly, and a runner built
 # with a hook that raises SIGTERM from inside frame 5.

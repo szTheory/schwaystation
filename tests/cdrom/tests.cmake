@@ -41,6 +41,12 @@ schway_add_test(NAME cdrom.region
   COMMAND schwaystation-test-cdrom region
   LABELS disc portable TIMEOUT 10)
 
+# Fault prevented: Test 22h is supported starting with vC1 firmware; vC0
+# boards return the documented unsupported response.
+schway_add_test(NAME cdrom.profile.firmware
+  COMMAND schwaystation-test-cdrom profile-firmware
+  LABELS disc portable TIMEOUT 10)
+
 # Fault prevented: parameter writes overflow the 16-byte FIFO, clearing it does
 # not restore write readiness, or an empty result read returns a stale byte.
 schway_add_test(NAME cdrom.bounds

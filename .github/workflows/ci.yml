@@ -52,7 +52,9 @@ defaults:
 
 jobs:
   # heavy=false only for a pull request or direct main push whose complete
-  # changed-path list is non-empty and entirely under .planning/.
+  # changed-path list is non-empty and entirely under .planning/, or for the
+  # release App's exact version/changelog metadata changes. Release CI retains
+  # the full matrix and release artifacts on that same commit.
   # release_inputs=true when a path the release pipeline reads changed.
   changes:
     runs-on: ubuntu-26.04
@@ -201,11 +203,12 @@ jobs:
               exit 0
             fi
           fi
-          if ! paths=$(git -C "$GITHUB_WORKSPACE" -c core.quotePath=true \
-            diff --no-renames --name-only "$BEFORE" "$AFTER" --); then
+          if ! changes=$(git -C "$GITHUB_WORKSPACE" -c core.quotePath=true \
+            diff --no-renames --name-status "$BEFORE" "$AFTER" --); then
             fail_closed
             exit 0
           fi
+          paths=$(printf '%s\n' "$changes" | cut -f2-)
           if [ -z "$paths" ]; then
             fail_closed
             exit 0
@@ -218,7 +221,12 @@ jobs:
             fail_closed
             exit 0
           fi
-          printf '%s\n' "$paths" | sh scripts/classify-changes.sh "$count" | tee -a "$GITHUB_OUTPUT"
+          release_metadata=
+          expected_metadata=$(printf 'M\t.release-please-manifest.json\nM\tCHANGELOG.md\nM\tversion.txt')
+          if [ "${GITHUB_ACTOR-}" = 'schwaystation-release[bot]' ] && [ "$changes" = "$expected_metadata" ]; then
+            release_metadata=release-metadata
+          fi
+          printf '%s\n' "$paths" | sh scripts/classify-changes.sh "$count" "$release_metadata" | tee -a "$GITHUB_OUTPUT"
           # CI_CLASSIFIER_TEST_END
 
   # Required renderer oracle: fetch the pinned captures and three source logs,

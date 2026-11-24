@@ -970,6 +970,27 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_preflight")
   return()
 endif()
 
+if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_controls")
+  foreach(required SOURCE_ROOT WORK_ROOT)
+    if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
+      message(FATAL_ERROR "feature controls require ${required}")
+    endif()
+  endforeach()
+  set(features "${WORK_ROOT}/compat-features-uppercase.csv")
+  file(WRITE "${features}"
+    "provider,profile,protection,peripheral,predicate,status,evidence,date\n"
+    "core,ntsc-u.PU18.v2,none,none,profile.select,pass,core.profile.machine.exit0,2026-11-23\n")
+  execute_process(COMMAND "${CMAKE_COMMAND}" "-DFEATURES=${features}"
+      -DMODE=features-preflight -P "${SOURCE_ROOT}/tests/cmake/compat-ratchet.cmake"
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+  if("${result}" STREQUAL "0" OR NOT "${output}${error}" MATCHES "invalid feature key field")
+    message(FATAL_ERROR "uppercase feature tuple token was not rejected: ${result}: ${output}${error}")
+  endif()
+  file(REMOVE "${features}")
+  message(STATUS "compatibility: uppercase profile token rejected")
+  return()
+endif()
+
 if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
   foreach(required SOURCE_ROOT WORK_ROOT)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
@@ -978,6 +999,22 @@ if(CMAKE_SCRIPT_MODE_FILE AND CASE STREQUAL "compat_features_ratchet")
   endforeach()
   set(expected_features "${WORK_ROOT}/compat-features-expected.csv")
   file(WRITE "${expected_features}" "provider,profile,protection,peripheral,predicate,status,evidence,date\nccd,ntsc-u,none,cdrom,disc_boot.mixed.64data+158audio+toc+indexes+pregap+subcode+guest.boot+read+audio+fmv,pass,disc.image.ccd.exit0;disc.image.legacy_parity.ccd.222x1+sub.21312.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ccd.boot+read+audio+fmv.exit0;package.chd_off.archive_contents+notices.exit0;example.sdl2.staged.compile.exit0;build.chd_on.runner+libretro+ecm+ccd.exit0;disc.image.ecm.exit0;disc.image.ccd.exit0;libretro.info.claims.exit0;install.consumer.exit0;hosted_main.unknown;hosted_nightly.unknown;hosted_release.unknown;fuzz.unknown,2026-11-22\nccd,ntsc-u,none,cdrom,sbi.selected_provider+bad_q_data+previous_good_getlocp,pass,disc.image.sbi.provider_binding.exit0;cdrom.sbi.selected_child_bad_q.exit0,2026-11-23\nchd,ntsc-u,none,cdrom,disc_boot.toc+sectors+subcode,pass,provider.disc.image.chd_parity.222x2;runner.disc.chd.exit0;libretro.content.chd.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.chd.boot+read+audio+fmv.exit0,2026-11-20\necm,ntsc-u,none,cdrom,disc_boot.one_data_track.64x1+toc+sectors+guest.boot+read+fmv,pass,disc.image.ecm.literal+modeled.exit0;disc.image.legacy_parity.ecm.64x1.exit0;runner.disc.legacy.exit0;libretro.content.legacy.exit0;disc.fixture.ecm.boot+read+fmv.exit0;package.chd_off.archive_contents+notices.exit0;example.sdl2.staged.compile.exit0;build.chd_on.runner+libretro+ecm+ccd.exit0;disc.image.ecm.exit0;disc.image.ccd.exit0;libretro.info.claims.exit0;install.consumer.exit0;hosted_main.unknown;hosted_nightly.unknown;hosted_release.unknown;fuzz.unknown,2026-11-22\npbp,ntsc-u,none,cdrom,disc_boot.one_data_track+toc+sectors+subcode+guest.boot+read+fmv_first_frame,pass,provider.disc.image.pbp_parity.64x1.exit0;runner.disc.pbp.exit0;libretro.content.pbp.exit0;release.archive_contents+notices.chd_on_off;disc.fixture.pbp.boot+read+fmv.exit0;hosted_ci.not_run,2026-11-21\n")
+  set(expected_profiles
+    ntsc-j.pm41-2.v2 ntsc-j.pm41.v2 ntsc-j.pu18.v2 ntsc-j.pu20.v2 ntsc-j.pu22.v2
+    ntsc-j.pu23.v2 ntsc-j.pu7.v0 ntsc-j.pu8-early.v0 ntsc-j.pu8-late.v2
+    ntsc-u.pm41-2.v2 ntsc-u.pm41.v2 ntsc-u.pu18.v2 ntsc-u.pu20.v2 ntsc-u.pu22.v2
+    ntsc-u.pu23.v2 ntsc-u.pu7.v0 ntsc-u.pu8-early.v0 ntsc-u.pu8-late.v2
+    pal.pm41-2.v2 pal.pm41.v2 pal.pu18.v2 pal.pu20.v2 pal.pu22.v2 pal.pu23.v2
+    pal.pu7.v0 pal.pu8-early.v0 pal.pu8-late.v2)
+  set(expected_profile_rows "")
+  foreach(profile IN LISTS expected_profiles)
+    string(APPEND expected_profile_rows
+      "core,${profile},none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23\n")
+  endforeach()
+  file(READ "${expected_features}" expected_content)
+  string(REPLACE "\necm," "\n${expected_profile_rows}ecm," expected_content
+    "${expected_content}")
+  file(WRITE "${expected_features}" "${expected_content}")
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env COMPAT_BASE_DIR= COMPAT_BASE_SHA=
       sh "${SOURCE_ROOT}/scripts/compat-ratchet.sh" "${SOURCE_ROOT}/tests/compat/features.csv"
       "${expected_features}" "" "${SOURCE_ROOT}/tests/compat/allow.txt" 2026-11-23 features
@@ -1356,6 +1393,12 @@ schway_add_test(NAME compat.features.preflight
     -DCASE=compat_features_preflight -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
   LABELS compat portable TIMEOUT 15)
 set_tests_properties(compat.features.preflight PROPERTIES FIXTURES_SETUP compat_features_preflight)
+
+# Fault prevented: an uppercase board token bypasses the canonical tuple grammar.
+schway_add_test(NAME compat.features.controls
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${PROJECT_SOURCE_DIR} -DWORK_ROOT=${PROJECT_BINARY_DIR}
+    -DCASE=compat_features_controls -P ${PROJECT_SOURCE_DIR}/tests/compat/tests.cmake
+  LABELS compat portable TIMEOUT 15)
 
 # Fault prevented: a feature row bypassing the same protected base and fresh-result judge.
 schway_add_test(NAME compat.features.ratchet

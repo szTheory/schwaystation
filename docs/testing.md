@@ -269,9 +269,10 @@ observed output.
 **The state lines.** With no picture yet, the ordinary frame hash is the test card whatever the CPU and devices did, so
 `hashes.txt` carries frame 30 and state hashes for `hello`, `gte_vectors`, `dma_chain` and `timers_lines`. It also carries
 `gpu_motion.exe` frame hashes at 60, 120 and 180 and state hashes at 150 and 180. This fixture draws moving pixels
-through GP0 and DMA2, so its frame digest covers rendered output; its saved-state digests cover the VRAM and GPU state
-needed to continue after frame 150. Format 18 also records the card protocol's pending-error latches, so the state pins
-changed while the rendered frame pins stayed fixed; card bytes and generation counters remain host-owned. `hash-equality`
+through GP0 and DMA2, so its frame digest covers rendered output; its saved-state digests cover the serialized state
+needed to continue after frame 150. Format 18 records the card protocol's pending-error latches, and format 19 adds the
+selected board identity. Those state pins change while the rendered frame pins stay fixed; card bytes and generation
+counters remain host-owned. `hash-equality`
 compares every row across all eight lanes, including generated
 media-file digests and the owned-disc predicates (boot at frame 600; mailbox, audio and frame at frame 900 for both
 no-input and Cross-input runs), as well as the portable be32 lane.
@@ -605,10 +606,9 @@ perf gpu_motion head=<n> base=<n> delta_bp=<n> verdict=PASS
 than that or more than the allow file permits; `UNSTABLE` the two base measurements differ; `NO_BASE` the base has
 no `perf` preset. An empty or non-numeric measurement is an input error, never a pass.
 
-The current absolute measurements and their producer identities are recorded in [`quality.json`](../quality.json)
-and [the Phase 7 baseline](../.planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md): test-card Ir is
-1,619,573 per frame, `gpu_motion` is 137,752,334, serialized state is 3,755,328 bytes including its header,
-and the linked Release WASI module is 608,540 bytes, measured on [Phase 8 CI run 44597715729](https://github.com/szTheory/schwaystation/actions/runs/44597715729/job/135820879050).
+Current bounds and producer links are in [`quality.json`](../quality.json); the [Phase 7 baseline](../.planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md)
+retains the original samples. Current values: test-card 1,619,573 Ir/frame, `gpu_motion` 138,319,014, state
+3,755,332 bytes, and Release WASI module 923,753 bytes.
 The exact CI critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
 fingerprint; see the [matching cohort and DAG](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
 

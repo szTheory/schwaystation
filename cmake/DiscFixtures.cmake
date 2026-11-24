@@ -64,7 +64,9 @@ configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/disc_boot_playlist.xml"
 configure_file("${PROJECT_SOURCE_DIR}/tests/fixtures/src/disc_boot.cnf"
   "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF" COPYONLY)
 file(CONFIGURE OUTPUT "${PROJECT_BINARY_DIR}/fixtures/SYSTEM.CNF.playlist"
-  CONTENT "BOOT = cdrom:\\SLUS_123.46;1\nTCB = 4\nEVENT = 10\n" NEWLINE_STYLE UNIX)
+  CONTENT "BOOT = cdrom:\\SLES_123.46;1\nTCB = 4\nEVENT = 10\n" NEWLINE_STYLE UNIX)
+file(CONFIGURE OUTPUT "${PROJECT_BINARY_DIR}/fixtures/disc_boot_selected_no_boot.m3u"
+  CONTENT "disc_boot_playlist.cue\nselected_no_boot.iso\n" NEWLINE_STYLE UNIX)
 # The .sbi source is a fixture marker consumed explicitly by disc tests. Keep it
 # out of the media directory, where a same-stem .sbi is a real SBI sidecar.
 

@@ -61,6 +61,19 @@ static schway *make(uint32_t region)
     return inst;
 }
 
+static schway *make_board(uint32_t region, uint32_t board, uint32_t gpu_v0)
+{
+    schway *inst = make(region);
+    schway_profile p;
+    memset(&p, 0, sizeof p);
+    p.size = (uint32_t)sizeof p;
+    p.region = region;
+    p.flags = gpu_v0 != 0u ? SCHWAY_PROFILE_GPU_V0 : 0u;
+    p.board = board;
+    CHECK_EQ_U64(schway_set_profile(inst, &p), SCHWAY_STATUS_OK);
+    return inst;
+}
+
 /* Sizes the five buffers from a fresh instance. */
 static void bufs_init(void)
 {
@@ -136,6 +149,15 @@ static uint64_t frame_hash(const schway *inst)
         for (uint32_t i = 0; i < 2u * v.width; i++) {
             hash = (hash ^ row[i]) * UINT64_C(1099511628211);
         }
+    }
+    return hash;
+}
+
+static uint64_t state_bytes_hash(const uint8_t *bytes, size_t size)
+{
+    uint64_t hash = UINT64_C(14695981039346656037);
+    for (size_t i = 0u; i < size; i++) {
+        hash = (hash ^ bytes[i]) * UINT64_C(1099511628211);
     }
     return hash;
 }
@@ -241,6 +263,110 @@ static void test_stable_bytes(void)
     CHECK(memcmp(good, after, n) == 0);
     printf("state_bytes=%zu\n", n);
     schway_destroy(inst);
+
+    schway *early = make_board(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU7, 1u);
+    run_to(early, 45u);
+    CHECK_EQ_U64(save(early, before), n);
+    uint64_t early_hash = state_bytes_hash(before, n);
+
+    schway *repeat = make_board(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU7, 1u);
+    run_to(repeat, 45u);
+    CHECK_EQ_U64(save(repeat, bad), n);
+    CHECK_EQ_HEX(state_bytes_hash(bad, n), early_hash);
+    CHECK(state_bytes_hash(good, n) != early_hash);
+    schway_destroy(repeat);
+    schway_destroy(early);
+}
+
+/* A cross-board load restores fixed board identity but keeps serialized
+   mutable RAM_SIZE instead of resetting it to the board's boot default. */
+static void test_profile(void)
+{
+    schway *src = make_board(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU7, 1u);
+    bus_write(src, 0x1F801060u, 4u, 0x1234u);
+    run_to(src, 4u);
+    size_t n = save(src, good);
+
+    schway *dst = make_board(SCHWAY_REGION_NTSC_U, SCHWAY_BOARD_PU18, 0u);
+    bus_write(dst, 0x1F801060u, 4u, 0x5678u);
+    CHECK_EQ_U64(dst->board, SCHWAY_BOARD_PU18);
+    CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(dst->board, SCHWAY_BOARD_PU7);
+    CHECK_EQ_U64(dst->profile_flags, SCHWAY_PROFILE_GPU_V0);
+    CHECK_EQ_U64(dst->spu_revision, 2922u);
+    CHECK_EQ_U64(dst->cd_firmware, 0u);
+    CHECK_EQ_U64(dst->ram_ctrl_boot, 0x0B80u);
+    CHECK_EQ_U64(dst->has_parallel_port, 1u);
+    CHECK_EQ_U64(dst->has_serial_port, 0u);
+    CHECK_EQ_U64(dst->bus.ram_size, 0x1234u);
+    CHECK_EQ_U64(save(dst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+    schway_destroy(dst);
+    schway_destroy(src);
+
+    /* Old-sized callers may select GPU v0 while inheriting the PU-18 board.
+       That documented compatibility state must survive serialization. */
+    schway *legacy = make(SCHWAY_REGION_NTSC_U);
+    schway_profile old;
+    memset(&old, 0, sizeof old);
+    old.size = (uint32_t)offsetof(schway_profile, board);
+    old.region = SCHWAY_REGION_NTSC_U;
+    old.flags = SCHWAY_PROFILE_GPU_V0;
+    old.board = SCHWAY_BOARD_PM41_2; /* outside the caller's declared size */
+    CHECK_EQ_U64(schway_set_profile(legacy, &old), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(legacy->board, SCHWAY_BOARD_PU18);
+    CHECK_EQ_U64(legacy->profile_flags, SCHWAY_PROFILE_GPU_V0);
+    n = save(legacy, good);
+
+    schway *legacy_target = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(schway_load_state(legacy_target, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(legacy_target->board, SCHWAY_BOARD_PU18);
+    CHECK_EQ_U64(legacy_target->profile_flags, SCHWAY_PROFILE_GPU_V0);
+    CHECK_EQ_U64(save(legacy_target, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+    schway_destroy(legacy_target);
+    schway_destroy(legacy);
+}
+
+/* The opt-in boot bit is part of the existing serialized profile flags, and
+   unknown bits remain an atomic state rejection. */
+static void test_fast_boot_profile(void)
+{
+    schway *src = make(SCHWAY_REGION_NTSC_U);
+    schway_profile profile;
+    memset(&profile, 0, sizeof profile);
+    profile.size = (uint32_t)sizeof profile;
+    profile.region = SCHWAY_REGION_NTSC_U;
+    profile.flags = SCHWAY_PROFILE_FAST_BOOT;
+    CHECK_EQ_U64(schway_set_profile(src, &profile), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(src->profile_flags, SCHWAY_PROFILE_FAST_BOOT);
+    size_t n = save(src, good);
+
+    schway *dst = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(schway_load_state(dst, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(dst->profile_flags, SCHWAY_PROFILE_FAST_BOOT);
+    CHECK_EQ_U64(save(dst, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+
+    size_t nf = schway__state_record(src, fields, MAX_FIELDS);
+    CHECK(nf <= MAX_FIELDS);
+    uint32_t profile_flags_at = 0u;
+    for (size_t i = 0u; i < nf && i < MAX_FIELDS; i++) {
+        if (strcmp(fields[i].name, "instance.profile_flags") == 0) {
+            profile_flags_at = fields[i].offset;
+        }
+    }
+    CHECK(profile_flags_at >= SCHWAY__STATE_HEADER_SIZE);
+    if (profile_flags_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + profile_flags_at, SCHWAY_PROFILE_FAST_BOOT | 0x20u, 4u);
+        reseal(bad, n);
+        expect_refused("unknown fast-boot profile flag", dst, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+
+    schway_destroy(dst);
+    schway_destroy(src);
 }
 
 /* Each corruption is refused with its own status before any byte applies. */
@@ -260,6 +386,10 @@ static void test_rejects(void)
     memcpy(bad, good, n);
     bad[H_FORMAT] ^= 0x02u;
     expect_refused("format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
+
+    memcpy(bad, good, n);
+    put_le(bad + H_FORMAT, 18u, 4u);
+    expect_refused("previous format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
     put_le(bad + H_FORMAT, 17u, 4u);
@@ -287,9 +417,15 @@ static void test_rejects(void)
     size_t nf = schway__state_record(src, fields, MAX_FIELDS);
     CHECK(nf <= MAX_FIELDS);
     uint32_t region_at = 0;
+    uint32_t board_at = 0;
+    uint32_t profile_flags_at = 0;
     for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
         if (strcmp(fields[i].name, "instance.region") == 0) {
             region_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "instance.board") == 0) {
+            board_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "instance.profile_flags") == 0) {
+            profile_flags_at = fields[i].offset;
         }
     }
     CHECK(region_at >= SCHWAY__STATE_HEADER_SIZE);
@@ -301,6 +437,23 @@ static void test_rejects(void)
             reseal(bad, n);
             expect_refused("region", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
         }
+    }
+
+    CHECK(board_at >= SCHWAY__STATE_HEADER_SIZE);
+    CHECK(profile_flags_at >= SCHWAY__STATE_HEADER_SIZE);
+    if (board_at >= SCHWAY__STATE_HEADER_SIZE &&
+        profile_flags_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + board_at, 0u, 4u);
+        reseal(bad, n);
+        expect_refused("board zero", target, bad, n, SCHWAY_STATUS_ERR_STATE_FIELD);
+
+        memcpy(bad, good, n);
+        put_le(bad + board_at, SCHWAY_BOARD_PM41_2 + 1u, 4u);
+        reseal(bad, n);
+        expect_refused("board above maximum", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+
     }
 
     /* The architectural zero register and COP0's stored/derived bits cannot
@@ -1323,8 +1476,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 18u);
-    CHECK_EQ_U64(v.behaviour_revision, 18u);
+    CHECK_EQ_U64(v.state_format, 19u);
+    CHECK_EQ_U64(v.behaviour_revision, 19u);
 }
 
 static void check_cpu_power_on(schway *inst)
@@ -1453,6 +1606,8 @@ static const struct {
 } cases[] = {
     {"state.cpu_fields", test_cpu_fields},
     {"state.device_fields", test_device_fields},
+    {"state.profile", test_profile},
+    {"profile.fast_boot", test_fast_boot_profile},
     {"state.record_sweep", test_record_sweep},
     {"state.rejects", test_rejects},
     {"state.round_trip", test_round_trip},

@@ -32,12 +32,15 @@ schway_add_test(NAME core.no_alloc_after_load
 # reset or size-tag contract that drifts from the documents without a test
 # failing on some lane.
 foreach(case IN ITEMS testcard.pixels testcard.counter testcard.frames_differ testcard.full_redraw
-    video.tuple video.pitch info audio.ring profile.rejected profile.locked reset.power
+    video.tuple video.pitch info audio.ring profile.rejected profile.locked profile.machine reset.power
     api.size_tags api.statuses api.error_changes_nothing create.allocator instances.independent)
   schway_add_test(NAME core.${case}
     COMMAND schwaystation-test-core ${case}
     LABELS core portable TIMEOUT 10)
 endforeach()
+schway_add_test(NAME core.boot.fast
+  COMMAND schwaystation-test-core boot.fast
+  LABELS core portable TIMEOUT 10)
 
 # audio.pairs runs 8,000 frames, so its time is set by the lane's memory speed:
 # 1.2 s on an Apple core, 6.42 s on the Intel macOS runner in run 40942957712
@@ -56,7 +59,7 @@ set_target_properties(schwaystation-test-state PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 schway_warnings(schwaystation-test-state)
 
-foreach(case IN ITEMS state.cpu_fields state.device_fields state.round_trip state.stable_bytes state.rejects state.visit
+foreach(case IN ITEMS state.cpu_fields state.device_fields state.profile state.round_trip state.stable_bytes state.rejects state.visit
     state.record_sweep state.run_bounds)
   set(timeout 10)
   if(case STREQUAL "state.record_sweep")
@@ -67,6 +70,9 @@ foreach(case IN ITEMS state.cpu_fields state.device_fields state.round_trip stat
     COMMAND schwaystation-test-state ${case}
     LABELS core portable TIMEOUT ${timeout})
 endforeach()
+schway_add_test(NAME core.profile.fast_boot
+  COMMAND schwaystation-test-state profile.fast_boot
+  LABELS core portable TIMEOUT 10)
 
 # The I/O page sweep. Fault prevented: an address of 1F801000h-1F801FFFh that
 # is owned, unbuilt and a gap at once, none of them, or on the wrong side of a
