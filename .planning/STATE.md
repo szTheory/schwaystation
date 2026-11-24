@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 10
+current_plan: 11
 status: executing
-stopped_at: Completed 14-09-PLAN.md
-last_updated: "2026-11-24T09:29:05.297Z"
+stopped_at: Completed 14-10-PLAN.md
+last_updated: "2026-11-24T09:36:34.569Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-09 complete; configured gpt-6-luna xhigh; two tasks, three task commits, 60m42s wall time; runner card selectors passed 3/3 and the final multitap selector passed 1/1; Plan 14-10 next
-state_head: a8bece6b2eb6dc2c3bda41d65956b4393ed1a6fe
+last_activity_desc: Phase 14 Plan 14-10 complete; configured gpt-6-luna xhigh; one task commit; 8m wall time; default two-pad callback-to-serial baseline and descriptor selectors passed 2/2; Plan 14-11 next
+state_head: 4cfe18e482fe3d961abed33705085248b8017a74
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 94
-  completed_plans: 88
+  completed_plans: 89
   percent: 70
 ---
 
@@ -26,16 +26,29 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-09 complete; Plan 14-10 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-10 baseline complete; Plan 14-11 next)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 10
+Current Plan: 11
 Total Plans in Phase: 15
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-09 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); two tasks, three task commits, 60m42s wall time; focused runner card selectors passed 3/3 and final multitap selector passed 1/1
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 9/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-10 baseline complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); one task commit, 8m wall time; focused multitap and descriptor selectors passed 2/2
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 10/15 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-10 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall interval was
+8m from 09:30:01Z through focused verification and closeout. One task commit was made: `4cfe18e` (default two-pad
+callback-to-serial baseline).
+
+Before the focused build, `git diff --check`, the libretro inventory sort, CI configure reuse, and exact selector
+presence checks passed. The focused build of `schwaystation-test-libretro-host` and `schwaystation_libretro`
+passed. `libretro.input.multitap` and `libretro.input.descriptors` then passed 2/2 in 0.03s. The test helper is
+confined to the card-test module; the descriptor selector confirmed it is not exported by the shipped module.
+The baseline covers only default players 0/1 on socket A. Plan 14-11 owns tap options and expanded routing.
+No broad suite, hosted CI, Act or Docker was needed.
 
 ### Phase 14 Plan 14-09 execution (2026-11-24)
 
@@ -52,7 +65,7 @@ test hook. The focused trio passed 3/3 in 14.39 seconds (multitap 1.37s, control
 After the final help assertions, the hook target rebuilt and multitap passed 1/1 in 0.55s. The pre-registered
 selector used `schwaystation-test-run-stop`, omitted from the plan's original build list; the plan was corrected
 to build that target. No workflow wiring changed, so no broad suite, Act or hosted CI run was needed. No Docker
-resources were created. Plan 14-10 is next.
+resources were created. Plan 14-10 followed.
 
 ### Phase 14 Plan 14-08 execution (2026-11-24)
 
@@ -1502,6 +1515,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P07 | 26m10s | 2 tasks | 7 files |
 | Phase 14 P08 | 16m21s | 2 tasks | 5 files |
 | Phase 14 P09 | 61m | 2 tasks | 4 files |
+| Phase 14 P10 | 8m | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1971,6 +1985,7 @@ Recent decisions affecting current work:
 - [Phase 14]: Per-port multitap options default off and are reapplied after each movie snapshot before frame latching.
 - [Phase 14]: Phase 14 Plans 10–14 split at behavior boundaries after Plan 14-09 took 60m42s; Codex GSD planner gpt-6.1-sol high and checker gpt-6-luna xhigh; planning/check review took about 8 minutes. — The plan checker passed requirements and dependency coverage. Keep each implementation slice below the 30-minute bound while preserving all selectors, metrics, and final verification.
 - [Phase 14]: Split Plan 14-10 again after selector evidence showed its default port 0/1 probes pass; callback order queried both players and disabled sockets caused the remaining expected tap RED. Plan 14-10 is now a green default two-pad test seam, Plan 14-11 owns topology. Codex planner gpt-6.1-sol high, checker gpt-6-luna xhigh; follow-up planning/check about 5 minutes. — Separating harness correctness from product behavior prevents invalid RED evidence and keeps implementation slices inside the 30-minute plan bound. Full topology and all final quality/CI gates remain required.
+- [Phase 14]: Keep Plan 14-10 limited to the default socket-A callback baseline; Plan 14-11 owns tap options and expanded routing.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2221,8 +2236,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T08:16:52.085Z
-Stopped at: Completed 14-09-PLAN.md
+Last session: 2026-11-24T09:36:08.314Z
+Stopped at: Completed 14-10-PLAN.md
 Resume file: None
 
 ### v1.0 session history
