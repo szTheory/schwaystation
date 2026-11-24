@@ -81,16 +81,16 @@ covered_files:
   - tests/sio/pad_tests.c
   - tests/sio/sio_tests.c
   - tests/sio/tests.cmake
-covered_digest: "v4:sha256:b1166db94023e3d3b7cba362a2c784a25f98d5f637b1d1a3660ab4b86693cf66"
+covered_digest: "v4:sha256:d2ad749c2e7ac39b971904fda0b846be80466dc1932b9464f57f895ccb8671b2"
 behavior_unverified: 0
 overrides_applied: 0
 ---
 
 # Phase 14: Multitap and Special Controllers Verification Report
 
-**Phase Goal:** Players can use the multitap on either port and use the PlayStation mouse, neGcon, Jogcon and Dual Analog flight mode.  
-**Verified:** 2026-11-24 14:33:28 UTC  
-**Status:** passed  
+**Phase Goal:** Players can use the multitap on either port and use the PlayStation mouse, neGcon, Jogcon and Dual Analog flight mode.
+**Verified:** 2026-11-24 14:33:28 UTC
+**Status:** passed
 **Re-verification:** No — initial verification.
 
 ## Goal Achievement
@@ -234,4 +234,3 @@ N/A — no visual UI or owner-hardware-only acceptance criterion exists. The lib
 
 _Verified: 2026-11-24 14:33:28 UTC_
 _Verifier: the agent (gsd-verifier)_
-
