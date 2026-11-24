@@ -229,13 +229,43 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     schway__state_u8_array(io, name_tap_history_req, sio->tap_history_req, 2u, 0u, 1u);
     schway__state_u8_array(io, name_tap_history_reply, sio->tap_history_reply, 2u,
                            TAP_REPLY_SLOT_A, TAP_REPLY_SHORT);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_mode[port] = io->r[port];
+        }
+    }
     schway__state_u8_array(io, name_tap_tx_mode, sio->tap_tx_mode, 2u, TAP_IDLE,
                            TAP_METHOD2);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_index[port] = io->r[port];
+        }
+    }
     schway__state_u8_array(io, name_tap_tx_index, sio->tap_tx_index, 2u, 0u, 35u);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_endpoint[port] = io->r[port];
+        }
+    }
     schway__state_u8_array(io, name_tap_tx_endpoint, sio->tap_tx_endpoint, 2u, 0u,
                            SCHWAY__PAD_ENDPOINT_COUNT - 1u);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_request[port] = io->r[port];
+        }
+    }
     schway__state_u8_array(io, name_tap_tx_request, sio->tap_tx_request, 2u, 0u, 1u);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_command[port] = io->r[port];
+        }
+    }
     schway__state_u8_array(io, name_tap_tx_command, sio->tap_tx_command, 2u, 0u, UINT8_MAX);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_slot_mask[port] = io->r[port];
+        }
+    }
     schway__state_u8_array(io, name_tap_slot_mask, sio->tap_slot_mask, 2u, 0u, 0x0Fu);
     schway__state_u8_array(io, name_tap_slot_id, &sio->tap_slot_id[0][0], 8u, 0u,
                            UINT8_MAX);
@@ -268,17 +298,25 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
                                  (ack_low == 0u && release_deadline == 0u));
         schway__state_check(io, !(ack_pending != 0u && ack_low != 0u));
         for (uint32_t port = 0u; port < 2u; port++) {
-            uint8_t tap_mode = sio->tap_tx_mode[port];
+            uint8_t tap_mode = io->tap_tx_mode[port];
             schway__state_check(io, tap_mode != TAP_IDLE ||
-                                       (sio->tap_tx_index[port] == 0u &&
-                                        sio->tap_tx_request[port] == 0u &&
-                                        sio->tap_tx_command[port] == 0u &&
-                                        sio->tap_slot_mask[port] == 0u));
-            schway__state_check(io, tap_mode == TAP_IDLE || sio->tap_tx_index[port] != 0u);
+                                       (io->tap_tx_index[port] == 0u &&
+                                        io->tap_tx_request[port] == 0u &&
+                                        io->tap_tx_command[port] == 0u &&
+                                        io->tap_slot_mask[port] == 0u));
+            schway__state_check(io, tap_mode == TAP_IDLE || io->tap_tx_index[port] != 0u);
             schway__state_check(io, tap_mode != TAP_LONG ||
-                                       (sio->tap_slot_mask[port] & 1u) != 0u);
+                                       (io->tap_slot_mask[port] & 1u) != 0u);
             schway__state_check(io, tap_mode != TAP_SHORT ||
-                                       (sio->tap_slot_mask[port] & 1u) != 0u);
+                                       (io->tap_slot_mask[port] & 1u) != 0u);
+            schway__state_check(io, tap_mode == TAP_IDLE ||
+                                       ((io->tap_tx_endpoint[port] < 2u
+                                             ? io->tap_tx_endpoint[port]
+                                             : io->tap_tx_endpoint[port] < 5u ? 0u : 1u) ==
+                                            port &&
+                                        io->pad_multitap[port] != 0u));
+            schway__state_check(io, !(io->card_tx_active[port] != 0u &&
+                                      tap_mode != TAP_IDLE));
             schway__state_check(io, io->card_tx_active[port] == 0u ||
                                        io->card_tx_endpoint[port] / 4u == port);
         }

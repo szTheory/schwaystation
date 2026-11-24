@@ -455,6 +455,9 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
                           : 0u;
         }
         schway__state_check(io, (phase != CARD_IDLE) == (active != 0u));
+        if (active != 0u && endpoint % 4u != 0u) {
+            schway__state_check(io, io->pad_multitap[endpoint / 4u] != 0u);
+        }
     }
 }
 

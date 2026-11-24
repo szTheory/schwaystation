@@ -641,9 +641,14 @@ receiving instance across state loads.
 It also records the host-supplied disc identity for validation; callback pointers and file handles stay outside the
 state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. Format 20 stores
 the frame-latched inputs and serial protocol state for eight controller endpoints, including multitap selection and
-the appended special-controller controls; pending host input remains outside the state. Format-16 through format-19
-states return `SCHWAY_STATUS_ERR_STATE_VERSION`. API v6 appends disc identity to the size-tagged descriptor;
-the behavior revision is 18 because PocketStation command behavior and serialized state fields changed.
+special-controller controls; pending host input remains outside the state. Loading restores card protocol progress,
+not the card image or its generation: those remain with the receiving instance, and only a newly completed valid
+write changes them. Format-16 through format-19 states return `SCHWAY_STATUS_ERR_STATE_VERSION`.
+
+The API version, state format and behavior revision are separate compatibility values. The current values are API
+v9, state format 20 and behavior revision 20: API versions track public header changes, state formats track the
+serialized layout, and behavior revisions track deterministic behavior and hash changes. API v6 introduced the
+host-supplied disc identity in the size-tagged descriptor.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:
 

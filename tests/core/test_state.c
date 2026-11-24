@@ -261,14 +261,24 @@ static void check_endpoint_inputs(const schway *inst)
             uint32_t device = endpoint % 7u;
             CHECK_EQ_U64(inst->pad.device[endpoint], device);
             CHECK_EQ_U64(inst->pad.present[endpoint], device != 0u ? 1u : 0u);
-            CHECK_EQ_HEX(inst->pad.buttons[endpoint], (uint16_t)~(0x1020u + endpoint));
+            uint16_t input_buttons = (uint16_t)(0x1020u + endpoint);
+            uint16_t expected_buttons = device == SCHWAY_INPUT_DEVICE_MOUSE
+                                            ? (uint16_t)(0xF0FFu |
+                                                         (0x0C00u &
+                                                          (uint16_t)~input_buttons))
+                                            : (uint16_t)~input_buttons;
+            CHECK_EQ_HEX(inst->pad.buttons[endpoint], expected_buttons);
             for (uint32_t axis = 0u; axis < 4u; axis++) {
                 CHECK_EQ_U64(inst->pad.axes[endpoint * 4u + axis],
                              30u + endpoint * 4u + axis);
             }
             CHECK_EQ_U64(inst->pad.analog_button[endpoint], endpoint & 1u);
-            CHECK_EQ_U64(inst->pad.mouse_dx[endpoint], 32764u + endpoint);
-            CHECK_EQ_U64(inst->pad.mouse_dy[endpoint], 32772u - endpoint);
+            CHECK_EQ_U64(inst->pad.mouse_dx[endpoint],
+                         device == SCHWAY_INPUT_DEVICE_MOUSE ? 32764u + endpoint : 32768u);
+            CHECK_EQ_U64(inst->pad.mouse_dy[endpoint],
+                         device == SCHWAY_INPUT_DEVICE_MOUSE ? 32772u - endpoint : 32768u);
+            CHECK_EQ_U64(inst->pad.mouse_startup_ack[endpoint],
+                         device == SCHWAY_INPUT_DEVICE_MOUSE ? 1u : 0u);
             CHECK_EQ_U64(inst->pad.negcon_twist[endpoint], 50u + endpoint);
             CHECK_EQ_U64(inst->pad.negcon_i[endpoint], 60u + endpoint);
             CHECK_EQ_U64(inst->pad.negcon_ii[endpoint], 70u + endpoint);
@@ -312,6 +322,25 @@ static void test_round_trip(void)
         schway_destroy(other);
         schway_destroy(inst);
     }
+
+    schway *reset = make(SCHWAY_REGION_NTSC_U);
+    for (uint32_t endpoint = 0u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
+        uint8_t received = 0u;
+        reset->pad.present[endpoint] = 1u;
+        reset->pad.device[endpoint] = SCHWAY_INPUT_DEVICE_DIGITAL;
+        CHECK_EQ_U64(schway__pad_byte(reset, endpoint, 0x01u, reset->ticks, &received), 1u);
+        CHECK_EQ_U64(schway__pad_byte(reset, endpoint, 0x42u, reset->ticks, &received), 1u);
+        CHECK_EQ_U64(schway__pad_byte(reset, endpoint, 0u, reset->ticks, &received), 1u);
+        CHECK_EQ_U64(schway__pad_byte(reset, endpoint, 0u, reset->ticks, &received), 1u);
+        CHECK_EQ_U64(reset->pad.phase[endpoint], 3u);
+    }
+    CHECK_EQ_U64(schway_reset(reset, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    for (uint32_t endpoint = 0u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
+        CHECK_EQ_U64(reset->pad.phase[endpoint], 0u);
+        CHECK_EQ_U64(reset->pad.command[endpoint], 0u);
+        CHECK_EQ_U64(reset->pad.data_index[endpoint], 0u);
+    }
+    schway_destroy(reset);
 }
 
 /* Save, load, save: the same bytes. */
@@ -569,7 +598,7 @@ static void test_rejects(void)
         memcpy(bad, good, n);
         put_le(bad + sio_tap_mode_at, 2u, 1u);
         put_le(bad + sio_tap_index_at, 1u, 1u);
-        put_le(bad + sio_tap_endpoint_at, 4u, 1u);
+        put_le(bad + sio_tap_endpoint_at, 5u, 1u);
         put_le(bad + sio_tap_slot_mask_at, 1u, 1u);
         put_le(bad + pad_multitap_at, 1u, 1u);
         reseal(bad, n);

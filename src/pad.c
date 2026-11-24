@@ -8,6 +8,7 @@
 #define PAD_WATCHDOG_TICKS UINT64_C(33868800)
 
 enum { PAD_IDLE, PAD_COMMAND, PAD_ID_END, PAD_PAYLOAD };
+enum { PAD_MOUSE_DELTA_MIN = 32640u, PAD_MOUSE_DELTA_MAX = 32895u };
 
 static const char name_buttons[] = "pad.buttons";
 static const char name_axes[] = "pad.axes";
@@ -255,8 +256,13 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
 {
     uint8_t saved_present[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_device[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t saved_phase[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t saved_command[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t saved_data_index[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_config[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t saved_analog[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_mouse_startup_ack[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t saved_multitap[2];
     uint8_t saved_map[SCHWAY__PAD_RUMBLE_MAP_SIZE];
     uint8_t saved_map_stage[SCHWAY__PAD_RUMBLE_MAP_SIZE];
     const uint8_t *read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
@@ -270,9 +276,11 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u8_array(io, name_axes, inst->pad.axes,
                            4u * SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT8_MAX);
     schway__state_u16_array(io, name_mouse_dx, inst->pad.mouse_dx,
-                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT16_MAX);
+                            SCHWAY__PAD_ENDPOINT_COUNT, PAD_MOUSE_DELTA_MIN,
+                            PAD_MOUSE_DELTA_MAX);
     schway__state_u16_array(io, name_mouse_dy, inst->pad.mouse_dy,
-                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT16_MAX);
+                            SCHWAY__PAD_ENDPOINT_COUNT, PAD_MOUSE_DELTA_MIN,
+                            PAD_MOUSE_DELTA_MAX);
     read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_mouse_startup_ack, inst->pad.mouse_startup_ack,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, 1u);
@@ -291,7 +299,14 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
                             SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT16_MAX);
     schway__state_u16_array(io, name_jogcon_flags, inst->pad.jogcon_flags,
                             SCHWAY__PAD_ENDPOINT_COUNT, 0u, 3u);
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_multitap, inst->pad.multitap, 2u, 0u, 1u);
+    if (read_bytes != NULL) {
+        memcpy(saved_multitap, read_bytes, sizeof saved_multitap);
+        memcpy(io->pad_multitap, read_bytes, sizeof io->pad_multitap);
+    } else {
+        memcpy(saved_multitap, inst->pad.multitap, sizeof saved_multitap);
+    }
     read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_present, inst->pad.present,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, 1u);
@@ -305,12 +320,30 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     if (read_bytes != NULL) {
         memcpy(saved_device, read_bytes, sizeof saved_device);
     }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_phase, inst->pad.phase,
                            SCHWAY__PAD_ENDPOINT_COUNT, PAD_IDLE, PAD_PAYLOAD);
+    if (read_bytes != NULL) {
+        memcpy(saved_phase, read_bytes, sizeof saved_phase);
+    } else {
+        memcpy(saved_phase, inst->pad.phase, sizeof saved_phase);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_command, inst->pad.command,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT8_MAX);
+    if (read_bytes != NULL) {
+        memcpy(saved_command, read_bytes, sizeof saved_command);
+    } else {
+        memcpy(saved_command, inst->pad.command, sizeof saved_command);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_data_index, inst->pad.data_index,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, 6u);
+    if (read_bytes != NULL) {
+        memcpy(saved_data_index, read_bytes, sizeof saved_data_index);
+    } else {
+        memcpy(saved_data_index, inst->pad.data_index, sizeof saved_data_index);
+    }
     read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_config_mode, inst->pad.config_mode,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, 1u);
@@ -319,8 +352,14 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     }
     schway__state_u8_array(io, name_response_mode, inst->pad.response_mode,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, 1u);
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_analog_mode, inst->pad.analog_mode,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, 1u);
+    if (read_bytes != NULL) {
+        memcpy(saved_analog, read_bytes, sizeof saved_analog);
+    } else {
+        memcpy(saved_analog, inst->pad.analog_mode, sizeof saved_analog);
+    }
     schway__state_u8_array(io, name_analog_button, inst->pad.analog_button,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, 1u);
     schway__state_u8_array(io, name_analog_lock, inst->pad.analog_lock,
@@ -368,6 +407,8 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     (void)schway__state_u64(io, name_transfers, &inst->pad.transfers, 0u,
                             SCHWAY__STATE_TICKS_MAX);
     for (uint32_t port = 0u; port < SCHWAY__PAD_ENDPOINT_COUNT; port++) {
+        uint32_t physical_port = port < 2u ? port : (port < 5u ? 0u : 1u);
+        int tap_socket = port >= 2u;
         for (uint32_t i = 0u; i < 6u; i++) {
             uint8_t value = saved_map[port * 6u + i];
             uint8_t staged = saved_map_stage[port * 6u + i];
@@ -382,6 +423,43 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
                                     (saved_device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
                                      saved_watchdog[port] != 0u));
         schway__state_check(io, saved_config[port] != 0u || saved_watchdog[port] == 0u);
+        schway__state_check(io, saved_phase[port] == PAD_IDLE || saved_present[port] != 0u);
+        if (saved_phase[port] == PAD_COMMAND) {
+            schway__state_check(io, saved_command[port] == 0u &&
+                                       saved_data_index[port] == 0u);
+        } else if (saved_phase[port] == PAD_ID_END) {
+            schway__state_check(io, saved_data_index[port] == 0u);
+        } else if (saved_phase[port] == PAD_PAYLOAD) {
+            uint32_t count = saved_command[port] == 0x42u
+                                 ? (saved_config[port] != 0u ||
+                                            (saved_device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
+                                             saved_analog[port] != 0u) ||
+                                            saved_device[port] == SCHWAY_INPUT_DEVICE_NEGCON ||
+                                            saved_device[port] == SCHWAY_INPUT_DEVICE_JOGCON ||
+                                            saved_device[port] ==
+                                                SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT
+                                        ? 6u
+                                        : saved_device[port] == SCHWAY_INPUT_DEVICE_MOUSE ? 4u
+                                                                                           : 2u)
+                                 : 6u;
+            schway__state_check(io, saved_data_index[port] < count);
+        }
+        schway__state_check(io, saved_command[port] == 0u ||
+                                   saved_command[port] == 0x42u ||
+                                   (saved_device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
+                                    (saved_command[port] == 0x43u ||
+                                     (saved_config[port] != 0u &&
+                                      (saved_command[port] == 0x44u ||
+                                       saved_command[port] == 0x45u ||
+                                       saved_command[port] == 0x46u ||
+                                       saved_command[port] == 0x47u ||
+                                       saved_command[port] == 0x4Cu ||
+                                       saved_command[port] == 0x4Du)))));
+        schway__state_check(io, tap_socket == 0 || saved_multitap[physical_port] != 0u ||
+                                   (saved_device[port] == SCHWAY_INPUT_DEVICE_NONE &&
+                                    saved_present[port] == 0u &&
+                                    saved_phase[port] == PAD_IDLE &&
+                                    saved_data_index[port] == 0u));
     }
 }
 
