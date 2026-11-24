@@ -720,6 +720,156 @@ static void special_mouse(void)
     mouse_tap_and_startup_ack();
 }
 
+static void set_direct_negcon(schway_input *input, uint32_t port, uint16_t buttons,
+                              uint8_t twist, uint8_t value_i, uint8_t value_ii, uint8_t value_l)
+{
+    schway_controller_input *controller = &input->controllers[port][0];
+    input->device[port] = SCHWAY_INPUT_DEVICE_NEGCON;
+    input->buttons[port] = buttons;
+    controller->device = SCHWAY_INPUT_DEVICE_NEGCON;
+    controller->buttons = buttons;
+    controller->negcon_twist = twist;
+    controller->negcon_i = value_i;
+    controller->negcon_ii = value_ii;
+    controller->negcon_l = value_l;
+}
+
+static void negcon_direct_vectors(void)
+{
+    static const uint8_t button_bits[] = {3u, 4u, 5u, 6u, 7u, 11u, 12u, 13u};
+    static const uint8_t raw_values[] = {0u, 128u, 255u};
+    for (uint32_t port = 0u; port < 2u; port++) {
+        schway *inst = make();
+        configure_sio_port(inst, port);
+        for (uint32_t i = 0u; i < sizeof raw_values; i++) {
+            schway_input input;
+            memset(&input, 0, sizeof input);
+            set_direct_negcon(&input, port, 0u, raw_values[i], raw_values[i],
+                              raw_values[i], raw_values[i]);
+            latch_input(inst, &input);
+            uint8_t payload[] = {0xFFu, 0xFFu, raw_values[i], raw_values[i],
+                                 raw_values[i], raw_values[i]};
+            poll(inst, 0x23u, payload, 6u, NULL);
+        }
+        for (uint32_t i = 0u; i < sizeof button_bits; i++) {
+            uint16_t pressed = (uint16_t)(1u << button_bits[i]);
+            schway_input input;
+            memset(&input, 0, sizeof input);
+            set_direct_negcon(&input, port, pressed, 0x80u, 0x11u, 0x22u, 0x33u);
+            latch_input(inst, &input);
+            uint16_t active_low = (uint16_t)~pressed;
+            uint8_t payload[] = {(uint8_t)active_low, (uint8_t)(active_low >> 8),
+                                 0x80u, 0x11u, 0x22u, 0x33u};
+            poll(inst, 0x23u, payload, 6u, NULL);
+        }
+        for (uint32_t axis = 0u; axis < 3u; axis++) {
+            for (uint32_t i = 0u; i < sizeof raw_values; i++) {
+                uint8_t controls[] = {0x31u, 0x52u, 0x73u};
+                controls[axis] = raw_values[i];
+                schway_input input;
+                memset(&input, 0, sizeof input);
+                set_direct_negcon(&input, port, 0u, 0xA5u,
+                                  controls[0], controls[1], controls[2]);
+                latch_input(inst, &input);
+                uint8_t payload[] = {0xFFu, 0xFFu, 0xA5u,
+                                     controls[0], controls[1], controls[2]};
+                poll(inst, 0x23u, payload, 6u, NULL);
+            }
+        }
+
+        CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+        CHECK_EQ_HEX(exchange(inst, 0x99u, 0), 0xFFu);
+        CHECK_EQ_U64(inst->sio.ack_pending, 0u);
+        CHECK_EQ_U64(inst->sio.ack_low, 0u);
+        CHECK_EQ_U64(inst->pad.phase[port], 0u);
+        schway_destroy(inst);
+    }
+}
+
+static void negcon_tap_methods(void)
+{
+    schway *inst = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.multitap[1] = 1u;
+    input.controllers[1][3].device = SCHWAY_INPUT_DEVICE_NEGCON;
+    input.controllers[1][3].buttons = (1u << 3) | (1u << 7) | (1u << 11) | (1u << 13);
+    input.controllers[1][3].negcon_twist = 0xFEu;
+    input.controllers[1][3].negcon_i = 0x12u;
+    input.controllers[1][3].negcon_ii = 0xA5u;
+    input.controllers[1][3].negcon_l = 0x80u;
+    latch_input(inst, &input);
+    configure_sio_port(inst, 1u);
+    CHECK_EQ_HEX(exchange(inst, 0x04u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x23u);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0x5Au);
+    uint16_t method2_buttons = (uint16_t)~input.controllers[1][3].buttons;
+    uint8_t method2[] = {(uint8_t)method2_buttons,
+                         (uint8_t)(method2_buttons >> 8), 0xFEu, 0x12u, 0xA5u, 0x80u};
+    for (uint32_t i = 0u; i < sizeof method2; i++) {
+        CHECK_EQ_HEX(exchange(inst, 0x01u, i + 1u < sizeof method2), method2[i]);
+    }
+    schway_destroy(inst);
+
+    inst = make();
+    memset(&input, 0, sizeof input);
+    input.multitap[0] = 1u;
+    input.controllers[0][0].device = SCHWAY_INPUT_DEVICE_DIGITAL;
+    input.controllers[0][3].device = SCHWAY_INPUT_DEVICE_NEGCON;
+    input.controllers[0][3].buttons = (1u << 3) | (1u << 5) | (1u << 12);
+    input.controllers[0][3].negcon_twist = 0x7Bu;
+    input.controllers[0][3].negcon_i = 0x01u;
+    input.controllers[0][3].negcon_ii = 0x80u;
+    input.controllers[0][3].negcon_l = 0xFFu;
+    latch_input(inst, &input);
+    configure_sio_port(inst, 0u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 0), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
+    uint8_t first_record[] = {0x41u, 0x5Au, 0xFFu, 0xFFu,
+                              0xFFu, 0xFFu, 0xFFu, 0xFFu};
+    uint16_t negcon_buttons = (uint16_t)~input.controllers[0][3].buttons;
+    uint8_t negcon_record[] = {0x23u, 0x5Au, (uint8_t)negcon_buttons,
+                               (uint8_t)(negcon_buttons >> 8), 0x7Bu, 0x01u, 0x80u, 0xFFu};
+    for (uint32_t i = 0u; i < 32u; i++) {
+        uint8_t expected = i < 8u ? first_record[i]
+                                   : i >= 24u ? negcon_record[i - 24u] : 0xFFu;
+        CHECK_EQ_HEX(exchange(inst, 0x01u, i < 31u), expected);
+    }
+    schway_destroy(inst);
+}
+
+static void negcon_instance_isolation(void)
+{
+    schway *instances[2] = {make(), make()};
+    const uint8_t twists[2] = {0x17u, 0xE9u};
+    for (uint32_t i = 0u; i < 2u; i++) {
+        schway_input input;
+        memset(&input, 0, sizeof input);
+        set_direct_negcon(&input, 0u, 0u, twists[i], (uint8_t)(i + 1u),
+                          (uint8_t)(i + 2u), (uint8_t)(i + 3u));
+        latch_input(instances[i], &input);
+        configure_sio_port(instances[i], 0u);
+        uint8_t payload[] = {0xFFu, 0xFFu, twists[i],
+                             (uint8_t)(i + 1u), (uint8_t)(i + 2u), (uint8_t)(i + 3u)};
+        poll(instances[i], 0x23u, payload, 6u, NULL);
+    }
+    schway_destroy(instances[0]);
+    schway_destroy(instances[1]);
+}
+
+static void special_negcon(void)
+{
+    negcon_direct_vectors();
+    negcon_tap_methods();
+    negcon_instance_isolation();
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -740,6 +890,8 @@ int main(int argc, char **argv)
         state_split_config();
     } else if (strcmp(argv[1], "special_mouse") == 0) {
         special_mouse();
+    } else if (strcmp(argv[1], "special_negcon") == 0) {
+        special_negcon();
     } else {
         return 2;
     }
