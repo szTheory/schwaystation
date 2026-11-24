@@ -232,9 +232,12 @@ static char memory_addrspaces[MEMORY_DESCRIPTOR_CAP][64];
 static unsigned memory_descriptor_count;
 static const char *analog_mode_value = "analog";
 static const char *analog_toggle_value = "enabled";
-static unsigned multitap_player;
+static const char *multitap_port1_value = "disabled";
+static const char *multitap_port2_value = "disabled";
 static int multitap_test_mode;
-static unsigned multitap_callback_visits[2];
+static unsigned multitap_callback_visits[8];
+static unsigned multitap_analog_visits[8];
+static unsigned multitap_invalid_player_visits;
 static int rumble_available;
 static int rumble_axis_mode;
 static unsigned audio_tap_checks;
@@ -312,7 +315,21 @@ static void check_options_v2(const struct retro_core_options_v2 *o)
     check_string("analog toggle value 0", d[5].values[0].value, "enabled");
     check_string("analog toggle value 1", d[5].values[1].value, "disabled");
     CHECK(d[5].values[2].value == NULL);
-    CHECK(d[6].key == NULL);
+    if (d[6].key == NULL) {
+        CHECK(d[6].key != NULL);
+        return;
+    }
+    check_string("port 1 multitap option key", d[6].key, "schwaystation_multitap_port1");
+    check_string("port 1 multitap option default", d[6].default_value, "disabled");
+    check_string("port 1 multitap option disabled", d[6].values[0].value, "disabled");
+    check_string("port 1 multitap option enabled", d[6].values[1].value, "enabled");
+    CHECK(d[6].values[2].value == NULL);
+    check_string("port 2 multitap option key", d[7].key, "schwaystation_multitap_port2");
+    check_string("port 2 multitap option default", d[7].default_value, "disabled");
+    check_string("port 2 multitap option disabled", d[7].values[0].value, "disabled");
+    check_string("port 2 multitap option enabled", d[7].values[1].value, "enabled");
+    CHECK(d[7].values[2].value == NULL);
+    CHECK(d[8].key == NULL);
 }
 
 /* The version 0 variables (L7483) carry both options. */
@@ -338,7 +355,23 @@ static void check_variables(const struct retro_variable *v)
     check_string("analog toggle variable key", v[5].key, "schwaystation_analog_toggle");
     check_string("analog toggle variable value", v[5].value,
                  "DualShock mode toggle; enabled|disabled");
-    CHECK(v[6].key == NULL);
+    if (v[6].key == NULL) {
+        CHECK(v[6].key != NULL);
+        return;
+    }
+    check_string("port 1 multitap variable key", v[6].key, "schwaystation_multitap_port1");
+    check_string("port 1 multitap variable value", v[6].value,
+                 "Multitap on controller port 1 (reload content); disabled|enabled");
+    check_string("port 2 multitap variable key", v[7].key, "schwaystation_multitap_port2");
+    check_string("port 2 multitap variable value", v[7].value,
+                 "Multitap on controller port 2 (reload content); disabled|enabled");
+    CHECK(v[8].key == NULL);
+}
+
+static unsigned expected_active_players(void)
+{
+    return 2u + (strcmp(multitap_port1_value, "enabled") == 0 ? 3u : 0u) +
+           (strcmp(multitap_port2_value, "enabled") == 0 ? 3u : 0u);
 }
 
 static void check_controller_info(const struct retro_controller_info *info)
@@ -351,7 +384,8 @@ static void check_controller_info(const struct retro_controller_info *info)
     if (info == NULL) {
         return;
     }
-    for (unsigned port = 0u; port < 2u; port++) {
+    unsigned active_players = expected_active_players();
+    for (unsigned port = 0u; port < active_players; port++) {
         CHECK_EQ_U64(info[port].num_types, 3u);
         CHECK(info[port].types != NULL);
         if (info[port].types == NULL) {
@@ -362,7 +396,7 @@ static void check_controller_info(const struct retro_controller_info *info)
             check_string("controller type name", info[port].types[i].desc, expected_names[i]);
         }
     }
-    CHECK(info[2].types == NULL);
+    CHECK(info[active_players].types == NULL);
 }
 
 #define EXPECTED_PAD_DESCRIPTORS(port_)                                                              \
@@ -393,33 +427,35 @@ static void check_controller_info(const struct retro_controller_info *info)
 
 static void validate_input_descriptors(const struct retro_input_descriptor *descriptors)
 {
-    static const struct retro_input_descriptor expected[] = {
+    static const struct retro_input_descriptor expected_pad[] = {
         EXPECTED_PAD_DESCRIPTORS(0u),
-        EXPECTED_PAD_DESCRIPTORS(1u),
-        {0u, 0u, 0u, 0u, NULL},
     };
-    unsigned index = 0u;
+    unsigned active_players = expected_active_players();
+    unsigned per_player = (unsigned)(sizeof expected_pad / sizeof expected_pad[0]);
     CHECK(descriptors != NULL);
     if (descriptors == NULL) {
         return;
     }
-    for (; expected[index].description != NULL; index++) {
-        const struct retro_input_descriptor *actual = &descriptors[index];
-        CHECK(actual->description != NULL);
-        if (actual->description == NULL) {
-            return;
+    for (unsigned player = 0u; player < active_players; player++) {
+        for (unsigned item = 0u; item < per_player; item++) {
+            const struct retro_input_descriptor *actual = &descriptors[player * per_player + item];
+            CHECK(actual->description != NULL);
+            if (actual->description == NULL) {
+                return;
+            }
+            CHECK_EQ_U64(actual->port, player);
+            CHECK_EQ_U64(actual->device, expected_pad[item].device);
+            CHECK_EQ_U64(actual->index, expected_pad[item].index);
+            CHECK_EQ_U64(actual->id, expected_pad[item].id);
+            check_string("input descriptor", actual->description, expected_pad[item].description);
         }
-        CHECK_EQ_U64(actual->port, expected[index].port);
-        CHECK_EQ_U64(actual->device, expected[index].device);
-        CHECK_EQ_U64(actual->index, expected[index].index);
-        CHECK_EQ_U64(actual->id, expected[index].id);
-        check_string("input descriptor", actual->description, expected[index].description);
     }
-    CHECK(descriptors[index].description == NULL);
-    CHECK_EQ_U64(descriptors[index].port, 0u);
-    CHECK_EQ_U64(descriptors[index].device, 0u);
-    CHECK_EQ_U64(descriptors[index].index, 0u);
-    CHECK_EQ_U64(descriptors[index].id, 0u);
+    unsigned terminator = active_players * per_player;
+    CHECK(descriptors[terminator].description == NULL);
+    CHECK_EQ_U64(descriptors[terminator].port, 0u);
+    CHECK_EQ_U64(descriptors[terminator].device, 0u);
+    CHECK_EQ_U64(descriptors[terminator].index, 0u);
+    CHECK_EQ_U64(descriptors[terminator].id, 0u);
 }
 #undef EXPECTED_PAD_DESCRIPTORS
 
@@ -524,6 +560,14 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         }
         if (strcmp(var->key, "schwaystation_analog_toggle") == 0) {
             var->value = analog_toggle_value;
+            return true;
+        }
+        if (strcmp(var->key, "schwaystation_multitap_port1") == 0) {
+            var->value = multitap_port1_value;
+            return true;
+        }
+        if (strcmp(var->key, "schwaystation_multitap_port2") == 0) {
+            var->value = multitap_port2_value;
             return true;
         }
         return false;
@@ -640,13 +684,23 @@ static void RETRO_CALLCONV on_poll(void)
 
 static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned index, unsigned id)
 {
-    if (multitap_test_mode && device == RETRO_DEVICE_JOYPAD && index == 0u && port < 2u) {
-        if ((port == 0u && id == RETRO_DEVICE_ID_JOYPAD_B) ||
-            (port == 1u && id == RETRO_DEVICE_ID_JOYPAD_A)) {
+    static const unsigned player_buttons[8] = {
+        RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_A,
+        RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_ID_JOYPAD_X,
+        RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R,
+        RETRO_DEVICE_ID_JOYPAD_L2, RETRO_DEVICE_ID_JOYPAD_R2,
+    };
+    if (multitap_test_mode) {
+        if (port >= 8u) {
+            multitap_invalid_player_visits++;
+            return 0;
+        }
+        if (device == RETRO_DEVICE_ANALOG) {
+            multitap_analog_visits[port]++;
+        }
+        if (device == RETRO_DEVICE_JOYPAD && index == 0u && id == player_buttons[port]) {
             multitap_callback_visits[port]++;
-            if (port == multitap_player) {
-                return 1;
-            }
+            return 1;
         }
     }
     if (rumble_axis_mode && device == RETRO_DEVICE_ANALOG && port < 2u) {
@@ -1504,23 +1558,85 @@ static int test_input_descriptors(void)
 
 static int test_input_multitap(void)
 {
-    static const uint16_t expected_buttons[] = {UINT16_C(0xBFFF), UINT16_C(0xDFFF)};
+    static const uint16_t expected_buttons[8] = {
+        UINT16_C(0xBFFF), UINT16_C(0xDFFF), UINT16_C(0x7FFF), UINT16_C(0xEFFF),
+        UINT16_C(0xFBFF), UINT16_C(0xF7FF), UINT16_C(0xFEFF), UINT16_C(0xFDFF),
+    };
+    static const struct {
+        const char *port1;
+        const char *port2;
+        unsigned players;
+        unsigned physical_port[8];
+        unsigned socket[8];
+    } topologies[] = {
+        {"disabled", "disabled", 2u, {0u, 1u}, {0u, 0u}},
+        {"enabled", "disabled", 5u, {0u, 0u, 0u, 0u, 1u}, {0u, 1u, 2u, 3u, 0u}},
+        {"disabled", "enabled", 5u, {0u, 1u, 1u, 1u, 1u}, {0u, 0u, 1u, 2u, 3u}},
+        {"enabled", "enabled", 8u, {0u, 0u, 0u, 0u, 1u, 1u, 1u, 1u},
+         {0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u}},
+    };
 
     CHECK(p_test_poll_endpoint != NULL);
-    CHECK_EQ_U64(p_load_game(NULL), 1u);
-    for (unsigned player = 0u; player < 2u; player++) {
-        uint16_t buttons = 0u;
+    for (unsigned topology = 0u; topology < sizeof topologies / sizeof topologies[0]; topology++) {
+        multitap_port1_value = topologies[topology].port1;
+        multitap_port2_value = topologies[topology].port2;
+        CHECK_EQ_U64(expected_active_players(), topologies[topology].players);
+        unsigned descriptors_before = input_descriptor_calls;
+        unsigned controllers_before = controller_info_calls;
+        CHECK_EQ_U64(p_load_game(NULL), 1u);
+        CHECK(input_descriptor_calls > descriptors_before);
+        CHECK(controller_info_calls > controllers_before);
+        if (input_descriptor_calls > descriptors_before) {
+            validate_input_descriptors(published_input_descriptors);
+        }
+        for (unsigned player = 0u; player < 8u; player++) {
+            p_set_controller_port_device(player, RETRO_DEVICE_JOYPAD);
+        }
+        p_set_controller_port_device(8u, RETRO_DEVICE_JOYPAD);
+
         unsigned polls_before = input_poll_calls;
-        unsigned callbacks_before = multitap_callback_visits[player];
-        multitap_player = player;
+        unsigned invalid_before = multitap_invalid_player_visits;
+        unsigned callbacks_before[8];
+        unsigned analog_before[8];
+        memcpy(callbacks_before, multitap_callback_visits, sizeof callbacks_before);
+        memcpy(analog_before, multitap_analog_visits, sizeof analog_before);
         p_run();
         CHECK_EQ_U64(input_poll_calls, polls_before + 1u);
-        CHECK(multitap_callback_visits[player] > callbacks_before);
-        CHECK_EQ_U64(p_test_poll_endpoint(player, 0u, &buttons), 1u);
-        CHECK_EQ_U64(buttons, expected_buttons[player]);
+        CHECK_EQ_U64(multitap_invalid_player_visits, invalid_before);
+        for (unsigned player = 0u; player < topologies[topology].players; player++) {
+            uint16_t buttons = 0u;
+            CHECK_EQ_U64(multitap_callback_visits[player], callbacks_before[player] + 1u);
+            CHECK_EQ_U64(p_test_poll_endpoint(topologies[topology].physical_port[player],
+                                              topologies[topology].socket[player], &buttons), 1u);
+            CHECK_EQ_U64(buttons, expected_buttons[player]);
+        }
+        if (topologies[topology].players < 8u) {
+            unsigned inactive = topologies[topology].players;
+            CHECK_EQ_U64(multitap_callback_visits[inactive], callbacks_before[inactive]);
+        }
+
+        if (topology == 0u) {
+            unsigned analog_visits = multitap_analog_visits[0];
+            p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG | (1u << 8));
+            polls_before = input_poll_calls;
+            p_run();
+            CHECK_EQ_U64(input_poll_calls, polls_before + 1u);
+            CHECK_EQ_U64(multitap_analog_visits[0], analog_visits);
+            uint16_t buttons = 0u;
+            CHECK_EQ_U64(p_test_poll_endpoint(0u, 0u, &buttons), 1u);
+            CHECK_EQ_U64(buttons, expected_buttons[0]);
+        }
+        p_unload_game();
     }
-    p_unload_game();
+
+    multitap_port1_value = "disabled";
+    multitap_port2_value = "disabled";
     p_deinit();
+    p_set_environment(env);
+    p_init();
+    validate_input_descriptors(published_input_descriptors);
+    p_deinit();
+    p_unload_game();
     module_close();
     return check_failures != 0 ? 1 : 0;
 }
