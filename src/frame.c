@@ -150,21 +150,42 @@ schway_status schway_set_input(schway *inst, const schway_input *input)
     if (inst == NULL || input == NULL) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-    schway_status st = schway__instance_check_size(input, SCHWAY__INPUT_SIZE_FIRST,
-                                                    (uint32_t)sizeof *input);
-    if (st != SCHWAY_STATUS_OK) {
-        return st;
+    uint32_t caller_size;
+    memcpy(&caller_size, input, sizeof caller_size);
+    if (caller_size < SCHWAY__INPUT_SIZE_FIRST || caller_size > 4096u) {
+        return SCHWAY_STATUS_ERR_STRUCT_SIZE;
     }
-    if (input->reserved0 != 0u) {
+
+    schway_input normalized;
+    memset(&normalized, 0, sizeof normalized);
+    uint32_t current_size = (uint32_t)sizeof normalized;
+    uint32_t copy_size = caller_size < current_size ? caller_size : current_size;
+    memcpy(&normalized, input, (size_t)copy_size);
+    const uint8_t *caller_bytes = (const uint8_t *)input;
+    for (uint32_t i = current_size; i < caller_size; i++) {
+        if (caller_bytes[i] != 0u) {
+            return SCHWAY_STATUS_ERR_STRUCT_SIZE;
+        }
+    }
+
+    if (normalized.reserved0 != 0u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
     for (uint32_t port = 0u; port < 2u; port++) {
-        if (input->device[port] > SCHWAY_INPUT_DEVICE_DUALSHOCK ||
-            input->analog_button[port] > 1u) {
+        if (normalized.device[port] > SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT ||
+            normalized.analog_button[port] > 1u || normalized.multitap[port] > 1u) {
             return SCHWAY_STATUS_ERR_ARGUMENT;
         }
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            const schway_controller_input *controller = &normalized.controllers[port][socket];
+            if (controller->device > SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT ||
+                controller->analog_button > 1u || controller->reserved0 != 0u ||
+                (controller->jogcon_flags & (uint16_t)~UINT16_C(0x0003)) != 0u) {
+                return SCHWAY_STATUS_ERR_ARGUMENT;
+            }
+        }
     }
-    memcpy(&inst->pad.pending_input, input, sizeof *input);
+    inst->pad.pending_input = normalized;
     inst->pad.pending_valid = 1u;
     return SCHWAY_STATUS_OK;
 }

@@ -1025,6 +1025,11 @@ static schway_status call_audio(void *b)
     return schway_get_audio(shared, (schway_audio *)b);
 }
 
+static schway_status call_input(void *b)
+{
+    return schway_set_input(shared, (const schway_input *)b);
+}
+
 static schway_status call_versions(void *b)
 {
     return schway_get_versions((schway_versions *)b);
@@ -1086,6 +1091,9 @@ static void test_size_tags(void)
     memset(&aud, 0, sizeof aud);
     aud.samples = audio_buf;
     aud.capacity = RING_PAIRS;
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.size = (uint32_t)sizeof input;
     const struct {
         const char *what;
         const void *valid;
@@ -1095,6 +1103,7 @@ static void test_size_tags(void)
         {"config", &cfg, (uint32_t)sizeof cfg, SCHWAY__CONFIG_SIZE_FIRST, call_config},
         {"profile", &pal, (uint32_t)sizeof pal, SCHWAY__PROFILE_SIZE_FIRST, call_profile},
         {"audio", &aud, (uint32_t)sizeof aud, SCHWAY__AUDIO_SIZE_FIRST, call_audio},
+        {"input", &input, (uint32_t)sizeof input, SCHWAY__INPUT_SIZE_FIRST, call_input},
     };
     for (size_t i = 0; i < sizeof inputs / sizeof inputs[0]; i++) {
         const uint32_t refused[] = {0u, inputs[i].first - 1u, TAG_MAX + 1u, 0xFFFFFFFFu};
