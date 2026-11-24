@@ -1,6 +1,6 @@
 ---
 phase: multitap-and-special-controllers
-verified: 2026-11-24T14:33:28Z
+verified: 2026-11-24T14:55:40Z
 status: passed
 score: 49/49 must-haves verified
 covered_files:
@@ -81,7 +81,7 @@ covered_files:
   - tests/sio/pad_tests.c
   - tests/sio/sio_tests.c
   - tests/sio/tests.cmake
-covered_digest: "v4:sha256:d2ad749c2e7ac39b971904fda0b846be80466dc1932b9464f57f895ccb8671b2"
+covered_digest: "v4:sha256:f274e2d9b0ff9996d65ca632a8a458f3edd7056b0068ad46e662a7fc161e33a7"
 behavior_unverified: 0
 overrides_applied: 0
 ---
@@ -89,9 +89,9 @@ overrides_applied: 0
 # Phase 14: Multitap and Special Controllers Verification Report
 
 **Phase Goal:** Players can use the multitap on either port and use the PlayStation mouse, neGcon, Jogcon and Dual Analog flight mode.
-**Verified:** 2026-11-24 14:33:28 UTC
+**Verified:** 2026-11-24 14:55:40 UTC
 **Status:** passed
-**Re-verification:** No — initial verification.
+**Re-verification:** Yes — targeted follow-up for the GCC state-serialization portability correction.
 
 ## Goal Achievement
 
@@ -184,12 +184,15 @@ The built-in `verify.key-links` heuristic found 1/30 declared plan links and rep
 
 | Behavior | Command | Result | Status |
 |---|---|---|---|
-| Integrated controller/card/API/runner/libretro behavior | `cmake --workflow --preset ci` | Exit 0; 705/705 CTest tests passed; all three macOS arm64 packages produced | ✓ PASS |
+| Integrated controller/card/API/runner/libretro behavior | `cmake --workflow --preset ci` on source head `d7d3cbf` | Exit 0; 705/705 CTest tests passed; all three macOS arm64 packages produced before the GCC portability correction | ✓ PASS |
 | Release artifact validation | Workflow CI release-test step | Exit 0; 8/8 release checks passed | ✓ PASS |
 | API v9 and endpoint input mapping | `abi.api_v9`, `libretro.input.special`, `libretro.input.multitap` in final workflow | Included in 705/705 pass | ✓ PASS |
 | Multitap serial/card/persistence | `sio.tap.*`, `card.tap.*`, `runner.cards.multitap`, `libretro.cards.multitap` in final workflow | Included in 705/705 pass | ✓ PASS |
 | Special-controller serial and host mapping | `sio.special.*`, `libretro.input.special` in final workflow | Included in 705/705 pass | ✓ PASS |
 | Compatibility ledger | `compat.features.preflight`, `compat.features.ratchet`, `compat.features.controls` | Included in 705/705 pass | ✓ PASS |
+| GCC portability and multitap state follow-up | Linux GCC 15.2 CMake configure/build of `schwaystation_sio` with warnings-as-errors; focused `core.state.*` and `sio.tap.*` CTest selectors | Exit 0; the SIO object compiled and all four selected tests passed in 2.07 seconds on the corrected source | ✓ PASS |
+
+The hosted GCC build found undefined pointer arithmetic when the state serializer treated the first inner `[4]` array as an eight-byte object. The storage is now a flat eight-byte array, with a separate `port * 4 + socket` index preserving the original serialized slot order and per-port reset range. A focused read-only source review confirmed the corrected indexing. The full local workflow above ran before this portability-only correction; the repaired PR head is awaiting its required hosted workflow run.
 
 ## Probe Execution
 
@@ -232,5 +235,5 @@ N/A — no visual UI or owner-hardware-only acceptance criterion exists. The lib
 
 ---
 
-_Verified: 2026-11-24 14:33:28 UTC_
-_Verifier: the agent (gsd-verifier)_
+_Verified: 2026-11-24 14:55:40 UTC_
+_Verifier: Codex; the initial goal-backward verification was produced by gsd-verifier._

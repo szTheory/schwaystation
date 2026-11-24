@@ -6,11 +6,11 @@ current_phase: 15
 current_phase_name: GunCon and Justifier
 current_plan: Not started
 status: planning
-stopped_at: Phase 14 complete, ready to plan Phase 15
-last_updated: "2026-11-24T14:33:49.173Z"
+stopped_at: Phase 14 verified; repaired head ready for hosted CI and ship
+last_updated: "2026-11-24T14:58:04Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 complete, transitioned to Phase 15
-state_head: d7d3cbfa444851c0547ca4a3a3af5a9a31039a12
+last_activity_desc: Phase 14 hosted CI found a GCC portability issue; corrected and locally verified before retry
+state_head: 440022c5ac03fec59b16cc310547c678f1e57a20
 progress:
   total_phases: 10
   completed_phases: 8
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 15 — GunCon and Justifier (ready to discuss and plan; Phase 14 is locally verified and complete, with ship/hosted release pending)
+**Current focus:** Phase 14 — corrected source is locally verified and committed on PR #42; hosted CI and release are pending before Phase 15 planning
 
 ## Current Position
 
@@ -34,8 +34,8 @@ Phase: 15 — GunCon and Justifier
 Current Plan: Not started
 Total Plans in Phase: Not planned
 Status: Ready to plan
-Last activity: 2026-11-24 — Phase 14 complete, transitioned to Phase 15
-Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and passed local verification. Phase 14 ship/hosted release and Phase 7–11 verification digest reconciliation remain pending.)
+Last activity: 2026-11-24 — Phase 14 portability correction is locally verified; PR #42 awaits retried hosted CI
+Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and passed local verification. Its repaired PR head needs hosted CI and release before Phase 15; Phase 7–11 verification digest reconciliation remains pending.)
 
 ### Phase 14 verification closeout (2026-11-24)
 
@@ -56,6 +56,35 @@ resources were used. CI/CD efficiency guidance is already discoverable in tracke
 `docs/maintaining.md`. Hosted WASI module size and Cachegrind instructions/frame remain with the exact named producers; no
 quality bound was guessed or widened. This was a local workflow, so there is no run URL; hosted Main and Release checks remain
 pending Phase 14 ship. No retail-game compatibility claim is inferred from peripheral protocol fixtures.
+
+### Phase 14 hosted CI correction (2026-11-24)
+
+Runtime/model: Codex; primary session model ID unavailable. A focused read-only source review confirmed the corrected SIO slot indexing.
+PR #42 (`phase/14-multitap-and-special-controllers`) had auto-merge enabled at head `39548c5`. Its first Main CI run
+[45416515458](https://github.com/szTheory/schwaystation/actions/runs/45416515458) exposed GCC object-bounds UB in the SIO state
+serializer: passing `&tap_slot_id[0][0]` with length eight crosses the first inner four-byte array. The same compile failure
+caused Linux x64/arm64, no-FP, GPU reference, BE32, WASI and perf jobs to fail. CI checks that finished before cancellation
+included hygiene, OpenBIOS and macOS arm64. The initial Nightly benchmark jobs passed; its fuzz job was still running.
+
+After confirming the compiler diagnostic in the linux-x64 log, obsolete Main CI and Nightly runs
+[45416515458](https://github.com/szTheory/schwaystation/actions/runs/45416515458) and
+[45416515484](https://github.com/szTheory/schwaystation/actions/runs/45416515484) were canceled before a repaired-head attempt.
+Their elapsed wall times were 426 seconds and 395 seconds. GitHub's timing endpoint returned zero per-job milliseconds for
+these canceled runs, so no raw runner-minute or billing savings are claimed.
+
+Commit `440022c` flattens the eight-byte ID storage and uses `port * 4 + socket` for every read, write and per-port reset,
+preserving the old serialized byte order. A review caught and prevented an initial use of the different pad-endpoint mapping;
+the final index was corrected before commit. `git diff --check` and the SIO inventory sort check exited 0. The existing local
+SIO/core test targets rebuilt successfully, and `ctest --test-dir build/ci --output-on-failure -R
+'^(sio[.]tap[.](poll_methods|history_edges)|core[.]state[.](round_trip|rejects))$'` passed all four selectors in 2.07 seconds.
+An Ubuntu 26.04 arm64 container compiled `schwaystation_sio` with GCC 15.2 and warnings-as-errors (exit 0). The first attempt
+to use `cmake --preset ci` exited 1 because the image's CMake 4.2.3 cannot parse this repository's preset schema 11; direct
+CMake configure/build was used instead. The task-named `--rm` container cleaned itself up; no task-created image, volume or
+network remains. Workflow wiring was unchanged, and `act` would not add coverage beyond the direct GCC compile and local tests.
+
+Next: push the reviewed correction and updated verification evidence, inspect the repaired head's Main CI and Nightly while
+they run and after they finish, then complete Phase 14 ship/release. Phase 15 must wait for that release. Hosted WASI module
+size and Cachegrind instructions/frame remain tied to their exact producers; no bound was guessed or widened.
 
 ### Phase 14 tail planning split (2026-11-24)
 
