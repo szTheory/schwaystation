@@ -576,6 +576,151 @@ static uint8_t signed_mouse_byte(int16_t value)
     return (uint8_t)(int8_t)clamped;
 }
 
+static void set_direct_flight(schway_input *input, uint32_t port, uint16_t buttons,
+                              const uint8_t axes[4])
+{
+    input->device[port] = SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT;
+    input->buttons[port] = buttons;
+    memcpy(input->axes[port], axes, 4u);
+}
+
+static void flight_direct_vectors(void)
+{
+    static const uint8_t endpoints[] = {0u, 128u, 255u};
+    static const uint8_t button_bits[] = {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u,
+                                          8u, 9u, 10u, 11u, 12u, 13u, 14u, 15u};
+    for (uint32_t port = 0u; port < 2u; port++) {
+        schway *inst = make();
+        configure_sio_port(inst, port);
+        for (uint32_t axis = 0u; axis < 4u; axis++) {
+            for (uint32_t value = 0u; value < sizeof endpoints; value++) {
+                uint8_t axes[] = {17u, 31u, 47u, 63u};
+                axes[axis] = endpoints[value];
+                schway_input input;
+                memset(&input, 0, sizeof input);
+                set_direct_flight(&input, port, 0u, axes);
+                latch_input(inst, &input);
+                uint8_t payload[] = {0xFFu, 0xFFu, axes[0], axes[1], axes[2], axes[3]};
+                poll(inst, 0x53u, payload, 6u, NULL);
+            }
+        }
+        for (uint32_t bit = 0u; bit < sizeof button_bits; bit++) {
+            uint16_t pressed = (uint16_t)(1u << button_bits[bit]);
+            const uint8_t axes[] = {0u, 128u, 255u, 64u};
+            schway_input input;
+            memset(&input, 0, sizeof input);
+            set_direct_flight(&input, port, pressed, axes);
+            latch_input(inst, &input);
+            uint16_t active_low = (uint16_t)~pressed;
+            uint8_t payload[] = {(uint8_t)active_low, (uint8_t)(active_low >> 8),
+                                 axes[0], axes[1], axes[2], axes[3]};
+            poll(inst, 0x53u, payload, 6u, NULL);
+        }
+
+        const uint8_t old_axes[] = {1u, 2u, 3u, 4u};
+        schway_input input;
+        memset(&input, 0, sizeof input);
+        set_direct_flight(&input, port, 1u << 13, old_axes);
+        latch_input(inst, &input);
+        schway_input next;
+        memset(&next, 0, sizeof next);
+        const uint8_t new_axes[] = {5u, 6u, 7u, 8u};
+        set_direct_flight(&next, port, 1u << 9, new_axes);
+        next.size = (uint32_t)sizeof next;
+        CHECK_EQ_U64(schway_set_input(inst, &next), SCHWAY_STATUS_OK);
+        uint8_t old_payload[] = {0xFFu, (uint8_t)~(1u << 13),
+                                 old_axes[0], old_axes[1], old_axes[2], old_axes[3]};
+        poll(inst, 0x53u, old_payload, 6u, NULL);
+        schway__pad_frame_end(inst);
+        schway__pad_frame_start(inst);
+        uint8_t new_payload[] = {0xFFu, (uint8_t)~(1u << 9),
+                                 new_axes[0], new_axes[1], new_axes[2], new_axes[3]};
+        poll(inst, 0x53u, new_payload, 6u, NULL);
+
+        for (uint32_t command = 0u; command < 7u; command++) {
+            static const uint8_t unsupported[] = {0x43u, 0x44u, 0x45u, 0x46u,
+                                                  0x47u, 0x4Cu, 0x4Du};
+            uint8_t received = 0u;
+            CHECK_EQ_U64(schway__pad_byte(inst, port, 0x01u, inst->ticks, &received), 1u);
+            CHECK_EQ_U64(schway__pad_byte(inst, port, unsupported[command], inst->ticks,
+                                          &received), 0u);
+            CHECK_EQ_HEX(received, 0xFFu);
+            CHECK_EQ_U64(inst->pad.phase[port], 0u);
+            CHECK_EQ_U64(inst->pad.config_mode[port], 0u);
+            CHECK_EQ_U64(inst->pad.rumble_large[port], 0u);
+            CHECK_EQ_U64(inst->pad.rumble_small[port], 0u);
+        }
+
+        CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+        configure_sio_port(inst, port);
+        poll(inst, 0x41u, (const uint8_t[]){0xFFu, 0xFFu}, 2u, NULL);
+        schway_destroy(inst);
+    }
+}
+
+static void flight_tap_vectors(void)
+{
+    schway *inst = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.multitap[1] = 1u;
+    input.controllers[1][0].device = SCHWAY_INPUT_DEVICE_DIGITAL;
+    input.controllers[1][3].device = SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT;
+    input.controllers[1][3].buttons = (uint16_t)((1u << 3) | (1u << 11) | (1u << 14));
+    input.controllers[1][3].axes[0] = 0u;
+    input.controllers[1][3].axes[1] = 128u;
+    input.controllers[1][3].axes[2] = 255u;
+    input.controllers[1][3].axes[3] = 64u;
+    latch_input(inst, &input);
+    configure_sio_port(inst, 1u);
+    CHECK_EQ_HEX(exchange(inst, 0x04u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x53u);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0x5Au);
+    uint16_t buttons = (uint16_t)~input.controllers[1][3].buttons;
+    uint8_t payload[] = {(uint8_t)buttons, (uint8_t)(buttons >> 8), 0u, 128u, 255u, 64u};
+    for (uint32_t i = 0u; i < sizeof payload; i++) {
+        CHECK_EQ_HEX(exchange(inst, 0u, i + 1u < sizeof payload), payload[i]);
+    }
+    schway_destroy(inst);
+
+    inst = make();
+    memset(&input, 0, sizeof input);
+    input.multitap[0] = 1u;
+    input.controllers[0][0].device = SCHWAY_INPUT_DEVICE_DIGITAL;
+    input.controllers[0][3].device = SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT;
+    input.controllers[0][3].buttons = (uint16_t)((1u << 7) | (1u << 12));
+    input.controllers[0][3].axes[0] = 255u;
+    input.controllers[0][3].axes[1] = 0u;
+    input.controllers[0][3].axes[2] = 128u;
+    input.controllers[0][3].axes[3] = 1u;
+    latch_input(inst, &input);
+    configure_sio_port(inst, 0u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 0), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
+    uint16_t flight_buttons = (uint16_t)~input.controllers[0][3].buttons;
+    uint8_t flight_record[] = {0x53u, 0x5Au, (uint8_t)flight_buttons,
+                               (uint8_t)(flight_buttons >> 8), 255u, 0u, 128u, 1u};
+    for (uint32_t i = 0u; i < 32u; i++) {
+        uint8_t expected = i < 8u ? (const uint8_t[]){0x41u, 0x5Au, 0xFFu, 0xFFu,
+                                                       0xFFu, 0xFFu, 0xFFu, 0xFFu}[i]
+                                   : i >= 24u ? flight_record[i - 24u] : 0xFFu;
+        CHECK_EQ_HEX(exchange(inst, 0x01u, i < 31u), expected);
+    }
+    schway_destroy(inst);
+}
+
+static void special_flight(void)
+{
+    flight_direct_vectors();
+    flight_tap_vectors();
+}
+
 static void set_direct_mouse(schway_input *input, uint32_t port, uint16_t buttons,
                              int16_t dx, int16_t dy)
 {
@@ -892,6 +1037,8 @@ int main(int argc, char **argv)
         special_mouse();
     } else if (strcmp(argv[1], "special_negcon") == 0) {
         special_negcon();
+    } else if (strcmp(argv[1], "special_flight") == 0) {
+        special_flight();
     } else {
         return 2;
     }
