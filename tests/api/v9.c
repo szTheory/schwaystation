@@ -33,6 +33,11 @@ _Static_assert(offsetof(schway_input, axes) == 16u, "released v8 input.axes");
 _Static_assert(offsetof(schway_input, analog_button) == 24u,
                "released v8 input.analog_button");
 _Static_assert(offsetof(schway_input, reserved0) == 26u, "released v8 input.reserved0");
+_Static_assert(sizeof(schway_controller_input) == 24u, "API v9 endpoint input size");
+_Static_assert(offsetof(schway_current_input, multitap) == 28u, "API v9 input.multitap");
+_Static_assert(offsetof(schway_current_input, controllers) == 36u,
+               "API v9 input.controllers");
+_Static_assert(sizeof(schway_current_input) == 228u, "API v9 input size");
 
 typedef struct observed_input {
     uint16_t buttons[2];
@@ -86,7 +91,7 @@ int main(void)
 
     schway_input input;
     memset(&input, 0, sizeof input);
-    input.size = (uint32_t)sizeof input;
+    input.size = 28u;
     input.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
     input.device[1] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
     input.buttons[0] = UINT16_C(0xA55A);
@@ -101,7 +106,12 @@ int main(void)
     input.axes[1][3] = 231u;
 
     /* This pointer has exactly the 28 bytes allocated by a released v8 caller. */
-    CHECK_EQ_U64(schway_set_input(inst, &input), SCHWAY_STATUS_OK);
+    schway_status old_status = schway_set_input(inst, &input);
+    if (old_status != SCHWAY_STATUS_OK) {
+        CHECK_EQ_U64(old_status, SCHWAY_STATUS_OK);
+        schway_destroy(inst);
+        CHECK_DONE();
+    }
     CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
 
     observed_input observed;

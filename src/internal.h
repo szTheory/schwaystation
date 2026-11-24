@@ -280,7 +280,10 @@ _Static_assert(offsetof(schway_input, buttons) == 12, "input.buttons");
 _Static_assert(offsetof(schway_input, axes) == 16, "input.axes");
 _Static_assert(offsetof(schway_input, analog_button) == 24, "input.analog_button");
 _Static_assert(offsetof(schway_input, reserved0) == 26, "input.reserved0");
-_Static_assert(sizeof(schway_input) == 28, "input size");
+_Static_assert(offsetof(schway_input, multitap) == 28, "input.multitap");
+_Static_assert(offsetof(schway_input, controllers) == 36, "input.controllers");
+_Static_assert(sizeof(schway_controller_input) == 24, "controller_input size");
+_Static_assert(sizeof(schway_input) == 228, "input size");
 
 _Static_assert(offsetof(schway_budget, size) == 0, "budget.size");
 _Static_assert(offsetof(schway_budget, flags) == 4, "budget.flags");

@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 8
+#define SCHWAY_API_VERSION 9
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -126,6 +126,10 @@ typedef uint32_t schway_status;
 #define SCHWAY_INPUT_DEVICE_NONE 0u
 #define SCHWAY_INPUT_DEVICE_DIGITAL 1u
 #define SCHWAY_INPUT_DEVICE_DUALSHOCK 2u
+#define SCHWAY_INPUT_DEVICE_MOUSE 3u
+#define SCHWAY_INPUT_DEVICE_NEGCON 4u
+#define SCHWAY_INPUT_DEVICE_JOGCON 5u
+#define SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT 6u
 
 #define SCHWAY_LICENCE_NONE 0u
 #define SCHWAY_LICENCE_JAPAN 1u
@@ -194,6 +198,18 @@ typedef struct schway_run_result {
     uint32_t rumble[2]; /* per-port large << 8 | small */
 } schway_run_result;
 
+typedef struct schway_controller_input {
+    uint32_t device; /* SCHWAY_INPUT_DEVICE_* */
+    uint16_t buttons; /* bit set means pressed; the serial reply is active low */
+    uint8_t axes[4]; /* right X, right Y, left X, left Y; centre is 128 */
+    uint8_t analog_button; /* 0 released, 1 pressed */
+    uint8_t reserved0;
+    int16_t mouse_dx, mouse_dy;
+    uint8_t negcon_twist, negcon_i, negcon_ii, negcon_l;
+    uint16_t jogcon_dial;
+    uint16_t jogcon_flags; /* bit 0 clockwise, bit 1 dial valid */
+} schway_controller_input;
+
 typedef struct schway_input {
     uint32_t size;
     uint32_t device[2]; /* SCHWAY_INPUT_DEVICE_* */
@@ -201,6 +217,8 @@ typedef struct schway_input {
     uint8_t axes[2][4]; /* right X, right Y, left X, left Y; centre is 128 */
     uint8_t analog_button[2]; /* 0 released, 1 pressed */
     uint16_t reserved0;
+    uint32_t multitap[2]; /* 0 disabled, 1 enabled */
+    schway_controller_input controllers[2][4]; /* one-based host port/socket coordinates */
 } schway_input;
 
 typedef struct schway_budget {
