@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/szTheory/schwaystation/compare/v0.13.0...v0.14.0) (2026-11-24)
+
+
+### Features
+
+* **controllers:** add multitap and special controller support ([#42](https://github.com/szTheory/schwaystation/issues/42)) ([1256732](https://github.com/szTheory/schwaystation/commit/1256732fe7d6d75166a54bbdefa07ab78e667774))
+
 ## [0.13.0](https://github.com/szTheory/schwaystation/compare/v0.12.0...v0.13.0) (2026-11-24)
 
 
