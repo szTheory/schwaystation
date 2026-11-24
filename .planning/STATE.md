@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 13
+current_plan: 14
 status: executing
-stopped_at: Completed 14-12-PLAN.md
-last_updated: "2026-11-24T10:48:04.156Z"
+stopped_at: Completed 14-13-PLAN.md
+last_updated: "2026-11-24T11:11:55.320Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-12 complete; configured gpt-6-luna xhigh; 24m wall time; two task commits; focused special/multitap/descriptor selectors passed 3/3; Plan 14-13 next
-state_head: 79e8c0cbc073bc004f7083cd4005a44943f424e6
+last_activity_desc: Phase 14 Plan 14-13 complete; configured gpt-6-luna xhigh; 18m wall time through summary and state closeout; two task commits; focused libretro selectors passed 5/5; SIO-01 remains gated
+state_head: 444e8af72d5eda28b85af17eda1644ae4056bc1c
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 94
-  completed_plans: 91
+  completed_plans: 92
   percent: 70
 ---
 
@@ -26,16 +26,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-12 complete; Plan 14-13 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-13 complete; Plan 14-14 has not started; SIO-01 remains gated)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 13
+Current Plan: 14
 Total Plans in Phase: 15
-Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-12 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); 24m wall time; two task commits; focused special, multitap and descriptor selectors passed 3/3
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 12/15 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Status: Ready for the next authorized plan
+Last activity: 2026-11-24 — Phase 14 Plan 14-13 complete; Codex GSD executor configured `gpt-6-luna` xhigh; 18m wall time through summary and state closeout; two task commits; focused libretro selectors passed 5/5; SIO-01 remains gated
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 13/15 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-13 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; OpenGSD 1.23.0; primary runtime model ID unavailable. Wall duration was 18m through summary and state closeout. Two task commits landed: `7686490` (RED persistence assertions) and `444e8af` (seven adapter sidecars).
+
+The libretro inventory sorted cleanly, and the selector preflight found all five planned tests. Existing `build/ci` was reused; `cmake --preset ci` and the focused libretro host/core build passed. The owned card persistence, controls, multitap and memory alias/boundary selectors passed 5/5 in 5.90 seconds. The direct TAP RED run failed on missing additional sidecar paths and classified `RED_EVIDENCE_OK`. Two strict-build issues in the test hooks were corrected before accepting RED. Shared SIO-01 remains open until its other declaring plans finish. No broad suite, hosted CI, Act or Docker was run; Plan 15 owns final reviewed-head integrated verification.
 
 ### Phase 14 Plan 14-12 execution (2026-11-24)
 
@@ -1543,6 +1549,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P10 | 9m | 1 tasks | 2 files |
 | Phase 14 P11 | 24m | 1 tasks | 3 files |
 | Phase 14 P12 | 24m | 1 tasks | 3 files |
+| Phase 14 P13 | 18m | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2016,6 +2023,8 @@ Recent decisions affecting current work:
 - [Phase 14]: Apply multitap topology only after successful content load — A rejected replacement must leave the currently running frontend descriptors and serial topology unchanged.
 - [Phase 14]: Accept only exact NONE, JOYPAD, and ANALOG controller IDs — Masking arbitrary subclasses would make the frontend claim support for devices that have no implemented input mapping.
 - [Phase 14]: Match supported special libretro controllers by exact device ID and map their host inputs with bounded integer conversions.
+- [Phase 14]: Libretro keeps port1A exclusively frontend-owned SAVE_RAM and persists only the seven remaining sockets.
+- [Phase 14]: Build sidecar paths once from the original content basename and advance saved generations only after atomic replacement succeeds.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2266,8 +2275,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T10:48:03.606Z
-Stopped at: Completed 14-12-PLAN.md
+Last session: 2026-11-24T11:11:54.882Z
+Stopped at: Completed 14-13-PLAN.md
 Resume file: None
 
 ### v1.0 session history
