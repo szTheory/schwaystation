@@ -133,6 +133,7 @@ static size_t(RETRO_CALLCONV *p_get_memory_size)(unsigned);
 static const uint8_t *(RETRO_CALLCONV *p_test_card2_data)(size_t *);
 static const char *(RETRO_CALLCONV *p_test_card2_path)(void);
 static int(RETRO_CALLCONV *p_test_poll_endpoint)(unsigned, unsigned, uint16_t *);
+static int(RETRO_CALLCONV *p_test_poll_bytes)(unsigned, unsigned, uint8_t *, size_t, size_t *);
 
 static const char *missing;
 
@@ -181,6 +182,7 @@ static void resolve_all(int inspect_card2)
         RESOLVE(p_test_card2_data, "schway__libretro_test_card2_data");
         RESOLVE(p_test_card2_path, "schway__libretro_test_card2_path");
         RESOLVE(p_test_poll_endpoint, "schway__libretro_test_poll_endpoint");
+        RESOLVE(p_test_poll_bytes, "schway__libretro_test_poll_bytes");
     }
 }
 
@@ -238,6 +240,11 @@ static int multitap_test_mode;
 static unsigned multitap_callback_visits[8];
 static unsigned multitap_analog_visits[8];
 static unsigned multitap_invalid_player_visits;
+static int special_input_mode;
+static int16_t special_mouse_x, special_mouse_y;
+static int16_t special_axes[2][2];
+static uint32_t special_buttons;
+static unsigned special_queries[8][3][16];
 static int rumble_available;
 static int rumble_axis_mode;
 static unsigned audio_tap_checks;
@@ -376,9 +383,19 @@ static unsigned expected_active_players(void)
 
 static void check_controller_info(const struct retro_controller_info *info)
 {
-    static const unsigned expected_ids[] = {RETRO_DEVICE_ANALOG, RETRO_DEVICE_JOYPAD,
-                                            RETRO_DEVICE_NONE};
-    static const char *expected_names[] = {"DualShock", "PlayStation Controller", "None"};
+    static const unsigned expected_ids[] = {
+        RETRO_DEVICE_ANALOG,
+        RETRO_DEVICE_JOYPAD,
+        RETRO_DEVICE_NONE,
+        RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1),
+        RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2),
+        RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3),
+        RETRO_DEVICE_MOUSE,
+    };
+    static const char *expected_names[] = {
+        "DualShock", "PlayStation Controller", "None", "Dual Analog Flight Stick",
+        "neGcon", "Jogcon", "Mouse",
+    };
     controller_info_calls++;
     CHECK(info != NULL);
     if (info == NULL) {
@@ -386,12 +403,13 @@ static void check_controller_info(const struct retro_controller_info *info)
     }
     unsigned active_players = expected_active_players();
     for (unsigned port = 0u; port < active_players; port++) {
-        CHECK_EQ_U64(info[port].num_types, 3u);
+        CHECK_EQ_U64(info[port].num_types,
+                     sizeof expected_ids / sizeof expected_ids[0]);
         CHECK(info[port].types != NULL);
         if (info[port].types == NULL) {
             continue;
         }
-        for (unsigned i = 0u; i < 3u; i++) {
+        for (unsigned i = 0u; i < sizeof expected_ids / sizeof expected_ids[0]; i++) {
             CHECK_EQ_U64(info[port].types[i].id, expected_ids[i]);
             check_string("controller type name", info[port].types[i].desc, expected_names[i]);
         }
@@ -702,6 +720,25 @@ static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned ind
             multitap_callback_visits[port]++;
             return 1;
         }
+    }
+    if (special_input_mode) {
+        if (port < 8u && device < 8u && index < 3u && id < 16u) {
+            special_queries[device][index][id]++;
+        }
+        if (device == RETRO_DEVICE_JOYPAD && index == 0u && id < 32u) {
+            return (special_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
+        }
+        if (device == RETRO_DEVICE_ANALOG && index < 2u && id < 2u) {
+            return special_axes[index][id];
+        }
+        if (device == RETRO_DEVICE_MOUSE) {
+            if (id == RETRO_DEVICE_ID_MOUSE_X) return special_mouse_x;
+            if (id == RETRO_DEVICE_ID_MOUSE_Y) return special_mouse_y;
+            if (id == RETRO_DEVICE_ID_MOUSE_LEFT || id == RETRO_DEVICE_ID_MOUSE_RIGHT) {
+                return (special_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
+            }
+        }
+        return 0;
     }
     if (rumble_axis_mode && device == RETRO_DEVICE_ANALOG && port < 2u) {
         if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_X) {
@@ -1659,6 +1696,151 @@ static int test_input_multitap(void)
     p_deinit();
     p_unload_game();
     module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static void clear_special_queries(void)
+{
+    memset(special_queries, 0, sizeof special_queries);
+}
+
+static void expect_special_packet(unsigned port, unsigned socket, uint8_t id,
+                                  const uint8_t *payload, size_t payload_size)
+{
+    uint8_t actual[9];
+    size_t written = 0u;
+    CHECK(p_test_poll_bytes != NULL);
+    if (p_test_poll_bytes == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(p_test_poll_bytes(port, socket, actual, sizeof actual, &written), 1u);
+    CHECK_EQ_U64(written, 3u + payload_size);
+    if (written == 3u + payload_size) {
+        CHECK_EQ_HEX(actual[0], 0xFFu);
+        CHECK_EQ_HEX(actual[1], id);
+        CHECK_EQ_HEX(actual[2], 0x5Au);
+        CHECK(memcmp(actual + 3u, payload, payload_size) == 0);
+    }
+}
+
+static void expect_special_query(unsigned device, unsigned index, unsigned id, unsigned count)
+{
+    CHECK_EQ_U64(special_queries[device][index][id], count);
+}
+
+static int test_input_special(void)
+{
+    static const uint8_t mouse_moved[] = {0xFFu, 0xF0u, 0x80u, 0x7Fu};
+    static const uint8_t mouse_neutral[] = {0xFFu, 0xFCu, 0u, 0u};
+    static const uint8_t flight_extremes[] = {0xFFu, 0xBFu, 0xFFu, 0u, 0u, 0xFFu};
+    static const uint8_t negcon_pressure[] = {0xE7u, 0x97u, 0xFFu, 0xFFu, 0xFFu, 0xFFu};
+    static const uint8_t jogcon_min[] = {0xD7u, 0xFFu, 0u, 0x80u, 1u, 0u};
+    static const uint8_t jogcon_zero[] = {0xFFu, 0xFFu, 0u, 0u, 0u, 0u};
+    static const uint8_t jogcon_max[] = {0xFFu, 0xFFu, 0xFEu, 0x7Fu, 2u, 0u};
+    const unsigned flight = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1);
+    const unsigned negcon = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2);
+    const unsigned jogcon = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3);
+    uint16_t buttons = 0u;
+    unsigned polls;
+
+    special_input_mode = 1;
+    special_buttons = UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_B;
+    special_mouse_x = 0;
+    special_mouse_y = 0;
+    memset(special_axes, 0, sizeof special_axes);
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+
+    /* Existing digital and DualShock caller mappings remain intact. */
+    p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+    run_one();
+    CHECK_EQ_U64(p_test_poll_endpoint(0u, 0u, &buttons), 1u);
+    CHECK_EQ_HEX(buttons, 0xBFFFu);
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    run_one();
+    CHECK_EQ_U64(p_test_poll_endpoint(0u, 0u, &buttons), 1u);
+    CHECK_EQ_HEX(buttons, 0xBFFFu);
+
+    p_set_controller_port_device(0u, RETRO_DEVICE_MOUSE);
+    special_mouse_x = INT16_MIN;
+    special_mouse_y = INT16_MAX;
+    special_buttons = (UINT32_C(1) << RETRO_DEVICE_ID_MOUSE_LEFT) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_MOUSE_RIGHT);
+    clear_special_queries();
+    polls = input_poll_calls;
+    run_one();
+    CHECK_EQ_U64(input_poll_calls, polls + 1u);
+    expect_special_query(RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_X, 1u);
+    expect_special_query(RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_Y, 1u);
+    expect_special_query(RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_LEFT, 1u);
+    expect_special_query(RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_RIGHT, 1u);
+    /* Mutating callback values after retro_run cannot change this frame's snapshot. */
+    special_mouse_x = 0;
+    special_mouse_y = 0;
+    special_buttons = 0u;
+    expect_special_packet(0u, 0u, 0x12u, mouse_moved, sizeof mouse_moved);
+    run_one();
+    expect_special_packet(0u, 0u, 0x12u, mouse_neutral, sizeof mouse_neutral);
+
+    p_set_controller_port_device(0u, flight);
+    special_buttons = UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_B;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MIN;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_Y] = INT16_MAX;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MAX;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_Y] = INT16_MIN;
+    clear_special_queries();
+    run_one();
+    expect_special_query(RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_query(RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_Y, 1u);
+    expect_special_query(RETRO_DEVICE_ANALOG, 1u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_query(RETRO_DEVICE_ANALOG, 1u, RETRO_DEVICE_ID_ANALOG_Y, 1u);
+    expect_special_packet(0u, 0u, 0x53u, flight_extremes, sizeof flight_extremes);
+
+    p_set_controller_port_device(0u, negcon);
+    special_buttons = (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_START) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_UP) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_R) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_B) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_A) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_L2);
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MAX;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MAX;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_Y] = INT16_MIN;
+    clear_special_queries();
+    run_one();
+    expect_special_packet(0u, 0u, 0x23u, negcon_pressure, sizeof negcon_pressure);
+
+    p_unload_game();
+    multitap_port1_value = "enabled";
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    p_set_controller_port_device(1u, jogcon);
+    special_buttons = (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_START) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_RIGHT);
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MIN;
+    clear_special_queries();
+    polls = input_poll_calls;
+    run_one();
+    CHECK_EQ_U64(input_poll_calls, polls + 1u);
+    expect_special_query(RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_packet(0u, 1u, 0xE3u, jogcon_min, sizeof jogcon_min);
+
+    special_buttons = 0u;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = 0;
+    run_one();
+    expect_special_packet(0u, 1u, 0xE3u, jogcon_zero, sizeof jogcon_zero);
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MAX;
+    run_one();
+    expect_special_packet(0u, 1u, 0xE3u, jogcon_max, sizeof jogcon_max);
+
+    /* Unknown subclasses are refused without replacing the selected device. */
+    p_set_controller_port_device(1u, RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 4));
+    run_one();
+    expect_special_packet(0u, 1u, 0xE3u, jogcon_max, sizeof jogcon_max);
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    special_input_mode = 0;
+    multitap_port1_value = "disabled";
     return check_failures != 0 ? 1 : 0;
 }
 
@@ -5383,6 +5565,7 @@ int main(int argc, char **argv)
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
     int input_multitap_mode = argc == 3 && strcmp(argv[2], "input-multitap") == 0;
+    int input_special_mode = argc == 3 && strcmp(argv[2], "input-special") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
@@ -5396,7 +5579,7 @@ int main(int argc, char **argv)
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
     if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode && !input_multitap_mode &&
-         !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
+         !input_special_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
@@ -5470,7 +5653,7 @@ int main(int argc, char **argv)
         return 1;
     }
     /* Every entry point, before anything else is called. */
-    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode || input_multitap_mode;
+    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode || input_multitap_mode || input_special_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -5480,7 +5663,8 @@ int main(int argc, char **argv)
     if (!inspect_card2 &&
         (module_sym("schway__libretro_test_card2_data") != NULL ||
          module_sym("schway__libretro_test_card2_path") != NULL ||
-         module_sym("schway__libretro_test_poll_endpoint") != NULL)) {
+         module_sym("schway__libretro_test_poll_endpoint") != NULL ||
+         module_sym("schway__libretro_test_poll_bytes") != NULL)) {
         fprintf(stderr, "production libretro module exports card test accessors\n");
         module_close();
         return 1;
@@ -5588,6 +5772,10 @@ int main(int argc, char **argv)
     if (input_multitap_mode) {
         multitap_test_mode = 1;
         return test_input_multitap();
+    }
+
+    if (input_special_mode) {
+        return test_input_special();
     }
 
     if (psexe_mode) {

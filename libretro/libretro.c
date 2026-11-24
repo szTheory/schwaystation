@@ -122,6 +122,9 @@ schway__libretro_test_card2_data(size_t *size);
 SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void);
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
 schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *buttons);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
+                                 size_t capacity, size_t *written);
 #endif
 
 static struct retro_disk_control_ext_callback lr_disk_control = {
@@ -1968,6 +1971,62 @@ schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *bu
         return 0;
     }
     *buttons = (uint16_t)((uint16_t)low_reply | (uint16_t)((uint16_t)high_reply << 8));
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
+                                 size_t capacity, size_t *written)
+{
+    uint8_t received;
+    unsigned endpoint;
+    unsigned payload_size;
+    size_t count = 0u;
+    if (written != NULL) {
+        *written = 0u;
+    }
+    if (inst == NULL || reply == NULL || written == NULL || port >= 2u || socket >= 4u ||
+        (socket != 0u && inst->pad.multitap[port] == 0u)) {
+        return 0;
+    }
+    endpoint = socket == 0u ? port : (port == 0u ? socket + 1u : socket + 4u);
+    switch (inst->pad.device[endpoint]) {
+    case SCHWAY_INPUT_DEVICE_MOUSE:
+        payload_size = 4u;
+        break;
+    case SCHWAY_INPUT_DEVICE_NEGCON:
+    case SCHWAY_INPUT_DEVICE_JOGCON:
+    case SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT:
+        payload_size = 6u;
+        break;
+    default:
+        return 0;
+    }
+    if (capacity < 3u + payload_size ||
+        !lr_test_write(0x1F801048u, 2u, 0x000Cu) ||
+        !lr_test_write(0x1F80104Eu, 2u, 0x0088u) ||
+        !lr_test_write(0x1F80104Au, 2u, 0x1003u | (port == 0u ? 0u : 0x2000u))) {
+        return 0;
+    }
+    if (!lr_test_exchange((uint8_t)(socket + 1u), port, 1, &received)) {
+        return 0;
+    }
+    reply[count++] = received;
+    if (!lr_test_exchange(0x42u, port, 1, &received)) {
+        return 0;
+    }
+    reply[count++] = received;
+    if (!lr_test_exchange(0u, port, 1, &received)) {
+        return 0;
+    }
+    reply[count++] = received;
+    for (unsigned i = 0u; i < payload_size; i++) {
+        if (!lr_test_exchange(0u, port, i + 1u < payload_size, &received)) {
+            return 0;
+        }
+        reply[count++] = received;
+    }
+    *written = count;
     return 1;
 }
 #undef SCHWAYSTATION_TEST_EXPORT
