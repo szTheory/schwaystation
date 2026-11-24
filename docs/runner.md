@@ -46,7 +46,7 @@ schwaystation-run --help | --version
 | `--hash-state` | After the last frame, print the SHA-256 of the saved [machine state](#frame-hash). Unavailable with `--disc`. |
 | `--inputs FILE` | Parse and apply bounded controller and disc controls at frame boundaries, then report lag frames. Give it once. See [Input scripts](#input-scripts). |
 | `--save-dir DIR` | Load and save all eight card sockets under DIR. The directory must exist; missing card files start as formatted blank cards. Give it once. See [Memory cards](#runner-memory-cards). |
-| `--memcard-names MODE` | Use `basename` (default) or opt into `serial` naming for both card files from an executable or the first disc member. Give it once. |
+| `--memcard-names MODE` | Use `basename` (default) or opt into `serial` naming to select the basename used for all eight card socket paths. Serial naming resolves the title serial from an executable or the first disc member. Give it once. |
 | `--serial SERIAL` | Keep this literal, validated card basename with `--memcard-names serial`. It overrides serial extraction and content hashing. |
 | `--png N:FILE` | After frame N, write its picture to FILE as a PNG. N is from 1 to the frame count. Give it once. |
 | `--probe FILE` | Print PS-EXE or disc metadata as `key=value` lines, and exit. See [Probe](#probe). Give it once. |
