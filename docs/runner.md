@@ -189,15 +189,21 @@ after every frame; the 300-frame run reports 150 lagged frames.
 
 See [memory card filenames and persistence](saves.md) for the stable per-port/per-socket suffix table and save-state boundary.
 
-With `--save-dir DIR`, the runner validates and loads the selected content, then imports both card files before
-execution. By default it uses
+With `--save-dir DIR`, the runner validates and loads the selected content, then imports all eight physical-port
+and socket card files before execution. By default it uses
 the executable filename without its final extension as the basename; a content-free run uses `schwaystation`.
-Slot 1 is `basename.srm` and slot 2 is `basename.1.mcr`. To share cards across a multi-disc set, pass
+Port 1/socket A is `basename.srm` and port 2/socket A is `basename.1.mcr`; B–D use the suffixes in
+[memory card filenames and persistence](saves.md). The legacy A filenames remain unchanged. To share cards across a multi-disc set, pass
 `--memcard-names serial` with a standalone PS-EXE or a disc image/playlist. The runner takes an executable serial
 only from the complete source filename stem: four ASCII letters (or the documented three-letter `LSP` prefix),
 `_` or `-`, three digits, a dot, and two digits, optionally followed by `.exe`. For example,
 `slus_123.45.exe` becomes `SLUS-12345`. It does not search an arbitrary substring or use the executable's licence
 text.
+
+`--multitap-port1 enabled|disabled` and `--multitap-port2 enabled|disabled` control the four-device multitap on
+each physical controller port independently. Both default to `disabled`. The selection is applied at every frame
+latch, including after an input movie updates its controller snapshot, so the command-line setting stays active
+throughout the run.
 
 An explicit `--serial SERIAL` takes precedence and preserves the supplied case and characters. It follows the
 legacy 1–63 character filename-component validator: ASCII letters, digits, `_`, `-` and `.`, with an alphanumeric
@@ -231,7 +237,7 @@ and card 2 uses the frontend save directory. Runner serial naming does not affec
 
 Missing card files leave the core's formatted blank cards in place. Invalid or unreadable card files stop the run
 with status 1 before any frame is executed, and the source file is never rewritten during import. At exit, each
-slot is saved only when a successful card Write command completed and advanced that slot's generation. An
+socket is saved only when a successful card Write command completed and advanced that socket's generation. An
 unchanged slot is not replaced. Files are written through an exclusive sibling temporary, synced, and atomically
 replaced. A failed import or save returns status 1; a failed save preserves the previous destination. SIGINT or
 SIGTERM still finishes the current frame and flushes completed writes before returning status 0.

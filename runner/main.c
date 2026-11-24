@@ -143,18 +143,18 @@ static void run_free(void *user, void *ptr, size_t size)
 }
 
 static const char synopsis[] =
-    "usage: schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
-    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
+    "usage: schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
+    "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
-    "                        \n"
+    "                         [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled]\n"
     "                         [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]\n"
-    "                         [--stop-on mailbox] [--inputs FILE]\n"
+    "                         [--stop-on mailbox] [--inputs FILE] [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled]\n"
     "                         [--hash] [--hash-audio]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
     "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
-    "                        \n"
+    "                         [--multitap-port1 enabled|disabled] [--multitap-port2 enabled|disabled]\n"
     "                         [--serial SERIAL] [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]\n"
     "       schwaystation-run --help | --version\n"
@@ -168,6 +168,7 @@ static const char synopsis[] =
     "  --hash-state       print the SHA-256 of the saved machine state\n"
     "  --inputs FILE     apply a validated controller script before each frame latch\n"
     "                    records may also use 'N lid=open', 'N disc=INDEX', 'N lid=closed'\n"
+    "  --multitap-portN MODE  enable or disable the four-device tap on physical port N (default disabled)\n"
     "  --save-dir DIR    import and save memory cards in this existing directory\n"
     "  --memcard-names MODE  basename (default) or serial; serial derives from an EXE or first disc member\n"
     "  --serial SERIAL   preserve this literal card basename as a compatibility override\n"
@@ -370,6 +371,8 @@ typedef struct options {
     const char *png_path;
     const char *inputs; /* --inputs FILE, else NULL */
     const char *save_dir; /* --save-dir DIR, else NULL */
+    uint32_t multitap[2];
+    int multitap_set[2];
     const char *serial; /* --serial SERIAL when serial card naming is selected */
     int serial_card_names; /* --memcard-names serial */
     int memcard_names_set;
@@ -454,6 +457,19 @@ static int parse_options(int argc, char **argv, options *o)
                 return usage("--inputs needs a file");
             }
             o->inputs = value;
+            i++;
+        } else if (strcmp(arg, "--multitap-port1") == 0 ||
+                   strcmp(arg, "--multitap-port2") == 0) {
+            uint32_t port = strcmp(arg, "--multitap-port1") == 0 ? 0u : 1u;
+            if (o->multitap_set[port] || value == NULL) {
+                return usage("give each --multitap-port option once with enabled or disabled");
+            }
+            if (strcmp(value, "enabled") == 0) {
+                o->multitap[port] = 1u;
+            } else if (strcmp(value, "disabled") != 0) {
+                return usage("--multitap-port1 and --multitap-port2 need enabled or disabled");
+            }
+            o->multitap_set[port] = 1;
             i++;
         } else if (strcmp(arg, "--save-dir") == 0) {
             if (o->save_dir != NULL) {
@@ -737,7 +753,8 @@ static int parse_options(int argc, char **argv, options *o)
             o->exe != NULL || o->disc != NULL || o->inputs != NULL || o->save_dir != NULL || o->hash || o->hash_audio ||
             o->hash_state || o->hash_vram || o->bench || o->tty || o->stop_mailbox || o->trace ||
             o->keep_going || o->png_path != NULL || o->memcard_names_set || o->serial != NULL ||
-            o->region_set || o->machine_set || o->boot_set || o->test_audio_failure) {
+            o->region_set || o->machine_set || o->boot_set || o->test_audio_failure ||
+            o->multitap_set[0] || o->multitap_set[1]) {
             return usage("--probe cannot be combined with run options or partial test metadata");
         }
         return SCHWAY__EXIT_OK;
@@ -755,7 +772,7 @@ static int parse_options(int argc, char **argv, options *o)
             o->save_dir != NULL || o->hash || o->hash_audio || o->hash_state || o->hash_vram || o->bench || o->tty ||
             o->stop_mailbox || o->trace || o->keep_going || o->png_path != NULL ||
             o->memcard_names_set || o->serial != NULL || o->region_set || o->machine_set ||
-            o->boot_set) {
+            o->boot_set || o->multitap_set[0] || o->multitap_set[1]) {
             return usage("--probe takes no other option");
         }
         return SCHWAY__EXIT_OK;
@@ -1852,6 +1869,15 @@ static int run(const options *opt)
                 status = SCHWAY__EXIT_FAILURE;
                 break;
             }
+        }
+        input_snapshot.multitap[0] = opt->multitap[0];
+        input_snapshot.multitap[1] = opt->multitap[1];
+        st = schway_set_input(inst, &input_snapshot);
+        if (st != SCHWAY_STATUS_OK) {
+            fprintf(stderr, "schwaystation-run: applying input options failed: %s\n",
+                    schway_status_string(st));
+            status = SCHWAY__EXIT_FAILURE;
+            break;
         }
         uint64_t start_ns = opt->bench ? schway__clock_ns() : 0u;
         schway_run_result res;
