@@ -59,9 +59,12 @@ cfg.size = (uint32_t)sizeof cfg;
 The size tag lets a program built against one header run with a library built from another.
 `schway_span` is an unversioned read-only view with `data` and `size`; do not initialize it with a size tag.
 
-**Input structs** (`schway_config`, `schway_profile`, `schway_budget`, `schway_audio`, `schway_tty`):
+**Input structs** (`schway_config`, `schway_profile`, `schway_budget`, `schway_audio`, `schway_tty`,
+`schway_input`):
 
 - A size below the struct's first released size returns `SCHWAY_STATUS_ERR_STRUCT_SIZE`.
+- `schway_input` keeps the released 28-byte API v8 prefix. API v9 accepts that prefix and any longer
+  caller-sized prefix through the current struct, zero-filling fields the caller did not provide.
 - A larger size from a newer header is accepted only if every byte past the library's struct is zero; a field
   added later keeps the old behaviour when it is zero.
 - A size above 4096 bytes is refused whatever the bytes hold, so a garbage tag never makes the library read far
@@ -79,15 +82,49 @@ A call that returns an error changes nothing: not the instance, not your struct.
 
 ## Pad input and frame reports
 
-`schway_input` is a host snapshot for both controller ports. `device` uses `SCHWAY_INPUT_DEVICE_NONE` to
-disconnect a port, `SCHWAY_INPUT_DEVICE_DIGITAL` for a two-button-byte pad and `SCHWAY_INPUT_DEVICE_DUALSHOCK`
-for a DualShock. Set bits in `buttons` mean pressed; SIO returns those buttons active-low. The four raw axis bytes
-are right X, right Y, left X and left Y, with 128 at centre. `analog_button` is a held 0/1 input; a rising edge
-toggles analog mode when the pad has not locked that button.
+`schway_input` is a host snapshot with an append-only size of 228 bytes in API v9. Its first 28 bytes retain the
+API v8 fields: `device[2]`, `buttons[2]`, `axes[2][4]`, `analog_button[2]` and `reserved0`. Set bits in
+`buttons` mean pressed; SIO returns those buttons active-low. The four raw axis bytes are right X, right Y,
+left X and left Y, with 128 at centre. `analog_button` is a held 0/1 input; a rising edge toggles DualShock
+analog mode when the pad has not locked that button. `reserved0` must be zero.
 
-Zero the struct, set its `size`, then call `schway_set_input`. The snapshot takes effect at the next frame start,
-so input set during a frame cannot change a poll already in progress. Host input itself is outside save states;
-the latched pad and in-progress serial protocol are saved.
+The device identifiers are `NONE=0`, `DIGITAL=1`, `DUALSHOCK=2`, `MOUSE=3`, `NEGCON=4`, `JOGCON=5` and
+`DUAL_ANALOG_FLIGHT=6`. `multitap[2]` contains 0 or 1 per physical port. The appended
+`controllers[2][4]` array holds four sockets per port; each `schway_controller_input` is 24 bytes:
+
+| Field | Type and valid values |
+| --- | --- |
+| `device` | `uint32_t`, one of the device identifiers above |
+| `buttons` | `uint16_t`, set bits mean pressed |
+| `axes[4]` | four `uint8_t` values: right X/Y, left X/Y; centre is 128 |
+| `analog_button` | `uint8_t`, 0 released or 1 pressed |
+| `reserved0` | `uint8_t`, must be zero |
+| `mouse_dx`, `mouse_dy` | signed `int16_t`, range −32768 through 32767; zero means no movement |
+| `negcon_twist`, `negcon_i`, `negcon_ii`, `negcon_l` | four `uint8_t` controls |
+| `jogcon_dial` | `uint16_t` dial value |
+| `jogcon_flags` | `uint16_t`; only bits 0 (clockwise) and 1 (dial valid) are allowed |
+
+Public port and socket coordinates are one-based; the C arrays use zero-based indexes. The stable internal
+endpoint mapping is:
+
+| Internal endpoint | Public coordinates |
+| ---: | --- |
+| 0 | port 1, socket 1 |
+| 1 | port 2, socket 1 |
+| 2–4 | port 1, sockets 2–4 |
+| 5–7 | port 2, sockets 2–4 |
+
+With `multitap[port] == 0`, the legacy prefix supplies device, buttons, axes and analog-button input for socket 1;
+`controllers[port][0]` supplies only its appended special-controller controls. Sockets 2–4 are disconnected.
+With the tap enabled, the corresponding `controllers[port][0..3]` entries supply the full input for all four
+sockets and the legacy fields are ignored for that port. Zero is neutral for buttons, analog-button, mouse
+movement, NegCon controls, JogCon dial and JogCon flags; centred stick axes should be set to 128 by the host.
+
+Zero the struct, set its `size`, then call `schway_set_input`. A truncated caller provides only the bytes named
+by its size tag; absent appended fields are zero, and the setter never reads beyond that count. It validates the
+normalized snapshot before replacing the pending input. The snapshot takes effect at the next frame start, so
+input set during a frame cannot change a poll already in progress. Pending host input itself is outside save
+states; the eight latched endpoint states and in-progress serial protocol are saved.
 
 The appended `schway_run_result.lag` is 1 when no complete controller poll occurred in that frame; peeks do not
 count. `rumble[0]` and `rumble[1]` report each port as `large << 8 | small`, where large is 0–255 and small is
@@ -593,8 +630,10 @@ storage-transfer fields (a 32-bit address, length and progress capped at 128 byt
 transfer fields remain zero until their first caller is implemented; card bytes and generation counters stay with the
 receiving instance across state loads.
 It also records the host-supplied disc identity for validation; callback pointers and file handles stay outside the
-state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. Format-16 and
-format-17 states return `SCHWAY_STATUS_ERR_STATE_VERSION`. API v6 appends disc identity to the size-tagged descriptor;
+state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. Format 20 stores
+the frame-latched inputs and serial protocol state for eight controller endpoints, including multitap selection and
+the appended special-controller controls; pending host input remains outside the state. Format-16 through format-19
+states return `SCHWAY_STATUS_ERR_STATE_VERSION`. API v6 appends disc identity to the size-tagged descriptor;
 the behavior revision is 18 because PocketStation command behavior and serialized state fields changed.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:
@@ -633,11 +672,12 @@ an unknown one included, and never `NULL`.
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
 
-`SCHWAY_API_VERSION` is 8. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
+`SCHWAY_API_VERSION` is 9. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
 Version 3 added `SCHWAY_FAULT_DMA`; version 4 added read-only `schway_span` memory views, card loading and card
 generation queries, plus copied BIOS loading and SHA-256 reporting. Version 5 added the host-supplied disc and TOC
 callbacks, lid control, and disc swapping; version 6 appended disc identity; version 7 appended `disc_flags` to
-`schway_profile`. A program that switches on the fault kind should treat a value it does not
+`schway_profile`; version 8 appended the board selection; version 9 adds the size-bounded multitap and
+controller-endpoint input fields. A program that switches on the fault kind should treat a value it does not
 know as a fault it cannot name.
 
 ## The test card

@@ -222,14 +222,74 @@ static void expect_refused(const char *what, schway *inst, const uint8_t *b, siz
     }
 }
 
-/* Run to 30 and save, run to 60; load the save and run to 60 again: the
-   same frame and the same state. */
+static void seed_endpoint_inputs(schway *inst)
+{
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.size = (uint32_t)sizeof input;
+    input.multitap[0] = 1u;
+    input.multitap[1] = 1u;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = socket == 0u ? port : 2u + port * 3u + socket - 1u;
+            schway_controller_input *controller = &input.controllers[port][socket];
+            controller->device = endpoint % 7u;
+            controller->buttons = (uint16_t)(0x1020u + endpoint);
+            for (uint32_t axis = 0u; axis < 4u; axis++) {
+                controller->axes[axis] = (uint8_t)(30u + endpoint * 4u + axis);
+            }
+            controller->analog_button = (uint8_t)(endpoint & 1u);
+            controller->mouse_dx = (int16_t)((int32_t)endpoint - 4);
+            controller->mouse_dy = (int16_t)(4 - (int32_t)endpoint);
+            controller->negcon_twist = (uint8_t)(50u + endpoint);
+            controller->negcon_i = (uint8_t)(60u + endpoint);
+            controller->negcon_ii = (uint8_t)(70u + endpoint);
+            controller->negcon_l = (uint8_t)(80u + endpoint);
+            controller->jogcon_dial = (uint16_t)(1000u + endpoint);
+            controller->jogcon_flags = (uint16_t)(endpoint & 3u);
+        }
+    }
+    CHECK_EQ_U64(schway_set_input(inst, &input), SCHWAY_STATUS_OK);
+    schway__pad_frame_start(inst);
+}
+
+static void check_endpoint_inputs(const schway *inst)
+{
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = socket == 0u ? port : 2u + port * 3u + socket - 1u;
+            uint32_t device = endpoint % 7u;
+            CHECK_EQ_U64(inst->pad.device[endpoint], device);
+            CHECK_EQ_U64(inst->pad.present[endpoint], device != 0u ? 1u : 0u);
+            CHECK_EQ_HEX(inst->pad.buttons[endpoint], (uint16_t)~(0x1020u + endpoint));
+            for (uint32_t axis = 0u; axis < 4u; axis++) {
+                CHECK_EQ_U64(inst->pad.axes[endpoint * 4u + axis],
+                             30u + endpoint * 4u + axis);
+            }
+            CHECK_EQ_U64(inst->pad.analog_button[endpoint], endpoint & 1u);
+            CHECK_EQ_U64(inst->pad.mouse_dx[endpoint], 32764u + endpoint);
+            CHECK_EQ_U64(inst->pad.mouse_dy[endpoint], 32772u - endpoint);
+            CHECK_EQ_U64(inst->pad.negcon_twist[endpoint], 50u + endpoint);
+            CHECK_EQ_U64(inst->pad.negcon_i[endpoint], 60u + endpoint);
+            CHECK_EQ_U64(inst->pad.negcon_ii[endpoint], 70u + endpoint);
+            CHECK_EQ_U64(inst->pad.negcon_l[endpoint], 80u + endpoint);
+            CHECK_EQ_U64(inst->pad.jogcon_dial[endpoint], 1000u + endpoint);
+            CHECK_EQ_U64(inst->pad.jogcon_flags[endpoint], endpoint & 3u);
+        }
+    }
+    CHECK_EQ_U64(inst->pad.multitap[0], 1u);
+    CHECK_EQ_U64(inst->pad.multitap[1], 1u);
+}
+
+/* Run to 30 and save endpoint input, run to 60; load the save and run to 60
+   again: the same frame, endpoint state and serialized bytes. */
 static void test_round_trip(void)
 {
     static const uint32_t regions[] = {SCHWAY_REGION_NTSC_U, SCHWAY_REGION_PAL};
     for (size_t k = 0; k < 2u; k++) {
         schway *inst = make(regions[k]);
         run_to(inst, 30);
+        seed_endpoint_inputs(inst);
         size_t n = save(inst, good);
         run_to(inst, 60);
         uint64_t h1 = frame_hash(inst);
@@ -237,6 +297,7 @@ static void test_round_trip(void)
         CHECK_EQ_U64(m, n);
         CHECK_EQ_U64(schway_load_state(inst, good, n), SCHWAY_STATUS_OK);
         CHECK_EQ_U64(inst->frame, 30);
+        check_endpoint_inputs(inst);
         run_to(inst, 60);
         uint64_t h2 = frame_hash(inst);
         CHECK_EQ_HEX(h1, h2);
@@ -245,6 +306,7 @@ static void test_round_trip(void)
         /* And into a second instance of the same region. */
         schway *other = make(regions[k]);
         CHECK_EQ_U64(schway_load_state(other, good, n), SCHWAY_STATUS_OK);
+        check_endpoint_inputs(other);
         run_to(other, 60);
         CHECK_EQ_HEX(frame_hash(other), h1);
         schway_destroy(other);
@@ -388,7 +450,7 @@ static void test_rejects(void)
     expect_refused("format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
-    put_le(bad + H_FORMAT, 18u, 4u);
+    put_le(bad + H_FORMAT, 19u, 4u);
     expect_refused("previous format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
@@ -1476,8 +1538,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 19u);
-    CHECK_EQ_U64(v.behaviour_revision, 19u);
+    CHECK_EQ_U64(v.state_format, 20u);
+    CHECK_EQ_U64(v.behaviour_revision, 20u);
 }
 
 static void check_cpu_power_on(schway *inst)
