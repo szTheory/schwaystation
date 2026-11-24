@@ -1,9 +1,10 @@
 # Serial I/O and digital pads
 
 SIO0 is the console's serial port for controllers and memory cards. The core models the SIO0 registers, an
-eight-byte receive FIFO, scheduled byte completion, two controller ports with independently enabled multitaps,
-and one memory card per port. SIO1 is outside this module. Card Read (52h), GetID (53h), and Write (57h) are
-supported.
+eight-byte receive FIFO, scheduled byte completion, and two controller ports with independently enabled
+multitaps. Each enabled tap exposes four controller sockets and four memory-card sockets, for up to eight card
+endpoints total. With a tap disabled, the existing `81h` card address selects socket A on that port. SIO1 is
+outside this module. Card Read (52h), GetID (53h), and Write (57h) are supported.
 
 ## Digital poll
 
@@ -105,10 +106,11 @@ of the address and data, and `47`. The final `47` byte has no ACK. An address ab
 ends the transaction. GetID returns the Sony-card reply `5A 5D 5C 5D 04 00 00 80` after the flag. Other commands
 abort without changing card bytes.
 
-Both slots own separate 131,072-byte raw spans. A new instance starts with formatted blank cards and flag `08`;
-before execution the host can import a raw image up to 131,072 bytes, padded with `FFh` when shorter. Card bytes
-and their generation counters are outside ordinary save states, while the in-flight SIO/card protocol state is
-saved so a pending transfer can resume.
+All eight port/socket endpoints own separate 131,072-byte raw spans. When a port's tap is enabled, addresses
+`81h`–`84h` select sockets A–D; with the tap disabled, the existing `81h` address selects socket A. A new
+instance starts with formatted blank cards and flag `08`; before execution the host can import a raw image up to
+131,072 bytes, padded with `FFh` when shorter. Card bytes and their generation counters are outside ordinary save
+states, while the in-flight SIO/card protocol state is saved so a pending transfer can resume.
 
 Write (57h) stages the addressed sector and its checksum while the old raw span remains visible. The final
 successful `47` response copies all 128 bytes at once, increments that slot's generation once, and clears the
