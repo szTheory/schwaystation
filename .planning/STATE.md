@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 9
+current_plan: 10
 status: executing
-stopped_at: Completed 14-08-PLAN.md
-last_updated: "2026-11-24T07:12:01.408Z"
+stopped_at: Completed 14-09-PLAN.md
+last_updated: "2026-11-24T08:18:54.318Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-08 complete; Codex GSD executor configured gpt-6-luna xhigh; two tasks, three task commits, 16m21s wall time; all eight stable card paths and atomic save-isolation vectors passed; focused card-files selection passed 5/5; next Plan 14-09
-state_head: 68e1c43dadbc9ea710f926f759a83636dc324a65
+last_activity_desc: Phase 14 Plan 14-09 complete; configured gpt-6-luna xhigh; two tasks, three task commits, 60m42s wall time; runner card selectors passed 3/3 and the final multitap selector passed 1/1; Plan 14-10 next
+state_head: cc3d2d808d22b85fdccbcfd073c55b8df40a117a
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 91
-  completed_plans: 87
+  completed_plans: 88
   percent: 70
 ---
 
@@ -26,16 +26,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-08 complete; Plan 14-09 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-09 complete; Plan 14-10 next)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 9
+Current Plan: 10
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-08 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); two tasks, three task commits, 16m21s wall time; focused card-files selection passed 5/5
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 8/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-09 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); two tasks, three task commits, 60m42s wall time; focused runner card selectors passed 3/3 and final multitap selector passed 1/1
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 9/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-09 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured
+wall interval was 60m42s (07:13:54–08:14:36 UTC); active time was not separately measured. Two tasks produced
+three task commits: `ae0311f` (eight-socket RED), `1f14811` (runner card lifecycle), and `cc3d2d8` (independent
+tap flags, docs and focused target correction). The explicit 30-minute split bound was exceeded; execution was
+kept within Plan 14-09 and recorded transparently.
+
+Before configure/build, the runner inventory sorted cleanly, `git diff --check` passed, and CTest selector
+preflights found the three card selectors. The eight-socket RED exited 8 on the missing port 1/socket B file;
+the JUnit evidence classified `RED_EVIDENCE_OK`. A typed card-byte view resolved the strict compile error in the
+test hook. The focused trio passed 3/3 in 14.39 seconds (multitap 1.37s, controls 0.42s, persistence 14.33s).
+After the final help assertions, the hook target rebuilt and multitap passed 1/1 in 0.55s. The pre-registered
+selector used `schwaystation-test-run-stop`, omitted from the plan's original build list; the plan was corrected
+to build that target. No workflow wiring changed, so no broad suite, Act or hosted CI run was needed. No Docker
+resources were created. Plan 14-10 is next.
 
 ### Phase 14 Plan 14-08 execution (2026-11-24)
 
@@ -1484,6 +1501,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P06 | 19m09s | 2 tasks | 5 files |
 | Phase 14 P07 | 26m10s | 2 tasks | 7 files |
 | Phase 14 P08 | 16m21s | 2 tasks | 5 files |
+| Phase 14 P09 | 61m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1949,6 +1967,8 @@ Recent decisions affecting current work:
 - [Phase 14]: Plan 14-07: cross-validate candidate pad, SIO and card protocol states before apply; preserve receiver-owned card media across restore. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 26m10s.
 - [Phase 14]: Scope legacy disc fixture prerequisites to their actual CTest consumers — The shared-directory TESTS property had added legacy setup/parity tests to unrelated focused selectors. Keep both fixture tests in the full inventory and retain dependencies on consumers; local configure and selector checks confirm unrelated state checks run alone while ECM guest and runner legacy checks still pull both prerequisites.
 - [Phase 14]: Plan 14-08: preserve A card filename aliases and map all eight stable port/socket suffixes; reject invalid or undersized paths atomically. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 16m21s.
+- [Phase 14]: Runner card persistence enumerates all eight physical port/socket identities and flushes only changed generations.
+- [Phase 14]: Per-port multitap options default off and are reapplied after each movie snapshot before frame latching.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2199,8 +2219,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T07:12:01.144Z
-Stopped at: Completed 14-08-PLAN.md
+Last session: 2026-11-24T08:16:52.085Z
+Stopped at: Completed 14-09-PLAN.md
 Resume file: None
 
 ### v1.0 session history
