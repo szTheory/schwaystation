@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: Not started
+current_plan: 2
 status: executing
-stopped_at: Phase 14 planning complete; runtime Codex; planner gpt-6.1-sol high; checker gpt-6-luna xhigh; primary model ID unavailable
-last_updated: "2026-11-24T03:04:44.568Z"
+stopped_at: Completed 14-01-PLAN.md; runtime Codex GSD; model gpt-6-luna xhigh; wall interval about 12m from plan commit checkpoint, executor start not separately captured
+last_updated: "2026-11-24T03:20:01.009Z"
 last_activity: 2026-11-23
-last_activity_desc: Phase 14 discuss complete; Codex GSD configured gpt-6-luna xhigh (primary model ID unavailable); three scout lenses synthesized
-state_head: df53134dc9aeb830d855ad488a0bbc8cc371309a
+last_activity_desc: Phase 14 Plan 14-01 complete; Codex GSD executor configured gpt-6-luna xhigh; three task commits; next Plan 14-02
+state_head: 150344e12a7c0526dfffd8e096d9dc5900041403
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 91
-  completed_plans: 79
+  completed_plans: 80
   percent: 70
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (discussion complete; planning next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-01 complete; Plan 14-02 next)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: Not started
+Current Plan: 2
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-23 — Phase 14 discuss complete; Codex GSD configured gpt-6-luna xhigh (primary model ID unavailable); three scout lenses synthesized
+Last activity: 2026-11-23 — Phase 14 Plan 14-01 complete; Codex GSD executor configured gpt-6-luna xhigh (primary runtime model ID unavailable); three task commits
 Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 context gathered and planning next. Phase 7–11 verification digests will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
@@ -1383,6 +1383,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 13 P05 | not tracked | 2 tasks | 11 files |
 | Phase 13 P06 | not reliably tracked | 2 tasks | 7 files |
 | Phase 13 P07 | not reliably tracked | 2 tasks | 8 files |
+| Phase 14 P01 | 12m | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -1829,6 +1830,8 @@ Recent decisions affecting current work:
 - [Phase 13]: Machine and region remain independent options applied at content load; auto region identity uses the shared host resolver.
 - [Phase 13]: Full BIOS boot remains the default; only the explicit fast-boot profile flag enables the shell handoff.
 - [Phase 13]: State format and behavior revision remain 19 because profile flags were already serialized and default behavior is unchanged.
+- [Phase 14]: Keep the released 28-byte caller layout fixed while testing it against the current API.
+- [Phase 14]: Register future peripheral tests as gating selectors and leave their behavior to the owning plans.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2079,9 +2082,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T03:04:44.356Z
-Stopped at: Phase 14 planning complete; runtime Codex; planner gpt-6.1-sol high; checker gpt-6-luna xhigh; primary model ID unavailable
-Resume file: .planning/phases/14-multitap-and-special-controllers/14-01-PLAN.md
+Last session: 2026-11-24T03:19:40.800Z
+Stopped at: Completed 14-01-PLAN.md; runtime Codex GSD; model gpt-6-luna xhigh; wall interval about 12m from plan commit checkpoint, executor start not separately captured
+Resume file: Phase 14 Plan 14-02
 
 ### v1.0 session history
 
