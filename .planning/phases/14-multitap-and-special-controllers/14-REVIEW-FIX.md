@@ -1,15 +1,51 @@
 ---
 phase: 14-multitap-and-special-controllers
-fixed_at: 2026-11-24T13:25:02Z
+fixed_at: 2026-11-24T13:45:20Z
 review_path: .planning/phases/14-multitap-and-special-controllers/14-REVIEW.md
-iteration: 1
-findings_in_scope: 4
-fixed: 4
+iteration: 2
+findings_in_scope: 2
+fixed: 2
 skipped: 0
 status: all_fixed
 ---
 
 # Phase 14: Code Review Fix Report
+
+## Iteration 2
+
+- **Fixed at:** 2026-11-24T13:45:20Z
+- **Source review:** `.planning/phases/14-multitap-and-special-controllers/14-REVIEW.md`
+- **Iteration:** 2
+
+**Summary:**
+- Findings in scope: 2
+- Fixed: 2
+- Skipped: 0
+
+### CR-03: Short-reply terminal index is a reachable save state
+
+- **Files modified:** `src/sio.c`, `tests/core/test_state.c`
+- **Commit:** `0bcefc2`
+- **Applied fix:** State validation accepts the short-reply terminal-pending index 3 and still rejects index 4. The state test drives a real slot-A/long/short transfer, saves the index-3 state with its checksum, loads it into another instance, checks byte-for-byte serialization, and resumes with the terminal ID byte.
+
+### WR-03: Runner card naming description covers all socket paths
+
+- **Files modified:** `docs/runner.md`
+- **Commit:** `d46d644`
+- **Applied fix:** Clarified that `--memcard-names serial` selects the shared basename used by all eight card socket paths and resolves the title serial from an executable or first disc member.
+
+## Verification (Iteration 2)
+
+Verification ran in the main checkout because `.planning/config.json` sets `workflow.use_worktrees` to `false`. All commands ran from the repository root. No state-size or quality metric files changed.
+
+- `git diff --check` — exit 0.
+- `cmake --preset ci` — exit 0.
+- `set -o pipefail && ctest --preset ci --show-only=json-v1 -R '^(core[.]state[.]rejects|sio[.]tap[.]history_edges|runner[.]cards[.](persistence|multitap))$' | python3 -c 'import json,sys; actual={t["name"] for t in json.load(sys.stdin)["tests"]}; required={"core.state.rejects","sio.tap.history_edges","runner.cards.persistence","runner.cards.multitap"}; print("enumerated:", ", ".join(sorted(actual))); missing=required-actual; print("missing:", ", ".join(sorted(missing))); sys.exit(bool(missing))'` — exit 0; all four selectors were present.
+- `cmake --build --preset ci --target schwaystation-test-state schwaystation-test-sio schwaystation-run` — exit 0.
+- `ctest --preset ci --no-tests=error -R '^(core[.]state[.]rejects|sio[.]tap[.]history_edges|runner[.]cards[.](persistence|multitap))$' --output-on-failure` — first run exit 8 because the new test expected short mode to populate `tap_tx_command`; that field is zero in this mode. After correcting the test expectation, the same command exited 0 and all four targeted tests passed.
+- No aggregate workflow or hosted run was requested, so there is no run URL.
+
+## Iteration 1 (historical)
 
 - **Fixed at:** 2026-11-24T13:25:02Z
 - **Source review:** `.planning/phases/14-multitap-and-special-controllers/14-REVIEW.md`
@@ -20,7 +56,7 @@ status: all_fixed
 - Fixed: 4
 - Skipped: 0
 
-## Fixed Issues
+## Iteration 1 Fixed Issues
 
 ### CR-01: Accepted multitap state can reach an out-of-range shift
 
@@ -46,7 +82,7 @@ status: all_fixed
 - **Commit:** `ea7ab0b`
 - **Applied fix:** Updated `--save-dir` to describe loading and saving all eight card sockets.
 
-## Verification
+## Verification (Iteration 1)
 
 Verification ran in the main checkout because `workflow.use_worktrees` is `false`. No isolated worktree was created. All commands ran from the repository root; no hosted run was requested, so there is no run URL.
 
@@ -68,6 +104,6 @@ None.
 
 ---
 
-- _Fixed: 2026-11-24T13:25:02Z_
+- _Iteration 1 fixed: 2026-11-24T13:25:02Z_
 - _Fixer: the agent (gsd-code-fixer)_
 - _Iteration: 1_
