@@ -73,7 +73,7 @@ run; Plan 16 owns the final reviewed-head aggregate verification.
 ### Phase 14 Plan 14-15 execution (2026-11-24)
 
 Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall duration
-was 12m, starting at 12:06:17Z. Task commit `a05c691` records the compatibility rows and independent ratchet
+was 13m, starting at 12:06:17Z. Task commit `a05c691` records the compatibility rows and independent ratchet
 expectations.
 
 The feature data rows passed the byte-sort, field-count, duplicate-key and compatibility-schema preflights. The
@@ -1598,7 +1598,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P12 | 24m | 1 tasks | 3 files |
 | Phase 14 P13 | 20m | 1 tasks | 2 files |
 | Phase 14 P14 | 32m22s | 1 tasks | 3 files |
-| Phase 14 P15 | 12m | 1 tasks | 3 files |
+| Phase 14 P15 | 13m | 1 tasks | 3 files |
 
 ## Accumulated Context
 
