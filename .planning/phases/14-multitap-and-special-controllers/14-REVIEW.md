@@ -1,10 +1,11 @@
 ---
 phase: 14-multitap-and-special-controllers
-reviewed: 2026-11-24T13:48:11Z
+reviewed: 2026-11-24T15:33:36Z
 depth: standard
-files_reviewed: 3
+files_reviewed: 4
 files_reviewed_list:
   - docs/runner.md
+  - src/pad.c
   - src/sio.c
   - tests/core/test_state.c
 findings:
@@ -18,18 +19,25 @@ status: clean
 
 # Phase 14: Code Review Report
 
-**Reviewed:** 2026-11-24T13:48:11Z
+**Reviewed:** 2026-11-24T15:33:36Z
 **Depth:** standard
-**Files Reviewed:** 3 (incremental scope since `cae3772`)
+**Files Reviewed:** 4 (the three-file incremental scope since `cae3772`, plus the GCC ABI gate follow-up in `src/pad.c`)
 **Status:** clean
 
 ## Summary
 
-This standard-depth re-review covered `docs/runner.md`, `src/sio.c`, and `tests/core/test_state.c`, the usable file list from the evaluation-scope resolver. The resolver returned `degraded` with reason `no-task-commits-since`; all three files were present and matched the requested scope. The short-reply state at index 3 is now accepted and resumes with the terminal slot ID, while index 4 is rejected. The per-mode transaction bounds still cap all indices used to derive long-reply socket shifts. The runner documentation accurately describes one selected basename across all eight socket paths. No issues remain in this scope. No tests were run during this static re-review; [14-REVIEW-FIX.md](14-REVIEW-FIX.md) records the targeted tests run for iteration 2.
+The standard-depth review covered `docs/runner.md`, `src/sio.c`, and `tests/core/test_state.c`, the usable file list from the evaluation-scope resolver. The resolver returned `degraded` with reason `no-task-commits-since`; all three files were present and matched the requested scope. The short-reply state at index 3 is now accepted and resumes with the terminal slot ID, while index 4 is rejected. The per-mode transaction bounds still cap all indices used to derive long-reply socket shifts. The runner documentation accurately describes one selected basename across all eight socket paths. The follow-up review also covered `src/pad.c` after hosted GCC reported `d name_watchdogs` in the ABI globals gate. No issues remain in either scope. No tests were run during the static reviews; [14-REVIEW-FIX.md](14-REVIEW-FIX.md) records the targeted tests run for iteration 2.
 
 ## Narrative Findings (AI reviewer)
 
 All reviewed files meet quality standards. No issues found.
+
+### GCC ABI gate follow-up (2026-11-24T15:33:36Z)
+
+Reviewed the `name_watchdogs` representation in `src/pad.c` after hosted GCC classified the pointer table as writable
+data. The fixed-width constant character rows preserve all eight endpoint names, their NUL terminators and the existing
+endpoint-indexed lookups. The array width derives from the `"pad.watchdog0"` literal, so each entry fits without
+truncation. No correctness, security or maintainability issue found.
 
 ## Historical Review Record
 
@@ -103,7 +111,7 @@ The fix report records `git diff --check`, CI configure/build, and the selected 
 
 ---
 
-_Reviewed: 2026-11-24T13:48:11Z_
+_Reviewed: 2026-11-24T15:33:36Z_
 
 _Reviewer: the agent (gsd-code-reviewer)_
 

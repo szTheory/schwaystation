@@ -6,11 +6,11 @@ current_phase: 15
 current_phase_name: GunCon and Justifier
 current_plan: Not started
 status: planning
-stopped_at: Phase 14 verified; repaired head ready for hosted CI and ship
-last_updated: "2026-11-24T15:23:04Z"
+stopped_at: Phase 14 verification refreshed; final local candidate ready for hosted CI and ship
+last_updated: "2026-11-24T15:40:57Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 GCC fixes and producer-backed quality pins pass the full local workflow; final hosted retry pending
-state_head: e60fb17fa2a98b4d114efed8700ead800862b160
+last_activity_desc: Phase 14 GCC ABI follow-up passes review, Linux preflight and full local workflow; final hosted retry pending
+state_head: 2ab13f4e0d44f1ddb4fd9c31f7ddb2804c19b074
 progress:
   total_phases: 10
   completed_phases: 8
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — corrected source and exact quality pins pass the full local workflow; PR #42 needs a green final-head hosted run and release before Phase 15 planning
+**Current focus:** Phase 14 — final candidate `2ab13f4` passes local review and verification; PR #42 needs final-head hosted CI and release before Phase 15 planning
 
 ## Current Position
 
@@ -120,6 +120,30 @@ campaign budget. Main CI route checks passed in about 8 seconds and required lan
 and exact-pin failures were canceled at 210 seconds. GitHub exposed no per-job billing times for that canceled run. No
 workflow wiring changed; direct GCC builds and focused CTests already exercised the fixes, so `act` would not add job-step
 coverage. The repaired final head still needs Main CI and Nightly before Phase 14 ship.
+
+### Phase 14 final GCC ABI gate correction (2026-11-24)
+
+Runtime/model: Codex with GSD code-reviewer and gsd-verifier `gpt-6-luna` xhigh; primary runtime model ID unavailable.
+The final-head retry on PR #42 initially pointed to commit `de5e368`. Both no-FP Linux jobs failed the same early
+`abi.globals` test: GCC's ELF archive classified the static `const char *` watchdog-name table as local writable
+relocation data (`d name_watchdogs`). The table contains immutable names, but its pointer representation made the ABI
+gate reject it. `src/pad.c` now stores the same eight NUL-terminated names in fixed-width constant character rows,
+preserving their endpoint indexing and serialized state keys. A focused GCC 13 Linux C17 compile with
+`-mgeneral-regs-only` and GNU `nm -P` exited 0 and reported `name_watchdogs r` (read-only data). Independent code review
+found no issue.
+
+The obsolete Main CI run [45425051636](https://github.com/szTheory/schwaystation/actions/runs/45425051636) was canceled
+after 219 seconds wall time once both no-FP failures were confirmed. Nightly [45425051737](https://github.com/szTheory/schwaystation/actions/runs/45425051737)
+was canceled after 189 seconds; its fuzz job reached the campaign step, which was stopped 21 seconds after starting.
+GitHub's timing endpoint returned zero per-job milliseconds for both canceled runs, so no billed runner-minute savings
+are claimed. The quick route and source preflights passed; workflow wiring was unchanged and local GNU nm plus GCC
+directly reproduced the failing ABI condition, so `act` offered no additional coverage for this source-only correction.
+
+After the correction, `cmake --workflow --preset ci` exited 0: 705/705 CTest tests passed in 73.01 seconds, all three
+macOS arm64 packages were produced, and the CI release checks passed 8/8 in 1.47 seconds. The Phase 14 code review is
+clean, all 49 goal-backward truths and four roadmap criteria remain verified, and the Phase 14 verification digest is
+refreshed at `2ab13f4`. This final local candidate still needs to be pushed to PR #42 and pass hosted Main CI and Nightly
+before ship. No Docker resource remains; the GCC preflight container used `--rm`.
 
 ### Phase 14 tail planning split (2026-11-24)
 

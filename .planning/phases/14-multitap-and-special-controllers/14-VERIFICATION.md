@@ -1,6 +1,6 @@
 ---
 phase: multitap-and-special-controllers
-verified: 2026-11-24T15:18:34Z
+verified: 2026-11-24T15:37:18Z
 status: passed
 score: 49/49 must-haves verified
 covered_files:
@@ -81,7 +81,7 @@ covered_files:
   - tests/sio/pad_tests.c
   - tests/sio/sio_tests.c
   - tests/sio/tests.cmake
-covered_digest: "v4:sha256:43da238df8e0028ca04512cbf7c25f000c05c3a92b49e4f6cbb5af795b8aba9a"
+covered_digest: "v4:sha256:e85bbebac205002dc9f9c28a96864d6f3baf908b288924856276c39c2a8b602d"
 behavior_unverified: 0
 overrides_applied: 0
 ---
@@ -89,9 +89,9 @@ overrides_applied: 0
 # Phase 14: Multitap and Special Controllers Verification Report
 
 **Phase Goal:** Players can use the multitap on either port and use the PlayStation mouse, neGcon, Jogcon and Dual Analog flight mode.
-**Verified:** 2026-11-24 15:18:34 UTC
+**Verified:** 2026-11-24 15:37:18 UTC
 **Status:** passed
-**Re-verification:** Yes — targeted follow-up for the GCC state-serialization portability correction.
+**Re-verification:** Yes — follow-up for the GCC ABI globals failure on the watchdog-name table representation.
 
 ## Goal Achievement
 
@@ -185,7 +185,7 @@ The built-in `verify.key-links` heuristic found 1/30 declared plan links and rep
 
 | Behavior | Command | Result | Status |
 |---|---|---|---|
-| Integrated controller/card/API/runner/libretro behavior | `cmake --workflow --preset ci` after both GCC fixes and measured quality-pin updates | Exit 0; 705/705 CTest tests passed in 69.07 seconds; all three macOS arm64 packages produced; release checks passed 8/8 | ✓ PASS |
+| Integrated controller/card/API/runner/libretro behavior | `cmake --workflow --preset ci` after the GCC watchdog-table correction | Exit 0; 705/705 CTest tests passed in 73.01 seconds; all three macOS arm64 packages produced; release checks passed 8/8 in 1.47 seconds | ✓ PASS |
 | Release artifact validation | Workflow CI release-test step | Exit 0; 8/8 release checks passed | ✓ PASS |
 | API v9 and endpoint input mapping | `abi.api_v9`, `libretro.input.special`, `libretro.input.multitap` in final workflow | Included in 705/705 pass | ✓ PASS |
 | Multitap serial/card/persistence | `sio.tap.*`, `card.tap.*`, `runner.cards.multitap`, `libretro.cards.multitap` in final workflow | Included in 705/705 pass | ✓ PASS |
@@ -194,10 +194,13 @@ The built-in `verify.key-links` heuristic found 1/30 declared plan links and rep
 | GCC portability and multitap state follow-up | Linux GCC 15.2 configure/build of `schwaystation_sio` with warnings-as-errors; focused `core.state.*` and `sio.tap.*` CTest selectors | Exit 0; the SIO object compiled and all four selected tests passed in 2.07 seconds on the corrected source | ✓ PASS |
 | GCC C17 libretro card-path compatibility | Linux GCC 15.2 no-FP configure/build of `schwaystation_libretro` with warnings-as-errors | Exit 0 after passing a temporary array of `const char *` views to the synchronous loader | ✓ PASS |
 | Libretro card-path behavior | Build `schwaystation-test-libretro-host`; CTest selectors `libretro.cards.persistence`, `libretro.cards.controls`, `libretro.cards.multitap`, and `libretro.input.multitap` | Exit 0; all four tests passed in 5.16 seconds | ✓ PASS |
+| GCC no-FP ABI data classification | GCC 13 C17 compile of `src/pad.c` with `-mgeneral-regs-only`, then GNU `nm -P` for `name_watchdogs` | Exit 0; `name_watchdogs r 300 70` confirms the fixed-width constant string table is emitted as read-only data. The task-named `--rm` container was removed automatically. | ✓ PASS |
 | Hosted WASI module size | `wasm32` job’s linked-module producer on PR run 45420382438 | Measured 947,976 bytes; the old 923,753-byte exact pin rejected the measured value, so the floor/ceiling now track 947,976 | ✓ VERIFIED |
 | Hosted Cachegrind instructions | `perf` job’s instructions-per-frame producer on PR run 45420382438 | Measured testcard 1,620,101 and GPU motion 138,319,540 Ir/frame; both relative comparisons passed, old exact pins rejected them, and the updated pins match | ✓ VERIFIED |
 
-The hosted GCC build found undefined pointer arithmetic when the state serializer treated the first inner `[4]` array as an eight-byte object. The storage is now a flat eight-byte array, with a separate `port * 4 + socket` index preserving the original serialized slot order and per-port reset range. The no-FP retry exposed a second C17 issue: a mutable 2D path array could not be passed to a nested `const` array pointer under `-Wpedantic`. The helper now receives a temporary array of `const char *` views. Focused source review confirmed both corrections. The exact WASI and Cachegrind producers then reported values above the old exact pins; the pins now record those exact results, with the relative performance limit unchanged. The repaired source and updated pins pass the full local workflow; a successful repaired-head hosted workflow is still required before ship.
+The hosted GCC build found undefined pointer arithmetic when the state serializer treated the first inner `[4]` array as an eight-byte object. The storage is now a flat eight-byte array, with a separate `port * 4 + socket` index preserving the original serialized slot order and per-port reset range. The next no-FP run exposed a C17 issue: a mutable 2D path array could not be passed to a nested `const` array pointer under `-Wpedantic`. The helper now receives a temporary array of `const char *` views. The exact WASI and Cachegrind producers then reported values above the old exact pins; `quality.json` now records those exact results and preserves the relative regression limit.
+
+The following final-head attempt, PR run [45425051636](https://github.com/szTheory/schwaystation/actions/runs/45425051636), failed both no-FP Linux lanes in `abi.globals` on the local symbol `d name_watchdogs`. The prior `static const char *const` table was semantically constant, but its relocations caused GNU `nm` to classify the archive entry as data. The table is now fixed-width `const char` rows, preserving all eight names, indices and NUL terminators. A focused GCC 13 compile with the no-FP flag and `nm -P` reports `name_watchdogs r`; the independent source review found no behavior change. PR run [45425051636](https://github.com/szTheory/schwaystation/actions/runs/45425051636) was canceled after 219 seconds and Nightly run [45425051737](https://github.com/szTheory/schwaystation/actions/runs/45425051737) after 189 seconds once the shared cause was confirmed. GitHub's timing API returned zero per-job milliseconds for both canceled runs, so no runner-time or billing savings are claimed. The latest local workflow after this correction passed 705/705 CTest cases, produced all three macOS arm64 packages and passed release checks 8/8. This final source candidate has not yet had hosted CI; a green PR-head CI and Nightly run remain required before ship and Phase 15.
 
 ## Probe Execution
 
@@ -240,5 +243,5 @@ N/A — no visual UI or owner-hardware-only acceptance criterion exists. The lib
 
 ---
 
-_Verified: 2026-11-24 15:18:34 UTC_
+_Verified: 2026-11-24 15:37:18 UTC_
 _Verifier: Codex; the initial goal-backward verification was produced by gsd-verifier._
