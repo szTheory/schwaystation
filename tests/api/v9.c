@@ -57,6 +57,13 @@ typedef struct observed_input {
     uint32_t saw_devices;
 } observed_input;
 
+typedef struct observed_card_state {
+    char names[160][96];
+    uint32_t count;
+    uint32_t duplicate;
+    uint32_t phase_seen[8];
+} observed_card_state;
+
 static void *test_alloc(void *user, size_t size)
 {
     (void)user;
@@ -84,6 +91,157 @@ static void observe_input(void *user, const char *name, const void *data,
         memcpy(observed->devices, data, sizeof observed->devices);
         observed->saw_devices = 1u;
     }
+}
+
+static void observe_card_state(void *user, const char *name, const void *data,
+                               uint32_t count, uint32_t width)
+{
+    observed_card_state *observed = (observed_card_state *)user;
+    static const char *const phase_names[8] = {
+        "card.slot1.phase", "card.port1.socketB.phase", "card.port1.socketC.phase",
+        "card.port1.socketD.phase", "card.slot2.phase", "card.port2.socketB.phase",
+        "card.port2.socketC.phase", "card.port2.socketD.phase"
+    };
+    (void)data;
+    if (strncmp(name, "card.", 5u) != 0) {
+        return;
+    }
+    if (observed->count < 160u) {
+        for (uint32_t i = 0u; i < observed->count; i++) {
+            if (strcmp(observed->names[i], name) == 0) {
+                observed->duplicate = 1u;
+            }
+        }
+        size_t length = strlen(name);
+        if (length < sizeof observed->names[0]) {
+            memcpy(observed->names[observed->count], name, length + 1u);
+            observed->count++;
+        } else {
+            observed->duplicate = 1u;
+        }
+    } else {
+        observed->duplicate = 1u;
+    }
+    if (count == 1u && width == 4u) {
+        for (uint32_t i = 0u; i < 8u; i++) {
+            if (strcmp(name, phase_names[i]) == 0) {
+                observed->phase_seen[i] = 1u;
+            }
+        }
+    }
+}
+
+static int check_card_socket_api(schway *inst)
+{
+    uint32_t failures = 0u;
+    uint32_t endpoint = 0u;
+    uint32_t loads_ok = 0u;
+    uint32_t gets_ok = 0u;
+    uint32_t generations_ok = 0u;
+    schway_span spans[8];
+    uint8_t inputs[8][2];
+    memset(spans, 0, sizeof spans);
+    memset(inputs, 0, sizeof inputs);
+    for (uint32_t port = SCHWAY_CARD_PORT_1; port <= SCHWAY_CARD_PORT_2; port++) {
+        for (uint32_t socket = SCHWAY_CARD_SOCKET_A; socket <= SCHWAY_CARD_SOCKET_D; socket++) {
+            inputs[endpoint][0] = (uint8_t)(0x31u + endpoint);
+            inputs[endpoint][1] = (uint8_t)(0xA0u + endpoint);
+            if (schway_load_memcard_socket(inst, port, socket, inputs[endpoint],
+                                           sizeof inputs[endpoint]) == SCHWAY_STATUS_OK) {
+                loads_ok++;
+            } else {
+                failures++;
+            }
+            if (schway_get_memcard(inst, port, socket, &spans[endpoint]) == SCHWAY_STATUS_OK) {
+                gets_ok++;
+                if (spans[endpoint].size != SCHWAY_MEMCARD_SIZE ||
+                    ((const uint8_t *)spans[endpoint].data)[0] != inputs[endpoint][0] ||
+                    ((const uint8_t *)spans[endpoint].data)[1] != inputs[endpoint][1] ||
+                    ((const uint8_t *)spans[endpoint].data)[2] != 0xFFu) {
+                    failures++;
+                }
+            } else {
+                failures++;
+            }
+            uint64_t generation = UINT64_MAX;
+            if (schway_memcard_socket_generation(inst, port, socket, &generation) !=
+                    SCHWAY_STATUS_OK || generation != 0u) {
+                failures++;
+            } else {
+                generations_ok++;
+            }
+            endpoint++;
+        }
+    }
+    for (uint32_t i = 0u; i < 8u; i++) {
+        for (uint32_t j = i + 1u; j < 8u; j++) {
+            if (spans[i].data != NULL && spans[i].data == spans[j].data &&
+                inputs[i][0] != inputs[j][0]) {
+                failures++;
+            }
+        }
+    }
+    schway_span legacy;
+    if (schway_get_memory(inst, SCHWAY_MEMORY_CARD1, &legacy) != SCHWAY_STATUS_OK ||
+        legacy.data != spans[0].data || legacy.size != spans[0].size) {
+        failures++;
+    }
+    if (schway_get_memory(inst, SCHWAY_MEMORY_CARD2, &legacy) != SCHWAY_STATUS_OK ||
+        legacy.data != spans[4].data || legacy.size != spans[4].size) {
+        failures++;
+    }
+    schway_span untouched = {inputs[0], 19u};
+    if (schway_get_memcard(inst, 0u, SCHWAY_CARD_SOCKET_A, &untouched) !=
+            SCHWAY_STATUS_ERR_ARGUMENT || untouched.data != inputs[0] || untouched.size != 19u) {
+        failures++;
+    }
+    if (schway_get_memcard(inst, SCHWAY_CARD_PORT_1, 0u, &untouched) !=
+            SCHWAY_STATUS_ERR_ARGUMENT || untouched.data != inputs[0] || untouched.size != 19u) {
+        failures++;
+    }
+    observed_card_state state;
+    memset(&state, 0, sizeof state);
+    if (schway_state_visit(inst, observe_card_state, &state) != SCHWAY_STATUS_OK ||
+        state.count != 136u || state.duplicate != 0u) {
+        failures++;
+    }
+    for (uint32_t i = 0u; i < 8u; i++) {
+        failures += state.phase_seen[i] == 1u ? 0u : 1u;
+    }
+    uint32_t unique_spans = 0u;
+    uint32_t phase_paths = 0u;
+    for (uint32_t i = 0u; i < 8u; i++) {
+        phase_paths += state.phase_seen[i];
+        if (spans[i].data == NULL) {
+            continue;
+        }
+        uint32_t first = 1u;
+        for (uint32_t j = 0u; j < i; j++) {
+            if (spans[j].data == spans[i].data) {
+                first = 0u;
+            }
+        }
+        unique_spans += first;
+    }
+    if (schway_run_frame(inst, NULL) != SCHWAY_STATUS_OK) {
+        failures++;
+    } else {
+        uint8_t replacement[2] = {0xE1u, 0xE2u};
+        schway_status status = schway_load_memcard_socket(inst, SCHWAY_CARD_PORT_1,
+                                                          SCHWAY_CARD_SOCKET_B,
+                                                          replacement, sizeof replacement);
+        if (status != SCHWAY_STATUS_ERR_ARGUMENT || spans[1].data == NULL ||
+            ((const uint8_t *)spans[1].data)[0] != inputs[1][0]) {
+            failures++;
+        }
+    }
+    printf("1..1\n%s 1 - API v9 exposes eight independent card sockets\n",
+           failures == 0u ? "ok" : "not ok");
+    if (failures != 0u) {
+        printf("# actual load/get/generation=%u/8/%u/8/%u/8 spans=%u/8 state-fields=%u/136 phase-paths=%u/8\n",
+               loads_ok, gets_ok, generations_ok, unique_spans, state.count, phase_paths);
+    }
+    return (int)failures;
 }
 
 static void check_legacy_input(schway *inst, const schway_current_input *input)
@@ -123,6 +281,8 @@ int main(void)
     schway *inst = NULL;
     CHECK_EQ_U64(schway_create(&config, &inst), SCHWAY_STATUS_OK);
     if (inst == NULL) CHECK_DONE();
+
+    check_failures += check_card_socket_api(inst);
 
     schway_input input;
     memset(&input, 0, sizeof input);

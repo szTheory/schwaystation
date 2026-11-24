@@ -64,6 +64,12 @@ typedef uint32_t schway_status;
 
 #define SCHWAY_CARD_SLOT_1 1u
 #define SCHWAY_CARD_SLOT_2 2u
+#define SCHWAY_CARD_PORT_1 1u
+#define SCHWAY_CARD_PORT_2 2u
+#define SCHWAY_CARD_SOCKET_A 1u
+#define SCHWAY_CARD_SOCKET_B 2u
+#define SCHWAY_CARD_SOCKET_C 3u
+#define SCHWAY_CARD_SOCKET_D 4u
 #define SCHWAY_MEMCARD_SIZE 131072u
 #define SCHWAY_BIOS_SIZE 524288u
 #define SCHWAY_BIOS_INFO_LOADED 1u
@@ -344,6 +350,12 @@ schway_status schway_load_bios(schway *inst, const void *bytes, size_t size);
 schway_status schway_get_bios_info(const schway *inst, schway_bios_info *out);
 schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes, size_t size);
 schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint64_t *out);
+schway_status schway_get_memcard(const schway *inst, uint32_t port, uint32_t socket,
+                                 schway_span *out);
+schway_status schway_load_memcard_socket(schway *inst, uint32_t port, uint32_t socket,
+                                         const void *bytes, size_t size);
+schway_status schway_memcard_socket_generation(const schway *inst, uint32_t port,
+                                               uint32_t socket, uint64_t *out);
 schway_status schway_open_disc(schway *inst, const schway_disc *disc);
 schway_status schway_set_lid(schway *inst, uint32_t open); /* 0 closed, 1 open */
 schway_status schway_swap_disc(schway *inst, const schway_disc *disc); /* empty TOC removes media */

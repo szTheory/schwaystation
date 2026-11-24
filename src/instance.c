@@ -575,6 +575,59 @@ schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint6
     return SCHWAY_STATUS_OK;
 }
 
+/* The public socket entry points first retain the fixed legacy A endpoints;
+   the tap endpoints are wired to independent storage in the card module. */
+static int memcard_socket_a_index(uint32_t port, uint32_t socket, uint32_t *index)
+{
+    if (socket != SCHWAY_CARD_SOCKET_A || index == NULL) {
+        return 0;
+    }
+    if (port == SCHWAY_CARD_PORT_1) {
+        *index = 0u;
+        return 1;
+    }
+    if (port == SCHWAY_CARD_PORT_2) {
+        *index = 1u;
+        return 1;
+    }
+    return 0;
+}
+
+schway_status schway_get_memcard(const schway *inst, uint32_t port, uint32_t socket,
+                                 schway_span *out)
+{
+    uint32_t index;
+    if (inst == NULL || out == NULL || !memcard_socket_a_index(port, socket, &index)) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    out->data = inst->card.slot[index].bytes;
+    out->size = sizeof inst->card.slot[index].bytes;
+    return SCHWAY_STATUS_OK;
+}
+
+schway_status schway_load_memcard_socket(schway *inst, uint32_t port, uint32_t socket,
+                                         const void *bytes, size_t size)
+{
+    uint32_t index;
+    if (!memcard_socket_a_index(port, socket, &index)) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    return schway_load_memcard(inst, index == 0u ? SCHWAY_CARD_SLOT_1 : SCHWAY_CARD_SLOT_2,
+                               bytes, size);
+}
+
+schway_status schway_memcard_socket_generation(const schway *inst, uint32_t port,
+                                               uint32_t socket, uint64_t *out)
+{
+    uint32_t index;
+    if (!memcard_socket_a_index(port, socket, &index)) {
+        return SCHWAY_STATUS_ERR_ARGUMENT;
+    }
+    return schway_memcard_generation(inst,
+                                     index == 0u ? SCHWAY_CARD_SLOT_1 : SCHWAY_CARD_SLOT_2,
+                                     out);
+}
+
 /* Literals behind a switch, never a pointer table: the core keeps no
    relocated data. */
 static const char text_ok[] = "ok";
