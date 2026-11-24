@@ -17,6 +17,11 @@
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
+#define JOY_DATA 0x1F801040u
+#define JOY_MODE 0x1F801048u
+#define JOY_CTRL 0x1F80104Au
+#define JOY_BAUD 0x1F80104Eu
+#define I_STAT 0x1F801070u
 
 /* Five buffers for saved states, sized from the core's own answer, so they
    follow the state as it grows. */
@@ -112,6 +117,22 @@ static void bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
 {
     uint32_t cycles = 0u;
     CHECK_EQ_U64(schway__bus_write(inst, addr, width, value, &cycles), 0u);
+}
+
+static uint32_t bus_read(schway *inst, uint32_t addr, uint32_t width)
+{
+    uint32_t cycles = 0u;
+    uint32_t value = 0u;
+    CHECK_EQ_U64(schway__bus_read(inst, addr, width, &value, &cycles), 0u);
+    return value;
+}
+
+static void advance_ticks(schway *inst, uint64_t tick)
+{
+    inst->ticks = tick;
+    schway__sched_sync(inst);
+    schway__sched_run(inst);
+    schway__spu_catch_up(inst, inst->ticks);
 }
 
 static uint16_t spu_attr(const schway *inst)
@@ -220,6 +241,73 @@ static void expect_refused(const char *what, schway *inst, const uint8_t *b, siz
         fprintf(stderr, "%s: a refused load changed the host audio ring\n", what);
         check_failures++;
     }
+}
+
+static uint8_t state_exchange_byte(schway *inst, uint8_t sent, uint8_t ack)
+{
+    uint64_t start = inst->ticks;
+    bus_write(inst, JOY_DATA, 1u, sent);
+    advance_ticks(inst, start + 1088u);
+    uint8_t received = (uint8_t)bus_read(inst, JOY_DATA, 1u);
+    if (ack != 0u) {
+        advance_ticks(inst, start + 1426u);
+        bus_write(inst, I_STAT, 4u, 0u);
+        bus_write(inst, JOY_CTRL, 2u, 0x1013u);
+        advance_ticks(inst, start + 1494u);
+        bus_write(inst, JOY_CTRL, 2u, 0x1003u);
+    }
+    return received;
+}
+
+static void test_short_terminal_round_trip(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    inst->pad.multitap[0] = 1u;
+    for (uint32_t socket = 0u; socket < 4u; socket++) {
+        uint32_t endpoint = socket == 0u ? 0u : 1u + socket;
+        schway__pad_set_connected(inst, endpoint, 1u);
+    }
+    bus_write(inst, JOY_MODE, 2u, 0x000Cu);
+    bus_write(inst, JOY_BAUD, 2u, 0x0088u);
+    bus_write(inst, JOY_CTRL, 2u, 0x1003u);
+
+    /* A requested Slot A poll arms the long method-1 reply. */
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    (void)state_exchange_byte(inst, 0x42u, 1u);
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    (void)state_exchange_byte(inst, 0x00u, 1u);
+    (void)state_exchange_byte(inst, 0x00u, 0u);
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    (void)state_exchange_byte(inst, 0x42u, 1u);
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        (void)state_exchange_byte(inst, 0x00u, i != 31u ? 1u : 0u);
+    }
+    CHECK_EQ_U64(inst->sio.tap_history_req[0], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_reply[0], 1u);
+
+    /* After the short reply's request byte, the terminal ID byte is next. */
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    (void)state_exchange_byte(inst, 0x42u, 1u);
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    CHECK_EQ_U64(inst->sio.tap_tx_mode[0], 3u);
+    CHECK_EQ_U64(inst->sio.tap_tx_index[0], 3u);
+    CHECK_EQ_U64(inst->sio.tap_tx_endpoint[0], 0u);
+    CHECK_EQ_U64(inst->sio.tap_slot_mask[0], 1u);
+    CHECK_EQ_U64(inst->sio.tap_tx_request[0], 1u);
+
+    size_t n = save(inst, good);
+    schway *copy = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(schway_load_state(copy, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(copy->sio.tap_tx_mode[0], 3u);
+    CHECK_EQ_U64(copy->sio.tap_tx_index[0], 3u);
+    CHECK_EQ_U64(save(copy, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+    CHECK_EQ_HEX(state_exchange_byte(copy, 0x00u, 0u), 0x41u);
+    CHECK_EQ_U64(copy->sio.tap_tx_mode[0], 0u);
+    CHECK_EQ_U64(copy->sio.tap_history_reply[0], 2u);
+    schway_destroy(copy);
+    schway_destroy(inst);
 }
 
 static void seed_endpoint_inputs(schway *inst)
@@ -605,7 +693,7 @@ static void test_rejects(void)
         } invalid_tap_indices[] = {
             {"long reply past terminal", 2u, 35u, 0u, 1u},
             {"slot A reply past terminal", 1u, 9u, 0u, 1u},
-            {"short reply past terminal", 3u, 3u, 0u, 1u},
+            {"short reply past terminal", 3u, 4u, 0u, 1u},
             {"method 2 reply past terminal", 4u, 9u, 2u, 0u},
         };
         for (size_t i = 0u; i < sizeof invalid_tap_indices / sizeof invalid_tap_indices[0];
@@ -721,6 +809,7 @@ static void test_rejects(void)
     reseal(bad, n);
     CHECK(memcmp(bad, good, n) == 0);
     CHECK_EQ_U64(schway_load_state(target, bad, n), SCHWAY_STATUS_OK);
+    test_short_terminal_round_trip();
     schway_destroy(target);
     schway_destroy(src);
 }
