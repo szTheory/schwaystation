@@ -82,6 +82,8 @@ A call that returns an error changes nothing: not the instance, not your struct.
 
 ## Pad input and frame reports
 
+Serial IDs, payloads and supported host mappings are detailed in [controller protocols](controllers.md).
+
 `schway_input` is a host snapshot with an append-only size of 228 bytes in API v9. Its first 28 bytes retain the
 API v8 fields: `device[2]`, `buttons[2]`, `axes[2][4]`, `analog_button[2]` and `reserved0`. Set bits in
 `buttons` mean pressed; SIO returns those buttons active-low. The four raw axis bytes are right X, right Y,
@@ -526,6 +528,8 @@ remain stable for the instance lifetime. The BIOS span initially names the built
 is loaded it names the instance's copied image and stays stable through resets. RAM, scratchpad and VRAM contents
 change as the core runs; card pointers and bytes remain stable across reads, state loads and power resets.
 `schway_get_vram` remains a convenience accessor for the VRAM span.
+
+See [memory card persistence and save-state boundaries](saves.md) for card filenames and host save behavior.
 
 Cards start as formatted blank images. Before execution, a host can import a raw image up to 131,072 bytes.
 Short images are padded with `FFh` through the end of the card, as required for an unallocated raw card area:

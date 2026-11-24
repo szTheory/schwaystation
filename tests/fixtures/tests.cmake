@@ -1027,8 +1027,8 @@ endforeach()
 foreach(row IN ITEMS
     # Format 19 adds the selected board identity. State hashes change while
     # rendered frame hashes remain unchanged.
-    "150|0b59d135ead432ddc9b9150aedbabf29c617b0d40414567a50fa3cf6fcf4c3e4"
-    "180|3142e3b7bed001f03330b34d3975862b476bf13320c026a3a0a466987d11abbe")
+    "150|a9218281c1d5b51fff4f48fc9fa388cf0459c5c0bf136b8ecb462cbb0d466d9b"
+    "180|b8285ab088a9a7d19afc2986913aa3f16780bb8fd52bea2c8b75e2d538076124")
   string(REPLACE "|" ";" fields "${row}")
   list(GET fields 0 frame)
   list(GET fields 1 hash)

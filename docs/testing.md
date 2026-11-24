@@ -13,6 +13,7 @@ It needs CMake 4.3 or later (the presets' minimum; the library alone configures 
 C++ compiler. The workflow configures into `build/ci` (Release, warnings as errors, macOS deployment target 10.13),
 builds, and runs every test except those labelled `release`, writing `build/ci/junit.xml`. The `release` tests
 check the packaged archives and run after the package step, with `ctest --preset ci-release`.
+For command-line usage and runner options, see the [runner guide](runner.md).
 
 `ctest --test-dir build/ci -R <regex> --output-on-failure` reruns part of the suite after a build;
 `ctest --test-dir build/ci -L <label>` selects by label. `-L` takes a regular expression that matches anywhere in a
@@ -608,7 +609,7 @@ no `perf` preset. An empty or non-numeric measurement is an input error, never a
 
 Current bounds and producer links are in [`quality.json`](../quality.json); the [Phase 7 baseline](../.planning/phases/07-faster-and-more-trustworthy-ci/07-BASELINES.md)
 retains the original samples. Current values: test-card 1,619,573 Ir/frame, `gpu_motion` 138,319,014, state
-3,755,332 bytes, and Release WASI module 923,753 bytes.
+3,757,638 bytes, and Release WASI module 923,753 bytes.
 The exact CI critical-path baseline is 2,249–3,293 seconds from two successful `ci.yml` push runs with the same workload
 fingerprint; see the [matching cohort and DAG](../.planning/phases/07-faster-and-more-trustworthy-ci/07-CI-EFFICIENCY.md).
 
