@@ -123,6 +123,13 @@ static bool RETRO_CALLCONV lr_disk_get_image_label(unsigned index, char *label, 
 SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
 schway__libretro_test_card2_data(size_t *size);
 SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void);
+SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
+schway__libretro_test_card_socket(unsigned port, unsigned socket, size_t *size,
+                                  uint64_t *generation, uint64_t *saved_generation,
+                                  const char **path);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_write_card_socket(unsigned port, unsigned socket, uint8_t value);
+SCHWAYSTATION_TEST_EXPORT void RETRO_CALLCONV schway__libretro_test_flush_cards(void);
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
 schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *buttons);
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
@@ -1990,6 +1997,54 @@ schway__libretro_test_card2_data(size_t *size)
 SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void)
 {
     return lr_card2_path[0] != '\0' ? lr_card2_path : NULL;
+}
+
+SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
+schway__libretro_test_card_socket(unsigned port, unsigned socket, size_t *size,
+                                  uint64_t *generation, uint64_t *saved_generation,
+                                  const char **path)
+{
+    schway_span card;
+    uint64_t current_generation;
+    if (size != NULL) *size = 0u;
+    if (generation != NULL) *generation = 0u;
+    if (saved_generation != NULL) *saved_generation = 0u;
+    if (path != NULL) *path = NULL;
+    if (inst == NULL || schway_get_memcard(inst, port, socket, &card) != SCHWAY_STATUS_OK ||
+        card.size != SCHWAY_MEMCARD_SIZE ||
+        schway_memcard_socket_generation(inst, port, socket, &current_generation) !=
+            SCHWAY_STATUS_OK) {
+        return NULL;
+    }
+    if (size != NULL) *size = card.size;
+    if (generation != NULL) *generation = current_generation;
+    if (port == SCHWAY_CARD_PORT_2 && socket == 1u) {
+        if (saved_generation != NULL) *saved_generation = lr_card2_saved_generation;
+        if (path != NULL && lr_card2_path[0] != '\0') *path = lr_card2_path;
+    }
+    return (const uint8_t *)card.data;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_write_card_socket(unsigned port, unsigned socket, uint8_t value)
+{
+    uint32_t endpoint;
+    schway_span card;
+    if (inst == NULL || port < 1u || port > 2u || socket < 1u || socket > 4u ||
+        schway_get_memcard(inst, port, socket, &card) != SCHWAY_STATUS_OK ||
+        card.size != SCHWAY_MEMCARD_SIZE) {
+        return 0;
+    }
+    endpoint = (port - 1u) * 4u + socket - 1u;
+    if (inst->card.slot[endpoint].generation == UINT64_MAX) return 0;
+    inst->card.slot[endpoint].bytes[128u] = value;
+    inst->card.slot[endpoint].generation++;
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT void RETRO_CALLCONV schway__libretro_test_flush_cards(void)
+{
+    lr_card2_flush();
 }
 
 static int lr_test_write(uint32_t address, uint32_t width, uint32_t value)

@@ -17,9 +17,11 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <direct.h>
+#define rmdir _rmdir
 #else
 #include <dlfcn.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #include <errno.h>
@@ -132,6 +134,11 @@ static void *(RETRO_CALLCONV *p_get_memory_data)(unsigned);
 static size_t(RETRO_CALLCONV *p_get_memory_size)(unsigned);
 static const uint8_t *(RETRO_CALLCONV *p_test_card2_data)(size_t *);
 static const char *(RETRO_CALLCONV *p_test_card2_path)(void);
+static const uint8_t *(RETRO_CALLCONV *p_test_card_socket)(unsigned, unsigned, size_t *,
+                                                            uint64_t *, uint64_t *,
+                                                            const char **);
+static int (RETRO_CALLCONV *p_test_write_card_socket)(unsigned, unsigned, uint8_t);
+static void (RETRO_CALLCONV *p_test_flush_cards)(void);
 static int(RETRO_CALLCONV *p_test_poll_endpoint)(unsigned, unsigned, uint16_t *);
 static int(RETRO_CALLCONV *p_test_poll_bytes)(unsigned, unsigned, uint8_t *, size_t, size_t *);
 
@@ -181,6 +188,9 @@ static void resolve_all(int inspect_card2)
     if (inspect_card2) {
         RESOLVE(p_test_card2_data, "schway__libretro_test_card2_data");
         RESOLVE(p_test_card2_path, "schway__libretro_test_card2_path");
+        RESOLVE(p_test_card_socket, "schway__libretro_test_card_socket");
+        RESOLVE(p_test_write_card_socket, "schway__libretro_test_write_card_socket");
+        RESOLVE(p_test_flush_cards, "schway__libretro_test_flush_cards");
         RESOLVE(p_test_poll_endpoint, "schway__libretro_test_poll_endpoint");
         RESOLVE(p_test_poll_bytes, "schway__libretro_test_poll_bytes");
     }
@@ -2084,6 +2094,152 @@ static void check_card_file_equal(const char *path, const unsigned char *expecte
         }
         free(actual);
     }
+}
+
+static int test_cards_multitap(const char *directory)
+{
+    static const char *const card_names[8] = {
+        "memcard_roundtrip.srm", "memcard_roundtrip.p1b.mcr",
+        "memcard_roundtrip.p1c.mcr", "memcard_roundtrip.p1d.mcr",
+        "memcard_roundtrip.1.mcr", "memcard_roundtrip.p2b.mcr",
+        "memcard_roundtrip.p2c.mcr", "memcard_roundtrip.p2d.mcr",
+    };
+    char exe_path[4096] = {0};
+    char paths[8][4096] = {{0}};
+    char backup_path[4096] = {0};
+    struct retro_game_info game;
+    void *save_ram;
+    const uint8_t *card;
+    size_t size;
+    uint64_t generation, saved_generation, prior_saved_generation;
+    const char *path;
+    int loaded = 0;
+    int path_length;
+
+    path_length = snprintf(exe_path, sizeof exe_path,
+                           "%s/../../fixtures/memcard_roundtrip.exe", directory);
+    CHECK(path_length > 0 && (size_t)path_length < sizeof exe_path);
+    CHECK(test_path(backup_path, sizeof backup_path, directory,
+                    "memcard_roundtrip.p1b.previous"));
+    for (unsigned index = 0u; index < 8u; index++) {
+        CHECK(test_path(paths[index], sizeof paths[index], directory, card_names[index]));
+        (void)remove(paths[index]);
+    }
+    (void)remove(backup_path);
+    if (check_failures != 0) goto cleanup;
+
+    save_directory = directory;
+    save_directory_available = 1;
+    memset(&game, 0, sizeof game);
+    game.path = exe_path;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (!loaded) goto cleanup;
+    save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    CHECK(save_ram != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), SCHWAY_MEMCARD_SIZE);
+    card = p_test_card_socket(1u, 1u, &size, &generation, &saved_generation, &path);
+    CHECK(card != NULL && card == save_ram);
+    CHECK_EQ_U64(size, SCHWAY_MEMCARD_SIZE);
+    CHECK(path == NULL);
+
+    /* A clean adapter card must not create a sidecar; card 1 remains frontend-owned. */
+    ((uint8_t *)save_ram)[128u] = 0xA0u;
+    p_test_flush_cards();
+    for (unsigned index = 0u; index < 8u; index++) {
+        FILE *file = fopen(paths[index], "rb");
+        CHECK(file == NULL);
+        if (file != NULL) (void)fclose(file);
+    }
+
+    /* Simulate one completed write per adapter-owned endpoint without booting a BIOS. */
+    for (unsigned index = 1u; index < 8u; index++) {
+        unsigned port_number = index / 4u + 1u;
+        unsigned socket_number = index % 4u + 1u;
+        uint8_t value = (uint8_t)(0x40u + index);
+        card = p_test_card_socket(port_number, socket_number, &size,
+                                  &generation, &saved_generation, &path);
+        CHECK(card != NULL);
+        CHECK_EQ_U64(size, SCHWAY_MEMCARD_SIZE);
+        CHECK(path != NULL && strcmp(path, paths[index]) == 0);
+        CHECK(p_test_write_card_socket(port_number, socket_number, value));
+        card = p_test_card_socket(port_number, socket_number, &size,
+                                  &generation, &saved_generation, &path);
+        CHECK(card != NULL);
+        CHECK_EQ_U64(card[128u], value);
+        CHECK_EQ_U64(generation, saved_generation + 1u);
+    }
+    p_test_flush_cards();
+    for (unsigned index = 1u; index < 8u; index++) {
+        check_card_file_value(paths[index], (int)(0x40u + index));
+    }
+    {
+        FILE *file = fopen(paths[0], "rb");
+        CHECK(file == NULL);
+        if (file != NULL) (void)fclose(file);
+    }
+
+    /* Failed replacement leaves the old image and generation retryable. */
+    CHECK(copy_test_file(paths[1], backup_path));
+    card = p_test_card_socket(1u, 2u, &size, &generation,
+                              &saved_generation, &path);
+    CHECK(card != NULL);
+    prior_saved_generation = saved_generation;
+    CHECK(p_test_write_card_socket(1u, 2u, 0x7Eu));
+    CHECK(remove(paths[1]) == 0);
+    CHECK(make_test_directory(paths[1]));
+    p_test_flush_cards();
+    card = p_test_card_socket(1u, 2u, &size, &generation,
+                              &saved_generation, &path);
+    CHECK(card != NULL);
+    CHECK_EQ_U64(generation, prior_saved_generation + 1u);
+    CHECK_EQ_U64(saved_generation, prior_saved_generation);
+    check_card_file_value(backup_path, (int)(0x40u + 1u));
+    CHECK(rmdir(paths[1]) == 0);
+    CHECK(copy_test_file(backup_path, paths[1]));
+    p_test_flush_cards();
+    card = p_test_card_socket(1u, 2u, &size, &generation,
+                              &saved_generation, &path);
+    CHECK(card != NULL);
+    CHECK_EQ_U64(generation, saved_generation);
+    check_card_file_value(paths[1], 0x7E);
+
+    p_unload_game();
+    loaded = 0;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (loaded) {
+        for (unsigned index = 1u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            unsigned expected = index == 1u ? 0x7Eu : 0x40u + index;
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            CHECK_EQ_U64(size, SCHWAY_MEMCARD_SIZE);
+            CHECK(path != NULL && strcmp(path, paths[index]) == 0);
+            CHECK_EQ_U64(card[128u], expected);
+            CHECK_EQ_U64(generation, saved_generation);
+        }
+        save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+        CHECK(save_ram != NULL);
+        CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), SCHWAY_MEMCARD_SIZE);
+        card = p_test_card_socket(1u, 1u, &size, &generation, &saved_generation, &path);
+        CHECK(card != NULL && card == save_ram);
+        CHECK(path == NULL);
+    }
+
+cleanup:
+    if (loaded) p_unload_game();
+    for (unsigned index = 0u; index < 8u; index++) {
+        (void)remove(paths[index]);
+    }
+    (void)rmdir(paths[1]);
+    (void)remove(backup_path);
+    int result = check_failures != 0 ? 1 : 0;
+    p_deinit();
+    module_close();
+    return result;
 }
 
 static int test_card_persistence(const char *exe_path, const char *directory)
@@ -5574,6 +5730,7 @@ int main(int argc, char **argv)
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
     int card_controls_mode = argc == 5 && strcmp(argv[2], "card-controls") == 0;
+    int cards_multitap_mode = argc == 4 && strcmp(argv[2], "cards-multitap") == 0;
     int memory_aliases_mode = argc == 3 && strcmp(argv[2], "memory-aliases") == 0;
     int memory_boundaries_mode = argc == 3 && strcmp(argv[2], "memory-boundaries") == 0;
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
@@ -5582,7 +5739,7 @@ int main(int argc, char **argv)
     if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode && !input_multitap_mode &&
          !input_special_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
-         !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
+         !card_controls_mode && !cards_multitap_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         (audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
@@ -5591,7 +5748,7 @@ int main(int argc, char **argv)
                              argv[5][0] == '\0' || argv[6][0] == '\0')) ||
         ((content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || content_boot_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
-          card_persistence_mode || card_controls_mode) &&
+          card_persistence_mode || card_controls_mode || cards_multitap_mode) &&
          argv[3][0] == '\0') ||
         (content_chd_mode && (argv[4][0] == '\0' || argv[5][0] == '\0' ||
                               argv[6][0] == '\0' || argv[7][0] == '\0' ||
@@ -5625,7 +5782,7 @@ int main(int argc, char **argv)
                 "disc-audio-equality-batch|disc-audio-equality-single <region> <m3u> <pcm> <bios-directory> | "
                 "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
-                "card-controls <exe> <save-dir> | memory-aliases | memory-boundaries | "
+                "card-controls <exe> <save-dir> | cards-multitap <save-dir> | memory-aliases | memory-boundaries | "
                 "video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | "
                 "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
@@ -5654,7 +5811,7 @@ int main(int argc, char **argv)
         return 1;
     }
     /* Every entry point, before anything else is called. */
-    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode || input_multitap_mode || input_special_mode;
+    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode || input_multitap_mode || input_special_mode || cards_multitap_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -5664,6 +5821,9 @@ int main(int argc, char **argv)
     if (!inspect_card2 &&
         (module_sym("schway__libretro_test_card2_data") != NULL ||
          module_sym("schway__libretro_test_card2_path") != NULL ||
+         module_sym("schway__libretro_test_card_socket") != NULL ||
+         module_sym("schway__libretro_test_write_card_socket") != NULL ||
+         module_sym("schway__libretro_test_flush_cards") != NULL ||
          module_sym("schway__libretro_test_poll_endpoint") != NULL ||
          module_sym("schway__libretro_test_poll_bytes") != NULL)) {
         fprintf(stderr, "production libretro module exports card test accessors\n");
@@ -5797,6 +5957,13 @@ int main(int argc, char **argv)
 
     if (card_controls_mode) {
         return test_card_controls(argv[3], argv[4]);
+    }
+
+    if (cards_multitap_mode) {
+        int result = test_cards_multitap(argv[3]);
+        printf("TAP version 13\n1..1\n%s 1 - libretro.cards.multitap\n",
+               result == 0 ? "ok" : "not ok");
+        return result;
     }
 
     if (memory_aliases_mode) {
