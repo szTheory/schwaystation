@@ -90,9 +90,11 @@ API v8 fields: `device[2]`, `buttons[2]`, `axes[2][4]`, `analog_button[2]` and `
 left X and left Y, with 128 at centre. `analog_button` is a held 0/1 input; a rising edge toggles DualShock
 analog mode when the pad has not locked that button. `reserved0` must be zero.
 
-The device identifiers are `NONE=0`, `DIGITAL=1`, `DUALSHOCK=2`, `MOUSE=3`, `NEGCON=4`, `JOGCON=5` and
-`DUAL_ANALOG_FLIGHT=6`. `multitap[2]` contains 0 or 1 per physical port. The appended
-`controllers[2][4]` array holds four sockets per port; each `schway_controller_input` is 24 bytes:
+The device identifiers are `SCHWAY_INPUT_DEVICE_NONE` (0), `SCHWAY_INPUT_DEVICE_DIGITAL` (1),
+`SCHWAY_INPUT_DEVICE_DUALSHOCK` (2), `SCHWAY_INPUT_DEVICE_MOUSE` (3), `SCHWAY_INPUT_DEVICE_NEGCON` (4),
+`SCHWAY_INPUT_DEVICE_JOGCON` (5) and `SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT` (6). `multitap[2]` contains 0 or 1 per
+physical port. The appended `controllers[2][4]` array holds four sockets per port; each `schway_controller_input`
+is 24 bytes:
 
 | Field | Type and valid values |
 | --- | --- |
@@ -521,10 +523,11 @@ reset. Copy data you need before destroying the instance.
 `SCHWAY_MEMORY_VRAM`, `SCHWAY_MEMORY_BIOS`, `SCHWAY_MEMORY_CARD1` or `SCHWAY_MEMORY_CARD2`. It returns the
 instance's 2 MiB RAM, 1 KiB scratchpad, 1 MiB VRAM, current BIOS image or one of the two legacy card images.
 API v9 adds `schway_get_memcard(inst, port, socket, &span)` to expose all eight physical tap-card endpoints.
-`SCHWAY_CARD_PORT_1` and `SCHWAY_CARD_PORT_2` are one-based physical ports; `SCHWAY_CARD_SOCKET_A` through
-`SCHWAY_CARD_SOCKET_D` are one-based sockets. Port 1/socket A remains card 1 and port 2/socket A remains card 2,
-whether or not either tap is enabled. No additional memory IDs are needed. RAM, scratchpad, VRAM and card pointers
-remain stable for the instance lifetime. The BIOS span initially names the built-in PS-EXE stub; after a host BIOS
+`SCHWAY_CARD_PORT_1` and `SCHWAY_CARD_PORT_2` are one-based physical ports. `SCHWAY_CARD_SOCKET_A` (1),
+`SCHWAY_CARD_SOCKET_B` (2), `SCHWAY_CARD_SOCKET_C` (3) and `SCHWAY_CARD_SOCKET_D` (4) are one-based sockets. Port
+1/socket A remains card 1 and port 2/socket A remains card 2, whether or not either tap is enabled. No additional
+memory IDs are needed. RAM, scratchpad, VRAM and card pointers remain stable for the instance lifetime. The BIOS
+span initially names the built-in PS-EXE stub; after a host BIOS
 is loaded it names the instance's copied image and stays stable through resets. RAM, scratchpad and VRAM contents
 change as the core runs; card pointers and bytes remain stable across reads, state loads and power resets.
 `schway_get_vram` remains a convenience accessor for the VRAM span.
