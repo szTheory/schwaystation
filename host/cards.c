@@ -535,6 +535,33 @@ schway_host_card_status schway__host_card_paths_for_identity(const char *directo
                                                  slot1, slot1_size, slot2, slot2_size);
 }
 
+schway_host_card_status schway__host_card_path_for_socket(const char *directory,
+                                                           const char *component,
+                                                           uint32_t port, uint32_t socket,
+                                                           char *out, size_t out_size)
+{
+    (void)directory;
+    (void)component;
+    (void)port;
+    (void)socket;
+    (void)out;
+    (void)out_size;
+    return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+}
+
+schway_host_card_status schway__host_card_identity_path_for_socket(
+    const char *directory, const char *identity, uint32_t port, uint32_t socket,
+    char *out, size_t out_size)
+{
+    (void)directory;
+    (void)identity;
+    (void)port;
+    (void)socket;
+    (void)out;
+    (void)out_size;
+    return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+}
+
 static schway_host_card_status schway__host_cards_publish_atomic(
     const char *path, const void *bytes, size_t size, int failure)
 {

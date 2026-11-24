@@ -887,6 +887,76 @@ cleanup:
     free(initial);
 }
 
+static void tap_paths(void)
+{
+    static const char *const suffixes[2][4] = {
+        {".srm", ".p1b.mcr", ".p1c.mcr", ".p1d.mcr"},
+        {".1.mcr", ".p2b.mcr", ".p2c.mcr", ".p2d.mcr"},
+    };
+    char directory[TEMP_PATH_CAP] = {0};
+    char path[TEMP_PATH_CAP];
+    char legacy1[TEMP_PATH_CAP];
+    char legacy2[TEMP_PATH_CAP];
+    char actual[TEMP_PATH_CAP];
+    int made_directory = create_work_directory(directory, sizeof directory);
+    CHECK(made_directory != 0);
+    if (!made_directory) {
+        return;
+    }
+
+    schway_host_card_status status = schway_host_card_paths_for_basename(
+        directory, "SLUS_123.45", legacy1, sizeof legacy1, legacy2, sizeof legacy2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    for (uint32_t port = SCHWAY_CARD_PORT_1; port <= SCHWAY_CARD_PORT_2; port++) {
+        for (uint32_t socket = SCHWAY_CARD_SOCKET_A; socket <= SCHWAY_CARD_SOCKET_D; socket++) {
+            size_t index = (size_t)(port - 1u);
+            size_t socket_index = (size_t)(socket - 1u);
+            int written = snprintf(path, sizeof path, "%s/SLUS_123.45%s", directory,
+                                   suffixes[index][socket_index]);
+            CHECK(written >= 0 && (size_t)written < sizeof path);
+            memset(actual, 'Q', sizeof actual);
+            status = schway__host_card_path_for_socket(directory, "SLUS_123.45",
+                                                       port, socket, actual, sizeof actual);
+            CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+            if (status == SCHWAY_HOST_CARD_OK) {
+                CHECK(strcmp(actual, path) == 0);
+                if (port == SCHWAY_CARD_PORT_1 && socket == SCHWAY_CARD_SOCKET_A) {
+                    CHECK(strcmp(actual, legacy1) == 0);
+                } else if (port == SCHWAY_CARD_PORT_2 && socket == SCHWAY_CARD_SOCKET_A) {
+                    CHECK(strcmp(actual, legacy2) == 0);
+                }
+            }
+        }
+    }
+
+    memset(path, 'Q', sizeof path);
+    status = schway__host_card_path_for_socket(directory, "../escape", 1u, 2u,
+                                               path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    status = schway__host_card_path_for_socket(directory, "SLUS_123.45", 0u, 1u,
+                                               path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    status = schway__host_card_path_for_socket(directory, "SLUS_123.45", 1u, 5u,
+                                               path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    status = schway__host_card_path_for_socket(directory, "SLUS_123.45", 1u, 2u,
+                                               path, 1u);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    status = schway__host_card_identity_path_for_socket(directory,
+                                                        "sgi2-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                                                        2u, 4u, path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    if (status == SCHWAY_HOST_CARD_OK) {
+        CHECK(strstr(path, ".p2d.mcr") != NULL);
+    }
+
+    CHECK(remove_directory(directory) == 0);
+}
+
 static void atomic_failures(void)
 {
     enum { GME_HEADER_SIZE = 0x0F40 };
@@ -1101,6 +1171,8 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "atomic_roundtrip") == 0) {
         atomic_roundtrip();
+    } else if (strcmp(argv[1], "tap_paths") == 0) {
+        tap_paths();
     } else if (strcmp(argv[1], "atomic_failures") == 0) {
         atomic_failures();
     } else if (strcmp(argv[1], "wrappers") == 0) {
