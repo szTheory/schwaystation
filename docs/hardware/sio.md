@@ -1,8 +1,9 @@
 # Serial I/O and digital pads
 
 SIO0 is the console's serial port for controllers and memory cards. The core models the SIO0 registers, an
-eight-byte receive FIFO, scheduled byte completion, two digital-pad ports and one memory card per port. SIO1
-is outside this module. Card Read (52h), GetID (53h), and Write (57h) are supported.
+eight-byte receive FIFO, scheduled byte completion, two controller ports with independently enabled multitaps,
+and one memory card per port. SIO1 is outside this module. Card Read (52h), GetID (53h), and Write (57h) are
+supported.
 
 ## Digital poll
 
@@ -10,6 +11,27 @@ The host selects port 1 or 2 through JOY_CTRL and sends `01 42 00 00 00`. The di
 then the two active-low button bytes. A zero button bit means pressed; a one means released. The final button byte
 ends the transaction without an ACK or IRQ7. A poll is counted only when that final byte completes. A SIO peek
 reads register state without consuming the receive FIFO or advancing the pad.
+
+## Multitap controller access
+
+Each port's tap is disabled by default and enabled independently. Method 2 uses `0n 42 00 ...`, where `n` is
+`1` through `4`, to poll one socket with that controller's normal protocol length. This preserves longer
+DualShock and configuration replies.
+
+Method 1 sends a normal Slot A poll with `01 42 01 ...`. The third transmitted byte is REQ: its reply still
+belongs to the current Slot A poll, and REQ controls the next access. REQ=0 selects Slot A on the next access.
+REQ=1 after a Slot A reply selects a long reply on the next access. That reply starts with the multitap ID
+`80 5A`, then four fixed eight-byte socket records. Each record has the controller ID, `5A`, two button bytes,
+and four analog bytes; shorter device replies and missing later sockets are padded with `FF` bytes.
+
+The documented Method 1 history is: REQ=0 returns Slot A after either kind of reply; REQ=1 after Slot A
+returns the long reply; REQ=1 after the long reply returns the four-byte short reply `FF 80 5A <Slot A ID>`;
+and REQ=1 after that short reply returns the long reply. The short reply is the documented HiZ/garbage response.
+An empty Slot A aborts at its first address byte, before a request can be accepted. The reply history and active
+per-port route are saved with SIO state; reset, deselect, or switching physical ports cancels an in-flight route
+and its pending ACK events.
+
+This controller model does not add the tap's IRQ10/lightgun wiring behavior.
 
 ## Timing model
 
@@ -70,5 +92,8 @@ deadlines; save states retain those deadlines and their per-port transaction sta
 - The approximate pad ACK delay and minimum ACK pulse width come from the pinned controller reference at the
   same revision. The 338-tick pad value and card timing are modeled values; they are not presented as direct
   hardware measurements.
+- Multitap controller addressing and the next-transaction REQ history follow PER.01 at pinned revision
+  `6d7d1bc106a7e0b616b0330fe58401ab1ba57f0f`, under “Multitap Controller Access” and “Multitap Controller
+  Access, Method 1 Details” in `docs/controllersandmemorycards.md`.
 - The 1,088-, 1,426-, 1,494-, 1,500- and 31,000-tick boundaries are deterministic model values and are covered
   by SIO and card tests.

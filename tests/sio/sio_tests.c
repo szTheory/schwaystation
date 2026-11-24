@@ -216,6 +216,8 @@ static void state_pending_ack(void)
     schway_destroy(source);
 }
 
+static void tap_abort_paths(void);
+
 static void transport_abort(void)
 {
     schway *reset = make();
@@ -244,6 +246,7 @@ static void transport_abort(void)
     CHECK((deselect->irq.stat & 0x80u) == 0u);
     CHECK(deselect->sio.ack_low == 0u);
     schway_destroy(deselect);
+    tap_abort_paths();
 }
 
 static uint8_t exchange_byte(schway *inst, uint8_t sent, int ack)
@@ -294,6 +297,66 @@ static void tap_setup(schway *inst, uint32_t port)
             inst->pad.axes[endpoint * 4u + axis] = (uint8_t)(0x30u + endpoint + axis);
         }
     }
+}
+
+static void tap_abort_paths(void)
+{
+    schway *reset = make();
+    configure(reset, 0u);
+    tap_setup(reset, 0u);
+    write_mmio(reset, JOY_DATA, 1u, 0x01u);
+    advance_to(reset, 1088u);
+    CHECK_EQ_U64(reset->sio.tap_tx_mode[0], 1u);
+    write_mmio(reset, JOY_CTRL, 2u, 0x1043u);
+    CHECK_EQ_U64(reset->sio.tap_tx_mode[0], 0u);
+    CHECK(reset->sio.tx_pending == 0u);
+    advance_to(reset, 1426u);
+    CHECK((reset->irq.stat & 0x80u) == 0u);
+    schway_destroy(reset);
+
+    schway *deselect = make();
+    configure(deselect, 0u);
+    tap_setup(deselect, 0u);
+    write_mmio(deselect, JOY_DATA, 1u, 0x01u);
+    advance_to(deselect, 1088u);
+    CHECK(deselect->sio.ack_pending != 0u);
+    CHECK_EQ_U64(deselect->sio.tap_tx_mode[0], 1u);
+    write_mmio(deselect, JOY_CTRL, 2u, 0x1001u);
+    CHECK_EQ_U64(deselect->sio.tap_tx_mode[0], 0u);
+    CHECK(deselect->sio.ack_pending == 0u);
+    advance_to(deselect, 1426u);
+    CHECK((deselect->irq.stat & 0x80u) == 0u);
+    CHECK(deselect->sio.ack_low == 0u);
+    schway_destroy(deselect);
+
+    schway *switch_port = make();
+    configure(switch_port, 0u);
+    tap_setup(switch_port, 0u);
+    tap_setup(switch_port, 1u);
+    write_mmio(switch_port, JOY_DATA, 1u, 0x01u);
+    advance_to(switch_port, 1088u);
+    (void)read_mmio(switch_port, JOY_DATA, 1u);
+    advance_to(switch_port, 1494u);
+    write_mmio(switch_port, I_STAT, 4u, 0u);
+    write_mmio(switch_port, JOY_CTRL, 2u, 0x1013u);
+    write_mmio(switch_port, JOY_CTRL, 2u, 0x1003u);
+    write_mmio(switch_port, JOY_DATA, 1u, 0x42u);
+    advance_to(switch_port, 1994u);
+    CHECK_EQ_U64(switch_port->sio.tap_tx_mode[0], 1u);
+    write_mmio(switch_port, JOY_CTRL, 2u, 0x3003u);
+    CHECK_EQ_U64(switch_port->sio.tap_tx_mode[0], 0u);
+    CHECK_EQ_U64(switch_port->sio.tap_tx_mode[1], 0u);
+    CHECK(switch_port->sio.tx_pending == 0u);
+    advance_to(switch_port, 2582u);
+    CHECK_EQ_U64(switch_port->sio.rx_count, 0u);
+    CHECK((switch_port->irq.stat & 0x80u) == 0u);
+    write_mmio(switch_port, JOY_DATA, 1u, 0x01u);
+    advance_to(switch_port, 3670u);
+    CHECK_EQ_HEX(read_mmio(switch_port, JOY_DATA, 1u), 0xFFu);
+    CHECK_EQ_U64(switch_port->sio.tap_tx_mode[1], 1u);
+    CHECK_EQ_U64(switch_port->sio.tap_history_req[0], 0u);
+    CHECK_EQ_U64(switch_port->sio.tap_history_req[1], 0u);
+    schway_destroy(switch_port);
 }
 
 static uint8_t tap_id(const schway *inst, uint32_t endpoint)
@@ -353,6 +416,164 @@ static void tap_method1_poll(schway *inst, uint32_t port)
                          analog ? inst->pad.axes[endpoint * 4u + axis] : 0xFFu);
         }
     }
+    CHECK(inst->sio.ack_pending == 0u);
+    CHECK(inst->sio.ack_low == 0u);
+    advance_to(inst, inst->ticks + 338u);
+    CHECK(inst->sio.ack_pending == 0u);
+    CHECK(inst->sio.ack_low == 0u);
+    CHECK((inst->irq.stat & 0x80u) == 0u);
+}
+
+static uint8_t tap_exchange_pair(schway *a, schway *b, uint8_t sent, int ack)
+{
+    uint8_t a_reply = exchange_byte(a, sent, ack);
+    uint8_t b_reply = exchange_byte(b, sent, ack);
+    CHECK_EQ_HEX(a_reply, b_reply);
+    check_states_equal(a, b);
+    return a_reply;
+}
+
+static uint8_t tap_exchange_triple(schway *a, schway *b, schway *c, uint8_t sent, int ack)
+{
+    uint8_t a_reply = exchange_byte(a, sent, ack);
+    uint8_t b_reply = exchange_byte(b, sent, ack);
+    uint8_t c_reply = exchange_byte(c, sent, ack);
+    CHECK_EQ_HEX(a_reply, b_reply);
+    CHECK_EQ_HEX(a_reply, c_reply);
+    check_states_equal(a, b);
+    check_states_equal(a, c);
+    return a_reply;
+}
+
+static void tap_pending_deadlines(void)
+{
+    schway *source = make();
+    configure(source, 0u);
+    tap_setup(source, 0u);
+    uint64_t start = source->ticks;
+    write_mmio(source, JOY_DATA, 1u, 0x01u);
+    CHECK(source->sio.tx_pending != 0u);
+    CHECK_EQ_U64(source->sio.byte_deadline, start + 1088u);
+    CHECK_EQ_U64(source->sio.tap_tx_mode[0], 0u);
+    schway *copy = clone_state(source);
+
+    advance_to(source, start + 1087u);
+    advance_to(copy, start + 1087u);
+    CHECK_EQ_U64(source->sio.rx_count, 0u);
+    CHECK_EQ_U64(copy->sio.rx_count, 0u);
+    advance_to(source, start + 1088u);
+    advance_to(copy, start + 1088u);
+    CHECK_EQ_U64(source->sio.tap_tx_mode[0], 1u);
+    CHECK_EQ_U64(copy->sio.tap_tx_mode[0], 1u);
+    CHECK_EQ_U64(source->sio.ack_deadline, start + 1426u);
+    CHECK_EQ_U64(copy->sio.ack_deadline, start + 1426u);
+    CHECK_EQ_HEX(read_mmio(source, JOY_DATA, 1u), 0xFFu);
+    CHECK_EQ_HEX(read_mmio(copy, JOY_DATA, 1u), 0xFFu);
+    schway *ack_copy = clone_state(source);
+    advance_to(source, start + 1425u);
+    advance_to(copy, start + 1425u);
+    advance_to(ack_copy, start + 1425u);
+    CHECK((source->irq.stat & 0x80u) == 0u);
+    CHECK((copy->irq.stat & 0x80u) == 0u);
+    CHECK((ack_copy->irq.stat & 0x80u) == 0u);
+    advance_to(source, start + 1426u);
+    advance_to(copy, start + 1426u);
+    advance_to(ack_copy, start + 1426u);
+    CHECK((source->irq.stat & 0x80u) != 0u);
+    CHECK((copy->irq.stat & 0x80u) != 0u);
+    CHECK((ack_copy->irq.stat & 0x80u) != 0u);
+    CHECK(source->sio.ack_low != 0u);
+    CHECK(copy->sio.ack_low != 0u);
+    CHECK(ack_copy->sio.ack_low != 0u);
+    check_states_equal(source, copy);
+    check_states_equal(source, ack_copy);
+    write_mmio(source, I_STAT, 4u, 0u);
+    write_mmio(copy, I_STAT, 4u, 0u);
+    write_mmio(ack_copy, I_STAT, 4u, 0u);
+    write_mmio(source, JOY_CTRL, 2u, 0x1013u);
+    write_mmio(copy, JOY_CTRL, 2u, 0x1013u);
+    write_mmio(ack_copy, JOY_CTRL, 2u, 0x1013u);
+    advance_to(source, start + 1493u);
+    advance_to(copy, start + 1493u);
+    advance_to(ack_copy, start + 1493u);
+    CHECK(source->sio.ack_low != 0u);
+    CHECK(copy->sio.ack_low != 0u);
+    CHECK(ack_copy->sio.ack_low != 0u);
+    advance_to(source, start + 1494u);
+    advance_to(copy, start + 1494u);
+    advance_to(ack_copy, start + 1494u);
+    CHECK(source->sio.ack_low == 0u);
+    CHECK(copy->sio.ack_low == 0u);
+    CHECK(ack_copy->sio.ack_low == 0u);
+    write_mmio(source, JOY_CTRL, 2u, 0x1003u);
+    write_mmio(copy, JOY_CTRL, 2u, 0x1003u);
+    write_mmio(ack_copy, JOY_CTRL, 2u, 0x1003u);
+    CHECK_EQ_HEX(tap_exchange_triple(source, copy, ack_copy, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(tap_exchange_triple(source, copy, ack_copy, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(tap_exchange_triple(source, copy, ack_copy, 0x00u, 1),
+                 (uint8_t)source->pad.buttons[0]);
+    CHECK_EQ_HEX(tap_exchange_triple(source, copy, ack_copy, 0x00u, 0),
+                 (uint8_t)(source->pad.buttons[0] >> 8));
+    schway_destroy(ack_copy);
+    schway_destroy(copy);
+    schway_destroy(source);
+}
+
+static void tap_empty_and_invalid(void)
+{
+    schway *empty_a = make();
+    configure(empty_a, 0u);
+    tap_setup(empty_a, 0u);
+    schway__pad_set_connected(empty_a, 0u, 0u);
+    write_mmio(empty_a, JOY_DATA, 1u, 0x01u);
+    advance_to(empty_a, 1087u);
+    CHECK_EQ_U64(empty_a->sio.rx_count, 0u);
+    advance_to(empty_a, 1088u);
+    CHECK_EQ_HEX(read_mmio(empty_a, JOY_DATA, 1u), 0xFFu);
+    CHECK(empty_a->sio.ack_pending == 0u);
+    CHECK(empty_a->sio.ack_low == 0u);
+    CHECK_EQ_U64(empty_a->pad.transfers, 0u);
+    advance_to(empty_a, 1494u);
+    CHECK((empty_a->irq.stat & 0x80u) == 0u);
+    schway_destroy(empty_a);
+
+    schway *invalid = make();
+    configure(invalid, 0u);
+    tap_setup(invalid, 0u);
+    write_mmio(invalid, JOY_DATA, 1u, 0x05u);
+    advance_to(invalid, 1088u);
+    CHECK_EQ_HEX(read_mmio(invalid, JOY_DATA, 1u), 0xFFu);
+    CHECK(invalid->sio.ack_pending == 0u);
+    CHECK_EQ_U64(invalid->sio.tap_tx_mode[0], 0u);
+    CHECK_EQ_U64(invalid->sio.tap_history_req[0], 0u);
+    schway_destroy(invalid);
+
+    schway *empty_b = make();
+    configure(empty_b, 0u);
+    tap_setup(empty_b, 0u);
+    schway__pad_set_connected(empty_b, 2u, 0u);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x01u, 1), 0x5Au);
+    (void)exchange_byte(empty_b, 0x00u, 1);
+    (void)exchange_byte(empty_b, 0x00u, 0);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x00u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x00u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x00u, 1), (uint8_t)empty_b->pad.buttons[0]);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x00u, 1),
+                 (uint8_t)(empty_b->pad.buttons[0] >> 8));
+    for (uint32_t i = 0u; i < 4u; i++) {
+        CHECK_EQ_HEX(exchange_byte(empty_b, 0x00u, 1), 0xFFu);
+    }
+    for (uint32_t i = 0u; i < 8u; i++) {
+        CHECK_EQ_HEX(exchange_byte(empty_b, 0x00u, 1), 0xFFu);
+    }
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x00u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange_byte(empty_b, 0x00u, 1), 0x5Au);
+    schway_destroy(empty_b);
 }
 
 static void tap_poll_methods(void)
@@ -369,6 +590,17 @@ static void tap_poll_methods(void)
     for (uint32_t port = 0u; port < 2u; port++) {
         tap_method1_poll(inst, port);
     }
+    write_mmio(inst, JOY_CTRL, 2u, 0x3003u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x04u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x43u, 1), 0x73u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), (uint8_t)inst->pad.buttons[7]);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)(inst->pad.buttons[7] >> 8));
+    for (uint32_t axis = 0u; axis < 4u; axis++) {
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, axis != 3u),
+                     inst->pad.axes[7u * 4u + axis]);
+    }
+    CHECK_EQ_U64(inst->pad.config_mode[7], 1u);
     schway_destroy(inst);
 }
 
@@ -377,32 +609,61 @@ static void tap_history_edges(void)
     schway *inst = make();
     configure(inst, 0u);
     tap_setup(inst, 0u);
+    tap_setup(inst, 1u);
     write_mmio(inst, JOY_CTRL, 2u, 0x1003u);
     CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
     CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x41u);
     CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
     CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)inst->pad.buttons[0]);
     CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), (uint8_t)(inst->pad.buttons[0] >> 8));
+    CHECK_EQ_U64(inst->sio.tap_history_req[0], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_reply[0], 0u);
+    CHECK_EQ_U64(inst->sio.tap_history_req[1], 0u);
+    tap_method1_poll(inst, 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_req[1], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_reply[1], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_req[0], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_reply[0], 0u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1003u);
+    schway *copy = clone_state(inst);
 
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x01u, 1), 0x5Au);
     for (uint32_t i = 0u; i < 32u; i++) {
-        (void)exchange_byte(inst, 0x00u, i != 31u);
+        (void)tap_exchange_pair(inst, copy, 0x00u, i != 31u);
     }
+    CHECK_EQ_U64(inst->sio.tap_history_req[0], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_reply[0], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_req[1], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_reply[1], 1u);
 
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), 0x41u);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
-    (void)exchange_byte(inst, 0x00u, 1);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x00u, 0), 0x41u);
+    CHECK(inst->sio.ack_pending == 0u);
+    CHECK(copy->sio.ack_pending == 0u);
+    advance_to(inst, inst->ticks + 338u);
+    advance_to(copy, copy->ticks + 338u);
+    CHECK((inst->irq.stat & 0x80u) == 0u);
+    CHECK((copy->irq.stat & 0x80u) == 0u);
+    CHECK(inst->sio.ack_low == 0u);
+    CHECK(copy->sio.ack_low == 0u);
+    check_states_equal(inst, copy);
+    CHECK_EQ_U64(inst->sio.tap_history_reply[0], 2u);
+
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(tap_exchange_pair(inst, copy, 0x01u, 1), 0x5Au);
     for (uint32_t i = 0u; i < 31u; i++) {
-        (void)exchange_byte(inst, 0x00u, i != 30u);
+        (void)tap_exchange_pair(inst, copy, 0x00u, i != 30u);
     }
+    (void)tap_exchange_pair(inst, copy, 0x00u, 0);
+    schway_destroy(copy);
     schway_destroy(inst);
+    tap_pending_deadlines();
+    tap_empty_and_invalid();
 }
 
 static void independent_ports_instances(void)
