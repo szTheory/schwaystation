@@ -7,10 +7,10 @@ current_phase_name: Multitap and special controllers
 current_plan: 8
 status: executing
 stopped_at: Completed 14-07-PLAN.md
-last_updated: "2026-11-24T06:49:16.448Z"
+last_updated: "2026-11-24T06:54:31.632Z"
 last_activity: 2026-11-24
 last_activity_desc: Phase 14 Plan 14-07 complete; Codex GSD executor configured gpt-6-luna xhigh; two tasks, four task commits, 26m10s wall time; candidate-state validation and eight-card restore checks passed; focused selection passed 15/15; SIO-01 and SIO-03 remain complete; next Plan 14-08
-state_head: c0e2b82a8bd751f799238cdaab37c6f4ef35dd4f
+state_head: cac73ff5799977519bb547dcfb7e09e48408f876
 progress:
   total_phases: 10
   completed_phases: 7
@@ -1931,6 +1931,7 @@ Recent decisions affecting current work:
 - [Phase 14]: Jogcon supports only its documented native 42h payload; wire bit 0 of the raw dial halfword is cleared and its physical interpretation is not inferred.
 - [Phase 14]: Jogcon direction flags are turned-left and turned-right; software configuration and feedback commands return FF with no ACK.
 - [Phase 14]: Plan 14-07: cross-validate candidate pad, SIO and card protocol states before apply; preserve receiver-owned card media across restore. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 26m10s.
+- [Phase 14]: Scope legacy disc fixture prerequisites to their actual CTest consumers — The shared-directory TESTS property had added legacy setup/parity tests to unrelated focused selectors. Keep both fixture tests in the full inventory and retain dependencies on consumers; local configure and selector checks confirm unrelated state checks run alone while ECM guest and runner legacy checks still pull both prerequisites.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
