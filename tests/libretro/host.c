@@ -132,6 +132,7 @@ static void *(RETRO_CALLCONV *p_get_memory_data)(unsigned);
 static size_t(RETRO_CALLCONV *p_get_memory_size)(unsigned);
 static const uint8_t *(RETRO_CALLCONV *p_test_card2_data)(size_t *);
 static const char *(RETRO_CALLCONV *p_test_card2_path)(void);
+static int(RETRO_CALLCONV *p_test_poll_endpoint)(unsigned, unsigned, uint16_t *);
 
 static const char *missing;
 
@@ -179,6 +180,7 @@ static void resolve_all(int inspect_card2)
     if (inspect_card2) {
         RESOLVE(p_test_card2_data, "schway__libretro_test_card2_data");
         RESOLVE(p_test_card2_path, "schway__libretro_test_card2_path");
+        RESOLVE(p_test_poll_endpoint, "schway__libretro_test_poll_endpoint");
     }
 }
 
@@ -230,6 +232,9 @@ static char memory_addrspaces[MEMORY_DESCRIPTOR_CAP][64];
 static unsigned memory_descriptor_count;
 static const char *analog_mode_value = "analog";
 static const char *analog_toggle_value = "enabled";
+static unsigned multitap_player;
+static int multitap_test_mode;
+static unsigned multitap_callback_visits[2];
 static int rumble_available;
 static int rumble_axis_mode;
 static unsigned audio_tap_checks;
@@ -635,6 +640,15 @@ static void RETRO_CALLCONV on_poll(void)
 
 static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned index, unsigned id)
 {
+    if (multitap_test_mode && device == RETRO_DEVICE_JOYPAD && index == 0u && port < 2u) {
+        if ((port == 0u && id == RETRO_DEVICE_ID_JOYPAD_B) ||
+            (port == 1u && id == RETRO_DEVICE_ID_JOYPAD_A)) {
+            multitap_callback_visits[port]++;
+            if (port == multitap_player) {
+                return 1;
+            }
+        }
+    }
     if (rumble_axis_mode && device == RETRO_DEVICE_ANALOG && port < 2u) {
         if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_X) {
             return INT16_MIN;
@@ -1484,6 +1498,29 @@ static int test_input_descriptors(void)
     validate_input_descriptors(published_input_descriptors);
     p_deinit();
     validate_input_descriptors(published_input_descriptors);
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static int test_input_multitap(void)
+{
+    static const uint16_t expected_buttons[] = {UINT16_C(0xBFFF), UINT16_C(0xDFFF)};
+
+    CHECK(p_test_poll_endpoint != NULL);
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    for (unsigned player = 0u; player < 2u; player++) {
+        uint16_t buttons = 0u;
+        unsigned polls_before = input_poll_calls;
+        unsigned callbacks_before = multitap_callback_visits[player];
+        multitap_player = player;
+        p_run();
+        CHECK_EQ_U64(input_poll_calls, polls_before + 1u);
+        CHECK(multitap_callback_visits[player] > callbacks_before);
+        CHECK_EQ_U64(p_test_poll_endpoint(player, 0u, &buttons), 1u);
+        CHECK_EQ_U64(buttons, expected_buttons[player]);
+    }
+    p_unload_game();
+    p_deinit();
     module_close();
     return check_failures != 0 ? 1 : 0;
 }
@@ -5208,6 +5245,7 @@ int main(int argc, char **argv)
     int options_profile_mode = argc == 3 && strcmp(argv[2], "options-profile") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
+    int input_multitap_mode = argc == 3 && strcmp(argv[2], "input-multitap") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
@@ -5220,7 +5258,7 @@ int main(int argc, char **argv)
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
-    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode &&
+    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode && !input_multitap_mode &&
          !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
@@ -5295,7 +5333,7 @@ int main(int argc, char **argv)
         return 1;
     }
     /* Every entry point, before anything else is called. */
-    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode;
+    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode || input_multitap_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -5304,7 +5342,8 @@ int main(int argc, char **argv)
     }
     if (!inspect_card2 &&
         (module_sym("schway__libretro_test_card2_data") != NULL ||
-         module_sym("schway__libretro_test_card2_path") != NULL)) {
+         module_sym("schway__libretro_test_card2_path") != NULL ||
+         module_sym("schway__libretro_test_poll_endpoint") != NULL)) {
         fprintf(stderr, "production libretro module exports card test accessors\n");
         module_close();
         return 1;
@@ -5407,6 +5446,11 @@ int main(int argc, char **argv)
 
     if (input_descriptors_mode) {
         return test_input_descriptors();
+    }
+
+    if (input_multitap_mode) {
+        multitap_test_mode = 1;
+        return test_input_multitap();
     }
 
     if (psexe_mode) {

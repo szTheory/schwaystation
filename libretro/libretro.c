@@ -24,6 +24,9 @@
 #include "../host/disc_probe.h"
 #include "../runner/region.h"
 #include "xrgb8888.h"
+#if defined(SCHWAYSTATION_LIBRETRO_TESTING)
+#include "../src/internal.h"
+#endif
 
 #ifndef SCHWAYSTATION_CHD
 #define SCHWAYSTATION_CHD 0
@@ -109,6 +112,8 @@ static bool RETRO_CALLCONV lr_disk_get_image_label(unsigned index, char *label, 
 SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
 schway__libretro_test_card2_data(size_t *size);
 SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *buttons);
 #endif
 
 static struct retro_disk_control_ext_callback lr_disk_control = {
@@ -1768,6 +1773,82 @@ schway__libretro_test_card2_data(size_t *size)
 SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void)
 {
     return lr_card2_path[0] != '\0' ? lr_card2_path : NULL;
+}
+
+static int lr_test_write(uint32_t address, uint32_t width, uint32_t value)
+{
+    uint32_t cycles = 0u;
+    return inst != NULL && schway__bus_write(inst, address, width, value, &cycles) == 0u;
+}
+
+static int lr_test_read(uint32_t address, uint32_t width, uint32_t *value)
+{
+    uint32_t cycles = 0u;
+    return inst != NULL && schway__bus_read(inst, address, width, value, &cycles) == 0u;
+}
+
+static void lr_test_advance(uint64_t tick)
+{
+    inst->ticks = tick;
+    schway__sched_sync(inst);
+    schway__sched_run(inst);
+    schway__spu_catch_up(inst, inst->ticks);
+}
+
+static int lr_test_exchange(uint8_t sent, unsigned port, int ack, uint8_t *received)
+{
+    uint32_t value = 0u;
+    uint64_t start = inst->ticks;
+    uint32_t port_bit = port == 0u ? 0u : 0x2000u;
+    if (!lr_test_write(0x1F801040u, 1u, sent)) {
+        return 0;
+    }
+    lr_test_advance(start + 1088u);
+    if (!lr_test_read(0x1F801040u, 1u, &value)) {
+        return 0;
+    }
+    *received = (uint8_t)value;
+    if (ack) {
+        lr_test_advance(start + 1426u);
+        if (!lr_test_write(0x1F801070u, 4u, 0u) ||
+            !lr_test_write(0x1F80104Au, 2u, 0x1013u | port_bit)) {
+            return 0;
+        }
+        lr_test_advance(start + 1494u);
+        return lr_test_write(0x1F80104Au, 2u, 0x1003u | port_bit);
+    }
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *buttons)
+{
+    uint8_t address_reply, id_reply, marker_reply, low_reply, high_reply;
+    uint32_t port_bit = port == 0u ? 0u : 0x2000u;
+    if (inst == NULL || buttons == NULL || port >= 2u || socket >= 4u ||
+        (socket != 0u && inst->pad.multitap[port] == 0u)) {
+        return 0;
+    }
+    if (!lr_test_write(0x1F801048u, 2u, 0x000Cu) ||
+        !lr_test_write(0x1F80104Eu, 2u, 0x0088u) ||
+        !lr_test_write(0x1F80104Au, 2u, 0x1003u | port_bit)) {
+        return 0;
+    }
+    if (!lr_test_exchange((uint8_t)(socket + 1u), port, 1, &address_reply)) {
+        return 0;
+    }
+    if (!lr_test_exchange(0x42u, port, 1, &id_reply) ||
+        !lr_test_exchange(0u, port, 1, &marker_reply) ||
+        !lr_test_exchange(0u, port, 1, &low_reply) ||
+        !lr_test_exchange(0u, port, 0, &high_reply)) {
+        return 0;
+    }
+    if (address_reply != 0xFFu || (id_reply != 0x41u && id_reply != 0x73u) ||
+        marker_reply != 0x5Au) {
+        return 0;
+    }
+    *buttons = (uint16_t)((uint16_t)low_reply | (uint16_t)((uint16_t)high_reply << 8));
+    return 1;
 }
 #undef SCHWAYSTATION_TEST_EXPORT
 #endif
