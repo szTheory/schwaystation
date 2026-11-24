@@ -138,6 +138,150 @@ static void next_input_frame(schway *inst, uint8_t analog_button)
     CHECK_EQ_U64(schway_run_frame(inst, NULL), SCHWAY_STATUS_OK);
 }
 
+static uint32_t endpoint_index(uint32_t port, uint32_t socket)
+{
+    return socket == 0u ? port : 2u + port * 3u + socket - 1u;
+}
+
+static uint8_t direct_endpoint_id(schway *inst, uint32_t endpoint)
+{
+    uint8_t received = 0u;
+    CHECK_EQ_U64(schway__pad_byte(inst, endpoint, 0x01u, inst->ticks, &received), 1u);
+    CHECK_EQ_HEX(received, 0xFFu);
+    CHECK_EQ_U64(schway__pad_byte(inst, endpoint, 0x42u, inst->ticks, &received), 1u);
+    uint8_t id = received;
+    CHECK_EQ_U64(schway__pad_byte(inst, endpoint, 0x00u, inst->ticks, &received), 1u);
+    CHECK_EQ_HEX(received, 0x5Au);
+    uint32_t count = id == 0x73u ? 6u : 2u;
+    for (uint32_t i = 0u; i < count; i++) {
+        uint32_t ack = schway__pad_byte(inst, endpoint, 0x00u, inst->ticks, &received);
+        CHECK_EQ_U64(ack, i + 1u < count ? 1u : 0u);
+    }
+    return id;
+}
+
+static void eight_endpoint_input_latch(void)
+{
+    schway *inst = make();
+    schway_input first;
+    memset(&first, 0, sizeof first);
+    first.size = (uint32_t)sizeof first;
+    first.multitap[0] = 1u;
+    first.multitap[1] = 1u;
+    first.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    first.buttons[0] = UINT16_C(0x00FF);
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = endpoint_index(port, socket);
+            schway_controller_input *controller = &first.controllers[port][socket];
+            controller->device = endpoint == 0u ? SCHWAY_INPUT_DEVICE_DIGITAL
+                                  : endpoint == 2u ? SCHWAY_INPUT_DEVICE_DUALSHOCK
+                                                   : endpoint % 7u;
+            controller->buttons = (uint16_t)(UINT16_C(0x0101) * (endpoint + 1u));
+            for (uint32_t axis = 0u; axis < 4u; axis++) {
+                controller->axes[axis] = (uint8_t)(10u * (axis + 1u) + endpoint);
+            }
+            controller->analog_button = (uint8_t)(endpoint & 1u);
+            controller->mouse_dx = (int16_t)((int32_t)endpoint - 4);
+            controller->mouse_dy = (int16_t)(4 - (int32_t)endpoint);
+            controller->negcon_twist = (uint8_t)(20u + endpoint);
+            controller->negcon_i = (uint8_t)(30u + endpoint);
+            controller->negcon_ii = (uint8_t)(40u + endpoint);
+            controller->negcon_l = (uint8_t)(50u + endpoint);
+            controller->jogcon_dial = (uint16_t)(100u + endpoint);
+            controller->jogcon_flags = (uint16_t)(endpoint & 3u);
+        }
+    }
+    CHECK_EQ_U64(schway_set_input(inst, &first), SCHWAY_STATUS_OK);
+    schway__pad_frame_start(inst);
+    CHECK_EQ_U64(inst->pad.pending_valid, 0u);
+    CHECK_EQ_U64(inst->pad.multitap[0], 1u);
+    CHECK_EQ_U64(inst->pad.multitap[1], 1u);
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = endpoint_index(port, socket);
+            const schway_controller_input *controller = &first.controllers[port][socket];
+            CHECK_EQ_U64(inst->pad.device[endpoint], controller->device);
+            CHECK_EQ_U64(inst->pad.present[endpoint],
+                         controller->device != SCHWAY_INPUT_DEVICE_NONE ? 1u : 0u);
+            CHECK_EQ_HEX(inst->pad.buttons[endpoint], (uint16_t)~controller->buttons);
+            CHECK(memcmp(&inst->pad.axes[endpoint * 4u], controller->axes, 4u) == 0);
+            CHECK_EQ_U64(inst->pad.analog_button[endpoint], controller->analog_button);
+            CHECK_EQ_U64(inst->pad.mouse_dx[endpoint],
+                         (uint16_t)((int32_t)controller->mouse_dx - INT16_MIN));
+            CHECK_EQ_U64(inst->pad.mouse_dy[endpoint],
+                         (uint16_t)((int32_t)controller->mouse_dy - INT16_MIN));
+            CHECK_EQ_U64(inst->pad.negcon_twist[endpoint], controller->negcon_twist);
+            CHECK_EQ_U64(inst->pad.negcon_i[endpoint], controller->negcon_i);
+            CHECK_EQ_U64(inst->pad.negcon_ii[endpoint], controller->negcon_ii);
+            CHECK_EQ_U64(inst->pad.negcon_l[endpoint], controller->negcon_l);
+            CHECK_EQ_U64(inst->pad.jogcon_dial[endpoint], controller->jogcon_dial);
+            CHECK_EQ_U64(inst->pad.jogcon_flags[endpoint], controller->jogcon_flags);
+        }
+    }
+    CHECK_EQ_HEX(direct_endpoint_id(inst, 0u), 0x41u);
+    CHECK_EQ_HEX(direct_endpoint_id(inst, 2u), 0x73u);
+
+    schway_input next;
+    memset(&next, 0, sizeof next);
+    next.size = (uint32_t)sizeof next;
+    next.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    next.device[1] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
+    next.buttons[0] = UINT16_C(0xA55A);
+    next.buttons[1] = UINT16_C(0xC33C);
+    next.axes[0][0] = 11u;
+    next.axes[1][0] = 22u;
+    next.controllers[0][0].mouse_dx = -100;
+    next.controllers[0][0].mouse_dy = 100;
+    next.controllers[0][0].negcon_twist = 1u;
+    next.controllers[0][0].negcon_i = 2u;
+    next.controllers[0][0].negcon_ii = 3u;
+    next.controllers[0][0].negcon_l = 4u;
+    next.controllers[0][0].jogcon_dial = 5u;
+    next.controllers[0][0].jogcon_flags = 3u;
+    next.controllers[1][0].mouse_dx = -200;
+    next.controllers[1][0].mouse_dy = 200;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 1u; socket < 4u; socket++) {
+            next.controllers[port][socket].device = SCHWAY_INPUT_DEVICE_MOUSE;
+            next.controllers[port][socket].buttons = UINT16_MAX;
+            next.controllers[port][socket].mouse_dx = 123;
+            next.controllers[port][socket].negcon_twist = 99u;
+        }
+    }
+    CHECK_EQ_U64(schway_set_input(inst, &next), SCHWAY_STATUS_OK);
+    schway__pad_frame_start(inst);
+    CHECK_EQ_U64(inst->pad.pending_valid, 1u);
+    CHECK_EQ_U64(inst->pad.multitap[0], 1u);
+    CHECK_EQ_HEX(inst->pad.buttons[2], (uint16_t)~first.controllers[0][1].buttons);
+
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    CHECK_EQ_U64(inst->pad.pending_valid, 0u);
+    CHECK_EQ_U64(inst->pad.multitap[0], 0u);
+    CHECK_EQ_U64(inst->pad.multitap[1], 0u);
+    CHECK_EQ_U64(inst->pad.device[0], SCHWAY_INPUT_DEVICE_DIGITAL);
+    CHECK_EQ_U64(inst->pad.device[1], SCHWAY_INPUT_DEVICE_DUALSHOCK);
+    CHECK_EQ_HEX(inst->pad.buttons[0], (uint16_t)~next.buttons[0]);
+    CHECK_EQ_HEX(inst->pad.buttons[1], (uint16_t)~next.buttons[1]);
+    CHECK_EQ_U64(inst->pad.axes[0], next.axes[0][0]);
+    CHECK_EQ_U64(inst->pad.axes[4], next.axes[1][0]);
+    CHECK_EQ_U64(inst->pad.mouse_dx[0], (uint16_t)(-100 - INT16_MIN));
+    CHECK_EQ_U64(inst->pad.mouse_dy[0], (uint16_t)(100 - INT16_MIN));
+    CHECK_EQ_U64(inst->pad.negcon_twist[0], 1u);
+    CHECK_EQ_U64(inst->pad.jogcon_dial[0], 5u);
+    CHECK_EQ_U64(inst->pad.jogcon_flags[0], 3u);
+    for (uint32_t endpoint = 2u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
+        CHECK_EQ_U64(inst->pad.device[endpoint], SCHWAY_INPUT_DEVICE_NONE);
+        CHECK_EQ_U64(inst->pad.present[endpoint], 0u);
+        CHECK_EQ_HEX(inst->pad.buttons[endpoint], UINT16_MAX);
+        CHECK_EQ_U64(inst->pad.mouse_dx[endpoint], UINT16_C(32768));
+        CHECK_EQ_U64(inst->pad.negcon_twist[endpoint], 0u);
+        CHECK_EQ_U64(inst->pad.jogcon_dial[endpoint], 0u);
+    }
+    schway_destroy(inst);
+}
+
 static void enter_config(schway *inst)
 {
     const uint8_t enter[] = {1u, 0u, 0u, 0u, 0u, 0u};
@@ -411,6 +555,7 @@ int main(int argc, char **argv)
         return 2;
     }
     if (strcmp(argv[1], "input_latch_and_rumble") == 0) {
+        eight_endpoint_input_latch();
         input_latch_and_rumble();
     } else if (strcmp(argv[1], "config_commands") == 0) {
         config_commands();

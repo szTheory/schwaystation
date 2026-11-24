@@ -49,9 +49,9 @@ _Static_assert(SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT == 6u,
                "API v9 dual analog flight identifier");
 
 typedef struct observed_input {
-    uint16_t buttons[2];
-    uint8_t axes[8];
-    uint8_t devices[2];
+    uint16_t buttons[8];
+    uint8_t axes[32];
+    uint8_t devices[8];
     uint32_t saw_buttons;
     uint32_t saw_axes;
     uint32_t saw_devices;
@@ -74,13 +74,13 @@ static void observe_input(void *user, const char *name, const void *data,
                           uint32_t count, uint32_t width)
 {
     observed_input *observed = (observed_input *)user;
-    if (strcmp(name, "pad.buttons") == 0 && count == 2u && width == 2u) {
+    if (strcmp(name, "pad.buttons") == 0 && count == 8u && width == 2u) {
         memcpy(observed->buttons, data, sizeof observed->buttons);
         observed->saw_buttons = 1u;
-    } else if (strcmp(name, "pad.axes") == 0 && count == 8u && width == 1u) {
+    } else if (strcmp(name, "pad.axes") == 0 && count == 32u && width == 1u) {
         memcpy(observed->axes, data, sizeof observed->axes);
         observed->saw_axes = 1u;
-    } else if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
+    } else if (strcmp(name, "pad.device") == 0 && count == 8u && width == 1u) {
         memcpy(observed->devices, data, sizeof observed->devices);
         observed->saw_devices = 1u;
     }
@@ -96,7 +96,7 @@ static void check_legacy_input(schway *inst, const schway_current_input *input)
     CHECK_EQ_U64(observed.saw_devices, 1u);
     CHECK_EQ_HEX(observed.buttons[0], (uint16_t)~input->buttons[0]);
     CHECK_EQ_HEX(observed.buttons[1], (uint16_t)~input->buttons[1]);
-    CHECK(memcmp(observed.axes, input->axes, sizeof observed.axes) == 0);
+    CHECK(memcmp(observed.axes, input->axes, sizeof input->axes) == 0);
     CHECK_EQ_U64(observed.devices[0], input->device[0]);
     CHECK_EQ_U64(observed.devices[1], input->device[1]);
 }

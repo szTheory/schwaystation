@@ -8,32 +8,43 @@
 
 struct schway__state_io;
 
+enum { SCHWAY__PAD_ENDPOINT_COUNT = 8, SCHWAY__PAD_RUMBLE_MAP_SIZE = 48 };
+
 struct schway__pad {
-    uint16_t buttons[2];
-    uint8_t axes[8];
-    uint8_t present[2];
-    uint8_t device[2];
-    uint8_t phase[2];
-    uint8_t command[2];
-    uint8_t data_index[2];
-    uint8_t config_mode[2];
-    uint8_t response_mode[2];
-    uint8_t analog_mode[2];
-    uint8_t analog_button[2];
-    uint8_t analog_lock[2];
-    uint8_t selector[2];
-    uint8_t old_rumble[2];
-    uint8_t rumble_locked[2];
-    uint8_t rumble_map_valid[2];
-    uint8_t rumble_large[2];
-    uint8_t rumble_small[2];
-    uint8_t rumble_stage_large[2];
-    uint8_t rumble_stage_small[2];
-    uint8_t rumble_map[12];
-    uint8_t rumble_map_stage[12];
+    uint16_t buttons[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t axes[4u * SCHWAY__PAD_ENDPOINT_COUNT];
+    uint16_t mouse_dx[SCHWAY__PAD_ENDPOINT_COUNT]; /* signed input + 32768 */
+    uint16_t mouse_dy[SCHWAY__PAD_ENDPOINT_COUNT]; /* signed input + 32768 */
+    uint8_t negcon_twist[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t negcon_i[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t negcon_ii[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t negcon_l[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint16_t jogcon_dial[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint16_t jogcon_flags[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t present[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t device[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t phase[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t command[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t data_index[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t config_mode[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t response_mode[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t analog_mode[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t analog_button[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t analog_lock[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t selector[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t old_rumble[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t rumble_locked[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t rumble_map_valid[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t rumble_large[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t rumble_small[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t rumble_stage_large[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t rumble_stage_small[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t rumble_map[SCHWAY__PAD_RUMBLE_MAP_SIZE];
+    uint8_t rumble_map_stage[SCHWAY__PAD_RUMBLE_MAP_SIZE];
+    uint8_t multitap[2];
     uint8_t frame_polls;
     uint8_t frame_latched;
-    uint64_t watchdog_deadline[2];
+    uint64_t watchdog_deadline[SCHWAY__PAD_ENDPOINT_COUNT];
     uint64_t transfers;
     schway_input pending_input; /* host-owned input is deliberately not saved */
     uint8_t pending_valid;
