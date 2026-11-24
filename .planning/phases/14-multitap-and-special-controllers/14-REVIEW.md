@@ -1,108 +1,116 @@
 ---
 phase: 14-multitap-and-special-controllers
-reviewed: 2026-11-24T13:12:58Z
+reviewed: 2026-11-24T13:33:15Z
 depth: standard
-files_reviewed: 45
+files_reviewed: 6
 files_reviewed_list:
-  - docs/compatibility.md
-  - docs/controllers.md
-  - docs/embedding.md
   - docs/hardware/sio.md
   - docs/runner.md
-  - docs/saves.md
-  - docs/testing.md
-  - host/cards.c
-  - host/cards.h
-  - include/schwaystation.h
-  - libretro/libretro.c
-  - quality.json
   - runner/main.c
-  - src/card.c
-  - src/card.h
-  - src/frame.c
-  - src/instance.c
-  - src/internal.h
-  - src/pad.c
-  - src/pad.h
   - src/sio.c
-  - src/sio.h
-  - src/state.h
-  - tests/abi/inventory.txt
-  - tests/abi/tests.cmake
-  - tests/api/v9.c
-  - tests/card/card_tests.c
-  - tests/card/files.c
-  - tests/card/inventory.txt
-  - tests/card/tests.cmake
-  - tests/compat/features.csv
-  - tests/compat/tests.cmake
-  - tests/core/test_core.c
   - tests/core/test_state.c
-  - tests/disc/tests.cmake
-  - tests/fixtures/tests.cmake
-  - tests/libretro/host.c
-  - tests/libretro/inventory.txt
-  - tests/libretro/tests.cmake
-  - tests/runner/inventory.txt
   - tests/runner/tests.cmake
-  - tests/sio/inventory.txt
-  - tests/sio/pad_tests.c
-  - tests/sio/sio_tests.c
-  - tests/sio/tests.cmake
 findings:
-  critical: 2
-  warning: 2
+  critical: 1
+  warning: 1
   info: 0
-  total: 4
+  total: 2
   necessity: 0
 status: issues_found
 ---
 
 # Phase 14: Code Review Report
 
-**Reviewed:** 2026-11-24T13:12:58Z  
-**Depth:** standard  
-**Files Reviewed:** 45  
+**Reviewed:** 2026-11-24T13:33:15Z
+**Depth:** standard
+**Files Reviewed:** 6 (incremental scope)
 **Status:** issues_found
 
 ## Summary
 
-The review covered the resolver's 33 `files` entries and all 12 `outsideUnion` entries, for 45 distinct paths; all were present on disk. The resolver marked `14-11-SUMMARY.md` unparsed. That summary exists and was read directly, so its source changes were still accounted for. The main concerns are a malformed multitap state that can reach undefined behavior and runner input movies losing socket A controls when a tap is enabled. Two documentation pages also retain outdated card counts. No tests were run as part of this read-only review.
+This incremental review covered the six files returned by the phase-scope resolver for changes since `f033365`. The resolver returned `degraded` (`no-task-commits-since`), but its usable file list matched the requested scope and every file was present. The original standard-depth review covered 45 files and recorded two critical issues and two warnings. All four fixes are recorded in [14-REVIEW-FIX.md](14-REVIEW-FIX.md). The current changes fix the long-reply index bound, restore legacy movie input on tapped socket A, and update card-socket documentation. This re-review found one reachable short-reply state that the new bound rejects and one stale card-naming description. No tests were run for this static re-review.
 
-## Critical Issues
+## Initial Review Record (historical; fixed)
 
-### CR-01: Accepted multitap state can reach an out-of-range shift
+The initial 45-file review recorded these findings; the fix report documents each resolution and its commit:
+
+- **CR-01:** Accepted multitap state could reach an out-of-range shift — fixed in `cc6eeb1`.
+- **CR-02:** Runner input movies stopped controlling socket A when a tap was enabled — fixed in `b88bc11`.
+- **WR-01:** SIO documentation described only two card slots — fixed in `ee834d8`.
+- **WR-02:** The runner `--save-dir` summary promised two card files — fixed in `ea7ab0b`.
+
+See [14-REVIEW-FIX.md](14-REVIEW-FIX.md) for the fix descriptions and recorded verification. Those four findings are historical and are not included in the current finding counts below.
+
+The original review scope was:
+
+- `docs/compatibility.md`
+- `docs/controllers.md`
+- `docs/embedding.md`
+- `docs/hardware/sio.md`
+- `docs/runner.md`
+- `docs/saves.md`
+- `docs/testing.md`
+- `host/cards.c`
+- `host/cards.h`
+- `include/schwaystation.h`
+- `libretro/libretro.c`
+- `quality.json`
+- `runner/main.c`
+- `src/card.c`
+- `src/card.h`
+- `src/frame.c`
+- `src/instance.c`
+- `src/internal.h`
+- `src/pad.c`
+- `src/pad.h`
+- `src/sio.c`
+- `src/sio.h`
+- `src/state.h`
+- `tests/abi/inventory.txt`
+- `tests/abi/tests.cmake`
+- `tests/api/v9.c`
+- `tests/card/card_tests.c`
+- `tests/card/files.c`
+- `tests/card/inventory.txt`
+- `tests/card/tests.cmake`
+- `tests/compat/features.csv`
+- `tests/compat/tests.cmake`
+- `tests/core/test_core.c`
+- `tests/core/test_state.c`
+- `tests/disc/tests.cmake`
+- `tests/fixtures/tests.cmake`
+- `tests/libretro/host.c`
+- `tests/libretro/inventory.txt`
+- `tests/libretro/tests.cmake`
+- `tests/runner/inventory.txt`
+- `tests/runner/tests.cmake`
+- `tests/sio/inventory.txt`
+- `tests/sio/pad_tests.c`
+- `tests/sio/sio_tests.c`
+- `tests/sio/tests.cmake`
+
+## Narrative Findings (AI reviewer)
+
+### Critical Issues
+
+#### CR-03: Short-reply index bound rejects a reachable save state
 
 **Severity:** BLOCKER  
-**File:** `src/sio.c:244, 301-321, 595-618`; `src/state.c:247-268`  
-**Issue:** The state reader accepts `sio.tap_tx_index` through 35, while a Method 1 long reply completes at index 34. The cross-field checks require a non-idle mode, nonzero index, enabled tap, same physical port and Slot A in the mask, but impose no mode-specific index bound. A checksummed state with long mode and index 35 therefore passes validation and is applied. Further transmitted bytes never finish that transfer; when the 8-bit index wraps, `index - 3u` underflows and the handler evaluates `1u << socket` with a shift count greater than the width of `unsigned`, which is undefined behavior.
-**Fix:** Reject impossible mode/index combinations during state validation. At minimum, cap the long-reply index at 34; add mode-specific bounds so other transaction modes cannot resume beyond their terminal byte.
+**File:** `src/sio.c:40-41, 53-56, 575-588`; `tests/core/test_state.c:605-610`
+**Issue:** After processing the short reply's second byte at index 2, `tap_byte` ACKs it and increments `tap_tx_index` to 3. Index 3 is the next live transaction position; processing that byte returns the slot ID and finishes the transaction. The new `TAP_SHORT_LAST_INDEX = 2` bound rejects index 3 during state validation, even though `schway_save_state` can serialize this reachable in-flight state. Loading that saved state therefore returns `SCHWAY_STATUS_ERR_STATE_FIELD` instead of resuming the transfer. The new malformed-state test also labels index 3 as past-terminal, cementing the off-by-one error.
+**Fix:** Allow the terminal pending-byte position, index 3, for `TAP_SHORT`; reject index 4 instead. Add a save/load roundtrip at the reachable short-reply index 3, while retaining the checksummed invalid-state test at index 4.
 
-### CR-02: Runner input movies stop controlling socket A when a tap is enabled
+### Warnings
 
-**Severity:** BLOCKER  
-**File:** `runner/main.c:1873-1875`; `runner/inputs.c:129-169`; `src/pad.c:148-166`  
-**Issue:** The runner movie parser writes the existing `p1` and `p2` grammar into the legacy `device`, `buttons`, `axes` and `analog_button` fields. The runner then sets `input_snapshot.multitap`, but leaves `controllers[port][0]` zeroed. When a tap is enabled, `schway__pad_frame_start` takes socket A's device and controls only from that zeroed endpoint entry and ignores the legacy fields. The corresponding movie-controlled player is therefore disconnected for each tapped port.
-**Fix:** Preserve the current two-port movie contract by copying each legacy port snapshot into `controllers[port][0]` whenever that port's tap is enabled, before calling `schway_set_input`. Keep the other sockets disconnected until the runner has an input format for them.
-
-## Warnings
-
-### WR-01: SIO documentation still describes only two card slots
+#### WR-03: Runner naming option still promises two card files
 
 **Severity:** WARNING  
-**File:** `docs/hardware/sio.md:3-5, 108-111`  
-**Issue:** The page says there is one card per port and later says “Both slots” own separate card spans, but Phase 14 adds four card sockets per port and routes addresses `81h`–`84h` when a tap is enabled. Readers of this protocol page are not told that the additional card endpoints exist.
-**Fix:** Describe all eight physical port/socket card endpoints and clarify that the existing direct card address selects socket A when taps are disabled.
-
-### WR-02: Runner save-directory option still promises two card files
-
-**Severity:** WARNING  
-**File:** `docs/runner.md:48`  
-**Issue:** The option table says `--save-dir` loads and saves “the two memory cards,” while the same page's card section documents importing all eight socket files. The option summary gives users an outdated description of the runner's persistence behavior.
-**Fix:** Change the option summary to say it loads and saves all eight card sockets under the directory.
+**File:** `docs/runner.md:48-50, 192-197`
+**Issue:** The `--save-dir` option now correctly says the runner loads and saves all eight sockets, and the detailed section says all eight files are imported. The adjacent `--memcard-names` row still describes naming “both card files,” so users can reasonably infer serial naming covers only the two legacy socket-A files even though it supplies the basename for all eight per-port/socket paths.
+**Fix:** Change “both card files” to “all eight card socket files” (or equivalently say the naming mode selects the basename used for all eight socket paths).
 
 ---
 
-_Reviewed: 2026-11-24T13:12:58Z_  
-_Reviewer: the agent (gsd-code-reviewer)_  
+_Reviewed: 2026-11-24T13:33:15Z_
+_Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
