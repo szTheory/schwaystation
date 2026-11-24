@@ -598,7 +598,7 @@ static void mouse_direct_vectors(void)
         input.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
         set_direct_mouse(&input, 0u, 1u << 10, values[i], values[i]);
         latch_input(inst, &input);
-        uint8_t payload[] = {0x00u, 0x08u, signed_mouse_byte(values[i]),
+        uint8_t payload[] = {0xFFu, 0xF8u, signed_mouse_byte(values[i]),
                              signed_mouse_byte(values[i])};
         poll(inst, 0x12u, payload, 4u, NULL);
         if (i == 0u || i == 4u || i == 8u) {
@@ -616,12 +616,12 @@ static void mouse_direct_vectors(void)
     (void)exchange(inst, 0x00u, 1);
     (void)exchange(inst, 0x00u, 1);
     schway__pad_abort(inst, 0u);
-    uint8_t payload[] = {0x00u, 0x0Cu, 64u, 0xC0u};
+    uint8_t payload[] = {0xFFu, 0xFCu, 64u, 0xC0u};
     poll(inst, 0x12u, payload, 4u, NULL);
 
     schway__pad_frame_end(inst);
     schway__pad_frame_start(inst);
-    uint8_t stopped[] = {0x00u, 0x0Cu, 0x00u, 0x00u};
+    uint8_t stopped[] = {0xFFu, 0xFCu, 0x00u, 0x00u};
     poll(inst, 0x12u, stopped, 4u, NULL);
     CHECK_EQ_U64(inst->pad.mouse_dx[0], UINT16_C(32768));
     CHECK_EQ_U64(inst->pad.mouse_dy[0], UINT16_C(32768));
@@ -679,7 +679,7 @@ static void mouse_tap_and_startup_ack(void)
     CHECK_EQ_HEX(exchange(inst, 0x04u, 1), 0xFFu);
     CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x12u);
     CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0x5Au);
-    uint8_t method2[] = {0x00u, 0x08u, 0x7Fu, 0x80u};
+    uint8_t method2[] = {0xFFu, 0xF8u, 0x7Fu, 0x80u};
     for (uint32_t i = 0u; i < sizeof method2; i++) {
         CHECK_EQ_HEX(exchange(inst, 0x00u, i + 1u < sizeof method2), method2[i]);
     }
@@ -705,7 +705,7 @@ static void mouse_tap_and_startup_ack(void)
     CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
     uint8_t first_record[] = {0x41u, 0x5Au, 0xFFu, 0xFFu,
                               0xFFu, 0xFFu, 0xFFu, 0xFFu};
-    uint8_t mouse_record[] = {0x12u, 0x5Au, 0x00u, 0x08u, 0x7Fu, 0x80u, 0xFFu, 0xFFu};
+    uint8_t mouse_record[] = {0x12u, 0x5Au, 0xFFu, 0xF8u, 0x7Fu, 0x80u, 0xFFu, 0xFFu};
     for (uint32_t i = 0u; i < 32u; i++) {
         uint8_t expected = i < 8u ? first_record[i]
                                    : i >= 24u ? mouse_record[i - 24u] : 0xFFu;

@@ -193,7 +193,8 @@ void schway__pad_frame_start(schway *inst)
                 }
                 inst->pad.analog_button[endpoint] = pressed;
                 inst->pad.buttons[endpoint] = device == SCHWAY_INPUT_DEVICE_MOUSE
-                                                  ? (uint16_t)(0x0C00u & (uint16_t)~buttons)
+                                                  ? (uint16_t)(0xF0FFu |
+                                                               (0x0C00u & (uint16_t)~buttons))
                                                   : (uint16_t)~buttons;
                 if (axes != NULL) {
                     memcpy(&inst->pad.axes[endpoint * 4u], axes, 4u);
