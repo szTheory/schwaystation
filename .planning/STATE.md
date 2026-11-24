@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 4
+current_plan: 5
 status: executing
-stopped_at: Completed 14-03-PLAN.md
-last_updated: "2026-11-24T04:37:12.637Z"
+stopped_at: Completed 14-04-PLAN.md
+last_updated: "2026-11-24T05:22:01.229Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-03 complete; Codex GSD executor configured gpt-6-luna xhigh; three task commits; focused local SIO tests passed; next Plan 14-04
-state_head: 8b876d085a92b2e03639bdf7f0b3038bd883ea4e
+last_activity_desc: Phase 14 Plan 14-04 complete; Codex GSD executor configured gpt-6-luna xhigh; four plan commits; eight focused tap/card selectors and three card-state selectors passed; SIO-01 complete; next Plan 14-05
+state_head: 3158414dabfd05d82f3596e69bd5f072614f2315
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 91
-  completed_plans: 82
+  completed_plans: 83
   percent: 70
 ---
 
@@ -26,16 +26,29 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-03 complete; Plan 14-04 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-04 complete; Plan 14-05 next)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-03 complete; Codex GSD executor configured gpt-6-luna xhigh (primary runtime model ID unavailable); three task commits; focused local SIO tests passed
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 context gathered and planning next. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-04 complete; Codex GSD executor configured gpt-6-luna xhigh (primary runtime model ID unavailable); four plan commits; focused tap/card tests passed; SIO-01 complete
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 4/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-04 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor, configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Measured
+wall interval was 38m59s (04:41:54–05:20:53 UTC); active time was not separately measured. Two tasks produced four
+plan commits: `1084eb1` (API RED), `c3cfb29` (eight-slot API/storage), `8b23612` (routing RED), and `3158414`
+(socket routing and docs). The card and SIO inventories sorted cleanly; exact selector preflights passed before
+the focused builds. API configure/build and ABI checks passed. The focused tap/card selection passed 8/8 in
+0.08s, followed by the affected state-restore selectors passing 3/3 in 1.00s. Both task RED-evidence checks
+returned `RED_EVIDENCE_OK`. One PocketStation test expectation was corrected to match the fixture's unset flags,
+and the affected selectors passed afterward. No workflow wiring changed, so no Act or hosted run was needed; no
+Docker resources were created. Plan 14-03 controller-slot evidence plus this plan's independent card routing,
+storage and protocol-state coverage complete SIO-01. Plan 14-05 is next.
 
 ### Phase 14 Plan 14-03 execution (2026-11-24)
 
@@ -1399,6 +1412,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P01 | 15m35s | 3 tasks | 11 files |
 | Phase 14 P02 | 36m | 3 tasks | 10 files |
 | Phase 14 P03 | 31m31s | 2 tasks | 4 files |
+| Phase 14 P04 | 39min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -1853,6 +1867,8 @@ Recent decisions affecting current work:
 - [Phase 14]: Method 1 REQ is request history for the next transaction and is evaluated with the previous response kind.
 - [Phase 14]: Tap routing and request history remain independent per physical SIO port.
 - [Phase 14]: Existing pad byte FSMs produce socket data and preserve each device's response length.
+- [Phase 14]: Legacy card 1/2 APIs remain fixed aliases for port 1/2 socket A, independent of tap configuration.
+- [Phase 14]: Serialize selected SIO card endpoint state, never card image bytes or generations.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2103,8 +2119,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T04:37:12.230Z
-Stopped at: Completed 14-03-PLAN.md
+Last session: 2026-11-24T05:22:00.962Z
+Stopped at: Completed 14-04-PLAN.md
 Resume file: None
 
 ### v1.0 session history

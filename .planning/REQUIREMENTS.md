@@ -51,7 +51,7 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 
 ### Serial peripherals and light guns
 
-- [ ] **SIO-01**: The multitap works on both SIO ports with four independently selected controller/card slots per tap, correct protocol lengths, acknowledgements, interrupts and empty-slot behavior; tap cards remain independent and persist through the save lifecycle.
+- [x] **SIO-01**: The multitap works on both SIO ports with four independently selected controller/card slots per tap, correct protocol lengths, acknowledgements, interrupts and empty-slot behavior; tap cards remain independent and persist through the save lifecycle.
 - [ ] **SIO-02**: The mouse protocol reports deterministic frame-latched integer movement and buttons with documented saturation/reset behavior, tested through serial vectors and the libretro input mapping.
 - [ ] **SIO-03**: neGcon and Jogcon report their documented serial/configuration modes and frame-latched integer controls with bounded, deterministic protocol tests; unsupported modes fail explicitly.
 - [ ] **SIO-04**: Dual Analog flight mode reports its documented analog axes/buttons through the existing size-tagged input boundary and libretro mapping, without changing the behavior of existing digital-pad or DualShock callers.
@@ -107,7 +107,7 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | PROFILE-02 | Phase 13 | Complete |
 | BOOT-01 | Phase 13 | Complete |
 | MDEC-01 | Phase 13 | Complete |
-| SIO-01 | Phase 14 | Pending |
+| SIO-01 | Phase 14 | Complete |
 | SIO-02 | Phase 14 | Pending |
 | SIO-03 | Phase 14 | Pending |
 | SIO-04 | Phase 14 | Pending |
