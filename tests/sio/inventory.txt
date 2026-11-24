@@ -13,6 +13,12 @@ sio.pad.old_rumble	portable,sio
 sio.pad.state_split_config	portable,sio
 sio.pad.watchdog_boundary	portable,sio
 sio.peek.pure	portable,sio
+sio.special.flight	portable,sio
+sio.special.jogcon	portable,sio
+sio.special.mouse	portable,sio
+sio.special.negcon	portable,sio
 sio.state.pending_ack	portable,sio
 sio.state.pending_byte	portable,sio
+sio.tap.history_edges	portable,sio
+sio.tap.poll_methods	portable,sio
 sio.transport.abort	portable,sio

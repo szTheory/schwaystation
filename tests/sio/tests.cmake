@@ -54,6 +54,30 @@ schway_add_test(NAME sio.state.pending_ack
 schway_add_test(NAME sio.transport.abort
   COMMAND schwaystation-test-sio transport_abort
   LABELS sio portable TIMEOUT 10)
+# Fault prevented: Dual Analog flight mode changes ID, button order or axis order.
+schway_add_test(NAME sio.special.flight
+  COMMAND schwaystation-test-sio-pad special_flight
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: Jogcon native dial/sign bytes or explicit unsupported modes change.
+schway_add_test(NAME sio.special.jogcon
+  COMMAND schwaystation-test-sio-pad special_jogcon
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: mouse button polarity or signed movement/reset bytes change.
+schway_add_test(NAME sio.special.mouse
+  COMMAND schwaystation-test-sio-pad special_mouse
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: neGcon twist and independent pressure controls shift wire bytes.
+schway_add_test(NAME sio.special.negcon
+  COMMAND schwaystation-test-sio-pad special_negcon
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: tap REQ history changes the current reply instead of the next transaction.
+schway_add_test(NAME sio.tap.history_edges
+  COMMAND schwaystation-test-sio tap_history_edges
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: either physical port's individual or four-pad tap poll selects the wrong socket.
+schway_add_test(NAME sio.tap.poll_methods
+  COMMAND schwaystation-test-sio tap_poll_methods
+  LABELS sio portable TIMEOUT 10)
 # Fault prevented: pad button state leaks between ports or core instances.
 schway_add_test(NAME sio.pad.independent_ports_instances
   COMMAND schwaystation-test-sio independent_ports_instances
