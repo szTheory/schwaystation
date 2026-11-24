@@ -1039,6 +1039,109 @@ static void tap_paths(void)
         }
     }
 
+    enum { TAP_CARD_COUNT = 8u, SELECTED_CARD = 5u };
+    size_t all_cards_size = (size_t)TAP_CARD_COUNT * SCHWAY_MEMCARD_SIZE;
+    uint8_t *images = (uint8_t *)malloc(all_cards_size);
+    uint8_t *replacement = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *candidate = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    uint8_t *readback = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
+    char socket_paths[TAP_CARD_COUNT][TEMP_PATH_CAP] = {{0}};
+    char temporary[TEMP_PATH_CAP] = {0};
+    int have_socket_file[TAP_CARD_COUNT] = {0};
+    CHECK(images != NULL && replacement != NULL && candidate != NULL && readback != NULL);
+    if (images == NULL || replacement == NULL || candidate == NULL || readback == NULL) {
+        CHECK(0);
+    } else {
+        unsigned saved = 0u;
+        for (unsigned i = 0u; i < TAP_CARD_COUNT; i++) {
+            uint32_t port = i < 4u ? SCHWAY_CARD_PORT_1 : SCHWAY_CARD_PORT_2;
+            uint32_t socket = (uint32_t)(i % 4u) + SCHWAY_CARD_SOCKET_A;
+            uint8_t *image = images + (size_t)i * SCHWAY_MEMCARD_SIZE;
+            memset(image, (int)(0x30u + i), SCHWAY_MEMCARD_SIZE);
+            status = schway__host_card_path_for_socket(directory, "SLUS_123.45", port, socket,
+                                                       socket_paths[i], sizeof socket_paths[i]);
+            CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+            if (status != SCHWAY_HOST_CARD_OK) {
+                continue;
+            }
+            status = schway_host_card_save_atomic(socket_paths[i], image, SCHWAY_MEMCARD_SIZE);
+            CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+            if (status != SCHWAY_HOST_CARD_OK) {
+                continue;
+            }
+            have_socket_file[i] = 1;
+            saved++;
+            size_t readback_size = 0u;
+            CHECK(read_file(socket_paths[i], readback, SCHWAY_MEMCARD_SIZE, &readback_size));
+            CHECK_EQ_U64(readback_size, SCHWAY_MEMCARD_SIZE);
+            CHECK(memcmp(readback, image, SCHWAY_MEMCARD_SIZE) == 0);
+        }
+        CHECK_EQ_U64(saved, TAP_CARD_COUNT);
+        if (saved == TAP_CARD_COUNT) {
+            memset(replacement, 0xD0, SCHWAY_MEMCARD_SIZE);
+            status = schway_host_card_save_atomic(socket_paths[SELECTED_CARD], replacement,
+                                                  SCHWAY_MEMCARD_SIZE);
+            CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+            size_t readback_size = 0u;
+            CHECK(read_file(socket_paths[SELECTED_CARD], readback, SCHWAY_MEMCARD_SIZE,
+                            &readback_size));
+            CHECK_EQ_U64(readback_size, SCHWAY_MEMCARD_SIZE);
+            CHECK(memcmp(readback, replacement, SCHWAY_MEMCARD_SIZE) == 0);
+            for (unsigned i = 0u; i < TAP_CARD_COUNT; i++) {
+                if (i != SELECTED_CARD) {
+                    check_file_unchanged(socket_paths[i],
+                                         images + (size_t)i * SCHWAY_MEMCARD_SIZE,
+                                         SCHWAY_MEMCARD_SIZE, readback, SCHWAY_MEMCARD_SIZE);
+                }
+            }
+
+            memset(candidate, 0xA7, SCHWAY_MEMCARD_SIZE);
+            schway_host_card_test_failure failures[2] = {
+                SCHWAY_HOST_CARD_TEST_FAILURE_FLUSH,
+                SCHWAY_HOST_CARD_TEST_FAILURE_RENAME,
+            };
+            for (size_t failure_index = 0u; failure_index < 2u; failure_index++) {
+                status = schway_host_card_test_save_atomic(
+                    socket_paths[SELECTED_CARD], candidate, SCHWAY_MEMCARD_SIZE,
+                    failures[failure_index]);
+                CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_IO);
+                check_file_unchanged(socket_paths[SELECTED_CARD], replacement,
+                                     SCHWAY_MEMCARD_SIZE, readback, SCHWAY_MEMCARD_SIZE);
+                for (unsigned i = 0u; i < TAP_CARD_COUNT; i++) {
+                    if (i != SELECTED_CARD) {
+                        check_file_unchanged(socket_paths[i],
+                                             images + (size_t)i * SCHWAY_MEMCARD_SIZE,
+                                             SCHWAY_MEMCARD_SIZE, readback, SCHWAY_MEMCARD_SIZE);
+                    }
+                }
+                for (unsigned i = 0u; i < TEMP_CANDIDATES; i++) {
+                    CHECK(set_temp_path(temporary, sizeof temporary,
+                                        socket_paths[SELECTED_CARD], i));
+                    CHECK(file_exists(temporary) == 0);
+                }
+            }
+        }
+    }
+
+    for (unsigned i = 0u; i < TAP_CARD_COUNT; i++) {
+        if (have_socket_file[i]) {
+            (void)remove(socket_paths[i]);
+        }
+        if (socket_paths[i][0] != '\0') {
+            for (unsigned candidate_index = 0u; candidate_index < TEMP_CANDIDATES;
+                 candidate_index++) {
+                if (set_temp_path(temporary, sizeof temporary, socket_paths[i], candidate_index) &&
+                    file_exists(temporary)) {
+                    (void)remove(temporary);
+                }
+            }
+        }
+    }
+    free(readback);
+    free(candidate);
+    free(replacement);
+    free(images);
+
     CHECK(remove_directory(directory) == 0);
 }
 

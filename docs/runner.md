@@ -187,6 +187,8 @@ after every frame; the 300-frame run reports 150 lagged frames.
 
 ## Runner memory cards
 
+See [memory card filenames and persistence](saves.md) for the stable per-port/per-socket suffix table and save-state boundary.
+
 With `--save-dir DIR`, the runner validates and loads the selected content, then imports both card files before
 execution. By default it uses
 the executable filename without its final extension as the basename; a content-free run uses `schwaystation`.
