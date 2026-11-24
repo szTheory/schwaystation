@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: Completed 14-04-PLAN.md
-last_updated: "2026-11-24T05:22:01.229Z"
+stopped_at: Completed 14-05-PLAN.md
+last_updated: "2026-11-24T05:53:26.578Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-04 complete; Codex GSD executor configured gpt-6-luna xhigh; four plan commits; eight focused tap/card selectors and three card-state selectors passed; SIO-01 complete; next Plan 14-05
-state_head: 3158414dabfd05d82f3596e69bd5f072614f2315
+last_activity_desc: Phase 14 Plan 14-05 complete; Codex GSD executor configured gpt-6-luna xhigh; five plan commits; sorted inventory and selector preflight passed; targeted pad/SIO build and three focused mouse/neGcon/tap tests passed; SIO-02/03 await later libretro and Jogcon slices; next Plan 14-06
+state_head: 50a93462076b4aef4bf16700bfd41ed47a7e9b89
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 91
-  completed_plans: 83
+  completed_plans: 84
   percent: 70
 ---
 
@@ -26,16 +26,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-04 complete; Plan 14-05 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-05 complete; Plan 14-06 next)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-04 complete; Codex GSD executor configured gpt-6-luna xhigh (primary runtime model ID unavailable); four plan commits; focused tap/card tests passed; SIO-01 complete
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 4/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-05 complete; Codex GSD executor configured gpt-6-luna xhigh (primary runtime model ID unavailable); five plan commits; focused mouse/neGcon/tap tests passed; SIO-02/03 await later slices
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 5/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-05 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor, configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The
+measured wall interval was 29m16s (05:25:25–05:54:41 UTC); active time was not separately measured. Two tasks
+produced five plan commits: `96b9aa7` (mouse RED), `5bc7308` (mouse implementation and shared response branch),
+`5d77069` (PER.01 mouse reserved bits), `e44a17a` (neGcon vectors), and `50a9346` (protocol documentation).
+The SIO inventory sorted and all three exact selectors were present before configure/build. The targeted pad/SIO
+build passed; the focused mouse, neGcon and tap selection passed 3/3 in 0.03 seconds. The mouse RED evidence
+classifier returned `RED_EVIDENCE_OK`. The shared response switch included neGcon behavior in Task 1's GREEN
+commit, so Task 2 added and passed dedicated tests without claiming a synthetic RED. PER.01 source review
+corrected the mouse's reserved button bits. No workflow wiring changed, so no broad workflow, Act or hosted run
+was needed; no Docker resources were created. SIO-02 remains pending its libretro mapping, and SIO-03 remains
+pending Jogcon and configuration-mode coverage. Plan 14-06 is next.
 
 ### Phase 14 Plan 14-04 execution (2026-11-24)
 
@@ -1413,6 +1427,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P02 | 36m | 3 tasks | 10 files |
 | Phase 14 P03 | 31m31s | 2 tasks | 4 files |
 | Phase 14 P04 | 39min | 2 tasks | 9 files |
+| Phase 14 P05 | 29m16s | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1869,6 +1884,9 @@ Recent decisions affecting current work:
 - [Phase 14]: Existing pad byte FSMs produce socket data and preserve each device's response length.
 - [Phase 14]: Legacy card 1/2 APIs remain fixed aliases for port 1/2 socket A, independent of tap configuration.
 - [Phase 14]: Serialize selected SIO card endpoint state, never card image bytes or generations.
+- [Phase 14]: Mouse movement is latched and saturated once at frame start; subsequent frames without fresh host input report zero movement while retaining button levels.
+- [Phase 14]: A mouse startup ACK-low hold is released only by an addressed 01h access at the same endpoint, including port 2 and tap sockets.
+- [Phase 14]: neGcon twist, I, II and L inputs are reported raw, without a response curve or deadzone.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2119,8 +2137,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T05:22:00.962Z
-Stopped at: Completed 14-04-PLAN.md
+Last session: 2026-11-24T05:53:26.342Z
+Stopped at: Completed 14-05-PLAN.md
 Resume file: None
 
 ### v1.0 session history
