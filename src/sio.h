@@ -21,7 +21,7 @@ struct schway__sio {
     uint8_t tap_history_req[2], tap_history_reply[2];
     uint8_t tap_tx_mode[2], tap_tx_index[2], tap_tx_endpoint[2];
     uint8_t tap_tx_request[2], tap_tx_command[2], tap_slot_mask[2];
-    uint8_t tap_slot_id[2][4];
+    uint8_t tap_slot_id[8];
     uint64_t byte_deadline, ack_deadline, release_deadline;
 };
 

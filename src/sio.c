@@ -296,8 +296,7 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
         }
     }
     schway__state_u8_array(io, name_tap_slot_mask, sio->tap_slot_mask, 2u, 0u, 0x0Fu);
-    schway__state_u8_array(io, name_tap_slot_id, &sio->tap_slot_id[0][0], 8u, 0u,
-                           UINT8_MAX);
+    schway__state_u8_array(io, name_tap_slot_id, sio->tap_slot_id, 8u, 0u, UINT8_MAX);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         for (uint32_t port = 0u; port < 2u; port++) {
             io->card_tx_active[port] = io->r[port];
@@ -405,6 +404,11 @@ static uint32_t tap_endpoint(uint32_t port, uint32_t socket)
     return socket == 0u ? port : 2u + port * 3u + socket - 1u;
 }
 
+static uint32_t tap_slot_index(uint32_t port, uint32_t socket)
+{
+    return port * 4u + socket;
+}
+
 static uint8_t tap_payload_size(uint8_t id)
 {
     if (id == 0x41u) {
@@ -450,7 +454,8 @@ static void tap_clear_transaction(struct schway__sio *sio, uint32_t port)
     sio->tap_tx_request[port] = 0u;
     sio->tap_tx_command[port] = 0u;
     sio->tap_slot_mask[port] = 0u;
-    memset(sio->tap_slot_id[port], 0, sizeof sio->tap_slot_id[port]);
+    memset(&sio->tap_slot_id[tap_slot_index(port, 0u)], 0,
+           4u * sizeof sio->tap_slot_id[0]);
 }
 
 static void tap_finish_transaction(struct schway__sio *sio, uint32_t port,
@@ -567,7 +572,7 @@ static uint32_t tap_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t now
             uint8_t id = 0xFFu;
             *ack = schway__pad_byte(inst, port, sent, now, &id);
             if (*ack != 0u && sent == 0x42u) {
-                sio->tap_slot_id[port][0] = id;
+                sio->tap_slot_id[tap_slot_index(port, 0u)] = id;
                 *received = 0x80u;
             } else {
                 *received = 0xFFu;
@@ -577,7 +582,7 @@ static uint32_t tap_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t now
             *received = 0x5Au;
             *ack = 1u;
         } else {
-            *received = sio->tap_slot_id[port][0];
+            *received = sio->tap_slot_id[tap_slot_index(port, 0u)];
             *ack = 0u;
         }
         if (*ack == 0u) {
@@ -613,7 +618,7 @@ static uint32_t tap_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t now
                     sio->tap_slot_mask[port] &= (uint8_t)~(1u << socket);
                     continue;
                 }
-                sio->tap_slot_id[port][socket] = id;
+                sio->tap_slot_id[tap_slot_index(port, socket)] = id;
             }
             *received = 0x80u;
             *ack = 1u;
@@ -629,10 +634,11 @@ static uint32_t tap_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t now
             if ((sio->tap_slot_mask[port] & (1u << socket)) == 0u) {
                 *received = 0xFFu;
             } else if (byte_index == 0u) {
-                *received = sio->tap_slot_id[port][socket];
+                *received = sio->tap_slot_id[tap_slot_index(port, socket)];
             } else if (byte_index == 1u) {
                 *received = 0x5Au;
-            } else if (byte_index >= 2u + tap_payload_size(sio->tap_slot_id[port][socket])) {
+            } else if (byte_index >=
+                       2u + tap_payload_size(sio->tap_slot_id[tap_slot_index(port, socket)])) {
                 *received = 0xFFu;
             } else {
                 uint32_t endpoint = tap_endpoint(port, socket);
