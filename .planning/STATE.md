@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 8
+current_plan: 9
 status: executing
-stopped_at: Completed 14-07-PLAN.md
-last_updated: "2026-11-24T06:54:31.632Z"
+stopped_at: Completed 14-08-PLAN.md
+last_updated: "2026-11-24T07:12:01.408Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-07 complete; Codex GSD executor configured gpt-6-luna xhigh; two tasks, four task commits, 26m10s wall time; candidate-state validation and eight-card restore checks passed; focused selection passed 15/15; SIO-01 and SIO-03 remain complete; next Plan 14-08
-state_head: cac73ff5799977519bb547dcfb7e09e48408f876
+last_activity_desc: Phase 14 Plan 14-08 complete; Codex GSD executor configured gpt-6-luna xhigh; two tasks, three task commits, 16m21s wall time; all eight stable card paths and atomic save-isolation vectors passed; focused card-files selection passed 5/5; next Plan 14-09
+state_head: 68e1c43dadbc9ea710f926f759a83636dc324a65
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 91
-  completed_plans: 86
+  completed_plans: 87
   percent: 70
 ---
 
@@ -26,16 +26,31 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-07 complete; Plan 14-08 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-08 complete; Plan 14-09 next)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 8
+Current Plan: 9
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-07 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); two tasks, four task commits, 26m10s wall time; focused state/card/SIO selection passed 15/15; SIO-01 and SIO-03 are complete
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 7/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-08 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); two tasks, three task commits, 16m21s wall time; focused card-files selection passed 5/5
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 8/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-08 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured
+wall interval was 16m21s (06:55:13–07:11:34 UTC); active time was not separately measured. Two tasks produced
+three commits: `ab475ee` (socket path RED), `3faadf8` (socket path GREEN), and `68e1c43` (eight-socket atomic
+persistence vectors and documentation).
+
+The existing card inventory was sorted and retained its pre-registered `card.files.tap_paths` selector. After
+`cmake --preset ci` and focused card-files builds, the combined five-test selector passed 5/5 in 0.03 seconds,
+covering the eight-name mapping, legacy aliases, unsafe/oversized inputs, atomic round-trip/failure behavior and
+existing wrapper handling. Eight 128 KiB card files were independently written and read back; replacing one left
+the other seven unchanged, and injected flush/rename failures preserved the selected prior file and left no
+temporary files. No workflow wiring changed, so no broad suite, Act, hosted CI or Docker run was needed. The
+suffix table and DEC.67 boundary are documented in `docs/saves.md`, linked from `docs/runner.md`. Plan 14-09 is next.
 
 ### Phase 14 Plan 14-07 execution (2026-11-24)
 
@@ -50,7 +65,7 @@ selection passed 15/15 in 3.67 seconds; it covered all eight card endpoints, can
 round-trip/stable bytes, API v9, tap history and pending SIO byte/ACK events. The format-20 state producer reported
 3,757,638 bytes. No serialized layout or quality bound changed. A mistaken non-mouse round-trip expectation was
 corrected; no workflow wiring changed, so no broad suite, Act, hosted CI or Docker run was needed. The summary is
-`.planning/phases/14-multitap-and-special-controllers/14-07-SUMMARY.md`. Plan 14-08 is next.
+`.planning/phases/14-multitap-and-special-controllers/14-07-SUMMARY.md`. Plan 14-08 followed.
 
 ### Phase 14 Plan 14-06 execution (2026-11-24)
 
@@ -1468,6 +1483,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P05 | 29m16s | 2 tasks | 5 files |
 | Phase 14 P06 | 19m09s | 2 tasks | 5 files |
 | Phase 14 P07 | 26m10s | 2 tasks | 7 files |
+| Phase 14 P08 | 16m21s | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1932,6 +1948,7 @@ Recent decisions affecting current work:
 - [Phase 14]: Jogcon direction flags are turned-left and turned-right; software configuration and feedback commands return FF with no ACK.
 - [Phase 14]: Plan 14-07: cross-validate candidate pad, SIO and card protocol states before apply; preserve receiver-owned card media across restore. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 26m10s.
 - [Phase 14]: Scope legacy disc fixture prerequisites to their actual CTest consumers — The shared-directory TESTS property had added legacy setup/parity tests to unrelated focused selectors. Keep both fixture tests in the full inventory and retain dependencies on consumers; local configure and selector checks confirm unrelated state checks run alone while ECM guest and runner legacy checks still pull both prerequisites.
+- [Phase 14]: Plan 14-08: preserve A card filename aliases and map all eight stable port/socket suffixes; reject invalid or undersized paths atomically. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 16m21s.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2182,8 +2199,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T06:49:16.198Z
-Stopped at: Completed 14-07-PLAN.md
+Last session: 2026-11-24T07:12:01.144Z
+Stopped at: Completed 14-08-PLAN.md
 Resume file: None
 
 ### v1.0 session history
