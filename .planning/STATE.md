@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 11
+current_plan: 12
 status: executing
-stopped_at: Completed 14-10-PLAN.md
-last_updated: "2026-11-24T09:36:34.569Z"
+stopped_at: Completed 14-11-PLAN.md
+last_updated: "2026-11-24T10:22:04.153Z"
 last_activity: 2026-11-24
 last_activity_desc: Phase 14 Plan 14-10 complete; configured gpt-6-luna xhigh; one task commit; 9m wall time; default two-pad callback-to-serial baseline and descriptor selectors passed 2/2; Plan 14-11 next
-state_head: 4cfe18e482fe3d961abed33705085248b8017a74
+state_head: 474aa6a3ea1f4c35d76a36e78a31ee6e7ea9991c
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 94
-  completed_plans: 89
+  completed_plans: 90
   percent: 70
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 11
+Current Plan: 12
 Total Plans in Phase: 15
 Status: Ready to execute
 Last activity: 2026-11-24 — Phase 14 Plan 14-10 baseline complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); one task commit, 9m wall time; focused multitap and descriptor selectors passed 2/2
@@ -1516,6 +1516,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P08 | 16m21s | 2 tasks | 5 files |
 | Phase 14 P09 | 61m | 2 tasks | 4 files |
 | Phase 14 P10 | 9m | 1 tasks | 2 files |
+| Phase 14 P11 | 24m | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1986,6 +1987,8 @@ Recent decisions affecting current work:
 - [Phase 14]: Phase 14 Plans 10–14 split at behavior boundaries after Plan 14-09 took 60m42s; Codex GSD planner gpt-6.1-sol high and checker gpt-6-luna xhigh; planning/check review took about 8 minutes. — The plan checker passed requirements and dependency coverage. Keep each implementation slice below the 30-minute bound while preserving all selectors, metrics, and final verification.
 - [Phase 14]: Split Plan 14-10 again after selector evidence showed its default port 0/1 probes pass; callback order queried both players and disabled sockets caused the remaining expected tap RED. Plan 14-10 is now a green default two-pad test seam, Plan 14-11 owns topology. Codex planner gpt-6.1-sol high, checker gpt-6-luna xhigh; follow-up planning/check about 5 minutes. — Separating harness correctness from product behavior prevents invalid RED evidence and keeps implementation slices inside the 30-minute plan bound. Full topology and all final quality/CI gates remain required.
 - [Phase 14]: Keep Plan 14-10 limited to the default socket-A callback baseline; Plan 14-11 owns tap options and expanded routing.
+- [Phase 14]: Apply multitap topology only after successful content load — A rejected replacement must leave the currently running frontend descriptors and serial topology unchanged.
+- [Phase 14]: Accept only exact NONE, JOYPAD, and ANALOG controller IDs — Masking arbitrary subclasses would make the frontend claim support for devices that have no implemented input mapping.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2236,8 +2239,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T09:36:08.314Z
-Stopped at: Completed 14-10-PLAN.md
+Last session: 2026-11-24T10:22:03.865Z
+Stopped at: Completed 14-11-PLAN.md
 Resume file: None
 
 ### v1.0 session history
