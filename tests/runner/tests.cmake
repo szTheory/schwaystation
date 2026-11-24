@@ -1430,7 +1430,8 @@ Path(sys.argv[2]).write_bytes(data)
       if(NOT movie STREQUAL "none")
         set(movie_arg --inputs "${movie}")
       endif()
-      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state ${movie_arg}
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state
+        ${movie_arg} ${ARGN}
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
       if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame ${frames} sha256 ${digits}" OR
          NOT out MATCHES "state sha256 ${digits}")
@@ -1451,6 +1452,8 @@ Path(sys.argv[2]).write_bytes(data)
     run_movie(2 "${OUT}/runner-empty.inputs" empty_movie)
     run_movie(2 "${OUT}/runner-button.inputs" event_after)
     run_movie(2 "${OUT}/runner-button.inputs" event_repeat)
+    run_movie(2 "${OUT}/runner-empty.inputs" multitap_empty --multitap-port1 enabled)
+    run_movie(2 "${OUT}/runner-button.inputs" multitap_button --multitap-port1 enabled)
     if(NOT no_movie_before_frame STREQUAL event_before_frame OR
        NOT no_movie_before_state STREQUAL event_before_state)
       message(FATAL_ERROR "an input scheduled for frame 2 changed the frame-1 state")
@@ -1464,6 +1467,9 @@ Path(sys.argv[2]).write_bytes(data)
     endif()
     if(no_movie_after_state STREQUAL event_after_state)
       message(FATAL_ERROR "the event-frame input did not change the saved latched state")
+    endif()
+    if(multitap_empty_state STREQUAL multitap_button_state)
+      message(FATAL_ERROR "legacy p1 movie input did not change socket A state with port 1 multitap")
     endif()
     if(NOT event_after_output STREQUAL event_repeat_output)
       message(FATAL_ERROR "replaying the same input movie changed its hashes")

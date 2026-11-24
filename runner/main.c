@@ -1872,6 +1872,15 @@ static int run(const options *opt)
         }
         input_snapshot.multitap[0] = opt->multitap[0];
         input_snapshot.multitap[1] = opt->multitap[1];
+        for (uint32_t port = 0u; port < 2u; port++) {
+            if (input_snapshot.multitap[port] != 0u) {
+                schway_controller_input *socket_a = &input_snapshot.controllers[port][0];
+                socket_a->device = input_snapshot.device[port];
+                socket_a->buttons = input_snapshot.buttons[port];
+                memcpy(socket_a->axes, input_snapshot.axes[port], sizeof socket_a->axes);
+                socket_a->analog_button = input_snapshot.analog_button[port];
+            }
+        }
         st = schway_set_input(inst, &input_snapshot);
         if (st != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: applying input options failed: %s\n",
