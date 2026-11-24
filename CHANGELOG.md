@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/szTheory/schwaystation/compare/v0.12.0...v0.13.0) (2026-11-24)
+
+
+### Features
+
+* **profile:** support regions, board revisions, and fast boot ([#40](https://github.com/szTheory/schwaystation/issues/40)) ([cb92563](https://github.com/szTheory/schwaystation/commit/cb9256364966c8d9b6d424567851b6bd76c5b628))
+
 ## [0.12.0](https://github.com/szTheory/schwaystation/compare/v0.11.0...v0.12.0) (2026-11-23)
 
 
