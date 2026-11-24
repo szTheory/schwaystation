@@ -164,19 +164,6 @@ static int write_preamble_address(schway *inst, uint8_t address, uint8_t expecte
     return 1;
 }
 
-static int write_preamble_after_address(schway *inst, uint8_t expected_flag)
-{
-    uint8_t flag = transfer(inst, 0x57u, CARD_ACK);
-    if (flag != expected_flag) {
-        CHECK_EQ_HEX(flag, expected_flag);
-        return 0;
-    }
-    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x5Au);
-    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x5Du);
-    CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0u);
-    return 1;
-}
-
 static int write_preamble(schway *inst, uint8_t expected_flag)
 {
     return write_preamble_address(inst, 0x81u, expected_flag);
@@ -1708,50 +1695,64 @@ static void tap_state(void)
         CHECK_EQ_U64(schway_load_memcard_socket(target, port, socket, target_images[endpoint],
                                                 SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
     }
-    source->pad.multitap[1] = 1u;
-    target->pad.multitap[1] = 1u;
-    uint8_t payload[SCHWAY__CARD_SECTOR_SIZE];
-    uint8_t target_old[SCHWAY__CARD_SECTOR_SIZE];
-    make_write_data(payload, 57u);
-    memcpy(target_old, &target_images[7][9u * SCHWAY__CARD_SECTOR_SIZE], sizeof target_old);
-    configure(target, 1u);
-    uint32_t start_checks = (uint32_t)check_failures;
-    CHECK_EQ_HEX(transfer(target, 0x84u, CARD_ACK), 0xFFu);
-    if ((uint32_t)check_failures != start_checks) {
-        goto done;
-    }
-    CHECK(write_preamble_after_address(target, 0x08u));
-    CHECK_EQ_HEX(write_address(target, 9u, CARD_ACK), 0u);
-    write_data(target, target_old, 0u, SCHWAY__CARD_SECTOR_SIZE);
-    write_finish(target, write_checksum(9u, target_old), 0x47u);
-    memcpy(&target_images[7][9u * SCHWAY__CARD_SECTOR_SIZE], target_old,
-           sizeof target_old);
-    target_generations[7]++;
-
-    configure(source, 1u);
-    if (!write_preamble_address(source, 0x84u, 0x08u) ||
-        write_address(source, 4u, CARD_ACK) != 0u) {
-        CHECK(0);
-        tap_test_report("saved tapped card FSM resumes without restoring card bytes",
-                        checks_before, 2u, 4u);
-        goto done;
-    }
-    write_data(source, payload, 0u, 8u);
+    /* A selected SIO card endpoint cannot be in flight while every card
+       protocol FSM is idle. Keep the mutation CRC-valid to reach validation. */
+    reject_mutated_state(source, target, "sio.card_tx_active", 0u, 1u);
     size_t state_size = schway_state_size(source);
     uint8_t *state = (uint8_t *)malloc(state_size);
     CHECK(state != NULL);
     if (state == NULL) {
         goto done;
     }
-    CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
-    CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
-    verify_tap_cards(target, target_images, target_generations);
-    write_data(target, payload, 8u, SCHWAY__CARD_SECTOR_SIZE);
-    write_finish(target, write_checksum(4u, payload), 0x47u);
-    memcpy(&target_images[7][4u * SCHWAY__CARD_SECTOR_SIZE], payload, sizeof payload);
-    target_generations[7]++;
-    verify_tap_cards(target, target_images, target_generations);
-    verify_tap_cards(source, source_images, source_generations);
+
+    source->pad.multitap[0] = 1u;
+    source->pad.multitap[1] = 1u;
+    target->pad.multitap[0] = 1u;
+    target->pad.multitap[1] = 1u;
+    for (uint32_t endpoint = 0u; endpoint < 8u; endpoint++) {
+        uint32_t port = endpoint / 4u;
+        uint8_t address = (uint8_t)(0x81u + endpoint % 4u);
+        uint32_t sector = 4u + endpoint;
+        uint8_t payload[SCHWAY__CARD_SECTOR_SIZE];
+        uint8_t *sector_bytes = &target_images[endpoint][sector * SCHWAY__CARD_SECTOR_SIZE];
+        make_write_data(payload, 57u + endpoint);
+
+        configure(source, port);
+        CHECK(write_preamble_address(source, address, 0x08u));
+        CHECK_EQ_HEX(transfer(source, (uint8_t)(sector >> 8), CARD_ACK), 0u);
+        CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        verify_tap_cards(target, target_images, target_generations);
+        write_mmio(source, JOY_CTRL, 2u, port == 0u ? 0u : 0x2000u);
+
+        /* Restore once with only the high address byte consumed, then again
+           with staged write data. Neither load may publish the staged sector. */
+        CHECK_EQ_HEX(transfer(target, (uint8_t)sector, CARD_ACK), 0u);
+        write_data(target, payload, 0u, 8u);
+        CHECK_EQ_U64(schway_save_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        verify_tap_cards(target, target_images, target_generations);
+        write_data(target, payload, 8u, SCHWAY__CARD_SECTOR_SIZE);
+        CHECK_EQ_U64(schway_save_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        verify_tap_cards(target, target_images, target_generations);
+
+        CHECK_EQ_HEX(transfer(target, write_checksum(sector, payload), CARD_ACK), 0u);
+        CHECK_EQ_HEX(transfer(target, 0u, CARD_ACK), 0x5Cu);
+        CHECK_EQ_HEX(transfer(target, 0u, CARD_ACK), 0x5Du);
+        CHECK_EQ_U64(schway_save_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        verify_tap_cards(target, target_images, target_generations);
+        CHECK_EQ_HEX(transfer(target, 0u, 0u), 0x47u);
+
+        memcpy(sector_bytes, payload, sizeof payload);
+        target_generations[endpoint]++;
+        CHECK_EQ_U64(target->card.slot[endpoint].generation, target_generations[endpoint]);
+        (void)transfer(target, 0u, 0u);
+        CHECK_EQ_U64(target->card.slot[endpoint].generation, target_generations[endpoint]);
+        verify_tap_cards(target, target_images, target_generations);
+        verify_tap_cards(source, source_images, source_generations);
+    }
     free(state);
 
 done:
