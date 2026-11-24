@@ -898,6 +898,8 @@ static void tap_paths(void)
     char legacy1[TEMP_PATH_CAP];
     char legacy2[TEMP_PATH_CAP];
     char actual[TEMP_PATH_CAP];
+    char directory_with_separator[TEMP_PATH_CAP];
+    char long_component[65];
     int made_directory = create_work_directory(directory, sizeof directory);
     CHECK(made_directory != 0);
     if (!made_directory) {
@@ -946,12 +948,95 @@ static void tap_paths(void)
                                                path, 1u);
     CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
     CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    int written = snprintf(path, sizeof path, "%s/SLUS_123.45.p1b.mcr", directory);
+    CHECK(written >= 0 && (size_t)written < sizeof path);
+    size_t exact_size = written >= 0 ? (size_t)written + 1u : 0u;
+    status = schway__host_card_path_for_socket(directory, "SLUS_123.45", 1u, 2u,
+                                               actual, exact_size);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    if (status == SCHWAY_HOST_CARD_OK) {
+        CHECK(strcmp(actual, path) == 0);
+    }
+    memset(actual, 'Q', sizeof actual);
+    status = schway__host_card_path_for_socket(directory, "SLUS_123.45", 1u, 2u,
+                                               actual, exact_size - 1u);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are((const uint8_t *)actual, sizeof actual, (uint8_t)'Q'));
+
+    written = snprintf(directory_with_separator, sizeof directory_with_separator, "%s/", directory);
+    CHECK(written >= 0 && (size_t)written < sizeof directory_with_separator);
+    status = schway__host_card_path_for_socket(directory_with_separator, "SLUS_123.45",
+                                               1u, 2u, actual, sizeof actual);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    if (status == SCHWAY_HOST_CARD_OK) {
+        CHECK(strcmp(actual, path) == 0);
+    }
+
+    memset(long_component, 'A', sizeof long_component - 1u);
+    long_component[sizeof long_component - 1u] = '\0';
+    memset(actual, 'Q', sizeof actual);
+    status = schway__host_card_path_for_socket(directory, long_component, 1u, 2u,
+                                               actual, sizeof actual);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)actual, sizeof actual, (uint8_t)'Q'));
+
     status = schway__host_card_identity_path_for_socket(directory,
                                                         "sgi2-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                                                         2u, 4u, path, sizeof path);
     CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
     if (status == SCHWAY_HOST_CARD_OK) {
-        CHECK(strstr(path, ".p2d.mcr") != NULL);
+        written = snprintf(actual, sizeof actual,
+                           "%s/sgi2-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.p2d.mcr",
+                           directory);
+        CHECK(written >= 0 && (size_t)written < sizeof actual);
+        CHECK(strcmp(path, actual) == 0);
+    }
+    status = schway__host_card_identity_path_for_socket(directory, "SLUS_123.45",
+                                                        2u, 2u, path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    if (status == SCHWAY_HOST_CARD_OK) {
+        CHECK(strcmp(path, legacy2) != 0);
+        CHECK(strstr(path, ".p2b.mcr") != NULL);
+    }
+    memset(path, 'Q', sizeof path);
+    status = schway__host_card_identity_path_for_socket(directory, "../bad", 2u, 2u,
+                                                        path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    status = schway__host_card_identity_path_for_socket(directory, "sgi2-bad", 2u, 2u,
+                                                        path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    status = schway__host_card_identity_path_for_socket(directory, "SLUS_123.45", 3u, 2u,
+                                                        path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    status = schway__host_card_identity_path_for_socket(directory, "SLUS_123.45", 2u, 0u,
+                                                        path, sizeof path);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_ARGUMENT);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+    status = schway__host_card_identity_path_for_socket(directory, "SLUS_123.45", 2u, 2u,
+                                                        path, 1u);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_ERR_SIZE);
+    CHECK(all_bytes_are((const uint8_t *)path, sizeof path, (uint8_t)'Q'));
+
+    status = schway_host_card_paths_for_basename(directory, "SLUS_123.45",
+                                                 legacy1, sizeof legacy1,
+                                                 legacy2, sizeof legacy2);
+    CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+    if (status == SCHWAY_HOST_CARD_OK) {
+        status = schway__host_card_path_for_socket(directory, "SLUS_123.45", 1u, 1u,
+                                                   actual, sizeof actual);
+        CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+        if (status == SCHWAY_HOST_CARD_OK) {
+            CHECK(strcmp(actual, legacy1) == 0);
+        }
+        status = schway__host_card_path_for_socket(directory, "SLUS_123.45", 2u, 1u,
+                                                   actual, sizeof actual);
+        CHECK_EQ_U64(status, SCHWAY_HOST_CARD_OK);
+        if (status == SCHWAY_HOST_CARD_OK) {
+            CHECK(strcmp(actual, legacy2) == 0);
+        }
     }
 
     CHECK(remove_directory(directory) == 0);
