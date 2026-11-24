@@ -132,6 +132,14 @@ SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
 schway__libretro_test_write_card_socket(unsigned port, unsigned socket, uint8_t value);
 SCHWAYSTATION_TEST_EXPORT void RETRO_CALLCONV schway__libretro_test_flush_cards(void);
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_lifecycle(unsigned endpoint, const char **path,
+                                     uint64_t *saved_generation);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_read_begin(unsigned port);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_read_byte(unsigned port, uint8_t sent, int ack,
+                                     uint8_t *received);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
 schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *buttons);
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
 schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
@@ -2078,6 +2086,23 @@ SCHWAYSTATION_TEST_EXPORT void RETRO_CALLCONV schway__libretro_test_flush_cards(
     lr_cards_flush();
 }
 
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_lifecycle(unsigned endpoint, const char **path,
+                                     uint64_t *saved_generation)
+{
+    if (path != NULL) {
+        *path = endpoint < LR_CARD_ENDPOINT_COUNT && lr_card_paths[endpoint][0] != '\0'
+                    ? lr_card_paths[endpoint]
+                    : NULL;
+    }
+    if (saved_generation != NULL) {
+        *saved_generation = endpoint < LR_CARD_ENDPOINT_COUNT
+                                ? lr_card_saved_generations[endpoint]
+                                : 0u;
+    }
+    return endpoint < LR_CARD_ENDPOINT_COUNT;
+}
+
 static int lr_test_write(uint32_t address, uint32_t width, uint32_t value)
 {
     uint32_t cycles = 0u;
@@ -2121,6 +2146,30 @@ static int lr_test_exchange(uint8_t sent, unsigned port, int ack, uint8_t *recei
         return lr_test_write(0x1F80104Au, 2u, 0x1003u | port_bit);
     }
     return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_read_begin(unsigned port)
+{
+    uint8_t received;
+    uint32_t port_bit = port == 0u ? 0u : 0x2000u;
+    if (inst == NULL || port >= 2u ||
+        !lr_test_write(0x1F801048u, 2u, 0x000Cu) ||
+        !lr_test_write(0x1F80104Eu, 2u, 0x0088u) ||
+        !lr_test_write(0x1F80104Au, 2u, 0x1003u | port_bit) ||
+        !lr_test_exchange(0x81u, port, 1, &received) || received != 0xFFu ||
+        !lr_test_exchange(0x52u, port, 1, &received) || received != 0x08u) {
+        return 0;
+    }
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_read_byte(unsigned port, uint8_t sent, int ack,
+                                     uint8_t *received)
+{
+    return inst != NULL && port < 2u && received != NULL &&
+           lr_test_exchange(sent, port, ack, received);
 }
 
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV

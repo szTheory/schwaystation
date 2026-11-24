@@ -10,7 +10,8 @@ of these suffixes to the already selected content basename, serial or validated 
 
 For example, basename `game` produces `game.srm` for port 1/socket A, `game.1.mcr` for port 2/socket A, and
 `game.p2c.mcr` for port 2/socket C. The physical port numbers and socket letters are stable whether a multitap is
-enabled or disabled. The legacy A paths stay unchanged, and the host does not add a sharing option.
+enabled or disabled. The legacy A paths stay unchanged, and the host does not add a sharing option. Controller
+and multitap socket selection is described in [controllers.md](controllers.md).
 
 Runner naming may use the content basename or its existing serial identity policy. Libretro continues to use the
 content basename; the frontend owns port 1/socket A through `RETRO_MEMORY_SAVE_RAM`, and the adapter owns the

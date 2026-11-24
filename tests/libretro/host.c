@@ -139,6 +139,9 @@ static const uint8_t *(RETRO_CALLCONV *p_test_card_socket)(unsigned, unsigned, s
                                                             const char **);
 static int (RETRO_CALLCONV *p_test_write_card_socket)(unsigned, unsigned, uint8_t);
 static void (RETRO_CALLCONV *p_test_flush_cards)(void);
+static int (RETRO_CALLCONV *p_test_card_lifecycle)(unsigned, const char **, uint64_t *);
+static int (RETRO_CALLCONV *p_test_card_read_begin)(unsigned);
+static int (RETRO_CALLCONV *p_test_card_read_byte)(unsigned, uint8_t, int, uint8_t *);
 static int(RETRO_CALLCONV *p_test_poll_endpoint)(unsigned, unsigned, uint16_t *);
 static int(RETRO_CALLCONV *p_test_poll_bytes)(unsigned, unsigned, uint8_t *, size_t, size_t *);
 
@@ -191,6 +194,9 @@ static void resolve_all(int inspect_card2)
         RESOLVE(p_test_card_socket, "schway__libretro_test_card_socket");
         RESOLVE(p_test_write_card_socket, "schway__libretro_test_write_card_socket");
         RESOLVE(p_test_flush_cards, "schway__libretro_test_flush_cards");
+        RESOLVE(p_test_card_lifecycle, "schway__libretro_test_card_lifecycle");
+        RESOLVE(p_test_card_read_begin, "schway__libretro_test_card_read_begin");
+        RESOLVE(p_test_card_read_byte, "schway__libretro_test_card_read_byte");
         RESOLVE(p_test_poll_endpoint, "schway__libretro_test_poll_endpoint");
         RESOLVE(p_test_poll_bytes, "schway__libretro_test_poll_bytes");
     }
@@ -2105,6 +2111,10 @@ static int test_cards_multitap(const char *directory)
         "memcard_roundtrip.p2c.mcr", "memcard_roundtrip.p2d.mcr",
     };
     char exe_path[4096] = {0};
+    char failed_exe_path[4096] = {0};
+    char playlist_path[4096] = {0};
+    char bios_directory[4096] = {0};
+    char swapped_card_path[4096] = {0};
     char paths[8][4096] = {{0}};
     char backup_path[4096] = {0};
     struct retro_game_info game;
@@ -2112,7 +2122,13 @@ static int test_cards_multitap(const char *directory)
     const uint8_t *card;
     size_t size;
     uint64_t generation, saved_generation, prior_saved_generation;
+    uint64_t receiving_generations[8] = {0};
+    uint8_t receiving_bytes[8] = {0};
+    uint8_t first_replies[6] = {0}, restored_replies[6] = {0};
+    void *saved_state = NULL;
+    size_t saved_state_size = 0u;
     const char *path;
+    const char *cleared_path;
     int loaded = 0;
     int path_length;
 
@@ -2125,6 +2141,18 @@ static int test_cards_multitap(const char *directory)
         CHECK(test_path(paths[index], sizeof paths[index], directory, card_names[index]));
         (void)remove(paths[index]);
     }
+    path_length = snprintf(failed_exe_path, sizeof failed_exe_path,
+                           "%s/missing-save-content.exe", directory);
+    CHECK(path_length > 0 && (size_t)path_length < sizeof failed_exe_path);
+    path_length = snprintf(playlist_path, sizeof playlist_path,
+                           "%s/../../fixtures/disc_boot_runner.m3u", directory);
+    CHECK(path_length > 0 && (size_t)path_length < sizeof playlist_path);
+    path_length = snprintf(bios_directory, sizeof bios_directory,
+                           "%s/../../openbios", directory);
+    CHECK(path_length > 0 && (size_t)path_length < sizeof bios_directory);
+    CHECK(test_path(swapped_card_path, sizeof swapped_card_path, directory,
+                    "disc_boot_runner.1.mcr"));
+    (void)remove(swapped_card_path);
     (void)remove(backup_path);
     if (check_failures != 0) goto cleanup;
 
@@ -2227,17 +2255,149 @@ static int test_cards_multitap(const char *directory)
         card = p_test_card_socket(1u, 1u, &size, &generation, &saved_generation, &path);
         CHECK(card != NULL && card == save_ram);
         CHECK(path == NULL);
+
+        /* A state restores the selected card's protocol, not any receiving image or generation. */
+        CHECK(p_test_card_read_begin(1u));
+        saved_state_size = p_serialize_size();
+        saved_state = saved_state_size != 0u ? malloc(saved_state_size) : NULL;
+        CHECK(saved_state != NULL);
+        CHECK(saved_state != NULL && p_serialize(saved_state, saved_state_size));
+        for (unsigned index = 0u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            uint8_t value = (uint8_t)(0x60u + index);
+            CHECK(p_test_write_card_socket(port_number, socket_number, value));
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            if (card != NULL) {
+                receiving_bytes[index] = card[128u];
+                receiving_generations[index] = generation;
+                CHECK_EQ_U64(receiving_bytes[index], value);
+            }
+        }
+        for (unsigned byte = 0u; byte < 6u; byte++) {
+            CHECK(p_test_card_read_byte(1u, 0u, 1, &first_replies[byte]));
+        }
+        CHECK(p_unserialize(saved_state, saved_state_size));
+        for (unsigned index = 0u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            if (card != NULL) {
+                CHECK_EQ_U64(card[128u], receiving_bytes[index]);
+                CHECK_EQ_U64(generation, receiving_generations[index]);
+            }
+        }
+        for (unsigned byte = 0u; byte < 6u; byte++) {
+            CHECK(p_test_card_read_byte(1u, 0u, 1, &restored_replies[byte]));
+        }
+        CHECK(memcmp(first_replies, restored_replies, sizeof first_replies) == 0);
+        free(saved_state);
+        saved_state = NULL;
+
+        p_reset();
+        for (unsigned index = 0u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            if (card != NULL) {
+                CHECK_EQ_U64(card[128u], receiving_bytes[index]);
+                CHECK_EQ_U64(generation, receiving_generations[index]);
+            }
+        }
+
+        struct retro_game_info failed_game;
+        memset(&failed_game, 0, sizeof failed_game);
+        failed_game.path = failed_exe_path;
+        CHECK(!p_load_game(&failed_game));
+        CHECK(p_serialize_size() != 0u);
+        for (unsigned index = 0u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            if (card != NULL) {
+                CHECK_EQ_U64(card[128u], receiving_bytes[index]);
+                CHECK_EQ_U64(generation, receiving_generations[index]);
+                CHECK(index == 0u ? path == NULL :
+                      path != NULL && strcmp(path, paths[index]) == 0);
+            }
+        }
     }
 
 cleanup:
+    free(saved_state);
     if (loaded) p_unload_game();
     for (unsigned index = 0u; index < 8u; index++) {
         (void)remove(paths[index]);
     }
     (void)rmdir(paths[1]);
     (void)remove(backup_path);
-    int result = check_failures != 0 ? 1 : 0;
+    for (unsigned index = 0u; index < 8u; index++) {
+        uint64_t saved_after_unload = UINT64_MAX;
+        cleared_path = (const char *)1;
+        CHECK(p_test_card_lifecycle(index, &cleared_path, &saved_after_unload));
+        CHECK(cleared_path == NULL);
+        CHECK_EQ_U64(saved_after_unload, 0u);
+    }
+
+    /* M3U swaps keep sidecars tied to the initial playlist basename. */
+    system_directory = bios_directory;
+    bios_option_value = "none";
+    save_directory = directory;
+    save_directory_available = 1;
+    memset(&game, 0, sizeof game);
+    game.path = playlist_path;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (loaded) {
+        CHECK_EQ_U64(disk_control.get_num_images(), 2u);
+        card = p_test_card_socket(2u, 1u, &size, &generation,
+                                  &saved_generation, &path);
+        CHECK(card != NULL);
+        CHECK(path != NULL && strcmp(path, swapped_card_path) == 0);
+        CHECK(disk_control.set_eject_state(true));
+        CHECK(disk_control.set_image_index(1u));
+        CHECK(disk_control.set_eject_state(false));
+        card = p_test_card_socket(2u, 1u, &size, &generation,
+                                  &saved_generation, &path);
+        CHECK(card != NULL);
+        CHECK(path != NULL && strcmp(path, swapped_card_path) == 0);
+        for (unsigned index = 1u; index < 8u; index++) {
+            static const char *const names[8] = {
+                "disc_boot_runner.srm", "disc_boot_runner.p1b.mcr",
+                "disc_boot_runner.p1c.mcr", "disc_boot_runner.p1d.mcr",
+                "disc_boot_runner.1.mcr", "disc_boot_runner.p2b.mcr",
+                "disc_boot_runner.p2c.mcr", "disc_boot_runner.p2d.mcr",
+            };
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            char expected_path[4096];
+            CHECK(test_path(expected_path, sizeof expected_path, directory, names[index]));
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            CHECK(path != NULL && strcmp(path, expected_path) == 0);
+        }
+        p_unload_game();
+        loaded = 0;
+    }
     p_deinit();
+    for (unsigned index = 0u; index < 8u; index++) {
+        uint64_t saved_after_deinit = UINT64_MAX;
+        cleared_path = (const char *)1;
+        CHECK(p_test_card_lifecycle(index, &cleared_path, &saved_after_deinit));
+        CHECK(cleared_path == NULL);
+        CHECK_EQ_U64(saved_after_deinit, 0u);
+    }
+    (void)remove(swapped_card_path);
+    int result = check_failures != 0 ? 1 : 0;
     module_close();
     return result;
 }
