@@ -1953,6 +1953,12 @@ foreach(case controls persistence sigterm)
     LABELS portable runner TIMEOUT 60)
 endforeach()
 
+# Fault prevented: runner card paths or protocol state alias across adapter sockets.
+schway_add_test(NAME runner.cards.multitap
+  COMMAND ${runner_cards_check} -DOUT=${PROJECT_BINARY_DIR}/tests/runner-cards-multitap
+    -DCASE=cards_multitap -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
+
 # Fault prevented: a runner that exits 0 after failing to write a file, or
 # calls a failure a usage error.
 set(runner_failure_cmd ${runner_cmd} --frames 1 --png "1:${PROJECT_BINARY_DIR}/tests/missing/x.png")

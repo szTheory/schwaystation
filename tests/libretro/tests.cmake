@@ -344,6 +344,14 @@ schway_add_test(NAME libretro.cards.controls
     ${PROJECT_BINARY_DIR}/tests/libretro-cards-controls
   LABELS libretro portable TIMEOUT 120)
 
+# Fault prevented: adapter endpoints alias one another or fail to retain independent card state.
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/tests/libretro-cards-multitap")
+schway_add_test(NAME libretro.cards.multitap
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation-libretro-card-test> cards-multitap
+    ${PROJECT_BINARY_DIR}/tests/libretro-cards-multitap
+  LABELS libretro portable TIMEOUT 30)
+
 # Fault prevented: address-space descriptors omit valid RAM/scratchpad aliases
 # or claim holes and adjacent non-memory regions.
 schway_add_test(NAME libretro.memory.aliases
@@ -363,6 +371,18 @@ schway_add_test(NAME libretro.input.controls
   COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
     $<TARGET_FILE:schwaystation_libretro> input-controls ${PROJECT_BINARY_DIR}/fixtures/pad_counter.exe
   LABELS libretro portable TIMEOUT 120)
+
+# Fault prevented: compact tap player mapping or per-frame input polling aliases a controller.
+schway_add_test(NAME libretro.input.multitap
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation-libretro-card-test> input-multitap
+  LABELS libretro portable TIMEOUT 30)
+
+# Fault prevented: special-controller callbacks produce incorrect serial values or stale snapshots.
+schway_add_test(NAME libretro.input.special
+  COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:schwaystation-test-libretro-host>
+    $<TARGET_FILE:schwaystation-libretro-card-test> input-special
+  LABELS libretro portable TIMEOUT 30)
 
 # Fault prevented: published input descriptors have wrong ports, IDs,
 # descriptions, or do not remain valid through load, run, unload and deinit.
