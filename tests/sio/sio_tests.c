@@ -325,6 +325,36 @@ static void tap_method2_socket(schway *inst, uint32_t port, uint32_t socket)
     }
 }
 
+static void tap_method1_poll(schway *inst, uint32_t port)
+{
+    write_mmio(inst, JOY_CTRL, 2u, 0x1003u | (port != 0u ? 0x2000u : 0u));
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), tap_id(inst, tap_endpoint(port, 0u)));
+    /* REQ is the third transmitted byte, but this access still returns Slot A. */
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1),
+                 (uint8_t)inst->pad.buttons[tap_endpoint(port, 0u)]);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0),
+                 (uint8_t)(inst->pad.buttons[tap_endpoint(port, 0u)] >> 8));
+
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    for (uint32_t socket = 0u; socket < 4u; socket++) {
+        uint32_t endpoint = tap_endpoint(port, socket);
+        int analog = tap_id(inst, endpoint) == 0x73u;
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), tap_id(inst, endpoint));
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), 0x5Au);
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)inst->pad.buttons[endpoint]);
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1),
+                     (uint8_t)(inst->pad.buttons[endpoint] >> 8));
+        for (uint32_t axis = 0u; axis < 4u; axis++) {
+            CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1),
+                         analog ? inst->pad.axes[endpoint * 4u + axis] : 0xFFu);
+        }
+    }
+}
+
 static void tap_poll_methods(void)
 {
     schway *inst = make();
@@ -336,30 +366,8 @@ static void tap_poll_methods(void)
             tap_method2_socket(inst, port, socket);
         }
     }
-
-    write_mmio(inst, JOY_CTRL, 2u, 0x1003u);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x41u);
-    /* REQ is the third transmitted byte, but this access still returns Slot A. */
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)inst->pad.buttons[0]);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), (uint8_t)(inst->pad.buttons[0] >> 8));
-
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
-    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
-    for (uint32_t socket = 0u; socket < 4u; socket++) {
-        uint32_t endpoint = tap_endpoint(0u, socket);
-        int analog = tap_id(inst, endpoint) == 0x73u;
-        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), tap_id(inst, endpoint));
-        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), 0x5Au);
-        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)inst->pad.buttons[endpoint]);
-        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1),
-                     (uint8_t)(inst->pad.buttons[endpoint] >> 8));
-        for (uint32_t axis = 0u; axis < 4u; axis++) {
-            CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1),
-                         analog ? inst->pad.axes[endpoint * 4u + axis] : 0xFFu);
-        }
+    for (uint32_t port = 0u; port < 2u; port++) {
+        tap_method1_poll(inst, port);
     }
     schway_destroy(inst);
 }
