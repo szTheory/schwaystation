@@ -29,7 +29,7 @@ key-decisions:
   - Keep the released 28-byte caller layout fixed while testing it against the current API.
   - Register future peripheral tests as gating selectors and leave their behavior to the owning plans.
 metrics:
-  duration: 12min
+  duration: 15m35s
   completed: 2026-11-23
   status: complete
 commits: 3
@@ -74,7 +74,7 @@ coverage:
 ## Performance
 
 - **Runtime/model:** Codex GSD executor; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable.
-- **Wall interval:** About 12 minutes from the plan commit checkpoint at 2026-11-23 22:05:13 EST through closeout shortly after 22:16 EST. Executor start was not separately captured; active time was not measured.
+- **Wall interval:** 15m35s from the phase plan commit checkpoint at 2026-11-23 22:05:13 EST through metadata closeout at 22:20:48 EST. Executor start was not separately captured; active time was not measured.
 - **Tasks:** 3. **Files modified:** 11.
 - **Task commits:** `6e81054`, `2f3835a`, `150344e` (three measured commits from `43d8be0` through `150344e`).
 
