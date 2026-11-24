@@ -4730,15 +4730,15 @@ static void visit_input_state(void *user, const char *name, const void *data, ui
                               uint32_t width)
 {
     struct input_state_snapshot *snapshot = (struct input_state_snapshot *)user;
-    if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
+    if (strcmp(name, "pad.device") == 0 && count == 8u && width == 1u) {
         memcpy(snapshot->device, data, sizeof snapshot->device);
-    } else if (strcmp(name, "pad.present") == 0 && count == 2u && width == 1u) {
+    } else if (strcmp(name, "pad.present") == 0 && count == 8u && width == 1u) {
         memcpy(snapshot->present, data, sizeof snapshot->present);
-    } else if (strcmp(name, "pad.analog_mode") == 0 && count == 2u && width == 1u) {
+    } else if (strcmp(name, "pad.analog_mode") == 0 && count == 8u && width == 1u) {
         memcpy(snapshot->analog_mode, data, sizeof snapshot->analog_mode);
-    } else if (strcmp(name, "pad.buttons") == 0 && count == 2u && width == 2u) {
+    } else if (strcmp(name, "pad.buttons") == 0 && count == 8u && width == 2u) {
         memcpy(snapshot->buttons, data, sizeof snapshot->buttons);
-    } else if (strcmp(name, "pad.axes") == 0 && count == 8u && width == 1u) {
+    } else if (strcmp(name, "pad.axes") == 0 && count == 32u && width == 1u) {
         memcpy(snapshot->axes, data, sizeof snapshot->axes);
     }
 }
@@ -5408,7 +5408,7 @@ static int test_input_controls(const char *path)
         controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DIGITAL, SCHWAY_INPUT_DEVICE_NONE);
         controls_step(reference, &input_snapshot, digital_none,
                       "independent digital and none ports", audio_floor, 1);
-        p_set_controller_port_device(0u, RETRO_DEVICE_MOUSE);
+        p_set_controller_port_device(0u, RETRO_DEVICE_LIGHTGUN);
         p_set_controller_port_device(2u, RETRO_DEVICE_ANALOG);
         controls_step(reference, &input_snapshot, digital_none,
                       "invalid requests preserve selected devices", audio_floor, 1);

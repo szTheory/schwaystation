@@ -205,13 +205,21 @@ static void eight_endpoint_input_latch(void)
             CHECK_EQ_U64(inst->pad.device[endpoint], controller->device);
             CHECK_EQ_U64(inst->pad.present[endpoint],
                          controller->device != SCHWAY_INPUT_DEVICE_NONE ? 1u : 0u);
-            CHECK_EQ_HEX(inst->pad.buttons[endpoint], (uint16_t)~controller->buttons);
+            uint16_t expected_buttons = controller->device == SCHWAY_INPUT_DEVICE_MOUSE
+                                            ? (uint16_t)(0xF0FFu |
+                                                         (0x0C00u & (uint16_t)~controller->buttons))
+                                            : (uint16_t)~controller->buttons;
+            CHECK_EQ_HEX(inst->pad.buttons[endpoint], expected_buttons);
             CHECK(memcmp(&inst->pad.axes[endpoint * 4u], controller->axes, 4u) == 0);
             CHECK_EQ_U64(inst->pad.analog_button[endpoint], controller->analog_button);
             CHECK_EQ_U64(inst->pad.mouse_dx[endpoint],
-                         (uint16_t)((int32_t)controller->mouse_dx - INT16_MIN));
+                         controller->device == SCHWAY_INPUT_DEVICE_MOUSE
+                             ? (uint16_t)((int32_t)controller->mouse_dx - INT16_MIN)
+                             : UINT16_C(32768));
             CHECK_EQ_U64(inst->pad.mouse_dy[endpoint],
-                         (uint16_t)((int32_t)controller->mouse_dy - INT16_MIN));
+                         controller->device == SCHWAY_INPUT_DEVICE_MOUSE
+                             ? (uint16_t)((int32_t)controller->mouse_dy - INT16_MIN)
+                             : UINT16_C(32768));
             CHECK_EQ_U64(inst->pad.negcon_twist[endpoint], controller->negcon_twist);
             CHECK_EQ_U64(inst->pad.negcon_i[endpoint], controller->negcon_i);
             CHECK_EQ_U64(inst->pad.negcon_ii[endpoint], controller->negcon_ii);
@@ -267,8 +275,8 @@ static void eight_endpoint_input_latch(void)
     CHECK_EQ_HEX(inst->pad.buttons[1], (uint16_t)~next.buttons[1]);
     CHECK_EQ_U64(inst->pad.axes[0], next.axes[0][0]);
     CHECK_EQ_U64(inst->pad.axes[4], next.axes[1][0]);
-    CHECK_EQ_U64(inst->pad.mouse_dx[0], (uint16_t)(-100 - INT16_MIN));
-    CHECK_EQ_U64(inst->pad.mouse_dy[0], (uint16_t)(100 - INT16_MIN));
+    CHECK_EQ_U64(inst->pad.mouse_dx[0], UINT16_C(32768));
+    CHECK_EQ_U64(inst->pad.mouse_dy[0], UINT16_C(32768));
     CHECK_EQ_U64(inst->pad.negcon_twist[0], 1u);
     CHECK_EQ_U64(inst->pad.jogcon_dial[0], 5u);
     CHECK_EQ_U64(inst->pad.jogcon_flags[0], 3u);
