@@ -628,12 +628,14 @@ static void flight_direct_vectors(void)
         set_direct_flight(&next, port, 1u << 9, new_axes);
         next.size = (uint32_t)sizeof next;
         CHECK_EQ_U64(schway_set_input(inst, &next), SCHWAY_STATUS_OK);
-        uint8_t old_payload[] = {0xFFu, (uint8_t)~(1u << 13),
+        uint16_t old_buttons = (uint16_t)~(uint16_t)(1u << 13);
+        uint8_t old_payload[] = {(uint8_t)old_buttons, (uint8_t)(old_buttons >> 8),
                                  old_axes[0], old_axes[1], old_axes[2], old_axes[3]};
         poll(inst, 0x53u, old_payload, 6u, NULL);
         schway__pad_frame_end(inst);
         schway__pad_frame_start(inst);
-        uint8_t new_payload[] = {0xFFu, (uint8_t)~(1u << 9),
+        uint16_t new_buttons = (uint16_t)~(uint16_t)(1u << 9);
+        uint8_t new_payload[] = {(uint8_t)new_buttons, (uint8_t)(new_buttons >> 8),
                                  new_axes[0], new_axes[1], new_axes[2], new_axes[3]};
         poll(inst, 0x53u, new_payload, 6u, NULL);
 

@@ -387,6 +387,9 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
 
 static uint8_t normal_id(const struct schway__pad *pad, uint32_t port)
 {
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
+        return 0x53u;
+    }
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_MOUSE) {
         return 0x12u;
     }
@@ -405,7 +408,8 @@ static uint8_t poll_size(const struct schway__pad *pad, uint32_t port)
     if (pad->config_mode[port] != 0u ||
         (pad->device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
          pad->analog_mode[port] != 0u) ||
-        pad->device[port] == SCHWAY_INPUT_DEVICE_NEGCON) {
+        pad->device[port] == SCHWAY_INPUT_DEVICE_NEGCON ||
+        pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
         return 6u;
     }
     return pad->device[port] == SCHWAY_INPUT_DEVICE_MOUSE ? 4u : 2u;
