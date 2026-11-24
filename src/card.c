@@ -867,7 +867,7 @@ uint32_t schway__card_byte(schway *inst, uint32_t endpoint, uint8_t sent, uint8_
     }
     struct schway__card_slot *slot = &inst->card.slot[endpoint];
     if (slot->phase == CARD_IDLE) {
-        if (sent != 0x81u) {
+        if (sent != (uint8_t)(0x81u + endpoint % 4u)) {
             return SCHWAY__CARD_BYTE_UNHANDLED;
         }
         slot->phase = CARD_COMMAND;

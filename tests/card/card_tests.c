@@ -1668,7 +1668,6 @@ static void tap_protocol(void)
                 (uint8_t)(0xC0u + endpoint), (uint8_t)(0xD0u + endpoint)
             };
             uint16_t index = (uint16_t)(endpoint + 1u);
-            uint8_t com_flags = (uint8_t)((endpoint + 1u) & 0x0Bu);
             pocket_storage_write_address(inst, address, 0x5Cu, 0x08000100u,
                                           sizeof payload, payload, sizeof payload);
             memcpy(&images[endpoint][0x100u], payload, sizeof payload);
@@ -1676,7 +1675,7 @@ static void tap_protocol(void)
             pocket_storage_read_address(inst, address, 0x5Bu, 0x08000100u,
                                         sizeof payload, payload, sizeof payload);
             pocket_set_index_address(inst, address, index, 0u, 0u, 0u);
-            pocket_metadata_address(inst, address, index, com_flags, 0u);
+            pocket_metadata_address(inst, address, index, 0u, 0u);
             verify_tap_cards(inst, images, generations);
         }
     }

@@ -517,11 +517,15 @@ reset. Copy data you need before destroying the instance.
 
 `schway_get_memory` exposes read-only spans selected by `SCHWAY_MEMORY_RAM`, `SCHWAY_MEMORY_SCRATCHPAD`,
 `SCHWAY_MEMORY_VRAM`, `SCHWAY_MEMORY_BIOS`, `SCHWAY_MEMORY_CARD1` or `SCHWAY_MEMORY_CARD2`. It returns the
-instance's 2 MiB RAM, 1 KiB scratchpad, 1 MiB VRAM, current BIOS image or one of two 131,072-byte card images.
-RAM, scratchpad, VRAM and card pointers remain stable for the instance lifetime. The BIOS span initially names the
-built-in PS-EXE stub; after a host BIOS is loaded it names the instance's copied image and stays stable through
-resets. RAM, scratchpad and VRAM contents change as the core runs; card pointers and bytes remain stable across
-reads, state loads and power resets. `schway_get_vram` remains a convenience accessor for the VRAM span.
+instance's 2 MiB RAM, 1 KiB scratchpad, 1 MiB VRAM, current BIOS image or one of the two legacy card images.
+API v9 adds `schway_get_memcard(inst, port, socket, &span)` to expose all eight physical tap-card endpoints.
+`SCHWAY_CARD_PORT_1` and `SCHWAY_CARD_PORT_2` are one-based physical ports; `SCHWAY_CARD_SOCKET_A` through
+`SCHWAY_CARD_SOCKET_D` are one-based sockets. Port 1/socket A remains card 1 and port 2/socket A remains card 2,
+whether or not either tap is enabled. No additional memory IDs are needed. RAM, scratchpad, VRAM and card pointers
+remain stable for the instance lifetime. The BIOS span initially names the built-in PS-EXE stub; after a host BIOS
+is loaded it names the instance's copied image and stays stable through resets. RAM, scratchpad and VRAM contents
+change as the core runs; card pointers and bytes remain stable across reads, state loads and power resets.
+`schway_get_vram` remains a convenience accessor for the VRAM span.
 
 Cards start as formatted blank images. Before execution, a host can import a raw image up to 131,072 bytes.
 Short images are padded with `FFh` through the end of the card, as required for an unallocated raw card area:
@@ -532,10 +536,15 @@ schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, raw_card, raw_card_size);
 schway_memcard_generation(inst, SCHWAY_CARD_SLOT_1, &generation);
 ```
 
-The one-based slots are `SCHWAY_CARD_SLOT_1` and `SCHWAY_CARD_SLOT_2`; each image has `SCHWAY_MEMCARD_SIZE`
-bytes. The core accepts raw bytes only; the host owns file access and any wrapper decoding. A null pointer, invalid
-slot, oversized image or import after execution returns `SCHWAY_STATUS_ERR_ARGUMENT` without changing the current
-card or its generation. Successful imports keep the span address stable and reset that slot's generation to zero.
+The one-based legacy slots are `SCHWAY_CARD_SLOT_1` and `SCHWAY_CARD_SLOT_2`; every socket image has
+`SCHWAY_MEMCARD_SIZE` bytes. `schway_load_memcard_socket(inst, port, socket, bytes, size)` imports one endpoint,
+and `schway_memcard_socket_generation(inst, port, socket, &generation)` reads its write counter. The original
+load and generation calls remain aliases for port 1/socket A and port 2/socket A. The core accepts raw bytes only;
+the host owns file access and any wrapper decoding. A null pointer, invalid coordinate, oversized image or import
+after execution returns `SCHWAY_STATUS_ERR_ARGUMENT` without changing bytes or generation. Successful imports
+keep the span address stable, pad short images with `FFh`, and reset that socket's generation to zero. When a tap is
+enabled, serial card addresses `81h` through `84h` select sockets A through D on that physical port. With a tap
+disabled, only the existing direct `81h` card address responds.
 
 Ordinary save states include the pending SIO/card protocol but exclude card bytes and generations. Before applying
 a state, the core validates card phase and address progression, checks checksum consistency where the saved fields
