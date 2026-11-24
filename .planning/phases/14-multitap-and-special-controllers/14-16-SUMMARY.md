@@ -124,7 +124,7 @@ status: complete
 - `ctest --preset ci --no-tests=error -R '^fixtures[.]gpu_motion[.]state[.](150|180)$' --output-on-failure` — exit 0; 2/2 passed in 1.40 seconds.
 - Link-target existence checks — exit 0. Modified documentation page sizes are 47,006 bytes (`docs/embedding.md`) and 61,194 bytes (`docs/testing.md`), both below the 61,440-byte limit.
 - `jq -e . quality.json` and the state-bound assertion — exit 0.
-- Exact producer-value preflights for `size.wasm=947976`, `ir_per_frame.testcard=1620101`, and `ir_per_frame.gpu_motion=138319540` via `tests/cmake/quality.cmake` — exit 0 for all three.
+- Earlier exact producer-value preflights for `size.wasm=947976`, `ir_per_frame.testcard=1620101`, and `ir_per_frame.gpu_motion=138319540` via `tests/cmake/quality.cmake` — exit 0 for all three before the final watchdog-table representation change.
 - After the SIO and C17 libretro portability fixes and measured-pin updates, `cmake --workflow --preset ci` — exit 0; 705/705 CTest tests passed in 69.07 seconds, all three macOS arm64 packages were produced, and the CI release selectors passed 8/8 in 1.47 seconds.
 - In named Ubuntu 26.04 arm64 container `schwaystation-phase14-gcc-libretro`, GCC 15.2 warnings-as-errors configure with `SCHWAYSTATION_NOFP=ON`, then `cmake --build /tmp/schwaystation-phase14-gcc-libretro --target schwaystation_libretro` — exit 0. The `--rm` container was removed automatically.
 - `cmake --build build/ci --target schwaystation-test-libretro-host` — exit 0; the focused card/input selector group `libretro.cards.persistence`, `libretro.cards.controls`, `libretro.cards.multitap`, and `libretro.input.multitap` passed 4/4 in 5.16 seconds.
@@ -133,14 +133,27 @@ status: complete
 
 - The exact Ubuntu 26.04 WASI producer measured the linked Release runner at 947,976 bytes on PR run 45420382438,
   job 138538583783. Its quality comparison failed only because the stored exact pin was stale; the new floor and ceiling
-  track that result: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783.
+  tracked that result for source before the watchdog-table representation change: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783.
+- The final source candidate measured 947,899 bytes with the Ubuntu 26.04 arm64 Clang/LLD 21.1.8 toolchain and CHD
+  enabled. In task-named container `schwaystation-phase14-wasi-size`, direct CMake configure/build of
+  `schwaystation-run` exited 0, `stat -c 'WASI_MODULE_BYTES=%s'` reported 947899, and the artifact form of
+  `tests/cmake/quality.cmake` exited 1 only because the then-current 947976 floor was higher; it validated the WASM magic.
+  After the exact bound update, `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=947899 -P
+  tests/cmake/quality.cmake` exited 0, and the focused `policy.quality_metrics` CTest passed 1/1 in 31.17 seconds.
+- Main CI [45428490941](https://github.com/szTheory/schwaystation/actions/runs/45428490941) failed before the WASI build
+  because that runner's apt update saw Microsoft's package feed but no Ubuntu package index. The same-head Nightly
+  [45428491372](https://github.com/szTheory/schwaystation/actions/runs/45428491372) installed the same packages and
+  passed its WASI benchmark, full vectors, native benchmarks and fuzz. Main CI was canceled after 1,159 seconds wall
+  time once the local exact producer revealed the stale pin; GitHub's timing API returned zero billable milliseconds.
 - The exact Linux x64 Cachegrind producer measured testcard at 1,620,101 and `gpu_motion` at 138,319,540 Ir/frame
   on the same run, job 138538117721. Both relative comparisons passed; the absolute comparisons exceeded their exact
   pins by 528 Ir/frame, so those pins now track the producer outputs without changing the 100-basis-point regression
   limit: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721.
-- The host still cannot reproduce either producer locally. The first full hosted attempt exposed the GCC SIO bounds
-  issue, then the retry exposed the independent C17 libretro qualifier issue; both are fixed and covered by local
-  GCC builds and focused tests. The repaired-head CI retry is pending.
+- The WASI producer is now locally reproducible in a task-named Ubuntu container; the local macOS host still lacks
+  Cachegrind, so instructions-per-frame remains hosted-only. The initial hosted run exposed GCC SIO bounds and C17
+  libretro qualifier issues; both are fixed and covered by local GCC builds/tests. A later no-FP run exposed the
+  pointer-table ABI classification, fixed with a read-only table. The final exact size is measured locally; updated
+  Main CI and Nightly results remain required before ship.
 
 ## Decisions Made
 
@@ -149,7 +162,7 @@ status: complete
 
 ## Deviations from Plan
 
-The implementation and focused checks finished around 12 minutes, but GSD closeout extended total wall time to about 32 minutes, exceeding the 30-minute slice cap by about 2 minutes. The plan's conditional hosted measurements remain pending because their pinned toolchains are unavailable locally.
+The implementation and focused checks finished around 12 minutes, but GSD closeout extended total wall time to about 32 minutes, exceeding the 30-minute slice cap by about 2 minutes. Cachegrind remains hosted-only on this host; the WASI module was reproduced later with the pinned Ubuntu 26.04 toolchain in a temporary container.
 
 ## Issues Encountered
 

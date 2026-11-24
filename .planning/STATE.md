@@ -6,10 +6,10 @@ current_phase: 15
 current_phase_name: GunCon and Justifier
 current_plan: Not started
 status: planning
-stopped_at: Phase 14 verification refreshed; final local candidate ready for hosted CI and ship
-last_updated: "2026-11-24T15:40:57Z"
+stopped_at: Phase 14 exact WASI bound updated; final hosted retry pending
+last_updated: "2026-11-24T16:21:13Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 GCC ABI follow-up passes review, Linux preflight and full local workflow; final hosted retry pending
+last_activity_desc: Phase 14 WASI size measured at 947899; updated exact pin and local quality test pass, hosted retry pending
 state_head: 2ab13f4e0d44f1ddb4fd9c31f7ddb2804c19b074
 progress:
   total_phases: 10
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — final candidate `2ab13f4` passes local review and verification; PR #42 needs final-head hosted CI and release before Phase 15 planning
+**Current focus:** Phase 14 — 947,899-byte WASI module pin passes locally; PR #42 needs this bound, Main CI and release before Phase 15
 
 ## Current Position
 
@@ -34,8 +34,8 @@ Phase: 15 — GunCon and Justifier
 Current Plan: Not started
 Total Plans in Phase: Not planned
 Status: Ready to plan
-Last activity: 2026-11-24 — Phase 14 fixes and measured bounds pass the full local workflow; PR #42 awaits final-head hosted CI
-Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and passed local verification. Its repaired PR head needs hosted CI and release before Phase 15; Phase 7–11 verification digest reconciliation remains pending.)
+Last activity: 2026-11-24 — final WASI module size was measured locally; CI needs a rerun after the exact pin update
+Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Its final PR head still needs green Main CI and release before Phase 15; Phase 7–11 verification digest reconciliation remains pending.)
 
 ### Phase 14 verification closeout (2026-11-24)
 
@@ -142,8 +142,37 @@ directly reproduced the failing ABI condition, so `act` offered no additional co
 After the correction, `cmake --workflow --preset ci` exited 0: 705/705 CTest tests passed in 73.01 seconds, all three
 macOS arm64 packages were produced, and the CI release checks passed 8/8 in 1.47 seconds. The Phase 14 code review is
 clean, all 49 goal-backward truths and four roadmap criteria remain verified, and the Phase 14 verification digest is
-refreshed at `2ab13f4`. This final local candidate still needs to be pushed to PR #42 and pass hosted Main CI and Nightly
-before ship. No Docker resource remains; the GCC preflight container used `--rm`.
+refreshed at `2ab13f4`.
+
+### Phase 14 final WASI measurement and hosted runner fault (2026-11-24)
+
+Runtime/model: Codex; primary runtime model ID unavailable. The follow-up local module build took about one minute,
+including the first dependency install. On source commit `2ab13f4`, the task-named, auto-removed Ubuntu 26.04 arm64
+container used Clang 21.1.8, LLD 21.1.8, `wasi-libc` 0.0~git20250726.3f7eb4c-4, the pinned CHD-enabled Release runner
+configuration, and the `schwaystation-run` target. Inside that container,
+`cmake -S /work -B /tmp/schwaystation-wasi-build -G Ninja -DCMAKE_TOOLCHAIN_FILE=/work/cmake/toolchains/wasm32-wasi.cmake
+-DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DSCHWAYSTATION_BUILD_TESTS=OFF
+-DSCHWAYSTATION_BUILD_LIBRETRO=OFF -DSCHWAYSTATION_BUILD_RUNNER=ON -DSCHWAYSTATION_CHD=ON
+-DSCHWAYSTATION_BUILD_CHD_TOOL=OFF` and `cmake --build /tmp/schwaystation-wasi-build --target schwaystation-run`
+exited 0. `stat -c 'WASI_MODULE_BYTES=%s' /tmp/schwaystation-wasi-build/schwaystation-run` reported 947899. The exact
+`tests/cmake/quality.cmake` artifact check exited 1 because the current floor was 947,976. Its WASM magic check passed,
+and its measured byte count is the producer result. The old measurement was from the pre-table source; the final module
+is 77 bytes smaller. After updating `quality.json`, `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=947899
+-P tests/cmake/quality.cmake` exited 0; `ctest --test-dir build/ci --output-on-failure -R
+'^policy[.]quality_metrics$' --no-tests=error` passed 1/1 in 31.17 seconds. `jq -e . quality.json`, the SIO inventory
+sort check and `git diff --check` also exited 0. The first container attempt failed because the minimal image lacked
+`ca-certificates`; the next named `--rm` run included it and completed the build. Docker left no task-created container,
+image, volume or network.
+
+Main CI run [45428490941](https://github.com/szTheory/schwaystation/actions/runs/45428490941) on PR head `4bcb76e`
+failed before its WASI build: `apt-get update` saw Microsoft's feed but no Ubuntu package index, so `wasi-libc` and
+`libclang-rt-21-dev-wasm32` had no installation candidate. The same-head Nightly run
+[45428491372](https://github.com/szTheory/schwaystation/actions/runs/45428491372) installed those exact packages and
+passed its WASI benchmark, vectors, benchmarks and fuzz suite. Main CI passed no-FP, perf, hygiene, OpenBIOS, GPU
+reference and the six-platform builds that completed before cancellation. It was canceled at 1,159 seconds wall time
+after the local producer exposed the stale exact pin; Nightly completed in 796 seconds with its fuzz job taking 782
+seconds. GitHub's timing endpoint returned zero billable milliseconds for both runs, so no runner-minute savings are
+claimed. Main CI plus its WASI-dependent hash comparison must pass on the corrected exact bound before Phase 14 ships.
 
 ### Phase 14 tail planning split (2026-11-24)
 
