@@ -7,10 +7,10 @@ current_phase_name: GunCon and Justifier
 current_plan: Not started
 status: planning
 stopped_at: Phase 14 verified; repaired head ready for hosted CI and ship
-last_updated: "2026-11-24T14:58:04Z"
+last_updated: "2026-11-24T15:23:04Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 hosted CI found a GCC portability issue; corrected and locally verified before retry
-state_head: 440022c5ac03fec59b16cc310547c678f1e57a20
+last_activity_desc: Phase 14 GCC fixes and producer-backed quality pins pass the full local workflow; final hosted retry pending
+state_head: e60fb17fa2a98b4d114efed8700ead800862b160
 progress:
   total_phases: 10
   completed_phases: 8
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — corrected source is locally verified and committed on PR #42; hosted CI and release are pending before Phase 15 planning
+**Current focus:** Phase 14 — corrected source and exact quality pins pass the full local workflow; PR #42 needs a green final-head hosted run and release before Phase 15 planning
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Phase: 15 — GunCon and Justifier
 Current Plan: Not started
 Total Plans in Phase: Not planned
 Status: Ready to plan
-Last activity: 2026-11-24 — Phase 14 portability correction is locally verified; PR #42 awaits retried hosted CI
+Last activity: 2026-11-24 — Phase 14 fixes and measured bounds pass the full local workflow; PR #42 awaits final-head hosted CI
 Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and passed local verification. Its repaired PR head needs hosted CI and release before Phase 15; Phase 7–11 verification digest reconciliation remains pending.)
 
 ### Phase 14 verification closeout (2026-11-24)
@@ -45,7 +45,7 @@ existence/substance checks. The path-only link heuristic found 1/30 links; manua
 cross-file function calls, generated inventory/ledger links and documentation links, with the corresponding full-suite tests
 passing. SIO-01–04 are satisfied. The GSD phase-completion transition updated the requirement statuses, roadmap and state.
 
-`cmake --workflow --preset ci` exited 0 on source head `d7d3cbf`: 705/705 CTest cases passed, all three macOS arm64 packages
+`cmake --workflow --preset ci` exited 0 on the initial Phase 14 source head `d7d3cbf`: 705/705 CTest cases passed, all three macOS arm64 packages
 were produced, and the separate CI release checks passed 8/8. The CTest critical path was 115.10s; the release checks took
 3.12s. The slowest cases were `policy.quality_metrics` (71.35s), `libretro.host` (51.50s), `libretro.input.movies` (33.12s),
 `runner.disc.legacy` (30.44s), and `runner.hashes_file` (23.28s). The local quality gate is serial and instrumentation-heavy;
@@ -82,9 +82,44 @@ to use `cmake --preset ci` exited 1 because the image's CMake 4.2.3 cannot parse
 CMake configure/build was used instead. The task-named `--rm` container cleaned itself up; no task-created image, volume or
 network remains. Workflow wiring was unchanged, and `act` would not add coverage beyond the direct GCC compile and local tests.
 
-Next: push the reviewed correction and updated verification evidence, inspect the repaired head's Main CI and Nightly while
-they run and after they finish, then complete Phase 14 ship/release. Phase 15 must wait for that release. Hosted WASI module
-size and Cachegrind instructions/frame remain tied to their exact producers; no bound was guessed or widened.
+That reviewed SIO correction and its evidence were pushed to PR #42; the following hosted attempt and additional findings
+are recorded below. Phase 15 remains behind Phase 14's passing final-head CI and release boundary.
+
+### Phase 14 second hosted run and exact quality measurements (2026-11-24)
+
+Main CI run [45420382438](https://github.com/szTheory/schwaystation/actions/runs/45420382438), on head `1dcc24c`, found the
+separate C17 GCC issue at `lr_card_sockets_load(card_paths)`: a mutable 2D character array cannot be implicitly converted
+to a pointer to arrays with nested `const` before C23 under `-Wpedantic`. Linux x64, no-FP x64/arm64, BE32 and other build
+lanes reported the same call-site diagnostic. The fix in `libretro/libretro.c` now builds a bounded eight-element view of
+`const char *` row pointers and passes it to the synchronous loader, which copies path data without retaining the view.
+Read-only review found no type, bounds, lifetime or behavior issue.
+
+That same run yielded the exact Phase 14 measurements before its quality gate stopped the WASI and perf jobs: linked Release
+WASI size was 947,976 bytes; Cachegrind reported testcard 1,620,101 and GPU motion 138,319,540 Ir/frame. The relative perf
+comparisons passed, but all three old exact pins were below the new measured values. `quality.json` now tracks these exact
+producer results, and `docs/testing.md` shows the current values. Evidence: [WASI job 138538583783](https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783)
+and [perf job 138538117721](https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721). The run was canceled after
+210 seconds wall time once the deterministic compiler and bound failures were confirmed. GitHub returned zero per-job timing
+after cancellation, so raw runner-time and billing savings are unavailable.
+
+Local follow-up on the corrected source: `cmake --build build/ci --target schwaystation-test-libretro-host` exited 0;
+`ctest --test-dir build/ci --output-on-failure -R '^(libretro[.]cards[.](multitap|persistence|controls)|libretro[.]input[.]multitap)$'`
+passed 4/4 in 5.16 seconds. The GCC 15.2 warnings-as-errors CMake build of `schwaystation_libretro` under the no-FP
+configuration exited 0; a read-only review confirmed C17 pointer compatibility. The exact WASI/perf measurement checks,
+`jq -e . quality.json`, inventory sorting, and `git diff --check` all exited 0. The final local
+`cmake --workflow --preset ci` on the corrected source and updated pins exited 0: 705/705 CTest tests passed in 69.07
+seconds, all three macOS arm64 packages were produced, and the CI release checks passed 8/8 in 1.47 seconds.
+
+The earlier Nightly run [45420383435](https://github.com/szTheory/schwaystation/actions/runs/45420383435) completed successfully
+on `1dcc24c`. The three native bench jobs took 45–61 seconds each, the WASI benchmark 142 seconds, and full vectors 70
+seconds; each ran alongside fuzz. The fuzz step itself took 674 seconds and executed eleven bounded 60-second campaigns
+sequentially, after fixture and sanitizer setup. This was the run's critical path (13m50 total). Inference from the step
+commands and durations: splitting the campaigns into runners repeats builds/setup, while running them together on one
+runner risks cutting their executions per campaign. No safe, cost-neutral reduction was evident without changing the
+campaign budget. Main CI route checks passed in about 8 seconds and required lanes ran in parallel; deterministic compiler
+and exact-pin failures were canceled at 210 seconds. GitHub exposed no per-job billing times for that canceled run. No
+workflow wiring changed; direct GCC builds and focused CTests already exercised the fixes, so `act` would not add job-step
+coverage. The repaired final head still needs Main CI and Nightly before Phase 14 ship.
 
 ### Phase 14 tail planning split (2026-11-24)
 
