@@ -1,47 +1,50 @@
 ---
 phase: 14-multitap-and-special-controllers
-reviewed: 2026-11-24T13:33:15Z
+reviewed: 2026-11-24T13:48:11Z
 depth: standard
-files_reviewed: 6
+files_reviewed: 3
 files_reviewed_list:
-  - docs/hardware/sio.md
   - docs/runner.md
-  - runner/main.c
   - src/sio.c
   - tests/core/test_state.c
-  - tests/runner/tests.cmake
 findings:
-  critical: 1
-  warning: 1
+  critical: 0
+  warning: 0
   info: 0
-  total: 2
+  total: 0
   necessity: 0
-status: issues_found
+status: clean
 ---
 
 # Phase 14: Code Review Report
 
-**Reviewed:** 2026-11-24T13:33:15Z
+**Reviewed:** 2026-11-24T13:48:11Z
 **Depth:** standard
-**Files Reviewed:** 6 (incremental scope)
-**Status:** issues_found
+**Files Reviewed:** 3 (incremental scope since `cae3772`)
+**Status:** clean
 
 ## Summary
 
-This incremental review covered the six files returned by the phase-scope resolver for changes since `f033365`. The resolver returned `degraded` (`no-task-commits-since`), but its usable file list matched the requested scope and every file was present. The original standard-depth review covered 45 files and recorded two critical issues and two warnings. All four fixes are recorded in [14-REVIEW-FIX.md](14-REVIEW-FIX.md). The current changes fix the long-reply index bound, restore legacy movie input on tapped socket A, and update card-socket documentation. This re-review found one reachable short-reply state that the new bound rejects and one stale card-naming description. No tests were run for this static re-review.
+This standard-depth re-review covered `docs/runner.md`, `src/sio.c`, and `tests/core/test_state.c`, the usable file list from the evaluation-scope resolver. The resolver returned `degraded` with reason `no-task-commits-since`; all three files were present and matched the requested scope. The short-reply state at index 3 is now accepted and resumes with the terminal slot ID, while index 4 is rejected. The per-mode transaction bounds still cap all indices used to derive long-reply socket shifts. The runner documentation accurately describes one selected basename across all eight socket paths. No issues remain in this scope. No tests were run during this static re-review; [14-REVIEW-FIX.md](14-REVIEW-FIX.md) records the targeted tests run for iteration 2.
 
-## Initial Review Record (historical; fixed)
+## Narrative Findings (AI reviewer)
 
-The initial 45-file review recorded these findings; the fix report documents each resolution and its commit:
+All reviewed files meet quality standards. No issues found.
+
+## Historical Review Record
+
+The records below preserve earlier review scopes and findings. Fixed historical findings are not included in the current frontmatter counts.
+
+### Initial standard-depth review
+
+The initial review covered 45 source files and recorded two critical issues and two warnings. All four were fixed as recorded in [14-REVIEW-FIX.md](14-REVIEW-FIX.md):
 
 - **CR-01:** Accepted multitap state could reach an out-of-range shift — fixed in `cc6eeb1`.
 - **CR-02:** Runner input movies stopped controlling socket A when a tap was enabled — fixed in `b88bc11`.
 - **WR-01:** SIO documentation described only two card slots — fixed in `ee834d8`.
 - **WR-02:** The runner `--save-dir` summary promised two card files — fixed in `ea7ab0b`.
 
-See [14-REVIEW-FIX.md](14-REVIEW-FIX.md) for the fix descriptions and recorded verification. Those four findings are historical and are not included in the current finding counts below.
-
-The original review scope was:
+The initial review scope was:
 
 - `docs/compatibility.md`
 - `docs/controllers.md`
@@ -89,28 +92,19 @@ The original review scope was:
 - `tests/sio/sio_tests.c`
 - `tests/sio/tests.cmake`
 
-## Narrative Findings (AI reviewer)
+### Prior incremental review (fixed in iteration 2)
 
-### Critical Issues
+The previous incremental review covered six files changed since `f033365`. Its two findings and fixes are preserved here and documented in iteration 2 of [14-REVIEW-FIX.md](14-REVIEW-FIX.md):
 
-#### CR-03: Short-reply index bound rejects a reachable save state
+- **CR-03:** The short-reply state validator rejected reachable index 3, preventing a saved transfer from loading and resuming. Fixed in `0bcefc2` by allowing index 3 and rejecting index 4; a save/load/resume regression was added.
+- **WR-03:** The `--memcard-names` row implied serial naming covered only two card files. Fixed in `d46d644` by stating it chooses the shared basename for all eight card socket paths.
 
-**Severity:** BLOCKER  
-**File:** `src/sio.c:40-41, 53-56, 575-588`; `tests/core/test_state.c:605-610`
-**Issue:** After processing the short reply's second byte at index 2, `tap_byte` ACKs it and increments `tap_tx_index` to 3. Index 3 is the next live transaction position; processing that byte returns the slot ID and finishes the transaction. The new `TAP_SHORT_LAST_INDEX = 2` bound rejects index 3 during state validation, even though `schway_save_state` can serialize this reachable in-flight state. Loading that saved state therefore returns `SCHWAY_STATUS_ERR_STATE_FIELD` instead of resuming the transfer. The new malformed-state test also labels index 3 as past-terminal, cementing the off-by-one error.
-**Fix:** Allow the terminal pending-byte position, index 3, for `TAP_SHORT`; reject index 4 instead. Add a save/load roundtrip at the reachable short-reply index 3, while retaining the checksummed invalid-state test at index 4.
-
-### Warnings
-
-#### WR-03: Runner naming option still promises two card files
-
-**Severity:** WARNING  
-**File:** `docs/runner.md:48-50, 192-197`
-**Issue:** The `--save-dir` option now correctly says the runner loads and saves all eight sockets, and the detailed section says all eight files are imported. The adjacent `--memcard-names` row still describes naming “both card files,” so users can reasonably infer serial naming covers only the two legacy socket-A files even though it supplies the basename for all eight per-port/socket paths.
-**Fix:** Change “both card files” to “all eight card socket files” (or equivalently say the naming mode selects the basename used for all eight socket paths).
+The fix report records `git diff --check`, CI configure/build, and the selected state/SIO/runner tests passing after the test expectation correction. This re-review confirms both fixes against the current source and documentation.
 
 ---
 
-_Reviewed: 2026-11-24T13:33:15Z_
+_Reviewed: 2026-11-24T13:48:11Z_
+
 _Reviewer: the agent (gsd-code-reviewer)_
+
 _Depth: standard_
