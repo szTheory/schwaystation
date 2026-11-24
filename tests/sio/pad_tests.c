@@ -646,6 +646,14 @@ static void mouse_tap_and_startup_ack(void)
     set_direct_mouse(&input, 1u, 1u << 10, 9, -9);
     latch_input(inst, &input);
     configure_sio_port(inst, 0u);
+    size_t state_size = schway_state_size(inst);
+    uint8_t *saved = malloc(state_size);
+    CHECK(saved != NULL);
+    if (saved == NULL) {
+        schway_destroy(inst);
+        return;
+    }
+    CHECK_EQ_U64(schway_save_state(inst, saved, state_size), SCHWAY_STATUS_OK);
     CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x80u) != 0u);
     (void)exchange(inst, 0x01u, 1);
     CHECK_EQ_U64(inst->sio.tx_pending, 0u);
@@ -653,6 +661,12 @@ static void mouse_tap_and_startup_ack(void)
     configure_sio_port(inst, 1u);
     (void)exchange(inst, 0x01u, 1);
     CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u);
+    CHECK_EQ_U64(schway_load_state(inst, saved, state_size), SCHWAY_STATUS_OK);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x80u) != 0u);
+    configure_sio_port(inst, 1u);
+    (void)exchange(inst, 0x01u, 1);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u);
+    free(saved);
 
     memset(&input, 0, sizeof input);
     input.multitap[1] = 1u;

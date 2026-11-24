@@ -13,6 +13,7 @@ static const char name_buttons[] = "pad.buttons";
 static const char name_axes[] = "pad.axes";
 static const char name_mouse_dx[] = "pad.mouse_dx";
 static const char name_mouse_dy[] = "pad.mouse_dy";
+static const char name_mouse_startup_ack[] = "pad.mouse_startup_ack";
 static const char name_negcon_twist[] = "pad.negcon_twist";
 static const char name_negcon_i[] = "pad.negcon_i";
 static const char name_negcon_ii[] = "pad.negcon_ii";
@@ -75,12 +76,19 @@ void schway__pad_abort(schway *inst, uint32_t port)
 {
     if (port < 2u) {
         inst->pad.phase[port] = PAD_IDLE;
+        inst->pad.command[port] = 0u;
+        inst->pad.data_index[port] = 0u;
         for (uint32_t socket = 1u; socket < 4u; socket++) {
-            inst->pad.phase[2u + port * 3u + socket - 1u] = PAD_IDLE;
+            uint32_t endpoint = 2u + port * 3u + socket - 1u;
+            inst->pad.phase[endpoint] = PAD_IDLE;
+            inst->pad.command[endpoint] = 0u;
+            inst->pad.data_index[endpoint] = 0u;
         }
     } else {
         for (uint32_t endpoint = 0u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
             inst->pad.phase[endpoint] = PAD_IDLE;
+            inst->pad.command[endpoint] = 0u;
+            inst->pad.data_index[endpoint] = 0u;
         }
     }
 }
@@ -98,10 +106,26 @@ void schway__pad_set_connected(schway *inst, uint32_t port, uint32_t connected)
         inst->pad.present[port] = connected != 0u ? 1u : 0u;
         inst->pad.device[port] = connected != 0u ? SCHWAY_INPUT_DEVICE_DIGITAL
                                                  : SCHWAY_INPUT_DEVICE_NONE;
+        inst->pad.mouse_startup_ack[port] = 0u;
+        inst->pad.mouse_dx[port] = UINT16_C(32768);
+        inst->pad.mouse_dy[port] = UINT16_C(32768);
         if (inst->pad.present[port] == 0u) {
             inst->pad.phase[port] = PAD_IDLE;
+            inst->pad.command[port] = 0u;
+            inst->pad.data_index[port] = 0u;
         }
     }
+}
+
+static uint16_t latched_mouse_delta(int16_t input)
+{
+    int32_t value = input;
+    if (value < -128) {
+        value = -128;
+    } else if (value > 127) {
+        value = 127;
+    }
+    return (uint16_t)(value - INT16_MIN);
 }
 
 void schway__pad_frame_start(schway *inst)
@@ -157,6 +181,10 @@ void schway__pad_frame_start(schway *inst)
                     inst->pad.present[endpoint] =
                         device != SCHWAY_INPUT_DEVICE_NONE ? 1u : 0u;
                     inst->pad.phase[endpoint] = PAD_IDLE;
+                    inst->pad.command[endpoint] = 0u;
+                    inst->pad.data_index[endpoint] = 0u;
+                    inst->pad.mouse_startup_ack[endpoint] =
+                        device == SCHWAY_INPUT_DEVICE_MOUSE ? 1u : 0u;
                 }
                 uint8_t prior_pressed = inst->pad.analog_button[endpoint];
                 if (device == SCHWAY_INPUT_DEVICE_DUALSHOCK && prior_pressed == 0u &&
@@ -164,16 +192,22 @@ void schway__pad_frame_start(schway *inst)
                     inst->pad.analog_mode[endpoint] ^= 1u;
                 }
                 inst->pad.analog_button[endpoint] = pressed;
-                inst->pad.buttons[endpoint] = (uint16_t)~buttons;
+                inst->pad.buttons[endpoint] = device == SCHWAY_INPUT_DEVICE_MOUSE
+                                                  ? (uint16_t)(0x0C00u & (uint16_t)~buttons)
+                                                  : (uint16_t)~buttons;
                 if (axes != NULL) {
                     memcpy(&inst->pad.axes[endpoint * 4u], axes, 4u);
                 } else {
                     memset(&inst->pad.axes[endpoint * 4u], 0, 4u);
                 }
-                inst->pad.mouse_dx[endpoint] =
-                    (uint16_t)((int32_t)(controls != NULL ? controls->mouse_dx : 0) - INT16_MIN);
-                inst->pad.mouse_dy[endpoint] =
-                    (uint16_t)((int32_t)(controls != NULL ? controls->mouse_dy : 0) - INT16_MIN);
+                inst->pad.mouse_dx[endpoint] = device == SCHWAY_INPUT_DEVICE_MOUSE &&
+                                                       controls != NULL
+                                                   ? latched_mouse_delta(controls->mouse_dx)
+                                                   : UINT16_C(32768);
+                inst->pad.mouse_dy[endpoint] = device == SCHWAY_INPUT_DEVICE_MOUSE &&
+                                                       controls != NULL
+                                                   ? latched_mouse_delta(controls->mouse_dy)
+                                                   : UINT16_C(32768);
                 inst->pad.negcon_twist[endpoint] =
                     controls != NULL ? controls->negcon_twist : 0u;
                 inst->pad.negcon_i[endpoint] = controls != NULL ? controls->negcon_i : 0u;
@@ -186,6 +220,11 @@ void schway__pad_frame_start(schway *inst)
             }
         }
         inst->pad.pending_valid = 0u;
+    } else {
+        for (uint32_t endpoint = 0u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
+            inst->pad.mouse_dx[endpoint] = UINT16_C(32768);
+            inst->pad.mouse_dy[endpoint] = UINT16_C(32768);
+        }
     }
     inst->pad.frame_latched = 1u;
 }
@@ -216,11 +255,15 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     uint8_t saved_present[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_device[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_config[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t saved_mouse_startup_ack[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_map[SCHWAY__PAD_RUMBLE_MAP_SIZE];
     uint8_t saved_map_stage[SCHWAY__PAD_RUMBLE_MAP_SIZE];
+    const uint8_t *read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     memcpy(saved_present, inst->pad.present, sizeof saved_present);
     memcpy(saved_device, inst->pad.device, sizeof saved_device);
     memcpy(saved_config, inst->pad.config_mode, sizeof saved_config);
+    memcpy(saved_mouse_startup_ack, inst->pad.mouse_startup_ack,
+           sizeof saved_mouse_startup_ack);
     schway__state_u16_array(io, name_buttons, inst->pad.buttons,
                             SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT16_MAX);
     schway__state_u8_array(io, name_axes, inst->pad.axes,
@@ -229,6 +272,12 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
                             SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT16_MAX);
     schway__state_u16_array(io, name_mouse_dy, inst->pad.mouse_dy,
                             SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT16_MAX);
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u8_array(io, name_mouse_startup_ack, inst->pad.mouse_startup_ack,
+                           SCHWAY__PAD_ENDPOINT_COUNT, 0u, 1u);
+    if (read_bytes != NULL) {
+        memcpy(saved_mouse_startup_ack, read_bytes, sizeof saved_mouse_startup_ack);
+    }
     schway__state_u8_array(io, name_negcon_twist, inst->pad.negcon_twist,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, UINT8_MAX);
     schway__state_u8_array(io, name_negcon_i, inst->pad.negcon_i,
@@ -242,7 +291,7 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     schway__state_u16_array(io, name_jogcon_flags, inst->pad.jogcon_flags,
                             SCHWAY__PAD_ENDPOINT_COUNT, 0u, 3u);
     schway__state_u8_array(io, name_multitap, inst->pad.multitap, 2u, 0u, 1u);
-    const uint8_t *read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_present, inst->pad.present,
                            SCHWAY__PAD_ENDPOINT_COUNT, 0u, 1u);
     if (read_bytes != NULL) {
@@ -326,6 +375,8 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
         }
         schway__state_check(io, saved_present[port] ==
                                     (saved_device[port] != SCHWAY_INPUT_DEVICE_NONE ? 1u : 0u));
+        schway__state_check(io, saved_mouse_startup_ack[port] == 0u ||
+                                    saved_device[port] == SCHWAY_INPUT_DEVICE_MOUSE);
         schway__state_check(io, saved_config[port] == 0u ||
                                     (saved_device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
                                      saved_watchdog[port] != 0u));
@@ -335,6 +386,12 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
 
 static uint8_t normal_id(const struct schway__pad *pad, uint32_t port)
 {
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_MOUSE) {
+        return 0x12u;
+    }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_NEGCON) {
+        return 0x23u;
+    }
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
         pad->analog_mode[port] != 0u) {
         return 0x73u;
@@ -344,11 +401,13 @@ static uint8_t normal_id(const struct schway__pad *pad, uint32_t port)
 
 static uint8_t poll_size(const struct schway__pad *pad, uint32_t port)
 {
-    return pad->config_mode[port] != 0u ||
-                   (pad->device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
-                    pad->analog_mode[port] != 0u)
-               ? 6u
-               : 2u;
+    if (pad->config_mode[port] != 0u ||
+        (pad->device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
+         pad->analog_mode[port] != 0u) ||
+        pad->device[port] == SCHWAY_INPUT_DEVICE_NEGCON) {
+        return 6u;
+    }
+    return pad->device[port] == SCHWAY_INPUT_DEVICE_MOUSE ? 4u : 2u;
 }
 
 static void refresh_watchdog(schway *inst, uint32_t port, uint64_t now)
@@ -365,6 +424,22 @@ static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t
     }
     if (index == 1u) {
         return (uint8_t)(pad->buttons[port] >> 8);
+    }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_MOUSE) {
+        uint16_t encoded = index == 2u ? pad->mouse_dx[port] : pad->mouse_dy[port];
+        return (uint8_t)((int32_t)encoded - 32768);
+    }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_NEGCON) {
+        switch (index) {
+        case 2u:
+            return pad->negcon_twist[port];
+        case 3u:
+            return pad->negcon_i[port];
+        case 4u:
+            return pad->negcon_ii[port];
+        default:
+            return pad->negcon_l[port];
+        }
     }
     return pad->axes[port * 4u + index - 2u];
 }
@@ -548,6 +623,9 @@ uint32_t schway__pad_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t no
     struct schway__pad *pad = &inst->pad;
     *received = 0xFFu;
     if (sent == 0x01u && pad->phase[port] == PAD_IDLE) {
+        if (pad->device[port] == SCHWAY_INPUT_DEVICE_MOUSE) {
+            pad->mouse_startup_ack[port] = 0u;
+        }
         pad->phase[port] = PAD_COMMAND;
         pad->command[port] = 0u;
         pad->data_index[port] = 0u;
@@ -629,4 +707,14 @@ uint32_t schway__pad_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t no
         pad->phase[port] = PAD_IDLE;
         return 0u;
     }
+}
+
+uint32_t schway__pad_mouse_ack_low(const schway *inst)
+{
+    for (uint32_t endpoint = 0u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
+        if (inst->pad.mouse_startup_ack[endpoint] != 0u) {
+            return 1u;
+        }
+    }
+    return 0u;
 }

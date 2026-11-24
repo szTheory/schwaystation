@@ -153,8 +153,9 @@ static uint32_t rx_preview(const struct schway__sio *sio, uint32_t width)
     return value;
 }
 
-static uint32_t status(const struct schway__sio *sio)
+static uint32_t status(const schway *inst)
 {
+    const struct schway__sio *sio = &inst->sio;
     uint32_t value = sio->tx_pending == 0u ? 5u : 0u;
     if (sio->rx_count != 0u) {
         value |= STAT_RX_READY;
@@ -162,7 +163,7 @@ static uint32_t status(const struct schway__sio *sio)
     if (sio->parity_error != 0u) {
         value |= 1u << 3;
     }
-    if (sio->ack_low != 0u) {
+    if (sio->ack_low != 0u || schway__pad_mouse_ack_low(inst) != 0u) {
         value |= STAT_ACK_LOW;
     }
     if (sio->irq != 0u) {
@@ -180,7 +181,7 @@ static int peek_reg(const schway *inst, uint32_t addr, uint32_t width, uint32_t 
     }
     if (addr >= SIO_STAT && addr + width <= SIO_STAT + 4u &&
         (width == 1u || width == 2u || width == 4u) && addr % width == 0u) {
-        *value = (status(sio) >> ((addr - SIO_STAT) * 8u)) &
+        *value = (status(inst) >> ((addr - SIO_STAT) * 8u)) &
                  (width == 1u ? 0xFFu : width == 2u ? 0xFFFFu : UINT32_MAX);
         return 0;
     }
@@ -324,6 +325,17 @@ static void rx_push(schway *inst, uint8_t value)
 static uint32_t tap_endpoint(uint32_t port, uint32_t socket)
 {
     return socket == 0u ? port : 2u + port * 3u + socket - 1u;
+}
+
+static uint8_t tap_payload_size(uint8_t id)
+{
+    if (id == 0x41u) {
+        return 2u;
+    }
+    if (id == 0x12u) {
+        return 4u;
+    }
+    return 6u;
 }
 
 static uint32_t card_address_endpoint(const schway *inst, uint32_t port, uint8_t sent,
@@ -542,6 +554,8 @@ static uint32_t tap_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t now
                 *received = sio->tap_slot_id[port][socket];
             } else if (byte_index == 1u) {
                 *received = 0x5Au;
+            } else if (byte_index >= 2u + tap_payload_size(sio->tap_slot_id[port][socket])) {
+                *received = 0xFFu;
             } else {
                 uint32_t endpoint = tap_endpoint(port, socket);
                 uint32_t pad_ack = schway__pad_byte(inst, endpoint, sent, now, received);

@@ -19,6 +19,7 @@ struct schway__pad {
     uint8_t negcon_i[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t negcon_ii[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t negcon_l[SCHWAY__PAD_ENDPOINT_COUNT];
+    uint8_t mouse_startup_ack[SCHWAY__PAD_ENDPOINT_COUNT];
     uint16_t jogcon_dial[SCHWAY__PAD_ENDPOINT_COUNT];
     uint16_t jogcon_flags[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t present[SCHWAY__PAD_ENDPOINT_COUNT];
@@ -60,5 +61,6 @@ void schway__pad_update_watchdog(schway *inst, uint64_t now);
 void schway__pad_state_io(struct schway__state_io *io, schway *inst);
 uint32_t schway__pad_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t now,
                           uint8_t *received);
+uint32_t schway__pad_mouse_ack_low(const schway *inst);
 
 #endif /* SCHWAYSTATION_PAD_H */
