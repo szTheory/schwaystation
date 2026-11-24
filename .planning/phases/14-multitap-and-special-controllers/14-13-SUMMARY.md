@@ -47,9 +47,9 @@ coverage:
         status: pass
     human_judgment: false
 metrics:
-  duration: 18m
+  duration: 20m
   completed_date: 2026-11-24
-duration: 18m
+duration: 20m
 completed: 2026-11-24
 status: complete
 ---
@@ -61,9 +61,9 @@ status: complete
 ## Performance
 
 - **Runtime/model:** Codex GSD executor; OpenGSD 1.23.0; configured `gpt-6-luna` xhigh.
-- **Duration:** 18 minutes.
+- **Duration:** 20 minutes.
 - **Started:** 2026-11-24T10:56:13Z.
-- **Completed:** 2026-11-24T11:14:18Z (implementation, focused verification, summary, and state closeout).
+- **Completed:** 2026-11-24T11:16:01Z (implementation, focused verification, summary, state closeout, and metadata commit).
 - **Tasks:** 1.
 - **Files modified:** 2.
 
@@ -122,6 +122,8 @@ status: complete
 ## Issues Encountered
 
 The first build attempt exposed the test-hook cast warning; the next exposed the missing `rmdir` declaration. Both were fixed before accepting RED evidence. A CTest run made after the failed build used the stale host executable and was discarded; the direct TAP test run then produced the valid failing behavior assertion.
+
+The per-plan commit ledger could not be written under the sandbox's read-only `.git` permission. The two task commits were measured from the plan-start HEAD captured in this summary's frontmatter.
 
 ## User Setup Required
 
