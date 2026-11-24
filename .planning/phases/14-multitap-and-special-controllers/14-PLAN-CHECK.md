@@ -1,36 +1,34 @@
 # Phase 14 Plan Check
 
 **Phase:** Multitap and special controllers
-**Plans rechecked:** 14-10 through 14-14
+**Plans rechecked:** 14-10 through 14-15
 **Status:** PASS — no blockers or warnings requiring revision
 
-## Requirement coverage
+## Scope and coverage
 
-| Requirement | Plans | Status |
-|---|---|---|
-| SIO-01 | 14-10, 14-12, 14-13, 14-14 | Tap topology, independent card sidecars, save/state lifecycle, and evidence ledger are covered. |
-| SIO-02 | 14-11, 14-14 | Mouse frame snapshot, saturation/reset, serial mapping, and tested-mode evidence are covered. |
-| SIO-03 | 14-11, 14-14 | neGcon/Jogcon frontend mapping, explicit unsupported modes, and evidence limits are covered. |
-| SIO-04 | 14-11, 14-14 | Flight mapping and compatibility-preserving frontend behavior are covered. |
+- **14-10 is baseline-only.** It preserves the default two-pad callback-to-serial harness seam, makes no product behavior claim, and explicitly requires SUMMARY `requirements-completed` to remain empty. Its SIO-01 frontmatter is traceability; it does not mark the requirement complete.
+- **14-11 owns full tap behavior:** independent per-port topology, eight descriptors, routing, poll count, and invalid/inactive selection handling.
+- **14-12 owns special-device frontend mappings** for mouse, flight, neGcon and Jogcon.
+- **14-13 and 14-14 retain the existing sidecar persistence and state/reset/swap/failure-isolation scopes.**
+- **14-15 retains the feature ledger, quality measurements and final reviewed-head handoff.**
 
-These plans complete the previously verified core and runner work in Plans 01–09. CONTEXT decisions remain represented: default-off independent taps; fixed physical socket identity; one frontend poll per frame; exact accepted device IDs; protocol-only state restore; stable filenames; existing test inventories and quality bounds. Deferred lightguns, SIO1, PS2, PocketStation execution, undocumented Jogcon feedback, and CI matrix redesign remain excluded.
+Together the plan set covers SIO-01–04 and the Phase 14 success criteria. Locked context decisions and deferred scope remain respected.
 
-## Plan integrity and dependency waves
+## Structure and ordering
 
-All five plans pass `verify.plan-structure`: each task has files, action, verification, done criteria, a failure direction, and a validate-only annotation. The roadmap/index reports 14-10 as the sole ready plan and 14/14 plans in order. Dependencies are acyclic and waves follow their inputs. The shared libretro adapter and host harness remain sequential.
+All six plans pass `verify.plan-structure`; their tasks have files, specific actions, verifications, done criteria, failure directions and validate-only annotations. The phase index and roadmap show 9/15 complete, plans 10–15 in order, and only 14-10 ready. Dependencies are acyclic and waves are consistent:
 
-| Plan | Tasks | Files | Wave | Dependencies | Status |
-|---|---:|---:|---:|---|---|
-| 14-10 | 1 | 3 | 7 | 14-06, 14-08 | Valid; topology/descriptors |
-| 14-11 | 1 | 3 | 8 | 14-10 | Valid; special-device mappings |
-| 14-12 | 1 | 2 | 9 | 14-11 | Valid; seven sidecars |
-| 14-13 | 1 | 3 | 10 | 14-12 | Valid; state and lifecycle isolation |
-| 14-14 | 2 | 7 | 11 | 14-07, 14-09, 14-13 | Valid; ledger, measurements and integration handoff |
+| Plan | Wave | Depends on |
+|---|---:|---|
+| 14-10 | 7 | 14-06, 14-08 |
+| 14-11 | 8 | 14-10 |
+| 14-12 | 9 | 14-11 |
+| 14-13 | 10 | 14-12 |
+| 14-14 | 11 | 14-13 |
+| 14-15 | 12 | 14-07, 14-09, 14-14 |
 
-## Verification and efficiency
+## Final verification and metrics
 
-The plan structure and roadmap-index checks exited 0. `estimate-check --calibrated` reports each slice at 6,500–11,500 tokens, below the 100,000-token budget; calibration confidence is low because there are no samples. Executors must record actual duration and keep each implementation slice within the project's 30-minute limit.
+Plan 14-15 specifies exactly one `cmake --workflow --preset ci` run on the final reviewed head and retains existing hosted gates, platforms, assertions and quality bounds. It requires exact local producer values where the pinned toolchain is available, exact hosted-only measurements otherwise, and forbids estimated bound changes. CI critical-path, duplicate work and runner cost review are included. Act is correctly omitted for unchanged workflow wiring; Docker is unnecessary.
 
-The plan sequence keeps selector checks, sorted inventories, configure/build, and focused tests ahead of the single final local CI workflow. It retains the existing platform matrix, assertions and quality bounds. Workflow wiring is unchanged, so Act adds no coverage; Docker is unnecessary. Plan 14-14 requires exact local metric producers where available and exact hosted measurements otherwise, with code review before aggregate verification.
-
-The structure parser reports its generic bare-`git diff --check` advisory for task checks. Here the checks run against the in-progress task tree before atomic commit, so that advisory is not a vacuous committed-diff verification. The existing noncanonical `14-PLAN-CHECK.md` filename is intentionally an audit artifact, not an executable plan.
+The parser's generic `git diff --check` advisory is non-blocking because the task checks run against the in-progress tree before atomic commit. No build or test was run in this review.
