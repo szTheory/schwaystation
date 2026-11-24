@@ -29,8 +29,36 @@
 #define PAD_ACK_HOLD 68u
 #define STATE_EVENT_AHEAD UINT64_C(40000000)
 
-enum { TAP_IDLE, TAP_SLOT_A, TAP_LONG, TAP_SHORT, TAP_METHOD2 };
+enum {
+    TAP_IDLE,
+    TAP_SLOT_A,
+    TAP_LONG,
+    TAP_SHORT,
+    TAP_METHOD2,
+    TAP_SLOT_A_LAST_INDEX = 8u,
+    TAP_LONG_LAST_INDEX = 34u,
+    TAP_SHORT_LAST_INDEX = 2u,
+    TAP_METHOD2_LAST_INDEX = 8u
+};
 enum { TAP_REPLY_SLOT_A, TAP_REPLY_LONG, TAP_REPLY_SHORT };
+
+static uint8_t tap_transaction_index_valid(uint8_t mode, uint8_t index)
+{
+    switch (mode) {
+    case TAP_IDLE:
+        return index == 0u;
+    case TAP_SLOT_A:
+        return index >= 1u && index <= TAP_SLOT_A_LAST_INDEX;
+    case TAP_LONG:
+        return index >= 1u && index <= TAP_LONG_LAST_INDEX;
+    case TAP_SHORT:
+        return index >= 1u && index <= TAP_SHORT_LAST_INDEX;
+    case TAP_METHOD2:
+        return index >= 1u && index <= TAP_METHOD2_LAST_INDEX;
+    default:
+        return 0u;
+    }
+}
 
 static const char name_mode[] = "sio.mode";
 static const char name_ctrl[] = "sio.ctrl";
@@ -241,7 +269,8 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
             io->tap_tx_index[port] = io->r[port];
         }
     }
-    schway__state_u8_array(io, name_tap_tx_index, sio->tap_tx_index, 2u, 0u, 35u);
+    schway__state_u8_array(io, name_tap_tx_index, sio->tap_tx_index, 2u, 0u,
+                           TAP_LONG_LAST_INDEX);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         for (uint32_t port = 0u; port < 2u; port++) {
             io->tap_tx_endpoint[port] = io->r[port];
@@ -304,7 +333,8 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
                                         io->tap_tx_request[port] == 0u &&
                                         io->tap_tx_command[port] == 0u &&
                                         io->tap_slot_mask[port] == 0u));
-            schway__state_check(io, tap_mode == TAP_IDLE || io->tap_tx_index[port] != 0u);
+            schway__state_check(io, tap_transaction_index_valid(
+                                        tap_mode, io->tap_tx_index[port]) != 0u);
             schway__state_check(io, tap_mode != TAP_LONG ||
                                        (io->tap_slot_mask[port] & 1u) != 0u);
             schway__state_check(io, tap_mode != TAP_SHORT ||

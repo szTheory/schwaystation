@@ -594,6 +594,36 @@ static void test_rejects(void)
     if (sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
         sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
         sio_tap_endpoint_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE &&
+        pad_multitap_at >= SCHWAY__STATE_HEADER_SIZE) {
+        static const struct {
+            const char *name;
+            uint8_t mode;
+            uint8_t index;
+            uint8_t endpoint;
+            uint8_t slot_mask;
+        } invalid_tap_indices[] = {
+            {"long reply past terminal", 2u, 35u, 0u, 1u},
+            {"slot A reply past terminal", 1u, 9u, 0u, 1u},
+            {"short reply past terminal", 3u, 3u, 0u, 1u},
+            {"method 2 reply past terminal", 4u, 9u, 2u, 0u},
+        };
+        for (size_t i = 0u; i < sizeof invalid_tap_indices / sizeof invalid_tap_indices[0];
+             i++) {
+            memcpy(bad, good, n);
+            put_le(bad + sio_tap_mode_at, invalid_tap_indices[i].mode, 1u);
+            put_le(bad + sio_tap_index_at, invalid_tap_indices[i].index, 1u);
+            put_le(bad + sio_tap_endpoint_at, invalid_tap_indices[i].endpoint, 1u);
+            put_le(bad + sio_tap_slot_mask_at, invalid_tap_indices[i].slot_mask, 1u);
+            put_le(bad + pad_multitap_at, 1u, 1u);
+            reseal(bad, n);
+            expect_refused(invalid_tap_indices[i].name, target, bad, n,
+                           SCHWAY_STATUS_ERR_STATE_FIELD);
+        }
+    }
+    if (sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_endpoint_at >= SCHWAY__STATE_HEADER_SIZE &&
         sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE) {
         memcpy(bad, good, n);
         put_le(bad + sio_tap_mode_at, 2u, 1u);
