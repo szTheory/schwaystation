@@ -390,6 +390,9 @@ static uint8_t normal_id(const struct schway__pad *pad, uint32_t port)
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
         return 0x53u;
     }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_JOGCON) {
+        return 0xE3u;
+    }
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_MOUSE) {
         return 0x12u;
     }
@@ -409,6 +412,7 @@ static uint8_t poll_size(const struct schway__pad *pad, uint32_t port)
         (pad->device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
          pad->analog_mode[port] != 0u) ||
         pad->device[port] == SCHWAY_INPUT_DEVICE_NEGCON ||
+        pad->device[port] == SCHWAY_INPUT_DEVICE_JOGCON ||
         pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
         return 6u;
     }
@@ -444,6 +448,19 @@ static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t
             return pad->negcon_ii[port];
         default:
             return pad->negcon_l[port];
+        }
+    }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_JOGCON) {
+        uint16_t dial = (uint16_t)(pad->jogcon_dial[port] & UINT16_C(0xFFFE));
+        switch (index) {
+        case 2u:
+            return (uint8_t)dial;
+        case 3u:
+            return (uint8_t)(dial >> 8);
+        case 4u:
+            return (uint8_t)(pad->jogcon_flags[port] & 3u);
+        default:
+            return 0u;
         }
     }
     return pad->axes[port * 4u + index - 2u];

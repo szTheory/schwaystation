@@ -213,7 +213,7 @@ typedef struct schway_controller_input {
     int16_t mouse_dx, mouse_dy;
     uint8_t negcon_twist, negcon_i, negcon_ii, negcon_l;
     uint16_t jogcon_dial;
-    uint16_t jogcon_flags; /* bit 0 clockwise, bit 1 dial valid */
+    uint16_t jogcon_flags; /* bit 0 turned left, bit 1 turned right */
 } schway_controller_input;
 
 typedef struct schway_input {

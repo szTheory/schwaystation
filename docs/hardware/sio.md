@@ -56,6 +56,29 @@ of the pad buttons and of other endpoints.
 For Method 1 tap polling, the mouse's six-byte ID-plus-payload reply occupies a shorter socket record and is
 padded with two `FF` bytes; the neGcon's ID-plus-payload fills its eight-byte record exactly.
 
+## Dual Analog flight and Jogcon
+
+The Dual Analog flight selection returns ID `5A53` and six payload bytes: the two active-low button bytes,
+then right X, right Y, left X and left Y. Each axis is the frame-latched raw `00`–`FF` input, with `80` as
+center. Its fixed eight-byte multitap record contains the ID, `5A`, both button bytes and all four axes.
+
+Jogcon's native `42h` poll returns ID `5AE3` and six payload bytes. The first two bytes are the active-low
+digital buttons. The next halfword carries the supplied `jogcon_dial` with wire bit 0 cleared because PER.01
+marks that bit unknown; the final halfword uses bit 0 for turned left and bit 1 for turned right, with all
+remaining bits zero. The dial halfword is copied from the frame latch on every poll; this model does not infer
+whether the physical value is an absolute position or a relative delta and does not accumulate it. Jogcon uses
+the existing digital device selection for digital-pad behavior.
+
+| Jogcon command | Result |
+| --- | --- |
+| `42h` | Supported native `5AE3` button, dial and direction payload |
+| `43h`, `44h`–`47h`, `4Ch`, `4Dh` | Reply `FF`, no ACK; do not enter config mode or alter rumble |
+| Any other command | Reply `FF`, no ACK |
+
+PER.01 reports a `4Dh` command and describes a motor, but does not establish a usable configuration/feedback
+protocol here. This implementation makes no Jogcon force-feedback claim. It also does not assign behavior to the
+unknown dial bit or claim that a controller-mode switch can be requested in software.
+
 ## Timing model
 
 At mode `000Ch` (eight data bits, no parity, factor MUL1) and baud reload `0088h`, the byte period is 1,088
@@ -122,5 +145,9 @@ deadlines; save states retain those deadlines and their per-port transaction sta
   `6d7d1bc106a7e0b616b0330fe58401ab1ba57f0f`, under “Controllers - Mouse” and “Racing Controllers” >
   “neGcon Racing Controller” in `docs/controllersandmemorycards.md`. The frame-latched movement clamp is this
   emulator's deterministic host-input contract, not a physical sensor measurement.
+- Dual Analog flight and Jogcon IDs and payload fields follow PER.01 at the same revision, under “Dual Analog
+  flight mode” and “Namco Jogcon” in `docs/controllersandmemorycards.md`. PER.01 leaves Jogcon dial bit 0,
+  absolute-versus-relative dial interpretation, software mode switching and command `4Dh` behavior unresolved;
+  the wire masking and command refusal here are the bounded behavior selected for this core.
 - The 1,088-, 1,426-, 1,494-, 1,500- and 31,000-tick boundaries are deterministic model values and are covered
   by SIO and card tests.

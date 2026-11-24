@@ -825,6 +825,23 @@ static void jogcon_direct_vectors(void)
         inst->pad.rumble_small[port] = 1u;
         inst->pad.old_rumble[port] = 1u;
         inst->pad.rumble_map[port * 6u] = 1u;
+        uint16_t latched_buttons = inst->pad.buttons[port];
+        uint16_t jogcon_dial = inst->pad.jogcon_dial[port];
+        uint16_t jogcon_flags = inst->pad.jogcon_flags[port];
+        uint8_t response_mode = inst->pad.response_mode[port];
+        uint8_t analog_button = inst->pad.analog_button[port];
+        uint8_t analog_lock = inst->pad.analog_lock[port];
+        uint8_t selector = inst->pad.selector[port];
+        uint8_t rumble_locked = inst->pad.rumble_locked[port];
+        uint8_t rumble_map_valid = inst->pad.rumble_map_valid[port];
+        uint8_t rumble_stage_large = inst->pad.rumble_stage_large[port];
+        uint8_t rumble_stage_small = inst->pad.rumble_stage_small[port];
+        uint64_t watchdog_deadline = inst->pad.watchdog_deadline[port];
+        uint8_t rumble_map[6];
+        uint8_t rumble_map_stage[6];
+        memcpy(rumble_map, &inst->pad.rumble_map[port * 6u], sizeof rumble_map);
+        memcpy(rumble_map_stage, &inst->pad.rumble_map_stage[port * 6u],
+               sizeof rumble_map_stage);
         uint64_t transfers = inst->pad.transfers;
         uint8_t frame_polls = inst->pad.frame_polls;
         for (uint32_t i = 0u; i < sizeof unsupported; i++) {
@@ -839,12 +856,28 @@ static void jogcon_direct_vectors(void)
             CHECK_EQ_U64(inst->pad.command[port], 0u);
             CHECK_EQ_U64(inst->pad.data_index[port], 0u);
             CHECK_EQ_U64(inst->pad.device[port], SCHWAY_INPUT_DEVICE_JOGCON);
+            CHECK_EQ_U64(inst->pad.present[port], 1u);
+            CHECK_EQ_U64(inst->pad.buttons[port], latched_buttons);
+            CHECK_EQ_U64(inst->pad.jogcon_dial[port], jogcon_dial);
+            CHECK_EQ_U64(inst->pad.jogcon_flags[port], jogcon_flags);
             CHECK_EQ_U64(inst->pad.config_mode[port], 0u);
+            CHECK_EQ_U64(inst->pad.response_mode[port], response_mode);
             CHECK_EQ_U64(inst->pad.analog_mode[port], 0u);
+            CHECK_EQ_U64(inst->pad.analog_button[port], analog_button);
+            CHECK_EQ_U64(inst->pad.analog_lock[port], analog_lock);
+            CHECK_EQ_U64(inst->pad.selector[port], selector);
             CHECK_EQ_U64(inst->pad.rumble_large[port], 0xA5u);
             CHECK_EQ_U64(inst->pad.rumble_small[port], 1u);
             CHECK_EQ_U64(inst->pad.old_rumble[port], 1u);
+            CHECK_EQ_U64(inst->pad.rumble_locked[port], rumble_locked);
+            CHECK_EQ_U64(inst->pad.rumble_map_valid[port], rumble_map_valid);
+            CHECK_EQ_U64(inst->pad.rumble_stage_large[port], rumble_stage_large);
+            CHECK_EQ_U64(inst->pad.rumble_stage_small[port], rumble_stage_small);
+            CHECK_EQ_U64(inst->pad.watchdog_deadline[port], watchdog_deadline);
             CHECK_EQ_U64(inst->pad.rumble_map[port * 6u], 1u);
+            CHECK(memcmp(rumble_map, &inst->pad.rumble_map[port * 6u], sizeof rumble_map) == 0);
+            CHECK(memcmp(rumble_map_stage, &inst->pad.rumble_map_stage[port * 6u],
+                         sizeof rumble_map_stage) == 0);
             CHECK_EQ_U64(inst->pad.transfers, transfers);
             CHECK_EQ_U64(inst->pad.frame_polls, frame_polls);
         }

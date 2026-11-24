@@ -101,8 +101,8 @@ The device identifiers are `NONE=0`, `DIGITAL=1`, `DUALSHOCK=2`, `MOUSE=3`, `NEG
 | `reserved0` | `uint8_t`, must be zero |
 | `mouse_dx`, `mouse_dy` | signed `int16_t`, range −32768 through 32767; zero means no movement |
 | `negcon_twist`, `negcon_i`, `negcon_ii`, `negcon_l` | four `uint8_t` controls |
-| `jogcon_dial` | `uint16_t` dial value |
-| `jogcon_flags` | `uint16_t`; only bits 0 (clockwise) and 1 (dial valid) are allowed |
+| `jogcon_dial` | `uint16_t` raw dial halfword; wire bit 0 is reserved and cleared |
+| `jogcon_flags` | `uint16_t`; bit 0 means turned left, bit 1 means turned right; other bits are rejected |
 
 Public port and socket coordinates are one-based; the C arrays use zero-based indexes. The stable internal
 endpoint mapping is:
