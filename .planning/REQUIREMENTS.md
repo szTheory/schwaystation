@@ -52,9 +52,9 @@ The real-host RetroArch test code remains at or below **300 lines total**. Every
 ### Serial peripherals and light guns
 
 - [x] **SIO-01**: The multitap works on both SIO ports with four independently selected controller/card slots per tap, correct protocol lengths, acknowledgements, interrupts and empty-slot behavior; tap cards remain independent and persist through the save lifecycle.
-- [ ] **SIO-02**: The mouse protocol reports deterministic frame-latched integer movement and buttons with documented saturation/reset behavior, tested through serial vectors and the libretro input mapping.
+- [x] **SIO-02**: The mouse protocol reports deterministic frame-latched integer movement and buttons with documented saturation/reset behavior, tested through serial vectors and the libretro input mapping.
 - [x] **SIO-03**: neGcon and Jogcon report their documented serial/configuration modes and frame-latched integer controls with bounded, deterministic protocol tests; unsupported modes fail explicitly.
-- [ ] **SIO-04**: Dual Analog flight mode reports its documented analog axes/buttons through the existing size-tagged input boundary and libretro mapping, without changing the behavior of existing digital-pad or DualShock callers.
+- [x] **SIO-04**: Dual Analog flight mode reports its documented analog axes/buttons through the existing size-tagged input boundary and libretro mapping, without changing the behavior of existing digital-pad or DualShock callers.
 - [ ] **SIO-05**: Every delivered controller class uses the official libretro device/subclass identifiers and a public, documented mapping; the host latches input at a frame boundary and does not add device or window code to the deliverables.
 - [ ] **GUN-01**: GunCon and Justifier serial protocols report trigger, reload/offscreen and coordinate state using deterministic GPU beam timestamps and a documented brightness threshold; tests cover bright, dark, edge and offscreen samples plus interrupt timing.
 - [ ] **GUN-02**: Light-gun inputs map through available libretro pointer/lightgun controls; missing host input is reported as unsupported and cannot create a false hit. No physical device or owner hardware capture is required by CI.
@@ -108,9 +108,9 @@ The roadmap maps each requirement to exactly one phase. Phase numbering continue
 | BOOT-01 | Phase 13 | Complete |
 | MDEC-01 | Phase 13 | Complete |
 | SIO-01 | Phase 14 | Complete |
-| SIO-02 | Phase 14 | Pending |
+| SIO-02 | Phase 14 | Complete |
 | SIO-03 | Phase 14 | Complete |
-| SIO-04 | Phase 14 | Pending |
+| SIO-04 | Phase 14 | Complete |
 | GUN-01 | Phase 15 | Pending |
 | GUN-02 | Phase 15 | Pending |
 | SIO-05 | Phase 15 | Pending |

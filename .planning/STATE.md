@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 14
-current_phase_name: Multitap and special controllers
-current_plan: 16
-status: ready_for_verification
-stopped_at: Completed 14-16-PLAN.md
-last_updated: "2026-11-24T12:38:34.924Z"
+current_phase: 15
+current_phase_name: GunCon and Justifier
+current_plan: Not started
+status: planning
+stopped_at: Phase 14 complete, ready to plan Phase 15
+last_updated: "2026-11-24T14:33:49.173Z"
 last_activity: 2026-11-24
-last_activity_desc: Plan 14-16 measured state bytes and updated two protocol-state pins; controller/save/runner docs are linked; hosted WASI and Cachegrind metrics remain pending for phase verification
-state_head: b51876c4ed8f60460c3229557073d8cdd72b99b6
+last_activity_desc: Phase 14 complete, transitioned to Phase 15
+state_head: d7d3cbfa444851c0547ca4a3a3af5a9a31039a12
 progress:
   total_phases: 10
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 95
   completed_plans: 95
-  percent: 70
+  percent: 80
 ---
 
 # Project State
@@ -26,16 +26,36 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (all 16 plans complete; source review and phase verification remain pending)
+**Current focus:** Phase 15 — GunCon and Justifier (ready to discuss and plan; Phase 14 is locally verified and complete, with ship/hosted release pending)
 
 ## Current Position
 
-Phase: 14 (Multitap and special controllers) — READY FOR VERIFICATION
-Current Plan: 16
-Total Plans in Phase: 16
-Status: Ready for phase verification after source review
-Last activity: 2026-11-24 — Plan 14-16 measured `state.bytes` at 3,757,638; stable-state and two updated GPU-motion state selectors passed; WASI and Ir/frame remain pending for exact hosted producers
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete, with source review and phase verification pending. Phase 7–11 verification digests will be reconciled at milestone close.)
+Phase: 15 — GunCon and Justifier
+Current Plan: Not started
+Total Plans in Phase: Not planned
+Status: Ready to plan
+Last activity: 2026-11-24 — Phase 14 complete, transitioned to Phase 15
+Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and passed local verification. Phase 14 ship/hosted release and Phase 7–11 verification digest reconciliation remain pending.)
+
+### Phase 14 verification closeout (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary session model ID unavailable. Verification elapsed time was not separately isolated.
+Goal-backward verification passed all four roadmap criteria and all 45 plan truths. The 46 declared plan artifacts passed
+existence/substance checks. The path-only link heuristic found 1/30 links; manual C/CMake/data-flow inspection traced the
+cross-file function calls, generated inventory/ledger links and documentation links, with the corresponding full-suite tests
+passing. SIO-01–04 are satisfied. The GSD phase-completion transition updated the requirement statuses, roadmap and state.
+
+`cmake --workflow --preset ci` exited 0 on source head `d7d3cbf`: 705/705 CTest cases passed, all three macOS arm64 packages
+were produced, and the separate CI release checks passed 8/8. The CTest critical path was 115.10s; the release checks took
+3.12s. The slowest cases were `policy.quality_metrics` (71.35s), `libretro.host` (51.50s), `libretro.input.movies` (33.12s),
+`runner.disc.legacy` (30.44s), and `runner.hashes_file` (23.28s). The local quality gate is serial and instrumentation-heavy;
+the prior 44.35s measurement and existing seed `.planning/seeds/SEED-261122-vlf-reduce-quality-gate-test-runtime-without-losing-coverage.md`
+show that a safe speed-up needs isolated harness refactoring. No assertion reduction or broad rerun is justified here.
+No workflow changed, the local workflow already exercises its controls, and Act would add no job-step coverage; no Act or Docker
+resources were used. CI/CD efficiency guidance is already discoverable in tracked `AGENTS.md`, `.planning/AUTONOMOUS.md` and
+`docs/maintaining.md`. Hosted WASI module size and Cachegrind instructions/frame remain with the exact named producers; no
+quality bound was guessed or widened. This was a local workflow, so there is no run URL; hosted Main and Release checks remain
+pending Phase 14 ship. No retail-game compatibility claim is inferred from peripheral protocol fixtures.
 
 ### Phase 14 tail planning split (2026-11-24)
 
@@ -1326,7 +1346,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 274
+- Total plans completed: 290
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1347,6 +1367,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 11 | 15 | - | - |
 | 12 | 7 | - | - |
 | 13 | 9 | - | - |
+| 14 | 16 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -2338,7 +2359,7 @@ come from `AGENTS.md`.
 ## Session Continuity
 
 Last session: 2026-11-24T12:38:34.398Z
-Stopped at: Completed 14-16-PLAN.md
+Stopped at: Phase 14 complete, ready to plan Phase 15
 Resume file: None
 
 ### v1.0 session history
