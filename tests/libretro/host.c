@@ -244,7 +244,7 @@ static int special_input_mode;
 static int16_t special_mouse_x, special_mouse_y;
 static int16_t special_axes[2][2];
 static uint32_t special_buttons;
-static unsigned special_queries[8][3][16];
+static unsigned special_queries[8][8][3][16];
 static int rumble_available;
 static int rumble_axis_mode;
 static unsigned audio_tap_checks;
@@ -723,7 +723,7 @@ static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned ind
     }
     if (special_input_mode) {
         if (port < 8u && device < 8u && index < 3u && id < 16u) {
-            special_queries[device][index][id]++;
+            special_queries[port][device][index][id]++;
         }
         if (device == RETRO_DEVICE_JOYPAD && index == 0u && id < 32u) {
             return (special_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
@@ -1723,9 +1723,10 @@ static void expect_special_packet(unsigned port, unsigned socket, uint8_t id,
     }
 }
 
-static void expect_special_query(unsigned device, unsigned index, unsigned id, unsigned count)
+static void expect_special_query(unsigned player, unsigned device, unsigned index, unsigned id,
+                                 unsigned count)
 {
-    CHECK_EQ_U64(special_queries[device][index][id], count);
+    CHECK_EQ_U64(special_queries[player][device][index][id], count);
 }
 
 static int test_input_special(void)
@@ -1769,10 +1770,10 @@ static int test_input_special(void)
     polls = input_poll_calls;
     run_one();
     CHECK_EQ_U64(input_poll_calls, polls + 1u);
-    expect_special_query(RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_X, 1u);
-    expect_special_query(RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_Y, 1u);
-    expect_special_query(RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_LEFT, 1u);
-    expect_special_query(RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_RIGHT, 1u);
+    expect_special_query(0u, RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_X, 1u);
+    expect_special_query(0u, RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_Y, 1u);
+    expect_special_query(0u, RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_LEFT, 1u);
+    expect_special_query(0u, RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_RIGHT, 1u);
     /* Mutating callback values after retro_run cannot change this frame's snapshot. */
     special_mouse_x = 0;
     special_mouse_y = 0;
@@ -1789,10 +1790,10 @@ static int test_input_special(void)
     special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_Y] = INT16_MIN;
     clear_special_queries();
     run_one();
-    expect_special_query(RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_X, 1u);
-    expect_special_query(RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_Y, 1u);
-    expect_special_query(RETRO_DEVICE_ANALOG, 1u, RETRO_DEVICE_ID_ANALOG_X, 1u);
-    expect_special_query(RETRO_DEVICE_ANALOG, 1u, RETRO_DEVICE_ID_ANALOG_Y, 1u);
+    expect_special_query(0u, RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_query(0u, RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_Y, 1u);
+    expect_special_query(0u, RETRO_DEVICE_ANALOG, 1u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_query(0u, RETRO_DEVICE_ANALOG, 1u, RETRO_DEVICE_ID_ANALOG_Y, 1u);
     expect_special_packet(0u, 0u, 0x53u, flight_extremes, sizeof flight_extremes);
 
     p_set_controller_port_device(0u, negcon);
@@ -1820,7 +1821,7 @@ static int test_input_special(void)
     polls = input_poll_calls;
     run_one();
     CHECK_EQ_U64(input_poll_calls, polls + 1u);
-    expect_special_query(RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_query(1u, RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_X, 1u);
     expect_special_packet(0u, 1u, 0xE3u, jogcon_min, sizeof jogcon_min);
 
     special_buttons = 0u;

@@ -51,6 +51,9 @@
 #define LR_ANALOG_TOGGLE_KEY "schwaystation_analog_toggle"
 #define LR_MULTITAP_PORT1_KEY "schwaystation_multitap_port1"
 #define LR_MULTITAP_PORT2_KEY "schwaystation_multitap_port2"
+#define LR_DEVICE_FLIGHT RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
+#define LR_DEVICE_NEGCON RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
+#define LR_DEVICE_JOGCON RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
 #define LR_ANALOG_TOGGLE_FRAMES 60u
 #define LR_ANALOG_TOGGLE_BUTTONS                                                            \
     ((1u << RETRO_DEVICE_ID_JOYPAD_SELECT) | (1u << RETRO_DEVICE_ID_JOYPAD_START) |        \
@@ -600,6 +603,10 @@ static struct retro_controller_description lr_controller_types[] = {
     {"DualShock", RETRO_DEVICE_ANALOG},
     {"PlayStation Controller", RETRO_DEVICE_JOYPAD},
     {"None", RETRO_DEVICE_NONE},
+    {"Dual Analog Flight Stick", LR_DEVICE_FLIGHT},
+    {"neGcon", LR_DEVICE_NEGCON},
+    {"Jogcon", LR_DEVICE_JOGCON},
+    {"Mouse", RETRO_DEVICE_MOUSE},
 };
 static struct retro_controller_info lr_controller_info[LR_PLAYER_LIMIT + 1u];
 
@@ -1033,13 +1040,36 @@ static int lr_is_exe_path(const char *path)
            (extension[5] == 'e' || extension[5] == 'E');
 }
 
+static uint8_t lr_axis_to_byte(int16_t axis)
+{
+    int32_t value = axis;
+    return value < 0 ? (uint8_t)(((value + 32768) * 128) / 32768)
+                     : (uint8_t)(128 + (value * 127) / 32767);
+}
+
+static uint8_t lr_pressure_from_axis(int16_t axis, int inverted)
+{
+    int32_t value = axis;
+    if (inverted != 0) {
+        value = -value;
+    }
+    if (value <= 0) {
+        return 0u;
+    }
+    if (value > 32767) {
+        return UINT8_MAX;
+    }
+    return (uint8_t)((value * 255) / 32767);
+}
+
 /* RetroPad positions map to the active-low serial word used by the PSX pad. */
 static void lr_queue_input(void)
 {
-    static const struct {
+    struct lr_button_mapping {
         unsigned id;
         uint16_t mask;
-    } mapping[] = {
+    };
+    static const struct lr_button_mapping pad_mapping[] = {
         {RETRO_DEVICE_ID_JOYPAD_SELECT, 0x0001u}, {RETRO_DEVICE_ID_JOYPAD_L3, 0x0002u},
         {RETRO_DEVICE_ID_JOYPAD_R3, 0x0004u},     {RETRO_DEVICE_ID_JOYPAD_START, 0x0008u},
         {RETRO_DEVICE_ID_JOYPAD_UP, 0x0010u},     {RETRO_DEVICE_ID_JOYPAD_RIGHT, 0x0020u},
@@ -1048,6 +1078,12 @@ static void lr_queue_input(void)
         {RETRO_DEVICE_ID_JOYPAD_L, 0x0400u},      {RETRO_DEVICE_ID_JOYPAD_R, 0x0800u},
         {RETRO_DEVICE_ID_JOYPAD_X, 0x1000u},      {RETRO_DEVICE_ID_JOYPAD_A, 0x2000u},
         {RETRO_DEVICE_ID_JOYPAD_B, 0x4000u},      {RETRO_DEVICE_ID_JOYPAD_Y, 0x8000u},
+    };
+    static const struct lr_button_mapping special_mapping[] = {
+        {RETRO_DEVICE_ID_JOYPAD_START, 0x0008u}, {RETRO_DEVICE_ID_JOYPAD_UP, 0x0010u},
+        {RETRO_DEVICE_ID_JOYPAD_RIGHT, 0x0020u}, {RETRO_DEVICE_ID_JOYPAD_DOWN, 0x0040u},
+        {RETRO_DEVICE_ID_JOYPAD_LEFT, 0x0080u}, {RETRO_DEVICE_ID_JOYPAD_R, 0x0800u},
+        {RETRO_DEVICE_ID_JOYPAD_B, 0x4000u}, {RETRO_DEVICE_ID_JOYPAD_A, 0x2000u},
     };
     schway_input snapshot;
 
@@ -1076,11 +1112,42 @@ static void lr_queue_input(void)
             controller->device = SCHWAY_INPUT_DEVICE_DUALSHOCK;
         } else if (device == RETRO_DEVICE_JOYPAD) {
             controller->device = SCHWAY_INPUT_DEVICE_DIGITAL;
+        } else if (device == RETRO_DEVICE_MOUSE) {
+            controller->device = SCHWAY_INPUT_DEVICE_MOUSE;
+        } else if (device == LR_DEVICE_FLIGHT) {
+            controller->device = SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT;
+        } else if (device == LR_DEVICE_NEGCON) {
+            controller->device = SCHWAY_INPUT_DEVICE_NEGCON;
+        } else if (device == LR_DEVICE_JOGCON) {
+            controller->device = SCHWAY_INPUT_DEVICE_JOGCON;
         } else {
             controller->device = SCHWAY_INPUT_DEVICE_NONE;
         }
-        if (controller->device != SCHWAY_INPUT_DEVICE_NONE) {
-            for (size_t i = 0u; i < sizeof mapping / sizeof mapping[0]; i++) {
+
+        if (controller->device == SCHWAY_INPUT_DEVICE_MOUSE) {
+            if (input_state_cb != NULL) {
+                controller->mouse_dx = input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
+                                                       RETRO_DEVICE_ID_MOUSE_X);
+                controller->mouse_dy = input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
+                                                       RETRO_DEVICE_ID_MOUSE_Y);
+                if (input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
+                                   RETRO_DEVICE_ID_MOUSE_LEFT) != 0) {
+                    controller->buttons |= 0x0800u;
+                }
+                if (input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
+                                   RETRO_DEVICE_ID_MOUSE_RIGHT) != 0) {
+                    controller->buttons |= 0x0400u;
+                }
+            }
+        } else if (controller->device != SCHWAY_INPUT_DEVICE_NONE) {
+            const struct lr_button_mapping *mapping = pad_mapping;
+            size_t mapping_count = sizeof pad_mapping / sizeof pad_mapping[0];
+            if (controller->device == SCHWAY_INPUT_DEVICE_NEGCON ||
+                controller->device == SCHWAY_INPUT_DEVICE_JOGCON) {
+                mapping = special_mapping;
+                mapping_count = sizeof special_mapping / sizeof special_mapping[0];
+            }
+            for (size_t i = 0u; i < mapping_count; i++) {
                 if (input_state_cb != NULL &&
                     input_state_cb(player, RETRO_DEVICE_JOYPAD, 0u, mapping[i].id) != 0) {
                     controller->buttons |= mapping[i].mask;
@@ -1089,28 +1156,53 @@ static void lr_queue_input(void)
                     }
                 }
             }
-        }
-        if (controller->device == SCHWAY_INPUT_DEVICE_DUALSHOCK && input_state_cb != NULL) {
-            int16_t left_x = input_state_cb(player, RETRO_DEVICE_ANALOG,
-                                            RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                                            RETRO_DEVICE_ID_ANALOG_X);
-            int16_t left_y = input_state_cb(player, RETRO_DEVICE_ANALOG,
-                                            RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                                            RETRO_DEVICE_ID_ANALOG_Y);
-            int16_t right_x = input_state_cb(player, RETRO_DEVICE_ANALOG,
-                                             RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                                             RETRO_DEVICE_ID_ANALOG_X);
-            int16_t right_y = input_state_cb(player, RETRO_DEVICE_ANALOG,
-                                             RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                                             RETRO_DEVICE_ID_ANALOG_Y);
-            int32_t axes[4] = {right_x, right_y, left_x, left_y};
-            for (unsigned axis = 0u; axis < 4u; axis++) {
-                int32_t value = axes[axis];
-                controller->axes[axis] = value < 0
-                                             ? (uint8_t)(((value + 32768) * 128) / 32768)
-                                             : (uint8_t)(128 + (value * 127) / 32767);
+            if ((controller->device == SCHWAY_INPUT_DEVICE_DUALSHOCK ||
+                 controller->device == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) &&
+                input_state_cb != NULL) {
+                int16_t left_x = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                                RETRO_DEVICE_ID_ANALOG_X);
+                int16_t left_y = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                                RETRO_DEVICE_ID_ANALOG_Y);
+                int16_t right_x = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                 RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                                 RETRO_DEVICE_ID_ANALOG_X);
+                int16_t right_y = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                 RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                                 RETRO_DEVICE_ID_ANALOG_Y);
+                int16_t axes[4] = {right_x, right_y, left_x, left_y};
+                for (unsigned axis = 0u; axis < 4u; axis++) {
+                    controller->axes[axis] = lr_axis_to_byte(axes[axis]);
+                }
+            } else if (controller->device == SCHWAY_INPUT_DEVICE_NEGCON &&
+                       input_state_cb != NULL) {
+                int16_t twist = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                               RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                               RETRO_DEVICE_ID_ANALOG_X);
+                int16_t pressure_i = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                    RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                                    RETRO_DEVICE_ID_ANALOG_Y);
+                int16_t pressure_ii = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                     RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                                     RETRO_DEVICE_ID_ANALOG_X);
+                controller->negcon_twist = lr_axis_to_byte(twist);
+                controller->negcon_i = lr_pressure_from_axis(pressure_i, 1);
+                controller->negcon_ii = lr_pressure_from_axis(pressure_ii, 0);
+                controller->negcon_l = input_state_cb(player, RETRO_DEVICE_JOYPAD, 0u,
+                                                       RETRO_DEVICE_ID_JOYPAD_L2) != 0
+                                           ? UINT8_MAX
+                                           : 0u;
+            } else if (controller->device == SCHWAY_INPUT_DEVICE_JOGCON &&
+                       input_state_cb != NULL) {
+                int16_t dial_value = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                    RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                                    RETRO_DEVICE_ID_ANALOG_X);
+                controller->jogcon_dial = (uint16_t)((uint16_t)dial_value & UINT16_C(0xFFFE));
+                controller->jogcon_flags = dial_value < 0 ? 1u : (dial_value > 0 ? 2u : 0u);
             }
         }
+
         if (controller->device == SCHWAY_INPUT_DEVICE_DUALSHOCK) {
             if (lr_mode_pulse_pending[player] != 0u) {
                 toggle_pulse = 1u;
@@ -1505,7 +1597,9 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 {
     if (port >= lr_active_player_count ||
         (device != RETRO_DEVICE_NONE && device != RETRO_DEVICE_JOYPAD &&
-         device != RETRO_DEVICE_ANALOG)) {
+         device != RETRO_DEVICE_ANALOG && device != RETRO_DEVICE_MOUSE &&
+         device != LR_DEVICE_FLIGHT && device != LR_DEVICE_NEGCON &&
+         device != LR_DEVICE_JOGCON)) {
         return;
     }
     lr_controller_devices[port] = device;
