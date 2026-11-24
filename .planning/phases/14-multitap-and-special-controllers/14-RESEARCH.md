@@ -1,3 +1,5 @@
+## RESEARCH COMPLETE
+
 # Phase 14: Multitap and special controllers - Research
 
 ## Planning recommendation
