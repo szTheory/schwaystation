@@ -876,10 +876,20 @@ Path(sys.argv[2]).write_bytes(data)
     set(card_dir "${OUT}/runner-cards-multitap")
     file(REMOVE_RECURSE "${card_dir}")
     file(MAKE_DIRECTORY "${card_dir}")
-    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
-      --test-card-write slot1)
-    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
-      --test-card-write slot2)
+    set(card_selectors port1a port1b port1c port1d port2a port2b port2c port2d)
+    foreach(selector IN LISTS card_selectors)
+      expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
+        --test-card-write "${selector}")
+    endforeach()
+    set(endpoint_card_files
+      "${card_dir}/schwaystation.srm"
+      "${card_dir}/schwaystation.p1b.mcr"
+      "${card_dir}/schwaystation.p1c.mcr"
+      "${card_dir}/schwaystation.p1d.mcr"
+      "${card_dir}/schwaystation.1.mcr"
+      "${card_dir}/schwaystation.p2b.mcr"
+      "${card_dir}/schwaystation.p2c.mcr"
+      "${card_dir}/schwaystation.p2d.mcr")
     set(expected_card_files
       "${card_dir}/schwaystation.srm"
       "${card_dir}/schwaystation.p1b.mcr"
@@ -889,11 +899,83 @@ Path(sys.argv[2]).write_bytes(data)
       "${card_dir}/schwaystation.p2b.mcr"
       "${card_dir}/schwaystation.p2c.mcr"
       "${card_dir}/schwaystation.p2d.mcr")
+    list(SORT expected_card_files)
+    file(GLOB actual_card_files LIST_DIRECTORIES FALSE "${card_dir}/*.srm" "${card_dir}/*.mcr")
+    list(SORT actual_card_files)
+    if(NOT actual_card_files STREQUAL expected_card_files)
+      message(FATAL_ERROR "runner did not persist exactly eight stable card socket files: ${actual_card_files}")
+    endif()
+    set(sector_values)
     foreach(card_file IN LISTS expected_card_files)
       if(NOT EXISTS "${card_file}")
         message(FATAL_ERROR "runner did not persist all eight card sockets; missing ${card_file}")
       endif()
+      file(SIZE "${card_file}" card_size)
+      file(READ "${card_file}" sector_value HEX OFFSET 896 LIMIT 8)
+      if(NOT card_size EQUAL 131072 OR sector_value STREQUAL "0000000000000000")
+        message(FATAL_ERROR "runner card has an invalid image size or empty written sector: ${card_file}")
+      endif()
+      list(APPEND sector_values "${sector_value}")
     endforeach()
+    list(REMOVE_DUPLICATES sector_values)
+    list(LENGTH sector_values unique_sector_count)
+    if(NOT unique_sector_count EQUAL 8)
+      message(FATAL_ERROR "card sockets did not retain eight unique sector payloads: ${sector_values}")
+    endif()
+
+    function(hash_card_set result_name)
+      set(values)
+      foreach(path IN LISTS expected_card_files)
+        file(SHA256 "${path}" value)
+        list(APPEND values "${value}")
+      endforeach()
+      set(${result_name} "${values}" PARENT_SCOPE)
+    endfunction()
+    hash_card_set(initial_hashes)
+    set(reloaded_hashes "${initial_hashes}")
+    foreach(index RANGE 0 7)
+      list(GET card_selectors ${index} selector)
+      list(GET endpoint_card_files ${index} endpoint_file)
+      string(REPLACE "port" "reload-port" reload_mode "${selector}")
+      expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
+        --test-card-write "${reload_mode}")
+      hash_card_set(next_hashes)
+      list(FIND expected_card_files "${endpoint_file}" selected_index)
+      foreach(card_index RANGE 0 7)
+        list(GET reloaded_hashes ${card_index} before)
+        list(GET next_hashes ${card_index} after)
+        if(card_index EQUAL selected_index)
+          if(before STREQUAL after)
+            message(FATAL_ERROR "fresh-process reload did not update ${selector}")
+          endif()
+        elseif(NOT before STREQUAL after)
+          message(FATAL_ERROR "fresh-process update of ${selector} changed another card")
+        endif()
+      endforeach()
+      set(reloaded_hashes "${next_hashes}")
+    endforeach()
+
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}")
+    hash_card_set(clean_hashes)
+    if(NOT clean_hashes STREQUAL reloaded_hashes)
+      message(FATAL_ERROR "a clean exit rewrote an unchanged card image")
+    endif()
+    foreach(mode partial-port1b bad-port1b)
+      expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
+        --test-card-write "${mode}")
+      hash_card_set(aborted_hashes)
+      if(NOT aborted_hashes STREQUAL clean_hashes)
+        message(FATAL_ERROR "${mode} changed card bytes without a successful completed write")
+      endif()
+    endforeach()
+    expect_exit(1 "cannot save card file" --frames 1 --save-dir "${card_dir}"
+      --test-card-write port1b --test-save-failure rename)
+    hash_card_set(failed_save_hashes)
+    file(GLOB temporary_files "${card_dir}/*.schwaystation.tmp.*")
+    if(NOT failed_save_hashes STREQUAL clean_hashes OR temporary_files)
+      message(FATAL_ERROR "failed atomic replacement changed a stored card or left a temporary")
+    endif()
+
   elseif(CASE STREQUAL "cards_persistence")
     set(NORMAL_RUN ${RUN})
     set(RUN ${HOOKED})

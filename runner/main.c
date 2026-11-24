@@ -146,12 +146,15 @@ static const char synopsis[] =
     "usage: schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --frames N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bench N [--inputs FILE] [--save-dir DIR] [--hash] [--hash-audio] [--hash-vram] [--png N:FILE]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE [--frames N | --bench N] [--tty]\n"
+    "                        \n"
     "                         [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --bios FILE --disc FILE [--boot full|fast] [--frames N | --bench N] [--tty]\n"
-    "                         [--stop-on mailbox] [--inputs FILE] [--hash] [--hash-audio]\n"
+    "                         [--stop-on mailbox] [--inputs FILE]\n"
+    "                         [--hash] [--hash-audio]\n"
     "       schwaystation-run [--machine BOARD] [--region auto|ntsc-u|ntsc-j|pal] --exe FILE [--frames N] [--tty]\n"
     "                         [--stop-on mailbox] [--trace first-fault] [--no-stop-on-fault]\n"
     "                         [--inputs FILE] [--save-dir DIR] [--memcard-names basename|serial]\n"
+    "                        \n"
     "                         [--serial SERIAL] [--hash] [--hash-audio] [--hash-state]\n"
     "       schwaystation-run --probe FILE [--metadata-ledger CSV --metadata-dat DAT]\n"
     "       schwaystation-run --help | --version\n"
@@ -496,6 +499,42 @@ static int parse_options(int argc, char **argv, options *o)
                 o->test_card_write = 4;
             } else if (strcmp(value, "slot1_then_bad") == 0) {
                 o->test_card_write = 5;
+            } else if (strcmp(value, "port1a") == 0) {
+                o->test_card_write = 6;
+            } else if (strcmp(value, "port1b") == 0) {
+                o->test_card_write = 7;
+            } else if (strcmp(value, "port1c") == 0) {
+                o->test_card_write = 8;
+            } else if (strcmp(value, "port1d") == 0) {
+                o->test_card_write = 9;
+            } else if (strcmp(value, "port2a") == 0) {
+                o->test_card_write = 10;
+            } else if (strcmp(value, "port2b") == 0) {
+                o->test_card_write = 11;
+            } else if (strcmp(value, "port2c") == 0) {
+                o->test_card_write = 12;
+            } else if (strcmp(value, "port2d") == 0) {
+                o->test_card_write = 13;
+            } else if (strcmp(value, "reload-port1a") == 0) {
+                o->test_card_write = 14;
+            } else if (strcmp(value, "reload-port1b") == 0) {
+                o->test_card_write = 15;
+            } else if (strcmp(value, "reload-port1c") == 0) {
+                o->test_card_write = 16;
+            } else if (strcmp(value, "reload-port1d") == 0) {
+                o->test_card_write = 17;
+            } else if (strcmp(value, "reload-port2a") == 0) {
+                o->test_card_write = 18;
+            } else if (strcmp(value, "reload-port2b") == 0) {
+                o->test_card_write = 19;
+            } else if (strcmp(value, "reload-port2c") == 0) {
+                o->test_card_write = 20;
+            } else if (strcmp(value, "reload-port2d") == 0) {
+                o->test_card_write = 21;
+            } else if (strcmp(value, "partial-port1b") == 0) {
+                o->test_card_write = 22;
+            } else if (strcmp(value, "bad-port1b") == 0) {
+                o->test_card_write = 23;
             } else {
                 return usage("--test-card-write needs a known card test mode");
             }
@@ -773,16 +812,19 @@ static int parse_options(int argc, char **argv, options *o)
     return SCHWAY__EXIT_OK;
 }
 
+enum { RUNNER_CARD_SOCKET_COUNT = 8 };
+
 typedef struct runner_card_files {
-    char *path[2];
-    uint64_t saved_generation[2];
+    char *path[RUNNER_CARD_SOCKET_COUNT];
+    uint64_t saved_generation[RUNNER_CARD_SOCKET_COUNT];
     int ready;
 } runner_card_files;
 
 static void runner_cards_release(runner_card_files *cards)
 {
-    free(cards->path[0]);
-    free(cards->path[1]);
+    for (uint32_t i = 0u; i < RUNNER_CARD_SOCKET_COUNT; i++) {
+        free(cards->path[i]);
+    }
     memset(cards, 0, sizeof *cards);
 }
 
@@ -877,35 +919,35 @@ static int runner_cards_load(const options *opt, schway *inst, runner_card_files
         }
         component = basename;
     }
-    size_t directory_size = strlen(opt->save_dir);
     size_t component_size = strlen(component);
-    size_t suffix_capacity = 1u + component_size + sizeof(".1.mcr");
-    if (directory_size > SIZE_MAX - suffix_capacity) {
+    size_t path_extra = component_size + sizeof(".p2d.mcr") + 1u;
+    size_t directory_size = strlen(opt->save_dir);
+    if (path_extra < component_size || directory_size > SIZE_MAX - path_extra) {
         fprintf(stderr, "schwaystation-run: card save path is too long\n");
         return SCHWAY__EXIT_FAILURE;
     }
-    size_t path_capacity = directory_size + suffix_capacity;
-    cards->path[0] = (char *)malloc(path_capacity);
-    cards->path[1] = (char *)malloc(path_capacity);
-    if (cards->path[0] == NULL || cards->path[1] == NULL) {
-        fprintf(stderr, "schwaystation-run: out of memory\n");
-        runner_cards_release(cards);
-        return SCHWAY__EXIT_FAILURE;
-    }
-    schway_host_card_status path_status = literal_identity || !opt->serial_card_names
-        ? schway_host_card_paths_for_basename(opt->save_dir, component, cards->path[0],
-                                               path_capacity, cards->path[1], path_capacity)
-        : schway__host_card_paths_for_identity(opt->save_dir, component, cards->path[0],
-                                                path_capacity, cards->path[1], path_capacity);
-    if (path_status != SCHWAY_HOST_CARD_OK) {
-        fprintf(stderr, "schwaystation-run: invalid card save path\n");
-        runner_cards_release(cards);
-        return path_status == SCHWAY_HOST_CARD_ERR_ARGUMENT ? SCHWAY__EXIT_USAGE
-                                                            : SCHWAY__EXIT_FAILURE;
-    }
+    size_t path_capacity = directory_size + path_extra;
 
-    for (uint32_t i = 0u; i < 2u; i++) {
-        uint32_t slot = i + 1u;
+    for (uint32_t i = 0u; i < RUNNER_CARD_SOCKET_COUNT; i++) {
+        uint32_t port = i / 4u + SCHWAY_CARD_PORT_1;
+        uint32_t socket = i % 4u + SCHWAY_CARD_SOCKET_A;
+        cards->path[i] = (char *)malloc(path_capacity);
+        if (cards->path[i] == NULL) {
+            fprintf(stderr, "schwaystation-run: out of memory\n");
+            runner_cards_release(cards);
+            return SCHWAY__EXIT_FAILURE;
+        }
+        schway_host_card_status path_status = literal_identity || !opt->serial_card_names
+            ? schway__host_card_path_for_socket(opt->save_dir, component, port, socket,
+                                                 cards->path[i], path_capacity)
+            : schway__host_card_identity_path_for_socket(opt->save_dir, component, port, socket,
+                                                          cards->path[i], path_capacity);
+        if (path_status != SCHWAY_HOST_CARD_OK) {
+            fprintf(stderr, "schwaystation-run: invalid card save path\n");
+            runner_cards_release(cards);
+            return path_status == SCHWAY_HOST_CARD_ERR_ARGUMENT ? SCHWAY__EXIT_USAGE
+                                                                : SCHWAY__EXIT_FAILURE;
+        }
         uint8_t *image = (uint8_t *)malloc(SCHWAY_MEMCARD_SIZE);
         if (image == NULL) {
             fprintf(stderr, "schwaystation-run: out of memory\n");
@@ -943,10 +985,12 @@ static int runner_cards_load(const options *opt, schway *inst, runner_card_files
             return SCHWAY__EXIT_FAILURE;
         }
         runner_card_lint(cards->path[i], &lint);
-        schway_status status = schway_load_memcard(inst, slot, image, SCHWAY_MEMCARD_SIZE);
+        schway_status status = schway_load_memcard_socket(inst, port, socket, image,
+                                                          SCHWAY_MEMCARD_SIZE);
         free(image);
         if (status != SCHWAY_STATUS_OK ||
-            schway_memcard_generation(inst, slot, &cards->saved_generation[i]) != SCHWAY_STATUS_OK) {
+            schway_memcard_socket_generation(inst, port, socket,
+                                              &cards->saved_generation[i]) != SCHWAY_STATUS_OK) {
             fprintf(stderr, "schwaystation-run: cannot load card file %s\n", cards->path[i]);
             runner_cards_release(cards);
             return SCHWAY__EXIT_FAILURE;
@@ -961,12 +1005,13 @@ static int runner_cards_flush(const options *opt, schway *inst, runner_card_file
     if (opt->save_dir == NULL || cards->ready == 0) {
         return status;
     }
-    for (uint32_t i = 0u; i < 2u; i++) {
-        uint32_t slot = i + 1u;
+    for (uint32_t i = 0u; i < RUNNER_CARD_SOCKET_COUNT; i++) {
+        uint32_t port = i / 4u + SCHWAY_CARD_PORT_1;
+        uint32_t socket = i % 4u + SCHWAY_CARD_SOCKET_A;
         uint64_t generation = 0u;
-        if (schway_memcard_generation(inst, slot, &generation) != SCHWAY_STATUS_OK) {
-            fprintf(stderr, "schwaystation-run: cannot read card generation for slot %lu\n",
-                    (unsigned long)slot);
+        if (schway_memcard_socket_generation(inst, port, socket, &generation) != SCHWAY_STATUS_OK) {
+            fprintf(stderr, "schwaystation-run: cannot read card generation for port %lu socket %lu\n",
+                    (unsigned long)port, (unsigned long)socket);
             if (status == SCHWAY__EXIT_OK) {
                 status = SCHWAY__EXIT_FAILURE;
             }
@@ -976,10 +1021,10 @@ static int runner_cards_flush(const options *opt, schway *inst, runner_card_file
             continue;
         }
         schway_span span;
-        uint32_t memory = i == 0u ? SCHWAY_MEMORY_CARD1 : SCHWAY_MEMORY_CARD2;
-        if (schway_get_memory(inst, memory, &span) != SCHWAY_STATUS_OK ||
+        if (schway_get_memcard(inst, port, socket, &span) != SCHWAY_STATUS_OK ||
             span.data == NULL || span.size != SCHWAY_MEMCARD_SIZE) {
-            fprintf(stderr, "schwaystation-run: cannot read card slot %lu\n", (unsigned long)slot);
+            fprintf(stderr, "schwaystation-run: cannot read card port %lu socket %lu\n",
+                    (unsigned long)port, (unsigned long)socket);
             if (status == SCHWAY__EXIT_OK) {
                 status = SCHWAY__EXIT_FAILURE;
             }
@@ -1066,8 +1111,8 @@ static int runner_test_transfer(schway *inst, uint8_t sent, uint32_t ack_ticks, 
     return 1;
 }
 
-static int runner_test_card_write(schway *inst, uint32_t port, uint8_t seed, uint32_t mode,
-                                  uint8_t expected_flag)
+static int runner_test_card_write(schway *inst, uint32_t port, uint32_t socket, uint8_t seed,
+                                  uint32_t mode, uint8_t expected_flag)
 {
     uint32_t port_bit = port == 0u ? 0u : 0x2000u;
     uint8_t reply = 0u;
@@ -1077,7 +1122,8 @@ static int runner_test_card_write(schway *inst, uint32_t port, uint8_t seed, uin
         !runner_test_mmio_write(inst, SCHWAY__TEST_JOY_CTRL, 2u, 0x1003u | port_bit)) {
         return 0;
     }
-    if (!runner_test_transfer(inst, 0x81u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0xFFu ||
+    if (!runner_test_transfer(inst, (uint8_t)(0x80u + socket), SCHWAY__TEST_CARD_ACK, &reply) ||
+        reply != 0xFFu ||
         !runner_test_transfer(inst, 0x57u, SCHWAY__TEST_CARD_ACK, &reply) ||
         reply != expected_flag ||
         !runner_test_transfer(inst, 0u, SCHWAY__TEST_CARD_ACK, &reply) || reply != 0x5Au ||
@@ -1114,20 +1160,55 @@ static int runner_test_card_write(schway *inst, uint32_t port, uint8_t seed, uin
 static int runner_test_card_mode(schway *inst, int mode)
 {
     if (mode == 1) {
-        return runner_test_card_write(inst, 0u, 0x31u, 1u, 0x08u);
+        return runner_test_card_write(inst, 0u, 1u, 0x31u, 1u, 0x08u);
     }
     if (mode == 2) {
-        return runner_test_card_write(inst, 1u, 0x62u, 1u, 0x08u);
+        return runner_test_card_write(inst, 1u, 1u, 0x62u, 1u, 0x08u);
     }
     if (mode == 3) {
-        return runner_test_card_write(inst, 0u, 0x31u, 3u, 0x08u);
+        return runner_test_card_write(inst, 0u, 1u, 0x31u, 3u, 0x08u);
     }
     if (mode == 4) {
-        return runner_test_card_write(inst, 0u, 0x62u, 4u, 0x08u);
+        return runner_test_card_write(inst, 0u, 1u, 0x62u, 4u, 0x08u);
     }
     if (mode == 5) {
-        return runner_test_card_write(inst, 0u, 0x31u, 1u, 0x08u) &&
-               runner_test_card_write(inst, 0u, 0x62u, 4u, 0u);
+        return runner_test_card_write(inst, 0u, 1u, 0x31u, 1u, 0x08u) &&
+               runner_test_card_write(inst, 0u, 1u, 0x62u, 4u, 0u);
+    }
+    if (mode >= 14 && mode < 22) {
+        uint32_t endpoint = (uint32_t)(mode - 14);
+        uint32_t port = endpoint / 4u;
+        uint32_t socket = endpoint % 4u + 1u;
+        uint8_t seed = (uint8_t)(0x31u + endpoint * 17u);
+        if (socket != 1u) {
+            inst->pad.multitap[port] = 1u;
+        }
+        schway_span span;
+        if (schway_get_memcard(inst, port + 1u, socket, &span) != SCHWAY_STATUS_OK ||
+            span.data == NULL || span.size != SCHWAY_MEMCARD_SIZE) {
+            return 0;
+        }
+        const uint8_t *card_bytes = (const uint8_t *)span.data;
+        for (uint32_t i = 0u; i < 128u; i++) {
+            if (card_bytes[7u * 128u + i] != (uint8_t)(i * 29u + seed)) {
+                return 0;
+            }
+        }
+        return runner_test_card_write(inst, port, socket, (uint8_t)(seed + 1u), 1u, 0x08u);
+    }
+    if (mode == 22 || mode == 23) {
+        inst->pad.multitap[0] = 1u;
+        return runner_test_card_write(inst, 0u, 2u, 0xC1u, mode == 22 ? 3u : 4u, 0x08u);
+    }
+    if (mode >= 6 && mode < 14) {
+        uint32_t endpoint = (uint32_t)(mode - 6);
+        uint32_t port = endpoint / 4u;
+        uint32_t socket = endpoint % 4u + 1u;
+        if (socket != 1u) {
+            inst->pad.multitap[port] = 1u;
+        }
+        return runner_test_card_write(inst, port, socket,
+                                      (uint8_t)(0x31u + endpoint * 17u), 1u, 0x08u);
     }
     return 0;
 }
