@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Completed 14-05-PLAN.md
-last_updated: "2026-11-24T05:53:26.578Z"
+stopped_at: Completed 14-06-PLAN.md
+last_updated: "2026-11-24T06:16:25.331Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-05 complete; Codex GSD executor configured gpt-6-luna xhigh; five plan commits; sorted inventory and selector preflight passed; targeted pad/SIO build and three focused mouse/neGcon/tap tests passed; SIO-02/03 await later libretro and Jogcon slices; next Plan 14-06
-state_head: 50a93462076b4aef4bf16700bfd41ed47a7e9b89
+last_activity_desc: Phase 14 Plan 14-06 complete; Codex GSD executor configured gpt-6-luna xhigh; four task commits; selector preflights and focused pad/SIO builds passed; flight/Jogcon selectors passed 6/6 and 4/4; SIO-03 complete; SIO-04 awaits libretro mapping; next Plan 14-07
+state_head: 4123d908be33640ccf619c76b61af42637b265d6
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 91
-  completed_plans: 84
+  completed_plans: 85
   percent: 70
 ---
 
@@ -26,16 +26,39 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-05 complete; Plan 14-06 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-06 complete; Plan 14-07 next)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-05 complete; Codex GSD executor configured gpt-6-luna xhigh (primary runtime model ID unavailable); five plan commits; focused mouse/neGcon/tap tests passed; SIO-02/03 await later slices
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 5/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-06 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); four task commits; focused flight/Jogcon/tap/DualShock selectors passed; SIO-03 complete and SIO-04 awaits libretro mapping
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 6/12 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-06 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Measured
+wall interval was 19m23s (05:57:02–06:16:25 UTC); active time was not separately measured. Two tasks produced
+four task commits: `bc4d8e1` (flight RED), `4bae1bb` (flight GREEN), `504b9e6` (Jogcon RED), and `4123d90`
+(Jogcon GREEN).
+
+Before configure/build, the changed path inventory sorted with `git diff --name-only | LC_ALL=C sort -cu`,
+`git diff --check` passed, and Python selector assertions confirmed the pre-registered flight, Jogcon, tap and
+DualShock tests. The first flight RED exited 8 on ID `41h` instead of `53h`; its JUnit record was classified
+`RED_EVIDENCE_OK`. After the minimal flight ID/length branch, the six-test selection passed 6/6 in 0.01s.
+The first Jogcon RED exited 8 on ID `41h` instead of `E3h`; its JUnit record was classified `RED_EVIDENCE_OK`.
+After adding the native dial and direction bytes, the four-test selection passed 4/4 in 0.04s. Both focused SIO
+test targets built successfully; save/load, direct ports, both tap methods, 0/128/255 axes, all button bits,
+unsupported Jogcon commands and old DualShock configuration/rumble/watchdog cases were exercised.
+
+The initial Task 1 green run exposed a mistaken expected high-byte vector, corrected before the passing rerun.
+The first Task 2 test compile exposed duplicate local variable names, corrected before RED evidence. A relative
+JUnit path was also corrected to an absolute ignored evidence path before classification. No workflow wiring
+changed, so no broad workflow, Act or hosted CI run was needed; no Docker resources were created. Plan 14-05's
+neGcon coverage plus this Jogcon implementation completes SIO-03. SIO-04 remains pending the later libretro
+mapping. Plan 14-07 is next.
 
 ### Phase 14 Plan 14-05 execution (2026-11-24)
 
@@ -1428,6 +1451,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P03 | 31m31s | 2 tasks | 4 files |
 | Phase 14 P04 | 39min | 2 tasks | 9 files |
 | Phase 14 P05 | 29m16s | 2 tasks | 5 files |
+| Phase 14 P06 | 19m09s | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1887,6 +1911,9 @@ Recent decisions affecting current work:
 - [Phase 14]: Mouse movement is latched and saturated once at frame start; subsequent frames without fresh host input report zero movement while retaining button levels.
 - [Phase 14]: A mouse startup ACK-low hold is released only by an addressed 01h access at the same endpoint, including port 2 and tap sockets.
 - [Phase 14]: neGcon twist, I, II and L inputs are reported raw, without a response curve or deadzone.
+- [Phase 14]: Dual Analog flight uses the existing axis order and ID 5A53 without redirecting DIGITAL or DUALSHOCK behavior.
+- [Phase 14]: Jogcon supports only its documented native 42h payload; wire bit 0 of the raw dial halfword is cleared and its physical interpretation is not inferred.
+- [Phase 14]: Jogcon direction flags are turned-left and turned-right; software configuration and feedback commands return FF with no ACK.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2137,8 +2164,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T05:53:26.342Z
-Stopped at: Completed 14-05-PLAN.md
+Last session: 2026-11-24T06:16:25.095Z
+Stopped at: Completed 14-06-PLAN.md
 Resume file: None
 
 ### v1.0 session history

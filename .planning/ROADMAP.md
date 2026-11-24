@@ -283,13 +283,13 @@ Plans:
   3. neGcon and Jogcon report documented serial modes and integer controls, and explicitly reject unsupported modes.
   4. The size-tagged input and libretro mappings carry Dual Analog flight axes and buttons. Existing digital-pad and DualShock callers still pass their compatibility checks. Ledger rows record the exercised controller modes.
 
-**Plans**: 5/12 plans executed
+**Plans**: 6/12 plans executed
 - [x] 14-01-PLAN.md
 - [x] 14-02-PLAN.md
 - [x] 14-03-PLAN.md
 - [x] 14-04-PLAN.md
 - [x] 14-05-PLAN.md
-- [ ] 14-06-PLAN.md
+- [x] 14-06-PLAN.md
 - [ ] 14-07-PLAN.md
 - [ ] 14-08-PLAN.md
 - [ ] 14-09-PLAN.md
@@ -341,6 +341,6 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 11. ECM and CloneCD images | 15/15 | Complete    | 2026-11-22 |
 | 12. SBI and LibCrypt | 7/7 | Complete    | 2026-11-23 |
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
-| 14. Multitap and special controllers | 5/12 | In Progress | - |
+| 14. Multitap and special controllers | 6/12 | In Progress | - |
 | 15. GunCon and Justifier | 0/TBD | Not started | - |
 | 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |
