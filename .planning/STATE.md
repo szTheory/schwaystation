@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed 14-01-PLAN.md; runtime Codex GSD; model gpt-6-luna xhigh; wall interval 15m35s from phase plan commit checkpoint, executor start not separately captured
-last_updated: "2026-11-24T03:20:01.009Z"
-last_activity: 2026-11-23
-last_activity_desc: Phase 14 Plan 14-01 complete; Codex GSD executor configured gpt-6-luna xhigh; three task commits; next Plan 14-02
-state_head: 150344e12a7c0526dfffd8e096d9dc5900041403
+stopped_at: Completed 14-02-PLAN.md; runtime Codex GSD executor; model gpt-6-luna xhigh; elapsed wall about 36m, active time not measured
+last_updated: "2026-11-24T03:59:43.034Z"
+last_activity: 2026-11-24
+last_activity_desc: Phase 14 Plan 14-02 complete; Codex GSD executor configured gpt-6-luna xhigh; four task commits; focused local tests passed; next Plan 14-03
+state_head: 72e2c63bf302e5986fe19255c728fd015e3bd680
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 91
-  completed_plans: 80
+  completed_plans: 81
   percent: 70
 ---
 
@@ -26,15 +26,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-01 complete; Plan 14-02 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-02 complete; Plan 14-03 next)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 12
 Status: Ready to execute
-Last activity: 2026-11-23 — Phase 14 Plan 14-01 complete; Codex GSD executor configured gpt-6-luna xhigh (primary runtime model ID unavailable); three task commits
+Last activity: 2026-11-24 — Phase 14 Plan 14-02 complete; Codex GSD executor configured gpt-6-luna xhigh (primary runtime model ID unavailable); four task commits; focused local tests passed
 Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 context gathered and planning next. Phase 7–11 verification digests will be reconciled at milestone close.)
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
@@ -1384,6 +1384,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 13 P06 | not reliably tracked | 2 tasks | 7 files |
 | Phase 13 P07 | not reliably tracked | 2 tasks | 8 files |
 | Phase 14 P01 | 15m35s | 3 tasks | 11 files |
+| Phase 14 P02 | 36m | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -1832,6 +1833,9 @@ Recent decisions affecting current work:
 - [Phase 13]: State format and behavior revision remain 19 because profile flags were already serialized and default behavior is unchanged.
 - [Phase 14]: Keep the released 28-byte caller layout fixed while testing it against the current API.
 - [Phase 14]: Register future peripheral tests as gating selectors and leave their behavior to the owning plans.
+- [Phase 14]: API v9 preserves the 28-byte v8 input prefix and validates a zero-filled, caller-sized snapshot before apply.
+- [Phase 14]: Frame-start latching resolves tap precedence across eight stable endpoints; rumble results remain tied to socket A.
+- [Phase 14]: The new serialized endpoint shape uses unreleased state format and behavior revision 20.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2082,9 +2086,9 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T03:19:40.800Z
-Stopped at: Completed 14-01-PLAN.md; runtime Codex GSD; model gpt-6-luna xhigh; wall interval 15m35s from phase plan commit checkpoint, executor start not separately captured
-Resume file: Phase 14 Plan 14-02
+Last session: 2026-11-24T03:59:42.800Z
+Stopped at: Completed 14-02-PLAN.md; runtime Codex GSD executor; model gpt-6-luna xhigh; elapsed wall about 36m, active time not measured
+Resume file: None
 
 ### v1.0 session history
 
