@@ -8,6 +8,7 @@
 #include "../check.h"
 
 #define JOY_DATA 0x1F801040u
+#define JOY_STAT 0x1F801044u
 #define JOY_MODE 0x1F801048u
 #define JOY_CTRL 0x1F80104Au
 #define JOY_BAUD 0x1F80104Eu
@@ -549,6 +550,162 @@ static void state_split_config(void)
     schway_destroy(inst);
 }
 
+static void configure_sio_port(schway *inst, uint32_t port)
+{
+    write_mmio(inst, JOY_MODE, 2u, 0x000Cu);
+    write_mmio(inst, JOY_BAUD, 2u, 0x0088u);
+    write_mmio(inst, JOY_CTRL, 2u, (uint16_t)(0x0003u | (port != 0u ? 0x2000u : 0u)));
+}
+
+static void latch_input(schway *inst, schway_input *input)
+{
+    input->size = (uint32_t)sizeof *input;
+    CHECK_EQ_U64(schway_set_input(inst, input), SCHWAY_STATUS_OK);
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+}
+
+static uint8_t signed_mouse_byte(int16_t value)
+{
+    int32_t clamped = value;
+    if (clamped < -128) {
+        clamped = -128;
+    } else if (clamped > 127) {
+        clamped = 127;
+    }
+    return (uint8_t)(int8_t)clamped;
+}
+
+static void set_direct_mouse(schway_input *input, uint32_t port, uint16_t buttons,
+                             int16_t dx, int16_t dy)
+{
+    input->device[port] = SCHWAY_INPUT_DEVICE_MOUSE;
+    input->buttons[port] = buttons;
+    input->controllers[port][0].device = SCHWAY_INPUT_DEVICE_MOUSE;
+    input->controllers[port][0].buttons = buttons;
+    input->controllers[port][0].mouse_dx = dx;
+    input->controllers[port][0].mouse_dy = dy;
+}
+
+static void mouse_direct_vectors(void)
+{
+    static const int16_t values[] = {INT16_MIN, -129, -128, -1, 0, 1, 127, 128, INT16_MAX};
+    schway *inst = make();
+    configure_sio_port(inst, 0u);
+    for (uint32_t i = 0u; i < sizeof values / sizeof values[0]; i++) {
+        schway_input input;
+        memset(&input, 0, sizeof input);
+        input.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+        set_direct_mouse(&input, 0u, 1u << 10, values[i], values[i]);
+        latch_input(inst, &input);
+        uint8_t payload[] = {0x00u, 0x08u, signed_mouse_byte(values[i]),
+                             signed_mouse_byte(values[i])};
+        poll(inst, 0x12u, payload, 4u, NULL);
+        if (i == 0u || i == 4u || i == 8u) {
+            poll(inst, 0x12u, payload, 4u, NULL);
+        }
+    }
+
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    set_direct_mouse(&input, 0u, 0u, 64, -64);
+    latch_input(inst, &input);
+    (void)exchange(inst, 0x01u, 1);
+    (void)exchange(inst, 0x42u, 1);
+    (void)exchange(inst, 0x00u, 1);
+    (void)exchange(inst, 0x00u, 1);
+    schway__pad_abort(inst, 0u);
+    uint8_t payload[] = {0x00u, 0x0Cu, 64u, 0xC0u};
+    poll(inst, 0x12u, payload, 4u, NULL);
+
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    uint8_t stopped[] = {0x00u, 0x0Cu, 0x00u, 0x00u};
+    poll(inst, 0x12u, stopped, 4u, NULL);
+    CHECK_EQ_U64(inst->pad.mouse_dx[0], UINT16_C(32768));
+    CHECK_EQ_U64(inst->pad.mouse_dy[0], UINT16_C(32768));
+    schway__pad_set_connected(inst, 0u, 0u);
+    CHECK_EQ_U64(inst->pad.phase[0], 0u);
+    CHECK_EQ_U64(inst->pad.mouse_dx[0], UINT16_C(32768));
+    CHECK_EQ_U64(inst->pad.mouse_dy[0], UINT16_C(32768));
+    schway__pad_reset(inst);
+    CHECK_EQ_U64(inst->pad.phase[0], 0u);
+    CHECK_EQ_U64(inst->pad.mouse_dx[0], UINT16_C(32768));
+    CHECK_EQ_U64(inst->pad.mouse_dy[0], UINT16_C(32768));
+    schway_destroy(inst);
+}
+
+static void mouse_tap_and_startup_ack(void)
+{
+    schway *inst = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    input.device[1] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    set_direct_mouse(&input, 1u, 1u << 10, 9, -9);
+    latch_input(inst, &input);
+    configure_sio_port(inst, 0u);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x80u) != 0u);
+    (void)exchange(inst, 0x01u, 1);
+    CHECK_EQ_U64(inst->sio.tx_pending, 0u);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x80u) != 0u);
+    configure_sio_port(inst, 1u);
+    (void)exchange(inst, 0x01u, 1);
+    CHECK((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u);
+
+    memset(&input, 0, sizeof input);
+    input.multitap[1] = 1u;
+    input.controllers[1][3].device = SCHWAY_INPUT_DEVICE_MOUSE;
+    input.controllers[1][3].buttons = 1u << 10;
+    input.controllers[1][3].mouse_dx = 127;
+    input.controllers[1][3].mouse_dy = -128;
+    latch_input(inst, &input);
+    configure_sio_port(inst, 1u);
+    CHECK_EQ_HEX(exchange(inst, 0x04u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x12u);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0x5Au);
+    uint8_t method2[] = {0x00u, 0x08u, 0x7Fu, 0x80u};
+    for (uint32_t i = 0u; i < sizeof method2; i++) {
+        CHECK_EQ_HEX(exchange(inst, 0x00u, i + 1u < sizeof method2), method2[i]);
+    }
+    schway_destroy(inst);
+
+    inst = make();
+    memset(&input, 0, sizeof input);
+    input.multitap[0] = 1u;
+    input.controllers[0][0].device = SCHWAY_INPUT_DEVICE_DIGITAL;
+    input.controllers[0][3].device = SCHWAY_INPUT_DEVICE_MOUSE;
+    input.controllers[0][3].buttons = 1u << 10;
+    input.controllers[0][3].mouse_dx = 127;
+    input.controllers[0][3].mouse_dy = -128;
+    latch_input(inst, &input);
+    configure_sio_port(inst, 0u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 0), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
+    uint8_t first_record[] = {0x41u, 0x5Au, 0xFFu, 0xFFu,
+                              0xFFu, 0xFFu, 0xFFu, 0xFFu};
+    uint8_t mouse_record[] = {0x12u, 0x5Au, 0x00u, 0x08u, 0x7Fu, 0x80u, 0xFFu, 0xFFu};
+    for (uint32_t i = 0u; i < 32u; i++) {
+        uint8_t expected = i < 8u ? first_record[i]
+                                   : i >= 24u ? mouse_record[i - 24u] : 0xFFu;
+        CHECK_EQ_HEX(exchange(inst, 0x01u, i < 31u), expected);
+    }
+    schway_destroy(inst);
+}
+
+static void special_mouse(void)
+{
+    mouse_direct_vectors();
+    mouse_tap_and_startup_ack();
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -567,6 +724,8 @@ int main(int argc, char **argv)
         watchdog_boundary();
     } else if (strcmp(argv[1], "state_split_config") == 0) {
         state_split_config();
+    } else if (strcmp(argv[1], "special_mouse") == 0) {
+        special_mouse();
     } else {
         return 2;
     }
