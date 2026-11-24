@@ -723,6 +723,209 @@ static void special_flight(void)
     flight_tap_vectors();
 }
 
+static void set_direct_jogcon(schway_input *input, uint32_t port, uint16_t buttons,
+                              uint16_t dial, uint16_t flags)
+{
+    input->device[port] = SCHWAY_INPUT_DEVICE_JOGCON;
+    input->buttons[port] = buttons;
+    input->controllers[port][0].device = SCHWAY_INPUT_DEVICE_JOGCON;
+    input->controllers[port][0].buttons = buttons;
+    input->controllers[port][0].jogcon_dial = dial;
+    input->controllers[port][0].jogcon_flags = flags;
+}
+
+static void jogcon_direct_vectors(void)
+{
+    static const uint16_t dial_patterns[] = {
+        0x0000u, 0x0001u, 0x1234u, 0x1235u, 0x7FFEu, 0x8001u, 0xFFFEu, 0xFFFFu};
+    static const uint8_t button_bits[] = {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u,
+                                          8u, 9u, 10u, 11u, 12u, 13u, 14u, 15u};
+    for (uint32_t port = 0u; port < 2u; port++) {
+        schway *inst = make();
+        configure_sio_port(inst, port);
+        for (uint32_t i = 0u; i < sizeof dial_patterns / sizeof dial_patterns[0]; i++) {
+            schway_input input;
+            memset(&input, 0, sizeof input);
+            set_direct_jogcon(&input, port, (uint16_t)((1u << 3) | (1u << 13)),
+                              dial_patterns[i], (uint16_t)(i & 3u));
+            latch_input(inst, &input);
+            uint16_t buttons = (uint16_t)~input.buttons[port];
+            uint16_t dial = (uint16_t)(dial_patterns[i] & UINT16_C(0xFFFE));
+            uint16_t flags = (uint16_t)(i & 3u);
+            uint8_t payload[] = {(uint8_t)buttons, (uint8_t)(buttons >> 8),
+                                 (uint8_t)dial, (uint8_t)(dial >> 8),
+                                 (uint8_t)flags, (uint8_t)(flags >> 8)};
+            poll(inst, 0xE3u, payload, 6u, NULL);
+            if (i == 0u || i == 7u) {
+                poll(inst, 0xE3u, payload, 6u, NULL);
+            }
+        }
+        for (uint32_t i = 0u; i < sizeof button_bits; i++) {
+            schway_input input;
+            memset(&input, 0, sizeof input);
+            uint16_t pressed = (uint16_t)(1u << button_bits[i]);
+            set_direct_jogcon(&input, port, pressed, 0xA55Bu, (uint16_t)(i & 3u));
+            latch_input(inst, &input);
+            uint16_t active_low = (uint16_t)~pressed;
+            uint16_t dial = UINT16_C(0xA55A);
+            uint16_t flags = (uint16_t)(i & 3u);
+            uint8_t payload[] = {(uint8_t)active_low, (uint8_t)(active_low >> 8),
+                                 (uint8_t)dial, (uint8_t)(dial >> 8),
+                                 (uint8_t)flags, (uint8_t)(flags >> 8)};
+            poll(inst, 0xE3u, payload, 6u, NULL);
+        }
+
+        schway_input saved_input;
+        memset(&saved_input, 0, sizeof saved_input);
+        set_direct_jogcon(&saved_input, port, 1u << 7, 0x8001u, 2u);
+        latch_input(inst, &saved_input);
+        size_t state_size = schway_state_size(inst);
+        uint8_t *saved = malloc(state_size);
+        CHECK(saved != NULL);
+        if (saved != NULL) {
+            CHECK_EQ_U64(schway_save_state(inst, saved, state_size), SCHWAY_STATUS_OK);
+            schway_input changed;
+            memset(&changed, 0, sizeof changed);
+            set_direct_jogcon(&changed, port, 1u << 9, 0x1235u, 1u);
+            latch_input(inst, &changed);
+            CHECK_EQ_U64(schway_load_state(inst, saved, state_size), SCHWAY_STATUS_OK);
+            uint16_t active_low = (uint16_t)~(uint16_t)(1u << 7);
+            uint16_t dial = UINT16_C(0x8000);
+            uint8_t payload[] = {(uint8_t)active_low, (uint8_t)(active_low >> 8),
+                                 (uint8_t)dial, (uint8_t)(dial >> 8), 2u, 0u};
+            poll(inst, 0xE3u, payload, 6u, NULL);
+            free(saved);
+        }
+
+        schway_input changed;
+        memset(&changed, 0, sizeof changed);
+        set_direct_jogcon(&changed, port, 1u << 11, 0x4001u, 1u);
+        latch_input(inst, &changed);
+        schway_input pending;
+        memset(&pending, 0, sizeof pending);
+        set_direct_jogcon(&pending, port, 1u << 4, 0xC003u, 2u);
+        pending.size = (uint32_t)sizeof pending;
+        CHECK_EQ_U64(schway_set_input(inst, &pending), SCHWAY_STATUS_OK);
+        uint16_t old_buttons = (uint16_t)~(uint16_t)(1u << 11);
+        uint16_t old_dial = UINT16_C(0x4000);
+        uint8_t old_payload[] = {(uint8_t)old_buttons, (uint8_t)(old_buttons >> 8),
+                                 (uint8_t)old_dial, (uint8_t)(old_dial >> 8), 1u, 0u};
+        poll(inst, 0xE3u, old_payload, 6u, NULL);
+        schway__pad_frame_end(inst);
+        schway__pad_frame_start(inst);
+        uint16_t new_buttons = (uint16_t)~(uint16_t)(1u << 4);
+        uint16_t new_dial = UINT16_C(0xC002);
+        uint8_t new_payload[] = {(uint8_t)new_buttons, (uint8_t)(new_buttons >> 8),
+                                 (uint8_t)new_dial, (uint8_t)(new_dial >> 8), 2u, 0u};
+        poll(inst, 0xE3u, new_payload, 6u, NULL);
+
+        static const uint8_t unsupported[] = {
+            0x00u, 0x43u, 0x44u, 0x45u, 0x46u, 0x47u, 0x4Cu, 0x4Du, 0x99u, 0xFFu};
+        inst->pad.rumble_large[port] = 0xA5u;
+        inst->pad.rumble_small[port] = 1u;
+        inst->pad.old_rumble[port] = 1u;
+        inst->pad.rumble_map[port * 6u] = 1u;
+        uint64_t transfers = inst->pad.transfers;
+        uint8_t frame_polls = inst->pad.frame_polls;
+        for (uint32_t i = 0u; i < sizeof unsupported; i++) {
+            schway__pad_abort(inst, port);
+            uint8_t received = 0u;
+            CHECK_EQ_U64(schway__pad_byte(inst, port, 0x01u, inst->ticks, &received), 1u);
+            CHECK_EQ_HEX(received, 0xFFu);
+            CHECK_EQ_U64(schway__pad_byte(inst, port, unsupported[i], inst->ticks,
+                                          &received), 0u);
+            CHECK_EQ_HEX(received, 0xFFu);
+            CHECK_EQ_U64(inst->pad.phase[port], 0u);
+            CHECK_EQ_U64(inst->pad.command[port], 0u);
+            CHECK_EQ_U64(inst->pad.data_index[port], 0u);
+            CHECK_EQ_U64(inst->pad.device[port], SCHWAY_INPUT_DEVICE_JOGCON);
+            CHECK_EQ_U64(inst->pad.config_mode[port], 0u);
+            CHECK_EQ_U64(inst->pad.analog_mode[port], 0u);
+            CHECK_EQ_U64(inst->pad.rumble_large[port], 0xA5u);
+            CHECK_EQ_U64(inst->pad.rumble_small[port], 1u);
+            CHECK_EQ_U64(inst->pad.old_rumble[port], 1u);
+            CHECK_EQ_U64(inst->pad.rumble_map[port * 6u], 1u);
+            CHECK_EQ_U64(inst->pad.transfers, transfers);
+            CHECK_EQ_U64(inst->pad.frame_polls, frame_polls);
+        }
+
+        schway_input digital;
+        memset(&digital, 0, sizeof digital);
+        digital.device[port] = SCHWAY_INPUT_DEVICE_DIGITAL;
+        digital.buttons[port] = 1u << 3;
+        latch_input(inst, &digital);
+        poll(inst, 0x41u, (const uint8_t[]){0xF7u, 0xFFu}, 2u, NULL);
+        CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+        configure_sio_port(inst, port);
+        poll(inst, 0x41u, (const uint8_t[]){0xFFu, 0xFFu}, 2u, NULL);
+        schway_destroy(inst);
+    }
+}
+
+static void jogcon_tap_vectors(void)
+{
+    schway *inst = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.multitap[1] = 1u;
+    input.controllers[1][0].device = SCHWAY_INPUT_DEVICE_DIGITAL;
+    input.controllers[1][3].device = SCHWAY_INPUT_DEVICE_JOGCON;
+    input.controllers[1][3].buttons = (uint16_t)((1u << 3) | (1u << 7) | (1u << 11));
+    input.controllers[1][3].jogcon_dial = 0xA55Bu;
+    input.controllers[1][3].jogcon_flags = 3u;
+    latch_input(inst, &input);
+    configure_sio_port(inst, 1u);
+    CHECK_EQ_HEX(exchange(inst, 0x04u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0xE3u);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0x5Au);
+    uint16_t buttons = (uint16_t)~input.controllers[1][3].buttons;
+    uint16_t dial = UINT16_C(0xA55A);
+    uint8_t method2[] = {(uint8_t)buttons, (uint8_t)(buttons >> 8),
+                         (uint8_t)dial, (uint8_t)(dial >> 8), 3u, 0u};
+    for (uint32_t i = 0u; i < sizeof method2; i++) {
+        CHECK_EQ_HEX(exchange(inst, 0u, i + 1u < sizeof method2), method2[i]);
+    }
+    schway_destroy(inst);
+
+    inst = make();
+    memset(&input, 0, sizeof input);
+    input.multitap[0] = 1u;
+    input.controllers[0][0].device = SCHWAY_INPUT_DEVICE_DIGITAL;
+    input.controllers[0][3].device = SCHWAY_INPUT_DEVICE_JOGCON;
+    input.controllers[0][3].buttons = (uint16_t)((1u << 3) | (1u << 5) | (1u << 12));
+    input.controllers[0][3].jogcon_dial = 0x7FFFu;
+    input.controllers[0][3].jogcon_flags = 1u;
+    latch_input(inst, &input);
+    configure_sio_port(inst, 0u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x00u, 0), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange(inst, 0x01u, 1), 0x5Au);
+    uint8_t first_record[] = {0x41u, 0x5Au, 0xFFu, 0xFFu,
+                              0xFFu, 0xFFu, 0xFFu, 0xFFu};
+    uint16_t method1_buttons = (uint16_t)~input.controllers[0][3].buttons;
+    uint16_t method1_dial = UINT16_C(0x7FFE);
+    uint8_t jogcon_record[] = {0xE3u, 0x5Au, (uint8_t)method1_buttons,
+                               (uint8_t)(method1_buttons >> 8), (uint8_t)method1_dial,
+                               (uint8_t)(method1_dial >> 8), 1u, 0u};
+    for (uint32_t i = 0u; i < 32u; i++) {
+        uint8_t expected = i < 8u ? first_record[i]
+                                   : i >= 24u ? jogcon_record[i - 24u] : 0xFFu;
+        CHECK_EQ_HEX(exchange(inst, 0x01u, i < 31u), expected);
+    }
+    schway_destroy(inst);
+}
+
+static void special_jogcon(void)
+{
+    jogcon_direct_vectors();
+    jogcon_tap_vectors();
+}
+
 static void set_direct_mouse(schway_input *input, uint32_t port, uint16_t buttons,
                              int16_t dx, int16_t dy)
 {
@@ -1041,6 +1244,8 @@ int main(int argc, char **argv)
         special_negcon();
     } else if (strcmp(argv[1], "special_flight") == 0) {
         special_flight();
+    } else if (strcmp(argv[1], "special_jogcon") == 0) {
+        special_jogcon();
     } else {
         return 2;
     }
