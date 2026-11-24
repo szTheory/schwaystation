@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 14
+current_plan: 15
 status: executing
-stopped_at: Completed 14-13-PLAN.md
-last_updated: "2026-11-24T11:17:20.275Z"
+stopped_at: Completed 14-14-PLAN.md
+last_updated: "2026-11-24T11:55:27.408Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-13 complete; configured gpt-6-luna xhigh; 20m wall time through metadata commit; two task commits; focused libretro selectors passed 5/5; SIO-01 remains gated
-state_head: 640340a72f92a5dfbc67c318986d836c7abfb752
+last_activity_desc: Phase 14 Plan 14-14 complete; configured gpt-6-luna xhigh; 32m22s wall time (2m22s beyond cap); one test/documentation commit; card lifecycle selectors passed 3/3; Plan 14-15 next
+state_head: 39cd8189966d38336627b79e98fef82d44cf56f1
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 94
-  completed_plans: 92
+  completed_plans: 93
   percent: 70
 ---
 
@@ -26,16 +26,29 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-13 complete; Plan 14-14 has not started; SIO-01 remains gated)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-14 complete; Plan 14-15 next; SIO-01 remains gated)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 14
+Current Plan: 15
 Total Plans in Phase: 15
 Status: Ready for the next authorized plan
-Last activity: 2026-11-24 — Phase 14 Plan 14-13 complete; Codex GSD executor configured `gpt-6-luna` xhigh; 20m wall time through metadata commit; two task commits; focused libretro selectors passed 5/5; SIO-01 remains gated
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 13/15 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-14 complete; Codex GSD executor configured `gpt-6-luna` xhigh; 32m22s wall time (2m22s past the plan cap); one test/documentation commit; card lifecycle selectors passed 3/3; SIO-01 remains gated
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 14/15 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-14 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured
+wall duration was 32m22s (11:20:03–11:52:25 UTC), 2m22s past the 30-minute plan cap. The executor stopped after
+its single task commit, `39cd818`; the orchestrator completed GSD closeout without further implementation.
+
+The CI configure/build and focused card tests passed. `libretro.cards.multitap`, `libretro.cards.persistence`
+and `libretro.cards.controls` passed 3/3 in 18.34s. The direct host test was green on its first run because the
+state, reset, failed-load and save-identity invariants already existed in production; no runtime change or
+artificial RED commit was made. This slice adds test-only probes/assertions and save ownership documentation.
+Shared SIO-01 remains open until its last declaring plan finishes. No broad suite, hosted CI, Act or Docker was
+run; Plan 15 owns the final reviewed-head aggregate verification.
 
 ### Phase 14 Plan 14-13 execution (2026-11-24)
 
@@ -1550,6 +1563,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P11 | 24m | 1 tasks | 3 files |
 | Phase 14 P12 | 24m | 1 tasks | 3 files |
 | Phase 14 P13 | 20m | 1 tasks | 2 files |
+| Phase 14 P14 | 32m22s | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -2275,8 +2289,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T11:17:19.774Z
-Stopped at: Completed 14-13-PLAN.md
+Last session: 2026-11-24T11:55:25.913Z
+Stopped at: Completed 14-14-PLAN.md
 Resume file: None
 
 ### v1.0 session history
