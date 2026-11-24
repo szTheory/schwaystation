@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 7
+current_plan: 8
 status: executing
-stopped_at: Completed 14-06-PLAN.md
-last_updated: "2026-11-24T06:16:25.331Z"
+stopped_at: Completed 14-07-PLAN.md
+last_updated: "2026-11-24T06:49:16.448Z"
 last_activity: 2026-11-24
 last_activity_desc: Phase 14 Plan 14-06 complete; Codex GSD executor configured gpt-6-luna xhigh; four task commits; selector preflights and focused pad/SIO builds passed; flight/Jogcon selectors passed 6/6 and 4/4; SIO-03 complete; SIO-04 awaits libretro mapping; next Plan 14-07
-state_head: 4123d908be33640ccf619c76b61af42637b265d6
+state_head: c0e2b82a8bd751f799238cdaab37c6f4ef35dd4f
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 91
-  completed_plans: 85
+  completed_plans: 86
   percent: 70
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 7
+Current Plan: 8
 Total Plans in Phase: 12
 Status: Ready to execute
 Last activity: 2026-11-24 — Phase 14 Plan 14-06 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); four task commits; focused flight/Jogcon/tap/DualShock selectors passed; SIO-03 complete and SIO-04 awaits libretro mapping
@@ -1452,6 +1452,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P04 | 39min | 2 tasks | 9 files |
 | Phase 14 P05 | 29m16s | 2 tasks | 5 files |
 | Phase 14 P06 | 19m09s | 2 tasks | 5 files |
+| Phase 14 P07 | 26m10s | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -1914,6 +1915,7 @@ Recent decisions affecting current work:
 - [Phase 14]: Dual Analog flight uses the existing axis order and ID 5A53 without redirecting DIGITAL or DUALSHOCK behavior.
 - [Phase 14]: Jogcon supports only its documented native 42h payload; wire bit 0 of the raw dial halfword is cleared and its physical interpretation is not inferred.
 - [Phase 14]: Jogcon direction flags are turned-left and turned-right; software configuration and feedback commands return FF with no ACK.
+- [Phase 14]: Plan 14-07: cross-validate candidate pad, SIO and card protocol states before apply; preserve receiver-owned card media across restore. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 26m10s.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2164,8 +2166,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T06:16:25.095Z
-Stopped at: Completed 14-06-PLAN.md
+Last session: 2026-11-24T06:49:16.198Z
+Stopped at: Completed 14-07-PLAN.md
 Resume file: None
 
 ### v1.0 session history
