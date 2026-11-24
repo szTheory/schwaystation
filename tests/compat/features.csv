@@ -19,6 +19,12 @@ core,ntsc-u.pu22.v2,none,none,profile.select,pass,core.profile.machine.exit0;lib
 core,ntsc-u.pu23.v2,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
 core,ntsc-u.pu7.v0,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
 core,ntsc-u.pu8-early.v0,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
+core,ntsc-u.pu8-late.v2,none,dual-analog-flight,buttons.axes.frame_latch+unsupported_mode.refusal+host.mapping,pass,sio.special.flight.exit0;libretro.input.special.exit0,2026-11-24
+core,ntsc-u.pu8-late.v2,none,jogcon,native_poll_payload+config_refusal+host.mapping,pass,sio.special.jogcon.exit0;libretro.input.special.exit0,2026-11-24
+core,ntsc-u.pu8-late.v2,none,mouse,relative_motion.frame_latch+active_low_buttons+host.mapping,pass,sio.special.mouse.exit0;libretro.input.special.exit0,2026-11-24
+core,ntsc-u.pu8-late.v2,none,multitap,eight_socket.card_protocol+independent.persistence,pass,card.tap.protocol.exit0;card.tap.state.exit0;runner.cards.multitap.exit0;runner.cards.persistence.exit0;libretro.cards.multitap.exit0;libretro.cards.persistence.exit0,2026-11-24
+core,ntsc-u.pu8-late.v2,none,multitap,poll_methods+request_history+host.topology,pass,sio.tap.history_edges.exit0;sio.tap.poll_methods.exit0;libretro.input.multitap.exit0;libretro.input.descriptors.exit0,2026-11-24
+core,ntsc-u.pu8-late.v2,none,negcon,native_poll_payload+host.mapping,pass,sio.special.negcon.exit0;libretro.input.special.exit0,2026-11-24
 core,ntsc-u.pu8-late.v2,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
 core,pal.pm41-2.v2,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23
 core,pal.pm41.v2,none,none,profile.select,pass,core.profile.machine.exit0;libretro.options.profile.exit0,2026-11-23

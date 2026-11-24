@@ -48,6 +48,14 @@ schway_host_card_status schway__host_card_paths_for_identity(const char *directo
                                                               const char *identity,
                                                               char *slot1, size_t slot1_size,
                                                               char *slot2, size_t slot2_size);
+/* Coordinates use the one-based public card port/socket values; refusal leaves out unchanged. */
+schway_host_card_status schway__host_card_path_for_socket(const char *directory,
+                                                           const char *component,
+                                                           uint32_t port, uint32_t socket,
+                                                           char *out, size_t out_size);
+schway_host_card_status schway__host_card_identity_path_for_socket(
+    const char *directory, const char *identity, uint32_t port, uint32_t socket,
+    char *out, size_t out_size);
 schway_host_card_status schway_host_card_save_atomic(const char *path, const void *bytes,
                                                       size_t size);
 schway_host_card_status schway_host_card_export_atomic(const char *path, const void *bytes,

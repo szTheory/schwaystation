@@ -1,13 +1,13 @@
 {
   "ir_per_frame": {
-    "testcard": {"floor": 1619573, "ceiling": 1619573},
-    "gpu_motion": {"floor": 138319014, "ceiling": 138319014}
+    "testcard": {"floor": 1620101, "ceiling": 1620101},
+    "gpu_motion": {"floor": 138319540, "ceiling": 138319540}
   },
   "size": {
-    "wasm": {"floor": 923753, "ceiling": 923753}
+    "wasm": {"floor": 947969, "ceiling": 947969}
   },
   "state": {
-    "bytes": {"floor": 3755332, "ceiling": 3755332}
+    "bytes": {"floor": 3757638, "ceiling": 3757638}
   },
   "ci": {
     "critical_path_s": {
@@ -28,6 +28,10 @@
     "2026-11-23: Phase 12's SBI-enabled Ubuntu 26 WASI lane measured the linked Release module at 910370 bytes on PR run 45141834168; this was the pre-Phase-13 bound: https://github.com/szTheory/schwaystation/actions/runs/45141834168/job/137581782805.",
     "2026-11-23: Phase 13 added the 4-byte instance.board field; the Linux x64 stable-state producer measured 3755332 bytes on PR run 45286519140, job 138084550570, so the state bound tracks the new serialized format: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550570.",
     "2026-11-23: Phase 13's unchanged Cachegrind producer measured gpu_motion at 138319014 Ir/frame on PR run 45286519140, job 138084221427, 41 basis points above the merge base and within the existing 100-basis-point regression limit; the absolute bound tracks the measurement and the relative gate is unchanged: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084221427.",
-    "2026-11-23: Phase 13's Ubuntu 26 WASI lane measured the linked Release schwaystation-run module at 923753 bytes on PR run 45286519140, job 138084550942; the absolute bound tracks this exact producer result: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550942."
+    "2026-11-23: Phase 13's Ubuntu 26 WASI lane measured the linked Release schwaystation-run module at 923753 bytes on PR run 45286519140, job 138084550942; the absolute bound tracks this exact producer result: https://github.com/szTheory/schwaystation/actions/runs/45286519140/job/138084550942.",
+    "2026-11-24: Phase 14's local stable-state producer (build/ci/tests/schwaystation-test-state state.stable_bytes) measured 3757638 bytes after the controller protocol-state addition; the bound tracks this exact local result. The producer exited 0; execution evidence is in .planning/phases/14-multitap-and-special-controllers/14-16-SUMMARY.md.",
+    "2026-11-24: Phase 14's Ubuntu 26.04 WASI producer measured the linked Release schwaystation-run module at 947976 bytes on PR run 45420382438, job 138538583783; floor and ceiling now track this exact measurement: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783.",
+    "2026-11-24: the first final-source local WASI reproduction measured 947899 bytes in an Ubuntu 26.04 arm64 container with SCHWAYSTATION_BUILD_TESTS=OFF; it did not match the hosted wasm32-chd preset. Main CI run 45436318507 measured 947969 bytes and failed only because the then-current ceiling was 947899. A local x86_64 Ubuntu 26.04 Clang/LLD 21.1.8 reproduction with tests enabled, CHD enabled and matching wasm32 settings built the Release runner at exactly 947969 bytes, confirming the hosted producer. The exact bound now tracks 947969. The run's other matrix jobs were canceled after this mismatch; GitHub timing reported zero billable milliseconds. The task-named x86_64 Docker container and its task-pulled image were removed after measurement.",
+    "2026-11-24: Phase 14's Cachegrind producer measured testcard at 1620101 and gpu_motion at 138319540 Ir/frame on PR run 45420382438, job 138538117721. Both relative comparisons passed; the exact-measurement ceilings were stale by 528 Ir and now track the producer values without changing the 100-basis-point regression limit: https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721."
   ]
 }

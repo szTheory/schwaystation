@@ -441,6 +441,97 @@ static int schway__host_cards_name_size(size_t directory_size, size_t separator_
 static void schway__host_cards_write_name(char *out, const char *directory,
                                           size_t directory_size, size_t separator_size,
                                           const char *serial, size_t serial_size,
+                                          const char *suffix, size_t suffix_size);
+
+static schway_host_card_status schway__host_cards_identity_component(
+    const char *identity, const char **component, size_t *component_size)
+{
+    static const char digest_v1_prefix[] = "sgi1-";
+    static const char digest_v2_prefix[] = "sgi2-";
+    if (identity == NULL || component == NULL || component_size == NULL) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    size_t prefix_size;
+    if (strncmp(identity, digest_v1_prefix, sizeof(digest_v1_prefix) - 1u) == 0) {
+        prefix_size = sizeof(digest_v1_prefix) - 1u;
+    } else if (strncmp(identity, digest_v2_prefix, sizeof(digest_v2_prefix) - 1u) == 0) {
+        prefix_size = sizeof(digest_v2_prefix) - 1u;
+    } else {
+        if (!schway__host_cards_basename_length(identity, component_size)) {
+            return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+        }
+        *component = identity;
+        return SCHWAY_HOST_CARD_OK;
+    }
+
+    size_t identity_size = strlen(identity);
+    if (identity_size != prefix_size + 64u) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    for (size_t i = prefix_size; i < identity_size; i++) {
+        char value = identity[i];
+        if (!((value >= '0' && value <= '9') || (value >= 'a' && value <= 'f'))) {
+            return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+        }
+    }
+    *component = identity;
+    *component_size = identity_size;
+    return SCHWAY_HOST_CARD_OK;
+}
+
+static schway_host_card_status schway__host_cards_path_for_component_suffix(
+    const char *directory, const char *component, size_t component_size,
+    const char *suffix, char *out, size_t out_size)
+{
+    if (directory == NULL || component == NULL || suffix == NULL || out == NULL) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    size_t directory_size = strlen(directory);
+    size_t separator_size =
+        directory_size != 0u && directory[directory_size - 1u] != '/' &&
+                directory[directory_size - 1u] != '\\'
+            ? 1u
+            : 0u;
+    size_t required = 0u;
+    size_t suffix_size = strlen(suffix) + 1u;
+    if (!schway__host_cards_name_size(directory_size, separator_size, component_size,
+                                       suffix_size, &required)) {
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    }
+    if (out_size < required) {
+        return SCHWAY_HOST_CARD_ERR_SIZE;
+    }
+    schway__host_cards_write_name(out, directory, directory_size, separator_size,
+                                  component, component_size, suffix, suffix_size);
+    return SCHWAY_HOST_CARD_OK;
+}
+
+static const char *schway__host_cards_socket_suffix(uint32_t port, uint32_t socket)
+{
+    if (port == SCHWAY_CARD_PORT_1) {
+        switch (socket) {
+        case SCHWAY_CARD_SOCKET_A: return ".srm";
+        case SCHWAY_CARD_SOCKET_B: return ".p1b.mcr";
+        case SCHWAY_CARD_SOCKET_C: return ".p1c.mcr";
+        case SCHWAY_CARD_SOCKET_D: return ".p1d.mcr";
+        default: return NULL;
+        }
+    }
+    if (port == SCHWAY_CARD_PORT_2) {
+        switch (socket) {
+        case SCHWAY_CARD_SOCKET_A: return ".1.mcr";
+        case SCHWAY_CARD_SOCKET_B: return ".p2b.mcr";
+        case SCHWAY_CARD_SOCKET_C: return ".p2c.mcr";
+        case SCHWAY_CARD_SOCKET_D: return ".p2d.mcr";
+        default: return NULL;
+        }
+    }
+    return NULL;
+}
+
+static void schway__host_cards_write_name(char *out, const char *directory,
+                                          size_t directory_size, size_t separator_size,
+                                          const char *serial, size_t serial_size,
                                           const char *suffix, size_t suffix_size)
 {
     size_t offset = 0u;
@@ -506,33 +597,48 @@ schway_host_card_status schway__host_card_paths_for_identity(const char *directo
                                                               char *slot1, size_t slot1_size,
                                                               char *slot2, size_t slot2_size)
 {
-    static const char digest_v1_prefix[] = "sgi1-";
-    static const char digest_v2_prefix[] = "sgi2-";
-    if (identity == NULL) {
-        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    const char *component = NULL;
+    size_t component_size = 0u;
+    schway_host_card_status status =
+        schway__host_cards_identity_component(identity, &component, &component_size);
+    if (status != SCHWAY_HOST_CARD_OK) {
+        return status;
     }
-    size_t prefix_size;
-    if (strncmp(identity, digest_v1_prefix, sizeof(digest_v1_prefix) - 1u) == 0) {
-        prefix_size = sizeof(digest_v1_prefix) - 1u;
-    } else if (strncmp(identity, digest_v2_prefix, sizeof(digest_v2_prefix) - 1u) == 0) {
-        prefix_size = sizeof(digest_v2_prefix) - 1u;
-    } else {
-        return schway_host_card_paths_for_basename(directory, identity,
-                                                  slot1, slot1_size, slot2, slot2_size);
-    }
-
-    size_t identity_size = strlen(identity);
-    if (identity_size != prefix_size + 64u) {
-        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
-    }
-    for (size_t i = prefix_size; i < identity_size; i++) {
-        char value = identity[i];
-        if (!((value >= '0' && value <= '9') || (value >= 'a' && value <= 'f'))) {
-            return SCHWAY_HOST_CARD_ERR_ARGUMENT;
-        }
-    }
-    return schway__host_cards_paths_for_component(directory, identity, identity_size,
+    return schway__host_cards_paths_for_component(directory, component, component_size,
                                                  slot1, slot1_size, slot2, slot2_size);
+}
+
+schway_host_card_status schway__host_card_path_for_socket(const char *directory,
+                                                           const char *component,
+                                                           uint32_t port, uint32_t socket,
+                                                           char *out, size_t out_size)
+{
+    size_t component_size = 0u;
+    const char *suffix = schway__host_cards_socket_suffix(port, socket);
+    if (suffix == NULL || !schway__host_cards_basename_length(component, &component_size)) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    return schway__host_cards_path_for_component_suffix(directory, component, component_size,
+                                                        suffix, out, out_size);
+}
+
+schway_host_card_status schway__host_card_identity_path_for_socket(
+    const char *directory, const char *identity, uint32_t port, uint32_t socket,
+    char *out, size_t out_size)
+{
+    const char *component = NULL;
+    size_t component_size = 0u;
+    const char *suffix = schway__host_cards_socket_suffix(port, socket);
+    if (suffix == NULL) {
+        return SCHWAY_HOST_CARD_ERR_ARGUMENT;
+    }
+    schway_host_card_status status =
+        schway__host_cards_identity_component(identity, &component, &component_size);
+    if (status != SCHWAY_HOST_CARD_OK) {
+        return status;
+    }
+    return schway__host_cards_path_for_component_suffix(directory, component, component_size,
+                                                        suffix, out, out_size);
 }
 
 static schway_host_card_status schway__host_cards_publish_atomic(

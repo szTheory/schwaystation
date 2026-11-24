@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define SCHWAY_API_VERSION 8
+#define SCHWAY_API_VERSION 9
 
 typedef uint32_t schway_status;
 #define SCHWAY_STATUS_OK 0u
@@ -64,6 +64,12 @@ typedef uint32_t schway_status;
 
 #define SCHWAY_CARD_SLOT_1 1u
 #define SCHWAY_CARD_SLOT_2 2u
+#define SCHWAY_CARD_PORT_1 1u
+#define SCHWAY_CARD_PORT_2 2u
+#define SCHWAY_CARD_SOCKET_A 1u
+#define SCHWAY_CARD_SOCKET_B 2u
+#define SCHWAY_CARD_SOCKET_C 3u
+#define SCHWAY_CARD_SOCKET_D 4u
 #define SCHWAY_MEMCARD_SIZE 131072u
 #define SCHWAY_BIOS_SIZE 524288u
 #define SCHWAY_BIOS_INFO_LOADED 1u
@@ -126,6 +132,10 @@ typedef uint32_t schway_status;
 #define SCHWAY_INPUT_DEVICE_NONE 0u
 #define SCHWAY_INPUT_DEVICE_DIGITAL 1u
 #define SCHWAY_INPUT_DEVICE_DUALSHOCK 2u
+#define SCHWAY_INPUT_DEVICE_MOUSE 3u
+#define SCHWAY_INPUT_DEVICE_NEGCON 4u
+#define SCHWAY_INPUT_DEVICE_JOGCON 5u
+#define SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT 6u
 
 #define SCHWAY_LICENCE_NONE 0u
 #define SCHWAY_LICENCE_JAPAN 1u
@@ -194,6 +204,18 @@ typedef struct schway_run_result {
     uint32_t rumble[2]; /* per-port large << 8 | small */
 } schway_run_result;
 
+typedef struct schway_controller_input {
+    uint32_t device; /* SCHWAY_INPUT_DEVICE_* */
+    uint16_t buttons; /* bit set means pressed; the serial reply is active low */
+    uint8_t axes[4]; /* right X, right Y, left X, left Y; centre is 128 */
+    uint8_t analog_button; /* 0 released, 1 pressed */
+    uint8_t reserved0;
+    int16_t mouse_dx, mouse_dy;
+    uint8_t negcon_twist, negcon_i, negcon_ii, negcon_l;
+    uint16_t jogcon_dial;
+    uint16_t jogcon_flags; /* bit 0 turned left, bit 1 turned right */
+} schway_controller_input;
+
 typedef struct schway_input {
     uint32_t size;
     uint32_t device[2]; /* SCHWAY_INPUT_DEVICE_* */
@@ -201,6 +223,8 @@ typedef struct schway_input {
     uint8_t axes[2][4]; /* right X, right Y, left X, left Y; centre is 128 */
     uint8_t analog_button[2]; /* 0 released, 1 pressed */
     uint16_t reserved0;
+    uint32_t multitap[2]; /* 0 disabled, 1 enabled */
+    schway_controller_input controllers[2][4]; /* one-based host port/socket coordinates */
 } schway_input;
 
 typedef struct schway_budget {
@@ -326,6 +350,12 @@ schway_status schway_load_bios(schway *inst, const void *bytes, size_t size);
 schway_status schway_get_bios_info(const schway *inst, schway_bios_info *out);
 schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes, size_t size);
 schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint64_t *out);
+schway_status schway_get_memcard(const schway *inst, uint32_t port, uint32_t socket,
+                                 schway_span *out);
+schway_status schway_load_memcard_socket(schway *inst, uint32_t port, uint32_t socket,
+                                         const void *bytes, size_t size);
+schway_status schway_memcard_socket_generation(const schway *inst, uint32_t port,
+                                               uint32_t socket, uint64_t *out);
 schway_status schway_open_disc(schway *inst, const schway_disc *disc);
 schway_status schway_set_lid(schway *inst, uint32_t open); /* 0 closed, 1 open */
 schway_status schway_swap_disc(schway *inst, const schway_disc *disc); /* empty TOC removes media */

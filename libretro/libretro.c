@@ -24,6 +24,9 @@
 #include "../host/disc_probe.h"
 #include "../runner/region.h"
 #include "xrgb8888.h"
+#if defined(SCHWAYSTATION_LIBRETRO_TESTING)
+#include "../src/internal.h"
+#endif
 
 #ifndef SCHWAYSTATION_CHD
 #define SCHWAYSTATION_CHD 0
@@ -38,13 +41,20 @@
 #define LR_EXE_HEADER 0x800u
 #define LR_EXE_MAX_BYTES (LR_EXE_HEADER + 2u * 1024u * 1024u)
 #define LR_CARD_PATH_CAP 4096u
+#define LR_CARD_ENDPOINT_COUNT 8u
 #define LR_DISC_PATH_CAP 4096u
 #define LR_DISC_LIMIT SCHWAY_DISC_IMAGE_PLAYLIST_LIMIT
 #define LR_MEMORY_DESCRIPTOR_COUNT 6u
+#define LR_PLAYER_LIMIT 8u
 #define LR_BIOS_KEY "schwaystation_bios"
 #define LR_BOOT_KEY "schwaystation_boot"
 #define LR_ANALOG_MODE_KEY "schwaystation_analog_mode"
 #define LR_ANALOG_TOGGLE_KEY "schwaystation_analog_toggle"
+#define LR_MULTITAP_PORT1_KEY "schwaystation_multitap_port1"
+#define LR_MULTITAP_PORT2_KEY "schwaystation_multitap_port2"
+#define LR_DEVICE_FLIGHT RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1)
+#define LR_DEVICE_NEGCON RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
+#define LR_DEVICE_JOGCON RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
 #define LR_ANALOG_TOGGLE_FRAMES 60u
 #define LR_ANALOG_TOGGLE_BUTTONS                                                            \
     ((1u << RETRO_DEVICE_ID_JOYPAD_SELECT) | (1u << RETRO_DEVICE_ID_JOYPAD_START) |        \
@@ -64,8 +74,8 @@ static schway_info info;
 static uint32_t *pixels;
 static int16_t *samples;
 static unsigned geometry_width, geometry_height;
-static char lr_card2_path[LR_CARD_PATH_CAP];
-static uint64_t lr_card2_saved_generation;
+static char lr_card_paths[LR_CARD_ENDPOINT_COUNT][LR_CARD_PATH_CAP];
+static uint64_t lr_card_saved_generations[LR_CARD_ENDPOINT_COUNT];
 static schway_disc_image *lr_discs[LR_DISC_LIMIT];
 static unsigned lr_disc_count;
 static unsigned lr_disc_index = LR_DISC_LIMIT;
@@ -77,12 +87,17 @@ static struct retro_memory_descriptor lr_memory_descriptors[LR_MEMORY_DESCRIPTOR
 static struct retro_memory_map lr_memory_map;
 static int lr_memory_map_registered;
 static struct retro_rumble_interface lr_rumble;
-static unsigned lr_controller_devices[2] = {RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG};
+static unsigned lr_controller_devices[LR_PLAYER_LIMIT] = {
+    RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG,
+    RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG, RETRO_DEVICE_ANALOG,
+};
 static uint8_t lr_analog_mode = 1u;
 static uint8_t lr_analog_toggle_enabled = 1u;
-static uint8_t lr_mode_pulse_pending[2];
-static uint8_t lr_toggle_latched[2];
-static uint8_t lr_toggle_frames[2];
+static uint8_t lr_mode_pulse_pending[LR_PLAYER_LIMIT];
+static uint8_t lr_toggle_latched[LR_PLAYER_LIMIT];
+static uint8_t lr_toggle_frames[LR_PLAYER_LIMIT];
+static uint8_t lr_multitap_enabled[2];
+static unsigned lr_active_player_count = 2u;
 
 static uint32_t lr_disc_read_sector(void *user, uint32_t lba, uint8_t raw[2352],
                                    uint8_t subcode[96]);
@@ -109,6 +124,26 @@ static bool RETRO_CALLCONV lr_disk_get_image_label(unsigned index, char *label, 
 SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
 schway__libretro_test_card2_data(size_t *size);
 SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void);
+SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
+schway__libretro_test_card_socket(unsigned port, unsigned socket, size_t *size,
+                                  uint64_t *generation, uint64_t *saved_generation,
+                                  const char **path);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_write_card_socket(unsigned port, unsigned socket, uint8_t value);
+SCHWAYSTATION_TEST_EXPORT void RETRO_CALLCONV schway__libretro_test_flush_cards(void);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_lifecycle(unsigned endpoint, const char **path,
+                                     uint64_t *saved_generation);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_read_begin(unsigned port);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_read_byte(unsigned port, uint8_t sent, int ack,
+                                     uint8_t *received);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *buttons);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
+                                 size_t capacity, size_t *written);
 #endif
 
 static struct retro_disk_control_ext_callback lr_disk_control = {
@@ -544,6 +579,22 @@ static struct retro_core_option_v2_definition lr_option_defs[] = {
      NULL,
      {{"enabled", "Enabled"}, {"disabled", "Disabled"}, {NULL, NULL}},
      "enabled"},
+    {LR_MULTITAP_PORT1_KEY,
+     "Multitap on controller port 1 (reload content)",
+     NULL,
+     "Expose four controller sockets on physical controller port 1. Reload content to apply.",
+     NULL,
+     NULL,
+     {{"disabled", "Disabled"}, {"enabled", "Enabled"}, {NULL, NULL}},
+     "disabled"},
+    {LR_MULTITAP_PORT2_KEY,
+     "Multitap on controller port 2 (reload content)",
+     NULL,
+     "Expose four controller sockets on physical controller port 2. Reload content to apply.",
+     NULL,
+     NULL,
+     {{"disabled", "Disabled"}, {"enabled", "Enabled"}, {NULL, NULL}},
+     "disabled"},
     {NULL, NULL, NULL, NULL, NULL, NULL, {{NULL, NULL}}, NULL},
 };
 static struct retro_core_option_v2_category lr_option_cats[] = {{NULL, NULL, NULL}};
@@ -557,6 +608,10 @@ static struct retro_variable lr_variables[] = {
     {LR_BOOT_KEY, "Boot (reload content); full|fast"},
     {LR_ANALOG_MODE_KEY, "DualShock mode; analog|digital"},
     {LR_ANALOG_TOGGLE_KEY, "DualShock mode toggle; enabled|disabled"},
+    {LR_MULTITAP_PORT1_KEY,
+     "Multitap on controller port 1 (reload content); disabled|enabled"},
+    {LR_MULTITAP_PORT2_KEY,
+     "Multitap on controller port 2 (reload content); disabled|enabled"},
     {NULL, NULL},
 };
 
@@ -564,12 +619,12 @@ static struct retro_controller_description lr_controller_types[] = {
     {"DualShock", RETRO_DEVICE_ANALOG},
     {"PlayStation Controller", RETRO_DEVICE_JOYPAD},
     {"None", RETRO_DEVICE_NONE},
+    {"Dual Analog Flight Stick", LR_DEVICE_FLIGHT},
+    {"neGcon", LR_DEVICE_NEGCON},
+    {"Jogcon", LR_DEVICE_JOGCON},
+    {"Mouse", RETRO_DEVICE_MOUSE},
 };
-static struct retro_controller_info lr_controller_info[] = {
-    {lr_controller_types, (unsigned)(sizeof lr_controller_types / sizeof lr_controller_types[0])},
-    {lr_controller_types, (unsigned)(sizeof lr_controller_types / sizeof lr_controller_types[0])},
-    {NULL, 0u},
-};
+static struct retro_controller_info lr_controller_info[LR_PLAYER_LIMIT + 1u];
 
 #define LR_PAD_DESCRIPTORS(port_)                                                             \
     {port_, RETRO_DEVICE_JOYPAD, 0u, RETRO_DEVICE_ID_JOYPAD_B, "Cross"},                     \
@@ -597,12 +652,71 @@ static struct retro_controller_info lr_controller_info[] = {
         {port_, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, \
          "Right Stick Y"}
 
-static struct retro_input_descriptor lr_input_descriptors[] = {
+static const struct retro_input_descriptor lr_pad_descriptor_template[] = {
     LR_PAD_DESCRIPTORS(0u),
-    LR_PAD_DESCRIPTORS(1u),
-    {0u, 0u, 0u, 0u, NULL},
 };
+static struct retro_input_descriptor
+    lr_input_descriptors[LR_PLAYER_LIMIT *
+                             (sizeof lr_pad_descriptor_template / sizeof lr_pad_descriptor_template[0]) +
+                         1u];
 #undef LR_PAD_DESCRIPTORS
+
+static void lr_publish_input_topology(void)
+{
+    const unsigned per_player =
+        (unsigned)(sizeof lr_pad_descriptor_template / sizeof lr_pad_descriptor_template[0]);
+    unsigned p0_players = lr_multitap_enabled[0] != 0u ? 4u : 1u;
+    lr_active_player_count = p0_players + (lr_multitap_enabled[1] != 0u ? 4u : 1u);
+
+    for (unsigned player = 0u; player < LR_PLAYER_LIMIT; player++) {
+        if (player < lr_active_player_count) {
+            lr_controller_info[player].types = lr_controller_types;
+            lr_controller_info[player].num_types =
+                (unsigned)(sizeof lr_controller_types / sizeof lr_controller_types[0]);
+        } else {
+            lr_controller_info[player].types = NULL;
+            lr_controller_info[player].num_types = 0u;
+        }
+    }
+    lr_controller_info[lr_active_player_count].types = NULL;
+    lr_controller_info[lr_active_player_count].num_types = 0u;
+
+    for (unsigned player = 0u; player < lr_active_player_count; player++) {
+        for (unsigned item = 0u; item < per_player; item++) {
+            struct retro_input_descriptor *descriptor =
+                &lr_input_descriptors[player * per_player + item];
+            *descriptor = lr_pad_descriptor_template[item];
+            descriptor->port = player;
+        }
+    }
+    memset(&lr_input_descriptors[lr_active_player_count * per_player], 0,
+           sizeof lr_input_descriptors[0]);
+
+    if (env_cb != NULL) {
+        (void)env_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, lr_controller_info);
+        (void)env_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, lr_input_descriptors);
+    }
+}
+
+static int lr_player_endpoint(unsigned player, unsigned *physical_port, unsigned *socket)
+{
+    unsigned port0_players = lr_multitap_enabled[0] != 0u ? 4u : 1u;
+    if (physical_port == NULL || socket == NULL || player >= lr_active_player_count) {
+        return 0;
+    }
+    if (player < port0_players) {
+        *physical_port = 0u;
+        *socket = player;
+        return 1;
+    }
+    player -= port0_players;
+    if (player >= (lr_multitap_enabled[1] != 0u ? 4u : 1u)) {
+        return 0;
+    }
+    *physical_port = 1u;
+    *socket = player;
+    return 1;
+}
 
 /* The allocator the adapter hands the core: the C library's malloc and free. */
 static void *lr_alloc(void *user, size_t size)
@@ -646,20 +760,29 @@ static void lr_acquire_rumble(void)
     }
 }
 
-static void lr_card2_flush(void)
+static void lr_cards_flush(void)
 {
-    schway_span card;
-    uint64_t generation;
-    if (inst == NULL || lr_card2_path[0] == '\0' ||
-        schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &generation) != SCHWAY_STATUS_OK ||
-        generation == lr_card2_saved_generation ||
-        schway_get_memory(inst, SCHWAY_MEMORY_CARD2, &card) != SCHWAY_STATUS_OK ||
-        card.size != SCHWAY_MEMCARD_SIZE) {
-        return;
-    }
-    if (schway_host_card_save_atomic(lr_card2_path, card.data, card.size) ==
-        SCHWAY_HOST_CARD_OK) {
-        lr_card2_saved_generation = generation;
+    if (inst == NULL) return;
+    for (unsigned endpoint = 1u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
+        uint32_t port = endpoint / 4u + 1u;
+        uint32_t socket = endpoint % 4u + 1u;
+        schway_span card;
+        uint64_t generation;
+        if (lr_card_paths[endpoint][0] == '\0' ||
+            schway_memcard_socket_generation(inst, port, socket, &generation) !=
+                SCHWAY_STATUS_OK ||
+            generation == lr_card_saved_generations[endpoint] ||
+            schway_get_memcard(inst, port, socket, &card) != SCHWAY_STATUS_OK ||
+            card.size != SCHWAY_MEMCARD_SIZE) {
+            continue;
+        }
+        if (schway_host_card_save_atomic(lr_card_paths[endpoint], card.data, card.size) ==
+            SCHWAY_HOST_CARD_OK) {
+            lr_card_saved_generations[endpoint] = generation;
+        } else {
+            fprintf(stderr, "schwaystation: memory card port %u socket %c save failed\n",
+                    (unsigned)port, (int)('A' + socket - 1u));
+        }
     }
 }
 
@@ -725,15 +848,16 @@ static void lr_memory_map_register(void)
     }
 }
 
-static int lr_card2_path_for_game(const struct retro_game_info *game,
-                                  char path[LR_CARD_PATH_CAP])
+static int lr_card_paths_for_game(
+    const struct retro_game_info *game,
+    char paths[LR_CARD_ENDPOINT_COUNT][LR_CARD_PATH_CAP])
 {
     const char *save_directory = NULL;
     const char *basename;
     const char *extension;
     char content_name[64];
-    char card_one[LR_CARD_PATH_CAP];
     size_t name_size;
+    memset(paths, 0, (size_t)LR_CARD_ENDPOINT_COUNT * LR_CARD_PATH_CAP);
     if (game == NULL || game->path == NULL || env_cb == NULL ||
         !env_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &save_directory) ||
         save_directory == NULL || save_directory[0] == '\0') {
@@ -755,12 +879,21 @@ static int lr_card2_path_for_game(const struct retro_game_info *game,
     }
     memcpy(content_name, basename, name_size);
     content_name[name_size] = '\0';
-    return schway_host_card_paths_for_basename(save_directory, content_name, card_one,
-                                                sizeof card_one, path, LR_CARD_PATH_CAP) ==
-           SCHWAY_HOST_CARD_OK;
+    for (unsigned endpoint = 1u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
+        uint32_t port = endpoint / 4u + 1u;
+        uint32_t socket = endpoint % 4u + 1u;
+        if (schway__host_card_path_for_socket(save_directory, content_name, port, socket,
+                                               paths[endpoint], LR_CARD_PATH_CAP) !=
+            SCHWAY_HOST_CARD_OK) {
+            memset(paths, 0, (size_t)LR_CARD_ENDPOINT_COUNT * LR_CARD_PATH_CAP);
+            return 0;
+        }
+    }
+    return 1;
 }
 
-static void lr_card2_load(const char *path)
+static void lr_card_socket_load(unsigned endpoint, uint32_t port, uint32_t socket,
+                                const char *path)
 {
     uint8_t *bytes;
     schway_host_card_status import_status;
@@ -775,7 +908,7 @@ static void lr_card2_load(const char *path)
     }
     import_status = schway_host_card_import_file(path, bytes, SCHWAY_MEMCARD_SIZE, NULL);
     if (import_status == SCHWAY_HOST_CARD_OK) {
-        if (schway_load_memcard(inst, SCHWAY_CARD_SLOT_2, bytes, SCHWAY_MEMCARD_SIZE) !=
+        if (schway_load_memcard_socket(inst, port, socket, bytes, SCHWAY_MEMCARD_SIZE) !=
             SCHWAY_STATUS_OK) {
             free(bytes);
             return;
@@ -786,30 +919,40 @@ static void lr_card2_load(const char *path)
     }
     free(bytes);
     path_size = strlen(path);
-    if (path_size >= sizeof lr_card2_path ||
-        schway_memcard_generation(inst, SCHWAY_CARD_SLOT_2, &generation) != SCHWAY_STATUS_OK) {
+    if (path_size >= sizeof lr_card_paths[endpoint] ||
+        schway_memcard_socket_generation(inst, port, socket, &generation) != SCHWAY_STATUS_OK) {
         return;
     }
-    memcpy(lr_card2_path, path, path_size + 1u);
-    lr_card2_saved_generation = generation;
+    memcpy(lr_card_paths[endpoint], path, path_size + 1u);
+    lr_card_saved_generations[endpoint] = generation;
+}
+
+static void lr_card_sockets_load(const char *const paths[LR_CARD_ENDPOINT_COUNT])
+{
+    for (unsigned endpoint = 1u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
+        if (paths[endpoint][0] != '\0') {
+            lr_card_socket_load(endpoint, endpoint / 4u + 1u, endpoint % 4u + 1u,
+                                paths[endpoint]);
+        }
+    }
 }
 
 /* Destroys the instance and frees the frame buffer. */
 static void lr_unload(void)
 {
-    lr_card2_flush();
+    lr_cards_flush();
     lr_memory_map_clear();
     if (inst != NULL) {
         lr_clear_rumble();
     }
-    for (unsigned port = 0u; port < 2u; port++) {
-        lr_mode_pulse_pending[port] =
-            (lr_controller_devices[port] & RETRO_DEVICE_MASK) == RETRO_DEVICE_ANALOG &&
+    for (unsigned player = 0u; player < LR_PLAYER_LIMIT; player++) {
+        lr_mode_pulse_pending[player] =
+            lr_controller_devices[player] == RETRO_DEVICE_ANALOG &&
                     lr_analog_mode == 0u
                 ? 1u
                 : 0u;
-        lr_toggle_frames[port] = 0u;
-        lr_toggle_latched[port] = 0u;
+        lr_toggle_frames[player] = 0u;
+        lr_toggle_latched[player] = 0u;
     }
     schway_destroy(inst);
     inst = NULL;
@@ -820,8 +963,8 @@ static void lr_unload(void)
     samples = NULL;
     geometry_width = 0u;
     geometry_height = 0u;
-    lr_card2_path[0] = '\0';
-    lr_card2_saved_generation = 0u;
+    memset(lr_card_paths, 0, sizeof lr_card_paths);
+    memset(lr_card_saved_generations, 0, sizeof lr_card_saved_generations);
     memset(&info, 0, sizeof info);
 }
 
@@ -942,13 +1085,36 @@ static int lr_is_exe_path(const char *path)
            (extension[5] == 'e' || extension[5] == 'E');
 }
 
+static uint8_t lr_axis_to_byte(int16_t axis)
+{
+    int32_t value = axis;
+    return value < 0 ? (uint8_t)(((value + 32768) * 128) / 32768)
+                     : (uint8_t)(128 + (value * 127) / 32767);
+}
+
+static uint8_t lr_pressure_from_axis(int16_t axis, int inverted)
+{
+    int32_t value = axis;
+    if (inverted != 0) {
+        value = -value;
+    }
+    if (value <= 0) {
+        return 0u;
+    }
+    if (value > 32767) {
+        return UINT8_MAX;
+    }
+    return (uint8_t)((value * 255) / 32767);
+}
+
 /* RetroPad positions map to the active-low serial word used by the PSX pad. */
 static void lr_queue_input(void)
 {
-    static const struct {
+    struct lr_button_mapping {
         unsigned id;
         uint16_t mask;
-    } mapping[] = {
+    };
+    static const struct lr_button_mapping pad_mapping[] = {
         {RETRO_DEVICE_ID_JOYPAD_SELECT, 0x0001u}, {RETRO_DEVICE_ID_JOYPAD_L3, 0x0002u},
         {RETRO_DEVICE_ID_JOYPAD_R3, 0x0004u},     {RETRO_DEVICE_ID_JOYPAD_START, 0x0008u},
         {RETRO_DEVICE_ID_JOYPAD_UP, 0x0010u},     {RETRO_DEVICE_ID_JOYPAD_RIGHT, 0x0020u},
@@ -958,6 +1124,12 @@ static void lr_queue_input(void)
         {RETRO_DEVICE_ID_JOYPAD_X, 0x1000u},      {RETRO_DEVICE_ID_JOYPAD_A, 0x2000u},
         {RETRO_DEVICE_ID_JOYPAD_B, 0x4000u},      {RETRO_DEVICE_ID_JOYPAD_Y, 0x8000u},
     };
+    static const struct lr_button_mapping special_mapping[] = {
+        {RETRO_DEVICE_ID_JOYPAD_START, 0x0008u}, {RETRO_DEVICE_ID_JOYPAD_UP, 0x0010u},
+        {RETRO_DEVICE_ID_JOYPAD_RIGHT, 0x0020u}, {RETRO_DEVICE_ID_JOYPAD_DOWN, 0x0040u},
+        {RETRO_DEVICE_ID_JOYPAD_LEFT, 0x0080u}, {RETRO_DEVICE_ID_JOYPAD_R, 0x0800u},
+        {RETRO_DEVICE_ID_JOYPAD_B, 0x4000u}, {RETRO_DEVICE_ID_JOYPAD_A, 0x2000u},
+    };
     schway_input snapshot;
 
     memset(&snapshot, 0, sizeof snapshot);
@@ -966,74 +1138,145 @@ static void lr_queue_input(void)
         for (unsigned axis = 0u; axis < 4u; axis++) {
             snapshot.axes[port][axis] = 128u;
         }
+        snapshot.multitap[port] = lr_multitap_enabled[port];
     }
-    for (unsigned port = 0u; port < 2u; port++) {
-        unsigned device = lr_controller_devices[port] & RETRO_DEVICE_MASK;
+    for (unsigned player = 0u; player < lr_active_player_count; player++) {
+        unsigned port, socket;
+        if (!lr_player_endpoint(player, &port, &socket)) {
+            continue;
+        }
+        schway_controller_input *controller = &snapshot.controllers[port][socket];
+        unsigned device = lr_controller_devices[player];
         uint32_t toggle_buttons = 0u;
         uint8_t toggle_pulse = 0u;
 
-        if (device == RETRO_DEVICE_ANALOG) {
-            snapshot.device[port] = SCHWAY_INPUT_DEVICE_DUALSHOCK;
-        } else if (device == RETRO_DEVICE_JOYPAD) {
-            snapshot.device[port] = SCHWAY_INPUT_DEVICE_DIGITAL;
-        } else {
-            snapshot.device[port] = SCHWAY_INPUT_DEVICE_NONE;
+        for (unsigned axis = 0u; axis < 4u; axis++) {
+            controller->axes[axis] = 128u;
         }
-        if (snapshot.device[port] != SCHWAY_INPUT_DEVICE_NONE) {
-            for (size_t i = 0u; i < sizeof mapping / sizeof mapping[0]; i++) {
+        if (device == RETRO_DEVICE_ANALOG) {
+            controller->device = SCHWAY_INPUT_DEVICE_DUALSHOCK;
+        } else if (device == RETRO_DEVICE_JOYPAD) {
+            controller->device = SCHWAY_INPUT_DEVICE_DIGITAL;
+        } else if (device == RETRO_DEVICE_MOUSE) {
+            controller->device = SCHWAY_INPUT_DEVICE_MOUSE;
+        } else if (device == LR_DEVICE_FLIGHT) {
+            controller->device = SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT;
+        } else if (device == LR_DEVICE_NEGCON) {
+            controller->device = SCHWAY_INPUT_DEVICE_NEGCON;
+        } else if (device == LR_DEVICE_JOGCON) {
+            controller->device = SCHWAY_INPUT_DEVICE_JOGCON;
+        } else {
+            controller->device = SCHWAY_INPUT_DEVICE_NONE;
+        }
+
+        if (controller->device == SCHWAY_INPUT_DEVICE_MOUSE) {
+            if (input_state_cb != NULL) {
+                controller->mouse_dx = input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
+                                                       RETRO_DEVICE_ID_MOUSE_X);
+                controller->mouse_dy = input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
+                                                       RETRO_DEVICE_ID_MOUSE_Y);
+                if (input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
+                                   RETRO_DEVICE_ID_MOUSE_LEFT) != 0) {
+                    controller->buttons |= 0x0800u;
+                }
+                if (input_state_cb(player, RETRO_DEVICE_MOUSE, 0u,
+                                   RETRO_DEVICE_ID_MOUSE_RIGHT) != 0) {
+                    controller->buttons |= 0x0400u;
+                }
+            }
+        } else if (controller->device != SCHWAY_INPUT_DEVICE_NONE) {
+            const struct lr_button_mapping *mapping = pad_mapping;
+            size_t mapping_count = sizeof pad_mapping / sizeof pad_mapping[0];
+            if (controller->device == SCHWAY_INPUT_DEVICE_NEGCON ||
+                controller->device == SCHWAY_INPUT_DEVICE_JOGCON) {
+                mapping = special_mapping;
+                mapping_count = sizeof special_mapping / sizeof special_mapping[0];
+            }
+            for (size_t i = 0u; i < mapping_count; i++) {
                 if (input_state_cb != NULL &&
-                    input_state_cb(port, RETRO_DEVICE_JOYPAD, 0u, mapping[i].id) != 0) {
-                    snapshot.buttons[port] |= mapping[i].mask;
+                    input_state_cb(player, RETRO_DEVICE_JOYPAD, 0u, mapping[i].id) != 0) {
+                    controller->buttons |= mapping[i].mask;
                     if (mapping[i].id < 32u) {
                         toggle_buttons |= 1u << mapping[i].id;
                     }
                 }
             }
-        }
-        if (snapshot.device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK && input_state_cb != NULL) {
-            int16_t left_x = input_state_cb(port, RETRO_DEVICE_ANALOG,
-                                            RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                                            RETRO_DEVICE_ID_ANALOG_X);
-            int16_t left_y = input_state_cb(port, RETRO_DEVICE_ANALOG,
-                                            RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                                            RETRO_DEVICE_ID_ANALOG_Y);
-            int16_t right_x = input_state_cb(port, RETRO_DEVICE_ANALOG,
-                                             RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                                             RETRO_DEVICE_ID_ANALOG_X);
-            int16_t right_y = input_state_cb(port, RETRO_DEVICE_ANALOG,
-                                             RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                                             RETRO_DEVICE_ID_ANALOG_Y);
-            int32_t axes[4] = {right_x, right_y, left_x, left_y};
-            for (unsigned axis = 0u; axis < 4u; axis++) {
-                int32_t value = axes[axis];
-                snapshot.axes[port][axis] = value < 0
-                                                ? (uint8_t)(((value + 32768) * 128) / 32768)
-                                                : (uint8_t)(128 + (value * 127) / 32767);
+            if ((controller->device == SCHWAY_INPUT_DEVICE_DUALSHOCK ||
+                 controller->device == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) &&
+                input_state_cb != NULL) {
+                int16_t left_x = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                                RETRO_DEVICE_ID_ANALOG_X);
+                int16_t left_y = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                                RETRO_DEVICE_ID_ANALOG_Y);
+                int16_t right_x = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                 RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                                 RETRO_DEVICE_ID_ANALOG_X);
+                int16_t right_y = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                 RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                                 RETRO_DEVICE_ID_ANALOG_Y);
+                int16_t axes[4] = {right_x, right_y, left_x, left_y};
+                for (unsigned axis = 0u; axis < 4u; axis++) {
+                    controller->axes[axis] = lr_axis_to_byte(axes[axis]);
+                }
+            } else if (controller->device == SCHWAY_INPUT_DEVICE_NEGCON &&
+                       input_state_cb != NULL) {
+                int16_t twist = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                               RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                               RETRO_DEVICE_ID_ANALOG_X);
+                int16_t pressure_i = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                    RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                                    RETRO_DEVICE_ID_ANALOG_Y);
+                int16_t pressure_ii = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                     RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                                                     RETRO_DEVICE_ID_ANALOG_X);
+                controller->negcon_twist = lr_axis_to_byte(twist);
+                controller->negcon_i = lr_pressure_from_axis(pressure_i, 1);
+                controller->negcon_ii = lr_pressure_from_axis(pressure_ii, 0);
+                controller->negcon_l = input_state_cb(player, RETRO_DEVICE_JOYPAD, 0u,
+                                                       RETRO_DEVICE_ID_JOYPAD_L2) != 0
+                                           ? UINT8_MAX
+                                           : 0u;
+            } else if (controller->device == SCHWAY_INPUT_DEVICE_JOGCON &&
+                       input_state_cb != NULL) {
+                int16_t dial_value = input_state_cb(player, RETRO_DEVICE_ANALOG,
+                                                    RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                                                    RETRO_DEVICE_ID_ANALOG_X);
+                controller->jogcon_dial = (uint16_t)((uint16_t)dial_value & UINT16_C(0xFFFE));
+                controller->jogcon_flags = dial_value < 0 ? 1u : (dial_value > 0 ? 2u : 0u);
             }
         }
-        if (snapshot.device[port] == SCHWAY_INPUT_DEVICE_DUALSHOCK) {
-            if (lr_mode_pulse_pending[port] != 0u) {
+
+        if (controller->device == SCHWAY_INPUT_DEVICE_DUALSHOCK) {
+            if (lr_mode_pulse_pending[player] != 0u) {
                 toggle_pulse = 1u;
-                lr_mode_pulse_pending[port] = 0u;
+                lr_mode_pulse_pending[player] = 0u;
             }
             if (lr_analog_toggle_enabled != 0u &&
                 (toggle_buttons & LR_ANALOG_TOGGLE_BUTTONS) == LR_ANALOG_TOGGLE_BUTTONS) {
-                if (lr_toggle_frames[port] < LR_ANALOG_TOGGLE_FRAMES) {
-                    lr_toggle_frames[port]++;
+                if (lr_toggle_frames[player] < LR_ANALOG_TOGGLE_FRAMES) {
+                    lr_toggle_frames[player]++;
                 }
-                if (lr_toggle_frames[port] == LR_ANALOG_TOGGLE_FRAMES &&
-                    lr_toggle_latched[port] == 0u) {
+                if (lr_toggle_frames[player] == LR_ANALOG_TOGGLE_FRAMES &&
+                    lr_toggle_latched[player] == 0u) {
                     toggle_pulse = 1u;
-                    lr_toggle_latched[port] = 1u;
+                    lr_toggle_latched[player] = 1u;
                 }
             } else {
-                lr_toggle_frames[port] = 0u;
-                lr_toggle_latched[port] = 0u;
+                lr_toggle_frames[player] = 0u;
+                lr_toggle_latched[player] = 0u;
             }
-            snapshot.analog_button[port] = toggle_pulse;
+            controller->analog_button = toggle_pulse;
         } else {
-            lr_toggle_frames[port] = 0u;
-            lr_toggle_latched[port] = 0u;
+            lr_toggle_frames[player] = 0u;
+            lr_toggle_latched[player] = 0u;
+        }
+        if (lr_multitap_enabled[port] == 0u) {
+            snapshot.device[port] = controller->device;
+            snapshot.buttons[port] = controller->buttons;
+            memcpy(snapshot.axes[port], controller->axes, sizeof snapshot.axes[port]);
+            snapshot.analog_button[port] = controller->analog_button;
         }
     }
     (void)schway_set_input(inst, &snapshot);
@@ -1138,8 +1381,8 @@ static void lr_refresh_input_options(void)
         }
         if (mode != lr_analog_mode) {
             lr_analog_mode = mode;
-            for (unsigned port = 0u; port < 2u; port++) {
-                lr_mode_pulse_pending[port] = 1u;
+            for (unsigned player = 0u; player < LR_PLAYER_LIMIT; player++) {
+                lr_mode_pulse_pending[player] = 1u;
             }
         }
     }
@@ -1154,6 +1397,24 @@ static void lr_refresh_input_options(void)
             memset(lr_toggle_latched, 0, sizeof lr_toggle_latched);
         }
     }
+}
+
+/* Multitap topology is intentionally sampled only while content is loading;
+   a running game keeps stable frontend-player to hardware-endpoint identities. */
+static uint8_t lr_read_multitap_option(const char *key)
+{
+    struct retro_variable var = {key, NULL};
+    if (env_cb == NULL || !env_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) || var.value == NULL) {
+        return 0u;
+    }
+    return strcmp(var.value, "enabled") == 0 ? 1u : 0u;
+}
+
+static void lr_apply_multitap_options(void)
+{
+    lr_multitap_enabled[0] = lr_read_multitap_option(LR_MULTITAP_PORT1_KEY);
+    lr_multitap_enabled[1] = lr_read_multitap_option(LR_MULTITAP_PORT2_KEY);
+    lr_publish_input_topology();
 }
 
 /* BIOS values are relative to the frontend's system directory. Reject
@@ -1264,8 +1525,7 @@ void retro_set_environment(retro_environment_t cb)
     } else {
         (void)cb(RETRO_ENVIRONMENT_SET_VARIABLES, lr_variables);
     }
-    (void)cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, lr_controller_info);
-    (void)cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, lr_input_descriptors);
+    lr_publish_input_topology();
 }
 
 void retro_set_video_refresh(retro_video_refresh_t cb)
@@ -1311,10 +1571,13 @@ void retro_deinit(void)
     }
     lr_unload();
     memset(&lr_rumble, 0, sizeof lr_rumble);
-    lr_controller_devices[0] = RETRO_DEVICE_ANALOG;
-    lr_controller_devices[1] = RETRO_DEVICE_ANALOG;
+    for (unsigned player = 0u; player < LR_PLAYER_LIMIT; player++) {
+        lr_controller_devices[player] = RETRO_DEVICE_ANALOG;
+    }
     lr_analog_mode = 1u;
     lr_analog_toggle_enabled = 1u;
+    memset(lr_multitap_enabled, 0, sizeof lr_multitap_enabled);
+    lr_active_player_count = 2u;
     memset(lr_mode_pulse_pending, 0, sizeof lr_mode_pulse_pending);
     memset(lr_toggle_latched, 0, sizeof lr_toggle_latched);
     memset(lr_toggle_frames, 0, sizeof lr_toggle_frames);
@@ -1322,6 +1585,7 @@ void retro_deinit(void)
     lr_disc_initial_index = 0u;
     lr_disc_initial_path[0] = '\0';
     env_cb = NULL;
+    lr_publish_input_topology();
     video_cb = NULL;
     audio_cb = NULL;
     audio_batch_cb = NULL;
@@ -1376,25 +1640,27 @@ void retro_get_system_av_info(struct retro_system_av_info *av)
 
 void retro_set_controller_port_device(unsigned port, unsigned device)
 {
-    unsigned base = device & RETRO_DEVICE_MASK;
-    if (port >= 2u || (base != RETRO_DEVICE_NONE && base != RETRO_DEVICE_JOYPAD &&
-                       base != RETRO_DEVICE_ANALOG)) {
+    if (port >= lr_active_player_count ||
+        (device != RETRO_DEVICE_NONE && device != RETRO_DEVICE_JOYPAD &&
+         device != RETRO_DEVICE_ANALOG && device != RETRO_DEVICE_MOUSE &&
+         device != LR_DEVICE_FLIGHT && device != LR_DEVICE_NEGCON &&
+         device != LR_DEVICE_JOGCON)) {
         return;
     }
     lr_controller_devices[port] = device;
     lr_toggle_frames[port] = 0u;
     lr_toggle_latched[port] = 0u;
     lr_mode_pulse_pending[port] =
-        base == RETRO_DEVICE_ANALOG && lr_analog_mode == 0u ? 1u : 0u;
+        device == RETRO_DEVICE_ANALOG && lr_analog_mode == 0u ? 1u : 0u;
 }
 
 /* L8939: a power cycle, the only reset this release has. */
 void retro_reset(void)
 {
     lr_clear_rumble();
-    for (unsigned port = 0u; port < 2u; port++) {
+    for (unsigned port = 0u; port < LR_PLAYER_LIMIT; port++) {
         lr_mode_pulse_pending[port] =
-            (lr_controller_devices[port] & RETRO_DEVICE_MASK) == RETRO_DEVICE_ANALOG &&
+            lr_controller_devices[port] == RETRO_DEVICE_ANALOG &&
                     lr_analog_mode == 0u
                 ? 1u
                 : 0u;
@@ -1534,8 +1800,8 @@ bool retro_load_game(const struct retro_game_info *game)
     schway_disc_image *prepared_discs[LR_DISC_LIMIT] = {NULL};
     unsigned prepared_count = 0u;
     unsigned initial_disc_index = 0u;
-    char card2_path[LR_CARD_PATH_CAP];
-    int have_card2_path = 0;
+    char card_paths[LR_CARD_ENDPOINT_COUNT][LR_CARD_PATH_CAP];
+    int have_card_paths = 0;
     int disc_mode = 0;
     int fast_boot = lr_option_fast_boot();
     int disc_boot_exe_eligible = 0;
@@ -1543,7 +1809,7 @@ bool retro_load_game(const struct retro_game_info *game)
     uint32_t disc_licence_area = SCHWAY_LICENCE_NONE;
     char identity_serial[16] = "";
 
-    card2_path[0] = '\0';
+    memset(card_paths, 0, sizeof card_paths);
 
     lr_acquire_rumble();
     lr_refresh_input_options();
@@ -1561,7 +1827,7 @@ bool retro_load_game(const struct retro_game_info *game)
                 return false;
             }
             exe_licence_area = exe_info.licence_area;
-            have_card2_path = lr_card2_path_for_game(game, card2_path);
+            have_card_paths = lr_card_paths_for_game(game, card_paths);
         } else if (lr_disc_path_supported(game->path)) {
             const char *bios_name = lr_option_bios();
             if (strcmp(bios_name, "none") == 0) {
@@ -1574,7 +1840,7 @@ bool retro_load_game(const struct retro_game_info *game)
                 lr_disc_close_set(prepared_discs, prepared_count);
                 return false;
             }
-            have_card2_path = lr_card2_path_for_game(game, card2_path);
+            have_card_paths = lr_card_paths_for_game(game, card_paths);
             disc_mode = 1;
             if (lr_disc_initial_valid != 0 &&
                 lr_disc_initial_index < prepared_count &&
@@ -1690,9 +1956,14 @@ bool retro_load_game(const struct retro_game_info *game)
         }
     }
     lr_disc_close_set(prepared_discs, prepared_count);
-    if (have_card2_path) {
-        lr_card2_load(card2_path);
+    if (have_card_paths) {
+        const char *card_path_views[LR_CARD_ENDPOINT_COUNT];
+        for (unsigned endpoint = 0u; endpoint < LR_CARD_ENDPOINT_COUNT; endpoint++) {
+            card_path_views[endpoint] = card_paths[endpoint];
+        }
+        lr_card_sockets_load(card_path_views);
     }
+    lr_apply_multitap_options();
     lr_memory_map_register();
     return true;
 }
@@ -1767,7 +2038,228 @@ schway__libretro_test_card2_data(size_t *size)
 
 SCHWAYSTATION_TEST_EXPORT const char *RETRO_CALLCONV schway__libretro_test_card2_path(void)
 {
-    return lr_card2_path[0] != '\0' ? lr_card2_path : NULL;
+    return lr_card_paths[4u][0] != '\0' ? lr_card_paths[4u] : NULL;
+}
+
+SCHWAYSTATION_TEST_EXPORT const uint8_t *RETRO_CALLCONV
+schway__libretro_test_card_socket(unsigned port, unsigned socket, size_t *size,
+                                  uint64_t *generation, uint64_t *saved_generation,
+                                  const char **path)
+{
+    schway_span card;
+    uint64_t current_generation;
+    unsigned endpoint;
+    if (size != NULL) *size = 0u;
+    if (generation != NULL) *generation = 0u;
+    if (saved_generation != NULL) *saved_generation = 0u;
+    if (path != NULL) *path = NULL;
+    if (inst == NULL || schway_get_memcard(inst, port, socket, &card) != SCHWAY_STATUS_OK ||
+        card.size != SCHWAY_MEMCARD_SIZE ||
+        schway_memcard_socket_generation(inst, port, socket, &current_generation) !=
+            SCHWAY_STATUS_OK) {
+        return NULL;
+    }
+    if (size != NULL) *size = card.size;
+    if (generation != NULL) *generation = current_generation;
+    endpoint = (port - 1u) * 4u + socket - 1u;
+    if (saved_generation != NULL) *saved_generation = lr_card_saved_generations[endpoint];
+    if (path != NULL && lr_card_paths[endpoint][0] != '\0') *path = lr_card_paths[endpoint];
+    return (const uint8_t *)card.data;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_write_card_socket(unsigned port, unsigned socket, uint8_t value)
+{
+    uint32_t endpoint;
+    schway_span card;
+    if (inst == NULL || port < 1u || port > 2u || socket < 1u || socket > 4u ||
+        schway_get_memcard(inst, port, socket, &card) != SCHWAY_STATUS_OK ||
+        card.size != SCHWAY_MEMCARD_SIZE) {
+        return 0;
+    }
+    endpoint = (port - 1u) * 4u + socket - 1u;
+    if (inst->card.slot[endpoint].generation == UINT64_MAX) return 0;
+    inst->card.slot[endpoint].bytes[128u] = value;
+    inst->card.slot[endpoint].generation++;
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT void RETRO_CALLCONV schway__libretro_test_flush_cards(void)
+{
+    lr_cards_flush();
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_lifecycle(unsigned endpoint, const char **path,
+                                     uint64_t *saved_generation)
+{
+    if (path != NULL) {
+        *path = endpoint < LR_CARD_ENDPOINT_COUNT && lr_card_paths[endpoint][0] != '\0'
+                    ? lr_card_paths[endpoint]
+                    : NULL;
+    }
+    if (saved_generation != NULL) {
+        *saved_generation = endpoint < LR_CARD_ENDPOINT_COUNT
+                                ? lr_card_saved_generations[endpoint]
+                                : 0u;
+    }
+    return endpoint < LR_CARD_ENDPOINT_COUNT;
+}
+
+static int lr_test_write(uint32_t address, uint32_t width, uint32_t value)
+{
+    uint32_t cycles = 0u;
+    return inst != NULL && schway__bus_write(inst, address, width, value, &cycles) == 0u;
+}
+
+static int lr_test_read(uint32_t address, uint32_t width, uint32_t *value)
+{
+    uint32_t cycles = 0u;
+    return inst != NULL && schway__bus_read(inst, address, width, value, &cycles) == 0u;
+}
+
+static void lr_test_advance(uint64_t tick)
+{
+    inst->ticks = tick;
+    schway__sched_sync(inst);
+    schway__sched_run(inst);
+    schway__spu_catch_up(inst, inst->ticks);
+}
+
+static int lr_test_exchange(uint8_t sent, unsigned port, int ack, uint8_t *received)
+{
+    uint32_t value = 0u;
+    uint64_t start = inst->ticks;
+    uint32_t port_bit = port == 0u ? 0u : 0x2000u;
+    if (!lr_test_write(0x1F801040u, 1u, sent)) {
+        return 0;
+    }
+    lr_test_advance(start + 1088u);
+    if (!lr_test_read(0x1F801040u, 1u, &value)) {
+        return 0;
+    }
+    *received = (uint8_t)value;
+    if (ack) {
+        lr_test_advance(start + 1426u);
+        if (!lr_test_write(0x1F801070u, 4u, 0u) ||
+            !lr_test_write(0x1F80104Au, 2u, 0x1013u | port_bit)) {
+            return 0;
+        }
+        lr_test_advance(start + 1494u);
+        return lr_test_write(0x1F80104Au, 2u, 0x1003u | port_bit);
+    }
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_read_begin(unsigned port)
+{
+    uint8_t received;
+    uint32_t port_bit = port == 0u ? 0u : 0x2000u;
+    if (inst == NULL || port >= 2u ||
+        !lr_test_write(0x1F801048u, 2u, 0x000Cu) ||
+        !lr_test_write(0x1F80104Eu, 2u, 0x0088u) ||
+        !lr_test_write(0x1F80104Au, 2u, 0x1003u | port_bit) ||
+        !lr_test_exchange(0x81u, port, 1, &received) || received != 0xFFu ||
+        !lr_test_exchange(0x52u, port, 1, &received) || received != 0x08u) {
+        return 0;
+    }
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_card_read_byte(unsigned port, uint8_t sent, int ack,
+                                     uint8_t *received)
+{
+    return inst != NULL && port < 2u && received != NULL &&
+           lr_test_exchange(sent, port, ack, received);
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_poll_endpoint(unsigned port, unsigned socket, uint16_t *buttons)
+{
+    uint8_t address_reply, id_reply, marker_reply, low_reply, high_reply;
+    uint32_t port_bit = port == 0u ? 0u : 0x2000u;
+    if (inst == NULL || buttons == NULL || port >= 2u || socket >= 4u ||
+        (socket != 0u && inst->pad.multitap[port] == 0u)) {
+        return 0;
+    }
+    if (!lr_test_write(0x1F801048u, 2u, 0x000Cu) ||
+        !lr_test_write(0x1F80104Eu, 2u, 0x0088u) ||
+        !lr_test_write(0x1F80104Au, 2u, 0x1003u | port_bit)) {
+        return 0;
+    }
+    if (!lr_test_exchange((uint8_t)(socket + 1u), port, 1, &address_reply)) {
+        return 0;
+    }
+    if (!lr_test_exchange(0x42u, port, 1, &id_reply) ||
+        !lr_test_exchange(0u, port, 1, &marker_reply) ||
+        !lr_test_exchange(0u, port, 1, &low_reply) ||
+        !lr_test_exchange(0u, port, 0, &high_reply)) {
+        return 0;
+    }
+    if (address_reply != 0xFFu || (id_reply != 0x41u && id_reply != 0x73u) ||
+        marker_reply != 0x5Au) {
+        return 0;
+    }
+    *buttons = (uint16_t)((uint16_t)low_reply | (uint16_t)((uint16_t)high_reply << 8));
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
+                                 size_t capacity, size_t *written)
+{
+    uint8_t received;
+    unsigned endpoint;
+    unsigned payload_size;
+    size_t count = 0u;
+    if (written != NULL) {
+        *written = 0u;
+    }
+    if (inst == NULL || reply == NULL || written == NULL || port >= 2u || socket >= 4u ||
+        (socket != 0u && inst->pad.multitap[port] == 0u)) {
+        return 0;
+    }
+    endpoint = socket == 0u ? port : (port == 0u ? socket + 1u : socket + 4u);
+    switch (inst->pad.device[endpoint]) {
+    case SCHWAY_INPUT_DEVICE_MOUSE:
+        payload_size = 4u;
+        break;
+    case SCHWAY_INPUT_DEVICE_NEGCON:
+    case SCHWAY_INPUT_DEVICE_JOGCON:
+    case SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT:
+        payload_size = 6u;
+        break;
+    default:
+        return 0;
+    }
+    if (capacity < 3u + payload_size ||
+        !lr_test_write(0x1F801048u, 2u, 0x000Cu) ||
+        !lr_test_write(0x1F80104Eu, 2u, 0x0088u) ||
+        !lr_test_write(0x1F80104Au, 2u, 0x1003u | (port == 0u ? 0u : 0x2000u))) {
+        return 0;
+    }
+    if (!lr_test_exchange((uint8_t)(socket + 1u), port, 1, &received)) {
+        return 0;
+    }
+    reply[count++] = received;
+    if (!lr_test_exchange(0x42u, port, 1, &received)) {
+        return 0;
+    }
+    reply[count++] = received;
+    if (!lr_test_exchange(0u, port, 1, &received)) {
+        return 0;
+    }
+    reply[count++] = received;
+    for (unsigned i = 0u; i < payload_size; i++) {
+        if (!lr_test_exchange(0u, port, i + 1u < payload_size, &received)) {
+            return 0;
+        }
+        reply[count++] = received;
+    }
+    *written = count;
+    return 1;
 }
 #undef SCHWAYSTATION_TEST_EXPORT
 #endif

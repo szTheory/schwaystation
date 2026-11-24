@@ -22,8 +22,8 @@
 
 /* Internal version numbers reported by schway_get_versions. */
 #define SCHWAY__ABI_VERSION 1u
-#define SCHWAY__BEHAVIOUR_REVISION 19u
-#define SCHWAY__STATE_FORMAT 19u
+#define SCHWAY__BEHAVIOUR_REVISION 20u
+#define SCHWAY__STATE_FORMAT 20u
 
 /* VRAM is 1024 x 512 halfwords (ARCHITECTURE section 4). */
 #define SCHWAY__VRAM_W 1024u
@@ -280,7 +280,10 @@ _Static_assert(offsetof(schway_input, buttons) == 12, "input.buttons");
 _Static_assert(offsetof(schway_input, axes) == 16, "input.axes");
 _Static_assert(offsetof(schway_input, analog_button) == 24, "input.analog_button");
 _Static_assert(offsetof(schway_input, reserved0) == 26, "input.reserved0");
-_Static_assert(sizeof(schway_input) == 28, "input size");
+_Static_assert(offsetof(schway_input, multitap) == 28, "input.multitap");
+_Static_assert(offsetof(schway_input, controllers) == 36, "input.controllers");
+_Static_assert(sizeof(schway_controller_input) == 24, "controller_input size");
+_Static_assert(sizeof(schway_input) == 228, "input size");
 
 _Static_assert(offsetof(schway_budget, size) == 0, "budget.size");
 _Static_assert(offsetof(schway_budget, flags) == 4, "budget.flags");
@@ -371,7 +374,7 @@ _Static_assert(SCHWAY_TRACE_EXEC == 1 && SCHWAY_TRACE_FAULT == 5 && SCHWAY__DEV_
 #define SCHWAY__PROFILE_SIZE_BOARD 20u /* appended in API v8 */
 #define SCHWAY__INFO_SIZE_FIRST 36u
 #define SCHWAY__RUN_RESULT_SIZE_FIRST 24u /* a literal: appended fields leave it alone */
-#define SCHWAY__INPUT_SIZE_FIRST ((uint32_t)sizeof(schway_input))
+#define SCHWAY__INPUT_SIZE_FIRST 28u
 #define SCHWAY__BUDGET_SIZE_FIRST 16u
 #define SCHWAY__VIDEO_SIZE_FIRST ((uint32_t)(80 + 2 * SCHWAY__P))
 #define SCHWAY__AUDIO_SIZE_FIRST ((uint32_t)(16 + 2 * SCHWAY__P))
@@ -390,7 +393,8 @@ _Static_assert(SCHWAY__PROFILE_SIZE_FLAGS == offsetof(schway_profile, disc_flags
 _Static_assert(SCHWAY__PROFILE_SIZE_DISC_FLAGS == offsetof(schway_profile, board), "profile disc flags size");
 _Static_assert(SCHWAY__PROFILE_SIZE_BOARD == sizeof(schway_profile), "profile board size");
 _Static_assert(SCHWAY__INFO_SIZE_FIRST == sizeof(schway_info), "info first size");
-_Static_assert(SCHWAY__INPUT_SIZE_FIRST == sizeof(schway_input), "input first size");
+_Static_assert(SCHWAY__INPUT_SIZE_FIRST == offsetof(schway_input, multitap),
+               "input first size");
 _Static_assert(SCHWAY__RUN_RESULT_SIZE_FIRST == offsetof(schway_run_result, exit_code),
                "run_result first size");
 _Static_assert(SCHWAY__BUDGET_SIZE_FIRST == sizeof(schway_budget), "budget first size");

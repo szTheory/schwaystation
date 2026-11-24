@@ -59,6 +59,15 @@ struct schway__state_io {
     int disc_mismatch;                /* VALIDATE: host disc identity differs */
     uint32_t cpu_cause;               /* VALIDATE: CAUSE bits carried to the IRQ fields */
     uint32_t irq_stat, irq_mask;      /* VALIDATE: the saved interrupt registers */
+    uint8_t pad_multitap[2];           /* VALIDATE: candidate tap topology */
+    uint8_t tap_tx_mode[2];            /* VALIDATE: candidate tap FSM fields */
+    uint8_t tap_tx_index[2];
+    uint8_t tap_tx_endpoint[2];
+    uint8_t tap_tx_request[2];
+    uint8_t tap_tx_command[2];
+    uint8_t tap_slot_mask[2];
+    uint8_t card_tx_active[2];         /* VALIDATE: candidate SIO/card transaction flags */
+    uint8_t card_tx_endpoint[2];       /* VALIDATE: candidate SIO/card endpoints */
     struct schway__state_field *rec;  /* RECORD: output, or NULL to only count */
     size_t rec_cap;                   /* RECORD: capacity of rec */
     size_t rec_n;                     /* RECORD: fields seen, which may exceed rec_cap */

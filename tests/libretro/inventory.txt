@@ -1,5 +1,6 @@
 # Tests this directory registers: name<TAB>labels, labels sorted and comma-separated, lines sorted in byte order.
 libretro.cards.controls	libretro,portable
+libretro.cards.multitap	libretro,portable
 libretro.cards.persistence	libretro,portable
 libretro.content.boot	libretro,portable
 libretro.content.chd	libretro,portable
@@ -18,6 +19,8 @@ libretro.info.claims.self_test	libretro,portable
 libretro.input.controls	libretro,portable
 libretro.input.descriptors	libretro,portable
 libretro.input.movies	libretro,portable
+libretro.input.multitap	libretro,portable
+libretro.input.special	libretro,portable
 libretro.memory.aliases	libretro,portable
 libretro.memory.boundaries	libretro,portable
 libretro.options.profile	libretro,portable

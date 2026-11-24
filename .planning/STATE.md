@@ -2,21 +2,21 @@
 gsd_state_version: "1.0"
 milestone: v2.0
 milestone_name: The whole library
-current_phase: 14
-current_phase_name: Multitap and special controllers
+current_phase: 15
+current_phase_name: GunCon and Justifier
 current_plan: Not started
 status: planning
-stopped_at: Phase 13 complete, ready to plan Phase 14
-last_updated: "2026-11-23T23:11:21.747Z"
-last_activity: 2026-11-23
-last_activity_desc: "Phase 13 shipped as PR #40"
-state_head: 35d178048bff1e1c33d3348868ba05e6887fc1db
+stopped_at: Phase 14 x86_64 tests-enabled WASI producer confirmed 947969; corrected pin and final hosted run pending
+last_updated: "2026-11-24T16:53:54Z"
+last_activity: 2026-11-24
+last_activity_desc: Phase 14 matched x86_64 tests-enabled WASI producer at 947969; correcting the pin after the earlier arm64 tests-off mismatch
+state_head: 2ab13f4e0d44f1ddb4fd9c31f7ddb2804c19b074
 progress:
   total_phases: 10
-  completed_phases: 7
-  total_plans: 79
-  completed_plans: 79
-  percent: 70
+  completed_phases: 8
+  total_plans: 95
+  completed_plans: 95
+  percent: 80
 ---
 
 # Project State
@@ -26,16 +26,389 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (plan only after Phase 13 ships)
+**Current focus:** Phase 14 — the matching x86_64 tests-enabled WASI producer measures 947,969 bytes; PR #42 needs this pin, Main CI and release before Phase 15
 
 ## Current Position
 
-Phase: 14 — Multitap and special controllers
+Phase: 15 — GunCon and Justifier
 Current Plan: Not started
-Total Plans in Phase: Not yet planned
+Total Plans in Phase: Not planned
 Status: Ready to plan
-Last activity: 2026-11-23 -- Phase 13 shipped as PR #40
-Progress: [███████░░░] 70% (6/10 v2.0 phases released; Phase 13 is verified and PR #40 is awaiting merge/release. Phase 14 planning starts after that release. Phase 7–11 verification digests are stale after later changes and will be reconciled at milestone close.)
+Last activity: 2026-11-24 — the tests-enabled x86_64 WASI producer matched CI at 947,969 bytes; update the bound before final hosted retry
+Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Its final PR head still needs green Main CI and release before Phase 15; Phase 7–11 verification digest reconciliation remains pending.)
+
+### Phase 14 verification closeout (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary session model ID unavailable. Verification elapsed time was not separately isolated.
+Goal-backward verification passed all four roadmap criteria and all 45 plan truths. The 46 declared plan artifacts passed
+existence/substance checks. The path-only link heuristic found 1/30 links; manual C/CMake/data-flow inspection traced the
+cross-file function calls, generated inventory/ledger links and documentation links, with the corresponding full-suite tests
+passing. SIO-01–04 are satisfied. The GSD phase-completion transition updated the requirement statuses, roadmap and state.
+
+`cmake --workflow --preset ci` exited 0 on the initial Phase 14 source head `d7d3cbf`: 705/705 CTest cases passed, all three macOS arm64 packages
+were produced, and the separate CI release checks passed 8/8. The CTest critical path was 115.10s; the release checks took
+3.12s. The slowest cases were `policy.quality_metrics` (71.35s), `libretro.host` (51.50s), `libretro.input.movies` (33.12s),
+`runner.disc.legacy` (30.44s), and `runner.hashes_file` (23.28s). The local quality gate is serial and instrumentation-heavy;
+the prior 44.35s measurement and existing seed `.planning/seeds/SEED-261122-vlf-reduce-quality-gate-test-runtime-without-losing-coverage.md`
+show that a safe speed-up needs isolated harness refactoring. No assertion reduction or broad rerun is justified here.
+No workflow changed, the local workflow already exercises its controls, and Act would add no job-step coverage; no Act or Docker
+resources were used. CI/CD efficiency guidance is already discoverable in tracked `AGENTS.md`, `.planning/AUTONOMOUS.md` and
+`docs/maintaining.md`. Hosted WASI module size and Cachegrind instructions/frame remain with the exact named producers; no
+quality bound was guessed or widened. This was a local workflow, so there is no run URL; hosted Main and Release checks remain
+pending Phase 14 ship. No retail-game compatibility claim is inferred from peripheral protocol fixtures.
+
+### Phase 14 hosted CI correction (2026-11-24)
+
+Runtime/model: Codex; primary session model ID unavailable. A focused read-only source review confirmed the corrected SIO slot indexing.
+PR #42 (`phase/14-multitap-and-special-controllers`) had auto-merge enabled at head `39548c5`. Its first Main CI run
+[45416515458](https://github.com/szTheory/schwaystation/actions/runs/45416515458) exposed GCC object-bounds UB in the SIO state
+serializer: passing `&tap_slot_id[0][0]` with length eight crosses the first inner four-byte array. The same compile failure
+caused Linux x64/arm64, no-FP, GPU reference, BE32, WASI and perf jobs to fail. CI checks that finished before cancellation
+included hygiene, OpenBIOS and macOS arm64. The initial Nightly benchmark jobs passed; its fuzz job was still running.
+
+After confirming the compiler diagnostic in the linux-x64 log, obsolete Main CI and Nightly runs
+[45416515458](https://github.com/szTheory/schwaystation/actions/runs/45416515458) and
+[45416515484](https://github.com/szTheory/schwaystation/actions/runs/45416515484) were canceled before a repaired-head attempt.
+Their elapsed wall times were 426 seconds and 395 seconds. GitHub's timing endpoint returned zero per-job milliseconds for
+these canceled runs, so no raw runner-minute or billing savings are claimed.
+
+Commit `440022c` flattens the eight-byte ID storage and uses `port * 4 + socket` for every read, write and per-port reset,
+preserving the old serialized byte order. A review caught and prevented an initial use of the different pad-endpoint mapping;
+the final index was corrected before commit. `git diff --check` and the SIO inventory sort check exited 0. The existing local
+SIO/core test targets rebuilt successfully, and `ctest --test-dir build/ci --output-on-failure -R
+'^(sio[.]tap[.](poll_methods|history_edges)|core[.]state[.](round_trip|rejects))$'` passed all four selectors in 2.07 seconds.
+An Ubuntu 26.04 arm64 container compiled `schwaystation_sio` with GCC 15.2 and warnings-as-errors (exit 0). The first attempt
+to use `cmake --preset ci` exited 1 because the image's CMake 4.2.3 cannot parse this repository's preset schema 11; direct
+CMake configure/build was used instead. The task-named `--rm` container cleaned itself up; no task-created image, volume or
+network remains. Workflow wiring was unchanged, and `act` would not add coverage beyond the direct GCC compile and local tests.
+
+That reviewed SIO correction and its evidence were pushed to PR #42; the following hosted attempt and additional findings
+are recorded below. Phase 15 remains behind Phase 14's passing final-head CI and release boundary.
+
+### Phase 14 second hosted run and exact quality measurements (2026-11-24)
+
+Main CI run [45420382438](https://github.com/szTheory/schwaystation/actions/runs/45420382438), on head `1dcc24c`, found the
+separate C17 GCC issue at `lr_card_sockets_load(card_paths)`: a mutable 2D character array cannot be implicitly converted
+to a pointer to arrays with nested `const` before C23 under `-Wpedantic`. Linux x64, no-FP x64/arm64, BE32 and other build
+lanes reported the same call-site diagnostic. The fix in `libretro/libretro.c` now builds a bounded eight-element view of
+`const char *` row pointers and passes it to the synchronous loader, which copies path data without retaining the view.
+Read-only review found no type, bounds, lifetime or behavior issue.
+
+That same run yielded the exact Phase 14 measurements before its quality gate stopped the WASI and perf jobs: linked Release
+WASI size was 947,976 bytes; Cachegrind reported testcard 1,620,101 and GPU motion 138,319,540 Ir/frame. The relative perf
+comparisons passed, but all three old exact pins were below the new measured values. `quality.json` now tracks these exact
+producer results, and `docs/testing.md` shows the current values. Evidence: [WASI job 138538583783](https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538583783)
+and [perf job 138538117721](https://github.com/szTheory/schwaystation/actions/runs/45420382438/job/138538117721). The run was canceled after
+210 seconds wall time once the deterministic compiler and bound failures were confirmed. GitHub returned zero per-job timing
+after cancellation, so raw runner-time and billing savings are unavailable.
+
+Local follow-up on the corrected source: `cmake --build build/ci --target schwaystation-test-libretro-host` exited 0;
+`ctest --test-dir build/ci --output-on-failure -R '^(libretro[.]cards[.](multitap|persistence|controls)|libretro[.]input[.]multitap)$'`
+passed 4/4 in 5.16 seconds. The GCC 15.2 warnings-as-errors CMake build of `schwaystation_libretro` under the no-FP
+configuration exited 0; a read-only review confirmed C17 pointer compatibility. The exact WASI/perf measurement checks,
+`jq -e . quality.json`, inventory sorting, and `git diff --check` all exited 0. The final local
+`cmake --workflow --preset ci` on the corrected source and updated pins exited 0: 705/705 CTest tests passed in 69.07
+seconds, all three macOS arm64 packages were produced, and the CI release checks passed 8/8 in 1.47 seconds.
+
+The earlier Nightly run [45420383435](https://github.com/szTheory/schwaystation/actions/runs/45420383435) completed successfully
+on `1dcc24c`. The three native bench jobs took 45–61 seconds each, the WASI benchmark 142 seconds, and full vectors 70
+seconds; each ran alongside fuzz. The fuzz step itself took 674 seconds and executed eleven bounded 60-second campaigns
+sequentially, after fixture and sanitizer setup. This was the run's critical path (13m50 total). Inference from the step
+commands and durations: splitting the campaigns into runners repeats builds/setup, while running them together on one
+runner risks cutting their executions per campaign. No safe, cost-neutral reduction was evident without changing the
+campaign budget. Main CI route checks passed in about 8 seconds and required lanes ran in parallel; deterministic compiler
+and exact-pin failures were canceled at 210 seconds. GitHub exposed no per-job billing times for that canceled run. No
+workflow wiring changed; direct GCC builds and focused CTests already exercised the fixes, so `act` would not add job-step
+coverage. The repaired final head still needs Main CI and Nightly before Phase 14 ship.
+
+### Phase 14 final GCC ABI gate correction (2026-11-24)
+
+Runtime/model: Codex with GSD code-reviewer and gsd-verifier `gpt-6-luna` xhigh; primary runtime model ID unavailable.
+The final-head retry on PR #42 initially pointed to commit `de5e368`. Both no-FP Linux jobs failed the same early
+`abi.globals` test: GCC's ELF archive classified the static `const char *` watchdog-name table as local writable
+relocation data (`d name_watchdogs`). The table contains immutable names, but its pointer representation made the ABI
+gate reject it. `src/pad.c` now stores the same eight NUL-terminated names in fixed-width constant character rows,
+preserving their endpoint indexing and serialized state keys. A focused GCC 13 Linux C17 compile with
+`-mgeneral-regs-only` and GNU `nm -P` exited 0 and reported `name_watchdogs r` (read-only data). Independent code review
+found no issue.
+
+The obsolete Main CI run [45425051636](https://github.com/szTheory/schwaystation/actions/runs/45425051636) was canceled
+after 219 seconds wall time once both no-FP failures were confirmed. Nightly [45425051737](https://github.com/szTheory/schwaystation/actions/runs/45425051737)
+was canceled after 189 seconds; its fuzz job reached the campaign step, which was stopped 21 seconds after starting.
+GitHub's timing endpoint returned zero per-job milliseconds for both canceled runs, so no billed runner-minute savings
+are claimed. The quick route and source preflights passed; workflow wiring was unchanged and local GNU nm plus GCC
+directly reproduced the failing ABI condition, so `act` offered no additional coverage for this source-only correction.
+
+After the correction, `cmake --workflow --preset ci` exited 0: 705/705 CTest tests passed in 73.01 seconds, all three
+macOS arm64 packages were produced, and the CI release checks passed 8/8 in 1.47 seconds. The Phase 14 code review is
+clean, all 49 goal-backward truths and four roadmap criteria remain verified, and the Phase 14 verification digest is
+refreshed at `2ab13f4`.
+
+### Phase 14 final WASI measurement and hosted runner fault (2026-11-24)
+
+Runtime/model: Codex; primary runtime model ID unavailable. The follow-up local module build took about one minute,
+including the first dependency install. On source commit `2ab13f4`, the task-named, auto-removed Ubuntu 26.04 arm64
+container used Clang 21.1.8, LLD 21.1.8, `wasi-libc` 0.0~git20250726.3f7eb4c-4, the pinned CHD-enabled Release runner
+configuration, and the `schwaystation-run` target. Inside that container,
+`cmake -S /work -B /tmp/schwaystation-wasi-build -G Ninja -DCMAKE_TOOLCHAIN_FILE=/work/cmake/toolchains/wasm32-wasi.cmake
+-DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DSCHWAYSTATION_BUILD_TESTS=OFF
+-DSCHWAYSTATION_BUILD_LIBRETRO=OFF -DSCHWAYSTATION_BUILD_RUNNER=ON -DSCHWAYSTATION_CHD=ON
+-DSCHWAYSTATION_BUILD_CHD_TOOL=OFF` and `cmake --build /tmp/schwaystation-wasi-build --target schwaystation-run`
+exited 0. `stat -c 'WASI_MODULE_BYTES=%s' /tmp/schwaystation-wasi-build/schwaystation-run` reported 947899. The exact
+`tests/cmake/quality.cmake` artifact check exited 1 because the current floor was 947,976. Its WASM magic check passed,
+and its measured byte count is the producer result. The old measurement was from the pre-table source; the final module
+is 77 bytes smaller. After updating `quality.json`, `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=947899
+-P tests/cmake/quality.cmake` exited 0; `ctest --test-dir build/ci --output-on-failure -R
+'^policy[.]quality_metrics$' --no-tests=error` passed 1/1 in 31.17 seconds. `jq -e . quality.json`, the SIO inventory
+sort check and `git diff --check` also exited 0. The first container attempt failed because the minimal image lacked
+`ca-certificates`; the next named `--rm` run included it and completed the build. Docker left no task-created container,
+image, volume or network.
+
+Main CI run [45428490941](https://github.com/szTheory/schwaystation/actions/runs/45428490941) on PR head `4bcb76e`
+failed before its WASI build: `apt-get update` saw Microsoft's feed but no Ubuntu package index, so `wasi-libc` and
+`libclang-rt-21-dev-wasm32` had no installation candidate. The same-head Nightly run
+[45428491372](https://github.com/szTheory/schwaystation/actions/runs/45428491372) installed those exact packages and
+passed its WASI benchmark, vectors, benchmarks and fuzz suite. Main CI passed no-FP, perf, hygiene, OpenBIOS, GPU
+reference and the six-platform builds that completed before cancellation. It was canceled at 1,159 seconds wall time
+after the local producer exposed the stale exact pin; Nightly completed in 796 seconds with its fuzz job taking 782
+seconds. GitHub's timing endpoint returned zero billable milliseconds for both runs, so no runner-minute savings are
+claimed. Main CI plus its WASI-dependent hash comparison must pass on the corrected exact bound before Phase 14 ships.
+
+### Phase 14 matched x86_64 WASI producer correction (2026-11-24)
+
+Runtime/model: Codex; primary session model ID unavailable. Main CI on head `d46ec1e` reached its linked-module size
+step and measured 947,969 bytes, failing only because the local update had set 947,899. The earlier 947,899-byte
+reproduction used an arm64 container and `SCHWAYSTATION_BUILD_TESTS=OFF`, so it did not match the hosted x86_64
+`wasm32-chd` preset. An x86_64 tests-off build measured 947,947; the tests-enabled build added the test-only card hook
+and matched CI exactly at 947,969.
+
+The local matched producer used a task-named Ubuntu 26.04 x86_64 container, Clang/LLD 21.1.8, `wasi-libc`
+0.0~git20250726.3f7eb4c-4, `libclang-rt-21-dev-wasm32`, Release, CHD enabled, and test registration enabled. Its
+direct CMake configure, `cmake --build ... --target schwaystation-run`, and `stat` command exited 0 with
+`WASI_MODULE_BYTES=947969`. Test emulator/fixture-tool paths were placeholders for configuration only; no WASI CTest
+was run locally. The exact measurement comes from both this producer and Main CI run
+[45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507). The pin is corrected to floor and
+ceiling 947969. `cmake -DQUALITY=quality.json -DMETRIC=size.wasm -DMEASURED=947969 -P
+tests/cmake/quality.cmake` exited 0; the focused `ctest --test-dir build/ci --output-on-failure -R
+'^policy[.]quality_metrics$' --no-tests=error` passed 1/1 in 47.15 seconds. The quality JSON, SIO inventory sort and
+`git diff --check` also passed before the retry push.
+
+After confirming the hosted mismatch, obsolete Main CI [45436318507](https://github.com/szTheory/schwaystation/actions/runs/45436318507)
+and Nightly [45436318741](https://github.com/szTheory/schwaystation/actions/runs/45436318741) were canceled at 323 and
+292 seconds elapsed. Nightly had already passed its WASI benchmark, all three native benchmarks and vectors; its fuzz
+job lasted 283 seconds wall, with the bounded-campaign step canceled after 180 seconds. Both timing endpoints returned zero billable milliseconds, so no cost savings are
+claimed. The x86_64 container and x86_64 base image pulled for it were removed; the pre-existing arm64
+`ubuntu:26.04` tag was restored. The corrected exact bound needs one final Main CI/Nightly attempt before Phase 14
+ships. No workflow changes were made; direct exact-producer reproduction provided more relevant coverage than `act`.
+
+### Phase 14 tail planning split (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; configured planner `gpt-6.1-sol`; active runtime model ID unavailable.
+Planning duration was not separately measured. Plan14's 32m22s execution exceeded the 30-minute cap; the
+unstarted 11,500-token Plan15 had two independent existing task boundaries. Plan15 now owns only the
+compatibility ledger and generated evidence (5,000-token projection, Wave12). New Plan16 owns only measured
+metrics, fixture state hashes and discoverable documentation (6,500-token projection, Wave13), then the
+complete final review/verification handoff. Each single-task implementation slice targets 20–28 minutes.
+The estimate-calibration query returned factor1, zero samples and low confidence; no speedup is claimed.
+
+Both original tasks, automated verification commands, done criteria and the complete phase handoff are
+preserved byte-for-byte across the split. GSD schema/structure checks, shell/Python syntax, read-only selector
+inspection, dependency/ownership checks and diff checks passed. The structure parser's existing bare-diff
+advisory remains appropriate for task checks against the uncommitted tree; the decision gate skips this
+context's unnumbered decisions, whose grouped aliases remain covered by the source audit in Plan16.
+ROADMAP and the GSD plan index now show 14/16 complete and 13 waves; only Plan15 is ready. Plans01–14,
+all summaries and existing requirement statuses are unchanged. No source change, configure/build,
+implementation test, hosted CI, Act, Docker or execution ran; no hosted run URL applies. The parent
+orchestrator acts next on the reviewed planning split; neither remaining plan has started.
+
+### Phase 14 Plan 14-14 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured
+wall duration was 32m22s (11:20:03–11:52:25 UTC), 2m22s past the 30-minute plan cap. The executor stopped after
+its single task commit, `39cd818`; the orchestrator completed GSD closeout without further implementation.
+
+The CI configure/build and focused card tests passed. `libretro.cards.multitap`, `libretro.cards.persistence`
+and `libretro.cards.controls` passed 3/3 in 18.34s. The direct host test was green on its first run because the
+state, reset, failed-load and save-identity invariants already existed in production; no runtime change or
+artificial RED commit was made. This slice adds test-only probes/assertions and save ownership documentation.
+Shared SIO-01 remains open until its last declaring plan finishes. No broad suite, hosted CI, Act or Docker was
+run; Plan 16 owns the final reviewed-head aggregate verification.
+
+### Phase 14 Plan 14-15 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall duration
+was 13m, starting at 12:06:17Z. Task commit `a05c691` records the compatibility rows and independent ratchet
+expectations.
+
+The feature data rows passed the byte-sort, field-count, duplicate-key and compatibility-schema preflights. The
+existing `build/ci` was reused; CI configure and `schwaystation-test-probe` build passed. The exact compatibility
+feature selector presence check passed, then `compat.features.preflight`, `compat.features.ratchet`, and
+`compat.features.controls` passed 3/3 in 1.30 seconds. The compatibility document was regenerated and its
+`--check` passed. Direct SIO/card/runner/libretro selectors cited by the rows passed in their owning prior plans;
+they were not rerun here. No broad suite, hosted CI, Act or Docker ran. Shared SIO-01–04 remain gated until Plan
+14-16 and phase verification complete.
+
+### Phase 14 Plan 14-16 execution (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall duration was about 32 minutes from 12:25:11Z through GSD closeout, exceeding the 30-minute slice cap by about 2 minutes. The task commit is `b51876c`.
+
+The reused `build/ci` stable-state producer measured 3,757,638 bytes, so `quality.json` now tracks that exact value; `core.state.stable_bytes` passed 1/1. The frame-150 and frame-180 `gpu_motion` state hashes were directly reproduced and their focused selectors passed 2/2. Controller, saves and runner pages are linked from the embedding/testing guides, which remain under their byte limits. Implementation and focused checks finished about 12 minutes into the slice; the additional wall time was GSD closeout, not implementation scope.
+
+No local `clang-21`/`wasm-ld` or Valgrind/Cachegrind was available. WASI size awaits `.github/workflows/ci.yml` `wasm32` → `Measure linked WASI module`; Ir/frame awaits the `perf` job → `Instructions per frame` after `Cachegrind` setup. Neither bound was guessed or changed. The parent orchestrator owns source review and the single aggregate workflow after review; SIO-01–04 remain open for phase verification.
+
+### Phase 14 Plan 14-13 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; OpenGSD 1.23.0; primary runtime model ID unavailable. Wall duration was 20m through metadata commit. Two task commits landed: `7686490` (RED persistence assertions) and `444e8af` (seven adapter sidecars).
+
+The libretro inventory sorted cleanly, and the selector preflight found all five planned tests. Existing `build/ci` was reused; `cmake --preset ci` and the focused libretro host/core build passed. The owned card persistence, controls, multitap and memory alias/boundary selectors passed 5/5 in 5.90 seconds. The direct TAP RED run failed on missing additional sidecar paths and classified `RED_EVIDENCE_OK`. Two strict-build issues in the test hooks were corrected before accepting RED. Shared SIO-01 remains open until its other declaring plans finish. No broad suite, hosted CI, Act or Docker was run; Plan 15 owns final reviewed-head integrated verification.
+
+### Phase 14 Plan 14-12 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Measured
+wall duration was 24m. Two task commits landed: `f295c54` (special mapping RED checks) and `79e8c0c`
+(special mappings and documentation).
+
+Cheap diff, sorted inventory and exact-selector preflights passed before configure/build. Existing `build/ci`
+was reused; CI configure and focused libretro host/core build passed. The `libretro.input.multitap`,
+`libretro.input.special` and `libretro.input.descriptors` selectors passed 3/3. An initial green attempt
+exposed a test counter incorrectly shared between players; the test now scopes observations by player and
+the rerun passed. Phase-wide SIO requirements remain open until all their declaring plans finish. No broad
+suite, hosted CI, Act or Docker was run; Plan 15 owns final reviewed-head aggregate verification.
+
+### Phase 14 Plan 14-11 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Measured
+wall duration was 24m. Three task commits landed: `b72c468` and `b1e8fd3` (RED coverage), then `474aa6a`
+(compact multitap topology, routing and documentation).
+
+Cheap `git diff --check`, inventory-sort and exact-selector preflights passed before configure/build. Existing
+`build/ci` was reused; `cmake --preset ci` and the focused libretro host/core build passed. The focused
+`libretro.input.multitap` and `libretro.input.descriptors` selectors passed 2/2. The summary's coverage block
+passes GSD classification; SIO-01 remains gated until its other declaring plans finish. No broad suite, hosted
+CI, Act or Docker was needed for this focused slice.
+
+### Phase 14 Plan 14-10 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall interval was
+9m from 09:30:01Z through focused verification and closeout. One task commit was made: `4cfe18e` (default two-pad
+callback-to-serial baseline).
+
+Before the focused build, `git diff --check`, the libretro inventory sort, CI configure reuse, and exact selector
+presence checks passed. The focused build of `schwaystation-test-libretro-host` and `schwaystation_libretro`
+passed. `libretro.input.multitap` and `libretro.input.descriptors` then passed 2/2 in 0.03s. The test helper is
+confined to the card-test module; the descriptor selector confirmed it is not exported by the shipped module.
+The baseline covers only default players 0/1 on socket A. Plan 14-11 owns tap options and expanded routing.
+No broad suite, hosted CI, Act or Docker was needed.
+
+### Phase 14 Plan 14-09 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured
+wall interval was 60m42s (07:13:54–08:14:36 UTC); active time was not separately measured. Two tasks produced
+three task commits: `ae0311f` (eight-socket RED), `1f14811` (runner card lifecycle), and `cc3d2d8` (independent
+tap flags, docs and focused target correction). The explicit 30-minute split bound was exceeded; execution was
+kept within Plan 14-09 and recorded transparently.
+
+Before configure/build, the runner inventory sorted cleanly, `git diff --check` passed, and CTest selector
+preflights found the three card selectors. The eight-socket RED exited 8 on the missing port 1/socket B file;
+the JUnit evidence classified `RED_EVIDENCE_OK`. A typed card-byte view resolved the strict compile error in the
+test hook. The focused trio passed 3/3 in 14.39 seconds (multitap 1.37s, controls 0.42s, persistence 14.33s).
+After the final help assertions, the hook target rebuilt and multitap passed 1/1 in 0.55s. The pre-registered
+selector used `schwaystation-test-run-stop`, omitted from the plan's original build list; the plan was corrected
+to build that target. No workflow wiring changed, so no broad suite, Act or hosted CI run was needed. No Docker
+resources were created. Plan 14-10 followed.
+
+### Phase 14 Plan 14-08 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured
+wall interval was 16m21s (06:55:13–07:11:34 UTC); active time was not separately measured. Two tasks produced
+three commits: `ab475ee` (socket path RED), `3faadf8` (socket path GREEN), and `68e1c43` (eight-socket atomic
+persistence vectors and documentation).
+
+The existing card inventory was sorted and retained its pre-registered `card.files.tap_paths` selector. After
+`cmake --preset ci` and focused card-files builds, the combined five-test selector passed 5/5 in 0.03 seconds,
+covering the eight-name mapping, legacy aliases, unsafe/oversized inputs, atomic round-trip/failure behavior and
+existing wrapper handling. Eight 128 KiB card files were independently written and read back; replacing one left
+the other seven unchanged, and injected flush/rename failures preserved the selected prior file and left no
+temporary files. No workflow wiring changed, so no broad suite, Act, hosted CI or Docker run was needed. The
+suffix table and DEC.67 boundary are documented in `docs/saves.md`, linked from `docs/runner.md`. Plan 14-09 is next.
+
+### Phase 14 Plan 14-07 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The measured
+wall interval was 26m10s (06:23:04–06:49:14 UTC); active time was not separately measured. Two tasks produced
+four task commits: `4412a0f` (card-state RED), `139fd5f` (card-state GREEN), `d1bb44c` (aggregate-state RED),
+and `c0e2b82` (aggregate-state GREEN).
+
+Before configure/build, the card, SIO and core inventories sorted cleanly and CTest selector preflights found the
+required tests. `cmake --preset ci` and the focused card/SIO/state/API targets built successfully. The final focused
+selection passed 15/15 in 3.67 seconds; it covered all eight card endpoints, candidate state rejection, state
+round-trip/stable bytes, API v9, tap history and pending SIO byte/ACK events. The format-20 state producer reported
+3,757,638 bytes. No serialized layout or quality bound changed. A mistaken non-mouse round-trip expectation was
+corrected; no workflow wiring changed, so no broad suite, Act, hosted CI or Docker run was needed. The summary is
+`.planning/phases/14-multitap-and-special-controllers/14-07-SUMMARY.md`. Plan 14-08 followed.
+
+### Phase 14 Plan 14-06 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Measured
+wall interval was 19m23s (05:57:02–06:16:25 UTC); active time was not separately measured. Two tasks produced
+four task commits: `bc4d8e1` (flight RED), `4bae1bb` (flight GREEN), `504b9e6` (Jogcon RED), and `4123d90`
+(Jogcon GREEN).
+
+Before configure/build, the changed path inventory sorted with `git diff --name-only | LC_ALL=C sort -cu`,
+`git diff --check` passed, and Python selector assertions confirmed the pre-registered flight, Jogcon, tap and
+DualShock tests. The first flight RED exited 8 on ID `41h` instead of `53h`; its JUnit record was classified
+`RED_EVIDENCE_OK`. After the minimal flight ID/length branch, the six-test selection passed 6/6 in 0.01s.
+The first Jogcon RED exited 8 on ID `41h` instead of `E3h`; its JUnit record was classified `RED_EVIDENCE_OK`.
+After adding the native dial and direction bytes, the four-test selection passed 4/4 in 0.04s. Both focused SIO
+test targets built successfully; save/load, direct ports, both tap methods, 0/128/255 axes, all button bits,
+unsupported Jogcon commands and old DualShock configuration/rumble/watchdog cases were exercised.
+
+The initial Task 1 green run exposed a mistaken expected high-byte vector, corrected before the passing rerun.
+The first Task 2 test compile exposed duplicate local variable names, corrected before RED evidence. A relative
+JUnit path was also corrected to an absolute ignored evidence path before classification. No workflow wiring
+changed, so no broad workflow, Act or hosted CI run was needed; no Docker resources were created. Plan 14-05's
+neGcon coverage plus this Jogcon implementation completes SIO-03. SIO-04 remains pending the later libretro
+mapping. Plan 14-07 followed.
+
+### Phase 14 Plan 14-05 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor, configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The
+measured wall interval was 29m16s (05:25:25–05:54:41 UTC); active time was not separately measured. Two tasks
+produced five plan commits: `96b9aa7` (mouse RED), `5bc7308` (mouse implementation and shared response branch),
+`5d77069` (PER.01 mouse reserved bits), `e44a17a` (neGcon vectors), and `50a9346` (protocol documentation).
+The SIO inventory sorted and all three exact selectors were present before configure/build. The targeted pad/SIO
+build passed; the focused mouse, neGcon and tap selection passed 3/3 in 0.03 seconds. The mouse RED evidence
+classifier returned `RED_EVIDENCE_OK`. The shared response switch included neGcon behavior in Task 1's GREEN
+commit, so Task 2 added and passed dedicated tests without claiming a synthetic RED. PER.01 source review
+corrected the mouse's reserved button bits. No workflow wiring changed, so no broad workflow, Act or hosted run
+was needed; no Docker resources were created. SIO-02 remains pending its libretro mapping, and SIO-03 remains
+pending Jogcon and configuration-mode coverage. Plan 14-06 is next.
+
+### Phase 14 Plan 14-04 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor, configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Measured
+wall interval was 38m59s (04:41:54–05:20:53 UTC); active time was not separately measured. Two tasks produced four
+plan commits: `1084eb1` (API RED), `c3cfb29` (eight-slot API/storage), `8b23612` (routing RED), and `3158414`
+(socket routing and docs). The card and SIO inventories sorted cleanly; exact selector preflights passed before
+the focused builds. API configure/build and ABI checks passed. The focused tap/card selection passed 8/8 in
+0.08s, followed by the affected state-restore selectors passing 3/3 in 1.00s. Both task RED-evidence checks
+returned `RED_EVIDENCE_OK`. One PocketStation test expectation was corrected to match the fixture's unset flags,
+and the affected selectors passed afterward. No workflow wiring changed, so no Act or hosted run was needed; no
+Docker resources were created. Plan 14-03 controller-slot evidence plus this plan's independent card routing,
+storage and protocol-state coverage complete SIO-01. Plan 14-05 is next.
+
+### Phase 14 Plan 14-03 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor, configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. The
+measured wall interval was 31m31s (04:01:30–04:33:01 UTC); active time was not separately measured. Two tasks
+produced three task commits: `f9b8d11` (RED), `7f0b42c` (router/history), and `8b876d0` (edge coverage and
+protocol documentation). `git diff --check`, sorted SIO inventory, and exact selector preflights passed. The
+Task 1 RED selector exited 8 on the missing Method 2 routing and next-transaction Method 1 behavior; the GSD
+RED-evidence checker returned `RED_EVIDENCE_OK`. The final focused selector command exited 0 with 6/6 tests
+passing in 1.26 seconds, including independent ports, Method 1 response history, Method 2 socket routing,
+empty/missing slots, aborts, saved deadlines, and no final ACK/IRQ. Workflow wiring did not change, so no Act
+or hosted run was needed; no Docker resources were created. SIO-01 remains phase-level pending for card routing
+and host persistence. Plan 14-04 is next.
 
 ### Phase 13 Plan 13-01 execution (2026-11-23)
 
@@ -1117,7 +1490,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 274
+- Total plans completed: 290
 - Average duration: Not measured
 - Total execution time: Not measured (active time is not tracked consistently)
 
@@ -1138,6 +1511,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | 11 | 15 | - | - |
 | 12 | 7 | - | - |
 | 13 | 9 | - | - |
+| 14 | 16 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -1383,6 +1757,22 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 13 P05 | not tracked | 2 tasks | 11 files |
 | Phase 13 P06 | not reliably tracked | 2 tasks | 7 files |
 | Phase 13 P07 | not reliably tracked | 2 tasks | 8 files |
+| Phase 14 P01 | 15m35s | 3 tasks | 11 files |
+| Phase 14 P02 | 36m | 3 tasks | 10 files |
+| Phase 14 P03 | 31m31s | 2 tasks | 4 files |
+| Phase 14 P04 | 39min | 2 tasks | 9 files |
+| Phase 14 P05 | 29m16s | 2 tasks | 5 files |
+| Phase 14 P06 | 19m09s | 2 tasks | 5 files |
+| Phase 14 P07 | 26m10s | 2 tasks | 7 files |
+| Phase 14 P08 | 16m21s | 2 tasks | 5 files |
+| Phase 14 P09 | 61m | 2 tasks | 4 files |
+| Phase 14 P10 | 9m | 1 tasks | 2 files |
+| Phase 14 P11 | 24m | 1 tasks | 3 files |
+| Phase 14 P12 | 24m | 1 tasks | 3 files |
+| Phase 14 P13 | 20m | 1 tasks | 2 files |
+| Phase 14 P14 | 32m22s | 1 tasks | 3 files |
+| Phase 14 P15 | 13m | 1 tasks | 3 files |
+| Phase 14 P16 | 12m | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1829,6 +2219,39 @@ Recent decisions affecting current work:
 - [Phase 13]: Machine and region remain independent options applied at content load; auto region identity uses the shared host resolver.
 - [Phase 13]: Full BIOS boot remains the default; only the explicit fast-boot profile flag enables the shell handoff.
 - [Phase 13]: State format and behavior revision remain 19 because profile flags were already serialized and default behavior is unchanged.
+- [Phase 14]: Keep the released 28-byte caller layout fixed while testing it against the current API.
+- [Phase 14]: Register future peripheral tests as gating selectors and leave their behavior to the owning plans.
+- [Phase 14]: API v9 preserves the 28-byte v8 input prefix and validates a zero-filled, caller-sized snapshot before apply.
+- [Phase 14]: Frame-start latching resolves tap precedence across eight stable endpoints; rumble results remain tied to socket A.
+- [Phase 14]: The new serialized endpoint shape uses unreleased state format and behavior revision 20.
+- [Phase 14]: Method 1 REQ is request history for the next transaction and is evaluated with the previous response kind.
+- [Phase 14]: Tap routing and request history remain independent per physical SIO port.
+- [Phase 14]: Existing pad byte FSMs produce socket data and preserve each device's response length.
+- [Phase 14]: Legacy card 1/2 APIs remain fixed aliases for port 1/2 socket A, independent of tap configuration.
+- [Phase 14]: Serialize selected SIO card endpoint state, never card image bytes or generations.
+- [Phase 14]: Mouse movement is latched and saturated once at frame start; subsequent frames without fresh host input report zero movement while retaining button levels.
+- [Phase 14]: A mouse startup ACK-low hold is released only by an addressed 01h access at the same endpoint, including port 2 and tap sockets.
+- [Phase 14]: neGcon twist, I, II and L inputs are reported raw, without a response curve or deadzone.
+- [Phase 14]: Dual Analog flight uses the existing axis order and ID 5A53 without redirecting DIGITAL or DUALSHOCK behavior.
+- [Phase 14]: Jogcon supports only its documented native 42h payload; wire bit 0 of the raw dial halfword is cleared and its physical interpretation is not inferred.
+- [Phase 14]: Jogcon direction flags are turned-left and turned-right; software configuration and feedback commands return FF with no ACK.
+- [Phase 14]: Plan 14-07: cross-validate candidate pad, SIO and card protocol states before apply; preserve receiver-owned card media across restore. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 26m10s.
+- [Phase 14]: Scope legacy disc fixture prerequisites to their actual CTest consumers — The shared-directory TESTS property had added legacy setup/parity tests to unrelated focused selectors. Keep both fixture tests in the full inventory and retain dependencies on consumers; local configure and selector checks confirm unrelated state checks run alone while ECM guest and runner legacy checks still pull both prerequisites.
+- [Phase 14]: Plan 14-08: preserve A card filename aliases and map all eight stable port/socket suffixes; reject invalid or undersized paths atomically. Runtime Codex GSD executor, configured gpt-6-luna xhigh; primary runtime model ID unavailable; measured duration 16m21s.
+- [Phase 14]: Runner card persistence enumerates all eight physical port/socket identities and flushes only changed generations.
+- [Phase 14]: Per-port multitap options default off and are reapplied after each movie snapshot before frame latching.
+- [Phase 14]: Phase 14 Plans 10–14 split at behavior boundaries after Plan 14-09 took 60m42s; Codex GSD planner gpt-6.1-sol high and checker gpt-6-luna xhigh; planning/check review took about 8 minutes. — The plan checker passed requirements and dependency coverage. Keep each implementation slice below the 30-minute bound while preserving all selectors, metrics, and final verification.
+- [Phase 14]: Split Plan 14-10 again after selector evidence showed its default port 0/1 probes pass; callback order queried both players and disabled sockets caused the remaining expected tap RED. Plan 14-10 is now a green default two-pad test seam, Plan 14-11 owns topology. Codex planner gpt-6.1-sol high, checker gpt-6-luna xhigh; follow-up planning/check about 5 minutes. — Separating harness correctness from product behavior prevents invalid RED evidence and keeps implementation slices inside the 30-minute plan bound. Full topology and all final quality/CI gates remain required.
+- [Phase 14]: Keep Plan 14-10 limited to the default socket-A callback baseline; Plan 14-11 owns tap options and expanded routing.
+- [Phase 14]: Apply multitap topology only after successful content load — A rejected replacement must leave the currently running frontend descriptors and serial topology unchanged.
+- [Phase 14]: Accept only exact NONE, JOYPAD, and ANALOG controller IDs — Masking arbitrary subclasses would make the frontend claim support for devices that have no implemented input mapping.
+- [Phase 14]: Match supported special libretro controllers by exact device ID and map their host inputs with bounded integer conversions.
+- [Phase 14]: Libretro keeps port1A exclusively frontend-owned SAVE_RAM and persists only the seven remaining sockets.
+- [Phase 14]: Build sidecar paths once from the original content basename and advance saved generations only after atomic replacement succeeds.
+- [Phase 14]: Use the existing ntsc-u.pu8-late.v2 profile token for the six tested controller feature rows.
+- [Phase 14]: Keep compatibility claims limited to passing selector evidence; leave retail-game support and undocumented Jogcon behavior unclaimed.
+- [Phase 14]: Set state.bytes to the exact 3,757,638-byte local stable-state producer measurement.
+- [Phase 14]: Leave WASI-size and Ir/frame bounds unchanged pending their exact hosted producers.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2079,8 +2502,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-23T20:39:03.752Z
-Stopped at: Phase 13 complete, ready to plan Phase 14
+Last session: 2026-11-24T12:38:34.398Z
+Stopped at: Phase 14 complete, ready to plan Phase 15
 Resume file: None
 
 ### v1.0 session history

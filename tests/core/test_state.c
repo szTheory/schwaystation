@@ -17,6 +17,11 @@
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
+#define JOY_DATA 0x1F801040u
+#define JOY_MODE 0x1F801048u
+#define JOY_CTRL 0x1F80104Au
+#define JOY_BAUD 0x1F80104Eu
+#define I_STAT 0x1F801070u
 
 /* Five buffers for saved states, sized from the core's own answer, so they
    follow the state as it grows. */
@@ -112,6 +117,22 @@ static void bus_write(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
 {
     uint32_t cycles = 0u;
     CHECK_EQ_U64(schway__bus_write(inst, addr, width, value, &cycles), 0u);
+}
+
+static uint32_t bus_read(schway *inst, uint32_t addr, uint32_t width)
+{
+    uint32_t cycles = 0u;
+    uint32_t value = 0u;
+    CHECK_EQ_U64(schway__bus_read(inst, addr, width, &value, &cycles), 0u);
+    return value;
+}
+
+static void advance_ticks(schway *inst, uint64_t tick)
+{
+    inst->ticks = tick;
+    schway__sched_sync(inst);
+    schway__sched_run(inst);
+    schway__spu_catch_up(inst, inst->ticks);
 }
 
 static uint16_t spu_attr(const schway *inst)
@@ -222,14 +243,151 @@ static void expect_refused(const char *what, schway *inst, const uint8_t *b, siz
     }
 }
 
-/* Run to 30 and save, run to 60; load the save and run to 60 again: the
-   same frame and the same state. */
+static uint8_t state_exchange_byte(schway *inst, uint8_t sent, uint8_t ack)
+{
+    uint64_t start = inst->ticks;
+    bus_write(inst, JOY_DATA, 1u, sent);
+    advance_ticks(inst, start + 1088u);
+    uint8_t received = (uint8_t)bus_read(inst, JOY_DATA, 1u);
+    if (ack != 0u) {
+        advance_ticks(inst, start + 1426u);
+        bus_write(inst, I_STAT, 4u, 0u);
+        bus_write(inst, JOY_CTRL, 2u, 0x1013u);
+        advance_ticks(inst, start + 1494u);
+        bus_write(inst, JOY_CTRL, 2u, 0x1003u);
+    }
+    return received;
+}
+
+static void test_short_terminal_round_trip(void)
+{
+    schway *inst = make(SCHWAY_REGION_NTSC_U);
+    inst->pad.multitap[0] = 1u;
+    for (uint32_t socket = 0u; socket < 4u; socket++) {
+        uint32_t endpoint = socket == 0u ? 0u : 1u + socket;
+        schway__pad_set_connected(inst, endpoint, 1u);
+    }
+    bus_write(inst, JOY_MODE, 2u, 0x000Cu);
+    bus_write(inst, JOY_BAUD, 2u, 0x0088u);
+    bus_write(inst, JOY_CTRL, 2u, 0x1003u);
+
+    /* A requested Slot A poll arms the long method-1 reply. */
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    (void)state_exchange_byte(inst, 0x42u, 1u);
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    (void)state_exchange_byte(inst, 0x00u, 1u);
+    (void)state_exchange_byte(inst, 0x00u, 0u);
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    (void)state_exchange_byte(inst, 0x42u, 1u);
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        (void)state_exchange_byte(inst, 0x00u, i != 31u ? 1u : 0u);
+    }
+    CHECK_EQ_U64(inst->sio.tap_history_req[0], 1u);
+    CHECK_EQ_U64(inst->sio.tap_history_reply[0], 1u);
+
+    /* After the short reply's request byte, the terminal ID byte is next. */
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    (void)state_exchange_byte(inst, 0x42u, 1u);
+    (void)state_exchange_byte(inst, 0x01u, 1u);
+    CHECK_EQ_U64(inst->sio.tap_tx_mode[0], 3u);
+    CHECK_EQ_U64(inst->sio.tap_tx_index[0], 3u);
+    CHECK_EQ_U64(inst->sio.tap_tx_endpoint[0], 0u);
+    CHECK_EQ_U64(inst->sio.tap_slot_mask[0], 1u);
+    CHECK_EQ_U64(inst->sio.tap_tx_request[0], 1u);
+
+    size_t n = save(inst, good);
+    schway *copy = make(SCHWAY_REGION_NTSC_U);
+    CHECK_EQ_U64(schway_load_state(copy, good, n), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(copy->sio.tap_tx_mode[0], 3u);
+    CHECK_EQ_U64(copy->sio.tap_tx_index[0], 3u);
+    CHECK_EQ_U64(save(copy, after), n);
+    CHECK(memcmp(good, after, n) == 0);
+    CHECK_EQ_HEX(state_exchange_byte(copy, 0x00u, 0u), 0x41u);
+    CHECK_EQ_U64(copy->sio.tap_tx_mode[0], 0u);
+    CHECK_EQ_U64(copy->sio.tap_history_reply[0], 2u);
+    schway_destroy(copy);
+    schway_destroy(inst);
+}
+
+static void seed_endpoint_inputs(schway *inst)
+{
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.size = (uint32_t)sizeof input;
+    input.multitap[0] = 1u;
+    input.multitap[1] = 1u;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = socket == 0u ? port : 2u + port * 3u + socket - 1u;
+            schway_controller_input *controller = &input.controllers[port][socket];
+            controller->device = endpoint % 7u;
+            controller->buttons = (uint16_t)(0x1020u + endpoint);
+            for (uint32_t axis = 0u; axis < 4u; axis++) {
+                controller->axes[axis] = (uint8_t)(30u + endpoint * 4u + axis);
+            }
+            controller->analog_button = (uint8_t)(endpoint & 1u);
+            controller->mouse_dx = (int16_t)((int32_t)endpoint - 4);
+            controller->mouse_dy = (int16_t)(4 - (int32_t)endpoint);
+            controller->negcon_twist = (uint8_t)(50u + endpoint);
+            controller->negcon_i = (uint8_t)(60u + endpoint);
+            controller->negcon_ii = (uint8_t)(70u + endpoint);
+            controller->negcon_l = (uint8_t)(80u + endpoint);
+            controller->jogcon_dial = (uint16_t)(1000u + endpoint);
+            controller->jogcon_flags = (uint16_t)(endpoint & 3u);
+        }
+    }
+    CHECK_EQ_U64(schway_set_input(inst, &input), SCHWAY_STATUS_OK);
+    schway__pad_frame_start(inst);
+}
+
+static void check_endpoint_inputs(const schway *inst)
+{
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = socket == 0u ? port : 2u + port * 3u + socket - 1u;
+            uint32_t device = endpoint % 7u;
+            CHECK_EQ_U64(inst->pad.device[endpoint], device);
+            CHECK_EQ_U64(inst->pad.present[endpoint], device != 0u ? 1u : 0u);
+            uint16_t input_buttons = (uint16_t)(0x1020u + endpoint);
+            uint16_t expected_buttons = device == SCHWAY_INPUT_DEVICE_MOUSE
+                                            ? (uint16_t)(0xF0FFu |
+                                                         (0x0C00u &
+                                                          (uint16_t)~input_buttons))
+                                            : (uint16_t)~input_buttons;
+            CHECK_EQ_HEX(inst->pad.buttons[endpoint], expected_buttons);
+            for (uint32_t axis = 0u; axis < 4u; axis++) {
+                CHECK_EQ_U64(inst->pad.axes[endpoint * 4u + axis],
+                             30u + endpoint * 4u + axis);
+            }
+            CHECK_EQ_U64(inst->pad.analog_button[endpoint], endpoint & 1u);
+            CHECK_EQ_U64(inst->pad.mouse_dx[endpoint],
+                         device == SCHWAY_INPUT_DEVICE_MOUSE ? 32764u + endpoint : 32768u);
+            CHECK_EQ_U64(inst->pad.mouse_dy[endpoint],
+                         device == SCHWAY_INPUT_DEVICE_MOUSE ? 32772u - endpoint : 32768u);
+            CHECK_EQ_U64(inst->pad.mouse_startup_ack[endpoint],
+                         device == SCHWAY_INPUT_DEVICE_MOUSE ? 1u : 0u);
+            CHECK_EQ_U64(inst->pad.negcon_twist[endpoint], 50u + endpoint);
+            CHECK_EQ_U64(inst->pad.negcon_i[endpoint], 60u + endpoint);
+            CHECK_EQ_U64(inst->pad.negcon_ii[endpoint], 70u + endpoint);
+            CHECK_EQ_U64(inst->pad.negcon_l[endpoint], 80u + endpoint);
+            CHECK_EQ_U64(inst->pad.jogcon_dial[endpoint], 1000u + endpoint);
+            CHECK_EQ_U64(inst->pad.jogcon_flags[endpoint], endpoint & 3u);
+        }
+    }
+    CHECK_EQ_U64(inst->pad.multitap[0], 1u);
+    CHECK_EQ_U64(inst->pad.multitap[1], 1u);
+}
+
+/* Run to 30 and save endpoint input, run to 60; load the save and run to 60
+   again: the same frame, endpoint state and serialized bytes. */
 static void test_round_trip(void)
 {
     static const uint32_t regions[] = {SCHWAY_REGION_NTSC_U, SCHWAY_REGION_PAL};
     for (size_t k = 0; k < 2u; k++) {
         schway *inst = make(regions[k]);
         run_to(inst, 30);
+        seed_endpoint_inputs(inst);
         size_t n = save(inst, good);
         run_to(inst, 60);
         uint64_t h1 = frame_hash(inst);
@@ -237,6 +395,7 @@ static void test_round_trip(void)
         CHECK_EQ_U64(m, n);
         CHECK_EQ_U64(schway_load_state(inst, good, n), SCHWAY_STATUS_OK);
         CHECK_EQ_U64(inst->frame, 30);
+        check_endpoint_inputs(inst);
         run_to(inst, 60);
         uint64_t h2 = frame_hash(inst);
         CHECK_EQ_HEX(h1, h2);
@@ -245,11 +404,31 @@ static void test_round_trip(void)
         /* And into a second instance of the same region. */
         schway *other = make(regions[k]);
         CHECK_EQ_U64(schway_load_state(other, good, n), SCHWAY_STATUS_OK);
+        check_endpoint_inputs(other);
         run_to(other, 60);
         CHECK_EQ_HEX(frame_hash(other), h1);
         schway_destroy(other);
         schway_destroy(inst);
     }
+
+    schway *reset = make(SCHWAY_REGION_NTSC_U);
+    for (uint32_t endpoint = 0u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
+        uint8_t received = 0u;
+        reset->pad.present[endpoint] = 1u;
+        reset->pad.device[endpoint] = SCHWAY_INPUT_DEVICE_DIGITAL;
+        CHECK_EQ_U64(schway__pad_byte(reset, endpoint, 0x01u, reset->ticks, &received), 1u);
+        CHECK_EQ_U64(schway__pad_byte(reset, endpoint, 0x42u, reset->ticks, &received), 1u);
+        CHECK_EQ_U64(schway__pad_byte(reset, endpoint, 0u, reset->ticks, &received), 1u);
+        CHECK_EQ_U64(schway__pad_byte(reset, endpoint, 0u, reset->ticks, &received), 1u);
+        CHECK_EQ_U64(reset->pad.phase[endpoint], 3u);
+    }
+    CHECK_EQ_U64(schway_reset(reset, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    for (uint32_t endpoint = 0u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
+        CHECK_EQ_U64(reset->pad.phase[endpoint], 0u);
+        CHECK_EQ_U64(reset->pad.command[endpoint], 0u);
+        CHECK_EQ_U64(reset->pad.data_index[endpoint], 0u);
+    }
+    schway_destroy(reset);
 }
 
 /* Save, load, save: the same bytes. */
@@ -388,7 +567,7 @@ static void test_rejects(void)
     expect_refused("format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
-    put_le(bad + H_FORMAT, 18u, 4u);
+    put_le(bad + H_FORMAT, 19u, 4u);
     expect_refused("previous format", target, bad, n, SCHWAY_STATUS_ERR_STATE_VERSION);
 
     memcpy(bad, good, n);
@@ -419,6 +598,18 @@ static void test_rejects(void)
     uint32_t region_at = 0;
     uint32_t board_at = 0;
     uint32_t profile_flags_at = 0;
+    uint32_t pad_phase_at = 0u;
+    uint32_t pad_device_at = 0u;
+    uint32_t pad_present_at = 0u;
+    uint32_t pad_multitap_at = 0u;
+    uint32_t pad_mouse_dx_at = 0u;
+    uint32_t sio_tap_mode_at = 0u;
+    uint32_t sio_tap_index_at = 0u;
+    uint32_t sio_tap_endpoint_at = 0u;
+    uint32_t sio_tap_slot_mask_at = 0u;
+    uint32_t card_tx_active_at = 0u;
+    uint32_t card_tx_endpoint_at = 0u;
+    uint32_t card_socket_b_phase_at = 0u;
     for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
         if (strcmp(fields[i].name, "instance.region") == 0) {
             region_at = fields[i].offset;
@@ -426,7 +617,129 @@ static void test_rejects(void)
             board_at = fields[i].offset;
         } else if (strcmp(fields[i].name, "instance.profile_flags") == 0) {
             profile_flags_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.phase") == 0) {
+            pad_phase_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.device") == 0) {
+            pad_device_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.present") == 0) {
+            pad_present_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.multitap") == 0) {
+            pad_multitap_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.mouse_dx") == 0) {
+            pad_mouse_dx_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.tap_tx_mode") == 0) {
+            sio_tap_mode_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.tap_tx_index") == 0) {
+            sio_tap_index_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.tap_tx_endpoint") == 0) {
+            sio_tap_endpoint_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.tap_slot_mask") == 0) {
+            sio_tap_slot_mask_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.card_tx_active") == 0) {
+            card_tx_active_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.card_tx_endpoint") == 0) {
+            card_tx_endpoint_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "card.port1.socketB.phase") == 0) {
+            card_socket_b_phase_at = fields[i].offset;
         }
+    }
+
+    CHECK(pad_phase_at >= SCHWAY__STATE_HEADER_SIZE &&
+          sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
+          sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
+          sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE &&
+          pad_device_at >= SCHWAY__STATE_HEADER_SIZE &&
+          pad_present_at >= SCHWAY__STATE_HEADER_SIZE &&
+          pad_multitap_at >= SCHWAY__STATE_HEADER_SIZE &&
+          pad_mouse_dx_at >= SCHWAY__STATE_HEADER_SIZE);
+    if (pad_phase_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + pad_phase_at + 7u, 3u, 1u);
+        reseal(bad, n);
+        expect_refused("payload phase on disconnected endpoint", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (pad_device_at >= SCHWAY__STATE_HEADER_SIZE &&
+        pad_present_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + pad_device_at + 2u, SCHWAY_INPUT_DEVICE_DIGITAL, 1u);
+        put_le(bad + pad_present_at + 2u, 1u, 1u);
+        reseal(bad, n);
+        expect_refused("tap socket connected with tap disabled", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + sio_tap_mode_at, 2u, 1u);
+        put_le(bad + sio_tap_index_at, 1u, 1u);
+        put_le(bad + sio_tap_slot_mask_at, 1u, 1u);
+        reseal(bad, n);
+        expect_refused("tap transaction on disabled port", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_endpoint_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE &&
+        pad_multitap_at >= SCHWAY__STATE_HEADER_SIZE) {
+        static const struct {
+            const char *name;
+            uint8_t mode;
+            uint8_t index;
+            uint8_t endpoint;
+            uint8_t slot_mask;
+        } invalid_tap_indices[] = {
+            {"long reply past terminal", 2u, 35u, 0u, 1u},
+            {"slot A reply past terminal", 1u, 9u, 0u, 1u},
+            {"short reply past terminal", 3u, 4u, 0u, 1u},
+            {"method 2 reply past terminal", 4u, 9u, 2u, 0u},
+        };
+        for (size_t i = 0u; i < sizeof invalid_tap_indices / sizeof invalid_tap_indices[0];
+             i++) {
+            memcpy(bad, good, n);
+            put_le(bad + sio_tap_mode_at, invalid_tap_indices[i].mode, 1u);
+            put_le(bad + sio_tap_index_at, invalid_tap_indices[i].index, 1u);
+            put_le(bad + sio_tap_endpoint_at, invalid_tap_indices[i].endpoint, 1u);
+            put_le(bad + sio_tap_slot_mask_at, invalid_tap_indices[i].slot_mask, 1u);
+            put_le(bad + pad_multitap_at, 1u, 1u);
+            reseal(bad, n);
+            expect_refused(invalid_tap_indices[i].name, target, bad, n,
+                           SCHWAY_STATUS_ERR_STATE_FIELD);
+        }
+    }
+    if (sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_endpoint_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + sio_tap_mode_at, 2u, 1u);
+        put_le(bad + sio_tap_index_at, 1u, 1u);
+        put_le(bad + sio_tap_endpoint_at, 5u, 1u);
+        put_le(bad + sio_tap_slot_mask_at, 1u, 1u);
+        put_le(bad + pad_multitap_at, 1u, 1u);
+        reseal(bad, n);
+        expect_refused("tap transaction selects other physical port", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (pad_mouse_dx_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + pad_mouse_dx_at, 0u, 2u);
+        reseal(bad, n);
+        expect_refused("mouse movement outside latched range", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (card_tx_active_at >= SCHWAY__STATE_HEADER_SIZE &&
+        card_tx_endpoint_at >= SCHWAY__STATE_HEADER_SIZE &&
+        card_socket_b_phase_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + card_tx_active_at, 1u, 1u);
+        put_le(bad + card_tx_endpoint_at, 1u, 1u);
+        put_le(bad + card_socket_b_phase_at, 1u, 1u);
+        reseal(bad, n);
+        expect_refused("card transaction on disabled tap socket", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
     }
     CHECK(region_at >= SCHWAY__STATE_HEADER_SIZE);
     if (region_at >= SCHWAY__STATE_HEADER_SIZE) {
@@ -496,6 +809,7 @@ static void test_rejects(void)
     reseal(bad, n);
     CHECK(memcmp(bad, good, n) == 0);
     CHECK_EQ_U64(schway_load_state(target, bad, n), SCHWAY_STATUS_OK);
+    test_short_terminal_round_trip();
     schway_destroy(target);
     schway_destroy(src);
 }
@@ -1476,8 +1790,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 19u);
-    CHECK_EQ_U64(v.behaviour_revision, 19u);
+    CHECK_EQ_U64(v.state_format, 20u);
+    CHECK_EQ_U64(v.behaviour_revision, 20u);
 }
 
 static void check_cpu_power_on(schway *inst)

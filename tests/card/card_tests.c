@@ -111,14 +111,19 @@ static uint8_t transfer(schway *inst, uint8_t sent, uint32_t ack_ticks)
     return received;
 }
 
-static void read_prefix_to_high(schway *inst, uint32_t sector)
+static void read_prefix_after_address(schway *inst, uint32_t sector)
 {
-    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
     CHECK_EQ_HEX(transfer(inst, 0x52u, CARD_ACK), 0x08u);
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x5Au);
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x5Du);
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0u);
     CHECK_EQ_HEX(transfer(inst, (uint8_t)(sector >> 8), CARD_ACK), 0u);
+}
+
+static void read_prefix_to_high(schway *inst, uint32_t sector)
+{
+    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    read_prefix_after_address(inst, sector);
 }
 
 static void read_sector_tail(schway *inst, uint32_t sector, const uint8_t *expected)
@@ -145,9 +150,9 @@ static void read_sector(schway *inst, uint32_t sector, const uint8_t *expected)
     read_sector_tail(inst, sector, expected);
 }
 
-static int write_preamble(schway *inst, uint8_t expected_flag)
+static int write_preamble_address(schway *inst, uint8_t address, uint8_t expected_flag)
 {
-    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, address, CARD_ACK), 0xFFu);
     uint8_t flag = transfer(inst, 0x57u, CARD_ACK);
     if (flag != expected_flag) {
         CHECK_EQ_HEX(flag, expected_flag);
@@ -157,6 +162,11 @@ static int write_preamble(schway *inst, uint8_t expected_flag)
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x5Du);
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0u);
     return 1;
+}
+
+static int write_preamble(schway *inst, uint8_t expected_flag)
+{
+    return write_preamble_address(inst, 0x81u, expected_flag);
 }
 
 static uint8_t write_address(schway *inst, uint32_t sector, uint32_t low_ack)
@@ -198,6 +208,22 @@ static int write_success(schway *inst, uint32_t sector, uint8_t expected_flag,
     uint8_t address = write_address(inst, sector, CARD_ACK);
     if (address != 0u) {
         CHECK_EQ_HEX(address, 0u);
+        return 0;
+    }
+    write_data(inst, data, 0u, SCHWAY__CARD_SECTOR_SIZE);
+    write_finish(inst, write_checksum(sector, data), 0x47u);
+    return 1;
+}
+
+static int write_success_address(schway *inst, uint8_t address, uint32_t sector,
+                                 uint8_t expected_flag, const uint8_t *data)
+{
+    if (!write_preamble_address(inst, address, expected_flag)) {
+        return 0;
+    }
+    uint8_t response = write_address(inst, sector, CARD_ACK);
+    if (response != 0u) {
+        CHECK_EQ_HEX(response, 0u);
         return 0;
     }
     write_data(inst, data, 0u, SCHWAY__CARD_SECTOR_SIZE);
@@ -686,6 +712,12 @@ static uint8_t command_flag(schway *inst, uint8_t command)
     return transfer(inst, command, CARD_ACK);
 }
 
+static uint8_t command_flag_address(schway *inst, uint8_t address, uint8_t command)
+{
+    CHECK_EQ_HEX(transfer(inst, address, CARD_ACK), 0xFFu);
+    return transfer(inst, command, CARD_ACK);
+}
+
 static void restart_transport(schway *inst, uint32_t port)
 {
     write_mmio(inst, JOY_CTRL, 2u, 0x1043u);
@@ -957,7 +989,8 @@ static void state_pending_edges(void)
     free(source_image);
 }
 
-static void pocket_metadata(schway *inst, uint16_t index, uint8_t com_flags)
+static void pocket_metadata_address(schway *inst, uint8_t address, uint16_t index,
+                                    uint8_t com_flags, uint8_t expected_flag)
 {
     uint8_t expected[18] = {
         (uint8_t)(index >> 8), (uint8_t)index,
@@ -965,7 +998,7 @@ static void pocket_metadata(schway *inst, uint16_t index, uint8_t com_flags)
         (uint8_t)((com_flags >> 3) & 1u), (uint8_t)((com_flags >> 2) & 1u),
         0u, 0u, 0u, 0u, 1u, 1u, 0x99u, 0x19u, 0u, 0u, 0u, 1u
     };
-    CHECK_EQ_HEX(command_flag(inst, 0x5Au), 0x08u);
+    CHECK_EQ_HEX(command_flag_address(inst, address, 0x5Au), expected_flag);
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x12u);
     for (uint32_t i = 0u; i < sizeof expected; i++) {
         uint32_t ack = i + 1u == sizeof expected ? 0u : CARD_ACK;
@@ -973,10 +1006,16 @@ static void pocket_metadata(schway *inst, uint16_t index, uint8_t com_flags)
     }
 }
 
-static void pocket_set_index(schway *inst, uint16_t index, uint32_t parameter,
-                             uint16_t old_index)
+static void pocket_metadata(schway *inst, uint16_t index, uint8_t com_flags)
 {
-    CHECK_EQ_HEX(command_flag(inst, 0x59u), 0x08u);
+    pocket_metadata_address(inst, 0x81u, index, com_flags, 0x08u);
+}
+
+static void pocket_set_index_address(schway *inst, uint8_t address, uint16_t index,
+                                     uint32_t parameter, uint16_t old_index,
+                                     uint8_t expected_flag)
+{
+    CHECK_EQ_HEX(command_flag_address(inst, address, 0x59u), expected_flag);
     CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), 0x06u);
     CHECK_EQ_HEX(transfer(inst, (uint8_t)(index >> 8), CARD_ACK),
                  (uint8_t)(old_index >> 8));
@@ -987,14 +1026,21 @@ static void pocket_set_index(schway *inst, uint16_t index, uint32_t parameter,
     }
 }
 
-static uint8_t pocket_storage_begin(schway *inst, uint8_t command, uint32_t address,
-                                    uint8_t requested, uint32_t terminal_ack)
+static void pocket_set_index(schway *inst, uint16_t index, uint32_t parameter,
+                             uint16_t old_index)
+{
+    pocket_set_index_address(inst, 0x81u, index, parameter, old_index, 0x08u);
+}
+
+static uint8_t pocket_storage_begin_address(schway *inst, uint8_t start_address,
+                                            uint8_t command, uint32_t address,
+                                            uint8_t requested, uint32_t terminal_ack)
 {
     uint8_t parameters[5] = {
         (uint8_t)address, (uint8_t)(address >> 8), (uint8_t)(address >> 16),
         (uint8_t)(address >> 24), requested
     };
-    CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+    CHECK_EQ_HEX(transfer(inst, start_address, CARD_ACK), 0xFFu);
     uint8_t flags = transfer(inst, command, CARD_ACK);
     CHECK(flags == 0u || flags == 0x08u);
     CHECK_EQ_HEX(transfer(inst, 0x01u, CARD_ACK), 0xFFu);
@@ -1003,6 +1049,13 @@ static uint8_t pocket_storage_begin(schway *inst, uint8_t command, uint32_t addr
         CHECK_EQ_HEX(transfer(inst, parameters[i], CARD_ACK), 0u);
     }
     return transfer(inst, 0u, terminal_ack);
+}
+
+static uint8_t pocket_storage_begin(schway *inst, uint8_t command, uint32_t address,
+                                    uint8_t requested, uint32_t terminal_ack)
+{
+    return pocket_storage_begin_address(inst, 0x81u, command, address, requested,
+                                        terminal_ack);
 }
 
 static void pocket_storage_write(schway *inst, uint8_t command, uint32_t address,
@@ -1015,10 +1068,36 @@ static void pocket_storage_write(schway *inst, uint8_t command, uint32_t address
     CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
 }
 
+static void pocket_storage_write_address(schway *inst, uint8_t start_address,
+                                         uint8_t command, uint32_t address,
+                                         uint8_t requested, const uint8_t *bytes,
+                                         uint32_t length)
+{
+    CHECK_EQ_HEX(pocket_storage_begin_address(inst, start_address, command, address,
+                                              requested, CARD_ACK), length);
+    for (uint32_t i = 0u; i < length; i++) {
+        CHECK_EQ_HEX(transfer(inst, bytes[i], CARD_ACK), 0u);
+    }
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
+}
+
 static void pocket_storage_read(schway *inst, uint8_t command, uint32_t address,
                                 uint8_t requested, const uint8_t *expected, uint32_t length)
 {
     CHECK_EQ_HEX(pocket_storage_begin(inst, command, address, requested, CARD_ACK), length);
+    for (uint32_t i = 0u; i < length; i++) {
+        CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), expected[i]);
+    }
+    CHECK_EQ_HEX(transfer(inst, 0u, 0u), 0xFFu);
+}
+
+static void pocket_storage_read_address(schway *inst, uint8_t start_address,
+                                        uint8_t command, uint32_t address,
+                                        uint8_t requested, const uint8_t *expected,
+                                        uint32_t length)
+{
+    CHECK_EQ_HEX(pocket_storage_begin_address(inst, start_address, command, address,
+                                              requested, CARD_ACK), length);
     for (uint32_t i = 0u; i < length; i++) {
         CHECK_EQ_HEX(transfer(inst, 0u, CARD_ACK), expected[i]);
     }
@@ -1416,6 +1495,277 @@ static void state_pocketstation_metadata(void)
     state_pocketstation_storage_restore();
 }
 
+static void verify_tap_cards(schway *inst, uint8_t *images[8],
+                             const uint64_t generations[8])
+{
+    uint32_t endpoint = 0u;
+    for (uint32_t port = SCHWAY_CARD_PORT_1; port <= SCHWAY_CARD_PORT_2; port++) {
+        for (uint32_t socket = SCHWAY_CARD_SOCKET_A; socket <= SCHWAY_CARD_SOCKET_D; socket++) {
+            schway_span span;
+            uint64_t generation = UINT64_MAX;
+            CHECK_EQ_U64(schway_get_memcard(inst, port, socket, &span), SCHWAY_STATUS_OK);
+            CHECK_EQ_U64(schway_memcard_socket_generation(inst, port, socket, &generation),
+                         SCHWAY_STATUS_OK);
+            CHECK_EQ_U64(generation, generations[endpoint]);
+            CHECK(memcmp(span.data, images[endpoint], SCHWAY_MEMCARD_SIZE) == 0);
+            endpoint++;
+        }
+    }
+}
+
+static void tap_test_report(const char *name, int checks_before,
+                            uint32_t failed_port, uint32_t failed_socket)
+{
+    int failed = check_failures != checks_before;
+    printf("1..1\n%s 1 - %s\n", failed != 0 ? "not ok" : "ok", name);
+    if (failed != 0 && failed_port != 0u && failed_socket != 0u) {
+        printf("# first address failure at port %u socket %u\n", failed_port, failed_socket);
+    }
+}
+
+static void tap_protocol(void)
+{
+    int checks_before = check_failures;
+    schway *inst = make();
+    uint8_t *images[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+    uint64_t generations[8] = {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u};
+    uint32_t failed_port = 0u;
+    uint32_t failed_socket = 0u;
+    for (uint32_t endpoint = 0u; endpoint < 8u; endpoint++) {
+        images[endpoint] = make_card((uint8_t)(13u + endpoint * 17u));
+        uint32_t port = SCHWAY_CARD_PORT_1 + endpoint / 4u;
+        uint32_t socket = SCHWAY_CARD_SOCKET_A + endpoint % 4u;
+        CHECK_EQ_U64(schway_load_memcard_socket(inst, port, socket, images[endpoint],
+                                                SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    }
+
+    /* Without a tap, only the two physical A cards answer 81h. */
+    for (uint32_t port = 0u; port < 2u; port++) {
+        configure(inst, port);
+        uint32_t endpoint = port * 4u;
+        uint32_t sector = port == 0u ? 0u : SCHWAY__CARD_SECTOR_COUNT - 1u;
+        uint32_t checks_at_start = (uint32_t)check_failures;
+        CHECK_EQ_HEX(transfer(inst, 0x81u, CARD_ACK), 0xFFu);
+        if ((uint32_t)check_failures != checks_at_start) {
+            failed_port = port + 1u;
+            failed_socket = 1u;
+            goto done;
+        }
+        read_prefix_after_address(inst, sector);
+        read_sector_tail(inst, sector,
+                         &images[endpoint][sector * SCHWAY__CARD_SECTOR_SIZE]);
+        for (uint32_t address = 0x82u; address <= 0x84u; address++) {
+            (void)transfer(inst, (uint8_t)address, 0u);
+        }
+    }
+
+    inst->pad.multitap[0] = 1u;
+    inst->pad.multitap[1] = 1u;
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = port * 4u + socket;
+            uint32_t sector = (endpoint & 1u) == 0u ? 0u : SCHWAY__CARD_SECTOR_COUNT - 1u;
+            configure(inst, port);
+            uint32_t checks_at_start = (uint32_t)check_failures;
+            uint8_t address = (uint8_t)(0x81u + socket);
+            CHECK_EQ_HEX(transfer(inst, address, CARD_ACK), 0xFFu);
+            if ((uint32_t)check_failures != checks_at_start) {
+                failed_port = port + 1u;
+                failed_socket = socket + 1u;
+                goto done;
+            }
+            read_prefix_after_address(inst, sector);
+            read_sector_tail(inst, sector,
+                             &images[endpoint][sector * SCHWAY__CARD_SECTOR_SIZE]);
+            uint64_t generation = UINT64_MAX;
+            CHECK_EQ_U64(schway_memcard_socket_generation(inst, port + 1u, socket + 1u,
+                                                          &generation), SCHWAY_STATUS_OK);
+            CHECK_EQ_U64(generation, generations[endpoint]);
+        }
+    }
+
+    /* Each completed 47h write changes only the selected image and generation. */
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = port * 4u + socket;
+            uint32_t sector = (endpoint & 1u) == 0u ? 0u : SCHWAY__CARD_SECTOR_COUNT - 1u;
+            uint8_t payload[SCHWAY__CARD_SECTOR_SIZE];
+            make_write_data(payload, 71u + endpoint);
+            configure(inst, port);
+            uint32_t checks_at_write = (uint32_t)check_failures;
+            CHECK(write_success_address(inst, (uint8_t)(0x81u + socket), sector, 0x08u,
+                                        payload));
+            if ((uint32_t)check_failures != checks_at_write) {
+                failed_port = port + 1u;
+                failed_socket = socket + 1u;
+                goto done;
+            }
+            memcpy(&images[endpoint][sector * SCHWAY__CARD_SECTOR_SIZE], payload,
+                   sizeof payload);
+            generations[endpoint]++;
+            verify_tap_cards(inst, images, generations);
+        }
+    }
+
+    /* Bad checksums, invalid sectors and three abort paths leave all images intact. */
+    {
+        const uint8_t address = 0x84u;
+        uint8_t payload[SCHWAY__CARD_SECTOR_SIZE];
+        make_write_data(payload, 109u);
+        configure(inst, 1u);
+        CHECK(write_preamble_address(inst, address, 0u));
+        CHECK_EQ_HEX(write_address(inst, 3u, CARD_ACK), 0u);
+        write_data(inst, payload, 0u, SCHWAY__CARD_SECTOR_SIZE);
+        write_finish(inst, (uint8_t)(write_checksum(3u, payload) ^ 1u), 0x4Eu);
+        verify_tap_cards(inst, images, generations);
+
+        CHECK(write_preamble_address(inst, address, 0x04u));
+        CHECK_EQ_HEX(write_address(inst, SCHWAY__CARD_SECTOR_COUNT, 0u), 0xFFu);
+        verify_tap_cards(inst, images, generations);
+
+        CHECK(write_preamble_address(inst, address, 0x04u));
+        CHECK_EQ_HEX(write_address(inst, 5u, CARD_ACK), 0u);
+        write_data(inst, payload, 0u, 8u);
+        write_mmio(inst, JOY_CTRL, 2u, 0x1001u);
+        verify_tap_cards(inst, images, generations);
+
+        configure(inst, 1u);
+        CHECK(write_preamble_address(inst, address, 0u));
+        CHECK_EQ_HEX(write_address(inst, 6u, CARD_ACK), 0u);
+        write_data(inst, payload, 0u, 8u);
+        write_mmio(inst, JOY_CTRL, 2u, 0x1043u);
+        verify_tap_cards(inst, images, generations);
+
+        configure(inst, 1u);
+        CHECK(write_preamble_address(inst, address, 0u));
+        CHECK_EQ_HEX(write_address(inst, 7u, CARD_ACK), 0u);
+        write_data(inst, payload, 0u, 8u);
+        write_mmio(inst, JOY_CTRL, 2u, 0x1003u);
+        verify_tap_cards(inst, images, generations);
+    }
+
+    /* PocketStation data and metadata remain scoped to each selected card. */
+    for (uint32_t port = 0u; port < 2u; port++) {
+        configure(inst, port);
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            uint32_t endpoint = port * 4u + socket;
+            uint8_t address = (uint8_t)(0x81u + socket);
+            uint8_t payload[4] = {
+                (uint8_t)(0xA0u + endpoint), (uint8_t)(0xB0u + endpoint),
+                (uint8_t)(0xC0u + endpoint), (uint8_t)(0xD0u + endpoint)
+            };
+            uint16_t index = (uint16_t)(endpoint + 1u);
+            pocket_storage_write_address(inst, address, 0x5Cu, 0x08000100u,
+                                          sizeof payload, payload, sizeof payload);
+            memcpy(&images[endpoint][0x100u], payload, sizeof payload);
+            generations[endpoint]++;
+            pocket_storage_read_address(inst, address, 0x5Bu, 0x08000100u,
+                                        sizeof payload, payload, sizeof payload);
+            pocket_set_index_address(inst, address, index, 0u, 0u, 0u);
+            pocket_metadata_address(inst, address, index, 0u, 0u);
+            verify_tap_cards(inst, images, generations);
+        }
+    }
+
+done:
+    tap_test_report("8n card addressing isolates eight cards and preserves timing",
+                    checks_before, failed_port, failed_socket);
+    for (uint32_t i = 0u; i < 8u; i++) {
+        free(images[i]);
+    }
+    schway_destroy(inst);
+}
+
+static void tap_state(void)
+{
+    int checks_before = check_failures;
+    schway *source = make();
+    schway *target = make();
+    uint8_t *source_images[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+    uint8_t *target_images[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+    uint64_t source_generations[8] = {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u};
+    uint64_t target_generations[8] = {0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u};
+    for (uint32_t endpoint = 0u; endpoint < 8u; endpoint++) {
+        uint32_t port = SCHWAY_CARD_PORT_1 + endpoint / 4u;
+        uint32_t socket = SCHWAY_CARD_SOCKET_A + endpoint % 4u;
+        source_images[endpoint] = make_card((uint8_t)(21u + endpoint * 9u));
+        target_images[endpoint] = make_card((uint8_t)(101u + endpoint * 7u));
+        CHECK_EQ_U64(schway_load_memcard_socket(source, port, socket, source_images[endpoint],
+                                                SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_memcard_socket(target, port, socket, target_images[endpoint],
+                                                SCHWAY_MEMCARD_SIZE), SCHWAY_STATUS_OK);
+    }
+    /* A selected SIO card endpoint cannot be in flight while every card
+       protocol FSM is idle. Keep the mutation CRC-valid to reach validation. */
+    reject_mutated_state(source, target, "sio.card_tx_active", 0u, 1u);
+    size_t state_size = schway_state_size(source);
+    uint8_t *state = (uint8_t *)malloc(state_size);
+    CHECK(state != NULL);
+    if (state == NULL) {
+        goto done;
+    }
+
+    source->pad.multitap[0] = 1u;
+    source->pad.multitap[1] = 1u;
+    target->pad.multitap[0] = 1u;
+    target->pad.multitap[1] = 1u;
+    for (uint32_t endpoint = 0u; endpoint < 8u; endpoint++) {
+        uint32_t port = endpoint / 4u;
+        uint8_t address = (uint8_t)(0x81u + endpoint % 4u);
+        uint32_t sector = 4u + endpoint;
+        uint8_t payload[SCHWAY__CARD_SECTOR_SIZE];
+        uint8_t *sector_bytes = &target_images[endpoint][sector * SCHWAY__CARD_SECTOR_SIZE];
+        make_write_data(payload, 57u + endpoint);
+
+        configure(source, port);
+        CHECK(write_preamble_address(source, address, 0x08u));
+        CHECK_EQ_HEX(transfer(source, (uint8_t)(sector >> 8), CARD_ACK), 0u);
+        CHECK_EQ_U64(schway_save_state(source, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        verify_tap_cards(target, target_images, target_generations);
+        write_mmio(source, JOY_CTRL, 2u, port == 0u ? 0u : 0x2000u);
+
+        /* Restore once with only the high address byte consumed, then again
+           with staged write data. Neither load may publish the staged sector. */
+        CHECK_EQ_HEX(transfer(target, (uint8_t)sector, CARD_ACK), 0u);
+        write_data(target, payload, 0u, 8u);
+        CHECK_EQ_U64(schway_save_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        verify_tap_cards(target, target_images, target_generations);
+        write_data(target, payload, 8u, SCHWAY__CARD_SECTOR_SIZE);
+        CHECK_EQ_U64(schway_save_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        verify_tap_cards(target, target_images, target_generations);
+
+        CHECK_EQ_HEX(transfer(target, write_checksum(sector, payload), CARD_ACK), 0u);
+        CHECK_EQ_HEX(transfer(target, 0u, CARD_ACK), 0x5Cu);
+        CHECK_EQ_HEX(transfer(target, 0u, CARD_ACK), 0x5Du);
+        CHECK_EQ_U64(schway_save_state(target, state, state_size), SCHWAY_STATUS_OK);
+        CHECK_EQ_U64(schway_load_state(target, state, state_size), SCHWAY_STATUS_OK);
+        verify_tap_cards(target, target_images, target_generations);
+        CHECK_EQ_HEX(transfer(target, 0u, 0u), 0x47u);
+
+        memcpy(sector_bytes, payload, sizeof payload);
+        target_generations[endpoint]++;
+        CHECK_EQ_U64(target->card.slot[endpoint].generation, target_generations[endpoint]);
+        (void)transfer(target, 0u, 0u);
+        CHECK_EQ_U64(target->card.slot[endpoint].generation, target_generations[endpoint]);
+        verify_tap_cards(target, target_images, target_generations);
+        verify_tap_cards(source, source_images, source_generations);
+    }
+    free(state);
+
+done:
+    tap_test_report("saved tapped card FSM resumes without restoring card bytes",
+                    checks_before, 0u, 0u);
+    for (uint32_t i = 0u; i < 8u; i++) {
+        free(target_images[i]);
+        free(source_images[i]);
+    }
+    schway_destroy(target);
+    schway_destroy(source);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -1437,6 +1787,10 @@ int main(int argc, char **argv)
         state_pending_edges();
     } else if (strcmp(argv[1], "state_pocketstation_metadata") == 0) {
         state_pocketstation_metadata();
+    } else if (strcmp(argv[1], "tap_protocol") == 0) {
+        tap_protocol();
+    } else if (strcmp(argv[1], "tap_state") == 0) {
+        tap_state();
     } else {
         return 2;
     }

@@ -17,9 +17,11 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <direct.h>
+#define rmdir _rmdir
 #else
 #include <dlfcn.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #include <errno.h>
@@ -132,6 +134,16 @@ static void *(RETRO_CALLCONV *p_get_memory_data)(unsigned);
 static size_t(RETRO_CALLCONV *p_get_memory_size)(unsigned);
 static const uint8_t *(RETRO_CALLCONV *p_test_card2_data)(size_t *);
 static const char *(RETRO_CALLCONV *p_test_card2_path)(void);
+static const uint8_t *(RETRO_CALLCONV *p_test_card_socket)(unsigned, unsigned, size_t *,
+                                                            uint64_t *, uint64_t *,
+                                                            const char **);
+static int (RETRO_CALLCONV *p_test_write_card_socket)(unsigned, unsigned, uint8_t);
+static void (RETRO_CALLCONV *p_test_flush_cards)(void);
+static int (RETRO_CALLCONV *p_test_card_lifecycle)(unsigned, const char **, uint64_t *);
+static int (RETRO_CALLCONV *p_test_card_read_begin)(unsigned);
+static int (RETRO_CALLCONV *p_test_card_read_byte)(unsigned, uint8_t, int, uint8_t *);
+static int(RETRO_CALLCONV *p_test_poll_endpoint)(unsigned, unsigned, uint16_t *);
+static int(RETRO_CALLCONV *p_test_poll_bytes)(unsigned, unsigned, uint8_t *, size_t, size_t *);
 
 static const char *missing;
 
@@ -179,6 +191,14 @@ static void resolve_all(int inspect_card2)
     if (inspect_card2) {
         RESOLVE(p_test_card2_data, "schway__libretro_test_card2_data");
         RESOLVE(p_test_card2_path, "schway__libretro_test_card2_path");
+        RESOLVE(p_test_card_socket, "schway__libretro_test_card_socket");
+        RESOLVE(p_test_write_card_socket, "schway__libretro_test_write_card_socket");
+        RESOLVE(p_test_flush_cards, "schway__libretro_test_flush_cards");
+        RESOLVE(p_test_card_lifecycle, "schway__libretro_test_card_lifecycle");
+        RESOLVE(p_test_card_read_begin, "schway__libretro_test_card_read_begin");
+        RESOLVE(p_test_card_read_byte, "schway__libretro_test_card_read_byte");
+        RESOLVE(p_test_poll_endpoint, "schway__libretro_test_poll_endpoint");
+        RESOLVE(p_test_poll_bytes, "schway__libretro_test_poll_bytes");
     }
 }
 
@@ -230,6 +250,17 @@ static char memory_addrspaces[MEMORY_DESCRIPTOR_CAP][64];
 static unsigned memory_descriptor_count;
 static const char *analog_mode_value = "analog";
 static const char *analog_toggle_value = "enabled";
+static const char *multitap_port1_value = "disabled";
+static const char *multitap_port2_value = "disabled";
+static int multitap_test_mode;
+static unsigned multitap_callback_visits[8];
+static unsigned multitap_analog_visits[8];
+static unsigned multitap_invalid_player_visits;
+static int special_input_mode;
+static int16_t special_mouse_x, special_mouse_y;
+static int16_t special_axes[2][2];
+static uint32_t special_buttons;
+static unsigned special_queries[8][8][3][16];
 static int rumble_available;
 static int rumble_axis_mode;
 static unsigned audio_tap_checks;
@@ -307,7 +338,21 @@ static void check_options_v2(const struct retro_core_options_v2 *o)
     check_string("analog toggle value 0", d[5].values[0].value, "enabled");
     check_string("analog toggle value 1", d[5].values[1].value, "disabled");
     CHECK(d[5].values[2].value == NULL);
-    CHECK(d[6].key == NULL);
+    if (d[6].key == NULL) {
+        CHECK(d[6].key != NULL);
+        return;
+    }
+    check_string("port 1 multitap option key", d[6].key, "schwaystation_multitap_port1");
+    check_string("port 1 multitap option default", d[6].default_value, "disabled");
+    check_string("port 1 multitap option disabled", d[6].values[0].value, "disabled");
+    check_string("port 1 multitap option enabled", d[6].values[1].value, "enabled");
+    CHECK(d[6].values[2].value == NULL);
+    check_string("port 2 multitap option key", d[7].key, "schwaystation_multitap_port2");
+    check_string("port 2 multitap option default", d[7].default_value, "disabled");
+    check_string("port 2 multitap option disabled", d[7].values[0].value, "disabled");
+    check_string("port 2 multitap option enabled", d[7].values[1].value, "enabled");
+    CHECK(d[7].values[2].value == NULL);
+    CHECK(d[8].key == NULL);
 }
 
 /* The version 0 variables (L7483) carry both options. */
@@ -333,31 +378,59 @@ static void check_variables(const struct retro_variable *v)
     check_string("analog toggle variable key", v[5].key, "schwaystation_analog_toggle");
     check_string("analog toggle variable value", v[5].value,
                  "DualShock mode toggle; enabled|disabled");
-    CHECK(v[6].key == NULL);
+    if (v[6].key == NULL) {
+        CHECK(v[6].key != NULL);
+        return;
+    }
+    check_string("port 1 multitap variable key", v[6].key, "schwaystation_multitap_port1");
+    check_string("port 1 multitap variable value", v[6].value,
+                 "Multitap on controller port 1 (reload content); disabled|enabled");
+    check_string("port 2 multitap variable key", v[7].key, "schwaystation_multitap_port2");
+    check_string("port 2 multitap variable value", v[7].value,
+                 "Multitap on controller port 2 (reload content); disabled|enabled");
+    CHECK(v[8].key == NULL);
+}
+
+static unsigned expected_active_players(void)
+{
+    return 2u + (strcmp(multitap_port1_value, "enabled") == 0 ? 3u : 0u) +
+           (strcmp(multitap_port2_value, "enabled") == 0 ? 3u : 0u);
 }
 
 static void check_controller_info(const struct retro_controller_info *info)
 {
-    static const unsigned expected_ids[] = {RETRO_DEVICE_ANALOG, RETRO_DEVICE_JOYPAD,
-                                            RETRO_DEVICE_NONE};
-    static const char *expected_names[] = {"DualShock", "PlayStation Controller", "None"};
+    static const unsigned expected_ids[] = {
+        RETRO_DEVICE_ANALOG,
+        RETRO_DEVICE_JOYPAD,
+        RETRO_DEVICE_NONE,
+        RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1),
+        RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2),
+        RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3),
+        RETRO_DEVICE_MOUSE,
+    };
+    static const char *expected_names[] = {
+        "DualShock", "PlayStation Controller", "None", "Dual Analog Flight Stick",
+        "neGcon", "Jogcon", "Mouse",
+    };
     controller_info_calls++;
     CHECK(info != NULL);
     if (info == NULL) {
         return;
     }
-    for (unsigned port = 0u; port < 2u; port++) {
-        CHECK_EQ_U64(info[port].num_types, 3u);
+    unsigned active_players = expected_active_players();
+    for (unsigned port = 0u; port < active_players; port++) {
+        CHECK_EQ_U64(info[port].num_types,
+                     sizeof expected_ids / sizeof expected_ids[0]);
         CHECK(info[port].types != NULL);
         if (info[port].types == NULL) {
             continue;
         }
-        for (unsigned i = 0u; i < 3u; i++) {
+        for (unsigned i = 0u; i < sizeof expected_ids / sizeof expected_ids[0]; i++) {
             CHECK_EQ_U64(info[port].types[i].id, expected_ids[i]);
             check_string("controller type name", info[port].types[i].desc, expected_names[i]);
         }
     }
-    CHECK(info[2].types == NULL);
+    CHECK(info[active_players].types == NULL);
 }
 
 #define EXPECTED_PAD_DESCRIPTORS(port_)                                                              \
@@ -388,33 +461,35 @@ static void check_controller_info(const struct retro_controller_info *info)
 
 static void validate_input_descriptors(const struct retro_input_descriptor *descriptors)
 {
-    static const struct retro_input_descriptor expected[] = {
+    static const struct retro_input_descriptor expected_pad[] = {
         EXPECTED_PAD_DESCRIPTORS(0u),
-        EXPECTED_PAD_DESCRIPTORS(1u),
-        {0u, 0u, 0u, 0u, NULL},
     };
-    unsigned index = 0u;
+    unsigned active_players = expected_active_players();
+    unsigned per_player = (unsigned)(sizeof expected_pad / sizeof expected_pad[0]);
     CHECK(descriptors != NULL);
     if (descriptors == NULL) {
         return;
     }
-    for (; expected[index].description != NULL; index++) {
-        const struct retro_input_descriptor *actual = &descriptors[index];
-        CHECK(actual->description != NULL);
-        if (actual->description == NULL) {
-            return;
+    for (unsigned player = 0u; player < active_players; player++) {
+        for (unsigned item = 0u; item < per_player; item++) {
+            const struct retro_input_descriptor *actual = &descriptors[player * per_player + item];
+            CHECK(actual->description != NULL);
+            if (actual->description == NULL) {
+                return;
+            }
+            CHECK_EQ_U64(actual->port, player);
+            CHECK_EQ_U64(actual->device, expected_pad[item].device);
+            CHECK_EQ_U64(actual->index, expected_pad[item].index);
+            CHECK_EQ_U64(actual->id, expected_pad[item].id);
+            check_string("input descriptor", actual->description, expected_pad[item].description);
         }
-        CHECK_EQ_U64(actual->port, expected[index].port);
-        CHECK_EQ_U64(actual->device, expected[index].device);
-        CHECK_EQ_U64(actual->index, expected[index].index);
-        CHECK_EQ_U64(actual->id, expected[index].id);
-        check_string("input descriptor", actual->description, expected[index].description);
     }
-    CHECK(descriptors[index].description == NULL);
-    CHECK_EQ_U64(descriptors[index].port, 0u);
-    CHECK_EQ_U64(descriptors[index].device, 0u);
-    CHECK_EQ_U64(descriptors[index].index, 0u);
-    CHECK_EQ_U64(descriptors[index].id, 0u);
+    unsigned terminator = active_players * per_player;
+    CHECK(descriptors[terminator].description == NULL);
+    CHECK_EQ_U64(descriptors[terminator].port, 0u);
+    CHECK_EQ_U64(descriptors[terminator].device, 0u);
+    CHECK_EQ_U64(descriptors[terminator].index, 0u);
+    CHECK_EQ_U64(descriptors[terminator].id, 0u);
 }
 #undef EXPECTED_PAD_DESCRIPTORS
 
@@ -519,6 +594,14 @@ static bool RETRO_CALLCONV env(unsigned cmd, void *data)
         }
         if (strcmp(var->key, "schwaystation_analog_toggle") == 0) {
             var->value = analog_toggle_value;
+            return true;
+        }
+        if (strcmp(var->key, "schwaystation_multitap_port1") == 0) {
+            var->value = multitap_port1_value;
+            return true;
+        }
+        if (strcmp(var->key, "schwaystation_multitap_port2") == 0) {
+            var->value = multitap_port2_value;
             return true;
         }
         return false;
@@ -635,6 +718,44 @@ static void RETRO_CALLCONV on_poll(void)
 
 static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned index, unsigned id)
 {
+    static const unsigned player_buttons[8] = {
+        RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_A,
+        RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_ID_JOYPAD_X,
+        RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R,
+        RETRO_DEVICE_ID_JOYPAD_L2, RETRO_DEVICE_ID_JOYPAD_R2,
+    };
+    if (multitap_test_mode) {
+        if (port >= 8u) {
+            multitap_invalid_player_visits++;
+            return 0;
+        }
+        if (device == RETRO_DEVICE_ANALOG) {
+            multitap_analog_visits[port]++;
+        }
+        if (device == RETRO_DEVICE_JOYPAD && index == 0u && id == player_buttons[port]) {
+            multitap_callback_visits[port]++;
+            return 1;
+        }
+    }
+    if (special_input_mode) {
+        if (port < 8u && device < 8u && index < 3u && id < 16u) {
+            special_queries[port][device][index][id]++;
+        }
+        if (device == RETRO_DEVICE_JOYPAD && index == 0u && id < 32u) {
+            return (special_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
+        }
+        if (device == RETRO_DEVICE_ANALOG && index < 2u && id < 2u) {
+            return special_axes[index][id];
+        }
+        if (device == RETRO_DEVICE_MOUSE) {
+            if (id == RETRO_DEVICE_ID_MOUSE_X) return special_mouse_x;
+            if (id == RETRO_DEVICE_ID_MOUSE_Y) return special_mouse_y;
+            if (id == RETRO_DEVICE_ID_MOUSE_LEFT || id == RETRO_DEVICE_ID_MOUSE_RIGHT) {
+                return (special_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
+            }
+        }
+        return 0;
+    }
     if (rumble_axis_mode && device == RETRO_DEVICE_ANALOG && port < 2u) {
         if (index == RETRO_DEVICE_INDEX_ANALOG_LEFT && id == RETRO_DEVICE_ID_ANALOG_X) {
             return INT16_MIN;
@@ -1488,6 +1609,258 @@ static int test_input_descriptors(void)
     return check_failures != 0 ? 1 : 0;
 }
 
+static int test_input_multitap(void)
+{
+    static const uint16_t expected_buttons[8] = {
+        UINT16_C(0xBFFF), UINT16_C(0xDFFF), UINT16_C(0x7FFF), UINT16_C(0xEFFF),
+        UINT16_C(0xFBFF), UINT16_C(0xF7FF), UINT16_C(0xFEFF), UINT16_C(0xFDFF),
+    };
+    static const struct {
+        const char *port1;
+        const char *port2;
+        unsigned players;
+        unsigned physical_port[8];
+        unsigned socket[8];
+    } topologies[] = {
+        {"disabled", "disabled", 2u, {0u, 1u}, {0u, 0u}},
+        {"enabled", "disabled", 5u, {0u, 0u, 0u, 0u, 1u}, {0u, 1u, 2u, 3u, 0u}},
+        {"disabled", "enabled", 5u, {0u, 1u, 1u, 1u, 1u}, {0u, 0u, 1u, 2u, 3u}},
+        {"enabled", "enabled", 8u, {0u, 0u, 0u, 0u, 1u, 1u, 1u, 1u},
+         {0u, 1u, 2u, 3u, 0u, 1u, 2u, 3u}},
+    };
+
+    CHECK(p_test_poll_endpoint != NULL);
+    for (unsigned topology = 0u; topology < sizeof topologies / sizeof topologies[0]; topology++) {
+        multitap_port1_value = topologies[topology].port1;
+        multitap_port2_value = topologies[topology].port2;
+        CHECK_EQ_U64(expected_active_players(), topologies[topology].players);
+        unsigned descriptors_before = input_descriptor_calls;
+        unsigned controllers_before = controller_info_calls;
+        CHECK_EQ_U64(p_load_game(NULL), 1u);
+        CHECK(input_descriptor_calls > descriptors_before);
+        CHECK(controller_info_calls > controllers_before);
+        if (input_descriptor_calls > descriptors_before) {
+            validate_input_descriptors(published_input_descriptors);
+        }
+        for (unsigned player = 0u; player < 8u; player++) {
+            p_set_controller_port_device(player, RETRO_DEVICE_JOYPAD);
+        }
+        p_set_controller_port_device(8u, RETRO_DEVICE_JOYPAD);
+
+        unsigned polls_before = input_poll_calls;
+        unsigned invalid_before = multitap_invalid_player_visits;
+        unsigned callbacks_before[8];
+        unsigned analog_before[8];
+        memcpy(callbacks_before, multitap_callback_visits, sizeof callbacks_before);
+        memcpy(analog_before, multitap_analog_visits, sizeof analog_before);
+        p_run();
+        CHECK_EQ_U64(input_poll_calls, polls_before + 1u);
+        CHECK_EQ_U64(multitap_invalid_player_visits, invalid_before);
+        for (unsigned player = 0u; player < topologies[topology].players; player++) {
+            uint16_t buttons = 0u;
+            CHECK_EQ_U64(multitap_callback_visits[player], callbacks_before[player] + 1u);
+            CHECK_EQ_U64(p_test_poll_endpoint(topologies[topology].physical_port[player],
+                                              topologies[topology].socket[player], &buttons), 1u);
+            CHECK_EQ_U64(buttons, expected_buttons[player]);
+        }
+        if (topologies[topology].players < 8u) {
+            unsigned inactive = topologies[topology].players;
+            CHECK_EQ_U64(multitap_callback_visits[inactive], callbacks_before[inactive]);
+        }
+
+        if (topology == 1u) {
+            const char *selected_port1 = multitap_port1_value;
+            const char *selected_port2 = multitap_port2_value;
+            unsigned reload_descriptors_before = input_descriptor_calls;
+            unsigned reload_controllers_before = controller_info_calls;
+            struct retro_game_info invalid_game = {
+                "missing-controller-topology.exe", NULL, 0u, NULL,
+            };
+            multitap_port1_value = "disabled";
+            multitap_port2_value = "disabled";
+            CHECK_EQ_U64(p_load_game(&invalid_game), 0u);
+            CHECK_EQ_U64(input_descriptor_calls, reload_descriptors_before);
+            CHECK_EQ_U64(controller_info_calls, reload_controllers_before);
+            multitap_port1_value = selected_port1;
+            multitap_port2_value = selected_port2;
+            if (input_descriptor_calls == reload_descriptors_before &&
+                controller_info_calls == reload_controllers_before) {
+                validate_input_descriptors(published_input_descriptors);
+            }
+        }
+
+        if (topology == 0u) {
+            unsigned analog_visits = multitap_analog_visits[0];
+            p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG | (1u << 8));
+            polls_before = input_poll_calls;
+            p_run();
+            CHECK_EQ_U64(input_poll_calls, polls_before + 1u);
+            CHECK_EQ_U64(multitap_analog_visits[0], analog_visits);
+            uint16_t buttons = 0u;
+            CHECK_EQ_U64(p_test_poll_endpoint(0u, 0u, &buttons), 1u);
+            CHECK_EQ_U64(buttons, expected_buttons[0]);
+        }
+        p_unload_game();
+    }
+
+    multitap_port1_value = "disabled";
+    multitap_port2_value = "disabled";
+    p_deinit();
+    p_set_environment(env);
+    p_init();
+    validate_input_descriptors(published_input_descriptors);
+    p_deinit();
+    p_unload_game();
+    module_close();
+    return check_failures != 0 ? 1 : 0;
+}
+
+static void clear_special_queries(void)
+{
+    memset(special_queries, 0, sizeof special_queries);
+}
+
+static void expect_special_packet(unsigned port, unsigned socket, uint8_t id,
+                                  const uint8_t *payload, size_t payload_size)
+{
+    uint8_t actual[9];
+    size_t written = 0u;
+    CHECK(p_test_poll_bytes != NULL);
+    if (p_test_poll_bytes == NULL) {
+        return;
+    }
+    CHECK_EQ_U64(p_test_poll_bytes(port, socket, actual, sizeof actual, &written), 1u);
+    CHECK_EQ_U64(written, 3u + payload_size);
+    if (written == 3u + payload_size) {
+        CHECK_EQ_HEX(actual[0], 0xFFu);
+        CHECK_EQ_HEX(actual[1], id);
+        CHECK_EQ_HEX(actual[2], 0x5Au);
+        CHECK(memcmp(actual + 3u, payload, payload_size) == 0);
+    }
+}
+
+static void expect_special_query(unsigned player, unsigned device, unsigned index, unsigned id,
+                                 unsigned count)
+{
+    CHECK_EQ_U64(special_queries[player][device][index][id], count);
+}
+
+static int test_input_special(void)
+{
+    static const uint8_t mouse_moved[] = {0xFFu, 0xF0u, 0x80u, 0x7Fu};
+    static const uint8_t mouse_neutral[] = {0xFFu, 0xFCu, 0u, 0u};
+    static const uint8_t flight_extremes[] = {0xFFu, 0xBFu, 0xFFu, 0u, 0u, 0xFFu};
+    static const uint8_t negcon_pressure[] = {0xE7u, 0x97u, 0xFFu, 0xFFu, 0xFFu, 0xFFu};
+    static const uint8_t jogcon_min[] = {0xD7u, 0xFFu, 0u, 0x80u, 1u, 0u};
+    static const uint8_t jogcon_zero[] = {0xFFu, 0xFFu, 0u, 0u, 0u, 0u};
+    static const uint8_t jogcon_max[] = {0xFFu, 0xFFu, 0xFEu, 0x7Fu, 2u, 0u};
+    const unsigned flight = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1);
+    const unsigned negcon = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2);
+    const unsigned jogcon = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3);
+    uint16_t buttons = 0u;
+    unsigned polls;
+
+    special_input_mode = 1;
+    special_buttons = UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_B;
+    special_mouse_x = 0;
+    special_mouse_y = 0;
+    memset(special_axes, 0, sizeof special_axes);
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+
+    /* Existing digital and DualShock caller mappings remain intact. */
+    p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+    run_one();
+    CHECK_EQ_U64(p_test_poll_endpoint(0u, 0u, &buttons), 1u);
+    CHECK_EQ_HEX(buttons, 0xBFFFu);
+    p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG);
+    run_one();
+    CHECK_EQ_U64(p_test_poll_endpoint(0u, 0u, &buttons), 1u);
+    CHECK_EQ_HEX(buttons, 0xBFFFu);
+
+    p_set_controller_port_device(0u, RETRO_DEVICE_MOUSE);
+    special_mouse_x = INT16_MIN;
+    special_mouse_y = INT16_MAX;
+    special_buttons = (UINT32_C(1) << RETRO_DEVICE_ID_MOUSE_LEFT) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_MOUSE_RIGHT);
+    clear_special_queries();
+    polls = input_poll_calls;
+    run_one();
+    CHECK_EQ_U64(input_poll_calls, polls + 1u);
+    expect_special_query(0u, RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_X, 1u);
+    expect_special_query(0u, RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_Y, 1u);
+    expect_special_query(0u, RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_LEFT, 1u);
+    expect_special_query(0u, RETRO_DEVICE_MOUSE, 0u, RETRO_DEVICE_ID_MOUSE_RIGHT, 1u);
+    /* Mutating callback values after retro_run cannot change this frame's snapshot. */
+    special_mouse_x = 0;
+    special_mouse_y = 0;
+    special_buttons = 0u;
+    expect_special_packet(0u, 0u, 0x12u, mouse_moved, sizeof mouse_moved);
+    run_one();
+    expect_special_packet(0u, 0u, 0x12u, mouse_neutral, sizeof mouse_neutral);
+
+    p_set_controller_port_device(0u, flight);
+    special_buttons = UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_B;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MIN;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_Y] = INT16_MAX;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MAX;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_Y] = INT16_MIN;
+    clear_special_queries();
+    run_one();
+    expect_special_query(0u, RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_query(0u, RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_Y, 1u);
+    expect_special_query(0u, RETRO_DEVICE_ANALOG, 1u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_query(0u, RETRO_DEVICE_ANALOG, 1u, RETRO_DEVICE_ID_ANALOG_Y, 1u);
+    expect_special_packet(0u, 0u, 0x53u, flight_extremes, sizeof flight_extremes);
+
+    p_set_controller_port_device(0u, negcon);
+    special_buttons = (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_START) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_UP) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_R) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_B) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_A) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_L2);
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MAX;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MAX;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_RIGHT][RETRO_DEVICE_ID_ANALOG_Y] = INT16_MIN;
+    clear_special_queries();
+    run_one();
+    expect_special_packet(0u, 0u, 0x23u, negcon_pressure, sizeof negcon_pressure);
+
+    p_unload_game();
+    multitap_port1_value = "enabled";
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    p_set_controller_port_device(1u, jogcon);
+    special_buttons = (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_START) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_RIGHT);
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MIN;
+    clear_special_queries();
+    polls = input_poll_calls;
+    run_one();
+    CHECK_EQ_U64(input_poll_calls, polls + 1u);
+    expect_special_query(1u, RETRO_DEVICE_ANALOG, 0u, RETRO_DEVICE_ID_ANALOG_X, 1u);
+    expect_special_packet(0u, 1u, 0xE3u, jogcon_min, sizeof jogcon_min);
+
+    special_buttons = 0u;
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = 0;
+    run_one();
+    expect_special_packet(0u, 1u, 0xE3u, jogcon_zero, sizeof jogcon_zero);
+    special_axes[RETRO_DEVICE_INDEX_ANALOG_LEFT][RETRO_DEVICE_ID_ANALOG_X] = INT16_MAX;
+    run_one();
+    expect_special_packet(0u, 1u, 0xE3u, jogcon_max, sizeof jogcon_max);
+
+    /* Unknown subclasses are refused without replacing the selected device. */
+    p_set_controller_port_device(1u, RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 4));
+    run_one();
+    expect_special_packet(0u, 1u, 0xE3u, jogcon_max, sizeof jogcon_max);
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    special_input_mode = 0;
+    multitap_port1_value = "disabled";
+    return check_failures != 0 ? 1 : 0;
+}
+
 /* Selected BIOS failures and rejected content leave the current serialized
    instance intact; a selected BIOS applies only to a no-content load. */
 static void content_region_reload(const char *exe_path)
@@ -1727,6 +2100,306 @@ static void check_card_file_equal(const char *path, const unsigned char *expecte
         }
         free(actual);
     }
+}
+
+static int test_cards_multitap(const char *directory)
+{
+    static const char *const card_names[8] = {
+        "memcard_roundtrip.srm", "memcard_roundtrip.p1b.mcr",
+        "memcard_roundtrip.p1c.mcr", "memcard_roundtrip.p1d.mcr",
+        "memcard_roundtrip.1.mcr", "memcard_roundtrip.p2b.mcr",
+        "memcard_roundtrip.p2c.mcr", "memcard_roundtrip.p2d.mcr",
+    };
+    char exe_path[4096] = {0};
+    char failed_exe_path[4096] = {0};
+    char playlist_path[4096] = {0};
+    char bios_directory[4096] = {0};
+    char swapped_card_path[4096] = {0};
+    char paths[8][4096] = {{0}};
+    char backup_path[4096] = {0};
+    struct retro_game_info game;
+    void *save_ram;
+    const uint8_t *card;
+    size_t size;
+    uint64_t generation, saved_generation, prior_saved_generation;
+    uint64_t receiving_generations[8] = {0};
+    uint8_t receiving_bytes[8] = {0};
+    uint8_t first_replies[6] = {0}, restored_replies[6] = {0};
+    void *saved_state = NULL;
+    size_t saved_state_size = 0u;
+    const char *path;
+    const char *cleared_path;
+    int loaded = 0;
+    int path_length;
+
+    path_length = snprintf(exe_path, sizeof exe_path,
+                           "%s/../../fixtures/memcard_roundtrip.exe", directory);
+    CHECK(path_length > 0 && (size_t)path_length < sizeof exe_path);
+    CHECK(test_path(backup_path, sizeof backup_path, directory,
+                    "memcard_roundtrip.p1b.previous"));
+    for (unsigned index = 0u; index < 8u; index++) {
+        CHECK(test_path(paths[index], sizeof paths[index], directory, card_names[index]));
+        (void)remove(paths[index]);
+    }
+    path_length = snprintf(failed_exe_path, sizeof failed_exe_path,
+                           "%s/missing-save-content.exe", directory);
+    CHECK(path_length > 0 && (size_t)path_length < sizeof failed_exe_path);
+    path_length = snprintf(playlist_path, sizeof playlist_path,
+                           "%s/../../fixtures/disc_boot_runner.m3u", directory);
+    CHECK(path_length > 0 && (size_t)path_length < sizeof playlist_path);
+    path_length = snprintf(bios_directory, sizeof bios_directory,
+                           "%s/../../openbios", directory);
+    CHECK(path_length > 0 && (size_t)path_length < sizeof bios_directory);
+    CHECK(test_path(swapped_card_path, sizeof swapped_card_path, directory,
+                    "disc_boot_runner.1.mcr"));
+    (void)remove(swapped_card_path);
+    (void)remove(backup_path);
+    if (check_failures != 0) goto cleanup;
+
+    save_directory = directory;
+    save_directory_available = 1;
+    memset(&game, 0, sizeof game);
+    game.path = exe_path;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (!loaded) goto cleanup;
+    save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    CHECK(save_ram != NULL);
+    CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), SCHWAY_MEMCARD_SIZE);
+    card = p_test_card_socket(1u, 1u, &size, &generation, &saved_generation, &path);
+    CHECK(card != NULL && card == save_ram);
+    CHECK_EQ_U64(size, SCHWAY_MEMCARD_SIZE);
+    CHECK(path == NULL);
+
+    /* A clean adapter card must not create a sidecar; card 1 remains frontend-owned. */
+    ((uint8_t *)save_ram)[128u] = 0xA0u;
+    p_test_flush_cards();
+    for (unsigned index = 0u; index < 8u; index++) {
+        FILE *file = fopen(paths[index], "rb");
+        CHECK(file == NULL);
+        if (file != NULL) (void)fclose(file);
+    }
+
+    /* Simulate one completed write per adapter-owned endpoint without booting a BIOS. */
+    for (unsigned index = 1u; index < 8u; index++) {
+        unsigned port_number = index / 4u + 1u;
+        unsigned socket_number = index % 4u + 1u;
+        uint8_t value = (uint8_t)(0x40u + index);
+        card = p_test_card_socket(port_number, socket_number, &size,
+                                  &generation, &saved_generation, &path);
+        CHECK(card != NULL);
+        CHECK_EQ_U64(size, SCHWAY_MEMCARD_SIZE);
+        CHECK(path != NULL && strcmp(path, paths[index]) == 0);
+        CHECK(p_test_write_card_socket(port_number, socket_number, value));
+        card = p_test_card_socket(port_number, socket_number, &size,
+                                  &generation, &saved_generation, &path);
+        CHECK(card != NULL);
+        CHECK_EQ_U64(card[128u], value);
+        CHECK_EQ_U64(generation, saved_generation + 1u);
+    }
+    p_test_flush_cards();
+    for (unsigned index = 1u; index < 8u; index++) {
+        check_card_file_value(paths[index], (int)(0x40u + index));
+    }
+    {
+        FILE *file = fopen(paths[0], "rb");
+        CHECK(file == NULL);
+        if (file != NULL) (void)fclose(file);
+    }
+
+    /* Failed replacement leaves the old image and generation retryable. */
+    CHECK(copy_test_file(paths[1], backup_path));
+    card = p_test_card_socket(1u, 2u, &size, &generation,
+                              &saved_generation, &path);
+    CHECK(card != NULL);
+    prior_saved_generation = saved_generation;
+    CHECK(p_test_write_card_socket(1u, 2u, 0x7Eu));
+    CHECK(remove(paths[1]) == 0);
+    CHECK(make_test_directory(paths[1]));
+    p_test_flush_cards();
+    card = p_test_card_socket(1u, 2u, &size, &generation,
+                              &saved_generation, &path);
+    CHECK(card != NULL);
+    CHECK_EQ_U64(generation, prior_saved_generation + 1u);
+    CHECK_EQ_U64(saved_generation, prior_saved_generation);
+    check_card_file_value(backup_path, (int)(0x40u + 1u));
+    CHECK(rmdir(paths[1]) == 0);
+    CHECK(copy_test_file(backup_path, paths[1]));
+    p_test_flush_cards();
+    card = p_test_card_socket(1u, 2u, &size, &generation,
+                              &saved_generation, &path);
+    CHECK(card != NULL);
+    CHECK_EQ_U64(generation, saved_generation);
+    check_card_file_value(paths[1], 0x7E);
+
+    p_unload_game();
+    loaded = 0;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (loaded) {
+        for (unsigned index = 1u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            unsigned expected = index == 1u ? 0x7Eu : 0x40u + index;
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            CHECK_EQ_U64(size, SCHWAY_MEMCARD_SIZE);
+            CHECK(path != NULL && strcmp(path, paths[index]) == 0);
+            CHECK_EQ_U64(card[128u], expected);
+            CHECK_EQ_U64(generation, saved_generation);
+        }
+        save_ram = p_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+        CHECK(save_ram != NULL);
+        CHECK_EQ_U64(p_get_memory_size(RETRO_MEMORY_SAVE_RAM), SCHWAY_MEMCARD_SIZE);
+        card = p_test_card_socket(1u, 1u, &size, &generation, &saved_generation, &path);
+        CHECK(card != NULL && card == save_ram);
+        CHECK(path == NULL);
+
+        /* A state restores the selected card's protocol, not any receiving image or generation. */
+        CHECK(p_test_card_read_begin(1u));
+        saved_state_size = p_serialize_size();
+        saved_state = saved_state_size != 0u ? malloc(saved_state_size) : NULL;
+        CHECK(saved_state != NULL);
+        CHECK(saved_state != NULL && p_serialize(saved_state, saved_state_size));
+        for (unsigned index = 0u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            uint8_t value = (uint8_t)(0x60u + index);
+            CHECK(p_test_write_card_socket(port_number, socket_number, value));
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            if (card != NULL) {
+                receiving_bytes[index] = card[128u];
+                receiving_generations[index] = generation;
+                CHECK_EQ_U64(receiving_bytes[index], value);
+            }
+        }
+        for (unsigned byte = 0u; byte < 6u; byte++) {
+            CHECK(p_test_card_read_byte(1u, 0u, 1, &first_replies[byte]));
+        }
+        CHECK(p_unserialize(saved_state, saved_state_size));
+        for (unsigned index = 0u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            if (card != NULL) {
+                CHECK_EQ_U64(card[128u], receiving_bytes[index]);
+                CHECK_EQ_U64(generation, receiving_generations[index]);
+            }
+        }
+        for (unsigned byte = 0u; byte < 6u; byte++) {
+            CHECK(p_test_card_read_byte(1u, 0u, 1, &restored_replies[byte]));
+        }
+        CHECK(memcmp(first_replies, restored_replies, sizeof first_replies) == 0);
+        free(saved_state);
+        saved_state = NULL;
+
+        p_reset();
+        for (unsigned index = 0u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            if (card != NULL) {
+                CHECK_EQ_U64(card[128u], receiving_bytes[index]);
+                CHECK_EQ_U64(generation, receiving_generations[index]);
+            }
+        }
+
+        struct retro_game_info failed_game;
+        memset(&failed_game, 0, sizeof failed_game);
+        failed_game.path = failed_exe_path;
+        CHECK(!p_load_game(&failed_game));
+        CHECK(p_serialize_size() != 0u);
+        for (unsigned index = 0u; index < 8u; index++) {
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            if (card != NULL) {
+                CHECK_EQ_U64(card[128u], receiving_bytes[index]);
+                CHECK_EQ_U64(generation, receiving_generations[index]);
+                CHECK(index == 0u ? path == NULL :
+                      path != NULL && strcmp(path, paths[index]) == 0);
+            }
+        }
+    }
+
+cleanup:
+    free(saved_state);
+    if (loaded) p_unload_game();
+    for (unsigned index = 0u; index < 8u; index++) {
+        (void)remove(paths[index]);
+    }
+    (void)rmdir(paths[1]);
+    (void)remove(backup_path);
+    for (unsigned index = 0u; index < 8u; index++) {
+        uint64_t saved_after_unload = UINT64_MAX;
+        cleared_path = (const char *)1;
+        CHECK(p_test_card_lifecycle(index, &cleared_path, &saved_after_unload));
+        CHECK(cleared_path == NULL);
+        CHECK_EQ_U64(saved_after_unload, 0u);
+    }
+
+    /* M3U swaps keep sidecars tied to the initial playlist basename. */
+    system_directory = bios_directory;
+    bios_option_value = "none";
+    save_directory = directory;
+    save_directory_available = 1;
+    memset(&game, 0, sizeof game);
+    game.path = playlist_path;
+    loaded = p_load_game(&game) ? 1 : 0;
+    CHECK(loaded);
+    if (loaded) {
+        CHECK_EQ_U64(disk_control.get_num_images(), 2u);
+        card = p_test_card_socket(2u, 1u, &size, &generation,
+                                  &saved_generation, &path);
+        CHECK(card != NULL);
+        CHECK(path != NULL && strcmp(path, swapped_card_path) == 0);
+        CHECK(disk_control.set_eject_state(true));
+        CHECK(disk_control.set_image_index(1u));
+        CHECK(disk_control.set_eject_state(false));
+        card = p_test_card_socket(2u, 1u, &size, &generation,
+                                  &saved_generation, &path);
+        CHECK(card != NULL);
+        CHECK(path != NULL && strcmp(path, swapped_card_path) == 0);
+        for (unsigned index = 1u; index < 8u; index++) {
+            static const char *const names[8] = {
+                "disc_boot_runner.srm", "disc_boot_runner.p1b.mcr",
+                "disc_boot_runner.p1c.mcr", "disc_boot_runner.p1d.mcr",
+                "disc_boot_runner.1.mcr", "disc_boot_runner.p2b.mcr",
+                "disc_boot_runner.p2c.mcr", "disc_boot_runner.p2d.mcr",
+            };
+            unsigned port_number = index / 4u + 1u;
+            unsigned socket_number = index % 4u + 1u;
+            char expected_path[4096];
+            CHECK(test_path(expected_path, sizeof expected_path, directory, names[index]));
+            card = p_test_card_socket(port_number, socket_number, &size,
+                                      &generation, &saved_generation, &path);
+            CHECK(card != NULL);
+            CHECK(path != NULL && strcmp(path, expected_path) == 0);
+        }
+        p_unload_game();
+        loaded = 0;
+    }
+    p_deinit();
+    for (unsigned index = 0u; index < 8u; index++) {
+        uint64_t saved_after_deinit = UINT64_MAX;
+        cleared_path = (const char *)1;
+        CHECK(p_test_card_lifecycle(index, &cleared_path, &saved_after_deinit));
+        CHECK(cleared_path == NULL);
+        CHECK_EQ_U64(saved_after_deinit, 0u);
+    }
+    (void)remove(swapped_card_path);
+    int result = check_failures != 0 ? 1 : 0;
+    module_close();
+    return result;
 }
 
 static int test_card_persistence(const char *exe_path, const char *directory)
@@ -4057,15 +4730,15 @@ static void visit_input_state(void *user, const char *name, const void *data, ui
                               uint32_t width)
 {
     struct input_state_snapshot *snapshot = (struct input_state_snapshot *)user;
-    if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
+    if (strcmp(name, "pad.device") == 0 && count == 8u && width == 1u) {
         memcpy(snapshot->device, data, sizeof snapshot->device);
-    } else if (strcmp(name, "pad.present") == 0 && count == 2u && width == 1u) {
+    } else if (strcmp(name, "pad.present") == 0 && count == 8u && width == 1u) {
         memcpy(snapshot->present, data, sizeof snapshot->present);
-    } else if (strcmp(name, "pad.analog_mode") == 0 && count == 2u && width == 1u) {
+    } else if (strcmp(name, "pad.analog_mode") == 0 && count == 8u && width == 1u) {
         memcpy(snapshot->analog_mode, data, sizeof snapshot->analog_mode);
-    } else if (strcmp(name, "pad.buttons") == 0 && count == 2u && width == 2u) {
+    } else if (strcmp(name, "pad.buttons") == 0 && count == 8u && width == 2u) {
         memcpy(snapshot->buttons, data, sizeof snapshot->buttons);
-    } else if (strcmp(name, "pad.axes") == 0 && count == 8u && width == 1u) {
+    } else if (strcmp(name, "pad.axes") == 0 && count == 32u && width == 1u) {
         memcpy(snapshot->axes, data, sizeof snapshot->axes);
     }
 }
@@ -4735,7 +5408,7 @@ static int test_input_controls(const char *path)
         controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DIGITAL, SCHWAY_INPUT_DEVICE_NONE);
         controls_step(reference, &input_snapshot, digital_none,
                       "independent digital and none ports", audio_floor, 1);
-        p_set_controller_port_device(0u, RETRO_DEVICE_MOUSE);
+        p_set_controller_port_device(0u, RETRO_DEVICE_LIGHTGUN);
         p_set_controller_port_device(2u, RETRO_DEVICE_ANALOG);
         controls_step(reference, &input_snapshot, digital_none,
                       "invalid requests preserve selected devices", audio_floor, 1);
@@ -4980,7 +5653,7 @@ static void visit_rumble_reference(void *user, const char *name, const void *dat
                                    uint32_t width)
 {
     struct rumble_reference_snapshot *found = (struct rumble_reference_snapshot *)user;
-    if (strcmp(name, "pad.device") == 0 && count == 2u && width == 1u) {
+    if (strcmp(name, "pad.device") == 0 && count == 8u && width == 1u) {
         found->device[0] = ((const uint8_t *)data)[0];
         found->device[1] = ((const uint8_t *)data)[1];
     } else if (strcmp(name, "bus.ram") == 0 && width == 1u && count >= 0x2000Cu) {
@@ -5208,6 +5881,8 @@ int main(int argc, char **argv)
     int options_profile_mode = argc == 3 && strcmp(argv[2], "options-profile") == 0;
     int psexe_mode = argc == 5 && strcmp(argv[2], "content-psexe") == 0;
     int input_descriptors_mode = argc == 3 && strcmp(argv[2], "input-descriptors") == 0;
+    int input_multitap_mode = argc == 3 && strcmp(argv[2], "input-multitap") == 0;
+    int input_special_mode = argc == 3 && strcmp(argv[2], "input-special") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
@@ -5215,15 +5890,16 @@ int main(int argc, char **argv)
     int lifecycle_mode = argc == 5 && strcmp(argv[2], "content-lifecycle") == 0;
     int card_persistence_mode = argc == 5 && strcmp(argv[2], "card-persistence") == 0;
     int card_controls_mode = argc == 5 && strcmp(argv[2], "card-controls") == 0;
+    int cards_multitap_mode = argc == 4 && strcmp(argv[2], "cards-multitap") == 0;
     int memory_aliases_mode = argc == 3 && strcmp(argv[2], "memory-aliases") == 0;
     int memory_boundaries_mode = argc == 3 && strcmp(argv[2], "memory-boundaries") == 0;
     int rumble_guest_mode = argc == 4 && strcmp(argv[2], "rumble-guest") == 0;
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
-    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode &&
-         !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
+    if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode && !input_multitap_mode &&
+         !input_special_mode && !video_geometry_mode && !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
-         !card_controls_mode && !memory_aliases_mode && !memory_boundaries_mode &&
+         !card_controls_mode && !cards_multitap_mode && !memory_aliases_mode && !memory_boundaries_mode &&
          !rumble_guest_mode && !rumble_controls_mode &&
          (argc != 3 || (strcmp(argv[2], "ntsc-u") != 0 && strcmp(argv[2], "pal") != 0))) ||
         (audio_mode && (!valid_audio_region(argv[3]) || argv[4][0] == '\0' ||
@@ -5232,7 +5908,7 @@ int main(int argc, char **argv)
                              argv[5][0] == '\0' || argv[6][0] == '\0')) ||
         ((content_mode || disc_control_mode || content_chd_mode || content_pbp_mode || content_legacy_mode || psexe_mode || content_profile_mode || content_boot_mode || video_geometry_mode || video_edges_mode || lifecycle_mode ||
           input_movies_mode || input_controls_mode || rumble_guest_mode || rumble_controls_mode ||
-          card_persistence_mode || card_controls_mode) &&
+          card_persistence_mode || card_controls_mode || cards_multitap_mode) &&
          argv[3][0] == '\0') ||
         (content_chd_mode && (argv[4][0] == '\0' || argv[5][0] == '\0' ||
                               argv[6][0] == '\0' || argv[7][0] == '\0' ||
@@ -5266,7 +5942,7 @@ int main(int argc, char **argv)
                 "disc-audio-equality-batch|disc-audio-equality-single <region> <m3u> <pcm> <bios-directory> | "
                 "content-psexe <exe> <directory> | audio-equality-batch|audio-equality-single <region> <exe> <pcm> | input-descriptors | "
                 "content-lifecycle <exe> <system-dir> | card-persistence <exe> <save-dir> | "
-                "card-controls <exe> <save-dir> | memory-aliases | memory-boundaries | "
+                "card-controls <exe> <save-dir> | cards-multitap <save-dir> | memory-aliases | memory-boundaries | "
                 "video-geometry <exe> | video-geometry-edges <exe> | input-movies <exe> | "
                 "input-controls <exe> | rumble-guest <exe> | rumble-controls <exe>\n");
         return 2;
@@ -5295,7 +5971,7 @@ int main(int argc, char **argv)
         return 1;
     }
     /* Every entry point, before anything else is called. */
-    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode;
+    int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode || card_persistence_mode || input_multitap_mode || input_special_mode || cards_multitap_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -5304,7 +5980,12 @@ int main(int argc, char **argv)
     }
     if (!inspect_card2 &&
         (module_sym("schway__libretro_test_card2_data") != NULL ||
-         module_sym("schway__libretro_test_card2_path") != NULL)) {
+         module_sym("schway__libretro_test_card2_path") != NULL ||
+         module_sym("schway__libretro_test_card_socket") != NULL ||
+         module_sym("schway__libretro_test_write_card_socket") != NULL ||
+         module_sym("schway__libretro_test_flush_cards") != NULL ||
+         module_sym("schway__libretro_test_poll_endpoint") != NULL ||
+         module_sym("schway__libretro_test_poll_bytes") != NULL)) {
         fprintf(stderr, "production libretro module exports card test accessors\n");
         module_close();
         return 1;
@@ -5409,6 +6090,15 @@ int main(int argc, char **argv)
         return test_input_descriptors();
     }
 
+    if (input_multitap_mode) {
+        multitap_test_mode = 1;
+        return test_input_multitap();
+    }
+
+    if (input_special_mode) {
+        return test_input_special();
+    }
+
     if (psexe_mode) {
         return test_content_psexe(argv[3], argv[4]);
     }
@@ -5427,6 +6117,13 @@ int main(int argc, char **argv)
 
     if (card_controls_mode) {
         return test_card_controls(argv[3], argv[4]);
+    }
+
+    if (cards_multitap_mode) {
+        int result = test_cards_multitap(argv[3]);
+        printf("TAP version 13\n1..1\n%s 1 - libretro.cards.multitap\n",
+               result == 0 ? "ok" : "not ok");
+        return result;
     }
 
     if (memory_aliases_mode) {

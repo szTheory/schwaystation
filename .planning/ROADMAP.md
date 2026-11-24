@@ -17,7 +17,7 @@ v2.0 expands the PlayStation library that the C library, headless runner and lib
 - [x] **Phase 11: ECM and CloneCD images** - Read ECM and CCD/IMG/SUB images with their correct sector and track data. (completed 2026-11-22)
 - [x] **Phase 12: SBI and LibCrypt** - Serve bad Q responses for a matching SBI sidecar while keeping sector reads intact. (completed 2026-11-23)
 - [x] **Phase 13: Regions, console revisions and playback** - Select supported hardware profiles, use the opt-in BIOS shortcut, and verify bounded FMV behavior. (completed 2026-11-23)
-- [ ] **Phase 14: Multitap and special controllers** - Play with tap controllers and cards, mouse, neGcon, Jogcon and Dual Analog flight mode.
+- [x] **Phase 14: Multitap and special controllers** - Play with tap controllers and cards, mouse, neGcon, Jogcon and Dual Analog flight mode. (completed 2026-11-24)
 - [ ] **Phase 15: GunCon and Justifier** - Aim and fire with deterministic beam sensing and documented libretro inputs.
 - [ ] **Phase 16: Patches, cheats and compatibility evidence** - Apply supported modifications and publish an evidence-backed account of library and core support.
 
@@ -283,7 +283,49 @@ Plans:
   3. neGcon and Jogcon report documented serial modes and integer controls, and explicitly reject unsupported modes.
   4. The size-tagged input and libretro mappings carry Dual Analog flight axes and buttons. Existing digital-pad and DualShock callers still pass their compatibility checks. Ledger rows record the exercised controller modes.
 
-**Plans**: TBD
+**Plans**: 16/16 plans complete
+**Wave 1**
+- [x] 14-01-PLAN.md
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 14-02-PLAN.md
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 14-03-PLAN.md
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 14-04-PLAN.md
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 14-05-PLAN.md
+- [x] 14-08-PLAN.md
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 14-06-PLAN.md
+- [x] 14-09-PLAN.md
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 14-07-PLAN.md
+- [x] 14-10-PLAN.md
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 14-11-PLAN.md
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 14-12-PLAN.md
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 14-13-PLAN.md
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 14-14-PLAN.md
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [x] 14-15-PLAN.md
+
+**Wave 13** *(blocked on Wave 12 completion)*
+- [x] 14-16-PLAN.md
+
 **UI hint**: no
 **Canonical refs:** `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md`, `.planning/preparation/HOSTS-AND-INTEGRATION.md`, `.planning/preparation/ARCHITECTURE.md`
 
@@ -329,6 +371,6 @@ Phases ship in numeric order. Dependency lines identify the implementation input
 | 11. ECM and CloneCD images | 15/15 | Complete    | 2026-11-22 |
 | 12. SBI and LibCrypt | 7/7 | Complete    | 2026-11-23 |
 | 13. Regions, console revisions and playback | 9/9 | Complete    | 2026-11-23 |
-| 14. Multitap and special controllers | 0/TBD | Not started | - |
+| 14. Multitap and special controllers | 16/16 | Complete    | 2026-11-24 |
 | 15. GunCon and Justifier | 0/TBD | Not started | - |
 | 16. Patches, cheats and compatibility evidence | 0/TBD | Not started | - |

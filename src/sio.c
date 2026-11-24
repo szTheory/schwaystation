@@ -29,6 +29,37 @@
 #define PAD_ACK_HOLD 68u
 #define STATE_EVENT_AHEAD UINT64_C(40000000)
 
+enum {
+    TAP_IDLE,
+    TAP_SLOT_A,
+    TAP_LONG,
+    TAP_SHORT,
+    TAP_METHOD2,
+    TAP_SLOT_A_LAST_INDEX = 8u,
+    TAP_LONG_LAST_INDEX = 34u,
+    TAP_SHORT_LAST_INDEX = 3u,
+    TAP_METHOD2_LAST_INDEX = 8u
+};
+enum { TAP_REPLY_SLOT_A, TAP_REPLY_LONG, TAP_REPLY_SHORT };
+
+static uint8_t tap_transaction_index_valid(uint8_t mode, uint8_t index)
+{
+    switch (mode) {
+    case TAP_IDLE:
+        return index == 0u;
+    case TAP_SLOT_A:
+        return index >= 1u && index <= TAP_SLOT_A_LAST_INDEX;
+    case TAP_LONG:
+        return index >= 1u && index <= TAP_LONG_LAST_INDEX;
+    case TAP_SHORT:
+        return index >= 1u && index <= TAP_SHORT_LAST_INDEX;
+    case TAP_METHOD2:
+        return index >= 1u && index <= TAP_METHOD2_LAST_INDEX;
+    default:
+        return 0u;
+    }
+}
+
 static const char name_mode[] = "sio.mode";
 static const char name_ctrl[] = "sio.ctrl";
 static const char name_baud[] = "sio.baud";
@@ -46,6 +77,17 @@ static const char name_irq[] = "sio.irq";
 static const char name_byte_deadline[] = "sio.byte_deadline";
 static const char name_ack_deadline[] = "sio.ack_deadline";
 static const char name_release_deadline[] = "sio.release_deadline";
+static const char name_card_tx_active[] = "sio.card_tx_active";
+static const char name_card_tx_endpoint[] = "sio.card_tx_endpoint";
+static const char name_tap_history_req[] = "sio.tap_history_req";
+static const char name_tap_history_reply[] = "sio.tap_history_reply";
+static const char name_tap_tx_mode[] = "sio.tap_tx_mode";
+static const char name_tap_tx_index[] = "sio.tap_tx_index";
+static const char name_tap_tx_endpoint[] = "sio.tap_tx_endpoint";
+static const char name_tap_tx_request[] = "sio.tap_tx_request";
+static const char name_tap_tx_command[] = "sio.tap_tx_command";
+static const char name_tap_slot_mask[] = "sio.tap_slot_mask";
+static const char name_tap_slot_id[] = "sio.tap_slot_id";
 
 static uint16_t state_u16(struct schway__state_io *io, const char *name, uint16_t *value,
                           uint16_t min, uint16_t max)
@@ -139,8 +181,9 @@ static uint32_t rx_preview(const struct schway__sio *sio, uint32_t width)
     return value;
 }
 
-static uint32_t status(const struct schway__sio *sio)
+static uint32_t status(const schway *inst)
 {
+    const struct schway__sio *sio = &inst->sio;
     uint32_t value = sio->tx_pending == 0u ? 5u : 0u;
     if (sio->rx_count != 0u) {
         value |= STAT_RX_READY;
@@ -148,7 +191,7 @@ static uint32_t status(const struct schway__sio *sio)
     if (sio->parity_error != 0u) {
         value |= 1u << 3;
     }
-    if (sio->ack_low != 0u) {
+    if (sio->ack_low != 0u || schway__pad_mouse_ack_low(inst) != 0u) {
         value |= STAT_ACK_LOW;
     }
     if (sio->irq != 0u) {
@@ -166,7 +209,7 @@ static int peek_reg(const schway *inst, uint32_t addr, uint32_t width, uint32_t 
     }
     if (addr >= SIO_STAT && addr + width <= SIO_STAT + 4u &&
         (width == 1u || width == 2u || width == 4u) && addr % width == 0u) {
-        *value = (status(sio) >> ((addr - SIO_STAT) * 8u)) &
+        *value = (status(inst) >> ((addr - SIO_STAT) * 8u)) &
                  (width == 1u ? 0xFFu : width == 2u ? 0xFFFFu : UINT32_MAX);
         return 0;
     }
@@ -211,6 +254,62 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
     uint64_t release_deadline = schway__state_u64(io, name_release_deadline,
                                                   &sio->release_deadline, 0u,
                                                   SCHWAY__STATE_TICKS_MAX);
+    schway__state_u8_array(io, name_tap_history_req, sio->tap_history_req, 2u, 0u, 1u);
+    schway__state_u8_array(io, name_tap_history_reply, sio->tap_history_reply, 2u,
+                           TAP_REPLY_SLOT_A, TAP_REPLY_SHORT);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_mode[port] = io->r[port];
+        }
+    }
+    schway__state_u8_array(io, name_tap_tx_mode, sio->tap_tx_mode, 2u, TAP_IDLE,
+                           TAP_METHOD2);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_index[port] = io->r[port];
+        }
+    }
+    schway__state_u8_array(io, name_tap_tx_index, sio->tap_tx_index, 2u, 0u,
+                           TAP_LONG_LAST_INDEX);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_endpoint[port] = io->r[port];
+        }
+    }
+    schway__state_u8_array(io, name_tap_tx_endpoint, sio->tap_tx_endpoint, 2u, 0u,
+                           SCHWAY__PAD_ENDPOINT_COUNT - 1u);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_request[port] = io->r[port];
+        }
+    }
+    schway__state_u8_array(io, name_tap_tx_request, sio->tap_tx_request, 2u, 0u, 1u);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_tx_command[port] = io->r[port];
+        }
+    }
+    schway__state_u8_array(io, name_tap_tx_command, sio->tap_tx_command, 2u, 0u, UINT8_MAX);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->tap_slot_mask[port] = io->r[port];
+        }
+    }
+    schway__state_u8_array(io, name_tap_slot_mask, sio->tap_slot_mask, 2u, 0u, 0x0Fu);
+    schway__state_u8_array(io, name_tap_slot_id, sio->tap_slot_id, 8u, 0u, UINT8_MAX);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->card_tx_active[port] = io->r[port];
+        }
+    }
+    schway__state_u8_array(io, name_card_tx_active, sio->card_tx_active, 2u, 0u, 1u);
+    if (io->mode == SCHWAY__STATE_VALIDATE) {
+        for (uint32_t port = 0u; port < 2u; port++) {
+            io->card_tx_endpoint[port] = io->r[port];
+        }
+    }
+    schway__state_u8_array(io, name_card_tx_endpoint, sio->card_tx_endpoint, 2u, 0u,
+                           SCHWAY__CARD_ENDPOINT_COUNT - 1u);
     if (io->mode == SCHWAY__STATE_VALIDATE) {
         uint64_t max = ticks > SCHWAY__STATE_TICKS_MAX - STATE_EVENT_AHEAD
                            ? SCHWAY__STATE_TICKS_MAX
@@ -226,6 +325,30 @@ void schway__sio_state_io(struct schway__state_io *io, schway *inst, uint64_t ti
                                   release_deadline <= max) ||
                                  (ack_low == 0u && release_deadline == 0u));
         schway__state_check(io, !(ack_pending != 0u && ack_low != 0u));
+        for (uint32_t port = 0u; port < 2u; port++) {
+            uint8_t tap_mode = io->tap_tx_mode[port];
+            schway__state_check(io, tap_mode != TAP_IDLE ||
+                                       (io->tap_tx_index[port] == 0u &&
+                                        io->tap_tx_request[port] == 0u &&
+                                        io->tap_tx_command[port] == 0u &&
+                                        io->tap_slot_mask[port] == 0u));
+            schway__state_check(io, tap_transaction_index_valid(
+                                        tap_mode, io->tap_tx_index[port]) != 0u);
+            schway__state_check(io, tap_mode != TAP_LONG ||
+                                       (io->tap_slot_mask[port] & 1u) != 0u);
+            schway__state_check(io, tap_mode != TAP_SHORT ||
+                                       (io->tap_slot_mask[port] & 1u) != 0u);
+            schway__state_check(io, tap_mode == TAP_IDLE ||
+                                       ((io->tap_tx_endpoint[port] < 2u
+                                             ? io->tap_tx_endpoint[port]
+                                             : io->tap_tx_endpoint[port] < 5u ? 0u : 1u) ==
+                                            port &&
+                                        io->pad_multitap[port] != 0u));
+            schway__state_check(io, !(io->card_tx_active[port] != 0u &&
+                                      tap_mode != TAP_IDLE));
+            schway__state_check(io, io->card_tx_active[port] == 0u ||
+                                       io->card_tx_endpoint[port] / 4u == port);
+        }
     }
 }
 
@@ -276,6 +399,263 @@ static void rx_push(schway *inst, uint8_t value)
     }
 }
 
+static uint32_t tap_endpoint(uint32_t port, uint32_t socket)
+{
+    return socket == 0u ? port : 2u + port * 3u + socket - 1u;
+}
+
+static uint32_t tap_slot_index(uint32_t port, uint32_t socket)
+{
+    return port * 4u + socket;
+}
+
+static uint8_t tap_payload_size(uint8_t id)
+{
+    if (id == 0x41u) {
+        return 2u;
+    }
+    if (id == 0x12u) {
+        return 4u;
+    }
+    return 6u;
+}
+
+static uint32_t card_address_endpoint(const schway *inst, uint32_t port, uint8_t sent,
+                                      uint32_t *endpoint)
+{
+    if (port >= 2u || endpoint == NULL) {
+        return 0u;
+    }
+    if (inst->sio.tap_tx_mode[port] != TAP_IDLE) {
+        return 0u;
+    }
+    if (sent == 0x81u) {
+        *endpoint = port * 4u;
+        return 1u;
+    }
+    if (inst->pad.multitap[port] != 0u && sent >= 0x82u && sent <= 0x84u) {
+        *endpoint = port * 4u + (uint32_t)(sent - 0x81u);
+        return 1u;
+    }
+    return 0u;
+}
+
+static void card_clear_transaction(struct schway__sio *sio, uint32_t port)
+{
+    sio->card_tx_active[port] = 0u;
+    sio->card_tx_endpoint[port] = (uint8_t)(port * 4u);
+}
+
+static void tap_clear_transaction(struct schway__sio *sio, uint32_t port)
+{
+    sio->tap_tx_mode[port] = TAP_IDLE;
+    sio->tap_tx_index[port] = 0u;
+    sio->tap_tx_endpoint[port] = 0u;
+    sio->tap_tx_request[port] = 0u;
+    sio->tap_tx_command[port] = 0u;
+    sio->tap_slot_mask[port] = 0u;
+    memset(&sio->tap_slot_id[tap_slot_index(port, 0u)], 0,
+           4u * sizeof sio->tap_slot_id[0]);
+}
+
+static void tap_finish_transaction(struct schway__sio *sio, uint32_t port,
+                                   uint8_t reply_kind)
+{
+    sio->tap_history_req[port] = sio->tap_tx_request[port];
+    sio->tap_history_reply[port] = reply_kind;
+    tap_clear_transaction(sio, port);
+}
+
+static uint8_t tap_next_reply(const struct schway__sio *sio, uint32_t port)
+{
+    if (sio->tap_history_req[port] == 0u) {
+        return TAP_SLOT_A;
+    }
+    if (sio->tap_history_reply[port] == TAP_REPLY_LONG) {
+        return TAP_SHORT;
+    }
+    return TAP_LONG;
+}
+
+static uint32_t tap_start_endpoint(schway *inst, uint32_t port, uint32_t socket,
+                                   uint64_t now)
+{
+    uint8_t ignored = 0xFFu;
+    uint32_t endpoint = tap_endpoint(port, socket);
+    uint32_t ack = schway__pad_byte(inst, endpoint, 0x01u, now, &ignored);
+    if (ack != 0u) {
+        inst->sio.tap_slot_mask[port] |= (uint8_t)(1u << socket);
+    }
+    return ack;
+}
+
+/* Returns one when a tap or routed endpoint accepted the address, including an
+   empty address that correctly aborts without acknowledging. */
+static uint32_t tap_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t now,
+                         uint8_t *received, uint32_t *ack)
+{
+    struct schway__sio *sio = &inst->sio;
+    if (port >= 2u || inst->pad.multitap[port] == 0u) {
+        return 0u;
+    }
+
+    uint8_t mode = sio->tap_tx_mode[port];
+    if (mode == TAP_IDLE) {
+        if (sent >= 0x02u && sent <= 0x04u) {
+            uint32_t socket = sent - 1u;
+            uint32_t endpoint = tap_endpoint(port, socket);
+            sio->tap_tx_mode[port] = TAP_METHOD2;
+            sio->tap_tx_endpoint[port] = (uint8_t)endpoint;
+            *ack = schway__pad_byte(inst, endpoint, 0x01u, now, received);
+            if (*ack == 0u) {
+                tap_clear_transaction(sio, port);
+            } else {
+                sio->tap_tx_index[port] = 1u;
+            }
+            return 1u;
+        }
+        if (sent != 0x01u) {
+            return 0u;
+        }
+
+        mode = tap_next_reply(sio, port);
+        sio->tap_tx_mode[port] = mode;
+        sio->tap_tx_index[port] = 0u;
+        sio->tap_tx_request[port] = 0u;
+        sio->tap_tx_command[port] = 0u;
+        sio->tap_slot_mask[port] = 0u;
+        *ack = tap_start_endpoint(inst, port, 0u, now);
+        if (*ack == 0u) {
+            tap_clear_transaction(sio, port);
+            *received = 0xFFu;
+            return 1u;
+        }
+        if (mode == TAP_LONG) {
+            for (uint32_t socket = 1u; socket < 4u; socket++) {
+                (void)tap_start_endpoint(inst, port, socket, now);
+            }
+        }
+        sio->tap_tx_index[port] = 1u;
+        *received = 0xFFu;
+        return 1u;
+    }
+
+    uint8_t index = sio->tap_tx_index[port];
+    if (mode == TAP_SLOT_A) {
+        *ack = schway__pad_byte(inst, port, sent, now, received);
+        if (index == 1u) {
+            sio->tap_tx_command[port] = sent;
+        } else if (index == 2u && sio->tap_tx_command[port] == 0x42u) {
+            sio->tap_tx_request[port] = sent == 0x01u ? 1u : 0u;
+        }
+        if (*ack == 0u) {
+            tap_finish_transaction(sio, port, TAP_REPLY_SLOT_A);
+        } else {
+            sio->tap_tx_index[port]++;
+        }
+        return 1u;
+    }
+
+    if (mode == TAP_METHOD2) {
+        uint32_t endpoint = sio->tap_tx_endpoint[port];
+        *ack = schway__pad_byte(inst, endpoint, sent, now, received);
+        if (*ack == 0u) {
+            tap_clear_transaction(sio, port);
+        } else {
+            sio->tap_tx_index[port]++;
+        }
+        return 1u;
+    }
+
+    if (mode == TAP_SHORT) {
+        if (index == 1u) {
+            uint8_t id = 0xFFu;
+            *ack = schway__pad_byte(inst, port, sent, now, &id);
+            if (*ack != 0u && sent == 0x42u) {
+                sio->tap_slot_id[tap_slot_index(port, 0u)] = id;
+                *received = 0x80u;
+            } else {
+                *received = 0xFFu;
+            }
+        } else if (index == 2u) {
+            sio->tap_tx_request[port] = sent == 0x01u ? 1u : 0u;
+            *received = 0x5Au;
+            *ack = 1u;
+        } else {
+            *received = sio->tap_slot_id[tap_slot_index(port, 0u)];
+            *ack = 0u;
+        }
+        if (*ack == 0u) {
+            schway__pad_abort(inst, port);
+            tap_finish_transaction(sio, port, TAP_REPLY_SHORT);
+        } else {
+            sio->tap_tx_index[port]++;
+        }
+        return 1u;
+    }
+
+    if (mode == TAP_LONG) {
+        if (index == 1u) {
+            if (sent != 0x42u) {
+                *received = 0xFFu;
+                *ack = 0u;
+                schway__pad_abort(inst, port);
+                tap_clear_transaction(sio, port);
+                return 1u;
+            }
+            for (uint32_t socket = 0u; socket < 4u; socket++) {
+                if ((sio->tap_slot_mask[port] & (1u << socket)) == 0u) {
+                    continue;
+                }
+                uint32_t endpoint = tap_endpoint(port, socket);
+                uint8_t id = 0xFFu;
+                if (schway__pad_byte(inst, endpoint, sent, now, &id) == 0u) {
+                    sio->tap_slot_mask[port] &= (uint8_t)~(1u << socket);
+                    continue;
+                }
+                uint8_t ignored = 0xFFu;
+                if (schway__pad_byte(inst, endpoint, 0x00u, now, &ignored) == 0u) {
+                    sio->tap_slot_mask[port] &= (uint8_t)~(1u << socket);
+                    continue;
+                }
+                sio->tap_slot_id[tap_slot_index(port, socket)] = id;
+            }
+            *received = 0x80u;
+            *ack = 1u;
+        } else if (index == 2u) {
+            sio->tap_tx_request[port] = sent == 0x01u ? 1u : 0u;
+            *received = 0x5Au;
+            *ack = 1u;
+        } else {
+            uint32_t stream_index = index - 3u;
+            uint32_t socket = stream_index / 8u;
+            uint32_t byte_index = stream_index % 8u;
+            *ack = index < 34u ? 1u : 0u;
+            if ((sio->tap_slot_mask[port] & (1u << socket)) == 0u) {
+                *received = 0xFFu;
+            } else if (byte_index == 0u) {
+                *received = sio->tap_slot_id[tap_slot_index(port, socket)];
+            } else if (byte_index == 1u) {
+                *received = 0x5Au;
+            } else if (byte_index >=
+                       2u + tap_payload_size(sio->tap_slot_id[tap_slot_index(port, socket)])) {
+                *received = 0xFFu;
+            } else {
+                uint32_t endpoint = tap_endpoint(port, socket);
+                uint32_t pad_ack = schway__pad_byte(inst, endpoint, sent, now, received);
+                (void)pad_ack;
+            }
+        }
+        if (index == 34u) {
+            tap_finish_transaction(sio, port, TAP_REPLY_LONG);
+        } else {
+            sio->tap_tx_index[port]++;
+        }
+        return 1u;
+    }
+    return 0u;
+}
+
 void schway__sio_event(schway *inst, uint64_t now)
 {
     struct schway__sio *sio = &inst->sio;
@@ -286,15 +666,34 @@ void schway__sio_event(schway *inst, uint64_t now)
         uint64_t period = byte_cycles(sio);
         uint64_t tx_start = sio->byte_deadline >= period ? sio->byte_deadline - period : 0u;
         if ((sio->ctrl & CTRL_SELECT) != 0u) {
-            uint32_t card_result = schway__card_byte(inst, sio->tx_port, sio->tx_data, &received);
+            uint32_t port = sio->tx_port;
+            uint32_t card_endpoint = 0u;
+            uint32_t card_selected = 0u;
+            uint32_t card_result = SCHWAY__CARD_BYTE_UNHANDLED;
+            if (sio->card_tx_active[port] != 0u) {
+                card_selected = 1u;
+                card_endpoint = sio->card_tx_endpoint[port];
+                card_result = schway__card_byte(inst, card_endpoint, sio->tx_data, &received);
+            } else if (card_address_endpoint(inst, port, sio->tx_data, &card_endpoint) != 0u) {
+                card_selected = 1u;
+                sio->card_tx_active[port] = 1u;
+                sio->card_tx_endpoint[port] = (uint8_t)card_endpoint;
+                card_result = schway__card_byte(inst, card_endpoint, sio->tx_data, &received);
+            }
             if (card_result == SCHWAY__CARD_BYTE_ACK) {
                 ack = 1u;
                 card_ack = SCHWAY__CARD_ACK_FROM_TX;
             } else if (card_result == SCHWAY__CARD_BYTE_READ_PAUSE) {
                 ack = 1u;
                 card_ack = SCHWAY__CARD_READ_PAUSE_FROM_TX;
+            } else if (card_result == SCHWAY__CARD_BYTE_NO_ACK) {
+                card_clear_transaction(sio, port);
             } else if (card_result == SCHWAY__CARD_BYTE_UNHANDLED) {
-                ack = schway__pad_byte(inst, sio->tx_port, sio->tx_data, now, &received);
+                if (card_selected != 0u) {
+                    card_clear_transaction(sio, port);
+                } else if (tap_byte(inst, port, sio->tx_data, now, &received, &ack) == 0u) {
+                    ack = schway__pad_byte(inst, port, sio->tx_data, now, &received);
+                }
             }
         }
         sio->byte_deadline = 0u;
@@ -358,7 +757,7 @@ static int write_ctrl(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
     if ((next & CTRL_RESET) != 0u) {
         schway__sio_reset(inst);
         schway__pad_abort(inst, 2u);
-        schway__card_abort(inst, 2u);
+        schway__card_abort(inst, SCHWAY__CARD_ENDPOINT_ALL);
         schway__sched_recalc(inst);
         return 0;
     }
@@ -367,7 +766,12 @@ static int write_ctrl(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
     if (old_select != new_select && (sio->ctrl & CTRL_SELECT) != 0u) {
         uint32_t port = (sio->ctrl & CTRL_PORT2) != 0u ? 1u : 0u;
         schway__pad_abort(inst, port);
-        schway__card_abort(inst, port);
+        uint32_t card_endpoint = sio->card_tx_active[port] != 0u
+                                     ? sio->card_tx_endpoint[port]
+                                     : port * 4u;
+        schway__card_abort(inst, card_endpoint);
+        card_clear_transaction(sio, port);
+        tap_clear_transaction(sio, port);
         sio->tx_pending = 0u;
         sio->byte_deadline = 0u;
         sio->ack_pending = 0u;

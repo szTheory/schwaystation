@@ -59,9 +59,12 @@ cfg.size = (uint32_t)sizeof cfg;
 The size tag lets a program built against one header run with a library built from another.
 `schway_span` is an unversioned read-only view with `data` and `size`; do not initialize it with a size tag.
 
-**Input structs** (`schway_config`, `schway_profile`, `schway_budget`, `schway_audio`, `schway_tty`):
+**Input structs** (`schway_config`, `schway_profile`, `schway_budget`, `schway_audio`, `schway_tty`,
+`schway_input`):
 
 - A size below the struct's first released size returns `SCHWAY_STATUS_ERR_STRUCT_SIZE`.
+- `schway_input` keeps the released 28-byte API v8 prefix. API v9 accepts that prefix and any longer
+  caller-sized prefix through the current struct, zero-filling fields the caller did not provide.
 - A larger size from a newer header is accepted only if every byte past the library's struct is zero; a field
   added later keeps the old behaviour when it is zero.
 - A size above 4096 bytes is refused whatever the bytes hold, so a garbage tag never makes the library read far
@@ -79,15 +82,53 @@ A call that returns an error changes nothing: not the instance, not your struct.
 
 ## Pad input and frame reports
 
-`schway_input` is a host snapshot for both controller ports. `device` uses `SCHWAY_INPUT_DEVICE_NONE` to
-disconnect a port, `SCHWAY_INPUT_DEVICE_DIGITAL` for a two-button-byte pad and `SCHWAY_INPUT_DEVICE_DUALSHOCK`
-for a DualShock. Set bits in `buttons` mean pressed; SIO returns those buttons active-low. The four raw axis bytes
-are right X, right Y, left X and left Y, with 128 at centre. `analog_button` is a held 0/1 input; a rising edge
-toggles analog mode when the pad has not locked that button.
+Serial IDs, payloads and supported host mappings are detailed in [controller protocols](controllers.md).
 
-Zero the struct, set its `size`, then call `schway_set_input`. The snapshot takes effect at the next frame start,
-so input set during a frame cannot change a poll already in progress. Host input itself is outside save states;
-the latched pad and in-progress serial protocol are saved.
+`schway_input` is a host snapshot with an append-only size of 228 bytes in API v9. Its first 28 bytes retain the
+API v8 fields: `device[2]`, `buttons[2]`, `axes[2][4]`, `analog_button[2]` and `reserved0`. Set bits in
+`buttons` mean pressed; SIO returns those buttons active-low. The four raw axis bytes are right X, right Y,
+left X and left Y, with 128 at centre. `analog_button` is a held 0/1 input; a rising edge toggles DualShock
+analog mode when the pad has not locked that button. `reserved0` must be zero.
+
+The device identifiers are `SCHWAY_INPUT_DEVICE_NONE` (0), `SCHWAY_INPUT_DEVICE_DIGITAL` (1),
+`SCHWAY_INPUT_DEVICE_DUALSHOCK` (2), `SCHWAY_INPUT_DEVICE_MOUSE` (3), `SCHWAY_INPUT_DEVICE_NEGCON` (4),
+`SCHWAY_INPUT_DEVICE_JOGCON` (5) and `SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT` (6). `multitap[2]` contains 0 or 1 per
+physical port. The appended `controllers[2][4]` array holds four sockets per port; each `schway_controller_input`
+is 24 bytes:
+
+| Field | Type and valid values |
+| --- | --- |
+| `device` | `uint32_t`, one of the device identifiers above |
+| `buttons` | `uint16_t`, set bits mean pressed |
+| `axes[4]` | four `uint8_t` values: right X/Y, left X/Y; centre is 128 |
+| `analog_button` | `uint8_t`, 0 released or 1 pressed |
+| `reserved0` | `uint8_t`, must be zero |
+| `mouse_dx`, `mouse_dy` | signed `int16_t`, range −32768 through 32767; zero means no movement |
+| `negcon_twist`, `negcon_i`, `negcon_ii`, `negcon_l` | four `uint8_t` controls |
+| `jogcon_dial` | `uint16_t` raw dial halfword; wire bit 0 is reserved and cleared |
+| `jogcon_flags` | `uint16_t`; bit 0 means turned left, bit 1 means turned right; other bits are rejected |
+
+Public port and socket coordinates are one-based; the C arrays use zero-based indexes. The stable internal
+endpoint mapping is:
+
+| Internal endpoint | Public coordinates |
+| ---: | --- |
+| 0 | port 1, socket 1 |
+| 1 | port 2, socket 1 |
+| 2–4 | port 1, sockets 2–4 |
+| 5–7 | port 2, sockets 2–4 |
+
+With `multitap[port] == 0`, the legacy prefix supplies device, buttons, axes and analog-button input for socket 1;
+`controllers[port][0]` supplies only its appended special-controller controls. Sockets 2–4 are disconnected.
+With the tap enabled, the corresponding `controllers[port][0..3]` entries supply the full input for all four
+sockets and the legacy fields are ignored for that port. Zero is neutral for buttons, analog-button, mouse
+movement, NegCon controls, JogCon dial and JogCon flags; centred stick axes should be set to 128 by the host.
+
+Zero the struct, set its `size`, then call `schway_set_input`. A truncated caller provides only the bytes named
+by its size tag; absent appended fields are zero, and the setter never reads beyond that count. It validates the
+normalized snapshot before replacing the pending input. The snapshot takes effect at the next frame start, so
+input set during a frame cannot change a poll already in progress. Pending host input itself is outside save
+states; the eight latched endpoint states and in-progress serial protocol are saved.
 
 The appended `schway_run_result.lag` is 1 when no complete controller poll occurred in that frame; peeks do not
 count. `rumble[0]` and `rumble[1]` report each port as `large << 8 | small`, where large is 0–255 and small is
@@ -480,11 +521,18 @@ reset. Copy data you need before destroying the instance.
 
 `schway_get_memory` exposes read-only spans selected by `SCHWAY_MEMORY_RAM`, `SCHWAY_MEMORY_SCRATCHPAD`,
 `SCHWAY_MEMORY_VRAM`, `SCHWAY_MEMORY_BIOS`, `SCHWAY_MEMORY_CARD1` or `SCHWAY_MEMORY_CARD2`. It returns the
-instance's 2 MiB RAM, 1 KiB scratchpad, 1 MiB VRAM, current BIOS image or one of two 131,072-byte card images.
-RAM, scratchpad, VRAM and card pointers remain stable for the instance lifetime. The BIOS span initially names the
-built-in PS-EXE stub; after a host BIOS is loaded it names the instance's copied image and stays stable through
-resets. RAM, scratchpad and VRAM contents change as the core runs; card pointers and bytes remain stable across
-reads, state loads and power resets. `schway_get_vram` remains a convenience accessor for the VRAM span.
+instance's 2 MiB RAM, 1 KiB scratchpad, 1 MiB VRAM, current BIOS image or one of the two legacy card images.
+API v9 adds `schway_get_memcard(inst, port, socket, &span)` to expose all eight physical tap-card endpoints.
+`SCHWAY_CARD_PORT_1` and `SCHWAY_CARD_PORT_2` are one-based physical ports. `SCHWAY_CARD_SOCKET_A` (1),
+`SCHWAY_CARD_SOCKET_B` (2), `SCHWAY_CARD_SOCKET_C` (3) and `SCHWAY_CARD_SOCKET_D` (4) are one-based sockets. Port
+1/socket A remains card 1 and port 2/socket A remains card 2, whether or not either tap is enabled. No additional
+memory IDs are needed. RAM, scratchpad, VRAM and card pointers remain stable for the instance lifetime. The BIOS
+span initially names the built-in PS-EXE stub; after a host BIOS
+is loaded it names the instance's copied image and stays stable through resets. RAM, scratchpad and VRAM contents
+change as the core runs; card pointers and bytes remain stable across reads, state loads and power resets.
+`schway_get_vram` remains a convenience accessor for the VRAM span.
+
+See [memory card persistence and save-state boundaries](saves.md) for card filenames and host save behavior.
 
 Cards start as formatted blank images. Before execution, a host can import a raw image up to 131,072 bytes.
 Short images are padded with `FFh` through the end of the card, as required for an unallocated raw card area:
@@ -495,10 +543,15 @@ schway_load_memcard(inst, SCHWAY_CARD_SLOT_1, raw_card, raw_card_size);
 schway_memcard_generation(inst, SCHWAY_CARD_SLOT_1, &generation);
 ```
 
-The one-based slots are `SCHWAY_CARD_SLOT_1` and `SCHWAY_CARD_SLOT_2`; each image has `SCHWAY_MEMCARD_SIZE`
-bytes. The core accepts raw bytes only; the host owns file access and any wrapper decoding. A null pointer, invalid
-slot, oversized image or import after execution returns `SCHWAY_STATUS_ERR_ARGUMENT` without changing the current
-card or its generation. Successful imports keep the span address stable and reset that slot's generation to zero.
+The one-based legacy slots are `SCHWAY_CARD_SLOT_1` and `SCHWAY_CARD_SLOT_2`; every socket image has
+`SCHWAY_MEMCARD_SIZE` bytes. `schway_load_memcard_socket(inst, port, socket, bytes, size)` imports one endpoint,
+and `schway_memcard_socket_generation(inst, port, socket, &generation)` reads its write counter. The original
+load and generation calls remain aliases for port 1/socket A and port 2/socket A. The core accepts raw bytes only;
+the host owns file access and any wrapper decoding. A null pointer, invalid coordinate, oversized image or import
+after execution returns `SCHWAY_STATUS_ERR_ARGUMENT` without changing bytes or generation. Successful imports
+keep the span address stable, pad short images with `FFh`, and reset that socket's generation to zero. When a tap is
+enabled, serial card addresses `81h` through `84h` select sockets A through D on that physical port. With a tap
+disabled, only the existing direct `81h` card address responds.
 
 Ordinary save states include the pending SIO/card protocol but exclude card bytes and generations. Before applying
 a state, the core validates card phase and address progression, checks checksum consistency where the saved fields
@@ -593,9 +646,16 @@ storage-transfer fields (a 32-bit address, length and progress capped at 128 byt
 transfer fields remain zero until their first caller is implemented; card bytes and generation counters stay with the
 receiving instance across state loads.
 It also records the host-supplied disc identity for validation; callback pointers and file handles stay outside the
-state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. Format-16 and
-format-17 states return `SCHWAY_STATUS_ERR_STATE_VERSION`. API v6 appends disc identity to the size-tagged descriptor;
-the behavior revision is 18 because PocketStation command behavior and serialized state fields changed.
+state. The cursor preserves a contiguous block stream when an EOB occupies the low half of a word. Format 20 stores
+the frame-latched inputs and serial protocol state for eight controller endpoints, including multitap selection and
+special-controller controls; pending host input remains outside the state. Loading restores card protocol progress,
+not the card image or its generation: those remain with the receiving instance, and only a newly completed valid
+write changes them. Format-16 through format-19 states return `SCHWAY_STATUS_ERR_STATE_VERSION`.
+
+The API version, state format and behavior revision are separate compatibility values. The current values are API
+v9, state format 20 and behavior revision 20: API versions track public header changes, state formats track the
+serialized layout, and behavior revisions track deterministic behavior and hash changes. API v6 introduced the
+host-supplied disc identity in the size-tagged descriptor.
 `schway_save_state` returns `SCHWAY_STATUS_ERR_BUFFER_TOO_SMALL` if `size` is below `schway_state_size`.
 `schway_load_state` checks the whole state before it changes anything:
 
@@ -633,11 +693,12 @@ an unknown one included, and never `NULL`.
 built with), `abi`, `behaviour_revision` (raised when the same inputs give different frames, audio or states) and
 `state_format`.
 
-`SCHWAY_API_VERSION` is 8. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
+`SCHWAY_API_VERSION` is 9. A version only appends names or size-tagged fields, so a program built against an earlier header runs unchanged.
 Version 3 added `SCHWAY_FAULT_DMA`; version 4 added read-only `schway_span` memory views, card loading and card
 generation queries, plus copied BIOS loading and SHA-256 reporting. Version 5 added the host-supplied disc and TOC
 callbacks, lid control, and disc swapping; version 6 appended disc identity; version 7 appended `disc_flags` to
-`schway_profile`. A program that switches on the fault kind should treat a value it does not
+`schway_profile`; version 8 appended the board selection; version 9 adds the size-bounded multitap and
+controller-endpoint input fields. A program that switches on the fault kind should treat a value it does not
 know as a fault it cannot name.
 
 ## The test card

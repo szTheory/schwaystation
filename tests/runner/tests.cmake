@@ -870,6 +870,147 @@ Path(sys.argv[2]).write_bytes(data)
     set(RUN ${HOOKED})
     expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash)
     expect_exit(0 "^frames 5\n.*max_rss_kib [0-9]+\n$" --bench 60)
+  elseif(CASE STREQUAL "cards_multitap")
+    set(RUN ${HOOKED})
+    string(REPEAT "[0-9a-f]" 64 digits)
+    execute_process(COMMAND ${EMULATOR} ${RUN} --help RESULT_VARIABLE help_rc
+      OUTPUT_VARIABLE help_out ERROR_VARIABLE help_err)
+    if(NOT help_rc STREQUAL "0" OR NOT help_out MATCHES "--multitap-port1 enabled" OR
+       NOT help_out MATCHES "--multitap-port2 enabled")
+      message(FATAL_ERROR "runner help does not document both multitap options: ${help_out}${help_err}")
+    endif()
+    set(card_dir "${OUT}/runner-cards-multitap")
+    file(REMOVE_RECURSE "${card_dir}")
+    file(MAKE_DIRECTORY "${card_dir}")
+    set(card_selectors port1a port1b port1c port1d port2a port2b port2c port2d)
+    foreach(selector IN LISTS card_selectors)
+      expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
+        --test-card-write "${selector}")
+    endforeach()
+    set(endpoint_card_files
+      "${card_dir}/schwaystation.srm"
+      "${card_dir}/schwaystation.p1b.mcr"
+      "${card_dir}/schwaystation.p1c.mcr"
+      "${card_dir}/schwaystation.p1d.mcr"
+      "${card_dir}/schwaystation.1.mcr"
+      "${card_dir}/schwaystation.p2b.mcr"
+      "${card_dir}/schwaystation.p2c.mcr"
+      "${card_dir}/schwaystation.p2d.mcr")
+    set(expected_card_files
+      "${card_dir}/schwaystation.srm"
+      "${card_dir}/schwaystation.p1b.mcr"
+      "${card_dir}/schwaystation.p1c.mcr"
+      "${card_dir}/schwaystation.p1d.mcr"
+      "${card_dir}/schwaystation.1.mcr"
+      "${card_dir}/schwaystation.p2b.mcr"
+      "${card_dir}/schwaystation.p2c.mcr"
+      "${card_dir}/schwaystation.p2d.mcr")
+    list(SORT expected_card_files)
+    file(GLOB actual_card_files LIST_DIRECTORIES FALSE "${card_dir}/*.srm" "${card_dir}/*.mcr")
+    list(SORT actual_card_files)
+    if(NOT actual_card_files STREQUAL expected_card_files)
+      message(FATAL_ERROR "runner did not persist exactly eight stable card socket files: ${actual_card_files}")
+    endif()
+    set(sector_values)
+    foreach(card_file IN LISTS expected_card_files)
+      if(NOT EXISTS "${card_file}")
+        message(FATAL_ERROR "runner did not persist all eight card sockets; missing ${card_file}")
+      endif()
+      file(SIZE "${card_file}" card_size)
+      file(READ "${card_file}" sector_value HEX OFFSET 896 LIMIT 8)
+      if(NOT card_size EQUAL 131072 OR sector_value STREQUAL "0000000000000000")
+        message(FATAL_ERROR "runner card has an invalid image size or empty written sector: ${card_file}")
+      endif()
+      list(APPEND sector_values "${sector_value}")
+    endforeach()
+    list(REMOVE_DUPLICATES sector_values)
+    list(LENGTH sector_values unique_sector_count)
+    if(NOT unique_sector_count EQUAL 8)
+      message(FATAL_ERROR "card sockets did not retain eight unique sector payloads: ${sector_values}")
+    endif()
+
+    function(hash_card_set result_name)
+      set(values)
+      foreach(path IN LISTS expected_card_files)
+        file(SHA256 "${path}" value)
+        list(APPEND values "${value}")
+      endforeach()
+      set(${result_name} "${values}" PARENT_SCOPE)
+    endfunction()
+    hash_card_set(initial_hashes)
+    set(reloaded_hashes "${initial_hashes}")
+    foreach(index RANGE 0 7)
+      list(GET card_selectors ${index} selector)
+      list(GET endpoint_card_files ${index} endpoint_file)
+      string(REPLACE "port" "reload-port" reload_mode "${selector}")
+      expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
+        --test-card-write "${reload_mode}")
+      hash_card_set(next_hashes)
+      list(FIND expected_card_files "${endpoint_file}" selected_index)
+      foreach(card_index RANGE 0 7)
+        list(GET reloaded_hashes ${card_index} before)
+        list(GET next_hashes ${card_index} after)
+        if(card_index EQUAL selected_index)
+          if(before STREQUAL after)
+            message(FATAL_ERROR "fresh-process reload did not update ${selector}")
+          endif()
+        elseif(NOT before STREQUAL after)
+          message(FATAL_ERROR "fresh-process update of ${selector} changed another card")
+        endif()
+      endforeach()
+      set(reloaded_hashes "${next_hashes}")
+    endforeach()
+
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}")
+    hash_card_set(clean_hashes)
+    if(NOT clean_hashes STREQUAL reloaded_hashes)
+      message(FATAL_ERROR "a clean exit rewrote an unchanged card image")
+    endif()
+    foreach(mode partial-port1b bad-port1b)
+      expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
+        --test-card-write "${mode}")
+      hash_card_set(aborted_hashes)
+      if(NOT aborted_hashes STREQUAL clean_hashes)
+        message(FATAL_ERROR "${mode} changed card bytes without a successful completed write")
+      endif()
+    endforeach()
+    expect_exit(1 "cannot save card file" --frames 1 --save-dir "${card_dir}"
+      --test-card-write port1b --test-save-failure rename)
+    hash_card_set(failed_save_hashes)
+    file(GLOB temporary_files "${card_dir}/*.schwaystation.tmp.*")
+    if(NOT failed_save_hashes STREQUAL clean_hashes OR temporary_files)
+      message(FATAL_ERROR "failed atomic replacement changed a stored card or left a temporary")
+    endif()
+
+    function(multitap_state result_name)
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames 2 --hash-state ${ARGN}
+        RESULT_VARIABLE state_rc OUTPUT_VARIABLE state_out ERROR_VARIABLE state_err)
+      if(NOT state_rc STREQUAL "0" OR NOT state_out MATCHES "state sha256 ${digits}")
+        message(FATAL_ERROR "multitap state run failed (${state_rc}): ${state_out}${state_err}")
+      endif()
+      string(REGEX MATCH "state sha256 ([0-9a-f]+)" state_match "${state_out}")
+      set(${result_name} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    endfunction()
+    multitap_state(default_state)
+    multitap_state(disabled_state --multitap-port1 disabled --multitap-port2 disabled)
+    multitap_state(port1_state --multitap-port1 enabled)
+    multitap_state(port2_state --multitap-port2 enabled)
+    multitap_state(both_state --multitap-port1 enabled --multitap-port2 enabled)
+    if(NOT default_state STREQUAL disabled_state OR default_state STREQUAL port1_state OR
+       default_state STREQUAL port2_state OR port1_state STREQUAL port2_state OR
+       port1_state STREQUAL both_state OR port2_state STREQUAL both_state)
+      message(FATAL_ERROR "multitap options are not independent or default-disabled")
+    endif()
+    set(movie "${OUT}/runner-multitap.inputs")
+    file(WRITE "${movie}" "2 p1=dualshock:X:128,128,128,128 p2=.\n")
+    multitap_state(movie_disabled --inputs "${movie}")
+    multitap_state(movie_port1 --inputs "${movie}" --multitap-port1 enabled)
+    if(movie_disabled STREQUAL movie_port1)
+      message(FATAL_ERROR "an input movie update discarded the selected multitap option")
+    endif()
+    refuse(--frames 1 --multitap-port1 invalid)
+    refuse(--frames 1 --multitap-port1 enabled --multitap-port1 disabled)
+    refuse(--frames 1 --multitap-port1)
   elseif(CASE STREQUAL "cards_persistence")
     set(NORMAL_RUN ${RUN})
     set(RUN ${HOOKED})
@@ -1289,7 +1430,8 @@ Path(sys.argv[2]).write_bytes(data)
       if(NOT movie STREQUAL "none")
         set(movie_arg --inputs "${movie}")
       endif()
-      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state ${movie_arg}
+      execute_process(COMMAND ${EMULATOR} ${RUN} --frames ${frames} --hash --hash-state
+        ${movie_arg} ${ARGN}
         RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
       if(NOT rc STREQUAL "0" OR NOT out MATCHES "frame ${frames} sha256 ${digits}" OR
          NOT out MATCHES "state sha256 ${digits}")
@@ -1310,6 +1452,8 @@ Path(sys.argv[2]).write_bytes(data)
     run_movie(2 "${OUT}/runner-empty.inputs" empty_movie)
     run_movie(2 "${OUT}/runner-button.inputs" event_after)
     run_movie(2 "${OUT}/runner-button.inputs" event_repeat)
+    run_movie(2 "${OUT}/runner-empty.inputs" multitap_empty --multitap-port1 enabled)
+    run_movie(2 "${OUT}/runner-button.inputs" multitap_button --multitap-port1 enabled)
     if(NOT no_movie_before_frame STREQUAL event_before_frame OR
        NOT no_movie_before_state STREQUAL event_before_state)
       message(FATAL_ERROR "an input scheduled for frame 2 changed the frame-1 state")
@@ -1323,6 +1467,9 @@ Path(sys.argv[2]).write_bytes(data)
     endif()
     if(no_movie_after_state STREQUAL event_after_state)
       message(FATAL_ERROR "the event-frame input did not change the saved latched state")
+    endif()
+    if(multitap_empty_state STREQUAL multitap_button_state)
+      message(FATAL_ERROR "legacy p1 movie input did not change socket A state with port 1 multitap")
     endif()
     if(NOT event_after_output STREQUAL event_repeat_output)
       message(FATAL_ERROR "replaying the same input movie changed its hashes")
@@ -1952,6 +2099,12 @@ foreach(case controls persistence sigterm)
     COMMAND ${runner_cards_check} -DCASE=cards_${case} -P ${CMAKE_CURRENT_LIST_FILE}
     LABELS portable runner TIMEOUT 60)
 endforeach()
+
+# Fault prevented: runner card paths or protocol state alias across adapter sockets.
+schway_add_test(NAME runner.cards.multitap
+  COMMAND ${runner_cards_check} -DOUT=${PROJECT_BINARY_DIR}/tests/runner-cards-multitap
+    -DCASE=cards_multitap -P ${CMAKE_CURRENT_LIST_FILE}
+  LABELS portable runner TIMEOUT 30)
 
 # Fault prevented: a runner that exits 0 after failing to write a file, or
 # calls a failure a usage error.

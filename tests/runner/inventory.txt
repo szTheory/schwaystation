@@ -10,6 +10,7 @@ runner.boot.fast	portable,runner
 runner.boot.full	portable,runner
 runner.boot.invalid	portable,runner
 runner.cards.controls	portable,runner
+runner.cards.multitap	portable,runner
 runner.cards.persistence	portable,runner
 runner.cards.sigterm	portable,runner
 runner.disc.api	portable,runner

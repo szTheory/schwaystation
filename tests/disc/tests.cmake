@@ -456,8 +456,9 @@ set_tests_properties(disc.image.legacy_preflight PROPERTIES
   FIXTURES_SETUP disc_legacy_preflight)
 set_tests_properties(disc.image.legacy_parity PROPERTIES
   FIXTURES_SETUP disc_legacy_parity FIXTURES_REQUIRED disc_legacy_preflight)
-get_property(schway__disc_registered_tests DIRECTORY PROPERTY TESTS)
-list(REMOVE_ITEM schway__disc_registered_tests
-  disc.image.legacy_preflight disc.image.legacy_parity)
-set_property(TEST ${schway__disc_registered_tests} APPEND PROPERTY
-  FIXTURES_REQUIRED "disc_legacy_preflight;disc_legacy_parity")
+set_tests_properties(disc.fixture.ecm.boot disc.fixture.ecm.read
+  disc.fixture.ccd.boot disc.fixture.ccd.read disc.fixture.ccd.audio PROPERTIES
+  FIXTURES_REQUIRED "compat_features_preflight;disc_legacy_preflight;disc_legacy_parity")
+set_tests_properties(disc.fixture.ecm.fmv disc.fixture.ccd.fmv PROPERTIES
+  FIXTURES_REQUIRED
+  "compat_features_preflight;disc_fmv_predicates;disc_legacy_preflight;disc_legacy_parity")

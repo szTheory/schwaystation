@@ -9,6 +9,8 @@
 struct schway__state_io;
 
 #define SCHWAY__CARD_SIZE SCHWAY_MEMCARD_SIZE
+#define SCHWAY__CARD_ENDPOINT_COUNT 8u
+#define SCHWAY__CARD_ENDPOINT_ALL SCHWAY__CARD_ENDPOINT_COUNT
 #define SCHWAY__CARD_SECTOR_SIZE 128u
 #define SCHWAY__CARD_SECTOR_COUNT 1024u
 #define SCHWAY__CARD_ACK_FROM_TX 1500u
@@ -46,13 +48,13 @@ struct schway__card_slot {
 };
 
 struct schway__card {
-    struct schway__card_slot slot[2];
+    struct schway__card_slot slot[SCHWAY__CARD_ENDPOINT_COUNT];
 };
 
 void schway__card_init(schway *inst);
 void schway__card_reset(schway *inst);
-void schway__card_abort(schway *inst, uint32_t port);
+void schway__card_abort(schway *inst, uint32_t endpoint);
 void schway__card_state_io(struct schway__state_io *io, schway *inst);
-uint32_t schway__card_byte(schway *inst, uint32_t port, uint8_t sent, uint8_t *received);
+uint32_t schway__card_byte(schway *inst, uint32_t endpoint, uint8_t sent, uint8_t *received);
 
 #endif /* SCHWAYSTATION_CARD_H */

@@ -68,6 +68,19 @@ schway_add_test(NAME card.files.atomic_failures
   COMMAND schwaystation-test-card-files atomic_failures
   LABELS card portable TIMEOUT 10)
 
+# Fault prevented: tap card addressing selects the wrong socket or changes its ACK/no-ACK timing.
+schway_add_test(NAME card.tap.protocol
+  COMMAND schwaystation-test-card tap_protocol
+  LABELS card portable TIMEOUT 10)
+# Fault prevented: card state restores leak across tap slots or roll back persistent bytes/generation.
+schway_add_test(NAME card.tap.state
+  COMMAND schwaystation-test-card tap_state
+  LABELS card portable TIMEOUT 10)
+# Fault prevented: two tap sockets alias one filename or a socket path escapes the content directory.
+schway_add_test(NAME card.files.tap_paths
+  COMMAND schwaystation-test-card-files tap_paths
+  LABELS card portable TIMEOUT 10)
+
 # Fault prevented: approved legacy wrappers are not imported and serial card names escape their directory.
 schway_add_test(NAME card.files.wrappers
   COMMAND schwaystation-test-card-files wrappers
