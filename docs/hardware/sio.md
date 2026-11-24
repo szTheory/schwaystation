@@ -33,6 +33,29 @@ and its pending ACK events.
 
 This controller model does not add the tap's IRQ10/lightgun wiring behavior.
 
+## Mouse and neGcon polls
+
+The mouse returns ID `5A12` and a four-byte payload. Its first halfword has right and left on active-low bits
+10 and 11; the other documented bits are fixed (`1` in bits 0–7 and 12–15, `0` in bits 8–9). The next
+halfword is signed X then signed Y. Host movement is an integer relative delta: each axis is clamped to
+`[-128, 127]` when latched at frame start, reused for polls within that frame, and zero on later frames without
+a fresh input snapshot. This is the core's input contract; it does not claim a measured physical mouse resolution.
+Button levels remain latched across frames. Reset, disconnect or device change clears movement and partial reply
+state; aborting a poll leaves the latched movement available for the next poll. The final payload byte has no ACK.
+
+A newly selected mouse holds the modeled ACK-low status until its addressed endpoint receives `01`. The hold is
+visible through JOY_STAT without a host polling loop and is released by an `01` addressed to port 1 or port 2 as
+appropriate. Tap endpoints use the same per-endpoint rule. This models the documented startup condition while
+keeping host progress bounded.
+
+The neGcon returns ID `5A23` and a six-byte payload. Start, the D-pad, R, B and A use the documented active-low
+button bits; the following bytes are raw twist, I, II and L values. Twist is `00` left through `FF` right, while
+the three pressure bytes are passed through without a response curve or deadzone. These values remain independent
+of the pad buttons and of other endpoints.
+
+For Method 1 tap polling, the mouse's six-byte ID-plus-payload reply occupies a shorter socket record and is
+padded with two `FF` bytes; the neGcon's ID-plus-payload fills its eight-byte record exactly.
+
 ## Timing model
 
 At mode `000Ch` (eight data bits, no parity, factor MUL1) and baud reload `0088h`, the byte period is 1,088
@@ -95,5 +118,9 @@ deadlines; save states retain those deadlines and their per-port transaction sta
 - Multitap controller addressing and the next-transaction REQ history follow PER.01 at pinned revision
   `6d7d1bc106a7e0b616b0330fe58401ab1ba57f0f`, under “Multitap Controller Access” and “Multitap Controller
   Access, Method 1 Details” in `docs/controllersandmemorycards.md`.
+- Mouse and neGcon IDs, button bits, and payload ordering follow PER.01 at pinned revision
+  `6d7d1bc106a7e0b616b0330fe58401ab1ba57f0f`, under “Controllers - Mouse” and “Racing Controllers” >
+  “neGcon Racing Controller” in `docs/controllersandmemorycards.md`. The frame-latched movement clamp is this
+  emulator's deterministic host-input contract, not a physical sensor measurement.
 - The 1,088-, 1,426-, 1,494-, 1,500- and 31,000-tick boundaries are deterministic model values and are covered
   by SIO and card tests.
