@@ -5,17 +5,17 @@ milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
 current_plan: 16
-status: executing
-stopped_at: Completed 14-15-PLAN.md
-last_updated: "2026-11-24T12:17:40.532Z"
+status: ready_for_verification
+stopped_at: Completed 14-16-PLAN.md
+last_updated: "2026-11-24T12:38:34.924Z"
 last_activity: 2026-11-24
-last_activity_desc: Plan 14-15 recorded six selector-backed controller/card rows; the three compatibility feature selectors passed; Plan 14-16 remains next and shared SIO requirements remain gated
-state_head: a05c6919b70662794a54e6d212f0fcd3bd257050
+last_activity_desc: Plan 14-16 measured state bytes and updated two protocol-state pins; controller/save/runner docs are linked; hosted WASI and Cachegrind metrics remain pending for phase verification
+state_head: b51876c4ed8f60460c3229557073d8cdd72b99b6
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 95
-  completed_plans: 94
+  completed_plans: 95
   percent: 70
 ---
 
@@ -26,16 +26,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-15 complete; metrics/docs Plan 14-16 next; phase verification remains pending)
+**Current focus:** Phase 14 — Multitap and special controllers (all 16 plans complete; source review and phase verification remain pending)
 
 ## Current Position
 
-Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
+Phase: 14 (Multitap and special controllers) — READY FOR VERIFICATION
 Current Plan: 16
 Total Plans in Phase: 16
-Status: Ready for the next authorized plan
-Last activity: 2026-11-24 — Plan 14-15 feature ledger complete; Codex GSD executor configured `gpt-6-luna` xhigh, primary runtime model ID unavailable; only the three feature selectors ran and passed; Plan 14-16 remains next
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 15/16 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Status: Ready for phase verification after source review
+Last activity: 2026-11-24 — Plan 14-16 measured `state.bytes` at 3,757,638; stable-state and two updated GPU-motion state selectors passed; WASI and Ir/frame remain pending for exact hosted producers
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete, with source review and phase verification pending. Phase 7–11 verification digests will be reconciled at milestone close.)
 
 ### Phase 14 tail planning split (2026-11-24)
 
@@ -83,6 +83,14 @@ feature selector presence check passed, then `compat.features.preflight`, `compa
 `--check` passed. Direct SIO/card/runner/libretro selectors cited by the rows passed in their owning prior plans;
 they were not rerun here. No broad suite, hosted CI, Act or Docker ran. Shared SIO-01–04 remain gated until Plan
 14-16 and phase verification complete.
+
+### Phase 14 Plan 14-16 execution (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall duration was about 32 minutes from 12:25:11Z through GSD closeout, exceeding the 30-minute slice cap by about 2 minutes. The task commit is `b51876c`.
+
+The reused `build/ci` stable-state producer measured 3,757,638 bytes, so `quality.json` now tracks that exact value; `core.state.stable_bytes` passed 1/1. The frame-150 and frame-180 `gpu_motion` state hashes were directly reproduced and their focused selectors passed 2/2. Controller, saves and runner pages are linked from the embedding/testing guides, which remain under their byte limits. Implementation and focused checks finished about 12 minutes into the slice; the additional wall time was GSD closeout, not implementation scope.
+
+No local `clang-21`/`wasm-ld` or Valgrind/Cachegrind was available. WASI size awaits `.github/workflows/ci.yml` `wasm32` → `Measure linked WASI module`; Ir/frame awaits the `perf` job → `Instructions per frame` after `Cachegrind` setup. Neither bound was guessed or changed. The parent orchestrator owns source review and the single aggregate workflow after review; SIO-01–04 remain open for phase verification.
 
 ### Phase 14 Plan 14-13 execution (2026-11-24)
 
@@ -1599,6 +1607,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P13 | 20m | 1 tasks | 2 files |
 | Phase 14 P14 | 32m22s | 1 tasks | 3 files |
 | Phase 14 P15 | 13m | 1 tasks | 3 files |
+| Phase 14 P16 | 12m | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2076,6 +2085,8 @@ Recent decisions affecting current work:
 - [Phase 14]: Build sidecar paths once from the original content basename and advance saved generations only after atomic replacement succeeds.
 - [Phase 14]: Use the existing ntsc-u.pu8-late.v2 profile token for the six tested controller feature rows.
 - [Phase 14]: Keep compatibility claims limited to passing selector evidence; leave retail-game support and undocumented Jogcon behavior unclaimed.
+- [Phase 14]: Set state.bytes to the exact 3,757,638-byte local stable-state producer measurement.
+- [Phase 14]: Leave WASI-size and Ir/frame bounds unchanged pending their exact hosted producers.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2326,8 +2337,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T12:17:39.911Z
-Stopped at: Completed 14-15-PLAN.md
+Last session: 2026-11-24T12:38:34.398Z
+Stopped at: Completed 14-16-PLAN.md
 Resume file: None
 
 ### v1.0 session history
