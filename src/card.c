@@ -8,40 +8,12 @@
 
 enum { CARD_IDLE, CARD_COMMAND, CARD_READ, CARD_ID, CARD_WRITE, CARD_POCKET };
 
-static const char card1_error_pending[] = "card.slot1.pending_error";
-static const char card1_phase[] = "card.slot1.phase";
-static const char card1_command[] = "card.slot1.command";
-static const char card1_read_step[] = "card.slot1.read_step";
-static const char card1_sector[] = "card.slot1.sector";
-static const char card1_checksum[] = "card.slot1.checksum";
-static const char card1_invalid_sector[] = "card.slot1.invalid_sector";
-static const char card1_write_step[] = "card.slot1.write_step";
-static const char card1_write_bad_checksum[] = "card.slot1.write_bad_checksum";
-static const char card1_write_data[] = "card.slot1.write_data";
-static const char card1_pocket_index[] = "card.slot1.pocket_index";
-static const char card1_pocket_flags[] = "card.slot1.pocket_flags";
-static const char card1_pocket_data[] = "card.slot1.pocket_data";
-static const char card1_pocket_address[] = "card.slot1.pocket_address";
-static const char card1_pocket_length[] = "card.slot1.pocket_length";
-static const char card1_pocket_step[] = "card.slot1.pocket_step";
-static const char card1_pocket_payload[] = "card.slot1.pocket_payload";
-static const char card2_error_pending[] = "card.slot2.pending_error";
-static const char card2_phase[] = "card.slot2.phase";
-static const char card2_command[] = "card.slot2.command";
-static const char card2_read_step[] = "card.slot2.read_step";
-static const char card2_sector[] = "card.slot2.sector";
-static const char card2_checksum[] = "card.slot2.checksum";
-static const char card2_invalid_sector[] = "card.slot2.invalid_sector";
-static const char card2_write_step[] = "card.slot2.write_step";
-static const char card2_write_bad_checksum[] = "card.slot2.write_bad_checksum";
-static const char card2_write_data[] = "card.slot2.write_data";
-static const char card2_pocket_index[] = "card.slot2.pocket_index";
-static const char card2_pocket_flags[] = "card.slot2.pocket_flags";
-static const char card2_pocket_data[] = "card.slot2.pocket_data";
-static const char card2_pocket_address[] = "card.slot2.pocket_address";
-static const char card2_pocket_length[] = "card.slot2.pocket_length";
-static const char card2_pocket_step[] = "card.slot2.pocket_step";
-static const char card2_pocket_payload[] = "card.slot2.pocket_payload";
+#define CARD_STATE_NAMES(prefix)                                                                    \
+    prefix ".pending_error", prefix ".phase", prefix ".command", prefix ".read_step",            \
+        prefix ".sector", prefix ".checksum", prefix ".invalid_sector", prefix ".write_step",   \
+        prefix ".write_bad_checksum", prefix ".write_data", prefix ".pocket_index",             \
+        prefix ".pocket_flags", prefix ".pocket_data", prefix ".pocket_address",                \
+        prefix ".pocket_length", prefix ".pocket_step", prefix ".pocket_payload"
 
 static void reset_slot_protocol(struct schway__card_slot *slot)
 {
@@ -382,13 +354,14 @@ static void initialize_slot(struct schway__card_slot *slot)
 
 void schway__card_init(schway *inst)
 {
-    initialize_slot(&inst->card.slot[0]);
-    initialize_slot(&inst->card.slot[1]);
+    for (uint32_t i = 0u; i < SCHWAY__CARD_ENDPOINT_COUNT; i++) {
+        initialize_slot(&inst->card.slot[i]);
+    }
 }
 
 void schway__card_reset(schway *inst)
 {
-    for (uint32_t i = 0u; i < 2u; i++) {
+    for (uint32_t i = 0u; i < SCHWAY__CARD_ENDPOINT_COUNT; i++) {
         struct schway__card_slot *slot = &inst->card.slot[i];
         slot->flags = 0x08u;
         slot->pocket_index = 0u;
@@ -397,13 +370,16 @@ void schway__card_reset(schway *inst)
     }
 }
 
-void schway__card_abort(schway *inst, uint32_t port)
+void schway__card_abort(schway *inst, uint32_t endpoint)
 {
-    if (port < 2u) {
-        reset_slot_protocol(&inst->card.slot[port]);
+    if (endpoint < SCHWAY__CARD_ENDPOINT_COUNT) {
+        reset_slot_protocol(&inst->card.slot[endpoint]);
+    } else if (endpoint == SCHWAY__CARD_ENDPOINT_ALL) {
+        for (uint32_t i = 0u; i < SCHWAY__CARD_ENDPOINT_COUNT; i++) {
+            reset_slot_protocol(&inst->card.slot[i]);
+        }
     } else {
-        reset_slot_protocol(&inst->card.slot[0]);
-        reset_slot_protocol(&inst->card.slot[1]);
+        return;
     }
 }
 
@@ -475,16 +451,14 @@ static void slot_state_io(struct schway__state_io *io, struct schway__card_slot 
 
 void schway__card_state_io(struct schway__state_io *io, schway *inst)
 {
-    slot_state_io(io, &inst->card.slot[0], card1_error_pending, card1_phase, card1_command, card1_read_step,
-                  card1_sector, card1_checksum, card1_invalid_sector, card1_write_step,
-                  card1_write_bad_checksum, card1_write_data, card1_pocket_index,
-                  card1_pocket_flags, card1_pocket_data, card1_pocket_address,
-                  card1_pocket_length, card1_pocket_step, card1_pocket_payload);
-    slot_state_io(io, &inst->card.slot[1], card2_error_pending, card2_phase, card2_command, card2_read_step,
-                  card2_sector, card2_checksum, card2_invalid_sector, card2_write_step,
-                  card2_write_bad_checksum, card2_write_data, card2_pocket_index,
-                  card2_pocket_flags, card2_pocket_data, card2_pocket_address,
-                  card2_pocket_length, card2_pocket_step, card2_pocket_payload);
+    slot_state_io(io, &inst->card.slot[0], CARD_STATE_NAMES("card.slot1"));
+    slot_state_io(io, &inst->card.slot[1], CARD_STATE_NAMES("card.port1.socketB"));
+    slot_state_io(io, &inst->card.slot[2], CARD_STATE_NAMES("card.port1.socketC"));
+    slot_state_io(io, &inst->card.slot[3], CARD_STATE_NAMES("card.port1.socketD"));
+    slot_state_io(io, &inst->card.slot[4], CARD_STATE_NAMES("card.slot2"));
+    slot_state_io(io, &inst->card.slot[5], CARD_STATE_NAMES("card.port2.socketB"));
+    slot_state_io(io, &inst->card.slot[6], CARD_STATE_NAMES("card.port2.socketC"));
+    slot_state_io(io, &inst->card.slot[7], CARD_STATE_NAMES("card.port2.socketD"));
 }
 
 static uint32_t begin_command(struct schway__card_slot *slot, uint8_t sent, uint8_t *received)
@@ -886,12 +860,12 @@ static uint32_t write_byte(struct schway__card_slot *slot, uint8_t sent, uint8_t
     return SCHWAY__CARD_BYTE_ACK;
 }
 
-uint32_t schway__card_byte(schway *inst, uint32_t port, uint8_t sent, uint8_t *received)
+uint32_t schway__card_byte(schway *inst, uint32_t endpoint, uint8_t sent, uint8_t *received)
 {
-    if (port >= 2u || received == NULL) {
+    if (endpoint >= SCHWAY__CARD_ENDPOINT_COUNT || received == NULL) {
         return SCHWAY__CARD_BYTE_UNHANDLED;
     }
-    struct schway__card_slot *slot = &inst->card.slot[port];
+    struct schway__card_slot *slot = &inst->card.slot[endpoint];
     if (slot->phase == CARD_IDLE) {
         if (sent != 0x81u) {
             return SCHWAY__CARD_BYTE_UNHANDLED;

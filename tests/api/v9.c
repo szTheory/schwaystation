@@ -47,6 +47,12 @@ _Static_assert(SCHWAY_INPUT_DEVICE_NEGCON == 4u, "API v9 NegCon identifier");
 _Static_assert(SCHWAY_INPUT_DEVICE_JOGCON == 5u, "API v9 JogCon identifier");
 _Static_assert(SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT == 6u,
                "API v9 dual analog flight identifier");
+_Static_assert(SCHWAY_CARD_PORT_1 == 1u, "API v9 card port 1 identifier");
+_Static_assert(SCHWAY_CARD_PORT_2 == 2u, "API v9 card port 2 identifier");
+_Static_assert(SCHWAY_CARD_SOCKET_A == 1u, "API v9 card socket A identifier");
+_Static_assert(SCHWAY_CARD_SOCKET_B == 2u, "API v9 card socket B identifier");
+_Static_assert(SCHWAY_CARD_SOCKET_C == 3u, "API v9 card socket C identifier");
+_Static_assert(SCHWAY_CARD_SOCKET_D == 4u, "API v9 card socket D identifier");
 
 typedef struct observed_input {
     uint16_t buttons[8];

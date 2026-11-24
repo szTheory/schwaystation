@@ -535,7 +535,8 @@ void schway__sio_event(schway *inst, uint64_t now)
         uint64_t period = byte_cycles(sio);
         uint64_t tx_start = sio->byte_deadline >= period ? sio->byte_deadline - period : 0u;
         if ((sio->ctrl & CTRL_SELECT) != 0u) {
-            uint32_t card_result = schway__card_byte(inst, sio->tx_port, sio->tx_data, &received);
+            uint32_t card_endpoint = sio->tx_port == 0u ? 0u : 4u;
+            uint32_t card_result = schway__card_byte(inst, card_endpoint, sio->tx_data, &received);
             if (card_result == SCHWAY__CARD_BYTE_ACK) {
                 ack = 1u;
                 card_ack = SCHWAY__CARD_ACK_FROM_TX;
@@ -609,7 +610,7 @@ static int write_ctrl(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
     if ((next & CTRL_RESET) != 0u) {
         schway__sio_reset(inst);
         schway__pad_abort(inst, 2u);
-        schway__card_abort(inst, 2u);
+        schway__card_abort(inst, SCHWAY__CARD_ENDPOINT_ALL);
         schway__sched_recalc(inst);
         return 0;
     }
@@ -618,7 +619,7 @@ static int write_ctrl(schway *inst, uint32_t addr, uint32_t width, uint32_t valu
     if (old_select != new_select && (sio->ctrl & CTRL_SELECT) != 0u) {
         uint32_t port = (sio->ctrl & CTRL_PORT2) != 0u ? 1u : 0u;
         schway__pad_abort(inst, port);
-        schway__card_abort(inst, port);
+        schway__card_abort(inst, port == 0u ? 0u : 4u);
         tap_clear_transaction(sio, port);
         sio->tx_pending = 0u;
         sio->byte_deadline = 0u;

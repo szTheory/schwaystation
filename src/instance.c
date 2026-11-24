@@ -537,8 +537,8 @@ schway_status schway_get_memory(const schway *inst, uint32_t memory, schway_span
         span.size = sizeof inst->card.slot[0].bytes;
         break;
     case SCHWAY_MEMORY_CARD2:
-        span.data = inst->card.slot[1].bytes;
-        span.size = sizeof inst->card.slot[1].bytes;
+        span.data = inst->card.slot[4].bytes;
+        span.size = sizeof inst->card.slot[4].bytes;
         break;
     default:
         return SCHWAY_STATUS_ERR_ARGUMENT;
@@ -554,7 +554,7 @@ schway_status schway_load_memcard(schway *inst, uint32_t slot, const void *bytes
         inst->profile_locked != 0u || inst->frame != 0u || inst->ticks != 0u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-    uint32_t index = slot == SCHWAY_CARD_SLOT_1 ? 0u : 1u;
+    uint32_t index = slot == SCHWAY_CARD_SLOT_1 ? 0u : 4u;
     memmove(inst->card.slot[index].bytes, bytes, size);
     if (size < SCHWAY_MEMCARD_SIZE) {
         memset(inst->card.slot[index].bytes + size, 0xFF, SCHWAY_MEMCARD_SIZE - size);
@@ -570,38 +570,32 @@ schway_status schway_memcard_generation(const schway *inst, uint32_t slot, uint6
         (slot != SCHWAY_CARD_SLOT_1 && slot != SCHWAY_CARD_SLOT_2)) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-    uint32_t index = slot == SCHWAY_CARD_SLOT_1 ? 0u : 1u;
+    uint32_t index = slot == SCHWAY_CARD_SLOT_1 ? 0u : 4u;
     *out = inst->card.slot[index].generation;
     return SCHWAY_STATUS_OK;
 }
 
-/* The public socket entry points first retain the fixed legacy A endpoints;
-   the tap endpoints are wired to independent storage in the card module. */
-static int memcard_socket_a_index(uint32_t port, uint32_t socket, uint32_t *index)
+static int memcard_socket_index(uint32_t port, uint32_t socket, uint32_t *index)
 {
-    if (socket != SCHWAY_CARD_SOCKET_A || index == NULL) {
+    if (index == NULL || port < SCHWAY_CARD_PORT_1 || port > SCHWAY_CARD_PORT_2 ||
+        socket < SCHWAY_CARD_SOCKET_A || socket > SCHWAY_CARD_SOCKET_D) {
         return 0;
     }
-    if (port == SCHWAY_CARD_PORT_1) {
-        *index = 0u;
-        return 1;
-    }
-    if (port == SCHWAY_CARD_PORT_2) {
-        *index = 1u;
-        return 1;
-    }
-    return 0;
+    *index = (port - SCHWAY_CARD_PORT_1) * 4u + (socket - SCHWAY_CARD_SOCKET_A);
+    return 1;
 }
 
 schway_status schway_get_memcard(const schway *inst, uint32_t port, uint32_t socket,
                                  schway_span *out)
 {
     uint32_t index;
-    if (inst == NULL || out == NULL || !memcard_socket_a_index(port, socket, &index)) {
+    if (inst == NULL || out == NULL || !memcard_socket_index(port, socket, &index)) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-    out->data = inst->card.slot[index].bytes;
-    out->size = sizeof inst->card.slot[index].bytes;
+    schway_span span;
+    span.data = inst->card.slot[index].bytes;
+    span.size = sizeof inst->card.slot[index].bytes;
+    *out = span;
     return SCHWAY_STATUS_OK;
 }
 
@@ -609,23 +603,29 @@ schway_status schway_load_memcard_socket(schway *inst, uint32_t port, uint32_t s
                                          const void *bytes, size_t size)
 {
     uint32_t index;
-    if (!memcard_socket_a_index(port, socket, &index)) {
+    if (inst == NULL || bytes == NULL || size > SCHWAY_MEMCARD_SIZE ||
+        !memcard_socket_index(port, socket, &index) || inst->profile_locked != 0u ||
+        inst->frame != 0u || inst->ticks != 0u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-    return schway_load_memcard(inst, index == 0u ? SCHWAY_CARD_SLOT_1 : SCHWAY_CARD_SLOT_2,
-                               bytes, size);
+    memmove(inst->card.slot[index].bytes, bytes, size);
+    if (size < SCHWAY_MEMCARD_SIZE) {
+        memset(inst->card.slot[index].bytes + size, 0xFF, SCHWAY_MEMCARD_SIZE - size);
+    }
+    inst->card.slot[index].generation = 0u;
+    schway__card_abort(inst, index);
+    return SCHWAY_STATUS_OK;
 }
 
 schway_status schway_memcard_socket_generation(const schway *inst, uint32_t port,
                                                uint32_t socket, uint64_t *out)
 {
     uint32_t index;
-    if (!memcard_socket_a_index(port, socket, &index)) {
+    if (inst == NULL || out == NULL || !memcard_socket_index(port, socket, &index)) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
-    return schway_memcard_generation(inst,
-                                     index == 0u ? SCHWAY_CARD_SLOT_1 : SCHWAY_CARD_SLOT_2,
-                                     out);
+    *out = inst->card.slot[index].generation;
+    return SCHWAY_STATUS_OK;
 }
 
 /* Literals behind a switch, never a pointer table: the core keeps no
