@@ -481,6 +481,18 @@ static void test_rejects(void)
     uint32_t region_at = 0;
     uint32_t board_at = 0;
     uint32_t profile_flags_at = 0;
+    uint32_t pad_phase_at = 0u;
+    uint32_t pad_device_at = 0u;
+    uint32_t pad_present_at = 0u;
+    uint32_t pad_multitap_at = 0u;
+    uint32_t pad_mouse_dx_at = 0u;
+    uint32_t sio_tap_mode_at = 0u;
+    uint32_t sio_tap_index_at = 0u;
+    uint32_t sio_tap_endpoint_at = 0u;
+    uint32_t sio_tap_slot_mask_at = 0u;
+    uint32_t card_tx_active_at = 0u;
+    uint32_t card_tx_endpoint_at = 0u;
+    uint32_t card_socket_b_phase_at = 0u;
     for (size_t i = 0; i < nf && i < MAX_FIELDS; i++) {
         if (strcmp(fields[i].name, "instance.region") == 0) {
             region_at = fields[i].offset;
@@ -488,7 +500,99 @@ static void test_rejects(void)
             board_at = fields[i].offset;
         } else if (strcmp(fields[i].name, "instance.profile_flags") == 0) {
             profile_flags_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.phase") == 0) {
+            pad_phase_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.device") == 0) {
+            pad_device_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.present") == 0) {
+            pad_present_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.multitap") == 0) {
+            pad_multitap_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "pad.mouse_dx") == 0) {
+            pad_mouse_dx_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.tap_tx_mode") == 0) {
+            sio_tap_mode_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.tap_tx_index") == 0) {
+            sio_tap_index_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.tap_tx_endpoint") == 0) {
+            sio_tap_endpoint_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.tap_slot_mask") == 0) {
+            sio_tap_slot_mask_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.card_tx_active") == 0) {
+            card_tx_active_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "sio.card_tx_endpoint") == 0) {
+            card_tx_endpoint_at = fields[i].offset;
+        } else if (strcmp(fields[i].name, "card.port1.socketB.phase") == 0) {
+            card_socket_b_phase_at = fields[i].offset;
         }
+    }
+
+    CHECK(pad_phase_at >= SCHWAY__STATE_HEADER_SIZE &&
+          sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
+          sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
+          sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE &&
+          pad_device_at >= SCHWAY__STATE_HEADER_SIZE &&
+          pad_present_at >= SCHWAY__STATE_HEADER_SIZE &&
+          pad_multitap_at >= SCHWAY__STATE_HEADER_SIZE &&
+          pad_mouse_dx_at >= SCHWAY__STATE_HEADER_SIZE);
+    if (pad_phase_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + pad_phase_at + 7u, 3u, 1u);
+        reseal(bad, n);
+        expect_refused("payload phase on disconnected endpoint", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (pad_device_at >= SCHWAY__STATE_HEADER_SIZE &&
+        pad_present_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + pad_device_at + 2u, SCHWAY_INPUT_DEVICE_DIGITAL, 1u);
+        put_le(bad + pad_present_at + 2u, 1u, 1u);
+        reseal(bad, n);
+        expect_refused("tap socket connected with tap disabled", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + sio_tap_mode_at, 2u, 1u);
+        put_le(bad + sio_tap_index_at, 1u, 1u);
+        put_le(bad + sio_tap_slot_mask_at, 1u, 1u);
+        reseal(bad, n);
+        expect_refused("tap transaction on disabled port", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_endpoint_at >= SCHWAY__STATE_HEADER_SIZE &&
+        sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + sio_tap_mode_at, 2u, 1u);
+        put_le(bad + sio_tap_index_at, 1u, 1u);
+        put_le(bad + sio_tap_endpoint_at, 4u, 1u);
+        put_le(bad + sio_tap_slot_mask_at, 1u, 1u);
+        put_le(bad + pad_multitap_at, 1u, 1u);
+        reseal(bad, n);
+        expect_refused("tap transaction selects other physical port", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (pad_mouse_dx_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + pad_mouse_dx_at, 0u, 2u);
+        reseal(bad, n);
+        expect_refused("mouse movement outside latched range", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
+    if (card_tx_active_at >= SCHWAY__STATE_HEADER_SIZE &&
+        card_tx_endpoint_at >= SCHWAY__STATE_HEADER_SIZE &&
+        card_socket_b_phase_at >= SCHWAY__STATE_HEADER_SIZE) {
+        memcpy(bad, good, n);
+        put_le(bad + card_tx_active_at, 1u, 1u);
+        put_le(bad + card_tx_endpoint_at, 1u, 1u);
+        put_le(bad + card_socket_b_phase_at, 1u, 1u);
+        reseal(bad, n);
+        expect_refused("card transaction on disabled tap socket", target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
     }
     CHECK(region_at >= SCHWAY__STATE_HEADER_SIZE);
     if (region_at >= SCHWAY__STATE_HEADER_SIZE) {
