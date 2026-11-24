@@ -275,6 +275,128 @@ static void check_poll(schway *inst, uint32_t port, uint16_t buttons)
     CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), (uint8_t)(buttons >> 8));
 }
 
+static uint32_t tap_endpoint(uint32_t port, uint32_t socket)
+{
+    return socket == 0u ? port : 2u + port * 3u + socket - 1u;
+}
+
+static void tap_setup(schway *inst, uint32_t port)
+{
+    inst->pad.multitap[port] = 1u;
+    for (uint32_t socket = 0u; socket < 4u; socket++) {
+        uint32_t endpoint = tap_endpoint(port, socket);
+        schway__pad_set_connected(inst, endpoint, 1u);
+        schway__pad_set_buttons(inst, endpoint, (uint16_t)~(0x2100u + endpoint));
+        inst->pad.analog_mode[endpoint] = endpoint == 7u ? 1u : 0u;
+        inst->pad.device[endpoint] = endpoint == 7u ? SCHWAY_INPUT_DEVICE_DUALSHOCK
+                                                    : SCHWAY_INPUT_DEVICE_DIGITAL;
+        for (uint32_t axis = 0u; axis < 4u; axis++) {
+            inst->pad.axes[endpoint * 4u + axis] = (uint8_t)(0x30u + endpoint + axis);
+        }
+    }
+}
+
+static uint8_t tap_id(const schway *inst, uint32_t endpoint)
+{
+    return inst->pad.device[endpoint] == SCHWAY_INPUT_DEVICE_DUALSHOCK &&
+                   inst->pad.analog_mode[endpoint] != 0u
+               ? 0x73u
+               : 0x41u;
+}
+
+static void tap_method2_socket(schway *inst, uint32_t port, uint32_t socket)
+{
+    uint32_t endpoint = tap_endpoint(port, socket);
+    uint16_t buttons = inst->pad.buttons[endpoint];
+    int analog = tap_id(inst, endpoint) == 0x73u;
+    write_mmio(inst, JOY_CTRL, 2u, 0x1003u | (port != 0u ? 0x2000u : 0u));
+    CHECK_EQ_HEX(exchange_byte(inst, (uint8_t)(socket + 1u), 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), tap_id(inst, endpoint));
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)buttons);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)(buttons >> 8));
+    if (analog) {
+        for (uint32_t axis = 0u; axis < 4u; axis++) {
+            CHECK_EQ_HEX(exchange_byte(inst, 0x00u, axis != 3u),
+                         inst->pad.axes[endpoint * 4u + axis]);
+        }
+    } else {
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), 0xFFu);
+    }
+}
+
+static void tap_poll_methods(void)
+{
+    schway *inst = make();
+    configure(inst, 0u);
+    tap_setup(inst, 0u);
+    tap_setup(inst, 1u);
+    for (uint32_t port = 0u; port < 2u; port++) {
+        for (uint32_t socket = 0u; socket < 4u; socket++) {
+            tap_method2_socket(inst, port, socket);
+        }
+    }
+
+    write_mmio(inst, JOY_CTRL, 2u, 0x1003u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x41u);
+    /* REQ is the third transmitted byte, but this access still returns Slot A. */
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)inst->pad.buttons[0]);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), (uint8_t)(inst->pad.buttons[0] >> 8));
+
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    for (uint32_t socket = 0u; socket < 4u; socket++) {
+        uint32_t endpoint = tap_endpoint(0u, socket);
+        int analog = tap_id(inst, endpoint) == 0x73u;
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), tap_id(inst, endpoint));
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), 0x5Au);
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)inst->pad.buttons[endpoint]);
+        CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1),
+                     (uint8_t)(inst->pad.buttons[endpoint] >> 8));
+        for (uint32_t axis = 0u; axis < 4u; axis++) {
+            CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1),
+                         analog ? inst->pad.axes[endpoint * 4u + axis] : 0xFFu);
+        }
+    }
+    schway_destroy(inst);
+}
+
+static void tap_history_edges(void)
+{
+    schway *inst = make();
+    configure(inst, 0u);
+    tap_setup(inst, 0u);
+    write_mmio(inst, JOY_CTRL, 2u, 0x1003u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x41u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 1), (uint8_t)inst->pad.buttons[0]);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), (uint8_t)(inst->pad.buttons[0] >> 8));
+
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    for (uint32_t i = 0u; i < 32u; i++) {
+        (void)exchange_byte(inst, 0x00u, i != 31u);
+    }
+
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x00u, 0), 0x41u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0xFFu);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x42u, 1), 0x80u);
+    CHECK_EQ_HEX(exchange_byte(inst, 0x01u, 1), 0x5Au);
+    (void)exchange_byte(inst, 0x00u, 1);
+    for (uint32_t i = 0u; i < 31u; i++) {
+        (void)exchange_byte(inst, 0x00u, i != 30u);
+    }
+    schway_destroy(inst);
+}
+
 static void independent_ports_instances(void)
 {
     schway *a = make();
@@ -496,6 +618,10 @@ int main(int argc, char **argv)
         no_final_ack();
     } else if (strcmp(argv[1], "peek_pure") == 0) {
         peek_pure();
+    } else if (strcmp(argv[1], "tap_poll_methods") == 0) {
+        tap_poll_methods();
+    } else if (strcmp(argv[1], "tap_history_edges") == 0) {
+        tap_history_edges();
     } else {
         return 2;
     }
