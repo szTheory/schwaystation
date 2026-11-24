@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 14
 current_phase_name: Multitap and special controllers
-current_plan: 15
+current_plan: 16
 status: executing
-stopped_at: Completed 14-14-PLAN.md
-last_updated: "2026-11-24T12:01:08Z"
+stopped_at: Completed 14-15-PLAN.md
+last_updated: "2026-11-24T12:17:40.532Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 tail replanned into separate ledger and metrics/docs slices; Plans 14-15 and 14-16 remain unstarted; planning checks passed; no implementation tests executed
-state_head: 39cd8189966d38336627b79e98fef82d44cf56f1
+last_activity_desc: Plan 14-15 recorded six selector-backed controller/card rows; the three compatibility feature selectors passed; Plan 14-16 remains next and shared SIO requirements remain gated
+state_head: a05c6919b70662794a54e6d212f0fcd3bd257050
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 95
-  completed_plans: 93
+  completed_plans: 94
   percent: 70
 ---
 
@@ -26,16 +26,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-14 complete; ledger Plan 14-15 next, then metrics/docs Plan 14-16; phase verification remains pending)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-15 complete; metrics/docs Plan 14-16 next; phase verification remains pending)
 
 ## Current Position
 
 Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
-Current Plan: 15
+Current Plan: 16
 Total Plans in Phase: 16
 Status: Ready for the next authorized plan
-Last activity: 2026-11-24 — Phase 14 tail planning-only split; Codex/OpenGSD 1.23.0; configured planner `gpt-6.1-sol`, active runtime model ID unavailable; Plans 14-15/14-16 unstarted; cheap planning checks passed
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 14/16 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Plan 14-15 feature ledger complete; Codex GSD executor configured `gpt-6-luna` xhigh, primary runtime model ID unavailable; only the three feature selectors ran and passed; Plan 14-16 remains next
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 15/16 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
 
 ### Phase 14 tail planning split (2026-11-24)
 
@@ -68,7 +68,21 @@ and `libretro.cards.controls` passed 3/3 in 18.34s. The direct host test was gre
 state, reset, failed-load and save-identity invariants already existed in production; no runtime change or
 artificial RED commit was made. This slice adds test-only probes/assertions and save ownership documentation.
 Shared SIO-01 remains open until its last declaring plan finishes. No broad suite, hosted CI, Act or Docker was
-run; Plan 15 owns the final reviewed-head aggregate verification.
+run; Plan 16 owns the final reviewed-head aggregate verification.
+
+### Phase 14 Plan 14-15 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Wall duration
+was 12m, starting at 12:06:17Z. Task commit `a05c691` records the compatibility rows and independent ratchet
+expectations.
+
+The feature data rows passed the byte-sort, field-count, duplicate-key and compatibility-schema preflights. The
+existing `build/ci` was reused; CI configure and `schwaystation-test-probe` build passed. The exact compatibility
+feature selector presence check passed, then `compat.features.preflight`, `compat.features.ratchet`, and
+`compat.features.controls` passed 3/3 in 1.30 seconds. The compatibility document was regenerated and its
+`--check` passed. Direct SIO/card/runner/libretro selectors cited by the rows passed in their owning prior plans;
+they were not rerun here. No broad suite, hosted CI, Act or Docker ran. Shared SIO-01–04 remain gated until Plan
+14-16 and phase verification complete.
 
 ### Phase 14 Plan 14-13 execution (2026-11-24)
 
@@ -1584,6 +1598,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P12 | 24m | 1 tasks | 3 files |
 | Phase 14 P13 | 20m | 1 tasks | 2 files |
 | Phase 14 P14 | 32m22s | 1 tasks | 3 files |
+| Phase 14 P15 | 12m | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -2059,6 +2074,8 @@ Recent decisions affecting current work:
 - [Phase 14]: Match supported special libretro controllers by exact device ID and map their host inputs with bounded integer conversions.
 - [Phase 14]: Libretro keeps port1A exclusively frontend-owned SAVE_RAM and persists only the seven remaining sockets.
 - [Phase 14]: Build sidecar paths once from the original content basename and advance saved generations only after atomic replacement succeeds.
+- [Phase 14]: Use the existing ntsc-u.pu8-late.v2 profile token for the six tested controller feature rows.
+- [Phase 14]: Keep compatibility claims limited to passing selector evidence; leave retail-game support and undocumented Jogcon behavior unclaimed.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2309,8 +2326,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-24T11:55:25.913Z
-Stopped at: Completed 14-14-PLAN.md
+Last session: 2026-11-24T12:17:39.911Z
+Stopped at: Completed 14-15-PLAN.md
 Resume file: None
 
 ### v1.0 session history
