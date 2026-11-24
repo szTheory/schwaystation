@@ -1615,6 +1615,27 @@ static int test_input_multitap(void)
             CHECK_EQ_U64(multitap_callback_visits[inactive], callbacks_before[inactive]);
         }
 
+        if (topology == 1u) {
+            const char *selected_port1 = multitap_port1_value;
+            const char *selected_port2 = multitap_port2_value;
+            unsigned reload_descriptors_before = input_descriptor_calls;
+            unsigned reload_controllers_before = controller_info_calls;
+            struct retro_game_info invalid_game = {
+                "missing-controller-topology.exe", NULL, 0u, NULL,
+            };
+            multitap_port1_value = "disabled";
+            multitap_port2_value = "disabled";
+            CHECK_EQ_U64(p_load_game(&invalid_game), 0u);
+            CHECK_EQ_U64(input_descriptor_calls, reload_descriptors_before);
+            CHECK_EQ_U64(controller_info_calls, reload_controllers_before);
+            multitap_port1_value = selected_port1;
+            multitap_port2_value = selected_port2;
+            if (input_descriptor_calls == reload_descriptors_before &&
+                controller_info_calls == reload_controllers_before) {
+                validate_input_descriptors(published_input_descriptors);
+            }
+        }
+
         if (topology == 0u) {
             unsigned analog_visits = multitap_analog_visits[0];
             p_set_controller_port_device(0u, RETRO_DEVICE_ANALOG | (1u << 8));
