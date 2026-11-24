@@ -252,13 +252,18 @@ if(CMAKE_SCRIPT_MODE_FILE)
     endif()
   elseif(CASE STREQUAL "pad_counter_movies")
     string(REPLACE "|" ";" EMULATOR "${EMULATOR}")
-    file(WRITE "${OUT}/pad-counter-empty.inputs" "")
+    # Keep the controller connected for the no-press control; an absent record
+    # leaves the input snapshot disconnected and the guest waits for an ACK.
+    file(WRITE "${OUT}/pad-counter-empty.inputs"
+      "1 p1=digital:.:128,128,128,128 p2=.\n")
     file(WRITE "${OUT}/pad-counter-held.inputs"
+      "1 p1=digital:.:128,128,128,128 p2=.\n"
       "60 p1=digital:X:128,128,128,128 p2=.\n"
       "120 p1=digital:X:128,128,128,128 p2=.\n"
       "180 p1=digital:X:128,128,128,128 p2=.\n"
       "240 p1=digital:X:128,128,128,128 p2=.\n")
     file(WRITE "${OUT}/pad-counter-three_edges.inputs"
+      "1 p1=digital:.:128,128,128,128 p2=.\n"
       "180 p1=digital:X:128,128,128,128 p2=.\n"
       "181 p1=digital:.:128,128,128,128 p2=.\n"
       "60 p1=digital:X:128,128,128,128 p2=.\n"
