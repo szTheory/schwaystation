@@ -870,6 +870,30 @@ Path(sys.argv[2]).write_bytes(data)
     set(RUN ${HOOKED})
     expect_exit(0 "^frame 5 sha256 ${EXPECTED}\n$" --frames 60 --hash)
     expect_exit(0 "^frames 5\n.*max_rss_kib [0-9]+\n$" --bench 60)
+  elseif(CASE STREQUAL "cards_multitap")
+    set(RUN ${HOOKED})
+    string(REPEAT "[0-9a-f]" 64 digits)
+    set(card_dir "${OUT}/runner-cards-multitap")
+    file(REMOVE_RECURSE "${card_dir}")
+    file(MAKE_DIRECTORY "${card_dir}")
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
+      --test-card-write slot1)
+    expect_exit(0 "frame 1 sha256 ${digits}" --frames 1 --hash --save-dir "${card_dir}"
+      --test-card-write slot2)
+    set(expected_card_files
+      "${card_dir}/schwaystation.srm"
+      "${card_dir}/schwaystation.p1b.mcr"
+      "${card_dir}/schwaystation.p1c.mcr"
+      "${card_dir}/schwaystation.p1d.mcr"
+      "${card_dir}/schwaystation.1.mcr"
+      "${card_dir}/schwaystation.p2b.mcr"
+      "${card_dir}/schwaystation.p2c.mcr"
+      "${card_dir}/schwaystation.p2d.mcr")
+    foreach(card_file IN LISTS expected_card_files)
+      if(NOT EXISTS "${card_file}")
+        message(FATAL_ERROR "runner did not persist all eight card sockets; missing ${card_file}")
+      endif()
+    endforeach()
   elseif(CASE STREQUAL "cards_persistence")
     set(NORMAL_RUN ${RUN})
     set(RUN ${HOOKED})
