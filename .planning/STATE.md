@@ -7,10 +7,10 @@ current_phase_name: Multitap and special controllers
 current_plan: 12
 status: executing
 stopped_at: Completed 14-11-PLAN.md
-last_updated: "2026-11-24T10:22:04.153Z"
+last_updated: "2026-11-24T10:24:04.564Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 Plan 14-10 complete; configured gpt-6-luna xhigh; one task commit; 9m wall time; default two-pad callback-to-serial baseline and descriptor selectors passed 2/2; Plan 14-11 next
-state_head: 474aa6a3ea1f4c35d76a36e78a31ee6e7ea9991c
+last_activity_desc: Phase 14 Plan 14-11 complete; configured gpt-6-luna xhigh; 24m wall time; three task commits; multitap topology and descriptor selectors passed 2/2; Plan 14-12 next
+state_head: 9184305e057cedfd14107b7b3685b0b904a8e95f
 progress:
   total_phases: 10
   completed_phases: 7
@@ -26,7 +26,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-10 baseline complete; Plan 14-11 next)
+**Current focus:** Phase 14 — Multitap and special controllers (Plan 14-11 complete; Plan 14-12 next)
 
 ## Current Position
 
@@ -34,8 +34,20 @@ Phase: 14 (Multitap and special controllers) — READY TO EXECUTE
 Current Plan: 12
 Total Plans in Phase: 15
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 14 Plan 14-10 baseline complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); one task commit, 9m wall time; focused multitap and descriptor selectors passed 2/2
-Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 10/15 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+Last activity: 2026-11-24 — Phase 14 Plan 14-11 complete; Codex GSD executor configured `gpt-6-luna` xhigh (primary runtime model ID unavailable); 24m wall time; three task commits; focused multitap and descriptor selectors passed 2/2
+Progress: [███████░░░] 70% (7/10 v2.0 phases released; Phase 14 has 11/15 plans complete. Phase 7–11 verification digests will be reconciled at milestone close.)
+
+### Phase 14 Plan 14-11 execution (2026-11-24)
+
+Runtime/model: Codex GSD executor configured `gpt-6-luna` xhigh; primary runtime model ID unavailable. Measured
+wall duration was 24m. Three task commits landed: `b72c468` and `b1e8fd3` (RED coverage), then `474aa6a`
+(compact multitap topology, routing and documentation).
+
+Cheap `git diff --check`, inventory-sort and exact-selector preflights passed before configure/build. Existing
+`build/ci` was reused; `cmake --preset ci` and the focused libretro host/core build passed. The focused
+`libretro.input.multitap` and `libretro.input.descriptors` selectors passed 2/2. The summary's coverage block
+passes GSD classification; SIO-01 remains gated until its other declaring plans finish. No broad suite, hosted
+CI, Act or Docker was needed for this focused slice.
 
 ### Phase 14 Plan 14-10 execution (2026-11-24)
 
