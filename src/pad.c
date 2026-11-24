@@ -44,7 +44,7 @@ static const char name_rumble_map[] = "pad.rumble_map";
 static const char name_rumble_map_stage[] = "pad.rumble_map_stage";
 static const char name_frame_polls[] = "pad.frame_polls";
 static const char name_frame_latched[] = "pad.frame_latched";
-static const char *const name_watchdogs[SCHWAY__PAD_ENDPOINT_COUNT] = {
+static const char name_watchdogs[SCHWAY__PAD_ENDPOINT_COUNT][sizeof "pad.watchdog0"] = {
     "pad.watchdog0", "pad.watchdog1", "pad.watchdog2", "pad.watchdog3",
     "pad.watchdog4", "pad.watchdog5", "pad.watchdog6", "pad.watchdog7"};
 static const char name_transfers[] = "pad.transfers";
