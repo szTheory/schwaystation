@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: 8
+current_plan: 9
 status: executing
-stopped_at: Completed 15-07-PLAN.md
-last_updated: "2026-11-25T13:48:52.974Z"
+stopped_at: Completed 15-08-PLAN.md
+last_updated: "2026-11-25T14:22:16.498Z"
 last_activity: 2026-11-25
-last_activity_desc: Phase 15 Plan 15-07 completed; Codex GSD executor gpt-6-luna; about 24m commit window, active time not isolated; focused libretro input checks passed; Plan 15-08 is next
-state_head: c3bb282784f68528173d1415542ba9770cdbfffa
+last_activity_desc: Phase 15 Plan 15-08 completed; Codex/OpenGSD 1.23.0, gsd-executor gpt-6-luna xhigh; 29m26s wall window; POINTER fallback and focused gun/topology checks passed; Plan 15-09 is next
+state_head: a6f6b093edc33ace004fea976f676eea4a9ff6a2
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 105
-  completed_plans: 102
+  completed_plans: 103
   percent: 80
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: 8
+Current Plan: 9
 Total Plans in Phase: 10
 Status: Ready to execute
-Last activity: 2026-11-25 — Phase 15 Plan 15-07 completed; Codex GSD executor gpt-6-luna; about 24m commit window, active time not isolated; focused libretro input checks passed; Plan 15-08 is next
+Last activity: 2026-11-25 — Phase 15 Plan 15-08 completed; Codex/OpenGSD 1.23.0, gsd-executor gpt-6-luna xhigh; 29m26s wall window; POINTER fallback and focused gun/topology checks passed; Plan 15-09 is next
 Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 and 16 remain. Refreshed Phase 7–14 verification reports all pass; retain TODO051 as unverified PBP-only routing for milestone audit.)
 
 ### Phase 15 discussion (2026-11-24)
@@ -76,6 +76,12 @@ Runtime/model: Codex/OpenGSD 1.23.0; `gsd-planner` gpt-6.1-sol high; `gsd-plan-c
 ### Phase 15 Plan 15-03 execution (2026-11-24)
 
 Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary session model ID unavailable. Plan execution ran from 2026-11-25T04:28:06Z through 04:41:31Z (13m25s wall). Both tasks followed RED/GREEN: the pad-state probe and GPU-storage probe each produced classifier-accepted target assertion failures before their implementation commits. One strict-build `-Wshadow` failure was corrected by renaming the direct input local; the targeted rerun passed. `cmake --preset ci`, the focused SIO pad/API target build, the four-selector API/pad set (4/4), the final `sio.gun.latch` selector (1/1), the fixture budget check (1/1), ABI-offset checks and sorted SIO inventory preflight passed. No broad workflow, hosted CI, Act or Docker work was needed at this plan boundary. Task commits: `3e9af4a`, `fd627ab`, `f275820`, `c0af4f1`; summary: `.planning/phases/15-guncon-and-justifier/15-03-SUMMARY.md`.
+
+### Phase 15 Plan 15-08 execution (2026-11-25)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary session model ID unavailable. The recorded wall window ran from the Plan 15-07 closeout at 2026-11-25T13:49:09Z through the final task commit at 14:18:35Z (29m26s). Task 1 used an accepted failing POINTER integration assertion before implementing capability-gated fallback. Task 2 found frame latching and tap restrictions already implemented by prior plans; regression tests plus documentation passed without a production fix.
+
+`cmake --preset ci`, required-selector enumeration, ABI v9, documentation budget and fixture budget checks passed. The Task 1 three-selector set passed 3/3, the Task 2 five-selector set passed 5/5, targeted builds and `git diff --check` passed. The first Task 2 run exposed an incomplete test-host LIGHTGUN trigger setup after pointer input state was separated; the mock was corrected before the final green run. A full-tree hygiene scan was stopped after about 25 seconds (exit 130) as redundant; the configured staged hygiene hook passed on both task commits. No broad workflow, hosted CI, Act or Docker or fuzz campaign was run. Task commits: `3390f94`, `f8e2a4e`, `059cc0f`, `a6f6b09`; summary: `.planning/phases/15-guncon-and-justifier/15-08-SUMMARY.md`.
 
 ### Phase 14 final hosted verification and release (2026-11-24)
 
@@ -1846,6 +1852,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 15 P05 | 2h28m | 2 tasks | 4 files |
 | Phase 15 P6 | about 3h 52m wall time; active time not isolated | 2 tasks | 5 files |
 | Phase 15 P07 | 24m commit window; active start not separately recorded | 2 tasks | 4 files |
+| Phase 15 P08 | 29m 26s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2340,6 +2347,8 @@ Recent decisions affecting current work:
 - [Phase 15]: Reuse the existing serialized byte-staging lane for Justifier sensing enable. — This preserves the established continuation format and avoids adding a state-format field or revision.
 - [Phase 15]: Use official LIGHTGUN base ID and Justifier subclass 2 on direct ports; do not offer guns behind multitaps.
 - [Phase 15]: Treat capability as device-type support only; zero input_state values remain neutral and cannot identify absent controls.
+- [Phase 15]: Prefer LIGHTGUN when both device types are advertised; POINTER is a limited fallback without forced reload.
+- [Phase 15]: Keep GunCon and Justifier on direct physical ports; multitap sockets reject guns.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2591,8 +2600,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T13:45:36.251Z
-Stopped at: Completed 15-07-PLAN.md
+Last session: 2026-11-25T14:22:16.187Z
+Stopped at: Completed 15-08-PLAN.md
 Resume file: None
 
 ### v1.0 session history
