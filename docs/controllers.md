@@ -1,7 +1,9 @@
 # Controllers and multitap
 
 The libretro core accepts the standard DualShock (ANALOG), PlayStation Controller (JOYPAD), and None devices.
-Its two multitap options are disabled by default and take effect when content is loaded or reloaded:
+It also offers GunCon and Justifier on direct physical ports. Their choices are omitted on a port with a
+multitap, including its socket A. The multitap options are disabled by default and take effect when content
+is loaded or reloaded:
 
 | Core option | Values | Default | Effect |
 | --- | --- | --- | --- |
@@ -34,6 +36,12 @@ subclasses use the vendored libretro formula `RETRO_DEVICE_SUBCLASS(RETRO_DEVICE
 | Mouse | Mouse X/Y are relative signed values and left/right buttons map to the PS1 mouse buttons. The adapter preserves each signed callback value; the core saturates movement to the device's −128 to +127 report range. A missing callback supplies zero movement and released buttons. |
 | neGcon | RetroPad Start, D-pad, R shoulder, B face button, and A face button map to the neGcon button word. Left-stick X maps linearly across 0–255 to twist. The positive side of right-stick Y, inverted, drives I pressure; the positive side of right-stick X drives II pressure. L2 drives L as 0 or 255. Pressure inputs have no extra curve or deadzone. |
 | Jogcon | Uses the neGcon button mapping. Left-stick X supplies the raw signed dial word: its 16-bit pattern is retained with bit 0 cleared, and a negative or positive value sets the corresponding direction flag. Zero clears both flags. No force-feedback behavior is inferred. |
+| GunCon (`RETRO_DEVICE_LIGHTGUN`) | Polls base LIGHTGUN Screen X/Y, Trigger, Offscreen, Reload, AUX A and AUX B once per frame. AUX A/B drive the GunCon A/B bits. Coordinates map signed libretro screen positions to the current active output pixels; `(0, 0)` is the center. |
+| Justifier (`RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 2)`) | Polls the same base LIGHTGUN device. Trigger drives the trigger bit, Start drives Start, and Select drives Back. Reload and Offscreen remain distinct from aim. |
+
+The screen-coordinate conversion maps the full signed range `−32768…32767` onto pixel coordinates `0…extent−1`
+with integer nearest rounding. The adapter keeps the aim, selected gun, trigger and offscreen/reload flags in
+one frame-latched input snapshot.
 
 These mappings are host controls chosen for remapping convenience. The emulated core receives integer values and
 does not apply additional curves, deadzones, or physical-dial response models.

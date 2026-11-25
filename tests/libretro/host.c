@@ -403,9 +403,18 @@ static unsigned expected_active_players(void)
            (strcmp(multitap_port2_value, "enabled") == 0 ? 3u : 0u);
 }
 
+static int expected_player_has_gun(unsigned player)
+{
+    unsigned port1_players = strcmp(multitap_port1_value, "enabled") == 0 ? 4u : 1u;
+    if (player < port1_players) {
+        return player == 0u && strcmp(multitap_port1_value, "enabled") != 0;
+    }
+    return player == port1_players && strcmp(multitap_port2_value, "enabled") != 0;
+}
+
 static void check_controller_info(const struct retro_controller_info *info)
 {
-    static const unsigned expected_ids[] = {
+    static const unsigned base_ids[] = {
         RETRO_DEVICE_ANALOG,
         RETRO_DEVICE_JOYPAD,
         RETRO_DEVICE_NONE,
@@ -414,10 +423,15 @@ static void check_controller_info(const struct retro_controller_info *info)
         RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3),
         RETRO_DEVICE_MOUSE,
     };
-    static const char *expected_names[] = {
+    static const char *base_names[] = {
         "DualShock", "PlayStation Controller", "None", "Dual Analog Flight Stick",
         "neGcon", "Jogcon", "Mouse",
     };
+    static const unsigned gun_ids[] = {
+        RETRO_DEVICE_LIGHTGUN,
+        RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 2),
+    };
+    static const char *gun_names[] = {"GunCon", "Justifier"};
     controller_info_calls++;
     CHECK(info != NULL);
     if (info == NULL) {
@@ -425,15 +439,20 @@ static void check_controller_info(const struct retro_controller_info *info)
     }
     unsigned active_players = expected_active_players();
     for (unsigned port = 0u; port < active_players; port++) {
+        unsigned gun_count = expected_player_has_gun(port) ? 2u : 0u;
         CHECK_EQ_U64(info[port].num_types,
-                     sizeof expected_ids / sizeof expected_ids[0]);
+                     sizeof base_ids / sizeof base_ids[0] + gun_count);
         CHECK(info[port].types != NULL);
         if (info[port].types == NULL) {
             continue;
         }
-        for (unsigned i = 0u; i < sizeof expected_ids / sizeof expected_ids[0]; i++) {
-            CHECK_EQ_U64(info[port].types[i].id, expected_ids[i]);
-            check_string("controller type name", info[port].types[i].desc, expected_names[i]);
+        for (unsigned i = 0u; i < sizeof base_ids / sizeof base_ids[0]; i++) {
+            CHECK_EQ_U64(info[port].types[i].id, base_ids[i]);
+            check_string("controller type name", info[port].types[i].desc, base_names[i]);
+        }
+        for (unsigned i = 0u; i < gun_count; i++) {
+            CHECK_EQ_U64(info[port].types[7u + i].id, gun_ids[i]);
+            check_string("controller type name", info[port].types[7u + i].desc, gun_names[i]);
         }
     }
     CHECK(info[active_players].types == NULL);
@@ -470,15 +489,28 @@ static void validate_input_descriptors(const struct retro_input_descriptor *desc
     static const struct retro_input_descriptor expected_pad[] = {
         EXPECTED_PAD_DESCRIPTORS(0u),
     };
+    static const struct retro_input_descriptor expected_gun[] = {
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X, "Screen X"},
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y, "Screen Y"},
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_TRIGGER, "Trigger"},
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN, "Offscreen"},
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_RELOAD, "Reload"},
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_AUX_A, "GunCon A"},
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_AUX_B, "GunCon B"},
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_START, "Justifier Start"},
+        {0u, RETRO_DEVICE_LIGHTGUN, 0u, RETRO_DEVICE_ID_LIGHTGUN_SELECT, "Justifier Back"},
+    };
     unsigned active_players = expected_active_players();
     unsigned per_player = (unsigned)(sizeof expected_pad / sizeof expected_pad[0]);
+    unsigned per_gun = (unsigned)(sizeof expected_gun / sizeof expected_gun[0]);
+    unsigned descriptor_count = 0u;
     CHECK(descriptors != NULL);
     if (descriptors == NULL) {
         return;
     }
     for (unsigned player = 0u; player < active_players; player++) {
         for (unsigned item = 0u; item < per_player; item++) {
-            const struct retro_input_descriptor *actual = &descriptors[player * per_player + item];
+            const struct retro_input_descriptor *actual = &descriptors[descriptor_count++];
             CHECK(actual->description != NULL);
             if (actual->description == NULL) {
                 return;
@@ -489,13 +521,27 @@ static void validate_input_descriptors(const struct retro_input_descriptor *desc
             CHECK_EQ_U64(actual->id, expected_pad[item].id);
             check_string("input descriptor", actual->description, expected_pad[item].description);
         }
+        if (expected_player_has_gun(player)) {
+            for (unsigned item = 0u; item < per_gun; item++) {
+                const struct retro_input_descriptor *actual = &descriptors[descriptor_count++];
+                CHECK(actual->description != NULL);
+                if (actual->description == NULL) {
+                    return;
+                }
+                CHECK_EQ_U64(actual->port, player);
+                CHECK_EQ_U64(actual->device, expected_gun[item].device);
+                CHECK_EQ_U64(actual->index, expected_gun[item].index);
+                CHECK_EQ_U64(actual->id, expected_gun[item].id);
+                check_string("lightgun input descriptor", actual->description,
+                             expected_gun[item].description);
+            }
+        }
     }
-    unsigned terminator = active_players * per_player;
-    CHECK(descriptors[terminator].description == NULL);
-    CHECK_EQ_U64(descriptors[terminator].port, 0u);
-    CHECK_EQ_U64(descriptors[terminator].device, 0u);
-    CHECK_EQ_U64(descriptors[terminator].index, 0u);
-    CHECK_EQ_U64(descriptors[terminator].id, 0u);
+    CHECK(descriptors[descriptor_count].description == NULL);
+    CHECK_EQ_U64(descriptors[descriptor_count].port, 0u);
+    CHECK_EQ_U64(descriptors[descriptor_count].device, 0u);
+    CHECK_EQ_U64(descriptors[descriptor_count].index, 0u);
+    CHECK_EQ_U64(descriptors[descriptor_count].id, 0u);
 }
 #undef EXPECTED_PAD_DESCRIPTORS
 
