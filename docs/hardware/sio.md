@@ -90,6 +90,13 @@ directly over SIO. The IDs, button bits and coordinate units follow the PER.01 c
 `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md` §2.7. These notes are a secondary source and do
 not establish a calibrated optical response.
 
+When input is unavailable or no light sample completed, the selected deterministic response is
+X=`0001h`, Y=`000Ah`. An explicit offscreen or reload input returns X=`0001h`, Y=`0005h`, even
+when the latched cursor has coordinates. PER.01 associates these response words with overlapping
+dark, busy and offscreen cases; the choices here resolve that ambiguity for this model and are not
+physical response measurements. A repeated or aborted poll uses the current frame-latched state;
+it cannot turn an invalid input into a hit or reuse an observation cleared by a newer snapshot.
+
 ## Timing model
 
 At mode `000Ch` (eight data bits, no parity, factor MUL1) and baud reload `0088h`, the byte period is 1,088

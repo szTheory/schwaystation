@@ -562,8 +562,18 @@ static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t
         if (index == 1u) {
             return (uint8_t)(buttons >> 8);
         }
-        uint16_t coordinate = index < 4u ? pad->gun_result_x[port]
-                                          : pad->gun_result_y[port];
+        uint16_t x = pad->gun_result_x[port];
+        uint16_t y = pad->gun_result_y[port];
+        uint32_t flags = pad->gun_input[port].flags;
+        if ((flags & (SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD)) != 0u) {
+            x = 1u;
+            y = 5u;
+        } else if ((flags & SCHWAY_GUN_INPUT_VALID) == 0u ||
+                   pad->gun_result_valid[port] == 0u) {
+            x = 1u;
+            y = 10u;
+        }
+        uint16_t coordinate = index < 4u ? x : y;
         if (index == 2u || index == 4u) {
             return (uint8_t)coordinate;
         }
