@@ -145,6 +145,8 @@ static int (RETRO_CALLCONV *p_test_card_read_byte)(unsigned, uint8_t, int, uint8
 static int(RETRO_CALLCONV *p_test_poll_endpoint)(unsigned, unsigned, uint16_t *);
 static int(RETRO_CALLCONV *p_test_poll_bytes)(unsigned, unsigned, uint8_t *, size_t, size_t *);
 static int(RETRO_CALLCONV *p_test_gun_input)(unsigned, schway_gun_input *);
+static int(RETRO_CALLCONV *p_test_gun_sensor)(unsigned, unsigned *, unsigned *);
+static int(RETRO_CALLCONV *p_test_fill_gun_frame)(void);
 
 static const char *missing;
 
@@ -201,6 +203,8 @@ static void resolve_all(int inspect_card2)
         RESOLVE(p_test_poll_endpoint, "schway__libretro_test_poll_endpoint");
         RESOLVE(p_test_poll_bytes, "schway__libretro_test_poll_bytes");
         RESOLVE(p_test_gun_input, "schway__libretro_test_gun_input");
+        RESOLVE(p_test_gun_sensor, "schway__libretro_test_gun_sensor");
+        RESOLVE(p_test_fill_gun_frame, "schway__libretro_test_fill_gun_frame");
     }
 }
 
@@ -267,6 +271,7 @@ static unsigned special_queries[8][8][3][17];
 static unsigned input_capabilities_calls;
 static int input_capabilities_available = 1;
 static uint64_t input_capabilities = UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
+static unsigned log_calls;
 static int rumble_available;
 static int rumble_axis_mode;
 static unsigned audio_tap_checks;
@@ -570,6 +575,7 @@ static void RETRO_CALLCONV log_printf(enum retro_log_level level, const char *fo
     va_start(args, format);
     (void)vsnprintf(log_message, sizeof log_message, format, args);
     va_end(args);
+    log_calls++;
 }
 
 static bool RETRO_CALLCONV env(unsigned cmd, void *data)
@@ -1945,6 +1951,31 @@ static void expect_gun_reply(unsigned port, uint8_t id, uint16_t buttons,
     }
 }
 
+static void expect_gun_unavailable(unsigned port)
+{
+    schway_gun_input snapshot;
+    unsigned armed = 1u, consumed = 1u;
+    uint8_t reply[9];
+    size_t written = 0u;
+    memset(&snapshot, 0xA5, sizeof snapshot);
+    CHECK_EQ_U64(p_test_gun_input(port, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 0u);
+    CHECK_EQ_U64(snapshot.y, 0u);
+    CHECK_EQ_HEX(snapshot.flags, 0u);
+    CHECK_EQ_U64(p_test_gun_sensor(port, &armed, &consumed), 1u);
+    CHECK_EQ_U64(armed, 0u);
+    CHECK_EQ_U64(consumed, 0u);
+    CHECK_EQ_U64(p_test_poll_bytes(port, 0u, reply, sizeof reply, &written), 1u);
+    CHECK_EQ_U64(written, 9u);
+    if (written == 9u) {
+        CHECK_EQ_U64(reply[5], 1u);
+        CHECK_EQ_U64(reply[6], 0u);
+        CHECK_EQ_U64(reply[7], 10u);
+        CHECK_EQ_U64(reply[8], 0u);
+        CHECK((reply[4] & 0x20u) != 0u);
+    }
+}
+
 static int test_input_lightgun(void)
 {
     const unsigned justifier = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 2);
@@ -2035,6 +2066,120 @@ static int test_input_lightgun(void)
     module_close();
     special_input_mode = 0;
     special_buttons = 0u;
+    return check_failures != 0 ? 1 : 0;
+}
+
+static int test_input_gun_unavailable(void)
+{
+    const uint32_t pressed = UINT32_C(1) << RETRO_DEVICE_ID_LIGHTGUN_TRIGGER;
+    const uint32_t valid_trigger = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    schway_gun_input snapshot;
+    unsigned armed = 0u, consumed = 0u;
+    unsigned capabilities, logs;
+    uint8_t reply[9];
+    size_t written = 0u;
+
+    special_input_mode = 1;
+    special_lightgun_x = 0;
+    special_lightgun_y = 0;
+    special_buttons = pressed;
+    input_capabilities_available = 1;
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
+    input_capabilities_calls = 0u;
+    p_set_input_state(input);
+    CHECK(p_test_gun_input != NULL && p_test_gun_sensor != NULL &&
+          p_test_fill_gun_frame != NULL);
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    p_set_controller_port_device(0u, RETRO_DEVICE_LIGHTGUN);
+    run_one(); /* Load the test-card display tuple before the test-only VRAM fill. */
+    CHECK_EQ_U64(p_test_fill_gun_frame(), 1u);
+
+    /* A bright center shot establishes a real hit before the frontend disappears. */
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+    CHECK_EQ_U64(p_test_gun_sensor(0u, &armed, &consumed), 1u);
+    CHECK_EQ_U64(armed, 0u);
+    CHECK_EQ_U64(consumed, 1u);
+    CHECK_EQ_U64(p_test_poll_bytes(0u, 0u, reply, sizeof reply, &written), 1u);
+    CHECK_EQ_U64(written, 9u);
+    if (written == 9u) {
+        CHECK(reply[7] != 10u);
+        CHECK((reply[4] & 0x20u) == 0u);
+    }
+
+    /* Removing the callback clears the previous aim, trigger and consumed hit. */
+    p_set_input_state(NULL);
+    capabilities = input_capabilities_calls;
+    logs = log_calls;
+    run_one();
+    CHECK_EQ_U64(input_capabilities_calls, capabilities);
+    CHECK_EQ_U64(log_calls, logs + 1u);
+    CHECK(strstr(log_message, "LIGHTGUN input unsupported") != NULL);
+    expect_gun_unavailable(0u);
+
+    /* The warning is transition-based, including a failed query and missing bit. */
+    logs = log_calls;
+    run_one();
+    CHECK_EQ_U64(log_calls, logs);
+    p_set_input_state(input);
+    input_capabilities_available = 0;
+    capabilities = input_capabilities_calls;
+    run_one();
+    CHECK_EQ_U64(input_capabilities_calls, capabilities + 1u);
+    CHECK_EQ_U64(log_calls, logs);
+    expect_gun_unavailable(0u);
+
+    input_capabilities_available = 1;
+    input_capabilities = 0u;
+    run_one();
+    expect_gun_unavailable(0u);
+    CHECK_EQ_U64(log_calls, logs);
+
+    /* Restoring the device-type capability recovers input and reports once. */
+    logs = log_calls;
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
+    capabilities = input_capabilities_calls;
+    run_one();
+    CHECK_EQ_U64(input_capabilities_calls, capabilities + 1u);
+    CHECK_EQ_U64(log_calls, logs + 1u);
+    CHECK(strstr(log_message, "LIGHTGUN input is available again") != NULL);
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+    CHECK_EQ_U64(p_test_gun_sensor(0u, &armed, &consumed), 1u);
+    CHECK_EQ_U64(consumed, 1u);
+    written = 0u;
+    CHECK_EQ_U64(p_test_poll_bytes(0u, 0u, reply, sizeof reply, &written), 1u);
+    CHECK_EQ_U64(written, 9u);
+    if (written == 9u) {
+        CHECK(reply[7] != 10u);
+        CHECK((reply[4] & 0x20u) == 0u);
+    }
+
+    /* Zero is a neutral trigger while signed zero aim remains the center. */
+    special_buttons = 0u;
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, SCHWAY_GUN_INPUT_VALID);
+    written = 0u;
+    CHECK_EQ_U64(p_test_poll_bytes(0u, 0u, reply, sizeof reply, &written), 1u);
+    CHECK_EQ_U64(written, 9u);
+    if (written == 9u) {
+        CHECK((reply[4] & 0x20u) != 0u);
+    }
+
+    p_set_input_state(input);
+    p_unload_game();
+    p_deinit();
+    module_close();
+    special_input_mode = 0;
+    special_buttons = 0u;
+    input_capabilities_available = 1;
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
     return check_failures != 0 ? 1 : 0;
 }
 
@@ -6059,6 +6204,7 @@ int main(int argc, char **argv)
     int input_multitap_mode = argc == 3 && strcmp(argv[2], "input-multitap") == 0;
     int input_special_mode = argc == 3 && strcmp(argv[2], "input-special") == 0;
     int input_lightgun_mode = argc == 3 && strcmp(argv[2], "input-lightgun") == 0;
+    int input_gun_unavailable_mode = argc == 3 && strcmp(argv[2], "input-gun-unavailable") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
     int input_movies_mode = argc == 4 && strcmp(argv[2], "input-movies") == 0;
@@ -6073,7 +6219,8 @@ int main(int argc, char **argv)
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
     if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode && !input_multitap_mode &&
-         !input_special_mode && !input_lightgun_mode && !video_geometry_mode &&
+         !input_special_mode && !input_lightgun_mode && !input_gun_unavailable_mode &&
+         !video_geometry_mode &&
          !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
          !card_controls_mode && !cards_multitap_mode && !memory_aliases_mode && !memory_boundaries_mode &&
@@ -6150,7 +6297,7 @@ int main(int argc, char **argv)
     /* Every entry point, before anything else is called. */
     int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode ||
                         card_persistence_mode || input_multitap_mode || input_special_mode ||
-                        input_lightgun_mode || cards_multitap_mode;
+                        input_lightgun_mode || input_gun_unavailable_mode || cards_multitap_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -6165,7 +6312,9 @@ int main(int argc, char **argv)
          module_sym("schway__libretro_test_flush_cards") != NULL ||
          module_sym("schway__libretro_test_poll_endpoint") != NULL ||
          module_sym("schway__libretro_test_poll_bytes") != NULL ||
-         module_sym("schway__libretro_test_gun_input") != NULL)) {
+         module_sym("schway__libretro_test_gun_input") != NULL ||
+         module_sym("schway__libretro_test_gun_sensor") != NULL ||
+         module_sym("schway__libretro_test_fill_gun_frame") != NULL)) {
         fprintf(stderr, "production libretro module exports card test accessors\n");
         module_close();
         return 1;
@@ -6281,6 +6430,10 @@ int main(int argc, char **argv)
 
     if (input_lightgun_mode) {
         return test_input_lightgun();
+    }
+
+    if (input_gun_unavailable_mode) {
+        return test_input_gun_unavailable();
     }
 
     if (psexe_mode) {

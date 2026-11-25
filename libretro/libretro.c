@@ -148,6 +148,10 @@ schway__libretro_test_poll_bytes(unsigned port, unsigned socket, uint8_t *reply,
                                  size_t capacity, size_t *written);
 SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
 schway__libretro_test_gun_input(unsigned port, schway_gun_input *out);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_gun_sensor(unsigned port, unsigned *armed, unsigned *consumed);
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_fill_gun_frame(void);
 #endif
 
 static struct retro_disk_control_ext_callback lr_disk_control = {
@@ -2468,6 +2472,34 @@ schway__libretro_test_gun_input(unsigned port, schway_gun_input *out)
     }
     *out = inst->pad.gun_input[port];
     return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV
+schway__libretro_test_gun_sensor(unsigned port, unsigned *armed, unsigned *consumed)
+{
+    if (inst == NULL || port >= 2u || armed == NULL || consumed == NULL) {
+        return 0;
+    }
+    *armed = inst->gpu.gun_sensor[port].armed;
+    *consumed = inst->gpu.gun_sensor[port].consumed;
+    return 1;
+}
+
+SCHWAYSTATION_TEST_EXPORT int RETRO_CALLCONV schway__libretro_test_fill_gun_frame(void)
+{
+    if (inst == NULL) {
+        return 0;
+    }
+    /* GP1 sets a 320x240 scan window; GP0 fills it bright
+       (.planning/preparation/PSX-GPU-AND-GTE.md §2.4). */
+    return lr_test_write(0x1F801814u, 4u, 0x06A00000u) &&
+           lr_test_write(0x1F801814u, 4u, 0x0703C000u) &&
+           lr_test_write(0x1F801814u, 4u, 0x05000000u) &&
+           lr_test_write(0x1F801814u, 4u, 0x08000001u) &&
+           lr_test_write(0x1F801814u, 4u, 0x03000000u) &&
+           lr_test_write(0x1F801810u, 4u, 0x02FFFFFFu) &&
+           lr_test_write(0x1F801810u, 4u, 0u) &&
+           lr_test_write(0x1F801810u, 4u, (240u << 16) | 320u);
 }
 #undef SCHWAYSTATION_TEST_EXPORT
 #endif
