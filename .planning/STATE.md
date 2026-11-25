@@ -6,11 +6,11 @@ current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
 current_plan: 01 (revised; checker recheck pending)
 status: planning
-stopped_at: Phase 16 plan scope warning revised; recheck pending
-last_updated: "2026-11-25T23:44:25.710Z"
+stopped_at: Phase 16 plans passed independent verification; execution ready
+last_updated: "2026-11-25T23:48:12.537Z"
 last_activity: 2026-11-25
 last_activity_desc: Phase 16 checker findings addressed; independent recheck pending
-state_head: 109e0fb491783a6ff02e57441e58321e30e3f9e1
+state_head: 26f3870e41203c30d8567a176cf69c641674d8b1
 progress:
   total_phases: 10
   completed_phases: 9
@@ -2625,11 +2625,11 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T23:44:25.298Z
-Stopped at: Phase 16 plan scope warning revised; recheck pending
+Last session: 2026-11-25T23:48:12.002Z
+Stopped at: Phase 16 plans passed independent verification; execution ready
 Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-01-PLAN.md
 
-Runtime/model: Codex with OpenGSD 1.23.0; primary model ID unavailable. Three assumption analyses used gpt-6.1-sol high.
+Runtime/model: Codex/OpenGSD 1.23.0 coordinator (primary model ID unavailable); assumption analysis gpt-6.1-sol high, phase researcher gpt-6-luna xhigh, planner and revision gpt-6.1-sol high, independent plan checker and rechecks gpt-6-luna xhigh.
 
 Phase 15 release boundary: `gh run view 45697774644 --json status,conclusion,jobs` exited 0 (Main CI passed); [run 45697774644](https://github.com/szTheory/schwaystation/actions/runs/45697774644). `gh run view 45698033992 --json status,conclusion,jobs` exited 0 (Release passed); [run 45698033992](https://github.com/szTheory/schwaystation/actions/runs/45698033992). `gh release view v0.15.0 --json isDraft,url` exited 0 with `isDraft=false`; [v0.15.0](https://github.com/szTheory/schwaystation/releases/tag/v0.15.0).
 
