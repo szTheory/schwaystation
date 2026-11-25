@@ -1466,7 +1466,7 @@ static void gun_protocol_check(int passed, const char *name)
     gun_protocol_count++;
     printf("%s %u - %s\n", passed != 0 ? "ok" : "not ok", gun_protocol_count, name);
     if (passed == 0) {
-        fprintf(stderr, "GunCon protocol assertion failed: %s\n", name);
+        fprintf(stderr, "Gun protocol assertion failed: %s\n", name);
         gun_protocol_failures++;
     }
 }
@@ -1586,6 +1586,65 @@ static int gun_guncon(void)
     return gun_protocol_failures != 0u || check_failures != 0 ? 1 : 0;
 }
 
+static void gun_justifier_begin(schway *inst, int verify_header)
+{
+    configure_sio_port(inst, 0u);
+    (void)exchange(inst, 0x01u, 1);
+    uint8_t id = exchange(inst, 0x42u, 1);
+    uint8_t delimiter = exchange(inst, 0x00u, 1);
+    if (verify_header != 0) {
+        gun_protocol_check(id == 0x31u, "Justifier reports ID 31h");
+        gun_protocol_check(delimiter == 0x5Au, "Justifier poll delimiter");
+    }
+}
+
+static int gun_justifier(void)
+{
+    gun_protocol_count = 0u;
+    gun_protocol_failures = 0u;
+    puts("TAP version 13");
+
+    schway *inst = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.device[0] = SCHWAY_INPUT_DEVICE_JUSTIFIER;
+    input.buttons[0] = (uint16_t)((1u << 3) | (1u << 14));
+    input.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    latch_input(inst, &input);
+
+    gun_justifier_begin(inst, 1);
+    uint8_t low = exchange(inst, 0x00u, 1);
+    uint8_t high = exchange(inst, 0x00u, 0);
+    gun_protocol_check(low == 0xF7u && high == 0x3Fu,
+                       "Justifier reports active-low start, back and trigger bits");
+    gun_protocol_check((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u,
+                       "Justifier button word has no final ACK");
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
+                       "Justifier sensing starts disabled");
+
+    gun_justifier_begin(inst, 0);
+    (void)exchange(inst, 0x10u, 1);
+    schway__pad_abort(inst, 0u);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
+                       "partial enable poll does not commit sensing");
+
+    gun_justifier_begin(inst, 0);
+    (void)exchange(inst, 0x10u, 1);
+    (void)exchange(inst, 0x00u, 0);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 1u,
+                       "complete 10h poll enables sensing");
+
+    gun_justifier_begin(inst, 0);
+    (void)exchange(inst, 0x00u, 1);
+    (void)exchange(inst, 0x00u, 0);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
+                       "complete zero-control poll disables sensing");
+
+    schway_destroy(inst);
+    printf("1..%u\n", gun_protocol_count);
+    return gun_protocol_failures != 0u || check_failures != 0 ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -1616,6 +1675,8 @@ int main(int argc, char **argv)
         return gun_latch();
     } else if (strcmp(argv[1], "gun_guncon") == 0) {
         return gun_guncon();
+    } else if (strcmp(argv[1], "gun_justifier") == 0) {
+        return gun_justifier();
     } else {
         return 2;
     }
