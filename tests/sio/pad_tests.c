@@ -1308,6 +1308,11 @@ static int gun_latch(void)
                            2u * sizeof(schway_gun_input) + 2u * sizeof(uint8_t);
     gun_tap_check(sizeof inst->pad >= required_size,
                   "pad reserves two fixed gun records and two observation results");
+    size_t gpu_state_end = offsetof(struct schway__gpu, busy_until) +
+                           sizeof inst->gpu.busy_until;
+    size_t sensor_state_bytes = 2u * (7u * sizeof(uint32_t) + sizeof(uint64_t));
+    gun_tap_check(sizeof inst->gpu >= gpu_state_end + sensor_state_bytes,
+                  "GPU reserves fixed event timing state for both direct ports");
     schway_input first;
     memset(&first, 0, sizeof first);
     first.size = (uint32_t)sizeof first;
