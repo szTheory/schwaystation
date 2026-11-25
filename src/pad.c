@@ -526,6 +526,10 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
         }
         schway__state_check(io, saved_present[port] ==
                                     (saved_device[port] != SCHWAY_INPUT_DEVICE_NONE ? 1u : 0u));
+        if (tap_socket != 0) {
+            schway__state_check(io, saved_device[port] != SCHWAY_INPUT_DEVICE_GUNCON &&
+                                       saved_device[port] != SCHWAY_INPUT_DEVICE_JUSTIFIER);
+        }
         if (port < 2u) {
             uint32_t flags = saved_gun_flags[port];
             schway__state_check(io, (flags & SCHWAY_GUN_INPUT_VALID) == 0u ||
@@ -639,6 +643,11 @@ static void refresh_watchdog(schway *inst, uint32_t port, uint64_t now)
 
 static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t index)
 {
+    if (port >= 2u &&
+        (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER ||
+         pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON)) {
+        return UINT8_MAX;
+    }
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
         enum { JUSTIFIER_START = 1u << 3, JUSTIFIER_BACK = 1u << 14,
                JUSTIFIER_TRIGGER = 1u << 15 };

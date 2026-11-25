@@ -764,6 +764,29 @@ static void test_rejects(void)
         expect_refused("tap socket connected with tap disabled", target, bad, n,
                        SCHWAY_STATUS_ERR_STATE_FIELD);
     }
+    if (pad_device_at >= SCHWAY__STATE_HEADER_SIZE &&
+        pad_present_at >= SCHWAY__STATE_HEADER_SIZE &&
+        pad_multitap_at >= SCHWAY__STATE_HEADER_SIZE) {
+        static const struct {
+            uint32_t endpoint;
+            uint32_t multitap_port;
+            uint32_t device;
+            const char *name;
+        } invalid_gun_taps[] = {
+            {2u, 0u, SCHWAY_INPUT_DEVICE_GUNCON, "GunCon in enabled port-one tap"},
+            {5u, 1u, SCHWAY_INPUT_DEVICE_JUSTIFIER, "Justifier in enabled port-two tap"},
+        };
+        for (size_t i = 0u; i < sizeof invalid_gun_taps / sizeof invalid_gun_taps[0]; i++) {
+            memcpy(bad, good, n);
+            put_le(bad + pad_multitap_at + invalid_gun_taps[i].multitap_port, 1u, 1u);
+            put_le(bad + pad_device_at + invalid_gun_taps[i].endpoint,
+                   invalid_gun_taps[i].device, 1u);
+            put_le(bad + pad_present_at + invalid_gun_taps[i].endpoint, 1u, 1u);
+            reseal(bad, n);
+            expect_refused(invalid_gun_taps[i].name, target, bad, n,
+                           SCHWAY_STATUS_ERR_STATE_FIELD);
+        }
+    }
     if (sio_tap_mode_at >= SCHWAY__STATE_HEADER_SIZE &&
         sio_tap_index_at >= SCHWAY__STATE_HEADER_SIZE &&
         sio_tap_slot_mask_at >= SCHWAY__STATE_HEADER_SIZE) {
