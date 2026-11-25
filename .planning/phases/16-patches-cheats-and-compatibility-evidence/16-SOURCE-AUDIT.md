@@ -34,7 +34,7 @@ The phase goal is: players can use supported disc patches and cheat strings, and
 
 ## Concrete implementation choices
 
-- Add `SCHWAY_API_VERSION 11` for `schway_write_ram`; the separate library ABI remains compatible because the operation is additive and no existing layout/signature changes. D-04's “ABI version” wording is interpreted through DEC.75's separate API/ABI policy.
+- Add `SCHWAY_API_VERSION 11` for `schway_write_ram` per corrected D-04; the separate library ABI remains compatible because the operation is additive and no existing layout/signature changes. Plan 02 owns the new caller/registration and adjusts only the older callers' current-version comparisons, retaining their frozen layouts and behavior assertions.
 - Shared host cheats have 32 entry indices, at most 64 lines per entry, at most 1,024 text bytes per entry, and at most 256 normalized writes across the table. Widths are 1/2 and offsets are canonical first-2-MiB main RAM only.
 - PPF requires a supplied whole-source SHA-256 for every version, plus all applicable native checks. The supported source is a single raw CUE data track starting at file byte zero, with no stored or virtual pregap. PPF bounds are 16 MiB of patch data and 262,144 records.
 - BPS uses the same exact raw stream, stages targets of at most 1 MiB in memory for portable/WASI cases, and private storage for larger targets. Source/target stay within the existing 1 GiB logical-image cap; patch and metadata caps are 64 MiB and 1 MiB.
@@ -58,9 +58,13 @@ The phase goal is: players can use supported disc patches and cheat strings, and
 | 10 | 16-16, 16-17 | No source, header or inventory overlaps within wave |
 | 11 | 16-18 | Sequential owner |
 
-Plan 01 establishes the CMake test skeleton and all six per-directory inventories. Later waves reuse those registrations; source ownership prevents parallel edits to shared runner, libretro, header, provider or compatibility files. Normal STATE/SUMMARY bookkeeping is serialized by the orchestrator. All plans target 20–28 minutes with 2–3 tasks, no task modifies more than five files. The inherited coarse setting does not override the owner's 30-minute split rule.
+Plan 01 establishes the CMake test skeleton and checks all six per-directory inventories. It uses the existing ABI registration/inventory and api_v10 test as its released-caller baseline; Plan 02 creates api_v11 and registers it immediately before adding the public write operation. Plan 01 modifies 12 files, and Plan 02 modifies 12 files across three tasks of at most five files. The patch test source is created before Plan 01's first configure so its target never refers to a missing source. Later waves reuse those registrations; source ownership prevents parallel edits to shared runner, libretro, header, provider or compatibility files. Normal STATE/SUMMARY bookkeeping is serialized by the orchestrator. All plans target 20–28 minutes with 2–3 tasks, no task modifies more than five files. The inherited coarse setting does not override the owner's 30-minute split rule.
 
 The 18 schemas and structures were validated with the GSD CLI with no warnings. Decision coverage passed for all eight decisions, and the explicit same-wave file intersection check found no shared files. Each task modifies at most five files. No application, build or behavior test ran as part of planning.
+
+## Plan-check revision
+
+The first independent check found two blockers: Plan 01 listed 15 modified files, and the research artifact retained three unresolved questions. The revised plan moves api_v11 creation/registration into Plan 02 and uses the existing api_v10 baseline in Plan 01. The research now records explicit resolved dispositions: every PPF version requires external whole-source SHA-256 plus applicable native checks (Plans 07–10), only the specified raw single-track/no-pregap CUE mapping is supported (Plans 07 and 10), and BPS uses bounded memory/private-file staging before publication (Plan 09). Those choices agree with the current context and plans; none remains open for execution to decide.
 
 ## Deliberate evidence boundaries
 

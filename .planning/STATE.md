@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
-current_plan: 01 (planned; checker pending)
+current_plan: 01 (revised; checker recheck pending)
 status: planning
-stopped_at: Phase 16 plans drafted; plan checker pending
-last_updated: "2026-11-25T23:13:03.582Z"
+stopped_at: Phase 16 plan-check revision complete; recheck pending
+last_updated: "2026-11-25T23:33:01.305Z"
 last_activity: 2026-11-25
-last_activity_desc: Phase 16 execution plans drafted; plan checker pending
-state_head: 7b14286e3040017986a8a2ae436ad59d13f5426b
+last_activity_desc: Phase 16 checker findings addressed; independent recheck pending
+state_head: f630656c9a30ab2a157430fcf16e91b317ebc9f1
 progress:
   total_phases: 10
   completed_phases: 9
@@ -33,13 +33,17 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 Phase: 16 — Patches, cheats and compatibility evidence
 Current Plan: 01 (planned; checker pending)
 Total Plans in Phase: 18
-Status: Plans drafted; plan checker pending
-Last activity: 2026-11-25 -- Phase 16 plans drafted from committed context and research
+Status: Plans revised; plan checker recheck pending
+Last activity: 2026-11-25 -- Phase 16 plan scope and research-resolution findings addressed
 Progress: [█████████░] 86% (9/10 v2.0 phases released; Phase 16 has 18 implementation plans awaiting plan checks and execution. Phase 7–14 verification fingerprints need refresh at the milestone audit after shared-file changes. Retain TODO051 as unverified PBP-only routing for that audit.)
 
 ### Phase 16 planning (2026-11-25)
 
 Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. Eighteen plans cover the four Phase 16 requirements and eight locked decisions across eleven file-disjoint waves. Plan 01 registers the CMake skeleton and exact test inventories; later owners implement checked RAM writes, bounded GameShark text/state, PPF/BPS source-bound overlays, per-occurrence DAT accounting and the protected fresh-result capability matrix. Plan schemas/structures are validated; code review and final phase verification remain later steps. No application/build/behavior tests ran during planning. The source audit records coverage, concrete bounds and the experimental metadata evidence boundary.
+
+### Phase 16 plan-check revision (2026-11-25)
+
+Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. The independent check found that Plan 01's 15-file scope reached its blocker threshold and the research retained three open questions. Plan 01 now uses the existing api_v10 baseline and modifies 12 files while preserving the CMake skeleton and all six inventory checks. Plan 02 creates/registers api_v11, adds the public write, and updates only the older callers' exact-current-version assertions; its three tasks each touch at most five files. The research records resolved source identity, raw-layout and BPS-staging choices consistent with the plans and current context. No application, build or behavior tests ran in this revision; independent recheck precedes execution.
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -2621,8 +2625,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T23:13:03.188Z
-Stopped at: Phase 16 plans drafted; plan checker pending
+Last session: 2026-11-25T23:33:00.890Z
+Stopped at: Phase 16 plan-check revision complete; recheck pending
 Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-01-PLAN.md
 
 Runtime/model: Codex with OpenGSD 1.23.0; primary model ID unavailable. Three assumption analyses used gpt-6.1-sol high.
