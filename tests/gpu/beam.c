@@ -11,7 +11,9 @@
 #define TIMER0_COUNT UINT32_C(0x1F801100)
 #define TIMER0_MODE UINT32_C(0x1F801104)
 #define TIMER0_TARGET UINT32_C(0x1F801108)
+#define TIMER1_COUNT UINT32_C(0x1F801110)
 #define TIMER1_MODE UINT32_C(0x1F801114)
+#define TIMER1_TARGET UINT32_C(0x1F801118)
 #define I_STAT UINT32_C(0x1F801070)
 #define EXE_LOAD_ADDR UINT32_C(0x80010000)
 #define MAX_FIELDS 256u
@@ -110,7 +112,7 @@ static uint64_t gun_tick_for_clocks(uint32_t region, uint64_t clocks)
     return ceil_div(clocks * UINT64_C(451584), rate);
 }
 
-static schway *make_gun_sample_instance(uint16_t pixel)
+static schway *make_gun_sample_instance(uint16_t pixel, uint32_t device)
 {
     schway *inst = make_instance(SCHWAY_REGION_NTSC_U, 0u);
     if (inst == NULL) {
@@ -128,12 +130,12 @@ static schway *make_gun_sample_instance(uint16_t pixel)
     schway_input input;
     memset(&input, 0, sizeof input);
     input.size = (uint32_t)sizeof input;
-    input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.device[0] = device;
     input.guns[0].x = 1;
     input.guns[0].y = 0;
     input.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
     gun_tap_check(schway_set_input(inst, &input) == SCHWAY_STATUS_OK,
-                  "public GunCon input is accepted");
+                  "public gun input is accepted");
     return inst;
 }
 
@@ -189,9 +191,9 @@ static void test_gun_sample(void)
 {
     gun_tap_checks = 0u;
     const uint64_t deadline = gun_tick_for_clocks(SCHWAY_REGION_NTSC_U, 8u);
-    schway *split = make_gun_sample_instance(0u);
-    schway *whole = make_gun_sample_instance(UINT16_C(0x7FFF));
-    schway *late = make_gun_sample_instance(0u);
+    schway *split = make_gun_sample_instance(0u, SCHWAY_INPUT_DEVICE_GUNCON);
+    schway *whole = make_gun_sample_instance(UINT16_C(0x7FFF), SCHWAY_INPUT_DEVICE_GUNCON);
+    schway *late = make_gun_sample_instance(0u, SCHWAY_INPUT_DEVICE_GUNCON);
     gun_tap_check(split != NULL && whole != NULL && late != NULL,
                   "GPU instances are created for beam timing controls");
     if (split == NULL || whole == NULL || late == NULL) {
@@ -227,6 +229,44 @@ static void test_gun_sample(void)
     schway_destroy(split);
     schway_destroy(whole);
     schway_destroy(late);
+}
+
+static void test_gun_irq_order(void)
+{
+    gun_tap_checks = 0u;
+    schway *inst = make_gun_sample_instance(UINT16_C(0x7FFF), SCHWAY_INPUT_DEVICE_JUSTIFIER);
+    gun_tap_check(inst != NULL, "Justifier IRQ instance is created");
+    if (inst == NULL) {
+        printf("1..%u\n", gun_tap_checks);
+        return;
+    }
+
+    schway__pad_frame_start(inst);
+    inst->pad.gun_enabled[0] = 1u;
+    inst->pad.gun_input[0].x = 3;
+    inst->vram[0][3] = UINT16_C(0x7FFF);
+    write_port(inst, TIMER0_TARGET, 100u);
+    write_port(inst, TIMER0_MODE, 0x00000100u); /* Dot-clock counter, no IRQ. */
+    write_port(inst, TIMER1_TARGET, 100u);
+    write_port(inst, TIMER1_MODE, 0u); /* System-clock counter, no IRQ. */
+
+    uint64_t deadline = gun_tick_for_clocks(SCHWAY_REGION_NTSC_U, 24u);
+    run_cycles(inst, deadline - 1u);
+    uint32_t timer0_before = read_port(inst, TIMER0_COUNT) & 0xFFFFu;
+    uint32_t timer1_before = read_port(inst, TIMER1_COUNT) & 0xFFFFu;
+    run_cycles(inst, 1u);
+    uint32_t status = read_port(inst, I_STAT);
+    uint32_t timer0_at_irq = read_port(inst, TIMER0_COUNT) & 0xFFFFu;
+    uint32_t timer1_at_irq = read_port(inst, TIMER1_COUNT) & 0xFFFFu;
+    gun_tap_check((status & (UINT32_C(1) << 10)) != 0u,
+                  "bright enabled Justifier sample raises IRQ10");
+    gun_tap_check(timer0_at_irq == timer0_before + 1u && timer1_at_irq == timer1_before + 1u,
+                  "Timer0 dots and Timer1 clocks are current when IRQ10 is observed");
+    gun_tap_check(inst->gpu.gun_sensor[0].consumed != 0u,
+                  "Justifier beam event is consumed once");
+
+    printf("1..%u\n", gun_tap_checks);
+    schway_destroy(inst);
 }
 
 static void test_gun_geometry(void)
@@ -1315,6 +1355,8 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "gun_sample") == 0) {
         test_gun_sample();
+    } else if (strcmp(argv[1], "gun_irq_order") == 0) {
+        test_gun_irq_order();
     } else if (strcmp(argv[1], "gun_geometry") == 0) {
         test_gun_geometry();
     } else if (strcmp(argv[1], "midline_dot_irq") == 0) {
