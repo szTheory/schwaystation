@@ -1261,6 +1261,20 @@ static void special_negcon(void)
     negcon_instance_isolation();
 }
 
+static int gun_latch(void)
+{
+    schway *inst = make();
+    size_t fixed_state_end = offsetof(struct schway__pad, pending_valid) +
+                             sizeof inst->pad.pending_valid;
+    size_t required_size = fixed_state_end +
+                           2u * sizeof(schway_gun_input) + 2u * sizeof(uint8_t);
+    int present = sizeof inst->pad >= required_size;
+    printf("TAP version 13\n1..1\n%s 1 - pad reserves two fixed gun records and two observation results\n",
+           present != 0 ? "ok" : "not ok");
+    schway_destroy(inst);
+    return present != 0 ? 0 : 1;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 2) {
@@ -1287,6 +1301,8 @@ int main(int argc, char **argv)
         special_flight();
     } else if (strcmp(argv[1], "special_jogcon") == 0) {
         special_jogcon();
+    } else if (strcmp(argv[1], "gun_latch") == 0) {
+        return gun_latch();
     } else {
         return 2;
     }
