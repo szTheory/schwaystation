@@ -1580,8 +1580,6 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst, uint64_t st
     uint32_t gun_consumed[2];
     int32_t gun_aim_x[2];
     int32_t gun_aim_y[2];
-    uint32_t gun_target_line[2];
-    uint32_t gun_target_clock[2];
     uint64_t gun_deadline[2];
     uint32_t gun_phase[2];
     for (uint32_t port = 0u; port < 2u; port++) {
@@ -1591,12 +1589,10 @@ void schway__gpu_state_io(struct schway__state_io *io, schway *inst, uint64_t st
                                                &sensor->consumed, 0u, 1u);
         gun_aim_x[port] = state_i32(io, name_gun_aim_x[port], &sensor->aim_x);
         gun_aim_y[port] = state_i32(io, name_gun_aim_y[port], &sensor->aim_y);
-        gun_target_line[port] = schway__state_u32(io, name_gun_target_line[port],
-                                                  &sensor->target_line, 0u,
-                                                  gpu_lines(inst->region) - 1u);
-        gun_target_clock[port] = schway__state_u32(io, name_gun_target_clock[port],
-                                                   &sensor->target_clock, 0u,
-                                                   gpu_line_clocks(inst->region) - 1u);
+        (void)schway__state_u32(io, name_gun_target_line[port], &sensor->target_line, 0u,
+                                gpu_lines(inst->region) - 1u);
+        (void)schway__state_u32(io, name_gun_target_clock[port], &sensor->target_clock, 0u,
+                                gpu_line_clocks(inst->region) - 1u);
         gun_deadline[port] = schway__state_u64(io, name_gun_deadline[port],
                                                &sensor->deadline, 0u, UINT64_MAX);
         gun_phase[port] = schway__state_u32(io, name_gun_phase[port], &sensor->phase, 0u, 2u);
