@@ -7,10 +7,10 @@ current_phase_name: Patches, cheats and compatibility evidence
 current_plan: Not started
 status: planning
 stopped_at: Phase 15 complete, ready to plan Phase 16
-last_updated: "2026-11-25T18:32:59.281Z"
+last_updated: "2026-11-25T18:59:19.028Z"
 last_activity: 2026-11-25
-last_activity_desc: Phase 15 complete, transitioned to Phase 16
-state_head: f0442f6fcc5eaa44ba96154787f5925cc1fbbd8a
+last_activity_desc: "Phase 15 shipped as PR #44"
+state_head: 27ad36e076d68a8a921f11a460d86923a6f52159
 progress:
   total_phases: 10
   completed_phases: 9
@@ -34,7 +34,7 @@ Phase: 16 — Patches, cheats and compatibility evidence
 Current Plan: Not started
 Total Plans in Phase: 12
 Status: Ready to plan
-Last activity: 2026-11-25 — Phase 15 complete, transitioned to Phase 16
+Last activity: 2026-11-25 -- Phase 15 shipped as PR #44
 Progress: [█████████░] 90% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 implementation and local checks are complete; Phase 16 remains. Phase 7–14 verification fingerprints currently need refresh after shared-file changes. Retain TODO051 as unverified PBP-only routing for milestone audit.)
 
 ### Phase 15 discussion (2026-11-24)
