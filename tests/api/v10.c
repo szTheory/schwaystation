@@ -39,6 +39,20 @@ typedef struct schway_input {
     schway_controller_input controllers[2][4];
 } schway_input;
 
+/* RED contract probe: model the planned append without depending on names
+   that the public API has not added yet. */
+typedef struct expected_gun_input {
+    int32_t x;
+    int32_t y;
+    uint32_t flags;
+    uint32_t reserved0;
+} expected_gun_input;
+
+typedef struct expected_v10_input {
+    schway_input v9;
+    expected_gun_input guns[2];
+} expected_v10_input;
+
 schway_status schway_set_input(schway *inst, const void *input);
 
 _Static_assert(offsetof(schway_input, size) == 0u, "API v9 input.size");
@@ -83,6 +97,9 @@ _Static_assert(sizeof(((schway_input *)0)->controllers[0]) == 96u,
 _Static_assert(sizeof(((schway_input *)0)->controllers) == 192u,
                "API v9 eight-endpoint stride");
 _Static_assert(sizeof(schway_input) == 228u, "API v9 input size");
+_Static_assert(offsetof(expected_v10_input, guns) == 228u, "API v10 guns offset");
+_Static_assert(sizeof(expected_gun_input) == 16u, "API v10 gun input size");
+_Static_assert(sizeof(expected_v10_input) == 260u, "API v10 input size");
 
 typedef struct observed_input {
     uint16_t buttons[8];
@@ -147,6 +164,16 @@ int main(void)
     schway *inst = NULL;
     CHECK_EQ_U64(schway_create(&config, &inst), SCHWAY_STATUS_OK);
     if (inst == NULL) CHECK_DONE();
+
+    CHECK_EQ_U64(SCHWAY_API_VERSION, 10u);
+    expected_v10_input extended;
+    memset(&extended, 0, sizeof extended);
+    extended.v9.size = (uint32_t)sizeof extended;
+    extended.v9.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    extended.guns[0].x = 0;
+    extended.guns[0].y = 0;
+    extended.guns[0].flags = 1u; /* explicit validity makes (0, 0) meaningful */
+    CHECK_EQ_U64(schway_set_input(inst, &extended), SCHWAY_STATUS_OK);
 
     /* Allocate exactly the released v9 object extent: no gun extension exists. */
     schway_input *input = (schway_input *)calloc(1u, sizeof *input);
