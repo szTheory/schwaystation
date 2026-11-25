@@ -33,6 +33,14 @@ marker; if none is known it uses NTSC-U/C. Conflicting hints are reported throug
 NTSC-J, or PAL overrides the inferred region. Machine and region are independent choices, and both take effect when
 content is loaded or reloaded. Region selection does not establish title compatibility.
 
+## Controller input
+
+Supported controllers, including GunCon and Justifier mappings, are documented in [controllers](controllers.md).
+Lightguns require the frontend's `input_state` callback and its `LIGHTGUN` device-type capability. Libretro does
+not report support for individual controls, so a neutral zero cannot distinguish a missing control from a released
+one. When the required host support is unavailable, the core logs the transition when a log interface is available
+and supplies no valid gun aim.
+
 ## Disc changes
 
 M3U playlists expose the libretro extended disk-control interface. Ejecting opens the emulated tray; selecting a

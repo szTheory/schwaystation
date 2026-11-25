@@ -43,5 +43,12 @@ The screen-coordinate conversion maps the full signed range `−32768…32767` o
 with integer nearest rounding. The adapter keeps the aim, selected gun, trigger and offscreen/reload flags in
 one frame-latched input snapshot.
 
+The frontend must provide `input_state` and advertise the `LIGHTGUN` device type. Without either, the core logs
+an unsupported transition when a log interface is available, submits no valid gun input, and cannot register a
+sensor hit. Libretro's capability bit covers device types only; it does not say which individual controls are
+present. A zero from `input_state`
+therefore means neutral and cannot identify an absent control. Zero screen X/Y remains a valid centered aim when
+the device type is supported, while a zero trigger is released.
+
 These mappings are host controls chosen for remapping convenience. The emulated core receives integer values and
 does not apply additional curves, deadzones, or physical-dial response models.
