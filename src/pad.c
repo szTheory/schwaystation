@@ -48,6 +48,31 @@ static const char name_watchdogs[SCHWAY__PAD_ENDPOINT_COUNT][sizeof "pad.watchdo
     "pad.watchdog0", "pad.watchdog1", "pad.watchdog2", "pad.watchdog3",
     "pad.watchdog4", "pad.watchdog5", "pad.watchdog6", "pad.watchdog7"};
 static const char name_transfers[] = "pad.transfers";
+static const char name_gun_x[2][sizeof "pad.gun0.x"] = {"pad.gun0.x", "pad.gun1.x"};
+static const char name_gun_y[2][sizeof "pad.gun0.y"] = {"pad.gun0.y", "pad.gun1.y"};
+static const char name_gun_flags[2][sizeof "pad.gun0.flags"] = {
+    "pad.gun0.flags", "pad.gun1.flags"};
+static const char name_gun_reserved[2][sizeof "pad.gun0.reserved"] = {
+    "pad.gun0.reserved", "pad.gun1.reserved"};
+static const char name_gun_result_x[] = "pad.gun_result_x";
+static const char name_gun_result_y[] = "pad.gun_result_y";
+static const char name_gun_result_valid[] = "pad.gun_valid";
+static const char name_gun_enabled[] = "pad.gun_enabled";
+
+static int32_t state_i32(struct schway__state_io *io, const char *name, int32_t *value)
+{
+    if (io->mode == SCHWAY__STATE_VISIT) {
+        io->visitor(io->user, name, value, 1u, 4u);
+        return *value;
+    }
+    uint32_t encoded = (uint32_t)*value ^ UINT32_C(0x80000000);
+    encoded = schway__state_u32(io, name, &encoded, 0u, UINT32_MAX);
+    int32_t decoded = (int32_t)((int64_t)encoded - INT64_C(0x80000000));
+    if (io->mode == SCHWAY__STATE_APPLY) {
+        *value = decoded;
+    }
+    return decoded;
+}
 
 static uint64_t deadline_after(uint64_t now, uint64_t delta)
 {
@@ -299,6 +324,14 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     uint8_t saved_analog[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_mouse_startup_ack[SCHWAY__PAD_ENDPOINT_COUNT];
     uint8_t saved_multitap[2];
+    int32_t saved_gun_x[2];
+    int32_t saved_gun_y[2];
+    uint32_t saved_gun_flags[2];
+    uint32_t saved_gun_reserved[2];
+    uint16_t saved_gun_result_x[2];
+    uint16_t saved_gun_result_y[2];
+    uint8_t saved_gun_result_valid[2];
+    uint8_t saved_gun_enabled[2];
     uint8_t saved_map[SCHWAY__PAD_RUMBLE_MAP_SIZE];
     uint8_t saved_map_stage[SCHWAY__PAD_RUMBLE_MAP_SIZE];
     const uint8_t *read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
@@ -352,7 +385,7 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
     schway__state_u8_array(io, name_device, inst->pad.device,
                            SCHWAY__PAD_ENDPOINT_COUNT, SCHWAY_INPUT_DEVICE_NONE,
-                           SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT);
+                           SCHWAY_INPUT_DEVICE_JUSTIFIER);
     if (read_bytes != NULL) {
         memcpy(saved_device, read_bytes, sizeof saved_device);
     }
@@ -442,6 +475,44 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
     }
     (void)schway__state_u64(io, name_transfers, &inst->pad.transfers, 0u,
                             SCHWAY__STATE_TICKS_MAX);
+    for (uint32_t port = 0u; port < 2u; port++) {
+        saved_gun_x[port] = state_i32(io, name_gun_x[port], &inst->pad.gun_input[port].x);
+        saved_gun_y[port] = state_i32(io, name_gun_y[port], &inst->pad.gun_input[port].y);
+        saved_gun_flags[port] = schway__state_u32(
+            io, name_gun_flags[port], &inst->pad.gun_input[port].flags, 0u,
+            SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER |
+                SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD);
+        saved_gun_reserved[port] = schway__state_u32(
+            io, name_gun_reserved[port], &inst->pad.gun_input[port].reserved0, 0u, 0u);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u16_array(io, name_gun_result_x, inst->pad.gun_result_x, 2u, 0u, UINT16_MAX);
+    if (read_bytes != NULL) {
+        memcpy(saved_gun_result_x, read_bytes, sizeof saved_gun_result_x);
+    } else {
+        memcpy(saved_gun_result_x, inst->pad.gun_result_x, sizeof saved_gun_result_x);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u16_array(io, name_gun_result_y, inst->pad.gun_result_y, 2u, 0u, UINT16_MAX);
+    if (read_bytes != NULL) {
+        memcpy(saved_gun_result_y, read_bytes, sizeof saved_gun_result_y);
+    } else {
+        memcpy(saved_gun_result_y, inst->pad.gun_result_y, sizeof saved_gun_result_y);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u8_array(io, name_gun_result_valid, inst->pad.gun_result_valid, 2u, 0u, 1u);
+    if (read_bytes != NULL) {
+        memcpy(saved_gun_result_valid, read_bytes, sizeof saved_gun_result_valid);
+    } else {
+        memcpy(saved_gun_result_valid, inst->pad.gun_result_valid, sizeof saved_gun_result_valid);
+    }
+    read_bytes = io->mode == SCHWAY__STATE_VALIDATE ? io->r : NULL;
+    schway__state_u8_array(io, name_gun_enabled, inst->pad.gun_enabled, 2u, 0u, 1u);
+    if (read_bytes != NULL) {
+        memcpy(saved_gun_enabled, read_bytes, sizeof saved_gun_enabled);
+    } else {
+        memcpy(saved_gun_enabled, inst->pad.gun_enabled, sizeof saved_gun_enabled);
+    }
     for (uint32_t port = 0u; port < SCHWAY__PAD_ENDPOINT_COUNT; port++) {
         uint32_t physical_port = port < 2u ? port : (port < 5u ? 0u : 1u);
         int tap_socket = port >= 2u;
@@ -453,6 +524,23 @@ void schway__pad_state_io(struct schway__state_io *io, schway *inst)
         }
         schway__state_check(io, saved_present[port] ==
                                     (saved_device[port] != SCHWAY_INPUT_DEVICE_NONE ? 1u : 0u));
+        if (port < 2u) {
+            uint32_t flags = saved_gun_flags[port];
+            schway__state_check(io, (flags & SCHWAY_GUN_INPUT_VALID) == 0u ||
+                                       (flags & (SCHWAY_GUN_INPUT_OFFSCREEN |
+                                                 SCHWAY_GUN_INPUT_RELOAD)) != 0u ||
+                                       (saved_gun_x[port] >= 0 && saved_gun_y[port] >= 0));
+            uint32_t is_gun = saved_device[port] == SCHWAY_INPUT_DEVICE_GUNCON ||
+                              saved_device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER;
+            schway__state_check(io, is_gun != 0u ||
+                                       (flags == 0u && saved_gun_reserved[port] == 0u &&
+                                        saved_gun_result_x[port] == 0u &&
+                                        saved_gun_result_y[port] == 0u &&
+                                        saved_gun_result_valid[port] == 0u &&
+                                        saved_gun_enabled[port] == 0u));
+            schway__state_check(io, saved_gun_enabled[port] == 0u ||
+                                       saved_device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER);
+        }
         schway__state_check(io, saved_mouse_startup_ack[port] == 0u ||
                                     saved_device[port] == SCHWAY_INPUT_DEVICE_MOUSE);
         schway__state_check(io, saved_config[port] == 0u ||
