@@ -1640,6 +1640,22 @@ static int gun_justifier(void)
     gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
                        "complete zero-control poll disables sensing");
 
+    CHECK_EQ_U64(schway_reset(inst, SCHWAY_RESET_POWER), SCHWAY_STATUS_OK);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u,
+                       "power reset clears Justifier sensing");
+    latch_input(inst, &input);
+    gun_justifier_begin(inst, 0);
+    (void)exchange(inst, 0x10u, 1);
+    (void)exchange(inst, 0x00u, 0);
+    schway_input digital;
+    memset(&digital, 0, sizeof digital);
+    digital.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    latch_input(inst, &digital);
+    gun_protocol_check(inst->pad.gun_enabled[0] == 0u &&
+                           inst->gpu.gun_sensor[0].armed == 0u &&
+                           inst->pad.gun_result_valid[0] == 0u,
+                       "device change clears Justifier sensing and stale shot state");
+
     schway_destroy(inst);
     printf("1..%u\n", gun_protocol_count);
     return gun_protocol_failures != 0u || check_failures != 0 ? 1 : 0;

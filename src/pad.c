@@ -504,6 +504,9 @@ static uint8_t normal_id(const struct schway__pad *pad, uint32_t port)
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON) {
         return 0x63u;
     }
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+        return 0x31u;
+    }
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT) {
         return 0x53u;
     }
@@ -546,6 +549,19 @@ static void refresh_watchdog(schway *inst, uint32_t port, uint64_t now)
 
 static uint8_t poll_reply(const struct schway__pad *pad, uint32_t port, uint32_t index)
 {
+    if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+        enum { JUSTIFIER_START = 1u << 3, JUSTIFIER_BACK = 1u << 14,
+               JUSTIFIER_TRIGGER = 1u << 15 };
+        uint16_t buttons = (uint16_t)(pad->buttons[port] |
+                                      (uint16_t)~(JUSTIFIER_START | JUSTIFIER_BACK |
+                                                  JUSTIFIER_TRIGGER));
+        if ((pad->gun_input[port].flags & SCHWAY_GUN_INPUT_TRIGGER) != 0u) {
+            buttons = (uint16_t)(buttons & (uint16_t)~JUSTIFIER_TRIGGER);
+        } else {
+            buttons = (uint16_t)(buttons | JUSTIFIER_TRIGGER);
+        }
+        return index == 0u ? (uint8_t)buttons : (uint8_t)(buttons >> 8);
+    }
     if (pad->device[port] == SCHWAY_INPUT_DEVICE_GUNCON) {
         /* GunCon 42h fields follow the button and coordinate table in docs/hardware/sio.md. */
         enum { GUNCON_A = 1u << 3, GUNCON_TRIGGER = 1u << 13, GUNCON_B = 1u << 14 };
@@ -686,6 +702,9 @@ static void finish_payload(schway *inst, uint32_t port, uint64_t now)
     struct schway__pad *pad = &inst->pad;
     uint8_t command = pad->command[port];
     if (command == 0x42u) {
+        if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+            pad->gun_enabled[port] = pad->rumble_stage_small[port];
+        }
         if (pad->rumble_locked[port] == 0u && pad->config_mode[port] != 0u) {
             pad->rumble_large[port] = pad->rumble_stage_large[port];
             pad->rumble_small[port] = pad->rumble_stage_small[port];
@@ -724,7 +743,10 @@ static uint8_t pad_payload(schway *inst, uint32_t port, uint8_t sent, uint64_t n
     uint8_t received = command_reply(pad, port, index);
     uint8_t command = pad->command[port];
     if (command == 0x42u) {
-        if (pad->config_mode[port] != 0u) {
+        if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER && index == 0u) {
+            /* Reuse the saved byte staging lane; the enable bit commits with the full poll. */
+            pad->rumble_stage_small[port] = (sent & 0x10u) != 0u ? 1u : 0u;
+        } else if (pad->config_mode[port] != 0u) {
             uint8_t mapping = pad->rumble_map[port * 6u + index];
             if (mapping == 0u) {
                 pad->rumble_stage_small[port] = sent & 1u;
@@ -811,6 +833,9 @@ uint32_t schway__pad_byte(schway *inst, uint32_t port, uint8_t sent, uint64_t no
             pad->response_mode[port] = pad->config_mode[port];
             pad->rumble_stage_large[port] = 0u;
             pad->rumble_stage_small[port] = 0u;
+            if (pad->device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+                pad->rumble_stage_small[port] = pad->gun_enabled[port];
+            }
             *received = pad->config_mode[port] != 0u ? 0xF3u : normal_id(pad, port);
             pad->phase[port] = PAD_ID_END;
             if (pad->config_mode[port] != 0u) {

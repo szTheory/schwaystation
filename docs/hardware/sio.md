@@ -97,6 +97,18 @@ dark, busy and offscreen cases; the choices here resolve that ambiguity for this
 physical response measurements. A repeated or aborted poll uses the current frame-latched state;
 it cannot turn an invalid input into a hit or reuse an observation cleared by a newer snapshot.
 
+## Justifier polls
+
+The direct-port Justifier answers poll command `42h` with ID `5A31h` and two payload bytes. Its
+active-low button word assigns Start to bit 3, Back to bit 14, and trigger to bit 15. The `10h` bit
+in the first host-to-controller payload byte enables its optical sensor; the state changes only
+when both payload bytes complete. An aborted poll therefore keeps the previous enable state.
+Reset or switching the attached device clears the enable state and any pending shot. The ID and
+button assignments follow the Justifier notes in
+`.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md` §2.7, which summarizes PER.01. This model
+supports only direct physical ports and does not claim multitap selection or multi-Justifier
+wiring behavior.
+
 ## Timing model
 
 At mode `000Ch` (eight data bits, no parity, factor MUL1) and baud reload `0088h`, the byte period is 1,088
