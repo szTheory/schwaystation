@@ -49,6 +49,11 @@ struct schway__pad {
     uint64_t transfers;
     schway_input pending_input; /* host-owned input is deliberately not saved */
     uint8_t pending_valid;
+    schway_gun_input gun_input[2];
+    uint16_t gun_result_x[2];
+    uint16_t gun_result_y[2];
+    uint8_t gun_result_valid[2];
+    uint8_t gun_enabled[2];
 };
 
 void schway__pad_reset(schway *inst);

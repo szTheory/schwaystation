@@ -54,6 +54,20 @@ static uint64_t deadline_after(uint64_t now, uint64_t delta)
     return now > SCHWAY__STATE_TICKS_MAX - delta ? SCHWAY__STATE_TICKS_MAX : now + delta;
 }
 
+static void pad_clear_gun_observation(schway *inst, uint32_t port)
+{
+    inst->pad.gun_result_x[port] = 0u;
+    inst->pad.gun_result_y[port] = 0u;
+    inst->pad.gun_result_valid[port] = 0u;
+}
+
+static void pad_clear_gun(schway *inst, uint32_t port)
+{
+    memset(&inst->pad.gun_input[port], 0, sizeof inst->pad.gun_input[port]);
+    inst->pad.gun_enabled[port] = 0u;
+    pad_clear_gun_observation(inst, port);
+}
+
 void schway__pad_reset(schway *inst)
 {
     memset(&inst->pad, 0, sizeof inst->pad);
@@ -70,6 +84,9 @@ void schway__pad_reset(schway *inst)
             inst->pad.rumble_map[index] = 0xFFu;
             inst->pad.rumble_map_stage[index] = 0xFFu;
         }
+    }
+    for (uint32_t port = 0u; port < 2u; port++) {
+        pad_clear_gun(inst, port);
     }
 }
 
@@ -104,6 +121,9 @@ void schway__pad_set_buttons(schway *inst, uint32_t port, uint16_t buttons)
 void schway__pad_set_connected(schway *inst, uint32_t port, uint32_t connected)
 {
     if (port < SCHWAY__PAD_ENDPOINT_COUNT) {
+        if (port < 2u) {
+            pad_clear_gun(inst, port);
+        }
         inst->pad.present[port] = connected != 0u ? 1u : 0u;
         inst->pad.device[port] = connected != 0u ? SCHWAY_INPUT_DEVICE_DIGITAL
                                                  : SCHWAY_INPUT_DEVICE_NONE;
@@ -138,6 +158,20 @@ void schway__pad_frame_start(schway *inst)
     if (inst->pad.pending_valid != 0u) {
         for (uint32_t port = 0u; port < 2u; port++) {
             inst->pad.multitap[port] = (uint8_t)inst->pad.pending_input.multitap[port];
+            uint32_t input_device = inst->pad.multitap[port] != 0u
+                                        ? inst->pad.pending_input.controllers[port][0].device
+                                        : inst->pad.pending_input.device[port];
+            if (inst->pad.multitap[port] == 0u &&
+                (input_device == SCHWAY_INPUT_DEVICE_GUNCON ||
+                 input_device == SCHWAY_INPUT_DEVICE_JUSTIFIER)) {
+                if (inst->pad.device[port] != input_device) {
+                    inst->pad.gun_enabled[port] = 0u;
+                }
+                inst->pad.gun_input[port] = inst->pad.pending_input.guns[port];
+                pad_clear_gun_observation(inst, port);
+            } else {
+                pad_clear_gun(inst, port);
+            }
             for (uint32_t socket = 0u; socket < 4u; socket++) {
                 uint32_t endpoint = socket == 0u ? port : 2u + port * 3u + socket - 1u;
                 const schway_controller_input *controller =

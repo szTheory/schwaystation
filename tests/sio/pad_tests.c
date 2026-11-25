@@ -1261,18 +1261,172 @@ static void special_negcon(void)
     negcon_instance_isolation();
 }
 
+static uint32_t gun_tap_count;
+static uint32_t gun_tap_failures;
+
+static void gun_tap_check(int passed, const char *name)
+{
+    gun_tap_count++;
+    printf("%s %u - %s\n", passed != 0 ? "ok" : "not ok", gun_tap_count, name);
+    if (passed == 0) {
+        fprintf(stderr, "gun latch assertion failed: %s\n", name);
+        gun_tap_failures++;
+    }
+}
+
+static int gun_records_equal(const schway_gun_input *actual, const schway_gun_input *expected)
+{
+    return memcmp(actual, expected, sizeof *actual) == 0;
+}
+
+static void seed_gun_observation(schway *inst, uint32_t port)
+{
+    inst->pad.gun_enabled[port] = 1u;
+    inst->pad.gun_result_x[port] = 123u;
+    inst->pad.gun_result_y[port] = 45u;
+    inst->pad.gun_result_valid[port] = 1u;
+}
+
+static int gun_pad_state_cleared(const schway *inst, uint32_t port)
+{
+    const schway_gun_input zero = {0};
+    return gun_records_equal(&inst->pad.gun_input[port], &zero) &&
+           inst->pad.gun_enabled[port] == 0u && inst->pad.gun_result_x[port] == 0u &&
+           inst->pad.gun_result_y[port] == 0u && inst->pad.gun_result_valid[port] == 0u;
+}
+
 static int gun_latch(void)
 {
+    gun_tap_count = 0u;
+    gun_tap_failures = 0u;
+    puts("TAP version 13");
     schway *inst = make();
+    schway *other = make();
     size_t fixed_state_end = offsetof(struct schway__pad, pending_valid) +
                              sizeof inst->pad.pending_valid;
     size_t required_size = fixed_state_end +
                            2u * sizeof(schway_gun_input) + 2u * sizeof(uint8_t);
-    int present = sizeof inst->pad >= required_size;
-    printf("TAP version 13\n1..1\n%s 1 - pad reserves two fixed gun records and two observation results\n",
-           present != 0 ? "ok" : "not ok");
+    gun_tap_check(sizeof inst->pad >= required_size,
+                  "pad reserves two fixed gun records and two observation results");
+    schway_input first;
+    memset(&first, 0, sizeof first);
+    first.size = (uint32_t)sizeof first;
+    first.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    first.device[1] = SCHWAY_INPUT_DEVICE_JUSTIFIER;
+    first.guns[0].x = 0;
+    first.guns[0].y = 0;
+    first.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    first.guns[1].x = 123;
+    first.guns[1].y = 77;
+    first.guns[1].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_OFFSCREEN;
+    gun_tap_check(schway_set_input(inst, &first) == SCHWAY_STATUS_OK,
+                  "API accepts independent direct-port gun records");
+    gun_tap_check(inst->pad.gun_input[0].flags == 0u &&
+                      inst->pad.device[0] == SCHWAY_INPUT_DEVICE_DIGITAL,
+                  "host submission remains pending before frame start");
+    schway__pad_frame_start(inst);
+    gun_tap_check(inst->pad.pending_valid == 0u &&
+                      inst->pad.device[0] == SCHWAY_INPUT_DEVICE_GUNCON &&
+                      inst->pad.device[1] == SCHWAY_INPUT_DEVICE_JUSTIFIER,
+                  "selected gun devices latch with the frame snapshot");
+    gun_tap_check(gun_records_equal(&inst->pad.gun_input[0], &first.guns[0]) &&
+                      gun_records_equal(&inst->pad.gun_input[1], &first.guns[1]),
+                  "coordinates, validity, trigger and offscreen flags latch together");
+    gun_tap_check(inst->pad.gun_result_valid[0] == 0u &&
+                      inst->pad.gun_result_valid[1] == 0u,
+                  "new host snapshot cannot reuse prior pad observations");
+
+    schway_input second = first;
+    second.guns[0].x = 39;
+    second.guns[0].y = 51;
+    second.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    gun_tap_check(schway_set_input(inst, &second) == SCHWAY_STATUS_OK,
+                  "second in-frame host snapshot is accepted");
+    schway__pad_frame_start(inst);
+    gun_tap_check(inst->pad.pending_valid != 0u &&
+                      gun_records_equal(&inst->pad.gun_input[0], &first.guns[0]),
+                  "repeated start cannot apply a mid-frame gun update");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(inst->pad.pending_valid == 0u &&
+                      gun_records_equal(&inst->pad.gun_input[0], &second.guns[0]) &&
+                      gun_records_equal(&inst->pad.gun_input[1], &second.guns[1]),
+                  "complete second snapshot applies at the next frame start");
+
+    seed_gun_observation(inst, 0u);
+    schway_input digital;
+    memset(&digital, 0, sizeof digital);
+    digital.size = (uint32_t)sizeof digital;
+    digital.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    gun_tap_check(schway_set_input(inst, &digital) == SCHWAY_STATUS_OK,
+                  "ordinary controller selection is accepted");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(gun_pad_state_cleared(inst, 0u),
+                  "switching to a digital pad clears gun input and result");
+
+    seed_gun_observation(inst, 0u);
+    digital.device[0] = SCHWAY_INPUT_DEVICE_NONE;
+    gun_tap_check(schway_set_input(inst, &digital) == SCHWAY_STATUS_OK,
+                  "empty port selection is accepted");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(gun_pad_state_cleared(inst, 0u),
+                  "switching to no device clears shot and protocol state");
+
+    schway_input valid_again;
+    memset(&valid_again, 0, sizeof valid_again);
+    valid_again.size = (uint32_t)sizeof valid_again;
+    valid_again.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    valid_again.guns[0] = first.guns[0];
+    gun_tap_check(schway_set_input(inst, &valid_again) == SCHWAY_STATUS_OK,
+                  "gun can be selected again after clearing");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(gun_records_equal(&inst->pad.gun_input[0], &valid_again.guns[0]) &&
+                      inst->pad.gun_result_valid[0] == 0u,
+                  "reselection with current aim does not replay the previous shot");
+
+    schway_input legacy;
+    memset(&legacy, 0, sizeof legacy);
+    legacy.size = (uint32_t)offsetof(schway_input, guns);
+    legacy.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+    gun_tap_check(schway_set_input(inst, &legacy) == SCHWAY_STATUS_OK,
+                  "frozen API v9 input size remains accepted");
+    schway__pad_frame_end(inst);
+    schway__pad_frame_start(inst);
+    gun_tap_check(inst->pad.device[0] == SCHWAY_INPUT_DEVICE_DIGITAL &&
+                      gun_pad_state_cleared(inst, 0u),
+                  "old-size callers clear gun availability");
+
+    schway_input other_input;
+    memset(&other_input, 0, sizeof other_input);
+    other_input.size = (uint32_t)sizeof other_input;
+    other_input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    other_input.device[1] = SCHWAY_INPUT_DEVICE_GUNCON;
+    other_input.guns[0].x = 17;
+    other_input.guns[0].y = 18;
+    other_input.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    other_input.guns[1].x = 91;
+    other_input.guns[1].y = 92;
+    other_input.guns[1].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    gun_tap_check(schway_set_input(other, &other_input) == SCHWAY_STATUS_OK,
+                  "second emulator instance accepts its own records");
+    schway__pad_frame_start(other);
+    gun_tap_check(gun_records_equal(&other->pad.gun_input[0], &other_input.guns[0]) &&
+                      gun_records_equal(&other->pad.gun_input[1], &other_input.guns[1]) &&
+                      inst->pad.gun_input[0].flags == 0u && inst->pad.gun_input[1].flags == 0u,
+                  "ports and emulator instances retain independent snapshots");
+
+    seed_gun_observation(other, 1u);
+    gun_tap_check(schway_reset(other, SCHWAY_RESET_POWER) == SCHWAY_STATUS_OK,
+                  "power reset completes");
+    gun_tap_check(gun_pad_state_cleared(other, 1u),
+                  "power reset clears latched input and pad protocol state");
     schway_destroy(inst);
-    return present != 0 ? 0 : 1;
+    schway_destroy(other);
+    printf("1..%u\n", gun_tap_count);
+    return gun_tap_failures != 0u || check_failures != 0 ? 1 : 0;
 }
 
 int main(int argc, char **argv)
