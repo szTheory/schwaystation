@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: 3
+current_plan: 4
 status: executing
-stopped_at: Completed 15-02-PLAN.md; Codex/OpenGSD 1.23.0 executor gpt-6-luna
-last_updated: "2026-11-25T04:15:41.349Z"
+stopped_at: Completed 15-03-PLAN.md
+last_updated: "2026-11-25T04:43:21.784Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 15 planning and independent plan review completed
-state_head: 5fd58ae1dd1a5b5ce05eac95f9f1b0f5d48202d1
+last_activity_desc: Phase 15 Plan 15-03 completed; Plan 15-04 is ready to execute
+state_head: c0af4f13a99f889834384e7e32f9f3f03d6fa865
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 105
-  completed_plans: 97
+  completed_plans: 98
   percent: 80
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: 3
+Current Plan: 4
 Total Plans in Phase: 10
 Status: Ready to execute
-Last activity: 2026-11-24 — Phase 15 planning and independent plan review completed; Phase 14 remains the latest released phase
+Last activity: 2026-11-24 — Phase 15 Plan 15-03 completed; Plan 15-04 is next. Phase 14 remains the latest released phase.
 Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 and 16 remain. Refreshed Phase 7–14 verification reports all pass; retain TODO051 as unverified PBP-only routing for milestone audit.)
 
 ### Phase 15 discussion (2026-11-24)
@@ -72,6 +72,10 @@ before IRQ10. Keep the threshold numeric decision to the implementation after th
 ### Phase 15 planning and plan review (2026-11-24)
 
 Runtime/model: Codex/OpenGSD 1.23.0; `gsd-planner` gpt-6.1-sol high; `gsd-plan-checker` gpt-6-luna xhigh; primary session model ID unavailable. Planning produced ten plans across seven dependency waves for GUN-01, GUN-02 and SIO-05. The independent checker found one portability blocker: machine-specific GSD home paths in the plan execution contexts would fail repository hygiene. All ten references were changed to the existing home-relative `@~/.codex/...` convention; plan structure, shell/failure-direction probes, `git diff --check` and `sh scripts/hygiene.sh --tree` then passed, and the checker passed with no remaining findings. Planning artifacts are ready for the required `docs(15): create phase plan` commit; source work and implementation tests have not started. Wall time from the preceding STATE checkpoint was about 27 minutes; active time was not isolated. No hosted CI, Act or Docker resources were used.
+
+### Phase 15 Plan 15-03 execution (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-executor` gpt-6-luna xhigh; primary session model ID unavailable. Plan execution ran from 2026-11-25T04:28:06Z through 04:41:31Z (13m25s wall). Both tasks followed RED/GREEN: the pad-state probe and GPU-storage probe each produced classifier-accepted target assertion failures before their implementation commits. One strict-build `-Wshadow` failure was corrected by renaming the direct input local; the targeted rerun passed. `cmake --preset ci`, the focused SIO pad/API target build, the four-selector API/pad set (4/4), the final `sio.gun.latch` selector (1/1), the fixture budget check (1/1), ABI-offset checks and sorted SIO inventory preflight passed. No broad workflow, hosted CI, Act or Docker work was needed at this plan boundary. Task commits: `3e9af4a`, `fd627ab`, `f275820`, `c0af4f1`; summary: `.planning/phases/15-guncon-and-justifier/15-03-SUMMARY.md`.
 
 ### Phase 14 final hosted verification and release (2026-11-24)
 
@@ -1837,6 +1841,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P16 | 12m | 1 tasks | 4 files |
 | Phase 15 P01 | 14 min | 3 tasks | 9 files |
 | Phase 15 P02 | 20m 10s | 2 tasks | 7 files |
+| Phase 15 P03 | 13m 25s | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -2321,6 +2326,8 @@ Recent decisions affecting current work:
 - [Phase 15]: Keep the released 228-byte API v9 input prefix and 24-byte controller endpoint stride unchanged.
 - [Phase 15]: Append two explicit 16-byte direct-port gun records at offset 228 in API v10.
 - [Phase 15]: Normalize only size-tagged caller bytes and validate the complete snapshot before replacing pending input; reject guns on enabled multitaps.
+- [Phase 15]: Keep pending host input outside saved state; serialize only hardware-visible latched continuation in Plan 09.
+- [Phase 15]: Pad owns gun protocol/result state and invalidates GPU-owned per-port beam events through the instance.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2571,8 +2578,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T04:15:40.925Z
-Stopped at: Completed 15-02-PLAN.md; Codex/OpenGSD 1.23.0 executor gpt-6-luna
+Last session: 2026-11-25T04:43:21.520Z
+Stopped at: Completed 15-03-PLAN.md
 Resume file: None
 
 ### v1.0 session history
