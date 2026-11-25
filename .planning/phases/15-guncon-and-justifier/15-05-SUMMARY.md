@@ -53,7 +53,7 @@ coverage:
         ref: "tests/gpu/beam.c#gpu.beam.reset_call_bound and gpu.beam.field_edges"
         status: pass
     human_judgment: false
-duration: 2h 26m
+duration: 2h 28m
 completed: 2026-11-25
 status: complete
 ---
@@ -64,7 +64,7 @@ status: complete
 
 ## Performance
 
-- **Duration:** 2h 26m (actual wall time; started at 2026-11-25T06:01:43Z)
+- **Duration:** 2h 28m (actual wall time; started at 2026-11-25T06:01:43Z)
 - **Completed:** 2026-11-25
 - **Tasks:** 2
 - **Files modified:** 4
