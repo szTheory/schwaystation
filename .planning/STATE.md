@@ -6,11 +6,11 @@ current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
 current_plan: 01 (revised; checker recheck pending)
 status: planning
-stopped_at: Phase 16 plan-check revision complete; recheck pending
-last_updated: "2026-11-25T23:33:01.305Z"
+stopped_at: Phase 16 plan scope warning revised; recheck pending
+last_updated: "2026-11-25T23:44:25.710Z"
 last_activity: 2026-11-25
 last_activity_desc: Phase 16 checker findings addressed; independent recheck pending
-state_head: f630656c9a30ab2a157430fcf16e91b317ebc9f1
+state_head: 109e0fb491783a6ff02e57441e58321e30e3f9e1
 progress:
   total_phases: 10
   completed_phases: 9
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 16 — Patches, cheats and compatibility evidence
-Current Plan: 01 (planned; checker pending)
+Current Plan: 01 (revised; checker recheck pending)
 Total Plans in Phase: 18
 Status: Plans revised; plan checker recheck pending
 Last activity: 2026-11-25 -- Phase 16 plan scope and research-resolution findings addressed
@@ -43,7 +43,7 @@ Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. Eighteen
 
 ### Phase 16 plan-check revision (2026-11-25)
 
-Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. The independent check found that Plan 01's 15-file scope reached its blocker threshold and the research retained three open questions. Plan 01 now uses the existing api_v10 baseline and modifies 12 files while preserving the CMake skeleton and all six inventory checks. Plan 02 creates/registers api_v11, adds the public write, and updates only the older callers' exact-current-version assertions; its three tasks each touch at most five files. The research records resolved source identity, raw-layout and BPS-staging choices consistent with the plans and current context. No application, build or behavior tests ran in this revision; independent recheck precedes execution.
+Runtime/model: Codex with OpenGSD 1.23.0; gsd-planner gpt-6.1-sol high. The independent check found that Plan 01's 15-file scope reached its blocker threshold and the research retained three open questions. Plan 01 now uses the existing api_v10 baseline and modifies 12 files while preserving the CMake skeleton and all six inventory checks; the plan and audit state the AGENTS.md rule 14 first-plan scope exception. A follow-up scope warning moves shared host-cheat wiring/test ownership from Plan 02 into the existing parser Plan 03. Plan 02 now has eight files in two API-only tasks; Plan 03 has five files in three tasks. Plan 02 creates/registers api_v11, adds the public write and updates only older callers' exact-current-version assertions. Every task remains at or below five files, all wave/dependency order is preserved, and the research records resolved source identity, raw-layout and BPS-staging choices consistent with the plans and current context. No application, build or behavior tests ran in this revision; independent recheck precedes execution.
 
 ### Phase 15 discussion (2026-11-24)
 
@@ -2625,8 +2625,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T23:33:00.890Z
-Stopped at: Phase 16 plan-check revision complete; recheck pending
+Last session: 2026-11-25T23:44:25.298Z
+Stopped at: Phase 16 plan scope warning revised; recheck pending
 Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-01-PLAN.md
 
 Runtime/model: Codex with OpenGSD 1.23.0; primary model ID unavailable. Three assumption analyses used gpt-6.1-sol high.

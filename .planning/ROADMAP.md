@@ -393,8 +393,8 @@ Plans:
 
 Plans:
 - [ ] 16-01-PLAN.md — Check the released api_v10 caller and register the complete test graph
-- [ ] 16-02-PLAN.md — Register api_v11, expose checked RAM writes and the shared host cheat boundary
-- [ ] 16-03-PLAN.md — Complete the bounded GameShark parser and canonical cheat bytes
+- [ ] 16-02-PLAN.md — Register api_v11 and expose checked RAM writes
+- [ ] 16-03-PLAN.md — Wire shared host cheats and complete the bounded parser and canonical bytes
 - [ ] 16-04-PLAN.md — Apply GameShark entries through libretro callbacks
 - [ ] 16-05-PLAN.md — Serialize libretro cheat configuration atomically
 - [ ] 16-06-PLAN.md — Expose runner cheats and configuration-aware state hashes
