@@ -73,6 +73,8 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
         schway__pad_frame_start(inst);
+        schway__gpu_sync(inst, inst->ticks);
+        schway__sched_sync(inst);
         inst->profile_locked = 1u;
         *stop = schway__cpu_run(inst, cycles, flags);
         *done = inst->frame != starting_frame;
@@ -84,6 +86,8 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
         schway__pad_frame_start(inst);
+        schway__gpu_sync(inst, inst->ticks);
+        schway__sched_sync(inst);
         /* No program runs and no device is stepped; only an event already due
            runs, at its own deadline, and with none armed the loop is one
            compare. */

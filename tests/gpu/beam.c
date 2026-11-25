@@ -17,6 +17,9 @@
 #define MAX_FIELDS 256u
 
 static int failures;
+static uint32_t gun_tap_checks;
+
+static uint64_t ceil_div(uint64_t n, uint64_t d);
 
 #define CHECK(expr)                                                                               \
     do {                                                                                          \
@@ -90,6 +93,92 @@ static void run_one_frame(schway *inst)
     result.size = (uint32_t)sizeof result;
     CHECK(schway_run_frame(inst, &result) == SCHWAY_STATUS_OK);
     CHECK(result.stop == SCHWAY_STOP_FRAME);
+}
+
+static void gun_tap_check(int passed, const char *name)
+{
+    gun_tap_checks++;
+    printf("%s %u - %s\n", passed != 0 ? "ok" : "not ok", gun_tap_checks, name);
+    if (passed == 0) {
+        failures++;
+    }
+}
+
+static uint64_t gun_tick_for_clocks(uint32_t region, uint64_t clocks)
+{
+    uint64_t rate = region == SCHWAY_REGION_PAL ? UINT64_C(709379) : UINT64_C(715909);
+    return ceil_div(clocks * UINT64_C(451584), rate);
+}
+
+static schway *make_gun_sample_instance(uint16_t pixel)
+{
+    schway *inst = make_instance(SCHWAY_REGION_NTSC_U, 0u);
+    if (inst == NULL) {
+        return NULL;
+    }
+
+    /* Program a 320-dot, 8-clock display window through GP1. */
+    write_port(inst, GP1, 0x06A00000u); /* X1=0, X2=2560 GPU clocks. */
+    write_port(inst, GP1, 0x0703C000u); /* Y1=0, Y2=240 scanlines. */
+    write_port(inst, GP1, 0x05000000u); /* VRAM display origin (0,0). */
+    write_port(inst, GP1, 0x08000001u); /* 320 dots, 8 GPU clocks per dot. */
+    write_port(inst, GP1, 0x03000000u); /* Enable display output. */
+    inst->vram[0][1] = pixel;
+
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.size = (uint32_t)sizeof input;
+    input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.guns[0].x = 1;
+    input.guns[0].y = 0;
+    input.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    gun_tap_check(schway_set_input(inst, &input) == SCHWAY_STATUS_OK,
+                  "public GunCon input is accepted");
+    return inst;
+}
+
+static void test_gun_sample(void)
+{
+    gun_tap_checks = 0u;
+    const uint64_t deadline = gun_tick_for_clocks(SCHWAY_REGION_NTSC_U, 8u);
+    schway *split = make_gun_sample_instance(0u);
+    schway *whole = make_gun_sample_instance(UINT16_C(0x7FFF));
+    schway *late = make_gun_sample_instance(0u);
+    gun_tap_check(split != NULL && whole != NULL && late != NULL,
+                  "GPU instances are created for beam timing controls");
+    if (split == NULL || whole == NULL || late == NULL) {
+        printf("1..%u\n", gun_tap_checks);
+        schway_destroy(split);
+        schway_destroy(whole);
+        schway_destroy(late);
+        return;
+    }
+
+    /* A write one tick before the event is visible; an identical total budget
+       with the pixel already bright must produce the same sensor coordinates. */
+    run_cycles(split, deadline - 1u);
+    split->vram[0][1] = UINT16_C(0x7FFF);
+    run_cycles(split, 1u);
+    run_cycles(whole, deadline);
+    gun_tap_check(split->pad.gun_result_valid[0] != 0u &&
+                      split->pad.gun_result_x[0] == 1u &&
+                      split->pad.gun_result_y[0] == 0u,
+                  "visible white pixel is sampled at its beam deadline");
+    gun_tap_check(whole->pad.gun_result_valid[0] != 0u &&
+                      whole->pad.gun_result_x[0] == split->pad.gun_result_x[0] &&
+                      whole->pad.gun_result_y[0] == split->pad.gun_result_y[0],
+                  "split and whole run budgets produce the same gun sample");
+
+    run_cycles(late, deadline);
+    late->vram[0][1] = UINT16_C(0x7FFF);
+    run_cycles(late, 1u);
+    gun_tap_check(late->pad.gun_result_valid[0] == 0u,
+                  "a VRAM write after the beam deadline cannot change its sample");
+
+    printf("1..%u\n", gun_tap_checks);
+    schway_destroy(split);
+    schway_destroy(whole);
+    schway_destroy(late);
 }
 
 static void put_le32(uint8_t *p, uint32_t value)
@@ -897,7 +986,9 @@ int main(int argc, char **argv)
     if (argc != 2) {
         return EXIT_FAILURE;
     }
-    if (strcmp(argv[1], "midline_dot_irq") == 0) {
+    if (strcmp(argv[1], "gun_sample") == 0) {
+        test_gun_sample();
+    } else if (strcmp(argv[1], "midline_dot_irq") == 0) {
         test_midline_dot_irq();
     } else if (strcmp(argv[1], "field_edges") == 0) {
         test_field_edges();
