@@ -106,3 +106,20 @@ schway_add_test(NAME sio.pad.final_no_ack
 schway_add_test(NAME sio.peek.pure
   COMMAND schwaystation-test-sio peek_pure
   LABELS sio portable TIMEOUT 10)
+
+# Fault prevented: direct and eight-slot v9 input values are lost at the frame latch.
+schway_add_test(NAME sio.gun.latch
+  COMMAND schwaystation-test-sio-pad gun_latch
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: GunCon ID, button bits, or coordinate reply bytes drift.
+schway_add_test(NAME sio.gun.guncon
+  COMMAND schwaystation-test-sio-pad gun_guncon
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: Justifier ID, button bits, or enabled reply behavior drift.
+schway_add_test(NAME sio.gun.justifier
+  COMMAND schwaystation-test-sio-pad gun_justifier
+  LABELS sio portable TIMEOUT 10)
+# Fault prevented: in-flight gun protocol state changes across a save/load boundary.
+schway_add_test(NAME sio.gun.state
+  COMMAND schwaystation-test-sio-pad gun_state
+  LABELS sio portable TIMEOUT 10)

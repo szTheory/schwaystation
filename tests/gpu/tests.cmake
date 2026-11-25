@@ -309,3 +309,20 @@ schway_add_test(NAME gpu.reference.controls
   COMMAND ${CMAKE_COMMAND} -DCASE=controls -DUNIT=$<TARGET_FILE:schwaystation-test-gpu-reference>
     "-DEMULATOR=${gpu_reference_emulator}" -P ${CMAKE_CURRENT_LIST_FILE}
   LABELS gpu portable TIMEOUT 30)
+
+# Fault prevented: an aimed-pixel sensor samples at a different GPU beam time.
+schway_add_test(NAME gpu.gun.sample
+  COMMAND schwaystation-test-gpu-beam gun_sample
+  LABELS gpu portable TIMEOUT 10)
+# Fault prevented: region, display origin, or active pixel geometry shifts the sensor coordinate.
+schway_add_test(NAME gpu.gun.geometry
+  COMMAND schwaystation-test-gpu-beam gun_geometry
+  LABELS gpu portable TIMEOUT 10)
+# Fault prevented: IRQ10 becomes visible before Timer 0/1 reach the sensor timestamp.
+schway_add_test(NAME gpu.gun.irq_order
+  COMMAND schwaystation-test-gpu-beam gun_irq_order
+  LABELS gpu portable TIMEOUT 10)
+# Fault prevented: scheduled sensor state changes across a save/load boundary.
+schway_add_test(NAME gpu.gun.state
+  COMMAND schwaystation-test-gpu-beam gun_state
+  LABELS gpu portable TIMEOUT 10)
