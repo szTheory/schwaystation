@@ -1471,6 +1471,22 @@ static void gun_protocol_check(int passed, const char *name)
     }
 }
 
+static void guncon_capture(schway *inst, uint32_t port, const char *label, uint8_t payload[6])
+{
+    char name[96];
+    configure_sio_port(inst, port);
+    gun_protocol_check(exchange(inst, 0x01u, 1) == 0xFFu, "GunCon poll address reply");
+    uint8_t id = exchange(inst, 0x42u, 1);
+    (void)snprintf(name, sizeof name, "%s keeps the GunCon ID", label);
+    gun_protocol_check(id == 0x63u, name);
+    gun_protocol_check(exchange(inst, 0x00u, 1) == 0x5Au, "GunCon poll delimiter");
+    for (uint32_t i = 0u; i < 6u; i++) {
+        payload[i] = exchange(inst, 0u, i < 5u);
+    }
+    (void)snprintf(name, sizeof name, "%s has no final ACK", label);
+    gun_protocol_check((read_mmio(inst, JOY_STAT, 4u) & 0x80u) == 0u, name);
+}
+
 static int gun_guncon(void)
 {
     gun_protocol_count = 0u;
@@ -1520,6 +1536,50 @@ static int gun_guncon(void)
                            port == 0u ? "port 1 final reply has no ACK" :
                                         "port 2 final reply has no ACK");
     }
+
+    schway_input no_light;
+    memset(&no_light, 0, sizeof no_light);
+    no_light.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    no_light.device[1] = SCHWAY_INPUT_DEVICE_GUNCON;
+    latch_input(inst, &no_light);
+    uint8_t reply[6];
+    static const uint8_t unavailable_coordinates[4] = {0x01u, 0x00u, 0x0Au, 0x00u};
+    guncon_capture(inst, 0u, "unavailable input", reply);
+    gun_protocol_check(memcmp(&reply[2], unavailable_coordinates,
+                              sizeof unavailable_coordinates) == 0,
+                       "unavailable sensor uses selected deterministic no-light response");
+
+    no_light.guns[0].x = 320;
+    no_light.guns[0].y = 200;
+    no_light.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    latch_input(inst, &no_light);
+    guncon_capture(inst, 0u, "dark valid cursor", reply);
+    gun_protocol_check(memcmp(&reply[2], unavailable_coordinates,
+                              sizeof unavailable_coordinates) == 0,
+                       "valid aim without a light sample returns the no-light response");
+
+    no_light.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER |
+                             SCHWAY_GUN_INPUT_RELOAD;
+    latch_input(inst, &no_light);
+    guncon_capture(inst, 0u, "explicit reload", reply);
+    static const uint8_t reload_payload[6] = {0xFFu, 0xDFu, 0x01u, 0x00u, 0x05u, 0x00u};
+    gun_protocol_check(memcmp(reply, reload_payload, sizeof reload_payload) == 0,
+                       "reload response overrides aim while preserving the pressed trigger");
+    uint8_t repeated[6];
+    guncon_capture(inst, 0u, "repeated reload", repeated);
+    gun_protocol_check(memcmp(reply, repeated, sizeof reply) == 0,
+                       "repeated reload polls return identical bytes");
+
+    configure_sio_port(inst, 0u);
+    (void)exchange(inst, 0x01u, 1);
+    (void)exchange(inst, 0x42u, 1);
+    (void)exchange(inst, 0x00u, 1);
+    (void)exchange(inst, 0x00u, 1);
+    (void)exchange(inst, 0x00u, 1);
+    schway__pad_abort(inst, 0u);
+    guncon_capture(inst, 0u, "aborted partial poll", repeated);
+    gun_protocol_check(memcmp(reply, repeated, sizeof reply) == 0,
+                       "aborted partial poll cannot leave stale response bytes");
 
     schway_destroy(inst);
     printf("1..%u\n", gun_protocol_count);
