@@ -1393,6 +1393,77 @@ static void test_equal_timer_beam_dma(void)
     schway_destroy(inst);
 }
 
+static void test_gun_state(void)
+{
+    gun_tap_checks = 0u;
+    failures = 0;
+    puts("TAP version 13");
+    schway *source = make_justifier_irq_instance(UINT16_C(0x7FFF), 0u,
+                                                 SCHWAY_GUN_INPUT_VALID, 1u);
+    schway *restored = make_instance(SCHWAY_REGION_NTSC_U, 0u);
+    gun_tap_check(source != NULL && restored != NULL,
+                  "state instances are created for a scheduled Justifier shot");
+    if (source == NULL || restored == NULL) {
+        schway_destroy(source);
+        schway_destroy(restored);
+        printf("1..%u\n", gun_tap_checks);
+        return;
+    }
+
+    write_port(source, TIMER0_TARGET, 100u);
+    write_port(source, TIMER0_MODE, 0x00000100u);
+    write_port(source, TIMER1_TARGET, 100u);
+    write_port(source, TIMER1_MODE, 0u);
+    uint64_t deadline = gun_tick_for_clocks(SCHWAY_REGION_NTSC_U, 24u);
+    run_cycles(source, deadline - 1u);
+    gun_tap_check(source->gpu.gun_sensor[0].armed != 0u &&
+                      source->gpu.gun_sensor[0].deadline == deadline,
+                  "sensor is armed at the tick immediately before its beam event");
+
+    size_t state_size = schway_state_size(source);
+    uint8_t *saved = state_size != 0u ? (uint8_t *)malloc(state_size) : NULL;
+    uint8_t *after = state_size != 0u ? (uint8_t *)malloc(state_size) : NULL;
+    gun_tap_check(saved != NULL && after != NULL,
+                  "state buffers are sized for the active instance");
+    if (saved != NULL && after != NULL) {
+        schway_status save_status = schway_save_state(source, saved, state_size);
+        gun_tap_check(save_status == SCHWAY_STATUS_OK,
+                      "save preserves the armed Justifier shot before its event");
+        schway_status load_status = schway_load_state(restored, saved, state_size);
+        gun_tap_check(load_status == SCHWAY_STATUS_OK,
+                      "load restores the armed sensor and exact beam deadline");
+        if (save_status == SCHWAY_STATUS_OK && load_status == SCHWAY_STATUS_OK) {
+            run_cycles(source, 1u);
+            run_cycles(restored, 1u);
+            uint32_t source_irq = read_port(source, I_STAT) & (UINT32_C(1) << 10);
+            uint32_t restored_irq = read_port(restored, I_STAT) & (UINT32_C(1) << 10);
+            uint32_t source_timer0 = read_port(source, TIMER0_COUNT) & 0xFFFFu;
+            uint32_t restored_timer0 = read_port(restored, TIMER0_COUNT) & 0xFFFFu;
+            uint32_t source_timer1 = read_port(source, TIMER1_COUNT) & 0xFFFFu;
+            uint32_t restored_timer1 = read_port(restored, TIMER1_COUNT) & 0xFFFFu;
+            gun_tap_check(source->ticks == restored->ticks && source_irq != 0u &&
+                              restored_irq == source_irq && source_timer0 == restored_timer0 &&
+                              source_timer1 == restored_timer1 &&
+                              source->pad.gun_result_valid[0] ==
+                                  restored->pad.gun_result_valid[0] &&
+                              source->gpu.gun_sensor[0].consumed ==
+                                  restored->gpu.gun_sensor[0].consumed,
+                          "restored beam event returns the same sample, timers and IRQ10");
+
+            gun_tap_check(schway_save_state(source, after, state_size) == SCHWAY_STATUS_OK &&
+                              schway_load_state(restored, after, state_size) == SCHWAY_STATUS_OK &&
+                              restored->gpu.gun_sensor[0].consumed == 1u &&
+                              restored->pad.gun_result_valid[0] == 1u,
+                          "state after the consumed event restores its observation");
+        }
+    }
+    free(saved);
+    free(after);
+    schway_destroy(source);
+    schway_destroy(restored);
+    printf("1..%u\n", gun_tap_checks);
+}
+
 static uint32_t state_offset(const schway *inst, const char *name)
 {
     size_t count = schway__state_record(inst, NULL, 0u);
@@ -1474,6 +1545,8 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "gun_sample") == 0) {
         test_gun_sample();
+    } else if (strcmp(argv[1], "gun_state") == 0) {
+        test_gun_state();
     } else if (strcmp(argv[1], "gun_irq_order") == 0) {
         test_gun_irq_order();
     } else if (strcmp(argv[1], "gun_geometry") == 0) {

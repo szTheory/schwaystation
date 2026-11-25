@@ -1458,6 +1458,84 @@ static int gun_latch(void)
     return gun_tap_failures != 0u || check_failures != 0 ? 1 : 0;
 }
 
+static uint32_t gun_state_checks;
+static uint32_t gun_state_failures;
+
+static void gun_state_check(int passed, const char *name)
+{
+    gun_state_checks++;
+    printf("%s %u - %s\n", passed != 0 ? "ok" : "not ok", gun_state_checks, name);
+    if (passed == 0) {
+        fprintf(stderr, "gun state assertion failed: %s\n", name);
+        gun_state_failures++;
+    }
+}
+
+static int gun_state(void)
+{
+    gun_state_checks = 0u;
+    gun_state_failures = 0u;
+    puts("TAP version 13");
+    schway *source = make();
+    schway *restored = make();
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.guns[0].x = 31;
+    input.guns[0].y = 45;
+    input.guns[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    latch_input(source, &input);
+    configure_sio_port(source, 0u);
+
+    uint64_t byte_start = source->ticks;
+    gun_state_check(exchange(source, 0x01u, 0) == 0xFFu,
+                    "GunCon address byte completes before its pending ACK");
+    size_t state_size = schway_state_size(source);
+    uint8_t *saved = state_size != 0u ? (uint8_t *)malloc(state_size) : NULL;
+    uint8_t *pending_saved = state_size != 0u ? (uint8_t *)malloc(state_size) : NULL;
+    gun_state_check(saved != NULL && pending_saved != NULL,
+                    "state buffers are sized for the active instance");
+    if (source == NULL || restored == NULL || saved == NULL || pending_saved == NULL) {
+        free(saved);
+        free(pending_saved);
+        schway_destroy(source);
+        schway_destroy(restored);
+        printf("1..%u\n", gun_state_checks);
+        return 1;
+    }
+
+    schway_status saved_status = schway_save_state(source, saved, state_size);
+    gun_state_check(saved_status == SCHWAY_STATUS_OK,
+                    "save accepts a GunCon poll during the address ACK window");
+    schway_input pending = input;
+    pending.guns[0].x = 90;
+    gun_state_check(schway_set_input(source, &pending) == SCHWAY_STATUS_OK,
+                    "a new host snapshot can wait while the current poll is active");
+    gun_state_check(schway_save_state(source, pending_saved, state_size) == SCHWAY_STATUS_OK &&
+                        memcmp(saved, pending_saved, state_size) == 0,
+                    "pending host input does not change serialized bytes");
+    schway_status loaded_status = schway_load_state(restored, saved, state_size);
+    gun_state_check(loaded_status == SCHWAY_STATUS_OK,
+                    "load restores the GunCon device and in-flight ACK state");
+    if (saved_status == SCHWAY_STATUS_OK && loaded_status == SCHWAY_STATUS_OK) {
+        advance_to(source, byte_start + 1494u);
+        advance_to(restored, byte_start + 1494u);
+        gun_state_check(read_mmio(source, JOY_STAT, 4u) == read_mmio(restored, JOY_STAT, 4u),
+                        "restored address ACK status matches uninterrupted execution");
+        uint8_t source_id = exchange(source, 0x42u, 0);
+        uint8_t restored_id = exchange(restored, 0x42u, 0);
+        gun_state_check(source_id == 0x63u && restored_id == source_id,
+                        "restored serial continuation returns the same GunCon ID");
+    }
+
+    free(saved);
+    free(pending_saved);
+    schway_destroy(source);
+    schway_destroy(restored);
+    printf("1..%u\n", gun_state_checks);
+    return gun_state_failures != 0u || check_failures != 0 ? 1 : 0;
+}
+
 static uint32_t gun_protocol_count;
 static uint32_t gun_protocol_failures;
 
@@ -1689,6 +1767,8 @@ int main(int argc, char **argv)
         special_jogcon();
     } else if (strcmp(argv[1], "gun_latch") == 0) {
         return gun_latch();
+    } else if (strcmp(argv[1], "gun_state") == 0) {
+        return gun_state();
     } else if (strcmp(argv[1], "gun_guncon") == 0) {
         return gun_guncon();
     } else if (strcmp(argv[1], "gun_justifier") == 0) {
