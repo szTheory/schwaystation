@@ -171,16 +171,35 @@ schway_status schway_set_input(schway *inst, const schway_input *input)
     if (normalized.reserved0 != 0u) {
         return SCHWAY_STATUS_ERR_ARGUMENT;
     }
+    const uint32_t gun_flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER |
+                               SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD;
     for (uint32_t port = 0u; port < 2u; port++) {
-        if (normalized.device[port] > SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT ||
+        if (normalized.device[port] > SCHWAY_INPUT_DEVICE_JUSTIFIER ||
             normalized.analog_button[port] > 1u || normalized.multitap[port] > 1u) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+        if (normalized.device[port] >= SCHWAY_INPUT_DEVICE_GUNCON &&
+            normalized.multitap[port] != 0u) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+        const schway_gun_input *gun = &normalized.guns[port];
+        if ((gun->flags & ~gun_flags) != 0u || gun->reserved0 != 0u) {
+            return SCHWAY_STATUS_ERR_ARGUMENT;
+        }
+        if ((gun->flags & SCHWAY_GUN_INPUT_VALID) != 0u &&
+            (gun->flags & (SCHWAY_GUN_INPUT_OFFSCREEN | SCHWAY_GUN_INPUT_RELOAD)) == 0u &&
+            (gun->x < 0 || gun->y < 0)) {
             return SCHWAY_STATUS_ERR_ARGUMENT;
         }
         for (uint32_t socket = 0u; socket < 4u; socket++) {
             const schway_controller_input *controller = &normalized.controllers[port][socket];
-            if (controller->device > SCHWAY_INPUT_DEVICE_DUAL_ANALOG_FLIGHT ||
+            if (controller->device > SCHWAY_INPUT_DEVICE_JUSTIFIER ||
                 controller->analog_button > 1u || controller->reserved0 != 0u ||
                 (controller->jogcon_flags & (uint16_t)~UINT16_C(0x0003)) != 0u) {
+                return SCHWAY_STATUS_ERR_ARGUMENT;
+            }
+            if (normalized.multitap[port] != 0u &&
+                controller->device >= SCHWAY_INPUT_DEVICE_GUNCON) {
                 return SCHWAY_STATUS_ERR_ARGUMENT;
             }
         }

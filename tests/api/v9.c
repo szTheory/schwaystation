@@ -37,8 +37,8 @@ _Static_assert(sizeof(schway_controller_input) == 24u, "API v9 endpoint input si
 _Static_assert(offsetof(schway_current_input, multitap) == 28u, "API v9 input.multitap");
 _Static_assert(offsetof(schway_current_input, controllers) == 36u,
                "API v9 input.controllers");
-_Static_assert(sizeof(schway_current_input) == 228u, "API v9 input size");
-_Static_assert(SCHWAY_API_VERSION == 9, "API v9 version");
+_Static_assert(sizeof(schway_current_input) == 260u, "API v10 current input size");
+_Static_assert(SCHWAY_API_VERSION == 10, "API v10 current version");
 _Static_assert(SCHWAY_INPUT_DEVICE_NONE == 0u, "API v9 none identifier");
 _Static_assert(SCHWAY_INPUT_DEVICE_DIGITAL == 1u, "API v9 digital identifier");
 _Static_assert(SCHWAY_INPUT_DEVICE_DUALSHOCK == 2u, "API v9 DualShock identifier");
@@ -377,7 +377,7 @@ int main(void)
     bad.size = 27u;
     expect_rejected_without_replacing(inst, &baseline, &bad, SCHWAY_STATUS_ERR_STRUCT_SIZE);
     bad = baseline;
-    bad.device[0] = 7u;
+    bad.device[0] = 9u;
     expect_rejected_without_replacing(inst, &baseline, &bad, SCHWAY_STATUS_ERR_ARGUMENT);
     bad = baseline;
     bad.analog_button[1] = 2u;
@@ -386,7 +386,7 @@ int main(void)
     bad.multitap[0] = 2u;
     expect_rejected_without_replacing(inst, &baseline, &bad, SCHWAY_STATUS_ERR_ARGUMENT);
     bad = baseline;
-    bad.controllers[1][3].device = 7u;
+    bad.controllers[1][3].device = 9u;
     expect_rejected_without_replacing(inst, &baseline, &bad, SCHWAY_STATUS_ERR_ARGUMENT);
     bad = baseline;
     bad.controllers[0][2].analog_button = 2u;
