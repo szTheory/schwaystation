@@ -982,7 +982,8 @@ jobs:
           fi
           base=$(git merge-base "origin/$BASE_REF" "$HEAD_SHA")
           echo "perf: head $HEAD_SHA, merge base $base"
-          if git show "$base:CMakePresets.json" 2> /dev/null | grep -q '"name": "perf"'; then
+          if git show "$base:CMakePresets.json" > "$RUNNER_TEMP/base-CMakePresets.json" 2> /dev/null && \
+            grep -q '"name": "perf"' "$RUNNER_TEMP/base-CMakePresets.json"; then
             git worktree add --detach "$RUNNER_TEMP/base" "$base"
             build "$RUNNER_TEMP/base" "$RUNNER_TEMP/perf/base"
             echo no_base=false >> "$GITHUB_OUTPUT"
