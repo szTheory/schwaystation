@@ -268,6 +268,7 @@ static int16_t special_lightgun_x, special_lightgun_y;
 static int16_t special_pointer_x, special_pointer_y;
 static int16_t special_axes[2][2];
 static uint32_t special_buttons;
+static uint32_t special_pointer_buttons;
 static unsigned special_queries[8][8][3][17];
 static unsigned input_capabilities_calls;
 static int input_capabilities_available = 1;
@@ -818,7 +819,9 @@ static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned ind
         if (device == RETRO_DEVICE_POINTER && index == 0u) {
             if (id == RETRO_DEVICE_ID_POINTER_X) return special_pointer_x;
             if (id == RETRO_DEVICE_ID_POINTER_Y) return special_pointer_y;
-            if (id < 32u) return (special_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
+            if (id < 32u) {
+                return (special_pointer_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
+            }
         }
         if (device == RETRO_DEVICE_ANALOG && index < 2u && id < 2u) {
             return special_axes[index][id];
@@ -2082,6 +2085,9 @@ static int test_input_pointer(void)
     const uint32_t offscreen = UINT32_C(1) << RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN;
     const uint32_t valid_trigger = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
     schway_gun_input snapshot;
+    uint8_t latched_reply[9], current_reply[9];
+    size_t latched_written = 0u, current_written = 0u;
+    uint16_t pad_buttons = 0u;
     unsigned armed = 0u, consumed = 0u, calls, polls;
 
     special_input_mode = 1;
@@ -2089,7 +2095,8 @@ static int test_input_pointer(void)
     special_lightgun_y = 0;
     special_pointer_x = 0;
     special_pointer_y = 0;
-    special_buttons = pressed;
+    special_buttons = 0u;
+    special_pointer_buttons = pressed;
     input_capabilities_available = 1;
     input_capabilities = UINT64_C(1) << RETRO_DEVICE_POINTER;
     input_capabilities_calls = 0u;
@@ -2139,6 +2146,7 @@ static int test_input_pointer(void)
     input_capabilities |= UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
     special_lightgun_x = INT16_MAX;
     special_lightgun_y = INT16_MIN;
+    special_buttons = UINT32_C(1) << RETRO_DEVICE_ID_LIGHTGUN_TRIGGER;
     special_pointer_x = (int16_t)-0x7FFF;
     special_pointer_y = (int16_t)-0x7FFF;
     clear_special_queries();
@@ -2150,6 +2158,62 @@ static int test_input_pointer(void)
     CHECK_EQ_U64(snapshot.x, 319u);
     CHECK_EQ_U64(snapshot.y, 0u);
     CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+
+    /* LIGHTGUN reload and offscreen remain distinct in their own frame snapshots. */
+    special_lightgun_x = 0;
+    special_lightgun_y = 0;
+    special_buttons = (UINT32_C(1) << RETRO_DEVICE_ID_LIGHTGUN_TRIGGER) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_LIGHTGUN_RELOAD);
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, SCHWAY_GUN_INPUT_TRIGGER | SCHWAY_GUN_INPUT_RELOAD);
+    CHECK_EQ_U64(p_test_poll_bytes(0u, 0u, latched_reply, sizeof latched_reply,
+                                   &latched_written), 1u);
+    CHECK_EQ_U64(latched_written, sizeof latched_reply);
+    if (latched_written == sizeof latched_reply) {
+        CHECK_EQ_U64(latched_reply[5], 1u);
+        CHECK_EQ_U64(latched_reply[6], 0u);
+        CHECK_EQ_U64(latched_reply[7], 5u);
+        CHECK_EQ_U64(latched_reply[8], 0u);
+    }
+    armed = consumed = 1u;
+    CHECK_EQ_U64(p_test_gun_sensor(0u, &armed, &consumed), 1u);
+    CHECK_EQ_U64(armed, 0u);
+    CHECK_EQ_U64(consumed, 0u);
+    special_lightgun_x = INT16_MAX;
+    special_lightgun_y = INT16_MIN;
+    special_buttons = (UINT32_C(1) << RETRO_DEVICE_ID_LIGHTGUN_TRIGGER) |
+                      (UINT32_C(1) << RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN);
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, SCHWAY_GUN_INPUT_TRIGGER | SCHWAY_GUN_INPUT_RELOAD);
+    CHECK_EQ_U64(p_test_poll_bytes(0u, 0u, current_reply, sizeof current_reply,
+                                   &current_written), 1u);
+    CHECK_EQ_U64(current_written, latched_written);
+    if (current_written == latched_written) {
+        CHECK(memcmp(current_reply, latched_reply, latched_written) == 0);
+    }
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 319u);
+    CHECK_EQ_U64(snapshot.y, 0u);
+    CHECK_EQ_HEX(snapshot.flags, SCHWAY_GUN_INPUT_TRIGGER | SCHWAY_GUN_INPUT_OFFSCREEN);
+    CHECK_EQ_U64(p_test_poll_bytes(0u, 0u, current_reply, sizeof current_reply,
+                                   &current_written), 1u);
+    CHECK_EQ_U64(current_written, sizeof current_reply);
+    if (current_written == sizeof current_reply) {
+        CHECK_EQ_U64(current_reply[5], 1u);
+        CHECK_EQ_U64(current_reply[6], 0u);
+        CHECK_EQ_U64(current_reply[7], 5u);
+        CHECK_EQ_U64(current_reply[8], 0u);
+    }
+    armed = consumed = 1u;
+    CHECK_EQ_U64(p_test_gun_sensor(0u, &armed, &consumed), 1u);
+    CHECK_EQ_U64(armed, 0u);
+    CHECK_EQ_U64(consumed, 0u);
 
     /* Pointer's documented signed endpoints map to the active image corners. */
     input_capabilities = UINT64_C(1) << RETRO_DEVICE_POINTER;
@@ -2169,13 +2233,13 @@ static int test_input_pointer(void)
     /* Offscreen invalidates aim; a released pointer keeps center aim without trigger. */
     special_pointer_x = 0;
     special_pointer_y = 0;
-    special_buttons = pressed | offscreen;
+    special_pointer_buttons = pressed | offscreen;
     run_one();
     CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
     CHECK_EQ_U64(snapshot.x, 160u);
     CHECK_EQ_U64(snapshot.y, 120u);
     CHECK_EQ_HEX(snapshot.flags, SCHWAY_GUN_INPUT_TRIGGER | SCHWAY_GUN_INPUT_OFFSCREEN);
-    special_buttons = 0u;
+    special_pointer_buttons = 0u;
     run_one();
     CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
     CHECK_EQ_U64(snapshot.x, 160u);
@@ -2185,7 +2249,7 @@ static int test_input_pointer(void)
 
     /* Neither advertised class is unsupported; restoring POINTER restores input. */
     input_capabilities = 0u;
-    special_buttons = pressed;
+    special_pointer_buttons = pressed;
     run_one();
     expect_gun_unavailable(0u);
     input_capabilities = UINT64_C(1) << RETRO_DEVICE_POINTER;
@@ -2193,11 +2257,123 @@ static int test_input_pointer(void)
     CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
     CHECK_EQ_HEX(snapshot.flags, valid_trigger);
 
+    /* Callback, capability and controller changes do not rewrite the current frame. */
+    special_pointer_x = 0;
+    special_pointer_y = 0;
+    special_pointer_buttons = pressed;
+    special_buttons = UINT32_C(1) << RETRO_DEVICE_ID_JOYPAD_B;
+    clear_special_queries();
+    calls = input_capabilities_calls;
+    run_one();
+    CHECK_EQ_U64(input_capabilities_calls, calls + 1u);
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+    CHECK_EQ_U64(p_test_poll_bytes(0u, 0u, latched_reply, sizeof latched_reply,
+                                   &latched_written), 1u);
+    CHECK_EQ_U64(latched_written, sizeof latched_reply);
+
+    special_pointer_x = 0x7FFF;
+    special_pointer_y = (int16_t)-0x7FFF;
+    special_pointer_buttons = 0u;
+    input_capabilities = 0u;
+    p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+    p_set_controller_port_device(1u, RETRO_DEVICE_JOYPAD);
+    calls = input_capabilities_calls;
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+    CHECK_EQ_U64(p_test_poll_bytes(0u, 0u, current_reply, sizeof current_reply,
+                                   &current_written), 1u);
+    CHECK_EQ_U64(current_written, latched_written);
+    if (current_written == latched_written) {
+        CHECK(memcmp(current_reply, latched_reply, latched_written) == 0);
+    }
+
+    clear_special_queries();
+    run_one();
+    CHECK_EQ_U64(input_capabilities_calls, calls);
+    expect_special_query(0u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 0u);
+    expect_special_query(1u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 0u);
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, 0u);
+    CHECK_EQ_U64(p_test_gun_input(1u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, 0u);
+    for (unsigned port = 0u; port < 2u; port++) {
+        armed = consumed = 1u;
+        CHECK_EQ_U64(p_test_gun_sensor(port, &armed, &consumed), 1u);
+        CHECK_EQ_U64(armed, 0u);
+        CHECK_EQ_U64(consumed, 0u);
+        CHECK_EQ_U64(p_test_poll_endpoint(port, 0u, &pad_buttons), 1u);
+        CHECK_EQ_HEX(pad_buttons, 0xBFFFu);
+    }
+
+    /* Both direct ports can independently mix an ordinary pad and a gun. */
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_POINTER;
+    special_pointer_x = 0;
+    special_pointer_y = 0;
+    special_pointer_buttons = pressed;
+    p_set_controller_port_device(0u, RETRO_DEVICE_LIGHTGUN);
+    p_set_controller_port_device(1u, RETRO_DEVICE_JOYPAD);
+    clear_special_queries();
+    run_one();
+    expect_special_query(0u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 1u);
+    expect_special_query(1u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 0u);
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+    CHECK_EQ_U64(p_test_gun_input(1u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, 0u);
+    CHECK_EQ_U64(p_test_poll_endpoint(1u, 0u, &pad_buttons), 1u);
+    CHECK_EQ_HEX(pad_buttons, 0xBFFFu);
+
+    p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+    p_set_controller_port_device(1u, justifier);
+    clear_special_queries();
+    run_one();
+    expect_special_query(0u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 0u);
+    expect_special_query(1u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 1u);
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, 0u);
+    CHECK_EQ_U64(p_test_gun_input(1u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+    CHECK_EQ_U64(p_test_poll_endpoint(0u, 0u, &pad_buttons), 1u);
+    CHECK_EQ_HEX(pad_buttons, 0xBFFFu);
+    armed = consumed = 1u;
+    CHECK_EQ_U64(p_test_gun_sensor(0u, &armed, &consumed), 1u);
+    CHECK_EQ_U64(armed, 0u);
+    CHECK_EQ_U64(consumed, 0u);
+
+    /* Tap sockets reject guns, without changing the direct gun on the other port. */
+    p_unload_game();
+    multitap_port1_value = "enabled";
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    p_set_controller_port_device(0u, RETRO_DEVICE_JOYPAD);
+    p_set_controller_port_device(1u, RETRO_DEVICE_JOYPAD);
+    p_set_controller_port_device(1u, RETRO_DEVICE_LIGHTGUN);
+    p_set_controller_port_device(4u, justifier);
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_POINTER;
+    special_pointer_buttons = pressed;
+    clear_special_queries();
+    run_one();
+    expect_special_query(0u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 0u);
+    expect_special_query(1u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 0u);
+    expect_special_query(4u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 1u);
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, 0u);
+    CHECK_EQ_U64(p_test_gun_input(1u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+    CHECK_EQ_U64(p_test_poll_endpoint(0u, 1u, &pad_buttons), 1u);
+    CHECK_EQ_HEX(pad_buttons, 0xBFFFu);
+
     p_unload_game();
     p_deinit();
     module_close();
     special_input_mode = 0;
     special_buttons = 0u;
+    special_pointer_buttons = 0u;
+    multitap_port1_value = "disabled";
     input_capabilities = UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
     return check_failures != 0 ? 1 : 0;
 }
