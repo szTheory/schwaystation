@@ -197,6 +197,19 @@ static void gpu_gun_arm(schway *inst)
     }
 }
 
+static void gpu_gun_retarget(schway *inst)
+{
+    for (uint32_t port = 0u; port < 2u; port++) {
+        struct schway__gpu_gun_sensor *sensor = &inst->gpu.gun_sensor[port];
+        if (sensor->armed != 0u && sensor->consumed == 0u) {
+            sensor->armed = 0u;
+            sensor->deadline = UINT64_MAX;
+            sensor->phase = 0u;
+        }
+    }
+    gpu_gun_arm(inst);
+}
+
 static void gpu_gun_sample(schway *inst, uint32_t port)
 {
     struct schway__gpu *g = &inst->gpu;
@@ -205,10 +218,22 @@ static void gpu_gun_sample(schway *inst, uint32_t port)
     schway__gpu_display(inst, &display);
     uint32_t x = (display.start_x + (uint32_t)sensor->aim_x) & 1023u;
     uint32_t y = (display.start_y + (uint32_t)sensor->aim_y) & 511u;
-    uint16_t pixel = inst->vram[y][x] & UINT16_C(0x7FFF);
-    uint32_t brightness = (uint32_t)(pixel & 31u) +
-                          (uint32_t)((pixel >> 5) & 31u) +
-                          (uint32_t)((pixel >> 10) & 31u);
+    uint32_t brightness = 0u;
+    if (display.rgb24 != 0u) {
+        for (uint32_t channel = 0u; channel < 3u; channel++) {
+            uint32_t byte_x = (display.start_x * 2u +
+                               (uint32_t)sensor->aim_x * 3u + channel) %
+                              (SCHWAY__VRAM_W * 2u);
+            uint16_t word = inst->vram[y][byte_x / 2u];
+            uint32_t component = (word >> ((byte_x & 1u) * 8u)) & 0xFFu;
+            brightness += component >> 3;
+        }
+    } else {
+        uint16_t pixel = inst->vram[y][x] & UINT16_C(0x7FFF);
+        brightness = (uint32_t)(pixel & 31u) +
+                     (uint32_t)((pixel >> 5) & 31u) +
+                     (uint32_t)((pixel >> 10) & 31u);
+    }
     if (display.enabled != 0u && brightness >= 48u) {
         uint64_t x8 = (uint64_t)sensor->target_clock * UINT64_C(107520) /
                       gpu_clock_num(inst->region);
@@ -1311,18 +1336,22 @@ static void gpu_gp1(schway *inst, uint32_t command, uint64_t tick)
         break;
     case 0x03u:
         g->display_disabled = value & 1u;
+        gpu_gun_retarget(inst);
         break;
     case 0x04u:
         g->dma_direction = value & 3u;
         break;
     case 0x05u:
         g->display_start = value & 0x0007FFFFu;
+        gpu_gun_retarget(inst);
         break;
     case 0x06u:
         g->horizontal_range = value & 0x00FFFFFFu;
+        gpu_gun_retarget(inst);
         break;
     case 0x07u:
         g->vertical_range = value & 0x000FFFFFu;
+        gpu_gun_retarget(inst);
         break;
     case 0x08u:
     {
@@ -1334,6 +1363,7 @@ static void gpu_gp1(schway *inst, uint32_t command, uint64_t tick)
         }
         g->display_mode = mode;
         g->beam_dot_phase %= gpu_dot_divisor(g->display_mode);
+        gpu_gun_retarget(inst);
         break;
     }
     case 0x09u:

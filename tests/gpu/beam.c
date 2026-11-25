@@ -265,6 +265,246 @@ static void test_gun_geometry(void)
                       "display mode change reschedules the same latched aim");
         schway_destroy(retarget);
     }
+
+    for (uint32_t level = 47u; level <= 49u; level++) {
+        schway *inst = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                   0u, 2560u, 0u, 240u,
+                                                   0u, 0u, 1, 0,
+                                                   SCHWAY_GUN_INPUT_VALID);
+        if (inst == NULL) {
+            gun_tap_check(0, "threshold instance is created");
+            continue;
+        }
+        inst->vram[0][1] = (uint16_t)(31u | ((level - 31u) << 5));
+        run_cycles(inst, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 1u, 0u,
+                                                   0u, 0u, 8u));
+        gun_tap_check((inst->pad.gun_result_valid[0] != 0u) == (level >= 48u),
+                      "RGB555 threshold 47/48/49 follows the five-bit channel sum");
+        schway_destroy(inst);
+    }
+
+    static const uint32_t modes[] = {0u, 1u, 2u, 3u, 0x40u};
+    static const uint32_t divisors[] = {10u, 8u, 5u, 4u, 7u};
+    for (uint32_t i = 0u; i < sizeof modes / sizeof modes[0]; i++) {
+        schway *inst = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, modes[i],
+                                                   0u, 2560u, 0u, 240u,
+                                                   0u, 0u, 3, 0,
+                                                   SCHWAY_GUN_INPUT_VALID);
+        if (inst == NULL) {
+            gun_tap_check(0, "dot-divisor instance is created");
+            continue;
+        }
+        inst->vram[0][3] = UINT16_C(0x7FFF);
+        run_cycles(inst, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 3u, 0u,
+                                                   0u, 0u, divisors[i]));
+        gun_tap_check(inst->pad.gun_result_valid[0] != 0u,
+                      "each GPU dot divisor samples its active source pixel");
+        schway_destroy(inst);
+    }
+
+    schway *edges = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                16u, 2576u, 4u, 244u,
+                                                0u, 0u, 319, 239,
+                                                SCHWAY_GUN_INPUT_VALID);
+    if (edges != NULL) {
+        edges->vram[239][319] = UINT16_C(0x7FFF);
+        run_cycles(edges, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 319u, 239u,
+                                                    16u, 4u, 8u));
+        gun_tap_check(edges->pad.gun_result_valid[0] != 0u &&
+                          edges->pad.gun_result_x[0] == 385u &&
+                          edges->pad.gun_result_y[0] == 243u,
+                      "last active output pixel maps through nonzero display edges");
+        schway_destroy(edges);
+    }
+
+    schway *wrapped = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                  0u, 2560u, 0u, 240u,
+                                                  1023u, 511u, 1, 1,
+                                                  SCHWAY_GUN_INPUT_VALID);
+    if (wrapped != NULL) {
+        wrapped->vram[0][0] = UINT16_C(0x7FFF);
+        run_cycles(wrapped, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 1u, 1u,
+                                                      0u, 0u, 8u));
+        gun_tap_check(wrapped->pad.gun_result_valid[0] != 0u &&
+                          wrapped->pad.gun_result_y[0] == 1u,
+                      "display origin wraps both VRAM coordinates");
+        schway_destroy(wrapped);
+    }
+
+    schway *rgb24_wrap = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 0x11u,
+                                                    0u, 2560u, 0u, 240u,
+                                                    1023u, 0u, 1, 0,
+                                                    SCHWAY_GUN_INPUT_VALID);
+    if (rgb24_wrap != NULL) {
+        gun_write_byte(rgb24_wrap, 0u, 1u, 128u);
+        gun_write_byte(rgb24_wrap, 0u, 2u, 128u);
+        gun_write_byte(rgb24_wrap, 0u, 3u, 128u);
+        run_cycles(rgb24_wrap, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 1u, 0u,
+                                                         0u, 0u, 8u));
+        gun_tap_check(rgb24_wrap->pad.gun_result_valid[0] != 0u,
+                      "RGB24 byte addressing wraps at the VRAM row boundary");
+        schway_destroy(rgb24_wrap);
+    }
+
+    const uint32_t regions[] = {SCHWAY_REGION_NTSC_J, SCHWAY_REGION_NTSC_U,
+                                SCHWAY_REGION_PAL};
+    for (uint32_t i = 0u; i < sizeof regions / sizeof regions[0]; i++) {
+        schway *inst = make_gun_geometry_instance(regions[i], 1u,
+                                                   0u, 2560u, 0u, 240u,
+                                                   0u, 0u, 1, 0,
+                                                   SCHWAY_GUN_INPUT_VALID);
+        if (inst == NULL) {
+            gun_tap_check(0, "regional instance is created");
+            continue;
+        }
+        inst->vram[0][1] = UINT16_C(0x7FFF);
+        run_cycles(inst, gun_deadline_from_origin(regions[i], 1u, 0u,
+                                                   0u, 0u, 8u));
+        gun_tap_check(inst->pad.gun_result_valid[0] != 0u &&
+                          inst->pad.gun_result_x[0] == 1u,
+                      "NTSC-J, NTSC-U and PAL use the regional GPU ratio");
+        schway_destroy(inst);
+    }
+
+    schway *interlaced = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 0x21u,
+                                                    0u, 2560u, 0u, 240u,
+                                                    0u, 0u, 1, 1,
+                                                    SCHWAY_GUN_INPUT_VALID);
+    if (interlaced != NULL) {
+        interlaced->vram[1][1] = UINT16_C(0x7FFF);
+        run_cycles(interlaced, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 1u, 1u,
+                                                         0u, 0u, 8u));
+        gun_tap_check(interlaced->pad.gun_result_valid[0] != 0u &&
+                          interlaced->pad.gun_result_y[0] == 1u,
+                      "interlaced mode samples the matching active output line");
+        schway_destroy(interlaced);
+    }
+
+    schway *first = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                0u, 2560u, 0u, 240u,
+                                                0u, 0u, 0, 0,
+                                                SCHWAY_GUN_INPUT_VALID);
+    if (first != NULL) {
+        first->vram[0][0] = UINT16_C(0x7FFF);
+        run_cycles(first, 1u);
+        gun_tap_check(first->pad.gun_result_valid[0] != 0u &&
+                          first->pad.gun_result_x[0] == 0u &&
+                          first->pad.gun_result_y[0] == 0u,
+                      "first active pixel samples when the input is latched");
+        schway_destroy(first);
+    }
+
+    schway *invalid = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                 0u, 2552u, 0u, 240u,
+                                                 0u, 0u, 319, 0,
+                                                 SCHWAY_GUN_INPUT_VALID);
+    if (invalid != NULL) {
+        struct schway__display display;
+        schway__gpu_display(invalid, &display);
+        uint32_t padded_width = (((display.x2 - display.x1) / display.dot_div) + 2u) & ~3u;
+        run_cycles(invalid, 2u);
+        gun_tap_check(padded_width == 320u && invalid->pad.gun_result_valid[0] == 0u,
+                      "rounded scanout padding is outside the active sample range");
+        schway_destroy(invalid);
+    }
+
+    schway *invalid_y = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                   0u, 2560u, 0u, 240u,
+                                                   0u, 0u, 0, 240,
+                                                   SCHWAY_GUN_INPUT_VALID);
+    if (invalid_y != NULL) {
+        run_cycles(invalid_y, 2u);
+        gun_tap_check(invalid_y->pad.gun_result_valid[0] == 0u,
+                      "vertical coordinates beyond the active range do not hit");
+        schway_destroy(invalid_y);
+    }
+
+    schway *invalid_height = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                        0u, 2560u, 0u, 0u,
+                                                        0u, 0u, 0, 0,
+                                                        SCHWAY_GUN_INPUT_VALID);
+    if (invalid_height != NULL) {
+        run_cycles(invalid_height, 2u);
+        gun_tap_check(invalid_height->pad.gun_result_valid[0] == 0u,
+                      "empty vertical display ranges do not arm the sensor");
+        schway_destroy(invalid_height);
+    }
+
+    schway *offscreen = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                    0u, 2560u, 0u, 240u,
+                                                    0u, 0u, 1, 0,
+                                                    SCHWAY_GUN_INPUT_VALID |
+                                                        SCHWAY_GUN_INPUT_OFFSCREEN);
+    if (offscreen != NULL) {
+        run_cycles(offscreen, 2u);
+        gun_tap_check(offscreen->pad.gun_result_valid[0] == 0u,
+                      "offscreen input does not arm the beam sensor");
+        schway_destroy(offscreen);
+    }
+
+    schway *reload = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                 0u, 2560u, 0u, 240u,
+                                                 0u, 0u, 1, 0,
+                                                 SCHWAY_GUN_INPUT_VALID |
+                                                     SCHWAY_GUN_INPUT_RELOAD);
+    if (reload != NULL) {
+        run_cycles(reload, 2u);
+        gun_tap_check(reload->pad.gun_result_valid[0] == 0u,
+                      "forced reload does not arm the beam sensor");
+        schway_destroy(reload);
+    }
+
+    schway *unavailable = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                      0u, 2560u, 0u, 240u,
+                                                      0u, 0u, 1, 0, 0u);
+    if (unavailable != NULL) {
+        unavailable->vram[0][1] = UINT16_C(0x7FFF);
+        run_cycles(unavailable, 2u);
+        gun_tap_check(unavailable->pad.gun_result_valid[0] == 0u,
+                      "aim without explicit validity does not arm the sensor");
+        schway_destroy(unavailable);
+    }
+
+    schway *dark = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                               0u, 2560u, 0u, 240u,
+                                               0u, 0u, 1, 0,
+                                               SCHWAY_GUN_INPUT_VALID);
+    if (dark != NULL) {
+        run_cycles(dark, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 1u, 0u,
+                                                   0u, 0u, 8u));
+        gun_tap_check(dark->pad.gun_result_valid[0] == 0u,
+                      "a dark active pixel produces no hit");
+        schway_destroy(dark);
+    }
+
+    schway *disabled = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                  0u, 2560u, 0u, 240u,
+                                                  0u, 0u, 1, 0,
+                                                  SCHWAY_GUN_INPUT_VALID);
+    if (disabled != NULL) {
+        disabled->vram[0][1] = UINT16_C(0x7FFF);
+        write_port(disabled, GP1, 0x03000001u);
+        run_cycles(disabled, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 1u, 0u,
+                                                       0u, 0u, 8u));
+        gun_tap_check(disabled->pad.gun_result_valid[0] == 0u,
+                      "disabled display output cannot produce a sample");
+        schway_destroy(disabled);
+    }
+
+    schway *start_change = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                       0u, 2560u, 0u, 240u,
+                                                       0u, 0u, 1, 0,
+                                                       SCHWAY_GUN_INPUT_VALID);
+    if (start_change != NULL) {
+        start_change->vram[0][11] = UINT16_C(0x7FFF);
+        run_cycles(start_change, 1u);
+        write_port(start_change, GP1, 0x0500000Au);
+        uint64_t deadline = start_change->gpu.gun_sensor[0].deadline;
+        run_cycles(start_change, deadline - start_change->ticks);
+        gun_tap_check(start_change->pad.gun_result_valid[0] != 0u,
+                      "display-origin changes sample the newly displayed VRAM pixel");
+        schway_destroy(start_change);
+    }
     printf("1..%u\n", gun_tap_checks);
 }
 
