@@ -1,6 +1,6 @@
 ---
 phase: 11-ecm-and-clonecd-images
-verified: 2026-11-22T22:08:48Z
+verified: 2026-11-25T02:03:04Z
 status: passed
 score: 45/45 must-haves verified
 re_verification:
@@ -99,7 +99,7 @@ covered_files:
   - tests/runner/tests.cmake
   - tools/gen_ccd.py
   - tools/gen_ecm.py
-covered_digest: "v4:sha256:7e62f50e8dfee6b22333c167415d6ca322c58e00d8f85518984150b83279e344"
+covered_digest: "v4:sha256:f9ae5eeaa5266186a4c819536b019fb9bb6e98726b65d3207c8220b9538a2e2e"
 behavior_unverified: 0
 overrides_applied: 0
 ---
@@ -107,9 +107,9 @@ overrides_applied: 0
 # Phase 11: ECM and CloneCD Images Verification Report
 
 **Phase Goal:** Players can open ECM and CloneCD images while retaining their documented track, sector and subcode behavior.
-**Verified:** 2026-11-22T21:35:32Z
+**Verified:** 2026-11-25T02:03:04Z
 **Status:** passed
-**Re-verification:** No; no prior verification report existed.
+**Re-verification:** Yes; current descendants were checked after later released phases changed covered files.
 
 ## Goal Achievement
 
@@ -119,13 +119,13 @@ overrides_applied: 0
 |---|---|---|---|
 | 1 | Supported ECM files produce the expected sector bytes on repeated and out-of-order reads; source extents and sector counts are checked before guest runs, and malformed tables, offsets and truncated streams fail within documented bounds. | ✓ VERIFIED | `host/disc_ecm.c` validates full encoded extent, decoded length, terminator and EDC before publishing; bounded checkpoint reads are exercised by the ECM tests and the full CI run. `tests/disc/legacy.c` and runner preflights compare exact source and requested/produced counts before guests. |
 | 2 | Supported CloneCD fixtures preserve modes, indexes, pregaps, subcode and first and last sector reads through CCD and IMG/SUB companions; invalid companion paths are rejected before an external file is opened. | ✓ VERIFIED | `host/disc_ccd.c` reconciles metadata and exact image/subcode sizes, canonicalizes and confines companion paths before opening, and transposes SUB data. `tests/disc/ccd.c` and `tests/fuzz/ccd.c` exercise boundary sectors, metadata, known-answer transpose, escapes and replacement behavior. |
-| 3 | The ledger records fixture results for both providers against the existing disc contract. | ✓ VERIFIED | `tests/compat/features.csv` has ECM and CCD pass rows for the observed local provider, guest, package and consumer evidence; Main, Nightly, Release and fuzz hosted/campaign evidence stays explicitly `unknown`. |
+| 3 | The ledger records fixture results for both providers against the existing disc contract. | ✓ VERIFIED | `tests/compat/features.csv` retains the fixture-backed ECM and CCD results and accurately keeps its phase-time hosted fields as `unknown`; later descendant Main, Nightly and Release runs are recorded below. |
 | 4 | Malformed ECM and CCD inputs fail through private host APIs before a reader is published. | ✓ VERIFIED | Private `schway__disc_ecm_open`/`schway__disc_ccd_open` validation paths and malformed regression cases in `tests/disc/ecm.c` and `tests/disc/ccd.c`; full workflow passed. |
 | 5 | CMake and exact test inventories include both private readers without changing the core ABI. | ✓ VERIFIED | `cmake/DiscTargets.cmake`, `tests/disc/tests.cmake`, `tests/disc/inventory.txt`, fuzz/runner/libretro registrations and private host headers; no public ABI change is present in the changed implementation. |
 | 6 | Existing gates remain within the fixed 3,901-line ceiling. | ✓ VERIFIED | `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` passed at 3,901/3,901. |
 | 7 | The measured metadata-only Nightly shortcut is explicitly deferred. | ✓ VERIFIED | Phase context D-12 and `.planning/todos/pending/051-nightly-pr-job-routing.md` record the measured line-budget reason and retain full Nightly routing. |
-| 8 | Full Nightly fallback, existing cases and required lanes remain in effect. | ✓ VERIFIED | `.github/workflows/nightly.yml` retains the full route; `tests/cmake/workflows.cmake` checks route and campaign wiring. Actual hosted Nightly execution remains unknown. |
-| 9 | ECM-01 and CCD-01 stay open until phase product evidence is complete. | ✓ VERIFIED | At verification time, both requirement rows were unchecked while local and hosted evidence were separated. The subsequent Phase 11 completion transition marked both complete from the local acceptance evidence; hosted Main/Nightly/Release gates remain unknown until ship. |
+| 8 | Full Nightly fallback, existing cases and required lanes remain in effect. | ✓ VERIFIED | `.github/workflows/nightly.yml` retains the full route; `tests/cmake/workflows.cmake` checks route and campaign wiring. Nightly run 45442543657 passed on the released Phase 14 code descendant. |
+| 9 | ECM-01 and CCD-01 stay open until phase product evidence is complete. | ✓ VERIFIED | Both requirements are complete after Phase 11 acceptance and release. Later descendant Main CI, Nightly and Release checks passed; the feature ledger preserves its original phase-time hosted fields. |
 | 10 | Aligned literal ECM returns identical source sectors on forward, repeated, reverse and random reads. | ✓ VERIFIED | `tests/disc/ecm.c` compares decoded bytes to source across access orders; `host/disc_ecm.c` resolves reads through indexed checkpoints. Full CI passed. |
 | 11 | Each ECM open validates encoded extent, decoded count, terminator and output EDC. | ✓ VERIFIED | `schway__disc_ecm_validate` checks all four before `schway__disc_ecm_open` returns a reader; malformed EDC, terminator and truncation cases are registered. |
 | 12 | ECM reader memory and random-read work are bounded independently of total image size. | ✓ VERIFIED | 1 GiB source/output limits, bounded checkpoint allocation and read-forward limits are enforced in `host/disc_ecm.c`; metric assertions are in `tests/disc/ecm.c` and `tests/fuzz/ecm.c`. |
@@ -212,8 +212,10 @@ At the prior verification point, the source was commit `32fc115`; that report's 
 | Nightly fuzz closure | Fresh task-scoped fuzz configure/build of `schwaystation-test-disc-legacy` and ECM/CCD replay targets; exact four closure CTests | Build exit 0; CTests 4/4 passed | ✓ PASS |
 | Workflow routing preflight | `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` | Exit 0; now requires the legacy test executable before closure CTests | ✓ PASS |
 | Repository-check budget | `cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` | Exit 0 | ✓ PASS |
-| Changed-head workflow/diff preflight | `git diff --check`; `ctest --test-dir build/ci --no-tests=error -R '^docs[.]budgets$'` | Parent-reported exit 0 for both; README and libretro docs retain the limited-compatibility caveat | ✓ PASS |
+| Changed-head workflow/diff preflight | `git diff --check`; `ctest --test-dir build/ci --no-tests=error -R '^docs[.]budgets$'` | Exit 0; README and libretro docs retain the limited-compatibility caveat | ✓ PASS |
 | Nightly route dry-run | `act schedule --dryrun` with the fuzz job selected | Exit 0; route included fixture build, closure and campaign steps; mapped to Ubuntu 24.04/arm64, dry-run only | ℹ️ Routing evidence only |
+| Final released descendant Main CI | [Run 45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354) | Success on `f08fc08d40a1ebcb42708e0a31be3111e3eed711`; Phase 11 code and registered tests are included | ✓ PASS |
+| Nightly and Release workflows | [Nightly 45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657); [Release 45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) | Both succeeded; Nightly ran on `75beb849f4b9e8a9a3bd023cc5c80632e4c74d56`, and Release on `f08fc08d40a1ebcb42708e0a31be3111e3eed711` | ✓ PASS |
 
 ### Final local Phase 11 ship follow-up (2026-11-22)
 
@@ -230,6 +232,10 @@ The reviewed follow-up changes passed the final local workflow. The complete run
 
 The CI efficiency correction measures `schwaystation-run` before building the complete WASI portable-test target set. A failed size bound therefore avoids unrelated test-target compilation; when the bound passes, the complete build and portable suite still run. The prior failed run had built 331 Ninja actions before discovering the stale size bound, so this change moves the comparison earlier without removing coverage. The 906,778-byte module measurement came from the exact hosted producer job in [run 45073362654](https://github.com/szTheory/schwaystation/actions/runs/45073362654/job/137365283519).
 
+### Test Quality Audit
+
+The requirement-linked ECM/CCD tests have no disabled cases. Their value assertions compare decoded sectors and reader output against independently generated raw inputs; the SUB path also has a literal known-answer transpose vector. The fixture generators write deterministic source-derived media and do not invoke the production readers. Final descendant Main CI and Nightly runs passed the registered test and replay lanes.
+
 ## Probe Execution
 
 No phase-declared `probe-*.sh` was found in the Phase 11 plans/summaries. No separate probe was required beyond the registered CTest/fuzz replay checks.
@@ -238,10 +244,10 @@ No phase-declared `probe-*.sh` was found in the Phase 11 plans/summaries. No sep
 
 | Requirement | Source | Description | Status | Evidence |
 |---|---|---|---|---|
-| ECM-01 | Phase 11 plans 03, 05, 07, 08, 10, 11 | Bounded ECM decoding, preserved sectors and pre-guest source/count checks | ✓ SATISFIED | ECM source validation/read tests, source parity, runner/libretro integration and full CI pass. Hosted gates are a separate ship-time check. |
-| CCD-01 | Phase 11 plans 04, 06, 07, 08, 10, 11, 13 | CCD/IMG/SUB subset, exact TOC/subcode/boundary behavior, confined companion paths | ✓ SATISFIED | CCD metadata, path, SUB and integration tests; full CI pass. Hosted gates are a separate ship-time check. |
+| ECM-01 | Phase 11 plans 03, 05, 07, 08, 10, 11 | Bounded ECM decoding, preserved sectors and pre-guest source/count checks | ✓ SATISFIED | ECM source validation/read tests, source parity, runner/libretro integration, Nightly and released-descendant Main CI passed. |
+| CCD-01 | Phase 11 plans 04, 06, 07, 08, 10, 11, 13 | CCD/IMG/SUB subset, exact TOC/subcode/boundary behavior, confined companion paths | ✓ SATISFIED | CCD metadata, path, SUB and integration tests, Nightly and released-descendant Main CI passed. |
 
-No Phase 11 requirement is orphaned. ECM-01 and CCD-01 are marked complete after local implementation evidence and verification. Hosted Main/Nightly/Release evidence remains pending successful post-fix runs.
+No Phase 11 requirement is orphaned. ECM-01 and CCD-01 are marked complete after local implementation evidence and verification; later descendant Main, Nightly and Release runs are green.
 
 ## Anti-Patterns Found
 
@@ -253,19 +259,17 @@ No Phase 11 requirement is orphaned. ECM-01 and CCD-01 are marked complete after
 
 No unreferenced `TBD`, `FIXME` or `XXX` markers were found in changed implementation files. No blocker anti-pattern was found.
 
-## Hosted Evidence and Next Action
+## Hosted Evidence
 
-Hosted post-fix Main, Nightly and Release results are **unknown**. The initial PR CI run at pre-fix head [`45070735988`](https://github.com/szTheory/schwaystation/actions/runs/45070735988) failed in ASan and Linux x64/arm64 because strict C17 hid the `symlink()` declaration; other matrix jobs were cancelled. The initial Nightly run at that pre-fix head [`45070735998`](https://github.com/szTheory/schwaystation/actions/runs/45070735998) passed four benchmark jobs and the full-vector job, then failed during ECM/CCD fixture closure because `schwaystation-test-disc-legacy` had not been built. Neither run establishes post-fix status. The follow-up source review found no new issue in either fix.
+The original Phase 11 PR attempts at pre-fix head [`45070735988`](https://github.com/szTheory/schwaystation/actions/runs/45070735988) and Nightly [`45070735998`](https://github.com/szTheory/schwaystation/actions/runs/45070735998) exposed the strict-C17 `symlink()` declaration and missing legacy-test target. Those defects were fixed and reviewed. The current Phase 11 implementation is contained in later released descendants: Nightly [45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657) succeeded on `75beb849f4b9e8a9a3bd023cc5c80632e4c74d56`; post-merge Main CI [45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354) and Release [45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) succeeded on `f08fc08d40a1ebcb42708e0a31be3111e3eed711`. Both descendants include the ECM/CCD providers, fixture generators, consumers and registered tests.
 
-The local full `cmake --workflow --preset ci` passed 670/670 tests and separate Release checks passed 7/7 after the Nightly target fix but immediately before the POSIX feature macro. After the macro, the targeted CCD selector passed 3/3, GCC 15.3 compiled the test with hosted strict-C17 warning/error flags, and fresh fuzz configure/build plus all four closure CTests passed. The `disc_registration` preflight and line budget passed. The Act route reached the fuzz closure but used an Ubuntu 24.04/arm64 dry-run mapping; it does not establish hosted Ubuntu 26.04 behavior. The parent also reports `git diff --check` and the docs budget test passed for current README/libretro documentation edits. The feature ledger correctly keeps Main, Nightly and Release unknown until a post-fix hosted run exists.
-
-The next action is to run or confirm required Main/Nightly/Release checks on the fixed PR head, then finish the authorized ship/merge/release path only after they are green. Do not treat the pre-fix failures, local checks or Act dry-run as hosted passes. No owner hardware or manual UAT is required.
+The feature ledger keeps its hosted fields as `unknown` because they describe the recorded Phase 11 provider-specific evidence; the later green workflow runs are recorded here without rewriting that historical row. No owner hardware or manual UAT is required.
 
 ## Gaps Summary
 
-The Phase 11 code goal remains achieved and all 45 deduplicated roadmap/plan truths are verified. The two post-verification CI defects are fixed and covered by local regression checks; no current implementation gap or human-verification item remains. Hosted post-fix checks are unknown and must run before ship completion.
+The Phase 11 code goal remains achieved and all 45 deduplicated roadmap/plan truths are verified. The stale fingerprint was refreshed after checking the current consumers and CI wiring; the original two CI defects remain fixed and covered by regressions. No current implementation gap or human-verification item remains, and the final released descendant Main, Nightly and Release checks are green.
 
 ---
 
-_Verified: 2026-11-22T21:35:32Z_
+_Verified: 2026-11-25T02:03:04Z_
 _Verifier: the agent (gsd-verifier)_

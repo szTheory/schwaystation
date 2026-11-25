@@ -186,7 +186,30 @@ The workspace sandbox denied the required GSD plan-ledger write inside `.git`. T
 
 ## Next Phase Readiness
 
-The implementation handoff is ready for the parent orchestrator's source review. After review, run the one required aggregate local workflow and the hosted gates on the final reviewed head.
+At this plan's original closeout, source review and final-head hosted gates were still pending. The reviewed implementation, final hosted evidence and release are recorded in the Phase 14 closeout below.
+
+## Final hosted evidence and CI efficiency review
+
+The corrected final-head Main CI run [45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076) passed on
+`75beb849f4b9e8a9a3bd023cc5c80632e4c74d56` in 3,943 seconds (65m43s). Its BE32 job took 64m09s; 657 tests passed,
+including the exact 947,969-byte WASI metric, six platform build legs, ASan, RetroArch, and cross-platform hash comparison.
+The serial `libretro.input.movies` test took 1,106.63 seconds after the other 656 tests completed. Nightly
+[45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657) passed in 814 seconds (13m34s); its
+fuzz job took 802 seconds, including 672 seconds for the eleven bounded campaigns. Both timing APIs reported zero
+billable milliseconds, so no dollar savings are inferred.
+
+The only measured coverage-preserving critical-path candidate is to isolate the movie test in a second required BE32
+job while retaining every other test in the current job. The estimate is about 18 minutes saved, with roughly 115 seconds
+of repeated setup/build; implementation also needs a private build/fixture workspace, disjoint shard inventory and exact
+JUnit-union validation, while preserving the BE32 hash artifact contract. Phase 14 research explicitly excludes workflow
+wiring changes, so this is recorded as pending todo 052 for Phase 15. No checks or quality bounds were removed.
+
+PR #42 merged as `1256732fe7d6d75166a54bbdefa07ab78e667774`; its post-merge Main CI
+[45454749260](https://github.com/szTheory/schwaystation/actions/runs/45454749260) and Release
+[45454749282](https://github.com/szTheory/schwaystation/actions/runs/45454749282) passed. Release PR #43 merged as
+`f08fc08d40a1ebcb42708e0a31be3111e3eed711`; its Main CI [45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354)
+and Release [45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) passed, and v0.14.0 was
+published. No Docker resources were created for this closeout.
 
 ## Self-Check: PASSED
 

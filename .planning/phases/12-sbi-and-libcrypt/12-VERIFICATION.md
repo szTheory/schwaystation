@@ -1,6 +1,6 @@
 ---
 phase: 12-sbi-and-libcrypt
-verified: 2026-11-23T08:38:26Z
+verified: 2026-11-25T02:03:50Z
 status: passed
 score: 2/2 truths verified
 covered_files:
@@ -45,7 +45,7 @@ covered_files:
   - tests/fuzz/seeds.h
   - tests/fuzz/tests.cmake
   - tests/libretro/tests.cmake
-covered_digest: "v4:sha256:6d51059c88cb41257c3f1e5c4283fde7718d605c10e5637243b02f0a571afd2f"
+covered_digest: "v4:sha256:5d1543a1213ce24b92be0ce61950c4522ea8bfb7ca2244595a416d37514f645a"
 behavior_unverified: 0
 overrides_applied: 0
 decision_coverage:
@@ -57,7 +57,7 @@ decision_coverage:
 # Phase 12: SBI and LibCrypt Verification Report
 
 **Phase goal:** With a matching SBI sidecar, supported protected discs receive the required subchannel responses.
-**Verified:** 2026-11-23T08:38:26Z
+**Verified:** 2026-11-25T02:03:50Z
 **Status:** passed
 **Score:** 2/2 roadmap truths verified
 
@@ -92,7 +92,7 @@ decision_coverage:
 | `tests/fuzz/tests.cmake` | `tests/fuzz/sbi.c` / production parser | VERIFIED | Replay and fuzz targets link the parser library; CTest includes the portable replay, and Nightly runs the mutation target. |
 | Runner PCM capture | Batch/single callback comparisons | VERIFIED | The same checked PCM file is supplied to both host cases for each of NTSC-J, NTSC-U and PAL. |
 
-The generic key-link checker could not resolve several prose endpoints and the inventory's indirect include. Those links were manually traced through the CMake registration helper and the production call paths above; no wiring gap remains.
+The generic key-link checker could not resolve several prose endpoints and the inventory's indirect include. Those links were manually traced through the CMake registration helper and the production call paths above; no wiring gap remains. The stale fingerprint came from successor-phase edits to the compatibility ledger, disc fixture wiring, and libretro test wiring. The SBI ledger row still contains only the three evaluated predicates, the SBI selectors remain active, and the successor edits add no SBI behavior claim or weaken either goal criterion.
 
 ## Local Verification Evidence
 
@@ -103,9 +103,9 @@ The generic key-link checker could not resolve several prose endpoints and the i
 | `cmake -DCASE=disc_registration -DROOT=. -P tests/cmake/workflows.cmake` | Exit 0; hosted selector/inventory wiring is connected. |
 | `cmake --workflow --preset ci` | Exit 0; full CTest run passed 674/674 tests, followed by 8/8 Release checks. This was the single full workflow run for this verification. |
 
-The local workflow took about 3m36s by the accumulated command-session wait time. `libretro.input.movies` took 49.84s versus the prior 25.94s local sample in Phase 10 (about 1.9×). This is one unrelated full-suite sample and does not justify a timeout or workflow change. The Plan 12-07 `libretro.host` optimization reduced runner captures from six to three while preserving all six comparisons; no end-to-end speedup is claimed without comparable hosted timing.
+The local workflow took about 3m36s by the accumulated command-session wait time. `libretro.input.movies` took 49.84s versus the prior 25.94s local sample in Phase 10 (about 1.9×). This is one unrelated full-suite sample and does not justify a timeout or workflow change. The Plan 12-07 `libretro.host` optimization reduced runner captures from six to three while preserving all six comparisons; no end-to-end speedup is claimed without comparable hosted timing. This was the single full workflow run for the original Phase 12 verification.
 
-The Apple Clang host lacks `libclang_rt.fuzzer_osx.a`, so no local mutation campaign was run. The hosted Ubuntu Nightly mutation campaign passed in [run 45149805901](https://github.com/szTheory/schwaystation/actions/runs/45149805901) on source head `c72ebae`; it is being rerun on the final ship head. The first Main CI attempt on that source head, [run 45149805712](https://github.com/szTheory/schwaystation/actions/runs/45149805712/job/137608141424), ended cancelled after 5m15 while its media setup step spent 4m58 installing the pinned encoder's FFmpeg development dependencies. This was a producer timeout, before platform builds; its provisional allowance was raised to 10 minutes, and the final ship head's Main CI remains required before merge.
+The Apple Clang host lacks `libclang_rt.fuzzer_osx.a`, so no local mutation campaign was run. At the Phase 12 ship, the hosted Ubuntu Nightly mutation campaign passed in [run 45149805901](https://github.com/szTheory/schwaystation/actions/runs/45149805901) on source head `c72ebae`. Its contemporaneous Main CI setup timeout was resolved before the Phase 12 release; those runs are historical evidence, not pending gates.
 
 ### Post-verification integration checks (2026-11-23)
 
@@ -116,7 +116,11 @@ The Apple Clang host lacks `libclang_rt.fuzzer_osx.a`, so no local mutation camp
 | `ctest --test-dir build/ci -R '^ci.classify_policy$' --output-on-failure` | Exit 0; 1/1 route-policy tests passed, including Main-only routing for metadata and example changes. |
 | `cmake -DMODE=timeouts -DDIR=.github/workflows -P tests/cmake/workflows.cmake && cmake -DMODE=pins -DDIR=.github/workflows -P tests/cmake/workflows.cmake && cmake -DROOT=. '-DPATTERNS=scripts/*.sh;tests/cmake/*.cmake;.githooks/*' -DLIMIT=3901 -P tests/cmake/line_budget.cmake` | Exit 0; all 26 timeout annotations and 61 action pins passed; tooling remains at 3,901/3,901 lines. |
 
-No Docker resources were created.
+No Docker resources were created during the Phase 12 checks.
+
+### Current shipped-source verification (2026-11-25)
+
+The current release is `f08fc08d40a1ebcb42708e0a31be3111e3eed711`; the worktree contains no source, test, or workflow edits. The complete Phase 14 Main CI run [45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076) passed all required jobs, including BE32, with 657 tests on `75beb849f4b9e8a9a3bd023cc5c80632e4c74d56`. Nightly [45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657) passed on the same test head. The tested head and current release differ only in Release Please metadata (`.release-please-manifest.json`, `CHANGELOG.md`, and `version.txt`), so the SBI parser, disc/CD-ROM paths, and current CTest wiring are covered by the green full-suite result. Final Main CI [45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354) and Release [45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) passed on the exact current release SHA. `gh run view` confirmed conclusions and head SHAs (exit 0). No suite was rerun for this stale-fingerprint refresh.
 
 ## Test Quality Audit
 

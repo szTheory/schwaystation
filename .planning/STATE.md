@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: Not started
+current_plan: Phase 15 planning
 status: planning
-stopped_at: Phase 14 x86_64 tests-enabled WASI producer confirmed 947969; corrected pin and final hosted run pending
-last_updated: "2026-11-24T16:53:54Z"
+stopped_at: Phase 15 discussion committed; plan-phase is next
+last_updated: "2026-11-25T02:55:32Z"
 last_activity: 2026-11-24
-last_activity_desc: Phase 14 matched x86_64 tests-enabled WASI producer at 947969; correcting the pin after the earlier arm64 tests-off mismatch
-state_head: 2ab13f4e0d44f1ddb4fd9c31f7ddb2804c19b074
+last_activity_desc: Phase 15 discussion completed after role fan-out and adversarial synthesis
+state_head: 073013a2fb30649c0a43a9384613f7fa743a0651
 progress:
   total_phases: 10
   completed_phases: 8
@@ -26,16 +26,74 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-19)
 
 **Core value:** PlayStation games behave as they do on the console, identically on every platform, from a small MIT-licensed C library that any host can embed.
-**Current focus:** Phase 14 — the matching x86_64 tests-enabled WASI producer measures 947,969 bytes; PR #42 needs this pin, Main CI and release before Phase 15
+**Current focus:** Phase 15 — plan GunCon and Justifier. Phase 14 shipped as v0.14.0 after final-head Main CI, Nightly, post-merge Main CI and Release CI passed.
 
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: Not started
+Current Plan: Phase 15 planning
 Total Plans in Phase: Not planned
-Status: Ready to plan
-Last activity: 2026-11-24 — the tests-enabled x86_64 WASI producer matched CI at 947,969 bytes; update the bound before final hosted retry
-Progress: [████████░░] 80% (7/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Its final PR head still needs green Main CI and release before Phase 15; Phase 7–11 verification digest reconciliation remains pending.)
+Status: Planning
+Last activity: 2026-11-24 — Phase 15 discussion committed; Phase 14 remains the latest released phase
+Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 and 16 remain. Refreshed Phase 7–14 verification reports all pass; retain TODO051 as unverified PBP-only routing for milestone audit.)
+
+### Phase 15 discussion (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; primary session model ID unavailable. Three read-only role reports covered
+domain behavior, GPU/SIO/API architecture, libretro integration, input robustness, and CI/devops. The adversarial
+pass resolved their topology difference: Phase 15 promises direct-port guns only; multitap gun and shared
+multi-Justifier behavior remain unclaimed. The additive API v10 recommendation preserves the 228-byte v9 prefix
+and 24-byte nested controller stride. LIGHTGUN is the complete host path; POINTER is a documented subset; missing
+capability is invalid input and cannot produce a hit. The beam event samples the aimed pixel at integer GPU time.
+The brightness threshold is an explicit emulator model because the cited T2 source has no calibrated number.
+No code changed and no tests ran during discussion.
+
+Context and discussion log were preflighted with `git diff --check` (exit 0) and committed as `63a37af`.
+Before expensive phase checks, verify ABI offsets, sorted inventories, selectors and budgets; run focused API,
+SIO, beam and libretro tests before the required local and hosted gates. Use `act` only if workflow changes add
+coverage, review every hosted run's critical path and runner use, and keep todo 052 deferred until the controller
+plan is stable. No Docker resources were created. No owner hardware capture is planned.
+
+The emulator has synthetic fixture and host integration evidence, but no current evidence establishes a retail
+game as playable. Do not infer retail compatibility from this gun protocol work.
+
+### Phase 15 planning research (2026-11-24)
+
+Runtime/model: Codex/OpenGSD 1.23.0; `gsd-phase-researcher` gpt-6-luna xhigh; primary runtime model ID unavailable.
+The three-role discussion fan-out was already complete, so the researcher converted that synthesis into
+`15-RESEARCH.md` and checked only the current implementation seams. Timed waits for its return totaled at least
+14 minutes; active work was not measured. No tests or source changes were made. The planning inputs
+passed `git diff --check`, and GSD reports both `has_context` and `has_research` true. Research commit: `073013a`.
+
+The research identified two plan risks to resolve against code: whether the aimed-pixel sample must read live
+RGB555 VRAM or reconstructed RGB24 output, and how to synchronize Timer 0/1 at the exact Justifier beam time
+before IRQ10. Keep the threshold numeric decision to the implementation after those representations are fixed.
+
+### Phase 14 final hosted verification and release (2026-11-24)
+
+Runtime/model: Codex; primary session model ID unavailable. The corrected exact-head Main CI run
+[45442543076](https://github.com/szTheory/schwaystation/actions/runs/45442543076) passed on `75beb849f4b9e8a9a3bd023cc5c80632e4c74d56`
+in 3,943 seconds (65m43s); its BE32 job passed in 64m09s, including the exact 947,969-byte WASI gate, portable tests,
+all six build legs, ASan, RetroArch, and the cross-platform hash comparison. Nightly
+[45442543657](https://github.com/szTheory/schwaystation/actions/runs/45442543657) passed in 814 seconds (13m34s); its
+fuzz job took 802 seconds and the 11 bounded campaigns took 672 seconds. Both timing endpoints reported zero billable
+milliseconds, so no dollar savings are inferred.
+
+The final-hosted-run review found the BE32 CTest lane was the Main critical path. It ran 657 tests in 3,709.53 seconds;
+`libretro.input.movies` was explicitly `RUN_SERIAL` and took 1,106.63 seconds after the other 656 tests completed. A
+dedicated movie-test shard could save about 18 minutes while retaining every case, but needs isolated fixture setup,
+disjoint shard inventories, and an exact JUnit-union check. Phase 14 research excludes workflow wiring, so this is
+recorded as todo 052 bound to Phase 15. The Nightly fuzz job is dominated by its 11 required 60-second campaigns;
+parallelizing them might reduce wall time, but the evidence does not show preserved per-target throughput or a cost
+reduction. Existing cheap preflight and CTest auto-parallelism remain; no quality or coverage was reduced.
+
+PR #42 merged as `1256732fe7d6d75166a54bbdefa07ab78e667774`. Post-merge Main CI
+[45454749260](https://github.com/szTheory/schwaystation/actions/runs/45454749260) and Release
+[45454749282](https://github.com/szTheory/schwaystation/actions/runs/45454749282) passed. Release PR #43 merged as
+`f08fc08d40a1ebcb42708e0a31be3111e3eed711`; its Main CI
+[45455115354](https://github.com/szTheory/schwaystation/actions/runs/45455115354) and Release
+[45455115400](https://github.com/szTheory/schwaystation/actions/runs/45455115400) passed, and v0.14.0 was published.
+No Docker resources were created during this final verification attempt.
 
 ### Phase 14 verification closeout (2026-11-24)
 
