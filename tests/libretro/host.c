@@ -265,6 +265,7 @@ static unsigned multitap_invalid_player_visits;
 static int special_input_mode;
 static int16_t special_mouse_x, special_mouse_y;
 static int16_t special_lightgun_x, special_lightgun_y;
+static int16_t special_pointer_x, special_pointer_y;
 static int16_t special_axes[2][2];
 static uint32_t special_buttons;
 static unsigned special_queries[8][8][3][17];
@@ -812,6 +813,11 @@ static int16_t RETRO_CALLCONV input(unsigned port, unsigned device, unsigned ind
         if (device == RETRO_DEVICE_LIGHTGUN && index == 0u) {
             if (id == RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X) return special_lightgun_x;
             if (id == RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y) return special_lightgun_y;
+            if (id < 32u) return (special_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
+        }
+        if (device == RETRO_DEVICE_POINTER && index == 0u) {
+            if (id == RETRO_DEVICE_ID_POINTER_X) return special_pointer_x;
+            if (id == RETRO_DEVICE_ID_POINTER_Y) return special_pointer_y;
             if (id < 32u) return (special_buttons & (UINT32_C(1) << id)) != 0u ? 1 : 0;
         }
         if (device == RETRO_DEVICE_ANALOG && index < 2u && id < 2u) {
@@ -2066,6 +2072,133 @@ static int test_input_lightgun(void)
     module_close();
     special_input_mode = 0;
     special_buttons = 0u;
+    return check_failures != 0 ? 1 : 0;
+}
+
+static int test_input_pointer(void)
+{
+    const unsigned justifier = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 2);
+    const uint32_t pressed = UINT32_C(1) << RETRO_DEVICE_ID_POINTER_PRESSED;
+    const uint32_t offscreen = UINT32_C(1) << RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN;
+    const uint32_t valid_trigger = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    schway_gun_input snapshot;
+    unsigned armed = 0u, consumed = 0u, calls, polls;
+
+    special_input_mode = 1;
+    special_lightgun_x = 0;
+    special_lightgun_y = 0;
+    special_pointer_x = 0;
+    special_pointer_y = 0;
+    special_buttons = pressed;
+    input_capabilities_available = 1;
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_POINTER;
+    input_capabilities_calls = 0u;
+    CHECK(p_test_gun_input != NULL && p_test_gun_sensor != NULL &&
+          p_test_fill_gun_frame != NULL);
+    CHECK_EQ_U64(p_load_game(NULL), 1u);
+    p_set_controller_port_device(0u, RETRO_DEVICE_LIGHTGUN);
+    p_set_controller_port_device(1u, justifier);
+
+    /* Pointer-only frontends provide a pressed center shot on both direct ports. */
+    clear_special_queries();
+    polls = input_poll_calls;
+    calls = input_capabilities_calls;
+    run_one();
+    CHECK_EQ_U64(input_poll_calls, polls + 1u);
+    CHECK_EQ_U64(input_capabilities_calls, calls + 1u);
+    for (unsigned port = 0u; port < 2u; port++) {
+        expect_special_query(port, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 1u);
+        expect_special_query(port, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_Y, 1u);
+        expect_special_query(port, RETRO_DEVICE_POINTER, 0u,
+                             RETRO_DEVICE_ID_POINTER_PRESSED, 1u);
+        expect_special_query(port, RETRO_DEVICE_POINTER, 0u,
+                             RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN, 1u);
+        expect_special_query(port, RETRO_DEVICE_LIGHTGUN, 0u,
+                             RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X, 0u);
+    }
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+    CHECK_EQ_U64(p_test_gun_input(1u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+
+    /* The real frame path samples the bright display for the center pointer shot. */
+    CHECK_EQ_U64(p_test_fill_gun_frame(), 1u);
+    calls = input_capabilities_calls;
+    run_one();
+    CHECK_EQ_U64(input_capabilities_calls, calls + 1u);
+    CHECK_EQ_U64(p_test_gun_sensor(0u, &armed, &consumed), 1u);
+    CHECK_EQ_U64(consumed, 1u);
+    expect_gun_reply(0u, 0x63u, 0x9FF7u, 6u);
+    expect_gun_reply(1u, 0x31u, 0x3FF7u, 2u);
+
+    /* LIGHTGUN takes precedence when both device types are advertised. */
+    input_capabilities |= UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
+    special_lightgun_x = INT16_MAX;
+    special_lightgun_y = INT16_MIN;
+    special_pointer_x = (int16_t)-0x7FFF;
+    special_pointer_y = (int16_t)-0x7FFF;
+    clear_special_queries();
+    run_one();
+    expect_special_query(0u, RETRO_DEVICE_LIGHTGUN, 0u,
+                         RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X, 1u);
+    expect_special_query(0u, RETRO_DEVICE_POINTER, 0u, RETRO_DEVICE_ID_POINTER_X, 0u);
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 319u);
+    CHECK_EQ_U64(snapshot.y, 0u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+
+    /* Pointer's documented signed endpoints map to the active image corners. */
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_POINTER;
+    special_pointer_x = (int16_t)-0x7FFF;
+    special_pointer_y = (int16_t)-0x7FFF;
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 0u);
+    CHECK_EQ_U64(snapshot.y, 0u);
+    special_pointer_x = 0x7FFF;
+    special_pointer_y = 0x7FFF;
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 319u);
+    CHECK_EQ_U64(snapshot.y, 239u);
+
+    /* Offscreen invalidates aim; a released pointer keeps center aim without trigger. */
+    special_pointer_x = 0;
+    special_pointer_y = 0;
+    special_buttons = pressed | offscreen;
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, SCHWAY_GUN_INPUT_TRIGGER | SCHWAY_GUN_INPUT_OFFSCREEN);
+    special_buttons = 0u;
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_U64(snapshot.x, 160u);
+    CHECK_EQ_U64(snapshot.y, 120u);
+    CHECK_EQ_HEX(snapshot.flags, SCHWAY_GUN_INPUT_VALID);
+    expect_gun_reply(1u, 0x31u, 0xBFF7u, 2u);
+
+    /* Neither advertised class is unsupported; restoring POINTER restores input. */
+    input_capabilities = 0u;
+    special_buttons = pressed;
+    run_one();
+    expect_gun_unavailable(0u);
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_POINTER;
+    run_one();
+    CHECK_EQ_U64(p_test_gun_input(0u, &snapshot), 1u);
+    CHECK_EQ_HEX(snapshot.flags, valid_trigger);
+
+    p_unload_game();
+    p_deinit();
+    module_close();
+    special_input_mode = 0;
+    special_buttons = 0u;
+    input_capabilities = UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
     return check_failures != 0 ? 1 : 0;
 }
 
@@ -6204,6 +6337,7 @@ int main(int argc, char **argv)
     int input_multitap_mode = argc == 3 && strcmp(argv[2], "input-multitap") == 0;
     int input_special_mode = argc == 3 && strcmp(argv[2], "input-special") == 0;
     int input_lightgun_mode = argc == 3 && strcmp(argv[2], "input-lightgun") == 0;
+    int input_pointer_mode = argc == 3 && strcmp(argv[2], "input-pointer") == 0;
     int input_gun_unavailable_mode = argc == 3 && strcmp(argv[2], "input-gun-unavailable") == 0;
     int video_geometry_mode = argc == 4 && strcmp(argv[2], "video-geometry") == 0;
     int video_edges_mode = argc == 4 && strcmp(argv[2], "video-geometry-edges") == 0;
@@ -6219,7 +6353,8 @@ int main(int argc, char **argv)
     int rumble_controls_mode = argc == 4 && strcmp(argv[2], "rumble-controls") == 0;
 
     if ((!audio_mode && !disc_audio_mode && !content_mode && !disc_control_mode && !content_chd_mode && !content_pbp_mode && !content_legacy_mode && !psexe_mode && !content_profile_mode && !content_boot_mode && !options_profile_mode && !input_descriptors_mode && !input_multitap_mode &&
-         !input_special_mode && !input_lightgun_mode && !input_gun_unavailable_mode &&
+         !input_special_mode && !input_lightgun_mode && !input_pointer_mode &&
+         !input_gun_unavailable_mode &&
          !video_geometry_mode &&
          !video_edges_mode && !input_movies_mode &&
          !input_controls_mode && !lifecycle_mode && !card_persistence_mode &&
@@ -6297,7 +6432,8 @@ int main(int argc, char **argv)
     /* Every entry point, before anything else is called. */
     int inspect_card2 = disc_control_mode || content_chd_mode || content_pbp_mode ||
                         card_persistence_mode || input_multitap_mode || input_special_mode ||
-                        input_lightgun_mode || input_gun_unavailable_mode || cards_multitap_mode;
+                        input_lightgun_mode || input_pointer_mode || input_gun_unavailable_mode ||
+                        cards_multitap_mode;
     resolve_all(inspect_card2);
     if (missing != NULL) {
         fprintf(stderr, "missing entry point %s\n", missing);
@@ -6430,6 +6566,10 @@ int main(int argc, char **argv)
 
     if (input_lightgun_mode) {
         return test_input_lightgun();
+    }
+
+    if (input_pointer_mode) {
+        return test_input_pointer();
     }
 
     if (input_gun_unavailable_mode) {
