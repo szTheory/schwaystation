@@ -112,7 +112,7 @@ static uint64_t gun_tick_for_clocks(uint32_t region, uint64_t clocks)
     return ceil_div(clocks * UINT64_C(451584), rate);
 }
 
-static schway *make_gun_sample_instance(uint16_t pixel, uint32_t device)
+static schway *make_gun_sample_instance(uint16_t pixel, uint32_t device, uint32_t port)
 {
     schway *inst = make_instance(SCHWAY_REGION_NTSC_U, 0u);
     if (inst == NULL) {
@@ -130,12 +130,27 @@ static schway *make_gun_sample_instance(uint16_t pixel, uint32_t device)
     schway_input input;
     memset(&input, 0, sizeof input);
     input.size = (uint32_t)sizeof input;
-    input.device[0] = device;
-    input.guns[0].x = 1;
-    input.guns[0].y = 0;
-    input.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    input.device[port] = device;
+    input.guns[port].x = 1;
+    input.guns[port].y = 0;
+    input.guns[port].flags = SCHWAY_GUN_INPUT_VALID;
     gun_tap_check(schway_set_input(inst, &input) == SCHWAY_STATUS_OK,
                   "public gun input is accepted");
+    return inst;
+}
+
+static schway *make_justifier_irq_instance(uint16_t pixel, uint32_t port,
+                                            uint32_t flags, uint32_t enabled)
+{
+    schway *inst = make_gun_sample_instance(pixel, SCHWAY_INPUT_DEVICE_JUSTIFIER, port);
+    if (inst == NULL) {
+        return NULL;
+    }
+    schway__pad_frame_start(inst);
+    inst->pad.gun_input[port].x = 3;
+    inst->pad.gun_input[port].flags = flags;
+    inst->pad.gun_enabled[port] = enabled != 0u ? 1u : 0u;
+    inst->vram[0][3] = pixel;
     return inst;
 }
 
@@ -191,9 +206,9 @@ static void test_gun_sample(void)
 {
     gun_tap_checks = 0u;
     const uint64_t deadline = gun_tick_for_clocks(SCHWAY_REGION_NTSC_U, 8u);
-    schway *split = make_gun_sample_instance(0u, SCHWAY_INPUT_DEVICE_GUNCON);
-    schway *whole = make_gun_sample_instance(UINT16_C(0x7FFF), SCHWAY_INPUT_DEVICE_GUNCON);
-    schway *late = make_gun_sample_instance(0u, SCHWAY_INPUT_DEVICE_GUNCON);
+    schway *split = make_gun_sample_instance(0u, SCHWAY_INPUT_DEVICE_GUNCON, 0u);
+    schway *whole = make_gun_sample_instance(UINT16_C(0x7FFF), SCHWAY_INPUT_DEVICE_GUNCON, 0u);
+    schway *late = make_gun_sample_instance(0u, SCHWAY_INPUT_DEVICE_GUNCON, 0u);
     gun_tap_check(split != NULL && whole != NULL && late != NULL,
                   "GPU instances are created for beam timing controls");
     if (split == NULL || whole == NULL || late == NULL) {
@@ -234,17 +249,13 @@ static void test_gun_sample(void)
 static void test_gun_irq_order(void)
 {
     gun_tap_checks = 0u;
-    schway *inst = make_gun_sample_instance(UINT16_C(0x7FFF), SCHWAY_INPUT_DEVICE_JUSTIFIER);
+    schway *inst = make_justifier_irq_instance(0u, 0u, SCHWAY_GUN_INPUT_VALID, 0u);
     gun_tap_check(inst != NULL, "Justifier IRQ instance is created");
     if (inst == NULL) {
         printf("1..%u\n", gun_tap_checks);
         return;
     }
 
-    schway__pad_frame_start(inst);
-    inst->pad.gun_enabled[0] = 1u;
-    inst->pad.gun_input[0].x = 3;
-    inst->vram[0][3] = UINT16_C(0x7FFF);
     write_port(inst, TIMER0_TARGET, 100u);
     write_port(inst, TIMER0_MODE, 0x00000100u); /* Dot-clock counter, no IRQ. */
     write_port(inst, TIMER1_TARGET, 100u);
@@ -254,16 +265,124 @@ static void test_gun_irq_order(void)
     run_cycles(inst, deadline - 1u);
     uint32_t timer0_before = read_port(inst, TIMER0_COUNT) & 0xFFFFu;
     uint32_t timer1_before = read_port(inst, TIMER1_COUNT) & 0xFFFFu;
+    inst->vram[0][3] = UINT16_C(0x7FFF);
+    inst->pad.gun_enabled[0] = 1u;
     run_cycles(inst, 1u);
     uint32_t status = read_port(inst, I_STAT);
     uint32_t timer0_at_irq = read_port(inst, TIMER0_COUNT) & 0xFFFFu;
     uint32_t timer1_at_irq = read_port(inst, TIMER1_COUNT) & 0xFFFFu;
     gun_tap_check((status & (UINT32_C(1) << 10)) != 0u,
-                  "bright enabled Justifier sample raises IRQ10");
+                  "enable and pre-event VRAM write produce Justifier IRQ10 at the beam tick");
     gun_tap_check(timer0_at_irq == timer0_before + 1u && timer1_at_irq == timer1_before + 1u,
                   "Timer0 dots and Timer1 clocks are current when IRQ10 is observed");
     gun_tap_check(inst->gpu.gun_sensor[0].consumed != 0u,
                   "Justifier beam event is consumed once");
+
+    schway *port1 = make_justifier_irq_instance(UINT16_C(0x7FFF), 1u,
+                                                  SCHWAY_GUN_INPUT_VALID, 1u);
+    gun_tap_check(port1 != NULL, "port-one Justifier instance is created");
+    if (port1 != NULL) {
+        run_cycles(port1, deadline);
+        uint32_t port1_status = read_port(port1, I_STAT);
+        gun_tap_check((port1_status & (UINT32_C(1) << 10)) != 0u &&
+                          port1->gpu.gun_sensor[1].consumed != 0u &&
+                          port1->gpu.gun_sensor[0].consumed == 0u &&
+                          inst->gpu.gun_sensor[1].armed == 0u &&
+                          inst->gpu.gun_sensor[1].consumed == 0u,
+                      "port-one whole-budget event matches port-zero split event in isolation");
+        write_port(port1, I_STAT, ~(UINT32_C(1) << 10));
+        gun_tap_check((read_port(port1, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                          (read_port(inst, I_STAT) & (UINT32_C(1) << 10)) != 0u,
+                      "separate instance IRQ status remains independent");
+    }
+    schway_destroy(port1);
+
+    write_port(inst, I_STAT, ~(UINT32_C(1) << 10));
+    schway__gpu_sync(inst, inst->ticks);
+    gun_tap_check((read_port(inst, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                      inst->gpu.gun_sensor[0].consumed != 0u,
+                  "clearing IRQ10 does not replay the consumed beam event");
+    schway__pad_frame_end(inst);
+    schway_input next_input;
+    memset(&next_input, 0, sizeof next_input);
+    next_input.size = (uint32_t)sizeof next_input;
+    next_input.device[0] = SCHWAY_INPUT_DEVICE_JUSTIFIER;
+    next_input.guns[0].x = 3;
+    next_input.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    CHECK(schway_set_input(inst, &next_input) == SCHWAY_STATUS_OK);
+    schway__pad_frame_start(inst);
+    schway__gpu_sync(inst, inst->ticks);
+    gun_tap_check(inst->gpu.gun_sensor[0].armed != 0u &&
+                      inst->gpu.gun_sensor[0].deadline > inst->ticks,
+                  "a fresh frame input rearms the sensor for its next beam position");
+
+    schway *disabled = make_justifier_irq_instance(UINT16_C(0x7FFF), 0u,
+                                                     SCHWAY_GUN_INPUT_VALID, 1u);
+    gun_tap_check(disabled != NULL, "same-tick disable control instance is created");
+    if (disabled != NULL) {
+        run_cycles(disabled, deadline - 1u);
+        disabled->pad.gun_enabled[0] = 0u;
+        run_cycles(disabled, 1u);
+        gun_tap_check((read_port(disabled, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                          disabled->gpu.gun_sensor[0].consumed != 0u,
+                      "same-tick disable suppresses Justifier IRQ10");
+    }
+    schway_destroy(disabled);
+
+    schway *dark = make_justifier_irq_instance(0u, 0u, SCHWAY_GUN_INPUT_VALID, 1u);
+    gun_tap_check(dark != NULL, "dark sensor control instance is created");
+    if (dark != NULL) {
+        run_cycles(dark, deadline);
+        gun_tap_check((read_port(dark, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                          dark->gpu.gun_sensor[0].consumed != 0u,
+                      "dark Justifier sample does not raise IRQ10");
+    }
+    schway_destroy(dark);
+
+    schway *offscreen = make_justifier_irq_instance(
+        UINT16_C(0x7FFF), 0u, SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_OFFSCREEN, 1u);
+    gun_tap_check(offscreen != NULL, "offscreen sensor control instance is created");
+    if (offscreen != NULL) {
+        run_cycles(offscreen, deadline);
+        gun_tap_check((read_port(offscreen, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                          offscreen->gpu.gun_sensor[0].armed == 0u,
+                      "offscreen Justifier aim does not arm an IRQ sample");
+    }
+    schway_destroy(offscreen);
+
+    schway *reload = make_justifier_irq_instance(
+        UINT16_C(0x7FFF), 0u, SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_RELOAD, 1u);
+    gun_tap_check(reload != NULL, "reload sensor control instance is created");
+    if (reload != NULL) {
+        run_cycles(reload, deadline);
+        gun_tap_check((read_port(reload, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                          reload->gpu.gun_sensor[0].armed == 0u,
+                      "reload Justifier input does not arm an IRQ sample");
+    }
+    schway_destroy(reload);
+
+    schway *missing = make_justifier_irq_instance(UINT16_C(0x7FFF), 0u, 0u, 1u);
+    gun_tap_check(missing != NULL, "missing-input sensor control instance is created");
+    if (missing != NULL) {
+        run_cycles(missing, deadline);
+        gun_tap_check((read_port(missing, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                          missing->gpu.gun_sensor[0].armed == 0u,
+                      "Justifier without valid aim does not arm an IRQ sample");
+    }
+    schway_destroy(missing);
+
+    schway *late = make_justifier_irq_instance(UINT16_C(0x7FFF), 0u,
+                                                 SCHWAY_GUN_INPUT_VALID, 0u);
+    gun_tap_check(late != NULL, "late-enable control instance is created");
+    if (late != NULL) {
+        run_cycles(late, deadline);
+        late->pad.gun_enabled[0] = 1u;
+        schway__gpu_sync(late, late->ticks);
+        gun_tap_check((read_port(late, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                          late->gpu.gun_sensor[0].consumed != 0u,
+                      "late enable cannot replay a consumed sample");
+    }
+    schway_destroy(late);
 
     printf("1..%u\n", gun_tap_checks);
     schway_destroy(inst);

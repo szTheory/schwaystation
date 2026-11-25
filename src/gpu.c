@@ -240,6 +240,10 @@ static void gpu_gun_sample(schway *inst, uint32_t port)
         inst->pad.gun_result_x[port] = (uint16_t)x8;
         inst->pad.gun_result_y[port] = (uint16_t)sensor->target_line;
         inst->pad.gun_result_valid[port] = 1u;
+        if (inst->pad.device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER &&
+            inst->pad.gun_enabled[port] != 0u) {
+            schway__irq_raise(inst, 10u);
+        }
     }
     sensor->armed = 0u;
     sensor->consumed = 1u;

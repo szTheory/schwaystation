@@ -107,7 +107,12 @@ Reset or switching the attached device clears the enable state and any pending s
 button assignments follow the Justifier notes in
 `.planning/preparation/PSX-PERIPHERALS-AND-SAVES.md` §2.7, which summarizes PER.01. This model
 supports only direct physical ports and does not claim multitap selection or multi-Justifier
-wiring behavior.
+wiring behavior. PER.01 describes the sensor's IRQ10 signal and the game's Timer0/Timer1 reads in
+the interrupt handler. In this model, a bright sample from an enabled Justifier raises IRQ source
+10 at the modeled beam position. The GPU event synchronizes both counters to that position first,
+so an IRQ handler observes their shot-time values; see the beam and counter ordering in
+`gpu.md` and `timers.md`. Disabled, dark, offscreen, and reload samples do not raise IRQ10; a
+sample already consumed in a frame is not replayed if the enable bit changes later.
 
 ## Timing model
 
