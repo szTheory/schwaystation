@@ -2132,8 +2132,8 @@ static int test_input_pointer(void)
     CHECK_EQ_U64(input_capabilities_calls, calls + 1u);
     CHECK_EQ_U64(p_test_gun_sensor(0u, &armed, &consumed), 1u);
     CHECK_EQ_U64(consumed, 1u);
-    expect_gun_reply(0u, 0x63u, 0x9FF7u, 6u);
-    expect_gun_reply(1u, 0x31u, 0x3FF7u, 2u);
+    expect_gun_reply(0u, 0x63u, 0xDFFFu, 6u);
+    expect_gun_reply(1u, 0x31u, 0x7FFFu, 2u);
 
     /* LIGHTGUN takes precedence when both device types are advertised. */
     input_capabilities |= UINT64_C(1) << RETRO_DEVICE_LIGHTGUN;
@@ -2181,7 +2181,7 @@ static int test_input_pointer(void)
     CHECK_EQ_U64(snapshot.x, 160u);
     CHECK_EQ_U64(snapshot.y, 120u);
     CHECK_EQ_HEX(snapshot.flags, SCHWAY_GUN_INPUT_VALID);
-    expect_gun_reply(1u, 0x31u, 0xBFF7u, 2u);
+    expect_gun_reply(1u, 0x31u, 0xFFFFu, 2u);
 
     /* Neither advertised class is unsupported; restoring POINTER restores input. */
     input_capabilities = 0u;

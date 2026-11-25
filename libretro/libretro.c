@@ -56,6 +56,10 @@
 #define LR_DEVICE_NEGCON RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
 #define LR_DEVICE_JOGCON RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 3)
 #define LR_DEVICE_JUSTIFIER RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_LIGHTGUN, 2)
+#define LR_GUN_SOURCE_UNKNOWN 0u
+#define LR_GUN_SOURCE_LIGHTGUN 1u
+#define LR_GUN_SOURCE_POINTER 2u
+#define LR_GUN_SOURCE_UNSUPPORTED 3u
 #define LR_ANALOG_TOGGLE_FRAMES 60u
 #define LR_ANALOG_TOGGLE_BUTTONS                                                            \
     ((1u << RETRO_DEVICE_ID_JOYPAD_SELECT) | (1u << RETRO_DEVICE_ID_JOYPAD_START) |        \
@@ -791,24 +795,30 @@ static int lr_has_selected_gun(void)
     return 0;
 }
 
-static void lr_log_lightgun_support(int supported)
+static void lr_log_gun_support(unsigned source)
 {
-    uint8_t state = supported ? 1u : 2u;
+    uint8_t state = (uint8_t)source;
     if (lr_lightgun_support_state == state) {
         return;
     }
-    if (!supported || lr_lightgun_support_state == 2u) {
+    if (source == LR_GUN_SOURCE_UNSUPPORTED || source == LR_GUN_SOURCE_POINTER ||
+        (source == LR_GUN_SOURCE_LIGHTGUN &&
+         (lr_lightgun_support_state == LR_GUN_SOURCE_UNSUPPORTED ||
+          lr_lightgun_support_state == LR_GUN_SOURCE_POINTER))) {
         struct retro_log_callback callback;
         if (env_cb != NULL) {
             memset(&callback, 0, sizeof callback);
             if (env_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &callback) &&
                 callback.log != NULL) {
-                if (supported) {
+                if (source == LR_GUN_SOURCE_LIGHTGUN) {
                     callback.log(RETRO_LOG_INFO,
                                  "schwaystation: LIGHTGUN input is available again\n");
+                } else if (source == LR_GUN_SOURCE_POINTER) {
+                    callback.log(RETRO_LOG_INFO,
+                                 "schwaystation: using POINTER input fallback for lightguns\n");
                 } else {
                     callback.log(RETRO_LOG_WARN,
-                                 "schwaystation: LIGHTGUN input unsupported: frontend callback or device capability unavailable\n");
+                                 "schwaystation: LIGHTGUN input unsupported: frontend callback or LIGHTGUN/POINTER device capability unavailable\n");
                 }
             }
         }
@@ -817,21 +827,24 @@ static void lr_log_lightgun_support(int supported)
 }
 
 /* Called from retro_run once before the frame's input snapshot is queued. */
-static int lr_lightgun_host_available(void)
+static unsigned lr_gun_host_source(void)
 {
     uint64_t capabilities = 0u;
-    int supported = 0;
+    unsigned source = LR_GUN_SOURCE_UNSUPPORTED;
     if (!lr_has_selected_gun()) {
-        lr_lightgun_support_state = 0u;
-        return 0;
+        lr_lightgun_support_state = LR_GUN_SOURCE_UNKNOWN;
+        return LR_GUN_SOURCE_UNKNOWN;
     }
     if (input_state_cb != NULL && env_cb != NULL &&
-        env_cb(RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES, &capabilities) &&
-        (capabilities & (UINT64_C(1) << RETRO_DEVICE_LIGHTGUN)) != 0u) {
-        supported = 1;
+        env_cb(RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES, &capabilities)) {
+        if ((capabilities & (UINT64_C(1) << RETRO_DEVICE_LIGHTGUN)) != 0u) {
+            source = LR_GUN_SOURCE_LIGHTGUN;
+        } else if ((capabilities & (UINT64_C(1) << RETRO_DEVICE_POINTER)) != 0u) {
+            source = LR_GUN_SOURCE_POINTER;
+        }
     }
-    lr_log_lightgun_support(supported);
-    return supported;
+    lr_log_gun_support(source);
+    return source;
 }
 
 static int lr_lightgun_pixel(int16_t coordinate, unsigned extent, int32_t *pixel)
@@ -1237,7 +1250,7 @@ static uint8_t lr_pressure_from_axis(int16_t axis, int inverted)
 }
 
 /* RetroPad positions map to the active-low serial word used by the PSX pad. */
-static void lr_queue_input(int lightgun_supported)
+static void lr_queue_input(unsigned gun_source)
 {
     struct lr_button_mapping {
         unsigned id;
@@ -1303,16 +1316,29 @@ static void lr_queue_input(int lightgun_supported)
         }
 
         if (lr_is_gun_device(device)) {
-            if (lightgun_supported && input_state_cb != NULL) {
-                int16_t screen_x = input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
-                                                  RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X);
-                int16_t screen_y = input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
-                                                  RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y);
-                int trigger = input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
-                                             RETRO_DEVICE_ID_LIGHTGUN_TRIGGER) != 0;
-                int offscreen = input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
-                                               RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN) != 0;
-                int reload = input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
+            if (gun_source != LR_GUN_SOURCE_UNKNOWN &&
+                gun_source != LR_GUN_SOURCE_UNSUPPORTED && input_state_cb != NULL) {
+                unsigned input_device = gun_source == LR_GUN_SOURCE_POINTER
+                                            ? RETRO_DEVICE_POINTER
+                                            : RETRO_DEVICE_LIGHTGUN;
+                unsigned x_id = gun_source == LR_GUN_SOURCE_POINTER
+                                    ? RETRO_DEVICE_ID_POINTER_X
+                                    : RETRO_DEVICE_ID_LIGHTGUN_SCREEN_X;
+                unsigned y_id = gun_source == LR_GUN_SOURCE_POINTER
+                                    ? RETRO_DEVICE_ID_POINTER_Y
+                                    : RETRO_DEVICE_ID_LIGHTGUN_SCREEN_Y;
+                unsigned trigger_id = gun_source == LR_GUN_SOURCE_POINTER
+                                          ? RETRO_DEVICE_ID_POINTER_PRESSED
+                                          : RETRO_DEVICE_ID_LIGHTGUN_TRIGGER;
+                unsigned offscreen_id = gun_source == LR_GUN_SOURCE_POINTER
+                                            ? RETRO_DEVICE_ID_POINTER_IS_OFFSCREEN
+                                            : RETRO_DEVICE_ID_LIGHTGUN_IS_OFFSCREEN;
+                int16_t screen_x = input_state_cb(player, input_device, 0u, x_id);
+                int16_t screen_y = input_state_cb(player, input_device, 0u, y_id);
+                int trigger = input_state_cb(player, input_device, 0u, trigger_id) != 0;
+                int offscreen = input_state_cb(player, input_device, 0u, offscreen_id) != 0;
+                int reload = gun_source == LR_GUN_SOURCE_LIGHTGUN &&
+                             input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
                                             RETRO_DEVICE_ID_LIGHTGUN_RELOAD) != 0;
                 int32_t pixel_x = 0, pixel_y = 0;
                 unsigned width = geometry_width != 0u ? geometry_width : info.width;
@@ -1336,7 +1362,7 @@ static void lr_queue_input(int lightgun_supported)
                     flags |= SCHWAY_GUN_INPUT_RELOAD;
                 }
                 snapshot.guns[port].flags = flags;
-                if (device == RETRO_DEVICE_LIGHTGUN) {
+                if (gun_source == LR_GUN_SOURCE_LIGHTGUN && device == RETRO_DEVICE_LIGHTGUN) {
                     if (input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
                                        RETRO_DEVICE_ID_LIGHTGUN_AUX_A) != 0) {
                         controller->buttons |= 0x0008u;
@@ -1345,7 +1371,7 @@ static void lr_queue_input(int lightgun_supported)
                                        RETRO_DEVICE_ID_LIGHTGUN_AUX_B) != 0) {
                         controller->buttons |= 0x4000u;
                     }
-                } else {
+                } else if (gun_source == LR_GUN_SOURCE_LIGHTGUN) {
                     if (input_state_cb(player, RETRO_DEVICE_LIGHTGUN, 0u,
                                        RETRO_DEVICE_ID_LIGHTGUN_START) != 0) {
                         controller->buttons |= 0x0008u;
@@ -1907,7 +1933,7 @@ void retro_run(void)
 {
     schway_video video;
     schway_run_result result;
-    int lightgun_supported;
+    unsigned gun_source;
 
     if (input_poll_cb != NULL) {
         input_poll_cb();
@@ -1916,8 +1942,8 @@ void retro_run(void)
         return;
     }
     lr_check_options();
-    lightgun_supported = lr_lightgun_host_available();
-    lr_queue_input(lightgun_supported);
+    gun_source = lr_gun_host_source();
+    lr_queue_input(gun_source);
     memset(&result, 0, sizeof result);
     result.size = (uint32_t)sizeof result;
     if (schway_run_frame(inst, &result) != SCHWAY_STATUS_OK) {

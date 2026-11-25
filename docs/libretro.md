@@ -36,10 +36,11 @@ content is loaded or reloaded. Region selection does not establish title compati
 ## Controller input
 
 Supported controllers, including GunCon and Justifier mappings, are documented in [controllers](controllers.md).
-Lightguns require the frontend's `input_state` callback and its `LIGHTGUN` device-type capability. Libretro does
-not report support for individual controls, so a neutral zero cannot distinguish a missing control from a released
-one. When the required host support is unavailable, the core logs the transition when a log interface is available
-and supplies no valid gun aim.
+Lightguns require the frontend's `input_state` callback and either `LIGHTGUN` or `POINTER` device-type capability.
+`LIGHTGUN` takes precedence when both are advertised; the POINTER fallback uses only X/Y, PRESSED and IS_OFFSCREEN,
+so it cannot express forced reload. Libretro does not report support for individual controls, so a neutral zero
+cannot distinguish a missing control from a released one. When neither host device type is available, the core
+logs the transition when a log interface is available and supplies no valid gun aim.
 
 ## Disc changes
 
