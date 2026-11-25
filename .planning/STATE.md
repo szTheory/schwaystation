@@ -6,11 +6,11 @@ current_phase: 16
 current_phase_name: Patches, cheats and compatibility evidence
 current_plan: Not started
 status: planning
-stopped_at: Phase 15 complete, ready to plan Phase 16
-last_updated: "2026-11-25T18:59:19.028Z"
+stopped_at: Phase 16 context gathered
+last_updated: "2026-11-25T22:30:48.455Z"
 last_activity: 2026-11-25
 last_activity_desc: "Phase 15 shipped as PR #44"
-state_head: 27ad36e076d68a8a921f11a460d86923a6f52159
+state_head: f6260661015f23468b1bd3c1944c7cc8fb3dcd2f
 progress:
   total_phases: 10
   completed_phases: 9
@@ -2617,9 +2617,10 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T22:08:47Z
-Stopped at: Phase 15 release complete; proceeding with Phase 16 on phase/16-patches-cheats-compatibility
-Resume file: None
+Last session: 2026-11-25T22:30:47.980Z
+Stopped at: Phase 16 context gathered
+Resume file: .planning/phases/16-patches-cheats-and-compatibility-evidence/16-CONTEXT.md
+Runtime/model: Codex with OpenGSD 1.23.0; primary model ID unavailable. Three assumption analyses used gpt-6.1-sol high.
 
 Phase 15 release boundary: `gh run view 45697774644 --json status,conclusion,jobs` exited 0 (Main CI passed); [run 45697774644](https://github.com/szTheory/schwaystation/actions/runs/45697774644). `gh run view 45698033992 --json status,conclusion,jobs` exited 0 (Release passed); [run 45698033992](https://github.com/szTheory/schwaystation/actions/runs/45698033992). `gh release view v0.15.0 --json isDraft,url` exited 0 with `isDraft=false`; [v0.15.0](https://github.com/szTheory/schwaystation/releases/tag/v0.15.0).
 
