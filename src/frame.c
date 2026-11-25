@@ -36,6 +36,17 @@ void schway__frame_gpu_reset(schway *inst, uint64_t tick)
     }
 }
 
+static int frame_has_direct_gun(const schway *inst)
+{
+    for (uint32_t port = 0u; port < 2u; port++) {
+        if (inst->pad.device[port] == SCHWAY_INPUT_DEVICE_GUNCON ||
+            inst->pad.device[port] == SCHWAY_INPUT_DEVICE_JUSTIFIER) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Moves the instance forward by at most limit cycles. The SPU queues one pair
    per 768-cycle boundary crossed when caught up at bus accesses and the public
    run boundary. No-content calls stop at the synthetic
@@ -72,9 +83,11 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             inst->run_active = 0u;
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
+        int had_direct_gun = frame_has_direct_gun(inst);
         schway__pad_frame_start(inst);
-        schway__gpu_sync(inst, inst->ticks);
-        schway__sched_sync(inst);
+        if (had_direct_gun != 0 || frame_has_direct_gun(inst) != 0) {
+            schway__sched_sync(inst);
+        }
         inst->profile_locked = 1u;
         *stop = schway__cpu_run(inst, cycles, flags);
         *done = inst->frame != starting_frame;
@@ -85,9 +98,11 @@ static schway_status advance(schway *inst, uint64_t limit, uint32_t flags, int *
             inst->run_active = 0u;
             return SCHWAY_STATUS_ERR_STATE_FIELD;
         }
+        int had_direct_gun = frame_has_direct_gun(inst);
         schway__pad_frame_start(inst);
-        schway__gpu_sync(inst, inst->ticks);
-        schway__sched_sync(inst);
+        if (had_direct_gun != 0 || frame_has_direct_gun(inst) != 0) {
+            schway__sched_sync(inst);
+        }
         /* No program runs and no device is stepped; only an event already due
            runs, at its own deadline, and with none armed the loop is one
            compare. */

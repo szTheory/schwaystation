@@ -206,6 +206,43 @@ static void test_gun_sample(void)
 {
     gun_tap_checks = 0u;
     const uint64_t deadline = gun_tick_for_clocks(SCHWAY_REGION_NTSC_U, 8u);
+    schway *idle = make_instance(SCHWAY_REGION_NTSC_U, 0u);
+    gun_tap_check(idle != NULL, "mode-zero display instance is created without an executable");
+    if (idle != NULL) {
+        write_port(idle, GP1, 0x06A00000u);
+        write_port(idle, GP1, 0x0703C000u);
+        write_port(idle, GP1, 0x05000000u);
+        write_port(idle, GP1, 0x08000000u);
+        write_port(idle, GP1, 0x03000000u);
+        run_cycles(idle, 100u);
+        gun_tap_check(idle->gpu.beam_tick == 0u && idle->gpu.beam_line_clock == 0u,
+                      "enabled mode-zero output alone does not activate generic beam timing");
+        schway_destroy(idle);
+    }
+
+    schway *mode_zero = make_gun_sample_instance(UINT16_C(0x7FFF),
+                                                 SCHWAY_INPUT_DEVICE_GUNCON, 0u);
+    gun_tap_check(mode_zero != NULL, "mode-zero sensor instance is created");
+    if (mode_zero != NULL) {
+        schway__pad_frame_start(mode_zero);
+        write_port(mode_zero, GP1, 0x08000000u);
+        uint64_t mode_zero_deadline = mode_zero->gpu.gun_sensor[0].deadline;
+        gun_tap_check(mode_zero->gpu.display_disabled == 0u &&
+                          mode_zero->gpu.display_mode == 0u &&
+                          mode_zero->gpu.gun_sensor[0].armed != 0u &&
+                          mode_zero_deadline != UINT64_MAX,
+                      "armed gun schedules a sample with mode-zero display output");
+        if (mode_zero_deadline >= mode_zero->ticks && mode_zero_deadline != UINT64_MAX) {
+            run_cycles(mode_zero, mode_zero_deadline - mode_zero->ticks);
+        }
+        gun_tap_check(mode_zero->pad.gun_result_valid[0] != 0u &&
+                          mode_zero->pad.gun_result_x[0] == 1u &&
+                          mode_zero->pad.gun_result_y[0] == 0u &&
+                          mode_zero->gpu.gun_sensor[0].consumed != 0u,
+                      "armed mode-zero beam samples the bright pixel");
+        schway_destroy(mode_zero);
+    }
+
     schway *split = make_gun_sample_instance(0u, SCHWAY_INPUT_DEVICE_GUNCON, 0u);
     schway *whole = make_gun_sample_instance(UINT16_C(0x7FFF), SCHWAY_INPUT_DEVICE_GUNCON, 0u);
     schway *late = make_gun_sample_instance(0u, SCHWAY_INPUT_DEVICE_GUNCON, 0u);

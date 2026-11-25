@@ -348,8 +348,18 @@ void schway__gpu_reset(schway *inst)
 
 static int gpu_beam_active(const schway *inst)
 {
-    return inst->exe_loaded != 0u || inst->gpu.display_mode != 0u ||
-           inst->gpu.display_disabled == 0u;
+    return inst->exe_loaded != 0u || inst->gpu.display_mode != 0u;
+}
+
+/* Keep the generic BIOS beam schedule unchanged. A queued gun shot temporarily
+   needs beam progress even when the guest has not loaded an executable and the
+   display mode is zero. */
+static int gpu_beam_timing_active(const schway *inst)
+{
+    if (gpu_beam_active(inst)) {
+        return 1;
+    }
+    return inst->gpu.gun_sensor[0].armed != 0u || inst->gpu.gun_sensor[1].armed != 0u;
 }
 
 /* Push a span of GPU clocks to Timer 0 without polling individual dots. */
@@ -426,7 +436,7 @@ uint64_t schway__gpu_next(const schway *inst)
             next = sensor->deadline;
         }
     }
-    if (!gpu_beam_active(inst)) {
+    if (!gpu_beam_timing_active(inst)) {
         return next;
     }
     uint32_t line_clocks = gpu_line_clocks(inst->region);
@@ -462,13 +472,16 @@ uint64_t schway__gpu_next(const schway *inst)
 void schway__gpu_sync(schway *inst, uint64_t now)
 {
     struct schway__gpu *g = &inst->gpu;
-    if (!gpu_beam_active(inst)) {
-        if (g->busy_until != 0u && g->busy_until <= now) {
-            g->busy_until = 0u;
-            gpu_update_dreq(inst);
-            gpu_dma_resume(inst, now);
+    if (!gpu_beam_timing_active(inst)) {
+        gpu_gun_arm(inst);
+        if (!gpu_beam_timing_active(inst)) {
+            if (g->busy_until != 0u && g->busy_until <= now) {
+                g->busy_until = 0u;
+                gpu_update_dreq(inst);
+                gpu_dma_resume(inst, now);
+            }
+            return;
         }
-        return;
     }
     if (now < g->beam_tick) {
         return;
