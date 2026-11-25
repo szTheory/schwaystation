@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed 15-01-PLAN.md; Codex/OpenGSD 1.23.0 executor gpt-6-luna
-last_updated: "2026-11-25T03:49:49.217Z"
+stopped_at: Completed 15-02-PLAN.md; Codex/OpenGSD 1.23.0 executor gpt-6-luna
+last_updated: "2026-11-25T04:15:41.349Z"
 last_activity: 2026-11-24
 last_activity_desc: Phase 15 planning and independent plan review completed
-state_head: 4c012b39539e87c8192203071811c0f18eff0a58
+state_head: 5fd58ae1dd1a5b5ce05eac95f9f1b0f5d48202d1
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 105
-  completed_plans: 96
+  completed_plans: 97
   percent: 80
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 10
-Status: In Progress
+Status: Ready to execute
 Last activity: 2026-11-24 — Phase 15 planning and independent plan review completed; Phase 14 remains the latest released phase
 Progress: [████████░░] 80% (8/10 v2.0 phases released; Phase 14 has 16/16 plans complete and 49/49 truths verified. Phase 15 and 16 remain. Refreshed Phase 7–14 verification reports all pass; retain TODO051 as unverified PBP-only routing for milestone audit.)
 
@@ -1836,6 +1836,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 14 P15 | 13m | 1 tasks | 3 files |
 | Phase 14 P16 | 12m | 1 tasks | 4 files |
 | Phase 15 P01 | 14 min | 3 tasks | 9 files |
+| Phase 15 P02 | 17m 25s | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -2317,6 +2318,9 @@ Recent decisions affecting current work:
 - [Phase 14]: Leave WASI-size and Ir/frame bounds unchanged pending their exact hosted producers.
 - [Phase 15]: Freeze the complete released v9 input and endpoint layouts locally so API v10 cannot move the 228-byte prefix or 24-byte endpoint stride.
 - [Phase 15]: Register planned gun behavior in existing test targets and inventories; leave future behavior selectors gating until their owning plans implement them.
+- [Phase 15]: Keep the released 228-byte API v9 input prefix and 24-byte controller endpoint stride unchanged.
+- [Phase 15]: Append two explicit 16-byte direct-port gun records at offset 228 in API v10.
+- [Phase 15]: Normalize only size-tagged caller bytes and validate the complete snapshot before replacing pending input; reject guns on enabled multitaps.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2567,8 +2571,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T03:49:48.979Z
-Stopped at: Completed 15-01-PLAN.md; Codex/OpenGSD 1.23.0 executor gpt-6-luna
+Last session: 2026-11-25T04:15:40.925Z
+Stopped at: Completed 15-02-PLAN.md; Codex/OpenGSD 1.23.0 executor gpt-6-luna
 Resume file: None
 
 ### v1.0 session history
