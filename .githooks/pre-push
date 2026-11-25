@@ -1,4 +1,4 @@
 #!/bin/sh
-# Scans every local-branch commit that no remote has yet, so the first push
-# covers the whole history and later pushes cover only what is new.
-exec "$(git rev-parse --show-toplevel)/scripts/hygiene.sh" --history --branches --not --remotes
+# Check only refs sent in this push; remote-known commits stay excluded.
+set --; while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do case "$local_sha" in *[!0]*) set -- "$@" "$local_sha";; esac; done
+[ "$#" -gt 0 ] || exit 0; exec "$(git rev-parse --show-toplevel)/scripts/hygiene.sh" --history "$@" --not --remotes

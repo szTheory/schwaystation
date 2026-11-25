@@ -430,9 +430,9 @@
     },
     {
       "name": "hygiene",
+      "$comment": "Hygiene tests are scripts only; skip the unrelated full emulator build and run the registered checks after configure.",
       "steps": [
         { "type": "configure", "name": "hygiene" },
-        { "type": "build", "name": "hygiene" },
         { "type": "test", "name": "hygiene" }
       ]
     },
