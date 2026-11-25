@@ -6037,7 +6037,7 @@ static int test_input_controls(const char *path)
         controls_input(&input_snapshot, SCHWAY_INPUT_DEVICE_DIGITAL, SCHWAY_INPUT_DEVICE_NONE);
         controls_step(reference, &input_snapshot, digital_none,
                       "independent digital and none ports", audio_floor, 1);
-        p_set_controller_port_device(0u, RETRO_DEVICE_LIGHTGUN);
+        p_set_controller_port_device(0u, RETRO_DEVICE_KEYBOARD);
         p_set_controller_port_device(2u, RETRO_DEVICE_ANALOG);
         controls_step(reference, &input_snapshot, digital_none,
                       "invalid requests preserve selected devices", audio_floor, 1);
