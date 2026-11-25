@@ -2617,9 +2617,11 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T16:39:57.389Z
-Stopped at: Phase 15 complete, ready to plan Phase 16
+Last session: 2026-11-25T22:08:47Z
+Stopped at: Phase 15 release complete; proceeding with Phase 16 on phase/16-patches-cheats-compatibility
 Resume file: None
+
+Phase 15 release boundary: `gh run view 45697774644 --json status,conclusion,jobs` exited 0 (Main CI passed); [run 45697774644](https://github.com/szTheory/schwaystation/actions/runs/45697774644). `gh run view 45698033992 --json status,conclusion,jobs` exited 0 (Release passed); [run 45698033992](https://github.com/szTheory/schwaystation/actions/runs/45698033992). `gh release view v0.15.0 --json isDraft,url` exited 0 with `isDraft=false`; [v0.15.0](https://github.com/szTheory/schwaystation/releases/tag/v0.15.0).
 
 ### v1.0 session history
 
