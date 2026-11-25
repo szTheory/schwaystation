@@ -13,7 +13,7 @@
 #include "state.h"
 #include "../check.h"
 
-#define MAX_FIELDS 512u
+#define MAX_FIELDS 1024u
 #define H_FORMAT 8u
 #define H_TOTAL 12u
 #define H_BODY_CRC 16u
@@ -32,6 +32,9 @@ static uint8_t *after;
 static uint8_t *stream; /* the visitor's own serialisation */
 static size_t state_cap;
 static struct schway__state_field fields[MAX_FIELDS];
+static uint32_t offset_of(const schway *inst, const char *name);
+static int field_record_matches(const schway *inst, const char *name, uint32_t width,
+                                uint32_t count);
 
 static void *test_alloc(void *user, size_t size)
 {
@@ -379,6 +382,78 @@ static void check_endpoint_inputs(const schway *inst)
     CHECK_EQ_U64(inst->pad.multitap[1], 1u);
 }
 
+static void seed_serialized_gun(schway *inst)
+{
+    inst->pad.multitap[0] = 0u;
+    inst->pad.device[0] = SCHWAY_INPUT_DEVICE_JUSTIFIER;
+    inst->pad.present[0] = 1u;
+    inst->pad.gun_input[0].x = 31;
+    inst->pad.gun_input[0].y = 45;
+    inst->pad.gun_input[0].flags = SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER;
+    inst->pad.gun_enabled[0] = 1u;
+    inst->pad.gun_result_x[0] = 123u;
+    inst->pad.gun_result_y[0] = 45u;
+    inst->pad.gun_result_valid[0] = 1u;
+    inst->gpu.gun_sensor[0].armed = 1u;
+    inst->gpu.gun_sensor[0].aim_x = 31;
+    inst->gpu.gun_sensor[0].aim_y = 45;
+    inst->gpu.gun_sensor[0].target_line = 34u;
+    inst->gpu.gun_sensor[0].target_clock = 56u;
+    inst->gpu.gun_sensor[0].deadline = inst->gpu.beam_tick + 100u;
+    inst->gpu.gun_sensor[0].phase = 1u;
+
+    inst->pad.device[1] = SCHWAY_INPUT_DEVICE_GUNCON;
+    inst->pad.present[1] = 1u;
+    inst->pad.gun_input[1].x = -7;
+    inst->pad.gun_input[1].y = -9;
+    inst->pad.gun_input[1].flags = SCHWAY_GUN_INPUT_OFFSCREEN;
+    inst->pad.gun_result_x[1] = 1u;
+    inst->pad.gun_result_y[1] = 5u;
+    inst->pad.gun_result_valid[1] = 1u;
+    inst->gpu.gun_sensor[1].consumed = 1u;
+    inst->gpu.gun_sensor[1].aim_x = 4;
+    inst->gpu.gun_sensor[1].aim_y = 5;
+    inst->gpu.gun_sensor[1].target_line = 22u;
+    inst->gpu.gun_sensor[1].target_clock = 88u;
+    inst->gpu.gun_sensor[1].phase = 2u;
+}
+
+static void check_serialized_gun(const schway *inst)
+{
+    CHECK_EQ_U64(inst->pad.device[0], SCHWAY_INPUT_DEVICE_JUSTIFIER);
+    CHECK_EQ_U64(inst->pad.gun_input[0].x, 31u);
+    CHECK_EQ_U64(inst->pad.gun_input[0].y, 45u);
+    CHECK_EQ_U64(inst->pad.gun_input[0].flags,
+                 SCHWAY_GUN_INPUT_VALID | SCHWAY_GUN_INPUT_TRIGGER);
+    CHECK_EQ_U64(inst->pad.gun_enabled[0], 1u);
+    CHECK_EQ_U64(inst->pad.gun_result_x[0], 123u);
+    CHECK_EQ_U64(inst->pad.gun_result_y[0], 45u);
+    CHECK_EQ_U64(inst->pad.gun_result_valid[0], 1u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[0].armed, 1u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[0].consumed, 0u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[0].aim_x, 31u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[0].aim_y, 45u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[0].target_line, 34u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[0].target_clock, 56u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[0].deadline, inst->gpu.beam_tick + 100u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[0].phase, 1u);
+    CHECK_EQ_U64(inst->pad.device[1], SCHWAY_INPUT_DEVICE_GUNCON);
+    CHECK(inst->pad.gun_input[1].x == -7);
+    CHECK(inst->pad.gun_input[1].y == -9);
+    CHECK_EQ_U64(inst->pad.gun_input[1].flags, SCHWAY_GUN_INPUT_OFFSCREEN);
+    CHECK_EQ_U64(inst->pad.gun_result_x[1], 1u);
+    CHECK_EQ_U64(inst->pad.gun_result_y[1], 5u);
+    CHECK_EQ_U64(inst->pad.gun_result_valid[1], 1u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[1].armed, 0u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[1].consumed, 1u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[1].aim_x, 4u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[1].aim_y, 5u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[1].target_line, 22u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[1].target_clock, 88u);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[1].deadline, UINT64_MAX);
+    CHECK_EQ_U64(inst->gpu.gun_sensor[1].phase, 2u);
+}
+
 /* Run to 30 and save endpoint input, run to 60; load the save and run to 60
    again: the same frame, endpoint state and serialized bytes. */
 static void test_round_trip(void)
@@ -410,6 +485,27 @@ static void test_round_trip(void)
         schway_destroy(other);
         schway_destroy(inst);
     }
+
+    schway *gun = make(SCHWAY_REGION_NTSC_U);
+    schway *gun_restore = make(SCHWAY_REGION_NTSC_U);
+    seed_serialized_gun(gun);
+    size_t gun_size = save(gun, good);
+    schway_input pending_gun;
+    memset(&pending_gun, 0, sizeof pending_gun);
+    pending_gun.size = (uint32_t)sizeof pending_gun;
+    pending_gun.device[0] = SCHWAY_INPUT_DEVICE_JUSTIFIER;
+    pending_gun.guns[0].x = 201;
+    pending_gun.guns[0].y = 77;
+    pending_gun.guns[0].flags = SCHWAY_GUN_INPUT_VALID;
+    CHECK_EQ_U64(schway_set_input(gun, &pending_gun), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(save(gun, before), gun_size);
+    CHECK(memcmp(good, before, gun_size) == 0);
+    CHECK_EQ_U64(schway_load_state(gun_restore, good, gun_size), SCHWAY_STATUS_OK);
+    check_serialized_gun(gun_restore);
+    CHECK_EQ_U64(save(gun_restore, after), gun_size);
+    CHECK(memcmp(good, after, gun_size) == 0);
+    schway_destroy(gun_restore);
+    schway_destroy(gun);
 
     schway *reset = make(SCHWAY_REGION_NTSC_U);
     for (uint32_t endpoint = 0u; endpoint < SCHWAY__PAD_ENDPOINT_COUNT; endpoint++) {
@@ -741,6 +837,26 @@ static void test_rejects(void)
         expect_refused("card transaction on disabled tap socket", target, bad, n,
                        SCHWAY_STATUS_ERR_STATE_FIELD);
     }
+    const struct {
+        const char *what;
+        const char *field;
+        uint64_t value;
+        uint32_t width;
+    } invalid_gun[] = {
+        {"gun device input flags", "pad.gun0.flags", 0x10u, 4u},
+        {"gun device input reserved field", "pad.gun0.reserved", 1u, 4u},
+        {"negative scheduled aim", "gpu.gun0.aim_x", UINT32_MAX, 4u},
+        {"inactive gun deadline", "gpu.gun0.deadline", 1u, 8u},
+        {"gun sensor phase", "gpu.gun0.phase", 3u, 4u},
+    };
+    for (size_t i = 0u; i < sizeof invalid_gun / sizeof invalid_gun[0]; i++) {
+        memcpy(bad, good, n);
+        put_le(bad + offset_of(src, invalid_gun[i].field), invalid_gun[i].value,
+               invalid_gun[i].width);
+        reseal(bad, n);
+        expect_refused(invalid_gun[i].what, target, bad, n,
+                       SCHWAY_STATUS_ERR_STATE_FIELD);
+    }
     CHECK(region_at >= SCHWAY__STATE_HEADER_SIZE);
     if (region_at >= SCHWAY__STATE_HEADER_SIZE) {
         static const uint32_t others[] = {SCHWAY_REGION_NTSC_J, SCHWAY_REGION_PAL};
@@ -882,6 +998,43 @@ static void test_visit(void)
         CHECK(!c.bad_name && !c.bad_width && !c.overflow);
         CHECK(c.saw_frame && c.saw_vram);
         CHECK(c.calls >= 2u && c.calls <= MAX_FIELDS);
+        static const struct {
+            const char *name;
+            uint32_t width, count;
+        } gun_fields[] = {
+            {"pad.gun0.x", 4u, 1u},
+            {"pad.gun0.y", 4u, 1u},
+            {"pad.gun0.flags", 4u, 1u},
+            {"pad.gun0.reserved", 4u, 1u},
+            {"pad.gun1.x", 4u, 1u},
+            {"pad.gun1.y", 4u, 1u},
+            {"pad.gun1.flags", 4u, 1u},
+            {"pad.gun1.reserved", 4u, 1u},
+            {"pad.gun_result_x", 2u, 2u},
+            {"pad.gun_result_y", 2u, 2u},
+            {"pad.gun_valid", 1u, 2u},
+            {"pad.gun_enabled", 1u, 2u},
+            {"gpu.gun0.armed", 4u, 1u},
+            {"gpu.gun0.consumed", 4u, 1u},
+            {"gpu.gun0.aim_x", 4u, 1u},
+            {"gpu.gun0.aim_y", 4u, 1u},
+            {"gpu.gun0.target_line", 4u, 1u},
+            {"gpu.gun0.target_clock", 4u, 1u},
+            {"gpu.gun0.deadline", 8u, 1u},
+            {"gpu.gun0.phase", 4u, 1u},
+            {"gpu.gun1.armed", 4u, 1u},
+            {"gpu.gun1.consumed", 4u, 1u},
+            {"gpu.gun1.aim_x", 4u, 1u},
+            {"gpu.gun1.aim_y", 4u, 1u},
+            {"gpu.gun1.target_line", 4u, 1u},
+            {"gpu.gun1.target_clock", 4u, 1u},
+            {"gpu.gun1.deadline", 8u, 1u},
+            {"gpu.gun1.phase", 4u, 1u},
+        };
+        for (size_t i = 0u; i < sizeof gun_fields / sizeof gun_fields[0]; i++) {
+            CHECK(field_record_matches(inst, gun_fields[i].name, gun_fields[i].width,
+                                       gun_fields[i].count));
+        }
         CHECK_EQ_U64(c.n, n - SCHWAY__STATE_HEADER_SIZE);
         CHECK(c.n == n - SCHWAY__STATE_HEADER_SIZE &&
               memcmp(stream, good + SCHWAY__STATE_HEADER_SIZE, c.n) == 0);
@@ -1790,8 +1943,8 @@ static void check_public_versions(void)
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
     CHECK_EQ_U64(v.api, SCHWAY_API_VERSION);
     CHECK_EQ_U64(v.abi, SCHWAY__ABI_VERSION);
-    CHECK_EQ_U64(v.state_format, 20u);
-    CHECK_EQ_U64(v.behaviour_revision, 20u);
+    CHECK_EQ_U64(v.state_format, 21u);
+    CHECK_EQ_U64(v.behaviour_revision, 21u);
 }
 
 static void check_cpu_power_on(schway *inst)

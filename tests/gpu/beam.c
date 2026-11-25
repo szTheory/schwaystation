@@ -1455,8 +1455,56 @@ static void test_gun_state(void)
                               restored->gpu.gun_sensor[0].consumed == 1u &&
                               restored->pad.gun_result_valid[0] == 1u,
                           "state after the consumed event restores its observation");
+            uint32_t irq10 = UINT32_C(1) << 10;
+            write_port(source, I_STAT, ~irq10);
+            write_port(restored, I_STAT, ~irq10);
+            gun_tap_check((read_port(source, I_STAT) & irq10) == 0u &&
+                              (read_port(restored, I_STAT) & irq10) == 0u &&
+                              schway_save_state(source, after, state_size) == SCHWAY_STATUS_OK &&
+                              schway_load_state(restored, after, state_size) == SCHWAY_STATUS_OK &&
+                              restored->gpu.gun_sensor[0].consumed == 1u,
+                          "acknowledged IRQ state reloads without rearming the consumed event");
+            run_cycles(source, 1u);
+            run_cycles(restored, 1u);
+            gun_tap_check((read_port(source, I_STAT) & irq10) == 0u &&
+                              (read_port(restored, I_STAT) & irq10) == 0u,
+                          "restored consumed event does not raise acknowledged IRQ10 again");
+
+            schway_input reset_input;
+            memset(&reset_input, 0, sizeof reset_input);
+            reset_input.size = (uint32_t)sizeof reset_input;
+            reset_input.device[0] = SCHWAY_INPUT_DEVICE_DIGITAL;
+            schway__pad_frame_end(source);
+            gun_tap_check(schway_set_input(source, &reset_input) == SCHWAY_STATUS_OK,
+                          "device reset input is accepted before saving its cleared state");
+            schway__pad_frame_start(source);
+            gun_tap_check(schway_save_state(source, after, state_size) == SCHWAY_STATUS_OK &&
+                              schway_load_state(restored, after, state_size) == SCHWAY_STATUS_OK &&
+                              restored->pad.device[0] == SCHWAY_INPUT_DEVICE_DIGITAL &&
+                              restored->pad.gun_input[0].flags == 0u &&
+                              restored->gpu.gun_sensor[0].armed == 0u &&
+                              restored->gpu.gun_sensor[0].consumed == 0u &&
+                              restored->gpu.gun_sensor[0].deadline == UINT64_MAX,
+                          "save after changing devices restores the cleared gun sensor state");
         }
     }
+    schway *disabled = make_justifier_irq_instance(UINT16_C(0x7FFF), 0u,
+                                                  SCHWAY_GUN_INPUT_VALID, 1u);
+    gun_tap_check(disabled != NULL, "disabled-display state instance is created");
+    if (disabled != NULL) {
+        write_port(disabled, GP1, 0x03000001u);
+        gun_tap_check(schway_save_state(disabled, saved, state_size) == SCHWAY_STATUS_OK &&
+                          schway_load_state(restored, saved, state_size) == SCHWAY_STATUS_OK &&
+                          restored->gpu.display_disabled == 1u &&
+                          restored->gpu.gun_sensor[0].armed == 0u,
+                      "save/load preserves an inactive sensor while display output is disabled");
+        run_cycles(disabled, deadline);
+        run_cycles(restored, deadline);
+        gun_tap_check((read_port(disabled, I_STAT) & (UINT32_C(1) << 10)) == 0u &&
+                          (read_port(restored, I_STAT) & (UINT32_C(1) << 10)) == 0u,
+                      "disabled-display state produces no Justifier IRQ10");
+    }
+    schway_destroy(disabled);
     free(saved);
     free(after);
     schway_destroy(source);

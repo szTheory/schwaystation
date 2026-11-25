@@ -1373,6 +1373,8 @@ static void test_no_alloc_after_load(void)
     memset(&v, 0, sizeof v);
     v.size = (uint32_t)sizeof v;
     CHECK_EQ_U64(schway_get_versions(&v), SCHWAY_STATUS_OK);
+    CHECK_EQ_U64(v.state_format, SCHWAY__STATE_FORMAT);
+    CHECK_EQ_U64(v.behaviour_revision, SCHWAY__BEHAVIOUR_REVISION);
     schway_info info;
     memset(&info, 0, sizeof info);
     info.size = (uint32_t)sizeof info;
