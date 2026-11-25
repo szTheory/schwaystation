@@ -137,6 +137,54 @@ static schway *make_gun_sample_instance(uint16_t pixel)
     return inst;
 }
 
+static schway *make_gun_geometry_instance(uint32_t region, uint32_t mode,
+                                          uint32_t x1, uint32_t x2,
+                                          uint32_t y1, uint32_t y2,
+                                          uint32_t start_x, uint32_t start_y,
+                                          int32_t aim_x, int32_t aim_y,
+                                          uint32_t flags)
+{
+    schway *inst = make_instance(region, 0u);
+    if (inst == NULL) {
+        return NULL;
+    }
+    write_port(inst, GP1, 0x06000000u | (x2 << 12) | x1);
+    write_port(inst, GP1, 0x07000000u | (y2 << 10) | y1);
+    write_port(inst, GP1, 0x05000000u | (start_y << 10) | start_x);
+    write_port(inst, GP1, 0x08000000u | mode);
+    write_port(inst, GP1, 0x03000000u);
+
+    schway_input input;
+    memset(&input, 0, sizeof input);
+    input.size = (uint32_t)sizeof input;
+    input.device[0] = SCHWAY_INPUT_DEVICE_GUNCON;
+    input.guns[0].x = aim_x;
+    input.guns[0].y = aim_y;
+    input.guns[0].flags = flags;
+    if (schway_set_input(inst, &input) != SCHWAY_STATUS_OK) {
+        CHECK(0);
+    }
+    return inst;
+}
+
+static void gun_write_byte(schway *inst, uint32_t y, uint32_t byte_x, uint8_t value)
+{
+    uint16_t *word = &inst->vram[y & 511u][(byte_x / 2u) & 1023u];
+    uint32_t shift = (byte_x & 1u) * 8u;
+    *word = (uint16_t)((*word & (uint16_t)~(UINT16_C(0xFF) << shift)) |
+                       (uint16_t)((uint16_t)value << shift));
+}
+
+static uint64_t gun_deadline_from_origin(uint32_t region, uint32_t aim_x,
+                                         uint32_t aim_y, uint32_t x1,
+                                         uint32_t y1, uint32_t dot_div)
+{
+    uint32_t line_clocks = region == SCHWAY_REGION_PAL ? 3406u : 3413u;
+    uint64_t clocks = (uint64_t)(y1 + aim_y) * line_clocks +
+                      x1 + (uint64_t)aim_x * dot_div;
+    return gun_tick_for_clocks(region, clocks);
+}
+
 static void test_gun_sample(void)
 {
     gun_tap_checks = 0u;
@@ -179,6 +227,45 @@ static void test_gun_sample(void)
     schway_destroy(split);
     schway_destroy(whole);
     schway_destroy(late);
+}
+
+static void test_gun_geometry(void)
+{
+    gun_tap_checks = 0u;
+    schway *rgb24 = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 0x11u,
+                                                0u, 2560u, 0u, 240u,
+                                                0u, 0u, 1, 0,
+                                                SCHWAY_GUN_INPUT_VALID);
+    gun_tap_check(rgb24 != NULL, "RGB24 geometry instance is created");
+    if (rgb24 != NULL) {
+        gun_write_byte(rgb24, 0u, 3u, 128u);
+        gun_write_byte(rgb24, 0u, 4u, 128u);
+        gun_write_byte(rgb24, 0u, 5u, 128u);
+        run_cycles(rgb24, gun_deadline_from_origin(SCHWAY_REGION_NTSC_U, 1u, 0u,
+                                                    0u, 0u, 8u));
+        gun_tap_check(rgb24->pad.gun_result_valid[0] != 0u &&
+                          rgb24->pad.gun_result_x[0] == 1u,
+                      "RGB24 sensor reconstructs the emitted three-byte pixel");
+        schway_destroy(rgb24);
+    }
+
+    schway *retarget = make_gun_geometry_instance(SCHWAY_REGION_NTSC_U, 1u,
+                                                   0u, 2560u, 0u, 240u,
+                                                   0u, 0u, 1, 0,
+                                                   SCHWAY_GUN_INPUT_VALID);
+    gun_tap_check(retarget != NULL, "retarget instance is created");
+    if (retarget != NULL) {
+        retarget->vram[0][1] = UINT16_C(0x7FFF);
+        run_cycles(retarget, 1u);
+        write_port(retarget, GP1, 0x08000003u); /* 4 GPU clocks per output pixel. */
+        uint64_t deadline = retarget->gpu.gun_sensor[0].deadline;
+        run_cycles(retarget, deadline - retarget->ticks);
+        gun_tap_check(retarget->pad.gun_result_valid[0] != 0u &&
+                          retarget->gpu.gun_sensor[0].target_clock == 4u,
+                      "display mode change reschedules the same latched aim");
+        schway_destroy(retarget);
+    }
+    printf("1..%u\n", gun_tap_checks);
 }
 
 static void put_le32(uint8_t *p, uint32_t value)
@@ -988,6 +1075,8 @@ int main(int argc, char **argv)
     }
     if (strcmp(argv[1], "gun_sample") == 0) {
         test_gun_sample();
+    } else if (strcmp(argv[1], "gun_geometry") == 0) {
+        test_gun_geometry();
     } else if (strcmp(argv[1], "midline_dot_irq") == 0) {
         test_midline_dot_irq();
     } else if (strcmp(argv[1], "field_edges") == 0) {
