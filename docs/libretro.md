@@ -41,6 +41,8 @@ Lightguns require the frontend's `input_state` callback and either `LIGHTGUN` or
 so it cannot express forced reload. Libretro does not report support for individual controls, so a neutral zero
 cannot distinguish a missing control from a released one. When neither host device type is available, the core
 logs the transition when a log interface is available and supplies no valid gun aim.
+GunCon and Justifier selections are available only on direct physical ports; multitap sockets do not accept guns.
+The Justifier subclass is a single-player controller mapping and does not claim two-player Justifier support.
 
 ## Disc changes
 
