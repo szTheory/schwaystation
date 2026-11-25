@@ -4,18 +4,18 @@ milestone: v2.0
 milestone_name: The whole library
 current_phase: 15
 current_phase_name: GunCon and Justifier
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: Completed 15-04-PLAN.md
-last_updated: "2026-11-25T05:02:01.370Z"
+stopped_at: Completed 15-05-PLAN.md
+last_updated: "2026-11-25T08:29:36.589Z"
 last_activity: 2026-11-24
 last_activity_desc: Phase 15 Plan 15-03 completed; Plan 15-04 is ready to execute
-state_head: f49d7949f77042c054fc67a1741cf6b8a417295a
+state_head: bc72f569b45aaf709150ce5945a976e58239a82c
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 105
-  completed_plans: 99
+  completed_plans: 100
   percent: 80
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-19)
 ## Current Position
 
 Phase: 15 — GunCon and Justifier
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 10
 Status: Ready to execute
 Last activity: 2026-11-24 — Phase 15 Plan 15-03 completed; Plan 15-04 is next. Phase 14 remains the latest released phase.
@@ -1843,6 +1843,7 @@ plan review passed after correcting one shell-command quote. No tests or workflo
 | Phase 15 P02 | 20m 10s | 2 tasks | 7 files |
 | Phase 15 P03 | 13m 25s | 2 tasks | 5 files |
 | Phase 15 P04 | 13m | 2 tasks | 3 files |
+| Phase 15 P05 | 2h26m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2331,6 +2332,8 @@ Recent decisions affecting current work:
 - [Phase 15]: Pad owns gun protocol/result state and invalidates GPU-owned per-port beam events through the instance.
 - [Phase 15]: GunCon unavailable or unsampled input returns X=0001h/Y=000Ah; explicit offscreen or reload returns X=0001h/Y=0005h as a deterministic model choice.
 - [Phase 15]: GunCon reports only the documented active-low A, trigger, and B wire bits; unsupported bits remain released.
+- [Phase 15]: Use one bounded GPU scheduler deadline per latched direct-port aim and sample live VRAM at that beam point.
+- [Phase 15]: Use RGB5 channel sum >= 48 as an uncalibrated threshold, decode RGB24 with scanout byte addressing, and truncate the regional 8 MHz X conversion.
 
 ### Pending Todos
 - [2026-10-20] [general] "Port the CI required roll-up check (policy.ci_required)" — [todo file](.planning/todos/pending/001-ci-required-gate.md)
@@ -2441,6 +2444,7 @@ come from `AGENTS.md`.
 
 | Date | Step | Runtime | Model |
 |------|------|---------|-------|
+| 2026-11-25 | /gsd-execute-plan 15-05 | Codex/OpenGSD executor gpt-6-luna; 2h26m wall from 06:01:43Z to 08:27Z. Focused ABI/budget preflight passed 2/2; beam timing controls passed 3/3; geometry matrix passed 28 assertions and the required selector set passed 4/4 in 0.03s. Task commits: `6d3fba9`, `b519b6a`, `bc72f56`. No broad suite, hosted CI, Act or Docker. The 20–28m low-confidence estimate was exceeded while deriving scheduler deadline/retarget behavior and adding edge coverage; next plans should compile the smallest visible path before expanding geometry cases. | gpt-6-luna |
 | 2026-11-18 | v1.0 audit, completion and cleanup | Codex/OpenGSD 1.20.0; reused exact-tree hosted CI; no local long suite rerun | Primary GPT-6 session (exact model ID unavailable); integration checker gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-discuss-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; three read-only advisors and adversarial synthesis | GPT-6 session (exact model ID not exposed); advisors gpt-6-luna xhigh |
 | 2026-11-15 | /gsd-plan-phase 6 (via /gsd-autonomous) | Codex, OpenGSD 1.20.0; 26 plans, 19 waves; schema/structure, command/failure probes, decision and requirement coverage; post-planning gaps clear | GPT-6 session (exact model ID not exposed); planner gpt-6.1-sol high; researcher and checker gpt-6-luna xhigh |
@@ -2581,8 +2585,8 @@ come from `AGENTS.md`.
 
 ## Session Continuity
 
-Last session: 2026-11-25T05:02:00.901Z
-Stopped at: Completed 15-04-PLAN.md
+Last session: 2026-11-25T08:29:36.195Z
+Stopped at: Completed 15-05-PLAN.md
 Resume file: None
 
 ### v1.0 session history
